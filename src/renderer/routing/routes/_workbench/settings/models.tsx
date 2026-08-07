@@ -22,6 +22,14 @@ import {
 	reviewModelAtom,
 	reviewThinkingLevelAtom,
 } from '@/renderer/state/preferences';
+import {
+	type AgentProviderId,
+	normalizeAgentProviderId,
+} from '@/shared/agent-provider';
+import {
+	getThinkingAxisLabel,
+	getThinkingLevelLabel,
+} from '@/shared/agent-thinking';
 import type { AgentModelOption } from '@/shared/ipc/contracts/agent-models';
 
 /** Route for the Models settings section; renders the models panel populated from agent capability discovery. */
@@ -84,6 +92,8 @@ function ModelsSettings() {
 	const resolvedReview = reviewModel ?? agentDefaultModelId;
 	const defaultLevels = thinkingLevelsFor(list, resolvedDefault);
 	const reviewLevels = thinkingLevelsFor(list, resolvedReview);
+	const defaultProvider = providerFor(list, resolvedDefault);
+	const reviewProvider = providerFor(list, resolvedReview);
 
 	return (
 		<SettingsSection
@@ -116,6 +126,7 @@ function ModelsSettings() {
 							ariaLabel='Default thinking level'
 							levels={defaultLevels}
 							onChange={setDefaultThinking}
+							provider={defaultProvider}
 							value={defaultThinking ?? modelsData?.defaultThinkingLevel}
 						/>
 					</div>
@@ -138,6 +149,7 @@ function ModelsSettings() {
 							ariaLabel='Review thinking level'
 							levels={reviewLevels}
 							onChange={setReviewThinking}
+							provider={reviewProvider}
 							value={reviewThinking ?? modelsData?.defaultThinkingLevel}
 						/>
 					</div>
@@ -197,28 +209,32 @@ function ThinkingLevelSelect({
 	ariaLabel,
 	levels,
 	onChange,
+	provider,
 	value,
 }: {
 	ariaLabel: string;
 	levels: readonly string[];
 	onChange: (next: string | null) => void;
+	/** Runtime whose vocabulary labels the levels; Claude's dial is effort, pi's is thinking. */
+	provider: AgentProviderId;
 	value: string | null | undefined;
 }) {
 	if (levels.length === 0) {
 		return null;
 	}
+	const axisLabel = getThinkingAxisLabel(provider);
 	return (
 		<Select
 			onValueChange={(next) => onChange(next || null)}
 			value={value ?? ''}
 		>
 			<SelectTrigger aria-label={ariaLabel} className='w-40' size='sm'>
-				<SelectValue placeholder='Thinking level' />
+				<SelectValue placeholder={`${axisLabel} level`} />
 			</SelectTrigger>
 			<SelectContent>
 				{levels.map((level) => (
 					<SelectItem key={level} value={level}>
-						{prettyThinkingLevel(level)}
+						{getThinkingLevelLabel(provider, level)}
 					</SelectItem>
 				))}
 			</SelectContent>
@@ -241,25 +257,17 @@ function thinkingLevelsFor(
 }
 
 /**
- * Map a thinking-level id to its user-facing label.
- * @param level - Raw thinking-level identifier
- * @returns The display label, or the raw level when unrecognized
+ * Resolve which agent runtime drives a given model, so its thinking levels are
+ * labelled in that runtime's vocabulary.
+ * @param list - Available agent model options
+ * @param modelId - ID of the model to look up, or null
+ * @returns The model's runtime, defaulting to pi when no model matches
  */
-function prettyThinkingLevel(level: string): string {
-	switch (level) {
-		case 'off':
-			return 'No thinking';
-		case 'minimal':
-			return 'Minimal';
-		case 'low':
-			return 'Low';
-		case 'medium':
-			return 'Medium';
-		case 'high':
-			return 'High';
-		case 'xhigh':
-			return 'Extra high';
-		default:
-			return level;
-	}
+function providerFor(
+	list: readonly AgentModelOption[],
+	modelId: string | null,
+): AgentProviderId {
+	return normalizeAgentProviderId(
+		modelId ? list.find((m) => m.id === modelId)?.agentProvider : undefined,
+	);
 }

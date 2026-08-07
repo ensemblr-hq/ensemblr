@@ -30,6 +30,10 @@ import {
 	type AgentProviderId,
 	normalizeAgentProviderId,
 } from '@/shared/agent-provider';
+import {
+	getThinkingLevelLabel,
+	listThinkingLevels,
+} from '@/shared/agent-thinking';
 import type { AgentPersistedEnvelope } from '@/shared/ipc/contracts/agent-message-payloads';
 import type {
 	AgentSessionEventWire,
@@ -61,30 +65,6 @@ export interface AgentComposerControllerState {
 	planMode: boolean;
 	thinkingLevel: string | null;
 }
-
-const THINKING_LABELS: Record<string, string> = {
-	high: 'High',
-	low: 'Low',
-	medium: 'Medium',
-	minimal: 'Minimal',
-	off: 'No thinking',
-	xhigh: 'Extra high',
-};
-
-/**
- * Canonical pi thinking levels (matches `ThinkingLevel` in
- * `@earendil-works/pi-agent-core`). Hard-coded so the picker doesn't depend
- * on `pi --list-models` reporting per-model levels — pi accepts any of these
- * via `--thinking` and the RPC `set_thinking_level` command.
- */
-const PI_THINKING_LEVELS = [
-	'off',
-	'minimal',
-	'low',
-	'medium',
-	'high',
-	'xhigh',
-] as const;
 
 /** Locally tracks the agent session opened for one chat tab before refetch lands. */
 interface PendingTabSession {
@@ -195,17 +175,17 @@ export function useAgentComposerController({
 		readonly ComposerThinkingOption[]
 	>(() => {
 		const selectedModel = models?.models.find((model) => model.id === modelId);
+		const provider = normalizeAgentProviderId(selectedModel?.agentProvider);
+		// A model's own list is authoritative — Claude publishes exactly the efforts
+		// it accepts, and offering one it would reject is worse than offering fewer.
+		// The runtime's canonical ladder stands in only when nothing was published,
+		// which is how a pi build that doesn't enumerate levels still gets a picker.
 		const supplied = selectedModel?.thinkingLevels ?? [];
-		// Prefer pi's per-model list when it covers the canonical 6 levels; fall
-		// back to the hard-coded canonical list so the picker works even when
-		// `pi --list-models` doesn't enumerate them.
 		const levels =
-			supplied.length >= PI_THINKING_LEVELS.length
-				? supplied
-				: PI_THINKING_LEVELS;
+			supplied.length > 0 ? supplied : listThinkingLevels(provider);
 		return levels.map((level) => ({
 			id: level,
-			label: THINKING_LABELS[level] ?? level,
+			label: getThinkingLevelLabel(provider, level),
 		}));
 	}, [models, modelId]);
 

@@ -336,6 +336,8 @@ export function createEnsemblrApi(): EnsemblrApi {
 		selectLocalRepository: () => invoke('selectLocalRepository'),
 		getAgentProviderReadiness: (request) =>
 			invoke('getAgentProviderReadiness', request),
+		listAgentProviderMcpServers: (request) =>
+			invoke('listAgentProviderMcpServers', request),
 		getAgentProviderExecutablePath: (request) =>
 			invoke('getAgentProviderExecutablePath', request),
 		setAgentProviderExecutablePath: (request) =>

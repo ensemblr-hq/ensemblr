@@ -3,7 +3,10 @@ import path from 'node:path';
 
 import type { AgentProviderId } from '../../shared/agent-provider';
 import { getAgentProviderDescriptor } from '../../shared/agent-provider.ts';
-import type { AgentExecutablePathSnapshotWire } from '../../shared/ipc/contracts/agent-provider';
+import type {
+	AgentExecutablePathSnapshotWire,
+	ListAgentProviderMcpServersResult,
+} from '../../shared/ipc/contracts/agent-provider';
 import type {
 	AgentExecutableResolution,
 	AgentProviderExecutableService,
@@ -15,6 +18,16 @@ import type {
 export interface CreateAgentProviderServiceOptions {
 	executables: Record<AgentProviderId, AgentProviderExecutableService>;
 	homeDirectory?: string;
+	/**
+	 * Per-runtime MCP roster readers. A runtime with no MCP surface is simply
+	 * absent, and its roster reads as empty rather than as an error.
+	 */
+	mcpRosters?: Partial<
+		Record<
+			AgentProviderId,
+			(cwd: string) => Promise<ListAgentProviderMcpServersResult>
+		>
+	>;
 	probes: Record<AgentProviderId, AgentProviderReadinessProbe>;
 }
 
@@ -28,6 +41,7 @@ export interface CreateAgentProviderServiceOptions {
 export function createAgentProviderService({
 	executables,
 	homeDirectory = homedir(),
+	mcpRosters = {},
 	probes,
 }: CreateAgentProviderServiceOptions): AgentProviderService {
 	const readSnapshot = async (
@@ -44,6 +58,8 @@ export function createAgentProviderService({
 			),
 		getExecutablePath: (provider) => readSnapshot(provider, null),
 		getReadiness: (provider) => probes[provider].probe(),
+		listMcpServers: async (provider, cwd) =>
+			(await mcpRosters[provider]?.(cwd)) ?? { error: null, servers: [] },
 		resolveSettingsFilePath: (provider) => {
 			const { settingsFile } = getAgentProviderDescriptor(provider);
 

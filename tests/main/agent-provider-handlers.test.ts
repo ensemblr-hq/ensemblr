@@ -31,6 +31,7 @@ let homeDirectory: string;
 let openedTargets: { targetId: string; workspacePath: string }[];
 let saved: { path: string; provider: string }[];
 let probed: string[];
+let rosterCalls: { cwd: string; provider: string }[];
 
 /** Builds an executable-service stub that records writes for one provider. */
 function createExecutableService(
@@ -105,6 +106,7 @@ beforeEach(() => {
 	openedTargets = [];
 	saved = [];
 	probed = [];
+	rosterCalls = [];
 
 	const openTargetService = {
 		listTargets: async () => [],
@@ -124,6 +126,22 @@ beforeEach(() => {
 				pi: createExecutableService('pi', '/opt/homebrew/bin/pi'),
 			},
 			homeDirectory,
+			mcpRosters: {
+				claude: async (cwd) => {
+					rosterCalls.push({ cwd, provider: 'claude' });
+					return {
+						error: null,
+						servers: [
+							{
+								error: null,
+								name: 'linear',
+								scope: 'user',
+								status: 'needs-auth',
+							},
+						],
+					};
+				},
+			},
 			probes: { claude: createProbe('claude'), pi: createProbe('pi') },
 		}),
 		openTargetService,
@@ -134,9 +152,10 @@ afterEach(() => {
 	rmSync(homeDirectory, { force: true, recursive: true });
 });
 
-test('registers exactly the six parameterized provider channels', () => {
+test('registers exactly the seven parameterized provider channels', () => {
 	expect(handle.mock.calls.map(([channel]) => channel)).toEqual([
 		'ensemblr:get-agent-provider-readiness',
+		'ensemblr:list-agent-provider-mcp-servers',
 		'ensemblr:get-agent-provider-executable-path',
 		'ensemblr:set-agent-provider-executable-path',
 		'ensemblr:clear-agent-provider-executable-path',
@@ -162,6 +181,39 @@ test('readiness routes claude to the Claude-backed probe', async () => {
 	expect(probed).toEqual(['claude']);
 });
 
+test('the MCP roster routes to the runtime registered for that provider', async () => {
+	const claude = await invoke('ensemblr:list-agent-provider-mcp-servers', {
+		cwd: '/workspaces/demo',
+		provider: 'claude',
+	});
+	const pi = await invoke('ensemblr:list-agent-provider-mcp-servers', {
+		cwd: '/workspaces/demo',
+		provider: 'pi',
+	});
+
+	expect(rosterCalls).toEqual([
+		{ cwd: '/workspaces/demo', provider: 'claude' },
+	]);
+	expect(claude).toEqual({
+		error: null,
+		servers: [
+			{ error: null, name: 'linear', scope: 'user', status: 'needs-auth' },
+		],
+	});
+	// Pi registers no roster, so it reads as empty rather than as a failure.
+	expect(pi).toEqual({ error: null, servers: [] });
+});
+
+test('the MCP roster rejects a request with no workspace directory', async () => {
+	await expect(
+		invoke('ensemblr:list-agent-provider-mcp-servers', {
+			cwd: '',
+			provider: 'claude',
+		}),
+	).rejects.toThrow();
+	expect(rosterCalls).toEqual([]);
+});
+
 test('every channel rejects an unknown provider id', async () => {
 	const channels = [
 		'ensemblr:get-agent-provider-readiness',
@@ -169,6 +221,13 @@ test('every channel rejects an unknown provider id', async () => {
 		'ensemblr:clear-agent-provider-executable-path',
 		'ensemblr:select-agent-provider-executable',
 	];
+
+	await expect(
+		invoke('ensemblr:list-agent-provider-mcp-servers', {
+			cwd: '/workspaces/demo',
+			provider: 'codex',
+		}),
+	).rejects.toThrow();
 
 	for (const channel of channels) {
 		await expect(invoke(channel, { provider: 'codex' })).rejects.toThrow();

@@ -1,23 +1,9 @@
 import type { EffortLevel } from '@anthropic-ai/claude-agent-sdk';
 
-/**
- * Thinking levels Claude Code accepts, in Ensemblr's own vocabulary. Pi's enum
- * runs `off | low | medium | high | xhigh`; Claude's `EffortLevel` runs
- * `low | medium | high | xhigh | max`. The two overlap on four values but are
- * not the same axis, so each provider publishes its own list on its model
- * entries rather than the picker assuming one shared enum.
- */
-export const CLAUDE_THINKING_LEVELS = [
-	'off',
-	'low',
-	'medium',
-	'high',
-	'xhigh',
-	'max',
-] as const;
-
-/** A thinking level selectable on a Claude model. */
-export type ClaudeThinkingLevel = (typeof CLAUDE_THINKING_LEVELS)[number];
+import {
+	CLAUDE_THINKING_LEVELS,
+	type ClaudeThinkingLevel,
+} from '../../shared/agent-thinking.ts';
 
 const EFFORT_BY_LEVEL = {
 	high: 'high',

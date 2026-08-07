@@ -29,6 +29,8 @@ import type {
 	AgentExecutableSelectionWire,
 	AgentProviderReadinessWire,
 	AgentProviderRequest,
+	ListAgentProviderMcpServersRequest,
+	ListAgentProviderMcpServersResult,
 	OpenAgentProviderSettingsFileRequest,
 	OpenAgentProviderSettingsFileResult,
 	SetAgentProviderExecutablePathRequest,
@@ -575,6 +577,10 @@ export interface IpcHandlerMap {
 	[IPC_CHANNELS.getAgentProviderReadiness]: IpcHandlerEntry<
 		AgentProviderRequest,
 		AgentProviderReadinessWire
+	>;
+	[IPC_CHANNELS.listAgentProviderMcpServers]: IpcHandlerEntry<
+		ListAgentProviderMcpServersRequest,
+		ListAgentProviderMcpServersResult
 	>;
 	[IPC_CHANNELS.selectAgentProviderExecutable]: IpcHandlerEntry<
 		AgentProviderRequest,

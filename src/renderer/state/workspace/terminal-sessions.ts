@@ -24,7 +24,11 @@ interface WorkspaceTerminalSessionsState {
 	activeTerminalIds: ReadonlySet<string>;
 	/** Kills the session and removes its tab from the dock. */
 	closeTerminal: (terminalId: string) => Promise<void>;
-	createTerminal: () => Promise<CreateTerminalSessionResult>;
+	/** Opens a dock terminal; without a command it spawns an interactive login shell. */
+	createTerminal: (options?: {
+		command?: string;
+		title?: string;
+	}) => Promise<CreateTerminalSessionResult>;
 	sessions: TerminalSessionSnapshot[];
 }
 
@@ -286,9 +290,13 @@ export function useWorkspaceTerminalSessions(
 		};
 	}, [workspaceId]);
 
-	const createTerminal =
-		useCallback(async (): Promise<CreateTerminalSessionResult> => {
+	const createTerminal = useCallback(
+		async (options?: {
+			command?: string;
+			title?: string;
+		}): Promise<CreateTerminalSessionResult> => {
 			const result = (await window.ensemblr?.createTerminalSession({
+				...options,
 				workspaceId,
 			})) ?? {
 				diagnostics: [
@@ -307,7 +315,9 @@ export function useWorkspaceTerminalSessions(
 			}
 
 			return result;
-		}, [workspaceId]);
+		},
+		[workspaceId],
+	);
 
 	const closeTerminal = useCallback(async (terminalId: string) => {
 		closedTerminalIdsRef.current.add(terminalId);

@@ -2,6 +2,7 @@ import type { AgentProviderId } from '@/shared/agent-provider';
 import type {
 	AgentExecutablePathSnapshotWire,
 	AgentProviderReadinessWire,
+	ListAgentProviderMcpServersResult,
 	OpenAgentProviderSettingsFileResult,
 } from '@/shared/ipc/contracts/agent-provider';
 import type { ListWorkspaceOpenTargetsResult } from '@/shared/ipc/contracts/open-target';
@@ -206,6 +207,65 @@ function piReadiness(): AgentProviderReadinessWire {
 		status: 'failure',
 		updatedAt: PROBED_AT,
 		version: '0.42.1',
+	};
+}
+
+/**
+ * Bridge stand-in for `listAgentProviderMcpServers`. Covers every tier a real
+ * roster spans — plugin, user, project, and remote connector — plus each status
+ * the panel renders differently.
+ * @param payload - The `{ cwd, provider }` request from the roster query.
+ * @returns The fixture roster for that provider.
+ */
+export function resolveFixtureAgentProviderMcpServers(
+	payload: unknown,
+): ListAgentProviderMcpServersResult {
+	if (readBridgeProvider(payload) === 'pi') {
+		return { error: null, servers: [] };
+	}
+	return {
+		error: null,
+		servers: [
+			{
+				error: null,
+				name: 'plugin:playwright:playwright',
+				scope: 'dynamic',
+				status: 'connected',
+			},
+			{ error: null, name: 'nanobanana', scope: 'user', status: 'connected' },
+			{
+				error: 'spawn npx ENOENT',
+				name: '@21st-dev/magic',
+				scope: 'user',
+				status: 'failed',
+			},
+			{ error: null, name: 'shadcn', scope: 'project', status: 'connected' },
+			{
+				error: 'connection refused (127.0.0.1:7317)',
+				name: 'fallow',
+				scope: 'project',
+				status: 'failed',
+			},
+			{
+				error: null,
+				name: 'claude.ai Linear',
+				scope: 'claudeai',
+				status: 'needs-auth',
+			},
+			{
+				error: null,
+				name: 'claude.ai Notion',
+				scope: 'claudeai',
+				status: 'needs-auth',
+			},
+			{
+				error: null,
+				name: 'claude.ai Figma',
+				scope: 'claudeai',
+				status: 'connected',
+			},
+			{ error: null, name: 'nocodb', scope: 'local', status: 'pending' },
+		],
 	};
 }
 

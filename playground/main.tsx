@@ -7,6 +7,7 @@ import '@/renderer/styles/index.css';
 
 import {
 	resolveFixtureAgentProviderExecutablePath,
+	resolveFixtureAgentProviderMcpServers,
 	resolveFixtureAgentProviderReadiness,
 	resolveFixtureOpenProviderSettingsFile,
 	resolveFixtureOpenTargets,
@@ -27,6 +28,7 @@ installPlaygroundBridge({
 	getAgentProviderReadiness: resolveFixtureAgentProviderReadiness,
 	getWorkspaceGitStatus: resolveFixtureGitStatus,
 	getWorkspaceMergeConflicts: resolveFixtureMergeConflicts,
+	listAgentProviderMcpServers: resolveFixtureAgentProviderMcpServers,
 	listWorkspaceOpenTargets: resolveFixtureOpenTargets,
 	openAgentProviderSettingsFile: resolveFixtureOpenProviderSettingsFile,
 });

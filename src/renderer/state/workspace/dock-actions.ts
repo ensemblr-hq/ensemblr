@@ -1,6 +1,6 @@
 import { useNavigate } from '@tanstack/react-router';
 import { useSetAtom } from 'jotai';
-import { useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { toast } from 'sonner';
 
 import {
@@ -8,6 +8,7 @@ import {
 	stopWorkspaceScript,
 } from '@/renderer/api/ensemblr/workspace-scripts';
 import { lastRunScriptAtomFamily } from '@/renderer/state/preferences';
+import { useConsumeDockTerminalRequests } from '@/renderer/state/workspace/terminal-requests';
 import type { WorkbenchRouteSearch } from '@/renderer/types/workbench';
 import type { WorkbenchDockActions } from '@/renderer/types/workbench-shell';
 import type {
@@ -25,7 +26,10 @@ interface UseWorkspaceDockActionsOptions {
 	 */
 	askAgentSetupScript: () => void;
 	closeTerminal: (terminalId: string) => Promise<void>;
-	createTerminal: () => Promise<CreateTerminalSessionResult>;
+	createTerminal: (options?: {
+		command?: string;
+		title?: string;
+	}) => Promise<CreateTerminalSessionResult>;
 	/** Repository id (`$repoId`) used to open its Scripts settings page. */
 	repositoryId: string;
 	sessions: readonly TerminalSessionSnapshot[];
@@ -68,6 +72,28 @@ export function useWorkspaceDockActions({
 		activeDockTabRef.current = activeDockTab;
 	});
 
+	const openTerminal = useCallback(
+		(options?: { command?: string; title?: string }) => {
+			void createTerminal(options)
+				.then((result) => {
+					if (result.session) {
+						updateSearchRef.current({ dock: `terminal:${result.session.id}` });
+						return;
+					}
+
+					const error = result.diagnostics.find(
+						(diagnostic) => diagnostic.severity === 'error',
+					);
+					toast.error(error?.message ?? 'The terminal could not start.');
+				})
+				.catch(() => {
+					toast.error('The terminal could not start.');
+				});
+		},
+		[createTerminal],
+	);
+	useConsumeDockTerminalRequests(workspaceId, openTerminal);
+
 	return useMemo<WorkbenchDockActions>(
 		() => ({
 			onAskAgentSetupScript: () => askAgentSetupScriptRef.current(),
@@ -87,25 +113,7 @@ export function useWorkspaceDockActions({
 					});
 				}
 			},
-			onNewTerminal: () => {
-				void createTerminal()
-					.then((result) => {
-						if (result.session) {
-							updateSearchRef.current({
-								dock: `terminal:${result.session.id}`,
-							});
-							return;
-						}
-
-						const error = result.diagnostics.find(
-							(diagnostic) => diagnostic.severity === 'error',
-						);
-						toast.error(error?.message ?? 'The terminal could not start.');
-					})
-					.catch(() => {
-						toast.error('The terminal could not start.');
-					});
-			},
+			onNewTerminal: () => openTerminal(),
 			onOpenRunPort: (url) => {
 				void window.ensemblr?.openExternal(url);
 			},
@@ -148,8 +156,8 @@ export function useWorkspaceDockActions({
 		}),
 		[
 			closeTerminal,
-			createTerminal,
 			navigate,
+			openTerminal,
 			repositoryId,
 			setLastRunScript,
 			workspaceId,

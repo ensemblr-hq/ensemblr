@@ -7,6 +7,7 @@ import type {
 	AgentExecutableSelectionWire,
 	AgentProviderExecutableSource,
 	AgentProviderReadinessWire,
+	ListAgentProviderMcpServersResult,
 	SetupRemediationWire,
 } from '../../shared/ipc/contracts/agent-provider';
 import type { ResolvedSettingSnapshot } from '../../shared/ipc/contracts/settings-resolution';
@@ -59,6 +60,10 @@ export interface AgentProviderService {
 	getReadiness: (
 		provider: AgentProviderId,
 	) => Promise<AgentProviderReadinessWire>;
+	listMcpServers: (
+		provider: AgentProviderId,
+		cwd: string,
+	) => Promise<ListAgentProviderMcpServersResult>;
 	/** Absolute path to the runtime's own settings file, or `null` when it has none. */
 	resolveSettingsFilePath: (provider: AgentProviderId) => string | null;
 	saveExecutablePath: (

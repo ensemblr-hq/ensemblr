@@ -26,12 +26,15 @@ export function ComposerPanel({
 	composer,
 	planReview,
 	seedText,
+	workspaceId,
 }: {
 	chatTabId: string;
 	composer: ComposerShellState;
 	/** Plan review header rendered inside the composer card, above the textarea. */
 	planReview?: ReactNode;
 	seedText?: string;
+	/** Workspace whose dock hosts terminals the control row hands work off to. */
+	workspaceId: string;
 }) {
 	const state = useComposerState({ chatTabId, composer, seedText });
 	const [focused, setFocused] = useState(false);
@@ -156,6 +159,7 @@ export function ComposerPanel({
 						onModelPickerOpenChange={setModelPickerOpen}
 						pickersDisabled={pickersDisabled}
 						state={state}
+						workspaceId={workspaceId}
 					/>
 				</div>
 			</div>

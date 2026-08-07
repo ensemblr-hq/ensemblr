@@ -114,6 +114,14 @@ export const ensemblrQueryKeys = {
 			'agent-provider-executable-path',
 			provider,
 		] as const,
+	/** Query key for one agent runtime's MCP roster as resolved in a directory. */
+	agentProviderMcpServers: (provider: AgentProviderId, cwd: string) =>
+		[
+			...ensemblrQueryKeys.all,
+			'agent-provider-mcp-servers',
+			provider,
+			cwd,
+		] as const,
 	/** Query key for one agent runtime's readiness snapshot. */
 	agentProviderReadiness: (provider: AgentProviderId) =>
 		[...ensemblrQueryKeys.all, 'agent-provider-readiness', provider] as const,

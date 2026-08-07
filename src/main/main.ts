@@ -59,6 +59,7 @@ import { createChatTabService } from './chat-tabs/chat-tab-service.ts';
 import { persistTerminalAgentSessionId } from './chat-tabs/persist-terminal-agent-session.ts';
 import {
 	createClaudeAgentAdapter,
+	createClaudeMcpRoster,
 	createClaudeModelLister,
 	createClaudePlanBridge,
 } from './claude-agent';
@@ -433,6 +434,14 @@ const resolveProviderExecutable = async (
 // adapts the existing readiness service, Claude's talks to the Agent SDK.
 const agentProviderService = createAgentProviderService({
 	executables: { claude: claudeExecutableService, pi: piExecutableService },
+	// Pi is absent on purpose: its tools come from the harness, so it has no MCP
+	// roster of its own and reports an empty one.
+	mcpRosters: {
+		claude: createClaudeMcpRoster({
+			resolveBaseEnv: resolveAgentSpawnEnv,
+			resolveExecutablePath: resolveClaudeExecutablePath,
+		}),
+	},
 	probes: {
 		claude: createClaudeReadinessProbe({
 			executableService: claudeExecutableService,

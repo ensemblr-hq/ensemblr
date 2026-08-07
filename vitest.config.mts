@@ -84,6 +84,8 @@ export default defineConfig({
 			'tests/main/claude-session-permission-mode.test.ts',
 			'tests/main/claude-tool-approval.test.ts',
 			'tests/main/claude-executable-plumbing.test.ts',
+			'tests/main/claude-mcp-roster.test.ts',
+			'tests/main/claude-model-catalog.test.ts',
 			'tests/main/agent-session-provider-pin.test.ts',
 			'tests/main/claude-agent-submit.test.ts',
 		],

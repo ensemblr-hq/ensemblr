@@ -1,5 +1,5 @@
 import { CheckIcon, SparklesIcon, StarIcon } from 'lucide-react';
-import { type CSSProperties, useMemo, useState } from 'react';
+import { type CSSProperties, type Ref, useMemo, useState } from 'react';
 import { Button } from '@/renderer/components/ui/button';
 import {
 	Popover,
@@ -85,6 +85,7 @@ function ModelOptionRow({
 	model,
 	onSelect,
 	onToggleFavourite,
+	ref,
 	selected,
 	shortcutIndex,
 }: {
@@ -94,6 +95,8 @@ function ModelOptionRow({
 	model: ComposerModelOption;
 	onSelect: () => void;
 	onToggleFavourite: () => void;
+	/** Set only on the selected row, so the popover can reveal it on open. */
+	ref?: Ref<HTMLDivElement>;
 	selected: boolean;
 	shortcutIndex: number | undefined;
 }) {
@@ -132,6 +135,7 @@ function ModelOptionRow({
 				'flex items-center gap-0.5 rounded-md',
 				selected && 'bg-muted',
 			)}
+			ref={ref}
 		>
 			{locked && lockedHint ? (
 				<Tooltip>
@@ -163,6 +167,23 @@ function ModelOptionRow({
 			</button>
 		</div>
 	);
+}
+
+/**
+ * Centres a row inside the popover's scroll viewport. Runs as a ref callback on
+ * the selected row, which mounts with the popover, so the list opens already
+ * scrolled to the current model instead of at the top of a long catalogue.
+ * @param row - The selected row, or null as it unmounts.
+ */
+function revealRow(row: HTMLDivElement | null): void {
+	const viewport = row?.closest<HTMLElement>(
+		'[data-slot="scroll-area-viewport"]',
+	);
+	if (!row || !viewport) {
+		return;
+	}
+	viewport.scrollTop =
+		row.offsetTop - viewport.clientHeight / 2 + row.offsetHeight / 2;
 }
 
 /** Renders the scrollable provider sections for model choices. */
@@ -199,6 +220,7 @@ function ModelOptionsList({
 							model={model}
 							onSelect={() => onSelect(model.id)}
 							onToggleFavourite={() => onToggleFavourite(model.id)}
+							ref={model.id === selectedId ? revealRow : undefined}
 							selected={model.id === selectedId}
 							shortcutIndex={shortcutIndexById.get(model.id)}
 						/>
