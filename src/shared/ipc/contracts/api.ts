@@ -1,3 +1,6 @@
+import type { AgentProviderApi } from './agent-provider';
+import type { AgentSessionApi, PiApi } from './agent-session';
+import type { AgentToolApprovalApi } from './agent-tool-approval';
 import type { AgentsApi } from './agents';
 import type { AppSettingsApi } from './app-settings';
 import type { ArchiveApi } from './archive-lifecycle';
@@ -9,7 +12,6 @@ import type { GithubApi } from './github';
 import type { HealthApi } from './health';
 import type { LinearApi } from './linear';
 import type { OpenTargetApi } from './open-target';
-import type { PiApi, PiSessionApi } from './pi-session';
 import type { QuickStartApi } from './quick-start';
 import type { RepositoryApi } from './repository';
 import type { RepositoryConfigApi } from './repository-config';
@@ -30,8 +32,8 @@ import type { RepositorySourcesApi } from './workspace-sources';
 /**
  * Aggregate IPC surface exposed to the renderer through the preload bridge.
  *
- * Each per-domain sub-API owns its slice of `window.ensemblr` (workspaces, Pi
- * sessions, clone progress, etc.). Composing them here keeps the channel
+ * Each per-domain sub-API owns its slice of `window.ensemblr` (workspaces,
+ * agent sessions, clone progress, etc.). Composing them here keeps the channel
  * registry's 1:1 method-name mapping intact while letting each domain evolve
  * its contract next to the wire types it depends on.
  */
@@ -40,7 +42,7 @@ export interface EnsemblrApi
 		AppSettingsApi,
 		WorkspaceApi,
 		RepositoryApi,
-		PiSessionApi,
+		AgentSessionApi,
 		ChatTabApi,
 		CloneApi,
 		ArchiveApi,
@@ -63,6 +65,8 @@ export interface EnsemblrApi
 		TerminalApi,
 		WorkspaceScriptsApi,
 		RepositorySourcesApi,
+		AgentProviderApi,
+		AgentToolApprovalApi,
 		PiApi,
 		LinearApi,
 		OpenTargetApi {}

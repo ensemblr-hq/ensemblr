@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
 import test from 'node:test';
 
 import { getRepositoryWorkspaceNavigationSnapshot } from '../../src/main/ipc/repository-workspace-navigation.ts';
@@ -27,7 +28,56 @@ const EXPECTED_MIGRATIONS = [
 	'010_chat_tab_terminal_kind',
 	'011_chat_tab_full_title',
 	'012_comment_origin',
+	'013_pi_session_provider',
+	'014_agent_session_vocabulary',
 ];
+
+const AGENT_VOCABULARY_MIGRATION_ID = '014_agent_session_vocabulary';
+const AGENT_VOCABULARY_MIGRATION_VERSION = 14;
+const PRE_AGENT_VOCABULARY_SCHEMA_VERSION = 13;
+
+const PRE_AGENT_VOCABULARY_SEED_SQL = `
+INSERT INTO repositories (id, slug, name, path, default_branch)
+VALUES ('repo-upgrade', 'upgrade', 'Upgrade', '/tmp/ensemblr/upgrade', 'main');
+
+INSERT INTO workspaces (id, repository_id, slug, name, path, branch_name, base_branch)
+VALUES ('ws-upgrade', 'repo-upgrade', 'the-130', 'THE-130', '/tmp/ensemblr/workspaces/the-130', 'philipp/the-130', 'main');
+
+INSERT INTO pi_sessions (
+	id, workspace_id, pi_session_id, executable_id, executable_path, model,
+	thinking_level, status, last_error, cwd, label, closed_at, metadata_json
+)
+VALUES
+	('pi-session-1', 'ws-upgrade', 'runtime-session-42', 'pi-default', '/usr/local/bin/pi', 'gpt-5.5', 'high', 'streaming', NULL, '/tmp/ensemblr/workspaces/the-130', 'Main chat', NULL, '{"seeded":"one"}'),
+	('pi-session-2', 'ws-upgrade', NULL, NULL, NULL, NULL, NULL, 'closed', 'spawn failed', '/tmp/ensemblr/workspaces/the-130', NULL, '2026-06-01T00:00:00.000Z', '{}');
+
+INSERT INTO pi_session_branches (id, pi_session_id, parent_branch_id, forked_from_turn_id, kind, label, metadata_json)
+VALUES
+	('branch-main', 'pi-session-1', NULL, NULL, 'main', 'Main', '{"branch":"main"}'),
+	('branch-fork', 'pi-session-1', 'branch-main', 'turn-0', 'fork', 'Fork', '{"branch":"fork"}');
+
+INSERT INTO pi_turns (id, branch_id, ordinal, status, prompt_text, model, thinking_level, completed_at, turn_metadata_json)
+VALUES
+	('turn-0', 'branch-main', 0, 'completed', 'first prompt', 'gpt-5.5', 'high', '2026-06-01T00:00:01.000Z', '{"turn":0}'),
+	('turn-1', 'branch-main', 1, 'streaming', 'second prompt', 'gpt-5.5', 'medium', NULL, '{"turn":1}');
+
+INSERT INTO pi_session_events (id, branch_id, turn_id, ordinal, event_type, stream, payload_json)
+VALUES
+	('evt-0', 'branch-main', 'turn-0', 0, 'message', 'protocol', '{"role":"user"}'),
+	('evt-1', 'branch-main', 'turn-0', 1, 'message', 'protocol', '{"role":"agent"}'),
+	('evt-2', 'branch-main', NULL, 2, 'stderr', 'stderr', '{"line":"warning"}');
+
+INSERT INTO chat_tabs (id, workspace_id, pi_session_id, kind, title, position, closed_at, metadata_json, full_title)
+VALUES
+	('tab-chat', 'ws-upgrade', 'pi-session-1', 'chat', 'Chat', 0, NULL, '{"tab":"chat"}', 'Chat with the agent'),
+	('tab-terminal', 'ws-upgrade', NULL, 'terminal', 'Terminal', 1, NULL, '{"tab":"terminal"}', 'Terminal');
+
+INSERT INTO checkpoints (id, workspace_id, session_id, pi_session_id, turn_id, git_ref, label, reason, git_hash, metadata_json)
+VALUES ('checkpoint-1', 'ws-upgrade', NULL, 'pi-session-1', 'turn-0', 'refs/ensemblr/checkpoints/1', 'Before turn 0', 'turn-start', 'abc1234', '{"checkpoint":1}');
+
+INSERT INTO pi_runtime_state (workspace_id, active_tab_id, last_active_session_id)
+VALUES ('ws-upgrade', 'tab-chat', 'pi-session-1');
+`;
 
 function createTestDatabasePath(): {
 	cleanup: () => void;
@@ -39,6 +89,95 @@ function createTestDatabasePath(): {
 		cleanup: () => rmSync(directory, { force: true, recursive: true }),
 		databasePath: path.join(directory, 'ensemblr-test.db'),
 	};
+}
+
+/**
+ * Builds a database at the pre-014 `pi_*` schema by running the real migration
+ * runner with `014_agent_session_vocabulary` pre-recorded as already applied, so
+ * migrations 001-013 run and 014 is skipped. There is no version argument on the
+ * runner, and `schema_migrations` is the only seam that selects which migrations
+ * execute.
+ */
+function openDatabaseBeforeAgentVocabulary(databasePath: string) {
+	const markerConnection = new DatabaseSync(databasePath);
+	listAppliedMigrationIds(markerConnection);
+	markerConnection
+		.prepare(
+			'INSERT INTO schema_migrations (id, version, name) VALUES (?, ?, ?)',
+		)
+		.run(
+			AGENT_VOCABULARY_MIGRATION_ID,
+			AGENT_VOCABULARY_MIGRATION_VERSION,
+			AGENT_VOCABULARY_MIGRATION_ID,
+		);
+	markerConnection.close();
+
+	return openEnsemblrDatabase({ databasePath });
+}
+
+/**
+ * Leaves a closed database holding real pre-014 rows and no record of migration
+ * 014, so the next {@link openEnsemblrDatabase} call applies 014 and nothing else.
+ */
+function seedDatabaseBeforeAgentVocabulary(databasePath: string): void {
+	const connection = openDatabaseBeforeAgentVocabulary(databasePath);
+
+	connection.database.exec(PRE_AGENT_VOCABULARY_SEED_SQL);
+	connection.database
+		.prepare('DELETE FROM schema_migrations WHERE id = ?')
+		.run(AGENT_VOCABULARY_MIGRATION_ID);
+	connection.database.close();
+}
+
+function readRows(
+	database: DatabaseSync,
+	sql: string,
+	...parameters: string[]
+): Array<Record<string, unknown>> {
+	return database
+		.prepare(sql)
+		.all(...parameters)
+		.map((row) => ({ ...(row as Record<string, unknown>) }));
+}
+
+function listTablesLike(database: DatabaseSync, pattern: string): string[] {
+	return readRows(
+		database,
+		`SELECT name FROM sqlite_master
+		 WHERE type = 'table' AND name LIKE ? ESCAPE '\\'
+		 ORDER BY name`,
+		pattern,
+	).map((row) => row.name as string);
+}
+
+function listForeignKeys(
+	database: DatabaseSync,
+	tableName: string,
+): Array<Record<string, unknown>> {
+	return readRows(
+		database,
+		`SELECT "from" AS source_column, "table" AS target_table, on_delete
+		 FROM pragma_foreign_key_list(?)
+		 ORDER BY "from"`,
+		tableName,
+	);
+}
+
+function countAgentRows(database: DatabaseSync): Record<string, number> {
+	const row = database
+		.prepare(`
+SELECT
+	(SELECT COUNT(*) FROM agent_sessions) AS agent_sessions,
+	(SELECT COUNT(*) FROM agent_session_branches) AS agent_session_branches,
+	(SELECT COUNT(*) FROM agent_turns) AS agent_turns,
+	(SELECT COUNT(*) FROM agent_session_events) AS agent_session_events,
+	(SELECT COUNT(*) FROM agent_runtime_state) AS agent_runtime_state,
+	(SELECT COUNT(*) FROM chat_tabs) AS chat_tabs,
+	(SELECT COUNT(*) FROM checkpoints) AS checkpoints
+`)
+		.get() as Record<string, number>;
+
+	return { ...row };
 }
 
 test('resolves the macOS app-support database path', () => {
@@ -84,6 +223,11 @@ test('opens an isolated database and applies foundation migrations', (t) => {
 		.map((row) => (row as { name: string }).name);
 
 	assert.deepEqual(tables, [
+		'agent_runtime_state',
+		'agent_session_branches',
+		'agent_session_events',
+		'agent_sessions',
+		'agent_turns',
 		'archive_records',
 		'chat_tabs',
 		'checkpoints',
@@ -93,11 +237,6 @@ test('opens an isolated database and applies foundation migrations', (t) => {
 		'linear_issues',
 		'linear_resources',
 		'linear_sync_state',
-		'pi_runtime_state',
-		'pi_session_branches',
-		'pi_session_events',
-		'pi_sessions',
-		'pi_turns',
 		'process_records',
 		'repositories',
 		'root_directories',
@@ -260,7 +399,7 @@ SELECT
 	);
 });
 
-test('migration 005 supports Pi session metadata round-trip', (t) => {
+test('supports an agent session metadata round-trip', (t) => {
 	const fixture = createTestDatabasePath();
 	t.after(fixture.cleanup);
 
@@ -272,61 +411,61 @@ test('migration 005 supports Pi session metadata round-trip', (t) => {
 
 	database.exec(`
 INSERT INTO repositories (id, slug, name, path, default_branch)
-VALUES ('repo-pi-1', 'pi-runtime', 'Pi Runtime', '/tmp/ensemblr/pi-runtime', 'main');
+VALUES ('repo-agent-1', 'agent-runtime', 'Agent Runtime', '/tmp/ensemblr/agent-runtime', 'main');
 
 INSERT INTO workspaces (id, repository_id, slug, name, path, branch_name, base_branch)
-VALUES ('ws-pi-1', 'repo-pi-1', 'the-128', 'THE-128', '/tmp/ensemblr/workspaces/the-128', 'philipp/the-128', 'main');
+VALUES ('ws-agent-1', 'repo-agent-1', 'the-128', 'THE-128', '/tmp/ensemblr/workspaces/the-128', 'philipp/the-128', 'main');
 
-INSERT INTO pi_sessions (id, workspace_id, pi_session_id, executable_id, model, status, cwd)
-VALUES ('pi-session-1', 'ws-pi-1', 'pi-runtime-session-7', 'pi-default', 'gpt-5.5', 'streaming', '/tmp/ensemblr/workspaces/the-128');
+INSERT INTO agent_sessions (id, workspace_id, runtime_session_id, executable_id, model, status, cwd)
+VALUES ('agent-session-1', 'ws-agent-1', 'agent-runtime-session-7', 'pi-default', 'gpt-5.5', 'streaming', '/tmp/ensemblr/workspaces/the-128');
 
-INSERT INTO pi_session_branches (id, pi_session_id, kind)
-VALUES ('branch-main', 'pi-session-1', 'main');
+INSERT INTO agent_session_branches (id, agent_session_id, kind)
+VALUES ('branch-main', 'agent-session-1', 'main');
 
-INSERT INTO pi_turns (id, branch_id, ordinal, prompt_text, status)
-VALUES ('turn-0', 'branch-main', 0, 'hello pi', 'completed');
+INSERT INTO agent_turns (id, branch_id, ordinal, prompt_text, status)
+VALUES ('turn-0', 'branch-main', 0, 'hello agent', 'completed');
 
-INSERT INTO pi_session_events (id, branch_id, turn_id, ordinal, event_type, stream, payload_json)
+INSERT INTO agent_session_events (id, branch_id, turn_id, ordinal, event_type, stream, payload_json)
 VALUES
-	('evt-0', 'branch-main', 'turn-0', 0, 'message', 'protocol', '{"role":"user","text":"hello pi"}'),
+	('evt-0', 'branch-main', 'turn-0', 0, 'message', 'protocol', '{"role":"user","text":"hello agent"}'),
 	('evt-1', 'branch-main', 'turn-0', 1, 'message', 'protocol', '{"role":"agent","text":"hi"}'),
 	('evt-stderr', 'branch-main', NULL, 2, 'stderr', 'stderr', '{"line":"warning"}');
 
-INSERT INTO chat_tabs (id, workspace_id, pi_session_id, kind, title, position)
-VALUES ('tab-1', 'ws-pi-1', 'pi-session-1', 'chat', 'Chat', 0);
+INSERT INTO chat_tabs (id, workspace_id, agent_session_id, kind, title, position)
+VALUES ('tab-1', 'ws-agent-1', 'agent-session-1', 'chat', 'Chat', 0);
 
-INSERT INTO pi_runtime_state (workspace_id, active_tab_id, last_active_session_id)
-VALUES ('ws-pi-1', 'tab-1', 'pi-session-1');
+INSERT INTO agent_runtime_state (workspace_id, active_tab_id, last_active_session_id)
+VALUES ('ws-agent-1', 'tab-1', 'agent-session-1');
 `);
 
 	const counts = database
 		.prepare(`
 SELECT
-	(SELECT COUNT(*) FROM pi_sessions) AS pi_sessions,
-	(SELECT COUNT(*) FROM pi_session_branches) AS pi_session_branches,
-	(SELECT COUNT(*) FROM pi_turns) AS pi_turns,
-	(SELECT COUNT(*) FROM pi_session_events) AS pi_session_events,
+	(SELECT COUNT(*) FROM agent_sessions) AS agent_sessions,
+	(SELECT COUNT(*) FROM agent_session_branches) AS agent_session_branches,
+	(SELECT COUNT(*) FROM agent_turns) AS agent_turns,
+	(SELECT COUNT(*) FROM agent_session_events) AS agent_session_events,
 	(SELECT COUNT(*) FROM chat_tabs) AS chat_tabs,
-	(SELECT COUNT(*) FROM pi_runtime_state) AS pi_runtime_state
+	(SELECT COUNT(*) FROM agent_runtime_state) AS agent_runtime_state
 `)
 		.get() as Record<string, number>;
 
 	assert.deepEqual(
 		{ ...counts },
 		{
+			agent_runtime_state: 1,
+			agent_session_branches: 1,
+			agent_session_events: 3,
+			agent_sessions: 1,
+			agent_turns: 1,
 			chat_tabs: 1,
-			pi_runtime_state: 1,
-			pi_session_branches: 1,
-			pi_session_events: 3,
-			pi_sessions: 1,
-			pi_turns: 1,
 		},
 	);
 
 	assert.throws(() => {
 		database
 			.prepare(
-				`INSERT INTO pi_turns (id, branch_id, ordinal, prompt_text)
+				`INSERT INTO agent_turns (id, branch_id, ordinal, prompt_text)
 				 VALUES ('turn-dup', 'branch-main', 0, 'duplicate')`,
 			)
 			.run();
@@ -335,14 +474,14 @@ SELECT
 	assert.throws(() => {
 		database
 			.prepare(
-				`INSERT INTO pi_session_events (id, branch_id, ordinal, event_type)
+				`INSERT INTO agent_session_events (id, branch_id, ordinal, event_type)
 				 VALUES ('evt-dup', 'branch-main', 0, 'message')`,
 			)
 			.run();
 	}, /UNIQUE/i);
 });
 
-test('migration 005 cascades pi session deletes on workspace removal', (t) => {
+test('cascades agent session deletes on workspace removal', (t) => {
 	const fixture = createTestDatabasePath();
 	t.after(fixture.cleanup);
 
@@ -354,32 +493,32 @@ test('migration 005 cascades pi session deletes on workspace removal', (t) => {
 
 	database.exec(`
 INSERT INTO repositories (id, slug, name, path, default_branch)
-VALUES ('repo-pi-2', 'pi-runtime-2', 'Pi Runtime 2', '/tmp/ensemblr/pi-runtime-2', 'main');
+VALUES ('repo-agent-2', 'agent-runtime-2', 'Agent Runtime 2', '/tmp/ensemblr/agent-runtime-2', 'main');
 
 INSERT INTO workspaces (id, repository_id, slug, name, path)
-VALUES ('ws-pi-2', 'repo-pi-2', 'the-129', 'THE-129', '/tmp/ensemblr/workspaces/the-129');
+VALUES ('ws-agent-2', 'repo-agent-2', 'the-129', 'THE-129', '/tmp/ensemblr/workspaces/the-129');
 
-INSERT INTO pi_sessions (id, workspace_id, status, cwd)
-VALUES ('pi-session-2', 'ws-pi-2', 'idle', '/tmp/ensemblr/workspaces/the-129');
+INSERT INTO agent_sessions (id, workspace_id, status, cwd)
+VALUES ('agent-session-2', 'ws-agent-2', 'idle', '/tmp/ensemblr/workspaces/the-129');
 
-INSERT INTO pi_session_branches (id, pi_session_id, kind)
-VALUES ('branch-cascade', 'pi-session-2', 'main');
+INSERT INTO agent_session_branches (id, agent_session_id, kind)
+VALUES ('branch-cascade', 'agent-session-2', 'main');
 
-INSERT INTO pi_session_events (id, branch_id, ordinal, event_type)
+INSERT INTO agent_session_events (id, branch_id, ordinal, event_type)
 VALUES ('evt-cascade', 'branch-cascade', 0, 'metadata');
 
-INSERT INTO chat_tabs (id, workspace_id, pi_session_id, kind, title)
-VALUES ('tab-cascade', 'ws-pi-2', 'pi-session-2', 'chat', 'Chat');
+INSERT INTO chat_tabs (id, workspace_id, agent_session_id, kind, title)
+VALUES ('tab-cascade', 'ws-agent-2', 'agent-session-2', 'chat', 'Chat');
 `);
 
-	database.prepare(`DELETE FROM workspaces WHERE id = ?`).run('ws-pi-2');
+	database.prepare(`DELETE FROM workspaces WHERE id = ?`).run('ws-agent-2');
 
 	const counts = database
 		.prepare(`
 SELECT
-	(SELECT COUNT(*) FROM pi_sessions) AS pi_sessions,
-	(SELECT COUNT(*) FROM pi_session_branches) AS pi_session_branches,
-	(SELECT COUNT(*) FROM pi_session_events) AS pi_session_events,
+	(SELECT COUNT(*) FROM agent_sessions) AS agent_sessions,
+	(SELECT COUNT(*) FROM agent_session_branches) AS agent_session_branches,
+	(SELECT COUNT(*) FROM agent_session_events) AS agent_session_events,
 	(SELECT COUNT(*) FROM chat_tabs) AS chat_tabs
 `)
 		.get() as Record<string, number>;
@@ -387,11 +526,516 @@ SELECT
 	assert.deepEqual(
 		{ ...counts },
 		{
+			agent_session_branches: 0,
+			agent_session_events: 0,
+			agent_sessions: 0,
 			chat_tabs: 0,
-			pi_session_branches: 0,
-			pi_session_events: 0,
-			pi_sessions: 0,
 		},
+	);
+});
+
+test('stages an upgrade fixture at the pre-014 pi_* schema', (t) => {
+	const fixture = createTestDatabasePath();
+	t.after(fixture.cleanup);
+
+	const connection = openDatabaseBeforeAgentVocabulary(fixture.databasePath);
+	t.after(() => connection.database.close());
+
+	assert.equal(
+		getCurrentSchemaVersion(connection.database),
+		PRE_AGENT_VOCABULARY_SCHEMA_VERSION,
+	);
+	assert.deepEqual(listTablesLike(connection.database, 'pi\\_%'), [
+		'pi_runtime_state',
+		'pi_session_branches',
+		'pi_session_events',
+		'pi_sessions',
+		'pi_turns',
+	]);
+	assert.deepEqual(listTablesLike(connection.database, 'agent\\_%'), []);
+});
+
+test('migration 014 carries pre-existing pi_* rows into the agent_* tables', (t) => {
+	const fixture = createTestDatabasePath();
+	t.after(fixture.cleanup);
+	seedDatabaseBeforeAgentVocabulary(fixture.databasePath);
+
+	const connection = openEnsemblrDatabase({
+		databasePath: fixture.databasePath,
+	});
+	t.after(() => connection.database.close());
+	const { database } = connection;
+
+	assert.equal(connection.schemaVersion, LATEST_SCHEMA_VERSION);
+	assert.deepEqual(listAppliedMigrationIds(database), EXPECTED_MIGRATIONS);
+	assert.deepEqual(listTablesLike(database, 'pi\\_%'), []);
+	assert.deepEqual(countAgentRows(database), {
+		agent_runtime_state: 1,
+		agent_session_branches: 2,
+		agent_session_events: 3,
+		agent_sessions: 2,
+		agent_turns: 2,
+		chat_tabs: 2,
+		checkpoints: 1,
+	});
+
+	assert.deepEqual(
+		readRows(
+			database,
+			`SELECT id, workspace_id, runtime_session_id, executable_id, executable_path,
+				model, thinking_level, status, last_error, cwd, label, closed_at,
+				metadata_json, provider
+			 FROM agent_sessions ORDER BY id`,
+		),
+		[
+			{
+				closed_at: null,
+				cwd: '/tmp/ensemblr/workspaces/the-130',
+				executable_id: 'pi-default',
+				executable_path: '/usr/local/bin/pi',
+				id: 'pi-session-1',
+				label: 'Main chat',
+				last_error: null,
+				metadata_json: '{"seeded":"one"}',
+				model: 'gpt-5.5',
+				provider: 'pi',
+				runtime_session_id: 'runtime-session-42',
+				status: 'streaming',
+				thinking_level: 'high',
+				workspace_id: 'ws-upgrade',
+			},
+			{
+				closed_at: '2026-06-01T00:00:00.000Z',
+				cwd: '/tmp/ensemblr/workspaces/the-130',
+				executable_id: null,
+				executable_path: null,
+				id: 'pi-session-2',
+				label: null,
+				last_error: 'spawn failed',
+				metadata_json: '{}',
+				model: null,
+				provider: 'pi',
+				runtime_session_id: null,
+				status: 'closed',
+				thinking_level: null,
+				workspace_id: 'ws-upgrade',
+			},
+		],
+	);
+
+	assert.deepEqual(
+		readRows(
+			database,
+			`SELECT id, agent_session_id, parent_branch_id, forked_from_turn_id, kind,
+				label, metadata_json
+			 FROM agent_session_branches ORDER BY id`,
+		),
+		[
+			{
+				agent_session_id: 'pi-session-1',
+				forked_from_turn_id: 'turn-0',
+				id: 'branch-fork',
+				kind: 'fork',
+				label: 'Fork',
+				metadata_json: '{"branch":"fork"}',
+				parent_branch_id: 'branch-main',
+			},
+			{
+				agent_session_id: 'pi-session-1',
+				forked_from_turn_id: null,
+				id: 'branch-main',
+				kind: 'main',
+				label: 'Main',
+				metadata_json: '{"branch":"main"}',
+				parent_branch_id: null,
+			},
+		],
+	);
+
+	assert.deepEqual(
+		readRows(
+			database,
+			`SELECT id, branch_id, ordinal, status, prompt_text, model, thinking_level,
+				completed_at, turn_metadata_json
+			 FROM agent_turns ORDER BY ordinal`,
+		),
+		[
+			{
+				branch_id: 'branch-main',
+				completed_at: '2026-06-01T00:00:01.000Z',
+				id: 'turn-0',
+				model: 'gpt-5.5',
+				ordinal: 0,
+				prompt_text: 'first prompt',
+				status: 'completed',
+				thinking_level: 'high',
+				turn_metadata_json: '{"turn":0}',
+			},
+			{
+				branch_id: 'branch-main',
+				completed_at: null,
+				id: 'turn-1',
+				model: 'gpt-5.5',
+				ordinal: 1,
+				prompt_text: 'second prompt',
+				status: 'streaming',
+				thinking_level: 'medium',
+				turn_metadata_json: '{"turn":1}',
+			},
+		],
+	);
+
+	assert.deepEqual(
+		readRows(
+			database,
+			`SELECT id, branch_id, turn_id, ordinal, event_type, stream, payload_json
+			 FROM agent_session_events ORDER BY ordinal`,
+		),
+		[
+			{
+				branch_id: 'branch-main',
+				event_type: 'message',
+				id: 'evt-0',
+				ordinal: 0,
+				payload_json: '{"role":"user"}',
+				stream: 'protocol',
+				turn_id: 'turn-0',
+			},
+			{
+				branch_id: 'branch-main',
+				event_type: 'message',
+				id: 'evt-1',
+				ordinal: 1,
+				payload_json: '{"role":"agent"}',
+				stream: 'protocol',
+				turn_id: 'turn-0',
+			},
+			{
+				branch_id: 'branch-main',
+				event_type: 'stderr',
+				id: 'evt-2',
+				ordinal: 2,
+				payload_json: '{"line":"warning"}',
+				stream: 'stderr',
+				turn_id: null,
+			},
+		],
+	);
+
+	assert.deepEqual(
+		readRows(
+			database,
+			`SELECT id, workspace_id, agent_session_id, kind, title, position, closed_at,
+				metadata_json, full_title
+			 FROM chat_tabs ORDER BY position`,
+		),
+		[
+			{
+				agent_session_id: 'pi-session-1',
+				closed_at: null,
+				full_title: 'Chat with the agent',
+				id: 'tab-chat',
+				kind: 'chat',
+				metadata_json: '{"tab":"chat"}',
+				position: 0,
+				title: 'Chat',
+				workspace_id: 'ws-upgrade',
+			},
+			{
+				agent_session_id: null,
+				closed_at: null,
+				full_title: 'Terminal',
+				id: 'tab-terminal',
+				kind: 'terminal',
+				metadata_json: '{"tab":"terminal"}',
+				position: 1,
+				title: 'Terminal',
+				workspace_id: 'ws-upgrade',
+			},
+		],
+	);
+
+	assert.deepEqual(
+		readRows(
+			database,
+			`SELECT id, workspace_id, session_id, agent_session_id, turn_id, git_ref,
+				label, reason, git_hash, metadata_json
+			 FROM checkpoints ORDER BY id`,
+		),
+		[
+			{
+				agent_session_id: 'pi-session-1',
+				git_hash: 'abc1234',
+				git_ref: 'refs/ensemblr/checkpoints/1',
+				id: 'checkpoint-1',
+				label: 'Before turn 0',
+				metadata_json: '{"checkpoint":1}',
+				reason: 'turn-start',
+				session_id: null,
+				turn_id: 'turn-0',
+				workspace_id: 'ws-upgrade',
+			},
+		],
+	);
+
+	assert.deepEqual(
+		readRows(
+			database,
+			'SELECT workspace_id, active_tab_id, last_active_session_id FROM agent_runtime_state',
+		),
+		[
+			{
+				active_tab_id: 'tab-chat',
+				last_active_session_id: 'pi-session-1',
+				workspace_id: 'ws-upgrade',
+			},
+		],
+	);
+});
+
+test('migration 014 repoints foreign keys at the renamed agent_* tables', (t) => {
+	const fixture = createTestDatabasePath();
+	t.after(fixture.cleanup);
+	seedDatabaseBeforeAgentVocabulary(fixture.databasePath);
+
+	const connection = openEnsemblrDatabase({
+		databasePath: fixture.databasePath,
+	});
+	t.after(() => connection.database.close());
+	const { database } = connection;
+
+	assert.deepEqual(readRows(database, 'PRAGMA foreign_key_check'), []);
+
+	assert.deepEqual(
+		{
+			agent_runtime_state: listForeignKeys(database, 'agent_runtime_state'),
+			agent_session_branches: listForeignKeys(
+				database,
+				'agent_session_branches',
+			),
+			agent_session_events: listForeignKeys(database, 'agent_session_events'),
+			agent_sessions: listForeignKeys(database, 'agent_sessions'),
+			agent_turns: listForeignKeys(database, 'agent_turns'),
+			chat_tabs: listForeignKeys(database, 'chat_tabs'),
+			checkpoints: listForeignKeys(database, 'checkpoints'),
+		},
+		{
+			agent_runtime_state: [
+				{
+					on_delete: 'SET NULL',
+					source_column: 'active_tab_id',
+					target_table: 'chat_tabs',
+				},
+				{
+					on_delete: 'SET NULL',
+					source_column: 'last_active_session_id',
+					target_table: 'agent_sessions',
+				},
+				{
+					on_delete: 'CASCADE',
+					source_column: 'workspace_id',
+					target_table: 'workspaces',
+				},
+			],
+			agent_session_branches: [
+				{
+					on_delete: 'CASCADE',
+					source_column: 'agent_session_id',
+					target_table: 'agent_sessions',
+				},
+				{
+					on_delete: 'SET NULL',
+					source_column: 'parent_branch_id',
+					target_table: 'agent_session_branches',
+				},
+			],
+			agent_session_events: [
+				{
+					on_delete: 'CASCADE',
+					source_column: 'branch_id',
+					target_table: 'agent_session_branches',
+				},
+				{
+					on_delete: 'SET NULL',
+					source_column: 'turn_id',
+					target_table: 'agent_turns',
+				},
+			],
+			agent_sessions: [
+				{
+					on_delete: 'CASCADE',
+					source_column: 'workspace_id',
+					target_table: 'workspaces',
+				},
+			],
+			agent_turns: [
+				{
+					on_delete: 'CASCADE',
+					source_column: 'branch_id',
+					target_table: 'agent_session_branches',
+				},
+			],
+			chat_tabs: [
+				{
+					on_delete: 'SET NULL',
+					source_column: 'agent_session_id',
+					target_table: 'agent_sessions',
+				},
+				{
+					on_delete: 'CASCADE',
+					source_column: 'workspace_id',
+					target_table: 'workspaces',
+				},
+			],
+			checkpoints: [
+				{
+					on_delete: 'SET NULL',
+					source_column: 'agent_session_id',
+					target_table: 'agent_sessions',
+				},
+				{
+					on_delete: 'SET NULL',
+					source_column: 'session_id',
+					target_table: 'sessions',
+				},
+				{
+					on_delete: 'SET NULL',
+					source_column: 'turn_id',
+					target_table: 'agent_turns',
+				},
+				{
+					on_delete: 'CASCADE',
+					source_column: 'workspace_id',
+					target_table: 'workspaces',
+				},
+			],
+		},
+	);
+});
+
+test('migration 014 keeps cascade and set-null behaviour on upgraded rows', (t) => {
+	const fixture = createTestDatabasePath();
+	t.after(fixture.cleanup);
+	seedDatabaseBeforeAgentVocabulary(fixture.databasePath);
+
+	const connection = openEnsemblrDatabase({
+		databasePath: fixture.databasePath,
+	});
+	t.after(() => connection.database.close());
+	const { database } = connection;
+
+	database
+		.prepare('DELETE FROM agent_session_branches WHERE id = ?')
+		.run('branch-main');
+
+	assert.deepEqual(countAgentRows(database), {
+		agent_runtime_state: 1,
+		agent_session_branches: 1,
+		agent_session_events: 0,
+		agent_sessions: 2,
+		agent_turns: 0,
+		chat_tabs: 2,
+		checkpoints: 1,
+	});
+	assert.deepEqual(
+		readRows(
+			database,
+			'SELECT id, parent_branch_id FROM agent_session_branches',
+		),
+		[{ id: 'branch-fork', parent_branch_id: null }],
+	);
+	assert.deepEqual(
+		readRows(
+			database,
+			'SELECT turn_id FROM checkpoints WHERE id = ?',
+			'checkpoint-1',
+		),
+		[{ turn_id: null }],
+	);
+
+	database
+		.prepare('DELETE FROM agent_sessions WHERE id = ?')
+		.run('pi-session-1');
+
+	assert.deepEqual(countAgentRows(database), {
+		agent_runtime_state: 1,
+		agent_session_branches: 0,
+		agent_session_events: 0,
+		agent_sessions: 1,
+		agent_turns: 0,
+		chat_tabs: 2,
+		checkpoints: 1,
+	});
+	assert.deepEqual(
+		readRows(
+			database,
+			'SELECT agent_session_id FROM chat_tabs WHERE id = ?',
+			'tab-chat',
+		),
+		[{ agent_session_id: null }],
+	);
+	assert.deepEqual(
+		readRows(
+			database,
+			'SELECT agent_session_id FROM checkpoints WHERE id = ?',
+			'checkpoint-1',
+		),
+		[{ agent_session_id: null }],
+	);
+	assert.deepEqual(
+		readRows(
+			database,
+			'SELECT active_tab_id, last_active_session_id FROM agent_runtime_state',
+		),
+		[{ active_tab_id: 'tab-chat', last_active_session_id: null }],
+	);
+
+	database.prepare('DELETE FROM chat_tabs WHERE id = ?').run('tab-chat');
+
+	assert.deepEqual(
+		readRows(database, 'SELECT active_tab_id FROM agent_runtime_state'),
+		[{ active_tab_id: null }],
+	);
+
+	database.prepare('DELETE FROM workspaces WHERE id = ?').run('ws-upgrade');
+
+	assert.deepEqual(countAgentRows(database), {
+		agent_runtime_state: 0,
+		agent_session_branches: 0,
+		agent_session_events: 0,
+		agent_sessions: 0,
+		agent_turns: 0,
+		chat_tabs: 0,
+		checkpoints: 0,
+	});
+	assert.deepEqual(readRows(database, 'PRAGMA foreign_key_check'), []);
+});
+
+test('a database upgraded through migration 014 matches one created from scratch', (t) => {
+	const upgradedFixture = createTestDatabasePath();
+	t.after(upgradedFixture.cleanup);
+	seedDatabaseBeforeAgentVocabulary(upgradedFixture.databasePath);
+
+	const upgradedConnection = openEnsemblrDatabase({
+		databasePath: upgradedFixture.databasePath,
+	});
+	t.after(() => upgradedConnection.database.close());
+
+	const freshFixture = createTestDatabasePath();
+	t.after(freshFixture.cleanup);
+
+	const freshConnection = openEnsemblrDatabase({
+		databasePath: freshFixture.databasePath,
+	});
+	t.after(() => freshConnection.database.close());
+
+	const schemaObjectsSql = `SELECT type, name, tbl_name, sql FROM sqlite_master
+		 WHERE name NOT LIKE 'sqlite\\_%' ESCAPE '\\'
+		 ORDER BY type, name`;
+
+	assert.deepEqual(
+		readRows(upgradedConnection.database, schemaObjectsSql),
+		readRows(freshConnection.database, schemaObjectsSql),
 	);
 });
 

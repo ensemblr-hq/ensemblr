@@ -82,7 +82,7 @@ a permission denial stays visible.
 
 | Goal | Tools |
 |---|---|
-| Delegate a subtask to a Pi sub-agent | `ensemblr_start_conversation` (fresh tab + `title`; keep its `piSessionId`). While planning, the child inherits Plan Mode. |
+| Delegate a subtask to a Pi sub-agent | `ensemblr_start_conversation` (fresh tab + `title`; keep its `agentSessionId`). While planning, the child inherits Plan Mode. |
 | Name your own tab | `ensemblr_set_name` (Pi chats only; the label goes in `title`, as it does everywhere) |
 | Name the workspace + git branch | `ensemblr_set_branch_name` (one-shot, placeholder names only; refuses unless the user enabled `git.renameWorkspaceOnBranch`, so call it only when the per-turn upkeep block asks) |
 | Record what the session covered | `ensemblr_set_summary` (every turn; Pi chats only) |
@@ -113,7 +113,7 @@ three orchestrating playbooks say so and a parity test pins it.
 
 1. **Spawn** each helper with `ensemblr_start_conversation` in its **own fresh tab** — pass a short,
    descriptive `title` and do **not** pass `chatTabId` (reusing a prior tab keeps its old title).
-   Omit `wait` and keep the returned `piSessionId`. **Brief each child with what to deliver, not
+   Omit `wait` and keep the returned `agentSessionId`. **Brief each child with what to deliver, not
    just what to look at:** the question it answers, the defaults it should assume rather than come
    back and ask about, and whether it reports inline (the default) or writes a file at a path the
    orchestrator names — a brief phrased as a noun ("produce a reference doc", "write up the
@@ -189,15 +189,15 @@ three orchestrating playbooks say so and a parity test pins it.
 ## Example — parallel delegation
 
 ```
-a = ensemblr_start_conversation({ prompt: "Write unit tests for src/foo.ts" })   // { piSessionId }
+a = ensemblr_start_conversation({ prompt: "Write unit tests for src/foo.ts" })   // { agentSessionId }
 b = ensemblr_start_conversation({ prompt: "Write unit tests for src/bar.ts" })
 # both children now run; block until they finish or need you:
 r = ensemblr_wait_for_agents({ mode: "all" })
 for child in r.completed:
   # evaluate child.lastMessage; if a child.signal is need_decision, answer it:
-  if child.signal: ensemblr_send_follow_up({ piSessionId: child.piSessionId, prompt: "<decision>" })
+  if child.signal: ensemblr_send_follow_up({ agentSessionId: child.agentSessionId, prompt: "<decision>" })
 # a signal returns the wait early, so re-wait on whoever is still running plus anyone you answered:
-still_out = [p.piSessionId for p in r.pending] + answered_ids
+still_out = [p.agentSessionId for p in r.pending] + answered_ids
 if still_out: ensemblr_wait_for_agents({ mode: "all", targets: still_out })
 ```
 

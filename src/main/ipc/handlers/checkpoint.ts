@@ -49,7 +49,7 @@ export function registerCheckpointHandlers({
 			const database = requireCheckpointDatabase();
 			const checkpoints = listTurnCheckpoints({
 				database,
-				piSessionId: request.piSessionId,
+				agentSessionId: request.agentSessionId,
 			});
 			return { checkpoints: checkpoints.map(toWire) };
 		},
@@ -164,7 +164,7 @@ function toWire(row: CheckpointRow): CheckpointWire {
 		gitRef: row.gitRef,
 		id: row.id,
 		label: row.label,
-		piSessionId: row.piSessionId,
+		agentSessionId: row.agentSessionId,
 		turnId: row.turnId,
 		workspaceId: row.workspaceId,
 	};

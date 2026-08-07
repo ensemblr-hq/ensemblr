@@ -597,6 +597,77 @@ UPDATE chat_tabs SET full_title = title;
 ALTER TABLE comments ADD COLUMN origin TEXT NOT NULL DEFAULT 'user';
 `,
 	},
+	{
+		id: '013_pi_session_provider',
+		version: 13,
+		// A chat is pinned to one agent runtime, and the pin is derivable through
+		// the bound session — so it lives here rather than on `chat_tabs`. Every
+		// existing row predates a second runtime and is therefore Pi's, which is
+		// also what a renderer that predates this column would assume. No inline
+		// CHECK: SQLite's ADD COLUMN restrictions make one fragile, and the value
+		// set is enforced by `shared/agent-provider.ts` at the boundary.
+		sql: `
+ALTER TABLE pi_sessions ADD COLUMN provider TEXT NOT NULL DEFAULT 'pi';
+
+CREATE INDEX idx_pi_sessions_provider ON pi_sessions(provider);
+`,
+	},
+	{
+		id: '014_agent_session_vocabulary',
+		version: 14,
+		// Sessions, turns, events and branches are provider-neutral now that Claude
+		// is a sibling runtime to Pi, so the `pi_*` spelling moves to `agent_*`.
+		// `agent_sessions.pi_session_id` becomes `runtime_session_id` rather than
+		// `agent_session_id`: it holds the id the CLI runtime knows the session by,
+		// while `chat_tabs`/`checkpoints`/`agent_session_branches.agent_session_id`
+		// all foreign-key `agent_sessions.id`. One name for both would be silent.
+		// `ALTER TABLE ... RENAME TO` carries indexes across but keeps their old
+		// names, so every `pi`-spelled index is dropped and recreated: a database
+		// migrated from 013 and one created from scratch must agree byte for byte
+		// in `sqlite_master`. `idx_chat_tabs_session_id` keeps its name and is
+		// recreated only to drop the quoting SQLite adds when it rewrites an index
+		// over a renamed column.
+		sql: `
+DROP INDEX idx_pi_sessions_workspace_id;
+DROP INDEX idx_pi_sessions_status;
+DROP INDEX idx_pi_sessions_pi_session_id;
+DROP INDEX idx_pi_sessions_provider;
+DROP INDEX idx_pi_session_branches_session_id;
+DROP INDEX idx_pi_session_branches_parent;
+DROP INDEX idx_pi_turns_branch_ordinal;
+DROP INDEX idx_pi_turns_status;
+DROP INDEX idx_pi_session_events_branch_ordinal;
+DROP INDEX idx_pi_session_events_turn_id;
+DROP INDEX idx_pi_session_events_type;
+DROP INDEX idx_checkpoints_pi_session_id;
+DROP INDEX idx_chat_tabs_session_id;
+
+ALTER TABLE pi_sessions RENAME TO agent_sessions;
+ALTER TABLE pi_session_branches RENAME TO agent_session_branches;
+ALTER TABLE pi_turns RENAME TO agent_turns;
+ALTER TABLE pi_session_events RENAME TO agent_session_events;
+ALTER TABLE pi_runtime_state RENAME TO agent_runtime_state;
+
+ALTER TABLE agent_sessions RENAME COLUMN pi_session_id TO runtime_session_id;
+ALTER TABLE agent_session_branches RENAME COLUMN pi_session_id TO agent_session_id;
+ALTER TABLE chat_tabs RENAME COLUMN pi_session_id TO agent_session_id;
+ALTER TABLE checkpoints RENAME COLUMN pi_session_id TO agent_session_id;
+
+CREATE INDEX idx_agent_sessions_workspace_id ON agent_sessions(workspace_id);
+CREATE INDEX idx_agent_sessions_status ON agent_sessions(status);
+CREATE INDEX idx_agent_sessions_runtime_session_id ON agent_sessions(runtime_session_id);
+CREATE INDEX idx_agent_sessions_provider ON agent_sessions(provider);
+CREATE INDEX idx_agent_session_branches_session_id ON agent_session_branches(agent_session_id);
+CREATE INDEX idx_agent_session_branches_parent ON agent_session_branches(parent_branch_id);
+CREATE INDEX idx_agent_turns_branch_ordinal ON agent_turns(branch_id, ordinal);
+CREATE INDEX idx_agent_turns_status ON agent_turns(status);
+CREATE INDEX idx_agent_session_events_branch_ordinal ON agent_session_events(branch_id, ordinal);
+CREATE INDEX idx_agent_session_events_turn_id ON agent_session_events(turn_id);
+CREATE INDEX idx_agent_session_events_type ON agent_session_events(event_type);
+CREATE INDEX idx_checkpoints_agent_session_id ON checkpoints(agent_session_id);
+CREATE INDEX idx_chat_tabs_session_id ON chat_tabs(agent_session_id);
+`,
+	},
 ];
 
 /** Highest declared migration version embedded in this build. */

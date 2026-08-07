@@ -1,20 +1,59 @@
 export type {
+	AgentEventRow,
+	AgentEventStream,
+	AppendAgentEventInput,
+} from './agent-event-repository.ts';
+export {
+	appendAgentEvent,
+	appendAgentEvents,
+	getEventById,
+	getMaxOrdinalForBranch,
+	listEventsByBranch,
+	listEventsByTurn,
+} from './agent-event-repository.ts';
+export type {
+	AgentSessionBranchKind,
+	AgentSessionBranchRow,
+	AgentSessionRow,
+	AgentSessionStatusValue,
+	AgentTurnRow,
+	AgentTurnStatus,
+	CreateAgentSessionInput,
+	CreateAgentSessionResult,
+	CreateAgentTurnInput,
+	UpdateAgentSessionPatch,
+	UpdateAgentTurnPatch,
+} from './agent-session-repository.ts';
+export {
+	createAgentSession,
+	createBranch,
+	createTurn,
+	getAgentSessionBranchById,
+	getAgentSessionById,
+	getTurnById,
+	listAgentSessionBranches,
+	listAgentSessionsByWorkspace,
+	listTurns,
+	updateAgentSession,
+	updateTurn,
+} from './agent-session-repository.ts';
+export type {
 	ArchiveRecordKind,
 	InsertArchiveRecordRowOptions,
 } from './archive-record-repository.ts';
 export { insertArchiveRecordRow } from './archive-record-repository.ts';
 export type {
+	AgentRuntimeStateRow,
 	ChatTabKind,
 	ChatTabRow,
 	OpenChatTabInput,
-	PiRuntimeStateRow,
 } from './chat-tab-repository.ts';
 export {
-	bindPiSession,
+	bindAgentSession,
 	closeChatTab,
 	deleteChatTab,
+	getChatTabByAgentSessionId,
 	getChatTabById,
-	getChatTabByPiSessionId,
 	getRuntimeState,
 	listClosedForWorkspace,
 	listOpenChatTabs,
@@ -32,49 +71,10 @@ export {
 export type { CheckpointRow } from './checkpoint-repository.ts';
 export {
 	getCheckpointByTurnId,
-	getNextCheckpointInPiSession,
+	getNextCheckpointInAgentSession,
 	insertCheckpoint,
-	listCheckpointsForPiSession,
+	listCheckpointsForAgentSession,
 } from './checkpoint-repository.ts';
-export type {
-	AppendPiEventInput,
-	PiEventRow,
-	PiEventStream,
-} from './pi-event-repository.ts';
-export {
-	appendPiEvent,
-	appendPiEvents,
-	getEventById,
-	getMaxOrdinalForBranch,
-	listEventsByBranch,
-	listEventsByTurn,
-} from './pi-event-repository.ts';
-export type {
-	CreatePiSessionInput,
-	CreatePiSessionResult,
-	CreatePiTurnInput,
-	PiSessionBranchKind,
-	PiSessionBranchRow,
-	PiSessionRow,
-	PiSessionStatus,
-	PiTurnRow,
-	PiTurnStatus,
-	UpdatePiSessionPatch,
-	UpdatePiTurnPatch,
-} from './pi-session-repository.ts';
-export {
-	createBranch,
-	createPiSession,
-	createTurn,
-	getPiSessionBranchById,
-	getPiSessionById,
-	getTurnById,
-	listPiSessionBranches,
-	listPiSessionsByWorkspace,
-	listTurns,
-	updatePiSession,
-	updateTurn,
-} from './pi-session-repository.ts';
 export type {
 	DeleteRepositoryRowByIdOptions,
 	InsertRepositoryRowOptions,

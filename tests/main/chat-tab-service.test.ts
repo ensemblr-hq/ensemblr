@@ -5,7 +5,10 @@ import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
 
-import { createChatTabService } from '../../src/main/chat-tabs/chat-tab-service.ts';
+import {
+	createChatTabService,
+	readHarnessSessionId,
+} from '../../src/main/chat-tabs/chat-tab-service.ts';
 import {
 	getChatTabById,
 	listOpenForWorkspace,
@@ -44,7 +47,7 @@ test('closeTab is a no-op for unknown and already-closed tabs', (t) => {
 
 	fixture.service.openTab({ workspaceId: fixture.workspaceId });
 	const second = fixture.service.openTab({
-		piSessionId: fixture.piSessionId,
+		agentSessionId: fixture.agentSessionId,
 		workspaceId: fixture.workspaceId,
 	});
 	fixture.service.closeTab({ chatTabId: second.id });
@@ -58,7 +61,7 @@ test('closeTab keeps the last open tab in a workspace', (t) => {
 	const fixture = openFixture(t);
 
 	const only = fixture.service.openTab({
-		piSessionId: fixture.piSessionId,
+		agentSessionId: fixture.agentSessionId,
 		workspaceId: fixture.workspaceId,
 	});
 	// Min-one rule keeps the tab open, so nothing is deleted.
@@ -80,7 +83,7 @@ test('closeTab deletes empty tabs instead of entering history', (t) => {
 	const fixture = openFixture(t);
 
 	fixture.service.openTab({
-		piSessionId: fixture.piSessionId,
+		agentSessionId: fixture.agentSessionId,
 		workspaceId: fixture.workspaceId,
 	});
 	const empty = fixture.service.openTab({
@@ -110,7 +113,7 @@ test('closeTab moves session-bound tabs into closed history', (t) => {
 
 	fixture.service.openTab({ workspaceId: fixture.workspaceId });
 	const bound = fixture.service.openTab({
-		piSessionId: fixture.piSessionId,
+		agentSessionId: fixture.agentSessionId,
 		workspaceId: fixture.workspaceId,
 	});
 	// Session-bound tabs are archived (restorable), not deleted.
@@ -131,36 +134,36 @@ test('closeTab moves session-bound tabs into closed history', (t) => {
 	assert.equal(restored?.closedAt, null);
 });
 
-test('bindPiSession validates tab and session existence', (t) => {
+test('bindAgentSession validates tab and session existence', (t) => {
 	const fixture = openFixture(t);
 
 	const tab = fixture.service.openTab({ workspaceId: fixture.workspaceId });
 
 	assert.throws(
 		() =>
-			fixture.service.bindPiSession({
+			fixture.service.bindAgentSession({
 				chatTabId: 'missing-tab',
-				piSessionId: fixture.piSessionId,
+				agentSessionId: fixture.agentSessionId,
 			}),
 		/does not exist/,
 	);
 	assert.throws(
 		() =>
-			fixture.service.bindPiSession({
+			fixture.service.bindAgentSession({
 				chatTabId: tab.id,
-				piSessionId: 'missing-session',
+				agentSessionId: 'missing-session',
 			}),
 		/does not exist/,
 	);
 
-	fixture.service.bindPiSession({
+	fixture.service.bindAgentSession({
 		chatTabId: tab.id,
-		piSessionId: fixture.piSessionId,
+		agentSessionId: fixture.agentSessionId,
 	});
 	assert.equal(
 		getChatTabById({ database: fixture.connection.database, id: tab.id })
-			?.piSessionId,
-		fixture.piSessionId,
+			?.agentSessionId,
+		fixture.agentSessionId,
 	);
 });
 
@@ -169,7 +172,7 @@ test('listClosedWithSummary lists closed tabs without a summary as restorable', 
 
 	fixture.service.openTab({ workspaceId: fixture.workspaceId });
 	const bound = fixture.service.openTab({
-		piSessionId: fixture.piSessionId,
+		agentSessionId: fixture.agentSessionId,
 		workspaceId: fixture.workspaceId,
 	});
 	fixture.service.closeTab({ chatTabId: bound.id });
@@ -190,7 +193,7 @@ test('listClosedWithSummary leaves the summary empty when the file is gone', (t)
 
 	fixture.service.openTab({ workspaceId: fixture.workspaceId });
 	const bound = fixture.service.openTab({
-		piSessionId: fixture.piSessionId,
+		agentSessionId: fixture.agentSessionId,
 		workspaceId: fixture.workspaceId,
 	});
 	fixture.service.closeTab({ chatTabId: bound.id });
@@ -222,7 +225,7 @@ test('listClosedWithSummary lists a closed tab whose summary file exists', (t) =
 
 	fixture.service.openTab({ workspaceId: fixture.workspaceId });
 	const bound = fixture.service.openTab({
-		piSessionId: fixture.piSessionId,
+		agentSessionId: fixture.agentSessionId,
 		workspaceId: fixture.workspaceId,
 	});
 	fixture.service.closeTab({ chatTabId: bound.id });
@@ -264,7 +267,7 @@ test('listClosedWithSummary trusts the persisted summary path outside the worksp
 
 	fixture.service.openTab({ workspaceId: fixture.workspaceId });
 	const bound = fixture.service.openTab({
-		piSessionId: fixture.piSessionId,
+		agentSessionId: fixture.agentSessionId,
 		workspaceId: fixture.workspaceId,
 	});
 	fixture.service.closeTab({ chatTabId: bound.id });
@@ -409,7 +412,7 @@ test('closing a chat tab at the limit allows a replacement to open', (t) => {
 
 	const tabs = Array.from({ length: 5 }, (_, index) =>
 		fixture.service.openTab({
-			piSessionId: index === 0 ? fixture.piSessionId : undefined,
+			agentSessionId: index === 0 ? fixture.agentSessionId : undefined,
 			title: `Chat ${index + 1}`,
 			workspaceId: fixture.workspaceId,
 		}),
@@ -489,7 +492,7 @@ test('closeTab archives terminal tabs as restorable, stamping title and metadata
 	assert.deepEqual(
 		fixture.service.closeTab({
 			chatTabId: terminalTab.id,
-			metadataPatch: { agentSessionId: 'claude-abc' },
+			metadataPatch: { harnessSessionId: 'claude-abc' },
 			title: 'Fix the auth bug',
 		}),
 		{ deleted: false },
@@ -502,7 +505,7 @@ test('closeTab archives terminal tabs as restorable, stamping title and metadata
 	assert.ok(stored);
 	assert.notEqual(stored?.closedAt, null);
 	assert.equal(stored?.title, 'Fix the auth bug');
-	assert.equal(stored?.metadata.agentSessionId, 'claude-abc');
+	assert.equal(stored?.metadata.harnessSessionId, 'claude-abc');
 	// The original harness metadata is preserved through the merge.
 	assert.equal(stored?.metadata.harnessId, 'claude');
 
@@ -551,8 +554,8 @@ test('closeTab archives a terminal tab whose session id was persisted before clo
 	const terminalTab = fixture.service.openTab({
 		kind: 'terminal',
 		metadata: {
-			agentSessionId: 'claude-persisted',
 			harnessId: 'claude',
+			harnessSessionId: 'claude-persisted',
 			terminalId: 'pty-4',
 		},
 		title: 'Claude Code',
@@ -569,7 +572,100 @@ test('closeTab archives a terminal tab whose session id was persisted before clo
 		id: terminalTab.id,
 	});
 	assert.notEqual(stored?.closedAt, null);
-	assert.equal(stored?.metadata.agentSessionId, 'claude-persisted');
+	assert.equal(stored?.metadata.harnessSessionId, 'claude-persisted');
+});
+
+test('closeTab archives a terminal tab whose session id sits under the legacy metadata key', (t) => {
+	const fixture = openFixture(t);
+
+	fixture.service.openTab({ workspaceId: fixture.workspaceId });
+	const terminalTab = fixture.service.openTab({
+		kind: 'terminal',
+		metadata: { harnessId: 'claude', terminalId: 'pty-legacy' },
+		title: 'Claude Code',
+		workspaceId: fixture.workspaceId,
+	});
+	// Rows persisted before the metadata key was renamed store the native harness
+	// session id under `agentSessionId`, which now names the Ensemblr session FK.
+	setChatTabMetadata({
+		database: fixture.connection.database,
+		id: terminalTab.id,
+		metadata: {
+			agentSessionId: 'claude-legacy',
+			harnessId: 'claude',
+			terminalId: 'pty-legacy',
+		},
+	});
+
+	assert.deepEqual(fixture.service.closeTab({ chatTabId: terminalTab.id }), {
+		deleted: false,
+	});
+
+	const stored = getChatTabById({
+		database: fixture.connection.database,
+		id: terminalTab.id,
+	});
+	assert.ok(stored);
+	assert.notEqual(stored?.closedAt, null);
+	assert.equal(stored?.metadata.agentSessionId, 'claude-legacy');
+
+	const closed = fixture.service.listTabs({
+		workspaceId: fixture.workspaceId,
+	}).closed;
+	assert.deepEqual(
+		closed.map((row) => row.id),
+		[terminalTab.id],
+	);
+});
+
+test('closeTab hard-deletes a terminal tab carrying neither session id key', (t) => {
+	const fixture = openFixture(t);
+
+	fixture.service.openTab({ workspaceId: fixture.workspaceId });
+	const terminalTab = fixture.service.openTab({
+		kind: 'terminal',
+		metadata: { harnessId: 'codex', terminalId: 'pty-neither' },
+		title: 'OpenAI Codex',
+		workspaceId: fixture.workspaceId,
+	});
+
+	assert.deepEqual(fixture.service.closeTab({ chatTabId: terminalTab.id }), {
+		deleted: true,
+	});
+
+	assert.equal(
+		getChatTabById({
+			database: fixture.connection.database,
+			id: terminalTab.id,
+		}),
+		null,
+	);
+	assert.equal(
+		fixture.service.listTabs({ workspaceId: fixture.workspaceId }).closed
+			.length,
+		0,
+	);
+});
+
+test('readHarnessSessionId prefers the current key and falls back to the legacy one', () => {
+	assert.equal(
+		readHarnessSessionId({
+			agentSessionId: 'legacy-id',
+			harnessSessionId: 'current-id',
+		}),
+		'current-id',
+	);
+	assert.equal(
+		readHarnessSessionId({ agentSessionId: 'legacy-id' }),
+		'legacy-id',
+	);
+	assert.equal(
+		readHarnessSessionId({ harnessSessionId: 'current-id' }),
+		'current-id',
+	);
+	assert.equal(readHarnessSessionId({ agentSessionId: '' }), null);
+	assert.equal(readHarnessSessionId({ harnessId: 'claude' }), null);
+	assert.equal(readHarnessSessionId(undefined), null);
 });
 
 test('restoreTab reopens an archived terminal tab', (t) => {
@@ -584,13 +680,13 @@ test('restoreTab reopens an archived terminal tab', (t) => {
 	});
 	fixture.service.closeTab({
 		chatTabId: terminalTab.id,
-		metadataPatch: { agentSessionId: 'codex-xyz' },
+		metadataPatch: { harnessSessionId: 'codex-xyz' },
 	});
 
 	const restored = fixture.service.restoreTab({ chatTabId: terminalTab.id });
 	assert.equal(restored?.id, terminalTab.id);
 	assert.equal(restored?.closedAt, null);
-	assert.equal(restored?.metadata.agentSessionId, 'codex-xyz');
+	assert.equal(restored?.metadata.harnessSessionId, 'codex-xyz');
 	assert.equal(
 		fixture.service.listTabs({ workspaceId: fixture.workspaceId }).closed
 			.length,
@@ -602,7 +698,7 @@ test('min-one rule counts chat tabs only, not open file tabs', (t) => {
 	const fixture = openFixture(t);
 
 	const chat = fixture.service.openTab({
-		piSessionId: fixture.piSessionId,
+		agentSessionId: fixture.agentSessionId,
 		workspaceId: fixture.workspaceId,
 	});
 	fixture.service.openTab({
@@ -632,7 +728,7 @@ test('service surfaces a clear error when the database is closed', (t) => {
 			open: () => ({ path: '', schemaVersion: 0, status: 'error' }),
 		},
 		lookups: {
-			piSessionExists: () => true,
+			agentSessionExists: () => true,
 		},
 	});
 

@@ -1,15 +1,26 @@
 import type {
 	PiSlashCommandSource,
 	PiSlashCommandSourceScope,
-} from '@/shared/ipc/contracts/pi-session';
+} from '@/shared/ipc/contracts/agent-session';
 
 import type { ComposerModelOption } from './workspace';
+
+/**
+ * One selectable row in the model selector: a model plus whether the chat's
+ * agent-runtime pin locks it out. Locked rows stay in the list and render
+ * disabled — dropping them would make the list silently shrink from one chat to
+ * the next, which reads as a bug.
+ */
+export interface ModelPickerRow {
+	locked: boolean;
+	model: ComposerModelOption;
+}
 
 /** One provider group inside the model selector menu. */
 export interface GroupedOptions {
 	provider: string;
 	providerLabel: string;
-	models: ComposerModelOption[];
+	models: ModelPickerRow[];
 }
 
 /** Describes a slash command surfaced in the composer autocomplete. */

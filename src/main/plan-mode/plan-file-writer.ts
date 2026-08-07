@@ -24,7 +24,7 @@ const MAX_COLLISION_ATTEMPTS = 50;
 /** What the agent submitted, plus the identity recorded in the frontmatter. */
 export interface WritePlanFileInput {
 	plan: string;
-	piSessionId: string;
+	agentSessionId: string;
 	title: string;
 	workspaceCwd: string;
 	workspaceId: string;
@@ -116,7 +116,7 @@ function renderFrontmatter(
 	const lines = [
 		'---',
 		`title: ${JSON.stringify(input.title)}`,
-		`piSessionId: ${JSON.stringify(input.piSessionId)}`,
+		`agentSessionId: ${JSON.stringify(input.agentSessionId)}`,
 		`workspaceId: ${JSON.stringify(input.workspaceId)}`,
 		`createdAt: ${JSON.stringify(createdAt)}`,
 		'---',

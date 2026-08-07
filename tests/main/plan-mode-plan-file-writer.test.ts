@@ -7,7 +7,7 @@ const WORKSPACE_CWD = '/tmp/workspace';
 const CREATED_AT = new Date('2026-07-28T14:32:07.000Z');
 
 const INPUT = {
-	piSessionId: 'sess-1',
+	agentSessionId: 'sess-1',
 	plan: '# Steps\n\n1. Do the thing',
 	title: 'Add Plan Mode',
 	workspaceCwd: WORKSPACE_CWD,
@@ -58,7 +58,7 @@ describe('createPlanFileWriter', () => {
 
 		const contents = written[0]?.contents ?? '';
 		expect(contents).toContain('title: "Add Plan Mode"');
-		expect(contents).toContain('piSessionId: "sess-1"');
+		expect(contents).toContain('agentSessionId: "sess-1"');
 		expect(contents).toContain('workspaceId: "ws-1"');
 		expect(contents).toContain(`createdAt: "${CREATED_AT.toISOString()}"`);
 		expect(contents).toContain('# Add Plan Mode');

@@ -13,6 +13,7 @@ export type ChatTabKind =
 
 /** Domain shape of a chat tab row returned by the repository. */
 export interface ChatTabRow {
+	agentSessionId: string | null;
 	closedAt: string | null;
 	/**
 	 * Untruncated title, for tooltips and search. Equals `title` whenever the
@@ -23,7 +24,6 @@ export interface ChatTabRow {
 	kind: ChatTabKind;
 	metadata: Record<string, unknown>;
 	openedAt: string;
-	piSessionId: string | null;
 	position: number;
 	title: string;
 	workspaceId: string;
@@ -31,6 +31,7 @@ export interface ChatTabRow {
 
 /** Input for opening a new chat tab in a workspace. */
 export interface OpenChatTabInput {
+	agentSessionId?: string | null;
 	/** Untruncated title; defaults to `title` when the caller has nothing longer. */
 	fullTitle?: string;
 	/**
@@ -41,13 +42,12 @@ export interface OpenChatTabInput {
 	insertAfterChatTabId?: string | null;
 	kind: ChatTabKind;
 	metadata?: Record<string, unknown>;
-	piSessionId?: string | null;
 	title: string;
 	workspaceId: string;
 }
 
-/** Per-workspace runtime state tracking the active tab and last active Pi session. */
-export interface PiRuntimeStateRow {
+/** Per-workspace runtime state tracking the active tab and last active agent session. */
+export interface AgentRuntimeStateRow {
 	activeTabId: string | null;
 	lastActiveSessionId: string | null;
 	updatedAt: string;
@@ -56,19 +56,19 @@ export interface PiRuntimeStateRow {
 
 /** Raw `chat_tabs` row shape with snake_case columns as stored in SQLite. */
 interface ChatTabRowShape {
+	agent_session_id: string | null;
 	closed_at: string | null;
 	full_title: string;
 	id: string;
 	kind: ChatTabKind;
 	metadata_json: string;
 	opened_at: string;
-	pi_session_id: string | null;
 	position: number;
 	title: string;
 	workspace_id: string;
 }
 
-/** Raw `pi_runtime_state` row shape with snake_case columns as stored in SQLite. */
+/** Raw `agent_runtime_state` row shape with snake_case columns as stored in SQLite. */
 interface RuntimeStateRowShape {
 	active_tab_id: string | null;
 	last_active_session_id: string | null;
@@ -76,11 +76,11 @@ interface RuntimeStateRowShape {
 	workspace_id: string;
 }
 
-const SELECT_TAB = `SELECT id, workspace_id, pi_session_id, kind, title, full_title, position, opened_at, closed_at, metadata_json
+const SELECT_TAB = `SELECT id, workspace_id, agent_session_id, kind, title, full_title, position, opened_at, closed_at, metadata_json
 FROM chat_tabs`;
 
 const SELECT_RUNTIME = `SELECT workspace_id, active_tab_id, last_active_session_id, updated_at
-FROM pi_runtime_state`;
+FROM agent_runtime_state`;
 
 /**
  * Opens a new chat tab, placing it directly right of `insertAfterChatTabId` and
@@ -111,13 +111,13 @@ export function openChatTab({
 
 		database
 			.prepare(
-				`INSERT INTO chat_tabs (id, workspace_id, pi_session_id, kind, title, full_title, position, metadata_json)
+				`INSERT INTO chat_tabs (id, workspace_id, agent_session_id, kind, title, full_title, position, metadata_json)
 					VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
 			)
 			.run(
 				id,
 				input.workspaceId,
-				input.piSessionId ?? null,
+				input.agentSessionId ?? null,
 				input.kind,
 				input.title,
 				input.fullTitle ?? input.title,
@@ -285,20 +285,20 @@ export function getChatTabById({
 }
 
 /**
- * Returns the tab bound to a Pi session (open or closed), or `null` when none
- * is. Lets a caller holding only a session id reach its tab without scanning
- * the workspace's tab list.
+ * Returns the tab bound to an agent session (open or closed), or `null` when
+ * none is. Lets a caller holding only a session id reach its tab without
+ * scanning the workspace's tab list.
  */
-export function getChatTabByPiSessionId({
+export function getChatTabByAgentSessionId({
+	agentSessionId,
 	database,
-	piSessionId,
 }: {
+	agentSessionId: string;
 	database: DatabaseSync;
-	piSessionId: string;
 }): ChatTabRow | null {
 	const row = database
-		.prepare(`${SELECT_TAB} WHERE pi_session_id = ?`)
-		.get(piSessionId) as ChatTabRowShape | undefined;
+		.prepare(`${SELECT_TAB} WHERE agent_session_id = ?`)
+		.get(agentSessionId) as ChatTabRowShape | undefined;
 	return row ? mapTabRow(row) : null;
 }
 
@@ -373,21 +373,21 @@ export function restoreClosedChatTab({
 }
 
 /**
- * Attaches an existing Pi session to a chat tab. Returns the updated row, or
+ * Attaches an existing agent session to a chat tab. Returns the updated row, or
  * `null` when no tab with `id` exists.
  */
-export function bindPiSession({
+export function bindAgentSession({
+	agentSessionId,
 	database,
 	id,
-	piSessionId,
 }: {
+	agentSessionId: string;
 	database: DatabaseSync;
 	id: string;
-	piSessionId: string;
 }): ChatTabRow | null {
 	database
-		.prepare(`UPDATE chat_tabs SET pi_session_id = ? WHERE id = ?`)
-		.run(piSessionId, id);
+		.prepare(`UPDATE chat_tabs SET agent_session_id = ? WHERE id = ?`)
+		.run(agentSessionId, id);
 	return getChatTabById({ database, id });
 }
 
@@ -425,7 +425,7 @@ export function getRuntimeState({
 }: {
 	database: DatabaseSync;
 	workspaceId: string;
-}): PiRuntimeStateRow {
+}): AgentRuntimeStateRow {
 	const row = database
 		.prepare(`${SELECT_RUNTIME} WHERE workspace_id = ?`)
 		.get(workspaceId) as RuntimeStateRowShape | undefined;
@@ -453,10 +453,10 @@ export function setRuntimeState({
 	database: DatabaseSync;
 	lastActiveSessionId?: string | null;
 	workspaceId: string;
-}): PiRuntimeStateRow {
+}): AgentRuntimeStateRow {
 	database
 		.prepare(
-			`INSERT INTO pi_runtime_state (workspace_id, active_tab_id, last_active_session_id)
+			`INSERT INTO agent_runtime_state (workspace_id, active_tab_id, last_active_session_id)
 			 VALUES (?, ?, ?)
 			 ON CONFLICT(workspace_id) DO UPDATE SET
 				active_tab_id = excluded.active_tab_id,
@@ -534,13 +534,13 @@ function shiftOpenPositionsFrom({
  */
 function mapTabRow(row: ChatTabRowShape): ChatTabRow {
 	return {
+		agentSessionId: row.agent_session_id,
 		closedAt: row.closed_at,
 		fullTitle: row.full_title || row.title,
 		id: row.id,
 		kind: row.kind,
 		metadata: parseMetadata(row.metadata_json),
 		openedAt: row.opened_at,
-		piSessionId: row.pi_session_id,
 		position: row.position,
 		title: row.title,
 		workspaceId: row.workspace_id,
@@ -548,11 +548,11 @@ function mapTabRow(row: ChatTabRowShape): ChatTabRow {
 }
 
 /**
- * Map a raw `pi_runtime_state` row to the domain {@link PiRuntimeStateRow}.
+ * Map a raw `agent_runtime_state` row to the domain {@link AgentRuntimeStateRow}.
  * @param row - Raw SQLite row
  * @returns The domain runtime state
  */
-function mapRuntimeRow(row: RuntimeStateRowShape): PiRuntimeStateRow {
+function mapRuntimeRow(row: RuntimeStateRowShape): AgentRuntimeStateRow {
 	return {
 		activeTabId: row.active_tab_id,
 		lastActiveSessionId: row.last_active_session_id,

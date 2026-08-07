@@ -24,13 +24,13 @@ import { createTestQueryClient, installEnsemblrApi } from '../support/dom';
 const WORKSPACE_ID = 'ws-1';
 
 const activeSession: SessionTabModel = {
+	agentSessionId: null,
 	chatTabId: 'tab-1',
 	id: 'tab-1',
 	isPreview: false,
 	isSubAgent: false,
 	kind: 'chat',
 	label: 'Chat',
-	piSessionId: null,
 	status: 'idle',
 	summary: '',
 	updatedLabel: 'Chat',
@@ -51,7 +51,7 @@ describe('agent tab broadcast invalidation', () => {
 				listeners.push(listener);
 				return () => undefined;
 			},
-			onPiSessionEvent: vi.fn(() => () => undefined),
+			onAgentSessionEvent: vi.fn(() => () => undefined),
 			onTerminalLifecycle: vi.fn(() => () => undefined),
 		});
 		const client = createTestQueryClient();
@@ -75,7 +75,7 @@ describe('agent tab broadcast invalidation', () => {
 		}
 
 		expect(invalidateQueries).toHaveBeenCalledWith({
-			queryKey: ensemblrQueryKeys.piSessionsForWorkspace(WORKSPACE_ID),
+			queryKey: ensemblrQueryKeys.agentSessionsForWorkspace(WORKSPACE_ID),
 		});
 		expect(invalidateQueries).toHaveBeenCalledWith({
 			queryKey: ensemblrQueryKeys.chatTabs(WORKSPACE_ID),

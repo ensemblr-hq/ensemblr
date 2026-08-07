@@ -1,3 +1,4 @@
+import type { AgentProviderId } from '@/shared/agent-provider';
 import type { EnsemblrApi } from '@/shared/ipc/contracts/api';
 
 /** Hierarchical TanStack Query keys for every Ensemblr IPC-backed query. */
@@ -9,9 +10,9 @@ export const ensemblrQueryKeys = {
 	/** Query key for a workspace's open chat tabs. */
 	chatTabs: (workspaceId: string) =>
 		[...ensemblrQueryKeys.all, 'chat-tabs', workspaceId] as const,
-	/** Query key for a Pi session's checkpoints. */
-	checkpointsForSession: (piSessionId: string) =>
-		[...ensemblrQueryKeys.all, 'checkpoints', piSessionId] as const,
+	/** Query key for an agent session's checkpoints. */
+	checkpointsForSession: (agentSessionId: string) =>
+		[...ensemblrQueryKeys.all, 'checkpoints', agentSessionId] as const,
 	/** Query key for a workspace's closed chat tabs with their summaries. */
 	closedChatTabsWithSummary: (workspaceId: string) =>
 		[
@@ -56,17 +57,17 @@ export const ensemblrQueryKeys = {
 	linearIssuesAll: () => [...ensemblrQueryKeys.all, 'linear-issues'] as const,
 	/** Query key for cached Linear workspace metadata. */
 	linearMetadata: () => [...ensemblrQueryKeys.all, 'linear-metadata'] as const,
-	/** Query key for the available Pi models. */
-	piModels: () => [...ensemblrQueryKeys.all, 'pi-models'] as const,
+	/** Query key for the available agent models. */
+	agentModels: () => [...ensemblrQueryKeys.all, 'agent-models'] as const,
 	/** Query key for a workspace's available Pi slash commands. */
 	piSlashCommands: (workspaceCwd: string) =>
 		[...ensemblrQueryKeys.all, 'pi-slash-commands', workspaceCwd] as const,
-	/** Query key for a branch's Pi session events. */
-	piSessionEvents: (branchId: string) =>
-		[...ensemblrQueryKeys.all, 'pi-session-events', branchId] as const,
-	/** Query key for a workspace's Pi sessions. */
-	piSessionsForWorkspace: (workspaceId: string) =>
-		[...ensemblrQueryKeys.all, 'pi-sessions', workspaceId] as const,
+	/** Query key for a branch's agent session events. */
+	agentSessionEvents: (branchId: string) =>
+		[...ensemblrQueryKeys.all, 'agent-session-events', branchId] as const,
+	/** Query key for a workspace's agent sessions. */
+	agentSessionsForWorkspace: (workspaceId: string) =>
+		[...ensemblrQueryKeys.all, 'agent-sessions', workspaceId] as const,
 	/** Query key for a workspace's pull-request snapshot. */
 	pullRequestSnapshot: (workspaceId: string) =>
 		[...ensemblrQueryKeys.all, 'pull-request-snapshot', workspaceId] as const,
@@ -106,9 +107,16 @@ export const ensemblrQueryKeys = {
 		[...ensemblrQueryKeys.all, 'repository-workspace-navigation'] as const,
 	/** Query key for the configured root directory. */
 	rootDirectory: () => [...ensemblrQueryKeys.all, 'root-directory'] as const,
-	/** Query key for the resolved Pi executable path snapshot. */
-	piExecutablePath: () =>
-		[...ensemblrQueryKeys.all, 'pi-executable-path'] as const,
+	/** Query key for one agent runtime's resolved executable path snapshot. */
+	agentProviderExecutablePath: (provider: AgentProviderId) =>
+		[
+			...ensemblrQueryKeys.all,
+			'agent-provider-executable-path',
+			provider,
+		] as const,
+	/** Query key for one agent runtime's readiness snapshot. */
+	agentProviderReadiness: (provider: AgentProviderId) =>
+		[...ensemblrQueryKeys.all, 'agent-provider-readiness', provider] as const,
 	/** Query key for a repository's on-disk configuration. */
 	repositoryConfig: (repositoryPath: string) =>
 		[...ensemblrQueryKeys.all, 'repository-config', repositoryPath] as const,

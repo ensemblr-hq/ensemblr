@@ -1,11 +1,10 @@
 import type { DynamicToolUIPart, UIMessage } from 'ai';
 import { useMemo } from 'react';
 import {
-	customMessageDataOf,
 	glyphForToolCall,
 	isHiddenEnsemblrToolCall,
-	skillPartDataOf,
-} from '@/renderer/lib/pi';
+} from '@/renderer/lib/agent-timeline';
+import { customMessageDataOf, skillPartDataOf } from '@/renderer/lib/pi';
 import { cn } from '@/renderer/lib/utils';
 import type { ChatAssistantTurnTiming } from '@/renderer/types/chat';
 import type { ToolGlyph } from '@/renderer/types/tool-presentation';
@@ -23,9 +22,9 @@ import { ChatWorkingIndicator } from './chat-turn-timer';
 
 /**
  * One assistant turn in the new chat surface. Splits the message parts into:
- *   - finalParts: the TRAILING contiguous run of `text` parts — Pi's actual
- *     answer. Trailing because Pi interleaves commentary and tool calls; only
- *     the closing prose is the response the user reads.
+ *   - finalParts: the TRAILING contiguous run of `text` parts — the agent's
+ *     actual answer. Trailing because agents interleave commentary and tool
+ *     calls; only the closing prose is the response the user reads.
  *   - activityParts: everything before that run (reasoning, tool calls, and
  *     intermediate text chunks emitted between tool calls).
  *

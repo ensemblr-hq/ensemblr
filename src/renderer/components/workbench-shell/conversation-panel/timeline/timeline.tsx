@@ -18,7 +18,7 @@ import {
 	looksLikeStackTrace,
 	noticeMetadataOf,
 	turnMetadataOf,
-} from '@/renderer/lib/pi';
+} from '@/renderer/lib/agent-timeline';
 import type { ChatAssistantTurnTiming } from '@/renderer/types/chat';
 import type {
 	SessionTabModel,
@@ -29,7 +29,7 @@ import { RestoreCheckpointDialog } from './restore-checkpoint-dialog';
 import { TimelineStartingState } from './timeline-starting-state';
 
 /**
- * Structured renderer for the Pi RPC event stream. Reads persisted events
+ * Structured renderer for the agent session event stream. Reads persisted events
  * from SQLite and overlays live events broadcast from the main process so
  * the conversation surface stays in sync without a refresh.
  *
@@ -62,12 +62,12 @@ function resolveStartingLabel(state: {
 		: null;
 }
 
-export function PiSessionTimeline({
-	activePiSessionId,
+export function AgentSessionTimeline({
+	activeAgentSessionId,
 	activeSession,
 	workspace,
 }: {
-	activePiSessionId: string | null;
+	activeAgentSessionId: string | null;
 	activeSession: SessionTabModel;
 	workspace: WorkspaceShellModel;
 }) {
@@ -76,35 +76,35 @@ export function PiSessionTimeline({
 		checkpointsByTurnId,
 		hasOtherOpenSessions,
 		isStreaming,
-		piSessionId,
+		agentSessionId,
 		sessionResolved,
 		sessionsFetching,
-		tabPiSessionId,
-	} = useTimelineSession({ activePiSessionId, activeSession, workspace });
+		tabAgentSessionId,
+	} = useTimelineSession({ activeAgentSessionId, activeSession, workspace });
 
 	const { error, events } = useTimelineEvents({
 		branchId,
-		sessionId: piSessionId,
+		sessionId: agentSessionId,
 	});
 
 	const fork = useForkConversation({
 		branchId,
-		sessionId: piSessionId ?? '',
+		sessionId: agentSessionId ?? '',
 		workspace,
 	});
-	const canFork = branchId.length > 0 && piSessionId !== null;
+	const canFork = branchId.length > 0 && agentSessionId !== null;
 
 	const openTurnDiff = useTurnDiffOpener();
 	const restore = useCheckpointRestore();
 
 	const requestRestore = useCallback(
 		({ label, turnId }: { label: string; turnId: string }) => {
-			if (!piSessionId) {
+			if (!agentSessionId) {
 				return;
 			}
-			restore.request({ branchId, label, piSessionId, turnId });
+			restore.request({ branchId, label, agentSessionId, turnId });
 		},
-		[branchId, piSessionId, restore.request],
+		[branchId, agentSessionId, restore.request],
 	);
 
 	const { messages, pendingStartMs, promptCount } = useTimelineMessages({
@@ -113,10 +113,10 @@ export function PiSessionTimeline({
 		isStreaming,
 	});
 
-	if (piSessionId && error) {
+	if (agentSessionId && error) {
 		return (
 			<section
-				aria-label='Pi session timeline'
+				aria-label='Agent session timeline'
 				className='flex flex-col gap-2 rounded-md border border-status-warning/30 bg-status-warning/10 p-3 text-status-warning text-xs'
 				data-timeline-state='errored'
 			>
@@ -129,10 +129,10 @@ export function PiSessionTimeline({
 	}
 
 	// An agent-spawned tab has no optimistic prompt to stand in for the real one,
-	// and Pi only echoes the prompt back once its child process has booted, so an
-	// empty transcript here means "starting", not "nothing to show".
+	// and the agent only echoes the prompt back once its child process has
+	// booted, so an empty transcript here means "starting", not "nothing to show".
 	const startingLabel = resolveStartingLabel({
-		hasSession: tabPiSessionId !== null,
+		hasSession: tabAgentSessionId !== null,
 		isStreaming,
 		sessionResolved,
 		sessionsFetching,
@@ -144,7 +144,7 @@ export function PiSessionTimeline({
 		}
 		return (
 			<section
-				aria-label='Pi session timeline'
+				aria-label='Agent session timeline'
 				className='flex min-h-0 flex-1 flex-col'
 				data-timeline-state='starting'
 			>
@@ -155,7 +155,7 @@ export function PiSessionTimeline({
 
 	return (
 		<section
-			aria-label='Pi session timeline'
+			aria-label='Agent session timeline'
 			className='flex min-h-0 flex-1 flex-col'
 			data-timeline-state='ready'
 		>
@@ -202,7 +202,7 @@ export function PiSessionTimeline({
 	);
 }
 
-/** Renders one mapped Pi message with chat or diagnostic semantics. */
+/** Renders one mapped agent message with chat or diagnostic semantics. */
 function TimelineMessage({
 	checkpointsByTurnId,
 	fork,

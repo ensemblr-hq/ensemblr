@@ -3,19 +3,19 @@ import { useAtomCallback } from 'jotai/utils';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import {
+	agentSessionsForWorkspaceQuery,
 	closeChatTab,
 	ensemblrQueryKeys,
 	listChatTabsQuery,
 	listClosedChatTabsWithSummaryQuery,
 	openChatTab,
-	piSessionsForWorkspaceQuery,
 	removeOpenChatTabFromCache,
 	reorderChatTabs,
 	restoreChatTab,
 	writeOpenedChatTabToCache,
 	writeReorderedChatTabsToCache,
 } from '@/renderer/api/ensemblr-queries';
-import { usePiSessionStatusInvalidation } from '@/renderer/hooks/workspace/use-pi-session-status-invalidation';
+import { useAgentSessionStatusInvalidation } from '@/renderer/hooks/workspace/use-agent-session-status-invalidation';
 import { useWorkspaceAgentBusy } from '@/renderer/hooks/workspace/use-workspace-agent-busy';
 import { areStringArraysEqual } from '@/renderer/lib/ordered-ids';
 import { forgetComposerDraft } from '@/renderer/state/composer';
@@ -35,6 +35,7 @@ import type {
 	SessionTabPlacement,
 	SessionTabState,
 } from '@/renderer/types/workbench-shell';
+import type { AgentSessionSnapshotWire } from '@/shared/ipc/contracts/agent-session';
 import type {
 	ChatTabWire,
 	CloseChatTabRequest,
@@ -42,7 +43,6 @@ import type {
 	ListChatTabsResult,
 	OpenChatTabRequest,
 } from '@/shared/ipc/contracts/chat-tab';
-import type { PiSessionSnapshotWire } from '@/shared/ipc/contracts/pi-session';
 import {
 	parseWorkspaceGitDiffScope,
 	type WorkspaceGitDiffScope,
@@ -59,6 +59,7 @@ import { resolveInsertAnchorId } from './session-tab-insert-anchor';
 import {
 	findDuplicateTerminalTabIds,
 	isLiveTerminalTab,
+	readHarnessSessionId,
 	resumeRestoredTerminalTab,
 } from './terminal-tab-restore';
 
@@ -143,24 +144,24 @@ export function useSessionTabState({
 	const { data: closedChatTabsData } = useQuery(
 		listClosedChatTabsWithSummaryQuery(workspaceId),
 	);
-	const { data: piSessionsData } = useQuery(
-		piSessionsForWorkspaceQuery(workspaceId),
+	const { data: agentSessionsData } = useQuery(
+		agentSessionsForWorkspaceQuery(workspaceId),
 	);
 
 	const openTabs = chatTabsData?.open ?? null;
 	const closedEntries = closedChatTabsData?.entries ?? null;
-	const piSessions = piSessionsData?.sessions;
+	const agentSessions = agentSessionsData?.sessions;
 
-	const piStatusByPiSessionId = useMemo(() => {
-		const map = new Map<string, PiSessionSnapshotWire>();
-		if (!piSessions) {
+	const agentStatusByAgentSessionId = useMemo(() => {
+		const map = new Map<string, AgentSessionSnapshotWire>();
+		if (!agentSessions) {
 			return map;
 		}
-		for (const session of piSessions) {
+		for (const session of agentSessions) {
 			map.set(session.id, session);
 		}
 		return map;
-	}, [piSessions]);
+	}, [agentSessions]);
 
 	// Live window titles agent harnesses emit via OSC escapes, keyed by their
 	// backing terminal id, so a running agent's own conversation title surfaces
@@ -197,7 +198,7 @@ export function useSessionTabState({
 		return openTabs.map((tab) => {
 			const model = toSessionTabModel(
 				tab,
-				piStatusByPiSessionId.get(tab.piSessionId ?? ''),
+				agentStatusByAgentSessionId.get(tab.agentSessionId ?? ''),
 			);
 			if (model.kind === 'terminal') {
 				const liveTitle = terminalTitles[model.terminalId];
@@ -212,7 +213,7 @@ export function useSessionTabState({
 			}
 			return model;
 		});
-	}, [busyTerminalIds, openTabs, piStatusByPiSessionId, terminalTitles]);
+	}, [agentStatusByAgentSessionId, busyTerminalIds, openTabs, terminalTitles]);
 
 	const closedSessions = useMemo<SessionTabModel[]>(() => {
 		if (!closedEntries) {
@@ -243,16 +244,17 @@ export function useSessionTabState({
 			queryKey: ensemblrQueryKeys.closedChatTabsWithSummary(workspaceId),
 		});
 		// The timeline resolves a tab's branch id out of the session list, so a tab
-		// that just gained a Pi session has no branch to query until this refetches.
+		// that just gained an agent session has no branch to query until this
+		// refetches.
 		void queryClient.invalidateQueries({
-			queryKey: ensemblrQueryKeys.piSessionsForWorkspace(workspaceId),
+			queryKey: ensemblrQueryKeys.agentSessionsForWorkspace(workspaceId),
 		});
 	}, [queryClient, workspaceId]);
 
-	// Refresh the Pi session list on status events across ALL sessions in this
+	// Refresh the agent session list on status events across ALL sessions in this
 	// workspace so inactive-tab spinners update. The composer-bound subscription
 	// filters to one session id and would otherwise miss background-tab changes.
-	usePiSessionStatusInvalidation(workspaceId);
+	useAgentSessionStatusInvalidation(workspaceId);
 
 	// An agent opening or closing a tab (main → renderer) is invisible to the
 	// tab list, which is a cached query only invalidated by renderer-local
@@ -642,9 +644,10 @@ export function useSessionTabState({
 
 	/**
 	 * For a closing terminal (harness) tab, kills its live PTY and returns the
-	 * close patch stamping the final title + native session id onto the archived
-	 * tab so the history row shows the conversation and a restore can reattach it.
-	 * Returns undefined for non-terminal tabs, which need no sidecar teardown.
+	 * close patch stamping the final title + native harness session id onto the
+	 * archived tab so the history row shows the conversation and a restore can
+	 * reattach it. Returns undefined for non-terminal tabs, which need no sidecar
+	 * teardown.
 	 */
 	const closeTerminalSidecar = useCallback(
 		(
@@ -658,9 +661,9 @@ export function useSessionTabState({
 			const terminalId = closing.terminalId;
 			void window.ensemblr?.killTerminalSession({ terminalId });
 			const title = terminalTitlesRef.current[terminalId];
-			const agentSessionId =
+			const harnessSessionId =
 				terminalSessionIdsRef.current[terminalId] ??
-				closing.agentSessionId ??
+				closing.harnessSessionId ??
 				null;
 			// The PTY is gone once closed; drop its ref entries so the maps do not
 			// accumulate across a long-lived workspace of spawned/closed terminals.
@@ -670,7 +673,7 @@ export function useSessionTabState({
 			// a previously-persisted id (e.g. a tab closed before a re-poll), leaving
 			// the archived tab unresumable and forcing a fresh session on restore.
 			return {
-				...(agentSessionId ? { metadataPatch: { agentSessionId } } : {}),
+				...(harnessSessionId ? { metadataPatch: { harnessSessionId } } : {}),
 				...(title ? { fullTitle: title.full, title: title.display } : {}),
 			};
 		},
@@ -756,9 +759,9 @@ export function useSessionTabState({
 			if (!tab) {
 				return;
 			}
-			if (event.session.agentSessionId) {
+			if (event.session.harnessSessionId) {
 				terminalSessionIdsRef.current[event.terminalId] =
-					event.session.agentSessionId;
+					event.session.harnessSessionId;
 			}
 			const liveTitle = resolveLiveTerminalTitle(
 				tab.harnessId,
@@ -843,7 +846,12 @@ export function useSessionTabState({
 				void closeSessionTabAsync(session.id);
 				continue;
 			}
-			const { agentSessionId, harnessId, id: chatTabId, terminalId } = session;
+			const {
+				harnessSessionId,
+				harnessId,
+				id: chatTabId,
+				terminalId,
+			} = session;
 			void api
 				.terminalSnapshot({ terminalId })
 				.then((snapshot) => {
@@ -857,16 +865,16 @@ export function useSessionTabState({
 					// fresh. This mirrors the pre-exact-resume behavior so a tab whose id
 					// never persisted still reattaches instead of opening a blank session.
 					const cwdContinue =
-						!agentSessionId && !resumedHarnessIds.has(harnessId);
+						!harnessSessionId && !resumedHarnessIds.has(harnessId);
 					if (cwdContinue) {
 						resumedHarnessIds.add(harnessId);
 					}
 					return api
 						.resumeAgentHarness({
 							chatTabId,
-							fresh: !agentSessionId && !cwdContinue,
+							fresh: !harnessSessionId && !cwdContinue,
 							harnessId,
-							sessionId: agentSessionId ?? undefined,
+							sessionId: harnessSessionId ?? undefined,
 							workspaceId,
 						})
 						.then((result) => {
@@ -1028,13 +1036,13 @@ function diffTabTitle(filePath: string, scope?: WorkspaceGitDiffScope): string {
 
 /** Shared identity fields every session-tab model carries, derived from the row. */
 type SessionTabBaseFields = {
+	agentSessionId: string | null;
 	chatTabId: string;
 	fullLabel: string;
 	id: string;
 	isPreview: boolean;
 	isSubAgent: boolean;
 	label: string;
-	piSessionId: string | null;
 	status: SessionTabModel['status'];
 	summary: string;
 	updatedLabel: string;
@@ -1067,7 +1075,7 @@ function toTerminalSessionTab(
 ): SessionTabModel {
 	return {
 		...base,
-		agentSessionId: metadataString(tab.metadata.agentSessionId, '') || null,
+		harnessSessionId: readHarnessSessionId(tab.metadata) ?? null,
 		harnessId: metadataString(tab.metadata.harnessId, ''),
 		harnessLabel: metadataString(tab.metadata.harnessLabel, base.label),
 		kind: 'terminal',
@@ -1092,17 +1100,17 @@ function toDocumentSessionTab(
 /** Maps an open chat-tab wire row into a renderer-facing `SessionTabModel`. */
 function toSessionTabModel(
 	tab: ChatTabWire,
-	piSession: PiSessionSnapshotWire | undefined,
+	agentSession: AgentSessionSnapshotWire | undefined,
 ): SessionTabModel {
 	const base: SessionTabBaseFields = {
+		agentSessionId: tab.agentSessionId,
 		chatTabId: tab.id,
 		fullLabel: tab.fullTitle || tab.title,
 		id: tab.id,
 		isPreview: tab.isPreview,
 		isSubAgent: tab.metadata.agentRole === 'subagent',
 		label: tab.title,
-		piSessionId: tab.piSessionId,
-		status: deriveTabStatus(piSession),
+		status: deriveTabStatus(agentSession),
 		summary: '',
 		updatedLabel: '',
 	};
@@ -1124,14 +1132,17 @@ function toSessionTabModel(
 	}
 }
 
-/** Maps a Pi session's runtime status to the tab spinner state. */
+/** Maps an agent session's runtime status to the tab spinner state. */
 function deriveTabStatus(
-	piSession: PiSessionSnapshotWire | undefined,
+	agentSession: AgentSessionSnapshotWire | undefined,
 ): SessionTabModel['status'] {
-	if (!piSession?.runtimeOpen) {
+	if (!agentSession?.runtimeOpen) {
 		return 'idle';
 	}
-	if (piSession.status === 'starting' || piSession.status === 'streaming') {
+	if (
+		agentSession.status === 'starting' ||
+		agentSession.status === 'streaming'
+	) {
 		return 'working';
 	}
 	return 'idle';
@@ -1142,6 +1153,7 @@ function toClosedSessionTabModel(
 	entry: ClosedChatTabEntryWire,
 ): SessionTabModel {
 	const base: SessionTabBaseFields = {
+		agentSessionId: entry.tab.agentSessionId,
 		chatTabId: entry.tab.id,
 		fullLabel:
 			entry.tab.fullTitle ||
@@ -1155,7 +1167,6 @@ function toClosedSessionTabModel(
 		// LLM-derived summary title is verbose and often diverges from what
 		// the user saw, so it is only used when no tab title exists.
 		label: entry.tab.title || entry.summaryTitle || 'Untitled chat',
-		piSessionId: entry.tab.piSessionId,
 		status: 'idle',
 		summary: entry.summaryPath,
 		updatedLabel: formatRelativeClosedAt(entry.closedAt),

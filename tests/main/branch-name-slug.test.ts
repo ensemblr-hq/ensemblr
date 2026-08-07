@@ -4,7 +4,7 @@ import {
 	composeRenamedBranch,
 	isWorkspaceNameable,
 	sanitizeBranchSlug,
-} from '../../src/main/pi-agent/branch-name-slug';
+} from '../../src/main/agent-runtime/branch-name-slug';
 import {
 	branchNameFromRef,
 	joinBranchName,

@@ -1,14 +1,11 @@
+import type { AgentAdapterSession } from '../../agent-runtime/agent-adapter.ts';
 import type {
-	PiAgentAdapterSession,
-	// re-used via metadata snapshot
-} from '../pi-agent-adapter.ts';
-import type {
-	PiAgentEventListener,
-	PiAgentSessionMetadata,
-} from '../pi-agent-types.ts';
+	AgentEventListener,
+	AgentSessionMetadata,
+} from '../../agent-runtime/agent-types.ts';
 
 /**
- * Builds the placeholder `PiAgentAdapterSession` returned when `spawn` throws
+ * Builds the placeholder `AgentAdapterSession` returned when `spawn` throws
  * synchronously. The placeholder honors the adapter contract: `subscribe`
  * replays a `spawn-error` followed by a `crashed` shutdown to late
  * subscribers so they observe the terminal state.
@@ -24,11 +21,11 @@ export function createSpawnFailureSession({
 	onClose,
 }: {
 	detail: string;
-	listeners: Set<PiAgentEventListener>;
-	metadata: PiAgentSessionMetadata;
+	listeners: Set<AgentEventListener>;
+	metadata: AgentSessionMetadata;
 	now: () => Date;
 	onClose: () => void;
-}): PiAgentAdapterSession {
+}): AgentAdapterSession {
 	let closed = false;
 	// The spawn-failure placeholder is registered in the adapter's open-session
 	// set like any session; removing it on close/abort keeps it from lingering

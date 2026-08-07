@@ -2,10 +2,11 @@
  * Wire contracts for chat-tab IPC. Mirrors the renderer-facing shape of
  * `chat_tabs` rows so the renderer never depends on storage internals.
  */
-import type { ChatTabKindWire } from './pi-session.ts';
+import type { ChatTabKindWire } from './agent-session.ts';
 
 /** Renderer-facing snapshot of a chat-tab row. */
 export interface ChatTabWire {
+	agentSessionId: string | null;
 	closedAt: string | null;
 	/**
 	 * Untruncated title. `title` is capped for tab display, so this is what a
@@ -22,7 +23,6 @@ export interface ChatTabWire {
 	kind: ChatTabKindWire;
 	metadata: Record<string, unknown>;
 	openedAt: string;
-	piSessionId: string | null;
 	position: number;
 	title: string;
 	workspaceId: string;
@@ -56,6 +56,7 @@ export interface ListChatTabsResult {
  * `{ filePath }`) and re-focus an already-open tab for the same subject.
  */
 export interface OpenChatTabRequest {
+	agentSessionId?: string | null;
 	/**
 	 * Open tab the new tab is placed directly to the right of, used by tabs opened
 	 * from inside a conversation (file, diff, comment, terminal) so they appear
@@ -65,7 +66,6 @@ export interface OpenChatTabRequest {
 	insertAfterChatTabId?: string | null;
 	kind?: ChatTabKindWire;
 	metadata?: Record<string, unknown>;
-	piSessionId?: string | null;
 	/**
 	 * Opens the tab as the workspace's single ephemeral preview slot: the next
 	 * preview open retargets this same tab instead of adding another one, until
@@ -83,7 +83,7 @@ export interface OpenChatTabResult {
 }
 
 /**
- * Close a chat tab. Summaries are refreshed by the Pi session lifecycle after
+ * Close a chat tab. Summaries are refreshed by the agent session lifecycle after
  * agent responses; close only marks `closed_at`. If this is the workspace's
  * final open tab, the handler is a no-op so the min-one-tab invariant holds
  * without creating a replacement.
@@ -93,7 +93,7 @@ export interface CloseChatTabRequest {
 	/**
 	 * Final title to stamp on a terminal (harness) tab as it is archived, so the
 	 * closed-history row shows the conversation title rather than the harness
-	 * label. Ignored for chat tabs, whose title is owned by the Pi session.
+	 * label. Ignored for chat tabs, whose title is owned by the agent session.
 	 */
 	title?: string;
 	/**
@@ -103,9 +103,11 @@ export interface CloseChatTabRequest {
 	fullTitle?: string;
 	/**
 	 * Metadata fields to merge onto a terminal (harness) tab as it is archived, so
-	 * a restored tab can reattach the exact conversation. Ignored for chat tabs.
+	 * a restored tab can reattach the exact conversation. `harnessSessionId` is the
+	 * harness CLI's native session id, not the tab's Ensemblr `agentSessionId`.
+	 * Ignored for chat tabs.
 	 */
-	metadataPatch?: { agentSessionId?: string | null };
+	metadataPatch?: { harnessSessionId?: string | null };
 }
 
 /** Result of closing a chat tab. */
@@ -154,14 +156,14 @@ export interface PinChatTabResult {
 	tab: ChatTabWire | null;
 }
 
-/** Attach a Pi session to an already-open tab. */
-export interface BindPiSessionToTabRequest {
+/** Attach an agent session to an already-open tab. */
+export interface BindAgentSessionToTabRequest {
+	agentSessionId: string;
 	chatTabId: string;
-	piSessionId: string;
 }
 
-/** Result of binding a Pi session to an open chat tab. */
-export interface BindPiSessionToTabResult {
+/** Result of binding an agent session to an open chat tab. */
+export interface BindAgentSessionToTabResult {
 	ok: true;
 }
 
@@ -176,14 +178,14 @@ export interface ListClosedChatTabsWithSummaryResult {
 }
 
 /**
- * Chat-tab IPC surface (open / close / restore / bind to Pi session, plus list
+ * Chat-tab IPC surface (open / close / restore / bind to agent session, plus list
  * queries). CHAT-FRAGILE — keep these signatures byte-for-byte identical to
  * the legacy `EnsemblrApi` slice; renderer state-machines depend on them.
  */
 export interface ChatTabApi {
-	bindPiSessionToChatTab: (
-		request: BindPiSessionToTabRequest,
-	) => Promise<BindPiSessionToTabResult>;
+	bindAgentSessionToChatTab: (
+		request: BindAgentSessionToTabRequest,
+	) => Promise<BindAgentSessionToTabResult>;
 	closeChatTab: (request: CloseChatTabRequest) => Promise<CloseChatTabResult>;
 	listChatTabs: (request: ListChatTabsRequest) => Promise<ListChatTabsResult>;
 	listClosedChatTabsWithSummary: (

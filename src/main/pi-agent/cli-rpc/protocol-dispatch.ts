@@ -1,10 +1,10 @@
 import { skillInvocationKey } from '../../../shared/pi-skill-invocation.ts';
 import type {
-	PiAgentErrorCode,
-	PiAgentEvent,
-	PiAgentSessionMetadata,
-	PiAgentSessionStatus,
-} from '../pi-agent-types.ts';
+	AgentErrorCode,
+	AgentEvent,
+	AgentSessionMetadata,
+	AgentSessionStatus,
+} from '../../agent-runtime/agent-types.ts';
 import {
 	extractMessageId,
 	isMessageRole,
@@ -26,18 +26,18 @@ import {
  * focused on switch-by-frame-type behavior without owning lifecycle state.
  */
 export interface ProtocolDispatchDeps {
-	emit: (event: PiAgentEvent) => void;
+	emit: (event: AgentEvent) => void;
 	emitError: (
-		code: PiAgentErrorCode,
+		code: AgentErrorCode,
 		message: string,
 		detail?: string,
 		recoverable?: boolean,
 	) => void;
 	patchMetadata: (
-		patch: Partial<PiAgentSessionMetadata>,
+		patch: Partial<AgentSessionMetadata>,
 		options?: { silent?: boolean },
-	) => PiAgentSessionMetadata;
-	setStatus: (next: PiAgentSessionStatus) => void;
+	) => AgentSessionMetadata;
+	setStatus: (next: AgentSessionStatus) => void;
 	requestContextUsage: () => void;
 	now: () => Date;
 	/** Pending `get_session_stats` request ids (mutated by both sides). */

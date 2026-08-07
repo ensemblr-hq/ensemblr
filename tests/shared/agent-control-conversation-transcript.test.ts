@@ -6,19 +6,19 @@ import {
 	type TranscriptSourceEvent,
 } from '../../src/shared/agent-control/conversation-transcript.ts';
 import type {
-	PiPersistedEnvelope,
-	PiWireMessagePart,
-} from '../../src/shared/ipc/contracts/pi-message-payloads.ts';
+	AgentPersistedEnvelope,
+	AgentWireMessagePart,
+} from '../../src/shared/ipc/contracts/agent-message-payloads.ts';
 
-const PI_SESSION_ID = 'session-1';
+const AGENT_SESSION_ID = 'session-1';
 
-const userPrompt = (prompt: string): PiPersistedEnvelope => ({
+const userPrompt = (prompt: string): AgentPersistedEnvelope => ({
 	kind: 'message',
 	payload: { kind: 'prompt', prompt },
 	role: 'user',
 });
 
-const agentText = (text: string): PiPersistedEnvelope => ({
+const agentText = (text: string): AgentPersistedEnvelope => ({
 	kind: 'message',
 	payload: { kind: 'text', text },
 	role: 'agent',
@@ -28,7 +28,7 @@ const toolCall = (
 	toolCallId: string,
 	name: string,
 	input: unknown,
-): PiPersistedEnvelope => ({
+): AgentPersistedEnvelope => ({
 	kind: 'message',
 	payload: { input, kind: 'tool-call', name, toolCallId },
 	role: 'tool',
@@ -38,22 +38,22 @@ const toolResult = (
 	toolCallId: string,
 	output: unknown,
 	isError = false,
-): PiPersistedEnvelope => ({
+): AgentPersistedEnvelope => ({
 	kind: 'message',
 	payload: { isError, kind: 'tool-result', output, toolCallId },
 	role: 'tool',
 });
 
 const composite = (
-	parts: readonly PiWireMessagePart[],
-): PiPersistedEnvelope => ({
+	parts: readonly AgentWireMessagePart[],
+): AgentPersistedEnvelope => ({
 	kind: 'message',
 	payload: { kind: 'message', parts, role: 'assistant' },
 	role: 'agent',
 });
 
 const branch = (
-	...payloads: readonly (PiPersistedEnvelope | null)[]
+	...payloads: readonly (AgentPersistedEnvelope | null)[]
 ): TranscriptSourceEvent[] =>
 	payloads.map((payload, index) => ({
 		ordinal: index + 1,
@@ -71,7 +71,7 @@ const read = (
 ) =>
 	buildConversationTranscript({
 		events,
-		piSessionId: PI_SESSION_ID,
+		agentSessionId: AGENT_SESSION_ID,
 		...options,
 	});
 
@@ -85,7 +85,7 @@ describe('buildConversationTranscript', () => {
 			firstOrdinal: null,
 			lastOrdinal: null,
 			nextOrdinal: null,
-			piSessionId: PI_SESSION_ID,
+			agentSessionId: AGENT_SESSION_ID,
 			turnCount: 0,
 		});
 	});
@@ -514,7 +514,7 @@ describe('buildConversationTranscript', () => {
 			firstOrdinal: 1,
 			lastOrdinal: 3,
 			nextOrdinal: null,
-			piSessionId: PI_SESSION_ID,
+			agentSessionId: AGENT_SESSION_ID,
 			turnCount: 1,
 		});
 	});

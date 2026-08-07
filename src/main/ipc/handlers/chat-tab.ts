@@ -1,7 +1,7 @@
 import { ipcMain } from 'electron';
 import { IPC_CHANNELS } from '../../../shared/ipc/channels';
 import type {
-	BindPiSessionToTabResult,
+	BindAgentSessionToTabResult,
 	ChatTabWire,
 	CloseChatTabResult,
 	ListChatTabsResult,
@@ -15,7 +15,7 @@ import type { ChatTabService } from '../../chat-tabs';
 import { isPreviewTab } from '../../chat-tabs/preview-tab-slot.ts';
 import type { ChatTabRow } from '../../storage/repositories';
 import {
-	bindPiSessionToChatTabRequestSchema,
+	bindAgentSessionToChatTabRequestSchema,
 	closeChatTabRequestSchema,
 	listChatTabsRequestSchema,
 	listClosedChatTabsWithSummaryRequestSchema,
@@ -99,10 +99,10 @@ export function registerChatTabHandlers({
 	);
 
 	ipcMain.handle(
-		IPC_CHANNELS.bindPiSessionToChatTab,
-		async (_event, raw: unknown): Promise<BindPiSessionToTabResult> => {
-			const request = bindPiSessionToChatTabRequestSchema.parse(raw);
-			chatTabService.bindPiSession(request);
+		IPC_CHANNELS.bindAgentSessionToChatTab,
+		async (_event, raw: unknown): Promise<BindAgentSessionToTabResult> => {
+			const request = bindAgentSessionToChatTabRequestSchema.parse(raw);
+			chatTabService.bindAgentSession(request);
 			return { ok: true };
 		},
 	);
@@ -141,7 +141,7 @@ function toWire(row: ChatTabRow): ChatTabWire {
 		kind: row.kind,
 		metadata: row.metadata,
 		openedAt: row.openedAt,
-		piSessionId: row.piSessionId,
+		agentSessionId: row.agentSessionId,
 		position: row.position,
 		title: row.title,
 		workspaceId: row.workspaceId,

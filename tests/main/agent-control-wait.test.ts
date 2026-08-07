@@ -32,7 +32,7 @@ const makeScheduler = (): WaitScheduler => {
  */
 const makePorts = (
 	statuses: Map<string, string>,
-	lastMessage: (piSessionId: string) => string = (id) => `msg:${id}`,
+	lastMessage: (agentSessionId: string) => string = (id) => `msg:${id}`,
 ): AgentControlPorts => ({
 	workspaces: { listWorkspaces: vi.fn().mockResolvedValue([]) },
 	tabs: {
@@ -45,24 +45,24 @@ const makePorts = (
 	conversations: {
 		startConversation: vi
 			.fn()
-			.mockResolvedValue({ chatTabId: 't', piSessionId: 'p' }),
+			.mockResolvedValue({ chatTabId: 't', agentSessionId: 'p' }),
 		sendFollowUp: vi.fn().mockResolvedValue(undefined),
 		setName: vi.fn().mockResolvedValue(null),
 		waitForIdle: vi.fn().mockResolvedValue('completed'),
 		getStatus: vi.fn<
 			(
-				piSessionId: string,
+				agentSessionId: string,
 			) => Promise<Omit<
 				AgentControlConversationStatus,
 				'hasFinalMessage'
 			> | null>
-		>(async (piSessionId) => {
-			const status = statuses.get(piSessionId);
-			return status ? { piSessionId, status, runtimeOpen: true } : null;
+		>(async (agentSessionId) => {
+			const status = statuses.get(agentSessionId);
+			return status ? { agentSessionId, status, runtimeOpen: true } : null;
 		}),
 		hasFinalMessage: vi.fn().mockResolvedValue(false),
-		getLastMessage: vi.fn(async (piSessionId: string) =>
-			lastMessage(piSessionId),
+		getLastMessage: vi.fn(async (agentSessionId: string) =>
+			lastMessage(agentSessionId),
 		),
 		readTranscript: vi.fn().mockResolvedValue({
 			entries: [],
@@ -70,7 +70,7 @@ const makePorts = (
 			firstOrdinal: null,
 			lastOrdinal: null,
 			nextOrdinal: null,
-			piSessionId: 'p',
+			agentSessionId: 'p',
 			turnCount: 0,
 		}),
 		isSpawnedSubAgent: vi.fn().mockResolvedValue(false),
@@ -126,7 +126,7 @@ const setup = (options: {
 	statuses: Map<string, string>;
 	children: string[];
 	guardrails?: Parameters<typeof createGuardrails>[0];
-	lastMessage?: (piSessionId: string) => string;
+	lastMessage?: (agentSessionId: string) => string;
 }) => {
 	const registry: OriginRegistry = createOriginRegistry({
 		generateToken: () => `tok-${Math.random()}`,
@@ -170,7 +170,7 @@ describe('agent-control waitForAgents', () => {
 			expect(data.timedOut).toBe(false);
 			expect(data.completed).toHaveLength(1);
 			expect(data.completed[0]).toMatchObject({
-				piSessionId: 'c1',
+				agentSessionId: 'c1',
 				status: 'idle',
 				lastMessage: 'msg:c1',
 			});
@@ -192,7 +192,7 @@ describe('agent-control waitForAgents', () => {
 		if (result.ok) {
 			const data = result.data as WaitForAgentsResult;
 			expect(data.timedOut).toBe(false);
-			expect(data.completed.map((c) => c.piSessionId).sort()).toEqual([
+			expect(data.completed.map((c) => c.agentSessionId).sort()).toEqual([
 				'c1',
 				'c2',
 			]);
@@ -214,7 +214,7 @@ describe('agent-control waitForAgents', () => {
 		if (result.ok) {
 			const data = result.data as WaitForAgentsResult;
 			expect(data.timedOut).toBe(true);
-			expect(data.completed.map((c) => c.piSessionId)).toEqual(['c1']);
+			expect(data.completed.map((c) => c.agentSessionId)).toEqual(['c1']);
 		}
 	});
 
@@ -347,7 +347,7 @@ describe('agent-control waitForAgents', () => {
 			expect(data.timedOut).toBe(false);
 			expect(data.completed).toHaveLength(1);
 			expect(data.completed[0]).toMatchObject({
-				piSessionId: 'c2',
+				agentSessionId: 'c2',
 				signal: { reason: 'need_decision', message: 'which framework?' },
 			});
 		}
@@ -368,7 +368,7 @@ describe('agent-control waitForAgents', () => {
 			expect(data.completed).toEqual([]);
 			expect(data.timedOut).toBe(false);
 			expect(data.pending).toEqual([
-				{ piSessionId: 'c1', status: 'streaming' },
+				{ agentSessionId: 'c1', status: 'streaming' },
 			]);
 		}
 	});
@@ -404,7 +404,7 @@ describe('agent-control waitForAgents', () => {
 			const data = result.data as WaitForAgentsResult;
 			expect(data.completed).toHaveLength(1);
 			expect(data.completed[0]).toMatchObject({
-				piSessionId: 'c1',
+				agentSessionId: 'c1',
 				signal: { reason: 'need_decision', message: 'which framework?' },
 			});
 		}
@@ -436,9 +436,11 @@ describe('agent-control waitForAgents', () => {
 		if (result.ok) {
 			const data = result.data as WaitForAgentsResult;
 			expect(data.timedOut).toBe(false);
-			expect(data.completed.map((agent) => agent.piSessionId)).toEqual(['c2']);
+			expect(data.completed.map((agent) => agent.agentSessionId)).toEqual([
+				'c2',
+			]);
 			expect(data.pending).toEqual([
-				{ piSessionId: 'c1', status: 'streaming' },
+				{ agentSessionId: 'c1', status: 'streaming' },
 			]);
 		}
 	});
@@ -467,7 +469,9 @@ describe('agent-control waitForAgents', () => {
 		if (result.ok) {
 			const data = result.data as WaitForAgentsResult;
 			expect(data.timedOut).toBe(true);
-			expect(data.completed.map((agent) => agent.piSessionId)).toEqual(['c1']);
+			expect(data.completed.map((agent) => agent.agentSessionId)).toEqual([
+				'c1',
+			]);
 		}
 	});
 
@@ -489,10 +493,12 @@ describe('agent-control waitForAgents', () => {
 		expect(result.ok).toBe(true);
 		if (result.ok) {
 			const data = result.data as WaitForAgentsResult;
-			expect(data.completed.map((agent) => agent.piSessionId)).toEqual(['c1']);
+			expect(data.completed.map((agent) => agent.agentSessionId)).toEqual([
+				'c1',
+			]);
 			expect(data.pending).toEqual([
-				{ piSessionId: 'c2', status: 'streaming' },
-				{ piSessionId: 'c3', status: 'streaming' },
+				{ agentSessionId: 'c2', status: 'streaming' },
+				{ agentSessionId: 'c3', status: 'streaming' },
 			]);
 		}
 	});
@@ -605,9 +611,9 @@ describe('agent-control waitForAgents', () => {
 				['c2', 'streaming'],
 			]),
 			children: ['c1', 'c2'],
-			lastMessage: (piSessionId) => {
-				reads.push(piSessionId);
-				return `msg:${piSessionId}`;
+			lastMessage: (agentSessionId) => {
+				reads.push(agentSessionId);
+				return `msg:${agentSessionId}`;
 			},
 		});
 
@@ -623,7 +629,7 @@ describe('agent-control waitForAgents', () => {
 			expect(data.timedOut).toBe(true);
 			expect(data.completed).toEqual([
 				{
-					piSessionId: 'c1',
+					agentSessionId: 'c1',
 					status: 'idle',
 					lastMessage: 'msg:c1',
 					reportTruncated: false,
@@ -631,7 +637,7 @@ describe('agent-control waitForAgents', () => {
 				},
 			]);
 			expect(data.pending).toEqual([
-				{ piSessionId: 'c2', status: 'streaming' },
+				{ agentSessionId: 'c2', status: 'streaming' },
 			]);
 		}
 		expect(reads).toEqual(['c1']);

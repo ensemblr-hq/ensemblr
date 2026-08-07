@@ -11,7 +11,7 @@ import type { SessionTabModel } from '../../src/renderer/types/workbench';
 
 function createTab(
 	overrides: Partial<
-		Pick<SessionTabModel, 'id' | 'piSessionId' | 'status'>
+		Pick<SessionTabModel, 'id' | 'agentSessionId' | 'status'>
 	> = {},
 ): SessionTabModel {
 	return {
@@ -21,7 +21,7 @@ function createTab(
 		isSubAgent: false,
 		kind: 'chat',
 		label: 'Chat',
-		piSessionId: null,
+		agentSessionId: null,
 		status: 'idle',
 		summary: '',
 		updatedLabel: '',
@@ -100,7 +100,7 @@ describe('selectSuccessorTabId', () => {
 
 describe('decideActiveClose', () => {
 	test('closes the active tab when more than one is open', () => {
-		const active = createTab({ id: 'chat-2', piSessionId: 'pi-2' });
+		const active = createTab({ id: 'chat-2', agentSessionId: 'agent-2' });
 		const decision = decideActiveClose(
 			[createTab(), active],
 			active,
@@ -109,12 +109,12 @@ describe('decideActiveClose', () => {
 	});
 
 	test('no-ops when the sole tab is a fresh, unbound chat', () => {
-		const active = createTab({ piSessionId: null });
+		const active = createTab({ agentSessionId: null });
 		expect(decideActiveClose([active], active)).toEqual({ kind: 'noop' });
 	});
 
 	test('resets when the sole tab has a Pi session bound', () => {
-		const active = createTab({ id: 'chat-9', piSessionId: 'pi-9' });
+		const active = createTab({ id: 'chat-9', agentSessionId: 'agent-9' });
 		expect(decideActiveClose([active], active)).toEqual({
 			kind: 'reset',
 			activeId: 'chat-9',
@@ -124,7 +124,7 @@ describe('decideActiveClose', () => {
 
 describe('resolveRunningCloseTarget', () => {
 	test('uses the live streaming flag for the active tab', () => {
-		const active = createTab({ id: 'chat-1', piSessionId: 'pi-1' });
+		const active = createTab({ id: 'chat-1', agentSessionId: 'agent-1' });
 		expect(
 			resolveRunningCloseTarget({
 				activeSessionId: 'chat-1',
@@ -132,14 +132,14 @@ describe('resolveRunningCloseTarget', () => {
 				tabs: [active],
 				targetId: 'chat-1',
 			}),
-		).toEqual({ isRunning: true, piSessionId: 'pi-1' });
+		).toEqual({ isRunning: true, agentSessionId: 'agent-1' });
 	});
 
 	test('reports the active tab as idle when it is not streaming', () => {
 		// `status` is 'working' but the live composer flag wins for the active tab.
 		const active = createTab({
 			id: 'chat-1',
-			piSessionId: 'pi-1',
+			agentSessionId: 'agent-1',
 			status: 'working',
 		});
 		expect(
@@ -149,13 +149,13 @@ describe('resolveRunningCloseTarget', () => {
 				tabs: [active],
 				targetId: 'chat-1',
 			}),
-		).toEqual({ isRunning: false, piSessionId: 'pi-1' });
+		).toEqual({ isRunning: false, agentSessionId: 'agent-1' });
 	});
 
 	test('falls back to persisted status for a background tab', () => {
 		const background = createTab({
 			id: 'chat-2',
-			piSessionId: 'pi-2',
+			agentSessionId: 'agent-2',
 			status: 'working',
 		});
 		expect(
@@ -165,11 +165,11 @@ describe('resolveRunningCloseTarget', () => {
 				tabs: [createTab(), background],
 				targetId: 'chat-2',
 			}),
-		).toEqual({ isRunning: true, piSessionId: 'pi-2' });
+		).toEqual({ isRunning: true, agentSessionId: 'agent-2' });
 	});
 
 	test('reports an idle background tab as not running', () => {
-		const background = createTab({ id: 'chat-2', piSessionId: 'pi-2' });
+		const background = createTab({ id: 'chat-2', agentSessionId: 'agent-2' });
 		expect(
 			resolveRunningCloseTarget({
 				activeSessionId: 'chat-1',
@@ -177,7 +177,7 @@ describe('resolveRunningCloseTarget', () => {
 				tabs: [createTab(), background],
 				targetId: 'chat-2',
 			}),
-		).toEqual({ isRunning: false, piSessionId: 'pi-2' });
+		).toEqual({ isRunning: false, agentSessionId: 'agent-2' });
 	});
 
 	test('treats an unknown target as not running with no session', () => {
@@ -188,6 +188,6 @@ describe('resolveRunningCloseTarget', () => {
 				tabs: [createTab()],
 				targetId: 'missing',
 			}),
-		).toEqual({ isRunning: false, piSessionId: null });
+		).toEqual({ isRunning: false, agentSessionId: null });
 	});
 });

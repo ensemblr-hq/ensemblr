@@ -1,5 +1,5 @@
 /**
- * The agent question dialog. A Pi agent that calls `ask_user_question` is
+ * The agent question dialog. An agent that calls `ask_user_question` is
  * blocked until this resolves, so it takes the composer's place in the chat that
  * asked: pick a numbered option, type your own answer, or dismiss it.
  */

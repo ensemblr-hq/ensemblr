@@ -3,7 +3,7 @@ import { useCallback, useMemo } from 'react';
 
 /**
  * Optimistically rendered user prompt that has been submitted by the composer
- * but is not yet reflected in the persisted Pi event stream. The Timeline
+ * but is not yet reflected in the persisted agent event stream. The Timeline
  * renders these as synthetic user messages and removes them once a matching
  * persisted event lands.
  */
@@ -14,7 +14,7 @@ export interface OptimisticPrompt {
 	submittedAt: string;
 }
 
-/** In-memory list of optimistically rendered prompts awaiting their matching persisted Pi events. */
+/** In-memory list of optimistically rendered prompts awaiting their matching persisted agent events. */
 const optimisticPromptsAtom = atom<readonly OptimisticPrompt[]>([]);
 
 /**

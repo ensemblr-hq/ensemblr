@@ -1,5 +1,5 @@
 /**
- * Renders the per-turn upkeep block appended to a Pi agent's system prompt.
+ * Renders the per-turn upkeep block appended to an agent's system prompt.
  *
  * The three naming tools are also described in the role playbooks, but a
  * playbook is static: a long skill invocation, or Plan Mode's instruction that

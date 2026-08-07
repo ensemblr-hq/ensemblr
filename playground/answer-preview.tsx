@@ -3,7 +3,7 @@ import {
 	FilePreviewOpenerProvider,
 	WorkspacePathResolverProvider,
 } from '@/renderer/components/workbench-shell/conversation-panel/file-preview-context';
-import { createWorkspacePathResolver } from '@/renderer/lib/pi';
+import { createWorkspacePathResolver } from '@/renderer/lib/agent-timeline';
 import type { WorkspaceFileSummary } from '@/renderer/types/workbench';
 
 /** Stand-in file tree the chips in `CHIP_STATES` are resolved against. */

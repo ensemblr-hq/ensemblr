@@ -163,7 +163,7 @@ rules that decide most cases:
   tab, a plan, a summary. Never `name`.
 - **`name`** — the identity of a durable, addressable thing: the workspace and
   its git branch. Qualified where the bare word would be ambiguous (`scriptName`).
-- **`<noun>Id`** — an opaque identifier: `chatTabId`, `piSessionId`,
+- **`<noun>Id`** — an opaque identifier: `chatTabId`, `agentSessionId`,
   `terminalId`, `workspaceId`, `harnessId`, `turnId`.
 - **`filePath`** — a workspace-relative path, everywhere. Never `file` or `path`.
 - Text by its audience: `prompt` to a conversation, `input` to a terminal,

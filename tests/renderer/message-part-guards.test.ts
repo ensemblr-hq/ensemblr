@@ -8,7 +8,7 @@ import {
 	buildSkillPart,
 	skillPartDataOf,
 } from '../../src/renderer/lib/pi/skill-part';
-import type { UIMessagePart } from '../../src/renderer/types/pi-timeline';
+import type { UIMessagePart } from '../../src/renderer/types/agent-timeline';
 
 function partWithData(type: string, data: unknown): UIMessagePart {
 	return { data, type } as unknown as UIMessagePart;

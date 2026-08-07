@@ -36,7 +36,7 @@ Pick icon names from Ensemblr's set (play, server, terminal, test-tube, flask-co
 Use the commands that actually apply to this repo, then tell me what you chose and why.`;
 
 /**
- * Builds the setup-tab "Ask agent" handler: opens a brand-new chat (fresh Pi
+ * Builds the setup-tab "Ask agent" handler: opens a brand-new chat (fresh agent
  * context) and seeds its composer with {@link ASK_AGENT_SETUP_PROMPT}.
  *
  * The seed is deferred until the new chat is the active session — only the

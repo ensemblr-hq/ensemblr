@@ -10,10 +10,12 @@ import { ComposerScene } from './composer-preview.tsx';
 import { ConflictsScene } from './conflicts-preview.tsx';
 import { ConversationScrollScene } from './conversation-scroll-preview.tsx';
 import { FilePreviewScene } from './file-preview.tsx';
+import { ProvidersScene } from './providers-preview.tsx';
 import { RightSidebarHeaderScene } from './right-sidebar-header-preview.tsx';
 import { StartingStatePreview } from './starting-state-preview.tsx';
 import { TabScrollerScene } from './tab-scroller-preview.tsx';
 import { TimelinePreview } from './timeline-preview.tsx';
+import { ToolApprovalScene } from './tool-approval-preview.tsx';
 import { TurnSummaryPreview } from './turn-summary-preview.tsx';
 import { ViewersScene } from './viewers-preview.tsx';
 
@@ -99,6 +101,18 @@ const SCENES = [
 		label: 'composer',
 		render: () => <ComposerScene />,
 		source: 'playground/composer-preview.tsx',
+	},
+	{
+		id: 'providers',
+		label: 'providers',
+		render: () => <ProvidersScene />,
+		source: 'playground/providers-preview.tsx',
+	},
+	{
+		id: 'tool-approval',
+		label: 'tool approval',
+		render: () => <ToolApprovalScene />,
+		source: 'playground/tool-approval-preview.tsx',
 	},
 ] as const;
 

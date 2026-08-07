@@ -4,44 +4,14 @@ import { IPC_CHANNELS } from '../../../shared/ipc/channels';
 import type {
 	ListPiSlashCommandsRequest,
 	ListPiSlashCommandsResult,
-	PiExecutablePathSnapshot,
-	PiExecutableSelectionResult,
-} from '../../../shared/ipc/contracts/pi-session';
+} from '../../../shared/ipc/contracts/agent-session';
 import { resolvePiSlashCommands } from '../../pi-agent/pi-slash-commands.ts';
-import type {
-	PiExecutableService,
-	PiExecutableSnapshot,
-} from '../../pi-runtime';
-import { parseSetPiExecutablePathRequest } from '../request-schemas.ts';
-import { showDirectorySelectionDialog } from './dialog-helpers.ts';
+import type { PiExecutableService } from '../../pi-runtime';
 
 /**
- * Projects the internal Pi executable snapshot onto the IPC-safe path snapshot
- * used to hydrate the Advanced settings screen. The override path is surfaced
- * only when it comes from the user's SQLite setting so the input reflects what
- * the user configured, not a config- or PATH-derived value.
- * @param snapshot - Resolved Pi executable snapshot.
- * @returns The IPC-safe path snapshot.
- */
-function toPathSnapshot(
-	snapshot: PiExecutableSnapshot,
-): PiExecutablePathSnapshot {
-	const override =
-		snapshot.setting && snapshot.setting.source === 'sqlite'
-			? String(snapshot.setting.value ?? '')
-			: null;
-
-	return {
-		overridePath: override?.trim() ? override : null,
-		resolvedPath: snapshot.path || null,
-		source: snapshot.source,
-		status: snapshot.status,
-	};
-}
-
-/**
- * Registers IPC handlers for selecting and saving a Pi executable override
- * and for surfacing pi's slash command catalog to the renderer.
+ * Registers the Pi CLI IPC handlers. Executable discovery and overrides live on
+ * the provider-parameterized `agent-provider` channels; slash commands stay
+ * here because they are a Pi CLI feature with no sibling on other runtimes.
  * @param options - Required services.
  */
 export function registerPiHandlers({
@@ -49,51 +19,6 @@ export function registerPiHandlers({
 }: {
 	piExecutableService: PiExecutableService;
 }): void {
-	ipcMain.handle(
-		IPC_CHANNELS.selectPiExecutable,
-		async (event): Promise<PiExecutableSelectionResult> => {
-			const selection = await showDirectorySelectionDialog(event, {
-				buttonLabel: 'Select Pi executable',
-				message:
-					'Select a Pi-compatible executable or wrapper script, such as pi or oh-my-pi.',
-				properties: ['openFile'],
-				title: 'Select Pi executable',
-			});
-
-			if (selection.canceled) {
-				return { canceled: true };
-			}
-
-			return piExecutableService.saveOverride(selection.path);
-		},
-	);
-
-	ipcMain.handle(
-		IPC_CHANNELS.getPiExecutablePath,
-		async (): Promise<PiExecutablePathSnapshot> =>
-			toPathSnapshot(await piExecutableService.getSnapshot()),
-	);
-
-	ipcMain.handle(
-		IPC_CHANNELS.setPiExecutablePath,
-		(_event, request: unknown): PiExecutableSelectionResult => {
-			const parsed = parseSetPiExecutablePathRequest(request);
-			if (!parsed) {
-				return {
-					canceled: false,
-					error: 'A Pi executable path is required.',
-				};
-			}
-
-			return piExecutableService.saveOverride(parsed.path);
-		},
-	);
-
-	ipcMain.handle(
-		IPC_CHANNELS.clearPiExecutablePath,
-		(): PiExecutableSelectionResult => piExecutableService.clearOverride(),
-	);
-
 	ipcMain.handle(
 		IPC_CHANNELS.listPiSlashCommands,
 		async (

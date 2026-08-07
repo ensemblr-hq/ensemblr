@@ -1,12 +1,14 @@
 /**
  * Public surface for the renderer-wide composer concern: composer-insert,
- * composer-submit, and attachment cross-component channels, the Pi composer
+ * composer-submit, and attachment cross-component channels, the agent composer
  * controller hook, and the optimistic prompt store shared between the composer
  * and the timeline.
  *
  * Outside this folder, import from `@/renderer/state/composer` only.
  */
 
+export type { AgentComposerControllerState } from './agent-composer';
+export { useAgentComposerController } from './agent-composer';
 export {
 	useComposerAttachmentDispatcher,
 	useComposerAttachmentInbox,
@@ -35,11 +37,9 @@ export {
 } from './composer-submit';
 export type { OptimisticPrompt } from './optimistic-prompts';
 export { useOptimisticPrompts } from './optimistic-prompts';
-export type { PiComposerControllerState } from './pi-composer';
-export { usePiComposerController } from './pi-composer';
 export type { PrimedAction } from './primed-action';
 export {
 	primedActionAtomFamily,
 	useComposerPrimedActionConsumer,
 } from './primed-action';
-export { useStopPiSession } from './use-stop-pi-session';
+export { useStopAgentSession } from './use-stop-agent-session';

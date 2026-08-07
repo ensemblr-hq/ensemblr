@@ -1,7 +1,7 @@
 import { useAtomValue } from 'jotai';
 import { XtermTerminal } from '@/renderer/components/workbench-shell/dock-panel/xterm-terminal';
 import { useConversationOpeners } from '@/renderer/hooks/workbench-shell/conversation-panel/use-conversation-openers';
-import type { createWorkspacePathResolver } from '@/renderer/lib/pi';
+import type { createWorkspacePathResolver } from '@/renderer/lib/agent-timeline';
 import {
 	formatLinkedIssueComposerSeed,
 	showsComposer,
@@ -84,7 +84,7 @@ export function WorkspaceConversationContent({
 	const developerMode = useAtomValue(developerModeAtom);
 	usePiRawFrameCapture(developerMode);
 	const debugSessionId =
-		activeSession.piSessionId ?? composer.activePiSessionId ?? null;
+		activeSession.agentSessionId ?? composer.activeAgentSessionId ?? null;
 	const isChatTab = (activeSession.kind ?? 'chat') === 'chat';
 
 	const { openFilePreview, openTurnDiff, resolveWorkspacePath } =
@@ -168,7 +168,7 @@ function ChatTabBody({
 						<ComposerSlot
 							chatTabId={activeSession.chatTabId}
 							composer={composer}
-							piSessionId={activeSession.piSessionId ?? null}
+							agentSessionId={activeSession.agentSessionId ?? null}
 							seedText={getLinkedIssueComposerSeed(
 								activeWorkspace,
 								activeSession,
@@ -233,7 +233,7 @@ function ActiveAuxiliaryPanel({
 
 /**
  * Composer seed for issue-created workspaces: the issue contents (heading, body,
- * link) are offered as the first-prompt draft (no Pi session yet); the user
+ * link) are offered as the first-prompt draft (no agent session yet); the user
  * edits and presses send — nothing is auto-submitted.
  */
 function getLinkedIssueComposerSeed(
@@ -242,7 +242,7 @@ function getLinkedIssueComposerSeed(
 ): string | undefined {
 	const linkedIssue = workspace.landingSummary?.linkedIssue;
 
-	if (!linkedIssue || session.piSessionId) {
+	if (!linkedIssue || session.agentSessionId) {
 		return undefined;
 	}
 

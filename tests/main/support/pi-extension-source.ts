@@ -30,6 +30,21 @@ const EXTENSION_TOOL_PATTERN =
 	/\btool\(\s*(['"])(ensemblr_[a-z_0-9]+)\1,\s*(['"])([A-Za-z]+)\3,\s*(['"])((?:\\.|(?!\5)[^\\])*)\5/gs;
 
 /**
+ * Matches a `pi.registerTool({ name, description, … })` registration, the form
+ * `ensemblr_exit_plan_mode` uses because it ends the turn itself rather than
+ * going through the shared `tool` helper.
+ */
+const EXTENSION_REGISTER_TOOL_PATTERN =
+	/name: '(ensemblr_[a-z_0-9]+)',\s*description:\s*(['"])((?:\\.|(?!\2)[^\\])*)\2/gs;
+
+/**
+ * Unescapes a captured source literal back to the string the extension registers
+ * at runtime, so it can be compared with the endpoint's copy byte for byte.
+ */
+const unescapeLiteral = (literal: string): string =>
+	literal.replace(/\\(['"\\])/g, '$1').replace(/\\n/g, '\n');
+
+/**
  * Maps an `ensemblr_*` tool name onto the control op it dispatches, following
  * the naming convention every tool registration in the extension uses.
  */
@@ -42,17 +57,18 @@ export const controlOpForToolName = (toolName: string): AgentControlOp =>
 
 /**
  * Reads each tool description the Pi extension registers, keyed by tool name, so
- * it can be held against the MCP endpoint's copy of the same string.
+ * it can be held against the MCP endpoint's copy of the same string. Covers both
+ * registration forms the extension uses.
  */
 export const extractEmbeddedToolDescriptions = (
 	source: string,
 ): Map<string, string> => {
 	const byName = new Map<string, string>();
 	for (const match of source.matchAll(EXTENSION_TOOL_PATTERN)) {
-		byName.set(
-			match[2],
-			match[6].replace(/\\(['"\\])/g, '$1').replace(/\\n/g, '\n'),
-		);
+		byName.set(match[2], unescapeLiteral(match[6]));
+	}
+	for (const match of source.matchAll(EXTENSION_REGISTER_TOOL_PATTERN)) {
+		byName.set(match[1], unescapeLiteral(match[3]));
 	}
 	return byName;
 };

@@ -2,21 +2,21 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo } from 'react';
 
 import {
+	agentSessionEventsQuery,
 	ensemblrQueryKeys,
-	piSessionEventsQuery,
-	subscribePiSessionEvents,
+	subscribeAgentSessionEvents,
 } from '@/renderer/api/ensemblr-queries';
 import type {
-	ListPiSessionEventsResult,
-	PiSessionEventWire,
-} from '@/shared/ipc/contracts/pi-session';
+	AgentSessionEventWire,
+	ListAgentSessionEventsResult,
+} from '@/shared/ipc/contracts/agent-session';
 
 /**
  * Subscribes the renderer to a single branch's event stream and returns the
  * persisted-then-live merged list in ordinal order.
  *
  * Persisted events arrive once via TanStack Query against
- * `ensemblr:list-pi-session-events`. Live events arrive through the preload
+ * `ensemblr:list-agent-session-events`. Live events arrive through the preload
  * broadcast channel and are appended to the same query cache so the UI does
  * not need a second source of truth.
  */
@@ -28,22 +28,24 @@ export function useTimelineEvents({
 	sessionId: string | null;
 }): {
 	error: unknown;
-	events: readonly PiSessionEventWire[];
+	events: readonly AgentSessionEventWire[];
 	isLoading: boolean;
 } {
 	const queryClient = useQueryClient();
-	const { data, error, isPending } = useQuery(piSessionEventsQuery(branchId));
+	const { data, error, isPending } = useQuery(
+		agentSessionEventsQuery(branchId),
+	);
 
 	useEffect(() => {
 		if (!sessionId) {
 			return undefined;
 		}
-		const unsubscribe = subscribePiSessionEvents((broadcast) => {
+		const unsubscribe = subscribeAgentSessionEvents((broadcast) => {
 			if (broadcast.sessionId !== sessionId) {
 				return;
 			}
-			queryClient.setQueryData<ListPiSessionEventsResult | undefined>(
-				ensemblrQueryKeys.piSessionEvents(broadcast.event.branchId),
+			queryClient.setQueryData<ListAgentSessionEventsResult | undefined>(
+				ensemblrQueryKeys.agentSessionEvents(broadcast.event.branchId),
 				(prev) => mergeBroadcast(prev, broadcast.event),
 			);
 		});
@@ -53,7 +55,7 @@ export function useTimelineEvents({
 		// pointless re-subscribes when the branch label changes mid-stream.
 	}, [queryClient, sessionId]);
 
-	const events = useMemo<readonly PiSessionEventWire[]>(
+	const events = useMemo<readonly AgentSessionEventWire[]>(
 		() => data?.events ?? [],
 		[data?.events],
 	);
@@ -72,9 +74,9 @@ export function useTimelineEvents({
  * @returns The updated event list result
  */
 function mergeBroadcast(
-	previous: ListPiSessionEventsResult | undefined,
-	event: PiSessionEventWire,
-): ListPiSessionEventsResult {
+	previous: ListAgentSessionEventsResult | undefined,
+	event: AgentSessionEventWire,
+): ListAgentSessionEventsResult {
 	const existing = previous?.events ?? [];
 	const tail = existing[existing.length - 1];
 	// Fast path: deltas stream in monotonic order, so an append-only push avoids

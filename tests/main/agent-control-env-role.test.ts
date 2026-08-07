@@ -36,7 +36,7 @@ const setup = (options: { markedSubAgent?: readonly string[] } = {}) => {
 		resolveWorkspaceCwd: (workspaceId) =>
 			workspaceId === WORKSPACE ? CWD : null,
 		getServerUrl: () => 'http://127.0.0.1:1234',
-		isSpawnedSubAgent: (piSessionId) => marked.has(piSessionId),
+		isSpawnedSubAgent: (agentSessionId) => marked.has(agentSessionId),
 	});
 	return { resolveAgentControlEnv };
 };

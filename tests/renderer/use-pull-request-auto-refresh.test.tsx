@@ -6,12 +6,12 @@ import type { ReactNode } from 'react';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 
 import { usePullRequestAutoRefresh } from '../../src/renderer/hooks/workbench-shell/route-layout/use-pull-request-auto-refresh';
-import type { PiPersistedEnvelope } from '../../src/shared/ipc/contracts/pi-message-payloads';
-import type { PiSessionEventBroadcast } from '../../src/shared/ipc/contracts/pi-session';
+import type { AgentPersistedEnvelope } from '../../src/shared/ipc/contracts/agent-message-payloads';
+import type { AgentSessionEventBroadcast } from '../../src/shared/ipc/contracts/agent-session';
 import { createTestQueryClient } from './support/dom';
 
 const mocks = vi.hoisted(() => ({
-	listener: null as ((event: PiSessionEventBroadcast) => void) | null,
+	listener: null as ((event: AgentSessionEventBroadcast) => void) | null,
 	refreshPullRequestSnapshot: vi.fn(() => Promise.resolve()),
 	refreshPullRequestSnapshotUntilPresent: vi.fn(() => Promise.resolve()),
 	unsubscribe: vi.fn(),
@@ -21,8 +21,8 @@ vi.mock('../../src/renderer/api/ensemblr-queries', () => ({
 	refreshPullRequestSnapshot: mocks.refreshPullRequestSnapshot,
 	refreshPullRequestSnapshotUntilPresent:
 		mocks.refreshPullRequestSnapshotUntilPresent,
-	subscribePiSessionEvents: (
-		listener: (event: PiSessionEventBroadcast) => void,
+	subscribeAgentSessionEvents: (
+		listener: (event: AgentSessionEventBroadcast) => void,
 	) => {
 		mocks.listener = listener;
 		return mocks.unsubscribe;
@@ -31,9 +31,9 @@ vi.mock('../../src/renderer/api/ensemblr-queries', () => ({
 
 /** Wraps a persisted envelope in a broadcast for the given workspace. */
 function broadcast(
-	payload: PiPersistedEnvelope | null,
+	payload: AgentPersistedEnvelope | null,
 	workspaceId = 'ws-1',
-): PiSessionEventBroadcast {
+): AgentSessionEventBroadcast {
 	return {
 		event: {
 			branchId: 'b1',
@@ -51,7 +51,7 @@ function broadcast(
 }
 
 /** A `gh pr create` tool-call envelope. */
-const PR_CREATE_CALL: PiPersistedEnvelope = {
+const PR_CREATE_CALL: AgentPersistedEnvelope = {
 	kind: 'message',
 	payload: {
 		input: { command: 'gh pr create --fill' },
@@ -63,7 +63,7 @@ const PR_CREATE_CALL: PiPersistedEnvelope = {
 };
 
 /** A tool-result envelope carrying the created PR URL. */
-const PR_URL_RESULT: PiPersistedEnvelope = {
+const PR_URL_RESULT: AgentPersistedEnvelope = {
 	kind: 'message',
 	payload: {
 		isError: false,
@@ -75,14 +75,14 @@ const PR_URL_RESULT: PiPersistedEnvelope = {
 };
 
 /** A status envelope for a streaming→idle turn end. */
-const TURN_END: PiPersistedEnvelope = {
+const TURN_END: AgentPersistedEnvelope = {
 	kind: 'status',
 	previous: 'streaming',
 	status: 'idle',
 };
 
 /** A turn-start status envelope. */
-const TURN_START: PiPersistedEnvelope = {
+const TURN_START: AgentPersistedEnvelope = {
 	kind: 'status',
 	previous: 'idle',
 	status: 'streaming',

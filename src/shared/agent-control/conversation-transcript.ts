@@ -5,20 +5,20 @@
  * "what did it actually do", which is the question a delegated unit of work
  * cannot be checked without.
  *
- * Two properties of the log make a naive walk wrong. Pi persists every tool
- * invocation twice — once as streaming frames, once inside the composite message
- * that closes the turn — so entries are merged on `toolCallId` or every call
- * renders twice. And a transcript has no natural ceiling, so the page is capped
- * per field and in total, with the cursor cutting only between event ordinals so
- * a resumed read can neither skip an entry nor repeat one.
+ * Two properties of the log make a naive walk wrong. A runtime persists every
+ * tool invocation twice — once as streaming frames, once inside the composite
+ * message that closes the turn — so entries are merged on `toolCallId` or every
+ * call renders twice. And a transcript has no natural ceiling, so the page is
+ * capped per field and in total, with the cursor cutting only between event
+ * ordinals so a resumed read can neither skip an entry nor repeat one.
  */
 
 import type {
-	PiEventStreamWire,
-	PiPersistedEnvelope,
-	PiWireMessagePart,
-	PiWireMessagePayload,
-} from '../ipc/contracts/pi-message-payloads.ts';
+	AgentEventStreamWire,
+	AgentPersistedEnvelope,
+	AgentWireMessagePart,
+	AgentWireMessagePayload,
+} from '../ipc/contracts/agent-message-payloads.ts';
 import {
 	type ConversationTranscriptEntry,
 	READ_CONVERSATION_LIMITS,
@@ -32,8 +32,8 @@ import {
  */
 export interface TranscriptSourceEvent {
 	ordinal: number;
-	payload: PiPersistedEnvelope | null;
-	stream: PiEventStreamWire;
+	payload: AgentPersistedEnvelope | null;
+	stream: AgentEventStreamWire;
 }
 
 /** Name a tool result carries when its call never made it into the log. */
@@ -73,13 +73,13 @@ type TranscriptSlot =
  */
 export function buildConversationTranscript({
 	events,
-	piSessionId,
+	agentSessionId,
 	fromOrdinal,
 	ordinal,
 	stat,
 }: {
 	events: readonly TranscriptSourceEvent[];
-	piSessionId: string;
+	agentSessionId: string;
 	fromOrdinal?: number;
 	ordinal?: number;
 	stat?: boolean;
@@ -89,7 +89,7 @@ export function buildConversationTranscript({
 		entryCount: entries.length,
 		firstOrdinal: entries.at(0)?.ordinal ?? null,
 		lastOrdinal: entries.at(-1)?.ordinal ?? null,
-		piSessionId,
+		agentSessionId,
 		turnCount: entries.filter((entry) => entry.kind === 'prompt').length,
 	};
 	if (stat) {
@@ -182,7 +182,7 @@ type ProjectedSlot =
  */
 function projectEnvelope(
 	ordinal: number,
-	envelope: PiPersistedEnvelope,
+	envelope: AgentPersistedEnvelope,
 ): readonly ProjectedSlot[] {
 	if (envelope.kind === 'error') {
 		return [
@@ -210,7 +210,7 @@ function projectEnvelope(
  */
 function projectAgentPayload(
 	ordinal: number,
-	payload: PiWireMessagePayload,
+	payload: AgentWireMessagePayload,
 ): readonly ProjectedSlot[] {
 	if (payload.kind === 'text') {
 		return textSlot('message', ordinal, payload.text);
@@ -235,7 +235,7 @@ function projectAgentPayload(
  */
 function projectMessageParts(
 	ordinal: number,
-	parts: readonly PiWireMessagePart[],
+	parts: readonly AgentWireMessagePart[],
 ): readonly ProjectedSlot[] {
 	const slots: ProjectedSlot[] = [];
 	let pendingText: string[] = [];
@@ -265,7 +265,7 @@ function projectMessageParts(
  * @param payload - The user envelope's inner wire payload.
  * @returns The prompt text, possibly empty.
  */
-function promptText(payload: PiWireMessagePayload): string {
+function promptText(payload: AgentWireMessagePayload): string {
 	if (payload.kind === 'prompt') {
 		return payload.prompt;
 	}
@@ -307,7 +307,7 @@ function textSlot(
 function toolSlot(
 	ordinal: number,
 	source: Extract<
-		PiWireMessagePayload | PiWireMessagePart,
+		AgentWireMessagePayload | AgentWireMessagePart,
 		{ kind: 'tool-call' | 'tool-result' }
 	>,
 ): ProjectedSlot {
@@ -431,7 +431,7 @@ function toolEntry(
 
 /**
  * Flattens a tool's arguments or result into readable text, unwrapping the
- * content-block envelope Pi tools answer in so a transcript shows the output
+ * content-block envelope agent tools answer in so a transcript shows the output
  * itself rather than the protocol around it.
  * @param value - A raw input or output value of any shape.
  * @returns The value as text, empty when it carried none.
@@ -455,7 +455,7 @@ function stringifyToolValue(value: unknown): string {
 }
 
 /**
- * Reads the text of a content-block envelope, the shape Pi tool results arrive
+ * Reads the text of a content-block envelope, the shape agent tool results arrive
  * in when they carry rendered output. An envelope whose blocks carry no text —
  * an image, an empty result — is refused rather than unwrapped to an empty
  * string, because a blank output is what a tool that returned nothing looks

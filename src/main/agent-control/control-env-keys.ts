@@ -1,0 +1,29 @@
+/**
+ * Env var names carrying the agent-control overlay into a spawned agent.
+ *
+ * Named once here because three unrelated call sites depend on the exact
+ * spelling: the resolver that writes the overlay, the harness launch decoration
+ * that references the token var by name inside `--mcp-config`, and the native
+ * Claude adapter that does the same through the Agent SDK. A drifted spelling
+ * in any one of them silently downgrades to an unauthenticated control client.
+ */
+
+/** Env var carrying the loopback control server's base URL. */
+export const CONTROL_URL_ENV_KEY = 'ENSEMBLR_CONTROL_URL';
+
+/** Env var carrying the per-workspace control token in an agent process. */
+export const CONTROL_TOKEN_ENV_KEY = 'ENSEMBLR_CONTROL_TOKEN';
+
+/** Env var carrying the caller's resolved control role. */
+export const CONTROL_ROLE_ENV_KEY = 'ENSEMBLR_CONTROL_ROLE';
+
+/**
+ * Renders a shell-style reference to an env var, for configs the agent's own
+ * CLI expands at launch. Passing the reference instead of the value keeps the
+ * secret out of the child's argv, where any process on the machine can read it.
+ * @param key - Env var name to reference.
+ * @returns The `${NAME}` reference string.
+ */
+export function envVarReference(key: string): string {
+	return `\${${key}}`;
+}

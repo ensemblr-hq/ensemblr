@@ -82,7 +82,7 @@ export function ComposerPanel({
 	const textareaBlock = (
 		<div className='relative' ref={state.anchorRef}>
 			<Textarea
-				aria-label='Pi composer'
+				aria-label='Agent composer'
 				className='sleek-scrollbar max-h-64 min-h-28 resize-none px-0 py-0 text-sm leading-relaxed shadow-none placeholder:text-muted-foreground/70 focus-visible:ring-0'
 				disabled={composer.disabled}
 				onBlur={() => setFocused(false)}

@@ -9,8 +9,12 @@ export {
 	canonicalizeArgs,
 } from './agent-control/arg-naming.ts';
 export { buildAskUserQuestionResult } from './agent-control/ask-user-question.ts';
-export type { AgentControlRole } from './agent-control/awareness.ts';
+export type {
+	AgentControlRole,
+	ControlAudience,
+} from './agent-control/awareness.ts';
 export {
+	awarenessForAudience,
 	HARNESS_AWARENESS,
 	ORCHESTRATOR_AWARENESS,
 	PLAN_MODE_ORCHESTRATOR_AWARENESS,
@@ -35,6 +39,7 @@ export {
 	SUBAGENT_UNUSABLE_OPS,
 	SUBAGENT_WITHHELD_OPS,
 	subAgentControlOpDenial,
+	withheldControlOps,
 } from './agent-control/subagent-policy.ts';
 export type { DiffFilePatch } from './agent-control/workspace-diff.ts';
 export {

@@ -25,7 +25,7 @@ vi.mock('@tanstack/react-router', () => ({
 vi.mock('@/renderer/api/ensemblr', () => ({
 	createWorkspace: vi.fn(),
 	ensemblrQueryKeys: {
-		piModels: () => ['pi-models'],
+		agentModels: () => ['pi-models'],
 		repositoryWorkspaceNavigation: () => ['nav'],
 	},
 	invalidateWorkspaceListViews,

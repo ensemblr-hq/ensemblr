@@ -1,15 +1,14 @@
 import type { UIMessage } from 'ai';
 import { useEffect, useMemo } from 'react';
-
-import { eventsToUIMessages } from '@/renderer/lib/pi';
 import {
+	eventsToUIMessages,
 	filterUnmatchedOptimistic,
 	matchOptimisticAgainstMessages,
 	optimisticToUIMessage,
-} from '@/renderer/lib/pi-timeline';
+} from '@/renderer/lib/agent-timeline';
 import { resolveLiveTurnStartMs } from '@/renderer/lib/workbench/timeline-timing';
 import { useOptimisticPrompts } from '@/renderer/state/composer';
-import type { PiSessionEventWire } from '@/shared/ipc/contracts/pi-session';
+import type { AgentSessionEventWire } from '@/shared/ipc/contracts/agent-session';
 
 /**
  * Merge persisted timeline events with the composer's optimistic prompts into
@@ -29,7 +28,7 @@ export function useTimelineMessages({
 	isStreaming,
 }: {
 	chatTabId: string;
-	events: readonly PiSessionEventWire[];
+	events: readonly AgentSessionEventWire[];
 	isStreaming: boolean;
 }): {
 	messages: UIMessage[];

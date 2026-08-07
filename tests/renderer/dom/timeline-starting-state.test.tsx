@@ -11,7 +11,7 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 
 import { ensemblrQueryKeys } from '../../../src/renderer/api/ensemblr-queries';
-import { PiSessionTimeline } from '../../../src/renderer/components/workbench-shell/conversation-panel/timeline/timeline';
+import { AgentSessionTimeline } from '../../../src/renderer/components/workbench-shell/conversation-panel/timeline/timeline';
 import type {
 	SessionTabModel,
 	WorkspaceShellModel,
@@ -23,19 +23,19 @@ import {
 } from '../support/dom';
 
 const WORKSPACE_ID = 'ws-1';
-const PI_SESSION_ID = 'pi-1';
+const AGENT_SESSION_ID = 'agent-1';
 const BRANCH_ID = 'branch-1';
 
 const workspace = { id: WORKSPACE_ID } as unknown as WorkspaceShellModel;
 
 const chatTab: SessionTabModel = {
+	agentSessionId: AGENT_SESSION_ID,
 	chatTabId: 'tab-1',
 	id: 'tab-1',
 	isPreview: false,
 	isSubAgent: true,
 	kind: 'chat',
 	label: 'Astro inventory',
-	piSessionId: PI_SESSION_ID,
 	status: 'working',
 	summary: '',
 	updatedLabel: 'Astro inventory',
@@ -52,18 +52,18 @@ function renderTimeline(options: {
 	const client = createTestQueryClient();
 	if (options.sessions !== 'in-flight') {
 		client.setQueryData(
-			ensemblrQueryKeys.piSessionsForWorkspace(WORKSPACE_ID),
+			ensemblrQueryKeys.agentSessionsForWorkspace(WORKSPACE_ID),
 			{
 				sessions: options.sessions ?? [],
 			},
 		);
 	}
-	client.setQueryData(ensemblrQueryKeys.piSessionEvents(BRANCH_ID), {
+	client.setQueryData(ensemblrQueryKeys.agentSessionEvents(BRANCH_ID), {
 		events: [],
 	});
 	return renderWithProviders(
-		<PiSessionTimeline
-			activePiSessionId={null}
+		<AgentSessionTimeline
+			activeAgentSessionId={null}
 			activeSession={options.tab ?? chatTab}
 			workspace={workspace}
 		/>,
@@ -72,10 +72,10 @@ function renderTimeline(options: {
 }
 
 /** One entry of the workspace session list, as the timeline reads it. */
-function piSession(status: string) {
+function agentSession(status: string) {
 	return {
 		branchId: BRANCH_ID,
-		id: PI_SESSION_ID,
+		id: AGENT_SESSION_ID,
 		model: 'gpt-5.5',
 		runtimeOpen: true,
 		status,
@@ -86,13 +86,15 @@ function piSession(status: string) {
 describe('timeline startup state', () => {
 	beforeEach(() => {
 		installEnsemblrApi({
-			listPiSessions: vi.fn(() => new Promise(() => undefined)),
-			onPiSessionEvent: vi.fn(() => () => undefined),
+			listAgentSessions: vi.fn(() => new Promise(() => undefined)),
+			onAgentSessionEvent: vi.fn(() => () => undefined),
 		});
 	});
 
 	test('shows a starting affordance while a spawned session has no events yet', () => {
-		const { container } = renderTimeline({ sessions: [piSession('starting')] });
+		const { container } = renderTimeline({
+			sessions: [agentSession('starting')],
+		});
 
 		expect(
 			container.querySelector('[data-timeline-state="starting"]'),
@@ -101,7 +103,9 @@ describe('timeline startup state', () => {
 	});
 
 	test('renders the dot-matrix scan as decoration, not as content', () => {
-		const { container } = renderTimeline({ sessions: [piSession('starting')] });
+		const { container } = renderTimeline({
+			sessions: [agentSession('starting')],
+		});
 
 		const scan = container.querySelector('[data-role="boot-scan"]');
 		expect(scan).not.toBeNull();
@@ -128,15 +132,15 @@ describe('timeline startup state', () => {
 	});
 
 	test('renders nothing for a settled session that produced no events', () => {
-		const { container } = renderTimeline({ sessions: [piSession('idle')] });
+		const { container } = renderTimeline({ sessions: [agentSession('idle')] });
 
 		expect(container.textContent).toBe('');
 	});
 
-	test('renders nothing for a tab with no Pi session at all', () => {
+	test('renders nothing for a tab with no agent session at all', () => {
 		const { container } = renderTimeline({
 			sessions: [],
-			tab: { ...chatTab, piSessionId: null, status: 'idle' },
+			tab: { ...chatTab, agentSessionId: null, status: 'idle' },
 		});
 
 		expect(container.textContent).toBe('');

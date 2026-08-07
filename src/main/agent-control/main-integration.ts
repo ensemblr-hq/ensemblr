@@ -15,6 +15,11 @@ import {
 	resolveAgentRole,
 } from '../../shared/agent-control.ts';
 import {
+	CONTROL_ROLE_ENV_KEY,
+	CONTROL_TOKEN_ENV_KEY,
+	CONTROL_URL_ENV_KEY,
+} from './control-env-keys.ts';
+import {
 	decorateHarnessCommand,
 	HARNESS_INSTRUCTIONS_FILENAME,
 } from './harness-launch-config.ts';
@@ -34,7 +39,7 @@ interface AgentControlIntegrationDeps {
 	 * tab marker rather than lineage. Omitted, the role falls back to spawn depth,
 	 * which reads a resumed sub-agent as a root orchestrator.
 	 */
-	isSpawnedSubAgent?: (piSessionId: string) => boolean;
+	isSpawnedSubAgent?: (agentSessionId: string) => boolean;
 }
 
 /** The main-process primitives the agent-control layer contributes. */
@@ -167,9 +172,9 @@ export function createAgentControlIntegration(
 		});
 		const marked = deps.isSpawnedSubAgent?.(identity.sessionId) === true;
 		return {
-			ENSEMBLR_CONTROL_URL: serverUrl,
-			ENSEMBLR_CONTROL_TOKEN: origin.token,
-			ENSEMBLR_CONTROL_ROLE: resolveAgentRole(marked, origin.depth),
+			[CONTROL_URL_ENV_KEY]: serverUrl,
+			[CONTROL_TOKEN_ENV_KEY]: origin.token,
+			[CONTROL_ROLE_ENV_KEY]: resolveAgentRole(marked, origin.depth),
 		};
 	};
 
@@ -187,7 +192,7 @@ export function createAgentControlIntegration(
 					workspaceId,
 					sessionId: `ws:${workspaceId}`,
 					species: 'harness',
-				}).ENSEMBLR_CONTROL_TOKEN ?? null,
+				})[CONTROL_TOKEN_ENV_KEY] ?? null,
 		});
 
 	return {

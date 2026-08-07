@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, test, vi } from 'vitest';
 import {
 	applyBranchSlug,
 	BranchSlugRejected,
-} from '../../src/main/pi-agent/naming/apply-branch-slug';
+} from '../../src/main/agent-runtime/naming/apply-branch-slug';
 
 const selectWorkspace = vi.hoisted(() => vi.fn());
 

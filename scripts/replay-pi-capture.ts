@@ -7,15 +7,23 @@
  * The mapping below mirrors `protocol-dispatch.ts` + the persistence adapter
  * closely enough to validate grouping, dedup, and the activity/final split
  * against real wire data without booting Electron.
+ *
+ * The mappers come from the `agent-timeline` leaf rather than its barrel: this
+ * script is typechecked by `tsconfig.scripts.json`, which carries only Node
+ * types, and the barrel transitively reaches renderer state and query modules
+ * that need `vite/client` and DOM lib.
  */
 
 import { readFileSync } from 'node:fs';
 
-import { eventsToUIMessages, turnMetadataOf } from '../src/renderer/lib/pi';
+import {
+	eventsToUIMessages,
+	turnMetadataOf,
+} from '../src/renderer/lib/agent-timeline/event-to-ui-message.ts';
 import type {
-	PiPersistedEnvelope,
-	PiSessionEventWire,
-	PiWireMessagePart,
+	AgentPersistedEnvelope,
+	AgentSessionEventWire,
+	AgentWireMessagePart,
 } from '../src/shared/ipc';
 
 type RawFrame = Record<string, unknown>;
@@ -30,9 +38,9 @@ let ordinal = 0;
  * @returns A replay-scoped session event ready for the timeline
  */
 function makeEvent(
-	payload: PiPersistedEnvelope,
+	payload: AgentPersistedEnvelope,
 	turnId: string | null,
-): PiSessionEventWire {
+): AgentSessionEventWire {
 	ordinal += 1;
 	return {
 		branchId: 'replay',
@@ -52,11 +60,11 @@ function makeEvent(
  * @param blocks - Untrusted content-block array read from a capture frame
  * @returns The recognised text, reasoning, and tool-call parts in order
  */
-function contentBlocksToParts(blocks: unknown): PiWireMessagePart[] {
+function contentBlocksToParts(blocks: unknown): AgentWireMessagePart[] {
 	if (!Array.isArray(blocks)) {
 		return [];
 	}
-	const parts: PiWireMessagePart[] = [];
+	const parts: AgentWireMessagePart[] = [];
 	for (const block of blocks) {
 		if (!block || typeof block !== 'object') {
 			continue;
@@ -84,7 +92,7 @@ function contentBlocksToParts(blocks: unknown): PiWireMessagePart[] {
  * @param lines - Raw JSONL lines from a Pi capture file
  * @returns Ordered session events reconstructed from the recognised frames
  */
-function framesToEvents(lines: readonly string[]): PiSessionEventWire[] {
+function framesToEvents(lines: readonly string[]): AgentSessionEventWire[] {
 	return lines.flatMap((line) => {
 		const frame = parseFrame(line);
 		return frame ? frameToEvents(frame) : [];
@@ -109,7 +117,7 @@ function parseFrame(line: string): RawFrame | null {
  * @param frame - A parsed capture frame
  * @returns The events the frame produces, empty for frames a replay ignores
  */
-function frameToEvents(frame: RawFrame): PiSessionEventWire[] {
+function frameToEvents(frame: RawFrame): AgentSessionEventWire[] {
 	switch (frame.type) {
 		case 'message_end':
 			return messageEndEvents(frame);
@@ -130,7 +138,7 @@ function frameToEvents(frame: RawFrame): PiSessionEventWire[] {
  * @param frame - The `message_end` frame
  * @returns The message event, or nothing when the frame carries no content
  */
-function messageEndEvents(frame: RawFrame): PiSessionEventWire[] {
+function messageEndEvents(frame: RawFrame): AgentSessionEventWire[] {
 	const message = (frame.message ?? {}) as RawFrame;
 	// Mirrors protocol-dispatch: tool_execution_end already carries it.
 	if (message.role === 'toolResult') {
@@ -154,7 +162,7 @@ function messageEndEvents(frame: RawFrame): PiSessionEventWire[] {
  * @param frame - The `message_update` frame
  * @returns The delta event, or nothing when the frame carries no text
  */
-function messageUpdateEvents(frame: RawFrame): PiSessionEventWire[] {
+function messageUpdateEvents(frame: RawFrame): AgentSessionEventWire[] {
 	const event = frame.assistantMessageEvent as RawFrame | undefined;
 	const text = readString(event?.text) ?? readString(event?.delta);
 	if (!text) {
@@ -173,7 +181,7 @@ function messageUpdateEvents(frame: RawFrame): PiSessionEventWire[] {
  * @param frame - The `tool_execution_start` frame
  * @returns The tool-call event
  */
-function toolCallEvent(frame: RawFrame): PiSessionEventWire {
+function toolCallEvent(frame: RawFrame): AgentSessionEventWire {
 	const toolCallId = readString(frame.toolCallId);
 	return makeEvent(
 		{
@@ -195,7 +203,7 @@ function toolCallEvent(frame: RawFrame): PiSessionEventWire {
  * @param frame - The `tool_execution_end` frame
  * @returns The tool-result event
  */
-function toolResultEvent(frame: RawFrame): PiSessionEventWire {
+function toolResultEvent(frame: RawFrame): AgentSessionEventWire {
 	const toolCallId = readString(frame.toolCallId);
 	return makeEvent(
 		{

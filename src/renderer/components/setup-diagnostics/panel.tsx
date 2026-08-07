@@ -27,6 +27,7 @@ interface SetupDiagnosticsPanelProps {
 }
 
 const GROUP_LABELS: Record<SetupCheckGroupId, string> = {
+	claude: 'Claude Code runtime',
 	core: 'Core runtime',
 	github: 'Git and GitHub',
 	linear: 'Linear',
@@ -39,6 +40,7 @@ const GROUP_ORDER: readonly SetupCheckGroupId[] = [
 	'storage',
 	'github',
 	'pi',
+	'claude',
 	'linear',
 ];
 

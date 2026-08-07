@@ -5,22 +5,22 @@
 
 /** Renderer-facing snapshot of a checkpoint row. */
 export interface CheckpointWire {
+	agentSessionId: string | null;
 	createdAt: string;
 	gitHash: string | null;
 	gitRef: string;
 	id: string;
 	label: string;
-	piSessionId: string | null;
 	turnId: string | null;
 	workspaceId: string;
 }
 
-/** List checkpoints captured for a Pi session, oldest first. */
+/** List checkpoints captured for an agent session, oldest first. */
 export interface ListTurnCheckpointsRequest {
-	piSessionId: string;
+	agentSessionId: string;
 }
 
-/** Result of listing a Pi session's checkpoints. */
+/** Result of listing an agent session's checkpoints. */
 export interface ListTurnCheckpointsResult {
 	checkpoints: readonly CheckpointWire[];
 }
@@ -68,7 +68,7 @@ export type ComputeTurnDiffResult =
 
 /**
  * Restore workspace files to a turn's pre-prompt checkpoint. Non-destructive
- * to Pi session files; later Ensemblr-visible events are hidden, not deleted.
+ * to agent session files; later Ensemblr-visible events are hidden, not deleted.
  */
 export interface RestoreCheckpointRequest {
 	/**

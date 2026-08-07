@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 
-import { parsePromptAttachments } from '../../src/renderer/lib/pi/prompt-attachment-parser';
+import { parsePromptAttachments } from '../../src/renderer/lib/agent-timeline/prompt-attachment-parser';
 
 describe('parsePromptAttachments', () => {
 	test('extracts a leading attachment block', () => {

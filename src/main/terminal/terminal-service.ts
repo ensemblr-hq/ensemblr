@@ -196,13 +196,14 @@ export interface CreateTerminalServiceOptions {
 	now?: () => Date;
 	onLifecycle: (event: TerminalLifecycleBroadcast) => void;
 	/**
-	 * Called when an agent session's native session id is first read from its
-	 * on-disk log, so the wiring layer can persist it onto the backing chat tab
-	 * for exact-conversation resume after a restart. Terminal-service stays free of
-	 * chat-tab knowledge; the seam carries only ids. Omitted → not persisted.
+	 * Called when a harness CLI's native session id is first read from its on-disk
+	 * log, so the wiring layer can persist it onto the backing chat tab for
+	 * exact-conversation resume after a restart. Carries the harness's own id, not
+	 * an Ensemblr agent session id. Terminal-service stays free of chat-tab
+	 * knowledge; the seam carries only ids. Omitted → not persisted.
 	 */
 	onAgentSessionCaptured?: (input: {
-		agentSessionId: string;
+		harnessSessionId: string;
 		terminalId: string;
 		workspaceId: string;
 	}) => void;
@@ -422,8 +423,8 @@ function conversationInfoPatch(
 	if (fullTitle && fullTitle !== snapshot.agentFullTitle) {
 		patch.agentFullTitle = fullTitle;
 	}
-	if (info.sessionId && info.sessionId !== snapshot.agentSessionId) {
-		patch.agentSessionId = info.sessionId;
+	if (info.sessionId && info.sessionId !== snapshot.harnessSessionId) {
+		patch.harnessSessionId = info.sessionId;
 	}
 	return Object.keys(patch).length > 0 ? patch : null;
 }
@@ -707,11 +708,11 @@ export function createTerminalService({
 		session: TrackedSession,
 		patch: Partial<TerminalSessionSnapshot>,
 	): void {
-		if (!onAgentSessionCaptured || !patch.agentSessionId) {
+		if (!onAgentSessionCaptured || !patch.harnessSessionId) {
 			return;
 		}
 		onAgentSessionCaptured({
-			agentSessionId: patch.agentSessionId,
+			harnessSessionId: patch.harnessSessionId,
 			terminalId: session.snapshot.id,
 			workspaceId: session.snapshot.workspaceId,
 		});
@@ -1008,7 +1009,7 @@ export function createTerminalService({
 			scrollback,
 			snapshot: {
 				agentBusy: false,
-				agentSessionId: null,
+				harnessSessionId: null,
 				agentFullTitle: null,
 				agentTitle: null,
 				cols: normalizedCols,

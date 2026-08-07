@@ -195,7 +195,7 @@ function createServiceFixture(
 	const lifecycleEvents: TerminalLifecycleBroadcast[] = [];
 	const outputEvents: TerminalOutputBroadcast[] = [];
 	const capturedAgentSessions: {
-		agentSessionId: string;
+		harnessSessionId: string;
 		terminalId: string;
 		workspaceId: string;
 	}[] = [];
@@ -481,7 +481,7 @@ test('reports a captured native session id so the tab can persist it for resume'
 	await new Promise((resolve) => setTimeout(resolve, 0));
 
 	assert.deepEqual(capturedAgentSessions, [
-		{ agentSessionId: 'session-abc', terminalId, workspaceId: WORKSPACE_ID },
+		{ harnessSessionId: 'session-abc', terminalId, workspaceId: WORKSPACE_ID },
 	]);
 });
 

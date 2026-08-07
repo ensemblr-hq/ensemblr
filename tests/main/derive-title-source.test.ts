@@ -2,7 +2,7 @@ import { describe, expect, test } from 'vitest';
 import {
 	deriveTitleSource,
 	stripPromptScaffolding,
-} from '../../src/main/pi-agent/naming/derive-title-source';
+} from '../../src/main/agent-runtime/naming/derive-title-source';
 import {
 	buildActionAttachmentBlock,
 	wrapWithMasterPrompt,

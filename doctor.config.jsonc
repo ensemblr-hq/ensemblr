@@ -118,7 +118,7 @@
 					"src/main/open-target/detect-installed-targets.ts",
 					"src/main/environment/workspace-environment.ts",
 					"src/main/linear/linear-oauth-callback-server.ts",
-					"src/main/pi-agent/session/summary-queue.ts",
+					"src/main/agent-runtime/session/summary-queue.ts",
 					"src/main/repository/delete-repository.ts",
 					"src/main/repository/archive-lifecycle.ts",
 					"src/main/repository/archive-repository.ts",
@@ -348,17 +348,20 @@
 				"rules": ["react-doctor/use-lazy-motion"]
 			},
 			{
-				// Main-process modules import their storage/checkpoint public surface
-				// through the `storage/repositories/index.ts` and `checkpoints/index.ts`
-				// barrels — the intended entrypoints (same rationale as the
-				// main.ts/handlers.ts override above). The no-barrel-import perf rule
-				// targets renderer bundle tree-shaking; the Electron main process is not
-				// bundled that way, so the cost is moot here.
+				// Main-process modules import their storage/checkpoint/setup public
+				// surface through the `storage/repositories/index.ts`,
+				// `checkpoints/index.ts` and `setup/index.ts` barrels — the intended
+				// entrypoints (same rationale as the main.ts/handlers.ts override
+				// above, and required by src/main/AGENTS.md → Public Surfaces). The
+				// no-barrel-import perf rule targets renderer bundle tree-shaking; the
+				// Electron main process is not bundled that way, so the cost is moot
+				// here.
 				"files": [
 					"src/main/checkpoints/checkpoint-service.ts",
 					"src/main/ipc/handlers/checkpoint.ts",
-					"src/main/pi-agent/pi-session-persistence.ts",
-					"src/main/pi-agent/session/chat-tab-plumbing.ts"
+					"src/main/agent-runtime/agent-session-persistence.ts",
+					"src/main/agent-runtime/session/chat-tab-plumbing.ts",
+					"src/main/agent-providers/claude-readiness-probe.ts"
 				],
 				"rules": ["react-doctor/no-barrel-import"]
 			},

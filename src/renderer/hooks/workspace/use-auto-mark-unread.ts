@@ -1,12 +1,12 @@
 import { useEffect, useRef } from 'react';
 
-import { subscribePiSessionEvents } from '@/renderer/api/ensemblr';
+import { subscribeAgentSessionEvents } from '@/renderer/api/ensemblr';
 import { isFinishedTurnEvent } from '@/renderer/hooks/workbench-shell/route-layout/detect-pull-request-creation';
 import { useWorkspaceBoardActions } from '@/renderer/state/workspace';
 
 /**
  * Tracks workspace unread state driven by agent activity. Marks a workspace
- * unread whenever one of its Pi agents finishes a turn while that workspace is
+ * unread whenever one of its agents finishes a turn while that workspace is
  * not the active one, and clears the flag when a workspace becomes active.
  *
  * A single global subscription (not per row) reacts to every workspace's turn
@@ -24,7 +24,7 @@ export function useAutoMarkUnread(activeWorkspaceId: string | null): void {
 	}, [activeWorkspaceId]);
 
 	useEffect(() => {
-		const unsubscribe = subscribePiSessionEvents((broadcast) => {
+		const unsubscribe = subscribeAgentSessionEvents((broadcast) => {
 			const envelope = broadcast.event.payload;
 			if (!envelope || !isFinishedTurnEvent(envelope)) {
 				return;

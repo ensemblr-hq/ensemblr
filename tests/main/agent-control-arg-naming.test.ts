@@ -137,9 +137,19 @@ describe('agent-control argument key parity', () => {
 		}
 	});
 
+	// Both surfaces now register the whole vocabulary and cut it to the caller at
+	// serve time, so a tool present in one and missing from the other is a gap
+	// rather than a deliberate omission.
+	it('registers the same tool vocabulary in both surfaces', () => {
+		const embedded = extractEmbeddedToolParamKeys(readExtensionSource());
+		expect([...embedded.keys()].sort()).toEqual(
+			TOOL_DEFS.map((def) => def.name).sort(),
+		);
+	});
+
 	it('declares the same Pi extension parameters as the schema accepts', () => {
 		const embedded = extractEmbeddedToolParamKeys(readExtensionSource());
-		expect(embedded.size).toBeGreaterThan(TOOL_DEFS.length);
+		expect(embedded.size).toBeGreaterThan(0);
 		for (const [toolName, keys] of embedded) {
 			const op = controlOpForToolName(toolName);
 			expect([...keys].sort(), toolName).toEqual([...argKeysForOp(op)]);

@@ -13,7 +13,7 @@ dive in here.
 ## Reference
 
 - [`pi/`](./pi) — Pi integration internals: the [RPC protocol](./pi/rpc-protocol.md) and [event taxonomy](./pi/event-taxonomy.md).
-- [`adr/`](./adr) — **40** Architecture Decision Records (`0001`–`0040`), the accepted decisions and their supersessions.
+- [`adr/`](./adr) — **42** Architecture Decision Records (`0001`–`0042`), the accepted decisions and their supersessions.
 - [`considerations/`](./considerations) — design records and forward-looking notes: the [Ensemblr Control design](./considerations/agent-control-layer.md), the [orchestration playbook](./considerations/agent-orchestration-playbook.md), and a [Deno-desktop migration study](./considerations/deno-desktop-migration.md).
 
 ## Product & planning

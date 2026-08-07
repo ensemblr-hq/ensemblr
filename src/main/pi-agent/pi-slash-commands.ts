@@ -2,7 +2,7 @@ import { existsSync, readFileSync, realpathSync } from 'node:fs';
 import { homedir } from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import type { PiSlashCommandWire } from '../../shared/ipc/contracts/pi-session';
+import type { PiSlashCommandWire } from '../../shared/ipc/contracts/agent-session';
 import type { PiExecutableSnapshot } from '../pi-runtime';
 import { isExecutableReady } from '../pi-runtime/pi-executable.ts';
 

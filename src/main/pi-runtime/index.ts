@@ -1,4 +1,3 @@
-export type { PiExecutableSelectionResult } from '../../shared/ipc/contracts/pi-session';
 export type {
 	PiExecutableDiagnostic,
 	PiExecutableDiagnosticSeverity,
@@ -19,8 +18,8 @@ export type {
 	CreatePiReadinessServiceOptions,
 	PiAgentDirectorySnapshot,
 	PiAgentDirectorySource,
-	PiModelOption,
 	PiProviderModelFailureCode,
+	PiProviderModelRow,
 	PiProviderModelSnapshot,
 	PiReadinessDiagnostic,
 	PiReadinessDiagnosticSeverity,

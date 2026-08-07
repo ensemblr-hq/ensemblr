@@ -7,7 +7,7 @@ import {
 	createOriginRegistry,
 } from '../../src/main/agent-control/index.ts';
 import type { AgentSpecies } from '../../src/main/agent-control/ports.ts';
-import { BranchSlugRejected } from '../../src/main/pi-agent/naming/apply-branch-slug.ts';
+import { BranchSlugRejected } from '../../src/main/agent-runtime/naming/apply-branch-slug.ts';
 import { SESSION_BRIEF_NUDGE_HEADER } from '../../src/shared/agent-control.ts';
 
 const CALLER = 'caller';
@@ -159,6 +159,23 @@ describe('setSummary', () => {
 			expect(result.code).toBe('denied-scope');
 		}
 		expect(setSummary).not.toHaveBeenCalled();
+	});
+
+	// The gate is the chat tab, not the runtime: a first-class Claude conversation
+	// owns one, so its summary lands in the same place a Pi conversation's does.
+	it('records the summary for a first-class Claude caller', async () => {
+		const setSummary = vi.fn();
+		const { invoke } = setup({ setSummary, species: 'claude' });
+
+		const result = await invoke('setSummary', {
+			summary: 'Body.',
+			title: 'Topic',
+		});
+
+		expect(result.ok).toBe(true);
+		expect(setSummary).toHaveBeenCalledWith(
+			expect.objectContaining({ summary: 'Body.', title: 'Topic' }),
+		);
 	});
 });
 

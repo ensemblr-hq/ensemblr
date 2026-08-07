@@ -10,17 +10,52 @@ import {
 	type ControlServer,
 	startControlServer,
 } from '../../src/main/agent-control/index.ts';
-import { HARNESS_AWARENESS } from '../../src/shared/agent-control.ts';
+import type { ControlAudience } from '../../src/shared/agent-control.ts';
+import {
+	HARNESS_AWARENESS,
+	ORCHESTRATOR_AWARENESS,
+	SUBAGENT_AWARENESS,
+} from '../../src/shared/agent-control.ts';
 
 const calls: AgentControlCommand[] = [];
 let server: ControlServer | null = null;
 
-const stubService: AgentControlService = {
+const HARNESS_ROOT: ControlAudience = {
+	hasChatTab: false,
+	role: 'orchestrator',
+};
+
+/**
+ * A service that answers every call the same way, so a test can vary only the
+ * audience it reports and read the tool list that follows from it.
+ */
+const makeStubService = (
+	audience: ControlAudience = HARNESS_ROOT,
+): AgentControlService => ({
+	describeAudience: async () => audience,
 	invoke: async (command) => {
 		calls.push(command);
 		return { ok: true, data: { echoed: command.op, args: command.rawArgs } };
 	},
 	releaseSession: () => {},
+});
+
+const stubService: AgentControlService = makeStubService();
+
+/** Connects an MCP client to a server serving the given audience. */
+const connectAs = async (audience: ControlAudience): Promise<Client> => {
+	server = await startControlServer(makeStubService(audience));
+	return await connect('good');
+};
+
+/** The tool names a given audience's list carries, over a live connection. */
+const toolNamesFor = async (
+	audience: ControlAudience,
+): Promise<readonly string[]> => {
+	const client = await connectAs(audience);
+	const { tools } = await client.listTools();
+	await client.close();
+	return tools.map((tool) => tool.name);
 };
 
 const connect = async (token: string): Promise<Client> => {
@@ -68,7 +103,8 @@ describe('agent-control MCP endpoint', () => {
 		// is served to every origin that may read a report at all.
 		expect(names).toContain('ensemblr_read_conversation');
 		// Chat-tab ops a harness origin cannot use: its tab is a terminal titled
-		// from the harness's own session log, and the service gates the rest to Pi.
+		// from the harness's own session log, and the service refuses all four to a
+		// caller with no chat tab.
 		expect(names).not.toContain('ensemblr_set_name');
 		expect(names).not.toContain('ensemblr_set_summary');
 		expect(names).not.toContain('ensemblr_ask_user_question');
@@ -174,5 +210,100 @@ describe('agent-control MCP endpoint', () => {
 		const content = result.content as Array<{ type: string; text: string }>;
 		expect(content[0]?.text).toContain('startTerminal');
 		await client.close();
+	});
+});
+
+// A first-class runtime reaches the app through the same endpoint a harness does,
+// but it drives a real chat tab, so the list and the playbook it receives have to
+// follow the caller rather than the transport.
+describe('agent-control MCP endpoint, per-origin surface', () => {
+	const CHAT_TAB_TOOLS = [
+		'ensemblr_set_name',
+		'ensemblr_set_summary',
+		'ensemblr_ask_user_question',
+		'ensemblr_exit_plan_mode',
+	] as const;
+
+	it('serves the chat-tab tools to a first-class root', async () => {
+		const names = await toolNamesFor({
+			hasChatTab: true,
+			role: 'orchestrator',
+		});
+
+		for (const tool of CHAT_TAB_TOOLS) {
+			expect(names, tool).toContain(tool);
+		}
+		expect(names).toContain('ensemblr_start_conversation');
+		expect(names).toContain('ensemblr_wait_for_agents');
+	});
+
+	it('withholds the chat-tab tools from a harness root', async () => {
+		const names = await toolNamesFor(HARNESS_ROOT);
+
+		for (const tool of CHAT_TAB_TOOLS) {
+			expect(names, tool).not.toContain(tool);
+		}
+	});
+
+	// The sub-agent axis is the one the Pi extension already applies to its own
+	// registrations; a first-class child over MCP has to land in the same place, or
+	// its list advertises a delegation surface the service refuses it.
+	it('withholds the delegation surface from a first-class sub-agent', async () => {
+		const names = await toolNamesFor({ hasChatTab: true, role: 'subagent' });
+
+		expect(names).toContain('ensemblr_set_name');
+		expect(names).toContain('ensemblr_set_summary');
+		expect(names).toContain('ensemblr_notify_orchestrator');
+		expect(names).toContain('ensemblr_get_workspace_diff');
+		for (const tool of [
+			'ensemblr_start_conversation',
+			'ensemblr_spawn_chat_tab',
+			'ensemblr_launch_harness',
+			'ensemblr_ask_user_question',
+			'ensemblr_exit_plan_mode',
+			'ensemblr_set_branch_name',
+			'ensemblr_wait_for_agents',
+		]) {
+			expect(names, tool).not.toContain(tool);
+		}
+	});
+
+	it('serves the orchestrator playbook to a first-class root', async () => {
+		const client = await connectAs({ hasChatTab: true, role: 'orchestrator' });
+
+		expect(client.getInstructions()).toBe(ORCHESTRATOR_AWARENESS);
+
+		await client.close();
+	});
+
+	it('serves the sub-agent playbook to a first-class sub-agent', async () => {
+		const client = await connectAs({ hasChatTab: true, role: 'subagent' });
+
+		expect(client.getInstructions()).toBe(SUBAGENT_AWARENESS);
+
+		await client.close();
+	});
+
+	// The harness variant tells its reader that naming a tab, summarizing, asking
+	// the user, and Plan Mode are absent by design. Serving it to a caller whose
+	// list carries all four would contradict the list in the same prompt.
+	it('keeps the harness playbook for a caller with no chat tab', async () => {
+		const client = await connectAs(HARNESS_ROOT);
+
+		expect(client.getInstructions()).toBe(HARNESS_AWARENESS);
+
+		await client.close();
+	});
+
+	it('names only tools a first-class root is actually served', async () => {
+		const served = new Set(
+			await toolNamesFor({ hasChatTab: true, role: 'orchestrator' }),
+		);
+		const mentioned = new Set(
+			ORCHESTRATOR_AWARENESS.match(/ensemblr_[a-z_]+/g) ?? [],
+		);
+
+		expect(mentioned.size).toBeGreaterThan(0);
+		expect([...mentioned].filter((name) => !served.has(name))).toEqual([]);
 	});
 });

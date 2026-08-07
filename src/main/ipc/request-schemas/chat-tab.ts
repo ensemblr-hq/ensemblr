@@ -22,7 +22,7 @@ export const openChatTabRequestSchema = z.object({
 		.enum(['chat', 'diff', 'document', 'file', 'preview', 'terminal'])
 		.optional(),
 	metadata: z.record(z.string(), z.unknown()).optional(),
-	piSessionId: optionalNullableString,
+	agentSessionId: optionalNullableString,
 	preview: z.boolean().optional(),
 	title: optionalStringCoerceNullToUndefined,
 	workspaceId: z.string().min(1),
@@ -38,15 +38,15 @@ export const closeChatTabRequestSchema = z.object({
 	chatTabId: z.string().min(1),
 	fullTitle: optionalStringCoerceNullToUndefined,
 	metadataPatch: z
-		.object({ agentSessionId: z.string().min(1).nullable().optional() })
+		.object({ harnessSessionId: z.string().min(1).nullable().optional() })
 		.optional(),
 	title: optionalStringCoerceNullToUndefined,
 });
 
-/** {@link import('../../../shared/ipc').BindPiSessionToTabRequest}. */
-export const bindPiSessionToChatTabRequestSchema = z.object({
+/** {@link import('../../../shared/ipc').BindAgentSessionToTabRequest}. */
+export const bindAgentSessionToChatTabRequestSchema = z.object({
 	chatTabId: z.string().min(1),
-	piSessionId: z.string().min(1),
+	agentSessionId: z.string().min(1),
 });
 
 /** {@link import('../../../shared/ipc').RestoreChatTabRequest}. */

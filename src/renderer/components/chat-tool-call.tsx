@@ -5,8 +5,8 @@ import {
 	presentReasoning,
 	presentSkillInvocation,
 	presentToolCall,
-} from '@/renderer/lib/pi';
-import type { PiCustomMessageData } from '@/renderer/types/pi-timeline';
+} from '@/renderer/lib/agent-timeline';
+import type { PiCustomMessageData } from '@/renderer/types/agent-timeline';
 import type { ToolPresentation } from '@/renderer/types/tool-presentation';
 import { ToolCollapsible } from './tool-collapsible';
 import { ToolBody } from './tool-collapsible/tool-body';

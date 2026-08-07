@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 
-import { parsePmsetBattery } from '../../src/main/pi-agent/macos-battery';
+import { parsePmsetBattery } from '../../src/main/agent-runtime/macos-battery';
 
 describe('parsePmsetBattery', () => {
 	test('reads a discharging laptop (not charging)', () => {

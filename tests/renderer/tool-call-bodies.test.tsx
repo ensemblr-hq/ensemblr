@@ -60,8 +60,8 @@ const REPLACE_FAILURE = [
 
 const STACK_TRACE = [
 	"TypeError: Cannot read properties of undefined (reading 'patch')",
-	'    at presentEdit (/repo/src/renderer/lib/pi/tool-presentation.ts:329:32)',
-	'    at presentToolCall (/repo/src/renderer/lib/pi/tool-presentation.ts:524:26)',
+	'    at presentEdit (/repo/src/renderer/lib/agent-timeline/tool-presentation.ts:329:32)',
+	'    at presentToolCall (/repo/src/renderer/lib/agent-timeline/tool-presentation.ts:524:26)',
 ].join('\n');
 
 const PLAYWRIGHT_OUTPUT = [
@@ -297,7 +297,7 @@ describe('tool call bodies', () => {
 		expect(trace).toHaveAttribute('aria-expanded', 'false');
 		expect(
 			within(body).queryByText(
-				'/repo/src/renderer/lib/pi/tool-presentation.ts:329:32',
+				'/repo/src/renderer/lib/agent-timeline/tool-presentation.ts:329:32',
 			),
 		).toBeNull();
 
@@ -305,12 +305,12 @@ describe('tool call bodies', () => {
 
 		expect(
 			within(body).getByText(
-				'/repo/src/renderer/lib/pi/tool-presentation.ts:329:32',
+				'/repo/src/renderer/lib/agent-timeline/tool-presentation.ts:329:32',
 			),
 		).toBeInTheDocument();
 		expect(
 			within(body).getByText(
-				'/repo/src/renderer/lib/pi/tool-presentation.ts:524:26',
+				'/repo/src/renderer/lib/agent-timeline/tool-presentation.ts:524:26',
 			),
 		).toBeInTheDocument();
 	});

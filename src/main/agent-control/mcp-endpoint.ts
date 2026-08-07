@@ -1,17 +1,20 @@
 /**
- * MCP (streamable HTTP) surface over the agent-control service, for third-party
- * harnesses (Claude Code, Codex, Mistral Vibe) that are native MCP clients. It
- * exposes the ops a harness can actually use as MCP tools; each forwards to
- * {@link AgentControlService.invoke} with the per-request bearer token, so the
- * service remains the single validation/scope/permission authority. Stateless:
- * a fresh server + transport per request (no sessions), token read from the
- * request's Authorization header by the caller.
+ * MCP (streamable HTTP) surface over the agent-control service, for every caller
+ * that speaks MCP rather than the Pi extension protocol: third-party harnesses
+ * (Claude Code, Codex, Mistral Vibe) and first-class runtimes wired to the same
+ * loopback server. Each tool forwards to {@link AgentControlService.invoke} with
+ * the per-request bearer token, so the service remains the single
+ * validation/scope/permission authority. Stateless: a fresh server + transport
+ * per request (no sessions), token read from the request's Authorization header
+ * by the caller.
  *
- * The chat-tab ops are deliberately absent: a harness owns a terminal tab whose
- * title is derived from the harness's own session log, so `setName` would have
- * no tab to rename, and `setSummary`, `askUserQuestion`, and the Plan Mode ops
- * are gated to Pi callers in the service. Listing a tool the service would only
- * refuse teaches the model to keep reaching for it.
+ * The tool list and the playbook are both cut to the caller. A harness owns a
+ * terminal tab that titles itself from its own session log, so the four chat-tab
+ * ops have nothing there to act on and the service refuses them; a spawned
+ * sub-agent loses the delegation surface it is refused on top of that. Listing a
+ * tool the service would only refuse teaches the model to keep reaching for it,
+ * which is why {@link withheldControlOps} answers both axes in one place rather
+ * than each bridge inventing its own answer.
  */
 import type { IncomingMessage, ServerResponse } from 'node:http';
 
@@ -22,13 +25,17 @@ import { type ZodRawShape, z } from 'zod';
 import {
 	type AgentControlOp,
 	type AgentControlResult,
-	HARNESS_AWARENESS,
+	ASK_USER_QUESTION_LIMITS,
+	awarenessForAudience,
+	type ControlAudience,
+	EXIT_PLAN_MODE_LIMITS,
 	WORKSPACE_BOARD_STATUSES,
+	withheldControlOps,
 } from '../../shared/agent-control.ts';
 import type { AgentControlService } from './agent-control-service.ts';
 
 /** One MCP tool: its client-facing name, the control op, help text, and args. */
-interface McpToolDef {
+export interface McpToolDef {
 	name: string;
 	op: AgentControlOp;
 	description: string;
@@ -37,16 +44,34 @@ interface McpToolDef {
 
 const startStop = z.enum(['setup', 'run']);
 
+/** One `askUserQuestion` choice, mirroring the shared questionnaire schema. */
+const askOption = z.object({
+	label: z.string().max(ASK_USER_QUESTION_LIMITS.maxLabelLength),
+	description: z.string().optional(),
+});
+
+/** One question in an `askUserQuestion` call, with its two-to-six choices. */
+const askQuestion = z.object({
+	question: z.string(),
+	header: z.string().optional(),
+	options: z
+		.array(askOption)
+		.min(ASK_USER_QUESTION_LIMITS.minOptions)
+		.max(ASK_USER_QUESTION_LIMITS.maxOptions),
+	multiSelect: z.boolean().optional(),
+});
+
 /**
- * MCP tool definitions mirroring the control vocabulary. Input shapes are
- * advisory for the client; the service re-validates authoritatively.
- */
-/**
- * Every tool this endpoint exposes. Exported so the parity test can hold each
- * description against the Pi extension's copy: the two registration sites cannot
- * share a module (the extension runs outside the app bundle), and these strings
- * carry behaviour — `stat=true FIRST` is the only thing stopping a model from
- * pulling a whole workspace diff it did not need.
+ * Every tool this endpoint knows how to serve, in the whole control vocabulary
+ * rather than one audience's slice of it — {@link toolDefsFor} cuts it down per
+ * caller. Input shapes are advisory for the client; the service re-validates
+ * authoritatively.
+ *
+ * Exported so the parity test can hold each description against the Pi
+ * extension's copy: the two registration sites cannot share a module (the
+ * extension runs outside the app bundle), and these strings carry behaviour —
+ * `stat=true FIRST` is the only thing stopping a model from pulling a whole
+ * workspace diff it did not need.
  */
 export const TOOL_DEFS: readonly McpToolDef[] = [
 	{
@@ -74,10 +99,17 @@ export const TOOL_DEFS: readonly McpToolDef[] = [
 		op: 'sendFollowUp',
 		description: 'Send a follow-up prompt into an existing Pi conversation.',
 		shape: {
-			piSessionId: z.string(),
+			agentSessionId: z.string(),
 			prompt: z.string(),
 			wait: z.boolean().optional(),
 		},
+	},
+	{
+		name: 'ensemblr_set_name',
+		op: 'setName',
+		description:
+			'Set a short, descriptive title for your own conversation tab so it is easy to identify. The label goes in `title`, the same key ensemblr_start_conversation names a tab with. This is the tab label, not the workspace or branch name — ensemblr_set_branch_name owns that.',
+		shape: { title: z.string() },
 	},
 	{
 		name: 'ensemblr_set_branch_name',
@@ -85,6 +117,13 @@ export const TOOL_DEFS: readonly McpToolDef[] = [
 		description:
 			'Name the work: renames this workspace AND its git branch together from one kebab-case slug (2-5 words, e.g. "add-dark-mode"), keeping any `prefix/` segment of the current branch. One-shot — it applies only while the workspace still carries its generated placeholder name; once named it reports that and changes nothing, so call it at most once. This names the workspace and branch, not your terminal tab, which titles itself from your own session log.',
 		shape: { name: z.string() },
+	},
+	{
+		name: 'ensemblr_set_summary',
+		op: 'setSummary',
+		description:
+			"Record the session summary the app keeps for this chat tab, replacing whatever is on file. Call it once the turn's work is done: `title` is a short topic line and `summary` is markdown covering the decisions made, the files touched, and what is still open. Writing it yourself is what keeps the record useful — the app's fallback only dumps the raw transcript. This does NOT rename the tab.",
+		shape: { title: z.string(), summary: z.string() },
 	},
 	{
 		name: 'ensemblr_close_tab',
@@ -238,14 +277,14 @@ export const TOOL_DEFS: readonly McpToolDef[] = [
 		name: 'ensemblr_get_conversation_status',
 		op: 'getConversationStatus',
 		description: 'Get the status of a Pi conversation by session id.',
-		shape: { piSessionId: z.string() },
+		shape: { agentSessionId: z.string() },
 	},
 	{
 		name: 'ensemblr_get_last_message',
 		op: 'getLastMessage',
 		description:
 			"Get a Pi conversation's report: every assistant message of its newest answered turn, joined in the order it was written. Persisted, so it survives the conversation closing and an app restart.",
-		shape: { piSessionId: z.string() },
+		shape: { agentSessionId: z.string() },
 	},
 	{
 		name: 'ensemblr_read_conversation',
@@ -253,7 +292,7 @@ export const TOOL_DEFS: readonly McpToolDef[] = [
 		description:
 			'Read what a Pi conversation actually did — its prompts, its answers, and every tool call with its arguments and result — rather than only the report ensemblr_get_last_message hands back. This is how you audit a sub-agent: confirm it ran what it claims to have run before you act on its findings. Call it with stat=true FIRST: that returns the entry count, the turn count, and the ordinal range with no content, so you know how much there is before you read it. Then page forward with fromOrdinal, resuming from the nextOrdinal each page returns, or pass ordinal to read a single entry whole — stat, ordinal, and fromOrdinal are alternatives, not a combination. Long fields are cut and marked with the ordinal that reads them in full.',
 		shape: {
-			piSessionId: z.string(),
+			agentSessionId: z.string(),
 			stat: z.boolean().optional(),
 			fromOrdinal: z.number().optional(),
 			ordinal: z.number().optional(),
@@ -287,6 +326,28 @@ export const TOOL_DEFS: readonly McpToolDef[] = [
 			message: z.string(),
 		},
 	},
+	{
+		name: 'ensemblr_ask_user_question',
+		op: 'askUserQuestion',
+		description:
+			"Ask the human a multiple-choice question and block until they answer. Use this whenever a decision is genuinely the user's to make — ambiguous requirements, a fork in the approach, a destructive step, or missing context you cannot infer — instead of guessing or stopping to ask in prose. This call has no time limit: it stays open until the user answers or dismisses it, however long that takes, so treat it as a real wait rather than something that comes back on its own. Every question needs 2-6 concrete options; the user can also type a free-text answer or dismiss the dialog. Ask up to 4 related questions at once rather than calling this repeatedly. Do not use it for questions you can answer by reading the codebase.",
+		shape: {
+			questions: z
+				.array(askQuestion)
+				.min(1)
+				.max(ASK_USER_QUESTION_LIMITS.maxQuestions),
+		},
+	},
+	{
+		name: 'ensemblr_exit_plan_mode',
+		op: 'exitPlanMode',
+		description:
+			'Plan Mode only: hand the finished plan to the user and END YOUR TURN. Pass the full plan, in markdown, as `plan`; the app posts it into the conversation for the user to read and saves it to `.context/plans/`, so do NOT also write the plan out as your own reply and do NOT write the file yourself. It then shows the user Approve / Refine / Hand off. This call does not wait for them: it returns at once and your turn is over. Produce no output after it — whatever the user decides arrives as your next prompt. Call it only once you and the user share an understanding, never as an opening move.',
+		shape: {
+			title: z.string().max(EXIT_PLAN_MODE_LIMITS.maxTitleLength),
+			plan: z.string().max(EXIT_PLAN_MODE_LIMITS.maxPlanLength),
+		},
+	},
 ];
 
 /**
@@ -302,21 +363,34 @@ function toMcpResult(result: AgentControlResult<unknown>) {
 }
 
 /**
+ * The tools one caller's list carries, cut from the full vocabulary by the same
+ * withholding policy the Pi extension applies to its own registrations.
+ * @param audience - Whether the caller has a chat tab, and its lineage role.
+ * @returns The definitions to register for that caller.
+ */
+export function toolDefsFor(audience: ControlAudience): readonly McpToolDef[] {
+	const withheld = withheldControlOps(audience);
+	return TOOL_DEFS.filter((def) => !withheld.has(def.op));
+}
+
+/**
  * Builds a fresh MCP server whose tools forward to the control service under a
- * fixed token.
+ * fixed token, carrying the tool list and playbook this caller should hold.
  * @param service - Agent-control service every tool delegates to.
  * @param token - Per-request bearer token identifying the caller.
+ * @param audience - Whether the caller has a chat tab, and its lineage role.
  * @returns A configured, not-yet-connected MCP server.
  */
 function buildMcpServer(
 	service: AgentControlService,
 	token: string,
+	audience: ControlAudience,
 ): McpServer {
 	const server = new McpServer(
 		{ name: 'ensemblr-control', version: '1.0.0' },
-		{ instructions: HARNESS_AWARENESS },
+		{ instructions: awarenessForAudience(audience) },
 	);
-	for (const def of TOOL_DEFS) {
+	for (const def of toolDefsFor(audience)) {
 		server.registerTool(
 			def.name,
 			{ description: def.description, inputSchema: def.shape },
@@ -330,7 +404,10 @@ function buildMcpServer(
 }
 
 /**
- * Handles a single MCP streamable-HTTP request end to end (stateless).
+ * Handles a single MCP streamable-HTTP request end to end (stateless). The
+ * caller's audience is resolved per request because the server is rebuilt per
+ * request; the service owns that resolution, so identity is never re-derived
+ * here from anything the caller supplied.
  * @param req - Incoming request.
  * @param res - Server response.
  * @param body - Parsed JSON-RPC body.
@@ -344,7 +421,11 @@ export async function handleMcpRequest(
 	service: AgentControlService,
 	token: string,
 ): Promise<void> {
-	const server = buildMcpServer(service, token);
+	const server = buildMcpServer(
+		service,
+		token,
+		await service.describeAudience(token),
+	);
 	const transport = new StreamableHTTPServerTransport({
 		sessionIdGenerator: undefined,
 	});

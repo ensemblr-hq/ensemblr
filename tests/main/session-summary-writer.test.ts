@@ -3,8 +3,8 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 
-import { createSessionSummaryWriter } from '../../src/main/pi-agent/session-summary-writer.ts';
-import type { PiSessionEventWire } from '../../src/shared/ipc/contracts/pi-session.ts';
+import { createSessionSummaryWriter } from '../../src/main/agent-runtime/session-summary-writer.ts';
+import type { AgentSessionEventWire } from '../../src/shared/ipc/contracts/agent-session.ts';
 
 const cleanups: Array<() => void> = [];
 
@@ -20,7 +20,7 @@ function makeWorkspaceDir(): string {
 	return directory;
 }
 
-function makeUserEvent(text: string, turnId = 't-1'): PiSessionEventWire {
+function makeUserEvent(text: string, turnId = 't-1'): AgentSessionEventWire {
 	return {
 		branchId: 'b-1',
 		createdAt: '2026-01-01T00:00:00.000Z',
@@ -37,7 +37,7 @@ function makeUserEvent(text: string, turnId = 't-1'): PiSessionEventWire {
 	};
 }
 
-function makeAgentEvent(text: string, turnId = 't-1'): PiSessionEventWire {
+function makeAgentEvent(text: string, turnId = 't-1'): AgentSessionEventWire {
 	return {
 		branchId: 'b-1',
 		createdAt: '2026-01-01T00:00:01.000Z',
@@ -69,7 +69,7 @@ function baseInput(workspaceCwd: string) {
 		chatTabId: 'tab-1',
 		closedAt: '2026-01-01T00:00:00.000Z',
 		events: CONVERSATION,
-		piSessionId: 'native-1',
+		runtimeSessionId: 'native-1',
 		workspaceCwd,
 	};
 }
@@ -83,7 +83,7 @@ describe('writeSessionSummary', () => {
 			chatTabId: 'tab-empty',
 			closedAt: '2026-01-01T00:00:00.000Z',
 			events: [],
-			piSessionId: null,
+			runtimeSessionId: null,
 			workspaceCwd,
 		});
 

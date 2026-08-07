@@ -1,6 +1,6 @@
 import type { UIMessage } from 'ai';
 
-import { turnMetadataOf } from '@/renderer/lib/pi';
+import { turnMetadataOf } from '@/renderer/lib/agent-timeline';
 import type { OptimisticPrompt } from '@/renderer/state/composer';
 
 /**

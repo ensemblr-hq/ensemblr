@@ -1,9 +1,9 @@
 import type {
-	PiAgentEvent,
-	PiAgentEventListener,
-	PiAgentSessionMetadata,
-	PiAgentSubscription,
-} from '../pi-agent-types.ts';
+	AgentEvent,
+	AgentEventListener,
+	AgentSessionMetadata,
+	AgentSubscription,
+} from '../../agent-runtime/agent-types.ts';
 
 /**
  * Listener fan-out helper for the CLI RPC adapter. Owns:
@@ -18,13 +18,13 @@ export function createListenerFanout({
 	listeners,
 	getMetadata,
 }: {
-	listeners: Set<PiAgentEventListener>;
-	getMetadata: () => PiAgentSessionMetadata;
+	listeners: Set<AgentEventListener>;
+	getMetadata: () => AgentSessionMetadata;
 }): {
-	emit: (event: PiAgentEvent) => void;
-	attachListener: (listener: PiAgentEventListener) => PiAgentSubscription;
+	emit: (event: AgentEvent) => void;
+	attachListener: (listener: AgentEventListener) => AgentSubscription;
 } {
-	const emit = (event: PiAgentEvent): void => {
+	const emit = (event: AgentEvent): void => {
 		// Snapshot before iterating so listeners that unsubscribe during fan-out
 		// don't mutate the live set mid-loop.
 		for (const listener of [...listeners]) {
@@ -36,9 +36,7 @@ export function createListenerFanout({
 		}
 	};
 
-	const attachListener = (
-		listener: PiAgentEventListener,
-	): PiAgentSubscription => {
+	const attachListener = (listener: AgentEventListener): AgentSubscription => {
 		listeners.add(listener);
 		// Replay current metadata so late subscribers can render the right state.
 		queueMicrotask(() => {

@@ -4,7 +4,7 @@ import {
 	classifyToolOutput,
 	looksLikeStackTrace,
 	stringifyToolValue,
-} from '../../src/renderer/lib/pi/tool-output-classifier';
+} from '../../src/renderer/lib/agent-timeline/tool-output-classifier';
 
 describe('classifyToolOutput', () => {
 	test('classifies Node stack traces as stack-trace', () => {

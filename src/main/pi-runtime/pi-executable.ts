@@ -9,7 +9,7 @@ import {
 import { homedir } from 'node:os';
 import path from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
-import type { PiExecutableSelectionResult } from '../../shared/ipc/contracts/pi-session';
+import type { AgentExecutableSelectionWire } from '../../shared/ipc/contracts/agent-provider';
 import type {
 	ResolvedSettingSnapshot,
 	SettingsResolutionSnapshot,
@@ -22,6 +22,10 @@ import type {
 import type { EnsemblrConfigResolutionService } from '../config';
 import { deleteSetting } from '../environment/settings-table.ts';
 import type { EnsemblrDatabaseService } from '../storage';
+import {
+	findConfiguredPathRejection,
+	isBareCommand,
+} from './internal/configured-executable-path.ts';
 import { normalizeConfiguredPath } from './internal/normalize-configured-path.ts';
 
 /** Overall outcome of Pi executable discovery. */
@@ -75,9 +79,9 @@ export function isExecutableReady(executable: PiExecutableSnapshot): boolean {
 
 /** Public surface of the Pi executable service. */
 export interface PiExecutableService {
-	clearOverride: () => PiExecutableSelectionResult;
+	clearOverride: () => AgentExecutableSelectionWire;
 	getSnapshot: () => Promise<PiExecutableSnapshot>;
-	saveOverride: (executablePath: string) => PiExecutableSelectionResult;
+	saveOverride: (executablePath: string) => AgentExecutableSelectionWire;
 }
 
 /** Options for {@link resolvePiExecutable}. */
@@ -274,7 +278,7 @@ export async function resolvePiExecutable({
 /**
  * Persists the user's Pi executable override into the SQLite `settings` table.
  * @param input - Database and selected path.
- * @returns A {@link PiExecutableSelectionResult}.
+ * @returns A {@link AgentExecutableSelectionWire}.
  */
 export function savePiExecutableOverride({
 	database,
@@ -282,7 +286,7 @@ export function savePiExecutableOverride({
 }: {
 	database: DatabaseSync | null;
 	executablePath: string;
-}): PiExecutableSelectionResult {
+}): AgentExecutableSelectionWire {
 	const selectedPath = executablePath.trim();
 
 	if (!selectedPath) {
@@ -348,13 +352,13 @@ export function savePiExecutableOverride({
  * Removes the user's Pi executable override from the SQLite `settings` table so
  * resolution falls back to the discovered/bundled Pi.
  * @param input - Database handle.
- * @returns A {@link PiExecutableSelectionResult}.
+ * @returns A {@link AgentExecutableSelectionWire}.
  */
 export function clearPiExecutableOverride({
 	database,
 }: {
 	database: DatabaseSync | null;
-}): PiExecutableSelectionResult {
+}): AgentExecutableSelectionWire {
 	if (!database) {
 		return {
 			canceled: false,
@@ -456,15 +460,15 @@ async function createExplicitCandidate({
 		return pathCandidate;
 	}
 
-	if (
-		rawPath !== '~' &&
-		!rawPath.startsWith('~/') &&
-		!path.isAbsolute(rawPath)
-	) {
+	const rejection = findConfiguredPathRejection(
+		rawPath,
+		PI_EXECUTABLE_SETTING_KEY,
+	);
+
+	if (rejection) {
 		diagnostics.push({
 			code: 'pi-executable-relative-path',
-			message:
-				'The pi.executablePath setting must be absolute, start with ~/, or be a bare command name.',
+			message: rejection,
 			path: rawPath,
 			severity: 'error',
 			source: setting.source,
@@ -480,12 +484,6 @@ async function createExplicitCandidate({
 		path: normalizedPath,
 		source: setting.source,
 	});
-}
-
-/** Resolves a configured path, expanding `~`. */
-/** True when the path looks like a bare command name (no `/` or path sep). */
-function isBareCommand(rawPath: string): boolean {
-	return !rawPath.includes('/') && !rawPath.includes(path.sep);
 }
 
 /**

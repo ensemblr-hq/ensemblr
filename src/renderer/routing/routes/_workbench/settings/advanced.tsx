@@ -4,9 +4,13 @@ import { useAtom } from 'jotai';
 import { useEffect, useRef, useState } from 'react';
 
 import {
+	agentProviderExecutablePathQuery,
+	clearAgentProviderExecutablePath,
 	ensemblrQueryKeys,
 	getEnsemblrApi,
 	rootDirectoryQuery,
+	selectAgentProviderExecutable,
+	setAgentProviderExecutablePath,
 } from '@/renderer/api/ensemblr';
 import { SettingRow } from '@/renderer/components/settings/setting-row';
 import { SettingsSection } from '@/renderer/components/settings/settings-section';
@@ -37,10 +41,7 @@ function AdvancedSettings() {
 	const [scrollbackMb, setScrollbackMb] = useAtom(terminalScrollbackMbAtom);
 	const [pickError, setPickError] = useState<string | null>(null);
 
-	const { data: piData } = useQuery({
-		queryFn: () => getEnsemblrApi().getPiExecutablePath(),
-		queryKey: ensemblrQueryKeys.piExecutablePath(),
-	});
+	const { data: piData } = useQuery(agentProviderExecutablePathQuery('pi'));
 	const [piPath, setPiPath] = useState('');
 	const piSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const resolvedOverride = piData?.overridePath ?? '';
@@ -64,7 +65,10 @@ function AdvancedSettings() {
 
 	const invalidatePiPath = () => {
 		void queryClient.invalidateQueries({
-			queryKey: ensemblrQueryKeys.piExecutablePath(),
+			queryKey: ensemblrQueryKeys.agentProviderExecutablePath('pi'),
+		});
+		void queryClient.invalidateQueries({
+			queryKey: ensemblrQueryKeys.agentProviderReadiness('pi'),
 		});
 		void queryClient.invalidateQueries({
 			queryKey: ensemblrQueryKeys.setupDiagnostics(),
@@ -75,8 +79,8 @@ function AdvancedSettings() {
 		const trimmed = value.trim();
 		void (
 			trimmed
-				? getEnsemblrApi().setPiExecutablePath({ path: trimmed })
-				: getEnsemblrApi().clearPiExecutablePath()
+				? setAgentProviderExecutablePath('pi', trimmed)
+				: clearAgentProviderExecutablePath('pi')
 		).then(invalidatePiPath);
 	};
 
@@ -97,7 +101,7 @@ function AdvancedSettings() {
 			piSaveTimerRef.current = null;
 		}
 		setPiPath('');
-		void getEnsemblrApi().clearPiExecutablePath().then(invalidatePiPath);
+		void clearAgentProviderExecutablePath('pi').then(invalidatePiPath);
 	};
 
 	const pickRoot = useMutation({
@@ -131,7 +135,7 @@ function AdvancedSettings() {
 
 	const pickPi = useMutation({
 		mutationFn: async () => {
-			const result = await getEnsemblrApi().selectPiExecutable();
+			const result = await selectAgentProviderExecutable('pi');
 			if (result.canceled) return null;
 			if (result.error) throw new Error(result.error);
 			return result.selectedPath ?? null;

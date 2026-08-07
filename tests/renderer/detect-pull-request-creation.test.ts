@@ -5,12 +5,12 @@ import {
 	isPullRequestCreationEvent,
 } from '../../src/renderer/hooks/workbench-shell/route-layout/detect-pull-request-creation';
 import type {
-	PiPersistedEnvelope,
-	PiWireMessagePart,
-} from '../../src/shared/ipc/contracts/pi-message-payloads';
+	AgentPersistedEnvelope,
+	AgentWireMessagePart,
+} from '../../src/shared/ipc/contracts/agent-message-payloads';
 
 /** Wraps a tool-call payload in the persisted message envelope shape. */
-function toolCall(input: unknown): PiPersistedEnvelope {
+function toolCall(input: unknown): AgentPersistedEnvelope {
 	return {
 		kind: 'message',
 		payload: { input, kind: 'tool-call', name: 'Bash', toolCallId: 'c1' },
@@ -19,7 +19,7 @@ function toolCall(input: unknown): PiPersistedEnvelope {
 }
 
 /** Wraps a tool-result payload in the persisted message envelope shape. */
-function toolResult(output: unknown): PiPersistedEnvelope {
+function toolResult(output: unknown): AgentPersistedEnvelope {
 	return {
 		kind: 'message',
 		payload: { isError: false, kind: 'tool-result', output, toolCallId: 'c1' },
@@ -29,8 +29,8 @@ function toolResult(output: unknown): PiPersistedEnvelope {
 
 /** Wraps finalized assistant message parts in the persisted envelope shape. */
 function assistantMessage(
-	parts: readonly PiWireMessagePart[],
-): PiPersistedEnvelope {
+	parts: readonly AgentWireMessagePart[],
+): AgentPersistedEnvelope {
 	return {
 		kind: 'message',
 		payload: { kind: 'message', parts, role: 'assistant' },
@@ -108,7 +108,7 @@ describe('isPullRequestCreationEvent', () => {
 function status(
 	current: 'starting' | 'streaming' | 'idle',
 	previous: 'starting' | 'streaming' | 'idle',
-): PiPersistedEnvelope {
+): AgentPersistedEnvelope {
 	return { kind: 'status', previous, status: current };
 }
 

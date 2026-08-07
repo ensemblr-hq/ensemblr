@@ -67,7 +67,7 @@ export function WorkspaceSidebarItem({
 	const { renderWorkspaceLink } = useNavigation();
 	const isUnread = useWorkspaceUnread(workspace.id);
 	const isPendingCreation = workspace.isPendingCreation === true;
-	// Live Pi runtime activity flows through `agentBusy` so it takes spinner
+	// Live agent runtime activity flows through `agentBusy` so it takes spinner
 	// priority over PR/check states without disturbing the cached
 	// `workspace.status` semantics elsewhere in the renderer.
 	const agentBusy = useWorkspaceBusy(workspace.id);

@@ -25,7 +25,7 @@ function createTab(id: string): SessionTabModel {
 		isSubAgent: false,
 		kind: 'chat',
 		label: id,
-		piSessionId: null,
+		agentSessionId: null,
 		status: 'idle',
 		summary: '',
 		updatedLabel: '',

@@ -38,9 +38,10 @@ export interface TerminalSessionSnapshot {
 	 * read from its on-disk session log (Claude transcript, Codex rollout, Vibe
 	 * session). `null` for non-agent sessions and before the first successful read.
 	 * Persisted onto the tab when it closes so a restored terminal tab can reattach
-	 * the exact conversation via the harness's `--resume <id>` command.
+	 * the exact conversation via the harness's `--resume <id>` command. This is the
+	 * harness CLI's own id, never an Ensemblr agent session id.
 	 */
-	agentSessionId: string | null;
+	harnessSessionId: string | null;
 	/**
 	 * Conversation title read from an agent harness's on-disk session log, for
 	 * harnesses whose OSC window title is not the conversation title (Codex, Vibe).

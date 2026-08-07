@@ -6,15 +6,15 @@ import {
 	type PortAdapterDeps,
 } from '../../src/main/agent-control/index.ts';
 import {
+	getChatTabByAgentSessionId,
 	getChatTabById,
-	getChatTabByPiSessionId,
 	setChatTabMetadata,
 } from '../../src/main/storage/repositories/chat-tab-repository.ts';
 import {
 	listAllWorkspaceRows,
 	selectWorkspaceWithRepositoryById,
 } from '../../src/main/storage/repositories/workspace-repository.ts';
-import type { PiPersistedEnvelope } from '../../src/shared/ipc/contracts/pi-session';
+import type { AgentPersistedEnvelope } from '../../src/shared/ipc/contracts/agent-session';
 import type { CreateTerminalSessionResult } from '../../src/shared/ipc/contracts/terminal.ts';
 import {
 	DEFAULT_RUN_SCRIPT_ICON,
@@ -23,7 +23,7 @@ import {
 
 vi.mock('../../src/main/storage/repositories/chat-tab-repository.ts', () => ({
 	getChatTabById: vi.fn(() => ({ workspaceId: 'ws', metadata: {} })),
-	getChatTabByPiSessionId: vi.fn(() => null),
+	getChatTabByAgentSessionId: vi.fn(() => null),
 	setChatTabMetadata: vi.fn(),
 }));
 
@@ -54,7 +54,7 @@ const makeDeps = (): {
 	const deps = {
 		databaseService: { getConnection: () => ({ database: {} }) },
 		chatTabService: { openTab, closeTab: vi.fn(), listTabs: vi.fn() },
-		piSessionService: {},
+		agentSessionService: {},
 		terminalService: {},
 		scriptLifecycleService: {},
 		harnessDetectionService: {},
@@ -160,20 +160,20 @@ describe('agent-control port adapters: conversation naming', () => {
 		vi.mocked(setChatTabMetadata).mockClear();
 	});
 
-	it('setName forwards to the pi session service and broadcasts', async () => {
+	it('setName forwards to the agent session service and broadcasts', async () => {
 		const setSessionName = vi.fn().mockResolvedValue({
 			applied: true,
 			chatTabId: 'tab-1',
 			title: 'Refactor auth',
 		});
 		const { deps, broadcastTabsChanged } = makeDeps();
-		(deps as { piSessionService: unknown }).piSessionService = {
+		(deps as { agentSessionService: unknown }).agentSessionService = {
 			setSessionName,
 			getSession: vi.fn(() => ({ workspaceId: 'ws' })),
 		};
 		const ports = createAgentControlPorts(deps);
 		const result = await ports.conversations.setName({
-			piSessionId: 'sess-1',
+			agentSessionId: 'sess-1',
 			name: 'Refactor auth',
 		});
 		expect(setSessionName).toHaveBeenCalledWith({
@@ -196,13 +196,13 @@ describe('agent-control port adapters: conversation naming', () => {
 			title: 'Chosen by hand',
 		});
 		const { deps, broadcastTabsChanged } = makeDeps();
-		(deps as { piSessionService: unknown }).piSessionService = {
+		(deps as { agentSessionService: unknown }).agentSessionService = {
 			setSessionName,
 			getSession: vi.fn(() => ({ workspaceId: 'ws' })),
 		};
 		const ports = createAgentControlPorts(deps);
 		const result = await ports.conversations.setName({
-			piSessionId: 'sess-1',
+			agentSessionId: 'sess-1',
 			name: 'Agent guess',
 		});
 		expect(result).toMatchObject({ applied: false, title: 'Chosen by hand' });
@@ -212,13 +212,13 @@ describe('agent-control port adapters: conversation naming', () => {
 	it('setName returns null and does not broadcast for an inactive session', async () => {
 		const setSessionName = vi.fn().mockResolvedValue(null);
 		const { deps, broadcastTabsChanged } = makeDeps();
-		(deps as { piSessionService: unknown }).piSessionService = {
+		(deps as { agentSessionService: unknown }).agentSessionService = {
 			setSessionName,
 			getSession: vi.fn(),
 		};
 		const ports = createAgentControlPorts(deps);
 		const result = await ports.conversations.setName({
-			piSessionId: 'gone',
+			agentSessionId: 'gone',
 			name: 'x',
 		});
 		expect(result).toBeNull();
@@ -232,7 +232,7 @@ describe('agent-control port adapters: conversation naming', () => {
 			title: 'Docs sweep',
 		});
 		const { deps } = makeDeps();
-		(deps as { piSessionService: unknown }).piSessionService = {
+		(deps as { agentSessionService: unknown }).agentSessionService = {
 			openSession: vi.fn().mockResolvedValue({ id: 'sess-1' }),
 			submitPrompt: vi.fn().mockResolvedValue({}),
 			setSessionName,
@@ -254,7 +254,7 @@ describe('agent-control port adapters: conversation naming', () => {
 			parentSessionId: 'parent-1',
 			planMode: false,
 		});
-		expect(result).toEqual({ chatTabId: 'tab-1', piSessionId: 'sess-1' });
+		expect(result).toEqual({ chatTabId: 'tab-1', agentSessionId: 'sess-1' });
 		expect(setChatTabMetadata).toHaveBeenCalledWith(
 			expect.objectContaining({
 				id: 'tab-1',
@@ -275,7 +275,7 @@ describe('agent-control port adapters: conversation naming', () => {
 	it('startConversation announces the tab-to-session binding before submitting', async () => {
 		const submitPrompt = vi.fn().mockResolvedValue({});
 		const { broadcastTabsChanged, deps } = makeDeps();
-		(deps as { piSessionService: unknown }).piSessionService = {
+		(deps as { agentSessionService: unknown }).agentSessionService = {
 			openSession: vi.fn().mockResolvedValue({ id: 'sess-1' }),
 			submitPrompt,
 			setSessionName: vi.fn().mockResolvedValue({ applied: true }),
@@ -313,7 +313,7 @@ describe('agent-control port adapters: conversation naming', () => {
 	// keep a locked composer forever if the marker stayed behind.
 	it('startConversation clears the sub-agent marker when a reused tab fails to submit', async () => {
 		const { deps } = makeDeps();
-		(deps as { piSessionService: unknown }).piSessionService = {
+		(deps as { agentSessionService: unknown }).agentSessionService = {
 			openSession: vi.fn().mockResolvedValue({ id: 'sess-1' }),
 			submitPrompt: vi.fn().mockRejectedValue(new Error('pi is not ready')),
 			stopSession: vi.fn().mockResolvedValue(undefined),
@@ -363,7 +363,7 @@ describe('agent-control port adapters: conversation naming', () => {
 	// back the whole surface the role policy exists to deny it.
 	it('startConversation leaves a pre-existing sub-agent marker alone when the submit fails', async () => {
 		const { deps } = makeDeps();
-		(deps as { piSessionService: unknown }).piSessionService = {
+		(deps as { agentSessionService: unknown }).agentSessionService = {
 			openSession: vi.fn().mockResolvedValue({ id: 'sess-2' }),
 			submitPrompt: vi.fn().mockRejectedValue(new Error('pi is not ready')),
 			stopSession: vi.fn().mockResolvedValue(undefined),
@@ -423,7 +423,7 @@ describe('agent-control port adapters: branch naming', () => {
 			appSettingsService: {
 				read: () => ({ git: { renameWorkspaceOnBranch } }),
 			},
-			piSessionService: { appendWorkspaceRenamed: vi.fn() },
+			agentSessionService: { appendWorkspaceRenamed: vi.fn() },
 			renameWorkspace,
 		});
 		vi.mocked(selectWorkspaceWithRepositoryById).mockReturnValue({
@@ -471,7 +471,7 @@ describe('agent-control port adapters: branch naming', () => {
 });
 
 describe('agent-control port adapters: last message', () => {
-	const agentMessage = (text: string): PiPersistedEnvelope => ({
+	const agentMessage = (text: string): AgentPersistedEnvelope => ({
 		kind: 'message',
 		role: 'agent',
 		payload: {
@@ -484,15 +484,17 @@ describe('agent-control port adapters: last message', () => {
 		},
 	});
 
-	const userPrompt = (text: string): PiPersistedEnvelope => ({
+	const userPrompt = (text: string): AgentPersistedEnvelope => ({
 		kind: 'message',
 		role: 'user',
 		payload: { kind: 'prompt', prompt: text },
 	});
 
-	const withPayloads = (payloads: readonly (PiPersistedEnvelope | null)[]) => {
+	const withPayloads = (
+		payloads: readonly (AgentPersistedEnvelope | null)[],
+	) => {
 		const { deps } = makeDeps();
-		(deps as { piSessionService: unknown }).piSessionService = {
+		(deps as { agentSessionService: unknown }).agentSessionService = {
 			getSession: vi.fn(() => ({ branchId: 'branch-1' })),
 			iterateEventPayloadsDescending: vi.fn(() => payloads),
 		};
@@ -617,7 +619,7 @@ describe('agent-control port adapters: last message', () => {
 
 	it('returns null for an unknown session', async () => {
 		const { deps } = makeDeps();
-		(deps as { piSessionService: unknown }).piSessionService = {
+		(deps as { agentSessionService: unknown }).agentSessionService = {
 			getSession: vi.fn(() => undefined),
 			iterateEventPayloadsDescending: vi.fn(() => []),
 		};
@@ -628,27 +630,27 @@ describe('agent-control port adapters: last message', () => {
 });
 
 describe('agent-control port adapters: readTranscript', () => {
-	const prompt = (text: string): PiPersistedEnvelope => ({
+	const prompt = (text: string): AgentPersistedEnvelope => ({
 		kind: 'message',
 		payload: { kind: 'prompt', prompt: text },
 		role: 'user',
 	});
 
-	const answer = (text: string): PiPersistedEnvelope => ({
+	const answer = (text: string): AgentPersistedEnvelope => ({
 		kind: 'message',
 		payload: { kind: 'text', text },
 		role: 'agent',
 	});
 
 	const withEvents = (
-		events: readonly { ordinal: number; payload: PiPersistedEnvelope }[],
+		events: readonly { ordinal: number; payload: AgentPersistedEnvelope }[],
 		session: { branchId: string } | null = { branchId: 'branch-1' },
 	) => {
 		const listEvents = vi.fn(() =>
 			events.map((event) => ({ ...event, stream: 'protocol' as const })),
 		);
 		const { deps } = makeDeps();
-		(deps as { piSessionService: unknown }).piSessionService = {
+		(deps as { agentSessionService: unknown }).agentSessionService = {
 			getSession: vi.fn(() => session),
 			listEvents,
 		};
@@ -662,7 +664,7 @@ describe('agent-control port adapters: readTranscript', () => {
 		]);
 
 		const result = await ports.conversations.readTranscript({
-			piSessionId: 'sess-1',
+			agentSessionId: 'sess-1',
 		});
 
 		expect(listEvents).toHaveBeenCalledWith('branch-1');
@@ -670,7 +672,7 @@ describe('agent-control port adapters: readTranscript', () => {
 			{ kind: 'prompt', ordinal: 1, text: 'audit the parser' },
 			{ kind: 'message', ordinal: 2, text: 'parser looks sound' },
 		]);
-		expect(result.piSessionId).toBe('sess-1');
+		expect(result.agentSessionId).toBe('sess-1');
 		expect(result.turnCount).toBe(1);
 	});
 
@@ -681,7 +683,7 @@ describe('agent-control port adapters: readTranscript', () => {
 		]);
 
 		const result = await ports.conversations.readTranscript({
-			piSessionId: 'sess-1',
+			agentSessionId: 'sess-1',
 			stat: true,
 		});
 
@@ -695,7 +697,7 @@ describe('agent-control port adapters: readTranscript', () => {
 		const { listEvents, ports } = withEvents([], null);
 
 		const result = await ports.conversations.readTranscript({
-			piSessionId: 'gone',
+			agentSessionId: 'gone',
 		});
 
 		expect(listEvents).not.toHaveBeenCalled();
@@ -705,7 +707,7 @@ describe('agent-control port adapters: readTranscript', () => {
 			firstOrdinal: null,
 			lastOrdinal: null,
 			nextOrdinal: null,
-			piSessionId: 'gone',
+			agentSessionId: 'gone',
 			turnCount: 0,
 		});
 	});
@@ -713,33 +715,35 @@ describe('agent-control port adapters: readTranscript', () => {
 
 describe('agent-control port adapters: sub-agent marker', () => {
 	const tab = (metadata: Record<string, unknown>) =>
-		({ id: 'tab-1', metadata }) as ReturnType<typeof getChatTabByPiSessionId>;
+		({ id: 'tab-1', metadata }) as ReturnType<
+			typeof getChatTabByAgentSessionId
+		>;
 
 	beforeEach(() => {
-		vi.mocked(getChatTabByPiSessionId).mockReset();
+		vi.mocked(getChatTabByAgentSessionId).mockReset();
 	});
 
 	it('reports the marker a spawn stamped on the session’s tab', async () => {
-		vi.mocked(getChatTabByPiSessionId).mockReturnValue(
+		vi.mocked(getChatTabByAgentSessionId).mockReturnValue(
 			tab({ agentRole: 'subagent' }),
 		);
 		const { deps } = makeDeps();
 		const ports = createAgentControlPorts(deps);
 		expect(await ports.conversations.isSpawnedSubAgent?.('sess-1')).toBe(true);
-		expect(getChatTabByPiSessionId).toHaveBeenCalledWith(
-			expect.objectContaining({ piSessionId: 'sess-1' }),
+		expect(getChatTabByAgentSessionId).toHaveBeenCalledWith(
+			expect.objectContaining({ agentSessionId: 'sess-1' }),
 		);
 	});
 
 	it('reports no marker for a tab that was never spawned into', async () => {
-		vi.mocked(getChatTabByPiSessionId).mockReturnValue(tab({}));
+		vi.mocked(getChatTabByAgentSessionId).mockReturnValue(tab({}));
 		const { deps } = makeDeps();
 		const ports = createAgentControlPorts(deps);
 		expect(await ports.conversations.isSpawnedSubAgent?.('sess-1')).toBe(false);
 	});
 
 	it('reports no marker for a session with no tab', async () => {
-		vi.mocked(getChatTabByPiSessionId).mockReturnValue(null);
+		vi.mocked(getChatTabByAgentSessionId).mockReturnValue(null);
 		const { deps } = makeDeps();
 		const ports = createAgentControlPorts(deps);
 		expect(await ports.conversations.isSpawnedSubAgent?.('gone')).toBe(false);
@@ -748,7 +752,7 @@ describe('agent-control port adapters: sub-agent marker', () => {
 	// Role resolution falls back to live lineage when the marker cannot be read, so
 	// a storage failure must not throw out of the plan-mode gate.
 	it('reports no marker when the read fails', async () => {
-		vi.mocked(getChatTabByPiSessionId).mockImplementation(() => {
+		vi.mocked(getChatTabByAgentSessionId).mockImplementation(() => {
 			throw new Error('database is closed');
 		});
 		const { deps } = makeDeps();
@@ -760,10 +764,10 @@ describe('agent-control port adapters: sub-agent marker', () => {
 describe('agent-control port adapters: conversation status', () => {
 	const withStatus = (
 		snapshot: unknown,
-		payloads: readonly (PiPersistedEnvelope | null)[] = [],
+		payloads: readonly (AgentPersistedEnvelope | null)[] = [],
 	) => {
 		const { deps } = makeDeps();
-		(deps as { piSessionService: unknown }).piSessionService = {
+		(deps as { agentSessionService: unknown }).agentSessionService = {
 			getSession: vi.fn(() => snapshot),
 			iterateEventPayloadsDescending: vi.fn(() => payloads),
 		};
@@ -773,7 +777,7 @@ describe('agent-control port adapters: conversation status', () => {
 	it('returns the live snapshot without scanning persisted events', async () => {
 		const { deps } = makeDeps();
 		const iterateEventPayloadsDescending = vi.fn(() => []);
-		(deps as { piSessionService: unknown }).piSessionService = {
+		(deps as { agentSessionService: unknown }).agentSessionService = {
 			getSession: vi.fn(() => ({
 				id: 'sess-1',
 				branchId: 'b1',
@@ -785,7 +789,7 @@ describe('agent-control port adapters: conversation status', () => {
 		const ports = createAgentControlPorts(deps);
 		const result = await ports.conversations.getStatus('sess-1');
 		expect(result).toEqual({
-			piSessionId: 'sess-1',
+			agentSessionId: 'sess-1',
 			status: 'closed',
 			runtimeOpen: false,
 		});

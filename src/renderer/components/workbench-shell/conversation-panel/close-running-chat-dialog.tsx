@@ -61,8 +61,8 @@ export function CloseRunningChatDialog({
 						Close running chat?
 					</DialogTitle>
 					<p className='text-muted-foreground text-xs'>
-						This chat is currently running. Closing it will stop the current Pi
-						session.
+						This chat is currently running. Closing it will stop the current
+						agent session.
 					</p>
 				</DialogHeader>
 

@@ -22,6 +22,7 @@
  * cross-check the playbook prose against it.
  */
 
+import type { ControlAudience } from './awareness.ts';
 import type { AgentControlOp } from './contracts.ts';
 
 /**
@@ -112,4 +113,36 @@ export const SUBAGENT_WITHHELD_OPS: ReadonlySet<AgentControlOp> = new Set([
  */
 export function subAgentControlOpDenial(op: AgentControlOp): string | null {
 	return SUBAGENT_BLOCKED_OPS.get(op) ?? null;
+}
+
+/**
+ * Ops that act on a native chat tab and that the service refuses to a caller
+ * without one: naming the tab, recording its summary, hosting a questionnaire in
+ * it, and posting a plan into it. The second withholding axis alongside the
+ * sub-agent one — a harness owns a terminal tab that titles itself from its own
+ * session log, so all four would have nothing to act on.
+ */
+const CHAT_TAB_ONLY_OPS: ReadonlySet<AgentControlOp> = new Set([
+	'setName',
+	'setSummary',
+	'askUserQuestion',
+	'exitPlanMode',
+]);
+
+/**
+ * Every op a caller's tool list leaves out, folding both withholding axes into
+ * one answer: the chat-tab ops a caller without a tab cannot use, and the ops a
+ * spawned sub-agent is denied or has no use for. Listing a tool the service would
+ * only refuse teaches the model to keep reaching for it, which is the same
+ * argument on both axes.
+ * @param audience - Whether the caller has a chat tab, and its lineage role.
+ * @returns The ops to withhold from that caller's tool list.
+ */
+export function withheldControlOps(
+	audience: ControlAudience,
+): ReadonlySet<AgentControlOp> {
+	return new Set([
+		...(audience.hasChatTab ? [] : CHAT_TAB_ONLY_OPS),
+		...(audience.role === 'subagent' ? SUBAGENT_WITHHELD_OPS : []),
+	]);
 }

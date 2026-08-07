@@ -15,7 +15,7 @@
  */
 import type { DatabaseSync } from 'node:sqlite';
 
-import { getChatTabByPiSessionId } from '../storage/repositories/chat-tab-repository.ts';
+import { getChatTabByAgentSessionId } from '../storage/repositories/chat-tab-repository.ts';
 
 /**
  * Reports whether the chat tab bound to a Pi session is stamped as hosting a
@@ -23,23 +23,26 @@ import { getChatTabByPiSessionId } from '../storage/repositories/chat-tab-reposi
  * failed read all report no marker, which leaves role resolution to lineage
  * exactly as it was before the marker existed.
  * @param database - Open database connection, or null/undefined before one is.
- * @param piSessionId - The session whose tab to inspect.
+ * @param agentSessionId - The session whose tab to inspect.
  * @returns True when the session's tab carries the sub-agent marker.
  */
 export function isSessionTabMarkedSubAgent(
 	database: DatabaseSync | null | undefined,
-	piSessionId: string,
+	agentSessionId: string,
 ): boolean {
 	if (!database) {
 		return false;
 	}
 	try {
-		const tab = getChatTabByPiSessionId({ database, piSessionId });
+		const tab = getChatTabByAgentSessionId({
+			agentSessionId,
+			database,
+		});
 		return tab?.metadata.agentRole === 'subagent';
 	} catch (cause) {
 		console.warn('[agent-control] could not read a tab’s sub-agent marker.', {
 			cause: cause instanceof Error ? cause.message : String(cause),
-			piSessionId,
+			agentSessionId,
 		});
 		return false;
 	}

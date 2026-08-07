@@ -8,7 +8,7 @@ import { z } from 'zod';
 
 /** {@link import('../../../shared/ipc').ListTurnCheckpointsRequest}. */
 export const listTurnCheckpointsRequestSchema = z.object({
-	piSessionId: z.string().min(1),
+	agentSessionId: z.string().min(1),
 });
 
 /** {@link import('../../../shared/ipc').ComputeTurnDiffRequest}. */

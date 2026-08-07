@@ -7,7 +7,10 @@ import {
 	createGuardrails,
 	createOriginRegistry,
 } from '../../src/main/agent-control/index.ts';
-import type { AgentControlOrigin } from '../../src/main/agent-control/ports.ts';
+import type {
+	AgentControlOrigin,
+	AgentSpecies,
+} from '../../src/main/agent-control/ports.ts';
 import type {
 	AskUserQuestionBroadcast,
 	AskUserQuestionClosedBroadcast,
@@ -83,7 +86,7 @@ describe('ask coordinator', () => {
 		await Promise.resolve();
 		expect(asked).toEqual([
 			{
-				piSessionId: 'session-1',
+				agentSessionId: 'session-1',
 				questions: QUESTIONS,
 				requestId: 'req-1',
 				workspaceId: 'workspace-1',
@@ -254,7 +257,10 @@ describe('ask coordinator', () => {
 		coordinator.settle({ answers: [], cancelled: true, requestId: 'req-1' });
 		await first;
 		expect(coordinator.openAsks()).toEqual([
-			expect.objectContaining({ piSessionId: 'session-2', requestId: 'req-2' }),
+			expect.objectContaining({
+				agentSessionId: 'session-2',
+				requestId: 'req-2',
+			}),
 		]);
 
 		coordinator.settle({ answers: [], cancelled: true, requestId: 'req-2' });
@@ -353,7 +359,7 @@ describe('ask coordinator', () => {
 	});
 });
 
-const serviceSetup = (species: 'pi' | 'harness') => {
+const serviceSetup = (species: AgentSpecies) => {
 	const registry = createOriginRegistry({ generateToken: () => 'tok-caller' });
 	registry.register({
 		sessionId: 'caller',
@@ -422,6 +428,23 @@ describe('askUserQuestion op', () => {
 		expect(result.ok).toBe(false);
 		expect(result.ok === false && result.code).toBe('denied-scope');
 		expect(asked).toEqual([]);
+	});
+
+	// A first-class Claude conversation renders the dialog in its own chat tab, so
+	// the questionnaire reaches the coordinator exactly as a Pi one does.
+	it('opens the dialog for a first-class Claude caller', async () => {
+		const { asked, service } = serviceSetup('claude');
+		const pending = service.invoke({
+			op: 'askUserQuestion',
+			rawArgs: { questions: QUESTIONS },
+			token: 'tok-caller',
+		});
+		await waitForAsk(asked);
+
+		expect(asked).toHaveLength(1);
+
+		service.releaseSession('caller');
+		expect((await pending).ok).toBe(true);
 	});
 
 	it('rejects a malformed questionnaire before it reaches the dialog', async () => {

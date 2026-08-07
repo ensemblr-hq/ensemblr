@@ -6,6 +6,6 @@
 export interface CheckpointRestoreTarget {
 	branchId: string;
 	label: string;
-	piSessionId: string;
+	agentSessionId: string;
 	turnId: string;
 }

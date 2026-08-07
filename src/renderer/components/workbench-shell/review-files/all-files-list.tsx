@@ -26,7 +26,7 @@ import { useReviewFilePreviewOpener } from '@/renderer/components/workbench-shel
 import { PanelPlaceholder } from '@/renderer/components/workbench-shell/panel-placeholder';
 import { useFileTreeExpansion } from '@/renderer/hooks/workbench-shell/review-files/use-file-tree-expansion';
 import { useOpenTargets } from '@/renderer/hooks/workbench-shell/use-open-targets';
-import { toWorkspaceLookupPath } from '@/renderer/lib/pi';
+import { toWorkspaceLookupPath } from '@/renderer/lib/agent-timeline';
 import { cn } from '@/renderer/lib/utils';
 import {
 	buildFileTree,

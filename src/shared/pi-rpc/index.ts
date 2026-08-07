@@ -1,9 +1,5 @@
 export type { PiRpcParseResult } from './parse.ts';
 export { parsePiRpcLine } from './parse.ts';
-export {
-	describesGracefulTermination,
-	isGracefulTermination,
-} from './process-exit.ts';
 export type {
 	PiAgentMessage,
 	PiAssistantBlock,

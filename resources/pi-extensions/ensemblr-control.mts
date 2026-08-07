@@ -55,7 +55,7 @@ Your last message is your answer to the user, and it is the last thing you produ
 Split the work before you split the agents. A child cold-starts with nothing but its brief, so every fact two children both need is a repository read paid for twice — and that re-derivation is what makes a fan-out cost more context than doing the work inline. When the workstreams share a foundation — the same files, the same inventory, the same shape of the code — establish it once yourself, or with one scout child, and put the findings with full paths into every brief. Fan out cold only where the work is genuinely disjoint.
 
 When delegation is warranted — delegate → wait → evaluate → integrate:
-1. Spawn each helper with \`ensemblr_start_conversation\` in its own fresh tab — pass a short, descriptive \`title\` and do NOT pass \`chatTabId\` (reusing a prior tab keeps its old title); omit \`wait\` and keep the \`piSessionId\` it returns. Brief each one with what to deliver, not just what to look at: the question it answers, the defaults it should assume rather than come back and ask you about, and whether it reports inline — the default — or writes a file at a path you name. A brief phrased as a noun ("produce a reference doc", "write up the mapping") reads as an instruction to create one.
+1. Spawn each helper with \`ensemblr_start_conversation\` in its own fresh tab — pass a short, descriptive \`title\` and do NOT pass \`chatTabId\` (reusing a prior tab keeps its old title); omit \`wait\` and keep the \`agentSessionId\` it returns. Brief each one with what to deliver, not just what to look at: the question it answers, the defaults it should assume rather than come back and ask you about, and whether it reports inline — the default — or writes a file at a path you name. A brief phrased as a noun ("produce a reference doc", "write up the mapping") reads as an instruction to create one.
 2. Once you have delegated everything you can in parallel, call \`ensemblr_wait_for_agents\` and let it block — this is how you avoid racing ahead. Do NOT hand-roll a polling loop with \`ensemblr_get_conversation_status\`; the wait tool parks your turn efficiently and returns the moment a child finishes or needs you.
    - \`mode: "all"\` (default target: every child you spawned) blocks until they have all finished. Pass it explicitly whenever that is what you want — the mode defaults to \`first\`.
    - \`mode: "first"\` returns as soon as any one child finishes or raises a signal — use it to react to whichever lands first.
@@ -151,7 +151,7 @@ Your job this turn is to reach a shared understanding with the user before any c
 
 Finding those facts does not have to be serial. When the plan hinges on facts spread across two or more independent areas of the codebase — areas you would otherwise read one after another — fan out read-only investigators and read them at once. Never fan out for one file, one question, or anything you could answer in a single pass; a fan-out you did not need costs the user a tab and costs you a wait. Split the work before you split the investigators: a child cold-starts with nothing but its brief, so a fact two of them both need is a repository read paid for twice. When the areas share a foundation — the same files, the same inventory, the same shape of the code — establish it once yourself, or with one scout child, and hand the findings with full paths to each investigator; fan out cold only where the questions are genuinely disjoint. When it is warranted, the loop is delegate → wait → evaluate → integrate:
 
-1. Spawn each investigator with \`ensemblr_start_conversation\` in its own fresh tab — pass a short \`title\` naming the QUESTION it is answering and do NOT pass \`chatTabId\`; omit \`wait\` and keep the \`piSessionId\` it returns. To run one on a specific model, call \`ensemblr_list_models\` first and pass an id from that list; never invent one. Depth, per-session spawn count, and spawn rate are capped, and a child cannot spawn further — never fork-bomb.
+1. Spawn each investigator with \`ensemblr_start_conversation\` in its own fresh tab — pass a short \`title\` naming the QUESTION it is answering and do NOT pass \`chatTabId\`; omit \`wait\` and keep the \`agentSessionId\` it returns. To run one on a specific model, call \`ensemblr_list_models\` first and pass an id from that list; never invent one. Depth, per-session spawn count, and spawn rate are capped, and a child cannot spawn further — never fork-bomb.
 2. A child you spawn inherits Plan Mode: it reads the repository and runs read-only commands, and it cannot write, edit, spawn anything of its own, or talk to the user. So brief it as a question to answer — "find and report how X works, with full paths" — never as work to do. A child briefed to implement will come back saying it could not. Name the defaults it should assume rather than come back and ask you about, so it spends its turn reading instead of waiting on you.
 3. Once everything that can run in parallel is delegated, call \`ensemblr_wait_for_agents\` and let it block. Do NOT hand-roll a polling loop with \`ensemblr_get_conversation_status\`. \`mode: "all"\` (default target: every child you spawned) waits for all of them — pass it explicitly, because the mode itself defaults to \`first\`, which returns on the first to settle. Either way the result names the investigators still running in \`pending\`, so wait again on those ids rather than polling them — including when it comes back \`timedOut: true\`, which is a capped wait window expiring while a child still works, not a fault to report or a reason to re-spawn. A child that is stuck calls \`ensemblr_notify_orchestrator\`, which wakes your wait immediately so you can answer it.
 4. Evaluate each report. A child's last message IS its report — a planning child never calls \`ensemblr_exit_plan_mode\`, so do not wait for a plan from one. If a report is thin or off-target, reply with \`ensemblr_send_follow_up\` and wait again. \`ensemblr_get_last_message\` recovers a report if your wait was interrupted. A child cannot ask the user anything, so its \`Open questions\` section is interview material for you: drop what you can settle by reading, merge what several children raised, and fold the rest into your next \`ensemblr_ask_user_question\` round. A decision a child left open is not one you may quietly close.
@@ -594,7 +594,7 @@ export default function ensemblrControl(pi: ExtensionAPI): void {
 		'sendFollowUp',
 		'Send a follow-up prompt into an existing Pi conversation.',
 		Type.Object({
-			piSessionId: Type.String(),
+			agentSessionId: Type.String(),
 			prompt: Type.String(),
 			wait: Type.Optional(Type.Boolean()),
 		}),
@@ -763,20 +763,20 @@ export default function ensemblrControl(pi: ExtensionAPI): void {
 		'ensemblr_get_conversation_status',
 		'getConversationStatus',
 		'Get the status of a Pi conversation by session id.',
-		Type.Object({ piSessionId: Type.String() }),
+		Type.Object({ agentSessionId: Type.String() }),
 	);
 	tool(
 		'ensemblr_get_last_message',
 		'getLastMessage',
 		"Get a Pi conversation's report: every assistant message of its newest answered turn, joined in the order it was written. Persisted, so it survives the conversation closing and an app restart.",
-		Type.Object({ piSessionId: Type.String() }),
+		Type.Object({ agentSessionId: Type.String() }),
 	);
 	tool(
 		'ensemblr_read_conversation',
 		'readConversation',
 		'Read what a Pi conversation actually did — its prompts, its answers, and every tool call with its arguments and result — rather than only the report ensemblr_get_last_message hands back. This is how you audit a sub-agent: confirm it ran what it claims to have run before you act on its findings. Call it with stat=true FIRST: that returns the entry count, the turn count, and the ordinal range with no content, so you know how much there is before you read it. Then page forward with fromOrdinal, resuming from the nextOrdinal each page returns, or pass ordinal to read a single entry whole — stat, ordinal, and fromOrdinal are alternatives, not a combination. Long fields are cut and marked with the ordinal that reads them in full.',
 		Type.Object({
-			piSessionId: Type.String(),
+			agentSessionId: Type.String(),
 			stat: Type.Optional(
 				Type.Boolean({
 					description:

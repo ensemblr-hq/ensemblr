@@ -16,6 +16,7 @@ const calls: AgentControlCommand[] = [];
 let server: ControlServer | null = null;
 
 const stubService: AgentControlService = {
+	describeAudience: async () => ({ hasChatTab: false, role: 'orchestrator' }),
 	invoke: async (command) => {
 		calls.push(command);
 		if (command.token !== 'good') {
@@ -171,6 +172,10 @@ describe('control server', () => {
 				await new Promise((resolve) => setTimeout(resolve, 600));
 				return { ok: true, data: { echoed: command.op } };
 			},
+			describeAudience: async () => ({
+				hasChatTab: false,
+				role: 'orchestrator',
+			}),
 			releaseSession: () => {},
 		};
 		server = await startControlServer(holdingService, {
@@ -231,6 +236,10 @@ describe('control server', () => {
 				await new Promise((resolve) => setTimeout(resolve, 400));
 				return { ok: true, data: { echoed: command.op } };
 			},
+			describeAudience: async () => ({
+				hasChatTab: false,
+				role: 'orchestrator',
+			}),
 			releaseSession: () => {},
 		};
 		server = await startControlServer(holdingService);

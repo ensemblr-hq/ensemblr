@@ -135,7 +135,7 @@ export function isSpawnOp(op: AgentControlOp): boolean {
 	return SPAWN_OPS.has(op);
 }
 
-/** Thinking-level tokens Pi accepts, kept loose as a string on the wire. */
+/** Thinking-level tokens an agent runtime accepts, kept loose as a string on the wire. */
 export type AgentControlThinkingLevel = string;
 
 /** Args for `spawnChatTab`: open an empty chat tab in the caller's workspace. */
@@ -231,7 +231,7 @@ export interface SetSummaryResult {
 
 /** Args for `sendFollowUp`: submit a follow-up prompt into an existing conversation. */
 export interface SendFollowUpArgs {
-	piSessionId: string;
+	agentSessionId: string;
 	prompt: string;
 	wait?: boolean;
 }
@@ -293,9 +293,9 @@ export interface ListTerminalsArgs {
 	workspaceId?: string;
 }
 
-/** Args for `getConversationStatus` / `getLastMessage`: target a Pi session. */
+/** Args for `getConversationStatus` / `getLastMessage`: target an agent session. */
 export interface ConversationRef {
-	piSessionId: string;
+	agentSessionId: string;
 }
 
 /**
@@ -315,7 +315,7 @@ export const READ_CONVERSATION_LIMITS = {
  * a combination, and are honoured in that order.
  */
 export interface ReadConversationArgs {
-	piSessionId: string;
+	agentSessionId: string;
 	/** Counts and ordinal range only, with no entries. */
 	stat?: boolean;
 	/** Inclusive lower bound on entry ordinal — the cursor a previous page returned. */
@@ -348,7 +348,7 @@ export type ConversationTranscriptEntry =
  * worth calling before a read: it says how much there is to page through.
  */
 export interface ReadConversationResult {
-	piSessionId: string;
+	agentSessionId: string;
 	/** Entries on the whole branch, after checkpoint-hidden events are excluded. */
 	entryCount: number;
 	/** User prompts on the branch — one per turn. */
@@ -378,7 +378,7 @@ export type WaitMode = 'first' | 'all';
 export type WaitReportDetail = 'full' | 'brief';
 
 /**
- * Args for `waitForAgents`: block the caller's turn until delegated Pi children
+ * Args for `waitForAgents`: block the caller's turn until delegated children
  * finish or need a decision. `targets` defaults to every live child of the
  * caller; `mode` defaults to `'first'`; `reports` defaults to `'full'`;
  * `timeoutMs` is clamped to the app's wait timeout.
@@ -405,7 +405,7 @@ export interface OrchestratorSignal {
 
 /** One settled (or attention-needing) child, as reported by `waitForAgents`. */
 export interface WaitedAgent {
-	piSessionId: string;
+	agentSessionId: string;
 	status: string;
 	lastMessage: string | null;
 	/** The child's pending signal when it woke the wait, else null. */
@@ -416,7 +416,7 @@ export interface WaitedAgent {
 
 /** A target that had not settled when `waitForAgents` returned. */
 export interface PendingAgent {
-	piSessionId: string;
+	agentSessionId: string;
 	status: string;
 }
 
@@ -525,13 +525,13 @@ export interface AskUserQuestionResult {
 
 /**
  * Main → renderer request to put an agent's questionnaire to the user. The
- * renderer shows it only in the chat tab bound to `piSessionId`, so a question
+ * renderer shows it only in the chat tab bound to `agentSessionId`, so a question
  * is answered in the conversation that asked it.
  */
 export interface AskUserQuestionBroadcast {
 	requestId: string;
 	workspaceId: string;
-	piSessionId: string;
+	agentSessionId: string;
 	questions: readonly AskUserQuestionItem[];
 }
 
@@ -586,7 +586,7 @@ export interface ExitPlanModeResult {
 
 /**
  * Main → renderer request to put a finished plan to the user. The renderer
- * shows it only in the chat tab bound to `piSessionId`, so a plan is reviewed
+ * shows it only in the chat tab bound to `agentSessionId`, so a plan is reviewed
  * in the conversation that wrote it. Carries no plan body: the app posts the
  * plan into that tab's timeline as a separate assistant message, so this
  * broadcast only needs the title and saved path — shipping the plan again here
@@ -595,7 +595,7 @@ export interface ExitPlanModeResult {
 export interface ExitPlanModeBroadcast {
 	requestId: string;
 	workspaceId: string;
-	piSessionId: string;
+	agentSessionId: string;
 	title: string;
 	/** Workspace-relative path of the saved plan, or null when the write failed. */
 	planPath: string | null;
@@ -614,7 +614,7 @@ export interface ExitPlanModeBroadcast {
 export interface PlanModeChangedBroadcast {
 	workspaceId: string;
 	chatTabId: string;
-	piSessionId: string;
+	agentSessionId: string;
 	planMode: boolean;
 }
 
@@ -856,7 +856,7 @@ export interface AgentControlTabInfo {
 	kind: string;
 	title: string;
 	workspaceId: string;
-	piSessionId: string | null;
+	agentSessionId: string | null;
 }
 
 /** Lightweight terminal descriptor returned by `listTerminals`. */
@@ -880,7 +880,7 @@ export interface AgentControlWorkspaceInfo {
 
 /** Conversation status returned by `getConversationStatus`. */
 export interface AgentControlConversationStatus {
-	piSessionId: string;
+	agentSessionId: string;
 	status: string;
 	runtimeOpen: boolean;
 	/**
@@ -905,14 +905,14 @@ export interface GetLastMessageResult {
 	message: string | null;
 }
 
-/** One available Pi model, as returned by `listModels`. */
+/** One available agent model, as returned by `listModels`. */
 export interface AgentControlModelInfo {
 	id: string;
 	provider: string;
 	displayName: string;
 }
 
-/** Available Pi models plus the default, returned by `listModels`. */
+/** Available agent models plus the default, returned by `listModels`. */
 export interface AgentControlModelList {
 	defaultModelId: string | null;
 	models: readonly AgentControlModelInfo[];

@@ -12,7 +12,7 @@
 import type {
 	ParsedSkillInvocation,
 	ParsedSkillPrompt,
-} from '@/renderer/types/pi-timeline';
+} from '@/renderer/types/agent-timeline';
 
 import {
 	EXPANDED_SKILL_INVOCATION,

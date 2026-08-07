@@ -9,6 +9,7 @@ import {
 	GitBranchIcon,
 	HeartPulseIcon,
 	KeyRoundIcon,
+	PlugZapIcon,
 	PuzzleIcon,
 	ScrollIcon,
 	SlidersHorizontalIcon,
@@ -43,6 +44,12 @@ const USER_NAV: UserNavItem[] = [
 		icon: SlidersHorizontalIcon,
 	},
 	{ kind: 'user', to: '/settings/models', label: 'Models', icon: BoxIcon },
+	{
+		kind: 'user',
+		to: '/settings/providers',
+		label: 'Providers',
+		icon: PlugZapIcon,
+	},
 	{
 		kind: 'user',
 		to: '/settings/environment',

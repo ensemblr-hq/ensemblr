@@ -5,7 +5,7 @@ import {
 	cleanTitleLine,
 	sanitizeChatTitle,
 	truncateChatTitle,
-} from '../../src/main/pi-agent/naming/sanitize-title';
+} from '../../src/main/agent-runtime/naming/sanitize-title';
 
 describe('cleanTitleLine', () => {
 	test('returns null for empty or whitespace input', () => {

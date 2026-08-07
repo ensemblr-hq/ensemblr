@@ -16,18 +16,18 @@ import {
 	type EnsemblrDatabaseConnection,
 	openEnsemblrDatabase,
 } from '../../src/main/storage/database.ts';
-import { appendPiEvent } from '../../src/main/storage/repositories/pi-event-repository.ts';
+import { appendAgentEvent } from '../../src/main/storage/repositories/agent-event-repository.ts';
 import {
-	createPiSession,
+	type AgentTurnRow,
+	createAgentSession,
 	createTurn,
-	getPiSessionBranchById,
-	type PiTurnRow,
-} from '../../src/main/storage/repositories/pi-session-repository.ts';
+	getAgentSessionBranchById,
+} from '../../src/main/storage/repositories/agent-session-repository.ts';
 
 interface Fixture {
+	agentSessionId: string;
 	branchId: string;
 	connection: EnsemblrDatabaseConnection;
-	piSessionId: string;
 	repoDirectory: string;
 	workspaceId: string;
 }
@@ -62,7 +62,7 @@ INSERT INTO workspaces (id, repository_id, slug, name, path)
 VALUES ('ws-restore', 'repo-restore', 'restore', 'Restore', '${repoDirectory}');
 `);
 
-	const { mainBranch, session } = createPiSession({
+	const { mainBranch, session } = createAgentSession({
 		database: connection.database,
 		input: { cwd: repoDirectory, workspaceId: 'ws-restore' },
 	});
@@ -70,13 +70,13 @@ VALUES ('ws-restore', 'repo-restore', 'restore', 'Restore', '${repoDirectory}');
 	return {
 		branchId: mainBranch.id,
 		connection,
-		piSessionId: session.id,
+		agentSessionId: session.id,
 		repoDirectory,
 		workspaceId: 'ws-restore',
 	};
 }
 
-function newTurn(fixture: Fixture, prompt: string): PiTurnRow {
+function newTurn(fixture: Fixture, prompt: string): AgentTurnRow {
 	return createTurn({
 		database: fixture.connection.database,
 		input: {
@@ -90,7 +90,7 @@ function newTurn(fixture: Fixture, prompt: string): PiTurnRow {
 
 async function captureForTurn(
 	fixture: Fixture,
-	turn: PiTurnRow,
+	turn: AgentTurnRow,
 	label: string,
 ) {
 	const capture = createCheckpointCapture();
@@ -98,7 +98,7 @@ async function captureForTurn(
 		cwd: fixture.repoDirectory,
 		database: fixture.connection.database,
 		label,
-		piSessionId: fixture.piSessionId,
+		agentSessionId: fixture.agentSessionId,
 		turnId: turn.id,
 		workspaceId: fixture.workspaceId,
 	});
@@ -163,7 +163,7 @@ test('restoreTurnCheckpoint reverts tracked files and records truncation', async
 
 	// Events for the turn (and a later one) that should be hidden after restore.
 	const database = fixture.connection.database;
-	appendPiEvent({
+	appendAgentEvent({
 		database,
 		input: {
 			branchId: fixture.branchId,
@@ -176,7 +176,7 @@ test('restoreTurnCheckpoint reverts tracked files and records truncation', async
 			turnId: turn.id,
 		},
 	});
-	appendPiEvent({
+	appendAgentEvent({
 		database,
 		input: {
 			branchId: fixture.branchId,
@@ -215,7 +215,7 @@ test('restoreTurnCheckpoint reverts tracked files and records truncation', async
 		'keep me',
 	);
 
-	const branch = getPiSessionBranchById({ database, id: fixture.branchId });
+	const branch = getAgentSessionBranchById({ database, id: fixture.branchId });
 	assert.ok(branch);
 	const ranges = readHiddenEventRanges(branch.metadata);
 	assert.equal(ranges.length, 1);

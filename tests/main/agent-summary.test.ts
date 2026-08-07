@@ -4,7 +4,7 @@ import {
 	type AgentSummaryMarker,
 	readAgentSummaryMarker,
 	withAgentSummaryMarker,
-} from '../../src/main/pi-agent/agent-summary.ts';
+} from '../../src/main/agent-runtime/agent-summary.ts';
 
 const marker: AgentSummaryMarker = {
 	body: '- Fixed the login redirect',

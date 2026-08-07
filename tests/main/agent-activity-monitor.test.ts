@@ -3,12 +3,12 @@ import {
 	type AgentActivityMonitorOptions,
 	type BatterySnapshot,
 	createAgentActivityMonitor,
-} from '../../src/main/pi-agent/agent-activity-monitor';
+} from '../../src/main/agent-runtime/agent-activity-monitor';
 import {
 	type AppSettings,
 	DEFAULT_APP_SETTINGS,
 } from '../../src/shared/config';
-import type { PiSessionEventWire } from '../../src/shared/ipc/contracts/pi-session';
+import type { AgentSessionEventWire } from '../../src/shared/ipc/contracts/agent-session';
 
 /** Lets the deferred async battery sample resolve before assertions. */
 function flush(): Promise<void> {
@@ -22,7 +22,7 @@ function settings(general: Partial<AppSettings['general']>): AppSettings {
 	};
 }
 
-function statusEvent(status: string): PiSessionEventWire {
+function statusEvent(status: string): AgentSessionEventWire {
 	return {
 		branchId: 'b1',
 		createdAt: '2026-01-01T00:00:00.000Z',

@@ -43,7 +43,7 @@ describe('plan submission', () => {
 		await submission.submit({ args: ARGS, origin: ORIGIN });
 
 		expect(writePlanFile).toHaveBeenCalledWith({
-			piSessionId: 'sess-1',
+			agentSessionId: 'sess-1',
 			plan: ARGS.plan,
 			title: ARGS.title,
 			workspaceCwd: '/tmp/workspace',
@@ -55,7 +55,7 @@ describe('plan submission', () => {
 		});
 		expect(reviews).toEqual([
 			{
-				piSessionId: 'sess-1',
+				agentSessionId: 'sess-1',
 				planPath: PLAN_PATH,
 				requestId: 'req-1',
 				title: ARGS.title,

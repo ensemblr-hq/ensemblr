@@ -3,7 +3,7 @@ import { createFileRoute } from '@tanstack/react-router';
 import { useAtom, useAtomValue } from 'jotai';
 import { useEffect, useMemo } from 'react';
 
-import { piModelsQuery } from '@/renderer/api/ensemblr';
+import { agentModelsQuery } from '@/renderer/api/ensemblr';
 import { ModelVisibilityList } from '@/renderer/components/settings/model-visibility-list';
 import { SettingRow } from '@/renderer/components/settings/setting-row';
 import { SettingsSection } from '@/renderer/components/settings/settings-section';
@@ -22,9 +22,9 @@ import {
 	reviewModelAtom,
 	reviewThinkingLevelAtom,
 } from '@/renderer/state/preferences';
-import type { PiModelOptionWire } from '@/shared/ipc/contracts/pi-session';
+import type { AgentModelOption } from '@/shared/ipc/contracts/agent-models';
 
-/** Route for the Models settings section; renders the models panel populated from Pi capability discovery. */
+/** Route for the Models settings section; renders the models panel populated from agent capability discovery. */
 export const Route = createFileRoute('/_workbench/settings/models')({
 	component: ModelsSettings,
 });
@@ -35,7 +35,7 @@ function ModelsSettings() {
 		data: modelsData,
 		error: modelsError,
 		isLoading: modelsLoading,
-	} = useQuery(piModelsQuery);
+	} = useQuery(agentModelsQuery);
 	const [defaultModel, setDefaultModel] = useAtom(defaultChatModelAtom);
 	const [defaultThinking, setDefaultThinking] = useAtom(
 		defaultChatThinkingLevelAtom,
@@ -52,7 +52,7 @@ function ModelsSettings() {
 		() => allModels.filter((model) => !hiddenSet.has(model.id)),
 		[allModels, hiddenSet],
 	);
-	const piDefaultModelId = modelsData?.defaultModelId ?? null;
+	const agentDefaultModelId = modelsData?.defaultModelId ?? null;
 
 	// If the model selected for the default or review slot gets hidden, fall back
 	// to the first visible model so the select never points at a hidden id. The
@@ -62,11 +62,11 @@ function ModelsSettings() {
 		if (!firstVisibleId) {
 			return;
 		}
-		const effectiveDefault = defaultModel ?? piDefaultModelId;
+		const effectiveDefault = defaultModel ?? agentDefaultModelId;
 		if (effectiveDefault && hiddenSet.has(effectiveDefault)) {
 			setDefaultModel(firstVisibleId);
 		}
-		const effectiveReview = reviewModel ?? piDefaultModelId;
+		const effectiveReview = reviewModel ?? agentDefaultModelId;
 		if (effectiveReview && hiddenSet.has(effectiveReview)) {
 			setReviewModel(firstVisibleId);
 		}
@@ -75,30 +75,30 @@ function ModelsSettings() {
 		hiddenSet,
 		defaultModel,
 		reviewModel,
-		piDefaultModelId,
+		agentDefaultModelId,
 		setDefaultModel,
 		setReviewModel,
 	]);
 
-	const resolvedDefault = defaultModel ?? piDefaultModelId;
-	const resolvedReview = reviewModel ?? piDefaultModelId;
+	const resolvedDefault = defaultModel ?? agentDefaultModelId;
+	const resolvedReview = reviewModel ?? agentDefaultModelId;
 	const defaultLevels = thinkingLevelsFor(list, resolvedDefault);
 	const reviewLevels = thinkingLevelsFor(list, resolvedReview);
 
 	return (
 		<SettingsSection
-			description='Pi models and thinking-level defaults for new chats and reviews. Sourced from Pi CLI capability discovery.'
+			description="Agent models and thinking-level defaults for new chats and reviews. Sourced from each configured runtime's capability discovery."
 			title='Models'
 		>
 			{modelsLoading ? (
 				<div className='flex items-center gap-2 py-6 text-muted-foreground text-sm'>
-					<Spinner className='size-4' /> Loading Pi models…
+					<Spinner className='size-4' /> Loading models…
 				</div>
 			) : null}
 
 			{modelsError ? (
 				<div className='py-6 text-sm text-status-danger'>
-					Pi model discovery failed: {String(modelsError)}.
+					Model discovery failed: {String(modelsError)}.
 				</div>
 			) : null}
 
@@ -120,7 +120,7 @@ function ModelsSettings() {
 						/>
 					</div>
 				}
-				description='Model used when you start a new chat. Falls back to the Pi-reported default when unset.'
+				description='Model used when you start a new chat. Falls back to the agent-reported default when unset.'
 				label='Default model'
 			/>
 
@@ -157,7 +157,7 @@ function ModelsSettings() {
 	);
 }
 
-/** Select dropdown for choosing a Pi model from the visible list; disabled when no models are available. */
+/** Select dropdown for choosing a model from the visible list; disabled when no models are available. */
 function ModelSelect({
 	ariaLabel,
 	models,
@@ -166,7 +166,7 @@ function ModelSelect({
 	value,
 }: {
 	ariaLabel: string;
-	models: readonly PiModelOptionWire[];
+	models: readonly AgentModelOption[];
 	onChange: (next: string | null) => void;
 	placeholder: string;
 	value: string | null;
@@ -228,12 +228,12 @@ function ThinkingLevelSelect({
 
 /**
  * Resolve the thinking levels a given model supports.
- * @param list - Available Pi model options
+ * @param list - Available agent model options
  * @param modelId - ID of the model to look up, or null
  * @returns The model's thinking levels, or an empty list when none match
  */
 function thinkingLevelsFor(
-	list: readonly PiModelOptionWire[],
+	list: readonly AgentModelOption[],
 	modelId: string | null,
 ): readonly string[] {
 	if (!modelId) return [];

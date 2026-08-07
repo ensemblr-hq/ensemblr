@@ -18,9 +18,9 @@ import { clearEnsemblrApi, installEnsemblrApi } from '../support/dom';
 
 const broadcast = (
 	requestId: string,
-	piSessionId: string,
+	agentSessionId: string,
 ): AskUserQuestionBroadcast => ({
-	piSessionId,
+	agentSessionId,
 	questions: [
 		{ options: [{ label: 'Yes' }, { label: 'No' }], question: 'Proceed?' },
 	],
@@ -58,13 +58,13 @@ const wrapper = ({ children }: { children: ReactNode }) => (
 	<Provider>{children}</Provider>
 );
 
-const mountPending = (piSessionId: string) =>
+const mountPending = (agentSessionId: string) =>
 	renderHook(
 		() => {
 			useAskUserQuestionSync();
 			return {
 				answer: useAnswerUserQuestion(),
-				pending: usePendingAskUserQuestion(piSessionId),
+				pending: usePendingAskUserQuestion(agentSessionId),
 			};
 		},
 		{ wrapper },

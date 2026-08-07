@@ -40,14 +40,14 @@ const makePorts = (
 	conversations: {
 		startConversation: vi
 			.fn()
-			.mockResolvedValue({ chatTabId: 't', piSessionId: 'pi-1' }),
+			.mockResolvedValue({ chatTabId: 't', agentSessionId: 'pi-1' }),
 		sendFollowUp: vi.fn().mockResolvedValue(undefined),
 		setName: vi
 			.fn()
 			.mockResolvedValue({ chatTabId: 'named-tab', title: 'Named' }),
 		waitForIdle: vi.fn().mockResolvedValue('completed'),
 		getStatus: vi.fn().mockResolvedValue({
-			piSessionId: 'pi-1',
+			agentSessionId: 'pi-1',
 			status: 'idle',
 			runtimeOpen: true,
 		}),
@@ -59,7 +59,7 @@ const makePorts = (
 			firstOrdinal: null,
 			lastOrdinal: null,
 			nextOrdinal: null,
-			piSessionId: 'pi-1',
+			agentSessionId: 'pi-1',
 			turnCount: 0,
 		}),
 		isSpawnedSubAgent: vi
@@ -482,7 +482,7 @@ describe('agent-control service: guardrails', () => {
 		const result = await service.invoke({
 			op: 'sendFollowUp',
 			token: 'tok-child',
-			rawArgs: { piSessionId: 'ancestor', prompt: 'hi', wait: true },
+			rawArgs: { agentSessionId: 'ancestor', prompt: 'hi', wait: true },
 		});
 		expect(result.ok).toBe(false);
 		if (!result.ok) {
@@ -576,7 +576,7 @@ describe('agent-control service: sub-agent role gate outside plan mode', () => {
 	const BLOCKED: Record<string, Record<string, unknown>> = {
 		spawnChatTab: {},
 		startConversation: { prompt: 'go' },
-		sendFollowUp: { piSessionId: 'pi-1', prompt: 'hi' },
+		sendFollowUp: { agentSessionId: 'pi-1', prompt: 'hi' },
 		launchHarness: { harnessId: 'claude' },
 		startTerminal: { kind: 'spawn' },
 		stopTerminal: { kind: 'run' },
@@ -678,9 +678,9 @@ describe('agent-control service: sub-agent role gate outside plan mode', () => {
 			['listTerminals', {}],
 			['listWorkspaces', {}],
 			['getWorkspaceStatus', {}],
-			['getConversationStatus', { piSessionId: 'pi-1' }],
-			['getLastMessage', { piSessionId: 'pi-1' }],
-			['readConversation', { piSessionId: 'pi-1', stat: true }],
+			['getConversationStatus', { agentSessionId: 'pi-1' }],
+			['getLastMessage', { agentSessionId: 'pi-1' }],
+			['readConversation', { agentSessionId: 'pi-1', stat: true }],
 			['readTerminalOutput', { terminalId: 'term-1' }],
 			['focusTab', { chatTabId: 'abc' }],
 			['focusPanel', { panel: 'changes' }],
@@ -802,7 +802,7 @@ describe('agent-control service: delegation', () => {
 		expect(result.ok).toBe(true);
 		if (result.ok) {
 			expect(result.data).toMatchObject({
-				piSessionId: 'pi-1',
+				agentSessionId: 'pi-1',
 				result: 'completed',
 			});
 		}
@@ -857,7 +857,7 @@ describe('agent-control service: delegation', () => {
 		});
 		expect(result.ok).toBe(true);
 		expect(ports.conversations.setName).toHaveBeenCalledWith({
-			piSessionId: 'caller',
+			agentSessionId: 'caller',
 			name: 'My task tab',
 		});
 	});
@@ -907,7 +907,7 @@ describe('agent-control service: delegation', () => {
 		expect(result.ok).toBe(true);
 		if (result.ok) {
 			expect(result.data).toMatchObject({
-				completed: [{ piSessionId: 'ghost', status: 'unknown' }],
+				completed: [{ agentSessionId: 'ghost', status: 'unknown' }],
 				timedOut: false,
 			});
 		}
@@ -1058,7 +1058,7 @@ describe('agent-control service: delegation', () => {
 		const result = await service.invoke({
 			op: 'getLastMessage',
 			token: 'tok-caller',
-			rawArgs: { piSessionId: 'pi-1' },
+			rawArgs: { agentSessionId: 'pi-1' },
 		});
 		expect(result.ok).toBe(true);
 		if (result.ok) {
@@ -1072,12 +1072,12 @@ describe('agent-control service: delegation', () => {
 		const result = await service.invoke({
 			op: 'readConversation',
 			token: 'tok-caller',
-			rawArgs: { piSessionId: 'pi-1', fromOrdinal: 12 },
+			rawArgs: { agentSessionId: 'pi-1', fromOrdinal: 12 },
 		});
 		expect(result.ok).toBe(true);
 		expect(ports.conversations.readTranscript).toHaveBeenCalledWith({
 			fromOrdinal: 12,
-			piSessionId: 'pi-1',
+			agentSessionId: 'pi-1',
 		});
 	});
 
@@ -1087,7 +1087,7 @@ describe('agent-control service: delegation', () => {
 		const result = await service.invoke({
 			op: 'readConversation',
 			token: 'tok-caller',
-			rawArgs: { piSessionId: 'pi-1', fromOrdinal: -3 },
+			rawArgs: { agentSessionId: 'pi-1', fromOrdinal: -3 },
 		});
 		expect(result.ok).toBe(false);
 		expect(ports.conversations.readTranscript).not.toHaveBeenCalled();
@@ -1100,7 +1100,7 @@ describe('agent-control service: delegation', () => {
 		const result = await service.invoke({
 			op: 'getLastMessage',
 			token: 'tok-caller',
-			rawArgs: { piSessionId: 'pi-1' },
+			rawArgs: { agentSessionId: 'pi-1' },
 		});
 		expect(result.ok).toBe(true);
 		if (result.ok) {
@@ -1276,5 +1276,179 @@ describe('agent-control service: review', () => {
 		if (!result.ok) {
 			expect(result.error).toContain('not a git repository');
 		}
+	});
+});
+
+// The chat-tab ops used to read `species !== 'pi'`, which denied every runtime
+// that was not Pi rather than every caller without a tab to act on. Claude runs
+// first-class in a real chat tab, so the four have somewhere to land; a harness
+// owns a terminal tab that titles itself and still has nowhere.
+describe('agent-control service: chat-tab ops by species', () => {
+	const CHAT_TAB_CALLS = {
+		setName: { title: 'Investigating the composer' },
+		setSummary: { summary: 'Body.', title: 'Topic' },
+		askUserQuestion: {
+			questions: [
+				{
+					question: 'Which approach?',
+					options: [{ label: 'Rewrite' }, { label: 'Patch' }],
+				},
+			],
+		},
+		exitPlanMode: { plan: '# Plan', title: 'The plan' },
+	} as const;
+
+	const ops = Object.keys(CHAT_TAB_CALLS) as Array<keyof typeof CHAT_TAB_CALLS>;
+
+	it.each(ops)('allows %s from a first-class Claude caller', async (op) => {
+		const ports = makePorts({ planning: true });
+		const { service } = setup({ ports, species: 'claude' });
+
+		const result = await service.invoke({
+			op,
+			token: 'tok-caller',
+			rawArgs: CHAT_TAB_CALLS[op],
+		});
+
+		expect(result.ok, JSON.stringify(result)).toBe(true);
+	});
+
+	it.each(ops)('allows %s from a Pi caller', async (op) => {
+		const ports = makePorts({ planning: true });
+		const { service } = setup({ ports });
+
+		const result = await service.invoke({
+			op,
+			token: 'tok-caller',
+			rawArgs: CHAT_TAB_CALLS[op],
+		});
+
+		expect(result.ok, JSON.stringify(result)).toBe(true);
+	});
+
+	it.each(ops)('denies %s to a harness caller', async (op) => {
+		const ports = makePorts({ planning: true });
+		const { service } = setup({ ports, species: 'harness' });
+
+		const result = await service.invoke({
+			op,
+			token: 'tok-caller',
+			rawArgs: CHAT_TAB_CALLS[op],
+		});
+
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.code).toBe('denied-scope');
+		}
+	});
+
+	it('drives the chat-tab ports for a Claude caller, not just the gate', async () => {
+		const ports = makePorts({ planning: true });
+		const { service } = setup({ ports, species: 'claude' });
+
+		await service.invoke({
+			op: 'setName',
+			token: 'tok-caller',
+			rawArgs: CHAT_TAB_CALLS.setName,
+		});
+		await service.invoke({
+			op: 'setSummary',
+			token: 'tok-caller',
+			rawArgs: CHAT_TAB_CALLS.setSummary,
+		});
+		await service.invoke({
+			op: 'exitPlanMode',
+			token: 'tok-caller',
+			rawArgs: CHAT_TAB_CALLS.exitPlanMode,
+		});
+
+		expect(ports.conversations.setName).toHaveBeenCalledWith({
+			agentSessionId: 'caller',
+			name: 'Investigating the composer',
+		});
+		expect(ports.sessionNaming.setSummary).toHaveBeenCalled();
+		expect(ports.planMode.exit).toHaveBeenCalled();
+	});
+
+	// Plan Mode governs the control surface, not just the exit call: a planning
+	// Claude session must be refused the ops that would put an unrestricted writer
+	// on its worktree, exactly as a planning Pi session is.
+	it('gates a planning Claude caller out of the writer ops', async () => {
+		const ports = makePorts({ planning: true });
+		const { service } = setup({ ports, species: 'claude' });
+
+		const result = await service.invoke({
+			op: 'startTerminal',
+			token: 'tok-caller',
+			rawArgs: { kind: 'run' },
+		});
+
+		expect(result.ok).toBe(false);
+		expect(ports.terminals.startTerminal).not.toHaveBeenCalled();
+	});
+
+	it('reports a Claude caller as planning in its session brief', async () => {
+		const ports = makePorts({ planning: true });
+		const { service } = setup({ ports, species: 'claude' });
+
+		const result = await service.invoke({
+			op: 'getSessionBrief',
+			token: 'tok-caller',
+			rawArgs: {},
+		});
+
+		expect(result).toMatchObject({ data: { planMode: true }, ok: true });
+	});
+});
+
+describe('agent-control service: audience resolution', () => {
+	it('reports a Pi root as a chat-tab orchestrator', async () => {
+		const { service } = setup({ ports: makePorts() });
+
+		expect(await service.describeAudience('tok-caller')).toEqual({
+			hasChatTab: true,
+			role: 'orchestrator',
+		});
+	});
+
+	it('reports a Claude root as a chat-tab orchestrator', async () => {
+		const { service } = setup({ ports: makePorts(), species: 'claude' });
+
+		expect(await service.describeAudience('tok-caller')).toEqual({
+			hasChatTab: true,
+			role: 'orchestrator',
+		});
+	});
+
+	it('reports a harness as having no chat tab', async () => {
+		const { service } = setup({ ports: makePorts(), species: 'harness' });
+
+		expect(await service.describeAudience('tok-caller')).toEqual({
+			hasChatTab: false,
+			role: 'orchestrator',
+		});
+	});
+
+	it('carries the durable sub-agent marker into the audience', async () => {
+		const { service } = setup({
+			ports: makePorts({ spawnedSubAgent: true }),
+			species: 'claude',
+		});
+
+		expect(await service.describeAudience('tok-caller')).toEqual({
+			hasChatTab: true,
+			role: 'subagent',
+		});
+	});
+
+	// An unresolvable token is refused by every op it goes on to call, so the list
+	// it sees barely matters — but it must not be the widest one on offer.
+	it('falls back to the narrowest surface for an unknown token', async () => {
+		const { service } = setup({ ports: makePorts() });
+
+		expect(await service.describeAudience('bogus')).toEqual({
+			hasChatTab: false,
+			role: 'orchestrator',
+		});
 	});
 });

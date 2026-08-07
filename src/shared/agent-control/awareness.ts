@@ -6,7 +6,7 @@
  * app picks the variant per agent from the caller's lineage depth; a parentless
  * session defaults to orchestrator.
  *
- * Plan Mode adds a second axis, so the Pi playbooks form a 2x2 of role by
+ * Plan Mode adds a second axis, so the playbooks form a 2x2 of role by
  * planning: {@link PLAN_MODE_ORCHESTRATOR_AWARENESS} and
  * {@link PLAN_MODE_SUBAGENT_AWARENESS} each replace the matching role variant
  * for as long as the conversation is in Plan Mode. Replacement rather than
@@ -24,19 +24,25 @@
  * CLI harnesses (Claude Code, Codex, Mistral Vibe). They are root sessions, so
  * the orchestrator variant would be the closest fit, but it describes a surface a
  * harness does not have: a chat tab it can name, the per-turn upkeep block, and
- * the Pi-only tools the MCP endpoint never exposes. It is deliberately shorter —
- * a harness receives it as a system-prompt append on a command line, not as an
+ * the chat-tab tools its tool list withholds. It is deliberately shorter — a
+ * harness receives it as a system-prompt append on a command line, not as an
  * extension hook with room to spare.
+ *
+ * {@link awarenessForAudience} is the single selection rule. It keys the harness
+ * variant off the absence of a chat tab rather than off a runtime's name, so a
+ * first-class runtime added later — Claude over the same MCP endpoint — receives
+ * the role playbook that matches the tools it actually holds.
  *
  * Three always-on injection points consume these:
  *
- * - **Harnesses** (Claude Code, Codex, Vibe): the MCP server's `instructions`
- *   field (`src/main/agent-control/mcp-endpoint.ts`) carries the harness
- *   playbook, and `src/main/agent-control/harness-launch-config.ts` appends the
- *   same text to the launch command as a system prompt, because no harness
+ * - **MCP callers** (harnesses, and first-class runtimes that speak MCP): the
+ *   server's `instructions` field (`src/main/agent-control/mcp-endpoint.ts`)
+ *   carries whatever {@link awarenessForAudience} selects for that connection,
+ *   and `src/main/agent-control/harness-launch-config.ts` appends the harness
+ *   playbook to the launch command as a system prompt, because no harness
  *   reliably surfaces an MCP server's `instructions` to its model.
  * - **Pi**: the shipped extension embeds byte-identical copies of all four
- *   Pi playbooks in `resources/pi-extensions/ensemblr-control.mts` (it cannot
+ *   playbooks in `resources/pi-extensions/ensemblr-control.mts` (it cannot
  *   import from `src/` at runtime in a packaged app), resolves the role once from
  *   the `ENSEMBLR_CONTROL_ROLE` env var, and swaps in the matching plan-mode
  *   playbook while the app reports Plan Mode on; a parity test asserts the
@@ -50,6 +56,18 @@
 
 /** Which control-layer playbook an agent receives, keyed off lineage depth. */
 export type AgentControlRole = 'orchestrator' | 'subagent';
+
+/**
+ * What a control caller is, as far as the two surfaces that shape themselves to
+ * the caller care: which playbook it receives and which tools its list carries.
+ * Both axes are properties of the caller rather than of any one runtime, so a
+ * runtime added later selects its surface by declaring these two facts.
+ */
+export interface ControlAudience {
+	/** Whether the caller drives a native chat tab rather than a terminal tab. */
+	hasChatTab: boolean;
+	role: AgentControlRole;
+}
 
 /**
  * The bookkeeping block a root receives: it owns the workspace name because the
@@ -169,7 +187,7 @@ Your last message is your answer to the user, and it is the last thing you produ
 Split the work before you split the agents. A child cold-starts with nothing but its brief, so every fact two children both need is a repository read paid for twice — and that re-derivation is what makes a fan-out cost more context than doing the work inline. When the workstreams share a foundation — the same files, the same inventory, the same shape of the code — establish it once yourself, or with one scout child, and put the findings with full paths into every brief. Fan out cold only where the work is genuinely disjoint.
 
 When delegation is warranted — delegate → wait → evaluate → integrate:
-1. Spawn each helper with \`ensemblr_start_conversation\` in its own fresh tab — pass a short, descriptive \`title\` and do NOT pass \`chatTabId\` (reusing a prior tab keeps its old title); omit \`wait\` and keep the \`piSessionId\` it returns. Brief each one with what to deliver, not just what to look at: the question it answers, the defaults it should assume rather than come back and ask you about, and whether it reports inline — the default — or writes a file at a path you name. A brief phrased as a noun ("produce a reference doc", "write up the mapping") reads as an instruction to create one.
+1. Spawn each helper with \`ensemblr_start_conversation\` in its own fresh tab — pass a short, descriptive \`title\` and do NOT pass \`chatTabId\` (reusing a prior tab keeps its old title); omit \`wait\` and keep the \`agentSessionId\` it returns. Brief each one with what to deliver, not just what to look at: the question it answers, the defaults it should assume rather than come back and ask you about, and whether it reports inline — the default — or writes a file at a path you name. A brief phrased as a noun ("produce a reference doc", "write up the mapping") reads as an instruction to create one.
 2. Once you have delegated everything you can in parallel, call \`ensemblr_wait_for_agents\` and let it block — this is how you avoid racing ahead. Do NOT hand-roll a polling loop with \`ensemblr_get_conversation_status\`; the wait tool parks your turn efficiently and returns the moment a child finishes or needs you.
    - \`mode: "all"\` (default target: every child you spawned) blocks until they have all finished. Pass it explicitly whenever that is what you want — the mode defaults to \`first\`.
    - \`mode: "first"\` returns as soon as any one child finishes or raises a signal — use it to react to whichever lands first.
@@ -246,7 +264,7 @@ Do the work yourself by default — one agent in one thread is the right tool fo
 Split the work before you split the agents. A child cold-starts with nothing but its brief, so every fact two children both need is a repository read paid for twice — and that re-derivation is what makes a fan-out cost more context than doing the work inline. When the workstreams share a foundation — the same files, the same inventory, the same shape of the code — establish it once yourself, or with one scout child, and put the findings with full paths into every brief. Fan out cold only where the work is genuinely disjoint.
 
 When delegation is warranted — delegate → wait → evaluate → integrate:
-1. Spawn each helper with \`ensemblr_start_conversation\` in its own fresh tab — pass a short, descriptive \`title\` and do NOT pass \`chatTabId\` (reusing a prior tab keeps its old title); omit \`wait\` and keep the \`piSessionId\` it returns. Brief each one with what to deliver, not just what to look at: the question it answers, the defaults it should assume rather than come back and ask you about, and whether it reports inline — the default — or writes a file at a path you name. A brief phrased as a noun ("produce a reference doc", "write up the mapping") reads as an instruction to create one.
+1. Spawn each helper with \`ensemblr_start_conversation\` in its own fresh tab — pass a short, descriptive \`title\` and do NOT pass \`chatTabId\` (reusing a prior tab keeps its old title); omit \`wait\` and keep the \`agentSessionId\` it returns. Brief each one with what to deliver, not just what to look at: the question it answers, the defaults it should assume rather than come back and ask you about, and whether it reports inline — the default — or writes a file at a path you name. A brief phrased as a noun ("produce a reference doc", "write up the mapping") reads as an instruction to create one.
 2. Once everything that can run in parallel is delegated, call \`ensemblr_wait_for_agents\` and let it block. Do NOT hand-roll a polling loop with \`ensemblr_get_conversation_status\`. \`mode: "all"\` (the default, targeting every child you spawned) waits for all of them; \`mode: "first"\` returns on the first to settle. It reports each settled child's status and last message, and a child that cannot produce its deliverable at all until someone answers wakes your wait immediately. Ordinary open decisions do NOT arrive that way — children park those in their reports for you to gather in step 4, so a wait that returns no signal does not mean nothing needs asking. \`timedOut: true\` with children still in \`pending\` is a lap of the loop, not a fault — the wait window is capped and a child doing real work outlives it routinely, so wait again on the pending ids rather than reporting a timeout or re-spawning a child that is still working. \`reports: "brief"\` returns each report's opening plus a pointer to \`ensemblr_get_last_message\` for the rest, which is worth it on a wide fan-out where every child's whole turn at once is what makes delegating cost you more context than doing the work inline.
 3. Evaluate each result. If a child is wrong, incomplete, or asked you something, reply with \`ensemblr_send_follow_up\` and wait again. Repeat until done.
 4. Gather the open questions before you answer. Read every child's \`Open questions\` section, drop the ones you can settle yourself by reading, merge the duplicates across children, and put what survives to the user as a short numbered list in your own answer, each with the options and the one you recommend. You have no questionnaire tool — the composer is the user's reply channel — so the list has to be in the answer itself, not raised mid-run.
@@ -362,7 +380,7 @@ Your job this turn is to reach a shared understanding with the user before any c
 
 Finding those facts does not have to be serial. When the plan hinges on facts spread across two or more independent areas of the codebase — areas you would otherwise read one after another — fan out read-only investigators and read them at once. Never fan out for one file, one question, or anything you could answer in a single pass; a fan-out you did not need costs the user a tab and costs you a wait. Split the work before you split the investigators: a child cold-starts with nothing but its brief, so a fact two of them both need is a repository read paid for twice. When the areas share a foundation — the same files, the same inventory, the same shape of the code — establish it once yourself, or with one scout child, and hand the findings with full paths to each investigator; fan out cold only where the questions are genuinely disjoint. When it is warranted, the loop is delegate → wait → evaluate → integrate:
 
-1. Spawn each investigator with \`ensemblr_start_conversation\` in its own fresh tab — pass a short \`title\` naming the QUESTION it is answering and do NOT pass \`chatTabId\`; omit \`wait\` and keep the \`piSessionId\` it returns. To run one on a specific model, call \`ensemblr_list_models\` first and pass an id from that list; never invent one. Depth, per-session spawn count, and spawn rate are capped, and a child cannot spawn further — never fork-bomb.
+1. Spawn each investigator with \`ensemblr_start_conversation\` in its own fresh tab — pass a short \`title\` naming the QUESTION it is answering and do NOT pass \`chatTabId\`; omit \`wait\` and keep the \`agentSessionId\` it returns. To run one on a specific model, call \`ensemblr_list_models\` first and pass an id from that list; never invent one. Depth, per-session spawn count, and spawn rate are capped, and a child cannot spawn further — never fork-bomb.
 2. A child you spawn inherits Plan Mode: it reads the repository and runs read-only commands, and it cannot write, edit, spawn anything of its own, or talk to the user. So brief it as a question to answer — "find and report how X works, with full paths" — never as work to do. A child briefed to implement will come back saying it could not. Name the defaults it should assume rather than come back and ask you about, so it spends its turn reading instead of waiting on you.
 3. Once everything that can run in parallel is delegated, call \`ensemblr_wait_for_agents\` and let it block. Do NOT hand-roll a polling loop with \`ensemblr_get_conversation_status\`. \`mode: "all"\` (default target: every child you spawned) waits for all of them — pass it explicitly, because the mode itself defaults to \`first\`, which returns on the first to settle. Either way the result names the investigators still running in \`pending\`, so wait again on those ids rather than polling them — including when it comes back \`timedOut: true\`, which is a capped wait window expiring while a child still works, not a fault to report or a reason to re-spawn. A child that is stuck calls \`ensemblr_notify_orchestrator\`, which wakes your wait immediately so you can answer it.
 4. Evaluate each report. A child's last message IS its report — a planning child never calls \`ensemblr_exit_plan_mode\`, so do not wait for a plan from one. If a report is thin or off-target, reply with \`ensemblr_send_follow_up\` and wait again. \`ensemblr_get_last_message\` recovers a report if your wait was interrupted. A child cannot ask the user anything, so its \`Open questions\` section is interview material for you: drop what you can settle by reading, merge what several children raised, and fold the rest into your next \`ensemblr_ask_user_question\` round. A decision a child left open is not one you may quietly close.
@@ -425,6 +443,25 @@ Your last message is your report, and your orchestrator is its only reader. Ever
 5. Then, under a literal \`Open questions\` heading, every decision that is the USER's to make. Write each as a question in one line, 2-6 concrete options under it, and which you recommend and why. Your orchestrator turns this section into questions it asks the user directly, so anything you cannot put in that shape is not a question — it is a gap, and belongs under 3. Ask nothing you could settle by reading, and omit the heading entirely when you have none.
 
 Produce nothing after it. Your report is persisted and survives your tab closing, so your orchestrator can read it whenever its wait returns.`;
+
+/**
+ * Selects the playbook a caller receives. The harness variant is chosen by the
+ * absence of a chat tab rather than by naming a runtime, so a first-class
+ * runtime — Pi, Claude — receives the full role playbook that matches the tools
+ * it actually holds. Plan Mode replaces the result for the turns it is on, which
+ * is the runtime's own swap to make: it owns the live toggle, and this selection
+ * happens once per connection.
+ * @param audience - Whether the caller has a chat tab, and its lineage role.
+ * @returns The playbook to inject for that caller.
+ */
+export function awarenessForAudience(audience: ControlAudience): string {
+	if (!audience.hasChatTab) {
+		return HARNESS_AWARENESS;
+	}
+	return audience.role === 'subagent'
+		? SUBAGENT_AWARENESS
+		: ORCHESTRATOR_AWARENESS;
+}
 
 /**
  * Derives an agent's control-layer role from its lineage depth. Only a root

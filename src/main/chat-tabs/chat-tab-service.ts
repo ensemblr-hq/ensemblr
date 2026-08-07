@@ -8,7 +8,7 @@ import {
 import type { EnsemblrDatabaseService } from '../storage';
 import { requireDatabase } from '../storage/database.ts';
 import {
-	bindPiSession,
+	bindAgentSession,
 	type ChatTabKind,
 	type ChatTabRow,
 	deleteChatTab,
@@ -37,8 +37,8 @@ import {
  * data-access layer; tests can pass a stub.
  */
 interface ChatTabLookups {
-	/** Returns `true` when a Pi session exists for the given id. */
-	piSessionExists: (input: { piSessionId: string }) => boolean;
+	/** Returns `true` when an agent session exists for the given id. */
+	agentSessionExists: (input: { agentSessionId: string }) => boolean;
 }
 
 /**
@@ -56,7 +56,10 @@ interface ClosedChatTabEntry {
 
 /** Public surface of the chat-tab service used by IPC handlers. */
 export interface ChatTabService {
-	bindPiSession: (input: { chatTabId: string; piSessionId: string }) => void;
+	bindAgentSession: (input: {
+		chatTabId: string;
+		agentSessionId: string;
+	}) => void;
 	closeTab: (input: {
 		chatTabId: string;
 		fullTitle?: string;
@@ -75,7 +78,7 @@ export interface ChatTabService {
 		insertAfterChatTabId?: string | null;
 		kind?: ChatTabKind;
 		metadata?: Record<string, unknown>;
-		piSessionId?: string | null;
+		agentSessionId?: string | null;
 		/** Opens into the workspace's single ephemeral preview slot. */
 		preview?: boolean;
 		title?: string;
@@ -90,6 +93,12 @@ export interface ChatTabService {
 }
 
 const DEFAULT_TAB_TITLE = 'New chat';
+
+/**
+ * Metadata key that held the native harness CLI session id before it was
+ * renamed to `harnessSessionId`. Read-only compatibility for pre-upgrade rows.
+ */
+const LEGACY_HARNESS_SESSION_ID_KEY = 'agentSessionId';
 
 /**
  * Owns chat-tab lifecycle policy: idempotent close, the minimum-one-open-tab
@@ -109,16 +118,16 @@ export function createChatTabService({
 		);
 
 	return {
-		bindPiSession: ({ chatTabId, piSessionId }) => {
+		bindAgentSession: ({ chatTabId, agentSessionId }) => {
 			const database = requireChatTabDatabase();
 			const existing = getChatTabById({ database, id: chatTabId });
 			if (!existing) {
 				throw new Error(`Chat tab ${chatTabId} does not exist.`);
 			}
-			if (!lookups.piSessionExists({ piSessionId })) {
-				throw new Error(`Pi session ${piSessionId} does not exist.`);
+			if (!lookups.agentSessionExists({ agentSessionId })) {
+				throw new Error(`Agent session ${agentSessionId} does not exist.`);
 			}
-			bindPiSession({ database, id: chatTabId, piSessionId });
+			bindAgentSession({ database, id: chatTabId, agentSessionId });
 		},
 		closeTab: ({ chatTabId, fullTitle, metadataPatch, title }) => {
 			const database = requireChatTabDatabase();
@@ -193,7 +202,7 @@ export function createChatTabService({
 			insertAfterChatTabId,
 			kind = 'chat',
 			metadata,
-			piSessionId,
+			agentSessionId,
 			preview = false,
 			title,
 			workspaceId,
@@ -223,7 +232,7 @@ export function createChatTabService({
 					insertAfterChatTabId: insertAfterChatTabId ?? null,
 					kind,
 					metadata: asPreview ? withPreviewFlag(metadata) : metadata,
-					piSessionId: piSessionId ?? null,
+					agentSessionId: agentSessionId ?? null,
 					title: resolvedTitle,
 					workspaceId,
 				},
@@ -409,9 +418,9 @@ function reconcileOpenTabOrder({
 	return orderedResult;
 }
 
-/** True when a tab has no attached Pi session and should not enter history. */
+/** True when a tab has no attached agent session and should not enter history. */
 function isEmptyChatTab(tab: ChatTabRow): boolean {
-	return tab.piSessionId === null;
+	return tab.agentSessionId === null;
 }
 
 /**
@@ -426,15 +435,28 @@ function isEmptyTerminalTab(
 	tab: ChatTabRow,
 	metadataPatch: Record<string, unknown> | undefined,
 ): boolean {
-	return !hasAgentSessionId(metadataPatch) && !hasAgentSessionId(tab.metadata);
+	return (
+		readHarnessSessionId(metadataPatch) === null &&
+		readHarnessSessionId(tab.metadata) === null
+	);
 }
 
-/** True when a metadata record carries a non-empty `agentSessionId` string. */
-function hasAgentSessionId(
+/**
+ * Reads the native harness CLI session id off a tab's metadata record. Rows
+ * persisted before the metadata key was renamed store it under
+ * `agentSessionId` — a name that now belongs to the tab's Ensemblr session FK —
+ * so that key is read for backwards compatibility but never written back, and
+ * a row self-heals onto `harnessSessionId` the next time it is persisted.
+ * @param metadata - Parsed chat-tab metadata record, if any
+ * @returns The harness session id, or null when the record carries none
+ */
+export function readHarnessSessionId(
 	metadata: Record<string, unknown> | undefined,
-): boolean {
-	const agentSessionId = metadata?.agentSessionId;
-	return typeof agentSessionId === 'string' && agentSessionId.length > 0;
+): string | null {
+	return (
+		readNonEmptyString(metadata?.harnessSessionId) ??
+		readNonEmptyString(metadata?.[LEGACY_HARNESS_SESSION_ID_KEY])
+	);
 }
 
 /**

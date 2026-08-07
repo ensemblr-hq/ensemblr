@@ -7,14 +7,14 @@ import path from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
 import test from 'node:test';
 
-import { attachSessionToChatTab } from '../../src/main/pi-agent/session/chat-tab-plumbing.ts';
+import { attachSessionToChatTab } from '../../src/main/agent-runtime/session/chat-tab-plumbing.ts';
 import { openEnsemblrDatabase } from '../../src/main/storage/database.ts';
+import { createAgentSession } from '../../src/main/storage/repositories/agent-session-repository.ts';
 import {
 	getChatTabById,
 	openChatTab,
 	setChatTabMetadata,
 } from '../../src/main/storage/repositories/chat-tab-repository.ts';
-import { createPiSession } from '../../src/main/storage/repositories/pi-session-repository.ts';
 
 interface Fixture {
 	database: DatabaseSync;
@@ -44,7 +44,7 @@ VALUES ('ws-pl', 'repo-pl', 'pl', 'PL', '/tmp/ensemblr/pl/ws');
 
 /** Creates a persisted Pi session in the fixture workspace and returns its id. */
 function newSession(fixture: Fixture): string {
-	const { session } = createPiSession({
+	const { session } = createAgentSession({
 		database: fixture.database,
 		input: { cwd: '/tmp/ensemblr/pl/ws', workspaceId: fixture.workspaceId },
 	});
@@ -58,7 +58,7 @@ test('reusing an auto-named tab clears the naming gate so it re-titles', (t) => 
 		database: fixture.database,
 		input: {
 			kind: 'chat',
-			piSessionId: firstSession,
+			agentSessionId: firstSession,
 			title: 'Old title',
 			workspaceId: fixture.workspaceId,
 		},
@@ -87,7 +87,7 @@ test('reusing a user-named tab preserves its title provenance', (t) => {
 		database: fixture.database,
 		input: {
 			kind: 'chat',
-			piSessionId: firstSession,
+			agentSessionId: firstSession,
 			title: 'User title',
 			workspaceId: fixture.workspaceId,
 		},

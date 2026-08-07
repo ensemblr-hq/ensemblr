@@ -1,3 +1,4 @@
+import type { AgentProviderId } from '@/shared/agent-provider';
 import type { HealthSnapshot } from '@/shared/ipc/contracts/health';
 import type { WorkspaceOpenTargetSnapshot } from '@/shared/ipc/contracts/open-target';
 // `WorkspaceOpenTarget` is re-exported here for the renderer's query result
@@ -217,7 +218,14 @@ export interface PullRequestGitStatusSummary {
 interface SessionTabBase {
 	id: string;
 	chatTabId: string;
-	piSessionId: string | null;
+	/**
+	 * Ensemblr agent session bound to this tab, or `null` when none is. This is the
+	 * app's own session row — the id that `stopAgentSession`, checkpoints, and the
+	 * composer address. The terminal variant additionally carries
+	 * `harnessSessionId`, the harness CLI's own id, which is never interchangeable
+	 * with this one.
+	 */
+	agentSessionId: string | null;
 	label: string;
 	/**
 	 * Untruncated `label`, for the tab tooltip. `label` is capped for display, so
@@ -273,16 +281,26 @@ export type SessionTabModel =
 			/** Display label of the launched harness (also the tab title). */
 			harnessLabel: string;
 			/**
-			 * Native harness session id for the conversation, when captured. Persisted
-			 * on close so a restored terminal tab can reattach the exact conversation.
+			 * Native session id the harness CLI (Claude/Codex/Vibe) records for this
+			 * conversation, when captured. Persisted on close so a restored terminal
+			 * tab can reattach the exact conversation via `--resume <id>`. Distinct
+			 * from `agentSessionId`, which is the Ensemblr agent session: only the
+			 * latter may be passed to Ensemblr session APIs.
 			 */
-			agentSessionId: string | null;
+			harnessSessionId: string | null;
 			filePath?: null;
 			kind: 'terminal';
 			turnId?: null;
 	  });
 
+/**
+ * One model in the composer picker. The two provider fields are different axes:
+ * `agentProvider` is the agent runtime that would drive the chat and is what the
+ * per-chat provider pin compares against, while `provider` is the inference
+ * provider (`anthropic`, `openai`, `claude-code`) the picker groups by.
+ */
 export interface ComposerModelOption {
+	agentProvider: AgentProviderId;
 	displayName: string;
 	id: string;
 	isDefault?: boolean;
@@ -300,13 +318,19 @@ export interface ComposerContextUsage {
 }
 
 export interface ComposerShellState {
-	activePiSessionId: string | null;
+	activeAgentSessionId: string | null;
 	availableModels: readonly ComposerModelOption[];
 	availableThinkingLevels: readonly ComposerThinkingOption[];
 	contextUsage: ComposerContextUsage | null;
 	disabled: boolean;
 	disabledReason: string | null;
 	isStreaming: boolean;
+	/**
+	 * Agent runtime this chat is pinned to, or `null` while it is still new and
+	 * any runtime may be chosen. Set once the chat has a session, after which the
+	 * model picker disables every other runtime's models.
+	 */
+	lockedProvider: AgentProviderId | null;
 	modelId: string | null;
 	modelLabel: string;
 	onModelChange: (modelId: string) => void;

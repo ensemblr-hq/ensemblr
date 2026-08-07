@@ -30,8 +30,10 @@
 
 import path from 'node:path';
 
+import { CONTROL_TOKEN_ENV_KEY, envVarReference } from './control-env-keys.ts';
+
 /** Env var carrying the per-workspace control token in a harness process. */
-const TOKEN_ENV_VAR = 'ENSEMBLR_CONTROL_TOKEN';
+const TOKEN_ENV_VAR = CONTROL_TOKEN_ENV_KEY;
 
 /**
  * Filename the harness playbook is written under. Vibe discovers instructions
@@ -87,7 +89,7 @@ function claudeDecoration(
 			ensemblr: {
 				type: 'http',
 				url,
-				headers: { Authorization: `Bearer \${${TOKEN_ENV_VAR}}` },
+				headers: { Authorization: `Bearer ${envVarReference(TOKEN_ENV_VAR)}` },
 			},
 		},
 	});

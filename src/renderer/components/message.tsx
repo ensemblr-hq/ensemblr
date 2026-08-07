@@ -8,11 +8,11 @@ import { useAtomValue } from 'jotai';
 import type { ComponentProps, ReactNode } from 'react';
 import { Children, memo, useMemo } from 'react';
 import { Streamdown } from 'streamdown';
-import { toBundledLanguage } from '@/renderer/lib/language-from-path';
 import {
 	attachmentPathFromInlineCode,
 	chipLabelForPath,
-} from '@/renderer/lib/pi';
+} from '@/renderer/lib/agent-timeline';
+import { toBundledLanguage } from '@/renderer/lib/language-from-path';
 import { cn } from '@/renderer/lib/utils';
 import {
 	markdownStyleAtom,

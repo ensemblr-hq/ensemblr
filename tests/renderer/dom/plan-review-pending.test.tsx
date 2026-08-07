@@ -15,9 +15,9 @@ import { clearEnsemblrApi, installEnsemblrApi } from '../support/dom';
 
 const broadcast = (
 	requestId: string,
-	piSessionId: string,
+	agentSessionId: string,
 ): ExitPlanModeBroadcast => ({
-	piSessionId,
+	agentSessionId,
 	planPath: '.context/plans/20260728-1432-add-plan-mode.md',
 	requestId,
 	title: 'Add Plan Mode',
@@ -42,13 +42,13 @@ const wrapper = ({ children }: { children: ReactNode }) => (
 	<Provider>{children}</Provider>
 );
 
-const mountPending = (piSessionId: string) =>
+const mountPending = (agentSessionId: string) =>
 	renderHook(
 		() => {
 			usePlanReviewSync();
 			return {
 				dismiss: useDismissPlanReview(),
-				pending: usePendingPlanReview(piSessionId),
+				pending: usePendingPlanReview(agentSessionId),
 			};
 		},
 		{ wrapper },

@@ -14,15 +14,15 @@ import {
 	type EnsemblrDatabaseConnection,
 	openEnsemblrDatabase,
 } from '../../src/main/storage/database.ts';
-import { getCheckpointByTurnId } from '../../src/main/storage/repositories/checkpoint-repository.ts';
 import {
-	createPiSession,
+	createAgentSession,
 	createTurn,
-} from '../../src/main/storage/repositories/pi-session-repository.ts';
+} from '../../src/main/storage/repositories/agent-session-repository.ts';
+import { getCheckpointByTurnId } from '../../src/main/storage/repositories/checkpoint-repository.ts';
 
 interface Fixture {
+	agentSessionId: string;
 	connection: EnsemblrDatabaseConnection;
-	piSessionId: string;
 	repoDirectory: string;
 	turnId: string;
 	workspaceId: string;
@@ -61,7 +61,7 @@ INSERT INTO workspaces (id, repository_id, slug, name, path)
 VALUES ('ws-ckpt', 'repo-ckpt', 'ckpt', 'Ckpt', '${repoDirectory}');
 `);
 
-	const { mainBranch, session } = createPiSession({
+	const { mainBranch, session } = createAgentSession({
 		database: connection.database,
 		input: { cwd: repoDirectory, workspaceId: 'ws-ckpt' },
 	});
@@ -77,7 +77,7 @@ VALUES ('ws-ckpt', 'repo-ckpt', 'ckpt', 'Ckpt', '${repoDirectory}');
 
 	return {
 		connection,
-		piSessionId: session.id,
+		agentSessionId: session.id,
 		repoDirectory,
 		turnId: turn.id,
 		workspaceId: 'ws-ckpt',
@@ -95,7 +95,7 @@ test('captures dirty and untracked files into a private ref', async (t) => {
 		cwd: fixture.repoDirectory,
 		database: fixture.connection.database,
 		label: 'change something',
-		piSessionId: fixture.piSessionId,
+		agentSessionId: fixture.agentSessionId,
 		turnId: fixture.turnId,
 		workspaceId: fixture.workspaceId,
 	});
@@ -107,7 +107,7 @@ test('captures dirty and untracked files into a private ref', async (t) => {
 	});
 	assert.equal(row.gitRef, expectedRef);
 	assert.equal(row.turnId, fixture.turnId);
-	assert.equal(row.piSessionId, fixture.piSessionId);
+	assert.equal(row.agentSessionId, fixture.agentSessionId);
 
 	const refHash = git(fixture.repoDirectory, 'rev-parse', expectedRef);
 	assert.equal(refHash, row.gitHash);
@@ -193,7 +193,7 @@ test('capture failure warns and returns null without blocking', async (t) => {
 		cwd: nonGitDirectory,
 		database: fixture.connection.database,
 		label: 'no repo here',
-		piSessionId: fixture.piSessionId,
+		agentSessionId: fixture.agentSessionId,
 		turnId: fixture.turnId,
 		workspaceId: fixture.workspaceId,
 	});

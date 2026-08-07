@@ -71,7 +71,7 @@ const setSummarySchema = z.strictObject({
 });
 
 const sendFollowUpSchema = z.strictObject({
-	piSessionId: nonEmpty,
+	agentSessionId: nonEmpty,
 	prompt: nonEmpty,
 	wait: z.boolean().optional(),
 });
@@ -134,11 +134,11 @@ const listTerminalsSchema = z.strictObject({
 });
 
 const conversationRefSchema = z.strictObject({
-	piSessionId: nonEmpty,
+	agentSessionId: nonEmpty,
 });
 
 const readConversationSchema = z.strictObject({
-	piSessionId: nonEmpty,
+	agentSessionId: nonEmpty,
 	stat: z.boolean().optional(),
 	fromOrdinal: z.number().int().min(0).optional(),
 	ordinal: z.number().int().min(0).optional(),

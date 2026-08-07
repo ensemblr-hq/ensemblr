@@ -8,7 +8,7 @@
 import type {
 	PiCustomMessageData,
 	UIMessagePart,
-} from '@/renderer/types/pi-timeline';
+} from '@/renderer/types/agent-timeline';
 
 /** Part type identifying an extension-injected Pi message on a UI message. */
 const PI_CUSTOM_PART_TYPE = 'data-pi-custom';

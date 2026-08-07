@@ -7,9 +7,9 @@
  */
 
 import type {
-	PiSkillPartData,
+	AgentSkillPartData,
 	UIMessagePart,
-} from '@/renderer/types/pi-timeline';
+} from '@/renderer/types/agent-timeline';
 
 /** Part type identifying a skill-activation marker on a UI message. */
 const PI_SKILL_PART_TYPE = 'data-pi-skill';
@@ -28,7 +28,9 @@ export function buildSkillPart(name: string): UIMessagePart {
  * @param part - The part to inspect
  * @returns The skill marker, or null when the part carries something else
  */
-export function skillPartDataOf(part: UIMessagePart): PiSkillPartData | null {
+export function skillPartDataOf(
+	part: UIMessagePart,
+): AgentSkillPartData | null {
 	if (part.type !== PI_SKILL_PART_TYPE || !('data' in part)) {
 		return null;
 	}

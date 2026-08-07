@@ -31,11 +31,22 @@ import type {
 } from '../../shared/agent-control.ts';
 import type { PermissionMode } from '../../shared/permissions.ts';
 
-/** Which agent species a control command originated from. */
-export type AgentSpecies = 'pi' | 'harness';
+/**
+ * Which agent runtime a control command originated from. `pi` and `claude` are
+ * first-class runtimes driving a native chat tab; `harness` is a third-party CLI
+ * (Claude Code, Codex, Vibe) launched into a terminal tab over MCP.
+ */
+export type AgentSpecies = 'pi' | 'claude' | 'harness';
 
 /**
- * Identity of an agent being spawned, resolved into a control-env overlay. Pi
+ * Runtimes that drive a native Ensemblr chat tab. The chat-tab ops key off
+ * membership here rather than off one runtime's name, so adding a runtime is a
+ * matter of declaring what surface it has instead of revisiting every gate.
+ */
+const CHAT_TAB_SPECIES: ReadonlySet<AgentSpecies> = new Set(['pi', 'claude']);
+
+/**
+ * Identity of an agent being spawned, resolved into a control-env overlay. Chat
  * sessions pass their real per-session id and the spawning session's id so
  * lineage (depth, deadlock) guardrails work; harness/terminal launches pass a
  * workspace-scoped id with `species: 'harness'`.
@@ -69,6 +80,19 @@ export interface AgentControlOrigin {
 	parentSessionId: string | null;
 	depth: number;
 	species: AgentSpecies;
+}
+
+/**
+ * Whether the caller drives a native chat tab, which is what every chat-tab op
+ * — naming the tab, recording its summary, questioning the user, Plan Mode —
+ * actually depends on. A harness owns a terminal tab that titles itself from its
+ * own session log, so there is no tab there to name, summarize, host a dialog,
+ * or post a plan into.
+ * @param origin - Resolved caller identity.
+ * @returns True when the caller has a native chat tab.
+ */
+export function originHasChatTab(origin: AgentControlOrigin): boolean {
+	return CHAT_TAB_SPECIES.has(origin.species);
 }
 
 /** Lists workspaces for the cross-workspace read ops. */
@@ -124,11 +148,11 @@ export interface ConversationPort {
 		 * unrestricted child from a planning parent.
 		 */
 		planMode: boolean;
-	}) => Promise<{ chatTabId: string; piSessionId: string }>;
+	}) => Promise<{ chatTabId: string; agentSessionId: string }>;
 	/** Lists the available Pi models plus the default, for model selection. */
 	listModels: () => Promise<AgentControlModelList>;
 	sendFollowUp: (input: {
-		piSessionId: string;
+		agentSessionId: string;
 		prompt: string;
 	}) => Promise<void>;
 	/**
@@ -137,12 +161,12 @@ export interface ConversationPort {
 	 * user owns the title and the rename was declined.
 	 */
 	setName: (input: {
-		piSessionId: string;
+		agentSessionId: string;
 		name: string;
 	}) => Promise<{ applied: boolean; chatTabId: string; title: string } | null>;
 	/** Resolves once the session goes idle, or `'timeout'` after `timeoutMs`. */
 	waitForIdle: (
-		piSessionId: string,
+		agentSessionId: string,
 		timeoutMs: number,
 	) => Promise<'completed' | 'timeout'>;
 	/**
@@ -152,21 +176,21 @@ export interface ConversationPort {
 	 * needs the full {@link AgentControlConversationStatus}.
 	 */
 	getStatus: (
-		piSessionId: string,
+		agentSessionId: string,
 	) => Promise<Omit<AgentControlConversationStatus, 'hasFinalMessage'> | null>;
 	/**
 	 * Whether a persisted assistant answer exists for the conversation. Scans
 	 * stored events, so it stays off the poll loop and is resolved only for the
 	 * callers that report the flag.
 	 */
-	hasFinalMessage: (piSessionId: string) => Promise<boolean>;
+	hasFinalMessage: (agentSessionId: string) => Promise<boolean>;
 	/**
 	 * The conversation's report: every assistant message of its newest answered
 	 * turn, joined, or null when it has produced none. A whole turn rather than a
 	 * single message so an agent that signs off after its findings does not
 	 * shadow them.
 	 */
-	getLastMessage: (piSessionId: string) => Promise<string | null>;
+	getLastMessage: (agentSessionId: string) => Promise<string | null>;
 	/**
 	 * A page of the conversation's persisted transcript: its prompts, answers, and
 	 * tool calls with arguments and results. Loads the branch's events, so it is a
@@ -187,9 +211,11 @@ export interface ConversationPort {
 	 * reports false rather than throwing, which leaves the role to depth exactly
 	 * as it was before the marker existed.
 	 */
-	isSpawnedSubAgent: (piSessionId: string) => Promise<boolean>;
+	isSpawnedSubAgent: (agentSessionId: string) => Promise<boolean>;
 	/** Owning workspace of a Pi session, or null when it does not exist. */
-	resolveConversationWorkspace: (piSessionId: string) => Promise<string | null>;
+	resolveConversationWorkspace: (
+		agentSessionId: string,
+	) => Promise<string | null>;
 }
 
 /**

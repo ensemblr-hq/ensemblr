@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 
-import { createWorkspacePathResolver } from '../../src/renderer/lib/pi';
+import { createWorkspacePathResolver } from '../../src/renderer/lib/agent-timeline';
 import type { WorkspaceFileSummary } from '../../src/renderer/types/workbench';
 
 function file(path: string): WorkspaceFileSummary {
