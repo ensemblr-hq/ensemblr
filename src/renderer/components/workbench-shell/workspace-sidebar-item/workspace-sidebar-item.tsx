@@ -1,7 +1,4 @@
-import { useAtomValue } from 'jotai';
-import { selectAtom } from 'jotai/utils';
 import { ArchiveIcon } from 'lucide-react';
-import { useMemo } from 'react';
 
 import { Button } from '@/renderer/components/ui/button';
 import {
@@ -10,16 +7,7 @@ import {
 } from '@/renderer/components/ui/context-menu';
 import { SidebarMenuButton } from '@/renderer/components/ui/sidebar';
 import { useNavigation } from '@/renderer/components/workbench-shell/shell-contexts';
-import { useLivePullRequestModel } from '@/renderer/hooks/workbench-shell/route-layout/use-live-pull-request-model';
-import { useWorkspaceBusy } from '@/renderer/hooks/workspace/use-workspace-busy';
-import { cn } from '@/renderer/lib/utils';
-import { getWorkspaceSidebarState } from '@/renderer/lib/workbench';
-import {
-	getRunningDockActivityState,
-	useWorkspaceUnread,
-	type WorkspaceDockActivityState,
-	workspaceDockActivityByWorkspaceAtom,
-} from '@/renderer/state/workspace';
+import { useWorkspaceSidebarRow } from '@/renderer/hooks/workbench-shell/navigation-sidebar/use-workspace-sidebar-row';
 import type {
 	WorkbenchRouteSearch,
 	WorkspaceShellModel,
@@ -31,8 +19,7 @@ import {
 } from '@/shared/permissions';
 
 import { WorkspaceContextMenuContent } from './context-menu';
-import { WorkspaceDiffStats } from './diff-stats';
-import { DockActivityDot } from './dock-activity-dot';
+import { WorkspaceSidebarItemContent } from './item-content';
 
 const archiveBoundary = classifyPermissionAction({
 	action: 'workspace-archive-delete',
@@ -65,86 +52,19 @@ export function WorkspaceSidebarItem({
 	workspace: WorkspaceShellModel;
 }) {
 	const { renderWorkspaceLink } = useNavigation();
-	const isUnread = useWorkspaceUnread(workspace.id);
+	const { dockActivityState, hasDiffStats, isUnread, sidebarState } =
+		useWorkspaceSidebarRow({ isActive, workspace });
 	const isPendingCreation = workspace.isPendingCreation === true;
-	// Live agent runtime activity flows through `agentBusy` so it takes spinner
-	// priority over PR/check states without disturbing the cached
-	// `workspace.status` semantics elsewhere in the renderer.
-	const agentBusy = useWorkspaceBusy(workspace.id);
-	// The active row shares the header's live PR snapshot (same query key), so its
-	// icon flips to ready-to-merge in the same render as the header — not one
-	// slower navigation poll later. Inactive rows keep the navigation snapshot's
-	// PR state (returned unchanged, so no extra subscriptions or re-renders).
-	const livePullRequest = useLivePullRequestModel({
-		changeSummary: workspace.changeSummary,
-		enabled: isActive,
-		fallback: workspace.pullRequest,
-		workspaceCwd: workspace.pathLabel,
-		workspaceId: workspace.id,
-	});
-	const liveWorkspace =
-		livePullRequest === workspace.pullRequest
-			? workspace
-			: { ...workspace, pullRequest: livePullRequest };
-	const sidebarState = getWorkspaceSidebarState(liveWorkspace, { agentBusy });
-	const WorkspaceIcon = sidebarState.icon;
-	const liveDockActivityAtom = useMemo(
-		() =>
-			selectAtom(
-				workspaceDockActivityByWorkspaceAtom,
-				(activity: Record<string, WorkspaceDockActivityState>) =>
-					activity[workspace.id] ?? null,
-			),
-		[workspace.id],
-	);
-	const liveDockActivityState = useAtomValue(liveDockActivityAtom);
-	const hasDiffStats =
-		workspace.changeSummary.additions > 0 ||
-		workspace.changeSummary.deletions > 0;
-	// Live for the active row via the atom; other rows fall back to their (possibly
-	// staler) navigation snapshot, so the dot's freshness is not uniform across rows.
-	const dockActivityState =
-		liveDockActivityState ?? getRunningDockActivityState(workspace.dockTabs);
-	const hasRunningDockActivity = dockActivityState !== null;
-	const workspaceButtonLabel = `Open workspace ${workspace.name}${
-		hasRunningDockActivity ? '; dock activity running' : ''
-	}`;
+
 	const buttonContent = (
-		<>
-			<div className='mt-0.5 grid size-5 shrink-0 place-items-center'>
-				<WorkspaceIcon
-					aria-hidden='true'
-					className={cn(
-						'size-3.5',
-						sidebarState.className,
-						sidebarState.isSpinning && 'animate-spin',
-					)}
-				/>
-			</div>
-			<div className='min-w-0 flex-1'>
-				<div className='flex min-w-0 items-center justify-between gap-2'>
-					<span
-						className={cn(
-							'min-w-0 flex-1 truncate text-[0.8125rem]',
-							isUnread ? 'font-semibold' : 'font-medium',
-						)}
-					>
-						{workspace.name}
-					</span>
-					<div className='flex shrink-0 items-center gap-1.5'>
-						{hasDiffStats ? <WorkspaceDiffStats workspace={workspace} /> : null}
-						{dockActivityState ? (
-							<DockActivityDot state={dockActivityState} />
-						) : null}
-					</div>
-				</div>
-				<div className='mt-1 flex min-w-0 items-center gap-1.5 text-muted-foreground text-xxs'>
-					<span className='truncate'>
-						{isPendingCreation ? 'Creating workspace…' : workspace.branchName}
-					</span>
-				</div>
-			</div>
-		</>
+		<WorkspaceSidebarItemContent
+			dockActivityState={dockActivityState}
+			hasDiffStats={hasDiffStats}
+			isPendingCreation={isPendingCreation}
+			isUnread={isUnread}
+			sidebarState={sidebarState}
+			workspace={workspace}
+		/>
 	);
 
 	if (isPendingCreation) {
@@ -165,6 +85,10 @@ export function WorkspaceSidebarItem({
 		);
 	}
 
+	const workspaceButtonLabel = `Open workspace ${workspace.name}${
+		dockActivityState ? '; dock activity running' : ''
+	}`;
+
 	return (
 		<ContextMenu>
 			<ContextMenuTrigger asChild>
@@ -180,10 +104,7 @@ export function WorkspaceSidebarItem({
 					>
 						{renderWorkspaceLink
 							? renderWorkspaceLink(
-									{
-										search: routeSearch,
-										workspace,
-									},
+									{ search: routeSearch, workspace },
 									buttonContent,
 								)
 							: buttonContent}

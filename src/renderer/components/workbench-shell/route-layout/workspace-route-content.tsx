@@ -1,12 +1,14 @@
 import { useQuery } from '@tanstack/react-query';
 import { Outlet, useNavigate } from '@tanstack/react-router';
 import { useAtomValue } from 'jotai';
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useMemo } from 'react';
 import { settingsResolutionQuery } from '@/renderer/api/ensemblr';
 import { CloseRunningChatDialog } from '@/renderer/components/workbench-shell/conversation-panel/close-running-chat-dialog';
 import { useSetupDiagnostics } from '@/renderer/components/workbench-shell/shell-contexts';
 import { WorkspaceWorkbenchContent } from '@/renderer/components/workbench-shell/workspace-content';
 import { useAskAgentSetupScript } from '@/renderer/hooks/workbench-shell/composer/use-ask-agent-setup-script';
+import { useAgentControlFocus } from '@/renderer/hooks/workbench-shell/route-layout/use-agent-control-focus';
+import { useGuardedSessionClose } from '@/renderer/hooks/workbench-shell/route-layout/use-guarded-session-close';
 import { useLiveWorkspaceModel } from '@/renderer/hooks/workbench-shell/route-layout/use-live-workspace-model';
 import {
 	createPlaceholderSession,
@@ -18,15 +20,9 @@ import {
 } from '@/renderer/lib/workbench/action-preference';
 import { configuredPreviewUrls } from '@/renderer/lib/workbench/preview-urls';
 import { isDockTab } from '@/renderer/lib/workbench/route-search';
-import { useRegisterCloseAction } from '@/renderer/state/close-action';
-import {
-	useAgentComposerController,
-	useStopAgentSession,
-} from '@/renderer/state/composer';
+import { useAgentComposerController } from '@/renderer/state/composer';
 import { repoSettingsOverrideAtomFamily } from '@/renderer/state/preferences';
 import {
-	resolveRunningCloseTarget,
-	useCloseRunningChatGuard,
 	usePublishWorkspaceDockActivity,
 	useSessionTabState,
 	useWorkspacePanelTabState,
@@ -132,68 +128,12 @@ export function WorkspaceRouteContent({
 		workspaceCwd: activeWorkspace.pathLabel,
 		workspaceId: activeWorkspace.id,
 	});
-	// ⌘/Ctrl+W and tab-strip closes both flow through a running-chat guard. The
-	// underlying close policy (close, no-op, or reset the sole chat) still lives
-	// in `useSessionTabState` (see `decideActiveClose`); the guard only adds a
-	// confirm-then-cancel step when the target tab's agent is mid-turn. Wired
-	// here because this is the one place holding both the registered close action
-	// and the composer's live streaming state.
-	const closeGuard = useCloseRunningChatGuard();
-	const stopAgentSessionById = useStopAgentSession(activeWorkspace.id);
-	const stopFor = useCallback(
-		(targetId: string, agentSessionId: string | null) => async () => {
-			// The active tab owns the live composer, so prefer its `onStop` (it also
-			// clears the composer's optimistic pending session). Background tabs have
-			// no live composer; cancel them by session id instead.
-			if (targetId === activeSession.id) {
-				await agentComposer.onStop();
-				return;
-			}
-			if (agentSessionId) {
-				await stopAgentSessionById(agentSessionId);
-			}
-		},
-		[activeSession.id, agentComposer.onStop, stopAgentSessionById],
-	);
-	const requestActiveClose = useCallback(() => {
-		closeGuard.requestClose({
-			isRunning: agentComposer.isStreaming,
-			onClose: sessionNavigation.closeActiveOrReset,
-			onStop: agentComposer.onStop,
-		});
-	}, [
-		closeGuard,
-		agentComposer.isStreaming,
-		agentComposer.onStop,
-		sessionNavigation.closeActiveOrReset,
-	]);
-	useRegisterCloseAction(requestActiveClose);
-	const requestTabClose = useCallback(
-		(targetId: string) => {
-			const target = resolveRunningCloseTarget({
-				activeSessionId: activeSession.id,
-				isActiveStreaming: agentComposer.isStreaming,
-				tabs: sessionNavigation.sessionTabs,
-				targetId,
-			});
-			closeGuard.requestClose({
-				isRunning: target.isRunning,
-				onClose: () => sessionNavigation.closeSessionTab(targetId),
-				onStop: stopFor(targetId, target.agentSessionId),
-			});
-		},
-		[
-			activeSession.id,
-			closeGuard,
-			agentComposer.isStreaming,
-			sessionNavigation,
-			stopFor,
-		],
-	);
-	const guardedSessionNavigation = useMemo(
-		() => ({ ...sessionNavigation, closeSessionTab: requestTabClose }),
-		[requestTabClose, sessionNavigation],
-	);
+	const { closeGuard, guardedSessionNavigation } = useGuardedSessionClose({
+		activeSessionId: activeSession.id,
+		agentComposer,
+		sessionNavigation,
+		workspaceId: activeWorkspace.id,
+	});
 	const composer = getComposerState({
 		activeAgentSessionId: agentComposer.activeSessionId,
 		activeSession,
@@ -269,17 +209,13 @@ export function WorkspaceRouteContent({
 		});
 	}
 
-	// An agent-control focus request (main → renderer) brings a tab, dock
-	// terminal, or review panel to the foreground. A ref holds the latest apply
-	// closure so the subscription is registered once yet always calls the current
-	// navigation setters. Applied only for the window showing this workspace.
 	/**
 	 * Applies an agent-control focus request for the window showing this
 	 * workspace, ignoring requests targeting another workspace or carrying a dock
 	 * id that is not a valid {@link DockTabId} (the payload is agent-supplied).
 	 * @param payload - The focus request broadcast from the main process.
 	 */
-	const applyFocus = (payload: FocusViewBroadcast) => {
+	function applyFocus(payload: FocusViewBroadcast) {
 		if (payload.workspaceId !== activeWorkspace.id) {
 			return;
 		}
@@ -295,18 +231,8 @@ export function WorkspaceRouteContent({
 			return;
 		}
 		updateSearch({ review: target.panel });
-	};
-	const applyFocusRef = useRef(applyFocus);
-	useEffect(() => {
-		applyFocusRef.current = applyFocus;
-	});
-	useEffect(
-		() =>
-			window.ensemblr?.onAgentControlFocusView((payload) =>
-				applyFocusRef.current(payload),
-			),
-		[],
-	);
+	}
+	useAgentControlFocus(applyFocus);
 
 	return (
 		<>

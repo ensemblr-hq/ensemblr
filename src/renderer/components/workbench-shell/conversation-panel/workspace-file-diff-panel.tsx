@@ -1,17 +1,12 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { ChevronDownIcon } from 'lucide-react';
 import { useMemo } from 'react';
 import { toast } from 'sonner';
 
 import {
-	deleteReviewComment,
-	ensemblrQueryKeys,
 	listChatTabsQuery,
 	pullRequestSnapshotQuery,
-	readWorkspaceFile,
 	reviewCommentsQuery,
-	saveReviewComment,
-	workspaceFileDiffQuery,
 } from '@/renderer/api/ensemblr-queries';
 import { DiffViewer } from '@/renderer/components/diff-viewer';
 import { Button } from '@/renderer/components/ui/button';
@@ -23,9 +18,10 @@ import {
 	DropdownMenuTrigger,
 } from '@/renderer/components/ui/dropdown-menu';
 import { OpenInToolbarMenu } from '@/renderer/components/workbench-shell/open-in-toolbar-menu';
+import { useDiffCommentMutations } from '@/renderer/hooks/workbench-shell/conversation-panel/use-diff-comment-mutations';
+import { useFileDiffContent } from '@/renderer/hooks/workbench-shell/conversation-panel/use-file-diff-content';
 import { useFileViewedMark } from '@/renderer/hooks/workbench-shell/conversation-panel/use-file-viewed-mark';
 import { parseSingleFileDiff } from '@/renderer/lib/diff/parse';
-import { diffNewSideIsWorkingTree } from '@/renderer/lib/diff/scope';
 import { groupDiffComments } from '@/renderer/lib/workbench/diff-comments';
 import { formatFileDiffContext } from '@/renderer/lib/workbench/review-context';
 import {
@@ -41,22 +37,8 @@ import type { WorkspaceGitDiffScope } from '@/shared/ipc/contracts/workspace-git
 
 import { PanelMessage } from './panel-message';
 
-const LOCAL_ID_PREFIX = 'local:';
-
 /** Stable empty list so an absent comment source keeps a fixed array identity. */
 const EMPTY_LIST: readonly never[] = [];
-
-/**
- * Strip the `local:` prefix from a diff comment id, returning the underlying
- * local review-comment id, or null for non-local (read-only GitHub) comments.
- * @param id - The diff comment id
- * @returns The local review-comment id, or null
- */
-function localCommentId(id: string): string | null {
-	return id.startsWith(LOCAL_ID_PREFIX)
-		? id.slice(LOCAL_ID_PREFIX.length)
-		: null;
-}
 
 /**
  * Rich single-file diff surface for a `kind: 'diff'` tab that carries a
@@ -81,31 +63,18 @@ export function WorkspaceFileDiffPanel({
 	workspaceCwd: string | null;
 	workspaceId: string;
 }) {
-	const queryClient = useQueryClient();
-	const newSideIsWorkingTree = diffNewSideIsWorkingTree(scope);
-
-	const diff = useQuery(
-		workspaceFileDiffQuery({ filePath, scope, workspaceCwd }),
-	);
 	const { data: commentsData } = useQuery(reviewCommentsQuery(workspaceId));
 	const { data: snapshotData } = useQuery(
 		pullRequestSnapshotQuery({ workspaceCwd, workspaceId }),
 	);
-	const resolvedPath =
-		diff.data && !diff.data.error ? diff.data.path : (filePath ?? '');
-	const fullFileEnabled =
-		newSideIsWorkingTree && Boolean(resolvedPath && workspaceCwd);
-	const fullFile = useQuery({
-		enabled: fullFileEnabled,
-		queryFn: () =>
-			readWorkspaceFile({
-				path: resolvedPath,
-				workspaceCwd: workspaceCwd ?? '',
-			}),
-		queryKey: ensemblrQueryKeys.filePreview(workspaceCwd ?? '', resolvedPath),
-		staleTime: 10_000,
-	});
-	const fileData = fullFile.data;
+	const {
+		fullFileContent,
+		fullFileContentPending,
+		isTruncated,
+		patch,
+		placeholder,
+		resolvedPath,
+	} = useFileDiffContent({ filePath, scope, workspaceCwd });
 
 	const { onViewedChange, viewed } = useFileViewedMark({
 		filePath: resolvedPath,
@@ -115,40 +84,9 @@ export function WorkspaceFileDiffPanel({
 	});
 	const reveal = useDiffLineReveal(resolvedPath, workspaceId);
 	const settleReveal = useSettleDiffLineReveal();
+	const { onAddComment, onDeleteComment, onResolveComment } =
+		useDiffCommentMutations({ filePath: resolvedPath, workspaceId });
 
-	const invalidateComments = () =>
-		queryClient.invalidateQueries({
-			queryKey: ensemblrQueryKeys.reviewComments(workspaceId),
-		});
-
-	const addMutation = useMutation({
-		mutationFn: (input: { body: string; lineNumber: number | null }) =>
-			saveReviewComment({
-				body: input.body,
-				filePath: resolvedPath,
-				lineNumber: input.lineNumber,
-				workspaceId,
-			}),
-		onError: notifyCommentFailed,
-		onSuccess: invalidateComments,
-	});
-	const resolveMutation = useMutation({
-		mutationFn: (input: { id: string; resolved: boolean }) =>
-			saveReviewComment({
-				id: input.id,
-				status: input.resolved ? 'resolved' : 'open',
-				workspaceId,
-			}),
-		onError: notifyCommentFailed,
-		onSuccess: invalidateComments,
-	});
-	const deleteMutation = useMutation({
-		mutationFn: (id: string) => deleteReviewComment({ id, workspaceId }),
-		onError: notifyCommentFailed,
-		onSuccess: invalidateComments,
-	});
-
-	const patch = diff.data && !diff.data.error ? (diff.data.patch ?? '') : '';
 	const githubComments =
 		snapshotData?.snapshot?.pullRequest?.comments ?? EMPTY_LIST;
 	const localComments = commentsData?.comments ?? EMPTY_LIST;
@@ -163,34 +101,21 @@ export function WorkspaceFileDiffPanel({
 		}).byChangeKey;
 	}, [patch, resolvedPath, githubComments, localComments]);
 
-	if (!filePath) {
-		return <PanelMessage message='This tab has no file associated.' />;
+	if (placeholder) {
+		return (
+			<PanelMessage message={placeholder.message} tone={placeholder.tone} />
+		);
 	}
-	if (diff.isPending) {
-		return <PanelMessage message='Loading diff…' />;
-	}
-	if (diff.isError) {
-		return <PanelMessage message='Could not load diff.' tone='error' />;
-	}
-	if (diff.data.error) {
-		return <PanelMessage message={diff.data.error.message} tone='error' />;
-	}
-	if (!patch) {
-		return <PanelMessage message='No changes in this file.' />;
-	}
-
-	const fullFileContent =
-		fileData && !fileData.error ? (fileData.content ?? null) : null;
 
 	return (
 		<DiffViewer
 			commentsByChangeKey={commentsByChangeKey}
 			filePath={resolvedPath}
 			fullFileContent={fullFileContent}
-			fullFileContentPending={fullFileEnabled && !fullFile.isFetched}
+			fullFileContentPending={fullFileContentPending}
 			headerActions={
 				<>
-					{diff.data.isTruncated ? (
+					{isTruncated ? (
 						<span className='text-status-warning text-xs'>Diff truncated</span>
 					) : null}
 					<AddToChatMenu
@@ -205,21 +130,9 @@ export function WorkspaceFileDiffPanel({
 					/>
 				</>
 			}
-			onAddComment={({ body, lineNumber }) =>
-				addMutation.mutate({ body, lineNumber })
-			}
-			onDeleteComment={(id) => {
-				const local = localCommentId(id);
-				if (local) {
-					deleteMutation.mutate(local);
-				}
-			}}
-			onResolveComment={(id, resolved) => {
-				const local = localCommentId(id);
-				if (local) {
-					resolveMutation.mutate({ id: local, resolved });
-				}
-			}}
+			onAddComment={onAddComment}
+			onDeleteComment={onDeleteComment}
+			onResolveComment={onResolveComment}
 			onRevealSettled={settleReveal}
 			onViewedChange={onViewedChange}
 			patch={patch}
@@ -310,14 +223,4 @@ function AddToChatMenu({
 			</DropdownMenuContent>
 		</DropdownMenu>
 	);
-}
-
-/**
- * Show an error toast when a local review-comment mutation fails.
- * @param error - The thrown error, if any
- */
-function notifyCommentFailed(error: unknown): void {
-	toast.error('Comment update failed', {
-		description: error instanceof Error ? error.message : undefined,
-	});
 }

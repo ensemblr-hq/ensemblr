@@ -1,22 +1,11 @@
 import { Icon } from '@iconify/react';
-import { useVirtualizer } from '@tanstack/react-virtual';
-import { useAtomValue } from 'jotai';
 import {
 	ChevronDownIcon,
 	ChevronRightIcon,
 	FolderOpenIcon,
 } from 'lucide-react';
-import {
-	type MouseEvent,
-	memo,
-	useCallback,
-	useEffect,
-	useMemo,
-	useRef,
-	useState,
-} from 'react';
+import { memo } from 'react';
 
-import { readWorkspaceDirectory } from '@/renderer/api/ensemblr-queries';
 import { Button } from '@/renderer/components/ui/button';
 import {
 	ContextMenu,
@@ -24,20 +13,14 @@ import {
 } from '@/renderer/components/ui/context-menu';
 import { useReviewFilePreviewOpener } from '@/renderer/components/workbench-shell/conversation-panel/file-preview-context';
 import { PanelPlaceholder } from '@/renderer/components/workbench-shell/panel-placeholder';
-import { useFileTreeExpansion } from '@/renderer/hooks/workbench-shell/review-files/use-file-tree-expansion';
+import { useWorkspaceFileTree } from '@/renderer/hooks/workbench-shell/review-files/use-workspace-file-tree';
 import { useOpenTargets } from '@/renderer/hooks/workbench-shell/use-open-targets';
-import { toWorkspaceLookupPath } from '@/renderer/lib/agent-timeline';
 import { cn } from '@/renderer/lib/utils';
 import {
-	buildFileTree,
 	fileTreeIndentClassName,
-	flattenFileTree,
 	getWorkspaceFileIconName,
-	listDirectoryPaths,
 } from '@/renderer/lib/workbench';
-import { workspaceDirectoryRevealRequestAtom } from '@/renderer/state/workspace';
 import type {
-	FileTreeMenuTarget,
 	FileTreeNode,
 	ReviewFilePreviewOpener,
 	WorkspaceFileSummary,
@@ -45,17 +28,6 @@ import type {
 
 import { AllFilesContextMenuContent } from './all-files-context-menu';
 import { FileTreeLabel } from './file-tree-label';
-
-/** Fixed row height (px). Rows are single-line (truncated), so heights are uniform. */
-const ROW_HEIGHT = 28;
-/** Extra rows rendered above/below the viewport to keep scrolling smooth. */
-const ROW_OVERSCAN = 12;
-/**
- * Assumed viewport height before the scroll element is measured. Lets the very
- * first render (and SSR/static markup in tests) emit rows instead of an empty
- * pane that fills in a frame later; the real height takes over once mounted.
- */
-const INITIAL_VIEWPORT_HEIGHT = 1200;
 
 /** Collapsible folder tree of every workspace file (files tab). */
 export function AllFilesList({
@@ -106,197 +78,17 @@ function WorkspaceFileTree({
 		workspaceId,
 	});
 
-	// Children of ignored directories the main process left collapsed (e.g.
-	// node_modules), fetched one level per expand and merged into the flat list
-	// so the tree can browse any folder regardless of size.
-	//
-	// Known limitation: these lazily-fetched entries are local state, not part of
-	// the `files` query, so they are NOT live-refreshed by the fs watcher or the
-	// poll (which the watcher deliberately ignores for `node_modules` anyway).
-	// An ignored folder expanded here shows a point-in-time snapshot until the
-	// workspace remounts (`key={workspaceCwd}` on the tree). Acceptable: ignored
-	// dirs rarely need live tracking, and `loadedDirsRef` prevents refetch churn.
-	const [lazyChildren, setLazyChildren] = useState<WorkspaceFileSummary[]>([]);
-	const loadedDirsRef = useRef<Set<string>>(new Set());
-
-	const allFiles = useMemo(() => {
-		if (lazyChildren.length === 0) {
-			return files;
-		}
-		// Drop any lazily-fetched child already present in the base list: a path
-		// in both would otherwise yield duplicate rows, since `buildFileTree`
-		// pushes files without de-duping.
-		const basePaths = new Set(files.map((entry) => entry.path));
-		const extra = lazyChildren.filter((entry) => !basePaths.has(entry.path));
-		return extra.length > 0 ? [...files, ...extra] : files;
-	}, [files, lazyChildren]);
-	const tree = useMemo(() => buildFileTree(allFiles), [allFiles]);
-	const knownDirectoryPaths = useMemo(() => listDirectoryPaths(tree), [tree]);
-	const knownDirectoryPathSet = useMemo(
-		() => new Set(knownDirectoryPaths),
-		[knownDirectoryPaths],
-	);
-	// Folders start collapsed: the full repo tree would be overwhelming if every
-	// directory rendered open.
-	const { expandDirectories, isExpanded, toggleDirectory } =
-		useFileTreeExpansion(false, knownDirectoryPaths);
-	const revealRequest = useAtomValue(workspaceDirectoryRevealRequestAtom);
-	const handledRevealRequestIdRef = useRef<number | null>(null);
-	const pendingRevealPathRef = useRef<string | null>(null);
-
-	const loadIgnoredDirectory = useCallback(
-		async (directoryPath: string) => {
-			if (!workspaceCwd || loadedDirsRef.current.has(directoryPath)) {
-				return;
-			}
-			loadedDirsRef.current.add(directoryPath);
-			const result = await readWorkspaceDirectory({
-				path: directoryPath,
-				workspaceCwd,
-			});
-			if (result.error) {
-				// Let a later expand retry.
-				loadedDirsRef.current.delete(directoryPath);
-				return;
-			}
-			setLazyChildren((previous) => {
-				const seen = new Set(previous.map((entry) => entry.path));
-				const additions = result.entries.flatMap((entry) =>
-					seen.has(entry.path)
-						? []
-						: [
-								{
-									id: `wsfile:${entry.path}`,
-									isIgnored: entry.isIgnored,
-									kind: entry.kind,
-									name: entry.name,
-									path: entry.path,
-								},
-							],
-				);
-				return additions.length > 0 ? [...previous, ...additions] : previous;
-			});
-		},
-		[workspaceCwd],
-	);
-
-	useEffect(() => {
-		if (
-			!revealRequest ||
-			revealRequest.workspaceId !== workspaceId ||
-			handledRevealRequestIdRef.current === revealRequest.id
-		) {
-			return;
-		}
-		const directoryPath = toWorkspaceLookupPath(
-			revealRequest.path,
-			workspaceCwd,
-		);
-		if (!knownDirectoryPathSet.has(directoryPath)) {
-			return;
-		}
-		handledRevealRequestIdRef.current = revealRequest.id;
-		expandDirectories(
-			directoryPathAndAncestors(directoryPath).filter((path) =>
-				knownDirectoryPathSet.has(path),
-			),
-		);
-		pendingRevealPathRef.current = directoryPath;
-		const directoryNode = findDirectoryNode(tree, directoryPath);
-		if (
-			directoryNode?.isIgnored &&
-			directoryNode.directories.length === 0 &&
-			directoryNode.files.length === 0
-		) {
-			void loadIgnoredDirectory(directoryPath);
-		}
-	}, [
-		expandDirectories,
-		knownDirectoryPathSet,
-		loadIgnoredDirectory,
-		revealRequest,
-		tree,
-		workspaceCwd,
-		workspaceId,
-	]);
-
-	// Only the currently visible rows; collapsed subtrees are skipped, so this
-	// recomputes cheaply on every toggle and feeds the virtualizer directly.
-	const rows = useMemo(
-		() => flattenFileTree(tree, isExpanded),
-		[tree, isExpanded],
-	);
-
-	// `willExpand` comes from the row (which already knows its open state) so this
-	// stays free of `isExpanded`, keeping a stable identity across toggles — a
-	// prerequisite for the memoized rows below to actually skip re-rendering.
-	const handleDirectoryToggle = useCallback(
-		(node: FileTreeNode<WorkspaceFileSummary>, willExpand: boolean) => {
-			toggleDirectory(node.path);
-			// On first expand of an ignored directory left collapsed by the main
-			// process (no enumerated children), fetch its contents lazily.
-			if (
-				willExpand &&
-				node.isIgnored &&
-				node.directories.length === 0 &&
-				node.files.length === 0
-			) {
-				void loadIgnoredDirectory(node.path);
-			}
-		},
-		[toggleDirectory, loadIgnoredDirectory],
-	);
-
 	const hasMenu =
 		openInTargets.length > 0 || Boolean(copyTarget) || Boolean(openFilePreview);
 
-	const [menuTarget, setMenuTarget] = useState<FileTreeMenuTarget | null>(null);
-	const handleContextCapture = useCallback(
-		(event: MouseEvent<HTMLDivElement>) => {
-			if (!hasMenu) {
-				return;
-			}
-			const rowElement = (event.target as HTMLElement).closest<HTMLElement>(
-				'[data-row-path]',
-			);
-			if (!rowElement?.dataset.rowPath) {
-				// Right-click landed below the rows: don't open an empty menu.
-				event.preventDefault();
-				event.stopPropagation();
-				return;
-			}
-			setMenuTarget({
-				relativePath: rowElement.dataset.rowPath,
-				relativePathKind:
-					rowElement.dataset.rowKind === 'directory' ? 'directory' : 'file',
-			});
-		},
-		[hasMenu],
-	);
-
-	const scrollRef = useRef<HTMLDivElement>(null);
-	const virtualizer = useVirtualizer({
-		count: rows.length,
-		estimateSize: () => ROW_HEIGHT,
-		getScrollElement: () => scrollRef.current,
-		initialRect: { height: INITIAL_VIEWPORT_HEIGHT, width: 0 },
-		overscan: ROW_OVERSCAN,
-	});
-
-	useEffect(() => {
-		const pendingPath = pendingRevealPathRef.current;
-		if (!pendingPath) {
-			return;
-		}
-		const rowIndex = rows.findIndex(
-			(row) => row.type === 'directory' && row.node.path === pendingPath,
-		);
-		if (rowIndex < 0) {
-			return;
-		}
-		pendingRevealPathRef.current = null;
-		virtualizer.scrollToIndex(rowIndex, { align: 'center' });
-	}, [rows, virtualizer]);
+	const {
+		handleContextCapture,
+		handleDirectoryToggle,
+		menuTarget,
+		rows,
+		scrollRef,
+		virtualizer,
+	} = useWorkspaceFileTree({ files, hasMenu, workspaceCwd, workspaceId });
 
 	const listBody = (
 		<div
@@ -358,38 +150,6 @@ function WorkspaceFileTree({
 			) : null}
 		</ContextMenu>
 	);
-}
-
-/**
- * Lists a directory path plus its parents, outermost first.
- * @param path - Workspace-relative directory path.
- * @returns Ancestor paths ending with the requested directory.
- */
-function directoryPathAndAncestors(path: string): string[] {
-	const parts = path.split('/').filter(Boolean);
-	return parts.map((_, index) => parts.slice(0, index + 1).join('/'));
-}
-
-/**
- * Finds a directory node in the tree by workspace-relative path.
- * @param node - Tree node to search from.
- * @param path - Directory path to find.
- * @returns The matching node, if present.
- */
-function findDirectoryNode(
-	node: FileTreeNode<WorkspaceFileSummary>,
-	path: string,
-): FileTreeNode<WorkspaceFileSummary> | null {
-	if (node.path === path) {
-		return node;
-	}
-	for (const directory of node.directories) {
-		const match = findDirectoryNode(directory, path);
-		if (match) {
-			return match;
-		}
-	}
-	return null;
 }
 
 /** Folder row with a collapse chevron, folder icon, and compacted label. */

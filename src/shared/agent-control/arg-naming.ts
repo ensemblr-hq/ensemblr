@@ -114,9 +114,13 @@ export function canonicalizeArgs(
 	if (!aliases || !isArgObject(rawArgs)) {
 		return rawArgs;
 	}
-	return Object.fromEntries(
-		Object.entries(rawArgs)
-			.filter(([key]) => !aliases[key] || !(aliases[key] in rawArgs))
-			.map(([key, value]) => [aliases[key] ?? key, value]),
-	);
+	const canonical: Record<string, unknown> = {};
+	for (const [key, value] of Object.entries(rawArgs)) {
+		const canonicalKey = aliases[key];
+		if (canonicalKey && canonicalKey in rawArgs) {
+			continue;
+		}
+		canonical[canonicalKey ?? key] = value;
+	}
+	return canonical;
 }
