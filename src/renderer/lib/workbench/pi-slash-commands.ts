@@ -1,8 +1,9 @@
 import type { SlashCommandDescriptor } from '@/renderer/types/workbench';
-import type { PiSlashCommandSource } from '@/shared/ipc/contracts/agent-session';
+import type { AgentProviderSlashCommandSource } from '@/shared/ipc/contracts/agent-provider';
 
 /** Source marker used for static fallback commands from Pi's TUI catalog. */
-const BUILTIN_SLASH_COMMAND_SOURCE = 'builtin' satisfies PiSlashCommandSource;
+const BUILTIN_SLASH_COMMAND_SOURCE =
+	'builtin' satisfies AgentProviderSlashCommandSource;
 
 /**
  * Pi's built-in slash commands. Vendored from
@@ -10,7 +11,7 @@ const BUILTIN_SLASH_COMMAND_SOURCE = 'builtin' satisfies PiSlashCommandSource;
  * (dist/core/slash-commands.js). These commands are TUI-oriented and are only
  * used when SDK-backed project/user command discovery fails.
  */
-export const SLASH_COMMANDS: readonly SlashCommandDescriptor[] = [
+export const PI_STATIC_SLASH_COMMANDS: readonly SlashCommandDescriptor[] = [
 	{
 		source: BUILTIN_SLASH_COMMAND_SOURCE,
 		autoSubmit: false,

@@ -6,7 +6,10 @@ import type {
 	SessionTabModel,
 	WorkspaceFileSummary,
 } from '@/renderer/types/workbench';
-import type { AgentProviderId } from '@/shared/agent-provider';
+import {
+	type AgentProviderId,
+	normalizeAgentProviderId,
+} from '@/shared/agent-provider';
 import type { SetupDiagnosticsSnapshot } from '@/shared/ipc/contracts/setup';
 
 /**
@@ -22,6 +25,23 @@ import type { SetupDiagnosticsSnapshot } from '@/shared/ipc/contracts/setup';
  */
 export function showsComposer(session: SessionTabModel): boolean {
 	return !session.isSubAgent;
+}
+
+/**
+ * Which agent runtime the composer's chips should speak for. A chat with a
+ * session is pinned and that pin wins; a new chat has no pin, so the selected
+ * model's runtime stands in — it is the one a submit would start.
+ * @param composer - Composer shell state carrying the pin and the selection.
+ * @returns The active runtime, defaulting to pi before either is known.
+ */
+export function resolveComposerProvider(
+	composer: ComposerShellState,
+): AgentProviderId {
+	return normalizeAgentProviderId(
+		composer.lockedProvider ??
+			composer.availableModels.find((option) => option.id === composer.modelId)
+				?.agentProvider,
+	);
 }
 
 /**

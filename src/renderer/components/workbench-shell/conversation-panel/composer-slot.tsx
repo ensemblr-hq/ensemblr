@@ -117,6 +117,7 @@ export function ComposerSlot({
 				) : null
 			}
 			seedText={seedText}
+			workspaceId={workspace.id}
 		/>
 	);
 }

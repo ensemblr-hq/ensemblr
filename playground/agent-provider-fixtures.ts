@@ -2,6 +2,7 @@ import type { AgentProviderId } from '@/shared/agent-provider';
 import type {
 	AgentExecutablePathSnapshotWire,
 	AgentProviderReadinessWire,
+	ListAgentProviderMcpServersResult,
 	OpenAgentProviderSettingsFileResult,
 } from '@/shared/ipc/contracts/agent-provider';
 import type { ListWorkspaceOpenTargetsResult } from '@/shared/ipc/contracts/open-target';
@@ -206,6 +207,47 @@ function piReadiness(): AgentProviderReadinessWire {
 		status: 'failure',
 		updatedAt: PROBED_AT,
 		version: '0.42.1',
+	};
+}
+
+/**
+ * Bridge stand-in for `listAgentProviderMcpServers`. Covers every tier a real
+ * roster spans — plugin, user, project, and remote connector — plus each status
+ * the panel renders differently.
+ * @param payload - The `{ cwd, provider }` request from the roster query.
+ * @returns The fixture roster for that provider.
+ */
+export function resolveFixtureAgentProviderMcpServers(
+	payload: unknown,
+): ListAgentProviderMcpServersResult {
+	if (readBridgeProvider(payload) === 'pi') {
+		return { error: null, servers: [] };
+	}
+	return {
+		error: null,
+		servers: [
+			{
+				error: null,
+				name: 'plugin:playwright:playwright',
+				status: 'connected',
+			},
+			{ error: null, name: 'nanobanana', status: 'connected' },
+			{
+				error: 'spawn npx ENOENT',
+				name: '@21st-dev/magic',
+				status: 'failed',
+			},
+			{ error: null, name: 'shadcn', status: 'connected' },
+			{
+				error: 'connection refused (127.0.0.1:7317)',
+				name: 'fallow',
+				status: 'failed',
+			},
+			{ error: null, name: 'claude.ai Linear', status: 'needs-auth' },
+			{ error: null, name: 'claude.ai Notion', status: 'needs-auth' },
+			{ error: null, name: 'claude.ai Figma', status: 'connected' },
+			{ error: null, name: 'nocodb', status: 'pending' },
+		],
 	};
 }
 

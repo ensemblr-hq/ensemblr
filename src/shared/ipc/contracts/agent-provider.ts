@@ -52,6 +52,97 @@ export interface AgentProviderAccountWire {
 }
 
 /**
+ * Connection state of one MCP server, as the runtime reports it. `needs-auth`
+ * is the only state the user can act on from Ensemblr, and the composer's MCP
+ * panel turns it into a button.
+ */
+export type AgentProviderMcpStatus =
+	| 'connected'
+	| 'disabled'
+	| 'failed'
+	| 'needs-auth'
+	| 'pending';
+
+/**
+ * One MCP server the runtime has configured, flattened for the wire. Only Claude
+ * Code reports these; pi sends an empty roster.
+ */
+export interface AgentProviderMcpServerWire {
+	/** Failure detail the runtime attached, when the server did not connect. */
+	error: string | null;
+	name: string;
+	status: AgentProviderMcpStatus;
+}
+
+/** Request for one runtime's MCP roster as it resolves inside a workspace. */
+export interface ListAgentProviderMcpServersRequest {
+	/**
+	 * Workspace directory to resolve the roster against. Project- and local-scope
+	 * servers are defined relative to it, so a global lookup would miss them.
+	 */
+	cwd: string;
+	provider: AgentProviderId;
+}
+
+/**
+ * One runtime's MCP roster. `error` carries why the roster is empty when the
+ * runtime could not be asked, so the caller distinguishes "none configured"
+ * from "could not read".
+ */
+export interface ListAgentProviderMcpServersResult {
+	error: string | null;
+	servers: readonly AgentProviderMcpServerWire[];
+}
+
+/**
+ * What registered a slash command, used to group the composer's slash menu.
+ * Pi reports one of these for every command; Claude Code's SDK reports no
+ * provenance at all, so its commands carry none.
+ */
+export type AgentProviderSlashCommandSource =
+	| 'builtin'
+	| 'extension'
+	| 'prompt'
+	| 'skill';
+
+/** Scope of the resource that registered a slash command. */
+export type AgentProviderSlashCommandScope = 'project' | 'temporary' | 'user';
+
+/** IPC-safe slash command metadata shown in the composer autocomplete menu. */
+export interface AgentProviderSlashCommandWire {
+	/** When true, picking the command submits it immediately (it takes no args). */
+	autoSubmit: boolean;
+	/** Bare command name without the leading slash. */
+	command: string;
+	description: string;
+	source?: AgentProviderSlashCommandSource;
+	sourceScope?: AgentProviderSlashCommandScope;
+}
+
+/** Request for one runtime's slash commands as they resolve inside a workspace. */
+export interface ListAgentProviderSlashCommandsRequest {
+	/**
+	 * Workspace directory to resolve commands against. Project-scoped skills,
+	 * prompts, and plugin commands live under it, so a global lookup would miss
+	 * them.
+	 */
+	cwd: string;
+	provider: AgentProviderId;
+}
+
+/**
+ * One runtime's slash commands. `source` says whether the runtime itself
+ * answered (`runtime`) or the list came from a vendored catalogue after live
+ * discovery failed (`static`), which is what lets the caller tell "this runtime
+ * has no commands" from "we could not ask it".
+ */
+export interface ListAgentProviderSlashCommandsResult {
+	commands: readonly AgentProviderSlashCommandWire[];
+	error: string | null;
+	source: 'runtime' | 'static';
+}
+
+/**
  * Provider-neutral readiness snapshot. Both tabs of the Providers page render
  * from this one shape; the provider-specific richness lives in `checks[]`.
  */
@@ -129,6 +220,12 @@ export interface AgentProviderApi {
 	getAgentProviderReadiness: (
 		request: AgentProviderRequest,
 	) => Promise<AgentProviderReadinessWire>;
+	listAgentProviderMcpServers: (
+		request: ListAgentProviderMcpServersRequest,
+	) => Promise<ListAgentProviderMcpServersResult>;
+	listAgentProviderSlashCommands: (
+		request: ListAgentProviderSlashCommandsRequest,
+	) => Promise<ListAgentProviderSlashCommandsResult>;
 	openAgentProviderSettingsFile: (
 		request: OpenAgentProviderSettingsFileRequest,
 	) => Promise<OpenAgentProviderSettingsFileResult>;

@@ -59,8 +59,10 @@ import { createChatTabService } from './chat-tabs/chat-tab-service.ts';
 import { persistTerminalAgentSessionId } from './chat-tabs/persist-terminal-agent-session.ts';
 import {
 	createClaudeAgentAdapter,
+	createClaudeMcpRoster,
 	createClaudeModelLister,
 	createClaudePlanBridge,
+	createClaudeSlashCommands,
 } from './claude-agent';
 import { installClaudeToolApproval } from './claude-agent/claude-tool-approval-ipc.ts';
 import { createLocalCommandService } from './commands';
@@ -86,7 +88,7 @@ import {
 } from './linear';
 import { installApplicationMenu } from './menu';
 import { createOpenTargetService } from './open-target';
-import { createPiCliRpcAdapter } from './pi-agent';
+import { createPiCliRpcAdapter, resolvePiSlashCommands } from './pi-agent';
 import {
 	createPiExecutableService,
 	createPiReadinessService,
@@ -433,6 +435,14 @@ const resolveProviderExecutable = async (
 // adapts the existing readiness service, Claude's talks to the Agent SDK.
 const agentProviderService = createAgentProviderService({
 	executables: { claude: claudeExecutableService, pi: piExecutableService },
+	// Pi is absent on purpose: its tools come from the harness, so it has no MCP
+	// roster of its own and reports an empty one.
+	mcpRosters: {
+		claude: createClaudeMcpRoster({
+			resolveBaseEnv: resolveAgentSpawnEnv,
+			resolveExecutablePath: resolveClaudeExecutablePath,
+		}),
+	},
 	probes: {
 		claude: createClaudeReadinessProbe({
 			executableService: claudeExecutableService,
@@ -440,6 +450,14 @@ const agentProviderService = createAgentProviderService({
 			resolveBaseEnv: resolveAgentSpawnEnv,
 		}),
 		pi: createPiReadinessProbe({ piReadinessService }),
+	},
+	slashCommandCatalogs: {
+		claude: createClaudeSlashCommands({
+			resolveBaseEnv: resolveAgentSpawnEnv,
+			resolveExecutablePath: resolveClaudeExecutablePath,
+		}),
+		pi: async (cwd) =>
+			resolvePiSlashCommands(await piExecutableService.getSnapshot(), cwd),
 	},
 });
 const agentClient = createAgentClient({

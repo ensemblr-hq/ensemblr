@@ -10,6 +10,8 @@
 export type { CreateClaudeAgentAdapterOptions } from './claude-agent-adapter';
 export { createClaudeAgentAdapter } from './claude-agent-adapter';
 export { buildClaudeMcpServers } from './claude-mcp-config';
+export type { CreateClaudeMcpRosterOptions } from './claude-mcp-roster';
+export { createClaudeMcpRoster } from './claude-mcp-roster';
 export { presentClaudeModels } from './claude-model-catalog';
 export type { CreateClaudeModelListerOptions } from './claude-model-lister';
 export { createClaudeModelLister } from './claude-model-lister';
@@ -32,12 +34,9 @@ export type {
 	ClaudePlanSubmittedEvent,
 } from './claude-plan-mode';
 export { detectPlanSubmission } from './claude-plan-mode';
-export type { ClaudeThinkingLevel } from './claude-thinking';
-export {
-	CLAUDE_THINKING_LEVELS,
-	toClaudeEffortLevel,
-	toThinkingLevels,
-} from './claude-thinking';
+export type { CreateClaudeSlashCommandsOptions } from './claude-slash-commands';
+export { createClaudeSlashCommands } from './claude-slash-commands';
+export { toClaudeEffortLevel, toThinkingLevels } from './claude-thinking';
 // `claude-tool-approval-ipc.ts` is deliberately absent: it imports `electron`,
 // and this barrel is loaded by Vitest suites running under plain Node. main.ts
 // imports `installClaudeToolApproval` from that module directly.

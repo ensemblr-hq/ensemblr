@@ -1,5 +1,5 @@
 import type { AgentProviderApi } from './agent-provider';
-import type { AgentSessionApi, PiApi } from './agent-session';
+import type { AgentSessionApi } from './agent-session';
 import type { AgentToolApprovalApi } from './agent-tool-approval';
 import type { AgentsApi } from './agents';
 import type { AppSettingsApi } from './app-settings';
@@ -67,6 +67,5 @@ export interface EnsemblrApi
 		RepositorySourcesApi,
 		AgentProviderApi,
 		AgentToolApprovalApi,
-		PiApi,
 		LinearApi,
 		OpenTargetApi {}

@@ -9,6 +9,8 @@ import {
 import { cn } from '@/renderer/lib/utils';
 import { getThinkingStrength } from '@/renderer/lib/workbench/thinking-strength';
 import type { ComposerThinkingOption } from '@/renderer/types/workbench';
+import type { AgentProviderId } from '@/shared/agent-provider';
+import { getThinkingAxisLabel } from '@/shared/agent-thinking';
 
 import { ThinkingBarIcon } from './thinking-bar-icon';
 
@@ -29,19 +31,23 @@ export function getNextThinkingId(
 }
 
 /**
- * Toggle-style thinking-level chip. Clicking cycles to the next pi thinking
- * level (off → minimal → low → medium → high → xhigh → off). Bar icon mirrors
- * the current strength; tint shifts amber once thinking is enabled.
+ * Toggle-style thinking-level chip. Clicking cycles to the next level the
+ * selected runtime offers — pi runs off → minimal → … → xhigh, Claude Code runs
+ * off → low → … → max — and the chip names the dial the way that runtime does.
+ * Bar icon mirrors the current strength; tint shifts amber once thinking is on.
  */
 export function ThinkingPicker({
 	disabled,
 	onChange,
 	options,
+	provider,
 	value,
 }: {
 	disabled?: boolean;
 	onChange: (level: string) => void;
 	options: readonly ComposerThinkingOption[];
+	/** Runtime whose vocabulary the chip labels itself with. */
+	provider: AgentProviderId;
 	value: string | null;
 }) {
 	const handleClick = useCallback(() => {
@@ -51,18 +57,20 @@ export function ThinkingPicker({
 		}
 	}, [onChange, options, value]);
 
+	const axisLabel = getThinkingAxisLabel(provider);
+
 	if (options.length === 0) {
 		return (
 			<span className='inline-flex items-center gap-1.5 rounded-md px-1.5 py-1 text-muted-foreground text-xs'>
 				<ThinkingBarIcon strength={0} />
-				<span>Thinking pending</span>
+				<span>{axisLabel} pending</span>
 			</span>
 		);
 	}
 
 	const selected =
 		options.find((option) => option.id === value) ?? options[0] ?? null;
-	const strength = getThinkingStrength(selected?.id ?? null);
+	const strength = getThinkingStrength(provider, selected?.id ?? null);
 	const tintClass =
 		strength > 0
 			? 'bg-status-warning/10 text-status-warning hover:bg-status-warning/15 hover:text-status-warning'
@@ -72,7 +80,7 @@ export function ThinkingPicker({
 		<Tooltip>
 			<TooltipTrigger asChild>
 				<Button
-					aria-label={`Thinking level: ${selected?.label ?? 'Off'}. Click to cycle.`}
+					aria-label={`${axisLabel} level: ${selected?.label ?? 'Off'}. Click to cycle.`}
 					className={cn('h-7 rounded-md px-2 font-medium', tintClass)}
 					disabled={disabled}
 					onClick={handleClick}
@@ -85,7 +93,7 @@ export function ThinkingPicker({
 				</Button>
 			</TooltipTrigger>
 			<TooltipContent sideOffset={4}>
-				Adjust thinking level
+				Adjust {axisLabel.toLowerCase()} level
 				<span className='ml-2 text-muted-foreground'>⌥T</span>
 			</TooltipContent>
 		</Tooltip>

@@ -59,9 +59,6 @@ export const ensemblrQueryKeys = {
 	linearMetadata: () => [...ensemblrQueryKeys.all, 'linear-metadata'] as const,
 	/** Query key for the available agent models. */
 	agentModels: () => [...ensemblrQueryKeys.all, 'agent-models'] as const,
-	/** Query key for a workspace's available Pi slash commands. */
-	piSlashCommands: (workspaceCwd: string) =>
-		[...ensemblrQueryKeys.all, 'pi-slash-commands', workspaceCwd] as const,
 	/** Query key for a branch's agent session events. */
 	agentSessionEvents: (branchId: string) =>
 		[...ensemblrQueryKeys.all, 'agent-session-events', branchId] as const,
@@ -113,6 +110,22 @@ export const ensemblrQueryKeys = {
 			...ensemblrQueryKeys.all,
 			'agent-provider-executable-path',
 			provider,
+		] as const,
+	/** Query key for one agent runtime's MCP roster as resolved in a directory. */
+	agentProviderMcpServers: (provider: AgentProviderId, cwd: string) =>
+		[
+			...ensemblrQueryKeys.all,
+			'agent-provider-mcp-servers',
+			provider,
+			cwd,
+		] as const,
+	/** Query key for one agent runtime's slash commands as resolved in a directory. */
+	agentProviderSlashCommands: (provider: AgentProviderId, cwd: string) =>
+		[
+			...ensemblrQueryKeys.all,
+			'agent-provider-slash-commands',
+			provider,
+			cwd,
 		] as const,
 	/** Query key for one agent runtime's readiness snapshot. */
 	agentProviderReadiness: (provider: AgentProviderId) =>

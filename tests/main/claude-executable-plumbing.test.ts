@@ -341,7 +341,9 @@ describe('the model lister runs the same binary the session will', () => {
 		const { captured, models } = await listWith(async () => OVERRIDE_PATH);
 
 		expect(captured[0]?.pathToClaudeCodeExecutable).toBe(OVERRIDE_PATH);
-		expect(models).toHaveLength(1);
+		// The catalog also carries pinned releases the runtime never advertises, so
+		// this asserts the runtime's own row landed rather than the total count.
+		expect(models).toContainEqual(expect.objectContaining({ id: 'opus' }));
 	});
 
 	it('lists nothing and never spawns when no binary resolves', async () => {
@@ -377,7 +379,9 @@ describe('the model lister runs the same binary the session will', () => {
 		expect(await lister()).toEqual([]);
 		executablePath = OVERRIDE_PATH;
 
-		expect(await lister()).toHaveLength(1);
+		expect(await lister()).toContainEqual(
+			expect.objectContaining({ id: 'opus' }),
+		);
 		expect(captured[0]?.pathToClaudeCodeExecutable).toBe(OVERRIDE_PATH);
 	});
 });

@@ -75,12 +75,19 @@ export function useTimelineMessages({
 		[messages],
 	);
 
-	// Show a live "Working…" indicator in the pre-first-token gap: the turn is
-	// streaming but no assistant turn exists yet (trailing message is the user
+	// Show a live "Working…" indicator in the pre-first-token gap: a turn is in
+	// flight but no assistant turn exists yet (trailing message is the user
 	// prompt). Anchored at the submit time so it ticks continuously into the
 	// streaming turn's own timer once the first event lands.
+	//
+	// `isStreaming` reads the persisted session status, which only flips after
+	// main has accepted the prompt and the session list has refetched — seconds
+	// on a cold runtime start. An optimistic prompt with no persisted twin means
+	// the turn is already in flight, so the timer starts on the tick the prompt
+	// renders rather than trailing it.
+	const turnInFlight = isStreaming || optimisticUnmatched.length > 0;
 	const pendingStartMs =
-		isStreaming && messages.at(-1)?.role === 'user'
+		turnInFlight && messages.at(-1)?.role === 'user'
 			? resolveLiveTurnStartMs(messages, optimistic.prompts)
 			: null;
 

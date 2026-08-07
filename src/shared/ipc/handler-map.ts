@@ -11,7 +11,7 @@
  *
  * Channels that broadcast events from main to renderer (push, no request) use
  * `void` for `req` and carry the broadcast envelope in `res`. Channels with
- * optional payloads (e.g. `listPiSlashCommands`) widen `req` to include
+ * optional payloads (e.g. `linearListIssues`) widen `req` to include
  * `undefined`.
  *
  * Type-only file — no runtime export.
@@ -29,6 +29,10 @@ import type {
 	AgentExecutableSelectionWire,
 	AgentProviderReadinessWire,
 	AgentProviderRequest,
+	ListAgentProviderMcpServersRequest,
+	ListAgentProviderMcpServersResult,
+	ListAgentProviderSlashCommandsRequest,
+	ListAgentProviderSlashCommandsResult,
 	OpenAgentProviderSettingsFileRequest,
 	OpenAgentProviderSettingsFileResult,
 	SetAgentProviderExecutablePathRequest,
@@ -39,8 +43,6 @@ import type {
 	ListAgentSessionEventsResult,
 	ListAgentSessionsRequest,
 	ListAgentSessionsResult,
-	ListPiSlashCommandsRequest,
-	ListPiSlashCommandsResult,
 	OpenAgentSessionRequest,
 	OpenAgentSessionResult,
 	PiRawFrameBroadcast,
@@ -441,10 +443,6 @@ export interface IpcHandlerMap {
 		ListAgentSessionsRequest,
 		ListAgentSessionsResult
 	>;
-	[IPC_CHANNELS.listPiSlashCommands]: IpcHandlerEntry<
-		ListPiSlashCommandsRequest | undefined,
-		ListPiSlashCommandsResult
-	>;
 	[IPC_CHANNELS.listReviewComments]: IpcHandlerEntry<
 		ListReviewCommentsRequest,
 		ListReviewCommentsResult
@@ -575,6 +573,14 @@ export interface IpcHandlerMap {
 	[IPC_CHANNELS.getAgentProviderReadiness]: IpcHandlerEntry<
 		AgentProviderRequest,
 		AgentProviderReadinessWire
+	>;
+	[IPC_CHANNELS.listAgentProviderMcpServers]: IpcHandlerEntry<
+		ListAgentProviderMcpServersRequest,
+		ListAgentProviderMcpServersResult
+	>;
+	[IPC_CHANNELS.listAgentProviderSlashCommands]: IpcHandlerEntry<
+		ListAgentProviderSlashCommandsRequest,
+		ListAgentProviderSlashCommandsResult
 	>;
 	[IPC_CHANNELS.selectAgentProviderExecutable]: IpcHandlerEntry<
 		AgentProviderRequest,

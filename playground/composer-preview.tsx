@@ -242,6 +242,7 @@ function ComposerCase({
 					chatTabId={chatTabId}
 					composer={composer}
 					planReview={planReview}
+					workspaceId='playground-workspace'
 				/>
 			</div>
 		</div>

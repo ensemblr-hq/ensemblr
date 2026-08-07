@@ -20,6 +20,8 @@
 
 export {
 	agentProviderRequestSchema,
+	listAgentProviderMcpServersRequestSchema,
+	listAgentProviderSlashCommandsRequestSchema,
 	openAgentProviderSettingsFileRequestSchema,
 	setAgentProviderExecutablePathRequestSchema,
 } from './request-schemas/agent-provider.ts';

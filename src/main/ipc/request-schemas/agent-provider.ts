@@ -22,6 +22,18 @@ export const agentProviderRequestSchema = z.object({
 	provider: agentProviderIdSchema,
 });
 
+/** {@link import('../../../shared/ipc').ListAgentProviderMcpServersRequest}. */
+export const listAgentProviderMcpServersRequestSchema = z.object({
+	cwd: z.string().min(1),
+	provider: agentProviderIdSchema,
+});
+
+/** {@link import('../../../shared/ipc').ListAgentProviderSlashCommandsRequest}. */
+export const listAgentProviderSlashCommandsRequestSchema = z.object({
+	cwd: z.string().min(1),
+	provider: agentProviderIdSchema,
+});
+
 /** {@link import('../../../shared/ipc').SetAgentProviderExecutablePathRequest}. */
 export const setAgentProviderExecutablePathRequestSchema = z.object({
 	path: z.string().min(1),

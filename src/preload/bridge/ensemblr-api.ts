@@ -185,7 +185,6 @@ export function createEnsemblrApi(): EnsemblrApi {
 			invoke('listAgentSessionEvents', request),
 		listAgentSessions: (request) => invoke('listAgentSessions', request),
 		listEnvFiles: (request) => invoke('listEnvFiles', request),
-		listPiSlashCommands: (request) => invoke('listPiSlashCommands', request),
 		listRepositoryBranches: (request) =>
 			invoke('listRepositoryBranches', request),
 		listRepositoryIssues: (request) => invoke('listRepositoryIssues', request),
@@ -336,6 +335,10 @@ export function createEnsemblrApi(): EnsemblrApi {
 		selectLocalRepository: () => invoke('selectLocalRepository'),
 		getAgentProviderReadiness: (request) =>
 			invoke('getAgentProviderReadiness', request),
+		listAgentProviderMcpServers: (request) =>
+			invoke('listAgentProviderMcpServers', request),
+		listAgentProviderSlashCommands: (request) =>
+			invoke('listAgentProviderSlashCommands', request),
 		getAgentProviderExecutablePath: (request) =>
 			invoke('getAgentProviderExecutablePath', request),
 		setAgentProviderExecutablePath: (request) =>

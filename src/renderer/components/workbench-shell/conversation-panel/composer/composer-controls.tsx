@@ -10,6 +10,7 @@ import {
 } from '@/renderer/components/ui/tooltip';
 import type { ComposerStateApi } from '@/renderer/hooks/workbench-shell/composer/use-composer-state';
 import { cn } from '@/renderer/lib/utils';
+import { resolveComposerProvider } from '@/renderer/lib/workbench/composer';
 import {
 	alwaysShowContextUsageAtom,
 	sendShortcutAtom,
@@ -18,6 +19,7 @@ import type { ComposerShellState } from '@/renderer/types/workbench';
 import { formatShortcut } from '@/shared/keymap';
 import { AttachmentMenu } from './attachment-menu';
 import { ContextIndicator } from './context-indicator';
+import { McpServersPanel } from './mcp-servers-panel';
 import { ModelPicker } from './model-picker';
 import { PlanModeToggle } from './plan-mode-toggle';
 import { ThinkingPicker } from './thinking-picker';
@@ -31,6 +33,8 @@ interface ComposerControlsProps {
 	/** True while a turn is streaming or the composer is disabled outright. */
 	pickersDisabled: boolean;
 	state: ComposerStateApi;
+	/** Workspace whose dock hosts the terminal the MCP panel hands auth off to. */
+	workspaceId: string;
 }
 
 /**
@@ -46,12 +50,14 @@ export function ComposerControls({
 	onModelPickerOpenChange,
 	pickersDisabled,
 	state,
+	workspaceId,
 }: ComposerControlsProps) {
 	const sendShortcut = useAtomValue(sendShortcutAtom);
 	const alwaysShowContext = useAtomValue(alwaysShowContextUsageAtom);
 	const sendShortcutHint = formatShortcut(
 		sendShortcut === 'mod+enter' ? 'composer.submitWithMod' : 'composer.submit',
 	);
+	const provider = resolveComposerProvider(composer);
 
 	return (
 		<div className='flex items-center justify-between gap-2'>
@@ -69,6 +75,7 @@ export function ComposerControls({
 					disabled={pickersDisabled}
 					onChange={composer.onThinkingChange}
 					options={composer.availableThinkingLevels}
+					provider={provider}
 					value={composer.thinkingLevel}
 				/>
 				<PlanModeToggle
@@ -78,6 +85,13 @@ export function ComposerControls({
 				/>
 			</div>
 			<div className='flex items-center gap-1'>
+				{provider === 'claude' ? (
+					<McpServersPanel
+						cwd={composer.workspaceCwd}
+						disabled={composer.disabled}
+						workspaceId={workspaceId}
+					/>
+				) : null}
 				{showContextIndicator(composer, alwaysShowContext) ? (
 					<ContextIndicator usage={composer.contextUsage} />
 				) : null}

@@ -66,7 +66,6 @@ import { registerHealthHandlers } from './handlers/health';
 import { registerLinearHandlers } from './handlers/linear';
 import { registerNavigationHandlers } from './handlers/navigation';
 import { registerOpenTargetHandlers } from './handlers/open-target';
-import { registerPiHandlers } from './handlers/pi';
 import { registerRepositoryHandlers } from './handlers/repository';
 import { registerRepositoryConfigHandlers } from './handlers/repository-config';
 import { registerRepositorySettingsHandlers } from './handlers/repository-settings';
@@ -246,7 +245,6 @@ export function registerIpcHandlers({
 		githubRepositoryListService,
 		withPermissionGate,
 	});
-	registerPiHandlers({ piExecutableService });
 	registerAgentProviderHandlers({ agentProviderService, openTargetService });
 	registerAgentSessionHandlers({
 		listClaudeModels,
