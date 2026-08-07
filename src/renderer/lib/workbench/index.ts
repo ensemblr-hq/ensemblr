@@ -1,7 +1,12 @@
 export { isWorkbenchActiveView } from './active-view';
 export { buildAddProjectMenuModel } from './add-project-menu';
 export { getChecksPanelState } from './checks-panel-state';
-export { getComposerState, showsComposer } from './composer';
+export {
+	getComposerState,
+	resolveComposerProvider,
+	showContextIndicator,
+	showsComposer,
+} from './composer';
 export { DEFAULT_DOCK_TAB, DEFAULT_REVIEW_TAB } from './constants';
 export {
 	getWorkspaceFileIconName,

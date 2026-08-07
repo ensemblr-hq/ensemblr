@@ -28,6 +28,24 @@ export function showsComposer(session: SessionTabModel): boolean {
 }
 
 /**
+ * Decides whether the context gauge is worth showing. It is noise at low usage,
+ * so by default it appears only past 70% of the window; the setting forces it on.
+ * @param composer - Composer shell state carrying the current usage.
+ * @param alwaysShow - The user's always-show-context preference.
+ * @returns True when the gauge should render.
+ */
+export function showContextIndicator(
+	composer: ComposerShellState,
+	alwaysShow: boolean,
+): boolean {
+	const usage = composer.contextUsage;
+	if (!usage || usage.maxTokens <= 0) {
+		return alwaysShow;
+	}
+	return alwaysShow || (usage.usedTokens / usage.maxTokens) * 100 > 70;
+}
+
+/**
  * Which agent runtime the composer's chips should speak for. A chat with a
  * session is pinned and that pin wins; a new chat has no pin, so the selected
  * model's runtime stands in — it is the one a submit would start.
