@@ -4,7 +4,8 @@ The versions this repo is pinned to, and the constraints that are not obvious
 from `package.json`. Policies for *how* to use the stack (npm, Biome, Jotai,
 Tailwind scale, JSDoc) live in `AGENTS.md` — this file is the stack itself.
 
-Verified against `package.json` at `0.1.0`. Re-check before asserting a version.
+Verified against `package.json` at `0.1.0` on 2026-08-08. Re-check before
+asserting a version.
 
 ## Platform
 
@@ -58,27 +59,46 @@ packaged app ships without them.
 | Async data | TanStack Query, TanStack Virtual |
 | State | Jotai (+ `jotai-family` for parameterized atoms) |
 | Terminal | `@xterm/xterm` 6 |
-| Markdown | `streamdown` + Shiki |
+| Markdown | `streamdown` + Shiki, with the `@streamdown/{cjk,code,math,mermaid}` plugins wired in `src/renderer/components/message.tsx` |
+| Diff rendering | `react-diff-view`, tokenized through Shiki |
+| Layout / motion | `react-resizable-panels`, `motion` (imported as `motion/react`) |
+| Drag and drop | `@atlaskit/pragmatic-drag-and-drop` (+ `-hitbox`), used by the dashboard board |
 | Validation | Zod 4 |
+
+The `ai` package (Vercel AI SDK 7) is a **type-only** dependency of the renderer:
+the agent timeline models turns as `UIMessage` / `DynamicToolUIPart`. Every one
+of its ~20 imports is an `import type` — nothing calls into it at runtime, and no
+model provider is wired through it. Keep it that way; runtimes are reached
+through `src/main/agent-runtime/`.
 
 **Tailwind 4 is CSS-first — there is no `tailwind.config.js` and there must not
 be one.** All configuration lives in `src/renderer/styles/index.css` via
 `@import "tailwindcss"`, `@theme`, `@plugin`, `@source`, and `@custom-variant`.
-`components.json` reflects this with `"tailwind": { "config": "" }`. A v3-style
-JS config file will simply be ignored.
+That file also pulls in `tw-animate-css` and `shadcn/tailwind.css` as CSS
+imports, which is why `tailwindcss`, `@tailwindcss/typography`, and `shadcn` sit
+in `devDependencies` and are allowlisted in `.fallowrc.jsonc`
+`ignoreDependencies` — Vite compiles them at build time and the renderer bundle
+needs none of them at runtime. `components.json` reflects the CSS-first setup
+with `"tailwind": { "config": "" }`. A v3-style JS config file will simply be
+ignored.
 
 `@source "../../../node_modules/streamdown/dist/*.js"` is required — Tailwind 4
 does not scan `node_modules`, and without it fenced code blocks render unstyled.
 
 shadcn aliases resolve into the renderer: `@/renderer/components`,
-`@/renderer/components/ui`, `@/renderer/lib`, `@/renderer/hooks/ui`. Vendored
-`ui/**` primitives are excluded from Biome and from most fallow rules; treat them
-as third-party.
+`@/renderer/components/ui`, `@/renderer/lib`, `@/renderer/hooks/ui` — the last
+of which has no directory in the tree today. Vendored `ui/**`
+primitives are quieted per-rule in fallow and react-doctor; treat them as
+third-party. They are **not** excluded from Biome — `biome.json` ignores
+`src/components/ui` and `src/hooks/ui`, neither of which exists, so re-vendoring
+a primitive gets reformatted to house style.
 
 ## Data and integrations
 
 - **SQLite via `node:sqlite` (`DatabaseSync`)** — Node 24's built-in. There is no
   `better-sqlite3` or `sql.js` dependency; do not add one.
+- **TOML** — `js-toml`, used only by `src/main/config/` to read and write the
+  committed `.ensemblr/settings.toml`.
 - **Secrets** — macOS Keychain, never a file or env var.
 - **GitHub** — shells out to the `gh` CLI. Ensemblr stores no GitHub token.
 - **Linear** — OAuth, with a loopback callback server.

@@ -17,7 +17,7 @@ These instructions apply to everything under `src/renderer/`.
   - `state/` for durable renderer UI state.
   - `styles/` for renderer CSS entrypoints and style assets.
   - `types/` for shared exported renderer types and ambient declarations.
-- Do not create concern folders directly under `src/renderer/`, for example `src/renderer/workbench/`. Put the concern inside the right type bucket, for example `lib/workbench/`, `fixtures/workbench/`, `state/workspace/`, or `types/workbench.ts`.
+- Do not create concern folders directly under `src/renderer/`, for example `src/renderer/workbench/`. Put the concern inside the right type bucket, for example `lib/workbench/`, `fixtures/workbench/`, `state/workspace/`, or `types/workbench/`.
 - Do not put mutable app state, fixture data, route files, or feature implementation in `config/`; keep it for stable renderer constants such as route stale times.
 
 ## Components
@@ -38,14 +38,14 @@ These instructions apply to everything under `src/renderer/`.
 - Keep router construction, hash history, router context, and module registration in `routing/router.tsx`.
 - Keep reusable route loading, redirect, and canonicalization orchestration in `routing/*-route-loaders.ts`. Keep pure domain helpers in `lib/<concern>/`.
 - Keep shared route components, layouts, and route boundary UI under `components/<concern>/`; route files should wire routes to those components rather than accumulating large UI implementations.
-- Put route params, router context, and exported loader-data types in `types/routing.ts`. Search param domain types belong with the concern they describe, such as `types/workbench.ts`.
+- Put route params, router context, and exported loader-data types in `types/routing.ts`. Search param domain types belong with the concern they describe, such as `types/workbench/routing.ts`.
 
 ## State
 
 - Use Jotai for shared renderer state.
 - Place durable state under `state/<concern>/`. Do not leave loose `.ts` files at the `state/` root.
 - Each state concern must expose its public surface through `state/<concern>/index.ts`.
-- Keep atoms in `state/<concern>/atoms.ts`; keep larger state hooks in sibling files such as `navigation.ts` or `session-tabs.ts`.
+- Keep atoms in `state/<concern>/atoms.ts`; keep larger state hooks in sibling files such as `navigation.ts` or `session-tabs.ts`. A concern that outgrows one atom file splits by topic into `<topic>-atoms.ts` siblings — see `state/workspace/` — never into a nested folder.
 - Outside the concern folder, import from `@/renderer/state/<concern>`, not from private state files.
 - State-only — no plain renderer hooks at the `state/` root. Hooks that wrap TanStack Query for live status (and similar utilities) belong in `hooks/<concern>/`.
 
@@ -54,6 +54,7 @@ These instructions apply to everything under `src/renderer/`.
 - Put runtime helpers under `lib/<concern>/`.
 - If a helper concern has multiple files, add `lib/<concern>/index.ts` as a runtime-value barrel.
 - Do not export shared types from `lib/` barrels. Shared exported renderer types belong in `types/`.
+- Keep a single-file type concern as `types/<concern>.ts`. A concern that outgrows one file becomes `types/<concern>/` with an `index.ts` barrel — `types/workbench/`, `types/workbench-shell/`, `types/components/` — and callers import `@/renderer/types/<concern>`.
 - Put ambient renderer declarations, such as `Window` bridge types, under `types/`.
 
 ## Fixture Data

@@ -1,12 +1,19 @@
 # UX Parity
 
-Date: 2026-07-18
+Date: 2026-08-08
 
-Ensemblr should match Conductor's observable workflows and information architecture where practical, while using distinct Ensemblr visual design, copy, branding, icons, and Pi-specific runtime behavior.
+Ensemblr should match Conductor's observable workflows and information architecture where practical, while using distinct Ensemblr visual design, copy, branding, icons, and runtime-specific agent behavior.
+
+> **Status (2026-08-08):** Ensemblr is no longer a single-runtime app. ADR 0042
+> added Claude Code as a second first-class agent runtime alongside Pi (#226–#237),
+> so "Pi" below should be read as "the chat's agent runtime" wherever the
+> statement is not genuinely Pi-specific. A chat is pinned to one provider; the
+> shared surface lives in `src/main/agent-runtime/`, with `pi-agent/` and
+> `claude-agent/` as sibling adapters.
 
 ## Current Shell Contract
 
-As of 2026-07-18, the implemented workbench shell is the product source of
+As of 2026-08-08, the implemented workbench shell is the product source of
 truth for layout and visible affordances. See
 `docs/product/current-shell-inventory.md`.
 
@@ -36,11 +43,11 @@ The current shell is the intended closest match to Conductor's own shell. Lost
 or unavailable screenshot evidence should not cause agents to reopen settled
 shell layout decisions.
 
-The visible chat transcript and prompt composer are now backed by the live Pi
-runtime. Prompt submission, stop, attachments, model/thinking controls, and
-runtime event rendering have landed; preserve their current placement and
-setup-gated behavior. Remaining polish, such as the full session-tree fork UX,
-is ongoing.
+The visible chat transcript and prompt composer are backed by a live agent
+runtime — Claude Code or Pi, pinned per chat. Prompt submission, stop,
+attachments, model/thinking controls, plan mode, slash commands, and runtime
+event rendering have landed; preserve their current placement and setup-gated
+behavior. Remaining polish, such as the full session-tree fork UX, is ongoing.
 
 ## Major Screen Patterns
 
@@ -77,7 +84,7 @@ Ensemblr equivalent:
 - Settings is a separate full-window settings view with a Back to app action.
 - Settings sidebar has app-wide sections first and local project sections below.
 - Main settings forms are narrow, centered, row-based, and mostly inline-editable.
-- App settings cover General, Models, Environment, Git, Appearance, Integrations, and (under "More") Diagnostics, Experimental, and Advanced. (The standalone Providers screen was removed — provider/auth setup is owned by Pi; readiness checks live in Diagnostics.)
+- App settings cover General, Models, Providers, Environment, Git, Appearance, Integrations, and (under "More") Diagnostics, Experimental, and Advanced. Providers was removed in the 2026-07-19 single-runtime pass and reinstated by #226 as the agent-runtime surface: one tab per first-class runtime (Claude Code, then Pi) with its executable, readiness, accounts, and settings-file location. The aggregate setup gate still lives in Diagnostics, and Ensemblr stores no provider tokens.
 - Repository settings are selected from the same sidebar and expose path, branch, remote, preview, copy, script, spotlight, instruction, and removal controls.
 
 Ensemblr equivalent:
@@ -106,10 +113,13 @@ Ensemblr equivalent:
 Ensemblr equivalent:
 
 - Keep the implemented chat tab strip, center timeline location, and bottom composer location as the app-shell contract.
-- Chat and prompt input behavior are wired to the Pi runtime. The transcript, attach button, send/stop button, and model/thinking badges are implemented, not placeholders.
-- Render structured Pi RPC events as timeline items.
-- Map model/reasoning controls to Pi concepts.
-- Preserve Pi session tree/fork behavior when retrying or continuing in a new chat.
+- Chat and prompt input behavior are wired to a live agent runtime. The transcript, attach button, send/stop button, and model/thinking badges are implemented, not placeholders.
+- Render structured runtime events as timeline items. Claude tool results render as cards, not raw JSON (#233).
+- Map model/reasoning controls to the pinned runtime's concepts. A chat is pinned to one provider for its lifetime (ADR 0042, decision 5), and a chat's thinking level is pinned to its session (#232).
+- Preserve session tree/fork behavior when retrying or continuing in a new chat.
+- Plan mode is a per-chat toggle (⌥⇧P) with an Approve / Refine / Hand off review bar rendered as the composer header (#184, #218).
+- A spawned sub-agent shows its runtime in the tab (#232) and inherits its caller's runtime (#236).
+- The composer supports a markdown preview toggle (#217) and a context-usage gauge that has a window before the first turn ends (#230, #235).
 
 ### Right-Side Workspace Panel
 
@@ -122,7 +132,8 @@ Ensemblr equivalent:
 
 - Keep the implemented All files / Changes / Checks tab order and right-sidebar location.
 - Treat file/diff/checks state as workspace metadata synchronized from git and GitHub/`gh`.
-- Allow selected files, diffs, comments, and check failures to be added to Pi chat context.
+- Selected files, diffs, comments, and check failures can be added to chat context; bulk-add sends only unresolved comments (#234). Agents can also read the workspace diff and file review comments through the control layer (#193).
+- Workspaces expose a target-branch selector, and the panel surfaces merge conflicts against that target (#215, #216).
 
 ### Terminal and Run Dock
 
@@ -162,13 +173,13 @@ Ensemblr equivalent:
 
 | Conductor concept | Ensemblr equivalent |
 | --- | --- |
-| Claude Code and Codex providers | Selected Pi CLI RPC runtime and Pi provider/model readiness. |
-| Claude/Codex model defaults | Pi model defaults and thinking-level controls. |
-| Claude/Codex config sync | Pi resource/config discovery from `~/.pi/agent`, project `.pi`, skills, prompts, themes, and context files. |
-| Claude tool approvals | Ensemblr permission modes mapped to Pi tool restrictions where available. |
-| Retry in new chat | Pi session tree fork/continuation behavior plus file checkpoint policy. |
-| Review/create-PR/fix prompt templates | Pi instruction templates stored per user/repository with source precedence. |
-| Provider environment catalog | Pi-relevant provider/env catalog plus generic environment variables. |
+| Claude Code and Codex providers | Two first-class agent runtimes: **Claude Code** (in-process `@anthropic-ai/claude-agent-sdk`) and **Pi** (CLI RPC). Both are siblings under `src/main/agent-runtime/`; Settings → Providers is the per-runtime readiness surface. Codex remains a terminal harness only, not an agent provider. See ADR 0042. |
+| Claude/Codex model defaults | App-wide default model and thinking level on Settings → Models, resolved per chat against the pinned runtime's own catalogue. |
+| Claude/Codex config sync | Each runtime keeps its own user environment: Pi discovers `~/.pi/agent`, project `.pi`, skills, prompts, themes, and context files; Claude Code uses the user's own `claude` configuration, slash commands, and MCP roster (#228). Ensemblr duplicates neither. |
+| Claude tool approvals | Workspace permission modes, enforced in-app for Claude (ADR 0042, decision 7) and mapped to Pi tool restrictions where available. Plan mode (#184) is a separate per-chat hold: Claude uses its native plan mode, Pi is gated through the shipped extension's `tool_call` hook. |
+| Retry in new chat | Agent session tree fork/continuation behavior plus file checkpoint policy. Ensemblr does not enable the Claude SDK's own file checkpointing (ADR 0042, decision 6). |
+| Review/create-PR/fix prompt templates | Repository action templates stored per user/repository with source precedence. |
+| Provider environment catalog | Runtime-relevant provider/env catalog plus generic environment variables. |
 | Conductor root path labels | Ensemblr root directory, with optional Conductor-compatible shared root support. |
 | `CONDUCTOR_*` environment variables | Native `ENSEMBLR_*` variables. |
 
@@ -181,8 +192,8 @@ Ensemblr equivalent:
 5. Implement workspace core: worktree creation, default branch/remote, copied files, setup script, placeholder naming, context folder.
 6. **Complete.** Implement Pi timeline: session creation, event rendering, tool calls, runtime errors, retry/fork actions, composer controls.
 7. **Complete.** Wire terminal dock: replace dock placeholder logs with setup/run output, named terminals, rerun/stop/run controls, PTY lifecycle.
-8. **Mostly complete.** Wire file/diff panel: all-files tree, changes tree, diff body, source filtering, discard controls, and search are live; inline local line comments remain polish.
-9. **Mostly complete.** Wire PR/checks panel: no-PR state, uncommitted state, PR metadata, CI/deployments, comments, todos, ready-to-merge state, and merge confirmation are live; add-review-context-to-Pi remains polish.
-10. Implement repository action preferences: review, create PR, fix errors, resolve conflicts, branch rename, and general Pi instructions.
+8. **Complete.** Wire file/diff panel: all-files tree, changes tree, diff body, source filtering, discard controls, and search are live. Inline local line comments shipped with the rich diff viewer (THE-152, #151, `diff-viewer/diff-comment-thread.tsx`); #211 unified the file preview, turn diff, and workspace file diff behind one code surface.
+9. **Complete.** Wire PR/checks panel: no-PR state, uncommitted state, PR metadata, CI/deployments, comments, todos, ready-to-merge state, and merge confirmation are live. PR comment bodies are readable in-app (#209) and open as their own tab (#207, #208); the deployed-build preview link is wired (#196, #197); merge conflicts surface in the panel with a "Resolve" action that hands the conflict to the agent (#215); resolved review comments render struck through and bulk-add sends only the unresolved ones (#234).
+10. Implement repository action preferences: review, create PR, fix errors, resolve conflicts, branch rename, and general agent instructions.
 11. Add polish/settings parity: appearance previews, keyboard shortcuts, command palette, diagnostics, and source-status polish. Voice remains post-core deferred.
 12. Revisit advanced integrations: Graphite stack support and cloud/remote workspace SSH behavior. Linear issue workflows are v1 scope, and GitHub workflows stay on `gh`/`gh api`.

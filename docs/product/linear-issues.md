@@ -1,8 +1,17 @@
 # Linear Issues
 
-Date: 2026-06-05
+Date: 2026-06-05 (status reviewed 2026-08-08)
 
 These issue templates are ready to copy into Linear. `ENS-*` IDs are local planning IDs for dependencies and can be replaced by Linear issue keys after import.
+
+> **Status (2026-08-08):** Most of `ENS-001`–`ENS-069` has shipped. This file
+> stays the ticket-text archive; per-ticket completion is tracked in
+> `docs/product/implementation-roadmap.md`, not here, so do not read an unmarked
+> template as outstanding work. Two things postdate every template below and have
+> no `ENS-*` node: the agent-control layer (ADR 0040) and Claude Code as a second
+> first-class agent runtime (ADR 0042) — plus plan mode (#184), named run scripts
+> (ADR 0041), branch takeover (#225), and the unified code surface (#211).
+> `ENS-026`–`ENS-035` describe Pi's adapter, not the whole runtime layer.
 
 Current shell alignment:
 
@@ -10,7 +19,7 @@ Current shell alignment:
 - Shared renderer-only shell state lives in Jotai atoms under `src/renderer/state/workspace`, and shared exported shell types live under `src/renderer/types/workbench-shell/` (barrel `index.ts`).
 - Use `docs/product/current-shell-inventory.md` with these issue templates.
 - Future tickets should wire live services into the current sidebar, header, chat/session tab strip, center timeline/composer placement, right PR/review panel, and lower dock.
-- Chat transcript content and prompt/composer behavior remain deferred until Pi runtime integration.
+- Chat transcript content and prompt/composer behavior are implemented against a live agent runtime; the "deferred until Pi runtime integration" note that stood here is no longer true.
 - Some visible command/menu items are placeholders or unresolved; do not infer behavior beyond the inventory and open decisions.
 
 ## ENS-001 Electron App Shell Scaffold
@@ -49,7 +58,7 @@ Verification:
 Source:
 - `docs/adr/0001-electron-react-shadcn.md`
 - `docs/adr/0026-use-file-based-tanstack-routing.md`
-- `docs/product/mvp-sequencing.md`
+- `docs/product/archive/mvp-sequencing.md` (archived)
 - `docs/product/ux-parity.md`
 
 Implementation notes:
@@ -2813,7 +2822,7 @@ Verification:
 - Docs review only.
 
 Source:
-- `docs/product/mvp-sequencing.md`
+- `docs/product/archive/mvp-sequencing.md` (archived)
 - `docs/product/open-decisions.md`
 
 Implementation notes:

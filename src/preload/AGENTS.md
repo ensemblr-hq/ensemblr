@@ -4,8 +4,8 @@ These instructions apply to everything under `src/preload/`.
 
 ## Organization
 
-- Keep `preload.ts` as the Electron preload entrypoint.
-- Put context bridge API construction under `bridge/`.
+- Keep `preload.ts` as the Electron preload entrypoint. It owns the `contextBridge.exposeInMainWorld` calls and nothing else: `window.ensemblr` for the API, plus the best-effort `window.ensemblrInitialShellSnapshot` seed that lets the renderer skip a first round trip.
+- Put context bridge API construction under `bridge/` — `bridge/ensemblr-api.ts` builds the API object, `bridge/index.ts` is its barrel.
 - Do not add unrelated app, renderer, or main-process business logic to preload modules.
 - Import cross-process contracts from `src/shared/`.
 

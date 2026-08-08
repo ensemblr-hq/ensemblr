@@ -1,8 +1,22 @@
 # Dependency Map
 
-Date: 2026-07-18
+Date: 2026-08-08
+
+> **Archived 2026-08-08.** The graph is frozen at the `ENS-*` planning era and is
+> not being redrawn: shipped features including the agent-control layer, plan
+> mode, the Claude Code runtime, named run scripts, branch adoption, and the
+> unified code surface have no node in it. Kept for provenance and no longer
+> maintained. See `docs/product/archive/README.md`.
+>
+> **Live equivalent:** `docs/product/implementation-roadmap.md` — its *Milestone
+> Dependencies* section carries the ordering constraints this map's Critical Path
+> restates, and its *Completed Implementation* tables carry shipped state with
+> PR/commit evidence. For the shipped shell itself, use
+> `docs/product/current-shell-inventory.md`.
 
 This map was generated from the local planning IDs in `docs/product/linear-issues.md`. The Mermaid graph remains useful as historical planning structure; use `docs/product/current-shell-inventory.md` and `docs/product/implementation-roadmap.md` for shipped-state details. Replace `ENS-*` IDs with Linear issue keys after import.
+
+> **The graph predates two structural changes and is not being redrawn.** (1) ADR 0040 added an agent-control layer (#166–#194) that has no `ENS-*` node; it depends on the workspace, terminal, review, and agent-session services and gates every op behind the workspace permission mode. (2) ADR 0042 added Claude Code as a second agent runtime (#226–#237), so milestone 4's `ENS-026`–`ENS-035` nodes describe Pi's adapter, not the whole runtime layer — the shared contract now sits above both adapters in `src/main/agent-runtime/`. Read the graph as planning history.
 
 ## Critical Path
 
@@ -10,11 +24,11 @@ This map was generated from the local planning IDs in `docs/product/linear-issue
 - The current shell has moved beyond fixture-only UI: repository/workspace navigation, Pi timeline/composer, terminal/script panes, All files, Changes/diff, GitHub PR/check metadata, Linear integration, settings, and the dashboard board now wire live TanStack Query/IPC data into the established regions. Navigation remains file-based TanStack routing with loader-driven data and redirects (see `docs/adr/0026-use-file-based-tanstack-routing.md`).
 - Setup/config (`ENS-009` through `ENS-016`) unblocks ready-state gating, Pi executable/RPC checks, `gh`, env/secrets, repository config, and safe root changes.
 - Workspace core (`ENS-017` through `ENS-025`) replaces fixture shell data with live repository/workspace records and unblocks Pi sessions, terminal/scripts, Linear workspace creation, and GitHub review flows while preserving current navigation, pinning, context-menu, header, and open-target affordances.
-- Pi runtime (`ENS-026` through `ENS-035`, plus `ENS-075`) unblocks agent timeline, checkpoints, context-to-Pi, and agent-assisted review/PR work.
+- Pi runtime (`ENS-026` through `ENS-035`, plus `ENS-075`) unblocked the agent timeline, checkpoints, context-to-chat, and agent-assisted review/PR work — all shipped. The runtime layer has since been generalised: `src/main/agent-runtime/` owns the adapter contract and session persistence, with `pi-agent/` and `claude-agent/` as siblings (ADR 0042). Plan mode (#184) and the agent-control layer (ADR 0040) sit on top of that shared contract, not on Pi.
 - Terminal/scripts (`ENS-036` through `ENS-042`) now has live setup/run execution in fixed dock panes, terminal sessions, process status, sanitized shell-derived env, workspace toolchain `PATH`, and `ENSEMBLR_*` injection. Archive-script and spotlight-testing edges remain separate lifecycle/discovery work.
 - Linear (`ENS-043` through `ENS-049`) depends on Keychain/SQLite/setup surfaces and workspace core for workspace-from-issue.
-- GitHub/review (`ENS-050` through `ENS-060`) now wires live All files, Changes/diff, Checks, PR status, comments, todos, and merge confirmation across the existing right-panel/header regions; inline line comments and richer add-review-context-to-Pi flows remain polish.
-- Settings/polish (`ENS-061` through `ENS-069`, plus `ENS-076`) has implemented app/repo settings boundaries for General, Models, Git, Appearance, Environment, Integrations, Diagnostics, Experimental, Advanced, and repository pages; remaining work should refine source diagnostics and command/deep-link polish.
+- GitHub/review (`ENS-050` through `ENS-060`) is complete across the existing right-panel/header regions: live All files, Changes/diff, Checks, PR status, comments, todos, and merge confirmation, plus inline line comments (THE-152, #151), resolved-comment strike-through and unresolved-only bulk-add (#234), readable PR comment bodies (#209), a unified code surface (#211), a target-branch selector (#216), and merge-conflict surfacing (#215).
+- Settings/polish (`ENS-061` through `ENS-069`, plus `ENS-076`) has implemented app/repo settings boundaries for General, Models, Providers, Git, Appearance, Environment, Integrations, Diagnostics, Experimental, Advanced, and repository pages. Providers returned in #226 as the per-runtime agent surface, and the repo Scripts page now writes the committed `.ensemblr/settings.toml` directly (ADR 0041). Remaining work should refine source diagnostics and command/deep-link polish.
 - Deferred issues (`ENS-070` through `ENS-074`) should not block core milestones.
 
 ## Mermaid Graph
@@ -404,4 +418,5 @@ flowchart TD
 - `ENS-075` and `ENS-076` use appended local IDs but should be imported in their logical milestone order.
 - Keep discovery tickets separate from build tickets so ambiguous API/schema behavior does not block unrelated implementation.
 - Do not create actual Linear issues until explicitly asked.
-- Current shell uncertainties that should not be guessed in implementation tickets: workspace-row status target, mark-unread semantics, and the Changes tab Review action.
+- The three former shell uncertainties are resolved: workspace-row **Set status** is local dashboard board state, **Mark unread/read** is a local attention marker, and the Changes tab **Review** button starts the repository `review` agent action.
+- Work that shipped without an `ENS-*` node, and so has no place in the graph above: the agent-control layer (ADR 0040), plan mode (#184), named run scripts (ADR 0041), branch takeover (#225), the unified code surface (#211), and the Claude Code runtime (ADR 0042).

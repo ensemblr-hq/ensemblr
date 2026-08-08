@@ -1,6 +1,10 @@
 # Docs Consistency Audit
 
-Date: 2026-07-18
+Date: 2026-08-08
+
+This file is append-only: each pass adds a dated section rather than rewriting
+the ones above it. Earlier sections describe what was true when they were
+written. Read the newest section first.
 
 ## Summary
 
@@ -11,7 +15,7 @@ The generated planning docs are broadly consistent with the latest accepted ADRs
 - `CONTEXT.md`
 - `docs/adr/*.md`
 - `docs/product/conductor-parity.md`
-- `docs/product/mvp-sequencing.md`
+- `docs/product/archive/mvp-sequencing.md` (archived)
 - `docs/product/onboarding-flow.md`
 - `docs/product/open-decisions.md`
 - `docs/product/screen-inventory.md`
@@ -69,7 +73,7 @@ file-based TanStack routing. Docs were realigned to that reality.
 - `docs/product/ux-parity.md`: clarified path vs search route state and
   per-workspace dock/review/chat persistence.
 - `docs/product/open-decisions.md`: added renderer routing to resolved decisions.
-- `docs/product/dependency-map.md`: noted file-based routing for the shell regions.
+- `docs/product/archive/dependency-map.md` (archived): noted file-based routing for the shell regions.
 - `docs/product/linear-issues.md`: aligned the shell-scaffold (ENS-001) and
   sidebar-navigation (ENS-020) ticket text with the routing reality.
 
@@ -186,3 +190,116 @@ decision docs were last substantively aligned before the Ensemblr rename pass
 - Inline line-comment UX and add-review-context-to-Pi flows remain future review
   polish.
 - Live Linear `THE-*` ticket syncing was not attempted in this refresh.
+
+## 2026-08-08 Product And Decision Docs Refresh
+
+Scope: `docs/product/**`, `docs/adr/**`, `docs/refactor/**` only. The root
+`README.md`, `CHANGELOG.md`, `docs/architecture-map.md`, the `AGENTS.md` family,
+and the agent-control/harness docs were out of scope for this pass and were not
+inspected.
+
+### Classification
+
+Only **living** docs were edited.
+
+| Class | Files |
+| --- | --- |
+| Living | `conductor-parity.md`, `current-shell-inventory.md`, `settings-inventory.md`, `ux-parity.md`, `open-decisions.md`, `implementation-roadmap.md`, `linear-milestones.md`, `linear-issues.md`, `docs-consistency-audit.md` |
+| Historical record | all 42 ADRs; `screen-inventory.md` (Conductor screenshot evidence, self-declared); `scaffold-audit-2026-06-04.md`, `settings-wiring-review-2026-07-14.md` (dated snapshots); `discovery-preview-url-detection.md`, `discovery-spotlight-testing.md`, `github-gh-discovery.md`, `linear-api-discovery.md` (closed discovery notes); `docs/refactor/composition-refactor-plan.md` (marked Landed 2026-06-07) |
+| Archived | `mvp-sequencing.md` and `dependency-map.md`, moved to `docs/product/archive/` on 2026-08-08 — both were living but spent, and the retirement recommendation below was acted on. |
+| Obsolete | none outright. |
+
+### Changes reviewed since `166b0e2` (2026-07-18)
+
+- `2d6503f` … `27f7b5b` (#166–#194, #224): the agent-control layer — loopback MCP
+  plus Pi `POST /invoke`, role-aware orchestration, sub-agent naming/status,
+  durable role scoping, transcript audit, cascade stops, `ask_user_question`.
+  Recorded as ADR 0040.
+- `c44bd8f`, `4773a7d`, `d87062e` (#184, #191, #218): plan mode for conversations.
+- `b87280b`, `5e1e175`, `e36b3f1` (#185–#188): timeline rebuilt around tool
+  presentation descriptors; session naming rebuilt.
+- `6ff6a98` … `df016b8` (#196, #197, #207–#209): PR comment reading, ephemeral
+  preview tab reuse, preview link to the deployed build.
+- `d2cacbb`, `cbed051` (#211, #212): one code surface behind file preview, turn
+  diff, workspace diff, and PR diff.
+- `e8b2fe2`, `915f017` (#215, #216): merge-conflict surfacing and a per-workspace
+  target-branch selector.
+- `5e28b06`, `c7b5387`, `b1f73fa` (#220, #222, #223): named run scripts per
+  repository. Recorded as ADR 0041.
+- `b0eeba5` (#225): a workspace takes over an existing branch instead of always
+  forking.
+- `069cd0b` … `4fbeb65` (#226–#237): Claude Code as a second first-class agent
+  runtime. Recorded as ADR 0042.
+
+### Fixes applied
+
+- `settings-inventory.md`: corrected the **"There is no Providers screen
+  (removed)"** claim — `/settings/providers` exists again as the agent-runtime
+  surface (#226). Rewrote the Providers section, added the plan-mode and
+  Providers entries to Open Settings Questions, and moved the date to 2026-08-08.
+- `ux-parity.md`: same Providers correction; added a multi-runtime status banner;
+  rewrote the "Pi-Specific Changes" table so its rows describe two runtimes;
+  marked checklist items 8 and 9 complete (inline line comments and
+  add-review-context shipped); added plan mode, the target-branch selector, and
+  merge-conflict surfacing to the panel and timeline contracts.
+- `open-decisions.md`: added a **Resolved Since 2026-07-21** section closing
+  eleven decisions (second runtime, Providers, plan mode, branch takeover, target
+  branch, inline comments, add-review-context, named run scripts, preview URLs,
+  spotlight testing, unified code surface); pruned the discovery list to what is
+  genuinely open; promoted the two real product decisions (spotlight dirty-root
+  override, loopback log parsing) into **Needs Product Decision**.
+- `current-shell-inventory.md`: replaced the Pi-only composer paragraph with the
+  two-runtime contract; emptied **Current Unknowns** of the inline-comment item.
+- `conductor-parity.md`: added a runtime-parity banner; renamed **Pi Agent
+  Runtime** to **Agent Runtime** and rewrote its rows; marked workspace creation,
+  diff viewer, comments, and comments-to-chat as implemented.
+- `implementation-roadmap.md`: added a **Completed since 2026-07-18** table with
+  twelve rows and PR/commit evidence; added the Claude runtime to the scope
+  baseline; replaced `PiAgentClient` with `AgentClient` in the workstream rules;
+  annotated `ENS-035`/`ENS-041`/`ENS-042`/`ENS-056` as answered or mostly
+  answered; rewrote **Decision Needed**.
+- `dependency-map.md`: added a banner explaining that the Mermaid graph predates
+  the agent-control layer and the second runtime and is not being redrawn; listed
+  the six shipped items that have no `ENS-*` node; resolved the three shell
+  uncertainties.
+- `linear-milestones.md`: added a milestone-by-milestone status banner; renamed
+  milestone 4 to **Agent Runtime and Timeline**; annotated exit criteria in
+  milestones 3, 4, 5, 7, and 8.
+- `mvp-sequencing.md`: added a status banner marking milestones 0–4 complete and
+  naming the two overtaken lines.
+- `linear-issues.md`: two targeted edits only (a status banner and the stale
+  "deferred until Pi runtime integration" bullet). The 2,900+ ticket templates
+  were left untouched.
+
+### ADR gaps identified (no ADRs written)
+
+Three shipped decisions are architecturally significant and have no ADR: the
+workspace `branchPlan` adopt/create model (#225), plan mode's layered
+fail-closed enforcement (#184), and the unified code surface (#211). ADR 0041
+was checked and *does* cover the multi-script `[scripts.run.<name>]` model, so
+named run scripts are **not** a gap. ADR 0022 already carries its
+`Superseded by 0039` note. No existing ADR was edited.
+
+### Not done
+
+- No new ADRs were written; the gaps above are reported for a decision on
+  whether to record them.
+- Live Linear `THE-*` tickets were not touched, and no `THE-` key was invented.
+  The keys present in commit history are `THE-102`, `THE-105`–`THE-110`,
+  `THE-113`, `THE-115`–`THE-130`, `THE-135`, `THE-136`, `THE-141`–`THE-150`,
+  `THE-152`, `THE-158`, and `THE-175`.
+- Docs outside `docs/product/`, `docs/adr/`, and `docs/refactor/` were not read
+  or edited.
+
+### Remaining ambiguities
+
+- ~~Whether `mvp-sequencing.md` and `dependency-map.md` should be retired rather
+  than carried as living docs — both are now mostly planning history.~~
+  **Resolved 2026-08-08:** both were moved to `docs/product/archive/` with
+  archive banners; see `docs/product/archive/README.md`.
+- Whether `linear-issues.md` should keep per-ticket text at all now that the
+  roadmap tracks completion.
+- Browser control and compaction UI remain the only unanswered parts of
+  `ENS-035`.
+- Review-thread and comment *mutation* coverage through `gh`/`gh api` is still
+  unverified (`ENS-056`).

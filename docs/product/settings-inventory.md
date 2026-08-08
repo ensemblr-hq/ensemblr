@@ -1,15 +1,15 @@
 # Settings Inventory
 
-Date: 2026-07-19
+Date: 2026-08-08
 
 This inventory reflects the settings screens as implemented in code. It separates
 app-wide settings from repository settings and assigns each setting to the right
 persistence layer.
 
-App-scope sections (`settings-sidebar.tsx`): **General, Models, Environment, Git,
-Appearance, Integrations** in the main group, and **Diagnostics, Experimental,
-Advanced** under "More". Repo-scope sections: **Environment, Git, Scripts,
-Actions, Misc**. There is no Providers screen (removed).
+App-scope sections (`settings-sidebar.tsx`): **General, Models, Providers,
+Environment, Git, Appearance, Integrations** in the main group, and
+**Diagnostics, Experimental, Advanced** under "More". Repo-scope sections:
+**Environment, Git, Scripts, Actions, Misc**.
 
 ## Storage Legend
 
@@ -65,11 +65,19 @@ Removed (Pi has no out-of-the-box support — verified against pi 0.79.1 docs an
 
 ### Providers
 
-**Removed.** The standalone Providers screen (route, sidebar entry, and command-palette
-entry) was deleted. Provider/auth setup is owned by Pi itself — Ensemblr does not store
-provider tokens or duplicate Pi's provider configuration. The readiness checks that screen
-surfaced (Pi runtime, Pi model provider, GitHub CLI) still live in **Diagnostics**, sourced
-from the setup-diagnostics gate.
+**Reinstated 2026-08-07 (#226) as the agent-runtime surface.** The screen was
+removed in the 2026-07-19 pass, when Pi was the only runtime and provider/auth
+setup was entirely Pi's. ADR 0042 added Claude Code as a second first-class
+runtime, so `/settings/providers` (`agent-providers/agent-providers-section.tsx`)
+now renders one tab per registered runtime — Claude Code leads, Pi follows in
+registry order — over `listAgentProviderDescriptors()` from
+`src/shared/agent-provider`. Each tab shows that runtime's executable row,
+readiness checks, signed-in accounts, and settings-file location, and the
+section-level Refresh re-probes whichever tab is open. Terminal harnesses
+(Codex, Vibe) are not agent providers and never appear here.
+
+Ensemblr still stores no provider tokens: each runtime keeps its own
+credentials, and the aggregate setup gate remains in **Diagnostics**.
 
 ### Diagnostics
 
@@ -275,4 +283,6 @@ For app-wide behavior, use:
 ## Open Settings Questions
 
 - Resolved (pi 0.79.1): plan mode is extension-only, fast mode and browser control have no core support, personality has no Pi concept — all dropped from the Models settings screen. Review-model separation is supported via a separate spawned session with its own `--model`.
-- No active settings product question remains from the 2026-07-19 refresh. Known implementation gaps are tracked in `settings-wiring-review-2026-07-14.md`; new settings work should update both documents when a value moves between `config.json`, SQLite, localStorage, repository config, or Keychain.
+- Resolved 2026-07-28 (#184): plan mode ships as a **per-chat toggle (⌥⇧P), not a setting**. There is still no "Default plan mode" row on Models. Pi enforcement runs through the shipped extension's `tool_call` hook against the shared classifier in `src/shared/plan-mode/`; Claude Code uses its own native plan mode (ADR 0042, decision 3).
+- Resolved 2026-08-07 (#226, ADR 0042): the Providers screen is back, now scoped to agent runtimes rather than model providers. Model/thinking defaults on **Models** stay app-wide; per-runtime executable, readiness, accounts, and settings-file location live on **Providers**.
+- No active settings product question remains from the 2026-08-08 refresh. Known implementation gaps are tracked in `settings-wiring-review-2026-07-14.md`; new settings work should update both documents when a value moves between `config.json`, SQLite, localStorage, repository config, or Keychain.

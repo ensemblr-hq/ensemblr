@@ -9,21 +9,37 @@ a place a team of agents runs itself.
 
 It is available to every agent species Ensemblr can run:
 
-- **Pi** (first-party) gets the tools through a shipped Pi extension.
-- **Claude Code**, **Codex**, and **Vibe** get them through an embedded MCP
-  server that Ensemblr auto-configures at launch. Vibe has no MCP-config flag, so
-  its server arrives as a `VIBE_MCP_SERVERS` env prefix — see
-  [`harnesses.md`](./harnesses.md).
+- **Pi**, a first-class agent runtime on the chat surface, gets the tools through
+  a shipped Pi extension.
+- **Claude Code**, the other first-class runtime, gets them over the same MCP
+  endpoint the harnesses use, because the Agent SDK is a native MCP client.
+- **Terminal harnesses** — the `claude` TUI, Codex, and Vibe — get them through
+  that MCP endpoint too, auto-configured into the launch command. Vibe has no
+  MCP-config flag, so its server arrives as a `VIBE_MCP_SERVERS` env prefix.
+
+Claude Code appears twice on that list and the two are different callers, not one
+— see [`harnesses.md`](./harnesses.md). Which surface a caller gets is decided by
+what it *is* (`ControlAudience`: does it drive a chat tab, and is it a root or a
+spawned child), never by which runtime it names.
 
 ## How it works
 
 Ensemblr runs a small control server on `127.0.0.1` (loopback only, ephemeral
-port). Pi reaches it via the shipped extension (`POST /invoke`); MCP-client
-harnesses reach it via an MCP endpoint (`POST /mcp`). Every request carries a
-per-workspace bearer token that Ensemblr injects into the agent's environment —
-the agent never supplies its own identity. One service validates the request,
-enforces scope and permissions, applies guardrails, and delegates to the app's
-existing services.
+port), serving three routes: `POST /invoke` (plain JSON, for the shipped Pi
+extension), `POST /mcp` (MCP streamable HTTP, for every MCP client), and
+`GET /health`. The MCP endpoint is stateless — a fresh server and transport per
+request — which is what lets the tool list and the playbook be cut to the caller
+on every connection.
+
+Every request carries a bearer token that Ensemblr injects into the agent's
+environment; the agent never supplies its own identity. An **agent conversation**
+is registered per session, so its origin carries real lineage (`parentSessionId`,
+`depth`) and the guardrails below have something to count. A **terminal** —
+including a harness — shares one workspace-level origin (`ws:<workspaceId>`),
+because a PTY has no session the app mints a token for; that is also why a
+harness cannot be told which agent runtime it is. One service validates the
+request, resolves the origin from the token, enforces scope and permissions,
+applies guardrails, and delegates to the app's existing services through ports.
 
 The architecture decision is [ADR 0040](./adr/0040-use-loopback-control-server-for-agent-app-control.md);
 the full design record is [`considerations/agent-control-layer.md`](./considerations/agent-control-layer.md).
@@ -42,6 +58,14 @@ gates the agent's local tool use):
 Scope is enforced regardless of mode: **writes act only on the caller's own
 workspace**, while **reads may span all open workspaces**. Expect and handle
 denials gracefully — a write can always be refused by the mode.
+
+The write set is `WRITE_OPS` in `src/shared/agent-control/contracts.ts`, and
+three ops that look like writes are deliberately outside it. `askUserQuestion`
+and `notifyOrchestrator` only move prose to a human or an orchestrator, so an
+agent in `read-only` mode can still ask and still escalate. `exitPlanMode` writes
+a plan file yet is exempt too: it is the only exit from Plan Mode, so gating it
+would strand a planning agent with every editing tool denied and no way out — it
+is gated on active Plan Mode instead.
 
 ## Guardrails
 
@@ -76,74 +100,215 @@ root, and got the whole surface back — while `notifyOrchestrator`, its one
 sanctioned escape hatch, broke on the same missing lineage. `notifyOrchestrator`
 now keys off the marker too, so the two move together.
 
-`waitForAgents` and `listModels` are not denied — a sub-agent simply has no
-children to wait on and no spawn to pick a model for. They are withheld from its
-tool list along with the thirteen above, because listing a tool the service would
-only refuse teaches the model to keep reaching for it. The Pi extension registers
-the complement of `SUBAGENT_WITHHELD_OPS` for a child, and a parity test compares
-its copy of that set against the shared one.
+`waitForAgents`, `listModels`, and `listRunScripts` are not denied — a sub-agent
+simply has no children to wait on, no spawn to pick a model for, and no
+`startTerminal` to pick a run script for. Those three (`SUBAGENT_UNUSABLE_OPS`)
+are withheld from its tool list along with the thirteen above, because listing a
+tool the service would only refuse teaches the model to keep reaching for it. The
+Pi extension registers the complement of `SUBAGENT_WITHHELD_OPS` — sixteen ops in
+all — for a child, and a parity test compares its copy of that set against the
+shared one.
 
 What a sub-agent keeps: every read, `focusTab`/`focusDockTab`/`focusPanel`,
 `setName`, `setSummary`, and `notifyOrchestrator`.
 
-## What an agent can do
+## The chat-tab axis
 
-The `ensemblr_*` tools group into a few families (see the
-[orchestration playbook](./considerations/agent-orchestration-playbook.md) for
-the exact argument shapes):
+Withholding runs on two axes, folded into one answer by `withheldControlOps`
+(`src/shared/agent-control/subagent-policy.ts`). The second is `CHAT_TAB_ONLY_OPS`
+— `setName`, `setSummary`, `askUserQuestion`, and `exitPlanMode` — which the
+service refuses to any caller that drives no native chat tab. That is a property
+of the **caller**, not of a runtime: a terminal harness owns a tab that titles
+itself from its own session log, so all four would have nothing to act on, while
+every first-class runtime on the chat surface (Pi and Claude Code alike) holds
+them. `ControlAudience` carries exactly the two facts — `hasChatTab` and `role` —
+so a runtime added later selects its surface by declaring them rather than by
+being named.
 
-- **Conversations** — open a chat tab and start a Pi sub-agent, steer it, name
-  your own tab, close a tab.
-- **Harnesses** — launch Claude Code or Codex in a terminal tab.
-- **Terminals** — start/stop the setup, run, or a spawn terminal; write to it;
-  read its output.
-- **Focus & inspect** — bring a tab, dock terminal, or the Files/Changes/Checks
-  panel forward; list workspaces, tabs, terminals, and models; read a
-  conversation's status or last message.
-- **Board** — move the workspace across the dashboard board and read its status.
-- **Review** — read the workspace diff (`ensemblr_get_workspace_diff`), read the
-  review comments on it (`ensemblr_get_diff_comments`), leave comments of your
-  own (`ensemblr_add_diff_comments`), and close the ones you have fixed
-  (`ensemblr_resolve_diff_comments`). All four act on the caller's own
-  workspace; none takes a workspace argument. See below.
-- **Ask the user** — put a multiple-choice question to the human and block until
-  they answer. Pi-only: the questionnaire renders in the chat tab that asked, in
-  place of the composer, so the answer lands where the question came from. A
-  harness caller has no such tab and is refused with `denied-scope`.
+## Tool reference
 
-  One questionnaire per session at a time: a second call while one is on screen
-  comes straight back unanswered rather than replacing it.
+Thirty-four tools, enumerated from `TOOL_DEFS` in
+`src/main/agent-control/mcp-endpoint.ts`. The argument names and types below are
+the authoritative Zod schemas in `src/shared/agent-control/schemas.ts` — every
+schema is a `strictObject`, so an argument not listed here is rejected as
+`invalid-args` with the accepted keys named in the reply. Required arguments are
+in **bold**; the rest are optional. Result shapes are in
+`src/shared/agent-control/contracts.ts`.
 
-  There is no timeout. The call is held until the user answers or dismisses it,
-  the asking turn ends, or the session does — a question left overnight is still
-  waiting in the morning. The transport has to hold too, which is why the Pi
-  extension posts over `node:http` rather than `fetch`: Node's `fetch` is undici,
-  whose `headersTimeout` defaults to five minutes, and it used to abort the call
-  while the dialog stayed on screen, so the answer the user eventually gave was
-  written to a dead socket and lost. Do not "tidy" that back to `fetch`.
+Every row is held against those modules by
+`tests/main/agent-control-doc-parity.test.ts`, which reads each argument out of
+its own backtick span. Keep one span per argument, keep the bold and the `?`
+saying the same thing, and write an enum's options exactly as its schema orders
+them; a row the parser cannot read fails the test rather than going unchecked.
 
-  A turn that ends before the user answers takes its questionnaire off screen:
-  the socket closes unanswered, `/invoke` aborts the op, and the coordinator
-  withdraws it. Without that the card would outlive its asker, look live, and
-  block the session's next question forever.
+**Gate** reads: `write` follows the workspace permission mode and acts only on
+the caller's own workspace; `read` is allowed in every mode and may span
+workspaces; `spawn` additionally spends depth, quota, and rate budget.
+**Withheld from** names the callers whose tool list omits it — `sub-agent`
+(denied by role, `denied-scope`), `sub-agent*` (withheld as unusable, still
+dispatchable), `no chat tab` (a terminal harness).
 
-  The reverse also has to hold: a window that reloads loses the card but not the
-  call, since the renderer keeps its pending questions in memory only. Main
-  re-announces every open questionnaire on `did-finish-load`, so the card comes
-  back rather than leaving the agent blocked on something nobody can see.
+### Conversations and delegation
 
-  The withdrawn case, the concurrent-ask case, and the no-window case each
-  resolve with a `summary` that tells the agent it was not a decline, so it can
-  retry rather than act on a refusal that never happened. Main renders that
-  `summary` from the answers it validated — the renderer never supplies prose.
+| Tool | Arguments | Gate | Withheld from |
+| --- | --- | --- | --- |
+| `ensemblr_spawn_chat_tab` | `title?: string` | write, spawn | sub-agent |
+| `ensemblr_start_conversation` | **`prompt: string`**, `chatTabId?: string`, `model?: string`, `thinkingLevel?: string`, `title?: string`, `wait?: boolean` | write, spawn | sub-agent |
+| `ensemblr_send_follow_up` | **`agentSessionId: string`**, **`prompt: string`**, `wait?: boolean` | write | sub-agent |
+| `ensemblr_wait_for_agents` | `targets?: string[]`, `mode?: 'first' \| 'all'`, `reports?: 'full' \| 'brief'`, `timeoutMs?: number` | read | sub-agent\* |
+| `ensemblr_notify_orchestrator` | **`reason: 'need_decision' \| 'blocked' \| 'progress' \| 'done'`**, **`message: string`** | read | — |
+| `ensemblr_list_models` | *(none)* | read | sub-agent\* |
+| `ensemblr_close_tab` | **`chatTabId: string`** | write | sub-agent |
 
-  Length rules are asymmetric on purpose. An over-long option **label** is
-  rejected, because the label is rendered and truncating it would change the
-  choice. An over-long question **header** is **trimmed**, because it is only the
-  accessible name of a pager dot — rejecting the batch over it cost a round trip
-  and bought nothing. Headers no longer have to be distinct either: `headerOf`
-  leads every label with its `Q<n>` position, so the pager is unambiguous however
-  the agent worded them.
+`waitForAgents` and `notifyOrchestrator` are reads, so they survive `read-only`
+mode — a blocked child can still reach its orchestrator when every write is
+refused.
+
+### Harnesses, terminals, and run scripts
+
+| Tool | Arguments | Gate | Withheld from |
+| --- | --- | --- | --- |
+| `ensemblr_launch_harness` | **`harnessId: string`** | write, spawn | sub-agent |
+| `ensemblr_start_terminal` | **`kind: 'setup' \| 'run' \| 'spawn'`**, `scriptName?: string` | write, spawn | sub-agent |
+| `ensemblr_list_run_scripts` | *(none)* | read | sub-agent\* |
+| `ensemblr_stop_terminal` | `terminalId?: string`, `kind?: 'setup' \| 'run'` — exactly one | write | sub-agent |
+| `ensemblr_write_terminal` | **`terminalId: string`**, **`input: string`** | write | sub-agent |
+| `ensemblr_read_terminal_output` | **`terminalId: string`** | read | — |
+
+`scriptName` is accepted only with `kind: 'run'`; any other pairing is rejected.
+See [Run scripts](./considerations/agent-orchestration-playbook.md#run-scripts).
+
+### Tabs, focus, and the board
+
+| Tool | Arguments | Gate | Withheld from |
+| --- | --- | --- | --- |
+| `ensemblr_open_tab` | **`variant: 'file' \| 'diff' \| 'comment'`**, `filePath?: string`, `turnId?: string`, `commentBody?: string`, `prNumber?: number` | write, spawn | sub-agent |
+| `ensemblr_focus_tab` | **`chatTabId: string`** | write | — |
+| `ensemblr_focus_dock_tab` | `terminalId?: string`, `kind?: 'setup' \| 'run'` — exactly one | write | — |
+| `ensemblr_focus_panel` | **`panel: 'files' \| 'changes' \| 'checks'`** | write | — |
+| `ensemblr_set_workspace_status` | **`status: 'backlog' \| 'in-progress' \| 'in-review' \| 'done' \| 'canceled'`** | write | sub-agent |
+| `ensemblr_get_workspace_status` | *(none)* | read | — |
+| `ensemblr_list_workspaces` | *(none)* | read | — |
+| `ensemblr_list_tabs` | `workspaceId?: string` | read | — |
+| `ensemblr_list_terminals` | `workspaceId?: string` | read | — |
+
+`file`/`diff` tabs need `filePath`; a `comment` tab needs `commentBody`.
+
+### Naming and session record
+
+| Tool | Arguments | Gate | Withheld from |
+| --- | --- | --- | --- |
+| `ensemblr_set_name` | **`title: string`** | write | no chat tab |
+| `ensemblr_set_branch_name` | **`name: string`** (≤ 120 chars), `userRequested?: boolean` | write | sub-agent |
+| `ensemblr_set_summary` | **`title: string`** (≤ 80), **`summary: string`** (≤ 4,000) | write | no chat tab |
+
+### Reading a conversation
+
+| Tool | Arguments | Gate | Withheld from |
+| --- | --- | --- | --- |
+| `ensemblr_get_conversation_status` | **`agentSessionId: string`** | read | — |
+| `ensemblr_get_last_message` | **`agentSessionId: string`** | read | — |
+| `ensemblr_read_conversation` | **`agentSessionId: string`**, `stat?: boolean`, `fromOrdinal?: number`, `ordinal?: number` | read | — |
+
+`stat`, `ordinal`, and `fromOrdinal` are alternatives honoured in that order, not
+a combination. A page caps each field at 2,000 characters and the whole page at
+`MAX_AGENT_PAYLOAD_CHARS`; `ordinal` reads one entry with the field cap lifted to
+the page budget. This is how an orchestrator audits what a child actually ran —
+its tool calls with their arguments and results — rather than trusting the report
+`getLastMessage` hands back.
+
+### Review
+
+| Tool | Arguments | Gate | Withheld from |
+| --- | --- | --- | --- |
+| `ensemblr_get_workspace_diff` | `filePath?: string`, `stat?: boolean` — not both | read | — |
+| `ensemblr_get_diff_comments` | `filePath?: string` | read | — |
+| `ensemblr_add_diff_comments` | **`comments: { filePath: string; lineNumber?: number \| null; body: string }[]`** (1–50, body ≤ 4,000) | write | — |
+| `ensemblr_resolve_diff_comments` | **`commentIds: string[]`** (1–50) | write | — |
+
+All four act on the caller's own workspace and none takes a workspace argument.
+`resolveDiffComments` is refused in Plan Mode. Any `filePath` must be relative to
+the workspace and must not climb out of it — an absolute path, a drive letter, or
+a `..` segment comes back as `invalid-args` rather than reaching git.
+
+### Asking the user, and Plan Mode
+
+| Tool | Arguments | Gate | Withheld from |
+| --- | --- | --- | --- |
+| `ensemblr_ask_user_question` | **`questions: { question: string; header?: string; options: { label: string; description? }[]; multiSelect?: boolean }[]`** (1–4 questions, 2–6 options each) | read | no chat tab, sub-agent |
+| `ensemblr_exit_plan_mode` | **`title: string`** (≤ 80), **`plan: string`** (≤ 60,000) | read | no chat tab, sub-agent |
+
+Both are reads rather than writes, so neither is blocked by `read-only` mode.
+Option labels must be distinct within a question and must not collide with the
+labels the dialog reserves for its own rows (`other`, `next`, `type something`);
+questions must be distinct within a call.
+
+### Not served over MCP
+
+`getSessionBrief` and `checkPlanModeTool` are control ops with no entry in
+`TOOL_DEFS`. They are the Pi extension's own per-turn hooks — the extension pulls
+the upkeep block over `getSessionBrief` on `before_agent_start` and asks
+`checkPlanModeTool` whether a built-in tool call is allowed while planning — so
+nothing reaches them over MCP. A first-class runtime driven over MCP has its
+system prompt fixed at session open and receives the same upkeep block through
+`resolveTurnPreamble` instead.
+
+### Choosing a model for a child
+
+A spawn never crosses the **agent runtime** axis (`pi` | `claude`), which is
+distinct from a model's inference **vendor** (`anthropic`, `openai`,
+`claude-code`) — `listModels` returns both on every entry precisely because the
+two were once called "provider" and got compared by accident. A child is pinned
+to its caller's runtime: `startConversation` passes the caller's own
+`callerRuntime` to the port, and a `model` belonging to the other runtime comes
+back as `invalid-args` naming both runtimes rather than being substituted. No
+tab, session, or spawn budget is consumed by that refusal.
+
+Called from a chat tab, `listModels` is already cut to the caller's runtime and
+`model` may be omitted to inherit the caller's own. Called from a terminal
+harness it carries every runtime — the app cannot tell which one the caller is,
+because a harness origin is minted per workspace — which is also why `model` is
+**mandatory** there and omitting it is refused rather than defaulted.
+
+## How the questionnaire behaves
+
+The questionnaire renders in the chat tab that asked, in place of the composer,
+so the answer lands where the question came from. A caller with no chat tab is
+refused with `denied-scope`.
+
+One questionnaire per session at a time: a second call while one is on screen
+comes straight back unanswered rather than replacing it.
+
+There is no timeout. The call is held until the user answers or dismisses it,
+the asking turn ends, or the session does — a question left overnight is still
+waiting in the morning. The transport has to hold too, which is why the Pi
+extension posts over `node:http` rather than `fetch`: Node's `fetch` is undici,
+whose `headersTimeout` defaults to five minutes, and it used to abort the call
+while the dialog stayed on screen, so the answer the user eventually gave was
+written to a dead socket and lost. Do not "tidy" that back to `fetch`.
+
+A turn that ends before the user answers takes its questionnaire off screen:
+the socket closes unanswered, `/invoke` aborts the op, and the coordinator
+withdraws it. Without that the card would outlive its asker, look live, and
+block the session's next question forever.
+
+The reverse also has to hold: a window that reloads loses the card but not the
+call, since the renderer keeps its pending questions in memory only. Main
+re-announces every open questionnaire on `did-finish-load`, so the card comes
+back rather than leaving the agent blocked on something nobody can see.
+
+The withdrawn case, the concurrent-ask case, and the no-window case each
+resolve with a `summary` that tells the agent it was not a decline, so it can
+retry rather than act on a refusal that never happened. Main renders that
+`summary` from the answers it validated — the renderer never supplies prose.
+
+Length rules are asymmetric on purpose. An over-long option **label** is
+rejected, because the label is rendered and truncating it would change the
+choice. An over-long question **header** is **trimmed** at 64 characters, because
+it is only the accessible name of a pager dot — rejecting the batch over it cost
+a round trip and bought nothing. Headers no longer have to be distinct either:
+`headerOf` leads every label with its `Q<n>` position, so the pager is
+unambiguous however the agent worded them.
 
 ## Argument naming
 
@@ -163,7 +328,8 @@ rules that decide most cases:
 - **`title`** — the human-readable label of a UI surface or an artifact: a chat
   tab, a plan, a summary. Never `name`.
 - **`name`** — the identity of a durable, addressable thing: the workspace and
-  its git branch. Qualified where the bare word would be ambiguous (`scriptName`).
+  its git branch, a run script. Qualified where the bare word would be ambiguous
+  (`scriptName`).
 - **`<noun>Id`** — an opaque identifier: `chatTabId`, `agentSessionId`,
   `terminalId`, `workspaceId`, `harnessId`, `turnId`.
 - **`filePath`** — a workspace-relative path, everywhere. Never `file` or `path`.
@@ -174,10 +340,13 @@ Scope is the agent-facing surface only. The main-process ports behind it keep
 their own vocabulary, and the service maps between the two at dispatch.
 
 **Near misses are forgiven, not rejected.** `AGENT_CONTROL_ARG_ALIASES` maps the
-spellings a tool's own name invites — `set_name` invites `name`,
-`set_branch_name` invites `slug` — onto the canonical key, and `validateArgs`
-rewrites them before the schema runs. A canonical key sent alongside an alias
-wins. The rewrite is silent on purpose: the canonical key already travels to the
+spellings a tool's own name invites onto the canonical key, and `validateArgs`
+rewrites them before the schema runs. Two families of alias exist today:
+`name → title` on the five ops whose own name invites it (`setName`,
+`setSummary`, `spawnChatTab`, `startConversation`, `exitPlanMode`), plus
+`branchName`/`slug → name` on `setBranchName`; and `file`/`path → filePath` on
+the three ops that take a path (`getWorkspaceDiff`, `getDiffComments`,
+`openTab`). A canonical key sent alongside an alias wins. The rewrite is silent on purpose: the canonical key already travels to the
 model in the tool schema, so an error would cost a round trip to teach what the
 description said. When a key really is unknown, the failure names the keys the op
 does accept, so the retry is informed.
@@ -188,9 +357,9 @@ parameter keys of all three surfaces against one another.
 
 ## Reviewing the diff
 
-The three review ops let an agent read the work in its workspace and annotate it
+The four review ops let an agent read the work in its workspace, annotate it
 where the user will find the annotation — on the line, in the Changes panel, not
-buried in a chat turn.
+buried in a chat turn — and close what it has fixed.
 
 **Scope is the review panel's scope.** `ensemblr_get_workspace_diff` resolves the
 workspace's `base_branch` and diffs from `merge-base(base, HEAD)` to the working
@@ -284,7 +453,10 @@ integrate**:
    wait again if needed.
 4. **Verify** a load-bearing claim before building on it. A child's report is a
    claim, not a fact the orchestrator checked, and a cited path reads as verified
-   even when nobody opened it — both orchestrator playbooks say so outright.
+   even when nobody opened it — both orchestrator playbooks say so outright. When
+   the claim is about what the child *did* rather than what a file says — a suite
+   it ran, a command that passed — `ensemblr_read_conversation` replays its actual
+   tool calls with their arguments and results; probe it with `stat: true` first.
 5. **Integrate** the outcomes and focus the relevant view so the user can
    follow along.
 

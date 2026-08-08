@@ -5,9 +5,11 @@ These instructions apply to everything under `src/shared/`.
 ## Organization
 
 - Shared code is for cross-process contracts and pure helpers used by main, preload, renderer, and tests.
-- Keep public concern entrypoints at the shared root, for example `ipc.ts` and `permissions.ts`.
-- If a shared concern grows past one file, move implementation into a same-named folder and keep the root file as the public entrypoint.
-- Group IPC constants and contract types under `ipc/`.
+- Keep public concern entrypoints at the shared root, for example `permissions.ts` and `agent-provider.ts`.
+- If a shared concern grows past one file, move implementation into a same-named folder and keep the root file as the public entrypoint — `agent-control.ts` + `agent-control/`, and the same pair for `plan-mode`, `scripts`, and `terminal`. Prefer this form over a bare `<concern>/index.ts`: `electron --test` runs through the Node ESM loader, which cannot resolve a directory specifier.
+- `ipc/`, `keymap/`, and `pi-rpc/` use the `<concern>/index.ts` form instead. Leave them as they are.
+- Group IPC constants and contract types under `ipc/`: channel names in `ipc/channels.ts`, request and response types in one module per concern under `ipc/contracts/`.
+- Register a new multi-file concern entrypoint in `.fallowrc.jsonc` `entry` or fallow reports its re-exports as dead code. Single-file concerns stay off that list on purpose, so a genuinely unused export still surfaces.
 
 ## Boundaries
 

@@ -29,6 +29,9 @@ npm run package      # build an unpacked .app under out/ (arm64)
 npm run make         # build distributables (.dmg + .zip) under out/make/
 ```
 
+`npm run build` is an alias for `npm run package`. All three of `build`,
+`package`, and `make` run `scripts/require-node-version.mjs` first.
+
 `make` and `package` cover the common cases; the channel/skip variants below
 wrap them with environment variables:
 
@@ -91,6 +94,35 @@ the env-strip + single-instance lock that closed the other path).
 
 `npm run package` writes the unpacked `.app` to `out/`.
 
+## What ships inside the `.app`
+
+The packager's `ignore` filter keeps the Vite output plus an explicit allow-list
+(`PACKAGE_KEEP_EXACT` / `PACKAGE_KEEP_PREFIXES` in `forge.config.ts`). Everything
+else under `node_modules` is dropped, because Vite bundles it. Two packages are
+`external` in `vite.main.config.mts` and therefore **must** be on the keep-list or
+the packaged app is broken in a way `npm run dev` never shows:
+
+- **`node-pty`** — a native module resolved from `node_modules` at runtime. Its
+  build-time dep `node-addon-api` is kept too (`@electron/rebuild` needs it to
+  recompile the addon against Electron's ABI), and `AutoUnpackNativesPlugin`
+  unpacks the resulting `.node` out of the asar.
+- **`@anthropic-ai/claude-agent-sdk`** — external because it calls
+  `createRequire(import.meta.url)` at module load, which Rollup rewrites to
+  `{}.url` in the CJS main bundle. `sdk.mjs` has to exist on disk to be required.
+
+The SDK's per-platform `claude-agent-sdk-<platform>` siblings are deliberately
+**not** kept — each carries a ~260 MB `claude` binary, and the user has to install
+and authenticate the real CLI anyway (`claude /login`). Native Claude Code
+therefore runs the user's own binary, found on `PATH` or set as an override in
+Settings → Providers
+([ADR 0042](./adr/0042-add-claude-code-as-a-second-first-class-agent-runtime.md)).
+The trailing slash on the SDK's prefix entry is what excludes those siblings; the
+matching exact entries hold the parent directories that prefix would otherwise
+drop.
+
+Adding another unbundled or native dependency means updating **both**
+`external` in the relevant Vite config and the `PACKAGE_KEEP_*` lists.
+
 ## Troubleshooting
 
 - **Stray Dock icon / duplicate instance.** Run `npm run diagnose:dock-flash`
@@ -99,7 +131,7 @@ the env-strip + single-instance lock that closed the other path).
   `--fix` to unregister dangling ones (live sibling builds are left alone).
 - **Node version error at build.** `require-node-version.mjs` refuses to build on
   a Node outside `>=24 <25`; switch with `nvm`/`mise` (`.nvmrc` / `mise.toml`).
-- **Node version error at install.** Non-interactive shells (Conductor's
+- **Node version error at install.** Non-interactive shells (a workspace's
   `setup`/`run` scripts, CI, hooks) never source the mise/nvm hooks, so they run
   under whatever Node is on PATH. Prefix the command with
   `./scripts/with-pinned-node.sh` — it resolves the `.nvmrc` Node via mise, nvm,
@@ -110,4 +142,7 @@ the env-strip + single-instance lock that closed the other path).
 ## See also
 
 - [ADR 0031](./adr/0031-strip-launch-context-env-and-single-instance-lock.md), [ADR 0032](./adr/0032-channel-scoped-bundle-identity.md) — the Dock-flash fixes.
+- [ADR 0042](./adr/0042-add-claude-code-as-a-second-first-class-agent-runtime.md) — why the Claude binary is not packaged.
+- [`../.claude/rules/stack.md`](../.claude/rules/stack.md) — the pinned versions, the two `external` packages, and the `legacy-peer-deps` constraint.
 - [`README.md`](../README.md) — tech stack and getting started.
+- [`onboarding.md`](./onboarding.md) — the contributor runbook the build sits at the end of.

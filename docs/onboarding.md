@@ -14,9 +14,17 @@ Windows path.
 | **Node 24.x** (exactly) | Native modules compile against the running major | `node -v` |
 | **npm** | The enforced package manager | `npm -v` |
 | **git** | Worktrees back every workspace | `git --version` |
-| **Pi CLI** | First-party agent runtime, spawned in RPC mode | `pi --version` |
+| **Pi CLI** | Agent runtime, spawned in RPC mode | `pi --version` |
+| **Claude Code CLI** | The other agent runtime, driven through `@anthropic-ai/claude-agent-sdk` against *your* binary — Ensemblr ships none | `claude --version` |
 | **GitHub CLI** | PR and check data; Ensemblr stores no GitHub token | `gh auth status` |
-| `claude` / `codex` / `vibe` _(optional)_ | Third-party harnesses; each appears only when its binary is on `PATH` | `which claude` |
+| `codex` / `vibe` _(optional)_ | Terminal harnesses; each appears only when its binary is on `PATH` | `which codex` |
+
+The two runtimes are gated differently. **Pi is part of the blocking setup gate**
+(`src/main/setup/setup-checks-pi.ts` — executable, RPC startup, provider/model
+readiness), so you need it to get past setup. **Claude Code is not** — it has a
+readiness probe (`src/main/agent-providers/claude-readiness-probe.ts`) surfaced in
+**Settings → Providers**, where you can also point at a binary that is not on
+`PATH`, but a missing `claude` does not block the app.
 
 ### The Node 24 pin is load-bearing
 
@@ -76,8 +84,16 @@ Read these in order:
    concern, and the two request paths (IPC, and agent → app control).
 3. [`../AGENTS.md`](../AGENTS.md) — the binding contributor policies, plus the
    scoped `AGENTS.md` for whichever subtree you are editing.
-4. [`adr/`](./adr) — 42 Architecture Decision Records. When something looks odd,
-   the ADR usually explains it.
+4. [`../.claude/rules/stack.md`](../.claude/rules/stack.md) — the pinned versions
+   and the constraints that are *not* obvious from `package.json` (why two
+   packages must stay unbundled, why `legacy-peer-deps` is set, why there is no
+   `tailwind.config.js`), and
+   [`../.claude/rules/patterns.md`](../.claude/rules/patterns.md) for the
+   structural rules a change has to respect.
+5. [`adr/`](./adr) — 45 Architecture Decision Records. When something looks odd,
+   the ADR usually explains it. Start with
+   [0042](./adr/0042-add-claude-code-as-a-second-first-class-agent-runtime.md) if
+   you are touching the agent layer.
 
 ## 5. Make a change
 
@@ -137,10 +153,13 @@ npm run test
 strip types without checking them. A `scripts/*.ts` type error only surfaces
 here.
 
+Run all four — CI does not. `.github/workflows/checks.yml` has exactly one job: a
+`react-doctor` scan diffed against `master`, failing on `error`, on pushes to
+`master` and PRs targeting it. Nothing in CI runs Biome, `tsc`, or the tests, so
+a red `npm run check` only surfaces on someone else's machine.
+
 For changed renderer code, also run the `react-doctor` skill and `fallow` on the
 changed set, per [`../.claude/rules/code-review.md`](../.claude/rules/code-review.md).
-CI runs a `react-doctor` scan against `master` on every push and PR
-(`.github/workflows/checks.yml`), failing on `error`.
 
 ## 8. Branches, issues, and PRs
 
@@ -160,6 +179,8 @@ CI runs a `react-doctor` scan against `master` on every push and PR
 | New route | A file under `src/renderer/routing/routes/`; let the Vite plugin regenerate `routeTree.gen.ts` |
 | New durable UI state | `src/renderer/state/<concern>/`, re-exported from that folder's `index.ts` |
 | New DB table or column | A numbered migration in `src/main/storage/database.ts`, plus its id in `tests/main/database.test.ts` |
-| New main-process concern | A folder under `src/main/` with an `index.ts`; add it to `src/main/AGENTS.md` |
+| New main-process concern | A folder under `src/main/` with an `index.ts`; add it to `src/main/AGENTS.md` **and** to `entry` in `.fallowrc.jsonc`, or fallow reports the barrel's re-exports as dead code |
+| New agent runtime | A sibling adapter folder under `src/main/` implementing the `src/main/agent-runtime/` contract — never a branch inside `pi-agent/` or `claude-agent/` ([ADR 0042](./adr/0042-add-claude-code-as-a-second-first-class-agent-runtime.md)) |
 | New agent control op | A service first, then a port in `src/main/agent-control/ports.ts` — control never adds capability code of its own |
-| A decision worth recording | The next numbered ADR in `docs/adr/`, and bump the count in `docs/README.md` |
+| New pure-logic test under `tests/main/` | The explicit `include` array in `vitest.config.mts` — it is not a glob |
+| A decision worth recording | The next numbered ADR in `docs/adr/`, and bump the count in all four places it appears: `docs/README.md`, both places in `README.md` (the project-structure block and the further-reading list), and §4 of this file |

@@ -25,7 +25,7 @@ Crossing one of these is an architecture bug, not a style preference.
 - **`src/main` is concern-first.** `agent-control/`, `storage/`, `linear/` — one
   folder per main-process concern, each with an `index.ts`.
 - **`src/renderer` is type-first, concern-second.** `state/workspace/`,
-  `lib/workbench/`, `types/workbench.ts` — never `src/renderer/workbench/`.
+  `lib/workbench/`, `types/workbench/` — never `src/renderer/workbench/`.
 
 Do not copy one subtree's layout into the other. This is the single most common
 way a change lands in the wrong place.
@@ -35,13 +35,20 @@ way a change lands in the wrong place.
 A multi-file concern exposes exactly one entrypoint and keeps its private helpers
 in siblings:
 
-- `src/shared/<concern>/` behind `src/shared/<concern>.ts` or `<concern>/index.ts`
-- `src/renderer/state/<concern>/index.ts`, `src/renderer/lib/<concern>/index.ts`
-- `src/main/<concern>/index.ts`
+- `src/shared/<concern>/` behind `src/shared/<concern>.ts` (preferred — the Node
+  ESM loader `electron --test` uses cannot resolve a bare directory specifier) or
+  `<concern>/index.ts` (`ipc/`, `keymap/`, `pi-rpc/`)
+- `src/renderer/state/<concern>/index.ts`, `src/renderer/lib/<concern>/index.ts`,
+  `src/renderer/types/<concern>/index.ts`, `src/renderer/components/**/index.ts`
+- `src/main/<concern>/index.ts` — all 30 main concerns have one
 
 Import from the barrel outside the concern; import siblings directly inside it.
-These barrels are registered as entries in `.fallowrc.jsonc` — a new concern
-barrel must be added there or fallow reports its re-exports as dead code.
+The shared and renderer barrels above are registered as entries in
+`.fallowrc.jsonc`, because their re-export surface crosses a process boundary the
+module graph cannot see; a new one must be added there or fallow reports its
+re-exports as dead code. Main-process barrels are **not** listed — they are
+reachable from `src/main/main.ts`, so a genuinely unused export in one should
+still surface.
 
 ## The IPC contract path
 
@@ -51,12 +58,21 @@ and the caller:
 1. `src/shared/ipc/channels.ts` — channel name, always `ensemblr:<kebab-name>`,
    keyed by its camelCase preload handle.
 2. `src/shared/ipc/contracts/<concern>.ts` — request and response types.
-3. `src/main/ipc/request-schemas/<concern>.ts` — the Zod validator.
+3. `src/main/ipc/request-schemas/<concern>.ts` — the Zod validator; shared field
+   validators live in `request-schemas/primitives.ts`.
 4. `src/main/ipc/handlers/<concern>.ts` — the handler, delegating to a service.
 
-Handlers validate and delegate; they do not hold business logic. `contracts.ts`
-is treated as type-only and is exempt from the JSDoc requirement — `channels.ts`
-is not.
+Handlers validate and delegate; they do not hold business logic. The modules
+under `src/shared/ipc/contracts/` are treated as type-only and are exempt from
+the JSDoc requirement — `channels.ts` is not.
+
+The Zod layer is a partial migration: there are fewer `request-schemas/` modules
+than `handlers/` modules, and some handlers still validate inline. Read the
+JSDoc at the top of `src/main/ipc/request-schemas.ts` before adding one — it
+records the two stances the existing modules take (strict `parse`, which throws
+on a malformed payload, versus lenient `safeParse`, which coerces to a
+known-empty payload and lets the service emit a diagnostic) and warns that
+existing semantics must be preserved exactly.
 
 ## Ports and adapters in agent control
 
@@ -71,6 +87,19 @@ service, build the service first. Both bridges — Pi via `POST /invoke`, MCP
 harnesses via `POST /mcp` — funnel into the one service so the two surfaces
 cannot drift.
 
+## Policy in `shared/`, enforced over the control server
+
+Plan Mode is the worked example. The classifiers — `src/shared/plan-mode.ts`
+behind `src/shared/plan-mode/` (bash guard, shell lexer, tool guard, control-op
+denials) — live in `shared/` and are reached over the agent-control server, while
+`src/main/plan-mode/` holds the per-session registry, the plan-file writer, and
+the submission coordinator.
+
+The shipped Pi extension cannot import from `src/` at runtime, so it asks the app
+per intercepted tool call rather than carrying its own copy. Follow that shape
+for any security-sensitive classifier: one implementation in `shared/`, queried
+across the boundary. A second copy is a parity test waiting to fail.
+
 ## Provider-neutral agent runtime
 
 `src/main/agent-runtime/` owns the adapter contract, `AgentClient`, and session
@@ -78,7 +107,13 @@ persistence/naming/summaries. `pi-agent/` and `claude-agent/` are **siblings**
 implementing that contract; `fake-agent-adapter.ts` is the test double.
 
 A new runtime is a new adapter folder, not a branch inside an existing one, and
-nothing runtime-specific belongs above the adapter line.
+nothing runtime-specific belongs above the adapter line — `agent-runtime/` knows
+no CLI flags and no SDK option names. Concretely: a provider id in
+`src/shared/agent-provider.ts`, a concern folder beside `pi-agent/` and
+`claude-agent/`, and an entry in the client's adapter map. `agent-providers/`
+carries the matching settings surface (executable discovery and overrides,
+readiness probing, model catalogue) so neither runtime is routed through the
+other's vocabulary.
 
 ## Repository layer over SQLite
 
@@ -128,7 +163,7 @@ reported as dead code:
 | New thing | Register in |
 | --- | --- |
 | Vite/Forge entry, playground entry | `.fallowrc.jsonc` `entry`, and `forge.config.ts` if packaged |
-| Concern barrel | `.fallowrc.jsonc` `entry` |
+| Shared or renderer concern barrel | `.fallowrc.jsonc` `entry` (main-process barrels are not listed — see above) |
 | Pi extension under `resources/pi-extensions/` | already globbed as an entry; loaded at runtime via `pi --mode rpc -e <file>` |
 | Dev script under `scripts/` | already globbed; typecheck it via `tsconfig.scripts.json` |
 | Pure-logic test under `tests/main/` | the explicit `include` array in `vitest.config.mts` |

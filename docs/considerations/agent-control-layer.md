@@ -2,7 +2,19 @@
 
 > Design record + as-built notes for Ensemblr Control. Lets agents drive Ensemblr from inside their
 > own sessions. **Shipped:** #166 (control layer), #168 (role-aware orchestration), #169 (sub-agent
-> naming + status sync). See [ADR 0040](../adr/0040-use-loopback-control-server-for-agent-app-control.md)
+> naming + status sync), #182 (`ask_user_question`), #191 (spawned children inherit Plan Mode),
+> #192 (sub-agent surface narrowed by durable role), #193 (read the workspace diff and its review
+> comments), #194 (audit a sub-agent's transcript; cascading stops), #223 (start a run script by
+> name), #224 (unbounded `ask_user_question`; canonical argument names), #232 (a spawned child's
+> runtime is shown; a chat's thinking level pins to its session), #236 (a spawned child is pinned to
+> its caller's agent runtime).
+>
+> This file records **why** the layer is shaped the way it is. It is not the tool reference: the
+> authoritative, enumerated `ensemblr_*` surface — every tool, its argument names and types, its
+> gate, and who it is withheld from — is in [`docs/agent-control.md`](../agent-control.md#tool-reference),
+> read off `TOOL_DEFS` and the Zod schemas. Prefer that when the two disagree.
+>
+> See [ADR 0040](../adr/0040-use-loopback-control-server-for-agent-app-control.md)
 > for the accepted decision and [`docs/agent-control.md`](../agent-control.md) for the user-facing guide.
 >
 > **Architecture pivot vs. the original plan:** rather than Pi's `extension_ui_request`/`_response`
@@ -68,6 +80,15 @@ variants (`ORCHESTRATOR_AWARENESS` / `SUBAGENT_AWARENESS` in `src/shared/agent-c
 are selected by lineage depth (`roleForDepth`); the Pi extension embeds byte-identical copies and a
 parity test guards drift (#168). See [`agent-orchestration-playbook.md`](./agent-orchestration-playbook.md).
 
+> **Superseded by #191/#192.** Two axes were added on top of role. Plan Mode gives a second pair of
+> playbooks — `PLAN_MODE_ORCHESTRATOR_AWARENESS` / `PLAN_MODE_SUBAGENT_AWARENESS` — which *replace*
+> the role variant for as long as the conversation is planning, and are consumed only by the Pi
+> extension (an MCP-only runtime has its system prompt fixed at session open). And role is no longer
+> read from depth alone: `resolveAgentRole(marked, depth)` prefers the durable sub-agent marker on
+> the chat tab and falls back to `roleForDepth`, because depth lives in an in-memory registry a
+> restart clears. `awarenessForAudience` is now the single selection rule, keyed off
+> `ControlAudience` (`hasChatTab` + `role`) rather than off a runtime's name.
+
 **Identity is per-workspace** (a pragmatic simplification of the plan's per-session tokens): one
 origin/token is minted per workspace and injected into every agent process in that workspace via
 `resolveAgentControlEnv` — Pi through its per-session env overlay, harnesses/terminals through the
@@ -75,6 +96,14 @@ origin/token is minted per workspace and injected into every agent process in th
 cross-workspace reads, permission mode, and per-workspace spawn quota/rate. Cross-generation depth
 and lineage deadlock detection degrade to no-ops under a shared workspace token; the registry API
 keeps per-session support for a later upgrade.
+
+> **Superseded — the later upgrade landed.** Identity is now split by caller kind. An **agent
+> conversation** registers its own per-session origin carrying real lineage (`parentSessionId`,
+> `depth`), so the depth cap, per-session quota/rate, `childrenOf` cascading stops, and the
+> ancestor-deadlock check all operate as designed. A **terminal** — a harness or a dock terminal —
+> still shares one workspace-level origin, minted as the pseudo-session `ws:<workspaceId>`, because
+> a PTY has no session to mint a token for. That residual sharing is why a harness cannot be told
+> which agent runtime it is and must pass `model` explicitly when it spawns a child (#236).
 
 ## Locked decisions
 
@@ -87,7 +116,16 @@ keeps per-session support for a later upgrade.
 | Guardrails | **All four:** max nesting depth, per-session spawn quota + rate limit, wait-mode timeout, lineage deadlock check. |
 | Permissions | **Uniform, follows mode.** Reads always allowed; all writes auto in `workspace-trusted`, confirm in `approval-required`, blocked in `read-only`. No per-op special-casing. |
 | Capabilities | Core + all extras (follow-up, drive terminal stdin, read output, open non-chat tabs). |
-| Lifecycle | **Persist — no cascade.** Spawned resources are first-class; parent ending does not tear them down. Lineage tracked for guardrails only. |
+| Lifecycle | **Persist — no cascade.** Spawned resources are first-class; parent ending does not tear them down. Lineage tracked for guardrails only. _(Partly superseded by #194 — see below.)_ |
+
+> **Lifecycle, superseded in part by #194.** Tabs and terminals still persist, and lineage is still
+> never used for cleanup. But *stopping a conversation now cascades*: `stopSession` walks the origin
+> registry's `childrenOf` lineage and aborts every live descendant with reason
+> `orchestrator-stopped`. The original decision assumed a user could always reach a stranded child
+> and stop it themselves; withholding the composer from a sub-agent's tab (#169) removed the Stop
+> button along with it, so "no cascade" would have left children running with nobody able to steer
+> them or read their reports. Descendants are collected in a `finally`, so a wedged root whose own
+> abort rejects — the likeliest one to have stranded something — still takes its lineage down.
 
 ## Capability vocabulary
 
@@ -95,14 +133,14 @@ Defined once in a shared contract (`src/shared/agent-control/`), consumed by bot
 
 **Writes (own workspace):**
 - `spawnChatTab()` → `{ chatTabId }`
-- `startConversation({ chatTabId?, prompt, model?, thinkingLevel?, title?, wait? })` → `{ chatTabId, agentSessionId, result? }` (a spawned tab is marked a sub-agent and tinted; `title` names it via Pi `/name`)
+- `startConversation({ chatTabId?, prompt, model?, thinkingLevel?, title?, wait? })` → `{ chatTabId, agentSessionId, result? }` (a spawned tab is marked a sub-agent and tinted; `title` names it via Pi `/name`). Since #236 the child is **pinned to the caller's agent runtime**: the service passes `callerRuntime` to the port, and a `model` belonging to the other runtime comes back `invalid-args` naming both rather than being substituted. Omitting `model` inherits the caller's; a terminal harness, whose runtime the app cannot name, must pass one
 - `sendFollowUp({ agentSessionId, prompt, wait? })` → `{ result? }` (Pi steer/follow_up + submitPrompt)
-- `setName({ title })` → `{ chatTabId, title }` — set the **caller's own** tab name via Pi `set_session_name`. Stamps `titleProvenance: 'agent'`; a title the user chose outranks it and the call reports `applied: false`
+- `setName({ title })` → `{ applied, title, message }` — set the **caller's own** tab name via Pi `set_session_name`. Stamps `titleProvenance: 'agent'`; a title the user chose outranks it and the call reports `applied: false` rather than failing. **Chat-tab callers only** (a terminal harness owns no chat tab)
 - `setBranchName({ name, userRequested? })` → `{ applied, name, branchName, message }` — name the caller's **workspace and its git branch** together from one slug. Gated on the branch, not the display name: it applies while the git branch still carries the name it was cut with, and a workspace the user has already titled keeps that title while only its branch moves. Reports `applied: false` rather than failing once the branch is named, unless `userRequested` says the user asked for a different one by name. An adopted branch never moves, and `git.renameWorkspaceOnBranch` overrides everything, `userRequested` included
-- `setSummary({ title, summary })` → `{ capturedAtOrdinal, message }` — record the caller's session summary. **Pi-only** (a harness origin owns no chat tab). Writes SQLite only; the summary queue projects it to `.context/sessions/` at the next turn boundary, so nothing materializes `.context/` mid-turn
+- `setSummary({ title, summary })` → `{ capturedAtOrdinal, message }` — record the caller's session summary. **Chat-tab callers only** — the axis is the tab, not the runtime, so native Claude holds it and a terminal harness does not. Writes SQLite only; the summary queue projects it to `.context/sessions/` at the next turn boundary, so nothing materializes `.context/` mid-turn
 - `closeTab({ chatTabId })`
 - `launchHarness({ harnessId })` → `{ chatTabId, terminalId }`
-- `startTerminal({ kind: 'setup' | 'run' | 'spawn' })` → `{ terminalId }`
+- `startTerminal({ kind: 'setup' | 'run' | 'spawn', scriptName? })` → `{ terminalId }` — `scriptName` (#223) picks one of the repository's named run scripts and is accepted with `kind: 'run'` only; omitted, it starts whichever script the repository marks default. A name the repository does not configure fails `not-found` and lists the ones it does, rather than quietly launching something else
 - `stopTerminal({ terminalId | kind })`
 - `writeTerminal({ terminalId, input })` (drive a spawn terminal / harness stdin)
 - `openTab({ variant: 'file' | 'diff' | 'comment', ... })` → `{ chatTabId }`
@@ -128,12 +166,46 @@ Defined once in a shared contract (`src/shared/agent-control/`), consumed by bot
 - `getWorkspaceDiff({ filePath?, stat? })` → `{ baseRef, files?, summary?, diff?, truncated, omittedFiles }` — the workspace's branch diff, scoped like the Changes panel (`merge-base(base_branch, HEAD)` → working tree, untracked files included). `stat: true` returns rows and totals with **no** per-file git call; `filePath` returns one patch whole. The full read is capped at `MAX_AGENT_PAYLOAD_CHARS` (32,000), cut on whole-file boundaries, with the dropped paths in `omittedFiles`
 - `getDiffComments({ filePath? })` → `{ comments }` — the workspace's Ensemblr-local review comments, each carrying `origin`. GitHub-synced PR threads are excluded: they are a live `gh` snapshot rather than local rows, and no op here could reply to or resolve one
 
+**Added after the original vocabulary was locked.** The list above is the #166 surface plus the
+review ops; the ops below arrived with later work and are recorded here so this section is not read
+as the whole set. Their argument shapes live in
+[`docs/agent-control.md`](../agent-control.md#tool-reference).
+
+- `setWorkspaceStatus({ status })` / `getWorkspaceStatus()` — move and read the caller's own kanban
+  column. The write is root-only: the status describes the whole workspace, not one delegated unit
+- `waitForAgents({ targets?, mode?, reports?, timeoutMs? })` → `{ completed, pending, timedOut, note? }` —
+  block on delegated children instead of polling. Classified a **read**, so it survives `read-only`
+- `notifyOrchestrator({ reason, message })` — a child pulls its orchestrator back. Also a read, so a
+  blocked child can escalate in any mode
+- `askUserQuestion({ questions })` → `{ answers, cancelled, summary }` (#182, unbounded since #224) —
+  put up to four multiple-choice questions to the human and block with no timeout. Chat-tab callers
+  only, and refused to a sub-agent whatever the mode
+- `exitPlanMode({ title, plan })` → `{ planPath, summary }` — hand a finished plan to the user and
+  end the turn. Deliberately outside `WRITE_OPS` although it writes a file: it is the only exit from
+  Plan Mode, so a mode gate would strand a planning agent with no way out
+- `readConversation({ agentSessionId, stat?, fromOrdinal?, ordinal? })` (#194) — page a conversation's
+  persisted transcript, tool calls included, so an orchestrator can audit what a child actually ran
+  rather than trusting its report
+- `listModels()` → `{ defaultModelId, models, runtime }` — cut to the caller's own agent runtime for
+  a chat caller, unfiltered for a terminal harness whose runtime the app cannot name
+- `listRunScripts()` → `{ scripts }` (#223) — the repository's named run scripts and which is default
+- `getSessionBrief()` and `checkPlanModeTool({ tool, command? })` — control ops with **no** MCP tool.
+  They are the Pi extension's own per-turn hooks; nothing reaches them over `POST /mcp`
+
 ## Components to build
 
 > **Superseded — pre-pivot build plan (historical).** This section describes the original
 > `extension_ui_request`/`extension_ui_response` + `protocol-dispatch` routing approach. The shipped
 > design instead unifies on one loopback HTTP control server; **Architecture (as built)** above and
 > **Implementation status** below are authoritative. Retained to record the reasoning behind the pivot.
+>
+> **Its file paths are historical too — do not follow them.** Five named below no longer exist:
+> `pi-session-service.ts` and `pi-agent-client.ts`/`cli-rpc-pi-agent-adapter.ts` (session ownership
+> moved to `src/main/agent-runtime/`; the Pi adapter is now the single
+> `src/main/pi-agent/pi-cli-rpc-adapter.ts`), `mcp-server.ts` (shipped as
+> `src/main/agent-control/mcp-endpoint.ts`), and `src/shared/agents/harness-registry.ts` (the registry
+> is `src/shared/agents.ts`, and the injection seam turned out to be
+> `src/main/agent-control/harness-launch-config.ts` rather than `buildCommand`).
 
 ### 1. Shared contract — `src/shared/agent-control/`
 - `contracts.ts` — request/response types for every op above (mirrors `src/shared/ipc/contracts/` style).
@@ -218,8 +290,12 @@ Defined once in a shared contract (`src/shared/agent-control/`), consumed by bot
 - Permission action kinds `app-control-read` / `app-control-write` — `src/shared/permissions.ts`.
 - Agent-control service, guardrails, origin registry, port adapters — `src/main/agent-control/`.
 - Loopback control server with `/invoke`, `/mcp`, `/health` — `control-server.ts` + `mcp-endpoint.ts`.
-- Env injection: `resolveAgentControlEnv` threaded into `pi-session-service` → lifecycle →
-  `session-open` (per-session `env` overlay) and into `terminal-service` (assembled env).
+- Env injection: `resolveAgentControlEnv` threaded into the agent-session service
+  (`src/main/agent-runtime/agent-session-service.ts`) → `agent-session-lifecycle.ts` →
+  `session/session-open.ts` (per-session `env` overlay) and into `terminal-service` (assembled env).
+  The Pi-specific `pi-session-service.ts` named in the superseded plan above no longer exists — session
+  ownership moved to the provider-neutral `src/main/agent-runtime/` when Claude became a second
+  first-class runtime.
 - Composition in `src/main/main.ts`: server started on boot, env provider, native-dialog confirm,
   server closed on `will-quit`. Pi launched with `-e <ext>` only when the extension + `typebox` resolve.
 - Pi extension shipped via Forge `extraResource` — `resources/pi-extensions/`.

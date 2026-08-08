@@ -12,23 +12,25 @@ dive in here.
 ## Guides
 
 - [`agent-control.md`](./agent-control.md) — **Ensemblr Control**: how agents drive the app, the permission model, guardrails, and multi-agent orchestration.
-- [`harnesses.md`](./harnesses.md) — the third-party agent CLIs (Claude Code, Codex, Vibe) Ensemblr can launch, with install, auto-approve, and resume details.
+- [`harnesses.md`](./harnesses.md) — the two first-class agent runtimes (Pi, Claude Code) versus the terminal harnesses Ensemblr launches as their native TUI, with install, auto-approve, and resume details.
 - [`build-and-release.md`](./build-and-release.md) — packaging, code signing, notarization, and build channels.
 
 ## Reference
 
 - [`pi/`](./pi) — Pi integration internals: the [RPC protocol](./pi/rpc-protocol.md) and [event taxonomy](./pi/event-taxonomy.md).
-- [`adr/`](./adr) — **42** Architecture Decision Records (`0001`–`0042`), the accepted decisions and their supersessions.
+- [`claude/`](./claude) — Claude Code runtime internals: the [runtime guide](./claude/README.md) (adapter wiring, discovery, live-discovered slash commands / MCP roster / model catalogue, effort, context measurement) and the [SDK surface reference](./claude/sdk-surface.md). [ADR 0042](./adr/0042-add-claude-code-as-a-second-first-class-agent-runtime.md) is the decision record.
+- [`adr/`](./adr) — **45** Architecture Decision Records (`0001`–`0045`), the accepted decisions and their supersessions.
 - [`considerations/`](./considerations) — design records and forward-looking notes: the [Ensemblr Control design](./considerations/agent-control-layer.md), the [orchestration playbook](./considerations/agent-orchestration-playbook.md), and a [Deno-desktop migration study](./considerations/deno-desktop-migration.md).
 
 ## Product & planning
 
-- [`product/`](./product) — roadmap, Conductor-parity notes, screen/settings/shell inventories, and discovery snapshots.
+- [`product/`](./product) — roadmap, Conductor-parity notes, screen/settings/shell inventories, and discovery snapshots. Spent planning artifacts live under [`product/archive/`](./product/archive).
 - [`refactor/`](./refactor) — refactor plans (e.g. the workbench composition refactor).
 
 ## Repository docs
 
 - [`../CONTEXT.md`](../CONTEXT.md) — product definition and ubiquitous language.
 - [`../CHANGELOG.md`](../CHANGELOG.md) — notable changes (Keep a Changelog format).
-- [`../AGENTS.md`](../AGENTS.md) — contributor policies (npm, Biome, Jotai, Tailwind, JSDoc).
+- [`../AGENTS.md`](../AGENTS.md) — contributor policies (npm, Biome, Jotai, Tailwind, JSDoc). Each `src/*` subtree has its own scoped `AGENTS.md`.
+- [`../.claude/rules/`](../.claude/rules) — the binding rule files `AGENTS.md` defers to: [`stack.md`](../.claude/rules/stack.md) (pinned versions and non-obvious constraints), [`patterns.md`](../.claude/rules/patterns.md) (structural patterns), [`jsdoc.md`](../.claude/rules/jsdoc.md), [`comments.md`](../.claude/rules/comments.md), [`code-review.md`](../.claude/rules/code-review.md).
 - [`../LICENSE`](../LICENSE) — MIT license.

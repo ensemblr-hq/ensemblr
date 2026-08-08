@@ -20,7 +20,9 @@ function getCopyrightNotice(): string {
 }
 
 /**
- * Returns the on-disk path to the bundled product roadmap markdown.
+ * Returns the on-disk path to the bundled product roadmap markdown. The bundled
+ * file is the archived MVP sequencing doc, which `extraResource` copies to the
+ * Resources root by basename.
  * @returns Absolute path to `mvp-sequencing.md`.
  */
 function getProductRoadmapPath(): string {
@@ -28,7 +30,7 @@ function getProductRoadmapPath(): string {
 		return path.join(process.resourcesPath, 'mvp-sequencing.md');
 	}
 
-	return path.join(app.getAppPath(), 'docs/product/mvp-sequencing.md');
+	return path.join(app.getAppPath(), 'docs/product/archive/mvp-sequencing.md');
 }
 
 /**

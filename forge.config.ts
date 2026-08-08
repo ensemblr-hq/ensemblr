@@ -157,7 +157,7 @@ const config: ForgeConfig = {
 		// LaunchServices registration (the Dock-flash root cause). See ADR 0032.
 		appBundleId: APP_BUNDLE_IDS[buildChannel],
 		extraResource: [
-			'docs/product/mvp-sequencing.md',
+			'docs/product/archive/mvp-sequencing.md',
 			'resources/pi-extensions',
 		],
 		// Packager resolves the platform extension (`icon.icns` on macOS).

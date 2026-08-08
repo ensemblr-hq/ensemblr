@@ -1,8 +1,10 @@
 # Linear Milestones
 
-Date: 2026-07-18
+Date: 2026-08-08
 
-These milestones were intended to be copied into Linear as project milestones. Issue IDs refer to the local planning IDs in `docs/product/linear-issues.md`; several exit criteria are now shipped and preserved here as planning history. Use `docs/product/implementation-roadmap.md` for current completion status.
+These milestones were intended to be copied into Linear as project milestones. Issue IDs refer to the local planning IDs in `docs/product/linear-issues.md`; most exit criteria are now shipped and preserved here as planning history. Use `docs/product/implementation-roadmap.md` for current completion status.
+
+> **Status (2026-08-08):** Milestones 1–5 and 7 are effectively met; milestone 6 (Linear) is met except archive/delete, which is blocked on schema/permission discovery; milestone 8 has its sections shipped with source-diagnostics and command/deep-link polish outstanding. Milestone 4's title and issue list predate ADR 0042 — the runtime layer is now provider-neutral with Pi and Claude Code as sibling adapters. Work that shipped without an `ENS-*` node (agent control, plan mode, named run scripts, branch takeover, unified code surface, the Claude runtime) is listed in the roadmap's "Completed since 2026-07-18" table, not here.
 
 ## 1. Foundation
 
@@ -35,7 +37,7 @@ Exit criteria:
 Primary source:
 
 - ADR 0001, 0008, 0009, 0010, 0018
-- `docs/product/mvp-sequencing.md`
+- `docs/product/archive/mvp-sequencing.md` (archived)
 - `docs/product/settings-inventory.md`
 
 ## 2. Setup Gate and Configuration
@@ -92,7 +94,7 @@ Exit criteria:
 - Users can add or clone a project into the managed root.
 - Existing shell regions render live repository/workspace records instead of fixture shell data.
 - Project/workspace navigation preserves the current sidebar, pinning, collapse/reorder, context-menu, header, and open-workspace launcher affordances.
-- Users can create a git worktree workspace from the configured branch source.
+- Users can create a git worktree workspace from the configured branch source. **Extended by #225:** creation carries a `branchPlan` — `adopt` takes over an existing branch, `create` cuts a fresh one at a fork point — and the base branch is a separate, selectable merge target (#216).
 - `.context/` exists for workspace handoff files.
 - Eligible gitignored files are copied through `.worktreeinclude`, the committed `.ensemblr/settings.toml`, or defaults.
 - Workspaces under a shared Conductor root can be adopted through filesystem/git metadata only.
@@ -105,10 +107,10 @@ Primary source:
 - `docs/product/screen-inventory.md`
 - `docs/product/ux-parity.md`
 
-## 4. Pi CLI RPC Runtime and Agent Timeline
+## 4. Agent Runtime and Timeline
 
 Goal:
-Run Pi through a selected CLI RPC executable, preserve the Pi user environment, render structured sessions, and provide checkpoint-backed agent workflow controls.
+Run an agent runtime from the workspace, preserve that runtime's own user environment, render structured sessions, and provide checkpoint-backed agent workflow controls. Written for Pi CLI RPC; generalised by ADR 0042 to cover Claude Code as a peer adapter.
 
 Included issues:
 
@@ -133,10 +135,11 @@ Exit criteria:
 - Checkpoints are captured before Pi user prompts and mapped to workspace/session/turn metadata.
 - Users can inspect turn diffs and restore files without mutating Pi session files.
 - Any number of chat tabs can be open per workspace (the five-tab cap was removed by ADR 0039); preview tabs re-focus rather than duplicate.
+- **Met, plus scope this list predates:** the agent-control layer (ADR 0040), per-chat plan mode (#184), and a second first-class runtime in Claude Code (ADR 0042, #226–#237). Of the original list, only browser control and compaction UI from `ENS-035` remain open.
 
 Primary source:
 
-- ADR 0002, 0003, 0012, 0016, 0022, 0025
+- ADR 0002, 0003, 0012, 0016, 0022, 0025, 0040, 0042
 - `docs/product/open-decisions.md`
 - `docs/product/ux-parity.md`
 
@@ -161,11 +164,12 @@ Exit criteria:
 - xterm.js replaces the existing dock placeholder in place and can render output, handle resize, copy/paste, scrollback, and process termination states.
 - Scripts receive native `ENSEMBLR_*` variables.
 - Run script modes support concurrent and nonconcurrent behavior.
-- Preview URL and spotlight testing uncertainties are documented before build work proceeds.
+- Preview URL and spotlight testing uncertainties are documented before build work proceeds. **Both are documented**: preview URL resolves template-first, spotlight testing is deferred post-core.
+- **Met, plus scope this list predates:** a repository defines any number of named `[scripts.run.<name>]` scripts, the repo Scripts settings screen writes the committed `.ensemblr/settings.toml` directly, and agents can start a run script by name (ADR 0041, #220/#222/#223).
 
 Primary source:
 
-- ADR 0002, 0007, 0016
+- ADR 0002, 0007, 0016, 0041
 - `docs/product/conductor-parity.md`
 - `docs/product/screen-inventory.md`
 - `docs/product/settings-inventory.md`
@@ -222,7 +226,7 @@ Included issues:
 
 Exit criteria:
 
-- Users can inspect all files, changed files, unified diffs, and local comments/todos.
+- Users can inspect all files, changed files, unified diffs, and local comments/todos. **Met** (THE-152, #151); #211 later unified file preview, turn diff, workspace diff, and PR diff behind one code surface, and #234 struck resolved comments through.
 - Review work wires live file, diff, PR, check, comment, todo, and merge data into the existing All files / Changes / Checks tabs and right PR header.
 - Selected files, diffs, comments, and check failures can be added to Pi context.
 - Users can commit/push/create a PR through `gh` with clear failures.
@@ -263,11 +267,12 @@ Exit criteria:
 - Security, permissions, Linear, `gh`, Pi readiness, and enterprise privacy are inspectable.
 - Appearance controls affect code, markdown, and terminal previews.
 - Command palette, shortcuts, deep links, and external-open actions cover core workflows.
-- Remaining non-deferred settings decisions are recorded explicitly; the 2026-07-18 refresh leaves no active settings product question.
+- Remaining non-deferred settings decisions are recorded explicitly; the 2026-08-08 refresh leaves no active settings product question.
+- **Scope this list predates:** Providers returned in #226 as the per-runtime agent surface, and the repo Scripts page writes the committed `.ensemblr/settings.toml` directly (ADR 0041).
 
 Primary source:
 
-- ADR 0016, 0018, 0019, 0020, 0021, 0022, 0025
+- ADR 0016, 0018, 0019, 0020, 0021, 0022, 0025, 0029, 0041, 0042
 - `docs/product/settings-inventory.md`
 - `docs/product/open-decisions.md`
 

@@ -1,6 +1,6 @@
 # Open Decisions
 
-Date: 2026-07-18
+Date: 2026-08-08
 
 ## Screenshot Gaps Remaining
 
@@ -26,7 +26,9 @@ Date: 2026-07-18
 
 ## Needs Product Decision
 
-- None blocking from the current shell refresh. Workspace-row **Set status** is a local dashboard board status, **Mark unread/read** is a local workspace-attention marker, and the Changes tab **Review** button starts the repository `review` agent action.
+- **Spotlight testing dirty-root override.** Whether spotlight testing may ever proceed with a dirty repository root under explicit user override. Blocks any spotlight implementation; recommendation in `discovery-spotlight-testing.md` is *not allowed*. Nothing else depends on it.
+- **Loopback-only preview-URL log parsing.** Whether opt-in log parsing ships post-core at all, given template expansion already covers the deterministic case. Recommendation in `discovery-preview-url-detection.md` is to defer.
+- Nothing blocking from the current shell. Workspace-row **Set status** is a local dashboard board status, **Mark unread/read** is a local workspace-attention marker, and the Changes tab **Review** button starts the repository `review` agent action.
 
 ## Needs Product Working Session
 
@@ -35,17 +37,13 @@ Date: 2026-07-18
 
 ## Needs Implementation Discovery
 
-- Pi CLI/RPC hooks available for permission brokering.
 - Pi CLI/RPC APIs for session tree navigation/forking beyond the current chat-tab model, retry-in-new-chat behavior, and compaction UI.
-- Pi CLI/RPC APIs for permission brokering, browser control, and context usage display. Model listing and model/thinking selection are already wired.
-- How to represent Pi sessions when a workspace is adopted from Conductor.
+- Pi CLI/RPC API for browser control. Model listing, model/thinking selection, permission brokering, plan mode, and context usage are all wired.
+- How to represent agent sessions when a workspace is adopted from Conductor.
 - Exact review-thread/comment mutation coverage through first-class `gh` and authenticated `gh api`; any gaps should be documented as unsupported or limited rather than solved with an app-owned GitHub auth layer.
 - Linear archive/delete schema and permission support. Create/read/update/comment and workspace-from-issue are resolved v1 scope, but field-level SDK/GraphQL mapping, pagination, filtering, labels, cycles, and metadata caching still need implementation discovery.
-- Whether `gh` exposes enough data for add-all-comments-to-chat and review-thread resolution.
 - Conductor checkpoint git refs, if any, and whether they can be safely detected without relying on private app DB.
 - Whether a `.conductor` folder exists in any real repositories and whether it has a documented/public meaning for workspace adoption (Ensemblr no longer reads it for repository config; see ADR 0030).
-- How to detect preview URLs from run/setup output robustly.
-- How to safely implement spotlight testing without overwriting root changes.
 - Which current command/menu placeholders should be keyboard-shortcut/global-command entries before their backing services exist.
 
 ## Resolved Since Screenshot Review
@@ -69,6 +67,20 @@ Date: 2026-07-18
 - Dashboard board: shipped as local board state with Backlog, In progress, In review, Done, and Canceled columns; workspace status/unread context-menu ambiguity is resolved as local app state.
 - Review action: the Changes/All files Review affordance starts the repository `review` agent action; inline line comments remain future review polish.
 - Setup/run/terminal environment: workspace processes now inherit sanitized shell-derived environment, workspace toolchain `PATH`, workspace overlays, and `ENSEMBLR_*` variables.
+
+## Resolved Since 2026-07-21
+
+- **Second agent runtime (ADR 0042, #226–#237, 2026-08-07).** Claude Code is a first-class runtime alongside Pi, driven in-process through `@anthropic-ai/claude-agent-sdk` against the user's own `claude` binary. Pi and Claude are siblings under `src/main/agent-runtime/`, not a translation layer. A chat is pinned to one provider for its lifetime; a spawned sub-agent inherits its caller's runtime (#236). Ensemblr does not enable the SDK's file checkpointing, and the workspace permission mode is enforced in-app for Claude.
+- **Providers settings screen (#226).** Reinstated after its 2026-07-19 removal, now scoped to agent runtimes rather than model providers: one tab per registered runtime with its executable, readiness, accounts, and settings-file location. Ensemblr still stores no provider tokens. This supersedes the "no Providers screen (removed)" line the settings docs carried.
+- **Plan mode (#184, 2026-07-28).** A per-chat toggle (⌥⇧P), not a setting. Enforcement is layered and fails closed: Pi's shipped extension intercepts `bash`/`edit`/`write` through the `tool_call` hook and asks the app, which answers from one classifier in `src/shared/plan-mode/`; agent-control also gates terminals, harnesses, follow-ups, and new conversations, since a spawned conversation would otherwise run unrestricted. `ensemblr_exit_plan_mode` writes the plan to `.context/plans/` and surfaces Approve / Refine / Hand off above the composer (rendered as the composer header since #218). Claude Code uses its own native plan mode instead (ADR 0042, decision 3).
+- **Branch takeover vs forking (#225, 2026-08-06).** A workspace is created from a `branchPlan`: `adopt` checks out and owns an existing branch, `create` cuts a fresh branch at a fork point. Base branch keeps its separate meaning as the merge target, defaulting to the PR's own base. Adopting a branch another worktree holds, or one that exists nowhere, fails up front with a named diagnostic; rollback never deletes a branch the creation did not cut. This closes the "review panel diffs the branch against itself" behavior. **No ADR yet — see the gap list in `docs-consistency-audit.md`.**
+- **Target branch and merge conflicts (#215, #216).** Workspaces expose a target-branch selector, and the checks panel surfaces merge conflicts against that target with a Resolve action that hands the conflict to the agent.
+- **Inline line-comment UX.** Shipped with the rich diff viewer (THE-152, #151) and completed by #234: resolved comments render struck through, and bulk-add sends only the unresolved ones. This was the last "review polish" item; it is no longer open.
+- **Add-review-context-to-agent.** Shipped. Comments and diffs reach chat context from the checks panel, PR comment bodies are readable in-app (#209), and agents can read the workspace diff and file review comments through the control layer (#193).
+- **Named run scripts per repository (#220, #222, #223; ADR 0041).** A repository defines any number of `[scripts.run.<name>]` tables with `command`, `icon`, `default`, and `available_in`. The Scripts settings screen writes the committed `.ensemblr/settings.toml` directly, agents can start a run script by name, and a legacy `run = "..."` string still resolves as one implicit script.
+- **Preview URL detection.** Resolved as template-first per `discovery-preview-url-detection.md`: expand `previewUrlTemplate` against the injected `ENSEMBLR_*` variables, never parse run/setup logs. The right-header preview link separately resolves the deployed build from GitHub data (#196, #197). Loopback-only log parsing stays deferred and opt-in if ever accepted.
+- **Spotlight testing.** Resolved as **deferred to post-core** per `discovery-spotlight-testing.md`. The safe minimum is patch-based apply with a persisted reverse patch and hard refusal on any dirty intersecting file; it never silently overwrites root changes and never auto-starts. One product decision remains before any code: whether spotlight may proceed with a dirty root under user override (recommendation: not allowed).
+- **Unified code surface (#211, #212).** File preview, turn diff, workspace file diff, and the PR diff render through one code surface split into panel/lines/header/hunk-gap/style parts, with gutter and container measurements named as design tokens. **No ADR — see the gap list.**
 
 ## Deferred
 

@@ -34,9 +34,11 @@ each exposing its public surface through `index.ts`.
 | Pi adapter | `pi-agent/` | Pi CLI RPC wire frames (`cli-rpc/`), payload normalizer, slash commands |
 | Claude adapter | `claude-agent/` | Claude Code adapter, MCP config + roster, model catalogue, readiness |
 | Pi runtime discovery | `pi-runtime/` | Pi executable discovery, readiness checks |
-| Provider catalogue | `agent-providers/` | Model catalogue and provider service across runtimes |
+| Pi transport plumbing | `pi-ipc/` | JSONL line stream shared by `pi-runtime/` and `pi-agent/`; no protocol knowledge |
+| Provider catalogue | `agent-providers/` | Model catalogue, executable overrides, readiness probes across runtimes |
+| Harness detection | `agents/` | Which spawnable harnesses are installed on PATH, and their trusted launch commands |
 | Agent → app control | `agent-control/` | Loopback control server, MCP endpoint, ports/adapters, guardrails, origin registry |
-| Plan mode | `plan-mode/` | Plan gating, plan-file writing, spawn inheritance |
+| Plan mode | `plan-mode/` | Per-session plan registry, plan-file writing, plan submission — the enforcement classifiers live in `src/shared/plan-mode/` |
 | App lifecycle | `app/` | `BrowserWindow` creation, window state |
 | Chat tabs | `chat-tabs/` | Tab service, preview slot, terminal-session persistence |
 | Checkpoints | `checkpoints/` | Git-backed per-turn checkpoints (ADR&nbsp;0012) |
@@ -48,9 +50,9 @@ each exposing its public surface through `index.ts`.
 | Native menus | `menu/` | Electron application menus |
 | Open targets | `open-target/` | External editor/app detection and launch |
 | Repositories | `repository/` | Registration, git probing, lifecycle |
-| Review | `review/` | Diff and review-comment services |
+| Review | `review/` | Ensemblr-local review comments and todos |
 | Root directory | `root/` | Managed root resolution and reconciliation |
-| Scripts | `scripts/` | Named run-script lifecycle |
+| Scripts | `scripts/` | Named run-script lifecycle, setup/archive hooks, setup fingerprint and state file |
 | Secrets | `secrets/` | Keychain-backed storage and metadata (ADR&nbsp;0018) |
 | Setup | `setup/` | Setup diagnostics orchestration |
 | Storage | `storage/` | SQLite connection (`database.ts`), migrations, `repositories/`, `tx.ts` |
@@ -62,10 +64,13 @@ them as an entrypoint.
 
 ## `src/preload` — the IPC bridge
 
-Deliberately tiny: `preload.ts` plus `bridge/ensemblr-api.ts`. It exposes one
-typed, narrow API over `contextBridge` and nothing else — no raw `ipcRenderer`,
-no Node APIs, no Electron objects, no service instances. Argument normalization
-and trust-boundary validation belong in the main-process handler, not here.
+Deliberately tiny: `preload.ts` plus `bridge/ensemblr-api.ts` behind
+`bridge/index.ts`. `preload.ts` owns every `contextBridge.exposeInMainWorld`
+call — `window.ensemblr` for the API, plus a best-effort
+`window.ensemblrInitialShellSnapshot` seeded synchronously so the renderer can
+skip a first round trip. Nothing else crosses: no raw `ipcRenderer`, no Node
+APIs, no Electron objects, no service instances. Argument normalization and
+trust-boundary validation belong in the main-process handler, not here.
 
 ## `src/renderer` — React UI
 
@@ -74,20 +79,20 @@ A new feature is split across these buckets, not given a folder of its own.
 
 | Bucket | Holds | Concern folders inside |
 | --- | --- | --- |
-| `api/` | TanStack Query clients, query options, preload-backed access | — |
-| `components/` | React components and UI composition | `workbench-shell/`, `conversation/`, `diff-viewer/`, `settings/`, `git/`, `linear/`, `code-surface/`, `command-palette/`, `welcome/`, `ui/` (vendored shadcn) |
+| `api/` | TanStack Query clients, query options, preload-backed access | `ensemblr/` |
+| `components/` | React components and UI composition | `workbench-shell/`, `conversation/`, `diff-viewer/`, `code-surface/`, `settings/`, `setup-diagnostics/`, `git/`, `linear/`, `command-palette/`, `ask-user-question/`, `tool-collapsible/`, `pi-replay/`, `welcome/`, `ui/` (vendored shadcn) |
 | `config/` | Stable renderer constants (route stale times, knobs) | — |
-| `hooks/` | Renderer hooks that are not durable shared state | — |
-| `lib/` | Runtime helpers grouped by concern | `workbench/`, `agent-timeline/`, `conversation/`, `diff/`, `github/`, `linear/`, `pi/`, `pi-replay/`, `terminal/`, `code/` |
-| `fixtures/` | Fixture/demo data production code may still consume | — |
+| `hooks/` | Renderer hooks that are not durable shared state | `workbench-shell/`, `workspace/`, `conversation/`, `code-surface/`, `settings/`, `setup-diagnostics/`, `preferences/`, `git/`, `linear/`, `ask-user-question/`, `welcome/` |
+| `lib/` | Runtime helpers grouped by concern | `workbench/`, `agent-timeline/`, `conversation/`, `diff/`, `code/`, `github/`, `linear/`, `pi/`, `pi-replay/`, `terminal/`, `instrumentation/`, `ask-user-question/`, `welcome/` |
+| `fixtures/` | Fixture/demo data production code may still consume | `workbench/` |
 | `routing/` | TanStack Router file routes + generated tree | `routes/` |
 | `state/` | Durable Jotai state | `workspace/`, `composer/`, `pi/`, `plan-mode/`, `preferences/`, `dialogs/`, `recents/`, `sidebar/`, `settings-ui/`, `tool-approval/`, `ask-user-question/`, `conversation-scroll/`, `close-action/` |
 | `styles/` | CSS entrypoint (`index.css`) and font assets | — |
-| `types/` | Exported renderer types and ambient declarations | — |
+| `types/` | Exported renderer types and ambient declarations | `workbench/`, `workbench-shell/`, `components/` |
 
 Never create a concern folder directly under `src/renderer/` (no
 `src/renderer/workbench/`). The concern goes inside the right bucket:
-`lib/workbench/`, `state/workspace/`, `types/workbench.ts`.
+`lib/workbench/`, `state/workspace/`, `types/workbench/`.
 
 **Routing.** File-based TanStack Router under `routing/routes/`
 (ADR&nbsp;0026): `__root.tsx` uses `createRootRouteWithContext`, route files use
@@ -107,13 +112,15 @@ atom.
 
 The only code both processes may import. Two shapes coexist:
 
-- **Single-file concerns** — 23 root modules (`agent-control.ts`, `config.ts`,
-  `permissions.ts`, `github.ts`, `slug.ts`, …).
+- **Single-file concerns** — plain root modules (`config.ts`, `permissions.ts`,
+  `github.ts`, `slug.ts`, …); 23 `.ts` files sit at the shared root in total.
 - **Multi-file concerns** — an implementation directory behind a stable
-  entrypoint: `ipc/` (34 contract modules under `ipc/contracts/`, plus
-  `channels.ts` and `handler-map.ts`), `pi-rpc/`, `keymap/`, `agent-control/`,
-  and the `<concern>.ts` + `<concern>/` pairs for `plan-mode`, `scripts`,
-  `terminal`.
+  entrypoint, in one of two forms:
+  - `<concern>/index.ts` — `ipc/` (34 contract modules under `ipc/contracts/`,
+    plus `channels.ts` and `handler-map.ts`), `pi-rpc/`, `keymap/`.
+  - `<concern>.ts` + `<concern>/` — `agent-control`, `plan-mode`, `scripts`,
+    `terminal`. This is the form `electron --test` can resolve, so prefer it for
+    anything the main-process suites import.
 
 Never import renderer UI, main-process services, Electron, or `node:fs` from
 here.
@@ -159,9 +166,9 @@ migration ids, so a new migration must be added to both.
 
 | Suite | Runner | Count |
 | --- | --- | --- |
-| `tests/main/**` | `electron --test` (`ELECTRON_RUN_AS_NODE=1`), plus the pure-logic files listed one-by-one in `vitest.config.mts` — an explicit list, not a glob, so it never drags in the Electron-only suites | 135 files |
-| `tests/renderer/**` | Vitest (`node` env; DOM files opt in per file) | 175 files (15 under `dom/`) |
-| `tests/shared/**` | Vitest | 27 files |
+| `tests/main/**` | `electron --test` (`ELECTRON_RUN_AS_NODE=1`), plus the pure-logic files listed one-by-one in `vitest.config.mts` — an explicit list, not a glob, so it never drags in the Electron-only suites | 137 files |
+| `tests/renderer/**` | Vitest (`node` env; DOM files opt in per file) | 193 files (16 under `dom/`) |
+| `tests/shared/**` | Vitest | 28 files |
 
-See [`onboarding.md`](./onboarding.md#running-the-tests) for which runner a new
+See [`onboarding.md`](./onboarding.md#6-running-the-tests) for which runner a new
 test should use.
