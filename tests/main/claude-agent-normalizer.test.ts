@@ -12,6 +12,7 @@ import {
 const NOW = new Date('2026-08-06T12:00:00.000Z');
 
 function createNormalizer(): {
+	beginTurn: () => readonly AgentEvent[];
 	discoveries: SdkSessionDiscovery[];
 	normalize: (message: unknown) => readonly AgentEvent[];
 	observeContextUsage: (usage: {
@@ -26,10 +27,30 @@ function createNormalizer(): {
 		onDiscovery: (discovery) => discoveries.push(discovery),
 	});
 	return {
+		beginTurn: () => normalizer.beginTurn(),
 		discoveries,
 		normalize: (message) => normalizer.normalize(message as SDKMessage),
 		observeContextUsage: (usage) => normalizer.observeContextUsage(usage),
 		setTurnId: (turnId) => normalizer.setTurnId(turnId),
+	};
+}
+
+function thinkingDelta(text: string, index = 0): unknown {
+	return {
+		event: {
+			delta: { thinking: text, type: 'thinking_delta' },
+			index,
+			type: 'content_block_delta',
+		},
+		type: 'stream_event',
+	};
+}
+
+function sealedThinking(blocks: readonly Record<string, unknown>[]): unknown {
+	return {
+		message: { content: blocks },
+		parent_tool_use_id: null,
+		type: 'assistant',
 	};
 }
 
@@ -222,6 +243,164 @@ test('thinking blocks on an assistant message become reasoning parts', () => {
 			role: 'assistant',
 		},
 	]);
+});
+
+test('a thinking block sealed empty is refilled from the deltas that preceded it', () => {
+	const { normalize } = createNormalizer();
+	normalize(initMessage());
+
+	normalize({ event: { type: 'message_start' }, type: 'stream_event' });
+	normalize(thinkingDelta('weighing '));
+	normalize(thinkingDelta('the options'));
+	const events = normalize(
+		sealedThinking([{ signature: 'sig', thinking: '', type: 'thinking' }]),
+	);
+
+	assert.deepEqual(messagePayloads(events), [
+		{
+			kind: 'message',
+			parts: [{ kind: 'reasoning', text: 'weighing the options' }],
+			role: 'assistant',
+		},
+	]);
+});
+
+test('deltas refill the block at their own index, leaving other blocks alone', () => {
+	const { normalize } = createNormalizer();
+	normalize(initMessage());
+
+	normalize({ event: { type: 'message_start' }, type: 'stream_event' });
+	normalize(thinkingDelta('second block', 1));
+	const events = normalize(
+		sealedThinking([
+			{ text: 'first', type: 'text' },
+			{ signature: 'sig', thinking: '', type: 'thinking' },
+		]),
+	);
+
+	assert.deepEqual(messagePayloads(events), [
+		{
+			kind: 'message',
+			parts: [
+				{ kind: 'text', text: 'first' },
+				{ kind: 'reasoning', text: 'second block' },
+			],
+			role: 'assistant',
+		},
+	]);
+});
+
+test('a thinking block the runtime redacted still marks that the turn reasoned', () => {
+	const { normalize } = createNormalizer();
+	normalize(initMessage());
+
+	const events = normalize(
+		sealedThinking([{ signature: 'sig', thinking: '', type: 'thinking' }]),
+	);
+
+	assert.deepEqual(messagePayloads(events), [
+		{
+			kind: 'message',
+			parts: [{ kind: 'reasoning', text: '' }],
+			role: 'assistant',
+		},
+	]);
+});
+
+test('message_start clears banked reasoning so it cannot bleed into the next message', () => {
+	const { normalize } = createNormalizer();
+	normalize(initMessage());
+
+	normalize({ event: { type: 'message_start' }, type: 'stream_event' });
+	normalize(thinkingDelta('first turn reasoning'));
+	normalize(sealedThinking([{ thinking: '', type: 'thinking' }]));
+	normalize({ event: { type: 'message_start' }, type: 'stream_event' });
+	const events = normalize(
+		sealedThinking([{ thinking: '', type: 'thinking' }]),
+	);
+
+	assert.deepEqual(messagePayloads(events), [
+		{
+			kind: 'message',
+			parts: [{ kind: 'reasoning', text: '' }],
+			role: 'assistant',
+		},
+	]);
+});
+
+test('the seal clears banked reasoning even when no message_start follows it', () => {
+	const { normalize } = createNormalizer();
+	normalize(initMessage());
+
+	normalize({ event: { type: 'message_start' }, type: 'stream_event' });
+	normalize(thinkingDelta('first turn reasoning'));
+	normalize(sealedThinking([{ thinking: '', type: 'thinking' }]));
+	const events = normalize(
+		sealedThinking([{ thinking: '', type: 'thinking' }]),
+	);
+
+	assert.deepEqual(messagePayloads(events), [
+		{
+			kind: 'message',
+			parts: [{ kind: 'reasoning', text: '' }],
+			role: 'assistant',
+		},
+	]);
+});
+
+test('a delta with an unreadable block index is streamed but never banked', () => {
+	const { normalize } = createNormalizer();
+	normalize(initMessage());
+
+	normalize({ event: { type: 'message_start' }, type: 'stream_event' });
+	const streamed = normalize({
+		event: {
+			delta: { thinking: 'unplaceable', type: 'thinking_delta' },
+			index: 'nope',
+			type: 'content_block_delta',
+		},
+		type: 'stream_event',
+	});
+	const events = normalize(
+		sealedThinking([{ thinking: '', type: 'thinking' }]),
+	);
+
+	assert.deepEqual(messagePayloads(streamed), [
+		{ kind: 'reasoning-delta', text: 'unplaceable' },
+	]);
+	assert.deepEqual(messagePayloads(events), [
+		{
+			kind: 'message',
+			parts: [{ kind: 'reasoning', text: '' }],
+			role: 'assistant',
+		},
+	]);
+});
+
+test('beginTurn opens the turn before the runtime has said anything', () => {
+	const { beginTurn, normalize } = createNormalizer();
+	normalize(initMessage());
+
+	assert.deepEqual(beginTurn(), [
+		{
+			at: NOW.toISOString(),
+			previous: 'idle',
+			status: 'streaming',
+			type: 'status',
+		},
+	]);
+});
+
+test('init does not report idle over a turn that is already open', () => {
+	const { beginTurn, normalize } = createNormalizer();
+
+	beginTurn();
+	const events = normalize(initMessage());
+
+	assert.deepEqual(
+		events.filter((event) => event.type === 'status'),
+		[],
+	);
 });
 
 test('a user message carrying tool_result blocks lands as tool-result, not prose', () => {

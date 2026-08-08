@@ -375,9 +375,7 @@ function projectMessagePayload(
 				? [{ state: 'done', text: payload.text, type: 'text' }]
 				: [];
 		case 'reasoning':
-			return payload.text
-				? [{ state: 'done', text: payload.text, type: 'reasoning' }]
-				: [];
+			return [{ state: 'done', text: payload.text, type: 'reasoning' }];
 		case 'custom':
 			return payload.text
 				? [
@@ -433,9 +431,7 @@ function projectMessagePart(
 				? [{ state: 'done', text: part.text, type: 'text' }]
 				: [];
 		case 'reasoning':
-			return part.text
-				? [{ state: 'done', text: part.text, type: 'reasoning' }]
-				: [];
+			return [{ state: 'done', text: part.text, type: 'reasoning' }];
 		case 'tool-call':
 			return [buildToolCallPart(part, event)];
 		case 'tool-result':

@@ -400,6 +400,17 @@ describe('presentReasoning', () => {
 			title: 'Thinking',
 		});
 	});
+
+	test('marks a redacted block as a thought with nothing to disclose', () => {
+		const presentation = presentReasoning('');
+
+		expect(presentation).toMatchObject({
+			body: { kind: 'empty' },
+			glyph: 'brain',
+			preview: null,
+			title: 'Thought',
+		});
+	});
 });
 
 describe('presentCustomMessage', () => {

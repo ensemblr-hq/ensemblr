@@ -109,8 +109,12 @@ export function contentBlockToPart(block: unknown): AgentMessagePart | null {
 	if (blockType === 'text' && typeof record.text === 'string') {
 		return { kind: 'text', text: record.text };
 	}
-	if (blockType === 'thinking' && typeof record.thinking === 'string') {
-		return { kind: 'reasoning', text: record.thinking };
+	// An empty block is dropped rather than kept: the timeline renders every
+	// reasoning part it receives, and only Claude — which redacts its prose and
+	// ships the signature alone — has a turn worth marking with no text.
+	const thinking = readNonEmptyString(record.thinking);
+	if (blockType === 'thinking' && thinking) {
+		return { kind: 'reasoning', text: thinking };
 	}
 	if (blockType === 'toolCall' || blockType === 'tool-call') {
 		const name = typeof record.name === 'string' ? record.name : 'tool';
