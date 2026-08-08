@@ -113,6 +113,25 @@
 	--ensemblr-status-danger: var(--ensemblr-if-light, oklch(0.58 0.19 28))
 		var(--ensemblr-if-dark, oklch(0.68 0.15 28));
 	/*
+	 * The merged-PR purple. Lives here rather than under `[data-pr-tone="merged"]`
+	 * so the `pr-merged` utilities resolve wherever a merged pull request renders.
+	 * An unresolved custom property makes a colour declaration invalid at computed
+	 * value time, and `border-color` then falls back to `currentcolor` — a bright
+	 * border rather than a missing one, so the scope leak reads as a design bug.
+	 */
+	--ensemblr-pr-merged: var(--ensemblr-if-light, oklch(0.5 0.2 304))
+		var(--ensemblr-if-dark, oklch(0.76 0.19 304));
+	--ensemblr-pr-merged-border: color-mix(
+		in oklch,
+		var(--ensemblr-pr-merged),
+		transparent 30%
+	);
+	--ensemblr-pr-merged-soft: color-mix(
+		in oklch,
+		var(--ensemblr-pr-merged),
+		transparent 86%
+	);
+	/*
 	 * Code surface. Owned by the app theme, not by the picked Shiki theme: a code
 	 * block reads as a panel of the app first and a syntax sample second, so its
 	 * background and border follow light/dark while only the token colours inside
@@ -367,20 +386,18 @@
 	--color-status-ok: var(--ensemblr-status-ok);
 	--color-status-warning: var(--ensemblr-status-warning);
 	--color-status-danger: var(--ensemblr-status-danger);
-	--color-status-merged: oklch(0.72 0.21 304);
 	/*
-	 * The merged-PR header's purple, as utilities rather than arbitrary values.
-	 * The underlying properties are scoped to `[data-pr-tone="merged"]` and cut
-	 * differently per polarity, so — like `--spacing-code-gutter` above —
-	 * `@theme inline` inlines the `var()` reference and each utility resolves
-	 * against the header it lands in. Outside that scope they resolve to nothing,
-	 * which is the intent: nothing else is a merged pull request.
+	 * Borrows the merged-PR purple rather than declaring an
+	 * `--ensemblr-status-merged` beside the three above: the sidebar chip and the
+	 * header pill mark the same thing, and two definitions of one colour drift.
+	 * It sits in the status family because the sidebar picks it alongside
+	 * `text-status-ok` and `text-status-danger`.
 	 */
-	--color-pr-merged: var(--right-sidebar-header-merged);
-	--color-pr-merged-border: var(--right-sidebar-header-merged-border);
-	--color-pr-merged-foreground: var(--right-sidebar-header-merged-foreground);
-	--color-pr-merged-hover: var(--right-sidebar-header-merged-hover);
-	--color-pr-merged-soft: var(--right-sidebar-header-merged-soft);
+	--color-status-merged: var(--ensemblr-pr-merged);
+	/* The merged-PR purple, as utilities rather than arbitrary values. */
+	--color-pr-merged: var(--ensemblr-pr-merged);
+	--color-pr-merged-border: var(--ensemblr-pr-merged-border);
+	--color-pr-merged-soft: var(--ensemblr-pr-merged-soft);
 	--color-code: var(--ensemblr-code);
 	--color-code-foreground: var(--ensemblr-code-foreground);
 	--color-code-border: var(--ensemblr-code-border);
@@ -542,39 +559,8 @@
 		}
 	}
 
-	.right-sidebar-header[data-pr-tone="merged"],
-	.right-sidebar-header-actions[data-pr-tone="merged"] {
-		--right-sidebar-header-merged: oklch(0.5 0.2 304);
-		--right-sidebar-header-merged-border: color-mix(
-			in oklch,
-			var(--right-sidebar-header-merged),
-			transparent 30%
-		);
-		--right-sidebar-header-merged-foreground: oklch(0.99 0 0);
-		--right-sidebar-header-merged-hover: color-mix(
-			in oklch,
-			var(--right-sidebar-header-merged),
-			black 10%
-		);
-		--right-sidebar-header-merged-soft: color-mix(
-			in oklch,
-			var(--right-sidebar-header-merged),
-			transparent 86%
-		);
-	}
-
-	.dark .right-sidebar-header[data-pr-tone="merged"],
-	.dark .right-sidebar-header-actions[data-pr-tone="merged"] {
-		--right-sidebar-header-merged: oklch(0.76 0.19 304);
-		--right-sidebar-header-merged-foreground: oklch(0.14 0.006 35);
-	}
-
 	.right-sidebar-header[data-pr-tone="merged"] {
-		background: color-mix(
-			in oklch,
-			var(--right-sidebar-header-merged),
-			transparent 82%
-		);
+		background: color-mix(in oklch, var(--ensemblr-pr-merged), transparent 82%);
 	}
 
 	.right-sidebar-header[data-pr-tone="ready"] {

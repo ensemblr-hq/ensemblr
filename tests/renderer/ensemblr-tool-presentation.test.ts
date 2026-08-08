@@ -2,6 +2,7 @@ import type { DynamicToolUIPart } from 'ai';
 import { describe, expect, test } from 'vitest';
 
 import {
+	canonicalEnsemblrToolName,
 	ENSEMBLR_CONTROL_TOOL_NAMES,
 	ensemblrToolGlyph,
 	ensemblrToolLabel,
@@ -60,6 +61,40 @@ const deniedCall = (
 		type: 'dynamic-tool',
 	}) as DynamicToolUIPart;
 
+// Claude Code reaches the control server over MCP, where the SDK namespaces
+// every tool by its server: the same call Pi reports as `ensemblr_set_name`
+// arrives as `mcp__ensemblr__ensemblr_set_name`.
+const mcpName = (toolName: string) => `mcp__ensemblr__${toolName}`;
+
+describe('canonicalEnsemblrToolName', () => {
+	test('passes through the name the extension registered', () => {
+		expect(canonicalEnsemblrToolName('ensemblr_set_name')).toBe(
+			'ensemblr_set_name',
+		);
+	});
+
+	test('unwraps the MCP namespacing a harness adds', () => {
+		expect(canonicalEnsemblrToolName(mcpName('ensemblr_wait_for_agents'))).toBe(
+			'ensemblr_wait_for_agents',
+		);
+	});
+
+	test('resolves every control tool through the wrapped form', () => {
+		for (const toolName of ENSEMBLR_CONTROL_TOOL_NAMES) {
+			expect(canonicalEnsemblrToolName(mcpName(toolName))).toBe(toolName);
+		}
+	});
+
+	// A slice that names no registered tool must not borrow a label from one.
+	test('refuses a name that only carries the prefix', () => {
+		expect(canonicalEnsemblrToolName('mcp__other__load_ensemblr_config')).toBe(
+			null,
+		);
+		expect(canonicalEnsemblrToolName('ensemblr_not_a_real_tool')).toBe(null);
+		expect(canonicalEnsemblrToolName('bash')).toBe(null);
+	});
+});
+
 describe('isHiddenEnsemblrToolCall', () => {
 	test.each([
 		'ensemblr_set_summary',
@@ -113,12 +148,28 @@ describe('isHiddenEnsemblrToolCall', () => {
 	])('keeps %s visible', (toolName) => {
 		expect(isHiddenEnsemblrToolCall(toolCall(toolName))).toBe(false);
 	});
+
+	// Bookkeeping the app asks for on its own behalf has to fold away whichever
+	// runtime made the call, or half the turns show the rows the other hides.
+	test.each([
+		'ensemblr_set_summary',
+		'ensemblr_set_name',
+		'ensemblr_set_branch_name',
+	])('hides the MCP-namespaced bookkeeping call %s', (toolName) => {
+		expect(isHiddenEnsemblrToolCall(toolCall(mcpName(toolName)))).toBe(true);
+	});
+
+	test('keeps a denied MCP-namespaced bookkeeping call visible', () => {
+		expect(
+			isHiddenEnsemblrToolCall(deniedCall(mcpName('ensemblr_set_branch_name'))),
+		).toBe(false);
+	});
 });
 
 describe('ensemblrToolLabel', () => {
 	test('names the action rather than the tool', () => {
 		expect(ensemblrToolLabel('ensemblr_wait_for_agents', {}, false)).toEqual({
-			glyph: 'bot',
+			glyph: 'hourglass',
 			title: 'Waited for sub-agents',
 		});
 	});
@@ -155,7 +206,7 @@ describe('ensemblrToolLabel', () => {
 			title: 'Read review comments',
 		});
 		expect(ensemblrToolLabel('ensemblr_add_diff_comments', {}, true)).toEqual({
-			glyph: 'message-square-text',
+			glyph: 'message-square-plus',
 			title: 'Leaving review comments',
 		});
 	});
@@ -164,10 +215,103 @@ describe('ensemblrToolLabel', () => {
 		expect(
 			ensemblrToolLabel(
 				'ensemblr_get_workspace_diff',
-				{ file: 'src/main/main.ts' },
+				{ filePath: 'src/main/main.ts' },
 				false,
 			)?.title,
 		).toBe('Read the diff: src/main/main.ts');
+	});
+
+	// `file` and `path` are the near-misses the control boundary rewrites to
+	// `filePath`, and the timeline records what the model sent, not the rewrite.
+	test('reads the forgiven spelling of a path argument', () => {
+		expect(
+			ensemblrToolLabel(
+				'ensemblr_get_diff_comments',
+				{ file: 'src/main/main.ts' },
+				false,
+			)?.title,
+		).toBe('Read review comments: src/main/main.ts');
+	});
+
+	test('reads the arguments the control surface actually names', () => {
+		expect(
+			ensemblrToolLabel(
+				'ensemblr_launch_harness',
+				{ harnessId: 'claude' },
+				true,
+			)?.title,
+		).toBe('Launching a harness: claude');
+		expect(
+			ensemblrToolLabel(
+				'ensemblr_write_terminal',
+				{ input: 'npm run check', terminalId: 't1' },
+				false,
+			)?.title,
+		).toBe('Typed into a terminal: npm run check');
+		expect(
+			ensemblrToolLabel('ensemblr_focus_panel', { panel: 'changes' }, false)
+				?.title,
+		).toBe('Focused a panel: changes');
+	});
+
+	// A batched call carries its subject inside an array, so a label reading only
+	// top-level keys says nothing about what the batch acted on.
+	test('steps into a batch to name what it acted on', () => {
+		expect(
+			ensemblrToolLabel(
+				'ensemblr_add_diff_comments',
+				{
+					comments: [
+						{
+							body: 'This leaks.',
+							filePath: 'src/main/main.ts',
+							lineNumber: 4,
+						},
+					],
+				},
+				false,
+			)?.title,
+		).toBe('Left review comments: src/main/main.ts');
+		expect(
+			ensemblrToolLabel(
+				'ensemblr_ask_user_question',
+				{
+					questions: [
+						{ options: [], question: 'Which branch should this land on?' },
+					],
+				},
+				true,
+			)?.title,
+		).toBe('Asking you a question: Which branch should this land on?');
+	});
+
+	test('titles a call the MCP-namespaced name reaches it under', () => {
+		expect(
+			ensemblrToolLabel(
+				'mcp__ensemblr__ensemblr_start_conversation',
+				{ title: 'Astro config audit' },
+				false,
+			),
+		).toEqual({
+			glyph: 'bot',
+			title: 'Started a sub-agent: Astro config audit',
+		});
+		expect(ensemblrToolGlyph('mcp__ensemblr__ensemblr_focus_tab')).toBe(
+			'crosshair',
+		);
+	});
+
+	// A folded turn paints one mark per call, so a terminal it started and a
+	// terminal it stopped reading as the same mark hides what the turn did.
+	test('marks each action with its own glyph', () => {
+		const glyphs = [
+			'ensemblr_start_terminal',
+			'ensemblr_stop_terminal',
+			'ensemblr_write_terminal',
+			'ensemblr_read_terminal_output',
+		].map((toolName) => ensemblrToolGlyph(toolName));
+
+		expect(new Set(glyphs).size).toBe(glyphs.length);
 	});
 
 	test('folds the spawned tab title into the label', () => {
@@ -235,6 +379,26 @@ describe('presentToolCall on control tools', () => {
 
 		expect(presentation.title).toBe('Started a sub-agent: Astro audit');
 		expect(presentation.glyph).toBe('bot');
+	});
+
+	// This is the row the screenshot showed: an MCP-namespaced control call
+	// titled with its wire name and marked with the generic wrench.
+	test('replaces the MCP-namespaced wire name too', () => {
+		const presentation = presentToolCall(
+			toolCall('mcp__ensemblr__ensemblr_get_workspace_diff', {
+				filePath: 'src/main/main.ts',
+			}),
+		);
+
+		expect(presentation.title).toBe('Read the diff: src/main/main.ts');
+		expect(presentation.glyph).toBe('file-diff');
+	});
+
+	test('names the tool rather than its MCP wrapper when it fails', () => {
+		expect(
+			presentToolCall(transportFailure('mcp__ensemblr__ensemblr_set_summary'))
+				.title,
+		).toBe('Ensemblr set summary failed');
 	});
 
 	test('gives every control tool a glyph other than the generic wrench', () => {

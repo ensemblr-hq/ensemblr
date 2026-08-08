@@ -69,6 +69,7 @@ export default defineConfig({
 			'tests/main/agent-control-awareness-parity.test.ts',
 			'tests/main/agent-control-arg-naming.test.ts',
 			'tests/main/agent-control-doc-parity.test.ts',
+			'tests/main/agent-control-timeline-labels.test.ts',
 			'tests/main/agent-control-session-naming.test.ts',
 			'tests/main/agent-control-ask-user-question.test.ts',
 			'tests/main/board-status-store.test.ts',

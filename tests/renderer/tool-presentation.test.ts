@@ -87,6 +87,62 @@ describe('presentToolCall', () => {
 		});
 	});
 
+	test('marks a read of an image placeholder as an image read', () => {
+		const presentation = presentToolCall(
+			call(
+				'read',
+				{ path: 'docs/shot.png' },
+				{ text: 'Read image file [image/png]' },
+			),
+		);
+
+		expect(presentation.title).toBe('Read image');
+		expect(presentation.glyph).toBe('image');
+		expect(presentation.body).toEqual({ kind: 'empty' });
+	});
+
+	test('marks a read whose image bytes carried no text as an image read', () => {
+		const presentation = presentToolCall(
+			call('read', { file_path: '/repo/.context/shot.PNG' }, { text: '' }),
+		);
+
+		expect(presentation.title).toBe('Read image');
+		expect(presentation.glyph).toBe('image');
+		expect(presentation.body).toEqual({ kind: 'empty' });
+		expect(presentation.badge).toMatchObject({
+			kind: 'file',
+			path: '/repo/.context/shot.PNG',
+		});
+	});
+
+	test('keeps an svg read on the text body it returns', () => {
+		const presentation = presentToolCall(
+			call('read', { path: 'src/logo.svg' }, { text: '<svg />\n' }),
+		);
+
+		expect(presentation.title).toBe('Read 1 lines');
+		expect(presentation.body).toMatchObject({ kind: 'code' });
+	});
+
+	// The extension is only a fallback for the runtime that projects image bytes
+	// to nothing. A runtime reporting a limit or a truncation on the same channel
+	// has something to say, and an image row would throw it away.
+	test('keeps a read of an image path that returned text on that text', () => {
+		const presentation = presentToolCall(
+			call(
+				'read',
+				{ path: 'assets/logo.png' },
+				{ text: 'File exceeds the maximum readable size.' },
+			),
+		);
+
+		expect(presentation.title).not.toBe('Read image');
+		expect(presentation.body).toMatchObject({
+			code: 'File exceeds the maximum readable size.',
+			kind: 'code',
+		});
+	});
+
 	test('renders an edit as a diff and counts its changed lines', () => {
 		const presentation = presentToolCall(
 			call(
@@ -401,15 +457,24 @@ describe('presentReasoning', () => {
 		});
 	});
 
-	test('marks a redacted block as a thought with nothing to disclose', () => {
-		const presentation = presentReasoning('');
+	test('trims the prose it projects into the body and preview', () => {
+		const presentation = presentReasoning('  Check the config.  ');
 
 		expect(presentation).toMatchObject({
-			body: { kind: 'empty' },
-			glyph: 'brain',
-			preview: null,
-			title: 'Thought',
+			body: { kind: 'markdown', text: 'Check the config.' },
+			preview: { font: 'sans', text: 'Check the config.' },
+			title: 'Thinking',
 		});
+	});
+
+	// A runtime that redacts its reasoning ships the block's signature and no
+	// prose. There is no row to project for it.
+	test.each([
+		'',
+		'   ',
+		'\n\t',
+	])('projects nothing for a block carrying %j', (text) => {
+		expect(presentReasoning(text)).toBeNull();
 	});
 });
 

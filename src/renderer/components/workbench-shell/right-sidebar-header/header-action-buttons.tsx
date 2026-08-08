@@ -15,12 +15,12 @@ import {
 import { useReviewActions } from '../review-actions/review-actions-context';
 
 /**
- * Styling shared by the two pending git states. Only geometry — the tone comes
- * from the Button's default `bg-primary` variant, which reads white-on-black
- * against the pending strip in dark mode and inverts in light, rather than an
- * amber fill that would fight the tint it sits on.
+ * Styling shared by every primary header action, whatever the pull request's
+ * tone. Only geometry — the fill comes from the Button's default `bg-primary`
+ * variant, which reads white-on-black in light mode and inverts in dark, rather
+ * than a status colour that would fight the tinted strip it sits on.
  */
-const PENDING_ACTION_BUTTON_CLASSES = 'h-7 rounded-md px-2.5';
+export const HEADER_ACTION_BUTTON_CLASSES = 'h-7 rounded-md px-2.5';
 
 const mergeBoundary = classifyPermissionAction({
 	action: 'pull-request-merge',
@@ -46,7 +46,7 @@ export function MergePullRequestAction() {
 
 	return (
 		<Button
-			className='h-7 rounded-md bg-status-ok px-2.5 text-primary-foreground hover:bg-status-ok/90'
+			className={HEADER_ACTION_BUTTON_CLASSES}
 			data-permission-boundary={mergeBoundary.boundary}
 			onClick={reviewActions?.openMergeConfirmation}
 			size='sm'
@@ -64,7 +64,7 @@ export function CommitAndPushAction() {
 
 	return (
 		<Button
-			className={PENDING_ACTION_BUTTON_CLASSES}
+			className={HEADER_ACTION_BUTTON_CLASSES}
 			disabled={reviewActions === null}
 			onClick={reviewActions?.commitAndPush}
 			size='sm'
@@ -82,7 +82,7 @@ export function PushBranchAction() {
 
 	return (
 		<Button
-			className={PENDING_ACTION_BUTTON_CLASSES}
+			className={HEADER_ACTION_BUTTON_CLASSES}
 			disabled={reviewActions === null || isPushing}
 			onClick={reviewActions?.pushBranch}
 			size='sm'

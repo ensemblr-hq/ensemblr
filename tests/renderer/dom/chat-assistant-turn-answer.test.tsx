@@ -12,6 +12,9 @@ const REPORT = 'What went well: every sub-agent returned a usable report.';
 const textPart = (text: string) =>
 	({ state: 'done', text, type: 'text' }) as UIMessage['parts'][number];
 
+const reasoningPart = (text: string) =>
+	({ state: 'done', text, type: 'reasoning' }) as UIMessage['parts'][number];
+
 const toolPart = (toolName: string, input: Record<string, unknown> = {}) =>
 	({
 		input,
@@ -106,6 +109,26 @@ describe('ChatAssistantTurn', () => {
 
 		expect(container.textContent).toContain('Waiting for sub-agents');
 		expect(container.textContent).not.toContain('Waited for sub-agents');
+	});
+
+	// A runtime that redacts its reasoning ships the block's signature and no
+	// prose. The row it used to get said "Thought" and opened onto nothing.
+	test('drops a reasoning block that carries no prose', () => {
+		const { container, queryByText } = renderWithProviders(
+			turn([reasoningPart('   '), textPart('Done.')]),
+		);
+
+		expect(queryByText('Thought')).toBeNull();
+		expect(queryByText(/1 message/)).toBeNull();
+		expect(container.querySelector('[data-role="turn-summary"]')).toBeNull();
+	});
+
+	test('keeps a reasoning block that carries prose', () => {
+		const { getByText } = renderWithProviders(
+			turn([reasoningPart('Check the config first.'), textPart('Done.')]),
+		);
+
+		expect(getByText(/1 message/)).toBeTruthy();
 	});
 
 	test('still folds commentary that precedes a real tool call', () => {

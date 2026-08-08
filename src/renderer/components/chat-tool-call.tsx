@@ -28,12 +28,14 @@ export function ChatToolCall({ part }: { part: DynamicToolUIPart }) {
 /**
  * One reasoning block, rendered as the same collapsible row a tool call gets so
  * thinking and acting read as a single timeline rather than two styles. A block
- * whose runtime redacted the prose still gets its row, so a turn that reasoned
- * says so instead of leaving a gap.
+ * whose runtime redacted the prose renders nothing: an inert row titled
+ * "Thought" costs the turn a line and discloses nothing behind it.
  */
 export function ChatReasoningCollapsible({ text }: { text: string }) {
-	const trimmed = text.trim();
-	const presentation = useMemo(() => presentReasoning(trimmed), [trimmed]);
+	const presentation = useMemo(() => presentReasoning(text), [text]);
+	if (presentation === null) {
+		return null;
+	}
 	return <ToolRow presentation={presentation} />;
 }
 

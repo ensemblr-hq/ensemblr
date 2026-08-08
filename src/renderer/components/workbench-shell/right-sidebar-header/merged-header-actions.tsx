@@ -7,6 +7,7 @@ import {
 } from '@/shared/permissions';
 
 import { useReviewActions } from '../review-actions/review-actions-context';
+import { HEADER_ACTION_BUTTON_CLASSES } from './header-action-buttons';
 
 const archiveBoundary = classifyPermissionAction({
 	action: 'workspace-archive-delete',
@@ -46,7 +47,7 @@ export function MergedHeaderActions() {
 				Continue
 			</Button>
 			<Button
-				className='h-7 rounded-md bg-pr-merged px-2.5 text-pr-merged-foreground hover:bg-pr-merged-hover'
+				className={HEADER_ACTION_BUTTON_CLASSES}
 				data-permission-boundary={archiveBoundary.boundary}
 				disabled={isBusy}
 				onClick={reviewActions?.archiveMergedWorkspace}
