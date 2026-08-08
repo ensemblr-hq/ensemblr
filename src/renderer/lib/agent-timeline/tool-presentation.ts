@@ -59,6 +59,7 @@ const TOOL_GLYPHS: Record<string, ToolGlyph> = {
 	run_command: 'terminal',
 	search: 'search',
 	shell: 'terminal',
+	skill: 'biceps-flexed',
 	str_replace: 'file-pen',
 	str_replace_editor: 'file-pen',
 	view: 'file-text',
@@ -166,7 +167,8 @@ function pathOf(bag: Record<string, unknown>): string | null {
 }
 
 /**
- * Builds the chip that pins a tool's target path to its row.
+ * Builds the chip that pins a tool's target path to its row, trimmed so the same
+ * file resolves against the workspace tree whichever tool named it.
  * @param path - Path the tool operated on, or null when it named none
  * @param kind - Whether the path is a file or a directory
  * @param counts - Added and removed line counts; either side may be null when
@@ -178,14 +180,15 @@ function fileBadge(
 	kind: 'file' | 'folder' = 'file',
 	counts: { additions: number | null; deletions: number | null } | null = null,
 ): ToolBadgeDescriptor | null {
-	if (path === null) {
+	const named = path?.trim() ?? '';
+	if (named.length === 0) {
 		return null;
 	}
 	return {
 		additions: counts?.additions ?? null,
 		deletions: counts?.deletions ?? null,
 		kind,
-		path,
+		path: named,
 	};
 }
 
@@ -578,6 +581,29 @@ function presentGeneric(part: DynamicToolUIPart): ToolPresenterResult {
 	};
 }
 
+/**
+ * Activates a packaged skill. The wire name is only ever `Skill`, so a turn that
+ * reached for three of them reads as three identical rows; the skill it invoked
+ * is the one thing the row has to say, and it travels in the arguments.
+ *
+ * Reads exactly as {@link presentSkillInvocation} reads the same act on the
+ * other runtime: one inert line, nothing to unfold. The result this call returns
+ * is the skill's own `SKILL.md` handed back to the caller — prompt rather than
+ * output, and the turn that follows is where its effect shows.
+ * @param part - The `skill` tool part to project
+ * @returns The row's title, badge, preview, and body
+ */
+function presentSkill(part: DynamicToolUIPart): ToolPresenterResult {
+	const name = stringField(inputOf(part), 'skill', 'skill_name', 'name');
+	return {
+		badge: null,
+		body: { kind: 'empty' },
+		preview: null,
+		title: name === null ? 'Skill' : `Skill: ${name}`,
+		tone: 'default',
+	};
+}
+
 const PRESENTERS: Record<
 	string,
 	(part: DynamicToolUIPart) => ToolPresenterResult
@@ -595,6 +621,7 @@ const PRESENTERS: Record<
 	run_command: presentBash,
 	search: presentGrep,
 	shell: presentBash,
+	skill: presentSkill,
 	str_replace: presentEdit,
 	str_replace_editor: presentEdit,
 	view: presentRead,
@@ -681,6 +708,7 @@ export function presentToolCall(part: DynamicToolUIPart): ToolPresentation {
 	);
 	const presentation = {
 		...projected,
+		badge: controlLabel?.badge ?? projected.badge,
 		glyph: projected.glyph ?? glyph,
 		title: controlLabel?.title ?? projected.title,
 	};
@@ -754,9 +782,9 @@ export function presentCustomMessage(
 
 /**
  * Projects a skill activation into a row, so a `/skill:name` invocation reads as
- * one line of turn activity — the skill named, marked "Skill activated" — rather
- * than the whole `SKILL.md` Pi expanded into the prompt. The body is empty: the
- * skill's effect is the turn that follows, not text to unfold.
+ * one line of turn activity naming the skill, rather than the whole `SKILL.md`
+ * Pi expanded into the prompt. The body is empty: the skill's effect is the turn
+ * that follows, not text to unfold.
  * @param name - The invoked skill's name
  * @returns The row presentation for the activation
  */
@@ -765,8 +793,8 @@ export function presentSkillInvocation(name: string): ToolPresentation {
 		badge: null,
 		body: { kind: 'empty' },
 		glyph: 'biceps-flexed',
-		preview: { font: 'mono', text: 'Skill activated' },
-		title: humanizeToolName(name),
+		preview: null,
+		title: `Skill: ${name}`,
 		tone: 'default',
 	};
 }

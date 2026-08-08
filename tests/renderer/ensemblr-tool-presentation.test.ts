@@ -169,6 +169,7 @@ describe('isHiddenEnsemblrToolCall', () => {
 describe('ensemblrToolLabel', () => {
 	test('names the action rather than the tool', () => {
 		expect(ensemblrToolLabel('ensemblr_wait_for_agents', {}, false)).toEqual({
+			badge: null,
 			glyph: 'hourglass',
 			title: 'Waited for sub-agents',
 		});
@@ -197,15 +198,18 @@ describe('ensemblrToolLabel', () => {
 	test('reads the review tools as the review action taken', () => {
 		expect(ensemblrToolLabel('ensemblr_get_workspace_diff', {}, false)).toEqual(
 			{
+				badge: null,
 				glyph: 'file-diff',
 				title: 'Read the diff',
 			},
 		);
 		expect(ensemblrToolLabel('ensemblr_get_diff_comments', {}, false)).toEqual({
+			badge: null,
 			glyph: 'message-square-text',
 			title: 'Read review comments',
 		});
 		expect(ensemblrToolLabel('ensemblr_add_diff_comments', {}, true)).toEqual({
+			badge: null,
 			glyph: 'message-square-plus',
 			title: 'Leaving review comments',
 		});
@@ -222,6 +226,7 @@ describe('ensemblrToolLabel', () => {
 				false,
 			),
 		).toEqual({
+			badge: null,
 			glyph: 'ticket-check',
 			title: 'Updated a Linear issue: THE-106',
 		});
@@ -242,6 +247,7 @@ describe('ensemblrToolLabel', () => {
 		expect(
 			ensemblrToolLabel('ensemblr_linear_get_metadata', {}, false),
 		).toEqual({
+			badge: null,
 			glyph: 'list',
 			title: 'Read Linear teams and states',
 		});
@@ -266,26 +272,61 @@ describe('ensemblrToolLabel', () => {
 		).toBe('Searched Linear issues: diff');
 	});
 
-	test('folds the file under review into the diff label', () => {
+	// A path in the title is a string the reader cannot open and cannot see the
+	// end of once the row truncates it. The chip is the same one a `write` row
+	// carries, so the file reads and opens the same way whichever tool named it.
+	test('pins the file under review as a chip rather than title text', () => {
 		expect(
 			ensemblrToolLabel(
 				'ensemblr_get_workspace_diff',
 				{ filePath: 'src/main/main.ts' },
 				false,
-			)?.title,
-		).toBe('Read the diff: src/main/main.ts');
+			),
+		).toEqual({
+			badge: {
+				additions: null,
+				deletions: null,
+				kind: 'file',
+				path: 'src/main/main.ts',
+			},
+			glyph: 'file-diff',
+			title: 'Read the diff',
+		});
 	});
 
 	// `file` and `path` are the near-misses the control boundary rewrites to
 	// `filePath`, and the timeline records what the model sent, not the rewrite.
 	test('reads the forgiven spelling of a path argument', () => {
-		expect(
-			ensemblrToolLabel(
-				'ensemblr_get_diff_comments',
-				{ file: 'src/main/main.ts' },
-				false,
-			)?.title,
-		).toBe('Read review comments: src/main/main.ts');
+		const label = ensemblrToolLabel(
+			'ensemblr_get_diff_comments',
+			{ file: 'src/main/main.ts' },
+			false,
+		);
+
+		expect(label?.badge?.path).toBe('src/main/main.ts');
+		expect(label?.title).toBe('Read review comments');
+	});
+
+	// All three `open_tab` variants take a path, so a row showing only the file
+	// cannot say whether it opened a preview, a diff, or a comment. The chip and
+	// the title are separate slots — the variant does not have to yield the one to
+	// hold the other.
+	test('names the variant and the file it opened in their own slots', () => {
+		const withFile = ensemblrToolLabel(
+			'ensemblr_open_tab',
+			{ filePath: 'src/main/main.ts', variant: 'diff' },
+			false,
+		);
+		const withoutFile = ensemblrToolLabel(
+			'ensemblr_open_tab',
+			{ variant: 'comment' },
+			false,
+		);
+
+		expect(withFile?.badge?.path).toBe('src/main/main.ts');
+		expect(withFile?.title).toBe('Opened a tab: diff');
+		expect(withoutFile?.badge).toBeNull();
+		expect(withoutFile?.title).toBe('Opened a tab: comment');
 	});
 
 	test('reads the arguments the control surface actually names', () => {
@@ -309,24 +350,47 @@ describe('ensemblrToolLabel', () => {
 		).toBe('Focused a panel: changes');
 	});
 
+	// One call files comments across as many files as the reviewer touched, so
+	// naming the first one labels the row with a file the body below it mostly is
+	// not about.
+	test('names no file on a batch spanning several', () => {
+		const label = ensemblrToolLabel(
+			'ensemblr_add_diff_comments',
+			{
+				comments: [
+					{ body: 'This leaks.', filePath: 'src/main/main.ts', lineNumber: 4 },
+					{ body: 'Same here.', filePath: 'src/main/ipc.ts', lineNumber: 9 },
+				],
+			},
+			false,
+		);
+
+		expect(label?.title).toBe('Left review comments');
+		expect(label?.badge).toBeNull();
+	});
+
+	// The objection above only holds while the batch disagrees. A pass that stayed
+	// in one file — the common one — names it, the same chip a single-path tool
+	// would have pinned.
+	test('pins the file a batch agreed on', () => {
+		const label = ensemblrToolLabel(
+			'ensemblr_add_diff_comments',
+			{
+				comments: [
+					{ body: 'This leaks.', filePath: 'src/main/main.ts', lineNumber: 4 },
+					{ body: 'And here.', filePath: 'src/main/main.ts', lineNumber: 9 },
+				],
+			},
+			false,
+		);
+
+		expect(label?.title).toBe('Left review comments');
+		expect(label?.badge?.path).toBe('src/main/main.ts');
+	});
+
 	// A batched call carries its subject inside an array, so a label reading only
 	// top-level keys says nothing about what the batch acted on.
 	test('steps into a batch to name what it acted on', () => {
-		expect(
-			ensemblrToolLabel(
-				'ensemblr_add_diff_comments',
-				{
-					comments: [
-						{
-							body: 'This leaks.',
-							filePath: 'src/main/main.ts',
-							lineNumber: 4,
-						},
-					],
-				},
-				false,
-			)?.title,
-		).toBe('Left review comments: src/main/main.ts');
 		expect(
 			ensemblrToolLabel(
 				'ensemblr_ask_user_question',
@@ -348,6 +412,7 @@ describe('ensemblrToolLabel', () => {
 				false,
 			),
 		).toEqual({
+			badge: null,
 			glyph: 'bot',
 			title: 'Started a sub-agent: Astro config audit',
 		});
@@ -377,6 +442,7 @@ describe('ensemblrToolLabel', () => {
 				false,
 			),
 		).toEqual({
+			badge: null,
 			glyph: 'bot',
 			title: 'Started a sub-agent: Astro config audit',
 		});
@@ -445,8 +511,14 @@ describe('presentToolCall on control tools', () => {
 			}),
 		);
 
-		expect(presentation.title).toBe('Read the diff: src/main/main.ts');
+		expect(presentation.title).toBe('Read the diff');
 		expect(presentation.glyph).toBe('file-diff');
+		expect(presentation.badge).toEqual({
+			additions: null,
+			deletions: null,
+			kind: 'file',
+			path: 'src/main/main.ts',
+		});
 	});
 
 	test('names the tool rather than its MCP wrapper when it fails', () => {

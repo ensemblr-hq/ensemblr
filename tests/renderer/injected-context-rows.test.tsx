@@ -112,10 +112,10 @@ describe('skill invocation prompts', () => {
 });
 
 describe('skill activation rows', () => {
-	test('names the skill and marks it activated inside the turn', () => {
+	test('names the skill inside the turn with nothing to open', () => {
 		renderRow(<ChatSkillInvocation name='caveman' />);
 
-		expect(screen.getByText('Caveman')).toBeInTheDocument();
-		expect(screen.getByText('Skill activated')).toBeInTheDocument();
+		expect(screen.getByText('Skill: caveman')).toBeInTheDocument();
+		expect(screen.getByRole('button')).toBeDisabled();
 	});
 });

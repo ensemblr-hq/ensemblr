@@ -1,5 +1,8 @@
 import type { DynamicToolUIPart } from 'ai';
-import type { ToolGlyph } from '@/renderer/types/tool-presentation';
+import type {
+	ToolBadgeDescriptor,
+	ToolGlyph,
+} from '@/renderer/types/tool-presentation';
 
 /**
  * How the app's own control tools read in the timeline.
@@ -62,6 +65,15 @@ interface EnsemblrToolLabel {
 	 * its subject inside an array still names it.
 	 */
 	detailKeys?: readonly string[];
+	/**
+	 * Input paths whose value is a workspace file, pinned as a clickable chip
+	 * rather than appended to the title — the same chip a `write` or an `edit`
+	 * row carries, so a path reads and opens the same way whichever tool named
+	 * it. Independent of {@link EnsemblrToolLabel.detailKeys}: a call naming both
+	 * a file and an argument, as `open_tab` names a file and a variant, shows the
+	 * two in their own slots rather than spending the title on the path.
+	 */
+	pathKeys?: readonly string[];
 }
 
 /**
@@ -111,9 +123,9 @@ const ENSEMBLR_TOOL_LABELS: Record<string, EnsemblrToolLabel> = {
 		verb: ['Focused', 'Focusing'],
 	},
 	ensemblr_add_diff_comments: {
-		detailKeys: ['comments.0.filePath'],
 		glyph: 'message-square-plus',
 		object: 'review comments',
+		pathKeys: ['comments.*.filePath'],
 		verb: ['Left', 'Leaving'],
 	},
 	ensemblr_resolve_diff_comments: {
@@ -127,9 +139,9 @@ const ENSEMBLR_TOOL_LABELS: Record<string, EnsemblrToolLabel> = {
 		verb: ['Checked', 'Checking'],
 	},
 	ensemblr_get_diff_comments: {
-		detailKeys: ['filePath', 'file', 'path'],
 		glyph: 'message-square-text',
 		object: 'review comments',
+		pathKeys: ['filePath', 'file', 'path'],
 		verb: ['Read', 'Reading'],
 	},
 	ensemblr_get_last_message: {
@@ -138,9 +150,9 @@ const ENSEMBLR_TOOL_LABELS: Record<string, EnsemblrToolLabel> = {
 		verb: ['Read', 'Reading'],
 	},
 	ensemblr_get_workspace_diff: {
-		detailKeys: ['filePath', 'file', 'path'],
 		glyph: 'file-diff',
 		object: 'the diff',
+		pathKeys: ['filePath', 'file', 'path'],
 		verb: ['Read', 'Reading'],
 	},
 	ensemblr_get_workspace_status: {
@@ -215,9 +227,10 @@ const ENSEMBLR_TOOL_LABELS: Record<string, EnsemblrToolLabel> = {
 		verb: ['Notified', 'Notifying'],
 	},
 	ensemblr_open_tab: {
-		detailKeys: ['filePath', 'file', 'path', 'variant'],
+		detailKeys: ['variant'],
 		glyph: 'panels-top-left',
 		object: 'a tab',
+		pathKeys: ['filePath', 'file', 'path'],
 		verb: ['Opened', 'Opening'],
 	},
 	ensemblr_read_conversation: {
@@ -423,25 +436,38 @@ export function isHiddenEnsemblrToolCall(part: DynamicToolUIPart): boolean {
 }
 
 /**
- * Walks a dotted path into a tool call's arguments, stepping through arrays by
- * numeric segment so a batched call's first item is reachable.
- * @param input - The tool call's input bag
- * @param path - Dotted path, e.g. `comments.0.filePath`
- * @returns The value at that path, or null when any segment is missing
+ * Steps one dotted-path segment, reading an array by numeric index or, on `*`,
+ * across every element, so a batched call is reachable either by its first item
+ * or as the whole set.
+ * @param value - The value the walk has reached so far
+ * @param segment - The segment to step through
+ * @returns The values the segment reaches, empty when it reaches none
  */
-function valueAtPath(input: Record<string, unknown>, path: string): unknown {
-	let current: unknown = input;
-	for (const segment of path.split('.')) {
-		if (Array.isArray(current)) {
-			current = current[Number(segment)];
-			continue;
-		}
-		if (typeof current !== 'object' || current === null) {
-			return null;
-		}
-		current = (current as Record<string, unknown>)[segment];
+function stepPathSegment(value: unknown, segment: string): unknown[] {
+	if (Array.isArray(value)) {
+		return segment === '*' ? value : [value[Number(segment)]];
 	}
-	return current;
+	if (typeof value !== 'object' || value === null) {
+		return [];
+	}
+	return [(value as Record<string, unknown>)[segment]];
+}
+
+/**
+ * Walks a dotted path into a tool call's arguments.
+ * @param input - The tool call's input bag
+ * @param path - Dotted path, e.g. `comments.0.filePath` or `comments.*.filePath`
+ * @returns Every value the path reaches, in order; empty when a segment is
+ * missing
+ */
+function valuesAtPath(input: Record<string, unknown>, path: string): unknown[] {
+	return path
+		.split('.')
+		.reduce<unknown[]>(
+			(reached, segment) =>
+				reached.flatMap((value) => stepPathSegment(value, segment)),
+			[input],
+		);
 }
 
 /**
@@ -456,7 +482,7 @@ function detailOf(
 	keys: readonly string[],
 ): string | null {
 	for (const key of keys) {
-		const value = valueAtPath(input, key);
+		const value = valuesAtPath(input, key)[0];
 		if (typeof value !== 'string') {
 			continue;
 		}
@@ -472,28 +498,80 @@ function detailOf(
 }
 
 /**
- * Resolves the human-readable title and glyph for a control tool call, folding
- * in the one argument that says which tab, sub-agent, or status it acted on. A
- * call still in flight reads in the present participle, so a blocking wait does
- * not claim to have finished while the turn is still working.
+ * Reads the one file a path's values agree on, ignoring the items that named
+ * none.
+ * @param values - The values a path reached
+ * @returns The agreed path, or null when they name none or disagree
+ */
+function agreedPath(values: readonly unknown[]): string | null {
+	const named = new Set<string>();
+	for (const value of values) {
+		if (typeof value === 'string' && value.trim().length > 0) {
+			named.add(value.trim());
+		}
+	}
+	return named.size === 1 ? [...named][0] : null;
+}
+
+/**
+ * Reads the workspace file a call named, for the row to pin as a chip rather
+ * than spell out in its title. Never shortened, unlike {@link detailOf} — the
+ * chip paints a basename and holds the whole path behind it.
+ *
+ * A batched path such as `comments.*.filePath` earns a chip only when every item
+ * names the same file: one call files comments across as many files as the
+ * reviewer touched, so pinning the first would label the row with a file most of
+ * its body is not about.
+ * @param input - The tool call's input bag
+ * @param keys - Input paths to try, in order
+ * @returns The path the call named, or null when none is usable
+ */
+function filePathOf(
+	input: Record<string, unknown>,
+	keys: readonly string[],
+): string | null {
+	for (const key of keys) {
+		const named = agreedPath(valuesAtPath(input, key));
+		if (named !== null) {
+			return named;
+		}
+	}
+	return null;
+}
+
+/**
+ * Resolves the human-readable title, glyph, and file chip for a control tool
+ * call, folding in the one argument that says which tab, sub-agent, or status it
+ * acted on. A call still in flight reads in the present participle, so a
+ * blocking wait does not claim to have finished while the turn is still working.
  * @param toolName - The tool name as the runtime reported it
  * @param input - The tool call's input bag
  * @param isRunning - Whether the call has yet to return
- * @returns The title and glyph, or null when the name is not a control tool
+ * @returns The title, glyph, and badge, or null when the name is not a control
+ * tool
  */
 export function ensemblrToolLabel(
 	toolName: string,
 	input: Record<string, unknown>,
 	isRunning: boolean,
-): { glyph: ToolGlyph; title: string } | null {
+): {
+	badge: ToolBadgeDescriptor | null;
+	glyph: ToolGlyph;
+	title: string;
+} | null {
 	const registered = canonicalEnsemblrToolName(toolName);
 	const label = registered ? ENSEMBLR_TOOL_LABELS[registered] : undefined;
 	if (!label) {
 		return null;
 	}
 	const action = `${label.verb[isRunning ? 1 : 0]} ${label.object}`;
+	const path = label.pathKeys ? filePathOf(input, label.pathKeys) : null;
 	const detail = label.detailKeys ? detailOf(input, label.detailKeys) : null;
 	return {
+		badge:
+			path === null
+				? null
+				: { additions: null, deletions: null, kind: 'file', path },
 		glyph: label.glyph,
 		title: detail ? `${action}: ${detail}` : action,
 	};
