@@ -37,7 +37,10 @@ export {
 	useDropComposerSubmits,
 } from './composer-submit';
 export type { OptimisticPrompt } from './optimistic-prompts';
-export { useOptimisticPrompts } from './optimistic-prompts';
+export {
+	useHasPendingPrompts,
+	useOptimisticPrompts,
+} from './optimistic-prompts';
 export type { PrimedAction } from './primed-action';
 export {
 	primedActionAtomFamily,
