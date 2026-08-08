@@ -156,6 +156,16 @@
 				"rules": ["react-doctor/async-defer-await"]
 			},
 			{
+				// `probeContextUsage` guards on `closed` *after* awaiting
+				// `getContextUsage()` on purpose: the check asks whether the session
+				// shut down while that control request was in flight, so hoisting it
+				// above the await — which is what the rule asks for — removes the only
+				// state it exists to observe and lets a dead session emit a usage
+				// event. The inline why-comment says the same at the call site.
+				"files": ["src/main/claude-agent/claude-agent-adapter.ts"],
+				"rules": ["react-doctor/async-defer-await"]
+			},
+			{
 				// Imported in `main.ts` and `ipc/handlers.ts` for type-only re-exports
 				// from a service barrel; the barrel exists to provide a single
 				// `setup-diagnostics` import surface used by IPC contracts.
