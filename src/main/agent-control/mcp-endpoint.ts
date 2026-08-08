@@ -29,6 +29,7 @@ import {
 	awarenessForAudience,
 	type ControlAudience,
 	EXIT_PLAN_MODE_LIMITS,
+	LINEAR_AGENT_LIMITS,
 	WORKSPACE_BOARD_STATUSES,
 	withheldControlOps,
 } from '../../shared/agent-control.ts';
@@ -254,6 +255,58 @@ export const TOOL_DEFS: readonly McpToolDef[] = [
 		description:
 			"Mark review comments on this workspace's diff as resolved, by the ids ensemblr_get_diff_comments and ensemblr_add_diff_comments hand back. Resolve a comment in the same turn you make the fix it asked for, and batch a whole review pass into one call. Resolve only what you actually fixed: a comment you deferred or disagree with stays open, and you say so in your reply. This only ever resolves — it cannot reopen a comment the user closed, and an id that matches no open comment here is reported back rather than failing the call.",
 		shape: { commentIds: z.array(z.string()) },
+	},
+	{
+		name: 'ensemblr_linear_list_issues',
+		op: 'linearListIssues',
+		description:
+			"Search the connected Linear account's issues. This is NOT scoped to your workspace — Linear is an app-level integration and one account can span several teams, so narrow with query (free text over identifier, title, and description) or teamId rather than reading the whole list as the work in front of you. Reads a local cache and syncs from Linear when it has gone stale, so it is cheap to call; pass refresh=true only when you need the very latest. Descriptions are NOT returned — read one issue with ensemblr_linear_get_issue. Check `status` before acting on the result: `not-connected` means the user has not linked Linear at all, which is a different answer from an empty list.",
+		shape: {
+			query: z.string().optional(),
+			teamId: z.string().optional(),
+			refresh: z.boolean().optional(),
+		},
+	},
+	{
+		name: 'ensemblr_linear_get_issue',
+		op: 'linearGetIssue',
+		description:
+			'Read one Linear issue with its description, labels, and comment thread. issueId takes either the uuid or the human identifier (THE-106); an identifier always goes to Linear rather than the local cache. The description is truncated and only the most recent comments are returned — the result says how many were dropped. Check `status`: `not-found` means the id is wrong, `not-connected` means Linear is not linked.',
+		shape: { issueId: z.string(), refresh: z.boolean().optional() },
+	},
+	{
+		name: 'ensemblr_linear_get_metadata',
+		op: 'linearGetMetadata',
+		description:
+			'List the Linear teams, projects, workflow states, labels, and users the connected account can see, each with the id ensemblr_linear_update_issue takes. The account is not scoped to your workspace, so expect teams that have nothing to do with the work here. Call this FIRST whenever you are about to set a state, an assignee, or a project — those arguments are ids, not names, and this is the only place to turn one into the other. Cycles are not returned; nothing on this surface sets one.',
+		shape: { refresh: z.boolean().optional() },
+	},
+	{
+		name: 'ensemblr_linear_create_comment',
+		op: 'linearCreateComment',
+		description:
+			'Post a comment on a Linear issue. The whole team reads it and nothing here can edit or delete it afterwards, so write it as you would a comment of your own: what you did, what you found, what is still open. Use it to record progress on a ticket rather than to talk to the user, who reads your reply instead.',
+		shape: {
+			issueId: z.string(),
+			commentBody: z.string().max(LINEAR_AGENT_LIMITS.maxCommentLength),
+		},
+	},
+	{
+		name: 'ensemblr_linear_update_issue',
+		op: 'linearUpdateIssue',
+		description:
+			'Change a Linear issue: its workflow state, assignee, priority (0 none, 1 urgent, 2 high, 3 medium, 4 low), title, or description. Pass at least one of those alongside issueId. stateId and assigneeId are ids from ensemblr_linear_get_metadata, never names. A state whose type is `completed` or `canceled` is REFUSED whatever you pass — agent work never closes a ticket here, and marking one canceled is the same call under a different label. Take it to In Review and say in your reply that it is ready; the user decides whether it is done.',
+		shape: {
+			issueId: z.string(),
+			stateId: z.string().optional(),
+			assigneeId: z.string().optional(),
+			priority: z.number().int().min(0).max(4).optional(),
+			title: z.string().max(LINEAR_AGENT_LIMITS.maxTitleLength).optional(),
+			description: z
+				.string()
+				.max(LINEAR_AGENT_LIMITS.maxDescriptionLength)
+				.optional(),
+		},
 	},
 	{
 		name: 'ensemblr_list_models',

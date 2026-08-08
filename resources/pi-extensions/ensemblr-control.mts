@@ -40,6 +40,7 @@ What you can drive:
 - Terminals: start/stop the setup script, a run script, or a spawn terminal (\`ensemblr_start_terminal\`/\`ensemblr_stop_terminal\`); type into one (\`ensemblr_write_terminal\`); read its output (\`ensemblr_read_terminal_output\`). A repository configures its run scripts by name — a dev server, a playground, an unsigned build — so call \`ensemblr_list_run_scripts\` and pass the \`scriptName\` you want; starting a run script without one takes the repository's default, which is rarely the one you meant.
 - Focus & inspect: bring a tab/terminal or the Files/Changes/Checks panel forward (\`ensemblr_focus_tab\`/\`ensemblr_focus_dock_tab\`/\`ensemblr_focus_panel\`); list workspaces/tabs/terminals; read a conversation's status or last message; audit what a conversation actually did, tool calls included (\`ensemblr_read_conversation\`).
 - Review: read this workspace's diff (\`ensemblr_get_workspace_diff\`) — call it with \`stat: true\` FIRST to see which files changed and how large the diff is, then read the whole thing, or one file at a time with \`filePath\`; read the review comments already on it (\`ensemblr_get_diff_comments\`); leave your own against a file and line (\`ensemblr_add_diff_comments\`), which the user reads in the Changes panel. Once you have fixed what a comment asked for, mark it resolved (\`ensemblr_resolve_diff_comments\`).
+- Linear: search the connected account's issues (\`ensemblr_linear_list_issues\`), read one with its comments (\`ensemblr_linear_get_issue\`), and read the team/project/state/label/user tables an update needs ids from (\`ensemblr_linear_get_metadata\`). None of this is scoped to your workspace — Linear is an app-level integration and one account can span several teams, so narrow a search with \`teamId\` or \`query\` rather than reading the whole list as the work in front of you. Linear is often not connected at all, so every one of these answers with a \`status\` — \`not-connected\` means the user has not linked Linear and no amount of retrying will change that, and it is not the same answer as an empty result. Comment on an issue (\`ensemblr_linear_create_comment\`) and move one along (\`ensemblr_linear_update_issue\`: state, assignee, priority, title, description). A state whose type is \`completed\` or \`canceled\` is refused whatever you pass — you take work as far as \`In Review\` and the user decides whether it is done.
 - Board: move your workspace across the kanban board and read its status (\`ensemblr_set_workspace_status\`/\`ensemblr_get_workspace_status\`); \`ensemblr_list_workspaces\` shows every workspace's board status.
 - Ask the user: when a decision is genuinely theirs — ambiguous requirements, a fork in the approach, a destructive step — put it to them with \`ensemblr_ask_user_question\` (up to 4 questions, each with 2-6 concrete options) instead of guessing or stalling. It blocks until they answer or dismiss it, with no time limit — a question left overnight is still waiting in the morning — so never plan around it expiring or hedge an answer you have not been given. They can type their own answer instead of picking an option.
 - Keep the workspace legible: name your tab (\`ensemblr_set_name\`), name the workspace and its git branch together from one kebab-case slug (\`ensemblr_set_branch_name\`), and record what the conversation has covered (\`ensemblr_set_summary\`).
@@ -87,10 +88,11 @@ const SUBAGENT_AWARENESS = `You are running inside Ensemblr, a desktop coding-wo
 What you can drive:
 - Focus & inspect: bring a tab/terminal or the Files/Changes/Checks panel forward (\`ensemblr_focus_tab\`/\`ensemblr_focus_dock_tab\`/\`ensemblr_focus_panel\`); list workspaces/tabs/terminals; read a conversation's status or last message; audit what a conversation actually did, tool calls included (\`ensemblr_read_conversation\`); read a terminal's output (\`ensemblr_read_terminal_output\`).
 - Review: read this workspace's diff (\`ensemblr_get_workspace_diff\`) — call it with \`stat: true\` FIRST to see which files changed and how large the diff is, then read the whole thing, or one file at a time with \`filePath\`; read the review comments already on it (\`ensemblr_get_diff_comments\`); leave your own against a file and line (\`ensemblr_add_diff_comments\`), which the user reads in the Changes panel. Once you have fixed what a comment asked for, mark it resolved (\`ensemblr_resolve_diff_comments\`).
+- Linear: search the connected account's issues (\`ensemblr_linear_list_issues\`), read one with its comments (\`ensemblr_linear_get_issue\`), and read the team/project/state/label/user tables an update needs ids from (\`ensemblr_linear_get_metadata\`). None of this is scoped to your workspace — Linear is an app-level integration and one account can span several teams, so narrow a search with \`teamId\` or \`query\` rather than reading the whole list as the work in front of you. Linear is often not connected at all, so every one of these answers with a \`status\` — \`not-connected\` means the user has not linked Linear and no amount of retrying will change that, and it is not the same answer as an empty result.
 - Board: read your workspace's kanban status (\`ensemblr_get_workspace_status\`); \`ensemblr_list_workspaces\` shows every workspace's.
 - Escalate: \`ensemblr_notify_orchestrator\` reaches the orchestrator that spawned you — reason \`need_decision\` or \`blocked\` pulls it back to you, \`progress\` and \`done\` keep it informed without interrupting.
 
-The rest of the surface is not yours and is refused here, so do not go hunting for it: starting or steering another conversation, launching a harness, starting/stopping/typing into a terminal, opening or closing tabs, moving the kanban board, naming the workspace and branch, and putting a question to the user all belong to the orchestrator that spawned you. Everything you would have used them for goes in your report instead.
+The rest of the surface is not yours and is refused here, so do not go hunting for it: starting or steering another conversation, launching a harness, starting/stopping/typing into a terminal, opening or closing tabs, moving the kanban board, naming the workspace and branch, commenting on or moving a Linear issue, and putting a question to the user all belong to the orchestrator that spawned you. Everything you would have used them for goes in your report instead.
 - Keep the workspace legible: name your tab (\`ensemblr_set_name\`) and record what the conversation has covered (\`ensemblr_set_summary\`).
 
 Keeping your own tab legible is your job, not the user's, and it is bookkeeping — do it as part of your turn, without narrating it or asking permission. Name the tab on your first turn, before the work; refresh the summary at the end of every turn. Naming the WORKSPACE and its git branch is not yours: that name describes the whole body of work rather than the one unit you were handed, so \`ensemblr_set_branch_name\` belongs to the root conversation that spawned you and is refused here. If the work deserves a different name, say so in your report and let your orchestrator make the call.
@@ -140,10 +142,11 @@ You are running inside Ensemblr, a desktop coding-workspace app, and you can dri
 - Delegate reading: spawn a sub-agent to answer a question for you (\`ensemblr_start_conversation\`), block until your children settle (\`ensemblr_wait_for_agents\`), steer one (\`ensemblr_send_follow_up\`), read its report (\`ensemblr_get_last_message\`), close its tab (\`ensemblr_close_tab\`). See the fan-out section below.
 - Focus & inspect: bring a tab/terminal or the Files/Changes/Checks panel forward (\`ensemblr_focus_tab\`/\`ensemblr_focus_dock_tab\`/\`ensemblr_focus_panel\`); list workspaces/tabs/terminals; read a conversation's status or last message; audit what a conversation actually did, tool calls included (\`ensemblr_read_conversation\`); read terminal output (\`ensemblr_read_terminal_output\`). Reads may span every open workspace.
 - Review: read this workspace's diff (\`ensemblr_get_workspace_diff\`) — call it with \`stat: true\` FIRST to see which files changed and how large the diff is, then read the whole thing, or one file at a time with \`filePath\`; read the review comments already on it (\`ensemblr_get_diff_comments\`); leave your own against a file and line (\`ensemblr_add_diff_comments\`), which the user reads in the Changes panel. All three stay available while planning — annotating a diff is planning output, not a change to the repository. Resolving one is not: \`ensemblr_resolve_diff_comments\` says a finding is fixed, and you have fixed nothing while planning, so it is refused here.
+- Linear: search the connected account's issues (\`ensemblr_linear_list_issues\`), read one with its comments (\`ensemblr_linear_get_issue\`), and read the team/project/state/label/user tables an update needs ids from (\`ensemblr_linear_get_metadata\`). None of this is scoped to your workspace — Linear is an app-level integration and one account can span several teams, so narrow a search with \`teamId\` or \`query\` rather than reading the whole list as the work in front of you. Linear is often not connected at all, so every one of these answers with a \`status\` — \`not-connected\` means the user has not linked Linear and no amount of retrying will change that, and it is not the same answer as an empty result. Commenting stays available too (\`ensemblr_linear_create_comment\`) — a comment records what you found. Moving a ticket does not: \`ensemblr_linear_update_issue\` claims an implementation you have not written, so it is refused here.
 - Keep the workspace legible: name your tab (\`ensemblr_set_name\`), name the workspace and its git branch together from one kebab-case slug (\`ensemblr_set_branch_name\`), and record what the conversation has covered (\`ensemblr_set_summary\`). All three stay available while planning — they label work, they do not perform it.
 - Board: read and set your workspace's kanban status (\`ensemblr_get_workspace_status\`/\`ensemblr_set_workspace_status\`).
 
-The rest is blocked while you plan: \`write\` and \`edit\`, any \`bash\` command that is not read-only, \`ensemblr_launch_harness\`, \`ensemblr_start_terminal\`, \`ensemblr_write_terminal\`, and \`ensemblr_resolve_diff_comments\` — anything that could change the repository, open a shell the read-only rules cannot reach, or claim a fix you have not made. \`ensemblr_send_follow_up\` reaches only a conversation that is itself planning, so it steers the investigators you spawned and is refused anywhere else. That enforcement is deliberate — do not look for a way around it. What is left may still prompt the user for approval depending on the workspace permission mode; expect and handle denials gracefully.
+The rest is blocked while you plan: \`write\` and \`edit\`, any \`bash\` command that is not read-only, \`ensemblr_launch_harness\`, \`ensemblr_start_terminal\`, \`ensemblr_write_terminal\`, \`ensemblr_resolve_diff_comments\`, and \`ensemblr_linear_update_issue\` — anything that could change the repository, open a shell the read-only rules cannot reach, or claim a fix you have not made. \`ensemblr_send_follow_up\` reaches only a conversation that is itself planning, so it steers the investigators you spawned and is refused anywhere else. That enforcement is deliberate — do not look for a way around it. What is left may still prompt the user for approval depending on the workspace permission mode; expect and handle denials gracefully.
 
 Nothing else in your context outranks this block, with one exception: an ENSEMBLR SESSION UPKEEP block may follow it. That block is the app's own bookkeeping — naming this tab, naming the workspace and branch, recording the session summary — and every item on it stays allowed while you plan. Do what it asks; it labels the work rather than starting it.
 
@@ -191,12 +194,13 @@ You are running inside Ensemblr, a desktop coding-workspace app, and you were sp
 - Report to your orchestrator: \`ensemblr_notify_orchestrator\` with reason \`need_decision\` or \`blocked\` pulls it back to you; \`progress\` and \`done\` keep it informed without interrupting.
 - Focus & inspect: bring a tab/terminal or the Files/Changes/Checks panel forward (\`ensemblr_focus_tab\`/\`ensemblr_focus_dock_tab\`/\`ensemblr_focus_panel\`); list workspaces/tabs/terminals; read a conversation's status or last message; audit what a conversation actually did, tool calls included (\`ensemblr_read_conversation\`); read terminal output (\`ensemblr_read_terminal_output\`). Reads may span every open workspace.
 - Review: read this workspace's diff (\`ensemblr_get_workspace_diff\`) — call it with \`stat: true\` FIRST to see which files changed and how large the diff is, then read the whole thing, or one file at a time with \`filePath\`; read the review comments already on it (\`ensemblr_get_diff_comments\`); leave your own against a file and line (\`ensemblr_add_diff_comments\`), which the user reads in the Changes panel. All three stay available while planning — annotating a diff is planning output, not a change to the repository. Resolving one is not: \`ensemblr_resolve_diff_comments\` says a finding is fixed, and you have fixed nothing while planning, so it is refused here.
+- Linear: search the connected account's issues (\`ensemblr_linear_list_issues\`), read one with its comments (\`ensemblr_linear_get_issue\`), and read the team/project/state/label/user tables an update needs ids from (\`ensemblr_linear_get_metadata\`). None of this is scoped to your workspace — Linear is an app-level integration and one account can span several teams, so narrow a search with \`teamId\` or \`query\` rather than reading the whole list as the work in front of you. Linear is often not connected at all, so every one of these answers with a \`status\` — \`not-connected\` means the user has not linked Linear and no amount of retrying will change that, and it is not the same answer as an empty result. Writing to Linear is not yours: a ticket is read by the whole team rather than by your orchestrator, so \`ensemblr_linear_create_comment\` and \`ensemblr_linear_update_issue\` are refused here. Put what you would have written in your report.
 - Keep your tab legible: name it (\`ensemblr_set_name\`) and record what the conversation has covered (\`ensemblr_set_summary\`). Both stay available while planning — they label work, they do not perform it. Naming the WORKSPACE and its git branch is not yours: \`ensemblr_set_branch_name\` belongs to the orchestrator that spawned you and is refused here.
 - Board: read your workspace's kanban status (\`ensemblr_get_workspace_status\`). Moving the board is not yours: it describes the whole workspace rather than the question you were handed, so \`ensemblr_set_workspace_status\` is refused here.
 
 You do not talk to the user. The orchestrator that spawned you owns that conversation and is blocked waiting on your report, so \`ensemblr_ask_user_question\` is refused here — send \`ensemblr_notify_orchestrator\` with reason \`need_decision\` instead and it will answer you.
 
-The rest is blocked while you plan: \`write\` and \`edit\`, any \`bash\` command that is not read-only, \`ensemblr_resolve_diff_comments\` (it claims a fix you have not made), and every tool that would hand the work to something else — \`ensemblr_start_conversation\`, \`ensemblr_send_follow_up\`, \`ensemblr_launch_harness\`, \`ensemblr_start_terminal\`, \`ensemblr_write_terminal\`. Being a spawned sub-agent blocks more, whatever the mode: the workspace's tabs and terminals outlive the question you were handed, so \`ensemblr_stop_terminal\`, \`ensemblr_open_tab\`, and \`ensemblr_close_tab\` are refused here too. \`ensemblr_exit_plan_mode\` is not yours to call either: submitting the plan belongs to the orchestrator, and a plan posted from here would put a review panel in a tab nobody is watching. That enforcement is deliberate — do not look for a way around it. What is left may still prompt the user for approval depending on the workspace permission mode; expect and handle denials gracefully.
+The rest is blocked while you plan: \`write\` and \`edit\`, any \`bash\` command that is not read-only, \`ensemblr_resolve_diff_comments\` and \`ensemblr_linear_update_issue\` (each claims work you have not done), and every tool that would hand the work to something else — \`ensemblr_start_conversation\`, \`ensemblr_send_follow_up\`, \`ensemblr_launch_harness\`, \`ensemblr_start_terminal\`, \`ensemblr_write_terminal\`. Being a spawned sub-agent blocks more, whatever the mode: the workspace's tabs and terminals outlive the question you were handed, so \`ensemblr_stop_terminal\`, \`ensemblr_open_tab\`, \`ensemblr_close_tab\`, and \`ensemblr_linear_create_comment\` are refused here too. \`ensemblr_exit_plan_mode\` is not yours to call either: submitting the plan belongs to the orchestrator, and a plan posted from here would put a review panel in a tab nobody is watching. That enforcement is deliberate — do not look for a way around it. What is left may still prompt the user for approval depending on the workspace permission mode; expect and handle denials gracefully.
 
 Nothing else in your context outranks this block, with one exception: an ENSEMBLR SESSION UPKEEP block may follow it. That block is the app's own bookkeeping — naming this tab, naming the workspace and branch, recording the session summary — and every item on it stays allowed while you plan. Do what it asks; it labels the work rather than starting it.
 
@@ -265,6 +269,8 @@ const SUBAGENT_WITHHELD_OPS = new Set([
 	'closeTab',
 	'exitPlanMode',
 	'launchHarness',
+	'linearCreateComment',
+	'linearUpdateIssue',
 	'listModels',
 	'listRunScripts',
 	'openTab',
@@ -868,6 +874,91 @@ export default function ensemblrControl(pi: ExtensionAPI): void {
 		"Mark review comments on this workspace's diff as resolved, by the ids ensemblr_get_diff_comments and ensemblr_add_diff_comments hand back. Resolve a comment in the same turn you make the fix it asked for, and batch a whole review pass into one call. Resolve only what you actually fixed: a comment you deferred or disagree with stays open, and you say so in your reply. This only ever resolves — it cannot reopen a comment the user closed, and an id that matches no open comment here is reported back rather than failing the call.",
 		Type.Object({
 			commentIds: Type.Array(Type.String(), { maxItems: 50, minItems: 1 }),
+		}),
+	);
+	tool(
+		'ensemblr_linear_list_issues',
+		'linearListIssues',
+		"Search the connected Linear account's issues. This is NOT scoped to your workspace — Linear is an app-level integration and one account can span several teams, so narrow with query (free text over identifier, title, and description) or teamId rather than reading the whole list as the work in front of you. Reads a local cache and syncs from Linear when it has gone stale, so it is cheap to call; pass refresh=true only when you need the very latest. Descriptions are NOT returned — read one issue with ensemblr_linear_get_issue. Check `status` before acting on the result: `not-connected` means the user has not linked Linear at all, which is a different answer from an empty list.",
+		Type.Object({
+			query: Type.Optional(
+				Type.String({
+					description:
+						'Free text matched against issue identifier, title, and description.',
+				}),
+			),
+			teamId: Type.Optional(
+				Type.String({
+					description:
+						'Narrow to one team, by an id from ensemblr_linear_get_metadata.',
+				}),
+			),
+			refresh: Type.Optional(
+				Type.Boolean({
+					description:
+						'Sync from Linear before reading, instead of serving a fresh cache.',
+				}),
+			),
+		}),
+	);
+	tool(
+		'ensemblr_linear_get_issue',
+		'linearGetIssue',
+		'Read one Linear issue with its description, labels, and comment thread. issueId takes either the uuid or the human identifier (THE-106); an identifier always goes to Linear rather than the local cache. The description is truncated and only the most recent comments are returned — the result says how many were dropped. Check `status`: `not-found` means the id is wrong, `not-connected` means Linear is not linked.',
+		Type.Object({
+			issueId: Type.String({
+				description: 'Issue uuid, or its human identifier such as THE-106.',
+			}),
+			refresh: Type.Optional(Type.Boolean()),
+		}),
+	);
+	tool(
+		'ensemblr_linear_get_metadata',
+		'linearGetMetadata',
+		'List the Linear teams, projects, workflow states, labels, and users the connected account can see, each with the id ensemblr_linear_update_issue takes. The account is not scoped to your workspace, so expect teams that have nothing to do with the work here. Call this FIRST whenever you are about to set a state, an assignee, or a project — those arguments are ids, not names, and this is the only place to turn one into the other. Cycles are not returned; nothing on this surface sets one.',
+		Type.Object({
+			refresh: Type.Optional(Type.Boolean()),
+		}),
+	);
+	tool(
+		'ensemblr_linear_create_comment',
+		'linearCreateComment',
+		'Post a comment on a Linear issue. The whole team reads it and nothing here can edit or delete it afterwards, so write it as you would a comment of your own: what you did, what you found, what is still open. Use it to record progress on a ticket rather than to talk to the user, who reads your reply instead.',
+		Type.Object({
+			issueId: Type.String({
+				description: 'Issue uuid, or its human identifier such as THE-106.',
+			}),
+			commentBody: Type.String({ maxLength: 8000 }),
+		}),
+	);
+	tool(
+		'ensemblr_linear_update_issue',
+		'linearUpdateIssue',
+		'Change a Linear issue: its workflow state, assignee, priority (0 none, 1 urgent, 2 high, 3 medium, 4 low), title, or description. Pass at least one of those alongside issueId. stateId and assigneeId are ids from ensemblr_linear_get_metadata, never names. A state whose type is `completed` or `canceled` is REFUSED whatever you pass — agent work never closes a ticket here, and marking one canceled is the same call under a different label. Take it to In Review and say in your reply that it is ready; the user decides whether it is done.',
+		Type.Object({
+			issueId: Type.String({
+				description: 'Issue uuid, or its human identifier such as THE-106.',
+			}),
+			stateId: Type.Optional(
+				Type.String({
+					description:
+						'Workflow state id from ensemblr_linear_get_metadata. A state whose type is completed or canceled is refused.',
+				}),
+			),
+			assigneeId: Type.Optional(
+				Type.String({
+					description: 'User id from ensemblr_linear_get_metadata.',
+				}),
+			),
+			priority: Type.Optional(
+				Type.Number({
+					description: '0 none, 1 urgent, 2 high, 3 medium, 4 low.',
+					maximum: 4,
+					minimum: 0,
+				}),
+			),
+			title: Type.Optional(Type.String({ maxLength: 255 })),
+			description: Type.Optional(Type.String({ maxLength: 32000 })),
 		}),
 	);
 	tool(

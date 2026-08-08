@@ -120,6 +120,9 @@ a permission denial stays visible.
 | Read the workspace diff | `ensemblr_get_workspace_diff` — call it with `stat: true` first, then read the whole diff or one `filePath` at a time |
 | Read / leave review comments | `ensemblr_get_diff_comments`, `ensemblr_add_diff_comments` (Ensemblr-local comments only; GitHub PR threads are not included) |
 | Close a comment you fixed | `ensemblr_resolve_diff_comments` — resolve in the same turn as the fix; resolve only what you actually fixed and say in your reply what you left open |
+| Read the Linear backlog | `ensemblr_linear_list_issues` (no descriptions), `ensemblr_linear_get_issue` (one issue, comments included), `ensemblr_linear_get_metadata` (the ids an update takes). Check `status`: `not-connected` is not an empty backlog. |
+| Record progress on a ticket | `ensemblr_linear_create_comment`. Sub-agents put it in their report instead. |
+| Move a ticket along | `ensemblr_linear_update_issue` — state, assignee, priority, title, description, by id. `Done` and `Canceled` states are refused: take it to In Review. Blocked while planning; sub-agents report instead. |
 | Pick a model for a child | `ensemblr_list_models` |
 | Surface work to the user | `ensemblr_focus_tab`, `ensemblr_focus_dock_tab`, `ensemblr_focus_panel` |
 | Tidy up | `ensemblr_close_tab` |

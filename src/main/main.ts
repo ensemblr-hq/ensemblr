@@ -733,6 +733,23 @@ const planSubmission = createPlanSubmission({
 	postPlanMessage: ({ sessionId, plan }) =>
 		agentSessionService.appendAgentMessage({ sessionId, text: plan }),
 });
+const linearAuthService = createLinearAuthService({
+	configService,
+	databaseService,
+	/** Opens an external URL in the user's default browser. */
+	openExternal: (url) => shell.openExternal(url),
+	secretStoreFactory: createSecretStore,
+});
+// Built here rather than beside the other Linear wiring below because the
+// agent-control ports need it: a control op reaching Linear runs long after
+// startup, but the port graph is assembled in one pass.
+const linearService = createLinearService({
+	client: createLinearClient({
+		/** Resolves the current Linear access token from the auth service. */
+		getAccessToken: () => linearAuthService.getAccessToken(),
+	}),
+	databaseService,
+});
 agentControlService = createAgentControlService({
 	guardrails: agentControlGuardrails,
 	originRegistry: agentControlOriginRegistry,
@@ -767,6 +784,7 @@ agentControlService = createAgentControlService({
 		getPermissionMode: () =>
 			readPermissionModeFromSnapshot(settingsResolutionService.resolve()),
 		harnessDetectionService,
+		linearService,
 		piExecutableService,
 		spawnModelResolver,
 		agentSessionService,
@@ -804,20 +822,6 @@ const createWorkspaceServiceWithSetup = withSetupScriptOnCreate({
 const archiveWorkspaceServiceWithScript = withArchiveScriptBeforeArchive({
 	archiveWorkspaceService,
 	scriptLifecycleService,
-});
-const linearAuthService = createLinearAuthService({
-	configService,
-	databaseService,
-	/** Opens an external URL in the user's default browser. */
-	openExternal: (url) => shell.openExternal(url),
-	secretStoreFactory: createSecretStore,
-});
-const linearService = createLinearService({
-	client: createLinearClient({
-		/** Resolves the current Linear access token from the auth service. */
-		getAccessToken: () => linearAuthService.getAccessToken(),
-	}),
-	databaseService,
 });
 const setupDiagnosticsService = createSetupDiagnosticsService({
 	configService,
