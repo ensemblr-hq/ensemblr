@@ -1,4 +1,5 @@
-import { atom, useAtom } from 'jotai';
+import { atom, useAtom, useAtomValue } from 'jotai';
+import { atomFamily } from 'jotai-family';
 import { useCallback, useMemo } from 'react';
 
 /**
@@ -16,6 +17,29 @@ export interface OptimisticPrompt {
 
 /** In-memory list of optimistically rendered prompts awaiting their matching persisted agent events. */
 const optimisticPromptsAtom = atom<readonly OptimisticPrompt[]>([]);
+
+/**
+ * Whether one chat tab has a prompt still awaiting its persisted twin, keyed by
+ * chat-tab id. Derived rather than filtered per consumer so a surface that only
+ * branches on the fact — the conversation panel choosing between the timeline
+ * and the empty state — re-renders when the flag flips rather than on every
+ * push and remove in every tab.
+ */
+const hasPendingPromptsAtomFamily = atomFamily((chatTabId: string) =>
+	atom((get) =>
+		get(optimisticPromptsAtom).some((entry) => entry.chatTabId === chatTabId),
+	),
+);
+
+/**
+ * Reads whether a chat tab has a prompt in flight, without subscribing the
+ * caller to the prompts themselves.
+ * @param chatTabId - Chat tab to check
+ * @returns True while the tab has at least one un-retired optimistic prompt
+ */
+export function useHasPendingPrompts(chatTabId: string): boolean {
+	return useAtomValue(hasPendingPromptsAtomFamily(chatTabId));
+}
 
 /**
  * Public hook around the optimistic-prompts atom. Exposes scoped helpers for

@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 
 import { listClosedChatTabsWithSummaryQuery } from '@/renderer/api/ensemblr-queries';
+import { useHasPendingPrompts } from '@/renderer/state/composer';
 import type {
 	ComposerShellState,
 	SessionTabModel,
@@ -15,7 +16,8 @@ import { WorkspaceLandingCard } from './workspace-landing-card';
  * Scrollable timeline content shown above the composer.
  *
  * Three mutually-exclusive states:
- *   1. Active agent session — render `AgentSessionTimeline` with events.
+ *   1. Active agent session, or a prompt already submitted into one that is
+ *      still opening — render `AgentSessionTimeline` with events.
  *   2. No session, transcripts exist — render `NewChatEmptyState` with chips
  *      for each `.context/sessions` transcript.
  *   3. No session, no transcripts — render `WorkspaceLandingCard` (fresh
@@ -36,6 +38,13 @@ export function WorkspaceTimeline({
 }) {
 	const agentSessionId =
 		activeSession.agentSessionId ?? composer.activeAgentSessionId ?? null;
+	// A chat's first prompt is submitted before its session exists — opening one
+	// costs a runtime spawn, seconds on a cold Claude start. Widening the branch
+	// on the raw flag is safe only because a prompt retires against a persisted
+	// event, which implies a resolved session: `agentSessionId` is already true
+	// for every prompt this flag drops, so the branch never narrows underneath a
+	// timeline that still has something to render.
+	const hasPendingPrompt = useHasPendingPrompts(activeSession.chatTabId);
 	const { data: transcriptsData } = useQuery(
 		listClosedChatTabsWithSummaryQuery(workspace.id),
 	);
@@ -46,7 +55,7 @@ export function WorkspaceTimeline({
 		(entry) => entry.summaryPath.length > 0,
 	);
 
-	if (agentSessionId) {
+	if (agentSessionId || hasPendingPrompt) {
 		return (
 			<div className='flex min-h-0 flex-1 flex-col'>
 				<AgentSessionTimeline
