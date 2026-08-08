@@ -1,6 +1,6 @@
 # Current Shell Inventory
 
-Date: 2026-07-18
+Date: 2026-08-08
 
 This inventory describes the implemented shell. Navigation is file-based
 (TanStack Router): `src/renderer/components/app.tsx` is now only the router
@@ -28,10 +28,20 @@ implemented shell should be treated as the closest intended match to
 Conductor's own shell, and future agents should not reopen settled shell parity
 decisions unless a direct product contradiction appears.
 
-Chat transcript rendering and the prompt composer are implemented on the Pi
-runtime: the center timeline renders structured Pi RPC events and the composer
-submits/stops real turns with attachments and model controls (see the surface
-rows below). Preserve their placement and setup-gated behavior.
+Chat transcript rendering and the prompt composer are implemented on a live
+agent runtime: the center timeline renders structured runtime events and the
+composer submits/stops real turns with attachments and model controls (see the
+surface rows below). Preserve their placement and setup-gated behavior.
+
+Since ADR 0042 (#226–#237) the shell drives **two** first-class agent runtimes —
+Claude Code (in-process `@anthropic-ai/claude-agent-sdk`) and Pi (CLI RPC) — as
+siblings under `src/main/agent-runtime/`. A chat tab is pinned to one provider
+for its lifetime and stays bound to its own agent session (#231); a spawned
+sub-agent shows its runtime in the tab (#232) and inherits its caller's (#236).
+Rows below written as "Pi" describe the shared surface unless they name a
+Pi-specific file. The shell also carries a per-chat plan mode (⌥⇧P) whose
+Approve / Refine / Hand off bar renders as the composer header (#184, #218), and
+a context-usage gauge that has a window before the first turn ends (#230, #235).
 
 ## Implementation Boundaries
 
@@ -280,7 +290,8 @@ insufficient.
 
 ## Current Unknowns
 
-- Inline line-comment UX remains future review polish; the current Changes tab opens diff/file-preview tabs and can start the repository `review` agent action.
+- None blocking. Inline line-comment UX shipped with the rich diff viewer (THE-152, #151) and was completed by #234, which strikes resolved comments through and bulk-adds only the unresolved ones; the Changes tab still opens diff/file-preview tabs and can start the repository `review` agent action.
 - Workspace board status and unread/read are resolved as local app state, not Linear issue state.
+- Settings → Providers is a first-class app-scope section again (#226), one tab per agent runtime. The 2026-07-19 "no Providers screen" note is superseded.
 
 **Note:** Workspace lifecycle settings (branch naming, archive/merge behavior) are now configured via Settings → Git. See the "Settings → Git" row above for details.

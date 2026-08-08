@@ -4,8 +4,11 @@
 > authoritative text lives in `src/shared/agent-control/awareness.ts` as a **2×2 of role by Plan
 > Mode**: `ORCHESTRATOR_AWARENESS` / `SUBAGENT_AWARENESS` for working agents, and
 > `PLAN_MODE_ORCHESTRATOR_AWARENESS` / `PLAN_MODE_SUBAGENT_AWARENESS` for planning ones. The role axis
-> comes from `roleForDepth`: a root (depth 0) is an orchestrator that may delegate; a spawned child
-> (depth ≥ 1) is a sub-agent that does its own work and never fans out. The Plan Mode axis comes from
+> comes from `resolveAgentRole(marked, depth)`: the durable sub-agent marker on the chat tab decides
+> it, falling back to `roleForDepth` when there is none — a root (depth 0) is an orchestrator that may
+> delegate; a spawned child (depth ≥ 1) is a sub-agent that does its own work and never fans out. The
+> marker wins because depth lives in an in-memory registry a restart clears, which used to hand a
+> resumed child the whole surface back. The Plan Mode axis comes from
 > the app per turn, and it **replaces** the role playbook rather than stacking on it — see
 > [Planning with sub-agents](#planning-with-sub-agents). Both reach the two always-on injection
 > points:
@@ -26,15 +29,22 @@
 
 ## What a harness does not get
 
-The MCP endpoint serves a harness only the ops it can actually use. The chat-tab ops are absent by
-design, and the service refuses them for a `harness` origin even if one is reached directly:
+The MCP endpoint serves a harness only the ops it can actually use. These four — `CHAT_TAB_ONLY_OPS`
+in `src/shared/agent-control/subagent-policy.ts` — are absent by design, and the service refuses them
+to any caller without a chat tab even if one is reached directly:
 
 | Absent | Why |
 |---|---|
 | `ensemblr_set_name` | A harness tab is a terminal whose title is derived from the harness's own session log (`src/main/terminal/agent-conversation-title.ts`) — there is no chat tab to rename. |
-| `ensemblr_set_summary` | Session summaries hang off a Pi chat tab. |
-| `ensemblr_ask_user_question` | The question panel renders inside the chat tab bound to the Pi session. |
-| `ensemblr_exit_plan_mode` | Plan Mode is a Pi-conversation toggle. |
+| `ensemblr_set_summary` | Session summaries hang off a chat tab's session record. |
+| `ensemblr_ask_user_question` | The question panel renders inside the chat tab bound to the asking session. |
+| `ensemblr_exit_plan_mode` | Plan Mode is a per-chat toggle, and the plan posts into the chat tab that wrote it. |
+
+The axis is the **tab, not the runtime**. `withheldControlOps` reads `ControlAudience.hasChatTab`, so
+native Claude Code holds all four while the `claude` TUI harness holds none — same binary, different
+caller. Naming a runtime here instead is what would have to be revisited every time one is added.
+Plan Mode itself is narrower still: the two plan-mode playbooks are consumed only by the shipped Pi
+extension, since a runtime whose only channel is MCP has its system prompt fixed at session open.
 
 A harness also gets no per-turn upkeep block — the app renders that into a Pi system prompt and a
 harness has no equivalent hook — so `HARNESS_AWARENESS` carries the branch-naming nudge itself.
@@ -83,7 +93,7 @@ the sub-agent side, where the reader is the orchestrator rather than the user.
 
 `visibleTurnParts`, in the same file, drops the three bookkeeping calls entirely
 (`ensemblr_set_summary`, `ensemblr_set_name`, `ensemblr_set_branch_name` — see
-`src/renderer/lib/pi/ensemblr-tool-presentation.ts`), so those specifically can no longer strand an
+`src/renderer/lib/agent-timeline/ensemblr-tool-presentation.ts`), so those specifically can no longer strand an
 answer. That is a backstop, not a licence: `ensemblr_close_tab`, `ensemblr_focus_*`, and every other
 control call still render, and still end the run. A **failed** bookkeeping call also still renders, so
 a permission denial stays visible.
@@ -92,18 +102,19 @@ a permission denial stays visible.
 
 | Goal | Tools |
 |---|---|
-| Delegate a subtask to a Pi sub-agent | `ensemblr_start_conversation` (fresh tab + `title`; keep its `agentSessionId`). While planning, the child inherits Plan Mode. |
-| Name your own tab | `ensemblr_set_name` (Pi chats only; the label goes in `title`, as it does everywhere) |
+| Delegate a subtask to a sub-agent | `ensemblr_start_conversation` (fresh tab + `title`; keep its `agentSessionId`). The child runs the caller's own agent runtime. While planning, it inherits Plan Mode. |
+| Name your own tab | `ensemblr_set_name` (chat tabs only; the label goes in `title`, as it does everywhere) |
 | Name the workspace + git branch | `ensemblr_set_branch_name` (once per branch, while the branch still carries the name it was cut with; refuses unless the user enabled `git.renameWorkspaceOnBranch`. Pass `userRequested: true` when the user asks for a different branch name — never `git branch -m`) |
-| Record what the session covered | `ensemblr_set_summary` (every turn; Pi chats only) |
+| Record what the session covered | `ensemblr_set_summary` (every turn; chat tabs only) |
 | **Block until children settle** | `ensemblr_wait_for_agents` |
 | Steer / correct a child | `ensemblr_send_follow_up`. While planning, reaches only a target that is itself planning. |
 | Delegate to a CLI agent | `ensemblr_launch_harness` (claude / codex / vibe). Blocked while planning. |
 | Run / inspect commands | `ensemblr_start_terminal`, `ensemblr_write_terminal`, `ensemblr_read_terminal_output`, `ensemblr_stop_terminal` |
 | Pick a run script to start | `ensemblr_list_run_scripts`, then `ensemblr_start_terminal` with `kind: "run"` and that `scriptName` |
 | Inspect a child out of band | `ensemblr_get_conversation_status`, `ensemblr_get_last_message` |
+| Audit what a child actually ran | `ensemblr_read_conversation` — its prompts, answers, and every tool call with arguments and result; call it with `stat: true` first, then page with `fromOrdinal`, or read one entry whole with `ordinal` |
 | Pull the orchestrator back (sub-agents) | `ensemblr_notify_orchestrator` |
-| Ask the human to decide | `ensemblr_ask_user_question` (blocks until answered; Pi chats only) |
+| Ask the human to decide | `ensemblr_ask_user_question` (blocks until answered, with no timeout; chat tabs only) |
 | See the workspace | `ensemblr_list_workspaces`, `ensemblr_list_tabs`, `ensemblr_list_terminals` |
 | Move / read the workspace board | `ensemblr_set_workspace_status`, `ensemblr_get_workspace_status` |
 | Read the workspace diff | `ensemblr_get_workspace_diff` — call it with `stat: true` first, then read the whole diff or one `filePath` at a time |
@@ -181,7 +192,8 @@ three orchestrating playbooks say so and a parity test pins it.
 > and would have to spend a `send_follow_up` round trip recovering work the child already did. A turn
 > that produced no assistant text at all (a child re-prompted and still working) is skipped rather than
 > treated as the end, so the report it already filed is still what comes back. A tool-heavy turn can
-> hold dozens of assistant messages, so the join stops at `MAX_REPORT_CHARS` (32k) — read newest-first,
+> hold dozens of assistant messages, so the join stops at `MAX_AGENT_PAYLOAD_CHARS` (32k,
+> `src/shared/agent-control/workspace-diff.ts` — one ceiling shared with the workspace diff) — read newest-first,
 > the cap sheds the narration that opened the turn, never the answer that closed it, and one child
 > cannot flood its orchestrator's context from a single tool result.
 
@@ -200,8 +212,8 @@ three orchestrating playbooks say so and a parity test pins it.
 ## Example — parallel delegation
 
 ```
-a = ensemblr_start_conversation({ prompt: "Write unit tests for src/foo.ts" })   // { agentSessionId }
-b = ensemblr_start_conversation({ prompt: "Write unit tests for src/bar.ts" })
+a = ensemblr_start_conversation({ title: "Test foo.ts", prompt: "Write unit tests for src/foo.ts" })  // { chatTabId, agentSessionId }
+b = ensemblr_start_conversation({ title: "Test bar.ts", prompt: "Write unit tests for src/bar.ts" })
 # both children now run; block until they finish or need you:
 r = ensemblr_wait_for_agents({ mode: "all" })
 for child in r.completed:
@@ -385,7 +397,7 @@ orchestrator owns that conversation and a prompt typed alongside would interleav
 turn it is waiting on. A disabled composer used to stand there while the child streamed; it only
 advertised an affordance that never unlocks. What keeps that from stranding a child nobody can
 reach: stopping a conversation now cascades into everything it spawned — `stopSession`
-(`src/main/pi-agent/pi-session-lifecycle.ts`) walks the origin registry's lineage and aborts each
+(`src/main/agent-runtime/agent-session-lifecycle.ts`) walks the origin registry's lineage and aborts each
 live descendant with reason `orchestrator-stopped`, guarding against a lineage that points back at
 itself and logging rather than throwing when one child refuses to abort. The descendants are
 collected in a `finally`, so a root whose own abort rejects still surfaces that failure to the

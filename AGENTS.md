@@ -66,7 +66,7 @@ Vitest is the mandated test runner for renderer and shared tests. npm is the pac
 ## State Management Policy
 
 - Use Jotai as the only app-level state management solution.
-- Define shared renderer state with Jotai atoms in concern-owned modules under `src/renderer/state/`, for example `src/renderer/state/workspace/atoms.ts`.
+- Define shared renderer state with Jotai atoms in concern-owned modules under `src/renderer/state/`, for example `src/renderer/state/preferences/atoms.ts`.
 - Each state concern should expose a narrow public surface through `src/renderer/state/<concern>/index.ts`; import from that index outside the concern.
 - Do not place shared Jotai atoms under `src/renderer/components/`. Component modules may read/write atoms, but durable state definitions belong in `src/renderer/state/`.
 - Do not add or use Redux, Zustand, Recoil, Valtio, MobX, Nanostores, XState, Effector, or custom global store implementations.
@@ -81,7 +81,7 @@ Vitest is the mandated test runner for renderer and shared tests. npm is the pac
 - Use canonical Tailwind classes before arbitrary values. For example, use `text-xs` instead of `text-[0.75rem]`, `rounded-2xl` instead of `rounded-[0.375rem]`, and `rounded-sm` instead of `rounded-[0.125rem]`.
 - If a value is not available as a canonical Tailwind class, use rem-based arbitrary values instead of px-based arbitrary values, especially for typography: use `text-[0.8125rem]` instead of `text-[13px]`.
 - Prefer semantic or existing tokenized utilities over new arbitrary values when the design system already exposes the needed value.
-- `npm run check` runs `scripts/check-tailwind-classes.mjs`, which fails on square-bracket pixel utilities and known non-canonical arbitrary classes. Update that script when adding another canonical class equivalence that agents should preserve.
+- `npm run check` runs `scripts/check-tailwind-classes.mjs`, which fails on square-bracket pixel utilities and known non-canonical arbitrary classes. It scans `src/renderer` only (`.css`, `.js`, `.jsx`, `.ts`, `.tsx`), so `playground/` is not covered. Update that script when adding another canonical class equivalence that agents should preserve.
 
 ## Scoped Agent Instructions
 
@@ -120,7 +120,7 @@ Every function, hook, React component, Jotai atom, and IPC contract in `src/main
 - For Jotai atoms (including derived atoms) and exported plain-data constants, describe the slice of state or the meaning of the value, plus any persistence or scope notes. Skip the JSDoc when the constant's name is self-explanatory.
 - For TanStack Router route definitions and loaders, describe the route's purpose, what data it loads, and any params or search params it consumes.
 - For IPC channel and contract definitions, describe what the channel does, who sends it, and who receives it.
-- Excluded by policy: shadcn UI primitives under `src/renderer/components/ui/`, type-only files (`*.d.ts`, anything under `types/`), the generated `routeTree.gen.ts`, mock fixtures under `src/renderer/mocks/`, pure barrel `index.ts` re-export files, and tests. `src/shared/ipc/contracts.ts` is also treated as type-only.
+- Excluded by policy: shadcn UI primitives under `src/renderer/components/ui/`, type-only files (`*.d.ts`, anything under `types/`), the generated `routeTree.gen.ts`, fixture data under `src/renderer/fixtures/`, pure barrel `index.ts` re-export files, and tests. The contract modules under `src/shared/ipc/contracts/` are also treated as type-only; `src/shared/ipc/channels.ts` is not.
 - When updating existing code, leave correct JSDoc in place and refresh it when behavior changes. Do not introduce new code without the appropriate JSDoc block.
 - See @.claude/rules/jsdoc.md for the per-function JSDoc contract: which declarations carry a block, and how to write the description, `@param`, and `@returns` tags.
 - Function bodies stay comment-free — clear names and small helpers over prose. See @.claude/rules/comments.md for how to remove a comment instead of writing one, plus the single exception (a short comment explaining a non-obvious *why* the code cannot express), what stays outside the rule (JSDoc, tool directives), and what is never allowed (commented-out code, bare `TODO`/`FIXME`).
@@ -133,7 +133,7 @@ See @.claude/rules/code-review.md — when the `code-review` skill runs, run `re
 
 - Linear project lookup defaults: team `The Swiss Cheese`, project `Ensemble`, issue key prefix `THE`.
 - Local planning IDs such as `ENS-006` are roadmap IDs, not Linear issue keys. Use Linear issue identifiers such as `THE-106` for branch names, PR titles, commits, and status updates.
-- When asked to grab the next issue, inspect Linear project `Ensemble` first, then use `docs/product/linear-issues.md`, `docs/product/linear-milestones.md`, `docs/product/dependency-map.md`, and `docs/product/implementation-roadmap.md` to confirm roadmap order, dependencies, and acceptance criteria.
+- When asked to grab the next issue, inspect Linear project `Ensemble` first, then use `docs/product/linear-issues.md`, `docs/product/linear-milestones.md`, and `docs/product/implementation-roadmap.md` to confirm roadmap order, dependencies, and acceptance criteria. The frozen `ENS-*` dependency graph is archived at `docs/product/archive/dependency-map.md`.
 - Never mark Linear tickets as `Done` from agent work. When implementation and verification are complete, move the ticket to `In Review`.
 - Never create a pull request unless the user explicitly asks for one in the current task. Do not infer PR creation from completed work, Linear-backed work, or branch readiness.
 - When creating a pull request for Linear-backed work, include the actual Linear issue code in the PR title, for example `THE-105`. Do not use only a local planning ID such as `ENS-005`.

@@ -1,12 +1,31 @@
 # MVP Sequencing
 
-Date: 2026-06-04
+Date: 2026-06-04 (status reviewed 2026-08-08)
 
-Ensemblr targets Conductor feature parity adapted for Pi. MVP sequencing is about implementation order, not reduced product ambition.
+> **Archived 2026-08-08.** Milestones 0–4 are complete and Milestone 5 is largely
+> complete, so nothing here is actionable: this document records the original
+> ordering, not a live checklist. It is kept for provenance and is no longer
+> maintained. See `docs/product/archive/README.md`.
+>
+> **Live equivalent:** `docs/product/implementation-roadmap.md` — its *Roadmap
+> Sequence* table carries the same milestone ordering against shipped state, its
+> *Milestone Dependencies* section carries the ordering constraints, and its
+> *Completed Implementation* tables attach PR/commit evidence. The deferred list
+> below survives verbatim as that document's *Explicitly deferred until
+> post-core*.
+>
+> Two Milestone 2 lines have been overtaken: the app now runs **two** agent
+> runtimes (Pi via CLI RPC, Claude Code in-process via the SDK) as siblings under
+> `src/main/agent-runtime/` (ADR 0042), and Milestone 3's run-script line now
+> means any number of named `[scripts.run.<name>]` scripts rather than one
+> `run` command (ADR 0041). Milestone 5's "Big terminal mode" was satisfied by
+> the terminal dock and is not a separate setting.
+
+Ensemblr targets Conductor feature parity. MVP sequencing is about implementation order, not reduced product ambition.
 
 ## Principle
 
-Build every major Conductor workflow, adapted for Pi, in thin vertical slices before polishing visual details.
+Build every major Conductor workflow in thin vertical slices before polishing visual details.
 
 ## Milestone 0: Product Foundation
 

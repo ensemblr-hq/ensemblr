@@ -16,20 +16,39 @@ never turned into free-text shell.
 ## Harness Claude Code is not native Claude Code
 
 The two Claude paths are deliberately separate, and the difference is
-load-bearing:
+load-bearing. "Launch Claude Code" means two different things depending on which
+one you mean, and both reach the same control server, so the name alone will not
+tell you which caller you are looking at:
 
 | | Harness `claude` tab | Native Claude chat |
 |---|---|---|
+| What launches it | `ensemblr_launch_harness` with `harnessId: "claude"`, or the robot menu | opening a chat tab on the `claude` agent runtime, or `ensemblr_start_conversation` from a `claude` chat |
 | Transport | `claude` TUI in a `node-pty` terminal | `@anthropic-ai/claude-agent-sdk`, driven in-process from main |
 | Binary | your `claude`, found on `PATH` | your `claude`, from the Providers override or `PATH` — Ensemblr ships none (ADR 0042 §1) |
 | Surface | raw terminal | chat tab, structured timeline, tool cards, checkpoints, forking, summaries |
-| Species | `harness` | `claude` |
+| Species | `harness` | agent runtime `claude` (`AgentProviderId`, alongside `pi`) |
 | Permissions | always `--dangerously-skip-permissions` (see below) | honours the workspace permission mode, like Pi |
+| Control origin | the workspace-level origin `ws:<id>`, shared with every terminal | its own per-session origin, with lineage (`parentSessionId`, `depth`) |
 | Playbook | `HARNESS_AWARENESS` | `ORCHESTRATOR_AWARENESS` / `SUBAGENT_AWARENESS` |
-| Control tools | no chat-tab tools | full `ensemblr_*` set over native MCP |
+| Control tools | no chat-tab tools | full `ensemblr_*` set over the same MCP endpoint |
+| Spawning children | must pass `model` — the app cannot tell its runtime | may omit `model`; the child is pinned to the `claude` runtime |
 
 Native Claude **never** inherits the harness's skip-permissions flag. Keep the
 two code paths visibly distinct so that default cannot leak across.
+
+Both Claude paths reach the control layer over `POST /mcp`; the endpoint decides
+what to serve from `ControlAudience` (does the caller drive a chat tab, and is it
+a root or a spawned child), never from the runtime's name. That is the whole
+reason a first-class runtime can be added without touching the withholding
+policy.
+
+**Plan Mode is Pi-only.** `PLAN_MODE_ORCHESTRATOR_AWARENESS` and
+`PLAN_MODE_SUBAGENT_AWARENESS` are consumed solely by the shipped Pi extension,
+which resolves this turn's Plan Mode over `getSessionBrief` and swaps the
+playbook. A runtime whose only channel is MCP has its system prompt fixed at
+session open (`systemPromptAppend` in
+`src/main/agent-runtime/session/agent-control-wiring.ts`), so it receives the
+role playbook and, per turn, only the upkeep block through `resolveTurnPreamble`.
 
 ## Supported harnesses
 

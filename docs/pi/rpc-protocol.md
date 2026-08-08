@@ -17,17 +17,28 @@ install with `npm ls -g @earendil-works/pi-coding-agent`:
 - `dist/modes/rpc/rpc-mode.js` — RPC mode implementation
 - `dist/modes/rpc/rpc-types.d.ts` — command/response/extension-UI types
 - `dist/modes/rpc/rpc-client.js` — reference subprocess client
-- Ensemblr's existing adapter: `src/main/pi-agent/pi-agent-client.ts`,
+- Ensemblr's existing adapter: `src/main/pi-agent/pi-cli-rpc-adapter.ts`,
   `src/main/pi-agent/cli-rpc/*`
+
+> **Path note.** The client and the adapter were once two modules
+> (`pi-agent-client.ts` and `cli-rpc-pi-agent-adapter.ts`); both are now the one
+> file `src/main/pi-agent/pi-cli-rpc-adapter.ts`. Pi's session ownership also
+> moved out of `pi-agent/` into the provider-neutral
+> `src/main/agent-runtime/` when Claude Code became a second first-class runtime,
+> so `pi-agent/` is now the Pi *adapter* only.
 
 ## Invocation
 
 - RPC mode starts with `pi --mode rpc [options]` (`rpc.md` "Starting RPC
   Mode"). Ensemblr's base args are
   `DEFAULT_PI_RPC_ARGS = ['--mode', 'rpc']`
-  (`src/main/pi-agent/pi-agent-client.ts:21`); `buildSessionArgs` then appends
-  `--model <provider/id>`, `--thinking <level>`, and `--session-id <id>` from
-  the resolved request when present.
+  (`src/main/pi-agent/pi-cli-rpc-adapter.ts:39`); `buildPiSessionArgs` (same
+  file) then appends `--model <provider/id>`, `--thinking <level>`, and
+  `--session-id <id>` from the resolved request when present. The composition
+  root overrides the base args with
+  `['--mode', 'rpc', '-e', piControlExtensionPath]` (`src/main/main.ts`) when the
+  shipped Ensemblr Control extension resolves, which is how Pi gets the
+  `ensemblr_*` tools — see [`../agent-control.md`](../agent-control.md).
 - Useful flags: `--provider <name>`, `--model <pattern>`,
   `--name <session name>`, `--no-session` (disable persistence),
   `--session-dir <path>` (`rpc.md` "Starting RPC Mode"). Captures use
@@ -39,12 +50,12 @@ install with `npm ls -g @earendil-works/pi-coding-agent`:
   the RPC `set_model` (`{type,provider,modelId}`) and `set_thinking_level`
   (`{type,level}`) commands, which the adapter writes ahead of the next
   `prompt` only when the selection differs from what the runtime is already on
-  (`src/main/pi-agent/cli-rpc-pi-agent-adapter.ts`).
+  (`src/main/pi-agent/pi-cli-rpc-adapter.ts`).
 - **No ephemeral utility sessions (Ensemblr).** Chat-title, branch-name, and
   session-summary generation used to spawn short-lived RPC sessions on the
   chat's own model, which on a local provider was slow enough to time out and
   discard the result. Titles are now derived without a model
-  (`naming/session-naming.ts`), and the branch name and session summary come
+  (`src/main/agent-runtime/naming/session-naming.ts`), and the branch name and session summary come
   from the agent itself via `ensemblr_set_branch_name` and
   `ensemblr_set_summary`. Every RPC session Ensemblr opens is a real
   conversation.
@@ -52,7 +63,10 @@ install with `npm ls -g @earendil-works/pi-coding-agent`:
   `localStorage` and used as React Query `initialData`, so the model picker is
   populated instantly on launch and refreshed silently in the background; an
   empty result never overwrites the last-known-good catalog
-  (`src/renderer/api/ensemblr/pi-models-cache.ts`).
+  (`src/renderer/api/ensemblr/agent-models-cache.ts`, seeded as `initialData` in
+  `src/renderer/api/ensemblr/agent-sessions.ts`). The module is now
+  provider-neutral — it caches the `AgentModelCatalog` that spans every runtime,
+  not just Pi's.
 
 ## Framing
 
@@ -73,18 +87,21 @@ optional `id` echoed back on the matching response (`rpc.md` "Protocol
 Overview"). The ones the timeline client needs:
 
 The complete set of frames Ensemblr actually writes to Pi stdin is
-`prompt`, `steer`, `follow_up`, `set_model`, `set_thinking_level`, and
-`get_session_stats` (`cli-rpc-pi-agent-adapter.ts`). Abort is an OS signal, not a
+`prompt`, `steer`, `follow_up`, `set_model`, `set_thinking_level`,
+`set_session_name`, `get_session_stats`, and `get_state`
+(`src/main/pi-agent/pi-cli-rpc-adapter.ts`). Abort is an OS signal, not a
 frame (see "Aborting"). The rest of the table is Pi capability, not app usage.
 
 | Command | Shape | Notes |
 |---|---|---|
-| prompt | Pi contract: `{"type":"prompt","message":string}`. **Ensemblr sends** `{"type":"prompt","message":string,"turnId":string,"attachments":[]}` (`cli-rpc-pi-agent-adapter.ts`). | `turnId`/`attachments` are client metadata Pi ignores today; `attachments` is always empty. No `images` field is sent — image/file attachments are serialized *into* `message` as text (see "Attachments"). `streamingBehavior` is **not** a prompt field: when set, the adapter emits a separate `steer`/`follow_up` frame instead (`"steer"\|"followUp"`). Pi rejects a `prompt` with `success:false` if it is already streaming (`rpc.md` "prompt"). |
+| prompt | Pi contract: `{"type":"prompt","message":string}`. **Ensemblr sends** `{"type":"prompt","message":string,"turnId":string,"attachments":[]}` (`pi-cli-rpc-adapter.ts`). | `turnId`/`attachments` are client metadata Pi ignores today; `attachments` is always empty. No `images` field is sent — image/file attachments are serialized *into* `message` as text (see "Attachments"). `streamingBehavior` is **not** a prompt field: when set, the adapter emits a separate `steer`/`follow_up` frame instead (`"steer"\|"followUp"`). Pi rejects a `prompt` with `success:false` if it is already streaming (`rpc.md` "prompt"). |
 | steer | `{"type":"steer","message":string}` | Queued; delivered after current assistant turn's tool calls (`rpc.md` "steer") |
 | follow_up | `{"type":"follow_up","message":string}` | Delivered when agent fully stops (`rpc.md` "follow_up") |
 | get_session_stats | `{"type":"get_session_stats"}` | Token usage, cost, `contextUsage` — feeds the status bar. The app refreshes it on every `turn_end`/`agent_end` (`rpc.md` "get_session_stats"). |
 | set_model / set_thinking_level | `{"type":"set_model","provider","modelId"}` / `{"type":"set_thinking_level","level"}` | Written ahead of the next `prompt` only when the selection differs from what the runtime is already on. Thinking levels: `off,minimal,low,medium,high,xhigh` |
-| abort / get_state / new_session | Pi capabilities, **not used by Ensemblr** | Abort is done by signal, not this frame. Session status is derived from the `agent_start`/`turn_start`/`agent_end` lifecycle, so `get_state` is never sent. |
+| set_session_name | `{"type":"set_session_name","name":string}` | Renames the Pi session. Reached from `ensemblr_set_name` and from the app's own tab-naming path (`AgentClient.setSessionName`). |
+| get_state | `{"id":string,"type":"get_state"}` | Sent by `getState()`, which times out on its own (`STATE_TIMEOUT_MS`). Session *status* is still derived from the `agent_start`/`turn_start`/`agent_end` lifecycle rather than polled — the one live caller is `session-naming.ts`, reading the session's current name. |
+| abort / new_session | Pi capabilities, **not used by Ensemblr** | Abort is done by signal, not this frame. |
 
 Response frames: `{"id?":string,"type":"response","command":string,
 "success":boolean,"data?":...,"error?":string}` (`rpc.md` "Commands",
@@ -157,12 +174,14 @@ in `multi-tool-chain` capture.
 ## Aborting
 
 - **Ensemblr aborts by signal, not by RPC frame.** `abort()` sends `SIGINT`, then
-  `SIGKILL` after `killGraceMs` (`cli-rpc-pi-agent-adapter.ts`). The
-  `{"type":"abort"}` command is a real Pi capability the app does not use.
+  `SIGKILL` after `killGraceMs` (`src/main/pi-agent/pi-cli-rpc-adapter.ts`,
+  `cli-rpc/kill-timer.ts`). The `{"type":"abort"}` command is a real Pi
+  capability the app does not use.
 - The in-flight assistant message still ends with
   `assistantMessageEvent.type:"error"`, `reason:"aborted"`, and/or
   `stopReason:"aborted"`, and `agent_end` still fires (confirmed in the
-  `abort-mid-turn` capture; sealed with `stopReason:"aborted"` in `reducer.ts`).
+  `abort-mid-turn` capture; sealed with `stopReason:"aborted"` in
+  `src/renderer/lib/pi-replay/reducer.ts`).
 
 ## Attachments
 
@@ -171,7 +190,7 @@ in `multi-tool-chain` capture.
   `<attached_file path="…">…</attached_file>` blocks and referenced directories
   become a `Referenced workspace folders:\n@<path>` header
   (`src/renderer/lib/workbench/mention-payload.ts`), round-tripped by
-  `src/renderer/lib/pi/prompt-attachment-parser.ts`.
+  `src/renderer/lib/agent-timeline/prompt-attachment-parser.ts`.
 - Raster images are saved to the workspace `.context/images/` and referenced by
   path only — no image bytes cross the RPC wire (ADR 0036,
   `composer-attachments.ts`).
@@ -239,6 +258,22 @@ full read of `dist/modes/rpc/rpc-types.d.ts` (`RpcCommand` union) and
 | Session ops | **Supported by Pi, unused by Ensemblr** | `switch_session`, `fork`, `clone`, `get_fork_messages`, `get_messages`, `set_session_name`, `export_html`, client-side `bash`. Ensemblr uses **none** of these over RPC — conversation "forking" is an app-side markdown summary plus a SQLite branch kind (`'main'\|'retry'\|'fork'`, `pi-session-service.ts`), and per-turn "checkpoints" are git snapshots on a private ref namespace `refs/ensemblr/checkpoints/…` (ADR 0012, `src/main/checkpoints/git-checkpoint.ts`), captured before each user turn. |
 
 ### Recommendations for Ensemblr settings (v1)
+
+> **What shipped instead, for the two that moved.** Both landed app-side rather
+> than as Pi spawn profiles, so nothing in the repo passes `--tools`,
+> `--exclude-tools`, `--no-tools`, or `--no-builtin-tools` today.
+>
+> - **Permission modes** are enforced in the main process by
+>   `classifyPermissionAction` (`src/shared/permissions.ts`), which the IPC
+>   permission gate and the agent-control service both consult. No RPC restart is
+>   involved, so a mid-session mode switch works — the constraint this section
+>   said the settings UI would have to state does not apply.
+> - **Plan Mode** shipped as an Ensemblr feature, not a Pi one. It is a per-chat
+>   toggle whose policy lives in `src/shared/plan-mode/`; Pi's own built-in tools
+>   are gated by the shipped control extension asking `checkPlanModeTool` before
+>   each call, and the read-only `bash` classifier is
+>   `src/shared/plan-mode/bash-guard.ts`. The row above stays accurate about
+>   *Pi core*: `{"type":"plan_mode"}` is still an unknown command.
 
 - **Enable:** model picker, thinking level, context usage, manual + auto
   compaction toggles (all already wired or trivially wireable).

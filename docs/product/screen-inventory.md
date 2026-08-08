@@ -84,9 +84,10 @@ No onboarding PNG files were captured under `.context/conductor-screens/01-onboa
 ### `.context/conductor-screens/02-root-settings/CleanShot 2026-06-04 at 17.55.35@2x.png`
 
 - Flow: `02-root-settings`
-- Screen name: App Settings - Providers — **REMOVED**
-- Status: The standalone Providers settings screen was deleted (route, sidebar entry, command-palette entry). Provider/auth setup is owned by Pi itself; Ensemblr does not store provider tokens.
-- Where it lives now: Provider readiness checks (Pi runtime, Pi model provider, GitHub CLI) remain in the **Diagnostics** screen, sourced from the setup-diagnostics gate.
+- Screen name: App Settings - Providers
+- Status: **Corrected 2026-08-08.** The two lines below record the 2026-07-19 state, when Pi was the only runtime and the screen had been deleted. ADR 0042 added Claude Code as a second first-class runtime, and #226 reinstated `/settings/providers` as the agent-runtime surface: one tab per registered runtime with its executable, readiness, accounts, and settings-file location. Ensemblr still stores no provider tokens. See `docs/product/settings-inventory.md`.
+- Status (2026-07-19, superseded): The standalone Providers settings screen was deleted (route, sidebar entry, command-palette entry). Provider/auth setup is owned by Pi itself; Ensemblr does not store provider tokens.
+- Where it lives now: the aggregate setup gate (agent-runtime readiness, git, GitHub CLI, Linear) remains in the **Diagnostics** screen; per-runtime readiness is on **Providers**.
 - Pi-specific adaptation: Provider credentials stay in the Pi user environment (ADR 0003); Ensemblr surfaces readiness only, not auth management.
 - Risks or implementation notes: Ensemblr should not expose tokens or account identifiers; secret values are hidden and stored outside plain JSON.
 

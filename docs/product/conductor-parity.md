@@ -1,10 +1,12 @@
 # Conductor Parity Matrix
 
-Date: 2026-07-18
+Date: 2026-08-08
 
-Ensemblr targets feature parity with Conductor's publicly observable and documented workflows, adapted for Pi. This matrix is a living checklist, not a copied product spec.
+Ensemblr targets feature parity with Conductor's publicly observable and documented workflows. This matrix is a living checklist, not a copied product spec.
 
-> **Status (2026-07-18):** The Pi runtime, live `gh`-backed PR/checks, live node-pty/xterm terminals, setup/run script execution, drag-order session tabs, optimistic workspace creation, the dashboard board, and the archive lifecycle have all shipped since this doc's parity targets were written. Rows framed below as future or aspirational are largely implemented; treat the "Ensemblr Target" wording as the intended contract and read the inline "Implemented" annotations for current state.
+> **Status (2026-08-08):** The Pi runtime, live `gh`-backed PR/checks, live node-pty/xterm terminals, setup/run script execution, drag-order session tabs, optimistic workspace creation, the dashboard board, and the archive lifecycle have all shipped since this doc's parity targets were written. Rows framed below as future or aspirational are largely implemented; treat the "Ensemblr Target" wording as the intended contract and read the inline "Implemented" annotations for current state.
+>
+> **Runtime parity closed (2026-08-07, ADR 0042):** this matrix was written when the answer to "Claude Code and Codex" was "Pi only". Claude Code is now a first-class agent runtime alongside Pi, driven in-process through `@anthropic-ai/claude-agent-sdk` against the user's own `claude` binary, with its own chat tabs, timeline, plan mode, slash commands, MCP roster, and model catalogue (#226–#237). Read "Pi" below as "the chat's agent runtime" wherever the row is not genuinely Pi-specific.
 
 Sources checked:
 
@@ -60,22 +62,22 @@ if original screenshot evidence is unavailable.
 | --- | --- | --- |
 | Independent tasks | Multiple workspaces for independently mergeable streams. | Same target. |
 | Shared work | Multiple agents in one workspace when they share branch/context. | Same target, represented as multiple Pi sessions in one workspace. |
-| Workspace creation | New workspace from branch, PR, issue, or Linear issue. | Same target; Linear issue workspaces are v1 scope and GitHub issue/PR entry points use `gh` where practical. |
-| Workspace landing | New workspaces show branch source, copied-file count, and setup-script guidance before the first prompt. | Same target with Pi composer ready on first prompt. |
+| Workspace creation | New workspace from branch, PR, issue, or Linear issue. | **Implemented.** Linear issue workspaces are v1 scope and GitHub issue/PR entry points use `gh`. Since #225 creation carries a `branchPlan`: `adopt` checks out and owns an existing branch (so its commits show in review and pushes land on the PR it backs), `create` cuts a fresh branch at a fork point. The base branch is a separate merge target, defaulting to the PR's own base, and is selectable per workspace (#216). |
+| Workspace landing | New workspaces show branch source, copied-file count, and setup-script guidance before the first prompt. | Same target with the composer ready on first prompt. |
 | Archive | Archive finished/discarded workspaces and run archive script first. | Lifecycle state in SQLite (`workspaces.archived_at` + `archive_records`) with `.context/` preserved under `archived-contexts/` and a hook surface for `ENS-038`'s archive script and `ENS-060`'s after-merge cleanup; branch cleanup is opt-in. See ADR 0027. |
 | Unarchive | Implicit through "restore" affordances on archived workspaces. | Repository context menu's **Browse archive…** entry opens a dialog listing archived workspaces. Restore NULLs `archived_at`, restores the preserved `.context/`, and recreates the worktree from the recorded base branch when archive ran with branch cleanup. |
 | Delete vs archive | Single destructive action. | Distinct intents: archive keeps state and context, delete drops the worktree + branch + row and writes the `.ensemblr-archived` sentinel. Both require explicit confirmation. Destructive repository delete also wipes `<root>/archived-contexts/<repo-slug>/`. |
 | Workspace context | `.context` folder for uncommitted handoff files. | Same target; preserved verbatim into `archived-contexts/<repo>/<workspace>-<timestamp>/.context/` on archive, with a sibling `archive-metadata.json` snapshot. |
 
-## Pi Agent Runtime
+## Agent Runtime
 
 | Area | Conductor Behavior | Ensemblr Target |
 | --- | --- | --- |
-| Agent types | Claude Code and Codex. | Pi only for v1. |
-| Session controls | Plan mode, fast mode, reasoning, personality, checkpoints. | **Implemented.** Adapt to Pi capabilities: model, thinking level, session tree, compaction, steering/follow-up, checkpoints. |
-| Instructions | Repository instructions, instruction files, skills. | Preserve Pi user environment and Pi resource loading from `~/.pi/agent`, project `.pi`, and context files. |
-| Timeline | Show agent messages, tool calls, output, status, and review context. | **Implemented.** Structured Pi RPC event timeline. |
-| Runtime errors | Inline provider/runtime error cards with retry and retry-in-new-chat actions. | Pi CLI/RPC runtime error cards with retry, fork, or continuation behavior mapped to Pi session history. |
+| Agent types | Claude Code and Codex. | **Implemented (2026-08-07, ADR 0042).** Two first-class runtimes: Claude Code (in-process SDK) and Pi (CLI RPC), as siblings under `src/main/agent-runtime/`. A chat is pinned to one provider; a spawned sub-agent inherits its caller's. Codex stays a terminal harness, not an agent provider. |
+| Session controls | Plan mode, fast mode, reasoning, personality, checkpoints. | **Implemented.** Model, thinking level, session tree, compaction, steering/follow-up, checkpoints, plus a per-chat plan mode (#184) — Claude's native one, Pi's through the shipped extension's `tool_call` hook. Fast mode and personality have no runtime concept and are not exposed. |
+| Instructions | Repository instructions, instruction files, skills. | Each runtime keeps its own user environment: Pi loads `~/.pi/agent`, project `.pi`, and context files; Claude Code uses the user's own configuration, slash commands, and MCP roster (#228). Ensemblr duplicates neither. |
+| Timeline | Show agent messages, tool calls, output, status, and review context. | **Implemented.** One structured timeline over a provider-neutral event vocabulary; Claude tool results render as cards, not raw JSON (#233). |
+| Runtime errors | Inline provider/runtime error cards with retry and retry-in-new-chat actions. | Runtime error cards with retry, fork, or continuation behavior mapped to the pinned runtime's session history. |
 | Composer | Prompt box supports model/reasoning controls, file/PR references, slash/run commands, attachments, optional voice input, and stop/submit controls. | **Implemented** (except voice). Pi composer with Pi model/thinking controls, Pi attachments/context, and stop/submit controls. Voice input is deferred until after core completion. |
 | Terminal mode | Big terminal mode and terminal panels. | **Implemented.** Live node-pty/xterm.js terminal panes for shells/scripts/logs. The primary Pi agent runtime is CLI RPC, not terminal scraping; optional raw interactive Pi terminals can be separate manual terminals. |
 
@@ -126,10 +128,10 @@ if original screenshot evidence is unavailable.
 
 | Area | Conductor Behavior | Ensemblr Target |
 | --- | --- | --- |
-| Diff viewer | Changed file list, unified diff, commit filtering. | Same target. |
+| Diff viewer | Changed file list, unified diff, commit filtering. | **Implemented.** Since #211 the file preview, turn diff, workspace file diff, and PR diff all render through one code surface. |
 | Changes tree | Folder-grouped changed-file tree with status badges, addition/deletion counts, search, and display controls. | Same target. |
-| Comments | Local line comments sent back to agent; GitHub review comments visible. | Same target. |
-| Comments to chat | GitHub/check comments can be added to the agent context. | Same target, adding selected comments to Pi chat context. |
+| Comments | Local line comments sent back to agent; GitHub review comments visible. | **Implemented** (THE-152, #151). Resolved comments render struck through (#234), and PR comment bodies are readable in-app (#209). |
+| Comments to chat | GitHub/check comments can be added to the agent context. | **Implemented.** Bulk-add sends only unresolved comments (#234); agents can also read the workspace diff and file review comments through the control layer (#193). |
 | PR actions | Create PR, respond to feedback, fix checks, merge. | Same target. |
 | Checks tab | Git status, PR metadata, CI/status checks, deployments, comments/review threads, todos. | Same target. |
 | PR readiness states | No-PR, uncommitted, pending/failing checks, and ready-to-merge states have distinct UI. | **Implemented.** Same target with live `gh`/git state cached in SQLite. |

@@ -1,12 +1,18 @@
 # Implementation Roadmap
 
-Date: 2026-07-18
+Date: 2026-08-08
 
 This roadmap converts the accepted ADRs and product parity docs into a Linear-ready implementation plan. It is an implementation roadmap, not a product-decision source. Accepted ADRs remain the source of truth when there is a conflict.
 
+It also absorbs two planning documents that shipped work has overtaken. The
+`ENS-*` dependency graph and the original milestone 0–5 build order now live in
+[`docs/product/archive/`](./archive/README.md); this document carries their live
+content in *Roadmap Sequence*, *Milestone Dependencies*, and *Completed
+Implementation*.
+
 ## Scope Baseline
 
-V1 builds a Pi-focused Electron desktop app with Conductor-style local workspace, agent, terminal, review, GitHub, Linear, and settings workflows.
+V1 builds a multi-runtime Electron desktop app with Conductor-style local workspace, agent, terminal, review, GitHub, Linear, and settings workflows. Milestone 4 was written when Pi was the only runtime; ADR 0042 made Claude Code a peer, so "Pi runtime" below means "agent runtime" except where a line is genuinely Pi-specific.
 
 In scope for v1:
 
@@ -19,7 +25,8 @@ In scope for v1:
 - `.worktreeinclude` support and `ENSEMBLR_*` script/env behavior.
 - Setup gate requiring git, authenticated `gh`, Pi executable/RPC readiness, root, SQLite, and process environment checks.
 - Pi runtime through selected CLI-compatible executable launched as `--mode rpc` from workspace `cwd`.
-- Preservation of the Pi user environment, including `~/.pi/agent`, project `.pi`, context files, sessions, skills, extensions, prompts, themes, tools, and provider/model configuration.
+- Claude Code runtime as a peer of Pi, driven in-process through `@anthropic-ai/claude-agent-sdk` against the user's own `claude` binary (the SDK's per-platform binary is deliberately not packaged). Both sit behind the shared adapter contract in `src/main/agent-runtime/`; a chat is pinned to one provider. See ADR 0042.
+- Preservation of each runtime's own user environment: Pi's `~/.pi/agent`, project `.pi`, context files, sessions, skills, extensions, prompts, themes, tools, and provider/model configuration; Claude Code's own configuration, slash commands, and MCP roster.
 - Git worktree workspace creation, workspace adoption from shared Conductor roots, `.context` folder support, and archive lifecycle.
 - xterm.js terminal dock backed by main-process PTY/process supervision.
 - Git-backed checkpoints under `refs/ensemblr/checkpoints/<workspace-id>/<turn-id>`.
@@ -60,6 +67,23 @@ Explicitly deferred until post-core:
 | 8. Settings and Parity Polish | Wordmark glitch animation fires immediately on mount | 957a71d |
 | 8. Settings and Parity Polish | Context-aware ⌘/Ctrl+W close action for workspace tabs, Settings shell, and window fallback | 695de4f |
 
+### Completed since 2026-07-18
+
+| Milestone | Completed Items | PR / Commit |
+| --- | --- | --- |
+| 4. Agent Runtime and Timeline | Agent-to-app control layer (loopback MCP + Pi `POST /invoke`), role-aware orchestration guidance, sub-agent naming/status sync, durable role scoping, transcript audit, cascade stops, `ask_user_question` — ADR 0040 | #166–#194, #224 (2d6503f … 27f7b5b) |
+| 4. Agent Runtime and Timeline | Plan mode for conversations: per-chat ⌥⇧P toggle, `src/shared/plan-mode/` classifier, `ensemblr_exit_plan_mode` writing `.context/plans/`, Approve/Refine/Hand off bar (later the composer header) | #184, #191, #218 (c44bd8f, 4773a7d, d87062e) |
+| 4. Agent Runtime and Timeline | Timeline rebuilt around tool presentation descriptors, collapsed skill invocations, rebuilt session naming, harness playbooks | #185–#188 (b87280b, 5e1e175, e36b3f1) |
+| 4. Agent Runtime and Timeline | **Claude Code as a second first-class agent runtime** — provider-neutral `src/main/agent-runtime/` with `pi-agent/` and `claude-agent/` as siblings, slash commands, MCP roster, model catalogue, live context measurement, per-chat provider pinning, runtime-aware sub-agents — ADR 0042 | #226–#237 (069cd0b … 4fbeb65) |
+| 5. Terminal, Scripts, and Processes | Named run scripts per repository (`[scripts.run.<name>]` with `command`/`icon`/`default`/`available_in`), split Run button, repo Scripts settings screen writing the committed `.ensemblr/settings.toml`, agent-startable by name — ADR 0041 | #220, #222, #223 (5e28b06, c7b5387, b1f73fa) |
+| 3. Repository and Workspace Core | Workspace takes over an existing branch instead of always forking: `branchPlan` adopt/create, `WorktreeBranchPlacement` union, named adoption diagnostics, rollback that never deletes a branch it did not cut, source-label sanitization | #225 (b0eeba5) |
+| 7. GitHub, Review, Checks, and Merge | Target-branch selector per workspace; merge conflicts surfaced in the checks panel with a Resolve action | #215, #216 (e8b2fe2, 915f017) |
+| 7. GitHub, Review, Checks, and Merge | Unified code surface behind file preview, turn diff, workspace file diff, and PR diff; gutter/container measurements moved onto design tokens | #211, #212 (d2cacbb, cbed051) |
+| 7. GitHub, Review, Checks, and Merge | PR comment bodies readable in-app, reusable ephemeral preview tab, sidebar preview button linked to the deployed build | #196, #197, #207, #208, #209 (6ff6a98 … df016b8) |
+| 7. GitHub, Review, Checks, and Merge | Checks panel strikes resolved comments through and bulk-adds only the unresolved ones | #234 (5a00d04) |
+| 8. Settings and Parity Polish | Providers settings screen reinstated as the agent-runtime surface (per-runtime executable, readiness, accounts, settings file) | #226 (069cd0b) |
+| — (toolchain) | The nub toolchain was adopted to replace npm and reverted the same day; npm remains the package manager per ADR 0038. The adopting commit cites "ADR 0039", which is *Remove Open Chat Tab Limit* — no nub ADR exists in `docs/adr/`. | #176, #178 (79eab44, 4b1108b) |
+
 ## Roadmap Sequence
 
 | Milestone | Focus | Exit criteria |
@@ -83,8 +107,9 @@ Explicitly deferred until post-core:
 - Treat the current workbench shell as the structural UI contract. Later tickets should replace fixture/local renderer data through TanStack Query and IPC-backed services rather than rebuilding navigation, review, PR header, chat tab, composer placement, or dock regions.
 - Keep durable renderer-only UI state in concern-owned Jotai atom modules under `src/renderer/state/`, and keep shared exported renderer types under `src/renderer/types/`.
 - Treat the current shell as the closest intended Conductor-shell match. Lost or unavailable screenshots are not a reason to restart shell parity design.
-- Preserve the implemented Pi runtime boundary: structured sessions, model/thinking controls, attachments, stop/submit, and checkpoint-aware timeline behavior now exist and should be extended through `PiAgentClient` and the Pi-session services rather than replaced.
-- Prefer boundaries that keep implementations testable: `PiAgentClient`, `GitHubService`, `LinearService`, `ConfigService`, `SecretStore`, `TerminalService`, and `WorkspaceService`. `GitHubService` is a `gh`/`gh api` command boundary, not an app-owned GitHub auth client.
+- Preserve the implemented agent-runtime boundary: structured sessions, model/thinking controls, attachments, stop/submit, plan mode, and checkpoint-aware timeline behavior now exist and should be extended through `AgentClient` and the session services in `src/main/agent-runtime/` rather than replaced.
+- A new agent runtime is a new adapter folder beside `pi-agent/` and `claude-agent/`, never a branch inside an existing one. Nothing runtime-specific belongs above the adapter line (ADR 0042).
+- Prefer boundaries that keep implementations testable: `AgentClient`, `GitHubService`, `LinearService`, `ConfigService`, `SecretStore`, `TerminalService`, and `WorkspaceService`. `GitHubService` is a `gh`/`gh api` command boundary, not an app-owned GitHub auth client.
 - Do not read or write Conductor's private SQLite database.
 - Do not pass Pi disabling flags by default.
 - Do not store raw secrets in JSON or SQLite.
@@ -107,13 +132,13 @@ Explicitly deferred until post-core:
 Discovery tickets are intentionally separate from build tickets:
 
 - `ENS-031` - Runtime error retry and session-fork discovery.
-- `ENS-035` - Pi capability discovery for model listing, review model, plan mode, fast mode, browser control, context usage, compaction, and permission restrictions.
-- `ENS-041` - Preview URL detection discovery from setup/run output.
-- `ENS-042` - Spotlight testing discovery for safe root/workspace synchronization.
+- `ENS-035` - **Mostly answered.** Model listing, review model, plan mode (#184), context usage (#230, #235), and permission restrictions are wired. Fast mode and personality have no runtime concept. Only browser control and compaction UI remain open.
+- `ENS-041` - **Answered.** `docs/product/discovery-preview-url-detection.md` settles on template-first `previewUrlTemplate` expansion over `ENSEMBLR_*`, never log parsing; the deployed-build preview link resolves from GitHub data (#196, #197). Loopback-only log parsing stays a deferred, opt-in product decision.
+- `ENS-042` - **Answered as deferred.** `docs/product/discovery-spotlight-testing.md` defers spotlight testing to post-core; one product decision (dirty-root override) must land before any code.
 - `ENS-044` - Linear schema and permission discovery, including archive/delete support, pagination, filtering, labels, cycles, and cache metadata.
-- `ENS-056` - GitHub comments, review threads, deployments, and add-all-comments coverage through `gh` and `gh api`.
+- `ENS-056` - **Mostly answered.** PR comment bodies, review-thread resolution state, and deployments all read through `gh` (#196, #209, #234). Remaining gap is review-thread and comment *mutation* coverage.
 - `ENS-068` - Non-deferred experimental feature discovery for sidebar visibility and resource usage.
-- Remaining shell polish to resolve before extending review behavior: inline line-comment UX and any add-review-context-to-Pi flow that goes beyond the current repository `review` agent action. See `docs/product/current-shell-inventory.md`.
+- No shell polish blocks review behavior any longer: inline line comments shipped with THE-152/#151 and #234, and add-review-context-to-chat shipped alongside agent-readable diffs and comments (#193).
 
 Discovery outputs should be short design notes committed with the ticket, or appended to the source product docs if they change planning guidance.
 
@@ -128,8 +153,10 @@ These tickets are now polish sessions, not blockers for shipped core layout:
 
 These are product decisions, not implementation guesses:
 
-- No active settings decision remains from the 2026-07-18 refresh. The AI-certainty phrase toggle was removed from v1, and Experimental currently contains only Developer Mode plus Auto-run after setup.
-- Review polish still needs product judgment before new behavior is added: inline line-comment UX and add-review-context-to-Pi flows beyond the current repository `review` agent action.
+- No active settings decision remains from the 2026-08-08 refresh. The AI-certainty phrase toggle was removed from v1, and Experimental currently contains only Developer Mode plus Auto-run after setup.
+- Review polish is no longer a decision item — inline line comments and add-review-context-to-chat both shipped.
+- Spotlight testing dirty-root override: whether spotlight may proceed with a dirty repository root under explicit user override. Blocks `ENS-042` build work only; recommendation is *not allowed*.
+- Loopback-only preview-URL log parsing: whether it ships post-core at all. Recommendation is to defer.
 
 If another ticket encounters ambiguity that would alter behavior, create a new Decision Needed item instead of guessing.
 
@@ -150,7 +177,7 @@ If another ticket encounters ambiguity that would alter behavior, create a new D
 - `docs/adr/*.md`
 - `docs/product/conductor-parity.md`
 - `docs/product/current-shell-inventory.md`
-- `docs/product/mvp-sequencing.md`
+- `docs/product/archive/mvp-sequencing.md` (archived)
 - `docs/product/ux-parity.md`
 - `docs/product/onboarding-flow.md`
 - `docs/product/settings-inventory.md`
