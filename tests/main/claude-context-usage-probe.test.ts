@@ -45,6 +45,7 @@ function createQuery(getContextUsage: () => Promise<unknown>): () => Query {
 			close: () => undefined,
 			getContextUsage,
 			interrupt: async () => undefined,
+			setMaxThinkingTokens: async () => undefined,
 			setModel: async () => undefined,
 			setPermissionMode: async () => undefined,
 		}) as unknown as Query;

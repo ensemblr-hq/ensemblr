@@ -137,6 +137,7 @@ const fakeQueryFn = (
 			getContextUsage: async () => CONTEXT_USAGE,
 			interrupt: async () => undefined,
 			mcpServerStatus: async () => [],
+			setMaxThinkingTokens: async () => undefined,
 			setModel: async () => undefined,
 			setPermissionMode: async () => undefined,
 			supportedCommands: async () => [],

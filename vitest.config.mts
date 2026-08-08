@@ -94,6 +94,7 @@ export default defineConfig({
 			'tests/main/claude-agent-submit.test.ts',
 			'tests/main/claude-context-usage-probe.test.ts',
 			'tests/main/claude-turn-preamble.test.ts',
+			'tests/main/claude-thinking-display.test.ts',
 		],
 		coverage: {
 			provider: 'istanbul',
