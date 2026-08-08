@@ -380,18 +380,23 @@ scale.
 `src/main/claude-agent/claude-thinking.ts` translates:
 
 - `toClaudeEffortLevel(level)` maps a level onto the SDK's `EffortLevel`. `off`
-  returns `null`, and the adapter then passes **no `effort` option plus
-  `maxThinkingTokens: 0`** — that is how the SDK expresses "do not think".
+  returns `null`, and the adapter then passes **no `effort` option**.
+- `CLAUDE_THINKING_CONFIG` is the `thinking` option every session opens with —
+  `{ type: 'adaptive', display: 'summarized' }`, unconditionally, whatever the
+  level. It supersedes the deprecated `maxThinkingTokens` option.
+- `steerClaudeThinking(query, level)` moves a live session onto a level in
+  either direction: `applyFlagSettings({ effortLevel })` for how hard to think,
+  then `setMaxThinkingTokens` for whether to at all — `0` for `off`, or `null`
+  plus the display for anything else.
 - `toThinkingLevels(model.supportedEffortLevels)` narrows the ladder to what a
   specific model advertises, so the picker never offers an effort the model
   would reject. A model reporting none gets `['off']` alone. Pinned rows get the
   full Claude ladder, because `supportedModels()` never mentions effort for them.
 
-Mid-session, `applyTurnSelection` writes `activeQuery.applyFlagSettings({
-effortLevel })` only when the requested level differs from what is already
-applied, and skips the switch entirely for a steer or follow-up because the
-runtime is already committed to a turn. That mirrors Pi's `set_thinking_level`
-discipline exactly.
+Mid-session, `applyTurnSelection` calls `steerClaudeThinking` only when the
+requested level differs from what is already applied, and skips the switch
+entirely for a steer or follow-up because the runtime is already committed to a
+turn. That mirrors Pi's `set_thinking_level` discipline exactly.
 
 ### The level pins to the session (#232)
 
@@ -521,6 +526,77 @@ A thinking block that comes through empty on both paths keeps its row anyway: a
 turn that reasoned should say so rather than vanish. Pi's normalizer was tightened
 in the same change to require non-empty thinking text, so only Claude — which
 genuinely redacts its prose — can produce the empty part.
+
+### Why the deltas were empty too (#239)
+
+The buffer alone was not enough, because the `thinking_delta` events carried no
+text either — a redacted block streams as pings whose `thinking` is `''` and
+whose only payload is `estimated_tokens`. The cause is upstream of the
+normalizer: the CLI forces `display: 'omitted'` on any **non-interactive**
+session that did not name a display mode itself, and on Opus 4.7 and later
+`omitted` is the API default regardless. Every SDK session is non-interactive,
+so Ensemblr got signatures and no prose.
+
+`CLAUDE_THINKING_CONFIG` names it explicitly — `{ type: 'adaptive', display:
+'summarized' }` — which the SDK forwards as `--thinking adaptive
+--thinking-display summarized`. Verified against the bundled CLI on one prompt:
+without the flag, 5 `thinking_delta` frames carrying 0 characters and a seal of
+0; with it, 7 frames carrying 628 characters and a seal of 628.
+
+A summary is only produced when there is enough reasoning to summarize. A short
+thinking block still arrives empty, and still renders as the inert "Thought" row
+above.
+
+### Why `off` is a budget, not a thinking mode (#239)
+
+The `thinking` option becomes a `--thinking` flag on the CLI's argv, and that
+flag is **sticky for the life of the process**. A session opened
+`{ type: 'disabled' }` can never be talked back out of it, so a chat that opened
+at `off` could never turn reasoning on again. Measured against the bundled CLI,
+`claude-code` 2.1.220, one reasoning prompt per row:
+
+| Session opened | Steer applied | `thinking_delta` frames / chars |
+|---|---|---|
+| `adaptive` + `summarized` | none | 6 / 372 |
+| `adaptive` + `summarized` | `applyFlagSettings({ alwaysThinkingEnabled: false, effortLevel: null })` | 4 / 298 |
+| `adaptive` + `summarized` | `setMaxThinkingTokens(0)` | **0 / 0** |
+| `adaptive` + `summarized`, plus `maxThinkingTokens: 0` | none | 4 / 327 |
+| `disabled` | `applyFlagSettings({ effortLevel: 'high' })` + `setMaxThinkingTokens(null, 'summarized')` | 0 / 0 |
+| `disabled` | the same plus `alwaysThinkingEnabled: true` | 0 / 0 |
+| `disabled` | the same plus `setMaxThinkingTokens(8000, 'summarized')` | 1 / 0 |
+
+Three things follow, and each one rules out an option that reads like it should
+work:
+
+- **`alwaysThinkingEnabled` does not move a live session.** It is a settings key,
+  and the `--thinking` flag outranks the flag-settings layer. Row 2 still thought.
+- **The `maxThinkingTokens` *option* is dead when `thinking` is set**, exactly as
+  the SDK documents. Row 4 still thought.
+- **`setMaxThinkingTokens(0)` is the only lever that turns a live session off**,
+  and `(null, 'summarized')` is what turns it back on. Rows 3 and 5–7.
+
+So every session opens with `CLAUDE_THINKING_CONFIG` and a chat set to `off` is
+switched off after the open instead — `applyOpeningThinking` in the adapter. The
+prompt queue is created `held` and opened only once that steer settles, so the
+runtime cannot read a first turn before it lands. Holding the stream rather than
+awaiting inside `submit` is deliberate: a yield between recording a prompt and
+queueing it would let two overlapping submits reach the runtime in the opposite
+order to the transcript. All four quadrants
+were then measured through `steerClaudeThinking` itself: open `high` thinks
+(8 frames / 342 chars), open `off` stays silent, `high` → `off` goes silent, and
+`off` → `high` thinks again.
+
+One limit survives. A level steered mid-session reasons more shallowly than the
+same level named on the opening argv — 1–2 frames against 8 — and a block that
+short has nothing to summarize, so its prose arrives empty and the timeline shows
+the inert "Thought" row. Swapping the order of the two calls changes nothing
+(measured both ways), and it is not the zeroing: a session that was never zeroed
+and only had its effort raised reasons just as shallowly. The steer restores
+*whether* the model thinks, and the opening flag is what makes it think hard.
+
+Confirmed on Opus (account default), Haiku 4.5, and Sonnet 4.6 — `adaptive` is
+accepted on all three, so opening every session able to think costs nothing on
+models that predate adaptive thinking.
 
 ### Turns open on the prompt, not on the answer (#237)
 

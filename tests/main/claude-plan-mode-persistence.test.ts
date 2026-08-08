@@ -79,6 +79,7 @@ function createReplayQuery(messages: readonly SDKMessage[]): {
 		applyFlagSettings: async () => undefined,
 		close: () => undefined,
 		interrupt: async () => undefined,
+		setMaxThinkingTokens: async () => undefined,
 		setModel: async () => undefined,
 		setPermissionMode,
 	}) as unknown as Query;

@@ -38,7 +38,11 @@ import {
 	type ClaudePlanSubmittedEvent,
 	detectPlanSubmission,
 } from './claude-plan-mode.ts';
-import { toClaudeEffortLevel } from './claude-thinking.ts';
+import {
+	CLAUDE_THINKING_CONFIG,
+	steerClaudeThinking,
+	toClaudeEffortLevel,
+} from './claude-thinking.ts';
 import { createPromptQueue } from './prompt-queue.ts';
 import { createSdkMessageNormalizer } from './sdk-message-normalizer.ts';
 
@@ -155,7 +159,7 @@ function createClaudeSession({
 	turnIdFactory: () => string;
 }): AgentAdapterSession {
 	const listeners = new Set<AgentEventListener>();
-	const promptQueue = createPromptQueue();
+	const promptQueue = createPromptQueue({ held: true });
 	const agentSessionId = input.request.agentSessionId;
 	const approval = canUseTool?.({ agentSessionId }) ?? null;
 	let metadata: AgentSessionMetadata = { ...input.metadata };
@@ -319,6 +323,27 @@ function createClaudeSession({
 		}
 	};
 
+	/**
+	 * Zeroes the thinking budget on a session whose chat opened at `off`. The
+	 * `thinking` option cannot carry that state: opening the session `disabled`
+	 * would pin a CLI flag no later steer can lift, leaving the chat unable to
+	 * turn reasoning back on. So every session opens able to think, and one that
+	 * should not is switched off here instead.
+	 */
+	const applyOpeningThinking = async (): Promise<void> => {
+		if (!activeQuery || toClaudeEffortLevel(input.request.thinkingLevel)) {
+			return;
+		}
+		try {
+			await steerClaudeThinking(activeQuery, input.request.thinkingLevel);
+		} catch (cause) {
+			console.warn('[claude-agent] could not disable session thinking.', {
+				cause: cause instanceof Error ? cause.message : String(cause),
+				sessionId: agentSessionId,
+			});
+		}
+	};
+
 	try {
 		activeQuery = queryFn({
 			options: buildQueryOptions({
@@ -339,6 +364,12 @@ function createClaudeSession({
 			emitShutdown('crashed');
 		});
 	}
+
+	// The queue is held so the steer lands before the runtime reads a first turn.
+	// `submit` deliberately does not wait on it: a yield between recording a
+	// prompt and queueing it would let two overlapping submits reach the runtime
+	// in the opposite order to the transcript.
+	void applyOpeningThinking().finally(promptQueue.open);
 
 	void pump();
 	void probeContextUsage();
@@ -524,8 +555,7 @@ async function applyTurnSelection({
 
 	const thinking = request.thinkingLevel?.trim();
 	if (thinking && thinking !== appliedThinking) {
-		const effort = toClaudeEffortLevel(thinking);
-		await activeQuery.applyFlagSettings({ effortLevel: effort });
+		await steerClaudeThinking(activeQuery, thinking);
 	}
 
 	const planMode = request.planMode;
@@ -572,7 +602,8 @@ function buildQueryOptions({
 		cwd: metadata.cwd,
 		env: stripLaunchContextEnv({ ...baseEnv, ...metadata.env }),
 		includePartialMessages: true,
-		...(effort ? { effort } : { maxThinkingTokens: 0 }),
+		...(effort ? { effort } : {}),
+		thinking: CLAUDE_THINKING_CONFIG,
 		...(Object.keys(mcpServers).length > 0 ? { mcpServers } : {}),
 		...(request.modelOverride?.trim()
 			? { model: request.modelOverride.trim() }

@@ -27,7 +27,7 @@ of `buildPiSessionArgs` for Pi.
 | `env` | `stripLaunchContextEnv({ ...baseEnv, ...metadata.env })` | `baseEnv` is the login-shell env (ADR 0003 / ADR 0031) so a Finder-launched app still finds `claude`; the strip drops the macOS/Electron launch-context keys that would make LaunchServices re-attribute the child to Ensemblr |
 | `includePartialMessages` | `true` | Required for `stream_event` deltas — without it the timeline has no streaming text |
 | `effort` | `low` \| `medium` \| `high` \| `xhigh` \| `max` | From `toClaudeEffortLevel(request.thinkingLevel)` |
-| `maxThinkingTokens` | `0`, **only** when no `effort` resolved | How the SDK expresses "do not think"; the two are mutually exclusive in this code |
+| `thinking` | `{ type: 'adaptive', display: 'summarized' }`, always | `CLAUDE_THINKING_CONFIG`. Supersedes the deprecated `maxThinkingTokens` option, which is ignored once this is set. Unconditional because the flag it becomes is sticky for the life of the process — a session opened `disabled` could never turn reasoning back on — so `off` is expressed by zeroing the budget after the open instead. The display is not cosmetic: a non-interactive session that names none has its thinking forced to `omitted`, and an omitted block reaches the timeline as a signature with no prose |
 | `mcpServers` | the `ensemblr` control server, omitted when the map is empty | See [Control MCP entry](#control-mcp-entry) below |
 | `model` | `request.modelOverride`, when non-blank | Otherwise the runtime picks |
 | `pathToClaudeCodeExecutable` | the resolved `claude` path, when one resolved | Ensemblr ships no binary |
@@ -94,7 +94,9 @@ concern.
 | `interrupt()` | adapter `abort()` | Then the turn is settled and the session shut down as `aborted` |
 | `close()` | adapter `abort()`/`close()`, every capability session's `finally` | |
 | `setModel(model)` | `applyTurnSelection` | Only when the requested model differs from what is applied |
-| `applyFlagSettings({ effortLevel })` | `applyTurnSelection` | The effort dial; only on a genuine change |
+| `applyFlagSettings({ effortLevel })` | `steerClaudeThinking` | The effort dial — how hard to think, never whether to; only on a genuine change |
+| `setMaxThinkingTokens(0)` | `steerClaudeThinking` | The off switch, and the only one that moves a live session. Used both by `applyOpeningThinking` for a chat opened at `off` and by `applyTurnSelection` for a turn that switches off |
+| `setMaxThinkingTokens(null, 'summarized')` | `steerClaudeThinking` | The on switch. The display has to be re-named because a session that was zeroed carries none, and the API default strips the prose |
 | `setPermissionMode(mode)` | `applyTurnSelection` | Re-asserted per turn because native `ExitPlanMode` moves it behind the adapter's back |
 | `getContextUsage()` | adapter `probeContextUsage()`, model lister | Ensemblr reads `maxTokens`, `totalTokens`, and (in the lister) `model` |
 | `supportedModels()` | model lister | `ModelInfo[]`; account entitlements decide the list |

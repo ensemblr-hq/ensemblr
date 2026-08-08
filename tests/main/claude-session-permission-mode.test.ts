@@ -92,6 +92,7 @@ function createPendingQuery(): Query {
 		close: () => undefined,
 		getContextUsage: async () => CONTEXT_USAGE,
 		interrupt: async () => undefined,
+		setMaxThinkingTokens: async () => undefined,
 		setModel: async () => undefined,
 		setPermissionMode: async () => undefined,
 	}) as unknown as Query;
