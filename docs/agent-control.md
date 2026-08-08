@@ -49,7 +49,7 @@ the full design record is [`considerations/agent-control-layer.md`](./considerat
 Control actions follow the **workspace permission mode** (the same setting that
 gates the agent's local tool use):
 
-| Mode | Reads | Writes (spawn, launch, terminals, focus, board, review comments) |
+| Mode | Reads | Writes (spawn, launch, terminals, focus, board, review comments, Linear) |
 | --- | --- | --- |
 | `read-only` | allowed | blocked |
 | `approval-required` | allowed | prompt the user to confirm |
@@ -86,11 +86,12 @@ Delegation is bounded so a runaway agent cannot fork-bomb the app
 
 Guardrails count spawns; they do not decide who may do what. That is the role
 policy in `src/shared/agent-control/subagent-policy.ts`, which refuses a spawned
-sub-agent thirteen ops with `denied-scope` **whatever mode it is in**:
+sub-agent fifteen ops with `denied-scope` **whatever mode it is in**:
 
 `spawnChatTab`, `startConversation`, `sendFollowUp`, `launchHarness`,
 `startTerminal`, `stopTerminal`, `writeTerminal`, `openTab`, `closeTab`,
-`setBranchName`, `setWorkspaceStatus`, `askUserQuestion`, `exitPlanMode`.
+`setBranchName`, `setWorkspaceStatus`, `askUserQuestion`, `exitPlanMode`,
+`linearCreateComment`, `linearUpdateIssue`.
 
 Two things run together and are easy to confuse. The spawn guardrail reads
 `origin.depth`, which lives in the in-memory origin registry; the role policy
@@ -103,14 +104,25 @@ now keys off the marker too, so the two move together.
 `waitForAgents`, `listModels`, and `listRunScripts` are not denied — a sub-agent
 simply has no children to wait on, no spawn to pick a model for, and no
 `startTerminal` to pick a run script for. Those three (`SUBAGENT_UNUSABLE_OPS`)
-are withheld from its tool list along with the thirteen above, because listing a
+are withheld from its tool list along with the fifteen above, because listing a
 tool the service would only refuse teaches the model to keep reaching for it. The
-Pi extension registers the complement of `SUBAGENT_WITHHELD_OPS` — sixteen ops in
+Pi extension registers the complement of `SUBAGENT_WITHHELD_OPS` — eighteen ops in
 all — for a child, and a parity test compares its copy of that set against the
 shared one.
 
 What a sub-agent keeps: every read, `focusTab`/`focusDockTab`/`focusPanel`,
 `setName`, `setSummary`, and `notifyOrchestrator`.
+
+The two Linear writes are the newest members and are there for a different reason
+from the rest. They are not scoped to a workspace at all — a Linear issue is read
+by the whole team — so the usual "acts on someone else's workspace" argument does
+not apply. What does is duplication and authority: three children each posting
+their own comment on the ticket they are all working produces noise the
+orchestrator cannot retract, and an issue's state, assignee, and title describe
+the whole body of work rather than the one unit a child was handed. The
+orchestrator writes to Linear once, for all of them. The three Linear reads stay
+available, because a child that cannot read the ticket it was briefed from is
+working blind.
 
 ## The chat-tab axis
 
@@ -127,7 +139,7 @@ being named.
 
 ## Tool reference
 
-Thirty-four tools, enumerated from `TOOL_DEFS` in
+Thirty-nine tools, enumerated from `TOOL_DEFS` in
 `src/main/agent-control/mcp-endpoint.ts`. The argument names and types below are
 the authoritative Zod schemas in `src/shared/agent-control/schemas.ts` — every
 schema is a `strictObject`, so an argument not listed here is rejected as
@@ -230,6 +242,20 @@ All four act on the caller's own workspace and none takes a workspace argument.
 `resolveDiffComments` is refused in Plan Mode. Any `filePath` must be relative to
 the workspace and must not climb out of it — an absolute path, a drive letter, or
 a `..` segment comes back as `invalid-args` rather than reaching git.
+
+### Linear
+
+| Tool | Arguments | Gate | Withheld from |
+| --- | --- | --- | --- |
+| `ensemblr_linear_list_issues` | `query?: string`, `teamId?: string`, `refresh?: boolean` | read | — |
+| `ensemblr_linear_get_issue` | **`issueId: string`**, `refresh?: boolean` | read | — |
+| `ensemblr_linear_get_metadata` | `refresh?: boolean` | read | — |
+| `ensemblr_linear_create_comment` | **`issueId: string`**, **`commentBody: string`** (≤ 8,000) | write | sub-agent |
+| `ensemblr_linear_update_issue` | **`issueId: string`**, `stateId?: string`, `assigneeId?: string`, `priority?: number` (0–4), `title?: string` (≤ 255), `description?: string` (≤ 32,000) | write | sub-agent |
+
+`linearUpdateIssue` needs at least one field beyond `issueId`, and a `stateId`
+whose workflow type is `completed` or `canceled` is refused. `linearUpdateIssue`
+is also refused in Plan Mode. See [Talking to Linear](#talking-to-linear).
 
 ### Asking the user, and Plan Mode
 
@@ -431,6 +457,72 @@ failing the call, and "no such id", "another workspace's id", and "archived" are
 deliberately merged into that one bucket so the op cannot be used as a
 cross-workspace id-existence oracle. The port lists the caller's own comments
 first and only writes ids in that set, so a foreign id never reaches the store.
+
+## Talking to Linear
+
+Ensemblr's Linear integration is otherwise renderer-only. The five control ops
+expose a deliberate subset of it to agents, over
+`src/main/agent-control/linear-ports.ts` — a gated port on the same
+`LinearService` the renderer's tracker views already use. No Linear GraphQL or
+cache logic lives in the control layer.
+
+**Nothing here is workspace-scoped.** Linear is an app-level integration bound to
+one account, so `LinearPort` takes no workspace argument and the op handlers drop
+`origin` entirely — there is no workspace a caller could point at that is not its
+own, and equally no filter narrowing a read to the work in front of it. One
+account can span several teams, which is why every tool description and playbook
+bullet says so outright and points at `teamId`: an agent told the list is "this
+workspace's" stops narrowing and reads a stranger's ticket as its own.
+
+**Assume it is not connected.** Most workspaces have no Linear account linked at
+all, and an unlinked integration is not an empty backlog. Every op answers with a
+`status` — `ok`, `not-connected`, `not-found`, `refused`, `failed` — and prose in
+`message` naming the recovery. Nothing throws: the service already returns a
+typed failure envelope, and the port maps it onto that one word so an agent can
+tell "the user never linked Linear" (stop asking) from "wrong id" (fix it) from
+"Linear is down" (retry or report). `reconnect-required` folds into
+`not-connected` because the recovery is the same — the user reauthorizes.
+
+**Done and Canceled are refused.** `AGENTS.md` says agent work never marks a
+Linear ticket `Done`; it goes to `In Review` and a human closes it. That is
+enforced in the port, not left to the playbook: before an update reaches Linear,
+`terminalStateRefusal` resolves the `stateId` against the cached workflow states
+and refuses any whose Linear `type` is `completed` **or** `canceled`
+(`LINEAR_TERMINAL_STATE_TYPES`). Both, because closing a ticket as canceled is
+the same act under a different label. The refusal comes back as
+`status: 'refused'` with a message naming In Review — a modelled answer the agent
+can act on, not an error.
+
+The guard **fails closed**. A `stateId` the cached metadata cannot classify —
+unknown id, a cached row carrying no workflow `type`, or a metadata read that
+could not reach Linear — is refused too, pointing at
+`ensemblr_linear_get_metadata` as the one call that resolves it. An
+unclassifiable state might be a Done column, and the whole point is that the app
+never posts an agent's "finished" to a tracker the team reads. A row without a
+type is unclassifiable on strictly less information than a missing one, so it
+takes the same refusal rather than being read as "not terminal".
+
+**Payloads are budgeted like the workspace diff.** Every result is fitted to
+`MAX_AGENT_PAYLOAD_CHARS` and says what it cut: `listIssues` returns no
+descriptions at all (a hundred issues carrying theirs is what turns a list into a
+context spend) and reports `omittedIssues`; `getIssue` clamps the description,
+keeps the most recent comments, and reports `omittedComments`; `getMetadata`
+fills one shared budget in priority order — states, teams, users, projects,
+labels — so a workspace with hundreds of labels cannot crowd out the states an
+update needs. Cycles are not returned at all, because no op here sets one.
+
+**The update surface is deliberately small.** `linearUpdateIssue` takes `stateId`,
+`assigneeId`, `priority`, `title`, and `description` and nothing else. Labels,
+project, cycle, and due date are planning decisions a human makes in Linear, and
+every field exposed here is one more thing an agent can get wrong on a ticket the
+whole team reads. `createIssue` is not exposed at all: the Linear service supports
+it, but filing a ticket is the decision the roadmap is made of, not a step in
+carrying one out. Both are purely additive if that changes.
+
+Ids, not names: `stateId`, `assigneeId`, and `teamId` are Linear uuids, which is
+what makes `ensemblr_linear_get_metadata` the first call of any update sequence.
+`issueId` is the exception and takes either the uuid or the human identifier
+(`THE-106`) — an identifier misses the local cache and always reaches Linear.
 
 ## Orchestration in practice
 

@@ -154,6 +154,35 @@ const ENSEMBLR_TOOL_LABELS: Record<string, EnsemblrToolLabel> = {
 		object: 'a harness',
 		verb: ['Launched', 'Launching'],
 	},
+	ensemblr_linear_create_comment: {
+		detailKeys: ['issueId', 'id', 'identifier'],
+		glyph: 'message-square-plus',
+		object: 'a Linear issue',
+		verb: ['Commented on', 'Commenting on'],
+	},
+	ensemblr_linear_get_issue: {
+		detailKeys: ['issueId', 'id', 'identifier'],
+		glyph: 'ticket',
+		object: 'a Linear issue',
+		verb: ['Read', 'Reading'],
+	},
+	ensemblr_linear_get_metadata: {
+		glyph: 'list',
+		object: 'Linear teams and states',
+		verb: ['Read', 'Reading'],
+	},
+	ensemblr_linear_list_issues: {
+		detailKeys: ['query', 'search'],
+		glyph: 'ticket',
+		object: 'Linear issues',
+		verb: ['Searched', 'Searching'],
+	},
+	ensemblr_linear_update_issue: {
+		detailKeys: ['issueId', 'id', 'identifier'],
+		glyph: 'ticket-check',
+		object: 'a Linear issue',
+		verb: ['Updated', 'Updating'],
+	},
 	ensemblr_list_models: {
 		glyph: 'list',
 		object: 'models',

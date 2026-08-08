@@ -25,6 +25,11 @@ import type {
 	GetSessionBriefResult,
 	GetWorkspaceDiffArgs,
 	LaunchHarnessArgs,
+	LinearCreateCommentArgs,
+	LinearGetIssueArgs,
+	LinearGetMetadataArgs,
+	LinearListIssuesArgs,
+	LinearUpdateIssueArgs,
 	ListTabsArgs,
 	ListTerminalsArgs,
 	NotifyOrchestratorArgs,
@@ -1186,7 +1191,8 @@ export function createAgentControlService({
 	// getWorkspaceDiff / getDiffComments / addDiffComments / resolveDiffComments
 	// take their workspace from the origin rather than from an argument, so a
 	// cross-workspace read or write is unreachable by construction and there is
-	// nothing left to gate.
+	// nothing left to gate. The Linear ops take no workspace at all — the
+	// integration is bound to one account app-wide — so the same holds there.
 	const opHandlers: Record<AgentControlOp, OpHandler> = {
 		addDiffComments: ({ args, origin }) =>
 			ports.review
@@ -1237,6 +1243,16 @@ export function createAgentControlService({
 		getWorkspaceStatus: ({ origin }) => handleGetWorkspaceStatus(origin),
 		launchHarness: ({ args, origin }) =>
 			handleLaunchHarness(origin, args as LaunchHarnessArgs),
+		linearCreateComment: ({ args }) =>
+			ports.linear.createComment(args as LinearCreateCommentArgs).then(ok),
+		linearGetIssue: ({ args }) =>
+			ports.linear.getIssue(args as LinearGetIssueArgs).then(ok),
+		linearGetMetadata: ({ args }) =>
+			ports.linear.getMetadata(args as LinearGetMetadataArgs).then(ok),
+		linearListIssues: ({ args }) =>
+			ports.linear.listIssues(args as LinearListIssuesArgs).then(ok),
+		linearUpdateIssue: ({ args }) =>
+			ports.linear.updateIssue(args as LinearUpdateIssueArgs).then(ok),
 		listModels: ({ origin }) =>
 			ports.conversations
 				.listModels({ runtime: originRuntime(origin) })

@@ -139,6 +139,47 @@ const makePorts = (
 			resolvedIds: ['c-1'],
 		}),
 	},
+	linear: {
+		listIssues: vi.fn().mockResolvedValue({
+			issues: [],
+			message: '0 issue(s).',
+			omittedIssues: 0,
+			source: 'cache',
+			status: 'ok',
+			truncated: false,
+		}),
+		getIssue: vi.fn().mockResolvedValue({
+			comments: [],
+			issue: null,
+			message: 'read',
+			omittedComments: 0,
+			source: 'cache',
+			status: 'ok',
+			truncated: false,
+		}),
+		getMetadata: vi.fn().mockResolvedValue({
+			labels: [],
+			message: 'metadata',
+			omittedResources: 0,
+			projects: [],
+			states: [],
+			syncedAt: null,
+			teams: [],
+			truncated: false,
+			status: 'ok',
+			users: [],
+		}),
+		createComment: vi.fn().mockResolvedValue({
+			commentId: 'lc-1',
+			message: 'Comment posted.',
+			status: 'ok',
+		}),
+		updateIssue: vi.fn().mockResolvedValue({
+			issue: null,
+			message: 'THE-1 updated.',
+			status: 'ok',
+		}),
+	},
 	permissions: { getMode: () => overrides.mode ?? 'workspace-trusted' },
 	confirm: { confirm: vi.fn().mockResolvedValue(overrides.confirm ?? true) },
 	ask: { ask: vi.fn(), releaseSession: vi.fn() },
@@ -1436,6 +1477,183 @@ describe('agent-control service: review', () => {
 		if (!result.ok) {
 			expect(result.error).toContain('not a git repository');
 		}
+	});
+});
+
+// Linear is an app-level integration bound to one account, so unlike the review
+// ops none of these carries a workspace at all — which makes the permission mode
+// and the sub-agent role the only two gates left to get right.
+describe('agent-control service: linear', () => {
+	const LINEAR_READS = {
+		linearGetIssue: { issueId: 'THE-106' },
+		linearGetMetadata: {},
+		linearListIssues: { query: 'composer' },
+	} as const;
+
+	const LINEAR_WRITES = {
+		linearCreateComment: {
+			commentBody: 'Done on the branch.',
+			issueId: 'THE-1',
+		},
+		linearUpdateIssue: { issueId: 'THE-1', stateId: 's-review' },
+	} as const;
+
+	it('dispatches each read to its port with the args as sent', async () => {
+		const ports = makePorts();
+		const { service } = setup({ ports });
+
+		for (const [op, rawArgs] of Object.entries(LINEAR_READS)) {
+			const result = await service.invoke({
+				op: op as keyof typeof LINEAR_READS,
+				token: 'tok-caller',
+				rawArgs,
+			});
+			expect(result.ok, op).toBe(true);
+		}
+		expect(ports.linear.listIssues).toHaveBeenCalledWith({ query: 'composer' });
+		expect(ports.linear.getIssue).toHaveBeenCalledWith({ issueId: 'THE-106' });
+		expect(ports.linear.getMetadata).toHaveBeenCalledWith({});
+	});
+
+	it('dispatches each write to its port', async () => {
+		const ports = makePorts();
+		const { service } = setup({ ports });
+
+		for (const [op, rawArgs] of Object.entries(LINEAR_WRITES)) {
+			const result = await service.invoke({
+				op: op as keyof typeof LINEAR_WRITES,
+				token: 'tok-caller',
+				rawArgs,
+			});
+			expect(result.ok, op).toBe(true);
+		}
+		expect(ports.linear.createComment).toHaveBeenCalledWith(
+			LINEAR_WRITES.linearCreateComment,
+		);
+		expect(ports.linear.updateIssue).toHaveBeenCalledWith(
+			LINEAR_WRITES.linearUpdateIssue,
+		);
+	});
+
+	it('rewrites the near-miss keys a model reaches for', async () => {
+		const ports = makePorts();
+		const { service } = setup({ ports });
+
+		await service.invoke({
+			op: 'linearCreateComment',
+			token: 'tok-caller',
+			rawArgs: { body: 'Verified.', identifier: 'THE-106' },
+		});
+
+		expect(ports.linear.createComment).toHaveBeenCalledWith({
+			commentBody: 'Verified.',
+			issueId: 'THE-106',
+		});
+	});
+
+	// An update carrying nothing but an id is a wasted round trip, and the reply
+	// has to say which fields it could have set rather than only that it failed.
+	it('rejects an update that changes nothing', async () => {
+		const ports = makePorts();
+		const { service } = setup({ ports });
+
+		const result = await service.invoke({
+			op: 'linearUpdateIssue',
+			token: 'tok-caller',
+			rawArgs: { issueId: 'THE-1' },
+		});
+
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.code).toBe('invalid-args');
+			expect(result.error).toContain('stateId');
+		}
+		expect(ports.linear.updateIssue).not.toHaveBeenCalled();
+	});
+
+	it('allows every read in read-only mode', async () => {
+		const { service } = setup({ ports: makePorts({ mode: 'read-only' }) });
+
+		for (const [op, rawArgs] of Object.entries(LINEAR_READS)) {
+			const result = await service.invoke({
+				op: op as keyof typeof LINEAR_READS,
+				token: 'tok-caller',
+				rawArgs,
+			});
+			expect(result.ok, op).toBe(true);
+		}
+	});
+
+	it('blocks both writes in read-only mode', async () => {
+		const ports = makePorts({ mode: 'read-only' });
+		const { service } = setup({ ports });
+
+		for (const [op, rawArgs] of Object.entries(LINEAR_WRITES)) {
+			const result = await service.invoke({
+				op: op as keyof typeof LINEAR_WRITES,
+				token: 'tok-caller',
+				rawArgs,
+			});
+			expect(result.ok, op).toBe(false);
+			if (!result.ok) {
+				expect(result.code, op).toBe('denied-permission');
+			}
+		}
+		expect(ports.linear.createComment).not.toHaveBeenCalled();
+		expect(ports.linear.updateIssue).not.toHaveBeenCalled();
+	});
+
+	// A child briefed from a ticket has to be able to read it; writing to one is
+	// the orchestrator's, because several children commenting on the same issue is
+	// noise nobody can retract.
+	it('keeps the reads for a spawned sub-agent and refuses the writes', async () => {
+		const ports = makePorts({ spawnedSubAgent: true });
+		const { service } = setup({ ports });
+
+		for (const [op, rawArgs] of Object.entries(LINEAR_READS)) {
+			const result = await service.invoke({
+				op: op as keyof typeof LINEAR_READS,
+				token: 'tok-caller',
+				rawArgs,
+			});
+			expect(result.ok, op).toBe(true);
+		}
+		for (const [op, rawArgs] of Object.entries(LINEAR_WRITES)) {
+			const result = await service.invoke({
+				op: op as keyof typeof LINEAR_WRITES,
+				token: 'tok-caller',
+				rawArgs,
+			});
+			expect(result.ok, op).toBe(false);
+			if (!result.ok) {
+				expect(result.code, op).toBe('denied-scope');
+				expect(result.error, op).toContain('report');
+			}
+		}
+	});
+
+	// Moving a ticket while planning claims an implementation that does not exist,
+	// which is the `resolveDiffComments` argument exactly. Commenting is not.
+	it('refuses the update while planning but leaves commenting alone', async () => {
+		const ports = makePorts({ planning: true });
+		const { service } = setup({ ports });
+
+		const update = await service.invoke({
+			op: 'linearUpdateIssue',
+			token: 'tok-caller',
+			rawArgs: { issueId: 'THE-1', stateId: 's-review' },
+		});
+		const comment = await service.invoke({
+			op: 'linearCreateComment',
+			token: 'tok-caller',
+			rawArgs: { commentBody: 'Found the seam.', issueId: 'THE-1' },
+		});
+
+		expect(update.ok).toBe(false);
+		if (!update.ok) {
+			expect(update.code).toBe('denied-scope');
+		}
+		expect(comment.ok).toBe(true);
 	});
 });
 

@@ -83,6 +83,14 @@ const SUBAGENT_BLOCKED_OPS: ReadonlyMap<AgentControlOp, string> = new Map([
 		'exitPlanMode',
 		'You were spawned as a sub-agent, and submitting a plan belongs to the orchestrator that spawned you — a plan posted here would put a review panel in a tab nobody is watching. Leave your findings as your last message instead; that is what the orchestrator reads.',
 	],
+	[
+		'linearCreateComment',
+		'You were spawned as a sub-agent, and a Linear issue is read by the whole team rather than by your orchestrator. Several children working the same ticket each posting their own comment is noise the orchestrator cannot retract, so it writes to Linear once, for all of you. Put what you would have commented in your report.',
+	],
+	[
+		'linearUpdateIssue',
+		"You were spawned as a sub-agent, and an issue's state, assignee, and title describe the whole body of work rather than the one unit you were handed, so moving the ticket belongs to the orchestrator that spawned you. Say in your report where you think it now stands and let the orchestrator move it.",
+	],
 ]);
 
 /**

@@ -32,6 +32,8 @@ import {
 	SquareXIcon,
 	StethoscopeIcon,
 	TerminalIcon,
+	TicketCheckIcon,
+	TicketIcon,
 	WrenchIcon,
 } from 'lucide-react';
 import type { ToolGlyph } from '@/renderer/types/tool-presentation';
@@ -73,5 +75,7 @@ export const GLYPH_ICONS: Record<ToolGlyph, LucideIcon> = {
 	'square-x': SquareXIcon,
 	stethoscope: StethoscopeIcon,
 	terminal: TerminalIcon,
+	ticket: TicketIcon,
+	'ticket-check': TicketCheckIcon,
 	wrench: WrenchIcon,
 };

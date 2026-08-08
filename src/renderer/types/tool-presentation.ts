@@ -40,6 +40,8 @@ export type ToolGlyph =
 	| 'square-x'
 	| 'stethoscope'
 	| 'terminal'
+	| 'ticket'
+	| 'ticket-check'
 	| 'wrench';
 
 /**

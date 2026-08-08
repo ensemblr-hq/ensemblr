@@ -102,6 +102,13 @@ const makePorts = (
 		addComments: vi.fn(),
 		resolveComments: vi.fn(),
 	},
+	linear: {
+		listIssues: vi.fn(),
+		getIssue: vi.fn(),
+		getMetadata: vi.fn(),
+		createComment: vi.fn(),
+		updateIssue: vi.fn(),
+	},
 	permissions: { getMode: () => 'workspace-trusted' },
 	confirm: { confirm: vi.fn().mockResolvedValue(true) },
 	ask: { ask: vi.fn(), releaseSession: vi.fn() },

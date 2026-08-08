@@ -44,6 +44,7 @@ import { readSessionBriefNaming } from '../agent-runtime/naming/session-brief-na
 import type { HarnessDetectionService } from '../agents/index.ts';
 import type { ChatTabService } from '../chat-tabs/chat-tab-service.ts';
 import type { AppSettingsService } from '../config';
+import type { LinearService } from '../linear';
 import type { PiExecutableService } from '../pi-runtime';
 import { isBlockedByPiExecutable } from '../pi-runtime/pi-executable-gate.ts';
 import type { RenameWorkspaceService } from '../repository';
@@ -58,6 +59,7 @@ import { listAllWorkspaceRows } from '../storage/repositories/workspace-reposito
 import type { TerminalService } from '../terminal';
 import type { WorkspaceGitService } from '../workspace-git';
 import type { BoardStatusStore } from './board-status-store.ts';
+import { makeLinearPort } from './linear-ports.ts';
 import {
 	type AgentControlPorts,
 	type AskPort,
@@ -91,6 +93,12 @@ export interface PortAdapterDeps {
 	appSettingsService: AppSettingsService;
 	workspaceGitService: WorkspaceGitService;
 	reviewService: ReviewService;
+	/**
+	 * The app's Linear data service, or null when the integration is not composed.
+	 * Nullable rather than optional so the composition root has to state which it
+	 * is; the port answers `not-connected` either way.
+	 */
+	linearService: LinearService | null;
 	/** Names a workspace and its git branch together, for `setBranchName`. */
 	renameWorkspace: RenameWorkspaceService['rename'];
 	getPermissionMode: () => PermissionMode;
@@ -976,6 +984,7 @@ export function createAgentControlPorts(
 		board: makeBoardPort(deps),
 		diff: makeDiffPort(deps),
 		review: makeReviewPort(deps),
+		linear: makeLinearPort(deps),
 		sessionNaming: makeSessionNamingPort(deps),
 		permissions: { getMode: () => deps.getPermissionMode() },
 		confirm: deps.confirm,

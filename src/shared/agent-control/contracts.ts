@@ -39,6 +39,11 @@ export const AGENT_CONTROL_OPS = [
 	'getDiffComments',
 	'addDiffComments',
 	'resolveDiffComments',
+	'linearListIssues',
+	'linearGetIssue',
+	'linearGetMetadata',
+	'linearCreateComment',
+	'linearUpdateIssue',
 	'listWorkspaces',
 	'listTabs',
 	'listTerminals',
@@ -105,6 +110,8 @@ const WRITE_OPS: ReadonlySet<AgentControlOp> = new Set([
 	'setWorkspaceStatus',
 	'addDiffComments',
 	'resolveDiffComments',
+	'linearCreateComment',
+	'linearUpdateIssue',
 ]);
 
 /**
@@ -811,6 +818,207 @@ export interface ResolveDiffCommentsResult {
 	alreadyResolved: readonly string[];
 	notFound: readonly string[];
 	message: string;
+}
+
+/**
+ * Bounds on the Linear ops, split by direction. The submission caps are runaway
+ * guards on what an agent writes to the tracker; the returned caps are what stops
+ * one issue's description or one long comment thread from spending the payload
+ * budget the whole result has to fit inside. Linear itself enforces a 255-char
+ * issue title, so that one is echoed here rather than invented.
+ */
+export const LINEAR_AGENT_LIMITS = {
+	maxCommentLength: 8_000,
+	maxDescriptionLength: 32_000,
+	maxTitleLength: 255,
+	/** Comments returned alongside one issue, newest last. */
+	maxReturnedComments: 40,
+	maxReturnedCommentChars: 1_500,
+	maxReturnedDescriptionChars: 4_000,
+} as const;
+
+/**
+ * Workflow-state categories an agent may not move an issue into. These are
+ * Linear's own `type` values: `completed` covers every Done column and `canceled`
+ * every Canceled one. Both close a ticket, so refusing one and allowing the other
+ * would be the same failure under a different label — an agent takes work as far
+ * as In Review and a human decides whether it is finished.
+ */
+export const LINEAR_TERMINAL_STATE_TYPES = ['canceled', 'completed'] as const;
+
+/**
+ * How a Linear op ended, in the vocabulary an agent acts on. Linear is often not
+ * connected at all, so every op answers with one of these rather than throwing:
+ * `not-connected` means tell the user to connect Linear in Settings and stop
+ * asking, `not-found` means the id was wrong, `refused` means the app declined a
+ * change it will never make, and `failed` covers everything Linear's API reported
+ * — a network fault, a rate limit, a permission error.
+ */
+export type LinearAgentStatus =
+	| 'ok'
+	| 'not-connected'
+	| 'not-found'
+	| 'refused'
+	| 'failed';
+
+/**
+ * One Linear issue as an agent reads it: flat, and named wherever a name exists,
+ * because a model acts on `In Review` far more reliably than on the state's uuid.
+ * The ids that survive are the ones an update takes back.
+ */
+export interface AgentLinearIssue {
+	id: string;
+	/** Human key, e.g. `THE-106` — what a branch, PR, or commit cites. */
+	identifier: string;
+	title: string;
+	url: string;
+	state: string | null;
+	stateId: string | null;
+	/** Linear's workflow category behind `state`, e.g. `started`, `completed`. */
+	stateType: string | null;
+	assignee: string | null;
+	priority: number | null;
+	team: string | null;
+	project: string | null;
+	updatedAt: string | null;
+}
+
+/** One issue read on its own, with the fields a list view deliberately omits. */
+export interface AgentLinearIssueDetail extends AgentLinearIssue {
+	/** Truncated to {@link LINEAR_AGENT_LIMITS.maxReturnedDescriptionChars}. */
+	description: string | null;
+	labels: readonly string[];
+}
+
+/** One comment on a Linear issue, truncated to the returned-body cap. */
+export interface AgentLinearComment {
+	author: string | null;
+	body: string;
+	createdAt: string | null;
+}
+
+/**
+ * One cached Linear metadata row. A single shape across teams, projects, states,
+ * labels, and users rather than five: an agent reads all of them for the same
+ * reason — to turn a name it knows into the id an update takes.
+ */
+export interface AgentLinearResource {
+	id: string;
+	name: string;
+	/** Short team key (`THE`) for a team; null for every other kind. */
+	key: string | null;
+	/** Workflow category for a state (`started`, `completed`, …); null otherwise. */
+	type: string | null;
+	/** Owning team for the states and labels scoped to one; null otherwise. */
+	teamId: string | null;
+}
+
+/**
+ * What every Linear op reports about how it went. `message` is the prose an agent
+ * reads on anything other than `ok`, and on a truncated read it names what was cut
+ * — a payload silently shortened reads as a complete answer.
+ */
+export interface LinearAgentOutcome {
+	status: LinearAgentStatus;
+	message: string;
+}
+
+/** Args for `linearListIssues`: search the workspace's Linear issues. */
+export interface LinearListIssuesArgs {
+	/** Free-text match over identifier, title, and description. */
+	query?: string;
+	teamId?: string;
+	/** Force a remote sync before reading, instead of serving a fresh cache. */
+	refresh?: boolean;
+}
+
+/**
+ * Result of `linearListIssues`. Descriptions are deliberately absent: a hundred
+ * issues carrying theirs is what turns a list into a context spend, and
+ * `linearGetIssue` is one call away for the one that matters.
+ */
+export interface LinearListIssuesResult extends LinearAgentOutcome {
+	/** Whether the rows came from the local cache or a fresh Linear read. */
+	source: 'cache' | 'remote' | null;
+	issues: readonly AgentLinearIssue[];
+	/** Rows dropped to fit the payload budget; narrow with `query` or `teamId`. */
+	omittedIssues: number;
+	truncated: boolean;
+}
+
+/** Args for `linearGetIssue`: read one issue with its comments. */
+export interface LinearGetIssueArgs {
+	/** Issue uuid or its human identifier, e.g. `THE-106`. */
+	issueId: string;
+	refresh?: boolean;
+}
+
+/** Result of `linearGetIssue`: the issue, its comments, and what was truncated. */
+export interface LinearGetIssueResult extends LinearAgentOutcome {
+	source: 'cache' | 'remote' | null;
+	issue: AgentLinearIssueDetail | null;
+	comments: readonly AgentLinearComment[];
+	/** Comments dropped to fit the returned-comment cap. */
+	omittedComments: number;
+	truncated: boolean;
+}
+
+/** Args for `linearGetMetadata`: read the id↔name tables an update needs. */
+export interface LinearGetMetadataArgs {
+	refresh?: boolean;
+}
+
+/**
+ * Result of `linearGetMetadata`. Cycles are left out: nothing on this surface
+ * sets one, so returning them would spend budget on rows no op can use.
+ */
+export interface LinearGetMetadataResult extends LinearAgentOutcome {
+	syncedAt: string | null;
+	teams: readonly AgentLinearResource[];
+	projects: readonly AgentLinearResource[];
+	states: readonly AgentLinearResource[];
+	labels: readonly AgentLinearResource[];
+	users: readonly AgentLinearResource[];
+	/** Rows dropped to fit the payload budget, across every kind. */
+	omittedResources: number;
+	truncated: boolean;
+}
+
+/** Args for `linearCreateComment`: post a comment on a Linear issue. */
+export interface LinearCreateCommentArgs {
+	issueId: string;
+	commentBody: string;
+}
+
+/**
+ * Result of `linearCreateComment`. The id alone rather than the whole comment:
+ * the agent wrote the body, so echoing it back spends context on text it holds.
+ */
+export interface LinearCreateCommentResult extends LinearAgentOutcome {
+	commentId: string | null;
+}
+
+/**
+ * Args for `linearUpdateIssue`. A deliberate subset of Linear's issue fields —
+ * labels, project, cycle, and due date are planning decisions a human makes in
+ * Linear, and every field exposed here is one more thing an agent can get wrong
+ * on a ticket the whole team reads. At least one field beyond `issueId` is
+ * required, since an update carrying nothing is a wasted round trip.
+ */
+export interface LinearUpdateIssueArgs {
+	issueId: string;
+	/** Workflow state to move the issue into; a Done or Canceled state is refused. */
+	stateId?: string;
+	assigneeId?: string;
+	/** Linear's own scale: 0 none, 1 urgent, 2 high, 3 medium, 4 low. */
+	priority?: number;
+	title?: string;
+	description?: string;
+}
+
+/** Result of `linearUpdateIssue`: the issue as Linear reports it after the write. */
+export interface LinearUpdateIssueResult extends LinearAgentOutcome {
+	issue: AgentLinearIssue | null;
 }
 
 /**

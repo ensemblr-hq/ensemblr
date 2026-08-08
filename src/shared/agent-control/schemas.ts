@@ -13,6 +13,7 @@ import {
 	ASK_USER_QUESTION_RESERVED_LABELS,
 	DIFF_COMMENT_LIMITS,
 	EXIT_PLAN_MODE_LIMITS,
+	LINEAR_AGENT_LIMITS,
 	SET_BRANCH_NAME_LIMITS,
 	SET_SUMMARY_LIMITS,
 	WORKSPACE_BOARD_STATUSES,
@@ -200,6 +201,57 @@ const resolveDiffCommentsSchema = z.strictObject({
 	commentIds: z.array(nonEmpty).min(1).max(DIFF_COMMENT_LIMITS.maxComments),
 });
 
+const linearListIssuesSchema = z.strictObject({
+	query: nonEmpty.optional(),
+	teamId: nonEmpty.optional(),
+	refresh: z.boolean().optional(),
+});
+
+const linearGetIssueSchema = z.strictObject({
+	issueId: nonEmpty,
+	refresh: z.boolean().optional(),
+});
+
+const linearGetMetadataSchema = z.strictObject({
+	refresh: z.boolean().optional(),
+});
+
+const linearCreateCommentSchema = z.strictObject({
+	issueId: nonEmpty,
+	commentBody: nonEmpty.max(LINEAR_AGENT_LIMITS.maxCommentLength),
+});
+
+const LINEAR_UPDATE_FIELDS = [
+	'stateId',
+	'assigneeId',
+	'priority',
+	'title',
+	'description',
+] as const;
+
+// Linear's own priority scale, not a rank the app invented: 0 none, 1 urgent,
+// 2 high, 3 medium, 4 low. Anything outside it is silently ignored by the API.
+const linearPriority = z.number().int().min(0).max(4);
+
+const linearUpdateIssueSchema = z
+	.strictObject({
+		issueId: nonEmpty,
+		stateId: nonEmpty.optional(),
+		assigneeId: nonEmpty.optional(),
+		priority: linearPriority.optional(),
+		title: nonEmpty.max(LINEAR_AGENT_LIMITS.maxTitleLength).optional(),
+		description: z
+			.string()
+			.max(LINEAR_AGENT_LIMITS.maxDescriptionLength)
+			.optional(),
+	})
+	.refine(
+		(args) => LINEAR_UPDATE_FIELDS.some((field) => args[field] !== undefined),
+		{
+			message: `Pass at least one field to change: ${LINEAR_UPDATE_FIELDS.join(', ')}.`,
+		},
+	);
+
 const waitForAgentsSchema = z.strictObject({
 	targets: z.array(nonEmpty).optional(),
 	mode: z.enum(['first', 'all']).optional(),
@@ -293,6 +345,11 @@ const AGENT_CONTROL_ARG_SCHEMAS = {
 	getDiffComments: getDiffCommentsSchema,
 	addDiffComments: addDiffCommentsSchema,
 	resolveDiffComments: resolveDiffCommentsSchema,
+	linearListIssues: linearListIssuesSchema,
+	linearGetIssue: linearGetIssueSchema,
+	linearGetMetadata: linearGetMetadataSchema,
+	linearCreateComment: linearCreateCommentSchema,
+	linearUpdateIssue: linearUpdateIssueSchema,
 	listWorkspaces: emptySchema,
 	listTabs: listTabsSchema,
 	listTerminals: listTerminalsSchema,
