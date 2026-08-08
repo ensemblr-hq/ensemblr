@@ -45,6 +45,17 @@ const STACK_TRACE_ERROR =
 	'TypeError: Cannot read properties of undefined\n    at resolve (/repo/src/a.ts:12:9)\n    at run (/repo/src/b.ts:44:3)';
 
 describe('presentToolCall', () => {
+	// The chip resolves against the workspace file tree to decide whether it can
+	// be opened, and a padded path places nowhere in it. Control tools trim theirs,
+	// so a runtime's own path arguments have to reach the tree the same way.
+	test('trims the path a runtime padded before pinning it', () => {
+		const presentation = presentToolCall(
+			call('read', { path: '  src/app.tsx\n' }, { text: 'a\n' }),
+		);
+
+		expect(presentation.badge).toMatchObject({ path: 'src/app.tsx' });
+	});
+
 	test('numbers a read body from the requested line', () => {
 		const presentation = presentToolCall(
 			call('read', { offset: 25, path: 'src/app.tsx' }, { text: 'a\nb\nc\n' }),
@@ -506,23 +517,72 @@ describe('presentCustomMessage', () => {
 	});
 });
 
+describe('presentToolCall on the skill tool', () => {
+	// Claude Code invokes every skill through one tool named `Skill`, so a turn
+	// that reached for three of them read as three identical wrench rows.
+	test('names the skill the call activated', () => {
+		const presentation = presentToolCall(
+			call(
+				'Skill',
+				{ args: 'src/main', skill: 'code-review' },
+				{ text: 'Loaded code-review.' },
+			),
+		);
+
+		expect(presentation.title).toBe('Skill: code-review');
+		expect(presentation.glyph).toBe('biceps-flexed');
+	});
+
+	// The same activation reaches the timeline as a tool call under Claude Code
+	// and as a prompt expansion under Pi. A reader auditing a turn should not have
+	// to know which runtime ran it to recognize the row.
+	test('reads the same whichever runtime activated the skill', () => {
+		const throughTheTool = presentToolCall(
+			call('Skill', { skill: 'code-review' }, { text: 'Loaded.' }),
+		);
+
+		expect(throughTheTool).toEqual(presentSkillInvocation('code-review'));
+	});
+
+	test('keeps the bare title when the call named no skill', () => {
+		const presentation = presentToolCall(call('Skill', {}, { text: 'ok' }));
+
+		expect(presentation.title).toBe('Skill');
+		expect(presentation.glyph).toBe('biceps-flexed');
+	});
+
+	// The result is the skill's own instructions handed back to the caller —
+	// prompt rather than output. An empty body is what leaves the row inert, so a
+	// reader is not offered a disclosure onto text the turn below already acts on.
+	test('offers no disclosure onto the instructions it loaded', () => {
+		const presentation = presentToolCall(
+			call('Skill', { skill: 'tdd' }, { text: 'Write the test first.' }),
+		);
+
+		expect(presentation.body).toEqual({ kind: 'empty' });
+		expect(presentation.preview).toBeNull();
+	});
+});
+
 describe('presentSkillInvocation', () => {
-	test('marks the named skill activated with nothing to disclose', () => {
+	test('names the activated skill with nothing to disclose', () => {
 		const presentation = presentSkillInvocation('caveman');
 
 		expect(presentation).toEqual({
 			badge: null,
 			body: { kind: 'empty' },
 			glyph: 'biceps-flexed',
-			preview: { font: 'mono', text: 'Skill activated' },
-			title: 'Caveman',
+			preview: null,
+			title: 'Skill: caveman',
 			tone: 'default',
 		});
 	});
 
-	test('humanizes a hyphenated skill name for the title', () => {
+	// The name is the one a user types after the slash, so it reaches the row as
+	// written rather than prettified into something they cannot search for.
+	test('keeps a hyphenated skill name as it was invoked', () => {
 		const presentation = presentSkillInvocation('code-review');
 
-		expect(presentation.title).toBe('Code review');
+		expect(presentation.title).toBe('Skill: code-review');
 	});
 });
