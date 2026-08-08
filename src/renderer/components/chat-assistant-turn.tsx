@@ -161,19 +161,27 @@ function ActivityPart({ part }: { part: UIMessage['parts'][number] }) {
 }
 
 /**
- * Drops the app's own bookkeeping calls, so naming a tab or filing a session
+ * Drops the parts that paint nothing.
+ *
+ * The app's own bookkeeping calls go first, so naming a tab or filing a session
  * summary neither costs the turn a row nor stands between the answer and the end
  * of the turn — the split below promotes only the text that trails the last part,
- * so a hidden call left in place would fold the answer away with it.
+ * so a hidden call left in place would fold the answer away with it. Reasoning
+ * blocks whose runtime redacted the prose go too: dropping them here, rather than
+ * at the row, also keeps them out of the summary's message count.
  * @param parts - The turn's parts, in the order it produced them
  * @returns The parts the timeline renders
  */
 function visibleTurnParts(parts: UIMessage['parts']): UIMessage['parts'] {
-	return parts.filter(
-		(part) =>
+	return parts.filter((part) => {
+		if (part.type === 'reasoning') {
+			return part.text.trim().length > 0;
+		}
+		return (
 			part.type !== 'dynamic-tool' ||
-			!isHiddenEnsemblrToolCall(part as DynamicToolUIPart),
-	);
+			!isHiddenEnsemblrToolCall(part as DynamicToolUIPart)
+		);
+	});
 }
 
 /**

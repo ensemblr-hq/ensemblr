@@ -25,6 +25,10 @@ import type { ToolGlyph } from '@/renderer/types/tool-presentation';
  * timeline as an ordinary result rather than as a transport error, so it is the
  * `{ ok: false }` envelope on the result's `details`, not the error text, that
  * separates the two.
+ *
+ * Every lookup here goes through {@link canonicalEnsemblrToolName} rather than
+ * the reported name, because only one of the two runtimes reports the name the
+ * control extension registered.
  */
 
 /** Wire-name prefix shared by every tool the app's control extension registers. */
@@ -52,23 +56,34 @@ interface EnsemblrToolLabel {
 	object: string;
 	/** The verb as `[settled, in flight]`, e.g. `['Waited', 'Waiting']`. */
 	verb: readonly [string, string];
-	/** Input keys whose value is appended to the title, first match winning. */
+	/**
+	 * Input paths whose value is appended to the title, first match winning. A
+	 * path may step into a batch — `comments.0.filePath` — so a call that carries
+	 * its subject inside an array still names it.
+	 */
 	detailKeys?: readonly string[];
 }
 
 /**
  * The label each control tool answers to. Titles read as the action taken rather
  * than the tool called, because the user is watching the app being driven and
- * has no use for the name of the lever.
+ * has no use for the name of the lever. Glyphs name the action too, so a folded
+ * turn's strip of marks distinguishes starting a terminal from stopping one.
+ *
+ * Detail keys are the canonical argument names from
+ * `src/shared/agent-control/arg-naming.ts`, followed by the near-misses that
+ * table forgives — the boundary rewrites `file` to `filePath` before the op
+ * runs, but the timeline records the arguments as the model actually sent them.
  */
 const ENSEMBLR_TOOL_LABELS: Record<string, EnsemblrToolLabel> = {
 	ensemblr_ask_user_question: {
+		detailKeys: ['questions.0.question'],
 		glyph: 'message-circle-question',
 		object: 'you a question',
 		verb: ['Asked', 'Asking'],
 	},
 	ensemblr_close_tab: {
-		glyph: 'panels-top-left',
+		glyph: 'square-x',
 		object: 'a tab',
 		verb: ['Closed', 'Closing'],
 	},
@@ -79,27 +94,30 @@ const ENSEMBLR_TOOL_LABELS: Record<string, EnsemblrToolLabel> = {
 		verb: ['Submitted', 'Submitting'],
 	},
 	ensemblr_focus_dock_tab: {
-		glyph: 'panels-top-left',
-		object: 'a panel',
-		verb: ['Opened', 'Opening'],
+		detailKeys: ['kind'],
+		glyph: 'crosshair',
+		object: 'a terminal',
+		verb: ['Focused', 'Focusing'],
 	},
 	ensemblr_focus_panel: {
-		glyph: 'panels-top-left',
+		detailKeys: ['panel'],
+		glyph: 'crosshair',
 		object: 'a panel',
-		verb: ['Opened', 'Opening'],
+		verb: ['Focused', 'Focusing'],
 	},
 	ensemblr_focus_tab: {
-		glyph: 'panels-top-left',
+		glyph: 'crosshair',
 		object: 'a tab',
 		verb: ['Focused', 'Focusing'],
 	},
 	ensemblr_add_diff_comments: {
-		glyph: 'message-square-text',
+		detailKeys: ['comments.0.filePath'],
+		glyph: 'message-square-plus',
 		object: 'review comments',
 		verb: ['Left', 'Leaving'],
 	},
 	ensemblr_resolve_diff_comments: {
-		glyph: 'message-square-text',
+		glyph: 'message-square-check',
 		object: 'review comments',
 		verb: ['Resolved', 'Resolving'],
 	},
@@ -109,7 +127,7 @@ const ENSEMBLR_TOOL_LABELS: Record<string, EnsemblrToolLabel> = {
 		verb: ['Checked', 'Checking'],
 	},
 	ensemblr_get_diff_comments: {
-		detailKeys: ['file'],
+		detailKeys: ['filePath', 'file', 'path'],
 		glyph: 'message-square-text',
 		object: 'review comments',
 		verb: ['Read', 'Reading'],
@@ -120,7 +138,7 @@ const ENSEMBLR_TOOL_LABELS: Record<string, EnsemblrToolLabel> = {
 		verb: ['Read', 'Reading'],
 	},
 	ensemblr_get_workspace_diff: {
-		detailKeys: ['file'],
+		detailKeys: ['filePath', 'file', 'path'],
 		glyph: 'file-diff',
 		object: 'the diff',
 		verb: ['Read', 'Reading'],
@@ -131,8 +149,8 @@ const ENSEMBLR_TOOL_LABELS: Record<string, EnsemblrToolLabel> = {
 		verb: ['Read', 'Reading'],
 	},
 	ensemblr_launch_harness: {
-		detailKeys: ['harness', 'agent'],
-		glyph: 'terminal',
+		detailKeys: ['harnessId'],
+		glyph: 'square-terminal',
 		object: 'a harness',
 		verb: ['Launched', 'Launching'],
 	},
@@ -163,11 +181,12 @@ const ENSEMBLR_TOOL_LABELS: Record<string, EnsemblrToolLabel> = {
 	},
 	ensemblr_notify_orchestrator: {
 		detailKeys: ['reason'],
-		glyph: 'bot',
+		glyph: 'bell',
 		object: 'the orchestrator',
 		verb: ['Notified', 'Notifying'],
 	},
 	ensemblr_open_tab: {
+		detailKeys: ['filePath', 'file', 'path', 'variant'],
 		glyph: 'panels-top-left',
 		object: 'a tab',
 		verb: ['Opened', 'Opening'],
@@ -178,12 +197,12 @@ const ENSEMBLR_TOOL_LABELS: Record<string, EnsemblrToolLabel> = {
 		verb: ['Read', 'Reading'],
 	},
 	ensemblr_read_terminal_output: {
-		glyph: 'terminal',
+		glyph: 'scroll-text',
 		object: 'terminal output',
 		verb: ['Read', 'Reading'],
 	},
 	ensemblr_send_follow_up: {
-		glyph: 'bot',
+		glyph: 'send',
 		object: 'a sub-agent',
 		verb: ['Steered', 'Steering'],
 	},
@@ -207,23 +226,24 @@ const ENSEMBLR_TOOL_LABELS: Record<string, EnsemblrToolLabel> = {
 	},
 	ensemblr_start_terminal: {
 		detailKeys: ['scriptName', 'kind'],
-		glyph: 'terminal',
+		glyph: 'play',
 		object: 'a terminal',
 		verb: ['Started', 'Starting'],
 	},
 	ensemblr_stop_terminal: {
-		glyph: 'terminal',
+		detailKeys: ['kind'],
+		glyph: 'circle-stop',
 		object: 'a terminal',
 		verb: ['Stopped', 'Stopping'],
 	},
 	ensemblr_wait_for_agents: {
-		glyph: 'bot',
+		glyph: 'hourglass',
 		object: 'for sub-agents',
 		verb: ['Waited', 'Waiting'],
 	},
 	ensemblr_write_terminal: {
-		detailKeys: ['data', 'text'],
-		glyph: 'terminal',
+		detailKeys: ['input'],
+		glyph: 'keyboard',
 		object: 'into a terminal',
 		verb: ['Typed', 'Typing'],
 	},
@@ -235,6 +255,39 @@ const ENSEMBLR_TOOL_LABELS: Record<string, EnsemblrToolLabel> = {
  */
 export const ENSEMBLR_CONTROL_TOOL_NAMES: readonly string[] =
 	Object.keys(ENSEMBLR_TOOL_LABELS);
+
+/** Every name the control extension registers, label-bearing or bookkeeping. */
+const CONTROL_TOOL_NAMES: ReadonlySet<string> = new Set([
+	...ENSEMBLR_CONTROL_TOOL_NAMES,
+	...BOOKKEEPING_TOOL_NAMES,
+]);
+
+/**
+ * Reduces the name a runtime reported to the name the control extension
+ * registered the tool under.
+ *
+ * The two runtimes disagree about what to call the same tool. Pi loads the
+ * extension in-process and reports `ensemblr_set_name`; Claude Code reaches the
+ * control server over MCP, where the SDK namespaces every tool by its server and
+ * reports `mcp__ensemblr__ensemblr_set_name`. Matching only the bare form left
+ * every call from the second runtime titled with its wire name and marked with
+ * the generic wrench.
+ *
+ * Taking the last `ensemblr_` segment resolves both shapes, and the registry
+ * check keeps that slice honest: an unrelated tool whose name happens to carry
+ * the prefix resolves to nothing rather than borrowing a label.
+ * @param toolName - The tool name as the runtime reported it
+ * @returns The registered name, or null when the tool is not a control tool
+ */
+export function canonicalEnsemblrToolName(toolName: string): string | null {
+	const lowered = toolName.toLowerCase();
+	const start = lowered.lastIndexOf(CONTROL_TOOL_PREFIX);
+	if (start === -1) {
+		return null;
+	}
+	const registered = lowered.slice(start);
+	return CONTROL_TOOL_NAMES.has(registered) ? registered : null;
+}
 
 /** Longest detail suffix kept on a title before it crowds the row. */
 const MAX_DETAIL_LENGTH = 48;
@@ -299,7 +352,7 @@ function detailsOf(part: DynamicToolUIPart): unknown {
 export function ensemblrControlFailure(
 	part: DynamicToolUIPart,
 ): EnsemblrControlFailure | null {
-	if (!part.toolName.toLowerCase().startsWith(CONTROL_TOOL_PREFIX)) {
+	if (canonicalEnsemblrToolName(part.toolName) === null) {
 		return null;
 	}
 	const details = detailsOf(part);
@@ -336,14 +389,37 @@ export function isHiddenEnsemblrToolCall(part: DynamicToolUIPart): boolean {
 	if (ensemblrControlFailure(part) !== null) {
 		return false;
 	}
-	return BOOKKEEPING_TOOL_NAMES.has(part.toolName.toLowerCase());
+	const registered = canonicalEnsemblrToolName(part.toolName);
+	return registered !== null && BOOKKEEPING_TOOL_NAMES.has(registered);
 }
 
 /**
- * Reads the first non-empty string among the given input keys, trimmed to a
+ * Walks a dotted path into a tool call's arguments, stepping through arrays by
+ * numeric segment so a batched call's first item is reachable.
+ * @param input - The tool call's input bag
+ * @param path - Dotted path, e.g. `comments.0.filePath`
+ * @returns The value at that path, or null when any segment is missing
+ */
+function valueAtPath(input: Record<string, unknown>, path: string): unknown {
+	let current: unknown = input;
+	for (const segment of path.split('.')) {
+		if (Array.isArray(current)) {
+			current = current[Number(segment)];
+			continue;
+		}
+		if (typeof current !== 'object' || current === null) {
+			return null;
+		}
+		current = (current as Record<string, unknown>)[segment];
+	}
+	return current;
+}
+
+/**
+ * Reads the first non-empty string among the given input paths, trimmed to a
  * length that fits a row title.
  * @param input - The tool call's input bag
- * @param keys - Input keys to try, in order
+ * @param keys - Input paths to try, in order
  * @returns The detail to append to the title, or null when none is usable
  */
 function detailOf(
@@ -351,7 +427,7 @@ function detailOf(
 	keys: readonly string[],
 ): string | null {
 	for (const key of keys) {
-		const value = input[key];
+		const value = valueAtPath(input, key);
 		if (typeof value !== 'string') {
 			continue;
 		}
@@ -371,7 +447,7 @@ function detailOf(
  * in the one argument that says which tab, sub-agent, or status it acted on. A
  * call still in flight reads in the present participle, so a blocking wait does
  * not claim to have finished while the turn is still working.
- * @param toolName - The raw wire tool name
+ * @param toolName - The tool name as the runtime reported it
  * @param input - The tool call's input bag
  * @param isRunning - Whether the call has yet to return
  * @returns The title and glyph, or null when the name is not a control tool
@@ -381,7 +457,8 @@ export function ensemblrToolLabel(
 	input: Record<string, unknown>,
 	isRunning: boolean,
 ): { glyph: ToolGlyph; title: string } | null {
-	const label = ENSEMBLR_TOOL_LABELS[toolName.toLowerCase()];
+	const registered = canonicalEnsemblrToolName(toolName);
+	const label = registered ? ENSEMBLR_TOOL_LABELS[registered] : undefined;
 	if (!label) {
 		return null;
 	}
@@ -396,9 +473,10 @@ export function ensemblrToolLabel(
 /**
  * Resolves a control tool's glyph without reading its arguments, for the summary
  * strip that paints one mark per folded call.
- * @param toolName - The raw wire tool name
+ * @param toolName - The tool name as the runtime reported it
  * @returns The glyph, or null when the name is not a control tool
  */
 export function ensemblrToolGlyph(toolName: string): ToolGlyph | null {
-	return ENSEMBLR_TOOL_LABELS[toolName.toLowerCase()]?.glyph ?? null;
+	const registered = canonicalEnsemblrToolName(toolName);
+	return registered ? (ENSEMBLR_TOOL_LABELS[registered]?.glyph ?? null) : null;
 }

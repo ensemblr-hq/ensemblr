@@ -13,7 +13,9 @@ import type {
 	ToolPresentation,
 	ToolPreviewDescriptor,
 } from '@/renderer/types/tool-presentation';
+import { isPreviewableImagePath } from '@/shared/preview-image';
 import {
+	canonicalEnsemblrToolName,
 	ensemblrControlFailure,
 	ensemblrToolGlyph,
 	ensemblrToolLabel,
@@ -281,6 +283,32 @@ function humanizeToolName(name: string): string {
 }
 
 /**
+ * Whether a `read` call targeted an image rather than text, which no runtime
+ * returns a numbered file body for — so a line-numbered code body and a "Read N
+ * lines" title would both be fiction.
+ *
+ * Runtimes say so two different ways: Pi answers with a one-line placeholder,
+ * while Claude Code returns the bytes as an image content block that the text
+ * projection drops, leaving an empty result. A previewable extension is the only
+ * signal left on that second path, and it counts only against that empty
+ * projection — a runtime reporting a size limit or a truncation in the same
+ * channel the placeholder arrives on has something to say, and an image row
+ * would discard it.
+ * @param path - Path the call read, or null when it named none
+ * @param text - The call's projected result text
+ * @returns True when the row should read as an image read
+ */
+function isImageRead(path: string | null, text: string): boolean {
+	const projected = text.trim();
+	if (IMAGE_READ_PLACEHOLDER.test(projected)) {
+		return true;
+	}
+	return (
+		projected.length === 0 && path !== null && isPreviewableImagePath(path)
+	);
+}
+
+/**
  * Reads a file and shows it with a gutter numbered from the tool's own numbering
  * when it returned a numbered body — both the truer origin and the only way the
  * row avoids two gutters — and from the requested start line otherwise.
@@ -292,10 +320,7 @@ function presentRead(part: DynamicToolUIPart): ToolPresenterResult {
 	const path = pathOf(input);
 	const output = outputOf(part);
 	const text = output?.text ?? '';
-	// The read tool never returns a numbered file body for an image — only this
-	// one-line placeholder — so a line-numbered code body and a "Read N lines"
-	// title would both be fiction. Fall back to the plain file badge instead.
-	if (IMAGE_READ_PLACEHOLDER.test(text.trim())) {
+	if (isImageRead(path, text)) {
 		return {
 			badge: fileBadge(path),
 			body: { kind: 'empty' },
@@ -624,6 +649,10 @@ function restingGlyph(part: DynamicToolUIPart): ToolGlyph {
  *
  * A failure carrying a stack trace gets the frame-parsing viewer rather than a
  * flat block, so a several-hundred-line traceback collapses to its error line.
+ * It is titled with the tool's name rather than the action, because the name is
+ * what makes a denial diagnosable — a control tool's name shorn of the MCP
+ * namespacing one runtime wraps it in, which identifies the server and not the
+ * call that was refused.
  * @param part - The tool part to project
  * @returns The row's icon, title, badge, preview, and body
  */
@@ -637,7 +666,7 @@ export function presentToolCall(part: DynamicToolUIPart): ToolPresentation {
 				: { kind: 'error', text: failureText },
 			glyph: 'circle-x',
 			preview: { font: 'mono', text: failureText },
-			title: `${humanizeToolName(part.toolName)} failed`,
+			title: `${humanizeToolName(canonicalEnsemblrToolName(part.toolName) ?? part.toolName)} failed`,
 			tone: 'destructive',
 		};
 	}
@@ -676,29 +705,24 @@ export function glyphForToolCall(part: DynamicToolUIPart): ToolGlyph {
  * Projects a reasoning block into the same row shape as a tool call, so
  * thinking and acting read as one timeline rather than two styles.
  *
- * A runtime that redacts its reasoning prose — Claude Code ships the block's
- * signature and no text — still gets a row, marking where the turn thought. It
- * carries no body, so the disclosure stays inert rather than opening onto
- * nothing.
- * @param text - The raw reasoning markdown, empty when the runtime redacted it
- * @returns The row presentation for the reasoning block
+ * A runtime that redacts its reasoning — Claude Code ships the block's signature
+ * and no text — leaves nothing to disclose, so it projects to nothing rather
+ * than to a row titled "Thought" that opens onto an empty body. Answering with
+ * null keeps that judgement here, where the shape of a reasoning row is already
+ * decided, rather than in every caller that renders one.
+ * @param text - The raw reasoning markdown
+ * @returns The row presentation, or null when the block carries no prose
  */
-export function presentReasoning(text: string): ToolPresentation {
-	if (text.length === 0) {
-		return {
-			badge: null,
-			body: { kind: 'empty' },
-			glyph: 'brain',
-			preview: null,
-			title: 'Thought',
-			tone: 'default',
-		};
+export function presentReasoning(text: string): ToolPresentation | null {
+	const prose = text.trim();
+	if (prose.length === 0) {
+		return null;
 	}
 	return {
 		badge: null,
-		body: { kind: 'markdown', text },
+		body: { kind: 'markdown', text: prose },
 		glyph: 'brain',
-		preview: { font: 'sans', text },
+		preview: { font: 'sans', text: prose },
 		title: 'Thinking',
 		tone: 'default',
 	};
