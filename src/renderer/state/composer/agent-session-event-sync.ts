@@ -68,6 +68,11 @@ function hasWorkspaceRenamedMetadata(
  * title lands, a navigation refetch after an auto-rename, and a session refetch
  * on any status change. Broadcasts for another workspace or another session are
  * ignored.
+ *
+ * A usage reading refetches nothing. The timeline already merges every
+ * broadcast into the event cache itself, so re-reading the branch here would
+ * both re-map the whole transcript mid-stream and overwrite the deltas that
+ * landed while that read was in flight.
  * @param activeSessionId - Session the composer is bound to, or null while new
  * @param onContextUsage - Records the newest usage reading for the gauge
  * @param workspaceId - Workspace whose broadcasts are relevant here
@@ -97,11 +102,6 @@ export function useAgentSessionEventSync({
 					onContextUsage({
 						sessionId: broadcast.sessionId,
 						usage: toComposerContextUsage(payload.usage),
-					});
-					void queryClient.invalidateQueries({
-						queryKey: ensemblrQueryKeys.agentSessionEvents(
-							broadcast.event.branchId,
-						),
 					});
 				}
 				return;

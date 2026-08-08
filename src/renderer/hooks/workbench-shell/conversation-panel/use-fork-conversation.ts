@@ -1,6 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useRouter } from '@tanstack/react-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import {
 	createWorkspace,
@@ -167,5 +167,10 @@ export function useForkConversation({
 		[attachSummary, isForking, navigate, queryClient, router, workspace],
 	);
 
-	return { forkToNewTab, forkToNewWorkspace, isForking };
+	// Held stable so the timeline's memoized turns are not invalidated by a fresh
+	// object on every render of a streaming transcript.
+	return useMemo(
+		() => ({ forkToNewTab, forkToNewWorkspace, isForking }),
+		[forkToNewTab, forkToNewWorkspace, isForking],
+	);
 }

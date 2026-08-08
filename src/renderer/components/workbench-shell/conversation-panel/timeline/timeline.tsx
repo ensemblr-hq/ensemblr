@@ -1,5 +1,5 @@
 import type { UIMessage } from 'ai';
-import { useCallback } from 'react';
+import { memo, useCallback } from 'react';
 import { ChatAssistantTurn } from '@/renderer/components/chat-assistant-turn';
 import { ChatWorkingIndicator } from '@/renderer/components/chat-turn-timer';
 import { ChatUserPrompt } from '@/renderer/components/chat-user-prompt';
@@ -202,8 +202,14 @@ export function AgentSessionTimeline({
 	);
 }
 
-/** Renders one mapped agent message with chat or diagnostic semantics. */
-function TimelineMessage({
+/**
+ * Renders one mapped agent message with chat or diagnostic semantics.
+ *
+ * Memoized because the live turn re-renders on every token: the projector hands
+ * settled turns back unchanged, so without this every earlier turn in the
+ * transcript would re-split its parts and re-render alongside the streaming one.
+ */
+const TimelineMessage = memo(function TimelineMessage({
 	checkpointsByTurnId,
 	fork,
 	isLastMessage,
@@ -242,7 +248,7 @@ function TimelineMessage({
 			onViewTurnDiff={onViewTurnDiff}
 		/>
 	);
-}
+});
 
 /** Renders one assistant turn with its fork, restore, and turn-diff affordances. */
 function AssistantTimelineTurn({

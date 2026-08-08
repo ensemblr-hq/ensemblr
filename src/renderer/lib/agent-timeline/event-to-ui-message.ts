@@ -53,20 +53,160 @@ import {
 export function eventsToUIMessages(
 	events: readonly AgentEventFrame[],
 ): UIMessage[] {
-	const result: UIMessage[] = [];
-	let pending: PendingGroup | null = null;
+	return createTimelineProjector()(events);
+}
 
-	for (const event of events) {
-		pending = handleEvent(event, pending, result);
-	}
+/**
+ * Resumable state of one projection: the exact event run already folded, the
+ * messages it produced, and the group left open at its end.
+ */
+interface ProjectionCursor {
+	folded: readonly AgentEventFrame[];
+	pending: PendingGroup | null;
+	result: readonly UIMessage[];
+}
 
-	if (pending) {
-		result.push(finalizeGroup(pending));
-	}
+/**
+ * One derived message per source message, held alongside the key it was derived
+ * under so a changed key rebuilds instead of serving a stale object.
+ */
+type MessageDerivationCache = WeakMap<
+	UIMessage,
+	{ derived: UIMessage; key: string }
+>;
 
-	return withPromptTimes(
-		relocateSkillInvocations(dropFlushedSkillDuplicates(result)),
+/**
+ * Per-projector caches, one per derivation the finalize passes apply. Together
+ * they keep every settled message referentially stable across the re-projections
+ * a streaming turn triggers, which is what lets the timeline memoize its rows.
+ */
+interface TimelineDecorations {
+	promptTime: MessageDerivationCache;
+	skillActivation: MessageDerivationCache;
+	skillCommand: MessageDerivationCache;
+	skillMarker: MessageDerivationCache;
+}
+
+/** A skill prompt awaiting the turn its marker belongs to. */
+interface SkillActivation {
+	name: string;
+	source: UIMessage;
+}
+
+const EMPTY_CURSOR: ProjectionCursor = {
+	folded: [],
+	pending: null,
+	result: [],
+};
+
+/**
+ * Builds a projector that folds only the events which arrived since its last
+ * call, so a streaming turn costs one delta of work per delta rather than
+ * refolding the whole branch. Re-mapping every event on every token is what
+ * pushes a long conversation past the frame budget mid-stream; the settled
+ * messages it returns also keep their identity, so only the live turn
+ * re-renders.
+ *
+ * Hold one projector per timeline for the component's lifetime. Handing it an
+ * unrelated event run is safe — it detects the break and refolds from the start.
+ * @returns A projector mapping an event run to the timeline's messages.
+ */
+export function createTimelineProjector(): (
+	events: readonly AgentEventFrame[],
+) => UIMessage[] {
+	const decorations: TimelineDecorations = {
+		promptTime: new WeakMap(),
+		skillActivation: new WeakMap(),
+		skillCommand: new WeakMap(),
+		skillMarker: new WeakMap(),
+	};
+	let cursor = EMPTY_CURSOR;
+
+	return (events) => {
+		const resumed = canResumeProjection(cursor, events);
+		const result: UIMessage[] = resumed ? [...cursor.result] : [];
+		let pending = resumed ? cursor.pending : null;
+
+		for (const event of events.slice(resumed ? cursor.folded.length : 0)) {
+			pending = handleEvent(event, pending, result);
+		}
+
+		cursor = { folded: [...events], pending, result };
+
+		return finalizeProjection(result, pending, decorations);
+	};
+}
+
+/**
+ * Whether `events` extends the exact run the cursor already folded.
+ *
+ * Compares every reference in the folded prefix rather than sampling its ends.
+ * TanStack Query's structural sharing keeps unchanged rows referentially
+ * identical, so a row that changed surfaces here as a new object — an
+ * end-sampled check would resume on a stale fold and serve a wrong transcript
+ * with no repair path short of a remount. The cursor compares against its own
+ * copy of the prefix, so a caller that appends to the array it handed over in
+ * place cannot make the check read the grown length as already folded. Both
+ * walks are pointer equality, orders of magnitude cheaper than the fold they
+ * guard, which allocates per event.
+ * @param cursor - State left by the previous projection
+ * @param events - The event run being projected now
+ * @returns True when the fold can resume instead of starting over
+ */
+function canResumeProjection(
+	cursor: ProjectionCursor,
+	events: readonly AgentEventFrame[],
+): boolean {
+	return (
+		events.length >= cursor.folded.length &&
+		cursor.folded.every((event, index) => event === events[index])
 	);
+}
+
+/**
+ * Closes the open group and applies the whole-transcript passes that cannot run
+ * incrementally, all of which are linear in messages rather than in events.
+ * @param result - Messages finalized so far
+ * @param pending - The group still accumulating, or null when none is open
+ * @param decorations - Caches that keep every row these passes derive identity-stable
+ * @returns The timeline's messages, newest last
+ */
+function finalizeProjection(
+	result: readonly UIMessage[],
+	pending: PendingGroup | null,
+	decorations: TimelineDecorations,
+): UIMessage[] {
+	const messages = pending ? [...result, finalizeGroup(pending)] : result;
+	return withPromptTimes(
+		relocateSkillInvocations(dropFlushedSkillDuplicates(messages), decorations),
+		decorations,
+	);
+}
+
+/**
+ * Reads a derived message out of `cache`, rebuilding it only when the key it was
+ * derived under changed. Reusing the previous object is what keeps a settled turn
+ * referentially stable across a streaming turn's re-projections, so a memoized
+ * timeline row re-renders only when its content actually moved.
+ * @param cache - Derived messages, keyed by the message each came from
+ * @param source - The message the derivation reads
+ * @param key - Everything outside `source` that the derivation depends on
+ * @param derive - Builds the derived message on a miss
+ * @returns The derived message, reused when nothing changed
+ */
+function deriveStable(
+	cache: MessageDerivationCache,
+	source: UIMessage,
+	key: string,
+	derive: () => UIMessage,
+): UIMessage {
+	const cached = cache.get(source);
+	if (cached?.key === key) {
+		return cached.derived;
+	}
+	const derived = derive();
+	cache.set(source, { derived, key });
+	return derived;
 }
 
 /**
@@ -140,47 +280,102 @@ function dropFlushedSkillDuplicates(
  * turn it opened as a "Skill activated" marker. The prompt then reads as a
  * normal bubble and the skill folds into the turn's activity instead of standing
  * above it as the whole `SKILL.md`.
+ * Every row this pass rewrites goes through {@link deriveStable}: a transcript
+ * that used a skill re-projects on every token like any other, and rebuilding
+ * these rows each time would strand exactly those turns outside the timeline's
+ * memoization.
  * @param messages - The finalized messages to transform
+ * @param decorations - Caches keeping the rewritten rows referentially stable
  * @returns The messages with skill prompts rewritten and their markers relocated
  */
-function relocateSkillInvocations(messages: readonly UIMessage[]): UIMessage[] {
+function relocateSkillInvocations(
+	messages: readonly UIMessage[],
+	decorations: TimelineDecorations,
+): UIMessage[] {
 	const result: UIMessage[] = [];
-	let pending: { name: string; source: UIMessage } | null = null;
+	let activation: SkillActivation | null = null;
 	for (const message of messages) {
-		if (pending) {
-			if (message.role === 'assistant') {
-				result.push({
-					...message,
-					parts: [buildSkillPart(pending.name), ...message.parts],
-				});
-				pending = null;
+		if (activation) {
+			const placed = placeSkillMarker(message, activation, decorations);
+			activation = null;
+			result.push(placed.row);
+			if (placed.absorbedMessage) {
 				continue;
 			}
-			result.push(skillActivationRow(pending.name, pending.source));
-			pending = null;
 		}
-		if (message.role !== 'user') {
-			result.push(message);
-			continue;
-		}
-		const { skill, text } = parseSkillInvocation(joinTextParts(message));
-		if (!skill) {
-			result.push(message);
-			continue;
-		}
-		result.push({
-			...message,
-			parts: [
-				{
-					state: 'done',
-					text: skillCommandText(skill.name, text),
-					type: 'text',
-				},
-			],
-		});
-		pending = { name: skill.name, source: message };
+		activation = emitRelocatedRow(message, result, decorations);
 	}
 	return result;
+}
+
+/**
+ * Places the marker for a skill whose prompt was just emitted: folded into the
+ * assistant turn it opened, or standing alone when the next row is not one.
+ * @param message - The row following the skill prompt
+ * @param activation - The activated skill's name and the prompt that invoked it
+ * @param decorations - Caches keeping the placed row referentially stable
+ * @returns The row carrying the marker, and whether it absorbed `message`
+ */
+function placeSkillMarker(
+	message: UIMessage,
+	activation: SkillActivation,
+	decorations: TimelineDecorations,
+): { absorbedMessage: boolean; row: UIMessage } {
+	if (message.role === 'assistant') {
+		return {
+			absorbedMessage: true,
+			row: deriveStable(
+				decorations.skillMarker,
+				message,
+				activation.name,
+				() => ({
+					...message,
+					parts: [buildSkillPart(activation.name), ...message.parts],
+				}),
+			),
+		};
+	}
+	return {
+		absorbedMessage: false,
+		row: deriveStable(
+			decorations.skillActivation,
+			activation.source,
+			activation.name,
+			() => skillActivationRow(activation.name, activation.source),
+		),
+	};
+}
+
+/**
+ * Emits one row that carries no relocated marker, rewriting a `<skill>` prompt
+ * back to the command the user typed so the bubble reads normally.
+ * @param message - The row being emitted
+ * @param result - Accumulator of relocated messages, appended in place
+ * @param decorations - Caches keeping the rewritten prompt referentially stable
+ * @returns The activation this row opened, or null when it opened none
+ */
+function emitRelocatedRow(
+	message: UIMessage,
+	result: UIMessage[],
+	decorations: TimelineDecorations,
+): SkillActivation | null {
+	if (message.role !== 'user') {
+		result.push(message);
+		return null;
+	}
+	const { skill, text } = parseSkillInvocation(joinTextParts(message));
+	if (!skill) {
+		result.push(message);
+		return null;
+	}
+	const command = skillCommandText(skill.name, text);
+	result.push(
+		deriveStable(decorations.skillCommand, message, command, () => ({
+			...message,
+			parts: [{ state: 'done', text: command, type: 'text' }],
+		})),
+	);
+	return { name: skill.name, source: message };
 }
 
 /**
@@ -219,7 +414,10 @@ function joinTextParts(message: UIMessage): string {
  * preceded it. Walks the finalized messages in order, tracking the latest
  * user-message timestamp, so the turn timer can span prompt → final answer.
  */
-function withPromptTimes(messages: readonly UIMessage[]): UIMessage[] {
+function withPromptTimes(
+	messages: readonly UIMessage[],
+	decorations: TimelineDecorations,
+): UIMessage[] {
 	let lastUserAt: string | undefined;
 	return messages.map((message) => {
 		const metadata = turnMetadataOf(message);
@@ -229,13 +427,14 @@ function withPromptTimes(messages: readonly UIMessage[]): UIMessage[] {
 			}
 			return message;
 		}
-		if (message.role === 'assistant' && metadata && lastUserAt) {
-			return {
-				...message,
-				metadata: { ...metadata, promptAt: lastUserAt },
-			};
+		if (message.role !== 'assistant' || !metadata || !lastUserAt) {
+			return message;
 		}
-		return message;
+		const promptAt = lastUserAt;
+		return deriveStable(decorations.promptTime, message, promptAt, () => ({
+			...message,
+			metadata: { ...metadata, promptAt },
+		}));
 	});
 }
 
