@@ -23,7 +23,8 @@ import type {
 	AutocompleteState,
 	ComposerShellState,
 	ExternalAttachment,
-	SlashCommandDescriptor,
+	MentionMatch,
+	SlashCommandMatch,
 	WorkspaceFileSummary,
 } from '@/renderer/types/workbench';
 
@@ -77,7 +78,7 @@ export interface ComposerStateApi {
 	/** Send the current draft to the agent as a follow-up (Cmd+J). */
 	queueCurrent: () => void;
 	mentionAttachments: readonly WorkspaceFileSummary[];
-	mentionMatches: readonly WorkspaceFileSummary[];
+	mentionMatches: readonly MentionMatch[];
 	onMentionSelect: (entry: WorkspaceFileSummary) => void;
 	onSlashSelect: (command: string, autoSubmit: boolean) => void;
 	pending: boolean;
@@ -87,7 +88,7 @@ export interface ComposerStateApi {
 	setActiveIndex: (index: number) => void;
 	/** True while the runtime is still being asked for its command catalogue. */
 	slashLoading: boolean;
-	slashMatches: readonly SlashCommandDescriptor[];
+	slashMatches: readonly SlashCommandMatch[];
 	textareaRef: RefObject<HTMLTextAreaElement | null>;
 	uploadAttachments: readonly File[];
 	value: string;

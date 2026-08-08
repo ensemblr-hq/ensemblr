@@ -5,39 +5,43 @@ import {
 	PopoverContent,
 } from '@/renderer/components/ui/popover';
 import { ScrollArea } from '@/renderer/components/ui/scroll-area';
+import { Skeleton } from '@/renderer/components/ui/skeleton';
 import { WorkspaceFileIcon } from '@/renderer/components/workbench-shell/review-files/workspace-file-icon';
 import type {
 	AutocompleteKind,
-	SlashCommandDescriptor,
+	MentionMatch,
+	SlashCommandMatch,
 	WorkspaceFileSummary,
 } from '@/renderer/types/workbench';
 import { AutocompleteRow } from './autocomplete-list';
+import { MatchHighlight } from './match-highlight';
 
 const MAX_AUTOCOMPLETE_HEIGHT_REM = 24;
 const AUTOCOMPLETE_ROW_HEIGHT_REM = 2.25;
 const AUTOCOMPLETE_VERTICAL_PADDING_REM = 0.5;
+const LOADING_PLACEHOLDER_ROWS = 5;
 
 /** Props for the textarea-anchored @ and / autocomplete popover. */
 interface ComposerAutocompletePopoverProps {
 	activeIndex: number;
 	children: ReactNode;
 	kind: AutocompleteKind;
-	mentionMatches: readonly WorkspaceFileSummary[];
+	mentionMatches: readonly MentionMatch[];
 	onHover: (index: number) => void;
 	onMentionSelect: (entry: WorkspaceFileSummary) => void;
 	onOpenChange: (open: boolean) => void;
 	onSlashSelect: (command: string, autoSubmit: boolean) => void;
 	/** True while the runtime is still being asked for its command catalogue. */
 	slashLoading: boolean;
-	slashMatches: readonly SlashCommandDescriptor[];
+	slashMatches: readonly SlashCommandMatch[];
 }
 
 /** Formats slash command description text without redundant source prefixes. */
-function formatSlashCommandSecondary(match: SlashCommandDescriptor): ReactNode {
-	if (!match.description) {
+function formatSlashCommandSecondary(match: SlashCommandMatch): ReactNode {
+	if (!match.item.description) {
 		return undefined;
 	}
-	return <span className='truncate'>{match.description}</span>;
+	return <span className='truncate'>{match.item.description}</span>;
 }
 
 /** Estimates popover list height so Radix ScrollArea owns overflow correctly. */
@@ -67,6 +71,20 @@ function AutocompleteScrollArea({
 	);
 }
 
+/**
+ * Renders placeholder rows while a runtime that has never been asked before
+ * resolves its catalogue, so the menu keeps the height and rhythm of the list it
+ * is about to become instead of collapsing to a line of text.
+ */
+function AutocompletePlaceholderRows(): ReactNode {
+	return Array.from({ length: LOADING_PLACEHOLDER_ROWS }, (_, index) => (
+		<div className='flex h-9 items-center gap-2 px-2' key={index}>
+			<Skeleton className='h-3 w-40' />
+			<Skeleton className='h-3 w-24' />
+		</div>
+	));
+}
+
 /** Renders workspace file autocomplete rows. */
 function renderMentionRows({
 	activeIndex,
@@ -75,7 +93,7 @@ function renderMentionRows({
 	onSelect,
 }: {
 	activeIndex: number;
-	matches: readonly WorkspaceFileSummary[];
+	matches: readonly MentionMatch[];
 	onHover: (index: number) => void;
 	onSelect: (entry: WorkspaceFileSummary) => void;
 }): ReactNode {
@@ -90,12 +108,18 @@ function renderMentionRows({
 	return matches.map((match, index) => (
 		<AutocompleteRow
 			active={index === activeIndex}
-			icon={<WorkspaceFileIcon file={match} />}
-			key={match.id}
+			icon={<WorkspaceFileIcon file={match.entry} />}
+			key={match.entry.id}
 			onHover={() => onHover(index)}
-			onSelect={() => onSelect(match)}
-			primary={match.name}
-			secondary={match.path === match.name ? undefined : match.path}
+			onSelect={() => onSelect(match.entry)}
+			primary={
+				<MatchHighlight ranges={match.nameRanges} text={match.entry.name} />
+			}
+			secondary={
+				match.entry.path === match.entry.name ? undefined : (
+					<MatchHighlight ranges={match.pathRanges} text={match.entry.path} />
+				)
+			}
 		/>
 	));
 }
@@ -110,14 +134,19 @@ function renderSlashRows({
 }: {
 	activeIndex: number;
 	loading: boolean;
-	matches: readonly SlashCommandDescriptor[];
+	matches: readonly SlashCommandMatch[];
 	onHover: (index: number) => void;
 	onSelect: (command: string, autoSubmit: boolean) => void;
 }): ReactNode {
+	// Guarded on an empty list, not on `loading` alone: once the cache seeds the
+	// menu, every background revalidate is a fetch with rows already on screen,
+	// and a loading affordance there would flash on each one.
 	if (matches.length === 0) {
-		return (
+		return loading ? (
+			<AutocompletePlaceholderRows />
+		) : (
 			<div className='px-2 py-1.5 text-muted-foreground text-xs'>
-				{loading ? 'Loading commands…' : 'No matching commands'}
+				No matching commands
 			</div>
 		);
 	}
@@ -125,18 +154,42 @@ function renderSlashRows({
 	return matches.map((match, index) => (
 		<AutocompleteRow
 			active={index === activeIndex}
-			key={match.command}
+			key={match.item.command}
 			onHover={() => onHover(index)}
-			onSelect={() => onSelect(match.command, match.autoSubmit)}
+			onSelect={() => onSelect(match.item.command, match.item.autoSubmit)}
 			primary={
 				<span>
 					<span className='text-muted-foreground'>/</span>
-					<span>{match.command}</span>
+					<MatchHighlight ranges={match.ranges} text={match.item.command} />
 				</span>
 			}
 			secondary={formatSlashCommandSecondary(match)}
 		/>
 	));
+}
+
+/**
+ * Counts the rows the popover should size itself for, so placeholder rows do not
+ * make it jump when the real list arrives.
+ * @param kind - Which autocomplete is open.
+ * @param mentionCount - How many mention rows there are.
+ * @param slashCount - How many slash rows there are.
+ * @param slashLoading - Whether the slash catalogue is still resolving.
+ * @returns The row count to size the list by.
+ */
+function getRowCount(
+	kind: AutocompleteKind,
+	mentionCount: number,
+	slashCount: number,
+	slashLoading: boolean,
+): number {
+	if (kind === 'mention') {
+		return mentionCount;
+	}
+	if (slashCount === 0 && slashLoading) {
+		return LOADING_PLACEHOLDER_ROWS;
+	}
+	return slashCount;
 }
 
 /** Stable textarea-anchored popover that renders @ files or / commands. */
@@ -153,8 +206,12 @@ export function ComposerAutocompletePopover({
 	slashMatches,
 }: ComposerAutocompletePopoverProps) {
 	const open = kind === 'mention' || kind === 'slash';
-	const rowCount =
-		kind === 'mention' ? mentionMatches.length : slashMatches.length;
+	const rowCount = getRowCount(
+		kind,
+		mentionMatches.length,
+		slashMatches.length,
+		slashLoading,
+	);
 	const rows =
 		kind === 'mention'
 			? renderMentionRows({

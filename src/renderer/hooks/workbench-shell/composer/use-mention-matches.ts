@@ -1,6 +1,9 @@
 import { useMemo } from 'react';
-import { fuzzyScore } from '@/renderer/lib/workbench/fuzzy-score';
-import type { WorkspaceFileSummary } from '@/renderer/types/workbench';
+import { fuzzyMatch, fuzzyScore } from '@/renderer/lib/workbench/fuzzy-score';
+import type {
+	MentionMatch,
+	WorkspaceFileSummary,
+} from '@/renderer/types/workbench';
 
 const DEFAULT_MENTION_LIMIT = 80;
 const MIN_DRILLDOWN_QUERY_LENGTH = 2;
@@ -153,12 +156,44 @@ function dedupeEntries(
 	return result;
 }
 
+/**
+ * The text a row's name was actually selected on. A query carrying a slash
+ * drills into a folder and filters its children by the segment after the last
+ * one, so matching a name against the whole query would report no spans on the
+ * very text the user typed to surface it.
+ * @param query - Normalized mention query.
+ * @returns The needle to highlight the name with.
+ */
+function nameQueryFor(query: string): string {
+	const slashIndex = query.lastIndexOf('/');
+	return slashIndex < 0 ? query : query.slice(slashIndex + 1);
+}
+
+/**
+ * Pairs an entry with the spans of its name and path that the query matched, so
+ * the menu can highlight them. A string the query did not match reports no
+ * spans, which is the honest answer for a row surfaced by its parent folder.
+ * @param entry - Workspace file the row renders.
+ * @param query - Normalized mention query.
+ * @returns The row with its highlight spans.
+ */
+function toMentionMatch(
+	entry: WorkspaceFileSummary,
+	query: string,
+): MentionMatch {
+	return {
+		entry,
+		nameRanges: fuzzyMatch(entry.name, nameQueryFor(query)).ranges,
+		pathRanges: fuzzyMatch(entry.path, query).ranges,
+	};
+}
+
 /** Builds hierarchical @ mention matches from a flat workspace file list. */
 export function getMentionMatches(
 	entries: readonly WorkspaceFileSummary[],
 	query: string,
 	limit = DEFAULT_MENTION_LIMIT,
-): WorkspaceFileSummary[] {
+): MentionMatch[] {
 	const normalizedQuery = query.trim().replace(/^@/, '');
 	const matches = normalizedQuery.includes('/')
 		? directChildrenForQuery(entries, normalizedQuery)
@@ -168,7 +203,9 @@ export function getMentionMatches(
 				...deepFallbackMatchesForQuery(entries, normalizedQuery),
 			]);
 
-	return matches.slice(0, limit);
+	return matches
+		.slice(0, limit)
+		.map((entry) => toMentionMatch(entry, normalizedQuery));
 }
 
 /** Memoized hook for composer @ mention matches. */
@@ -176,7 +213,7 @@ export function useMentionMatches(
 	entries: readonly WorkspaceFileSummary[],
 	query: string,
 	limit = DEFAULT_MENTION_LIMIT,
-): WorkspaceFileSummary[] {
+): MentionMatch[] {
 	return useMemo(
 		() => getMentionMatches(entries, query, limit),
 		[entries, query, limit],
