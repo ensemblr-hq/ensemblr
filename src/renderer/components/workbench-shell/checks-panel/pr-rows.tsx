@@ -219,12 +219,41 @@ export function ChecksActionRow({
 }
 
 /**
+ * Badge naming a comment's resolution state, matching the diff thread's colours.
+ * Renders nothing when the comment has no resolution to report — a plain issue
+ * comment or a bot annotation is neither resolved nor open.
+ */
+function CommentResolutionBadge({
+	isResolved,
+}: {
+	isResolved?: boolean | null;
+}) {
+	if (isResolved === true) {
+		return (
+			<span className='shrink-0 rounded-sm bg-status-ok/15 px-1 text-status-ok text-xxs'>
+				Resolved
+			</span>
+		);
+	}
+	if (isResolved === false) {
+		return (
+			<span className='shrink-0 rounded-sm bg-status-warning/15 px-1 text-status-warning text-xxs'>
+				Unresolved
+			</span>
+		);
+	}
+	return null;
+}
+
+/**
  * Single PR comment row. Clicking the row opens a read-only preview tab into the
  * workspace's ephemeral preview slot, and double-clicking keeps that tab open;
  * hovering reveals Go-to-line, Hide (session-only dismiss), and Add-to-chat
  * actions. The leading badge shows the comment author (falling back to the
  * provider label), and `detail` carries the comment's first line of prose,
- * falling back to its `path:line` location when the body has none.
+ * falling back to its `path:line` location when the body has none. A resolved
+ * comment strikes its own text through, the same way a done todo does, so the
+ * list reads as work left rather than work logged.
  */
 export function PullRequestCommentRow({
 	comment,
@@ -240,6 +269,8 @@ export function PullRequestCommentRow({
 	onJumpToLine?: () => void;
 	onOpenPreview?: (options?: FileOpenOptions) => void;
 }) {
+	const isResolved = comment.isResolved === true;
+
 	return (
 		<div className='group flex min-h-7 min-w-0 items-center justify-between gap-2 overflow-hidden rounded-md px-1 hover:bg-muted'>
 			<button
@@ -255,10 +286,20 @@ export function PullRequestCommentRow({
 				type='button'
 			>
 				<ProviderMark provider={comment.provider} />
-				<span className='max-w-28 shrink-0 truncate font-semibold text-xs'>
+				<span
+					className={cn(
+						'max-w-28 shrink-0 truncate font-semibold text-xs',
+						isResolved && 'text-muted-foreground line-through',
+					)}
+				>
 					{comment.author ?? getProviderLabel(comment.provider)}
 				</span>
-				<span className='min-w-0 truncate text-muted-foreground text-xs'>
+				<span
+					className={cn(
+						'min-w-0 truncate text-muted-foreground text-xs',
+						isResolved && 'line-through',
+					)}
+				>
 					{comment.detail}
 				</span>
 				{comment.origin === 'agent' ? (
@@ -266,11 +307,7 @@ export function PullRequestCommentRow({
 						Agent
 					</span>
 				) : null}
-				{comment.isResolved === false ? (
-					<span className='shrink-0 rounded-sm bg-status-warning/15 px-1 text-status-warning text-xxs'>
-						Unresolved
-					</span>
-				) : null}
+				<CommentResolutionBadge isResolved={comment.isResolved} />
 			</button>
 			<div className='hidden shrink-0 items-center gap-0.5 group-hover:flex'>
 				{onJumpToLine ? (

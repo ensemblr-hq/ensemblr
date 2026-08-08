@@ -10,8 +10,8 @@ import { defineConfig } from 'vitest/config';
  * into happy-dom per file with a `// @vitest-environment happy-dom` docblock.
  * Coverage uses the Istanbul provider and emits `coverage/coverage-final.json`,
  * which `fallow audit --coverage` reads directly. Most of `tests/main` runs on
- * `electron --test`; the 12 pure-logic main-process suites that only need the
- * `node` env are wired in explicitly below (not a `tests/main/**` glob, which
+ * `electron --test`; the pure-logic main-process suites that only need the
+ * `node` env are wired in one-by-one below (not a `tests/main/**` glob, which
  * would drag in the electron-only suites).
  */
 export default defineConfig({

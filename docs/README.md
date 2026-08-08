@@ -4,6 +4,11 @@ Documentation for Ensemblr — a macOS workbench for isolated, multi-agent codin
 workflows. Start with the root [`README.md`](../README.md) for an overview, then
 dive in here.
 
+## Start here
+
+- [`onboarding.md`](./onboarding.md) — clone → prerequisites → install → run → first change → first PR, including which test runner a new test belongs to.
+- [`architecture-map.md`](./architecture-map.md) — which directory owns which concern across the four runtime boundaries, the IPC contract path, and where state persists.
+
 ## Guides
 
 - [`agent-control.md`](./agent-control.md) — **Ensemblr Control**: how agents drive the app, the permission model, guardrails, and multi-agent orchestration.
