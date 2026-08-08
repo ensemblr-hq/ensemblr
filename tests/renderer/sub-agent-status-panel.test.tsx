@@ -8,6 +8,7 @@ import { describe, expect, test } from 'vitest';
 import { SubAgentStatusPanel } from '../../src/renderer/components/workbench-shell/conversation-panel/sub-agent-status-panel';
 import { appSettingsAtom } from '../../src/renderer/state/preferences';
 import { DEFAULT_APP_SETTINGS } from '../../src/shared/config';
+import { asModelVendorId } from '../../src/shared/ipc/contracts/agent-models';
 import { createComposerShellState } from './support/composer';
 import { renderWithProviders } from './support/dom';
 
@@ -18,7 +19,7 @@ const CLAUDE_MODELS = [
 		displayName: 'Opus 5',
 		id: 'claude-code/opus',
 		isDefault: true,
-		provider: 'claude-code',
+		vendor: asModelVendorId('claude-code'),
 	},
 ];
 

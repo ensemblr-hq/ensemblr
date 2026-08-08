@@ -5,6 +5,7 @@ import {
 	writeCachedAgentModels,
 } from '../../src/renderer/api/ensemblr/agent-models-cache';
 import type { AgentModelCatalog } from '../../src/shared/ipc/contracts/agent-models';
+import { asModelVendorId } from '../../src/shared/ipc/contracts/agent-models';
 
 const KEY = 'ensemblr_pref_pi_models_snapshot';
 
@@ -36,7 +37,7 @@ const CATALOG: AgentModelCatalog = {
 			contextWindow: 200_000,
 			displayName: 'Sonnet',
 			id: 'anthropic/sonnet',
-			provider: 'anthropic',
+			vendor: asModelVendorId('anthropic'),
 			thinkingLevels: ['off', 'medium', 'high'],
 		},
 	],
@@ -58,7 +59,7 @@ const TWO_PROVIDERS: AgentModelCatalog = {
 			contextWindow: 200_000,
 			displayName: 'Sonnet',
 			id: 'anthropic/sonnet',
-			provider: 'anthropic',
+			vendor: asModelVendorId('anthropic'),
 			thinkingLevels: ['off', 'medium', 'high'],
 		},
 		{
@@ -66,7 +67,7 @@ const TWO_PROVIDERS: AgentModelCatalog = {
 			contextWindow: 200_000,
 			displayName: 'GPT',
 			id: 'openai-codex/gpt-5.6-sol',
-			provider: 'openai-codex',
+			vendor: asModelVendorId('openai-codex'),
 			thinkingLevels: ['off', 'medium', 'high'],
 		},
 	],
@@ -82,7 +83,7 @@ const PARTIAL: AgentModelCatalog = {
 			contextWindow: 200_000,
 			displayName: 'Sonnet',
 			id: 'anthropic/sonnet',
-			provider: 'anthropic',
+			vendor: asModelVendorId('anthropic'),
 			thinkingLevels: ['off', 'medium', 'high'],
 		},
 	],

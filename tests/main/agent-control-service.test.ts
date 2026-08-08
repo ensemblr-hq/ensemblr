@@ -40,7 +40,7 @@ const makePorts = (
 	conversations: {
 		startConversation: vi
 			.fn()
-			.mockResolvedValue({ chatTabId: 't', agentSessionId: 'pi-1' }),
+			.mockResolvedValue({ ok: true, chatTabId: 't', agentSessionId: 'pi-1' }),
 		sendFollowUp: vi.fn().mockResolvedValue(undefined),
 		setName: vi
 			.fn()
@@ -839,6 +839,82 @@ describe('agent-control service: delegation', () => {
 		expect(ports.conversations.startConversation).toHaveBeenCalledWith(
 			expect.objectContaining({ callerModel: 'master-model' }),
 		);
+	});
+
+	it('names the caller’s own runtime on the spawn, so a child cannot cross it', async () => {
+		const ports = makePorts();
+		const { service } = setup({ ports, species: 'claude' });
+		await service.invoke({
+			op: 'startConversation',
+			token: 'tok-caller',
+			rawArgs: { prompt: 'go' },
+		});
+		expect(ports.conversations.startConversation).toHaveBeenCalledWith(
+			expect.objectContaining({ callerRuntime: 'claude' }),
+		);
+	});
+
+	// A harness's control origin is minted per workspace and shared by every
+	// terminal in it, so there is no runtime to inherit and the resolver says so.
+	it('reports a harness caller as having no runtime rather than as Pi', async () => {
+		const ports = makePorts();
+		const { service } = setup({ ports, species: 'harness' });
+		await service.invoke({
+			op: 'startConversation',
+			token: 'tok-caller',
+			rawArgs: { prompt: 'go' },
+		});
+		expect(ports.conversations.startConversation).toHaveBeenCalledWith(
+			expect.objectContaining({ callerRuntime: null }),
+		);
+	});
+
+	// The agent can fix a refused model on its next turn, which an `internal`
+	// envelope would read as a fault worth retrying verbatim.
+	it('reports a cross-runtime model request as an argument failure', async () => {
+		const ports = makePorts();
+		ports.conversations.startConversation = vi
+			.fn()
+			.mockResolvedValue({ ok: false, reason: 'that model runs on Pi' });
+		const { service } = setup({ ports, species: 'claude' });
+		const result = await service.invoke({
+			op: 'startConversation',
+			token: 'tok-caller',
+			rawArgs: { prompt: 'go', model: 'anthropic/sonnet' },
+		});
+		expect(result).toMatchObject({
+			code: 'invalid-args',
+			error: 'that model runs on Pi',
+			ok: false,
+		});
+	});
+
+	// A refused spawn never reached a runtime, so it must not eat a slot from the
+	// fork-bomb budget the way a real one does.
+	it('does not count a refused spawn against the spawn guardrail', async () => {
+		const ports = makePorts();
+		ports.conversations.startConversation = vi
+			.fn()
+			.mockResolvedValue({ ok: false, reason: 'name a model' });
+		const { service } = setup({
+			ports,
+			guardrails: { maxSpawnsPerSession: 1 },
+		});
+		await service.invoke({
+			op: 'startConversation',
+			token: 'tok-caller',
+			rawArgs: { prompt: 'go' },
+		});
+		ports.conversations.startConversation = vi
+			.fn()
+			.mockResolvedValue({ ok: true, chatTabId: 't', agentSessionId: 'pi-1' });
+		const second = await service.invoke({
+			op: 'startConversation',
+			token: 'tok-caller',
+			rawArgs: { prompt: 'go' },
+		});
+
+		expect(second).toMatchObject({ ok: true });
 	});
 
 	it('threads a spawn title through to startConversation', async () => {

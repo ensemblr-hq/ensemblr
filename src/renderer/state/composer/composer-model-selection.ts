@@ -26,6 +26,36 @@ interface PersistedSelection {
 }
 
 /**
+ * Level a chat lands on when the one it resolved belongs to the other runtime's
+ * vocabulary. It is the one rung both ladders publish, so the chip always names
+ * something the selected model accepts.
+ */
+const FALLBACK_THINKING_LEVEL = 'medium';
+
+/**
+ * Keeps the resolved level inside the selected model's own ladder. The chain
+ * below crosses runtimes freely — the Settings default is one value for the
+ * whole app, and a spawned child's session was written by another agent — so a
+ * Claude chat's `max` can land on a Pi model, which the picker cannot name and
+ * the runtime would reject. Left alone while the catalog has not placed the
+ * model, since an unknown ladder is no reason to overrule the user's pick.
+ * @param requested - The level the resolution chain produced.
+ * @param options - The levels the selected model accepts, empty when unknown.
+ * @returns The level to run at, or null when none of them fit.
+ */
+function clampToLadder(
+	requested: string | null,
+	options: readonly ComposerThinkingOption[],
+): string | null {
+	if (options.length === 0 || options.some((level) => level.id === requested)) {
+		return requested;
+	}
+	return (
+		options.find((level) => level.id === FALLBACK_THINKING_LEVEL)?.id ?? null
+	);
+}
+
+/**
  * Resolves which model and thinking level a chat runs at, and the options the
  * pickers offer.
  *
@@ -71,7 +101,7 @@ export function useComposerModelSelection({
 			displayName: model.displayName,
 			id: model.id,
 			isDefault: model.id === models.defaultModelId,
-			provider: model.provider,
+			vendor: model.vendor,
 		}));
 	}, [models]);
 
@@ -82,17 +112,13 @@ export function useComposerModelSelection({
 		models?.defaultModelId ??
 		availableModels[0]?.id ??
 		null;
-	const thinkingLevel =
-		chatThinkingOverride ??
-		persistedActiveSession?.thinkingLevel ??
-		defaultThinkingLevel ??
-		models?.defaultThinkingLevel ??
-		null;
-
 	const availableThinkingLevels = useMemo<
 		readonly ComposerThinkingOption[]
 	>(() => {
-		const selectedModel = models?.models.find((model) => model.id === modelId);
+		if (!models) {
+			return [];
+		}
+		const selectedModel = models.models.find((model) => model.id === modelId);
 		const provider = normalizeAgentProviderId(selectedModel?.agentProvider);
 		// A model's own list is authoritative — Claude publishes exactly the efforts
 		// it accepts, and offering one it would reject is worse than offering fewer.
@@ -106,6 +132,15 @@ export function useComposerModelSelection({
 			label: getThinkingLevelLabel(provider, level),
 		}));
 	}, [models, modelId]);
+
+	const thinkingLevel = clampToLadder(
+		chatThinkingOverride ??
+			persistedActiveSession?.thinkingLevel ??
+			defaultThinkingLevel ??
+			models?.defaultThinkingLevel ??
+			null,
+		availableThinkingLevels,
+	);
 
 	return {
 		availableModels,

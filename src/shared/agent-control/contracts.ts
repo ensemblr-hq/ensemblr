@@ -8,6 +8,7 @@
  * delegates. The op names are namespaced `ensemblr.<op>` on the wire; this module
  * defines the bare op identifiers and their argument/result shapes.
  */
+import type { AgentProviderId } from '../agent-provider.ts';
 import type { ReviewCommentWire } from '../ipc/contracts/review-comments.ts';
 import type {
 	WorkspaceGitChangeSummaryWire,
@@ -948,17 +949,30 @@ export interface GetLastMessageResult {
 	message: string | null;
 }
 
-/** One available agent model, as returned by `listModels`. */
+/**
+ * One available agent model, as returned by `listModels`. `runtime` is the agent
+ * runtime that would drive the chat and is the axis a spawn may not cross;
+ * `vendor` is the inference vendor (`anthropic`, `openai`, `claude-code`) and is
+ * descriptive only. They were both called "provider" once, which is how a spawn
+ * check meant to keep a child inside its runtime ended up comparing vendors.
+ */
 export interface AgentControlModelInfo {
-	id: string;
-	provider: string;
 	displayName: string;
+	id: string;
+	runtime: AgentProviderId;
+	vendor: string;
 }
 
-/** Available agent models plus the default, returned by `listModels`. */
+/**
+ * Available agent models plus the default, returned by `listModels`. The list is
+ * already cut to the calling orchestrator's own runtime, so every id in it is
+ * one the caller may spawn a child on; `runtime` names which one, or is null for
+ * a caller (a terminal harness) whose runtime the app cannot determine.
+ */
 export interface AgentControlModelList {
 	defaultModelId: string | null;
 	models: readonly AgentControlModelInfo[];
+	runtime: AgentProviderId | null;
 }
 
 /** One run script the workspace's repository configures, as returned by `listRunScripts`. */

@@ -23,9 +23,11 @@ const makePorts = (planningSessions: ReadonlySet<string>): AgentControlPorts =>
 			resolveTabWorkspace: vi.fn().mockResolvedValue('ws'),
 		},
 		conversations: {
-			startConversation: vi
-				.fn()
-				.mockResolvedValue({ chatTabId: 't', agentSessionId: 'pi-1' }),
+			startConversation: vi.fn().mockResolvedValue({
+				ok: true,
+				chatTabId: 't',
+				agentSessionId: 'pi-1',
+			}),
 			sendFollowUp: vi.fn().mockResolvedValue(undefined),
 			setName: vi.fn().mockResolvedValue({ chatTabId: 't', title: 'Named' }),
 			waitForIdle: vi.fn().mockResolvedValue('completed'),

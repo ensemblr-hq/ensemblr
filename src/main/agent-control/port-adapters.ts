@@ -22,6 +22,7 @@ import {
 	MAX_AGENT_PAYLOAD_CHARS,
 	resolveAgentRole,
 } from '../../shared/agent-control.ts';
+import type { AgentProviderId } from '../../shared/agent-provider.ts';
 import { findHarnessDefinition } from '../../shared/agents.ts';
 import type {
 	AgentPersistedEnvelope,
@@ -30,6 +31,10 @@ import type {
 import type { CreateTerminalSessionResult } from '../../shared/ipc/contracts/terminal.ts';
 import type { PermissionMode } from '../../shared/permissions.ts';
 import { selectDefaultRunScript } from '../../shared/scripts.ts';
+import type {
+	SpawnCallerIdentity,
+	SpawnModelResolver,
+} from '../agent-providers';
 import type { AgentSessionService } from '../agent-runtime/agent-session-service.ts';
 import {
 	applyBranchSlug,
@@ -38,13 +43,9 @@ import {
 import { readSessionBriefNaming } from '../agent-runtime/naming/session-brief-naming.ts';
 import type { HarnessDetectionService } from '../agents/index.ts';
 import type { ChatTabService } from '../chat-tabs/chat-tab-service.ts';
-import type { LocalCommandService } from '../commands';
 import type { AppSettingsService } from '../config';
 import type { PiExecutableService } from '../pi-runtime';
-import {
-	presentPiModels,
-	resolvePiProviderModels,
-} from '../pi-runtime/pi-provider-models.ts';
+import { isBlockedByPiExecutable } from '../pi-runtime/pi-executable-gate.ts';
 import type { RenameWorkspaceService } from '../repository';
 import type { ReviewService } from '../review';
 import type { ScriptLifecycleService } from '../scripts/script-lifecycle-service.ts';
@@ -85,7 +86,8 @@ export interface PortAdapterDeps {
 	scriptLifecycleService: ScriptLifecycleService;
 	harnessDetectionService: HarnessDetectionService;
 	piExecutableService: PiExecutableService;
-	localCommandService: LocalCommandService;
+	/** Decides a delegated child's model, runtime, and thinking level. */
+	spawnModelResolver: SpawnModelResolver;
 	appSettingsService: AppSettingsService;
 	workspaceGitService: WorkspaceGitService;
 	reviewService: ReviewService;
@@ -231,100 +233,59 @@ function makeTabPort(deps: PortAdapterDeps): TabPort {
 }
 
 /**
- * Builds the Pi conversation port over the Pi session service. `agentSessionId` on
- * the wire is the service's internal session id (stable across the runtime id).
+ * Builds the agent conversation port over the agent session service.
+ * `agentSessionId` on the wire is the service's internal session id (stable
+ * across the runtime id).
  * @param deps - Adapter collaborators.
  * @returns The conversation port.
  */
 function makeConversationPort(deps: PortAdapterDeps): ConversationPort {
-	const requireExecutable = async () => {
+	/**
+	 * The Pi snapshot every open request carries, gated by the same rule the
+	 * renderer's own open uses: only a child that will actually run on Pi waits on
+	 * Pi's binary, or an app with no Pi install could not delegate at all.
+	 */
+	const requireExecutableFor = async (runtime: AgentProviderId) => {
 		const executable = await deps.piExecutableService.getSnapshot();
-		if (executable.status === 'error' || !executable.command) {
+		if (isBlockedByPiExecutable({ executable, provider: runtime })) {
 			throw new Error('Pi executable is unavailable.');
 		}
 		return executable;
 	};
 
-	const loadModelCatalog = async (): Promise<AgentControlModelList> => {
-		const executable = await deps.piExecutableService.getSnapshot();
-		const snapshot = await resolvePiProviderModels({
-			executable,
-			localCommandService: deps.localCommandService,
-		});
-		const presented = presentPiModels(snapshot);
+	/**
+	 * The spawning agent's own identity: its persisted session row, plus the live
+	 * model its bridge forwarded. Neither comes from the agent's own arguments —
+	 * a terminal harness forwards no model and has no session row to read.
+	 */
+	const describeCaller = (input: {
+		callerModel: string | undefined;
+		callerRuntime: AgentProviderId | null;
+		parentSessionId: string;
+	}): SpawnCallerIdentity => {
+		const session = deps.agentSessionService.getSession(input.parentSessionId);
 		return {
-			defaultModelId: presented.defaultModelId,
-			models: presented.models.map((model) => ({
-				id: model.id,
-				provider: model.provider,
-				displayName: model.displayName,
-			})),
+			liveModelId: input.callerModel ?? null,
+			runtime: input.callerRuntime,
+			sessionModelId: session?.model ?? null,
+			thinkingLevel: session?.thinkingLevel ?? null,
 		};
 	};
 
-	/**
-	 * Best guess at the spawning agent's model: the caller's own model when the
-	 * extension forwarded a valid one, else the workspace's most-recently-updated
-	 * open Pi session (usually the master), else the catalog default. Used both as
-	 * the fallback model and to constrain a requested model to the same provider.
-	 */
-	const resolveMasterModel = (
-		workspaceId: string,
-		callerModel: string | undefined,
-		catalog: AgentControlModelList,
-	): string | null => {
-		const available = new Set(catalog.models.map((model) => model.id));
-		if (callerModel && available.has(callerModel)) {
-			return callerModel;
-		}
-		const recent = [
-			...deps.agentSessionService.listSessionsForWorkspace(workspaceId),
-		]
-			.filter((session) => session.model && available.has(session.model))
-			.sort((a, b) => (b.updatedAt ?? '').localeCompare(a.updatedAt ?? ''))[0];
-		return recent?.model ?? catalog.defaultModelId ?? null;
-	};
-
-	/**
-	 * Resolves the model a spawned conversation should use. A requested model is
-	 * honored only when it exists AND matches the master's provider; otherwise the
-	 * child inherits the master's model. Degrades to the raw request/caller/default
-	 * if the model catalog cannot be loaded, so a spawn is never blocked.
-	 */
-	const resolveModel = async (
-		requested: string | undefined,
-		callerModel: string | undefined,
-		workspaceId: string,
-	): Promise<string | null> => {
-		let catalog: AgentControlModelList;
-		try {
-			catalog = await loadModelCatalog();
-		} catch (cause) {
-			console.warn('[agent-control] model catalog unavailable for a spawn.', {
-				cause: cause instanceof Error ? cause.message : String(cause),
-				requested: requested ?? null,
-				workspaceId,
-			});
-			return requested ?? callerModel ?? null;
-		}
-		const providerOf = new Map(
-			catalog.models.map((model) => [model.id, model.provider] as const),
-		);
-		const master = resolveMasterModel(workspaceId, callerModel, catalog);
-		const masterProvider = master ? providerOf.get(master) : undefined;
-		if (
-			requested &&
-			providerOf.has(requested) &&
-			(masterProvider === undefined ||
-				providerOf.get(requested) === masterProvider)
-		) {
-			return requested;
-		}
-		return master;
-	};
-
 	return {
-		listModels: loadModelCatalog,
+		listModels: async ({ runtime }): Promise<AgentControlModelList> => {
+			const listing = await deps.spawnModelResolver.listModelsFor(runtime);
+			return {
+				defaultModelId: listing.defaultModelId,
+				models: listing.models.map((model) => ({
+					displayName: model.displayName,
+					id: model.id,
+					runtime: model.agentProvider,
+					vendor: model.vendor,
+				})),
+				runtime: listing.runtime,
+			};
+		},
 		startConversation: async ({
 			workspaceId,
 			workspaceCwd,
@@ -334,11 +295,24 @@ function makeConversationPort(deps: PortAdapterDeps): ConversationPort {
 			thinkingLevel,
 			title,
 			callerModel,
+			callerRuntime,
 			parentSessionId,
 			planMode,
 		}) => {
-			const executable = await requireExecutable();
-			const resolvedModel = await resolveModel(model, callerModel, workspaceId);
+			const resolution = await deps.spawnModelResolver.resolveForSpawn({
+				caller: describeCaller({
+					callerModel,
+					callerRuntime,
+					parentSessionId,
+				}),
+				requestedModelId: model ?? null,
+				requestedThinkingLevel: thinkingLevel ?? null,
+			});
+			if (!resolution.ok) {
+				return { ok: false, reason: resolution.reason };
+			}
+			const selection = resolution.selection;
+			const executable = await requireExecutableFor(selection.runtime);
 			const openedTabId = chatTabId
 				? null
 				: deps.chatTabService.openTab({ kind: 'chat', workspaceId }).id;
@@ -353,8 +327,12 @@ function makeConversationPort(deps: PortAdapterDeps): ConversationPort {
 				chatTabId: targetTabId,
 				workspaceId,
 				workspaceCwd,
-				model: resolvedModel,
-				thinkingLevel: thinkingLevel ?? null,
+				model: selection.modelId,
+				// Without this the open falls through to the default runtime, which is
+				// how a Claude orchestrator's children were created as Pi sessions
+				// however the model resolved.
+				provider: selection.runtime,
+				thinkingLevel: selection.thinkingLevel,
 				initialPrompt: prompt,
 				executable,
 				parentSessionId,
@@ -383,8 +361,9 @@ function makeConversationPort(deps: PortAdapterDeps): ConversationPort {
 				await deps.agentSessionService.submitPrompt({
 					sessionId: snapshot.id,
 					prompt,
-					model: resolvedModel,
-					thinkingLevel: thinkingLevel ?? null,
+					model: selection.modelId,
+					provider: selection.runtime,
+					thinkingLevel: selection.thinkingLevel,
 				});
 			} catch (error) {
 				await rollbackConversation(deps, {
@@ -402,7 +381,7 @@ function makeConversationPort(deps: PortAdapterDeps): ConversationPort {
 				});
 			}
 			deps.broadcastTabsChanged({ workspaceId });
-			return { chatTabId: targetTabId, agentSessionId: snapshot.id };
+			return { ok: true, chatTabId: targetTabId, agentSessionId: snapshot.id };
 		},
 		sendFollowUp: async ({ agentSessionId, prompt }) => {
 			const streaming =

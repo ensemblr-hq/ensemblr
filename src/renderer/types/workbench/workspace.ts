@@ -1,4 +1,5 @@
 import type { AgentProviderId } from '@/shared/agent-provider';
+import type { ModelVendorId } from '@/shared/ipc/contracts/agent-models';
 import type { HealthSnapshot } from '@/shared/ipc/contracts/health';
 import type { WorkspaceOpenTargetSnapshot } from '@/shared/ipc/contracts/open-target';
 // `WorkspaceOpenTarget` is re-exported here for the renderer's query result
@@ -294,10 +295,10 @@ export type SessionTabModel =
 	  });
 
 /**
- * One model in the composer picker. The two provider fields are different axes:
+ * One model in the composer picker. The two fields below are different axes:
  * `agentProvider` is the agent runtime that would drive the chat and is what the
- * per-chat provider pin compares against, while `provider` is the inference
- * provider (`anthropic`, `openai`, `claude-code`) the picker groups by.
+ * per-chat provider pin compares against, while `vendor` is the inference vendor
+ * (`anthropic`, `openai`, `claude-code`) the picker groups by.
  */
 export interface ComposerModelOption {
 	agentProvider: AgentProviderId;
@@ -310,7 +311,7 @@ export interface ComposerModelOption {
 	displayName: string;
 	id: string;
 	isDefault?: boolean;
-	provider: string;
+	vendor: ModelVendorId;
 }
 
 export interface ComposerThinkingOption {

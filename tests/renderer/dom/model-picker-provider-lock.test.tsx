@@ -16,6 +16,7 @@ import { ModelPicker } from '@/renderer/components/workbench-shell/conversation-
 import { ModelProviderIcon } from '@/renderer/components/workbench-shell/conversation-panel/composer/model-provider-icon';
 import type { ComposerModelOption } from '@/renderer/types/workbench';
 import type { AgentProviderId } from '@/shared/agent-provider';
+import { asModelVendorId } from '@/shared/ipc/contracts/agent-models';
 import { installLocalStorage, renderWithProviders } from '../support/dom';
 
 const ANTHROPIC_VIEW_BOX = '0 0 24 24';
@@ -24,7 +25,7 @@ const CLAUDE_VIEW_BOX = '0 0 256 257';
 function option(
 	id: string,
 	displayName: string,
-	provider: string,
+	vendor: string,
 	agentProvider: AgentProviderId,
 ): ComposerModelOption {
 	return {
@@ -33,7 +34,7 @@ function option(
 		displayName,
 		id,
 		isDefault: false,
-		provider,
+		vendor: asModelVendorId(vendor),
 	};
 }
 
@@ -167,7 +168,7 @@ describe('ModelPicker provider lock', () => {
 describe('ModelProviderIcon', () => {
 	test('the Claude runtime wins over the inference provider', () => {
 		const { container } = renderWithProviders(
-			<ModelProviderIcon agentProvider='claude' provider='anthropic' />,
+			<ModelProviderIcon agentProvider='claude' vendor='anthropic' />,
 		);
 		const svg = container.querySelector('svg');
 
@@ -179,7 +180,7 @@ describe('ModelProviderIcon', () => {
 
 	test('a Pi chat on an Anthropic model keeps the Anthropic wordmark', () => {
 		const { container } = renderWithProviders(
-			<ModelProviderIcon agentProvider='pi' provider='anthropic' />,
+			<ModelProviderIcon agentProvider='pi' vendor='anthropic' />,
 		);
 		const svg = container.querySelector('svg');
 
@@ -191,10 +192,10 @@ describe('ModelProviderIcon', () => {
 
 	test('the two runtimes draw different paths for the same inference provider', () => {
 		const claude = renderWithProviders(
-			<ModelProviderIcon agentProvider='claude' provider='anthropic' />,
+			<ModelProviderIcon agentProvider='claude' vendor='anthropic' />,
 		);
 		const pi = renderWithProviders(
-			<ModelProviderIcon agentProvider='pi' provider='anthropic' />,
+			<ModelProviderIcon agentProvider='pi' vendor='anthropic' />,
 		);
 		const pathOf = (root: HTMLElement) =>
 			root.querySelector('svg > path')?.getAttribute('d');
@@ -204,7 +205,7 @@ describe('ModelProviderIcon', () => {
 
 	test('an unknown inference provider falls back to the sparkle', () => {
 		const { container } = renderWithProviders(
-			<ModelProviderIcon agentProvider='pi' provider='lmstudio' />,
+			<ModelProviderIcon agentProvider='pi' vendor='lmstudio' />,
 		);
 
 		expect(container.querySelector('svg.lucide-sparkles')).not.toBeNull();

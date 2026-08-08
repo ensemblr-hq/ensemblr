@@ -62,7 +62,7 @@ function toRow(
 function groupByProvider(rows: readonly ModelPickerRow[]): GroupedOptions[] {
 	const groups = new Map<string, GroupedOptions>();
 	for (const row of rows) {
-		const key = row.model.provider || 'other';
+		const key = row.model.vendor || 'other';
 		const existing = groups.get(key);
 		if (existing) {
 			existing.models.push(row);

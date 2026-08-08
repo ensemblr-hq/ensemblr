@@ -20,6 +20,10 @@ import {
 	DEFAULT_RUN_SCRIPT_ICON,
 	type RunScriptDefinition,
 } from '../../src/shared/scripts.ts';
+import {
+	fakeSpawnModelResolver,
+	modelOption,
+} from './support/spawn-model-resolver.ts';
 
 vi.mock('../../src/main/storage/repositories/chat-tab-repository.ts', () => ({
 	getChatTabById: vi.fn(() => ({ workspaceId: 'ws', metadata: {} })),
@@ -59,6 +63,9 @@ const makeDeps = (): {
 		scriptLifecycleService: {},
 		harnessDetectionService: {},
 		piExecutableService: {},
+		spawnModelResolver: fakeSpawnModelResolver([
+			modelOption({ id: 'anthropic/sonnet', runtime: 'pi' }),
+		]),
 		getPermissionMode: () => 'workspace-trusted',
 		broadcastFocus: vi.fn(),
 		broadcastTabsChanged,
@@ -244,17 +251,21 @@ describe('agent-control port adapters: conversation naming', () => {
 				.fn()
 				.mockResolvedValue({ status: 'ready', command: 'pi' }),
 		};
-		(deps as { localCommandService: unknown }).localCommandService = {};
 		const ports = createAgentControlPorts(deps);
 		const result = await ports.conversations.startConversation({
 			workspaceId: 'ws',
 			workspaceCwd: '/ws',
 			prompt: 'do it',
 			title: 'Docs sweep',
+			callerRuntime: 'pi',
 			parentSessionId: 'parent-1',
 			planMode: false,
 		});
-		expect(result).toEqual({ chatTabId: 'tab-1', agentSessionId: 'sess-1' });
+		expect(result).toEqual({
+			ok: true,
+			chatTabId: 'tab-1',
+			agentSessionId: 'sess-1',
+		});
 		expect(setChatTabMetadata).toHaveBeenCalledWith(
 			expect.objectContaining({
 				id: 'tab-1',
@@ -287,13 +298,13 @@ describe('agent-control port adapters: conversation naming', () => {
 				.fn()
 				.mockResolvedValue({ status: 'ready', command: 'pi' }),
 		};
-		(deps as { localCommandService: unknown }).localCommandService = {};
 		const ports = createAgentControlPorts(deps);
 
 		await ports.conversations.startConversation({
 			workspaceId: 'ws',
 			workspaceCwd: '/ws',
 			prompt: 'do it',
+			callerRuntime: 'pi',
 			parentSessionId: 'parent-1',
 			planMode: false,
 		});
@@ -326,7 +337,6 @@ describe('agent-control port adapters: conversation naming', () => {
 				.fn()
 				.mockResolvedValue({ status: 'ready', command: 'pi' }),
 		};
-		(deps as { localCommandService: unknown }).localCommandService = {};
 		vi.mocked(getChatTabById)
 			.mockReturnValueOnce({
 				metadata: { pinned: true },
@@ -344,6 +354,7 @@ describe('agent-control port adapters: conversation naming', () => {
 				workspaceCwd: '/ws',
 				chatTabId: 'tab-reused',
 				prompt: 'do it',
+				callerRuntime: 'pi',
 				parentSessionId: 'parent-1',
 				planMode: false,
 			}),
@@ -376,7 +387,6 @@ describe('agent-control port adapters: conversation naming', () => {
 				.fn()
 				.mockResolvedValue({ status: 'ready', command: 'pi' }),
 		};
-		(deps as { localCommandService: unknown }).localCommandService = {};
 		vi.mocked(getChatTabById).mockReturnValue({
 			metadata: { agentRole: 'subagent', pinned: true },
 			workspaceId: 'ws',
@@ -389,6 +399,7 @@ describe('agent-control port adapters: conversation naming', () => {
 				workspaceCwd: '/ws',
 				chatTabId: 'tab-already-subagent',
 				prompt: 'do it',
+				callerRuntime: 'pi',
 				parentSessionId: 'parent-1',
 				planMode: false,
 			}),

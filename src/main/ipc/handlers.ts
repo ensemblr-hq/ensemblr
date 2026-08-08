@@ -1,5 +1,7 @@
-import type { AgentModelOption } from '../../shared/ipc/contracts/agent-models';
-import type { AgentProviderService } from '../agent-providers';
+import type {
+	AgentModelCatalogService,
+	AgentProviderService,
+} from '../agent-providers';
 import type { AgentSessionService } from '../agent-runtime';
 import type { HarnessDetectionService } from '../agents/index.ts';
 import { createChatTabService } from '../chat-tabs/index.ts';
@@ -111,8 +113,6 @@ interface RegisterIpcHandlersOptions {
 	linearService: LinearService;
 	listAllWorkspacesService: ListAllWorkspacesService;
 	listArchivedWorkspacesService: ListArchivedWorkspacesService;
-	/** Lists Claude Code's models for the merged composer catalog. */
-	listClaudeModels?: () => Promise<readonly AgentModelOption[]>;
 	listWorkspaceFilesService: ListWorkspaceFilesService;
 	localCommandService: LocalCommandService;
 	localRepositoryImportService: LocalRepositoryImportService;
@@ -121,6 +121,8 @@ interface RegisterIpcHandlersOptions {
 	onAppSettingsUpdated?: () => void;
 	openTargetService: OpenTargetService;
 	piExecutableService: PiExecutableService;
+	/** Merged per-runtime model catalog, shared with the agent-control spawn path. */
+	agentModelCatalog: AgentModelCatalogService;
 	agentSessionService: AgentSessionService;
 	planModeRegistry: PlanModeRegistry;
 	quickStartProjectService: QuickStartProjectService;
@@ -171,7 +173,6 @@ export function registerIpcHandlers({
 	linearService,
 	listAllWorkspacesService,
 	listArchivedWorkspacesService,
-	listClaudeModels,
 	listWorkspaceFilesService,
 	localCommandService,
 	localRepositoryImportService,
@@ -179,6 +180,7 @@ export function registerIpcHandlers({
 	onAppSettingsUpdated,
 	openTargetService,
 	piExecutableService,
+	agentModelCatalog,
 	agentSessionService,
 	planModeRegistry,
 	quickStartProjectService,
@@ -247,10 +249,9 @@ export function registerIpcHandlers({
 	});
 	registerAgentProviderHandlers({ agentProviderService, openTargetService });
 	registerAgentSessionHandlers({
-		listClaudeModels,
-		localCommandService,
-		piExecutableService,
+		agentModelCatalog,
 		agentSessionService,
+		piExecutableService,
 		planModeRegistry,
 		withPermissionGate,
 	});

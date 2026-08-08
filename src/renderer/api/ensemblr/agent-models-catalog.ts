@@ -15,7 +15,7 @@ import type { AgentModelCatalog } from '@/shared/ipc/contracts/agent-models';
 
 /** Collects the distinct provider identifiers present in a catalog. */
 function providerSet(result: AgentModelCatalog): ReadonlySet<string> {
-	return new Set(result.models.map((model) => model.provider));
+	return new Set(result.models.map((model) => model.vendor));
 }
 
 /**

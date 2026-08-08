@@ -6,7 +6,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { AgentSessionService } from '../../src/main/agent-runtime/agent-session-service.ts';
 import type { PiExecutableSnapshot } from '../../src/main/pi-runtime/pi-executable.ts';
-import type { AgentModelOption } from '../../src/shared/ipc/contracts/agent-models.ts';
+import {
+	type AgentModelOption,
+	asModelVendorId,
+} from '../../src/shared/ipc/contracts/agent-models.ts';
 
 const handle = vi.fn();
 
@@ -18,6 +21,12 @@ vi.mock('electron', () => ({
 
 const { createAgentControlPorts } = await import(
 	'../../src/main/agent-control/index.ts'
+);
+const { createAgentModelCatalog } = await import(
+	'../../src/main/agent-providers/agent-model-catalog.ts'
+);
+const { fakeSpawnModelResolver, modelOption } = await import(
+	'./support/spawn-model-resolver.ts'
 );
 const { createAgentClient } = await import(
 	'../../src/main/agent-runtime/agent-client.ts'
@@ -75,7 +84,7 @@ const CLAUDE_MODELS: readonly AgentModelOption[] = [
 		contextWindow: 1_000_000,
 		displayName: 'Opus 4.5 (1M)',
 		id: CLAUDE_MODEL,
-		provider: 'claude-code',
+		vendor: asModelVendorId('claude-code'),
 		thinkingLevels: ['low', 'high'],
 	},
 ];
@@ -87,7 +96,7 @@ const PI_MODELS: readonly AgentModelOption[] = [
 		contextWindow: 200_000,
 		displayName: 'Sonnet 4',
 		id: PI_MODEL,
-		provider: 'anthropic',
+		vendor: asModelVendorId('anthropic'),
 		thinkingLevels: ['off', 'high'],
 	},
 ];
@@ -150,9 +159,14 @@ function registerHandlers({
 	};
 
 	registerAgentSessionHandlers({
+		agentModelCatalog: createAgentModelCatalog({
+			listClaudeModels,
+			localCommandService: {} as never,
+			piExecutableService: {
+				getSnapshot: async () => piExecutable,
+			} as never,
+		}),
 		agentSessionService: recorded as unknown as AgentSessionService,
-		listClaudeModels,
-		localCommandService: {} as never,
 		piExecutableService: {
 			clearOverride: () => ({ canceled: false }),
 			getSnapshot: async () => piExecutable,
@@ -347,10 +361,12 @@ describe('a spawned sub-agent starts in Plan Mode rather than joining it late', 
 			databaseService: { getConnection: () => ({ database: {} }) },
 			getPermissionMode: () => 'workspace-trusted',
 			harnessDetectionService: {},
-			localCommandService: {},
 			piExecutableService: {
 				getSnapshot: vi.fn(async () => ({ command: 'pi', status: 'ok' })),
 			},
+			spawnModelResolver: fakeSpawnModelResolver([
+				modelOption({ id: PI_MODEL, runtime: 'pi' }),
+			]),
 			planMode: {
 				activateForSpawn,
 				exit: vi.fn(),
@@ -362,6 +378,7 @@ describe('a spawned sub-agent starts in Plan Mode rather than joining it late', 
 		} as never);
 
 		await ports.conversations.startConversation({
+			callerRuntime: 'pi',
 			parentSessionId: 'ws:ws',
 			planMode,
 			prompt: 'go',

@@ -2,13 +2,14 @@ import { describe, expect, test } from 'vitest';
 
 import { resolveContextUsage } from '../../src/renderer/lib/workbench';
 import type { ComposerModelOption } from '../../src/renderer/types/workbench';
+import { asModelVendorId } from '../../src/shared/ipc/contracts/agent-models';
 
 const model = (contextWindow: number | null): ComposerModelOption => ({
 	agentProvider: 'pi',
 	contextWindow,
 	displayName: 'Opus 5',
 	id: 'anthropic/claude-opus-5',
-	provider: 'anthropic',
+	vendor: asModelVendorId('anthropic'),
 });
 
 describe('the gauge denominator before a session has measured one', () => {

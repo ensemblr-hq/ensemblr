@@ -1,6 +1,7 @@
 import {
 	type AgentModelCatalog,
 	type AgentModelOption,
+	asModelVendorId,
 	EMPTY_AGENT_MODEL_CATALOG,
 } from '../../shared/ipc/contracts/agent-models.ts';
 import type {
@@ -47,8 +48,8 @@ export function presentPiModels(
 						contextWindow: row.contextWindow,
 						displayName: row.model,
 						id: row.id,
-						provider: row.provider,
 						thinkingLevels: DEFAULT_THINKING_LEVELS,
+						vendor: asModelVendorId(row.provider),
 					},
 				]
 			: [],

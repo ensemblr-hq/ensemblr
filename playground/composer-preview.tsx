@@ -10,6 +10,7 @@ import type {
 	WorkspaceFileSummary,
 } from '@/renderer/types/workbench';
 import type { AgentProviderId } from '@/shared/agent-provider';
+import { asModelVendorId } from '@/shared/ipc/contracts/agent-models';
 
 import { createPlaygroundQueryClient } from './playground-query-client.ts';
 import { ControlGroup, SceneSection, SceneToggle } from './scene-chrome.tsx';
@@ -28,28 +29,28 @@ const MODELS: readonly ComposerModelOption[] = [
 		displayName: 'Opus 5',
 		id: 'claude-opus-5',
 		isDefault: true,
-		provider: 'anthropic',
+		vendor: asModelVendorId('anthropic'),
 	},
 	{
 		agentProvider: 'pi',
 		contextWindow: 1_000_000,
 		displayName: 'Sonnet 5',
 		id: 'claude-sonnet-5',
-		provider: 'anthropic',
+		vendor: asModelVendorId('anthropic'),
 	},
 	{
 		agentProvider: 'claude',
 		contextWindow: 200_000,
 		displayName: 'Claude Code — Opus 5',
 		id: 'claude-code/opus-5',
-		provider: 'claude-code',
+		vendor: asModelVendorId('claude-code'),
 	},
 	{
 		agentProvider: 'claude',
 		contextWindow: 200_000,
 		displayName: 'Claude Code — Sonnet 5',
 		id: 'claude-code/sonnet-5',
-		provider: 'claude-code',
+		vendor: asModelVendorId('claude-code'),
 	},
 ];
 

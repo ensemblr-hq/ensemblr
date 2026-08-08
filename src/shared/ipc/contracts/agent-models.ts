@@ -1,14 +1,38 @@
 import type { AgentProviderId } from '../../agent-provider.ts';
 
 /**
+ * The *inference vendor* a model is served by — `anthropic`, `openai`,
+ * `nvidia-nim`, `lmstudio`, `claude-code`. Branded so it cannot be compared
+ * against an {@link AgentProviderId}, which names the *agent runtime* driving a
+ * chat. The two axes were both spelled `provider` and were compared against each
+ * other in the spawn path, which let a same-vendor, wrong-runtime model pass a
+ * check that was meant to keep a spawn inside its runtime; the brand turns that
+ * mistake into a type error.
+ */
+export type ModelVendorId = string & {
+	readonly __modelVendor: unique symbol;
+};
+
+/**
+ * Tags a raw vendor string read off a runtime's own catalog as a
+ * {@link ModelVendorId}. The one sanctioned way in — call it where a catalog is
+ * parsed, never to launder a runtime id into a vendor.
+ * @param value - Vendor name exactly as the runtime reported it.
+ * @returns The same string, typed as a vendor id.
+ */
+export function asModelVendorId(value: string): ModelVendorId {
+	return value as ModelVendorId;
+}
+
+/**
  * One selectable model in the composer's picker, from whichever agent runtime
  * can drive it.
  *
- * The two provider fields are different axes and both are load-bearing:
- * `provider` is the *inference* provider (`anthropic`, `openai`, `claude-code`)
- * and drives the picker's grouping; `agentProvider` is the *agent runtime* and
- * drives the per-chat provider lock. A Pi chat can run an Anthropic model, and
- * only a Claude chat can run a `claude-code` one.
+ * The two fields below are different axes and both are load-bearing: `vendor` is
+ * the *inference* vendor (`anthropic`, `openai`, `claude-code`) and drives the
+ * picker's grouping; `agentProvider` is the *agent runtime* and drives the
+ * per-chat provider lock. A Pi chat can run an Anthropic model, and only a
+ * Claude chat can run a `claude-code` one.
  */
 export interface AgentModelOption {
 	agentProvider: AgentProviderId;
@@ -21,9 +45,9 @@ export interface AgentModelOption {
 	contextWindow: number | null;
 	displayName: string;
 	id: string;
-	provider: string;
 	/** Thinking/effort levels this specific model accepts, in ascending order. */
 	thinkingLevels: readonly string[];
+	vendor: ModelVendorId;
 }
 
 /**

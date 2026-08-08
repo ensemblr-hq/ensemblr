@@ -84,7 +84,7 @@ export const TOOL_DEFS: readonly McpToolDef[] = [
 		name: 'ensemblr_start_conversation',
 		op: 'startConversation',
 		description:
-			"Open a fresh chat tab (or reuse one via chatTabId) and start a Pi conversation. Pass a short, descriptive title to name the sub-agent's tab. Brief it with what to deliver, not just what to look at: the question it answers, the defaults it should assume rather than come back and ask about, and whether it reports inline (the default) or writes a file at a path you name. Set wait=true to block until it finishes.",
+			"Open a fresh chat tab (or reuse one via chatTabId) and start a conversation. A chat tab spawns children on its own agent runtime and may omit `model` to inherit its own; a terminal harness has no runtime the app can name, so it must pass a `model` from ensemblr_list_models and is refused without one. Pass a short, descriptive title to name the sub-agent's tab. Brief it with what to deliver, not just what to look at: the question it answers, the defaults it should assume rather than come back and ask about, and whether it reports inline (the default) or writes a file at a path you name. Set wait=true to block until it finishes.",
 		shape: {
 			chatTabId: z.string().optional(),
 			prompt: z.string(),
@@ -259,7 +259,7 @@ export const TOOL_DEFS: readonly McpToolDef[] = [
 		name: 'ensemblr_list_models',
 		op: 'listModels',
 		description:
-			'List the Pi models available in this app (id, provider, display name) plus the default. Call this before setting a model on start_conversation; only pass a model id that appears here, preferably from the same provider.',
+			'List the models you can spawn a child on (id, runtime, vendor, display name) plus the default. `runtime` is the agent runtime that would drive the child and is the axis a spawn may not cross; `vendor` is only who serves the model. Called from a chat tab the list is already cut to your own runtime, because a child always runs the runtime you do. Called from a terminal harness it carries every runtime, because the app cannot tell which one you are — which is also why `model` is mandatory there. Call this before setting a model on start_conversation and pass an id that appears here; one from another runtime is refused, not substituted.',
 		shape: {},
 	},
 	{
