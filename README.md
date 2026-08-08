@@ -212,7 +212,8 @@ src/
 resources/      Shipped Pi extensions (e.g. `ensemblr-control.mts`)
 
 docs/
-├── adr/            Architecture Decision Records (40)
+├── adr/            Architecture Decision Records (42)
+├── onboarding.md · architecture-map.md — clone-to-first-PR runbook & directory index
 ├── agent-control.md · harnesses.md · build-and-release.md — feature & operator guides
 ├── considerations/ Design records (Ensemblr Control, orchestration playbook, Deno migration)
 ├── pi/             Pi integration (RPC protocol, event taxonomy)
@@ -321,13 +322,15 @@ See `package.json` for the full list of `test:*` scripts.
 ## Documentation
 
 - [`docs/`](./docs) — documentation index.
+- [`docs/onboarding.md`](./docs/onboarding.md) — clone → run → first change runbook.
+- [`docs/architecture-map.md`](./docs/architecture-map.md) — which directory owns which concern.
 - [`CONTEXT.md`](./CONTEXT.md) — product definition and ubiquitous language.
 - [`CHANGELOG.md`](./CHANGELOG.md) — notable changes (Keep a Changelog format).
 - [`AGENTS.md`](./AGENTS.md) — contributor policies (package manager, Biome, state, Tailwind, docs).
 - [`docs/agent-control.md`](./docs/agent-control.md) — Ensemblr Control & orchestration.
 - [`docs/harnesses.md`](./docs/harnesses.md) — third-party agent harnesses.
 - [`docs/build-and-release.md`](./docs/build-and-release.md) — packaging, signing, notarization, channels.
-- [`docs/adr/`](./docs/adr) — 40 Architecture Decision Records.
+- [`docs/adr/`](./docs/adr) — 42 Architecture Decision Records.
 - [`docs/considerations/`](./docs/considerations) — design records (Ensemblr Control, orchestration).
 - [`docs/pi/`](./docs/pi) — Pi RPC protocol and event taxonomy.
 - [`docs/product/`](./docs/product) — roadmap, Conductor parity, shell/settings inventories.
