@@ -101,6 +101,13 @@ describe('agent-control MCP endpoint', () => {
 		expect(names).toContain('ensemblr_get_diff_comments');
 		expect(names).toContain('ensemblr_add_diff_comments');
 		expect(names).toContain('ensemblr_resolve_diff_comments');
+		// Linear is an app-level integration bound to one account, so none of its
+		// ops takes a workspace and a harness root is served all five.
+		expect(names).toContain('ensemblr_linear_list_issues');
+		expect(names).toContain('ensemblr_linear_get_issue');
+		expect(names).toContain('ensemblr_linear_get_metadata');
+		expect(names).toContain('ensemblr_linear_create_comment');
+		expect(names).toContain('ensemblr_linear_update_issue');
 		// Auditing a delegated conversation is a read over persisted events, so it
 		// is served to every origin that may read a report at all.
 		expect(names).toContain('ensemblr_read_conversation');
@@ -111,7 +118,23 @@ describe('agent-control MCP endpoint', () => {
 		expect(names).not.toContain('ensemblr_set_summary');
 		expect(names).not.toContain('ensemblr_ask_user_question');
 		expect(names).not.toContain('ensemblr_exit_plan_mode');
-		expect(tools).toHaveLength(30);
+		expect(tools).toHaveLength(35);
+		await client.close();
+	});
+
+	// The Done refusal is a policy the port enforces, and an agent that only meets
+	// it after the call has already told the user the ticket is closed. It has to
+	// travel in the description, in the tool list, before the first attempt.
+	it('warns before the call that agent work cannot close a Linear ticket', async () => {
+		server = await startControlServer(stubService);
+		const client = await connect('good');
+		const { tools } = await client.listTools();
+		const updateTool = tools.find(
+			(tool) => tool.name === 'ensemblr_linear_update_issue',
+		);
+		expect(updateTool?.description).toContain('REFUSED');
+		expect(updateTool?.description).toContain('canceled');
+		expect(updateTool?.description).toContain('In Review');
 		await client.close();
 	});
 
@@ -257,6 +280,11 @@ describe('agent-control MCP endpoint, per-origin surface', () => {
 		expect(names).toContain('ensemblr_set_summary');
 		expect(names).toContain('ensemblr_notify_orchestrator');
 		expect(names).toContain('ensemblr_get_workspace_diff');
+		// A child briefed from a ticket has to be able to read it; writing to one is
+		// the orchestrator's, so the reads stay and the two writes go.
+		expect(names).toContain('ensemblr_linear_get_issue');
+		expect(names).toContain('ensemblr_linear_list_issues');
+		expect(names).toContain('ensemblr_linear_get_metadata');
 		for (const tool of [
 			'ensemblr_start_conversation',
 			'ensemblr_spawn_chat_tab',
@@ -265,6 +293,8 @@ describe('agent-control MCP endpoint, per-origin surface', () => {
 			'ensemblr_exit_plan_mode',
 			'ensemblr_set_branch_name',
 			'ensemblr_wait_for_agents',
+			'ensemblr_linear_create_comment',
+			'ensemblr_linear_update_issue',
 		]) {
 			expect(names, tool).not.toContain(tool);
 		}

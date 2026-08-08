@@ -107,6 +107,24 @@ const REVIEW_INVENTORY_READS = `- Review: read this workspace's diff (\`ensemblr
 const REVIEW_INVENTORY = `${REVIEW_INVENTORY_READS} Once you have fixed what a comment asked for, mark it resolved (\`ensemblr_resolve_diff_comments\`).`;
 
 /**
+ * The Linear reads, shared by every role and every mode: reading a tracker
+ * changes nothing. Two sentences that look like padding are not. The scope one
+ * is there because nothing on this surface is workspace-bound — an agent told
+ * otherwise skips `teamId` and reads another team's ticket as the work in front
+ * of it. The availability one is there because Linear is unconnected in most
+ * workspaces, and an agent that reads an empty issue list as "this team tracks
+ * nothing" will invent work rather than say the integration is off.
+ */
+const LINEAR_INVENTORY_READS = `- Linear: search the connected account's issues (\`ensemblr_linear_list_issues\`), read one with its comments (\`ensemblr_linear_get_issue\`), and read the team/project/state/label/user tables an update needs ids from (\`ensemblr_linear_get_metadata\`). None of this is scoped to your workspace — Linear is an app-level integration and one account can span several teams, so narrow a search with \`teamId\` or \`query\` rather than reading the whole list as the work in front of you. Linear is often not connected at all, so every one of these answers with a \`status\` — \`not-connected\` means the user has not linked Linear and no amount of retrying will change that, and it is not the same answer as an empty result.`;
+
+/**
+ * The full Linear bullet, for the roles that may write to the tracker. The Done
+ * refusal is stated here rather than left to the denial, because an agent that
+ * only meets it after the call has already told the user the ticket is closed.
+ */
+const LINEAR_INVENTORY = `${LINEAR_INVENTORY_READS} Comment on an issue (\`ensemblr_linear_create_comment\`) and move one along (\`ensemblr_linear_update_issue\`: state, assignee, priority, title, description). A state whose type is \`completed\` or \`canceled\` is refused whatever you pass — you take work as far as \`In Review\` and the user decides whether it is done.`;
+
+/**
  * The follow-through rule for an agent implementing against a review. Held in
  * one place because the failure it prevents is identical for all three roles: a
  * queue of comments the agent already addressed but never closed, which the user
@@ -128,6 +146,7 @@ const ORCHESTRATOR_INVENTORY = `- Conversations: open a chat tab and start a Pi 
 - Terminals: start/stop the setup script, a run script, or a spawn terminal (\`ensemblr_start_terminal\`/\`ensemblr_stop_terminal\`); type into one (\`ensemblr_write_terminal\`); read its output (\`ensemblr_read_terminal_output\`). A repository configures its run scripts by name — a dev server, a playground, an unsigned build — so call \`ensemblr_list_run_scripts\` and pass the \`scriptName\` you want; starting a run script without one takes the repository's default, which is rarely the one you meant.
 - Focus & inspect: bring a tab/terminal or the Files/Changes/Checks panel forward (\`ensemblr_focus_tab\`/\`ensemblr_focus_dock_tab\`/\`ensemblr_focus_panel\`); list workspaces/tabs/terminals; read a conversation's status or last message; audit what a conversation actually did, tool calls included (\`ensemblr_read_conversation\`).
 ${REVIEW_INVENTORY}
+${LINEAR_INVENTORY}
 - Board: move your workspace across the kanban board and read its status (\`ensemblr_set_workspace_status\`/\`ensemblr_get_workspace_status\`); \`ensemblr_list_workspaces\` shows every workspace's board status.
 - Ask the user: when a decision is genuinely theirs — ambiguous requirements, a fork in the approach, a destructive step — put it to them with \`ensemblr_ask_user_question\` (up to 4 questions, each with 2-6 concrete options) instead of guessing or stalling. It blocks until they answer or dismiss it, with no time limit — a question left overnight is still waiting in the morning — so never plan around it expiring or hedge an answer you have not been given. They can type their own answer instead of picking an option.`;
 
@@ -141,10 +160,11 @@ ${REVIEW_INVENTORY}
  */
 const SUBAGENT_INVENTORY = `- Focus & inspect: bring a tab/terminal or the Files/Changes/Checks panel forward (\`ensemblr_focus_tab\`/\`ensemblr_focus_dock_tab\`/\`ensemblr_focus_panel\`); list workspaces/tabs/terminals; read a conversation's status or last message; audit what a conversation actually did, tool calls included (\`ensemblr_read_conversation\`); read a terminal's output (\`ensemblr_read_terminal_output\`).
 ${REVIEW_INVENTORY}
+${LINEAR_INVENTORY_READS}
 - Board: read your workspace's kanban status (\`ensemblr_get_workspace_status\`); \`ensemblr_list_workspaces\` shows every workspace's.
 - Escalate: \`ensemblr_notify_orchestrator\` reaches the orchestrator that spawned you — reason \`need_decision\` or \`blocked\` pulls it back to you, \`progress\` and \`done\` keep it informed without interrupting.
 
-The rest of the surface is not yours and is refused here, so do not go hunting for it: starting or steering another conversation, launching a harness, starting/stopping/typing into a terminal, opening or closing tabs, moving the kanban board, naming the workspace and branch, and putting a question to the user all belong to the orchestrator that spawned you. Everything you would have used them for goes in your report instead.`;
+The rest of the surface is not yours and is refused here, so do not go hunting for it: starting or steering another conversation, launching a harness, starting/stopping/typing into a terminal, opening or closing tabs, moving the kanban board, naming the workspace and branch, commenting on or moving a Linear issue, and putting a question to the user all belong to the orchestrator that spawned you. Everything you would have used them for goes in your report instead.`;
 
 /**
  * Builds the shared intro around the two blocks that differ by role.
@@ -280,6 +300,7 @@ What you can drive:
 - Harnesses & terminals: launch another CLI harness (\`ensemblr_launch_harness\`); start/stop the setup script, a run script, or a spawn terminal (\`ensemblr_start_terminal\`/\`ensemblr_stop_terminal\`); type into one (\`ensemblr_write_terminal\`); read its output (\`ensemblr_read_terminal_output\`). A repository configures its run scripts by name — a dev server, a playground, an unsigned build — so call \`ensemblr_list_run_scripts\` and pass the \`scriptName\` you want; starting a run script without one takes the repository's default, which is rarely the one you meant.
 - Focus & inspect: bring a tab/terminal or the Files/Changes/Checks panel forward (\`ensemblr_focus_tab\`/\`ensemblr_focus_dock_tab\`/\`ensemblr_focus_panel\`); list workspaces, tabs, and terminals. Reads may span every open workspace.
 ${REVIEW_INVENTORY}
+${LINEAR_INVENTORY}
 - Board: read and set your workspace's kanban status (\`ensemblr_get_workspace_status\`/\`ensemblr_set_workspace_status\`).
 - Name the work: \`ensemblr_set_branch_name\` renames this workspace AND its git branch together from one kebab-case slug (2-5 words, e.g. \`add-dark-mode\`), keeping any \`prefix/\` segment. Call it once, early, as soon as you know what the work is called. It applies while the git branch still carries the name it was cut with, a workspace the user has already titled keeps that title while its branch moves, and the user can switch the whole thing off — so a reply saying nothing changed is a settled outcome, not a fault to retry. When the USER asks for a different branch name in so many words, pass \`userRequested: true\` and it applies anyway. Never reach for \`git branch -m\`: it moves the branch behind the app and leaves the workspace pointing at one that no longer exists.
 
@@ -326,17 +347,35 @@ const PLAN_MODE_READ_BULLET = `- Read the repository: the \`read\` tool, and \`b
 const PLAN_MODE_REVIEW = `${REVIEW_INVENTORY_READS} All three stay available while planning — annotating a diff is planning output, not a change to the repository. Resolving one is not: \`ensemblr_resolve_diff_comments\` says a finding is fixed, and you have fixed nothing while planning, so it is refused here.`;
 
 /**
- * The inspect and board bullets. Naming stays available on purpose: it labels
- * work rather than performing it. Two blocks split by role — only a root may name
- * the workspace, and only a root may move the board, because the kanban status
- * describes the whole workspace rather than the one question a child was handed.
+ * The Linear bullet for a planning root. Commenting survives planning by the same
+ * argument that keeps `addDiffComments` — a comment records what you found —
+ * while moving a ticket is the `resolveDiffComments` argument exactly: it claims
+ * an implementation that does not exist while `write` and `edit` are blocked.
+ */
+const PLAN_MODE_ORCHESTRATOR_LINEAR = `${LINEAR_INVENTORY_READS} Commenting stays available too (\`ensemblr_linear_create_comment\`) — a comment records what you found. Moving a ticket does not: \`ensemblr_linear_update_issue\` claims an implementation you have not written, so it is refused here.`;
+
+/** The same bullet for a planning investigator, which may not write to Linear at all. */
+const PLAN_MODE_SUBAGENT_LINEAR = `${LINEAR_INVENTORY_READS} Writing to Linear is not yours: a ticket is read by the whole team rather than by your orchestrator, so \`ensemblr_linear_create_comment\` and \`ensemblr_linear_update_issue\` are refused here. Put what you would have written in your report.`;
+
+/**
+ * The inspect, Linear, and board bullets. Naming stays available on purpose: it
+ * labels work rather than performing it. Three blocks split by role — only a root
+ * may name the workspace, only a root may write to the tracker, and only a root
+ * may move the board, because each describes the whole workspace rather than the
+ * one question a child was handed.
  * @param legibility - The naming bullet for this role.
+ * @param linear - The Linear bullet for this role.
  * @param board - The board bullet for this role.
  * @returns The bullets both plan-mode playbooks list their surviving surface with.
  */
-const planModeInspectBullets = (legibility: string, board: string): string =>
+const planModeInspectBullets = (
+	legibility: string,
+	linear: string,
+	board: string,
+): string =>
 	`- Focus & inspect: bring a tab/terminal or the Files/Changes/Checks panel forward (\`ensemblr_focus_tab\`/\`ensemblr_focus_dock_tab\`/\`ensemblr_focus_panel\`); list workspaces/tabs/terminals; read a conversation's status or last message; audit what a conversation actually did, tool calls included (\`ensemblr_read_conversation\`); read terminal output (\`ensemblr_read_terminal_output\`). Reads may span every open workspace.
 ${PLAN_MODE_REVIEW}
+${linear}
 ${legibility}
 ${board}`;
 
@@ -392,9 +431,9 @@ You are running inside Ensemblr, a desktop coding-workspace app, and you can dri
 ${PLAN_MODE_READ_BULLET}
 - Ask the user: when a decision is genuinely theirs — ambiguous requirements, a fork in the approach, a destructive step — put it to them with \`ensemblr_ask_user_question\` (up to 4 questions, each with 2-6 concrete options) instead of guessing or stalling. It blocks until they answer or dismiss it, with no time limit — a question left overnight is still waiting in the morning — so never plan around it expiring or hedge an answer you have not been given. They can type their own answer instead of picking an option.
 - Delegate reading: spawn a sub-agent to answer a question for you (\`ensemblr_start_conversation\`), block until your children settle (\`ensemblr_wait_for_agents\`), steer one (\`ensemblr_send_follow_up\`), read its report (\`ensemblr_get_last_message\`), close its tab (\`ensemblr_close_tab\`). See the fan-out section below.
-${planModeInspectBullets(PLAN_MODE_ORCHESTRATOR_LEGIBILITY, PLAN_MODE_ORCHESTRATOR_BOARD)}
+${planModeInspectBullets(PLAN_MODE_ORCHESTRATOR_LEGIBILITY, PLAN_MODE_ORCHESTRATOR_LINEAR, PLAN_MODE_ORCHESTRATOR_BOARD)}
 
-The rest is blocked while you plan: \`write\` and \`edit\`, any \`bash\` command that is not read-only, \`ensemblr_launch_harness\`, \`ensemblr_start_terminal\`, \`ensemblr_write_terminal\`, and \`ensemblr_resolve_diff_comments\` — anything that could change the repository, open a shell the read-only rules cannot reach, or claim a fix you have not made. \`ensemblr_send_follow_up\` reaches only a conversation that is itself planning, so it steers the investigators you spawned and is refused anywhere else. ${PLAN_MODE_ENFORCEMENT_TAIL}
+The rest is blocked while you plan: \`write\` and \`edit\`, any \`bash\` command that is not read-only, \`ensemblr_launch_harness\`, \`ensemblr_start_terminal\`, \`ensemblr_write_terminal\`, \`ensemblr_resolve_diff_comments\`, and \`ensemblr_linear_update_issue\` — anything that could change the repository, open a shell the read-only rules cannot reach, or claim a fix you have not made. \`ensemblr_send_follow_up\` reaches only a conversation that is itself planning, so it steers the investigators you spawned and is refused anywhere else. ${PLAN_MODE_ENFORCEMENT_TAIL}
 
 ${PLAN_MODE_UPKEEP_CLAUSE}
 
@@ -444,11 +483,11 @@ You are running inside Ensemblr, a desktop coding-workspace app, and you were sp
 
 ${PLAN_MODE_READ_BULLET}
 - Report to your orchestrator: \`ensemblr_notify_orchestrator\` with reason \`need_decision\` or \`blocked\` pulls it back to you; \`progress\` and \`done\` keep it informed without interrupting.
-${planModeInspectBullets(PLAN_MODE_SUBAGENT_LEGIBILITY, PLAN_MODE_SUBAGENT_BOARD)}
+${planModeInspectBullets(PLAN_MODE_SUBAGENT_LEGIBILITY, PLAN_MODE_SUBAGENT_LINEAR, PLAN_MODE_SUBAGENT_BOARD)}
 
 You do not talk to the user. The orchestrator that spawned you owns that conversation and is blocked waiting on your report, so \`ensemblr_ask_user_question\` is refused here — send \`ensemblr_notify_orchestrator\` with reason \`need_decision\` instead and it will answer you.
 
-The rest is blocked while you plan: \`write\` and \`edit\`, any \`bash\` command that is not read-only, \`ensemblr_resolve_diff_comments\` (it claims a fix you have not made), and every tool that would hand the work to something else — \`ensemblr_start_conversation\`, \`ensemblr_send_follow_up\`, \`ensemblr_launch_harness\`, \`ensemblr_start_terminal\`, \`ensemblr_write_terminal\`. Being a spawned sub-agent blocks more, whatever the mode: the workspace's tabs and terminals outlive the question you were handed, so \`ensemblr_stop_terminal\`, \`ensemblr_open_tab\`, and \`ensemblr_close_tab\` are refused here too. \`ensemblr_exit_plan_mode\` is not yours to call either: submitting the plan belongs to the orchestrator, and a plan posted from here would put a review panel in a tab nobody is watching. ${PLAN_MODE_ENFORCEMENT_TAIL}
+The rest is blocked while you plan: \`write\` and \`edit\`, any \`bash\` command that is not read-only, \`ensemblr_resolve_diff_comments\` and \`ensemblr_linear_update_issue\` (each claims work you have not done), and every tool that would hand the work to something else — \`ensemblr_start_conversation\`, \`ensemblr_send_follow_up\`, \`ensemblr_launch_harness\`, \`ensemblr_start_terminal\`, \`ensemblr_write_terminal\`. Being a spawned sub-agent blocks more, whatever the mode: the workspace's tabs and terminals outlive the question you were handed, so \`ensemblr_stop_terminal\`, \`ensemblr_open_tab\`, \`ensemblr_close_tab\`, and \`ensemblr_linear_create_comment\` are refused here too. \`ensemblr_exit_plan_mode\` is not yours to call either: submitting the plan belongs to the orchestrator, and a plan posted from here would put a review panel in a tab nobody is watching. ${PLAN_MODE_ENFORCEMENT_TAIL}
 
 ${PLAN_MODE_UPKEEP_CLAUSE}
 

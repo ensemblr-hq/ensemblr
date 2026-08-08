@@ -46,6 +46,10 @@ const PLAN_MODE_BLOCKED_OPS: ReadonlyMap<AgentControlOp, string> = new Map([
 		'resolveDiffComments',
 		'`ensemblr_resolve_diff_comments` marks a review finding as fixed, and nothing has been fixed while `write` and `edit` are blocked — a comment resolved from here tells the user a change landed that does not exist',
 	],
+	[
+		'linearUpdateIssue',
+		'`ensemblr_linear_update_issue` moves a ticket the whole team reads, and an issue pushed to In Review from here claims an implementation that does not exist while `write` and `edit` are blocked — the same reason `ensemblr_resolve_diff_comments` is blocked. Commenting on the issue is not: `ensemblr_linear_create_comment` records what you found, which is planning output',
+	],
 ]);
 
 /**

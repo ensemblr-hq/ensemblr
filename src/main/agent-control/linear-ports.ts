@@ -1,0 +1,557 @@
+/**
+ * The {@link LinearPort} over the existing Linear data service.
+ *
+ * Kept out of `port-adapters.ts` for the same reason `review-ports.ts` is: this
+ * is not thin delegation. Three things happen here that belong to no other
+ * caller of the Linear service — the wire shapes are flattened into the few
+ * fields an agent acts on, every payload is fitted to the agent budget and says
+ * what it cut, and a state change into a Done or Canceled column is refused
+ * before it reaches Linear. The service itself stays unaware that an agent is
+ * one of its callers.
+ *
+ * Nothing here throws. The service already answers with a typed failure envelope
+ * rather than an exception, and this module maps that envelope onto the one
+ * `status` word an agent branches on.
+ */
+
+import type {
+	AgentLinearComment,
+	AgentLinearIssue,
+	AgentLinearIssueDetail,
+	AgentLinearResource,
+	LinearAgentStatus,
+	LinearCreateCommentResult,
+	LinearGetIssueResult,
+	LinearGetMetadataResult,
+	LinearListIssuesResult,
+	LinearUpdateIssueResult,
+} from '../../shared/agent-control.ts';
+import {
+	LINEAR_AGENT_LIMITS,
+	LINEAR_TERMINAL_STATE_TYPES,
+	MAX_AGENT_PAYLOAD_CHARS,
+} from '../../shared/agent-control.ts';
+import type {
+	GetLinearMetadataResult,
+	LinearCommentWire,
+	LinearIssueWire,
+	LinearMetadataWire,
+	LinearResourceWire,
+	LinearServiceFailure,
+} from '../../shared/ipc/contracts/linear.ts';
+import type { LinearService } from '../linear';
+import type { LinearPort } from './ports.ts';
+
+/** Collaborators the Linear port delegates to. */
+export interface LinearPortDeps {
+	/**
+	 * The app's Linear service, or null when the app was composed without one.
+	 * Nullable so a build that omits the integration answers `not-connected`
+	 * rather than crashing the control op with an undefined read.
+	 */
+	linearService: LinearService | null;
+}
+
+/** State types an agent may never move an issue into, for a fast membership test. */
+const TERMINAL_STATE_TYPES: ReadonlySet<string> = new Set(
+	LINEAR_TERMINAL_STATE_TYPES,
+);
+
+const NOT_CONNECTED_MESSAGE =
+	'Linear is not connected. The user connects it in Settings → Integrations; nothing you can pass will change this, so say so rather than retrying.';
+
+/**
+ * Maps the service's failure code onto the word an agent branches on.
+ * `reconnect-required` folds into `not-connected` because the recovery is
+ * identical — the user reauthorizes — and a second word for one action only
+ * invites a model to handle one and not the other.
+ * @param failure - The service's typed failure envelope.
+ * @returns The agent-facing status.
+ */
+function statusFor(failure: LinearServiceFailure): LinearAgentStatus {
+	if (
+		failure.code === 'not-connected' ||
+		failure.code === 'reconnect-required'
+	) {
+		return 'not-connected';
+	}
+	return failure.code === 'not-found' ? 'not-found' : 'failed';
+}
+
+/**
+ * Renders the prose an agent reads on a failure, naming the recovery rather than
+ * only the fault. A rate limit is the one case where waiting is the right move,
+ * so its retry window is spelled out when Linear supplied one.
+ * @param failure - The service's typed failure envelope.
+ * @param status - The agent-facing status the failure mapped to.
+ * @returns The message to carry on the result.
+ */
+function messageFor(
+	failure: LinearServiceFailure,
+	status: LinearAgentStatus,
+): string {
+	if (status === 'not-connected') {
+		return NOT_CONNECTED_MESSAGE;
+	}
+	if (status === 'not-found') {
+		return `Linear has no such issue: ${failure.message} Check the id or identifier, or search with ensemblr_linear_list_issues.`;
+	}
+	const retry =
+		failure.retryAfterSeconds === null
+			? ''
+			: ` Retry in ${failure.retryAfterSeconds}s.`;
+	return `Linear failed (${failure.code}): ${failure.message}${retry}`;
+}
+
+/** The outcome fields every failed Linear op reports. */
+function failed(failure: LinearServiceFailure): {
+	status: LinearAgentStatus;
+	message: string;
+} {
+	const status = statusFor(failure);
+	return { message: messageFor(failure, status), status };
+}
+
+/** The outcome fields a Linear op reports when the app has no Linear service. */
+function unavailable(): { status: LinearAgentStatus; message: string } {
+	return { message: NOT_CONNECTED_MESSAGE, status: 'not-connected' };
+}
+
+/**
+ * Cuts text to a budget and says so in place, because a description silently
+ * shortened reads as the whole thing and an agent will quote it back as such.
+ * @param text - The text to fit.
+ * @param budget - Characters the text may occupy, marker excluded.
+ * @returns The text at or under budget, marked when anything was cut.
+ */
+function clampText(text: string, budget: number): string {
+	return text.length <= budget
+		? text
+		: `${text.slice(0, budget).trimEnd()}\n\n… shortened to ${budget} characters. Open the issue in Linear for the rest.`;
+}
+
+/**
+ * Keeps as many rows as the budget affords, measuring each by the JSON an agent
+ * actually receives. Greedy from the front rather than proportional: the service
+ * hands back its most recently updated issues first, so a contiguous head is the
+ * half worth keeping.
+ * @param rows - Rows in the order they should survive.
+ * @param budget - Characters the kept rows may occupy in total.
+ * @returns The rows that fit and how many were dropped.
+ */
+function fitRows<T>(
+	rows: readonly T[],
+	budget: number,
+): { kept: readonly T[]; omitted: number; spent: number } {
+	const kept: T[] = [];
+	let spent = 0;
+	for (const row of rows) {
+		const cost = JSON.stringify(row).length + 1;
+		if (spent + cost > budget) {
+			break;
+		}
+		kept.push(row);
+		spent += cost;
+	}
+	return { kept, omitted: rows.length - kept.length, spent };
+}
+
+/**
+ * Renders the sentence that owns up to a cut payload. Named counts rather than a
+ * bare flag: a model acts on "narrow it" far more reliably than on `truncated`.
+ * @param omitted - How many rows were dropped.
+ * @param noun - What the dropped rows are, e.g. `issue`.
+ * @param recovery - The call or argument that recovers them.
+ * @returns The sentence to append, or an empty string when nothing was cut.
+ */
+function truncationNote(
+	omitted: number,
+	noun: string,
+	recovery: string,
+): string {
+	return omitted === 0
+		? ''
+		: ` ${omitted} ${noun}(s) were dropped to fit the payload budget — ${recovery}`;
+}
+
+/** Flattens a wire issue into the fields an agent acts on. */
+function toAgentIssue(issue: LinearIssueWire): AgentLinearIssue {
+	return {
+		assignee: issue.assigneeName,
+		id: issue.id,
+		identifier: issue.identifier,
+		priority: issue.priority,
+		project: issue.projectName,
+		state: issue.stateName,
+		stateId: issue.stateId,
+		stateType: issue.stateType,
+		team: issue.teamName,
+		title: issue.title,
+		updatedAt: issue.updatedAt,
+		url: issue.url,
+	};
+}
+
+/** Flattens a wire issue for a single-issue read, description and labels included. */
+function toAgentIssueDetail(issue: LinearIssueWire): AgentLinearIssueDetail {
+	return {
+		...toAgentIssue(issue),
+		description: issue.description
+			? clampText(
+					issue.description,
+					LINEAR_AGENT_LIMITS.maxReturnedDescriptionChars,
+				)
+			: null,
+		labels: issue.labels.map((label) => label.name),
+	};
+}
+
+/** Flattens a wire comment, clamping a body that would crowd out the rest. */
+function toAgentComment(comment: LinearCommentWire): AgentLinearComment {
+	return {
+		author: comment.authorName,
+		body: clampText(comment.body, LINEAR_AGENT_LIMITS.maxReturnedCommentChars),
+		createdAt: comment.createdAt,
+	};
+}
+
+/** Whether the returned-comment cap would cut this body. */
+function commentWasClamped(comment: LinearCommentWire): boolean {
+	return comment.body.length > LINEAR_AGENT_LIMITS.maxReturnedCommentChars;
+}
+
+/** Whether the returned-description cap would cut this issue's description. */
+function descriptionWasClamped(issue: LinearIssueWire): boolean {
+	return (
+		issue.description !== null &&
+		issue.description.length > LINEAR_AGENT_LIMITS.maxReturnedDescriptionChars
+	);
+}
+
+/**
+ * Fits an issue's comment thread into what the budget leaves after the issue
+ * itself, newest first, then restores chronological order. Newest-first is the
+ * selection order rather than the returned one: the recent exchange is what an
+ * agent needs, but a thread handed back out of sequence reads as a conversation
+ * that never happened.
+ * @param comments - The thread as Linear returned it, oldest first.
+ * @param issue - The issue already committed to the payload, for its cost.
+ * @returns The comments that fit, in order, how many were dropped, and whether
+ * any body that survived was itself cut.
+ */
+function fitComments(
+	comments: readonly LinearCommentWire[],
+	issue: AgentLinearIssueDetail,
+): {
+	kept: readonly AgentLinearComment[];
+	omitted: number;
+	clamped: boolean;
+} {
+	const newestFirst = [...comments]
+		.reverse()
+		.slice(0, LINEAR_AGENT_LIMITS.maxReturnedComments);
+	const fitted = fitRows(
+		newestFirst.map(toAgentComment),
+		MAX_AGENT_PAYLOAD_CHARS - JSON.stringify(issue).length,
+	);
+	return {
+		clamped: newestFirst.slice(0, fitted.kept.length).some(commentWasClamped),
+		kept: [...fitted.kept].reverse(),
+		omitted: comments.length - fitted.kept.length,
+	};
+}
+
+/** Flattens a wire metadata row into the id, name, and two qualifiers an agent uses. */
+function toAgentResource(resource: LinearResourceWire): AgentLinearResource {
+	return {
+		id: resource.id,
+		key: resource.key,
+		name: resource.name,
+		teamId: resource.teamId,
+		type: resource.type,
+	};
+}
+
+/**
+ * The metadata kinds an agent receives, in the order the budget fills them.
+ * States and teams come first because an update cannot be written without them;
+ * cycles are absent because no op on this surface sets one.
+ */
+const METADATA_KINDS = [
+	'states',
+	'teams',
+	'users',
+	'projects',
+	'labels',
+] as const;
+
+/** One metadata kind's flattened rows, keyed the way the result carries them. */
+type MetadataRows = Record<
+	(typeof METADATA_KINDS)[number],
+	readonly AgentLinearResource[]
+>;
+
+/**
+ * Fits every metadata kind into one shared budget, in priority order, so a
+ * workspace with hundreds of labels cannot crowd out the states an update needs.
+ * @param metadata - The cached metadata as the service returned it.
+ * @returns The rows that fit, per kind, and how many were dropped in total.
+ */
+function fitMetadata(metadata: LinearMetadataWire): {
+	rows: MetadataRows;
+	omitted: number;
+} {
+	const rows = {} as Record<
+		(typeof METADATA_KINDS)[number],
+		readonly AgentLinearResource[]
+	>;
+	let remaining = MAX_AGENT_PAYLOAD_CHARS;
+	let omitted = 0;
+	for (const kind of METADATA_KINDS) {
+		const fitted = fitRows(metadata[kind].map(toAgentResource), remaining);
+		rows[kind] = fitted.kept;
+		remaining -= fitted.spent;
+		omitted += fitted.omitted;
+	}
+	return { omitted, rows };
+}
+
+/** The empty metadata result body, for the paths that have no rows to report. */
+const NO_METADATA_ROWS: MetadataRows = {
+	labels: [],
+	projects: [],
+	states: [],
+	teams: [],
+	users: [],
+};
+
+/**
+ * Names why a state could not be classified: the id matched no cached row, the
+ * row that matched carries no workflow type, or Linear could not be reached to
+ * read the states at all.
+ * @param metadata - The metadata read the lookup ran against.
+ * @param state - The row the id matched, absent when it matched nothing.
+ * @returns The clause the refusal states its cause with.
+ */
+function unclassifiableCause(
+	metadata: GetLinearMetadataResult,
+	state: LinearResourceWire | undefined,
+): string {
+	if (state) {
+		return `the cached row for "${state.name}" carries no workflow type`;
+	}
+	return metadata.status === 'error'
+		? `Linear could not be reached to check it (${metadata.failure.message})`
+		: 'no cached workflow state has that id';
+}
+
+/**
+ * Reports why an agent may not move an issue into a state, or null when it may.
+ *
+ * Fails closed on purpose. A state the cached metadata cannot classify might be
+ * a Done column, and the whole point of the guard is that the app never posts an
+ * agent's "finished" to a tracker the team reads — so an unclassifiable state is
+ * refused with the one call that resolves it rather than passed through on the
+ * assumption it is harmless. A row found without a `type` is as unclassifiable as
+ * an id that matched nothing, and takes the same refusal.
+ * @param service - The Linear service the states are read from.
+ * @param stateId - The workflow state the update would move the issue into.
+ * @returns The model-facing refusal, or null when the state is not terminal.
+ */
+async function terminalStateRefusal(
+	service: LinearService,
+	stateId: string,
+): Promise<string | null> {
+	const metadata = await service.getMetadata();
+	const state = metadata.metadata.states.find((row) => row.id === stateId);
+	if (!state || state.type === null) {
+		return `Refused: this app will not move an issue into a state it cannot classify, and ${unclassifiableCause(metadata, state)}. Call ensemblr_linear_get_metadata and pass a state id from the list it returns.`;
+	}
+	if (TERMINAL_STATE_TYPES.has(state.type)) {
+		return `Refused: "${state.name}" is a ${state.type} state, and agent work never closes a ticket here — marking it canceled is the same call under a different label. Move it to In Review instead and say in your reply that it is ready; the user decides whether it is done.`;
+	}
+	return null;
+}
+
+/**
+ * Builds the Linear port over the app's Linear data service.
+ * @param deps - Port collaborators.
+ * @returns The Linear port.
+ */
+export function makeLinearPort(deps: LinearPortDeps): LinearPort {
+	const { linearService } = deps;
+
+	return {
+		listIssues: async ({ query, refresh, teamId }) => {
+			if (!linearService) {
+				return {
+					...unavailable(),
+					issues: [],
+					omittedIssues: 0,
+					source: null,
+					truncated: false,
+				} satisfies LinearListIssuesResult;
+			}
+			const result = await linearService.listIssues({ query, refresh, teamId });
+			const fitted = fitRows(
+				result.issues.map(toAgentIssue),
+				MAX_AGENT_PAYLOAD_CHARS,
+			);
+			const cut = truncationNote(
+				fitted.omitted,
+				'issue',
+				'narrow the search with `query` or `teamId`.',
+			);
+			if (result.status === 'error') {
+				const outcome = failed(result.failure);
+				return {
+					issues: fitted.kept,
+					message: `${outcome.message} The ${fitted.kept.length} issue(s) here are what the local cache already held.${cut}`,
+					omittedIssues: fitted.omitted,
+					source: null,
+					status: outcome.status,
+					truncated: fitted.omitted > 0,
+				} satisfies LinearListIssuesResult;
+			}
+			return {
+				issues: fitted.kept,
+				message: `${fitted.kept.length} issue(s), read from the ${result.source}. Descriptions are omitted here — read one with ensemblr_linear_get_issue.${cut}`,
+				omittedIssues: fitted.omitted,
+				source: result.source,
+				status: 'ok',
+				truncated: fitted.omitted > 0,
+			} satisfies LinearListIssuesResult;
+		},
+
+		getIssue: async ({ issueId, refresh }) => {
+			if (!linearService) {
+				return {
+					...unavailable(),
+					comments: [],
+					issue: null,
+					omittedComments: 0,
+					source: null,
+					truncated: false,
+				} satisfies LinearGetIssueResult;
+			}
+			const result = await linearService.getIssue({ id: issueId, refresh });
+			if (result.status === 'error') {
+				return {
+					...failed(result.failure),
+					comments: [],
+					issue: null,
+					omittedComments: 0,
+					source: null,
+					truncated: false,
+				} satisfies LinearGetIssueResult;
+			}
+			const issue = toAgentIssueDetail(result.issue);
+			const thread = fitComments(result.comments, issue);
+			const cut = truncationNote(
+				thread.omitted,
+				'older comment',
+				'open the issue in Linear to read the full thread.',
+			);
+			return {
+				comments: thread.kept,
+				issue,
+				message: `${issue.identifier} "${issue.title}" is in ${issue.state ?? 'no state'}, read from the ${result.source}.${cut}`,
+				omittedComments: thread.omitted,
+				source: result.source,
+				status: 'ok',
+				truncated:
+					thread.omitted > 0 ||
+					thread.clamped ||
+					descriptionWasClamped(result.issue),
+			} satisfies LinearGetIssueResult;
+		},
+
+		getMetadata: async ({ refresh }) => {
+			if (!linearService) {
+				return {
+					...unavailable(),
+					...NO_METADATA_ROWS,
+					omittedResources: 0,
+					syncedAt: null,
+					truncated: false,
+				} satisfies LinearGetMetadataResult;
+			}
+			const result = await linearService.getMetadata({ refresh });
+			const fitted = fitMetadata(result.metadata);
+			const cut = truncationNote(
+				fitted.omitted,
+				'row',
+				'the states and teams an update needs are kept first.',
+			);
+			if (result.status === 'error') {
+				const outcome = failed(result.failure);
+				return {
+					...fitted.rows,
+					message: `${outcome.message} The rows here are what the local cache already held.${cut}`,
+					omittedResources: fitted.omitted,
+					status: outcome.status,
+					syncedAt: result.metadata.syncedAt,
+					truncated: fitted.omitted > 0,
+				} satisfies LinearGetMetadataResult;
+			}
+			return {
+				...fitted.rows,
+				message: `Teams, projects, workflow states, labels, and users, as synced at ${result.metadata.syncedAt ?? 'an unknown time'}. Cycles are not returned — nothing on this surface sets one.${cut}`,
+				omittedResources: fitted.omitted,
+				status: 'ok',
+				syncedAt: result.metadata.syncedAt,
+				truncated: fitted.omitted > 0,
+			} satisfies LinearGetMetadataResult;
+		},
+
+		createComment: async ({ commentBody, issueId }) => {
+			if (!linearService) {
+				return { ...unavailable(), commentId: null };
+			}
+			const result = await linearService.createComment({
+				body: commentBody,
+				issueId,
+			});
+			if (result.status === 'error') {
+				return { ...failed(result.failure), commentId: null };
+			}
+			return {
+				commentId: result.comment.id,
+				message: `Comment posted on ${issueId}. It is visible to the whole team in Linear and cannot be edited or deleted from here.`,
+				status: 'ok',
+			} satisfies LinearCreateCommentResult;
+		},
+
+		updateIssue: async ({
+			assigneeId,
+			description,
+			issueId,
+			priority,
+			stateId,
+			title,
+		}) => {
+			if (!linearService) {
+				return { ...unavailable(), issue: null };
+			}
+			if (stateId) {
+				const refusal = await terminalStateRefusal(linearService, stateId);
+				if (refusal) {
+					return { issue: null, message: refusal, status: 'refused' };
+				}
+			}
+			const result = await linearService.updateIssue({
+				id: issueId,
+				input: { assigneeId, description, priority, stateId, title },
+			});
+			if (result.status === 'error') {
+				return { ...failed(result.failure), issue: null };
+			}
+			const issue = toAgentIssue(result.issue);
+			return {
+				issue,
+				message: `${issue.identifier} updated; it is now in ${issue.state ?? 'no state'}.`,
+				status: 'ok',
+			} satisfies LinearUpdateIssueResult;
+		},
+	};
+}

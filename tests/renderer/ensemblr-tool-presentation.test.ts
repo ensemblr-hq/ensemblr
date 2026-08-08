@@ -211,6 +211,61 @@ describe('ensemblrToolLabel', () => {
 		});
 	});
 
+	// The identifier is the whole point of a Linear row: `Updated a Linear issue`
+	// says nothing a user can act on, while `Updated a Linear issue: THE-106` is
+	// the ticket they can go and look at.
+	test('reads the Linear tools with the ticket they acted on', () => {
+		expect(
+			ensemblrToolLabel(
+				'ensemblr_linear_update_issue',
+				{ issueId: 'THE-106', stateId: 's-review' },
+				false,
+			),
+		).toEqual({
+			glyph: 'ticket-check',
+			title: 'Updated a Linear issue: THE-106',
+		});
+		expect(
+			ensemblrToolLabel(
+				'ensemblr_linear_create_comment',
+				{ commentBody: 'shipped', issueId: 'THE-106' },
+				true,
+			)?.title,
+		).toBe('Commenting on a Linear issue: THE-106');
+		expect(
+			ensemblrToolLabel(
+				'ensemblr_linear_list_issues',
+				{ query: 'composer' },
+				false,
+			)?.title,
+		).toBe('Searched Linear issues: composer');
+		expect(
+			ensemblrToolLabel('ensemblr_linear_get_metadata', {}, false),
+		).toEqual({
+			glyph: 'list',
+			title: 'Read Linear teams and states',
+		});
+	});
+
+	// `id`, `identifier`, and `search` are the near-misses the control boundary
+	// rewrites, and the timeline records what the model sent, not the rewrite.
+	test('reads the forgiven spelling of a Linear argument', () => {
+		expect(
+			ensemblrToolLabel(
+				'ensemblr_linear_get_issue',
+				{ identifier: 'THE-42' },
+				false,
+			)?.title,
+		).toBe('Read a Linear issue: THE-42');
+		expect(
+			ensemblrToolLabel(
+				'ensemblr_linear_list_issues',
+				{ search: 'diff' },
+				false,
+			)?.title,
+		).toBe('Searched Linear issues: diff');
+	});
+
 	test('folds the file under review into the diff label', () => {
 		expect(
 			ensemblrToolLabel(

@@ -20,6 +20,16 @@ import type {
 	FocusPanelName,
 	GetDiffCommentsResult,
 	GetWorkspaceDiffResult,
+	LinearCreateCommentArgs,
+	LinearCreateCommentResult,
+	LinearGetIssueArgs,
+	LinearGetIssueResult,
+	LinearGetMetadataArgs,
+	LinearGetMetadataResult,
+	LinearListIssuesArgs,
+	LinearListIssuesResult,
+	LinearUpdateIssueArgs,
+	LinearUpdateIssueResult,
 	OpenTabVariant,
 	ReadConversationArgs,
 	ReadConversationResult,
@@ -375,6 +385,44 @@ export interface ReviewPort {
 }
 
 /**
+ * Reads and writes Linear issues over the service that already backs the
+ * renderer's tracker views.
+ *
+ * The seam sits above that service rather than beside it because its two callers
+ * want opposite things from the same rows. The renderer draws a board: it wants
+ * every field, the typed failure envelope, and the cache-versus-remote provenance
+ * that lets it badge a stale list. An agent wants a handful of flat rows it can
+ * act on, one `status` word it can branch on, and a hard ceiling on what a single
+ * read costs its context — and it must never be handed a route to close a ticket,
+ * which this repository reserves for a human. Putting any of that in the shared
+ * service would shape a renderer's data around an agent's budget, so the
+ * flattening, the truncation, and the terminal-state guard live here.
+ *
+ * Nothing throws. Linear is unconnected in most workspaces and its API fails for
+ * ordinary reasons, and an agent has to tell "no tracker" from "no such issue"
+ * from "Linear is down" to do anything sensible — so every failure travels as a
+ * `status` on the result rather than as an exception the service would flatten
+ * into one `internal` code.
+ *
+ * No member takes a workspace argument: Linear is an app-level integration bound
+ * to one account, so there is nothing here an agent could point at a workspace
+ * that is not its own.
+ */
+export interface LinearPort {
+	listIssues: (input: LinearListIssuesArgs) => Promise<LinearListIssuesResult>;
+	getIssue: (input: LinearGetIssueArgs) => Promise<LinearGetIssueResult>;
+	getMetadata: (
+		input: LinearGetMetadataArgs,
+	) => Promise<LinearGetMetadataResult>;
+	createComment: (
+		input: LinearCreateCommentArgs,
+	) => Promise<LinearCreateCommentResult>;
+	updateIssue: (
+		input: LinearUpdateIssueArgs,
+	) => Promise<LinearUpdateIssueResult>;
+}
+
+/**
  * Resolves the active permission mode. The mode is a global app setting (the
  * same value the IPC permission gate reads), so it takes no workspace argument.
  */
@@ -478,6 +526,7 @@ export interface AgentControlPorts {
 	board: BoardPort;
 	diff: DiffPort;
 	review: ReviewPort;
+	linear: LinearPort;
 	permissions: PermissionPort;
 	confirm: ConfirmPort;
 }
