@@ -167,10 +167,12 @@ export function useWorkbenchNavigation({
 		],
 	);
 
-	const navigation: NavigationContextValue = {
-		renderStaticLink,
-		renderWorkspaceLink,
-	};
+	// Context value for the whole shell: a fresh object here re-renders every
+	// consumer on every render of the layout.
+	const navigation = useMemo<NavigationContextValue>(
+		() => ({ renderStaticLink, renderWorkspaceLink }),
+		[renderStaticLink, renderWorkspaceLink],
+	);
 
 	return {
 		addProjectMenu,

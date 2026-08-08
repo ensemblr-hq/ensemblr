@@ -1,7 +1,7 @@
 import type { UIMessage } from 'ai';
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
-	eventsToUIMessages,
+	createTimelineProjector,
 	filterUnmatchedOptimistic,
 	matchOptimisticAgainstMessages,
 	optimisticToUIMessage,
@@ -35,9 +35,14 @@ export function useTimelineMessages({
 	pendingStartMs: number | null;
 	promptCount: number;
 } {
+	// One projector for this timeline's whole life, so a streaming turn folds only
+	// what arrived since the last render. It is impure by design, and safe inside
+	// useMemo — which React may discard and recompute — only because every
+	// mismatch in its resume check falls back to a full refold.
+	const [projectEvents] = useState(createTimelineProjector);
 	const persistedMessages = useMemo<UIMessage[]>(
-		() => eventsToUIMessages(events),
-		[events],
+		() => projectEvents(events),
+		[events, projectEvents],
 	);
 
 	const optimistic = useOptimisticPrompts(chatTabId);

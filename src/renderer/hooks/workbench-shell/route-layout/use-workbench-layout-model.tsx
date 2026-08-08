@@ -94,29 +94,50 @@ export function useWorkbenchLayoutModel({
 		}
 	}, [queries.hasPreloadBridge, queries.refetchSetupDiagnostics]);
 
-	const model: WorkbenchLayoutModel = {
-		activeProject: displaySelection?.project ?? null,
-		activeWorkspace: displaySelection?.workspace ?? null,
-		addProjectMenu: nav.addProjectMenu,
-		displayProjects,
-		displaySelection,
-		health: shellHealth,
-		navigateToStaticRoute: nav.navigateToStaticRoute,
-		navigateToWorkspace: nav.navigateToWorkspace,
-		onAddProject: nav.onAddProject,
-		resolveWorkspaceRouteSearch: nav.resolveWorkspaceRouteSearch,
-	};
+	// Both objects are context values for the whole workbench subtree, almost
+	// none of which is memoized: rebuilding either on every render of this
+	// component re-renders the entire shell whenever a poll or an agent
+	// broadcast lands.
+	const model = useMemo<WorkbenchLayoutModel>(
+		() => ({
+			activeProject: displaySelection?.project ?? null,
+			activeWorkspace: displaySelection?.workspace ?? null,
+			addProjectMenu: nav.addProjectMenu,
+			displayProjects,
+			displaySelection,
+			health: shellHealth,
+			navigateToStaticRoute: nav.navigateToStaticRoute,
+			navigateToWorkspace: nav.navigateToWorkspace,
+			onAddProject: nav.onAddProject,
+			resolveWorkspaceRouteSearch: nav.resolveWorkspaceRouteSearch,
+		}),
+		[
+			displayProjects,
+			displaySelection,
+			nav.addProjectMenu,
+			nav.navigateToStaticRoute,
+			nav.navigateToWorkspace,
+			nav.onAddProject,
+			nav.resolveWorkspaceRouteSearch,
+			shellHealth,
+		],
+	);
 
-	return {
-		model,
-		navigation: nav.navigation,
-		setupDiagnostics: {
+	const setupDiagnostics = useMemo<SetupDiagnosticsContextValue>(
+		() => ({
 			state: {
 				setupDiagnostics: setupSnapshot,
 				setupDiagnosticsError: setupError,
 				isSetupDiagnosticsRetrying: isManualRetrying,
 			},
 			actions: { onSetupDiagnosticsRetry },
-		},
+		}),
+		[isManualRetrying, onSetupDiagnosticsRetry, setupError, setupSnapshot],
+	);
+
+	return {
+		model,
+		navigation: nav.navigation,
+		setupDiagnostics,
 	};
 }
