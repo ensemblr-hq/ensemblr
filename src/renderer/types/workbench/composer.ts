@@ -1,9 +1,10 @@
+import type { MatchRange } from '@/renderer/lib/workbench/fuzzy-score';
 import type {
 	AgentProviderSlashCommandScope,
 	AgentProviderSlashCommandSource,
 } from '@/shared/ipc/contracts/agent-provider';
 
-import type { ComposerModelOption } from './workspace';
+import type { ComposerModelOption, WorkspaceFileSummary } from './workspace';
 
 /**
  * One selectable row in the model selector: a model plus whether the chat's
@@ -34,6 +35,19 @@ export interface SlashCommandDescriptor {
 	sourceScope?: AgentProviderSlashCommandScope;
 	/** When true, command runs immediately on pick (no args expected). */
 	autoSubmit: boolean;
+}
+
+/** One ranked slash-command row plus the spans of its name that matched the query. */
+export interface SlashCommandMatch {
+	item: SlashCommandDescriptor;
+	ranges: readonly MatchRange[];
+}
+
+/** One ranked mention row plus the spans of its name and path that matched the query. */
+export interface MentionMatch {
+	entry: WorkspaceFileSummary;
+	nameRanges: readonly MatchRange[];
+	pathRanges: readonly MatchRange[];
 }
 
 /** Discrete thinking-effort strength from 0 (off) to 5 (extra-high). */

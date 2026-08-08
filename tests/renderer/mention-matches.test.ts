@@ -36,13 +36,13 @@ const FILES: WorkspaceFileSummary[] = [
 ];
 
 test('empty @ mention shows root folders then root files only', () => {
-	const paths = getMentionMatches(FILES, '').map((entry) => entry.path);
+	const paths = getMentionMatches(FILES, '').map((match) => match.entry.path);
 
 	expect(paths).toEqual(['docs', 'src', 'package.json', 'README.md']);
 });
 
 test('@ mention drills into a matching root folder as query gets specific', () => {
-	const paths = getMentionMatches(FILES, 'sr').map((entry) => entry.path);
+	const paths = getMentionMatches(FILES, 'sr').map((match) => match.entry.path);
 
 	expect(paths.slice(0, 5)).toEqual([
 		'src',
@@ -54,7 +54,9 @@ test('@ mention drills into a matching root folder as query gets specific', () =
 });
 
 test('@ mention with slash shows direct children of that folder', () => {
-	const paths = getMentionMatches(FILES, 'src/').map((entry) => entry.path);
+	const paths = getMentionMatches(FILES, 'src/').map(
+		(match) => match.entry.path,
+	);
 
 	expect(paths).toEqual([
 		'src/main',
@@ -65,7 +67,33 @@ test('@ mention with slash shows direct children of that folder', () => {
 });
 
 test('@ mention with nested slash filters direct children by segment', () => {
-	const paths = getMentionMatches(FILES, 'src/r').map((entry) => entry.path);
+	const paths = getMentionMatches(FILES, 'src/r').map(
+		(match) => match.entry.path,
+	);
 
 	expect(paths).toEqual(['src/renderer']);
+});
+
+// A drilldown row is selected by the segment after the last slash, so that is
+// what its name has to be highlighted against — matching the name against the
+// whole `src/r` reports no spans on the very text the user typed.
+test('a drilldown row highlights the segment that selected it', () => {
+	const [match] = getMentionMatches(FILES, 'src/r');
+
+	expect(match.nameRanges).toEqual([{ end: 1, start: 0 }]);
+	expect(match.pathRanges).toEqual([{ end: 5, start: 0 }]);
+});
+
+test('a top-level query still highlights the whole match on both labels', () => {
+	const [match] = getMentionMatches(FILES, 'src');
+
+	expect(match.entry.path).toBe('src');
+	expect(match.nameRanges).toEqual([{ end: 3, start: 0 }]);
+});
+
+test('a bare folder query highlights nothing on its children', () => {
+	const [match] = getMentionMatches(FILES, 'src/');
+
+	expect(match.entry.path).toBe('src/main');
+	expect(match.nameRanges).toEqual([]);
 });

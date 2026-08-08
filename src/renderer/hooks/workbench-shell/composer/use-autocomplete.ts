@@ -1,5 +1,3 @@
-import { useMemo } from 'react';
-import { fuzzyScore } from '@/renderer/lib/workbench/fuzzy-score';
 import type { AutocompleteState } from '@/renderer/types/workbench';
 
 const SLASH_RE = /(?:^|\s)\/([\w:-]*)$/;
@@ -45,41 +43,4 @@ export function detectAutocomplete(
 	}
 
 	return { kind: null, query: '', tokenStart: caret, tokenEnd: caret };
-}
-
-/** An item paired with its fuzzy-match score. */
-interface FuzzyScored<T> {
-	item: T;
-	score: number;
-}
-
-/**
- * Memoizes the highest-scoring fuzzy matches for a query over a list of items.
- * @param items - Candidate items to score
- * @param query - Fuzzy query string
- * @param getKey - Extracts the string each item is scored against
- * @param limit - Maximum number of matches to return
- * @returns The best-scoring items, ordered best first
- */
-export function useFuzzyMatches<T>(
-	items: readonly T[],
-	query: string,
-	getKey: (item: T) => string,
-	limit = 12,
-): T[] {
-	return useMemo(() => {
-		if (items.length === 0) {
-			return [];
-		}
-		const scored: FuzzyScored<T>[] = [];
-		for (const item of items) {
-			const key = getKey(item);
-			const score = fuzzyScore(key, query);
-			if (score > 0) {
-				scored.push({ item, score });
-			}
-		}
-		scored.sort((a, b) => b.score - a.score);
-		return scored.slice(0, limit).map((entry) => entry.item);
-	}, [items, query, getKey, limit]);
 }

@@ -6,10 +6,34 @@ import { IPC_CHANNELS } from '@/shared/ipc/channels';
 import type {
 	AgentExecutablePathSnapshotWire,
 	AgentExecutableSelectionWire,
+	ListAgentProviderSlashCommandsResult,
 	OpenAgentProviderSettingsFileResult,
 } from '@/shared/ipc/contracts/agent-provider';
 
 import { ensemblrQueryKeys, getEnsemblrApi } from './query-keys';
+import {
+	clearCachedSlashCommands,
+	readCachedSlashCommands,
+	writeCachedSlashCommands,
+} from './slash-commands-cache';
+
+/**
+ * Shapes a cached catalogue as a live runtime result, so a seeded menu is
+ * indistinguishable from a freshly discovered one downstream.
+ * @param provider - Agent runtime whose catalogue to read.
+ * @param cwd - Workspace directory the catalogue was resolved against.
+ * @returns The cached catalogue as a result, or undefined when none is usable.
+ */
+function seedSlashCommandsFromCache(
+	provider: AgentProviderId,
+	cwd: string,
+): ListAgentProviderSlashCommandsResult | undefined {
+	const cached = readCachedSlashCommands(provider, cwd);
+	if (!cached) {
+		return undefined;
+	}
+	return { commands: cached.commands, error: null, source: 'runtime' };
+}
 
 /**
  * Query options for one agent runtime's readiness snapshot. Probing starts a
@@ -65,6 +89,12 @@ export function agentProviderMcpServersQuery(
  * workspace so project-scoped skills, prompts, and commands are included.
  * Discovery starts a child process, so the catalogue is held fresh for five
  * minutes — long enough that opening the slash menu never pays for a probe.
+ *
+ * Seeds from the localStorage cache so a workspace opened before paints its menu
+ * instantly on launch, then revalidates only once the seed is genuinely older
+ * than `staleTime`: reporting the cache's real fetch time through
+ * `initialDataUpdatedAt` is what stops every launch from spawning a `claude`
+ * child immediately.
  * @param provider - Agent runtime whose commands the composer offers.
  * @param cwd - Workspace directory the commands resolve against.
  * @returns Query options for the slash command catalogue.
@@ -75,15 +105,43 @@ export function agentProviderSlashCommandsQuery(
 ) {
 	return queryOptions({
 		enabled: cwd.length > 0,
-		queryFn: () =>
-			profileElectronIpcCall(
+		/**
+		 * Seeds the menu from the localStorage cache for an instant first paint.
+		 * Must stay a function: these options are rebuilt on every composer render,
+		 * so the value form would read and parse the cache on every keystroke.
+		 */
+		initialData: () => seedSlashCommandsFromCache(provider, cwd),
+		/** Reports when the seed was actually discovered, so `staleTime` applies to it. */
+		initialDataUpdatedAt: () =>
+			readCachedSlashCommands(provider, cwd)?.fetchedAt,
+		/**
+		 * Fetches the live catalogue over IPC. A runtime answer is persisted, and a
+		 * runtime answer of zero commands clears the entry — the user deleted their
+		 * skills, and falling back would resurrect them forever. Only a result the
+		 * runtime could not actually produce falls back to the cache, and it keeps
+		 * that result's `error` so filling the menu from the cache never reads as a
+		 * discovery that succeeded.
+		 */
+		queryFn: async (): Promise<ListAgentProviderSlashCommandsResult> => {
+			const result = await profileElectronIpcCall(
 				{
 					channel: IPC_CHANNELS.listAgentProviderSlashCommands,
 					usesDatabase: false,
 				},
 				() =>
 					getEnsemblrApi().listAgentProviderSlashCommands({ cwd, provider }),
-			),
+			);
+			if (result.source !== 'runtime' || result.error !== null) {
+				const seeded = seedSlashCommandsFromCache(provider, cwd);
+				return seeded ? { ...seeded, error: result.error } : result;
+			}
+			if (result.commands.length === 0) {
+				clearCachedSlashCommands(provider, cwd);
+				return result;
+			}
+			writeCachedSlashCommands(provider, cwd, result.commands, Date.now());
+			return result;
+		},
 		queryKey: ensemblrQueryKeys.agentProviderSlashCommands(provider, cwd),
 		staleTime: 5 * 60_000,
 	});

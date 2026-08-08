@@ -1,3 +1,4 @@
+import { useSetAtom } from 'jotai';
 import {
 	type Dispatch,
 	type RefObject,
@@ -6,18 +7,19 @@ import {
 	useState,
 } from 'react';
 
-import {
-	detectAutocomplete,
-	useFuzzyMatches,
-} from '@/renderer/hooks/workbench-shell/composer/use-autocomplete';
+import { detectAutocomplete } from '@/renderer/hooks/workbench-shell/composer/use-autocomplete';
 import { useMentionMatches } from '@/renderer/hooks/workbench-shell/composer/use-mention-matches';
 import { useSlashCommands } from '@/renderer/hooks/workbench-shell/composer/use-slash-commands';
+import { useSlashMatches } from '@/renderer/hooks/workbench-shell/composer/use-slash-matches';
 import { resolveComposerProvider } from '@/renderer/lib/workbench/composer';
+import {
+	recordSlashCommandUse,
+	slashCommandUsageAtom,
+} from '@/renderer/state/slash-commands';
 import type {
 	AutocompleteKind,
 	AutocompleteState,
 	ComposerShellState,
-	SlashCommandDescriptor,
 	WorkspaceFileSummary,
 } from '@/renderer/types/workbench';
 
@@ -28,17 +30,6 @@ const EMPTY_AUTOCOMPLETE: AutocompleteState = {
 	tokenStart: 0,
 	tokenEnd: 0,
 };
-
-/**
- * Module-level so `useFuzzyMatches` keeps its memo across renders; an inline
- * arrow would be a fresh dependency every render and rescore the whole
- * catalogue on each keystroke.
- * @param entry - Slash command being scored.
- * @returns The text the fuzzy query is matched against.
- */
-function getSlashCommandKey(entry: SlashCommandDescriptor): string {
-	return entry.command;
-}
 
 /**
  * Steps the autocomplete highlight, clamping the stored index into the list
@@ -114,12 +105,12 @@ export function useComposerAutocomplete({
 		composer.workspaceCwd,
 		slashOpen,
 	);
-	const slashMatches = useFuzzyMatches(
+	const slashMatches = useSlashMatches(
 		slashCatalogue.commands,
 		slashOpen ? autocomplete.query : '',
-		getSlashCommandKey,
-		80,
+		slashOpen,
 	);
+	const recordSlashUsage = useSetAtom(slashCommandUsageAtom);
 
 	const updateAutocomplete = useCallback((nextValue: string, caret: number) => {
 		setAutocomplete(detectAutocomplete(nextValue, caret));
@@ -187,6 +178,9 @@ export function useComposerAutocomplete({
 
 	const onSlashSelect = useCallback(
 		(command: string, autoSubmit: boolean) => {
+			recordSlashUsage((usage) =>
+				recordSlashCommandUse(usage, command, Date.now()),
+			);
 			const { after, before } = splitAroundToken(value, autocomplete);
 			const slashText = `/${command}`;
 			const replacesWholeDraft =
@@ -203,6 +197,7 @@ export function useComposerAutocomplete({
 			autocomplete,
 			dismissAutocomplete,
 			onSubmitSlashCommand,
+			recordSlashUsage,
 			replaceToken,
 			setValue,
 			value,
@@ -213,9 +208,11 @@ export function useComposerAutocomplete({
 	const autocompleteTotal = mentionOpen
 		? mentionMatches.length
 		: slashMatches.length * Number(slashOpen);
-	// The list can shrink under a stored index — a slash catalogue refetch drops
-	// entries while the token is untouched — which would strand the highlight off
-	// the end and make Enter a silent no-op.
+	// The list can shrink under a stored index — a mention list narrows while the
+	// token is untouched — which would strand the highlight off the end and make
+	// Enter a silent no-op. The slash catalogue is additionally held steady for as
+	// long as its menu is open, because a reorder under the highlight would make
+	// Enter run a different command rather than none.
 	const safeActiveIndex = Math.min(
 		activeIndex,
 		Math.max(0, autocompleteTotal - 1),
@@ -225,13 +222,13 @@ export function useComposerAutocomplete({
 		if (mentionOpen) {
 			const match = mentionMatches[safeActiveIndex];
 			if (match) {
-				onMentionSelect(match);
+				onMentionSelect(match.entry);
 			}
 			return;
 		}
 		const match = slashMatches[safeActiveIndex];
 		if (match) {
-			onSlashSelect(match.command, match.autoSubmit);
+			onSlashSelect(match.item.command, match.item.autoSubmit);
 		}
 	}, [
 		mentionOpen,

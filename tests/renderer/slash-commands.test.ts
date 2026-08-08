@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { normalizeSlashCommands } from '../../src/renderer/hooks/workbench-shell/composer/use-slash-commands';
+import { normalizeSlashCommands } from '../../src/renderer/lib/workbench/slash-command-order';
 import type { SlashCommandDescriptor } from '../../src/renderer/types/workbench';
 
 const COMMANDS: SlashCommandDescriptor[] = [
