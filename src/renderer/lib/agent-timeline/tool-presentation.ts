@@ -675,10 +675,25 @@ export function glyphForToolCall(part: DynamicToolUIPart): ToolGlyph {
 /**
  * Projects a reasoning block into the same row shape as a tool call, so
  * thinking and acting read as one timeline rather than two styles.
- * @param text - The raw reasoning markdown
+ *
+ * A runtime that redacts its reasoning prose — Claude Code ships the block's
+ * signature and no text — still gets a row, marking where the turn thought. It
+ * carries no body, so the disclosure stays inert rather than opening onto
+ * nothing.
+ * @param text - The raw reasoning markdown, empty when the runtime redacted it
  * @returns The row presentation for the reasoning block
  */
 export function presentReasoning(text: string): ToolPresentation {
+	if (text.length === 0) {
+		return {
+			badge: null,
+			body: { kind: 'empty' },
+			glyph: 'brain',
+			preview: null,
+			title: 'Thought',
+			tone: 'default',
+		};
+	}
 	return {
 		badge: null,
 		body: { kind: 'markdown', text },

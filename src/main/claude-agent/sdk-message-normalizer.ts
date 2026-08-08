@@ -8,6 +8,10 @@ import type {
 	AgentModelMetadata,
 	AgentSessionStatus,
 } from '../agent-runtime/agent-types.ts';
+import {
+	createStreamedReasoning,
+	type StreamedReasoning,
+} from './streamed-reasoning.ts';
 import { toolResultDetails } from './tool-result-details.ts';
 
 /** What the runtime told us about itself once its session was up. */
@@ -48,6 +52,13 @@ export interface SdkMessageNormalizer {
 		contextWindow: number;
 		tokens: number;
 	}) => readonly AgentEvent[];
+	/**
+	 * Opens a turn the instant its prompt is queued, rather than waiting for the
+	 * runtime's first message. Claude takes seconds to reach that message, and
+	 * the timeline's working indicator and turn timer both key off the `status`
+	 * event, so without this the chat looks idle for the whole gap.
+	 */
+	beginTurn: () => readonly AgentEvent[];
 	/** Status events that settle an open turn the runtime never closed with a `result`. */
 	settleTurn: () => readonly AgentEvent[];
 	/** Translates one SDK message into zero or more normalized events. */
@@ -79,6 +90,7 @@ export function createSdkMessageNormalizer({
 	let contextTokens = 0;
 	let mainModel: string | null = null;
 	let reported: AgentContextUsage | null = null;
+	const reasoning = createStreamedReasoning();
 
 	const at = (): string => now().toISOString();
 
@@ -127,7 +139,9 @@ export function createSdkMessageNormalizer({
 				model: readModelMetadata(message.model),
 				sessionId: message.session_id,
 			});
-			return transitionTo('idle');
+			// `init` can land after the opening prompt was already queued, and only
+			// a session still waiting for its first prompt should be called idle.
+			return status === 'starting' ? transitionTo('idle') : [];
 		}
 
 		if (message.subtype === 'compact_boundary') {
@@ -154,7 +168,7 @@ export function createSdkMessageNormalizer({
 	): readonly AgentEvent[] => {
 		const events = [
 			...transitionTo('streaming'),
-			...normalizeAssistant(message, messageEvent),
+			...normalizeAssistant(message, messageEvent, reasoning),
 		];
 
 		if (message.parent_tool_use_id !== null) {
@@ -199,6 +213,7 @@ export function createSdkMessageNormalizer({
 	};
 
 	return {
+		beginTurn: () => transitionTo('streaming'),
 		observeContextUsage: (usage) => {
 			if (reported) {
 				return [];
@@ -212,7 +227,7 @@ export function createSdkMessageNormalizer({
 				case 'system':
 					return handleSystem(message);
 				case 'stream_event':
-					return normalizeStreamEvent(message, messageEvent);
+					return normalizeStreamEvent(message, messageEvent, reasoning);
 				case 'assistant':
 					return handleAssistant(message);
 				case 'user':
@@ -242,16 +257,28 @@ type MessageEventFactory = (
  * Tool-argument deltas (`input_json_delta`) are dropped: the wire union carries
  * no partial-tool-input variant, and the sealing `assistant` message delivers
  * the complete input a moment later.
+ * Reasoning deltas are also banked into `reasoning`: the sealing `assistant`
+ * message carries its `thinking` blocks emptied, so this stream is the only
+ * place the text ever appears and the seal has to be refilled from it.
  * @param message - The `stream_event` SDK message.
  * @param messageEvent - Factory that stamps the current turn onto an event.
+ * @param reasoning - Buffer collecting this message's reasoning text.
  * @returns Normalized events, empty for stream events with no timeline effect.
  */
 function normalizeStreamEvent(
 	message: Extract<SDKMessage, { type: 'stream_event' }>,
 	messageEvent: MessageEventFactory,
+	reasoning: StreamedReasoning,
 ): readonly AgentEvent[] {
 	const event = message.event as unknown as Record<string, unknown>;
-	if (readString(event.type) !== 'content_block_delta') {
+	const eventType = readString(event.type);
+
+	if (eventType === 'message_start') {
+		reasoning.reset();
+		return [];
+	}
+
+	if (eventType !== 'content_block_delta') {
 		return [];
 	}
 
@@ -264,12 +291,32 @@ function normalizeStreamEvent(
 
 	if (readString(delta.type) === 'thinking_delta') {
 		const text = readString(delta.thinking);
-		return text
-			? [messageEvent({ kind: 'reasoning-delta', text }, 'agent')]
-			: [];
+		if (!text) {
+			return [];
+		}
+		const blockIndex = readBlockIndex(event.index);
+		if (blockIndex !== null) {
+			reasoning.append(blockIndex, text);
+		}
+		return [messageEvent({ kind: 'reasoning-delta', text }, 'agent')];
 	}
 
 	return [];
+}
+
+/**
+ * Reads a stream event's content-block index, which pairs a delta with the
+ * block the sealing message will carry at that position. An unreadable index is
+ * refused rather than defaulted: banking the text under a block it did not come
+ * from would attribute one block's reasoning to another, which nothing
+ * downstream could detect.
+ * @param value - Raw `index` field off the stream event.
+ * @returns The index, or null when the event reported none Ensemblr can use.
+ */
+function readBlockIndex(value: unknown): number | null {
+	return typeof value === 'number' && Number.isInteger(value) && value >= 0
+		? value
+		: null;
 }
 
 /**
@@ -279,13 +326,18 @@ function normalizeStreamEvent(
  * `tool_execution_start` so a tool card opens as soon as the call is known.
  * @param message - The `assistant` SDK message.
  * @param messageEvent - Factory that stamps the current turn onto an event.
+ * @param reasoning - Text banked from this message's `thinking_delta` events.
  * @returns The seal followed by its tool-call events.
  */
 function normalizeAssistant(
 	message: Extract<SDKMessage, { type: 'assistant' }>,
 	messageEvent: MessageEventFactory,
+	reasoning: StreamedReasoning,
 ): readonly AgentEvent[] {
-	const parts = readBlocks(message.message?.content).flatMap(toMessagePart);
+	const parts = readBlocks(message.message?.content).flatMap((block, index) =>
+		toMessagePart(block, reasoning.take(index)),
+	);
+	reasoning.reset();
 
 	return [
 		messageEvent({ kind: 'message', parts, role: 'assistant' }, 'agent'),
@@ -437,11 +489,15 @@ function toUsage({
  * Projects one Anthropic content block onto a timeline part. Blocks Ensemblr
  * does not render — `tool_result` (handled by its own branch), server-tool
  * blocks — yield nothing.
+ * A `thinking` block arrives with its text stripped — the seal keeps only the
+ * signature — so its reasoning is recovered from the deltas that preceded it.
  * @param block - One entry from a message's `content` array.
+ * @param streamedReasoning - Reasoning banked for this block's index, if any.
  * @returns A single-element array with the part, or an empty array.
  */
 function toMessagePart(
 	block: Record<string, unknown>,
+	streamedReasoning: string | null,
 ): readonly AgentMessagePart[] {
 	const blockType = readString(block.type);
 
@@ -451,23 +507,37 @@ function toMessagePart(
 	}
 
 	if (blockType === 'thinking') {
-		const text = readString(block.thinking);
-		return text ? [{ kind: 'reasoning', text }] : [];
-	}
-
-	if (blockType === 'tool_use') {
-		const name = readString(block.name) ?? 'tool';
+		// Kept even when it and its deltas both came through empty: a turn that
+		// reasoned should say so rather than vanish the way a dropped part does.
 		return [
 			{
-				input: isRecord(block.input) ? block.input : {},
-				kind: 'tool-call',
-				name,
-				toolCallId: readString(block.id) ?? name,
+				kind: 'reasoning',
+				text: readString(block.thinking) ?? streamedReasoning ?? '',
 			},
 		];
 	}
 
+	if (blockType === 'tool_use') {
+		return [toToolCallPart(block)];
+	}
+
 	return [];
+}
+
+/**
+ * Projects a `tool_use` block onto a tool-call part, naming the call after the
+ * tool when the block carries no id of its own.
+ * @param block - A `tool_use` entry from a message's `content` array.
+ * @returns The tool-call part.
+ */
+function toToolCallPart(block: Record<string, unknown>): AgentMessagePart {
+	const name = readString(block.name) ?? 'tool';
+	return {
+		input: isRecord(block.input) ? block.input : {},
+		kind: 'tool-call',
+		name,
+		toolCallId: readString(block.id) ?? name,
+	};
 }
 
 /**

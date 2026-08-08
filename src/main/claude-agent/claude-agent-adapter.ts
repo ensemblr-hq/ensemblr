@@ -460,6 +460,12 @@ function createClaudeSession({
 				turnId,
 				type: 'message',
 			});
+			// The timeline keys its working indicator and turn timer off `status`
+			// events, and Claude's first message is seconds away, so the turn is
+			// announced open here rather than when the runtime finally answers.
+			for (const event of normalizer.beginTurn()) {
+				emit(event);
+			}
 			patchMetadata({ status: 'streaming' });
 
 			promptQueue.push(toSdkUserMessage(runtimePrompt));

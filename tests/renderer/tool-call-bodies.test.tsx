@@ -355,6 +355,16 @@ describe('tool call bodies', () => {
 		expect(body.textContent).not.toContain('**');
 	});
 
+	test('keeps a row for a redacted reasoning block, with the disclosure inert', () => {
+		renderRow(<ChatReasoningCollapsible text='' />);
+
+		const toggle = disclosureFor('Thought');
+
+		expect(toggle).toBeDisabled();
+		fireEvent.click(toggle);
+		expect(bodyOf(toggle)).toBeNull();
+	});
+
 	test('paints a call still in flight as a running placeholder', () => {
 		renderRow(
 			<ChatToolCall

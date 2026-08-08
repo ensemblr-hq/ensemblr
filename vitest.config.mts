@@ -29,6 +29,7 @@ export default defineConfig({
 			'tests/renderer/**/*.test.{ts,tsx}',
 			'tests/shared/**/*.test.ts',
 			'tests/main/branch-name-slug.test.ts',
+			'tests/main/pi-wire-content-blocks.test.ts',
 			'tests/main/sanitize-title.test.ts',
 			'tests/main/title-provenance.test.ts',
 			'tests/main/derive-title-source.test.ts',

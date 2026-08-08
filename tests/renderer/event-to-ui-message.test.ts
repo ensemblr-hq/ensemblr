@@ -132,6 +132,50 @@ describe('eventsToUIMessages', () => {
 		]);
 	});
 
+	test('keeps a redacted reasoning payload so the turn still shows it thought', () => {
+		const messages = eventsToUIMessages([
+			event({
+				id: 'evt-agent-redacted-reasoning',
+				payload: {
+					kind: 'message',
+					payload: { kind: 'reasoning', text: '' },
+					role: 'agent',
+				},
+				turnId: 'turn-redacted-reasoning',
+			}),
+		]);
+
+		expect(messages[0]?.parts).toEqual([
+			{ state: 'done', text: '', type: 'reasoning' },
+		]);
+	});
+
+	test('keeps a redacted reasoning part inside a composite message', () => {
+		const messages = eventsToUIMessages([
+			event({
+				id: 'evt-agent-redacted-part',
+				payload: {
+					kind: 'message',
+					payload: {
+						kind: 'message',
+						parts: [
+							{ kind: 'reasoning', text: '' },
+							{ kind: 'text', text: 'Hi there' },
+						],
+						role: 'assistant',
+					},
+					role: 'agent',
+				},
+				turnId: 'turn-redacted-part',
+			}),
+		]);
+
+		expect(messages[0]?.parts).toEqual([
+			{ state: 'done', text: '', type: 'reasoning' },
+			{ state: 'done', text: 'Hi there', type: 'text' },
+		]);
+	});
+
 	test('maps a composite assistant message into reasoning + text + tool-call parts', () => {
 		const messages = eventsToUIMessages([
 			event({
