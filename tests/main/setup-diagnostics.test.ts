@@ -425,11 +425,13 @@ function createPiReadinessService(
 			modelCount: 2,
 			models: [
 				{
+					contextWindow: 400_000,
 					id: 'openai-codex/gpt-5.5',
 					model: 'gpt-5.5',
 					provider: 'openai-codex',
 				},
 				{
+					contextWindow: 400_000,
 					id: 'openai-codex/gpt-5.4',
 					model: 'gpt-5.4',
 					provider: 'openai-codex',

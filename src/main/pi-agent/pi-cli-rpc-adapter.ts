@@ -438,6 +438,11 @@ function createCliRpcSession({
 		onRawLine: (line) => emitRawFrame('rx', line),
 	});
 
+	// Pi answers `get_session_stats` before it has been prompted, and that answer
+	// is the only place the context window is named — asking only at turn
+	// boundaries leaves the gauge without a denominator for the whole first turn.
+	requestContextUsage();
+
 	/**
 	 * Emits the prompts Pi never echoed back as user messages so an interrupted
 	 * turn keeps the prompt that opened it. Pi is the transcript's usual source

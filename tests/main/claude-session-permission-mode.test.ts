@@ -27,6 +27,7 @@ import {
 } from '../../src/main/storage/database.ts';
 import { createAgentSession } from '../../src/main/storage/repositories/agent-session-repository.ts';
 import type { PermissionMode } from '../../src/shared/permissions.ts';
+import { CONTEXT_USAGE } from './helpers/claude-context-usage.ts';
 
 const WORKSPACE_ID = 'ws-perm';
 const WORKSPACE_CWD = '/tmp/ensemblr/perm/ws';
@@ -89,6 +90,7 @@ function createPendingQuery(): Query {
 	return Object.assign(iterator, {
 		applyFlagSettings: async () => undefined,
 		close: () => undefined,
+		getContextUsage: async () => CONTEXT_USAGE,
 		interrupt: async () => undefined,
 		setModel: async () => undefined,
 		setPermissionMode: async () => undefined,

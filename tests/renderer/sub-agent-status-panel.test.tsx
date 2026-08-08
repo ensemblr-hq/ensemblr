@@ -14,6 +14,7 @@ import { renderWithProviders } from './support/dom';
 const CLAUDE_MODELS = [
 	{
 		agentProvider: 'claude' as const,
+		contextWindow: 200_000,
 		displayName: 'Opus 5',
 		id: 'claude-code/opus',
 		isDefault: true,

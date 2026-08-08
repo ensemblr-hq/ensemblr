@@ -67,6 +67,7 @@ export function useComposerModelSelection({
 		}
 		return models.models.map((model) => ({
 			agentProvider: normalizeAgentProviderId(model.agentProvider),
+			contextWindow: model.contextWindow,
 			displayName: model.displayName,
 			id: model.id,
 			isDefault: model.id === models.defaultModelId,

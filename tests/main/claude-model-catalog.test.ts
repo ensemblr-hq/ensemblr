@@ -86,6 +86,58 @@ describe('the Claude catalog names alias rows after what they resolve to', () =>
 	});
 });
 
+describe('the Claude catalog carries the window the runtime reported', () => {
+	/** Maps every catalog row's id to the window it claims. */
+	const windowsById = (
+		sessionWindow?: Parameters<typeof presentClaudeModels>[1],
+	): Map<string, number | null> =>
+		new Map(
+			presentClaudeModels(ALIAS_ROWS, sessionWindow).map((model) => [
+				model.id,
+				model.contextWindow,
+			]),
+		);
+
+	it('stamps it on the model it was measured on, and no other', () => {
+		const windows = windowsById({
+			contextWindow: 967_000,
+			model: 'claude-opus-5[1m]',
+		});
+
+		expect(windows.get('opus[1m]')).toBe(967_000);
+		expect(windows.get('sonnet')).toBeNull();
+		expect(windows.get('haiku')).toBeNull();
+	});
+
+	it('never lends that window to a pinned release', () => {
+		const windows = windowsById({
+			contextWindow: 967_000,
+			model: 'claude-opus-5[1m]',
+		});
+
+		expect(windows.get('claude-opus-4-8')).toBeNull();
+		expect(windows.get('claude-sonnet-4-6')).toBeNull();
+	});
+
+	it('stamps a pinned row when the reading was taken on that release', () => {
+		const windows = windowsById({
+			contextWindow: 200_000,
+			model: 'claude-sonnet-4-6',
+		});
+
+		expect(windows.get('claude-sonnet-4-6')).toBe(200_000);
+		expect(windows.get('opus[1m]')).toBeNull();
+	});
+
+	it('leaves the window unknown when the runtime did not answer', () => {
+		expect(
+			presentClaudeModels(ALIAS_ROWS).every(
+				(model) => model.contextWindow === null,
+			),
+		).toBe(true);
+	});
+});
+
 describe('the Claude catalog appends the pinned releases', () => {
 	it('offers them among the runtime rows, on the full effort ladder', () => {
 		const models = presentClaudeModels(ALIAS_ROWS);

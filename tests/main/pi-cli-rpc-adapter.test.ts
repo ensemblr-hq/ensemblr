@@ -180,6 +180,58 @@ function firstItem<T>(items: readonly T[]): T {
 	return item;
 }
 
+const STATS_PROBE = '"type":"get_session_stats"';
+
+/**
+ * What a call under test wrote, minus the `get_session_stats` probe the adapter
+ * sends at spawn so the context gauge has a window before the first turn ends.
+ */
+function commandChunks(child: FakeChildHandle): readonly string[] {
+	return child.getStdinChunks().filter((chunk) => !chunk.includes(STATS_PROBE));
+}
+
+test('asks for session stats at spawn, before anything is prompted', async () => {
+	const recorder = createSpawnRecorder();
+	const adapter = createPiCliRpcAdapter({ spawn: recorder.spawn });
+	await adapter.createSession(buildInput());
+	await waitForMicrotasks();
+	const child = firstItem(recorder.getChildren());
+
+	assert.match(firstItem(child.getStdinChunks()), /"type":"get_session_stats"/);
+	await adapter.shutdown();
+});
+
+test('reports the window the spawn-time stats probe answers with', async () => {
+	const recorder = createSpawnRecorder();
+	const adapter = createPiCliRpcAdapter({ spawn: recorder.spawn });
+	const session = await adapter.createSession(buildInput());
+	const { events, listener } = collectEvents();
+	session.subscribe(listener);
+	await waitForMicrotasks();
+	const child = firstItem(recorder.getChildren());
+	const probe = JSON.parse(firstItem(child.getStdinChunks())) as { id: string };
+
+	child.emitStdout(
+		`${JSON.stringify({
+			command: 'get_session_stats',
+			data: {
+				contextUsage: { contextWindow: 1_000_000, percent: 0, tokens: 0 },
+			},
+			id: probe.id,
+			success: true,
+			type: 'response',
+		})}\n`,
+	);
+
+	assert.deepEqual(
+		events.flatMap((event) =>
+			event.type === 'context-usage' ? [event.usage] : [],
+		),
+		[{ contextWindow: 1_000_000, percent: 0, tokens: 0 }],
+	);
+	await adapter.shutdown();
+});
+
 test('spawns the executable with metadata cwd, args, and merged env', async () => {
 	const recorder = createSpawnRecorder();
 	const adapter = createPiCliRpcAdapter({ spawn: recorder.spawn });
@@ -780,12 +832,13 @@ test('submit writes a JSONL frame to stdin and waits for Pi user echo', async ()
 	const child = firstItem(recorder.getChildren());
 
 	const ack = await session.submit({ prompt: 'do the thing' });
-	assert.equal(ack.turnId, 'turn-1');
+	assert.match(ack.turnId, /^turn-\d+$/);
 
-	const stdinChunks = child.getStdinChunks();
+	const stdinChunks = commandChunks(child);
 	assert.equal(stdinChunks.length, 1);
 	const firstStdinChunk = stdinChunks[0];
 	assert.ok(firstStdinChunk);
+	assert.match(firstStdinChunk, new RegExp(`"turnId":"${ack.turnId}"`));
 	// Pi RPC protocol (@earendil-works/pi-coding-agent): `prompt` command
 	// with `message` field, one JSONL frame per line.
 	assert.match(firstStdinChunk, /"type":"prompt"/);
@@ -824,7 +877,7 @@ test('setSessionName writes a set_session_name frame to stdin', async () => {
 
 	await session.setSessionName('  Refactor auth  ');
 
-	const frame = firstItem(child.getStdinChunks());
+	const frame = firstItem(commandChunks(child));
 	assert.match(frame, /"type":"set_session_name"/);
 	assert.match(frame, /"name":"Refactor auth"/);
 	assert.match(frame, /\n$/);
@@ -839,7 +892,7 @@ test('setSessionName rejects a blank name without writing a frame', async () => 
 	const child = firstItem(recorder.getChildren());
 
 	await assert.rejects(() => session.setSessionName('   '), /empty/i);
-	assert.equal(child.getStdinChunks().length, 0);
+	assert.equal(commandChunks(child).length, 0);
 	await adapter.shutdown();
 });
 
@@ -882,7 +935,7 @@ test('submit rejects with a typed error when the stdin pipe is dead', async () =
 		/not writable/,
 	);
 	// The frame is never handed to the broken pipe.
-	assert.equal(child.getStdinChunks().length, 0);
+	assert.equal(commandChunks(child).length, 0);
 	await adapter.shutdown();
 });
 
@@ -895,7 +948,7 @@ test('submit with streamingBehavior:steer writes a steer frame, not a prompt', a
 
 	await session.submit({ prompt: 'go this way', streamingBehavior: 'steer' });
 
-	const chunks = child.getStdinChunks();
+	const chunks = commandChunks(child);
 	assert.equal(chunks.length, 1);
 	assert.match(chunks[0] ?? '', /"type":"steer"/);
 	assert.match(chunks[0] ?? '', /"message":"go this way"/);
@@ -917,7 +970,7 @@ test('submit with streamingBehavior:followUp writes a follow_up frame', async ()
 		streamingBehavior: 'followUp',
 	});
 
-	const chunks = child.getStdinChunks();
+	const chunks = commandChunks(child);
 	assert.equal(chunks.length, 1);
 	assert.match(chunks[0] ?? '', /"type":"follow_up"/);
 	assert.match(chunks[0] ?? '', /"message":"and then this"/);
@@ -938,7 +991,7 @@ test('submit emits set_model and set_thinking_level before the prompt when chang
 		thinkingLevel: 'high',
 	});
 
-	const chunks = child.getStdinChunks();
+	const chunks = commandChunks(child);
 	assert.equal(chunks.length, 3);
 	const setModel = JSON.parse(chunks[0] ?? '');
 	assert.deepEqual(setModel, {
@@ -971,7 +1024,7 @@ test('submit skips set_model when the request matches the spawned model', async 
 		prompt: 'go',
 	});
 
-	const chunks = child.getStdinChunks();
+	const chunks = commandChunks(child);
 	assert.equal(chunks.length, 1);
 	assert.match(chunks[0] ?? '', /"type":"prompt"/);
 	assert.doesNotMatch(chunks[0] ?? '', /set_model/);
@@ -992,7 +1045,7 @@ test('submit skips set_thinking_level when the request matches the spawned level
 
 	await session.submit({ prompt: 'go', thinkingLevel: 'high' });
 
-	const chunks = child.getStdinChunks();
+	const chunks = commandChunks(child);
 	assert.equal(chunks.length, 1);
 	assert.match(chunks[0] ?? '', /"type":"prompt"/);
 	assert.doesNotMatch(chunks[0] ?? '', /set_thinking_level/);
@@ -1020,7 +1073,7 @@ test('submit ignores a malformed model override and warns instead of sending it'
 		console.warn = originalWarn;
 	}
 
-	const chunks = child.getStdinChunks();
+	const chunks = commandChunks(child);
 	assert.equal(chunks.length, 1);
 	assert.match(chunks[0] ?? '', /"type":"prompt"/);
 	assert.doesNotMatch(chunks[0] ?? '', /set_model/);

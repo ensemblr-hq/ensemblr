@@ -12,6 +12,13 @@ import type { AgentProviderId } from '../../agent-provider.ts';
  */
 export interface AgentModelOption {
 	agentProvider: AgentProviderId;
+	/**
+	 * Context window in tokens, as the runtime's own catalog names it. This is
+	 * what lets the composer show a denominator on a chat that has never run a
+	 * turn — a live session's measurement supersedes it the moment one lands.
+	 * `null` when the runtime publishes no window for this model.
+	 */
+	contextWindow: number | null;
 	displayName: string;
 	id: string;
 	provider: string;

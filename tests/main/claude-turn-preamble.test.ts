@@ -12,6 +12,7 @@ import type {
 	AgentSessionMetadata,
 } from '../../src/main/agent-runtime/index.ts';
 import { createClaudeAgentAdapter } from '../../src/main/claude-agent/claude-agent-adapter.ts';
+import { CONTEXT_USAGE } from './helpers/claude-context-usage.ts';
 
 const SESSION_ID = 'agent-session-preamble';
 const WORKSPACE_CWD = '/tmp/ensemblr/preamble/ws';
@@ -25,6 +26,7 @@ function createPendingQuery(): Query {
 	return Object.assign(iterator, {
 		applyFlagSettings: async () => undefined,
 		close: () => undefined,
+		getContextUsage: async () => CONTEXT_USAGE,
 		interrupt: async () => undefined,
 		setModel: async () => undefined,
 		setPermissionMode: async () => undefined,

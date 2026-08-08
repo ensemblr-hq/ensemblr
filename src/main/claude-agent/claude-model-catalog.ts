@@ -152,6 +152,33 @@ function presentDisplayName(model: ModelInfo): string {
 }
 
 /**
+ * A window reading and the model it was measured on. `getContextUsage()` answers
+ * for one session's model, so the model it names is what decides which catalog
+ * rows may claim the figure.
+ */
+type SessionWindow = {
+	readonly contextWindow: number;
+	readonly model: string;
+};
+
+/**
+ * The window a row may claim: the reading's own model's, and nothing otherwise.
+ * A 1M Opus reading stamped across the catalog would put a denominator five
+ * times too wide on a Sonnet chat's gauge, for the whole of its first turn.
+ * @param canonicalId - The wire id the row resolves to.
+ * @param sessionWindow - What the listing session measured, when it answered.
+ * @returns The window in tokens, or null when the row names another model.
+ */
+function windowForModel(
+	canonicalId: string,
+	sessionWindow: SessionWindow | null,
+): number | null {
+	return sessionWindow?.model === canonicalId
+		? sessionWindow.contextWindow
+		: null;
+}
+
+/**
  * A catalog entry carrying the sort keys read off its canonical id, so the
  * ordering pass does not have to re-parse ids it has already seen.
  */
@@ -199,11 +226,18 @@ function compareModels(left: RankedModel, right: RankedModel): number {
  * a shared enum: pi's levels and Claude's efforts overlap but are different
  * axes, and offering an effort a model would reject is worse than offering
  * fewer.
+ *
+ * `supportedModels()` publishes no context window, so the only figure available
+ * is whatever the listing session measured — and that describes the one model
+ * that session runs. It is stamped on that model's row alone; every other row
+ * reports an unknown window until a chat opens a session on it.
  * @param models - The models the runtime reported for this account.
+ * @param sessionWindow - What the listing session measured, when it answered.
  * @returns Catalog entries ordered by `FAMILY_ORDER`, newest version first.
  */
 export function presentClaudeModels(
 	models: readonly ModelInfo[],
+	sessionWindow: SessionWindow | null = null,
 ): readonly AgentModelOption[] {
 	const advertised = models.flatMap((model) =>
 		model.value && model.value !== DEFAULT_MODEL_ALIAS
@@ -211,6 +245,10 @@ export function presentClaudeModels(
 					rankModel(
 						{
 							agentProvider: 'claude' as const,
+							contextWindow: windowForModel(
+								readCanonicalId(model),
+								sessionWindow,
+							),
 							displayName: presentDisplayName(model),
 							id: model.value,
 							provider: CLAUDE_INFERENCE_PROVIDER,
@@ -238,6 +276,7 @@ export function presentClaudeModels(
 		rankModel(
 			{
 				agentProvider: 'claude' as const,
+				contextWindow: windowForModel(model.id, sessionWindow),
 				displayName: model.displayName,
 				id: model.id,
 				provider: CLAUDE_INFERENCE_PROVIDER,

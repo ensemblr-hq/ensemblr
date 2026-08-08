@@ -33,6 +33,7 @@ const CATALOG: AgentModelCatalog = {
 	models: [
 		{
 			agentProvider: 'pi' as const,
+			contextWindow: 200_000,
 			displayName: 'Sonnet',
 			id: 'anthropic/sonnet',
 			provider: 'anthropic',
@@ -54,6 +55,7 @@ const TWO_PROVIDERS: AgentModelCatalog = {
 	models: [
 		{
 			agentProvider: 'pi' as const,
+			contextWindow: 200_000,
 			displayName: 'Sonnet',
 			id: 'anthropic/sonnet',
 			provider: 'anthropic',
@@ -61,6 +63,7 @@ const TWO_PROVIDERS: AgentModelCatalog = {
 		},
 		{
 			agentProvider: 'pi' as const,
+			contextWindow: 200_000,
 			displayName: 'GPT',
 			id: 'openai-codex/gpt-5.6-sol',
 			provider: 'openai-codex',
@@ -76,6 +79,7 @@ const PARTIAL: AgentModelCatalog = {
 	models: [
 		{
 			agentProvider: 'pi' as const,
+			contextWindow: 200_000,
 			displayName: 'Sonnet',
 			id: 'anthropic/sonnet',
 			provider: 'anthropic',

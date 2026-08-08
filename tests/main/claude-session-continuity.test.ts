@@ -24,6 +24,7 @@ import {
 	getAgentSessionById,
 } from '../../src/main/storage/repositories/agent-session-repository.ts';
 import type { AgentProviderId } from '../../src/shared/agent-provider.ts';
+import { CONTEXT_USAGE } from './helpers/claude-context-usage.ts';
 
 const WORKSPACE_ID = 'ws-continuity';
 const WORKSPACE_CWD = '/tmp/ensemblr/continuity/ws';
@@ -81,6 +82,7 @@ function createPendingQuery(): Query {
 	return Object.assign(iterator, {
 		applyFlagSettings: async () => undefined,
 		close: () => undefined,
+		getContextUsage: async () => CONTEXT_USAGE,
 		interrupt: async () => undefined,
 		setModel: async () => undefined,
 		setPermissionMode: async () => undefined,

@@ -65,7 +65,18 @@ export function createClaudeModelLister({
 		});
 
 		try {
-			return presentClaudeModels(await session.supportedModels());
+			// The catalog publishes no window per model, so the listing session is
+			// asked for its own — it is the only figure available to a chat that has
+			// not opened a session yet. It answers for the one model this session
+			// runs, which is why the reading carries that model with it.
+			const [models, usage] = await Promise.all([
+				session.supportedModels(),
+				session.getContextUsage().catch(() => null),
+			]);
+			return presentClaudeModels(
+				models,
+				usage ? { contextWindow: usage.maxTokens, model: usage.model } : null,
+			);
 		} finally {
 			promptQueue.close();
 			session.close();

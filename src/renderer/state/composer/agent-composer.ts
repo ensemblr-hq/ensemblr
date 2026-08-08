@@ -6,6 +6,7 @@ import {
 	agentSessionEventsQuery,
 	agentSessionsForWorkspaceQuery,
 } from '@/renderer/api/ensemblr-queries';
+import { resolveContextUsage } from '@/renderer/lib/workbench';
 import {
 	type TaggedContextUsage,
 	toComposerContextUsage,
@@ -153,10 +154,14 @@ export function useAgentComposerController({
 	// Live usage is tagged by session id; a stale snapshot from a previous
 	// session is treated as absent so the gauge falls back to persisted state
 	// without needing a reset-on-change effect.
-	const contextUsage =
+	const measuredContextUsage =
 		liveContextUsage && liveContextUsage.sessionId === activeSessionId
 			? liveContextUsage.usage
 			: persistedContextUsage;
+	const contextUsage = resolveContextUsage(
+		measuredContextUsage,
+		availableModels.find((option) => option.id === modelId),
+	);
 	const isAgentSessionStreaming =
 		activeSessionSnapshot?.runtimeOpen === true &&
 		(activeSessionStatus === 'starting' || activeSessionStatus === 'streaming');

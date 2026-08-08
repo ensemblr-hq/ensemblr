@@ -90,6 +90,7 @@ export default defineConfig({
 			'tests/main/claude-model-catalog.test.ts',
 			'tests/main/agent-session-provider-pin.test.ts',
 			'tests/main/claude-agent-submit.test.ts',
+			'tests/main/claude-context-usage-probe.test.ts',
 			'tests/main/claude-turn-preamble.test.ts',
 		],
 		coverage: {

@@ -21,7 +21,14 @@ function model(
 	provider: string,
 	agentProvider: AgentProviderId,
 ): ComposerModelOption {
-	return { agentProvider, displayName: id, id, isDefault: false, provider };
+	return {
+		agentProvider,
+		contextWindow: 200_000,
+		displayName: id,
+		id,
+		isDefault: false,
+		provider,
+	};
 }
 
 const PI_ANTHROPIC = 'pi/anthropic-haiku';

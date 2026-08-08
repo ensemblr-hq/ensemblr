@@ -7,6 +7,7 @@ import {
 	createClaudeAgentAdapter,
 	createClaudePlanBridge,
 } from '../../src/main/claude-agent/index.ts';
+import { CONTEXT_USAGE } from './helpers/claude-context-usage.ts';
 
 const TOKEN = 'tok-claude-1';
 
@@ -133,7 +134,7 @@ const fakeQueryFn = (
 		Object.assign(replay(), {
 			applyFlagSettings: async () => undefined,
 			close: () => undefined,
-			getContextUsage: async () => null,
+			getContextUsage: async () => CONTEXT_USAGE,
 			interrupt: async () => undefined,
 			mcpServerStatus: async () => [],
 			setModel: async () => undefined,

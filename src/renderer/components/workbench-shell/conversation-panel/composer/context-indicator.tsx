@@ -7,7 +7,8 @@ import {
 import { Progress } from '@/renderer/components/ui/progress';
 import type { ComposerContextUsage } from '@/renderer/types/workbench';
 
-const FALLBACK_MAX = 258_400;
+/** Stands in for both halves of the count when no window is known. */
+const UNKNOWN_TOKENS = '—';
 
 /** Formats token counts into compact model-picker-friendly labels. */
 function formatTokens(value: number): string {
@@ -22,17 +23,18 @@ function formatTokens(value: number): string {
 
 /** Renders the composer context-window gauge and hover details. */
 export function ContextIndicator({
-	maxLabel,
 	usage,
 }: {
-	maxLabel?: string;
 	usage: ComposerContextUsage | null;
 }) {
 	const used = usage?.usedTokens ?? 0;
-	const max = usage?.maxTokens ?? FALLBACK_MAX;
+	const max = usage?.maxTokens ?? 0;
 	const percent = max > 0 ? Math.min(100, (used / max) * 100) : 0;
 	const hasRingProgress = percent > 0;
 	const ringDash = `${percent}, 100`;
+	const counts = usage
+		? `${formatTokens(used)}/${formatTokens(max)}`
+		: `${UNKNOWN_TOKENS}/${UNKNOWN_TOKENS}`;
 
 	return (
 		<HoverCard closeDelay={80} openDelay={150}>
@@ -86,7 +88,7 @@ export function ContextIndicator({
 				<div className='flex items-center justify-between gap-6'>
 					<span className='font-medium text-sm'>Context</span>
 					<span className='text-muted-foreground text-xs tabular-nums'>
-						{formatTokens(used)}/{maxLabel ?? formatTokens(max)}
+						{counts}
 					</span>
 				</div>
 				{usage ? (
