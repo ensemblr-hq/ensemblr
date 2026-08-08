@@ -30,6 +30,7 @@ import type {
 	StartTerminalKind,
 	WorkspaceBoardStatusValue,
 } from '../../shared/agent-control.ts';
+import type { AgentProviderId } from '../../shared/agent-provider.ts';
 import type { PermissionMode } from '../../shared/permissions.ts';
 
 /**
@@ -96,6 +97,21 @@ export function originHasChatTab(origin: AgentControlOrigin): boolean {
 	return CHAT_TAB_SPECIES.has(origin.species);
 }
 
+/**
+ * The agent runtime a caller is itself running on, which is the axis a spawned
+ * child may not cross. `pi` and `claude` name a runtime directly; a harness
+ * resolves to null, because its control origin is minted per workspace and
+ * shared by every terminal in it — the app cannot tell a Claude Code CLI from a
+ * Codex one, let alone from a bare shell, once the token is in the environment.
+ * @param origin - Resolved caller identity.
+ * @returns The caller's runtime, or null when it has none the app can name.
+ */
+export function originRuntime(
+	origin: AgentControlOrigin,
+): AgentProviderId | null {
+	return origin.species === 'harness' ? null : origin.species;
+}
+
 /** Lists workspaces for the cross-workspace read ops. */
 export interface WorkspacePort {
 	listWorkspaces: () => Promise<readonly AgentControlWorkspaceInfo[]>;
@@ -123,7 +139,18 @@ export interface TabPort {
 	resolveTabWorkspace: (chatTabId: string) => Promise<string | null>;
 }
 
-/** Pi conversation lifecycle plus its scope-check and read helpers. */
+/**
+ * What a spawn attempt produced. A model the spawn cannot honour — one from
+ * another agent runtime, or none inferable at all — is a modelled refusal rather
+ * than a thrown error: the calling agent can correct it on its next turn, and
+ * the reason is prose written for it to read. Everything else that can go wrong
+ * here (a runtime that will not start, a first prompt that fails) still rejects.
+ */
+export type StartConversationOutcome =
+	| { ok: true; chatTabId: string; agentSessionId: string }
+	| { ok: false; reason: string };
+
+/** Agent conversation lifecycle plus its scope-check and read helpers. */
 export interface ConversationPort {
 	startConversation: (input: {
 		workspaceId: string;
@@ -135,11 +162,19 @@ export interface ConversationPort {
 		/** Descriptive name applied to the new conversation's tab via Pi `/name`. */
 		title?: string;
 		/**
-		 * The spawning (master) agent's own model, used as a fallback when no valid
-		 * `model` is requested so a Pi child inherits the master's model rather than
-		 * a hallucinated one. Only Pi callers provide it.
+		 * The model the caller's own runtime reports it is running now, forwarded by
+		 * the Pi extension. Fresher than the caller's session row, so it is preferred
+		 * when the catalog places it on the caller's runtime — and dropped entirely
+		 * when it does not, so the forwarded value can never move a child across.
 		 */
 		callerModel?: string;
+		/**
+		 * The agent runtime the caller itself runs on, resolved from its control
+		 * origin. The child is pinned to this runtime and an explicit `model` from
+		 * another one is refused; null means the caller has no runtime the app can
+		 * name, and the spawn fails unless it names a model outright.
+		 */
+		callerRuntime: AgentProviderId | null;
 		/** Caller session id, threaded into the child's spawn env for lineage. */
 		parentSessionId: string;
 		/**
@@ -149,9 +184,14 @@ export interface ConversationPort {
 		 * unrestricted child from a planning parent.
 		 */
 		planMode: boolean;
-	}) => Promise<{ chatTabId: string; agentSessionId: string }>;
-	/** Lists the available Pi models plus the default, for model selection. */
-	listModels: () => Promise<AgentControlModelList>;
+	}) => Promise<StartConversationOutcome>;
+	/**
+	 * Lists the models the caller may spawn a child on — its own runtime's, or
+	 * every runtime's when the caller has none the app can name.
+	 */
+	listModels: (input: {
+		runtime: AgentProviderId | null;
+	}) => Promise<AgentControlModelList>;
 	sendFollowUp: (input: {
 		agentSessionId: string;
 		prompt: string;

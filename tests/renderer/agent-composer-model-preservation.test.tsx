@@ -15,6 +15,7 @@ import {
 import type { AgentProviderId } from '../../src/shared/agent-provider';
 import { DEFAULT_APP_SETTINGS } from '../../src/shared/config';
 import type { AgentModelCatalog } from '../../src/shared/ipc/contracts/agent-models';
+import { asModelVendorId } from '../../src/shared/ipc/contracts/agent-models';
 import type { AgentSessionSnapshotWire } from '../../src/shared/ipc/contracts/agent-session';
 import {
 	clearEnsemblrApi,
@@ -45,24 +46,24 @@ const CATALOG: AgentModelCatalog = {
 			contextWindow: 200_000,
 			displayName: 'Claude Sonnet',
 			id: ORIGINAL_MODEL,
-			provider: 'anthropic',
-			thinkingLevels: ['medium'],
+			vendor: asModelVendorId('anthropic'),
+			thinkingLevels: ['off', 'minimal', 'low', 'medium', 'high', 'xhigh'],
 		},
 		{
 			agentProvider: 'pi',
 			contextWindow: 400_000,
 			displayName: 'GPT-5',
 			id: NEW_DEFAULT_MODEL,
-			provider: 'openai',
-			thinkingLevels: ['medium'],
+			vendor: asModelVendorId('openai'),
+			thinkingLevels: ['off', 'minimal', 'low', 'medium', 'high', 'xhigh'],
 		},
 		{
 			agentProvider: 'claude',
 			contextWindow: 200_000,
 			displayName: 'Claude Opus',
 			id: CLAUDE_MODEL,
-			provider: 'claude-code',
-			thinkingLevels: ['medium'],
+			vendor: asModelVendorId('claude-code'),
+			thinkingLevels: ['off', 'low', 'medium', 'high', 'xhigh', 'max'],
 		},
 	],
 };
@@ -243,6 +244,31 @@ describe('agent composer thinking-level preservation', () => {
 	// block would still pass if a sub-agent tab somehow carried an override, so
 	// pin both halves: empty override yields the session's level, and a set one
 	// still wins — which is what keeps the rung from swallowing a real pick.
+	// The Settings default is one value for the whole app while each runtime has
+	// its own ladder, so a user on Claude's `max` opening a Pi chat resolved a level
+	// the picker could not name — which is what rendered the chip as "<axis> pending".
+	test('drops a default level the selected model’s runtime does not publish', () => {
+		const { result } = renderComposer({
+			defaultThinkingLevel: 'max',
+			withSession: false,
+		});
+
+		expect(result.current.thinkingLevel).toBe('medium');
+		expect(
+			result.current.availableThinkingLevels.map((level) => level.id),
+		).not.toContain('max');
+	});
+
+	test('keeps that same level when the chat is on the runtime that publishes it', () => {
+		const { result } = renderComposer({
+			defaultModel: CLAUDE_MODEL,
+			defaultThinkingLevel: 'max',
+			withSession: false,
+		});
+
+		expect(result.current.thinkingLevel).toBe('max');
+	});
+
 	test('resolves a tab that has no per-chat override at all', () => {
 		const { result, store } = renderComposer({ defaultThinkingLevel: 'high' });
 

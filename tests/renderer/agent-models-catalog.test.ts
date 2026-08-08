@@ -8,6 +8,7 @@ import {
 	PI_MODELS_POLL_MS,
 } from '../../src/renderer/api/ensemblr/agent-models-catalog';
 import type { AgentModelCatalog } from '../../src/shared/ipc/contracts/agent-models';
+import { asModelVendorId } from '../../src/shared/ipc/contracts/agent-models';
 
 /** Builds a catalog from `provider/model` id strings, one model per id. */
 function catalog(ids: readonly string[]): AgentModelCatalog {
@@ -19,7 +20,7 @@ function catalog(ids: readonly string[]): AgentModelCatalog {
 			contextWindow: 200_000,
 			displayName: id,
 			id,
-			provider: id.split('/')[0] ?? 'other',
+			vendor: asModelVendorId(id.split('/')[0] ?? 'other'),
 			thinkingLevels: ['off', 'medium', 'high'],
 		})),
 	};

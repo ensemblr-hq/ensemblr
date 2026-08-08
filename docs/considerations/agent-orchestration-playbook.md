@@ -403,12 +403,39 @@ owns the conversation is the one blocked waiting on the report. The question rid
 
 ## Model selection
 
-To run a child on a specific model, first `ensemblr_list_models` (returns each model's `id`,
-`provider`, `displayName`, plus the default) and pass a `model` id that appears there — prefer the
-same provider you are on. If you omit `model`, the child inherits the caller's model when it's
-available (Pi callers only; the extension forwards it), otherwise the app default. The server
-**validates** the requested model against the catalog: an unknown id is dropped in favor of the
-caller-model or default fallback rather than failing the spawn — so never invent a model id.
+A spawn never crosses the **agent runtime** axis (`pi` | `claude`). Do not confuse it with a
+model's **inference vendor** (`anthropic`, `openai`, `claude-code`): both were once called
+"provider", and comparing one against the other is what let a Claude Code orchestrator spawn
+children on Pi. `AgentModelOption.vendor` is a branded `ModelVendorId` so the two can no longer be
+compared by accident.
+
+Resolution order, in `src/main/agent-providers/spawn-model-resolver.ts`:
+
+1. An explicit `model` — honoured only when it belongs to the caller's own runtime. A cross-runtime
+   id is **refused** with an `invalid-args` envelope naming both runtimes, never substituted.
+2. Otherwise the caller's own model — the live one its runtime forwarded (`callerModel`, Pi only)
+   when the catalog places it on the caller's runtime, else the persisted session row. The row only
+   learns a new model when a prompt goes through Ensemblr, so an agent that switched model inside
+   its own runtime is described by the forwarded value and by nothing else.
+3. Otherwise the catalog's own default for the caller's runtime, falling back to that runtime's
+   first entry when the default belongs to the other one.
+
+`ensemblr_list_models` (`id`, `runtime`, `vendor`, `displayName`, plus the default) is already cut to
+the caller's runtime, so every id it returns is spawnable. The caller's runtime comes from its
+control origin — `pi` and `claude` chats name theirs; a **terminal harness cannot**, because its
+origin is minted per workspace (`ws:<id>`) and shared by every terminal in it. Such a caller gets the
+unfiltered list and must pass `model` explicitly; omitting it is refused rather than defaulted onto
+Pi, and `HARNESS_AWARENESS` plus both tool descriptions say so up front so no harness has to learn
+it from a failed call.
+
+A refusal is a modelled outcome, not a thrown error: the port returns
+`{ ok: false, reason }` (`StartConversationOutcome`), the service turns it into an `invalid-args`
+envelope, and no tab, session, or spawn-guardrail slot is consumed. Everything else that can fail
+here — a runtime that will not start, a first prompt that rejects — still throws and still rolls
+back.
+
+The child's thinking level follows the same rule: requested → caller's → `medium`, each accepted only
+if the child's model publishes that rung, so `max` never lands on a Pi chat.
 
 ## Run scripts
 

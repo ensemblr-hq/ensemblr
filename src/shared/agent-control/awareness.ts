@@ -228,7 +228,7 @@ When delegation is warranted — delegate → wait → evaluate → integrate:
 
 A child's last message is its report and is persisted permanently — it survives the child closing and even an app restart. If your wait is ever interrupted (for example the app restarts) and a child then shows a \`closed\` or \`idle\` status, read its result with \`ensemblr_get_last_message\` before reacting — \`closed\` means the child ended, not that its work was lost, and \`ensemblr_get_conversation_status\` reports \`hasFinalMessage: true\` whenever that report is still there. Never re-spawn a child to redo work whose report you can still read.
 
-Model selection: to run a child on a specific model, first call \`ensemblr_list_models\` and pass a \`model\` id that appears in that list (prefer the same provider you are on). If you omit \`model\`, the child inherits your model when it is available, otherwise the app default. Never invent or guess a model id.
+Model selection: omit \`model\` and the child inherits yours. To run one on a different model, call \`ensemblr_list_models\` first and pass an id from that list — it carries only the models your own agent runtime can drive, and a model belonging to the other runtime is refused rather than substituted, so a child always runs the runtime you do. Never invent or guess a model id.
 
 Etiquette & limits:
 - Delegation is shallow by design — only you, the root, may spawn; children do their own work and cannot delegate onward. Depth, per-session spawn count, and spawn rate are capped; never fork-bomb.
@@ -298,7 +298,9 @@ When delegation is warranted — delegate → wait → evaluate → integrate:
 4. Gather the open questions before you answer. Read every child's \`Open questions\` section, drop the ones you can settle yourself by reading, merge the duplicates across children, and put what survives to the user as a short numbered list in your own answer, each with the options and the one you recommend. You have no questionnaire tool — the composer is the user's reply channel — so the list has to be in the answer itself, not raised mid-run.
 5. Integrate the outcomes into your own answer, and focus the relevant view so the user can follow along.
 
-A child's last message is its report and is persisted permanently — it survives the child closing and even an app restart, so read it with \`ensemblr_get_last_message\` rather than re-spawning a child to redo work you can still read. To run a child on a specific model, call \`ensemblr_list_models\` first and pass an id from that list; never invent one.
+A child's last message is its report and is persisted permanently — it survives the child closing and even an app restart, so read it with \`ensemblr_get_last_message\` rather than re-spawning a child to redo work you can still read.
+
+Model selection: \`model\` is REQUIRED of you. A chat tab spawns children on its own agent runtime, but you are a terminal harness — your control token is minted per workspace and shared by every terminal in it, so the app cannot tell which runtime you are and will not guess one for you. Call \`ensemblr_list_models\` first: it returns every runtime's models (each with its \`runtime\` and its inference \`vendor\`) precisely because yours cannot be narrowed, and pass one of those ids on \`ensemblr_start_conversation\`. Omitting \`model\` is refused, not defaulted. Never invent or guess a model id.
 
 Etiquette & limits:
 - Delegation is shallow by design — children do their own work and cannot delegate onward. Depth, per-session spawn count, and spawn rate are capped; never fork-bomb.

@@ -72,6 +72,7 @@ import {
 	type AgentControlOrigin,
 	type AgentControlPorts,
 	originHasChatTab,
+	originRuntime,
 } from './ports.ts';
 
 /** A single inbound control command, as handed over by either bridge. */
@@ -82,8 +83,10 @@ export interface AgentControlCommand {
 	/** Raw, untrusted argument object from the agent. */
 	rawArgs: unknown;
 	/**
-	 * The calling Pi agent's own model, forwarded by the Pi extension as a
-	 * fallback for spawned conversations. Absent for harness (MCP) callers.
+	 * The calling Pi agent's live model, forwarded by the Pi extension. Absent for
+	 * every MCP caller. Only a hint for spawned conversations — the caller's own
+	 * runtime comes from its control origin and its persisted session, neither of
+	 * which an agent supplies.
 	 */
 	callerModel?: string;
 	/**
@@ -511,6 +514,16 @@ export function createAgentControlService({
 		return ok(created);
 	};
 
+	/**
+	 * Opens a delegated conversation. A model the spawn cannot honour — one from
+	 * another agent runtime, or none inferable at all — comes back as an argument
+	 * failure naming the runtime, because the calling agent can fix that on its
+	 * next turn and an `internal` envelope reads as a fault to retry verbatim.
+	 * @param origin - Resolved caller identity.
+	 * @param args - Prompt, optional tab, model, thinking level, title, and wait flag.
+	 * @param callerModel - The Pi extension's live-model hint, absent for MCP callers.
+	 * @returns The spawned conversation, or the reason it was refused.
+	 */
 	const handleStartConversation = async (
 		origin: AgentControlOrigin,
 		args: StartConversationArgs,
@@ -536,12 +549,20 @@ export function createAgentControlService({
 			thinkingLevel: args.thinkingLevel,
 			title: args.title,
 			callerModel,
+			callerRuntime: originRuntime(origin),
 			parentSessionId: origin.sessionId,
 			planMode: isPlanning(origin),
 		});
+		if (!started.ok) {
+			return fail('invalid-args', started.reason);
+		}
 		guardrails.recordSpawn(origin.sessionId);
 		const result = await waitIfRequested(started.agentSessionId, args.wait);
-		return ok({ ...started, result });
+		return ok({
+			agentSessionId: started.agentSessionId,
+			chatTabId: started.chatTabId,
+			result,
+		});
 	};
 
 	/**
@@ -1216,7 +1237,10 @@ export function createAgentControlService({
 		getWorkspaceStatus: ({ origin }) => handleGetWorkspaceStatus(origin),
 		launchHarness: ({ args, origin }) =>
 			handleLaunchHarness(origin, args as LaunchHarnessArgs),
-		listModels: () => ports.conversations.listModels().then(ok),
+		listModels: ({ origin }) =>
+			ports.conversations
+				.listModels({ runtime: originRuntime(origin) })
+				.then(ok),
 		listRunScripts: ({ origin }) =>
 			ports.terminals
 				.listRunScripts({ workspaceId: origin.workspaceId })

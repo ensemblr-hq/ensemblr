@@ -1,15 +1,18 @@
 import type { ModelInfo } from '@anthropic-ai/claude-agent-sdk';
 
 import { CLAUDE_THINKING_LEVELS } from '../../shared/agent-thinking.ts';
-import type { AgentModelOption } from '../../shared/ipc/contracts/agent-models';
+import {
+	type AgentModelOption,
+	asModelVendorId,
+} from '../../shared/ipc/contracts/agent-models';
 import { toThinkingLevels } from './claude-thinking.ts';
 
 /**
- * Inference provider stamped on every Claude Code model. Claude Code model ids
- * (`sonnet`, `opus[1m]`, …) carry no provider segment, so the picker's grouping
+ * Inference vendor stamped on every Claude Code model. Claude Code model ids
+ * (`sonnet`, `opus[1m]`, …) carry no vendor segment, so the picker's grouping
  * key is supplied here rather than parsed out of the id.
  */
-const CLAUDE_INFERENCE_PROVIDER = 'claude-code';
+const CLAUDE_INFERENCE_VENDOR = 'claude-code';
 
 /**
  * Model id the SDK uses for "whatever Claude Code would pick". It is a real,
@@ -251,8 +254,8 @@ export function presentClaudeModels(
 							),
 							displayName: presentDisplayName(model),
 							id: model.value,
-							provider: CLAUDE_INFERENCE_PROVIDER,
 							thinkingLevels: toThinkingLevels(model.supportedEffortLevels),
+							vendor: asModelVendorId(CLAUDE_INFERENCE_VENDOR),
 						},
 						readCanonicalId(model),
 					),
@@ -279,8 +282,8 @@ export function presentClaudeModels(
 				contextWindow: windowForModel(model.id, sessionWindow),
 				displayName: model.displayName,
 				id: model.id,
-				provider: CLAUDE_INFERENCE_PROVIDER,
 				thinkingLevels: PINNED_THINKING_LEVELS,
+				vendor: asModelVendorId(CLAUDE_INFERENCE_VENDOR),
 			},
 			model.id,
 		),

@@ -115,7 +115,7 @@ function ModelOptionRow({
 			<ModelProviderIcon
 				agentProvider={model.agentProvider}
 				className='text-muted-foreground'
-				provider={model.provider}
+				vendor={model.vendor}
 			/>
 			<span className='flex-1 truncate'>{model.displayName}</span>
 			{selected ? <CheckIcon /> : null}
@@ -293,7 +293,7 @@ export function ModelPicker({
 						>
 							<ModelProviderIcon
 								agentProvider={selected?.agentProvider ?? null}
-								provider={selected?.provider ?? ''}
+								vendor={selected?.vendor ?? ''}
 							/>
 							<span className='font-medium text-foreground'>
 								{selected?.displayName ?? 'Select model'}

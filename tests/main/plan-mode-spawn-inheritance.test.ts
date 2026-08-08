@@ -2,11 +2,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createAgentControlPorts } from '../../src/main/agent-control/index.ts';
 import type { PortAdapterDeps } from '../../src/main/agent-control/port-adapters.ts';
-
-vi.mock('../../src/main/pi-runtime/pi-provider-models.ts', () => ({
-	resolvePiProviderModels: vi.fn(async () => ({})),
-	presentPiModels: vi.fn(() => ({ defaultModelId: 'm', models: [] })),
-}));
+import {
+	fakeSpawnModelResolver,
+	modelOption,
+} from './support/spawn-model-resolver.ts';
 
 vi.mock('../../src/main/storage/repositories/chat-tab-repository.ts', () => ({
 	getChatTabById: vi.fn(() => ({ id: 'tab-1', metadata: {} })),
@@ -51,7 +50,9 @@ const makeDeps = () => {
 		piExecutableService: {
 			getSnapshot: vi.fn(async () => ({ status: 'ready', command: 'pi' })),
 		},
-		localCommandService: {},
+		spawnModelResolver: fakeSpawnModelResolver([
+			modelOption({ id: 'anthropic/sonnet', runtime: 'pi' }),
+		]),
 		getPermissionMode: () => 'workspace-trusted',
 		augmentHarnessCommand: (command: string) => command,
 		broadcastFocus: vi.fn(),
@@ -71,6 +72,7 @@ const makeDeps = () => {
 
 const spawn = (deps: PortAdapterDeps, planMode: boolean, chatTabId?: string) =>
 	createAgentControlPorts(deps).conversations.startConversation({
+		callerRuntime: 'pi',
 		chatTabId,
 		parentSessionId: 'parent',
 		planMode,

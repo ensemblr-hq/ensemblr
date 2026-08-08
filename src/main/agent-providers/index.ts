@@ -30,3 +30,12 @@ export type { CreateClaudeReadinessProbeOptions } from './claude-readiness-probe
 export { createClaudeReadinessProbe } from './claude-readiness-probe';
 export type { CreatePiReadinessProbeOptions } from './pi-readiness-probe';
 export { createPiReadinessProbe } from './pi-readiness-probe';
+export type {
+	CreateSpawnModelResolverOptions,
+	SpawnCallerIdentity,
+	SpawnModelListing,
+	SpawnModelResolution,
+	SpawnModelResolver,
+	SpawnModelSelection,
+} from './spawn-model-resolver';
+export { createSpawnModelResolver } from './spawn-model-resolver';

@@ -24,7 +24,7 @@ interface ProviderGroup {
 function groupByProvider(models: readonly AgentModelOption[]): ProviderGroup[] {
 	const groups = new Map<string, ProviderGroup>();
 	for (const model of models) {
-		const key = model.provider || 'other';
+		const key = model.vendor || 'other';
 		const existing = groups.get(key);
 		if (existing) {
 			existing.models.push(model);
@@ -60,9 +60,7 @@ export function ModelVisibilityList() {
 					(model) =>
 						model.displayName.toLowerCase().includes(needle) ||
 						model.id.toLowerCase().includes(needle) ||
-						getProviderDisplayName(model.provider)
-							.toLowerCase()
-							.includes(needle),
+						getProviderDisplayName(model.vendor).toLowerCase().includes(needle),
 				)
 			: models;
 		return groupByProvider(filtered);

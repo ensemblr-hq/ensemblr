@@ -11,6 +11,7 @@ import { useAgentComposerController } from '../../src/renderer/state/composer';
 import { appSettingsAtom } from '../../src/renderer/state/preferences';
 import { DEFAULT_APP_SETTINGS } from '../../src/shared/config';
 import type { AgentModelCatalog } from '../../src/shared/ipc/contracts/agent-models';
+import { asModelVendorId } from '../../src/shared/ipc/contracts/agent-models';
 import type {
 	AgentSessionSnapshotWire,
 	SubmitAgentPromptRequest,
@@ -38,7 +39,7 @@ const CATALOG: AgentModelCatalog = {
 			contextWindow: 200_000,
 			displayName: 'Claude Sonnet',
 			id: MODEL_ID,
-			provider: 'anthropic',
+			vendor: asModelVendorId('anthropic'),
 			thinkingLevels: ['medium'],
 		},
 		{
@@ -46,7 +47,7 @@ const CATALOG: AgentModelCatalog = {
 			contextWindow: 1_000_000,
 			displayName: 'Claude Opus',
 			id: OTHER_TAB_MODEL_ID,
-			provider: 'anthropic',
+			vendor: asModelVendorId('anthropic'),
 			thinkingLevels: ['high', 'medium'],
 		},
 	],

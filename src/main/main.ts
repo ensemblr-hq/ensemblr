@@ -33,10 +33,12 @@ import {
 	startControlServer,
 } from './agent-control';
 import {
+	createAgentModelCatalog,
 	createAgentProviderService,
 	createClaudeExecutableService,
 	createClaudeReadinessProbe,
 	createPiReadinessProbe,
+	createSpawnModelResolver,
 } from './agent-providers';
 import {
 	type AgentExecutableSnapshot,
@@ -411,6 +413,17 @@ const listClaudeModels = createClaudeModelLister({
 	resolveBaseEnv: resolveAgentSpawnEnv,
 	resolveExecutablePath: resolveClaudeExecutablePath,
 });
+// One catalog for both spawn routes — the renderer's open request and an
+// orchestrator's delegation — so the two can never disagree about which runtime
+// owns a model id, and `pi --list-models` is shelled out for once between them.
+const agentModelCatalog = createAgentModelCatalog({
+	listClaudeModels,
+	localCommandService,
+	piExecutableService,
+});
+const spawnModelResolver = createSpawnModelResolver({
+	catalog: agentModelCatalog,
+});
 /**
  * Resolves the binary a non-Pi agent runtime launches, so the executable the
  * Providers page reports is the one the session actually runs. Pi's own
@@ -754,8 +767,8 @@ agentControlService = createAgentControlService({
 		getPermissionMode: () =>
 			readPermissionModeFromSnapshot(settingsResolutionService.resolve()),
 		harnessDetectionService,
-		localCommandService,
 		piExecutableService,
+		spawnModelResolver,
 		agentSessionService,
 		// Both are stateless factories over services already constructed here, so
 		// the control layer builds its own rather than reaching into the IPC
@@ -922,13 +935,13 @@ app.whenReady().then(() => {
 		linearService,
 		listAllWorkspacesService,
 		listArchivedWorkspacesService,
-		listClaudeModels,
 		listWorkspaceFilesService,
 		localCommandService,
 		localRepositoryImportService,
 		localRepositoryRegistrationService,
 		openTargetService,
 		piExecutableService,
+		agentModelCatalog,
 		agentSessionService,
 		planModeRegistry,
 		quickStartProjectService,

@@ -42,20 +42,20 @@ function BrandGlyph({
 }
 
 /**
- * Brand mark for a model, keyed by both provider axes. The agent runtime wins:
- * a model the Claude Code runtime enumerates gets Claude's star, whatever its
- * inference provider says. Everything else falls back to the inference provider,
- * so Pi's Anthropic models keep the Anthropic wordmark, and niche or local
- * providers (lmstudio, ollama, …) get the generic sparkle.
+ * Brand mark for a model, keyed by both axes. The agent runtime wins: a model
+ * the Claude Code runtime enumerates gets Claude's star, whatever its inference
+ * vendor says. Everything else falls back to the vendor, so Pi's Anthropic
+ * models keep the Anthropic wordmark, and niche or local vendors (lmstudio,
+ * ollama, …) get the generic sparkle.
  */
 export function ModelProviderIcon({
 	agentProvider,
 	className,
-	provider,
+	vendor,
 	...props
 }: {
 	agentProvider: AgentProviderId | null;
-	provider: string;
+	vendor: string;
 } & ComponentProps<'svg'>) {
 	if (agentProvider === 'claude') {
 		return (
@@ -67,7 +67,7 @@ export function ModelProviderIcon({
 			/>
 		);
 	}
-	const id = provider.toLowerCase();
+	const id = vendor.toLowerCase();
 	if (id.includes('anthropic') || id.includes('claude')) {
 		return (
 			<BrandGlyph className={className} path={ANTHROPIC_PATH} {...props} />

@@ -15,10 +15,11 @@ import type {
 	GroupedOptions,
 } from '../../src/renderer/types/workbench';
 import type { AgentProviderId } from '../../src/shared/agent-provider';
+import { asModelVendorId } from '../../src/shared/ipc/contracts/agent-models';
 
 function model(
 	id: string,
-	provider: string,
+	vendor: string,
 	agentProvider: AgentProviderId,
 ): ComposerModelOption {
 	return {
@@ -27,7 +28,7 @@ function model(
 		displayName: id,
 		id,
 		isDefault: false,
-		provider,
+		vendor: asModelVendorId(vendor),
 	};
 }
 

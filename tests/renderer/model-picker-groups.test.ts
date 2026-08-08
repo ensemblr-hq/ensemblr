@@ -3,10 +3,11 @@ import { describe, expect, test } from 'vitest';
 import { buildModelGroups } from '../../src/renderer/lib/workbench/model-picker-groups';
 import type { ComposerModelOption } from '../../src/renderer/types/workbench';
 import type { AgentProviderId } from '../../src/shared/agent-provider';
+import { asModelVendorId } from '../../src/shared/ipc/contracts/agent-models';
 
 function model(
 	id: string,
-	provider: string,
+	vendor: string,
 	agentProvider: AgentProviderId = 'pi',
 ): ComposerModelOption {
 	return {
@@ -15,7 +16,7 @@ function model(
 		displayName: id,
 		id,
 		isDefault: false,
-		provider,
+		vendor: asModelVendorId(vendor),
 	};
 }
 
