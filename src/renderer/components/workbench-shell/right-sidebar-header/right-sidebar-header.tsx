@@ -111,10 +111,7 @@ export function RightSidebarHeaderInlineActions({
 	}
 
 	return (
-		<div
-			className='right-sidebar-header-actions flex shrink-0 items-center gap-2'
-			data-pr-tone={headerState.tone}
-		>
+		<div className='flex shrink-0 items-center gap-2'>
 			{hasPullRequestNumber ? (
 				<RightSidebarHeaderPullRequestLinks headerState={headerState} />
 			) : null}
