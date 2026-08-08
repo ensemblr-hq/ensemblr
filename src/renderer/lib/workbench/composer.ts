@@ -28,6 +28,27 @@ export function showsComposer(session: SessionTabModel): boolean {
 }
 
 /**
+ * The usage the gauge should render. A reading measured on the chat's own
+ * session always wins; with none yet — a chat that has never run a turn, or one
+ * whose first turn is still in flight — the selected model's published window
+ * stands in at zero occupancy, so the gauge shows a real denominator instead of
+ * claiming the window is unknown.
+ * @param measured - Usage the runtime has reported for this chat, if any.
+ * @param selectedModel - The model the composer would submit with.
+ * @returns The usage to render, or null when no window is known at all.
+ */
+export function resolveContextUsage(
+	measured: ComposerContextUsage | null,
+	selectedModel: ComposerModelOption | undefined,
+): ComposerContextUsage | null {
+	if (measured) {
+		return measured;
+	}
+	const contextWindow = selectedModel?.contextWindow ?? 0;
+	return contextWindow > 0 ? { maxTokens: contextWindow, usedTokens: 0 } : null;
+}
+
+/**
  * Decides whether the context gauge is worth showing. It is noise at low usage,
  * so by default it appears only past 70% of the window; the setting forces it on.
  * @param composer - Composer shell state carrying the current usage.

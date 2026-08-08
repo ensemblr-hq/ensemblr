@@ -4,6 +4,7 @@ export { getChecksPanelState } from './checks-panel-state';
 export {
 	getComposerState,
 	resolveComposerProvider,
+	resolveContextUsage,
 	showContextIndicator,
 	showsComposer,
 } from './composer';

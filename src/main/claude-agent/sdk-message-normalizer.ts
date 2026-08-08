@@ -34,6 +34,20 @@ export interface CreateSdkMessageNormalizerOptions {
  * transitions and usage snapshots the timeline expects.
  */
 export interface SdkMessageNormalizer {
+	/**
+	 * Seeds the session's opening usage from a reading the adapter asked the
+	 * runtime for directly, rather than one read off the message stream. The
+	 * window it carries measures every response until a `result` names one of its
+	 * own.
+	 *
+	 * Seeds only what is still unknown, and nothing at all once a snapshot has
+	 * been emitted: this reading was taken at session start, so a stream that has
+	 * already moved either half has a fresher figure than it does.
+	 */
+	observeContextUsage: (usage: {
+		contextWindow: number;
+		tokens: number;
+	}) => readonly AgentEvent[];
 	/** Status events that settle an open turn the runtime never closed with a `result`. */
 	settleTurn: () => readonly AgentEvent[];
 	/** Translates one SDK message into zero or more normalized events. */
@@ -84,9 +98,10 @@ export function createSdkMessageNormalizer({
 
 	/**
 	 * Emits a usage snapshot when the reading has actually moved. Stays silent
-	 * until the window is known, because a zero window renders as a gauge with no
-	 * denominator rather than as an unknown one, and the runtime only names the
-	 * window on its first `result`.
+	 * until something has been measured against a known window: a zero window
+	 * renders as a gauge with no denominator rather than as an unknown one, and a
+	 * zero occupancy would overwrite a resumed thread's real reading with the
+	 * nothing this session has seen so far.
 	 * @returns One `context-usage` event, or nothing when there is no news.
 	 */
 	const reportUsage = (): readonly AgentEvent[] => {
@@ -184,6 +199,14 @@ export function createSdkMessageNormalizer({
 	};
 
 	return {
+		observeContextUsage: (usage) => {
+			if (reported) {
+				return [];
+			}
+			contextWindow = contextWindow || usage.contextWindow;
+			contextTokens = contextTokens || usage.tokens;
+			return reportUsage();
+		},
 		normalize: (message) => {
 			switch (message.type) {
 				case 'system':

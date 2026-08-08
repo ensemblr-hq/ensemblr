@@ -72,6 +72,7 @@ function createReadyExecutable(): PiExecutableSnapshot {
 const CLAUDE_MODELS: readonly AgentModelOption[] = [
 	{
 		agentProvider: 'claude',
+		contextWindow: 1_000_000,
 		displayName: 'Opus 4.5 (1M)',
 		id: CLAUDE_MODEL,
 		provider: 'claude-code',
@@ -83,6 +84,7 @@ const CLAUDE_MODELS: readonly AgentModelOption[] = [
 const PI_MODELS: readonly AgentModelOption[] = [
 	{
 		agentProvider: 'pi',
+		contextWindow: 200_000,
 		displayName: 'Sonnet 4',
 		id: PI_MODEL,
 		provider: 'anthropic',

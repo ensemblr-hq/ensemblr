@@ -18,6 +18,7 @@ import type {
 	ToolApprovalClosedBroadcast,
 	ToolApprovalRequestedBroadcast,
 } from '../../src/shared/agent-tool-approval.ts';
+import { CONTEXT_USAGE } from './helpers/claude-context-usage.ts';
 
 const WORKSPACE_ID = 'ws-approval';
 const WORKSPACE_CWD = '/tmp/ensemblr/approval/ws';
@@ -685,6 +686,7 @@ function createPendingQuery(): Query {
 	return Object.assign(iterator, {
 		applyFlagSettings: async () => undefined,
 		close: () => undefined,
+		getContextUsage: async () => CONTEXT_USAGE,
 		interrupt: async () => undefined,
 		setModel: async () => undefined,
 		setPermissionMode: async () => undefined,

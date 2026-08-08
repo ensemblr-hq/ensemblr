@@ -27,7 +27,14 @@ function option(
 	provider: string,
 	agentProvider: AgentProviderId,
 ): ComposerModelOption {
-	return { agentProvider, displayName, id, isDefault: false, provider };
+	return {
+		agentProvider,
+		contextWindow: 200_000,
+		displayName,
+		id,
+		isDefault: false,
+		provider,
+	};
 }
 
 /**

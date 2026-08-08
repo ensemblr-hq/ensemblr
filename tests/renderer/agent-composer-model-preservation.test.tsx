@@ -42,6 +42,7 @@ const CATALOG: AgentModelCatalog = {
 	models: [
 		{
 			agentProvider: 'pi',
+			contextWindow: 200_000,
 			displayName: 'Claude Sonnet',
 			id: ORIGINAL_MODEL,
 			provider: 'anthropic',
@@ -49,6 +50,7 @@ const CATALOG: AgentModelCatalog = {
 		},
 		{
 			agentProvider: 'pi',
+			contextWindow: 400_000,
 			displayName: 'GPT-5',
 			id: NEW_DEFAULT_MODEL,
 			provider: 'openai',
@@ -56,6 +58,7 @@ const CATALOG: AgentModelCatalog = {
 		},
 		{
 			agentProvider: 'claude',
+			contextWindow: 200_000,
 			displayName: 'Claude Opus',
 			id: CLAUDE_MODEL,
 			provider: 'claude-code',

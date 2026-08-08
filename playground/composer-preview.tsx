@@ -24,6 +24,7 @@ const WORKSPACE_CWD = '/Users/you/Projects/ensemblr';
 const MODELS: readonly ComposerModelOption[] = [
 	{
 		agentProvider: 'pi',
+		contextWindow: 1_000_000,
 		displayName: 'Opus 5',
 		id: 'claude-opus-5',
 		isDefault: true,
@@ -31,18 +32,21 @@ const MODELS: readonly ComposerModelOption[] = [
 	},
 	{
 		agentProvider: 'pi',
+		contextWindow: 1_000_000,
 		displayName: 'Sonnet 5',
 		id: 'claude-sonnet-5',
 		provider: 'anthropic',
 	},
 	{
 		agentProvider: 'claude',
+		contextWindow: 200_000,
 		displayName: 'Claude Code — Opus 5',
 		id: 'claude-code/opus-5',
 		provider: 'claude-code',
 	},
 	{
 		agentProvider: 'claude',
+		contextWindow: 200_000,
 		displayName: 'Claude Code — Sonnet 5',
 		id: 'claude-code/sonnet-5',
 		provider: 'claude-code',

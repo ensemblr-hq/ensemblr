@@ -35,6 +35,7 @@ const CATALOG: AgentModelCatalog = {
 	models: [
 		{
 			agentProvider: 'pi',
+			contextWindow: 200_000,
 			displayName: 'Claude Sonnet',
 			id: MODEL_ID,
 			provider: 'anthropic',
@@ -42,6 +43,7 @@ const CATALOG: AgentModelCatalog = {
 		},
 		{
 			agentProvider: 'pi',
+			contextWindow: 1_000_000,
 			displayName: 'Claude Opus',
 			id: OTHER_TAB_MODEL_ID,
 			provider: 'anthropic',

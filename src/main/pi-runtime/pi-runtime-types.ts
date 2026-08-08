@@ -94,6 +94,8 @@ export interface PiRpcSmokeSnapshot {
  * the shared `AgentModelOption` the composer consumes.
  */
 export interface PiProviderModelRow {
+	/** Tokens the `context` column names, or null on a build that prints none. */
+	contextWindow: number | null;
 	id: string;
 	model: string;
 	provider: string;

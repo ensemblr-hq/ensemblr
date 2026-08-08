@@ -44,6 +44,7 @@ export function presentPiModels(
 			? [
 					{
 						agentProvider: 'pi' as const,
+						contextWindow: row.contextWindow,
 						displayName: row.model,
 						id: row.id,
 						provider: row.provider,
@@ -158,6 +159,46 @@ export async function resolvePiProviderModels({
 	};
 }
 
+/** How much a `pi --list-models` size suffix multiplies its number by. */
+const TOKEN_MAGNITUDES: Readonly<Record<string, number>> = {
+	B: 1_000_000_000,
+	K: 1_000,
+	M: 1_000_000,
+};
+
+/**
+ * Smallest bare number the `context` column is believed on. A suffixed cell says
+ * what it is; an unsuffixed one is only a token count by position, and the
+ * column read is a fixed index into a table whose layout varies by build. A
+ * three-figure window does not exist, so anything under this is another column.
+ */
+const MIN_UNSUFFIXED_TOKENS = 1_000;
+
+/**
+ * Reads the `context` column of `pi --list-models` as a token count — `200K`
+ * becomes 200000 and `262.1K` becomes 262100. Pi builds that print no such
+ * column, and cells too small to be a window, report it as unknown rather than
+ * as zero, so the composer can tell "this model has no published window" from
+ * "this model has none left".
+ * @param cell - The column's raw text, when the row had one.
+ * @returns The context window in tokens, or null when the cell names no size.
+ */
+function parseContextWindowCell(cell: string | undefined): number | null {
+	const match = /^(\d+(?:\.\d+)?)([KMB])?$/i.exec(cell?.trim() ?? '');
+	const amount = match?.[1];
+	if (!amount) {
+		return null;
+	}
+	const suffix = match?.[2]?.toUpperCase();
+	const tokens = Math.round(
+		Number(amount) * (TOKEN_MAGNITUDES[suffix ?? ''] ?? 1),
+	);
+	const isPlausibleWindow = suffix
+		? tokens > 0
+		: tokens >= MIN_UNSUFFIXED_TOKENS;
+	return isPlausibleWindow ? tokens : null;
+}
+
 /**
  * Parses the columnar `pi --list-models` output into provider/model rows plus
  * deduplicated counts.
@@ -205,7 +246,12 @@ export function parsePiListModelsOutput(output: string): {
 			continue;
 		}
 		seenIds.add(id);
-		models.push({ id, model, provider });
+		models.push({
+			contextWindow: parseContextWindowCell(columns[2]),
+			id,
+			model,
+			provider,
+		});
 	}
 
 	return {

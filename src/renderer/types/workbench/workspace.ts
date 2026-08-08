@@ -301,6 +301,12 @@ export type SessionTabModel =
  */
 export interface ComposerModelOption {
 	agentProvider: AgentProviderId;
+	/**
+	 * Context window in tokens as the runtime's catalog names it, or null when it
+	 * publishes none. Stands in as the gauge's denominator until a session has
+	 * measured one.
+	 */
+	contextWindow: number | null;
 	displayName: string;
 	id: string;
 	isDefault?: boolean;

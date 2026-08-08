@@ -14,6 +14,10 @@ const NOW = new Date('2026-08-06T12:00:00.000Z');
 function createNormalizer(): {
 	discoveries: SdkSessionDiscovery[];
 	normalize: (message: unknown) => readonly AgentEvent[];
+	observeContextUsage: (usage: {
+		contextWindow: number;
+		tokens: number;
+	}) => readonly AgentEvent[];
 	setTurnId: (turnId: string | null) => void;
 } {
 	const discoveries: SdkSessionDiscovery[] = [];
@@ -24,6 +28,7 @@ function createNormalizer(): {
 	return {
 		discoveries,
 		normalize: (message) => normalizer.normalize(message as SDKMessage),
+		observeContextUsage: (usage) => normalizer.observeContextUsage(usage),
 		setTurnId: (turnId) => normalizer.setTurnId(turnId),
 	};
 }
@@ -595,23 +600,93 @@ test('a subagent response leaves the main thread occupancy alone', () => {
 	assert.deepEqual(usageSnapshots(subagent), []);
 });
 
-test('nothing is reported until the runtime has named a context window', () => {
-	const { normalize } = createNormalizer();
+test('a directly-read usage reading reports the session baseline right away', () => {
+	const { normalize, observeContextUsage } = createNormalizer();
 	normalize(initMessage());
 
-	const beforeWindow = normalize(
-		assistantMessage({ cache_read_input_tokens: 120_000, output_tokens: 500 }),
+	assert.deepEqual(
+		usageSnapshots(
+			observeContextUsage({ contextWindow: 967_000, tokens: 23_000 }),
+		),
+		[
+			{
+				contextWindow: 967_000,
+				percent: (23_000 / 967_000) * 100,
+				tokens: 23_000,
+			},
+		],
 	);
+});
+
+test('the window a direct reading named carries the gauge through the first turn', () => {
+	const { normalize, observeContextUsage } = createNormalizer();
+	normalize(initMessage());
+	observeContextUsage({ contextWindow: 1_000_000, tokens: 23_000 });
+
+	const beforeResult = normalize(
+		assistantMessage({ cache_read_input_tokens: 250_000, output_tokens: 0 }),
+	);
+
+	assert.deepEqual(usageSnapshots(beforeResult), [
+		{ contextWindow: 1_000_000, percent: 25, tokens: 250_000 },
+	]);
+});
+
+test('the turn result replaces the window the direct reading named', () => {
+	const { normalize, observeContextUsage } = createNormalizer();
+	normalize(initMessage());
+	observeContextUsage({ contextWindow: 1_000_000, tokens: 120_000 });
+
 	const atResult = normalize({
 		modelUsage: { 'claude-opus-5': { contextWindow: 200_000 } },
 		subtype: 'success',
 		type: 'result',
 	});
 
-	assert.deepEqual(usageSnapshots(beforeWindow), []);
 	assert.deepEqual(usageSnapshots(atResult), [
-		{ contextWindow: 200_000, percent: 60.25, tokens: 120_500 },
+		{ contextWindow: 200_000, percent: 60, tokens: 120_000 },
 	]);
+});
+
+test('a runtime that answers nothing leaves the gauge unreported', () => {
+	const { normalize, observeContextUsage } = createNormalizer();
+	normalize(initMessage());
+
+	assert.deepEqual(
+		usageSnapshots(observeContextUsage({ contextWindow: 0, tokens: 0 })),
+		[],
+	);
+});
+
+test('a direct reading never walks back an occupancy the stream already moved', () => {
+	const { normalize, observeContextUsage } = createNormalizer();
+	normalize(initMessage());
+	normalize(assistantMessage({ cache_read_input_tokens: 250_000 }));
+
+	assert.deepEqual(
+		usageSnapshots(
+			observeContextUsage({ contextWindow: 1_000_000, tokens: 23_000 }),
+		),
+		[{ contextWindow: 1_000_000, percent: 25, tokens: 250_000 }],
+	);
+});
+
+test('a direct reading that lands late never undoes what the turn reported', () => {
+	const { normalize, observeContextUsage } = createNormalizer();
+	normalize(initMessage());
+	normalize({
+		modelUsage: { 'claude-opus-5': { contextWindow: 200_000 } },
+		subtype: 'success',
+		type: 'result',
+	});
+	normalize(assistantMessage({ input_tokens: 150_000 }));
+
+	assert.deepEqual(
+		usageSnapshots(
+			observeContextUsage({ contextWindow: 1_000_000, tokens: 23_000 }),
+		),
+		[],
+	);
 });
 
 test('the window comes from the main model, not a wider subagent model', () => {

@@ -9,7 +9,14 @@ function model(
 	provider: string,
 	agentProvider: AgentProviderId = 'pi',
 ): ComposerModelOption {
-	return { agentProvider, displayName: id, id, isDefault: false, provider };
+	return {
+		agentProvider,
+		contextWindow: 200_000,
+		displayName: id,
+		id,
+		isDefault: false,
+		provider,
+	};
 }
 
 const OPTIONS: readonly ComposerModelOption[] = [

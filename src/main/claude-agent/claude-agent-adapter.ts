@@ -286,6 +286,39 @@ function createClaudeSession({
 		}
 	};
 
+	/**
+	 * Asks the runtime what this session's window is and how much of it the system
+	 * prompt, tools and memory already occupy. Claude names its window nowhere in
+	 * the message stream until a turn's `result`, so without this the gauge has no
+	 * denominator for the whole of the first turn — and the account's own figure
+	 * is the only trustworthy one, since the SDK's model catalog publishes none.
+	 */
+	const probeContextUsage = async (): Promise<void> => {
+		if (!activeQuery) {
+			return;
+		}
+		try {
+			const usage = await activeQuery.getContextUsage();
+			// Guarded after the await, not before it: this asks whether the session
+			// died during the control round trip, which hoisting it would stop it
+			// being able to answer.
+			if (closed) {
+				return;
+			}
+			for (const event of normalizer.observeContextUsage({
+				contextWindow: usage.maxTokens,
+				tokens: usage.totalTokens,
+			})) {
+				forward(event);
+			}
+		} catch (cause) {
+			console.warn('[claude-agent] could not read the session context usage.', {
+				cause: cause instanceof Error ? cause.message : String(cause),
+				sessionId: agentSessionId,
+			});
+		}
+	};
+
 	try {
 		activeQuery = queryFn({
 			options: buildQueryOptions({
@@ -308,6 +341,7 @@ function createClaudeSession({
 	}
 
 	void pump();
+	void probeContextUsage();
 
 	const session: AgentAdapterSession = {
 		/**

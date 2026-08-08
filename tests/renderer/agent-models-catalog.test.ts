@@ -16,6 +16,7 @@ function catalog(ids: readonly string[]): AgentModelCatalog {
 		defaultThinkingLevel: ids.length > 0 ? 'medium' : null,
 		models: ids.map((id) => ({
 			agentProvider: 'pi' as const,
+			contextWindow: 200_000,
 			displayName: id,
 			id,
 			provider: id.split('/')[0] ?? 'other',

@@ -436,15 +436,68 @@ test('parses pi --list-models provider/model output', () => {
 			modelCount: 2,
 			models: [
 				{
+					contextWindow: 272_000,
 					id: 'openai-codex/gpt-5.5',
 					model: 'gpt-5.5',
 					provider: 'openai-codex',
 				},
-				{ id: 'anthropic/claude', model: 'claude', provider: 'anthropic' },
+				{
+					contextWindow: 200_000,
+					id: 'anthropic/claude',
+					model: 'claude',
+					provider: 'anthropic',
+				},
 			],
 			providerCount: 2,
 		},
 	);
+});
+
+test('reads the context column as tokens, whatever unit it is printed in', () => {
+	const parsed = parsePiListModelsOutput(
+		`provider   model     context
+anthropic  opus      1M
+lmstudio   glm       262.1K
+ollama     tiny      8192
+legacy     unsized   yes
+`,
+	);
+
+	assert.deepEqual(
+		parsed.models.map((row) => row.contextWindow),
+		[1_000_000, 262_100, 8_192, null],
+	);
+});
+
+test('rejects a bare number too small to be a window, whatever column it is', () => {
+	const parsed = parsePiListModelsOutput(
+		`provider   model   price   context
+anthropic  opus    3.00    200K
+openai     gpt     12      1M
+`,
+	);
+
+	assert.deepEqual(
+		parsed.models.map((row) => row.contextWindow),
+		[null, null],
+	);
+});
+
+test('reports an unknown window on a build that prints no context column', () => {
+	const parsed = parsePiListModelsOutput(
+		`provider   model
+anthropic  opus
+`,
+	);
+
+	assert.deepEqual(parsed.models, [
+		{
+			contextWindow: null,
+			id: 'anthropic/opus',
+			model: 'opus',
+			provider: 'anthropic',
+		},
+	]);
 });
 
 test('parses single-space-separated table rows', () => {
@@ -460,16 +513,19 @@ anthropic claude-sonnet-4 200K 8.0K yes yes
 			modelCount: 3,
 			models: [
 				{
+					contextWindow: 1_000_000,
 					id: 'google/gemini-2.0-flash',
 					model: 'gemini-2.0-flash',
 					provider: 'google',
 				},
 				{
+					contextWindow: 1_000_000,
 					id: 'google/gemini-2.5-pro',
 					model: 'gemini-2.5-pro',
 					provider: 'google',
 				},
 				{
+					contextWindow: 200_000,
 					id: 'anthropic/claude-sonnet-4',
 					model: 'claude-sonnet-4',
 					provider: 'anthropic',

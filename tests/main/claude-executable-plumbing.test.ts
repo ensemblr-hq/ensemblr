@@ -27,6 +27,7 @@ import type { PiExecutableSnapshot } from '../../src/main/pi-runtime/pi-executab
 import { openEnsemblrDatabase } from '../../src/main/storage/database.ts';
 import type { AgentProviderId } from '../../src/shared/agent-provider.ts';
 import type { SettingsResolutionSnapshot } from '../../src/shared/ipc/contracts/settings-resolution.ts';
+import { CONTEXT_USAGE } from './helpers/claude-context-usage.ts';
 
 const WORKSPACE_ID = 'ws-exec';
 const WORKSPACE_CWD = '/tmp/ensemblr/exec/ws';
@@ -86,6 +87,7 @@ function createPendingQuery(): Query {
 	return Object.assign(iterator, {
 		applyFlagSettings: async () => undefined,
 		close: () => undefined,
+		getContextUsage: async () => CONTEXT_USAGE,
 		interrupt: async () => undefined,
 		setModel: async () => undefined,
 		setPermissionMode: async () => undefined,
@@ -383,6 +385,27 @@ describe('the model lister runs the same binary the session will', () => {
 			expect.objectContaining({ id: 'opus' }),
 		);
 		expect(captured[0]?.pathToClaudeCodeExecutable).toBe(OVERRIDE_PATH);
+	});
+
+	it('gives the measured window to that model alone, not the whole catalog', async () => {
+		const lister = createClaudeModelLister({
+			queryFn: () =>
+				Object.assign(createPendingQuery(), {
+					supportedModels: async (): Promise<readonly ModelInfo[]> => [
+						{ resolvedModel: CONTEXT_USAGE.model, value: 'opus' } as ModelInfo,
+						{ resolvedModel: 'claude-sonnet-5', value: 'sonnet' } as ModelInfo,
+					],
+				}) as unknown as Query,
+			resolveBaseEnv: () => ({ PATH: '/usr/bin' }),
+			resolveExecutablePath: async () => OVERRIDE_PATH,
+		});
+
+		const windows = new Map(
+			(await lister()).map((model) => [model.id, model.contextWindow]),
+		);
+
+		expect(windows.get('opus')).toBe(CONTEXT_USAGE.maxTokens);
+		expect(windows.get('sonnet')).toBeNull();
 	});
 });
 
