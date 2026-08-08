@@ -35,6 +35,7 @@ import {
 	formatAllCommentsContext,
 	formatCommentContext,
 	formatTodoContext,
+	isOutstandingComment,
 } from '@/renderer/lib/workbench/review-context';
 import { useComposerInsert } from '@/renderer/state/composer';
 import {
@@ -341,9 +342,15 @@ function ChecksPullRequestPanel({
 	const insertIntoComposer = useComposerInsert();
 	const gitStatusSection = resolveGitStatusSection(state);
 
-	// GitHub review comments first, then the user's own local notes.
+	// GitHub review comments first, then the user's own local notes. The PR model
+	// already projects open local comments into its own list, so those are dropped
+	// here rather than rendered twice — `localComments` carries the resolution
+	// state and authorship the projection leaves behind.
 	const comments = useMemo(
-		() => [...pullRequest.comments, ...localComments],
+		() => [
+			...pullRequest.comments.filter((comment) => comment.provider !== 'local'),
+			...localComments,
+		],
 		[pullRequest.comments, localComments],
 	);
 
@@ -451,8 +458,9 @@ function ConflictsSection({
 /**
  * "Comments" section listing GitHub review comments and Ensemblr-local notes
  * together. Each row opens a read-only preview, adds itself to chat, or hides for
- * the session; the header adds every visible comment to chat at once. Session
- * hides are keyed by workspace so they never leak across a workspace switch.
+ * the session; the header adds every visible *outstanding* comment to chat at
+ * once, since a resolved thread is work already done and only dilutes the ask.
+ * Session hides are keyed by workspace so they never leak across a switch.
  */
 function CommentsSection({
 	comments,
@@ -477,6 +485,7 @@ function CommentsSection({
 	const visibleComments = comments.filter(
 		(comment) => !hidden.ids.has(comment.id),
 	);
+	const outstandingComments = visibleComments.filter(isOutstandingComment);
 
 	const addCommentToChat = (comment: PullRequestCommentSummary) => {
 		insertIntoComposer(formatCommentContext(comment, prNumber));
@@ -501,13 +510,13 @@ function CommentsSection({
 	return (
 		<section className='flex min-w-0 flex-col gap-1.5'>
 			<ChecksSectionHeader
-				actionLabel={visibleComments.length ? 'Add all to chat' : undefined}
+				actionLabel={outstandingComments.length ? 'Add all to chat' : undefined}
 				label='Comments'
 				onAction={() => {
 					insertIntoComposer(
-						formatAllCommentsContext(visibleComments, prNumber),
+						formatAllCommentsContext(outstandingComments, prNumber),
 					);
-					toast.success('All comments added to chat.');
+					toast.success('Outstanding comments added to chat.');
 				}}
 			/>
 			{visibleComments.length ? (

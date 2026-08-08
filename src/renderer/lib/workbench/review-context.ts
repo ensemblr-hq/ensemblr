@@ -34,13 +34,32 @@ export function formatCommentContext(
 	if (comment.url) {
 		lines.push(`Link: ${comment.url}`);
 	}
-	if (comment.isResolved === false) {
-		lines.push('Thread is unresolved.');
+	if (typeof comment.isResolved === 'boolean') {
+		lines.push(
+			comment.isResolved ? 'Thread is resolved.' : 'Thread is unresolved.',
+		);
 	}
 	if (comment.isOutdated) {
 		lines.push('Thread is outdated against the current diff.');
 	}
 	return clampReviewContext(lines.join('\n'));
+}
+
+/**
+ * Whether a comment still reads as work the agent could pick up. A comment with
+ * no resolution state at all — a plain issue comment, a bot annotation — counts
+ * as outstanding, because nothing has said otherwise and CI feedback is work.
+ *
+ * Deliberately looser than the merge dialog's unresolved count, which gates on
+ * explicitly-open threads only: a bot annotation can never be resolved, so
+ * counting it there would raise a merge warning the user cannot clear.
+ * @param comment - The comment to classify
+ * @returns True unless the comment is explicitly resolved
+ */
+export function isOutstandingComment(
+	comment: PullRequestCommentSummary,
+): boolean {
+	return comment.isResolved !== true;
 }
 
 /**
@@ -79,7 +98,7 @@ function describeCommentLabel(
 	return author ? `${author} — ${source}` : source;
 }
 
-/** Formats every PR comment into one context block ("Add all to chat"). */
+/** Formats the given PR comments into one context block ("Add all to chat"). */
 export function formatAllCommentsContext(
 	comments: readonly PullRequestCommentSummary[],
 	prNumber?: number,

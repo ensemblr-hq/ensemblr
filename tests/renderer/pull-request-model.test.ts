@@ -674,6 +674,28 @@ describe('review context formatting', () => {
 		expect(text).toContain('Thread is unresolved.');
 	});
 
+	// Adding a single resolved row to chat stays available, so the block has to say
+	// the thread is closed or Pi reads settled feedback as work still to do.
+	test('a resolved thread says so, and one with no state says neither', () => {
+		const resolved = formatCommentContext({
+			body: 'Handled.',
+			detail: 'Handled.',
+			id: 'c1',
+			isResolved: true,
+			provider: 'github',
+		});
+		const stateless = formatCommentContext({
+			body: 'React Doctor found 2 issues',
+			detail: 'React Doctor found 2 issues',
+			id: 'c2',
+			provider: 'github-actions',
+		});
+
+		expect(resolved).toContain('Thread is resolved.');
+		expect(stateless).not.toContain('Thread is resolved.');
+		expect(stateless).not.toContain('Thread is unresolved.');
+	});
+
 	test('all-comments context numbers each comment', () => {
 		const text = formatAllCommentsContext(
 			[
