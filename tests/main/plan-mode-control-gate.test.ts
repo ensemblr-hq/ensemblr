@@ -62,6 +62,7 @@ const makePorts = (planningSessions: ReadonlySet<string>): AgentControlPorts =>
 			getWorkspaceStatus: vi.fn().mockReturnValue('backlog'),
 		},
 		permissions: { getMode: () => 'workspace-trusted' },
+		language: { getLanguage: () => 'en' },
 		confirm: { confirm: vi.fn().mockResolvedValue(true) },
 		ask: { ask: vi.fn(), releaseSession: vi.fn() },
 		planMode: {

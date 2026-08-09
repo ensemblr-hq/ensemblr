@@ -66,6 +66,7 @@ export default defineConfig({
 			'tests/main/agent-control-review-ports.test.ts',
 			'tests/main/agent-control-linear-ports.test.ts',
 			'tests/main/agent-control-harness-launch-config.test.ts',
+			'tests/main/agent-control-harness-playbook-file.test.ts',
 			'tests/main/agent-control-model-resolution.test.ts',
 			'tests/main/agent-control-wait.test.ts',
 			'tests/main/agent-control-awareness-parity.test.ts',

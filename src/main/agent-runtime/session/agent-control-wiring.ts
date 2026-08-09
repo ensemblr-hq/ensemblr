@@ -34,8 +34,8 @@ const SUBAGENT_ROLE: AgentControlRole = 'subagent';
  */
 const NATIVE_MCP_PROVIDERS: ReadonlySet<AgentProviderId> = new Set(['claude']);
 
-/** Resolves the per-turn upkeep block for one agent session. */
-export type SessionBriefNudgeResolver = (
+/** Resolves everything the app prepends to one agent session's turn. */
+export type TurnPreambleResolver = (
 	sessionId: string,
 ) => Promise<string | null>;
 
@@ -97,25 +97,25 @@ function readControlMcp(
  * describes, and an inventory of absent tools only sends a model hunting.
  *
  * The turn preamble rides alongside the playbook for the same runtimes and the
- * same reason Pi does not need it: Pi's extension pulls the upkeep block itself
- * before every turn, while a runtime the app drives over MCP has its system
- * prompt fixed at session open and would otherwise never hear about naming the
- * session still owes.
- * @param input - Session identity, its runtime, the env resolver, and the upkeep-block resolver.
+ * same reason Pi does not need it: Pi's extension pulls its own blocks before
+ * every turn, while a runtime the app drives over MCP has its system prompt
+ * fixed at session open and would otherwise never hear about naming the session
+ * still owes, nor about a language switched since it opened.
+ * @param input - Session identity, its runtime, the env resolver, and the turn-preamble resolver.
  * @returns The env overlay plus the MCP endpoint, playbook, and turn preamble, where they apply.
  */
 export function resolveAgentControlWiring({
 	parentSessionId,
 	provider,
 	resolveAgentControlEnv,
-	resolveSessionBriefNudge,
+	resolveTurnPreamble,
 	sessionId,
 	workspaceId,
 }: {
 	parentSessionId: string | null;
 	provider: AgentProviderId;
 	resolveAgentControlEnv: AgentControlEnvResolver | undefined;
-	resolveSessionBriefNudge: SessionBriefNudgeResolver | undefined;
+	resolveTurnPreamble: TurnPreambleResolver | undefined;
 	sessionId: string;
 	workspaceId: string;
 }): AgentControlWiring {
@@ -141,8 +141,8 @@ export function resolveAgentControlWiring({
 	return {
 		controlMcp,
 		env,
-		resolveTurnPreamble: resolveSessionBriefNudge
-			? () => resolveSessionBriefNudge(sessionId)
+		resolveTurnPreamble: resolveTurnPreamble
+			? () => resolveTurnPreamble(sessionId)
 			: null,
 		systemPromptAppend: awarenessForAudience({
 			hasChatTab: true,

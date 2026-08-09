@@ -8,6 +8,7 @@ import {
 	createOriginRegistry,
 	type GuardrailConfig,
 } from '../../src/main/agent-control/index.ts';
+import type { AppLanguage } from '../../src/shared/i18n.ts';
 import type { PermissionMode } from '../../src/shared/permissions.ts';
 
 /**
@@ -23,6 +24,7 @@ const makePorts = (
 		terminalWorkspace: string | null;
 		planning: boolean;
 		spawnedSubAgent: boolean;
+		language: AppLanguage;
 	}> = {},
 ): AgentControlPorts => ({
 	workspaces: { listWorkspaces: vi.fn().mockResolvedValue([]) },
@@ -181,6 +183,7 @@ const makePorts = (
 		}),
 	},
 	permissions: { getMode: () => overrides.mode ?? 'workspace-trusted' },
+	language: { getLanguage: () => overrides.language ?? 'en' },
 	confirm: { confirm: vi.fn().mockResolvedValue(overrides.confirm ?? true) },
 	ask: { ask: vi.fn(), releaseSession: vi.fn() },
 	planMode: {

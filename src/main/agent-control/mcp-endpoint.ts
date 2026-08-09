@@ -434,6 +434,27 @@ export function toolDefsFor(audience: ControlAudience): readonly McpToolDef[] {
 }
 
 /**
+ * Resolves the `instructions` a connection carries: the caller's playbook, plus
+ * the language directive for a caller with no per-turn channel to receive it on.
+ * A caller with a chat tab is one the app prompts itself and already appends the
+ * directive per turn, so adding it here would only say the same thing twice.
+ * @param service - Agent-control service holding the resolved app language.
+ * @param audience - Whether the caller has a chat tab, and its lineage role.
+ * @returns The instructions to serve alongside this caller's tool list.
+ */
+function instructionsFor(
+	service: AgentControlService,
+	audience: ControlAudience,
+): string {
+	const playbook = awarenessForAudience(audience);
+	if (audience.hasChatTab) {
+		return playbook;
+	}
+	const directive = service.readLanguageDirective();
+	return directive ? `${playbook}\n\n${directive}` : playbook;
+}
+
+/**
  * Builds a fresh MCP server whose tools forward to the control service under a
  * fixed token, carrying the tool list and playbook this caller should hold.
  * @param service - Agent-control service every tool delegates to.
@@ -448,7 +469,7 @@ function buildMcpServer(
 ): McpServer {
 	const server = new McpServer(
 		{ name: 'ensemblr-control', version: '1.0.0' },
-		{ instructions: awarenessForAudience(audience) },
+		{ instructions: instructionsFor(service, audience) },
 	);
 	for (const def of toolDefsFor(audience)) {
 		server.registerTool(

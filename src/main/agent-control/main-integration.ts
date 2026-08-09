@@ -11,9 +11,11 @@ import path from 'node:path';
 import { type App, BrowserWindow, dialog } from 'electron';
 
 import {
+	buildLanguageDirective,
 	HARNESS_AWARENESS,
 	resolveAgentRole,
 } from '../../shared/agent-control.ts';
+import type { AppLanguage } from '../../shared/i18n.ts';
 import {
 	CONTROL_ROLE_ENV_KEY,
 	CONTROL_TOKEN_ENV_KEY,
@@ -34,6 +36,8 @@ interface AgentControlIntegrationDeps {
 	resolveWorkspaceCwd: (workspaceId: string) => string | null;
 	/** Current control-server base URL, or null before the server is up. */
 	getServerUrl: () => string | null;
+	/** The language the app renders in, for the harness playbook's directive. */
+	getLanguage: () => AppLanguage;
 	/**
 	 * Whether a session was spawned as somebody's sub-agent, read from the durable
 	 * tab marker rather than lineage. Omitted, the role falls back to spawn depth,
@@ -97,16 +101,28 @@ function resolvePiControlExtensionPath(app: App): string | null {
  * and never a half-truncated prompt. A staging file left behind by a failed
  * write is inert — a harness reads only `AGENTS.md` — and the next write reuses
  * and consumes it.
+ *
+ * Writing per launch also re-resolves the language directive per launch, which
+ * is the only channel a harness has for it: it reads this file once at startup
+ * and the app never prompts it again.
  * @param app - The Electron app, for the `userData` path.
+ * @param language - The language the app is rendering in.
  * @returns Absolute path to the directory holding the playbook, or null.
  */
-function writeHarnessInstructions(app: App): string | null {
+function writeHarnessInstructions(
+	app: App,
+	language: AppLanguage,
+): string | null {
 	const directory = path.join(app.getPath('userData'), 'harness-instructions');
 	const playbook = path.join(directory, HARNESS_INSTRUCTIONS_FILENAME);
 	const staging = `${playbook}.tmp`;
+	const directive = buildLanguageDirective(language);
+	const contents = directive
+		? `${HARNESS_AWARENESS}\n\n${directive}`
+		: HARNESS_AWARENESS;
 	try {
 		mkdirSync(directory, { recursive: true });
-		writeFileSync(staging, `${HARNESS_AWARENESS}\n`, 'utf8');
+		writeFileSync(staging, `${contents}\n`, 'utf8');
 		renameSync(staging, playbook);
 		return directory;
 	} catch {
@@ -186,7 +202,10 @@ export function createAgentControlIntegration(
 		decorateHarnessCommand(command, {
 			baseUrl: deps.getServerUrl(),
 			harnessId,
-			instructionsDirectory: writeHarnessInstructions(deps.app),
+			instructionsDirectory: writeHarnessInstructions(
+				deps.app,
+				deps.getLanguage(),
+			),
 			token:
 				resolveAgentControlEnv({
 					workspaceId,

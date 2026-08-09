@@ -41,6 +41,7 @@ import type {
 	WorkspaceBoardStatusValue,
 } from '../../shared/agent-control.ts';
 import type { AgentProviderId } from '../../shared/agent-provider.ts';
+import type { AppLanguage } from '../../shared/i18n.ts';
 import type { PermissionMode } from '../../shared/permissions.ts';
 
 /**
@@ -431,6 +432,17 @@ export interface PermissionPort {
 }
 
 /**
+ * Resolves the language the app renders in, so the playbooks an agent receives
+ * can carry the directive that puts its prose in the same language. Like the
+ * permission mode this is a global app setting, so it takes no workspace
+ * argument, and it is read per call rather than captured because the user can
+ * change it while sessions are live.
+ */
+export interface LanguagePort {
+	getLanguage: () => AppLanguage;
+}
+
+/**
  * Surfaces a confirmation to the human when the mode requires approval. Returns
  * true when approved. Harnesses have no native confirm channel, so this drives
  * Ensemblr's own UI regardless of the caller's species.
@@ -528,5 +540,6 @@ export interface AgentControlPorts {
 	review: ReviewPort;
 	linear: LinearPort;
 	permissions: PermissionPort;
+	language: LanguagePort;
 	confirm: ConfirmPort;
 }
