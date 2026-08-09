@@ -1,6 +1,8 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import type { TFunction } from 'i18next';
 import { useAtom } from 'jotai';
 import { useCallback, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { workspaceGitStatusQuery } from '@/renderer/api/ensemblr';
 import { mapGitStatusToReviewFiles } from '@/renderer/lib/workbench/review-files';
@@ -32,28 +34,48 @@ function sourceToScope(
 
 /**
  * Empty-state copy tailored to the active change source.
+ * @param t - Translator bound to the active language
  * @param source - The change source currently being viewed
  * @returns The title and message the empty file list shows
  */
-function emptyStateForSource(source: ChangesSource): {
+function emptyStateForSource(
+	t: TFunction,
+	source: ChangesSource,
+): {
 	message: string;
 	title: string;
 } {
 	if (source.kind === 'uncommitted') {
 		return {
-			message: 'Everything here is committed.',
-			title: 'No uncommitted changes yet',
+			message: t(
+				'git:changes-source.empty.uncommitted.message',
+				'Everything here is committed.',
+			),
+			title: t(
+				'git:changes-source.empty.uncommitted.title',
+				'No uncommitted changes yet',
+			),
 		};
 	}
 	if (source.kind === 'commit') {
 		return {
-			message: `${source.shortHash} touched no files.`,
-			title: 'No changes in this commit',
+			message: t(
+				'git:changes-source.empty.commit.message',
+				'{{shortHash}} touched no files.',
+				{ shortHash: source.shortHash },
+			),
+			title: t(
+				'git:changes-source.empty.commit.title',
+				'No changes in this commit',
+			),
 		};
 	}
 	return {
-		message: 'Changes on this branch appear here.',
-		title: 'No changes yet',
+		message: t(
+			'git:changes-source.empty.branch.message',
+			'Changes on this branch appear here.',
+		),
+		title: t('git:changes-source.empty.branch.title', 'No changes yet'),
 	};
 }
 
@@ -71,6 +93,7 @@ function emptyStateForSource(source: ChangesSource): {
  * @returns The active source, the files and count it yields, and the source setter
  */
 export function useChangesSource(workspace: WorkspaceShellModel) {
+	const { t } = useTranslation();
 	const [sourceMap, setSourceMap] = useAtom(changesSourceByWorkspaceAtom);
 	const storedSource = sourceMap[workspace.id];
 	const source = useMemo<ChangesSource>(
@@ -123,7 +146,7 @@ export function useChangesSource(workspace: WorkspaceShellModel) {
 			() => new Set(workspace.reviewFiles.map((file) => file.path)),
 			[workspace.reviewFiles],
 		),
-		emptyState: useMemo(() => emptyStateForSource(source), [source]),
+		emptyState: useMemo(() => emptyStateForSource(t, source), [t, source]),
 		isCommitLoading: source.kind === 'commit' && isSourceStatusLoading,
 		scope,
 		setSource,

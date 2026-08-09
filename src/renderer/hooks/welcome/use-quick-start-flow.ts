@@ -11,6 +11,7 @@ import {
 	rootDirectoryQuery,
 	selectCloneDestination,
 } from '@/renderer/api/ensemblr-queries';
+import { failureText } from '@/renderer/lib/failure-text';
 import { seedFirstWorkspace } from '@/renderer/lib/workbench/seed-first-workspace';
 import { lastWorkspaceSelectionAtom } from '@/renderer/state/workspace';
 import type {
@@ -132,7 +133,7 @@ export function useQuickStartFlow({
 				// opening the first workspace succeeded — the project may have no
 				// GitHub remote either way.
 				for (const warning of warnings) {
-					toast.warning(warning.message);
+					toast.warning(failureText(t, warning) ?? warning.message);
 				}
 				onSuccess?.();
 				return result;

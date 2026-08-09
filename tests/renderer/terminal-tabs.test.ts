@@ -1,5 +1,7 @@
 import { describe, expect, test } from 'vitest';
 
+import { i18n } from '../../src/renderer/lib/i18n';
+
 import {
 	mapTerminalSessionsToDockTabs,
 	reduceTerminalInputActivity,
@@ -28,6 +30,7 @@ function createSession(
 		rows: 24,
 		scriptName: null,
 		status: 'running',
+		titleIsDefault: false,
 		title: 'Terminal',
 		workspaceId: 'workspace-1',
 		...overrides,
@@ -83,7 +86,9 @@ describe('terminalSessionToDockStatus', () => {
 
 describe('mapTerminalSessionsToDockTabs', () => {
 	test('returns no terminal tabs when no interactive sessions exist', () => {
-		expect(mapTerminalSessionsToDockTabs({ sessions: [] })).toEqual([]);
+		expect(mapTerminalSessionsToDockTabs({ sessions: [], t: i18n.t })).toEqual(
+			[],
+		);
 	});
 
 	test('maps interactive sessions to terminal tabs and skips script sessions', () => {
@@ -93,6 +98,7 @@ describe('mapTerminalSessionsToDockTabs', () => {
 				createSession({ id: 'b', kind: 'run-script', title: 'Run' }),
 				createSession({ id: 'c', status: 'failed', title: 'Terminal 2' }),
 			],
+			t: i18n.t,
 		});
 
 		expect(tabs).toHaveLength(2);
@@ -110,6 +116,7 @@ describe('mapTerminalSessionsToDockTabs', () => {
 				createSession({ id: 'a', title: 'Terminal' }),
 				createSession({ id: 'b', status: 'exited', title: 'Terminal 2' }),
 			],
+			t: i18n.t,
 		});
 
 		expect(tabs[0]?.status).toBe('running');

@@ -300,8 +300,51 @@ test('renders reconciliation errors as a danger apply result', () => {
 	expect(markup).toContain('text-status-danger');
 	expect(markup).toContain('reconcile-directory-read-failed');
 	expect(markup).toContain(
+		'A directory under the root could not be read during the scan.',
+	);
+	// Main's own sentence restates the headline without adding runtime detail,
+	// so it would read as an untranslated second line in every locale.
+	expect(markup).not.toContain(
 		'Failed to read workspaces during root reconciliation.',
 	);
+	expect(markup).toContain('/Users/alice/Conductor/workspaces');
+});
+
+test('keeps a diagnostic message that carries detail the code cannot', () => {
+	const preview = createRootDirectoryPreview();
+	const applyResult: RootDirectoryChangeApplyResult = {
+		applied: true,
+		newRoot: preview.newRoot,
+		oldRoot: preview.oldRoot,
+		oldRootPreserved: true,
+		reconciliation: {
+			diagnostics: [
+				{
+					code: 'reconcile-directory-read-failed',
+					message: 'EACCES: permission denied, scandir "/Users/alice/locked".',
+					severity: 'error',
+				},
+			],
+			repositoryDirectoryCount: 1,
+			scannedAt: '2026-06-06T08:05:00.000Z',
+			status: 'error',
+			workspaceDirectoryCount: 0,
+		},
+	};
+	const markup = renderToStaticMarkup(
+		<RootDirectoryChangeContent
+			applyResult={applyResult}
+			canApply={true}
+			isApplying={false}
+			onConfirm={() => undefined}
+			preview={preview}
+		/>,
+	);
+
+	expect(markup).toContain(
+		'A directory under the root could not be read during the scan.',
+	);
+	expect(markup).toContain('EACCES: permission denied, scandir');
 });
 
 function createRootDirectoryPreview(): RootDirectoryChangePreview {

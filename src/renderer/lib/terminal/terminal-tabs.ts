@@ -1,3 +1,5 @@
+import type { TFunction } from 'i18next';
+
 import type { TerminalInputEventDetail } from '@/renderer/types/terminal';
 import type {
 	DockTabStatus,
@@ -131,9 +133,11 @@ export function terminalSessionToDockStatus(
 export function mapTerminalSessionsToDockTabs({
 	activeTerminalIds = new Set(),
 	sessions,
+	t,
 }: {
 	activeTerminalIds?: ReadonlySet<string>;
 	sessions: readonly TerminalSessionSnapshot[];
+	t: TFunction;
 }): TerminalDockTabModel[] {
 	const tabs: TerminalDockTabModel[] = [];
 	for (const session of sessions) {
@@ -143,7 +147,9 @@ export function mapTerminalSessionsToDockTabs({
 		tabs.push({
 			id: `terminal:${session.id}` as const,
 			kind: 'terminal',
-			label: session.title,
+			label: session.titleIsDefault
+				? t('workbench:dock-tab.terminal.label', 'Terminal')
+				: session.title,
 			sessionStatus: session.status,
 			status:
 				session.status === 'running' && activeTerminalIds.has(session.id)

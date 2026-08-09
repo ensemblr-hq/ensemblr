@@ -45,11 +45,12 @@
 		"delete": "Διαγραφή σχολίου",
 		"go-to-line": "Μετάβαση στη γραμμή στο diff",
 		"hide": "Απόκρυψη σχολίου",
+		"no-description": "Χωρίς περιγραφή",
 		"outdated": "Παρωχημένο",
 		"reopen": "Επανάνοιγμα σχολίου",
 		"resolve": "Επίλυση σχολίου",
 		"resolved": "Επιλυμένο",
-		"source-actions-bot": "Bot Actions",
+		"source-actions-bot": "Bot του Actions",
 		"source-local": "Τοπικό",
 		"submit": "Σχολιασμός",
 		"unresolved": "Ανεπίλυτο"

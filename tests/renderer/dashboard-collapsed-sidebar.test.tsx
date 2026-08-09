@@ -13,10 +13,9 @@ import {
 	WorkbenchLayoutModelProvider,
 } from '../../src/renderer/components/workbench-shell/shell-contexts';
 import { shellFixtureProjects } from '../../src/renderer/fixtures/workbench/projects';
-import {
-	BOARD_STATUS_LABELS,
-	BOARD_STATUS_ORDER,
-} from '../../src/renderer/state/workspace';
+import { i18n } from '../../src/renderer/lib/i18n';
+import { boardStatusLabel } from '../../src/renderer/lib/workbench/board-status-presentation';
+import { BOARD_STATUS_ORDER } from '../../src/renderer/state/workspace';
 import type { SetupDiagnosticsContextValue } from '../../src/renderer/types/contexts';
 import type { ProjectShellModel } from '../../src/renderer/types/workbench';
 import type { WorkbenchLayoutModel } from '../../src/renderer/types/workbench-shell';
@@ -132,7 +131,7 @@ test('keeps the dashboard board accessible when no workspace exists', () => {
 	for (const status of BOARD_STATUS_ORDER) {
 		expect(
 			screen.getByRole('region', {
-				name: `${BOARD_STATUS_LABELS[status]} column, 0 workspaces`,
+				name: `${boardStatusLabel(i18n.t, status)} column, 0 workspaces`,
 			}),
 		).toBeTruthy();
 	}

@@ -13,6 +13,7 @@ import {
 	refreshPullRequestSnapshot,
 } from '@/renderer/api/ensemblr-queries';
 import { useRemoveWorkspaceAction } from '@/renderer/hooks/workbench-shell/use-remove-workspace-action';
+import { failureText } from '@/renderer/lib/failure-text';
 import { i18n } from '@/renderer/lib/i18n';
 import {
 	ReviewActionError,
@@ -40,7 +41,9 @@ function announceContinueSuccess(
 		{ branch: branchName },
 	);
 	if (warning) {
-		toast.warning(title, { description: warning.message });
+		toast.warning(title, {
+			description: failureText(i18n.t, warning) ?? undefined,
+		});
 		return;
 	}
 	toast.success(title);

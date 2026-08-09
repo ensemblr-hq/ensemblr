@@ -67,11 +67,14 @@
 			"none": "Без приоритета",
 			"urgent": "Срочный"
 		},
+		"save-failed": "Не удалось сохранить задачу. Проверьте соединение и повторите.",
 		"saving": "Сохранение…",
 		"submit-create": "Создать задачу",
 		"submit-edit": "Сохранить изменения",
+		"team-required": "Выберите команду для новой задачи.",
 		"title-create": "Новая задача Linear",
 		"title-edit": "Изменить {{identifier}}",
+		"title-required": "Нужен заголовок.",
 		"unset-option": "{{field}}: нет"
 	},
 	"issue-list": {

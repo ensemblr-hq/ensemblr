@@ -1,8 +1,10 @@
 import { describe, expect, test } from 'vitest';
 
+import { i18n } from '../../src/renderer/lib/i18n';
+
+import { boardStatusLabel } from '../../src/renderer/lib/workbench/board-status-presentation';
 import {
 	applyBoardStatus,
-	BOARD_STATUS_LABELS,
 	BOARD_STATUS_ORDER,
 	DEFAULT_BOARD_STATUS,
 	resolveBoardStatus,
@@ -46,7 +48,7 @@ describe('board status metadata', () => {
 
 	test('every ordered status has a label', () => {
 		for (const status of BOARD_STATUS_ORDER) {
-			expect(BOARD_STATUS_LABELS[status]).toBeTruthy();
+			expect(boardStatusLabel(i18n.t, status)).toBeTruthy();
 		}
 	});
 });

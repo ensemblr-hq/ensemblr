@@ -11,6 +11,7 @@ import {
 const BUNDLED_MONO_FONT = 'JetBrainsMono Nerd Font Mono';
 
 /** Fallback monospace stack appended after the user's chosen font. */
+// i18next-instrument-ignore -- font family names
 const MONO_FALLBACK_STACK = `"${BUNDLED_MONO_FONT}", "JetBrains Mono Variable", "JetBrains Mono", Menlo, Consolas, monospace`;
 
 /** Root classes for each non-default accessible-color variant. */

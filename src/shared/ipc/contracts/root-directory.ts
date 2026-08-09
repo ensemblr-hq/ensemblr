@@ -19,9 +19,35 @@ export type RootDirectoryManagedPathStatus =
 	| 'missing'
 	| 'present';
 
+/** Stable diagnostic code for a managed-root problem the renderer translates. */
+export type RootDirectoryDiagnosticCode =
+	| 'managed-directory-create-failed'
+	| 'managed-directory-missing'
+	| 'managed-directory-read-failed'
+	| 'managed-directory-stat-failed'
+	| 'managed-directory-unwritable'
+	| 'managed-path-not-directory'
+	| 'reconcile-child-not-directory'
+	| 'reconcile-directory-read-failed'
+	| 'reconcile-path-stat-failed'
+	| 'reconcile-workspace-repository-not-directory'
+	| 'root-create-failed'
+	| 'root-missing'
+	| 'root-not-directory'
+	| 'root-read-failed'
+	| 'root-setting-empty'
+	| 'root-setting-invalid-type'
+	| 'root-setting-locked'
+	| 'root-setting-missing'
+	| 'root-setting-relative'
+	| 'root-stat-failed'
+	| 'root-unwritable'
+	| 'shared-root-content'
+	| 'unsafe-root-content';
+
 /** A single diagnostic about the managed root directory. */
 export interface RootDirectoryDiagnostic {
-	code: string;
+	code: RootDirectoryDiagnosticCode;
 	message: string;
 	path?: string;
 	severity: RootDirectoryDiagnosticSeverity;

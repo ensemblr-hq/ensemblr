@@ -92,7 +92,7 @@ export function useForkConversation({
 			void (async () => {
 				try {
 					const opened = await openChatTab({
-						title: 'Forked chat',
+						title: t('workbench:fork.new-tab-title', 'Forked chat'),
 						workspaceId: workspace.id,
 					});
 					await attachSummary({ chatTabId: opened.tab.id, upToOrdinal });
@@ -152,7 +152,7 @@ export function useForkConversation({
 					}
 					const target = created.workspace;
 					const opened = await openChatTab({
-						title: 'Forked chat',
+						title: t('workbench:fork.new-tab-title', 'Forked chat'),
 						workspaceId: target.id,
 					});
 					await attachSummary({

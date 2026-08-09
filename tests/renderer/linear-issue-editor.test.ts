@@ -27,12 +27,12 @@ test('validateIssueEditorFields: requires a title always and a team on create', 
 	const fields = createIssueEditorFields();
 
 	expect(validateIssueEditorFields(fields, 'create')).toEqual({
-		error: 'A title is required.',
+		code: 'title-required',
 		ok: false,
 	});
 	expect(
 		validateIssueEditorFields({ ...fields, title: 'X' }, 'create'),
-	).toEqual({ error: 'Choose a team for the new issue.', ok: false });
+	).toEqual({ code: 'team-required', ok: false });
 	expect(
 		validateIssueEditorFields(
 			{ ...fields, teamId: 'team-1', title: 'X' },

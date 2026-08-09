@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { isRootDirectoryPickerAction } from '@/renderer/lib/setup-diagnostics';
 import type {
@@ -42,6 +43,7 @@ export function useRootDirectoryChange({
 	onRemediationAction,
 	onRetry,
 }: UseRootDirectoryChangeOptions = {}): UseRootDirectoryChangeResult {
+	const { t } = useTranslation();
 	const [selection, setSelection] =
 		useState<RootDirectorySelectionResult | null>(null);
 	const [applyResult, setApplyResult] =
@@ -61,7 +63,10 @@ export function useRootDirectoryChange({
 
 			if (!next) {
 				setActionError(
-					'Root directory selection is unavailable in this context.',
+					t(
+						'settings:root-directory.error.picker-unavailable',
+						'Root directory selection is unavailable in this context.',
+					),
 				);
 				return;
 			}
@@ -72,7 +77,11 @@ export function useRootDirectoryChange({
 
 			if (next.error || !next.preview) {
 				setActionError(
-					next.error ?? 'The selected root directory could not be previewed.',
+					next.error ??
+						t(
+							'settings:root-directory.error.preview-failed',
+							'The selected root directory could not be previewed.',
+						),
 				);
 				return;
 			}
@@ -88,7 +97,12 @@ export function useRootDirectoryChange({
 		const path = selection?.preview?.newRoot.path;
 
 		if (!path) {
-			setActionError('No root directory path was selected.');
+			setActionError(
+				t(
+					'settings:root-directory.error.no-path-selected',
+					'No root directory path was selected.',
+				),
+			);
 			return;
 		}
 
@@ -102,7 +116,10 @@ export function useRootDirectoryChange({
 
 			if (!result) {
 				setActionError(
-					'Root directory changes are unavailable in this context.',
+					t(
+						'settings:root-directory.error.change-unavailable',
+						'Root directory changes are unavailable in this context.',
+					),
 				);
 				return;
 			}

@@ -5,6 +5,7 @@ import {
 	useCallback,
 	useState,
 } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import {
 	formatExternalAttachmentText,
@@ -76,6 +77,7 @@ export function useComposerSubmit({
 	setUploadAttachments: Dispatch<SetStateAction<readonly File[]>>;
 	setValue: Dispatch<SetStateAction<string>>;
 }) {
+	const { t } = useTranslation();
 	const [pending, setPending] = useState(false);
 	const [blockedNotice, setBlockedNotice] = useState(false);
 	const followUp = useAtomValue(followUpBehaviorAtom);
@@ -125,7 +127,10 @@ export function useComposerSubmit({
 				setAttachmentError(
 					cause instanceof Error
 						? cause.message
-						: 'Failed to attach selected file.',
+						: t(
+								'workbench:composer.attachment-failed',
+								'Failed to attach selected file.',
+							),
 				);
 			} finally {
 				setPending(false);
@@ -139,6 +144,7 @@ export function useComposerSubmit({
 			setExternalAttachments,
 			setUploadAttachments,
 			setMentionAttachments,
+			t,
 		],
 	);
 

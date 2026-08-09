@@ -14,8 +14,13 @@ export interface LinearIssueEditorFields {
 	title: string;
 }
 
+/** Why the editor form failed validation, translated at the call site. */
+export type IssueEditorValidationCode = 'team-required' | 'title-required';
+
 /** Validation outcome for the editor form. */
-export type IssueEditorValidation = { error: string; ok: false } | { ok: true };
+export type IssueEditorValidation =
+	| { code: IssueEditorValidationCode; ok: false }
+	| { ok: true };
 
 /** Connection-level gate state for every Linear surface. */
 export type LinearGateState =

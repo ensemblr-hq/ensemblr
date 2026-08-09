@@ -14,6 +14,7 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from '@/renderer/components/ui/dialog';
+import { failureText } from '@/renderer/lib/failure-text';
 import type { DiscardChangesTarget } from '@/renderer/types/workbench';
 
 /**
@@ -83,7 +84,7 @@ function DiscardChangesDialogForm({
 		},
 		onSuccess: (result) => {
 			if (result.error) {
-				setErrorMessage(result.error.message);
+				setErrorMessage(failureText(t, result.error));
 				return;
 			}
 			onOpenChange(false);

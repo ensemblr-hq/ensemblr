@@ -28,6 +28,7 @@ export default defineConfig({
 		include: [
 			'tests/renderer/**/*.test.{ts,tsx}',
 			'tests/shared/**/*.test.ts',
+			'tests/scripts/**/*.test.mjs',
 			'tests/main/branch-name-slug.test.ts',
 			'tests/main/pi-wire-content-blocks.test.ts',
 			'tests/main/sanitize-title.test.ts',

@@ -2,11 +2,11 @@ import { useQuery } from '@tanstack/react-query';
 import { FileDiffIcon } from 'lucide-react';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-
 import { turnDiffQuery } from '@/renderer/api/ensemblr-queries';
 import { CodeViewerHeader } from '@/renderer/components/code-surface';
 import { DiffViewer } from '@/renderer/components/diff-viewer';
 import { splitCombinedPatch } from '@/renderer/lib/diff/parse';
+import { failureText } from '@/renderer/lib/failure-text';
 import type { TurnDiffFileWire } from '@/shared/ipc/contracts/checkpoint';
 
 import { PanelMessage } from './panel-message';
@@ -57,7 +57,9 @@ export function TurnDiffPanel({ turnId }: { turnId: string | null }) {
 
 	const result = data;
 	if (!result.ok) {
-		return <PanelMessage message={result.error.message} tone='error' />;
+		return (
+			<PanelMessage message={failureText(t, result.error) ?? ''} tone='error' />
+		);
 	}
 
 	const files = result.files;

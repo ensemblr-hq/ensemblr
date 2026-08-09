@@ -1,7 +1,6 @@
 import { ChevronsUpDownIcon, GitBranchIcon } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
-
 import { Button } from '@/renderer/components/ui/button';
 import {
 	Command,
@@ -18,6 +17,7 @@ import {
 	PopoverTrigger,
 } from '@/renderer/components/ui/popover';
 import { useBranchOptions } from '@/renderer/hooks/git/use-branch-options';
+import { failureText } from '@/renderer/lib/failure-text';
 import { cn } from '@/renderer/lib/utils';
 import { bareBranchName } from '@/shared/branch-ref';
 import type { RepositoryBranchWire } from '@/shared/ipc/contracts/workspace-sources';
@@ -67,6 +67,7 @@ export function BranchPicker({
 	searchPlaceholder,
 	value,
 }: BranchPickerProps) {
+	const { t } = useTranslation();
 	const [open, setOpen] = useState(false);
 	const [search, setSearch] = useState('');
 	const { branches, error, isLoading } = useBranchOptions(repositoryId, open);
@@ -115,7 +116,7 @@ export function BranchPicker({
 					/>
 					<CommandList>
 						<BranchListStatus
-							error={error?.message ?? null}
+							error={failureText(t, error)}
 							isEmpty={branches.length === 0 && !offersTypedRef}
 							isLoading={isLoading}
 							remediation={error?.remediation ?? null}

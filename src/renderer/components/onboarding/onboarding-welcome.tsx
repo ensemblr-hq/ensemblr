@@ -7,6 +7,7 @@ import { WelcomeWordmark } from '@/renderer/components/welcome/welcome-wordmark'
 import type { OnboardingCheckId } from '@/renderer/types/onboarding';
 
 import { OnboardingBrandSwatch } from './onboarding-brand-mark';
+import { OnboardingLanguagePicker } from './onboarding-language-picker';
 
 /**
  * The three things setup covers, previewed before the wizard starts. Each row
@@ -73,7 +74,10 @@ export function OnboardingWelcome({
 	};
 
 	return (
-		<div className='flex size-full items-center justify-center overflow-y-auto bg-canvas px-8 py-14'>
+		<div className='relative flex size-full items-center justify-center overflow-y-auto bg-canvas px-8 py-14'>
+			<div className='absolute top-4 right-4 z-10'>
+				<OnboardingLanguagePicker />
+			</div>
 			<section className='flex w-full max-w-lg flex-col items-center gap-10 text-center'>
 				<motion.div
 					animate={{ opacity: 1, y: 0 }}

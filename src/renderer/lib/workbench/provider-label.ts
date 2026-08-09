@@ -7,6 +7,7 @@ export function getProviderLabel(provider: ProviderMarkKind) {
 		return 'GitHub';
 	}
 
+	// i18next-instrument-ignore -- product name
 	if (provider === 'github-actions') {
 		return 'GitHub Actions';
 	}

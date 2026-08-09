@@ -1,4 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
+import type { TFunction } from 'i18next';
+import { useTranslation } from 'react-i18next';
 
 import {
 	ensemblrQueryKeys,
@@ -27,27 +29,39 @@ function resolveDiffPlaceholder({
 	hasPatch,
 	isError,
 	isPending,
+	t,
 }: {
 	errorMessage: string | null;
 	hasFilePath: boolean;
 	hasPatch: boolean;
 	isError: boolean;
 	isPending: boolean;
+	t: TFunction;
 }): DiffPlaceholder | null {
 	if (!hasFilePath) {
-		return { message: 'This tab has no file associated.' };
+		return {
+			message: t(
+				'workbench:file-diff.no-file',
+				'This tab has no file associated.',
+			),
+		};
 	}
 	if (isPending) {
-		return { message: 'Loading diff…' };
+		return { message: t('workbench:file-diff.loading', 'Loading diff…') };
 	}
 	if (isError) {
-		return { message: 'Could not load diff.', tone: 'error' };
+		return {
+			message: t('workbench:file-diff.load-failed', 'Could not load diff.'),
+			tone: 'error',
+		};
 	}
 	if (errorMessage) {
 		return { message: errorMessage, tone: 'error' };
 	}
 	if (!hasPatch) {
-		return { message: 'No changes in this file.' };
+		return {
+			message: t('workbench:file-diff.no-changes', 'No changes in this file.'),
+		};
 	}
 	return null;
 }
@@ -70,6 +84,7 @@ export function useFileDiffContent({
 	scope?: WorkspaceGitDiffScope;
 	workspaceCwd: string | null;
 }) {
+	const { t } = useTranslation();
 	const diff = useQuery(
 		workspaceFileDiffQuery({ filePath, scope, workspaceCwd }),
 	);
@@ -103,6 +118,7 @@ export function useFileDiffContent({
 			hasPatch: Boolean(patch),
 			isError: diff.isError,
 			isPending: diff.isPending,
+			t,
 		}),
 		resolvedPath,
 	};

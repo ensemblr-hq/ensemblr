@@ -89,12 +89,32 @@
 		"url-label": "Repository URL",
 		"url-placeholder": "Search repos or paste URL"
 	},
+	"clone-repos": {
+		"empty": {
+			"no-matches": "No matching repositories.",
+			"no-suggestions": "No repos to suggest yet."
+		},
+		"location-placeholder": "Managed repos directory",
+		"searching-all": "Searching all repositories…"
+	},
 	"conversation": {
 		"scroll-to-newest": "Scroll to newest message"
 	},
 	"diagnostics-log": {
 		"trigger": "Diagnostics log",
 		"truncated": "(truncated)"
+	},
+	"entity-name": {
+		"project": {
+			"invalid-characters": "Use only letters, numbers, dots, dashes, or underscores.",
+			"leading-dot": "Project names cannot start with a dot.",
+			"too-long": "Project names must be {{max}} characters or fewer."
+		},
+		"workspace": {
+			"invalid-characters": "Use only letters, numbers, spaces, dots, dashes, or underscores.",
+			"leading-dot": "Workspace names cannot start with a dot.",
+			"too-long": "Workspace names must be {{max}} characters or fewer."
+		}
 	},
 	"local-import": {
 		"description": "Ensemblr is cloning the tracked git files into your managed repos folder, then creating the first workspace.",

@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import {
 	createLinearIssue,
@@ -12,6 +13,7 @@ import {
 	buildUpdateIssueRequest,
 	createIssueEditorFields,
 	describeLinearFailure,
+	issueEditorValidationText,
 	validateIssueEditorFields,
 } from '@/renderer/lib/linear';
 import type { LinearIssueEditorFields } from '@/renderer/types/linear';
@@ -39,6 +41,7 @@ export function useIssueEditorForm({
 	onOpenChange: (open: boolean) => void;
 	open: boolean;
 }) {
+	const { t } = useTranslation();
 	const mode: 'create' | 'edit' = issue ? 'edit' : 'create';
 	const queryClient = useQueryClient();
 	const { data: metadataData } = useQuery({
@@ -68,7 +71,12 @@ export function useIssueEditorForm({
 			return createLinearIssue(buildCreateIssueRequest(fields));
 		},
 		onError: () => {
-			setError('Saving the issue failed. Check your connection and try again.');
+			setError(
+				t(
+					'linear:issue-editor.save-failed',
+					'Saving the issue failed. Check your connection and try again.',
+				),
+			);
 		},
 		onSuccess: async (result) => {
 			if (result && result.status === 'error') {
@@ -103,7 +111,7 @@ export function useIssueEditorForm({
 			const validation = validateIssueEditorFields(fields, mode);
 
 			if (!validation.ok) {
-				setError(validation.error);
+				setError(issueEditorValidationText(t, validation.code));
 				return;
 			}
 

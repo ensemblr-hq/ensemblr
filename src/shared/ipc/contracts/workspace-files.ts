@@ -149,7 +149,7 @@ export interface ReadWorkspaceDirectoryRequest {
 }
 
 /** Failure reason for a read-workspace-directory request. */
-type ReadWorkspaceDirectoryFailureCode =
+export type ReadWorkspaceDirectoryFailureCode =
 	| 'invalid-cwd'
 	| 'invalid-path'
 	| 'not-directory'

@@ -9,6 +9,7 @@ import {
 
 import type {
 	RootDirectoryDiagnostic,
+	RootDirectoryDiagnosticCode,
 	RootDirectoryManagedPathSnapshot,
 	RootDirectorySnapshot,
 } from '../../shared/ipc/contracts/root-directory';
@@ -334,8 +335,8 @@ function createDirectory(
 	directoryPath: string,
 	createdPaths: string[],
 	diagnostics: RootDirectoryDiagnostic[],
-	errorCode: string,
-	permissionCode = errorCode,
+	errorCode: RootDirectoryDiagnosticCode,
+	permissionCode: RootDirectoryDiagnosticCode = errorCode,
 ): boolean {
 	try {
 		mkdirSync(directoryPath, { recursive: true });
@@ -356,7 +357,7 @@ function createDirectory(
 function getDirectoryStats(
 	directoryPath: string,
 	diagnostics: RootDirectoryDiagnostic[],
-	errorCode: string,
+	errorCode: RootDirectoryDiagnosticCode,
 ) {
 	try {
 		return statSync(directoryPath);
@@ -375,8 +376,8 @@ function getDirectoryStats(
 function readDirectoryEntries(
 	directoryPath: string,
 	diagnostics: RootDirectoryDiagnostic[],
-	errorCode: string,
-	permissionCode = errorCode,
+	errorCode: RootDirectoryDiagnosticCode,
+	permissionCode: RootDirectoryDiagnosticCode = errorCode,
 ): string[] | null {
 	try {
 		return readdirSync(directoryPath).sort();
@@ -395,7 +396,7 @@ function readDirectoryEntries(
 function assertWritable(
 	directoryPath: string,
 	diagnostics: RootDirectoryDiagnostic[],
-	errorCode: string,
+	errorCode: RootDirectoryDiagnosticCode,
 ): void {
 	try {
 		accessSync(directoryPath, constants.W_OK);

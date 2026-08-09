@@ -45,6 +45,7 @@
 		"delete": "Delete comment",
 		"go-to-line": "Go to line in diff",
 		"hide": "Hide comment",
+		"no-description": "No description",
 		"outdated": "Outdated",
 		"reopen": "Reopen comment",
 		"resolve": "Resolve comment",

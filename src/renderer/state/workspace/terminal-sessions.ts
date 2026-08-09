@@ -302,6 +302,7 @@ export function useWorkspaceTerminalSessions(
 				diagnostics: [
 					{
 						code: 'bridge-unavailable',
+						// i18next-instrument-ignore -- English fallback behind the code
 						message: 'The Electron preload bridge is unavailable.',
 						severity: 'error' as const,
 					},

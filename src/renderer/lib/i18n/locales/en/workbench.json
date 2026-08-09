@@ -63,6 +63,13 @@
 		"no-commands": "No matching commands",
 		"no-files": "No matching files"
 	},
+	"board-status": {
+		"backlog": "Backlog",
+		"canceled": "Canceled",
+		"done": "Done",
+		"in-progress": "In progress",
+		"in-review": "In review"
+	},
 	"browse-archive": {
 		"description": "Restore an archived workspace, or permanently purge it. Restoring rebuilds the worktree from the recorded base branch when branch cleanup ran at archive time.",
 		"empty": {
@@ -147,6 +154,7 @@
 	},
 	"composer": {
 		"aria-label": "Agent composer",
+		"attachment-failed": "Failed to attach selected file.",
 		"blocked-follow-up": "Follow-ups are blocked while the agent is working — stop the turn or wait for it to finish.",
 		"focus-hint": "<key>{{shortcut}}</key><label>to focus</label>",
 		"model": {
@@ -395,7 +403,16 @@
 		},
 		"setup": {
 			"label": "Setup"
+		},
+		"terminal": {
+			"label": "Terminal"
 		}
+	},
+	"file-diff": {
+		"load-failed": "Could not load diff.",
+		"loading": "Loading diff…",
+		"no-changes": "No changes in this file.",
+		"no-file": "This tab has no file associated."
 	},
 	"file-preview": {
 		"actions": {
@@ -424,6 +441,9 @@
 	},
 	"file-tree-menu": {
 		"actions": "{{path}} actions"
+	},
+	"fork": {
+		"new-tab-title": "Forked chat"
 	},
 	"git-failure": {
 		"invalid-cwd": {

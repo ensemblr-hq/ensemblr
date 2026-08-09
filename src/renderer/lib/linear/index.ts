@@ -2,6 +2,7 @@ export {
 	buildCreateIssueRequest,
 	buildUpdateIssueRequest,
 	createIssueEditorFields,
+	issueEditorValidationText,
 	UNSET_FIELD,
 	validateIssueEditorFields,
 } from './issue-editor-model';
