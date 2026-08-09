@@ -385,7 +385,8 @@
 					"src/main/ipc/handlers/checkpoint.ts",
 					"src/main/agent-runtime/agent-session-persistence.ts",
 					"src/main/agent-runtime/session/chat-tab-plumbing.ts",
-					"src/main/agent-providers/claude-readiness-probe.ts"
+					"src/main/agent-providers/claude-readiness-probe.ts",
+					"src/main/agent-providers/pi-readiness-probe.ts"
 				],
 				"rules": ["react-doctor/no-barrel-import"]
 			},
