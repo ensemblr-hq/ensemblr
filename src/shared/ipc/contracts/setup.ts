@@ -10,6 +10,7 @@ export type SetupCheckGroupId =
 	| 'storage';
 /** Identifier for an individual setup diagnostic check. */
 export type SetupCheckId =
+	| 'claude-executable'
 	| 'config'
 	| 'environment-variables'
 	| 'gh-auth'

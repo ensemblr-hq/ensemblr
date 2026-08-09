@@ -4,6 +4,7 @@ import elCommon from './locales/el/common.json';
 import elErrors from './locales/el/errors.json';
 import elGit from './locales/el/git.json';
 import elLinear from './locales/el/linear.json';
+import elOnboarding from './locales/el/onboarding.json';
 import elReview from './locales/el/review.json';
 import elSettings from './locales/el/settings.json';
 import elWorkbench from './locales/el/workbench.json';
@@ -11,6 +12,7 @@ import enCommon from './locales/en/common.json';
 import enErrors from './locales/en/errors.json';
 import enGit from './locales/en/git.json';
 import enLinear from './locales/en/linear.json';
+import enOnboarding from './locales/en/onboarding.json';
 import enReview from './locales/en/review.json';
 import enSettings from './locales/en/settings.json';
 import enWorkbench from './locales/en/workbench.json';
@@ -18,6 +20,7 @@ import ruCommon from './locales/ru/common.json';
 import ruErrors from './locales/ru/errors.json';
 import ruGit from './locales/ru/git.json';
 import ruLinear from './locales/ru/linear.json';
+import ruOnboarding from './locales/ru/onboarding.json';
 import ruReview from './locales/ru/review.json';
 import ruSettings from './locales/ru/settings.json';
 import ruWorkbench from './locales/ru/workbench.json';
@@ -34,9 +37,10 @@ export const I18N_NAMESPACES = [
 	'git',
 	'linear',
 	'errors',
+	'onboarding',
 ] as const;
 
-/** One of the seven message namespaces. */
+/** One of the eight message namespaces. */
 export type I18nNamespace = (typeof I18N_NAMESPACES)[number];
 
 /** Namespace resolved when a key carries no `<namespace>:` prefix. */
@@ -55,6 +59,7 @@ export const resources = {
 		errors: elErrors,
 		git: elGit,
 		linear: elLinear,
+		onboarding: elOnboarding,
 		review: elReview,
 		settings: elSettings,
 		workbench: elWorkbench,
@@ -64,6 +69,7 @@ export const resources = {
 		errors: enErrors,
 		git: enGit,
 		linear: enLinear,
+		onboarding: enOnboarding,
 		review: enReview,
 		settings: enSettings,
 		workbench: enWorkbench,
@@ -73,6 +79,7 @@ export const resources = {
 		errors: ruErrors,
 		git: ruGit,
 		linear: ruLinear,
+		onboarding: ruOnboarding,
 		review: ruReview,
 		settings: ruSettings,
 		workbench: ruWorkbench,

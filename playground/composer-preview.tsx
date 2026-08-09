@@ -13,7 +13,12 @@ import type { AgentProviderId } from '@/shared/agent-provider';
 import { asModelVendorId } from '@/shared/ipc/contracts/agent-models';
 
 import { createPlaygroundQueryClient } from './playground-query-client.ts';
-import { ControlGroup, SceneSection, SceneToggle } from './scene-chrome.tsx';
+import {
+	ControlGroup,
+	SceneControls,
+	SceneSection,
+	SceneToggle,
+} from './scene-chrome.tsx';
 
 const WORKSPACE_CWD = '/Users/you/Projects/ensemblr';
 
@@ -125,7 +130,7 @@ export function ComposerScene() {
 	return (
 		<QueryClientProvider client={client}>
 			<div className='flex flex-col gap-8'>
-				<SceneControls
+				<ComposerControls
 					hasPlanReview={hasPlanReview}
 					isHandingOff={isHandingOff}
 					isStreaming={isStreaming}
@@ -301,7 +306,7 @@ function useComposerStub({
 }
 
 /** Toggles for the inputs the live composer cannot derive on its own. */
-function SceneControls({
+function ComposerControls({
 	hasPlanReview,
 	isHandingOff,
 	isStreaming,
@@ -327,8 +332,8 @@ function SceneControls({
 	planMode: boolean;
 }) {
 	return (
-		<div className='flex flex-col gap-2 rounded-md border border-border bg-surface px-3 py-2'>
-			<div className='flex flex-wrap items-center gap-x-4 gap-y-2'>
+		<SceneControls>
+			<div className='flex flex-col gap-3'>
 				<ControlGroup label='plan review pending'>
 					<OnOff isOn={hasPlanReview} onChange={onPlanReviewChange} />
 				</ControlGroup>
@@ -359,10 +364,10 @@ function SceneControls({
 					/>
 				</ControlGroup>
 			</div>
-			<span className='font-mono text-muted-foreground text-xxs'>
+			<span className='break-all font-mono text-muted-foreground text-xxs'>
 				{lastDecision ?? 'no decision yet'}
 			</span>
-		</div>
+		</SceneControls>
 	);
 }
 

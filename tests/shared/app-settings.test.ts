@@ -90,6 +90,19 @@ describe('parseAppSettings', () => {
 		).toBe(false);
 	});
 
+	test('parses the onboarding completion stamp, defaulting to never shown', () => {
+		expect(DEFAULT_APP_SETTINGS.onboarding.completedAt).toBeNull();
+		expect(
+			parseAppSettings({
+				onboarding: { completedAt: '2026-08-09T10:00:00.000Z' },
+			}).onboarding.completedAt,
+		).toBe('2026-08-09T10:00:00.000Z');
+		expect(
+			parseAppSettings({ onboarding: { completedAt: 42 } }).onboarding
+				.completedAt,
+		).toBeNull();
+	});
+
 	test('falls back per-field on invalid values', () => {
 		const parsed = parseAppSettings({
 			general: { sendShortcut: 'bogus', toolCallCollapse: 42 },
@@ -154,6 +167,14 @@ describe('mergeAppSettings', () => {
 		});
 		expect(next.experimental.autoRunAfterSetup).toBe(true);
 		expect(DEFAULT_APP_SETTINGS.experimental.autoRunAfterSetup).toBe(false);
+	});
+
+	test('merges the onboarding section immutably', () => {
+		const next = mergeAppSettings(DEFAULT_APP_SETTINGS, {
+			onboarding: { completedAt: '2026-08-09T10:00:00.000Z' },
+		});
+		expect(next.onboarding.completedAt).toBe('2026-08-09T10:00:00.000Z');
+		expect(DEFAULT_APP_SETTINGS.onboarding.completedAt).toBeNull();
 	});
 });
 

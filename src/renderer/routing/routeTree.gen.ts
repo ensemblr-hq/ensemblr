@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as OnboardingRouteImport } from './routes/onboarding'
 import { Route as WorkbenchRouteImport } from './routes/_workbench'
 import { Route as DebugPiReplayRouteImport } from './routes/debug.pi-replay'
 import { Route as WorkbenchSettingsRouteImport } from './routes/_workbench/settings'
@@ -42,6 +43,11 @@ import { Route as WorkbenchShellProjectsProjectIdWorkspacesWorkspaceIdRouteRoute
 import { Route as WorkbenchShellProjectsProjectIdWorkspacesWorkspaceIdIndexRouteImport } from './routes/_workbench/_shell/projects/$projectId/workspaces/$workspaceId/index'
 import { Route as WorkbenchShellProjectsProjectIdWorkspacesWorkspaceIdChatsChatIdRouteImport } from './routes/_workbench/_shell/projects/$projectId/workspaces/$workspaceId/chats/$chatId'
 
+const OnboardingRoute = OnboardingRouteImport.update({
+  id: '/onboarding',
+  path: '/onboarding',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const WorkbenchRoute = WorkbenchRouteImport.update({
   id: '/_workbench',
   getParentRoute: () => rootRouteImport,
@@ -229,6 +235,7 @@ const WorkbenchShellProjectsProjectIdWorkspacesWorkspaceIdChatsChatIdRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof WorkbenchShellIndexRoute
+  '/onboarding': typeof OnboardingRoute
   '/settings': typeof WorkbenchSettingsRouteWithChildren
   '/debug/pi-replay': typeof DebugPiReplayRoute
   '/dashboard': typeof WorkbenchShellDashboardRoute
@@ -261,6 +268,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof WorkbenchShellIndexRoute
+  '/onboarding': typeof OnboardingRoute
   '/debug/pi-replay': typeof DebugPiReplayRoute
   '/dashboard': typeof WorkbenchShellDashboardRoute
   '/history': typeof WorkbenchShellHistoryRoute
@@ -291,6 +299,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_workbench': typeof WorkbenchRouteWithChildren
+  '/onboarding': typeof OnboardingRoute
   '/_workbench/_shell': typeof WorkbenchShellRouteWithChildren
   '/_workbench/settings': typeof WorkbenchSettingsRouteWithChildren
   '/debug/pi-replay': typeof DebugPiReplayRoute
@@ -327,6 +336,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/onboarding'
     | '/settings'
     | '/debug/pi-replay'
     | '/dashboard'
@@ -359,6 +369,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/onboarding'
     | '/debug/pi-replay'
     | '/dashboard'
     | '/history'
@@ -388,6 +399,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/_workbench'
+    | '/onboarding'
     | '/_workbench/_shell'
     | '/_workbench/settings'
     | '/debug/pi-replay'
@@ -423,11 +435,19 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   WorkbenchRoute: typeof WorkbenchRouteWithChildren
+  OnboardingRoute: typeof OnboardingRoute
   DebugPiReplayRoute: typeof DebugPiReplayRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/onboarding': {
+      id: '/onboarding'
+      path: '/onboarding'
+      fullPath: '/onboarding'
+      preLoaderRoute: typeof OnboardingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_workbench': {
       id: '/_workbench'
       path: ''
@@ -791,6 +811,7 @@ const WorkbenchRouteWithChildren = WorkbenchRoute._addFileChildren(
 
 const rootRouteChildren: RootRouteChildren = {
   WorkbenchRoute: WorkbenchRouteWithChildren,
+  OnboardingRoute: OnboardingRoute,
   DebugPiReplayRoute: DebugPiReplayRoute,
 }
 export const routeTree = rootRouteImport

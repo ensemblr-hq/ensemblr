@@ -44,7 +44,7 @@ or unavailable screenshot evidence should not cause agents to reopen settled
 shell layout decisions.
 
 The visible chat transcript and prompt composer are backed by a live agent
-runtime — Claude Code or Pi, pinned per chat. Prompt submission, stop,
+runtime — Pi or Claude Code, pinned per chat. Prompt submission, stop,
 attachments, model/thinking controls, plan mode, slash commands, and runtime
 event rendering have landed; preserve their current placement and setup-gated
 behavior. Remaining polish, such as the full session-tree fork UX, is ongoing.
@@ -84,13 +84,25 @@ Ensemblr equivalent:
 - Settings is a separate full-window settings view with a Back to app action.
 - Settings sidebar has app-wide sections first and local project sections below.
 - Main settings forms are narrow, centered, row-based, and mostly inline-editable.
-- App settings cover General, Models, Providers, Environment, Git, Appearance, Integrations, and (under "More") Diagnostics, Experimental, and Advanced. Providers was removed in the 2026-07-19 single-runtime pass and reinstated by #226 as the agent-runtime surface: one tab per first-class runtime (Claude Code, then Pi) with its executable, readiness, accounts, and settings-file location. The aggregate setup gate still lives in Diagnostics, and Ensemblr stores no provider tokens.
+- App settings cover General, Models, Providers, Environment, Git, Appearance, Integrations, and (under "More") Diagnostics, Experimental, and Advanced. Providers was removed in the 2026-07-19 single-runtime pass and reinstated by #226 as the agent-runtime surface: one tab per first-class runtime (Pi, then Claude Code) with its executable, readiness, accounts, and settings-file location. The aggregate setup gate still lives in Diagnostics, and Ensemblr stores no provider tokens.
 - Repository settings are selected from the same sidebar and expose path, branch, remote, preview, copy, script, spotlight, instruction, and removal controls.
 
 Ensemblr equivalent:
 
 - Keep app settings and repository settings in one settings shell.
 - Store high-churn mutable settings in SQLite, declarative defaults in `~/.config/ensemblr/config.json`, shared repository behavior in the committed `.ensemblr/settings.toml`, and secrets outside plain config files.
+
+### First-Run Onboarding
+
+Ensemblr equivalent:
+
+- A first launch opens the setup wizard at `/onboarding` rather than the workbench: a welcome moment, then one screen per gate — agent CLI, GitHub CLI, Linear — and a terminal screen that names whatever is still unresolved.
+- The wizard is the first-run surface only. Settings → Diagnostics owns the recurring case and remains the full gate; the wizard shows the five checks a first run can act on and reads them from the same `setupDiagnostics` probe.
+- The agent-CLI gate is either-or: a working Pi *or* a working Claude Code satisfies it, so a machine carrying one runtime reads as ready and the runtime the user skipped dims instead of turning red. Linear is a soft gate that always leaves a way forward.
+- The same either-or rule governs the diagnostics rollup, not just the wizard, and both read the one `AGENT_RUNTIME_CHECK_GROUPS` table in `src/shared/setup-checks.ts` — Pi's four checks, Claude's one. `setupDiagnostics` resolves it onto each check's `blocking` flag before computing `blocked`: with one runtime working the others demote to optional, and with none working every runtime check is promoted to required, because either would fix it. The wizard resolves the same groups into one card per runtime, so a Pi whose executable resolved but whose RPC handshake failed reads as the blocked runtime it is instead of a green card over a workbench the app considers blocked. Ensemblr needs *an* agent runtime, never a particular one and never both.
+- `warning` counts as a pass wherever the question is "can the app use this" — `isPassingSetupStatus`, shared by both gates, so a Pi binary whose version probe is flaky never blocks a machine the rest of the app calls ready. The Linear step is the deliberate exception: `linear-oauth` reports `warning` for "not connected", so that step demands an outright `success` rather than drawing itself as done.
+- Both exits — finishing and skipping — record `app.onboarding.completedAt` in `~/.config/ensemblr/config.json`, so the wizard never nags. Clearing that field re-runs it.
+- The guard sits on the workbench shell route, not on `/_workbench`, so `/settings/*` stays reachable while onboarding is outstanding.
 
 ### Workspace Landing
 

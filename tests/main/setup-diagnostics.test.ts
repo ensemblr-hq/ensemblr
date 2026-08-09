@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import type {
+	AgentExecutableResolution,
+	AgentProviderExecutableService,
+} from '../../src/main/agent-providers/agent-provider-types.ts';
+import type {
 	LocalCommandFailureCode,
 	LocalCommandResult,
 	LocalCommandService,
@@ -50,9 +54,11 @@ const CHECK_ORDER: readonly SetupCheckId[] = [
 	'pi-agent-directory',
 	'pi-rpc',
 	'pi-provider-model',
+	'claude-executable',
 	'linear-oauth',
 ];
 const GROUPS: Record<SetupCheckId, SetupCheckGroupId> = {
+	'claude-executable': 'claude',
 	config: 'core',
 	'environment-variables': 'core',
 	'gh-auth': 'github',
@@ -392,6 +398,24 @@ function createPiExecutableService(
 	};
 }
 
+function createClaudeExecutableService(
+	resolution: Partial<AgentExecutableResolution> = {},
+): AgentProviderExecutableService {
+	const snapshot: AgentExecutableResolution = {
+		path: `${HOME}/bin/claude`,
+		setting: null,
+		source: 'path',
+		status: 'ok',
+		...resolution,
+	};
+
+	return {
+		clearOverride: () => ({ canceled: false }),
+		getSnapshot: async () => snapshot,
+		saveOverride: (selectedPath) => ({ canceled: false, selectedPath }),
+	};
+}
+
 function createPiReadinessService(
 	snapshot: Partial<PiReadinessSnapshot> = {},
 ): PiReadinessService {
@@ -531,6 +555,7 @@ function createFutureProviders(
 async function getSnapshot(
 	options: {
 		checkProviders?: Partial<Record<SetupCheckId, SetupCheckProvider>>;
+		claudeExecutableService?: AgentProviderExecutableService;
 		configService?: EnsemblrConfigService;
 		databaseService?: EnsemblrDatabaseService;
 		environmentVariablesService?: EnvironmentVariablesService;
@@ -542,6 +567,8 @@ async function getSnapshot(
 ) {
 	const service = createSetupDiagnosticsService({
 		checkProviders: createFutureProviders(options.checkProviders),
+		claudeExecutableService:
+			options.claudeExecutableService ?? createClaudeExecutableService(),
 		configService: options.configService ?? createConfigService(),
 		databaseService: options.databaseService ?? createDatabaseService(),
 		environmentVariablesService:
@@ -589,7 +616,7 @@ test('reports ready when required checks pass and Linear is optional', async () 
 
 	assert.equal(snapshot.status, 'ready');
 	assert.equal(snapshot.blockedCount, 0);
-	assert.equal(snapshot.optionalCount, 2);
+	assert.equal(snapshot.optionalCount, 3);
 	assert.equal(snapshot.warningCount, 1);
 	assert.equal(environmentVariablesCheck.blocking, false);
 	assert.equal(environmentVariablesCheck.status, 'success');
@@ -616,8 +643,46 @@ test('reports ready when required checks pass and Linear is optional', async () 
 	);
 });
 
-test('blocks readiness when Pi executable discovery fails', async () => {
+test('reports Pi executable discovery failures without blocking on Claude', async () => {
+	const brokenPi = createPiExecutableService({
+		command: '',
+		diagnostics: [
+			{
+				code: 'pi-executable-missing',
+				message: 'Configured Pi executable does not exist.',
+				severity: 'error',
+			},
+		],
+		displayPath: '',
+		path: '',
+		probe: null,
+		source: 'config-default',
+		status: 'error',
+	});
+	const snapshot = await getSnapshot({ piExecutableService: brokenPi });
+	const piCheck = getCheck(snapshot, 'pi-executable');
+
+	assert.equal(snapshot.status, 'ready');
+	assert.equal(snapshot.blockedCount, 0);
+	assert.equal(piCheck.blocking, false);
+	assert.equal(piCheck.status, 'failure');
+	assert.match(piCheck.detail, /Configured Pi executable does not exist/);
+	assert.equal(
+		piCheck.remediationActions.some(
+			(action) =>
+				action.kind === 'select-path' && action.target === 'pi.executablePath',
+		),
+		true,
+	);
+});
+
+test('blocks readiness when Pi executable discovery fails and Claude is absent', async () => {
 	const snapshot = await getSnapshot({
+		claudeExecutableService: createClaudeExecutableService({
+			path: '',
+			source: 'missing',
+			status: 'error',
+		}),
 		piExecutableService: createPiExecutableService({
 			command: '',
 			diagnostics: [
@@ -634,19 +699,10 @@ test('blocks readiness when Pi executable discovery fails', async () => {
 			status: 'error',
 		}),
 	});
-	const piCheck = getCheck(snapshot, 'pi-executable');
 
 	assert.equal(snapshot.status, 'blocked');
-	assert.equal(snapshot.blockedCount, 1);
-	assert.equal(piCheck.status, 'failure');
-	assert.match(piCheck.detail, /Configured Pi executable does not exist/);
-	assert.equal(
-		piCheck.remediationActions.some(
-			(action) =>
-				action.kind === 'select-path' && action.target === 'pi.executablePath',
-		),
-		true,
-	);
+	assert.equal(getCheck(snapshot, 'pi-executable').blocking, true);
+	assert.equal(getCheck(snapshot, 'claude-executable').blocking, true);
 });
 
 test('does not offer Pi executable picker for locked managed config', async () => {
@@ -827,6 +883,85 @@ test('does not block readiness for warnings on required checks', async () => {
 		snapshot.checks.find((check) => check.id === 'shell-process-launch')
 			?.status,
 		'warning',
+	);
+});
+
+test('reports the resolved Claude executable without blocking', async () => {
+	const snapshot = await getSnapshot();
+	const claudeCheck = getCheck(snapshot, 'claude-executable');
+
+	assert.equal(claudeCheck.blocking, false);
+	assert.equal(claudeCheck.group, 'claude');
+	assert.equal(claudeCheck.status, 'success');
+	assert.equal(claudeCheck.detail, 'Found on PATH: ~/bin/claude.');
+});
+
+test('stays ready on a Claude-only machine, demoting the Pi checks', async () => {
+	const snapshot = await getSnapshot({
+		checkProviders: {
+			'pi-agent-directory': createProvider('pi-agent-directory', 'failure'),
+			'pi-executable': createProvider('pi-executable', 'failure'),
+			'pi-provider-model': createProvider('pi-provider-model', 'failure'),
+			'pi-rpc': createProvider('pi-rpc', 'failure'),
+		},
+	});
+
+	assert.equal(snapshot.status, 'ready');
+	assert.equal(snapshot.blockedCount, 0);
+	assert.equal(getCheck(snapshot, 'pi-executable').blocking, false);
+	assert.equal(getCheck(snapshot, 'pi-rpc').blocking, false);
+	assert.equal(getCheck(snapshot, 'claude-executable').status, 'success');
+});
+
+test('blocks and marks every runtime required when neither one works', async () => {
+	const snapshot = await getSnapshot({
+		checkProviders: {
+			'pi-agent-directory': createProvider('pi-agent-directory', 'failure'),
+			'pi-executable': createProvider('pi-executable', 'failure'),
+			'pi-provider-model': createProvider('pi-provider-model', 'failure'),
+			'pi-rpc': createProvider('pi-rpc', 'failure'),
+		},
+		claudeExecutableService: createClaudeExecutableService({
+			path: '',
+			source: 'missing',
+			status: 'error',
+		}),
+	});
+
+	assert.equal(snapshot.status, 'blocked');
+	assert.equal(getCheck(snapshot, 'pi-executable').blocking, true);
+	assert.equal(getCheck(snapshot, 'claude-executable').blocking, true);
+});
+
+test('keeps every runtime check required when both runtimes work', async () => {
+	const snapshot = await getSnapshot();
+
+	assert.equal(getCheck(snapshot, 'pi-executable').blocking, true);
+	assert.equal(getCheck(snapshot, 'claude-executable').blocking, false);
+});
+
+test('keeps readiness when Claude Code is missing and Pi is present', async () => {
+	const snapshot = await getSnapshot({
+		claudeExecutableService: createClaudeExecutableService({
+			path: '',
+			source: 'missing',
+			status: 'error',
+		}),
+	});
+	const claudeCheck = getCheck(snapshot, 'claude-executable');
+
+	assert.equal(snapshot.status, 'ready');
+	assert.equal(snapshot.blockedCount, 0);
+	assert.equal(claudeCheck.status, 'failure');
+	assert.match(claudeCheck.detail, /was not found in the shell-derived PATH/);
+	assert.deepEqual(
+		claudeCheck.remediationActions.map((action) => action.id),
+		[
+			'install-claude-code',
+			'open-claude-setup-docs',
+			'select-claude-executable',
+			'retry-claude-executable',
+		],
 	);
 });
 

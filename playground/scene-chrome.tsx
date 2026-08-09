@@ -1,6 +1,41 @@
 import type { ReactNode } from 'react';
+import { createContext, use } from 'react';
+import { createPortal } from 'react-dom';
 
 import { cn } from '@/renderer/lib/utils';
+
+const SceneControlHostContext = createContext<HTMLElement | null>(null);
+
+/**
+ * Publishes the right-sidebar node that scene controls render into. The shell
+ * owns the node; scenes stay unaware of where their toggles land.
+ */
+export function SceneControlHostProvider({
+	children,
+	host,
+}: {
+	children: ReactNode;
+	host: HTMLElement | null;
+}) {
+	return (
+		<SceneControlHostContext.Provider value={host}>
+			{children}
+		</SceneControlHostContext.Provider>
+	);
+}
+
+/**
+ * Renders a scene's own toggles in the right sidebar while their state stays
+ * with the scene that owns it. Portalling rather than lifting the state into the
+ * shell keeps each scene's permutations local — the shell would otherwise need a
+ * union of every scene's control model. Renders nothing while the sidebar is
+ * collapsed.
+ */
+export function SceneControls({ children }: { children: ReactNode }) {
+	const host = use(SceneControlHostContext);
+
+	return host ? createPortal(children, host) : null;
+}
 
 /** A titled block within a scene, introducing what the surface below it shows. */
 export function SceneSection({
@@ -23,7 +58,11 @@ export function SceneSection({
 	);
 }
 
-/** One labelled cluster of scene toggles. */
+/**
+ * One labelled cluster of toggles. Stacked rather than inline because these live
+ * in a sidebar column, where a row of label-then-pills runs out of width after
+ * two options.
+ */
 export function ControlGroup({
 	children,
 	label,
@@ -32,17 +71,18 @@ export function ControlGroup({
 	label: string;
 }) {
 	return (
-		<div className='flex items-center gap-1.5'>
+		<div className='flex flex-col gap-1'>
 			<span className='font-mono text-muted-foreground text-xxs uppercase tracking-wide'>
 				{label}
 			</span>
-			<div className='flex items-center gap-1'>{children}</div>
+			<div className='flex flex-wrap items-center gap-1'>{children}</div>
 		</div>
 	);
 }
 
 /**
- * Scene-local toggle pill. Deliberately not a shipped `Button` — the scene's own
+ * Playground toggle pill, used by both the shell's canvas settings and the
+ * scenes' own controls. Deliberately not a shipped `Button` — the playground's
  * chrome must not be mistaken for, or measured as, the surface under review.
  */
 export function SceneToggle({

@@ -38,6 +38,19 @@ const APP_SETTINGS_SCOPE = { scope: 'app', scopeId: '' } as const;
 const MISSING_EXECUTABLE_SOURCE = 'missing';
 
 /**
+ * Official native installer for Claude Code on macOS, Linux and WSL
+ * (code.claude.com/docs/en/setup). Offered as a `run-command` remediation, which
+ * every surface copies to the clipboard and never executes. Lives here rather
+ * than beside the readiness probe because the setup-diagnostics check needs it
+ * too, and `src/main/setup/` cannot import the probe without a module cycle.
+ */
+export const CLAUDE_INSTALL_COMMAND =
+	'curl -fsSL https://claude.ai/install.sh | bash';
+
+/** Official Claude Code setup docs, for the npm route and other platforms. */
+export const CLAUDE_SETUP_DOCS_URL = 'https://code.claude.com/docs/en/setup';
+
+/**
  * Claude's resolution, plus the reason an `error` resolution failed. It is
  * structurally an {@link AgentExecutableResolution}, so the provider surface
  * reads it unchanged — the extra field is where Claude carries what Pi carries

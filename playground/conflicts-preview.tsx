@@ -15,7 +15,12 @@ import {
 	WORKTREE_CONFLICT_PATHS,
 } from './conflicts-fixtures.ts';
 import { createPlaygroundQueryClient } from './playground-query-client.ts';
-import { ControlGroup, SceneSection, SceneToggle } from './scene-chrome.tsx';
+import {
+	ControlGroup,
+	SceneControls,
+	SceneSection,
+	SceneToggle,
+} from './scene-chrome.tsx';
 
 /**
  * How the conflicting files were found. `worktree` is a merge or rebase already
@@ -73,7 +78,7 @@ export function ConflictsScene() {
 		<QueryClientProvider client={client}>
 			<ReviewActionsContextProvider value={reviewActions}>
 				<div className='flex flex-col gap-8'>
-					<SceneControls
+					<ConflictControls
 						isAgentWorking={isAgentWorking}
 						onAgentWorkingChange={setAgentWorking}
 						onSourceChange={setSource}
@@ -120,7 +125,7 @@ export function ConflictsScene() {
 }
 
 /** Toggles for the scene's two independent axes. */
-function SceneControls({
+function ConflictControls({
 	isAgentWorking,
 	onAgentWorkingChange,
 	onSourceChange,
@@ -132,7 +137,7 @@ function SceneControls({
 	source: ConflictSource;
 }) {
 	return (
-		<div className='flex flex-wrap items-center gap-4 rounded-md border border-border bg-toolbar px-3 py-2.5'>
+		<SceneControls>
 			<ControlGroup label='conflict source'>
 				<SceneToggle
 					isActive={source === 'worktree'}
@@ -157,6 +162,6 @@ function SceneControls({
 					onClick={() => onAgentWorkingChange(true)}
 				/>
 			</ControlGroup>
-		</div>
+		</SceneControls>
 	);
 }

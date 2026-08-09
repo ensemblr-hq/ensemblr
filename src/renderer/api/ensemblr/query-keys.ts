@@ -133,6 +133,9 @@ export const ensemblrQueryKeys = {
 	/** Query key for a repository's on-disk configuration. */
 	repositoryConfig: (repositoryPath: string) =>
 		[...ensemblrQueryKeys.all, 'repository-config', repositoryPath] as const,
+	/** Query key for the first-run onboarding state read from `config.json`. */
+	onboardingStatus: () =>
+		[...ensemblrQueryKeys.all, 'onboarding-status'] as const,
 	/** Query key for the setup-diagnostics snapshot. */
 	setupDiagnostics: () =>
 		[...ensemblrQueryKeys.all, 'setup-diagnostics'] as const,

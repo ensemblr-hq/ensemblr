@@ -44,7 +44,7 @@ function executableSourceLabel(
 }
 
 /**
- * One agent provider's tab. Both Claude Code and Pi render through this single
+ * One agent provider's tab. Both Pi and Claude Code render through this single
  * component from `(descriptor, readiness)` — the tabs are siblings, not two
  * hand-written pages, so a change to the layout lands on both at once.
  */

@@ -27,7 +27,11 @@ import {
 	createRetryRemediation,
 	toExecutableSource,
 } from './agent-provider-types.ts';
-import type { ClaudeExecutableResolution } from './claude-executable.ts';
+import {
+	CLAUDE_INSTALL_COMMAND,
+	CLAUDE_SETUP_DOCS_URL,
+	type ClaudeExecutableResolution,
+} from './claude-executable.ts';
 
 const CLAUDE_DESCRIPTOR = getAgentProviderDescriptor('claude');
 const DEFAULT_VERSION_TIMEOUT_MS = 5000;
@@ -47,14 +51,6 @@ const RETRY_REMEDIATION = createRetryRemediation(CLAUDE_DESCRIPTOR);
 
 /** Sentinel {@link raceDeadline} resolves to when the deadline wins the race. */
 const DEADLINE_EXCEEDED = Symbol('claude-session-deadline');
-
-/**
- * Official native installer for Claude Code on macOS, Linux and WSL
- * (code.claude.com/docs/en/setup). Offered as a `run-command` remediation,
- * which the Providers page copies to the clipboard and never executes.
- */
-const CLAUDE_INSTALL_COMMAND = 'curl -fsSL https://claude.ai/install.sh | bash';
-const CLAUDE_SETUP_DOCS_URL = 'https://code.claude.com/docs/en/setup';
 
 /**
  * Detail every "no binary" check repeats, so the executable, version and auth

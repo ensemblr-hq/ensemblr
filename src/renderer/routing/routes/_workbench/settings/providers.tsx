@@ -2,7 +2,7 @@ import { createFileRoute } from '@tanstack/react-router';
 
 import { AgentProvidersSection } from '@/renderer/components/settings/agent-providers/agent-providers-section';
 
-/** Route for the Providers settings section; renders the Claude Code and Pi runtime tabs. */
+/** Route for the Providers settings section; renders the Pi and Claude Code runtime tabs. */
 export const Route = createFileRoute('/_workbench/settings/providers')({
 	component: ProvidersSettings,
 });

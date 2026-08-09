@@ -7,7 +7,12 @@ import {
 	isFixtureProviderSignedIn,
 	setFixtureProviderSignedIn,
 } from './agent-provider-fixtures.ts';
-import { ControlGroup, SceneSection, SceneToggle } from './scene-chrome.tsx';
+import {
+	ControlGroup,
+	SceneControls,
+	SceneSection,
+	SceneToggle,
+} from './scene-chrome.tsx';
 
 /**
  * Settings → Providers without Electron. Both tabs come out of the same
@@ -27,9 +32,9 @@ export function ProvidersScene() {
 	return (
 		<SceneSection
 			label='Settings · Providers'
-			note='One tab panel driven by (descriptor, readiness). Claude Code reports an account and a warning check; Pi reports no account and a failed RPC smoke test.'
+			note='One tab panel driven by (descriptor, readiness). Pi reports no account and a failed RPC smoke test; Claude Code reports an account and a warning check.'
 		>
-			<div className='flex flex-wrap items-center gap-4'>
+			<SceneControls>
 				<ControlGroup label='claude auth'>
 					<SceneToggle
 						isActive={signedIn}
@@ -42,7 +47,7 @@ export function ProvidersScene() {
 						onClick={() => applySignedIn(false)}
 					/>
 				</ControlGroup>
-			</div>
+			</SceneControls>
 			<div className='rounded-md border border-border bg-background'>
 				<AgentProvidersSection />
 			</div>
