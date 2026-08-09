@@ -1,8 +1,7 @@
 /**
- * Relative-time helpers for the History screen. No date library exists in the
- * app, so bucketing is hand-rolled with the same `Date.parse` + `Number.isNaN`
- * guard style as `formatRelativeClosedAt` (src/renderer/state/workspace/
- * session-tabs.ts), using calendar-day boundaries (not raw elapsed
+ * Relative-time helpers for the History screen and the closed-tab strip. No date
+ * library exists in the app, so bucketing is hand-rolled with a `Date.parse` +
+ * `Number.isNaN` guard, using calendar-day boundaries (not raw elapsed
  * milliseconds) so "Yesterday" stays correct near midnight. The wording itself
  * comes from `Intl.RelativeTimeFormat`, which knows every locale's plural split
  * (`2 дня` vs `5 дней`) that a hand-written English branch cannot express.
@@ -10,9 +9,12 @@
 
 import { i18n } from '@/renderer/lib/i18n';
 
-const DAY_MS = 24 * 60 * 60 * 1000;
+const MINUTE_MS = 60 * 1000;
+const HOUR_MS = 60 * MINUTE_MS;
+const DAY_MS = 24 * HOUR_MS;
 
 const relativeFormatters = new Map<string, Intl.RelativeTimeFormat>();
+const shortRelativeFormatters = new Map<string, Intl.RelativeTimeFormat>();
 
 /**
  * Returns a cached `Intl.RelativeTimeFormat` for a locale. Constructing one is
@@ -30,6 +32,58 @@ function relativeFormatter(locale: string): Intl.RelativeTimeFormat {
 	const formatter = new Intl.RelativeTimeFormat(locale, { numeric: 'always' });
 	relativeFormatters.set(locale, formatter);
 	return formatter;
+}
+
+/**
+ * Returns a cached short-style `Intl.RelativeTimeFormat` for a locale, for the
+ * one-line closed-tab rows. `short` abbreviates the unit noun only where the
+ * locale has an abbreviation for it, so English days stay `2 days ago` while
+ * minutes and hours shorten. `narrow` is not used despite being tighter:
+ * Russian renders it as a bare minus sign (`-5 мин`) rather than a past-tense
+ * phrase.
+ * @param locale - BCP-47 tag of the active UI language
+ * @returns A formatter emitting the locale's abbreviated form (`5 min. ago`)
+ */
+function shortRelativeFormatter(locale: string): Intl.RelativeTimeFormat {
+	const cached = shortRelativeFormatters.get(locale);
+	if (cached) {
+		return cached;
+	}
+
+	const formatter = new Intl.RelativeTimeFormat(locale, {
+		numeric: 'always',
+		style: 'short',
+	});
+	shortRelativeFormatters.set(locale, formatter);
+	return formatter;
+}
+
+/**
+ * Renders a closed-at ISO timestamp as the compact relative label on a
+ * closed-tab history row. Returns the raw input when it cannot be parsed, so a
+ * malformed row still shows something instead of throwing.
+ * @param closedAtIso - ISO timestamp the tab was closed at
+ * @returns The label in the active UI language
+ */
+export function formatRelativeClosedAt(closedAtIso: string): string {
+	const closedAt = Date.parse(closedAtIso);
+	if (Number.isNaN(closedAt)) {
+		return closedAtIso;
+	}
+
+	const elapsed = Date.now() - closedAt;
+	if (elapsed < MINUTE_MS) {
+		return i18n.t('workbench:history.closed-at.just-now', 'just now');
+	}
+
+	const formatter = shortRelativeFormatter(i18n.language);
+	if (elapsed < HOUR_MS) {
+		return formatter.format(-Math.floor(elapsed / MINUTE_MS), 'minute');
+	}
+	if (elapsed < DAY_MS) {
+		return formatter.format(-Math.floor(elapsed / HOUR_MS), 'hour');
+	}
+	return formatter.format(-Math.floor(elapsed / DAY_MS), 'day');
 }
 
 /**

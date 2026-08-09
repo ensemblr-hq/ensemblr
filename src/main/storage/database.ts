@@ -668,6 +668,23 @@ CREATE INDEX idx_checkpoints_agent_session_id ON checkpoints(agent_session_id);
 CREATE INDEX idx_chat_tabs_session_id ON chat_tabs(agent_session_id);
 `,
 	},
+	{
+		id: '015_untitled_chat_tab_placeholder',
+		version: 15,
+		// Tabs nobody named carried the literal English `New chat`, written by the
+		// main process where no i18n instance exists — so they stayed English under
+		// Russian and Greek. The untitled state is now the empty string and the
+		// renderer paints the localized placeholder over it. `titleProvenance` is
+		// stamped by every deliberate naming and is absent on a tab nobody touched,
+		// so a title someone really did choose — `New chat` included — is spared.
+		sql: `
+UPDATE chat_tabs
+SET title = '', full_title = ''
+WHERE title = 'New chat'
+	AND full_title IN ('', 'New chat')
+	AND json_extract(metadata_json, '$.titleProvenance') IS NULL;
+`,
+	},
 ];
 
 /** Highest declared migration version embedded in this build. */

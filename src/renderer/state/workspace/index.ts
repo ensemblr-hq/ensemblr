@@ -51,7 +51,6 @@ export {
 } from './selection-atoms';
 export { readStoredWorkspaceSelection } from './selection-storage';
 export { resolveRunningCloseTarget } from './session-tab-close';
-export { formatRelativeClosedAt } from './session-tab-model-mappers';
 export { shouldSelectOnTabClick } from './session-tab-select';
 export { useSessionTabState } from './session-tabs';
 export {

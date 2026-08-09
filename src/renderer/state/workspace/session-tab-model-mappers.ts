@@ -1,3 +1,5 @@
+import { i18n } from '@/renderer/lib/i18n';
+import { formatRelativeClosedAt } from '@/renderer/lib/workbench/relative-time';
 import type { SessionTabModel } from '@/renderer/types/workbench';
 import type { AgentSessionSnapshotWire } from '@/shared/ipc/contracts/agent-session';
 import type {
@@ -26,6 +28,26 @@ type SessionTabBaseFields = {
 /** Reads a metadata field as a string, falling back when it is absent or non-string. */
 function metadataString(value: unknown, fallback: string): string {
 	return typeof value === 'string' ? value : fallback;
+}
+
+/**
+ * Label for an open tab the main process stored untitled. The row is blank by
+ * design — a placeholder written there would be English forever — so the strip
+ * supplies the wording, and `useSessionTabModels` re-derives it on a language
+ * switch by keying its memo on the active language.
+ * @returns The localized "New chat" placeholder
+ */
+function untitledOpenTabLabel(): string {
+	return i18n.t('workbench:session-tabs.untitled', 'New chat');
+}
+
+/**
+ * Label for a closed tab that never earned a title. "New chat" would misread on
+ * a history row, so the history says untitled rather than new.
+ * @returns The localized "Untitled chat" placeholder
+ */
+function untitledClosedTabLabel(): string {
+	return i18n.t('workbench:session-tabs.untitled-closed', 'Untitled chat');
 }
 
 /** Builds the `diff` variant, carrying its optional file path, turn id, and scope. */
@@ -80,11 +102,11 @@ export function toSessionTabModel(
 	const base: SessionTabBaseFields = {
 		agentSessionId: tab.agentSessionId,
 		chatTabId: tab.id,
-		fullLabel: tab.fullTitle || tab.title,
+		fullLabel: tab.fullTitle || tab.title || untitledOpenTabLabel(),
 		id: tab.id,
 		isPreview: tab.isPreview,
 		isSubAgent: tab.metadata.agentRole === 'subagent',
-		label: tab.title,
+		label: tab.title || untitledOpenTabLabel(),
 		status: deriveTabStatus(agentSession),
 		summary: '',
 		updatedLabel: '',
@@ -134,14 +156,14 @@ export function toClosedSessionTabModel(
 			entry.tab.fullTitle ||
 			entry.tab.title ||
 			entry.summaryTitle ||
-			'Untitled chat',
+			untitledClosedTabLabel(),
 		id: entry.tab.id,
 		isPreview: false,
 		isSubAgent: entry.tab.metadata.agentRole === 'subagent',
 		// Prefer the short chat-title that was visible on the open tab. The
 		// LLM-derived summary title is verbose and often diverges from what
 		// the user saw, so it is only used when no tab title exists.
-		label: entry.tab.title || entry.summaryTitle || 'Untitled chat',
+		label: entry.tab.title || entry.summaryTitle || untitledClosedTabLabel(),
 		status: 'idle',
 		summary: entry.summaryPath,
 		updatedLabel: formatRelativeClosedAt(entry.closedAt),
@@ -159,31 +181,4 @@ export function toClosedSessionTabModel(
 		return toTerminalSessionTab(base, closedTab);
 	}
 	return { ...base, kind: 'chat' };
-}
-
-const MINUTE_MS = 60_000;
-const HOUR_MS = 60 * MINUTE_MS;
-const DAY_MS = 24 * HOUR_MS;
-
-/**
- * Renders a closed-at ISO timestamp as a compact relative label
- * (`"just now"`, `"5m ago"`, `"2h ago"`, `"3d ago"`). Returns the raw input
- * when it cannot be parsed.
- */
-export function formatRelativeClosedAt(closedAtIso: string): string {
-	const closedAt = Date.parse(closedAtIso);
-	if (Number.isNaN(closedAt)) {
-		return closedAtIso;
-	}
-	const elapsed = Date.now() - closedAt;
-	if (elapsed < MINUTE_MS) {
-		return 'just now';
-	}
-	if (elapsed < HOUR_MS) {
-		return `${Math.floor(elapsed / MINUTE_MS)}m ago`;
-	}
-	if (elapsed < DAY_MS) {
-		return `${Math.floor(elapsed / HOUR_MS)}h ago`;
-	}
-	return `${Math.floor(elapsed / DAY_MS)}d ago`;
 }

@@ -42,7 +42,7 @@ export interface SessionNamingInput {
  * unreachable provider can never leave a tab unlabeled.
  *
  * A real title is the agent's job, through `ensemblr_set_name` — this only has
- * to beat "New chat" until that lands, and the provenance ladder guarantees it
+ * to beat the untitled placeholder until that lands, and the provenance ladder guarantees it
  * yields the moment it does. The write is gated so firing at open and again at
  * every turn-idle can never clobber a settled name; it simply retries a
  * derivation that had nothing to work with. An in-flight guard keyed by chat

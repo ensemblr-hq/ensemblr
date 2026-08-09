@@ -2272,6 +2272,9 @@ export default interface Resources {
 				unknown: 'Unknown';
 				yesterday: 'Yesterday';
 			};
+			'closed-at': {
+				'just-now': 'just now';
+			};
 			empty: {
 				failed: 'Failed to load workspace history.';
 				loading: 'Loading workspaces…';
@@ -2538,6 +2541,8 @@ export default interface Resources {
 				toggle: 'Toggle Pi debug panel';
 			};
 			'new-tab': 'New chat tab';
+			untitled: 'New chat';
+			'untitled-closed': 'Untitled chat';
 		};
 		'setup-script': {
 			'add-manually': 'Add manually';

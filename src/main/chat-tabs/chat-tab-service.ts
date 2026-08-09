@@ -81,6 +81,7 @@ export interface ChatTabService {
 		agentSessionId?: string | null;
 		/** Opens into the workspace's single ephemeral preview slot. */
 		preview?: boolean;
+		/** Blank opens the tab untitled; the renderer supplies the localized placeholder. */
 		title?: string;
 		workspaceId: string;
 	}) => ChatTabRow;
@@ -92,7 +93,14 @@ export interface ChatTabService {
 	restoreTab: (input: { chatTabId: string }) => ChatTabRow | null;
 }
 
-const DEFAULT_TAB_TITLE = 'New chat';
+/**
+ * Title stored for a tab nobody has named yet. It is empty rather than an
+ * English placeholder because the row outlives every language switch: the main
+ * process cannot reach the renderer's i18n instance, so a literal written here
+ * would stay English in Russian and Greek forever. The renderer renders the
+ * localized placeholder over the blank instead.
+ */
+const UNTITLED_TAB_TITLE = '';
 
 /**
  * Metadata key that held the native harness CLI session id before it was
@@ -209,7 +217,7 @@ export function createChatTabService({
 		}) => {
 			const database = requireChatTabDatabase();
 			const openTabs = listOpenForWorkspace({ database, workspaceId });
-			const resolvedTitle = title?.trim() || DEFAULT_TAB_TITLE;
+			const resolvedTitle = title?.trim() || UNTITLED_TAB_TITLE;
 			const asPreview = preview && canPreviewKind(kind);
 
 			if (kind !== 'chat') {
