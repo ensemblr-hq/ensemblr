@@ -57,6 +57,14 @@ const experimentalSettingsSchema = z.object({
 	autoRunAfterSetup: z.boolean().catch(false),
 });
 
+// First-run state, not a preference. `completedAt` is the ISO timestamp at which
+// the user left the onboarding wizard — by finishing it or by skipping it, since
+// neither should bring the wizard back. Null means it has never been shown, so
+// clearing this field by hand re-runs onboarding on the next launch.
+const onboardingSettingsSchema = z.object({
+	completedAt: z.string().nullable().catch(null),
+});
+
 // Appearance settings drive live DOM/CSS side-effects (theme class, mono-font
 // CSS var, ligature/accessible-color root classes) plus terminal and code-block
 // typography. Enum unions live here as the single source of truth; the renderer
@@ -95,6 +103,7 @@ const appSettingsSchema = z.object({
 	git: gitSettingsSchema,
 	appearance: appearanceSettingsSchema,
 	experimental: experimentalSettingsSchema,
+	onboarding: onboardingSettingsSchema,
 });
 
 /** Validated shape of the user-facing App settings persisted under the config `app` key. */
@@ -109,6 +118,8 @@ export type GitSettings = AppSettings['git'];
 export type AppearanceSettings = AppSettings['appearance'];
 /** The `experimental` section of App settings. */
 export type ExperimentalSettings = AppSettings['experimental'];
+/** The `onboarding` first-run state section of App settings. */
+export type OnboardingSettings = AppSettings['onboarding'];
 
 /** Section-scoped partial patch applied by `updateAppSettings`. */
 export interface AppSettingsPatch {
@@ -117,6 +128,7 @@ export interface AppSettingsPatch {
 	git?: Partial<GitSettings>;
 	appearance?: Partial<AppearanceSettings>;
 	experimental?: Partial<ExperimentalSettings>;
+	onboarding?: Partial<OnboardingSettings>;
 }
 
 /** Validates an untrusted patch at the IPC boundary; unknown keys are dropped. */
@@ -126,6 +138,7 @@ export const appSettingsPatchSchema = z.object({
 	git: gitSettingsSchema.partial().optional(),
 	appearance: appearanceSettingsSchema.partial().optional(),
 	experimental: experimentalSettingsSchema.partial().optional(),
+	onboarding: onboardingSettingsSchema.partial().optional(),
 });
 
 /** Fully-defaulted settings — the baseline before any config file is read. */
@@ -135,6 +148,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = appSettingsSchema.parse({
 	git: {},
 	appearance: {},
 	experimental: {},
+	onboarding: {},
 });
 
 /** True for a non-null, non-array plain object. */
@@ -157,6 +171,7 @@ export function parseAppSettings(raw: unknown): AppSettings {
 		git: asRecord(record.git),
 		appearance: asRecord(record.appearance),
 		experimental: asRecord(record.experimental),
+		onboarding: asRecord(record.onboarding),
 	});
 	return result.success ? result.data : DEFAULT_APP_SETTINGS;
 }
@@ -172,5 +187,6 @@ export function mergeAppSettings(
 		git: { ...current.git, ...patch.git },
 		appearance: { ...current.appearance, ...patch.appearance },
 		experimental: { ...current.experimental, ...patch.experimental },
+		onboarding: { ...current.onboarding, ...patch.onboarding },
 	};
 }

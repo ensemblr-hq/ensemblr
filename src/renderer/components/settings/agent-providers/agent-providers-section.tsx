@@ -19,21 +19,14 @@ import {
 } from '@/renderer/components/ui/tabs';
 import { cn } from '@/renderer/lib/utils';
 import {
-	type AgentProviderDescriptor,
 	type AgentProviderId,
+	DEFAULT_AGENT_PROVIDER,
 	listAgentProviderDescriptors,
 } from '@/shared/agent-provider';
 import type { SetupRemediationAction } from '@/shared/ipc/contracts/setup';
 
 /**
- * Runtime the Providers page opens on. Claude Code leads the tab strip; every
- * other registered runtime follows in registry order, so a third provider shows
- * up without touching this file.
- */
-const LEAD_PROVIDER: AgentProviderId = 'claude';
-
-/**
- * Providers settings page. Claude Code and Pi are true siblings here: one
+ * Providers settings page. Pi and Claude Code are true siblings here: one
  * {@link ProviderTabPanel} renders both tabs from `(descriptor, readiness)`,
  * and the section-level Refresh re-probes whichever tab is open. Terminal
  * harnesses (Codex, Vibe) are not agent providers and never appear.
@@ -41,9 +34,9 @@ const LEAD_PROVIDER: AgentProviderId = 'claude';
 export function AgentProvidersSection() {
 	const { t } = useTranslation();
 	const queryClient = useQueryClient();
-	const descriptors = orderedProviderTabs();
+	const descriptors = listAgentProviderDescriptors();
 	const [activeProvider, setActiveProvider] = useState<AgentProviderId>(
-		descriptors[0]?.id ?? LEAD_PROVIDER,
+		descriptors[0]?.id ?? DEFAULT_AGENT_PROVIDER,
 	);
 	const [isManualRetrying, setIsManualRetrying] = useState(false);
 
@@ -134,19 +127,6 @@ export function AgentProvidersSection() {
 			</Tabs>
 		</SettingsSection>
 	);
-}
-
-/**
- * Tab order for the page: {@link LEAD_PROVIDER} first, then the registry's own
- * order for everything else.
- * @returns The provider descriptors in tab-strip order.
- */
-function orderedProviderTabs(): readonly AgentProviderDescriptor[] {
-	const descriptors = listAgentProviderDescriptors();
-	return [
-		...descriptors.filter((descriptor) => descriptor.id === LEAD_PROVIDER),
-		...descriptors.filter((descriptor) => descriptor.id !== LEAD_PROVIDER),
-	];
 }
 
 /**

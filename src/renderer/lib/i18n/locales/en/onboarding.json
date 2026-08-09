@@ -1,0 +1,88 @@
+{
+	"card": {
+		"status": {
+			"failure": "Not found",
+			"pending": "Waiting",
+			"running": "Checking",
+			"subdued": "Not installed",
+			"success": "Ready",
+			"warning": "Needs attention"
+		}
+	},
+	"checks": {
+		"claude-executable": "Claude Code",
+		"gh-auth": "GitHub CLI signed in",
+		"gh-cli": "GitHub CLI installed",
+		"linear-oauth": "Linear account",
+		"pi-executable": "Pi"
+	},
+	"footer": {
+		"continue": "Continue",
+		"defer": "I'll do this later",
+		"finish": "Open Ensemblr",
+		"recheck": "Check again",
+		"rechecking": "Checking…"
+	},
+	"header": {
+		"eyebrow": "Ensemblr Setup",
+		"progress": "{{satisfied}} of {{total}} required"
+	},
+	"rail": {
+		"label": "Setup steps",
+		"optional": "Optional"
+	},
+	"ready": {
+		"lead": "Ensemblr is ready to open its first workspace.",
+		"outstanding": "{{step}} is still unresolved",
+		"partial-lead": "You can start now, but some things will not work until these are done. Settings → Diagnostics has them whenever you are ready.",
+		"partial-title": "Almost there",
+		"title": "You're all set"
+	},
+	"screens": {
+		"agent-cli": {
+			"blocked-cta": "Install an agent CLI",
+			"empty": "No agent runtime is compiled into this build, so there is nothing to install.",
+			"lead": "Ensemblr drives Pi and Claude Code as local processes on this machine. Install either one — you don't need both.",
+			"title": "Install an agent CLI"
+		},
+		"github": {
+			"blocked-cta": "Sign in to gh",
+			"empty": "The GitHub CLI is not wired into this build, so there is nothing to connect.",
+			"lead": "Branch, pull request, review, and merge workflows shell out to gh. It needs to be installed and signed in.",
+			"title": "Connect the GitHub CLI"
+		},
+		"linear": {
+			"blocked-cta": "Skip for now",
+			"empty": "Linear is not configured for this build, so there is nothing to connect.",
+			"lead": "Browse issues and open workspaces straight from them. Ensemblr works fine without it.",
+			"title": "Connect Linear"
+		}
+	},
+	"steps": {
+		"agent-cli": "Agent CLI",
+		"github": "GitHub",
+		"linear": "Linear",
+		"ready": "Ready",
+		"welcome": "Welcome"
+	},
+	"welcome": {
+		"lead": "Ensemblr runs coding agents and the GitHub CLI as local processes. A short check confirms they are there — it takes about a minute.",
+		"requirements": {
+			"agent-cli": {
+				"detail": "Pi or Claude Code",
+				"label": "An agent CLI"
+			},
+			"github": {
+				"detail": "Installed and signed in",
+				"label": "GitHub CLI"
+			},
+			"linear": {
+				"detail": "Optional",
+				"label": "Linear"
+			}
+		},
+		"skip": "Skip setup",
+		"start": "Get started",
+		"title": "Let's get your machine ready"
+	}
+}

@@ -849,6 +849,7 @@ const archiveWorkspaceServiceWithScript = withArchiveScriptBeforeArchive({
 	scriptLifecycleService,
 });
 const setupDiagnosticsService = createSetupDiagnosticsService({
+	claudeExecutableService,
 	configService,
 	databaseService,
 	environmentVariablesService,

@@ -34,7 +34,12 @@ import {
 	PREVIEW_DEPLOYMENT_VARIANTS,
 	PREVIEW_LABEL_COLLAPSE_FIXTURE,
 } from './right-sidebar-header-fixtures.ts';
-import { ControlGroup, SceneSection, SceneToggle } from './scene-chrome.tsx';
+import {
+	ControlGroup,
+	SceneControls,
+	SceneSection,
+	SceneToggle,
+} from './scene-chrome.tsx';
 import { StubbedWorkbenchLayout } from './stubbed-workbench-layout.tsx';
 
 /** Which post-merge action the review-actions stub reports as in flight. */
@@ -121,7 +126,7 @@ export function RightSidebarHeaderScene() {
 		<QueryClientProvider client={client}>
 			<ReviewActionsContextProvider value={reviewActions}>
 				<div className='flex flex-col gap-8'>
-					<SceneControls
+					<HeaderStateControls
 						busyAction={busyAction}
 						hasPreviewDeployment={hasPreviewDeployment}
 						isAgentWorking={isAgentWorking}
@@ -336,7 +341,7 @@ function CollapsedToolbarRow({
 }
 
 /** The scene toggles and their setters, lifted out because there are ten of them. */
-interface SceneControlsProps {
+interface HeaderStateControlsProps {
 	busyAction: BusyAction;
 	hasPreviewDeployment: boolean;
 	isAgentWorking: boolean;
@@ -350,7 +355,7 @@ interface SceneControlsProps {
 }
 
 /** Toggles for the inputs the header reads from context rather than the workspace. */
-function SceneControls({
+function HeaderStateControls({
 	busyAction,
 	hasPreviewDeployment,
 	isAgentWorking,
@@ -361,9 +366,9 @@ function SceneControls({
 	onPreviewDeploymentChange,
 	onPushingChange,
 	onRefreshingChange,
-}: SceneControlsProps) {
+}: HeaderStateControlsProps) {
 	return (
-		<div className='flex flex-wrap items-center gap-x-4 gap-y-2 rounded-md border border-border bg-surface px-3 py-2'>
+		<SceneControls>
 			<ControlGroup label='agent working'>
 				<SceneToggle
 					isActive={isAgentWorking}
@@ -422,7 +427,7 @@ function SceneControls({
 					onClick={() => onRefreshingChange(false)}
 				/>
 			</ControlGroup>
-		</div>
+		</SceneControls>
 	);
 }
 

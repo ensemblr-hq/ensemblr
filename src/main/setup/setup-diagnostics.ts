@@ -5,6 +5,11 @@ import type {
 	SetupCheckSnapshot,
 	SetupDiagnosticsSnapshot,
 } from '../../shared/ipc/contracts/setup';
+import {
+	AGENT_RUNTIME_CHECK_GROUPS,
+	isPassingSetupStatus,
+} from '../../shared/setup-checks.ts';
+import type { AgentProviderExecutableService } from '../agent-providers/agent-provider-types.ts';
 import type { LocalCommandService } from '../commands/local-command';
 import type { EnsemblrConfigService } from '../config';
 import type { EnvironmentVariablesService } from '../environment';
@@ -14,6 +19,7 @@ import type { PiReadinessService } from '../pi-runtime/pi-readiness';
 import type { EnsemblrRootDirectoryService } from '../root';
 import type { EnsemblrDatabaseService } from '../storage';
 import type { SetupCheckProvider } from './setup-check-context.ts';
+import { getClaudeExecutableCheck } from './setup-checks-claude.ts';
 import {
 	getConfigCheck,
 	getDatabaseCheck,
@@ -43,6 +49,7 @@ export interface SetupDiagnosticsService {
 /** Options for {@link createSetupDiagnosticsService}. */
 interface CreateSetupDiagnosticsServiceOptions {
 	checkProviders?: Partial<Record<SetupCheckId, SetupCheckProvider>>;
+	claudeExecutableService: AgentProviderExecutableService;
 	configService: EnsemblrConfigService;
 	databaseService: EnsemblrDatabaseService;
 	environmentVariablesService: EnvironmentVariablesService;
@@ -69,8 +76,12 @@ const SETUP_CHECK_ORDER: readonly SetupCheckId[] = [
 	'pi-agent-directory',
 	'pi-rpc',
 	'pi-provider-model',
+	'claude-executable',
 	'linear-oauth',
 ];
+
+const AGENT_RUNTIME_CHECK_IDS: readonly (readonly SetupCheckId[])[] =
+	Object.values(AGENT_RUNTIME_CHECK_GROUPS);
 
 const SENSITIVE_ASSIGNMENT_PATTERN =
 	/\b([A-Z0-9_.-]*(?:ACCESS[_-]?TOKEN|API[_-]?KEY|CREDENTIAL|PASSWORD|PRIVATE[_-]?KEY|SECRET|TOKEN)[A-Z0-9_.-]*)(\s*[=:]\s*)(["']?)([^\s"',;]+)/gi;
@@ -87,6 +98,7 @@ const TOKEN_LINE_PATTERN =
  */
 export function createSetupDiagnosticsService({
 	checkProviders = {},
+	claudeExecutableService,
 	configService,
 	databaseService,
 	environmentVariablesService,
@@ -100,6 +112,8 @@ export function createSetupDiagnosticsService({
 }: CreateSetupDiagnosticsServiceOptions): SetupDiagnosticsService {
 	const context = { homeDirectory, now };
 	const builtInProviders: Record<SetupCheckId, SetupCheckProvider> = {
+		'claude-executable': () =>
+			getClaudeExecutableCheck({ claudeExecutableService, context }),
 		config: () => getConfigCheck({ configService, context }),
 		'environment-variables': () =>
 			getEnvironmentVariablesCheck({
@@ -157,12 +171,13 @@ export function createSetupDiagnosticsService({
  * @returns A {@link SetupDiagnosticsSnapshot}.
  */
 function createDiagnosticsSnapshot(
-	checks: SetupCheckSnapshot[],
+	rawChecks: SetupCheckSnapshot[],
 	generatedAt: string,
 ): SetupDiagnosticsSnapshot {
+	const checks = applyAgentRuntimeGate(rawChecks);
 	const requiredChecks = checks.filter((check) => check.blocking);
 	const blockedRequiredChecks = requiredChecks.filter(
-		(check) => !isPassingStatus(check.status),
+		(check) => !isPassingSetupStatus(check.status),
 	);
 	const hasRequiredFailure = blockedRequiredChecks.some(
 		(check) => check.status === 'failure',
@@ -188,9 +203,52 @@ function createDiagnosticsSnapshot(
 	};
 }
 
-/** Returns true when the check status counts as a pass (success or warning). */
-function isPassingStatus(status: SetupCheckSnapshot['status']): boolean {
-	return status === 'success' || status === 'warning';
+/**
+ * Resolves the either-or agent-runtime gate onto each runtime check's `blocking`
+ * flag. Ensemblr drives chats through Pi *or* Claude Code, so a machine carrying
+ * one working runtime is ready: the runtime the user did not install must not
+ * hold the whole app at `blocked`.
+ *
+ * With one runtime working, the runtimes that are not are demoted to optional —
+ * a broken install of the runtime you never chose is not the app's problem. With
+ * none working, every runtime check is promoted to blocking: the app genuinely
+ * cannot open a chat, and either runtime would fix it, so neither should read as
+ * merely optional.
+ * @param checks - Every check snapshot, in display order.
+ * @returns The checks with agent-runtime `blocking` flags resolved.
+ */
+function applyAgentRuntimeGate(
+	checks: readonly SetupCheckSnapshot[],
+): SetupCheckSnapshot[] {
+	const byId = new Map(checks.map((check) => [check.id, check]));
+	const isRuntimeSatisfied = (runtimeIds: readonly SetupCheckId[]) =>
+		runtimeIds.every((id) => {
+			const check = byId.get(id);
+			return check ? isPassingSetupStatus(check.status) : false;
+		});
+	const hasWorkingRuntime = AGENT_RUNTIME_CHECK_IDS.some(isRuntimeSatisfied);
+	const coveredIds = new Set(
+		AGENT_RUNTIME_CHECK_IDS.filter(
+			(runtimeIds) => !isRuntimeSatisfied(runtimeIds),
+		).flat(),
+	);
+
+	return checks.map((check) => {
+		if (!isAgentRuntimeCheck(check.id)) {
+			return check;
+		}
+
+		const blocking = hasWorkingRuntime
+			? check.blocking && !coveredIds.has(check.id)
+			: true;
+
+		return blocking === check.blocking ? check : { ...check, blocking };
+	});
+}
+
+/** True when the check belongs to one of the either-or agent runtimes. */
+function isAgentRuntimeCheck(id: SetupCheckId): boolean {
+	return AGENT_RUNTIME_CHECK_IDS.some((runtimeIds) => runtimeIds.includes(id));
 }
 
 /** Applies home-directory collapse and secret redaction to a check snapshot. */

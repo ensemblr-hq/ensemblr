@@ -4,7 +4,7 @@ import {
 	openAppConfigFile,
 	selectAgentProviderExecutable,
 } from '@/renderer/api/ensemblr';
-import { isPiExecutablePickerAction } from '@/renderer/lib/setup-diagnostics';
+import { resolveExecutablePickerProvider } from '@/renderer/lib/setup-diagnostics';
 import type {
 	SetupCheckSnapshot,
 	SetupRemediationAction,
@@ -19,7 +19,7 @@ import type {
  * - `open-settings` navigates to the relevant settings screen (or opens
  *   `config.json` for the declarative-config check)
  * - `open-external` opens a vetted docs URL in the default browser
- * - `select-path` (Pi executable only) drives the native picker, then retries
+ * - `select-path` (agent-runtime executables) drives the native picker, then retries
  *
  * `run-command` is intentionally absent: clipboard copy + its transient
  * confirmation are owned by the originating row button.
@@ -51,12 +51,14 @@ export function useGenericRemediation({
 					}
 				}
 				return;
-			case 'select-path':
-				if (isPiExecutablePickerAction(action, check)) {
-					await selectAgentProviderExecutable('pi');
+			case 'select-path': {
+				const provider = resolveExecutablePickerProvider(action, check);
+				if (provider) {
+					await selectAgentProviderExecutable(provider);
 					onRetry?.();
 				}
 				return;
+			}
 			default:
 				return;
 		}
