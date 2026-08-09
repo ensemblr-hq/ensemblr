@@ -1,4 +1,5 @@
 import { useCallback, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import {
 	deleteWorkspace,
@@ -64,6 +65,7 @@ function DeleteWorkspaceDialogForm({
 	onOpenChange: (open: boolean) => void;
 	workspace: WorkspaceShellModel;
 }) {
+	const { t } = useTranslation();
 	const [stage, setStage] = useState<DeleteStage>('idle');
 	const [diagnostics, setDiagnostics] = useState<DeleteWorkspaceDiagnostic[]>(
 		[],
@@ -99,11 +101,14 @@ function DeleteWorkspaceDialogForm({
 	return (
 		<>
 			<DialogHeader>
-				<DialogTitle>Delete workspace?</DialogTitle>
+				<DialogTitle>
+					{t('workbench:delete-workspace.title', 'Delete workspace?')}
+				</DialogTitle>
 				<DialogDescription className='text-xs'>
-					Permanently removes the worktree folder, drops the local branch, and
-					deletes the workspace from Ensemblr. Anything not pushed to the remote
-					is lost. This cannot be undone.
+					{t(
+						'workbench:delete-workspace.description',
+						'Permanently removes the worktree folder, drops the local branch, and deletes the workspace from Ensemblr. Anything not pushed to the remote is lost. This cannot be undone.',
+					)}
 				</DialogDescription>
 			</DialogHeader>
 
@@ -123,7 +128,7 @@ function DeleteWorkspaceDialogForm({
 					type='button'
 					variant='ghost'
 				>
-					Cancel
+					{t('common:actions.cancel', 'Cancel')}
 				</Button>
 				<Button
 					disabled={!canDelete}
@@ -131,7 +136,9 @@ function DeleteWorkspaceDialogForm({
 					type='button'
 					variant='destructive'
 				>
-					{isBusy ? 'Deleting…' : 'Delete'}
+					{isBusy
+						? t('common:actions.deleting', 'Deleting…')
+						: t('common:actions.delete', 'Delete')}
 				</Button>
 			</DialogFooter>
 		</>

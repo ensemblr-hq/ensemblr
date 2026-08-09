@@ -6,6 +6,7 @@ import {
 	SettingsIcon,
 	Trash2Icon,
 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 import {
 	ContextMenuContent,
@@ -19,8 +20,6 @@ import {
 	classifyPermissionAction,
 	DEFAULT_PERMISSION_MODE,
 } from '@/shared/permissions';
-
-const COMING_SOON_REASON = 'Coming soon';
 
 const repositoryRemovalBoundary = classifyPermissionAction({
 	action: 'repository-removal',
@@ -43,6 +42,8 @@ export function ProjectContextMenuContent({
 	onRepositorySettingsSelect: () => void;
 	project: ProjectShellModel;
 }) {
+	const { t } = useTranslation();
+	const comingSoon = t('common:status.coming-soon', 'Coming soon');
 	const createFromSourceWired = Boolean(onCreateFromSourceSelect);
 	const archiveWired = Boolean(onArchiveSelect);
 	const browseArchiveWired = Boolean(onBrowseArchiveSelect);
@@ -50,23 +51,31 @@ export function ProjectContextMenuContent({
 
 	return (
 		<ContextMenuContent
-			aria-label={`${project.name} repository actions`}
+			aria-label={t(
+				'workbench:repository-menu.aria-label',
+				'{{repository}} repository actions',
+				{ repository: project.name },
+			)}
 			className='w-56 bg-muted p-1'
 		>
 			<ContextMenuGroup>
 				<SidebarContextMenuItem>
 					<PlusIcon aria-hidden='true' />
-					<span className='min-w-0 flex-1'>New workspace</span>
+					<span className='min-w-0 flex-1'>
+						{t('workbench:repository-menu.new-workspace', 'New workspace')}
+					</span>
 					<ContextMenuShortcut>⌘N</ContextMenuShortcut>
 				</SidebarContextMenuItem>
 				<SidebarContextMenuItem
 					data-action-placeholder='create-workspace-from-source'
 					disabled={!createFromSourceWired}
 					onSelect={onCreateFromSourceSelect}
-					title={createFromSourceWired ? undefined : COMING_SOON_REASON}
+					title={createFromSourceWired ? undefined : comingSoon}
 				>
 					<GitBranchPlusIcon aria-hidden='true' />
-					<span className='min-w-0 flex-1'>Create from…</span>
+					<span className='min-w-0 flex-1'>
+						{t('workbench:repository-menu.create-from', 'Create from…')}
+					</span>
 					<ContextMenuShortcut>⌘⇧N</ContextMenuShortcut>
 				</SidebarContextMenuItem>
 				<SidebarContextMenuItem
@@ -75,11 +84,18 @@ export function ProjectContextMenuContent({
 					onSelect={onBrowseArchiveSelect}
 				>
 					<ArchiveRestoreIcon aria-hidden='true' />
-					<span className='min-w-0 flex-1'>Workspace archive</span>
+					<span className='min-w-0 flex-1'>
+						{t(
+							'workbench:repository-menu.workspace-archive',
+							'Workspace archive',
+						)}
+					</span>
 				</SidebarContextMenuItem>
 				<SidebarContextMenuItem onSelect={onRepositorySettingsSelect}>
 					<SettingsIcon aria-hidden='true' />
-					<span className='min-w-0 flex-1'>Repository settings</span>
+					<span className='min-w-0 flex-1'>
+						{t('workbench:repository-menu.settings', 'Repository settings')}
+					</span>
 					<ContextMenuShortcut>⌘,</ContextMenuShortcut>
 				</SidebarContextMenuItem>
 			</ContextMenuGroup>
@@ -92,7 +108,9 @@ export function ProjectContextMenuContent({
 					onSelect={onArchiveSelect}
 				>
 					<ArchiveIcon aria-hidden='true' />
-					<span className='min-w-0 flex-1'>Archive repository</span>
+					<span className='min-w-0 flex-1'>
+						{t('workbench:repository-menu.archive', 'Archive repository')}
+					</span>
 				</SidebarContextMenuItem>
 				<SidebarContextMenuItem
 					data-action-placeholder='repository-delete-confirmation'
@@ -102,7 +120,9 @@ export function ProjectContextMenuContent({
 					variant='destructive'
 				>
 					<Trash2Icon aria-hidden='true' />
-					<span className='min-w-0 flex-1'>Delete repository…</span>
+					<span className='min-w-0 flex-1'>
+						{t('workbench:repository-menu.delete', 'Delete repository…')}
+					</span>
 				</SidebarContextMenuItem>
 			</ContextMenuGroup>
 		</ContextMenuContent>

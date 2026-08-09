@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { CodePanel } from '@/renderer/components/code-surface';
 import { MessageResponse } from '@/renderer/components/message';
 import { StackTraceDiagnostic } from '@/renderer/components/stack-trace-diagnostic';
@@ -39,7 +40,12 @@ function ToolMarkdownOutput({ children }: { children: string }) {
 
 /** Placeholder shown while a tool call is still running and has no result yet. */
 function ToolPendingOutput() {
-	return <p className='px-1 text-muted-foreground text-xs italic'>Running…</p>;
+	const { t } = useTranslation();
+	return (
+		<p className='px-1 text-muted-foreground text-xs italic'>
+			{t('common:tool-row.running', 'Running…')}
+		</p>
+	);
 }
 
 /**

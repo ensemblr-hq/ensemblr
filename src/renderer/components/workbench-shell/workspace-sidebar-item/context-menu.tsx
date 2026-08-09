@@ -7,6 +7,7 @@ import {
 	PinIcon,
 	Trash2Icon,
 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 import {
 	ContextMenuContent,
@@ -57,6 +58,7 @@ export function WorkspaceContextMenuContent({
 	onRenameSelect?: () => void;
 	workspace: WorkspaceShellModel;
 }) {
+	const { t } = useTranslation();
 	const currentStatus = useWorkspaceBoardStatus(workspace.id);
 	const isUnread = useWorkspaceUnread(workspace.id);
 	const { setWorkspaceBoardStatus, toggleWorkspaceUnread } =
@@ -66,7 +68,11 @@ export function WorkspaceContextMenuContent({
 
 	return (
 		<ContextMenuContent
-			aria-label={`${workspace.name} workspace actions`}
+			aria-label={t(
+				'workbench:workspace-menu.aria-label',
+				'{{workspace}} workspace actions',
+				{ workspace: workspace.name },
+			)}
 			className='w-56 bg-muted p-1'
 		>
 			<ContextMenuGroup>
@@ -75,14 +81,20 @@ export function WorkspaceContextMenuContent({
 				>
 					<MailIcon aria-hidden='true' />
 					<span className='min-w-0 flex-1'>
-						{isUnread ? 'Mark as read' : 'Mark as unread'}
+						{isUnread
+							? t('workbench:workspace-menu.mark-read', 'Mark as read')
+							: t('workbench:workspace-menu.mark-unread', 'Mark as unread')}
 					</span>
 					<ContextMenuShortcut>R</ContextMenuShortcut>
 				</SidebarContextMenuItem>
 				{onPinToggle ? (
 					<SidebarContextMenuItem onSelect={onPinToggle}>
 						<PinIcon aria-hidden='true' />
-						<span className='min-w-0 flex-1'>{isPinned ? 'Unpin' : 'Pin'}</span>
+						<span className='min-w-0 flex-1'>
+							{isPinned
+								? t('common:actions.unpin', 'Unpin')
+								: t('common:actions.pin', 'Pin')}
+						</span>
 						<ContextMenuShortcut>P</ContextMenuShortcut>
 					</SidebarContextMenuItem>
 				) : null}
@@ -92,7 +104,9 @@ export function WorkspaceContextMenuContent({
 							aria-hidden='true'
 							className={currentStatusPresentation.iconClassName}
 						/>
-						<span className='min-w-0 flex-1'>Set status</span>
+						<span className='min-w-0 flex-1'>
+							{t('workbench:workspace-menu.set-status', 'Set status')}
+						</span>
 					</ContextMenuSubTrigger>
 					<ContextMenuSubContent className='w-48 bg-muted p-1'>
 						<ContextMenuGroup>
@@ -119,7 +133,9 @@ export function WorkspaceContextMenuContent({
 					onSelect={onRenameSelect}
 				>
 					<PencilIcon aria-hidden='true' />
-					<span className='min-w-0 flex-1'>Rename</span>
+					<span className='min-w-0 flex-1'>
+						{t('common:actions.rename', 'Rename')}
+					</span>
 				</SidebarContextMenuItem>
 			</ContextMenuGroup>
 			<ContextMenuSeparator />
@@ -130,7 +146,9 @@ export function WorkspaceContextMenuContent({
 					onSelect={onArchiveSelect}
 				>
 					<ArchiveIcon aria-hidden='true' />
-					<span className='min-w-0 flex-1'>Archive</span>
+					<span className='min-w-0 flex-1'>
+						{t('common:actions.archive', 'Archive')}
+					</span>
 				</SidebarContextMenuItem>
 				<SidebarContextMenuItem
 					data-permission-boundary={archiveBoundary.boundary}
@@ -139,7 +157,9 @@ export function WorkspaceContextMenuContent({
 					variant='destructive'
 				>
 					<Trash2Icon aria-hidden='true' />
-					<span className='min-w-0 flex-1'>Delete…</span>
+					<span className='min-w-0 flex-1'>
+						{t('common:actions.delete-ellipsis', 'Delete…')}
+					</span>
 				</SidebarContextMenuItem>
 			</ContextMenuGroup>
 		</ContextMenuContent>

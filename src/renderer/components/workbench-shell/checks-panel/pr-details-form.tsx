@@ -1,4 +1,5 @@
 import { useLayoutEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/renderer/components/ui/button';
 import { Input } from '@/renderer/components/ui/input';
@@ -28,7 +29,13 @@ export function PrDetailsForm({
 	onTitleChange,
 	title,
 }: PrDetailsFormProps) {
+	const { t } = useTranslation();
 	const descriptionRef = useRef<HTMLTextAreaElement>(null);
+	const titleLabel = t('git:pull-request.title-field', 'PR title');
+	const descriptionLabel = t(
+		'git:pull-request.description-field',
+		'PR description',
+	);
 
 	// Resize to fit content on every value change, including the initial PR seed.
 	// biome-ignore lint/correctness/useExhaustiveDependencies: re-measures on description change; the body reads scrollHeight rather than description directly.
@@ -44,7 +51,7 @@ export function PrDetailsForm({
 	return (
 		<section className='flex min-w-0 flex-col gap-0.5'>
 			<Input
-				aria-label='PR title'
+				aria-label={titleLabel}
 				autoCapitalize='off'
 				autoComplete='off'
 				autoCorrect='off'
@@ -64,13 +71,13 @@ export function PrDetailsForm({
 						onDiscard();
 					}
 				}}
-				placeholder='PR title'
+				placeholder={titleLabel}
 				readOnly={isReadOnly}
 				spellCheck={false}
 				value={title}
 			/>
 			<textarea
-				aria-label='PR description'
+				aria-label={descriptionLabel}
 				autoCapitalize='off'
 				autoComplete='off'
 				autoCorrect='off'
@@ -86,7 +93,7 @@ export function PrDetailsForm({
 						onDiscard();
 					}
 				}}
-				placeholder='PR description'
+				placeholder={descriptionLabel}
 				readOnly={isReadOnly}
 				ref={descriptionRef}
 				rows={1}
@@ -96,10 +103,10 @@ export function PrDetailsForm({
 			{isDirty && !isReadOnly ? (
 				<div className='flex items-center justify-end gap-1.5 pt-1'>
 					<Button onClick={onDiscard} size='sm' variant='ghost'>
-						Discard
+						{t('common:actions.discard', 'Discard')}
 					</Button>
 					<Button disabled={!canSave} onClick={onSave} size='sm'>
-						Save
+						{t('common:actions.save', 'Save')}
 					</Button>
 				</div>
 			) : null}

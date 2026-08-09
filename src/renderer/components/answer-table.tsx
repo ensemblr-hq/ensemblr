@@ -1,6 +1,7 @@
 import { Maximize2Icon, Minimize2Icon } from 'lucide-react';
 import type { ComponentProps, ReactNode } from 'react';
 import { useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { extractTableDataFromElement, tableDataToMarkdown } from 'streamdown';
 import { cn } from '@/renderer/lib/utils';
 import { BlockControlButton, BlockControls } from './block-controls';
@@ -40,6 +41,7 @@ function TableFrame({
 	sizeControl: ReactNode;
 	viewportClassName?: string;
 }) {
+	const { t } = useTranslation();
 	const tableRef = useRef<HTMLTableElement>(null);
 
 	return (
@@ -56,7 +58,7 @@ function TableFrame({
 			</div>
 			<BlockControls>
 				<CopyResponseButton
-					label='Copy table'
+					label={t('common:answer-table.copy', 'Copy table')}
 					text={() => tableClipboardPayload(tableRef.current)}
 				/>
 				{sizeControl}
@@ -75,6 +77,7 @@ function TableFrame({
  * the wide ones the conversation column has to clip.
  */
 export function AnswerTable({ children, className }: ComponentProps<'table'>) {
+	const { t } = useTranslation();
 	const [expanded, setExpanded] = useState(false);
 
 	return (
@@ -83,7 +86,7 @@ export function AnswerTable({ children, className }: ComponentProps<'table'>) {
 				className={className}
 				sizeControl={
 					<BlockControlButton
-						label='Expand table'
+						label={t('common:answer-table.expand', 'Expand table')}
 						onClick={() => setExpanded(true)}
 					>
 						<Maximize2Icon aria-hidden='true' className='size-3.5' />
@@ -98,13 +101,15 @@ export function AnswerTable({ children, className }: ComponentProps<'table'>) {
 					className='max-w-6xl sm:max-w-6xl'
 					showCloseButton={false}
 				>
-					<DialogTitle className='sr-only'>Table</DialogTitle>
+					<DialogTitle className='sr-only'>
+						{t('common:answer-table.dialog-title', 'Table')}
+					</DialogTitle>
 					<div className='ensemblr-answer text-sm'>
 						<TableFrame
 							className={className}
 							sizeControl={
 								<BlockControlButton
-									label='Collapse table'
+									label={t('common:answer-table.collapse', 'Collapse table')}
 									onClick={() => setExpanded(false)}
 								>
 									<Minimize2Icon aria-hidden='true' className='size-3.5' />

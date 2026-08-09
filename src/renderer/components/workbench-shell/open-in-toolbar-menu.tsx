@@ -1,4 +1,5 @@
 import { ChevronDownIcon } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/renderer/components/ui/button';
 import { useOpenTargets } from '@/renderer/hooks/workbench-shell/use-open-targets';
@@ -20,6 +21,7 @@ export function OpenInToolbarMenu({
 	filePath: string;
 	workspaceId: string;
 }) {
+	const { t } = useTranslation();
 	const { copyTarget, invokeTarget, openInTargets } = useOpenTargets({
 		workspaceId,
 	});
@@ -36,7 +38,7 @@ export function OpenInToolbarMenu({
 			openInTargets={openInTargets}
 		>
 			<Button className='h-6 px-1.5 text-xs' size='xs' variant='ghost'>
-				Open in
+				{t('workbench:open-in.label', 'Open in')}
 				<ChevronDownIcon data-icon='inline-end' />
 			</Button>
 		</OpenInFileMenu>

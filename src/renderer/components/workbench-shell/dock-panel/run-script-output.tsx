@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next';
+
 import type { WorkspaceScriptSummary } from '@/renderer/types/workbench';
 
 import { RunStoppedEmptyState } from './run-stopped-empty-state';
@@ -14,13 +16,24 @@ export function RunScriptOutputPanel({
 	onRunScript: () => void;
 	script: WorkspaceScriptSummary;
 }) {
+	const { t } = useTranslation();
+
 	if (script.status === 'missing') {
 		return (
 			<ScriptEmptyState
-				actionLabel='Setup Scripts'
-				detail='Add a run script for the normal dev server, watcher, worker, or local app command.'
+				actionLabel={t(
+					'workbench:run-script.configure-action',
+					'Setup Scripts',
+				)}
+				detail={t(
+					'workbench:run-script.empty.detail',
+					'Add a run script for the normal dev server, watcher, worker, or local app command.',
+				)}
 				onAction={onOpenSetupScripts}
-				title='No run script configured'
+				title={t(
+					'workbench:run-script.empty.title',
+					'No run script configured',
+				)}
 			/>
 		);
 	}

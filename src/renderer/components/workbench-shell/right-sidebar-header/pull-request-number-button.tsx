@@ -1,4 +1,5 @@
 import { ArrowUpRightIcon } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/renderer/components/ui/button';
 import { getPullRequestLinkButtonClassName } from '@/renderer/lib/workbench/pull-request-link-button';
@@ -14,7 +15,13 @@ export function PullRequestNumberButton({
 	tone: PullRequestHeaderTone;
 	url?: string;
 }) {
+	const { t } = useTranslation();
 	const className = getPullRequestLinkButtonClassName(tone);
+	const openLabel = t(
+		'git:pull-request.open-number',
+		'Open pull request #{{number}}',
+		{ number },
+	);
 	const content = (
 		<>
 			<span className='font-mono tabular-nums'>#{number}</span>
@@ -25,7 +32,7 @@ export function PullRequestNumberButton({
 	if (url) {
 		return (
 			<Button
-				aria-label={`Open pull request #${number}`}
+				aria-label={openLabel}
 				asChild
 				className={className}
 				size='sm'
@@ -40,7 +47,7 @@ export function PullRequestNumberButton({
 
 	return (
 		<Button
-			aria-label={`Open pull request #${number}`}
+			aria-label={openLabel}
 			className={className}
 			size='sm'
 			variant='outline'

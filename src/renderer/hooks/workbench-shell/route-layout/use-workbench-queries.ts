@@ -5,6 +5,7 @@ import {
 	useQueryClient,
 } from '@tanstack/react-query';
 import { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import {
 	healthQuery,
@@ -38,6 +39,7 @@ export function useWorkbenchQueries({
 }: {
 	loaderData: WorkbenchShellData;
 }) {
+	const { i18n } = useTranslation();
 	const queryClient = useQueryClient();
 	const hasPreloadBridge = isEnsemblrApiAvailable();
 	const { data: healthData, error: healthErrorResult } = useQuery({
@@ -75,10 +77,11 @@ export function useWorkbenchQueries({
 			undefined,
 	});
 	const navigationRepositories = navigationSnapshot?.repositories;
+	// biome-ignore lint/correctness/useExhaustiveDependencies: project rows are translated through the i18n singleton, so the language is a real input Biome cannot see.
 	const baseProjects = useMemo(
 		() =>
 			hasPreloadBridge ? mapRepositoriesToProjects(navigationRepositories) : [],
-		[hasPreloadBridge, navigationRepositories],
+		[hasPreloadBridge, navigationRepositories, i18n.language],
 	);
 	const workspaceChangeSummaryTargets = useMemo(
 		() => getNavigationWorkspaceChangeSummaryTargets(navigationRepositories),

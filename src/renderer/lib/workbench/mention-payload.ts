@@ -88,6 +88,8 @@ function truncateAttachmentContent(content: string): string {
 	const head = content.slice(0, ATTACHED_FILE_HEAD_CHARS);
 	const tail = content.slice(content.length - ATTACHED_FILE_TAIL_CHARS);
 	const elided = content.length - head.length - tail.length;
+	// Pinned to en-US, not the UI language: this text goes into an agent prompt,
+	// so localizing it would make what the model sees vary by UI language.
 	return `${head}\n\n[...elided ${elided.toLocaleString('en-US')} chars...]\n\n${tail}`;
 }
 

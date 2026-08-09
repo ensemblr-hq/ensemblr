@@ -1,6 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { createFileRoute, Link } from '@tanstack/react-router';
+import type { TFunction } from 'i18next';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import {
 	cancelLinearLogin,
@@ -24,8 +26,10 @@ export const Route = createFileRoute('/_workbench/settings/integrations')({
 
 /** Integrations settings panel; currently exposes the Linear connection row. */
 function IntegrationsSettings() {
+	const { t } = useTranslation();
+
 	return (
-		<SettingsSection title='Integrations'>
+		<SettingsSection title={t('settings:integrations.title', 'Integrations')}>
 			<LinearConnectionRow />
 		</SettingsSection>
 	);
@@ -33,6 +37,7 @@ function IntegrationsSettings() {
 
 /** Settings row that connects, disconnects, or reconnects the Linear integration and surfaces login failures. */
 function LinearConnectionRow() {
+	const { t } = useTranslation();
 	const queryClient = useQueryClient();
 	const { data: snapshot, isLoading: connectionLoading } = useQuery(
 		linearConnectionQuery,
@@ -95,8 +100,9 @@ function LinearConnectionRow() {
 					snapshot={snapshot}
 				/>
 			}
-			description={describeLinearConnection(snapshot, connectionLoading)}
+			description={describeLinearConnection(t, snapshot, connectionLoading)}
 			label={
+				/* i18next-instrument-ignore */
 				<span className='flex items-center gap-2'>
 					<LinearLogo className='size-4' />
 					Linear
@@ -127,6 +133,8 @@ function LinearConnectionControls({
 	onDisconnect: () => void;
 	snapshot: LinearConnectionSnapshot | undefined;
 }) {
+	const { t } = useTranslation();
+
 	if (!snapshot) {
 		return <Spinner className='size-4' />;
 	}
@@ -136,10 +144,10 @@ function LinearConnectionControls({
 			<div className='flex items-center gap-2'>
 				<Spinner className='size-4' />
 				<span className='text-muted-foreground text-xs'>
-					Waiting for browser…
+					{t('settings:integrations.linear.waiting', 'Waiting for browser…')}
 				</span>
 				<Button onClick={onCancel} size='sm' variant='ghost'>
-					Cancel
+					{t('common:actions.cancel', 'Cancel')}
 				</Button>
 			</div>
 		);
@@ -149,7 +157,9 @@ function LinearConnectionControls({
 		return (
 			<div className='flex items-center gap-2'>
 				<Button asChild size='sm' variant='ghost'>
-					<Link to='/linear'>Browse issues</Link>
+					<Link to='/linear'>
+						{t('settings:integrations.linear.browse-issues', 'Browse issues')}
+					</Link>
 				</Button>
 				<Button
 					disabled={isDisconnecting}
@@ -157,7 +167,9 @@ function LinearConnectionControls({
 					size='sm'
 					variant='outline'
 				>
-					{isDisconnecting ? 'Disconnecting…' : 'Disconnect'}
+					{isDisconnecting
+						? t('settings:integrations.linear.disconnecting', 'Disconnecting…')
+						: t('settings:integrations.linear.disconnect', 'Disconnect')}
 				</Button>
 			</div>
 		);
@@ -169,7 +181,9 @@ function LinearConnectionControls({
 			onClick={onConnect}
 			size='sm'
 		>
-			{snapshot.state === 'reconnect-required' ? 'Reconnect' : 'Connect'}
+			{snapshot.state === 'reconnect-required'
+				? t('settings:integrations.linear.reconnect', 'Reconnect')
+				: t('settings:integrations.linear.connect', 'Connect')}
 		</Button>
 	);
 }
@@ -180,34 +194,63 @@ function LinearConnectionStateBadge({
 }: {
 	snapshot: LinearConnectionSnapshot | undefined;
 }) {
+	const { t } = useTranslation();
+
 	if (!snapshot) {
 		return null;
 	}
 
 	switch (snapshot.state) {
 		case 'connected':
-			return <Badge variant='secondary'>Connected</Badge>;
+			return (
+				<Badge variant='secondary'>
+					{t('settings:integrations.linear.state-connected', 'Connected')}
+				</Badge>
+			);
 		case 'reconnect-required':
-			return <Badge variant='destructive'>Reconnect required</Badge>;
+			return (
+				<Badge variant='destructive'>
+					{t(
+						'settings:integrations.linear.state-reconnect',
+						'Reconnect required',
+					)}
+				</Badge>
+			);
 		case 'not-configured':
-			return <Badge variant='outline'>Not configured</Badge>;
+			return (
+				<Badge variant='outline'>
+					{t(
+						'settings:integrations.linear.state-not-configured',
+						'Not configured',
+					)}
+				</Badge>
+			);
 		default:
-			return <Badge variant='outline'>Disconnected</Badge>;
+			return (
+				<Badge variant='outline'>
+					{t('settings:integrations.linear.state-disconnected', 'Disconnected')}
+				</Badge>
+			);
 	}
 }
 
 /**
  * Build the human-readable description of the current Linear connection for the settings row.
+ * @param t - Translation function from `useTranslation`
  * @param snapshot - Latest Linear connection snapshot, or undefined while loading
  * @param isLoading - Whether the connection query is still in flight
  * @returns A sentence describing the connection state and next action
  */
 function describeLinearConnection(
+	t: TFunction,
 	snapshot: LinearConnectionSnapshot | undefined,
 	isLoading: boolean,
 ): string {
 	if (isLoading || !snapshot) {
-		return 'Checking the Linear connection…';
+		return t(
+			'settings:integrations.linear.checking',
+			'Checking the Linear connection…',
+		);
 	}
 
 	switch (snapshot.state) {
@@ -216,16 +259,35 @@ function describeLinearConnection(
 			const organization = snapshot.organizationName;
 
 			if (identity && organization) {
-				return `Connected as ${identity} in ${organization}.`;
+				return t(
+					'settings:integrations.linear.connected-as-in',
+					'Connected as {{identity}} in {{organization}}.',
+					{ identity, organization },
+				);
 			}
 
-			return identity ? `Connected as ${identity}.` : 'Connected to Linear.';
+			return identity
+				? t(
+						'settings:integrations.linear.connected-as',
+						'Connected as {{identity}}.',
+						{ identity },
+					)
+				: t('settings:integrations.linear.connected', 'Connected to Linear.');
 		}
 		case 'not-configured':
-			return 'Add app.linear.clientId to ~/.config/ensemblr/config.json to enable Linear sign-in. Linear is optional for local and GitHub-only workflows.';
+			return t(
+				'settings:integrations.linear.not-configured',
+				'Add app.linear.clientId to ~/.config/ensemblr/config.json to enable Linear sign-in. Linear is optional for local and GitHub-only workflows.',
+			);
 		case 'reconnect-required':
-			return 'The stored Linear token expired and cannot be refreshed automatically. Reconnect to continue using Linear workflows.';
+			return t(
+				'settings:integrations.linear.reconnect-required',
+				'The stored Linear token expired and cannot be refreshed automatically. Reconnect to continue using Linear workflows.',
+			);
 		default:
-			return 'Connect Linear to browse issues, manage them from Ensemblr, and create workspaces from issues.';
+			return t(
+				'settings:integrations.linear.disconnected',
+				'Connect Linear to browse issues, manage them from Ensemblr, and create workspaces from issues.',
+			);
 	}
 }

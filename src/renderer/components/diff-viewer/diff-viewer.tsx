@@ -10,6 +10,7 @@ import {
 	Hunk,
 	type HunkData,
 } from 'react-diff-view';
+import { useTranslation } from 'react-i18next';
 import 'react-diff-view/style/index.css';
 import type { BundledLanguage } from 'shiki';
 
@@ -165,19 +166,15 @@ export function DiffViewer({
 }
 
 /**
- * Label for the gap band shown between two non-adjacent hunks, describing how
- * many unchanged lines the diff skipped between them so the jump in line
- * numbers reads as a deliberate boundary rather than missing content.
+ * How many unchanged lines the diff skipped between two non-adjacent hunks, so
+ * the gap band can say why the line numbers jump instead of leaving it as
+ * missing content.
  * @param previous - The hunk rendered above the gap
  * @param next - The hunk rendered below the gap
- * @returns A human-readable count of the hidden unchanged lines
+ * @returns The number of hidden unchanged lines, or zero when the hunks abut
  */
-function hunkGapLabel(previous: HunkData, next: HunkData): string {
-	const hidden = next.oldStart - (previous.oldStart + previous.oldLines);
-	if (hidden <= 0) {
-		return 'Unchanged lines';
-	}
-	return `${hidden} unchanged line${hidden === 1 ? '' : 's'}`;
+function hunkGapHiddenLines(previous: HunkData, next: HunkData): number {
+	return next.oldStart - (previous.oldStart + previous.oldLines);
 }
 
 /** Stable empty selection so an idle viewer keeps a fixed `selectedChanges` identity. */
@@ -230,6 +227,7 @@ function DiffBody({
 	widgets: Record<string, ReactNode>;
 	wordWrap: boolean;
 }) {
+	const { t } = useTranslation();
 	const paneRef = useRef<HTMLDivElement>(null);
 	const showWhitespace = useAtomValue(diffShowWhitespaceAtom);
 	const tokens = useDiffTokens(hunks, language, showWhitespace);
@@ -270,7 +268,7 @@ function DiffBody({
 				<>
 					<span className='invisible'>{renderDefault()}</span>
 					<button
-						aria-label='Add comment'
+						aria-label={t('review:diff-viewer.add-comment', 'Add comment')}
 						className='absolute inset-0 m-auto flex size-4.5 cursor-pointer items-center justify-center rounded-xs bg-foreground text-background shadow-xs transition-colors hover:bg-foreground/90'
 						onClick={() => onRequestComment(change)}
 						type='button'
@@ -281,7 +279,7 @@ function DiffBody({
 			) : (
 				renderDefault()
 			),
-		[onRequestComment],
+		[onRequestComment, t],
 	);
 	const renderGutter = commentingEnabled ? renderAddCommentGutter : undefined;
 
@@ -338,10 +336,22 @@ function DiffBody({
 						if (index === 0) {
 							return rows;
 						}
+						const hidden = hunkGapHiddenLines(renderHunks[index - 1], hunk);
 						return [
 							<Decoration key={`gap-${hunk.content}`}>
 								<CodeHunkGap
-									label={hunkGapLabel(renderHunks[index - 1], hunk)}
+									label={
+										hidden <= 0
+											? t(
+													'review:diff-viewer.unchanged-lines',
+													'Unchanged lines',
+												)
+											: t('review:diff-viewer.hidden-line-count', {
+													count: hidden,
+													defaultValue_one: '{{count}} unchanged line',
+													defaultValue_other: '{{count}} unchanged lines',
+												})
+									}
 								/>
 							</Decoration>,
 							...rows,

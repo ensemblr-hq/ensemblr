@@ -7,6 +7,7 @@ import {
 	WrapTextIcon,
 } from 'lucide-react';
 import { type ComponentType, useId } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { IconToggle } from '@/renderer/components/icon-toggle';
 import { Button } from '@/renderer/components/ui/button';
@@ -48,6 +49,7 @@ export function DiffToolbar({
 	viewed = false,
 	viewMode,
 }: DiffToolbarProps) {
+	const { t } = useTranslation();
 	const [layout, setLayout] = useAtom(diffLayoutAtom);
 	const [showWhitespace, setShowWhitespace] = useAtom(diffShowWhitespaceAtom);
 	const [wordWrap, setWordWrap] = useAtom(diffWordWrapAtom);
@@ -58,21 +60,28 @@ export function DiffToolbar({
 				<ViewModeButton
 					active={viewMode === 'diff'}
 					icon={FileDiffIcon}
-					label='Diff'
+					label={t('review:diff-toolbar.mode-diff', 'Diff')}
 					onClick={() => onViewModeChange('diff')}
 				/>
 				<ViewModeButton
 					active={viewMode === 'file'}
 					disabled={fileModeDisabled}
-					disabledHint='Full file view is unavailable for this diff'
+					disabledHint={t(
+						'review:diff-toolbar.mode-file-unavailable',
+						'Full file view is unavailable for this diff',
+					)}
 					icon={FileIcon}
-					label='File'
+					label={t('review:diff-toolbar.mode-file', 'File')}
 					onClick={() => onViewModeChange('file')}
 				/>
 			</div>
 			<IconToggle
 				active={layout === 'split'}
-				label={layout === 'split' ? 'Unified view' : 'Split view'}
+				label={
+					layout === 'split'
+						? t('review:diff-toolbar.unified-view', 'Unified view')
+						: t('review:diff-toolbar.split-view', 'Split view')
+				}
 				onClick={() => setLayout(layout === 'split' ? 'unified' : 'split')}
 			>
 				<Columns2Icon />
@@ -80,7 +89,9 @@ export function DiffToolbar({
 			<IconToggle
 				active={showWhitespace}
 				label={
-					showWhitespace ? 'Hide hidden characters' : 'Show hidden characters'
+					showWhitespace
+						? t('review:diff-toolbar.hide-whitespace', 'Hide hidden characters')
+						: t('review:diff-toolbar.show-whitespace', 'Show hidden characters')
 				}
 				onClick={() => setShowWhitespace(!showWhitespace)}
 			>
@@ -88,7 +99,11 @@ export function DiffToolbar({
 			</IconToggle>
 			<IconToggle
 				active={wordWrap}
-				label={wordWrap ? 'Disable word wrap' : 'Enable word wrap'}
+				label={
+					wordWrap
+						? t('review:diff-toolbar.disable-word-wrap', 'Disable word wrap')
+						: t('review:diff-toolbar.enable-word-wrap', 'Enable word wrap')
+				}
 				onClick={() => setWordWrap(!wordWrap)}
 			>
 				<WrapTextIcon />
@@ -115,6 +130,7 @@ function ViewedCheckbox({
 	onChange: (viewed: boolean) => void;
 	viewed: boolean;
 }) {
+	const { t } = useTranslation();
 	const checkboxId = useId();
 
 	return (
@@ -133,11 +149,13 @@ function ViewedCheckbox({
 						id={checkboxId}
 						onCheckedChange={(checked) => onChange(checked === true)}
 					/>
-					Viewed
+					{t('review:diff-toolbar.viewed', 'Viewed')}
 				</Label>
 			</TooltipTrigger>
 			<TooltipContent>
-				{viewed ? 'Unmark viewed' : 'Mark viewed'}
+				{viewed
+					? t('review:diff-toolbar.unmark-viewed', 'Unmark viewed')
+					: t('review:diff-toolbar.mark-viewed', 'Mark viewed')}
 			</TooltipContent>
 		</Tooltip>
 	);

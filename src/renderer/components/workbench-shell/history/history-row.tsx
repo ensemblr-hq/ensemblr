@@ -6,6 +6,7 @@ import {
 	GitBranchIcon,
 } from 'lucide-react';
 import { type ReactNode, useCallback, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import {
 	invalidateWorkspaceListViews,
@@ -47,6 +48,7 @@ export function HistoryRow({
 	entry: WorkspaceHistoryEntry;
 	onOpen: (entry: WorkspaceHistoryEntry) => void;
 }) {
+	const { t } = useTranslation();
 	const queryClient = useQueryClient();
 	const apiAvailable = isEnsemblrApiAvailable();
 	const [pending, setPending] = useState(false);
@@ -98,13 +100,18 @@ export function HistoryRow({
 							size='xs'
 							title={
 								restoreBlocked
-									? 'Cannot restore: the recorded base branch or branch name is missing.'
+									? t(
+											'workbench:history.row.restore-blocked',
+											'Cannot restore: the recorded base branch or branch name is missing.',
+										)
 									: undefined
 							}
 							type='button'
 							variant='subtle'
 						>
-							{pending ? 'Restoring…' : 'Unarchive'}
+							{pending
+								? t('common:actions.restoring', 'Restoring…')
+								: t('common:actions.unarchive', 'Unarchive')}
 						</Button>
 					</RowTrailing>
 				</div>
@@ -119,7 +126,7 @@ export function HistoryRow({
 					<RowLabel entry={entry} />
 					<RowTrailing date={formatRowDate(entry.updatedAt)}>
 						<span className='flex items-center gap-1 whitespace-nowrap font-medium text-muted-foreground text-xs'>
-							Go to
+							{t('workbench:history.row.go-to', 'Go to')}
 							<ArrowRightIcon aria-hidden='true' className='size-3' />
 						</span>
 					</RowTrailing>

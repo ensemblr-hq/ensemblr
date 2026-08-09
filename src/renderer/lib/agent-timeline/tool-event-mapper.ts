@@ -1,4 +1,5 @@
 import type { DynamicToolUIPart } from 'ai';
+import { i18n } from '@/renderer/lib/i18n';
 import type {
 	AgentToolOutput,
 	UIMessagePart,
@@ -225,7 +226,9 @@ function stringifyOutput(value: unknown): string {
  * @returns A non-empty error message string
  */
 function normalizeToolError(output: AgentToolOutput): string {
-	return output.text.length > 0 ? output.text : 'Tool execution failed.';
+	return output.text.length > 0
+		? output.text
+		: i18n.t('workbench:tool-call.failed.generic', 'Tool execution failed.');
 }
 
 /**

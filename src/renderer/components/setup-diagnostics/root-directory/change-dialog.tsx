@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/renderer/components/ui/button';
 import {
@@ -33,6 +34,7 @@ export function RootDirectoryChangeDialog({
 	onOpenChange: (open: boolean) => void;
 	selection: RootDirectorySelectionResult | null;
 }) {
+	const { t } = useTranslation();
 	const preview = selection?.preview ?? null;
 	const canApply = Boolean(preview?.canApply) && !isApplying;
 
@@ -44,10 +46,17 @@ export function RootDirectoryChangeDialog({
 					canApply={canApply}
 					header={
 						<DialogHeader>
-							<DialogTitle>Change root directory</DialogTitle>
+							<DialogTitle>
+								{t(
+									'common:root-directory.change-title',
+									'Change root directory',
+								)}
+							</DialogTitle>
 							<DialogDescription>
-								Switch Ensemblr to the selected root and reindex/adopt from that
-								filesystem layout after confirmation.
+								{t(
+									'common:root-directory.change-description',
+									'Switch Ensemblr to the selected root and reindex/adopt from that filesystem layout after confirmation.',
+								)}
 							</DialogDescription>
 						</DialogHeader>
 					}
@@ -82,16 +91,19 @@ export function RootDirectoryChangeContent({
 	onConfirm: () => void;
 	preview: RootDirectoryChangePreview | null;
 }) {
+	const { t } = useTranslation();
 	return (
 		<>
 			{header ?? (
 				<div className='flex flex-col gap-2'>
 					<h2 className='font-heading font-medium text-base leading-none'>
-						Change root directory
+						{t('common:root-directory.change-title', 'Change root directory')}
 					</h2>
 					<p className='text-muted-foreground text-sm'>
-						Switch Ensemblr to the selected root and reindex/adopt from that
-						filesystem layout after confirmation.
+						{t(
+							'common:root-directory.change-description',
+							'Switch Ensemblr to the selected root and reindex/adopt from that filesystem layout after confirmation.',
+						)}
 					</p>
 				</div>
 			)}
@@ -101,23 +113,30 @@ export function RootDirectoryChangeContent({
 					<RootPathPreview preview={preview} />
 					<section className='rounded-md border border-status-warning/30 bg-status-warning/10 px-3 py-2.5 text-xs leading-5'>
 						<p className='font-medium text-foreground'>
-							Old root contents are preserved.
+							{t(
+								'common:root-directory.preserved-title',
+								'Old root contents are preserved.',
+							)}
 						</p>
 						<p className='mt-1 text-muted-foreground'>
-							Switching changes where Ensemblr looks for repos, workspaces, and
-							archived contexts. Reindex/adopt is the default behavior.
-							Migration is a separate action. Delete or cleanup is a separate
-							destructive action.
+							{t(
+								'common:root-directory.preserved-body',
+								'Switching changes where Ensemblr looks for repos, workspaces, and archived contexts. Reindex/adopt is the default behavior. Migration is a separate action. Delete or cleanup is a separate destructive action.',
+							)}
 						</p>
 						<p className='mt-1 text-muted-foreground'>
-							Shared Conductor root continuity covers filesystem, git, and
-							config only; chat/session/checkpoint continuity is not guaranteed
-							across apps.
+							{t(
+								'common:root-directory.continuity-note',
+								'Shared Conductor root continuity covers filesystem, git, and config only; chat/session/checkpoint continuity is not guaranteed across apps.',
+							)}
 						</p>
 					</section>
 					<RootDirectoryDiagnostics
 						diagnostics={preview.diagnostics}
-						emptyLabel='No blocking root warnings.'
+						emptyLabel={t(
+							'common:root-directory.no-blocking-warnings',
+							'No blocking root warnings.',
+						)}
 					/>
 					{applyResult ? (
 						<RootDirectoryApplyResult result={applyResult} />
@@ -132,7 +151,9 @@ export function RootDirectoryChangeContent({
 					type='button'
 					variant='default'
 				>
-					{isApplying ? 'Applying' : 'Switch root'}
+					{isApplying
+						? t('common:root-directory.applying', 'Applying')
+						: t('common:root-directory.switch', 'Switch root')}
 				</Button>
 			</DialogFooter>
 		</>

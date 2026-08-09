@@ -1,4 +1,5 @@
 import { ChevronRightIcon } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 import {
 	Collapsible,
@@ -26,6 +27,7 @@ export function DiagnosticsLogCollapsible({
 	className?: string;
 	logs: readonly SetupCheckLogSnapshot[];
 }) {
+	const { t } = useTranslation();
 	if (logs.length === 0) {
 		return null;
 	}
@@ -37,7 +39,7 @@ export function DiagnosticsLogCollapsible({
 					aria-hidden='true'
 					className='size-3.5 transition-transform group-data-[state=open]:rotate-90'
 				/>
-				Diagnostics log
+				{t('common:diagnostics-log.trigger', 'Diagnostics log')}
 			</CollapsibleTrigger>
 			<CollapsibleContent className='mt-1.5 flex flex-col gap-1 rounded-md border border-border bg-muted/40 px-2.5 py-2 text-xs'>
 				{logs.slice(0, VISIBLE_LOG_COUNT).map((log) => (
@@ -48,7 +50,9 @@ export function DiagnosticsLogCollapsible({
 						<span className='font-medium text-foreground'>{log.label}</span>
 						{': '}
 						{log.text}
-						{log.truncated ? ' (truncated)' : null}
+						{log.truncated
+							? ` ${t('common:diagnostics-log.truncated', '(truncated)')}`
+							: null}
 					</p>
 				))}
 			</CollapsibleContent>

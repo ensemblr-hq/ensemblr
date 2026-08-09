@@ -1,4 +1,4 @@
-import { formatCount } from '@/renderer/lib/format';
+import { i18n } from '@/renderer/lib/i18n';
 import type {
 	ChecksGitStatusSection,
 	ChecksPanelState,
@@ -15,72 +15,114 @@ export function getChecksPanelState(
 	if (!hasPullRequest) {
 		if (workspace.changeSummary.files > 0) {
 			return {
-				detail: `${formatCount(
-					workspace.changeSummary.files,
-					'uncommitted change',
-				)} ready for PR setup.`,
+				detail: i18n.t('workbench:checks-panel.uncommitted.detail', {
+					count: workspace.changeSummary.files,
+					defaultValue_one: '{{count}} uncommitted change ready for PR setup.',
+					defaultValue_other:
+						'{{count}} uncommitted changes ready for PR setup.',
+				}),
 				hasPullRequest: false,
 				kind: 'uncommitted',
 				status: 'pending',
-				title: 'No pull request',
+				title: i18n.t(
+					'workbench:checks-panel.no-pull-request.title',
+					'No pull request',
+				),
 			};
 		}
 
 		return {
-			detail: 'No local changes to review.',
+			detail: i18n.t(
+				'workbench:checks-panel.empty.detail',
+				'No local changes to review.',
+			),
 			hasPullRequest: false,
 			kind: 'empty',
 			status: 'open',
-			title: 'No pull request',
+			title: i18n.t(
+				'workbench:checks-panel.no-pull-request.title',
+				'No pull request',
+			),
 		};
 	}
 
 	if (pullRequest.status === 'ready-to-merge') {
 		return {
-			detail: pullRequest.detail || 'All required checks passed.',
+			detail:
+				pullRequest.detail ||
+				i18n.t(
+					'workbench:checks-panel.ready.detail',
+					'All required checks passed.',
+				),
 			hasPullRequest: true,
 			kind: 'pr-ready',
 			pullRequest,
 			status: 'ready',
-			title: pullRequest.label || 'Ready to merge',
+			title:
+				pullRequest.label ||
+				i18n.t('workbench:checks-panel.ready.title', 'Ready to merge'),
 		};
 	}
 
 	if (pullRequest.status === 'checking') {
 		return {
-			detail: pullRequest.detail || 'Checks are still running.',
+			detail:
+				pullRequest.detail ||
+				i18n.t(
+					'workbench:checks-panel.checking.detail',
+					'Checks are still running.',
+				),
 			hasPullRequest: true,
 			kind: 'pr-checking',
 			pullRequest,
 			status: 'pending',
-			title: pullRequest.label || 'Checks pending',
+			title:
+				pullRequest.label ||
+				i18n.t('workbench:checks-panel.checking.title', 'Checks pending'),
 		};
 	}
 
 	if (pullRequest.status === 'blocked') {
 		return {
-			detail: pullRequest.detail || 'Resolve blockers before merge.',
+			detail:
+				pullRequest.detail ||
+				i18n.t(
+					'workbench:checks-panel.blocked.detail',
+					'Resolve blockers before merge.',
+				),
 			hasPullRequest: true,
 			kind: 'pr-blocked',
 			pullRequest,
 			status: 'blocked',
-			title: pullRequest.label || 'Checks failed',
+			title:
+				pullRequest.label ||
+				i18n.t('workbench:checks-panel.blocked.title', 'Checks failed'),
 		};
 	}
 
 	if (pullRequest.status === 'agent-working') {
 		return {
-			detail: pullRequest.detail || 'The agent is updating this workspace.',
+			detail:
+				pullRequest.detail ||
+				i18n.t(
+					'workbench:checks-panel.working.detail',
+					'The agent is updating this workspace.',
+				),
 			hasPullRequest: true,
 			kind: 'pr-working',
 			pullRequest,
 			status: 'pending',
-			title: 'Pull request active',
+			title: i18n.t(
+				'workbench:checks-panel.working.title',
+				'Pull request active',
+			),
 		};
 	}
 
 	return {
-		detail: pullRequest.detail || 'Pull request is open.',
+		detail:
+			pullRequest.detail ||
+			i18n.t('workbench:checks-panel.open.detail', 'Pull request is open.'),
 		hasPullRequest: true,
 		kind: 'pr-open',
 		pullRequest,
@@ -88,7 +130,9 @@ export function getChecksPanelState(
 		title:
 			pullRequest.label ||
 			pullRequest.title ||
-			`Pull request #${pullRequest.number}`,
+			i18n.t('workbench:checks-panel.open.title', 'Pull request #{{number}}', {
+				number: pullRequest.number,
+			}),
 	};
 }
 

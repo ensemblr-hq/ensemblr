@@ -57,6 +57,40 @@ These instructions apply to everything under `src/renderer/`.
 - Keep a single-file type concern as `types/<concern>.ts`. A concern that outgrows one file becomes `types/<concern>/` with an `index.ts` barrel — `types/workbench/`, `types/workbench-shell/`, `types/components/` — and callers import `@/renderer/types/<concern>`.
 - Put ambient renderer declarations, such as `Window` bridge types, under `types/`.
 
+## User-Facing Strings
+
+- Every user-facing string is a catalogue key, not a literal. Write
+  `t('<namespace>:<surface>.<element>', 'Default English')` — English is
+  extracted from the call sites by `npm run i18n:extract`, never hand-written
+  into `lib/i18n/locales/en/`.
+- `i18n.t()` is for `lib/` only. Anything reachable from a component or a hook
+  must use `useTranslation()`, or it will not re-render when the language
+  changes.
+- Never hand-edit `lib/i18n/locales/**`. Run `npm run i18n:extract` and then
+  `npm run i18n:types` after adding keys; `npm run i18n:status` reports
+  per-locale completion.
+- Plurals pass `count` with `defaultValue_one` / `defaultValue_other`. Never
+  concatenate a plural — Russian has four categories and changes the verb too.
+  One `t()` call pluralises exactly one noun; a sentence with two countable
+  nouns needs one call each, composed through placeholders.
+- **Memoising a `lib/` function that calls the singleton needs the language in
+  its deps.** `useMemo(() => presentToolCall(part), [part])` returns the
+  language it was first computed in, forever — the component re-renders on
+  `languageChanged` but the memo does not recompute. Add `i18n.language` from
+  `useTranslation()` to the deps array. This does not apply to `useCallback`,
+  which memoises the function rather than its result.
+- **`src/shared/` returns locale-neutral codes, never English labels.** It sits
+  on a cross-process boundary and cannot reach the renderer's i18n instance, so
+  a label it returns is English forever — and interpolating one into a
+  translated sentence yields half-translated output, `aria-label`s included.
+  Export the union and translate it renderer-side.
+- `npm run check` runs `i18n:lint`, which fails on hardcoded strings and on
+  sentences concatenated across translations. Suppress a genuine false positive
+  — a brand name, a `⌘↵` glyph, a command example — with an
+  `i18next-instrument-ignore` directive, not by widening the config.
+- See `docs/i18n-glossary.md` for the product vocabulary in `ru` and `el`. Fix a
+  term there before translating, and record any new call you had to make.
+
 ## Fixture Data
 
 - Put fixture, demo, and placeholder data under `fixtures/<concern>/`.

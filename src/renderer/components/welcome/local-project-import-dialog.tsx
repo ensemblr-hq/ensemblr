@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import {
 	Dialog,
@@ -10,13 +11,10 @@ import {
 import { Spinner } from '@/renderer/components/ui/spinner';
 
 const STILL_WORKING_DELAY_MS = 10_000;
-const INITIAL_DESCRIPTION =
-	'Ensemblr is cloning the tracked git files into your managed repos folder, then creating the first workspace.';
-const STILL_WORKING_DESCRIPTION =
-	'Still working — large repositories with deep history can take a minute or two. The window will switch as soon as the workspace is ready.';
 
 /** Dialog body that reports import progress and escalates to a "still working" note after a delay. */
 function ImportDialogBody() {
+	const { t } = useTranslation();
 	const [stillWorking, setStillWorking] = useState(false);
 
 	useEffect(() => {
@@ -31,9 +29,19 @@ function ImportDialogBody() {
 		<div className='flex items-start gap-3'>
 			<Spinner className='mt-0.5 size-5 shrink-0 text-muted-foreground' />
 			<DialogHeader className='gap-2'>
-				<DialogTitle>Opening local project…</DialogTitle>
+				<DialogTitle>
+					{t('common:local-import.title', 'Opening local project…')}
+				</DialogTitle>
 				<DialogDescription>
-					{stillWorking ? STILL_WORKING_DESCRIPTION : INITIAL_DESCRIPTION}
+					{stillWorking
+						? t(
+								'common:local-import.still-working',
+								'Still working — large repositories with deep history can take a minute or two. The window will switch as soon as the workspace is ready.',
+							)
+						: t(
+								'common:local-import.description',
+								'Ensemblr is cloning the tracked git files into your managed repos folder, then creating the first workspace.',
+							)}
 				</DialogDescription>
 			</DialogHeader>
 		</div>

@@ -1,6 +1,7 @@
 import { useNavigate } from '@tanstack/react-router';
 import { useSetAtom } from 'jotai';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 
 import {
@@ -60,6 +61,7 @@ export function useWorkspaceDockActions({
 	workspaceId,
 }: UseWorkspaceDockActionsOptions): WorkbenchDockActions {
 	const navigate = useNavigate();
+	const { t } = useTranslation();
 	const setLastRunScript = useSetAtom(lastRunScriptAtomFamily(workspaceId));
 	const askAgentSetupScriptRef = useRef(askAgentSetupScript);
 	const updateSearchRef = useRef(updateSearch);
@@ -90,13 +92,24 @@ export function useWorkspaceDockActions({
 					const error = result.diagnostics.find(
 						(diagnostic) => diagnostic.severity === 'error',
 					);
-					toast.error(error?.message ?? 'The terminal could not start.');
+					toast.error(
+						error?.message ??
+							t(
+								'errors:terminal.start-failed.title',
+								'The terminal could not start.',
+							),
+					);
 				})
 				.catch(() => {
-					toast.error('The terminal could not start.');
+					toast.error(
+						t(
+							'errors:terminal.start-failed.title',
+							'The terminal could not start.',
+						),
+					);
 				});
 		},
-		[createTerminal],
+		[createTerminal, t],
 	);
 	useProvideDockTerminal(workspaceId, openTerminal);
 

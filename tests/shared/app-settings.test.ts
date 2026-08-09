@@ -6,6 +6,7 @@ import {
 	mergeAppSettings,
 	parseAppSettings,
 } from '../../src/shared/config';
+import { LANGUAGE_PREFERENCES } from '../../src/shared/i18n';
 
 describe('parseAppSettings', () => {
 	test('fills all defaults from empty / nullish input', () => {
@@ -166,5 +167,51 @@ describe('appSettingsPatchSchema', () => {
 		expect(parsed.general && 'bogus' in parsed.general).toBe(false);
 		expect(parsed.experimental?.autoRunAfterSetup).toBe(true);
 		expect(parsed.models).toBeUndefined();
+	});
+});
+
+describe('general.language', () => {
+	test('defaults to following the system language', () => {
+		expect(DEFAULT_APP_SETTINGS.general.language).toBe('system');
+	});
+
+	// The no-migration guarantee: every config.json written before this field
+	// existed must keep parsing.
+	test('a config with no language key parses to the default', () => {
+		expect(
+			parseAppSettings({ general: { sendShortcut: 'mod+enter' } }).general
+				.language,
+		).toBe('system');
+	});
+
+	test('an invalid value catches back to the default', () => {
+		expect(
+			parseAppSettings({ general: { language: 'de' } }).general.language,
+		).toBe('system');
+		expect(
+			parseAppSettings({ general: { language: 7 } }).general.language,
+		).toBe('system');
+	});
+
+	// The zod enum duplicates LANGUAGE_PREFERENCES deliberately — zod needs a
+	// literal tuple, and importing shared/i18n.ts into the config module would
+	// drag it into the i18n graph. This is what keeps the two in step.
+	test('accepts exactly the shared LANGUAGE_PREFERENCES values', () => {
+		for (const preference of LANGUAGE_PREFERENCES) {
+			expect(
+				parseAppSettings({ general: { language: preference } }).general
+					.language,
+			).toBe(preference);
+		}
+	});
+
+	test('round-trips through a patch', () => {
+		const parsed = appSettingsPatchSchema.parse({
+			general: { language: 'el' },
+		});
+		expect(parsed.general?.language).toBe('el');
+		expect(
+			mergeAppSettings(DEFAULT_APP_SETTINGS, parsed).general.language,
+		).toBe('el');
 	});
 });

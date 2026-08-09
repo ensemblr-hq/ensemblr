@@ -1,0 +1,157 @@
+{
+	"changes": {
+		"empty": {
+			"message": "Οι αλλαγές θα εμφανιστούν εδώ.",
+			"title": "Δεν υπάρχουν ακόμη αλλαγές αρχείων"
+		},
+		"group-clean": "Χωρίς συγκρούσεις",
+		"group-conflicts": "Συγκρούσεις",
+		"loading": "Φόρτωση αλλαγών…"
+	},
+	"check-status": {
+		"failed": "Απέτυχε",
+		"passed": "Πέτυχε",
+		"running": "Εκτελείται"
+	},
+	"checks": {
+		"add-all-to-chat": "Προσθήκη όλων στη συνομιλία",
+		"add-todo": "+ Προσθήκη",
+		"check-details-link": "Λεπτομέρειες ελέγχου {{label}} (ανοίγει σε νέα καρτέλα)",
+		"checks": "Έλεγχοι",
+		"comments": "Σχόλια",
+		"conflicts": "Συγκρούσεις",
+		"git-status": "Κατάσταση git",
+		"no-checks": "Δεν αναφέρθηκαν έλεγχοι",
+		"no-comments": "Δεν υπάρχουν ακόμη σχόλια",
+		"no-pull-request": "Δεν υπάρχει ανοιχτό PR",
+		"no-todos": "Δεν υπάρχουν ακόμη εκκρεμότητες",
+		"sync-error": {
+			"title": "Δεν ήταν δυνατή η ανανέωση από το GitHub"
+		},
+		"todo-input-label": "Τίτλος νέας εκκρεμότητας",
+		"todo-placeholder": "Τίτλος εκκρεμότητας",
+		"todos": "Οι εκκρεμότητές σας",
+		"uncommitted-change-count_one": "{{count}} αλλαγή χωρίς commit",
+		"uncommitted-change-count_other": "{{count}} αλλαγές χωρίς commit"
+	},
+	"comment": {
+		"add-to-chat": "Προσθήκη σχολίου στη συνομιλία",
+		"added-to-chat": {
+			"title": "Το σχόλιο προστέθηκε στη συνομιλία."
+		},
+		"agent-badge": "Πράκτορας",
+		"composer-label": "Νέο σχόλιο σε γραμμή",
+		"composer-placeholder": "Προσθέστε ένα τοπικό σχόλιο αξιολόγησης σε αυτή τη γραμμή…",
+		"delete": "Διαγραφή σχολίου",
+		"go-to-line": "Μετάβαση στη γραμμή στο diff",
+		"hide": "Απόκρυψη σχολίου",
+		"outdated": "Παρωχημένο",
+		"reopen": "Επανάνοιγμα σχολίου",
+		"resolve": "Επίλυση σχολίου",
+		"resolved": "Επιλυμένο",
+		"source-actions-bot": "Bot Actions",
+		"source-local": "Τοπικό",
+		"submit": "Σχολιασμός",
+		"unresolved": "Ανεπίλυτο"
+	},
+	"comment-preview": {
+		"actions": {
+			"add-to-chat": "Προσθήκη σχολίου στη συνομιλία",
+			"open-external": "Άνοιγμα σχολίου στο {{provider}}"
+		},
+		"added-to-chat": {
+			"title": "Το σχόλιο προστέθηκε στη συνομιλία."
+		},
+		"reply-count_one": "{{count}} απάντηση",
+		"reply-count_other": "{{count}} απαντήσεις",
+		"state": {
+			"outdated": "Παρωχημένο",
+			"unresolved": "Ανεπίλυτο"
+		}
+	},
+	"comments": {
+		"added-to-chat": {
+			"title": "Τα εκκρεμή σχόλια προστέθηκαν στη συνομιλία."
+		}
+	},
+	"diff-toolbar": {
+		"disable-word-wrap": "Απενεργοποίηση αναδίπλωσης γραμμών",
+		"enable-word-wrap": "Ενεργοποίηση αναδίπλωσης γραμμών",
+		"hide-whitespace": "Απόκρυψη μη εκτυπώσιμων χαρακτήρων",
+		"mark-viewed": "Σήμανση ως αναγνωσμένου",
+		"mode-diff": "Diff",
+		"mode-file": "Αρχείο",
+		"mode-file-unavailable": "Η προβολή ολόκληρου του αρχείου δεν είναι διαθέσιμη για αυτό το diff",
+		"show-whitespace": "Εμφάνιση μη εκτυπώσιμων χαρακτήρων",
+		"split-view": "Διαχωρισμένη προβολή",
+		"unified-view": "Ενιαία προβολή",
+		"unmark-viewed": "Κατάργηση σήμανσης ανάγνωσης",
+		"viewed": "Αναγνωσμένο"
+	},
+	"diff-viewer": {
+		"add-comment": "Προσθήκη σχολίου",
+		"hidden-line-count_one": "{{count}} αμετάβλητη γραμμή",
+		"hidden-line-count_other": "{{count}} αμετάβλητες γραμμές",
+		"unchanged-lines": "Αμετάβλητες γραμμές"
+	},
+	"discard-changes": {
+		"affected-file-count_one": "{{count}} αρχείο επηρεάζεται",
+		"affected-file-count_other": "{{count}} αρχεία επηρεάζονται",
+		"description": "Οι αλλαγές στο δέντρο εργασίας επαναφέρονται στο τελευταίο commit· ένα νέο αρχείο διαγράφεται. Αυτό δεν μπορεί να αναιρεθεί.",
+		"description-bulk": "Κάθε αλλαγή στο δέντρο εργασίας επαναφέρεται στο τελευταίο commit και τυχόν νέα αρχεία διαγράφονται. Αυτό δεν μπορεί να αναιρεθεί.",
+		"submitting": "Απόρριψη…",
+		"title": "Απόρριψη αλλαγών;",
+		"title-bulk": "Απόρριψη όλων των αλλαγών;"
+	},
+	"file-diff": {
+		"add-diff-to-chat": "Προσθήκη diff στη συνομιλία",
+		"add-to-chat": "Προσθήκη στη συνομιλία",
+		"added-to-chat": {
+			"title": "Το diff προστέθηκε στο {{chat}}."
+		},
+		"fallback-chat-name": "συνομιλία",
+		"latest-chat": "πιο πρόσφατη",
+		"truncated": "Το diff περικόπηκε",
+		"untitled-chat": "Συνομιλία χωρίς τίτλο"
+	},
+	"file-menu": {
+		"actions": "Ενέργειες για {{path}}"
+	},
+	"file-row": {
+		"discard": "Απόρριψη αλλαγών στο {{path}}",
+		"open": "Άνοιγμα {{path}}",
+		"open-in": "Άνοιγμα {{path}} σε…",
+		"viewed": "Αναγνωσμένο"
+	},
+	"file-status": {
+		"added": "Προστεθειμένο",
+		"conflicted": "Σε σύγκρουση",
+		"deleted": "Διαγραμμένο",
+		"modified": "Τροποποιημένο",
+		"renamed": "Μετονομασμένο",
+		"untracked": "Μη παρακολουθούμενο"
+	},
+	"review-panel": {
+		"refresh-pull-request": "Ανανέωση κατάστασης pull request",
+		"review-action": "Αξιολόγηση",
+		"search-files": "Αναζήτηση αρχείων",
+		"tabs": {
+			"changes": "Αλλαγές",
+			"checks": "Έλεγχοι",
+			"files": "Όλα τα αρχεία"
+		},
+		"view-mode": {
+			"as-folders": "Εμφάνιση αλλαγών σε φακέλους",
+			"as-list": "Εμφάνιση αλλαγών σε λίστα"
+		}
+	},
+	"todo": {
+		"add-to-chat": "Προσθήκη εκκρεμότητας στη συνομιλία",
+		"added-to-chat": {
+			"title": "Η εργασία προστέθηκε στη συνομιλία."
+		},
+		"delete": "Διαγραφή εκκρεμότητας",
+		"mark-done": "Σήμανση εκκρεμότητας ως ολοκληρωμένης: {{label}}",
+		"mark-open": "Σήμανση εκκρεμότητας ως ανοιχτής: {{label}}"
+	}
+}

@@ -1,8 +1,8 @@
 import type { ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { ScrollArea } from '@/renderer/components/ui/scroll-area';
 import { PanelAlert } from '@/renderer/components/workbench-shell/panel-alert';
-import { formatCount } from '@/renderer/lib/format';
 import type { ChecksPanelState } from '@/renderer/types/components';
 import type { WorkspaceShellModel } from '@/renderer/types/workbench';
 
@@ -43,6 +43,7 @@ export function ChecksNoPullRequestState({
 	todoSection?: ReactNode;
 	workspace: WorkspaceShellModel;
 }) {
+	const { t } = useTranslation();
 	// "Commit and push" only makes sense for uncommitted edits; "Create PR" keys
 	// off the wider branch-diff signal instead.
 	const hasUncommittedChanges = state.kind === 'uncommitted';
@@ -56,27 +57,37 @@ export function ChecksNoPullRequestState({
 				{workspace.pullRequest.syncError ? (
 					<PanelAlert
 						detail={workspace.pullRequest.syncError}
-						title='Could not refresh from GitHub'
+						title={t(
+							'review:checks.sync-error.title',
+							'Could not refresh from GitHub',
+						)}
 					/>
 				) : null}
 				{children}
 
 				<section className='flex min-w-0 flex-col gap-1.5'>
-					<ChecksSectionHeader label='Git status' />
+					<ChecksSectionHeader
+						label={t('review:checks.git-status', 'Git status')}
+					/>
 					<ChecksActionRow
-						actionLabel={canCreatePullRequest ? 'Create PR' : undefined}
+						actionLabel={
+							canCreatePullRequest
+								? t('git:pull-request.create-action', 'Create PR')
+								: undefined
+						}
 						disabled={isAgentWorking}
-						label='No PR open'
+						label={t('review:checks.no-pull-request', 'No PR open')}
 						onAction={onCreatePullRequest}
 					/>
 					{hasUncommittedChanges ? (
 						<ChecksActionRow
-							actionLabel='Commit and push'
+							actionLabel={t('git:actions.commit-and-push', 'Commit and push')}
 							disabled={isAgentWorking}
-							label={formatCount(
-								workspace.changeSummary.files,
-								'uncommitted change',
-							)}
+							label={t('review:checks.uncommitted-change-count', {
+								count: workspace.changeSummary.files,
+								defaultValue_one: '{{count}} uncommitted change',
+								defaultValue_other: '{{count}} uncommitted changes',
+							})}
 							onAction={onCommitAndPush}
 						/>
 					) : null}
@@ -88,8 +99,12 @@ export function ChecksNoPullRequestState({
 
 				{todoSection ?? (
 					<section className='flex min-w-0 flex-col gap-1.5'>
-						<ChecksSectionHeader label='Your todos' />
-						<ChecksEmptyMessage label='No todos yet' />
+						<ChecksSectionHeader
+							label={t('review:checks.todos', 'Your todos')}
+						/>
+						<ChecksEmptyMessage
+							label={t('review:checks.no-todos', 'No todos yet')}
+						/>
 					</section>
 				)}
 			</div>

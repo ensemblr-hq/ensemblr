@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { type ReactNode, useCallback, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 
 import { reviewMergeSettingsQuery } from '@/renderer/api/ensemblr-queries';
@@ -50,6 +51,7 @@ export function ReviewActionsProvider({
 	children: ReactNode;
 	runAgentAction: (action: AgentActionKind) => void;
 }) {
+	const { t } = useTranslation();
 	const [activeDialog, setActiveDialog] = useState<ActiveReviewDialog>(null);
 	const closeDialog = useCallback(() => setActiveDialog(null), []);
 
@@ -81,11 +83,21 @@ export function ReviewActionsProvider({
 	const submitToComposer = useComposerSubmit(activeWorkspace.id);
 	const commitAndPush = useCallback(() => {
 		if (!submitToComposer(buildCommitAndPushPrompt(activeWorkspace))) {
-			toast.error('Open a chat tab to hand this to the agent.');
+			toast.error(
+				t(
+					'errors:composer.no-chat-tab.title',
+					'Open a chat tab to hand this to the agent.',
+				),
+			);
 			return;
 		}
-		toast.success('Asked the agent to commit and push.');
-	}, [activeWorkspace, submitToComposer]);
+		toast.success(
+			t(
+				'git:commit-and-push.asked.title',
+				'Asked the agent to commit and push.',
+			),
+		);
+	}, [activeWorkspace, submitToComposer, t]);
 
 	const value = useMemo<ReviewActionsValue>(
 		() => ({

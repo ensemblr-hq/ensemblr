@@ -27,6 +27,7 @@ export {
 	desktopNotificationsAtom,
 	followUpBehaviorAtom,
 	hiddenModelsAtom,
+	languageAtom,
 	markdownStyleAtom,
 	monoFontAtom,
 	renameWorkspaceOnBranchAtom,
@@ -77,4 +78,5 @@ export {
 	codeThemeForMode,
 	useResolvedCodeTheme,
 } from './use-code-theme';
+export { useLanguageEffect } from './use-language-effect';
 export { useThemeEffect } from './use-theme-effect';

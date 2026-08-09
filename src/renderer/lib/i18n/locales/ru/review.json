@@ -1,0 +1,165 @@
+{
+	"changes": {
+		"empty": {
+			"message": "Здесь появятся изменения.",
+			"title": "Изменений файлов пока нет"
+		},
+		"group-clean": "Без конфликтов",
+		"group-conflicts": "Конфликты",
+		"loading": "Загрузка изменений…"
+	},
+	"check-status": {
+		"failed": "Не пройдена",
+		"passed": "Пройдена",
+		"running": "Выполняется"
+	},
+	"checks": {
+		"add-all-to-chat": "Добавить всё в диалог",
+		"add-todo": "+ Добавить",
+		"check-details-link": "Подробности проверки {{label}} (откроется в новой вкладке)",
+		"checks": "Проверки",
+		"comments": "Комментарии",
+		"conflicts": "Конфликты",
+		"git-status": "Статус git",
+		"no-checks": "Проверок нет",
+		"no-comments": "Комментариев пока нет",
+		"no-pull-request": "Нет открытых PR",
+		"no-todos": "Список дел пуст",
+		"sync-error": {
+			"title": "Не удалось обновить данные из GitHub"
+		},
+		"todo-input-label": "Название нового пункта",
+		"todo-placeholder": "Название пункта",
+		"todos": "Ваш список дел",
+		"uncommitted-change-count_one": "{{count}} незакоммиченное изменение",
+		"uncommitted-change-count_few": "{{count}} незакоммиченных изменения",
+		"uncommitted-change-count_many": "{{count}} незакоммиченных изменений",
+		"uncommitted-change-count_other": "{{count}} незакоммиченного изменения"
+	},
+	"comment": {
+		"add-to-chat": "Добавить комментарий в диалог",
+		"added-to-chat": {
+			"title": "Комментарий добавлен в диалог."
+		},
+		"agent-badge": "Агент",
+		"composer-label": "Новый комментарий к строке",
+		"composer-placeholder": "Добавьте локальный комментарий к ревью на этой строке…",
+		"delete": "Удалить комментарий",
+		"go-to-line": "Перейти к строке в diff",
+		"hide": "Скрыть комментарий",
+		"outdated": "Устарел",
+		"reopen": "Открыть комментарий заново",
+		"resolve": "Отметить комментарий решённым",
+		"resolved": "Решён",
+		"source-actions-bot": "Бот Actions",
+		"source-local": "Локальный",
+		"submit": "Комментировать",
+		"unresolved": "Не решён"
+	},
+	"comment-preview": {
+		"actions": {
+			"add-to-chat": "Добавить комментарий в диалог",
+			"open-external": "Открыть комментарий в {{provider}}"
+		},
+		"added-to-chat": {
+			"title": "Комментарий добавлен в диалог."
+		},
+		"reply-count_one": "{{count}} ответ",
+		"reply-count_few": "{{count}} ответа",
+		"reply-count_many": "{{count}} ответов",
+		"reply-count_other": "{{count}} ответа",
+		"state": {
+			"outdated": "Устарел",
+			"unresolved": "Не решён"
+		}
+	},
+	"comments": {
+		"added-to-chat": {
+			"title": "Незакрытые комментарии добавлены в диалог."
+		}
+	},
+	"diff-toolbar": {
+		"disable-word-wrap": "Отключить перенос строк",
+		"enable-word-wrap": "Включить перенос строк",
+		"hide-whitespace": "Скрыть непечатаемые символы",
+		"mark-viewed": "Отметить просмотренным",
+		"mode-diff": "Diff",
+		"mode-file": "Файл",
+		"mode-file-unavailable": "Просмотр файла целиком недоступен для этого diff",
+		"show-whitespace": "Показать непечатаемые символы",
+		"split-view": "Раздельный вид",
+		"unified-view": "Единый вид",
+		"unmark-viewed": "Снять отметку о просмотре",
+		"viewed": "Просмотрено"
+	},
+	"diff-viewer": {
+		"add-comment": "Добавить комментарий",
+		"hidden-line-count_one": "{{count}} неизменённая строка",
+		"hidden-line-count_few": "{{count}} неизменённые строки",
+		"hidden-line-count_many": "{{count}} неизменённых строк",
+		"hidden-line-count_other": "{{count}} неизменённой строки",
+		"unchanged-lines": "Неизменённые строки"
+	},
+	"discard-changes": {
+		"affected-file-count_one": "Затронут {{count}} файл",
+		"affected-file-count_few": "Затронуто {{count}} файла",
+		"affected-file-count_many": "Затронуто {{count}} файлов",
+		"affected-file-count_other": "Затронуто {{count}} файла",
+		"description": "Изменения в рабочем дереве откатываются к последнему коммиту; новый файл удаляется. Это нельзя отменить.",
+		"description-bulk": "Все изменения в рабочем дереве откатываются к последнему коммиту, а новые файлы удаляются. Это нельзя отменить.",
+		"submitting": "Отмена изменений…",
+		"title": "Отменить изменения?",
+		"title-bulk": "Отменить все изменения?"
+	},
+	"file-diff": {
+		"add-diff-to-chat": "Добавить diff в диалог",
+		"add-to-chat": "Добавить в диалог",
+		"added-to-chat": {
+			"title": "Diff добавлен в {{chat}}."
+		},
+		"fallback-chat-name": "диалог",
+		"latest-chat": "последний",
+		"truncated": "Diff сокращён",
+		"untitled-chat": "Диалог без названия"
+	},
+	"file-menu": {
+		"actions": "Действия для {{path}}"
+	},
+	"file-row": {
+		"discard": "Отменить изменения в {{path}}",
+		"open": "Открыть {{path}}",
+		"open-in": "Открыть {{path}} в…",
+		"viewed": "Просмотрено"
+	},
+	"file-status": {
+		"added": "Добавлен",
+		"conflicted": "С конфликтом",
+		"deleted": "Удалён",
+		"modified": "Изменён",
+		"renamed": "Переименован",
+		"untracked": "Неотслеживаемый"
+	},
+	"review-panel": {
+		"refresh-pull-request": "Обновить статус pull request",
+		"review-action": "Ревью",
+		"search-files": "Поиск файлов",
+		"tabs": {
+			"changes": "Изменения",
+			"checks": "Проверки",
+			"files": "Все файлы"
+		},
+		"view-mode": {
+			"as-folders": "Показать изменения папками",
+			"as-list": "Показать изменения списком"
+		}
+	},
+	"todo": {
+		"add-to-chat": "Добавить пункт в диалог",
+		"added-to-chat": {
+			"title": "Задача добавлена в диалог."
+		},
+		"delete": "Удалить пункт",
+		"mark-done": "Отметить пункт выполненным: {{label}}",
+		"mark-open": "Отметить пункт невыполненным: {{label}}"
+	}
+}

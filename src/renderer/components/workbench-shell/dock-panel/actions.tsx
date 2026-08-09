@@ -4,6 +4,7 @@ import {
 	SettingsIcon,
 	SquareIcon,
 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 import { RunScriptIcon } from '@/renderer/components/run-script-icon';
 import { Button } from '@/renderer/components/ui/button';
@@ -42,6 +43,7 @@ export function DockPanelActions({
 	activeRunScript: RunScriptDefinition | null;
 	workspace: WorkspaceShellModel;
 }) {
+	const { t } = useTranslation();
 	const { run } = workspace.scripts;
 
 	if (run.status === 'running') {
@@ -60,14 +62,14 @@ export function DockPanelActions({
 					port={typeof run.port === 'number' ? run.port : null}
 				/>
 				<Button
-					aria-label='Stop run script'
+					aria-label={t('workbench:run-script.stop-label', 'Stop run script')}
 					onClick={actions.onStopRunScript}
 					size='xs'
 					variant='outline'
 				>
 					<SquareIcon data-icon='inline-start' />
 					<span className='@max-md/dock-header:hidden whitespace-nowrap'>
-						Stop
+						{t('common:actions.stop', 'Stop')}
 					</span>
 					<RunShortcutHint />
 				</Button>
@@ -125,10 +127,13 @@ function RunScriptControl({
 	onRun: (scriptName: string) => void;
 	scripts: readonly RunScriptDefinition[];
 }) {
+	const { t } = useTranslation();
 	const label = formatRunScriptLabel(active.name);
 	const primary = (
 		<Button
-			aria-label={`Run ${label}`}
+			aria-label={t('workbench:run-script.run-label', 'Run {{script}}', {
+				script: label,
+			})}
 			className={scripts.length > 1 ? 'rounded-r-none' : undefined}
 			onClick={() => onRun(active.name)}
 			size='xs'
@@ -152,7 +157,7 @@ function RunScriptControl({
 			<DropdownMenu>
 				<DropdownMenuTrigger asChild>
 					<Button
-						aria-label='Choose run script'
+						aria-label={t('workbench:run-script.choose', 'Choose run script')}
 						className='rounded-l-none border-l-0 px-1'
 						size='xs'
 						variant='outline'
@@ -177,7 +182,7 @@ function RunScriptControl({
 						onSelect={onConfigure}
 					>
 						<SettingsIcon />
-						Configure
+						{t('common:actions.configure', 'Configure')}
 					</DropdownMenuItem>
 				</DropdownMenuContent>
 			</DropdownMenu>
@@ -201,6 +206,7 @@ function OpenPreviewControl({
 	options: PreviewUrlOption[];
 	port: number | null;
 }) {
+	const { t } = useTranslation();
 	const primary = options[0];
 
 	if (!primary) {
@@ -212,8 +218,16 @@ function OpenPreviewControl({
 			<Button
 				aria-label={
 					port !== null
-						? `Open preview on port ${port}`
-						: `Open ${primary.name}`
+						? t(
+								'workbench:preview.open-port',
+								'Open preview on port {{port}}',
+								{
+									port,
+								},
+							)
+						: t('workbench:preview.open-named', 'Open {{name}}', {
+								name: primary.name,
+							})
 				}
 				onClick={() => onOpen(primary.url)}
 				size='xs'
@@ -222,7 +236,11 @@ function OpenPreviewControl({
 				<ExternalLinkIcon data-icon='inline-start' />
 				{port !== null ? (
 					<>
-						<span className='@max-md/dock-header:hidden'>Open :{port}</span>
+						<span className='@max-md/dock-header:hidden'>
+							{t('workbench:preview.open-port-label', 'Open :{{port}}', {
+								port,
+							})}
+						</span>
 						<span className='@max-md/dock-header:inline hidden'>:{port}</span>
 					</>
 				) : (
@@ -247,10 +265,14 @@ function OpenPreviewSplit({
 	options: PreviewUrlOption[];
 	primary: PreviewUrlOption;
 }) {
+	const { t } = useTranslation();
+
 	return (
 		<div className='flex items-center'>
 			<Button
-				aria-label={`Open ${primary.name}`}
+				aria-label={t('workbench:preview.open-named', 'Open {{name}}', {
+					name: primary.name,
+				})}
 				className='rounded-r-none'
 				onClick={() => onOpen(primary.url)}
 				size='xs'
@@ -262,7 +284,7 @@ function OpenPreviewSplit({
 			<DropdownMenu>
 				<DropdownMenuTrigger asChild>
 					<Button
-						aria-label='Choose preview URL'
+						aria-label={t('workbench:preview.choose-url', 'Choose preview URL')}
 						className='rounded-l-none border-l-0 px-1'
 						size='xs'
 						variant='outline'

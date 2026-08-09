@@ -6,6 +6,7 @@ import {
 	isEnsemblrApiAvailable,
 	selectLocalRepository,
 } from '@/renderer/api/ensemblr-queries';
+import { i18n } from '@/renderer/lib/i18n';
 
 import { seedFirstWorkspace } from './seed-first-workspace';
 
@@ -31,7 +32,12 @@ export async function openLocalProjectFlow({
 	setLocalProjectImportOpen,
 }: OpenLocalProjectFlowOptions): Promise<void> {
 	if (!isEnsemblrApiAvailable()) {
-		toast.error('Preload bridge is unavailable in this context.');
+		toast.error(
+			i18n.t(
+				'errors:open-local-project.bridge-unavailable.title',
+				'Preload bridge is unavailable in this context.',
+			),
+		);
 		return;
 	}
 
@@ -54,7 +60,11 @@ export async function openLocalProjectFlow({
 		if (!result.registered || !result.repository) {
 			const reason =
 				result.diagnostics.find((diagnostic) => diagnostic.severity === 'error')
-					?.message ?? 'The repository could not be imported.';
+					?.message ??
+				i18n.t(
+					'errors:open-local-project.import-failed.title',
+					'The repository could not be imported.',
+				);
 			toast.error(reason);
 			return;
 		}
@@ -68,19 +78,30 @@ export async function openLocalProjectFlow({
 		});
 
 		if (seed.status === 'success') {
-			toast.success(`Opened ${repository.name}.`);
+			toast.success(
+				i18n.t('errors:open-local-project.opened.title', 'Opened {{name}}.', {
+					name: repository.name,
+				}),
+			);
 			return;
 		}
 
 		toast.error(
 			seed.error ??
-				`Imported ${repository.name} but couldn't open a workspace.`,
+				i18n.t(
+					'errors:open-local-project.seed-failed.title',
+					"Imported {{name}} but couldn't open a workspace.",
+					{ name: repository.name },
+				),
 		);
 	} catch (error) {
 		toast.error(
 			error instanceof Error
 				? error.message
-				: 'The local project could not be opened.',
+				: i18n.t(
+						'errors:open-local-project.unexpected.title',
+						'The local project could not be opened.',
+					),
 		);
 	} finally {
 		setLocalProjectImportOpen(false);

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 
 import { useComposerInsert } from '@/renderer/state/composer';
@@ -56,6 +57,7 @@ export function useAskAgentSetupScript({
 	selectChat: (chatTabId: string) => void;
 }): () => void {
 	const insertIntoComposer = useComposerInsert();
+	const { t } = useTranslation();
 	const pendingChatIdRef = useRef<string | null>(null);
 
 	useEffect(() => {
@@ -64,11 +66,16 @@ export function useAskAgentSetupScript({
 		}
 		pendingChatIdRef.current = null;
 		insertIntoComposer(ASK_AGENT_SETUP_PROMPT);
-		toast.success('New chat ready for setup.', {
-			description:
-				'Send the prompt to have the agent create .ensemblr/settings.toml — edit it first if needed.',
-		});
-	}, [activeChatTabId, insertIntoComposer]);
+		toast.success(
+			t('errors:setup-script.chat-ready.title', 'New chat ready for setup.'),
+			{
+				description: t(
+					'errors:setup-script.chat-ready.description',
+					'Send the prompt to have the agent create .ensemblr/settings.toml — edit it first if needed.',
+				),
+			},
+		);
+	}, [activeChatTabId, insertIntoComposer, t]);
 
 	return useCallback(() => {
 		void openSessionTab()
@@ -82,9 +89,18 @@ export function useAskAgentSetupScript({
 			.catch(() => {
 				// A null result or rejection means the new chat never opened, so nothing
 				// is pending to seed — surface it and stop.
-				toast.error('Could not open a new chat.', {
-					description: 'Try the "Ask agent" action again from the setup tab.',
-				});
+				toast.error(
+					t(
+						'errors:setup-script.chat-failed.title',
+						'Could not open a new chat.',
+					),
+					{
+						description: t(
+							'errors:setup-script.chat-failed.description',
+							'Try the "Ask agent" action again from the setup tab.',
+						),
+					},
+				);
 			});
-	}, [openSessionTab, selectChat]);
+	}, [openSessionTab, selectChat, t]);
 }

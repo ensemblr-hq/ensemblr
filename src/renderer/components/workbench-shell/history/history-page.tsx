@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { SearchIcon } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import {
 	allWorkspacesHistoryQuery,
@@ -27,6 +28,7 @@ interface HistoryGroupModel {
  * and buckets appear newest-first.
  */
 export function HistoryPage() {
+	const { i18n, t } = useTranslation();
 	const apiAvailable = isEnsemblrApiAvailable();
 	const { navigateToWorkspace } = useWorkbenchLayoutRouteModel();
 	const { data, isError, isLoading } = useQuery({
@@ -49,7 +51,11 @@ export function HistoryPage() {
 		);
 	}, [entries, filter]);
 
-	const groups = useMemo(() => groupByBucket(filtered), [filtered]);
+	// biome-ignore lint/correctness/useExhaustiveDependencies: bucketForDate translates through the i18n singleton, so the language is a real input Biome cannot see.
+	const groups = useMemo(
+		() => groupByBucket(filtered),
+		[filtered, i18n.language],
+	);
 
 	const handleOpen = useCallback(
 		(entry: WorkspaceHistoryEntry) => {
@@ -66,12 +72,15 @@ export function HistoryPage() {
 					className='size-4 shrink-0 text-muted-foreground'
 				/>
 				<input
-					aria-label='Filter workspaces'
+					aria-label={t('workbench:history.filter.label', 'Filter workspaces')}
 					className='h-full w-full min-w-0 max-w-xl bg-transparent text-sm outline-none placeholder:text-muted-foreground'
 					onChange={(event) => {
 						setFilter(event.target.value);
 					}}
-					placeholder='Filter workspaces…'
+					placeholder={t(
+						'workbench:history.filter.placeholder',
+						'Filter workspaces…',
+					)}
 					value={filter}
 				/>
 			</header>
@@ -108,22 +117,51 @@ function HistoryBody({
 	isLoading: boolean;
 	onOpen: (entry: WorkspaceHistoryEntry) => void;
 }) {
+	const { t } = useTranslation();
+
 	if (!apiAvailable) {
 		return (
-			<HistoryNotice message='The preload bridge is unavailable in this context.' />
+			<HistoryNotice
+				message={t(
+					'workbench:history.empty.unavailable',
+					'The preload bridge is unavailable in this context.',
+				)}
+			/>
 		);
 	}
 	if (isLoading) {
-		return <HistoryNotice message='Loading workspaces…' />;
+		return (
+			<HistoryNotice
+				message={t('workbench:history.empty.loading', 'Loading workspaces…')}
+			/>
+		);
 	}
 	if (isError) {
-		return <HistoryNotice message='Failed to load workspace history.' />;
+		return (
+			<HistoryNotice
+				message={t(
+					'workbench:history.empty.failed',
+					'Failed to load workspace history.',
+				)}
+			/>
+		);
 	}
 	if (!hasEntries) {
-		return <HistoryNotice message='No workspaces yet.' />;
+		return (
+			<HistoryNotice
+				message={t('workbench:history.empty.none', 'No workspaces yet.')}
+			/>
+		);
 	}
 	if (groups.length === 0) {
-		return <HistoryNotice message='No workspaces match your filter.' />;
+		return (
+			<HistoryNotice
+				message={t(
+					'workbench:history.empty.no-match',
+					'No workspaces match your filter.',
+				)}
+			/>
+		);
 	}
 
 	return (

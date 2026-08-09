@@ -10,6 +10,7 @@ import {
 	TriangleAlertIcon,
 	XIcon,
 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 import { FilePathLabel } from '@/renderer/components/file-path-label';
 import { Button } from '@/renderer/components/ui/button';
@@ -67,13 +68,15 @@ export function PullRequestStatusRow({
 
 /** Row naming one file that cannot merge cleanly with the base branch. */
 export function PullRequestConflictRow({ path }: { path: string }) {
+	const { t } = useTranslation();
+
 	return (
 		<div
 			className='flex min-h-7 min-w-0 items-center gap-2 px-1 font-mono text-xs'
 			data-conflict-path={path}
 		>
 			<TriangleAlertIcon
-				aria-label='Conflicted'
+				aria-label={t('review:file-status.conflicted', 'Conflicted')}
 				className='size-3.5 shrink-0 text-status-danger'
 				role='img'
 			/>
@@ -84,10 +87,12 @@ export function PullRequestConflictRow({ path }: { path: string }) {
 
 /** Renders the semantic icon for a GitHub check's current state. */
 function CheckStatusIcon({ status }: { status: PullRequestCheckStatus }) {
+	const { t } = useTranslation();
+
 	if (status === 'pending') {
 		return (
 			<span
-				aria-label='Running'
+				aria-label={t('review:check-status.running', 'Running')}
 				className='grid size-3.5 shrink-0 place-items-center text-status-warning'
 				role='img'
 			>
@@ -102,7 +107,7 @@ function CheckStatusIcon({ status }: { status: PullRequestCheckStatus }) {
 	if (status === 'ready') {
 		return (
 			<span
-				aria-label='Passed'
+				aria-label={t('review:check-status.passed', 'Passed')}
 				className='grid size-3.5 shrink-0 place-items-center text-status-ok'
 				role='img'
 			>
@@ -113,7 +118,7 @@ function CheckStatusIcon({ status }: { status: PullRequestCheckStatus }) {
 
 	return (
 		<span
-			aria-label='Failed'
+			aria-label={t('review:check-status.failed', 'Failed')}
 			className='grid size-3.5 shrink-0 place-items-center text-status-danger'
 			role='img'
 		>
@@ -128,6 +133,7 @@ export function PullRequestCheckRow({
 }: {
 	check: WorkspaceShellModel['pullRequest']['checks'][number];
 }) {
+	const { t } = useTranslation();
 	const baseClassName =
 		'flex min-h-7 min-w-0 items-center justify-between gap-2 rounded-sm px-1 text-xs';
 	const contents = (
@@ -156,7 +162,11 @@ export function PullRequestCheckRow({
 	if (check.url) {
 		return (
 			<a
-				aria-label={`${check.label} check details (opens in new tab)`}
+				aria-label={t(
+					'review:checks.check-details-link',
+					'{{label}} check details (opens in new tab)',
+					{ label: check.label },
+				)}
 				className={cn(
 					baseClassName,
 					'outline-none transition-colors hover:bg-foreground/5 focus-visible:ring-1 focus-visible:ring-ring',
@@ -228,17 +238,19 @@ function CommentResolutionBadge({
 }: {
 	isResolved?: boolean | null;
 }) {
+	const { t } = useTranslation();
+
 	if (isResolved === true) {
 		return (
 			<span className='shrink-0 rounded-sm bg-status-ok/15 px-1 text-status-ok text-xxs'>
-				Resolved
+				{t('review:comment.resolved', 'Resolved')}
 			</span>
 		);
 	}
 	if (isResolved === false) {
 		return (
 			<span className='shrink-0 rounded-sm bg-status-warning/15 px-1 text-status-warning text-xxs'>
-				Unresolved
+				{t('review:comment.unresolved', 'Unresolved')}
 			</span>
 		);
 	}
@@ -269,6 +281,7 @@ export function PullRequestCommentRow({
 	onJumpToLine?: () => void;
 	onOpenPreview?: (options?: FileOpenOptions) => void;
 }) {
+	const { t } = useTranslation();
 	const isResolved = comment.isResolved === true;
 
 	return (
@@ -304,7 +317,7 @@ export function PullRequestCommentRow({
 				</span>
 				{comment.origin === 'agent' ? (
 					<span className='shrink-0 rounded-sm bg-muted px-1 text-muted-foreground text-xxs'>
-						Agent
+						{t('review:comment.agent-badge', 'Agent')}
 					</span>
 				) : null}
 				<CommentResolutionBadge isResolved={comment.isResolved} />
@@ -318,7 +331,9 @@ export function PullRequestCommentRow({
 						variant='ghost'
 					>
 						<FileDiffIcon />
-						<span className='sr-only'>Go to line in diff</span>
+						<span className='sr-only'>
+							{t('review:comment.go-to-line', 'Go to line in diff')}
+						</span>
 					</Button>
 				) : null}
 				{onHide ? (
@@ -329,7 +344,9 @@ export function PullRequestCommentRow({
 						variant='ghost'
 					>
 						<EyeOffIcon />
-						<span className='sr-only'>Hide comment</span>
+						<span className='sr-only'>
+							{t('review:comment.hide', 'Hide comment')}
+						</span>
 					</Button>
 				) : null}
 				{onAddToChat ? (
@@ -340,7 +357,9 @@ export function PullRequestCommentRow({
 						variant='ghost'
 					>
 						<MessageSquarePlusIcon />
-						<span className='sr-only'>Add comment to chat</span>
+						<span className='sr-only'>
+							{t('review:comment.add-to-chat', 'Add comment to chat')}
+						</span>
 					</Button>
 				) : null}
 			</div>
@@ -360,13 +379,22 @@ export function PullRequestTodoRow({
 	onToggle?: () => void;
 	todo: WorkspaceShellModel['pullRequest']['todos'][number];
 }) {
+	const { t } = useTranslation();
 	const isDone = todo.status === 'done';
 	const ToggleIcon = isDone ? CheckCircle2Icon : CircleIcon;
 
 	return (
 		<div className='group flex min-h-7 min-w-0 items-center justify-between gap-2 px-1'>
 			<button
-				aria-label={`Mark todo ${isDone ? 'open' : 'done'}: ${todo.label}`}
+				aria-label={
+					isDone
+						? t('review:todo.mark-open', 'Mark todo open: {{label}}', {
+								label: todo.label,
+							})
+						: t('review:todo.mark-done', 'Mark todo done: {{label}}', {
+								label: todo.label,
+							})
+				}
 				className='flex min-w-0 flex-1 cursor-pointer items-center gap-2 text-left'
 				onClick={onToggle}
 				type='button'
@@ -396,7 +424,9 @@ export function PullRequestTodoRow({
 						variant='ghost'
 					>
 						<MessageSquarePlusIcon />
-						<span className='sr-only'>Add todo to chat</span>
+						<span className='sr-only'>
+							{t('review:todo.add-to-chat', 'Add todo to chat')}
+						</span>
 					</Button>
 				) : null}
 				{onDelete ? (
@@ -407,7 +437,9 @@ export function PullRequestTodoRow({
 						variant='ghost'
 					>
 						<XIcon />
-						<span className='sr-only'>Delete todo</span>
+						<span className='sr-only'>
+							{t('review:todo.delete', 'Delete todo')}
+						</span>
 					</Button>
 				) : null}
 			</div>

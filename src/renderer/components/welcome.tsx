@@ -3,6 +3,7 @@ import { useNavigate, useRouter } from '@tanstack/react-router';
 import { useAtomValue, useSetAtom } from 'jotai';
 import { FolderIcon, FolderPlusIcon, GlobeIcon } from 'lucide-react';
 import { useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import {
 	githubRepositoryListQuery,
@@ -26,6 +27,7 @@ import { WelcomeWordmark } from './welcome/welcome-wordmark';
 
 /** Default landing view shown when no project/workspace is selected. */
 export function Welcome() {
+	const { t } = useTranslation();
 	const navigate = useNavigate();
 	const router = useRouter();
 	const setCloneOpen = useSetAtom(cloneDialogOpenAtom);
@@ -70,17 +72,20 @@ export function Welcome() {
 						<WelcomeActionCard
 							disabled={localProjectImportOpen}
 							icon={FolderIcon}
-							label='Open project'
+							label={t('common:welcome.open-project', 'Open project')}
 							onClick={onOpenLocalProject}
 						/>
 						<WelcomeActionCard
 							icon={GlobeIcon}
-							label='Open GitHub project'
+							label={t(
+								'common:welcome.open-github-project',
+								'Open GitHub project',
+							)}
 							onClick={() => setCloneOpen(true)}
 						/>
 						<WelcomeActionCard
 							icon={FolderPlusIcon}
-							label='Quick start'
+							label={t('common:welcome.quick-start', 'Quick start')}
 							onClick={() => setQuickStartOpen(true)}
 						/>
 					</div>

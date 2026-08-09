@@ -1,4 +1,6 @@
+import type { TFunction } from 'i18next';
 import type { CSSProperties, ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
 	Popover,
 	PopoverAnchor,
@@ -91,16 +93,18 @@ function renderMentionRows({
 	matches,
 	onHover,
 	onSelect,
+	t,
 }: {
 	activeIndex: number;
 	matches: readonly MentionMatch[];
 	onHover: (index: number) => void;
 	onSelect: (entry: WorkspaceFileSummary) => void;
+	t: TFunction;
 }): ReactNode {
 	if (matches.length === 0) {
 		return (
 			<div className='px-2 py-1.5 text-muted-foreground text-xs'>
-				No matching files
+				{t('workbench:autocomplete.no-files', 'No matching files')}
 			</div>
 		);
 	}
@@ -131,12 +135,14 @@ function renderSlashRows({
 	matches,
 	onHover,
 	onSelect,
+	t,
 }: {
 	activeIndex: number;
 	loading: boolean;
 	matches: readonly SlashCommandMatch[];
 	onHover: (index: number) => void;
 	onSelect: (command: string, autoSubmit: boolean) => void;
+	t: TFunction;
 }): ReactNode {
 	// Guarded on an empty list, not on `loading` alone: once the cache seeds the
 	// menu, every background revalidate is a fetch with rows already on screen,
@@ -146,7 +152,7 @@ function renderSlashRows({
 			<AutocompletePlaceholderRows />
 		) : (
 			<div className='px-2 py-1.5 text-muted-foreground text-xs'>
-				No matching commands
+				{t('workbench:autocomplete.no-commands', 'No matching commands')}
 			</div>
 		);
 	}
@@ -205,6 +211,7 @@ export function ComposerAutocompletePopover({
 	slashLoading,
 	slashMatches,
 }: ComposerAutocompletePopoverProps) {
+	const { t } = useTranslation();
 	const open = kind === 'mention' || kind === 'slash';
 	const rowCount = getRowCount(
 		kind,
@@ -219,6 +226,7 @@ export function ComposerAutocompletePopover({
 					matches: mentionMatches,
 					onHover,
 					onSelect: onMentionSelect,
+					t,
 				})
 			: renderSlashRows({
 					activeIndex,
@@ -226,6 +234,7 @@ export function ComposerAutocompletePopover({
 					matches: slashMatches,
 					onHover,
 					onSelect: onSlashSelect,
+					t,
 				});
 
 	return (

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { RunScriptIcon } from '@/renderer/components/run-script-icon';
 import { Button } from '@/renderer/components/ui/button';
@@ -27,6 +28,7 @@ export function RunScriptIconPicker({
 	onChange: (icon: RunScriptIconName) => void;
 	value: RunScriptIconName;
 }) {
+	const { t } = useTranslation();
 	const [open, setOpen] = useState(false);
 	const [query, setQuery] = useState('');
 	const normalizedQuery = query.trim().toLowerCase();
@@ -46,7 +48,11 @@ export function RunScriptIconPicker({
 		>
 			<PopoverTrigger asChild>
 				<Button
-					aria-label={`Icon: ${formatRunScriptLabel(value)}`}
+					aria-label={t(
+						'settings:run-scripts.icon-picker.trigger-aria-label',
+						'Icon: {{name}}',
+						{ name: formatRunScriptLabel(value) },
+					)}
 					size='icon'
 					type='button'
 					variant='outline'
@@ -56,10 +62,16 @@ export function RunScriptIconPicker({
 			</PopoverTrigger>
 			<PopoverContent align='start' className='w-64 p-2'>
 				<Input
-					aria-label='Search icons'
+					aria-label={t(
+						'settings:run-scripts.icon-picker.search',
+						'Search icons',
+					)}
 					className='h-8 text-xs'
 					onChange={(event) => setQuery(event.target.value)}
-					placeholder='Search icons'
+					placeholder={t(
+						'settings:run-scripts.icon-picker.search',
+						'Search icons',
+					)}
 					value={query}
 				/>
 				<div className='mt-2 grid max-h-56 grid-cols-8 gap-1 overflow-y-auto'>
@@ -84,7 +96,11 @@ export function RunScriptIconPicker({
 				</div>
 				{matches.length === 0 ? (
 					<p className='py-3 text-center text-muted-foreground text-xs'>
-						No icons match “{query}”.
+						{t(
+							'settings:run-scripts.icon-picker.no-matches',
+							'No icons match “{{query}}”.',
+							{ query },
+						)}
 					</p>
 				) : null}
 			</PopoverContent>

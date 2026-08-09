@@ -1,4 +1,4 @@
-import { ipcMain } from 'electron';
+import { app, ipcMain } from 'electron';
 
 import {
 	type AppSettings,
@@ -47,5 +47,13 @@ export function registerAppSettingsHandlers({
 			appSettingsService.ensureExists();
 			return openInEditor(appSettingsService.getPath());
 		},
+	);
+
+	// `getPreferredSystemLanguages` and not `getLocale`: the latter is Chromium's
+	// UI locale, narrowed to languages Chromium ships translations for, so a
+	// Greek user would silently resolve to English. Only the preferred list is
+	// ordered, which is what lets an unsupported first language fall through.
+	ipcMain.handle(IPC_CHANNELS.getSystemLanguages, (): string[] =>
+		app.getPreferredSystemLanguages(),
 	);
 }

@@ -1,6 +1,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { RefreshCwIcon } from 'lucide-react';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import {
 	agentProviderReadinessQuery,
@@ -38,6 +39,7 @@ const LEAD_PROVIDER: AgentProviderId = 'claude';
  * harnesses (Codex, Vibe) are not agent providers and never appear.
  */
 export function AgentProvidersSection() {
+	const { t } = useTranslation();
 	const queryClient = useQueryClient();
 	const descriptors = orderedProviderTabs();
 	const [activeProvider, setActiveProvider] = useState<AgentProviderId>(
@@ -90,17 +92,28 @@ export function AgentProvidersSection() {
 						aria-hidden='true'
 						className={cn('size-4', isManualRetrying && 'animate-spin')}
 					/>
-					{isManualRetrying ? 'Refreshing…' : 'Refresh'}
+					{isManualRetrying
+						? t('settings:providers.refreshing', 'Refreshing…')
+						: t('settings:providers.refresh', 'Refresh')}
 				</Button>
 			}
-			description='Agent runtimes that can drive a chat. Each one resolves its own executable, reports its own readiness, and keeps its own credentials.'
-			title='Providers'
+			description={t(
+				'settings:providers.description',
+				'Agent runtimes that can drive a chat. Each one resolves its own executable, reports its own readiness, and keeps its own credentials.',
+			)}
+			title={t('settings:providers.title', 'Providers')}
 		>
 			<Tabs
 				onValueChange={(next) => setActiveProvider(next as AgentProviderId)}
 				value={activeProvider}
 			>
-				<TabsList aria-label='Agent providers' variant='line'>
+				<TabsList
+					aria-label={t(
+						'settings:providers.tabs-aria-label',
+						'Agent providers',
+					)}
+					variant='line'
+				>
 					{descriptors.map((descriptor) => (
 						<TabsTrigger key={descriptor.id} value={descriptor.id}>
 							{descriptor.label}

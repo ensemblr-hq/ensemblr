@@ -1,3 +1,6 @@
+import type { TFunction } from 'i18next';
+import { useTranslation } from 'react-i18next';
+
 import { Button } from '@/renderer/components/ui/button';
 import {
 	Dialog,
@@ -49,6 +52,7 @@ function CloneGithubDialogForm({
 }: {
 	onOpenChange: (open: boolean) => void;
 }) {
+	const { t } = useTranslation();
 	const {
 		activeDescendantId,
 		browseDisabled,
@@ -74,14 +78,14 @@ function CloneGithubDialogForm({
 		<>
 			<DialogHeader className='px-4 pt-4'>
 				<DialogTitle className='font-medium text-[0.9375rem]'>
-					Clone GitHub repo
+					{t('common:clone-dialog.title', 'Clone GitHub repo')}
 				</DialogTitle>
 			</DialogHeader>
 
 			<div className='flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 pt-3 pb-3'>
 				<div className='flex flex-col gap-1.5'>
 					<Label className='text-xs' htmlFor='clone-github-url'>
-						Repository URL
+						{t('common:clone-dialog.url-label', 'Repository URL')}
 					</Label>
 					<Input
 						aria-activedescendant={activeDescendantId}
@@ -93,7 +97,10 @@ function CloneGithubDialogForm({
 						id='clone-github-url'
 						onChange={(event) => search.handleUrlChange(event.target.value)}
 						onKeyDown={search.handleUrlKeyDown}
-						placeholder='Search repos or paste URL'
+						placeholder={t(
+							'common:clone-dialog.url-placeholder',
+							'Search repos or paste URL',
+						)}
 						role='combobox'
 						value={url}
 					/>
@@ -101,7 +108,9 @@ function CloneGithubDialogForm({
 
 				<div className='flex flex-col gap-1.5'>
 					<Label className='text-xs'>
-						{search.isSearching ? 'Matching repos' : 'Recent repos'}
+						{search.isSearching
+							? t('common:clone-dialog.matching-repos', 'Matching repos')
+							: t('common:clone-dialog.recent-repos', 'Recent repos')}
 					</Label>
 					<CloneGithubRecentRepos
 						disabled={isBusy}
@@ -145,7 +154,7 @@ function CloneGithubDialogForm({
 						type='button'
 						variant='outline'
 					>
-						Try again
+						{t('common:actions.try-again', 'Try again')}
 					</Button>
 				) : null}
 				<Button
@@ -155,7 +164,8 @@ function CloneGithubDialogForm({
 					type='button'
 					variant='default'
 				>
-					{getCloneButtonLabel(stage)}
+					{getCloneButtonLabel(stage, t)}
+					{/* i18next-instrument-ignore */}
 					<span
 						aria-hidden='true'
 						className='ml-1 inline-flex items-center gap-0.5 text-xxs opacity-70'
@@ -168,18 +178,23 @@ function CloneGithubDialogForm({
 	);
 }
 
-/** Picks the clone button label that matches the current stage. */
-function getCloneButtonLabel(stage: CloneStage): string {
+/**
+ * Picks the clone button label that matches the current stage.
+ * @param stage - Stage the clone flow is in.
+ * @param t - Translator from the calling component.
+ * @returns The label to paint on the submit button.
+ */
+function getCloneButtonLabel(stage: CloneStage, t: TFunction): string {
 	switch (stage) {
 		case 'preparing':
-			return 'Preparing…';
+			return t('common:clone-dialog.stage.preparing', 'Preparing…');
 		case 'cloning':
-			return 'Cloning…';
+			return t('common:clone-dialog.stage.cloning', 'Cloning…');
 		case 'opening':
-			return 'Opening…';
+			return t('common:clone-dialog.stage.opening', 'Opening…');
 		case 'failure':
 		case 'idle':
 		case 'success':
-			return 'Clone repo';
+			return t('common:clone-dialog.stage.submit', 'Clone repo');
 	}
 }

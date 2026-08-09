@@ -1,4 +1,5 @@
 import { toast } from 'sonner';
+import { i18n } from '@/renderer/lib/i18n';
 import type { SessionTabModel } from '@/renderer/types/workbench';
 import type { ChatTabWire } from '@/shared/ipc/contracts/chat-tab';
 
@@ -209,8 +210,16 @@ export function resumeRestoredTerminalTab(
 			const message = resumeResult.diagnostics.find(
 				(diagnostic) => diagnostic.severity === 'error',
 			)?.message;
-			toast.error('Could not restore agent', {
-				description: message ?? 'The harness could not be resumed.',
-			});
+			toast.error(
+				i18n.t('errors:agent-restore.failed.title', 'Could not restore agent'),
+				{
+					description:
+						message ??
+						i18n.t(
+							'errors:agent-restore.failed.description',
+							'The harness could not be resumed.',
+						),
+				},
+			);
 		});
 }

@@ -1,3 +1,4 @@
+import { i18n } from '@/renderer/lib/i18n';
 import type { RepositoryPreviewUrl } from '@/shared/ipc/contracts/repository-settings';
 import type { SettingsResolutionSnapshot } from '@/shared/ipc/contracts/settings-resolution';
 
@@ -74,10 +75,16 @@ export function resolvePreviewUrlOptions({
 }): PreviewUrlOption[] {
 	if (configured.length > 0) {
 		return configured.map((entry, index) => ({
-			name: entry.name.trim() || `Preview ${index + 1}`,
+			name:
+				entry.name.trim() ||
+				i18n.t('workbench:preview-url.fallback.name', 'Preview {{index}}', {
+					index: index + 1,
+				}),
 			url: interpolatePreviewUrl(entry.url, { port, workspaceName }),
 		}));
 	}
 
-	return detectedUrl ? [{ name: 'Open', url: detectedUrl }] : [];
+	return detectedUrl
+		? [{ name: i18n.t('common:actions.open', 'Open'), url: detectedUrl }]
+		: [];
 }

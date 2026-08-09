@@ -1,4 +1,5 @@
 import { useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 
 import type { PullRequestCommentSummary } from '@/renderer/types/workbench';
@@ -53,6 +54,7 @@ export function useSessionTabOpeners({
 	openChatTab: OpenChatTab;
 	workspaceId: string;
 }) {
+	const { t } = useTranslation();
 	const openAuxiliary = useCallback(
 		async (
 			input: Parameters<OpenAuxiliaryTab>[0],
@@ -118,9 +120,18 @@ export function useSessionTabOpeners({
 				const message = launch?.diagnostics.find(
 					(diagnostic) => diagnostic.severity === 'error',
 				)?.message;
-				toast.error('Could not launch agent', {
-					description: message ?? `${harnessLabel} is not available.`,
-				});
+				toast.error(
+					t('errors:agent-launch.failed.title', 'Could not launch agent'),
+					{
+						description:
+							message ??
+							t(
+								'errors:agent-launch.failed.description',
+								'{{harness}} is not available.',
+								{ harness: harnessLabel },
+							),
+					},
+				);
 				return null;
 			}
 			const opened = await openAuxiliary({
@@ -135,7 +146,7 @@ export function useSessionTabOpeners({
 			}
 			return opened;
 		},
-		[openAuxiliary, workspaceId],
+		[openAuxiliary, t, workspaceId],
 	);
 
 	return {

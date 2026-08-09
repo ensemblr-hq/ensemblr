@@ -1,5 +1,6 @@
 import { CopyIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import {
 	DropdownMenu,
@@ -41,6 +42,7 @@ export function OpenInFileMenu({
 	onOpenChange,
 	openInTargets,
 }: OpenInFileMenuProps) {
+	const { t } = useTranslation();
 	const invoke = (target: WorkspaceOpenTarget) =>
 		void invokeTarget(target, {
 			relativePath: filePath,
@@ -77,7 +79,9 @@ export function OpenInFileMenu({
 								aria-hidden='true'
 								className='size-4 text-muted-foreground'
 							/>
-							<span className='min-w-0 flex-1'>Copy path</span>
+							<span className='min-w-0 flex-1'>
+								{t('workbench:open-in.copy-path', 'Copy path')}
+							</span>
 						</DropdownMenuItem>
 					</>
 				) : null}

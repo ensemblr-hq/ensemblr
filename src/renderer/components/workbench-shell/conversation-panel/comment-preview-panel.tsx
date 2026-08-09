@@ -1,5 +1,6 @@
 import { ExternalLinkIcon, MessageSquarePlusIcon } from 'lucide-react';
 import { useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 
 import { CommentMarkdown } from '@/renderer/components/comment-markdown';
@@ -28,13 +29,16 @@ export function CommentPreviewPanel({
 }: {
 	comment: CommentPreviewPayload;
 }) {
+	const { t } = useTranslation();
 	const insertIntoComposer = useComposerInsert();
 	const openWorkspaceFileDiff = useWorkspaceFileDiffOpener();
 
 	const addToChat = useCallback(() => {
 		insertIntoComposer(formatCommentContext(comment, comment.prNumber));
-		toast.success('Comment added to chat.');
-	}, [comment, insertIntoComposer]);
+		toast.success(
+			t('review:comment-preview.added-to-chat.title', 'Comment added to chat.'),
+		);
+	}, [comment, insertIntoComposer, t]);
 
 	const { line, path } = comment;
 	const jumpToLine = useCallback(() => {
@@ -74,6 +78,7 @@ function CommentPreviewHeader({
 	onAddToChat: () => void;
 	onJumpToLine?: () => void;
 }) {
+	const { t } = useTranslation();
 	return (
 		<div className='flex shrink-0 items-start justify-between gap-2 border-border border-b px-4 py-2.5'>
 			<div className='flex min-w-0 flex-col gap-0.5 overflow-hidden'>
@@ -84,12 +89,12 @@ function CommentPreviewHeader({
 					</span>
 					{comment.isResolved === false ? (
 						<span className='shrink-0 rounded-sm bg-status-warning/15 px-1 text-status-warning text-xxs'>
-							Unresolved
+							{t('review:comment-preview.state.unresolved', 'Unresolved')}
 						</span>
 					) : null}
 					{comment.isOutdated ? (
 						<span className='shrink-0 rounded-sm bg-muted px-1 text-muted-foreground text-xxs'>
-							Outdated
+							{t('review:comment-preview.state.outdated', 'Outdated')}
 						</span>
 					) : null}
 				</div>
@@ -103,12 +108,21 @@ function CommentPreviewHeader({
 			<div className='flex shrink-0 items-center gap-0.5'>
 				<Button onClick={onAddToChat} size='icon-sm' variant='ghost'>
 					<MessageSquarePlusIcon />
-					<span className='sr-only'>Add comment to chat</span>
+					<span className='sr-only'>
+						{t(
+							'review:comment-preview.actions.add-to-chat',
+							'Add comment to chat',
+						)}
+					</span>
 				</Button>
 				{comment.url ? (
 					<Button asChild size='icon-sm' variant='ghost'>
 						<a
-							aria-label={`Open comment on ${getProviderLabel(comment.provider)}`}
+							aria-label={t(
+								'review:comment-preview.actions.open-external',
+								'Open comment on {{provider}}',
+								{ provider: getProviderLabel(comment.provider) },
+							)}
 							href={comment.url}
 							rel='noreferrer'
 							target='_blank'
@@ -138,10 +152,15 @@ function CommentMeta({
 	onJumpToLine?: () => void;
 	replyCount: number;
 }) {
+	const { t } = useTranslation();
 	const trailing = [
 		createdAt ? formatRowDate(createdAt) : '',
 		replyCount > 0
-			? `${replyCount} ${replyCount === 1 ? 'reply' : 'replies'}`
+			? t('review:comment-preview.reply-count', {
+					count: replyCount,
+					defaultValue_one: '{{count}} reply',
+					defaultValue_other: '{{count}} replies',
+				})
 			: '',
 	].filter(Boolean);
 

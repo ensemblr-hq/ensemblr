@@ -1,5 +1,7 @@
+import type { TFunction } from 'i18next';
 import { CheckIcon, SparklesIcon, StarIcon } from 'lucide-react';
 import { type CSSProperties, type Ref, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/renderer/components/ui/button';
 import {
 	Popover,
@@ -50,10 +52,15 @@ interface ModelPickerProps {
  * Explains why a model row is unselectable, naming the runtime the chat is
  * already committed to so the rule reads as a pin rather than a failure.
  * @param lockedProvider - Agent runtime the chat is pinned to.
+ * @param t - Translator from the calling component, so the hint follows the UI language.
  * @returns The tooltip copy shown on every locked-out row.
  */
-function getLockedHint(lockedProvider: AgentProviderId): string {
-	return `This chat runs on ${getAgentProviderLabel(lockedProvider)}. Start a new chat to switch provider.`;
+function getLockedHint(lockedProvider: AgentProviderId, t: TFunction): string {
+	return t(
+		'workbench:model-picker.locked-hint',
+		'This chat runs on {{provider}}. Start a new chat to switch provider.',
+		{ provider: getAgentProviderLabel(lockedProvider) },
+	);
 }
 
 /** Estimates content height so Radix ScrollArea receives a definite height. */
@@ -100,6 +107,7 @@ function ModelOptionRow({
 	selected: boolean;
 	shortcutIndex: number | undefined;
 }) {
+	const { t } = useTranslation();
 	const selectButton = (
 		<Button
 			className={cn(
@@ -148,7 +156,11 @@ function ModelOptionRow({
 				selectButton
 			)}
 			<button
-				aria-label={favourite ? 'Unfavourite model' : 'Favourite model'}
+				aria-label={
+					favourite
+						? t('workbench:model-picker.unfavourite', 'Unfavourite model')
+						: t('workbench:model-picker.favourite', 'Favourite model')
+				}
 				aria-pressed={favourite}
 				className={cn(
 					'mr-1 shrink-0 rounded-md p-1.5 transition-[color,background-color,opacity] hover:bg-secondary/60',
@@ -244,6 +256,7 @@ export function ModelPicker({
 	options,
 	value,
 }: ModelPickerProps) {
+	const { t } = useTranslation();
 	const [tooltipOpen, setTooltipOpen] = useState(false);
 	const {
 		allHidden,
@@ -263,7 +276,7 @@ export function ModelPicker({
 		options,
 		value,
 	});
-	const lockedHint = lockedProvider ? getLockedHint(lockedProvider) : null;
+	const lockedHint = lockedProvider ? getLockedHint(lockedProvider, t) : null;
 	const scrollAreaStyle = useMemo<CSSProperties>(
 		() => ({ height: getMenuHeight(groups) }),
 		[groups],
@@ -273,7 +286,7 @@ export function ModelPicker({
 		return (
 			<span className='inline-flex items-center gap-1.5 rounded-md px-1.5 py-1 text-muted-foreground text-xs'>
 				<SparklesIcon className='size-3.5' />
-				<span>Model pending</span>
+				<span>{t('workbench:model-picker.pending', 'Model pending')}</span>
 			</span>
 		);
 	}
@@ -284,7 +297,7 @@ export function ModelPicker({
 				<TooltipTrigger asChild>
 					<PopoverTrigger asChild>
 						<Button
-							aria-label='Model'
+							aria-label={t('workbench:model-picker.aria-label', 'Model')}
 							className='h-7 rounded-md px-1.5'
 							disabled={disabled}
 							size='sm'
@@ -296,20 +309,25 @@ export function ModelPicker({
 								vendor={selected?.vendor ?? ''}
 							/>
 							<span className='font-medium text-foreground'>
-								{selected?.displayName ?? 'Select model'}
+								{selected?.displayName ??
+									t('workbench:model-picker.unselected', 'Select model')}
 							</span>
 						</Button>
 					</PopoverTrigger>
 				</TooltipTrigger>
 				<TooltipContent sideOffset={4}>
-					Change model
+					{t('workbench:model-picker.tooltip', 'Change model')}
+					{/* i18next-instrument-ignore */}
 					<span className='ml-2 text-muted-foreground'>⌥P</span>
 				</TooltipContent>
 			</Tooltip>
 			<PopoverContent align='start' className='w-80 overflow-hidden p-1.5'>
 				{allHidden ? (
 					<p className='px-2 py-3 text-muted-foreground text-xs'>
-						All models hidden — manage in Settings → Models.
+						{t(
+							'workbench:model-picker.all-hidden',
+							'All models hidden — manage in Settings → Models.',
+						)}
 					</p>
 				) : (
 					<ScrollArea className='pr-3.5' style={scrollAreaStyle}>

@@ -1,5 +1,6 @@
 import { Icon } from '@iconify/react';
 import { XIcon } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { cn } from '@/renderer/lib/utils';
 import { getWorkspaceFileIconName } from '@/renderer/lib/workbench';
 import type { WorkspaceFileSummary } from '@/renderer/types/workbench';
@@ -19,6 +20,7 @@ export function AttachmentChip({
 		| { kind: 'upload'; name: string };
 	onRemove: () => void;
 }) {
+	const { t } = useTranslation();
 	const label = file.name;
 	const isDirectory = file.kind === 'directory';
 	const iconName = getWorkspaceFileIconName({
@@ -36,7 +38,9 @@ export function AttachmentChip({
 			<Icon aria-hidden='true' className='size-3.5 shrink-0' icon={iconName} />
 			<span className='font-medium'>{label}</span>
 			<button
-				aria-label={`Remove ${label}`}
+				aria-label={t('common:actions.remove-named', 'Remove {{label}}', {
+					label,
+				})}
 				className='inline-flex size-3.5 items-center justify-center rounded-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground'
 				onClick={onRemove}
 				type='button'

@@ -8,6 +8,7 @@ import {
 	RefreshCwIcon,
 } from 'lucide-react';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { linearIssueQuery } from '@/renderer/api/ensemblr';
 import { Button } from '@/renderer/components/ui/button';
@@ -37,6 +38,7 @@ import { LinearIssueMetaBadges } from './issue-meta-badges';
 
 /** Linear issue detail: metadata header, description, and comment thread. */
 export function LinearIssueDetail({ issueId }: { issueId: string }) {
+	const { t } = useTranslation();
 	const {
 		data: result,
 		isFetching,
@@ -60,16 +62,20 @@ export function LinearIssueDetail({ issueId }: { issueId: string }) {
 				<p className='text-muted-foreground text-sm'>
 					{result
 						? describeLinearFailure(result.failure)
-						: 'This Linear issue could not be loaded.'}
+						: t(
+								'linear:issue-detail.load-failed',
+								'This Linear issue could not be loaded.',
+							)}
 				</p>
 				<div className='flex items-center gap-2'>
 					<Button asChild size='sm' variant='ghost'>
 						<Link to='/linear'>
-							<ArrowLeftIcon /> Back to issues
+							<ArrowLeftIcon />{' '}
+							{t('linear:issue-detail.back', 'Back to issues')}
 						</Link>
 					</Button>
 					<Button onClick={() => void refetch()} size='sm' variant='outline'>
-						<RefreshCwIcon /> Retry
+						<RefreshCwIcon /> {t('common:actions.retry', 'Retry')}
 					</Button>
 				</div>
 			</div>
@@ -88,7 +94,9 @@ export function LinearIssueDetail({ issueId }: { issueId: string }) {
 					{result.issue.description}
 				</p>
 			) : (
-				<p className='text-muted-foreground text-xs'>No description.</p>
+				<p className='text-muted-foreground text-xs'>
+					{t('linear:issue-detail.no-description', 'No description.')}
+				</p>
 			)}
 			<Separator />
 			<IssueComments comments={result.comments} />
@@ -107,13 +115,17 @@ function IssueDetailHeader({
 	issue: LinearIssueWire;
 	onRefresh: () => void;
 }) {
+	const { t } = useTranslation();
 	const [editorOpen, setEditorOpen] = useState(false);
 
 	return (
 		<div className='flex flex-col gap-2'>
 			<div className='flex items-center gap-2'>
 				<Button asChild size='icon-sm' variant='ghost'>
-					<Link aria-label='Back to issues' to='/linear'>
+					<Link
+						aria-label={t('linear:issue-detail.back', 'Back to issues')}
+						to='/linear'
+					>
 						<ArrowLeftIcon />
 					</Link>
 				</Button>
@@ -129,7 +141,7 @@ function IssueDetailHeader({
 				) : null}
 				<span className='ml-auto flex items-center gap-1'>
 					<Button
-						aria-label='Refresh issue'
+						aria-label={t('linear:issue-detail.refresh', 'Refresh issue')}
 						disabled={isRefreshing}
 						onClick={onRefresh}
 						size='icon-sm'
@@ -141,7 +153,10 @@ function IssueDetailHeader({
 					</Button>
 					<Button asChild size='icon-sm' variant='ghost'>
 						<a
-							aria-label='Open in Linear'
+							aria-label={t(
+								'linear:issue-detail.open-external',
+								'Open in Linear',
+							)}
 							href={issue.url}
 							rel='noreferrer'
 							target='_blank'
@@ -150,7 +165,7 @@ function IssueDetailHeader({
 						</a>
 					</Button>
 					<Button onClick={() => setEditorOpen(true)} size='sm' variant='ghost'>
-						<PencilIcon /> Edit
+						<PencilIcon /> {t('common:actions.edit', 'Edit')}
 					</Button>
 					<CreateWorkspaceFromIssueButton issue={issue} />
 				</span>
@@ -173,6 +188,7 @@ function IssueDetailHeader({
  * (name, branch, linked-issue metadata, composer context — ENS-048).
  */
 function CreateWorkspaceFromIssueButton({ issue }: { issue: LinearIssueWire }) {
+	const { t } = useTranslation();
 	const model = useWorkbenchLayoutRouteModel();
 	const { create, isCreating } = useCreateWorkspaceFromProject();
 
@@ -188,12 +204,14 @@ function CreateWorkspaceFromIssueButton({ issue }: { issue: LinearIssueWire }) {
 					size='sm'
 					variant='outline'
 				>
-					{isCreating ? 'Creating…' : 'Create workspace'}
+					{isCreating
+						? t('linear:create-workspace.creating', 'Creating…')
+						: t('linear:create-workspace.trigger', 'Create workspace')}
 				</Button>
 			</DropdownMenuTrigger>
 			<DropdownMenuContent align='end' className='w-64 p-1'>
 				<DropdownMenuLabel className='px-2 pt-1.5 pb-1 text-muted-foreground text-xs'>
-					Create in repository
+					{t('linear:create-workspace.menu-label', 'Create in repository')}
 				</DropdownMenuLabel>
 				{model.displayProjects.map((project) => (
 					<DropdownMenuItem
@@ -217,8 +235,14 @@ function CreateWorkspaceFromIssueButton({ issue }: { issue: LinearIssueWire }) {
 
 /** Renders a Linear issue's comment thread, or an empty-state note when there are none. */
 function IssueComments({ comments }: { comments: LinearCommentWire[] }) {
+	const { t } = useTranslation();
+
 	if (comments.length === 0) {
-		return <p className='text-muted-foreground text-xs'>No comments yet.</p>;
+		return (
+			<p className='text-muted-foreground text-xs'>
+				{t('linear:issue-detail.no-comments', 'No comments yet.')}
+			</p>
+		);
 	}
 
 	return (
@@ -230,7 +254,8 @@ function IssueComments({ comments }: { comments: LinearCommentWire[] }) {
 				>
 					<div className='mb-1 flex items-center gap-2 text-muted-foreground text-xs'>
 						<span className='font-medium text-foreground'>
-							{comment.authorName ?? 'Unknown'}
+							{comment.authorName ??
+								t('linear:issue-detail.unknown-author', 'Unknown')}
 						</span>
 						{comment.createdAt ? (
 							<span>{new Date(comment.createdAt).toLocaleString()}</span>

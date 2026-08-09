@@ -7,6 +7,7 @@ import {
 	SettingsIcon,
 	ShieldAlertIcon,
 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 import { DiagnosticsLogCollapsible } from '@/renderer/components/diagnostics-log-collapsible';
 import { CopyCommandButton } from '@/renderer/components/settings/agent-providers/copy-command-button';
@@ -21,12 +22,6 @@ import type {
 
 /** Status a provider readiness check can report, taken from the wire contract. */
 type CheckStatus = AgentProviderCheckWire['status'];
-
-const CHECK_STATUS_LABELS = {
-	failure: 'Failed',
-	success: 'Ready',
-	warning: 'Warning',
-} satisfies Record<CheckStatus, string>;
 
 const CHECK_STATUS_TONE = {
 	failure: 'danger',
@@ -70,8 +65,14 @@ export function ProviderCheckRow({
 	check: AgentProviderCheckWire;
 	onRemediation: (action: SetupRemediationAction) => void;
 }) {
+	const { t } = useTranslation();
 	const Icon = CHECK_STATUS_ICON[check.status];
 	const logs = check.logs ?? [];
+	const statusLabels: Record<CheckStatus, string> = {
+		failure: t('settings:providers.check-status.failure', 'Failed'),
+		success: t('settings:providers.check-status.success', 'Ready'),
+		warning: t('settings:providers.check-status.warning', 'Warning'),
+	};
 
 	return (
 		<li className='flex flex-col gap-2 px-3 py-3'>
@@ -97,7 +98,7 @@ export function ProviderCheckRow({
 					className='mt-0.5 shrink-0'
 					tone={CHECK_STATUS_TONE[check.status]}
 				>
-					{CHECK_STATUS_LABELS[check.status]}
+					{statusLabels[check.status]}
 				</StatusBadge>
 			</div>
 

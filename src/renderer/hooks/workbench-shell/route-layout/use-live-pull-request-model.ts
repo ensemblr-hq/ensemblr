@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import {
 	pullRequestSnapshotQuery,
@@ -29,6 +30,9 @@ interface UseLivePullRequestModelInput {
  * Returns `fallback` unchanged (same reference) until a snapshot lands, and when
  * `enabled` is false, so inactive rows never subscribe or allocate a new model.
  *
+ * The model it builds carries already-translated labels, so the active language
+ * is one of the memo's inputs and a language switch rebuilds it.
+ *
  * @param changeSummary - Branch change counts folded into the PR git-status row.
  * @param enabled - Whether to subscribe to the live queries; false yields the fallback.
  * @param fallback - PR model to return before the snapshot is available.
@@ -43,6 +47,7 @@ export function useLivePullRequestModel({
 	workspaceCwd,
 	workspaceId,
 }: UseLivePullRequestModelInput): WorkspaceShellModel['pullRequest'] {
+	const { i18n } = useTranslation();
 	const { data: prSnapshotData } = useQuery({
 		...pullRequestSnapshotQuery({ workspaceCwd, workspaceId }),
 		enabled: enabled && !!workspaceCwd && !!workspaceId,
@@ -56,6 +61,7 @@ export function useLivePullRequestModel({
 		enabled: enabled && !!workspaceId,
 	});
 
+	// biome-ignore lint/correctness/useExhaustiveDependencies: the model builder translates through the i18n singleton, so the language is a real input Biome cannot see.
 	return useMemo(() => {
 		if (!enabled || !prSnapshotData) {
 			return fallback;
@@ -73,6 +79,7 @@ export function useLivePullRequestModel({
 		changeSummary,
 		enabled,
 		fallback,
+		i18n.language,
 		prSnapshotData,
 		reviewCommentsData?.comments,
 		reviewTodosData?.todos,

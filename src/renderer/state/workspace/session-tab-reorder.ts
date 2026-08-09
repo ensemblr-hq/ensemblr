@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 
 import {
@@ -35,6 +36,7 @@ export function useSessionTabReorder({
 	workspaceId: string;
 }) {
 	const queryClient = useQueryClient();
+	const { t } = useTranslation();
 	const { pinSessionTab } = usePreviewTabSlot({
 		invalidateChatTabs,
 		queryClient,
@@ -47,9 +49,10 @@ export function useSessionTabReorder({
 			reorderChatTabs({ orderedIds, workspaceId }),
 		onError: (error) => {
 			invalidateChatTabs();
-			toast.error('Could not reorder tabs', {
-				description: error instanceof Error ? error.message : undefined,
-			});
+			toast.error(
+				t('errors:chat-tab.reorder-failed.title', 'Could not reorder tabs'),
+				{ description: error instanceof Error ? error.message : undefined },
+			);
 		},
 		onMutate: (orderedIds: readonly string[]) => {
 			writeReorderedChatTabsToCache({

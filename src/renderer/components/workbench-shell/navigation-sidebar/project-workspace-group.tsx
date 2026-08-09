@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next';
+
 import {
 	SidebarGroup,
 	SidebarGroupContent,
@@ -61,9 +63,15 @@ export function ProjectWorkspaceGroup({
 	) => WorkbenchRouteSearch;
 	workspaces: WorkspaceShellModel[];
 }) {
+	const { t } = useTranslation();
+
 	return (
 		<SidebarGroup
-			aria-label={`Reorder repository ${project.name}`}
+			aria-label={t(
+				'workbench:navigation-sidebar.repository.reorder',
+				'Reorder repository {{repository}}',
+				{ repository: project.name },
+			)}
 			className='gap-1 py-1.5'
 		>
 			<ProjectSidebarHeader

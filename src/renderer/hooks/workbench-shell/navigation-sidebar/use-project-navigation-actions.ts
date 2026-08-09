@@ -9,6 +9,7 @@ import {
 	isEnsemblrApiAvailable,
 } from '@/renderer/api/ensemblr-queries';
 import { queryClient } from '@/renderer/api/query-client';
+import { i18n } from '@/renderer/lib/i18n';
 import {
 	addPendingWorkspaceToNavigationSnapshot,
 	removePendingWorkspaceFromNavigationSnapshot,
@@ -184,12 +185,23 @@ function getCreateWorkspaceFailureMessage(
 		(diagnostic: CreateWorkspaceDiagnostic) => diagnostic.severity === 'error',
 	);
 
-	return firstError?.message ?? 'Failed to create workspace.';
+	return (
+		firstError?.message ??
+		i18n.t(
+			'errors:workspace-create.failed.title',
+			'Failed to create workspace.',
+		)
+	);
 }
 
 /** Returns a user-facing message for unexpected create-workspace exceptions. */
 function getCreateWorkspaceExceptionMessage(cause: unknown): string {
-	return cause instanceof Error ? cause.message : 'Failed to create workspace.';
+	return cause instanceof Error
+		? cause.message
+		: i18n.t(
+				'errors:workspace-create.failed.title',
+				'Failed to create workspace.',
+			);
 }
 
 /** Returns a project-id set with the provided project marked as creating. */

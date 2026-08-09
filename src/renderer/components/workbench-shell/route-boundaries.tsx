@@ -1,5 +1,6 @@
 import { type ErrorComponentProps, Link } from '@tanstack/react-router';
 import type { ReactElement } from 'react';
+import { useTranslation } from 'react-i18next';
 import { WorkbenchEmptyStateShell } from '@/renderer/components/workbench-empty-state';
 import { getErrorMessage } from '@/renderer/lib/error';
 import { getWorkbenchStaticRoute } from '@/renderer/lib/workbench';
@@ -42,14 +43,21 @@ function renderBoundary(emptyState: BoundaryCopy, health: WorkbenchHealth) {
 
 /** TanStack Router `pendingComponent` rendered while a route loader is in-flight. */
 export function WorkbenchRoutePending() {
+	const { t } = useTranslation();
 	return renderBoundary(
 		{
-			detail: 'Ensemblr is reading repositories and workspaces from SQLite.',
-			title: 'Loading repositories',
+			detail: t(
+				'errors:route-pending.detail',
+				'Ensemblr is reading repositories and workspaces from SQLite.',
+			),
+			title: t('errors:route-pending.title', 'Loading repositories'),
 		},
 		{
-			detail: 'Renderer route data is loading.',
-			label: 'Loading',
+			detail: t(
+				'errors:route-pending.health-detail',
+				'Renderer route data is loading.',
+			),
+			label: t('errors:route-pending.health-label', 'Loading'),
 			state: 'pending',
 		},
 	);
@@ -57,14 +65,20 @@ export function WorkbenchRoutePending() {
 
 /** TanStack Router `errorComponent` rendered when a route loader throws. */
 export function WorkbenchRouteError({ error }: ErrorComponentProps) {
+	const { t } = useTranslation();
 	return renderBoundary(
 		{
-			detail: getErrorMessage(error) ?? 'Route data failed to load.',
-			title: 'Route unavailable',
+			detail:
+				getErrorMessage(error) ??
+				t('errors:route-error.detail', 'Route data failed to load.'),
+			title: t('errors:route-error.title', 'Route unavailable'),
 		},
 		{
-			detail: 'TanStack Router caught a route-level failure.',
-			label: 'Route error',
+			detail: t(
+				'errors:route-error.health-detail',
+				'TanStack Router caught a route-level failure.',
+			),
+			label: t('errors:route-error.health-label', 'Route error'),
 			state: 'unavailable',
 		},
 	);
@@ -72,14 +86,21 @@ export function WorkbenchRouteError({ error }: ErrorComponentProps) {
 
 /** TanStack Router `notFoundComponent` rendered for unmatched routes. */
 export function WorkbenchRouteNotFound() {
+	const { t } = useTranslation();
 	return renderBoundary(
 		{
-			detail: 'The requested route does not exist.',
-			title: 'Page not found',
+			detail: t(
+				'errors:route-not-found.detail',
+				'The requested route does not exist.',
+			),
+			title: t('errors:route-not-found.title', 'Page not found'),
 		},
 		{
-			detail: 'Choose another route from the workspace navigation.',
-			label: 'Not found',
+			detail: t(
+				'errors:route-not-found.health-detail',
+				'Choose another route from the workspace navigation.',
+			),
+			label: t('errors:route-not-found.health-label', 'Not found'),
 			state: 'unavailable',
 		},
 	);

@@ -1,4 +1,5 @@
 import { RefreshCwIcon } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 import { StatusDot } from '@/renderer/components/status-badge';
 import { Button } from '@/renderer/components/ui/button';
@@ -30,6 +31,7 @@ export function SetupDiagnosticsSummary({
 	title,
 	tone,
 }: SetupDiagnosticsSummaryProps) {
+	const { t } = useTranslation();
 	return (
 		<div className='flex items-center justify-between gap-4 rounded-lg border bg-card px-5 py-4'>
 			<div className='flex min-w-0 items-center gap-3.5'>
@@ -55,7 +57,9 @@ export function SetupDiagnosticsSummary({
 					aria-hidden='true'
 					className={cn('size-4', isRetrying && 'animate-spin')}
 				/>
-				{isRetrying ? 'Retrying' : 'Retry checks'}
+				{isRetrying
+					? t('common:setup-summary.retrying', 'Retrying')
+					: t('common:setup-summary.retry', 'Retry checks')}
 			</Button>
 		</div>
 	);
@@ -63,13 +67,29 @@ export function SetupDiagnosticsSummary({
 
 /** Plain-text count run-on for the summary strip. */
 function SummaryCounts({ snapshot }: { snapshot: SetupDiagnosticsSnapshot }) {
+	const { t } = useTranslation();
+	// Three independent stats behind a styled separator, not one sentence: each
+	// fragment is a complete noun phrase and no word order crosses between them.
+	// i18next-instrument-ignore
 	return (
 		<>
-			{snapshot.successCount} passed
+			{t('common:setup-summary.passed-count', {
+				count: snapshot.successCount,
+				defaultValue_one: '{{count}} passed',
+				defaultValue_other: '{{count}} passed',
+			})}
 			<CountSeparator />
-			{snapshot.warningCount} warnings
+			{t('common:setup-summary.warning-count', {
+				count: snapshot.warningCount,
+				defaultValue_one: '{{count}} warning',
+				defaultValue_other: '{{count}} warnings',
+			})}
 			<CountSeparator />
-			{snapshot.blockedCount} blocked
+			{t('common:setup-summary.blocked-count', {
+				count: snapshot.blockedCount,
+				defaultValue_one: '{{count}} blocked',
+				defaultValue_other: '{{count}} blocked',
+			})}
 		</>
 	);
 }

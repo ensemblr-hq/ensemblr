@@ -11,6 +11,7 @@ import {
 	toolCallCollapseAtom,
 	useAppearanceEffect,
 	useAppSettingsSync,
+	useLanguageEffect,
 	useThemeEffect,
 } from '@/renderer/state/preferences';
 import { useToolApprovalSync } from '@/renderer/state/tool-approval';
@@ -19,6 +20,7 @@ import { useToolApprovalSync } from '@/renderer/state/tool-approval';
 export function App() {
 	useThemeEffect();
 	useAppearanceEffect();
+	useLanguageEffect();
 	useAppSettingsSync();
 	useConfigReloadSync();
 	useAskUserQuestionSync();

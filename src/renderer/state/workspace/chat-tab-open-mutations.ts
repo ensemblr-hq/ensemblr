@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 
 import {
@@ -33,6 +34,7 @@ export function useChatTabOpenMutations({
 	workspaceId: string;
 }) {
 	const queryClient = useQueryClient();
+	const { t } = useTranslation();
 
 	const invalidateChatTabs = useCallback(() => {
 		void queryClient.invalidateQueries({
@@ -112,9 +114,12 @@ export function useChatTabOpenMutations({
 			}),
 		onError: (error) => {
 			invalidateChatTabs();
-			toast.error('Could not open tab', {
-				description: error instanceof Error ? error.message : undefined,
-			});
+			toast.error(
+				t('errors:chat-tab.open-failed.title', 'Could not open tab'),
+				{
+					description: error instanceof Error ? error.message : undefined,
+				},
+			);
 		},
 		onSuccess: (result) => {
 			cacheOpenedTab(result);

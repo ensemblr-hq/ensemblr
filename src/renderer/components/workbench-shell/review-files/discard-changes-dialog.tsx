@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import {
 	discardWorkspaceChanges,
@@ -57,6 +58,7 @@ function DiscardChangesDialogForm({
 	target: DiscardChangesTarget;
 	workspaceCwd: string;
 }) {
+	const { t } = useTranslation();
 	const queryClient = useQueryClient();
 	const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -65,7 +67,9 @@ function DiscardChangesDialogForm({
 			discardWorkspaceChanges({ paths: target.paths, workspaceCwd }),
 		onError: (error) =>
 			setErrorMessage(
-				error instanceof Error ? error.message : 'Could not discard changes.',
+				error instanceof Error
+					? error.message
+					: t('errors:discard-changes.failed', 'Could not discard changes.'),
 			),
 		onSettled: () => {
 			// Some files may have been discarded even on partial failure, so refresh
@@ -97,12 +101,20 @@ function DiscardChangesDialogForm({
 		<>
 			<DialogHeader>
 				<DialogTitle className='font-medium text-[0.9375rem]'>
-					{isBulk ? 'Discard all changes?' : 'Discard changes?'}
+					{isBulk
+						? t('review:discard-changes.title-bulk', 'Discard all changes?')
+						: t('review:discard-changes.title', 'Discard changes?')}
 				</DialogTitle>
 				<p className='text-muted-foreground text-xs'>
 					{isBulk
-						? 'Every working-tree change is reverted to the last commit and any new files are deleted. This cannot be undone.'
-						: 'The working-tree changes are reverted to the last commit; a new file is deleted. This cannot be undone.'}
+						? t(
+								'review:discard-changes.description-bulk',
+								'Every working-tree change is reverted to the last commit and any new files are deleted. This cannot be undone.',
+							)
+						: t(
+								'review:discard-changes.description',
+								'The working-tree changes are reverted to the last commit; a new file is deleted. This cannot be undone.',
+							)}
 				</p>
 			</DialogHeader>
 
@@ -111,8 +123,11 @@ function DiscardChangesDialogForm({
 					{target.title}
 				</span>
 				<span className='text-[0.6875rem] text-muted-foreground'>
-					{target.fileCount} {target.fileCount === 1 ? 'file' : 'files'}{' '}
-					affected
+					{t('review:discard-changes.affected-file-count', {
+						count: target.fileCount,
+						defaultValue_one: '{{count}} file affected',
+						defaultValue_other: '{{count}} files affected',
+					})}
 				</span>
 			</div>
 
@@ -128,7 +143,7 @@ function DiscardChangesDialogForm({
 					type='button'
 					variant='outline'
 				>
-					Cancel
+					{t('common:actions.cancel', 'Cancel')}
 				</Button>
 				<Button
 					className='h-8'
@@ -137,7 +152,9 @@ function DiscardChangesDialogForm({
 					type='button'
 					variant='destructive'
 				>
-					{mutation.isPending ? 'Discarding…' : 'Discard'}
+					{mutation.isPending
+						? t('review:discard-changes.submitting', 'Discarding…')
+						: t('common:actions.discard', 'Discard')}
 				</Button>
 			</div>
 		</>

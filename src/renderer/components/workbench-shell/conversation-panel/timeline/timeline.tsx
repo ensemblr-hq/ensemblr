@@ -1,5 +1,7 @@
 import type { UIMessage } from 'ai';
+import type { TFunction } from 'i18next';
 import { memo, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ChatAssistantTurn } from '@/renderer/components/chat-assistant-turn';
 import { ChatWorkingIndicator } from '@/renderer/components/chat-turn-timer';
 import { ChatUserPrompt } from '@/renderer/components/chat-user-prompt';
@@ -43,22 +45,26 @@ import { TimelineStartingState } from './timeline-starting-state';
  * that list is in flight, because a session that stays missing after the fetch
  * settles is gone, and a spinner that never resolves is worse than a blank panel.
  * @param state - Whether the tab is bound, whether its session resolved, whether the session list is in flight, and whether the turn is live.
+ * @param t - Translator from the calling component, so the label follows the UI language.
  * @returns The message to show, or null when there is nothing to stand in for.
  */
-function resolveStartingLabel(state: {
-	hasSession: boolean;
-	isStreaming: boolean;
-	sessionResolved: boolean;
-	sessionsFetching: boolean;
-}): string | null {
+function resolveStartingLabel(
+	state: {
+		hasSession: boolean;
+		isStreaming: boolean;
+		sessionResolved: boolean;
+		sessionsFetching: boolean;
+	},
+	t: TFunction,
+): string | null {
 	if (!state.hasSession) {
 		return null;
 	}
 	if (state.isStreaming) {
-		return 'Starting agent';
+		return t('workbench:timeline.starting.agent', 'Starting agent');
 	}
 	return !state.sessionResolved && state.sessionsFetching
-		? 'Loading conversation'
+		? t('workbench:timeline.starting.loading', 'Loading conversation')
 		: null;
 }
 
@@ -71,6 +77,7 @@ export function AgentSessionTimeline({
 	activeSession: SessionTabModel;
 	workspace: WorkspaceShellModel;
 }) {
+	const { t } = useTranslation();
 	const {
 		branchId,
 		checkpointsByTurnId,
@@ -116,12 +123,18 @@ export function AgentSessionTimeline({
 	if (agentSessionId && error) {
 		return (
 			<section
-				aria-label='Agent session timeline'
+				aria-label={t(
+					'workbench:timeline.aria-label',
+					'Agent session timeline',
+				)}
 				className='flex flex-col gap-2 rounded-md border border-status-warning/30 bg-status-warning/10 p-3 text-status-warning text-xs'
 				data-timeline-state='errored'
 			>
 				<p>
-					Could not load timeline events.{' '}
+					{t(
+						'workbench:timeline.load-failed',
+						'Could not load timeline events.',
+					)}{' '}
 					{error instanceof Error ? error.message : null}
 				</p>
 			</section>
@@ -131,12 +144,15 @@ export function AgentSessionTimeline({
 	// An agent-spawned tab has no optimistic prompt to stand in for the real one,
 	// and the agent only echoes the prompt back once its child process has
 	// booted, so an empty transcript here means "starting", not "nothing to show".
-	const startingLabel = resolveStartingLabel({
-		hasSession: tabAgentSessionId !== null,
-		isStreaming,
-		sessionResolved,
-		sessionsFetching,
-	});
+	const startingLabel = resolveStartingLabel(
+		{
+			hasSession: tabAgentSessionId !== null,
+			isStreaming,
+			sessionResolved,
+			sessionsFetching,
+		},
+		t,
+	);
 
 	if (messages.length === 0) {
 		if (startingLabel === null) {
@@ -144,7 +160,10 @@ export function AgentSessionTimeline({
 		}
 		return (
 			<section
-				aria-label='Agent session timeline'
+				aria-label={t(
+					'workbench:timeline.aria-label',
+					'Agent session timeline',
+				)}
 				className='flex min-h-0 flex-1 flex-col'
 				data-timeline-state='starting'
 			>
@@ -155,7 +174,7 @@ export function AgentSessionTimeline({
 
 	return (
 		<section
-			aria-label='Agent session timeline'
+			aria-label={t('workbench:timeline.aria-label', 'Agent session timeline')}
 			className='flex min-h-0 flex-1 flex-col'
 			data-timeline-state='ready'
 		>

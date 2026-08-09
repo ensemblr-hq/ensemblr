@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import type { ComposerStateApi } from '@/renderer/hooks/workbench-shell/composer/use-composer-state';
 import { AttachmentChip } from './attachment-chip';
 
@@ -8,6 +9,7 @@ import { AttachmentChip } from './attachment-chip';
  * the thing it describes. Renders nothing when there is nothing to say.
  */
 export function ComposerNotices({ state }: { state: ComposerStateApi }) {
+	const { t } = useTranslation();
 	return (
 		<>
 			{state.hasChips ? (
@@ -42,8 +44,10 @@ export function ComposerNotices({ state }: { state: ComposerStateApi }) {
 			) : null}
 			{state.blockedNotice ? (
 				<output className='text-muted-foreground text-xs'>
-					Follow-ups are blocked while the agent is working — stop the turn or
-					wait for it to finish.
+					{t(
+						'workbench:composer.blocked-follow-up',
+						'Follow-ups are blocked while the agent is working — stop the turn or wait for it to finish.',
+					)}
 				</output>
 			) : null}
 		</>

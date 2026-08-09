@@ -1,0 +1,258 @@
+{
+	"actions": {
+		"add": "Add",
+		"allow": "Allow",
+		"approve": "Approve",
+		"archive": "Archive",
+		"archiving": "Archiving…",
+		"back": "Back",
+		"browse": "Browse",
+		"cancel": "Cancel",
+		"configure": "Configure",
+		"continue": "Continue",
+		"copied": "Copied",
+		"copy-code": "Copy code",
+		"copy-path": "Copy path",
+		"copy-response": "Copy response",
+		"create": "Create",
+		"delete": "Delete",
+		"delete-ellipsis": "Delete…",
+		"deleting": "Deleting…",
+		"deny": "Deny",
+		"discard": "Discard",
+		"discard-changes": "Discard changes",
+		"edit": "Edit",
+		"keep-open": "Keep open",
+		"open": "Open",
+		"open-in": "Open in",
+		"picking": "Picking…",
+		"pin": "Pin",
+		"remove": "Remove",
+		"remove-named": "Remove {{label}}",
+		"removing": "Removing…",
+		"rename": "Rename",
+		"renaming": "Renaming…",
+		"reset-managed-root": "Reset to managed repos directory",
+		"resolve": "Resolve",
+		"restoring": "Restoring…",
+		"retry": "Retry",
+		"revert-to-default": "Revert to default",
+		"save": "Save",
+		"saving": "Saving…",
+		"send": "Send",
+		"stop": "Stop",
+		"try-again": "Try again",
+		"unarchive": "Unarchive",
+		"unpin": "Unpin",
+		"view": "View"
+	},
+	"agent-question": {
+		"dismiss": "Dismiss question",
+		"free-text-label": "Type your own answer",
+		"free-text-placeholder": "Type something…",
+		"hint": {
+			"dismiss": "Esc dismiss",
+			"move": "↑↓ move",
+			"select": "Enter select",
+			"submit": "{{shortcut}} submit",
+			"toggle": "Enter toggle"
+		},
+		"next": "Next question",
+		"previous": "Previous question",
+		"section-label": "Agent question",
+		"submit": "Submit answers"
+	},
+	"answer-table": {
+		"collapse": "Collapse table",
+		"copy": "Copy table",
+		"dialog-title": "Table",
+		"expand": "Expand table"
+	},
+	"clipboard": {
+		"path-copied": "Path copied to clipboard.",
+		"workspace-path-copied": "Workspace path copied."
+	},
+	"clone-dialog": {
+		"loading-repos": "Loading repos from GitHub…",
+		"location-label": "Location",
+		"matching-repos": "Matching repos",
+		"private": "Private",
+		"recent-repos": "Recent repos",
+		"stage": {
+			"cloning": "Cloning…",
+			"opening": "Opening…",
+			"preparing": "Preparing…",
+			"submit": "Clone repo"
+		},
+		"title": "Clone GitHub repo",
+		"url-label": "Repository URL",
+		"url-placeholder": "Search repos or paste URL"
+	},
+	"conversation": {
+		"scroll-to-newest": "Scroll to newest message"
+	},
+	"diagnostics-log": {
+		"trigger": "Diagnostics log",
+		"truncated": "(truncated)"
+	},
+	"local-import": {
+		"description": "Ensemblr is cloning the tracked git files into your managed repos folder, then creating the first workspace.",
+		"still-working": "Still working — large repositories with deep history can take a minute or two. The window will switch as soon as the workspace is ready.",
+		"title": "Opening local project…"
+	},
+	"pi-replay": {
+		"event-count_one": "{{count}} event",
+		"event-count_other": "{{count}} events",
+		"title": "Pi fixture replay"
+	},
+	"quick-start": {
+		"creates": "Creates folder and repo <name>{{projectName}}</name>",
+		"creating": "Creating…",
+		"description": "Create a local folder and initialize a new git repository.",
+		"name-label": "Project name",
+		"parent-label": "Parent folder",
+		"parent-placeholder": "Managed repos directory",
+		"title": "Create project"
+	},
+	"root-directory": {
+		"applied": "Applied",
+		"applying": "Applying",
+		"change-description": "Switch Ensemblr to the selected root and reindex/adopt from that filesystem layout after confirmation.",
+		"change-title": "Change root directory",
+		"continuity-note": "Shared Conductor root continuity covers filesystem, git, and config only; chat/session/checkpoint continuity is not guaranteed across apps.",
+		"current-root": "Current root",
+		"no-blocking-warnings": "No blocking root warnings.",
+		"no-current-root": "No current root snapshot",
+		"no-reconciliation-warnings": "No reconciliation warnings.",
+		"not-applied": "Not applied",
+		"preserved-body": "Switching changes where Ensemblr looks for repos, workspaces, and archived contexts. Reindex/adopt is the default behavior. Migration is a separate action. Delete or cleanup is a separate destructive action.",
+		"preserved-title": "Old root contents are preserved.",
+		"reconciliation": "Reconciliation scanned {{repositoryDirectories}} and {{workspaceDirectories}}.",
+		"repository-directory-count_one": "{{count}} repository directory",
+		"repository-directory-count_other": "{{count}} repository directories",
+		"result-title": "Root switch result",
+		"selected-root": "Selected root",
+		"switch": "Switch root",
+		"workspace-directory-count_one": "{{count}} workspace directory",
+		"workspace-directory-count_other": "{{count}} workspace directories"
+	},
+	"session-status": {
+		"context": "{{percent}}% context",
+		"tokens_one": "{{formatted}} token",
+		"tokens_other": "{{formatted}} tokens"
+	},
+	"setup-check": {
+		"optional": "Optional",
+		"status": {
+			"failure": "Failed",
+			"pending": "Pending",
+			"running": "Running",
+			"success": "Ready",
+			"warning": "Warning"
+		}
+	},
+	"setup-summary": {
+		"blocked": {
+			"detail_one": "{{count}} required check needs attention before core workflows open.",
+			"detail_other": "{{count}} required checks need attention before core workflows open.",
+			"title": "Core workflows are blocked"
+		},
+		"blocked-count_one": "{{count}} blocked",
+		"blocked-count_other": "{{count}} blocked",
+		"checking": {
+			"detail": "Ensemblr is collecting setup diagnostics.",
+			"title": "Checking setup readiness"
+		},
+		"group": {
+			"claude": "Claude Code runtime",
+			"core": "Core runtime",
+			"github": "Git and GitHub",
+			"linear": "Linear",
+			"pi": "Pi runtime",
+			"storage": "Storage"
+		},
+		"loading": "Loading setup diagnostics",
+		"local-execution-notice": "Agents, scripts, terminals, and tools run locally with your macOS account permissions. Workspace trusted mode is the default; stricter modes can require approval or read-only access where supported.",
+		"passed-count_one": "{{count}} passed",
+		"passed-count_other": "{{count}} passed",
+		"pending": {
+			"detail_one": "{{count}} required check is still pending.",
+			"detail_other": "{{count}} required checks are still pending.",
+			"title": "Setup checks are still pending"
+		},
+		"ready": {
+			"detail": "{{passedChecks}} and {{remainingWarnings}}.",
+			"passed-checks_one": "{{count}} check passed",
+			"passed-checks_other": "{{count}} checks passed",
+			"remaining-warnings_one": "{{count}} warning remains",
+			"remaining-warnings_other": "{{count}} warnings remain",
+			"title": "Core workflows are ready"
+		},
+		"retry": "Retry checks",
+		"retrying": "Retrying",
+		"unavailable": {
+			"detail": "Setup diagnostics could not be loaded from the main process.",
+			"title": "Setup diagnostics unavailable"
+		},
+		"warning-count_one": "{{count}} warning",
+		"warning-count_other": "{{count}} warnings"
+	},
+	"stack-trace": {
+		"empty": "No stack frames"
+	},
+	"status": {
+		"coming-soon": "Coming soon"
+	},
+	"terminal": {
+		"title": "Terminal"
+	},
+	"thinking": {
+		"reasoned": "Reasoned for {{seconds}}s",
+		"reasoning": "Reasoning… {{seconds}}s"
+	},
+	"tool-approval": {
+		"allow-session": "Allow for this session",
+		"deny-label": "Deny tool call",
+		"headline": "Claude wants to use {{tool}}.",
+		"key-hints": "1 allow · 2 allow for session · 3 deny · Esc deny",
+		"section-label": "Tool approval request",
+		"status": "Approval required for {{tool}}."
+	},
+	"tool-output": {
+		"show-all_one": "Show all {{count}} line",
+		"show-all_other": "Show all {{count}} lines"
+	},
+	"tool-row": {
+		"running": "Running…"
+	},
+	"turn-footer": {
+		"actions": "Turn actions",
+		"fork-tab": "Fork to new tab",
+		"fork-workspace": "Fork to new workspace",
+		"restore-checkpoint": "Restore to before this turn…",
+		"stopped": "Stopped",
+		"view-diff": "View turn diff"
+	},
+	"turn-summary": {
+		"fallback": "Work",
+		"messages_one": "{{count}} message",
+		"messages_other": "{{count}} messages",
+		"tool-calls_one": "{{count}} tool call",
+		"tool-calls_other": "{{count}} tool calls"
+	},
+	"turn-timer": {
+		"working": "Working…"
+	},
+	"units": {
+		"mb": "MB",
+		"px": "{{value}}px",
+		"seconds": "{{seconds}}s",
+		"workspace-count_one": "{{count}} workspace",
+		"workspace-count_other": "{{count}} workspaces"
+	},
+	"welcome": {
+		"open-github-project": "Open GitHub project",
+		"open-project": "Open project",
+		"quick-start": "Quick start"
+	}
+}

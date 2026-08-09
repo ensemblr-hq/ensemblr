@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useNavigate, useRouter } from '@tanstack/react-router';
 import { useSetAtom } from 'jotai';
 import { useCallback, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 
 import {
@@ -50,6 +51,7 @@ export function useQuickStartFlow({
 } = {}): UseQuickStartFlowResult {
 	const navigate = useNavigate();
 	const router = useRouter();
+	const { t } = useTranslation();
 	const setLastWorkspaceSelection = useSetAtom(lastWorkspaceSelectionAtom);
 	const { data: rootDirectoryData } = useQuery({
 		...rootDirectoryQuery,
@@ -111,10 +113,19 @@ export function useQuickStartFlow({
 					(diagnostic) => diagnostic.severity === 'warning',
 				);
 				if (seed.status === 'success') {
-					toast.success(`Created project ${repository.name}.`);
+					toast.success(
+						t('errors:quick-start.created.title', 'Created project {{name}}.', {
+							name: repository.name,
+						}),
+					);
 				} else {
 					toast.error(
-						seed.error ?? `Created ${repository.name}, opening failed.`,
+						seed.error ??
+							t(
+								'errors:quick-start.open-failed.title',
+								'Created {{name}}, opening failed.',
+								{ name: repository.name },
+							),
 					);
 				}
 				// Surface publish (and any future) warnings regardless of whether
@@ -131,7 +142,7 @@ export function useQuickStartFlow({
 			setDiagnostics(result.diagnostics);
 			return result;
 		},
-		[navigate, onSuccess, parentPath, router, setLastWorkspaceSelection],
+		[navigate, onSuccess, parentPath, router, setLastWorkspaceSelection, t],
 	);
 
 	const retry = useCallback(() => {

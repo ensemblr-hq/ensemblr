@@ -1,5 +1,7 @@
+import type { TFunction } from 'i18next';
 import { useAtomValue } from 'jotai';
 import { useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { emitTerminalInput } from '@/renderer/lib/terminal';
 import {
 	createXtermAdapter,
@@ -37,6 +39,7 @@ export function XtermTerminal({
 	sessionStatus: TerminalSessionStatus | null;
 	terminalId: string;
 }) {
+	const { t } = useTranslation();
 	const containerRef = useRef<HTMLDivElement | null>(null);
 	const adapterRef = useRef<TerminalRendererAdapter | null>(null);
 	const terminalFont = useAtomValue(terminalFontAtom);
@@ -61,7 +64,7 @@ export function XtermTerminal({
 	// The exit banner is for interactive terminals only. Setup/Run script panels
 	// (read-only) surface lifecycle controls and status in their panel chrome, so
 	// the footer would be redundant noise there.
-	const exitNotice = readOnly ? null : formatExitNotice(sessionStatus);
+	const exitNotice = readOnly ? null : formatExitNotice(sessionStatus, t);
 
 	useEffect(() => {
 		const container = containerRef.current;
@@ -238,15 +241,23 @@ export function XtermTerminal({
 	);
 }
 
-/** Human-readable banner shown when the session is no longer running. */
-function formatExitNotice(status: TerminalSessionStatus | null): string | null {
+/**
+ * Human-readable banner shown when the session is no longer running.
+ * @param status - The session's last reported status
+ * @param t - The caller's translation function, so the copy follows the UI language
+ * @returns The banner text, or null while the session is still running
+ */
+function formatExitNotice(
+	status: TerminalSessionStatus | null,
+	t: TFunction,
+): string | null {
 	switch (status) {
 		case 'exited':
-			return 'Session ended.';
+			return t('workbench:terminal.session-ended', 'Session ended.');
 		case 'failed':
-			return 'Session failed.';
+			return t('workbench:terminal.session-failed', 'Session failed.');
 		case 'stopped':
-			return 'Session stopped.';
+			return t('workbench:terminal.session-stopped', 'Session stopped.');
 		default:
 			return null;
 	}

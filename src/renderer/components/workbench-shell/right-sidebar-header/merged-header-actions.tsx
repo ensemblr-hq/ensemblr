@@ -1,4 +1,5 @@
 import { ArchiveIcon, FastForwardIcon, LoaderCircleIcon } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/renderer/components/ui/button';
 import {
@@ -20,6 +21,7 @@ const archiveBoundary = classifyPermissionAction({
  * mutually exclusive endings for the same workspace.
  */
 export function MergedHeaderActions() {
+	const { t } = useTranslation();
 	const reviewActions = useReviewActions();
 	const isBusy =
 		reviewActions === null ||
@@ -44,7 +46,7 @@ export function MergedHeaderActions() {
 				) : (
 					<FastForwardIcon aria-hidden='true' data-icon='inline-start' />
 				)}
-				Continue
+				{t('common:actions.continue', 'Continue')}
 			</Button>
 			<Button
 				className={HEADER_ACTION_BUTTON_CLASSES}
@@ -62,7 +64,7 @@ export function MergedHeaderActions() {
 				) : (
 					<ArchiveIcon aria-hidden='true' data-icon='inline-start' />
 				)}
-				Archive
+				{t('common:actions.archive', 'Archive')}
 			</Button>
 		</div>
 	);

@@ -1,5 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 
 import {
@@ -24,6 +25,7 @@ export function useRepoSettingsWriter(
 	project: RepoProject,
 ): (patch: RepositorySettingsPatch) => Promise<void> {
 	const queryClient = useQueryClient();
+	const { t } = useTranslation();
 
 	return useCallback(
 		async (patch: RepositorySettingsPatch): Promise<void> => {
@@ -37,16 +39,26 @@ export function useRepoSettingsWriter(
 					settings: patch,
 				});
 				if (!result.ok) {
-					toast.error('Could not save repository settings.');
+					toast.error(
+						t(
+							'errors:repo-settings.save-failed.title',
+							'Could not save repository settings.',
+						),
+					);
 					return;
 				}
 				await queryClient.invalidateQueries({
 					queryKey: ensemblrQueryKeys.settingsResolution(repoId),
 				});
 			} catch {
-				toast.error('Could not save repository settings.');
+				toast.error(
+					t(
+						'errors:repo-settings.save-failed.title',
+						'Could not save repository settings.',
+					),
+				);
 			}
 		},
-		[project, queryClient, repoId],
+		[project, queryClient, repoId, t],
 	);
 }

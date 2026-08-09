@@ -9,6 +9,7 @@ import {
 	Undo2Icon,
 } from 'lucide-react';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { FilePathLabel } from '@/renderer/components/file-path-label';
 import { Button } from '@/renderer/components/ui/button';
@@ -64,6 +65,7 @@ export function ReviewFileRow({
 		openFile,
 		openInTargets,
 	} = useReviewFileActions();
+	const { t } = useTranslation();
 	const [isMenuOpen, setIsMenuOpen] = useState(false);
 
 	const fileName = getReviewFileName(file.path);
@@ -95,7 +97,9 @@ export function ReviewFileRow({
 				: { 'aria-level': ariaLevel, role: 'treeitem' as const })}
 		>
 			<button
-				aria-label={`Open ${file.path}`}
+				aria-label={t('review:file-row.open', 'Open {{path}}', {
+					path: file.path,
+				})}
 				className='flex h-full min-w-0 flex-1 items-center gap-2 self-stretch rounded-md px-2 text-left font-mono text-xs'
 				onClick={openThisFile}
 				onDoubleClick={keepThisFileOpen}
@@ -120,7 +124,7 @@ export function ReviewFileRow({
 			>
 				{viewed ? (
 					<CheckIcon
-						aria-label='Viewed'
+						aria-label={t('review:file-row.viewed', 'Viewed')}
 						className='size-3.5 shrink-0 text-muted-foreground'
 						role='img'
 					/>
@@ -138,7 +142,11 @@ export function ReviewFileRow({
 					<Tooltip>
 						<TooltipTrigger asChild>
 							<Button
-								aria-label={`Discard changes to ${file.path}`}
+								aria-label={t(
+									'review:file-row.discard',
+									'Discard changes to {{path}}',
+									{ path: file.path },
+								)}
 								className='text-muted-foreground hover:text-foreground'
 								onClick={() => onDiscardFile(file.path)}
 								size='icon-xs'
@@ -147,7 +155,9 @@ export function ReviewFileRow({
 								<Undo2Icon />
 							</Button>
 						</TooltipTrigger>
-						<TooltipContent>Discard changes</TooltipContent>
+						<TooltipContent>
+							{t('common:actions.discard-changes', 'Discard changes')}
+						</TooltipContent>
 					</Tooltip>
 				) : null}
 				{hasOpenInMenu ? (
@@ -159,7 +169,9 @@ export function ReviewFileRow({
 						openInTargets={openInTargets}
 					>
 						<Button
-							aria-label={`Open ${file.path} in…`}
+							aria-label={t('review:file-row.open-in', 'Open {{path}} in…', {
+								path: file.path,
+							})}
 							className='text-muted-foreground hover:text-foreground'
 							size='icon-xs'
 							variant='ghost'
@@ -205,38 +217,14 @@ function ReviewFileStats({ file }: { file: ReviewFileSummary }) {
  */
 const reviewFileStatusMark: Record<
 	ReviewFileSummary['status'],
-	{ Icon: typeof DotSquareIcon; className: string; label: string }
+	{ Icon: typeof DotSquareIcon; className: string }
 > = {
-	added: {
-		Icon: PlusSquareIcon,
-		className: 'text-muted-foreground',
-		label: 'Added',
-	},
-	conflicted: {
-		Icon: TriangleAlertIcon,
-		className: 'text-status-danger',
-		label: 'Conflicted',
-	},
-	deleted: {
-		Icon: MinusSquareIcon,
-		className: 'text-status-danger',
-		label: 'Deleted',
-	},
-	modified: {
-		Icon: DotSquareIcon,
-		className: 'text-status-warning',
-		label: 'Modified',
-	},
-	renamed: {
-		Icon: DotSquareIcon,
-		className: 'text-status-warning',
-		label: 'Renamed',
-	},
-	untracked: {
-		Icon: PlusSquareIcon,
-		className: 'text-muted-foreground',
-		label: 'Untracked',
-	},
+	added: { Icon: PlusSquareIcon, className: 'text-muted-foreground' },
+	conflicted: { Icon: TriangleAlertIcon, className: 'text-status-danger' },
+	deleted: { Icon: MinusSquareIcon, className: 'text-status-danger' },
+	modified: { Icon: DotSquareIcon, className: 'text-status-warning' },
+	renamed: { Icon: DotSquareIcon, className: 'text-status-warning' },
+	untracked: { Icon: PlusSquareIcon, className: 'text-muted-foreground' },
 };
 
 /** Renders the colored icon marking a review file's git change status. */
@@ -245,11 +233,20 @@ function ReviewFileStatusMark({
 }: {
 	status: ReviewFileSummary['status'];
 }) {
-	const { Icon, className, label } = reviewFileStatusMark[status];
+	const { t } = useTranslation();
+	const { Icon, className } = reviewFileStatusMark[status];
+	const label: Record<ReviewFileSummary['status'], string> = {
+		added: t('review:file-status.added', 'Added'),
+		conflicted: t('review:file-status.conflicted', 'Conflicted'),
+		deleted: t('review:file-status.deleted', 'Deleted'),
+		modified: t('review:file-status.modified', 'Modified'),
+		renamed: t('review:file-status.renamed', 'Renamed'),
+		untracked: t('review:file-status.untracked', 'Untracked'),
+	};
 
 	return (
 		<Icon
-			aria-label={label}
+			aria-label={label[status]}
 			className={cn('size-3.5 shrink-0', className)}
 			role='img'
 		/>

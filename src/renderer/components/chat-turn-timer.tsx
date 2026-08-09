@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { useElapsedMs } from '@/renderer/hooks/use-elapsed-ms';
 import { formatTurnDuration } from '@/renderer/lib/format-duration';
 import { cn } from '@/renderer/lib/utils';
@@ -41,6 +42,7 @@ export function ChatWorkingIndicator({
 	className?: string;
 	startMs: number;
 }) {
+	const { t } = useTranslation();
 	return (
 		<div
 			className={cn(
@@ -53,7 +55,7 @@ export function ChatWorkingIndicator({
 				aria-hidden='true'
 				className='size-1.5 animate-pulse rounded-full bg-muted-foreground/70'
 			/>
-			<span>Working…</span>
+			<span>{t('common:turn-timer.working', 'Working…')}</span>
 			<ChatTurnTimer startMs={startMs} />
 		</div>
 	);

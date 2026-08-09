@@ -10,6 +10,7 @@ import {
 	XIcon,
 } from 'lucide-react';
 import { Fragment } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/renderer/components/ui/button';
 import { TabScroller } from '@/renderer/components/ui/tab-scroller';
@@ -54,6 +55,7 @@ export function DockPanel({
 	onTabChange: (tab: DockTabId) => void;
 	workspace: WorkspaceShellModel;
 }) {
+	const { t } = useTranslation();
 	const { state, actions: layoutActions } = useWorkbenchLayout();
 	const isCollapsed = state.isDockCollapsed;
 	const DockToggleIcon = isCollapsed ? ChevronUpIcon : ChevronDownIcon;
@@ -87,7 +89,9 @@ export function DockPanel({
 			<div className='@container/dock-header flex h-9 shrink-0 items-center justify-between gap-2 overflow-hidden px-2 shadow-bottom-rule'>
 				<Button
 					aria-label={
-						isCollapsed ? 'Expand terminal area' : 'Collapse terminal area'
+						isCollapsed
+							? t('workbench:dock-panel.expand', 'Expand terminal area')
+							: t('workbench:dock-panel.collapse', 'Collapse terminal area')
 					}
 					className='size-6 shrink-0 text-muted-foreground hover:text-foreground'
 					onClick={(event) => {
@@ -154,7 +158,9 @@ export function DockPanel({
 					variant='ghost'
 				>
 					<PlusIcon aria-hidden='true' />
-					<span className='sr-only'>New terminal</span>
+					<span className='sr-only'>
+						{t('workbench:dock-panel.new-terminal', 'New terminal')}
+					</span>
 				</Button>
 				<div className='flex shrink-0 items-center gap-1'>
 					<DockPanelActions
@@ -230,9 +236,13 @@ function DockTabCloseButton({
 	onCloseTerminal: (terminalId: string) => void;
 	terminalId: string;
 }) {
+	const { t } = useTranslation();
+
 	return (
 		<button
-			aria-label={`Close ${label} tab`}
+			aria-label={t('workbench:dock-panel.close-tab', 'Close {{label}} tab', {
+				label,
+			})}
 			className='pointer-events-none absolute top-1/2 right-1 grid size-4 -translate-y-1/2 place-items-center rounded-sm text-muted-foreground opacity-0 transition hover:text-foreground focus-visible:pointer-events-auto focus-visible:opacity-100 group-focus-within/dock-tab:pointer-events-auto group-focus-within/dock-tab:opacity-100 group-hover/dock-tab:pointer-events-auto group-hover/dock-tab:opacity-100'
 			onClick={(event) => {
 				event.stopPropagation();

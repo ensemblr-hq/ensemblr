@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { Trash2Icon } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import { Trans, useTranslation } from 'react-i18next';
 
 import {
 	getEnsemblrApi,
@@ -89,6 +90,7 @@ export const Route = createFileRoute('/_workbench/settings/repo/$repoId/misc')({
 
 /** Repository-scoped Misc settings panel for root/workspace paths, preview URLs, files-to-copy globs, and repository removal. */
 function RepoMiscSettings() {
+	const { t } = useTranslation();
 	const { repoId } = Route.useParams();
 	const { resolved, project } = useRepoSettings(repoId);
 	const save = useRepoSettingsWriter(repoId, project);
@@ -112,12 +114,18 @@ function RepoMiscSettings() {
 
 	return (
 		<SettingsSection
-			description='Repository paths, preview URLs, files-to-copy patterns, and lifecycle.'
-			title='Misc'
+			description={t(
+				'settings:repo.misc.description',
+				'Repository paths, preview URLs, files-to-copy patterns, and lifecycle.',
+			)}
+			title={t('settings:repo.misc.title', 'Misc')}
 		>
 			<SettingRow
-				description='Do not move or delete this directory. Instead, remove the repository in Ensemblr.'
-				label='Root path'
+				description={t(
+					'settings:repo.root-path.description',
+					'Do not move or delete this directory. Instead, remove the repository in Ensemblr.',
+				)}
+				label={t('settings:repo.root-path.label', 'Root path')}
 				stack
 			>
 				<code className='mt-2 block truncate rounded-md bg-muted/40 px-3 py-2 font-mono text-xs'>
@@ -126,8 +134,11 @@ function RepoMiscSettings() {
 			</SettingRow>
 
 			<SettingRow
-				description='Do not move or delete the workspace subdirectories. Instead, archive workspaces in Ensemblr.'
-				label='Workspaces path'
+				description={t(
+					'settings:repo.workspaces-path.description',
+					'Do not move or delete the workspace subdirectories. Instead, archive workspaces in Ensemblr.',
+				)}
+				label={t('settings:repo.workspaces-path.label', 'Workspaces path')}
 				stack
 			>
 				<code className='mt-2 block truncate rounded-md bg-muted/40 px-3 py-2 font-mono text-xs'>
@@ -152,18 +163,23 @@ function RepoMiscSettings() {
 					<DialogTrigger asChild>
 						<Button size='sm' variant='destructive'>
 							<Trash2Icon aria-hidden='true' className='size-4' />
-							Remove repository
+							{t('settings:repo.remove.trigger', 'Remove repository')}
 						</Button>
 					</DialogTrigger>
 					<DialogContent>
 						<DialogHeader>
-							<DialogTitle>Remove this repository?</DialogTitle>
+							<DialogTitle>
+								{t('settings:repo.remove.title', 'Remove this repository?')}
+							</DialogTitle>
 							<DialogDescription>
-								Removes the repository from Ensemblr. The on-disk directory at
-								<code className='mx-1 font-mono text-xs'>
-									{project?.pathLabel}
-								</code>
-								is not deleted; delete it manually if you want it gone.
+								<Trans
+									components={{
+										path: <code className='mx-1 font-mono text-xs' />,
+									}}
+									defaults='Removes the repository from Ensemblr. The on-disk directory at<path>{{path}}</path>is not deleted; delete it manually if you want it gone.'
+									i18nKey='settings:repo.remove.description'
+									values={{ path: project?.pathLabel ?? '' }}
+								/>
 							</DialogDescription>
 						</DialogHeader>
 						{removeError ? (
@@ -171,14 +187,18 @@ function RepoMiscSettings() {
 						) : null}
 						<DialogFooter>
 							<DialogClose asChild>
-								<Button variant='ghost'>Cancel</Button>
+								<Button variant='ghost'>
+									{t('common:actions.cancel', 'Cancel')}
+								</Button>
 							</DialogClose>
 							<Button
 								disabled={remove.isPending}
 								onClick={() => remove.mutate()}
 								variant='destructive'
 							>
-								{remove.isPending ? 'Removing…' : 'Remove'}
+								{remove.isPending
+									? t('common:actions.removing', 'Removing…')
+									: t('common:actions.remove', 'Remove')}
 							</Button>
 						</DialogFooter>
 					</DialogContent>
@@ -202,6 +222,7 @@ function PreviewUrlsSetting({
 	onSave: (urls: RepositoryPreviewUrl[] | null) => void;
 	seed: RepositoryPreviewUrl[];
 }) {
+	const { t } = useTranslation();
 	const [rows, setRows] = useState<PreviewUrlRow[]>(() => toPreviewRows(seed));
 	const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const lastSavedRef = useRef<RepositoryPreviewUrl[]>(seed);
@@ -258,8 +279,11 @@ function PreviewUrlsSetting({
 
 	return (
 		<SettingRow
-			description='Overrides the terminal panel’s Open button URL. Add more than one to switch between them from the Open button dropdown; the first is opened by default and the rest appear in the dropdown in order. Supports `$ENSEMBLR_WORKSPACE_NAME` and `$ENSEMBLR_PORT`. Leave blank to auto-detect from output logs.'
-			label='Preview URLs'
+			description={t(
+				'settings:repo.preview-urls.description',
+				'Overrides the terminal panel’s Open button URL. Add more than one to switch between them from the Open button dropdown; the first is opened by default and the rest appear in the dropdown in order. Supports `$ENSEMBLR_WORKSPACE_NAME` and `$ENSEMBLR_PORT`. Leave blank to auto-detect from output logs.',
+			)}
+			label={t('settings:repo.preview-urls.label', 'Preview URLs')}
 			modified={modified}
 			onReset={() => onSave(null)}
 			stack
@@ -268,14 +292,23 @@ function PreviewUrlsSetting({
 				{rows.map((entry, idx) => (
 					<div className='flex gap-2' key={entry.id}>
 						<Input
-							aria-label='Preview URL name'
+							aria-label={t(
+								'settings:repo.preview-urls.name-aria-label',
+								'Preview URL name',
+							)}
 							className='h-8 w-32 text-xs'
 							onChange={(e) => editRow(idx, { name: e.target.value })}
-							placeholder='Name'
+							placeholder={t(
+								'settings:repo.preview-urls.name-placeholder',
+								'Name',
+							)}
 							value={entry.name}
 						/>
 						<Input
-							aria-label='Preview URL template'
+							aria-label={t(
+								'settings:repo.preview-urls.template-aria-label',
+								'Preview URL template',
+							)}
 							className='h-8 flex-1 font-mono text-xs'
 							onChange={(e) => editRow(idx, { url: e.target.value })}
 							placeholder='https://localhost:$ENSEMBLR_PORT'
@@ -287,7 +320,7 @@ function PreviewUrlsSetting({
 					</div>
 				))}
 				<Button onClick={addRow} size='sm' variant='outline'>
-					+ Add preview URL
+					{t('settings:repo.preview-urls.add', '+ Add preview URL')}
 				</Button>
 			</div>
 		</SettingRow>
@@ -307,6 +340,7 @@ function FilesToCopySetting({
 	onSave: (patterns: string[] | null) => void;
 	seed: string;
 }) {
+	const { t } = useTranslation();
 	const { onChange, value } = useDebouncedSettingField(
 		seed,
 		(next) => {
@@ -322,14 +356,18 @@ function FilesToCopySetting({
 
 	return (
 		<SettingRow
-			description='Ensemblr will automatically copy these file paths into each new workspace. Supports gitignore-style globs.'
-			label='Files to copy'
+			description={t(
+				'settings:repo.files-to-copy.description',
+				'Ensemblr will automatically copy these file paths into each new workspace. Supports gitignore-style globs.',
+			)}
+			label={t('settings:repo.files-to-copy.label', 'Files to copy')}
 			modified={modified}
 			onReset={() => onSave(null)}
 			stack
 		>
+			{/* i18next-instrument-ignore */}
 			<Textarea
-				aria-label='Files to copy'
+				aria-label={t('settings:repo.files-to-copy.label', 'Files to copy')}
 				className='mt-2 min-h-18 font-mono text-xs'
 				onChange={(e) => onChange(e.target.value)}
 				placeholder='.env*'

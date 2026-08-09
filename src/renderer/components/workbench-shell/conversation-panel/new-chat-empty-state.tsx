@@ -1,4 +1,5 @@
 import { SparklesIcon } from 'lucide-react';
+import { Trans, useTranslation } from 'react-i18next';
 
 import { Button } from '@/renderer/components/ui/button';
 import { useComposerAttachmentDispatcher } from '@/renderer/state/composer';
@@ -20,19 +21,27 @@ export function NewChatEmptyState({
 	workspaceCwd: string;
 	workspaceName: string;
 }) {
+	const { t } = useTranslation();
 	return (
 		<section
-			aria-label='New chat empty state'
+			aria-label={t('workbench:new-chat.aria-label', 'New chat empty state')}
 			className='flex flex-col items-start gap-4 text-sm'
 			data-new-chat-state='empty'
 		>
 			<p className='text-muted-foreground'>
-				New chat in <span className='font-mono'>/{workspaceName}</span>.
+				<Trans
+					components={{ path: <span className='font-mono' /> }}
+					defaults='New chat in <path>/{{workspaceName}}</path>.'
+					i18nKey='workbench:new-chat.headline'
+					values={{ workspaceName }}
+				/>
 			</p>
 
 			{transcripts.length > 0 ? (
 				<div className='flex flex-col items-start gap-2'>
-					<p className='text-muted-foreground text-xs'>Add chat transcripts:</p>
+					<p className='text-muted-foreground text-xs'>
+						{t('workbench:new-chat.transcripts-label', 'Add chat transcripts:')}
+					</p>
 					<ul className='flex flex-wrap gap-2'>
 						{transcripts.map((entry) => (
 							<li key={entry.tab.id}>
@@ -60,10 +69,14 @@ function TranscriptChip({
 	entry: ClosedChatTabEntryWire;
 	workspaceCwd: string;
 }) {
+	const { t } = useTranslation();
 	// Mirror the open tab label — the short chat-title set on the tab itself
 	// is the user's anchor. The LLM-derived summary title is verbose and
 	// inconsistent so it is only used as a last-resort fallback.
-	const label = entry.tab.title || entry.summaryTitle || 'Untitled transcript';
+	const label =
+		entry.tab.title ||
+		entry.summaryTitle ||
+		t('workbench:new-chat.untitled-transcript', 'Untitled transcript');
 	const dispatch = useComposerAttachmentDispatcher();
 
 	const handleAttach = () => {

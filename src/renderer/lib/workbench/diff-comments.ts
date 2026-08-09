@@ -1,6 +1,7 @@
 import type { HunkData } from 'react-diff-view';
 
 import { resolveChangeKey } from '@/renderer/lib/diff/parse';
+import { i18n } from '@/renderer/lib/i18n';
 import type { DiffComment } from '@/renderer/types/diff';
 import type { GithubCommentWire } from '@/shared/ipc/contracts/github';
 import type { ReviewCommentWire } from '@/shared/ipc/contracts/review-comments';
@@ -50,7 +51,9 @@ function toLocalDiffComment(comment: ReviewCommentWire): DiffComment {
 		id: `local:${comment.id}`,
 		isResolved: comment.status === 'resolved',
 		source: 'local',
-		...(comment.origin === 'agent' ? { author: 'Agent' } : {}),
+		...(comment.origin === 'agent'
+			? { author: i18n.t('workbench:diff-comment.author.agent', 'Agent') }
+			: {}),
 	};
 }
 

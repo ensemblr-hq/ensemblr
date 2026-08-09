@@ -7,6 +7,7 @@ import {
 	XIcon,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/renderer/components/ui/button';
 import { cn } from '@/renderer/lib/utils';
@@ -23,6 +24,7 @@ import type { PiRawFrameKind } from '@/shared/ipc/contracts/agent-session';
  * compared against the underlying protocol without spelunking through logs.
  */
 export function PiRawFramePanel({ sessionId }: { sessionId: string | null }) {
+	const { t } = useTranslation();
 	const [open, setOpen] = useDebugPanelToggle();
 	const allFrames = useRawFrames();
 	const clear = useClearRawFrames();
@@ -95,17 +97,25 @@ export function PiRawFramePanel({ sessionId }: { sessionId: string | null }) {
 
 	return (
 		<aside
-			aria-label='Pi raw frames debug panel'
+			aria-label={t(
+				'workbench:raw-frames.aria-label',
+				'Pi raw frames debug panel',
+			)}
 			className='pointer-events-auto absolute top-0 right-0 z-30 flex h-full w-[30rem] flex-col border-border border-l bg-background/95 shadow-lg backdrop-blur'
 			data-debug-panel='pi-raw-frames'
 		>
 			<header className='flex shrink-0 flex-col gap-2 border-border border-b px-3 py-2'>
 				<div className='flex items-center justify-between gap-2'>
 					<div className='flex items-center gap-2'>
-						<span className='font-medium text-xs'>Pi raw frames</span>
+						<span className='font-medium text-xs'>
+							{t('workbench:raw-frames.heading', 'Pi raw frames')}
+						</span>
 						<span
 							className='rounded-sm bg-muted px-1.5 py-0.5 text-[0.625rem] text-muted-foreground'
-							title='visible / total captured'
+							title={t(
+								'workbench:raw-frames.count-title',
+								'visible / total captured',
+							)}
 						>
 							{frames.length} / {allFrames.length}
 						</span>
@@ -127,7 +137,10 @@ export function PiRawFramePanel({ sessionId }: { sessionId: string | null }) {
 							onClick={() => setFilter('tx')}
 						/>
 						<Button
-							aria-label='Toggle session scope'
+							aria-label={t(
+								'workbench:raw-frames.session-scope',
+								'Toggle session scope',
+							)}
 							className={cn(
 								'h-6 rounded-sm px-1.5 text-[0.625rem]',
 								sessionScope
@@ -139,10 +152,10 @@ export function PiRawFramePanel({ sessionId }: { sessionId: string | null }) {
 							type='button'
 							variant='ghost'
 						>
-							this session
+							{t('workbench:raw-frames.this-session', 'this session')}
 						</Button>
 						<Button
-							aria-label='Clear frames'
+							aria-label={t('workbench:raw-frames.clear', 'Clear frames')}
 							onClick={clear}
 							size='icon-xs'
 							type='button'
@@ -151,7 +164,7 @@ export function PiRawFramePanel({ sessionId }: { sessionId: string | null }) {
 							<EraserIcon />
 						</Button>
 						<Button
-							aria-label='Close debug panel'
+							aria-label={t('workbench:raw-frames.close', 'Close debug panel')}
 							onClick={() => setOpen(false)}
 							size='icon-xs'
 							type='button'
@@ -162,7 +175,9 @@ export function PiRawFramePanel({ sessionId }: { sessionId: string | null }) {
 					</div>
 				</div>
 				<div className='flex flex-wrap items-center gap-1 text-[0.625rem] text-muted-foreground'>
-					<span className='mr-1 uppercase tracking-wide'>kind:</span>
+					<span className='mr-1 uppercase tracking-wide'>
+						{t('workbench:raw-frames.kind-label', 'kind:')}
+					</span>
 					<KindToggle
 						active={kindToggles.chat}
 						label='chat'
@@ -170,18 +185,23 @@ export function PiRawFramePanel({ sessionId }: { sessionId: string | null }) {
 					/>
 					<KindToggle
 						active={kindToggles.unknown}
-						label='other'
+						label={t('workbench:raw-frames.kind-other', 'other')}
 						onClick={() => toggleKind('unknown')}
 					/>
-					<span className='mr-1 ml-2 uppercase tracking-wide'>noise:</span>
+					<span className='mr-1 ml-2 uppercase tracking-wide'>
+						{t('workbench:raw-frames.noise-label', 'noise:')}
+					</span>
 					<KindToggle
 						active={hideSignatures}
-						label='hide signatures'
+						label={t('workbench:raw-frames.hide-signatures', 'hide signatures')}
 						onClick={() => setHideSignatures((prev) => !prev)}
 					/>
 					<KindToggle
 						active={hideSessionStats}
-						label='hide session_stats'
+						label={t(
+							'workbench:raw-frames.hide-session-stats',
+							'hide session_stats',
+						)}
 						onClick={() => setHideSessionStats((prev) => !prev)}
 					/>
 				</div>
@@ -192,7 +212,7 @@ export function PiRawFramePanel({ sessionId }: { sessionId: string | null }) {
 			>
 				{frames.length === 0 ? (
 					<p className='text-muted-foreground text-xs'>
-						Waiting for Pi traffic…
+						{t('workbench:raw-frames.waiting', 'Waiting for Pi traffic…')}
 					</p>
 				) : (
 					<ul className='flex flex-col gap-2'>
@@ -311,6 +331,7 @@ function FrameItem({
 	};
 	hideSignatures: boolean;
 }) {
+	const { t } = useTranslation();
 	const pretty = useMemo(() => {
 		try {
 			const parsed = JSON.parse(frame.line);
@@ -352,14 +373,24 @@ function FrameItem({
 					</span>
 					<span>{time}</span>
 					<Button
-						aria-label={copied ? 'Copied frame to clipboard' : 'Copy frame'}
+						aria-label={
+							copied
+								? t(
+										'workbench:raw-frames.copied-aria',
+										'Copied frame to clipboard',
+									)
+								: t('workbench:raw-frames.copy-aria', 'Copy frame')
+						}
 						className='size-5'
 						onClick={handleCopy}
 						size='icon-xs'
 						title={
 							copied
-								? 'Copied'
-								: 'Copy frame (signatures follow the current toggle)'
+								? t('workbench:raw-frames.copied-title', 'Copied')
+								: t(
+										'workbench:raw-frames.copy-title',
+										'Copy frame (signatures follow the current toggle)',
+									)
 						}
 						type='button'
 						variant='ghost'

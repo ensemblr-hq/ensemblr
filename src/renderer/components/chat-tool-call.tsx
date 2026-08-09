@@ -1,5 +1,6 @@
 import type { DynamicToolUIPart } from 'ai';
 import { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
 	presentCustomMessage,
 	presentReasoning,
@@ -21,7 +22,12 @@ import {
  * badge, preview, and body all come from the projected presentation.
  */
 export function ChatToolCall({ part }: { part: DynamicToolUIPart }) {
-	const presentation = useMemo(() => presentToolCall(part), [part]);
+	const { i18n } = useTranslation();
+	// biome-ignore lint/correctness/useExhaustiveDependencies: the presenter translates through the i18n singleton, so the language is a real input Biome cannot see.
+	const presentation = useMemo(
+		() => presentToolCall(part),
+		[part, i18n.language],
+	);
 	return <ToolRow presentation={presentation} />;
 }
 
@@ -32,7 +38,12 @@ export function ChatToolCall({ part }: { part: DynamicToolUIPart }) {
  * "Thought" costs the turn a line and discloses nothing behind it.
  */
 export function ChatReasoningCollapsible({ text }: { text: string }) {
-	const presentation = useMemo(() => presentReasoning(text), [text]);
+	const { i18n } = useTranslation();
+	// biome-ignore lint/correctness/useExhaustiveDependencies: the presenter translates through the i18n singleton, so the language is a real input Biome cannot see.
+	const presentation = useMemo(
+		() => presentReasoning(text),
+		[text, i18n.language],
+	);
 	if (presentation === null) {
 		return null;
 	}
@@ -45,7 +56,12 @@ export function ChatReasoningCollapsible({ text }: { text: string }) {
  * the assistant wrote, and it stays folded until asked for.
  */
 export function ChatCustomMessage({ data }: { data: PiCustomMessageData }) {
-	const presentation = useMemo(() => presentCustomMessage(data), [data]);
+	const { i18n } = useTranslation();
+	// biome-ignore lint/correctness/useExhaustiveDependencies: the presenter translates through the i18n singleton, so the language is a real input Biome cannot see.
+	const presentation = useMemo(
+		() => presentCustomMessage(data),
+		[data, i18n.language],
+	);
 	return <ToolRow presentation={presentation} />;
 }
 
@@ -55,7 +71,12 @@ export function ChatCustomMessage({ data }: { data: PiCustomMessageData }) {
  * the turn took rather than the whole `SKILL.md` pasted above it.
  */
 export function ChatSkillInvocation({ name }: { name: string }) {
-	const presentation = useMemo(() => presentSkillInvocation(name), [name]);
+	const { i18n } = useTranslation();
+	// biome-ignore lint/correctness/useExhaustiveDependencies: the presenter translates through the i18n singleton, so the language is a real input Biome cannot see.
+	const presentation = useMemo(
+		() => presentSkillInvocation(name),
+		[name, i18n.language],
+	);
 	return <ToolRow presentation={presentation} />;
 }
 

@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next';
+
 import { SettingRow } from '@/renderer/components/settings/setting-row';
 import { Button } from '@/renderer/components/ui/button';
 import { Input } from '@/renderer/components/ui/input';
@@ -8,6 +10,7 @@ import { usePiExecutableOverride } from '@/renderer/hooks/settings/use-pi-execut
  * native picker, and a reset back to the discovered system Pi.
  */
 export function PiExecutableRow() {
+	const { t } = useTranslation();
 	const { clearPiPath, isPicking, onPiPathChange, piPath, pickPi } =
 		usePiExecutableOverride();
 
@@ -21,7 +24,9 @@ export function PiExecutableRow() {
 						size='sm'
 						variant='outline'
 					>
-						{isPicking ? 'Picking…' : 'Browse'}
+						{isPicking
+							? t('common:actions.picking', 'Picking…')
+							: t('common:actions.browse', 'Browse')}
 					</Button>
 					<Button
 						disabled={!piPath}
@@ -29,16 +34,22 @@ export function PiExecutableRow() {
 						size='sm'
 						variant='ghost'
 					>
-						Use bundled Pi
+						{t('settings:advanced.pi-executable.use-bundled', 'Use bundled Pi')}
 					</Button>
 				</div>
 			}
-			description='Override the bundled Pi executable with a custom one. Leave empty to use the discovered system Pi (recommended).'
-			label='Pi executable path'
+			description={t(
+				'settings:advanced.pi-executable.description',
+				'Override the bundled Pi executable with a custom one. Leave empty to use the discovered system Pi (recommended).',
+			)}
+			label={t('settings:advanced.pi-executable.label', 'Pi executable path')}
 			stack
 		>
 			<Input
-				aria-label='Pi executable path'
+				aria-label={t(
+					'settings:advanced.pi-executable.label',
+					'Pi executable path',
+				)}
 				className='mt-2 h-8 font-mono text-xs'
 				onChange={(e) => onPiPathChange(e.target.value)}
 				placeholder='/opt/homebrew/bin/pi'

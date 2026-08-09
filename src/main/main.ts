@@ -901,7 +901,8 @@ app.whenReady().then(() => {
 	moveRepositoryScriptsIntoCommittedConfig();
 	rootDirectoryService.ensure();
 	void sharedRootAdoptionService.reconcile();
-	installApplicationMenu();
+	const readAppSettings = () => appSettingsService.read();
+	installApplicationMenu(readAppSettings);
 	// config.json is the source of truth; live-reload the renderer when it's
 	// edited outside the app (the service suppresses echoes of its own writes).
 	appSettingsService.startWatching((settings) => {
@@ -909,6 +910,7 @@ app.whenReady().then(() => {
 			settings,
 		} satisfies AppSettingsChangedBroadcast);
 		agentActivityMonitor.refresh();
+		installApplicationMenu(readAppSettings);
 	});
 	// Live-reload the non-App config sections (linear, security, managed,
 	// environment, repositoryDefaults, repositoryRules) so external config.json
@@ -950,7 +952,13 @@ app.whenReady().then(() => {
 		planModeRegistry,
 		quickStartProjectService,
 		renameWorkspaceService,
-		onAppSettingsUpdated: () => agentActivityMonitor.refresh(),
+		// The in-app write is echo-suppressed and so never reaches the watcher
+		// above; without this rebuild the menu keeps the previous language until
+		// the next restart.
+		onAppSettingsUpdated: () => {
+			agentActivityMonitor.refresh();
+			installApplicationMenu(readAppSettings);
+		},
 		repositoryConfigService,
 		rootDirectoryService,
 		scriptLifecycleService,

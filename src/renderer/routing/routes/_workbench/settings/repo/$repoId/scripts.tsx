@@ -1,4 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router';
+import { useTranslation } from 'react-i18next';
 
 import { RunScriptsSection } from '@/renderer/components/settings/run-scripts/run-scripts-section';
 import { SettingRow } from '@/renderer/components/settings/setting-row';
@@ -32,9 +33,6 @@ export const Route = createFileRoute(
 /** Typed `resolved(key)` lookup returned by {@link useRepoSettings}. */
 type ResolveSetting = ReturnType<typeof useRepoSettings>['resolved'];
 
-const SCRIPTS_DESCRIPTION =
-	'Commands that run when workspaces are set up, run, or archived. Saved to the repository’s committed .ensemblr/settings.toml.';
-
 /**
  * Reads the repository's named run scripts through the shared parser, so a
  * legacy single `scripts.run` command shows up here as the implicit script the
@@ -61,6 +59,7 @@ function readResolvedRunScripts(
  * from render state instead of a derive-into-state effect.
  */
 function RepoScriptsSettings() {
+	const { t } = useTranslation();
 	const { repoId } = Route.useParams();
 	const root = useRepoSettings(repoId, 'root');
 	const workspace = useRepoSettings(repoId, 'workspace');
@@ -70,7 +69,13 @@ function RepoScriptsSettings() {
 
 	if (!settingsLoaded) {
 		return (
-			<SettingsSection description={SCRIPTS_DESCRIPTION} title='Scripts'>
+			<SettingsSection
+				description={t(
+					'settings:repo.scripts.description',
+					'Commands that run when workspaces are set up, run, or archived. Saved to the repository’s committed .ensemblr/settings.toml.',
+				)}
+				title={t('settings:repo.scripts.title', 'Scripts')}
+			>
 				{null}
 			</SettingsSection>
 		);
@@ -161,23 +166,35 @@ function ScriptsEditor({
 	/** True when the open workspace's branch commits different scripts. */
 	workspaceDiverges: boolean;
 }) {
+	const { t } = useTranslation();
 	const { form, updateForm } = useScriptsSettingsForm(repoId, project, initial);
 
 	return (
-		<SettingsSection description={SCRIPTS_DESCRIPTION} title='Scripts'>
+		<SettingsSection
+			description={t(
+				'settings:repo.scripts.description',
+				'Commands that run when workspaces are set up, run, or archived. Saved to the repository’s committed .ensemblr/settings.toml.',
+			)}
+			title={t('settings:repo.scripts.title', 'Scripts')}
+		>
 			{workspaceDiverges ? (
 				<p className='pt-4 text-muted-foreground text-xs'>
-					The workspace you have open commits different scripts on its branch,
-					and runs those. Merge this file to change what it runs.
+					{t(
+						'settings:repo.scripts.diverges',
+						'The workspace you have open commits different scripts on its branch, and runs those. Merge this file to change what it runs.',
+					)}
 				</p>
 			) : null}
 
 			<ScriptRow
-				description='Runs when a new workspace is created.'
-				label='Setup script'
+				description={t(
+					'settings:repo.setup-script.description',
+					'Runs when a new workspace is created.',
+				)}
+				label={t('settings:repo.setup-script.label', 'Setup script')}
 				onChange={(value) => updateForm({ setup: value })}
 				onReset={() => updateForm({ setup: '' })}
-				placeholder='e.g. npm ci'
+				placeholder={t('settings:repo.setup-script.placeholder', 'e.g. npm ci')}
 				value={form.setup}
 			/>
 
@@ -187,8 +204,11 @@ function ScriptsEditor({
 			/>
 
 			<SettingRow
-				description='Whether run scripts can run in parallel across workspaces.'
-				label='Run mode'
+				description={t(
+					'settings:repo.run-mode.description',
+					'Whether run scripts can run in parallel across workspaces.',
+				)}
+				label={t('settings:repo.run-mode.label', 'Run mode')}
 				stack
 			>
 				<RadioGroup
@@ -203,9 +223,12 @@ function ScriptsEditor({
 							value='concurrent'
 						/>
 						<label className='cursor-pointer' htmlFor='run-mode-concurrent'>
-							<div>Concurrent</div>
+							<div>{t('settings:repo.run-mode.concurrent', 'Concurrent')}</div>
 							<p className='text-muted-foreground text-xs'>
-								Run scripts can run in multiple workspaces at once.
+								{t(
+									'settings:repo.run-mode.concurrent-description',
+									'Run scripts can run in multiple workspaces at once.',
+								)}
 							</p>
 						</label>
 					</div>
@@ -216,9 +239,14 @@ function ScriptsEditor({
 							value='nonconcurrent'
 						/>
 						<label className='cursor-pointer' htmlFor='run-mode-nonconcurrent'>
-							<div>Non-concurrent</div>
+							<div>
+								{t('settings:repo.run-mode.nonconcurrent', 'Non-concurrent')}
+							</div>
 							<p className='text-muted-foreground text-xs'>
-								Only one run script can run at a time.
+								{t(
+									'settings:repo.run-mode.nonconcurrent-description',
+									'Only one run script can run at a time.',
+								)}
 							</p>
 						</label>
 					</div>
@@ -232,16 +260,25 @@ function ScriptsEditor({
 						onCheckedChange={(value) => updateForm({ autoRun: value })}
 					/>
 				}
-				description="Start this repository's run script automatically after a new local workspace finishes setup."
-				label='Auto-run after setup'
+				description={t(
+					'settings:repo.auto-run.description',
+					"Start this repository's run script automatically after a new local workspace finishes setup.",
+				)}
+				label={t('settings:repo.auto-run.label', 'Auto-run after setup')}
 			/>
 
 			<ScriptRow
-				description='Runs before a workspace is archived.'
-				label='Archive script'
+				description={t(
+					'settings:repo.archive-script.description',
+					'Runs before a workspace is archived.',
+				)}
+				label={t('settings:repo.archive-script.label', 'Archive script')}
 				onChange={(value) => updateForm({ archive: value })}
 				onReset={() => updateForm({ archive: '' })}
-				placeholder='e.g. rm -rf node_modules'
+				placeholder={t(
+					'settings:repo.archive-script.placeholder',
+					'e.g. rm -rf node_modules',
+				)}
 				value={form.archive}
 			/>
 		</SettingsSection>

@@ -1,4 +1,5 @@
 import { PanelRightCloseIcon, PanelRightOpenIcon } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 import { BranchPicker } from '@/renderer/components/git/branch-picker';
 import { Button } from '@/renderer/components/ui/button';
@@ -26,6 +27,7 @@ export function WorkbenchHeader({
 	activeProject: ProjectShellModel;
 	activeWorkspace: WorkspaceShellModel;
 }) {
+	const { t } = useTranslation();
 	const { state, actions } = useWorkbenchLayout();
 	const isRightSidebarCollapsed = state.isRightSidebarCollapsed;
 	const RightSidebarToggleIcon = isRightSidebarCollapsed
@@ -73,8 +75,11 @@ export function WorkbenchHeader({
 					<RightSidebarToggleIcon />
 					<span className='sr-only'>
 						{isRightSidebarCollapsed
-							? 'Open review sidebar'
-							: 'Collapse review sidebar'}
+							? t('workbench:header.review-sidebar.open', 'Open review sidebar')
+							: t(
+									'workbench:header.review-sidebar.collapse',
+									'Collapse review sidebar',
+								)}
 					</span>
 				</Button>
 			</div>
@@ -94,6 +99,7 @@ function WorkspaceTargetBranch({
 	activeWorkspace: WorkspaceShellModel;
 	repositoryId: string;
 }) {
+	const { t } = useTranslation();
 	const { isPending, retargetBranch, retargetRef } = useWorkspaceTargetBranch(
 		activeWorkspace.id,
 	);
@@ -107,16 +113,24 @@ function WorkspaceTargetBranch({
 						disabled={isPending}
 						onSelect={retargetBranch}
 						onSelectCustomRef={retargetRef}
-						placeholder='Set target branch'
+						placeholder={t(
+							'workbench:header.target-branch.placeholder',
+							'Set target branch',
+						)}
 						repositoryId={repositoryId}
-						searchPlaceholder='Search or enter a branch…'
+						searchPlaceholder={t(
+							'workbench:header.target-branch.search',
+							'Search or enter a branch…',
+						)}
 						value={activeWorkspace.landingSummary?.branchSource.baseBranch}
 					/>
 				</span>
 			</TooltipTrigger>
 			<TooltipContent>
-				Target branch — what this workspace diffs and opens pull requests
-				against.
+				{t(
+					'workbench:header.target-branch.tooltip',
+					'Target branch — what this workspace diffs and opens pull requests against.',
+				)}
 			</TooltipContent>
 		</Tooltip>
 	);

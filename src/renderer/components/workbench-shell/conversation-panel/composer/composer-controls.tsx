@@ -1,5 +1,6 @@
 import { useAtomValue } from 'jotai';
 import { ArrowUpIcon, SquareIcon } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/renderer/components/ui/button';
 import { Spinner } from '@/renderer/components/ui/spinner';
@@ -128,11 +129,12 @@ function SubmitControl({
 	sendShortcutHint: string;
 	state: ComposerStateApi;
 }) {
+	const { t } = useTranslation();
 	const showStop = state.isStreaming && !state.hasContent;
 	if (showStop) {
 		return (
 			<Button
-				aria-label='Stop'
+				aria-label={t('common:actions.stop', 'Stop')}
 				className='rounded-md'
 				onClick={() => void composer.onStop()}
 				size='icon-sm'
@@ -146,7 +148,7 @@ function SubmitControl({
 
 	const sendButton = (
 		<Button
-			aria-label='Send'
+			aria-label={t('common:actions.send', 'Send')}
 			className={cn(
 				'rounded-md',
 				!state.canSend &&
@@ -172,7 +174,7 @@ function SubmitControl({
 					composer.disabledReason
 				) : (
 					<>
-						Send message
+						{t('workbench:composer.send-tooltip', 'Send message')}
 						<span className='ml-2 text-muted-foreground'>
 							{sendShortcutHint}
 						</span>

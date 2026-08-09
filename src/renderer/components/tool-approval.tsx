@@ -4,8 +4,10 @@
  * composer's place in the chat that raised it — the same swap the agent
  * questionnaire uses, for the same reason.
  */
+import type { TFunction } from 'i18next';
 import { XIcon } from 'lucide-react';
 import { useCallback, useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/renderer/components/ui/button';
 import type {
@@ -27,9 +29,6 @@ const PRIMARY_INPUT_FIELDS = [
 	'url',
 	'query',
 ] as const;
-
-/** Key hints shown beside the decision buttons. */
-const KEY_HINTS = '1 allow · 2 allow for session · 3 deny · Esc deny';
 
 /** Decision each shortcut key stands for. */
 const DECISION_KEYS: Readonly<
@@ -79,12 +78,18 @@ function breakDownInput(
  * The sentence at the top of the card. Claude Code supplies its own prompt for
  * most tools; the fallback names the tool so an unrecognised one still reads.
  * @param request - The pending prompt.
+ * @param t - Translator from the calling component.
  * @returns The headline to show.
  */
-function headlineFor(request: ToolApprovalRequestedBroadcast): string {
+function headlineFor(
+	request: ToolApprovalRequestedBroadcast,
+	t: TFunction,
+): string {
 	return (
 		request.title ??
-		`Claude wants to use ${request.displayName ?? request.toolName}.`
+		t('common:tool-approval.headline', 'Claude wants to use {{tool}}.', {
+			tool: request.displayName ?? request.toolName,
+		})
 	);
 }
 
@@ -101,6 +106,7 @@ export function ToolApprovalCard({
 	onDecide: (decision: ToolApprovalDecision) => void;
 	request: ToolApprovalRequestedBroadcast;
 }) {
+	const { t } = useTranslation();
 	const shellRef = useRef<HTMLElement>(null);
 	const decideRef = useRef(onDecide);
 
@@ -129,19 +135,24 @@ export function ToolApprovalCard({
 	return (
 		<footer className='shrink-0 bg-background px-4 pt-2 pb-5'>
 			<section
-				aria-label='Tool approval request'
+				aria-label={t(
+					'common:tool-approval.section-label',
+					'Tool approval request',
+				)}
 				className='mx-auto flex w-full max-w-4xl flex-col gap-2 rounded-xl border border-border bg-pane/80 px-4 pt-3 pb-2.5 shadow-panel outline-none'
 				onKeyDown={handleKeyDown}
 				ref={shellRef}
 				tabIndex={-1}
 			>
 				<p className='sr-only' role='status'>
-					{`Approval required for ${request.toolName}.`}
+					{t('common:tool-approval.status', 'Approval required for {{tool}}.', {
+						tool: request.toolName,
+					})}
 				</p>
 				<header className='flex items-start justify-between gap-3'>
 					<div className='flex min-w-0 flex-1 flex-col gap-1'>
 						<h2 className='text-pretty font-medium text-foreground text-sm leading-5'>
-							{headlineFor(request)}
+							{headlineFor(request, t)}
 						</h2>
 						<p className='flex items-center gap-2 text-muted-foreground text-xs'>
 							<span className='rounded-sm bg-muted px-1.5 py-0.5 font-mono text-foreground text-xxs'>
@@ -153,7 +164,7 @@ export function ToolApprovalCard({
 						</p>
 					</div>
 					<Button
-						aria-label='Deny tool call'
+						aria-label={t('common:tool-approval.deny-label', 'Deny tool call')}
 						className='-mt-0.5 -mr-1'
 						onClick={() => onDecide({ kind: 'deny' })}
 						size='icon-xs'
@@ -180,8 +191,11 @@ export function ToolApprovalCard({
 				) : null}
 
 				<div className='flex items-center justify-between gap-3'>
-					<p className='truncate text-muted-foreground/60 text-xs'>
-						{KEY_HINTS}
+					<p className='min-w-0 flex-1 text-muted-foreground/60 text-xs'>
+						{t(
+							'common:tool-approval.key-hints',
+							'1 allow · 2 allow for session · 3 deny · Esc deny',
+						)}
 					</p>
 					<div className='flex shrink-0 items-center gap-1.5'>
 						<Button
@@ -190,7 +204,7 @@ export function ToolApprovalCard({
 							type='button'
 							variant='ghost'
 						>
-							Deny
+							{t('common:actions.deny', 'Deny')}
 						</Button>
 						<Button
 							onClick={() => onDecide({ kind: 'allow-for-session' })}
@@ -198,10 +212,13 @@ export function ToolApprovalCard({
 							type='button'
 							variant='outline'
 						>
-							Allow for this session
+							{t(
+								'common:tool-approval.allow-session',
+								'Allow for this session',
+							)}
 						</Button>
 						<Button onClick={() => onDecide({ kind: 'allow' })} size='sm'>
-							Allow
+							{t('common:actions.allow', 'Allow')}
 						</Button>
 					</div>
 				</div>

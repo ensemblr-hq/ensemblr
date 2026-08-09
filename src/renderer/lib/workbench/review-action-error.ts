@@ -1,5 +1,6 @@
 import { toast } from 'sonner';
 
+import { i18n } from '@/renderer/lib/i18n';
 import type { GithubFailure } from '@/shared/ipc/contracts/github';
 
 /** Error wrapper preserving the typed gh failure for toast remediation. */
@@ -7,7 +8,13 @@ export class ReviewActionError extends Error {
 	readonly failure?: GithubFailure;
 
 	constructor(failure?: GithubFailure) {
-		super(failure?.message ?? 'GitHub action failed.');
+		super(
+			failure?.message ??
+				i18n.t(
+					'errors:review-action.failed.description',
+					'GitHub action failed.',
+				),
+		);
 		this.failure = failure;
 	}
 }

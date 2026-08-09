@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next';
+
 import { cn } from '@/renderer/lib/utils';
 import type { ThinkingBarStrength } from '@/renderer/types/workbench';
 
@@ -20,6 +22,7 @@ export function ThinkingBarIcon({
 	className?: string;
 	strength: ThinkingBarStrength;
 }) {
+	const { t } = useTranslation();
 	return (
 		<svg
 			aria-hidden='true'
@@ -31,7 +34,9 @@ export function ThinkingBarIcon({
 			width={ICON_WIDTH}
 			xmlns='http://www.w3.org/2000/svg'
 		>
-			<title>Thinking level</title>
+			<title>
+				{t('workbench:thinking-picker.icon-title', 'Thinking level')}
+			</title>
 			{BAR_HEIGHTS.map((height, index) => {
 				const active = index < strength;
 				const x = BAR_X_START + index * (BAR_WIDTH + BAR_GAP);

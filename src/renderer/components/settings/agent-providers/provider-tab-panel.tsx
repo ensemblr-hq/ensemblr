@@ -1,3 +1,6 @@
+import type { TFunction } from 'i18next';
+import { useTranslation } from 'react-i18next';
+
 import { CopyCommandButton } from '@/renderer/components/settings/agent-providers/copy-command-button';
 import { ProviderAccountList } from '@/renderer/components/settings/agent-providers/provider-account-list';
 import { ProviderCheckRow } from '@/renderer/components/settings/agent-providers/provider-check-row';
@@ -10,11 +13,35 @@ import type { AgentProviderDescriptor } from '@/shared/agent-provider';
 import type { AgentProviderReadinessWire } from '@/shared/ipc/contracts/agent-provider';
 import type { SetupRemediationAction } from '@/shared/ipc/contracts/setup';
 
-const EXECUTABLE_SOURCE_LABELS = {
-	configured: 'a configured override',
-	missing: 'nothing — no executable resolved',
-	path: 'the executable found on PATH',
-} satisfies Record<AgentProviderReadinessWire['executableSource'], string>;
+/**
+ * Names where the runtime's executable was resolved from, for the sentence under
+ * the provider headline.
+ * @param t - Translation function from `useTranslation`
+ * @param source - The resolution source reported by readiness
+ * @returns The clause naming that source
+ */
+function executableSourceLabel(
+	t: TFunction,
+	source: AgentProviderReadinessWire['executableSource'],
+): string {
+	switch (source) {
+		case 'configured':
+			return t(
+				'settings:providers.executable-source.configured',
+				'a configured override',
+			);
+		case 'missing':
+			return t(
+				'settings:providers.executable-source.missing',
+				'nothing — no executable resolved',
+			);
+		default:
+			return t(
+				'settings:providers.executable-source.path',
+				'the executable found on PATH',
+			);
+	}
+}
 
 /**
  * One agent provider's tab. Both Claude Code and Pi render through this single
@@ -34,6 +61,7 @@ export function ProviderTabPanel({
 	onRemediation: (action: SetupRemediationAction) => void;
 	readiness: AgentProviderReadinessWire | null;
 }) {
+	const { t } = useTranslation();
 	const connected = readiness?.status === 'success';
 
 	return (
@@ -43,16 +71,23 @@ export function ProviderTabPanel({
 					descriptor.loginCommand && !connected ? (
 						<CopyCommandButton
 							command={descriptor.loginCommand}
-							label={`Copy ${descriptor.loginCommand}`}
+							label={t('settings:providers.copy-command', 'Copy {{command}}', {
+								command: descriptor.loginCommand,
+							})}
 						/>
 					) : null
 				}
-				description={describeProviderRuntime(descriptor, readiness, isLoading)}
+				description={describeProviderRuntime(
+					t,
+					descriptor,
+					readiness,
+					isLoading,
+				)}
 				label={
 					<span className='flex items-center gap-2'>
 						{descriptor.label}
 						<StatusBadge tone={statusTone(readiness, isLoading)}>
-							{statusLabel(readiness, isLoading)}
+							{statusLabel(t, readiness, isLoading)}
 						</StatusBadge>
 					</span>
 				}
@@ -62,22 +97,30 @@ export function ProviderTabPanel({
 				) : null}
 				{descriptor.loginCommand && !connected ? (
 					<p className='text-muted-foreground text-xs'>
-						Sign-in is interactive: Ensemblr copies the command, you run it in a
-						terminal.
+						{t(
+							'settings:providers.sign-in-hint',
+							'Sign-in is interactive: Ensemblr copies the command, you run it in a terminal.',
+						)}
 					</p>
 				) : null}
 			</SettingRow>
 
 			{isLoading && !readiness ? (
 				<div className='flex items-center gap-2 py-6 text-muted-foreground text-sm'>
-					<Spinner className='size-4' /> Checking {descriptor.label}…
+					<Spinner className='size-4' />{' '}
+					{t('settings:providers.checking', 'Checking {{provider}}…', {
+						provider: descriptor.label,
+					})}
 				</div>
 			) : null}
 
 			{readiness?.account ? (
 				<SettingRow
-					description='Reported by the provider for the credentials Ensemblr will use.'
-					label='Account'
+					description={t(
+						'settings:providers.account.description',
+						'Reported by the provider for the credentials Ensemblr will use.',
+					)}
+					label={t('settings:providers.account.label', 'Account')}
 					stack
 				>
 					<div className='mt-2'>
@@ -88,8 +131,11 @@ export function ProviderTabPanel({
 
 			{readiness && readiness.checks.length > 0 ? (
 				<SettingRow
-					description='Everything Ensemblr probes before it will start a chat on this runtime.'
-					label='Readiness checks'
+					description={t(
+						'settings:providers.checks.description',
+						'Everything Ensemblr probes before it will start a chat on this runtime.',
+					)}
+					label={t('settings:providers.checks.label', 'Readiness checks')}
 					stack
 				>
 					<ul className='mt-2 divide-y divide-border rounded-md border bg-card/40'>
@@ -134,45 +180,68 @@ function statusTone(
 
 /**
  * Text for the provider's headline badge.
+ * @param t - Translation function from `useTranslation`
  * @param readiness - Latest readiness snapshot, or null while unavailable.
  * @param isLoading - Whether the readiness probe is still in flight.
  * @returns The badge label.
  */
 function statusLabel(
+	t: TFunction,
 	readiness: AgentProviderReadinessWire | null,
 	isLoading: boolean,
 ): string {
 	if (readiness) {
-		return readiness.status === 'success' ? 'Connected' : 'Not ready';
+		return readiness.status === 'success'
+			? t('settings:providers.status.connected', 'Connected')
+			: t('settings:providers.status.not-ready', 'Not ready');
 	}
-	return isLoading ? 'Checking…' : 'Unavailable';
+	return isLoading
+		? t('settings:providers.status.checking', 'Checking…')
+		: t('settings:providers.status.unavailable', 'Unavailable');
 }
 
 /**
  * Sentence describing the resolved runtime under the provider's headline row.
+ * @param t - Translation function from `useTranslation`
  * @param descriptor - Static facts about the provider.
  * @param readiness - Latest readiness snapshot, or null while unavailable.
  * @param isLoading - Whether the readiness probe is still in flight.
  * @returns A human-readable summary of version and executable resolution.
  */
 function describeProviderRuntime(
+	t: TFunction,
 	descriptor: AgentProviderDescriptor,
 	readiness: AgentProviderReadinessWire | null,
 	isLoading: boolean,
 ): string {
 	if (!readiness) {
 		return isLoading
-			? `Probing the ${descriptor.executableCommand} executable…`
-			: `Ensemblr could not probe the ${descriptor.executableCommand} executable.`;
+			? t(
+					'settings:providers.runtime.probing',
+					'Probing the {{command}} executable…',
+					{ command: descriptor.executableCommand },
+				)
+			: t(
+					'settings:providers.runtime.probe-failed',
+					'Ensemblr could not probe the {{command}} executable.',
+					{ command: descriptor.executableCommand },
+				);
 	}
 
-	const version = readiness.version
+	const runtime = readiness.version
 		? `${descriptor.label} ${readiness.version}`
 		: descriptor.label;
-	const origin = EXECUTABLE_SOURCE_LABELS[readiness.executableSource];
-	const location = readiness.executablePath
-		? ` at ${readiness.executablePath}`
-		: '';
+	const origin = executableSourceLabel(t, readiness.executableSource);
 
-	return `${version}, running from ${origin}${location}.`;
+	return readiness.executablePath
+		? t(
+				'settings:providers.runtime.resolved-at',
+				'{{runtime}}, running from {{origin}} at {{path}}.',
+				{ origin, path: readiness.executablePath, runtime },
+			)
+		: t(
+				'settings:providers.runtime.resolved',
+				'{{runtime}}, running from {{origin}}.',
+				{ origin, runtime },
+			);
 }

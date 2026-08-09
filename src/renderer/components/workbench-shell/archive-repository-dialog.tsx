@@ -1,4 +1,5 @@
 import { useCallback, useState } from 'react';
+import { Trans, useTranslation } from 'react-i18next';
 
 import {
 	archiveRepository,
@@ -65,6 +66,7 @@ function ArchiveRepositoryDialogForm({
 	onOpenChange: (open: boolean) => void;
 	project: ProjectShellModel;
 }) {
+	const { t } = useTranslation();
 	const [stage, setStage] = useState<ArchiveStage>('idle');
 	const [branchCleanup, setBranchCleanup] = useState(false);
 	const [diagnostics, setDiagnostics] = useState<ArchiveRepositoryDiagnostic[]>(
@@ -113,14 +115,25 @@ function ArchiveRepositoryDialogForm({
 	return (
 		<>
 			<DialogHeader>
-				<DialogTitle>Archive repository?</DialogTitle>
+				<DialogTitle>
+					{t('workbench:archive-repository.title', 'Archive repository?')}
+				</DialogTitle>
 				<DialogDescription className='text-xs'>
-					Marks the repository and {workspaceCount}{' '}
-					{workspaceCount === 1 ? 'workspace' : 'workspaces'} as archived. Each
-					workspace's <span className='font-mono'>.context/</span> handoff files
-					are preserved under{' '}
-					<span className='font-mono'>archived-contexts/</span>. Worktrees and
-					the repository folder stay on disk.
+					<Trans
+						components={[
+							<span className='font-mono' key='context-dir' />,
+							<span className='font-mono' key='archived-contexts-dir' />,
+						]}
+						defaults="Marks the repository and {{workspaces}} as archived. Each workspace's <0>.context/</0> handoff files are preserved under <1>archived-contexts/</1>. Worktrees and the repository folder stay on disk."
+						i18nKey='workbench:archive-repository.description'
+						values={{
+							workspaces: t('common:units.workspace-count', {
+								count: workspaceCount,
+								defaultValue_one: '{{count}} workspace',
+								defaultValue_other: '{{count}} workspaces',
+							}),
+						}}
+					/>
 				</DialogDescription>
 			</DialogHeader>
 
@@ -130,14 +143,17 @@ function ArchiveRepositoryDialogForm({
 				<CleanupToggle
 					checked={branchCleanup}
 					description={
-						<>
-							The per-workspace <span className='font-mono'>.context/</span>{' '}
-							handoff files are preserved; anything else not pushed will be
-							lost.
-						</>
+						<Trans
+							components={[<span className='font-mono' key='context-dir' />]}
+							defaults='The per-workspace <0>.context/</0> handoff files are preserved; anything else not pushed will be lost.'
+							i18nKey='workbench:archive-repository.cleanup.description'
+						/>
 					}
 					disabled={isBusy}
-					label='Also remove each worktree and drop its local branch'
+					label={t(
+						'workbench:archive-repository.cleanup.label',
+						'Also remove each worktree and drop its local branch',
+					)}
 					onCheckedChange={setBranchCleanup}
 				/>
 			) : null}
@@ -156,7 +172,7 @@ function ArchiveRepositoryDialogForm({
 					type='button'
 					variant='ghost'
 				>
-					Cancel
+					{t('common:actions.cancel', 'Cancel')}
 				</Button>
 				<Button
 					disabled={!canArchive}
@@ -164,7 +180,9 @@ function ArchiveRepositoryDialogForm({
 					type='button'
 					variant={branchCleanup ? 'destructive' : 'default'}
 				>
-					{isBusy ? 'Archiving…' : 'Archive'}
+					{isBusy
+						? t('common:actions.archiving', 'Archiving…')
+						: t('common:actions.archive', 'Archive')}
 				</Button>
 			</DialogFooter>
 		</>

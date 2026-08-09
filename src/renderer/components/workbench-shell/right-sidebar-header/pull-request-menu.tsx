@@ -5,6 +5,7 @@ import {
 	MoreVerticalIcon,
 	RefreshCwIcon,
 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/renderer/components/ui/button';
 import {
@@ -35,6 +36,7 @@ export function PullRequestMenu({
 	hasConflicts?: boolean;
 	url?: string;
 }) {
+	const { t } = useTranslation();
 	const reviewActions = useReviewActions();
 
 	return (
@@ -42,7 +44,9 @@ export function PullRequestMenu({
 			<DropdownMenuTrigger asChild>
 				<Button size='icon-sm' variant='ghost'>
 					<MoreVerticalIcon />
-					<span className='sr-only'>Open pull request menu</span>
+					<span className='sr-only'>
+						{t('git:pull-request-menu.label', 'Open pull request menu')}
+					</span>
 				</Button>
 			</DropdownMenuTrigger>
 			<DropdownMenuContent align='end' className='w-auto whitespace-nowrap'>
@@ -52,7 +56,7 @@ export function PullRequestMenu({
 						onSelect={() => reviewActions?.runAgentAction('resolve-conflicts')}
 					>
 						<GitMergeConflictIcon aria-hidden='true' />
-						Resolve conflicts
+						{t('git:pull-request-menu.resolve-conflicts', 'Resolve conflicts')}
 					</DropdownMenuItem>
 				) : null}
 				<DropdownMenuItem
@@ -60,13 +64,13 @@ export function PullRequestMenu({
 					onSelect={() => reviewActions?.refreshPullRequest()}
 				>
 					<RefreshCwIcon aria-hidden='true' />
-					Refresh PR status
+					{t('git:pull-request-menu.refresh', 'Refresh PR status')}
 				</DropdownMenuItem>
 				{url ? (
 					<DropdownMenuItem asChild>
 						<a href={url} rel='noreferrer' target='_blank'>
 							<ExternalLinkIcon aria-hidden='true' />
-							Open on GitHub
+							{t('git:pull-request-menu.open-on-github', 'Open on GitHub')}
 						</a>
 					</DropdownMenuItem>
 				) : null}

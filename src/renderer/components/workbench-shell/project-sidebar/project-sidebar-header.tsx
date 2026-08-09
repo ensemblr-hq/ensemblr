@@ -6,6 +6,7 @@ import {
 	SettingsIcon,
 } from 'lucide-react';
 import type { ComponentProps } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import {
 	ContextMenu,
@@ -47,6 +48,7 @@ export function ProjectSidebarHeader({
 	project: ProjectShellModel;
 	workspaceCount: number;
 }) {
+	const { t } = useTranslation();
 	const createFromSourceWired = Boolean(onCreateFromSourceSelect);
 	const createWorkspaceWired = Boolean(onCreateWorkspaceSelect);
 	return (
@@ -56,9 +58,19 @@ export function ProjectSidebarHeader({
 					<span className='flex min-w-0 items-center gap-2'>
 						<button
 							aria-expanded={!isCollapsed}
-							aria-label={`${
-								isCollapsed ? 'Expand' : 'Collapse'
-							} repository ${project.name}`}
+							aria-label={
+								isCollapsed
+									? t(
+											'workbench:repository-header.expand',
+											'Expand repository {{repository}}',
+											{ repository: project.name },
+										)
+									: t(
+											'workbench:repository-header.collapse',
+											'Collapse repository {{repository}}',
+											{ repository: project.name },
+										)
+							}
 							className='relative size-4 shrink-0 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring'
 							onClick={(event) => {
 								event.stopPropagation();
@@ -93,7 +105,11 @@ export function ProjectSidebarHeader({
 					</span>
 					<div className='absolute top-1/2 right-1 flex -translate-y-1/2 items-center gap-0.5'>
 						<ProjectHeaderActionButton
-							aria-label={`Repository settings for ${project.name}`}
+							aria-label={t(
+								'workbench:repository-header.settings',
+								'Repository settings for {{repository}}',
+								{ repository: project.name },
+							)}
 							className='hidden group-hover/project-toggle:flex'
 							onClick={onRepositorySettingsSelect}
 							onPointerDown={(event) => event.stopPropagation()}
@@ -102,7 +118,11 @@ export function ProjectSidebarHeader({
 						</ProjectHeaderActionButton>
 						{createFromSourceWired ? (
 							<ProjectHeaderActionButton
-								aria-label={`Create workspace from a source in ${project.name}`}
+								aria-label={t(
+									'workbench:repository-header.create-from-source',
+									'Create workspace from a source in {{repository}}',
+									{ repository: project.name },
+								)}
 								className='hidden group-hover/project-toggle:flex'
 								data-action-scope='project'
 								onClick={onCreateFromSourceSelect}
@@ -116,8 +136,16 @@ export function ProjectSidebarHeader({
 						<ProjectHeaderActionButton
 							aria-label={
 								isCreatingWorkspace
-									? `Creating workspace in ${project.name}`
-									: `Create workspace in ${project.name}`
+									? t(
+											'workbench:repository-header.creating-workspace',
+											'Creating workspace in {{repository}}',
+											{ repository: project.name },
+										)
+									: t(
+											'workbench:repository-header.create-workspace',
+											'Create workspace in {{repository}}',
+											{ repository: project.name },
+										)
 							}
 							data-action-scope='workspace'
 							disabled={!createWorkspaceWired || isCreatingWorkspace}

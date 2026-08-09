@@ -18,6 +18,11 @@ import { z } from 'zod';
 const generalSettingsSchema = z.object({
 	sendShortcut: z.enum(['enter', 'mod+enter']).catch('enter'),
 	followUpBehavior: z.enum(['steer', 'queue', 'block']).catch('steer'),
+	// Kept as a literal tuple rather than spread from `LANGUAGE_PREFERENCES`:
+	// zod needs literals, and importing `shared/i18n.ts` here would drag the
+	// config module into the i18n graph. `tests/shared/app-settings.test.ts`
+	// asserts the two agree.
+	language: z.enum(['system', 'en', 'ru', 'el']).catch('system'),
 	desktopNotifications: z.boolean().catch(true),
 	autoConvertLongText: z.boolean().catch(true),
 	alwaysShowContextUsage: z.boolean().catch(true),

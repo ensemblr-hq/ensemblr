@@ -1,3 +1,4 @@
+import { i18n } from '@/renderer/lib/i18n';
 import type {
 	ProjectShellModel,
 	WorkspaceShellModel,
@@ -13,11 +14,30 @@ export function workspaceSummaryRows(
 	workspace: WorkspaceShellModel,
 ): LifecycleSummaryRow[] {
 	return [
-		{ label: 'Workspace', value: workspace.name },
+		{
+			label: i18n.t(
+				'workbench:lifecycle-dialog.summary.workspace',
+				'Workspace',
+			),
+			value: workspace.name,
+		},
 		...(workspace.branchName
-			? [{ label: 'Branch', mono: true, value: workspace.branchName }]
+			? [
+					{
+						label: i18n.t(
+							'workbench:lifecycle-dialog.summary.branch',
+							'Branch',
+						),
+						mono: true,
+						value: workspace.branchName,
+					},
+				]
 			: []),
-		{ label: 'Path', mono: true, value: workspace.pathLabel },
+		{
+			label: i18n.t('workbench:lifecycle-dialog.summary.path', 'Path'),
+			mono: true,
+			value: workspace.pathLabel,
+		},
 	];
 }
 
@@ -30,7 +50,17 @@ export function projectSummaryRows(
 	project: ProjectShellModel,
 ): LifecycleSummaryRow[] {
 	return [
-		{ label: 'Repository', value: project.name },
-		{ label: 'Path', mono: true, value: project.pathLabel },
+		{
+			label: i18n.t(
+				'workbench:lifecycle-dialog.summary.repository',
+				'Repository',
+			),
+			value: project.name,
+		},
+		{
+			label: i18n.t('workbench:lifecycle-dialog.summary.path', 'Path'),
+			mono: true,
+			value: project.pathLabel,
+		},
 	];
 }

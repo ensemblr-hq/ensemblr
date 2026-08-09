@@ -1,5 +1,6 @@
 import { MapIcon } from 'lucide-react';
 import { useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/renderer/components/ui/button';
 import {
@@ -26,6 +27,7 @@ export function PlanModeToggle({
 	onChange: (planMode: boolean) => void;
 	value: boolean;
 }) {
+	const { t } = useTranslation();
 	const handleClick = useCallback(() => {
 		onChange(!value);
 	}, [onChange, value]);
@@ -34,7 +36,17 @@ export function PlanModeToggle({
 		<Tooltip>
 			<TooltipTrigger asChild>
 				<Button
-					aria-label={`Plan mode: ${value ? 'on' : 'off'}. Click to toggle.`}
+					aria-label={
+						value
+							? t(
+									'workbench:plan-mode.aria-label-on',
+									'Plan mode: on. Click to toggle.',
+								)
+							: t(
+									'workbench:plan-mode.aria-label-off',
+									'Plan mode: off. Click to toggle.',
+								)
+					}
 					aria-pressed={value}
 					// The `subtle` variant claims `aria-pressed:` for its own grey
 					// pressed look, so the accent tint only wins when declared under
@@ -51,11 +63,13 @@ export function PlanModeToggle({
 					variant='subtle'
 				>
 					<MapIcon />
-					{value ? <span>Plan</span> : null}
+					{value ? <span>{t('workbench:plan-mode.chip', 'Plan')}</span> : null}
 				</Button>
 			</TooltipTrigger>
 			<TooltipContent sideOffset={4}>
-				{value ? 'Leave plan mode' : 'Plan before editing'}
+				{value
+					? t('workbench:plan-mode.tooltip-on', 'Leave plan mode')
+					: t('workbench:plan-mode.tooltip-off', 'Plan before editing')}
 				<span className='ml-2 text-muted-foreground'>{SHORTCUT_HINT}</span>
 			</TooltipContent>
 		</Tooltip>

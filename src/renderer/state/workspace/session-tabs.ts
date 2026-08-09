@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAtomCallback } from 'jotai/utils';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import {
 	agentSessionsForWorkspaceQuery,
@@ -123,6 +124,7 @@ export function useSessionTabState({
 	closeActiveOrReset: () => void;
 } {
 	const workspaceId = activeWorkspace.id;
+	const { t } = useTranslation();
 	const readSessionVisits = useAtomCallback(
 		useCallback((get) => get(sessionVisitOrderByWorkspaceAtom), []),
 	);
@@ -205,9 +207,12 @@ export function useSessionTabState({
 			const droppedSubmits = dropComposerSubmits(chatTabId);
 			if (droppedSubmits > 0) {
 				toast.warning(
-					droppedSubmits === 1
-						? 'Cancelled a queued action for the closed chat.'
-						: `Cancelled ${droppedSubmits} queued actions for the closed chat.`,
+					t('errors:chat-tab.dropped-submits.title', {
+						count: droppedSubmits,
+						defaultValue_one: 'Cancelled a queued action for the closed chat.',
+						defaultValue_other:
+							'Cancelled {{count}} queued actions for the closed chat.',
+					}),
 				);
 			}
 			void queryClient.invalidateQueries({

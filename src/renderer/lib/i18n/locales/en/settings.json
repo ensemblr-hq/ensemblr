@@ -1,0 +1,506 @@
+{
+	"advanced": {
+		"description": "Root directory, Pi executable override, and terminal-scrollback limits.",
+		"pi-executable": {
+			"description": "Override the bundled Pi executable with a custom one. Leave empty to use the discovered system Pi (recommended).",
+			"label": "Pi executable path",
+			"use-bundled": "Use bundled Pi"
+		},
+		"root-directory": {
+			"description": "Where Ensemblr stores repositories and workspaces. This should be an empty directory you do not modify directly. Changing this will reconcile your repository list against the new root.",
+			"label": "Ensemblr root directory",
+			"reading": "Reading root…",
+			"source": "source: {{source}}",
+			"unset": "Not configured"
+		},
+		"scrollback": {
+			"aria-label": "Terminal scrollback limit in megabytes",
+			"description": "Maximum size of each terminal pane scrollback buffer. Larger values keep more history at the cost of memory.",
+			"label": "Terminal scrollback limit"
+		},
+		"title": "Advanced"
+	},
+	"appearance": {
+		"accessible-colors": {
+			"default": "Default",
+			"description": "Theme optimized for color vision differences.",
+			"deuteranopia": "Deuteranopia",
+			"label": "Accessible colors",
+			"protanopia": "Protanopia",
+			"tritanopia": "Tritanopia"
+		},
+		"code-ligatures": {
+			"description": "Use font ligatures in file editors and diffs.",
+			"label": "Code ligatures"
+		},
+		"code-theme": {
+			"description": "Syntax highlighting for code blocks and editors. Each theme follows the app theme, using its light cut in light mode and its dark cut in dark mode.",
+			"label": "Code theme"
+		},
+		"markdown-style": {
+			"compact": "Compact",
+			"default": "Default",
+			"description": "Rendering style for markdown files.",
+			"label": "Markdown style",
+			"prose": "Prose"
+		},
+		"mono-font": {
+			"aria-label": "Mono font name",
+			"description": "Font used for code and diffs. The bundled Nerd Font is the default; custom fonts must be installed on your system.",
+			"label": "Mono font"
+		},
+		"terminal-font": {
+			"aria-label": "Terminal font name",
+			"description": "The bundled Nerd Font is the default; enter another font name exactly as installed to override it.",
+			"label": "Terminal font"
+		},
+		"terminal-font-size": {
+			"description": "Adjust the size of text in the integrated terminal.",
+			"label": "Terminal font size"
+		},
+		"theme": {
+			"dark": "Dark",
+			"description": "Toggle with ⌘⌥T.",
+			"label": "Theme",
+			"light": "Light",
+			"system": "System"
+		},
+		"title": "Appearance"
+	},
+	"diagnostics": {
+		"copy-bundle": "Copy diagnostics bundle",
+		"description": "Setup gate checks for Pi, git, GitHub, Linear, and the Ensemblr runtime. The diagnostics bundle redacts secrets, account ids, and full paths before going to the clipboard.",
+		"title": "Diagnostics"
+	},
+	"environment": {
+		"add": "Add environment variable",
+		"description": "Environment variables used by Ensemblr and passed to agent sessions, scripts, and terminals.",
+		"documented": {
+			"add-aria-label": "Add {{name}}",
+			"hide": "Hide documented variables",
+			"not-set": "Not set",
+			"show_one": "Show documented variables ({{count}})",
+			"show_other": "Show documented variables ({{count}})"
+		},
+		"empty": {
+			"description": "Add a variable to make it available in this environment.",
+			"title": "No variables set"
+		},
+		"env-files": {
+			"add": "Add env file",
+			"browse-aria-label": "Browse for env file",
+			"description": "Load environment variables from env files. In the native file picker, press <kbd>Cmd+Shift+.</kbd> to show hidden files.",
+			"remove-aria-label": "Remove {{path}}",
+			"title": "Env files"
+		},
+		"loading": "Reading environment…",
+		"read-failed": "Failed to read environment: {{error}}.",
+		"row": {
+			"delete": "Delete variable",
+			"edit": "Edit variable",
+			"hide-value": "Hide value",
+			"show-value": "Show value"
+		},
+		"sheet": {
+			"edit-title": "Edit environment variable",
+			"empty-value-hint": "Use an empty value to set this variable to an empty string.",
+			"name": "Name",
+			"name-rule": "Variable names may only contain letters, numbers, and underscores.",
+			"value": "Value",
+			"value-required": "A value is required."
+		},
+		"title": "Environment"
+	},
+	"experimental": {
+		"auto-run": {
+			"description": "Start a repository's run script automatically after setup when no repository-specific setting overrides it.",
+			"label": "Auto-run after setup"
+		},
+		"description": "Developer-only controls and early automation defaults.",
+		"developer-mode": {
+			"description": "Show developer-only diagnostics and Pi debug controls.",
+			"label": "Developer Mode"
+		},
+		"title": "Experimental"
+	},
+	"general": {
+		"auto-convert": {
+			"description": "Convert pasted text over 5000 characters into text attachments.",
+			"label": "Auto-convert long text"
+		},
+		"caffeinate": {
+			"description": "Prevent your Mac from sleeping while an agent is actively working. Shuts off below 10% battery.",
+			"label": "Caffeinate while agents are running"
+		},
+		"context-usage": {
+			"description": "Always show context usage. By default, only shown when more than 70% is used.",
+			"label": "Always show context usage"
+		},
+		"follow-up": {
+			"block": "Block",
+			"description": "Queue messages to send after the agent finishes, or steer the agent mid-turn. Use ⌘J to queue.",
+			"label": "Follow-up behavior",
+			"queue": "Queue",
+			"steer": "Steer"
+		},
+		"language": {
+			"description": "Interface language. System follows your macOS language order.",
+			"label": "Language",
+			"system": "System"
+		},
+		"notifications": {
+			"description": "Get notified when an agent finishes working in a chat.",
+			"label": "Desktop notifications"
+		},
+		"send-shortcut": {
+			"description": "Use {{shortcut}} for new lines.",
+			"label": "Send messages with"
+		},
+		"title": "General",
+		"tool-calls": {
+			"description": "Show all tool calls expanded by default instead of collapsed. Toggle with {{shortcut}}.",
+			"label": "Don't collapse tool calls"
+		}
+	},
+	"git": {
+		"archive-on-merge": {
+			"description": "Automatically archive a workspace after merging its PR.",
+			"label": "Archive on merge"
+		},
+		"branch-prefix": {
+			"custom": "Custom:",
+			"custom-aria-label": "Custom branch prefix",
+			"description": "Prefix for new workspace branch names.",
+			"github-username": "GitHub username (resolved via `gh`)",
+			"label": "Branch name prefix",
+			"none": "None"
+		},
+		"delete-branch": {
+			"description": "Delete the local branch when archiving a workspace. To delete the remote branch, configure it on GitHub.",
+			"label": "Delete branch on archive"
+		},
+		"description": "Workspace branch defaults and lifecycle behavior. Repository-scope overrides win when set.",
+		"rename-workspace": {
+			"description": "Ask the agent to rename a workspace from its placeholder composer name, and its git branch to match, once it knows what the work is. Off leaves the placeholder name in place.",
+			"label": "Let agents name the workspace and branch"
+		},
+		"set-upstream": {
+			"description": "Configure new Ensemblr workspaces so plain `git push` sets a branch upstream. Turning this off avoids writing Git worktree config, but PR info may be less reliable until branches have an upstream.",
+			"label": "Set upstream on plain `git push`"
+		},
+		"title": "Git"
+	},
+	"header": {
+		"edit-config": "Edit in {{file}}",
+		"open-menu": {
+			"aria-label": "{{label}} — choose an app"
+		},
+		"open-primary": {
+			"aria-label": "{{label}} in {{app}}"
+		},
+		"repo-picker": {
+			"aria-label": "Active repository",
+			"placeholder": "Select repository"
+		},
+		"scope-repo": "Repo",
+		"scope-user": "User"
+	},
+	"integrations": {
+		"linear": {
+			"browse-issues": "Browse issues",
+			"checking": "Checking the Linear connection…",
+			"connect": "Connect",
+			"connected": "Connected to Linear.",
+			"connected-as": "Connected as {{identity}}.",
+			"connected-as-in": "Connected as {{identity}} in {{organization}}.",
+			"disconnect": "Disconnect",
+			"disconnected": "Connect Linear to browse issues, manage them from Ensemblr, and create workspaces from issues.",
+			"disconnecting": "Disconnecting…",
+			"not-configured": "Add app.linear.clientId to ~/.config/ensemblr/config.json to enable Linear sign-in. Linear is optional for local and GitHub-only workflows.",
+			"reconnect": "Reconnect",
+			"reconnect-required": "The stored Linear token expired and cannot be refreshed automatically. Reconnect to continue using Linear workflows.",
+			"state-connected": "Connected",
+			"state-disconnected": "Disconnected",
+			"state-not-configured": "Not configured",
+			"state-reconnect": "Reconnect required",
+			"waiting": "Waiting for browser…"
+		},
+		"title": "Integrations"
+	},
+	"models": {
+		"default-model": {
+			"aria-label": "Default chat model",
+			"description": "Model used when you start a new chat. Falls back to the agent-reported default when unset.",
+			"label": "Default model",
+			"thinking-aria-label": "Default thinking level"
+		},
+		"description": "Agent models and thinking-level defaults for new chats and reviews. Sourced from each configured runtime's capability discovery.",
+		"discovery-failed": "Model discovery failed: {{error}}.",
+		"loading": "Loading models…",
+		"no-models": "No models",
+		"review-model": {
+			"aria-label": "Review model",
+			"description": "Model used for the Review action on a workspace.",
+			"label": "Review model",
+			"thinking-aria-label": "Review thinking level"
+		},
+		"thinking": {
+			"effort-placeholder": "Effort level",
+			"level": {
+				"high": "High",
+				"low": "Low",
+				"max": "Max",
+				"medium": "Medium",
+				"minimal": "Minimal",
+				"off": "No thinking",
+				"xhigh": "Extra high"
+			},
+			"thinking-placeholder": "Thinking level"
+		},
+		"title": "Models",
+		"visibility": {
+			"description": "Hide models you don’t use from the model picker and the default/review selects. Hiding the selected default or review model switches it to the first available.",
+			"empty": "No models available.",
+			"hidden-count_one": "{{count}} of {{total}} hidden.",
+			"hidden-count_other": "{{count}} of {{total}} hidden.",
+			"hide-model": "Hide {{model}}",
+			"hide-provider": "Hide all {{provider}} models",
+			"label": "Model visibility",
+			"locked": "At least one model must stay visible",
+			"no-matches": "No models match “{{query}}”.",
+			"search-aria-label": "Search models",
+			"search-placeholder": "Search models…",
+			"show-all": "Show all",
+			"show-model": "Show {{model}}",
+			"show-provider": "Show all {{provider}} models"
+		}
+	},
+	"nav": {
+		"advanced": "Advanced",
+		"appearance": "Appearance",
+		"aria-label": "Settings sections",
+		"diagnostics": "Diagnostics",
+		"environment": "Environment",
+		"experimental": "Experimental",
+		"general": "General",
+		"git": "Git",
+		"integrations": "Integrations",
+		"models": "Models",
+		"more": "More",
+		"providers": "Providers"
+	},
+	"providers": {
+		"account": {
+			"api-provider": "API provider",
+			"credential-source": "Credential source",
+			"description": "Reported by the provider for the credentials Ensemblr will use.",
+			"email": "Account",
+			"empty": "The provider reported no account details.",
+			"label": "Account",
+			"organization": "Organization",
+			"plan": "Plan"
+		},
+		"check-status": {
+			"failure": "Failed",
+			"success": "Ready",
+			"warning": "Warning"
+		},
+		"checking": "Checking {{provider}}…",
+		"checks": {
+			"description": "Everything Ensemblr probes before it will start a chat on this runtime.",
+			"label": "Readiness checks"
+		},
+		"copy-command": "Copy {{command}}",
+		"description": "Agent runtimes that can drive a chat. Each one resolves its own executable, reports its own readiness, and keeps its own credentials.",
+		"executable": {
+			"description": "Override the discovered {{command}} binary with a custom one. Leave empty to use the executable found on PATH (recommended).",
+			"label": "{{provider}} executable path",
+			"not-found": "Not found",
+			"resolved": "Resolved executable",
+			"source": "source: {{source}}",
+			"use-discovered": "Use discovered {{command}}"
+		},
+		"executable-source": {
+			"configured": "a configured override",
+			"missing": "nothing — no executable resolved",
+			"path": "the executable found on PATH"
+		},
+		"refresh": "Refresh",
+		"refreshing": "Refreshing…",
+		"runtime": {
+			"probe-failed": "Ensemblr could not probe the {{command}} executable.",
+			"probing": "Probing the {{command}} executable…",
+			"resolved": "{{runtime}}, running from {{origin}}.",
+			"resolved-at": "{{runtime}}, running from {{origin}} at {{path}}."
+		},
+		"settings-file": {
+			"description": "{{provider}} reads its own configuration from this file. Ensemblr never edits it — open it in your editor to change permissions, hooks, or MCP servers.",
+			"label": "{{provider}} settings file",
+			"menu-aria-label": "{{label}} — choose an app",
+			"open": "Open in",
+			"primary-aria-label": "{{label}} {{app}}"
+		},
+		"sign-in-hint": "Sign-in is interactive: Ensemblr copies the command, you run it in a terminal.",
+		"status": {
+			"checking": "Checking…",
+			"connected": "Connected",
+			"not-ready": "Not ready",
+			"unavailable": "Unavailable"
+		},
+		"tabs-aria-label": "Agent providers",
+		"title": "Providers"
+	},
+	"repo": {
+		"actions": {
+			"branch-rename-description": "Custom instructions for generating branch names from your messages.",
+			"branch-rename-title": "Branch rename preferences",
+			"code-review-description": "Add custom instructions sent to the agent when you click the Review button.",
+			"code-review-title": "Code review preferences",
+			"create-pr-description": "Add custom instructions sent to the agent when you click the Create PR button.",
+			"create-pr-title": "Create PR preferences",
+			"description": "Configure action-specific behavior and instructions for this repository.",
+			"fix-errors-description": "Add custom instructions sent to the agent when you click the Fix errors button.",
+			"fix-errors-title": "Fix errors preferences",
+			"general-description": "A master prompt prepended as context to the first message of every new chat in this repository.",
+			"general-title": "General preferences",
+			"placeholder": "Add your preferences here. The agent will be told to prioritize these instructions over its default instructions.",
+			"remove-aria-label": "Remove {{name}}",
+			"resolve-conflicts-description": "Add custom instructions sent to the agent when you click the Resolve conflicts button.",
+			"resolve-conflicts-title": "Resolve conflicts preferences",
+			"title": "Actions"
+		},
+		"archive-on-merge": {
+			"description": "Automatically archive a workspace after merging its PR. Overrides your user-scope default for this repo.",
+			"label": "Archive on merge"
+		},
+		"archive-script": {
+			"description": "Runs before a workspace is archived.",
+			"label": "Archive script",
+			"placeholder": "e.g. rm -rf node_modules"
+		},
+		"auto-run": {
+			"description": "Start this repository's run script automatically after a new local workspace finishes setup.",
+			"label": "Auto-run after setup"
+		},
+		"branch-from": {
+			"description": "Each workspace is an isolated copy of your codebase. Set the upstream branch new workspaces fork from.",
+			"label": "Branch new workspaces from",
+			"repository-default": "Repository default",
+			"search-placeholder": "Search or enter a ref…"
+		},
+		"delete-branch": {
+			"description": "Delete the local branch when archiving a workspace. Overrides your user-scope default for this repo.",
+			"label": "Delete branch on archive"
+		},
+		"environment": {
+			"description": "Repository-scoped environment variables. Repository values override user defaults; secrets are stored in the macOS Keychain.",
+			"title": "Environment"
+		},
+		"files-to-copy": {
+			"description": "Ensemblr will automatically copy these file paths into each new workspace. Supports gitignore-style globs.",
+			"label": "Files to copy"
+		},
+		"git": {
+			"committed-note": "Committed <file>.ensemblr/settings.toml</file> values shared with the team still win over these personal overrides.",
+			"description": "Per-repository git defaults. These override your user-scope git settings for this repo only.",
+			"title": "Git"
+		},
+		"misc": {
+			"description": "Repository paths, preview URLs, files-to-copy patterns, and lifecycle.",
+			"title": "Misc"
+		},
+		"not-found": "Repository <id>{{repoId}}</id> not found.",
+		"preview-urls": {
+			"add": "+ Add preview URL",
+			"description": "Overrides the terminal panel’s Open button URL. Add more than one to switch between them from the Open button dropdown; the first is opened by default and the rest appear in the dropdown in order. Supports `$ENSEMBLR_WORKSPACE_NAME` and `$ENSEMBLR_PORT`. Leave blank to auto-detect from output logs.",
+			"label": "Preview URLs",
+			"name-aria-label": "Preview URL name",
+			"name-placeholder": "Name",
+			"template-aria-label": "Preview URL template"
+		},
+		"remote-origin": {
+			"description": "Where Ensemblr pushes, pulls, and opens PRs. Read-only for now — runtime honors the git \"origin\" remote; a configurable remote is planned.",
+			"label": "Remote origin"
+		},
+		"remove": {
+			"description": "Removes the repository from Ensemblr. The on-disk directory at<path>{{path}}</path>is not deleted; delete it manually if you want it gone.",
+			"title": "Remove this repository?",
+			"trigger": "Remove repository"
+		},
+		"root-path": {
+			"description": "Do not move or delete this directory. Instead, remove the repository in Ensemblr.",
+			"label": "Root path"
+		},
+		"run-mode": {
+			"concurrent": "Concurrent",
+			"concurrent-description": "Run scripts can run in multiple workspaces at once.",
+			"description": "Whether run scripts can run in parallel across workspaces.",
+			"label": "Run mode",
+			"nonconcurrent": "Non-concurrent",
+			"nonconcurrent-description": "Only one run script can run at a time."
+		},
+		"scripts": {
+			"description": "Commands that run when workspaces are set up, run, or archived. Saved to the repository’s committed .ensemblr/settings.toml.",
+			"diverges": "The workspace you have open commits different scripts on its branch, and runs those. Merge this file to change what it runs.",
+			"title": "Scripts"
+		},
+		"setup-script": {
+			"description": "Runs when a new workspace is created.",
+			"label": "Setup script",
+			"placeholder": "e.g. npm ci"
+		},
+		"spotlight": {
+			"coming-soon": "Coming soon",
+			"description": "Replace Run with Spotlight for this repository so workspace changes are tested in the repository root. Spotlight is a separate feature still in development (workspace→root diff/apply with rollback); see docs/product/discovery-spotlight-testing.md.",
+			"label": "Use spotlight testing"
+		},
+		"workspaces-path": {
+			"description": "Do not move or delete the workspace subdirectories. Instead, archive workspaces in Ensemblr.",
+			"label": "Workspaces path"
+		}
+	},
+	"repo-nav": {
+		"actions": "Actions",
+		"empty": "No repository selected.",
+		"environment": "Environment",
+		"git": "Git",
+		"misc": "Misc",
+		"scripts": "Scripts"
+	},
+	"run-scripts": {
+		"description": "Shortcuts for quick actions, like running your dev server or test suite. Use <port>$ENSEMBLR_PORT</port> for the workspace's allocated port.",
+		"editor": {
+			"add-title": "Add run script",
+			"command": "Command",
+			"default": "Default",
+			"default-description": "Runs when you press ⌘R in a workspace that has no other pick.",
+			"description": "Shortcuts for quick actions, like running your dev server or test suite. Use <port>$ENSEMBLR_PORT</port> for this workspace's allocated port.",
+			"duplicate-name": "Another run script already uses this name.",
+			"edit-title": "Edit run script",
+			"name": "Name"
+		},
+		"empty": "No run scripts yet. Add one to get started.",
+		"icon-picker": {
+			"no-matches": "No icons match “{{query}}”.",
+			"search": "Search icons",
+			"trigger-aria-label": "Icon: {{name}}"
+		},
+		"row": {
+			"default": "Default",
+			"delete-aria-label": "Delete {{name}}",
+			"edit-aria-label": "Edit {{name}}",
+			"unavailable": "Not available locally"
+		},
+		"title": "Run scripts"
+	},
+	"source-badge": {
+		"built-in-default": "default",
+		"config-default": "config defaults",
+		"managed-config": "managed config",
+		"sqlite": "personal (sqlite)",
+		"unset": "not set",
+		"user-default": "user defaults",
+		"value": "source: {{source}}",
+		"value-locked": "source: {{source}} · locked"
+	}
+}

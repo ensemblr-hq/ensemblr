@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next';
+
 import { Button } from '@/renderer/components/ui/button';
 import {
 	Dialog,
@@ -22,6 +24,7 @@ export function RestoreCheckpointDialog({
 	onConfirm: () => void;
 	target: CheckpointRestoreTarget | null;
 }) {
+	const { t } = useTranslation();
 	return (
 		<Dialog
 			onOpenChange={(open) => {
@@ -33,32 +36,42 @@ export function RestoreCheckpointDialog({
 		>
 			<DialogContent className='gap-4 sm:max-w-lg'>
 				<DialogHeader>
-					<DialogTitle>Restore workspace to before this turn?</DialogTitle>
+					<DialogTitle>
+						{t(
+							'workbench:restore-checkpoint.title',
+							'Restore workspace to before this turn?',
+						)}
+					</DialogTitle>
 					<DialogDescription className='space-y-2'>
 						<span className='block'>
-							Workspace files revert to the snapshot taken before “
-							{target?.label}”. Later messages in this chat are hidden from the
-							timeline, but the agent’s own session history is never modified —
-							you can keep prompting from the restored state.
+							{t(
+								'workbench:restore-checkpoint.description',
+								'Workspace files revert to the snapshot taken before “{{label}}”. Later messages in this chat are hidden from the timeline, but the agent’s own session history is never modified — you can keep prompting from the restored state.',
+								{ label: target?.label ?? '' },
+							)}
 						</span>
 						<span className='block'>
-							Files created after the snapshot that were never tracked stay in
-							place.
+							{t(
+								'workbench:restore-checkpoint.untracked',
+								'Files created after the snapshot that were never tracked stay in place.',
+							)}
 						</span>
 						{hasOtherOpenSessions ? (
 							<span className='block font-medium text-status-warning'>
-								Another chat session is active in this workspace; its newer file
-								changes may be overwritten by this restore.
+								{t(
+									'workbench:restore-checkpoint.other-sessions',
+									'Another chat session is active in this workspace; its newer file changes may be overwritten by this restore.',
+								)}
 							</span>
 						) : null}
 					</DialogDescription>
 				</DialogHeader>
 				<DialogFooter>
 					<Button onClick={onCancel} variant='ghost'>
-						Cancel
+						{t('common:actions.cancel', 'Cancel')}
 					</Button>
 					<Button onClick={onConfirm} variant='destructive'>
-						Restore workspace
+						{t('workbench:restore-checkpoint.confirm', 'Restore workspace')}
 					</Button>
 				</DialogFooter>
 			</DialogContent>

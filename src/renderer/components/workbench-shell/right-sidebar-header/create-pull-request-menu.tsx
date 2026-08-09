@@ -5,6 +5,7 @@ import {
 	GitPullRequestCreateIcon,
 	GitPullRequestDraftIcon,
 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 
 import { Button } from '@/renderer/components/ui/button';
@@ -36,6 +37,7 @@ export function CreatePullRequestMenu({
 }: {
 	workspace: WorkspaceShellModel;
 }) {
+	const { t } = useTranslation();
 	const submitToComposer = useComposerSubmit(workspace.id);
 	const reviewActions = useReviewActions();
 	// Hand the agent the live title/description from the Checks tab (including
@@ -61,7 +63,12 @@ export function CreatePullRequestMenu({
 
 	const createPullRequest = () => {
 		reviewActions?.runAgentAction('create-pr');
-		toast.success('Asked the agent to open a pull request.');
+		toast.success(
+			t(
+				'git:pull-request-create.asked.title',
+				'Asked the agent to open a pull request.',
+			),
+		);
 	};
 
 	const createDraftPullRequest = () => {
@@ -74,10 +81,20 @@ export function CreatePullRequestMenu({
 			}),
 		);
 		if (!queued) {
-			toast.error('Open a chat tab to hand this to the agent.');
+			toast.error(
+				t(
+					'errors:composer.no-chat-tab.title',
+					'Open a chat tab to hand this to the agent.',
+				),
+			);
 			return;
 		}
-		toast.success('Asked the agent to open a draft pull request.');
+		toast.success(
+			t(
+				'git:pull-request-create-draft.asked.title',
+				'Asked the agent to open a draft pull request.',
+			),
+		);
 	};
 
 	const openManually = () => {
@@ -95,13 +112,16 @@ export function CreatePullRequestMenu({
 				variant='ghost'
 			>
 				<GitPullRequestCreateIcon data-icon='inline-start' />
-				Create PR
+				{t('git:pull-request.create-action', 'Create PR')}
 			</Button>
 			<span aria-hidden='true' className='h-4 w-px shrink-0 bg-border' />
 			<DropdownMenu>
 				<DropdownMenuTrigger asChild>
 					<Button
-						aria-label='Open create pull request options'
+						aria-label={t(
+							'git:create-pull-request.options-label',
+							'Open create pull request options',
+						)}
 						className='size-7 rounded-none border-0 bg-transparent'
 						size='icon-sm'
 						variant='ghost'
@@ -112,11 +132,11 @@ export function CreatePullRequestMenu({
 				<DropdownMenuContent align='end' className='w-56'>
 					<DropdownMenuItem onSelect={createDraftPullRequest}>
 						<GitPullRequestDraftIcon aria-hidden='true' />
-						Create draft PR
+						{t('git:create-pull-request.draft', 'Create draft PR')}
 					</DropdownMenuItem>
 					<DropdownMenuItem disabled={!compareUrl} onSelect={openManually}>
 						<ExternalLinkIcon aria-hidden='true' />
-						Create PR manually
+						{t('git:create-pull-request.manual', 'Create PR manually')}
 					</DropdownMenuItem>
 				</DropdownMenuContent>
 			</DropdownMenu>

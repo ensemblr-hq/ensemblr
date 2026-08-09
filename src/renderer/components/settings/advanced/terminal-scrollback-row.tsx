@@ -1,4 +1,5 @@
 import { useAtom } from 'jotai';
+import { useTranslation } from 'react-i18next';
 
 import { SettingRow } from '@/renderer/components/settings/setting-row';
 import { Input } from '@/renderer/components/ui/input';
@@ -14,6 +15,7 @@ const DEFAULT_SCROLLBACK_MB =
  * reset back to the factory default.
  */
 export function TerminalScrollbackRow() {
+	const { t } = useTranslation();
 	const [scrollbackMb, setScrollbackMb] = useAtom(terminalScrollbackMbAtom);
 
 	return (
@@ -21,7 +23,10 @@ export function TerminalScrollbackRow() {
 			control={
 				<div className='flex items-center gap-2 text-xs'>
 					<Input
-						aria-label='Terminal scrollback limit in megabytes'
+						aria-label={t(
+							'settings:advanced.scrollback.aria-label',
+							'Terminal scrollback limit in megabytes',
+						)}
 						className='h-8 w-20 text-right font-mono'
 						max={200}
 						min={1}
@@ -31,11 +36,19 @@ export function TerminalScrollbackRow() {
 						type='number'
 						value={scrollbackMb}
 					/>
-					<span className='text-muted-foreground'>MB</span>
+					<span className='text-muted-foreground'>
+						{t('common:units.mb', 'MB')}
+					</span>
 				</div>
 			}
-			description='Maximum size of each terminal pane scrollback buffer. Larger values keep more history at the cost of memory.'
-			label='Terminal scrollback limit'
+			description={t(
+				'settings:advanced.scrollback.description',
+				'Maximum size of each terminal pane scrollback buffer. Larger values keep more history at the cost of memory.',
+			)}
+			label={t(
+				'settings:advanced.scrollback.label',
+				'Terminal scrollback limit',
+			)}
 			modified={scrollbackMb !== DEFAULT_SCROLLBACK_MB}
 			onReset={() => setScrollbackMb(DEFAULT_SCROLLBACK_MB)}
 		/>

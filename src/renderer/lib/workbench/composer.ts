@@ -1,3 +1,4 @@
+import { i18n } from '@/renderer/lib/i18n';
 import type {
 	ComposerContextUsage,
 	ComposerModelOption,
@@ -135,10 +136,11 @@ export function getComposerState({
 }): ComposerShellState {
 	const modelLabel =
 		availableModels.find((option) => option.id === modelId)?.displayName ??
-		'Model pending';
+		i18n.t('workbench:composer.model.pending', 'Model pending');
 	const thinkingLabelText =
 		availableThinkingLevels.find((option) => option.id === thinkingLevel)
-			?.label ?? 'Thinking pending';
+			?.label ??
+		i18n.t('workbench:composer.thinking.pending', 'Thinking pending');
 
 	const base = {
 		activeAgentSessionId,
@@ -166,7 +168,10 @@ export function getComposerState({
 			...base,
 			disabled: true,
 			disabledReason: setupError,
-			placeholder: 'Resolve setup diagnostics before starting an agent turn.',
+			placeholder: i18n.t(
+				'workbench:composer.setup-error.placeholder',
+				'Resolve setup diagnostics before starting an agent turn.',
+			),
 		};
 	}
 
@@ -174,8 +179,14 @@ export function getComposerState({
 		return {
 			...base,
 			disabled: true,
-			disabledReason: 'Ensemblr is still checking setup readiness.',
-			placeholder: 'Setup checks are still loading.',
+			disabledReason: i18n.t(
+				'workbench:composer.setup-loading.reason',
+				'Ensemblr is still checking setup readiness.',
+			),
+			placeholder: i18n.t(
+				'workbench:composer.setup-loading.placeholder',
+				'Setup checks are still loading.',
+			),
 		};
 	}
 
@@ -183,8 +194,15 @@ export function getComposerState({
 		return {
 			...base,
 			disabled: true,
-			disabledReason: `${setupDiagnostics.blockedCount} required setup checks need attention.`,
-			placeholder: 'Fix setup blockers before sending a prompt.',
+			disabledReason: i18n.t('workbench:composer.setup-blocked.reason', {
+				count: setupDiagnostics.blockedCount,
+				defaultValue_one: '{{count}} required setup check needs attention.',
+				defaultValue_other: '{{count}} required setup checks need attention.',
+			}),
+			placeholder: i18n.t(
+				'workbench:composer.setup-blocked.placeholder',
+				'Fix setup blockers before sending a prompt.',
+			),
 		};
 	}
 
@@ -193,7 +211,14 @@ export function getComposerState({
 		disabled: false,
 		disabledReason: null,
 		placeholder: planMode
-			? 'Describe what you want built — the agent will plan it with you before touching any files'
-			: `Ask the agent to continue ${activeSession.label.toLowerCase()}`,
+			? i18n.t(
+					'workbench:composer.plan-mode.placeholder',
+					'Describe what you want built — the agent will plan it with you before touching any files',
+				)
+			: i18n.t(
+					'workbench:composer.ready.placeholder',
+					'Ask the agent to continue {{session}}',
+					{ session: activeSession.label.toLowerCase() },
+				),
 	};
 }

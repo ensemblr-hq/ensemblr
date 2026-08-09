@@ -1,4 +1,6 @@
+import type { TFunction } from 'i18next';
 import { GitMergeIcon } from 'lucide-react';
+import { Trans, useTranslation } from 'react-i18next';
 
 import { Button } from '@/renderer/components/ui/button';
 import {
@@ -33,12 +35,14 @@ export function MergeConfirmationDialog({
 	open: boolean;
 	workspace: WorkspaceShellModel;
 }) {
+	const { t } = useTranslation();
 	const { pullRequest } = workspace;
 	const isReady = pullRequest.status === 'ready-to-merge';
 	const { hasBlockers, rows } = summarizeMergeReadiness({
 		archiveAfterMerge,
 		deleteLocalBranchOnArchive,
 		pullRequest,
+		t,
 	});
 
 	return (
@@ -46,14 +50,24 @@ export function MergeConfirmationDialog({
 			<DialogContent className='sm:max-w-md'>
 				<DialogHeader>
 					<DialogTitle>
-						Merge pull request
-						{pullRequest.number ? ` #${pullRequest.number}` : ''}
+						{pullRequest.number
+							? t(
+									'git:merge-dialog.title-numbered',
+									'Merge pull request #{{number}}',
+									{ number: pullRequest.number },
+								)
+							: t('git:merge-dialog.title', 'Merge pull request')}
 					</DialogTitle>
 					<DialogDescription>
-						Merges <span className='font-mono'>{workspace.branchName}</span>{' '}
-						through <span className='font-mono'>gh pr merge</span>. This action
-						is visible to everyone on the repository and cannot be undone from
-						Ensemblr.
+						<Trans
+							components={{ mono: <span className='font-mono' /> }}
+							defaults='Merges <mono>{{branch}}</mono> through <mono>{{command}}</mono>. This action is visible to everyone on the repository and cannot be undone from Ensemblr.'
+							i18nKey='git:merge-dialog.description'
+							values={{
+								branch: workspace.branchName,
+								command: 'gh pr merge',
+							}}
+						/>
 					</DialogDescription>
 				</DialogHeader>
 				<ul className='flex flex-col gap-1.5 text-xs'>
@@ -69,8 +83,14 @@ export function MergeConfirmationDialog({
 				{!isReady ? (
 					<p className='text-status-danger text-xs'>
 						{hasBlockers
-							? 'Required checks have not passed. Merging now overrides merge readiness and only succeeds if repository policy allows it.'
-							: 'This pull request is not marked ready to merge. Continue only if you are sure.'}
+							? t(
+									'git:merge-dialog.warning-blocked',
+									'Required checks have not passed. Merging now overrides merge readiness and only succeeds if repository policy allows it.',
+								)
+							: t(
+									'git:merge-dialog.warning-not-ready',
+									'This pull request is not marked ready to merge. Continue only if you are sure.',
+								)}
 					</p>
 				) : null}
 				<DialogFooter>
@@ -79,7 +99,7 @@ export function MergeConfirmationDialog({
 						onClick={() => onOpenChange(false)}
 						variant='ghost'
 					>
-						Cancel
+						{t('common:actions.cancel', 'Cancel')}
 					</Button>
 					<Button
 						className='bg-status-ok text-primary-foreground hover:bg-status-ok/90'
@@ -87,7 +107,7 @@ export function MergeConfirmationDialog({
 						onClick={onConfirm}
 					>
 						<GitMergeIcon data-icon='inline-start' />
-						{mergeButtonLabel({ isReady, isSubmitting })}
+						{mergeButtonLabel({ isReady, isSubmitting, t })}
 					</Button>
 				</DialogFooter>
 			</DialogContent>
@@ -108,16 +128,19 @@ interface MergeSummaryRowModel {
  * @param archiveAfterMerge - Whether the workspace is archived once the merge lands
  * @param deleteLocalBranchOnArchive - Whether archiving also deletes the local branch
  * @param pullRequest - The workspace's pull-request model
+ * @param t - The caller's translation function, so the copy follows the UI language
  * @returns The summary rows and the blocking-check flag
  */
 function summarizeMergeReadiness({
 	archiveAfterMerge,
 	deleteLocalBranchOnArchive,
 	pullRequest,
+	t,
 }: {
 	archiveAfterMerge: boolean;
 	deleteLocalBranchOnArchive: boolean;
 	pullRequest: WorkspaceShellModel['pullRequest'];
+	t: TFunction;
 }): { hasBlockers: boolean; rows: MergeSummaryRowModel[] } {
 	const failing = pullRequest.checks.filter(
 		(check) => check.status === 'blocked',
@@ -137,33 +160,45 @@ function summarizeMergeReadiness({
 		hasBlockers,
 		rows: [
 			{
-				label: 'Checks',
+				label: t('git:merge-dialog.checks-label', 'Checks'),
 				tone: hasBlockers ? 'warning' : 'ok',
 				value: describeChecks({
 					failing,
 					hasBlockers,
 					pending,
 					reported: pullRequest.checks.length,
+					t,
 				}),
 			},
 			{
-				label: 'Comments',
+				label: t('git:merge-dialog.comments-label', 'Comments'),
 				tone: unresolved ? 'warning' : 'ok',
 				value: unresolved
-					? `${unresolved} unresolved`
-					: 'No unresolved comments',
+					? t('git:merge-dialog.comments-unresolved', {
+							count: unresolved,
+							defaultValue_one: '{{count}} unresolved',
+							defaultValue_other: '{{count}} unresolved',
+						})
+					: t('git:merge-dialog.comments-clear', 'No unresolved comments'),
 			},
 			{
-				label: 'Todos',
+				label: t('git:merge-dialog.todos-label', 'Todos'),
 				tone: openTodos ? 'warning' : 'ok',
-				value: openTodos ? `${openTodos} open` : 'No open todos',
+				value: openTodos
+					? t('git:merge-dialog.todos-open', {
+							count: openTodos,
+							defaultValue_one: '{{count}} open',
+							defaultValue_other: '{{count}} open',
+						})
+					: t('git:merge-dialog.todos-clear', 'No open todos'),
 			},
 			{
-				label: 'After merge',
+				label: t('git:merge-dialog.after-merge-label', 'After merge'),
 				tone: 'neutral',
 				value: describeArchiveBehavior({
 					archiveAfterMerge,
 					deleteLocalBranchOnArchive,
+					t,
 				}),
 			},
 		],
@@ -176,6 +211,7 @@ function summarizeMergeReadiness({
  * @param hasBlockers - Whether any check blocks the merge
  * @param pending - How many checks are still running
  * @param reported - How many checks the pull request reported at all
+ * @param t - The caller's translation function, so the copy follows the UI language
  * @returns The summary sentence
  */
 function describeChecks({
@@ -183,58 +219,81 @@ function describeChecks({
 	hasBlockers,
 	pending,
 	reported,
+	t,
 }: {
 	failing: number;
 	hasBlockers: boolean;
 	pending: number;
 	reported: number;
+	t: TFunction;
 }): string {
 	if (reported === 0) {
-		return 'No checks reported';
+		return t('git:merge-dialog.checks-none', 'No checks reported');
 	}
 	return hasBlockers
-		? `${failing} failing, ${pending} pending`
-		: 'All checks passed';
+		? t(
+				'git:merge-dialog.checks-blocked',
+				'{{failing}} failing, {{pending}} pending',
+				{
+					failing,
+					pending,
+				},
+			)
+		: t('git:merge-dialog.checks-passed', 'All checks passed');
 }
 
 /**
  * Phrase what happens to the workspace once the merge lands.
  * @param archiveAfterMerge - Whether the workspace is archived once the merge lands
  * @param deleteLocalBranchOnArchive - Whether archiving also deletes the local branch
+ * @param t - The caller's translation function, so the copy follows the UI language
  * @returns The summary sentence
  */
 function describeArchiveBehavior({
 	archiveAfterMerge,
 	deleteLocalBranchOnArchive,
+	t,
 }: {
 	archiveAfterMerge: boolean;
 	deleteLocalBranchOnArchive: boolean;
+	t: TFunction;
 }): string {
 	if (!archiveAfterMerge) {
-		return 'Workspace stays open (archive offered after merge)';
+		return t(
+			'git:merge-dialog.after-merge-stay',
+			'Workspace stays open (archive offered after merge)',
+		);
 	}
 	return deleteLocalBranchOnArchive
-		? 'Workspace will be archived and the local branch deleted'
-		: 'Workspace will be archived';
+		? t(
+				'git:merge-dialog.after-merge-archive-branch',
+				'Workspace will be archived and the local branch deleted',
+			)
+		: t('git:merge-dialog.after-merge-archive', 'Workspace will be archived');
 }
 
 /**
  * Label the confirm button, warning when the merge overrides readiness.
  * @param isReady - Whether the pull request reports as ready to merge
  * @param isSubmitting - Whether a merge is already in flight
+ * @param t - The caller's translation function, so the copy follows the UI language
  * @returns The button label
  */
 function mergeButtonLabel({
 	isReady,
 	isSubmitting,
+	t,
 }: {
 	isReady: boolean;
 	isSubmitting: boolean;
+	t: TFunction;
 }): string {
 	if (isSubmitting) {
-		return 'Merging…';
+		return t('git:merge-dialog.submitting', 'Merging…');
 	}
-	return isReady ? 'Confirm merge' : 'Merge anyway';
+	return isReady
+		? t('git:merge-dialog.confirm', 'Confirm merge')
+		: t('git:merge-dialog.confirm-override', 'Merge anyway');
 }
 
 /** Tailwind text tone applied to a summary row's value. */

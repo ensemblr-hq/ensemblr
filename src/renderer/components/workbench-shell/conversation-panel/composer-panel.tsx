@@ -1,4 +1,5 @@
 import { type ReactNode, useCallback, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { LinearIssuePickerDialog } from '@/renderer/components/linear/linear-issue-picker-dialog';
 import { Textarea } from '@/renderer/components/ui/textarea';
 import { useHotkey } from '@/renderer/hooks/use-hotkey';
@@ -36,6 +37,7 @@ export function ComposerPanel({
 	/** Workspace whose dock hosts terminals the control row hands work off to. */
 	workspaceId: string;
 }) {
+	const { t } = useTranslation();
 	const state = useComposerState({ chatTabId, composer, seedText });
 	const [focused, setFocused] = useState(false);
 	const [modelPickerOpen, setModelPickerOpen] = useState(false);
@@ -80,12 +82,15 @@ export function ComposerPanel({
 	const placeholder =
 		composer.placeholder.length > 0
 			? composer.placeholder
-			: 'Ask to make changes, @mention files, run /commands';
+			: t(
+					'workbench:composer.placeholder',
+					'Ask to make changes, @mention files, run /commands',
+				);
 
 	const textareaBlock = (
 		<div className='relative' ref={state.anchorRef}>
 			<Textarea
-				aria-label='Agent composer'
+				aria-label={t('workbench:composer.aria-label', 'Agent composer')}
 				className='sleek-scrollbar max-h-64 min-h-28 resize-none px-0 py-0 text-sm leading-relaxed shadow-none placeholder:text-muted-foreground/70 focus-visible:ring-0'
 				disabled={composer.disabled}
 				onBlur={() => setFocused(false)}
@@ -124,7 +129,10 @@ export function ComposerPanel({
 				<div className='flex flex-col gap-2 px-4 pt-3 pb-2.5'>
 					<input
 						accept='*/*'
-						aria-label='Upload attachment'
+						aria-label={t(
+							'workbench:composer.upload-input.aria-label',
+							'Upload attachment',
+						)}
 						className='hidden'
 						multiple
 						onChange={state.handleFileChange}

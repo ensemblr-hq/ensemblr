@@ -3,6 +3,7 @@
  * one dot per question, filled once that question has an answer.
  */
 import { ChevronLeftIcon, ChevronRightIcon } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/renderer/components/ui/button';
 import { cn } from '@/renderer/lib/utils';
@@ -36,13 +37,14 @@ export function QuestionPager({
 	onMovePage: (delta: number) => void;
 	pages: readonly { answered: boolean; key: string; label: string }[];
 }) {
+	const { t } = useTranslation();
 	if (pages.length < 2) {
 		return null;
 	}
 	return (
 		<div className='flex items-center gap-0.5'>
 			<Button
-				aria-label='Previous question'
+				aria-label={t('common:agent-question.previous', 'Previous question')}
 				onClick={() => onMovePage(-1)}
 				size='icon-xs'
 				type='button'
@@ -70,7 +72,7 @@ export function QuestionPager({
 				))}
 			</div>
 			<Button
-				aria-label='Next question'
+				aria-label={t('common:agent-question.next', 'Next question')}
 				onClick={() => onMovePage(1)}
 				size='icon-xs'
 				type='button'

@@ -1,4 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
+import type { TFunction } from 'i18next';
+import { useTranslation } from 'react-i18next';
 
 import {
 	ensemblrQueryKeys,
@@ -25,6 +27,7 @@ export function FilePreviewPanel({
 	workspaceCwd: string | null;
 	workspaceId: string;
 }) {
+	const { t } = useTranslation();
 	const { data, isError, isPending } = useQuery({
 		enabled: Boolean(filePath && workspaceCwd),
 		queryFn: () =>
@@ -37,16 +40,40 @@ export function FilePreviewPanel({
 	});
 
 	if (!filePath || !workspaceCwd) {
-		return <PanelMessage message='This tab has no file associated with it.' />;
+		return (
+			<PanelMessage
+				message={t(
+					'workbench:file-preview.empty.no-file',
+					'This tab has no file associated with it.',
+				)}
+			/>
+		);
 	}
 
 	if (isPending) {
-		return <PanelMessage message={`Loading ${filePath}…`} />;
+		return (
+			<PanelMessage
+				message={t(
+					'workbench:file-preview.empty.loading',
+					'Loading {{filePath}}…',
+					{
+						filePath,
+					},
+				)}
+			/>
+		);
 	}
 
 	if (isError) {
 		return (
-			<PanelMessage message={`Could not read ${filePath}.`} tone='error' />
+			<PanelMessage
+				message={t(
+					'workbench:file-preview.failure.unreadable',
+					'Could not read {{filePath}}.',
+					{ filePath },
+				)}
+				tone='error'
+			/>
 		);
 	}
 
@@ -54,7 +81,7 @@ export function FilePreviewPanel({
 	if (result.error) {
 		return (
 			<PanelMessage
-				message={describeReadFailure(result.error.code, filePath)}
+				message={describeReadFailure(result.error.code, filePath, t)}
 				tone='error'
 			/>
 		);
@@ -81,24 +108,49 @@ export function FilePreviewPanel({
  * Build a human-readable message for a workspace file read failure.
  * @param code - The read-failure code.
  * @param filePath - The path that failed to read.
+ * @param t - Translator from the calling component, so the message follows the UI language.
  * @returns A user-facing explanation of the failure.
  */
 function describeReadFailure(
 	code: ReadWorkspaceFileFailureCode,
 	filePath: string,
+	t: TFunction,
 ): string {
 	switch (code) {
 		case 'not-found':
-			return `${filePath} does not exist in this workspace.`;
+			return t(
+				'workbench:file-preview.failure.not-found',
+				'{{filePath}} does not exist in this workspace.',
+				{ filePath },
+			);
 		case 'not-file':
-			return `${filePath} is a directory and cannot be previewed.`;
+			return t(
+				'workbench:file-preview.failure.not-file',
+				'{{filePath}} is a directory and cannot be previewed.',
+				{ filePath },
+			);
 		case 'too-large':
-			return `${filePath} is too large to preview.`;
+			return t(
+				'workbench:file-preview.failure.too-large',
+				'{{filePath}} is too large to preview.',
+				{ filePath },
+			);
 		case 'invalid-path':
-			return `${filePath} is outside this workspace.`;
+			return t(
+				'workbench:file-preview.failure.invalid-path',
+				'{{filePath}} is outside this workspace.',
+				{ filePath },
+			);
 		case 'invalid-cwd':
-			return 'The workspace directory is unavailable.';
+			return t(
+				'workbench:file-preview.failure.invalid-cwd',
+				'The workspace directory is unavailable.',
+			);
 		default:
-			return `Could not read ${filePath}.`;
+			return t(
+				'workbench:file-preview.failure.unreadable',
+				'Could not read {{filePath}}.',
+				{ filePath },
+			);
 	}
 }

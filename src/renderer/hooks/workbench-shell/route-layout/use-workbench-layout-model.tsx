@@ -1,5 +1,6 @@
 import { getRouteApi } from '@tanstack/react-router';
 import { useCallback, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useWorkbenchNavigation } from '@/renderer/hooks/workbench-shell/route-layout/use-workbench-navigation';
 import { useWorkbenchQueries } from '@/renderer/hooks/workbench-shell/route-layout/use-workbench-queries';
 import { useWorkspaceSelectionPersistence } from '@/renderer/hooks/workbench-shell/route-layout/use-workspace-selection-persistence';
@@ -35,6 +36,7 @@ export function useWorkbenchLayoutModel({
 	loaderData: WorkbenchShellData;
 	routeState: WorkbenchShellRouteState;
 }): WorkbenchLayoutModelBundle {
+	const { i18n } = useTranslation();
 	const queries = useWorkbenchQueries({ loaderData });
 	const setupError =
 		getErrorMessage(queries.setupDiagnosticsErrorResult) ??
@@ -60,6 +62,7 @@ export function useWorkbenchLayoutModel({
 			routeState,
 		});
 
+	// biome-ignore lint/correctness/useExhaustiveDependencies: health labels are translated through the i18n singleton, so the language is a real input Biome cannot see.
 	const shellHealth = useMemo(
 		() =>
 			getWorkbenchHealth({
@@ -70,6 +73,7 @@ export function useWorkbenchLayoutModel({
 				setupSnapshot,
 			}),
 		[
+			i18n.language,
 			queries.hasPreloadBridge,
 			queries.healthData,
 			healthError,

@@ -1,0 +1,149 @@
+{
+	"actions": {
+		"commit-and-push": "Commit и push",
+		"merge": "Merge",
+		"push": "Push"
+	},
+	"branch-picker": {
+		"default-tag": "по умолчанию",
+		"empty-remote": "Удалённые ветки не найдены.",
+		"loading": "Загрузка веток…",
+		"no-match": "Нет подходящих веток.",
+		"use-typed-ref": "Использовать <ref>{{typedRef}}</ref>"
+	},
+	"changes-source": {
+		"all": "Все изменения",
+		"changed-file-count_one": "{{count}} файл изменён",
+		"changed-file-count_few": "{{count}} файла изменено",
+		"changed-file-count_many": "{{count}} файлов изменено",
+		"changed-file-count_other": "{{count}} файла изменено",
+		"commits-empty": "Коммитов пока нет.",
+		"commits-failed": "Не удалось загрузить коммиты.",
+		"commits-loading": "Загрузка коммитов…",
+		"discard-all": "Отменить все изменения без коммита",
+		"menu-label": "Открыть меню изменений",
+		"uncommitted": "Изменения без коммита",
+		"uncommitted-badge": "Без коммита",
+		"uncommitted-empty": "Нет изменений без коммита"
+	},
+	"commit-and-push": {
+		"asked": {
+			"title": "Агенту отправлен запрос сделать commit и push."
+		}
+	},
+	"create-pull-request": {
+		"draft": "Создать черновик PR",
+		"manual": "Создать PR вручную",
+		"options-label": "Открыть параметры создания pull request"
+	},
+	"git-status": {
+		"action": {
+			"commit-push": "Commit и push",
+			"push": "Push",
+			"push-branch": "Push ветки"
+		},
+		"clean": "Синхронизировано с удалённым репозиторием",
+		"uncommitted_one": "{{count}} изменение без коммита",
+		"uncommitted_few": "{{count}} изменения без коммита",
+		"uncommitted_many": "{{count}} изменений без коммита",
+		"uncommitted_other": "{{count}} изменения без коммита",
+		"unpublished": "Ветка ещё не запушена",
+		"unpushed_one": "{{count}} коммит без push",
+		"unpushed_few": "{{count}} коммита без push",
+		"unpushed_many": "{{count}} коммитов без push",
+		"unpushed_other": "{{count}} коммита без push"
+	},
+	"merge-conflicts": {
+		"asked": {
+			"title": "Агенту отправлен запрос разрешить конфликты merge."
+		}
+	},
+	"merge-dialog": {
+		"after-merge-archive": "Рабочая область будет заархивирована",
+		"after-merge-archive-branch": "Рабочая область будет заархивирована, а локальная ветка удалена",
+		"after-merge-label": "После merge",
+		"after-merge-stay": "Рабочая область останется открытой (архивация будет предложена после merge)",
+		"checks-blocked": "{{failing}} с ошибками, {{pending}} в ожидании",
+		"checks-label": "Проверки",
+		"checks-none": "Проверок нет",
+		"checks-passed": "Все проверки пройдены",
+		"comments-clear": "Нерешённых комментариев нет",
+		"comments-label": "Комментарии",
+		"comments-unresolved_one": "{{count}} нерешённый комментарий",
+		"comments-unresolved_few": "{{count}} нерешённых комментария",
+		"comments-unresolved_many": "{{count}} нерешённых комментариев",
+		"comments-unresolved_other": "{{count}} нерешённого комментария",
+		"confirm": "Подтвердить merge",
+		"confirm-override": "Всё равно выполнить merge",
+		"description": "Выполняет merge ветки <mono>{{branch}}</mono> через <mono>{{command}}</mono>. Это действие видно всем в репозитории, и его нельзя отменить из Ensemblr.",
+		"submitting": "Выполняется merge…",
+		"title": "Выполнить merge pull request",
+		"title-numbered": "Выполнить merge pull request #{{number}}",
+		"todos-clear": "Открытых задач нет",
+		"todos-label": "Задачи",
+		"todos-open_one": "{{count}} открытая задача",
+		"todos-open_few": "{{count}} открытые задачи",
+		"todos-open_many": "{{count}} открытых задач",
+		"todos-open_other": "{{count}} открытой задачи",
+		"warning-blocked": "Обязательные проверки не пройдены. Merge сейчас переопределит готовность к merge и сработает, только если это разрешает политика репозитория.",
+		"warning-not-ready": "Этот pull request не отмечен как готовый к merge. Продолжайте, только если уверены."
+	},
+	"preview-deployment": {
+		"open": "Открыть preview-деплой",
+		"open-provider": "Открыть preview-деплой {{provider}}"
+	},
+	"pull-request": {
+		"create-action": "Создать PR",
+		"description-field": "Описание PR",
+		"detail": {
+			"blocked": "Устраните неуспешные проверки или блокирующие замечания ревью перед merge.",
+			"checking": "Проверки ещё выполняются.",
+			"closed": "Этот pull request закрыт без merge.",
+			"conflicting": "Необходимо разрешить конфликты merge.",
+			"draft": "Черновик pull request — отметьте готовность к ревью, чтобы запустить проверки политик.",
+			"merged": "Merge этого pull request выполнен.",
+			"no-pull-request": "Для этой ветки ещё нет pull request.",
+			"open": "Pull request открыт.",
+			"ready-to-merge": "Все обязательные проверки пройдены.",
+			"sync-failed": "Не удалось обновить состояние GitHub: {{error}}"
+		},
+		"label": {
+			"blocked": "Заблокирован",
+			"checking": "Проверки идут",
+			"closed": "Закрыт",
+			"conflicts": "Конфликты merge",
+			"draft": "Черновик",
+			"merged": "Merge выполнен",
+			"no-pull-request": "Нет PR",
+			"ready-to-merge": "Готов к merge"
+		},
+		"open-number": "Открыть pull request #{{number}}",
+		"title-field": "Заголовок PR",
+		"update-action": "Обновить PR"
+	},
+	"pull-request-create": {
+		"asked": {
+			"title": "Агенту отправлен запрос открыть pull request."
+		}
+	},
+	"pull-request-create-draft": {
+		"asked": {
+			"title": "Агенту отправлен запрос открыть черновик pull request."
+		}
+	},
+	"pull-request-header": {
+		"activity": "Идёт работа с pull request",
+		"agent-working": "Агент работает"
+	},
+	"pull-request-menu": {
+		"label": "Открыть меню pull request",
+		"open-on-github": "Открыть на GitHub",
+		"refresh": "Обновить статус PR",
+		"resolve-conflicts": "Разрешить конфликты"
+	},
+	"pull-request-update": {
+		"asked": {
+			"title": "Агенту отправлен запрос обновить pull request."
+		}
+	}
+}

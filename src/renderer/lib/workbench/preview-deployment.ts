@@ -1,3 +1,4 @@
+import { i18n } from '@/renderer/lib/i18n';
 import type {
 	PullRequestCheckStatus,
 	PullRequestCheckSummary,
@@ -82,7 +83,9 @@ function fromDeploymentStatus(
 	}
 
 	return {
-		label: deployment.environment || 'Preview',
+		label:
+			deployment.environment ||
+			i18n.t('workbench:preview-deployment.label', 'Preview'),
 		provider: inferDeploymentProvider(deployment.url),
 		source: 'github-deployment',
 		status: toCheckStatus(deployment.state),
@@ -143,7 +146,7 @@ function fromBotComment(
 		);
 		if (url) {
 			return {
-				label: 'Preview',
+				label: i18n.t('workbench:preview-deployment.label', 'Preview'),
 				provider: inferDeploymentProvider(url),
 				source: 'pr-comment',
 				status: 'ready',

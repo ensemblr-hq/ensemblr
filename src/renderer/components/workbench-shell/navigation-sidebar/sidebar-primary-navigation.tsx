@@ -1,4 +1,5 @@
 import { HistoryIcon, LayoutDashboardIcon, SettingsIcon } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 import {
 	SidebarGroup,
@@ -21,6 +22,8 @@ export function SidebarPrimaryNavigation({
 	activeView: WorkbenchActiveView;
 	onStaticNavigationSelect: (target: WorkbenchStaticNavigationTarget) => void;
 }) {
+	const { t } = useTranslation();
+
 	return (
 		<>
 			<SidebarGroup className='min-h-11.75 justify-center py-1'>
@@ -29,22 +32,28 @@ export function SidebarPrimaryNavigation({
 						<StaticNavigationItem
 							icon={<LayoutDashboardIcon aria-hidden='true' />}
 							isActive={activeView === 'dashboard'}
-							label='Dashboard'
+							label={t(
+								'workbench:navigation-sidebar.nav.dashboard',
+								'Dashboard',
+							)}
 							onSelect={onStaticNavigationSelect}
 							target='dashboard'
 						/>
 						<StaticNavigationItem
 							icon={<HistoryIcon aria-hidden='true' />}
 							isActive={activeView === 'history'}
-							label='History'
+							label={t('workbench:navigation-sidebar.nav.history', 'History')}
 							onSelect={onStaticNavigationSelect}
 							target='history'
 						/>
 						<StaticNavigationItem
-							ariaLabel='Open app settings'
+							ariaLabel={t(
+								'workbench:navigation-sidebar.nav.settings-aria',
+								'Open app settings',
+							)}
 							icon={<SettingsIcon aria-hidden='true' />}
 							isActive={activeView === 'settings'}
-							label='Settings'
+							label={t('workbench:navigation-sidebar.nav.settings', 'Settings')}
 							onSelect={onStaticNavigationSelect}
 							target='settings'
 						/>

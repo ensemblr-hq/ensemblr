@@ -1,4 +1,5 @@
 import { PlayIcon } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/renderer/components/ui/button';
 
@@ -12,12 +13,19 @@ export function SetupNotRunEmptyState({
 }: {
 	onRunSetupScript: () => void;
 }) {
+	const { t } = useTranslation();
+
 	return (
 		<div className='flex h-full items-center justify-center bg-terminal p-4 text-terminal-foreground'>
 			<div className='flex flex-col items-center gap-2 text-center'>
-				<div className='font-medium text-sm'>No setup script output</div>
+				<div className='font-medium text-sm'>
+					{t('workbench:setup-script.not-run.title', 'No setup script output')}
+				</div>
 				<p className='text-terminal-muted text-xs leading-5'>
-					Setup script output will appear here after running setup.
+					{t(
+						'workbench:setup-script.not-run.message',
+						'Setup script output will appear here after running setup.',
+					)}
 				</p>
 				<Button
 					className='mt-1 gap-2'
@@ -26,7 +34,7 @@ export function SetupNotRunEmptyState({
 					variant='outline'
 				>
 					<PlayIcon aria-hidden='true' />
-					Run setup
+					{t('workbench:setup-script.run', 'Run setup')}
 				</Button>
 			</div>
 		</div>

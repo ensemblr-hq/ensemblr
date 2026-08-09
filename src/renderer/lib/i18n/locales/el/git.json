@@ -1,0 +1,139 @@
+{
+	"actions": {
+		"commit-and-push": "Commit και push",
+		"merge": "Merge",
+		"push": "Push"
+	},
+	"branch-picker": {
+		"default-tag": "προεπιλογή",
+		"empty-remote": "Δεν βρέθηκαν απομακρυσμένοι κλάδοι.",
+		"loading": "Φόρτωση κλάδων…",
+		"no-match": "Δεν ταιριάζει κανένας κλάδος.",
+		"use-typed-ref": "Χρήση <ref>{{typedRef}}</ref>"
+	},
+	"changes-source": {
+		"all": "Όλες οι αλλαγές",
+		"changed-file-count_one": "{{count}} αρχείο άλλαξε",
+		"changed-file-count_other": "{{count}} αρχεία άλλαξαν",
+		"commits-empty": "Δεν υπάρχουν ακόμη commit.",
+		"commits-failed": "Δεν ήταν δυνατή η φόρτωση των commit.",
+		"commits-loading": "Φόρτωση commit…",
+		"discard-all": "Απόρριψη όλων των αλλαγών χωρίς commit",
+		"menu-label": "Άνοιγμα μενού αλλαγών",
+		"uncommitted": "Αλλαγές χωρίς commit",
+		"uncommitted-badge": "Χωρίς commit",
+		"uncommitted-empty": "Δεν υπάρχουν αλλαγές χωρίς commit"
+	},
+	"commit-and-push": {
+		"asked": {
+			"title": "Ζητήθηκε από τον πράκτορα να κάνει commit και push."
+		}
+	},
+	"create-pull-request": {
+		"draft": "Δημιουργία πρόχειρου PR",
+		"manual": "Χειροκίνητη δημιουργία PR",
+		"options-label": "Άνοιγμα επιλογών δημιουργίας pull request"
+	},
+	"git-status": {
+		"action": {
+			"commit-push": "Commit και push",
+			"push": "Push",
+			"push-branch": "Push κλάδου"
+		},
+		"clean": "Ενημερωμένο με το απομακρυσμένο αποθετήριο",
+		"uncommitted_one": "{{count}} αλλαγή χωρίς commit",
+		"uncommitted_other": "{{count}} αλλαγές χωρίς commit",
+		"unpublished": "Δεν έχει γίνει ακόμη push του κλάδου",
+		"unpushed_one": "{{count}} commit χωρίς push",
+		"unpushed_other": "{{count}} commits χωρίς push"
+	},
+	"merge-conflicts": {
+		"asked": {
+			"title": "Ζητήθηκε από τον πράκτορα να επιλύσει τις συγκρούσεις merge."
+		}
+	},
+	"merge-dialog": {
+		"after-merge-archive": "Ο χώρος εργασίας θα αρχειοθετηθεί",
+		"after-merge-archive-branch": "Ο χώρος εργασίας θα αρχειοθετηθεί και ο τοπικός κλάδος θα διαγραφεί",
+		"after-merge-label": "Μετά το merge",
+		"after-merge-stay": "Ο χώρος εργασίας παραμένει ανοιχτός (η αρχειοθέτηση προτείνεται μετά το merge)",
+		"checks-blocked": "{{failing}} απέτυχαν, {{pending}} σε εκκρεμότητα",
+		"checks-label": "Έλεγχοι",
+		"checks-none": "Δεν αναφέρθηκαν έλεγχοι",
+		"checks-passed": "Όλοι οι έλεγχοι πέρασαν",
+		"comments-clear": "Δεν υπάρχουν ανεπίλυτα σχόλια",
+		"comments-label": "Σχόλια",
+		"comments-unresolved_one": "{{count}} ανεπίλυτο",
+		"comments-unresolved_other": "{{count}} ανεπίλυτα",
+		"confirm": "Επιβεβαίωση merge",
+		"confirm-override": "Merge ούτως ή άλλως",
+		"description": "Κάνει merge τον κλάδο <mono>{{branch}}</mono> μέσω <mono>{{command}}</mono>. Αυτή η ενέργεια είναι ορατή σε όλους στο αποθετήριο και δεν μπορεί να αναιρεθεί από το Ensemblr.",
+		"submitting": "Γίνεται merge…",
+		"title": "Merge του pull request",
+		"title-numbered": "Merge του pull request #{{number}}",
+		"todos-clear": "Δεν υπάρχουν ανοιχτές εργασίες",
+		"todos-label": "Εργασίες",
+		"todos-open_one": "{{count}} ανοιχτή",
+		"todos-open_other": "{{count}} ανοιχτές",
+		"warning-blocked": "Οι απαιτούμενοι έλεγχοι δεν πέρασαν. Το merge τώρα παρακάμπτει την ετοιμότητα για merge και θα πετύχει μόνο αν το επιτρέπει η πολιτική του αποθετηρίου.",
+		"warning-not-ready": "Αυτό το pull request δεν έχει σημανθεί ως έτοιμο για merge. Συνεχίστε μόνο αν είστε σίγουροι."
+	},
+	"preview-deployment": {
+		"open": "Άνοιγμα preview deployment",
+		"open-provider": "Άνοιγμα preview deployment {{provider}}"
+	},
+	"pull-request": {
+		"create-action": "Δημιουργία PR",
+		"description-field": "Περιγραφή PR",
+		"detail": {
+			"blocked": "Επιλύστε τους ελέγχους που απέτυχαν ή τα εμπόδια αξιολόγησης πριν το merge.",
+			"checking": "Οι έλεγχοι εκτελούνται ακόμη.",
+			"closed": "Αυτό το pull request έκλεισε χωρίς merge.",
+			"conflicting": "Πρέπει να επιλυθούν οι συγκρούσεις merge.",
+			"draft": "Πρόχειρο pull request — σημάνετέ το ως έτοιμο για αξιολόγηση για να εκτελεστούν οι έλεγχοι πολιτικής.",
+			"merged": "Αυτό το pull request έχει γίνει merge.",
+			"no-pull-request": "Δεν υπάρχει ακόμη pull request για αυτόν τον κλάδο.",
+			"open": "Το pull request είναι ανοιχτό.",
+			"ready-to-merge": "Όλοι οι απαιτούμενοι έλεγχοι πέρασαν.",
+			"sync-failed": "Δεν ήταν δυνατή η ανανέωση της κατάστασης GitHub: {{error}}"
+		},
+		"label": {
+			"blocked": "Αποκλεισμένο",
+			"checking": "Έλεγχοι σε εξέλιξη",
+			"closed": "Κλειστό",
+			"conflicts": "Συγκρούσεις merge",
+			"draft": "Πρόχειρο",
+			"merged": "Έγινε merge",
+			"no-pull-request": "Χωρίς PR",
+			"ready-to-merge": "Έτοιμο για merge"
+		},
+		"open-number": "Άνοιγμα pull request #{{number}}",
+		"title-field": "Τίτλος PR",
+		"update-action": "Ενημέρωση PR"
+	},
+	"pull-request-create": {
+		"asked": {
+			"title": "Ζητήθηκε από τον πράκτορα να ανοίξει pull request."
+		}
+	},
+	"pull-request-create-draft": {
+		"asked": {
+			"title": "Ζητήθηκε από τον πράκτορα να ανοίξει πρόχειρο pull request."
+		}
+	},
+	"pull-request-header": {
+		"activity": "Δραστηριότητα pull request σε εξέλιξη",
+		"agent-working": "Ο πράκτορας εργάζεται"
+	},
+	"pull-request-menu": {
+		"label": "Άνοιγμα μενού pull request",
+		"open-on-github": "Άνοιγμα στο GitHub",
+		"refresh": "Ανανέωση κατάστασης PR",
+		"resolve-conflicts": "Επίλυση συγκρούσεων"
+	},
+	"pull-request-update": {
+		"asked": {
+			"title": "Ζητήθηκε από τον πράκτορα να ενημερώσει το pull request."
+		}
+	}
+}

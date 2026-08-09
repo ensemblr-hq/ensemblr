@@ -10,6 +10,7 @@ import {
 	useRef,
 	useState,
 } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/renderer/components/ui/button';
 import { cn } from '@/renderer/lib/utils';
 
@@ -55,15 +56,18 @@ const TerminalTitle = ({
 	className,
 	children,
 	...props
-}: TerminalTitleProps) => (
-	<div
-		className={cn('flex items-center gap-2 text-sm text-zinc-400', className)}
-		{...props}
-	>
-		<TerminalIcon className='size-4' />
-		{children ?? 'Terminal'}
-	</div>
-);
+}: TerminalTitleProps) => {
+	const { t } = useTranslation();
+	return (
+		<div
+			className={cn('flex items-center gap-2 text-sm text-zinc-400', className)}
+			{...props}
+		>
+			<TerminalIcon className='size-4' />
+			{children ?? t('common:terminal.title', 'Terminal')}
+		</div>
+	);
+};
 
 /** Props for the terminal status indicator. */
 type TerminalStatusProps = HTMLAttributes<HTMLDivElement>;

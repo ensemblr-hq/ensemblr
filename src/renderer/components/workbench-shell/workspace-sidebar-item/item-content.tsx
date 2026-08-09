@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next';
+
 import { cn } from '@/renderer/lib/utils';
 import type { getWorkspaceSidebarState } from '@/renderer/lib/workbench';
 import type { WorkspaceDockActivityState } from '@/renderer/state/workspace';
@@ -30,6 +32,7 @@ export function WorkspaceSidebarItemContent({
 	sidebarState,
 	workspace,
 }: WorkspaceSidebarItemContentProps) {
+	const { t } = useTranslation();
 	const WorkspaceIcon = sidebarState.icon;
 
 	return (
@@ -63,7 +66,9 @@ export function WorkspaceSidebarItemContent({
 				</div>
 				<div className='mt-1 flex min-w-0 items-center gap-1.5 text-muted-foreground text-xxs'>
 					<span className='truncate'>
-						{isPendingCreation ? 'Creating workspace…' : workspace.branchName}
+						{isPendingCreation
+							? t('workbench:workspace-item.creating', 'Creating workspace…')
+							: workspace.branchName}
 					</span>
 				</div>
 			</div>

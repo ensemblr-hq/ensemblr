@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useId, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import {
 	ensemblrQueryKeys,
@@ -35,6 +36,7 @@ export function EnvironmentVariableSheet({
 	target: EnvironmentVariableSheetTarget | null;
 	onClose: () => void;
 }) {
+	const { t } = useTranslation();
 	const queryClient = useQueryClient();
 	const nameId = useId();
 	const valueId = useId();
@@ -116,13 +118,18 @@ export function EnvironmentVariableSheet({
 
 		if (!nameValid) {
 			setError(
-				'Variable names may only contain letters, numbers, and underscores.',
+				t(
+					'settings:environment.sheet.name-rule',
+					'Variable names may only contain letters, numbers, and underscores.',
+				),
 			);
 			return;
 		}
 
 		if (!valueValid) {
-			setError('A value is required.');
+			setError(
+				t('settings:environment.sheet.value-required', 'A value is required.'),
+			);
 			return;
 		}
 
@@ -141,10 +148,18 @@ export function EnvironmentVariableSheet({
 			<SheetContent className='w-[28rem] sm:max-w-none'>
 				<SheetHeader>
 					<SheetTitle>
-						{isEdit ? 'Edit environment variable' : 'Add environment variable'}
+						{isEdit
+							? t(
+									'settings:environment.sheet.edit-title',
+									'Edit environment variable',
+								)
+							: t('settings:environment.add', 'Add environment variable')}
 					</SheetTitle>
 					<SheetDescription>
-						Variable names may only contain letters, numbers, and underscores.
+						{t(
+							'settings:environment.sheet.name-rule',
+							'Variable names may only contain letters, numbers, and underscores.',
+						)}
 					</SheetDescription>
 				</SheetHeader>
 				<form
@@ -155,7 +170,9 @@ export function EnvironmentVariableSheet({
 					}}
 				>
 					<div className='flex flex-col gap-1.5'>
-						<Label htmlFor={nameId}>Name</Label>
+						<Label htmlFor={nameId}>
+							{t('settings:environment.sheet.name', 'Name')}
+						</Label>
 						<Input
 							autoFocus={!nameLocked}
 							disabled={nameLocked}
@@ -167,7 +184,9 @@ export function EnvironmentVariableSheet({
 						/>
 					</div>
 					<div className='flex min-h-0 flex-1 flex-col gap-1.5'>
-						<Label htmlFor={valueId}>Value</Label>
+						<Label htmlFor={valueId}>
+							{t('settings:environment.sheet.value', 'Value')}
+						</Label>
 						<Textarea
 							autoFocus={nameLocked}
 							className='min-h-70 font-mono text-sm'
@@ -175,7 +194,10 @@ export function EnvironmentVariableSheet({
 							onChange={(event) => setValue(event.target.value)}
 							placeholder={
 								isDocumentedAdd
-									? 'Use an empty value to set this variable to an empty string.'
+									? t(
+											'settings:environment.sheet.empty-value-hint',
+											'Use an empty value to set this variable to an empty string.',
+										)
 									: undefined
 							}
 							spellCheck={false}
@@ -186,7 +208,7 @@ export function EnvironmentVariableSheet({
 				</form>
 				<SheetFooter className='flex-row justify-end gap-2'>
 					<Button onClick={onClose} type='button' variant='ghost'>
-						Cancel
+						{t('common:actions.cancel', 'Cancel')}
 					</Button>
 					<Button
 						disabled={!canSave}
@@ -194,7 +216,9 @@ export function EnvironmentVariableSheet({
 						type='button'
 						variant='default'
 					>
-						{mutation.isPending ? 'Saving…' : 'Save'}
+						{mutation.isPending
+							? t('common:actions.saving', 'Saving…')
+							: t('common:actions.save', 'Save')}
 					</Button>
 				</SheetFooter>
 			</SheetContent>

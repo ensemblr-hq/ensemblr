@@ -1,4 +1,5 @@
 import { useCallback, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { useOpenTargetShortcuts } from '@/renderer/hooks/workbench-shell/use-open-target-shortcuts';
 import { useOpenTargets } from '@/renderer/hooks/workbench-shell/use-open-targets';
@@ -12,6 +13,7 @@ export function OpenWorkspaceMenu({
 }: {
 	workspace: WorkspaceShellModel;
 }) {
+	const { t } = useTranslation();
 	const [isMenuOpen, setMenuOpen] = useState(false);
 	const closeMenu = useCallback(() => setMenuOpen(false), []);
 	const { invokeTarget, openTargets, primaryTarget } = useOpenTargets({
@@ -32,12 +34,19 @@ export function OpenWorkspaceMenu({
 
 	return (
 		<OpenTargetSplitButton
-			menuAriaLabel='Open current workspace app options'
+			menuAriaLabel={t(
+				'workbench:open-workspace-menu.options',
+				'Open current workspace app options',
+			)}
 			onInvoke={(target) => void invokeTarget(target)}
 			onOpenChange={setMenuOpen}
 			open={isMenuOpen}
 			openTargets={openTargets}
-			primaryAriaLabel={`Open current workspace in ${primaryTarget.label}`}
+			primaryAriaLabel={t(
+				'workbench:open-workspace-menu.primary',
+				'Open current workspace in {{target}}',
+				{ target: primaryTarget.label },
+			)}
 			primaryTarget={primaryTarget}
 		/>
 	);

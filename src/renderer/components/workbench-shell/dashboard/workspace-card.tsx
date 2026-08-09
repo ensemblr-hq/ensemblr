@@ -8,8 +8,10 @@ import {
 	type Edge,
 	extractClosestEdge,
 } from '@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge';
+import type { TFunction } from 'i18next';
 import { GitBranchIcon } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { Badge } from '@/renderer/components/ui/badge';
 import { Card } from '@/renderer/components/ui/card';
@@ -23,6 +25,7 @@ import { useWorkspaceBusy } from '@/renderer/hooks/workspace/use-workspace-busy'
 import { cn } from '@/renderer/lib/utils';
 import { getWorkspaceSidebarState } from '@/renderer/lib/workbench';
 import { useWorkspaceUnread } from '@/renderer/state/workspace';
+import type { WorkspaceSidebarStateKind } from '@/renderer/types/components';
 import type { WorkspaceShellModel } from '@/renderer/types/workbench';
 
 import { useBoardWorkspaceMenuController } from './board-workspace-menu';
@@ -82,6 +85,7 @@ export function WorkspaceCard({
 	projectName: string;
 	workspace: WorkspaceShellModel;
 }) {
+	const { t } = useTranslation();
 	const menu = useBoardWorkspaceMenuController();
 	const isUnread = useWorkspaceUnread(workspace.id);
 	const hasDiffStats =
@@ -102,7 +106,11 @@ export function WorkspaceCard({
 					<BoardDropIndicator edge={closestEdge} />
 					<Card className='gap-0 border border-foreground/10 py-0 ring-0 hover:border-foreground/20'>
 						<button
-							aria-label={`Open workspace ${workspace.name}`}
+							aria-label={t(
+								'workbench:workspace-item.open-aria',
+								'Open workspace {{workspace}}',
+								{ workspace: workspace.name },
+							)}
 							className='flex w-full flex-col gap-2 px-3 py-2.5 text-left'
 							onClick={onOpen}
 							type='button'
@@ -172,15 +180,67 @@ function WorkspaceCardFooter({
 	);
 }
 
+/**
+ * Sentence fragment naming a workspace's live state inside the card's aria
+ * label. Keyed off the state id so translators receive a phrase per state
+ * rather than an enum member reworded into English.
+ * @param t - Translation function from `useTranslation`
+ * @param kind - Sidebar state the badge is tinted by
+ * @returns The state fragment in the active language
+ */
+function workspaceStateLabel(
+	t: TFunction,
+	kind: WorkspaceSidebarStateKind,
+): string {
+	switch (kind) {
+		case 'branch':
+			return t('workbench:dashboard.card.state.branch', 'branch');
+		case 'pr-blocked':
+			return t('workbench:dashboard.card.state.pr-blocked', 'blocked');
+		case 'pr-checking':
+			return t('workbench:dashboard.card.state.pr-checking', 'checks running');
+		case 'pr-merged':
+			return t('workbench:dashboard.card.state.pr-merged', 'merged');
+		case 'pr-open':
+			return t('workbench:dashboard.card.state.pr-open', 'open');
+		case 'pr-ready':
+			return t('workbench:dashboard.card.state.pr-ready', 'ready to merge');
+		case 'pr-working':
+			return t('workbench:dashboard.card.state.pr-working', 'agent working');
+		case 'workspace-blocked':
+			return t(
+				'workbench:dashboard.card.state.workspace-blocked',
+				'workspace blocked',
+			);
+		case 'workspace-checking':
+			return t(
+				'workbench:dashboard.card.state.workspace-checking',
+				'workspace checks running',
+			);
+		default:
+			return t(
+				'workbench:dashboard.card.state.workspace-working',
+				'agent working',
+			);
+	}
+}
+
 /** Badge showing a workspace's PR number tinted by its live PR/agent status. */
 function WorkspacePrBadge({ workspace }: { workspace: WorkspaceShellModel }) {
+	const { t } = useTranslation();
 	const agentBusy = useWorkspaceBusy(workspace.id);
 	const state = getWorkspaceSidebarState(workspace, { agentBusy });
 	const StateIcon = state.icon;
-	const stateLabel = state.kind.replace(/^pr-/, '').replace(/-/g, ' ');
 	return (
 		<Badge
-			aria-label={`Pull request #${workspace.pullRequest.number} ${stateLabel}`}
+			aria-label={t(
+				'workbench:dashboard.card.pull-request-aria',
+				'Pull request #{{number}} {{state}}',
+				{
+					number: workspace.pullRequest.number,
+					state: workspaceStateLabel(t, state.kind),
+				},
+			)}
 			className='gap-1'
 			variant='outline'
 		>

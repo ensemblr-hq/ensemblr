@@ -1,3 +1,4 @@
+import { i18n } from '@/renderer/lib/i18n';
 import type {
 	LinearGateState,
 	LinearWorkspaceSeed,
@@ -9,13 +10,26 @@ import type {
 	LinearServiceFailure,
 } from '@/shared/ipc/contracts/linear';
 
-const PRIORITY_LABELS: Record<number, string> = {
-	0: 'No priority',
-	1: 'Urgent',
-	2: 'High',
-	3: 'Medium',
-	4: 'Low',
-};
+/**
+ * Translates one Linear priority number. Resolved per call rather than from a
+ * module-scope table, so a language switch is picked up without a reload.
+ * @param priority - Linear priority number, 0 (none) through 4 (low)
+ * @returns The localized priority label
+ */
+function priorityLabel(priority: number): string {
+	switch (priority) {
+		case 1:
+			return i18n.t('linear:priority.urgent', 'Urgent');
+		case 2:
+			return i18n.t('linear:priority.high', 'High');
+		case 3:
+			return i18n.t('linear:priority.medium', 'Medium');
+		case 4:
+			return i18n.t('linear:priority.low', 'Low');
+		default:
+			return i18n.t('linear:priority.none', 'No priority');
+	}
+}
 
 const STALE_AFTER_MS = 5 * 60 * 1000;
 
@@ -49,11 +63,7 @@ export function deriveLinearGateState({
 
 /** Human label for a Linear priority number (0 = none … 4 = low). */
 export function getLinearPriorityLabel(priority: number | null): string {
-	if (priority === null) {
-		return PRIORITY_LABELS[0] as string;
-	}
-
-	return PRIORITY_LABELS[priority] ?? (PRIORITY_LABELS[0] as string);
+	return priorityLabel(priority ?? 0);
 }
 
 /**
@@ -63,21 +73,43 @@ export function getLinearPriorityLabel(priority: number | null): string {
 export function describeLinearFailure(failure: LinearServiceFailure): string {
 	switch (failure.code) {
 		case 'not-connected':
-			return 'Linear is not connected. Sign in from integration settings.';
+			return i18n.t(
+				'linear:failure.not-connected',
+				'Linear is not connected. Sign in from integration settings.',
+			);
 		case 'reconnect-required':
-			return 'The Linear connection expired. Reconnect from integration settings.';
+			return i18n.t(
+				'linear:failure.reconnect-required',
+				'The Linear connection expired. Reconnect from integration settings.',
+			);
 		case 'permission-denied':
-			return 'Your Linear account does not have permission for this action.';
+			return i18n.t(
+				'linear:failure.permission-denied',
+				'Your Linear account does not have permission for this action.',
+			);
 		case 'rate-limited':
 			return failure.retryAfterSeconds
-				? `Linear rate limit reached. Try again in ${failure.retryAfterSeconds}s.`
-				: 'Linear rate limit reached. Try again shortly.';
+				? i18n.t(
+						'linear:failure.rate-limited-retry',
+						'Linear rate limit reached. Try again in {{seconds}}s.',
+						{ seconds: failure.retryAfterSeconds },
+					)
+				: i18n.t(
+						'linear:failure.rate-limited',
+						'Linear rate limit reached. Try again shortly.',
+					);
 		case 'not-found':
-			return 'This Linear issue no longer exists or is not visible to you.';
+			return i18n.t(
+				'linear:failure.not-found',
+				'This Linear issue no longer exists or is not visible to you.',
+			);
 		case 'invalid-request':
 			return failure.message;
 		default:
-			return 'Linear is unreachable. Showing cached data where available.';
+			return i18n.t(
+				'linear:failure.unreachable',
+				'Linear is unreachable. Showing cached data where available.',
+			);
 	}
 }
 

@@ -1,13 +1,11 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 
 import { setWorkspaceBaseBranch } from '@/renderer/api/ensemblr';
 import { invalidateWorkspaceListViews } from '@/renderer/api/ensemblr/invalidate-workspace-list-views';
 import { originQualifiedRef } from '@/shared/branch-ref';
-
-/** Shown when the bridge rejects, where no service diagnostic exists to quote. */
-const RETARGET_FAILED_MESSAGE = 'Could not change the target branch.';
 
 /** Retarget callbacks for one workspace, plus whether a write is in flight. */
 export interface WorkspaceTargetBranchControls {
@@ -29,16 +27,21 @@ export function useWorkspaceTargetBranch(
 	workspaceId: string,
 ): WorkspaceTargetBranchControls {
 	const queryClient = useQueryClient();
+	const { t } = useTranslation();
+	const retargetFailedMessage = t(
+		'errors:target-branch.retarget-failed.title',
+		'Could not change the target branch.',
+	);
 
 	const { isPending, mutate } = useMutation({
 		mutationFn: (baseBranch: string) =>
 			setWorkspaceBaseBranch({ baseBranch, workspaceId }),
 		onError: () => {
-			toast.error(RETARGET_FAILED_MESSAGE);
+			toast.error(retargetFailedMessage);
 		},
 		onSuccess: async (result) => {
 			if (result.status === 'failure') {
-				toast.error(result.diagnostics[0]?.message ?? RETARGET_FAILED_MESSAGE);
+				toast.error(result.diagnostics[0]?.message ?? retargetFailedMessage);
 				return;
 			}
 			await invalidateWorkspaceListViews(queryClient);

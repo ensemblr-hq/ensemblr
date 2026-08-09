@@ -1,5 +1,6 @@
 import { CheckIcon, CopyIcon } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { cn } from '@/renderer/lib/utils';
 import { BlockControlButton } from './block-controls';
 
@@ -31,7 +32,7 @@ async function writeToClipboard(payload: { html?: string; text: string }) {
  */
 export function CopyResponseButton({
 	className,
-	label = 'Copy response',
+	label,
 	text,
 }: {
 	className?: string;
@@ -40,6 +41,7 @@ export function CopyResponseButton({
 	/** The text itself, or a getter run on click when it has to be read back from the DOM. */
 	text: string | (() => { html?: string; text: string });
 }) {
+	const { t } = useTranslation();
 	const [copied, setCopied] = useState(false);
 	const resetTimer = useRef<number | null>(null);
 	useEffect(
@@ -69,7 +71,7 @@ export function CopyResponseButton({
 	return (
 		<BlockControlButton
 			className={cn(copied && 'text-status-ok opacity-100', className)}
-			label={label}
+			label={label ?? t('common:actions.copy-response', 'Copy response')}
 			onClick={copy}
 		>
 			<Icon aria-hidden='true' className='size-3.5' />

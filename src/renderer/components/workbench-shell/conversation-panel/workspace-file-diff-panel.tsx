@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { ChevronDownIcon } from 'lucide-react';
 import { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 
 import {
@@ -63,6 +64,7 @@ export function WorkspaceFileDiffPanel({
 	workspaceCwd: string | null;
 	workspaceId: string;
 }) {
+	const { i18n, t } = useTranslation();
 	const { data: commentsData } = useQuery(reviewCommentsQuery(workspaceId));
 	const { data: snapshotData } = useQuery(
 		pullRequestSnapshotQuery({ workspaceCwd, workspaceId }),
@@ -91,6 +93,7 @@ export function WorkspaceFileDiffPanel({
 		snapshotData?.snapshot?.pullRequest?.comments ?? EMPTY_LIST;
 	const localComments = commentsData?.comments ?? EMPTY_LIST;
 
+	// biome-ignore lint/correctness/useExhaustiveDependencies: the agent author label is translated through the i18n singleton, so the language is a real input Biome cannot see.
 	const commentsByChangeKey = useMemo(() => {
 		const file = parseSingleFileDiff(patch);
 		return groupDiffComments({
@@ -99,7 +102,7 @@ export function WorkspaceFileDiffPanel({
 			hunks: file?.hunks ?? [],
 			localComments,
 		}).byChangeKey;
-	}, [patch, resolvedPath, githubComments, localComments]);
+	}, [patch, resolvedPath, githubComments, localComments, i18n.language]);
 
 	if (placeholder) {
 		return (
@@ -116,7 +119,9 @@ export function WorkspaceFileDiffPanel({
 			headerActions={
 				<>
 					{isTruncated ? (
-						<span className='text-status-warning text-xs'>Diff truncated</span>
+						<span className='text-status-warning text-xs'>
+							{t('review:file-diff.truncated', 'Diff truncated')}
+						</span>
 					) : null}
 					<AddToChatMenu
 						filePath={resolvedPath}
@@ -160,6 +165,7 @@ function AddToChatMenu({
 	patch: string;
 	workspaceId: string;
 }) {
+	const { t } = useTranslation();
 	const insertToChat = useComposerInsertToChat();
 	const requestComposerFocus = useRequestComposerFocus();
 	const { data } = useQuery(listChatTabsQuery(workspaceId));
@@ -172,7 +178,11 @@ function AddToChatMenu({
 
 	const addToChat = (tab: ChatTabWire) => {
 		insertToChat(tab.id, formatFileDiffContext({ filePath, patch }));
-		toast.success(`Diff added to ${tab.title || 'chat'}.`);
+		toast.success(
+			t('review:file-diff.added-to-chat.title', 'Diff added to {{chat}}.', {
+				chat: tab.title || t('review:file-diff.fallback-chat-name', 'chat'),
+			}),
+		);
 		onSelectChat(tab.id);
 		requestComposerFocus(tab.id);
 	};
@@ -189,7 +199,7 @@ function AddToChatMenu({
 				size='xs'
 				variant='ghost'
 			>
-				Add to chat
+				{t('review:file-diff.add-to-chat', 'Add to chat')}
 			</Button>
 		);
 	}
@@ -198,12 +208,14 @@ function AddToChatMenu({
 		<DropdownMenu>
 			<DropdownMenuTrigger asChild>
 				<Button className='h-6 px-1.5 text-xs' size='xs' variant='ghost'>
-					Add to chat
+					{t('review:file-diff.add-to-chat', 'Add to chat')}
 					<ChevronDownIcon data-icon='inline-end' />
 				</Button>
 			</DropdownMenuTrigger>
 			<DropdownMenuContent align='end' className='w-56 bg-muted p-1'>
-				<DropdownMenuLabel className='px-2'>Add diff to chat</DropdownMenuLabel>
+				<DropdownMenuLabel className='px-2'>
+					{t('review:file-diff.add-diff-to-chat', 'Add diff to chat')}
+				</DropdownMenuLabel>
 				{chats.map((tab, index) => (
 					<DropdownMenuItem
 						className='h-8 gap-2.5 px-2 text-[0.8125rem]'
@@ -211,11 +223,12 @@ function AddToChatMenu({
 						onSelect={() => addToChat(tab)}
 					>
 						<span className='min-w-0 flex-1 truncate'>
-							{tab.title || 'Untitled chat'}
+							{tab.title ||
+								t('review:file-diff.untitled-chat', 'Untitled chat')}
 						</span>
 						{index === 0 ? (
 							<span className='shrink-0 text-muted-foreground text-xs'>
-								latest
+								{t('review:file-diff.latest-chat', 'latest')}
 							</span>
 						) : null}
 					</DropdownMenuItem>

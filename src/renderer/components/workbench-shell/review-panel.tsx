@@ -7,6 +7,7 @@ import {
 	SearchIcon,
 } from 'lucide-react';
 import { useCallback, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/renderer/components/ui/button';
 import { Tabs, TabsContent } from '@/renderer/components/ui/tabs';
@@ -46,6 +47,7 @@ export function ReviewPanel({
 	onTabChange: (tab: ReviewPanelTab) => void;
 	workspace: WorkspaceShellModel;
 }) {
+	const { t } = useTranslation();
 	const [changesViewMode, setChangesViewMode] = useAtom(changesViewModeAtom);
 	const [isFileSearchOpen, setIsFileSearchOpen] = useState(false);
 
@@ -75,13 +77,13 @@ export function ReviewPanel({
 		id: ReviewPanelTab;
 		label: string;
 	}> = [
-		{ id: 'files', label: 'All files' },
+		{ id: 'files', label: t('review:review-panel.tabs.files', 'All files') },
 		{
 			count: changesCount,
 			id: 'changes',
-			label: 'Changes',
+			label: t('review:review-panel.tabs.changes', 'Changes'),
 		},
-		{ id: 'checks', label: 'Checks' },
+		{ id: 'checks', label: t('review:review-panel.tabs.checks', 'Checks') },
 	];
 
 	const openFileSearch = useCallback(() => {
@@ -200,6 +202,8 @@ function ReviewPanelActions({
 	source: ChangesSource;
 	workspace: WorkspaceShellModel;
 }) {
+	const { t } = useTranslation();
+
 	if (activeTab === 'checks') {
 		return <ChecksRefreshButton />;
 	}
@@ -221,8 +225,14 @@ function ReviewPanelActions({
 						<ChangesViewIcon />
 						<span className='sr-only'>
 							{changesViewMode === 'folders'
-								? 'Show changes as list'
-								: 'Show changes as folders'}
+								? t(
+										'review:review-panel.view-mode.as-list',
+										'Show changes as list',
+									)
+								: t(
+										'review:review-panel.view-mode.as-folders',
+										'Show changes as folders',
+									)}
 						</span>
 					</Button>
 					{/* When a non-default source is active its badge owns the slot; the
@@ -248,7 +258,9 @@ function ReviewPanelActions({
 					<ReviewActionButton canReview={canReview} />
 					<Button onClick={onFileSearchOpen} size='icon-sm' variant='ghost'>
 						<SearchIcon />
-						<span className='sr-only'>Search files</span>
+						<span className='sr-only'>
+							{t('review:review-panel.search-files', 'Search files')}
+						</span>
 					</Button>
 				</>
 			)}
@@ -258,6 +270,7 @@ function ReviewPanelActions({
 
 /** Kicks off the review agent action; shared by the Changes and All files tabs. */
 function ReviewActionButton({ canReview }: { canReview: boolean }) {
+	const { t } = useTranslation();
 	const reviewActions = useReviewActions();
 
 	// Nothing to review when the branch diff is empty — hide the affordance.
@@ -273,13 +286,16 @@ function ReviewActionButton({ canReview }: { canReview: boolean }) {
 			variant='ghost'
 		>
 			<EyeIcon data-icon='inline-start' />
-			<span className='review-panel-action-label'>Review</span>
+			<span className='review-panel-action-label'>
+				{t('review:review-panel.review-action', 'Review')}
+			</span>
 		</Button>
 	);
 }
 
 /** Manual gh snapshot refresh for the Checks tab. */
 function ChecksRefreshButton() {
+	const { t } = useTranslation();
 	const reviewActions = useReviewActions();
 
 	return (
@@ -295,7 +311,12 @@ function ChecksRefreshButton() {
 						reviewActions?.isRefreshingPullRequest ? 'animate-spin' : undefined,
 					)}
 				/>
-				<span className='sr-only'>Refresh pull request status</span>
+				<span className='sr-only'>
+					{t(
+						'review:review-panel.refresh-pull-request',
+						'Refresh pull request status',
+					)}
+				</span>
 			</Button>
 		</div>
 	);

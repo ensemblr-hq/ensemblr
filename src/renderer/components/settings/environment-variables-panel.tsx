@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { PlusIcon } from 'lucide-react';
 import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { environmentVariablesQuery } from '@/renderer/api/ensemblr';
 import { DocumentedVariablesList } from '@/renderer/components/settings/documented-variables-list';
@@ -48,6 +49,7 @@ export function EnvironmentVariablesPanel({
 	scopeId,
 	title,
 }: EnvironmentVariablesPanelProps) {
+	const { t } = useTranslation();
 	const { data, error, isLoading } = useQuery(environmentVariablesQuery);
 	const [target, setTarget] = useState<EnvironmentVariableSheetTarget | null>(
 		null,
@@ -73,7 +75,7 @@ export function EnvironmentVariablesPanel({
 			variant='secondary'
 		>
 			<PlusIcon aria-hidden='true' className='size-4' />
-			Add environment variable
+			{t('settings:environment.add', 'Add environment variable')}
 		</Button>
 	);
 
@@ -87,18 +89,29 @@ export function EnvironmentVariablesPanel({
 				<div className='space-y-3 pt-4'>
 					{isLoading ? (
 						<div className='flex items-center gap-2 py-6 text-muted-foreground text-sm'>
-							<Spinner className='size-4' /> Reading environment…
+							<Spinner className='size-4' />{' '}
+							{t('settings:environment.loading', 'Reading environment…')}
 						</div>
 					) : error ? (
 						<div className='py-6 text-sm text-status-danger'>
-							Failed to read environment: {String(error)}.
+							{t(
+								'settings:environment.read-failed',
+								'Failed to read environment: {{error}}.',
+								{ error: String(error) },
+							)}
 						</div>
 					) : (
 						<>
 							{configured.length === 0 ? (
 								<SettingsEmptyState
-									description='Add a variable to make it available in this environment.'
-									title='No variables set'
+									description={t(
+										'settings:environment.empty.description',
+										'Add a variable to make it available in this environment.',
+									)}
+									title={t(
+										'settings:environment.empty.title',
+										'No variables set',
+									)}
 								/>
 							) : (
 								<div className='divide-y divide-border rounded-md border bg-card/40'>

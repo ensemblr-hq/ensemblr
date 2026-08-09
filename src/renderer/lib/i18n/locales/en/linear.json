@@ -1,0 +1,117 @@
+{
+	"comment-composer": {
+		"label": "Add a comment",
+		"placeholder": "Add a comment…",
+		"posting": "Posting…",
+		"submit": "Comment"
+	},
+	"connection-gate": {
+		"not-configured": {
+			"description": "Add app.linear.clientId to ~/.config/ensemblr/config.json, then connect from integration settings.",
+			"title": "Linear is not configured"
+		},
+		"not-connected": {
+			"description": "Connect Linear from integration settings to browse issues, manage them from Ensemblr, and create workspaces from issues.",
+			"title": "Linear is not connected"
+		},
+		"open-settings": "Open integration settings",
+		"reconnect-required": {
+			"title": "Linear needs to be reconnected"
+		}
+	},
+	"create-workspace": {
+		"creating": "Creating…",
+		"menu-label": "Create in repository",
+		"trigger": "Create workspace"
+	},
+	"failure": {
+		"not-connected": "Linear is not connected. Sign in from integration settings.",
+		"not-found": "This Linear issue no longer exists or is not visible to you.",
+		"permission-denied": "Your Linear account does not have permission for this action.",
+		"rate-limited": "Linear rate limit reached. Try again shortly.",
+		"rate-limited-retry": "Linear rate limit reached. Try again in {{seconds}}s.",
+		"reconnect-required": "The Linear connection expired. Reconnect from integration settings.",
+		"unreachable": "Linear is unreachable. Showing cached data where available."
+	},
+	"issue-badges": {
+		"archived": "Archived"
+	},
+	"issue-detail": {
+		"back": "Back to issues",
+		"load-failed": "This Linear issue could not be loaded.",
+		"no-comments": "No comments yet.",
+		"no-description": "No description.",
+		"open-external": "Open in Linear",
+		"refresh": "Refresh issue",
+		"unknown-author": "Unknown"
+	},
+	"issue-editor": {
+		"description-create": "Create an issue in the connected Linear workspace.",
+		"description-edit": "Update fields where your Linear permissions allow.",
+		"field": {
+			"assignee": "Assignee",
+			"cycle": "Cycle",
+			"description": "Issue description",
+			"description-placeholder": "Description (markdown)",
+			"due-date": "Due date",
+			"priority": "Priority",
+			"project": "Project",
+			"status": "Status",
+			"team": "Team",
+			"title": "Issue title"
+		},
+		"priority": {
+			"high": "High",
+			"low": "Low",
+			"medium": "Medium",
+			"none": "No priority",
+			"urgent": "Urgent"
+		},
+		"saving": "Saving…",
+		"submit-create": "Create issue",
+		"submit-edit": "Save changes",
+		"title-create": "New Linear issue",
+		"title-edit": "Edit {{identifier}}",
+		"unset-option": "{{field}}: none"
+	},
+	"issue-list": {
+		"all-teams": "All teams",
+		"empty": "No Linear issues are cached yet. Refresh to sync from Linear.",
+		"empty-search": "No issues match your search.",
+		"new-issue": "New issue",
+		"refresh": "Refresh issues",
+		"search-label": "Search Linear issues",
+		"search-placeholder": "Search by identifier or title…"
+	},
+	"issue-picker": {
+		"description": "Search Linear issues and pick one to link.",
+		"empty": "No issues match your search.",
+		"loading": "Loading issues…",
+		"not-connected": "Linear is not connected. Sign in from integration settings.",
+		"search-placeholder": "Search by identifier or title…",
+		"title": "Link Linear issue"
+	},
+	"linked-issue": {
+		"connect": "Connect Linear",
+		"reconnect": "Reconnect Linear",
+		"refresh": "Refresh linked issue",
+		"refresh-status": "Refresh linked issue status",
+		"set-status": "Set status",
+		"set-status-menu": "Update Linear status",
+		"status": {
+			"deleted": "Deleted in Linear",
+			"no-access": "No access",
+			"rate-limited": "Rate limited",
+			"unavailable": "Status unavailable"
+		},
+		"update-failed": "Updating the Linear status failed.",
+		"updating": "Updating…"
+	},
+	"priority": {
+		"high": "High",
+		"low": "Low",
+		"medium": "Medium",
+		"none": "No priority",
+		"urgent": "Urgent"
+	}
+}

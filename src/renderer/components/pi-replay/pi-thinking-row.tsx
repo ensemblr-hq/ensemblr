@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { cn } from '@/renderer/lib/utils';
 import type { PiThinkingItem } from '@/renderer/types/pi-replay';
 
@@ -15,6 +16,7 @@ export function PiThinkingRow({
 	className?: string;
 	item: PiThinkingItem;
 }) {
+	const { t } = useTranslation();
 	const isOpen = item.endedAtMs === null;
 	const [nowMs, setNowMs] = useState(() => Date.now());
 	useEffect(() => {
@@ -28,8 +30,12 @@ export function PiThinkingRow({
 	const durationMs = (item.endedAtMs ?? nowMs) - item.startedAtMs;
 	const seconds = Math.max(0, durationMs) / 1000;
 	const label = isOpen
-		? `Reasoning… ${seconds.toFixed(1)}s`
-		: `Reasoned for ${seconds < 10 ? seconds.toFixed(1) : Math.round(seconds)}s`;
+		? t('common:thinking.reasoning', 'Reasoning… {{seconds}}s', {
+				seconds: seconds.toFixed(1),
+			})
+		: t('common:thinking.reasoned', 'Reasoned for {{seconds}}s', {
+				seconds: seconds < 10 ? seconds.toFixed(1) : Math.round(seconds),
+			});
 
 	return (
 		<div

@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next';
+
 import type { RootDirectoryChangePreview } from '@/shared/ipc/contracts/root-directory';
 
 /** Read-only preview block showing what a root-directory change will do. */
@@ -6,16 +8,25 @@ export function RootPathPreview({
 }: {
 	preview: RootDirectoryChangePreview;
 }) {
+	const { t } = useTranslation();
 	return (
 		<div className='grid gap-2 text-xs'>
 			<div className='rounded-md border border-border bg-background/60 px-3 py-2'>
-				<p className='font-medium'>Current root</p>
+				<p className='font-medium'>
+					{t('common:root-directory.current-root', 'Current root')}
+				</p>
 				<code className='mt-1 block break-all text-muted-foreground'>
-					{preview.oldRoot?.path ?? 'No current root snapshot'}
+					{preview.oldRoot?.path ??
+						t(
+							'common:root-directory.no-current-root',
+							'No current root snapshot',
+						)}
 				</code>
 			</div>
 			<div className='rounded-md border border-border bg-background/60 px-3 py-2'>
-				<p className='font-medium'>Selected root</p>
+				<p className='font-medium'>
+					{t('common:root-directory.selected-root', 'Selected root')}
+				</p>
 				<code className='mt-1 block break-all text-muted-foreground'>
 					{preview.newRoot.path}
 				</code>

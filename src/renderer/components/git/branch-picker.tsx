@@ -1,5 +1,6 @@
 import { ChevronsUpDownIcon, GitBranchIcon } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
+import { Trans, useTranslation } from 'react-i18next';
 
 import { Button } from '@/renderer/components/ui/button';
 import {
@@ -138,9 +139,12 @@ export function BranchPicker({
 							<PinnedOption
 								isChecked={typedRef === selected}
 								label={
-									<>
-										Use <span className='font-mono'>{typedRef}</span>
-									</>
+									<Trans
+										components={{ ref: <span className='font-mono' /> }}
+										defaults='Use <ref>{{typedRef}}</ref>'
+										i18nKey='git:branch-picker.use-typed-ref'
+										values={{ typedRef }}
+									/>
 								}
 								onSelect={() => {
 									onSelectCustomRef(typedRef);
@@ -214,6 +218,8 @@ function BranchOption({
 	isChecked: boolean;
 	onSelect: () => void;
 }) {
+	const { t } = useTranslation();
+
 	return (
 		<CommandItem
 			className='gap-2'
@@ -226,7 +232,9 @@ function BranchOption({
 				{branch.name}
 			</span>
 			{branch.isDefault ? (
-				<span className='shrink-0 text-muted-foreground text-xxs'>default</span>
+				<span className='shrink-0 text-muted-foreground text-xxs'>
+					{t('git:branch-picker.default-tag', 'default')}
+				</span>
 			) : null}
 		</CommandItem>
 	);
@@ -248,10 +256,12 @@ function BranchListStatus({
 	isLoading: boolean;
 	remediation: string | null;
 }) {
+	const { t } = useTranslation();
+
 	if (isLoading) {
 		return (
 			<div className='py-6 text-center text-muted-foreground text-xs'>
-				Loading branches…
+				{t('git:branch-picker.loading', 'Loading branches…')}
 			</div>
 		);
 	}
@@ -270,14 +280,14 @@ function BranchListStatus({
 	if (isEmpty) {
 		return (
 			<div className='py-6 text-center text-muted-foreground text-xs'>
-				No remote branches found.
+				{t('git:branch-picker.empty-remote', 'No remote branches found.')}
 			</div>
 		);
 	}
 
 	return (
 		<CommandEmpty className='py-6 text-muted-foreground text-xs'>
-			No branches match.
+			{t('git:branch-picker.no-match', 'No branches match.')}
 		</CommandEmpty>
 	);
 }

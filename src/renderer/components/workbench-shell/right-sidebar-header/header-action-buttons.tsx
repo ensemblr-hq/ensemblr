@@ -4,12 +4,13 @@ import {
 	GitMergeIcon,
 	LoaderCircleIcon,
 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/renderer/components/ui/button';
+import { usePermissionBoundaryLabel } from '@/renderer/hooks/workbench-shell/use-permission-boundary-label';
 import {
 	classifyPermissionAction,
 	DEFAULT_PERMISSION_MODE,
-	getPermissionBoundaryLabel,
 } from '@/shared/permissions';
 
 import { useReviewActions } from '../review-actions/review-actions-context';
@@ -26,7 +27,6 @@ const mergeBoundary = classifyPermissionAction({
 	action: 'pull-request-merge',
 	mode: DEFAULT_PERMISSION_MODE,
 });
-const mergeBoundaryLabel = getPermissionBoundaryLabel(mergeBoundary.boundary);
 
 /** Trailing-slot spinner standing in for an action that is not offered yet. */
 export function HeaderActivitySpinner({ label }: { label: string }) {
@@ -42,6 +42,8 @@ export function HeaderActivitySpinner({ label }: { label: string }) {
 
 /** Opens the merge confirmation dialog — the only path to `gh pr merge` (ADR 0023). */
 export function MergePullRequestAction() {
+	const { t } = useTranslation();
+	const mergeBoundaryLabel = usePermissionBoundaryLabel(mergeBoundary.boundary);
 	const reviewActions = useReviewActions();
 
 	return (
@@ -52,7 +54,7 @@ export function MergePullRequestAction() {
 			size='sm'
 		>
 			<GitMergeIcon data-icon='inline-start' />
-			Merge
+			{t('git:actions.merge', 'Merge')}
 			<span className='sr-only'>{mergeBoundaryLabel}</span>
 		</Button>
 	);
@@ -60,6 +62,7 @@ export function MergePullRequestAction() {
 
 /** Hands staging, committing, and pushing the worktree to the chat agent. */
 export function CommitAndPushAction() {
+	const { t } = useTranslation();
 	const reviewActions = useReviewActions();
 
 	return (
@@ -70,13 +73,14 @@ export function CommitAndPushAction() {
 			size='sm'
 		>
 			<GitCommitVerticalIcon aria-hidden='true' data-icon='inline-start' />
-			Commit and push
+			{t('git:actions.commit-and-push', 'Commit and push')}
 		</Button>
 	);
 }
 
 /** Pushes the branch with git, the one review chore that skips the agent. */
 export function PushBranchAction() {
+	const { t } = useTranslation();
 	const reviewActions = useReviewActions();
 	const isPushing = reviewActions?.isPushingBranch === true;
 
@@ -96,7 +100,7 @@ export function PushBranchAction() {
 			) : (
 				<ArrowUpIcon aria-hidden='true' data-icon='inline-start' />
 			)}
-			Push
+			{t('git:actions.push', 'Push')}
 		</Button>
 	);
 }
