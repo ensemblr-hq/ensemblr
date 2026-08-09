@@ -90,6 +90,18 @@ describe('parseAppSettings', () => {
 		).toBe(false);
 	});
 
+	test('parses developer mode, defaulting off on a non-boolean', () => {
+		expect(DEFAULT_APP_SETTINGS.experimental.developerMode).toBe(false);
+		expect(
+			parseAppSettings({ experimental: { developerMode: true } }).experimental
+				.developerMode,
+		).toBe(true);
+		expect(
+			parseAppSettings({ experimental: { developerMode: 'on' } }).experimental
+				.developerMode,
+		).toBe(false);
+	});
+
 	test('parses the onboarding completion stamp, defaulting to never shown', () => {
 		expect(DEFAULT_APP_SETTINGS.onboarding.completedAt).toBeNull();
 		expect(

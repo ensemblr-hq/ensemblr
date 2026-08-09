@@ -113,6 +113,17 @@
 	--ensemblr-status-danger: var(--ensemblr-if-light, oklch(0.58 0.19 28))
 		var(--ensemblr-if-dark, oklch(0.68 0.15 28));
 	/*
+	 * Third-party brand colours, for the provider marks in onboarding and
+	 * Settings → Providers. Deliberately NOT theme colours: they are the vendors'
+	 * own hexes and must not shift with the app's palette or its light/dark
+	 * variants. They are named here rather than inlined at the call sites so the
+	 * value appears once instead of once per `bg-`/`text-` pair. Pi has no entry —
+	 * it is the house runtime and borrows `--ensemblr-accent`.
+	 */
+	--ensemblr-brand-claude: #d97757;
+	--ensemblr-brand-linear: #5e6ad2;
+	--ensemblr-brand-linear-ink: #6b77e0;
+	/*
 	 * The merged-PR purple. Lives here rather than under `[data-pr-tone="merged"]`
 	 * so the `pr-merged` utilities resolve wherever a merged pull request renders.
 	 * An unresolved custom property makes a colour declaration invalid at computed
@@ -383,6 +394,9 @@
 	--color-pane-strong: var(--ensemblr-pane-strong);
 	--color-ink: var(--ensemblr-ink);
 	--color-accent-strong: var(--ensemblr-accent);
+	--color-brand-claude: var(--ensemblr-brand-claude);
+	--color-brand-linear: var(--ensemblr-brand-linear);
+	--color-brand-linear-ink: var(--ensemblr-brand-linear-ink);
 	--color-status-ok: var(--ensemblr-status-ok);
 	--color-status-warning: var(--ensemblr-status-warning);
 	--color-status-danger: var(--ensemblr-status-danger);

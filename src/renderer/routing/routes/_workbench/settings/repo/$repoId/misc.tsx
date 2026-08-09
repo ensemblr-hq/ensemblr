@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
-import { Trash2Icon } from 'lucide-react';
+import { PlusIcon, Trash2Icon } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 
@@ -9,6 +9,7 @@ import {
 	invalidateWorkspaceListViews,
 } from '@/renderer/api/ensemblr';
 import { SettingRow } from '@/renderer/components/settings/setting-row';
+import { SettingsCodeValue } from '@/renderer/components/settings/settings-code-value';
 import { SettingsSection } from '@/renderer/components/settings/settings-section';
 import { Button } from '@/renderer/components/ui/button';
 import {
@@ -128,9 +129,7 @@ function RepoMiscSettings() {
 				label={t('settings:repo.root-path.label', 'Root path')}
 				stack
 			>
-				<code className='mt-2 block truncate rounded-md bg-muted/40 px-3 py-2 font-mono text-xs'>
-					{project?.pathLabel ?? '—'}
-				</code>
+				<SettingsCodeValue value={project?.pathLabel ?? '—'} />
 			</SettingRow>
 
 			<SettingRow
@@ -141,9 +140,9 @@ function RepoMiscSettings() {
 				label={t('settings:repo.workspaces-path.label', 'Workspaces path')}
 				stack
 			>
-				<code className='mt-2 block truncate rounded-md bg-muted/40 px-3 py-2 font-mono text-xs'>
-					{project ? `${project.pathLabel} (workspaces)` : '—'}
-				</code>
+				<SettingsCodeValue
+					value={project ? `${project.pathLabel} (workspaces)` : '—'}
+				/>
 			</SettingRow>
 
 			<PreviewUrlsSetting
@@ -158,52 +157,59 @@ function RepoMiscSettings() {
 				seed={seededFilesToCopy}
 			/>
 
-			<div className='pt-6'>
-				<Dialog>
-					<DialogTrigger asChild>
-						<Button size='sm' variant='destructive'>
-							<Trash2Icon aria-hidden='true' className='size-4' />
-							{t('settings:repo.remove.trigger', 'Remove repository')}
-						</Button>
-					</DialogTrigger>
-					<DialogContent>
-						<DialogHeader>
-							<DialogTitle>
-								{t('settings:repo.remove.title', 'Remove this repository?')}
-							</DialogTitle>
-							<DialogDescription>
-								<Trans
-									components={{
-										path: <code className='mx-1 font-mono text-xs' />,
-									}}
-									defaults='Removes the repository from Ensemblr. The on-disk directory at<path>{{path}}</path>is not deleted; delete it manually if you want it gone.'
-									i18nKey='settings:repo.remove.description'
-									values={{ path: project?.pathLabel ?? '' }}
-								/>
-							</DialogDescription>
-						</DialogHeader>
-						{removeError ? (
-							<p className='text-status-danger text-xs'>{removeError}</p>
-						) : null}
-						<DialogFooter>
-							<DialogClose asChild>
-								<Button variant='ghost'>
-									{t('common:actions.cancel', 'Cancel')}
-								</Button>
-							</DialogClose>
-							<Button
-								disabled={remove.isPending}
-								onClick={() => remove.mutate()}
-								variant='destructive'
-							>
-								{remove.isPending
-									? t('common:actions.removing', 'Removing…')
-									: t('common:actions.remove', 'Remove')}
+			<SettingRow
+				control={
+					<Dialog>
+						<DialogTrigger asChild>
+							<Button size='sm' variant='destructive'>
+								<Trash2Icon aria-hidden='true' data-icon='inline-start' />
+								{t('settings:repo.remove.trigger', 'Remove repository')}
 							</Button>
-						</DialogFooter>
-					</DialogContent>
-				</Dialog>
-			</div>
+						</DialogTrigger>
+						<DialogContent>
+							<DialogHeader>
+								<DialogTitle>
+									{t('settings:repo.remove.title', 'Remove this repository?')}
+								</DialogTitle>
+								<DialogDescription>
+									<Trans
+										components={{
+											path: <code className='mx-1 font-mono text-xs' />,
+										}}
+										defaults='Removes the repository from Ensemblr. The on-disk directory at<path>{{path}}</path>is not deleted; delete it manually if you want it gone.'
+										i18nKey='settings:repo.remove.description'
+										values={{ path: project?.pathLabel ?? '' }}
+									/>
+								</DialogDescription>
+							</DialogHeader>
+							{removeError ? (
+								<p className='text-status-danger text-xs'>{removeError}</p>
+							) : null}
+							<DialogFooter>
+								<DialogClose asChild>
+									<Button variant='ghost'>
+										{t('common:actions.cancel', 'Cancel')}
+									</Button>
+								</DialogClose>
+								<Button
+									disabled={remove.isPending}
+									onClick={() => remove.mutate()}
+									variant='destructive'
+								>
+									{remove.isPending
+										? t('common:actions.removing', 'Removing…')
+										: t('common:actions.remove', 'Remove')}
+								</Button>
+							</DialogFooter>
+						</DialogContent>
+					</Dialog>
+				}
+				description={t(
+					'settings:repo.remove.row-description',
+					'Drops this repository from Ensemblr. Workspaces stop being tracked; nothing on disk is deleted.',
+				)}
+				label={t('settings:repo.remove.row-label', 'Remove repository')}
+			/>
 		</SettingsSection>
 	);
 }
@@ -288,15 +294,15 @@ function PreviewUrlsSetting({
 			onReset={() => onSave(null)}
 			stack
 		>
-			<div className='mt-2 space-y-2'>
+			<div className='space-y-2'>
 				{rows.map((entry, idx) => (
-					<div className='flex gap-2' key={entry.id}>
+					<div className='flex items-center gap-2' key={entry.id}>
 						<Input
 							aria-label={t(
 								'settings:repo.preview-urls.name-aria-label',
 								'Preview URL name',
 							)}
-							className='h-8 w-32 text-xs'
+							className='h-7 w-32 text-xs'
 							onChange={(e) => editRow(idx, { name: e.target.value })}
 							placeholder={t(
 								'settings:repo.preview-urls.name-placeholder',
@@ -309,18 +315,27 @@ function PreviewUrlsSetting({
 								'settings:repo.preview-urls.template-aria-label',
 								'Preview URL template',
 							)}
-							className='h-8 flex-1 font-mono text-xs'
+							className='h-7 flex-1 font-mono text-xs'
 							onChange={(e) => editRow(idx, { url: e.target.value })}
 							placeholder='https://localhost:$ENSEMBLR_PORT'
 							value={entry.url}
 						/>
-						<Button onClick={() => deleteRow(idx)} size='icon' variant='ghost'>
-							<Trash2Icon aria-hidden='true' className='size-4' />
+						<Button
+							aria-label={t(
+								'settings:repo.preview-urls.delete-aria-label',
+								'Delete preview URL',
+							)}
+							onClick={() => deleteRow(idx)}
+							size='icon-sm'
+							variant='ghost'
+						>
+							<Trash2Icon aria-hidden='true' className='size-3.5' />
 						</Button>
 					</div>
 				))}
 				<Button onClick={addRow} size='sm' variant='outline'>
-					{t('settings:repo.preview-urls.add', '+ Add preview URL')}
+					<PlusIcon aria-hidden='true' data-icon='inline-start' />
+					{t('settings:repo.preview-urls.add', 'Add preview URL')}
 				</Button>
 			</div>
 		</SettingRow>
@@ -368,7 +383,7 @@ function FilesToCopySetting({
 			{/* i18next-instrument-ignore */}
 			<Textarea
 				aria-label={t('settings:repo.files-to-copy.label', 'Files to copy')}
-				className='mt-2 min-h-18 font-mono text-xs'
+				className='min-h-18 font-mono text-xs'
 				onChange={(e) => onChange(e.target.value)}
 				placeholder='.env*'
 				value={value}

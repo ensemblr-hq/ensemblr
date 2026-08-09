@@ -4,6 +4,7 @@ import type {
 	SetupCheckId,
 	SetupCheckSnapshot,
 	SetupDiagnosticsSnapshot,
+	SetupMessageParams,
 } from '../../shared/ipc/contracts/setup';
 import {
 	AGENT_RUNTIME_CHECK_GROUPS,
@@ -259,11 +260,46 @@ function sanitizeCheck(
 	return {
 		...check,
 		detail: formatSafeText(check.detail, homeDirectory),
+		...(check.detailMessage
+			? {
+					detailMessage: {
+						...check.detailMessage,
+						...(check.detailMessage.params
+							? {
+									params: sanitizeMessageParams(
+										check.detailMessage.params,
+										homeDirectory,
+									),
+								}
+							: {}),
+					},
+				}
+			: {}),
 		logs: check.logs.map((log) => ({
 			...log,
 			text: formatSafeText(log.text, homeDirectory),
 		})),
 	};
+}
+
+/**
+ * Redacts the string values a localized message interpolates. Paths and command
+ * output reach the renderer as params now, so they need the same treatment the
+ * flattened English detail gets.
+ * @param params - Interpolation values as the check authored them.
+ * @param homeDirectory - Home directory to collapse.
+ * @returns The params with every string value sanitised.
+ */
+function sanitizeMessageParams(
+	params: SetupMessageParams,
+	homeDirectory: string,
+): SetupMessageParams {
+	return Object.fromEntries(
+		Object.entries(params).map(([key, value]) => [
+			key,
+			typeof value === 'string' ? formatSafeText(value, homeDirectory) : value,
+		]),
+	);
 }
 
 /**

@@ -1,3 +1,4 @@
+import type { TFunction } from 'i18next';
 import {
 	CheckIcon,
 	ClipboardIcon,
@@ -14,6 +15,10 @@ import { useTranslation } from 'react-i18next';
 
 import { StatusBadge } from '@/renderer/components/status-badge';
 import { Button } from '@/renderer/components/ui/button';
+import {
+	setupCheckDetail,
+	setupRemediationLabel,
+} from '@/renderer/lib/setup-check-text';
 import { cn } from '@/renderer/lib/utils';
 import type {
 	OnboardingCheckModel,
@@ -122,6 +127,31 @@ const ACTIONABLE_PRESENTATIONS: readonly CardPresentation[] = [
 const COPIED_RESET_MS = 1800;
 
 /**
+ * Remediation ids the wizard labels for itself. `open-linear-settings` starts
+ * OAuth in place here instead of navigating to Settings → Integrations, so the
+ * shared diagnostics label names an action this button does not take.
+ */
+const WIZARD_REMEDIATION_LABEL: Record<string, (t: TFunction) => string> = {
+	'open-linear-settings': (t) => t('common:actions.connect', 'Connect'),
+};
+
+/**
+ * Labels a remediation button, preferring the wizard's own wording wherever the
+ * shared diagnostics label describes a different action.
+ * @param remediation - The remediation being labelled.
+ * @param t - Translator from the calling component.
+ * @returns The button label.
+ */
+function remediationLabel(
+	remediation: OnboardingRemediation,
+	t: TFunction,
+): string {
+	const override = WIZARD_REMEDIATION_LABEL[remediation.id];
+
+	return override ? override(t) : setupRemediationLabel(remediation, t);
+}
+
+/**
  * One probe rendered as a card. Roomier than the shipped `SetupCheckRow`, which
  * is tuned for a settings list of fifteen; a wizard step shows one or two.
  */
@@ -211,7 +241,7 @@ export function OnboardingCheckCard({
 					</div>
 					{isProbing ? (
 						<>
-							<span className='sr-only'>{check.detail}</span>
+							<span className='sr-only'>{setupCheckDetail(check, t)}</span>
 							<span
 								aria-hidden='true'
 								className='h-3 w-3/5 animate-pulse rounded-full bg-muted'
@@ -219,7 +249,7 @@ export function OnboardingCheckCard({
 						</>
 					) : (
 						<p className='text-muted-foreground text-xs leading-5'>
-							{check.detail}
+							{setupCheckDetail(check, t)}
 						</p>
 					)}
 				</div>
@@ -248,7 +278,7 @@ export function OnboardingCheckCard({
 								<span className='truncate'>
 									{copied
 										? t('common:actions.copied', 'Copied')
-										: remediation.label}
+										: remediationLabel(remediation, t)}
 								</span>
 							</Button>
 						);

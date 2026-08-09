@@ -15,14 +15,20 @@ import { FilePreviewPanel } from '../../src/renderer/components/workbench-shell/
 import { SessionTabs } from '../../src/renderer/components/workbench-shell/conversation-panel/session-tabs';
 import { getWorkspaceFileIconNameForPath } from '../../src/renderer/lib/workbench';
 import type { SessionTabModel } from '../../src/renderer/types/workbench';
+import { DEFAULT_APP_SETTINGS } from '../../src/shared/config';
 import {
 	createTestQueryClient,
+	installEnsemblrApi,
 	installLocalStorage,
 	renderWithProviders,
 } from './support/dom';
 
 beforeEach(() => {
 	installLocalStorage();
+	installEnsemblrApi({
+		getAppSettings: async () => DEFAULT_APP_SETTINGS,
+		updateAppSettings: async () => DEFAULT_APP_SETTINGS,
+	});
 });
 
 const workspaceCwd = '/workspace/ensemblr';

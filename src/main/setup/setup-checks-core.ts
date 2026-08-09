@@ -7,8 +7,10 @@ import type { EnsemblrRootDirectoryService } from '../root';
 import type { EnsemblrDatabaseService } from '../storage';
 import {
 	appendCommandStreamLogs,
+	authoredDetail,
 	defineCheck,
 	type SetupCheckProviderContext,
+	unexpectedErrorDetail,
 } from './setup-check-context.ts';
 
 /** Returns the safe display of `text` with the user's home collapsed to `~`. */
@@ -38,16 +40,20 @@ export function getConfigCheck({
 				: config.status === 'ok' || config.status === 'missing'
 					? 'success'
 					: 'warning';
-			const detail =
-				diagnostics[0] ??
-				(config.status === 'missing'
-					? 'No declarative config file was found; built-in defaults are active.'
-					: 'Declarative config loaded.');
+			const upstreamDetail = diagnostics[0];
 
 			return {
-				detail,
+				...(upstreamDetail
+					? { detail: upstreamDetail }
+					: config.status === 'missing'
+						? authoredDetail(
+								'config-missing',
+								'No declarative config file was found; built-in defaults are active.',
+							)
+						: authoredDetail('config-loaded', 'Declarative config loaded.')),
 				logs: diagnostics.map((diagnostic) => ({
 					label: 'Config diagnostic',
+					labelMessage: { code: 'config-diagnostic' as const },
 					text: diagnostic,
 				})),
 				remediationActions: [
@@ -88,10 +94,10 @@ export function getEnvironmentVariablesCheck({
 		id: 'environment-variables',
 		onError: (error) => ({
 			blocking: false,
-			detail:
-				error instanceof Error
-					? error.message
-					: 'Unknown environment variable check error.',
+			...unexpectedErrorDetail(error, {
+				code: 'environment-unknown-error',
+				text: 'Unknown environment variable check error.',
+			}),
 			status: 'warning',
 		}),
 		run: async () => {
@@ -112,7 +118,7 @@ export function getEnvironmentVariablesCheck({
 
 			return {
 				blocking,
-				detail: getEnvironmentVariablesDetail(snapshot),
+				...getEnvironmentVariablesDetail(snapshot),
 				logs: createEnvironmentVariablesLogs(snapshot),
 				remediationActions: [
 					{
@@ -156,22 +162,32 @@ export function getDatabaseCheck({
 			const database = databaseService.getHealth();
 			const status = database.status === 'ok' ? 'success' : 'failure';
 			const safePath = formatSafeText(database.path, ctx.homeDirectory);
-			const detail =
-				database.status === 'ok'
-					? `SQLite opened at ${safePath}; schema version ${database.schemaVersion}.`
-					: (database.error ?? `SQLite failed to open at ${safePath}.`);
 
 			return {
-				detail,
+				...(database.status === 'ok'
+					? authoredDetail(
+							'database-ready',
+							`SQLite opened at ${safePath}; schema version ${database.schemaVersion}.`,
+							{ path: safePath, schemaVersion: database.schemaVersion },
+						)
+					: database.error
+						? { detail: database.error }
+						: authoredDetail(
+								'database-open-failed',
+								`SQLite failed to open at ${safePath}.`,
+								{ path: safePath },
+							)),
 				logs: [
 					{
 						label: 'Database path',
+						labelMessage: { code: 'database-path' as const },
 						text: safePath,
 					},
 					...(database.error
 						? [
 								{
 									label: 'Database error',
+									labelMessage: { code: 'database-error' as const },
 									text: database.error,
 								},
 							]
@@ -219,15 +235,20 @@ export function getRootDirectoryCheck({
 						? 'warning'
 						: 'failure';
 			const safePath = formatSafeText(root.path, ctx.homeDirectory);
-			const detail =
-				root.diagnostics[0]?.message ??
-				`Ensemblr root is ready at ${safePath}.`;
+			const upstreamDetail = root.diagnostics[0]?.message;
 
 			return {
-				detail,
+				...(upstreamDetail
+					? { detail: upstreamDetail }
+					: authoredDetail(
+							'root-directory-ready',
+							`Ensemblr root is ready at ${safePath}.`,
+							{ path: safePath },
+						)),
 				logs: [
 					{
 						label: 'Root path',
+						labelMessage: { code: 'root-path' as const },
 						text: safePath,
 					},
 					...root.diagnostics.map((diagnostic) => ({
@@ -286,15 +307,21 @@ export function getManagedDirectoriesCheck({
 					managedPath.status === 'invalid' || managedPath.status === 'missing',
 			);
 			const status = failingPaths.length > 0 ? 'failure' : 'success';
-			const detail =
-				failingPaths.length > 0
-					? `Managed directories need attention: ${failingPaths
-							.map((managedPath) => managedPath.key)
-							.join(', ')}.`
-					: 'Managed repos, workspaces, and archived-contexts directories are ready.';
+			const failingKeys = failingPaths
+				.map((managedPath) => managedPath.key)
+				.join(', ');
 
 			return {
-				detail,
+				...(failingPaths.length > 0
+					? authoredDetail(
+							'managed-directories-attention',
+							`Managed directories need attention: ${failingKeys}.`,
+							{ keys: failingKeys },
+						)
+					: authoredDetail(
+							'managed-directories-ready',
+							'Managed repos, workspaces, and archived-contexts directories are ready.',
+						)),
 				logs: root.managedPaths.map((managedPath) => ({
 					label: managedPath.key,
 					text: `${managedPath.status}: ${formatSafeText(
@@ -332,9 +359,11 @@ export function getShellProcessCheck({
 			'Verifies Electron can launch local commands through the user shell environment.',
 		group: 'core',
 		id: 'shell-process-launch',
-		onError: (error) => ({
-			detail: error instanceof Error ? error.message : 'Unknown process error.',
-		}),
+		onError: (error) =>
+			unexpectedErrorDetail(error, {
+				code: 'shell-unknown-error',
+				text: 'Unknown process error.',
+			}),
 		run: async () => {
 			const environment = await localCommandService.getEnvironment();
 			const result = await localCommandService.run({
@@ -354,8 +383,12 @@ export function getShellProcessCheck({
 
 			if (result.status !== 'success') {
 				return {
-					detail:
-						result.failure?.message ?? 'The process launch smoke check failed.',
+					...(result.failure?.message
+						? { detail: result.failure.message }
+						: authoredDetail(
+								'shell-smoke-failed',
+								'The process launch smoke check failed.',
+							)),
 					logs,
 					status: 'failure',
 				};
@@ -365,13 +398,17 @@ export function getShellProcessCheck({
 				environment.source === 'fallback' || environment.diagnostics.length > 0
 					? 'warning'
 					: 'success';
-			const detail =
-				status === 'success'
-					? 'Commands launch successfully with the shell-derived environment.'
-					: 'Commands launch successfully, but shell environment resolution used a fallback.';
 
 			return {
-				detail,
+				...(status === 'success'
+					? authoredDetail(
+							'shell-ready',
+							'Commands launch successfully with the shell-derived environment.',
+						)
+					: authoredDetail(
+							'shell-fallback-environment',
+							'Commands launch successfully, but shell environment resolution used a fallback.',
+						)),
 				logs,
 				status,
 			};
@@ -410,18 +447,24 @@ function countEnvironmentVariableStatuses(
 	return { configured, masked, reserved };
 }
 
-/** Renders the headline detail string for the env-vars check. */
-function getEnvironmentVariablesDetail(
-	snapshot: EnvironmentVariablesSnapshot,
-): string {
+/** Renders the headline detail for the env-vars check. */
+function getEnvironmentVariablesDetail(snapshot: EnvironmentVariablesSnapshot) {
 	if (snapshot.missingRequiredCount > 0) {
-		return `${snapshot.missingRequiredCount} required environment variables are unset.`;
+		return authoredDetail(
+			'environment-missing-required',
+			`${snapshot.missingRequiredCount} required environment variables are unset.`,
+			{ count: snapshot.missingRequiredCount },
+		);
 	}
 
 	const { configured, masked, reserved } =
 		countEnvironmentVariableStatuses(snapshot);
 
-	return `${configured} configured variables, ${masked} masked secrets, and ${reserved} reserved runtime variables are cataloged.`;
+	return authoredDetail(
+		'environment-cataloged',
+		`${configured} configured variables, ${masked} masked secrets, and ${reserved} reserved runtime variables are cataloged.`,
+		{ configured, masked, reserved },
+	);
 }
 
 /** Renders the per-variable counts and diagnostics as setup check logs. */
@@ -434,18 +477,22 @@ function createEnvironmentVariablesLogs(
 	return [
 		{
 			label: 'Catalog entries',
+			labelMessage: { code: 'catalog-entries' },
 			text: String(snapshot.catalog.length),
 		},
 		{
 			label: 'Configured variables',
+			labelMessage: { code: 'configured-variables' },
 			text: String(configured),
 		},
 		{
 			label: 'Masked secrets',
+			labelMessage: { code: 'masked-secrets' },
 			text: String(masked),
 		},
 		{
 			label: 'Reserved runtime variables',
+			labelMessage: { code: 'reserved-runtime-variables' },
 			text: String(reserved),
 		},
 		...snapshot.diagnostics.map((diagnostic) => ({

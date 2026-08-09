@@ -228,7 +228,7 @@ test('treats warning prerequisites as satisfied', () => {
 	expect(findAction(model, 'quick-start').enabled).toBe(true);
 });
 
-test('falls back to the action reason when a failed check has no detail', () => {
+test('names the failed check when it carries no detail', () => {
 	const model = buildAddProjectMenuModel({
 		recents: [],
 		setupSnapshot: createSnapshot(
@@ -246,7 +246,7 @@ test('falls back to the action reason when a failed check has no detail', () => 
 	});
 
 	expect(findAction(model, 'open-github').unavailableReason).toBe(
-		'Sign in with the GitHub CLI (gh auth login) to open GitHub projects.',
+		'GitHub CLI installed is not ready yet.',
 	);
 });
 

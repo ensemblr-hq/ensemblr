@@ -133,7 +133,6 @@
 		"group-settings": "Настройки",
 		"label": "Палитра команд",
 		"placeholder": "Поиск команд…",
-		"settings-advanced": "Настройки · Дополнительно",
 		"settings-appearance": "Настройки · Внешний вид",
 		"settings-diagnostics": "Настройки · Диагностика",
 		"settings-environment": "Настройки · Окружение",
@@ -143,6 +142,7 @@
 		"settings-integrations": "Настройки · Интеграции",
 		"settings-models": "Настройки · Модели",
 		"settings-providers": "Настройки · Провайдеры",
+		"settings-shortcuts": "Настройки · Горячие клавиши",
 		"theme-dark": "Тема · Тёмная",
 		"theme-light": "Тема · Светлая",
 		"theme-system": "Тема · Системная"

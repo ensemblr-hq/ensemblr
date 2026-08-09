@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import type { TFunction } from 'i18next';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -8,9 +9,30 @@ import {
 	rootDirectoryQuery,
 } from '@/renderer/api/ensemblr';
 import { SettingRow } from '@/renderer/components/settings/setting-row';
+import { SettingsCodeValue } from '@/renderer/components/settings/settings-code-value';
 import { Badge } from '@/renderer/components/ui/badge';
 import { Button } from '@/renderer/components/ui/button';
 import { Spinner } from '@/renderer/components/ui/spinner';
+import type { RootDirectoryStatus } from '@/shared/ipc/contracts/root-directory';
+
+/**
+ * Names a non-ok root-directory health status. Main returns the locale-neutral
+ * code, so the badge reads it in the app language rather than showing the raw
+ * value.
+ * @param status - Health status the root service reported.
+ * @param t - Translation function from `useTranslation`
+ * @returns The badge label.
+ */
+function rootStatusLabel(status: RootDirectoryStatus, t: TFunction): string {
+	switch (status) {
+		case 'error':
+			return t('settings:general.root-directory.status.error', 'error');
+		case 'warning':
+			return t('settings:general.root-directory.status.warning', 'warning');
+		case 'ok':
+			return t('settings:general.root-directory.status.ok', 'ready');
+	}
+}
 
 /**
  * Settings row for the Ensemblr root directory: shows the configured path and
@@ -36,7 +58,11 @@ export function RootDirectoryRow() {
 			});
 			if (!apply.applied) {
 				throw new Error(
-					apply.error ?? 'Failed to apply root directory change.',
+					apply.error ??
+						t(
+							'settings:general.root-directory.apply-failed',
+							'Failed to apply the root directory change.',
+						),
 				);
 			}
 			return { applied: true as const };
@@ -70,18 +96,18 @@ export function RootDirectoryRow() {
 				</Button>
 			}
 			description={t(
-				'settings:advanced.root-directory.description',
+				'settings:general.root-directory.description',
 				'Where Ensemblr stores repositories and workspaces. This should be an empty directory you do not modify directly. Changing this will reconcile your repository list against the new root.',
 			)}
 			label={
 				<span className='flex items-center gap-2'>
 					{t(
-						'settings:advanced.root-directory.label',
+						'settings:general.root-directory.label',
 						'Ensemblr root directory',
 					)}
 					{rootStatus !== 'ok' ? (
 						<Badge variant={rootStatus === 'error' ? 'destructive' : 'outline'}>
-							{rootStatus}
+							{rootStatusLabel(rootStatus, t)}
 						</Badge>
 					) : null}
 				</span>
@@ -89,26 +115,18 @@ export function RootDirectoryRow() {
 			stack
 		>
 			{rootLoading ? (
-				<div className='mt-2 flex items-center gap-2 text-muted-foreground text-xs'>
-					<Spinner className='size-3' />{' '}
-					{t('settings:advanced.root-directory.reading', 'Reading root…')}
+				<div className='flex items-center gap-2 text-muted-foreground text-xs'>
+					<Spinner className='size-3.5' />
+					{t('settings:general.root-directory.reading', 'Reading root…')}
 				</div>
 			) : (
-				<div className='mt-2 space-y-1'>
-					<code className='block truncate rounded-md bg-muted/40 px-3 py-2 font-mono text-xs'>
-						{rootData?.path ??
-							t('settings:advanced.root-directory.unset', 'Not configured')}
-					</code>
-					{rootData?.source ? (
-						<p className='text-[0.625rem] text-muted-foreground'>
-							{t(
-								'settings:advanced.root-directory.source',
-								'source: {{source}}',
-								{ source: rootData.source },
-							)}
-						</p>
-					) : null}
-				</div>
+				<SettingsCodeValue
+					source={rootData?.source ?? null}
+					value={
+						rootData?.path ??
+						t('settings:general.root-directory.unset', 'Not configured')
+					}
+				/>
 			)}
 			{pickError ? (
 				<p className='mt-2 text-status-danger text-xs'>{pickError}</p>

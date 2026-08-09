@@ -33,10 +33,10 @@ const WIZARD_CARDS: readonly {
 /**
  * Projects the shipped diagnostics snapshot onto the wizard's card models.
  *
- * `detail` and the remediation labels pass through untranslated, exactly as
- * `SetupDiagnosticsPanel` renders them — they are composed in the main process,
- * which has no i18n. Only the titles are translated, because the wizard shows
- * one or two cards and wants shorter names than a settings list of fifteen.
+ * `detailMessage` rides along so the card renders the detail in the app language
+ * the same way `SetupDiagnosticsPanel` does. Titles are translated here instead
+ * of from the check id, because the wizard shows one or two cards and wants
+ * shorter names than a settings list of fifteen.
  * @param snapshot - The diagnostics snapshot, or undefined before it arrives.
  * @param titles - Translated card title per check.
  * @returns The card models, or null while the first probe is still in flight.
@@ -83,6 +83,7 @@ function toCardModel(
 
 	return {
 		detail: blocker.detail,
+		...(blocker.detailMessage ? { detailMessage: blocker.detailMessage } : {}),
 		id,
 		remediations: blocker.remediationActions.map((action) => ({ ...action })),
 		status: blocker.status,

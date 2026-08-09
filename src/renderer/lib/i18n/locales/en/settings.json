@@ -1,25 +1,4 @@
 {
-	"advanced": {
-		"description": "Root directory, Pi executable override, and terminal-scrollback limits.",
-		"pi-executable": {
-			"description": "Override the bundled Pi executable with a custom one. Leave empty to use the discovered system Pi (recommended).",
-			"label": "Pi executable path",
-			"use-bundled": "Use bundled Pi"
-		},
-		"root-directory": {
-			"description": "Where Ensemblr stores repositories and workspaces. This should be an empty directory you do not modify directly. Changing this will reconcile your repository list against the new root.",
-			"label": "Ensemblr root directory",
-			"reading": "Reading root…",
-			"source": "source: {{source}}",
-			"unset": "Not configured"
-		},
-		"scrollback": {
-			"aria-label": "Terminal scrollback limit in megabytes",
-			"description": "Maximum size of each terminal pane scrollback buffer. Larger values keep more history at the cost of memory.",
-			"label": "Terminal scrollback limit"
-		},
-		"title": "Advanced"
-	},
 	"appearance": {
 		"accessible-colors": {
 			"default": "Default",
@@ -37,6 +16,7 @@
 			"description": "Syntax highlighting for code blocks and editors. Each theme follows the app theme, using its light cut in light mode and its dark cut in dark mode.",
 			"label": "Code theme"
 		},
+		"description": "Theme, syntax highlighting, and the fonts used for code, diffs, and the integrated terminal.",
 		"markdown-style": {
 			"compact": "Compact",
 			"default": "Default",
@@ -48,6 +28,11 @@
 			"aria-label": "Mono font name",
 			"description": "Font used for code and diffs. The bundled Nerd Font is the default; custom fonts must be installed on your system.",
 			"label": "Mono font"
+		},
+		"scrollback": {
+			"aria-label": "Terminal scrollback limit in megabytes",
+			"description": "Maximum size of each terminal pane scrollback buffer. Larger values keep more history at the cost of memory.",
+			"label": "Terminal scrollback limit"
 		},
 		"terminal-font": {
 			"aria-label": "Terminal font name",
@@ -67,9 +52,18 @@
 		},
 		"title": "Appearance"
 	},
+	"common": {
+		"source": "source: {{source}}"
+	},
 	"diagnostics": {
 		"copy-bundle": "Copy diagnostics bundle",
 		"description": "Setup gate checks for Pi, git, GitHub, Linear, and the Ensemblr runtime. The diagnostics bundle redacts secrets, account ids, and full paths before going to the clipboard.",
+		"rerun-onboarding": {
+			"action": "Re-run wizard",
+			"description": "Reopen the first-run setup wizard. Nothing already configured is undone — the wizard re-probes every check and walks you through whatever is still unresolved.",
+			"failed": "Could not reopen the setup wizard: {{error}}.",
+			"label": "Setup wizard"
+		},
 		"title": "Diagnostics"
 	},
 	"environment": {
@@ -136,6 +130,7 @@
 			"description": "Always show context usage. By default, only shown when more than 70% is used.",
 			"label": "Always show context usage"
 		},
+		"description": "How chats behave day to day: the language Ensemblr speaks, how messages are sent, and what it does while an agent is working.",
 		"follow-up": {
 			"block": "Block",
 			"description": "Queue messages to send after the agent finishes, or steer the agent mid-turn. Use ⌘J to queue.",
@@ -151,6 +146,18 @@
 		"notifications": {
 			"description": "Get notified when an agent finishes working in a chat.",
 			"label": "Desktop notifications"
+		},
+		"root-directory": {
+			"apply-failed": "Failed to apply the root directory change.",
+			"description": "Where Ensemblr stores repositories and workspaces. This should be an empty directory you do not modify directly. Changing this will reconcile your repository list against the new root.",
+			"label": "Ensemblr root directory",
+			"reading": "Reading root…",
+			"status": {
+				"error": "error",
+				"ok": "ready",
+				"warning": "warning"
+			},
+			"unset": "Not configured"
 		},
 		"send-shortcut": {
 			"description": "Use {{shortcut}} for new lines.",
@@ -168,7 +175,7 @@
 			"label": "Archive on merge"
 		},
 		"branch-prefix": {
-			"custom": "Custom:",
+			"custom": "Custom",
 			"custom-aria-label": "Custom branch prefix",
 			"description": "Prefix for new workspace branch names.",
 			"github-username": "GitHub username (resolved via `gh`)",
@@ -206,6 +213,7 @@
 		"scope-user": "User"
 	},
 	"integrations": {
+		"description": "Third-party services Ensemblr can sign in to on your behalf. Each one is optional and can be disconnected at any time.",
 		"linear": {
 			"browse-issues": "Browse issues",
 			"checking": "Checking the Linear connection…",
@@ -276,7 +284,7 @@
 		}
 	},
 	"nav": {
-		"advanced": "Advanced",
+		"app": "Application",
 		"appearance": "Appearance",
 		"aria-label": "Settings sections",
 		"diagnostics": "Diagnostics",
@@ -287,7 +295,8 @@
 		"integrations": "Integrations",
 		"models": "Models",
 		"more": "More",
-		"providers": "Providers"
+		"providers": "Providers",
+		"shortcuts": "Shortcuts"
 	},
 	"providers": {
 		"account": {
@@ -299,6 +308,15 @@
 			"label": "Account",
 			"organization": "Organization",
 			"plan": "Plan"
+		},
+		"check": {
+			"agent-directory": "Agent directory",
+			"auth": "Authentication",
+			"executable": "{{provider}} executable",
+			"mcp": "MCP servers",
+			"provider-models": "Providers and models",
+			"rpc-smoke": "RPC startup",
+			"version": "Version"
 		},
 		"check-status": {
 			"failure": "Failed",
@@ -312,12 +330,40 @@
 		},
 		"copy-command": "Copy {{command}}",
 		"description": "Agent runtimes that can drive a chat. Each one resolves its own executable, reports its own readiness, and keeps its own credentials.",
+		"detail": {
+			"account-identity": "{{identity}}.",
+			"account-identity-with-plan": "{{identity}} ({{plan}}).",
+			"account-signed-in": "Signed in.",
+			"account-signed-in-with-plan": "Signed in ({{plan}}).",
+			"claude-executable-override-broken": "The configured {{provider}} executable could not be run. Clear the override to fall back to the {{command}} on your PATH, or pick a runnable binary.",
+			"claude-no-executable": "No {{command}} executable was found on your PATH. Ensemblr does not ship {{provider}}: install it, run {{loginCommand}}, then re-run these checks.",
+			"claude-not-signed-in": "{{provider}} is installed but not signed in.",
+			"claude-session-timeout": "{{provider}} started but did not answer within {{seconds}}s. Run {{command}} in a terminal to clear any pending login or Keychain prompt, then re-run these checks.",
+			"claude-version-no-executable": "There is no {{command}} binary to version-probe. Install {{provider}}, run {{loginCommand}}, then re-run these checks.",
+			"executable-configured": "Configured override: {{path}}.",
+			"executable-on-path": "Found on PATH: {{path}}.",
+			"its-login-command": "its login command",
+			"mcp-connected_one": "{{count}} MCP server connected.",
+			"mcp-connected_other": "{{count}} MCP servers connected.",
+			"mcp-none": "No MCP servers are configured.",
+			"mcp-unhealthy": "{{servers}}",
+			"mcp-unlistable": "MCP servers could not be listed because the runtime did not report them.",
+			"pi-agent-directory-resolved": "{{path}} ({{source}}).",
+			"pi-agent-directory-unverified": "{{provider}}'s agent directory could not be verified.",
+			"pi-executable-resolved": "{{path}} ({{source}}).",
+			"pi-executable-undiscovered": "{{provider}} could not be discovered. Install it or select a compatible executable.",
+			"pi-models-ready": "{{modelCount}} models across {{providerCount}} providers.",
+			"pi-models-unverified": "Provider and model readiness could not be verified.",
+			"pi-rpc-invalid": "{{provider}} RPC startup did not produce valid JSONL.",
+			"pi-rpc-ready": "Startup produced a valid {{frameType}} frame.",
+			"version-command-failed": "{{command}} --version failed: {{message}}",
+			"version-command-failed-unknown": "{{command}} --version failed for an unknown reason."
+		},
 		"executable": {
 			"description": "Override the discovered {{command}} binary with a custom one. Leave empty to use the executable found on PATH (recommended).",
 			"label": "{{provider}} executable path",
 			"not-found": "Not found",
 			"resolved": "Resolved executable",
-			"source": "source: {{source}}",
 			"use-discovered": "Use discovered {{command}}"
 		},
 		"executable-source": {
@@ -356,6 +402,7 @@
 			"branch-rename-title": "Branch rename preferences",
 			"code-review-description": "Add custom instructions sent to the agent when you click the Review button.",
 			"code-review-title": "Code review preferences",
+			"committed-note": "The committed <file>[prompts]</file> block in <file>.ensemblr/settings.toml</file> supplies the team-shared text. A personal preference typed here wins over it for you only, and clearing one falls back to the shared text.",
 			"create-pr-description": "Add custom instructions sent to the agent when you click the Create PR button.",
 			"create-pr-title": "Create PR preferences",
 			"description": "Configure action-specific behavior and instructions for this repository.",
@@ -367,6 +414,7 @@
 			"remove-aria-label": "Remove {{name}}",
 			"resolve-conflicts-description": "Add custom instructions sent to the agent when you click the Resolve conflicts button.",
 			"resolve-conflicts-title": "Resolve conflicts preferences",
+			"source-personal": "source: personal (this device)",
 			"title": "Actions"
 		},
 		"archive-on-merge": {
@@ -411,19 +459,18 @@
 		},
 		"not-found": "Repository <id>{{repoId}}</id> not found.",
 		"preview-urls": {
-			"add": "+ Add preview URL",
+			"add": "Add preview URL",
+			"delete-aria-label": "Delete preview URL",
 			"description": "Overrides the terminal panel’s Open button URL. Add more than one to switch between them from the Open button dropdown; the first is opened by default and the rest appear in the dropdown in order. Supports `$ENSEMBLR_WORKSPACE_NAME` and `$ENSEMBLR_PORT`. Leave blank to auto-detect from output logs.",
 			"label": "Preview URLs",
 			"name-aria-label": "Preview URL name",
 			"name-placeholder": "Name",
 			"template-aria-label": "Preview URL template"
 		},
-		"remote-origin": {
-			"description": "Where Ensemblr pushes, pulls, and opens PRs. Read-only for now — runtime honors the git \"origin\" remote; a configurable remote is planned.",
-			"label": "Remote origin"
-		},
 		"remove": {
 			"description": "Removes the repository from Ensemblr. The on-disk directory at<path>{{path}}</path>is not deleted; delete it manually if you want it gone.",
+			"row-description": "Drops this repository from Ensemblr. Workspaces stop being tracked; nothing on disk is deleted.",
+			"row-label": "Remove repository",
 			"title": "Remove this repository?",
 			"trigger": "Remove repository"
 		},
@@ -442,17 +489,27 @@
 		"scripts": {
 			"description": "Commands that run when workspaces are set up, run, or archived. Saved to the repository’s committed .ensemblr/settings.toml.",
 			"diverges": "The workspace you have open commits different scripts on its branch, and runs those. Merge this file to change what it runs.",
+			"loading": "Reading scripts…",
 			"title": "Scripts"
+		},
+		"security": {
+			"committed-note": "A committed <file>.ensemblr/settings.toml</file> value shared with the team still wins over this personal override — a repository can raise its own floor and you cannot lower it locally.",
+			"description": "How much an agent may do on its own in this repository. Applies to every workspace of the repo, and to the tools agents reach over the control server.",
+			"permission-mode": {
+				"approval-required": "Approval required",
+				"approval-required-description": "Every write, command, and app-control action asks you first.",
+				"label": "Agent permission mode",
+				"read-only": "Read only",
+				"read-only-description": "Agents may read the workspace but cannot write, run commands, or drive the app.",
+				"workspace-trusted": "Workspace trusted",
+				"workspace-trusted-description": "Agents act freely inside the workspace; anything outside it still asks."
+			},
+			"title": "Security"
 		},
 		"setup-script": {
 			"description": "Runs when a new workspace is created.",
 			"label": "Setup script",
 			"placeholder": "e.g. npm ci"
-		},
-		"spotlight": {
-			"coming-soon": "Coming soon",
-			"description": "Replace Run with Spotlight for this repository so workspace changes are tested in the repository root. Spotlight is a separate feature still in development (workspace→root diff/apply with rollback); see docs/product/discovery-spotlight-testing.md.",
-			"label": "Use spotlight testing"
 		},
 		"workspaces-path": {
 			"description": "Do not move or delete the workspace subdirectories. Instead, archive workspaces in Ensemblr.",
@@ -464,8 +521,10 @@
 		"empty": "No repository selected.",
 		"environment": "Environment",
 		"git": "Git",
+		"group": "Repository",
 		"misc": "Misc",
-		"scripts": "Scripts"
+		"scripts": "Scripts",
+		"security": "Security"
 	},
 	"run-scripts": {
 		"description": "Shortcuts for quick actions, like running your dev server or test suite. Use <port>$ENSEMBLR_PORT</port> for the workspace's allocated port.",
@@ -479,7 +538,8 @@
 			"edit-title": "Edit run script",
 			"name": "Name"
 		},
-		"empty": "No run scripts yet. Add one to get started.",
+		"empty": "No run scripts yet",
+		"empty-description": "Add one and it shows up in the terminal panel’s Run menu.",
 		"icon-picker": {
 			"no-matches": "No icons match “{{query}}”.",
 			"search": "Search icons",
@@ -492,6 +552,54 @@
 			"unavailable": "Not available locally"
 		},
 		"title": "Run scripts"
+	},
+	"shortcuts": {
+		"count_one": "{{count}} shortcut",
+		"count_other": "{{count}} shortcuts",
+		"description": "Every keyboard shortcut Ensemblr binds, grouped by where it is active. Read-only — shortcuts are not rebindable yet.",
+		"name": {
+			"agents-open": "Launch coding agent",
+			"autocomplete-confirm": "Confirm autocomplete selection",
+			"autocomplete-dismiss": "Close autocomplete popover",
+			"autocomplete-next": "Next autocomplete entry",
+			"autocomplete-prev": "Previous autocomplete entry",
+			"changes-uncommitted": "Show uncommitted changes",
+			"composer-cycle-thinking": "Cycle thinking level",
+			"composer-focus": "Focus composer",
+			"composer-newline": "Insert newline in composer",
+			"composer-queue": "Queue message as a follow-up",
+			"composer-remove-last-mention": "Remove last mention attachment",
+			"composer-submit": "Send message",
+			"composer-submit-with-mod": "Send message",
+			"composer-toggle-model-picker": "Toggle model picker",
+			"composer-toggle-plan-mode": "Toggle plan mode",
+			"dialog-submit": "Submit dialog form",
+			"diff-comment-submit": "Submit diff comment",
+			"files-search": "Open file search",
+			"model-picker-select-by-index": "Select model by index (1-9)",
+			"palette-open": "Open command palette",
+			"question-submit": "Submit answers to an agent question",
+			"run-start": "Start or stop run script",
+			"settings-open": "Open settings",
+			"sidebar-toggle": "Toggle sidebar",
+			"tab-close": "Close tab",
+			"tab-keep-open": "Keep preview tab open",
+			"tab-new": "New chat tab",
+			"tab-next": "Next tab",
+			"tab-prev": "Previous tab",
+			"tab-select-by-index": "Select tab by index (⌘1–8, ⌘9 last)",
+			"tool-calls-toggle-collapse": "Expand or collapse all tool calls",
+			"workspace-new": "New workspace"
+		},
+		"scope": {
+			"autocomplete": "Autocomplete",
+			"composer": "Composer",
+			"dialog": "Dialogs",
+			"global": "Global",
+			"menu": "Menus",
+			"model-picker": "Model picker"
+		},
+		"title": "Shortcuts"
 	},
 	"source-badge": {
 		"built-in-default": "default",

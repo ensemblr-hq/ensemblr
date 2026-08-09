@@ -1,14 +1,15 @@
 import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
 
+import { AgentProviderBrandTile } from '@/renderer/components/agent-provider-brand';
 import { CopyCommandButton } from '@/renderer/components/settings/agent-providers/copy-command-button';
 import { ProviderAccountList } from '@/renderer/components/settings/agent-providers/provider-account-list';
 import { ProviderCheckRow } from '@/renderer/components/settings/agent-providers/provider-check-row';
 import { ProviderExecutableRow } from '@/renderer/components/settings/agent-providers/provider-executable-row';
 import { ProviderSettingsFileRow } from '@/renderer/components/settings/agent-providers/provider-settings-file-row';
 import { SettingRow } from '@/renderer/components/settings/setting-row';
+import { SettingsLoadingState } from '@/renderer/components/settings/settings-async-state';
 import { StatusBadge } from '@/renderer/components/status-badge';
-import { Spinner } from '@/renderer/components/ui/spinner';
 import type { AgentProviderDescriptor } from '@/shared/agent-provider';
 import type { AgentProviderReadinessWire } from '@/shared/ipc/contracts/agent-provider';
 import type { SetupRemediationAction } from '@/shared/ipc/contracts/setup';
@@ -66,52 +67,48 @@ export function ProviderTabPanel({
 
 	return (
 		<div className='divide-y divide-border'>
-			<SettingRow
-				control={
-					descriptor.loginCommand && !connected ? (
-						<CopyCommandButton
-							command={descriptor.loginCommand}
-							label={t('settings:providers.copy-command', 'Copy {{command}}', {
-								command: descriptor.loginCommand,
-							})}
-						/>
-					) : null
-				}
-				description={describeProviderRuntime(
-					t,
-					descriptor,
-					readiness,
-					isLoading,
-				)}
-				label={
-					<span className='flex items-center gap-2'>
-						{descriptor.label}
+			<div className='flex items-start gap-3 py-4'>
+				<AgentProviderBrandTile provider={descriptor.id} />
+				<div className='min-w-0 flex-1 space-y-1'>
+					<div className='flex flex-wrap items-center gap-x-2 gap-y-1'>
+						<p className='font-medium text-foreground text-sm'>
+							{descriptor.label}
+						</p>
 						<StatusBadge tone={statusTone(readiness, isLoading)}>
 							{statusLabel(t, readiness, isLoading)}
 						</StatusBadge>
-					</span>
-				}
-			>
-				{errorMessage ? (
-					<p className='text-status-danger text-xs'>{errorMessage}</p>
-				) : null}
-				{descriptor.loginCommand && !connected ? (
-					<p className='text-muted-foreground text-xs'>
-						{t(
-							'settings:providers.sign-in-hint',
-							'Sign-in is interactive: Ensemblr copies the command, you run it in a terminal.',
-						)}
+					</div>
+					<p className='max-w-prose text-pretty text-muted-foreground text-xs leading-relaxed'>
+						{describeProviderRuntime(t, descriptor, readiness, isLoading)}
 					</p>
+					{errorMessage ? (
+						<p className='text-status-danger text-xs'>{errorMessage}</p>
+					) : null}
+					{descriptor.loginCommand && !connected ? (
+						<p className='text-muted-foreground text-xs'>
+							{t(
+								'settings:providers.sign-in-hint',
+								'Sign-in is interactive: Ensemblr copies the command, you run it in a terminal.',
+							)}
+						</p>
+					) : null}
+				</div>
+				{descriptor.loginCommand && !connected ? (
+					<CopyCommandButton
+						command={descriptor.loginCommand}
+						label={t('settings:providers.copy-command', 'Copy {{command}}', {
+							command: descriptor.loginCommand,
+						})}
+					/>
 				) : null}
-			</SettingRow>
+			</div>
 
 			{isLoading && !readiness ? (
-				<div className='flex items-center gap-2 py-6 text-muted-foreground text-sm'>
-					<Spinner className='size-4' />{' '}
-					{t('settings:providers.checking', 'Checking {{provider}}…', {
+				<SettingsLoadingState
+					label={t('settings:providers.checking', 'Checking {{provider}}…', {
 						provider: descriptor.label,
 					})}
-				</div>
+				/>
 			) : null}
 
 			{readiness?.account ? (
@@ -123,9 +120,7 @@ export function ProviderTabPanel({
 					label={t('settings:providers.account.label', 'Account')}
 					stack
 				>
-					<div className='mt-2'>
-						<ProviderAccountList account={readiness.account} />
-					</div>
+					<ProviderAccountList account={readiness.account} />
 				</SettingRow>
 			) : null}
 
@@ -138,12 +133,13 @@ export function ProviderTabPanel({
 					label={t('settings:providers.checks.label', 'Readiness checks')}
 					stack
 				>
-					<ul className='mt-2 divide-y divide-border rounded-md border bg-card/40'>
+					<ul className='divide-y divide-border overflow-hidden rounded-xl border border-border bg-card/40'>
 						{readiness.checks.map((check) => (
 							<ProviderCheckRow
 								check={check}
 								key={check.id}
 								onRemediation={onRemediation}
+								provider={descriptor.id}
 							/>
 						))}
 					</ul>

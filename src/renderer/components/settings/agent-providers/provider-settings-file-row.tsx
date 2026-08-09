@@ -2,6 +2,7 @@ import { FileCodeIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import { SettingRow } from '@/renderer/components/settings/setting-row';
+import { SettingsCodeValue } from '@/renderer/components/settings/settings-code-value';
 import { Button } from '@/renderer/components/ui/button';
 import { OpenTargetSplitButton } from '@/renderer/components/workbench-shell/open-target-split-button';
 import { useProviderSettingsFileOpenTargets } from '@/renderer/hooks/use-provider-settings-file-open-targets';
@@ -63,9 +64,7 @@ export function ProviderSettingsFileRow({
 			)}
 			stack
 		>
-			<code className='mt-2 block truncate rounded-md bg-muted/40 px-3 py-2 font-mono text-xs'>
-				{settingsFile}
-			</code>
+			<SettingsCodeValue value={settingsFile} />
 		</SettingRow>
 	);
 }

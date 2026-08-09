@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { CodeBlock } from '@/renderer/components/code-block';
 import { SettingRow } from '@/renderer/components/settings/setting-row';
 import { SettingsSection } from '@/renderer/components/settings/settings-section';
+import { TerminalScrollbackRow } from '@/renderer/components/settings/terminal-scrollback-row';
 import { Input } from '@/renderer/components/ui/input';
 import {
 	Select,
@@ -59,7 +60,13 @@ function AppearanceSettings() {
 	const [terminalSize, setTerminalSize] = useAtom(terminalFontSizeAtom);
 
 	return (
-		<SettingsSection title={t('settings:appearance.title', 'Appearance')}>
+		<SettingsSection
+			description={t(
+				'settings:appearance.description',
+				'Theme, syntax highlighting, the fonts used for code, diffs, and the integrated terminal, and how much scrollback each terminal pane holds.',
+			)}
+			title={t('settings:appearance.title', 'Appearance')}
+		>
 			<SettingRow
 				control={
 					<Select
@@ -166,7 +173,7 @@ function AppearanceSettings() {
 				onReset={() => setCodeTheme(DEFAULTS.codeTheme)}
 				stack
 			>
-				<CodeBlock className='mt-3' code={CODE_SAMPLE} language='typescript' />
+				<CodeBlock code={CODE_SAMPLE} language='typescript' />
 			</SettingRow>
 
 			<SettingRow
@@ -176,7 +183,7 @@ function AppearanceSettings() {
 							'settings:appearance.mono-font.aria-label',
 							'Mono font name',
 						)}
-						className='h-8 w-56'
+						className='h-7 w-56'
 						onChange={(e) => setMonoFont(e.target.value)}
 						placeholder='JetBrainsMono Nerd Font Mono'
 						value={monoFont}
@@ -191,7 +198,7 @@ function AppearanceSettings() {
 				onReset={() => setMonoFont(DEFAULTS.monoFont)}
 				stack
 			>
-				<pre className='mt-3 overflow-x-auto rounded-md bg-code px-4 py-3 text-code-foreground text-xs leading-relaxed ring-1 ring-code-border'>
+				<pre className='overflow-x-auto rounded-xl bg-code px-4 py-3 text-code-foreground text-xs leading-relaxed ring-1 ring-code-border'>
 					<code style={{ fontFamily: `"${monoFont}", var(--font-mono)` }}>
 						{MONO_PREVIEW}
 					</code>
@@ -247,7 +254,7 @@ function AppearanceSettings() {
 							'settings:appearance.terminal-font.aria-label',
 							'Terminal font name',
 						)}
-						className='h-8 w-56'
+						className='h-7 w-56'
 						onChange={(e) => setTerminalFont(e.target.value)}
 						placeholder='JetBrainsMono Nerd Font Mono'
 						value={terminalFont}
@@ -280,31 +287,35 @@ function AppearanceSettings() {
 				onReset={() => setTerminalSize(DEFAULTS.terminalFontSize)}
 				stack
 			>
-				<input
-					aria-label={t(
-						'settings:appearance.terminal-font-size.label',
-						'Terminal font size',
-					)}
-					className='mt-2 w-full accent-accent'
-					max={24}
-					min={8}
-					onChange={(e) => setTerminalSize(Number(e.target.value))}
-					step={1}
-					type='range'
-					value={terminalSize}
-				/>
-				<pre
-					className='mt-3 overflow-x-auto rounded-md bg-terminal px-4 py-3 text-terminal-foreground leading-relaxed ring-1 ring-terminal-border'
-					style={{
-						fontFamily: `"${terminalFont}", var(--font-mono)`,
-						fontSize: `${terminalSize}px`,
-					}}
-				>
-					<code>
-						~/project main v3.72{'\n'}$ npm test ✓{'\n'}↳ ► All tests passed!
-					</code>
-				</pre>
+				<div className='space-y-3'>
+					<input
+						aria-label={t(
+							'settings:appearance.terminal-font-size.label',
+							'Terminal font size',
+						)}
+						className='w-full accent-accent'
+						max={24}
+						min={8}
+						onChange={(e) => setTerminalSize(Number(e.target.value))}
+						step={1}
+						type='range'
+						value={terminalSize}
+					/>
+					<pre
+						className='overflow-x-auto rounded-xl bg-terminal px-4 py-3 text-terminal-foreground leading-relaxed ring-1 ring-terminal-border'
+						style={{
+							fontFamily: `"${terminalFont}", var(--font-mono)`,
+							fontSize: `${terminalSize}px`,
+						}}
+					>
+						<code>
+							~/project main v3.72{'\n'}$ npm test ✓{'\n'}↳ ► All tests passed!
+						</code>
+					</pre>
+				</div>
 			</SettingRow>
+
+			<TerminalScrollbackRow />
 		</SettingsSection>
 	);
 }

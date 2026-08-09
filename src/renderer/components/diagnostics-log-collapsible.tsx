@@ -6,6 +6,7 @@ import {
 	CollapsibleContent,
 	CollapsibleTrigger,
 } from '@/renderer/components/ui/collapsible';
+import { setupLogLabel } from '@/renderer/lib/setup-check-text';
 import type { SetupCheckLogSnapshot } from '@/shared/ipc/contracts/setup';
 
 /**
@@ -47,7 +48,9 @@ export function DiagnosticsLogCollapsible({
 						className='wrap-break-word text-muted-foreground leading-5'
 						key={`${log.label}-${log.text}`}
 					>
-						<span className='font-medium text-foreground'>{log.label}</span>
+						<span className='font-medium text-foreground'>
+							{setupLogLabel(log, t)}
+						</span>
 						{': '}
 						{log.text}
 						{log.truncated

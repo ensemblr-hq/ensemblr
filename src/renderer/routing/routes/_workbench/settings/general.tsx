@@ -2,6 +2,7 @@ import { createFileRoute } from '@tanstack/react-router';
 import { useAtom } from 'jotai';
 import { useTranslation } from 'react-i18next';
 
+import { RootDirectoryRow } from '@/renderer/components/settings/root-directory-row';
 import { SettingRow } from '@/renderer/components/settings/setting-row';
 import { SettingsSection } from '@/renderer/components/settings/settings-section';
 import {
@@ -54,7 +55,13 @@ function GeneralSettings() {
 	const [toolCalls, setToolCalls] = useAtom(toolCallCollapseAtom);
 
 	return (
-		<SettingsSection title={t('settings:general.title', 'General')}>
+		<SettingsSection
+			description={t(
+				'settings:general.description',
+				'How chats behave day to day: the language Ensemblr speaks, how messages are sent, what it does while an agent is working, and where it keeps its repositories.',
+			)}
+			title={t('settings:general.title', 'General')}
+		>
 			<SettingRow
 				control={
 					<Select
@@ -230,6 +237,8 @@ function GeneralSettings() {
 				modified={toolCalls !== DEFAULTS.toolCallCollapse}
 				onReset={() => setToolCalls(DEFAULTS.toolCallCollapse)}
 			/>
+
+			<RootDirectoryRow />
 		</SettingsSection>
 	);
 }

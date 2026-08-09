@@ -17,10 +17,7 @@ export const Route = createFileRoute('/_workbench/settings/experimental')({
 });
 
 /** Factory defaults; a row shows its "modified" accent when its value differs. */
-const DEFAULTS = {
-	autoRunAfterSetup: DEFAULT_APP_SETTINGS.experimental.autoRunAfterSetup,
-	developerMode: false,
-} as const;
+const DEFAULTS = DEFAULT_APP_SETTINGS.experimental;
 
 /** Experimental features panel toggling developer-only controls and setup automation defaults. */
 function ExperimentalSettings() {

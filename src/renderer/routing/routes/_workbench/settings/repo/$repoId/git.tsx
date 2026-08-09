@@ -5,7 +5,6 @@ import { BranchPicker } from '@/renderer/components/git/branch-picker';
 import { SettingRow } from '@/renderer/components/settings/setting-row';
 import { SettingsSection } from '@/renderer/components/settings/settings-section';
 import { SourceBadge } from '@/renderer/components/settings/source-badge';
-import { Input } from '@/renderer/components/ui/input';
 import { Switch } from '@/renderer/components/ui/switch';
 import { useRepoSettings } from '@/renderer/hooks/use-repo-settings';
 import { useRepoSettingsWriter } from '@/renderer/hooks/use-repo-settings-writer';
@@ -57,8 +56,6 @@ function RepoGitSettings() {
 				resolved={resolved('branchFrom')}
 				save={save}
 			/>
-
-			<RemoteOriginSetting resolved={resolved('remoteOrigin')} />
 
 			<SettingRow
 				control={
@@ -114,42 +111,6 @@ function RepoGitSettings() {
 				/>
 			</p>
 		</SettingsSection>
-	);
-}
-
-/**
- * Read-only display of the remote every git operation targets. Editable once a
- * configurable remote lands; until then it exists so the resolved value and its
- * source are visible rather than implied.
- */
-function RemoteOriginSetting({
-	resolved,
-}: {
-	resolved: ResolvedSettingSnapshot | undefined;
-}) {
-	const { t } = useTranslation();
-
-	return (
-		<SettingRow
-			control={
-				<Input
-					aria-label={t('settings:repo.remote-origin.label', 'Remote origin')}
-					className='h-8 w-44 font-mono text-xs'
-					disabled
-					value={stringValue(resolved) || 'origin'}
-				/>
-			}
-			description={t(
-				'settings:repo.remote-origin.description',
-				'Where Ensemblr pushes, pulls, and opens PRs. Read-only for now — runtime honors the git "origin" remote; a configurable remote is planned.',
-			)}
-			label={
-				<span className='flex items-center gap-2'>
-					{t('settings:repo.remote-origin.label', 'Remote origin')}
-					<SourceBadge source={resolved?.source} />
-				</span>
-			}
-		/>
 	);
 }
 

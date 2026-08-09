@@ -4,6 +4,10 @@
  * Renderer code resolves shortcuts via `matchesShortcut` / `useHotkey` /
  * `useKeymapHandler`. Main-process menu code resolves via `getAccelerator`.
  *
+ * Bindings only — a shortcut's user-facing name lives in the renderer
+ * catalogues under `settings:shortcuts.name.*`, keyed by the ids below, so the
+ * reference screen renders it in the app language.
+ *
  * Modifier semantics: every modifier listed in `modifiers` must be pressed,
  * every modifier NOT listed must NOT be pressed. `mod` resolves to Cmd on
  * macOS, Ctrl elsewhere.
@@ -31,9 +35,8 @@ export interface Binding {
 	readonly modifiers?: readonly Modifier[];
 }
 
-/** Definition of a shortcut: its description, scope, key bindings, and optional Electron accelerator. */
+/** Definition of a shortcut: its scope, key bindings, and optional Electron accelerator. */
 export interface ShortcutDef {
-	readonly description: string;
 	readonly scope: Scope;
 	readonly bindings: readonly Binding[];
 	readonly accelerator?: string;
@@ -51,166 +54,134 @@ const tabIndexBindings: readonly Binding[] = Array.from(
 
 export const SHORTCUTS = {
 	'sidebar.toggle': {
-		description: 'Toggle sidebar',
 		scope: 'global',
 		bindings: [{ key: 'b', modifiers: ['mod'] }],
 	},
 	'palette.open': {
-		description: 'Open command palette',
 		scope: 'global',
 		bindings: [{ key: 'k', modifiers: ['mod'] }],
 		accelerator: 'CommandOrControl+K',
 	},
 	'settings.open': {
-		description: 'Open settings',
 		scope: 'global',
 		bindings: [{ key: ',', modifiers: ['mod'] }],
 		accelerator: 'CommandOrControl+,',
 	},
 	'files.search': {
-		description: 'Open file search',
 		scope: 'global',
 		bindings: [{ key: 'p', modifiers: ['mod'] }],
 	},
 	'composer.focus': {
-		description: 'Focus composer',
 		scope: 'composer',
 		bindings: [{ key: 'l', modifiers: ['mod'] }],
 	},
 	'composer.toggleModelPicker': {
-		description: 'Toggle model picker',
 		scope: 'composer',
 		bindings: [{ key: 'p', modifiers: ['alt'] }],
 	},
 	'composer.cycleThinking': {
-		description: 'Cycle thinking level',
 		scope: 'composer',
 		bindings: [{ key: 't', modifiers: ['alt'] }],
 	},
 	'composer.togglePlanMode': {
-		description: 'Toggle plan mode',
 		scope: 'composer',
 		bindings: [{ key: 'p', modifiers: ['alt', 'shift'] }],
 	},
 	'composer.submit': {
-		description: 'Send message',
 		scope: 'composer',
 		bindings: [{ key: 'Enter' }],
 	},
 	'composer.submitWithMod': {
-		description: 'Send message',
 		scope: 'composer',
 		bindings: [{ key: 'Enter', modifiers: ['mod'] }],
 	},
 	'composer.newline': {
-		description: 'Insert newline in composer',
 		scope: 'composer',
 		bindings: [{ key: 'Enter', modifiers: ['shift'] }],
 	},
 	'diffComment.submit': {
-		description: 'Submit diff comment',
 		scope: 'composer',
 		bindings: [{ key: 'Enter', modifiers: ['mod'] }],
 	},
 	'question.submit': {
-		description: 'Submit answers to an agent question',
 		scope: 'dialog',
 		bindings: [{ key: 'Enter', modifiers: ['mod'] }],
 	},
 	'composer.queue': {
-		description: 'Queue message as a follow-up',
 		scope: 'composer',
 		bindings: [{ key: 'j', modifiers: ['mod'] }],
 	},
 	'composer.removeLastMention': {
-		description: 'Remove last mention attachment',
 		scope: 'composer',
 		bindings: [{ key: 'Backspace' }],
 	},
 	'autocomplete.next': {
-		description: 'Next autocomplete entry',
 		scope: 'autocomplete',
 		bindings: [{ key: 'ArrowDown' }],
 	},
 	'autocomplete.prev': {
-		description: 'Previous autocomplete entry',
 		scope: 'autocomplete',
 		bindings: [{ key: 'ArrowUp' }],
 	},
 	'autocomplete.confirm': {
-		description: 'Confirm autocomplete selection',
 		scope: 'autocomplete',
 		bindings: [{ key: 'Enter' }, { key: 'Tab' }],
 	},
 	'autocomplete.dismiss': {
-		description: 'Close autocomplete popover',
 		scope: 'autocomplete',
 		bindings: [{ key: 'Escape' }],
 	},
 	'dialog.submit': {
-		description: 'Submit dialog form',
 		scope: 'dialog',
 		bindings: [{ key: 'Enter', modifiers: ['mod'] }],
 	},
 	'modelPicker.selectByIndex': {
-		description: 'Select model by index (1-9)',
 		scope: 'modelPicker',
 		bindings: digitBindings,
 	},
 	'workspace.new': {
-		description: 'New workspace',
 		scope: 'menu',
 		bindings: [{ key: 'n', modifiers: ['mod'] }],
 		accelerator: 'CommandOrControl+N',
 	},
 	'toolCalls.toggleCollapse': {
-		description: 'Expand or collapse all tool calls',
 		scope: 'global',
 		bindings: [{ key: 'o', modifiers: ['ctrl'] }],
 	},
 	'tab.close': {
-		description: 'Close tab',
 		scope: 'menu',
 		bindings: [{ key: 'w', modifiers: ['mod'] }],
 		accelerator: 'CommandOrControl+W',
 	},
 	'tab.new': {
-		description: 'New chat tab',
 		scope: 'global',
 		bindings: [{ key: 't', modifiers: ['mod'] }],
 	},
 	'tab.keepOpen': {
-		description: 'Keep preview tab open',
 		scope: 'global',
 		bindings: [{ key: 'Enter', modifiers: ['mod', 'shift'] }],
 	},
 	'tab.next': {
-		description: 'Next tab',
 		scope: 'global',
 		bindings: [{ key: ']', modifiers: ['mod', 'shift'] }],
 	},
 	'tab.prev': {
-		description: 'Previous tab',
 		scope: 'global',
 		bindings: [{ key: '[', modifiers: ['mod', 'shift'] }],
 	},
 	'tab.selectByIndex': {
-		description: 'Select tab by index (⌘1–8, ⌘9 last)',
 		scope: 'global',
 		bindings: tabIndexBindings,
 	},
 	'changes.uncommitted': {
-		description: 'Show uncommitted changes',
 		scope: 'global',
 		bindings: [{ key: 'u', modifiers: ['mod', 'alt'] }],
 	},
 	'run.start': {
-		description: 'Start or stop run script',
 		scope: 'global',
 		bindings: [{ key: 'r', modifiers: ['mod'] }],
 	},
 	'agents.open': {
-		description: 'Launch coding agent',
 		scope: 'global',
 		bindings: [{ key: 'a', modifiers: ['mod', 'shift'] }],
 		accelerator: 'CommandOrControl+Shift+A',

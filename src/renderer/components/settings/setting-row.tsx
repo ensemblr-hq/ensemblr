@@ -99,7 +99,7 @@ export function SettingRow({
 						) : null}
 					</div>
 					{description ? (
-						<p className='text-muted-foreground text-xs leading-relaxed'>
+						<p className='max-w-prose text-pretty text-muted-foreground text-xs leading-relaxed'>
 							{description}
 						</p>
 					) : null}

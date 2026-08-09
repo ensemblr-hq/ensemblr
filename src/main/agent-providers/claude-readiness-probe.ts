@@ -22,10 +22,13 @@ import type {
 	AgentExecutableResolution,
 	AgentProviderExecutableService,
 	AgentProviderReadinessProbe,
+	ProviderDetailFields,
 } from './agent-provider-types.ts';
 import {
+	authoredDetail,
 	createRetryRemediation,
 	toExecutableSource,
+	upstreamDetail,
 } from './agent-provider-types.ts';
 import {
 	CLAUDE_INSTALL_COMMAND,
@@ -85,8 +88,18 @@ export interface CreateClaudeReadinessProbeOptions {
 /** What a single short-lived `query()` reports about the signed-in runtime. */
 interface ClaudeSessionProbeResult {
 	account: AccountInfo | null;
-	error: string | null;
+	/** Why the capabilities could not be read, ready to render; `null` on success. */
+	errorDetail: ProviderDetailFields | null;
 	mcpServers: readonly McpServerStatus[];
+}
+
+/**
+ * The detail every "no binary" check repeats, so the executable, version and
+ * auth rows all name the same single cause instead of three unrelated failures.
+ * @returns The authored detail fields.
+ */
+function noExecutableDetail(): ProviderDetailFields {
+	return authoredDetail('claude-no-executable', NO_EXECUTABLE_DETAIL);
 }
 
 /**
@@ -242,7 +255,7 @@ async function probeClaudeSession({
 	sessionTimeoutMs: number;
 }): Promise<ClaudeSessionProbeResult> {
 	if (!executablePath) {
-		return { account: null, error: NO_EXECUTABLE_DETAIL, mcpServers: [] };
+		return { account: null, errorDetail: noExecutableDetail(), mcpServers: [] };
 	}
 
 	const baseEnv = await resolveBaseEnv();
@@ -269,7 +282,9 @@ async function probeClaudeSession({
 	} catch (cause) {
 		return {
 			account: null,
-			error: cause instanceof Error ? cause.message : String(cause),
+			errorDetail: {
+				detail: cause instanceof Error ? cause.message : String(cause),
+			},
 			mcpServers: [],
 		};
 	} finally {
@@ -304,14 +319,14 @@ async function readSessionCapabilities({
 
 		return {
 			account: null,
-			error: describeSessionTimeout(sessionTimeoutMs),
+			errorDetail: describeSessionTimeout(sessionTimeoutMs),
 			mcpServers: [],
 		};
 	}
 
 	const [account, mcpServers] = capabilities;
 
-	return { account, error: null, mcpServers };
+	return { account, errorDetail: null, mcpServers };
 }
 
 /**
@@ -346,10 +361,16 @@ async function raceDeadline<T>(
  * @param sessionTimeoutMs - Deadline that elapsed.
  * @returns The failure detail the auth check renders.
  */
-function describeSessionTimeout(sessionTimeoutMs: number): string {
+function describeSessionTimeout(
+	sessionTimeoutMs: number,
+): ProviderDetailFields {
 	const seconds = Math.max(1, Math.round(sessionTimeoutMs / MS_PER_SECOND));
 
-	return `${CLAUDE_DESCRIPTOR.label} started but did not answer within ${seconds}s. Run ${CLAUDE_DESCRIPTOR.executableCommand} in a terminal to clear any pending login or Keychain prompt, then re-run these checks.`;
+	return authoredDetail(
+		'claude-session-timeout',
+		`${CLAUDE_DESCRIPTOR.label} started but did not answer within ${seconds}s. Run ${CLAUDE_DESCRIPTOR.executableCommand} in a terminal to clear any pending login or Keychain prompt, then re-run these checks.`,
+		{ seconds },
+	);
 }
 
 /**
@@ -403,11 +424,13 @@ function createExecutableCheck(
 
 	if (source === 'missing') {
 		return {
-			detail:
-				describeRejectedExecutable(executable) ??
+			...(upstreamDetail(describeRejectedExecutable(executable)) ??
 				(executable.setting
-					? `The configured ${CLAUDE_DESCRIPTOR.label} executable could not be run. Clear the override to fall back to the ${CLAUDE_DESCRIPTOR.executableCommand} on your PATH, or pick a runnable binary.`
-					: NO_EXECUTABLE_DETAIL),
+					? authoredDetail(
+							'claude-executable-override-broken',
+							`The configured ${CLAUDE_DESCRIPTOR.label} executable could not be run. Clear the override to fall back to the ${CLAUDE_DESCRIPTOR.executableCommand} on your PATH, or pick a runnable binary.`,
+						)
+					: noExecutableDetail())),
 			id: 'executable',
 			label: `${CLAUDE_DESCRIPTOR.label} executable`,
 			logs: null,
@@ -426,7 +449,17 @@ function createExecutableCheck(
 	}
 
 	return {
-		detail: `${source === 'configured' ? 'Configured override' : 'Found on PATH'}: ${executable.path}.`,
+		...(source === 'configured'
+			? authoredDetail(
+					'executable-configured',
+					`Configured override: ${executable.path}.`,
+					{ path: executable.path },
+				)
+			: authoredDetail(
+					'executable-on-path',
+					`Found on PATH: ${executable.path}.`,
+					{ path: executable.path },
+				)),
 		id: 'executable',
 		label: `${CLAUDE_DESCRIPTOR.label} executable`,
 		logs: null,
@@ -442,7 +475,10 @@ function createVersionCheck(
 ): AgentProviderCheckWire {
 	if (!result) {
 		return {
-			detail: `There is no ${CLAUDE_DESCRIPTOR.executableCommand} binary to version-probe. ${NO_EXECUTABLE_DETAIL}`,
+			...authoredDetail(
+				'claude-version-no-executable',
+				`There is no ${CLAUDE_DESCRIPTOR.executableCommand} binary to version-probe. ${NO_EXECUTABLE_DETAIL}`,
+			),
 			id: 'version',
 			label: 'Version',
 			logs: null,
@@ -455,7 +491,17 @@ function createVersionCheck(
 
 	if (result.status !== 'success') {
 		return {
-			detail: `${executable.path} --version failed: ${result.failure?.message ?? 'Unknown command failure.'}`,
+			...(result.failure?.message
+				? authoredDetail(
+						'version-command-failed',
+						`${executable.path} --version failed: ${result.failure.message}`,
+						{ command: executable.path, message: result.failure.message },
+					)
+				: authoredDetail(
+						'version-command-failed-unknown',
+						`${executable.path} --version failed: Unknown command failure.`,
+						{ command: executable.path },
+					)),
 			id: 'version',
 			label: 'Version',
 			logs,
@@ -485,7 +531,7 @@ function createAuthCheck(
 ): AgentProviderCheckWire {
 	if (isAuthenticated(session.account)) {
 		return {
-			detail: describeAccount(session.account),
+			...describeAccount(session.account),
 			id: 'auth',
 			label: 'Authentication',
 			logs: null,
@@ -495,9 +541,11 @@ function createAuthCheck(
 	}
 
 	return {
-		detail:
-			session.error ??
-			`${CLAUDE_DESCRIPTOR.label} is installed but not signed in.`,
+		...(session.errorDetail ??
+			authoredDetail(
+				'claude-not-signed-in',
+				`${CLAUDE_DESCRIPTOR.label} is installed but not signed in.`,
+			)),
 		id: 'auth',
 		label: 'Authentication',
 		logs: null,
@@ -514,10 +562,12 @@ function createAuthCheck(
 function createMcpCheck(
 	session: ClaudeSessionProbeResult,
 ): AgentProviderCheckWire {
-	if (session.error) {
+	if (session.errorDetail) {
 		return {
-			detail:
+			...authoredDetail(
+				'mcp-unlistable',
 				'MCP servers could not be listed because the runtime did not report them.',
+			),
 			id: 'mcp',
 			label: 'MCP servers',
 			logs: null,
@@ -531,10 +581,12 @@ function createMcpCheck(
 	);
 
 	if (unhealthy.length > 0) {
+		const servers = unhealthy
+			.map((server) => `${server.name}: ${server.status}`)
+			.join(', ');
+
 		return {
-			detail: unhealthy
-				.map((server) => `${server.name}: ${server.status}`)
-				.join(', '),
+			...authoredDetail('mcp-unhealthy', servers, { servers }),
 			id: 'mcp',
 			label: 'MCP servers',
 			logs: null,
@@ -544,10 +596,13 @@ function createMcpCheck(
 	}
 
 	return {
-		detail:
-			session.mcpServers.length === 0
-				? 'No MCP servers are configured.'
-				: `${session.mcpServers.length} MCP server(s) connected.`,
+		...(session.mcpServers.length === 0
+			? authoredDetail('mcp-none', 'No MCP servers are configured.')
+			: authoredDetail(
+					'mcp-connected',
+					`${session.mcpServers.length} MCP server(s) connected.`,
+					{ count: session.mcpServers.length },
+				)),
 		id: 'mcp',
 		label: 'MCP servers',
 		logs: null,
@@ -620,13 +675,26 @@ function isAuthenticated(account: AccountInfo | null): account is AccountInfo {
 	);
 }
 
-/** Renders the signed-in identity as a one-line detail string. */
-function describeAccount(account: AccountInfo): string {
+/** Renders the signed-in identity as the auth check's detail line. */
+function describeAccount(account: AccountInfo): ProviderDetailFields {
 	const identity =
-		account.email ?? account.organization ?? account.apiProvider ?? 'Signed in';
-	const plan = account.subscriptionType ? ` (${account.subscriptionType})` : '';
+		account.email ?? account.organization ?? account.apiProvider ?? null;
+	const plan = account.subscriptionType ?? null;
 
-	return `${identity}${plan}.`;
+	if (!identity) {
+		return plan
+			? authoredDetail('account-signed-in-with-plan', `Signed in (${plan}).`, {
+					plan,
+				})
+			: authoredDetail('account-signed-in', 'Signed in.');
+	}
+
+	return plan
+		? authoredDetail('account-identity-with-plan', `${identity} (${plan}).`, {
+				identity,
+				plan,
+			})
+		: authoredDetail('account-identity', `${identity}.`, { identity });
 }
 
 /** Projects the SDK's account shape onto the wire, nulling absent fields. */

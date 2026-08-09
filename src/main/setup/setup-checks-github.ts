@@ -1,11 +1,14 @@
+import type { SetupDetailMessage } from '../../shared/ipc/contracts/setup';
 import type {
 	LocalCommandResult,
 	LocalCommandService,
 } from '../commands/local-command';
 import {
+	authoredDetail,
 	createCommandLogs,
 	defineCheck,
 	type SetupCheckProviderContext,
+	unexpectedErrorDetail,
 } from './setup-check-context.ts';
 
 const GITHUB_HOSTNAME = 'github.com';
@@ -19,6 +22,9 @@ interface GitHubCheckDeps {
 	localCommandService: LocalCommandService;
 }
 
+/** The detail fields a failure mapper returns. */
+type DetailResult = { detail: string; detailMessage?: SetupDetailMessage };
+
 /** Builds the snapshot for the `git --version` setup check. */
 export function getGitExecutableCheck(deps: GitHubCheckDeps) {
 	const check = defineCheck<SetupCheckProviderContext>({
@@ -27,10 +33,11 @@ export function getGitExecutableCheck(deps: GitHubCheckDeps) {
 			'Detects a runnable git executable before repository and worktree workflows are enabled.',
 		group: 'github',
 		id: 'git-executable',
-		onError: (error) => ({
-			detail:
-				error instanceof Error ? error.message : 'Unknown git check error.',
-		}),
+		onError: (error) =>
+			unexpectedErrorDetail(error, {
+				code: 'git-unknown-error',
+				text: 'Unknown git check error.',
+			}),
 		run: async () => {
 			const result = await deps.localCommandService.run({
 				args: ['--version'],
@@ -41,13 +48,17 @@ export function getGitExecutableCheck(deps: GitHubCheckDeps) {
 			const logs = createCommandLogs(result);
 
 			if (result.status === 'success') {
-				const version =
-					getFirstOutputLine(result.stdout) ??
-					getFirstOutputLine(result.stderr) ??
-					'Git version detected.';
+				const version = getReportedVersion(result);
 
 				return {
-					detail: `Git is available: ${version}.`,
+					...(version
+						? authoredDetail('git-available', `Git is available: ${version}.`, {
+								version,
+							})
+						: authoredDetail(
+								'git-available-unknown-version',
+								'Git is available.',
+							)),
 					logs,
 					remediationActions: [
 						{
@@ -61,7 +72,7 @@ export function getGitExecutableCheck(deps: GitHubCheckDeps) {
 			}
 
 			return {
-				detail: getGitFailureDetail(result),
+				...getGitFailureDetail(result),
 				logs,
 				remediationActions: [
 					{
@@ -99,12 +110,11 @@ export function getGitHubCliCheck(deps: GitHubCheckDeps) {
 			'Detects a runnable GitHub CLI executable for PR, check, comment, and merge workflows.',
 		group: 'github',
 		id: 'gh-cli',
-		onError: (error) => ({
-			detail:
-				error instanceof Error
-					? error.message
-					: 'Unknown GitHub CLI check error.',
-		}),
+		onError: (error) =>
+			unexpectedErrorDetail(error, {
+				code: 'gh-cli-unknown-error',
+				text: 'Unknown GitHub CLI check error.',
+			}),
 		run: async () => {
 			const result = await deps.localCommandService.run({
 				args: ['--version'],
@@ -115,13 +125,19 @@ export function getGitHubCliCheck(deps: GitHubCheckDeps) {
 			const logs = createCommandLogs(result);
 
 			if (result.status === 'success') {
-				const version =
-					getFirstOutputLine(result.stdout) ??
-					getFirstOutputLine(result.stderr) ??
-					'GitHub CLI version detected.';
+				const version = getReportedVersion(result);
 
 				return {
-					detail: `GitHub CLI is available: ${version}.`,
+					...(version
+						? authoredDetail(
+								'gh-cli-available',
+								`GitHub CLI is available: ${version}.`,
+								{ version },
+							)
+						: authoredDetail(
+								'gh-cli-available-unknown-version',
+								'GitHub CLI is available.',
+							)),
 					logs,
 					remediationActions: [
 						{
@@ -135,7 +151,7 @@ export function getGitHubCliCheck(deps: GitHubCheckDeps) {
 			}
 
 			return {
-				detail: getGitHubCliFailureDetail(result),
+				...getGitHubCliFailureDetail(result),
 				logs,
 				remediationActions: [
 					{
@@ -167,12 +183,11 @@ export function getGitHubAuthCheck(deps: GitHubCheckDeps) {
 			'Runs gh auth status for github.com without requesting token output.',
 		group: 'github',
 		id: 'gh-auth',
-		onError: (error) => ({
-			detail:
-				error instanceof Error
-					? error.message
-					: 'Unknown GitHub auth check error.',
-		}),
+		onError: (error) =>
+			unexpectedErrorDetail(error, {
+				code: 'gh-auth-unknown-error',
+				text: 'Unknown GitHub auth check error.',
+			}),
 		run: async () => {
 			const result = await deps.localCommandService.run({
 				args: ['auth', 'status', '--hostname', GITHUB_HOSTNAME, '--active'],
@@ -184,7 +199,11 @@ export function getGitHubAuthCheck(deps: GitHubCheckDeps) {
 
 			if (result.status === 'success') {
 				return {
-					detail: `GitHub CLI is authenticated for ${GITHUB_HOSTNAME}.`,
+					...authoredDetail(
+						'gh-auth-ready',
+						`GitHub CLI is authenticated for ${GITHUB_HOSTNAME}.`,
+						{ hostname: GITHUB_HOSTNAME },
+					),
 					logs,
 					remediationActions: [
 						{
@@ -198,7 +217,7 @@ export function getGitHubAuthCheck(deps: GitHubCheckDeps) {
 			}
 
 			return {
-				detail: getGitHubAuthFailureDetail(result),
+				...getGitHubAuthFailureDetail(result),
 				logs,
 				remediationActions: [
 					{
@@ -222,6 +241,15 @@ export function getGitHubAuthCheck(deps: GitHubCheckDeps) {
 	return check(deps.context);
 }
 
+/** Returns the version line a `--version` run reported, or `null`. */
+function getReportedVersion(result: LocalCommandResult): string | null {
+	return (
+		getFirstOutputLine(result.stdout) ??
+		getFirstOutputLine(result.stderr) ??
+		null
+	);
+}
+
 /** Returns the first non-blank line in a command output, or `null`. */
 function getFirstOutputLine(output: string): string | null {
 	const line = output
@@ -233,47 +261,90 @@ function getFirstOutputLine(output: string): string | null {
 }
 
 /** Maps a `git --version` failure to a user-facing message. */
-function getGitFailureDetail(result: LocalCommandResult): string {
+function getGitFailureDetail(result: LocalCommandResult): DetailResult {
 	switch (result.failure?.code) {
 		case 'command-not-found':
-			return 'Git was not found in the shell-derived PATH. Install Git or Xcode Command Line Tools, then retry.';
+			return authoredDetail(
+				'git-not-found',
+				'Git was not found in the shell-derived PATH. Install Git or Xcode Command Line Tools, then retry.',
+			);
 		case 'timeout':
-			return 'Git version check timed out.';
+			return authoredDetail('git-timeout', 'Git version check timed out.');
 		case 'output-truncated':
-			return 'Git version check produced too much output.';
+			return authoredDetail(
+				'git-output-truncated',
+				'Git version check produced too much output.',
+			);
 		default:
-			return `Git version check failed: ${
-				result.failure?.message ?? 'Unknown command failure.'
-			}`;
+			return result.failure?.message
+				? authoredDetail(
+						'git-failed',
+						`Git version check failed: ${result.failure.message}`,
+						{ message: result.failure.message },
+					)
+				: authoredDetail(
+						'git-failed-unknown',
+						'Git version check failed: Unknown command failure.',
+					);
 	}
 }
 
 /** Maps a `gh --version` failure to a user-facing message. */
-function getGitHubCliFailureDetail(result: LocalCommandResult): string {
+function getGitHubCliFailureDetail(result: LocalCommandResult): DetailResult {
 	switch (result.failure?.code) {
 		case 'command-not-found':
-			return 'GitHub CLI was not found in the shell-derived PATH. Install gh, then retry.';
+			return authoredDetail(
+				'gh-cli-not-found',
+				'GitHub CLI was not found in the shell-derived PATH. Install gh, then retry.',
+			);
 		case 'timeout':
-			return 'GitHub CLI version check timed out.';
+			return authoredDetail(
+				'gh-cli-timeout',
+				'GitHub CLI version check timed out.',
+			);
 		case 'output-truncated':
-			return 'GitHub CLI version check produced too much output.';
+			return authoredDetail(
+				'gh-cli-output-truncated',
+				'GitHub CLI version check produced too much output.',
+			);
 		default:
-			return `GitHub CLI version check failed: ${
-				result.failure?.message ?? 'Unknown command failure.'
-			}`;
+			return result.failure?.message
+				? authoredDetail(
+						'gh-cli-failed',
+						`GitHub CLI version check failed: ${result.failure.message}`,
+						{ message: result.failure.message },
+					)
+				: authoredDetail(
+						'gh-cli-failed-unknown',
+						'GitHub CLI version check failed: Unknown command failure.',
+					);
 	}
 }
 
 /** Maps a `gh auth status` failure to a user-facing message. */
-function getGitHubAuthFailureDetail(result: LocalCommandResult): string {
+function getGitHubAuthFailureDetail(result: LocalCommandResult): DetailResult {
 	switch (result.failure?.code) {
 		case 'command-not-found':
-			return 'GitHub CLI was not found before authentication could be checked. Install gh, then retry.';
+			return authoredDetail(
+				'gh-auth-cli-not-found',
+				'GitHub CLI was not found before authentication could be checked. Install gh, then retry.',
+			);
 		case 'timeout':
-			return `GitHub authentication check timed out for ${GITHUB_HOSTNAME}.`;
+			return authoredDetail(
+				'gh-auth-timeout',
+				`GitHub authentication check timed out for ${GITHUB_HOSTNAME}.`,
+				{ hostname: GITHUB_HOSTNAME },
+			);
 		case 'output-truncated':
-			return 'GitHub authentication check produced too much output.';
+			return authoredDetail(
+				'gh-auth-output-truncated',
+				'GitHub authentication check produced too much output.',
+			);
 		default:
-			return `GitHub CLI is not authenticated for ${GITHUB_HOSTNAME}. Run gh auth login --hostname ${GITHUB_HOSTNAME}, then retry.`;
+			return authoredDetail(
+				'gh-auth-required',
+				`GitHub CLI is not authenticated for ${GITHUB_HOSTNAME}. Run gh auth login --hostname ${GITHUB_HOSTNAME}, then retry.`,
+				{ hostname: GITHUB_HOSTNAME },
+			);
 	}
 }

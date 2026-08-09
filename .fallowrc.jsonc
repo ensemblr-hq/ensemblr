@@ -148,6 +148,11 @@
 				"files": ["playground/**"],
 				"maxCrap": 60,
 				"reason": "Dev-only preview harness. Vitest never runs playground/, so its coverage term is structurally 0 and CRAP collapses to cyclomatic² + cyclomatic — a 12-line fixture that defaults seven fields lands at 56 purely for being untested by design. Cyclomatic and cognitive ceilings still apply unchanged, so a genuinely convoluted scene is still reported."
+			},
+			{
+				"files": ["src/main/**"],
+				"maxCrap": 650,
+				"reason": "Most of tests/main runs on `electron --test`, which emits no Istanbul data (see the vitest.config.mts prologue — only the pure-logic node-env suites are wired into Vitest). A well-tested main-process module therefore reports coverage 0 and CRAP collapses to cyclomatic² + cyclomatic, so a 5-branch check lands at 30 purely for being tested by the other runner. 650 is cyclomatic² + cyclomatic at the maxCyclomatic ceiling of 25, which makes cyclomatic and cognitive the real gates for this tree instead of a coverage term that cannot be measured. Revisit if the electron suites ever emit coverage."
 			}
 		]
 	},

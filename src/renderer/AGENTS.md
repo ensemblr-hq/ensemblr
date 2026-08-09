@@ -90,6 +90,9 @@ These instructions apply to everything under `src/renderer/`.
   `i18next-instrument-ignore` directive, not by widening the config.
 - See `docs/i18n-glossary.md` for the product vocabulary in `ru` and `el`. Fix a
   term there before translating, and record any new call you had to make.
+- **A key you add ships translated.** `ru` and `el` are filled in the same
+  change, and a surface you touch comes out with no empty values left behind.
+  `.claude/rules/i18n.md` carries the full contract.
 
 ## Fixture Data
 

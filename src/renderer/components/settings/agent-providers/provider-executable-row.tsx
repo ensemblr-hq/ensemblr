@@ -10,6 +10,7 @@ import {
 	setAgentProviderExecutablePath,
 } from '@/renderer/api/ensemblr';
 import { SettingRow } from '@/renderer/components/settings/setting-row';
+import { SettingsCodeValue } from '@/renderer/components/settings/settings-code-value';
 import { Button } from '@/renderer/components/ui/button';
 import { Input } from '@/renderer/components/ui/input';
 import { useDebouncedSettingField } from '@/renderer/hooks/use-debounced-setting-field';
@@ -123,34 +124,34 @@ export function ProviderExecutableRow({
 			)}
 			stack
 		>
-			<Input
-				aria-label={t(
-					'settings:providers.executable.label',
-					'{{provider}} executable path',
-					{ provider: descriptor.label },
-				)}
-				className='mt-2 h-8 font-mono text-xs'
-				onChange={(event) => onChange(event.target.value)}
-				placeholder={`/opt/homebrew/bin/${descriptor.executableCommand}`}
-				value={value}
-			/>
-			<p className='mt-2 text-muted-foreground text-xs'>
-				{t('settings:providers.executable.resolved', 'Resolved executable')}
-			</p>
-			<code className='mt-1 block truncate rounded-md bg-muted/40 px-3 py-2 font-mono text-xs'>
-				{snapshot?.resolvedPath ??
-					t('settings:providers.executable.not-found', 'Not found')}
-			</code>
-			{snapshot?.source ? (
-				<p className='mt-1 text-muted-foreground text-xxs'>
-					{t('settings:providers.executable.source', 'source: {{source}}', {
-						source: snapshot.source,
-					})}
-				</p>
-			) : null}
-			{pickError ? (
-				<p className='mt-2 text-status-danger text-xs'>{pickError}</p>
-			) : null}
+			<div className='space-y-3'>
+				<Input
+					aria-label={t(
+						'settings:providers.executable.label',
+						'{{provider}} executable path',
+						{ provider: descriptor.label },
+					)}
+					className='h-7 font-mono text-xs'
+					onChange={(event) => onChange(event.target.value)}
+					placeholder={`/opt/homebrew/bin/${descriptor.executableCommand}`}
+					value={value}
+				/>
+				<div className='space-y-1'>
+					<p className='font-medium text-muted-foreground text-xxs uppercase tracking-widest'>
+						{t('settings:providers.executable.resolved', 'Resolved executable')}
+					</p>
+					<SettingsCodeValue
+						source={snapshot?.source ?? null}
+						value={
+							snapshot?.resolvedPath ??
+							t('settings:providers.executable.not-found', 'Not found')
+						}
+					/>
+				</div>
+				{pickError ? (
+					<p className='text-status-danger text-xs'>{pickError}</p>
+				) : null}
+			</div>
 		</SettingRow>
 	);
 }

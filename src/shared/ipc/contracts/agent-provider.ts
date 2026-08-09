@@ -1,5 +1,9 @@
 import type { AgentProviderId } from '../../agent-provider';
-import type { SetupCheckLogSnapshot, SetupRemediationAction } from './setup';
+import type {
+	SetupCheckLogSnapshot,
+	SetupMessageParams,
+	SetupRemediationAction,
+} from './setup';
 
 /**
  * Captured command output attached to a provider check. Identical to the shape
@@ -27,9 +31,53 @@ export type AgentProviderExecutableSource = 'configured' | 'missing' | 'path';
 /** Roll-up of every check in one readiness probe. */
 export type AgentProviderReadinessStatus = 'failure' | 'success';
 
-/** One readiness check the Providers page renders as a row. */
+/**
+ * Codes for every readiness detail a probe authors itself, so the Providers page
+ * renders it in the app language. A detail that passes an upstream message
+ * through — a runtime error, an upstream diagnostic, tool stderr — carries no
+ * code and surfaces verbatim.
+ */
+export type AgentProviderDetailCode =
+	| 'account-identity'
+	| 'account-identity-with-plan'
+	| 'account-signed-in'
+	| 'account-signed-in-with-plan'
+	| 'claude-executable-override-broken'
+	| 'claude-no-executable'
+	| 'claude-not-signed-in'
+	| 'claude-session-timeout'
+	| 'claude-version-no-executable'
+	| 'executable-configured'
+	| 'executable-on-path'
+	| 'mcp-connected'
+	| 'mcp-none'
+	| 'mcp-unhealthy'
+	| 'mcp-unlistable'
+	| 'pi-agent-directory-resolved'
+	| 'pi-agent-directory-unverified'
+	| 'pi-executable-resolved'
+	| 'pi-executable-undiscovered'
+	| 'pi-models-ready'
+	| 'pi-models-unverified'
+	| 'pi-rpc-invalid'
+	| 'pi-rpc-ready'
+	| 'version-command-failed'
+	| 'version-command-failed-unknown';
+
+/** A readiness detail the renderer localizes: a catalogue code plus its values. */
+export interface AgentProviderDetailMessage {
+	code: AgentProviderDetailCode;
+	params?: SetupMessageParams;
+}
+
+/**
+ * One readiness check the Providers page renders as a row. `label` and `detail`
+ * are the English source; the page renders the translation keyed by `id` and by
+ * `detailMessage` when the probe authored the line.
+ */
 export interface AgentProviderCheckWire {
 	detail: string | null;
+	detailMessage?: AgentProviderDetailMessage;
 	/** Stable per-provider check id, e.g. `executable`, `auth`, `rpc-smoke`. */
 	id: string;
 	label: string;

@@ -1,24 +1,11 @@
 import { createFileRoute } from '@tanstack/react-router';
 import type { TFunction } from 'i18next';
 import { useAtom } from 'jotai';
-import { Undo2Icon } from 'lucide-react';
-import { useTranslation } from 'react-i18next';
-import { SettingRow } from '@/renderer/components/settings/setting-row';
+import { Trans, useTranslation } from 'react-i18next';
+import { ActionPreferenceItem } from '@/renderer/components/settings/action-preference-item';
 import { SettingsSection } from '@/renderer/components/settings/settings-section';
-import {
-	Accordion,
-	AccordionContent,
-	AccordionItem,
-	AccordionTrigger,
-} from '@/renderer/components/ui/accordion';
-import { Badge } from '@/renderer/components/ui/badge';
-import { Switch } from '@/renderer/components/ui/switch';
-import { Textarea } from '@/renderer/components/ui/textarea';
-import {
-	Tooltip,
-	TooltipContent,
-	TooltipTrigger,
-} from '@/renderer/components/ui/tooltip';
+import { Accordion } from '@/renderer/components/ui/accordion';
+import { useRepoSettings } from '@/renderer/hooks/use-repo-settings';
 import {
 	REPO_ACTION_KEYS,
 	type RepoActionKey,
@@ -103,10 +90,11 @@ function actionMeta(
 	};
 }
 
-/** Repository-scoped Actions settings panel for spotlight testing and per-action agent instruction overrides. */
+/** Repository-scoped Actions settings panel for per-action agent instruction overrides. */
 function RepoActionsSettings() {
 	const { t } = useTranslation();
 	const { repoId } = Route.useParams();
+	const { resolved } = useRepoSettings(repoId);
 	const [overrides, setOverrides] = useAtom(
 		repoSettingsOverrideAtomFamily(repoId),
 	);
@@ -126,96 +114,41 @@ function RepoActionsSettings() {
 			)}
 			title={t('settings:repo.actions.title', 'Actions')}
 		>
-			<SettingRow
-				control={<Switch checked={false} disabled />}
-				description={t(
-					'settings:repo.spotlight.description',
-					'Replace Run with Spotlight for this repository so workspace changes are tested in the repository root. Spotlight is a separate feature still in development (workspace→root diff/apply with rollback); see docs/product/discovery-spotlight-testing.md.',
-				)}
-				label={
-					<span className='flex items-center gap-2'>
-						{t('settings:repo.spotlight.label', 'Use spotlight testing')}
-						<Badge variant='outline'>
-							{t('settings:repo.spotlight.coming-soon', 'Coming soon')}
-						</Badge>
-					</span>
-				}
-			/>
-
 			<Accordion collapsible type='single'>
 				{REPO_ACTION_KEYS.map((key) => {
-					const actionCopy = meta[key];
-					const hasValue = Boolean(overrides.actionPreferences?.[key]?.trim());
+					const personal = overrides.actionPreferences?.[key] ?? '';
+					const snapshot = resolved(`actionPreferences.${key}`);
 					return (
-						<AccordionItem
-							className='group/pref relative'
+						<ActionPreferenceItem
+							actionKey={key}
+							description={meta[key].description}
 							key={key}
-							value={key}
-						>
-							{hasValue ? (
-								<span
-									aria-hidden='true'
-									className='absolute top-4 bottom-4 -left-4 w-0.5 rounded-full bg-accent-strong'
-								/>
-							) : null}
-							{hasValue ? (
-								<Tooltip>
-									<TooltipTrigger asChild>
-										<button
-											aria-label={t(
-												'settings:repo.actions.remove-aria-label',
-												'Remove {{name}}',
-												{ name: actionCopy.title },
-											)}
-											className='absolute top-4 right-10 z-10 inline-flex size-5 shrink-0 items-center justify-center rounded-sm text-muted-foreground opacity-0 transition-opacity hover:bg-muted hover:text-foreground focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring group-hover/pref:opacity-100'
-											onClick={(e) => {
-												e.stopPropagation();
-												clearPref(key);
-											}}
-											type='button'
-										>
-											<Undo2Icon aria-hidden='true' className='size-3.5' />
-										</button>
-									</TooltipTrigger>
-									<TooltipContent>
-										{t('common:actions.remove', 'Remove')}
-									</TooltipContent>
-								</Tooltip>
-							) : null}
-							<AccordionTrigger className='py-4 hover:no-underline'>
-								<div className='flex flex-col items-start gap-0.5 text-left'>
-									<span className='flex items-center gap-1.5 font-medium text-sm'>
-										{actionCopy.title}
-									</span>
-									<span className='text-muted-foreground text-xs'>
-										{actionCopy.description}
-									</span>
-								</div>
-							</AccordionTrigger>
-							<AccordionContent className='px-1 pt-0.5'>
-								<Textarea
-									aria-label={actionCopy.title}
-									className='min-h-22 font-mono text-xs'
-									onChange={(e) =>
-										setOverrides((prev) => ({
-											...prev,
-											actionPreferences: {
-												...(prev.actionPreferences ?? {}),
-												[key]: e.target.value,
-											},
-										}))
-									}
-									placeholder={t(
-										'settings:repo.actions.placeholder',
-										'Add your preferences here. The agent will be told to prioritize these instructions over its default instructions.',
-									)}
-									value={overrides.actionPreferences?.[key] ?? ''}
-								/>
-							</AccordionContent>
-						</AccordionItem>
+							onChange={(next) =>
+								setOverrides((prev) => ({
+									...prev,
+									actionPreferences: {
+										...(prev.actionPreferences ?? {}),
+										[key]: next,
+									},
+								}))
+							}
+							onClear={() => clearPref(key)}
+							personal={personal}
+							shared={typeof snapshot?.value === 'string' ? snapshot.value : ''}
+							sharedSource={snapshot?.source}
+							title={meta[key].title}
+						/>
 					);
 				})}
 			</Accordion>
+
+			<p className='py-3 text-muted-foreground text-xs'>
+				<Trans
+					components={{ file: <code className='font-mono' /> }}
+					defaults='The committed <file>[prompts]</file> block in <file>.ensemblr/settings.toml</file> supplies the team-shared text. A personal preference typed here wins over it for you only, and clearing one falls back to the shared text.'
+					i18nKey='settings:repo.actions.committed-note'
+				/>
+			</p>
 		</SettingsSection>
 	);
 }

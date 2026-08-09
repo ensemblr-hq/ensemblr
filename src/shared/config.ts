@@ -55,6 +55,7 @@ const gitSettingsSchema = z.object({
 /** Experimental user defaults that can feed repository behavior. */
 const experimentalSettingsSchema = z.object({
 	autoRunAfterSetup: z.boolean().catch(false),
+	developerMode: z.boolean().catch(false),
 });
 
 // First-run state, not a preference. `completedAt` is the ISO timestamp at which

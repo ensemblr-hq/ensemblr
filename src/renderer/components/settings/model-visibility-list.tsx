@@ -4,11 +4,14 @@ import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { agentModelsQuery } from '@/renderer/api/ensemblr';
+import {
+	SettingsErrorState,
+	SettingsLoadingState,
+} from '@/renderer/components/settings/settings-async-state';
 import { SettingsEmptyState } from '@/renderer/components/settings/settings-empty-state';
 import { Button } from '@/renderer/components/ui/button';
 import { Input } from '@/renderer/components/ui/input';
 import { ScrollArea } from '@/renderer/components/ui/scroll-area';
-import { Spinner } from '@/renderer/components/ui/spinner';
 import { Switch } from '@/renderer/components/ui/switch';
 import { getProviderDisplayName } from '@/renderer/lib/workbench/model-picker-groups';
 import { hiddenModelsAtom } from '@/renderer/state/preferences';
@@ -70,30 +73,29 @@ export function ModelVisibilityList() {
 
 	if (isLoading) {
 		return (
-			<div className='flex items-center gap-2 py-6 text-muted-foreground text-sm'>
-				<Spinner className='size-4' />{' '}
-				{t('settings:models.loading', 'Loading models…')}
-			</div>
+			<SettingsLoadingState
+				label={t('settings:models.loading', 'Loading models…')}
+			/>
 		);
 	}
 
 	if (error) {
 		return (
-			<div className='py-6 text-sm text-status-danger'>
-				{t(
+			<SettingsErrorState
+				message={t(
 					'settings:models.discovery-failed',
 					'Model discovery failed: {{error}}.',
 					{ error: String(error) },
 				)}
-			</div>
+			/>
 		);
 	}
 
 	if (models.length === 0) {
 		return (
-			<p className='py-6 text-muted-foreground text-sm'>
-				{t('settings:models.visibility.empty', 'No models available.')}
-			</p>
+			<SettingsEmptyState
+				title={t('settings:models.visibility.empty', 'No models available.')}
+			/>
 		);
 	}
 
@@ -139,7 +141,7 @@ export function ModelVisibilityList() {
 						'settings:models.visibility.search-aria-label',
 						'Search models',
 					)}
-					className='h-8'
+					className='h-7'
 					onChange={(event) => setQuery(event.target.value)}
 					placeholder={t(
 						'settings:models.visibility.search-placeholder',
@@ -167,7 +169,7 @@ export function ModelVisibilityList() {
 					)}
 				/>
 			) : (
-				<ScrollArea className='h-80 rounded-md border bg-card/40'>
+				<ScrollArea className='h-80 rounded-xl border border-border bg-card/40'>
 					<ul className='divide-y divide-border'>
 						{groups.map((group) => {
 							const groupVisibleCount = group.models.filter(

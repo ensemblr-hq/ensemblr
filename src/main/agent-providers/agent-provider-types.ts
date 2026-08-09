@@ -5,6 +5,8 @@ import type {
 import type {
 	AgentExecutablePathSnapshotWire,
 	AgentExecutableSelectionWire,
+	AgentProviderDetailCode,
+	AgentProviderDetailMessage,
 	AgentProviderExecutableSource,
 	AgentProviderReadinessWire,
 	ListAgentProviderMcpServersResult,
@@ -12,6 +14,7 @@ import type {
 	SetupRemediationWire,
 } from '../../shared/ipc/contracts/agent-provider';
 import type { ResolvedSettingSnapshot } from '../../shared/ipc/contracts/settings-resolution';
+import type { SetupMessageParams } from '../../shared/ipc/contracts/setup';
 
 /**
  * The slice of a resolved executable the provider surface needs: what ran,
@@ -79,6 +82,44 @@ export interface AgentProviderService {
 		provider: AgentProviderId,
 		executablePath: string,
 	) => AgentExecutableSelectionWire;
+}
+
+/** Detail fields for one readiness check, as the wire carries them. */
+export type ProviderDetailFields = {
+	detail: string;
+	detailMessage?: AgentProviderDetailMessage;
+};
+
+/**
+ * Pairs an authored readiness detail with the code and values the Providers page
+ * needs to render it in the app language. The English text stays on the wire
+ * because the diagnostics bundle records it verbatim.
+ * @param code - Catalogue code for the line.
+ * @param text - The English source, already interpolated.
+ * @param params - Values the catalogue entry interpolates.
+ * @returns The detail fields for an {@link AgentProviderCheckWire}.
+ */
+export function authoredDetail(
+	code: AgentProviderDetailCode,
+	text: string,
+	params?: SetupMessageParams,
+): ProviderDetailFields {
+	return {
+		detail: text,
+		detailMessage: params ? { code, params } : { code },
+	};
+}
+
+/**
+ * Passes an upstream message through as the detail, untranslated — a runtime
+ * error or an upstream diagnostic is not ours to reword.
+ * @param message - The upstream message, when there is one.
+ * @returns The detail fields, or null when the caller should author its own line.
+ */
+export function upstreamDetail(
+	message: string | null | undefined,
+): ProviderDetailFields | null {
+	return message ? { detail: message } : null;
 }
 
 /**

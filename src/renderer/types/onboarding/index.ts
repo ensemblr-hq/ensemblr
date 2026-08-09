@@ -1,6 +1,7 @@
 import type {
 	SetupCheckId,
 	SetupCheckStatus,
+	SetupDetailMessage,
 	SetupRemediationActionKind,
 } from '@/shared/ipc/contracts/setup';
 
@@ -58,6 +59,7 @@ export interface OnboardingRemediation {
 /** One probe result rendered as a card inside a step. */
 export interface OnboardingCheckModel {
 	detail: string;
+	detailMessage?: SetupDetailMessage;
 	id: OnboardingCheckId;
 	remediations: OnboardingRemediation[];
 	status: SetupCheckStatus;

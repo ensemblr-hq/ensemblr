@@ -2,6 +2,15 @@ import { atom } from 'jotai';
 import { atomWithStorage } from 'jotai/utils';
 
 /**
+ * localStorage key backing {@link settingsActiveRepoIdAtom}. Exported because
+ * the `/settings/repo` index route resolves the same value from a `beforeLoad`
+ * guard, where no Jotai store is available — reading the key literally there is
+ * what let the two drift apart silently.
+ */
+export const SETTINGS_ACTIVE_REPO_ID_STORAGE_KEY =
+	'ensemblr_settings_ui_active_repo_id';
+
+/**
  * Settings UI state — not a user preference. The router URL (`$repoId`) is the
  * source of truth when on a repo route; this atom only remembers the
  * last-visited repo so the sidebar can default the repo scope when the user
@@ -9,7 +18,7 @@ import { atomWithStorage } from 'jotai/utils';
  * validate against the live project list before navigating.
  */
 export const settingsActiveRepoIdAtom = atomWithStorage<string | null>(
-	'ensemblr_settings_ui_active_repo_id',
+	SETTINGS_ACTIVE_REPO_ID_STORAGE_KEY,
 	null,
 );
 

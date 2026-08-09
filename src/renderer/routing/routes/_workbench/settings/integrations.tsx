@@ -29,7 +29,13 @@ function IntegrationsSettings() {
 	const { t } = useTranslation();
 
 	return (
-		<SettingsSection title={t('settings:integrations.title', 'Integrations')}>
+		<SettingsSection
+			description={t(
+				'settings:integrations.description',
+				'Third-party services Ensemblr can sign in to on your behalf. Each one is optional and can be disconnected at any time.',
+			)}
+			title={t('settings:integrations.title', 'Integrations')}
+		>
 			<LinearConnectionRow />
 		</SettingsSection>
 	);

@@ -5,8 +5,10 @@ import type {
 } from '../../shared/ipc/contracts/setup';
 import type { LinearAuthService } from '../linear';
 import {
+	authoredDetail,
 	defineCheck,
 	type SetupCheckProviderContext,
+	unexpectedErrorDetail,
 } from './setup-check-context.ts';
 
 /** Dependencies for the Linear setup check. */
@@ -38,8 +40,10 @@ export function getLinearConnectionCheck(deps: LinearCheckDeps) {
 		group: 'linear',
 		id: 'linear-oauth',
 		onError: (error) => ({
-			detail:
-				error instanceof Error ? error.message : 'Unknown Linear check error.',
+			...unexpectedErrorDetail(error, {
+				code: 'linear-unknown-error',
+				text: 'Unknown Linear check error.',
+			}),
 			remediationActions: LINEAR_REMEDIATION_ACTIONS,
 			status: 'warning',
 		}),
@@ -47,7 +51,7 @@ export function getLinearConnectionCheck(deps: LinearCheckDeps) {
 			const snapshot = await deps.linearAuthService.getConnectionStatus();
 
 			return {
-				detail: describeConnection(snapshot),
+				...describeConnection(snapshot),
 				remediationActions: LINEAR_REMEDIATION_ACTIONS,
 				status: statusForConnection(snapshot),
 			};
@@ -70,29 +74,46 @@ function statusForConnection(
 }
 
 /**
- * Build the user-facing detail message describing the Linear connection state.
+ * Build the user-facing detail describing the Linear connection state.
  * @param snapshot - Current Linear connection state
- * @returns A human-readable description of the connection
+ * @returns The detail fields for the check result
  */
-function describeConnection(snapshot: LinearConnectionSnapshot): string {
+function describeConnection(snapshot: LinearConnectionSnapshot) {
 	switch (snapshot.state) {
 		case 'connected': {
 			const identity = snapshot.userName ?? snapshot.userEmail;
 			const organization = snapshot.organizationName;
 
 			if (identity && organization) {
-				return `Linear is connected as ${identity} (${organization}).`;
+				return authoredDetail(
+					'linear-connected-with-organization',
+					`Linear is connected as ${identity} (${organization}).`,
+					{ identity, organization },
+				);
 			}
 
 			return identity
-				? `Linear is connected as ${identity}.`
-				: 'Linear is connected.';
+				? authoredDetail(
+						'linear-connected-as',
+						`Linear is connected as ${identity}.`,
+						{ identity },
+					)
+				: authoredDetail('linear-connected', 'Linear is connected.');
 		}
 		case 'not-configured':
-			return 'Linear OAuth is not configured. Add app.linear.clientId to the Ensemblr config to enable Linear workflows. Linear is optional for local and GitHub-only workflows.';
+			return authoredDetail(
+				'linear-not-configured',
+				'Linear OAuth is not configured. Add app.linear.clientId to the Ensemblr config to enable Linear workflows. Linear is optional for local and GitHub-only workflows.',
+			);
 		case 'reconnect-required':
-			return 'The stored Linear token expired and cannot be refreshed. Reconnect Linear from integration settings.';
+			return authoredDetail(
+				'linear-reconnect-required',
+				'The stored Linear token expired and cannot be refreshed. Reconnect Linear from integration settings.',
+			);
 		default:
-			return 'Linear is not connected. Sign in from integration settings to enable Linear workflows.';
+			return authoredDetail(
+				'linear-not-connected',
+				'Linear is not connected. Sign in from integration settings to enable Linear workflows.',
+			);
 	}
 }

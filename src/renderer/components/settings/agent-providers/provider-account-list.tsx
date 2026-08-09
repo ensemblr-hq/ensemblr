@@ -59,10 +59,10 @@ export function ProviderAccountList({
 	}
 
 	return (
-		<ul className='divide-y divide-border rounded-md border bg-card/40'>
+		<ul className='divide-y divide-border overflow-hidden rounded-xl border border-border bg-card/40'>
 			{populated.map((field) => (
 				<li
-					className='flex items-baseline justify-between gap-4 px-3 py-2'
+					className='flex items-baseline justify-between gap-4 px-3 py-2.5'
 					key={field}
 				>
 					<span className='shrink-0 text-muted-foreground text-xs'>

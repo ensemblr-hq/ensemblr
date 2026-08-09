@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 
 import { RunScriptIcon } from '@/renderer/components/run-script-icon';
+import { SettingsEmptyState } from '@/renderer/components/settings/settings-empty-state';
 import { Button } from '@/renderer/components/ui/button';
 import {
 	formatRunScriptLabel,
@@ -41,12 +42,12 @@ export function RunScriptsSection({
 
 	return (
 		<div className='py-4'>
-			<div className='flex items-start justify-between gap-4'>
-				<div>
-					<p className='font-medium text-sm'>
+			<div className='flex items-start justify-between gap-6'>
+				<div className='min-w-0 flex-1 space-y-1'>
+					<p className='font-medium text-foreground text-sm'>
 						{t('settings:run-scripts.title', 'Run scripts')}
 					</p>
-					<p className='text-muted-foreground text-xs'>
+					<p className='max-w-prose text-muted-foreground text-xs leading-relaxed'>
 						<Trans
 							components={{ port: <code /> }}
 							defaults="Shortcuts for quick actions, like running your dev server or test suite. Use <port>$ENSEMBLR_PORT</port> for the workspace's allocated port."
@@ -66,12 +67,14 @@ export function RunScriptsSection({
 			</div>
 
 			{scripts.length === 0 ? (
-				<p className='mt-3 text-muted-foreground text-sm'>
-					{t(
-						'settings:run-scripts.empty',
-						'No run scripts yet. Add one to get started.',
+				<SettingsEmptyState
+					className='mt-3'
+					description={t(
+						'settings:run-scripts.empty-description',
+						'Add one and it shows up in the terminal panel’s Run menu.',
 					)}
-				</p>
+					title={t('settings:run-scripts.empty', 'No run scripts yet')}
+				/>
 			) : (
 				<ul className='mt-3 space-y-2'>
 					{scripts.map((script) => (
@@ -119,8 +122,8 @@ function RunScriptRow({
 	const { t } = useTranslation();
 
 	return (
-		<li className='flex items-center gap-3 rounded-lg border border-border px-3 py-2'>
-			<span className='grid size-8 shrink-0 place-items-center rounded-md border border-border text-muted-foreground'>
+		<li className='flex items-center gap-3 rounded-xl border border-border bg-card/40 px-3 py-2'>
+			<span className='grid size-8 shrink-0 place-items-center rounded-lg border border-border text-muted-foreground'>
 				<RunScriptIcon className='size-4' name={script.icon} />
 			</span>
 			<div className='min-w-0 flex-1'>

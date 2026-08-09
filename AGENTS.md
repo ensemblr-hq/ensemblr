@@ -83,6 +83,17 @@ Vitest is the mandated test runner for renderer and shared tests. npm is the pac
 - Prefer semantic or existing tokenized utilities over new arbitrary values when the design system already exposes the needed value.
 - `npm run check` runs `scripts/check-tailwind-classes.mjs`, which fails on square-bracket pixel utilities and known non-canonical arbitrary classes. It scans `src/renderer` only (`.css`, `.js`, `.jsx`, `.ts`, `.tsx`), so `playground/` is not covered. Update that script when adding another canonical class equivalence that agents should preserve.
 
+## Localization Policy
+
+The app ships in English, Russian, and Greek. A change that adds or edits a user-facing surface is not finished until all three read it in their own language.
+
+- Every user-facing string a change adds ships with `ru` and `el` filled in the same change. No key introduced by a change may be left empty in `src/renderer/lib/i18n/locales/ru/*.json` or `src/renderer/lib/i18n/locales/el/*.json`.
+- A surface that is not translated yet becomes the change's responsibility once the change touches it: migrate its hardcoded literals to keys and fill the missing `ru`/`el` values for that file. The obligation is bounded by the files touched — do not add to the backlog, and do not treat unrelated debt as in scope.
+- `locales/en/**` is generated from the `t('key', 'Default English')` call sites by `npm run i18n:extract` and is never hand-edited; `locales/ru/**` and `locales/el/**` are hand-filled against that skeleton. Run `npm run i18n:extract`, fill the new empty values, then `npm run i18n:types`, and confirm with `npm run i18n:status`. `npm run check` runs `i18n:lint`.
+- Fix the term in `docs/i18n-glossary.md` before translating, and add the row in the same change when a term has none.
+- `src/shared/` and `src/main/` return locale-neutral codes rather than English labels, so adding a code there is a user-facing change: the renderer mapper needs its `t()` case and that key needs `ru` and `el`. The native menu table in `src/main/menu/menu-strings.ts` is the one main-process catalogue — a new item adds all three languages there.
+- See @.claude/rules/i18n.md for the full contract: what counts as a user-facing surface, plural categories per locale, interpolation placeholders, agent-facing prose (which is steered by `buildLanguageDirective`, not translated), and when an `i18next-instrument-ignore` directive is legitimate.
+
 ## Scoped Agent Instructions
 
 - This root file contains repository-wide defaults. Before editing a subtree, check for the closest scoped `AGENTS.md`; scoped instructions are more specific and override these general rules.

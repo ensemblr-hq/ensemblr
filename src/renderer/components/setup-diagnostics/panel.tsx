@@ -87,7 +87,7 @@ export function SetupDiagnosticsPanel({
 	});
 
 	return (
-		<div className='flex flex-col gap-6 pt-4'>
+		<div className='flex flex-col gap-6 py-4'>
 			{error ? <DangerNotice>{error}</DangerNotice> : null}
 			{rootActionError ? <DangerNotice>{rootActionError}</DangerNotice> : null}
 

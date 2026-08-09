@@ -131,7 +131,6 @@
 		"group-settings": "Settings",
 		"label": "Command palette",
 		"placeholder": "Search commands…",
-		"settings-advanced": "Settings · Advanced",
 		"settings-appearance": "Settings · Appearance",
 		"settings-diagnostics": "Settings · Diagnostics",
 		"settings-environment": "Settings · Environment",
@@ -141,6 +140,7 @@
 		"settings-integrations": "Settings · Integrations",
 		"settings-models": "Settings · Models",
 		"settings-providers": "Settings · Providers",
+		"settings-shortcuts": "Settings · Shortcuts",
 		"theme-dark": "Theme · Dark",
 		"theme-light": "Theme · Light",
 		"theme-system": "Theme · System"

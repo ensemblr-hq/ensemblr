@@ -96,18 +96,20 @@ export function SettingsHeader({
 				<ArrowLeftIcon aria-hidden='true' className='size-4' />
 				<span>{t('common:actions.back', 'Back')}</span>
 			</Button>
-			<div className='ml-2 flex items-center gap-1'>
-				<ScopeTab
-					active={scope === 'user'}
-					label={t('settings:header.scope-user', 'User')}
-					onClick={() => handleScopeChange('user')}
-				/>
-				<ScopeTab
-					active={scope === 'repo'}
-					disabled={disableRepoTab}
-					label={t('settings:header.scope-repo', 'Repo')}
-					onClick={() => handleScopeChange('repo')}
-				/>
+			<div className='flex min-w-0 items-center gap-2'>
+				<div className='flex shrink-0 items-center gap-0.5 rounded-lg bg-muted/70 p-0.5'>
+					<ScopeTab
+						active={scope === 'user'}
+						label={t('settings:header.scope-user', 'User')}
+						onClick={() => handleScopeChange('user')}
+					/>
+					<ScopeTab
+						active={scope === 'repo'}
+						disabled={disableRepoTab}
+						label={t('settings:header.scope-repo', 'Repo')}
+						onClick={() => handleScopeChange('repo')}
+					/>
+				</div>
 				{scope === 'repo' && projects.length > 0 ? (
 					<Select
 						onValueChange={handleRepoChange}
@@ -118,7 +120,7 @@ export function SettingsHeader({
 								'settings:header.repo-picker.aria-label',
 								'Active repository',
 							)}
-							className='ml-6'
+							className='max-w-56'
 							size='sm'
 						>
 							<SelectValue
@@ -212,7 +214,7 @@ function EditConfigMenu({
 	);
 }
 
-/** Renders a User/Repo scope tab with an active-state underline. */
+/** One half of the User/Repo segmented switch; the active half is a raised pill. */
 function ScopeTab({
 	active,
 	disabled,
@@ -225,24 +227,19 @@ function ScopeTab({
 	onClick: () => void;
 }) {
 	return (
-		<Button
+		<button
 			aria-pressed={active}
 			className={cn(
-				'relative h-auto rounded-none bg-transparent px-2 py-1.5 text-xs hover:bg-transparent aria-pressed:bg-transparent',
-				active ? 'text-foreground' : undefined,
+				'inline-flex h-6 select-none items-center rounded-md px-2.5 font-medium text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50',
+				active
+					? 'bg-background text-foreground shadow-2xs'
+					: 'text-muted-foreground hover:text-foreground',
 			)}
 			disabled={disabled}
 			onClick={onClick}
-			size='sm'
-			variant='ghost'
+			type='button'
 		>
 			{label}
-			{active ? (
-				<span
-					aria-hidden='true'
-					className='absolute inset-x-1 -bottom-px h-px bg-foreground'
-				/>
-			) : null}
-		</Button>
+		</button>
 	);
 }

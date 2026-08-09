@@ -6,8 +6,10 @@ import {
 	CLAUDE_SETUP_DOCS_URL,
 } from '../agent-providers/claude-executable.ts';
 import {
+	authoredDetail,
 	defineCheck,
 	type SetupCheckProviderContext,
+	unexpectedErrorDetail,
 } from './setup-check-context.ts';
 
 const CLAUDE_DESCRIPTOR = getAgentProviderDescriptor('claude');
@@ -45,10 +47,10 @@ export function getClaudeExecutableCheck({
 		group: 'claude',
 		id: 'claude-executable',
 		onError: (error) => ({
-			detail:
-				error instanceof Error
-					? error.message
-					: `Unknown ${CLAUDE_DESCRIPTOR.label} executable check error.`,
+			...unexpectedErrorDetail(error, {
+				code: 'claude-unknown-error',
+				text: `Unknown ${CLAUDE_DESCRIPTOR.label} executable check error.`,
+			}),
 			remediationActions: createRemediationActions(null),
 		}),
 		run: async () => {
@@ -56,7 +58,7 @@ export function getClaudeExecutableCheck({
 			const isResolved = executable.status === 'ok' && Boolean(executable.path);
 
 			return {
-				detail: describeExecutable(executable),
+				...describeExecutable(executable),
 				remediationActions: createRemediationActions(executable),
 				status: isResolved ? 'success' : 'failure',
 			};
@@ -70,18 +72,34 @@ export function getClaudeExecutableCheck({
 /**
  * Renders the resolution as the one-line detail the check surfaces.
  * @param executable - Resolution reported by the executable service.
- * @returns The detail line, naming the resolved path or why nothing resolved.
+ * @returns The detail fields, naming the resolved path or why nothing resolved.
  */
-function describeExecutable(executable: AgentExecutableResolution): string {
+function describeExecutable(executable: AgentExecutableResolution) {
 	if (executable.status === 'ok' && executable.path) {
-		return `${executable.setting ? 'Configured override' : 'Found on PATH'}: ${executable.path}.`;
+		return executable.setting
+			? authoredDetail(
+					'claude-executable-override',
+					`Configured override: ${executable.path}.`,
+					{ path: executable.path },
+				)
+			: authoredDetail(
+					'claude-executable-on-path',
+					`Found on PATH: ${executable.path}.`,
+					{ path: executable.path },
+				);
 	}
 
 	if (executable.setting) {
-		return `The configured ${CLAUDE_DESCRIPTOR.label} executable could not be run. Clear the override to fall back to the ${CLAUDE_DESCRIPTOR.executableCommand} on your PATH, or pick a runnable binary.`;
+		return authoredDetail(
+			'claude-executable-override-broken',
+			`The configured ${CLAUDE_DESCRIPTOR.label} executable could not be run. Clear the override to fall back to the ${CLAUDE_DESCRIPTOR.executableCommand} on your PATH, or pick a runnable binary.`,
+		);
 	}
 
-	return `${CLAUDE_DESCRIPTOR.label} was not found in the shell-derived PATH. Ensemblr does not ship it: install ${CLAUDE_DESCRIPTOR.label}, then retry.`;
+	return authoredDetail(
+		'claude-executable-not-found',
+		`${CLAUDE_DESCRIPTOR.label} was not found in the shell-derived PATH. Ensemblr does not ship it: install ${CLAUDE_DESCRIPTOR.label}, then retry.`,
+	);
 }
 
 /**
