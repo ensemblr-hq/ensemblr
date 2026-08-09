@@ -4,13 +4,9 @@ import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/renderer/components/ui/button';
 import { WelcomeWordmark } from '@/renderer/components/welcome/welcome-wordmark';
-import { cn } from '@/renderer/lib/utils';
 import type { OnboardingCheckId } from '@/renderer/types/onboarding';
 
-import {
-	OnboardingBrandGlyph,
-	onboardingBrandTint,
-} from './onboarding-brand-mark';
+import { OnboardingBrandSwatch } from './onboarding-brand-mark';
 
 /**
  * The three things setup covers, previewed before the wizard starts. Each row
@@ -125,15 +121,7 @@ export function OnboardingWelcome({
 						>
 							<span className='flex shrink-0 items-center -space-x-1.5'>
 								{requirement.brands.map((brand) => (
-									<span
-										className={cn(
-											'flex size-8 items-center justify-center rounded-lg ring-2 ring-card',
-											onboardingBrandTint(brand),
-										)}
-										key={brand}
-									>
-										<OnboardingBrandGlyph checkId={brand} />
-									</span>
+									<OnboardingBrandSwatch checkId={brand} key={brand} />
 								))}
 							</span>
 							<span className='min-w-0 flex-1 font-medium text-foreground text-sm'>

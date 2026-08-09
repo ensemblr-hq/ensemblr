@@ -4,8 +4,9 @@ import { useEffect, useState } from 'react';
 import { cn } from '@/renderer/lib/utils';
 import { codeThemeAtom } from '@/renderer/state/preferences';
 
-import { findScene, type SceneId, SceneNav } from './playground-scenes.tsx';
+import { SceneNav } from './playground-scenes.tsx';
 import { PlaygroundSidebar, useSidebarToggle } from './playground-sidebar.tsx';
+import { findScene, type SceneId } from './scene-catalog.tsx';
 import {
 	ControlGroup,
 	SceneControlHostProvider,

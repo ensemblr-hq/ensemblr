@@ -360,8 +360,15 @@
 				// download bundle size (`m` ~4.6kb vs `motion` ~34kb); this app is
 				// Electron-packaged with no over-the-network bundle, so that win is
 				// moot. The smaller parse/exec cost still applies but isn't worth the
-				// LazyMotion indirection here.
-				"files": ["src/renderer/components/shimmer.tsx"],
+				// LazyMotion indirection here. The onboarding wizard is the strongest
+				// case for the bundled import: it is the very first surface a new
+				// install renders, so a LazyMotion feature bundle resolving after
+				// first paint would drop the entrance animations it exists to play.
+				"files": [
+					"src/renderer/components/onboarding/onboarding-step-rail.tsx",
+					"src/renderer/components/onboarding/onboarding-welcome.tsx",
+					"src/renderer/components/onboarding/onboarding-wizard.tsx"
+				],
 				"rules": ["react-doctor/use-lazy-motion"]
 			},
 			{

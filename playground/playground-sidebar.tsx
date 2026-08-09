@@ -31,15 +31,13 @@ export function useSidebarToggle(
 	);
 
 	const toggle = useCallback(() => {
-		setOpen((previous) => {
-			const next = !previous;
-			window.localStorage.setItem(
-				`${OPEN_STATE_STORAGE_PREFIX}${key}`,
-				next ? 'open' : 'collapsed',
-			);
-			return next;
-		});
-	}, [key]);
+		const next = !isOpen;
+		setOpen(next);
+		window.localStorage.setItem(
+			`${OPEN_STATE_STORAGE_PREFIX}${key}`,
+			next ? 'open' : 'collapsed',
+		);
+	}, [isOpen, key]);
 
 	return { isOpen, toggle };
 }

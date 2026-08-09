@@ -130,11 +130,25 @@ export function OnboardingBrandGlyph({
 }
 
 /**
- * Tint classes for a check's brand, for surfaces that want the color without
- * the tile — the welcome rows stack two marks in one swatch.
- * @param checkId - The probe whose brand tint to read.
- * @returns The background and text classes for that brand.
+ * The mark in its own tinted swatch at row scale. The welcome rows overlap two
+ * of these for the either-or runtimes, so the ring is drawn in the card color
+ * to cut the one behind it rather than outline both.
  */
-export function onboardingBrandTint(checkId: OnboardingCheckId): string {
-	return BRAND[checkId].tint;
+export function OnboardingBrandSwatch({
+	checkId,
+}: {
+	checkId: OnboardingCheckId;
+}) {
+	const { Logo, tint } = BRAND[checkId];
+
+	return (
+		<span
+			className={cn(
+				'flex size-8 items-center justify-center rounded-lg ring-2 ring-card',
+				tint,
+			)}
+		>
+			<Logo className='size-4' />
+		</span>
+	);
 }
