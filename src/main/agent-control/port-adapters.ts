@@ -80,6 +80,13 @@ import {
 import { makeDiffPort, makeReviewPort } from './review-ports.ts';
 import { isSessionTabMarkedSubAgent } from './sub-agent-marker.ts';
 
+/**
+ * What an untitled tab is called when an agent lists tabs. The stored title is
+ * blank so the UI can localize it, but agent-facing prose stays English — an
+ * empty string would read to the agent as a tab with no identity at all.
+ */
+const UNNAMED_TAB_TITLE = 'New chat';
+
 /** Collaborators the adapters delegate to; supplied by the composition root. */
 export interface PortAdapterDeps {
 	databaseService: EnsemblrDatabaseService;
@@ -234,7 +241,7 @@ function makeTabPort(deps: PortAdapterDeps): TabPort {
 			return open.map((tab) => ({
 				chatTabId: tab.id,
 				kind: tab.kind,
-				title: tab.title,
+				title: tab.title || UNNAMED_TAB_TITLE,
 				workspaceId: tab.workspaceId,
 				agentSessionId: tab.agentSessionId,
 			}));

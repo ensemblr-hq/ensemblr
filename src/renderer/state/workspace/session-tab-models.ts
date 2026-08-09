@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import {
 	agentSessionsForWorkspaceQuery,
@@ -43,6 +44,8 @@ export function useSessionTabModels({
 	busyTerminalIds: ReadonlySet<string>;
 	terminalTitles: Record<string, LiveTerminalTitle>;
 }) {
+	const { i18n: i18nInstance } = useTranslation();
+	const language = i18nInstance.language;
 	const workspaceId = activeWorkspace.id;
 	const {
 		data: chatTabsData,
@@ -68,6 +71,7 @@ export function useSessionTabModels({
 		return map;
 	}, [agentSessions]);
 
+	// biome-ignore lint/correctness/useExhaustiveDependencies: the mappers name untitled tabs and relative times through the i18n singleton, so the language is a real input Biome cannot see.
 	const sessionTabs = useMemo<SessionTabModel[]>(() => {
 		if (!openTabs) {
 			return [];
@@ -91,7 +95,13 @@ export function useSessionTabModels({
 					: {}),
 			};
 		});
-	}, [agentStatusByAgentSessionId, busyTerminalIds, openTabs, terminalTitles]);
+	}, [
+		agentStatusByAgentSessionId,
+		busyTerminalIds,
+		language,
+		openTabs,
+		terminalTitles,
+	]);
 
 	const resolvedActiveSession = useMemo(
 		() =>
@@ -135,9 +145,10 @@ export function useSessionTabModels({
 	]);
 
 	return {
+		// biome-ignore lint/correctness/useExhaustiveDependencies: the mapper names untitled tabs and relative times through the i18n singleton, so the language is a real input Biome cannot see.
 		closedSessions: useMemo<SessionTabModel[]>(
 			() => (closedEntries ?? []).map(toClosedSessionTabModel),
-			[closedEntries],
+			[closedEntries, language],
 		),
 		effectiveActiveSession,
 		/** True once the tab list has settled, so a bootstrap can trust an empty result. */

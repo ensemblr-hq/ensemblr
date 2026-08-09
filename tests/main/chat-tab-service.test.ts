@@ -27,7 +27,7 @@ test('openTab defaults blank titles and lists the tab as open', (t) => {
 		workspaceId: fixture.workspaceId,
 	});
 
-	assert.equal(tab.title, 'New chat');
+	assert.equal(tab.title, '');
 	const { closed, open } = fixture.service.listTabs({
 		workspaceId: fixture.workspaceId,
 	});

@@ -36,6 +36,7 @@ Rules of thumb:
 | Harness | Харнесс | Harness | The Claude Code / Codex terminal integration. Ensemblr-specific. |
 | Agent | Агент | Πράκτορας | |
 | Conversation | Диалог | Συνομιλία | The chat tab's thread. |
+| Chat | Чат | Συνομιλία | The tab as the user opens it — `New chat` is `Новый чат`/`Νέα συνομιλία`. Russian splits the two: the thing you open is a `чат`, the thread inside it is a `диалог`. Greek uses `συνομιλία` for both. One exception in Russian: a chat that is over — a closed tab in history, a transcript offered to the composer — is named for the thread it left behind, so `Untitled chat` is `Диалог без названия` (`session-tabs.untitled-closed`, `review:file-diff.untitled-chat`). |
 | Turn | Ход | Γύρος | One agent request/response cycle. |
 | Tab | Вкладка | Καρτέλα | |
 | Dock | Док | Dock | The bottom panel strip. |

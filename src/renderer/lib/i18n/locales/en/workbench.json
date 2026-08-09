@@ -503,6 +503,9 @@
 			"unknown": "Unknown",
 			"yesterday": "Yesterday"
 		},
+		"closed-at": {
+			"just-now": "just now"
+		},
 		"empty": {
 			"failed": "Failed to load workspace history.",
 			"loading": "Loading workspaces…",
@@ -768,7 +771,9 @@
 			"title": "Pi raw frames (debug)",
 			"toggle": "Toggle Pi debug panel"
 		},
-		"new-tab": "New chat tab"
+		"new-tab": "New chat tab",
+		"untitled": "New chat",
+		"untitled-closed": "Untitled chat"
 	},
 	"setup-script": {
 		"add-manually": "Add manually",

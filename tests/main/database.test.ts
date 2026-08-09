@@ -30,11 +30,21 @@ const EXPECTED_MIGRATIONS = [
 	'012_comment_origin',
 	'013_pi_session_provider',
 	'014_agent_session_vocabulary',
+	'015_untitled_chat_tab_placeholder',
 ];
 
-const AGENT_VOCABULARY_MIGRATION_ID = '014_agent_session_vocabulary';
 const AGENT_VOCABULARY_MIGRATION_VERSION = 14;
 const PRE_AGENT_VOCABULARY_SCHEMA_VERSION = 13;
+
+// Staging a pre-014 database means suppressing 014 *and* everything appended
+// after it, or the newer migrations run against the old schema and the fixture
+// is no longer pre-014. Ids are numbered in order, so the index is the version.
+const SUPPRESSED_MIGRATIONS = EXPECTED_MIGRATIONS.slice(
+	AGENT_VOCABULARY_MIGRATION_VERSION - 1,
+).map((id, offset) => ({
+	id,
+	version: AGENT_VOCABULARY_MIGRATION_VERSION + offset,
+}));
 
 const PRE_AGENT_VOCABULARY_SEED_SQL = `
 INSERT INTO repositories (id, slug, name, path, default_branch)
@@ -93,23 +103,20 @@ function createTestDatabasePath(): {
 
 /**
  * Builds a database at the pre-014 `pi_*` schema by running the real migration
- * runner with `014_agent_session_vocabulary` pre-recorded as already applied, so
- * migrations 001-013 run and 014 is skipped. There is no version argument on the
- * runner, and `schema_migrations` is the only seam that selects which migrations
- * execute.
+ * runner with `014_agent_session_vocabulary` and every later migration
+ * pre-recorded as already applied, so migrations 001-013 run and the rest are
+ * skipped. There is no version argument on the runner, and `schema_migrations`
+ * is the only seam that selects which migrations execute.
  */
 function openDatabaseBeforeAgentVocabulary(databasePath: string) {
 	const markerConnection = new DatabaseSync(databasePath);
 	listAppliedMigrationIds(markerConnection);
-	markerConnection
-		.prepare(
-			'INSERT INTO schema_migrations (id, version, name) VALUES (?, ?, ?)',
-		)
-		.run(
-			AGENT_VOCABULARY_MIGRATION_ID,
-			AGENT_VOCABULARY_MIGRATION_VERSION,
-			AGENT_VOCABULARY_MIGRATION_ID,
-		);
+	const insertMarker = markerConnection.prepare(
+		'INSERT INTO schema_migrations (id, version, name) VALUES (?, ?, ?)',
+	);
+	for (const migration of SUPPRESSED_MIGRATIONS) {
+		insertMarker.run(migration.id, migration.version, migration.id);
+	}
 	markerConnection.close();
 
 	return openEnsemblrDatabase({ databasePath });
@@ -117,15 +124,19 @@ function openDatabaseBeforeAgentVocabulary(databasePath: string) {
 
 /**
  * Leaves a closed database holding real pre-014 rows and no record of migration
- * 014, so the next {@link openEnsemblrDatabase} call applies 014 and nothing else.
+ * 014 or anything after it, so the next {@link openEnsemblrDatabase} call
+ * applies exactly that tail in order.
  */
 function seedDatabaseBeforeAgentVocabulary(databasePath: string): void {
 	const connection = openDatabaseBeforeAgentVocabulary(databasePath);
 
 	connection.database.exec(PRE_AGENT_VOCABULARY_SEED_SQL);
-	connection.database
-		.prepare('DELETE FROM schema_migrations WHERE id = ?')
-		.run(AGENT_VOCABULARY_MIGRATION_ID);
+	const deleteMarker = connection.database.prepare(
+		'DELETE FROM schema_migrations WHERE id = ?',
+	);
+	for (const migration of SUPPRESSED_MIGRATIONS) {
+		deleteMarker.run(migration.id);
+	}
 	connection.database.close();
 }
 
@@ -1247,4 +1258,61 @@ test('repository workspace navigation snapshot handles unavailable database', ()
 	const snapshot = getRepositoryWorkspaceNavigationSnapshot(null);
 
 	assert.deepEqual(snapshot.repositories, []);
+});
+
+test('migration 015 blanks the English "New chat" placeholder but spares a chosen title', (t) => {
+	const fixture = createTestDatabasePath();
+	t.after(fixture.cleanup);
+
+	const seeded = openEnsemblrDatabase({ databasePath: fixture.databasePath });
+	seeded.database.exec(`
+INSERT INTO repositories (id, slug, name, path, default_branch)
+VALUES ('repo-untitled', 'untitled', 'Untitled', '/tmp/ensemblr/untitled', 'main');
+
+INSERT INTO workspaces (id, repository_id, slug, name, path, branch_name, base_branch)
+VALUES ('ws-untitled', 'repo-untitled', 'the-200', 'THE-200', '/tmp/ensemblr/workspaces/the-200', 'philipp/the-200', 'main');
+
+INSERT INTO chat_tabs (id, workspace_id, kind, title, full_title, position, metadata_json)
+VALUES
+	('tab-placeholder', 'ws-untitled', 'chat', 'New chat', 'New chat', 0, '{}'),
+	('tab-legacy-blank-full', 'ws-untitled', 'chat', 'New chat', '', 1, '{}'),
+	('tab-named', 'ws-untitled', 'chat', 'New chat', 'New chat about the parser', 2, '{}'),
+	('tab-user-named', 'ws-untitled', 'chat', 'Fix the parser', 'Fix the parser', 3, '{}'),
+	('tab-chose-the-placeholder', 'ws-untitled', 'chat', 'New chat', 'New chat', 4, '{"titleProvenance":"user","titleAutoNamed":true}');
+`);
+	seeded.database
+		.prepare('DELETE FROM schema_migrations WHERE id = ?')
+		.run('015_untitled_chat_tab_placeholder');
+	seeded.database.close();
+
+	const connection = openEnsemblrDatabase({
+		databasePath: fixture.databasePath,
+	});
+	t.after(() => connection.database.close());
+
+	assert.deepEqual(
+		readRows(
+			connection.database,
+			'SELECT id, title, full_title FROM chat_tabs ORDER BY position',
+		),
+		[
+			{ full_title: '', id: 'tab-placeholder', title: '' },
+			{ full_title: '', id: 'tab-legacy-blank-full', title: '' },
+			{
+				full_title: 'New chat about the parser',
+				id: 'tab-named',
+				title: 'New chat',
+			},
+			{
+				full_title: 'Fix the parser',
+				id: 'tab-user-named',
+				title: 'Fix the parser',
+			},
+			{
+				full_title: 'New chat',
+				id: 'tab-chose-the-placeholder',
+				title: 'New chat',
+			},
+		],
+	);
 });
