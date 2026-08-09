@@ -19,6 +19,20 @@
 		"commits-failed": "Δεν ήταν δυνατή η φόρτωση των commit.",
 		"commits-loading": "Φόρτωση commit…",
 		"discard-all": "Απόρριψη όλων των αλλαγών χωρίς commit",
+		"empty": {
+			"branch": {
+				"message": "Οι αλλαγές αυτού του κλάδου θα εμφανιστούν εδώ.",
+				"title": "Καμία αλλαγή ακόμη"
+			},
+			"commit": {
+				"message": "Το {{shortHash}} δεν άγγιξε κανένα αρχείο.",
+				"title": "Καμία αλλαγή σε αυτό το commit"
+			},
+			"uncommitted": {
+				"message": "Όλα εδώ έχουν γίνει commit.",
+				"title": "Καμία αλλαγή χωρίς commit"
+			}
+		},
 		"menu-label": "Άνοιγμα μενού αλλαγών",
 		"uncommitted": "Αλλαγές χωρίς commit",
 		"uncommitted-badge": "Χωρίς commit",

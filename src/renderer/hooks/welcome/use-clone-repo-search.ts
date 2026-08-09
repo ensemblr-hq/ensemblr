@@ -5,6 +5,7 @@ import {
 	useMemo,
 	useState,
 } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import {
 	githubRepositoryFullListQuery,
@@ -55,6 +56,7 @@ export function useCloneRepoSearch({
 	setUrl: (value: string) => void;
 	url: string;
 }): UseCloneRepoSearchResult {
+	const { t } = useTranslation();
 	const [highlightIndex, setHighlightIndex] = useState(-1);
 
 	const trimmedUrl = url.trim();
@@ -147,6 +149,16 @@ export function useCloneRepoSearch({
 
 	return {
 		...view,
+		emptyMessage: isSearching
+			? t('common:clone-repos.empty.no-matches', 'No matching repositories.')
+			: t(
+					'common:clone-repos.empty.no-suggestions',
+					'No repos to suggest yet.',
+				),
+		footerHint:
+			isSearching && isFullListLoading
+				? t('common:clone-repos.searching-all', 'Searching all repositories…')
+				: undefined,
 		handleUrlChange,
 		handleUrlKeyDown,
 		highlightIndex: highlight,

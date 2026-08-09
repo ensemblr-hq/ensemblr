@@ -19,6 +19,20 @@
 		"commits-failed": "Could not load commits.",
 		"commits-loading": "Loading commits…",
 		"discard-all": "Discard all uncommitted changes",
+		"empty": {
+			"branch": {
+				"message": "Changes on this branch appear here.",
+				"title": "No changes yet"
+			},
+			"commit": {
+				"message": "{{shortHash}} touched no files.",
+				"title": "No changes in this commit"
+			},
+			"uncommitted": {
+				"message": "Everything here is committed.",
+				"title": "No uncommitted changes yet"
+			}
+		},
 		"menu-label": "Open changes menu",
 		"uncommitted": "Uncommitted changes",
 		"uncommitted-badge": "Uncommitted",

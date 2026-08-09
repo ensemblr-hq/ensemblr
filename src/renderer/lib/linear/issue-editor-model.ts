@@ -1,5 +1,8 @@
+import type { TFunction } from 'i18next';
+
 import type {
 	IssueEditorValidation,
+	IssueEditorValidationCode,
 	LinearIssueEditorFields,
 } from '@/renderer/types/linear';
 import type {
@@ -41,11 +44,11 @@ export function validateIssueEditorFields(
 	mode: 'create' | 'edit',
 ): IssueEditorValidation {
 	if (fields.title.trim().length === 0) {
-		return { error: 'A title is required.', ok: false };
+		return { code: 'title-required', ok: false };
 	}
 
 	if (mode === 'create' && fields.teamId.length === 0) {
-		return { error: 'Choose a team for the new issue.', ok: false };
+		return { code: 'team-required', ok: false };
 	}
 
 	return { ok: true };
@@ -166,4 +169,26 @@ function areLabelIdsEqual(a: string[], b: string[]): boolean {
 	const sortedB = [...b].sort();
 
 	return sortedA.every((id, index) => id === sortedB[index]);
+}
+
+/**
+ * Localized copy for a validation code, so the pure validator above stays free
+ * of display concerns.
+ * @param t - Translator bound to the active language
+ * @param code - Validation code the editor form failed on
+ * @returns The message the editor shows above the form
+ */
+export function issueEditorValidationText(
+	t: TFunction,
+	code: IssueEditorValidationCode,
+): string {
+	switch (code) {
+		case 'title-required':
+			return t('linear:issue-editor.title-required', 'A title is required.');
+		case 'team-required':
+			return t(
+				'linear:issue-editor.team-required',
+				'Choose a team for the new issue.',
+			);
+	}
 }

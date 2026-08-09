@@ -676,7 +676,11 @@ export function createTerminalService({
 		}
 		const nextTitle = latestTitle.trim();
 		if (nextTitle && nextTitle !== session.snapshot.title) {
-			session.snapshot = { ...session.snapshot, title: nextTitle };
+			session.snapshot = {
+				...session.snapshot,
+				title: nextTitle,
+				titleIsDefault: false,
+			};
 			broadcastLifecycle(session);
 		}
 	}
@@ -1028,6 +1032,7 @@ export function createTerminalService({
 				scriptName: scriptName ?? null,
 				status: 'running',
 				title: title?.trim() || defaultTitle(kind),
+				titleIsDefault: !title?.trim(),
 				workspaceId,
 			},
 			stopRequested: false,

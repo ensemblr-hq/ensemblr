@@ -43,6 +43,7 @@ async function getUser(id: number): Promise<User> {
   return { name: data.name, active: true };
 }`;
 
+// i18next-instrument-ignore -- source-code specimen for the font preview
 const MONO_PREVIEW = `// Preview
 const greeting = 'Hello, World!';
 function sum(a, b) { return a + b; }`;

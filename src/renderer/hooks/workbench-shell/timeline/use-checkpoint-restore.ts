@@ -7,6 +7,7 @@ import {
 	ensemblrQueryKeys,
 	restoreCheckpoint,
 } from '@/renderer/api/ensemblr-queries';
+import { failureText } from '@/renderer/lib/failure-text';
 import type { CheckpointRestoreTarget } from '@/renderer/types/workbench';
 
 /** Owns the restore-confirmation flow: target state, IPC call, invalidation. */
@@ -35,7 +36,7 @@ export function useCheckpointRestore(): {
 			toast.error(
 				t('errors:checkpoint-restore.failed.title', 'Restore failed'),
 				{
-					description: result.error.message,
+					description: failureText(t, result.error) ?? undefined,
 				},
 			);
 			return;

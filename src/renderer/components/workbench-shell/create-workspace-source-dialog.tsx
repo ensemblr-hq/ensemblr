@@ -8,7 +8,6 @@ import {
 } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-
 import { Button } from '@/renderer/components/ui/button';
 import {
 	Command,
@@ -29,6 +28,7 @@ import {
 	ToggleGroupItem,
 } from '@/renderer/components/ui/toggle-group';
 import { useWorkspaceSourcePicker } from '@/renderer/hooks/workbench-shell/navigation-sidebar/use-workspace-source-picker';
+import { failureText } from '@/renderer/lib/failure-text';
 import {
 	getWorkspaceSourceActions,
 	getWorkspaceSourceKindLabel,
@@ -180,7 +180,7 @@ export function CreateWorkspaceSourceDialog({
 					    list never flashes a loading state over real data. */}
 					{sources.length === 0 && error ? (
 						<div className='px-3 py-8 text-destructive text-xs'>
-							<p>{error.message}</p>
+							<p>{failureText(t, error)}</p>
 							{error.remediation ? (
 								<p className='mt-1 text-muted-foreground'>
 									{error.remediation}

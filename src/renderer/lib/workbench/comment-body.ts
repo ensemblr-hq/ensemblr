@@ -6,6 +6,8 @@
  * so a comment row says what its author wrote rather than what its bot encoded.
  */
 
+import { i18n } from '@/renderer/lib/i18n';
+
 const HTML_COMMENT = /<!--[\s\S]*?-->/g;
 const HTML_TAG = /<[^>]*>/g;
 const BLANK_LINE_RUN = /\n{3,}/g;
@@ -23,12 +25,6 @@ const WHITESPACE_RUN = /\s+/g;
 const METADATA_DEFINITION = /^[ \t]*\[[^\]]*\]:[ \t]*#\S{24,}[ \t]*$/gm;
 
 const SUMMARY_CHAR_LIMIT = 200;
-
-/**
- * What a comment is called once nothing in its thread reads as prose. Shared so
- * the row and the preview that opens from it say the same thing.
- */
-export const NO_DESCRIPTION_LABEL = 'No description';
 
 /**
  * Removes machine-only markup — HTML comment markers and metadata link
@@ -135,5 +131,8 @@ export function describeComment({
 			return replySummary;
 		}
 	}
-	return formatCommentLocation(path, line) || NO_DESCRIPTION_LABEL;
+	return (
+		formatCommentLocation(path, line) ||
+		i18n.t('review:comment.no-description', 'No description')
+	);
 }

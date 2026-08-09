@@ -67,11 +67,14 @@
 			"none": "No priority",
 			"urgent": "Urgent"
 		},
+		"save-failed": "Saving the issue failed. Check your connection and try again.",
 		"saving": "Saving…",
 		"submit-create": "Create issue",
 		"submit-edit": "Save changes",
+		"team-required": "Choose a team for the new issue.",
 		"title-create": "New Linear issue",
 		"title-edit": "Edit {{identifier}}",
+		"title-required": "A title is required.",
 		"unset-option": "{{field}}: none"
 	},
 	"issue-list": {

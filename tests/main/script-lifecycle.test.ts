@@ -187,6 +187,7 @@ function createTerminalServiceFake({
 				rows: 24,
 				scriptName: options.scriptName ?? null,
 				status: 'running',
+				titleIsDefault: false,
 				title: options.title ?? 'Terminal',
 				workspaceId: options.workspaceId,
 			};

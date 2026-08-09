@@ -19,7 +19,10 @@ import {
 import { Input } from '@/renderer/components/ui/input';
 import { Label } from '@/renderer/components/ui/label';
 import { useKeymapHandler } from '@/renderer/hooks/use-keymap-handler';
-import { validateEntityName } from '@/renderer/lib/entity-name-validation';
+import {
+	entityNameIssueText,
+	validateEntityName,
+} from '@/renderer/lib/entity-name-validation';
 import type { KeymapBinding } from '@/renderer/types/keymap';
 import type { WorkspaceShellModel } from '@/renderer/types/workbench';
 import { composeRenamedBranch } from '@/shared/branch-name';
@@ -75,10 +78,8 @@ function RenameWorkspaceDialogForm({
 
 	const trimmedName = name.trim();
 	const trimmedBranch = branchName.trim();
-	const localValidation = validateEntityName({
-		allowedCharacters: 'letters, numbers, spaces, dots, dashes, or underscores',
+	const nameIssue = validateEntityName({
 		name: trimmedName,
-		noun: 'Workspace',
 		pattern: WORKSPACE_NAME_PATTERN,
 	});
 	// An adopted branch may already back a pull request, so the service refuses to
@@ -90,7 +91,7 @@ function RenameWorkspaceDialogForm({
 	const canRename =
 		stage !== 'renaming' &&
 		trimmedName.length > 0 &&
-		localValidation === null &&
+		nameIssue === null &&
 		!isUnchanged &&
 		isEnsemblrApiAvailable();
 
@@ -208,8 +209,10 @@ function RenameWorkspaceDialogForm({
 					onKeyDown={handleSubmitKey}
 					value={name}
 				/>
-				{localValidation ? (
-					<p className='text-[0.6875rem] text-destructive'>{localValidation}</p>
+				{nameIssue ? (
+					<p className='text-[0.6875rem] text-destructive'>
+						{entityNameIssueText(t, 'workspace', nameIssue)}
+					</p>
 				) : null}
 			</div>
 

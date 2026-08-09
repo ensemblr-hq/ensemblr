@@ -91,12 +91,32 @@ export default interface Resources {
 			'url-label': 'Repository URL';
 			'url-placeholder': 'Search repos or paste URL';
 		};
+		'clone-repos': {
+			empty: {
+				'no-matches': 'No matching repositories.';
+				'no-suggestions': 'No repos to suggest yet.';
+			};
+			'location-placeholder': 'Managed repos directory';
+			'searching-all': 'Searching all repositories…';
+		};
 		conversation: {
 			'scroll-to-newest': 'Scroll to newest message';
 		};
 		'diagnostics-log': {
 			trigger: 'Diagnostics log';
 			truncated: '(truncated)';
+		};
+		'entity-name': {
+			project: {
+				'invalid-characters': 'Use only letters, numbers, dots, dashes, or underscores.';
+				'leading-dot': 'Project names cannot start with a dot.';
+				'too-long': 'Project names must be {{max}} characters or fewer.';
+			};
+			workspace: {
+				'invalid-characters': 'Use only letters, numbers, spaces, dots, dashes, or underscores.';
+				'leading-dot': 'Workspace names cannot start with a dot.';
+				'too-long': 'Workspace names must be {{max}} characters or fewer.';
+			};
 		};
 		'local-import': {
 			description: 'Ensemblr is cloning the tracked git files into your managed repos folder, then creating the first workspace.';
@@ -487,6 +507,148 @@ export default interface Resources {
 		'discard-changes': {
 			failed: 'Could not discard changes.';
 		};
+		failure: {
+			'archive-aborted-by-hook': 'An archive hook stopped the operation.';
+			'archive-record-missing': 'No archive record was found for this workspace.';
+			'archived-context-already-exists': 'An archived context already exists at the destination.';
+			'archived-context-cleanup-failed': 'The archived context could not be removed.';
+			'archived-context-copy-failed': 'The context directory could not be copied into the archive.';
+			'archived-context-missing': 'No archived context was found, so the restore was skipped.';
+			'archived-context-restore-failed': 'The archived context could not be restored.';
+			'archived-contexts-directory-missing': 'The managed root has no archived-contexts directory. Configure the root directory first.';
+			auth: 'GitHub authentication failed. Sign in again, then retry.';
+			'base-branch-invalid': 'That base branch name is not valid.';
+			'base-branch-missing': 'The base branch was not preserved, so the worktree cannot be recreated.';
+			'base-branch-unresolvable': 'That base branch could not be resolved in this repository, even after fetching.';
+			'base-branch-unsynced': 'The base branch is out of sync with its remote.';
+			'branch-adopted': 'This workspace took over an existing branch, which may already back a pull request, so the branch cannot be renamed here.';
+			'branch-already-checked-out': 'That branch is already checked out in another worktree.';
+			'branch-already-exists': 'That branch already exists.';
+			'branch-checkout-failed': 'The branch could not be checked out.';
+			'branch-cleanup-failed': 'The branch could not be cleaned up.';
+			'branch-name-invalid': 'That branch name is not valid.';
+			'branch-not-found': 'That branch was not found locally or on origin.';
+			'branch-rename-failed': 'The branch could not be renamed.';
+			'branch-rollback-failed': 'The branch change failed and could not be rolled back.';
+			'branch-unresolved': 'Could not determine which branch this workspace is on.';
+			'command-failed': 'The command failed.';
+			'copy-failed': 'The files could not be copied.';
+			'database-unavailable': 'The local database is unavailable, so nothing was changed.';
+			'destination-exists': 'Something already exists at the destination. Remove it or pick another location.';
+			'destination-not-writable': 'Ensemblr cannot write to that location. Pick a writable one.';
+			'destination-path-relative': 'The destination path must be absolute.';
+			'destination-required': 'No destination was provided and the managed root has none to fall back on.';
+			'diff-failed': 'The diff could not be produced.';
+			'dirty-state': 'The working tree has uncommitted changes.';
+			'gh-not-authenticated': 'GitHub CLI is not signed in. Run gh auth login, then retry.';
+			'gh-not-installed': 'GitHub CLI was not found in PATH. Install it, then retry.';
+			'git-failed': 'The git command failed.';
+			'git-init-failed': 'The repository could not be initialized.';
+			'git-not-installed': 'git was not found in PATH. Install git, then retry.';
+			'git-worktree-failed': 'The worktree could not be created.';
+			'invalid-attachment': 'That attachment could not be read.';
+			'invalid-cwd': 'The workspace path must be an absolute directory.';
+			'invalid-image': 'That attachment is not a valid image.';
+			'invalid-path': 'That path must stay inside the workspace.';
+			'invalid-pattern': 'That pattern is not valid.';
+			'invalid-repository': 'That is not a usable repository.';
+			'invalid-worktree': 'The worktree does not belong to this repository.';
+			'job-unknown': 'The clone job has expired or was never prepared. Start a new clone.';
+			'lifecycle-hook-failed': 'A lifecycle hook failed.';
+			'managed-directory-create-failed': 'A managed directory could not be created under the root.';
+			'managed-directory-missing': 'A managed directory is missing from the root.';
+			'managed-directory-read-failed': 'A managed directory could not be read.';
+			'managed-directory-stat-failed': 'A managed directory could not be inspected.';
+			'managed-directory-unwritable': 'A managed directory is not writable.';
+			'managed-path-not-directory': 'A managed path exists but is not a directory.';
+			'managed-repositories-path-missing': 'The managed root has no repositories directory. Configure the root directory first.';
+			'merge-blocked': 'GitHub refused the merge for this pull request.';
+			'mkdir-failed': 'The directory could not be created.';
+			'name-already-in-use': 'That name is already taken.';
+			'name-invalid': 'That name is not valid.';
+			'name-required': 'Enter a name.';
+			network: 'GitHub is unreachable. Check your connection and retry.';
+			'no-checkpoint': 'No checkpoint was captured for this turn.';
+			'no-pull-request': 'This branch has no pull request.';
+			'no-remote': 'This repository has no remote configured.';
+			'not-a-git-repo': 'That folder is not a git repository.';
+			'not-directory': 'That path is not a directory.';
+			'not-file': 'That path is not a file.';
+			'not-found': 'That path was not found.';
+			'nothing-to-commit': 'Nothing to commit — the working tree is clean.';
+			'parse-failed': 'The command output could not be parsed.';
+			'path-not-a-git-repository': 'That path is not a git repository.';
+			'pattern-listing-failed': 'The files matching that pattern could not be listed.';
+			permission: 'Permission was denied for that location.';
+			'permission-denied': 'Permission was denied.';
+			'publish-failed': 'The project was created locally, but publishing it to GitHub failed.';
+			'read-failed': 'That file could not be read.';
+			'reconcile-child-not-directory': 'An entry under the root is not a directory and was skipped.';
+			'reconcile-directory-read-failed': 'A directory under the root could not be read during the scan.';
+			'reconcile-path-stat-failed': 'A path under the root could not be inspected during the scan.';
+			'reconcile-workspace-repository-not-directory': "A workspace's repository folder is not a directory.";
+			'register-failed': 'The repository could not be registered.';
+			'remote-already-registered': 'This repository is already registered with Ensemblr.';
+			'repositories-path-missing': 'The managed root has no workspaces directory. Configure the root directory first.';
+			'repository-already-archived': 'That repository is already archived.';
+			'repository-already-registered': 'This repository is already registered with Ensemblr.';
+			'repository-copy-failed': 'The repository could not be copied.';
+			'repository-copy-target-inside-source': 'Choose a project outside the managed root — the destination would be inside the folder you picked.';
+			'repository-delete-failed': 'The repository could not be deleted.';
+			'repository-id-required': 'A repository is required.';
+			'repository-insert-failed': 'The repository could not be saved.';
+			'repository-not-found': 'That repository was not found.';
+			'repository-path-is-workspace': 'That path is already tracked as a workspace. Pick the parent repository instead.';
+			'repository-path-missing': 'No repository path was provided.';
+			'repository-path-not-directory': 'That repository path is not a directory.';
+			'repository-path-relative': 'The repository path must be absolute.';
+			'repository-path-unreadable': 'That repository path could not be read.';
+			'repository-permission-denied': 'Permission was denied for that repository.';
+			'repository-remote-already-registered': 'Another registered repository already tracks this remote. Remove it before re-adding.';
+			'repository-scan-failed': 'The repository could not be scanned.';
+			'repository-update-failed': 'The repository record could not be updated.';
+			'restore-failed': 'The restore failed.';
+			'root-create-failed': 'The root directory could not be created.';
+			'root-missing': 'The configured root directory does not exist.';
+			'root-not-directory': 'The configured root path exists but is not a directory.';
+			'root-read-failed': 'The root directory could not be read.';
+			'root-setting-empty': 'The root directory setting is empty.';
+			'root-setting-invalid-type': 'The root directory setting must be a path.';
+			'root-setting-locked': 'The root directory is pinned by configuration and cannot be changed here.';
+			'root-setting-missing': 'The root directory setting could not be resolved.';
+			'root-setting-relative': 'The root directory must be an absolute path.';
+			'root-stat-failed': 'The root directory could not be inspected.';
+			'root-unavailable': 'The managed root is unavailable, so the operation was skipped.';
+			'root-unwritable': 'The root directory is not writable.';
+			'shared-root-content': 'The root directory holds files Ensemblr does not manage.';
+			'source-path-missing': 'A source path no longer exists, so it was skipped.';
+			'spawn-error': 'The process could not be started.';
+			'too-large': 'That file is too large.';
+			'tracked-skipped': 'That path is tracked by git, so it was skipped.';
+			'unarchive-aborted-by-hook': 'An unarchive hook stopped the operation.';
+			'unsafe-root-content': 'The root directory holds content that is unsafe to manage.';
+			'unsupported-host': 'That host is not supported.';
+			'url-invalid': 'That repository URL is not valid.';
+			'url-required': 'Enter a repository URL.';
+			'workspace-already-archived': 'That workspace is already archived.';
+			'workspace-archive-failed': 'A workspace could not be archived.';
+			'workspace-branch-collision': 'Several workspaces in this repository share one branch.';
+			'workspace-cleanup-failed': 'The workspace could not be cleaned up.';
+			'workspace-delete-failed': 'The workspace could not be deleted.';
+			'workspace-id-required': 'A workspace is required.';
+			'workspace-insert-failed': 'The workspace could not be saved.';
+			'workspace-missing': 'That workspace no longer exists.';
+			'workspace-not-archived': 'That workspace is not archived.';
+			'workspace-not-found': 'That workspace no longer exists.';
+			'workspace-orphaned': 'Workspaces exist for a repository Ensemblr does not know.';
+			'workspace-scan-failed': 'The workspace could not be scanned.';
+			'workspace-update-failed': 'The workspace record could not be updated.';
+			'worktree-cleanup-failed': 'The worktree could not be removed.';
+			'worktree-move-failed': 'The worktree could not be moved.';
+			'worktree-recreate-failed': 'The worktree could not be recreated.';
+			'worktree-repository-mismatch': 'That worktree belongs to a different repository.';
+			'write-failed': 'That file could not be written.';
+		};
 		fork: {
 			failed: {
 				title: 'Fork failed.';
@@ -673,6 +835,20 @@ export default interface Resources {
 			'commits-failed': 'Could not load commits.';
 			'commits-loading': 'Loading commits…';
 			'discard-all': 'Discard all uncommitted changes';
+			empty: {
+				branch: {
+					message: 'Changes on this branch appear here.';
+					title: 'No changes yet';
+				};
+				commit: {
+					message: '{{shortHash}} touched no files.';
+					title: 'No changes in this commit';
+				};
+				uncommitted: {
+					message: 'Everything here is committed.';
+					title: 'No uncommitted changes yet';
+				};
+			};
 			'menu-label': 'Open changes menu';
 			uncommitted: 'Uncommitted changes';
 			'uncommitted-badge': 'Uncommitted';
@@ -860,11 +1036,14 @@ export default interface Resources {
 				none: 'No priority';
 				urgent: 'Urgent';
 			};
+			'save-failed': 'Saving the issue failed. Check your connection and try again.';
 			saving: 'Saving…';
 			'submit-create': 'Create issue';
 			'submit-edit': 'Save changes';
+			'team-required': 'Choose a team for the new issue.';
 			'title-create': 'New Linear issue';
 			'title-edit': 'Edit {{identifier}}';
+			'title-required': 'A title is required.';
 			'unset-option': '{{field}}: none';
 		};
 		'issue-list': {
@@ -976,6 +1155,9 @@ export default interface Resources {
 			welcome: 'Welcome';
 		};
 		welcome: {
+			language: {
+				label: 'Interface language';
+			};
 			lead: 'Ensemblr runs coding agents and the GitHub CLI as local processes. A short check confirms they are there — it takes about a minute.';
 			requirements: {
 				'agent-cli': {
@@ -1043,6 +1225,7 @@ export default interface Resources {
 			delete: 'Delete comment';
 			'go-to-line': 'Go to line in diff';
 			hide: 'Hide comment';
+			'no-description': 'No description';
 			outdated: 'Outdated';
 			reopen: 'Reopen comment';
 			resolve: 'Resolve comment';
@@ -1681,6 +1864,14 @@ export default interface Resources {
 			scripts: 'Scripts';
 			security: 'Security';
 		};
+		'root-directory': {
+			error: {
+				'change-unavailable': 'Root directory changes are unavailable in this context.';
+				'no-path-selected': 'No root directory path was selected.';
+				'picker-unavailable': 'Root directory selection is unavailable in this context.';
+				'preview-failed': 'The selected root directory could not be previewed.';
+			};
+		};
 		'run-scripts': {
 			description: "Shortcuts for quick actions, like running your dev server or test suite. Use <port>$ENSEMBLR_PORT</port> for the workspace's allocated port.";
 			editor: {
@@ -1832,6 +2023,13 @@ export default interface Resources {
 			'no-commands': 'No matching commands';
 			'no-files': 'No matching files';
 		};
+		'board-status': {
+			backlog: 'Backlog';
+			canceled: 'Canceled';
+			done: 'Done';
+			'in-progress': 'In progress';
+			'in-review': 'In review';
+		};
 		'browse-archive': {
 			description: 'Restore an archived workspace, or permanently purge it. Restoring rebuilds the worktree from the recorded base branch when branch cleanup ran at archive time.';
 			empty: {
@@ -1916,6 +2114,7 @@ export default interface Resources {
 		};
 		composer: {
 			'aria-label': 'Agent composer';
+			'attachment-failed': 'Failed to attach selected file.';
 			'blocked-follow-up': 'Follow-ups are blocked while the agent is working — stop the turn or wait for it to finish.';
 			'focus-hint': '<key>{{shortcut}}</key><label>to focus</label>';
 			model: {
@@ -2165,6 +2364,15 @@ export default interface Resources {
 			setup: {
 				label: 'Setup';
 			};
+			terminal: {
+				label: 'Terminal';
+			};
+		};
+		'file-diff': {
+			'load-failed': 'Could not load diff.';
+			loading: 'Loading diff…';
+			'no-changes': 'No changes in this file.';
+			'no-file': 'This tab has no file associated.';
 		};
 		'file-preview': {
 			actions: {
@@ -2193,6 +2401,9 @@ export default interface Resources {
 		};
 		'file-tree-menu': {
 			actions: '{{path}} actions';
+		};
+		fork: {
+			'new-tab-title': 'Forked chat';
 		};
 		'git-failure': {
 			'invalid-cwd': {

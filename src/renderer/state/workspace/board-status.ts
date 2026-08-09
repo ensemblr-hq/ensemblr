@@ -18,15 +18,6 @@ export const BOARD_STATUS_ORDER: readonly WorkspaceBoardStatus[] =
 /** Status a workspace falls back to when it has no explicit board status. */
 export const DEFAULT_BOARD_STATUS: WorkspaceBoardStatus = 'backlog';
 
-/** Human-readable labels for each board status. */
-export const BOARD_STATUS_LABELS: Record<WorkspaceBoardStatus, string> = {
-	backlog: 'Backlog',
-	'in-progress': 'In progress',
-	'in-review': 'In review',
-	done: 'Done',
-	canceled: 'Canceled',
-};
-
 /**
  * Resolves a workspace's board status from the persisted status map, applying
  * the default for workspaces that have never been assigned one.

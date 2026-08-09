@@ -3,7 +3,10 @@ import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { cn } from '@/renderer/lib/utils';
-import { BOARD_STATUS_PRESENTATION } from '@/renderer/lib/workbench/board-status-presentation';
+import {
+	BOARD_STATUS_PRESENTATION,
+	boardStatusLabel,
+} from '@/renderer/lib/workbench/board-status-presentation';
 import type { WorkspaceBoardStatus } from '@/renderer/state/workspace';
 import type { BoardCard } from '@/renderer/types/workbench-shell';
 
@@ -27,6 +30,7 @@ export function BoardColumn({
 	const [isDraggedOver, setIsDraggedOver] = useState(false);
 	const presentation = BOARD_STATUS_PRESENTATION[status];
 	const StatusIcon = presentation.icon;
+	const statusLabel = boardStatusLabel(t, status);
 
 	useEffect(() => {
 		const element = ref.current;
@@ -49,7 +53,7 @@ export function BoardColumn({
 				'workbench:dashboard.column.aria-label',
 				'{{status}} column, {{workspaces}}',
 				{
-					status: presentation.label,
+					status: statusLabel,
 					workspaces: t('common:units.workspace-count', {
 						count: cards.length,
 						defaultValue_one: '{{count}} workspace',
@@ -69,7 +73,7 @@ export function BoardColumn({
 					className={cn('size-3.5', presentation.iconClassName)}
 				/>
 				<span className='min-w-0 flex-1 truncate font-medium text-[0.8125rem]'>
-					{presentation.label}
+					{statusLabel}
 				</span>
 				<span className='text-muted-foreground text-xxs tabular-nums'>
 					{cards.length}

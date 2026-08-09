@@ -84,6 +84,13 @@ export interface TerminalSessionSnapshot {
 	scriptName: string | null;
 	status: TerminalSessionStatus;
 	title: string;
+	/**
+	 * True while {@link title} is the English stand-in main assigns a session that
+	 * was never named — by the user, by an OSC escape, or by a harness log. The
+	 * renderer names those from {@link kind} in the app's language and keeps the
+	 * English text only for the support bundle.
+	 */
+	titleIsDefault: boolean;
 	workspaceId: string;
 }
 

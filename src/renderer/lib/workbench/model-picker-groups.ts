@@ -12,6 +12,7 @@ import type { AgentProviderId } from '@/shared/agent-provider';
  * plain vendor ids beside them must stay vendor-named, or a Pi chat running an
  * Anthropic model lands in a group labelled after a runtime it is not using.
  */
+// i18next-instrument-ignore -- vendor and runtime brand names
 const PROVIDER_DISPLAY_NAMES: Record<string, string> = {
 	anthropic: 'Anthropic',
 	'claude-code': 'Claude Code',

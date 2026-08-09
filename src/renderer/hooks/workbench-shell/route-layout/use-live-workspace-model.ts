@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import {
 	settingsResolutionQuery,
@@ -74,6 +75,7 @@ export function useLiveWorkspaceModel({
 	liveWorkspaceFiles: ActiveWorkspace['workspaceFiles'];
 	workspaceWithLiveDockTabs: ActiveWorkspace;
 } {
+	const { t } = useTranslation();
 	// Run the setup script on open only when the dependency fingerprint is
 	// missing or stale, so restarting into a workspace never needlessly reinstalls.
 	useEnsureWorkspaceSetup(activeWorkspace.id);
@@ -207,6 +209,7 @@ export function useLiveWorkspaceModel({
 				...mapTerminalSessionsToDockTabs({
 					activeTerminalIds: terminalSessions.activeTerminalIds,
 					sessions: terminalSessions.sessions,
+					t,
 				}),
 			],
 			...liveReview,
@@ -223,6 +226,7 @@ export function useLiveWorkspaceModel({
 		scriptSettingsData,
 		terminalSessions.activeTerminalIds,
 		terminalSessions.sessions,
+		t,
 	]);
 
 	return { liveWorkspaceFiles, workspaceWithLiveDockTabs };

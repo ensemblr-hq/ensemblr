@@ -55,8 +55,6 @@ export function filterGithubRepositories(
 /** Derived view-state for the clone dialog's repo list, per {@link deriveRepoSearchView}. */
 interface RepoSearchView {
 	displayedEntries: GithubRepositoryEntry[];
-	emptyMessage: string;
-	footerHint: string | undefined;
 	isDisplayLoading: boolean;
 	liveError: string | undefined;
 }
@@ -64,10 +62,10 @@ interface RepoSearchView {
 /**
  * Derives what the repo list should show from the recent + full query results.
  * When searching, results filter over the full set once it succeeds, otherwise
- * over the recent set as a progressive fallback; the "Searching all
- * repositories…" hint stays visible while the full query is still in flight, and
- * a full-scope error only surfaces while searching. Pure so its branch matrix is
- * unit-testable without React.
+ * over the recent set as a progressive fallback, and a full-scope error only
+ * surfaces while searching. Pure so its branch matrix is unit-testable without
+ * React; the empty and hint copy stays with the hook, where a translator is in
+ * scope.
  */
 export function deriveRepoSearchView(input: {
 	full: GithubRepositoryListResult | undefined;
@@ -86,11 +84,6 @@ export function deriveRepoSearchView(input: {
 		displayedEntries: isSearching
 			? filterGithubRepositories(searchSource, query)
 			: recentEntries,
-		emptyMessage: isSearching
-			? 'No matching repositories.'
-			: 'No repos to suggest yet.',
-		footerHint:
-			isSearching && isFullLoading ? 'Searching all repositories…' : undefined,
 		isDisplayLoading: isSearching
 			? isRecentLoading && isFullLoading
 			: isRecentLoading,

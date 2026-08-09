@@ -526,6 +526,14 @@
 		"scripts": "Scripts",
 		"security": "Security"
 	},
+	"root-directory": {
+		"error": {
+			"change-unavailable": "Root directory changes are unavailable in this context.",
+			"no-path-selected": "No root directory path was selected.",
+			"picker-unavailable": "Root directory selection is unavailable in this context.",
+			"preview-failed": "The selected root directory could not be previewed."
+		}
+	},
 	"run-scripts": {
 		"description": "Shortcuts for quick actions, like running your dev server or test suite. Use <port>$ENSEMBLR_PORT</port> for the workspace's allocated port.",
 		"editor": {

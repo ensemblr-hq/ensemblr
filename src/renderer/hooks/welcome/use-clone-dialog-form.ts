@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import {
 	isEnsemblrApiAvailable,
@@ -27,6 +28,7 @@ export function useCloneDialogForm({
 }: {
 	onOpenChange: (open: boolean) => void;
 }) {
+	const { t } = useTranslation();
 	const { data: rootDirectoryData } = useQuery({
 		...rootDirectoryQuery,
 		enabled: isEnsemblrApiAvailable(),
@@ -120,7 +122,9 @@ export function useCloneDialogForm({
 		handleSubmitKey,
 		isBusy,
 		location,
-		locationPlaceholder: defaultParentPath || 'Managed repos directory',
+		locationPlaceholder:
+			defaultParentPath ||
+			t('common:clone-repos.location-placeholder', 'Managed repos directory'),
 		logs,
 		resetLocation: () => setLocationOverride(null),
 		retry,

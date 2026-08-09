@@ -1,6 +1,7 @@
 import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
 
+import { DialogDiagnosticsList } from '@/renderer/components/dialog-diagnostics-list';
 import { Button } from '@/renderer/components/ui/button';
 import {
 	Dialog,
@@ -16,7 +17,6 @@ import {
 } from '@/renderer/hooks/welcome/use-clone-dialog-form';
 import type { CloneStage } from '@/renderer/types/welcome';
 
-import { CloneGithubDiagnostics } from './clone-github-diagnostics.tsx';
 import { CloneGithubLocationField } from './clone-github-location-field.tsx';
 import { CloneGithubProgressLog } from './clone-github-progress-log.tsx';
 import { CloneGithubRecentRepos } from './clone-github-recent-repos.tsx';
@@ -142,7 +142,10 @@ function CloneGithubDialogForm({
 				{logs.length > 0 ? <CloneGithubProgressLog logs={logs} /> : null}
 
 				{stage === 'failure' && diagnostics.length > 0 ? (
-					<CloneGithubDiagnostics diagnostics={diagnostics} />
+					<DialogDiagnosticsList
+						diagnostics={diagnostics}
+						testId='clone-diagnostics'
+					/>
 				) : null}
 			</div>
 

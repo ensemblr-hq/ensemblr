@@ -15,7 +15,10 @@ import { Input } from '@/renderer/components/ui/input';
 import { Label } from '@/renderer/components/ui/label';
 import { useKeymapHandler } from '@/renderer/hooks/use-keymap-handler';
 import { useQuickStartFlow } from '@/renderer/hooks/welcome/use-quick-start-flow';
-import { validateEntityName } from '@/renderer/lib/entity-name-validation';
+import {
+	entityNameIssueText,
+	validateEntityName,
+} from '@/renderer/lib/entity-name-validation';
 import type { KeymapBinding } from '@/renderer/types/keymap';
 
 /** Modal for creating a brand-new local project (folder + git init + register). */
@@ -68,16 +71,14 @@ function QuickStartDialogForm({
 	const [name, setName] = useState('');
 
 	const trimmedName = name.trim();
-	const localValidation = validateEntityName({
-		allowedCharacters: 'letters, numbers, dots, dashes, or underscores',
+	const nameIssue = validateEntityName({
 		name: trimmedName,
-		noun: 'Project',
 		pattern: NAME_PATTERN,
 	});
 	const canCreate =
 		!isBusy &&
 		trimmedName.length > 0 &&
-		localValidation === null &&
+		nameIssue === null &&
 		isEnsemblrApiAvailable();
 	const parentPlaceholder =
 		defaultParentPath ||
@@ -145,8 +146,10 @@ function QuickStartDialogForm({
 						/>
 					</p>
 				) : null}
-				{localValidation ? (
-					<p className='text-[0.6875rem] text-destructive'>{localValidation}</p>
+				{nameIssue ? (
+					<p className='text-[0.6875rem] text-destructive'>
+						{entityNameIssueText(t, 'project', nameIssue)}
+					</p>
 				) : null}
 			</div>
 

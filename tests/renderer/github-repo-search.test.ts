@@ -206,8 +206,6 @@ test('deriveRepoSearchView shows the recent entries verbatim when not searching'
 	expect(view.displayedEntries.map((entry) => entry.fullName)).toEqual([
 		'octo/recent',
 	]);
-	expect(view.emptyMessage).toBe('No repos to suggest yet.');
-	expect(view.footerHint).toBeUndefined();
 });
 
 test('deriveRepoSearchView filters over recents and shows the hint while the full list loads', () => {
@@ -225,8 +223,6 @@ test('deriveRepoSearchView filters over recents and shows the hint while the ful
 	expect(view.displayedEntries.map((entry) => entry.fullName)).toEqual([
 		'octo/widgets',
 	]);
-	expect(view.footerHint).toBe('Searching all repositories…');
-	expect(view.emptyMessage).toBe('No matching repositories.');
 });
 
 test('deriveRepoSearchView filters over the full set once it succeeds', () => {
@@ -245,7 +241,6 @@ test('deriveRepoSearchView filters over the full set once it succeeds', () => {
 	expect(view.displayedEntries.map((entry) => entry.fullName)).toEqual([
 		'octo/deep-widgets',
 	]);
-	expect(view.footerHint).toBeUndefined();
 });
 
 test('deriveRepoSearchView surfaces the full error while searching, falling back to recents', () => {

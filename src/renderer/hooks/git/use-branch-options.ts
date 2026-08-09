@@ -57,6 +57,8 @@ function resolveFailure(
 	if (thrown) {
 		return {
 			code: 'command-failed',
+			// i18next-instrument-ignore -- English fallback behind the code the
+			// renderer translates; see githubFailureText.
 			message: 'Could not load branches for this repository.',
 			remediation: thrown.message,
 		};

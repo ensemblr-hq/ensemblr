@@ -61,6 +61,10 @@ Rules of thumb:
 | Root directory | Корневой каталог | Ριζικός κατάλογος | The managed directory holding repos and workspaces. |
 | Permission mode | Режим разрешений | Λειτουργία δικαιωμάτων | How much an agent may do unattended. |
 | Keyboard shortcut | Горячая клавиша | Συντόμευση πληκτρολογίου | Shortened to "Горячие клавиши"/"Συντομεύσεις" in the nav, where the column is tight. |
+| Board status | Статус на доске | Κατάσταση πίνακα | The kanban column a workspace sits in: `Бэклог`/`Εκκρεμότητες`, `В работе`/`Σε εξέλιξη`, `На ревью`/`Σε αξιολόγηση`, `Готово`/`Ολοκληρώθηκε`, `Отменено`/`Ακυρώθηκε`. |
+| Actions bot | Бот Actions | Bot του Actions | The GitHub Actions commenter. `Actions` is the product name and stays; only the noun in front of it is localized. |
+| Managed root | Управляемый корневой каталог | Διαχειριζόμενος ριζικός κατάλογος | The root plus the directories Ensemblr creates under it. |
+| Diagnostic | Диагностика | Διαγνωστικό | One coded problem a failed operation reports; the renderer translates it from the code, never from main's English. |
 
 ## Core verbs
 

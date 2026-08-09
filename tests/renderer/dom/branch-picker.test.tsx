@@ -199,7 +199,9 @@ test('surfaces a gh failure instead of an empty list', async () => {
 	await userEvent.click(screen.getByRole('button', { name: /master/ }));
 
 	expect(
-		await screen.findByText('gh is not authenticated.'),
+		await screen.findByText(
+			'GitHub CLI is not signed in. Run gh auth login, then retry.',
+		),
 	).toBeInTheDocument();
 	expect(screen.getByText('Run `gh auth login`.')).toBeInTheDocument();
 });

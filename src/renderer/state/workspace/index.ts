@@ -8,7 +8,6 @@ export {
 } from './board-state';
 export {
 	applyBoardStatus,
-	BOARD_STATUS_LABELS,
 	BOARD_STATUS_ORDER,
 	DEFAULT_BOARD_STATUS,
 	resolveBoardStatus,

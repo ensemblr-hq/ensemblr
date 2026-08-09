@@ -1,4 +1,5 @@
-import { NO_DESCRIPTION_LABEL } from '@/renderer/lib/workbench/comment-body';
+import { useTranslation } from 'react-i18next';
+
 import { ChatMessageText } from './chat-message-text';
 
 /**
@@ -15,10 +16,11 @@ export function CommentMarkdown({
 	body: string;
 	className?: string;
 }) {
+	const { t } = useTranslation();
 	if (body.trim().length === 0) {
 		return (
 			<p className='text-muted-foreground text-xs italic'>
-				{NO_DESCRIPTION_LABEL}
+				{t('review:comment.no-description', 'No description')}
 			</p>
 		);
 	}
