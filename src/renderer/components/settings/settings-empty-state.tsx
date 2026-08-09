@@ -15,12 +15,16 @@ export function SettingsEmptyState({
 	return (
 		<div
 			className={cn(
-				'rounded-md border border-dashed py-8 text-center text-muted-foreground text-sm',
+				'flex flex-col items-center gap-1 rounded-xl border border-border border-dashed px-4 py-7 text-center',
 				className,
 			)}
 		>
-			<div className='font-medium text-foreground'>{title}</div>
-			{description ? <p className='mt-1'>{description}</p> : null}
+			<p className='font-medium text-foreground text-sm'>{title}</p>
+			{description ? (
+				<p className='text-pretty text-muted-foreground text-xs'>
+					{description}
+				</p>
+			) : null}
 		</div>
 	);
 }

@@ -66,11 +66,11 @@ function GitSettings() {
 				stack
 			>
 				<RadioGroup
-					className='mt-2 flex flex-col gap-2'
+					className='flex flex-col gap-2'
 					onValueChange={(v) => setPrefixSource(v as typeof prefixSource)}
 					value={prefixSource}
 				>
-					<div className='flex items-center gap-2 text-sm'>
+					<div className='flex h-7 items-center gap-2 text-sm'>
 						<RadioGroupItem id='branch-prefix-gh' value='github-username' />
 						<label className='cursor-pointer' htmlFor='branch-prefix-gh'>
 							{t(
@@ -79,24 +79,24 @@ function GitSettings() {
 							)}
 						</label>
 					</div>
-					<div className='flex items-center gap-2 text-sm'>
+					<div className='flex h-7 items-center gap-2 text-sm'>
 						<RadioGroupItem id='branch-prefix-custom' value='custom' />
 						<label className='cursor-pointer' htmlFor='branch-prefix-custom'>
-							{t('settings:git.branch-prefix.custom', 'Custom:')}
+							{t('settings:git.branch-prefix.custom', 'Custom')}
 						</label>
 						<Input
 							aria-label={t(
 								'settings:git.branch-prefix.custom-aria-label',
 								'Custom branch prefix',
 							)}
-							className='h-7 w-40'
+							className='h-7 w-40 font-mono text-xs'
 							disabled={prefixSource !== 'custom'}
 							onChange={(e) => setCustomPrefix(e.target.value)}
 							placeholder='feature'
 							value={customPrefix}
 						/>
 					</div>
-					<div className='flex items-center gap-2 text-sm'>
+					<div className='flex h-7 items-center gap-2 text-sm'>
 						<RadioGroupItem id='branch-prefix-none' value='none' />
 						<label className='cursor-pointer' htmlFor='branch-prefix-none'>
 							{t('settings:git.branch-prefix.none', 'None')}

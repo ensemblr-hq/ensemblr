@@ -12,6 +12,7 @@ import {
 import { resolveSettings } from '../../src/main/config/config-resolution.ts';
 import { upsertRepositorySettings } from '../../src/main/environment/repository-settings.ts';
 import { openEnsemblrDatabase } from '../../src/main/storage/database.ts';
+import { DEFAULT_PERMISSION_MODE } from '../../src/shared/permissions.ts';
 
 const REPO_ID = 'repo-1';
 
@@ -139,6 +140,33 @@ test('null / blank / empty patch fields delete their row and fall back to defaul
 			filesSource: 'built-in-default',
 		},
 	);
+});
+
+test('permissionMode writes the resolver-visible security.permissionMode row', (t) => {
+	const database = createDatabaseFixture(t);
+
+	upsertRepositorySettings({
+		database,
+		repositoryId: REPO_ID,
+		settings: { permissionMode: 'read-only' },
+	});
+
+	const stored = resolvedRepository(database);
+	assert.equal(stored('security.permissionMode')?.value, 'read-only');
+	assert.equal(stored('security.permissionMode')?.source, 'sqlite');
+
+	upsertRepositorySettings({
+		database,
+		repositoryId: REPO_ID,
+		settings: { permissionMode: null },
+	});
+
+	const cleared = resolvedRepository(database);
+	assert.equal(
+		cleared('security.permissionMode')?.value,
+		DEFAULT_PERMISSION_MODE,
+	);
+	assert.notEqual(cleared('security.permissionMode')?.source, 'sqlite');
 });
 
 test('omitted patch fields leave existing rows untouched', (t) => {

@@ -11,10 +11,13 @@ import type {
 	PiReadinessSnapshot,
 	PiRpcSmokeSnapshot,
 } from '../pi-runtime';
+import { commandLog } from '../setup/index.ts';
 import type { AgentProviderReadinessProbe } from './agent-provider-types.ts';
 import {
+	authoredDetail,
 	createRetryRemediation,
 	toExecutableSource,
+	upstreamDetail,
 } from './agent-provider-types.ts';
 
 const PI_DESCRIPTOR = getAgentProviderDescriptor('pi');
@@ -77,19 +80,31 @@ function createExecutableCheck(
 			: executable.status === 'warning'
 				? 'warning'
 				: 'failure';
+	const source = executable.source ?? 'unknown';
 
 	return {
-		detail:
-			status === 'failure'
-				? (firstErrorMessage(executable.diagnostics) ??
-					`${PI_DESCRIPTOR.label} could not be discovered. Install it or select a compatible executable.`)
-				: `${executable.displayPath} (${executable.source ?? 'unknown source'}).`,
+		...(status === 'failure'
+			? (upstreamDetail(firstErrorMessage(executable.diagnostics)) ??
+				authoredDetail(
+					'pi-executable-undiscovered',
+					`${PI_DESCRIPTOR.label} could not be discovered. Install it or select a compatible executable.`,
+					{ provider: PI_DESCRIPTOR.label },
+				))
+			: authoredDetail(
+					'pi-executable-resolved',
+					`${executable.displayPath} (${executable.source ?? 'unknown source'}).`,
+					{ path: executable.displayPath, source },
+				)),
 		id: 'executable',
 		label: `${PI_DESCRIPTOR.label} executable`,
 		logs: executable.probe
 			? [
 					{
 						label: `${executable.probe.kind} probe`,
+						labelMessage: {
+							code: 'pi-probe' as const,
+							params: { kind: executable.probe.kind },
+						},
 						text: executable.probe.detail,
 					},
 				]
@@ -118,15 +133,31 @@ function createAgentDirectoryCheck(
 	const failed = agentDirectory.status !== 'success';
 
 	return {
-		detail: failed
-			? (firstErrorMessage(agentDirectory.diagnostics) ??
-				`${PI_DESCRIPTOR.label}'s agent directory could not be verified.`)
-			: `${agentDirectory.path} (${agentDirectory.source}).`,
+		...(failed
+			? (upstreamDetail(firstErrorMessage(agentDirectory.diagnostics)) ??
+				authoredDetail(
+					'pi-agent-directory-unverified',
+					`${PI_DESCRIPTOR.label}'s agent directory could not be verified.`,
+					{ provider: PI_DESCRIPTOR.label },
+				))
+			: authoredDetail(
+					'pi-agent-directory-resolved',
+					`${agentDirectory.path} (${agentDirectory.source}).`,
+					{ path: agentDirectory.path, source: agentDirectory.source },
+				)),
 		id: 'agent-directory',
 		label: 'Agent directory',
 		logs: [
-			{ label: 'Agent directory path', text: agentDirectory.path },
-			{ label: 'Source', text: agentDirectory.source },
+			{
+				label: 'Agent directory path',
+				labelMessage: { code: 'agent-directory-path' },
+				text: agentDirectory.path,
+			},
+			{
+				label: 'Source',
+				labelMessage: { code: 'source' },
+				text: agentDirectory.source,
+			},
 		],
 		remediations: [RETRY_REMEDIATION],
 		status: failed ? 'failure' : 'success',
@@ -137,15 +168,25 @@ function createAgentDirectoryCheck(
 function createRpcSmokeCheck(rpc: PiRpcSmokeSnapshot): AgentProviderCheckWire {
 	const failed = rpc.status !== 'success';
 
+	const frameType = rpc.firstFrame?.type ?? 'JSONL';
+
 	return {
-		detail: failed
-			? (rpc.failure?.message ??
-				`${PI_DESCRIPTOR.label} RPC startup did not produce valid JSONL.`)
-			: `Startup produced a valid ${rpc.firstFrame?.type ?? 'JSONL'} frame.`,
+		...(failed
+			? (upstreamDetail(rpc.failure?.message) ??
+				authoredDetail(
+					'pi-rpc-invalid',
+					`${PI_DESCRIPTOR.label} RPC startup did not produce valid JSONL.`,
+					{ provider: PI_DESCRIPTOR.label },
+				))
+			: authoredDetail(
+					'pi-rpc-ready',
+					`Startup produced a valid ${frameType} frame.`,
+					{ frameType },
+				)),
 		id: 'rpc-smoke',
 		label: 'RPC startup',
 		logs: [
-			{ label: 'Command', text: rpc.logs.command },
+			commandLog(rpc.logs.command),
 			{ label: 'cwd', text: rpc.logs.cwd },
 			...(rpc.logs.stdout
 				? [
@@ -178,19 +219,26 @@ function createProviderModelCheck(
 	const failed = providerModels.status !== 'success';
 
 	return {
-		detail: failed
-			? (providerModels.failure?.message ??
-				'Provider and model readiness could not be verified.')
-			: `${providerModels.modelCount} models across ${providerModels.providerCount} providers.`,
+		...(failed
+			? (upstreamDetail(providerModels.failure?.message) ??
+				authoredDetail(
+					'pi-models-unverified',
+					'Provider and model readiness could not be verified.',
+				))
+			: authoredDetail(
+					'pi-models-ready',
+					`${providerModels.modelCount} models across ${providerModels.providerCount} providers.`,
+					{
+						modelCount: providerModels.modelCount,
+						providerCount: providerModels.providerCount,
+					},
+				)),
 		id: 'provider-models',
 		label: 'Providers and models',
 		logs: [
-			{
-				label: 'Command',
-				text: providerModels.command
-					? `${providerModels.command} --list-models`
-					: '',
-			},
+			commandLog(
+				providerModels.command ? `${providerModels.command} --list-models` : '',
+			),
 		],
 		remediations: [RETRY_REMEDIATION],
 		status: failed ? 'failure' : 'success',

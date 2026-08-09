@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 
 import { RunScriptsSection } from '@/renderer/components/settings/run-scripts/run-scripts-section';
 import { SettingRow } from '@/renderer/components/settings/setting-row';
+import { SettingsLoadingState } from '@/renderer/components/settings/settings-async-state';
 import { SettingsSection } from '@/renderer/components/settings/settings-section';
 import {
 	RadioGroup,
@@ -76,7 +77,9 @@ function RepoScriptsSettings() {
 				)}
 				title={t('settings:repo.scripts.title', 'Scripts')}
 			>
-				{null}
+				<SettingsLoadingState
+					label={t('settings:repo.scripts.loading', 'Reading scripts…')}
+				/>
 			</SettingsSection>
 		);
 	}
@@ -178,7 +181,7 @@ function ScriptsEditor({
 			title={t('settings:repo.scripts.title', 'Scripts')}
 		>
 			{workspaceDiverges ? (
-				<p className='pt-4 text-muted-foreground text-xs'>
+				<p className='py-4 text-muted-foreground text-xs'>
 					{t(
 						'settings:repo.scripts.diverges',
 						'The workspace you have open commits different scripts on its branch, and runs those. Merge this file to change what it runs.',
@@ -212,42 +215,50 @@ function ScriptsEditor({
 				stack
 			>
 				<RadioGroup
-					className='mt-2 flex flex-col gap-2'
+					className='flex flex-col gap-3'
 					onValueChange={(value) => updateForm({ runMode: value as RunMode })}
 					value={form.runMode}
 				>
-					<div className='flex items-start gap-2 text-sm'>
+					<div className='flex items-start gap-2'>
 						<RadioGroupItem
 							className='mt-0.5'
 							id='run-mode-concurrent'
 							value='concurrent'
 						/>
-						<label className='cursor-pointer' htmlFor='run-mode-concurrent'>
-							<div>{t('settings:repo.run-mode.concurrent', 'Concurrent')}</div>
-							<p className='text-muted-foreground text-xs'>
+						<label
+							className='cursor-pointer space-y-0.5'
+							htmlFor='run-mode-concurrent'
+						>
+							<span className='block font-medium text-foreground text-sm'>
+								{t('settings:repo.run-mode.concurrent', 'Concurrent')}
+							</span>
+							<span className='block text-muted-foreground text-xs leading-relaxed'>
 								{t(
 									'settings:repo.run-mode.concurrent-description',
 									'Run scripts can run in multiple workspaces at once.',
 								)}
-							</p>
+							</span>
 						</label>
 					</div>
-					<div className='flex items-start gap-2 text-sm'>
+					<div className='flex items-start gap-2'>
 						<RadioGroupItem
 							className='mt-0.5'
 							id='run-mode-nonconcurrent'
 							value='nonconcurrent'
 						/>
-						<label className='cursor-pointer' htmlFor='run-mode-nonconcurrent'>
-							<div>
+						<label
+							className='cursor-pointer space-y-0.5'
+							htmlFor='run-mode-nonconcurrent'
+						>
+							<span className='block font-medium text-foreground text-sm'>
 								{t('settings:repo.run-mode.nonconcurrent', 'Non-concurrent')}
-							</div>
-							<p className='text-muted-foreground text-xs'>
+							</span>
+							<span className='block text-muted-foreground text-xs leading-relaxed'>
 								{t(
 									'settings:repo.run-mode.nonconcurrent-description',
 									'Only one run script can run at a time.',
 								)}
-							</p>
+							</span>
 						</label>
 					</div>
 				</RadioGroup>
@@ -311,7 +322,7 @@ function ScriptRow({
 		>
 			<Textarea
 				aria-label={label}
-				className='mt-2 min-h-18 font-mono text-xs'
+				className='min-h-18 font-mono text-xs'
 				onChange={(event) => onChange(event.target.value)}
 				placeholder={placeholder}
 				value={value}

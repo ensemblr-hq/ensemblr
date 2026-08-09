@@ -186,12 +186,9 @@ export const filePreviewMarkdownPreviewAtom = atomWithStorage<boolean>(
 );
 
 // ─── Experimental (user) ──────────────────────────────────────────────────────
-
-/** Whether developer-only diagnostics and debug controls are visible; persisted to localStorage. */
-export const developerModeAtom = atomWithStorage<boolean>(
-	KEY('exp_developer_mode'),
-	false,
-);
+// Moved to config.json (see ./app-settings): `experimental.developerMode` joins
+// `experimental.autoRunAfterSetup` so both Experimental rows are reachable from
+// the header's "Edit in config.json" and survive a cleared localStorage.
 
 // ─── Advanced (user) ──────────────────────────────────────────────────────────
 
@@ -213,12 +210,19 @@ const REPO_SETTINGS_KEYS = [
 	'archiveAfterMerge',
 	'filesToCopy',
 	'previewUrls',
+	'security.permissionMode',
 	'scripts.setup',
 	'scripts.run',
 	'scripts.runScripts',
 	'scripts.archive',
 	'runScriptMode',
 	'autoRunAfterSetup',
+	'actionPreferences.branchRename',
+	'actionPreferences.codeReview',
+	'actionPreferences.createPr',
+	'actionPreferences.fixErrors',
+	'actionPreferences.general',
+	'actionPreferences.resolveConflicts',
 ] as const;
 /** One of the known repo-scope setting keys resolvable from the settings snapshot. */
 export type RepoSettingsKey = (typeof REPO_SETTINGS_KEYS)[number];

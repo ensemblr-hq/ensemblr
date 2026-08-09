@@ -144,13 +144,156 @@ export default interface Resources {
 			tokens_other: '{{formatted}} tokens';
 		};
 		'setup-check': {
+			action: {
+				'choose-root-directory': 'Choose another root';
+				'install-claude-code': 'Copy the {{provider}} install command';
+				'install-command-line-tools': 'Install command-line tools';
+				'open-claude-setup-docs': 'Open {{provider}} setup docs';
+				'open-config-settings': 'Open config diagnostics';
+				'open-environment-settings': 'Open environment settings';
+				'open-gh-install': 'Open GitHub CLI install docs';
+				'open-git-install': 'Open Git install docs';
+				'open-linear-settings': 'Open integration settings';
+				'open-pi-provider-settings': 'Open Pi provider settings';
+				'rerun-provider-checks': 'Re-run {{provider}} checks';
+				retry: 'Retry check';
+				'retry-claude-executable': 'Retry {{provider}} executable check';
+				'retry-config': 'Retry config check';
+				'retry-database': 'Retry database check';
+				'retry-environment-variables': 'Retry environment check';
+				'retry-gh-auth': 'Retry GitHub auth check';
+				'retry-gh-cli': 'Retry gh check';
+				'retry-git-executable': 'Retry git check';
+				'retry-linear': 'Retry Linear check';
+				'retry-managed-directories': 'Retry directory check';
+				'retry-pi-agent-directory': 'Retry Pi agent directory check';
+				'retry-pi-executable': 'Retry Pi executable check';
+				'retry-pi-provider-model': 'Retry provider/model check';
+				'retry-pi-rpc': 'Retry Pi RPC check';
+				'retry-root-directory': 'Retry root check';
+				'run-claude-login': 'Run {{command}}';
+				'run-gh-auth-login': 'Run gh auth login';
+				'select-claude-executable': 'Select {{provider}} executable';
+				'select-pi-executable': 'Select Pi executable';
+			};
+			detail: {
+				'claude-executable-not-found': '{{provider}} was not found in the shell-derived PATH. Ensemblr does not ship it: install {{provider}}, then retry.';
+				'claude-executable-on-path': 'Found on PATH: {{path}}.';
+				'claude-executable-override': 'Configured override: {{path}}.';
+				'claude-executable-override-broken': 'The configured {{provider}} executable could not be run. Clear the override to fall back to the {{command}} on your PATH, or pick a runnable binary.';
+				'claude-unknown-error': 'Unknown {{provider}} executable check error.';
+				'config-loaded': 'Declarative config loaded.';
+				'config-missing': 'No declarative config file was found; built-in defaults are active.';
+				'database-open-failed': 'SQLite failed to open at {{path}}.';
+				'database-ready': 'SQLite opened at {{path}}; schema version {{schemaVersion}}.';
+				'environment-cataloged': '{{configured}} configured variables, {{masked}} masked secrets, and {{reserved}} reserved runtime variables are cataloged.';
+				'environment-missing-required_one': '{{count}} required environment variable is unset.';
+				'environment-missing-required_other': '{{count}} required environment variables are unset.';
+				'environment-unknown-error': 'Unknown environment variable check error.';
+				'gh-auth-cli-not-found': 'GitHub CLI was not found before authentication could be checked. Install gh, then retry.';
+				'gh-auth-output-truncated': 'GitHub authentication check produced too much output.';
+				'gh-auth-ready': 'GitHub CLI is authenticated for {{hostname}}.';
+				'gh-auth-required': 'GitHub CLI is not authenticated for {{hostname}}. Run gh auth login --hostname {{hostname}}, then retry.';
+				'gh-auth-timeout': 'GitHub authentication check timed out for {{hostname}}.';
+				'gh-auth-unknown-error': 'Unknown GitHub auth check error.';
+				'gh-cli-available': 'GitHub CLI is available: {{version}}.';
+				'gh-cli-available-unknown-version': 'GitHub CLI is available.';
+				'gh-cli-failed': 'GitHub CLI version check failed: {{message}}';
+				'gh-cli-failed-unknown': 'GitHub CLI version check failed for an unknown reason.';
+				'gh-cli-not-found': 'GitHub CLI was not found in the shell-derived PATH. Install gh, then retry.';
+				'gh-cli-output-truncated': 'GitHub CLI version check produced too much output.';
+				'gh-cli-timeout': 'GitHub CLI version check timed out.';
+				'gh-cli-unknown-error': 'Unknown GitHub CLI check error.';
+				'git-available': 'Git is available: {{version}}.';
+				'git-available-unknown-version': 'Git is available.';
+				'git-failed': 'Git version check failed: {{message}}';
+				'git-failed-unknown': 'Git version check failed for an unknown reason.';
+				'git-not-found': 'Git was not found in the shell-derived PATH. Install Git or Xcode Command Line Tools, then retry.';
+				'git-output-truncated': 'Git version check produced too much output.';
+				'git-timeout': 'Git version check timed out.';
+				'git-unknown-error': 'Unknown git check error.';
+				'linear-connected': 'Linear is connected.';
+				'linear-connected-as': 'Linear is connected as {{identity}}.';
+				'linear-connected-with-organization': 'Linear is connected as {{identity}} ({{organization}}).';
+				'linear-not-configured': 'Linear OAuth is not configured. Add app.linear.clientId to the Ensemblr config to enable Linear workflows. Linear is optional for local and GitHub-only workflows.';
+				'linear-not-connected': 'Linear is not connected. Sign in from integration settings to enable Linear workflows.';
+				'linear-reconnect-required': 'The stored Linear token expired and cannot be refreshed. Reconnect Linear from integration settings.';
+				'linear-unknown-error': 'Unknown Linear check error.';
+				'managed-directories-attention': 'Managed directories need attention: {{keys}}.';
+				'managed-directories-ready': 'Managed repos, workspaces, and archived-contexts directories are ready.';
+				'pi-agent-directory-ready': 'Pi agent directory resolves from {{source}}: {{path}}.';
+				'pi-agent-directory-unknown-error': 'Unknown Pi agent directory check error.';
+				'pi-agent-directory-unverified': 'Pi agent directory could not be verified. Fix the Pi environment path or directory permissions, then retry.';
+				'pi-executable-not-found': 'Pi executable could not be discovered. Install Pi, select a compatible executable or wrapper, then retry.';
+				'pi-executable-probe-warning': 'Pi executable is present at {{path}}, but version/help probing needs attention.';
+				'pi-executable-ready-no-probe': 'Pi executable selected from {{source}}: {{path}}. No version/help probe ran.';
+				'pi-executable-ready-with-probe': 'Pi executable selected from {{source}}: {{path}}. {{probeKind}} probe returned: {{probeDetail}}';
+				'pi-executable-unknown-error': 'Unknown Pi executable check error.';
+				'pi-models-ready': 'Pi listed {{modelCount}} models across {{providerCount}} providers.';
+				'pi-models-unknown-error': 'Unknown Pi provider/model check error.';
+				'pi-models-unverified': 'Pi provider/model readiness could not be verified.';
+				'pi-rpc-invalid': 'Pi RPC startup did not produce valid JSONL.';
+				'pi-rpc-ready': 'Pi RPC startup produced a valid {{frameType}} frame from {{cwd}}.';
+				'pi-rpc-unknown-error': 'Unknown Pi RPC check error.';
+				'root-directory-ready': 'Ensemblr root is ready at {{path}}.';
+				'shell-fallback-environment': 'Commands launch successfully, but shell environment resolution used a fallback.';
+				'shell-ready': 'Commands launch successfully with the shell-derived environment.';
+				'shell-smoke-failed': 'The process launch smoke check failed.';
+				'shell-unknown-error': 'Unknown process error.';
+				'unknown-check-error': 'Unknown check error.';
+			};
+			log: {
+				'agent-directory-path': 'Agent directory path';
+				'catalog-entries': 'Catalog entries';
+				command: 'Command';
+				'config-diagnostic': 'Config diagnostic';
+				'configured-variables': 'Configured variables';
+				'database-error': 'Database error';
+				'database-path': 'Database path';
+				'executable-path': 'Executable path';
+				'first-jsonl-frame': 'First JSONL frame';
+				'masked-secrets': 'Masked secrets';
+				'model-count': 'Model count';
+				'pi-probe': '{{kind}} probe';
+				'provider-count': 'Provider count';
+				'reserved-runtime-variables': 'Reserved runtime variables';
+				'root-path': 'Root path';
+				source: 'Source';
+			};
 			optional: 'Optional';
+			'pi-source': {
+				'built-in-default': 'built-in default';
+				'common-location': 'common local binary location';
+				'config-default': 'declarative config';
+				'ensemblr-config': 'Ensemblr repository config';
+				'managed-config': 'managed config';
+				path: 'shell PATH';
+				sqlite: 'user override';
+				unknown: 'unknown source';
+			};
 			status: {
 				failure: 'Failed';
 				pending: 'Pending';
 				running: 'Running';
 				success: 'Ready';
 				warning: 'Warning';
+			};
+			title: {
+				'claude-executable': '{{provider}} executable';
+				config: 'Declarative config';
+				'environment-variables': 'Environment variables';
+				'gh-auth': 'GitHub CLI authenticated';
+				'gh-cli': 'GitHub CLI installed';
+				'git-executable': 'Git executable';
+				'linear-oauth': 'Linear connection';
+				'managed-directories': 'Managed directories';
+				'pi-agent-directory': 'Pi agent directory';
+				'pi-executable': 'Pi executable';
+				'pi-provider-model': 'Pi provider and model readiness';
+				'pi-rpc': 'Pi RPC startup';
+				'root-directory': 'Root directory';
+				'shell-process-launch': 'Shell and process launch';
+				'sqlite-database': 'SQLite database';
 			};
 		};
 		'setup-summary': {
@@ -769,7 +912,7 @@ export default interface Resources {
 				running: 'Checking';
 				subdued: 'Not installed';
 				success: 'Ready';
-				warning: 'Not connected';
+				warning: 'Needs attention';
 			};
 		};
 		checks: {
@@ -1007,27 +1150,6 @@ export default interface Resources {
 		};
 	};
 	settings: {
-		advanced: {
-			description: 'Root directory, Pi executable override, and terminal-scrollback limits.';
-			'pi-executable': {
-				description: 'Override the bundled Pi executable with a custom one. Leave empty to use the discovered system Pi (recommended).';
-				label: 'Pi executable path';
-				'use-bundled': 'Use bundled Pi';
-			};
-			'root-directory': {
-				description: 'Where Ensemblr stores repositories and workspaces. This should be an empty directory you do not modify directly. Changing this will reconcile your repository list against the new root.';
-				label: 'Ensemblr root directory';
-				reading: 'Reading root…';
-				source: 'source: {{source}}';
-				unset: 'Not configured';
-			};
-			scrollback: {
-				'aria-label': 'Terminal scrollback limit in megabytes';
-				description: 'Maximum size of each terminal pane scrollback buffer. Larger values keep more history at the cost of memory.';
-				label: 'Terminal scrollback limit';
-			};
-			title: 'Advanced';
-		};
 		appearance: {
 			'accessible-colors': {
 				default: 'Default';
@@ -1045,6 +1167,7 @@ export default interface Resources {
 				description: 'Syntax highlighting for code blocks and editors. Each theme follows the app theme, using its light cut in light mode and its dark cut in dark mode.';
 				label: 'Code theme';
 			};
+			description: 'Theme, syntax highlighting, and the fonts used for code, diffs, and the integrated terminal.';
 			'markdown-style': {
 				compact: 'Compact';
 				default: 'Default';
@@ -1056,6 +1179,11 @@ export default interface Resources {
 				'aria-label': 'Mono font name';
 				description: 'Font used for code and diffs. The bundled Nerd Font is the default; custom fonts must be installed on your system.';
 				label: 'Mono font';
+			};
+			scrollback: {
+				'aria-label': 'Terminal scrollback limit in megabytes';
+				description: 'Maximum size of each terminal pane scrollback buffer. Larger values keep more history at the cost of memory.';
+				label: 'Terminal scrollback limit';
 			};
 			'terminal-font': {
 				'aria-label': 'Terminal font name';
@@ -1075,9 +1203,17 @@ export default interface Resources {
 			};
 			title: 'Appearance';
 		};
+		common: {
+			source: 'source: {{source}}';
+		};
 		diagnostics: {
 			'copy-bundle': 'Copy diagnostics bundle';
 			description: 'Setup gate checks for Pi, git, GitHub, Linear, and the Ensemblr runtime. The diagnostics bundle redacts secrets, account ids, and full paths before going to the clipboard.';
+			'rerun-onboarding': {
+				action: 'Re-run wizard';
+				description: 'Reopen the first-run setup wizard. Nothing already configured is undone — the wizard re-probes every check and walks you through whatever is still unresolved.';
+				label: 'Setup wizard';
+			};
 			title: 'Diagnostics';
 		};
 		environment: {
@@ -1144,6 +1280,7 @@ export default interface Resources {
 				description: 'Always show context usage. By default, only shown when more than 70% is used.';
 				label: 'Always show context usage';
 			};
+			description: 'How chats behave day to day: the language Ensemblr speaks, how messages are sent, and what it does while an agent is working.';
 			'follow-up': {
 				block: 'Block';
 				description: 'Queue messages to send after the agent finishes, or steer the agent mid-turn. Use ⌘J to queue.';
@@ -1159,6 +1296,12 @@ export default interface Resources {
 			notifications: {
 				description: 'Get notified when an agent finishes working in a chat.';
 				label: 'Desktop notifications';
+			};
+			'root-directory': {
+				description: 'Where Ensemblr stores repositories and workspaces. This should be an empty directory you do not modify directly. Changing this will reconcile your repository list against the new root.';
+				label: 'Ensemblr root directory';
+				reading: 'Reading root…';
+				unset: 'Not configured';
 			};
 			'send-shortcut': {
 				description: 'Use {{shortcut}} for new lines.';
@@ -1176,7 +1319,7 @@ export default interface Resources {
 				label: 'Archive on merge';
 			};
 			'branch-prefix': {
-				custom: 'Custom:';
+				custom: 'Custom';
 				'custom-aria-label': 'Custom branch prefix';
 				description: 'Prefix for new workspace branch names.';
 				'github-username': 'GitHub username (resolved via `gh`)';
@@ -1214,6 +1357,7 @@ export default interface Resources {
 			'scope-user': 'User';
 		};
 		integrations: {
+			description: 'Third-party services Ensemblr can sign in to on your behalf. Each one is optional and can be disconnected at any time.';
 			linear: {
 				'browse-issues': 'Browse issues';
 				checking: 'Checking the Linear connection…';
@@ -1284,7 +1428,7 @@ export default interface Resources {
 			};
 		};
 		nav: {
-			advanced: 'Advanced';
+			app: 'Application';
 			appearance: 'Appearance';
 			'aria-label': 'Settings sections';
 			diagnostics: 'Diagnostics';
@@ -1296,6 +1440,7 @@ export default interface Resources {
 			models: 'Models';
 			more: 'More';
 			providers: 'Providers';
+			shortcuts: 'Shortcuts';
 		};
 		providers: {
 			account: {
@@ -1307,6 +1452,15 @@ export default interface Resources {
 				label: 'Account';
 				organization: 'Organization';
 				plan: 'Plan';
+			};
+			check: {
+				'agent-directory': 'Agent directory';
+				auth: 'Authentication';
+				executable: '{{provider}} executable';
+				mcp: 'MCP servers';
+				'provider-models': 'Providers and models';
+				'rpc-smoke': 'RPC startup';
+				version: 'Version';
 			};
 			'check-status': {
 				failure: 'Failed';
@@ -1320,12 +1474,40 @@ export default interface Resources {
 			};
 			'copy-command': 'Copy {{command}}';
 			description: 'Agent runtimes that can drive a chat. Each one resolves its own executable, reports its own readiness, and keeps its own credentials.';
+			detail: {
+				'account-identity': '{{identity}}.';
+				'account-identity-with-plan': '{{identity}} ({{plan}}).';
+				'account-signed-in': 'Signed in.';
+				'account-signed-in-with-plan': 'Signed in ({{plan}}).';
+				'claude-executable-override-broken': 'The configured {{provider}} executable could not be run. Clear the override to fall back to the {{command}} on your PATH, or pick a runnable binary.';
+				'claude-no-executable': 'No {{command}} executable was found on your PATH. Ensemblr does not ship {{provider}}: install it, run {{loginCommand}}, then re-run these checks.';
+				'claude-not-signed-in': '{{provider}} is installed but not signed in.';
+				'claude-session-timeout': '{{provider}} started but did not answer within {{seconds}}s. Run {{command}} in a terminal to clear any pending login or Keychain prompt, then re-run these checks.';
+				'claude-version-no-executable': 'There is no {{command}} binary to version-probe. Install {{provider}}, run {{loginCommand}}, then re-run these checks.';
+				'executable-configured': 'Configured override: {{path}}.';
+				'executable-on-path': 'Found on PATH: {{path}}.';
+				'its-login-command': 'its login command';
+				'mcp-connected_one': '{{count}} MCP server connected.';
+				'mcp-connected_other': '{{count}} MCP servers connected.';
+				'mcp-none': 'No MCP servers are configured.';
+				'mcp-unhealthy': '{{servers}}';
+				'mcp-unlistable': 'MCP servers could not be listed because the runtime did not report them.';
+				'pi-agent-directory-resolved': '{{path}} ({{source}}).';
+				'pi-agent-directory-unverified': "{{provider}}'s agent directory could not be verified.";
+				'pi-executable-resolved': '{{path}} ({{source}}).';
+				'pi-executable-undiscovered': '{{provider}} could not be discovered. Install it or select a compatible executable.';
+				'pi-models-ready': '{{modelCount}} models across {{providerCount}} providers.';
+				'pi-models-unverified': 'Provider and model readiness could not be verified.';
+				'pi-rpc-invalid': '{{provider}} RPC startup did not produce valid JSONL.';
+				'pi-rpc-ready': 'Startup produced a valid {{frameType}} frame.';
+				'version-command-failed': '{{command}} --version failed: {{message}}';
+				'version-command-failed-unknown': '{{command}} --version failed for an unknown reason.';
+			};
 			executable: {
 				description: 'Override the discovered {{command}} binary with a custom one. Leave empty to use the executable found on PATH (recommended).';
 				label: '{{provider}} executable path';
 				'not-found': 'Not found';
 				resolved: 'Resolved executable';
-				source: 'source: {{source}}';
 				'use-discovered': 'Use discovered {{command}}';
 			};
 			'executable-source': {
@@ -1364,6 +1546,7 @@ export default interface Resources {
 				'branch-rename-title': 'Branch rename preferences';
 				'code-review-description': 'Add custom instructions sent to the agent when you click the Review button.';
 				'code-review-title': 'Code review preferences';
+				'committed-note': 'The committed <file>[prompts]</file> block in <file>.ensemblr/settings.toml</file> supplies the team-shared text. A personal preference typed here wins over it for you only, and clearing one falls back to the shared text.';
 				'create-pr-description': 'Add custom instructions sent to the agent when you click the Create PR button.';
 				'create-pr-title': 'Create PR preferences';
 				description: 'Configure action-specific behavior and instructions for this repository.';
@@ -1375,6 +1558,7 @@ export default interface Resources {
 				'remove-aria-label': 'Remove {{name}}';
 				'resolve-conflicts-description': 'Add custom instructions sent to the agent when you click the Resolve conflicts button.';
 				'resolve-conflicts-title': 'Resolve conflicts preferences';
+				'source-personal': 'source: personal (this device)';
 				title: 'Actions';
 			};
 			'archive-on-merge': {
@@ -1419,19 +1603,18 @@ export default interface Resources {
 			};
 			'not-found': 'Repository <id>{{repoId}}</id> not found.';
 			'preview-urls': {
-				add: '+ Add preview URL';
+				add: 'Add preview URL';
+				'delete-aria-label': 'Delete preview URL';
 				description: 'Overrides the terminal panel’s Open button URL. Add more than one to switch between them from the Open button dropdown; the first is opened by default and the rest appear in the dropdown in order. Supports `$ENSEMBLR_WORKSPACE_NAME` and `$ENSEMBLR_PORT`. Leave blank to auto-detect from output logs.';
 				label: 'Preview URLs';
 				'name-aria-label': 'Preview URL name';
 				'name-placeholder': 'Name';
 				'template-aria-label': 'Preview URL template';
 			};
-			'remote-origin': {
-				description: 'Where Ensemblr pushes, pulls, and opens PRs. Read-only for now — runtime honors the git "origin" remote; a configurable remote is planned.';
-				label: 'Remote origin';
-			};
 			remove: {
 				description: 'Removes the repository from Ensemblr. The on-disk directory at<path>{{path}}</path>is not deleted; delete it manually if you want it gone.';
+				'row-description': 'Drops this repository from Ensemblr. Workspaces stop being tracked; nothing on disk is deleted.';
+				'row-label': 'Remove repository';
 				title: 'Remove this repository?';
 				trigger: 'Remove repository';
 			};
@@ -1450,17 +1633,27 @@ export default interface Resources {
 			scripts: {
 				description: 'Commands that run when workspaces are set up, run, or archived. Saved to the repository’s committed .ensemblr/settings.toml.';
 				diverges: 'The workspace you have open commits different scripts on its branch, and runs those. Merge this file to change what it runs.';
+				loading: 'Reading scripts…';
 				title: 'Scripts';
+			};
+			security: {
+				'committed-note': 'A committed <file>.ensemblr/settings.toml</file> value shared with the team still wins over this personal override — a repository can raise its own floor and you cannot lower it locally.';
+				description: 'How much an agent may do on its own in this repository. Applies to every workspace of the repo, and to the tools agents reach over the control server.';
+				'permission-mode': {
+					'approval-required': 'Approval required';
+					'approval-required-description': 'Every write, command, and app-control action asks you first.';
+					label: 'Agent permission mode';
+					'read-only': 'Read only';
+					'read-only-description': 'Agents may read the workspace but cannot write, run commands, or drive the app.';
+					'workspace-trusted': 'Workspace trusted';
+					'workspace-trusted-description': 'Agents act freely inside the workspace; anything outside it still asks.';
+				};
+				title: 'Security';
 			};
 			'setup-script': {
 				description: 'Runs when a new workspace is created.';
 				label: 'Setup script';
 				placeholder: 'e.g. npm ci';
-			};
-			spotlight: {
-				'coming-soon': 'Coming soon';
-				description: 'Replace Run with Spotlight for this repository so workspace changes are tested in the repository root. Spotlight is a separate feature still in development (workspace→root diff/apply with rollback); see docs/product/discovery-spotlight-testing.md.';
-				label: 'Use spotlight testing';
 			};
 			'workspaces-path': {
 				description: 'Do not move or delete the workspace subdirectories. Instead, archive workspaces in Ensemblr.';
@@ -1472,8 +1665,10 @@ export default interface Resources {
 			empty: 'No repository selected.';
 			environment: 'Environment';
 			git: 'Git';
+			group: 'Repository';
 			misc: 'Misc';
 			scripts: 'Scripts';
+			security: 'Security';
 		};
 		'run-scripts': {
 			description: "Shortcuts for quick actions, like running your dev server or test suite. Use <port>$ENSEMBLR_PORT</port> for the workspace's allocated port.";
@@ -1487,7 +1682,8 @@ export default interface Resources {
 				'edit-title': 'Edit run script';
 				name: 'Name';
 			};
-			empty: 'No run scripts yet. Add one to get started.';
+			empty: 'No run scripts yet';
+			'empty-description': 'Add one and it shows up in the terminal panel’s Run menu.';
 			'icon-picker': {
 				'no-matches': 'No icons match “{{query}}”.';
 				search: 'Search icons';
@@ -1500,6 +1696,54 @@ export default interface Resources {
 				unavailable: 'Not available locally';
 			};
 			title: 'Run scripts';
+		};
+		shortcuts: {
+			count_one: '{{count}} shortcut';
+			count_other: '{{count}} shortcuts';
+			description: 'Every keyboard shortcut Ensemblr binds, grouped by where it is active. Read-only — shortcuts are not rebindable yet.';
+			name: {
+				'agents-open': 'Launch coding agent';
+				'autocomplete-confirm': 'Confirm autocomplete selection';
+				'autocomplete-dismiss': 'Close autocomplete popover';
+				'autocomplete-next': 'Next autocomplete entry';
+				'autocomplete-prev': 'Previous autocomplete entry';
+				'changes-uncommitted': 'Show uncommitted changes';
+				'composer-cycle-thinking': 'Cycle thinking level';
+				'composer-focus': 'Focus composer';
+				'composer-newline': 'Insert newline in composer';
+				'composer-queue': 'Queue message as a follow-up';
+				'composer-remove-last-mention': 'Remove last mention attachment';
+				'composer-submit': 'Send message';
+				'composer-submit-with-mod': 'Send message';
+				'composer-toggle-model-picker': 'Toggle model picker';
+				'composer-toggle-plan-mode': 'Toggle plan mode';
+				'dialog-submit': 'Submit dialog form';
+				'diff-comment-submit': 'Submit diff comment';
+				'files-search': 'Open file search';
+				'model-picker-select-by-index': 'Select model by index (1-9)';
+				'palette-open': 'Open command palette';
+				'question-submit': 'Submit answers to an agent question';
+				'run-start': 'Start or stop run script';
+				'settings-open': 'Open settings';
+				'sidebar-toggle': 'Toggle sidebar';
+				'tab-close': 'Close tab';
+				'tab-keep-open': 'Keep preview tab open';
+				'tab-new': 'New chat tab';
+				'tab-next': 'Next tab';
+				'tab-prev': 'Previous tab';
+				'tab-select-by-index': 'Select tab by index (⌘1–8, ⌘9 last)';
+				'tool-calls-toggle-collapse': 'Expand or collapse all tool calls';
+				'workspace-new': 'New workspace';
+			};
+			scope: {
+				autocomplete: 'Autocomplete';
+				composer: 'Composer';
+				dialog: 'Dialogs';
+				global: 'Global';
+				menu: 'Menus';
+				'model-picker': 'Model picker';
+			};
+			title: 'Shortcuts';
 		};
 		'source-badge': {
 			'built-in-default': 'default';
@@ -1645,7 +1889,6 @@ export default interface Resources {
 			'group-settings': 'Settings';
 			label: 'Command palette';
 			placeholder: 'Search commands…';
-			'settings-advanced': 'Settings · Advanced';
 			'settings-appearance': 'Settings · Appearance';
 			'settings-diagnostics': 'Settings · Diagnostics';
 			'settings-environment': 'Settings · Environment';
@@ -1655,6 +1898,7 @@ export default interface Resources {
 			'settings-integrations': 'Settings · Integrations';
 			'settings-models': 'Settings · Models';
 			'settings-providers': 'Settings · Providers';
+			'settings-shortcuts': 'Settings · Shortcuts';
 			'theme-dark': 'Theme · Dark';
 			'theme-light': 'Theme · Light';
 			'theme-system': 'Theme · System';

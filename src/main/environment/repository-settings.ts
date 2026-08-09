@@ -16,7 +16,8 @@ interface UpsertRepositorySettingsInput {
  * Persists a repository's personal settings patch as repository-scoped SQLite
  * rows the settings resolver reads verbatim (`branchFrom`, `remoteOrigin`,
  * `deleteLocalBranchOnArchive`, `archiveAfterMerge`, `filesToCopy`,
- * `previewUrls`). An omitted field is left untouched; an explicit `null` (or a
+ * `previewUrls`, `security.permissionMode`). An omitted field is left
+ * untouched; an explicit `null` (or a
  * blank string / empty list) deletes its row so the value falls back to
  * `.ensemblr/settings.toml`, user defaults, then the built-in default. All rows
  * are written in a single transaction so a mid-sequence failure rolls back
@@ -66,6 +67,12 @@ export function upsertRepositorySettings({
 			key: 'previewUrls',
 			scope,
 			value: settings.previewUrls,
+		});
+		setStringSetting({
+			database,
+			key: 'security.permissionMode',
+			scope,
+			value: settings.permissionMode,
 		});
 	});
 }

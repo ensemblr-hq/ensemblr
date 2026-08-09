@@ -2,20 +2,22 @@ import { Link, useRouterState } from '@tanstack/react-router';
 import type { TFunction } from 'i18next';
 import type { LucideIcon } from 'lucide-react';
 import {
-	BeakerIcon,
 	BoxIcon,
 	BrushIcon,
 	CableIcon,
 	FlaskConicalIcon,
 	GitBranchIcon,
 	HeartPulseIcon,
+	KeyboardIcon,
 	KeyRoundIcon,
 	PlugZapIcon,
 	PuzzleIcon,
 	ScrollIcon,
+	ShieldIcon,
 	SlidersHorizontalIcon,
 	TerminalIcon,
 } from 'lucide-react';
+import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { cn } from '@/renderer/lib/utils';
@@ -98,17 +100,17 @@ function userNav(t: TFunction): UserNavItem[] {
 		},
 		{
 			group: 'more',
+			icon: KeyboardIcon,
+			kind: 'user',
+			label: t('settings:nav.shortcuts', 'Shortcuts'),
+			to: '/settings/shortcuts',
+		},
+		{
+			group: 'more',
 			icon: FlaskConicalIcon,
 			kind: 'user',
 			label: t('settings:nav.experimental', 'Experimental'),
 			to: '/settings/experimental',
-		},
-		{
-			group: 'more',
-			icon: BeakerIcon,
-			kind: 'user',
-			label: t('settings:nav.advanced', 'Advanced'),
-			to: '/settings/advanced',
 		},
 	];
 }
@@ -145,6 +147,12 @@ function repoNav(t: TFunction): RepoNavItem[] {
 			section: 'actions',
 		},
 		{
+			icon: ShieldIcon,
+			kind: 'repo',
+			label: t('settings:repo-nav.security', 'Security'),
+			section: 'security',
+		},
+		{
 			icon: ScrollIcon,
 			kind: 'repo',
 			label: t('settings:repo-nav.misc', 'Misc'),
@@ -159,6 +167,7 @@ const REPO_SECTION_TARGETS = {
 	git: '/settings/repo/$repoId/git',
 	misc: '/settings/repo/$repoId/misc',
 	scripts: '/settings/repo/$repoId/scripts',
+	security: '/settings/repo/$repoId/security',
 } as const;
 
 /** Section id for the per-repo settings sub-nav. Derived from the route map. */
@@ -177,7 +186,7 @@ export function SettingsSidebar({
 	return (
 		<nav
 			aria-label={t('settings:nav.aria-label', 'Settings sections')}
-			className='flex h-full w-56 shrink-0 flex-col gap-4 border-r bg-sidebar/60 px-2 py-3'
+			className='flex h-full w-56 shrink-0 flex-col gap-5 overflow-y-auto border-r bg-sidebar/60 px-2 py-4'
 		>
 			{scope === 'user' ? <UserNav /> : <RepoNav activeRepoId={activeRepoId} />}
 		</nav>
@@ -192,21 +201,20 @@ function UserNav() {
 	const more = items.filter((item) => item.group === 'more');
 	return (
 		<>
-			<ul className='flex flex-col gap-0.5'>
+			<NavGroup label={t('settings:nav.app', 'Application')}>
 				{main.map((item) => (
 					<li key={item.to}>
 						<UserNavLink item={item} />
 					</li>
 				))}
-			</ul>
-			<NavGroupLabel>{t('settings:nav.more', 'More')}</NavGroupLabel>
-			<ul className='flex flex-col gap-0.5'>
+			</NavGroup>
+			<NavGroup label={t('settings:nav.more', 'More')}>
 				{more.map((item) => (
 					<li key={item.to}>
 						<UserNavLink item={item} />
 					</li>
 				))}
-			</ul>
+			</NavGroup>
 		</>
 	);
 }
@@ -223,21 +231,24 @@ function RepoNav({ activeRepoId }: { activeRepoId: string | null }) {
 		);
 	}
 	return (
-		<ul className='flex flex-col gap-0.5'>
+		<NavGroup label={t('settings:repo-nav.group', 'Repository')}>
 			{repoNav(t).map((item) => (
 				<li key={item.section}>
 					<RepoNavLink item={item} repoId={activeRepoId} />
 				</li>
 			))}
-		</ul>
+		</NavGroup>
 	);
 }
 
-/** Renders a small uppercase label heading a settings nav group. */
-function NavGroupLabel({ children }: { children: string }) {
+/** A labelled block of settings nav links. */
+function NavGroup({ children, label }: { children: ReactNode; label: string }) {
 	return (
-		<div className='px-2 pt-1 font-medium text-[0.6875rem] text-muted-foreground uppercase tracking-wide'>
-			{children}
+		<div className='flex flex-col gap-1'>
+			<div className='px-2 font-medium text-muted-foreground text-xxs uppercase tracking-widest'>
+				{label}
+			</div>
+			<ul className='flex flex-col gap-0.5'>{children}</ul>
 		</div>
 	);
 }
@@ -250,7 +261,7 @@ function UserNavLink({ item }: { item: UserNavItem }) {
 
 	return (
 		<Link className={navLinkClass(isActive)} preload='intent' to={item.to}>
-			<Icon aria-hidden='true' className='size-4 text-muted-foreground' />
+			<Icon aria-hidden='true' className='size-4 shrink-0 opacity-70' />
 			<span className='truncate' title={item.label}>
 				{item.label}
 			</span>
@@ -272,7 +283,7 @@ function RepoNavLink({ item, repoId }: { item: RepoNavItem; repoId: string }) {
 			preload='intent'
 			to={target}
 		>
-			<Icon aria-hidden='true' className='size-4 text-muted-foreground' />
+			<Icon aria-hidden='true' className='size-4 shrink-0 opacity-70' />
 			<span className='truncate' title={item.label}>
 				{item.label}
 			</span>

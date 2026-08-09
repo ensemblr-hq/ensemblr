@@ -1,3 +1,5 @@
+import type { PermissionMode } from '../../permissions.ts';
+
 /** A named preview URL surfaced in the workspace preview picker. */
 export interface RepositoryPreviewUrl {
 	name: string;
@@ -17,6 +19,8 @@ export interface RepositorySettingsPatch {
 	branchFrom?: string | null;
 	deleteLocalBranchOnArchive?: boolean | null;
 	filesToCopy?: string[] | null;
+	/** Stored under the resolver's `security.permissionMode` key. */
+	permissionMode?: PermissionMode | null;
 	previewUrls?: RepositoryPreviewUrl[] | null;
 	remoteOrigin?: string | null;
 }

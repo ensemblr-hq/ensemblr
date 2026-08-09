@@ -45,7 +45,7 @@ export function SourceBadge({
 
 	if (!source) {
 		return (
-			<Badge className='text-[0.625rem]' variant='outline'>
+			<Badge className='font-normal text-xxs' variant='outline'>
 				{t('settings:source-badge.unset', 'not set')}
 			</Badge>
 		);

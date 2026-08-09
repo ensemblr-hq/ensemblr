@@ -21,18 +21,22 @@ export function SettingsSection({
 }: SettingsSectionProps) {
 	return (
 		<section className={cn('mx-auto w-full max-w-3xl px-8 py-10', className)}>
-			<header className='flex items-start justify-between gap-4 pb-2'>
-				<div className='min-w-0 flex-1'>
-					<h1 className='font-semibold text-2xl tracking-normal'>{title}</h1>
+			<header className='flex items-start justify-between gap-4 pb-6'>
+				<div className='min-w-0 flex-1 space-y-1.5'>
+					<h1 className='text-balance font-semibold text-2xl text-foreground tracking-tight'>
+						{title}
+					</h1>
 					{description ? (
-						<p className='mt-1 text-muted-foreground text-sm leading-6'>
+						<p className='max-w-prose text-pretty text-muted-foreground text-sm leading-6'>
 							{description}
 						</p>
 					) : null}
 				</div>
 				{action ? <div className='shrink-0'>{action}</div> : null}
 			</header>
-			<div className='divide-y divide-border'>{children}</div>
+			<div className='divide-y divide-border border-border border-t'>
+				{children}
+			</div>
 		</section>
 	);
 }

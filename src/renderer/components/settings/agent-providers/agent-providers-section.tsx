@@ -8,6 +8,7 @@ import {
 	ensemblrQueryKeys,
 	selectAgentProviderExecutable,
 } from '@/renderer/api/ensemblr';
+import { AgentProviderLogo } from '@/renderer/components/agent-provider-brand';
 import { ProviderTabPanel } from '@/renderer/components/settings/agent-providers/provider-tab-panel';
 import { SettingsSection } from '@/renderer/components/settings/settings-section';
 import { Button } from '@/renderer/components/ui/button';
@@ -97,6 +98,7 @@ export function AgentProvidersSection() {
 			title={t('settings:providers.title', 'Providers')}
 		>
 			<Tabs
+				className='pt-4'
 				onValueChange={(next) => setActiveProvider(next as AgentProviderId)}
 				value={activeProvider}
 			>
@@ -109,6 +111,10 @@ export function AgentProvidersSection() {
 				>
 					{descriptors.map((descriptor) => (
 						<TabsTrigger key={descriptor.id} value={descriptor.id}>
+							<AgentProviderLogo
+								className='size-3.5'
+								provider={descriptor.id}
+							/>
 							{descriptor.label}
 						</TabsTrigger>
 					))}

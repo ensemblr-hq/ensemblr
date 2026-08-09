@@ -3,6 +3,7 @@ export type {
 	SetupCheckProviderContext,
 } from './setup-check-context';
 export {
+	commandLog,
 	createCommandLogs,
 	createSetupCheckSnapshot,
 } from './setup-check-context';

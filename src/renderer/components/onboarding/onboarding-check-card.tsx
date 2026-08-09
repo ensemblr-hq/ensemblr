@@ -14,6 +14,10 @@ import { useTranslation } from 'react-i18next';
 
 import { StatusBadge } from '@/renderer/components/status-badge';
 import { Button } from '@/renderer/components/ui/button';
+import {
+	setupCheckDetail,
+	setupRemediationLabel,
+} from '@/renderer/lib/setup-check-text';
 import { cn } from '@/renderer/lib/utils';
 import type {
 	OnboardingCheckModel,
@@ -211,7 +215,7 @@ export function OnboardingCheckCard({
 					</div>
 					{isProbing ? (
 						<>
-							<span className='sr-only'>{check.detail}</span>
+							<span className='sr-only'>{setupCheckDetail(check, t)}</span>
 							<span
 								aria-hidden='true'
 								className='h-3 w-3/5 animate-pulse rounded-full bg-muted'
@@ -219,7 +223,7 @@ export function OnboardingCheckCard({
 						</>
 					) : (
 						<p className='text-muted-foreground text-xs leading-5'>
-							{check.detail}
+							{setupCheckDetail(check, t)}
 						</p>
 					)}
 				</div>
@@ -248,7 +252,7 @@ export function OnboardingCheckCard({
 								<span className='truncate'>
 									{copied
 										? t('common:actions.copied', 'Copied')
-										: remediation.label}
+										: setupRemediationLabel(remediation, t)}
 								</span>
 							</Button>
 						);

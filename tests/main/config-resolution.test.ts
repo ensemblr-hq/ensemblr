@@ -53,6 +53,7 @@ function makeUserExperimental(
 ): ExperimentalSettings {
 	return {
 		autoRunAfterSetup: false,
+		developerMode: false,
 		...overrides,
 	};
 }

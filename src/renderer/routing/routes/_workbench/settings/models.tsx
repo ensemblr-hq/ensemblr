@@ -7,6 +7,10 @@ import { useTranslation } from 'react-i18next';
 import { agentModelsQuery } from '@/renderer/api/ensemblr';
 import { ModelVisibilityList } from '@/renderer/components/settings/model-visibility-list';
 import { SettingRow } from '@/renderer/components/settings/setting-row';
+import {
+	SettingsErrorState,
+	SettingsLoadingState,
+} from '@/renderer/components/settings/settings-async-state';
 import { SettingsSection } from '@/renderer/components/settings/settings-section';
 import {
 	Select,
@@ -15,7 +19,6 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from '@/renderer/components/ui/select';
-import { Spinner } from '@/renderer/components/ui/spinner';
 import { thinkingLevelLabel } from '@/renderer/lib/workbench/thinking-labels';
 import {
 	defaultChatModelAtom,
@@ -104,20 +107,19 @@ function ModelsSettings() {
 			title={t('settings:models.title', 'Models')}
 		>
 			{modelsLoading ? (
-				<div className='flex items-center gap-2 py-6 text-muted-foreground text-sm'>
-					<Spinner className='size-4' />{' '}
-					{t('settings:models.loading', 'Loading models…')}
-				</div>
+				<SettingsLoadingState
+					label={t('settings:models.loading', 'Loading models…')}
+				/>
 			) : null}
 
 			{modelsError ? (
-				<div className='py-6 text-sm text-status-danger'>
-					{t(
+				<SettingsErrorState
+					message={t(
 						'settings:models.discovery-failed',
 						'Model discovery failed: {{error}}.',
 						{ error: String(modelsError) },
 					)}
-				</div>
+				/>
 			) : null}
 
 			<SettingRow

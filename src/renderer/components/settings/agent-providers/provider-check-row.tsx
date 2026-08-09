@@ -13,7 +13,13 @@ import { DiagnosticsLogCollapsible } from '@/renderer/components/diagnostics-log
 import { CopyCommandButton } from '@/renderer/components/settings/agent-providers/copy-command-button';
 import { StatusBadge } from '@/renderer/components/status-badge';
 import { Button } from '@/renderer/components/ui/button';
+import {
+	providerCheckDetail,
+	providerCheckLabel,
+} from '@/renderer/lib/provider-check-text';
+import { setupRemediationLabel } from '@/renderer/lib/setup-check-text';
 import { cn } from '@/renderer/lib/utils';
+import type { AgentProviderId } from '@/shared/agent-provider';
 import type { AgentProviderCheckWire } from '@/shared/ipc/contracts/agent-provider';
 import type {
 	SetupRemediationAction,
@@ -61,13 +67,16 @@ const CONTENT_INDENT = 'pl-6.5';
 export function ProviderCheckRow({
 	check,
 	onRemediation,
+	provider,
 }: {
 	check: AgentProviderCheckWire;
 	onRemediation: (action: SetupRemediationAction) => void;
+	provider: AgentProviderId;
 }) {
 	const { t } = useTranslation();
 	const Icon = CHECK_STATUS_ICON[check.status];
 	const logs = check.logs ?? [];
+	const detail = providerCheckDetail(check, t);
 	const statusLabels: Record<CheckStatus, string> = {
 		failure: t('settings:providers.check-status.failure', 'Failed'),
 		success: t('settings:providers.check-status.success', 'Ready'),
@@ -86,10 +95,12 @@ export function ProviderCheckRow({
 						)}
 					/>
 					<div className='min-w-0 space-y-0.5'>
-						<p className='font-medium text-sm leading-snug'>{check.label}</p>
-						{check.detail ? (
+						<p className='font-medium text-sm leading-snug'>
+							{providerCheckLabel(check, provider, t)}
+						</p>
+						{detail ? (
 							<p className='wrap-break-word text-muted-foreground text-xs leading-5'>
-								{check.detail}
+								{detail}
 							</p>
 						) : null}
 					</div>
@@ -130,9 +141,12 @@ function RemediationButton({
 	action: SetupRemediationAction;
 	onRemediation: (action: SetupRemediationAction) => void;
 }) {
+	const { t } = useTranslation();
+	const label = setupRemediationLabel(action, t);
+
 	if (action.kind === 'run-command') {
 		return action.command ? (
-			<CopyCommandButton command={action.command} label={action.label} />
+			<CopyCommandButton command={action.command} label={label} />
 		) : null;
 	}
 
@@ -147,7 +161,7 @@ function RemediationButton({
 			variant='outline'
 		>
 			<Icon aria-hidden='true' data-icon='inline-start' />
-			{action.label}
+			{label}
 		</Button>
 	);
 }

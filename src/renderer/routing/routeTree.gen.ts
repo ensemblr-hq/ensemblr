@@ -16,6 +16,7 @@ import { Route as WorkbenchSettingsRouteImport } from './routes/_workbench/setti
 import { Route as WorkbenchShellRouteImport } from './routes/_workbench/_shell'
 import { Route as WorkbenchSettingsIndexRouteImport } from './routes/_workbench/settings/index'
 import { Route as WorkbenchShellIndexRouteImport } from './routes/_workbench/_shell/index'
+import { Route as WorkbenchSettingsShortcutsRouteImport } from './routes/_workbench/settings/shortcuts'
 import { Route as WorkbenchSettingsProvidersRouteImport } from './routes/_workbench/settings/providers'
 import { Route as WorkbenchSettingsModelsRouteImport } from './routes/_workbench/settings/models'
 import { Route as WorkbenchSettingsIntegrationsRouteImport } from './routes/_workbench/settings/integrations'
@@ -25,7 +26,6 @@ import { Route as WorkbenchSettingsExperimentalRouteImport } from './routes/_wor
 import { Route as WorkbenchSettingsEnvironmentRouteImport } from './routes/_workbench/settings/environment'
 import { Route as WorkbenchSettingsDiagnosticsRouteImport } from './routes/_workbench/settings/diagnostics'
 import { Route as WorkbenchSettingsAppearanceRouteImport } from './routes/_workbench/settings/appearance'
-import { Route as WorkbenchSettingsAdvancedRouteImport } from './routes/_workbench/settings/advanced'
 import { Route as WorkbenchShellHistoryRouteImport } from './routes/_workbench/_shell/history'
 import { Route as WorkbenchShellDashboardRouteImport } from './routes/_workbench/_shell/dashboard'
 import { Route as WorkbenchSettingsRepoIndexRouteImport } from './routes/_workbench/settings/repo/index'
@@ -34,6 +34,7 @@ import { Route as WorkbenchSettingsRepoRepoIdRouteImport } from './routes/_workb
 import { Route as WorkbenchShellLinearIssueIdRouteImport } from './routes/_workbench/_shell/linear/$issueId'
 import { Route as WorkbenchShellProjectsProjectIdRouteRouteImport } from './routes/_workbench/_shell/projects/$projectId/route'
 import { Route as WorkbenchSettingsRepoRepoIdIndexRouteImport } from './routes/_workbench/settings/repo/$repoId/index'
+import { Route as WorkbenchSettingsRepoRepoIdSecurityRouteImport } from './routes/_workbench/settings/repo/$repoId/security'
 import { Route as WorkbenchSettingsRepoRepoIdScriptsRouteImport } from './routes/_workbench/settings/repo/$repoId/scripts'
 import { Route as WorkbenchSettingsRepoRepoIdMiscRouteImport } from './routes/_workbench/settings/repo/$repoId/misc'
 import { Route as WorkbenchSettingsRepoRepoIdGitRouteImport } from './routes/_workbench/settings/repo/$repoId/git'
@@ -76,6 +77,12 @@ const WorkbenchShellIndexRoute = WorkbenchShellIndexRouteImport.update({
   path: '/',
   getParentRoute: () => WorkbenchShellRoute,
 } as any)
+const WorkbenchSettingsShortcutsRoute =
+  WorkbenchSettingsShortcutsRouteImport.update({
+    id: '/shortcuts',
+    path: '/shortcuts',
+    getParentRoute: () => WorkbenchSettingsRoute,
+  } as any)
 const WorkbenchSettingsProvidersRoute =
   WorkbenchSettingsProvidersRouteImport.update({
     id: '/providers',
@@ -128,12 +135,6 @@ const WorkbenchSettingsAppearanceRoute =
     path: '/appearance',
     getParentRoute: () => WorkbenchSettingsRoute,
   } as any)
-const WorkbenchSettingsAdvancedRoute =
-  WorkbenchSettingsAdvancedRouteImport.update({
-    id: '/advanced',
-    path: '/advanced',
-    getParentRoute: () => WorkbenchSettingsRoute,
-  } as any)
 const WorkbenchShellHistoryRoute = WorkbenchShellHistoryRouteImport.update({
   id: '/history',
   path: '/history',
@@ -178,6 +179,12 @@ const WorkbenchSettingsRepoRepoIdIndexRoute =
   WorkbenchSettingsRepoRepoIdIndexRouteImport.update({
     id: '/',
     path: '/',
+    getParentRoute: () => WorkbenchSettingsRepoRepoIdRoute,
+  } as any)
+const WorkbenchSettingsRepoRepoIdSecurityRoute =
+  WorkbenchSettingsRepoRepoIdSecurityRouteImport.update({
+    id: '/security',
+    path: '/security',
     getParentRoute: () => WorkbenchSettingsRepoRepoIdRoute,
   } as any)
 const WorkbenchSettingsRepoRepoIdScriptsRoute =
@@ -240,7 +247,6 @@ export interface FileRoutesByFullPath {
   '/debug/pi-replay': typeof DebugPiReplayRoute
   '/dashboard': typeof WorkbenchShellDashboardRoute
   '/history': typeof WorkbenchShellHistoryRoute
-  '/settings/advanced': typeof WorkbenchSettingsAdvancedRoute
   '/settings/appearance': typeof WorkbenchSettingsAppearanceRoute
   '/settings/diagnostics': typeof WorkbenchSettingsDiagnosticsRoute
   '/settings/environment': typeof WorkbenchSettingsEnvironmentRoute
@@ -250,6 +256,7 @@ export interface FileRoutesByFullPath {
   '/settings/integrations': typeof WorkbenchSettingsIntegrationsRoute
   '/settings/models': typeof WorkbenchSettingsModelsRoute
   '/settings/providers': typeof WorkbenchSettingsProvidersRoute
+  '/settings/shortcuts': typeof WorkbenchSettingsShortcutsRoute
   '/settings/': typeof WorkbenchSettingsIndexRoute
   '/projects/$projectId': typeof WorkbenchShellProjectsProjectIdRouteRouteWithChildren
   '/linear/$issueId': typeof WorkbenchShellLinearIssueIdRoute
@@ -261,6 +268,7 @@ export interface FileRoutesByFullPath {
   '/settings/repo/$repoId/git': typeof WorkbenchSettingsRepoRepoIdGitRoute
   '/settings/repo/$repoId/misc': typeof WorkbenchSettingsRepoRepoIdMiscRoute
   '/settings/repo/$repoId/scripts': typeof WorkbenchSettingsRepoRepoIdScriptsRoute
+  '/settings/repo/$repoId/security': typeof WorkbenchSettingsRepoRepoIdSecurityRoute
   '/settings/repo/$repoId/': typeof WorkbenchSettingsRepoRepoIdIndexRoute
   '/projects/$projectId/workspaces/$workspaceId': typeof WorkbenchShellProjectsProjectIdWorkspacesWorkspaceIdRouteRouteWithChildren
   '/projects/$projectId/workspaces/$workspaceId/': typeof WorkbenchShellProjectsProjectIdWorkspacesWorkspaceIdIndexRoute
@@ -272,7 +280,6 @@ export interface FileRoutesByTo {
   '/debug/pi-replay': typeof DebugPiReplayRoute
   '/dashboard': typeof WorkbenchShellDashboardRoute
   '/history': typeof WorkbenchShellHistoryRoute
-  '/settings/advanced': typeof WorkbenchSettingsAdvancedRoute
   '/settings/appearance': typeof WorkbenchSettingsAppearanceRoute
   '/settings/diagnostics': typeof WorkbenchSettingsDiagnosticsRoute
   '/settings/environment': typeof WorkbenchSettingsEnvironmentRoute
@@ -282,6 +289,7 @@ export interface FileRoutesByTo {
   '/settings/integrations': typeof WorkbenchSettingsIntegrationsRoute
   '/settings/models': typeof WorkbenchSettingsModelsRoute
   '/settings/providers': typeof WorkbenchSettingsProvidersRoute
+  '/settings/shortcuts': typeof WorkbenchSettingsShortcutsRoute
   '/settings': typeof WorkbenchSettingsIndexRoute
   '/projects/$projectId': typeof WorkbenchShellProjectsProjectIdRouteRouteWithChildren
   '/linear/$issueId': typeof WorkbenchShellLinearIssueIdRoute
@@ -292,6 +300,7 @@ export interface FileRoutesByTo {
   '/settings/repo/$repoId/git': typeof WorkbenchSettingsRepoRepoIdGitRoute
   '/settings/repo/$repoId/misc': typeof WorkbenchSettingsRepoRepoIdMiscRoute
   '/settings/repo/$repoId/scripts': typeof WorkbenchSettingsRepoRepoIdScriptsRoute
+  '/settings/repo/$repoId/security': typeof WorkbenchSettingsRepoRepoIdSecurityRoute
   '/settings/repo/$repoId': typeof WorkbenchSettingsRepoRepoIdIndexRoute
   '/projects/$projectId/workspaces/$workspaceId': typeof WorkbenchShellProjectsProjectIdWorkspacesWorkspaceIdIndexRoute
   '/projects/$projectId/workspaces/$workspaceId/chats/$chatId': typeof WorkbenchShellProjectsProjectIdWorkspacesWorkspaceIdChatsChatIdRoute
@@ -305,7 +314,6 @@ export interface FileRoutesById {
   '/debug/pi-replay': typeof DebugPiReplayRoute
   '/_workbench/_shell/dashboard': typeof WorkbenchShellDashboardRoute
   '/_workbench/_shell/history': typeof WorkbenchShellHistoryRoute
-  '/_workbench/settings/advanced': typeof WorkbenchSettingsAdvancedRoute
   '/_workbench/settings/appearance': typeof WorkbenchSettingsAppearanceRoute
   '/_workbench/settings/diagnostics': typeof WorkbenchSettingsDiagnosticsRoute
   '/_workbench/settings/environment': typeof WorkbenchSettingsEnvironmentRoute
@@ -315,6 +323,7 @@ export interface FileRoutesById {
   '/_workbench/settings/integrations': typeof WorkbenchSettingsIntegrationsRoute
   '/_workbench/settings/models': typeof WorkbenchSettingsModelsRoute
   '/_workbench/settings/providers': typeof WorkbenchSettingsProvidersRoute
+  '/_workbench/settings/shortcuts': typeof WorkbenchSettingsShortcutsRoute
   '/_workbench/_shell/': typeof WorkbenchShellIndexRoute
   '/_workbench/settings/': typeof WorkbenchSettingsIndexRoute
   '/_workbench/_shell/projects/$projectId': typeof WorkbenchShellProjectsProjectIdRouteRouteWithChildren
@@ -327,6 +336,7 @@ export interface FileRoutesById {
   '/_workbench/settings/repo/$repoId/git': typeof WorkbenchSettingsRepoRepoIdGitRoute
   '/_workbench/settings/repo/$repoId/misc': typeof WorkbenchSettingsRepoRepoIdMiscRoute
   '/_workbench/settings/repo/$repoId/scripts': typeof WorkbenchSettingsRepoRepoIdScriptsRoute
+  '/_workbench/settings/repo/$repoId/security': typeof WorkbenchSettingsRepoRepoIdSecurityRoute
   '/_workbench/settings/repo/$repoId/': typeof WorkbenchSettingsRepoRepoIdIndexRoute
   '/_workbench/_shell/projects/$projectId/workspaces/$workspaceId': typeof WorkbenchShellProjectsProjectIdWorkspacesWorkspaceIdRouteRouteWithChildren
   '/_workbench/_shell/projects/$projectId/workspaces/$workspaceId/': typeof WorkbenchShellProjectsProjectIdWorkspacesWorkspaceIdIndexRoute
@@ -341,7 +351,6 @@ export interface FileRouteTypes {
     | '/debug/pi-replay'
     | '/dashboard'
     | '/history'
-    | '/settings/advanced'
     | '/settings/appearance'
     | '/settings/diagnostics'
     | '/settings/environment'
@@ -351,6 +360,7 @@ export interface FileRouteTypes {
     | '/settings/integrations'
     | '/settings/models'
     | '/settings/providers'
+    | '/settings/shortcuts'
     | '/settings/'
     | '/projects/$projectId'
     | '/linear/$issueId'
@@ -362,6 +372,7 @@ export interface FileRouteTypes {
     | '/settings/repo/$repoId/git'
     | '/settings/repo/$repoId/misc'
     | '/settings/repo/$repoId/scripts'
+    | '/settings/repo/$repoId/security'
     | '/settings/repo/$repoId/'
     | '/projects/$projectId/workspaces/$workspaceId'
     | '/projects/$projectId/workspaces/$workspaceId/'
@@ -373,7 +384,6 @@ export interface FileRouteTypes {
     | '/debug/pi-replay'
     | '/dashboard'
     | '/history'
-    | '/settings/advanced'
     | '/settings/appearance'
     | '/settings/diagnostics'
     | '/settings/environment'
@@ -383,6 +393,7 @@ export interface FileRouteTypes {
     | '/settings/integrations'
     | '/settings/models'
     | '/settings/providers'
+    | '/settings/shortcuts'
     | '/settings'
     | '/projects/$projectId'
     | '/linear/$issueId'
@@ -393,6 +404,7 @@ export interface FileRouteTypes {
     | '/settings/repo/$repoId/git'
     | '/settings/repo/$repoId/misc'
     | '/settings/repo/$repoId/scripts'
+    | '/settings/repo/$repoId/security'
     | '/settings/repo/$repoId'
     | '/projects/$projectId/workspaces/$workspaceId'
     | '/projects/$projectId/workspaces/$workspaceId/chats/$chatId'
@@ -405,7 +417,6 @@ export interface FileRouteTypes {
     | '/debug/pi-replay'
     | '/_workbench/_shell/dashboard'
     | '/_workbench/_shell/history'
-    | '/_workbench/settings/advanced'
     | '/_workbench/settings/appearance'
     | '/_workbench/settings/diagnostics'
     | '/_workbench/settings/environment'
@@ -415,6 +426,7 @@ export interface FileRouteTypes {
     | '/_workbench/settings/integrations'
     | '/_workbench/settings/models'
     | '/_workbench/settings/providers'
+    | '/_workbench/settings/shortcuts'
     | '/_workbench/_shell/'
     | '/_workbench/settings/'
     | '/_workbench/_shell/projects/$projectId'
@@ -427,6 +439,7 @@ export interface FileRouteTypes {
     | '/_workbench/settings/repo/$repoId/git'
     | '/_workbench/settings/repo/$repoId/misc'
     | '/_workbench/settings/repo/$repoId/scripts'
+    | '/_workbench/settings/repo/$repoId/security'
     | '/_workbench/settings/repo/$repoId/'
     | '/_workbench/_shell/projects/$projectId/workspaces/$workspaceId'
     | '/_workbench/_shell/projects/$projectId/workspaces/$workspaceId/'
@@ -489,6 +502,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/'
       preLoaderRoute: typeof WorkbenchShellIndexRouteImport
       parentRoute: typeof WorkbenchShellRoute
+    }
+    '/_workbench/settings/shortcuts': {
+      id: '/_workbench/settings/shortcuts'
+      path: '/shortcuts'
+      fullPath: '/settings/shortcuts'
+      preLoaderRoute: typeof WorkbenchSettingsShortcutsRouteImport
+      parentRoute: typeof WorkbenchSettingsRoute
     }
     '/_workbench/settings/providers': {
       id: '/_workbench/settings/providers'
@@ -553,13 +573,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof WorkbenchSettingsAppearanceRouteImport
       parentRoute: typeof WorkbenchSettingsRoute
     }
-    '/_workbench/settings/advanced': {
-      id: '/_workbench/settings/advanced'
-      path: '/advanced'
-      fullPath: '/settings/advanced'
-      preLoaderRoute: typeof WorkbenchSettingsAdvancedRouteImport
-      parentRoute: typeof WorkbenchSettingsRoute
-    }
     '/_workbench/_shell/history': {
       id: '/_workbench/_shell/history'
       path: '/history'
@@ -614,6 +627,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/settings/repo/$repoId/'
       preLoaderRoute: typeof WorkbenchSettingsRepoRepoIdIndexRouteImport
+      parentRoute: typeof WorkbenchSettingsRepoRepoIdRoute
+    }
+    '/_workbench/settings/repo/$repoId/security': {
+      id: '/_workbench/settings/repo/$repoId/security'
+      path: '/security'
+      fullPath: '/settings/repo/$repoId/security'
+      preLoaderRoute: typeof WorkbenchSettingsRepoRepoIdSecurityRouteImport
       parentRoute: typeof WorkbenchSettingsRepoRepoIdRoute
     }
     '/_workbench/settings/repo/$repoId/scripts': {
@@ -737,6 +757,7 @@ interface WorkbenchSettingsRepoRepoIdRouteChildren {
   WorkbenchSettingsRepoRepoIdGitRoute: typeof WorkbenchSettingsRepoRepoIdGitRoute
   WorkbenchSettingsRepoRepoIdMiscRoute: typeof WorkbenchSettingsRepoRepoIdMiscRoute
   WorkbenchSettingsRepoRepoIdScriptsRoute: typeof WorkbenchSettingsRepoRepoIdScriptsRoute
+  WorkbenchSettingsRepoRepoIdSecurityRoute: typeof WorkbenchSettingsRepoRepoIdSecurityRoute
   WorkbenchSettingsRepoRepoIdIndexRoute: typeof WorkbenchSettingsRepoRepoIdIndexRoute
 }
 
@@ -750,6 +771,8 @@ const WorkbenchSettingsRepoRepoIdRouteChildren: WorkbenchSettingsRepoRepoIdRoute
     WorkbenchSettingsRepoRepoIdMiscRoute: WorkbenchSettingsRepoRepoIdMiscRoute,
     WorkbenchSettingsRepoRepoIdScriptsRoute:
       WorkbenchSettingsRepoRepoIdScriptsRoute,
+    WorkbenchSettingsRepoRepoIdSecurityRoute:
+      WorkbenchSettingsRepoRepoIdSecurityRoute,
     WorkbenchSettingsRepoRepoIdIndexRoute:
       WorkbenchSettingsRepoRepoIdIndexRoute,
   }
@@ -760,7 +783,6 @@ const WorkbenchSettingsRepoRepoIdRouteWithChildren =
   )
 
 interface WorkbenchSettingsRouteChildren {
-  WorkbenchSettingsAdvancedRoute: typeof WorkbenchSettingsAdvancedRoute
   WorkbenchSettingsAppearanceRoute: typeof WorkbenchSettingsAppearanceRoute
   WorkbenchSettingsDiagnosticsRoute: typeof WorkbenchSettingsDiagnosticsRoute
   WorkbenchSettingsEnvironmentRoute: typeof WorkbenchSettingsEnvironmentRoute
@@ -770,13 +792,13 @@ interface WorkbenchSettingsRouteChildren {
   WorkbenchSettingsIntegrationsRoute: typeof WorkbenchSettingsIntegrationsRoute
   WorkbenchSettingsModelsRoute: typeof WorkbenchSettingsModelsRoute
   WorkbenchSettingsProvidersRoute: typeof WorkbenchSettingsProvidersRoute
+  WorkbenchSettingsShortcutsRoute: typeof WorkbenchSettingsShortcutsRoute
   WorkbenchSettingsIndexRoute: typeof WorkbenchSettingsIndexRoute
   WorkbenchSettingsRepoRepoIdRoute: typeof WorkbenchSettingsRepoRepoIdRouteWithChildren
   WorkbenchSettingsRepoIndexRoute: typeof WorkbenchSettingsRepoIndexRoute
 }
 
 const WorkbenchSettingsRouteChildren: WorkbenchSettingsRouteChildren = {
-  WorkbenchSettingsAdvancedRoute: WorkbenchSettingsAdvancedRoute,
   WorkbenchSettingsAppearanceRoute: WorkbenchSettingsAppearanceRoute,
   WorkbenchSettingsDiagnosticsRoute: WorkbenchSettingsDiagnosticsRoute,
   WorkbenchSettingsEnvironmentRoute: WorkbenchSettingsEnvironmentRoute,
@@ -786,6 +808,7 @@ const WorkbenchSettingsRouteChildren: WorkbenchSettingsRouteChildren = {
   WorkbenchSettingsIntegrationsRoute: WorkbenchSettingsIntegrationsRoute,
   WorkbenchSettingsModelsRoute: WorkbenchSettingsModelsRoute,
   WorkbenchSettingsProvidersRoute: WorkbenchSettingsProvidersRoute,
+  WorkbenchSettingsShortcutsRoute: WorkbenchSettingsShortcutsRoute,
   WorkbenchSettingsIndexRoute: WorkbenchSettingsIndexRoute,
   WorkbenchSettingsRepoRepoIdRoute:
     WorkbenchSettingsRepoRepoIdRouteWithChildren,

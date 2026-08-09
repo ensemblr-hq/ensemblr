@@ -43,7 +43,7 @@ export function DocumentedVariablesList({
 				</Button>
 			</CollapsibleTrigger>
 			<CollapsibleContent>
-				<ul className='mt-2 divide-y divide-border rounded-md border bg-card/40'>
+				<ul className='mt-2 divide-y divide-border overflow-hidden rounded-xl border border-border bg-card/40'>
 					{variables.map((variable) => (
 						<li
 							className='flex items-center gap-3 px-3 py-2.5 text-sm'

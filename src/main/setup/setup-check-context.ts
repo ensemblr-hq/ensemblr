@@ -4,6 +4,9 @@ import type {
 	SetupCheckLogSnapshot,
 	SetupCheckSnapshot,
 	SetupCheckStatus,
+	SetupDetailCode,
+	SetupDetailMessage,
+	SetupMessageParams,
 	SetupRemediationAction,
 } from '../../shared/ipc/contracts/setup';
 import type { LocalCommandResult } from '../commands/local-command';
@@ -26,6 +29,8 @@ export type SetupCheckProvider = (
 interface SetupCheckRunResult {
 	blocking?: boolean;
 	detail: string;
+	/** Omitted when `detail` passes an upstream message through untouched. */
+	detailMessage?: SetupDetailMessage;
 	logs?: SetupCheckLogSnapshot[];
 	remediationActions?: SetupRemediationAction[];
 	status: SetupCheckStatus;
@@ -47,7 +52,50 @@ interface DefineCheckOptions<TCtx extends SetupCheckProviderContext> {
 	run: (context: TCtx) => Promise<SetupCheckRunResult> | SetupCheckRunResult;
 	title: string;
 	/** Fallback detail used when `onError` does not supply one. */
-	unknownErrorDetail?: string;
+	unknownError?: LocalizedDetail;
+}
+
+/** An authored detail line: its catalogue code plus the English source text. */
+interface LocalizedDetail {
+	code: SetupDetailCode;
+	text: string;
+}
+
+/**
+ * Pairs an authored detail line with the code and values the renderer needs to
+ * render it in the app language. The English text stays on the snapshot because
+ * the support bundle records it verbatim.
+ * @param code - Catalogue code for the line.
+ * @param text - The English source, already interpolated.
+ * @param params - Values the catalogue entry interpolates.
+ * @returns The detail fields for a {@link SetupCheckRunResult}.
+ */
+export function authoredDetail(
+	code: SetupDetailCode,
+	text: string,
+	params?: SetupMessageParams,
+): { detail: string; detailMessage: SetupDetailMessage } {
+	return {
+		detail: text,
+		detailMessage: params ? { code, params } : { code },
+	};
+}
+
+/**
+ * Renders an unexpected check failure as a detail line. A thrown `Error` carries
+ * its own message, which is upstream text we surface verbatim rather than
+ * translate; anything else falls back to the check's own authored line.
+ * @param error - Whatever the check body threw.
+ * @param fallback - The authored line to use when the throw carries no message.
+ * @returns The detail fields for a {@link SetupCheckErrorResult}.
+ */
+export function unexpectedErrorDetail(
+	error: unknown,
+	fallback: LocalizedDetail,
+): { detail: string; detailMessage?: SetupDetailMessage } {
+	return error instanceof Error
+		? { detail: error.message }
+		: { detail: fallback.text, detailMessage: { code: fallback.code } };
 }
 
 /**
@@ -66,6 +114,9 @@ export function defineCheck<TCtx extends SetupCheckProviderContext>(
 				blocking: result.blocking ?? definition.blocking,
 				description: definition.description,
 				detail: result.detail,
+				...(result.detailMessage
+					? { detailMessage: result.detailMessage }
+					: {}),
 				group: definition.group,
 				id: definition.id,
 				logs: result.logs ?? [],
@@ -77,16 +128,25 @@ export function defineCheck<TCtx extends SetupCheckProviderContext>(
 				updatedAt: context.now().toISOString(),
 			});
 		} catch (error) {
-			const fallbackDetail =
-				error instanceof Error
-					? error.message
-					: (definition.unknownErrorDetail ?? 'Unknown check error.');
+			const fallback = unexpectedErrorDetail(
+				error,
+				definition.unknownError ?? {
+					code: 'unknown-check-error',
+					text: 'Unknown check error.',
+				},
+			);
 			const override = definition.onError?.(error, context) ?? {};
+			const detail = override.detail ?? fallback.detail;
+			const detailMessage =
+				override.detail === undefined
+					? fallback.detailMessage
+					: override.detailMessage;
 
 			return createSetupCheckSnapshot({
 				blocking: override.blocking ?? definition.blocking,
 				description: definition.description,
-				detail: override.detail ?? fallbackDetail,
+				detail,
+				...(detailMessage ? { detailMessage } : {}),
 				group: definition.group,
 				id: definition.id,
 				logs: override.logs ?? [],
@@ -151,16 +211,24 @@ export function appendCommandStreamLogs(
 	}
 }
 
+/**
+ * Builds the log entry naming the command a check ran.
+ * @param command - The command line, already safe to display.
+ * @returns The log entry, labelled for translation.
+ */
+export function commandLog(command: string): SetupCheckLogSnapshot {
+	return {
+		label: 'Command',
+		labelMessage: { code: 'command' },
+		text: command,
+	};
+}
+
 /** Renders a {@link LocalCommandResult} as a setup check log set. */
 export function createCommandLogs(
 	result: LocalCommandResult,
 ): SetupCheckLogSnapshot[] {
-	const logs: SetupCheckLogSnapshot[] = [
-		{
-			label: 'Command',
-			text: result.logs.command,
-		},
-	];
+	const logs: SetupCheckLogSnapshot[] = [commandLog(result.logs.command)];
 
 	appendCommandStreamLogs(logs, result);
 

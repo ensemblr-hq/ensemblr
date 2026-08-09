@@ -17,6 +17,11 @@ import { useTranslation } from 'react-i18next';
 import { DiagnosticsLogCollapsible } from '@/renderer/components/diagnostics-log-collapsible';
 import { StatusBadge } from '@/renderer/components/status-badge';
 import { Button } from '@/renderer/components/ui/button';
+import {
+	setupCheckDetail,
+	setupCheckTitle,
+	setupRemediationLabel,
+} from '@/renderer/lib/setup-check-text';
 import { cn } from '@/renderer/lib/utils';
 import type {
 	SetupCheckSnapshot,
@@ -136,7 +141,7 @@ export function SetupCheckRow({
 					/>
 					<div className='min-w-0 space-y-0.5'>
 						<p className='font-medium text-sm leading-snug'>
-							{check.title}
+							{setupCheckTitle(check.id, t)}
 							{check.blocking ? null : (
 								<span className='ml-2 font-normal text-muted-foreground text-xs'>
 									{t('common:setup-check.optional', 'Optional')}
@@ -144,7 +149,7 @@ export function SetupCheckRow({
 							)}
 						</p>
 						<p className='text-muted-foreground text-xs leading-5'>
-							{check.detail}
+							{setupCheckDetail(check, t)}
 						</p>
 					</div>
 				</div>
@@ -177,7 +182,9 @@ export function SetupCheckRow({
 								variant='outline'
 							>
 								<ActionIcon aria-hidden='true' data-icon='inline-start' />
-								{copied ? t('common:actions.copied', 'Copied') : action.label}
+								{copied
+									? t('common:actions.copied', 'Copied')
+									: setupRemediationLabel(action, t)}
 							</Button>
 						);
 					})}

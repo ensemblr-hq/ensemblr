@@ -24,10 +24,10 @@ export function TerminalScrollbackRow() {
 				<div className='flex items-center gap-2 text-xs'>
 					<Input
 						aria-label={t(
-							'settings:advanced.scrollback.aria-label',
+							'settings:appearance.scrollback.aria-label',
 							'Terminal scrollback limit in megabytes',
 						)}
-						className='h-8 w-20 text-right font-mono'
+						className='h-7 w-20 text-right font-mono text-xs'
 						max={200}
 						min={1}
 						onChange={(e) =>
@@ -42,11 +42,11 @@ export function TerminalScrollbackRow() {
 				</div>
 			}
 			description={t(
-				'settings:advanced.scrollback.description',
+				'settings:appearance.scrollback.description',
 				'Maximum size of each terminal pane scrollback buffer. Larger values keep more history at the cost of memory.',
 			)}
 			label={t(
-				'settings:advanced.scrollback.label',
+				'settings:appearance.scrollback.label',
 				'Terminal scrollback limit',
 			)}
 			modified={scrollbackMb !== DEFAULT_SCROLLBACK_MB}

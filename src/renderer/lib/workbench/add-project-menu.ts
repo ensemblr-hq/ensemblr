@@ -1,4 +1,8 @@
 import { i18n } from '@/renderer/lib/i18n';
+import {
+	setupCheckDetail,
+	setupCheckTitle,
+} from '@/renderer/lib/setup-check-text';
 import type {
 	AddProjectActionId,
 	AddProjectActionModel,
@@ -134,8 +138,10 @@ function resolveBlockingReason(
 		// the action enabled so we never disable on an unknown prerequisite.
 		if (check && check.status === 'failure') {
 			return (
-				describeFailedCheck(check.detail, check.title) ??
-				definition.unavailableReason
+				describeFailedCheck(
+					setupCheckDetail(check, i18n.t),
+					setupCheckTitle(check.id, i18n.t),
+				) ?? definition.unavailableReason
 			);
 		}
 	}

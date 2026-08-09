@@ -32,5 +32,5 @@ dive in here.
 - [`../CONTEXT.md`](../CONTEXT.md) — product definition and ubiquitous language.
 - [`../CHANGELOG.md`](../CHANGELOG.md) — notable changes (Keep a Changelog format).
 - [`../AGENTS.md`](../AGENTS.md) — contributor policies (npm, Biome, Jotai, Tailwind, JSDoc). Each `src/*` subtree has its own scoped `AGENTS.md`.
-- [`../.claude/rules/`](../.claude/rules) — the binding rule files `AGENTS.md` defers to: [`stack.md`](../.claude/rules/stack.md) (pinned versions and non-obvious constraints), [`patterns.md`](../.claude/rules/patterns.md) (structural patterns), [`jsdoc.md`](../.claude/rules/jsdoc.md), [`comments.md`](../.claude/rules/comments.md), [`code-review.md`](../.claude/rules/code-review.md).
+- [`../.claude/rules/`](../.claude/rules) — the binding rule files `AGENTS.md` defers to: [`stack.md`](../.claude/rules/stack.md) (pinned versions and non-obvious constraints), [`patterns.md`](../.claude/rules/patterns.md) (structural patterns), [`jsdoc.md`](../.claude/rules/jsdoc.md), [`comments.md`](../.claude/rules/comments.md), [`i18n.md`](../.claude/rules/i18n.md) (translation completeness), [`code-review.md`](../.claude/rules/code-review.md).
 - [`../LICENSE`](../LICENSE) — MIT license.

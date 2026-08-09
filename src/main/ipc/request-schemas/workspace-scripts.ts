@@ -6,6 +6,7 @@
  */
 import { z } from 'zod';
 
+import { PERMISSION_MODES } from '../../../shared/permissions.ts';
 import { RUN_SCRIPT_ICON_NAMES } from '../../../shared/scripts.ts';
 
 /** One named run script the Scripts settings screen persists. */
@@ -70,6 +71,7 @@ const repositorySettingsPatchSchema = z.object({
 	branchFrom: z.string().nullable().optional(),
 	deleteLocalBranchOnArchive: z.boolean().nullable().optional(),
 	filesToCopy: z.array(z.string()).nullable().optional(),
+	permissionMode: z.enum(PERMISSION_MODES).nullable().optional(),
 	previewUrls: z.array(repositoryPreviewUrlSchema).nullable().optional(),
 	remoteOrigin: z.string().nullable().optional(),
 });

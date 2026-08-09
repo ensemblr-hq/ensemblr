@@ -118,6 +118,8 @@ export const autoRunAfterSetupAtom = settingAtom(
 	'experimental',
 	'autoRunAfterSetup',
 );
+/** Whether developer-only diagnostics and debug controls are visible. */
+export const developerModeAtom = settingAtom('experimental', 'developerMode');
 
 // ─── Appearance ─────────────────────────────────────────────────────────────────
 // Backs the Settings → Appearance page. Consumers apply these live via

@@ -1,6 +1,6 @@
 import { createFileRoute, redirect } from '@tanstack/react-router';
 
-const LAST_REPO_STORAGE_KEY = 'ensemblr_pref_active_repo_id';
+import { SETTINGS_ACTIVE_REPO_ID_STORAGE_KEY } from '@/renderer/state/settings-ui';
 
 /**
  * Bare `/settings/repo` redirects to the last-known repo's environment section,
@@ -9,7 +9,9 @@ const LAST_REPO_STORAGE_KEY = 'ensemblr_pref_active_repo_id';
  */
 function readLastRepoId(): string | null {
 	try {
-		const raw = window.localStorage.getItem(LAST_REPO_STORAGE_KEY);
+		const raw = window.localStorage.getItem(
+			SETTINGS_ACTIVE_REPO_ID_STORAGE_KEY,
+		);
 		if (!raw) return null;
 		const parsed = JSON.parse(raw) as unknown;
 		return typeof parsed === 'string' ? parsed : null;

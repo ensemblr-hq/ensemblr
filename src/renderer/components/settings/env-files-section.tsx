@@ -82,12 +82,12 @@ export function EnvFilesSection({
 	};
 
 	return (
-		<div className='space-y-3 pt-6'>
+		<div className='space-y-3 border-border border-t pt-5'>
 			<div className='space-y-1'>
 				<h2 className='font-medium text-foreground text-sm'>
 					{t('settings:environment.env-files.title', 'Env files')}
 				</h2>
-				<p className='text-muted-foreground text-sm leading-6'>
+				<p className='max-w-prose text-muted-foreground text-xs leading-relaxed'>
 					<Trans
 						components={{
 							kbd: (
@@ -101,10 +101,10 @@ export function EnvFilesSection({
 			</div>
 
 			{paths.length > 0 ? (
-				<ul className='divide-y divide-border rounded-md border bg-card/40'>
+				<ul className='divide-y divide-border overflow-hidden rounded-xl border border-border bg-card/40'>
 					{paths.map((path) => (
 						<li
-							className='flex items-center gap-2 px-3 py-2 text-sm'
+							className='flex items-center gap-2 px-3 py-2.5 text-sm'
 							key={path}
 						>
 							<FolderIcon
@@ -137,6 +137,7 @@ export function EnvFilesSection({
 					<div className='flex items-center gap-2'>
 						<Input
 							autoFocus
+							className='h-7 font-mono text-xs'
 							onChange={(event) => setDraft(event.target.value)}
 							placeholder='~/.env'
 							spellCheck={false}
@@ -148,14 +149,15 @@ export function EnvFilesSection({
 								'Browse for env file',
 							)}
 							onClick={() => void handleBrowse()}
-							size='icon'
+							size='icon-sm'
 							variant='outline'
 						>
-							<FolderIcon aria-hidden='true' className='size-4' />
+							<FolderIcon aria-hidden='true' className='size-3.5' />
 						</Button>
 						<Button
 							disabled={!draft.trim() || addMutation.isPending}
 							onClick={handleAdd}
+							size='sm'
 							variant='secondary'
 						>
 							{t('common:actions.add', 'Add')}
@@ -163,17 +165,17 @@ export function EnvFilesSection({
 						<Button
 							aria-label={t('common:actions.cancel', 'Cancel')}
 							onClick={handleCancel}
-							size='icon'
+							size='icon-sm'
 							variant='ghost'
 						>
-							<XIcon aria-hidden='true' className='size-4' />
+							<XIcon aria-hidden='true' className='size-3.5' />
 						</Button>
 					</div>
-					{error ? <p className='text-sm text-status-danger'>{error}</p> : null}
+					{error ? <p className='text-status-danger text-xs'>{error}</p> : null}
 				</div>
 			) : (
-				<Button onClick={() => setDraft('')} variant='outline'>
-					<PlusIcon aria-hidden='true' className='size-4' />
+				<Button onClick={() => setDraft('')} size='sm' variant='outline'>
+					<PlusIcon aria-hidden='true' data-icon='inline-start' />
 					{t('settings:environment.env-files.add', 'Add env file')}
 				</Button>
 			)}

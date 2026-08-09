@@ -11,9 +11,12 @@ import type {
 	PiRpcSmokeSnapshot,
 } from '../pi-runtime/pi-readiness';
 import {
+	authoredDetail,
+	commandLog,
 	createCommandLogs,
 	defineCheck,
 	type SetupCheckProviderContext,
+	unexpectedErrorDetail,
 } from './setup-check-context.ts';
 
 /** Builds the snapshot for the Pi agent-directory readiness check. */
@@ -30,26 +33,26 @@ export function getPiAgentDirectoryCheck({
 			'Verifies the normal Pi agent directory without redirecting Pi resource discovery.',
 		group: 'pi',
 		id: 'pi-agent-directory',
-		onError: (error) => ({
-			detail:
-				error instanceof Error
-					? error.message
-					: 'Unknown Pi agent directory check error.',
-		}),
+		onError: (error) =>
+			unexpectedErrorDetail(error, {
+				code: 'pi-agent-directory-unknown-error',
+				text: 'Unknown Pi agent directory check error.',
+			}),
 		run: async () => {
 			const readiness = await piReadinessService.getSnapshot();
 			const agentDirectory = readiness.agentDirectory;
 			const status =
 				agentDirectory.status === 'success' ? 'success' : 'failure';
-			const detail =
-				status === 'success'
-					? `Pi agent directory resolves from ${formatPiAgentDirectorySource(
-							agentDirectory.source,
-						)}: ${agentDirectory.path}.`
-					: getPiAgentDirectoryFailureDetail(agentDirectory);
+			const source = formatPiAgentDirectorySource(agentDirectory.source);
 
 			return {
-				detail,
+				...(status === 'success'
+					? authoredDetail(
+							'pi-agent-directory-ready',
+							`Pi agent directory resolves from ${source}: ${agentDirectory.path}.`,
+							{ path: agentDirectory.path, source },
+						)
+					: getPiAgentDirectoryFailureDetail(agentDirectory)),
 				logs: createPiAgentDirectoryLogs(agentDirectory),
 				remediationActions: [
 					{
@@ -81,22 +84,30 @@ export function getPiRpcCheck({
 			'Launches the selected Pi executable with --mode rpc from a managed setup smoke workspace.',
 		group: 'pi',
 		id: 'pi-rpc',
-		onError: (error) => ({
-			detail:
-				error instanceof Error ? error.message : 'Unknown Pi RPC check error.',
-		}),
+		onError: (error) =>
+			unexpectedErrorDetail(error, {
+				code: 'pi-rpc-unknown-error',
+				text: 'Unknown Pi RPC check error.',
+			}),
 		run: async () => {
 			const readiness = await piReadinessService.getSnapshot();
 			const rpc = readiness.rpc;
 			const status = rpc.status === 'success' ? 'success' : 'failure';
-			const detail =
-				status === 'success'
-					? `Pi RPC startup produced a valid ${rpc.firstFrame?.type ?? 'JSONL'} frame from ${rpc.cwd}.`
-					: (rpc.failure?.message ??
-						'Pi RPC startup did not produce valid JSONL.');
+			const frameType = rpc.firstFrame?.type ?? 'JSONL';
 
 			return {
-				detail,
+				...(status === 'success'
+					? authoredDetail(
+							'pi-rpc-ready',
+							`Pi RPC startup produced a valid ${frameType} frame from ${rpc.cwd}.`,
+							{ cwd: rpc.cwd, frameType },
+						)
+					: rpc.failure?.message
+						? { detail: rpc.failure.message }
+						: authoredDetail(
+								'pi-rpc-invalid',
+								'Pi RPC startup did not produce valid JSONL.',
+							)),
 				logs: createPiRpcLogs(rpc),
 				remediationActions: [
 					{
@@ -134,25 +145,33 @@ export function getPiProviderModelCheck({
 			'Runs pi --list-models through the selected executable to verify provider/model readiness.',
 		group: 'pi',
 		id: 'pi-provider-model',
-		onError: (error) => ({
-			detail:
-				error instanceof Error
-					? error.message
-					: 'Unknown Pi provider/model check error.',
-		}),
+		onError: (error) =>
+			unexpectedErrorDetail(error, {
+				code: 'pi-models-unknown-error',
+				text: 'Unknown Pi provider/model check error.',
+			}),
 		run: async () => {
 			const readiness = await piReadinessService.getSnapshot();
 			const providerModels = readiness.providerModels;
 			const status =
 				providerModels.status === 'success' ? 'success' : 'failure';
-			const detail =
-				status === 'success'
-					? `Pi listed ${providerModels.modelCount} models across ${providerModels.providerCount} providers.`
-					: (providerModels.failure?.message ??
-						'Pi provider/model readiness could not be verified.');
 
 			return {
-				detail,
+				...(status === 'success'
+					? authoredDetail(
+							'pi-models-ready',
+							`Pi listed ${providerModels.modelCount} models across ${providerModels.providerCount} providers.`,
+							{
+								modelCount: providerModels.modelCount,
+								providerCount: providerModels.providerCount,
+							},
+						)
+					: providerModels.failure?.message
+						? { detail: providerModels.failure.message }
+						: authoredDetail(
+								'pi-models-unverified',
+								'Pi provider/model readiness could not be verified.',
+							)),
 				logs: createPiProviderModelLogs(providerModels),
 				remediationActions: [
 					{
@@ -191,10 +210,10 @@ export function getPiExecutableCheck({
 		group: 'pi',
 		id: 'pi-executable',
 		onError: (error) => ({
-			detail:
-				error instanceof Error
-					? error.message
-					: 'Unknown Pi executable check error.',
+			...unexpectedErrorDetail(error, {
+				code: 'pi-executable-unknown-error',
+				text: 'Unknown Pi executable check error.',
+			}),
 			remediationActions: [
 				{
 					id: 'select-pi-executable',
@@ -217,17 +236,9 @@ export function getPiExecutableCheck({
 					: executable.status === 'warning'
 						? 'warning'
 						: 'failure';
-			const detail =
-				status === 'success'
-					? `Pi executable selected from ${formatSourceLabel(
-							executable.source,
-						)}: ${executable.displayPath}. ${formatProbeDetail(executable)}`
-					: status === 'warning'
-						? `Pi executable is present at ${executable.displayPath}, but version/help probing needs attention.`
-						: getPiExecutableFailureDetail(executable.diagnostics);
 
 			return {
-				detail,
+				...describePiExecutable(executable, status),
 				logs: createPiExecutableLogs(executable),
 				remediationActions: createPiExecutableRemediationActions(executable),
 				status,
@@ -237,6 +248,45 @@ export function getPiExecutableCheck({
 	});
 
 	return check(context);
+}
+
+/** Renders the Pi executable resolution as the check's detail line. */
+function describePiExecutable(
+	executable: PiExecutableSnapshot,
+	status: 'failure' | 'success' | 'warning',
+) {
+	if (status === 'failure') {
+		return getPiExecutableFailureDetail(executable.diagnostics);
+	}
+
+	if (status === 'warning') {
+		return authoredDetail(
+			'pi-executable-probe-warning',
+			`Pi executable is present at ${executable.displayPath}, but version/help probing needs attention.`,
+			{ path: executable.displayPath },
+		);
+	}
+
+	const source = formatSourceLabel(executable.source);
+	const sourceCode = executable.source ?? 'unknown';
+	const probe = executable.probe;
+
+	return probe
+		? authoredDetail(
+				'pi-executable-ready-with-probe',
+				`Pi executable selected from ${source}: ${executable.displayPath}. ${probe.kind} probe returned: ${probe.detail}`,
+				{
+					path: executable.displayPath,
+					probeDetail: probe.detail,
+					probeKind: probe.kind,
+					source: sourceCode,
+				},
+			)
+		: authoredDetail(
+				'pi-executable-ready-no-probe',
+				`Pi executable selected from ${source}: ${executable.displayPath}. No version/help probe ran.`,
+				{ path: executable.displayPath, source: sourceCode },
+			);
 }
 
 /** Builds the remediation actions surfaced by the Pi executable check. */
@@ -270,10 +320,12 @@ function createPiAgentDirectoryLogs(
 	return [
 		{
 			label: 'Agent directory path',
+			labelMessage: { code: 'agent-directory-path' },
 			text: agentDirectory.path,
 		},
 		{
 			label: 'Source',
+			labelMessage: { code: 'source' },
 			text: formatPiAgentDirectorySource(agentDirectory.source),
 		},
 		...agentDirectory.diagnostics.map((diagnostic) => ({
@@ -288,10 +340,7 @@ function createPiAgentDirectoryLogs(
 /** Renders Pi RPC smoke metadata as setup check logs. */
 function createPiRpcLogs(rpc: PiRpcSmokeSnapshot): SetupCheckLogSnapshot[] {
 	const logs: SetupCheckLogSnapshot[] = [
-		{
-			label: 'Command',
-			text: rpc.logs.command,
-		},
+		commandLog(rpc.logs.command),
 		{
 			label: 'cwd',
 			text: rpc.logs.cwd,
@@ -301,6 +350,7 @@ function createPiRpcLogs(rpc: PiRpcSmokeSnapshot): SetupCheckLogSnapshot[] {
 	if (rpc.firstFrame) {
 		logs.push({
 			label: 'First JSONL frame',
+			labelMessage: { code: 'first-jsonl-frame' },
 			text: rpc.firstFrame.type,
 		});
 	}
@@ -338,22 +388,23 @@ function createPiProviderModelLogs(
 	const resultLogs = providerModels.result
 		? createCommandLogs(providerModels.result)
 		: [
-				{
-					label: 'Command',
-					text: providerModels.command
+				commandLog(
+					providerModels.command
 						? `${providerModels.command} --list-models`
 						: '',
-				},
+				),
 			];
 
 	return [
 		...resultLogs,
 		{
 			label: 'Model count',
+			labelMessage: { code: 'model-count' },
 			text: String(providerModels.modelCount),
 		},
 		{
 			label: 'Provider count',
+			labelMessage: { code: 'provider-count' },
 			text: String(providerModels.providerCount),
 		},
 		...(providerModels.failure
@@ -369,13 +420,14 @@ function createPiProviderModelLogs(
 
 /** Renders Pi executable metadata as setup check logs. */
 function createPiExecutableLogs(
-	executable: Awaited<ReturnType<PiExecutableService['getSnapshot']>>,
+	executable: PiExecutableSnapshot,
 ): SetupCheckLogSnapshot[] {
 	const logs: SetupCheckLogSnapshot[] = [];
 
 	if (executable.path) {
 		logs.push({
 			label: 'Executable path',
+			labelMessage: { code: 'executable-path' },
 			text: executable.path,
 		});
 	}
@@ -383,6 +435,7 @@ function createPiExecutableLogs(
 	if (executable.source) {
 		logs.push({
 			label: 'Source',
+			labelMessage: { code: 'source' },
 			text: formatSourceLabel(executable.source),
 		});
 	}
@@ -390,6 +443,10 @@ function createPiExecutableLogs(
 	if (executable.probe) {
 		logs.push({
 			label: `${executable.probe.kind} probe`,
+			labelMessage: {
+				code: 'pi-probe',
+				params: { kind: executable.probe.kind },
+			},
 			text: executable.probe.detail,
 		});
 	}
@@ -416,22 +473,22 @@ function formatPiAgentDirectorySource(source: PiAgentDirectorySource): string {
 /** Picks the headline failure detail for the Pi agent-directory check. */
 function getPiAgentDirectoryFailureDetail(
 	agentDirectory: PiAgentDirectorySnapshot,
-): string {
+) {
 	const diagnostic =
 		agentDirectory.diagnostics.find(
 			(candidate) => candidate.severity === 'error',
 		) ?? agentDirectory.diagnostics.at(-1);
 
-	return (
-		diagnostic?.message ??
-		'Pi agent directory could not be verified. Fix the Pi environment path or directory permissions, then retry.'
-	);
+	return diagnostic?.message
+		? { detail: diagnostic.message }
+		: authoredDetail(
+				'pi-agent-directory-unverified',
+				'Pi agent directory could not be verified. Fix the Pi environment path or directory permissions, then retry.',
+			);
 }
 
 /** Renders the Pi executable source as a human-readable label. */
-function formatSourceLabel(
-	source: Awaited<ReturnType<PiExecutableService['getSnapshot']>>['source'],
-): string {
+function formatSourceLabel(source: PiExecutableSnapshot['source']): string {
 	switch (source) {
 		case 'common-location':
 			return 'common local binary location';
@@ -452,29 +509,18 @@ function formatSourceLabel(
 	}
 }
 
-/** Renders the Pi executable probe result as a short string. */
-function formatProbeDetail(
-	executable: Awaited<ReturnType<PiExecutableService['getSnapshot']>>,
-): string {
-	if (!executable.probe) {
-		return 'No version/help probe ran.';
-	}
-
-	return `${executable.probe.kind} probe returned: ${executable.probe.detail}`;
-}
-
 /** Picks the headline failure detail for the Pi executable check. */
 function getPiExecutableFailureDetail(
-	diagnostics: Awaited<
-		ReturnType<PiExecutableService['getSnapshot']>
-	>['diagnostics'],
-): string {
+	diagnostics: PiExecutableSnapshot['diagnostics'],
+) {
 	const blockingDiagnostic =
 		diagnostics.find((diagnostic) => diagnostic.severity === 'error') ??
 		diagnostics.at(-1);
 
-	return (
-		blockingDiagnostic?.message ??
-		'Pi executable could not be discovered. Install Pi, select a compatible executable or wrapper, then retry.'
-	);
+	return blockingDiagnostic?.message
+		? { detail: blockingDiagnostic.message }
+		: authoredDetail(
+				'pi-executable-not-found',
+				'Pi executable could not be discovered. Install Pi, select a compatible executable or wrapper, then retry.',
+			);
 }

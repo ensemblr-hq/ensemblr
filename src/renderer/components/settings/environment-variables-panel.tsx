@@ -8,10 +8,13 @@ import { DocumentedVariablesList } from '@/renderer/components/settings/document
 import { EnvFilesSection } from '@/renderer/components/settings/env-files-section';
 import { EnvironmentVariableRow } from '@/renderer/components/settings/environment-variable-row';
 import { EnvironmentVariableSheet } from '@/renderer/components/settings/environment-variable-sheet';
+import {
+	SettingsErrorState,
+	SettingsLoadingState,
+} from '@/renderer/components/settings/settings-async-state';
 import { SettingsEmptyState } from '@/renderer/components/settings/settings-empty-state';
 import { SettingsSection } from '@/renderer/components/settings/settings-section';
 import { Button } from '@/renderer/components/ui/button';
-import { Spinner } from '@/renderer/components/ui/spinner';
 import type { EnvironmentVariableSheetTarget } from '@/renderer/types/settings';
 import type {
 	EnvironmentVariableScope,
@@ -86,20 +89,19 @@ export function EnvironmentVariablesPanel({
 				description={description}
 				title={title}
 			>
-				<div className='space-y-3 pt-4'>
+				<div className='space-y-4 pt-5'>
 					{isLoading ? (
-						<div className='flex items-center gap-2 py-6 text-muted-foreground text-sm'>
-							<Spinner className='size-4' />{' '}
-							{t('settings:environment.loading', 'Reading environment…')}
-						</div>
+						<SettingsLoadingState
+							label={t('settings:environment.loading', 'Reading environment…')}
+						/>
 					) : error ? (
-						<div className='py-6 text-sm text-status-danger'>
-							{t(
+						<SettingsErrorState
+							message={t(
 								'settings:environment.read-failed',
 								'Failed to read environment: {{error}}.',
 								{ error: String(error) },
 							)}
-						</div>
+						/>
 					) : (
 						<>
 							{configured.length === 0 ? (
@@ -114,7 +116,7 @@ export function EnvironmentVariablesPanel({
 									)}
 								/>
 							) : (
-								<div className='divide-y divide-border rounded-md border bg-card/40'>
+								<div className='divide-y divide-border overflow-hidden rounded-xl border border-border bg-card/40'>
 									{configured.map((variable) => (
 										<EnvironmentVariableRow
 											key={variable.key}
@@ -131,9 +133,7 @@ export function EnvironmentVariablesPanel({
 								variables={documented}
 							/>
 							{enableEnvFiles ? (
-								<div className='border-border border-t'>
-									<EnvFilesSection scope={scope} scopeId={scopeId} />
-								</div>
+								<EnvFilesSection scope={scope} scopeId={scopeId} />
 							) : null}
 						</>
 					)}

@@ -172,13 +172,13 @@ export function CommandPalette() {
 			run: go(() => navigate({ to: '/settings/experimental' })),
 		},
 		{
-			id: 'settings.advanced',
+			id: 'settings.shortcuts',
 			label: t(
-				'workbench:command-palette.settings-advanced',
-				'Settings · Advanced',
+				'workbench:command-palette.settings-shortcuts',
+				'Settings · Shortcuts',
 			),
 			icon: TerminalIcon,
-			run: go(() => navigate({ to: '/settings/advanced' })),
+			run: go(() => navigate({ to: '/settings/shortcuts' })),
 		},
 	];
 

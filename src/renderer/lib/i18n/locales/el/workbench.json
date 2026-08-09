@@ -131,7 +131,6 @@
 		"group-settings": "Ρυθμίσεις",
 		"label": "Παλέτα εντολών",
 		"placeholder": "Αναζήτηση εντολών…",
-		"settings-advanced": "Ρυθμίσεις · Για προχωρημένους",
 		"settings-appearance": "Ρυθμίσεις · Εμφάνιση",
 		"settings-diagnostics": "Ρυθμίσεις · Διαγνωστικά",
 		"settings-environment": "Ρυθμίσεις · Περιβάλλον",
@@ -141,6 +140,7 @@
 		"settings-integrations": "Ρυθμίσεις · Ενσωματώσεις",
 		"settings-models": "Ρυθμίσεις · Μοντέλα",
 		"settings-providers": "Ρυθμίσεις · Πάροχοι",
+		"settings-shortcuts": "Ρυθμίσεις · Συντομεύσεις",
 		"theme-dark": "Θέμα · Σκούρο",
 		"theme-light": "Θέμα · Φωτεινό",
 		"theme-system": "Θέμα · Συστήματος"
