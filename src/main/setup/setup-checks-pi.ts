@@ -50,7 +50,7 @@ export function getPiAgentDirectoryCheck({
 					? authoredDetail(
 							'pi-agent-directory-ready',
 							`Pi agent directory resolves from ${source}: ${agentDirectory.path}.`,
-							{ path: agentDirectory.path, source },
+							{ path: agentDirectory.path, source: agentDirectory.source },
 						)
 					: getPiAgentDirectoryFailureDetail(agentDirectory)),
 				logs: createPiAgentDirectoryLogs(agentDirectory),
@@ -467,7 +467,7 @@ function createPiExecutableLogs(
 function formatPiAgentDirectorySource(source: PiAgentDirectorySource): string {
 	return source === 'environment'
 		? 'PI_CODING_AGENT_DIR'
-		: 'Pi default ~/.pi/agent';
+		: 'Pi default location';
 }
 
 /** Picks the headline failure detail for the Pi agent-directory check. */

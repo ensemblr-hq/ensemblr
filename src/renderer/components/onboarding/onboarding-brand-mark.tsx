@@ -1,6 +1,6 @@
 import type { ReactElement } from 'react';
 
-import { AGENT_PROVIDER_BRAND } from '@/renderer/components/agent-provider-brand';
+import { AGENT_PROVIDER_BRAND } from '@/renderer/components/agent-provider-brand-marks';
 import {
 	GithubLogo,
 	LinearLogo,
@@ -11,8 +11,9 @@ import type { OnboardingCheckId } from '@/renderer/types/onboarding';
 /**
  * Brand identity for one probe: which mark to draw, and the tint the card tile
  * wears. The agent runtimes reuse the shared provider marks so the wizard and
- * Settings → Providers never drift; Linear's indigo is the vendor's own literal
- * because it does not belong in the app's theme tokens.
+ * Settings → Providers never drift; Linear's indigo is the vendor's own colour,
+ * held as `--ensemblr-brand-linear` so it stays fixed rather than tracking the
+ * app palette.
  */
 const BRAND: Record<
 	OnboardingCheckId,
@@ -23,7 +24,7 @@ const BRAND: Record<
 	'gh-cli': { Logo: GithubLogo, tint: 'bg-foreground/8 text-foreground/85' },
 	'linear-oauth': {
 		Logo: LinearLogo,
-		tint: 'bg-[#5e6ad2]/14 text-[#6b77e0]',
+		tint: 'bg-brand-linear/14 text-brand-linear-ink',
 	},
 	'pi-executable': AGENT_PROVIDER_BRAND.pi,
 };

@@ -34,15 +34,33 @@ function DiagnosticsRoute() {
 	const [copied, setCopied] = useState(false);
 	const [isManualRetrying, setIsManualRetrying] = useState(false);
 	const [isRerunning, setIsRerunning] = useState(false);
+	const [rerunError, setRerunError] = useState<string | null>(null);
 	const navigate = useNavigate();
 
+	// `_shell`'s first-run guard reads `onboardingStatusQuery`, which never goes
+	// stale, so the cleared stamp has to be written into the cache as well as to
+	// disk or the guard keeps waving this session past the wizard.
 	const onRerunOnboarding = async () => {
 		setIsRerunning(true);
+		setRerunError(null);
 		try {
-			await updateAppSettings({ onboarding: { completedAt: null } });
+			const settings = await updateAppSettings({
+				onboarding: { completedAt: null },
+			});
+			queryClient.setQueryData(
+				ensemblrQueryKeys.onboardingStatus(),
+				settings.onboarding,
+			);
 			await navigate({ to: '/onboarding' });
-		} catch {
+		} catch (error) {
 			setIsRerunning(false);
+			setRerunError(
+				t(
+					'settings:diagnostics.rerun-onboarding.failed',
+					'Could not reopen the setup wizard: {{error}}.',
+					{ error: error instanceof Error ? error.message : String(error) },
+				),
+			);
 		}
 	};
 
@@ -119,7 +137,12 @@ function DiagnosticsRoute() {
 					'Reopen the first-run setup wizard. Nothing already configured is undone — the wizard re-probes every check and walks you through whatever is still unresolved.',
 				)}
 				label={t('settings:diagnostics.rerun-onboarding.label', 'Setup wizard')}
-			/>
+				stack
+			>
+				{rerunError ? (
+					<p className='text-status-danger text-xs'>{rerunError}</p>
+				) : null}
+			</SettingRow>
 		</SettingsSection>
 	);
 }

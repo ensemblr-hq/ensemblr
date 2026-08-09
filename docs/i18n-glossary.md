@@ -56,6 +56,10 @@ Rules of thumb:
 | Token | Токен | Διακριτικό | Model context unit. Localized in both — it is not git porcelain and not a proper noun. |
 | Remote | Удалённый | Απομακρυσμένο | The adjective is localized; the remote's *name* (`origin`) is not. |
 | Merged | Выполнен merge | Έγινε merge | Past-tense PR status. `merge` stays borrowed per the git-porcelain rule; only the auxiliary is localized. |
+| Setup wizard | Мастер настройки | Οδηγός εγκατάστασης | The first-run gate. "Мастер"/"οδηγός" is the platform word for a wizard; never "волшебник"/"μάγος". |
+| Root directory | Корневой каталог | Ριζικός κατάλογος | The managed directory holding repos and workspaces. |
+| Permission mode | Режим разрешений | Λειτουργία δικαιωμάτων | How much an agent may do unattended. |
+| Keyboard shortcut | Горячая клавиша | Συντόμευση πληκτρολογίου | Shortened to "Горячие клавиши"/"Συντομεύσεις" in the nav, where the column is tight. |
 
 ## Core verbs
 
@@ -73,6 +77,7 @@ Rules of thumb:
 | Stop | Остановить | Διακοπή | |
 | Approve | Разрешить | Έγκριση | Tool approval. |
 | Deny | Отклонить | Άρνηση | |
+| Connect | Подключить | Σύνδεση | Linking an integration such as Linear or the GitHub CLI. |
 | Spawn | Запустить | Εκκίνηση | Starting a sub-agent. |
 | Clone | Клонировать | Κλωνοποίηση | |
 | Push | Push | Push | Git; untranslated. |
@@ -86,9 +91,20 @@ Rules of thumb:
 | Appearance | Внешний вид | Εμφάνιση |
 | Models | Модели | Μοντέλα |
 | Git | Git | Git |
-| Advanced | Дополнительно | Για προχωρημένους |
+| Providers | Провайдеры | Πάροχοι |
+| Integrations | Интеграции | Ενσωματώσεις |
+| Diagnostics | Диагностика | Διαγνωστικά |
+| Shortcuts | Горячие клавиши | Συντομεύσεις |
 | Experimental | Экспериментальные | Πειραματικά |
 | Environment | Окружение | Περιβάλλον |
+| Security | Безопасность | Ασφάλεια |
+| Actions | Действия | Ενέργειες |
+| Scripts | Скрипты | Σενάρια |
+| Misc | Разное | Διάφορα |
+
+"Advanced" was a section until the settings restructure split it into
+**Shortcuts** plus rows folded into General and Appearance; it has no page and
+no row of its own any more.
 
 ## Language names
 

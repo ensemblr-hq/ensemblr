@@ -16,15 +16,24 @@ export const Route = createFileRoute('/_workbench/settings/shortcuts')({
 	component: ShortcutsSettings,
 });
 
+/**
+ * Rank each scope takes in the reference, widest surface first. A `Record` and
+ * not an array so a scope added to the keymap fails to compile here rather than
+ * silently rendering no group.
+ */
+const SCOPE_RANK: Record<Scope, number> = {
+	global: 0,
+	composer: 1,
+	autocomplete: 2,
+	modelPicker: 3,
+	dialog: 4,
+	menu: 5,
+};
+
 /** Scope order the reference lists groups in, widest surface first. */
-const SCOPE_ORDER: readonly Scope[] = [
-	'global',
-	'composer',
-	'autocomplete',
-	'modelPicker',
-	'dialog',
-	'menu',
-];
+const SCOPE_ORDER: readonly Scope[] = (Object.keys(SCOPE_RANK) as Scope[]).sort(
+	(left, right) => SCOPE_RANK[left] - SCOPE_RANK[right],
+);
 
 /**
  * Names each shortcut scope for the group heading. Built from `t()` rather than
@@ -178,14 +187,14 @@ function shortcutName(t: TFunction): Record<ShortcutId, string> {
  * @returns Shortcut ids keyed by the scope they are active in
  */
 function shortcutsByScope(): Record<Scope, ShortcutId[]> {
-	const grouped = {
+	const grouped: Record<Scope, ShortcutId[]> = {
 		autocomplete: [],
 		composer: [],
 		dialog: [],
 		global: [],
 		menu: [],
 		modelPicker: [],
-	} as Record<Scope, ShortcutId[]>;
+	};
 
 	for (const id of Object.keys(SHORTCUTS) as ShortcutId[]) {
 		grouped[SHORTCUTS[id].scope].push(id);
@@ -231,7 +240,7 @@ function ShortcutsSettings() {
 								<span className='min-w-0 truncate text-foreground text-xs'>
 									{names[id]}
 								</span>
-								<kbd className='shrink-0 rounded-md border border-border bg-muted px-1.5 py-0.5 font-mono text-[0.6875rem] text-muted-foreground'>
+								<kbd className='shrink-0 rounded-md border border-border bg-muted px-1.5 py-0.5 font-mono text-muted-foreground text-xxs'>
 									{formatShortcut(id)}
 								</kbd>
 							</li>

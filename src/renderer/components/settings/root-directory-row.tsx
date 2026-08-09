@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import type { TFunction } from 'i18next';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -12,6 +13,26 @@ import { SettingsCodeValue } from '@/renderer/components/settings/settings-code-
 import { Badge } from '@/renderer/components/ui/badge';
 import { Button } from '@/renderer/components/ui/button';
 import { Spinner } from '@/renderer/components/ui/spinner';
+import type { RootDirectoryStatus } from '@/shared/ipc/contracts/root-directory';
+
+/**
+ * Names a non-ok root-directory health status. Main returns the locale-neutral
+ * code, so the badge reads it in the app language rather than showing the raw
+ * value.
+ * @param status - Health status the root service reported.
+ * @param t - Translation function from `useTranslation`
+ * @returns The badge label.
+ */
+function rootStatusLabel(status: RootDirectoryStatus, t: TFunction): string {
+	switch (status) {
+		case 'error':
+			return t('settings:general.root-directory.status.error', 'error');
+		case 'warning':
+			return t('settings:general.root-directory.status.warning', 'warning');
+		case 'ok':
+			return t('settings:general.root-directory.status.ok', 'ready');
+	}
+}
 
 /**
  * Settings row for the Ensemblr root directory: shows the configured path and
@@ -37,7 +58,11 @@ export function RootDirectoryRow() {
 			});
 			if (!apply.applied) {
 				throw new Error(
-					apply.error ?? 'Failed to apply root directory change.',
+					apply.error ??
+						t(
+							'settings:general.root-directory.apply-failed',
+							'Failed to apply the root directory change.',
+						),
 				);
 			}
 			return { applied: true as const };
@@ -82,7 +107,7 @@ export function RootDirectoryRow() {
 					)}
 					{rootStatus !== 'ok' ? (
 						<Badge variant={rootStatus === 'error' ? 'destructive' : 'outline'}>
-							{rootStatus}
+							{rootStatusLabel(rootStatus, t)}
 						</Badge>
 					) : null}
 				</span>

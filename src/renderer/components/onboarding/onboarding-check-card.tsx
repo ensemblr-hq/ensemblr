@@ -1,3 +1,4 @@
+import type { TFunction } from 'i18next';
 import {
 	CheckIcon,
 	ClipboardIcon,
@@ -126,6 +127,31 @@ const ACTIONABLE_PRESENTATIONS: readonly CardPresentation[] = [
 const COPIED_RESET_MS = 1800;
 
 /**
+ * Remediation ids the wizard labels for itself. `open-linear-settings` starts
+ * OAuth in place here instead of navigating to Settings → Integrations, so the
+ * shared diagnostics label names an action this button does not take.
+ */
+const WIZARD_REMEDIATION_LABEL: Record<string, (t: TFunction) => string> = {
+	'open-linear-settings': (t) => t('common:actions.connect', 'Connect'),
+};
+
+/**
+ * Labels a remediation button, preferring the wizard's own wording wherever the
+ * shared diagnostics label describes a different action.
+ * @param remediation - The remediation being labelled.
+ * @param t - Translator from the calling component.
+ * @returns The button label.
+ */
+function remediationLabel(
+	remediation: OnboardingRemediation,
+	t: TFunction,
+): string {
+	const override = WIZARD_REMEDIATION_LABEL[remediation.id];
+
+	return override ? override(t) : setupRemediationLabel(remediation, t);
+}
+
+/**
  * One probe rendered as a card. Roomier than the shipped `SetupCheckRow`, which
  * is tuned for a settings list of fifteen; a wizard step shows one or two.
  */
@@ -252,7 +278,7 @@ export function OnboardingCheckCard({
 								<span className='truncate'>
 									{copied
 										? t('common:actions.copied', 'Copied')
-										: setupRemediationLabel(remediation, t)}
+										: remediationLabel(remediation, t)}
 								</span>
 							</Button>
 						);

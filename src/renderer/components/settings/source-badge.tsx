@@ -51,7 +51,7 @@ export function SourceBadge({
 		);
 	}
 	return (
-		<Badge className='text-[0.625rem]' variant='outline'>
+		<Badge className='font-normal text-xxs' variant='outline'>
 			{locked
 				? t(
 						'settings:source-badge.value-locked',

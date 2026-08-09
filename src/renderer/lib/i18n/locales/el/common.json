@@ -9,6 +9,7 @@
 		"browse": "Περιήγηση",
 		"cancel": "Άκυρο",
 		"configure": "Διαμόρφωση",
+		"connect": "Σύνδεση",
 		"continue": "Συνέχεια",
 		"copied": "Αντιγράφηκε",
 		"copy-code": "Αντιγραφή κώδικα",
@@ -259,6 +260,9 @@
 			"source": "Πηγή"
 		},
 		"optional": "Προαιρετικό",
+		"pi-agent-source": {
+			"default": "προεπιλεγμένη τοποθεσία Pi"
+		},
 		"pi-source": {
 			"built-in-default": "την ενσωματωμένη προεπιλογή",
 			"common-location": "συνήθη τοποθεσία τοπικών εκτελέσιμων",

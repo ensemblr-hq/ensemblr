@@ -9,6 +9,7 @@
 		"browse": "Browse",
 		"cancel": "Cancel",
 		"configure": "Configure",
+		"connect": "Connect",
 		"continue": "Continue",
 		"copied": "Copied",
 		"copy-code": "Copy code",
@@ -259,6 +260,9 @@
 			"source": "Source"
 		},
 		"optional": "Optional",
+		"pi-agent-source": {
+			"default": "Pi default location"
+		},
 		"pi-source": {
 			"built-in-default": "built-in default",
 			"common-location": "common local binary location",

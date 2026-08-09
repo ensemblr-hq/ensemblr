@@ -11,6 +11,7 @@ export default interface Resources {
 			browse: 'Browse';
 			cancel: 'Cancel';
 			configure: 'Configure';
+			connect: 'Connect';
 			continue: 'Continue';
 			copied: 'Copied';
 			'copy-code': 'Copy code';
@@ -261,6 +262,9 @@ export default interface Resources {
 				source: 'Source';
 			};
 			optional: 'Optional';
+			'pi-agent-source': {
+				default: 'Pi default location';
+			};
 			'pi-source': {
 				'built-in-default': 'built-in default';
 				'common-location': 'common local binary location';
@@ -1212,6 +1216,7 @@ export default interface Resources {
 			'rerun-onboarding': {
 				action: 'Re-run wizard';
 				description: 'Reopen the first-run setup wizard. Nothing already configured is undone — the wizard re-probes every check and walks you through whatever is still unresolved.';
+				failed: 'Could not reopen the setup wizard: {{error}}.';
 				label: 'Setup wizard';
 			};
 			title: 'Diagnostics';
@@ -1298,9 +1303,15 @@ export default interface Resources {
 				label: 'Desktop notifications';
 			};
 			'root-directory': {
+				'apply-failed': 'Failed to apply the root directory change.';
 				description: 'Where Ensemblr stores repositories and workspaces. This should be an empty directory you do not modify directly. Changing this will reconcile your repository list against the new root.';
 				label: 'Ensemblr root directory';
 				reading: 'Reading root…';
+				status: {
+					error: 'error';
+					ok: 'ready';
+					warning: 'warning';
+				};
 				unset: 'Not configured';
 			};
 			'send-shortcut': {
