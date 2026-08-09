@@ -1,5 +1,6 @@
 import { dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { cn } from '@/renderer/lib/utils';
 import { BOARD_STATUS_PRESENTATION } from '@/renderer/lib/workbench/board-status-presentation';
@@ -21,6 +22,7 @@ export function BoardColumn({
 	onOpenWorkspace: (projectId: string, workspaceId: string) => void;
 	status: WorkspaceBoardStatus;
 }) {
+	const { t } = useTranslation();
 	const ref = useRef<HTMLDivElement | null>(null);
 	const [isDraggedOver, setIsDraggedOver] = useState(false);
 	const presentation = BOARD_STATUS_PRESENTATION[status];
@@ -43,7 +45,18 @@ export function BoardColumn({
 
 	return (
 		<section
-			aria-label={`${presentation.label} column, ${cards.length} ${cards.length === 1 ? 'workspace' : 'workspaces'}`}
+			aria-label={t(
+				'workbench:dashboard.column.aria-label',
+				'{{status}} column, {{workspaces}}',
+				{
+					status: presentation.label,
+					workspaces: t('common:units.workspace-count', {
+						count: cards.length,
+						defaultValue_one: '{{count}} workspace',
+						defaultValue_other: '{{count}} workspaces',
+					}),
+				},
+			)}
 			className={cn(
 				'flex w-72 shrink-0 flex-col rounded-xl bg-muted/40 transition-colors',
 				isDraggedOver && 'bg-muted',

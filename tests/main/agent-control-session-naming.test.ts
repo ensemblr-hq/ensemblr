@@ -8,7 +8,11 @@ import {
 } from '../../src/main/agent-control/index.ts';
 import type { AgentSpecies } from '../../src/main/agent-control/ports.ts';
 import { BranchSlugRejected } from '../../src/main/agent-runtime/naming/apply-branch-slug.ts';
-import { SESSION_BRIEF_NUDGE_HEADER } from '../../src/shared/agent-control.ts';
+import {
+	buildLanguageDirective,
+	SESSION_BRIEF_NUDGE_HEADER,
+} from '../../src/shared/agent-control.ts';
+import type { AppLanguage } from '../../src/shared/i18n.ts';
 
 const CALLER = 'caller';
 
@@ -25,6 +29,7 @@ function setup(
 		setName?: unknown;
 		setSummary?: unknown;
 		species?: AgentSpecies;
+		language?: AppLanguage;
 	} = {},
 ) {
 	const registry = createOriginRegistry({ generateToken: () => 'tok' });
@@ -53,6 +58,7 @@ function setup(
 		},
 		focus: { focusDockTab: vi.fn(), focusPanel: vi.fn(), focusTab: vi.fn() },
 		harnesses: { launchHarness: vi.fn() },
+		language: { getLanguage: () => overrides.language ?? 'en' },
 		permissions: { getMode: () => 'workspace-trusted' },
 		planMode: { exit: vi.fn(), isActive: () => false, releaseSession: vi.fn() },
 		sessionNaming: {
@@ -73,7 +79,7 @@ function setup(
 		op: Parameters<typeof service.invoke>[0]['op'],
 		rawArgs: Record<string, unknown> = {},
 	) => service.invoke({ op, rawArgs, token: 'tok' });
-	return { invoke, ports };
+	return { invoke, ports, service };
 }
 
 describe('setBranchName', () => {
@@ -249,5 +255,67 @@ describe('getSessionBrief', () => {
 		const { invoke } = setup();
 
 		expect((await invoke('getSessionBrief')).ok).toBe(true);
+	});
+
+	it('carries the language directive for a translated app', async () => {
+		const { invoke } = setup({ language: 'ru' });
+
+		const result = await invoke('getSessionBrief');
+
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			expect(result.data).toMatchObject({
+				languageDirective: buildLanguageDirective('ru'),
+			});
+		}
+	});
+
+	it('carries no language directive for an English app', async () => {
+		const { invoke } = setup();
+
+		const result = await invoke('getSessionBrief');
+
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			expect(result.data).toMatchObject({ languageDirective: null });
+		}
+	});
+});
+
+describe('readTurnPreamble', () => {
+	it('appends the language directive to the upkeep block', async () => {
+		const { service } = setup({
+			language: 'el',
+			readBrief: vi.fn().mockResolvedValue({
+				branch: { current: null, eligible: false },
+				summaryStale: true,
+				titleNeeded: false,
+			}),
+		});
+
+		const preamble = await service.readTurnPreamble(CALLER);
+
+		expect(preamble).toContain(SESSION_BRIEF_NUDGE_HEADER);
+		expect(preamble).toContain(buildLanguageDirective('el') ?? '');
+	});
+
+	it('returns the directive alone when no upkeep is outstanding', async () => {
+		const { service } = setup({ language: 'ru' });
+
+		expect(await service.readTurnPreamble(CALLER)).toBe(
+			buildLanguageDirective('ru'),
+		);
+	});
+
+	it('returns nothing when the app is English and nothing is outstanding', async () => {
+		const { service } = setup();
+
+		expect(await service.readTurnPreamble(CALLER)).toBeNull();
+	});
+
+	it('reports nothing for a session with no resolvable origin', async () => {
+		const { service } = setup({ language: 'ru' });
+
+		expect(await service.readTurnPreamble('unknown')).toBeNull();
 	});
 });

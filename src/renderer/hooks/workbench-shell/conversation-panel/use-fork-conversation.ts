@@ -1,6 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useRouter } from '@tanstack/react-router';
 import { useCallback, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import {
 	createWorkspace,
@@ -40,6 +41,7 @@ export function useForkConversation({
 	const navigate = useNavigate();
 	const router = useRouter();
 	const queryClient = useQueryClient();
+	const { t } = useTranslation();
 	const dispatchAttachment = useComposerAttachmentDispatcher();
 	const [isForking, setIsForking] = useState(false);
 
@@ -62,7 +64,13 @@ export function useForkConversation({
 				upToOrdinal,
 			});
 			if (!result.summary) {
-				throw new Error(result.error ?? 'Fork summary could not be written.');
+				throw new Error(
+					result.error ??
+						t(
+							'errors:fork.summary-failed.title',
+							'Fork summary could not be written.',
+						),
+				);
 			}
 			const { relativePath, title } = result.summary;
 			dispatchAttachment(chatTabId, {
@@ -72,7 +80,7 @@ export function useForkConversation({
 				path: relativePath,
 			});
 		},
-		[branchId, dispatchAttachment, sessionId],
+		[branchId, dispatchAttachment, sessionId, t],
 	);
 
 	const forkToNewTab = useCallback(
@@ -99,15 +107,19 @@ export function useForkConversation({
 						},
 						to: '/projects/$projectId/workspaces/$workspaceId/chats/$chatId',
 					});
-					toast.success('Forked to a new tab.');
+					toast.success(t('errors:fork.new-tab.title', 'Forked to a new tab.'));
 				} catch (error) {
-					toast.error(error instanceof Error ? error.message : 'Fork failed.');
+					toast.error(
+						error instanceof Error
+							? error.message
+							: t('errors:fork.failed.title', 'Fork failed.'),
+					);
 				} finally {
 					setIsForking(false);
 				}
 			})();
 		},
-		[attachSummary, isForking, navigate, queryClient, workspace],
+		[attachSummary, isForking, navigate, queryClient, t, workspace],
 	);
 
 	const forkToNewWorkspace = useCallback(
@@ -131,7 +143,11 @@ export function useForkConversation({
 						const reason =
 							created.diagnostics.find(
 								(diagnostic) => diagnostic.severity === 'error',
-							)?.message ?? 'The fork workspace could not be created.';
+							)?.message ??
+							t(
+								'errors:fork.workspace-failed.title',
+								'The fork workspace could not be created.',
+							);
 						throw new Error(reason);
 					}
 					const target = created.workspace;
@@ -156,15 +172,27 @@ export function useForkConversation({
 						},
 						to: '/projects/$projectId/workspaces/$workspaceId/chats/$chatId',
 					});
-					toast.success(`Forked to workspace ${target.name}.`);
+					toast.success(
+						t(
+							'errors:fork.new-workspace.title',
+							'Forked to workspace {{name}}.',
+							{
+								name: target.name,
+							},
+						),
+					);
 				} catch (error) {
-					toast.error(error instanceof Error ? error.message : 'Fork failed.');
+					toast.error(
+						error instanceof Error
+							? error.message
+							: t('errors:fork.failed.title', 'Fork failed.'),
+					);
 				} finally {
 					setIsForking(false);
 				}
 			})();
 		},
-		[attachSummary, isForking, navigate, queryClient, router, workspace],
+		[attachSummary, isForking, navigate, queryClient, router, t, workspace],
 	);
 
 	// Held stable so the timeline's memoized turns are not invalidated by a fresh

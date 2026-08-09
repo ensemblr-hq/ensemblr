@@ -11,6 +11,7 @@ export const IPC_CHANNELS = {
 	getAppSettings: 'ensemblr:get-app-settings',
 	updateAppSettings: 'ensemblr:update-app-settings',
 	openAppConfigFile: 'ensemblr:open-app-config-file',
+	getSystemLanguages: 'ensemblr:get-system-languages',
 	openExternal: 'ensemblr:open-external',
 	bindAgentSessionToChatTab: 'ensemblr:bind-agent-session-to-chat-tab',
 	closeActiveTab: 'ensemblr:close-active-tab',

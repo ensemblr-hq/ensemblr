@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import {
 	createLinearComment,
@@ -11,6 +12,7 @@ import { describeLinearFailure } from '@/renderer/lib/linear';
 
 /** Inline composer that posts a comment to a Linear issue. */
 export function LinearCommentComposer({ issueId }: { issueId: string }) {
+	const { t } = useTranslation();
 	const queryClient = useQueryClient();
 	const [body, setBody] = useState('');
 	const [error, setError] = useState<string | null>(null);
@@ -33,10 +35,10 @@ export function LinearCommentComposer({ issueId }: { issueId: string }) {
 	return (
 		<div className='flex flex-col gap-2'>
 			<Textarea
-				aria-label='Add a comment'
+				aria-label={t('linear:comment-composer.label', 'Add a comment')}
 				className='min-h-16'
 				onChange={(event) => setBody(event.target.value)}
-				placeholder='Add a comment…'
+				placeholder={t('linear:comment-composer.placeholder', 'Add a comment…')}
 				value={body}
 			/>
 			{error ? (
@@ -50,7 +52,9 @@ export function LinearCommentComposer({ issueId }: { issueId: string }) {
 					onClick={() => mutation.mutate()}
 					size='sm'
 				>
-					{mutation.isPending ? 'Posting…' : 'Comment'}
+					{mutation.isPending
+						? t('linear:comment-composer.posting', 'Posting…')
+						: t('linear:comment-composer.submit', 'Comment')}
 				</Button>
 			</div>
 		</div>

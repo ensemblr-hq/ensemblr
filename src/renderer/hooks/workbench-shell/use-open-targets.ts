@@ -1,4 +1,5 @@
 import { useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 
 import { getEnsemblrApiOrNull } from '@/renderer/api/ensemblr';
@@ -28,12 +29,18 @@ export function useOpenTargets({
 		primaryTarget,
 		rememberTarget,
 	} = useOpenTargetMenu(workspaceId);
+	const { t } = useTranslation();
 
 	const invokeTarget = useCallback(
 		async (target: WorkspaceOpenTarget, options?: OpenTargetPathOptions) => {
 			const ensemblr = getEnsemblrApiOrNull();
 			if (!ensemblr) {
-				toast.error('Open in… is unavailable without the Electron bridge.');
+				toast.error(
+					t(
+						'errors:open-target.bridge-unavailable.title',
+						'Open in… is unavailable without the Electron bridge.',
+					),
+				);
 				return;
 			}
 			const result = await ensemblr.openWorkspaceInTarget({
@@ -47,7 +54,13 @@ export function useOpenTargets({
 					: {}),
 			});
 			if (!result.ok) {
-				toast.error(`Failed to open in ${target.label}: ${result.error}`);
+				toast.error(
+					t(
+						'errors:open-target.open-failed.title',
+						'Failed to open in {{target}}: {{error}}',
+						{ error: result.error, target: target.label },
+					),
+				);
 				return;
 			}
 			// Quick-launch memory is for the header split button (workspace root);
@@ -57,11 +70,16 @@ export function useOpenTargets({
 			}
 			if (target.behavior === 'copy-path') {
 				toast.success(
-					options ? 'Path copied to clipboard.' : 'Workspace path copied.',
+					options
+						? t('common:clipboard.path-copied', 'Path copied to clipboard.')
+						: t(
+								'common:clipboard.workspace-path-copied',
+								'Workspace path copied.',
+							),
 				);
 			}
 		},
-		[rememberTarget, workspaceId],
+		[rememberTarget, t, workspaceId],
 	);
 
 	return {

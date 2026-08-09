@@ -31,21 +31,28 @@ const HARNESS_ROOT: ControlAudience = {
  */
 const makeStubService = (
 	audience: ControlAudience = HARNESS_ROOT,
+	languageDirective: string | null = null,
 ): AgentControlService => ({
 	describeAudience: async () => audience,
 	invoke: async (command) => {
 		calls.push(command);
 		return { ok: true, data: { echoed: command.op, args: command.rawArgs } };
 	},
-	readSessionBriefNudge: async () => null,
+	readLanguageDirective: () => languageDirective,
+	readTurnPreamble: async () => null,
 	releaseSession: () => {},
 });
 
 const stubService: AgentControlService = makeStubService();
 
 /** Connects an MCP client to a server serving the given audience. */
-const connectAs = async (audience: ControlAudience): Promise<Client> => {
-	server = await startControlServer(makeStubService(audience));
+const connectAs = async (
+	audience: ControlAudience,
+	languageDirective: string | null = null,
+): Promise<Client> => {
+	server = await startControlServer(
+		makeStubService(audience, languageDirective),
+	);
 	return await connect('good');
 };
 
@@ -323,6 +330,32 @@ describe('agent-control MCP endpoint, per-origin surface', () => {
 		const client = await connectAs(HARNESS_ROOT);
 
 		expect(client.getInstructions()).toBe(HARNESS_AWARENESS);
+
+		await client.close();
+	});
+
+	// A harness reads these instructions once, at connect, and the app never
+	// prompts it again — so this is its only channel for the directive.
+	it('appends the language directive to a harness playbook', async () => {
+		const directive = 'LANGUAGE: reply in Ελληνικά.';
+		const client = await connectAs(HARNESS_ROOT, directive);
+
+		expect(client.getInstructions()).toBe(
+			`${HARNESS_AWARENESS}\n\n${directive}`,
+		);
+
+		await client.close();
+	});
+
+	// A first-class runtime is prompted per turn and already receives the
+	// directive there; repeating it here would state it twice in one prompt.
+	it('leaves the directive off a caller the app prompts per turn', async () => {
+		const client = await connectAs(
+			{ hasChatTab: true, role: 'orchestrator' },
+			'LANGUAGE: reply in Русский.',
+		);
+
+		expect(client.getInstructions()).toBe(ORCHESTRATOR_AWARENESS);
 
 		await client.close();
 	});

@@ -1,5 +1,6 @@
 import { useAtom, useAtomValue } from 'jotai';
 import { useCallback, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { useHotkey } from '@/renderer/hooks/use-hotkey';
 import { buildModelGroups } from '@/renderer/lib/workbench/model-picker-groups';
@@ -57,6 +58,7 @@ export function useModelPickerState({
 	options: readonly ComposerModelOption[];
 	value: string | null;
 }): ModelPickerState {
+	const { i18n } = useTranslation();
 	const [internalOpen, setInternalOpen] = useState(false);
 	const open = controlledOpen ?? internalOpen;
 	const setOpen = useCallback(
@@ -83,9 +85,10 @@ export function useModelPickerState({
 		[setFavourites],
 	);
 
+	// biome-ignore lint/correctness/useExhaustiveDependencies: provider labels are translated through the i18n singleton, so the language is a real input Biome cannot see.
 	const groups = useMemo(
 		() => buildModelGroups(options, favourites, hidden, lockedProvider),
-		[options, favourites, hidden, lockedProvider],
+		[options, favourites, hidden, lockedProvider, i18n.language],
 	);
 	const orderedShortcuts = useMemo(
 		() =>

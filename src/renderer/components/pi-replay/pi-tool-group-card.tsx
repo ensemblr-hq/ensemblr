@@ -5,6 +5,7 @@ import {
 	XIcon,
 } from 'lucide-react';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
 	Collapsible,
 	CollapsibleContent,
@@ -28,6 +29,7 @@ export function PiToolGroupCard({
 	className?: string;
 	group: PiToolGroupItem;
 }) {
+	const { t } = useTranslation();
 	const [open, setOpen] = useState(false);
 	const Chevron = open ? ChevronDownIcon : ChevronRightIcon;
 	const running = group.calls.some((call) => call.endedAtMs === null);
@@ -70,11 +72,17 @@ export function PiToolGroupCard({
 					/>
 				)}
 				<span className='font-medium text-foreground/85'>
-					{group.calls.length} tool calls
+					{t('common:turn-summary.tool-calls', {
+						count: group.calls.length,
+						defaultValue_one: '{{count}} tool call',
+						defaultValue_other: '{{count}} tool calls',
+					})}
 				</span>
 				{spanMs !== null ? (
 					<span className='text-muted-foreground/60 text-xs'>
-						· {(spanMs / 1000).toFixed(1)}s
+						{`· ${t('common:units.seconds', '{{seconds}}s', {
+							seconds: (spanMs / 1000).toFixed(1),
+						})}`}
 					</span>
 				) : null}
 			</CollapsibleTrigger>

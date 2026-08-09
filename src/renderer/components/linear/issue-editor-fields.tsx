@@ -1,3 +1,6 @@
+import type { TFunction } from 'i18next';
+import { useTranslation } from 'react-i18next';
+
 import { Badge } from '@/renderer/components/ui/badge';
 import { Input } from '@/renderer/components/ui/input';
 import {
@@ -14,13 +17,26 @@ import type {
 	LinearResourceWire,
 } from '@/shared/ipc/contracts/linear';
 
-const PRIORITY_OPTIONS = [
-	{ label: 'No priority', value: '0' },
-	{ label: 'Urgent', value: '1' },
-	{ label: 'High', value: '2' },
-	{ label: 'Medium', value: '3' },
-	{ label: 'Low', value: '4' },
-];
+/**
+ * Linear's five priority levels as picker options, built per render so the
+ * labels follow the active language.
+ * @param t - Translation function from the calling component
+ * @returns Priority options in the select's own shape
+ */
+function buildPriorityOptions(
+	t: TFunction,
+): Array<{ label: string; value: string }> {
+	return [
+		{
+			label: t('linear:issue-editor.priority.none', 'No priority'),
+			value: '0',
+		},
+		{ label: t('linear:issue-editor.priority.urgent', 'Urgent'), value: '1' },
+		{ label: t('linear:issue-editor.priority.high', 'High'), value: '2' },
+		{ label: t('linear:issue-editor.priority.medium', 'Medium'), value: '3' },
+		{ label: t('linear:issue-editor.priority.low', 'Low'), value: '4' },
+	];
+}
 
 /** Shared shape of the editor's picker sections: current fields plus the patch sink. */
 interface IssueEditorSectionProps {
@@ -79,6 +95,8 @@ function EditorSelect({
 	placeholder: string;
 	value: string | undefined;
 }) {
+	const { t } = useTranslation();
+
 	return (
 		<Select onValueChange={onChange} value={value}>
 			<SelectTrigger aria-label={ariaLabel} size='sm'>
@@ -86,7 +104,11 @@ function EditorSelect({
 			</SelectTrigger>
 			<SelectContent>
 				{allowUnset ? (
-					<SelectItem value={UNSET_FIELD}>{placeholder}: none</SelectItem>
+					<SelectItem value={UNSET_FIELD}>
+						{t('linear:issue-editor.unset-option', '{{field}}: none', {
+							field: placeholder,
+						})}
+					</SelectItem>
 				) : null}
 				{options.map((option) => (
 					<SelectItem key={option.value} value={option.value}>
@@ -109,11 +131,19 @@ export function IssueEditorFieldGrid({
 	mode,
 	update,
 }: IssueEditorSectionProps & { mode: 'create' | 'edit' }) {
+	const { t } = useTranslation();
+	const teamLabel = t('linear:issue-editor.field.team', 'Team');
+	const statusLabel = t('linear:issue-editor.field.status', 'Status');
+	const priorityLabel = t('linear:issue-editor.field.priority', 'Priority');
+	const assigneeLabel = t('linear:issue-editor.field.assignee', 'Assignee');
+	const projectLabel = t('linear:issue-editor.field.project', 'Project');
+	const cycleLabel = t('linear:issue-editor.field.cycle', 'Cycle');
+
 	return (
 		<div className='grid grid-cols-2 gap-2'>
 			{mode === 'create' ? (
 				<EditorSelect
-					aria-label='Team'
+					aria-label={teamLabel}
 					onChange={(teamId) =>
 						update({
 							cycleId: UNSET_FIELD,
@@ -123,52 +153,52 @@ export function IssueEditorFieldGrid({
 						})
 					}
 					options={toOptions(metadata?.teams)}
-					placeholder='Team'
+					placeholder={teamLabel}
 					value={fields.teamId || undefined}
 				/>
 			) : null}
 			<EditorSelect
-				aria-label='Status'
+				aria-label={statusLabel}
 				allowUnset
 				onChange={(stateId) => update({ stateId })}
 				options={toOptions(filterByTeam(metadata?.states ?? [], fields.teamId))}
-				placeholder='Status'
+				placeholder={statusLabel}
 				value={fields.stateId}
 			/>
 			<EditorSelect
-				aria-label='Priority'
+				aria-label={priorityLabel}
 				allowUnset
 				onChange={(priority) => update({ priority })}
-				options={PRIORITY_OPTIONS}
-				placeholder='Priority'
+				options={buildPriorityOptions(t)}
+				placeholder={priorityLabel}
 				value={fields.priority}
 			/>
 			<EditorSelect
-				aria-label='Assignee'
+				aria-label={assigneeLabel}
 				allowUnset
 				onChange={(assigneeId) => update({ assigneeId })}
 				options={toOptions(metadata?.users)}
-				placeholder='Assignee'
+				placeholder={assigneeLabel}
 				value={fields.assigneeId}
 			/>
 			<EditorSelect
-				aria-label='Project'
+				aria-label={projectLabel}
 				allowUnset
 				onChange={(projectId) => update({ projectId })}
 				options={toOptions(metadata?.projects)}
-				placeholder='Project'
+				placeholder={projectLabel}
 				value={fields.projectId}
 			/>
 			<EditorSelect
-				aria-label='Cycle'
+				aria-label={cycleLabel}
 				allowUnset
 				onChange={(cycleId) => update({ cycleId })}
 				options={toOptions(filterByTeam(metadata?.cycles ?? [], fields.teamId))}
-				placeholder='Cycle'
+				placeholder={cycleLabel}
 				value={fields.cycleId}
 			/>
 			<Input
-				aria-label='Due date'
+				aria-label={t('linear:issue-editor.field.due-date', 'Due date')}
 				onChange={(event) => update({ dueDate: event.target.value })}
 				type='date'
 				value={fields.dueDate}

@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useAtom } from 'jotai';
 import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { agentModelsQuery } from '@/renderer/api/ensemblr';
 import { SettingsEmptyState } from '@/renderer/components/settings/settings-empty-state';
@@ -46,6 +47,7 @@ function groupByProvider(models: readonly AgentModelOption[]): ProviderGroup[] {
  * from the picker list. Mirrors the self-fetching shape of the settings lists.
  */
 export function ModelVisibilityList() {
+	const { t } = useTranslation();
 	const { data, error, isLoading } = useQuery(agentModelsQuery);
 	const [hidden, setHidden] = useAtom(hiddenModelsAtom);
 	const [query, setQuery] = useState('');
@@ -69,7 +71,8 @@ export function ModelVisibilityList() {
 	if (isLoading) {
 		return (
 			<div className='flex items-center gap-2 py-6 text-muted-foreground text-sm'>
-				<Spinner className='size-4' /> Loading models…
+				<Spinner className='size-4' />{' '}
+				{t('settings:models.loading', 'Loading models…')}
 			</div>
 		);
 	}
@@ -77,14 +80,20 @@ export function ModelVisibilityList() {
 	if (error) {
 		return (
 			<div className='py-6 text-sm text-status-danger'>
-				Model discovery failed: {String(error)}.
+				{t(
+					'settings:models.discovery-failed',
+					'Model discovery failed: {{error}}.',
+					{ error: String(error) },
+				)}
 			</div>
 		);
 	}
 
 	if (models.length === 0) {
 		return (
-			<p className='py-6 text-muted-foreground text-sm'>No models available.</p>
+			<p className='py-6 text-muted-foreground text-sm'>
+				{t('settings:models.visibility.empty', 'No models available.')}
+			</p>
 		);
 	}
 
@@ -126,10 +135,16 @@ export function ModelVisibilityList() {
 		<div className='space-y-3'>
 			<div className='flex items-center gap-2'>
 				<Input
-					aria-label='Search models'
+					aria-label={t(
+						'settings:models.visibility.search-aria-label',
+						'Search models',
+					)}
 					className='h-8'
 					onChange={(event) => setQuery(event.target.value)}
-					placeholder='Search models…'
+					placeholder={t(
+						'settings:models.visibility.search-placeholder',
+						'Search models…',
+					)}
 					value={query}
 				/>
 				<Button
@@ -139,12 +154,18 @@ export function ModelVisibilityList() {
 					size='sm'
 					variant='ghost'
 				>
-					Show all
+					{t('settings:models.visibility.show-all', 'Show all')}
 				</Button>
 			</div>
 
 			{groups.length === 0 ? (
-				<SettingsEmptyState title={`No models match “${query}”.`} />
+				<SettingsEmptyState
+					title={t(
+						'settings:models.visibility.no-matches',
+						'No models match “{{query}}”.',
+						{ query },
+					)}
+				/>
 			) : (
 				<ScrollArea className='h-80 rounded-md border bg-card/40'>
 					<ul className='divide-y divide-border'>
@@ -164,14 +185,29 @@ export function ModelVisibilityList() {
 											{group.providerLabel}
 										</span>
 										<Switch
-											aria-label={`${providerVisible ? 'Hide' : 'Show'} all ${group.providerLabel} models`}
+											aria-label={
+												providerVisible
+													? t(
+															'settings:models.visibility.hide-provider',
+															'Hide all {{provider}} models',
+															{ provider: group.providerLabel },
+														)
+													: t(
+															'settings:models.visibility.show-provider',
+															'Show all {{provider}} models',
+															{ provider: group.providerLabel },
+														)
+											}
 											checked={providerVisible}
 											disabled={providerLocked}
 											onCheckedChange={() => toggleProvider(group)}
 											size='sm'
 											title={
 												providerLocked
-													? 'At least one model must stay visible'
+													? t(
+															'settings:models.visibility.locked',
+															'At least one model must stay visible',
+														)
 													: undefined
 											}
 										/>
@@ -198,14 +234,29 @@ export function ModelVisibilityList() {
 														) : null}
 													</div>
 													<Switch
-														aria-label={`${visible ? 'Hide' : 'Show'} ${model.displayName}`}
+														aria-label={
+															visible
+																? t(
+																		'settings:models.visibility.hide-model',
+																		'Hide {{model}}',
+																		{ model: model.displayName },
+																	)
+																: t(
+																		'settings:models.visibility.show-model',
+																		'Show {{model}}',
+																		{ model: model.displayName },
+																	)
+														}
 														checked={visible}
 														disabled={lockedVisible}
 														onCheckedChange={() => toggle(model.id)}
 														size='sm'
 														title={
 															lockedVisible
-																? 'At least one model must stay visible'
+																? t(
+																		'settings:models.visibility.locked',
+																		'At least one model must stay visible',
+																	)
 																: undefined
 														}
 													/>
@@ -221,7 +272,12 @@ export function ModelVisibilityList() {
 			)}
 
 			<p className='text-muted-foreground text-xs'>
-				{hiddenCount} of {models.length} hidden.
+				{t('settings:models.visibility.hidden-count', {
+					count: hiddenCount,
+					defaultValue_one: '{{count}} of {{total}} hidden.',
+					defaultValue_other: '{{count}} of {{total}} hidden.',
+					total: models.length,
+				})}
 			</p>
 		</div>
 	);

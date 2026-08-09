@@ -24,7 +24,8 @@ const stubService: AgentControlService = {
 		}
 		return { ok: true, data: { echoed: command.op } };
 	},
-	readSessionBriefNudge: async () => null,
+	readLanguageDirective: () => null,
+	readTurnPreamble: async () => null,
 	releaseSession: () => {},
 };
 
@@ -177,7 +178,8 @@ describe('control server', () => {
 				hasChatTab: false,
 				role: 'orchestrator',
 			}),
-			readSessionBriefNudge: async () => null,
+			readLanguageDirective: () => null,
+			readTurnPreamble: async () => null,
 			releaseSession: () => {},
 		};
 		server = await startControlServer(holdingService, {
@@ -242,7 +244,8 @@ describe('control server', () => {
 				hasChatTab: false,
 				role: 'orchestrator',
 			}),
-			readSessionBriefNudge: async () => null,
+			readLanguageDirective: () => null,
+			readTurnPreamble: async () => null,
 			releaseSession: () => {},
 		};
 		server = await startControlServer(holdingService);

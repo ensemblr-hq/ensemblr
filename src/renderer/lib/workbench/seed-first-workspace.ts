@@ -6,6 +6,7 @@ import {
 	repositoryWorkspaceNavigationQuery,
 } from '@/renderer/api/ensemblr-queries';
 import { queryClient } from '@/renderer/api/query-client';
+import { i18n } from '@/renderer/lib/i18n';
 import type { StoredWorkspaceSelection } from '@/renderer/types/workbench';
 import type { RepositoryWorkspaceNavigationSnapshot } from '@/shared/ipc/contracts/repository-navigation';
 import type { CreateWorkspaceResult } from '@/shared/ipc/contracts/workspace';
@@ -57,7 +58,10 @@ export async function seedFirstWorkspace({
 			error:
 				error instanceof Error
 					? error.message
-					: 'The starter workspace could not be created.',
+					: i18n.t(
+							'errors:seed-workspace.create-failed.message',
+							'The starter workspace could not be created.',
+						),
 			status: 'failure',
 		};
 	}
@@ -65,7 +69,11 @@ export async function seedFirstWorkspace({
 	if (result.status !== 'success' || !result.workspace) {
 		const reason =
 			result.diagnostics.find((diagnostic) => diagnostic.severity === 'error')
-				?.message ?? 'The starter workspace could not be created.';
+				?.message ??
+			i18n.t(
+				'errors:seed-workspace.create-failed.message',
+				'The starter workspace could not be created.',
+			);
 		return { error: reason, status: 'failure' };
 	}
 
@@ -90,8 +98,10 @@ export async function seedFirstWorkspace({
 
 	if (!routeParams) {
 		return {
-			error:
+			error: i18n.t(
+				'errors:seed-workspace.not-in-snapshot.message',
 				'The starter workspace was created, but the navigation snapshot did not include it yet.',
+			),
 			status: 'failure',
 			workspaceId,
 		};
@@ -147,12 +157,18 @@ export async function refreshRepositoryWorkspaceNavigationCache(
 function getNavigationRefreshErrorMessage(error: unknown): string {
 	return error instanceof Error
 		? error.message
-		: 'The starter workspace was created, but the navigation snapshot could not be refreshed.';
+		: i18n.t(
+				'errors:seed-workspace.refresh-failed.message',
+				'The starter workspace was created, but the navigation snapshot could not be refreshed.',
+			);
 }
 
 /** Builds the user-facing message for a failed post-create route transition. */
 function getWorkspaceOpenErrorMessage(error: unknown): string {
 	return error instanceof Error
 		? error.message
-		: 'The starter workspace was created, but it could not be opened.';
+		: i18n.t(
+				'errors:seed-workspace.open-failed.message',
+				'The starter workspace was created, but it could not be opened.',
+			);
 }

@@ -4,6 +4,7 @@
  * asked: pick a numbered option, type your own answer, or dismiss it.
  */
 import { XIcon } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { QuestionFooter } from '@/renderer/components/ask-user-question/question-footer';
 import { QuestionRows } from '@/renderer/components/ask-user-question/question-rows';
 import { Button } from '@/renderer/components/ui/button';
@@ -30,6 +31,7 @@ export function AskUserQuestionCard({
 	}) => void;
 	questions: readonly AskUserQuestionItem[];
 }) {
+	const { t } = useTranslation();
 	const { handleKeyDown, inputRef, run, shellRef, state } = useQuestionnaire({
 		onFinish,
 		questions,
@@ -43,7 +45,7 @@ export function AskUserQuestionCard({
 	return (
 		<footer className='shrink-0 bg-background px-4 pt-2 pb-5'>
 			<section
-				aria-label='Agent question'
+				aria-label={t('common:agent-question.section-label', 'Agent question')}
 				className='mx-auto flex w-full max-w-4xl flex-col gap-2 rounded-xl border border-border bg-pane/80 px-4 pt-3 pb-2.5 shadow-panel outline-none'
 				onKeyDown={handleKeyDown}
 				ref={shellRef}
@@ -54,7 +56,7 @@ export function AskUserQuestionCard({
 						{question.question}
 					</h2>
 					<Button
-						aria-label='Dismiss question'
+						aria-label={t('common:agent-question.dismiss', 'Dismiss question')}
 						className='-mt-0.5 -mr-1'
 						onClick={() => run({ type: 'cancel' })}
 						size='icon-xs'

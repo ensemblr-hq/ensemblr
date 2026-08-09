@@ -1,10 +1,15 @@
-import { ipcMain } from 'electron';
+import { app, ipcMain } from 'electron';
 
+import {
+	type AppLanguage,
+	FALLBACK_LANGUAGE,
+	resolveLanguage,
+} from '../../../shared/i18n';
 import { IPC_CHANNELS } from '../../../shared/ipc/channels';
 import type { HealthSnapshot } from '../../../shared/ipc/contracts/health';
 import type { RepositoryWorkspaceNavigationSnapshot } from '../../../shared/ipc/contracts/repository-navigation';
 import type { InitialShellSnapshot } from '../../../shared/ipc/contracts/shell-snapshot';
-import type { EnsemblrConfigService } from '../../config';
+import type { AppSettingsService, EnsemblrConfigService } from '../../config';
 import type { OpenTargetService } from '../../open-target';
 import type { EnsemblrDatabaseService } from '../../storage';
 import { getRepositoryWorkspaceNavigationSnapshot } from '../repository-workspace-navigation';
@@ -17,10 +22,12 @@ import { buildHealthSnapshot } from './health';
  * the preload bridge.
  */
 export function registerShellSnapshotHandlers({
+	appSettingsService,
 	configService,
 	databaseService,
 	openTargetService,
 }: {
+	appSettingsService: AppSettingsService;
 	configService: EnsemblrConfigService;
 	databaseService: EnsemblrDatabaseService;
 	openTargetService: OpenTargetService;
@@ -29,11 +36,31 @@ export function registerShellSnapshotHandlers({
 		const snapshot: InitialShellSnapshot = {
 			capturedAt: new Date().toISOString(),
 			health: safeBuildHealthSnapshot(configService, databaseService),
+			language: safeResolveLanguage(appSettingsService),
 			navigation: safeBuildNavigationSnapshot(databaseService),
 			openTargets: openTargetService.getCachedSnapshots(),
 		};
 		event.returnValue = snapshot;
 	});
+}
+
+/**
+ * Resolve the render language the same way the native menu does, so the
+ * renderer's first paint matches the menu bar instead of flashing English.
+ * @param appSettingsService - Reads the stored `general.language` preference
+ * @returns The resolved language, falling back to English when the read throws
+ */
+function safeResolveLanguage(
+	appSettingsService: AppSettingsService,
+): AppLanguage {
+	try {
+		return resolveLanguage(
+			appSettingsService.read().general.language,
+			app.getPreferredSystemLanguages(),
+		);
+	} catch {
+		return FALLBACK_LANGUAGE;
+	}
 }
 
 /**

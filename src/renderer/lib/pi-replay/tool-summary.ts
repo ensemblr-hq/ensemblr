@@ -4,6 +4,7 @@
  * `lsp_diagnostics` — see docs/pi/event-taxonomy.md).
  */
 
+import { i18n } from '@/renderer/lib/i18n';
 import type { PiToolCallItem } from '@/renderer/types/pi-replay';
 
 const SUMMARY_MAX_LENGTH = 64;
@@ -68,13 +69,19 @@ export function summarizeToolCall(call: PiToolCallItem): string {
 	switch (call.toolName) {
 		case 'bash': {
 			const command = stringArg(call.args, 'command');
-			return command ? firstLine(command) : 'shell command';
+			return command
+				? firstLine(command)
+				: i18n.t('workbench:pi-replay.summary.shell-command', 'shell command');
 		}
 		case 'read':
-			return path ? shortPath(path) : 'file';
+			return path
+				? shortPath(path)
+				: i18n.t('workbench:pi-replay.summary.file', 'file');
 		case 'edit':
 		case 'write': {
-			const label = path ? shortPath(path) : 'file';
+			const label = path
+				? shortPath(path)
+				: i18n.t('workbench:pi-replay.summary.file', 'file');
 			const diff =
 				call.details && typeof call.details.diff === 'string'
 					? call.details.diff

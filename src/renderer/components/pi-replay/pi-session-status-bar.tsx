@@ -1,15 +1,32 @@
+import { useTranslation } from 'react-i18next';
 import { cn } from '@/renderer/lib/utils';
 import type { PiTimelineSessionMeta } from '@/renderer/types/pi-replay';
 
-/** Formats a token count compactly: 980, 4.2k, 1.3M. */
-function formatTokens(count: number): string {
-	if (count < 1000) {
-		return String(count);
+/**
+ * One compact number formatter per language. `Intl.NumberFormat` construction
+ * is the expensive half of formatting, and the status bar re-renders on every
+ * stats frame, so the instances are held for the life of the module.
+ */
+const COMPACT_FORMATTERS = new Map<string, Intl.NumberFormat>();
+
+/**
+ * Formats a token count in the reader's own abbreviation — `1.2K` in English,
+ * `1,2 тыс.` in Russian — which is why the suffix cannot be hard-coded.
+ * @param count - Raw token count.
+ * @param language - The active i18next language tag.
+ * @returns The abbreviated count.
+ */
+function formatTokens(count: number, language: string): string {
+	const cached = COMPACT_FORMATTERS.get(language);
+	if (cached) {
+		return cached.format(count);
 	}
-	if (count < 1_000_000) {
-		return `${(count / 1000).toFixed(1)}k`;
-	}
-	return `${(count / 1_000_000).toFixed(1)}M`;
+	const formatter = new Intl.NumberFormat(language, {
+		maximumFractionDigits: 1,
+		notation: 'compact',
+	});
+	COMPACT_FORMATTERS.set(language, formatter);
+	return formatter.format(count);
 }
 
 /**
@@ -24,6 +41,7 @@ export function PiSessionStatusBar({
 	className?: string;
 	session: PiTimelineSessionMeta;
 }) {
+	const { i18n, t } = useTranslation();
 	const { model, stats, statusTexts } = session;
 	const tokens = stats?.tokens?.total ?? null;
 	const cost = stats?.cost ?? null;
@@ -34,13 +52,24 @@ export function PiSessionStatusBar({
 		segments.push(model);
 	}
 	if (tokens !== null) {
-		segments.push(`${formatTokens(tokens)} tokens`);
+		segments.push(
+			t('common:session-status.tokens', {
+				count: tokens,
+				defaultValue_one: '{{formatted}} token',
+				defaultValue_other: '{{formatted}} tokens',
+				formatted: formatTokens(tokens, i18n.language),
+			}),
+		);
 	}
 	if (cost !== null) {
 		segments.push(`$${cost.toFixed(2)}`);
 	}
 	if (contextPercent !== null && contextPercent !== undefined) {
-		segments.push(`${Math.round(contextPercent)}% context`);
+		segments.push(
+			t('common:session-status.context', '{{percent}}% context', {
+				percent: Math.round(contextPercent),
+			}),
+		);
 	}
 	if (segments.length === 0 && statusEntries.length === 0) {
 		return null;

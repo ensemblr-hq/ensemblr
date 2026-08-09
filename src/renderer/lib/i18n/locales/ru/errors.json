@@ -1,0 +1,249 @@
+{
+	"agent-action": {
+		"prompt-failed": {
+			"title": "Не удалось подготовить промпт действия."
+		}
+	},
+	"agent-launch": {
+		"failed": {
+			"description": "{{harness}} недоступен.",
+			"title": "Не удалось запустить агента"
+		}
+	},
+	"agent-restore": {
+		"failed": {
+			"description": "Не удалось возобновить работу харнесса.",
+			"title": "Не удалось восстановить агента"
+		}
+	},
+	"attachment": {
+		"malformed": {
+			"message": "Данные вставленного файла имеют неверный формат."
+		},
+		"read-failed": {
+			"message": "Не удалось прочитать вставленный файл."
+		},
+		"save-failed": {
+			"message": "Не удалось сохранить вставленный файл."
+		}
+	},
+	"chat-tab": {
+		"dropped-submits": {
+			"title_one": "Отменено действие в очереди для закрытого диалога.",
+			"title_few": "Отменено {{count}} действия в очереди для закрытого диалога.",
+			"title_many": "Отменено {{count}} действий в очереди для закрытого диалога.",
+			"title_other": "Отменено {{count}} действия в очереди для закрытого диалога."
+		},
+		"open-failed": {
+			"title": "Не удалось открыть вкладку"
+		},
+		"pin-failed": {
+			"title": "Не удалось оставить вкладку открытой"
+		},
+		"reorder-failed": {
+			"title": "Не удалось изменить порядок вкладок"
+		}
+	},
+	"checkpoint-restore": {
+		"failed": {
+			"title": "Восстановление не удалось"
+		},
+		"restored": {
+			"description": "Файлы возвращены к состоянию до «{{label}}».",
+			"title": "Рабочая область восстановлена"
+		}
+	},
+	"clone": {
+		"cloned": {
+			"title": "Репозиторий {{name}} клонирован."
+		},
+		"open-failed": {
+			"title": "Репозиторий {{name}} клонирован, но открыть не удалось."
+		}
+	},
+	"composer": {
+		"no-chat-tab": {
+			"title": "Откройте вкладку диалога, чтобы передать это агенту."
+		}
+	},
+	"continue-branch": {
+		"failed": {
+			"title": "Не удалось продолжить после merge pull request."
+		},
+		"success": {
+			"title": "Продолжаем на ветке {{branch}}."
+		}
+	},
+	"diff-comment": {
+		"update-failed": {
+			"title": "Не удалось обновить комментарий"
+		}
+	},
+	"discard-changes": {
+		"failed": "Не удалось отменить изменения."
+	},
+	"fork": {
+		"failed": {
+			"title": "Не удалось выполнить fork."
+		},
+		"new-tab": {
+			"title": "Fork создан в новой вкладке."
+		},
+		"new-workspace": {
+			"title": "Fork создан в рабочей области {{name}}."
+		},
+		"summary-failed": {
+			"title": "Не удалось записать сводку fork."
+		},
+		"workspace-failed": {
+			"title": "Не удалось создать рабочую область для fork."
+		}
+	},
+	"merge": {
+		"failed": {
+			"title": "Не удалось выполнить merge"
+		}
+	},
+	"open-local-project": {
+		"bridge-unavailable": {
+			"title": "Preload-мост недоступен в этом контексте."
+		},
+		"import-failed": {
+			"title": "Не удалось импортировать репозиторий."
+		},
+		"opened": {
+			"title": "Репозиторий {{name}} открыт."
+		},
+		"seed-failed": {
+			"title": "Репозиторий {{name}} импортирован, но открыть рабочую область не удалось."
+		},
+		"unexpected": {
+			"title": "Не удалось открыть локальный проект."
+		}
+	},
+	"open-target": {
+		"bridge-unavailable": {
+			"title": "«Открыть в…» недоступно без моста Electron."
+		},
+		"open-failed": {
+			"title": "Не удалось открыть в {{target}}: {{error}}"
+		},
+		"settings-open-failed": {
+			"title": "Не удалось открыть файл настроек в {{target}}."
+		}
+	},
+	"plan-handoff": {
+		"failed": {
+			"title": "Не удалось передать план."
+		}
+	},
+	"pull-request-refresh": {
+		"failed": {
+			"title": "Не удалось обновить pull request"
+		}
+	},
+	"push": {
+		"failed": {
+			"title": "Не удалось выполнить push"
+		},
+		"success": {
+			"title": "Push ветки выполнен."
+		}
+	},
+	"quick-start": {
+		"created": {
+			"title": "Создан проект {{name}}."
+		},
+		"open-failed": {
+			"title": "Проект {{name}} создан, но открыть не удалось."
+		}
+	},
+	"repo-settings": {
+		"save-failed": {
+			"title": "Не удалось сохранить настройки репозитория."
+		}
+	},
+	"review-action": {
+		"failed": {
+			"description": "Не удалось выполнить операцию GitHub."
+		}
+	},
+	"review-todo": {
+		"failed": {
+			"title": "Не удалось обновить todo"
+		}
+	},
+	"route-error": {
+		"detail": "Не удалось загрузить данные маршрута.",
+		"health-detail": "TanStack Router перехватил ошибку на уровне маршрута.",
+		"health-label": "Ошибка маршрута",
+		"title": "Маршрут недоступен"
+	},
+	"route-not-found": {
+		"detail": "Запрошенный маршрут не существует.",
+		"health-detail": "Выберите другой маршрут в навигации рабочей области.",
+		"health-label": "Не найдено",
+		"title": "Страница не найдена"
+	},
+	"route-pending": {
+		"detail": "Ensemblr читает репозитории и рабочие области из SQLite.",
+		"health-detail": "Загружаются данные маршрута рендерера.",
+		"health-label": "Загрузка",
+		"title": "Загрузка репозиториев"
+	},
+	"script-settings": {
+		"save-failed": {
+			"title": "Не удалось сохранить настройки скриптов."
+		}
+	},
+	"seed-workspace": {
+		"create-failed": {
+			"message": "Не удалось создать начальную рабочую область."
+		},
+		"not-in-snapshot": {
+			"message": "Начальная рабочая область создана, но ещё не попала в снимок навигации."
+		},
+		"open-failed": {
+			"message": "Начальная рабочая область создана, но открыть её не удалось."
+		},
+		"refresh-failed": {
+			"message": "Начальная рабочая область создана, но обновить снимок навигации не удалось."
+		}
+	},
+	"setup-script": {
+		"chat-failed": {
+			"description": "Повторите действие «Спросить агента» на вкладке настройки.",
+			"title": "Не удалось открыть новый диалог."
+		},
+		"chat-ready": {
+			"description": "Отправьте промпт, чтобы агент создал .ensemblr/settings.toml — при необходимости сначала отредактируйте его.",
+			"title": "Новый диалог готов к настройке."
+		}
+	},
+	"target-branch": {
+		"retarget-failed": {
+			"title": "Не удалось изменить целевую ветку."
+		}
+	},
+	"terminal": {
+		"start-failed": {
+			"title": "Не удалось запустить терминал."
+		}
+	},
+	"workspace-archive": {
+		"archived": {
+			"title": "Рабочая область архивирована."
+		},
+		"failed": {
+			"title": "Не удалось архивировать рабочую область."
+		},
+		"skipped": {
+			"title": "Рабочая область не была архивирована."
+		}
+	},
+	"workspace-create": {
+		"failed": {
+			"title": "Не удалось создать рабочую область."
+		}
+	}
+}

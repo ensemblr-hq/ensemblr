@@ -1,4 +1,5 @@
 import { CalendarIcon, UserIcon } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 import { Badge } from '@/renderer/components/ui/badge';
 import { getLinearPriorityLabel } from '@/renderer/lib/linear';
@@ -36,6 +37,8 @@ export function LinearIssueMetaBadges({
 	issue: LinearIssueWire;
 	showLabels?: boolean;
 }) {
+	const { t } = useTranslation();
+
 	return (
 		<span className='flex flex-wrap items-center gap-1.5'>
 			<LinearStateBadge color={issue.stateColor} name={issue.stateName} />
@@ -56,7 +59,11 @@ export function LinearIssueMetaBadges({
 					{issue.dueDate}
 				</Badge>
 			) : null}
-			{issue.archivedAt ? <Badge variant='secondary'>Archived</Badge> : null}
+			{issue.archivedAt ? (
+				<Badge variant='secondary'>
+					{t('linear:issue-badges.archived', 'Archived')}
+				</Badge>
+			) : null}
 			{showLabels
 				? issue.labels.map((label) => (
 						<Badge key={label.id} variant='outline'>

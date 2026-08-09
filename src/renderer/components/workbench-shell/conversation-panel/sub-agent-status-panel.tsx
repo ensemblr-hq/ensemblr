@@ -1,4 +1,5 @@
 import { useAtomValue } from 'jotai';
+import { useTranslation } from 'react-i18next';
 
 import {
 	resolveComposerProvider,
@@ -26,6 +27,7 @@ export function SubAgentStatusPanel({
 }: {
 	composer: ComposerShellState;
 }) {
+	const { t } = useTranslation();
 	const alwaysShowContextUsage = useAtomValue(alwaysShowContextUsageAtom);
 
 	if (!composer.activeAgentSessionId) {
@@ -37,7 +39,10 @@ export function SubAgentStatusPanel({
 
 	return (
 		<aside
-			aria-label='Sub-agent runtime'
+			aria-label={t(
+				'workbench:sub-agent-status.aria-label',
+				'Sub-agent runtime',
+			)}
 			className='shrink-0 bg-background px-4 pt-2 pb-4'
 			data-role='sub-agent-status'
 		>

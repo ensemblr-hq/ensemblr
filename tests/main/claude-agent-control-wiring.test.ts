@@ -44,6 +44,7 @@ const setup = (
 			getAppPath: () => process.cwd(),
 			getPath: () => '/tmp/userData',
 		} as never,
+		getLanguage: () => 'en' as const,
 		getServerUrl: () => (options.serverUp === false ? null : SERVER_URL),
 		isSpawnedSubAgent: (sessionId) => marked.has(sessionId),
 		originRegistry: registry,
@@ -60,7 +61,7 @@ const setup = (
 			parentSessionId: input.parentSessionId ?? null,
 			provider: input.provider,
 			resolveAgentControlEnv,
-			resolveSessionBriefNudge: undefined,
+			resolveTurnPreamble: undefined,
 			sessionId: input.sessionId,
 			workspaceId: WORKSPACE,
 		});
@@ -157,7 +158,7 @@ describe('agent-control wiring: the control MCP endpoint', () => {
 			parentSessionId: null,
 			provider: 'claude',
 			resolveAgentControlEnv: undefined,
-			resolveSessionBriefNudge: undefined,
+			resolveTurnPreamble: undefined,
 			sessionId: 'claude-1',
 			workspaceId: WORKSPACE,
 		});
@@ -184,6 +185,7 @@ describe('agent-control wiring: the per-turn upkeep block', () => {
 				getAppPath: () => process.cwd(),
 				getPath: () => '/tmp/userData',
 			} as never,
+			getLanguage: () => 'en' as const,
 			getServerUrl: () => SERVER_URL,
 			originRegistry: registry,
 			resolveWorkspaceCwd: () => CWD,
@@ -196,7 +198,7 @@ describe('agent-control wiring: the per-turn upkeep block', () => {
 					parentSessionId: null,
 					provider,
 					resolveAgentControlEnv,
-					resolveSessionBriefNudge: async (id) => {
+					resolveTurnPreamble: async (id) => {
 						asked.push(id);
 						return 'UPKEEP';
 					},

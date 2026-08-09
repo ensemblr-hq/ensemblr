@@ -1,5 +1,6 @@
 import { PencilIcon, PlusIcon, Trash2Icon } from 'lucide-react';
 import { useState } from 'react';
+import { Trans, useTranslation } from 'react-i18next';
 
 import { RunScriptIcon } from '@/renderer/components/run-script-icon';
 import { Button } from '@/renderer/components/ui/button';
@@ -26,6 +27,7 @@ export function RunScriptsSection({
 	onChange: (scripts: RunScriptDefinition[]) => void;
 	scripts: readonly RunScriptDefinition[];
 }) {
+	const { t } = useTranslation();
 	const [target, setTarget] = useState<EditorTarget | null>(null);
 	const editing =
 		target?.kind === 'edit'
@@ -41,11 +43,15 @@ export function RunScriptsSection({
 		<div className='py-4'>
 			<div className='flex items-start justify-between gap-4'>
 				<div>
-					<p className='font-medium text-sm'>Run scripts</p>
+					<p className='font-medium text-sm'>
+						{t('settings:run-scripts.title', 'Run scripts')}
+					</p>
 					<p className='text-muted-foreground text-xs'>
-						Shortcuts for quick actions, like running your dev server or test
-						suite. Use <code>$ENSEMBLR_PORT</code> for the workspace's allocated
-						port.
+						<Trans
+							components={{ port: <code /> }}
+							defaults="Shortcuts for quick actions, like running your dev server or test suite. Use <port>$ENSEMBLR_PORT</port> for the workspace's allocated port."
+							i18nKey='settings:run-scripts.description'
+						/>
 					</p>
 				</div>
 				<Button
@@ -55,13 +61,16 @@ export function RunScriptsSection({
 					variant='outline'
 				>
 					<PlusIcon data-icon='inline-start' />
-					Add
+					{t('common:actions.add', 'Add')}
 				</Button>
 			</div>
 
 			{scripts.length === 0 ? (
 				<p className='mt-3 text-muted-foreground text-sm'>
-					No run scripts yet. Add one to get started.
+					{t(
+						'settings:run-scripts.empty',
+						'No run scripts yet. Add one to get started.',
+					)}
 				</p>
 			) : (
 				<ul className='mt-3 space-y-2'>
@@ -107,6 +116,8 @@ function RunScriptRow({
 	onEdit: () => void;
 	script: RunScriptDefinition;
 }) {
+	const { t } = useTranslation();
+
 	return (
 		<li className='flex items-center gap-3 rounded-lg border border-border px-3 py-2'>
 			<span className='grid size-8 shrink-0 place-items-center rounded-md border border-border text-muted-foreground'>
@@ -116,11 +127,16 @@ function RunScriptRow({
 				<p className='flex items-center gap-2 text-sm'>
 					{formatRunScriptLabel(script.name)}
 					{script.isDefault ? (
-						<span className='text-muted-foreground text-xs'>Default</span>
+						<span className='text-muted-foreground text-xs'>
+							{t('settings:run-scripts.row.default', 'Default')}
+						</span>
 					) : null}
 					{isRunScriptAvailableLocally(script) ? null : (
 						<span className='text-muted-foreground text-xs'>
-							Not available locally
+							{t(
+								'settings:run-scripts.row.unavailable',
+								'Not available locally',
+							)}
 						</span>
 					)}
 				</p>
@@ -129,7 +145,11 @@ function RunScriptRow({
 				</p>
 			</div>
 			<Button
-				aria-label={`Edit ${script.name}`}
+				aria-label={t(
+					'settings:run-scripts.row.edit-aria-label',
+					'Edit {{name}}',
+					{ name: script.name },
+				)}
 				onClick={onEdit}
 				size='icon-sm'
 				type='button'
@@ -138,7 +158,11 @@ function RunScriptRow({
 				<PencilIcon aria-hidden='true' />
 			</Button>
 			<Button
-				aria-label={`Delete ${script.name}`}
+				aria-label={t(
+					'settings:run-scripts.row.delete-aria-label',
+					'Delete {{name}}',
+					{ name: script.name },
+				)}
 				onClick={onDelete}
 				size='icon-sm'
 				type='button'

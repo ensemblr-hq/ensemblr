@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useSetAtom } from 'jotai';
+import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 
 import {
@@ -12,6 +13,7 @@ import {
 	refreshPullRequestSnapshot,
 } from '@/renderer/api/ensemblr-queries';
 import { useRemoveWorkspaceAction } from '@/renderer/hooks/workbench-shell/use-remove-workspace-action';
+import { i18n } from '@/renderer/lib/i18n';
 import {
 	ReviewActionError,
 	showReviewActionError,
@@ -32,13 +34,16 @@ function announceContinueSuccess(
 	diagnostics: ContinueWorkspaceBranchResult['diagnostics'],
 ): void {
 	const [warning] = diagnostics;
+	const title = i18n.t(
+		'errors:continue-branch.success.title',
+		'Continuing on {{branch}}.',
+		{ branch: branchName },
+	);
 	if (warning) {
-		toast.warning(`Continuing on ${branchName}.`, {
-			description: warning.message,
-		});
+		toast.warning(title, { description: warning.message });
 		return;
 	}
-	toast.success(`Continuing on ${branchName}.`);
+	toast.success(title);
 }
 
 /**
@@ -67,6 +72,7 @@ export function useReviewMutations({
 	onSettled: () => void;
 }) {
 	const queryClient = useQueryClient();
+	const { t } = useTranslation();
 	const setContinuedMergedPullRequests = useSetAtom(
 		continuedMergedPullRequestByWorkspaceAtom,
 	);
@@ -101,9 +107,13 @@ export function useReviewMutations({
 				workspaceId,
 			}),
 		onError: async (cause) => {
-			toast.warning('Archiving the workspace failed.', {
-				description: cause instanceof Error ? cause.message : undefined,
-			});
+			toast.warning(
+				t(
+					'errors:workspace-archive.failed.title',
+					'Archiving the workspace failed.',
+				),
+				{ description: cause instanceof Error ? cause.message : undefined },
+			);
 			await invalidateWorkspaceListViews(queryClient);
 		},
 		onSuccess: async (result) => {
@@ -116,12 +126,18 @@ export function useReviewMutations({
 					return rest;
 				});
 				await removeWorkspace(workspaceId);
-				toast.success('Workspace archived.');
+				toast.success(
+					t('errors:workspace-archive.archived.title', 'Workspace archived.'),
+				);
 				return;
 			}
-			toast.warning('The workspace was not archived.', {
-				description: result.diagnostics?.[0]?.message,
-			});
+			toast.warning(
+				t(
+					'errors:workspace-archive.skipped.title',
+					'The workspace was not archived.',
+				),
+				{ description: result.diagnostics?.[0]?.message },
+			);
 			await invalidateWorkspaceListViews(queryClient);
 		},
 	});
@@ -129,15 +145,23 @@ export function useReviewMutations({
 	const continueMergedWorkspaceMutation = useMutation({
 		mutationFn: () => continueWorkspaceBranch({ workspaceId }),
 		onError: (cause) => {
-			toast.error('Could not continue past the merged pull request.', {
-				description: cause instanceof Error ? cause.message : undefined,
-			});
+			toast.error(
+				t(
+					'errors:continue-branch.failed.title',
+					'Could not continue past the merged pull request.',
+				),
+				{ description: cause instanceof Error ? cause.message : undefined },
+			);
 		},
 		onSuccess: async (result) => {
 			if (result.status !== 'success' || result.branchName === null) {
-				toast.error('Could not continue past the merged pull request.', {
-					description: result.diagnostics[0]?.message,
-				});
+				toast.error(
+					t(
+						'errors:continue-branch.failed.title',
+						'Could not continue past the merged pull request.',
+					),
+					{ description: result.diagnostics[0]?.message },
+				);
 				return;
 			}
 			// The snapshot refresh below is what actually retires the merged
@@ -165,7 +189,11 @@ export function useReviewMutations({
 				throw new ReviewActionError(result.error);
 			}
 		},
-		onError: (error) => showReviewActionError('Merge failed', error),
+		onError: (error) =>
+			showReviewActionError(
+				t('errors:merge.failed.title', 'Merge failed'),
+				error,
+			),
 		onSuccess: () => {
 			onSettled();
 			void refreshPullRequestSnapshot({
@@ -194,9 +222,13 @@ export function useReviewMutations({
 				throw new ReviewActionError(result.error);
 			}
 		},
-		onError: (error) => showReviewActionError('Push failed', error),
+		onError: (error) =>
+			showReviewActionError(
+				t('errors:push.failed.title', 'Push failed'),
+				error,
+			),
 		onSuccess: async () => {
-			toast.success('Branch pushed.');
+			toast.success(t('errors:push.success.title', 'Branch pushed.'));
 			await Promise.all([
 				refreshPullRequestSnapshot({ queryClient, workspaceCwd, workspaceId }),
 				queryClient.invalidateQueries({

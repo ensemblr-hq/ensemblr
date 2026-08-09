@@ -1,5 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { useAtom } from 'jotai';
+import { useTranslation } from 'react-i18next';
 
 import { CodeBlock } from '@/renderer/components/code-block';
 import { SettingRow } from '@/renderer/components/settings/setting-row';
@@ -47,6 +48,7 @@ function sum(a, b) { return a + b; }`;
 
 /** Appearance settings panel for theme, code and markdown styling, and terminal font choices. */
 function AppearanceSettings() {
+	const { t } = useTranslation();
 	const [theme, setTheme] = useAtom(themeAtom);
 	const [accessibleColors, setAccessibleColors] = useAtom(accessibleColorsAtom);
 	const [codeTheme, setCodeTheme] = useAtom(codeThemeAtom);
@@ -57,7 +59,7 @@ function AppearanceSettings() {
 	const [terminalSize, setTerminalSize] = useAtom(terminalFontSizeAtom);
 
 	return (
-		<SettingsSection title='Appearance'>
+		<SettingsSection title={t('settings:appearance.title', 'Appearance')}>
 			<SettingRow
 				control={
 					<Select
@@ -68,14 +70,23 @@ function AppearanceSettings() {
 							<SelectValue />
 						</SelectTrigger>
 						<SelectContent>
-							<SelectItem value='system'>System</SelectItem>
-							<SelectItem value='light'>Light</SelectItem>
-							<SelectItem value='dark'>Dark</SelectItem>
+							<SelectItem value='system'>
+								{t('settings:appearance.theme.system', 'System')}
+							</SelectItem>
+							<SelectItem value='light'>
+								{t('settings:appearance.theme.light', 'Light')}
+							</SelectItem>
+							<SelectItem value='dark'>
+								{t('settings:appearance.theme.dark', 'Dark')}
+							</SelectItem>
 						</SelectContent>
 					</Select>
 				}
-				description='Toggle with ⌘⌥T.'
-				label='Theme'
+				description={t(
+					'settings:appearance.theme.description',
+					'Toggle with ⌘⌥T.',
+				)}
+				label={t('settings:appearance.theme.label', 'Theme')}
 				modified={theme !== DEFAULTS.theme}
 				onReset={() => setTheme(DEFAULTS.theme)}
 			/>
@@ -92,15 +103,38 @@ function AppearanceSettings() {
 							<SelectValue />
 						</SelectTrigger>
 						<SelectContent>
-							<SelectItem value='default'>Default</SelectItem>
-							<SelectItem value='protanopia'>Protanopia</SelectItem>
-							<SelectItem value='deuteranopia'>Deuteranopia</SelectItem>
-							<SelectItem value='tritanopia'>Tritanopia</SelectItem>
+							<SelectItem value='default'>
+								{t('settings:appearance.accessible-colors.default', 'Default')}
+							</SelectItem>
+							<SelectItem value='protanopia'>
+								{t(
+									'settings:appearance.accessible-colors.protanopia',
+									'Protanopia',
+								)}
+							</SelectItem>
+							<SelectItem value='deuteranopia'>
+								{t(
+									'settings:appearance.accessible-colors.deuteranopia',
+									'Deuteranopia',
+								)}
+							</SelectItem>
+							<SelectItem value='tritanopia'>
+								{t(
+									'settings:appearance.accessible-colors.tritanopia',
+									'Tritanopia',
+								)}
+							</SelectItem>
 						</SelectContent>
 					</Select>
 				}
-				description='Theme optimized for color vision differences.'
-				label='Accessible colors'
+				description={t(
+					'settings:appearance.accessible-colors.description',
+					'Theme optimized for color vision differences.',
+				)}
+				label={t(
+					'settings:appearance.accessible-colors.label',
+					'Accessible colors',
+				)}
 				modified={accessibleColors !== DEFAULTS.accessibleColors}
 				onReset={() => setAccessibleColors(DEFAULTS.accessibleColors)}
 			/>
@@ -123,8 +157,11 @@ function AppearanceSettings() {
 						</SelectContent>
 					</Select>
 				}
-				description='Syntax highlighting for code blocks and editors. Each theme follows the app theme, using its light cut in light mode and its dark cut in dark mode.'
-				label='Code theme'
+				description={t(
+					'settings:appearance.code-theme.description',
+					'Syntax highlighting for code blocks and editors. Each theme follows the app theme, using its light cut in light mode and its dark cut in dark mode.',
+				)}
+				label={t('settings:appearance.code-theme.label', 'Code theme')}
 				modified={codeTheme !== DEFAULTS.codeTheme}
 				onReset={() => setCodeTheme(DEFAULTS.codeTheme)}
 				stack
@@ -135,15 +172,21 @@ function AppearanceSettings() {
 			<SettingRow
 				control={
 					<Input
-						aria-label='Mono font name'
+						aria-label={t(
+							'settings:appearance.mono-font.aria-label',
+							'Mono font name',
+						)}
 						className='h-8 w-56'
 						onChange={(e) => setMonoFont(e.target.value)}
 						placeholder='JetBrainsMono Nerd Font Mono'
 						value={monoFont}
 					/>
 				}
-				description='Font used for code and diffs. The bundled Nerd Font is the default; custom fonts must be installed on your system.'
-				label='Mono font'
+				description={t(
+					'settings:appearance.mono-font.description',
+					'Font used for code and diffs. The bundled Nerd Font is the default; custom fonts must be installed on your system.',
+				)}
+				label={t('settings:appearance.mono-font.label', 'Mono font')}
 				modified={monoFont !== DEFAULTS.monoFont}
 				onReset={() => setMonoFont(DEFAULTS.monoFont)}
 				stack
@@ -157,8 +200,11 @@ function AppearanceSettings() {
 
 			<SettingRow
 				control={<Switch checked={ligatures} onCheckedChange={setLigatures} />}
-				description='Use font ligatures in file editors and diffs.'
-				label='Code ligatures'
+				description={t(
+					'settings:appearance.code-ligatures.description',
+					'Use font ligatures in file editors and diffs.',
+				)}
+				label={t('settings:appearance.code-ligatures.label', 'Code ligatures')}
 				modified={ligatures !== DEFAULTS.codeLigatures}
 				onReset={() => setLigatures(DEFAULTS.codeLigatures)}
 			/>
@@ -173,14 +219,23 @@ function AppearanceSettings() {
 							<SelectValue />
 						</SelectTrigger>
 						<SelectContent>
-							<SelectItem value='default'>Default</SelectItem>
-							<SelectItem value='compact'>Compact</SelectItem>
-							<SelectItem value='prose'>Prose</SelectItem>
+							<SelectItem value='default'>
+								{t('settings:appearance.markdown-style.default', 'Default')}
+							</SelectItem>
+							<SelectItem value='compact'>
+								{t('settings:appearance.markdown-style.compact', 'Compact')}
+							</SelectItem>
+							<SelectItem value='prose'>
+								{t('settings:appearance.markdown-style.prose', 'Prose')}
+							</SelectItem>
 						</SelectContent>
 					</Select>
 				}
-				description='Rendering style for markdown files.'
-				label='Markdown style'
+				description={t(
+					'settings:appearance.markdown-style.description',
+					'Rendering style for markdown files.',
+				)}
+				label={t('settings:appearance.markdown-style.label', 'Markdown style')}
 				modified={markdownStyle !== DEFAULTS.markdownStyle}
 				onReset={() => setMarkdownStyle(DEFAULTS.markdownStyle)}
 			/>
@@ -188,15 +243,21 @@ function AppearanceSettings() {
 			<SettingRow
 				control={
 					<Input
-						aria-label='Terminal font name'
+						aria-label={t(
+							'settings:appearance.terminal-font.aria-label',
+							'Terminal font name',
+						)}
 						className='h-8 w-56'
 						onChange={(e) => setTerminalFont(e.target.value)}
 						placeholder='JetBrainsMono Nerd Font Mono'
 						value={terminalFont}
 					/>
 				}
-				description='The bundled Nerd Font is the default; enter another font name exactly as installed to override it.'
-				label='Terminal font'
+				description={t(
+					'settings:appearance.terminal-font.description',
+					'The bundled Nerd Font is the default; enter another font name exactly as installed to override it.',
+				)}
+				label={t('settings:appearance.terminal-font.label', 'Terminal font')}
 				modified={terminalFont !== DEFAULTS.terminalFont}
 				onReset={() => setTerminalFont(DEFAULTS.terminalFont)}
 			/>
@@ -204,17 +265,26 @@ function AppearanceSettings() {
 			<SettingRow
 				control={
 					<span className='text-muted-foreground text-xs tabular-nums'>
-						{terminalSize}px
+						{t('common:units.px', '{{value}}px', { value: terminalSize })}
 					</span>
 				}
-				description='Adjust the size of text in the integrated terminal.'
-				label='Terminal font size'
+				description={t(
+					'settings:appearance.terminal-font-size.description',
+					'Adjust the size of text in the integrated terminal.',
+				)}
+				label={t(
+					'settings:appearance.terminal-font-size.label',
+					'Terminal font size',
+				)}
 				modified={terminalSize !== DEFAULTS.terminalFontSize}
 				onReset={() => setTerminalSize(DEFAULTS.terminalFontSize)}
 				stack
 			>
 				<input
-					aria-label='Terminal font size'
+					aria-label={t(
+						'settings:appearance.terminal-font-size.label',
+						'Terminal font size',
+					)}
 					className='mt-2 w-full accent-accent'
 					max={24}
 					min={8}

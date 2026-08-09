@@ -7,6 +7,7 @@ import {
 	useMemo,
 	useState,
 } from 'react';
+import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 
 import {
@@ -150,6 +151,7 @@ function usePrDetailsDraft(workspace: WorkspaceShellModel): PrDetailsFormState {
 
 /** Review-panel "Checks" tab — renders PR metadata, statuses, comments and todos. */
 export function ChecksPanel({ workspace }: { workspace: WorkspaceShellModel }) {
+	const { t } = useTranslation();
 	const panelState = getChecksPanelState(workspace);
 	const todoActions = useTodoActions(workspace.id);
 	const reviewActions = useReviewActions();
@@ -171,15 +173,26 @@ export function ChecksPanel({ workspace }: { workspace: WorkspaceShellModel }) {
 		reviewActions?.runAgentAction('create-pr');
 		toast.success(
 			workspace.pullRequest.number
-				? 'Asked the agent to update the pull request.'
-				: 'Asked the agent to open a pull request.',
+				? t(
+						'git:pull-request-update.asked.title',
+						'Asked the agent to update the pull request.',
+					)
+				: t(
+						'git:pull-request-create.asked.title',
+						'Asked the agent to open a pull request.',
+					),
 		);
-	}, [reviewActions, workspace.pullRequest.number]);
+	}, [reviewActions, t, workspace.pullRequest.number]);
 
 	const sendResolveConflicts = useCallback(() => {
 		reviewActions?.runAgentAction('resolve-conflicts');
-		toast.success('Asked the agent to resolve the merge conflicts.');
-	}, [reviewActions]);
+		toast.success(
+			t(
+				'git:merge-conflicts.asked.title',
+				'Asked the agent to resolve the merge conflicts.',
+			),
+		);
+	}, [reviewActions, t]);
 
 	const conflictsSection =
 		conflicts.paths.size || conflicts.error ? (
@@ -258,20 +271,17 @@ interface TodoActions {
 	toggleTodo: (input: { id: string; nextDone: boolean }) => void;
 }
 
-/**
- * Show an error toast when a todo mutation fails.
- * @param error - The thrown error, if any.
- */
-function notifyTodoUpdateFailed(error: unknown): void {
-	toast.error('Todo update failed', {
-		description: error instanceof Error ? error.message : undefined,
-	});
-}
-
 /** Mutations for the "Your todos" section, invalidating the todos query. */
 function useTodoActions(workspaceId: string): TodoActions {
+	const { t } = useTranslation();
 	const queryClient = useQueryClient();
-	const onError = notifyTodoUpdateFailed;
+	const onError = useCallback(
+		(error: unknown) =>
+			toast.error(t('errors:review-todo.failed.title', 'Todo update failed'), {
+				description: error instanceof Error ? error.message : undefined,
+			}),
+		[t],
+	);
 
 	const addMutation = useMutation({
 		mutationFn: (title: string) => saveReviewTodo({ title, workspaceId }),
@@ -338,6 +348,7 @@ function ChecksPullRequestPanel({
 	todoActions: TodoActions;
 	workspace: WorkspaceShellModel;
 }) {
+	const { t } = useTranslation();
 	const { pullRequest } = state;
 	const insertIntoComposer = useComposerInsert();
 	const gitStatusSection = resolveGitStatusSection(state);
@@ -363,7 +374,10 @@ function ChecksPullRequestPanel({
 				{pullRequest.syncError ? (
 					<PanelAlert
 						detail={pullRequest.syncError}
-						title='Could not refresh from GitHub'
+						title={t(
+							'review:checks.sync-error.title',
+							'Could not refresh from GitHub',
+						)}
 					/>
 				) : null}
 				{children}
@@ -372,10 +386,12 @@ function ChecksPullRequestPanel({
 					<section className='flex min-w-0 flex-col gap-1.5'>
 						<ChecksSectionHeader
 							actionLabel={
-								gitStatusSection.showUpdateAction ? 'Update PR' : undefined
+								gitStatusSection.showUpdateAction
+									? t('git:pull-request.update-action', 'Update PR')
+									: undefined
 							}
 							disabled={isAgentWorking}
-							label='Git status'
+							label={t('review:checks.git-status', 'Git status')}
 							onAction={onUpdatePullRequest}
 						/>
 						<PullRequestStatusRow
@@ -390,13 +406,15 @@ function ChecksPullRequestPanel({
 				{conflictsSection}
 
 				<section className='flex min-w-0 flex-col gap-1.5'>
-					<ChecksSectionHeader label='Checks' />
+					<ChecksSectionHeader label={t('review:checks.checks', 'Checks')} />
 					{pullRequest.checks.length ? (
 						pullRequest.checks.map((check) => (
 							<PullRequestCheckRow check={check} key={check.id} />
 						))
 					) : (
-						<ChecksEmptyMessage label='No checks reported' />
+						<ChecksEmptyMessage
+							label={t('review:checks.no-checks', 'No checks reported')}
+						/>
 					)}
 				</section>
 
@@ -409,7 +427,9 @@ function ChecksPullRequestPanel({
 				<TodoSection
 					onAddToChat={(todo) => {
 						insertIntoComposer(formatTodoContext(todo));
-						toast.success('Todo added to chat.');
+						toast.success(
+							t('review:todo.added-to-chat.title', 'Todo added to chat.'),
+						);
 					}}
 					todoActions={todoActions}
 					todos={workspace.pullRequest.todos}
@@ -438,12 +458,14 @@ function ConflictsSection({
 	onResolve: () => void;
 	paths: readonly string[];
 }) {
+	const { t } = useTranslation();
+
 	return (
 		<section className='flex min-w-0 flex-col gap-1.5'>
 			<ChecksSectionHeader
-				actionLabel={error ? undefined : 'Resolve'}
+				actionLabel={error ? undefined : t('common:actions.resolve', 'Resolve')}
 				disabled={isAgentWorking}
-				label='Conflicts'
+				label={t('review:checks.conflicts', 'Conflicts')}
 				onAction={onResolve}
 			/>
 			{error ? (
@@ -471,6 +493,7 @@ function CommentsSection({
 	prNumber?: number;
 	workspaceId: string;
 }) {
+	const { t } = useTranslation();
 	const insertIntoComposer = useComposerInsert();
 	const openCommentPreview = useCommentPreviewOpener();
 	const openWorkspaceFileDiff = useWorkspaceFileDiffOpener();
@@ -489,7 +512,9 @@ function CommentsSection({
 
 	const addCommentToChat = (comment: PullRequestCommentSummary) => {
 		insertIntoComposer(formatCommentContext(comment, prNumber));
-		toast.success('Comment added to chat.');
+		toast.success(
+			t('review:comment.added-to-chat.title', 'Comment added to chat.'),
+		);
 	};
 	const hideComment = (id: string) => {
 		setHidden((current) => ({
@@ -510,13 +535,22 @@ function CommentsSection({
 	return (
 		<section className='flex min-w-0 flex-col gap-1.5'>
 			<ChecksSectionHeader
-				actionLabel={outstandingComments.length ? 'Add all to chat' : undefined}
-				label='Comments'
+				actionLabel={
+					outstandingComments.length
+						? t('review:checks.add-all-to-chat', 'Add all to chat')
+						: undefined
+				}
+				label={t('review:checks.comments', 'Comments')}
 				onAction={() => {
 					insertIntoComposer(
 						formatAllCommentsContext(outstandingComments, prNumber),
 					);
-					toast.success('Outstanding comments added to chat.');
+					toast.success(
+						t(
+							'review:comments.added-to-chat.title',
+							'Outstanding comments added to chat.',
+						),
+					);
 				}}
 			/>
 			{visibleComments.length ? (
@@ -536,7 +570,9 @@ function CommentsSection({
 					/>
 				))
 			) : (
-				<ChecksEmptyMessage label='No comments yet' />
+				<ChecksEmptyMessage
+					label={t('review:checks.no-comments', 'No comments yet')}
+				/>
 			)}
 		</section>
 	);
@@ -554,6 +590,7 @@ function TodoSection({
 	todoActions: TodoActions;
 	todos: WorkspaceShellModel['pullRequest']['todos'];
 }) {
+	const { t } = useTranslation();
 	const [isAdding, setIsAdding] = useState(false);
 	const [draftTitle, setDraftTitle] = useState('');
 
@@ -569,20 +606,20 @@ function TodoSection({
 	return (
 		<section className='flex min-w-0 flex-col gap-1.5'>
 			<ChecksSectionHeader
-				actionLabel='+ Add'
-				label='Your todos'
+				actionLabel={t('review:checks.add-todo', '+ Add')}
+				label={t('review:checks.todos', 'Your todos')}
 				onAction={() => setIsAdding(true)}
 			/>
 			{isAdding ? (
 				<div className='flex items-center gap-1.5 px-1'>
 					<Input
-						aria-label='New todo title'
+						aria-label={t('review:checks.todo-input-label', 'New todo title')}
 						autoFocus
 						className='h-7 text-xs'
 						onBlur={submitDraft}
 						onChange={(event) => setDraftTitle(event.target.value)}
 						onKeyDown={(event) => {
-							if (event.key === 'Enter') {
+							if (event.key === 'Enter' && !event.nativeEvent.isComposing) {
 								submitDraft();
 							}
 							if (event.key === 'Escape') {
@@ -590,11 +627,11 @@ function TodoSection({
 								setIsAdding(false);
 							}
 						}}
-						placeholder='Todo title'
+						placeholder={t('review:checks.todo-placeholder', 'Todo title')}
 						value={draftTitle}
 					/>
 					<Button className='h-7 text-xs' onClick={submitDraft} size='xs'>
-						Add
+						{t('common:actions.add', 'Add')}
 					</Button>
 				</div>
 			) : null}
@@ -614,7 +651,9 @@ function TodoSection({
 					/>
 				))
 			) : isAdding ? null : (
-				<ChecksEmptyMessage label='No todos yet' />
+				<ChecksEmptyMessage
+					label={t('review:checks.no-todos', 'No todos yet')}
+				/>
 			)}
 		</section>
 	);

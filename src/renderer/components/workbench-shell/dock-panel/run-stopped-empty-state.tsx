@@ -1,4 +1,5 @@
 import { PlayIcon } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/renderer/components/ui/button';
 import { formatShortcut } from '@/shared/keymap';
@@ -13,6 +14,8 @@ export function RunStoppedEmptyState({
 }: {
 	onRunScript: () => void;
 }) {
+	const { t } = useTranslation();
+
 	return (
 		<div className='flex h-full items-center justify-center bg-terminal p-4 text-terminal-foreground'>
 			<div className='flex flex-col items-center gap-5 text-center'>
@@ -28,12 +31,17 @@ export function RunStoppedEmptyState({
 						size='sm'
 						variant='outline'
 					>
-						Start Run
+						{t('workbench:run-script.start', 'Start Run')}
 						<span className='text-terminal-muted'>
 							{formatShortcut('run.start')}
 						</span>
 					</Button>
-					<p className='text-terminal-muted text-xs'>Test your changes here.</p>
+					<p className='text-terminal-muted text-xs'>
+						{t(
+							'workbench:run-script.stopped-caption',
+							'Test your changes here.',
+						)}
+					</p>
 				</div>
 			</div>
 		</div>

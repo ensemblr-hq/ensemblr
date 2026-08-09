@@ -1,13 +1,27 @@
+import type { TFunction } from 'i18next';
+import { useTranslation } from 'react-i18next';
+
 import type { AgentProviderAccountWire } from '@/shared/ipc/contracts/agent-provider';
 
-/** Row labels for the account table, in display order. */
-const ACCOUNT_FIELD_LABELS = {
-	apiProvider: 'API provider',
-	email: 'Account',
-	organization: 'Organization',
-	subscriptionType: 'Plan',
-	tokenSource: 'Credential source',
-} satisfies Record<keyof AgentProviderAccountWire, string>;
+/**
+ * Row labels for the account table.
+ * @param t - Translation function from `useTranslation`
+ * @returns The label for every account field
+ */
+function accountFieldLabels(
+	t: TFunction,
+): Record<keyof AgentProviderAccountWire, string> {
+	return {
+		apiProvider: t('settings:providers.account.api-provider', 'API provider'),
+		email: t('settings:providers.account.email', 'Account'),
+		organization: t('settings:providers.account.organization', 'Organization'),
+		subscriptionType: t('settings:providers.account.plan', 'Plan'),
+		tokenSource: t(
+			'settings:providers.account.credential-source',
+			'Credential source',
+		),
+	};
+}
 
 const ACCOUNT_FIELD_ORDER = [
 	'email',
@@ -27,6 +41,8 @@ export function ProviderAccountList({
 }: {
 	account: AgentProviderAccountWire;
 }) {
+	const { t } = useTranslation();
+	const labels = accountFieldLabels(t);
 	const populated = ACCOUNT_FIELD_ORDER.filter(
 		(field) => account[field] !== null && account[field] !== '',
 	);
@@ -34,7 +50,10 @@ export function ProviderAccountList({
 	if (populated.length === 0) {
 		return (
 			<p className='text-muted-foreground text-xs'>
-				The provider reported no account details.
+				{t(
+					'settings:providers.account.empty',
+					'The provider reported no account details.',
+				)}
 			</p>
 		);
 	}
@@ -47,7 +66,7 @@ export function ProviderAccountList({
 					key={field}
 				>
 					<span className='shrink-0 text-muted-foreground text-xs'>
-						{ACCOUNT_FIELD_LABELS[field]}
+						{labels[field]}
 					</span>
 					<span className='min-w-0 truncate font-mono text-foreground text-xs'>
 						{account[field]}

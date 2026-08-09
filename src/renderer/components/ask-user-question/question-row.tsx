@@ -3,13 +3,11 @@
  * user types their own answer into.
  */
 import { CheckIcon } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 import { Input } from '@/renderer/components/ui/input';
 import { cn } from '@/renderer/lib/utils';
 import type { QuestionnaireRow } from '@/renderer/types/ask-user-question';
-
-/** Placeholder for the free-text row, matching the dialog's "answer your own way" affordance. */
-const FREE_TEXT_PLACEHOLDER = 'Type something…';
 
 /** Shared row chrome: number gutter, hit area, and the focus/hover background. */
 const ROW_CLASSNAME =
@@ -126,16 +124,23 @@ export function QuestionFreeTextRow({
 	row: QuestionnaireRow;
 	value: string;
 }) {
+	const { t } = useTranslation();
 	return (
 		<div className={cn(ROW_CLASSNAME, focused && 'bg-pane-strong')}>
 			<RowNumber focused={focused} number={row.number} />
 			<Input
-				aria-label='Type your own answer'
+				aria-label={t(
+					'common:agent-question.free-text-label',
+					'Type your own answer',
+				)}
 				className='h-5 border-0 bg-transparent p-0 text-sm leading-5 shadow-none placeholder:text-muted-foreground/60 focus-visible:ring-0 dark:bg-transparent'
 				onChange={(event) => onChange(event.target.value)}
 				onFocus={onFocus}
 				onKeyDown={onKeyDown}
-				placeholder={FREE_TEXT_PLACEHOLDER}
+				placeholder={t(
+					'common:agent-question.free-text-placeholder',
+					'Type something…',
+				)}
 				ref={inputRef}
 				value={value}
 			/>

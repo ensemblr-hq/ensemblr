@@ -208,6 +208,7 @@ export function registerIpcHandlers({
 	registerEnvironmentHandlers({ environmentVariablesService });
 	registerHealthHandlers({ configService, databaseService });
 	registerShellSnapshotHandlers({
+		appSettingsService,
 		configService,
 		databaseService,
 		openTargetService,

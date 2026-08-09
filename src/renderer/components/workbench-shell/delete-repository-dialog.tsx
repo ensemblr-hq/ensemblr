@@ -1,4 +1,5 @@
 import { useCallback, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import {
 	deleteRepository,
@@ -65,6 +66,7 @@ function DeleteRepositoryDialogForm({
 	onOpenChange: (open: boolean) => void;
 	project: ProjectShellModel;
 }) {
+	const { t } = useTranslation();
 	const [stage, setStage] = useState<DeleteStage>('idle');
 	const [diagnostics, setDiagnostics] = useState<DeleteRepositoryDiagnostic[]>(
 		[],
@@ -101,13 +103,21 @@ function DeleteRepositoryDialogForm({
 	return (
 		<>
 			<DialogHeader>
-				<DialogTitle>Delete repository?</DialogTitle>
+				<DialogTitle>
+					{t('workbench:delete-repository.title', 'Delete repository?')}
+				</DialogTitle>
 				<DialogDescription className='text-xs'>
-					Permanently removes the repository and {workspaceCount}{' '}
-					{workspaceCount === 1 ? 'workspace' : 'workspaces'} from Ensemblr.
-					Each workspace's worktree folder is deleted and its local branch is
-					dropped. The repository folder stays on disk so you can re-register it
-					later. This cannot be undone.
+					{t(
+						'workbench:delete-repository.description',
+						"Permanently removes the repository and {{workspaces}} from Ensemblr. Each workspace's worktree folder is deleted and its local branch is dropped. The repository folder stays on disk so you can re-register it later. This cannot be undone.",
+						{
+							workspaces: t('common:units.workspace-count', {
+								count: workspaceCount,
+								defaultValue_one: '{{count}} workspace',
+								defaultValue_other: '{{count}} workspaces',
+							}),
+						},
+					)}
 				</DialogDescription>
 			</DialogHeader>
 
@@ -127,7 +137,7 @@ function DeleteRepositoryDialogForm({
 					type='button'
 					variant='ghost'
 				>
-					Cancel
+					{t('common:actions.cancel', 'Cancel')}
 				</Button>
 				<Button
 					disabled={!canDelete}
@@ -135,7 +145,9 @@ function DeleteRepositoryDialogForm({
 					type='button'
 					variant='destructive'
 				>
-					{isBusy ? 'Deleting…' : 'Delete'}
+					{isBusy
+						? t('common:actions.deleting', 'Deleting…')
+						: t('common:actions.delete', 'Delete')}
 				</Button>
 			</DialogFooter>
 		</>

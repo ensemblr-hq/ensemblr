@@ -1,0 +1,157 @@
+{
+	"changes": {
+		"empty": {
+			"message": "Changes appear here.",
+			"title": "No file changes yet"
+		},
+		"group-clean": "Clean",
+		"group-conflicts": "Conflicts",
+		"loading": "Loading changes…"
+	},
+	"check-status": {
+		"failed": "Failed",
+		"passed": "Passed",
+		"running": "Running"
+	},
+	"checks": {
+		"add-all-to-chat": "Add all to chat",
+		"add-todo": "+ Add",
+		"check-details-link": "{{label}} check details (opens in new tab)",
+		"checks": "Checks",
+		"comments": "Comments",
+		"conflicts": "Conflicts",
+		"git-status": "Git status",
+		"no-checks": "No checks reported",
+		"no-comments": "No comments yet",
+		"no-pull-request": "No PR open",
+		"no-todos": "No todos yet",
+		"sync-error": {
+			"title": "Could not refresh from GitHub"
+		},
+		"todo-input-label": "New todo title",
+		"todo-placeholder": "Todo title",
+		"todos": "Your todos",
+		"uncommitted-change-count_one": "{{count}} uncommitted change",
+		"uncommitted-change-count_other": "{{count}} uncommitted changes"
+	},
+	"comment": {
+		"add-to-chat": "Add comment to chat",
+		"added-to-chat": {
+			"title": "Comment added to chat."
+		},
+		"agent-badge": "Agent",
+		"composer-label": "New line comment",
+		"composer-placeholder": "Add a local review comment on this line…",
+		"delete": "Delete comment",
+		"go-to-line": "Go to line in diff",
+		"hide": "Hide comment",
+		"outdated": "Outdated",
+		"reopen": "Reopen comment",
+		"resolve": "Resolve comment",
+		"resolved": "Resolved",
+		"source-actions-bot": "Actions bot",
+		"source-local": "Local",
+		"submit": "Comment",
+		"unresolved": "Unresolved"
+	},
+	"comment-preview": {
+		"actions": {
+			"add-to-chat": "Add comment to chat",
+			"open-external": "Open comment on {{provider}}"
+		},
+		"added-to-chat": {
+			"title": "Comment added to chat."
+		},
+		"reply-count_one": "{{count}} reply",
+		"reply-count_other": "{{count}} replies",
+		"state": {
+			"outdated": "Outdated",
+			"unresolved": "Unresolved"
+		}
+	},
+	"comments": {
+		"added-to-chat": {
+			"title": "Outstanding comments added to chat."
+		}
+	},
+	"diff-toolbar": {
+		"disable-word-wrap": "Disable word wrap",
+		"enable-word-wrap": "Enable word wrap",
+		"hide-whitespace": "Hide hidden characters",
+		"mark-viewed": "Mark viewed",
+		"mode-diff": "Diff",
+		"mode-file": "File",
+		"mode-file-unavailable": "Full file view is unavailable for this diff",
+		"show-whitespace": "Show hidden characters",
+		"split-view": "Split view",
+		"unified-view": "Unified view",
+		"unmark-viewed": "Unmark viewed",
+		"viewed": "Viewed"
+	},
+	"diff-viewer": {
+		"add-comment": "Add comment",
+		"hidden-line-count_one": "{{count}} unchanged line",
+		"hidden-line-count_other": "{{count}} unchanged lines",
+		"unchanged-lines": "Unchanged lines"
+	},
+	"discard-changes": {
+		"affected-file-count_one": "{{count}} file affected",
+		"affected-file-count_other": "{{count}} files affected",
+		"description": "The working-tree changes are reverted to the last commit; a new file is deleted. This cannot be undone.",
+		"description-bulk": "Every working-tree change is reverted to the last commit and any new files are deleted. This cannot be undone.",
+		"submitting": "Discarding…",
+		"title": "Discard changes?",
+		"title-bulk": "Discard all changes?"
+	},
+	"file-diff": {
+		"add-diff-to-chat": "Add diff to chat",
+		"add-to-chat": "Add to chat",
+		"added-to-chat": {
+			"title": "Diff added to {{chat}}."
+		},
+		"fallback-chat-name": "chat",
+		"latest-chat": "latest",
+		"truncated": "Diff truncated",
+		"untitled-chat": "Untitled chat"
+	},
+	"file-menu": {
+		"actions": "{{path}} actions"
+	},
+	"file-row": {
+		"discard": "Discard changes to {{path}}",
+		"open": "Open {{path}}",
+		"open-in": "Open {{path}} in…",
+		"viewed": "Viewed"
+	},
+	"file-status": {
+		"added": "Added",
+		"conflicted": "Conflicted",
+		"deleted": "Deleted",
+		"modified": "Modified",
+		"renamed": "Renamed",
+		"untracked": "Untracked"
+	},
+	"review-panel": {
+		"refresh-pull-request": "Refresh pull request status",
+		"review-action": "Review",
+		"search-files": "Search files",
+		"tabs": {
+			"changes": "Changes",
+			"checks": "Checks",
+			"files": "All files"
+		},
+		"view-mode": {
+			"as-folders": "Show changes as folders",
+			"as-list": "Show changes as list"
+		}
+	},
+	"todo": {
+		"add-to-chat": "Add todo to chat",
+		"added-to-chat": {
+			"title": "Todo added to chat."
+		},
+		"delete": "Delete todo",
+		"mark-done": "Mark todo done: {{label}}",
+		"mark-open": "Mark todo open: {{label}}"
+	}
+}

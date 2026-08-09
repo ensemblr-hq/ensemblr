@@ -1,0 +1,117 @@
+{
+	"comment-composer": {
+		"label": "Добавить комментарий",
+		"placeholder": "Добавить комментарий…",
+		"posting": "Отправка…",
+		"submit": "Комментировать"
+	},
+	"connection-gate": {
+		"not-configured": {
+			"description": "Добавьте app.linear.clientId в ~/.config/ensemblr/config.json, затем подключитесь в настройках интеграций.",
+			"title": "Linear не настроен"
+		},
+		"not-connected": {
+			"description": "Подключите Linear в настройках интеграций, чтобы просматривать задачи, управлять ими из Ensemblr и создавать рабочие области из задач.",
+			"title": "Linear не подключён"
+		},
+		"open-settings": "Открыть настройки интеграций",
+		"reconnect-required": {
+			"title": "Linear нужно подключить заново"
+		}
+	},
+	"create-workspace": {
+		"creating": "Создание…",
+		"menu-label": "Создать в репозитории",
+		"trigger": "Создать рабочую область"
+	},
+	"failure": {
+		"not-connected": "Linear не подключён. Войдите в настройках интеграций.",
+		"not-found": "Эта задача Linear больше не существует или недоступна вам.",
+		"permission-denied": "У вашего аккаунта Linear нет прав на это действие.",
+		"rate-limited": "Достигнут лимит запросов Linear. Повторите попытку позже.",
+		"rate-limited-retry": "Достигнут лимит запросов Linear. Повторите через {{seconds}} с.",
+		"reconnect-required": "Подключение к Linear истекло. Переподключитесь в настройках интеграций.",
+		"unreachable": "Linear недоступен. Показаны кэшированные данные, где они есть."
+	},
+	"issue-badges": {
+		"archived": "В архиве"
+	},
+	"issue-detail": {
+		"back": "Назад к задачам",
+		"load-failed": "Не удалось загрузить эту задачу Linear.",
+		"no-comments": "Комментариев пока нет.",
+		"no-description": "Описания нет.",
+		"open-external": "Открыть в Linear",
+		"refresh": "Обновить задачу",
+		"unknown-author": "Неизвестно"
+	},
+	"issue-editor": {
+		"description-create": "Создайте задачу в подключённой рабочей области Linear.",
+		"description-edit": "Обновите те поля, которые разрешают ваши права в Linear.",
+		"field": {
+			"assignee": "Исполнитель",
+			"cycle": "Цикл",
+			"description": "Описание задачи",
+			"description-placeholder": "Описание (markdown)",
+			"due-date": "Срок выполнения",
+			"priority": "Приоритет",
+			"project": "Проект",
+			"status": "Статус",
+			"team": "Команда",
+			"title": "Название задачи"
+		},
+		"priority": {
+			"high": "Высокий",
+			"low": "Низкий",
+			"medium": "Средний",
+			"none": "Без приоритета",
+			"urgent": "Срочный"
+		},
+		"saving": "Сохранение…",
+		"submit-create": "Создать задачу",
+		"submit-edit": "Сохранить изменения",
+		"title-create": "Новая задача Linear",
+		"title-edit": "Изменить {{identifier}}",
+		"unset-option": "{{field}}: нет"
+	},
+	"issue-list": {
+		"all-teams": "Все команды",
+		"empty": "Задачи Linear пока не кэшированы. Обновите, чтобы синхронизировать из Linear.",
+		"empty-search": "Задачи по запросу не найдены.",
+		"new-issue": "Новая задача",
+		"refresh": "Обновить задачи",
+		"search-label": "Поиск задач Linear",
+		"search-placeholder": "Поиск по идентификатору или названию…"
+	},
+	"issue-picker": {
+		"description": "Найдите задачу Linear и выберите её для привязки.",
+		"empty": "Задачи по запросу не найдены.",
+		"loading": "Загрузка задач…",
+		"not-connected": "Linear не подключён. Войдите в настройках интеграций.",
+		"search-placeholder": "Поиск по идентификатору или названию…",
+		"title": "Привязать задачу Linear"
+	},
+	"linked-issue": {
+		"connect": "Подключить Linear",
+		"reconnect": "Переподключить Linear",
+		"refresh": "Обновить связанную задачу",
+		"refresh-status": "Обновить статус связанной задачи",
+		"set-status": "Задать статус",
+		"set-status-menu": "Обновить статус в Linear",
+		"status": {
+			"deleted": "Удалена в Linear",
+			"no-access": "Нет доступа",
+			"rate-limited": "Превышен лимит",
+			"unavailable": "Статус недоступен"
+		},
+		"update-failed": "Не удалось обновить статус в Linear.",
+		"updating": "Обновление…"
+	},
+	"priority": {
+		"high": "Высокий",
+		"low": "Низкий",
+		"medium": "Средний",
+		"none": "Без приоритета",
+		"urgent": "Срочный"
+	}
+}

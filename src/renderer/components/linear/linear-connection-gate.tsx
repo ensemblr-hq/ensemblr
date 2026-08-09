@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import type { ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { linearConnectionQuery } from '@/renderer/api/ensemblr';
 import { Button } from '@/renderer/components/ui/button';
@@ -13,6 +14,7 @@ import { deriveLinearGateState } from '@/renderer/lib/linear';
  * connected, otherwise shows sign-in / configuration remediation.
  */
 export function LinearConnectionGate({ children }: { children: ReactNode }) {
+	const { t } = useTranslation();
 	const { data: connectionData, isLoading: connectionLoading } = useQuery(
 		linearConnectionQuery,
 	);
@@ -38,18 +40,38 @@ export function LinearConnectionGate({ children }: { children: ReactNode }) {
 			<LinearLogo className='size-8 text-muted-foreground' />
 			<p className='font-medium text-foreground text-sm'>
 				{gate.kind === 'not-configured'
-					? 'Linear is not configured'
+					? t(
+							'linear:connection-gate.not-configured.title',
+							'Linear is not configured',
+						)
 					: gate.kind === 'reconnect-required'
-						? 'Linear needs to be reconnected'
-						: 'Linear is not connected'}
+						? t(
+								'linear:connection-gate.reconnect-required.title',
+								'Linear needs to be reconnected',
+							)
+						: t(
+								'linear:connection-gate.not-connected.title',
+								'Linear is not connected',
+							)}
 			</p>
 			<p className='max-w-sm text-muted-foreground text-xs leading-relaxed'>
 				{gate.kind === 'not-configured'
-					? 'Add app.linear.clientId to ~/.config/ensemblr/config.json, then connect from integration settings.'
-					: 'Connect Linear from integration settings to browse issues, manage them from Ensemblr, and create workspaces from issues.'}
+					? t(
+							'linear:connection-gate.not-configured.description',
+							'Add app.linear.clientId to ~/.config/ensemblr/config.json, then connect from integration settings.',
+						)
+					: t(
+							'linear:connection-gate.not-connected.description',
+							'Connect Linear from integration settings to browse issues, manage them from Ensemblr, and create workspaces from issues.',
+						)}
 			</p>
 			<Button asChild size='sm' variant='outline'>
-				<Link to='/settings/integrations'>Open integration settings</Link>
+				<Link to='/settings/integrations'>
+					{t(
+						'linear:connection-gate.open-settings',
+						'Open integration settings',
+					)}
+				</Link>
 			</Button>
 		</div>
 	);

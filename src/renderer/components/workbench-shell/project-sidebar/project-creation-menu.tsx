@@ -4,6 +4,7 @@ import {
 	GlobeIcon,
 	type LucideIcon,
 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 import {
 	DropdownMenu,
@@ -18,8 +19,6 @@ import type {
 	AddProjectMenuModel,
 	RecentProject,
 } from '@/renderer/types/workbench';
-
-const COMING_SOON_REASON = 'Coming soon';
 
 const addProjectActionIcons: Record<AddProjectActionId, LucideIcon> = {
 	'open-github': GlobeIcon,
@@ -37,6 +36,8 @@ export function ProjectCreationMenu({
 	onSelectAction?: (id: AddProjectActionId) => void;
 	onSelectRecent?: (recent: RecentProject) => void;
 }) {
+	const { t } = useTranslation();
+	const comingSoon = t('common:status.coming-soon', 'Coming soon');
 	const actionsWired = Boolean(onSelectAction);
 	const recentsWired = Boolean(onSelectRecent);
 	const hasRecents = model.recents.length > 0;
@@ -45,7 +46,10 @@ export function ProjectCreationMenu({
 		<DropdownMenu>
 			<DropdownMenuTrigger asChild>
 				<SidebarGroupAction
-					aria-label='Open repository creation menu'
+					aria-label={t(
+						'workbench:project-creation-menu.trigger',
+						'Open repository creation menu',
+					)}
 					className='top-2 size-6 [&>svg]:size-3.5'
 					type='button'
 				>
@@ -61,6 +65,7 @@ export function ProjectCreationMenu({
 					const Icon = addProjectActionIcons[action.id];
 					const reason = resolveActionReason({
 						action,
+						comingSoon,
 						wired: actionsWired,
 					});
 					const enabled = reason === null;
@@ -97,7 +102,7 @@ export function ProjectCreationMenu({
 				{hasRecents ? (
 					<>
 						<DropdownMenuLabel className='px-2 pt-3 pb-1 text-muted-foreground text-xs'>
-							Recents
+							{t('workbench:project-creation-menu.recents', 'Recents')}
 						</DropdownMenuLabel>
 						{model.recents.map((recent) => (
 							<DropdownMenuItem
@@ -110,7 +115,7 @@ export function ProjectCreationMenu({
 										onSelectRecent?.(recent);
 									}
 								}}
-								title={recentsWired ? undefined : COMING_SOON_REASON}
+								title={recentsWired ? undefined : comingSoon}
 							>
 								<FolderIcon
 									aria-hidden='true'
@@ -129,13 +134,16 @@ export function ProjectCreationMenu({
 /** Picks the disabled-reason for an add-project action (or null when enabled). */
 function resolveActionReason({
 	action,
+	comingSoon,
 	wired,
 }: {
 	action: AddProjectMenuModel['actions'][number];
+	/** Localized fallback reason for actions the shell has not wired up yet. */
+	comingSoon: string;
 	wired: boolean;
 }): string | null {
 	if (!action.enabled) {
-		return action.unavailableReason ?? COMING_SOON_REASON;
+		return action.unavailableReason ?? comingSoon;
 	}
-	return wired ? null : COMING_SOON_REASON;
+	return wired ? null : comingSoon;
 }

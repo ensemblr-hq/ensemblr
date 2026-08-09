@@ -2,6 +2,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import { useStore } from 'jotai';
 import { useCallback, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import {
 	ensemblrQueryKeys,
@@ -37,6 +38,7 @@ export function usePlanHandoff(workspace: WorkspaceShellModel): {
 } {
 	const navigate = useNavigate();
 	const queryClient = useQueryClient();
+	const { t } = useTranslation();
 	const store = useStore();
 	const dispatchAttachment = useComposerAttachmentDispatcher();
 	const requestComposerFocus = useRequestComposerFocus();
@@ -81,7 +83,9 @@ export function usePlanHandoff(workspace: WorkspaceShellModel): {
 				return chatTabId;
 			} catch (error) {
 				toast.error(
-					error instanceof Error ? error.message : 'Plan handoff failed.',
+					error instanceof Error
+						? error.message
+						: t('errors:plan-handoff.failed.title', 'Plan handoff failed.'),
 				);
 				return null;
 			} finally {
@@ -95,6 +99,7 @@ export function usePlanHandoff(workspace: WorkspaceShellModel): {
 			queryClient,
 			requestComposerFocus,
 			store,
+			t,
 			workspace,
 		],
 	);

@@ -64,6 +64,7 @@ packaged app ships without them.
 | Layout / motion | `react-resizable-panels`, `motion` (imported as `motion/react`) |
 | Drag and drop | `@atlaskit/pragmatic-drag-and-drop` (+ `-hitbox`), used by the dashboard board |
 | Validation | Zod 4 |
+| i18n | `i18next` 26 + `react-i18next` 17; catalogues bundled as JSON under `src/renderer/lib/i18n/locales/` |
 
 The `ai` package (Vercel AI SDK 7) is a **type-only** dependency of the renderer:
 the agent timeline models turns as `UIMessage` / `DynamicToolUIPart`. Every one
@@ -118,6 +119,13 @@ a primitive gets reformatted to house style.
   `bun:test`, Jest, or Mocha.
 - **fallow** (`.fallowrc.jsonc`) and **react-doctor** (`doctor.config.jsonc`) run
   as review diagnostics; CI runs react-doctor against `master`.
+- **i18next-cli** drives `npm run i18n:{extract,types,status,lint}`. `i18n:lint`
+  runs inside `npm run check` and fails the build on hardcoded user-facing
+  strings and on sentences concatenated across translations; suppress a false
+  positive with an `i18next-instrument-ignore` directive at the call site.
+  `i18n:extract` and `i18n:types` each re-run Biome over what they wrote —
+  i18next-cli emits 2-space JSON and Biome formats with tabs, so without that
+  the two rewrite each other on every run.
 - `scripts/check-tailwind-classes.mjs` runs inside `npm run check` and fails on
   px-based arbitrary utilities.
 

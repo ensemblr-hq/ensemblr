@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next';
+
 import {
 	Command,
 	CommandDialog,
@@ -22,6 +24,7 @@ export function AllFilesSearchDialog({
 	onOpenChange: (open: boolean) => void;
 	open: boolean;
 }) {
+	const { t } = useTranslation();
 	const openFilePreview = useReviewFilePreviewOpener();
 	const searchableFiles = files.filter((file) => file.kind === 'file');
 	const closeSearch = () => {
@@ -35,19 +38,38 @@ export function AllFilesSearchDialog({
 	return (
 		<CommandDialog
 			className='top-20 max-w-xl translate-y-0 shadow-2xl sm:max-w-xl'
-			description='Open a repository file from the All files tab.'
+			description={t(
+				'workbench:all-files-search.description',
+				'Open a repository file from the All files tab.',
+			)}
 			onOpenChange={onOpenChange}
 			open={open}
-			title='Search files'
+			title={t('workbench:all-files-search.title', 'Search files')}
 		>
 			<Command className='rounded-xl border-0'>
-				<CommandInput placeholder='Search files' />
+				<CommandInput
+					placeholder={t(
+						'workbench:all-files-search.placeholder',
+						'Search files',
+					)}
+				/>
 				<CommandList className='max-h-80'>
-					<CommandEmpty>No files match your search.</CommandEmpty>
-					<CommandGroup heading='Files'>
+					<CommandEmpty>
+						{t(
+							'workbench:all-files-search.empty',
+							'No files match your search.',
+						)}
+					</CommandEmpty>
+					<CommandGroup
+						heading={t('workbench:all-files-search.group-files', 'Files')}
+					>
 						{searchableFiles.map((file) => (
 							<CommandItem
-								aria-label={`Open ${file.path} preview`}
+								aria-label={t(
+									'workbench:all-files.open-preview',
+									'Open {{path}} preview',
+									{ path: file.path },
+								)}
 								className='min-h-10'
 								key={file.id}
 								onSelect={() => selectFile(file.path)}

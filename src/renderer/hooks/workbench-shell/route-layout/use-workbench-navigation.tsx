@@ -1,6 +1,7 @@
 import { Link, useNavigate, useRouter } from '@tanstack/react-router';
 import { useAtomValue, useSetAtom } from 'jotai';
 import { type ReactElement, useCallback, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import {
 	buildAddProjectMenuModel,
@@ -60,6 +61,7 @@ export function useWorkbenchNavigation({
 	displayProjects: ProjectShellModel[];
 	setupSnapshot: SetupDiagnosticsSnapshot | null;
 }): WorkbenchNavigationResult {
+	const { i18n } = useTranslation();
 	const navigate = useNavigate();
 	const router = useRouter();
 	const setLastWorkspaceSelection = useSetAtom(lastWorkspaceSelectionAtom);
@@ -130,13 +132,14 @@ export function useWorkbenchNavigation({
 		],
 	);
 
+	// biome-ignore lint/correctness/useExhaustiveDependencies: menu labels are translated through the i18n singleton, so the language is a real input Biome cannot see.
 	const addProjectMenu = useMemo(
 		() =>
 			buildAddProjectMenuModel({
 				recents: recentProjects,
 				setupSnapshot,
 			}),
-		[recentProjects, setupSnapshot],
+		[recentProjects, setupSnapshot, i18n.language],
 	);
 	const onAddProject = useCallback(
 		(id: AddProjectActionId) => {

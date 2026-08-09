@@ -1,3 +1,4 @@
+import { i18n } from '@/renderer/lib/i18n';
 import type {
 	AddProjectActionId,
 	AddProjectActionModel,
@@ -27,30 +28,45 @@ interface AddProjectActionDefinition {
  * issue/PR) are modeled separately in the project context menu, so the ticket's
  * "treat project and workspace actions as distinct in menu state" requirement is
  * preserved by keeping this catalog project-only.
+ * @returns The action definitions, with copy resolved in the active language.
  */
-const ADD_PROJECT_ACTION_DEFINITIONS: readonly AddProjectActionDefinition[] = [
-	{
-		id: 'open-local',
-		label: 'Open local project',
-		requiredCheckIds: ['root-directory'],
-		unavailableReason:
-			'Set a writable Ensemblr root directory before opening local projects.',
-	},
-	{
-		id: 'open-github',
-		label: 'Open GitHub project',
-		requiredCheckIds: ['gh-cli', 'gh-auth'],
-		unavailableReason:
-			'Sign in with the GitHub CLI (gh auth login) to open GitHub projects.',
-	},
-	{
-		id: 'quick-start',
-		label: 'Quick start',
-		requiredCheckIds: ['root-directory'],
-		unavailableReason:
-			'Set a writable Ensemblr root directory before starting a new project.',
-	},
-];
+function addProjectActionDefinitions(): readonly AddProjectActionDefinition[] {
+	return [
+		{
+			id: 'open-local',
+			label: i18n.t(
+				'workbench:add-project.open-local.label',
+				'Open local project',
+			),
+			requiredCheckIds: ['root-directory'],
+			unavailableReason: i18n.t(
+				'workbench:add-project.open-local.unavailable',
+				'Set a writable Ensemblr root directory before opening local projects.',
+			),
+		},
+		{
+			id: 'open-github',
+			label: i18n.t(
+				'workbench:add-project.open-github.label',
+				'Open GitHub project',
+			),
+			requiredCheckIds: ['gh-cli', 'gh-auth'],
+			unavailableReason: i18n.t(
+				'workbench:add-project.open-github.unavailable',
+				'Sign in with the GitHub CLI (gh auth login) to open GitHub projects.',
+			),
+		},
+		{
+			id: 'quick-start',
+			label: i18n.t('workbench:add-project.quick-start.label', 'Quick start'),
+			requiredCheckIds: ['root-directory'],
+			unavailableReason: i18n.t(
+				'workbench:add-project.quick-start.unavailable',
+				'Set a writable Ensemblr root directory before starting a new project.',
+			),
+		},
+	];
+}
 
 /**
  * Builds the add-project menu model, resolving each action's availability
@@ -66,7 +82,7 @@ export function buildAddProjectMenuModel({
 	setupSnapshot: SetupDiagnosticsSnapshot | null;
 }): AddProjectMenuModel {
 	return {
-		actions: ADD_PROJECT_ACTION_DEFINITIONS.map((definition) =>
+		actions: addProjectActionDefinitions().map((definition) =>
 			resolveAddProjectAction(definition, setupSnapshot),
 		),
 		recents,
@@ -144,5 +160,13 @@ function describeFailedCheck(
 	}
 
 	const trimmedTitle = title?.trim();
-	return trimmedTitle ? `${trimmedTitle} is not ready yet.` : null;
+	return trimmedTitle
+		? i18n.t(
+				'workbench:add-project.check.not-ready',
+				'{{title}} is not ready yet.',
+				{
+					title: trimmedTitle,
+				},
+			)
+		: null;
 }

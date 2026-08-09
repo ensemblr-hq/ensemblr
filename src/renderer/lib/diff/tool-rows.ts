@@ -1,3 +1,4 @@
+import { i18n } from '@/renderer/lib/i18n';
 import type { ToolDiffRow } from '@/renderer/types/diff';
 import { newLineNumberOf, oldLineNumberOf, parseSingleFileDiff } from './parse';
 
@@ -56,7 +57,11 @@ export function buildToolDiffRows(patch: string): {
  */
 function describeGap(hidden: number): string {
 	if (hidden <= 0) {
-		return 'Unchanged lines';
+		return i18n.t('review:diff-viewer.unchanged-lines', 'Unchanged lines');
 	}
-	return `${hidden} unchanged line${hidden === 1 ? '' : 's'}`;
+	return i18n.t('review:diff-viewer.hidden-line-count', {
+		count: hidden,
+		defaultValue_one: '{{count}} unchanged line',
+		defaultValue_other: '{{count}} unchanged lines',
+	});
 }

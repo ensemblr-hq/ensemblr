@@ -1,0 +1,247 @@
+{
+	"agent-action": {
+		"prompt-failed": {
+			"title": "Could not prepare the action prompt."
+		}
+	},
+	"agent-launch": {
+		"failed": {
+			"description": "{{harness}} is not available.",
+			"title": "Could not launch agent"
+		}
+	},
+	"agent-restore": {
+		"failed": {
+			"description": "The harness could not be resumed.",
+			"title": "Could not restore agent"
+		}
+	},
+	"attachment": {
+		"malformed": {
+			"message": "Pasted file payload was malformed."
+		},
+		"read-failed": {
+			"message": "Pasted file could not be read."
+		},
+		"save-failed": {
+			"message": "Pasted file could not be saved."
+		}
+	},
+	"chat-tab": {
+		"dropped-submits": {
+			"title_one": "Cancelled a queued action for the closed chat.",
+			"title_other": "Cancelled {{count}} queued actions for the closed chat."
+		},
+		"open-failed": {
+			"title": "Could not open tab"
+		},
+		"pin-failed": {
+			"title": "Could not keep tab open"
+		},
+		"reorder-failed": {
+			"title": "Could not reorder tabs"
+		}
+	},
+	"checkpoint-restore": {
+		"failed": {
+			"title": "Restore failed"
+		},
+		"restored": {
+			"description": "Files reverted to before “{{label}}”.",
+			"title": "Workspace restored"
+		}
+	},
+	"clone": {
+		"cloned": {
+			"title": "Cloned {{name}}."
+		},
+		"open-failed": {
+			"title": "Cloned {{name}}, opening failed."
+		}
+	},
+	"composer": {
+		"no-chat-tab": {
+			"title": "Open a chat tab to hand this to the agent."
+		}
+	},
+	"continue-branch": {
+		"failed": {
+			"title": "Could not continue past the merged pull request."
+		},
+		"success": {
+			"title": "Continuing on {{branch}}."
+		}
+	},
+	"diff-comment": {
+		"update-failed": {
+			"title": "Comment update failed"
+		}
+	},
+	"discard-changes": {
+		"failed": "Could not discard changes."
+	},
+	"fork": {
+		"failed": {
+			"title": "Fork failed."
+		},
+		"new-tab": {
+			"title": "Forked to a new tab."
+		},
+		"new-workspace": {
+			"title": "Forked to workspace {{name}}."
+		},
+		"summary-failed": {
+			"title": "Fork summary could not be written."
+		},
+		"workspace-failed": {
+			"title": "The fork workspace could not be created."
+		}
+	},
+	"merge": {
+		"failed": {
+			"title": "Merge failed"
+		}
+	},
+	"open-local-project": {
+		"bridge-unavailable": {
+			"title": "Preload bridge is unavailable in this context."
+		},
+		"import-failed": {
+			"title": "The repository could not be imported."
+		},
+		"opened": {
+			"title": "Opened {{name}}."
+		},
+		"seed-failed": {
+			"title": "Imported {{name}} but couldn't open a workspace."
+		},
+		"unexpected": {
+			"title": "The local project could not be opened."
+		}
+	},
+	"open-target": {
+		"bridge-unavailable": {
+			"title": "Open in… is unavailable without the Electron bridge."
+		},
+		"open-failed": {
+			"title": "Failed to open in {{target}}: {{error}}"
+		},
+		"settings-open-failed": {
+			"title": "Failed to open the settings file in {{target}}."
+		}
+	},
+	"plan-handoff": {
+		"failed": {
+			"title": "Plan handoff failed."
+		}
+	},
+	"pull-request-refresh": {
+		"failed": {
+			"title": "Pull request refresh failed"
+		}
+	},
+	"push": {
+		"failed": {
+			"title": "Push failed"
+		},
+		"success": {
+			"title": "Branch pushed."
+		}
+	},
+	"quick-start": {
+		"created": {
+			"title": "Created project {{name}}."
+		},
+		"open-failed": {
+			"title": "Created {{name}}, opening failed."
+		}
+	},
+	"repo-settings": {
+		"save-failed": {
+			"title": "Could not save repository settings."
+		}
+	},
+	"review-action": {
+		"failed": {
+			"description": "GitHub action failed."
+		}
+	},
+	"review-todo": {
+		"failed": {
+			"title": "Todo update failed"
+		}
+	},
+	"route-error": {
+		"detail": "Route data failed to load.",
+		"health-detail": "TanStack Router caught a route-level failure.",
+		"health-label": "Route error",
+		"title": "Route unavailable"
+	},
+	"route-not-found": {
+		"detail": "The requested route does not exist.",
+		"health-detail": "Choose another route from the workspace navigation.",
+		"health-label": "Not found",
+		"title": "Page not found"
+	},
+	"route-pending": {
+		"detail": "Ensemblr is reading repositories and workspaces from SQLite.",
+		"health-detail": "Renderer route data is loading.",
+		"health-label": "Loading",
+		"title": "Loading repositories"
+	},
+	"script-settings": {
+		"save-failed": {
+			"title": "Could not save script settings."
+		}
+	},
+	"seed-workspace": {
+		"create-failed": {
+			"message": "The starter workspace could not be created."
+		},
+		"not-in-snapshot": {
+			"message": "The starter workspace was created, but the navigation snapshot did not include it yet."
+		},
+		"open-failed": {
+			"message": "The starter workspace was created, but it could not be opened."
+		},
+		"refresh-failed": {
+			"message": "The starter workspace was created, but the navigation snapshot could not be refreshed."
+		}
+	},
+	"setup-script": {
+		"chat-failed": {
+			"description": "Try the \"Ask agent\" action again from the setup tab.",
+			"title": "Could not open a new chat."
+		},
+		"chat-ready": {
+			"description": "Send the prompt to have the agent create .ensemblr/settings.toml — edit it first if needed.",
+			"title": "New chat ready for setup."
+		}
+	},
+	"target-branch": {
+		"retarget-failed": {
+			"title": "Could not change the target branch."
+		}
+	},
+	"terminal": {
+		"start-failed": {
+			"title": "The terminal could not start."
+		}
+	},
+	"workspace-archive": {
+		"archived": {
+			"title": "Workspace archived."
+		},
+		"failed": {
+			"title": "Archiving the workspace failed."
+		},
+		"skipped": {
+			"title": "The workspace was not archived."
+		}
+	},
+	"workspace-create": {
+		"failed": {
+			"title": "Failed to create workspace."
+		}
+	}
+}

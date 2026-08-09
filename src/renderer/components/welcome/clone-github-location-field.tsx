@@ -1,4 +1,5 @@
 import type { KeyboardEventHandler } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/renderer/components/ui/button';
 import { Input } from '@/renderer/components/ui/input';
@@ -33,10 +34,11 @@ export function CloneGithubLocationField({
 	placeholder,
 	value,
 }: CloneGithubLocationFieldProps) {
+	const { t } = useTranslation();
 	return (
 		<div className='flex flex-col gap-1.5'>
 			<Label className='text-xs' htmlFor='clone-github-location'>
-				Location
+				{t('common:clone-dialog.location-label', 'Location')}
 			</Label>
 			<div className='flex gap-2'>
 				<Input
@@ -55,7 +57,7 @@ export function CloneGithubLocationField({
 					type='button'
 					variant='outline'
 				>
-					Browse
+					{t('common:actions.browse', 'Browse')}
 				</Button>
 			</div>
 			{canReset ? (
@@ -64,7 +66,10 @@ export function CloneGithubLocationField({
 					onClick={onReset}
 					type='button'
 				>
-					Reset to managed repos directory
+					{t(
+						'common:actions.reset-managed-root',
+						'Reset to managed repos directory',
+					)}
 				</button>
 			) : null}
 		</div>

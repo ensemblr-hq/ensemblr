@@ -1,3 +1,4 @@
+import { i18n } from '@/renderer/lib/i18n';
 import type {
 	ComposerModelOption,
 	GroupedOptions,
@@ -124,7 +125,10 @@ export function buildModelGroups(
 		{
 			models: favouriteRows,
 			provider: FAVOURITES_GROUP_KEY,
-			providerLabel: 'Favourites',
+			providerLabel: i18n.t(
+				'workbench:model-picker.group.favourites',
+				'Favourites',
+			),
 		},
 		...providerGroups,
 	];

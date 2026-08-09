@@ -1,4 +1,5 @@
 import { useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/renderer/components/ui/button';
 import {
@@ -10,7 +11,7 @@ import { cn } from '@/renderer/lib/utils';
 import { getThinkingStrength } from '@/renderer/lib/workbench/thinking-strength';
 import type { ComposerThinkingOption } from '@/renderer/types/workbench';
 import type { AgentProviderId } from '@/shared/agent-provider';
-import { getThinkingAxisLabel } from '@/shared/agent-thinking';
+import { getThinkingAxis } from '@/shared/agent-thinking';
 
 import { ThinkingBarIcon } from './thinking-bar-icon';
 
@@ -50,6 +51,7 @@ export function ThinkingPicker({
 	provider: AgentProviderId;
 	value: string | null;
 }) {
+	const { t } = useTranslation();
 	const handleClick = useCallback(() => {
 		const nextId = getNextThinkingId(options, value);
 		if (nextId) {
@@ -57,13 +59,20 @@ export function ThinkingPicker({
 		}
 	}, [onChange, options, value]);
 
-	const axisLabel = getThinkingAxisLabel(provider);
+	const isEffortAxis = getThinkingAxis(provider) === 'effort';
 
 	if (options.length === 0) {
 		return (
 			<span className='inline-flex items-center gap-1.5 rounded-md px-1.5 py-1 text-muted-foreground text-xs'>
 				<ThinkingBarIcon strength={0} />
-				<span>{axisLabel} pending</span>
+				<span>
+					{isEffortAxis
+						? t('workbench:thinking-picker.pending-effort', 'Effort pending')
+						: t(
+								'workbench:thinking-picker.pending-thinking',
+								'Thinking pending',
+							)}
+				</span>
 			</span>
 		);
 	}
@@ -75,12 +84,26 @@ export function ThinkingPicker({
 		strength > 0
 			? 'bg-status-warning/10 text-status-warning hover:bg-status-warning/15 hover:text-status-warning'
 			: undefined;
+	const levelLabel =
+		selected?.label ?? t('workbench:thinking-picker.off', 'Off');
 
 	return (
 		<Tooltip>
 			<TooltipTrigger asChild>
 				<Button
-					aria-label={`${axisLabel} level: ${selected?.label ?? 'Off'}. Click to cycle.`}
+					aria-label={
+						isEffortAxis
+							? t(
+									'workbench:thinking-picker.aria-label-effort',
+									'Effort level: {{level}}. Click to cycle.',
+									{ level: levelLabel },
+								)
+							: t(
+									'workbench:thinking-picker.aria-label-thinking',
+									'Thinking level: {{level}}. Click to cycle.',
+									{ level: levelLabel },
+								)
+					}
 					className={cn('h-7 rounded-md px-2 font-medium', tintClass)}
 					disabled={disabled}
 					onClick={handleClick}
@@ -89,11 +112,21 @@ export function ThinkingPicker({
 					variant='subtle'
 				>
 					<ThinkingBarIcon strength={strength} />
-					{strength > 0 ? <span>{selected?.label ?? 'Off'}</span> : null}
+					{strength > 0 ? (
+						<span>
+							{selected?.label ?? t('workbench:thinking-picker.off', 'Off')}
+						</span>
+					) : null}
 				</Button>
 			</TooltipTrigger>
 			<TooltipContent sideOffset={4}>
-				Adjust {axisLabel.toLowerCase()} level
+				{isEffortAxis
+					? t('workbench:thinking-picker.tooltip-effort', 'Adjust effort level')
+					: t(
+							'workbench:thinking-picker.tooltip-thinking',
+							'Adjust thinking level',
+						)}
+				{/* i18next-instrument-ignore */}
 				<span className='ml-2 text-muted-foreground'>⌥T</span>
 			</TooltipContent>
 		</Tooltip>

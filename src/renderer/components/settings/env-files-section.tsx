@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { FolderIcon, PlusIcon, XIcon } from 'lucide-react';
 import { useState } from 'react';
+import { Trans, useTranslation } from 'react-i18next';
 
 import {
 	addEnvFile,
@@ -21,6 +22,7 @@ export function EnvFilesSection({
 	scope: EnvironmentVariableScope;
 	scopeId?: string;
 }) {
+	const { t } = useTranslation();
 	const queryClient = useQueryClient();
 	const { data } = useQuery(envFilesQuery({ scope, scopeId }));
 	const [draft, setDraft] = useState<string | null>(null);
@@ -82,14 +84,19 @@ export function EnvFilesSection({
 	return (
 		<div className='space-y-3 pt-6'>
 			<div className='space-y-1'>
-				<h2 className='font-medium text-foreground text-sm'>Env files</h2>
+				<h2 className='font-medium text-foreground text-sm'>
+					{t('settings:environment.env-files.title', 'Env files')}
+				</h2>
 				<p className='text-muted-foreground text-sm leading-6'>
-					Load environment variables from env files. In the native file picker,
-					press{' '}
-					<kbd className='rounded-sm bg-foreground/5 p-1 font-medium font-sans'>
-						Cmd+Shift+.
-					</kbd>{' '}
-					to show hidden files.
+					<Trans
+						components={{
+							kbd: (
+								<kbd className='rounded-sm bg-foreground/5 p-1 font-medium font-sans' />
+							),
+						}}
+						defaults='Load environment variables from env files. In the native file picker, press <kbd>Cmd+Shift+.</kbd> to show hidden files.'
+						i18nKey='settings:environment.env-files.description'
+					/>
 				</p>
 			</div>
 
@@ -108,7 +115,11 @@ export function EnvFilesSection({
 								{path}
 							</code>
 							<Button
-								aria-label={`Remove ${path}`}
+								aria-label={t(
+									'settings:environment.env-files.remove-aria-label',
+									'Remove {{path}}',
+									{ path },
+								)}
 								disabled={removeMutation.isPending}
 								onClick={() => removeMutation.mutate(path)}
 								size='icon-xs'
@@ -132,7 +143,10 @@ export function EnvFilesSection({
 							value={draft}
 						/>
 						<Button
-							aria-label='Browse for env file'
+							aria-label={t(
+								'settings:environment.env-files.browse-aria-label',
+								'Browse for env file',
+							)}
 							onClick={() => void handleBrowse()}
 							size='icon'
 							variant='outline'
@@ -144,10 +158,10 @@ export function EnvFilesSection({
 							onClick={handleAdd}
 							variant='secondary'
 						>
-							Add
+							{t('common:actions.add', 'Add')}
 						</Button>
 						<Button
-							aria-label='Cancel'
+							aria-label={t('common:actions.cancel', 'Cancel')}
 							onClick={handleCancel}
 							size='icon'
 							variant='ghost'
@@ -160,7 +174,7 @@ export function EnvFilesSection({
 			) : (
 				<Button onClick={() => setDraft('')} variant='outline'>
 					<PlusIcon aria-hidden='true' className='size-4' />
-					Add env file
+					{t('settings:environment.env-files.add', 'Add env file')}
 				</Button>
 			)}
 		</div>

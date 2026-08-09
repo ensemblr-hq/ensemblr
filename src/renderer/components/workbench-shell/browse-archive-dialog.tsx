@@ -1,6 +1,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArchiveIcon, ArchiveRestoreIcon, Trash2Icon } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import {
 	archivedWorkspacesQuery,
@@ -71,6 +72,7 @@ function BrowseArchiveDialogBody({
 	onChange: (repositoryId: string) => Promise<void> | void;
 	project: ProjectShellModel;
 }) {
+	const { t } = useTranslation();
 	const queryClient = useQueryClient();
 	const apiAvailable = isEnsemblrApiAvailable();
 	const { data, isLoading, isError } = useQuery({
@@ -150,24 +152,49 @@ function BrowseArchiveDialogBody({
 		<>
 			<DialogHeader>
 				<DialogTitle className='font-medium text-[0.9375rem]'>
-					Workspace archive — {project.name}
+					{t(
+						'workbench:browse-archive.title',
+						'Workspace archive — {{repository}}',
+						{ repository: project.name },
+					)}
 				</DialogTitle>
 				<p className='text-muted-foreground text-xs'>
-					Restore an archived workspace, or permanently purge it. Restoring
-					rebuilds the worktree from the recorded base branch when branch
-					cleanup ran at archive time.
+					{t(
+						'workbench:browse-archive.description',
+						'Restore an archived workspace, or permanently purge it. Restoring rebuilds the worktree from the recorded base branch when branch cleanup ran at archive time.',
+					)}
 				</p>
 			</DialogHeader>
 
 			<div className='-mx-4 max-h-[60vh] overflow-y-auto border-border border-t border-b'>
 				{!apiAvailable ? (
-					<EmptyState message='The preload bridge is unavailable in this context.' />
+					<EmptyState
+						message={t(
+							'workbench:browse-archive.empty.unavailable',
+							'The preload bridge is unavailable in this context.',
+						)}
+					/>
 				) : isLoading ? (
-					<EmptyState message='Loading archived workspaces…' />
+					<EmptyState
+						message={t(
+							'workbench:browse-archive.empty.loading',
+							'Loading archived workspaces…',
+						)}
+					/>
 				) : isError ? (
-					<EmptyState message='Failed to load archived workspaces.' />
+					<EmptyState
+						message={t(
+							'workbench:browse-archive.empty.failed',
+							'Failed to load archived workspaces.',
+						)}
+					/>
 				) : entries.length === 0 ? (
-					<EmptyState message='No archived workspaces for this repository.' />
+					<EmptyState
+						message={t(
+							'workbench:browse-archive.empty.none',
+							'No archived workspaces for this repository.',
+						)}
+					/>
 				) : (
 					<ul className='divide-y divide-border'>
 						{entries.map((entry) => {
@@ -190,16 +217,27 @@ function BrowseArchiveDialogBody({
 											{entry.name}
 										</span>
 										<span className='font-mono text-[0.6875rem] text-muted-foreground'>
-											{entry.branchName ?? 'no branch'}
+											{entry.branchName ??
+												t(
+													'workbench:browse-archive.row.no-branch',
+													'no branch',
+												)}
 										</span>
 										<span className='truncate font-mono text-[0.6875rem] text-muted-foreground'>
 											{entry.path}
 										</span>
 										<span className='text-[0.6875rem] text-muted-foreground'>
-											Archived {formatArchivedAt(entry.archivedAt)}
 											{entry.branchCleanup
-												? ' · worktree was destroyed (recreate from base branch on restore)'
-												: ''}
+												? t(
+														'workbench:browse-archive.row.archived-destroyed',
+														'Archived {{date}} · worktree was destroyed (recreate from base branch on restore)',
+														{ date: formatArchivedAt(entry.archivedAt) },
+													)
+												: t(
+														'workbench:browse-archive.row.archived',
+														'Archived {{date}}',
+														{ date: formatArchivedAt(entry.archivedAt) },
+													)}
 										</span>
 									</div>
 									<div className='flex gap-2'>
@@ -215,8 +253,8 @@ function BrowseArchiveDialogBody({
 										>
 											<ArchiveRestoreIcon aria-hidden='true' />
 											{isBusy && pendingAction === 'unarchive'
-												? 'Restoring…'
-												: 'Unarchive'}
+												? t('common:actions.restoring', 'Restoring…')
+												: t('common:actions.unarchive', 'Unarchive')}
 										</Button>
 										<Button
 											className='h-8'
@@ -230,8 +268,11 @@ function BrowseArchiveDialogBody({
 										>
 											<Trash2Icon aria-hidden='true' />
 											{isBusy && pendingAction === 'delete'
-												? 'Deleting…'
-												: 'Delete permanently'}
+												? t('common:actions.deleting', 'Deleting…')
+												: t(
+														'workbench:browse-archive.row.delete-permanently',
+														'Delete permanently',
+													)}
 										</Button>
 									</div>
 									{showDiagnostics ? (

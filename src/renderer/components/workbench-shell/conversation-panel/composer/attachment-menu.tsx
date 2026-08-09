@@ -5,6 +5,7 @@ import {
 	PlusIcon,
 } from 'lucide-react';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 
 import { Button } from '@/renderer/components/ui/button';
@@ -32,6 +33,7 @@ export function AttachmentMenu({
 	onAddAttachment: () => void;
 	onLinkIssue?: () => void;
 }) {
+	const { t } = useTranslation();
 	const [menuOpen, setMenuOpen] = useState(false);
 	return (
 		<DropdownMenu onOpenChange={setMenuOpen} open={menuOpen}>
@@ -39,7 +41,10 @@ export function AttachmentMenu({
 				<TooltipTrigger asChild>
 					<DropdownMenuTrigger asChild>
 						<Button
-							aria-label='Attachments'
+							aria-label={t(
+								'workbench:attachment-menu.aria-label',
+								'Attachments',
+							)}
 							className='rounded-md'
 							disabled={disabled}
 							size='icon-sm'
@@ -51,7 +56,10 @@ export function AttachmentMenu({
 					</DropdownMenuTrigger>
 				</TooltipTrigger>
 				<TooltipContent sideOffset={4}>
-					Add attachments, link issues, and more
+					{t(
+						'workbench:attachment-menu.tooltip',
+						'Add attachments, link issues, and more',
+					)}
 				</TooltipContent>
 			</Tooltip>
 			<DropdownMenuContent align='end' className='w-64 p-1.5' sideOffset={10}>
@@ -61,7 +69,9 @@ export function AttachmentMenu({
 						onSelect={onAddAttachment}
 					>
 						<PaperclipIcon />
-						<span className='flex-1'>Add attachment</span>
+						<span className='flex-1'>
+							{t('workbench:attachment-menu.add-attachment', 'Add attachment')}
+						</span>
 						<DropdownMenuShortcut>⌘U</DropdownMenuShortcut>
 					</DropdownMenuItem>
 					<DropdownMenuItem
@@ -70,20 +80,39 @@ export function AttachmentMenu({
 							if (onLinkIssue) {
 								onLinkIssue();
 							} else {
-								toast.info('Linking issues is coming soon.');
+								toast.info(
+									t(
+										'workbench:attachment-menu.link-issue-soon.title',
+										'Linking issues is coming soon.',
+									),
+								);
 							}
 						}}
 					>
 						<LinkIcon />
-						<span className='flex-1'>Link issue</span>
+						<span className='flex-1'>
+							{t('workbench:attachment-menu.link-issue', 'Link issue')}
+						</span>
 						<DropdownMenuShortcut>⌘I</DropdownMenuShortcut>
 					</DropdownMenuItem>
 					<DropdownMenuItem
 						className='gap-3 px-2 py-2 text-sm'
-						onSelect={() => toast.info('Linking workspaces is coming soon.')}
+						onSelect={() =>
+							toast.info(
+								t(
+									'workbench:attachment-menu.link-workspaces-soon.title',
+									'Linking workspaces is coming soon.',
+								),
+							)
+						}
 					>
 						<FolderOpenIcon />
-						<span className='flex-1'>Link workspaces</span>
+						<span className='flex-1'>
+							{t(
+								'workbench:attachment-menu.link-workspaces',
+								'Link workspaces',
+							)}
+						</span>
 					</DropdownMenuItem>
 				</DropdownMenuGroup>
 			</DropdownMenuContent>

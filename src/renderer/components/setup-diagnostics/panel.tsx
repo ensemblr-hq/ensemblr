@@ -1,4 +1,6 @@
+import type { TFunction } from 'i18next';
 import { ClockIcon } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 import { useRootDirectoryChange } from '@/renderer/hooks/setup-diagnostics/use-change';
 import { useGenericRemediation } from '@/renderer/hooks/setup-diagnostics/use-remediation';
@@ -26,14 +28,28 @@ interface SetupDiagnosticsPanelProps {
 	snapshot: SetupDiagnosticsSnapshot | null;
 }
 
-const GROUP_LABELS: Record<SetupCheckGroupId, string> = {
-	claude: 'Claude Code runtime',
-	core: 'Core runtime',
-	github: 'Git and GitHub',
-	linear: 'Linear',
-	pi: 'Pi runtime',
-	storage: 'Storage',
-};
+/**
+ * Names one group heading in the checks list.
+ * @param group - The check group being titled.
+ * @param t - Translator from the calling component.
+ * @returns The heading to paint above that group.
+ */
+function groupLabel(group: SetupCheckGroupId, t: TFunction): string {
+	switch (group) {
+		case 'claude':
+			return t('common:setup-summary.group.claude', 'Claude Code runtime');
+		case 'core':
+			return t('common:setup-summary.group.core', 'Core runtime');
+		case 'github':
+			return t('common:setup-summary.group.github', 'Git and GitHub');
+		case 'linear':
+			return t('common:setup-summary.group.linear', 'Linear');
+		case 'pi':
+			return t('common:setup-summary.group.pi', 'Pi runtime');
+		case 'storage':
+			return t('common:setup-summary.group.storage', 'Storage');
+	}
+}
 
 const GROUP_ORDER: readonly SetupCheckGroupId[] = [
 	'core',
@@ -52,7 +68,8 @@ export function SetupDiagnosticsPanel({
 	onRetry,
 	snapshot,
 }: SetupDiagnosticsPanelProps) {
-	const summary = getSetupSummary(snapshot, error);
+	const { t } = useTranslation();
+	const summary = getSetupSummary(snapshot, t, error);
 	const { handle: handleGenericRemediation } = useGenericRemediation({
 		onRetry,
 	});
@@ -97,7 +114,7 @@ export function SetupDiagnosticsPanel({
 						return (
 							<section className='flex flex-col gap-1' key={group}>
 								<h2 className='px-3 font-medium text-muted-foreground text-xs uppercase tracking-wide'>
-									{GROUP_LABELS[group]}
+									{groupLabel(group, t)}
 								</h2>
 								<div className='flex flex-col divide-y divide-border'>
 									{checks.map((check) => (
@@ -115,7 +132,9 @@ export function SetupDiagnosticsPanel({
 			) : (
 				<div className='flex items-center gap-2 px-3 text-muted-foreground text-xs'>
 					<ClockIcon aria-hidden='true' className='size-4 shrink-0' />
-					<span>Loading setup diagnostics</span>
+					<span>
+						{t('common:setup-summary.loading', 'Loading setup diagnostics')}
+					</span>
 				</div>
 			)}
 
@@ -147,9 +166,16 @@ function DangerNotice({ children }: { children: React.ReactNode }) {
 	);
 }
 
-/** Renders a one-line summary for the snapshot — counts plus blocking notice. */
+/**
+ * Renders a one-line summary for the snapshot — counts plus blocking notice.
+ * @param snapshot - The diagnostics snapshot, or null before it arrives.
+ * @param t - Translator from the calling component.
+ * @param error - IPC failure that replaces the snapshot entirely.
+ * @returns The title, detail, and tone for the summary strip.
+ */
 function getSetupSummary(
 	snapshot: SetupDiagnosticsSnapshot | null,
+	t: TFunction,
 	error?: string | null,
 ): {
 	detail: string;
@@ -158,39 +184,85 @@ function getSetupSummary(
 } {
 	if (error) {
 		return {
-			detail: 'Setup diagnostics could not be loaded from the main process.',
-			title: 'Setup diagnostics unavailable',
+			detail: t(
+				'common:setup-summary.unavailable.detail',
+				'Setup diagnostics could not be loaded from the main process.',
+			),
+			title: t(
+				'common:setup-summary.unavailable.title',
+				'Setup diagnostics unavailable',
+			),
 			tone: 'danger',
 		};
 	}
 
 	if (!snapshot) {
 		return {
-			detail: 'Ensemblr is collecting setup diagnostics.',
-			title: 'Checking setup readiness',
+			detail: t(
+				'common:setup-summary.checking.detail',
+				'Ensemblr is collecting setup diagnostics.',
+			),
+			title: t(
+				'common:setup-summary.checking.title',
+				'Checking setup readiness',
+			),
 			tone: 'muted',
 		};
 	}
 
 	if (snapshot.status === 'ready') {
 		return {
-			detail: `${snapshot.successCount} checks passed and ${snapshot.warningCount} warnings remain.`,
-			title: 'Core workflows are ready',
+			detail: t(
+				'common:setup-summary.ready.detail',
+				'{{passedChecks}} and {{remainingWarnings}}.',
+				{
+					passedChecks: t('common:setup-summary.ready.passed-checks', {
+						count: snapshot.successCount,
+						defaultValue_one: '{{count}} check passed',
+						defaultValue_other: '{{count}} checks passed',
+					}),
+					remainingWarnings: t(
+						'common:setup-summary.ready.remaining-warnings',
+						{
+							count: snapshot.warningCount,
+							defaultValue_one: '{{count}} warning remains',
+							defaultValue_other: '{{count}} warnings remain',
+						},
+					),
+				},
+			),
+			title: t('common:setup-summary.ready.title', 'Core workflows are ready'),
 			tone: 'ok',
 		};
 	}
 
 	if (snapshot.status === 'checking') {
 		return {
-			detail: `${snapshot.blockedCount} required checks are still pending.`,
-			title: 'Setup checks are still pending',
+			detail: t('common:setup-summary.pending.detail', {
+				count: snapshot.blockedCount,
+				defaultValue_one: '{{count}} required check is still pending.',
+				defaultValue_other: '{{count}} required checks are still pending.',
+			}),
+			title: t(
+				'common:setup-summary.pending.title',
+				'Setup checks are still pending',
+			),
 			tone: 'warning',
 		};
 	}
 
 	return {
-		detail: `${snapshot.blockedCount} required checks need attention before core workflows open.`,
-		title: 'Core workflows are blocked',
+		detail: t('common:setup-summary.blocked.detail', {
+			count: snapshot.blockedCount,
+			defaultValue_one:
+				'{{count}} required check needs attention before core workflows open.',
+			defaultValue_other:
+				'{{count}} required checks need attention before core workflows open.',
+		}),
+		title: t(
+			'common:setup-summary.blocked.title',
+			'Core workflows are blocked',
+		),
 		tone: 'danger',
 	};
 }

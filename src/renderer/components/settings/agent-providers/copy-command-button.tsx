@@ -1,5 +1,6 @@
 import { CheckIcon, ClipboardIcon } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/renderer/components/ui/button';
 
@@ -19,6 +20,7 @@ export function CopyCommandButton({
 	command: string;
 	label: string;
 }) {
+	const { t } = useTranslation();
 	const [copied, setCopied] = useState(false);
 	const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -60,7 +62,7 @@ export function CopyCommandButton({
 			variant='outline'
 		>
 			<Icon aria-hidden='true' data-icon='inline-start' />
-			{copied ? 'Copied' : label}
+			{copied ? t('common:actions.copied', 'Copied') : label}
 		</Button>
 	);
 }

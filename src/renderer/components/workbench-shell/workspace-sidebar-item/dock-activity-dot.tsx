@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next';
+
 import { cn } from '@/renderer/lib/utils';
 import type { WorkspaceDockActivityState } from '@/renderer/state/workspace';
 
@@ -7,6 +9,8 @@ export function DockActivityDot({
 }: {
 	state: WorkspaceDockActivityState;
 }) {
+	const { t } = useTranslation();
+
 	return (
 		<span
 			aria-hidden='true'
@@ -15,7 +19,10 @@ export function DockActivityDot({
 				state === 'setup-running' ? 'bg-status-warning' : 'bg-status-ok',
 			)}
 			data-workspace-dock-activity={state}
-			title='Dock activity running'
+			title={t(
+				'workbench:workspace-item.dock-activity',
+				'Dock activity running',
+			)}
 		/>
 	);
 }

@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import type { TFunction } from 'i18next';
 import {
 	CheckIcon,
 	CircleSlashIcon,
@@ -15,6 +16,7 @@ import {
 	useMemo,
 	useState,
 } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import {
 	agentProviderExecutablePathQuery,
@@ -56,30 +58,41 @@ const MCP_COMMAND = '/mcp';
 const ROW_CLASSES =
 	'flex w-full items-center gap-2 rounded-md px-1 py-1 text-left';
 
-/** How each connection state reads: its icon, tint, and right-hand label. */
+/**
+ * How each connection state reads: its icon, tint, and right-hand label. The
+ * label is a resolver rather than a string so the row renders it in the active
+ * language; a connected server states its health with the glyph alone.
+ */
 const STATUS_PRESENTATION = {
 	connected: { icon: CheckIcon, label: null, tint: 'text-status-ok' },
 	disabled: {
 		icon: CircleSlashIcon,
-		label: 'Disabled',
+		label: (t: TFunction) =>
+			t('workbench:mcp-servers.status.disabled', 'Disabled'),
 		tint: 'text-muted-foreground',
 	},
-	failed: { icon: XIcon, label: 'Error', tint: 'text-status-danger' },
+	failed: {
+		icon: XIcon,
+		label: (t: TFunction) => t('workbench:mcp-servers.status.failed', 'Error'),
+		tint: 'text-status-danger',
+	},
 	'needs-auth': {
 		icon: TriangleAlertIcon,
-		label: 'Needs auth',
+		label: (t: TFunction) =>
+			t('workbench:mcp-servers.status.needs-auth', 'Needs auth'),
 		tint: 'text-status-warning',
 	},
 	pending: {
 		icon: ClockIcon,
-		label: 'Awaiting status',
+		label: (t: TFunction) =>
+			t('workbench:mcp-servers.status.pending', 'Awaiting status'),
 		tint: 'text-accent-strong',
 	},
 } satisfies Record<
 	AgentProviderMcpStatus,
 	{
 		icon: ComponentType<{ className?: string }>;
-		label: string | null;
+		label: ((t: TFunction) => string) | null;
 		tint: string;
 	}
 >;
@@ -100,12 +113,17 @@ function buildMcpCommand(executablePath: string | null): string {
  * Explains an empty roster: "none configured" and "could not be read" look the
  * same on screen but mean opposite things.
  * @param result - The roster the runtime returned, when it answered at all.
+ * @param t - Translator from the calling component, so the line follows the UI language.
  * @returns The line the panel shows in place of rows.
  */
 function emptyRosterMessage(
 	result: ListAgentProviderMcpServersResult | undefined,
+	t: TFunction,
 ): string {
-	return result?.error ?? 'No MCP servers are configured.';
+	return (
+		result?.error ??
+		t('workbench:mcp-servers.empty', 'No MCP servers are configured.')
+	);
 }
 
 /**
@@ -121,17 +139,19 @@ function McpServerRow({
 	onAuthorize: (() => void) | null;
 	server: AgentProviderMcpServerWire;
 }) {
+	const { t } = useTranslation();
 	const presentation = STATUS_PRESENTATION[server.status];
 	const StatusIcon = presentation.icon;
+	const statusLabel = presentation.label?.(t) ?? null;
 	const cells = (
 		<>
 			<StatusIcon className={cn('size-3.5 shrink-0', presentation.tint)} />
 			<span className='min-w-0 flex-1 truncate text-foreground text-xs'>
 				{server.name}
 			</span>
-			{presentation.label ? (
+			{statusLabel ? (
 				<span className={cn('shrink-0 text-xxs', presentation.tint)}>
-					{presentation.label}
+					{statusLabel}
 				</span>
 			) : null}
 		</>
@@ -139,7 +159,9 @@ function McpServerRow({
 
 	const row = onAuthorize ? (
 		<button
-			aria-label={`Authorise ${server.name}`}
+			aria-label={t('workbench:mcp-servers.authorise', 'Authorise {{name}}', {
+				name: server.name,
+			})}
 			className={cn(
 				ROW_CLASSES,
 				'transition-colors hover:bg-secondary/60 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50',
@@ -183,6 +205,7 @@ export function McpServersPanel({
 	disabled?: boolean;
 	workspaceId: string;
 }) {
+	const { t } = useTranslation();
 	const [open, setOpen] = useState(false);
 	const { data, isFetching, refetch } = useQuery({
 		...agentProviderMcpServersQuery('claude', cwd),
@@ -215,7 +238,7 @@ export function McpServersPanel({
 				<TooltipTrigger asChild>
 					<PopoverTrigger asChild>
 						<Button
-							aria-label='MCP servers'
+							aria-label={t('workbench:mcp-servers.aria-label', 'MCP servers')}
 							className='h-7 rounded-md px-2 font-medium'
 							disabled={disabled}
 							size='sm'
@@ -226,13 +249,20 @@ export function McpServersPanel({
 						</Button>
 					</PopoverTrigger>
 				</TooltipTrigger>
-				<TooltipContent sideOffset={4}>MCP servers</TooltipContent>
+				<TooltipContent sideOffset={4}>
+					{t('workbench:mcp-servers.aria-label', 'MCP servers')}
+				</TooltipContent>
 			</Tooltip>
 			<PopoverContent align='start' className='w-72 overflow-hidden p-1.5'>
 				<div className='flex items-center justify-between gap-2 px-1 pb-1'>
-					<span className='text-muted-foreground text-xs'>MCPs</span>
+					<span className='text-muted-foreground text-xs'>
+						{t('workbench:mcp-servers.heading', 'MCPs')}
+					</span>
 					<Button
-						aria-label='Refresh MCP servers'
+						aria-label={t(
+							'workbench:mcp-servers.refresh',
+							'Refresh MCP servers',
+						)}
 						className='size-6 rounded-md'
 						disabled={isFetching}
 						onClick={() => void refetch()}
@@ -249,7 +279,9 @@ export function McpServersPanel({
 				</div>
 				{servers.length === 0 ? (
 					<p className='px-1 py-2 text-muted-foreground text-xs'>
-						{isFetching ? 'Reading the MCP roster…' : emptyRosterMessage(data)}
+						{isFetching
+							? t('workbench:mcp-servers.loading', 'Reading the MCP roster…')
+							: emptyRosterMessage(data, t)}
 					</p>
 				) : (
 					<ScrollArea className='pr-3.5' style={scrollAreaStyle}>

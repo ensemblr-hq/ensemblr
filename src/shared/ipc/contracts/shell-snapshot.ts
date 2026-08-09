@@ -1,3 +1,4 @@
+import type { AppLanguage } from '../../i18n';
 import type { HealthSnapshot } from './health';
 import type { WorkspaceOpenTargetSnapshot } from './open-target';
 import type { RepositoryWorkspaceNavigationSnapshot } from './repository-navigation';
@@ -10,6 +11,8 @@ import type { RepositoryWorkspaceNavigationSnapshot } from './repository-navigat
 export interface InitialShellSnapshot {
 	capturedAt: string;
 	health: HealthSnapshot | null;
+	/** Language the main process resolved, so the first paint is never English by default. */
+	language: AppLanguage;
 	navigation: RepositoryWorkspaceNavigationSnapshot | null;
 	openTargets: WorkspaceOpenTargetSnapshot[] | null;
 }

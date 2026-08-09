@@ -1,5 +1,6 @@
 import { GitPullRequestArrowIcon, TriangleAlertIcon } from 'lucide-react';
 import { type MouseEvent, useCallback, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import {
 	ContextMenu,
@@ -37,10 +38,7 @@ export function ReviewFileList({
 	conflictPaths,
 	diffScope,
 	discardablePaths,
-	emptyState = {
-		message: 'Changes appear here.',
-		title: 'No file changes yet',
-	},
+	emptyState,
 	error,
 	files,
 	isLoading = false,
@@ -57,7 +55,7 @@ export function ReviewFileList({
 	diffScope?: WorkspaceGitDiffScope;
 	/** Paths that can be discarded (uncommitted); others hide the discard action. */
 	discardablePaths?: ReadonlySet<string>;
-	/** Overrides the empty-state copy for the active source. */
+	/** Overrides the empty-state copy for the active source; defaults to the all-changes copy. */
 	emptyState?: { message: string; title: string };
 	error?: WorkspaceGitFailure;
 	files: ReviewFileSummary[];
@@ -67,6 +65,7 @@ export function ReviewFileList({
 	viewMode: ChangesViewMode;
 	workspaceId: string;
 }) {
+	const { t } = useTranslation();
 	const markedFiles = useMemo(
 		() => markConflictedFiles(files, conflictPaths),
 		[conflictPaths, files],
@@ -128,17 +127,31 @@ export function ReviewFileList({
 		if (isLoading) {
 			return (
 				<div className='flex h-full items-center justify-center px-8 text-center text-muted-foreground text-xs'>
-					Loading changes…
+					{t('review:changes.loading', 'Loading changes…')}
 				</div>
 			);
 		}
-		return <PanelPlaceholder icon={GitPullRequestArrowIcon} {...emptyState} />;
+		return (
+			<PanelPlaceholder
+				icon={GitPullRequestArrowIcon}
+				{...(emptyState ?? {
+					message: t('review:changes.empty.message', 'Changes appear here.'),
+					title: t('review:changes.empty.title', 'No file changes yet'),
+				})}
+			/>
+		);
 	}
 
 	const flatList = conflictGroups ? (
 		<>
-			<ReviewFileGroup files={conflictGroups.conflicted} label='Conflicts' />
-			<ReviewFileGroup files={conflictGroups.clean} label='Clean' />
+			<ReviewFileGroup
+				files={conflictGroups.conflicted}
+				label={t('review:changes.group-conflicts', 'Conflicts')}
+			/>
+			<ReviewFileGroup
+				files={conflictGroups.clean}
+				label={t('review:changes.group-clean', 'Clean')}
+			/>
 		</>
 	) : (
 		listedFiles.map((file) => (

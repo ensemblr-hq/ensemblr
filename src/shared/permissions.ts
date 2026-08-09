@@ -23,8 +23,16 @@ export type PermissionActionKind =
 	| 'workspace-read'
 	| 'workspace-write';
 
-/** Resolution applied to a single action under a given permission mode. */
-type PermissionBoundary = 'allowed' | 'blocked' | 'confirmation-required';
+/**
+ * Resolution applied to a single action under a given permission mode. The
+ * union is the locale-neutral contract: UI code keys its own wording off these
+ * codes rather than off {@link getPermissionBoundaryLabel}, which this module
+ * cannot translate from a process that has no renderer i18n instance.
+ */
+export type PermissionBoundary =
+	| 'allowed'
+	| 'blocked'
+	| 'confirmation-required';
 
 /** Permission boundary decision for one action, with explanatory reason. */
 interface PermissionBoundarySnapshot {
@@ -106,9 +114,12 @@ export function getPermissionModeLabel(mode: PermissionMode): string {
 }
 
 /**
- * Returns the user-facing label for a given permission boundary outcome.
+ * Returns the English label for a given permission boundary outcome, for
+ * diagnostics and main-process reporting. Renderer surfaces must translate the
+ * {@link PermissionBoundary} code instead — interpolating this into a localised
+ * sentence produces a half-translated one.
  * @param boundary - Boundary whose label is requested.
- * @returns Display string suitable for UI rendering.
+ * @returns English display string.
  */
 export function getPermissionBoundaryLabel(
 	boundary: PermissionBoundary,

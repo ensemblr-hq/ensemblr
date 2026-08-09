@@ -2,6 +2,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
 import { CheckIcon, ClipboardCheckIcon } from 'lucide-react';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import {
 	ensemblrQueryKeys,
@@ -23,6 +24,7 @@ export const Route = createFileRoute('/_workbench/settings/diagnostics')({
  * bundle" action that sanitizes secrets before placing JSON on the clipboard.
  */
 function DiagnosticsRoute() {
+	const { t } = useTranslation();
 	const queryClient = useQueryClient();
 	const { data: snapshot, error: queryError } = useQuery(setupDiagnosticsQuery);
 	const [copied, setCopied] = useState(false);
@@ -66,11 +68,16 @@ function DiagnosticsRoute() {
 					) : (
 						<ClipboardCheckIcon aria-hidden='true' className='size-4' />
 					)}
-					{copied ? 'Copied' : 'Copy diagnostics bundle'}
+					{copied
+						? t('common:actions.copied', 'Copied')
+						: t('settings:diagnostics.copy-bundle', 'Copy diagnostics bundle')}
 				</Button>
 			}
-			description='Setup gate checks for Pi, git, GitHub, Linear, and the Ensemblr runtime. The diagnostics bundle redacts secrets, account ids, and full paths before going to the clipboard.'
-			title='Diagnostics'
+			description={t(
+				'settings:diagnostics.description',
+				'Setup gate checks for Pi, git, GitHub, Linear, and the Ensemblr runtime. The diagnostics bundle redacts secrets, account ids, and full paths before going to the clipboard.',
+			)}
+			title={t('settings:diagnostics.title', 'Diagnostics')}
 		>
 			<SetupDiagnosticsPanel
 				error={queryError instanceof Error ? queryError.message : null}

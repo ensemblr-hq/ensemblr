@@ -1,5 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 
 import { refreshPullRequestSnapshot } from '@/renderer/api/ensemblr-queries';
@@ -21,6 +22,7 @@ export function usePullRequestRefresh({
 	refreshPullRequest: () => void;
 } {
 	const queryClient = useQueryClient();
+	const { t } = useTranslation();
 	const [isRefreshingPullRequest, setIsRefreshingPullRequest] = useState(false);
 
 	const refreshPullRequest = useCallback(async () => {
@@ -35,13 +37,17 @@ export function usePullRequestRefresh({
 				workspaceId,
 			});
 		} catch (cause) {
-			toast.error('Pull request refresh failed', {
-				description: cause instanceof Error ? cause.message : undefined,
-			});
+			toast.error(
+				t(
+					'errors:pull-request-refresh.failed.title',
+					'Pull request refresh failed',
+				),
+				{ description: cause instanceof Error ? cause.message : undefined },
+			);
 		} finally {
 			setIsRefreshingPullRequest(false);
 		}
-	}, [queryClient, workspaceCwd, workspaceId]);
+	}, [queryClient, t, workspaceCwd, workspaceId]);
 
 	return {
 		isRefreshingPullRequest,

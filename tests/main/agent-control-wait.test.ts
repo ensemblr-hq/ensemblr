@@ -110,6 +110,7 @@ const makePorts = (
 		updateIssue: vi.fn(),
 	},
 	permissions: { getMode: () => 'workspace-trusted' },
+	language: { getLanguage: () => 'en' },
 	confirm: { confirm: vi.fn().mockResolvedValue(true) },
 	ask: { ask: vi.fn(), releaseSession: vi.fn() },
 	planMode: {

@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 import { cn } from '@/renderer/lib/utils';
 import { BlockControls } from '../block-controls';
 import { CopyResponseButton } from '../copy-response-button';
@@ -35,6 +36,7 @@ export function CodeSurface({
 	/** Shows a hover-revealed copy button holding this text. */
 	copyText?: string;
 }) {
+	const { t } = useTranslation();
 	return (
 		<div
 			className={cn(
@@ -50,7 +52,10 @@ export function CodeSurface({
 			</div>
 			{copyText === undefined ? null : (
 				<BlockControls>
-					<CopyResponseButton label='Copy code' text={copyText} />
+					<CopyResponseButton
+						label={t('common:actions.copy-code', 'Copy code')}
+						text={copyText}
+					/>
 				</BlockControls>
 			)}
 		</div>

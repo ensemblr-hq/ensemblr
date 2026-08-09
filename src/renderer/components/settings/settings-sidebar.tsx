@@ -1,4 +1,5 @@
 import { Link, useRouterState } from '@tanstack/react-router';
+import type { TFunction } from 'i18next';
 import type { LucideIcon } from 'lucide-react';
 import {
 	BeakerIcon,
@@ -15,6 +16,7 @@ import {
 	SlidersHorizontalIcon,
 	TerminalIcon,
 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 import { cn } from '@/renderer/lib/utils';
 import type { SettingsScope } from '@/renderer/types/settings';
@@ -36,74 +38,120 @@ interface RepoNavItem {
 	icon: LucideIcon;
 }
 
-const USER_NAV: UserNavItem[] = [
-	{
-		kind: 'user',
-		to: '/settings/general',
-		label: 'General',
-		icon: SlidersHorizontalIcon,
-	},
-	{ kind: 'user', to: '/settings/models', label: 'Models', icon: BoxIcon },
-	{
-		kind: 'user',
-		to: '/settings/providers',
-		label: 'Providers',
-		icon: PlugZapIcon,
-	},
-	{
-		kind: 'user',
-		to: '/settings/environment',
-		label: 'Environment',
-		icon: KeyRoundIcon,
-	},
-	{ kind: 'user', to: '/settings/git', label: 'Git', icon: GitBranchIcon },
-	{
-		kind: 'user',
-		to: '/settings/appearance',
-		label: 'Appearance',
-		icon: BrushIcon,
-	},
-	{
-		kind: 'user',
-		to: '/settings/integrations',
-		label: 'Integrations',
-		icon: PuzzleIcon,
-	},
-	{
-		group: 'more',
-		icon: HeartPulseIcon,
-		kind: 'user',
-		label: 'Diagnostics',
-		to: '/settings/diagnostics',
-	},
-	{
-		group: 'more',
-		icon: FlaskConicalIcon,
-		kind: 'user',
-		label: 'Experimental',
-		to: '/settings/experimental',
-	},
-	{
-		group: 'more',
-		icon: BeakerIcon,
-		kind: 'user',
-		label: 'Advanced',
-		to: '/settings/advanced',
-	},
-];
+/**
+ * Builds the user-scope nav entries. The labels are `t()` calls rather than a
+ * module-scope constant table so a language change re-renders them and so
+ * `i18next-cli extract` can see every key statically.
+ * @param t - Translation function from `useTranslation`
+ * @returns The user-scope nav entries in display order
+ */
+function userNav(t: TFunction): UserNavItem[] {
+	return [
+		{
+			kind: 'user',
+			to: '/settings/general',
+			label: t('settings:nav.general', 'General'),
+			icon: SlidersHorizontalIcon,
+		},
+		{
+			kind: 'user',
+			to: '/settings/models',
+			label: t('settings:nav.models', 'Models'),
+			icon: BoxIcon,
+		},
+		{
+			kind: 'user',
+			to: '/settings/providers',
+			label: t('settings:nav.providers', 'Providers'),
+			icon: PlugZapIcon,
+		},
+		{
+			kind: 'user',
+			to: '/settings/environment',
+			label: t('settings:nav.environment', 'Environment'),
+			icon: KeyRoundIcon,
+		},
+		{
+			kind: 'user',
+			to: '/settings/git',
+			label: t('settings:nav.git', 'Git'),
+			icon: GitBranchIcon,
+		},
+		{
+			kind: 'user',
+			to: '/settings/appearance',
+			label: t('settings:nav.appearance', 'Appearance'),
+			icon: BrushIcon,
+		},
+		{
+			kind: 'user',
+			to: '/settings/integrations',
+			label: t('settings:nav.integrations', 'Integrations'),
+			icon: PuzzleIcon,
+		},
+		{
+			group: 'more',
+			icon: HeartPulseIcon,
+			kind: 'user',
+			label: t('settings:nav.diagnostics', 'Diagnostics'),
+			to: '/settings/diagnostics',
+		},
+		{
+			group: 'more',
+			icon: FlaskConicalIcon,
+			kind: 'user',
+			label: t('settings:nav.experimental', 'Experimental'),
+			to: '/settings/experimental',
+		},
+		{
+			group: 'more',
+			icon: BeakerIcon,
+			kind: 'user',
+			label: t('settings:nav.advanced', 'Advanced'),
+			to: '/settings/advanced',
+		},
+	];
+}
 
-const REPO_NAV: RepoNavItem[] = [
-	{
-		icon: KeyRoundIcon,
-		kind: 'repo',
-		label: 'Environment',
-		section: 'environment',
-	},
-	{ icon: GitBranchIcon, kind: 'repo', label: 'Git', section: 'git' },
-	{ icon: TerminalIcon, kind: 'repo', label: 'Scripts', section: 'scripts' },
-	{ icon: CableIcon, kind: 'repo', label: 'Actions', section: 'actions' },
-	{ icon: ScrollIcon, kind: 'repo', label: 'Misc', section: 'misc' },
-];
+/**
+ * Builds the repo-scope nav entries.
+ * @param t - Translation function from `useTranslation`
+ * @returns The repo-scope nav entries in display order
+ */
+function repoNav(t: TFunction): RepoNavItem[] {
+	return [
+		{
+			icon: KeyRoundIcon,
+			kind: 'repo',
+			label: t('settings:repo-nav.environment', 'Environment'),
+			section: 'environment',
+		},
+		{
+			icon: GitBranchIcon,
+			kind: 'repo',
+			label: t('settings:repo-nav.git', 'Git'),
+			section: 'git',
+		},
+		{
+			icon: TerminalIcon,
+			kind: 'repo',
+			label: t('settings:repo-nav.scripts', 'Scripts'),
+			section: 'scripts',
+		},
+		{
+			icon: CableIcon,
+			kind: 'repo',
+			label: t('settings:repo-nav.actions', 'Actions'),
+			section: 'actions',
+		},
+		{
+			icon: ScrollIcon,
+			kind: 'repo',
+			label: t('settings:repo-nav.misc', 'Misc'),
+			section: 'misc',
+		},
+	];
+}
 
 const REPO_SECTION_TARGETS = {
 	actions: '/settings/repo/$repoId/actions',
@@ -124,9 +172,11 @@ export function SettingsSidebar({
 	scope: SettingsScope;
 	activeRepoId: string | null;
 }) {
+	const { t } = useTranslation();
+
 	return (
 		<nav
-			aria-label='Settings sections'
+			aria-label={t('settings:nav.aria-label', 'Settings sections')}
 			className='flex h-full w-56 shrink-0 flex-col gap-4 border-r bg-sidebar/60 px-2 py-3'
 		>
 			{scope === 'user' ? <UserNav /> : <RepoNav activeRepoId={activeRepoId} />}
@@ -136,8 +186,10 @@ export function SettingsSidebar({
 
 /** Renders the user-scope settings nav, split into a main group and a "More" group. */
 function UserNav() {
-	const main = USER_NAV.filter((item) => item.group !== 'more');
-	const more = USER_NAV.filter((item) => item.group === 'more');
+	const { t } = useTranslation();
+	const items = userNav(t);
+	const main = items.filter((item) => item.group !== 'more');
+	const more = items.filter((item) => item.group === 'more');
 	return (
 		<>
 			<ul className='flex flex-col gap-0.5'>
@@ -147,7 +199,7 @@ function UserNav() {
 					</li>
 				))}
 			</ul>
-			<NavGroupLabel>More</NavGroupLabel>
+			<NavGroupLabel>{t('settings:nav.more', 'More')}</NavGroupLabel>
 			<ul className='flex flex-col gap-0.5'>
 				{more.map((item) => (
 					<li key={item.to}>
@@ -161,16 +213,18 @@ function UserNav() {
 
 /** Renders the repo-scope settings nav, or a placeholder when no repository is selected. */
 function RepoNav({ activeRepoId }: { activeRepoId: string | null }) {
+	const { t } = useTranslation();
+
 	if (!activeRepoId) {
 		return (
 			<p className='px-2 py-1 text-muted-foreground text-xs'>
-				No repository selected.
+				{t('settings:repo-nav.empty', 'No repository selected.')}
 			</p>
 		);
 	}
 	return (
 		<ul className='flex flex-col gap-0.5'>
-			{REPO_NAV.map((item) => (
+			{repoNav(t).map((item) => (
 				<li key={item.section}>
 					<RepoNavLink item={item} repoId={activeRepoId} />
 				</li>
@@ -197,7 +251,9 @@ function UserNavLink({ item }: { item: UserNavItem }) {
 	return (
 		<Link className={navLinkClass(isActive)} preload='intent' to={item.to}>
 			<Icon aria-hidden='true' className='size-4 text-muted-foreground' />
-			<span className='truncate'>{item.label}</span>
+			<span className='truncate' title={item.label}>
+				{item.label}
+			</span>
 		</Link>
 	);
 }
@@ -217,7 +273,9 @@ function RepoNavLink({ item, repoId }: { item: RepoNavItem; repoId: string }) {
 			to={target}
 		>
 			<Icon aria-hidden='true' className='size-4 text-muted-foreground' />
-			<span className='truncate'>{item.label}</span>
+			<span className='truncate' title={item.label}>
+				{item.label}
+			</span>
 		</Link>
 	);
 }

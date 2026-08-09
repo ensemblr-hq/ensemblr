@@ -1,4 +1,5 @@
 import { useAtomValue } from 'jotai';
+import { useTranslation } from 'react-i18next';
 
 import { CodeBlockContent } from '@/renderer/components/code-block';
 import { MessageResponse } from '@/renderer/components/message';
@@ -22,6 +23,7 @@ export function FilePreviewBody({
 	filePath: string;
 	result: ReadWorkspaceFileResult;
 }) {
+	const { t } = useTranslation();
 	const wordWrap = useAtomValue(filePreviewWordWrapAtom);
 	const markdownPreview = useAtomValue(filePreviewMarkdownPreviewAtom);
 	const { imageSource, showFormattedPreview } = resolvePreviewMode(
@@ -35,7 +37,13 @@ export function FilePreviewBody({
 		return (
 			<div className='sleek-scrollbar flex min-h-0 flex-1 items-center justify-center overflow-auto bg-code p-4'>
 				<img
-					alt={`Preview of ${filePath}`}
+					alt={t(
+						'workbench:file-preview.image-alt',
+						'Preview of {{filePath}}',
+						{
+							filePath,
+						},
+					)}
 					className='max-h-full max-w-full rounded-md object-contain shadow-sm'
 					src={imageSource}
 				/>

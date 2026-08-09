@@ -4,6 +4,11 @@ import type { DatabaseSync } from 'node:sqlite';
 import { app, BrowserWindow, ipcMain, shell } from 'electron';
 import { parseAskUserQuestionReply } from '../shared/agent-control.ts';
 import type { AgentProviderId } from '../shared/agent-provider.ts';
+import {
+	type AppLanguage,
+	FALLBACK_LANGUAGE,
+	resolveLanguage,
+} from '../shared/i18n.ts';
 import { IPC_CHANNELS } from '../shared/ipc/channels';
 import type {
 	AgentSessionEventBroadcast,
@@ -264,6 +269,24 @@ const settingsResolutionService = createEnsemblrConfigResolutionService({
 	databaseService,
 	rootDirectory: isDev ? devRootDirectory : undefined,
 });
+/**
+ * Resolves the language the app is rendering in, the same way the native menu
+ * and the shell snapshot do. Read per call rather than captured so a language
+ * the user switches mid-session reaches the next agent turn, and defensive
+ * because it runs on the agent-control path: a settings read that throws must
+ * not take a harness launch or a turn's prompt down with it.
+ * @returns The resolved app language, falling back to English.
+ */
+const resolveAppLanguage = (): AppLanguage => {
+	try {
+		return resolveLanguage(
+			appSettingsService.read().general.language,
+			app.getPreferredSystemLanguages(),
+		);
+	} catch {
+		return FALLBACK_LANGUAGE;
+	}
+};
 const repositoryConfigService = createRepositoryConfigService();
 const rootDirectoryService = createEnsemblrRootDirectoryService({
 	databaseService,
@@ -357,6 +380,7 @@ const {
 	},
 	/** Reads the control server's URL lazily, null until the server is listening. */
 	getServerUrl: () => agentControlServer?.url ?? null,
+	getLanguage: resolveAppLanguage,
 	/** Reads the durable sub-agent marker so a resumed child keeps its playbook. */
 	isSpawnedSubAgent: (agentSessionId) =>
 		isSessionTabMarkedSubAgent(
@@ -535,8 +559,8 @@ const agentSessionService = createAgentSessionService({
 		readPermissionModeFromSnapshot(settingsResolutionService.resolve()),
 	resolveProviderExecutable,
 	/** Renders this turn's naming upkeep for runtimes the app prompts directly. */
-	resolveSessionBriefNudge: async (sessionId) =>
-		(await agentControlService?.readSessionBriefNudge(sessionId)) ?? null,
+	resolveTurnPreamble: async (sessionId) =>
+		(await agentControlService?.readTurnPreamble(sessionId)) ?? null,
 	/** Live sub-agents of a session, so stopping an orchestrator stops its children. */
 	resolveSpawnedChildren: (sessionId) =>
 		agentControlOriginRegistry.childrenOf(sessionId),
@@ -783,6 +807,7 @@ agentControlService = createAgentControlService({
 		/** Reads the currently resolved permission mode that gates control ops. */
 		getPermissionMode: () =>
 			readPermissionModeFromSnapshot(settingsResolutionService.resolve()),
+		getLanguage: resolveAppLanguage,
 		harnessDetectionService,
 		linearService,
 		piExecutableService,
@@ -901,7 +926,8 @@ app.whenReady().then(() => {
 	moveRepositoryScriptsIntoCommittedConfig();
 	rootDirectoryService.ensure();
 	void sharedRootAdoptionService.reconcile();
-	installApplicationMenu();
+	const readAppSettings = () => appSettingsService.read();
+	installApplicationMenu(readAppSettings);
 	// config.json is the source of truth; live-reload the renderer when it's
 	// edited outside the app (the service suppresses echoes of its own writes).
 	appSettingsService.startWatching((settings) => {
@@ -909,6 +935,7 @@ app.whenReady().then(() => {
 			settings,
 		} satisfies AppSettingsChangedBroadcast);
 		agentActivityMonitor.refresh();
+		installApplicationMenu(readAppSettings);
 	});
 	// Live-reload the non-App config sections (linear, security, managed,
 	// environment, repositoryDefaults, repositoryRules) so external config.json
@@ -950,7 +977,13 @@ app.whenReady().then(() => {
 		planModeRegistry,
 		quickStartProjectService,
 		renameWorkspaceService,
-		onAppSettingsUpdated: () => agentActivityMonitor.refresh(),
+		// The in-app write is echo-suppressed and so never reaches the watcher
+		// above; without this rebuild the menu keeps the previous language until
+		// the next restart.
+		onAppSettingsUpdated: () => {
+			agentActivityMonitor.refresh();
+			installApplicationMenu(readAppSettings);
+		},
 		repositoryConfigService,
 		rootDirectoryService,
 		scriptLifecycleService,

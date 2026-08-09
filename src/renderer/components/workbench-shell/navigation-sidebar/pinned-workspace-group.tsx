@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next';
+
 import {
 	SidebarGroup,
 	SidebarGroupContent,
@@ -30,6 +32,7 @@ export function PinnedWorkspaceGroup({
 		workspace: WorkspaceShellModel,
 	) => WorkbenchRouteSearch;
 }) {
+	const { t } = useTranslation();
 	const {
 		pinnedWorkspaceEntries,
 		pinnedWorkspaceIdSet,
@@ -43,7 +46,9 @@ export function PinnedWorkspaceGroup({
 	return (
 		<SidebarGroup className='gap-1 py-1.5'>
 			<SidebarGroupLabel className='h-7 justify-between pr-7'>
-				<span className='truncate'>Pinned</span>
+				<span className='truncate'>
+					{t('workbench:navigation-sidebar.pinned.label', 'Pinned')}
+				</span>
 			</SidebarGroupLabel>
 			<SidebarGroupContent>
 				<div className='flex w-full min-w-0 flex-col gap-1'>

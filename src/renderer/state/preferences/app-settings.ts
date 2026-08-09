@@ -60,6 +60,8 @@ function settingAtom<
 // ─── General ──────────────────────────────────────────────────────────────────
 export const sendShortcutAtom = settingAtom('general', 'sendShortcut');
 export const followUpBehaviorAtom = settingAtom('general', 'followUpBehavior');
+/** UI language preference; `system` defers to the OS language order. */
+export const languageAtom = settingAtom('general', 'language');
 export const desktopNotificationsAtom = settingAtom(
 	'general',
 	'desktopNotifications',

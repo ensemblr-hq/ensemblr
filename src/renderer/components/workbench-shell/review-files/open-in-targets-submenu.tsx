@@ -1,4 +1,5 @@
 import { ArrowUpRightIcon } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 import {
 	ContextMenuItem,
@@ -22,6 +23,8 @@ export function OpenInTargetsSubmenu({
 	onSelect: (openTarget: WorkspaceOpenTarget) => void;
 	openInTargets: readonly WorkspaceOpenTarget[];
 }) {
+	const { t } = useTranslation();
+
 	if (!openInTargets.length) {
 		return null;
 	}
@@ -33,7 +36,9 @@ export function OpenInTargetsSubmenu({
 					aria-hidden='true'
 					className='text-muted-foreground'
 				/>
-				<span className='min-w-0 flex-1'>Open in</span>
+				<span className='min-w-0 flex-1'>
+					{t('common:actions.open-in', 'Open in')}
+				</span>
 			</ContextMenuSubTrigger>
 			<ContextMenuSubContent className='w-60 bg-muted p-1'>
 				{openInTargets.map((openTarget) => (

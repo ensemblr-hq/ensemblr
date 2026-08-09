@@ -1,4 +1,5 @@
 import { CopyIcon, EyeIcon, PinIcon, Undo2Icon } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 import {
 	ContextMenuContent,
@@ -27,6 +28,7 @@ export function ReviewFilesContextMenuContent({
 }: {
 	target: ReviewFileMenuTarget | null;
 }) {
+	const { t } = useTranslation();
 	const {
 		copyTarget,
 		invokeTarget,
@@ -50,7 +52,7 @@ export function ReviewFilesContextMenuContent({
 
 	return (
 		<ContextMenuContent
-			aria-label={`${path} actions`}
+			aria-label={t('review:file-menu.actions', '{{path}} actions', { path })}
 			className='w-48 bg-muted p-1'
 		>
 			{openFile ? (
@@ -60,14 +62,18 @@ export function ReviewFilesContextMenuContent({
 						onSelect={() => openFile(path)}
 					>
 						<EyeIcon aria-hidden='true' className='text-muted-foreground' />
-						<span className='min-w-0 flex-1'>View</span>
+						<span className='min-w-0 flex-1'>
+							{t('common:actions.view', 'View')}
+						</span>
 					</ContextMenuItem>
 					<ContextMenuItem
 						className='h-8 gap-2 px-2 text-[0.8125rem]'
 						onSelect={() => openFile(path, { preview: false })}
 					>
 						<PinIcon aria-hidden='true' className='text-muted-foreground' />
-						<span className='min-w-0 flex-1'>Keep open</span>
+						<span className='min-w-0 flex-1'>
+							{t('common:actions.keep-open', 'Keep open')}
+						</span>
 					</ContextMenuItem>
 				</>
 			) : null}
@@ -78,7 +84,9 @@ export function ReviewFilesContextMenuContent({
 					onSelect={() => invoke(copyTarget)}
 				>
 					<CopyIcon aria-hidden='true' className='text-muted-foreground' />
-					<span className='min-w-0 flex-1'>Copy path</span>
+					<span className='min-w-0 flex-1'>
+						{t('common:actions.copy-path', 'Copy path')}
+					</span>
 				</ContextMenuItem>
 			) : null}
 			{canDiscard ? (
@@ -89,7 +97,9 @@ export function ReviewFilesContextMenuContent({
 						onSelect={() => onDiscardFile(path)}
 					>
 						<Undo2Icon aria-hidden='true' className='text-muted-foreground' />
-						<span className='min-w-0 flex-1'>Discard changes</span>
+						<span className='min-w-0 flex-1'>
+							{t('common:actions.discard-changes', 'Discard changes')}
+						</span>
 					</ContextMenuItem>
 				</>
 			) : null}

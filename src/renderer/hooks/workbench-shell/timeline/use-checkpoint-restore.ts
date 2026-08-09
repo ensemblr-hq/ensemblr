@@ -1,5 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 
 import {
@@ -16,6 +17,7 @@ export function useCheckpointRestore(): {
 	target: CheckpointRestoreTarget | null;
 } {
 	const queryClient = useQueryClient();
+	const { t } = useTranslation();
 	const [target, setTarget] = useState<CheckpointRestoreTarget | null>(null);
 
 	const cancel = useCallback(() => setTarget(null), []);
@@ -30,12 +32,24 @@ export function useCheckpointRestore(): {
 			turnId: target.turnId,
 		});
 		if (!result.ok) {
-			toast.error('Restore failed', { description: result.error.message });
+			toast.error(
+				t('errors:checkpoint-restore.failed.title', 'Restore failed'),
+				{
+					description: result.error.message,
+				},
+			);
 			return;
 		}
-		toast.success('Workspace restored', {
-			description: `Files reverted to before “${target.label}”.`,
-		});
+		toast.success(
+			t('errors:checkpoint-restore.restored.title', 'Workspace restored'),
+			{
+				description: t(
+					'errors:checkpoint-restore.restored.description',
+					'Files reverted to before “{{label}}”.',
+					{ label: target.label },
+				),
+			},
+		);
 		void queryClient.invalidateQueries({
 			queryKey: ensemblrQueryKeys.agentSessionEvents(target.branchId),
 		});
@@ -49,7 +63,7 @@ export function useCheckpointRestore(): {
 		void queryClient.invalidateQueries({
 			queryKey: [...ensemblrQueryKeys.all, 'file-preview'],
 		});
-	}, [queryClient, target]);
+	}, [queryClient, t, target]);
 
 	return { cancel, confirm, request: setTarget, target };
 }

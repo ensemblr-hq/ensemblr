@@ -1,3 +1,4 @@
+import { i18n } from '@/renderer/lib/i18n';
 import type {
 	WorkspaceSource,
 	WorkspaceSourceAction,
@@ -12,35 +13,49 @@ export const WORKSPACE_SOURCE_KINDS: readonly WorkspaceSourceKind[] = [
 	'issue',
 ];
 
-const kindLabels: Record<WorkspaceSourceKind, string> = {
-	branch: 'Branches',
-	issue: 'Issues',
-	'pull-request': 'Pull requests',
-};
-
-const CREATE_ACTION: WorkspaceSourceAction = {
-	id: 'create',
-	label: 'Create',
-	shortcut: '↵',
-	variant: 'primary',
-};
-
-const USE_BRANCH_ACTION: WorkspaceSourceAction = {
-	id: 'use-branch',
-	label: 'Use branch',
-	shortcut: '↵',
-	variant: 'primary',
-};
-
-const EXISTING_WORKSPACE_ACTIONS: readonly WorkspaceSourceAction[] = [
-	{ id: 'open', label: 'Open', shortcut: '↵', variant: 'secondary' },
-	{
-		id: 'duplicate-branch',
-		label: 'Duplicate branch',
-		shortcut: '⌘↵',
+/** The create-from row action that cuts a new branch for the workspace. */
+function createAction(): WorkspaceSourceAction {
+	return {
+		id: 'create',
+		label: i18n.t('common:actions.create', 'Create'),
+		shortcut: '↵',
 		variant: 'primary',
-	},
-];
+	};
+}
+
+/** The create-from row action that hands the workspace an existing branch. */
+function adoptBranchAction(): WorkspaceSourceAction {
+	return {
+		id: 'use-branch',
+		label: i18n.t(
+			'workbench:workspace-source-picker.action.use-branch',
+			'Use branch',
+		),
+		shortcut: '↵',
+		variant: 'primary',
+	};
+}
+
+/** The create-from row actions offered when a workspace already holds the branch. */
+function existingWorkspaceActions(): WorkspaceSourceAction[] {
+	return [
+		{
+			id: 'open',
+			label: i18n.t('common:actions.open', 'Open'),
+			shortcut: '↵',
+			variant: 'secondary',
+		},
+		{
+			id: 'duplicate-branch',
+			label: i18n.t(
+				'workbench:workspace-source-picker.action.duplicate-branch',
+				'Duplicate branch',
+			),
+			shortcut: '⌘↵',
+			variant: 'primary',
+		},
+	];
+}
 
 const providerLabels: Record<WorkspaceSourceProvider, string> = {
 	github: 'GitHub',
@@ -49,7 +64,20 @@ const providerLabels: Record<WorkspaceSourceProvider, string> = {
 
 /** Tab label for a source kind, e.g. `Pull requests`. */
 export function getWorkspaceSourceKindLabel(kind: WorkspaceSourceKind): string {
-	return kindLabels[kind];
+	switch (kind) {
+		case 'branch':
+			return i18n.t(
+				'workbench:workspace-source-picker.kind.branch',
+				'Branches',
+			);
+		case 'issue':
+			return i18n.t('workbench:workspace-source-picker.kind.issue', 'Issues');
+		case 'pull-request':
+			return i18n.t(
+				'workbench:workspace-source-picker.kind.pull-request',
+				'Pull requests',
+			);
+	}
 }
 
 /**
@@ -69,18 +97,18 @@ export function getWorkspaceSourceActions(
 ): WorkspaceSourceAction[] {
 	switch (source.kind) {
 		case 'issue':
-			return [CREATE_ACTION];
+			return [createAction()];
 		case 'branch':
 			if (source.isDefaultBranch) {
-				return [CREATE_ACTION];
+				return [createAction()];
 			}
 			return source.hasWorkspace
-				? [...EXISTING_WORKSPACE_ACTIONS]
-				: [USE_BRANCH_ACTION];
+				? existingWorkspaceActions()
+				: [adoptBranchAction()];
 		case 'pull-request':
 			return source.hasWorkspace
-				? [...EXISTING_WORKSPACE_ACTIONS]
-				: [USE_BRANCH_ACTION];
+				? existingWorkspaceActions()
+				: [adoptBranchAction()];
 	}
 }
 

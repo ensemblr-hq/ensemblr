@@ -1,3 +1,4 @@
+import { i18n } from '@/renderer/lib/i18n';
 import type { ProviderMarkKind } from '@/renderer/types/components';
 
 /** Maps a {@link ProviderMarkKind} to a short display label. */
@@ -23,8 +24,8 @@ export function getProviderLabel(provider: ProviderMarkKind) {
 	}
 
 	if (provider === 'local') {
-		return 'Local';
+		return i18n.t('workbench:provider.local', 'Local');
 	}
 
-	return 'Preview';
+	return i18n.t('workbench:provider.preview', 'Preview');
 }

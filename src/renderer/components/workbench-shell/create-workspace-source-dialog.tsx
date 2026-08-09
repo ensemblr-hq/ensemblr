@@ -1,3 +1,4 @@
+import type { TFunction } from 'i18next';
 import {
 	CheckIcon,
 	ChevronsUpDownIcon,
@@ -6,6 +7,7 @@ import {
 	GitPullRequestIcon,
 } from 'lucide-react';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/renderer/components/ui/button';
 import {
@@ -45,11 +47,29 @@ import type {
 import { ProjectAvatar } from './project-avatar';
 import { GithubLogo, LinearLogo } from './source-provider-logo';
 
-const searchPlaceholders: Record<WorkspaceSourceKind, string> = {
-	branch: 'Search by name',
-	issue: 'Search by issue number, title, or description',
-	'pull-request': 'Search by title, number, or author',
-};
+/**
+ * Resolve the command-input placeholder for the selected source kind.
+ * @param t - Translator from `useTranslation`.
+ * @param kind - The source kind currently selected in the toggle group.
+ * @returns The localized placeholder for that kind.
+ */
+function searchPlaceholder(t: TFunction, kind: WorkspaceSourceKind): string {
+	const placeholders: Record<WorkspaceSourceKind, string> = {
+		branch: t(
+			'workbench:create-workspace-source.search.branch',
+			'Search by name',
+		),
+		issue: t(
+			'workbench:create-workspace-source.search.issue',
+			'Search by issue number, title, or description',
+		),
+		'pull-request': t(
+			'workbench:create-workspace-source.search.pull-request',
+			'Search by title, number, or author',
+		),
+	};
+	return placeholders[kind];
+}
 
 /** Command-palette dialog for creating a workspace from a branch, PR, or issue. */
 export function CreateWorkspaceSourceDialog({
@@ -70,6 +90,7 @@ export function CreateWorkspaceSourceDialog({
 	project: ProjectShellModel | null;
 	projects: ProjectShellModel[];
 }) {
+	const { t } = useTranslation();
 	const [kind, setKind] = useState<WorkspaceSourceKind>('pull-request');
 	const [repoId, setRepoId] = useState(project?.id ?? projects[0]?.id ?? '');
 
@@ -114,13 +135,19 @@ export function CreateWorkspaceSourceDialog({
 	return (
 		<CommandDialog
 			className='max-w-xl translate-y-0 sm:max-w-xl'
-			description='Choose a branch, pull request, or issue to start a workspace.'
+			description={t(
+				'workbench:create-workspace-source.description',
+				'Choose a branch, pull request, or issue to start a workspace.',
+			)}
 			onOpenChange={onOpenChange}
 			open={open}
-			title='Create workspace from source'
+			title={t(
+				'workbench:create-workspace-source.title',
+				'Create workspace from source',
+			)}
 		>
 			<Command className='rounded-xl border-0'>
-				<CommandInput placeholder={searchPlaceholders[kind]} />
+				<CommandInput placeholder={searchPlaceholder(t, kind)} />
 				<div className='flex items-center justify-between gap-2 px-1.5 py-1'>
 					<ToggleGroup
 						onValueChange={(next) => {
@@ -162,12 +189,19 @@ export function CreateWorkspaceSourceDialog({
 						</div>
 					) : sources.length === 0 && isLoading ? (
 						<div className='py-8 text-center text-muted-foreground text-xs'>
-							Loading {getWorkspaceSourceKindLabel(kind).toLowerCase()}…
+							{t(
+								'workbench:create-workspace-source.loading',
+								'Loading {{sources}}…',
+								{ sources: getWorkspaceSourceKindLabel(kind).toLowerCase() },
+							)}
 						</div>
 					) : (
 						<CommandEmpty className='py-8 text-muted-foreground text-xs'>
-							No {getWorkspaceSourceKindLabel(kind).toLowerCase()} match your
-							search.
+							{t(
+								'workbench:create-workspace-source.no-match',
+								'No {{sources}} match your search.',
+								{ sources: getWorkspaceSourceKindLabel(kind).toLowerCase() },
+							)}
 						</CommandEmpty>
 					)}
 					<CommandGroup>
@@ -260,6 +294,7 @@ function WorkspaceRepoSelector({
 	projects: ProjectShellModel[];
 	selectedRepo: ProjectShellModel | null;
 }) {
+	const { t } = useTranslation();
 	const [open, setOpen] = useState(false);
 
 	return (
@@ -279,7 +314,11 @@ function WorkspaceRepoSelector({
 						/>
 					)}
 					<span className='max-w-32 truncate'>
-						{selectedRepo?.name ?? 'Select repository'}
+						{selectedRepo?.name ??
+							t(
+								'workbench:create-workspace-source.repository.select',
+								'Select repository',
+							)}
 					</span>
 					<ChevronsUpDownIcon
 						aria-hidden='true'
@@ -289,10 +328,18 @@ function WorkspaceRepoSelector({
 			</PopoverTrigger>
 			<PopoverContent align='end' className='w-64 overflow-hidden p-0'>
 				<Command>
-					<CommandInput placeholder='Search repositories…' />
+					<CommandInput
+						placeholder={t(
+							'workbench:create-workspace-source.repository.search',
+							'Search repositories…',
+						)}
+					/>
 					<CommandList>
 						<CommandEmpty className='py-6 text-muted-foreground text-xs'>
-							No repositories found.
+							{t(
+								'workbench:create-workspace-source.repository.empty',
+								'No repositories found.',
+							)}
 						</CommandEmpty>
 						<CommandGroup>
 							{projects.map((candidate) => (

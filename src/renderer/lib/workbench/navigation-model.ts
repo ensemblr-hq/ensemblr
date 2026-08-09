@@ -1,3 +1,4 @@
+import { i18n } from '@/renderer/lib/i18n';
 import { parseGithubRepoFromRemoteUrl } from '@/renderer/lib/workbench/github-compare-url';
 import { PENDING_WORKSPACE_CREATION_METADATA_KEY } from '@/renderer/lib/workbench/optimistic-workspace';
 import type {
@@ -65,11 +66,14 @@ export function createPlaceholderSession(
 		id,
 		isPreview: false,
 		isSubAgent: false,
-		label: 'Workspace',
+		label: i18n.t('workbench:session-tab.placeholder.label', 'Workspace'),
 		agentSessionId: null,
 		status: 'idle',
-		summary: 'Workspace session placeholder.',
-		updatedLabel: 'loaded',
+		summary: i18n.t(
+			'workbench:session-tab.placeholder.summary',
+			'Workspace session placeholder.',
+		),
+		updatedLabel: i18n.t('workbench:session-tab.placeholder.updated', 'loaded'),
 	};
 }
 
@@ -140,8 +144,14 @@ function mapWorkspaceNavigationSnapshot(
 		},
 		checks: isPendingCreation
 			? {
-					detail: 'The workspace is still being created.',
-					label: 'Creating',
+					detail: i18n.t(
+						'workbench:workspace-checks.creating.detail',
+						'The workspace is still being created.',
+					),
+					label: i18n.t(
+						'workbench:workspace-checks.creating.label',
+						'Creating',
+					),
 					status: 'pending',
 				}
 			: mapPresentationChecks(presentation),
@@ -159,7 +169,7 @@ function mapWorkspaceNavigationSnapshot(
 		scripts: createPlaceholderScripts(),
 		sessions: [createPlaceholderSessionFromSnapshot(workspace)],
 		sourceSummary: isPendingCreation
-			? 'creating workspace'
+			? i18n.t('workbench:workspace-source.creating', 'creating workspace')
 			: getWorkspaceSourceSummary(repository, workspace),
 		status: isPendingCreation ? 'working' : 'idle',
 		workspaceFiles: [],
@@ -173,32 +183,53 @@ function mapPresentationChecks(
 	switch (presentation?.status) {
 		case 'blocked':
 			return {
-				detail: 'Checks are failing.',
-				label: 'Checks failed',
+				detail: i18n.t(
+					'workbench:workspace-checks.blocked.detail',
+					'Checks are failing.',
+				),
+				label: i18n.t(
+					'workbench:workspace-checks.blocked.label',
+					'Checks failed',
+				),
 				status: 'blocked',
 			};
 		case 'checking':
 			return {
-				detail: 'Checks are running.',
-				label: 'Checks running',
+				detail: i18n.t(
+					'workbench:workspace-checks.checking.detail',
+					'Checks are running.',
+				),
+				label: i18n.t(
+					'workbench:workspace-checks.checking.label',
+					'Checks running',
+				),
 				status: 'pending',
 			};
 		case 'merged':
 			return {
-				detail: 'Pull request merged.',
-				label: 'Merged',
+				detail: i18n.t(
+					'workbench:workspace-checks.merged.detail',
+					'Pull request merged.',
+				),
+				label: i18n.t('workbench:workspace-checks.merged.label', 'Merged'),
 				status: 'ready',
 			};
 		case 'closed':
 			return {
-				detail: 'Pull request closed.',
-				label: 'Closed',
+				detail: i18n.t(
+					'workbench:workspace-checks.closed.detail',
+					'Pull request closed.',
+				),
+				label: i18n.t('workbench:workspace-checks.closed.label', 'Closed'),
 				status: 'ready',
 			};
 		default:
 			return {
-				detail: 'No checks reported.',
-				label: 'No checks',
+				detail: i18n.t(
+					'workbench:workspace-checks.none.detail',
+					'No checks reported.',
+				),
+				label: i18n.t('workbench:workspace-checks.none.label', 'No checks'),
 				status: 'ready',
 			};
 	}
@@ -218,7 +249,10 @@ function mapPresentationPullRequest(
 		description: [],
 		gitStatus: {
 			kind: 'clean' as const,
-			label: 'No PR open',
+			label: i18n.t(
+				'workbench:workspace-pull-request.clean.label',
+				'No PR open',
+			),
 			status: 'open' as const,
 		},
 		title: '',
@@ -227,15 +261,21 @@ function mapPresentationPullRequest(
 	if (!presentation) {
 		return {
 			...base,
-			detail: 'No pull request for this branch yet.',
-			label: 'No PR',
+			detail: i18n.t(
+				'workbench:workspace-pull-request.absent.detail',
+				'No pull request for this branch yet.',
+			),
+			label: i18n.t('workbench:workspace-pull-request.absent.label', 'No PR'),
 			status: 'idle',
 		};
 	}
 	const { state, status } = mapPresentationStatus(presentation.status);
 	return {
 		...base,
-		detail: 'Pull request status from the last GitHub sync.',
+		detail: i18n.t(
+			'workbench:workspace-pull-request.present.detail',
+			'Pull request status from the last GitHub sync.',
+		),
 		label: 'PR',
 		number: presentation.number,
 		state,
@@ -270,14 +310,23 @@ function getWorkspaceSourceSummary(
 	workspace: RepositoryWorkspaceNavigationWorkspace,
 ): string {
 	if (workspace.baseBranch) {
-		return `targets ${workspace.baseBranch}`;
+		return i18n.t('workbench:workspace-source.targets', 'targets {{branch}}', {
+			branch: workspace.baseBranch,
+		});
 	}
 
 	if (repository.defaultBranch) {
-		return `repository default branch ${repository.defaultBranch}`;
+		return i18n.t(
+			'workbench:workspace-source.default-branch',
+			'repository default branch {{branch}}',
+			{ branch: repository.defaultBranch },
+		);
 	}
 
-	return 'workspace loaded from SQLite';
+	return i18n.t(
+		'workbench:workspace-source.fallback',
+		'workspace loaded from SQLite',
+	);
 }
 
 /** Returns the first non-empty trimmed string value found at any candidate key. */
@@ -323,13 +372,13 @@ function createPlaceholderDockTabs(): DockTabModel[] {
 		{
 			id: 'setup',
 			kind: 'setup-script',
-			label: 'Setup',
+			label: i18n.t('workbench:dock-tab.setup.label', 'Setup'),
 			status: 'idle',
 		},
 		{
 			id: 'run',
 			kind: 'run-script',
-			label: 'Run',
+			label: i18n.t('workbench:dock-tab.run.label', 'Run'),
 			status: 'idle',
 		},
 	];
@@ -357,12 +406,14 @@ function createPlaceholderSessionFromSnapshot(
 		id,
 		isPreview: false,
 		isSubAgent: false,
-		label: 'Workspace',
+		label: i18n.t('workbench:session-tab.placeholder.label', 'Workspace'),
 		agentSessionId: null,
 		status: 'idle',
-		summary:
+		summary: i18n.t(
+			'workbench:session-tab.snapshot.summary',
 			'SQLite workspace record loaded. Agent sessions are not wired yet.',
-		updatedLabel: 'loaded',
+		),
+		updatedLabel: i18n.t('workbench:session-tab.placeholder.updated', 'loaded'),
 	};
 }
 
@@ -385,13 +436,30 @@ function createPlaceholderLandingSummary(
 		? 'linked-issue'
 		: inferPlaceholderLandingKind({ baseBranch, branchName });
 	const branchDetail = baseBranch
-		? `Changes are compared against ${baseBranch}.`
-		: 'Changes are compared against the repository default branch.';
+		? i18n.t(
+				'workbench:workspace-landing.branch-source.base',
+				'Changes are compared against {{branch}}.',
+				{ branch: baseBranch },
+			)
+		: i18n.t(
+				'workbench:workspace-landing.branch-source.default',
+				'Changes are compared against the repository default branch.',
+			);
 	const headline = linkedIssue
-		? `Workspace created from ${linkedIssue.reference}`
+		? i18n.t(
+				'workbench:workspace-landing.headline.linked-issue',
+				'Workspace created from {{reference}}',
+				{ reference: linkedIssue.reference },
+			)
 		: kind === 'cloned-repo'
-			? 'Repository cloned'
-			: 'New workspace ready';
+			? i18n.t(
+					'workbench:workspace-landing.headline.cloned-repo',
+					'Repository cloned',
+				)
+			: i18n.t(
+					'workbench:workspace-landing.headline.new',
+					'New workspace ready',
+				);
 	const copiedFiles = readWorkspaceFileCount(workspace.metadata);
 
 	return {
@@ -406,8 +474,10 @@ function createPlaceholderLandingSummary(
 		...(linkedIssue ? { linkedIssue } : {}),
 		repositoryName: repository.name || repository.slug,
 		setupGuidance: {
-			detail:
+			detail: i18n.t(
+				'workbench:workspace-landing.setup-guidance.missing',
 				'No setup script is configured for this repository. Add one to bootstrap dependencies before the first agent turn.',
+			),
 			state: 'missing',
 		},
 		workspaceName: workspace.name || workspace.slug || branchName,
@@ -431,14 +501,21 @@ function readWorkspaceFileCount(
 	if (workspaceFileCount === null) {
 		return {
 			count: 0,
-			detail: 'Workspace file count is unavailable.',
+			detail: i18n.t(
+				'workbench:workspace-landing.copied-files.unavailable',
+				'Workspace file count is unavailable.',
+			),
 			state: 'unavailable',
 		};
 	}
 
 	return {
 		count: workspaceFileCount,
-		detail: `Copied ${workspaceFileCount} file${workspaceFileCount === 1 ? '' : 's'} into workspace.`,
+		detail: i18n.t('workbench:workspace-landing.copied-files.detail', {
+			count: workspaceFileCount,
+			defaultValue_one: 'Copied {{count}} file into workspace.',
+			defaultValue_other: 'Copied {{count}} files into workspace.',
+		}),
 		state: 'copied',
 	};
 }

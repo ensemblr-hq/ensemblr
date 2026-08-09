@@ -1,5 +1,6 @@
 import { atom, useSetAtom, useStore } from 'jotai';
 import { useCallback, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 
 /** Spawns a dock terminal on a command and focuses its tab. */
@@ -27,17 +28,23 @@ export function useRequestDockTerminal(): (request: {
 	workspaceId: string;
 }) => void {
 	const store = useStore();
+	const { t } = useTranslation();
 
 	return useCallback(
 		(request: { command: string; title: string; workspaceId: string }) => {
 			const open = store.get(dockTerminalOpenersAtom)[request.workspaceId];
 			if (!open) {
-				toast.error('The terminal could not start.');
+				toast.error(
+					t(
+						'errors:terminal.start-failed.title',
+						'The terminal could not start.',
+					),
+				);
 				return;
 			}
 			open({ command: request.command, title: request.title });
 		},
-		[store],
+		[store, t],
 	);
 }
 

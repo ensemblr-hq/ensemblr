@@ -1,4 +1,5 @@
 import { useCallback, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { SidebarInset, SidebarTrigger } from '@/renderer/components/ui/sidebar';
 import { WorkbenchPlaceholderPage } from '@/renderer/components/workbench-shell/route-layout';
@@ -74,6 +75,7 @@ function groupCardsByStatus(
  * columns visible when no workspaces remain.
  */
 export function DashboardBoard() {
+	const { t } = useTranslation();
 	const model = useWorkbenchLayoutRouteModel();
 	const { state: setupDiagnosticsState } = useSetupDiagnostics();
 	const statusByWorkspaceId = useWorkspaceBoardStatuses();
@@ -119,7 +121,7 @@ export function DashboardBoard() {
 			<main className='flex min-w-0 flex-1 flex-col overflow-hidden'>
 				<header className='native-toolbar flex h-12 shrink-0 items-center gap-2.5 border-border border-b px-4 font-medium text-sm'>
 					<SidebarTrigger className='sidebar-collapsed-trigger' />
-					<span>Dashboard</span>
+					<span>{t('workbench:dashboard.title', 'Dashboard')}</span>
 				</header>
 				<BoardWorkspaceMenuProvider controller={workspaceMenu}>
 					<div className='min-h-0 flex-1 overflow-x-auto p-4'>

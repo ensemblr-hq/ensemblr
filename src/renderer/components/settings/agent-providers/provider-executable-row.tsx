@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import {
 	agentProviderExecutablePathQuery,
@@ -28,6 +29,7 @@ export function ProviderExecutableRow({
 }: {
 	descriptor: AgentProviderDescriptor;
 }) {
+	const { t } = useTranslation();
 	const queryClient = useQueryClient();
 	const [pickError, setPickError] = useState<string | null>(null);
 	const { data: snapshot } = useQuery(
@@ -91,7 +93,9 @@ export function ProviderExecutableRow({
 						size='sm'
 						variant='outline'
 					>
-						{pick.isPending ? 'Picking…' : 'Browse'}
+						{pick.isPending
+							? t('common:actions.picking', 'Picking…')
+							: t('common:actions.browse', 'Browse')}
 					</Button>
 					<Button
 						disabled={!value}
@@ -99,28 +103,49 @@ export function ProviderExecutableRow({
 						size='sm'
 						variant='ghost'
 					>
-						Use discovered {descriptor.executableCommand}
+						{t(
+							'settings:providers.executable.use-discovered',
+							'Use discovered {{command}}',
+							{ command: descriptor.executableCommand },
+						)}
 					</Button>
 				</div>
 			}
-			description={`Override the discovered ${descriptor.executableCommand} binary with a custom one. Leave empty to use the executable found on PATH (recommended).`}
-			label={`${descriptor.label} executable path`}
+			description={t(
+				'settings:providers.executable.description',
+				'Override the discovered {{command}} binary with a custom one. Leave empty to use the executable found on PATH (recommended).',
+				{ command: descriptor.executableCommand },
+			)}
+			label={t(
+				'settings:providers.executable.label',
+				'{{provider}} executable path',
+				{ provider: descriptor.label },
+			)}
 			stack
 		>
 			<Input
-				aria-label={`${descriptor.label} executable path`}
+				aria-label={t(
+					'settings:providers.executable.label',
+					'{{provider}} executable path',
+					{ provider: descriptor.label },
+				)}
 				className='mt-2 h-8 font-mono text-xs'
 				onChange={(event) => onChange(event.target.value)}
 				placeholder={`/opt/homebrew/bin/${descriptor.executableCommand}`}
 				value={value}
 			/>
-			<p className='mt-2 text-muted-foreground text-xs'>Resolved executable</p>
+			<p className='mt-2 text-muted-foreground text-xs'>
+				{t('settings:providers.executable.resolved', 'Resolved executable')}
+			</p>
 			<code className='mt-1 block truncate rounded-md bg-muted/40 px-3 py-2 font-mono text-xs'>
-				{snapshot?.resolvedPath ?? 'Not found'}
+				{snapshot?.resolvedPath ??
+					t('settings:providers.executable.not-found', 'Not found')}
 			</code>
 			{snapshot?.source ? (
 				<p className='mt-1 text-muted-foreground text-xxs'>
-					source: {snapshot.source}
+					{t('settings:providers.executable.source', 'source: {{source}}', {
+						source: snapshot.source,
+					})}
 				</p>
 			) : null}
 			{pickError ? (

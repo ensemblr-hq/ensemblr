@@ -1,5 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { useAtom } from 'jotai';
+import { useTranslation } from 'react-i18next';
 
 import { SettingRow } from '@/renderer/components/settings/setting-row';
 import { SettingsSection } from '@/renderer/components/settings/settings-section';
@@ -23,28 +24,44 @@ const DEFAULTS = {
 
 /** Experimental features panel toggling developer-only controls and setup automation defaults. */
 function ExperimentalSettings() {
+	const { t } = useTranslation();
 	const [developerMode, setDeveloperMode] = useAtom(developerModeAtom);
 	const [autoRun, setAutoRun] = useAtom(autoRunAfterSetupAtom);
 
 	return (
 		<SettingsSection
-			description='Developer-only controls and early automation defaults.'
-			title='Experimental'
+			description={t(
+				'settings:experimental.description',
+				'Developer-only controls and early automation defaults.',
+			)}
+			title={t('settings:experimental.title', 'Experimental')}
 		>
 			<SettingRow
 				control={
 					<Switch checked={developerMode} onCheckedChange={setDeveloperMode} />
 				}
-				description='Show developer-only diagnostics and Pi debug controls.'
-				label='Developer Mode'
+				description={t(
+					'settings:experimental.developer-mode.description',
+					'Show developer-only diagnostics and Pi debug controls.',
+				)}
+				label={t(
+					'settings:experimental.developer-mode.label',
+					'Developer Mode',
+				)}
 				modified={developerMode !== DEFAULTS.developerMode}
 				onReset={() => setDeveloperMode(DEFAULTS.developerMode)}
 			/>
 
 			<SettingRow
 				control={<Switch checked={autoRun} onCheckedChange={setAutoRun} />}
-				description="Start a repository's run script automatically after setup when no repository-specific setting overrides it."
-				label='Auto-run after setup'
+				description={t(
+					'settings:experimental.auto-run.description',
+					"Start a repository's run script automatically after setup when no repository-specific setting overrides it.",
+				)}
+				label={t(
+					'settings:experimental.auto-run.label',
+					'Auto-run after setup',
+				)}
 				modified={autoRun !== DEFAULTS.autoRunAfterSetup}
 				onReset={() => setAutoRun(DEFAULTS.autoRunAfterSetup)}
 			/>

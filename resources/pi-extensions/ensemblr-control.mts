@@ -475,27 +475,37 @@ function callerModelId(ctx: { model?: { id?: string } } | undefined) {
 
 /**
  * Asks the app for this turn's brief: whether the conversation is in Plan Mode,
- * so the planning playbook stands in for the role one only while planning, and
- * the upkeep block naming whatever the session still owes. The app renders that
- * block, so this file holds no second copy of its wording to drift.
+ * so the planning playbook stands in for the role one only while planning, the
+ * upkeep block naming whatever the session still owes, and the directive putting
+ * user-facing prose in the app's language. The app renders both blocks, so this
+ * file holds no second copy of their wording to drift.
  *
- * A transport failure reports "not planning, nothing outstanding": the prompt
+ * A transport failure reports "not planning, nothing to append": the prompt
  * text is cosmetic, and real Plan Mode enforcement lives in the `tool_call`
  * hook, which asks the app per call and fails closed on its own.
- * @returns The playbook selector and the upkeep block to append.
+ * @returns The playbook selector and the blocks to append.
  */
 async function fetchSessionBrief(): Promise<{
 	planning: boolean;
 	nudge: string | null;
+	languageDirective: string | null;
 }> {
 	const result = await invoke('getSessionBrief', {}, undefined);
 	if (!result.ok) {
-		return { nudge: null, planning: false };
+		return { languageDirective: null, nudge: null, planning: false };
 	}
 	const brief = result.data as
-		| { planMode?: boolean; nudge?: string | null }
+		| {
+				planMode?: boolean;
+				nudge?: string | null;
+				languageDirective?: string | null;
+		  }
 		| undefined;
 	return {
+		languageDirective:
+			typeof brief?.languageDirective === 'string'
+				? brief.languageDirective
+				: null,
 		nudge: typeof brief?.nudge === 'string' ? brief.nudge : null,
 		planning: brief?.planMode === true,
 	};
@@ -523,10 +533,15 @@ export default function ensemblrControl(pi: ExtensionAPI): void {
 	}
 
 	pi.on('before_agent_start', async (event) => {
-		const { nudge, planning } = await fetchSessionBrief();
+		const { languageDirective, nudge, planning } = await fetchSessionBrief();
 		const playbook = planning ? PLAN_MODE_AWARENESS_FOR_ROLE : AWARENESS;
-		const upkeep = nudge ? `\n\n${nudge}` : '';
-		return { systemPrompt: `${event.systemPrompt}\n\n${playbook}${upkeep}` };
+		const blocks = [
+			event.systemPrompt,
+			playbook,
+			nudge,
+			languageDirective,
+		].filter((block) => typeof block === 'string' && block.length > 0);
+		return { systemPrompt: blocks.join('\n\n') };
 	});
 
 	// Enforcement asks the app on every guarded call rather than trusting a

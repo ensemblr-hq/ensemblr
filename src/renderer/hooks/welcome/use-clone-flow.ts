@@ -1,6 +1,7 @@
 import { useNavigate, useRouter } from '@tanstack/react-router';
 import { useSetAtom } from 'jotai';
 import { useCallback, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 
 import {
@@ -39,6 +40,7 @@ interface UseCloneFlowResult {
 export function useCloneFlow(): UseCloneFlowResult {
 	const navigate = useNavigate();
 	const router = useRouter();
+	const { t } = useTranslation();
 	const setLastWorkspaceSelection = useSetAtom(lastWorkspaceSelectionAtom);
 	const [stage, setStage] = useState<CloneStage>('idle');
 	const [diagnostics, setDiagnostics] = useState<
@@ -110,11 +112,20 @@ export function useCloneFlow(): UseCloneFlowResult {
 				});
 				if (seed.status === 'success') {
 					setStage('success');
-					toast.success(`Cloned ${repository.name}.`);
+					toast.success(
+						t('errors:clone.cloned.title', 'Cloned {{name}}.', {
+							name: repository.name,
+						}),
+					);
 				} else {
 					setStage('failure');
 					toast.error(
-						seed.error ?? `Cloned ${repository.name}, opening failed.`,
+						seed.error ??
+							t(
+								'errors:clone.open-failed.title',
+								'Cloned {{name}}, opening failed.',
+								{ name: repository.name },
+							),
 					);
 				}
 				return;
@@ -123,7 +134,7 @@ export function useCloneFlow(): UseCloneFlowResult {
 			setStage('failure');
 			setDiagnostics(result.diagnostics);
 		},
-		[navigate, router, setLastWorkspaceSelection],
+		[navigate, router, setLastWorkspaceSelection, t],
 	);
 
 	const retry = useCallback(() => {

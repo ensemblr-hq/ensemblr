@@ -8,6 +8,8 @@
 		"src/preload/preload.ts",
 		"src/renderer/main.tsx",
 		"forge.config.ts",
+		// Read by the `i18n:*` npm scripts (i18next-cli), not imported by src.
+		"i18next.config.ts",
 		"vite.main.config.mts",
 		"vite.preload.config.mts",
 		"vite.renderer.config.mts",
@@ -88,9 +90,12 @@
 	// reads those as production imports and wants them moved to `dependencies`,
 	// but they are build-time only — Vite/PostCSS compiles the CSS at build, so
 	// devDependencies is correct and the renderer bundle needs none at runtime.
+	// i18next-cli is invoked only through the `i18n:*` npm scripts, so there is
+	// no import edge for fallow to follow.
 	"ignoreDependencies": [
 		"@electron-forge/shared-types",
 		"@tailwindcss/typography",
+		"i18next-cli",
 		"class-variance-authority",
 		"cmdk",
 		"radix-ui",

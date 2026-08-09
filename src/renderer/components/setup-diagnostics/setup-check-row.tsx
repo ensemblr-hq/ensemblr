@@ -1,3 +1,4 @@
+import type { TFunction } from 'i18next';
 import {
 	AlertCircleIcon,
 	CheckCircle2Icon,
@@ -11,6 +12,7 @@ import {
 	ShieldAlertIcon,
 } from 'lucide-react';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { DiagnosticsLogCollapsible } from '@/renderer/components/diagnostics-log-collapsible';
 import { StatusBadge } from '@/renderer/components/status-badge';
@@ -23,13 +25,26 @@ import type {
 	SetupRemediationActionKind,
 } from '@/shared/ipc/contracts/setup';
 
-const CHECK_STATUS_LABELS: Record<SetupCheckStatus, string> = {
-	failure: 'Failed',
-	pending: 'Pending',
-	running: 'Running',
-	success: 'Ready',
-	warning: 'Warning',
-};
+/**
+ * Names the badge shown beside one check.
+ * @param status - Lifecycle status the check reported.
+ * @param t - Translator from the calling component.
+ * @returns The badge text.
+ */
+function checkStatusLabel(status: SetupCheckStatus, t: TFunction): string {
+	switch (status) {
+		case 'failure':
+			return t('common:setup-check.status.failure', 'Failed');
+		case 'pending':
+			return t('common:setup-check.status.pending', 'Pending');
+		case 'running':
+			return t('common:setup-check.status.running', 'Running');
+		case 'success':
+			return t('common:setup-check.status.success', 'Ready');
+		case 'warning':
+			return t('common:setup-check.status.warning', 'Warning');
+	}
+}
 
 const CHECK_STATUS_TONE: Record<
 	SetupCheckStatus,
@@ -80,6 +95,7 @@ export function SetupCheckRow({
 		check: SetupCheckSnapshot,
 	) => void | Promise<void>;
 }) {
+	const { t } = useTranslation();
 	const Icon = CHECK_STATUS_ICON[check.status];
 	const [copiedActionId, setCopiedActionId] = useState<string | null>(null);
 
@@ -123,7 +139,7 @@ export function SetupCheckRow({
 							{check.title}
 							{check.blocking ? null : (
 								<span className='ml-2 font-normal text-muted-foreground text-xs'>
-									Optional
+									{t('common:setup-check.optional', 'Optional')}
 								</span>
 							)}
 						</p>
@@ -136,7 +152,7 @@ export function SetupCheckRow({
 					className='mt-0.5 shrink-0'
 					tone={CHECK_STATUS_TONE[check.status]}
 				>
-					{CHECK_STATUS_LABELS[check.status]}
+					{checkStatusLabel(check.status, t)}
 				</StatusBadge>
 			</div>
 
@@ -161,7 +177,7 @@ export function SetupCheckRow({
 								variant='outline'
 							>
 								<ActionIcon aria-hidden='true' data-icon='inline-start' />
-								{copied ? 'Copied' : action.label}
+								{copied ? t('common:actions.copied', 'Copied') : action.label}
 							</Button>
 						);
 					})}

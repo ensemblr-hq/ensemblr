@@ -1,4 +1,5 @@
 import { useAtomValue } from 'jotai';
+import { useTranslation } from 'react-i18next';
 
 import { useReviewableChanges } from '@/renderer/hooks/workbench-shell/review-files/use-reviewable-changes';
 import { useWorkspaceConflicts } from '@/renderer/hooks/workbench-shell/review-files/use-workspace-conflicts';
@@ -129,12 +130,18 @@ export function RightSidebarHeaderInlineActions({
  * next `gh` snapshot lands, the live agent-busy flag the review provider
  * publishes so the header freezes for the length of an agent turn, and the same
  * conflict probe the Checks panel and Changes list read so all three agree.
+ *
+ * Every header label comes back already translated, off the `i18n` singleton
+ * React cannot observe, so this hook subscribes its caller to `languageChanged`
+ * on their behalf.
+ *
  * @param activeWorkspace - Workspace the header renders for.
  * @returns The resolved header state.
  */
 function useRightSidebarHeaderState(
 	activeWorkspace: WorkspaceShellModel,
 ): RightSidebarHeaderState {
+	useTranslation();
 	const hasBranchChanges = useReviewableChanges(activeWorkspace);
 	const reviewActions = useReviewActions();
 	const { paths: conflictPaths } = useWorkspaceConflicts(activeWorkspace);
@@ -184,8 +191,14 @@ function RightSidebarHeaderAction({
 	activeWorkspace: WorkspaceShellModel;
 	headerState: RightSidebarHeaderState;
 }) {
+	const { t } = useTranslation();
+
 	if (headerState.isAgentWorking) {
-		return <HeaderActivitySpinner label='Agent working' />;
+		return (
+			<HeaderActivitySpinner
+				label={t('git:pull-request-header.agent-working', 'Agent working')}
+			/>
+		);
 	}
 
 	switch (headerState.kind) {
@@ -195,7 +208,12 @@ function RightSidebarHeaderAction({
 			return <MergedHeaderActions />;
 		case 'pr-checking':
 			return (
-				<HeaderActivitySpinner label='Pull request activity in progress' />
+				<HeaderActivitySpinner
+					label={t(
+						'git:pull-request-header.activity',
+						'Pull request activity in progress',
+					)}
+				/>
 			);
 		case 'pr-uncommitted':
 			return <CommitAndPushAction />;

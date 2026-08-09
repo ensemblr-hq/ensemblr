@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { BundledLanguage } from 'shiki';
 import {
 	CODE_CONTENT_CLASSES,
@@ -32,7 +33,12 @@ export function ToolDiffPreview({
 	language: BundledLanguage;
 	patch: string;
 }) {
-	const { rows, sources } = useMemo(() => buildToolDiffRows(patch), [patch]);
+	const { i18n } = useTranslation();
+	// biome-ignore lint/correctness/useExhaustiveDependencies: the skipped-lines band is translated through the i18n singleton, so the language is a real input Biome cannot see.
+	const { rows, sources } = useMemo(
+		() => buildToolDiffRows(patch),
+		[patch, i18n.language],
+	);
 	const tokensByHunk = useHighlightedHunks(sources, language);
 	const maxLineNumber = useMemo(() => highestLineNumber(rows), [rows]);
 

@@ -151,6 +151,7 @@ export function createEnsemblrApi(): EnsemblrApi {
 		environmentVariables: () => invoke('environmentVariables'),
 		getAppSettings: () => invoke('getAppSettings'),
 		getPathForFile: (file) => webUtils.getPathForFile(file),
+		getSystemLanguages: () => invoke('getSystemLanguages'),
 		getPullRequestSnapshot: (request) =>
 			invoke('getPullRequestSnapshot', request),
 		getWorkspaceCommits: (request) => invoke('getWorkspaceCommits', request),

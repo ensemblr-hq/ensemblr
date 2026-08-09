@@ -1,5 +1,6 @@
 import { LockIcon, PlusIcon } from 'lucide-react';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { Badge } from '@/renderer/components/ui/badge';
 import { Button } from '@/renderer/components/ui/button';
@@ -18,6 +19,7 @@ export function DocumentedVariablesList({
 	variables: EnvironmentVariableSnapshot[];
 	onAdd: (key: string) => void;
 }) {
+	const { t } = useTranslation();
 	const [open, setOpen] = useState(false);
 
 	if (variables.length === 0) {
@@ -29,8 +31,15 @@ export function DocumentedVariablesList({
 			<CollapsibleTrigger asChild>
 				<Button className='px-0 text-muted-foreground' size='sm' variant='link'>
 					{open
-						? 'Hide documented variables'
-						: `Show documented variables (${variables.length})`}
+						? t(
+								'settings:environment.documented.hide',
+								'Hide documented variables',
+							)
+						: t('settings:environment.documented.show', {
+								count: variables.length,
+								defaultValue_one: 'Show documented variables ({{count}})',
+								defaultValue_other: 'Show documented variables ({{count}})',
+							})}
 				</Button>
 			</CollapsibleTrigger>
 			<CollapsibleContent>
@@ -57,10 +66,14 @@ export function DocumentedVariablesList({
 								</p>
 							</div>
 							<Badge className='shrink-0' variant='outline'>
-								Not set
+								{t('settings:environment.documented.not-set', 'Not set')}
 							</Badge>
 							<Button
-								aria-label={`Add ${variable.key}`}
+								aria-label={t(
+									'settings:environment.documented.add-aria-label',
+									'Add {{name}}',
+									{ name: variable.key },
+								)}
 								className='shrink-0'
 								onClick={() => onAdd(variable.key)}
 								size='icon-xs'

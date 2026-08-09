@@ -21,6 +21,13 @@ export interface AppSettingsApi {
 	getAppSettings: () => Promise<AppSettings>;
 	updateAppSettings: (patch: AppSettingsPatch) => Promise<AppSettings>;
 	openAppConfigFile: () => Promise<OpenAppConfigFileResult>;
+	/**
+	 * OS language tags, most-preferred first, for resolving the `system`
+	 * language setting. Not folded into {@link AppSettingsApi.getAppSettings}:
+	 * that payload is the persisted schema and would leak this into
+	 * `config.json`. macOS requires a relaunch to change the list.
+	 */
+	getSystemLanguages: () => Promise<string[]>;
 	onAppSettingsChanged: (
 		listener: (event: AppSettingsChangedBroadcast) => void,
 	) => () => void;

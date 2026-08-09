@@ -1,5 +1,7 @@
+import type { TFunction } from 'i18next';
 import { useAtomValue } from 'jotai';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { StatusBadge } from '@/renderer/components/status-badge';
 import { ScrollArea } from '@/renderer/components/ui/scroll-area';
 import {
@@ -139,6 +141,7 @@ function SidebarHealthFooter({
 	health: WorkbenchHealth;
 	projects: ProjectShellModel[];
 }) {
+	const { t } = useTranslation();
 	const repositoryCount = projects.length;
 	const workspaceCount = projects.reduce(
 		(count, project) => count + project.workspaces.length,
@@ -147,6 +150,7 @@ function SidebarHealthFooter({
 	const setupContext = useSetupDiagnosticsOptional();
 	const setupLine = describeSetupLine(
 		setupContext?.state.setupDiagnostics ?? null,
+		t,
 	);
 
 	return (
@@ -156,8 +160,20 @@ function SidebarHealthFooter({
 					{health.label}
 				</StatusBadge>
 				<div className='flex items-center gap-2 font-mono text-muted-foreground text-xxs leading-4'>
-					<span>{repositoryCount} repos</span>
-					<span>{workspaceCount} workspaces</span>
+					<span>
+						{t('workbench:navigation-sidebar.footer.repositories', {
+							count: repositoryCount,
+							defaultValue_one: '{{count}} repo',
+							defaultValue_other: '{{count}} repos',
+						})}
+					</span>
+					<span>
+						{t('workbench:navigation-sidebar.footer.workspaces', {
+							count: workspaceCount,
+							defaultValue_one: '{{count}} workspace',
+							defaultValue_other: '{{count}} workspaces',
+						})}
+					</span>
 				</div>
 				<p className='line-clamp-2 text-muted-foreground text-xxs leading-4'>
 					{health.detail}
@@ -179,20 +195,32 @@ function SidebarHealthFooter({
 /**
  * Derive the sidebar footer status line from a setup-diagnostics snapshot.
  * @param snapshot - The latest setup-diagnostics snapshot, or null when none.
+ * @param t - Translator from the calling component's `useTranslation`.
  * @returns The status line, or null when setup is ready and nothing needs surfacing.
  */
 function describeSetupLine(
 	snapshot: SetupDiagnosticsSnapshot | null,
+	t: TFunction,
 ): string | null {
 	if (!snapshot || snapshot.status === 'ready') {
 		return null;
 	}
 	if (snapshot.status === 'checking') {
-		return 'Setup checks running…';
+		return t(
+			'workbench:navigation-sidebar.setup.checking',
+			'Setup checks running…',
+		);
 	}
 	const blocked = snapshot.blockedCount ?? 0;
 	if (blocked > 0) {
-		return `${blocked} setup check${blocked === 1 ? '' : 's'} blocked — open diagnostics`;
+		return t('workbench:navigation-sidebar.setup.blocked', {
+			count: blocked,
+			defaultValue_one: '{{count}} setup check blocked — open diagnostics',
+			defaultValue_other: '{{count}} setup checks blocked — open diagnostics',
+		});
 	}
-	return 'Setup not ready — open diagnostics';
+	return t(
+		'workbench:navigation-sidebar.setup.not-ready',
+		'Setup not ready — open diagnostics',
+	);
 }

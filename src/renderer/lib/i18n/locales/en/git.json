@@ -1,0 +1,139 @@
+{
+	"actions": {
+		"commit-and-push": "Commit and push",
+		"merge": "Merge",
+		"push": "Push"
+	},
+	"branch-picker": {
+		"default-tag": "default",
+		"empty-remote": "No remote branches found.",
+		"loading": "Loading branches…",
+		"no-match": "No branches match.",
+		"use-typed-ref": "Use <ref>{{typedRef}}</ref>"
+	},
+	"changes-source": {
+		"all": "All changes",
+		"changed-file-count_one": "{{count}} file changed",
+		"changed-file-count_other": "{{count}} files changed",
+		"commits-empty": "No commits yet.",
+		"commits-failed": "Could not load commits.",
+		"commits-loading": "Loading commits…",
+		"discard-all": "Discard all uncommitted changes",
+		"menu-label": "Open changes menu",
+		"uncommitted": "Uncommitted changes",
+		"uncommitted-badge": "Uncommitted",
+		"uncommitted-empty": "No uncommitted changes"
+	},
+	"commit-and-push": {
+		"asked": {
+			"title": "Asked the agent to commit and push."
+		}
+	},
+	"create-pull-request": {
+		"draft": "Create draft PR",
+		"manual": "Create PR manually",
+		"options-label": "Open create pull request options"
+	},
+	"git-status": {
+		"action": {
+			"commit-push": "Commit and push",
+			"push": "Push",
+			"push-branch": "Push branch"
+		},
+		"clean": "Up to date with remote",
+		"uncommitted_one": "{{count}} uncommitted change",
+		"uncommitted_other": "{{count}} uncommitted changes",
+		"unpublished": "Branch not pushed yet",
+		"unpushed_one": "{{count}} unpushed commit",
+		"unpushed_other": "{{count}} unpushed commits"
+	},
+	"merge-conflicts": {
+		"asked": {
+			"title": "Asked the agent to resolve the merge conflicts."
+		}
+	},
+	"merge-dialog": {
+		"after-merge-archive": "Workspace will be archived",
+		"after-merge-archive-branch": "Workspace will be archived and the local branch deleted",
+		"after-merge-label": "After merge",
+		"after-merge-stay": "Workspace stays open (archive offered after merge)",
+		"checks-blocked": "{{failing}} failing, {{pending}} pending",
+		"checks-label": "Checks",
+		"checks-none": "No checks reported",
+		"checks-passed": "All checks passed",
+		"comments-clear": "No unresolved comments",
+		"comments-label": "Comments",
+		"comments-unresolved_one": "{{count}} unresolved",
+		"comments-unresolved_other": "{{count}} unresolved",
+		"confirm": "Confirm merge",
+		"confirm-override": "Merge anyway",
+		"description": "Merges <mono>{{branch}}</mono> through <mono>{{command}}</mono>. This action is visible to everyone on the repository and cannot be undone from Ensemblr.",
+		"submitting": "Merging…",
+		"title": "Merge pull request",
+		"title-numbered": "Merge pull request #{{number}}",
+		"todos-clear": "No open todos",
+		"todos-label": "Todos",
+		"todos-open_one": "{{count}} open",
+		"todos-open_other": "{{count}} open",
+		"warning-blocked": "Required checks have not passed. Merging now overrides merge readiness and only succeeds if repository policy allows it.",
+		"warning-not-ready": "This pull request is not marked ready to merge. Continue only if you are sure."
+	},
+	"preview-deployment": {
+		"open": "Open preview deployment",
+		"open-provider": "Open {{provider}} preview deployment"
+	},
+	"pull-request": {
+		"create-action": "Create PR",
+		"description-field": "PR description",
+		"detail": {
+			"blocked": "Resolve failing checks or review blockers before merge.",
+			"checking": "Checks are still running.",
+			"closed": "This pull request was closed without merging.",
+			"conflicting": "Merge conflicts must be resolved.",
+			"draft": "Draft pull request — mark ready for review to run policy gates.",
+			"merged": "This pull request has been merged.",
+			"no-pull-request": "No pull request for this branch yet.",
+			"open": "Pull request is open.",
+			"ready-to-merge": "All required checks passed.",
+			"sync-failed": "Could not refresh GitHub state: {{error}}"
+		},
+		"label": {
+			"blocked": "Blocked",
+			"checking": "Checks running",
+			"closed": "Closed",
+			"conflicts": "Merge conflicts",
+			"draft": "Draft",
+			"merged": "Merged",
+			"no-pull-request": "No PR",
+			"ready-to-merge": "Ready to merge"
+		},
+		"open-number": "Open pull request #{{number}}",
+		"title-field": "PR title",
+		"update-action": "Update PR"
+	},
+	"pull-request-create": {
+		"asked": {
+			"title": "Asked the agent to open a pull request."
+		}
+	},
+	"pull-request-create-draft": {
+		"asked": {
+			"title": "Asked the agent to open a draft pull request."
+		}
+	},
+	"pull-request-header": {
+		"activity": "Pull request activity in progress",
+		"agent-working": "Agent working"
+	},
+	"pull-request-menu": {
+		"label": "Open pull request menu",
+		"open-on-github": "Open on GitHub",
+		"refresh": "Refresh PR status",
+		"resolve-conflicts": "Resolve conflicts"
+	},
+	"pull-request-update": {
+		"asked": {
+			"title": "Asked the agent to update the pull request."
+		}
+	}
+}

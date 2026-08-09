@@ -1,8 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
 import { useAtom } from 'jotai';
 import { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { agentModelsQuery } from '@/renderer/api/ensemblr-queries';
+import { thinkingLevelLabel } from '@/renderer/lib/workbench/thinking-labels';
 import {
 	chatModelOverrideAtomFamily,
 	chatThinkingOverrideAtomFamily,
@@ -14,10 +16,7 @@ import type {
 	ComposerThinkingOption,
 } from '@/renderer/types/workbench';
 import { normalizeAgentProviderId } from '@/shared/agent-provider';
-import {
-	getThinkingLevelLabel,
-	listThinkingLevels,
-} from '@/shared/agent-thinking';
+import { listThinkingLevels } from '@/shared/agent-thinking';
 
 /** The persisted session fields the model and thinking ladders resolve against. */
 interface PersistedSelection {
@@ -78,6 +77,7 @@ export function useComposerModelSelection({
 	persistedActiveSession: PersistedSelection | undefined;
 }) {
 	const { data: models } = useQuery(agentModelsQuery);
+	const { t } = useTranslation();
 
 	// Per-chat overrides win when set; otherwise a new chat inherits the
 	// Settings → Default model/thinking. Keying the override atoms by chat-tab
@@ -129,9 +129,9 @@ export function useComposerModelSelection({
 			supplied.length > 0 ? supplied : listThinkingLevels(provider);
 		return levels.map((level) => ({
 			id: level,
-			label: getThinkingLevelLabel(provider, level),
+			label: thinkingLevelLabel(t, level),
 		}));
-	}, [models, modelId]);
+	}, [models, modelId, t]);
 
 	const thinkingLevel = clampToLadder(
 		chatThinkingOverride ??

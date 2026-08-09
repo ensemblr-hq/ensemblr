@@ -1,5 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { useAtom } from 'jotai';
+import { useTranslation } from 'react-i18next';
 
 import { SettingRow } from '@/renderer/components/settings/setting-row';
 import { SettingsSection } from '@/renderer/components/settings/settings-section';
@@ -17,10 +18,12 @@ import {
 	caffeinateWhileRunningAtom,
 	desktopNotificationsAtom,
 	followUpBehaviorAtom,
+	languageAtom,
 	sendShortcutAtom,
 	toolCallCollapseAtom,
 } from '@/renderer/state/preferences';
 import { DEFAULT_APP_SETTINGS } from '@/shared/config';
+import { APP_LANGUAGES, LANGUAGE_ENDONYMS } from '@/shared/i18n';
 import { formatShortcut } from '@/shared/keymap';
 
 /** Route for the General settings section; renders the general-settings panel. */
@@ -38,6 +41,8 @@ const NEWLINE_HINT = formatShortcut('composer.newline');
 
 /** General settings panel for the send shortcut, follow-up behavior, notifications, and other core chat preferences. */
 function GeneralSettings() {
+	const { t } = useTranslation();
+	const [language, setLanguage] = useAtom(languageAtom);
 	const [sendShortcut, setSendShortcut] = useAtom(sendShortcutAtom);
 	const [followUp, setFollowUp] = useAtom(followUpBehaviorAtom);
 	const [notifications, setNotifications] = useAtom(desktopNotificationsAtom);
@@ -49,7 +54,40 @@ function GeneralSettings() {
 	const [toolCalls, setToolCalls] = useAtom(toolCallCollapseAtom);
 
 	return (
-		<SettingsSection title='General'>
+		<SettingsSection title={t('settings:general.title', 'General')}>
+			<SettingRow
+				control={
+					<Select
+						onValueChange={(v) => setLanguage(v as typeof language)}
+						value={language}
+					>
+						<SelectTrigger className='w-40' size='sm'>
+							<SelectValue />
+						</SelectTrigger>
+						<SelectContent>
+							<SelectItem value='system'>
+								{t('settings:general.language.system', 'System')}
+							</SelectItem>
+							{/* Endonyms read identically in every UI language, which is the
+							    point of using one — a user stranded in a language they cannot
+							    read can still find their own. */}
+							{APP_LANGUAGES.map((code) => (
+								<SelectItem key={code} value={code}>
+									{LANGUAGE_ENDONYMS[code]}
+								</SelectItem>
+							))}
+						</SelectContent>
+					</Select>
+				}
+				description={t(
+					'settings:general.language.description',
+					'Interface language. System follows your macOS language order.',
+				)}
+				label={t('settings:general.language.label', 'Language')}
+				modified={language !== DEFAULTS.language}
+				onReset={() => setLanguage(DEFAULTS.language)}
+			/>
+
 			<SettingRow
 				control={
 					<Select
@@ -65,8 +103,12 @@ function GeneralSettings() {
 						</SelectContent>
 					</Select>
 				}
-				description={`Use ${NEWLINE_HINT} for new lines.`}
-				label='Send messages with'
+				description={t(
+					'settings:general.send-shortcut.description',
+					'Use {{shortcut}} for new lines.',
+					{ shortcut: NEWLINE_HINT },
+				)}
+				label={t('settings:general.send-shortcut.label', 'Send messages with')}
 				modified={sendShortcut !== DEFAULTS.sendShortcut}
 				onReset={() => setSendShortcut(DEFAULTS.sendShortcut)}
 			/>
@@ -81,14 +123,23 @@ function GeneralSettings() {
 							<SelectValue />
 						</SelectTrigger>
 						<SelectContent>
-							<SelectItem value='steer'>Steer</SelectItem>
-							<SelectItem value='queue'>Queue</SelectItem>
-							<SelectItem value='block'>Block</SelectItem>
+							<SelectItem value='steer'>
+								{t('settings:general.follow-up.steer', 'Steer')}
+							</SelectItem>
+							<SelectItem value='queue'>
+								{t('settings:general.follow-up.queue', 'Queue')}
+							</SelectItem>
+							<SelectItem value='block'>
+								{t('settings:general.follow-up.block', 'Block')}
+							</SelectItem>
 						</SelectContent>
 					</Select>
 				}
-				description='Queue messages to send after the agent finishes, or steer the agent mid-turn. Use ⌘J to queue.'
-				label='Follow-up behavior'
+				description={t(
+					'settings:general.follow-up.description',
+					'Queue messages to send after the agent finishes, or steer the agent mid-turn. Use ⌘J to queue.',
+				)}
+				label={t('settings:general.follow-up.label', 'Follow-up behavior')}
 				modified={followUp !== DEFAULTS.followUpBehavior}
 				onReset={() => setFollowUp(DEFAULTS.followUpBehavior)}
 			/>
@@ -97,8 +148,14 @@ function GeneralSettings() {
 				control={
 					<Switch checked={notifications} onCheckedChange={setNotifications} />
 				}
-				description='Get notified when an agent finishes working in a chat.'
-				label='Desktop notifications'
+				description={t(
+					'settings:general.notifications.description',
+					'Get notified when an agent finishes working in a chat.',
+				)}
+				label={t(
+					'settings:general.notifications.label',
+					'Desktop notifications',
+				)}
 				modified={notifications !== DEFAULTS.desktopNotifications}
 				onReset={() => setNotifications(DEFAULTS.desktopNotifications)}
 			/>
@@ -110,8 +167,14 @@ function GeneralSettings() {
 						onCheckedChange={setAutoConvertLong}
 					/>
 				}
-				description='Convert pasted text over 5000 characters into text attachments.'
-				label='Auto-convert long text'
+				description={t(
+					'settings:general.auto-convert.description',
+					'Convert pasted text over 5000 characters into text attachments.',
+				)}
+				label={t(
+					'settings:general.auto-convert.label',
+					'Auto-convert long text',
+				)}
 				modified={autoConvertLong !== DEFAULTS.autoConvertLongText}
 				onReset={() => setAutoConvertLong(DEFAULTS.autoConvertLongText)}
 			/>
@@ -120,8 +183,14 @@ function GeneralSettings() {
 				control={
 					<Switch checked={showContext} onCheckedChange={setShowContext} />
 				}
-				description='Always show context usage. By default, only shown when more than 70% is used.'
-				label='Always show context usage'
+				description={t(
+					'settings:general.context-usage.description',
+					'Always show context usage. By default, only shown when more than 70% is used.',
+				)}
+				label={t(
+					'settings:general.context-usage.label',
+					'Always show context usage',
+				)}
 				modified={showContext !== DEFAULTS.alwaysShowContextUsage}
 				onReset={() => setShowContext(DEFAULTS.alwaysShowContextUsage)}
 			/>
@@ -130,8 +199,14 @@ function GeneralSettings() {
 				control={
 					<Switch checked={caffeinate} onCheckedChange={setCaffeinate} />
 				}
-				description='Prevent your Mac from sleeping while an agent is actively working. Shuts off below 10% battery.'
-				label='Caffeinate while agents are running'
+				description={t(
+					'settings:general.caffeinate.description',
+					'Prevent your Mac from sleeping while an agent is actively working. Shuts off below 10% battery.',
+				)}
+				label={t(
+					'settings:general.caffeinate.label',
+					'Caffeinate while agents are running',
+				)}
 				modified={caffeinate !== DEFAULTS.caffeinateWhileRunning}
 				onReset={() => setCaffeinate(DEFAULTS.caffeinateWhileRunning)}
 			/>
@@ -143,8 +218,15 @@ function GeneralSettings() {
 						onCheckedChange={(v) => setToolCalls(v ? 'expanded' : 'collapsed')}
 					/>
 				}
-				description={`Show all tool calls expanded by default instead of collapsed. Toggle with ${TOOL_CALL_TOGGLE_HINT}.`}
-				label="Don't collapse tool calls"
+				description={t(
+					'settings:general.tool-calls.description',
+					'Show all tool calls expanded by default instead of collapsed. Toggle with {{shortcut}}.',
+					{ shortcut: TOOL_CALL_TOGGLE_HINT },
+				)}
+				label={t(
+					'settings:general.tool-calls.label',
+					"Don't collapse tool calls",
+				)}
 				modified={toolCalls !== DEFAULTS.toolCallCollapse}
 				onReset={() => setToolCalls(DEFAULTS.toolCallCollapse)}
 			/>

@@ -2,7 +2,9 @@
  * Footer of the agent question dialog: the question pager, the key hints for
  * the question on screen, and the submit button.
  */
+import type { TFunction } from 'i18next';
 import { ArrowUpIcon } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 import { QuestionPager } from '@/renderer/components/ask-user-question/question-pager';
 import { Button } from '@/renderer/components/ui/button';
@@ -28,19 +30,29 @@ const SUBMIT_SHORTCUT = formatShortcut('question.submit');
  * multi-question run may be worth answering only in part.
  * @param question - Question currently on screen.
  * @param questionCount - How many questions the agent asked.
+ * @param t - Translator from the calling component.
  * @returns The hint line for this question.
  */
 function keyHints(
 	question: AskUserQuestionItem,
 	questionCount: number,
+	t: TFunction,
 ): string {
-	const confirm = question.multiSelect ? 'Enter toggle' : 'Enter select';
+	const confirm = question.multiSelect
+		? t('common:agent-question.hint.toggle', 'Enter toggle')
+		: t('common:agent-question.hint.select', 'Enter select');
 	const needsChord = questionCount > 1 || question.multiSelect === true;
 	return [
-		'↑↓ move',
+		t('common:agent-question.hint.move', '↑↓ move'),
 		confirm,
-		...(needsChord ? [`${SUBMIT_SHORTCUT} submit`] : []),
-		'Esc dismiss',
+		...(needsChord
+			? [
+					t('common:agent-question.hint.submit', '{{shortcut}} submit', {
+						shortcut: SUBMIT_SHORTCUT,
+					}),
+				]
+			: []),
+		t('common:agent-question.hint.dismiss', 'Esc dismiss'),
 	].join(' · ');
 }
 
@@ -52,6 +64,7 @@ export function QuestionFooter({
 	run: (action: QuestionnaireAction) => void;
 	state: QuestionnaireState;
 }) {
+	const { t } = useTranslation();
 	const question = state.questions[state.pageIndex];
 	if (!question) {
 		return null;
@@ -71,13 +84,13 @@ export function QuestionFooter({
 					pages={pages}
 				/>
 				<p className='truncate pl-1 text-muted-foreground/60 text-xs'>
-					{keyHints(question, state.questions.length)}
+					{keyHints(question, state.questions.length, t)}
 				</p>
 			</div>
 			<Tooltip>
 				<TooltipTrigger asChild>
 					<Button
-						aria-label='Submit answers'
+						aria-label={t('common:agent-question.submit', 'Submit answers')}
 						className='rounded-md'
 						onClick={() => run({ type: 'submit' })}
 						size='icon-sm'
@@ -87,7 +100,7 @@ export function QuestionFooter({
 					</Button>
 				</TooltipTrigger>
 				<TooltipContent>
-					Submit answers
+					{t('common:agent-question.submit', 'Submit answers')}
 					<span className='ml-2 text-muted-foreground'>{SUBMIT_SHORTCUT}</span>
 				</TooltipContent>
 			</Tooltip>

@@ -1,6 +1,7 @@
 import { useNavigate, useRouterState } from '@tanstack/react-router';
 import { ArrowLeftIcon, FileCodeIcon } from 'lucide-react';
 import { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
 	REPO_SECTION_TARGETS,
 	type RepoSectionId,
@@ -50,6 +51,7 @@ export function SettingsHeader({
 	projects: ProjectShellModel[];
 	activeRepoId: string | null;
 }) {
+	const { t } = useTranslation();
 	const navigate = useNavigate();
 	const pathname = useRouterState({ select: (s) => s.location.pathname });
 	const closeSettings = useCloseSettings();
@@ -84,27 +86,26 @@ export function SettingsHeader({
 	// User scope opens ~/.config/ensemblr/config.json; repo scope opens the active
 	// repo's committed .ensemblr/settings.toml. Both are created if missing.
 	const activeRepo = projects.find((project) => project.id === activeRepoId);
-	const configLabel =
-		scope === 'user'
-			? 'Edit in config.json'
-			: 'Edit in .ensemblr/settings.toml';
+	const configLabel = t('settings:header.edit-config', 'Edit in {{file}}', {
+		file: scope === 'user' ? 'config.json' : '.ensemblr/settings.toml',
+	});
 
 	return (
 		<header className='native-toolbar macos-traffic-light-spacer flex h-11 shrink-0 items-center gap-3 border-b pr-3 pl-[var(--ensemblr-traffic-light-safe-inline)]'>
 			<Button onClick={closeSettings} size='sm' variant='ghost'>
 				<ArrowLeftIcon aria-hidden='true' className='size-4' />
-				<span>Back</span>
+				<span>{t('common:actions.back', 'Back')}</span>
 			</Button>
 			<div className='ml-2 flex items-center gap-1'>
 				<ScopeTab
 					active={scope === 'user'}
-					label='User'
+					label={t('settings:header.scope-user', 'User')}
 					onClick={() => handleScopeChange('user')}
 				/>
 				<ScopeTab
 					active={scope === 'repo'}
 					disabled={disableRepoTab}
-					label='Repo'
+					label={t('settings:header.scope-repo', 'Repo')}
 					onClick={() => handleScopeChange('repo')}
 				/>
 				{scope === 'repo' && projects.length > 0 ? (
@@ -113,11 +114,19 @@ export function SettingsHeader({
 						value={activeRepoId ?? undefined}
 					>
 						<SelectTrigger
-							aria-label='Active repository'
+							aria-label={t(
+								'settings:header.repo-picker.aria-label',
+								'Active repository',
+							)}
 							className='ml-6'
 							size='sm'
 						>
-							<SelectValue placeholder='Select repository' />
+							<SelectValue
+								placeholder={t(
+									'settings:header.repo-picker.placeholder',
+									'Select repository',
+								)}
+							/>
 						</SelectTrigger>
 						<SelectContent>
 							{projects.map((project) => (
@@ -162,6 +171,7 @@ function EditConfigMenu({
 	label: string;
 	activeRepoPath: string | null;
 }) {
+	const { t } = useTranslation();
 	const config = useMemo<SettingsConfigFile>(
 		() =>
 			scope === 'user'
@@ -184,10 +194,18 @@ function EditConfigMenu({
 
 	return (
 		<OpenTargetSplitButton
-			menuAriaLabel={`${label} — choose an app`}
+			menuAriaLabel={t(
+				'settings:header.open-menu.aria-label',
+				'{{label}} — choose an app',
+				{ label },
+			)}
 			onInvoke={(target) => void invokeTarget(target)}
 			openTargets={openTargets}
-			primaryAriaLabel={`${label} in ${primaryTarget.label}`}
+			primaryAriaLabel={t(
+				'settings:header.open-primary.aria-label',
+				'{{label}} in {{app}}',
+				{ app: primaryTarget.label, label },
+			)}
 			primaryLabel={label}
 			primaryTarget={primaryTarget}
 		/>

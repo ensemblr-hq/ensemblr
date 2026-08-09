@@ -1,3 +1,5 @@
+import { i18n } from '@/renderer/lib/i18n';
+
 /** Splits a command line into the separate commands it chains together. */
 const SEGMENT_SEPARATOR = /\s*(?:&&|\|\||[;|\n])\s*/;
 
@@ -32,98 +34,203 @@ const PACKAGE_MANAGERS = new Set(['bun', 'npm', 'pnpm', 'yarn']);
 /** Runners that stand in front of the tool actually being invoked. */
 const PACKAGE_EXECUTORS = new Set(['bunx', 'npx', 'pnpx']);
 
+/**
+ * Every action a command row can be titled with, each resolving its own text in
+ * the active language. Held apart from the lookup tables below because the same
+ * action is reached by many commands — `go build` and `cargo build` are one
+ * title — and a locale should translate it once.
+ */
+const TITLES = {
+	buildImage: () =>
+		i18n.t('workbench:shell-title.build-image', 'Building an image'),
+	buildProject: () =>
+		i18n.t('workbench:shell-title.build-project', 'Building the project'),
+	changeDirectory: () =>
+		i18n.t('workbench:shell-title.change-directory', 'Changing directory'),
+	changePermissions: () =>
+		i18n.t('workbench:shell-title.change-permissions', 'Changing permissions'),
+	checkCode: () =>
+		i18n.t('workbench:shell-title.check-code', 'Checking the code'),
+	checkDirectory: () =>
+		i18n.t('workbench:shell-title.check-directory', 'Checking the directory'),
+	checkDiskUsage: () =>
+		i18n.t('workbench:shell-title.check-disk-usage', 'Checking disk usage'),
+	checkGitStatus: () =>
+		i18n.t('workbench:shell-title.check-git-status', 'Checking git status'),
+	commitChanges: () =>
+		i18n.t('workbench:shell-title.commit-changes', 'Committing changes'),
+	compareFiles: () =>
+		i18n.t('workbench:shell-title.compare-files', 'Comparing files'),
+	copyFiles: () => i18n.t('workbench:shell-title.copy-files', 'Copying files'),
+	countLines: () =>
+		i18n.t('workbench:shell-title.count-lines', 'Counting lines'),
+	createDirectory: () =>
+		i18n.t('workbench:shell-title.create-directory', 'Creating a directory'),
+	createFile: () =>
+		i18n.t('workbench:shell-title.create-file', 'Creating a file'),
+	fetchRemote: () =>
+		i18n.t('workbench:shell-title.fetch-remote', 'Fetching from the remote'),
+	fetchUrl: () => i18n.t('workbench:shell-title.fetch-url', 'Fetching a URL'),
+	inspectProcesses: () =>
+		i18n.t('workbench:shell-title.inspect-processes', 'Inspecting processes'),
+	installDependencies: () =>
+		i18n.t(
+			'workbench:shell-title.install-dependencies',
+			'Installing dependencies',
+		),
+	listBranches: () =>
+		i18n.t('workbench:shell-title.list-branches', 'Listing branches'),
+	listFiles: () => i18n.t('workbench:shell-title.list-files', 'Listing files'),
+	locateBinary: () =>
+		i18n.t('workbench:shell-title.locate-binary', 'Locating a binary'),
+	mergeBranches: () =>
+		i18n.t('workbench:shell-title.merge-branches', 'Merging branches'),
+	moveFiles: () => i18n.t('workbench:shell-title.move-files', 'Moving files'),
+	openFile: () => i18n.t('workbench:shell-title.open-file', 'Opening a file'),
+	printOutput: () =>
+		i18n.t('workbench:shell-title.print-output', 'Printing output'),
+	pullChanges: () =>
+		i18n.t('workbench:shell-title.pull-changes', 'Pulling changes'),
+	pushChanges: () =>
+		i18n.t('workbench:shell-title.push-changes', 'Pushing changes'),
+	readCommit: () =>
+		i18n.t('workbench:shell-title.read-commit', 'Reading a commit'),
+	readFile: () => i18n.t('workbench:shell-title.read-file', 'Reading a file'),
+	readGitHistory: () =>
+		i18n.t('workbench:shell-title.read-git-history', 'Reading git history'),
+	rebaseBranch: () =>
+		i18n.t('workbench:shell-title.rebase-branch', 'Rebasing the branch'),
+	removeFiles: () =>
+		i18n.t('workbench:shell-title.remove-files', 'Removing files'),
+	reviewChanges: () =>
+		i18n.t('workbench:shell-title.review-changes', 'Reviewing changes'),
+	runContainer: () =>
+		i18n.t('workbench:shell-title.run-container', 'Running a container'),
+	runScript: () =>
+		i18n.t('workbench:shell-title.run-script', 'Running a script'),
+	runTests: () => i18n.t('workbench:shell-title.run-tests', 'Running tests'),
+	searchFiles: () =>
+		i18n.t('workbench:shell-title.search-files', 'Searching files'),
+	stageChanges: () =>
+		i18n.t('workbench:shell-title.stage-changes', 'Staging changes'),
+	startDevServer: () =>
+		i18n.t('workbench:shell-title.start-dev-server', 'Starting the dev server'),
+	stashChanges: () =>
+		i18n.t('workbench:shell-title.stash-changes', 'Stashing changes'),
+	stopProcess: () =>
+		i18n.t('workbench:shell-title.stop-process', 'Stopping a process'),
+	switchBranches: () =>
+		i18n.t('workbench:shell-title.switch-branches', 'Switching branches'),
+	transformText: () =>
+		i18n.t('workbench:shell-title.transform-text', 'Transforming text'),
+	typeCheck: () => i18n.t('workbench:shell-title.type-check', 'Type-checking'),
+	waiting: () => i18n.t('workbench:shell-title.waiting', 'Waiting'),
+} satisfies Record<string, () => string>;
+
+/**
+ * Names an invocation the tables have no title for, by the binary or script it
+ * ran.
+ * @param name - The binary or script that was invoked
+ * @returns The fallback title
+ */
+function runningNamed(name: string): string {
+	return i18n.t('workbench:shell-title.run-named', 'Running {{name}}', {
+		name,
+	});
+}
+
 /** Subcommands whose parent binary alone would say too little. */
-const SUBCOMMAND_TITLES: Record<string, string> = {
-	'cargo build': 'Building the project',
-	'cargo test': 'Running tests',
-	'docker build': 'Building an image',
-	'docker run': 'Running a container',
-	'git add': 'Staging changes',
-	'git branch': 'Listing branches',
-	'git checkout': 'Switching branches',
-	'git commit': 'Committing changes',
-	'git diff': 'Reviewing changes',
-	'git fetch': 'Fetching from the remote',
-	'git log': 'Reading git history',
-	'git merge': 'Merging branches',
-	'git pull': 'Pulling changes',
-	'git push': 'Pushing changes',
-	'git rebase': 'Rebasing the branch',
-	'git show': 'Reading a commit',
-	'git stash': 'Stashing changes',
-	'git status': 'Checking git status',
-	'git switch': 'Switching branches',
-	'go build': 'Building the project',
-	'go test': 'Running tests',
+const SUBCOMMAND_TITLES: Record<string, () => string> = {
+	'cargo build': TITLES.buildProject,
+	'cargo test': TITLES.runTests,
+	'docker build': TITLES.buildImage,
+	'docker run': TITLES.runContainer,
+	'git add': TITLES.stageChanges,
+	'git branch': TITLES.listBranches,
+	'git checkout': TITLES.switchBranches,
+	'git commit': TITLES.commitChanges,
+	'git diff': TITLES.reviewChanges,
+	'git fetch': TITLES.fetchRemote,
+	'git log': TITLES.readGitHistory,
+	'git merge': TITLES.mergeBranches,
+	'git pull': TITLES.pullChanges,
+	'git push': TITLES.pushChanges,
+	'git rebase': TITLES.rebaseBranch,
+	'git show': TITLES.readCommit,
+	'git stash': TITLES.stashChanges,
+	'git status': TITLES.checkGitStatus,
+	'git switch': TITLES.switchBranches,
+	'go build': TITLES.buildProject,
+	'go test': TITLES.runTests,
 };
 
 /** What each known binary is doing, phrased as the step it performs. */
-const COMMAND_TITLES: Record<string, string> = {
-	ack: 'Searching files',
-	ag: 'Searching files',
-	awk: 'Transforming text',
-	bat: 'Reading a file',
-	cat: 'Reading a file',
-	cd: 'Changing directory',
-	chmod: 'Changing permissions',
-	chown: 'Changing permissions',
-	cp: 'Copying files',
-	curl: 'Fetching a URL',
-	deno: 'Running a script',
-	df: 'Checking disk usage',
-	diff: 'Comparing files',
-	du: 'Checking disk usage',
-	echo: 'Printing output',
-	fd: 'Listing files',
-	find: 'Listing files',
-	grep: 'Searching files',
-	head: 'Reading a file',
-	jest: 'Running tests',
-	kill: 'Stopping a process',
-	less: 'Reading a file',
-	ls: 'Listing files',
-	mkdir: 'Creating a directory',
-	mv: 'Moving files',
-	node: 'Running a script',
-	open: 'Opening a file',
-	pgrep: 'Inspecting processes',
-	pkill: 'Stopping a process',
-	printf: 'Printing output',
-	ps: 'Inspecting processes',
-	pwd: 'Checking the directory',
-	python: 'Running a script',
-	python3: 'Running a script',
-	pytest: 'Running tests',
-	rg: 'Searching files',
-	rm: 'Removing files',
-	rmdir: 'Removing files',
-	sed: 'Transforming text',
-	sleep: 'Waiting',
-	tail: 'Reading a file',
-	touch: 'Creating a file',
-	tree: 'Listing files',
-	tsc: 'Type-checking',
-	tsx: 'Running a script',
-	vitest: 'Running tests',
-	wc: 'Counting lines',
-	whereis: 'Locating a binary',
-	which: 'Locating a binary',
-	wget: 'Fetching a URL',
+const COMMAND_TITLES: Record<string, () => string> = {
+	ack: TITLES.searchFiles,
+	ag: TITLES.searchFiles,
+	awk: TITLES.transformText,
+	bat: TITLES.readFile,
+	cat: TITLES.readFile,
+	cd: TITLES.changeDirectory,
+	chmod: TITLES.changePermissions,
+	chown: TITLES.changePermissions,
+	cp: TITLES.copyFiles,
+	curl: TITLES.fetchUrl,
+	deno: TITLES.runScript,
+	df: TITLES.checkDiskUsage,
+	diff: TITLES.compareFiles,
+	du: TITLES.checkDiskUsage,
+	echo: TITLES.printOutput,
+	fd: TITLES.listFiles,
+	find: TITLES.listFiles,
+	grep: TITLES.searchFiles,
+	head: TITLES.readFile,
+	jest: TITLES.runTests,
+	kill: TITLES.stopProcess,
+	less: TITLES.readFile,
+	ls: TITLES.listFiles,
+	mkdir: TITLES.createDirectory,
+	mv: TITLES.moveFiles,
+	node: TITLES.runScript,
+	open: TITLES.openFile,
+	pgrep: TITLES.inspectProcesses,
+	pkill: TITLES.stopProcess,
+	printf: TITLES.printOutput,
+	ps: TITLES.inspectProcesses,
+	pwd: TITLES.checkDirectory,
+	python: TITLES.runScript,
+	python3: TITLES.runScript,
+	pytest: TITLES.runTests,
+	rg: TITLES.searchFiles,
+	rm: TITLES.removeFiles,
+	rmdir: TITLES.removeFiles,
+	sed: TITLES.transformText,
+	sleep: TITLES.waiting,
+	tail: TITLES.readFile,
+	touch: TITLES.createFile,
+	tree: TITLES.listFiles,
+	tsc: TITLES.typeCheck,
+	tsx: TITLES.runScript,
+	vitest: TITLES.runTests,
+	wc: TITLES.countLines,
+	whereis: TITLES.locateBinary,
+	which: TITLES.locateBinary,
+	wget: TITLES.fetchUrl,
 };
 
 /** What each well-known package script does, keyed by its name before any `:`. */
-const SCRIPT_TITLES: Record<string, string> = {
-	biome: 'Checking the code',
-	build: 'Building the project',
-	check: 'Checking the code',
-	dev: 'Starting the dev server',
-	format: 'Checking the code',
-	lint: 'Checking the code',
-	start: 'Starting the dev server',
-	test: 'Running tests',
-	tsc: 'Type-checking',
-	typecheck: 'Type-checking',
-	types: 'Type-checking',
+const SCRIPT_TITLES: Record<string, () => string> = {
+	biome: TITLES.checkCode,
+	build: TITLES.buildProject,
+	check: TITLES.checkCode,
+	dev: TITLES.startDevServer,
+	format: TITLES.checkCode,
+	lint: TITLES.checkCode,
+	start: TITLES.startDevServer,
+	test: TITLES.runTests,
+	tsc: TITLES.typeCheck,
+	typecheck: TITLES.typeCheck,
+	types: TITLES.typeCheck,
 };
 
 /** Package-manager arguments that install rather than run something. */
@@ -243,7 +350,7 @@ function subcommandTitle(
 	for (const token of args) {
 		const title = SUBCOMMAND_TITLES[`${binary} ${token}`];
 		if (title !== undefined) {
-			return title;
+			return title();
 		}
 	}
 	return undefined;
@@ -257,7 +364,8 @@ function subcommandTitle(
  */
 function scriptTitle(script: string): string {
 	const base = script.split(':')[0] ?? script;
-	return SCRIPT_TITLES[base] ?? `Running ${script}`;
+	const title = SCRIPT_TITLES[base];
+	return title ? title() : runningNamed(script);
 }
 
 /**
@@ -269,16 +377,16 @@ function scriptTitle(script: string): string {
 function packageManagerTitle(manager: string, args: readonly string[]): string {
 	const argument = firstScriptArgument(args);
 	if (argument === null) {
-		return `Running ${manager}`;
+		return runningNamed(manager);
 	}
 	if (INSTALL_ARGUMENTS.has(argument)) {
-		return 'Installing dependencies';
+		return TITLES.installDependencies();
 	}
 	if (!RUN_ARGUMENTS.has(argument)) {
 		return scriptTitle(argument);
 	}
 	const script = firstScriptArgument(args.slice(args.indexOf(argument) + 1));
-	return script === null ? `Running ${manager}` : scriptTitle(script);
+	return script === null ? runningNamed(manager) : scriptTitle(script);
 }
 
 /**
@@ -295,15 +403,15 @@ function titleForTokens(tokens: readonly string[]): string {
 	const args = tokens.slice(1);
 	if (PACKAGE_EXECUTORS.has(binary)) {
 		const invoked = afterFlags(args);
-		return invoked.length > 0 ? titleForTokens(invoked) : `Running ${binary}`;
+		return invoked.length > 0 ? titleForTokens(invoked) : runningNamed(binary);
 	}
 	if (PACKAGE_MANAGERS.has(binary)) {
 		return packageManagerTitle(binary, args);
 	}
 	return (
 		subcommandTitle(binary, args) ??
-		COMMAND_TITLES[binary] ??
-		`Running ${binary}`
+		COMMAND_TITLES[binary]?.() ??
+		runningNamed(binary)
 	);
 }
 

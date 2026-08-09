@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Trans, useTranslation } from 'react-i18next';
 
 import { Button } from '@/renderer/components/ui/button';
 import {
@@ -51,17 +52,23 @@ export function RunScriptEditorDialog({
 	/** Script being edited, or null when adding a new one. */
 	script: RunScriptDefinition | null;
 }) {
+	const { t } = useTranslation();
+
 	return (
 		<Dialog onOpenChange={onOpenChange} open={open}>
 			<DialogContent className='sm:max-w-lg'>
 				<DialogHeader>
 					<DialogTitle>
-						{script ? 'Edit run script' : 'Add run script'}
+						{script
+							? t('settings:run-scripts.editor.edit-title', 'Edit run script')
+							: t('settings:run-scripts.editor.add-title', 'Add run script')}
 					</DialogTitle>
 					<DialogDescription>
-						Shortcuts for quick actions, like running your dev server or test
-						suite. Use <code>$ENSEMBLR_PORT</code> for this workspace's
-						allocated port.
+						<Trans
+							components={{ port: <code /> }}
+							defaults="Shortcuts for quick actions, like running your dev server or test suite. Use <port>$ENSEMBLR_PORT</port> for this workspace's allocated port."
+							i18nKey='settings:run-scripts.editor.description'
+						/>
 					</DialogDescription>
 				</DialogHeader>
 
@@ -93,6 +100,7 @@ function RunScriptEditorForm({
 	onSubmit: (script: RunScriptDefinition) => void;
 	script: RunScriptDefinition | null;
 }) {
+	const { t } = useTranslation();
 	const [draft, setDraft] = useState<RunScriptDefinition>(
 		script ?? BLANK_RUN_SCRIPT,
 	);
@@ -112,7 +120,7 @@ function RunScriptEditorForm({
 
 			<DialogFooter>
 				<Button onClick={onCancel} type='button' variant='ghost'>
-					Cancel
+					{t('common:actions.cancel', 'Cancel')}
 				</Button>
 				<Button
 					disabled={!canSave}
@@ -125,7 +133,9 @@ function RunScriptEditorForm({
 					}
 					type='button'
 				>
-					{script ? 'Save' : 'Add'}
+					{script
+						? t('common:actions.save', 'Save')
+						: t('common:actions.add', 'Add')}
 				</Button>
 			</DialogFooter>
 		</>
@@ -165,11 +175,13 @@ function RunScriptEditorFields({
 	duplicateName: boolean;
 	onChange: (next: RunScriptDefinition) => void;
 }) {
+	const { t } = useTranslation();
+
 	return (
 		<div className='space-y-4'>
 			<div className='space-y-1.5'>
 				<label className='font-medium text-sm' htmlFor='run-script-name'>
-					Name
+					{t('settings:run-scripts.editor.name', 'Name')}
 				</label>
 				<div className='flex gap-2'>
 					<RunScriptIconPicker
@@ -188,15 +200,19 @@ function RunScriptEditorFields({
 				</div>
 				{duplicateName ? (
 					<p className='text-destructive text-xs'>
-						Another run script already uses this name.
+						{t(
+							'settings:run-scripts.editor.duplicate-name',
+							'Another run script already uses this name.',
+						)}
 					</p>
 				) : null}
 			</div>
 
 			<div className='space-y-1.5'>
 				<label className='font-medium text-sm' htmlFor='run-script-command'>
-					Command
+					{t('settings:run-scripts.editor.command', 'Command')}
 				</label>
+				{/* i18next-instrument-ignore */}
 				<Textarea
 					className='min-h-18 font-mono text-xs'
 					id='run-script-command'
@@ -210,9 +226,14 @@ function RunScriptEditorFields({
 
 			<div className='flex items-center justify-between gap-4'>
 				<div>
-					<p className='font-medium text-sm'>Default</p>
+					<p className='font-medium text-sm'>
+						{t('settings:run-scripts.editor.default', 'Default')}
+					</p>
 					<p className='text-muted-foreground text-xs'>
-						Runs when you press ⌘R in a workspace that has no other pick.
+						{t(
+							'settings:run-scripts.editor.default-description',
+							'Runs when you press ⌘R in a workspace that has no other pick.',
+						)}
 					</p>
 				</div>
 				<Switch

@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 
 import {
@@ -62,6 +63,7 @@ function RenameWorkspaceDialogForm({
 	onOpenChange: (open: boolean) => void;
 	workspace: WorkspaceShellModel;
 }) {
+	const { t } = useTranslation();
 	const [name, setName] = useState(workspace.name);
 	const [branchName, setBranchName] = useState(workspace.branchName);
 	// Handler-only flag (never read during render): a ref avoids needless state.
@@ -116,7 +118,14 @@ function RenameWorkspaceDialogForm({
 				queryKey: ensemblrQueryKeys.repositoryWorkspaceNavigation(),
 			});
 			toast.success(
-				`Renamed to ${result.workspace.name} on branch ${result.workspace.branchName}.`,
+				t(
+					'workbench:workspace-rename.succeeded',
+					'Renamed to {{name}} on branch {{branch}}.',
+					{
+						branch: result.workspace.branchName,
+						name: result.workspace.name,
+					},
+				),
 			);
 			onOpenChange(false);
 			return;
@@ -128,6 +137,7 @@ function RenameWorkspaceDialogForm({
 		branchPinned,
 		canRename,
 		onOpenChange,
+		t,
 		trimmedBranch,
 		trimmedName,
 		workspace.branchName,
@@ -159,18 +169,24 @@ function RenameWorkspaceDialogForm({
 		<>
 			<DialogHeader>
 				<DialogTitle className='font-medium text-[0.9375rem]'>
-					Rename workspace
+					{t('workbench:rename-workspace.title', 'Rename workspace')}
 				</DialogTitle>
 				<p className='text-muted-foreground text-xs'>
 					{branchPinned
-						? 'Updates the workspace name. This workspace took over an existing branch, so the branch keeps its name. The worktree folder stays put.'
-						: 'Updates the workspace name. The branch is auto-renamed from the slugged name unless you override it below. The worktree folder stays put.'}
+						? t(
+								'workbench:rename-workspace.description-pinned',
+								'Updates the workspace name. This workspace took over an existing branch, so the branch keeps its name. The worktree folder stays put.',
+							)
+						: t(
+								'workbench:rename-workspace.description',
+								'Updates the workspace name. The branch is auto-renamed from the slugged name unless you override it below. The worktree folder stays put.',
+							)}
 				</p>
 			</DialogHeader>
 
 			<div className='flex flex-col gap-1.5'>
 				<Label className='text-xs' htmlFor='rename-workspace-name'>
-					Workspace name
+					{t('workbench:rename-workspace.name.label', 'Workspace name')}
 				</Label>
 				<Input
 					autoFocus
@@ -199,7 +215,7 @@ function RenameWorkspaceDialogForm({
 
 			<div className='flex flex-col gap-1.5'>
 				<Label className='text-xs' htmlFor='rename-workspace-branch'>
-					Branch name
+					{t('workbench:rename-workspace.branch.label', 'Branch name')}
 				</Label>
 				<Input
 					className='h-9 font-mono text-xs'
@@ -214,8 +230,14 @@ function RenameWorkspaceDialogForm({
 				/>
 				<p className='text-[0.6875rem] text-muted-foreground'>
 					{branchPinned
-						? 'This branch came from a branch or pull request the workspace took over, so renaming it here would orphan that work.'
-						: 'Follows the workspace name slug until you edit it.'}
+						? t(
+								'workbench:rename-workspace.branch.pinned-hint',
+								'This branch came from a branch or pull request the workspace took over, so renaming it here would orphan that work.',
+							)
+						: t(
+								'workbench:rename-workspace.branch.hint',
+								'Follows the workspace name slug until you edit it.',
+							)}
 				</p>
 			</div>
 
@@ -230,7 +252,11 @@ function RenameWorkspaceDialogForm({
 				onRetry={stage === 'failure' ? handleRetry : null}
 				onSubmit={handleRename}
 				submitDisabled={!canRename}
-				submitLabel={stage === 'renaming' ? 'Renaming…' : 'Rename'}
+				submitLabel={
+					stage === 'renaming'
+						? t('common:actions.renaming', 'Renaming…')
+						: t('common:actions.rename', 'Rename')
+				}
 			/>
 		</>
 	);

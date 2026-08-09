@@ -1,0 +1,1051 @@
+{
+	"add-project": {
+		"check": {
+			"not-ready": "{{title}}: ещё не готово."
+		},
+		"open-github": {
+			"label": "Открыть проект GitHub",
+			"unavailable": "Войдите через GitHub CLI (gh auth login), чтобы открывать проекты GitHub."
+		},
+		"open-local": {
+			"label": "Открыть локальный проект",
+			"unavailable": "Укажите доступный для записи корневой каталог Ensemblr, прежде чем открывать локальные проекты."
+		},
+		"quick-start": {
+			"label": "Быстрый старт",
+			"unavailable": "Укажите доступный для записи корневой каталог Ensemblr, прежде чем создавать новый проект."
+		}
+	},
+	"all-files": {
+		"empty": {
+			"message": "Файлы появятся здесь сразу после создания.",
+			"title": "Файлов пока нет"
+		},
+		"open-preview": "Открыть предпросмотр {{path}}"
+	},
+	"all-files-search": {
+		"description": "Открыть файл репозитория с вкладки «Все файлы».",
+		"empty": "Файлы по запросу не найдены.",
+		"group-files": "Файлы",
+		"placeholder": "Поиск файлов",
+		"title": "Поиск файлов"
+	},
+	"archive-repository": {
+		"cleanup": {
+			"description": "Файлы передачи <0>.context/</0> каждой рабочей области сохраняются; всё остальное, что не отправлено через push, будет потеряно.",
+			"label": "Также удалить каждый worktree и его локальную ветку"
+		},
+		"description": "Репозиторий и {{workspaces}} помечаются как архивные. Файлы передачи <0>.context/</0> каждой рабочей области сохраняются в <1>archived-contexts/</1>. Каталоги worktree и папка репозитория остаются на диске.",
+		"title": "Архивировать репозиторий?"
+	},
+	"archive-workspace": {
+		"cleanup": {
+			"description": "Файлы передачи <0>.context/</0> сохраняются; всё остальное, что не отправлено в remote, будет потеряно.",
+			"label": "Также удалить worktree и локальную ветку"
+		},
+		"description": "Рабочая область помечается как архивная, а её файлы передачи <0>.context/</0> сохраняются в <1>archived-contexts/</1>. По умолчанию каталог worktree и локальная ветка остаются на диске; ничего не коммитится и не отправляется через push.",
+		"title": "Архивировать рабочую область?"
+	},
+	"attachment-menu": {
+		"add-attachment": "Добавить вложение",
+		"aria-label": "Вложения",
+		"link-issue": "Связать задачу",
+		"link-issue-soon": {
+			"title": "Привязка задач скоро появится."
+		},
+		"link-workspaces": "Связать рабочие области",
+		"link-workspaces-soon": {
+			"title": "Привязка рабочих областей скоро появится."
+		},
+		"tooltip": "Добавить вложения, связать задачи и другое"
+	},
+	"autocomplete": {
+		"no-commands": "Команды не найдены",
+		"no-files": "Файлы не найдены"
+	},
+	"browse-archive": {
+		"description": "Восстановите архивную рабочую область или удалите её безвозвратно. При восстановлении worktree пересоздаётся из записанной базовой ветки, если при архивации выполнялась очистка веток.",
+		"empty": {
+			"failed": "Не удалось загрузить архивные рабочие области.",
+			"loading": "Загрузка архивных рабочих областей…",
+			"none": "Для этого репозитория нет архивных рабочих областей.",
+			"unavailable": "Мост preload недоступен в этом контексте."
+		},
+		"row": {
+			"archived": "Архивировано {{date}}",
+			"archived-destroyed": "Архивировано {{date}} · worktree удалён (при восстановлении будет пересоздан из базовой ветки)",
+			"delete-permanently": "Удалить безвозвратно",
+			"no-branch": "без ветки"
+		},
+		"title": "Архив рабочих областей — {{repository}}"
+	},
+	"checks-panel": {
+		"blocked": {
+			"detail": "Устраните блокеры перед merge.",
+			"title": "Проверки не пройдены"
+		},
+		"checking": {
+			"detail": "Проверки ещё выполняются.",
+			"title": "Проверки в ожидании"
+		},
+		"empty": {
+			"detail": "Нет локальных изменений для ревью."
+		},
+		"no-pull-request": {
+			"title": "Нет pull request"
+		},
+		"open": {
+			"detail": "Pull request открыт.",
+			"title": "Pull request #{{number}}"
+		},
+		"ready": {
+			"detail": "Все обязательные проверки пройдены.",
+			"title": "Готово к merge"
+		},
+		"uncommitted": {
+			"detail_one": "{{count}} незакоммиченное изменение готово к настройке PR.",
+			"detail_few": "{{count}} незакоммиченных изменения готовы к настройке PR.",
+			"detail_many": "{{count}} незакоммиченных изменений готовы к настройке PR.",
+			"detail_other": "{{count}} незакоммиченного изменения готово к настройке PR."
+		},
+		"working": {
+			"detail": "Агент обновляет эту рабочую область.",
+			"title": "Pull request активен"
+		}
+	},
+	"close-running-chat": {
+		"confirm": "Всё равно закрыть",
+		"description": "Этот чат сейчас выполняется. Его закрытие остановит текущую сессию агента.",
+		"title": "Закрыть выполняющийся чат?"
+	},
+	"closed-tabs": {
+		"empty": "Нет закрытых вкладок чата",
+		"tooltip": "Закрытые вкладки чата",
+		"trigger": "Открыть закрытые вкладки чата"
+	},
+	"command-palette": {
+		"empty": "Команда не найдена.",
+		"go-history": "Открыть историю чатов",
+		"go-home": "Перейти на главную",
+		"go-linear": "Просмотр задач Linear",
+		"group-appearance": "Внешний вид",
+		"group-navigation": "Навигация",
+		"group-settings": "Настройки",
+		"label": "Палитра команд",
+		"placeholder": "Поиск команд…",
+		"settings-advanced": "Настройки · Дополнительно",
+		"settings-appearance": "Настройки · Внешний вид",
+		"settings-diagnostics": "Настройки · Диагностика",
+		"settings-environment": "Настройки · Окружение",
+		"settings-experimental": "Настройки · Экспериментальные",
+		"settings-general": "Настройки · Основные",
+		"settings-git": "Настройки · Git",
+		"settings-integrations": "Настройки · Интеграции",
+		"settings-models": "Настройки · Модели",
+		"settings-providers": "Настройки · Провайдеры",
+		"theme-dark": "Тема · Тёмная",
+		"theme-light": "Тема · Светлая",
+		"theme-system": "Тема · Системная"
+	},
+	"composer": {
+		"aria-label": "Поле ввода для агента",
+		"blocked-follow-up": "Дополнения заблокированы, пока агент работает — остановите ход или дождитесь его завершения.",
+		"focus-hint": "<key>{{shortcut}}</key><label>для фокуса</label>",
+		"model": {
+			"pending": "Модель ожидается"
+		},
+		"placeholder": "Попросите внести изменения, упоминайте файлы через @, запускайте /команды",
+		"plan-mode": {
+			"placeholder": "Опишите, что нужно сделать — агент составит план вместе с вами, прежде чем трогать файлы"
+		},
+		"ready": {
+			"placeholder": "Попросите агента продолжить {{session}}"
+		},
+		"send-tooltip": "Отправить сообщение",
+		"setup-blocked": {
+			"placeholder": "Устраните блокеры настройки перед отправкой запроса.",
+			"reason_one": "{{count}} обязательная проверка настройки требует внимания.",
+			"reason_few": "{{count}} обязательные проверки настройки требуют внимания.",
+			"reason_many": "{{count}} обязательных проверок настройки требуют внимания.",
+			"reason_other": "{{count}} обязательной проверки настройки требует внимания."
+		},
+		"setup-error": {
+			"placeholder": "Устраните проблемы диагностики настройки, прежде чем начинать ход агента."
+		},
+		"setup-loading": {
+			"placeholder": "Проверки настройки ещё загружаются.",
+			"reason": "Ensemblr ещё проверяет готовность настройки."
+		},
+		"thinking": {
+			"pending": "Размышление ожидается"
+		},
+		"upload-input": {
+			"aria-label": "Загрузить вложение"
+		}
+	},
+	"context-usage": {
+		"aria-label": "Использование контекста",
+		"gauge-title": "Шкала использования контекста",
+		"heading": "Контекст",
+		"unavailable": "Окно контекста недоступно для этой модели.",
+		"window-used": "Использовано окна"
+	},
+	"control-tool": {
+		"add-diff-comments": {
+			"done": "Оставил комментарии к ревью",
+			"running": "Оставляет комментарии к ревью"
+		},
+		"ask-user-question": {
+			"done": "Задал вам вопрос",
+			"running": "Задаёт вам вопрос"
+		},
+		"close-tab": {
+			"done": "Закрыл вкладку",
+			"running": "Закрывает вкладку"
+		},
+		"exit-plan-mode": {
+			"done": "Отправил план",
+			"running": "Отправляет план"
+		},
+		"focus-dock-tab": {
+			"done": "Переключился на терминал",
+			"running": "Переключается на терминал"
+		},
+		"focus-panel": {
+			"done": "Переключился на панель",
+			"running": "Переключается на панель"
+		},
+		"focus-tab": {
+			"done": "Переключился на вкладку",
+			"running": "Переключается на вкладку"
+		},
+		"get-conversation-status": {
+			"done": "Проверил суб-агента",
+			"running": "Проверяет суб-агента"
+		},
+		"get-diff-comments": {
+			"done": "Прочитал комментарии к ревью",
+			"running": "Читает комментарии к ревью"
+		},
+		"get-last-message": {
+			"done": "Прочитал отчёт суб-агента",
+			"running": "Читает отчёт суб-агента"
+		},
+		"get-workspace-diff": {
+			"done": "Прочитал diff",
+			"running": "Читает diff"
+		},
+		"get-workspace-status": {
+			"done": "Прочитал статус на доске",
+			"running": "Читает статус на доске"
+		},
+		"launch-harness": {
+			"done": "Запустил харнесс",
+			"running": "Запускает харнесс"
+		},
+		"linear-create-comment": {
+			"done": "Прокомментировал задачу в Linear",
+			"running": "Комментирует задачу в Linear"
+		},
+		"linear-get-issue": {
+			"done": "Прочитал задачу в Linear",
+			"running": "Читает задачу в Linear"
+		},
+		"linear-get-metadata": {
+			"done": "Прочитал команды и статусы Linear",
+			"running": "Читает команды и статусы Linear"
+		},
+		"linear-list-issues": {
+			"done": "Искал задачи в Linear",
+			"running": "Ищет задачи в Linear"
+		},
+		"linear-update-issue": {
+			"done": "Обновил задачу в Linear",
+			"running": "Обновляет задачу в Linear"
+		},
+		"list-models": {
+			"done": "Получил список моделей",
+			"running": "Получает список моделей"
+		},
+		"list-run-scripts": {
+			"done": "Получил список скриптов запуска",
+			"running": "Получает список скриптов запуска"
+		},
+		"list-tabs": {
+			"done": "Получил список вкладок",
+			"running": "Получает список вкладок"
+		},
+		"list-terminals": {
+			"done": "Получил список терминалов",
+			"running": "Получает список терминалов"
+		},
+		"list-workspaces": {
+			"done": "Получил список рабочих областей",
+			"running": "Получает список рабочих областей"
+		},
+		"notify-orchestrator": {
+			"done": "Уведомил оркестратора",
+			"running": "Уведомляет оркестратора"
+		},
+		"open-tab": {
+			"done": "Открыл вкладку",
+			"running": "Открывает вкладку"
+		},
+		"read-conversation": {
+			"done": "Прочитал транскрипт суб-агента",
+			"running": "Читает транскрипт суб-агента"
+		},
+		"read-terminal-output": {
+			"done": "Прочитал вывод терминала",
+			"running": "Читает вывод терминала"
+		},
+		"resolve-diff-comments": {
+			"done": "Закрыл комментарии к ревью",
+			"running": "Закрывает комментарии к ревью"
+		},
+		"send-follow-up": {
+			"done": "Направил суб-агента",
+			"running": "Направляет суб-агента"
+		},
+		"set-workspace-status": {
+			"done": "Переместил рабочую область",
+			"running": "Перемещает рабочую область"
+		},
+		"spawn-chat-tab": {
+			"done": "Открыл вкладку чата",
+			"running": "Открывает вкладку чата"
+		},
+		"start-conversation": {
+			"done": "Запустил суб-агента",
+			"running": "Запускает суб-агента"
+		},
+		"start-terminal": {
+			"done": "Запустил терминал",
+			"running": "Запускает терминал"
+		},
+		"stop-terminal": {
+			"done": "Остановил терминал",
+			"running": "Останавливает терминал"
+		},
+		"wait-for-agents": {
+			"done": "Дождался суб-агентов",
+			"running": "Ожидает суб-агентов"
+		},
+		"with-detail": "{{action}}: {{detail}}",
+		"write-terminal": {
+			"done": "Ввёл текст в терминал",
+			"running": "Вводит текст в терминал"
+		}
+	},
+	"create-workspace-source": {
+		"description": "Выберите ветку, pull request или задачу, чтобы создать рабочую область.",
+		"loading": "Загружаются {{sources}}…",
+		"no-match": "По запросу не найдены {{sources}}.",
+		"repository": {
+			"empty": "Репозитории не найдены.",
+			"search": "Поиск репозиториев…",
+			"select": "Выберите репозиторий"
+		},
+		"search": {
+			"branch": "Поиск по имени",
+			"issue": "Поиск по номеру, названию или описанию задачи",
+			"pull-request": "Поиск по названию, номеру или автору"
+		},
+		"title": "Создать рабочую область из источника"
+	},
+	"dashboard": {
+		"card": {
+			"pull-request-aria": "Pull request #{{number}} {{state}}",
+			"state": {
+				"branch": "ветка",
+				"pr-blocked": "заблокирован",
+				"pr-checking": "проверки выполняются",
+				"pr-merged": "выполнен merge",
+				"pr-open": "открыт",
+				"pr-ready": "готов к merge",
+				"pr-working": "агент работает",
+				"workspace-blocked": "рабочая область заблокирована",
+				"workspace-checking": "проверки рабочей области выполняются",
+				"workspace-working": "агент работает"
+			}
+		},
+		"column": {
+			"aria-label": "Колонка {{status}}, {{workspaces}}"
+		},
+		"title": "Доска"
+	},
+	"delete-repository": {
+		"description": "Репозиторий и {{workspaces}} безвозвратно удаляются из Ensemblr. У каждой рабочей области удаляются каталог worktree и локальная ветка. Папка репозитория остаётся на диске, чтобы его можно было зарегистрировать заново. Отменить это действие нельзя.",
+		"title": "Удалить репозиторий?"
+	},
+	"delete-workspace": {
+		"description": "Безвозвратно удаляет каталог worktree, локальную ветку и саму рабочую область из Ensemblr. Всё, что не отправлено в remote, будет потеряно. Отменить это действие нельзя.",
+		"title": "Удалить рабочую область?"
+	},
+	"diff-comment": {
+		"author": {
+			"agent": "Агент"
+		}
+	},
+	"dock-panel": {
+		"close-tab": "Закрыть вкладку {{label}}",
+		"collapse": "Свернуть область терминала",
+		"expand": "Развернуть область терминала",
+		"new-terminal": "Новый терминал"
+	},
+	"dock-tab": {
+		"run": {
+			"label": "Запуск"
+		},
+		"setup": {
+			"label": "Настройка"
+		}
+	},
+	"file-preview": {
+		"actions": {
+			"show-preview": "Показать форматированный предпросмотр",
+			"show-source": "Показать исходный текст",
+			"wrap-off": "Выключить перенос строк",
+			"wrap-on": "Включить перенос строк"
+		},
+		"empty": {
+			"loading": "Загрузка {{filePath}}…",
+			"no-file": "С этой вкладкой не связан ни один файл."
+		},
+		"failure": {
+			"invalid-cwd": "Каталог рабочей области недоступен.",
+			"invalid-path": "{{filePath}} находится за пределами этой рабочей области.",
+			"not-file": "{{filePath}} — это каталог, предпросмотр невозможен.",
+			"not-found": "{{filePath}} не существует в этой рабочей области.",
+			"too-large": "{{filePath}} слишком велик для предпросмотра.",
+			"unreadable": "Не удалось прочитать {{filePath}}."
+		},
+		"image-alt": "Предпросмотр {{filePath}}"
+	},
+	"file-tree": {
+		"collapse-folder": "Свернуть {{path}}",
+		"expand-folder": "Развернуть {{path}}"
+	},
+	"file-tree-menu": {
+		"actions": "Действия для {{path}}"
+	},
+	"git-failure": {
+		"invalid-cwd": {
+			"message": "Не удалось открыть папку, на которую указывает рабочая область. Возможно, её переместили, переименовали или удалили после создания рабочей области.",
+			"title": "Папка рабочей области недоступна"
+		},
+		"merge-probe": {
+			"title": "Не удалось проверить конфликты merge"
+		},
+		"not-a-repo": {
+			"message": "Эта папка не отслеживается git, поэтому сравнивать не с чем. Инициализируйте здесь репозиторий или пересоздайте рабочую область из клонированного.",
+			"title": "Не репозиторий git"
+		},
+		"unknown": {
+			"message": "Git не смог сообщить об изменениях в этой рабочей области.",
+			"title": "Не удалось прочитать изменения"
+		}
+	},
+	"harness-launcher": {
+		"none-detected": "Харнессы не обнаружены",
+		"none-installed": "Кодинг-агенты не обнаружены",
+		"trigger": "Запустить кодинг-агента"
+	},
+	"header": {
+		"review-sidebar": {
+			"collapse": "Свернуть панель ревью",
+			"open": "Открыть панель ревью"
+		},
+		"target-branch": {
+			"placeholder": "Указать целевую ветку",
+			"search": "Найдите или введите ветку…",
+			"tooltip": "Целевая ветка — с ней рабочая область сравнивает изменения и в неё открывает pull request."
+		}
+	},
+	"health": {
+		"checking": {
+			"detail": "Renderer вызывает типизированный мост preload через TanStack Query.",
+			"label": "Проверка IPC"
+		},
+		"config-blocked": {
+			"detail": "Декларативная конфигурация блокирует готовность.",
+			"label": "Конфигурация {{appName}} требует внимания"
+		},
+		"database-error": {
+			"detail": "Не удалось открыть базу данных.",
+			"label": "База данных {{appName}} недоступна"
+		},
+		"no-bridge": {
+			"detail": "Мост preload Electron недоступен в этом контексте."
+		},
+		"online": {
+			"detail": "Electron {{electronVersion}} на {{platform}}. Схема базы данных v{{schemaVersion}}.",
+			"label": "IPC {{appName}} на связи"
+		},
+		"setup-blocked": {
+			"detail_one": "{{count}} обязательная проверка настройки требует внимания.",
+			"detail_few": "{{count}} обязательные проверки настройки требуют внимания.",
+			"detail_many": "{{count}} обязательных проверок настройки требуют внимания.",
+			"detail_other": "{{count}} обязательной проверки настройки требует внимания.",
+			"label": "Настройка заблокирована"
+		},
+		"setup-checking": {
+			"label": "Проверки настройки в ожидании"
+		},
+		"setup-error": {
+			"label": "Диагностика настройки недоступна"
+		},
+		"setup-loading": {
+			"detail": "Ensemblr собирает проверки готовности настройки.",
+			"label": "Проверка настройки"
+		},
+		"unavailable": {
+			"label": "IPC недоступен"
+		}
+	},
+	"history": {
+		"bucket": {
+			"today": "Сегодня",
+			"unknown": "Неизвестно",
+			"yesterday": "Вчера"
+		},
+		"empty": {
+			"failed": "Не удалось загрузить историю рабочих областей.",
+			"loading": "Загрузка рабочих областей…",
+			"no-match": "По фильтру рабочие области не найдены.",
+			"none": "Рабочих областей пока нет.",
+			"unavailable": "Мост preload недоступен в этом контексте."
+		},
+		"filter": {
+			"label": "Фильтр рабочих областей",
+			"placeholder": "Фильтр рабочих областей…"
+		},
+		"row": {
+			"go-to": "Перейти",
+			"restore-blocked": "Восстановление невозможно: не записана базовая ветка или имя ветки."
+		}
+	},
+	"landing-card": {
+		"aria-label": "Сводка новой рабочей области",
+		"branch": {
+			"plain": "На ветке <ref>{{branchName}}</ref>",
+			"with-base": "На ветке <ref>{{branchName}}</ref>, сравнение с <ref>{{baseBranch}}</ref>"
+		},
+		"created": {
+			"copied_one": "Создана рабочая область {{workspaceName}}, скопирован {{count}} файл",
+			"copied_few": "Создана рабочая область {{workspaceName}}, скопировано {{count}} файла",
+			"copied_many": "Создана рабочая область {{workspaceName}}, скопировано {{count}} файлов",
+			"copied_other": "Создана рабочая область {{workspaceName}}, скопировано {{count}} файла",
+			"detail": "Создана рабочая область {{workspaceName}}. {{detail}}"
+		},
+		"headline": "Вы в новой копии <repo>{{repositoryName}}</repo> под названием <workspace>{{workspaceName}}</workspace>"
+	},
+	"lifecycle-dialog": {
+		"summary": {
+			"branch": "Ветка",
+			"path": "Путь",
+			"repository": "Репозиторий",
+			"workspace": "Рабочая область"
+		}
+	},
+	"mcp-servers": {
+		"aria-label": "Серверы MCP",
+		"authorise": "Авторизовать {{name}}",
+		"empty": "Серверы MCP не настроены.",
+		"heading": "MCP",
+		"loading": "Чтение списка MCP…",
+		"refresh": "Обновить серверы MCP",
+		"status": {
+			"disabled": "Отключён",
+			"failed": "Ошибка",
+			"needs-auth": "Нужна авторизация",
+			"pending": "Ожидание статуса"
+		}
+	},
+	"model-picker": {
+		"all-hidden": "Все модели скрыты — настройте в «Настройки → Модели».",
+		"aria-label": "Модель",
+		"favourite": "В избранное",
+		"group": {
+			"favourites": "Избранные"
+		},
+		"locked-hint": "Этот чат работает на {{provider}}. Начните новый чат, чтобы сменить провайдера.",
+		"pending": "Модель ожидается",
+		"tooltip": "Сменить модель",
+		"unfavourite": "Убрать из избранного",
+		"unselected": "Выбрать модель"
+	},
+	"navigation-sidebar": {
+		"footer": {
+			"repositories_one": "{{count}} репозиторий",
+			"repositories_few": "{{count}} репозитория",
+			"repositories_many": "{{count}} репозиториев",
+			"repositories_other": "{{count}} репозитория",
+			"workspaces_one": "{{count}} рабочая область",
+			"workspaces_few": "{{count}} рабочие области",
+			"workspaces_many": "{{count}} рабочих областей",
+			"workspaces_other": "{{count}} рабочей области"
+		},
+		"nav": {
+			"dashboard": "Доска",
+			"history": "История",
+			"settings": "Настройки",
+			"settings-aria": "Открыть настройки приложения"
+		},
+		"pinned": {
+			"label": "Закреплённые"
+		},
+		"repositories": {
+			"label": "Репозитории"
+		},
+		"repository": {
+			"reorder": "Переставить репозиторий {{repository}}"
+		},
+		"setup": {
+			"blocked_one": "{{count}} проверка настройки заблокирована — откройте диагностику",
+			"blocked_few": "{{count}} проверки настройки заблокированы — откройте диагностику",
+			"blocked_many": "{{count}} проверок настройки заблокировано — откройте диагностику",
+			"blocked_other": "{{count}} проверки настройки заблокировано — откройте диагностику",
+			"checking": "Проверки настройки выполняются…",
+			"not-ready": "Настройка не готова — откройте диагностику"
+		}
+	},
+	"new-chat": {
+		"aria-label": "Пустое состояние нового чата",
+		"headline": "Новый чат в <path>/{{workspaceName}}</path>.",
+		"transcripts-label": "Добавить транскрипты чатов:",
+		"untitled-transcript": "Транскрипт без названия"
+	},
+	"open-in": {
+		"copy-path": "Копировать путь",
+		"label": "Открыть в"
+	},
+	"open-workspace-menu": {
+		"options": "Варианты приложений для текущей рабочей области",
+		"primary": "Открыть текущую рабочую область в {{target}}"
+	},
+	"permission-boundary": {
+		"allowed": "Разрешено",
+		"blocked": "Заблокировано",
+		"confirmation-required": "Требуется подтверждение"
+	},
+	"pi-replay": {
+		"summary": {
+			"file": "файл",
+			"shell-command": "команда оболочки"
+		}
+	},
+	"placeholder": {
+		"dashboard": {
+			"detail": "Канбан-доска ещё не подключена.",
+			"title": "Доска"
+		},
+		"history": {
+			"detail": "История сессий ещё не подключена.",
+			"title": "История"
+		},
+		"linear": {
+			"detail": "Задачи Linear доступны в разделе Linear.",
+			"title": "Linear"
+		},
+		"settings": {
+			"detail": "Настройки доступны в разделе настроек.",
+			"title": "Настройки"
+		},
+		"setup": {
+			"detail": "Пройдите проверки настройки, прежде чем создавать или открывать рабочие области.",
+			"title": "Требуется настройка"
+		}
+	},
+	"plan-mode": {
+		"aria-label-off": "Режим плана: выключен. Нажмите, чтобы переключить.",
+		"aria-label-on": "Режим плана: включён. Нажмите, чтобы переключить.",
+		"chip": "План",
+		"tooltip-off": "Спланировать перед правками",
+		"tooltip-on": "Выйти из режима плана"
+	},
+	"plan-review": {
+		"actions": {
+			"hand-off": "Передать в работу",
+			"refine": "Доработать"
+		},
+		"aria-label": "Просмотр плана"
+	},
+	"preview": {
+		"choose-url": "Выбрать URL предпросмотра",
+		"open-named": "Открыть {{name}}",
+		"open-port": "Открыть предпросмотр на порту {{port}}",
+		"open-port-label": "Открыть :{{port}}"
+	},
+	"preview-deployment": {
+		"label": "Превью"
+	},
+	"preview-url": {
+		"fallback": {
+			"name": "Предпросмотр {{index}}"
+		}
+	},
+	"project-avatar": {
+		"alt": "Аватар {{owner}}"
+	},
+	"project-creation-menu": {
+		"recents": "Недавние",
+		"trigger": "Открыть меню создания репозитория"
+	},
+	"provider": {
+		"local": "Локальный",
+		"preview": "Превью"
+	},
+	"raw-frames": {
+		"aria-label": "Панель отладки сырых кадров Pi",
+		"clear": "Очистить кадры",
+		"close": "Закрыть панель отладки",
+		"copied-aria": "Кадр скопирован в буфер обмена",
+		"copied-title": "Скопировано",
+		"copy-aria": "Копировать кадр",
+		"copy-title": "Копировать кадр (подписи — по текущему переключателю)",
+		"count-title": "видимых / всего захвачено",
+		"heading": "Сырые кадры Pi",
+		"hide-session-stats": "скрыть session_stats",
+		"hide-signatures": "скрыть подписи",
+		"kind-label": "тип:",
+		"kind-other": "другое",
+		"noise-label": "шум:",
+		"session-scope": "Переключить область сессии",
+		"this-session": "эта сессия",
+		"waiting": "Ожидание трафика Pi…"
+	},
+	"rename-workspace": {
+		"branch": {
+			"hint": "Повторяет slug имени рабочей области, пока вы не измените его вручную.",
+			"label": "Имя ветки",
+			"pinned-hint": "Эта ветка досталась рабочей области от существующей ветки или pull request, поэтому переименование здесь оставило бы ту работу без ветки."
+		},
+		"description": "Обновляет имя рабочей области. Ветка переименовывается автоматически по slug имени, если ниже не задать своё. Папка worktree остаётся на месте.",
+		"description-pinned": "Обновляет имя рабочей области. Эта рабочая область переняла существующую ветку, поэтому ветка сохраняет своё имя. Папка worktree остаётся на месте.",
+		"name": {
+			"label": "Имя рабочей области"
+		},
+		"title": "Переименовать рабочую область"
+	},
+	"repository-header": {
+		"collapse": "Свернуть репозиторий {{repository}}",
+		"create-from-source": "Создать рабочую область из источника в {{repository}}",
+		"create-workspace": "Создать рабочую область в {{repository}}",
+		"creating-workspace": "Создаётся рабочая область в {{repository}}",
+		"expand": "Развернуть репозиторий {{repository}}",
+		"settings": "Настройки репозитория {{repository}}"
+	},
+	"repository-menu": {
+		"archive": "Архивировать репозиторий",
+		"aria-label": "Действия с репозиторием {{repository}}",
+		"create-from": "Создать из…",
+		"delete": "Удалить репозиторий…",
+		"new-workspace": "Новая рабочая область",
+		"settings": "Настройки репозитория",
+		"workspace-archive": "Архив рабочих областей"
+	},
+	"restore-checkpoint": {
+		"confirm": "Восстановить рабочую область",
+		"description": "Файлы рабочей области возвращаются к снимку, сделанному до «{{label}}». Последующие сообщения в этом чате скрываются из таймлайна, но собственная история сессии агента не меняется — можно продолжать работу из восстановленного состояния.",
+		"other-sessions": "В этой рабочей области активна другая сессия чата; её более свежие изменения файлов могут быть перезаписаны при восстановлении.",
+		"title": "Восстановить рабочую область до этого хода?",
+		"untracked": "Файлы, созданные после снимка и не попавшие под отслеживание, остаются на месте."
+	},
+	"run-script": {
+		"choose": "Выбрать скрипт запуска",
+		"configure-action": "Настроить скрипты",
+		"empty": {
+			"detail": "Добавьте скрипт запуска для dev-сервера, watcher, worker или локальной команды приложения.",
+			"title": "Скрипт запуска не настроен"
+		},
+		"run-label": "Запустить {{script}}",
+		"start": "Запустить",
+		"stop-label": "Остановить скрипт запуска",
+		"stopped-caption": "Проверяйте здесь свои изменения."
+	},
+	"session-tab": {
+		"placeholder": {
+			"label": "Рабочая область",
+			"summary": "Заглушка сессии рабочей области.",
+			"updated": "загружено"
+		},
+		"snapshot": {
+			"summary": "Запись рабочей области из SQLite загружена. Сессии агента ещё не подключены."
+		}
+	},
+	"session-tabs": {
+		"close-tab": "Закрыть вкладку {{label}}",
+		"debug": {
+			"hide": "Скрыть панель отладки Pi",
+			"show": "Показать панель отладки Pi",
+			"title": "Сырые кадры Pi (отладка)",
+			"toggle": "Переключить панель отладки Pi"
+		},
+		"new-tab": "Новая вкладка чата"
+	},
+	"setup-script": {
+		"add-manually": "Добавить вручную",
+		"ask-agent": "Спросить агента",
+		"missing": {
+			"message": "Выполняйте команды при создании рабочей области, чтобы установить зависимости или подготовить окружение",
+			"title": "Добавить скрипт настройки"
+		},
+		"not-run": {
+			"message": "Вывод скрипта настройки появится здесь после запуска настройки.",
+			"title": "Нет вывода скрипта настройки"
+		},
+		"rerun": "Перезапустить настройку",
+		"run": "Запустить настройку",
+		"stop": "Остановить настройку"
+	},
+	"shell-title": {
+		"build-image": "Сборка образа",
+		"build-project": "Сборка проекта",
+		"change-directory": "Смена каталога",
+		"change-permissions": "Изменение прав доступа",
+		"check-code": "Проверка кода",
+		"check-directory": "Проверка каталога",
+		"check-disk-usage": "Проверка места на диске",
+		"check-git-status": "Проверка статуса git",
+		"commit-changes": "Коммит изменений",
+		"compare-files": "Сравнение файлов",
+		"copy-files": "Копирование файлов",
+		"count-lines": "Подсчёт строк",
+		"create-directory": "Создание каталога",
+		"create-file": "Создание файла",
+		"fetch-remote": "Fetch из remote",
+		"fetch-url": "Запрос по URL",
+		"inspect-processes": "Просмотр процессов",
+		"install-dependencies": "Установка зависимостей",
+		"list-branches": "Список веток",
+		"list-files": "Список файлов",
+		"locate-binary": "Поиск бинарника",
+		"merge-branches": "Merge веток",
+		"move-files": "Перемещение файлов",
+		"open-file": "Открытие файла",
+		"print-output": "Вывод текста",
+		"pull-changes": "Pull изменений",
+		"push-changes": "Push изменений",
+		"read-commit": "Чтение коммита",
+		"read-file": "Чтение файла",
+		"read-git-history": "Чтение истории git",
+		"rebase-branch": "Rebase ветки",
+		"remove-files": "Удаление файлов",
+		"review-changes": "Просмотр изменений",
+		"run-container": "Запуск контейнера",
+		"run-named": "Запуск {{name}}",
+		"run-script": "Запуск скрипта",
+		"run-tests": "Запуск тестов",
+		"search-files": "Поиск по файлам",
+		"stage-changes": "Индексация изменений",
+		"start-dev-server": "Запуск dev-сервера",
+		"stash-changes": "Stash изменений",
+		"stop-process": "Остановка процесса",
+		"switch-branches": "Переключение веток",
+		"transform-text": "Преобразование текста",
+		"type-check": "Проверка типов",
+		"waiting": "Ожидание"
+	},
+	"sidebar-header": {
+		"agent": {
+			"working": "Работает..."
+		},
+		"pr": {
+			"merged": "Выполнен merge",
+			"ready": "Готово к merge"
+		}
+	},
+	"sub-agent-status": {
+		"aria-label": "Среда выполнения суб-агента"
+	},
+	"terminal": {
+		"session-ended": "Сессия завершена.",
+		"session-failed": "Сессия завершилась с ошибкой.",
+		"session-stopped": "Сессия остановлена."
+	},
+	"thinking-picker": {
+		"aria-label-effort": "Уровень усилий: {{level}}. Нажмите для переключения.",
+		"aria-label-thinking": "Уровень размышления: {{level}}. Нажмите для переключения.",
+		"icon-title": "Уровень размышления",
+		"off": "Выключено",
+		"pending-effort": "Усилия ожидаются",
+		"pending-thinking": "Размышление ожидается",
+		"tooltip-effort": "Настроить уровень усилий",
+		"tooltip-thinking": "Настроить уровень размышления"
+	},
+	"timeline": {
+		"aria-label": "Таймлайн сессии агента",
+		"load-failed": "Не удалось загрузить события таймлайна.",
+		"runtime-error": "Ошибка выполнения",
+		"starting": {
+			"agent": "Запуск агента",
+			"loading": "Загрузка диалога"
+		},
+		"turn-stopped": "Вы остановили этот ход"
+	},
+	"tool-call": {
+		"bash": {
+			"title": "Bash"
+		},
+		"diagnostics": {
+			"clean": "Диагностика",
+			"count_one": "{{count}} диагностика",
+			"count_few": "{{count}} диагностики",
+			"count_many": "{{count}} диагностик",
+			"count_other": "{{count}} диагностики",
+			"none": "Нет диагностики"
+		},
+		"edit": {
+			"title": "Правка"
+		},
+		"failed": {
+			"generic": "Не удалось выполнить инструмент.",
+			"title": "{{tool}}: ошибка",
+			"unspecified": "Вызов завершился ошибкой без указания причины."
+		},
+		"generic": {
+			"input-label": "Ввод:",
+			"output-label": "Вывод:",
+			"title": "Инструмент"
+		},
+		"glob": {
+			"title": "Glob"
+		},
+		"grep": {
+			"title": "Поиск"
+		},
+		"list": {
+			"title": "Список"
+		},
+		"placeholder": {
+			"empty-pattern": "(пусто)",
+			"no-command": "(нет команды)",
+			"no-path": "(нет пути)"
+		},
+		"read": {
+			"image": "Прочитано изображение",
+			"lines_one": "Прочитана {{count}} строка",
+			"lines_few": "Прочитано {{count}} строки",
+			"lines_many": "Прочитано {{count}} строк",
+			"lines_other": "Прочитано {{count}} строки",
+			"title": "Чтение"
+		},
+		"reasoning": {
+			"title": "Размышление"
+		},
+		"skill": {
+			"named": "Скилл: {{name}}",
+			"title": "Навык"
+		},
+		"write": {
+			"title": "Запись"
+		}
+	},
+	"turn-diff": {
+		"empty": {
+			"failed": "Не удалось вычислить diff.",
+			"loading": "Вычисление diff хода…",
+			"no-changes": "В этом ходе нет изменений файлов.",
+			"no-turn": "С этой вкладкой не связан ни один ход."
+		},
+		"file-count_one": "{{count}} файл",
+		"file-count_few": "{{count}} файла",
+		"file-count_many": "{{count}} файлов",
+		"file-count_other": "{{count}} файла"
+	},
+	"workspace-checks": {
+		"blocked": {
+			"detail": "Проверки не проходят.",
+			"label": "Проверки не пройдены"
+		},
+		"checking": {
+			"detail": "Проверки выполняются.",
+			"label": "Проверки идут"
+		},
+		"closed": {
+			"detail": "Pull request закрыт.",
+			"label": "Закрыт"
+		},
+		"creating": {
+			"detail": "Рабочая область ещё создаётся.",
+			"label": "Создаётся"
+		},
+		"merged": {
+			"detail": "Pull request влит.",
+			"label": "Выполнен merge"
+		},
+		"none": {
+			"detail": "Проверок не зарегистрировано.",
+			"label": "Нет проверок"
+		}
+	},
+	"workspace-item": {
+		"archive-aria": "Архивировать рабочую область {{workspace}}; {{boundary}}",
+		"creating": "Создание рабочей области…",
+		"creating-aria": "Рабочая область {{workspace}} создаётся",
+		"creating-tooltip": "{{workspace}} создаётся",
+		"dock-activity": "В доке идёт активность",
+		"open-aria": "Открыть рабочую область {{workspace}}",
+		"open-busy-aria": "Открыть рабочую область {{workspace}}; в доке идёт активность"
+	},
+	"workspace-landing": {
+		"branch-source": {
+			"base": "Изменения сравниваются с {{branch}}.",
+			"default": "Изменения сравниваются с веткой репозитория по умолчанию."
+		},
+		"copied-files": {
+			"detail_one": "В рабочую область скопирован {{count}} файл.",
+			"detail_few": "В рабочую область скопировано {{count}} файла.",
+			"detail_many": "В рабочую область скопировано {{count}} файлов.",
+			"detail_other": "В рабочую область скопировано {{count}} файла.",
+			"unavailable": "Количество файлов рабочей области недоступно."
+		},
+		"headline": {
+			"cloned-repo": "Репозиторий клонирован",
+			"linked-issue": "Рабочая область создана из {{reference}}",
+			"new": "Новая рабочая область готова"
+		},
+		"setup-guidance": {
+			"missing": "Для этого репозитория не настроен скрипт настройки. Добавьте его, чтобы установить зависимости до первого хода агента."
+		}
+	},
+	"workspace-menu": {
+		"aria-label": "Действия с рабочей областью {{workspace}}",
+		"mark-read": "Отметить как прочитанное",
+		"mark-unread": "Отметить как непрочитанное",
+		"set-status": "Задать статус"
+	},
+	"workspace-pull-request": {
+		"absent": {
+			"detail": "Для этой ветки ещё нет pull request.",
+			"label": "Нет PR"
+		},
+		"clean": {
+			"label": "PR не открыт"
+		},
+		"present": {
+			"detail": "Статус pull request из последней синхронизации с GitHub."
+		}
+	},
+	"workspace-rename": {
+		"succeeded": "Переименовано в {{name}} на ветке {{branch}}."
+	},
+	"workspace-source": {
+		"creating": "создаётся рабочая область",
+		"default-branch": "ветка репозитория по умолчанию {{branch}}",
+		"fallback": "рабочая область загружена из SQLite",
+		"targets": "цель — {{branch}}"
+	},
+	"workspace-source-picker": {
+		"action": {
+			"duplicate-branch": "Дублировать ветку",
+			"use-branch": "Использовать ветку"
+		},
+		"kind": {
+			"branch": "Ветки",
+			"issue": "Задачи",
+			"pull-request": "Pull requests"
+		}
+	}
+}

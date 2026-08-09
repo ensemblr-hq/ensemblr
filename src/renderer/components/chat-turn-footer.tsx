@@ -5,6 +5,7 @@ import {
 	SplitIcon,
 	SquarePlusIcon,
 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import {
 	DropdownMenu,
 	DropdownMenuContent,
@@ -43,6 +44,7 @@ export function ChatTurnFooter({
 	/** Opens the diff between this turn's checkpoint and the post-turn state. */
 	onViewTurnDiff?: () => void;
 }) {
+	const { t } = useTranslation();
 	const hasForkActions = Boolean(
 		onForkToNewTab ||
 			onForkToNewWorkspace ||
@@ -65,7 +67,7 @@ export function ChatTurnFooter({
 				<DropdownMenu>
 					<DropdownMenuTrigger asChild>
 						<button
-							aria-label='Turn actions'
+							aria-label={t('common:turn-footer.actions', 'Turn actions')}
 							className='rounded-md p-1 text-muted-foreground opacity-70 transition-[color,background-color,opacity] hover:bg-secondary/60 hover:text-foreground hover:opacity-100 data-[state=open]:bg-secondary/60 data-[state=open]:text-foreground data-[state=open]:opacity-100'
 							disabled={forkDisabled}
 							type='button'
@@ -83,7 +85,7 @@ export function ChatTurnFooter({
 								onSelect={() => onForkToNewTab()}
 							>
 								<SquarePlusIcon aria-hidden='true' className='size-4' />
-								Fork to new tab
+								{t('common:turn-footer.fork-tab', 'Fork to new tab')}
 							</DropdownMenuItem>
 						) : null}
 						{onForkToNewWorkspace ? (
@@ -93,7 +95,10 @@ export function ChatTurnFooter({
 								onSelect={() => onForkToNewWorkspace()}
 							>
 								<SplitIcon aria-hidden='true' className='size-4' />
-								Fork to new workspace
+								{t(
+									'common:turn-footer.fork-workspace',
+									'Fork to new workspace',
+								)}
 							</DropdownMenuItem>
 						) : null}
 						{onViewTurnDiff ? (
@@ -102,7 +107,7 @@ export function ChatTurnFooter({
 								onSelect={() => onViewTurnDiff()}
 							>
 								<FileDiffIcon aria-hidden='true' className='size-4' />
-								View turn diff
+								{t('common:turn-footer.view-diff', 'View turn diff')}
 							</DropdownMenuItem>
 						) : null}
 						{onRestoreToCheckpoint ? (
@@ -111,7 +116,10 @@ export function ChatTurnFooter({
 								onSelect={() => onRestoreToCheckpoint()}
 							>
 								<HistoryIcon aria-hidden='true' className='size-4' />
-								Restore to before this turn…
+								{t(
+									'common:turn-footer.restore-checkpoint',
+									'Restore to before this turn…',
+								)}
 							</DropdownMenuItem>
 						) : null}
 					</DropdownMenuContent>

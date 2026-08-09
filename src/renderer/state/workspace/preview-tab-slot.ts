@@ -1,5 +1,6 @@
 import { type QueryClient, useMutation } from '@tanstack/react-query';
 import { useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 
 import {
@@ -28,13 +29,17 @@ export function usePreviewTabSlot({
 	sessionTabs: readonly SessionTabModel[];
 	workspaceId: string;
 }): { pinSessionTab: (chatTabId: string) => void } {
+	const { t } = useTranslation();
 	const pinChatTabMutation = useMutation({
 		mutationFn: (chatTabId: string) => pinChatTab({ chatTabId }),
 		onError: (error) => {
 			invalidateChatTabs();
-			toast.error('Could not keep tab open', {
-				description: error instanceof Error ? error.message : undefined,
-			});
+			toast.error(
+				t('errors:chat-tab.pin-failed.title', 'Could not keep tab open'),
+				{
+					description: error instanceof Error ? error.message : undefined,
+				},
+			);
 		},
 		onSuccess: (result) => {
 			if (result.tab) {

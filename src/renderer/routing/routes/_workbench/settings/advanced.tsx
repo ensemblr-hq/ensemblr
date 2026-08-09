@@ -1,4 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router';
+import { useTranslation } from 'react-i18next';
 
 import { PiExecutableRow } from '@/renderer/components/settings/advanced/pi-executable-row';
 import { RootDirectoryRow } from '@/renderer/components/settings/advanced/root-directory-row';
@@ -12,10 +13,15 @@ export const Route = createFileRoute('/_workbench/settings/advanced')({
 
 /** Advanced settings panel for the Ensemblr root directory, a custom Pi executable override, and the terminal scrollback limit. */
 function AdvancedSettings() {
+	const { t } = useTranslation();
+
 	return (
 		<SettingsSection
-			description='Root directory, Pi executable override, and terminal-scrollback limits.'
-			title='Advanced'
+			description={t(
+				'settings:advanced.description',
+				'Root directory, Pi executable override, and terminal-scrollback limits.',
+			)}
+			title={t('settings:advanced.title', 'Advanced')}
 		>
 			<RootDirectoryRow />
 			<PiExecutableRow />

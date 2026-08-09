@@ -1,3 +1,4 @@
+import { i18n } from '@/renderer/lib/i18n';
 import type { WorkbenchHealth } from '@/renderer/types/workbench-shell';
 import type { HealthSnapshot } from '@/shared/ipc/contracts/health';
 import type { SetupDiagnosticsSnapshot } from '@/shared/ipc/contracts/setup';
@@ -23,8 +24,11 @@ export function getWorkbenchHealth({
 }): WorkbenchHealth {
 	if (!hasPreloadBridge) {
 		return {
-			detail: 'Electron preload bridge is unavailable in this context.',
-			label: 'IPC unavailable',
+			detail: i18n.t(
+				'workbench:health.no-bridge.detail',
+				'Electron preload bridge is unavailable in this context.',
+			),
+			label: i18n.t('workbench:health.unavailable.label', 'IPC unavailable'),
 			state: 'unavailable',
 		};
 	}
@@ -40,15 +44,17 @@ export function getWorkbenchHealth({
 	if (healthError) {
 		return {
 			detail: healthError,
-			label: 'IPC unavailable',
+			label: i18n.t('workbench:health.unavailable.label', 'IPC unavailable'),
 			state: 'unavailable',
 		};
 	}
 
 	return {
-		detail:
+		detail: i18n.t(
+			'workbench:health.checking.detail',
 			'Renderer is calling the typed preload bridge through TanStack Query.',
-		label: 'Checking IPC',
+		),
+		label: i18n.t('workbench:health.checking.label', 'Checking IPC'),
 		state: 'pending',
 	};
 }
@@ -72,8 +78,17 @@ function resolveReachableHealth({
 }): WorkbenchHealth {
 	if (healthSnapshot.database.status === 'error') {
 		return {
-			detail: healthSnapshot.database.error ?? 'Database failed to open.',
-			label: `${healthSnapshot.appName} database unavailable`,
+			detail:
+				healthSnapshot.database.error ??
+				i18n.t(
+					'workbench:health.database-error.detail',
+					'Database failed to open.',
+				),
+			label: i18n.t(
+				'workbench:health.database-error.label',
+				'{{appName}} database unavailable',
+				{ appName: healthSnapshot.appName },
+			),
 			state: 'unavailable',
 		};
 	}
@@ -82,8 +97,15 @@ function resolveReachableHealth({
 		return {
 			detail:
 				healthSnapshot.config.diagnostics[0]?.message ??
-				'Declarative config blocks readiness.',
-			label: `${healthSnapshot.appName} config requires attention`,
+				i18n.t(
+					'workbench:health.config-blocked.detail',
+					'Declarative config blocks readiness.',
+				),
+			label: i18n.t(
+				'workbench:health.config-blocked.label',
+				'{{appName}} config requires attention',
+				{ appName: healthSnapshot.appName },
+			),
 			state: 'unavailable',
 		};
 	}
@@ -91,33 +113,56 @@ function resolveReachableHealth({
 	if (setupError) {
 		return {
 			detail: setupError,
-			label: 'Setup diagnostics unavailable',
+			label: i18n.t(
+				'workbench:health.setup-error.label',
+				'Setup diagnostics unavailable',
+			),
 			state: 'unavailable',
 		};
 	}
 
 	if (!setupSnapshot) {
 		return {
-			detail: 'Ensemblr is collecting setup readiness checks.',
-			label: 'Checking setup',
+			detail: i18n.t(
+				'workbench:health.setup-loading.detail',
+				'Ensemblr is collecting setup readiness checks.',
+			),
+			label: i18n.t('workbench:health.setup-loading.label', 'Checking setup'),
 			state: 'pending',
 		};
 	}
 
 	if (setupSnapshot.status !== 'ready') {
 		return {
-			detail: `${setupSnapshot.blockedCount} required setup checks need attention.`,
+			detail: i18n.t('workbench:health.setup-blocked.detail', {
+				count: setupSnapshot.blockedCount,
+				defaultValue_one: '{{count}} required setup check needs attention.',
+				defaultValue_other: '{{count}} required setup checks need attention.',
+			}),
 			label:
 				setupSnapshot.status === 'checking'
-					? 'Setup checks pending'
-					: 'Setup blocked',
+					? i18n.t(
+							'workbench:health.setup-checking.label',
+							'Setup checks pending',
+						)
+					: i18n.t('workbench:health.setup-blocked.label', 'Setup blocked'),
 			state: setupSnapshot.status === 'checking' ? 'pending' : 'unavailable',
 		};
 	}
 
 	return {
-		detail: `Electron ${healthSnapshot.versions.electron} on ${healthSnapshot.platform}. Database schema v${healthSnapshot.database.schemaVersion}.`,
-		label: `${healthSnapshot.appName} IPC online`,
+		detail: i18n.t(
+			'workbench:health.online.detail',
+			'Electron {{electronVersion}} on {{platform}}. Database schema v{{schemaVersion}}.',
+			{
+				electronVersion: healthSnapshot.versions.electron,
+				platform: healthSnapshot.platform,
+				schemaVersion: healthSnapshot.database.schemaVersion,
+			},
+		),
+		label: i18n.t('workbench:health.online.label', '{{appName}} IPC online', {
+			appName: healthSnapshot.appName,
+		}),
 		state: 'online',
 	};
 }

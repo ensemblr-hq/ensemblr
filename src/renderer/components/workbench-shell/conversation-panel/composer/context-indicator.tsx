@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next';
+
 import { Button } from '@/renderer/components/ui/button';
 import {
 	HoverCard,
@@ -27,6 +29,7 @@ export function ContextIndicator({
 }: {
 	usage: ComposerContextUsage | null;
 }) {
+	const { t } = useTranslation();
 	const used = usage?.usedTokens ?? 0;
 	const max = usage?.maxTokens ?? 0;
 	const percent = max > 0 ? Math.min(100, (used / max) * 100) : 0;
@@ -40,7 +43,7 @@ export function ContextIndicator({
 		<HoverCard closeDelay={80} openDelay={150}>
 			<HoverCardTrigger asChild>
 				<Button
-					aria-label='Context usage'
+					aria-label={t('workbench:context-usage.aria-label', 'Context usage')}
 					className='rounded-md'
 					size='icon-sm'
 					type='button'
@@ -52,7 +55,9 @@ export function ContextIndicator({
 						role='img'
 						viewBox='0 0 36 36'
 					>
-						<title>Context usage gauge</title>
+						<title>
+							{t('workbench:context-usage.gauge-title', 'Context usage gauge')}
+						</title>
 						<circle
 							cx='18'
 							cy='18'
@@ -86,7 +91,9 @@ export function ContextIndicator({
 				sideOffset={4}
 			>
 				<div className='flex items-center justify-between gap-6'>
-					<span className='font-medium text-sm'>Context</span>
+					<span className='font-medium text-sm'>
+						{t('workbench:context-usage.heading', 'Context')}
+					</span>
 					<span className='text-muted-foreground text-xs tabular-nums'>
 						{counts}
 					</span>
@@ -95,13 +102,18 @@ export function ContextIndicator({
 					<>
 						<Progress className='h-2 bg-muted' value={percent} />
 						<div className='flex items-center justify-between gap-6 text-muted-foreground text-xs'>
-							<span>Window used</span>
+							<span>
+								{t('workbench:context-usage.window-used', 'Window used')}
+							</span>
 							<span className='tabular-nums'>{percent.toFixed(1)}%</span>
 						</div>
 					</>
 				) : (
 					<p className='text-muted-foreground text-xs'>
-						Context window unavailable for this model.
+						{t(
+							'workbench:context-usage.unavailable',
+							'Context window unavailable for this model.',
+						)}
 					</p>
 				)}
 			</HoverCardContent>

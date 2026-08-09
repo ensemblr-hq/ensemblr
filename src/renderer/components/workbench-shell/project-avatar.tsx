@@ -1,5 +1,6 @@
 import { FolderGit2Icon } from 'lucide-react';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { cn } from '@/renderer/lib/utils';
 import type { ProjectShellModel } from '@/renderer/types/workbench';
@@ -14,6 +15,7 @@ export function ProjectAvatar({
 	project: ProjectShellModel;
 	size: 'md' | 'sm';
 }) {
+	const { t } = useTranslation();
 	const [hasImageError, setHasImageError] = useState(false);
 	const avatarUrl = project.owner.avatarUrl;
 	const showImage = Boolean(avatarUrl) && !hasImageError;
@@ -30,7 +32,9 @@ export function ProjectAvatar({
 		>
 			{showImage ? (
 				<img
-					alt={`${project.owner.name} avatar`}
+					alt={t('workbench:project-avatar.alt', '{{owner}} avatar', {
+						owner: project.owner.name,
+					})}
 					className='size-full object-cover'
 					draggable={false}
 					onError={() => setHasImageError(true)}

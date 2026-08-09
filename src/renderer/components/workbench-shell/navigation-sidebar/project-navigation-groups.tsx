@@ -1,4 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 
 import { prefetchWorkspaceSources } from '@/renderer/api/ensemblr';
 import { ReorderList } from '@/renderer/components/ui/reorder-list';
@@ -57,6 +58,7 @@ export function ProjectNavigationGroups({
 		workspace: WorkspaceShellModel,
 	) => WorkbenchRouteSearch;
 }) {
+	const { t } = useTranslation();
 	const {
 		collapsedProjectIdSet,
 		orderedProjects,
@@ -100,7 +102,12 @@ export function ProjectNavigationGroups({
 		<>
 			<SidebarGroup className='gap-1 py-1.5'>
 				<SidebarGroupLabel className='h-7 justify-between pr-7'>
-					<span className='truncate'>Repositories</span>
+					<span className='truncate'>
+						{t(
+							'workbench:navigation-sidebar.repositories.label',
+							'Repositories',
+						)}
+					</span>
 				</SidebarGroupLabel>
 				<ProjectCreationMenu
 					model={addProjectMenu ?? { actions: [], recents: [] }}

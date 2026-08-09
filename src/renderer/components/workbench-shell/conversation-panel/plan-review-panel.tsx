@@ -1,4 +1,5 @@
 import { CheckIcon, PencilIcon, SplitIcon } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/renderer/components/ui/button';
 
@@ -25,14 +26,15 @@ export function PlanReviewPanel({
 	onHandoff: () => void;
 	onRefine: () => void;
 }) {
+	const { t } = useTranslation();
 	return (
 		<section
-			aria-label='Plan review'
+			aria-label={t('workbench:plan-review.aria-label', 'Plan review')}
 			className='flex items-center justify-end gap-1 border-accent-strong/25 border-b border-dashed bg-accent-strong/[0.06] px-4 py-2.5'
 		>
 			<Button disabled={busy} onClick={onApprove} size='sm' type='button'>
 				<CheckIcon />
-				Approve
+				{t('common:actions.approve', 'Approve')}
 			</Button>
 			<Button
 				disabled={busy}
@@ -42,7 +44,7 @@ export function PlanReviewPanel({
 				variant='subtle'
 			>
 				<PencilIcon />
-				Refine
+				{t('workbench:plan-review.actions.refine', 'Refine')}
 			</Button>
 			<Button
 				disabled={busy}
@@ -52,7 +54,7 @@ export function PlanReviewPanel({
 				variant='subtle'
 			>
 				<SplitIcon />
-				Hand off
+				{t('workbench:plan-review.actions.hand-off', 'Hand off')}
 			</Button>
 		</section>
 	);

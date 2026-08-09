@@ -1,5 +1,6 @@
 import { BotIcon, CheckIcon, XIcon } from 'lucide-react';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { CommentMarkdown } from '@/renderer/components/comment-markdown';
 import { Button } from '@/renderer/components/ui/button';
@@ -83,6 +84,7 @@ function DiffCommentRow({
 	onDelete: () => void;
 	onResolve: () => void;
 }) {
+	const { t } = useTranslation();
 	const isLocal = comment.source === 'local';
 	return (
 		<div className='flex items-start justify-between gap-2 rounded-md border border-code-border bg-background px-2.5 py-1.5'>
@@ -96,12 +98,12 @@ function DiffCommentRow({
 					) : null}
 					{comment.isOutdated ? (
 						<span className='rounded-sm bg-muted px-1 text-muted-foreground'>
-							Outdated
+							{t('review:comment.outdated', 'Outdated')}
 						</span>
 					) : null}
 					{comment.isResolved ? (
 						<span className='rounded-sm bg-status-ok/15 px-1 text-status-ok'>
-							Resolved
+							{t('review:comment.resolved', 'Resolved')}
 						</span>
 					) : null}
 				</div>
@@ -145,7 +147,11 @@ function LocalCommentActions({
 	onDelete: () => void;
 	onResolve: () => void;
 }) {
-	const resolveLabel = isResolved ? 'Reopen comment' : 'Resolve comment';
+	const { t } = useTranslation();
+	const resolveLabel = isResolved
+		? t('review:comment.reopen', 'Reopen comment')
+		: t('review:comment.resolve', 'Resolve comment');
+	const deleteLabel = t('review:comment.delete', 'Delete comment');
 	return (
 		<div className='flex shrink-0 items-center gap-0.5'>
 			<Tooltip>
@@ -171,10 +177,10 @@ function LocalCommentActions({
 						variant='ghost'
 					>
 						<XIcon />
-						<span className='sr-only'>Delete comment</span>
+						<span className='sr-only'>{deleteLabel}</span>
 					</Button>
 				</TooltipTrigger>
-				<TooltipContent>Delete comment</TooltipContent>
+				<TooltipContent>{deleteLabel}</TooltipContent>
 			</Tooltip>
 		</div>
 	);
@@ -182,15 +188,18 @@ function LocalCommentActions({
 
 /** Small badge identifying a comment's source (local, GitHub, or Actions bot). */
 function SourceBadge({ source }: { source: DiffCommentSource }) {
+	const { t } = useTranslation();
+
 	if (source === 'github-actions') {
 		return (
 			<span className='flex items-center gap-1 rounded-sm bg-muted px-1 text-muted-foreground'>
 				<BotIcon className='size-3' />
-				Actions bot
+				{t('review:comment.source-actions-bot', 'Actions bot')}
 			</span>
 		);
 	}
 	if (source === 'github') {
+		// i18next-instrument-ignore
 		return (
 			<span className='rounded-sm bg-muted px-1 text-muted-foreground'>
 				GitHub
@@ -199,7 +208,7 @@ function SourceBadge({ source }: { source: DiffCommentSource }) {
 	}
 	return (
 		<span className='rounded-sm bg-muted px-1 text-muted-foreground'>
-			Local
+			{t('review:comment.source-local', 'Local')}
 		</span>
 	);
 }
@@ -219,6 +228,7 @@ function DiffCommentComposer({
 	onCancel: () => void;
 	onSubmit: (body: string) => void;
 }) {
+	const { t } = useTranslation();
 	const [body, setBody] = useState('');
 	const trimmed = body.trim();
 
@@ -232,7 +242,7 @@ function DiffCommentComposer({
 		<div className='flex flex-col gap-1.5'>
 			<Textarea
 				autoFocus
-				aria-label='New line comment'
+				aria-label={t('review:comment.composer-label', 'New line comment')}
 				className='min-h-14 resize-none rounded-md bg-background text-xs md:text-xs'
 				onChange={(event) => setBody(event.target.value)}
 				onKeyDown={(event) => {
@@ -245,15 +255,18 @@ function DiffCommentComposer({
 						submit();
 					}
 				}}
-				placeholder='Add a local review comment on this line…'
+				placeholder={t(
+					'review:comment.composer-placeholder',
+					'Add a local review comment on this line…',
+				)}
 				value={body}
 			/>
 			<div className='flex items-center justify-end gap-1.5'>
 				<Button onClick={onCancel} size='xs' variant='ghost'>
-					Cancel
+					{t('common:actions.cancel', 'Cancel')}
 				</Button>
 				<Button disabled={trimmed.length === 0} onClick={submit} size='xs'>
-					Comment
+					{t('review:comment.submit', 'Comment')}
 					<kbd className='ml-1.5 font-sans text-primary-foreground/70'>
 						{COMMENT_SUBMIT_HINT}
 					</kbd>

@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { FileDiffIcon } from 'lucide-react';
 import { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { turnDiffQuery } from '@/renderer/api/ensemblr-queries';
 import { CodeViewerHeader } from '@/renderer/components/code-surface';
@@ -17,6 +18,7 @@ import { PanelMessage } from './panel-message';
  * one rich {@link DiffViewer} per changed file.
  */
 export function TurnDiffPanel({ turnId }: { turnId: string | null }) {
+	const { t } = useTranslation();
 	const { data, isError, isPending } = useQuery(turnDiffQuery(turnId));
 
 	const patchFiles = useMemo(
@@ -25,13 +27,32 @@ export function TurnDiffPanel({ turnId }: { turnId: string | null }) {
 	);
 
 	if (!turnId) {
-		return <PanelMessage message='This tab has no turn associated.' />;
+		return (
+			<PanelMessage
+				message={t(
+					'workbench:turn-diff.empty.no-turn',
+					'This tab has no turn associated.',
+				)}
+			/>
+		);
 	}
 	if (isPending) {
-		return <PanelMessage message='Computing turn diff…' />;
+		return (
+			<PanelMessage
+				message={t('workbench:turn-diff.empty.loading', 'Computing turn diff…')}
+			/>
+		);
 	}
 	if (isError) {
-		return <PanelMessage message='Could not compute diff.' tone='error' />;
+		return (
+			<PanelMessage
+				message={t(
+					'workbench:turn-diff.empty.failed',
+					'Could not compute diff.',
+				)}
+				tone='error'
+			/>
+		);
 	}
 
 	const result = data;
@@ -41,7 +62,14 @@ export function TurnDiffPanel({ turnId }: { turnId: string | null }) {
 
 	const files = result.files;
 	if (files.length === 0) {
-		return <PanelMessage message='No file changes in this turn.' />;
+		return (
+			<PanelMessage
+				message={t(
+					'workbench:turn-diff.empty.no-changes',
+					'No file changes in this turn.',
+				)}
+			/>
+		);
 	}
 
 	return (
@@ -49,7 +77,11 @@ export function TurnDiffPanel({ turnId }: { turnId: string | null }) {
 			<CodeViewerHeader
 				actions={
 					<span className='text-muted-foreground text-xs tabular-nums'>
-						{files.length} file{files.length === 1 ? '' : 's'}
+						{t('workbench:turn-diff.file-count', {
+							count: files.length,
+							defaultValue_one: '{{count}} file',
+							defaultValue_other: '{{count}} files',
+						})}
 					</span>
 				}
 				icon={

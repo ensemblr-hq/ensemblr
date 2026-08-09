@@ -1,4 +1,5 @@
 import { ArchiveIcon } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/renderer/components/ui/button';
 import {
@@ -8,6 +9,7 @@ import {
 import { SidebarMenuButton } from '@/renderer/components/ui/sidebar';
 import { useNavigation } from '@/renderer/components/workbench-shell/shell-contexts';
 import { useWorkspaceSidebarRow } from '@/renderer/hooks/workbench-shell/navigation-sidebar/use-workspace-sidebar-row';
+import { usePermissionBoundaryLabel } from '@/renderer/hooks/workbench-shell/use-permission-boundary-label';
 import type {
 	WorkbenchRouteSearch,
 	WorkspaceShellModel,
@@ -15,7 +17,6 @@ import type {
 import {
 	classifyPermissionAction,
 	DEFAULT_PERMISSION_MODE,
-	getPermissionBoundaryLabel,
 } from '@/shared/permissions';
 
 import { WorkspaceContextMenuContent } from './context-menu';
@@ -25,9 +26,6 @@ const archiveBoundary = classifyPermissionAction({
 	action: 'workspace-archive-delete',
 	mode: DEFAULT_PERMISSION_MODE,
 });
-const archiveBoundaryLabel = getPermissionBoundaryLabel(
-	archiveBoundary.boundary,
-);
 
 /** Sidebar row for a single workspace, with state icon, diff stats and context menu. */
 export function WorkspaceSidebarItem({
@@ -51,6 +49,10 @@ export function WorkspaceSidebarItem({
 	routeSearch: WorkbenchRouteSearch;
 	workspace: WorkspaceShellModel;
 }) {
+	const { t } = useTranslation();
+	const archiveBoundaryLabel = usePermissionBoundaryLabel(
+		archiveBoundary.boundary,
+	);
 	const { renderWorkspaceLink } = useNavigation();
 	const { dockActivityState, hasDiffStats, isUnread, sidebarState } =
 		useWorkspaceSidebarRow({ isActive, workspace });
@@ -72,12 +74,20 @@ export function WorkspaceSidebarItem({
 			<div className='group/workspace-sidebar-item relative min-w-0 opacity-80'>
 				<SidebarMenuButton
 					aria-disabled='true'
-					aria-label={`Workspace ${workspace.name} is being created`}
+					aria-label={t(
+						'workbench:workspace-item.creating-aria',
+						'Workspace {{workspace}} is being created',
+						{ workspace: workspace.name },
+					)}
 					className='h-auto min-h-12 cursor-not-allowed items-start gap-2 py-2'
 					data-workspace-sidebar-state={sidebarState.kind}
 					disabled
 					isActive={false}
-					tooltip={`${workspace.name} is being created`}
+					tooltip={t(
+						'workbench:workspace-item.creating-tooltip',
+						'{{workspace}} is being created',
+						{ workspace: workspace.name },
+					)}
 				>
 					{buttonContent}
 				</SidebarMenuButton>
@@ -85,9 +95,15 @@ export function WorkspaceSidebarItem({
 		);
 	}
 
-	const workspaceButtonLabel = `Open workspace ${workspace.name}${
-		dockActivityState ? '; dock activity running' : ''
-	}`;
+	const workspaceButtonLabel = dockActivityState
+		? t(
+				'workbench:workspace-item.open-busy-aria',
+				'Open workspace {{workspace}}; dock activity running',
+				{ workspace: workspace.name },
+			)
+		: t('workbench:workspace-item.open-aria', 'Open workspace {{workspace}}', {
+				workspace: workspace.name,
+			});
 
 	return (
 		<ContextMenu>
@@ -111,7 +127,11 @@ export function WorkspaceSidebarItem({
 					</SidebarMenuButton>
 					{onArchiveSelect ? (
 						<Button
-							aria-label={`Archive workspace ${workspace.name}; ${archiveBoundaryLabel}`}
+							aria-label={t(
+								'workbench:workspace-item.archive-aria',
+								'Archive workspace {{workspace}}; {{boundary}}',
+								{ boundary: archiveBoundaryLabel, workspace: workspace.name },
+							)}
 							className='absolute right-1.5 bottom-1.5 size-6 opacity-0 transition-opacity hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:opacity-100 group-hover/workspace-sidebar-item:opacity-100'
 							data-permission-boundary={archiveBoundary.boundary}
 							onClick={(event) => {

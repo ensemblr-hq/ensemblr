@@ -1,5 +1,6 @@
 import { useAtom } from 'jotai';
 import { EyeIcon, WrapTextIcon } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 import { IconToggle } from '@/renderer/components/icon-toggle';
 import { OpenInToolbarMenu } from '@/renderer/components/workbench-shell/open-in-toolbar-menu';
@@ -24,6 +25,7 @@ export function FilePreviewActions({
 	result: ReadWorkspaceFileResult;
 	workspaceId: string;
 }) {
+	const { t } = useTranslation();
 	const [wordWrap, setWordWrap] = useAtom(filePreviewWordWrapAtom);
 	const [markdownPreview, setMarkdownPreview] = useAtom(
 		filePreviewMarkdownPreviewAtom,
@@ -45,7 +47,17 @@ export function FilePreviewActions({
 			{isMarkdown && !imageSource ? (
 				<IconToggle
 					active={markdownPreview}
-					label={markdownPreview ? 'Show raw source' : 'Show formatted preview'}
+					label={
+						markdownPreview
+							? t(
+									'workbench:file-preview.actions.show-source',
+									'Show raw source',
+								)
+							: t(
+									'workbench:file-preview.actions.show-preview',
+									'Show formatted preview',
+								)
+					}
 					onClick={() => setMarkdownPreview(!markdownPreview)}
 				>
 					<EyeIcon />
@@ -54,7 +66,14 @@ export function FilePreviewActions({
 			{imageSource || showFormattedPreview ? null : (
 				<IconToggle
 					active={wordWrap}
-					label={wordWrap ? 'Disable word wrap' : 'Enable word wrap'}
+					label={
+						wordWrap
+							? t(
+									'workbench:file-preview.actions.wrap-off',
+									'Disable word wrap',
+								)
+							: t('workbench:file-preview.actions.wrap-on', 'Enable word wrap')
+					}
 					onClick={() => setWordWrap(!wordWrap)}
 				>
 					<WrapTextIcon />

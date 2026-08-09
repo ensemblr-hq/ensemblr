@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import { PlusIcon, RefreshCwIcon, SearchIcon } from 'lucide-react';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import {
 	linearIssuesQuery,
@@ -27,6 +28,7 @@ const ALL_TEAMS = 'all';
 
 /** Linear issue browse list: search, team filter, refresh, and issue rows. */
 export function LinearIssueList() {
+	const { t } = useTranslation();
 	const navigate = useNavigate();
 	const [query, setQuery] = useState('');
 	const [teamId, setTeamId] = useState<string>(ALL_TEAMS);
@@ -50,6 +52,7 @@ export function LinearIssueList() {
 			? metadataData.metadata.teams
 			: [];
 	const rows = result?.issues ?? [];
+	const allTeamsLabel = t('linear:issue-list.all-teams', 'All teams');
 
 	return (
 		<div className='flex w-full flex-col gap-3'>
@@ -60,20 +63,26 @@ export function LinearIssueList() {
 						className='absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground'
 					/>
 					<Input
-						aria-label='Search Linear issues'
+						aria-label={t(
+							'linear:issue-list.search-label',
+							'Search Linear issues',
+						)}
 						className='pl-8'
 						onChange={(event) => setQuery(event.target.value)}
-						placeholder='Search by identifier or title…'
+						placeholder={t(
+							'linear:issue-list.search-placeholder',
+							'Search by identifier or title…',
+						)}
 						value={query}
 					/>
 				</div>
 				{teams.length > 0 ? (
 					<Select onValueChange={setTeamId} value={teamId}>
 						<SelectTrigger className='w-44' size='sm'>
-							<SelectValue placeholder='All teams' />
+							<SelectValue placeholder={allTeamsLabel} />
 						</SelectTrigger>
 						<SelectContent>
-							<SelectItem value={ALL_TEAMS}>All teams</SelectItem>
+							<SelectItem value={ALL_TEAMS}>{allTeamsLabel}</SelectItem>
 							{teams.map((team) => (
 								<SelectItem key={team.id} value={team.id}>
 									{team.name}
@@ -83,7 +92,7 @@ export function LinearIssueList() {
 					</Select>
 				) : null}
 				<Button
-					aria-label='Refresh issues'
+					aria-label={t('linear:issue-list.refresh', 'Refresh issues')}
 					disabled={issuesFetching}
 					onClick={() => void refetchIssues()}
 					size='icon-sm'
@@ -94,7 +103,7 @@ export function LinearIssueList() {
 					/>
 				</Button>
 				<Button onClick={() => setEditorOpen(true)} size='sm'>
-					<PlusIcon /> New issue
+					<PlusIcon /> {t('linear:issue-list.new-issue', 'New issue')}
 				</Button>
 			</div>
 			<LinearIssueEditorDialog onOpenChange={setEditorOpen} open={editorOpen} />
@@ -114,8 +123,14 @@ export function LinearIssueList() {
 			) : rows.length === 0 ? (
 				<p className='py-12 text-center text-muted-foreground text-xs'>
 					{query
-						? 'No issues match your search.'
-						: 'No Linear issues are cached yet. Refresh to sync from Linear.'}
+						? t(
+								'linear:issue-list.empty-search',
+								'No issues match your search.',
+							)
+						: t(
+								'linear:issue-list.empty',
+								'No Linear issues are cached yet. Refresh to sync from Linear.',
+							)}
 				</p>
 			) : (
 				<ul className='flex flex-col divide-y divide-border rounded-lg border border-border'>

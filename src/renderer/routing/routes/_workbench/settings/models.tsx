@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
 import { useAtom, useAtomValue } from 'jotai';
 import { useEffect, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { agentModelsQuery } from '@/renderer/api/ensemblr';
 import { ModelVisibilityList } from '@/renderer/components/settings/model-visibility-list';
@@ -15,6 +16,7 @@ import {
 	SelectValue,
 } from '@/renderer/components/ui/select';
 import { Spinner } from '@/renderer/components/ui/spinner';
+import { thinkingLevelLabel } from '@/renderer/lib/workbench/thinking-labels';
 import {
 	defaultChatModelAtom,
 	defaultChatThinkingLevelAtom,
@@ -26,10 +28,7 @@ import {
 	type AgentProviderId,
 	normalizeAgentProviderId,
 } from '@/shared/agent-provider';
-import {
-	getThinkingAxisLabel,
-	getThinkingLevelLabel,
-} from '@/shared/agent-thinking';
+import { getThinkingAxis } from '@/shared/agent-thinking';
 import type { AgentModelOption } from '@/shared/ipc/contracts/agent-models';
 
 /** Route for the Models settings section; renders the models panel populated from agent capability discovery. */
@@ -39,6 +38,7 @@ export const Route = createFileRoute('/_workbench/settings/models')({
 
 /** Models settings panel for choosing default chat and review models, their thinking levels, and which models are visible. */
 function ModelsSettings() {
+	const { t } = useTranslation();
 	const {
 		data: modelsData,
 		error: modelsError,
@@ -97,18 +97,26 @@ function ModelsSettings() {
 
 	return (
 		<SettingsSection
-			description="Agent models and thinking-level defaults for new chats and reviews. Sourced from each configured runtime's capability discovery."
-			title='Models'
+			description={t(
+				'settings:models.description',
+				"Agent models and thinking-level defaults for new chats and reviews. Sourced from each configured runtime's capability discovery.",
+			)}
+			title={t('settings:models.title', 'Models')}
 		>
 			{modelsLoading ? (
 				<div className='flex items-center gap-2 py-6 text-muted-foreground text-sm'>
-					<Spinner className='size-4' /> Loading models…
+					<Spinner className='size-4' />{' '}
+					{t('settings:models.loading', 'Loading models…')}
 				</div>
 			) : null}
 
 			{modelsError ? (
 				<div className='py-6 text-sm text-status-danger'>
-					Model discovery failed: {String(modelsError)}.
+					{t(
+						'settings:models.discovery-failed',
+						'Model discovery failed: {{error}}.',
+						{ error: String(modelsError) },
+					)}
 				</div>
 			) : null}
 
@@ -116,14 +124,23 @@ function ModelsSettings() {
 				control={
 					<div className='flex items-center gap-2'>
 						<ModelSelect
-							ariaLabel='Default chat model'
+							ariaLabel={t(
+								'settings:models.default-model.aria-label',
+								'Default chat model',
+							)}
 							models={list}
 							onChange={setDefaultModel}
-							placeholder={modelsData?.defaultModelId ?? 'No models'}
+							placeholder={
+								modelsData?.defaultModelId ??
+								t('settings:models.no-models', 'No models')
+							}
 							value={resolvedDefault}
 						/>
 						<ThinkingLevelSelect
-							ariaLabel='Default thinking level'
+							ariaLabel={t(
+								'settings:models.default-model.thinking-aria-label',
+								'Default thinking level',
+							)}
 							levels={defaultLevels}
 							onChange={setDefaultThinking}
 							provider={defaultProvider}
@@ -131,22 +148,34 @@ function ModelsSettings() {
 						/>
 					</div>
 				}
-				description='Model used when you start a new chat. Falls back to the agent-reported default when unset.'
-				label='Default model'
+				description={t(
+					'settings:models.default-model.description',
+					'Model used when you start a new chat. Falls back to the agent-reported default when unset.',
+				)}
+				label={t('settings:models.default-model.label', 'Default model')}
 			/>
 
 			<SettingRow
 				control={
 					<div className='flex items-center gap-2'>
 						<ModelSelect
-							ariaLabel='Review model'
+							ariaLabel={t(
+								'settings:models.review-model.aria-label',
+								'Review model',
+							)}
 							models={list}
 							onChange={setReviewModel}
-							placeholder={modelsData?.defaultModelId ?? 'No models'}
+							placeholder={
+								modelsData?.defaultModelId ??
+								t('settings:models.no-models', 'No models')
+							}
 							value={resolvedReview}
 						/>
 						<ThinkingLevelSelect
-							ariaLabel='Review thinking level'
+							ariaLabel={t(
+								'settings:models.review-model.thinking-aria-label',
+								'Review thinking level',
+							)}
 							levels={reviewLevels}
 							onChange={setReviewThinking}
 							provider={reviewProvider}
@@ -154,13 +183,19 @@ function ModelsSettings() {
 						/>
 					</div>
 				}
-				description='Model used for the Review action on a workspace.'
-				label='Review model'
+				description={t(
+					'settings:models.review-model.description',
+					'Model used for the Review action on a workspace.',
+				)}
+				label={t('settings:models.review-model.label', 'Review model')}
 			/>
 
 			<SettingRow
-				description='Hide models you don’t use from the model picker and the default/review selects. Hiding the selected default or review model switches it to the first available.'
-				label='Model visibility'
+				description={t(
+					'settings:models.visibility.description',
+					'Hide models you don’t use from the model picker and the default/review selects. Hiding the selected default or review model switches it to the first available.',
+				)}
+				label={t('settings:models.visibility.label', 'Model visibility')}
 				stack
 			>
 				<ModelVisibilityList />
@@ -219,22 +254,27 @@ function ThinkingLevelSelect({
 	provider: AgentProviderId;
 	value: string | null | undefined;
 }) {
+	const { t } = useTranslation();
+
 	if (levels.length === 0) {
 		return null;
 	}
-	const axisLabel = getThinkingAxisLabel(provider);
+	const placeholder =
+		getThinkingAxis(provider) === 'effort'
+			? t('settings:models.thinking.effort-placeholder', 'Effort level')
+			: t('settings:models.thinking.thinking-placeholder', 'Thinking level');
 	return (
 		<Select
 			onValueChange={(next) => onChange(next || null)}
 			value={value ?? ''}
 		>
 			<SelectTrigger aria-label={ariaLabel} className='w-40' size='sm'>
-				<SelectValue placeholder={`${axisLabel} level`} />
+				<SelectValue placeholder={placeholder} />
 			</SelectTrigger>
 			<SelectContent>
 				{levels.map((level) => (
 					<SelectItem key={level} value={level}>
-						{getThinkingLevelLabel(provider, level)}
+						{thinkingLevelLabel(t, level)}
 					</SelectItem>
 				))}
 			</SelectContent>

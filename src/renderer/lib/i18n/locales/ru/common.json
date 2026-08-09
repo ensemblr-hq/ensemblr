@@ -1,0 +1,288 @@
+{
+	"actions": {
+		"add": "Добавить",
+		"allow": "Разрешить",
+		"approve": "Утвердить",
+		"archive": "Архивировать",
+		"archiving": "Архивирование…",
+		"back": "Назад",
+		"browse": "Обзор",
+		"cancel": "Отмена",
+		"configure": "Настроить",
+		"continue": "Продолжить",
+		"copied": "Скопировано",
+		"copy-code": "Копировать код",
+		"copy-path": "Копировать путь",
+		"copy-response": "Копировать ответ",
+		"create": "Создать",
+		"delete": "Удалить",
+		"delete-ellipsis": "Удалить…",
+		"deleting": "Удаление…",
+		"deny": "Отклонить",
+		"discard": "Отбросить",
+		"discard-changes": "Отменить изменения",
+		"edit": "Изменить",
+		"keep-open": "Оставить открытым",
+		"open": "Открыть",
+		"open-in": "Открыть в",
+		"picking": "Выбор…",
+		"pin": "Закрепить",
+		"remove": "Удалить",
+		"remove-named": "Удалить {{label}}",
+		"removing": "Удаление…",
+		"rename": "Переименовать",
+		"renaming": "Переименование…",
+		"reset-managed-root": "Сбросить до папки управляемых репозиториев",
+		"resolve": "Устранить",
+		"restoring": "Восстановление…",
+		"retry": "Повторить",
+		"revert-to-default": "Вернуть по умолчанию",
+		"save": "Сохранить",
+		"saving": "Сохранение…",
+		"send": "Отправить",
+		"stop": "Остановить",
+		"try-again": "Попробовать снова",
+		"unarchive": "Разархивировать",
+		"unpin": "Открепить",
+		"view": "Просмотр"
+	},
+	"agent-question": {
+		"dismiss": "Закрыть вопрос",
+		"free-text-label": "Введите свой ответ",
+		"free-text-placeholder": "Введите что-нибудь…",
+		"hint": {
+			"dismiss": "Esc закрыть",
+			"move": "↑↓ перейти",
+			"select": "Enter выбрать",
+			"submit": "{{shortcut}} отправить",
+			"toggle": "Enter переключить"
+		},
+		"next": "Следующий вопрос",
+		"previous": "Предыдущий вопрос",
+		"section-label": "Вопрос агента",
+		"submit": "Отправить ответы"
+	},
+	"answer-table": {
+		"collapse": "Свернуть таблицу",
+		"copy": "Копировать таблицу",
+		"dialog-title": "Таблица",
+		"expand": "Развернуть таблицу"
+	},
+	"clipboard": {
+		"path-copied": "Путь скопирован в буфер обмена.",
+		"workspace-path-copied": "Путь рабочей области скопирован."
+	},
+	"clone-dialog": {
+		"loading-repos": "Загрузка репозиториев с GitHub…",
+		"location-label": "Расположение",
+		"matching-repos": "Подходящие репозитории",
+		"private": "Приватный",
+		"recent-repos": "Недавние репозитории",
+		"stage": {
+			"cloning": "Клонирование…",
+			"opening": "Открытие…",
+			"preparing": "Подготовка…",
+			"submit": "Клонировать репозиторий"
+		},
+		"title": "Клонировать репозиторий с GitHub",
+		"url-label": "URL репозитория",
+		"url-placeholder": "Найдите репозиторий или вставьте URL"
+	},
+	"conversation": {
+		"scroll-to-newest": "Перейти к последнему сообщению"
+	},
+	"diagnostics-log": {
+		"trigger": "Журнал диагностики",
+		"truncated": "(обрезано)"
+	},
+	"local-import": {
+		"description": "Ensemblr клонирует отслеживаемые git-файлы в папку управляемых репозиториев, а затем создаёт первую рабочую область.",
+		"still-working": "Работа продолжается — большим репозиториям с глубокой историей может потребоваться минута-другая. Окно переключится, как только рабочая область будет готова.",
+		"title": "Открытие локального проекта…"
+	},
+	"pi-replay": {
+		"event-count_one": "{{count}} событие",
+		"event-count_few": "{{count}} события",
+		"event-count_many": "{{count}} событий",
+		"event-count_other": "{{count}} события",
+		"title": "Воспроизведение фикстуры Pi"
+	},
+	"quick-start": {
+		"creates": "Создаст папку и репозиторий <name>{{projectName}}</name>",
+		"creating": "Создание…",
+		"description": "Создайте локальную папку и инициализируйте новый git-репозиторий.",
+		"name-label": "Название проекта",
+		"parent-label": "Родительская папка",
+		"parent-placeholder": "Папка управляемых репозиториев",
+		"title": "Создать проект"
+	},
+	"root-directory": {
+		"applied": "Применено",
+		"applying": "Применение",
+		"change-description": "Переключить Ensemblr на выбранный корневой каталог и после подтверждения переиндексировать или принять структуру этой файловой системы.",
+		"change-title": "Сменить корневой каталог",
+		"continuity-note": "Общая преемственность корневого каталога Conductor охватывает только файловую систему, git и конфигурацию; преемственность диалогов, сессий и контрольных точек между приложениями не гарантируется.",
+		"current-root": "Текущий корневой каталог",
+		"no-blocking-warnings": "Блокирующих предупреждений по корневому каталогу нет.",
+		"no-current-root": "Снимок текущего корневого каталога отсутствует",
+		"no-reconciliation-warnings": "Предупреждений при сверке нет.",
+		"not-applied": "Не применено",
+		"preserved-body": "Переключение меняет то, где Ensemblr ищет репозитории, рабочие области и архивные контексты. Переиндексация и принятие — поведение по умолчанию. Миграция — отдельное действие. Удаление или очистка — отдельное разрушительное действие.",
+		"preserved-title": "Содержимое старого корневого каталога сохраняется.",
+		"reconciliation": "Сверка просканировала {{repositoryDirectories}} и {{workspaceDirectories}}.",
+		"repository-directory-count_one": "{{count}} каталог репозитория",
+		"repository-directory-count_few": "{{count}} каталога репозиториев",
+		"repository-directory-count_many": "{{count}} каталогов репозиториев",
+		"repository-directory-count_other": "{{count}} каталога репозиториев",
+		"result-title": "Результат смены корневого каталога",
+		"selected-root": "Выбранный корневой каталог",
+		"switch": "Сменить корень",
+		"workspace-directory-count_one": "{{count}} каталог рабочей области",
+		"workspace-directory-count_few": "{{count}} каталога рабочих областей",
+		"workspace-directory-count_many": "{{count}} каталогов рабочих областей",
+		"workspace-directory-count_other": "{{count}} каталога рабочих областей"
+	},
+	"session-status": {
+		"context": "{{percent}}% контекста",
+		"tokens_one": "{{formatted}} токен",
+		"tokens_few": "{{formatted}} токена",
+		"tokens_many": "{{formatted}} токенов",
+		"tokens_other": "{{formatted}} токена"
+	},
+	"setup-check": {
+		"optional": "Необязательно",
+		"status": {
+			"failure": "Ошибка",
+			"pending": "Ожидание",
+			"running": "Выполняется",
+			"success": "Готово",
+			"warning": "Предупреждение"
+		}
+	},
+	"setup-summary": {
+		"blocked": {
+			"detail_one": "{{count}} обязательная проверка требует внимания, прежде чем откроются основные рабочие процессы.",
+			"detail_few": "{{count}} обязательные проверки требуют внимания, прежде чем откроются основные рабочие процессы.",
+			"detail_many": "{{count}} обязательных проверок требуют внимания, прежде чем откроются основные рабочие процессы.",
+			"detail_other": "{{count}} обязательной проверки требует внимания, прежде чем откроются основные рабочие процессы.",
+			"title": "Основные рабочие процессы заблокированы"
+		},
+		"blocked-count_one": "{{count}} заблокирована",
+		"blocked-count_few": "{{count}} заблокированы",
+		"blocked-count_many": "{{count}} заблокировано",
+		"blocked-count_other": "{{count}} заблокировано",
+		"checking": {
+			"detail": "Ensemblr собирает диагностику настройки.",
+			"title": "Проверка готовности настройки"
+		},
+		"group": {
+			"claude": "Среда выполнения Claude Code",
+			"core": "Основная среда выполнения",
+			"github": "Git и GitHub",
+			"linear": "Linear",
+			"pi": "Среда выполнения Pi",
+			"storage": "Хранилище"
+		},
+		"loading": "Загрузка диагностики настройки",
+		"local-execution-notice": "Агенты, скрипты, терминалы и инструменты выполняются локально с правами вашей учётной записи macOS. По умолчанию рабочая область работает в доверенном режиме; более строгие режимы могут требовать подтверждения или доступа только для чтения там, где это поддерживается.",
+		"passed-count_one": "{{count}} пройдена",
+		"passed-count_few": "{{count}} пройдены",
+		"passed-count_many": "{{count}} пройдено",
+		"passed-count_other": "{{count}} пройдено",
+		"pending": {
+			"detail_one": "{{count}} обязательная проверка всё ещё ожидает выполнения.",
+			"detail_few": "{{count}} обязательные проверки всё ещё ожидают выполнения.",
+			"detail_many": "{{count}} обязательных проверок всё ещё ожидают выполнения.",
+			"detail_other": "{{count}} обязательной проверки всё ещё ожидает выполнения.",
+			"title": "Проверки настройки всё ещё ожидают выполнения"
+		},
+		"ready": {
+			"detail": "{{passedChecks}}, {{remainingWarnings}}.",
+			"passed-checks_one": "пройдена {{count}} проверка",
+			"passed-checks_few": "пройдено {{count}} проверки",
+			"passed-checks_many": "пройдено {{count}} проверок",
+			"passed-checks_other": "пройдено {{count}} проверки",
+			"remaining-warnings_one": "остаётся {{count}} предупреждение",
+			"remaining-warnings_few": "остаётся {{count}} предупреждения",
+			"remaining-warnings_many": "остаётся {{count}} предупреждений",
+			"remaining-warnings_other": "остаётся {{count}} предупреждения",
+			"title": "Основные рабочие процессы готовы"
+		},
+		"retry": "Повторить проверки",
+		"retrying": "Повтор",
+		"unavailable": {
+			"detail": "Не удалось загрузить диагностику настройки из основного процесса.",
+			"title": "Диагностика настройки недоступна"
+		},
+		"warning-count_one": "{{count}} предупреждение",
+		"warning-count_few": "{{count}} предупреждения",
+		"warning-count_many": "{{count}} предупреждений",
+		"warning-count_other": "{{count}} предупреждения"
+	},
+	"stack-trace": {
+		"empty": "Нет кадров стека"
+	},
+	"status": {
+		"coming-soon": "Скоро"
+	},
+	"terminal": {
+		"title": "Терминал"
+	},
+	"thinking": {
+		"reasoned": "Размышление заняло {{seconds}} с",
+		"reasoning": "Размышление… {{seconds}} с"
+	},
+	"tool-approval": {
+		"allow-session": "Разрешить на эту сессию",
+		"deny-label": "Отклонить вызов инструмента",
+		"headline": "Claude хочет использовать {{tool}}.",
+		"key-hints": "1 разрешить · 2 разрешить на сессию · 3 отклонить · Esc отклонить",
+		"section-label": "Запрос на разрешение инструмента",
+		"status": "Требуется разрешение для {{tool}}."
+	},
+	"tool-output": {
+		"show-all_one": "Показать {{count}} строку",
+		"show-all_few": "Показать все {{count}} строки",
+		"show-all_many": "Показать все {{count}} строк",
+		"show-all_other": "Показать все {{count}} строки"
+	},
+	"tool-row": {
+		"running": "Выполняется…"
+	},
+	"turn-footer": {
+		"actions": "Действия хода",
+		"fork-tab": "Форк в новую вкладку",
+		"fork-workspace": "Форк в новую рабочую область",
+		"restore-checkpoint": "Восстановить состояние до этого хода…",
+		"stopped": "Остановлено",
+		"view-diff": "Показать diff хода"
+	},
+	"turn-summary": {
+		"fallback": "Работа",
+		"messages_one": "{{count}} сообщение",
+		"messages_few": "{{count}} сообщения",
+		"messages_many": "{{count}} сообщений",
+		"messages_other": "{{count}} сообщения",
+		"tool-calls_one": "{{count}} вызов инструмента",
+		"tool-calls_few": "{{count}} вызова инструмента",
+		"tool-calls_many": "{{count}} вызовов инструментов",
+		"tool-calls_other": "{{count}} вызова инструмента"
+	},
+	"turn-timer": {
+		"working": "Работа…"
+	},
+	"units": {
+		"mb": "МБ",
+		"px": "{{value}}px",
+		"seconds": "{{seconds}} с",
+		"workspace-count_one": "{{count}} рабочая область",
+		"workspace-count_few": "{{count}} рабочие области",
+		"workspace-count_many": "{{count}} рабочих областей",
+		"workspace-count_other": "{{count}} рабочей области"
+	},
+	"welcome": {
+		"open-github-project": "Открыть проект с GitHub",
+		"open-project": "Открыть проект",
+		"quick-start": "Быстрый старт"
+	}
+}

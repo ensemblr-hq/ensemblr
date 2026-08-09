@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { CopyResponseButton } from '@/renderer/components/copy-response-button';
 import { useElapsedMs } from '@/renderer/hooks/use-elapsed-ms';
 import { formatTurnDuration } from '@/renderer/lib/format-duration';
@@ -17,6 +18,7 @@ export function PiTurnFooter({
 	className?: string;
 	item: PiTurnFooterItem;
 }) {
+	const { t } = useTranslation();
 	return (
 		<div
 			className={cn(
@@ -28,7 +30,7 @@ export function PiTurnFooter({
 		>
 			{item.aborted ? (
 				<span className='rounded-sm border border-status-warning/40 px-1.5 py-0.5 text-status-warning'>
-					Stopped
+					{t('common:turn-footer.stopped', 'Stopped')}
 				</span>
 			) : null}
 			<span>{formatTurnDuration(item.durationMs)}</span>

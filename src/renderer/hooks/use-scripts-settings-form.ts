@@ -1,5 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 
 import {
@@ -29,6 +30,7 @@ export function useScriptsSettingsForm(
 	initial: ScriptsForm,
 ): { form: ScriptsForm; updateForm: (patch: Partial<ScriptsForm>) => void } {
 	const queryClient = useQueryClient();
+	const { t } = useTranslation();
 	const [form, setForm] = useState<ScriptsForm>(initial);
 	const formRef = useRef(form);
 	const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -49,16 +51,26 @@ export function useScriptsSettingsForm(
 				setup: next.setup.trim() ? next.setup : null,
 			});
 			if (!result.ok) {
-				toast.error('Could not save script settings.');
+				toast.error(
+					t(
+						'errors:script-settings.save-failed.title',
+						'Could not save script settings.',
+					),
+				);
 				return;
 			}
 			await queryClient.invalidateQueries({
 				queryKey: ensemblrQueryKeys.settingsResolution(repoId),
 			});
 		} catch {
-			toast.error('Could not save script settings.');
+			toast.error(
+				t(
+					'errors:script-settings.save-failed.title',
+					'Could not save script settings.',
+				),
+			);
 		}
-	}, [project, queryClient, repoId]);
+	}, [project, queryClient, repoId, t]);
 
 	// Keep the latest persist closure reachable from the unmount-only cleanup.
 	const persistRef = useRef(persist);

@@ -1,4 +1,5 @@
 import { CopyIcon, EyeIcon, PinIcon } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 import {
 	ContextMenuContent,
@@ -43,6 +44,8 @@ export function AllFilesContextMenuContent({
 	openInTargets: readonly WorkspaceOpenTarget[];
 	target: FileTreeMenuTarget | null;
 }) {
+	const { t } = useTranslation();
+
 	if (!target) {
 		return null;
 	}
@@ -57,7 +60,9 @@ export function AllFilesContextMenuContent({
 
 	return (
 		<ContextMenuContent
-			aria-label={`${path} actions`}
+			aria-label={t('workbench:file-tree-menu.actions', '{{path}} actions', {
+				path,
+			})}
 			className='w-44 bg-muted p-1'
 		>
 			{canOpen ? (
@@ -67,14 +72,18 @@ export function AllFilesContextMenuContent({
 						onSelect={() => openFilePreview(path)}
 					>
 						<EyeIcon aria-hidden='true' className='text-muted-foreground' />
-						<span className='min-w-0 flex-1'>View</span>
+						<span className='min-w-0 flex-1'>
+							{t('common:actions.view', 'View')}
+						</span>
 					</ContextMenuItem>
 					<ContextMenuItem
 						className='h-8 gap-2 px-2 text-[0.8125rem]'
 						onSelect={() => openFilePreview(path, { preview: false })}
 					>
 						<PinIcon aria-hidden='true' className='text-muted-foreground' />
-						<span className='min-w-0 flex-1'>Keep open</span>
+						<span className='min-w-0 flex-1'>
+							{t('common:actions.keep-open', 'Keep open')}
+						</span>
 					</ContextMenuItem>
 					{openInTargets.length || copyTarget ? <ContextMenuSeparator /> : null}
 				</>
@@ -86,7 +95,9 @@ export function AllFilesContextMenuContent({
 					onSelect={() => invoke(copyTarget)}
 				>
 					<CopyIcon aria-hidden='true' className='text-muted-foreground' />
-					<span className='min-w-0 flex-1'>Copy path</span>
+					<span className='min-w-0 flex-1'>
+						{t('common:actions.copy-path', 'Copy path')}
+					</span>
 				</ContextMenuItem>
 			) : null}
 		</ContextMenuContent>

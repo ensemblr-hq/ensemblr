@@ -16,6 +16,7 @@ import {
 	useRef,
 	useState,
 } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/renderer/components/ui/button';
 import {
 	Collapsible,
@@ -88,7 +89,6 @@ const useStackTrace = () => {
 const parseStackFrame = (line: string): StackFrame => {
 	const trimmed = line.trim();
 
-	// Pattern: at functionName (filePath:line:column)
 	const withParensMatch = trimmed.match(STACK_FRAME_WITH_PARENS_REGEX);
 	if (withParensMatch) {
 		const [, functionName, filePath, lineNum, colNum] = withParensMatch;
@@ -106,7 +106,6 @@ const parseStackFrame = (line: string): StackFrame => {
 		};
 	}
 
-	// Pattern: at filePath:line:column (no function name)
 	const withoutFnMatch = trimmed.match(STACK_FRAME_WITHOUT_FN_REGEX);
 	if (withoutFnMatch) {
 		const [, filePath, lineNum, colNum] = withoutFnMatch;
@@ -164,7 +163,7 @@ const parseStackTrace = (trace: string): ParsedStackTrace => {
 		errorMessage = msg || '';
 	}
 
-	// Parse stack frames (lines starting with "at")
+	// i18next-instrument-ignore
 	const frames = lines
 		.slice(1)
 		.flatMap((line) =>
@@ -535,6 +534,7 @@ export const StackTraceFrames = memo(
 		showInternalFrames = true,
 		...props
 	}: StackTraceFramesProps) => {
+		const { t } = useTranslation();
 		const { trace, onFilePathClick } = useStackTrace();
 
 		const framesToShow = showInternalFrames
@@ -575,7 +575,9 @@ export const StackTraceFrames = memo(
 					</div>
 				))}
 				{framesToShow.length === 0 && (
-					<div className='text-muted-foreground text-xs'>No stack frames</div>
+					<div className='text-muted-foreground text-xs'>
+						{t('common:stack-trace.empty', 'No stack frames')}
+					</div>
 				)}
 			</div>
 		);

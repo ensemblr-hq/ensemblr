@@ -1,4 +1,5 @@
 import { FolderIcon, GitBranchIcon } from 'lucide-react';
+import { Trans, useTranslation } from 'react-i18next';
 
 import { LinkedIssueStatus } from '@/renderer/components/linear/linked-issue-status';
 import type { WorkspaceLandingSummary } from '@/renderer/types/workbench';
@@ -20,6 +21,8 @@ export function WorkspaceLandingCard({
 }: {
 	landingSummary: WorkspaceLandingSummary | null | undefined;
 }) {
+	const { t } = useTranslation();
+
 	if (!landingSummary) {
 		return null;
 	}
@@ -30,14 +33,23 @@ export function WorkspaceLandingCard({
 
 	return (
 		<section
-			aria-label='Workspace landing summary'
+			aria-label={t(
+				'workbench:landing-card.aria-label',
+				'Workspace landing summary',
+			)}
 			className='flex flex-col items-start gap-3 text-sm'
 			data-landing-card-kind={landingSummary.kind}
 		>
 			<div className='rounded-md bg-muted/50 px-3 py-2 text-foreground'>
-				You’re in a new copy of{' '}
-				<span className='font-mono'>{repositoryName}</span> called{' '}
-				<span className='font-mono'>{workspaceName}</span>
+				<Trans
+					components={{
+						repo: <span className='font-mono' />,
+						workspace: <span className='font-mono' />,
+					}}
+					defaults='You’re in a new copy of <repo>{{repositoryName}}</repo> called <workspace>{{workspaceName}}</workspace>'
+					i18nKey='workbench:landing-card.headline'
+					values={{ repositoryName, workspaceName }}
+				/>
 			</div>
 
 			{landingSummary.linkedIssue ? (
@@ -47,38 +59,45 @@ export function WorkspaceLandingCard({
 			<p className='flex items-center gap-2 text-muted-foreground text-xs'>
 				<GitBranchIcon aria-hidden='true' className='size-3.5 shrink-0' />
 				<span>
-					On{' '}
-					<span className='font-mono text-foreground'>
-						{branchSource.branchName}
-					</span>
 					{baseBranch ? (
-						<>
-							, compared against{' '}
-							<span className='font-mono text-foreground'>{baseBranch}</span>
-						</>
-					) : null}
+						<Trans
+							components={{
+								ref: <span className='font-mono text-foreground' />,
+							}}
+							defaults='On <ref>{{branchName}}</ref>, compared against <ref>{{baseBranch}}</ref>'
+							i18nKey='workbench:landing-card.branch.with-base'
+							values={{ baseBranch, branchName: branchSource.branchName }}
+						/>
+					) : (
+						<Trans
+							components={{
+								ref: <span className='font-mono text-foreground' />,
+							}}
+							defaults='On <ref>{{branchName}}</ref>'
+							i18nKey='workbench:landing-card.branch.plain'
+							values={{ branchName: branchSource.branchName }}
+						/>
+					)}
 				</span>
 			</p>
 
 			<p className='flex items-center gap-2 text-muted-foreground text-xs'>
 				<FolderIcon aria-hidden='true' className='size-3.5 shrink-0' />
 				<span>
-					Created{' '}
-					<span className='rounded-sm border border-border bg-muted/40 px-1.5 py-0.5 font-mono text-foreground'>
-						{workspaceName}
-					</span>
-					{copiedFiles.state === 'copied' ? (
-						<>
-							{' '}
-							and copied{' '}
-							<span className='font-mono text-foreground'>
-								{copiedFiles.count}
-							</span>{' '}
-							file{copiedFiles.count === 1 ? '' : 's'}
-						</>
-					) : (
-						<>. {copiedFiles.detail}</>
-					)}
+					{copiedFiles.state === 'copied'
+						? t('workbench:landing-card.created.copied', {
+								count: copiedFiles.count,
+								defaultValue_one:
+									'Created {{workspaceName}} and copied {{count}} file',
+								defaultValue_other:
+									'Created {{workspaceName}} and copied {{count}} files',
+								workspaceName,
+							})
+						: t(
+								'workbench:landing-card.created.detail',
+								'Created {{workspaceName}}. {{detail}}',
+								{ detail: copiedFiles.detail, workspaceName },
+							)}
 				</span>
 			</p>
 		</section>

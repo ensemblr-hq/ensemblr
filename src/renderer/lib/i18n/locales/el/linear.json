@@ -1,0 +1,117 @@
+{
+	"comment-composer": {
+		"label": "Προσθήκη σχολίου",
+		"placeholder": "Προσθήκη σχολίου…",
+		"posting": "Δημοσίευση…",
+		"submit": "Σχολιασμός"
+	},
+	"connection-gate": {
+		"not-configured": {
+			"description": "Προσθέστε το app.linear.clientId στο ~/.config/ensemblr/config.json και έπειτα συνδεθείτε από τις ρυθμίσεις ενσωματώσεων.",
+			"title": "Το Linear δεν έχει ρυθμιστεί"
+		},
+		"not-connected": {
+			"description": "Συνδέστε το Linear από τις ρυθμίσεις ενσωματώσεων για να περιηγηθείτε στα ζητήματα, να τα διαχειρίζεστε από το Ensemblr και να δημιουργείτε χώρους εργασίας από ζητήματα.",
+			"title": "Το Linear δεν είναι συνδεδεμένο"
+		},
+		"open-settings": "Άνοιγμα ρυθμίσεων ενσωματώσεων",
+		"reconnect-required": {
+			"title": "Το Linear πρέπει να συνδεθεί ξανά"
+		}
+	},
+	"create-workspace": {
+		"creating": "Δημιουργία…",
+		"menu-label": "Δημιουργία σε αποθετήριο",
+		"trigger": "Δημιουργία χώρου εργασίας"
+	},
+	"failure": {
+		"not-connected": "Το Linear δεν είναι συνδεδεμένο. Συνδεθείτε από τις ρυθμίσεις ενσωματώσεων.",
+		"not-found": "Αυτό το ζήτημα Linear δεν υπάρχει πλέον ή δεν είναι ορατό σε εσάς.",
+		"permission-denied": "Ο λογαριασμός σας Linear δεν έχει δικαίωμα για αυτήν την ενέργεια.",
+		"rate-limited": "Συμπληρώθηκε το όριο αιτημάτων του Linear. Δοκιμάστε ξανά σύντομα.",
+		"rate-limited-retry": "Συμπληρώθηκε το όριο αιτημάτων του Linear. Δοκιμάστε ξανά σε {{seconds}} δευτ.",
+		"reconnect-required": "Η σύνδεση με το Linear έληξε. Επανασυνδεθείτε από τις ρυθμίσεις ενσωματώσεων.",
+		"unreachable": "Το Linear δεν είναι προσβάσιμο. Εμφανίζονται προσωρινά αποθηκευμένα δεδομένα όπου υπάρχουν."
+	},
+	"issue-badges": {
+		"archived": "Αρχειοθετημένο"
+	},
+	"issue-detail": {
+		"back": "Πίσω στα ζητήματα",
+		"load-failed": "Δεν ήταν δυνατή η φόρτωση αυτού του ζητήματος Linear.",
+		"no-comments": "Δεν υπάρχουν ακόμη σχόλια.",
+		"no-description": "Χωρίς περιγραφή.",
+		"open-external": "Άνοιγμα στο Linear",
+		"refresh": "Ανανέωση ζητήματος",
+		"unknown-author": "Άγνωστος"
+	},
+	"issue-editor": {
+		"description-create": "Δημιουργήστε ένα ζήτημα στον συνδεδεμένο χώρο εργασίας Linear.",
+		"description-edit": "Ενημερώστε τα πεδία που επιτρέπουν τα δικαιώματά σας στο Linear.",
+		"field": {
+			"assignee": "Υπεύθυνος",
+			"cycle": "Κύκλος",
+			"description": "Περιγραφή ζητήματος",
+			"description-placeholder": "Περιγραφή (markdown)",
+			"due-date": "Προθεσμία",
+			"priority": "Προτεραιότητα",
+			"project": "Έργο",
+			"status": "Κατάσταση",
+			"team": "Ομάδα",
+			"title": "Τίτλος ζητήματος"
+		},
+		"priority": {
+			"high": "Υψηλή",
+			"low": "Χαμηλή",
+			"medium": "Μεσαία",
+			"none": "Χωρίς προτεραιότητα",
+			"urgent": "Επείγουσα"
+		},
+		"saving": "Αποθήκευση…",
+		"submit-create": "Δημιουργία ζητήματος",
+		"submit-edit": "Αποθήκευση αλλαγών",
+		"title-create": "Νέο ζήτημα Linear",
+		"title-edit": "Επεξεργασία {{identifier}}",
+		"unset-option": "{{field}}: κανένα"
+	},
+	"issue-list": {
+		"all-teams": "Όλες οι ομάδες",
+		"empty": "Δεν υπάρχουν ακόμη αποθηκευμένα ζητήματα Linear. Ανανεώστε για συγχρονισμό από το Linear.",
+		"empty-search": "Κανένα ζήτημα δεν ταιριάζει με την αναζήτησή σας.",
+		"new-issue": "Νέο ζήτημα",
+		"refresh": "Ανανέωση ζητημάτων",
+		"search-label": "Αναζήτηση ζητημάτων Linear",
+		"search-placeholder": "Αναζήτηση με αναγνωριστικό ή τίτλο…"
+	},
+	"issue-picker": {
+		"description": "Αναζητήστε ζητήματα Linear και επιλέξτε ένα για σύνδεση.",
+		"empty": "Κανένα ζήτημα δεν ταιριάζει με την αναζήτησή σας.",
+		"loading": "Φόρτωση ζητημάτων…",
+		"not-connected": "Το Linear δεν είναι συνδεδεμένο. Συνδεθείτε από τις ρυθμίσεις ενσωματώσεων.",
+		"search-placeholder": "Αναζήτηση με αναγνωριστικό ή τίτλο…",
+		"title": "Σύνδεση ζητήματος Linear"
+	},
+	"linked-issue": {
+		"connect": "Σύνδεση Linear",
+		"reconnect": "Επανασύνδεση Linear",
+		"refresh": "Ανανέωση συνδεδεμένου ζητήματος",
+		"refresh-status": "Ανανέωση κατάστασης συνδεδεμένου ζητήματος",
+		"set-status": "Ορισμός κατάστασης",
+		"set-status-menu": "Ενημέρωση κατάστασης Linear",
+		"status": {
+			"deleted": "Διαγράφηκε στο Linear",
+			"no-access": "Χωρίς πρόσβαση",
+			"rate-limited": "Όριο αιτημάτων",
+			"unavailable": "Κατάσταση μη διαθέσιμη"
+		},
+		"update-failed": "Η ενημέρωση της κατάστασης στο Linear απέτυχε.",
+		"updating": "Ενημέρωση…"
+	},
+	"priority": {
+		"high": "Υψηλή",
+		"low": "Χαμηλή",
+		"medium": "Μεσαία",
+		"none": "Χωρίς προτεραιότητα",
+		"urgent": "Επείγουσα"
+	}
+}

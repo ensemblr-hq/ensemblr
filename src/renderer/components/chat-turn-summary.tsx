@@ -2,6 +2,7 @@ import { useAtomValue } from 'jotai';
 import { ChevronRightIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useId, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useScrollAnchor } from '@/renderer/hooks/conversation/use-anchored-disclosure';
 import { formatTurnDuration } from '@/renderer/lib/format-duration';
 import { cn } from '@/renderer/lib/utils';
@@ -42,6 +43,7 @@ export function ChatTurnSummary({
 	// the mode it was made under, so the next flip invalidates it and the turn
 	// obeys the new default again.
 	const collapseMode = useAtomValue(toolCallCollapseAtom);
+	const { t } = useTranslation();
 	const bodyId = useId();
 	const [override, setOverride] = useState<{
 		mode: typeof collapseMode;
@@ -55,14 +57,24 @@ export function ChatTurnSummary({
 	const segments: string[] = [];
 	if (toolGlyphs.length > 0) {
 		segments.push(
-			`${toolGlyphs.length} tool ${pluralize('call', toolGlyphs.length)}`,
+			t('common:turn-summary.tool-calls', {
+				count: toolGlyphs.length,
+				defaultValue_one: '{{count}} tool call',
+				defaultValue_other: '{{count}} tool calls',
+			}),
 		);
 	}
 	if (messageCount > 0) {
-		segments.push(`${messageCount} ${pluralize('message', messageCount)}`);
+		segments.push(
+			t('common:turn-summary.messages', {
+				count: messageCount,
+				defaultValue_one: '{{count}} message',
+				defaultValue_other: '{{count}} messages',
+			}),
+		);
 	}
 	if (segments.length === 0) {
-		segments.push('Work');
+		segments.push(t('common:turn-summary.fallback', 'Work'));
 	}
 	const headline = segments.join(', ');
 	const trailing = durationMs !== null ? formatTurnDuration(durationMs) : null;
@@ -133,14 +145,4 @@ function ToolGlyphStrip({ glyphs }: { glyphs: readonly ToolGlyph[] }) {
 			{overflow > 0 ? <span className='text-xxs'>+{overflow}</span> : null}
 		</span>
 	);
-}
-
-/**
- * Pluralize a word by appending `s` unless the count is exactly one.
- * @param word - Singular word to pluralize
- * @param count - Count that selects singular or plural
- * @returns The singular or pluralized word
- */
-function pluralize(word: string, count: number): string {
-	return count === 1 ? word : `${word}s`;
 }

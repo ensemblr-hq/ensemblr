@@ -4,6 +4,7 @@ import { ArrowDownIcon } from 'lucide-react';
 import { ScrollArea as ScrollAreaPrimitive } from 'radix-ui';
 import type { ComponentProps, ReactNode } from 'react';
 import { useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
 	StickToBottom,
 	type StickToBottomContext,
@@ -126,6 +127,7 @@ export const ConversationScrollButton = ({
 	className,
 	...props
 }: ConversationScrollButtonProps) => {
+	const { t } = useTranslation();
 	const { isAtBottom, scrollToBottom } = useStickToBottomContext();
 
 	const handleScrollToBottom = useCallback(() => {
@@ -135,7 +137,10 @@ export const ConversationScrollButton = ({
 	return (
 		!isAtBottom && (
 			<Button
-				aria-label='Scroll to newest message'
+				aria-label={t(
+					'common:conversation.scroll-to-newest',
+					'Scroll to newest message',
+				)}
 				className={cn(
 					'absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full dark:bg-background dark:hover:bg-muted',
 					className,

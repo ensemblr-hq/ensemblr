@@ -7,6 +7,7 @@ import {
 	Trash2Icon,
 } from 'lucide-react';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import {
 	ensemblrQueryKeys,
@@ -34,6 +35,7 @@ export function EnvironmentVariableRow({
 	scopeId?: string;
 	onEdit: (key: string) => void;
 }) {
+	const { t } = useTranslation();
 	const queryClient = useQueryClient();
 	const [revealed, setRevealed] = useState(false);
 	const [revealedValue, setRevealedValue] = useState<string | null>(null);
@@ -89,7 +91,11 @@ export function EnvironmentVariableRow({
 			</div>
 			<div className='flex shrink-0 items-center gap-2'>
 				<Button
-					aria-label={revealed ? 'Hide value' : 'Show value'}
+					aria-label={
+						revealed
+							? t('settings:environment.row.hide-value', 'Hide value')
+							: t('settings:environment.row.show-value', 'Show value')
+					}
 					disabled={loading}
 					onClick={() => void handleToggleReveal()}
 					size='icon-xs'
@@ -109,7 +115,7 @@ export function EnvironmentVariableRow({
 			</div>
 			<div className='flex shrink-0 items-center gap-1'>
 				<Button
-					aria-label='Edit variable'
+					aria-label={t('settings:environment.row.edit', 'Edit variable')}
 					onClick={() => onEdit(variable.key)}
 					size='icon-xs'
 					variant='ghost'
@@ -117,7 +123,7 @@ export function EnvironmentVariableRow({
 					<PencilIcon aria-hidden='true' className='size-3.5' />
 				</Button>
 				<Button
-					aria-label='Delete variable'
+					aria-label={t('settings:environment.row.delete', 'Delete variable')}
 					disabled={deleteMutation.isPending}
 					onClick={() => deleteMutation.mutate()}
 					size='icon-xs'

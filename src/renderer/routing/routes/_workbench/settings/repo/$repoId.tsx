@@ -1,6 +1,7 @@
 import { createFileRoute, Outlet } from '@tanstack/react-router';
 import { useSetAtom } from 'jotai';
 import { useEffect } from 'react';
+import { Trans } from 'react-i18next';
 
 import { workbenchRouteApi } from '@/renderer/hooks/workbench-shell/route-layout/use-workbench-layout-model';
 import { settingsActiveRepoIdAtom } from '@/renderer/state/settings-ui';
@@ -28,8 +29,14 @@ function RepoSettingsLayout() {
 	if (!project) {
 		return (
 			<div className='mx-auto w-full max-w-3xl px-8 py-10 text-muted-foreground text-sm'>
-				Repository <span className='font-mono text-foreground'>{repoId}</span>{' '}
-				not found.
+				<Trans
+					components={{
+						id: <span className='font-mono text-foreground' />,
+					}}
+					defaults='Repository <id>{{repoId}}</id> not found.'
+					i18nKey='settings:repo.not-found'
+					values={{ repoId }}
+				/>
 			</div>
 		);
 	}

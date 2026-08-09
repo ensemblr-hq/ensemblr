@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Badge } from '@/renderer/components/ui/badge';
 import { Button } from '@/renderer/components/ui/button';
 import {
@@ -62,6 +63,7 @@ function parseFixture(rawText: string): readonly PiCapturedLine[] {
  * original capture.
  */
 export function PiReplayView() {
+	const { t } = useTranslation();
 	const fixtureNames = useMemo(
 		() =>
 			Object.keys(FIXTURE_SOURCES)
@@ -134,7 +136,9 @@ export function PiReplayView() {
 	return (
 		<div className='flex h-full min-h-0 flex-col bg-background text-foreground'>
 			<header className='flex flex-wrap items-center gap-2 border-border/40 border-b px-4 py-2'>
-				<span className='font-medium text-sm'>Pi fixture replay</span>
+				<span className='font-medium text-sm'>
+					{t('common:pi-replay.title', 'Pi fixture replay')}
+				</span>
 				<Badge variant='outline'>dev</Badge>
 				<Select onValueChange={setFixtureName} value={fixtureName}>
 					<SelectTrigger className='h-8 w-60 text-xs' size='sm'>
@@ -164,7 +168,11 @@ export function PiReplayView() {
 					{running ? 'Restart' : 'Replay'}
 				</Button>
 				<span className='text-muted-foreground text-xs'>
-					{inputs.length} events
+					{t('common:pi-replay.event-count', {
+						count: inputs.length,
+						defaultValue_one: '{{count}} event',
+						defaultValue_other: '{{count}} events',
+					})}
 				</span>
 			</header>
 			<PiTimeline state={state} />

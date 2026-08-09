@@ -1,11 +1,27 @@
-import { MERGE_CONFLICTS_LABEL } from '@/renderer/lib/workbench/pull-request-model';
+import { i18n } from '@/renderer/lib/i18n';
 import type {
 	RightSidebarHeaderState,
 	WorkspaceShellModel,
 } from '@/renderer/types/workbench';
 
-/** Label the header falls back to while an agent turn is in flight. */
-const AGENT_WORKING_LABEL = 'Working...';
+/**
+ * Label the header falls back to while an agent turn is in flight.
+ * @returns The label in the active language.
+ */
+function agentWorkingLabel(): string {
+	return i18n.t('workbench:sidebar-header.agent.working', 'Working...');
+}
+
+/**
+ * The one name a conflicting branch goes by, resolved per call so a language
+ * switch reaches it. Shares its key with the pull-request model, which reports
+ * the conflicts `gh` returns, while the header also reports the ones the local
+ * trial merge found first — so both routes to the same fact read identically.
+ * @returns The label in the active language.
+ */
+function mergeConflictsLabel(): string {
+	return i18n.t('git:pull-request.label.conflicts', 'Merge conflicts');
+}
 
 /** Options that adjust header derivation for signals outside the PR snapshot. */
 interface RightSidebarHeaderStateOptions {
@@ -55,7 +71,7 @@ export function getRightSidebarHeaderState(
 	const hasPullRequestNumber = typeof pullRequestNumber === 'number';
 	const isAgentWorking =
 		options.agentBusy === true || pullRequest.status === 'agent-working';
-	const workingLabel = isAgentWorking ? AGENT_WORKING_LABEL : '';
+	const workingLabel = isAgentWorking ? agentWorkingLabel() : '';
 	const hasConflicts =
 		options.hasConflicts === true || pullRequest.isConflicting === true;
 
@@ -68,7 +84,7 @@ export function getRightSidebarHeaderState(
 			hasConflicts,
 			isAgentWorking,
 			kind: hasBranchChanges ? 'create-pr' : 'empty',
-			label: hasConflicts ? MERGE_CONFLICTS_LABEL : workingLabel,
+			label: hasConflicts ? mergeConflictsLabel() : workingLabel,
 			tone: hasConflicts ? 'blocked' : 'neutral',
 		};
 	}
@@ -109,7 +125,9 @@ function resolveNumberedHeaderVariant(
 	if (pullRequest.state === 'merged') {
 		return {
 			kind: 'pr-merged',
-			label: pullRequest.label || 'Merged',
+			label:
+				pullRequest.label ||
+				i18n.t('workbench:sidebar-header.pr.merged', 'Merged'),
 			tone: 'merged',
 		};
 	}
@@ -127,7 +145,7 @@ function resolveNumberedHeaderVariant(
 	if (hasConflicts) {
 		return {
 			kind: 'pr-blocked',
-			label: MERGE_CONFLICTS_LABEL,
+			label: mergeConflictsLabel(),
 			tone: 'blocked',
 		};
 	}
@@ -135,7 +153,9 @@ function resolveNumberedHeaderVariant(
 	if (pullRequest.status === 'ready-to-merge') {
 		return {
 			kind: 'pr-ready',
-			label: pullRequest.label || 'Ready to merge',
+			label:
+				pullRequest.label ||
+				i18n.t('workbench:sidebar-header.pr.ready', 'Ready to merge'),
 			tone: 'ready',
 		};
 	}

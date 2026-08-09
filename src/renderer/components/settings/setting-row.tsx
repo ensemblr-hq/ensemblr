@@ -1,5 +1,6 @@
 import { Undo2Icon } from 'lucide-react';
 import type { ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import {
 	Tooltip,
@@ -34,11 +35,14 @@ interface SettingRowProps {
 
 /** Icon button that reverts a modified setting to its default; revealed on row hover or keyboard focus. */
 function RevertToDefaultButton({ onReset }: { onReset: () => void }) {
+	const { t } = useTranslation();
+	const label = t('common:actions.revert-to-default', 'Revert to default');
+
 	return (
 		<Tooltip>
 			<TooltipTrigger asChild>
 				<button
-					aria-label='Revert to default'
+					aria-label={label}
 					className='inline-flex size-5 shrink-0 items-center justify-center rounded-sm text-muted-foreground opacity-0 transition-opacity hover:bg-muted hover:text-foreground focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring group-hover:opacity-100'
 					onClick={onReset}
 					type='button'
@@ -46,7 +50,7 @@ function RevertToDefaultButton({ onReset }: { onReset: () => void }) {
 					<Undo2Icon aria-hidden='true' className='size-3.5' />
 				</button>
 			</TooltipTrigger>
-			<TooltipContent>Revert to default</TooltipContent>
+			<TooltipContent>{label}</TooltipContent>
 		</Tooltip>
 	);
 }

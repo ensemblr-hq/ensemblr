@@ -1,7 +1,9 @@
 import { InfoIcon } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 /** Quiet footnote explaining local-execution guarantees beneath the checks list. */
 export function LocalExecutionNotice() {
+	const { t } = useTranslation();
 	return (
 		<p
 			className='flex items-start gap-2 text-muted-foreground text-xs leading-5'
@@ -9,9 +11,10 @@ export function LocalExecutionNotice() {
 		>
 			<InfoIcon aria-hidden='true' className='mt-0.5 size-3.5 shrink-0' />
 			<span>
-				Agents, scripts, terminals, and tools run locally with your macOS
-				account permissions. Workspace trusted mode is the default; stricter
-				modes can require approval or read-only access where supported.
+				{t(
+					'common:setup-summary.local-execution-notice',
+					'Agents, scripts, terminals, and tools run locally with your macOS account permissions. Workspace trusted mode is the default; stricter modes can require approval or read-only access where supported.',
+				)}
 			</span>
 		</p>
 	);

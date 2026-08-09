@@ -1,7 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
+import type { TFunction } from 'i18next';
 import { RefreshCwIcon } from 'lucide-react';
 import { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import {
 	ensemblrQueryKeys,
@@ -60,6 +62,7 @@ function LinearLinkedIssueStatus({
 	linkedIssue: WorkspaceLinkedIssueSummary;
 	remoteId: string;
 }) {
+	const { t } = useTranslation();
 	const { data: connectionData, isLoading: connectionLoading } = useQuery(
 		linearConnectionQuery,
 	);
@@ -89,8 +92,8 @@ function LinearLinkedIssueStatus({
 				<Button asChild size='sm' variant='ghost'>
 					<Link to='/settings/integrations'>
 						{gate.kind === 'reconnect-required'
-							? 'Reconnect Linear'
-							: 'Connect Linear'}
+							? t('linear:linked-issue.reconnect', 'Reconnect Linear')
+							: t('linear:linked-issue.connect', 'Connect Linear')}
 					</Link>
 				</Button>
 			</span>
@@ -103,12 +106,15 @@ function LinearLinkedIssueStatus({
 				<LinkedIssueReference linkedIssue={linkedIssue} />
 				<Badge variant='outline'>
 					{result
-						? shortFailureLabel(result.failure.code)
-						: 'Status unavailable'}
+						? shortFailureLabel(result.failure.code, t)
+						: t('linear:linked-issue.status.unavailable', 'Status unavailable')}
 				</Badge>
 				{result?.failure.code === 'not-found' ? null : (
 					<Button
-						aria-label='Refresh linked issue'
+						aria-label={t(
+							'linear:linked-issue.refresh',
+							'Refresh linked issue',
+						)}
 						onClick={() => void refetchDetail()}
 						size='icon-sm'
 						variant='ghost'
@@ -128,13 +134,18 @@ function LinearLinkedIssueStatus({
 				name={result.issue.stateName}
 			/>
 			{result.issue.archivedAt ? (
-				<Badge variant='secondary'>Archived</Badge>
+				<Badge variant='secondary'>
+					{t('linear:issue-badges.archived', 'Archived')}
+				</Badge>
 			) : (
 				<SetStatusMenu issue={result.issue} />
 			)}
 			{isLinearDataStale(result.issue.syncedAt, now) ? (
 				<Button
-					aria-label='Refresh linked issue status'
+					aria-label={t(
+						'linear:linked-issue.refresh-status',
+						'Refresh linked issue status',
+					)}
 					disabled={detailFetching}
 					onClick={() => void refetchDetail()}
 					size='icon-sm'
@@ -151,6 +162,7 @@ function LinearLinkedIssueStatus({
 
 /** Explicit status-change menu fed by cached team workflow states. */
 function SetStatusMenu({ issue }: { issue: LinearIssueWire }) {
+	const { t } = useTranslation();
 	const queryClient = useQueryClient();
 	const { data: metadataData } = useQuery(linearMetadataQuery);
 	const mutation = useMutation({
@@ -180,7 +192,10 @@ function SetStatusMenu({ issue }: { issue: LinearIssueWire }) {
 		mutation.data?.status === 'error'
 			? describeLinearFailure(mutation.data.failure)
 			: mutation.error
-				? 'Updating the Linear status failed.'
+				? t(
+						'linear:linked-issue.update-failed',
+						'Updating the Linear status failed.',
+					)
 				: null;
 
 	return (
@@ -188,12 +203,14 @@ function SetStatusMenu({ issue }: { issue: LinearIssueWire }) {
 			<DropdownMenu>
 				<DropdownMenuTrigger asChild>
 					<Button disabled={mutation.isPending} size='sm' variant='ghost'>
-						{mutation.isPending ? 'Updating…' : 'Set status'}
+						{mutation.isPending
+							? t('linear:linked-issue.updating', 'Updating…')
+							: t('linear:linked-issue.set-status', 'Set status')}
 					</Button>
 				</DropdownMenuTrigger>
 				<DropdownMenuContent align='start' className='w-48 p-1'>
 					<DropdownMenuLabel className='px-2 pt-1.5 pb-1 text-muted-foreground text-xs'>
-						Update Linear status
+						{t('linear:linked-issue.set-status-menu', 'Update Linear status')}
 					</DropdownMenuLabel>
 					{states.map((state) => (
 						<DropdownMenuItem
@@ -260,17 +277,18 @@ function LinkedIssueReference({
 /**
  * Map a Linear failure code to a short status badge label.
  * @param code - Linear failure code
+ * @param t - Translation function from the calling component
  * @returns A concise human-readable status label
  */
-function shortFailureLabel(code: string): string {
+function shortFailureLabel(code: string, t: TFunction): string {
 	switch (code) {
 		case 'not-found':
-			return 'Deleted in Linear';
+			return t('linear:linked-issue.status.deleted', 'Deleted in Linear');
 		case 'permission-denied':
-			return 'No access';
+			return t('linear:linked-issue.status.no-access', 'No access');
 		case 'rate-limited':
-			return 'Rate limited';
+			return t('linear:linked-issue.status.rate-limited', 'Rate limited');
 		default:
-			return 'Status unavailable';
+			return t('linear:linked-issue.status.unavailable', 'Status unavailable');
 	}
 }

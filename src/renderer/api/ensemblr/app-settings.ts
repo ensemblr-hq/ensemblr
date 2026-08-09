@@ -19,6 +19,11 @@ export function updateAppSettings(
 	return getEnsemblrApi().updateAppSettings(patch);
 }
 
+/** Reads the OS language preference order (most-preferred first) from main. */
+export function getSystemLanguages(): Promise<string[]> {
+	return getEnsemblrApi().getSystemLanguages();
+}
+
 /** Opens `config.json` in the user's editor (creating it if needed). */
 export function openAppConfigFile(): Promise<OpenAppConfigFileResult> {
 	return getEnsemblrApi().openAppConfigFile();

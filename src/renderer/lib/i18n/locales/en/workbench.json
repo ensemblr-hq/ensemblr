@@ -1,0 +1,1029 @@
+{
+	"add-project": {
+		"check": {
+			"not-ready": "{{title}} is not ready yet."
+		},
+		"open-github": {
+			"label": "Open GitHub project",
+			"unavailable": "Sign in with the GitHub CLI (gh auth login) to open GitHub projects."
+		},
+		"open-local": {
+			"label": "Open local project",
+			"unavailable": "Set a writable Ensemblr root directory before opening local projects."
+		},
+		"quick-start": {
+			"label": "Quick start",
+			"unavailable": "Set a writable Ensemblr root directory before starting a new project."
+		}
+	},
+	"all-files": {
+		"empty": {
+			"message": "Files appear here as soon as they are created.",
+			"title": "No files yet"
+		},
+		"open-preview": "Open {{path}} preview"
+	},
+	"all-files-search": {
+		"description": "Open a repository file from the All files tab.",
+		"empty": "No files match your search.",
+		"group-files": "Files",
+		"placeholder": "Search files",
+		"title": "Search files"
+	},
+	"archive-repository": {
+		"cleanup": {
+			"description": "The per-workspace <0>.context/</0> handoff files are preserved; anything else not pushed will be lost.",
+			"label": "Also remove each worktree and drop its local branch"
+		},
+		"description": "Marks the repository and {{workspaces}} as archived. Each workspace's <0>.context/</0> handoff files are preserved under <1>archived-contexts/</1>. Worktrees and the repository folder stay on disk.",
+		"title": "Archive repository?"
+	},
+	"archive-workspace": {
+		"cleanup": {
+			"description": "The <0>.context/</0> handoff files are preserved; anything else not pushed to the remote will be lost.",
+			"label": "Also remove the worktree and drop the local branch"
+		},
+		"description": "Marks the workspace as archived and preserves its <0>.context/</0> handoff files under <1>archived-contexts/</1>. By default the worktree folder and local branch stay on disk; nothing is committed or pushed.",
+		"title": "Archive workspace?"
+	},
+	"attachment-menu": {
+		"add-attachment": "Add attachment",
+		"aria-label": "Attachments",
+		"link-issue": "Link issue",
+		"link-issue-soon": {
+			"title": "Linking issues is coming soon."
+		},
+		"link-workspaces": "Link workspaces",
+		"link-workspaces-soon": {
+			"title": "Linking workspaces is coming soon."
+		},
+		"tooltip": "Add attachments, link issues, and more"
+	},
+	"autocomplete": {
+		"no-commands": "No matching commands",
+		"no-files": "No matching files"
+	},
+	"browse-archive": {
+		"description": "Restore an archived workspace, or permanently purge it. Restoring rebuilds the worktree from the recorded base branch when branch cleanup ran at archive time.",
+		"empty": {
+			"failed": "Failed to load archived workspaces.",
+			"loading": "Loading archived workspaces…",
+			"none": "No archived workspaces for this repository.",
+			"unavailable": "The preload bridge is unavailable in this context."
+		},
+		"row": {
+			"archived": "Archived {{date}}",
+			"archived-destroyed": "Archived {{date}} · worktree was destroyed (recreate from base branch on restore)",
+			"delete-permanently": "Delete permanently",
+			"no-branch": "no branch"
+		},
+		"title": "Workspace archive — {{repository}}"
+	},
+	"checks-panel": {
+		"blocked": {
+			"detail": "Resolve blockers before merge.",
+			"title": "Checks failed"
+		},
+		"checking": {
+			"detail": "Checks are still running.",
+			"title": "Checks pending"
+		},
+		"empty": {
+			"detail": "No local changes to review."
+		},
+		"no-pull-request": {
+			"title": "No pull request"
+		},
+		"open": {
+			"detail": "Pull request is open.",
+			"title": "Pull request #{{number}}"
+		},
+		"ready": {
+			"detail": "All required checks passed.",
+			"title": "Ready to merge"
+		},
+		"uncommitted": {
+			"detail_one": "{{count}} uncommitted change ready for PR setup.",
+			"detail_other": "{{count}} uncommitted changes ready for PR setup."
+		},
+		"working": {
+			"detail": "The agent is updating this workspace.",
+			"title": "Pull request active"
+		}
+	},
+	"close-running-chat": {
+		"confirm": "Close anyway",
+		"description": "This chat is currently running. Closing it will stop the current agent session.",
+		"title": "Close running chat?"
+	},
+	"closed-tabs": {
+		"empty": "No closed chat tabs",
+		"tooltip": "Closed chat tabs",
+		"trigger": "Open closed chat tabs"
+	},
+	"command-palette": {
+		"empty": "No matching command.",
+		"go-history": "Open chat history",
+		"go-home": "Go to workbench",
+		"go-linear": "Browse Linear issues",
+		"group-appearance": "Appearance",
+		"group-navigation": "Navigation",
+		"group-settings": "Settings",
+		"label": "Command palette",
+		"placeholder": "Search commands…",
+		"settings-advanced": "Settings · Advanced",
+		"settings-appearance": "Settings · Appearance",
+		"settings-diagnostics": "Settings · Diagnostics",
+		"settings-environment": "Settings · Environment",
+		"settings-experimental": "Settings · Experimental",
+		"settings-general": "Settings · General",
+		"settings-git": "Settings · Git",
+		"settings-integrations": "Settings · Integrations",
+		"settings-models": "Settings · Models",
+		"settings-providers": "Settings · Providers",
+		"theme-dark": "Theme · Dark",
+		"theme-light": "Theme · Light",
+		"theme-system": "Theme · System"
+	},
+	"composer": {
+		"aria-label": "Agent composer",
+		"blocked-follow-up": "Follow-ups are blocked while the agent is working — stop the turn or wait for it to finish.",
+		"focus-hint": "<key>{{shortcut}}</key><label>to focus</label>",
+		"model": {
+			"pending": "Model pending"
+		},
+		"placeholder": "Ask to make changes, @mention files, run /commands",
+		"plan-mode": {
+			"placeholder": "Describe what you want built — the agent will plan it with you before touching any files"
+		},
+		"ready": {
+			"placeholder": "Ask the agent to continue {{session}}"
+		},
+		"send-tooltip": "Send message",
+		"setup-blocked": {
+			"placeholder": "Fix setup blockers before sending a prompt.",
+			"reason_one": "{{count}} required setup check needs attention.",
+			"reason_other": "{{count}} required setup checks need attention."
+		},
+		"setup-error": {
+			"placeholder": "Resolve setup diagnostics before starting an agent turn."
+		},
+		"setup-loading": {
+			"placeholder": "Setup checks are still loading.",
+			"reason": "Ensemblr is still checking setup readiness."
+		},
+		"thinking": {
+			"pending": "Thinking pending"
+		},
+		"upload-input": {
+			"aria-label": "Upload attachment"
+		}
+	},
+	"context-usage": {
+		"aria-label": "Context usage",
+		"gauge-title": "Context usage gauge",
+		"heading": "Context",
+		"unavailable": "Context window unavailable for this model.",
+		"window-used": "Window used"
+	},
+	"control-tool": {
+		"add-diff-comments": {
+			"done": "Left review comments",
+			"running": "Leaving review comments"
+		},
+		"ask-user-question": {
+			"done": "Asked you a question",
+			"running": "Asking you a question"
+		},
+		"close-tab": {
+			"done": "Closed a tab",
+			"running": "Closing a tab"
+		},
+		"exit-plan-mode": {
+			"done": "Submitted a plan",
+			"running": "Submitting a plan"
+		},
+		"focus-dock-tab": {
+			"done": "Focused a terminal",
+			"running": "Focusing a terminal"
+		},
+		"focus-panel": {
+			"done": "Focused a panel",
+			"running": "Focusing a panel"
+		},
+		"focus-tab": {
+			"done": "Focused a tab",
+			"running": "Focusing a tab"
+		},
+		"get-conversation-status": {
+			"done": "Checked a sub-agent",
+			"running": "Checking a sub-agent"
+		},
+		"get-diff-comments": {
+			"done": "Read review comments",
+			"running": "Reading review comments"
+		},
+		"get-last-message": {
+			"done": "Read a sub-agent's report",
+			"running": "Reading a sub-agent's report"
+		},
+		"get-workspace-diff": {
+			"done": "Read the diff",
+			"running": "Reading the diff"
+		},
+		"get-workspace-status": {
+			"done": "Read board status",
+			"running": "Reading board status"
+		},
+		"launch-harness": {
+			"done": "Launched a harness",
+			"running": "Launching a harness"
+		},
+		"linear-create-comment": {
+			"done": "Commented on a Linear issue",
+			"running": "Commenting on a Linear issue"
+		},
+		"linear-get-issue": {
+			"done": "Read a Linear issue",
+			"running": "Reading a Linear issue"
+		},
+		"linear-get-metadata": {
+			"done": "Read Linear teams and states",
+			"running": "Reading Linear teams and states"
+		},
+		"linear-list-issues": {
+			"done": "Searched Linear issues",
+			"running": "Searching Linear issues"
+		},
+		"linear-update-issue": {
+			"done": "Updated a Linear issue",
+			"running": "Updating a Linear issue"
+		},
+		"list-models": {
+			"done": "Listed models",
+			"running": "Listing models"
+		},
+		"list-run-scripts": {
+			"done": "Listed run scripts",
+			"running": "Listing run scripts"
+		},
+		"list-tabs": {
+			"done": "Listed tabs",
+			"running": "Listing tabs"
+		},
+		"list-terminals": {
+			"done": "Listed terminals",
+			"running": "Listing terminals"
+		},
+		"list-workspaces": {
+			"done": "Listed workspaces",
+			"running": "Listing workspaces"
+		},
+		"notify-orchestrator": {
+			"done": "Notified the orchestrator",
+			"running": "Notifying the orchestrator"
+		},
+		"open-tab": {
+			"done": "Opened a tab",
+			"running": "Opening a tab"
+		},
+		"read-conversation": {
+			"done": "Read a sub-agent's transcript",
+			"running": "Reading a sub-agent's transcript"
+		},
+		"read-terminal-output": {
+			"done": "Read terminal output",
+			"running": "Reading terminal output"
+		},
+		"resolve-diff-comments": {
+			"done": "Resolved review comments",
+			"running": "Resolving review comments"
+		},
+		"send-follow-up": {
+			"done": "Steered a sub-agent",
+			"running": "Steering a sub-agent"
+		},
+		"set-workspace-status": {
+			"done": "Moved the workspace",
+			"running": "Moving the workspace"
+		},
+		"spawn-chat-tab": {
+			"done": "Opened a chat tab",
+			"running": "Opening a chat tab"
+		},
+		"start-conversation": {
+			"done": "Started a sub-agent",
+			"running": "Starting a sub-agent"
+		},
+		"start-terminal": {
+			"done": "Started a terminal",
+			"running": "Starting a terminal"
+		},
+		"stop-terminal": {
+			"done": "Stopped a terminal",
+			"running": "Stopping a terminal"
+		},
+		"wait-for-agents": {
+			"done": "Waited for sub-agents",
+			"running": "Waiting for sub-agents"
+		},
+		"with-detail": "{{action}}: {{detail}}",
+		"write-terminal": {
+			"done": "Typed into a terminal",
+			"running": "Typing into a terminal"
+		}
+	},
+	"create-workspace-source": {
+		"description": "Choose a branch, pull request, or issue to start a workspace.",
+		"loading": "Loading {{sources}}…",
+		"no-match": "No {{sources}} match your search.",
+		"repository": {
+			"empty": "No repositories found.",
+			"search": "Search repositories…",
+			"select": "Select repository"
+		},
+		"search": {
+			"branch": "Search by name",
+			"issue": "Search by issue number, title, or description",
+			"pull-request": "Search by title, number, or author"
+		},
+		"title": "Create workspace from source"
+	},
+	"dashboard": {
+		"card": {
+			"pull-request-aria": "Pull request #{{number}} {{state}}",
+			"state": {
+				"branch": "branch",
+				"pr-blocked": "blocked",
+				"pr-checking": "checks running",
+				"pr-merged": "merged",
+				"pr-open": "open",
+				"pr-ready": "ready to merge",
+				"pr-working": "agent working",
+				"workspace-blocked": "workspace blocked",
+				"workspace-checking": "workspace checks running",
+				"workspace-working": "agent working"
+			}
+		},
+		"column": {
+			"aria-label": "{{status}} column, {{workspaces}}"
+		},
+		"title": "Dashboard"
+	},
+	"delete-repository": {
+		"description": "Permanently removes the repository and {{workspaces}} from Ensemblr. Each workspace's worktree folder is deleted and its local branch is dropped. The repository folder stays on disk so you can re-register it later. This cannot be undone.",
+		"title": "Delete repository?"
+	},
+	"delete-workspace": {
+		"description": "Permanently removes the worktree folder, drops the local branch, and deletes the workspace from Ensemblr. Anything not pushed to the remote is lost. This cannot be undone.",
+		"title": "Delete workspace?"
+	},
+	"diff-comment": {
+		"author": {
+			"agent": "Agent"
+		}
+	},
+	"dock-panel": {
+		"close-tab": "Close {{label}} tab",
+		"collapse": "Collapse terminal area",
+		"expand": "Expand terminal area",
+		"new-terminal": "New terminal"
+	},
+	"dock-tab": {
+		"run": {
+			"label": "Run"
+		},
+		"setup": {
+			"label": "Setup"
+		}
+	},
+	"file-preview": {
+		"actions": {
+			"show-preview": "Show formatted preview",
+			"show-source": "Show raw source",
+			"wrap-off": "Disable word wrap",
+			"wrap-on": "Enable word wrap"
+		},
+		"empty": {
+			"loading": "Loading {{filePath}}…",
+			"no-file": "This tab has no file associated with it."
+		},
+		"failure": {
+			"invalid-cwd": "The workspace directory is unavailable.",
+			"invalid-path": "{{filePath}} is outside this workspace.",
+			"not-file": "{{filePath}} is a directory and cannot be previewed.",
+			"not-found": "{{filePath}} does not exist in this workspace.",
+			"too-large": "{{filePath}} is too large to preview.",
+			"unreadable": "Could not read {{filePath}}."
+		},
+		"image-alt": "Preview of {{filePath}}"
+	},
+	"file-tree": {
+		"collapse-folder": "Collapse {{path}}",
+		"expand-folder": "Expand {{path}}"
+	},
+	"file-tree-menu": {
+		"actions": "{{path}} actions"
+	},
+	"git-failure": {
+		"invalid-cwd": {
+			"message": "The folder this workspace points at could not be opened. It may have been moved, renamed, or deleted since the workspace was created.",
+			"title": "Workspace folder unavailable"
+		},
+		"merge-probe": {
+			"title": "Could not check for merge conflicts"
+		},
+		"not-a-repo": {
+			"message": "This folder is not tracked by git, so there is no history to compare against. Initialize a repository here, or recreate the workspace from a cloned one.",
+			"title": "Not a git repository"
+		},
+		"unknown": {
+			"message": "Git could not report this workspace’s changes.",
+			"title": "Could not read changes"
+		}
+	},
+	"harness-launcher": {
+		"none-detected": "No harnesses detected",
+		"none-installed": "No coding agents detected",
+		"trigger": "Launch coding agent"
+	},
+	"header": {
+		"review-sidebar": {
+			"collapse": "Collapse review sidebar",
+			"open": "Open review sidebar"
+		},
+		"target-branch": {
+			"placeholder": "Set target branch",
+			"search": "Search or enter a branch…",
+			"tooltip": "Target branch — what this workspace diffs and opens pull requests against."
+		}
+	},
+	"health": {
+		"checking": {
+			"detail": "Renderer is calling the typed preload bridge through TanStack Query.",
+			"label": "Checking IPC"
+		},
+		"config-blocked": {
+			"detail": "Declarative config blocks readiness.",
+			"label": "{{appName}} config requires attention"
+		},
+		"database-error": {
+			"detail": "Database failed to open.",
+			"label": "{{appName}} database unavailable"
+		},
+		"no-bridge": {
+			"detail": "Electron preload bridge is unavailable in this context."
+		},
+		"online": {
+			"detail": "Electron {{electronVersion}} on {{platform}}. Database schema v{{schemaVersion}}.",
+			"label": "{{appName}} IPC online"
+		},
+		"setup-blocked": {
+			"detail_one": "{{count}} required setup check needs attention.",
+			"detail_other": "{{count}} required setup checks need attention.",
+			"label": "Setup blocked"
+		},
+		"setup-checking": {
+			"label": "Setup checks pending"
+		},
+		"setup-error": {
+			"label": "Setup diagnostics unavailable"
+		},
+		"setup-loading": {
+			"detail": "Ensemblr is collecting setup readiness checks.",
+			"label": "Checking setup"
+		},
+		"unavailable": {
+			"label": "IPC unavailable"
+		}
+	},
+	"history": {
+		"bucket": {
+			"today": "Today",
+			"unknown": "Unknown",
+			"yesterday": "Yesterday"
+		},
+		"empty": {
+			"failed": "Failed to load workspace history.",
+			"loading": "Loading workspaces…",
+			"no-match": "No workspaces match your filter.",
+			"none": "No workspaces yet.",
+			"unavailable": "The preload bridge is unavailable in this context."
+		},
+		"filter": {
+			"label": "Filter workspaces",
+			"placeholder": "Filter workspaces…"
+		},
+		"row": {
+			"go-to": "Go to",
+			"restore-blocked": "Cannot restore: the recorded base branch or branch name is missing."
+		}
+	},
+	"landing-card": {
+		"aria-label": "Workspace landing summary",
+		"branch": {
+			"plain": "On <ref>{{branchName}}</ref>",
+			"with-base": "On <ref>{{branchName}}</ref>, compared against <ref>{{baseBranch}}</ref>"
+		},
+		"created": {
+			"copied_one": "Created {{workspaceName}} and copied {{count}} file",
+			"copied_other": "Created {{workspaceName}} and copied {{count}} files",
+			"detail": "Created {{workspaceName}}. {{detail}}"
+		},
+		"headline": "You’re in a new copy of <repo>{{repositoryName}}</repo> called <workspace>{{workspaceName}}</workspace>"
+	},
+	"lifecycle-dialog": {
+		"summary": {
+			"branch": "Branch",
+			"path": "Path",
+			"repository": "Repository",
+			"workspace": "Workspace"
+		}
+	},
+	"mcp-servers": {
+		"aria-label": "MCP servers",
+		"authorise": "Authorise {{name}}",
+		"empty": "No MCP servers are configured.",
+		"heading": "MCPs",
+		"loading": "Reading the MCP roster…",
+		"refresh": "Refresh MCP servers",
+		"status": {
+			"disabled": "Disabled",
+			"failed": "Error",
+			"needs-auth": "Needs auth",
+			"pending": "Awaiting status"
+		}
+	},
+	"model-picker": {
+		"all-hidden": "All models hidden — manage in Settings → Models.",
+		"aria-label": "Model",
+		"favourite": "Favourite model",
+		"group": {
+			"favourites": "Favourites"
+		},
+		"locked-hint": "This chat runs on {{provider}}. Start a new chat to switch provider.",
+		"pending": "Model pending",
+		"tooltip": "Change model",
+		"unfavourite": "Unfavourite model",
+		"unselected": "Select model"
+	},
+	"navigation-sidebar": {
+		"footer": {
+			"repositories_one": "{{count}} repo",
+			"repositories_other": "{{count}} repos",
+			"workspaces_one": "{{count}} workspace",
+			"workspaces_other": "{{count}} workspaces"
+		},
+		"nav": {
+			"dashboard": "Dashboard",
+			"history": "History",
+			"settings": "Settings",
+			"settings-aria": "Open app settings"
+		},
+		"pinned": {
+			"label": "Pinned"
+		},
+		"repositories": {
+			"label": "Repositories"
+		},
+		"repository": {
+			"reorder": "Reorder repository {{repository}}"
+		},
+		"setup": {
+			"blocked_one": "{{count}} setup check blocked — open diagnostics",
+			"blocked_other": "{{count}} setup checks blocked — open diagnostics",
+			"checking": "Setup checks running…",
+			"not-ready": "Setup not ready — open diagnostics"
+		}
+	},
+	"new-chat": {
+		"aria-label": "New chat empty state",
+		"headline": "New chat in <path>/{{workspaceName}}</path>.",
+		"transcripts-label": "Add chat transcripts:",
+		"untitled-transcript": "Untitled transcript"
+	},
+	"open-in": {
+		"copy-path": "Copy path",
+		"label": "Open in"
+	},
+	"open-workspace-menu": {
+		"options": "Open current workspace app options",
+		"primary": "Open current workspace in {{target}}"
+	},
+	"permission-boundary": {
+		"allowed": "Allowed",
+		"blocked": "Blocked",
+		"confirmation-required": "Requires confirmation"
+	},
+	"pi-replay": {
+		"summary": {
+			"file": "file",
+			"shell-command": "shell command"
+		}
+	},
+	"placeholder": {
+		"dashboard": {
+			"detail": "Kanban board is not connected yet.",
+			"title": "Dashboard"
+		},
+		"history": {
+			"detail": "Session history is not connected yet.",
+			"title": "History"
+		},
+		"linear": {
+			"detail": "Linear issues are available from the Linear route.",
+			"title": "Linear"
+		},
+		"settings": {
+			"detail": "Settings are available from the settings route.",
+			"title": "Settings"
+		},
+		"setup": {
+			"detail": "Complete setup checks before creating or opening workspaces.",
+			"title": "Setup required"
+		}
+	},
+	"plan-mode": {
+		"aria-label-off": "Plan mode: off. Click to toggle.",
+		"aria-label-on": "Plan mode: on. Click to toggle.",
+		"chip": "Plan",
+		"tooltip-off": "Plan before editing",
+		"tooltip-on": "Leave plan mode"
+	},
+	"plan-review": {
+		"actions": {
+			"hand-off": "Hand off",
+			"refine": "Refine"
+		},
+		"aria-label": "Plan review"
+	},
+	"preview": {
+		"choose-url": "Choose preview URL",
+		"open-named": "Open {{name}}",
+		"open-port": "Open preview on port {{port}}",
+		"open-port-label": "Open :{{port}}"
+	},
+	"preview-deployment": {
+		"label": "Preview"
+	},
+	"preview-url": {
+		"fallback": {
+			"name": "Preview {{index}}"
+		}
+	},
+	"project-avatar": {
+		"alt": "{{owner}} avatar"
+	},
+	"project-creation-menu": {
+		"recents": "Recents",
+		"trigger": "Open repository creation menu"
+	},
+	"provider": {
+		"local": "Local",
+		"preview": "Preview"
+	},
+	"raw-frames": {
+		"aria-label": "Pi raw frames debug panel",
+		"clear": "Clear frames",
+		"close": "Close debug panel",
+		"copied-aria": "Copied frame to clipboard",
+		"copied-title": "Copied",
+		"copy-aria": "Copy frame",
+		"copy-title": "Copy frame (signatures follow the current toggle)",
+		"count-title": "visible / total captured",
+		"heading": "Pi raw frames",
+		"hide-session-stats": "hide session_stats",
+		"hide-signatures": "hide signatures",
+		"kind-label": "kind:",
+		"kind-other": "other",
+		"noise-label": "noise:",
+		"session-scope": "Toggle session scope",
+		"this-session": "this session",
+		"waiting": "Waiting for Pi traffic…"
+	},
+	"rename-workspace": {
+		"branch": {
+			"hint": "Follows the workspace name slug until you edit it.",
+			"label": "Branch name",
+			"pinned-hint": "This branch came from a branch or pull request the workspace took over, so renaming it here would orphan that work."
+		},
+		"description": "Updates the workspace name. The branch is auto-renamed from the slugged name unless you override it below. The worktree folder stays put.",
+		"description-pinned": "Updates the workspace name. This workspace took over an existing branch, so the branch keeps its name. The worktree folder stays put.",
+		"name": {
+			"label": "Workspace name"
+		},
+		"title": "Rename workspace"
+	},
+	"repository-header": {
+		"collapse": "Collapse repository {{repository}}",
+		"create-from-source": "Create workspace from a source in {{repository}}",
+		"create-workspace": "Create workspace in {{repository}}",
+		"creating-workspace": "Creating workspace in {{repository}}",
+		"expand": "Expand repository {{repository}}",
+		"settings": "Repository settings for {{repository}}"
+	},
+	"repository-menu": {
+		"archive": "Archive repository",
+		"aria-label": "{{repository}} repository actions",
+		"create-from": "Create from…",
+		"delete": "Delete repository…",
+		"new-workspace": "New workspace",
+		"settings": "Repository settings",
+		"workspace-archive": "Workspace archive"
+	},
+	"restore-checkpoint": {
+		"confirm": "Restore workspace",
+		"description": "Workspace files revert to the snapshot taken before “{{label}}”. Later messages in this chat are hidden from the timeline, but the agent’s own session history is never modified — you can keep prompting from the restored state.",
+		"other-sessions": "Another chat session is active in this workspace; its newer file changes may be overwritten by this restore.",
+		"title": "Restore workspace to before this turn?",
+		"untracked": "Files created after the snapshot that were never tracked stay in place."
+	},
+	"run-script": {
+		"choose": "Choose run script",
+		"configure-action": "Setup Scripts",
+		"empty": {
+			"detail": "Add a run script for the normal dev server, watcher, worker, or local app command.",
+			"title": "No run script configured"
+		},
+		"run-label": "Run {{script}}",
+		"start": "Start Run",
+		"stop-label": "Stop run script",
+		"stopped-caption": "Test your changes here."
+	},
+	"session-tab": {
+		"placeholder": {
+			"label": "Workspace",
+			"summary": "Workspace session placeholder.",
+			"updated": "loaded"
+		},
+		"snapshot": {
+			"summary": "SQLite workspace record loaded. Agent sessions are not wired yet."
+		}
+	},
+	"session-tabs": {
+		"close-tab": "Close {{label}} tab",
+		"debug": {
+			"hide": "Hide Pi debug panel",
+			"show": "Show Pi debug panel",
+			"title": "Pi raw frames (debug)",
+			"toggle": "Toggle Pi debug panel"
+		},
+		"new-tab": "New chat tab"
+	},
+	"setup-script": {
+		"add-manually": "Add manually",
+		"ask-agent": "Ask agent",
+		"missing": {
+			"message": "Run commands when a workspace is created to install dependencies or set up the environment",
+			"title": "Add setup script"
+		},
+		"not-run": {
+			"message": "Setup script output will appear here after running setup.",
+			"title": "No setup script output"
+		},
+		"rerun": "Rerun setup",
+		"run": "Run setup",
+		"stop": "Stop setup"
+	},
+	"shell-title": {
+		"build-image": "Building an image",
+		"build-project": "Building the project",
+		"change-directory": "Changing directory",
+		"change-permissions": "Changing permissions",
+		"check-code": "Checking the code",
+		"check-directory": "Checking the directory",
+		"check-disk-usage": "Checking disk usage",
+		"check-git-status": "Checking git status",
+		"commit-changes": "Committing changes",
+		"compare-files": "Comparing files",
+		"copy-files": "Copying files",
+		"count-lines": "Counting lines",
+		"create-directory": "Creating a directory",
+		"create-file": "Creating a file",
+		"fetch-remote": "Fetching from the remote",
+		"fetch-url": "Fetching a URL",
+		"inspect-processes": "Inspecting processes",
+		"install-dependencies": "Installing dependencies",
+		"list-branches": "Listing branches",
+		"list-files": "Listing files",
+		"locate-binary": "Locating a binary",
+		"merge-branches": "Merging branches",
+		"move-files": "Moving files",
+		"open-file": "Opening a file",
+		"print-output": "Printing output",
+		"pull-changes": "Pulling changes",
+		"push-changes": "Pushing changes",
+		"read-commit": "Reading a commit",
+		"read-file": "Reading a file",
+		"read-git-history": "Reading git history",
+		"rebase-branch": "Rebasing the branch",
+		"remove-files": "Removing files",
+		"review-changes": "Reviewing changes",
+		"run-container": "Running a container",
+		"run-named": "Running {{name}}",
+		"run-script": "Running a script",
+		"run-tests": "Running tests",
+		"search-files": "Searching files",
+		"stage-changes": "Staging changes",
+		"start-dev-server": "Starting the dev server",
+		"stash-changes": "Stashing changes",
+		"stop-process": "Stopping a process",
+		"switch-branches": "Switching branches",
+		"transform-text": "Transforming text",
+		"type-check": "Type-checking",
+		"waiting": "Waiting"
+	},
+	"sidebar-header": {
+		"agent": {
+			"working": "Working..."
+		},
+		"pr": {
+			"merged": "Merged",
+			"ready": "Ready to merge"
+		}
+	},
+	"sub-agent-status": {
+		"aria-label": "Sub-agent runtime"
+	},
+	"terminal": {
+		"session-ended": "Session ended.",
+		"session-failed": "Session failed.",
+		"session-stopped": "Session stopped."
+	},
+	"thinking-picker": {
+		"aria-label-effort": "Effort level: {{level}}. Click to cycle.",
+		"aria-label-thinking": "Thinking level: {{level}}. Click to cycle.",
+		"icon-title": "Thinking level",
+		"off": "Off",
+		"pending-effort": "Effort pending",
+		"pending-thinking": "Thinking pending",
+		"tooltip-effort": "Adjust effort level",
+		"tooltip-thinking": "Adjust thinking level"
+	},
+	"timeline": {
+		"aria-label": "Agent session timeline",
+		"load-failed": "Could not load timeline events.",
+		"runtime-error": "Runtime error",
+		"starting": {
+			"agent": "Starting agent",
+			"loading": "Loading conversation"
+		},
+		"turn-stopped": "You stopped this turn"
+	},
+	"tool-call": {
+		"bash": {
+			"title": "Bash"
+		},
+		"diagnostics": {
+			"clean": "Diagnostics",
+			"count_one": "{{count}} diagnostic",
+			"count_other": "{{count}} diagnostics",
+			"none": "No diagnostics"
+		},
+		"edit": {
+			"title": "Edit"
+		},
+		"failed": {
+			"generic": "Tool execution failed.",
+			"title": "{{tool}} failed",
+			"unspecified": "The call failed without a reported reason."
+		},
+		"generic": {
+			"input-label": "Input:",
+			"output-label": "Output:",
+			"title": "Tool"
+		},
+		"glob": {
+			"title": "Glob"
+		},
+		"grep": {
+			"title": "Search"
+		},
+		"list": {
+			"title": "List"
+		},
+		"placeholder": {
+			"empty-pattern": "(empty)",
+			"no-command": "(no command)",
+			"no-path": "(no path)"
+		},
+		"read": {
+			"image": "Read image",
+			"lines_one": "Read {{count}} line",
+			"lines_other": "Read {{count}} lines",
+			"title": "Read"
+		},
+		"reasoning": {
+			"title": "Thinking"
+		},
+		"skill": {
+			"named": "Skill: {{name}}",
+			"title": "Skill"
+		},
+		"write": {
+			"title": "Write"
+		}
+	},
+	"turn-diff": {
+		"empty": {
+			"failed": "Could not compute diff.",
+			"loading": "Computing turn diff…",
+			"no-changes": "No file changes in this turn.",
+			"no-turn": "This tab has no turn associated."
+		},
+		"file-count_one": "{{count}} file",
+		"file-count_other": "{{count}} files"
+	},
+	"workspace-checks": {
+		"blocked": {
+			"detail": "Checks are failing.",
+			"label": "Checks failed"
+		},
+		"checking": {
+			"detail": "Checks are running.",
+			"label": "Checks running"
+		},
+		"closed": {
+			"detail": "Pull request closed.",
+			"label": "Closed"
+		},
+		"creating": {
+			"detail": "The workspace is still being created.",
+			"label": "Creating"
+		},
+		"merged": {
+			"detail": "Pull request merged.",
+			"label": "Merged"
+		},
+		"none": {
+			"detail": "No checks reported.",
+			"label": "No checks"
+		}
+	},
+	"workspace-item": {
+		"archive-aria": "Archive workspace {{workspace}}; {{boundary}}",
+		"creating": "Creating workspace…",
+		"creating-aria": "Workspace {{workspace}} is being created",
+		"creating-tooltip": "{{workspace}} is being created",
+		"dock-activity": "Dock activity running",
+		"open-aria": "Open workspace {{workspace}}",
+		"open-busy-aria": "Open workspace {{workspace}}; dock activity running"
+	},
+	"workspace-landing": {
+		"branch-source": {
+			"base": "Changes are compared against {{branch}}.",
+			"default": "Changes are compared against the repository default branch."
+		},
+		"copied-files": {
+			"detail_one": "Copied {{count}} file into workspace.",
+			"detail_other": "Copied {{count}} files into workspace.",
+			"unavailable": "Workspace file count is unavailable."
+		},
+		"headline": {
+			"cloned-repo": "Repository cloned",
+			"linked-issue": "Workspace created from {{reference}}",
+			"new": "New workspace ready"
+		},
+		"setup-guidance": {
+			"missing": "No setup script is configured for this repository. Add one to bootstrap dependencies before the first agent turn."
+		}
+	},
+	"workspace-menu": {
+		"aria-label": "{{workspace}} workspace actions",
+		"mark-read": "Mark as read",
+		"mark-unread": "Mark as unread",
+		"set-status": "Set status"
+	},
+	"workspace-pull-request": {
+		"absent": {
+			"detail": "No pull request for this branch yet.",
+			"label": "No PR"
+		},
+		"clean": {
+			"label": "No PR open"
+		},
+		"present": {
+			"detail": "Pull request status from the last GitHub sync."
+		}
+	},
+	"workspace-rename": {
+		"succeeded": "Renamed to {{name}} on branch {{branch}}."
+	},
+	"workspace-source": {
+		"creating": "creating workspace",
+		"default-branch": "repository default branch {{branch}}",
+		"fallback": "workspace loaded from SQLite",
+		"targets": "targets {{branch}}"
+	},
+	"workspace-source-picker": {
+		"action": {
+			"duplicate-branch": "Duplicate branch",
+			"use-branch": "Use branch"
+		},
+		"kind": {
+			"branch": "Branches",
+			"issue": "Issues",
+			"pull-request": "Pull requests"
+		}
+	}
+}

@@ -61,14 +61,23 @@ const LABELS_BY_PROVIDER = {
 } satisfies Record<AgentProviderId, Record<string, string>>;
 
 /**
- * What each runtime calls the dial. Pi steers a thinking level; Claude Code
- * steers an effort level that also governs how much work it does per turn, so
- * the picker names the axis the way the runtime's own docs and CLI do.
+ * The dial a runtime steers, as a locale-neutral id. Pi steers a thinking
+ * level; Claude Code steers an effort level that also governs how much work it
+ * does per turn, so the picker names the axis the way the runtime's own docs
+ * and CLI do. UI code translates this id rather than {@link
+ * getThinkingAxisLabel}, which is English-only.
  */
-const AXIS_LABEL_BY_PROVIDER = {
-	claude: 'Effort',
-	pi: 'Thinking',
-} satisfies Record<AgentProviderId, string>;
+export type ThinkingAxis = 'effort' | 'thinking';
+
+const AXIS_BY_PROVIDER = {
+	claude: 'effort',
+	pi: 'thinking',
+} satisfies Record<AgentProviderId, ThinkingAxis>;
+
+const AXIS_LABELS = {
+	effort: 'Effort',
+	thinking: 'Thinking',
+} satisfies Record<ThinkingAxis, string>;
 
 /**
  * The canonical level list for one runtime, used when a model publishes none of
@@ -98,10 +107,20 @@ export function getThinkingLevelLabel(
 }
 
 /**
- * Name of the dial itself for one runtime, for tooltips and aria labels.
+ * Which dial one runtime steers, as an id a caller can translate.
+ * @param provider - Agent runtime to describe.
+ * @returns `thinking` for pi, `effort` for Claude Code.
+ */
+export function getThinkingAxis(provider: AgentProviderId): ThinkingAxis {
+	return AXIS_BY_PROVIDER[provider];
+}
+
+/**
+ * English name of the dial itself for one runtime. Renderer surfaces translate
+ * {@link getThinkingAxis} instead, so a localised picker is not half English.
  * @param provider - Agent runtime to describe.
  * @returns `Thinking` or `Effort`.
  */
 export function getThinkingAxisLabel(provider: AgentProviderId): string {
-	return AXIS_LABEL_BY_PROVIDER[provider];
+	return AXIS_LABELS[AXIS_BY_PROVIDER[provider]];
 }

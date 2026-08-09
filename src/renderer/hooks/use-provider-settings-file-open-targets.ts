@@ -1,4 +1,5 @@
 import { useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 
 import {
@@ -30,28 +31,40 @@ export function useProviderSettingsFileOpenTargets(
 		primaryTarget,
 		rememberTarget,
 	} = useOpenTargetMenu(`agent-provider:${provider}`);
+	const { t } = useTranslation();
 
 	const invokeTarget = useCallback(
 		async (target: WorkspaceOpenTarget) => {
 			if (getEnsemblrApiOrNull() === null) {
-				toast.error('Open in… is unavailable without the Electron bridge.');
+				toast.error(
+					t(
+						'errors:open-target.bridge-unavailable.title',
+						'Open in… is unavailable without the Electron bridge.',
+					),
+				);
 				return;
 			}
 			const result = await openAgentProviderSettingsFile(provider, target.id);
 			if (!result.opened) {
 				toast.error(
 					result.error ??
-						`Failed to open the settings file in ${target.label}.`,
+						t(
+							'errors:open-target.settings-open-failed.title',
+							'Failed to open the settings file in {{target}}.',
+							{ target: target.label },
+						),
 				);
 				return;
 			}
 			if (target.behavior === 'copy-path') {
-				toast.success('Path copied to clipboard.');
+				toast.success(
+					t('common:clipboard.path-copied', 'Path copied to clipboard.'),
+				);
 				return;
 			}
 			rememberTarget(target.id);
 		},
-		[provider, rememberTarget],
+		[provider, rememberTarget, t],
 	);
 
 	return {

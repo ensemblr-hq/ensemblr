@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/renderer/components/ui/button';
 import { ScrollArea } from '@/renderer/components/ui/scroll-area';
@@ -28,10 +29,11 @@ export function CloneGithubRecentRepos({
 	onSelect,
 	repos,
 }: CloneGithubRecentReposProps) {
+	const { t } = useTranslation();
 	if (isLoading && repos.length === 0) {
 		return (
 			<div className='flex items-center justify-center rounded-lg border border-border bg-background/40 px-2.5 py-3 text-muted-foreground text-xxs'>
-				Loading repos from GitHub…
+				{t('common:clone-dialog.loading-repos', 'Loading repos from GitHub…')}
 			</div>
 		);
 	}
@@ -74,7 +76,7 @@ export function CloneGithubRecentRepos({
 												<span className='truncate'>{repo.fullName}</span>
 												{repo.isPrivate ? (
 													<span className='shrink-0 rounded-sm bg-muted px-1 py-px text-[0.625rem] text-muted-foreground uppercase tracking-wide'>
-														Private
+														{t('common:clone-dialog.private', 'Private')}
 													</span>
 												) : null}
 											</span>

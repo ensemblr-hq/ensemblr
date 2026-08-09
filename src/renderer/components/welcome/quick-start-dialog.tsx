@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
+import { Trans, useTranslation } from 'react-i18next';
 
 import { isEnsemblrApiAvailable } from '@/renderer/api/ensemblr-queries';
 import { DialogActionFooter } from '@/renderer/components/dialog-action-footer';
@@ -45,6 +46,7 @@ function QuickStartDialogForm({
 }: {
 	onOpenChange: (open: boolean) => void;
 }) {
+	const { t } = useTranslation();
 	const {
 		defaultParentPath,
 		diagnostics,
@@ -77,7 +79,9 @@ function QuickStartDialogForm({
 		trimmedName.length > 0 &&
 		localValidation === null &&
 		isEnsemblrApiAvailable();
-	const parentPlaceholder = defaultParentPath || 'Managed repos directory';
+	const parentPlaceholder =
+		defaultParentPath ||
+		t('common:quick-start.parent-placeholder', 'Managed repos directory');
 
 	const handleCreate = useCallback(async () => {
 		if (!canCreate) {
@@ -103,16 +107,19 @@ function QuickStartDialogForm({
 		<>
 			<DialogHeader>
 				<DialogTitle className='font-medium text-[0.9375rem]'>
-					Create project
+					{t('common:quick-start.title', 'Create project')}
 				</DialogTitle>
 				<p className='text-muted-foreground text-xs'>
-					Create a local folder and initialize a new git repository.
+					{t(
+						'common:quick-start.description',
+						'Create a local folder and initialize a new git repository.',
+					)}
 				</p>
 			</DialogHeader>
 
 			<div className='flex flex-col gap-1.5'>
 				<Label className='text-xs' htmlFor='quick-start-name'>
-					Project name
+					{t('common:quick-start.name-label', 'Project name')}
 				</Label>
 				<Input
 					autoFocus
@@ -126,10 +133,16 @@ function QuickStartDialogForm({
 				/>
 				{trimmedName ? (
 					<p className='text-[0.6875rem] text-muted-foreground'>
-						Creates folder and repo{' '}
-						<span className='rounded-sm bg-muted px-1 py-px font-mono'>
-							{trimmedName}
-						</span>
+						<Trans
+							components={{
+								name: (
+									<span className='rounded-sm bg-muted px-1 py-px font-mono' />
+								),
+							}}
+							defaults='Creates folder and repo <name>{{projectName}}</name>'
+							i18nKey='common:quick-start.creates'
+							values={{ projectName: trimmedName }}
+						/>
 					</p>
 				) : null}
 				{localValidation ? (
@@ -139,7 +152,7 @@ function QuickStartDialogForm({
 
 			<div className='flex flex-col gap-1.5'>
 				<Label className='text-xs' htmlFor='quick-start-parent'>
-					Parent folder
+					{t('common:quick-start.parent-label', 'Parent folder')}
 				</Label>
 				<div className='flex gap-2'>
 					<Input
@@ -160,7 +173,7 @@ function QuickStartDialogForm({
 						type='button'
 						variant='outline'
 					>
-						Browse
+						{t('common:actions.browse', 'Browse')}
 					</Button>
 				</div>
 				{parentPathOverride !== null &&
@@ -171,7 +184,10 @@ function QuickStartDialogForm({
 						onClick={resetParentPath}
 						type='button'
 					>
-						Reset to managed repos directory
+						{t(
+							'common:actions.reset-managed-root',
+							'Reset to managed repos directory',
+						)}
 					</button>
 				) : null}
 			</div>
@@ -187,7 +203,11 @@ function QuickStartDialogForm({
 				onRetry={stage === 'failure' ? retry : null}
 				onSubmit={handleCreate}
 				submitDisabled={!canCreate}
-				submitLabel={stage === 'creating' ? 'Creating…' : 'Create'}
+				submitLabel={
+					stage === 'creating'
+						? t('common:quick-start.creating', 'Creating…')
+						: t('common:actions.create', 'Create')
+				}
 			/>
 		</>
 	);

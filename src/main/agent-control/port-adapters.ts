@@ -24,6 +24,7 @@ import {
 } from '../../shared/agent-control.ts';
 import type { AgentProviderId } from '../../shared/agent-provider.ts';
 import { findHarnessDefinition } from '../../shared/agents.ts';
+import type { AppLanguage } from '../../shared/i18n.ts';
 import type {
 	AgentPersistedEnvelope,
 	AgentWireMessagePayload,
@@ -102,6 +103,8 @@ export interface PortAdapterDeps {
 	/** Names a workspace and its git branch together, for `setBranchName`. */
 	renameWorkspace: RenameWorkspaceService['rename'];
 	getPermissionMode: () => PermissionMode;
+	/** Reads the language the app renders in, for the playbooks' language directive. */
+	getLanguage: () => AppLanguage;
 	/** Adds the agent-control MCP config and playbook to a harness launch command. */
 	augmentHarnessCommand: (
 		command: string,
@@ -987,6 +990,7 @@ export function createAgentControlPorts(
 		linear: makeLinearPort(deps),
 		sessionNaming: makeSessionNamingPort(deps),
 		permissions: { getMode: () => deps.getPermissionMode() },
+		language: { getLanguage: () => deps.getLanguage() },
 		confirm: deps.confirm,
 		ask: deps.ask,
 		planMode: deps.planMode,

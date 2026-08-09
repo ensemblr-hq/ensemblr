@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useAtomValue, useStore } from 'jotai';
 import { useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 
 import { settingsResolutionQuery } from '@/renderer/api/ensemblr';
@@ -113,6 +114,7 @@ export function useAgentActionRunner({
 	sessionTabs: readonly SessionTabModel[];
 }): (action: AgentActionKind) => void {
 	const store = useStore();
+	const { t } = useTranslation();
 	const overrides = useAtomValue(
 		repoSettingsOverrideAtomFamily(activeProject.id),
 	);
@@ -154,9 +156,13 @@ export function useAgentActionRunner({
 					workspaceCwd: activeWorkspace.pathLabel,
 				});
 				if (writeResult.error || !writeResult.file) {
-					toast.error('Could not prepare the action prompt.', {
-						description: writeResult.error?.message,
-					});
+					toast.error(
+						t(
+							'errors:agent-action.prompt-failed.title',
+							'Could not prepare the action prompt.',
+						),
+						{ description: writeResult.error?.message },
+					);
 					return;
 				}
 				const primed: PrimedAction = {
@@ -207,6 +213,7 @@ export function useAgentActionRunner({
 			selectChat,
 			sessionTabs,
 			store,
+			t,
 		],
 	);
 }

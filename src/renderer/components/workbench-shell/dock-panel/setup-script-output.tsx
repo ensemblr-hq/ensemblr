@@ -1,4 +1,5 @@
 import { RefreshCwIcon, SquareIcon } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/renderer/components/ui/button';
 import type { WorkspaceScriptSummary } from '@/renderer/types/workbench';
@@ -67,6 +68,8 @@ function SetupActionButton({
 	onStop: () => void;
 	running: boolean;
 }) {
+	const { t } = useTranslation();
+
 	return (
 		<Button
 			className='absolute right-3 bottom-3 z-10 pr-2 shadow-sm'
@@ -79,7 +82,9 @@ function SetupActionButton({
 			) : (
 				<RefreshCwIcon data-icon='inline-start' />
 			)}
-			{running ? 'Stop setup' : 'Rerun setup'}
+			{running
+				? t('workbench:setup-script.stop', 'Stop setup')
+				: t('workbench:setup-script.rerun', 'Rerun setup')}
 		</Button>
 	);
 }

@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/renderer/components/ui/button';
 import {
@@ -29,6 +30,7 @@ export function CloseRunningChatDialog({
 	onConfirm: () => void;
 	open: boolean;
 }) {
+	const { t } = useTranslation();
 	const submitBindings = useMemo<readonly KeymapBinding<HTMLDivElement>[]>(
 		() => [
 			[
@@ -58,11 +60,13 @@ export function CloseRunningChatDialog({
 			>
 				<DialogHeader>
 					<DialogTitle className='font-medium text-[0.9375rem]'>
-						Close running chat?
+						{t('workbench:close-running-chat.title', 'Close running chat?')}
 					</DialogTitle>
 					<p className='text-muted-foreground text-xs'>
-						This chat is currently running. Closing it will stop the current
-						agent session.
+						{t(
+							'workbench:close-running-chat.description',
+							'This chat is currently running. Closing it will stop the current agent session.',
+						)}
 					</p>
 				</DialogHeader>
 
@@ -73,7 +77,7 @@ export function CloseRunningChatDialog({
 						type='button'
 						variant='outline'
 					>
-						Cancel
+						{t('common:actions.cancel', 'Cancel')}
 					</Button>
 					<Button
 						className='h-8 gap-2'
@@ -81,7 +85,8 @@ export function CloseRunningChatDialog({
 						type='button'
 						variant='destructive'
 					>
-						Close anyway
+						{t('workbench:close-running-chat.confirm', 'Close anyway')}
+						{/* i18next-instrument-ignore */}
 						<span
 							aria-hidden='true'
 							className='ml-1 inline-flex items-center gap-0.5 text-[0.6875rem] opacity-70'

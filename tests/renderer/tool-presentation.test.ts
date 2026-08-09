@@ -131,7 +131,7 @@ describe('presentToolCall', () => {
 			call('read', { path: 'src/logo.svg' }, { text: '<svg />\n' }),
 		);
 
-		expect(presentation.title).toBe('Read 1 lines');
+		expect(presentation.title).toBe('Read 1 line');
 		expect(presentation.body).toMatchObject({ kind: 'code' });
 	});
 

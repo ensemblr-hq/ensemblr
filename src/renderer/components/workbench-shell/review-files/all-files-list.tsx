@@ -5,6 +5,7 @@ import {
 	FolderOpenIcon,
 } from 'lucide-react';
 import { memo } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/renderer/components/ui/button';
 import {
@@ -39,12 +40,17 @@ export function AllFilesList({
 	workspaceCwd: string;
 	workspaceId: string;
 }) {
+	const { t } = useTranslation();
+
 	if (!files.length) {
 		return (
 			<PanelPlaceholder
 				icon={FolderOpenIcon}
-				message='Files appear here as soon as they are created.'
-				title='No files yet'
+				message={t(
+					'workbench:all-files.empty.message',
+					'Files appear here as soon as they are created.',
+				)}
+				title={t('workbench:all-files.empty.title', 'No files yet')}
 			/>
 		);
 	}
@@ -172,6 +178,7 @@ const WorkspaceFolderRow = memo(
 			willExpand: boolean,
 		) => void;
 	}) {
+		const { t } = useTranslation();
 		const isCollapsed = !isExpanded;
 		const FolderChevronIcon = isCollapsed ? ChevronRightIcon : ChevronDownIcon;
 		// A collapsed row only advertises its own name; the merged `a / b / c` chain
@@ -185,7 +192,15 @@ const WorkspaceFolderRow = memo(
 		return (
 			<Button
 				aria-expanded={!isCollapsed}
-				aria-label={`${isCollapsed ? 'Expand' : 'Collapse'} ${node.path}`}
+				aria-label={
+					isCollapsed
+						? t('workbench:file-tree.expand-folder', 'Expand {{path}}', {
+								path: node.path,
+							})
+						: t('workbench:file-tree.collapse-folder', 'Collapse {{path}}', {
+								path: node.path,
+							})
+				}
 				aria-level={level + 1}
 				// Highlight only on hover: drop the ghost variant's persistent
 				// open-state fill (`aria-expanded:bg-muted`) while keeping the hover
@@ -238,9 +253,17 @@ const WorkspaceFileRow = memo(function WorkspaceFileRow({
 	level: number;
 	openFilePreview: ReviewFilePreviewOpener | null;
 }) {
+	const { t } = useTranslation();
+
 	return (
 		<Button
-			aria-label={`Open ${file.path} preview`}
+			aria-label={t(
+				'workbench:all-files.open-preview',
+				'Open {{path}} preview',
+				{
+					path: file.path,
+				},
+			)}
 			aria-level={level + 1}
 			className={cn(
 				'h-7 w-full justify-start gap-1.5 rounded-md px-2 py-0.5 text-left font-normal',

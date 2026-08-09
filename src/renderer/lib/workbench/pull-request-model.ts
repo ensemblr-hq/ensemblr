@@ -1,3 +1,4 @@
+import { i18n } from '@/renderer/lib/i18n';
 import type {
 	PullRequestCheckSummary,
 	PullRequestCommentReplySummary,
@@ -25,13 +26,6 @@ import {
 	summarizeCommentBody,
 } from './comment-body';
 import { derivePreviewDeployment } from './preview-deployment';
-
-/**
- * The one name a conflicting branch goes by. Shared with the sidebar header,
- * which reports conflicts the local trial merge found before `gh` has caught up,
- * so both routes to the same fact read identically.
- */
-export const MERGE_CONFLICTS_LABEL = 'Merge conflicts';
 
 /** Inputs for building the workspace shell PR model: local changes, review rows, and the gh snapshot. */
 interface BuildPullRequestShellModelInput {
@@ -66,10 +60,13 @@ export function buildPullRequestShellModel({
 			comments: localCommentSummaries,
 			description: [],
 			detail: syncError
-				? `Could not refresh GitHub state: ${syncError}`
-				: 'No pull request for this branch yet.',
+				? syncErrorDetail(syncError)
+				: i18n.t(
+						'git:pull-request.detail.no-pull-request',
+						'No pull request for this branch yet.',
+					),
 			gitStatus,
-			label: 'No PR',
+			label: i18n.t('git:pull-request.label.no-pull-request', 'No PR'),
 			status: 'idle',
 			...(syncError ? { syncError } : {}),
 			...(snapshot ? { syncedAt: snapshot.syncedAt } : {}),
@@ -285,29 +282,42 @@ function deriveLabel(
 	status: PullRequestShellStatus,
 ): string {
 	if (pullRequest.state === 'merged') {
-		return 'Merged';
+		return i18n.t('git:pull-request.label.merged', 'Merged');
 	}
 	if (pullRequest.state === 'closed') {
-		return 'Closed';
+		return i18n.t('git:pull-request.label.closed', 'Closed');
 	}
 	if (pullRequest.isDraft) {
-		return 'Draft';
+		return i18n.t('git:pull-request.label.draft', 'Draft');
 	}
 	switch (status) {
 		case 'ready-to-merge':
-			return 'Ready to merge';
+			return i18n.t('git:pull-request.label.ready-to-merge', 'Ready to merge');
 		case 'blocked':
 			// `blocked` covers failing checks, requested changes, and conflicts
 			// alike; name the conflict, because it is the one a reviewer resolves
 			// here rather than on GitHub.
 			return pullRequest.mergeable === 'conflicting'
-				? MERGE_CONFLICTS_LABEL
-				: 'Blocked';
+				? i18n.t('git:pull-request.label.conflicts', 'Merge conflicts')
+				: i18n.t('git:pull-request.label.blocked', 'Blocked');
 		case 'checking':
-			return 'Checks running';
+			return i18n.t('git:pull-request.label.checking', 'Checks running');
 		default:
 			return '';
 	}
+}
+
+/**
+ * Renders the detail line shown when the gh refresh itself failed.
+ * @param syncError - The message the failed refresh reported
+ * @returns The detail line naming the refresh failure
+ */
+function syncErrorDetail(syncError: string): string {
+	return i18n.t(
+		'git:pull-request.detail.sync-failed',
+		'Could not refresh GitHub state: {{error}}',
+		{ error: syncError },
+	);
 }
 
 /**
@@ -325,27 +335,48 @@ function deriveDetail({
 	syncError?: string;
 }): string {
 	if (syncError) {
-		return `Could not refresh GitHub state: ${syncError}`;
+		return syncErrorDetail(syncError);
 	}
 	if (pullRequest.state === 'merged') {
-		return 'This pull request has been merged.';
+		return i18n.t(
+			'git:pull-request.detail.merged',
+			'This pull request has been merged.',
+		);
 	}
 	if (pullRequest.state === 'closed') {
-		return 'This pull request was closed without merging.';
+		return i18n.t(
+			'git:pull-request.detail.closed',
+			'This pull request was closed without merging.',
+		);
 	}
 	switch (status) {
 		case 'ready-to-merge':
-			return 'All required checks passed.';
+			return i18n.t(
+				'git:pull-request.detail.ready-to-merge',
+				'All required checks passed.',
+			);
 		case 'blocked':
 			return pullRequest.mergeable === 'conflicting'
-				? 'Merge conflicts must be resolved.'
-				: 'Resolve failing checks or review blockers before merge.';
+				? i18n.t(
+						'git:pull-request.detail.conflicting',
+						'Merge conflicts must be resolved.',
+					)
+				: i18n.t(
+						'git:pull-request.detail.blocked',
+						'Resolve failing checks or review blockers before merge.',
+					);
 		case 'checking':
-			return 'Checks are still running.';
+			return i18n.t(
+				'git:pull-request.detail.checking',
+				'Checks are still running.',
+			);
 		default:
 			return pullRequest.isDraft
-				? 'Draft pull request — mark ready for review to run policy gates.'
-				: 'Pull request is open.';
+				? i18n.t(
+						'git:pull-request.detail.draft',
+						'Draft pull request — mark ready for review to run policy gates.',
+					)
+				: i18n.t('git:pull-request.detail.open', 'Pull request is open.');
 	}
 }
 
@@ -356,36 +387,43 @@ function buildGitStatus(
 ): PullRequestGitStatusSummary {
 	if (changeSummary.files > 0) {
 		return {
-			actionLabel: 'Commit and push',
+			actionLabel: i18n.t(
+				'git:git-status.action.commit-push',
+				'Commit and push',
+			),
 			kind: 'uncommitted',
-			label: `${changeSummary.files} uncommitted change${
-				changeSummary.files === 1 ? '' : 's'
-			}`,
+			label: i18n.t('git:git-status.uncommitted', {
+				count: changeSummary.files,
+				defaultValue_one: '{{count}} uncommitted change',
+				defaultValue_other: '{{count}} uncommitted changes',
+			}),
 			status: 'pending',
 		};
 	}
 	const branchSync = snapshot?.branchSync;
 	if (branchSync && !branchSync.hasUpstream) {
 		return {
-			actionLabel: 'Push branch',
+			actionLabel: i18n.t('git:git-status.action.push-branch', 'Push branch'),
 			kind: 'unpublished',
-			label: 'Branch not pushed yet',
+			label: i18n.t('git:git-status.unpublished', 'Branch not pushed yet'),
 			status: 'pending',
 		};
 	}
 	if (branchSync && branchSync.ahead > 0) {
 		return {
-			actionLabel: 'Push',
+			actionLabel: i18n.t('git:git-status.action.push', 'Push'),
 			kind: 'unpushed',
-			label: `${branchSync.ahead} unpushed commit${
-				branchSync.ahead === 1 ? '' : 's'
-			}`,
+			label: i18n.t('git:git-status.unpushed', {
+				count: branchSync.ahead,
+				defaultValue_one: '{{count}} unpushed commit',
+				defaultValue_other: '{{count}} unpushed commits',
+			}),
 			status: 'pending',
 		};
 	}
 	return {
 		kind: 'clean',
-		label: 'Up to date with remote',
+		label: i18n.t('git:git-status.clean', 'Up to date with remote'),
 		status: 'open',
 	};
 }

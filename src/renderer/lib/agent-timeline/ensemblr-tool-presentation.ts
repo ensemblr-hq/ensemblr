@@ -1,26 +1,22 @@
 import type { DynamicToolUIPart } from 'ai';
+import { i18n } from '@/renderer/lib/i18n';
 import type {
 	ToolBadgeDescriptor,
 	ToolGlyph,
 } from '@/renderer/types/tool-presentation';
+import {
+	BOOKKEEPING_TOOL_NAMES,
+	canonicalEnsemblrToolName,
+	ENSEMBLR_TOOL_LABELS,
+} from './ensemblr-control-tool-registry';
 
 /**
  * How the app's own control tools read in the timeline.
  *
- * The `ensemblr_*` tools drive the app rather than the repository, so the
- * generic extension row serves them badly: it titles the row with the raw wire
- * name and unfolds the whole argument payload, which for a session summary means
- * pretty-printing several thousand characters of markdown the user already has.
- * This module supplies the label and mark each one deserves, and names the three
- * that should not appear at all.
- *
- * The hidden set is the bookkeeping the app asks for on its own behalf — naming
- * the tab, naming the workspace and branch, recording the session summary. The
- * user did not request it, its result is already visible as the tab title or the
- * branch name, and a row for it costs the turn a line of attention. Hiding it
- * also keeps a turn's closing prose where the user can read it: the timeline
- * promotes only the run of text that follows the turn's last visible tool call,
- * so a summary call filed after the answer would fold that answer away.
+ * The label and mark each `ensemblr_*` tool answers to live next door in
+ * `ensemblr-control-tool-registry.ts`; this module reads that table against a
+ * recorded call — resolving the tense, folding in the one argument that says
+ * what the call acted on, and deciding which rows the timeline omits entirely.
  *
  * A failed call is never hidden. The denial codes these tools return —
  * `denied-permission`, `denied-scope`, `invalid-args` — are exactly what a user
@@ -34,302 +30,10 @@ import type {
  * control extension registered.
  */
 
-/** Wire-name prefix shared by every tool the app's control extension registers. */
-const CONTROL_TOOL_PREFIX = 'ensemblr_';
-
-/** Wire names of the bookkeeping calls the timeline omits when they succeed. */
-const BOOKKEEPING_TOOL_NAMES: ReadonlySet<string> = new Set([
-	'ensemblr_set_branch_name',
-	'ensemblr_set_name',
-	'ensemblr_set_summary',
-]);
-
-/**
- * Title and mark for one control tool, before its arguments are read.
- *
- * The verb is held as a pair rather than as a finished title so that a call
- * still in flight reads in the present participle — `ensemblr_wait_for_agents`
- * blocks for as long as its children run, and "Waited for sub-agents" over a
- * turn that is still working describes something that has not happened yet.
- * Pairing the two forms in a tuple makes a missing tense a type error.
- */
-interface EnsemblrToolLabel {
-	glyph: ToolGlyph;
-	/** What the verb acts on, e.g. `for sub-agents`. */
-	object: string;
-	/** The verb as `[settled, in flight]`, e.g. `['Waited', 'Waiting']`. */
-	verb: readonly [string, string];
-	/**
-	 * Input paths whose value is appended to the title, first match winning. A
-	 * path may step into a batch — `comments.0.filePath` — so a call that carries
-	 * its subject inside an array still names it.
-	 */
-	detailKeys?: readonly string[];
-	/**
-	 * Input paths whose value is a workspace file, pinned as a clickable chip
-	 * rather than appended to the title — the same chip a `write` or an `edit`
-	 * row carries, so a path reads and opens the same way whichever tool named
-	 * it. Independent of {@link EnsemblrToolLabel.detailKeys}: a call naming both
-	 * a file and an argument, as `open_tab` names a file and a variant, shows the
-	 * two in their own slots rather than spending the title on the path.
-	 */
-	pathKeys?: readonly string[];
-}
-
-/**
- * The label each control tool answers to. Titles read as the action taken rather
- * than the tool called, because the user is watching the app being driven and
- * has no use for the name of the lever. Glyphs name the action too, so a folded
- * turn's strip of marks distinguishes starting a terminal from stopping one.
- *
- * Detail keys are the canonical argument names from
- * `src/shared/agent-control/arg-naming.ts`, followed by the near-misses that
- * table forgives — the boundary rewrites `file` to `filePath` before the op
- * runs, but the timeline records the arguments as the model actually sent them.
- */
-const ENSEMBLR_TOOL_LABELS: Record<string, EnsemblrToolLabel> = {
-	ensemblr_ask_user_question: {
-		detailKeys: ['questions.0.question'],
-		glyph: 'message-circle-question',
-		object: 'you a question',
-		verb: ['Asked', 'Asking'],
-	},
-	ensemblr_close_tab: {
-		glyph: 'square-x',
-		object: 'a tab',
-		verb: ['Closed', 'Closing'],
-	},
-	ensemblr_exit_plan_mode: {
-		detailKeys: ['title'],
-		glyph: 'clipboard-list',
-		object: 'a plan',
-		verb: ['Submitted', 'Submitting'],
-	},
-	ensemblr_focus_dock_tab: {
-		detailKeys: ['kind'],
-		glyph: 'crosshair',
-		object: 'a terminal',
-		verb: ['Focused', 'Focusing'],
-	},
-	ensemblr_focus_panel: {
-		detailKeys: ['panel'],
-		glyph: 'crosshair',
-		object: 'a panel',
-		verb: ['Focused', 'Focusing'],
-	},
-	ensemblr_focus_tab: {
-		glyph: 'crosshair',
-		object: 'a tab',
-		verb: ['Focused', 'Focusing'],
-	},
-	ensemblr_add_diff_comments: {
-		glyph: 'message-square-plus',
-		object: 'review comments',
-		pathKeys: ['comments.*.filePath'],
-		verb: ['Left', 'Leaving'],
-	},
-	ensemblr_resolve_diff_comments: {
-		glyph: 'message-square-check',
-		object: 'review comments',
-		verb: ['Resolved', 'Resolving'],
-	},
-	ensemblr_get_conversation_status: {
-		glyph: 'bot',
-		object: 'a sub-agent',
-		verb: ['Checked', 'Checking'],
-	},
-	ensemblr_get_diff_comments: {
-		glyph: 'message-square-text',
-		object: 'review comments',
-		pathKeys: ['filePath', 'file', 'path'],
-		verb: ['Read', 'Reading'],
-	},
-	ensemblr_get_last_message: {
-		glyph: 'bot',
-		object: "a sub-agent's report",
-		verb: ['Read', 'Reading'],
-	},
-	ensemblr_get_workspace_diff: {
-		glyph: 'file-diff',
-		object: 'the diff',
-		pathKeys: ['filePath', 'file', 'path'],
-		verb: ['Read', 'Reading'],
-	},
-	ensemblr_get_workspace_status: {
-		glyph: 'kanban',
-		object: 'board status',
-		verb: ['Read', 'Reading'],
-	},
-	ensemblr_launch_harness: {
-		detailKeys: ['harnessId'],
-		glyph: 'square-terminal',
-		object: 'a harness',
-		verb: ['Launched', 'Launching'],
-	},
-	ensemblr_linear_create_comment: {
-		detailKeys: ['issueId', 'id', 'identifier'],
-		glyph: 'message-square-plus',
-		object: 'a Linear issue',
-		verb: ['Commented on', 'Commenting on'],
-	},
-	ensemblr_linear_get_issue: {
-		detailKeys: ['issueId', 'id', 'identifier'],
-		glyph: 'ticket',
-		object: 'a Linear issue',
-		verb: ['Read', 'Reading'],
-	},
-	ensemblr_linear_get_metadata: {
-		glyph: 'list',
-		object: 'Linear teams and states',
-		verb: ['Read', 'Reading'],
-	},
-	ensemblr_linear_list_issues: {
-		detailKeys: ['query', 'search'],
-		glyph: 'ticket',
-		object: 'Linear issues',
-		verb: ['Searched', 'Searching'],
-	},
-	ensemblr_linear_update_issue: {
-		detailKeys: ['issueId', 'id', 'identifier'],
-		glyph: 'ticket-check',
-		object: 'a Linear issue',
-		verb: ['Updated', 'Updating'],
-	},
-	ensemblr_list_models: {
-		glyph: 'list',
-		object: 'models',
-		verb: ['Listed', 'Listing'],
-	},
-	ensemblr_list_run_scripts: {
-		glyph: 'list',
-		object: 'run scripts',
-		verb: ['Listed', 'Listing'],
-	},
-	ensemblr_list_tabs: {
-		glyph: 'list',
-		object: 'tabs',
-		verb: ['Listed', 'Listing'],
-	},
-	ensemblr_list_terminals: {
-		glyph: 'list',
-		object: 'terminals',
-		verb: ['Listed', 'Listing'],
-	},
-	ensemblr_list_workspaces: {
-		glyph: 'list',
-		object: 'workspaces',
-		verb: ['Listed', 'Listing'],
-	},
-	ensemblr_notify_orchestrator: {
-		detailKeys: ['reason'],
-		glyph: 'bell',
-		object: 'the orchestrator',
-		verb: ['Notified', 'Notifying'],
-	},
-	ensemblr_open_tab: {
-		detailKeys: ['variant'],
-		glyph: 'panels-top-left',
-		object: 'a tab',
-		pathKeys: ['filePath', 'file', 'path'],
-		verb: ['Opened', 'Opening'],
-	},
-	ensemblr_read_conversation: {
-		glyph: 'bot',
-		object: "a sub-agent's transcript",
-		verb: ['Read', 'Reading'],
-	},
-	ensemblr_read_terminal_output: {
-		glyph: 'scroll-text',
-		object: 'terminal output',
-		verb: ['Read', 'Reading'],
-	},
-	ensemblr_send_follow_up: {
-		glyph: 'send',
-		object: 'a sub-agent',
-		verb: ['Steered', 'Steering'],
-	},
-	ensemblr_set_workspace_status: {
-		detailKeys: ['status'],
-		glyph: 'kanban',
-		object: 'the workspace',
-		verb: ['Moved', 'Moving'],
-	},
-	ensemblr_spawn_chat_tab: {
-		detailKeys: ['title'],
-		glyph: 'panels-top-left',
-		object: 'a chat tab',
-		verb: ['Opened', 'Opening'],
-	},
-	ensemblr_start_conversation: {
-		detailKeys: ['title'],
-		glyph: 'bot',
-		object: 'a sub-agent',
-		verb: ['Started', 'Starting'],
-	},
-	ensemblr_start_terminal: {
-		detailKeys: ['scriptName', 'kind'],
-		glyph: 'play',
-		object: 'a terminal',
-		verb: ['Started', 'Starting'],
-	},
-	ensemblr_stop_terminal: {
-		detailKeys: ['kind'],
-		glyph: 'circle-stop',
-		object: 'a terminal',
-		verb: ['Stopped', 'Stopping'],
-	},
-	ensemblr_wait_for_agents: {
-		glyph: 'hourglass',
-		object: 'for sub-agents',
-		verb: ['Waited', 'Waiting'],
-	},
-	ensemblr_write_terminal: {
-		detailKeys: ['input'],
-		glyph: 'keyboard',
-		object: 'into a terminal',
-		verb: ['Typed', 'Typing'],
-	},
-};
-
-/**
- * Every control tool the timeline has a label for, so a test can hold the whole
- * registry to the same contract rather than a hand-copied sample of it.
- */
-export const ENSEMBLR_CONTROL_TOOL_NAMES: readonly string[] =
-	Object.keys(ENSEMBLR_TOOL_LABELS);
-
-/** Every name the control extension registers, label-bearing or bookkeeping. */
-const CONTROL_TOOL_NAMES: ReadonlySet<string> = new Set([
-	...ENSEMBLR_CONTROL_TOOL_NAMES,
-	...BOOKKEEPING_TOOL_NAMES,
-]);
-
-/**
- * Reduces the name a runtime reported to the name the control extension
- * registered the tool under.
- *
- * The two runtimes disagree about what to call the same tool. Pi loads the
- * extension in-process and reports `ensemblr_set_name`; Claude Code reaches the
- * control server over MCP, where the SDK namespaces every tool by its server and
- * reports `mcp__ensemblr__ensemblr_set_name`. Matching only the bare form left
- * every call from the second runtime titled with its wire name and marked with
- * the generic wrench.
- *
- * Taking the last `ensemblr_` segment resolves both shapes, and the registry
- * check keeps that slice honest: an unrelated tool whose name happens to carry
- * the prefix resolves to nothing rather than borrowing a label.
- * @param toolName - The tool name as the runtime reported it
- * @returns The registered name, or null when the tool is not a control tool
- */
-export function canonicalEnsemblrToolName(toolName: string): string | null {
-	const lowered = toolName.toLowerCase();
-	const start = lowered.lastIndexOf(CONTROL_TOOL_PREFIX);
-	if (start === -1) {
-		return null;
-	}
-	const registered = lowered.slice(start);
-	return CONTROL_TOOL_NAMES.has(registered) ? registered : null;
-}
+export {
+	canonicalEnsemblrToolName,
+	ENSEMBLR_CONTROL_TOOL_NAMES,
+} from './ensemblr-control-tool-registry';
 
 /** Longest detail suffix kept on a title before it crowds the row. */
 const MAX_DETAIL_LENGTH = 48;
@@ -564,7 +268,7 @@ export function ensemblrToolLabel(
 	if (!label) {
 		return null;
 	}
-	const action = `${label.verb[isRunning ? 1 : 0]} ${label.object}`;
+	const action = label.title[isRunning ? 1 : 0]();
 	const path = label.pathKeys ? filePathOf(input, label.pathKeys) : null;
 	const detail = label.detailKeys ? detailOf(input, label.detailKeys) : null;
 	return {
@@ -573,7 +277,12 @@ export function ensemblrToolLabel(
 				? null
 				: { additions: null, deletions: null, kind: 'file', path },
 		glyph: label.glyph,
-		title: detail ? `${action}: ${detail}` : action,
+		title: detail
+			? i18n.t('workbench:control-tool.with-detail', '{{action}}: {{detail}}', {
+					action,
+					detail,
+				})
+			: action,
 	};
 }
 

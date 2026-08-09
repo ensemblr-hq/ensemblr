@@ -3,6 +3,7 @@ import {
 	writeWorkspaceFileAttachment,
 	writeWorkspaceImageAttachment,
 } from '@/renderer/api/ensemblr-queries';
+import { i18n } from '@/renderer/lib/i18n';
 import type {
 	ExternalAttachment,
 	WorkspaceFileSummary,
@@ -55,6 +56,28 @@ export function getTransferFiles(data: DataTransfer): readonly File[] {
 	return Array.from(data.files);
 }
 
+/**
+ * The message shown when a pasted file cannot be read off the clipboard.
+ * @returns The message in the active language.
+ */
+function readFailureMessage(): string {
+	return i18n.t(
+		'errors:attachment.read-failed.message',
+		'Pasted file could not be read.',
+	);
+}
+
+/**
+ * The message shown when a pasted file cannot be persisted into the workspace.
+ * @returns The message in the active language.
+ */
+function saveFailureMessage(): string {
+	return i18n.t(
+		'errors:attachment.save-failed.message',
+		'Pasted file could not be saved.',
+	);
+}
+
 /** Reads a browser File as the base64 body of a data URL. */
 function readFileAsBase64(file: File): Promise<string> {
 	return new Promise((resolve, reject) => {
@@ -62,18 +85,25 @@ function readFileAsBase64(file: File): Promise<string> {
 		reader.addEventListener('load', () => {
 			const result = reader.result;
 			if (typeof result !== 'string') {
-				reject(new Error('Pasted file could not be read.'));
+				reject(new Error(readFailureMessage()));
 				return;
 			}
 			const separatorIndex = result.indexOf(',');
 			if (separatorIndex === -1) {
-				reject(new Error('Pasted file payload was malformed.'));
+				reject(
+					new Error(
+						i18n.t(
+							'errors:attachment.malformed.message',
+							'Pasted file payload was malformed.',
+						),
+					),
+				);
 				return;
 			}
 			resolve(result.slice(separatorIndex + 1));
 		});
 		reader.addEventListener('error', () => {
-			reject(reader.error ?? new Error('Pasted file could not be read.'));
+			reject(reader.error ?? new Error(readFailureMessage()));
 		});
 		reader.readAsDataURL(file);
 	});
@@ -135,7 +165,7 @@ async function saveCopy(
 				workspaceCwd,
 			});
 	if (result.error || !result.file) {
-		throw new Error(result.error?.message ?? 'Pasted file could not be saved.');
+		throw new Error(result.error?.message ?? saveFailureMessage());
 	}
 	return toWorkspaceFileSummary(result.file);
 }
@@ -172,10 +202,7 @@ export async function attachPastedFiles(
 			savedFiles.push(await saveCopy(file, workspaceCwd));
 		}
 	} catch (cause) {
-		error =
-			cause instanceof Error
-				? cause.message
-				: 'Pasted file could not be saved.';
+		error = cause instanceof Error ? cause.message : saveFailureMessage();
 	}
 	return { error, savedExternals, savedFiles };
 }

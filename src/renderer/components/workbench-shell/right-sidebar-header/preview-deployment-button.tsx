@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next';
+
 import { Button } from '@/renderer/components/ui/button';
 import {
 	getPullRequestLinkButtonClassName,
@@ -52,11 +54,16 @@ export function PreviewDeploymentButton({
 	>;
 	tone: PullRequestHeaderTone;
 }) {
+	const { t } = useTranslation();
 	const providerLabel = getPreviewDeploymentProviderLabel(deployment.provider);
-	const previewLabel =
+	const openLabel =
 		providerLabel === 'deployment'
-			? 'preview deployment'
-			: `${providerLabel} preview deployment`;
+			? t('git:preview-deployment.open', 'Open preview deployment')
+			: t(
+					'git:preview-deployment.open-provider',
+					'Open {{provider}} preview deployment',
+					{ provider: providerLabel },
+				);
 	const providerIconPath = getPreviewDeploymentProviderIconPath(
 		deployment.provider,
 	);
@@ -72,7 +79,7 @@ export function PreviewDeploymentButton({
 
 	return (
 		<Button
-			aria-label={`Open ${previewLabel}`}
+			aria-label={openLabel}
 			asChild
 			className={getPullRequestLinkButtonClassName(pillTone)}
 			size='sm'

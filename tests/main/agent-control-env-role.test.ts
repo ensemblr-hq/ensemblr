@@ -35,6 +35,7 @@ const setup = (options: { markedSubAgent?: readonly string[] } = {}) => {
 		originRegistry: registry,
 		resolveWorkspaceCwd: (workspaceId) =>
 			workspaceId === WORKSPACE ? CWD : null,
+		getLanguage: () => 'en' as const,
 		getServerUrl: () => 'http://127.0.0.1:1234',
 		isSpawnedSubAgent: (agentSessionId) => marked.has(agentSessionId),
 	});
@@ -94,6 +95,7 @@ describe('agent-control env: the role handed to a spawned agent', () => {
 			} as never,
 			originRegistry: registry,
 			resolveWorkspaceCwd: () => CWD,
+			getLanguage: () => 'en' as const,
 			getServerUrl: () => 'http://127.0.0.1:1234',
 		});
 		const env = resolveAgentControlEnv({
@@ -115,6 +117,7 @@ describe('agent-control env: when there is nothing to hand out', () => {
 			} as never,
 			originRegistry: registry,
 			resolveWorkspaceCwd: () => CWD,
+			getLanguage: () => 'en' as const,
 			getServerUrl: () => null,
 		});
 		expect(

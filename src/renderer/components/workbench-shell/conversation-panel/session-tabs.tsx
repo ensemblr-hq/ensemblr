@@ -26,6 +26,7 @@ import {
 	useRef,
 	useState,
 } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/renderer/components/ui/button';
 import {
 	DropdownMenu,
@@ -130,6 +131,7 @@ export function SessionTabs({
 	) => void;
 	sessions: SessionTabModel[];
 }) {
+	const { t } = useTranslation();
 	const [isOpening, setIsOpening] = useState(false);
 	const requestComposerFocus = useRequestComposerFocus();
 	const [debugOpen, setDebugOpen] = useDebugPanelToggle();
@@ -237,12 +239,12 @@ export function SessionTabs({
 							<GhostIconButton
 								disabled={isOpening}
 								icon={<PlusIcon />}
-								label='New chat tab'
+								label={t('workbench:session-tabs.new-tab', 'New chat tab')}
 								onClick={handleOpen}
 							/>
 						</TooltipTrigger>
 						<ShortcutTooltipContent
-							label='New chat tab'
+							label={t('workbench:session-tabs.new-tab', 'New chat tab')}
 							shortcut={NEW_TAB_SHORTCUT_HINT}
 						/>
 					</Tooltip>
@@ -252,16 +254,26 @@ export function SessionTabs({
 				{developerMode ? (
 					<Button
 						aria-label={
-							debugOpen ? 'Hide Pi debug panel' : 'Show Pi debug panel'
+							debugOpen
+								? t('workbench:session-tabs.debug.hide', 'Hide Pi debug panel')
+								: t('workbench:session-tabs.debug.show', 'Show Pi debug panel')
 						}
 						className={cn(debugOpen && 'bg-muted text-foreground')}
 						onClick={() => setDebugOpen(!debugOpen)}
 						size='icon-sm'
-						title='Pi raw frames (debug)'
+						title={t(
+							'workbench:session-tabs.debug.title',
+							'Pi raw frames (debug)',
+						)}
 						variant='ghost'
 					>
 						<BugIcon />
-						<span className='sr-only'>Toggle Pi debug panel</span>
+						<span className='sr-only'>
+							{t(
+								'workbench:session-tabs.debug.toggle',
+								'Toggle Pi debug panel',
+							)}
+						</span>
 					</Button>
 				) : null}
 				<HarnessLauncherMenu
@@ -306,6 +318,7 @@ function SessionTab({
 	onDragStart,
 	onDragEnd,
 }: SessionTabProps) {
+	const { t } = useTranslation();
 	const isChatKind = (session.kind ?? 'chat') === 'chat';
 	const canClose = isChatKind ? openChatTabCount > 1 : true;
 	const showCloseControls = canClose && !isDraggingTab;
@@ -365,7 +378,11 @@ function SessionTab({
 			) : null}
 			{showCloseControls ? (
 				<button
-					aria-label={`Close ${session.label} tab`}
+					aria-label={t(
+						'workbench:session-tabs.close-tab',
+						'Close {{label}} tab',
+						{ label: session.label },
+					)}
 					className='absolute top-1/2 right-2 grid size-5 -translate-y-1/2 place-items-center rounded-sm opacity-0 transition hover:bg-transparent hover:text-foreground focus-visible:opacity-100 group-hover/session-tab:opacity-100'
 					onClick={(event) => {
 						event.stopPropagation();
@@ -476,6 +493,7 @@ function HarnessLauncherMenu({
 	}) => Promise<{ chatTabId: string } | null>;
 	onSessionTabChange: (sessionId: string) => void;
 }) {
+	const { t } = useTranslation();
 	const [open, setOpen] = useState(false);
 	const [launchingId, setLaunchingId] = useState<string | null>(null);
 	const launchedRef = useRef(false);
@@ -539,11 +557,19 @@ function HarnessLauncherMenu({
 						<GhostIconButton
 							disabled
 							icon={<BotIcon />}
-							label='Launch coding agent'
+							label={t(
+								'workbench:harness-launcher.trigger',
+								'Launch coding agent',
+							)}
 						/>
 					</span>
 				</TooltipTrigger>
-				<ShortcutTooltipContent label='No harnesses detected' />
+				<ShortcutTooltipContent
+					label={t(
+						'workbench:harness-launcher.none-detected',
+						'No harnesses detected',
+					)}
+				/>
 			</Tooltip>
 		);
 	}
@@ -564,11 +590,17 @@ function HarnessLauncherMenu({
 			<Tooltip>
 				<TooltipTrigger asChild>
 					<DropdownMenuTrigger asChild>
-						<GhostIconButton icon={<BotIcon />} label='Launch coding agent' />
+						<GhostIconButton
+							icon={<BotIcon />}
+							label={t(
+								'workbench:harness-launcher.trigger',
+								'Launch coding agent',
+							)}
+						/>
 					</DropdownMenuTrigger>
 				</TooltipTrigger>
 				<ShortcutTooltipContent
-					label='Launch coding agent'
+					label={t('workbench:harness-launcher.trigger', 'Launch coding agent')}
 					shortcut={AGENTS_SHORTCUT_HINT}
 				/>
 			</Tooltip>
@@ -636,7 +668,10 @@ function HarnessLauncherMenu({
 						className='h-9 px-2 text-muted-foreground text-xs'
 						disabled
 					>
-						No coding agents detected
+						{t(
+							'workbench:harness-launcher.none-installed',
+							'No coding agents detected',
+						)}
 					</DropdownMenuItem>
 				)}
 			</DropdownMenuContent>
@@ -696,6 +731,7 @@ function ClosedSessionHistoryMenu({
 	closedSessions: SessionTabModel[];
 	onSessionTabRestore: (sessionId: string) => void;
 }) {
+	const { t } = useTranslation();
 	return (
 		<DropdownMenu>
 			<Tooltip>
@@ -703,11 +739,16 @@ function ClosedSessionHistoryMenu({
 					<DropdownMenuTrigger asChild>
 						<GhostIconButton
 							icon={<HistoryIcon />}
-							label='Open closed chat tabs'
+							label={t(
+								'workbench:closed-tabs.trigger',
+								'Open closed chat tabs',
+							)}
 						/>
 					</DropdownMenuTrigger>
 				</TooltipTrigger>
-				<ShortcutTooltipContent label='Closed chat tabs' />
+				<ShortcutTooltipContent
+					label={t('workbench:closed-tabs.tooltip', 'Closed chat tabs')}
+				/>
 			</Tooltip>
 			<DropdownMenuContent align='end' className='w-72 p-1'>
 				{closedSessions.length ? (
@@ -735,7 +776,7 @@ function ClosedSessionHistoryMenu({
 						className='h-9 px-2 text-muted-foreground text-xs'
 						disabled
 					>
-						No closed chat tabs
+						{t('workbench:closed-tabs.empty', 'No closed chat tabs')}
 					</DropdownMenuItem>
 				)}
 			</DropdownMenuContent>

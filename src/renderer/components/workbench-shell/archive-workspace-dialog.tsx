@@ -1,4 +1,5 @@
 import { useCallback, useState } from 'react';
+import { Trans, useTranslation } from 'react-i18next';
 
 import {
 	archiveWorkspace,
@@ -65,6 +66,7 @@ function ArchiveWorkspaceDialogForm({
 	onOpenChange: (open: boolean) => void;
 	workspace: WorkspaceShellModel;
 }) {
+	const { t } = useTranslation();
 	const [stage, setStage] = useState<ArchiveStage>('idle');
 	const [branchCleanup, setBranchCleanup] = useState(false);
 	const [diagnostics, setDiagnostics] = useState<ArchiveWorkspaceDiagnostic[]>(
@@ -112,13 +114,18 @@ function ArchiveWorkspaceDialogForm({
 	return (
 		<>
 			<DialogHeader>
-				<DialogTitle>Archive workspace?</DialogTitle>
+				<DialogTitle>
+					{t('workbench:archive-workspace.title', 'Archive workspace?')}
+				</DialogTitle>
 				<DialogDescription className='text-xs'>
-					Marks the workspace as archived and preserves its{' '}
-					<span className='font-mono'>.context/</span> handoff files under{' '}
-					<span className='font-mono'>archived-contexts/</span>. By default the
-					worktree folder and local branch stay on disk; nothing is committed or
-					pushed.
+					<Trans
+						components={[
+							<span className='font-mono' key='context-dir' />,
+							<span className='font-mono' key='archived-contexts-dir' />,
+						]}
+						defaults='Marks the workspace as archived and preserves its <0>.context/</0> handoff files under <1>archived-contexts/</1>. By default the worktree folder and local branch stay on disk; nothing is committed or pushed.'
+						i18nKey='workbench:archive-workspace.description'
+					/>
 				</DialogDescription>
 			</DialogHeader>
 
@@ -128,13 +135,17 @@ function ArchiveWorkspaceDialogForm({
 				<CleanupToggle
 					checked={branchCleanup}
 					description={
-						<>
-							The <span className='font-mono'>.context/</span> handoff files are
-							preserved; anything else not pushed to the remote will be lost.
-						</>
+						<Trans
+							components={[<span className='font-mono' key='context-dir' />]}
+							defaults='The <0>.context/</0> handoff files are preserved; anything else not pushed to the remote will be lost.'
+							i18nKey='workbench:archive-workspace.cleanup.description'
+						/>
 					}
 					disabled={isBusy}
-					label='Also remove the worktree and drop the local branch'
+					label={t(
+						'workbench:archive-workspace.cleanup.label',
+						'Also remove the worktree and drop the local branch',
+					)}
 					onCheckedChange={setBranchCleanup}
 				/>
 			) : null}
@@ -153,7 +164,7 @@ function ArchiveWorkspaceDialogForm({
 					type='button'
 					variant='ghost'
 				>
-					Cancel
+					{t('common:actions.cancel', 'Cancel')}
 				</Button>
 				<Button
 					disabled={!canArchive}
@@ -161,7 +172,9 @@ function ArchiveWorkspaceDialogForm({
 					type='button'
 					variant={branchCleanup ? 'destructive' : 'default'}
 				>
-					{isBusy ? 'Archiving…' : 'Archive'}
+					{isBusy
+						? t('common:actions.archiving', 'Archiving…')
+						: t('common:actions.archive', 'Archive')}
 				</Button>
 			</DialogFooter>
 		</>

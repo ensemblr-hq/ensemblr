@@ -13,6 +13,7 @@ import {
 	TerminalIcon,
 } from 'lucide-react';
 import { useCallback, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import {
 	Command,
@@ -45,6 +46,7 @@ interface ActionEntry {
  * settings sections, theme cycling, and Linear access in one searchable view.
  */
 export function CommandPalette() {
+	const { t } = useTranslation();
 	const [open, setOpen] = useState(false);
 	const navigate = useNavigate();
 	const [theme, setTheme] = useAtom(themeAtom);
@@ -69,20 +71,20 @@ export function CommandPalette() {
 	const navigation: ActionEntry[] = [
 		{
 			id: 'go.home',
-			label: 'Go to workbench',
+			label: t('workbench:command-palette.go-home', 'Go to workbench'),
 			icon: LayoutDashboardIcon,
 			run: go(() => navigate({ to: '/' })),
 			shortcutId: 'sidebar.toggle',
 		},
 		{
 			id: 'go.linear',
-			label: 'Browse Linear issues',
+			label: t('workbench:command-palette.go-linear', 'Browse Linear issues'),
 			icon: LinkIcon,
 			run: go(() => navigate({ to: '/linear' })),
 		},
 		{
 			id: 'go.history',
-			label: 'Open chat history',
+			label: t('workbench:command-palette.go-history', 'Open chat history'),
 			icon: LayoutDashboardIcon,
 			run: go(() => navigate({ to: '/history' })),
 		},
@@ -91,63 +93,90 @@ export function CommandPalette() {
 	const settings: ActionEntry[] = [
 		{
 			id: 'settings.general',
-			label: 'Settings · General',
+			label: t(
+				'workbench:command-palette.settings-general',
+				'Settings · General',
+			),
 			icon: SettingsIcon,
 			run: go(() => navigate({ to: '/settings/general' })),
 			shortcutId: 'settings.open',
 		},
 		{
 			id: 'settings.models',
-			label: 'Settings · Models',
+			label: t(
+				'workbench:command-palette.settings-models',
+				'Settings · Models',
+			),
 			icon: BoxIcon,
 			run: go(() => navigate({ to: '/settings/models' })),
 		},
 		{
 			id: 'settings.providers',
-			label: 'Settings · Providers',
+			label: t(
+				'workbench:command-palette.settings-providers',
+				'Settings · Providers',
+			),
 			icon: PlugZapIcon,
 			keywords: ['claude', 'pi', 'agent', 'runtime'],
 			run: go(() => navigate({ to: '/settings/providers' })),
 		},
 		{
 			id: 'settings.environment',
-			label: 'Settings · Environment',
+			label: t(
+				'workbench:command-palette.settings-environment',
+				'Settings · Environment',
+			),
 			icon: KeyboardIcon,
 			run: go(() => navigate({ to: '/settings/environment' })),
 		},
 		{
 			id: 'settings.git',
-			label: 'Settings · Git',
+			label: t('workbench:command-palette.settings-git', 'Settings · Git'),
 			icon: GitBranchIcon,
 			run: go(() => navigate({ to: '/settings/git' })),
 		},
 		{
 			id: 'settings.appearance',
-			label: 'Settings · Appearance',
+			label: t(
+				'workbench:command-palette.settings-appearance',
+				'Settings · Appearance',
+			),
 			icon: SettingsIcon,
 			run: go(() => navigate({ to: '/settings/appearance' })),
 		},
 		{
 			id: 'settings.integrations',
-			label: 'Settings · Integrations',
+			label: t(
+				'workbench:command-palette.settings-integrations',
+				'Settings · Integrations',
+			),
 			icon: PuzzleIcon,
 			run: go(() => navigate({ to: '/settings/integrations' })),
 		},
 		{
 			id: 'settings.diagnostics',
-			label: 'Settings · Diagnostics',
+			label: t(
+				'workbench:command-palette.settings-diagnostics',
+				'Settings · Diagnostics',
+			),
 			icon: HeartPulseIcon,
 			run: go(() => navigate({ to: '/settings/diagnostics' })),
 		},
 		{
 			id: 'settings.experimental',
-			label: 'Settings · Experimental',
+			label: t(
+				'workbench:command-palette.settings-experimental',
+				'Settings · Experimental',
+			),
 			icon: TerminalIcon,
 			run: go(() => navigate({ to: '/settings/experimental' })),
 		},
 		{
 			id: 'settings.advanced',
-			label: 'Settings · Advanced',
+			label: t(
+				'workbench:command-palette.settings-advanced',
+				'Settings · Advanced',
+			),
 			icon: TerminalIcon,
 			run: go(() => navigate({ to: '/settings/advanced' })),
 		},
@@ -156,20 +185,20 @@ export function CommandPalette() {
 	const appearance: ActionEntry[] = [
 		{
 			id: 'theme.system',
-			label: 'Theme · System',
+			label: t('workbench:command-palette.theme-system', 'Theme · System'),
 			icon: SettingsIcon,
 			keywords: ['light', 'dark'],
 			run: go(() => setTheme('system')),
 		},
 		{
 			id: 'theme.light',
-			label: 'Theme · Light',
+			label: t('workbench:command-palette.theme-light', 'Theme · Light'),
 			icon: SettingsIcon,
 			run: go(() => setTheme('light')),
 		},
 		{
 			id: 'theme.dark',
-			label: 'Theme · Dark',
+			label: t('workbench:command-palette.theme-dark', 'Theme · Dark'),
 			icon: SettingsIcon,
 			run: go(() => setTheme('dark')),
 		},
@@ -177,26 +206,39 @@ export function CommandPalette() {
 
 	return (
 		<CommandDialog onOpenChange={setOpen} open={open}>
-			<Command label='Command palette'>
-				<CommandInput placeholder='Search commands…' />
+			<Command label={t('workbench:command-palette.label', 'Command palette')}>
+				<CommandInput
+					placeholder={t(
+						'workbench:command-palette.placeholder',
+						'Search commands…',
+					)}
+				/>
 				<CommandList>
-					<CommandEmpty>No matching command.</CommandEmpty>
+					<CommandEmpty>
+						{t('workbench:command-palette.empty', 'No matching command.')}
+					</CommandEmpty>
 					<ActionGroup
 						actions={navigation}
 						currentTheme={theme}
-						heading='Navigation'
+						heading={t(
+							'workbench:command-palette.group-navigation',
+							'Navigation',
+						)}
 					/>
 					<CommandSeparator />
 					<ActionGroup
 						actions={settings}
 						currentTheme={theme}
-						heading='Settings'
+						heading={t('workbench:command-palette.group-settings', 'Settings')}
 					/>
 					<CommandSeparator />
 					<ActionGroup
 						actions={appearance}
 						currentTheme={theme}
-						heading='Appearance'
+						heading={t(
+							'workbench:command-palette.group-appearance',
+							'Appearance',
+						)}
 					/>
 				</CommandList>
 			</Command>

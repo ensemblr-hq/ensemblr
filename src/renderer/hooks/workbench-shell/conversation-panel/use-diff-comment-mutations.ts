@@ -6,6 +6,7 @@ import {
 	ensemblrQueryKeys,
 	saveReviewComment,
 } from '@/renderer/api/ensemblr-queries';
+import { i18n } from '@/renderer/lib/i18n';
 
 const LOCAL_ID_PREFIX = 'local:';
 
@@ -26,9 +27,10 @@ function localCommentId(id: string): string | null {
  * @param error - The thrown error, if any
  */
 function notifyCommentFailed(error: unknown): void {
-	toast.error('Comment update failed', {
-		description: error instanceof Error ? error.message : undefined,
-	});
+	toast.error(
+		i18n.t('errors:diff-comment.update-failed.title', 'Comment update failed'),
+		{ description: error instanceof Error ? error.message : undefined },
+	);
 }
 
 /**

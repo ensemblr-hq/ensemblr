@@ -1,3 +1,4 @@
+import { i18n } from '@/renderer/lib/i18n';
 import type { WorkspaceGitFailure } from '@/shared/ipc/contracts/workspace-git';
 
 /** Panel copy for a failed git read: what happened, what to do, and git's own words. */
@@ -20,23 +21,39 @@ export function describeWorkspaceGitFailure(
 	if (failure.code === 'not-a-git-repo') {
 		return {
 			detail: failure.message,
-			message:
+			message: i18n.t(
+				'workbench:git-failure.not-a-repo.message',
 				'This folder is not tracked by git, so there is no history to compare against. Initialize a repository here, or recreate the workspace from a cloned one.',
-			title: 'Not a git repository',
+			),
+			title: i18n.t(
+				'workbench:git-failure.not-a-repo.title',
+				'Not a git repository',
+			),
 		};
 	}
 	if (failure.code === 'invalid-cwd') {
 		return {
 			detail: failure.message,
-			message:
+			message: i18n.t(
+				'workbench:git-failure.invalid-cwd.message',
 				'The folder this workspace points at could not be opened. It may have been moved, renamed, or deleted since the workspace was created.',
-			title: 'Workspace folder unavailable',
+			),
+			title: i18n.t(
+				'workbench:git-failure.invalid-cwd.title',
+				'Workspace folder unavailable',
+			),
 		};
 	}
 	return {
 		detail: failure.message,
-		message: 'Git could not report this workspace’s changes.',
-		title: 'Could not read changes',
+		message: i18n.t(
+			'workbench:git-failure.unknown.message',
+			'Git could not report this workspace’s changes.',
+		),
+		title: i18n.t(
+			'workbench:git-failure.unknown.title',
+			'Could not read changes',
+		),
 	};
 }
 
@@ -52,6 +69,9 @@ export function describeMergeConflictProbeFailure(
 ): Omit<GitFailureCopy, 'message'> {
 	return {
 		detail: failure.message,
-		title: 'Could not check for merge conflicts',
+		title: i18n.t(
+			'workbench:git-failure.merge-probe.title',
+			'Could not check for merge conflicts',
+		),
 	};
 }

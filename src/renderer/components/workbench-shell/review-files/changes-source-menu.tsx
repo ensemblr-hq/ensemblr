@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { CheckIcon, MoreVerticalIcon, Undo2Icon, XIcon } from 'lucide-react';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { workspaceCommitsQuery } from '@/renderer/api/ensemblr';
 import { Button } from '@/renderer/components/ui/button';
@@ -27,18 +28,26 @@ export function ChangesSourceBadge({
 	onClear: () => void;
 	source: ChangesSource;
 }) {
+	const { t } = useTranslation();
+
 	if (source.kind === 'all') {
 		return null;
 	}
 	const label =
-		source.kind === 'uncommitted' ? 'Uncommitted' : source.shortHash;
+		source.kind === 'uncommitted'
+			? t('git:changes-source.uncommitted-badge', 'Uncommitted')
+			: source.shortHash;
 
 	return (
 		<Button
 			className='h-7 max-w-40 gap-1 px-2'
 			onClick={onClear}
 			size='xs'
-			title={source.kind === 'commit' ? source.subject : 'Uncommitted changes'}
+			title={
+				source.kind === 'commit'
+					? source.subject
+					: t('git:changes-source.uncommitted', 'Uncommitted changes')
+			}
 			variant='outline'
 		>
 			<XIcon data-icon='inline-start' />
@@ -62,6 +71,7 @@ export function ChangesOverflowMenu({
 	source: ChangesSource;
 	workspace: WorkspaceShellModel;
 }) {
+	const { t } = useTranslation();
 	// Defer the `git log` call until the menu actually opens — there's no reason
 	// to read commits for every workspace the user merely glances at.
 	const [open, setOpen] = useState(false);
@@ -81,7 +91,9 @@ export function ChangesOverflowMenu({
 			<DropdownMenuTrigger asChild>
 				<Button size='icon-sm' variant='ghost'>
 					<MoreVerticalIcon />
-					<span className='sr-only'>Open changes menu</span>
+					<span className='sr-only'>
+						{t('git:changes-source.menu-label', 'Open changes menu')}
+					</span>
 				</Button>
 			</DropdownMenuTrigger>
 			<DropdownMenuContent align='end' className='w-80 p-0'>
@@ -90,7 +102,9 @@ export function ChangesOverflowMenu({
 						className='h-9 px-2 text-sm'
 						onSelect={() => onSelectSource({ kind: 'all' })}
 					>
-						<span className='min-w-0 flex-1 truncate'>All changes</span>
+						<span className='min-w-0 flex-1 truncate'>
+							{t('git:changes-source.all', 'All changes')}
+						</span>
 						{source.kind === 'all' ? (
 							<CheckIcon aria-hidden='true' className='size-4' />
 						) : null}
@@ -101,14 +115,19 @@ export function ChangesOverflowMenu({
 					>
 						<div className='min-w-0 flex-1'>
 							<div className='truncate font-medium text-sm'>
-								Uncommitted changes
+								{t('git:changes-source.uncommitted', 'Uncommitted changes')}
 							</div>
 							<div className='text-muted-foreground text-xs'>
 								{uncommittedCount > 0
-									? `${uncommittedCount} ${
-											uncommittedCount === 1 ? 'file' : 'files'
-										} changed`
-									: 'No uncommitted changes'}
+									? t('git:changes-source.changed-file-count', {
+											count: uncommittedCount,
+											defaultValue_one: '{{count}} file changed',
+											defaultValue_other: '{{count}} files changed',
+										})
+									: t(
+											'git:changes-source.uncommitted-empty',
+											'No uncommitted changes',
+										)}
 							</div>
 						</div>
 						{source.kind === 'uncommitted' ? (
@@ -122,11 +141,14 @@ export function ChangesOverflowMenu({
 				<div className='sleek-scrollbar max-h-72 overflow-y-auto p-1'>
 					{hasCommitFailure ? (
 						<div className='px-2 py-2 text-muted-foreground text-xs'>
-							Could not load commits.
+							{t(
+								'git:changes-source.commits-failed',
+								'Could not load commits.',
+							)}
 						</div>
 					) : isPending ? (
 						<div className='px-2 py-2 text-muted-foreground text-xs'>
-							Loading commits…
+							{t('git:changes-source.commits-loading', 'Loading commits…')}
 						</div>
 					) : commits.length ? (
 						commits.map((commit) => (
@@ -157,7 +179,7 @@ export function ChangesOverflowMenu({
 						))
 					) : (
 						<div className='px-2 py-2 text-muted-foreground text-xs'>
-							No commits yet.
+							{t('git:changes-source.commits-empty', 'No commits yet.')}
 						</div>
 					)}
 				</div>
@@ -171,7 +193,10 @@ export function ChangesOverflowMenu({
 							>
 								<Undo2Icon aria-hidden='true' />
 								<span className='min-w-0 flex-1 truncate'>
-									Discard all uncommitted changes
+									{t(
+										'git:changes-source.discard-all',
+										'Discard all uncommitted changes',
+									)}
 								</span>
 							</DropdownMenuItem>
 						</div>

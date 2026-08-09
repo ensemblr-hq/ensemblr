@@ -8,6 +8,7 @@ import {
 	XIcon,
 } from 'lucide-react';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { BundledLanguage } from 'shiki';
 import { CodeBlock } from '@/renderer/components/code-block';
 import { Terminal } from '@/renderer/components/terminal';
@@ -42,6 +43,7 @@ export function PiToolCard({
 	call: PiToolCallItem;
 	className?: string;
 }) {
+	const { t } = useTranslation();
 	const failed = call.status === 'error';
 	// Setting picks the default open state; failures always force-open so their
 	// error tail is visible. An explicit user toggle (`userOpen`) wins over both.
@@ -87,7 +89,9 @@ export function PiToolCard({
 				) : null}
 				{durationMs !== null ? (
 					<span className='ml-auto shrink-0 text-muted-foreground/60 text-xs'>
-						{(durationMs / 1000).toFixed(1)}s
+						{t('common:units.seconds', '{{seconds}}s', {
+							seconds: (durationMs / 1000).toFixed(1),
+						})}
 					</span>
 				) : null}
 			</CollapsibleTrigger>
@@ -179,6 +183,7 @@ function ToolOutput({
 	call: PiToolCallItem;
 	failed: boolean;
 }) {
+	const { t } = useTranslation();
 	const [showAll, setShowAll] = useState(false);
 	const diff =
 		call.details && typeof call.details.diff === 'string'
@@ -206,7 +211,11 @@ function ToolOutput({
 					onClick={() => setShowAll(true)}
 					type='button'
 				>
-					Show all {lines.length} lines
+					{t('common:tool-output.show-all', {
+						count: lines.length,
+						defaultValue_one: 'Show all {{count}} line',
+						defaultValue_other: 'Show all {{count}} lines',
+					})}
 				</button>
 			) : null}
 			<div className='max-h-72 overflow-auto'>

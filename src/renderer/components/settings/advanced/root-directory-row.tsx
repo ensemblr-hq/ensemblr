@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import {
 	ensemblrQueryKeys,
@@ -17,6 +18,7 @@ import { Spinner } from '@/renderer/components/ui/spinner';
  * a newly chosen root.
  */
 export function RootDirectoryRow() {
+	const { t } = useTranslation();
 	const queryClient = useQueryClient();
 	const { data: rootData, isLoading: rootLoading } =
 		useQuery(rootDirectoryQuery);
@@ -62,13 +64,21 @@ export function RootDirectoryRow() {
 					size='sm'
 					variant='outline'
 				>
-					{pickRoot.isPending ? 'Picking…' : 'Browse'}
+					{pickRoot.isPending
+						? t('common:actions.picking', 'Picking…')
+						: t('common:actions.browse', 'Browse')}
 				</Button>
 			}
-			description='Where Ensemblr stores repositories and workspaces. This should be an empty directory you do not modify directly. Changing this will reconcile your repository list against the new root.'
+			description={t(
+				'settings:advanced.root-directory.description',
+				'Where Ensemblr stores repositories and workspaces. This should be an empty directory you do not modify directly. Changing this will reconcile your repository list against the new root.',
+			)}
 			label={
 				<span className='flex items-center gap-2'>
-					Ensemblr root directory
+					{t(
+						'settings:advanced.root-directory.label',
+						'Ensemblr root directory',
+					)}
 					{rootStatus !== 'ok' ? (
 						<Badge variant={rootStatus === 'error' ? 'destructive' : 'outline'}>
 							{rootStatus}
@@ -80,16 +90,22 @@ export function RootDirectoryRow() {
 		>
 			{rootLoading ? (
 				<div className='mt-2 flex items-center gap-2 text-muted-foreground text-xs'>
-					<Spinner className='size-3' /> Reading root…
+					<Spinner className='size-3' />{' '}
+					{t('settings:advanced.root-directory.reading', 'Reading root…')}
 				</div>
 			) : (
 				<div className='mt-2 space-y-1'>
 					<code className='block truncate rounded-md bg-muted/40 px-3 py-2 font-mono text-xs'>
-						{rootData?.path ?? 'Not configured'}
+						{rootData?.path ??
+							t('settings:advanced.root-directory.unset', 'Not configured')}
 					</code>
 					{rootData?.source ? (
 						<p className='text-[0.625rem] text-muted-foreground'>
-							source: {rootData.source}
+							{t(
+								'settings:advanced.root-directory.source',
+								'source: {{source}}',
+								{ source: rootData.source },
+							)}
 						</p>
 					) : null}
 				</div>

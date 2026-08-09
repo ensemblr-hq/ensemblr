@@ -1,5 +1,6 @@
 import type { UIMessage } from 'ai';
 
+import { i18n } from '@/renderer/lib/i18n';
 import type { AgentNoticeMetadata } from '@/renderer/types/agent-timeline';
 import type {
 	AgentPersistedEnvelope,
@@ -32,7 +33,9 @@ export function buildErrorMessage(
 	) {
 		return null;
 	}
-	const head = error.message || 'Runtime error';
+	const head =
+		error.message ||
+		i18n.t('workbench:timeline.runtime-error', 'Runtime error');
 	const body = error.detail ? `\n${error.detail}` : '';
 	return {
 		id: `pi-event:${event.id}`,
@@ -40,8 +43,6 @@ export function buildErrorMessage(
 		role: 'system',
 	};
 }
-
-const INTERRUPTED_NOTICE_TEXT = 'You stopped this turn';
 
 /**
  * Projects a `shutdown` envelope into the marker left where the user stopped a
@@ -64,7 +65,16 @@ export function buildInterruptedMessage(
 	return {
 		id: `pi-event:${event.id}`,
 		metadata: { notice: 'interrupted' } satisfies AgentNoticeMetadata,
-		parts: [{ state: 'done', text: INTERRUPTED_NOTICE_TEXT, type: 'text' }],
+		parts: [
+			{
+				state: 'done',
+				text: i18n.t(
+					'workbench:timeline.turn-stopped',
+					'You stopped this turn',
+				),
+				type: 'text',
+			},
+		],
 		role: 'system',
 	};
 }

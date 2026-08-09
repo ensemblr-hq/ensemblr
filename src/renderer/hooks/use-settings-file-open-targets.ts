@@ -1,4 +1,5 @@
 import { useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 
 import {
@@ -39,6 +40,7 @@ export function useSettingsFileOpenTargets(
 		primaryTarget,
 		rememberTarget,
 	} = useOpenTargetMenu(settingsHistoryKey(config));
+	const { t } = useTranslation();
 
 	const scope = config.scope;
 	const repositoryPath = config.scope === 'repo' ? config.repositoryPath : null;
@@ -46,7 +48,12 @@ export function useSettingsFileOpenTargets(
 	const invokeTarget = useCallback(
 		async (target: WorkspaceOpenTarget) => {
 			if (getEnsemblrApiOrNull() === null) {
-				toast.error('Open in… is unavailable without the Electron bridge.');
+				toast.error(
+					t(
+						'errors:open-target.bridge-unavailable.title',
+						'Open in… is unavailable without the Electron bridge.',
+					),
+				);
 				return;
 			}
 			const requestConfig: SettingsConfigFile =
@@ -58,16 +65,24 @@ export function useSettingsFileOpenTargets(
 				targetId: target.id,
 			});
 			if (!result.ok) {
-				toast.error(`Failed to open in ${target.label}: ${result.error}`);
+				toast.error(
+					t(
+						'errors:open-target.open-failed.title',
+						'Failed to open in {{target}}: {{error}}',
+						{ error: result.error, target: target.label },
+					),
+				);
 				return;
 			}
 			if (target.behavior === 'copy-path') {
-				toast.success('Path copied to clipboard.');
+				toast.success(
+					t('common:clipboard.path-copied', 'Path copied to clipboard.'),
+				);
 				return;
 			}
 			rememberTarget(target.id);
 		},
-		[rememberTarget, repositoryPath, scope],
+		[rememberTarget, repositoryPath, scope, t],
 	);
 
 	return {

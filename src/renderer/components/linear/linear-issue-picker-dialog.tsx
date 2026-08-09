@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import {
 	linearConnectionQuery,
@@ -30,6 +31,7 @@ export function LinearIssuePickerDialog({
 	onSelect: (issue: LinearIssueWire) => void;
 	open: boolean;
 }) {
+	const { t } = useTranslation();
 	const [query, setQuery] = useState('');
 	const { data: connectionData, isLoading: connectionLoading } = useQuery({
 		...linearConnectionQuery,
@@ -49,24 +51,33 @@ export function LinearIssuePickerDialog({
 	return (
 		<CommandDialog
 			className='max-w-xl translate-y-0 sm:max-w-xl'
-			description='Search Linear issues and pick one to link.'
+			description={t(
+				'linear:issue-picker.description',
+				'Search Linear issues and pick one to link.',
+			)}
 			onOpenChange={onOpenChange}
 			open={open}
-			title='Link Linear issue'
+			title={t('linear:issue-picker.title', 'Link Linear issue')}
 		>
 			<Command className='rounded-xl border-0' shouldFilter={false}>
 				<CommandInput
 					onValueChange={setQuery}
-					placeholder='Search by identifier or title…'
+					placeholder={t(
+						'linear:issue-picker.search-placeholder',
+						'Search by identifier or title…',
+					)}
 					value={query}
 				/>
 				<CommandList className='max-h-80 border-border border-t'>
 					<CommandEmpty className='py-8 text-muted-foreground text-xs'>
 						{gate.kind === 'ready'
 							? issuesLoading
-								? 'Loading issues…'
-								: 'No issues match your search.'
-							: 'Linear is not connected. Sign in from integration settings.'}
+								? t('linear:issue-picker.loading', 'Loading issues…')
+								: t('linear:issue-picker.empty', 'No issues match your search.')
+							: t(
+									'linear:issue-picker.not-connected',
+									'Linear is not connected. Sign in from integration settings.',
+								)}
 					</CommandEmpty>
 					{gate.kind === 'ready' ? (
 						<CommandGroup>
