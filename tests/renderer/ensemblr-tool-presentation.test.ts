@@ -388,9 +388,9 @@ describe('ensemblrToolLabel', () => {
 		expect(label?.badge?.path).toBe('src/main/main.ts');
 	});
 
-	// A batched call carries its subject inside an array, so a label reading only
-	// top-level keys says nothing about what the batch acted on.
-	test('steps into a batch to name what it acted on', () => {
+	// A question is a sentence, and a sentence cut to the title's length reads as
+	// less than the bare action does, so the row deliberately quotes none of it.
+	test('leaves a question out of the row it titles', () => {
 		expect(
 			ensemblrToolLabel(
 				'ensemblr_ask_user_question',
@@ -401,7 +401,7 @@ describe('ensemblrToolLabel', () => {
 				},
 				true,
 			)?.title,
-		).toBe('Asking you a question: Which branch should this land on?');
+		).toBe('Asking you a question');
 	});
 
 	test('titles a call the MCP-namespaced name reaches it under', () => {

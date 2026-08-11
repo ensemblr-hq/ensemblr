@@ -53,8 +53,8 @@ interface EnsemblrToolLabel {
 	title: readonly [() => string, () => string];
 	/**
 	 * Input paths whose value is appended to the title, first match winning. A
-	 * path may step into a batch — `comments.0.filePath` — so a call that carries
-	 * its subject inside an array still names it.
+	 * path may step across a batch with `*` — `comments.*.filePath` — so a call
+	 * that carries its subject inside an array still names it.
 	 */
 	detailKeys?: readonly string[];
 	/**
@@ -81,7 +81,6 @@ interface EnsemblrToolLabel {
  */
 export const ENSEMBLR_TOOL_LABELS: Record<string, EnsemblrToolLabel> = {
 	ensemblr_ask_user_question: {
-		detailKeys: ['questions.0.question'],
 		glyph: 'message-circle-question',
 		title: [
 			() =>
