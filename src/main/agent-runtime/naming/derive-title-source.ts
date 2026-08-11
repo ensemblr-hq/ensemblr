@@ -8,22 +8,25 @@
 import { parseSlashCommand } from '../../../shared/pi-skill-invocation.ts';
 import {
 	attachedFileBlockPattern,
+	linkedDirectoriesBlockPattern,
 	referencedFoldersBlockPattern,
 	userPreferencesBlockPattern,
 } from '../../../shared/prompt-scaffolding.ts';
 
 /**
  * Strips the composer/master-prompt scaffolding from a prompt, leaving the
- * user's typed text. Removes every referenced-folders preamble (wherever it
- * appears, not just at the start), all `<user_preferences>` blocks, and all
- * `<attached_file>` blocks, then collapses blank runs and trims. Uses the shared
- * scaffolding patterns so a renderer wording change cannot leak into the title.
+ * user's typed text. Removes every referenced-folders and linked-directories
+ * preamble (wherever it appears, not just at the start), all
+ * `<user_preferences>` blocks, and all `<attached_file>` blocks, then collapses
+ * blank runs and trims. Uses the shared scaffolding patterns so a renderer
+ * wording change cannot leak into the title.
  * @param prompt - The raw persisted or composed prompt text.
  * @returns The residual typed message text, which may be empty.
  */
 export function stripPromptScaffolding(prompt: string): string {
 	return prompt
 		.replace(referencedFoldersBlockPattern(), '')
+		.replace(linkedDirectoriesBlockPattern(), '')
 		.replace(userPreferencesBlockPattern(), '')
 		.replace(attachedFileBlockPattern(), '')
 		.replace(/\n{3,}/g, '\n\n')

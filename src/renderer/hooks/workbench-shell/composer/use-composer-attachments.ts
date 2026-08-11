@@ -10,16 +10,17 @@ import {
 } from 'react';
 
 import {
+	appendAttachments,
 	attachPastedFiles,
+	attachPastedText,
 	getTransferFiles,
 } from '@/renderer/lib/workbench/composer-attachments';
 import {
-	composerExternalsAtomFamily,
-	composerMentionsAtomFamily,
-	composerUploadsAtomFamily,
+	composerAttachmentsAtomFamily,
 	useComposerAttachmentInbox,
 } from '@/renderer/state/composer';
 import { autoConvertLongTextAtom } from '@/renderer/state/preferences';
+import type { ComposerAttachment } from '@/renderer/types/workbench';
 
 /**
  * Pasted text at or above this length is converted into a `.txt` attachment
@@ -28,97 +29,84 @@ import { autoConvertLongTextAtom } from '@/renderer/state/preferences';
 const PASTE_ATTACHMENT_THRESHOLD = 5_000;
 
 /**
- * The composer's three attachment lists and every way the user adds to or
- * removes from them: the file picker, paste (files and long-text conversion),
- * and drag-and-drop.
+ * The composer's attachment list and every way the user adds to or removes from
+ * it: the file picker, paste (files and long-text conversion), drag-and-drop,
+ * and the cross-component inbox other panels push through.
  *
- * Uploads are in-memory `File`s awaiting send; mentions are workspace files
- * referenced by path; externals are files copied in from outside the workspace.
- * Adds dedupe by path so re-attaching the same file is a no-op.
- * @param chatTabId - Chat tab the attachment lists are scoped to
+ * One ordered list covers every source, so the order the user attached things in
+ * is the order the outgoing prompt carries. Everything is written to the
+ * workspace's content-addressed store the moment it is attached, so every chip
+ * carries a real path and re-attaching the same bytes costs nothing.
+ * @param chatTabId - Chat tab the attachment list is scoped to
+ * @param insertPlainText - Fallback for a long paste whose write failed
  * @param workspaceCwd - Absolute workspace path pasted files are saved under
- * @returns The lists, their setters, the pending error, and the DOM handlers
+ * @returns The list, its setter, the pending error, and the DOM handlers
  */
 export function useComposerAttachments({
 	chatTabId,
+	insertPlainText,
 	workspaceCwd,
 }: {
 	chatTabId: string;
+	insertPlainText: (text: string) => void;
 	workspaceCwd: string;
 }) {
 	const fileInputRef = useRef<HTMLInputElement | null>(null);
-	const [uploadAttachments, setUploadAttachments] = useAtom(
-		composerUploadsAtomFamily(chatTabId),
-	);
-	const [mentionAttachments, setMentionAttachments] = useAtom(
-		composerMentionsAtomFamily(chatTabId),
-	);
-	const [externalAttachments, setExternalAttachments] = useAtom(
-		composerExternalsAtomFamily(chatTabId),
+	const [attachments, setAttachments] = useAtom(
+		composerAttachmentsAtomFamily(chatTabId),
 	);
 	const [attachmentError, setAttachmentError] = useState<string | null>(null);
 	const autoConvertLong = useAtomValue(autoConvertLongTextAtom);
 
-	// Drain externally-pushed attachments (transcript chips, etc.) into the
-	// mention list. Dedup by path so re-clicking the same chip is a no-op.
+	const addAttachments = useCallback(
+		(incoming: readonly ComposerAttachment[]) => {
+			setAttachments((prev) => appendAttachments(prev, incoming));
+		},
+		[setAttachments],
+	);
+
+	// Drain externally-pushed attachments (transcript chips, plan handoff, fork).
 	const attachmentInbox = useComposerAttachmentInbox(chatTabId);
 	useEffect(() => {
 		if (attachmentInbox.pending.length === 0) {
 			return;
 		}
-		setMentionAttachments((prev) => {
-			const next = [...prev];
-			for (const file of attachmentInbox.pending) {
-				if (!next.some((existing) => existing.path === file.path)) {
-					next.push(file);
-				}
-			}
-			return next;
-		});
+		addAttachments(attachmentInbox.pending);
 		attachmentInbox.clear();
-	}, [attachmentInbox, setMentionAttachments]);
+	}, [addAttachments, attachmentInbox]);
 
 	const handlePastedFiles = useCallback(
 		async (files: readonly File[]) => {
 			setAttachmentError(null);
-			const { error, savedExternals, savedFiles } = await attachPastedFiles(
-				files,
-				workspaceCwd,
-			);
-			if (error) {
-				setAttachmentError(error);
+			const result = await attachPastedFiles(files, workspaceCwd);
+			if (result.error) {
+				setAttachmentError(result.error);
 			}
-			if (savedFiles.length > 0) {
-				setMentionAttachments((prev) => {
-					const next = [...prev];
-					for (const file of savedFiles) {
-						if (!next.some((existing) => existing.path === file.path)) {
-							next.push(file);
-						}
-					}
-					return next;
-				});
-			}
-			if (savedExternals.length > 0) {
-				setExternalAttachments((prev) => {
-					const next = [...prev];
-					for (const external of savedExternals) {
-						if (
-							!next.some(
-								(existing) => existing.absolutePath === external.absolutePath,
-							)
-						) {
-							next.push(external);
-						}
-					}
-					return next;
-				});
+			if (result.attachments.length > 0) {
+				addAttachments(result.attachments);
 			}
 		},
-		[workspaceCwd, setMentionAttachments, setExternalAttachments],
+		[addAttachments, workspaceCwd],
 	);
 
-	/** Handles file pastes and long-text paste conversion for the textarea. */
+	/**
+	 * Converts a long paste into a stored attachment. A write that fails puts the
+	 * text back in the draft rather than surfacing an error: the paste already
+	 * had its default prevented, so dropping it would lose the user's clipboard.
+	 */
+	const handlePastedText = useCallback(
+		async (text: string) => {
+			setAttachmentError(null);
+			try {
+				addAttachments([await attachPastedText(text, workspaceCwd)]);
+			} catch {
+				insertPlainText(text);
+			}
+		},
+		[addAttachments, insertPlainText, workspaceCwd],
+	);
+
+	/** Handles file pastes and long-text paste conversion for the composer. */
 	const handlePaste = useCallback(
 		(event: ReactClipboardEvent<HTMLTextAreaElement>) => {
 			const files = getTransferFiles(event.clipboardData);
@@ -135,11 +123,9 @@ export function useComposerAttachments({
 				return;
 			}
 			event.preventDefault();
-			const file = new File([text], 'pasted-text.txt', { type: 'text/plain' });
-			setUploadAttachments((prev) => [...prev, file]);
-			setAttachmentError(null);
+			void handlePastedText(text);
 		},
-		[autoConvertLong, handlePastedFiles, setUploadAttachments],
+		[autoConvertLong, handlePastedFiles, handlePastedText],
 	);
 
 	/** Accepts files dropped onto the composer, saving them like a paste. */
@@ -166,43 +152,25 @@ export function useComposerAttachments({
 		(event: ChangeEvent<HTMLInputElement>) => {
 			const files = event.target.files ? [...event.target.files] : [];
 			if (files.length > 0) {
-				setUploadAttachments((prev) => [...prev, ...files]);
+				void handlePastedFiles(files);
 			}
 			event.target.value = '';
 		},
-		[setUploadAttachments],
+		[handlePastedFiles],
 	);
 
-	const removeUpload = useCallback(
-		(index: number) => {
-			setUploadAttachments((prev) => prev.filter((_, idx) => idx !== index));
-		},
-		[setUploadAttachments],
-	);
-
-	const removeMention = useCallback(
-		(path: string) => {
+	const removeAttachment = useCallback(
+		(id: string) => {
 			setAttachmentError(null);
-			setMentionAttachments((prev) =>
-				prev.filter((entry) => entry.path !== path),
-			);
+			setAttachments((prev) => prev.filter((entry) => entry.id !== id));
 		},
-		[setMentionAttachments],
-	);
-
-	const removeExternal = useCallback(
-		(absolutePath: string) => {
-			setAttachmentError(null);
-			setExternalAttachments((prev) =>
-				prev.filter((entry) => entry.absolutePath !== absolutePath),
-			);
-		},
-		[setExternalAttachments],
+		[setAttachments],
 	);
 
 	return {
+		addAttachments,
 		attachmentError,
-		externalAttachments,
+		attachments,
 		fileInputRef,
 		handleAddAttachment: useCallback(() => {
 			fileInputRef.current?.click();
@@ -211,18 +179,9 @@ export function useComposerAttachments({
 		handleDrop,
 		handleFileChange,
 		handlePaste,
-		hasChips:
-			uploadAttachments.length > 0 ||
-			mentionAttachments.length > 0 ||
-			externalAttachments.length > 0,
-		mentionAttachments,
-		removeExternal,
-		removeMention,
-		removeUpload,
+		hasChips: attachments.length > 0,
+		removeAttachment,
 		setAttachmentError,
-		setExternalAttachments,
-		setMentionAttachments,
-		setUploadAttachments,
-		uploadAttachments,
+		setAttachments,
 	};
 }

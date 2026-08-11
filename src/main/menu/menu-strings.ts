@@ -61,7 +61,7 @@ const MENU_LABELS = {
 		hide: 'Скрыть {{app}}',
 		hideOthers: 'Скрыть остальные',
 		minimize: 'Свернуть',
-		newWorkspace: 'Новая рабочая область',
+		newWorkspace: 'Новое рабочее пространство',
 		openProductRoadmap: 'Открыть дорожную карту',
 		paste: 'Вставить',
 		pasteAndMatchStyle: 'Вставить и согласовать стиль',

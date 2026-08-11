@@ -1,10 +1,12 @@
 import { i18n } from '@/renderer/lib/i18n';
+import { renderIssueDocument } from '@/renderer/lib/workbench/issue-document';
 import type {
 	LinearGateState,
 	LinearWorkspaceSeed,
 } from '@/renderer/types/linear';
 import type { WorkspaceSource } from '@/renderer/types/workbench';
 import type {
+	LinearCommentWire,
 	LinearConnectionSnapshot,
 	LinearIssueWire,
 	LinearServiceFailure,
@@ -142,6 +144,48 @@ export function formatLinearIssueContext(issue: {
 		: '';
 
 	return `Linear issue ${issue.identifier}: ${issue.title}${link}${excerpt}`;
+}
+
+/**
+ * Renders a Linear issue as a full markdown document for the composer to store
+ * and attach — every metadata field, the whole description, and every comment,
+ * rather than the one-line excerpt {@link formatLinearIssueContext} produces.
+ * @param issue - The issue to render.
+ * @param comments - The issue's comments, when they have been fetched.
+ * @returns The markdown document to persist.
+ */
+export function formatLinearIssueDocument(
+	issue: LinearIssueWire,
+	comments: readonly LinearCommentWire[] = [],
+): string {
+	return renderIssueDocument({
+		body: issue.description,
+		comments: comments.map((comment) => ({
+			author: comment.authorName,
+			body: comment.body,
+			createdAt: comment.createdAt,
+		})),
+		fields: [
+			{ label: 'Status', value: issue.stateName },
+			{
+				label: 'Priority',
+				value: issue.priority === null ? null : priorityLabel(issue.priority),
+			},
+			{ label: 'Assignee', value: issue.assigneeName },
+			{ label: 'Team', value: issue.teamName },
+			{ label: 'Project', value: issue.projectName },
+			{ label: 'Cycle', value: issue.cycleName },
+			{ label: 'Due date', value: issue.dueDate },
+			{
+				label: 'Labels',
+				value: issue.labels.map((label) => label.name).join(', '),
+			},
+			{ label: 'Updated', value: issue.updatedAt },
+		],
+		reference: issue.identifier,
+		title: issue.title,
+		url: issue.url,
+	});
 }
 
 /**

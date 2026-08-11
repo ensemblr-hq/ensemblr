@@ -34,6 +34,8 @@ export default defineConfig({
 			'tests/main/sanitize-title.test.ts',
 			'tests/main/title-provenance.test.ts',
 			'tests/main/derive-title-source.test.ts',
+			'tests/main/linked-directory-recents.test.ts',
+			'tests/main/linked-directory-service.test.ts',
 			'tests/main/apply-branch-slug.test.ts',
 			'tests/main/agent-summary.test.ts',
 			'tests/main/session-brief-naming.test.ts',

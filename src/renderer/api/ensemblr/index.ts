@@ -16,6 +16,7 @@ export * from './health';
 export * from './history';
 export * from './invalidate-workspace-list-views';
 export * from './linear';
+export * from './linked-directories';
 export * from './navigation';
 export * from './open-targets';
 export {

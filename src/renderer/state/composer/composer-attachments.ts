@@ -1,35 +1,39 @@
 import { atom, useAtom } from 'jotai';
 import { useCallback, useMemo } from 'react';
 
-import type { WorkspaceFileSummary } from '@/renderer/types/workbench';
+import type { ComposerAttachment } from '@/renderer/types/workbench';
 
 /**
- * Cross-component channel for files that should land in the composer's
- * mention list. Sources (transcript chips, drag-and-drop, etc.) push entries
- * keyed by the target chat tab, and the composer drains entries on render.
+ * Cross-component channel for attachments that should land in a composer.
+ * Sources (transcript chips, plan handoff, fork) push entries keyed by the
+ * target chat tab, and the composer drains entries on render.
  */
 interface PendingEntry {
+	attachment: ComposerAttachment;
 	chatTabId: string;
-	file: WorkspaceFileSummary;
 }
 
-/** In-memory queue of files awaiting insertion into a chat tab's composer mention list. */
+/** In-memory queue of attachments awaiting insertion into a chat tab's composer. */
 const pendingComposerAttachmentsAtom = atom<readonly PendingEntry[]>([]);
 
-/** Inbox view for the composer — reads + drains entries for a chat tab. */
+/**
+ * Inbox view for the composer — reads and drains entries for a chat tab.
+ * @param chatTabId - Chat tab whose queued attachments to read
+ * @returns The queued attachments plus a callback that clears them
+ */
 export function useComposerAttachmentInbox(chatTabId: string): {
-	pending: readonly WorkspaceFileSummary[];
+	pending: readonly ComposerAttachment[];
 	clear: () => void;
 } {
 	const [all, setAll] = useAtom(pendingComposerAttachmentsAtom);
 	const pending = useMemo(() => {
-		const files: WorkspaceFileSummary[] = [];
+		const attachments: ComposerAttachment[] = [];
 		for (const entry of all) {
 			if (entry.chatTabId === chatTabId) {
-				files.push(entry.file);
+				attachments.push(entry.attachment);
 			}
 		}
-		return files;
+		return attachments;
 	}, [all, chatTabId]);
 	const clear = useCallback(() => {
 		setAll((prev) => prev.filter((entry) => entry.chatTabId !== chatTabId));
@@ -37,24 +41,28 @@ export function useComposerAttachmentInbox(chatTabId: string): {
 	return { pending, clear };
 }
 
-/** Dispatcher for senders — pushes a file to the inbox, dedup'd by path. */
+/**
+ * Dispatcher for senders — pushes an attachment to the inbox, deduped by id.
+ * @returns A callback taking the target chat tab and the attachment to queue
+ */
 export function useComposerAttachmentDispatcher(): (
 	chatTabId: string,
-	file: WorkspaceFileSummary,
+	attachment: ComposerAttachment,
 ) => void {
 	const [, setAll] = useAtom(pendingComposerAttachmentsAtom);
 	return useCallback(
-		(chatTabId, file) => {
+		(chatTabId, attachment) => {
 			setAll((prev) => {
 				if (
 					prev.some(
 						(entry) =>
-							entry.chatTabId === chatTabId && entry.file.path === file.path,
+							entry.chatTabId === chatTabId &&
+							entry.attachment.id === attachment.id,
 					)
 				) {
 					return prev;
 				}
-				return [...prev, { chatTabId, file }];
+				return [...prev, { attachment, chatTabId }];
 			});
 		},
 		[setAll],

@@ -2,6 +2,8 @@ import { atom } from 'jotai';
 import { atomWithStorage } from 'jotai/utils';
 import { atomFamily } from 'jotai-family';
 
+import type { LinkedDirectory } from '@/renderer/types/workbench';
+
 /** Behavior when the user submits a message mid-turn. */
 export type FollowUpBehavior = 'steer' | 'queue' | 'block';
 
@@ -62,6 +64,43 @@ export const chatPlanModeAtomFamily = atomFamily((chatTabId: string) =>
 );
 
 /**
+ * Directories outside the workspace this chat has been given access to, keyed by
+ * chat-tab id. Like {@link chatPlanModeAtomFamily} this is the durable record of
+ * the user's choice and rides every `openAgentSession` call; the main process
+ * keeps no copy of its own.
+ *
+ * Deliberately per-chat rather than per-workspace: a linked directory widens what
+ * the agent may read, so one chat silently changing another chat's reach would be
+ * a permission surprise.
+ */
+export const chatLinkedDirectoriesAtomFamily = atomFamily((chatTabId: string) =>
+	atomWithStorage<readonly LinkedDirectory[]>(
+		KEY(`chat_linked_dirs_${chatTabId}`),
+		[],
+	),
+);
+
+/**
+ * The linked directories that were in force when this chat's runtime session was
+ * opened. Claude's SDK takes `additionalDirectories` only at launch, so a folder
+ * linked mid-session is not readable until the chat reopens; comparing this with
+ * {@link chatLinkedDirectoriesAtomFamily} is what lets the composer say so
+ * instead of letting the agent hit an unexplained permission denial.
+ *
+ * `null` means no session has opened for this chat yet, which an empty array
+ * cannot express — a chat whose session opened with nothing linked also stores
+ * `[]`, and reading that as "never opened" would silence the warning for the
+ * commonest case of all: send a message first, link a directory after.
+ */
+export const chatAppliedLinkedDirectoriesAtomFamily = atomFamily(
+	(chatTabId: string) =>
+		atomWithStorage<readonly string[] | null>(
+			KEY(`chat_applied_linked_dirs_${chatTabId}`),
+			null,
+		),
+);
+
+/**
  * Drops a chat's per-chat override atoms and their backing localStorage keys.
  * Call only when a chat tab is permanently deleted — closed tabs are restorable
  * and must keep their overrides. `atomFamily.remove` evicts just the in-memory
@@ -72,6 +111,8 @@ export function forgetChatOverrides(chatTabId: string): void {
 	chatModelOverrideAtomFamily.remove(chatTabId);
 	chatThinkingOverrideAtomFamily.remove(chatTabId);
 	chatPlanModeAtomFamily.remove(chatTabId);
+	chatLinkedDirectoriesAtomFamily.remove(chatTabId);
+	chatAppliedLinkedDirectoriesAtomFamily.remove(chatTabId);
 	const storage =
 		typeof globalThis.localStorage === 'undefined'
 			? null
@@ -82,6 +123,8 @@ export function forgetChatOverrides(chatTabId: string): void {
 	storage.removeItem(KEY(`chat_model_${chatTabId}`));
 	storage.removeItem(KEY(`chat_thinking_${chatTabId}`));
 	storage.removeItem(KEY(`chat_plan_mode_${chatTabId}`));
+	storage.removeItem(KEY(`chat_linked_dirs_${chatTabId}`));
+	storage.removeItem(KEY(`chat_applied_linked_dirs_${chatTabId}`));
 }
 
 // ─── Models (user defaults) ───────────────────────────────────────────────────

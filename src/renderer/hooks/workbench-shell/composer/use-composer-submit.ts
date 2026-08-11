@@ -8,45 +8,42 @@ import {
 import { useTranslation } from 'react-i18next';
 
 import {
-	formatExternalAttachmentText,
-	formatMentionAttachmentText,
-	formatUploadAttachmentText,
+	serializeComposerAttachments,
+	serializeLinkedDirectories,
 } from '@/renderer/lib/workbench/mention-payload';
 import {
 	useComposerPrimedActionConsumer,
 	useComposerSubmitConsumer,
 } from '@/renderer/state/composer';
-import { followUpBehaviorAtom } from '@/renderer/state/preferences';
+import {
+	chatLinkedDirectoriesAtomFamily,
+	followUpBehaviorAtom,
+} from '@/renderer/state/preferences';
 import type {
+	ComposerAttachment,
 	ComposerShellState,
-	ExternalAttachment,
-	WorkspaceFileSummary,
 } from '@/renderer/types/workbench';
 
-/** The draft and every chip list one send carries. */
+/** The text and attachments one send carries. */
 interface ComposerDraft {
-	externals: readonly ExternalAttachment[];
-	mentions: readonly WorkspaceFileSummary[];
+	attachments: readonly ComposerAttachment[];
 	text: string;
-	uploads: readonly File[];
 }
+
+/** An empty draft, for the sends that carry a payload and nothing else. */
+const EMPTY_DRAFT: ComposerDraft = { attachments: [], text: '' };
 
 /**
  * Whether a draft carries nothing worth sending.
- * @param draft - The text and chip lists a send would carry
+ * @param draft - The text and attachments a send would carry
  * @returns True when there is no text and no attachment
  */
 function isEmptyDraft(draft: ComposerDraft): boolean {
-	return (
-		draft.text.trim().length === 0 &&
-		draft.mentions.length === 0 &&
-		draft.uploads.length === 0 &&
-		draft.externals.length === 0
-	);
+	return draft.text.trim().length === 0 && draft.attachments.length === 0;
 }
 
 /**
- * The composer's send pipeline: serializes chips into the outgoing prompt,
+ * The composer's send pipeline: serializes attachments into the outgoing prompt,
  * clears the draft optimistically and restores it on failure, and maps the
  * Follow-up behavior setting onto the runtime's mid-turn delivery frames. Also
  * drains the two external channels — primed agent actions and Checks-panel
@@ -59,28 +56,23 @@ export function useComposerSubmit({
 	composer,
 	draft,
 	setAttachmentError,
-	setExternalAttachments,
-	setMentionAttachments,
-	setUploadAttachments,
+	setAttachments,
 	setValue,
 }: {
 	chatTabId: string;
 	composer: ComposerShellState;
 	draft: ComposerDraft;
 	setAttachmentError: (error: string | null) => void;
-	setExternalAttachments: Dispatch<
-		SetStateAction<readonly ExternalAttachment[]>
-	>;
-	setMentionAttachments: Dispatch<
-		SetStateAction<readonly WorkspaceFileSummary[]>
-	>;
-	setUploadAttachments: Dispatch<SetStateAction<readonly File[]>>;
+	setAttachments: Dispatch<SetStateAction<readonly ComposerAttachment[]>>;
 	setValue: Dispatch<SetStateAction<string>>;
 }) {
 	const { t } = useTranslation();
 	const [pending, setPending] = useState(false);
 	const [blockedNotice, setBlockedNotice] = useState(false);
 	const followUp = useAtomValue(followUpBehaviorAtom);
+	const linkedDirectories = useAtomValue(
+		chatLinkedDirectoriesAtomFamily(chatTabId),
+	);
 
 	const submitText = useCallback(
 		async (
@@ -90,26 +82,26 @@ export function useComposerSubmit({
 			if (composer.disabled || pending || isEmptyDraft(outgoing)) {
 				return;
 			}
-			const { externals, mentions, text, uploads } = outgoing;
+			const { attachments, text } = outgoing;
 			setPending(true);
 			setAttachmentError(null);
 			try {
-				const attachmentText = await formatMentionAttachmentText({
-					mentions,
+				const attachmentText = await serializeComposerAttachments({
+					attachments,
 					workspaceCwd: composer.workspaceCwd,
 				});
-				const uploadText = await formatUploadAttachmentText(uploads);
-				const externalText = formatExternalAttachmentText(externals);
-				const payload = [attachmentText, uploadText, externalText, text.trim()]
+				const payload = [
+					serializeLinkedDirectories(linkedDirectories),
+					attachmentText,
+					text.trim(),
+				]
 					.filter(Boolean)
 					.join('\n\n');
 				// Clear the composer before awaiting onSubmit. onSubmit renders an
 				// optimistic prompt synchronously, so leaving the textarea populated
 				// during its async round-trip shows the prompt in two places at once.
 				setValue('');
-				setUploadAttachments([]);
-				setMentionAttachments([]);
-				setExternalAttachments([]);
+				setAttachments([]);
 				try {
 					await composer.onSubmit(
 						payload,
@@ -118,9 +110,7 @@ export function useComposerSubmit({
 				} catch (cause) {
 					// Restore the unsent text so the user does not lose their input.
 					setValue(text);
-					setUploadAttachments([...uploads]);
-					setMentionAttachments([...mentions]);
-					setExternalAttachments([...externals]);
+					setAttachments([...attachments]);
 					throw cause;
 				}
 			} catch (cause) {
@@ -138,12 +128,11 @@ export function useComposerSubmit({
 		},
 		[
 			composer,
+			linkedDirectories,
 			pending,
 			setAttachmentError,
+			setAttachments,
 			setValue,
-			setExternalAttachments,
-			setUploadAttachments,
-			setMentionAttachments,
 			t,
 		],
 	);
@@ -181,12 +170,7 @@ export function useComposerSubmit({
 		(payload: string, autoSubmit: boolean) => {
 			const hasDraft = draft.text.trim().length > 0;
 			if (autoSubmit && !hasDraft) {
-				void submitText({
-					externals: [],
-					mentions: [],
-					text: payload,
-					uploads: [],
-				});
+				void submitText({ ...EMPTY_DRAFT, text: payload });
 				return;
 			}
 			setValue((current) =>
@@ -224,7 +208,7 @@ export function useComposerSubmit({
 			) {
 				return false;
 			}
-			dispatchSubmit({ externals: [], mentions: [], text, uploads: [] });
+			dispatchSubmit({ ...EMPTY_DRAFT, text });
 			return true;
 		},
 		[

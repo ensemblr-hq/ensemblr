@@ -32,6 +32,7 @@ import { ThinkingPicker } from './thinking-picker';
 interface ComposerControlsProps {
 	composer: ComposerShellState;
 	modelPickerOpen: boolean;
+	onLinkDirectory: () => void;
 	onLinkIssue: () => void;
 	onModelPickerOpenChange: (open: boolean) => void;
 	/** True while a turn is streaming or the composer is disabled outright. */
@@ -50,6 +51,7 @@ interface ComposerControlsProps {
 export function ComposerControls({
 	composer,
 	modelPickerOpen,
+	onLinkDirectory,
 	onLinkIssue,
 	onModelPickerOpenChange,
 	pickersDisabled,
@@ -102,6 +104,7 @@ export function ComposerControls({
 				<AttachmentMenu
 					disabled={composer.disabled}
 					onAddAttachment={state.handleAddAttachment}
+					onLinkDirectory={onLinkDirectory}
 					onLinkIssue={onLinkIssue}
 				/>
 				<SubmitControl

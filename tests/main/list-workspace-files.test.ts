@@ -1,11 +1,14 @@
 /// <reference types="node" />
 
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import {
 	mkdirSync,
 	mkdtempSync,
+	readdirSync,
 	readFileSync,
 	rmSync,
+	statSync,
 	writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -16,6 +19,11 @@ import { createLocalCommandService } from '../../src/main/commands/local-command
 import { createListWorkspaceFilesService } from '../../src/main/workspace-files/list-workspace-files';
 
 const tempDirs: string[] = [];
+
+/** The hash-folder name the attachment store derives for a payload. */
+function sha256Prefix(buffer: Buffer): string {
+	return createHash('sha256').update(buffer).digest('hex').slice(0, 6);
+}
 
 afterEach(() => {
 	while (tempDirs.length > 0) {
@@ -214,7 +222,7 @@ describe('createListWorkspaceFilesService.read', () => {
 });
 
 describe('createListWorkspaceFilesService.writeImageAttachment', () => {
-	test('writes pasted images into .context/images as ignored workspace files', async () => {
+	test('writes pasted images into a content-addressed folder as ignored workspace files', async () => {
 		const cwd = seedRepo();
 		const bytes = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a]);
 		const result = await workspaceFilesService().writeImageAttachment({
@@ -234,9 +242,10 @@ describe('createListWorkspaceFilesService.writeImageAttachment', () => {
 			isIgnored: true,
 			kind: 'file',
 		});
-		expect(file.path).toMatch(
-			/^\.context\/images\/screenshot-1-\d+-[0-9a-f]{8}\.png$/,
+		expect(file.path).toBe(
+			`.context/attachments/${sha256Prefix(bytes)}/screenshot-1.png`,
 		);
+		expect(result.reused).toBe(false);
 		expect(readFileSync(path.join(cwd, file.path))).toEqual(bytes);
 	});
 
@@ -277,8 +286,8 @@ describe('createListWorkspaceFilesService.writeImageAttachment', () => {
 		});
 
 		expect(result.error).toBeUndefined();
-		expect(result.file?.path).toMatch(
-			/^\.context\/images\/shot-\d+-[0-9a-f]{8}\.webp$/,
+		expect(result.file?.path).toBe(
+			`.context/attachments/${sha256Prefix(bytes)}/shot.webp`,
 		);
 	});
 
@@ -327,7 +336,7 @@ describe('createListWorkspaceFilesService.writeImageAttachment', () => {
 });
 
 describe('createListWorkspaceFilesService.writeFileAttachment', () => {
-	test('writes pasted files into .context/attachments as ignored workspace files', async () => {
+	test('writes pasted files into a content-addressed folder as ignored workspace files', async () => {
 		const cwd = seedRepo();
 		const bytes = Buffer.from('%PDF-1.7 fake pdf body');
 		const result = await workspaceFilesService().writeFileAttachment({
@@ -342,36 +351,136 @@ describe('createListWorkspaceFilesService.writeFileAttachment', () => {
 			throw new Error('Expected pasted attachment file entry.');
 		}
 		expect(file).toMatchObject({ isIgnored: true, kind: 'file' });
-		expect(file.path).toMatch(
-			/^\.context\/attachments\/quarterly-report-\d+-[0-9a-f]{8}\.pdf$/,
+		expect(file.path).toBe(
+			`.context/attachments/${sha256Prefix(bytes)}/quarterly-report.pdf`,
 		);
+		expect(result.reused).toBe(false);
 		expect(readFileSync(path.join(cwd, file.path))).toEqual(bytes);
 	});
 
 	test('sniffs extensionless text payloads and saves them as .txt', async () => {
+		const bytes = Buffer.from('#!/bin/sh\necho hi\n');
 		const result = await workspaceFilesService().writeFileAttachment({
-			contentBase64: Buffer.from('#!/bin/sh\necho hi\n').toString('base64'),
+			contentBase64: bytes.toString('base64'),
 			name: 'Makefile',
 			workspaceCwd: seedRepo(),
 		});
 
-		expect(result.file?.path).toMatch(
-			/^\.context\/attachments\/makefile-\d+-[0-9a-f]{8}\.txt$/,
+		expect(result.file?.path).toBe(
+			`.context/attachments/${sha256Prefix(bytes)}/makefile.txt`,
 		);
 	});
 
 	test('falls back to a bin extension for extensionless binary payloads', async () => {
+		const bytes = Buffer.from([0x00, 0x01, 0x02, 0x00, 0xff]);
 		const result = await workspaceFilesService().writeFileAttachment({
-			contentBase64: Buffer.from([0x00, 0x01, 0x02, 0x00, 0xff]).toString(
-				'base64',
-			),
+			contentBase64: bytes.toString('base64'),
 			name: 'blob',
 			workspaceCwd: seedRepo(),
 		});
 
-		expect(result.file?.path).toMatch(
-			/^\.context\/attachments\/blob-\d+-[0-9a-f]{8}\.bin$/,
+		expect(result.file?.path).toBe(
+			`.context/attachments/${sha256Prefix(bytes)}/blob.bin`,
 		);
+	});
+
+	test('reuses an identical payload instead of writing a second copy', async () => {
+		const cwd = seedRepo();
+		const bytes = Buffer.from('%PDF-1.7 the very same bytes');
+		const request = {
+			contentBase64: bytes.toString('base64'),
+			name: 'report.pdf',
+			workspaceCwd: cwd,
+		};
+		const service = workspaceFilesService();
+
+		const first = await service.writeFileAttachment(request);
+		const second = await service.writeFileAttachment(request);
+
+		expect(first.reused).toBe(false);
+		expect(second.reused).toBe(true);
+		expect(second.file?.path).toBe(first.file?.path);
+		expect(
+			readdirSync(path.join(cwd, path.dirname(first.file?.path ?? ''))),
+		).toEqual(['report.pdf']);
+	});
+
+	test('shares one copy of the bytes when the same payload arrives under a second name', async () => {
+		const cwd = seedRepo();
+		const bytes = Buffer.from('identical bytes, two names');
+		const service = workspaceFilesService();
+
+		const first = await service.writeFileAttachment({
+			contentBase64: bytes.toString('base64'),
+			name: 'first.txt',
+			workspaceCwd: cwd,
+		});
+		const second = await service.writeFileAttachment({
+			contentBase64: bytes.toString('base64'),
+			name: 'second.txt',
+			workspaceCwd: cwd,
+		});
+
+		const hashDir = `.context/attachments/${sha256Prefix(bytes)}`;
+		expect(first.file?.path).toBe(`${hashDir}/first.txt`);
+		expect(second.file?.path).toBe(`${hashDir}/second.txt`);
+		expect(readFileSync(path.join(cwd, `${hashDir}/second.txt`))).toEqual(
+			bytes,
+		);
+		// A hardlink, not a second copy: both names point at one inode.
+		expect(statSync(path.join(cwd, `${hashDir}/first.txt`)).ino).toBe(
+			statSync(path.join(cwd, `${hashDir}/second.txt`)).ino,
+		);
+	});
+
+	test('keeps different payloads that share a name in separate folders', async () => {
+		const cwd = seedRepo();
+		const service = workspaceFilesService();
+		const first = Buffer.from('one screenshot');
+		const second = Buffer.from('a different screenshot');
+
+		const firstResult = await service.writeFileAttachment({
+			contentBase64: first.toString('base64'),
+			name: 'shot.png',
+			workspaceCwd: cwd,
+		});
+		const secondResult = await service.writeFileAttachment({
+			contentBase64: second.toString('base64'),
+			name: 'shot.png',
+			workspaceCwd: cwd,
+		});
+
+		expect(firstResult.file?.path).not.toBe(secondResult.file?.path);
+		expect(readFileSync(path.join(cwd, firstResult.file?.path ?? ''))).toEqual(
+			first,
+		);
+		expect(readFileSync(path.join(cwd, secondResult.file?.path ?? ''))).toEqual(
+			second,
+		);
+	});
+
+	test('writes one file when the same payload is attached concurrently', async () => {
+		const cwd = seedRepo();
+		const bytes = Buffer.from('raced attachment payload');
+		const service = workspaceFilesService();
+		const request = {
+			contentBase64: bytes.toString('base64'),
+			name: 'raced.txt',
+			workspaceCwd: cwd,
+		};
+
+		const results = await Promise.all([
+			service.writeFileAttachment(request),
+			service.writeFileAttachment(request),
+			service.writeFileAttachment(request),
+		]);
+
+		const hashDir = `.context/attachments/${sha256Prefix(bytes)}`;
+		for (const result of results) {
+			expect(result.error).toBeUndefined();
+			expect(result.file?.path).toBe(`${hashDir}/raced.txt`);
+		}
+		expect(readdirSync(path.join(cwd, hashDir))).toEqual(['raced.txt']);
 	});
 
 	test('rejects an undecodable base64 payload', async () => {

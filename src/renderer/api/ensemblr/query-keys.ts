@@ -57,6 +57,9 @@ export const ensemblrQueryKeys = {
 	linearIssuesAll: () => [...ensemblrQueryKeys.all, 'linear-issues'] as const,
 	/** Query key for cached Linear workspace metadata. */
 	linearMetadata: () => [...ensemblrQueryKeys.all, 'linear-metadata'] as const,
+	/** Query key for the app-global list of recently linked directories. */
+	linkedDirectoryRecents: () =>
+		[...ensemblrQueryKeys.all, 'linked-directory-recents'] as const,
 	/** Query key for the available agent models. */
 	agentModels: () => [...ensemblrQueryKeys.all, 'agent-models'] as const,
 	/** Query key for a branch's agent session events. */

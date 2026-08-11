@@ -11,6 +11,7 @@ import type { EnvironmentApi } from './environment';
 import type { GithubApi } from './github';
 import type { HealthApi } from './health';
 import type { LinearApi } from './linear';
+import type { LinkedDirectoriesApi } from './linked-directories';
 import type { OpenTargetApi } from './open-target';
 import type { QuickStartApi } from './quick-start';
 import type { RepositoryApi } from './repository';
@@ -68,4 +69,5 @@ export interface EnsemblrApi
 		AgentProviderApi,
 		AgentToolApprovalApi,
 		LinearApi,
+		LinkedDirectoriesApi,
 		OpenTargetApi {}

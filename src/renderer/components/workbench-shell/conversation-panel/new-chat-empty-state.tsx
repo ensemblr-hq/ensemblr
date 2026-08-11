@@ -87,8 +87,8 @@ function TranscriptChip({
 		const relativePath = toWorkspaceRelative(workspaceCwd, entry.summaryPath);
 		dispatch(activeChatTabId, {
 			id: `transcript:${entry.tab.id}`,
-			kind: 'file',
-			name: label,
+			kind: 'workspace-file',
+			label,
 			path: relativePath,
 		});
 	};

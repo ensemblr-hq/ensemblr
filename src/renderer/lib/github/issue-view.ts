@@ -1,3 +1,4 @@
+import { renderIssueDocument } from '@/renderer/lib/workbench/issue-document';
 import type { GithubIssueWorkspaceSeed } from '@/renderer/types/github';
 import type { WorkspaceSource } from '@/renderer/types/workbench';
 import type { RepositoryIssueWire } from '@/shared/ipc/contracts/workspace-sources';
@@ -5,6 +6,27 @@ import type { RepositoryIssueWire } from '@/shared/ipc/contracts/workspace-sourc
 /** Stable picker-row id for a GitHub issue source. */
 export function githubIssueSourceId(issueNumber: number): string {
 	return `gh-issue:${issueNumber}`;
+}
+
+/**
+ * Renders a GitHub issue as a full markdown document for the composer to store
+ * and attach, carrying the whole body rather than a summary line.
+ * @param issue - The issue to render.
+ * @returns The markdown document to persist.
+ */
+export function formatGithubIssueDocument(issue: RepositoryIssueWire): string {
+	return renderIssueDocument({
+		body: issue.body,
+		fields: [
+			{ label: 'Status', value: issue.state?.toLowerCase() },
+			{ label: 'Author', value: issue.authorLogin },
+			{ label: 'Labels', value: issue.labels.join(', ') },
+			{ label: 'Updated', value: issue.updatedAt },
+		],
+		reference: `#${issue.number}`,
+		title: issue.title,
+		url: issue.url,
+	});
 }
 
 /** Maps live GitHub issues into create-from picker sources. */

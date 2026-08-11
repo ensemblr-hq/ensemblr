@@ -14,9 +14,7 @@ export {
 	useComposerAttachmentInbox,
 } from './composer-attachments';
 export {
-	composerExternalsAtomFamily,
-	composerMentionsAtomFamily,
-	composerUploadsAtomFamily,
+	composerAttachmentsAtomFamily,
 	composerValueAtomFamily,
 	forgetComposerDraft,
 } from './composer-drafts';

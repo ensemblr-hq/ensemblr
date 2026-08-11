@@ -596,8 +596,13 @@ function buildQueryOptions({
 	const executablePath = request.executable?.command?.trim();
 	const mcpServers = buildClaudeMcpServers(request.controlMcp);
 
+	const linkedDirectories = request.linkedDirectories ?? [];
+
 	return {
 		...permission,
+		...(linkedDirectories.length > 0
+			? { additionalDirectories: [...linkedDirectories] }
+			: {}),
 		canUseTool: buildCanUseTool({ canUseTool, mode }),
 		cwd: metadata.cwd,
 		env: stripLaunchContextEnv({ ...baseEnv, ...metadata.env }),

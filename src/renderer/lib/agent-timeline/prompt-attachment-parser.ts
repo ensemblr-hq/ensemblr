@@ -18,6 +18,7 @@ import type {
 } from '@/renderer/types/agent-timeline';
 import {
 	attachedFileBlockPattern,
+	leadingLinkedDirectoriesPattern,
 	leadingReferencedFoldersPattern,
 	userPreferencesBlockPattern,
 } from '@/shared/prompt-scaffolding';
@@ -25,13 +26,22 @@ import {
 /**
  * Splits a persisted prompt into its attachment blocks (referenced workspace
  * folders and `<attached_file>` markers, in order of appearance) and the
- * remaining typed text.
+ * remaining typed text. The linked-directories preamble is stripped without
+ * becoming an attachment — it describes the chat, not the message.
  * @param prompt - The raw persisted prompt text
  * @returns The extracted attachments and the remaining trimmed message text
  */
 export function parsePromptAttachments(prompt: string): ParsedPrompt {
 	let remaining = prompt;
 	const attachments: ParsedPromptAttachment[] = [];
+
+	// Dropped rather than collected: linked directories are a standing grant the
+	// composer re-sends with every message, so a chip per turn would stack the
+	// same rows down the whole transcript and read as a per-message attachment.
+	const linkedMatch = leadingLinkedDirectoriesPattern().exec(remaining);
+	if (linkedMatch) {
+		remaining = remaining.slice(linkedMatch[0].length);
+	}
 
 	const folderMatch = leadingReferencedFoldersPattern().exec(remaining);
 	if (folderMatch) {

@@ -61,7 +61,7 @@ export function readWorkspaceDirectory(
 	);
 }
 
-/** Persists a pasted composer image under the workspace `.context/images/`. */
+/** Persists a pasted composer image in the workspace's content-addressed attachment store. */
 export function writeWorkspaceImageAttachment(
 	request: WriteWorkspaceImageAttachmentRequest,
 ): Promise<WriteWorkspaceImageAttachmentResult> {
@@ -83,7 +83,7 @@ export function getPathForFile(file: File): string {
 	return getEnsemblrApi().getPathForFile(file);
 }
 
-/** Persists a pasted composer non-image file under the workspace `.context/attachments/`. */
+/** Persists a pasted composer non-image file in the workspace's content-addressed attachment store. */
 export function writeWorkspaceFileAttachment(
 	request: WriteWorkspaceFileAttachmentRequest,
 ): Promise<WriteWorkspaceFileAttachmentResult> {

@@ -75,8 +75,8 @@ export function useForkConversation({
 			const { relativePath, title } = result.summary;
 			dispatchAttachment(chatTabId, {
 				id: `wsfile:${relativePath}`,
-				kind: 'file',
-				name: title ?? relativePath.split('/').at(-1) ?? relativePath,
+				kind: 'workspace-file',
+				label: title ?? relativePath.split('/').at(-1) ?? relativePath,
 				path: relativePath,
 			});
 		},

@@ -14,7 +14,10 @@ import {
 } from '@/renderer/state/composer/agent-session-event-sync';
 import { useAgentTurns } from '@/renderer/state/composer/agent-turns';
 import { useComposerModelSelection } from '@/renderer/state/composer/composer-model-selection';
-import { chatPlanModeAtomFamily } from '@/renderer/state/preferences';
+import {
+	chatLinkedDirectoriesAtomFamily,
+	chatPlanModeAtomFamily,
+} from '@/renderer/state/preferences';
 import type {
 	ComposerContextUsage,
 	ComposerModelOption,
@@ -106,6 +109,20 @@ export function useAgentComposerController({
 		return decided === null ? {} : { planMode: decided };
 	}, [chatTabId, store]);
 
+	/**
+	 * Reads the chat's linked directories at call time, matching
+	 * {@link planModeRequest}: a session opens after an await, and a render-scope
+	 * read would launch the runtime with whatever set was current a tick earlier.
+	 * @returns The absolute paths to grant the opening session.
+	 */
+	const linkedDirectoriesRequest = useCallback(
+		(): readonly string[] =>
+			store
+				.get(chatLinkedDirectoriesAtomFamily(chatTabId))
+				.map((directory) => directory.path),
+		[chatTabId, store],
+	);
+
 	const persistedActiveSession = sessionsData?.sessions.find(
 		(session) => session.id === currentAgentSessionId,
 	);
@@ -123,6 +140,7 @@ export function useAgentComposerController({
 		useAgentTurns({
 			chatTabId,
 			isResolvingChatTab,
+			linkedDirectoriesRequest,
 			masterPrompt,
 			modelId,
 			persistedActiveSession,

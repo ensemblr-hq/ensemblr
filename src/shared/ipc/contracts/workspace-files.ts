@@ -54,7 +54,7 @@ export interface WriteWorkspaceImageAttachmentRequest {
 	workspaceCwd: string;
 }
 
-/** Request to persist a pasted non-image file under the workspace `.context/attachments/` folder. */
+/** Request to persist a pasted non-image file in the workspace attachment store. */
 export interface WriteWorkspaceFileAttachmentRequest {
 	contentBase64: string;
 	name?: string;
@@ -104,13 +104,18 @@ export type WriteWorkspaceImageAttachmentFailureCode =
 	| 'invalid-path'
 	| 'write-failed';
 
-/** Result of persisting a pasted image as a workspace file attachment. */
+/**
+ * Result of persisting a pasted image as a workspace file attachment. `reused`
+ * reports that the store already held byte-identical content and returned the
+ * existing path rather than writing a second copy.
+ */
 export interface WriteWorkspaceImageAttachmentResult {
 	error?: {
 		code: WriteWorkspaceImageAttachmentFailureCode;
 		message: string;
 	};
 	file?: WorkspaceFileEntryWire;
+	reused?: boolean;
 	sizeBytes?: number;
 }
 
@@ -122,13 +127,18 @@ export type WriteWorkspaceFileAttachmentFailureCode =
 	| 'too-large'
 	| 'write-failed';
 
-/** Result of persisting a pasted non-image file as a workspace file attachment. */
+/**
+ * Result of persisting a pasted non-image file as a workspace file attachment.
+ * `reused` reports that the store already held byte-identical content and
+ * returned the existing path rather than writing a second copy.
+ */
 export interface WriteWorkspaceFileAttachmentResult {
 	error?: {
 		code: WriteWorkspaceFileAttachmentFailureCode;
 		message: string;
 	};
 	file?: WorkspaceFileEntryWire;
+	reused?: boolean;
 	sizeBytes?: number;
 }
 
@@ -193,11 +203,11 @@ export interface WorkspaceFilesApi {
 	readWorkspaceFile: (
 		request: ReadWorkspaceFileRequest,
 	) => Promise<ReadWorkspaceFileResult>;
-	/** Persist a pasted composer image under `.context/images/`. */
+	/** Persist a pasted composer image under `.context/attachments/<hash>/`. */
 	writeWorkspaceImageAttachment: (
 		request: WriteWorkspaceImageAttachmentRequest,
 	) => Promise<WriteWorkspaceImageAttachmentResult>;
-	/** Persist a pasted composer non-image file under `.context/attachments/`. */
+	/** Persist a pasted composer non-image file under `.context/attachments/<hash>/`. */
 	writeWorkspaceFileAttachment: (
 		request: WriteWorkspaceFileAttachmentRequest,
 	) => Promise<WriteWorkspaceFileAttachmentResult>;

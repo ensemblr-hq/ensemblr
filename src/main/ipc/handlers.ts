@@ -18,6 +18,7 @@ import {
 	createWorkspacePrStatusSweeper,
 } from '../github/index.ts';
 import type { LinearAuthService, LinearService } from '../linear';
+import { createLinkedDirectoryService } from '../linked-directories/index.ts';
 import type { OpenTargetService } from '../open-target';
 import type { PiExecutableService } from '../pi-runtime';
 import type { PlanModeRegistry } from '../plan-mode';
@@ -66,6 +67,7 @@ import { registerEnvironmentHandlers } from './handlers/environment';
 import { registerGithubHandlers } from './handlers/github';
 import { registerHealthHandlers } from './handlers/health';
 import { registerLinearHandlers } from './handlers/linear';
+import { registerLinkedDirectoryHandlers } from './handlers/linked-directories';
 import { registerNavigationHandlers } from './handlers/navigation';
 import { registerOpenTargetHandlers } from './handlers/open-target';
 import { registerRepositoryHandlers } from './handlers/repository';
@@ -275,6 +277,9 @@ export function registerIpcHandlers({
 		reviewService: createReviewService({ databaseService }),
 	});
 	registerLinearHandlers({ linearAuthService, linearService });
+	registerLinkedDirectoryHandlers({
+		linkedDirectoryService: createLinkedDirectoryService({ databaseService }),
+	});
 	registerOpenTargetHandlers({
 		appSettingsService,
 		databaseService,

@@ -10,7 +10,9 @@ export type { AgentActionKind } from './agent-actions';
 export type { AutocompleteKind, AutocompleteState } from './autocomplete';
 export type { CheckpointRestoreTarget } from './checkpoint';
 export type {
+	ComposerAttachment,
 	GroupedOptions,
+	LinkedDirectory,
 	LinkedIssueComposerSeedInput,
 	MentionMatch,
 	ModelPickerRow,

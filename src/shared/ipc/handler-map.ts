@@ -116,6 +116,12 @@ import type {
 	UpdateLinearIssueRequest,
 } from './contracts/linear';
 import type {
+	LinkedDirectoryRequest,
+	LinkedDirectorySelectionResult,
+	ListLinkedDirectoryRecentsResult,
+	RecordLinkedDirectoryResult,
+} from './contracts/linked-directories';
+import type {
 	ListWorkspaceOpenTargetsResult,
 	OpenSettingsFileInTargetRequest,
 	OpenTargetResult,
@@ -565,6 +571,22 @@ export interface IpcHandlerMap {
 	[IPC_CHANNELS.selectCloneDestination]: IpcHandlerEntry<
 		void,
 		CloneDestinationSelectionResult
+	>;
+	[IPC_CHANNELS.selectLinkedDirectory]: IpcHandlerEntry<
+		void,
+		LinkedDirectorySelectionResult
+	>;
+	[IPC_CHANNELS.listLinkedDirectoryRecents]: IpcHandlerEntry<
+		void,
+		ListLinkedDirectoryRecentsResult
+	>;
+	[IPC_CHANNELS.recordLinkedDirectoryRecent]: IpcHandlerEntry<
+		LinkedDirectoryRequest,
+		RecordLinkedDirectoryResult
+	>;
+	[IPC_CHANNELS.forgetLinkedDirectoryRecent]: IpcHandlerEntry<
+		LinkedDirectoryRequest,
+		ListLinkedDirectoryRecentsResult
 	>;
 	[IPC_CHANNELS.selectLocalRepository]: IpcHandlerEntry<
 		void,

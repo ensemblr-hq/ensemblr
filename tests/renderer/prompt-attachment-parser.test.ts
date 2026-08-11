@@ -49,4 +49,20 @@ describe('parsePromptAttachments', () => {
 		const { attachments } = parsePromptAttachments(prompt);
 		expect(attachments[0]?.path).toBe('a"b.ts');
 	});
+
+	test('strips the linked-directories preamble without a chip per turn', () => {
+		const prompt =
+			'Linked directories:\n/Users/me/Vault\n/Users/me/designs\n\nCheck my notes.';
+		const { attachments, text } = parsePromptAttachments(prompt);
+		expect(attachments).toEqual([]);
+		expect(text).toBe('Check my notes.');
+	});
+
+	test('keeps referenced folders as chips while dropping linked directories', () => {
+		const prompt =
+			'Linked directories:\n/Users/me/Vault\n\nReferenced workspace folders:\n@src/renderer\n\nRefactor this.';
+		const { attachments, text } = parsePromptAttachments(prompt);
+		expect(attachments).toEqual([{ content: '', path: 'src/renderer' }]);
+		expect(text).toBe('Refactor this.');
+	});
 });
