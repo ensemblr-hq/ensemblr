@@ -21,6 +21,7 @@ import {
 import type {
 	ComposerContextUsage,
 	ComposerModelOption,
+	ComposerSubmitOutcome,
 	ComposerThinkingOption,
 } from '@/renderer/types/workbench';
 import type { AgentProviderId } from '@/shared/agent-provider';
@@ -49,7 +50,7 @@ export interface AgentComposerControllerState {
 	onSubmit: (
 		prompt: string,
 		options?: { streamingBehavior?: PiStreamingBehavior },
-	) => Promise<void>;
+	) => Promise<ComposerSubmitOutcome>;
 	onThinkingChange: (thinkingLevel: string) => void;
 	planMode: boolean;
 	thinkingLevel: string | null;

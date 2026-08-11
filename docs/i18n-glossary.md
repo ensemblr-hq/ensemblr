@@ -78,6 +78,8 @@ Rules of thumb:
 | Steer | Направить | Καθοδήγηση | Interrupting an agent mid-turn. |
 | Follow-up | Дополнение | Συμπλήρωμα | The queued/steering message. |
 | Queue | В очередь | Σε ουρά | |
+| Held | Удерживается | Κρατείται | A follow-up the `block` behavior keeps out of a running turn. |
+| Paused | Пауза | Παύση | A queue that will not drain until the user says so. Distinct from Held: held is the setting, paused is the queue's state. |
 | Archive | Архивировать | Αρχειοθέτηση | |
 | Discard | Отменить изменения | Απόρριψη | Destructive; never plain "Отменить" (= Undo). |
 | Undo | Отменить | Αναίρεση | |

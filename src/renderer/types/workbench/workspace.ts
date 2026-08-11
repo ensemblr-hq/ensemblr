@@ -324,6 +324,17 @@ export interface ComposerContextUsage {
 	usedTokens: number;
 }
 
+/**
+ * What a submit reports back. The composer clears the draft before awaiting, so
+ * a send that failed has to say so or the message is gone with nothing but a
+ * `lastError` to show for it. An outcome rather than a rejection: throwing would
+ * propagate through the plan-review and primed-action paths, which have no
+ * draft to restore and no way to report one.
+ */
+export interface ComposerSubmitOutcome {
+	error?: string;
+}
+
 export interface ComposerShellState {
 	activeAgentSessionId: string | null;
 	availableModels: readonly ComposerModelOption[];
@@ -346,7 +357,7 @@ export interface ComposerShellState {
 	onSubmit: (
 		prompt: string,
 		options?: { streamingBehavior?: 'steer' | 'followUp' },
-	) => Promise<void> | void;
+	) => Promise<ComposerSubmitOutcome>;
 	onThinkingChange: (thinkingLevel: string) => void;
 	placeholder: string;
 	/** Whether this chat is planning: mutating tools are blocked until a plan is approved. */

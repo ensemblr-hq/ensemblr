@@ -48,6 +48,7 @@ export {
 	presentSkillInvocation,
 	presentToolCall,
 } from './tool-presentation.ts';
+export { glyphForToolName } from './tool-presenters.ts';
 export {
 	createWorkspacePathResolver,
 	toWorkspaceLookupPath,

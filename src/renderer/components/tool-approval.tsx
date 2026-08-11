@@ -3,32 +3,25 @@
  * blocked inside the SDK's `canUseTool` until this resolves, so it takes the
  * composer's place in the chat that raised it — the same swap the agent
  * questionnaire uses, for the same reason.
+ *
+ * It wears the composer's frame with an accent band across the top: the shape
+ * says "this is where you act", the band says the app is waiting rather than
+ * offering. Plan mode's dashed accent border is the sibling signal, kept
+ * distinct because that one is a draft and this one is a block.
  */
 import type { TFunction } from 'i18next';
 import { XIcon } from 'lucide-react';
 import { useCallback, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { ApprovalActions } from '@/renderer/components/tool-approval/approval-actions';
+import { ApprovalInput } from '@/renderer/components/tool-approval/approval-input';
+import { ApprovalMark } from '@/renderer/components/tool-approval/approval-mark';
 import { Button } from '@/renderer/components/ui/button';
 import type {
 	ToolApprovalDecision,
 	ToolApprovalRequestedBroadcast,
 } from '@/shared/agent-tool-approval';
-
-/**
- * Tool-input fields worth showing first, in priority order: a `Bash` command, an
- * `Edit`/`Write` path, a `Grep` pattern. Anything else falls back to whichever
- * field the tool listed first.
- */
-const PRIMARY_INPUT_FIELDS = [
-	'command',
-	'file_path',
-	'filePath',
-	'path',
-	'pattern',
-	'url',
-	'query',
-] as const;
 
 /** Decision each shortcut key stands for. */
 const DECISION_KEYS: Readonly<
@@ -39,40 +32,6 @@ const DECISION_KEYS: Readonly<
 	'3': { kind: 'deny' },
 	Escape: { kind: 'deny' },
 };
-
-/** How many secondary input fields the card lists under the primary one. */
-const MAX_SECONDARY_FIELDS = 3;
-
-/** The one input field the card shows in full, plus the rest for context. */
-interface InputBreakdown {
-	primary: { name: string; value: string } | null;
-	secondary: ReadonlyArray<{ name: string; value: string }>;
-}
-
-/**
- * Splits a tool input into the field the user is really deciding about and the
- * remaining context.
- * @param input - Display-ready input preview from the broadcast.
- * @returns The primary field and up to {@link MAX_SECONDARY_FIELDS} others.
- */
-function breakDownInput(
-	input: Readonly<Record<string, string>>,
-): InputBreakdown {
-	const names = Object.keys(input);
-	const primaryName =
-		PRIMARY_INPUT_FIELDS.find((candidate) => names.includes(candidate)) ??
-		names[0];
-	if (primaryName === undefined) {
-		return { primary: null, secondary: [] };
-	}
-	return {
-		primary: { name: primaryName, value: input[primaryName] ?? '' },
-		secondary: names
-			.filter((name) => name !== primaryName)
-			.slice(0, MAX_SECONDARY_FIELDS)
-			.map((name) => ({ name, value: input[name] ?? '' })),
-	};
-}
 
 /**
  * The sentence at the top of the card. Claude Code supplies its own prompt for
@@ -130,7 +89,9 @@ export function ToolApprovalCard({
 		decideRef.current(decision);
 	}, []);
 
-	const { primary, secondary } = breakDownInput(request.input);
+	const headlineNamesTool =
+		request.title === undefined && request.displayName === undefined;
+	const showsMeta = !headlineNamesTool || request.description !== undefined;
 
 	return (
 		<footer className='shrink-0 bg-background px-4 pt-2 pb-5'>
@@ -139,7 +100,7 @@ export function ToolApprovalCard({
 					'common:tool-approval.section-label',
 					'Tool approval request',
 				)}
-				className='mx-auto flex w-full max-w-4xl flex-col gap-2 rounded-xl border border-border bg-pane/80 px-4 pt-3 pb-2.5 shadow-panel outline-none'
+				className='@container/approval mx-auto flex w-full max-w-4xl flex-col overflow-hidden rounded-xl border border-accent-strong/35 bg-pane/80 shadow-panel outline-none'
 				onKeyDown={handleKeyDown}
 				ref={shellRef}
 				tabIndex={-1}
@@ -149,23 +110,31 @@ export function ToolApprovalCard({
 						tool: request.toolName,
 					})}
 				</p>
-				<header className='flex items-start justify-between gap-3'>
-					<div className='flex min-w-0 flex-1 flex-col gap-1'>
+
+				<header className='flex items-start gap-2.5 border-accent-strong/20 border-b bg-accent-strong/[0.06] px-3 py-2.5'>
+					<ApprovalMark toolName={request.toolName} />
+					<div className='flex min-w-0 flex-1 flex-col gap-0.5'>
 						<h2 className='text-pretty font-medium text-foreground text-sm leading-5'>
 							{headlineFor(request, t)}
 						</h2>
-						<p className='flex items-center gap-2 text-muted-foreground text-xs'>
-							<span className='rounded-sm bg-muted px-1.5 py-0.5 font-mono text-foreground text-xxs'>
-								{request.toolName}
-							</span>
-							{request.description ? (
-								<span className='min-w-0 truncate'>{request.description}</span>
-							) : null}
-						</p>
+						{showsMeta ? (
+							<p className='flex min-w-0 items-center gap-1.5 text-muted-foreground text-xs leading-4'>
+								{headlineNamesTool ? null : (
+									<span className='shrink-0 rounded-sm bg-foreground/[0.07] px-1 py-0.5 font-mono text-foreground text-xxs leading-4'>
+										{request.toolName}
+									</span>
+								)}
+								{request.description ? (
+									<span className='min-w-0 truncate'>
+										{request.description}
+									</span>
+								) : null}
+							</p>
+						) : null}
 					</div>
 					<Button
 						aria-label={t('common:tool-approval.deny-label', 'Deny tool call')}
-						className='-mt-0.5 -mr-1'
+						className='-mr-1'
 						onClick={() => onDecide({ kind: 'deny' })}
 						size='icon-xs'
 						type='button'
@@ -175,53 +144,9 @@ export function ToolApprovalCard({
 					</Button>
 				</header>
 
-				{primary ? (
-					<div className='flex flex-col gap-1'>
-						<pre className='max-h-32 overflow-auto whitespace-pre-wrap break-words rounded-md border border-border bg-background px-2 py-1.5 font-mono text-foreground text-xs'>
-							{primary.value}
-						</pre>
-						{secondary.length > 0 ? (
-							<p className='truncate text-muted-foreground/70 text-xs'>
-								{secondary
-									.map((field) => `${field.name}: ${field.value}`)
-									.join(' · ')}
-							</p>
-						) : null}
-					</div>
-				) : null}
+				<ApprovalInput input={request.input} />
 
-				<div className='flex items-center justify-between gap-3'>
-					<p className='min-w-0 flex-1 text-muted-foreground/60 text-xs'>
-						{t(
-							'common:tool-approval.key-hints',
-							'1 allow · 2 allow for session · 3 deny · Esc deny',
-						)}
-					</p>
-					<div className='flex shrink-0 items-center gap-1.5'>
-						<Button
-							onClick={() => onDecide({ kind: 'deny' })}
-							size='sm'
-							type='button'
-							variant='ghost'
-						>
-							{t('common:actions.deny', 'Deny')}
-						</Button>
-						<Button
-							onClick={() => onDecide({ kind: 'allow-for-session' })}
-							size='sm'
-							type='button'
-							variant='outline'
-						>
-							{t(
-								'common:tool-approval.allow-session',
-								'Allow for this session',
-							)}
-						</Button>
-						<Button onClick={() => onDecide({ kind: 'allow' })} size='sm'>
-							{t('common:actions.allow', 'Allow')}
-						</Button>
-					</div>
-				</div>
+				<ApprovalActions onDecide={onDecide} />
 			</section>
 		</footer>
 	);

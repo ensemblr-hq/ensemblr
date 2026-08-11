@@ -35,6 +35,19 @@ export {
 	useComposerSubmitConsumer,
 	useDropComposerSubmits,
 } from './composer-submit';
+export type { FollowUpQueueApi } from './follow-up-queue';
+export {
+	appendFollowUp,
+	createFollowUp,
+	followUpQueueAtomFamily,
+	followUpQueueHeldAtomFamily,
+	forgetFollowUpQueue,
+	moveFollowUp,
+	removeFollowUp,
+	reorderFollowUps,
+	useFollowUpQueue,
+	useHoldFollowUpQueue,
+} from './follow-up-queue';
 export type { OptimisticPrompt } from './optimistic-prompts';
 export {
 	useHasPendingPrompts,

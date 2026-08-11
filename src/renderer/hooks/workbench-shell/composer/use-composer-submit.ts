@@ -11,6 +11,7 @@ import {
 import {
 	useComposerPrimedActionConsumer,
 	useComposerSubmitConsumer,
+	useFollowUpQueue,
 } from '@/renderer/state/composer';
 import {
 	chatLinkedDirectoriesAtomFamily,
@@ -19,7 +20,10 @@ import {
 import type {
 	ComposerDraftSegment,
 	ComposerShellState,
+	QueuedFollowUp,
+	QueuedFollowUpSource,
 } from '@/renderer/types/workbench';
+import { flushesAutomatically, useFollowUpFlush } from './use-follow-up-flush';
 
 /**
  * What one send carries. `segments` is the draft in document order, so the
@@ -57,6 +61,95 @@ function isEmptyDraft(draft: ComposerDraft): boolean {
 }
 
 /**
+ * Puts an unsent draft back in the composer. Prefers the document so chips land
+ * back in the sentence rather than bunched at the end; plain text is the
+ * fallback for a send that never had one, such as a queued chore.
+ * @param editorRef - Handle to the mounted editor
+ * @param snapshot - The document the draft came from, when it had one
+ * @param text - Flattened draft text, used when there is no document
+ */
+function restoreDraft(
+	editorRef: RefObject<ComposerEditorHandle | null>,
+	snapshot: EditorState | null | undefined,
+	text: string,
+): void {
+	if (snapshot) {
+		editorRef.current?.restore(snapshot);
+		return;
+	}
+	editorRef.current?.setText(text);
+}
+
+/**
+ * The message to show for a send that threw rather than reporting an outcome —
+ * serializing an attachment is the one step here that can.
+ * @param cause - Whatever was thrown
+ * @param fallback - Translated message for a cause that carries none
+ * @returns The message to put in the composer's error strip
+ */
+function describeSendFailure(cause: unknown, fallback: string): string {
+	return cause instanceof Error ? cause.message : fallback;
+}
+
+/**
+ * What a send does to the composer box around it: empty it before the prompt
+ * renders, and put the draft back if the send does not land.
+ */
+interface DraftLifecycle {
+	clear: () => void;
+	restore: () => void;
+}
+
+/** Leaves the box alone, for a send whose draft never came out of it. */
+const DETACHED_DRAFT: DraftLifecycle = {
+	clear: () => undefined,
+	restore: () => undefined,
+};
+
+/**
+ * Resolves who owns the composer box for one send. A draft taken off the queue
+ * gets {@link DETACHED_DRAFT}: the queue recovers its own entry, and the flush
+ * fires on the agent's schedule, so touching the box would clear or overwrite a
+ * draft the user is very likely part-way through typing.
+ * @param editorRef - Handle to the mounted editor
+ * @param outgoing - The draft being sent
+ * @param fromQueue - Whether the draft came off the queue rather than the box
+ * @returns The clear and restore steps this send should run
+ */
+function draftLifecycle(
+	editorRef: RefObject<ComposerEditorHandle | null>,
+	outgoing: ComposerDraft,
+	fromQueue: boolean | undefined,
+): DraftLifecycle {
+	if (fromQueue) {
+		return DETACHED_DRAFT;
+	}
+	return {
+		clear: () => editorRef.current?.clear(),
+		restore: () => restoreDraft(editorRef, outgoing.snapshot, outgoing.text),
+	};
+}
+
+/**
+ * Turns a draft into a queue entry. Keeps the document alongside the segments so
+ * putting the entry back in the composer restores it as it was typed.
+ * @param draft - The draft being queued
+ * @param source - Whether a user or the Checks panel queued it
+ * @returns The entry to append to the queue
+ */
+function toQueuedFollowUp(
+	draft: ComposerDraft,
+	source: QueuedFollowUpSource,
+): Omit<QueuedFollowUp, 'id' | 'queuedAt'> {
+	return {
+		segments: draft.segments,
+		snapshot: draft.snapshot ?? null,
+		source,
+		text: draft.text,
+	};
+}
+
+/**
  * The composer's send pipeline: serializes attachments into the outgoing prompt,
  * clears the draft optimistically and restores it on failure, and maps the
  * Follow-up behavior setting onto the runtime's mid-turn delivery frames. Also
@@ -84,8 +177,8 @@ export function useComposerSubmit({
 }) {
 	const { t } = useTranslation();
 	const [pending, setPending] = useState(false);
-	const [blockedNotice, setBlockedNotice] = useState(false);
 	const followUp = useAtomValue(followUpBehaviorAtom);
+	const queue = useFollowUpQueue(chatTabId);
 	const linkedDirectories = useAtomValue(
 		chatLinkedDirectoriesAtomFamily(chatTabId),
 	);
@@ -93,17 +186,21 @@ export function useComposerSubmit({
 	const submitText = useCallback(
 		async (
 			outgoing: ComposerDraft,
-			streamingBehavior?: 'steer' | 'followUp',
-		) => {
+			options?: {
+				fromQueue?: boolean;
+				streamingBehavior?: 'steer' | 'followUp';
+			},
+		): Promise<boolean> => {
 			if (composer.disabled || pending || isEmptyDraft(outgoing)) {
-				return;
+				return false;
 			}
-			const { segments, snapshot, text } = outgoing;
+			const { fromQueue, streamingBehavior } = options ?? {};
+			const draft = draftLifecycle(editorRef, outgoing, fromQueue);
 			setPending(true);
 			setAttachmentError(null);
 			try {
 				const body = await serializeComposerDraft({
-					segments,
+					segments: outgoing.segments,
 					workspaceCwd: composer.workspaceCwd,
 				});
 				const payload = [serializeLinkedDirectories(linkedDirectories), body]
@@ -112,30 +209,31 @@ export function useComposerSubmit({
 				// Clear the composer before awaiting onSubmit. onSubmit renders an
 				// optimistic prompt synchronously, so leaving the draft populated
 				// during its async round-trip shows the prompt in two places at once.
-				editorRef.current?.clear();
-				try {
-					await composer.onSubmit(
-						payload,
-						streamingBehavior ? { streamingBehavior } : undefined,
-					);
-				} catch (cause) {
-					// Restore the unsent draft so the user does not lose their input.
-					if (snapshot) {
-						editorRef.current?.restore(snapshot);
-					} else {
-						editorRef.current?.setText(text);
-					}
-					throw cause;
-				}
-			} catch (cause) {
-				setAttachmentError(
-					cause instanceof Error
-						? cause.message
-						: t(
-								'workbench:composer.attachment-failed',
-								'Failed to attach selected file.',
-							),
+				draft.clear();
+				// A caller that reports no outcome has reported no failure; reading
+				// `.error` off it directly would throw and restore a draft that went.
+				const outcome = await composer.onSubmit(
+					payload,
+					streamingBehavior ? { streamingBehavior } : undefined,
 				);
+				if (outcome?.error) {
+					draft.restore();
+					setAttachmentError(outcome.error);
+					return false;
+				}
+				return true;
+			} catch (cause) {
+				draft.restore();
+				setAttachmentError(
+					describeSendFailure(
+						cause,
+						t(
+							'workbench:composer.attachment-failed',
+							'Failed to attach selected file.',
+						),
+					),
+				);
+				return false;
 			} finally {
 				setPending(false);
 			}
@@ -143,27 +241,66 @@ export function useComposerSubmit({
 		[composer, editorRef, linkedDirectories, pending, setAttachmentError, t],
 	);
 
-	// Maps the Follow-up behavior setting onto Pi's native mid-turn delivery:
-	// `steer` → `steer` frame (injected after the current tool calls), `queue` →
-	// `follow_up` frame (delivered when the agent stops), `block` → dropped. When
-	// idle, every mode sends a normal prompt. Pi owns the queue, so there is no
-	// renderer-side hold to flush.
+	/**
+	 * Sends an entry the queue handed over, putting it back at the head and
+	 * pausing the queue when it does not land. One place owns what a failed
+	 * queued send means, so the automatic flush and the user's "Send now" cannot
+	 * recover from it differently.
+	 * @param entry - The entry taken off the queue
+	 * @returns Whether it was delivered
+	 */
+	const submitQueued = useCallback(
+		async (entry: QueuedFollowUp): Promise<boolean> => {
+			const delivered = await submitText(
+				{
+					segments: entry.segments,
+					snapshot: entry.snapshot,
+					text: entry.text,
+				},
+				{ fromQueue: true },
+			);
+			if (!delivered) {
+				queue.requeue(entry);
+				queue.hold();
+			}
+			return delivered;
+		},
+		[queue, submitText],
+	);
+
+	/**
+	 * Queues a draft for this chat and clears the composer, so a queued message
+	 * reads as sent-later rather than sitting in the box as if it were unsent.
+	 * @param outgoing - The draft to queue
+	 * @param source - Whether a user or the Checks panel queued it
+	 */
+	const enqueueDraft = useCallback(
+		(outgoing: ComposerDraft, source: QueuedFollowUpSource) => {
+			queue.enqueue(toQueuedFollowUp(outgoing, source));
+			editorRef.current?.clear();
+		},
+		[editorRef, queue],
+	);
+
+	/**
+	 * Routes a send by the Follow-up behavior. `steer` keeps the runtime's native
+	 * steer frame, which must not wait; `queue` and `block` both hold the message
+	 * here so it stays listable and editable, since neither runtime can read back
+	 * or cancel what it holds. Idle, every behavior sends a normal prompt.
+	 */
 	const dispatchSubmit = useCallback(
 		(outgoing: ComposerDraft) => {
 			if (composer.isStreaming && !isEmptyDraft(outgoing)) {
-				if (followUp === 'block') {
-					// Keep the draft and explain the no-op rather than eating the key.
-					setBlockedNotice(true);
+				if (followUp === 'steer') {
+					void submitText(outgoing, { streamingBehavior: 'steer' });
 					return;
 				}
-				setBlockedNotice(false);
-				void submitText(outgoing, followUp === 'steer' ? 'steer' : 'followUp');
+				enqueueDraft(outgoing, 'user');
 				return;
 			}
-			setBlockedNotice(false);
 			void submitText(outgoing);
 		},
-		[composer.isStreaming, followUp, submitText],
+		[composer.isStreaming, enqueueDraft, followUp, submitText],
 	);
 
 	/**
@@ -189,57 +326,118 @@ export function useComposerSubmit({
 		deliverPrimedAction,
 	);
 
-	// Drain auto-submit prompts queued from the Checks panel (commit & push,
-	// create PR). These bypass the textarea and go straight through the normal
-	// send pipeline so they respect the Follow-up behavior just like a manual
-	// send — the Checks panel hands the chore to the active tab's agent.
-	// Returns whether the prompt was accepted for delivery. The consumer keeps
-	// anything we reject and retries when this callback is recreated (composer
-	// enabled, send finished, streaming ended), so a chore queued while the
-	// composer is busy or mid-turn-blocked is held and sent once it is free
-	// rather than being dropped. Mirrors the drop conditions above.
+	/**
+	 * Drains a Checks-panel chore (commit & push, create PR) through the same send
+	 * pipeline, bypassing the textarea. Mid-turn a chore is queued rather than
+	 * dispatched — under `steer` it would otherwise inject a background git chore
+	 * into a turn doing something unrelated.
+	 * @param text - The chore prompt to hand to this chat's agent
+	 * @returns Whether it was accepted; the consumer retries whatever we refuse
+	 */
 	const submitFromChannel = useCallback(
 		(text: string): boolean => {
 			if (composer.disabled || pending) {
 				return false;
 			}
-			if (
-				composer.isStreaming &&
-				text.trim().length > 0 &&
-				followUp === 'block'
-			) {
-				return false;
+			const draft = textDraft(text);
+			if (composer.isStreaming && !isEmptyDraft(draft)) {
+				enqueueDraft(draft, 'chore');
+				return true;
 			}
-			dispatchSubmit(textDraft(text));
+			void submitText(draft);
 			return true;
 		},
 		[
 			composer.disabled,
 			composer.isStreaming,
-			dispatchSubmit,
-			followUp,
+			enqueueDraft,
 			pending,
+			submitText,
 		],
 	);
 	useComposerSubmitConsumer(chatTabId, submitFromChannel);
 
+	useFollowUpFlush({
+		behavior: followUp,
+		canSend: !composer.disabled && !pending,
+		isStreaming: composer.isStreaming,
+		queue,
+		submit: submitQueued,
+	});
+
+	const [queueHead] = queue.entries;
+	// Whether the queue is waiting on the user rather than on the agent: paused
+	// after a stop or a failed flush, or holding a `block`-mode message once the
+	// agent has freed up. The second case never drains on its own, so without it
+	// the panel would show a queue with no way to send it. Mid-turn under `block`
+	// there is still nothing the user can do, so it stays false until the turn
+	// ends rather than offering a control that would no-op.
+	const queueStalled =
+		queue.held ||
+		(!composer.isStreaming &&
+			queueHead !== undefined &&
+			!flushesAutomatically(queueHead, followUp));
+
 	return {
-		blockedNotice,
 		dispatchSubmit,
+		/**
+		 * Stops the turn and pauses the queue with it. A stop lowers the streaming
+		 * flag exactly like a natural finish, so without the pause the flush would
+		 * read the interruption as the agent finishing and send the very messages
+		 * the user was cutting short.
+		 */
+		handleStop: useCallback(async () => {
+			queue.hold();
+			await composer.onStop();
+		}, [composer, queue]),
+		/**
+		 * Drains a stalled queue on the user's say-so. Mid-turn this can only mean
+		 * "stop holding" — the head still waits for the turn to end, because that is
+		 * the whole point of not steering. Idle, the head goes straight out and the
+		 * flush takes the rest as each turn finishes.
+		 */
+		flushQueueNow: useCallback(() => {
+			queue.release();
+			if (composer.isStreaming) {
+				return;
+			}
+			const next = queue.takeNext();
+			if (next) {
+				void submitQueued(next);
+			}
+		}, [composer.isStreaming, queue, submitQueued]),
 		followUp,
 		handleSubmit: useCallback(
 			() => dispatchSubmit(readDraft()),
 			[dispatchSubmit, readDraft],
 		),
 		pending,
-		// Cmd+J explicitly queues the current draft as a follow-up regardless of the
-		// Follow-up setting; when idle it just sends normally.
+		queue,
+		queueStalled,
+		// Cmd+J queues the current draft in every mode, so the shortcut means the
+		// same thing the queue panel shows. When idle it just sends normally.
 		queueCurrent: useCallback(() => {
-			void submitText(
-				readDraft(),
-				composer.isStreaming ? 'followUp' : undefined,
-			);
-		}, [composer.isStreaming, readDraft, submitText]),
-		setBlockedNotice,
+			const draft = readDraft();
+			if (composer.isStreaming && !isEmptyDraft(draft)) {
+				enqueueDraft(draft, 'user');
+				return;
+			}
+			void submitText(draft);
+		}, [composer.isStreaming, enqueueDraft, readDraft, submitText]),
+		/**
+		 * Takes a queued entry back out for editing, restoring the document so its
+		 * chips land where the user left them.
+		 */
+		restoreQueued: useCallback(
+			(id: string) => {
+				const entry = queue.take(id);
+				if (!entry) {
+					return;
+				}
+				restoreDraft(editorRef, entry.snapshot, entry.text);
+				editorRef.current?.focus();
+			},
+			[editorRef, queue],
+		),
 	};
 }

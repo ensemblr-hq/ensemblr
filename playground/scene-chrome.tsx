@@ -81,6 +81,29 @@ export function ControlGroup({
 }
 
 /**
+ * The on/off pair a boolean scene knob is made of. Lives here rather than in one
+ * scene because more than one scene needs it, and two copies drift.
+ */
+export function SceneOnOff({
+	isOn,
+	onChange,
+}: {
+	isOn: boolean;
+	onChange: (enabled: boolean) => void;
+}) {
+	return (
+		<>
+			<SceneToggle isActive={isOn} label='on' onClick={() => onChange(true)} />
+			<SceneToggle
+				isActive={!isOn}
+				label='off'
+				onClick={() => onChange(false)}
+			/>
+		</>
+	);
+}
+
+/**
  * Playground toggle pill, used by both the shell's canvas settings and the
  * scenes' own controls. Deliberately not a shipped `Button` — the playground's
  * chrome must not be mistaken for, or measured as, the surface under review.

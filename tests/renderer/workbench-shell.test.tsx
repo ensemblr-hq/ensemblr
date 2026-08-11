@@ -207,7 +207,7 @@ function renderWorkbench(
 								onModelChange: () => undefined,
 								onPlanModeChange: () => undefined,
 								onStop: () => undefined,
-								onSubmit: () => undefined,
+								onSubmit: () => Promise.resolve({}),
 								onThinkingChange: () => undefined,
 								planMode: false,
 								setupDiagnostics: snapshot,

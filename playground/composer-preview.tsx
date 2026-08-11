@@ -1,94 +1,22 @@
 import { QueryClientProvider } from '@tanstack/react-query';
 import { useStore } from 'jotai';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useState } from 'react';
 
 import { ComposerPanel } from '@/renderer/components/workbench-shell/conversation-panel';
 import { PlanReviewPanel } from '@/renderer/components/workbench-shell/conversation-panel/plan-review-panel';
 import { chatLinkedDirectoriesAtomFamily } from '@/renderer/state/preferences';
-import type {
-	ComposerModelOption,
-	ComposerShellState,
-	ComposerThinkingOption,
-	LinkedDirectory,
-	WorkspaceFileSummary,
-} from '@/renderer/types/workbench';
+import type { LinkedDirectory } from '@/renderer/types/workbench';
 import type { AgentProviderId } from '@/shared/agent-provider';
-import { asModelVendorId } from '@/shared/ipc/contracts/agent-models';
 
+import { useComposerStub } from './composer-fixtures.ts';
 import { createPlaygroundQueryClient } from './playground-query-client.ts';
 import {
 	ControlGroup,
 	SceneControls,
+	SceneOnOff,
 	SceneSection,
 	SceneToggle,
 } from './scene-chrome.tsx';
-
-const WORKSPACE_CWD = '/Users/you/Projects/ensemblr';
-
-/**
- * Two runtimes' models in one catalog, so the picker's provider pin has
- * something to lock out. `provider` is the inference provider the picker groups
- * by; `agentProvider` is the runtime the pin compares against.
- */
-const MODELS: readonly ComposerModelOption[] = [
-	{
-		agentProvider: 'pi',
-		contextWindow: 1_000_000,
-		displayName: 'Opus 5',
-		id: 'claude-opus-5',
-		isDefault: true,
-		vendor: asModelVendorId('anthropic'),
-	},
-	{
-		agentProvider: 'pi',
-		contextWindow: 1_000_000,
-		displayName: 'Sonnet 5',
-		id: 'claude-sonnet-5',
-		vendor: asModelVendorId('anthropic'),
-	},
-	{
-		agentProvider: 'claude',
-		contextWindow: 200_000,
-		displayName: 'Claude Code — Opus 5',
-		id: 'claude-code/opus-5',
-		vendor: asModelVendorId('claude-code'),
-	},
-	{
-		agentProvider: 'claude',
-		contextWindow: 200_000,
-		displayName: 'Claude Code — Sonnet 5',
-		id: 'claude-code/sonnet-5',
-		vendor: asModelVendorId('claude-code'),
-	},
-];
-
-const THINKING_LEVELS: readonly ComposerThinkingOption[] = [
-	{ id: 'off', label: 'Off' },
-	{ id: 'think', label: 'Think' },
-	{ id: 'ultrathink', label: 'Ultrathink' },
-];
-
-/**
- * Enough of a file tree for the `@` mention picker to have something to match,
- * without pulling the app's own fixture list into a scene that only needs the
- * popover to open.
- */
-const WORKSPACE_FILES: readonly WorkspaceFileSummary[] = [
-	{ id: 'dir-src', kind: 'directory', name: 'src', path: 'src' },
-	{
-		id: 'file-composer-panel',
-		kind: 'file',
-		name: 'composer-panel.tsx',
-		path: 'src/renderer/components/workbench-shell/conversation-panel/composer-panel.tsx',
-	},
-	{
-		id: 'file-plan-review-panel',
-		kind: 'file',
-		name: 'plan-review-panel.tsx',
-		path: 'src/renderer/components/workbench-shell/conversation-panel/plan-review-panel.tsx',
-	},
-	{ id: 'file-readme', kind: 'file', name: 'README.md', path: 'README.md' },
-];
 
 /** Prompt `usePlanReview` submits on approval, mirrored so the scene reports it. */
 const APPROVAL_PROMPT = 'Approved — implement the plan.';
@@ -283,52 +211,6 @@ function ComposerCase({
 	);
 }
 
-/**
- * Builds the `ComposerShellState` the panel reads. Every callback is inert
- * except plan mode, which the scene owns so the chip and the dashed border stay
- * in step with the decision bar above them.
- * @param input - The two inputs the scene varies, plus the plan-mode setter.
- * @returns A composer state fixture wired to the scene's plan-mode toggle.
- */
-function useComposerStub({
-	isStreaming,
-	lockedProvider,
-	onPlanModeChange,
-	planMode,
-}: {
-	isStreaming: boolean;
-	lockedProvider: AgentProviderId | null;
-	onPlanModeChange?: (planMode: boolean) => void;
-	planMode: boolean;
-}): ComposerShellState {
-	return useMemo(
-		() => ({
-			activeAgentSessionId: 'playground-session',
-			availableModels: MODELS,
-			availableThinkingLevels: THINKING_LEVELS,
-			contextUsage: { maxTokens: 200_000, usedTokens: 48_000 },
-			disabled: false,
-			disabledReason: null,
-			isStreaming,
-			lockedProvider,
-			modelId: MODELS[0].id,
-			modelLabel: MODELS[0].displayName,
-			onModelChange: () => undefined,
-			onPlanModeChange: (next: boolean) => onPlanModeChange?.(next),
-			onStop: () => undefined,
-			onSubmit: () => undefined,
-			onThinkingChange: () => undefined,
-			placeholder: '',
-			planMode,
-			thinkingLabel: 'Think',
-			thinkingLevel: 'think',
-			workspaceCwd: WORKSPACE_CWD,
-			workspaceFiles: WORKSPACE_FILES,
-		}),
-		[isStreaming, lockedProvider, onPlanModeChange, planMode],
-	);
-}
-
 /** Toggles for the inputs the live composer cannot derive on its own. */
 function ComposerControls({
 	hasPlanReview,
@@ -359,16 +241,16 @@ function ComposerControls({
 		<SceneControls>
 			<div className='flex flex-col gap-3'>
 				<ControlGroup label='plan review pending'>
-					<OnOff isOn={hasPlanReview} onChange={onPlanReviewChange} />
+					<SceneOnOff isOn={hasPlanReview} onChange={onPlanReviewChange} />
 				</ControlGroup>
 				<ControlGroup label='plan mode'>
-					<OnOff isOn={planMode} onChange={onPlanModeChange} />
+					<SceneOnOff isOn={planMode} onChange={onPlanModeChange} />
 				</ControlGroup>
 				<ControlGroup label='handing off'>
-					<OnOff isOn={isHandingOff} onChange={onHandingOffChange} />
+					<SceneOnOff isOn={isHandingOff} onChange={onHandingOffChange} />
 				</ControlGroup>
 				<ControlGroup label='streaming'>
-					<OnOff isOn={isStreaming} onChange={onStreamingChange} />
+					<SceneOnOff isOn={isStreaming} onChange={onStreamingChange} />
 				</ControlGroup>
 				<ControlGroup label='provider pin'>
 					<SceneToggle
@@ -392,25 +274,5 @@ function ComposerControls({
 				{lastDecision ?? 'no decision yet'}
 			</span>
 		</SceneControls>
-	);
-}
-
-/** The on/off pair every toggle in this scene is made of. */
-function OnOff({
-	isOn,
-	onChange,
-}: {
-	isOn: boolean;
-	onChange: (enabled: boolean) => void;
-}) {
-	return (
-		<>
-			<SceneToggle isActive={isOn} label='on' onClick={() => onChange(true)} />
-			<SceneToggle
-				isActive={!isOn}
-				label='off'
-				onClick={() => onChange(false)}
-			/>
-		</>
 	);
 }

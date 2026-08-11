@@ -12,6 +12,7 @@ import { wrapWithMasterPrompt } from '@/renderer/lib/workbench/action-prompts';
 import { useInFlightTurns } from '@/renderer/state/composer/in-flight-turns';
 import { useOptimisticPrompts } from '@/renderer/state/composer/optimistic-prompts';
 import { chatAppliedLinkedDirectoriesAtomFamily } from '@/renderer/state/preferences';
+import type { ComposerSubmitOutcome } from '@/renderer/types/workbench';
 import type { PiStreamingBehavior } from '@/shared/ipc/contracts/agent-session';
 
 /**
@@ -213,16 +214,16 @@ export function useAgentTurns({
 		async (
 			prompt: string,
 			options?: { streamingBehavior?: PiStreamingBehavior },
-		): Promise<void> => {
+		): Promise<ComposerSubmitOutcome> => {
 			const trimmed = prompt.trim();
 			if (!trimmed) {
-				return;
+				return {};
 			}
 			if (!isRealChatTabId || isResolvingChatTab) {
-				setLastError(
-					'Workspace chat tab is still initializing. Try again in a moment.',
-				);
-				return;
+				const error =
+					'Workspace chat tab is still initializing. Try again in a moment.';
+				setLastError(error);
+				return { error };
 			}
 			setLastError(null);
 			const turn: AgentTurnOptions = {
@@ -248,9 +249,10 @@ export function useAgentTurns({
 
 			const resolved = await ensureSession(trimmed, turn);
 			if (!resolved.sessionId) {
-				setLastError(resolved.error ?? 'Unable to open an agent session.');
+				const error = resolved.error ?? 'Unable to open an agent session.';
+				setLastError(error);
 				optimistic.remove(optimisticEntry.id);
-				return;
+				return { error };
 			}
 
 			const turnSessionId = resolved.sessionId;
@@ -265,7 +267,9 @@ export function useAgentTurns({
 			if (result.error) {
 				setLastError(result.error);
 				optimistic.remove(optimisticEntry.id);
+				return { error: result.error };
 			}
+			return {};
 		},
 		[
 			activeSessionId,
