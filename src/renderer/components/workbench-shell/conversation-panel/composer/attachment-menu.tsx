@@ -1,5 +1,5 @@
 import {
-	FolderOpenIcon,
+	FolderSymlinkIcon,
 	LinkIcon,
 	PaperclipIcon,
 	PlusIcon,
@@ -27,10 +27,12 @@ import {
 export function AttachmentMenu({
 	disabled,
 	onAddAttachment,
+	onLinkDirectory,
 	onLinkIssue,
 }: {
 	disabled?: boolean;
 	onAddAttachment: () => void;
+	onLinkDirectory: () => void;
 	onLinkIssue?: () => void;
 }) {
 	const { t } = useTranslation();
@@ -97,21 +99,11 @@ export function AttachmentMenu({
 					</DropdownMenuItem>
 					<DropdownMenuItem
 						className='gap-3 px-2 py-2 text-sm'
-						onSelect={() =>
-							toast.info(
-								t(
-									'workbench:attachment-menu.link-workspaces-soon.title',
-									'Linking workspaces is coming soon.',
-								),
-							)
-						}
+						onSelect={onLinkDirectory}
 					>
-						<FolderOpenIcon />
+						<FolderSymlinkIcon />
 						<span className='flex-1'>
-							{t(
-								'workbench:attachment-menu.link-workspaces',
-								'Link workspaces',
-							)}
+							{t('workbench:attachment-menu.link-directory', 'Link directory')}
 						</span>
 					</DropdownMenuItem>
 				</DropdownMenuGroup>

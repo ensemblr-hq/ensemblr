@@ -23,7 +23,7 @@ Rules of thumb:
 
 | English | Русский | Ελληνικά | Note |
 | --- | --- | --- | --- |
-| Workspace | Рабочая область | Χώρος εργασίας | The isolated per-task copy of a repo. Never "проект"/"έργο" — that is `project`. |
+| Workspace | Рабочее пространство | Χώρος εργασίας | The isolated per-task copy of a repo. Never "проект"/"έργο" — that is `project`. |
 | Repository | Репозиторий | Αποθετήριο | |
 | Project | Проект | Έργο | The imported local repo, as distinct from a workspace. |
 | Worktree | Worktree | Worktree | Git term; untranslated. |
@@ -55,11 +55,14 @@ Rules of thumb:
 | Issue | Задача | Ζήτημα | Linear issue. |
 | Tool call | Вызов инструмента | Κλήση εργαλείου | |
 | Attachment | Вложение | Συνημμένο | |
+| Pasted text | Вставленный текст | Επικολλημένο κείμενο | A long clipboard paste the composer stored as an attachment. Named for the act, not the file — "вставка"/"επικόλληση" reads as the gesture, and the chip labels a thing. |
 | Token | Токен | Διακριτικό | Model context unit. Localized in both — it is not git porcelain and not a proper noun. |
 | Remote | Удалённый | Απομακρυσμένο | The adjective is localized; the remote's *name* (`origin`) is not. |
 | Merged | Выполнен merge | Έγινε merge | Past-tense PR status. `merge` stays borrowed per the git-porcelain rule; only the auxiliary is localized. |
 | Setup wizard | Мастер настройки | Οδηγός εγκατάστασης | The first-run gate. "Мастер"/"οδηγός" is the platform word for a wizard; never "волшебник"/"μάγος". |
 | Root directory | Корневой каталог | Ριζικός κατάλογος | The managed directory holding repos and workspaces. |
+| Linked directory | Прикреплённая директория | Συνδεδεμένος κατάλογος | An arbitrary folder on disk a chat's agent was given access to. Deliberately `директория`, not the `каталог` of `Root directory`: for a folder the user picked themselves, `каталог` reads dated in Russian. `Каталог` stays for the managed root, which is Ensemblr's own structure. Greek uses `κατάλογος` for both. Never `рабочее пространство`/`χώρος εργασίας` — that is `Workspace`. |
+| Link (a directory or issue) | Прикрепить | Σύνδεση | The verb on the composer's `+` menu. Russian uses `прикрепить`, matching how the composer's other rows read; `связать` was rejected as reading like establishing a relation rather than attaching a thing. |
 | Permission mode | Режим разрешений | Λειτουργία δικαιωμάτων | How much an agent may do unattended. |
 | Keyboard shortcut | Горячая клавиша | Συντόμευση πληκτρολογίου | Shortened to "Горячие клавиши"/"Συντομεύσεις" in the nav, where the column is tight. |
 | Board status | Статус на доске | Κατάσταση πίνακα | The kanban column a workspace sits in: `Бэклог`/`Εκκρεμότητες`, `В работе`/`Σε εξέλιξη`, `На ревью`/`Σε αξιολόγηση`, `Готово`/`Ολοκληρώθηκε`, `Отменено`/`Ακυρώθηκε`. |

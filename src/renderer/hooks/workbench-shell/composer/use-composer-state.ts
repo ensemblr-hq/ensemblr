@@ -13,6 +13,8 @@ import { useComposerAttachments } from '@/renderer/hooks/workbench-shell/compose
 import { useComposerAutocomplete } from '@/renderer/hooks/workbench-shell/composer/use-composer-autocomplete';
 import { useComposerKeymap } from '@/renderer/hooks/workbench-shell/composer/use-composer-keymap';
 import { useComposerSubmit } from '@/renderer/hooks/workbench-shell/composer/use-composer-submit';
+import { useIssueAttachments } from '@/renderer/hooks/workbench-shell/composer/use-issue-attachments';
+import { useLinkedDirectories } from '@/renderer/hooks/workbench-shell/composer/use-linked-directories';
 import {
 	composerValueAtomFamily,
 	useComposerInsertConsumer,
@@ -21,12 +23,16 @@ import { sendShortcutAtom } from '@/renderer/state/preferences';
 import type {
 	AutocompleteKind,
 	AutocompleteState,
+	ComposerAttachment,
 	ComposerShellState,
-	ExternalAttachment,
+	LinkedDirectory,
 	MentionMatch,
 	SlashCommandMatch,
 	WorkspaceFileSummary,
 } from '@/renderer/types/workbench';
+import type { LinearIssueWire } from '@/shared/ipc/contracts/linear';
+import type { RecordLinkedDirectoryFailureCode } from '@/shared/ipc/contracts/linked-directories';
+import type { RepositoryIssueWire } from '@/shared/ipc/contracts/workspace-sources';
 
 /** Inputs required by the composer state hook. */
 interface UseComposerStateArgs {
@@ -45,6 +51,12 @@ export interface ComposerStateApi {
 	activeIndex: number;
 	anchorRef: RefObject<HTMLDivElement | null>;
 	attachmentError: string | null;
+	/** Everything the draft carries alongside its text, in the order it was added. */
+	attachments: readonly ComposerAttachment[];
+	/** Writes a GitHub issue out as a markdown document and attaches it. */
+	attachGithubIssue: (issue: RepositoryIssueWire) => Promise<void>;
+	/** Writes a Linear issue (with its comments) out and attaches it. */
+	attachLinearIssue: (issue: LinearIssueWire) => Promise<void>;
 	/**
 	 * True after a mid-stream submit was dropped because the Follow-up behavior is
 	 * set to "block". Lets the composer explain the no-op instead of swallowing
@@ -59,7 +71,6 @@ export interface ComposerStateApi {
 	/** True when a send is allowed even while the agent is working (steer / follow-up). */
 	canSend: boolean;
 	dismissAutocomplete: () => void;
-	externalAttachments: readonly ExternalAttachment[];
 	fileInputRef: RefObject<HTMLInputElement | null>;
 	handleAddAttachment: () => void;
 	handleChange: (event: ChangeEvent<HTMLTextAreaElement>) => void;
@@ -75,35 +86,38 @@ export interface ComposerStateApi {
 	hasContent: boolean;
 	insertText: (text: string) => void;
 	isStreaming: boolean;
+	/** Grants this chat's agent access to a directory outside the workspace. */
+	linkDirectory: (
+		path: string,
+	) => Promise<RecordLinkedDirectoryFailureCode | null>;
+	/** Directories outside the workspace this chat may read, sticky across sends. */
+	linkedDirectories: readonly LinkedDirectory[];
+	/** Linked after the runtime session opened, so not readable until it reopens. */
+	pendingLinkedDirectories: readonly LinkedDirectory[];
+	unlinkDirectory: (path: string) => void;
 	/** Send the current draft to the agent as a follow-up (Cmd+J). */
 	queueCurrent: () => void;
-	mentionAttachments: readonly WorkspaceFileSummary[];
 	mentionMatches: readonly MentionMatch[];
 	onMentionSelect: (entry: WorkspaceFileSummary) => void;
 	onSlashSelect: (command: string, autoSubmit: boolean) => void;
 	pending: boolean;
-	removeExternal: (absolutePath: string) => void;
-	removeMention: (path: string) => void;
-	removeUpload: (index: number) => void;
+	removeAttachment: (id: string) => void;
 	setActiveIndex: (index: number) => void;
 	/** True while the runtime is still being asked for its command catalogue. */
 	slashLoading: boolean;
 	slashMatches: readonly SlashCommandMatch[];
 	textareaRef: RefObject<HTMLTextAreaElement | null>;
-	uploadAttachments: readonly File[];
 	value: string;
 }
 
 /**
  * Owns the composer's local state machine: textarea value, mention + slash
- * autocomplete, chip lists for mentions and uploaded files, keymap bindings,
- * and the submit pipeline that serializes attachments into the outgoing
- * prompt. Returns a stable shape so the parent component is a thin JSX
- * orchestrator.
+ * autocomplete, the ordered attachment list, keymap bindings, and the submit
+ * pipeline that serializes attachments into the outgoing prompt. Returns a
+ * stable shape so the parent component is a thin JSX orchestrator.
  *
- * The submit pipeline inlines uploaded file text alongside @ mentions so the
- * existing `prompt: string` IPC contract stays untouched — uploads no longer
- * vanish silently when the user hits send.
+ * The submit pipeline inlines attachment content into the prompt text so the
+ * existing `prompt: string` IPC contract stays untouched.
  */
 export function useComposerState({
 	chatTabId,
@@ -114,29 +128,6 @@ export function useComposerState({
 	const anchorRef = useRef<HTMLDivElement | null>(null);
 
 	const [value, setValue] = useAtom(composerValueAtomFamily(chatTabId));
-	const {
-		attachmentError,
-		externalAttachments,
-		fileInputRef,
-		handleAddAttachment,
-		handleDragOver,
-		handleDrop,
-		handleFileChange,
-		handlePaste,
-		hasChips,
-		mentionAttachments,
-		removeExternal,
-		removeMention,
-		removeUpload,
-		setAttachmentError,
-		setExternalAttachments,
-		setMentionAttachments,
-		setUploadAttachments,
-		uploadAttachments,
-	} = useComposerAttachments({
-		chatTabId,
-		workspaceCwd: composer.workspaceCwd,
-	});
 
 	const insertText = useCallback(
 		(text: string) => {
@@ -147,6 +138,39 @@ export function useComposerState({
 		},
 		[setValue],
 	);
+
+	const {
+		addAttachments,
+		attachmentError,
+		attachments,
+		fileInputRef,
+		handleAddAttachment,
+		handleDragOver,
+		handleDrop,
+		handleFileChange,
+		handlePaste,
+		hasChips,
+		removeAttachment,
+		setAttachmentError,
+		setAttachments,
+	} = useComposerAttachments({
+		chatTabId,
+		insertPlainText: insertText,
+		workspaceCwd: composer.workspaceCwd,
+	});
+
+	const {
+		linkDirectory,
+		linkedDirectories,
+		pendingDirectories,
+		unlinkDirectory,
+	} = useLinkedDirectories({ chatTabId });
+
+	const { attachGithubIssue, attachLinearIssue } = useIssueAttachments({
+		addAttachments,
+		setAttachmentError,
+		workspaceCwd: composer.workspaceCwd,
+	});
 
 	// Drain review-context insertions queued from the Checks panel / diff views.
 	useComposerInsertConsumer(insertText);
@@ -172,16 +196,9 @@ export function useComposerState({
 	} = useComposerSubmit({
 		chatTabId,
 		composer,
-		draft: {
-			externals: externalAttachments,
-			mentions: mentionAttachments,
-			text: value,
-			uploads: uploadAttachments,
-		},
+		draft: { attachments, text: value },
 		setAttachmentError,
-		setExternalAttachments,
-		setMentionAttachments,
-		setUploadAttachments,
+		setAttachments,
 		setValue,
 	});
 
@@ -203,16 +220,10 @@ export function useComposerState({
 		stepActive,
 		updateAutocomplete,
 	} = useComposerAutocomplete({
+		addAttachments,
 		composer,
-		onSubmitSlashCommand: (text) =>
-			dispatchSubmit({
-				externals: externalAttachments,
-				mentions: mentionAttachments,
-				text,
-				uploads: uploadAttachments,
-			}),
+		onSubmitSlashCommand: (text) => dispatchSubmit({ attachments, text }),
 		setAttachmentError,
-		setMentionAttachments,
 		setValue,
 		textareaRef,
 		value,
@@ -232,13 +243,13 @@ export function useComposerState({
 	const sendShortcut = useAtomValue(sendShortcutAtom);
 
 	const removeLastMention = useCallback(() => {
-		setMentionAttachments((prev) => prev.slice(0, -1));
-	}, [setMentionAttachments]);
+		setAttachments((prev) => prev.slice(0, -1));
+	}, [setAttachments]);
 
 	const handleKeyDown = useComposerKeymap({
 		autocompleteKind,
 		canConfirmAutocomplete: autocompleteActive,
-		canRemoveLastMention: value.length === 0 && mentionAttachments.length > 0,
+		canRemoveLastMention: value.length === 0 && attachments.length > 0,
 		onConfirmAutocomplete: confirmAutocomplete,
 		onDismissAutocomplete: dismissAutocomplete,
 		onQueue: queueCurrent,
@@ -251,11 +262,7 @@ export function useComposerState({
 	});
 
 	const isStreaming = composer.isStreaming || pending;
-	const hasContent =
-		value.trim().length > 0 ||
-		mentionAttachments.length > 0 ||
-		uploadAttachments.length > 0 ||
-		externalAttachments.length > 0;
+	const hasContent = value.trim().length > 0 || attachments.length > 0;
 	// A normal (idle) send: enabled only when nothing is streaming.
 	const canSubmit = !composer.disabled && !isStreaming && hasContent;
 	// A send that is valid even mid-turn (steer / follow-up). Lets the composer
@@ -273,7 +280,10 @@ export function useComposerState({
 	return {
 		activeIndex,
 		anchorRef,
+		attachGithubIssue,
+		attachLinearIssue,
 		attachmentError,
+		attachments,
 		blockedNotice,
 		autocomplete,
 		autocompleteActive,
@@ -282,7 +292,6 @@ export function useComposerState({
 		canSubmit,
 		canSend,
 		dismissAutocomplete,
-		externalAttachments,
 		fileInputRef,
 		handleAddAttachment,
 		handleChange,
@@ -297,20 +306,20 @@ export function useComposerState({
 		hasContent,
 		insertText,
 		isStreaming,
-		mentionAttachments,
+		linkDirectory,
+		linkedDirectories,
 		mentionMatches,
 		onMentionSelect,
 		onSlashSelect,
 		pending,
+		pendingLinkedDirectories: pendingDirectories,
 		queueCurrent,
-		removeExternal,
-		removeMention,
-		removeUpload,
+		removeAttachment,
 		setActiveIndex,
 		slashLoading,
 		slashMatches,
 		textareaRef,
-		uploadAttachments,
+		unlinkDirectory,
 		value,
 	};
 }

@@ -11,6 +11,7 @@ export {
 	deriveLinearGateState,
 	describeLinearFailure,
 	formatLinearIssueContext,
+	formatLinearIssueDocument,
 	getLinearPriorityLabel,
 	isLinearDataStale,
 	mapLinearIssuesToWorkspaceSources,

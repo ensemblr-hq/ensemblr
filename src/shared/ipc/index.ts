@@ -198,6 +198,15 @@ export type {
 	UpdateLinearIssueRequest,
 } from './contracts/linear';
 export type {
+	LinkedDirectoriesApi,
+	LinkedDirectoryRecentWire,
+	LinkedDirectoryRequest,
+	LinkedDirectorySelectionResult,
+	ListLinkedDirectoryRecentsResult,
+	RecordLinkedDirectoryFailureCode,
+	RecordLinkedDirectoryResult,
+} from './contracts/linked-directories';
+export type {
 	QuickStartApi,
 	QuickStartProjectDiagnostic,
 	QuickStartProjectDiagnosticCode,

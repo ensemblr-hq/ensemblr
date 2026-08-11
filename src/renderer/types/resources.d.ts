@@ -444,6 +444,9 @@ export default interface Resources {
 			};
 		};
 		attachment: {
+			'issue-failed': {
+				message: 'Issue could not be attached.';
+			};
 			malformed: {
 				message: 'Pasted file payload was malformed.';
 			};
@@ -1054,14 +1057,6 @@ export default interface Resources {
 			refresh: 'Refresh issues';
 			'search-label': 'Search Linear issues';
 			'search-placeholder': 'Search by identifier or title…';
-		};
-		'issue-picker': {
-			description: 'Search Linear issues and pick one to link.';
-			empty: 'No issues match your search.';
-			loading: 'Loading issues…';
-			'not-connected': 'Linear is not connected. Sign in from integration settings.';
-			'search-placeholder': 'Search by identifier or title…';
-			title: 'Link Linear issue';
 		};
 		'linked-issue': {
 			connect: 'Connect Linear';
@@ -2009,13 +2004,10 @@ export default interface Resources {
 		'attachment-menu': {
 			'add-attachment': 'Add attachment';
 			'aria-label': 'Attachments';
+			'link-directory': 'Link directory';
 			'link-issue': 'Link issue';
 			'link-issue-soon': {
 				title: 'Linking issues is coming soon.';
-			};
-			'link-workspaces': 'Link workspaces';
-			'link-workspaces-soon': {
-				title: 'Linking workspaces is coming soon.';
 			};
 			tooltip: 'Add attachments, link issues, and more';
 		};
@@ -2120,8 +2112,14 @@ export default interface Resources {
 			'last-unread': 'Last unread';
 			'last-unread-tooltip': 'Jump to the newest unread chat in {{workspace}}';
 			'last-unread-tooltip-generic': 'Jump to the newest unread chat';
+			'linked-directory-pending_one': 'The agent reads a newly linked directory from the next session — reopen this chat to give it access.';
+			'linked-directory-pending_other': 'The agent reads newly linked directories from the next session — reopen this chat to give it access.';
 			model: {
 				pending: 'Model pending';
+			};
+			'pasted-text': {
+				summary_one: 'Pasted text · {{count}} line';
+				summary_other: 'Pasted text · {{count}} lines';
 			};
 			placeholder: 'Ask to make changes, @mention files, run /commands';
 			'plan-mode': {
@@ -2505,6 +2503,16 @@ export default interface Resources {
 				'restore-blocked': 'Cannot restore: the recorded base branch or branch name is missing.';
 			};
 		};
+		'issue-picker': {
+			description: 'Search Linear and GitHub issues and pick one to attach.';
+			empty: 'No issues match your search.';
+			'group-github': 'GitHub';
+			'group-linear': 'Linear';
+			'linear-not-connected': 'Linear is not connected, so only GitHub issues are listed. Sign in from integration settings.';
+			loading: 'Loading issues…';
+			'search-placeholder': 'Search by identifier, number, or title…';
+			title: 'Attach issue';
+		};
 		'landing-card': {
 			'aria-label': 'Workspace landing summary';
 			branch: {
@@ -2525,6 +2533,21 @@ export default interface Resources {
 				repository: 'Repository';
 				workspace: 'Workspace';
 			};
+		};
+		'link-directory': {
+			browse: 'Browse…';
+			description: 'Give this chat’s agent access to a directory outside the workspace.';
+			empty: 'No directories match your search.';
+			error: {
+				'invalid-path': 'That path could not be understood.';
+				'not-a-directory': 'That path is a file, not a directory.';
+				'read-failed': 'That directory could not be read.';
+			};
+			group: 'Directories';
+			loading: 'Loading directories…';
+			missing: 'Missing';
+			'search-placeholder': 'Search directories…';
+			title: 'Link directory';
 		};
 		'mcp-servers': {
 			'aria-label': 'MCP servers';

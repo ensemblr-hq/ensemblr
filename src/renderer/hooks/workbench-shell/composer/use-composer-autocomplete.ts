@@ -12,6 +12,7 @@ import { useMentionMatches } from '@/renderer/hooks/workbench-shell/composer/use
 import { useSlashCommands } from '@/renderer/hooks/workbench-shell/composer/use-slash-commands';
 import { useSlashMatches } from '@/renderer/hooks/workbench-shell/composer/use-slash-matches';
 import { resolveComposerProvider } from '@/renderer/lib/workbench/composer';
+import { workspaceFileAttachment } from '@/renderer/lib/workbench/composer-attachments';
 import {
 	recordSlashCommandUse,
 	slashCommandUsageAtom,
@@ -19,6 +20,7 @@ import {
 import type {
 	AutocompleteKind,
 	AutocompleteState,
+	ComposerAttachment,
 	ComposerShellState,
 	WorkspaceFileSummary,
 } from '@/renderer/types/workbench';
@@ -71,20 +73,18 @@ function splitAroundToken(
  * @returns The open state, the match lists, and the handlers the textarea binds to
  */
 export function useComposerAutocomplete({
+	addAttachments,
 	composer,
 	onSubmitSlashCommand,
 	setAttachmentError,
-	setMentionAttachments,
 	setValue,
 	textareaRef,
 	value,
 }: {
+	addAttachments: (incoming: readonly ComposerAttachment[]) => void;
 	composer: ComposerShellState;
 	onSubmitSlashCommand: (text: string) => void;
 	setAttachmentError: (error: string | null) => void;
-	setMentionAttachments: Dispatch<
-		SetStateAction<readonly WorkspaceFileSummary[]>
-	>;
 	setValue: Dispatch<SetStateAction<string>>;
 	textareaRef: RefObject<HTMLTextAreaElement | null>;
 	value: string;
@@ -150,27 +150,22 @@ export function useComposerAutocomplete({
 
 	const onMentionSelect = useCallback(
 		(entry: WorkspaceFileSummary) => {
-			// Drop the @query token from textarea, push file onto chip list
 			setAttachmentError(null);
 			const { after, before } = splitAroundToken(value, autocomplete);
 			const trimmedBefore = before.trimEnd();
 			setValue(
 				`${trimmedBefore}${trimmedBefore.length > 0 ? ' ' : ''}${after.trimStart()}`,
 			);
-			setMentionAttachments((prev) =>
-				prev.some((existing) => existing.path === entry.path)
-					? prev
-					: [...prev, entry],
-			);
+			addAttachments([workspaceFileAttachment(entry)]);
 			dismissAutocomplete();
 			restoreCaret(trimmedBefore.length + 1);
 		},
 		[
+			addAttachments,
 			autocomplete,
 			dismissAutocomplete,
 			restoreCaret,
 			setAttachmentError,
-			setMentionAttachments,
 			setValue,
 			value,
 		],

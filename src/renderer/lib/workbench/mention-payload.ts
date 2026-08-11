@@ -1,10 +1,11 @@
 import { readWorkspaceFile } from '@/renderer/api/ensemblr-queries';
 import type {
-	ExternalAttachment,
-	WorkspaceFileSummary,
+	ComposerAttachment,
+	LinkedDirectory,
 } from '@/renderer/types/workbench';
 import {
 	formatAttachedFileBlock,
+	LINKED_DIRECTORIES_HEADER,
 	REFERENCED_FOLDERS_HEADER,
 } from '@/shared/prompt-scaffolding';
 
@@ -69,6 +70,7 @@ const TEXT_INLINE_EXTENSIONS = new Set([
 ]);
 const ATTACHMENT_PLACEHOLDER =
 	'[attachment saved in the workspace — inspect this file directly if needed]';
+const EXTERNAL_PLACEHOLDER = '[external file — inspect this path directly]';
 
 /** Wraps one workspace file's content in the shared attachment marker, truncated to budget. */
 function formatAttachedFileSection(pathValue: string, content: string): string {
@@ -94,124 +96,157 @@ function truncateAttachmentContent(content: string): string {
 }
 
 /**
- * Formats the selected @ mentions (workspace files + directories) into the
- * text payload that gets appended to the user's prompt when sent to the agent.
+ * Announces the chat's linked directories by absolute path, so the agent knows
+ * which roots outside the workspace it may work in.
  *
- * Reads text file mentions via IPC and inlines their content in a fenced
- * `<attached_file>` block. Image mentions use a placeholder so the agent sees the
- * saved workspace path without flooding the prompt with binary bytes.
- * Directories are surfaced as a separate header so the agent knows the user referenced
- * them without expecting inline content.
+ * Sent with every message rather than once per session: the runtime grants
+ * access at session open, but nothing keeps an earlier turn's announcement in
+ * the model's working context, and a path per line is a negligible share of the
+ * prompt.
+ * @param directories - The chat's linked directories.
+ * @returns The header block, or an empty string when nothing is linked.
+ */
+export function serializeLinkedDirectories(
+	directories: readonly LinkedDirectory[],
+): string {
+	if (directories.length === 0) {
+		return '';
+	}
+	return `${LINKED_DIRECTORIES_HEADER}\n${directories
+		.map((directory) => directory.path)
+		.join('\n')}`;
+}
+
+/**
+ * Formats the composer's ordered attachment list into the text payload appended
+ * to the user's prompt when sent to the agent.
+ *
+ * Directories collect into one leading header so the agent knows the user
+ * referenced them without expecting inline content. Text files are read over IPC
+ * and inlined in an `<attached_file>` block; images, binaries, and externally
+ * referenced paths get a placeholder so the agent sees the path without the
+ * prompt being flooded with bytes.
  *
  * Throws when a file read fails, so the caller can surface the error to the
  * user before clearing the composer.
+ * @param attachments - The composer's attachments, in the order the user added them.
+ * @param workspaceCwd - Absolute workspace root the relative paths resolve against.
+ * @returns The block of attachment sections, or an empty string when there are none.
  */
-export async function formatMentionAttachmentText({
-	mentions,
+export async function serializeComposerAttachments({
+	attachments,
 	workspaceCwd,
 }: {
-	mentions: readonly WorkspaceFileSummary[];
+	attachments: readonly ComposerAttachment[];
 	workspaceCwd: string;
 }): Promise<string> {
-	if (mentions.length === 0) {
+	if (attachments.length === 0) {
 		return '';
 	}
 
 	const sections: string[] = [];
-	const directoryRefs = mentions.filter((entry) => entry.kind === 'directory');
-	if (directoryRefs.length > 0) {
+	const directories = attachments.filter(
+		(entry) => entry.kind === 'workspace-directory',
+	);
+	if (directories.length > 0) {
 		sections.push(
-			`${REFERENCED_FOLDERS_HEADER}\n${directoryRefs.map((entry) => `@${entry.path}`).join('\n')}`,
+			`${REFERENCED_FOLDERS_HEADER}\n${directories.map((entry) => `@${entry.path}`).join('\n')}`,
 		);
 	}
 
-	const fileMentions = mentions.filter((entry) => entry.kind === 'file');
-	const textFileMentions = fileMentions.filter((entry) =>
-		shouldInlineAsText(entry.path),
+	// Reads are independent, so issue them together before walking the list;
+	// each result keys back to its attachment so the emitted sections stay in the
+	// user's original order.
+	const contentByAttachment = await readAttachmentContents(
+		attachments,
+		workspaceCwd,
 	);
-	// Text reads are independent, so issue them in parallel (Promise.all preserves
-	// order). Results key back to their mention so the emitted sections stay in the
-	// user's original mention order, interleaving image placeholders with text.
-	const textResults = await Promise.all(
-		textFileMentions.map((mention) =>
-			readWorkspaceFile({ path: mention.path, workspaceCwd }),
-		),
-	);
-	const resultByMention = new Map(
-		textFileMentions.map((mention, index) => [mention, textResults[index]]),
-	);
-	for (const mention of fileMentions) {
-		if (!shouldInlineAsText(mention.path)) {
-			sections.push(
-				formatAttachedFileSection(mention.path, ATTACHMENT_PLACEHOLDER),
-			);
+	for (const attachment of attachments) {
+		if (attachment.kind === 'workspace-directory') {
 			continue;
 		}
-		const result = resultByMention.get(mention);
-		if (!result) {
-			continue;
-		}
-		if (result.error) {
-			throw new Error(
-				`Could not attach ${mention.path}: ${result.error.message}`,
-			);
-		}
-		sections.push(formatAttachedFileSection(result.path, result.content ?? ''));
+		sections.push(
+			formatAttachedFileSection(
+				attachmentPromptPath(attachment),
+				contentByAttachment.get(attachment.id) ?? ATTACHMENT_PLACEHOLDER,
+			),
+		);
 	}
 
 	return sections.join('\n\n');
+}
+
+/**
+ * Resolves the body of every attachment whose content is inlined, leaving the
+ * rest to fall back to a placeholder.
+ * @param attachments - The composer's attachments.
+ * @param workspaceCwd - Absolute workspace root the relative paths resolve against.
+ * @returns Attachment id to inlined body, for those that have one.
+ */
+async function readAttachmentContents(
+	attachments: readonly ComposerAttachment[],
+	workspaceCwd: string,
+): Promise<Map<string, string>> {
+	const resolved = await Promise.all(
+		attachments.map((attachment) =>
+			readAttachmentContent(attachment, workspaceCwd),
+		),
+	);
+	const contentById = new Map<string, string>();
+	for (const [index, content] of resolved.entries()) {
+		const attachment = attachments[index];
+		if (attachment && content !== null) {
+			contentById.set(attachment.id, content);
+		}
+	}
+	return contentById;
+}
+
+/**
+ * Reads one attachment's inlined body, or null when it is announced by path
+ * instead (a directory, an image, a binary, or a file outside the workspace).
+ * @param attachment - The attachment to resolve.
+ * @param workspaceCwd - Absolute workspace root the relative paths resolve against.
+ * @returns The body to inline, or null to fall back to a placeholder.
+ */
+async function readAttachmentContent(
+	attachment: ComposerAttachment,
+	workspaceCwd: string,
+): Promise<string | null> {
+	if (attachment.kind === 'external-file') {
+		return EXTERNAL_PLACEHOLDER;
+	}
+	if (
+		attachment.kind === 'workspace-directory' ||
+		!shouldInlineAsText(attachment.path)
+	) {
+		return null;
+	}
+	const result = await readWorkspaceFile({
+		path: attachment.path,
+		workspaceCwd,
+	});
+	if (result.error) {
+		throw new Error(
+			`Could not attach ${attachment.path}: ${result.error.message}`,
+		);
+	}
+	return result.content ?? '';
+}
+
+/**
+ * The path an attachment is announced under inside its `<attached_file>` marker.
+ * @param attachment - The attachment being serialized.
+ * @returns The workspace-relative path, the absolute path, or the upload's name.
+ */
+function attachmentPromptPath(attachment: ComposerAttachment): string {
+	return attachment.kind === 'external-file'
+		? attachment.absolutePath
+		: attachment.path;
 }
 
 /** Returns true when a file's content should be inlined as text rather than referenced by path. */
 function shouldInlineAsText(pathValue: string): boolean {
 	const extension = pathValue.split('.').pop()?.toLowerCase();
 	return extension ? TEXT_INLINE_EXTENSIONS.has(extension) : false;
-}
-
-/**
- * Formats large files referenced by absolute path (not copied into the
- * workspace) as a path-only section, so the agent opens each file directly rather than
- * receiving its bytes.
- */
-export function formatExternalAttachmentText(
-	externals: readonly ExternalAttachment[],
-): string {
-	if (externals.length === 0) {
-		return '';
-	}
-	return externals
-		.map((external) =>
-			formatAttachedFileSection(
-				external.absolutePath,
-				'[external file — inspect this path directly]',
-			),
-		)
-		.join('\n\n');
-}
-
-/**
- * Reads each uploaded file as text and wraps it in the shared `<attached_file>`
- * envelope so the agent receives uploads alongside @ mentions. Falls back to a
- * `[binary]` placeholder if a file cannot be decoded as text.
- */
-export async function formatUploadAttachmentText(
-	uploads: readonly File[],
-): Promise<string> {
-	if (uploads.length === 0) {
-		return '';
-	}
-	// Decodes are independent; read them in parallel. Promise.all preserves the
-	// upload order so the rendered sections still match the user's selection.
-	const sections = await Promise.all(
-		uploads.map(async (file) => {
-			let content: string;
-			try {
-				content = await file.text();
-			} catch {
-				content = '[binary upload — content could not be decoded as text]';
-			}
-			return formatAttachedFileSection(file.name, content);
-		}),
-	);
-	return sections.join('\n\n');
 }

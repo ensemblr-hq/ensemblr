@@ -1,17 +1,17 @@
 import { type ReactNode, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { LinearIssuePickerDialog } from '@/renderer/components/linear/linear-issue-picker-dialog';
 import { Textarea } from '@/renderer/components/ui/textarea';
 import { useHotkey } from '@/renderer/hooks/use-hotkey';
 import { useComposerState } from '@/renderer/hooks/workbench-shell/composer/use-composer-state';
-import { formatLinearIssueContext } from '@/renderer/lib/linear';
 import { cn } from '@/renderer/lib/utils';
 import { useConsumeComposerFocusRequest } from '@/renderer/state/composer';
 import type { ComposerShellState } from '@/renderer/types/workbench';
 import { ComposerControls } from './composer/composer-controls';
 import { ComposerNotices } from './composer/composer-notices';
 import { ComposerFocusHint } from './composer/focus-hint';
+import { IssuePickerDialog } from './composer/issue-picker-dialog';
 import { ConnectedLastUnreadButton } from './composer/last-unread-button';
+import { LinkDirectoryDialog } from './composer/link-directory-dialog';
 import { ComposerAutocompletePopover } from './composer/mention-popover';
 import { getNextThinkingId } from './composer/thinking-picker';
 
@@ -27,6 +27,7 @@ export function ComposerPanel({
 	chatTabId,
 	composer,
 	planReview,
+	repositoryId,
 	seedText,
 	workspaceId,
 }: {
@@ -34,6 +35,8 @@ export function ComposerPanel({
 	composer: ComposerShellState;
 	/** Plan review header rendered inside the composer card, above the textarea. */
 	planReview?: ReactNode;
+	/** Repository whose GitHub issues the attachment menu offers. */
+	repositoryId: string;
 	seedText?: string;
 	/** Workspace whose dock hosts terminals the control row hands work off to. */
 	workspaceId: string;
@@ -43,6 +46,7 @@ export function ComposerPanel({
 	const [focused, setFocused] = useState(false);
 	const [modelPickerOpen, setModelPickerOpen] = useState(false);
 	const [issuePickerOpen, setIssuePickerOpen] = useState(false);
+	const [directoryPickerOpen, setDirectoryPickerOpen] = useState(false);
 
 	const focusTextarea = useCallback(() => {
 		state.textareaRef.current?.focus();
@@ -169,6 +173,7 @@ export function ComposerPanel({
 						<ComposerControls
 							composer={composer}
 							modelPickerOpen={modelPickerOpen}
+							onLinkDirectory={() => setDirectoryPickerOpen(true)}
 							onLinkIssue={() => setIssuePickerOpen(true)}
 							onModelPickerOpenChange={setModelPickerOpen}
 							pickersDisabled={pickersDisabled}
@@ -178,10 +183,22 @@ export function ComposerPanel({
 					</div>
 				</div>
 			</div>
-			<LinearIssuePickerDialog
+			<LinkDirectoryDialog
+				linkedDirectories={state.linkedDirectories}
+				onLink={state.linkDirectory}
+				onOpenChange={setDirectoryPickerOpen}
+				onUnlink={state.unlinkDirectory}
+				open={directoryPickerOpen}
+			/>
+			<IssuePickerDialog
 				onOpenChange={setIssuePickerOpen}
-				onSelect={(issue) => state.insertText(formatLinearIssueContext(issue))}
+				onSelect={(picked) => {
+					void (picked.provider === 'linear'
+						? state.attachLinearIssue(picked.issue)
+						: state.attachGithubIssue(picked.issue));
+				}}
 				open={issuePickerOpen}
+				repositoryId={repositoryId}
 			/>
 		</footer>
 	);

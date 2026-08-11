@@ -102,6 +102,13 @@ export interface OpenAgentSessionRequest {
 	initialPrompt?: string | null;
 	label?: string;
 	/**
+	 * Absolute paths outside the workspace this chat may read. The renderer's
+	 * per-chat setting is the durable source and re-sends this on every open;
+	 * runtimes that sandbox by working directory grant them at launch, which is
+	 * why a directory linked mid-session only takes effect on the next open.
+	 */
+	linkedDirectories?: readonly string[];
+	/**
 	 * Whether the chat's Plan Mode toggle is on. The renderer's per-chat setting
 	 * is the durable source and re-sends this on every open and submit, so the
 	 * main-process registry is a derived, in-memory mirror.

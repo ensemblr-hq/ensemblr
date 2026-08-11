@@ -105,6 +105,7 @@ export function ComposerSlot({
 		<ComposerPanel
 			chatTabId={chatTabId}
 			composer={composer}
+			repositoryId={workspace.projectId}
 			planReview={
 				plan.review ? (
 					<PlanReviewPanel

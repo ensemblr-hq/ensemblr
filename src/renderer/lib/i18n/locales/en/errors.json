@@ -17,6 +17,9 @@
 		}
 	},
 	"attachment": {
+		"issue-failed": {
+			"message": "Issue could not be attached."
+		},
 		"malformed": {
 			"message": "Pasted file payload was malformed."
 		},

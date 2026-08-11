@@ -63,8 +63,8 @@ export function usePlanHandoff(workspace: WorkspaceShellModel): {
 				if (planPath) {
 					dispatchAttachment(chatTabId, {
 						id: `wsfile:${planPath}`,
-						kind: 'file',
-						name: planPath.split('/').at(-1) ?? planPath,
+						kind: 'workspace-file',
+						label: planPath.split('/').at(-1) ?? planPath,
 						path: planPath,
 					});
 				}

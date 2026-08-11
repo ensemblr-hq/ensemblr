@@ -100,8 +100,8 @@ describe('usePlanHandoff', () => {
 		expect(result.current.inbox.pending).toEqual([
 			{
 				id: `wsfile:${PLAN_PATH}`,
-				kind: 'file',
-				name: '20260728-1432-add-plan-mode.md',
+				kind: 'workspace-file',
+				label: '20260728-1432-add-plan-mode.md',
 				path: PLAN_PATH,
 			},
 		]);

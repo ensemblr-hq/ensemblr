@@ -17,6 +17,7 @@ import {
 	CommandInput,
 	CommandItem,
 	CommandList,
+	CommandSeparator,
 } from '@/renderer/components/ui/command';
 import {
 	Popover,
@@ -174,7 +175,8 @@ export function CreateWorkspaceSourceDialog({
 						selectedRepo={selectedRepo}
 					/>
 				</div>
-				<CommandList className='max-h-80 border-border border-t'>
+				<CommandSeparator alwaysRender />
+				<CommandList className='max-h-80'>
 					{/* Banners only when there is nothing to show yet — once cached rows
 					    exist we render them and let a refetch happen silently, so the
 					    list never flashes a loading state over real data. */}

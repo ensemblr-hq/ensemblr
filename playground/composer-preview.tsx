@@ -1,12 +1,15 @@
 import { QueryClientProvider } from '@tanstack/react-query';
+import { useStore } from 'jotai';
 import { useCallback, useMemo, useState } from 'react';
 
 import { ComposerPanel } from '@/renderer/components/workbench-shell/conversation-panel';
 import { PlanReviewPanel } from '@/renderer/components/workbench-shell/conversation-panel/plan-review-panel';
+import { chatLinkedDirectoriesAtomFamily } from '@/renderer/state/preferences';
 import type {
 	ComposerModelOption,
 	ComposerShellState,
 	ComposerThinkingOption,
+	LinkedDirectory,
 	WorkspaceFileSummary,
 } from '@/renderer/types/workbench';
 import type { AgentProviderId } from '@/shared/agent-provider';
@@ -197,6 +200,17 @@ export function ComposerScene() {
 						}
 					/>
 					<ComposerCase
+						chatTabId='playground-composer-linked-directory'
+						label='linked directory — chip carries the absolute path it granted'
+						linkedDirectories={[
+							{
+								name: 'Vault 111',
+								path: '/Users/you/Documents/Obsidian/Vault 111',
+							},
+						]}
+						planMode={false}
+					/>
+					<ComposerCase
 						chatTabId='playground-composer-handing-off'
 						label='hand off in flight — every action locked'
 						planMode
@@ -220,6 +234,7 @@ function ComposerCase({
 	chatTabId,
 	isStreaming = false,
 	label,
+	linkedDirectories,
 	lockedProvider = null,
 	onPlanModeChange,
 	planMode,
@@ -228,11 +243,19 @@ function ComposerCase({
 	chatTabId: string;
 	isStreaming?: boolean;
 	label?: string;
+	/** Seeds the chat's linked-directory set so the sticky chip has something to render. */
+	linkedDirectories?: readonly LinkedDirectory[];
 	lockedProvider?: AgentProviderId | null;
 	onPlanModeChange?: (planMode: boolean) => void;
 	planMode: boolean;
 	planReview?: React.ReactNode;
 }) {
+	const store = useStore();
+	useState(() => {
+		if (linkedDirectories) {
+			store.set(chatLinkedDirectoriesAtomFamily(chatTabId), linkedDirectories);
+		}
+	});
 	const composer = useComposerStub({
 		isStreaming,
 		lockedProvider,
@@ -252,6 +275,7 @@ function ComposerCase({
 					chatTabId={chatTabId}
 					composer={composer}
 					planReview={planReview}
+					repositoryId='playground-repository'
 					workspaceId='playground-workspace'
 				/>
 			</div>

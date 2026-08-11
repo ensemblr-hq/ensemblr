@@ -18,7 +18,11 @@ vi.mock('@/renderer/api/ensemblr-queries', () => ({
 	writeWorkspaceImageAttachment: () => writeWorkspaceImageAttachment(),
 }));
 
-import { attachPastedFiles } from '../../src/renderer/lib/workbench/composer-attachments';
+import {
+	appendAttachments,
+	attachPastedFiles,
+	attachPastedText,
+} from '../../src/renderer/lib/workbench/composer-attachments';
 
 function savedRow(path: string) {
 	return {
@@ -36,10 +40,10 @@ beforeEach(() => {
 	writeWorkspaceFileAttachment.mockReset();
 	getPathForFile.mockReset();
 	writeWorkspaceImageAttachment.mockResolvedValue(
-		savedRow('.context/images/x.png'),
+		savedRow('.context/attachments/aa11bb/x.png'),
 	);
 	writeWorkspaceFileAttachment.mockResolvedValue(
-		savedRow('.context/attachments/x.svg'),
+		savedRow('.context/attachments/cc22dd/x.svg'),
 	);
 });
 
@@ -54,7 +58,7 @@ describe('attachPastedFiles', () => {
 		expect(writeWorkspaceImageAttachment).toHaveBeenCalledTimes(1);
 		expect(writeWorkspaceFileAttachment).not.toHaveBeenCalled();
 		expect(result.error).toBeNull();
-		expect(result.savedFiles).toHaveLength(1);
+		expect(result.attachments).toHaveLength(1);
 	});
 
 	test('routes an SVG through the file write path so it is not rejected as an image', async () => {
@@ -67,7 +71,7 @@ describe('attachPastedFiles', () => {
 		expect(writeWorkspaceFileAttachment).toHaveBeenCalledTimes(1);
 		expect(writeWorkspaceImageAttachment).not.toHaveBeenCalled();
 		expect(result.error).toBeNull();
-		expect(result.savedFiles).toHaveLength(1);
+		expect(result.attachments).toHaveLength(1);
 	});
 
 	test('surfaces a write failure as an error while keeping earlier saves', async () => {
@@ -79,6 +83,59 @@ describe('attachPastedFiles', () => {
 		const result = await attachPastedFiles([doc], '/repo');
 
 		expect(result.error).toBe('disk full');
-		expect(result.savedFiles).toHaveLength(0);
+		expect(result.attachments).toHaveLength(0);
+	});
+});
+
+describe('attachPastedText', () => {
+	beforeEach(() => {
+		writeWorkspaceFileAttachment.mockResolvedValue(
+			savedRow('.context/attachments/ee33ff/pasted-text.txt'),
+		);
+	});
+
+	test('persists the paste and carries a capped preview plus its line count', async () => {
+		const text = `${'x'.repeat(300)}\nsecond\nthird`;
+
+		const attachment = await attachPastedText(text, '/repo');
+
+		expect(writeWorkspaceFileAttachment).toHaveBeenCalledTimes(1);
+		expect(attachment).toMatchObject({
+			id: 'wsfile:.context/attachments/ee33ff/pasted-text.txt',
+			kind: 'pasted-text',
+			label: 'pasted-text.txt',
+			lineCount: 3,
+			path: '.context/attachments/ee33ff/pasted-text.txt',
+		});
+		if (attachment.kind !== 'pasted-text') {
+			throw new Error('Expected a pasted-text attachment.');
+		}
+		expect(attachment.preview).toHaveLength(240);
+	});
+
+	test('drops leading blank lines so the preview opens on real content', async () => {
+		const attachment = await attachPastedText('\n\n  \nreal content', '/repo');
+
+		if (attachment.kind !== 'pasted-text') {
+			throw new Error('Expected a pasted-text attachment.');
+		}
+		expect(attachment.preview).toBe('real content');
+	});
+
+	test('propagates a write failure so the caller can fall back to inline text', async () => {
+		writeWorkspaceFileAttachment.mockResolvedValueOnce({
+			error: { code: 'write-failed', message: 'disk full' },
+		});
+
+		await expect(attachPastedText('a long paste', '/repo')).rejects.toThrow(
+			'disk full',
+		);
+	});
+
+	test('dedupes to one chip when the same paste is stored twice', async () => {
+		const first = await attachPastedText('same paste', '/repo');
+		const second = await attachPastedText('same paste', '/repo');
+
+		expect(appendAttachments([first], [second])).toEqual([first]);
 	});
 });

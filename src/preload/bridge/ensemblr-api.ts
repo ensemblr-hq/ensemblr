@@ -179,6 +179,12 @@ export function createEnsemblrApi(): EnsemblrApi {
 		listArchivedWorkspaces: (request) =>
 			invoke('listArchivedWorkspaces', request),
 		listChatTabs: (request) => invoke('listChatTabs', request),
+		forgetLinkedDirectoryRecent: (request) =>
+			invoke('forgetLinkedDirectoryRecent', request),
+		listLinkedDirectoryRecents: () => invoke('listLinkedDirectoryRecents'),
+		recordLinkedDirectoryRecent: (request) =>
+			invoke('recordLinkedDirectoryRecent', request),
+		selectLinkedDirectory: () => invoke('selectLinkedDirectory'),
 		listClosedChatTabsWithSummary: (request) =>
 			invoke('listClosedChatTabsWithSummary', request),
 		listAgentModels: () => invoke('listAgentModels'),

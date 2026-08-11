@@ -75,6 +75,11 @@ export {
 	insertCheckpoint,
 	listCheckpointsForAgentSession,
 } from './checkpoint-repository.ts';
+export type { LinkedDirectoryRecentRow } from './linked-directory-repository.ts';
+export {
+	readLinkedDirectoryRecents,
+	writeLinkedDirectoryRecents,
+} from './linked-directory-repository.ts';
 export type {
 	DeleteRepositoryRowByIdOptions,
 	InsertRepositoryRowOptions,

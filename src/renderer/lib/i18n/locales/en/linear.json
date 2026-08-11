@@ -86,14 +86,6 @@
 		"search-label": "Search Linear issues",
 		"search-placeholder": "Search by identifier or title…"
 	},
-	"issue-picker": {
-		"description": "Search Linear issues and pick one to link.",
-		"empty": "No issues match your search.",
-		"loading": "Loading issues…",
-		"not-connected": "Linear is not connected. Sign in from integration settings.",
-		"search-placeholder": "Search by identifier or title…",
-		"title": "Link Linear issue"
-	},
 	"linked-issue": {
 		"connect": "Connect Linear",
 		"reconnect": "Reconnect Linear",

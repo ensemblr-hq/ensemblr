@@ -1,4 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useStore } from 'jotai';
 import { useCallback, useState } from 'react';
 
 import {
@@ -10,6 +11,7 @@ import {
 import { wrapWithMasterPrompt } from '@/renderer/lib/workbench/action-prompts';
 import { useInFlightTurns } from '@/renderer/state/composer/in-flight-turns';
 import { useOptimisticPrompts } from '@/renderer/state/composer/optimistic-prompts';
+import { chatAppliedLinkedDirectoriesAtomFamily } from '@/renderer/state/preferences';
 import type { PiStreamingBehavior } from '@/shared/ipc/contracts/agent-session';
 
 /**
@@ -47,6 +49,7 @@ interface PersistedSession {
 export function useAgentTurns({
 	chatTabId,
 	isResolvingChatTab,
+	linkedDirectoriesRequest,
 	masterPrompt,
 	modelId,
 	persistedActiveSession,
@@ -57,6 +60,13 @@ export function useAgentTurns({
 }: {
 	chatTabId: string;
 	isResolvingChatTab: boolean;
+	/**
+	 * Reads the chat's linked directories at open time. Only the open request
+	 * carries them: the runtimes that sandbox by working directory take their
+	 * extra roots at launch, so a per-turn field would promise a grant no submit
+	 * can make.
+	 */
+	linkedDirectoriesRequest: () => readonly string[];
 	masterPrompt: string;
 	modelId: string | null;
 	persistedActiveSession: PersistedSession | undefined;
@@ -66,6 +76,7 @@ export function useAgentTurns({
 	workspaceId: string;
 }) {
 	const queryClient = useQueryClient();
+	const store = useStore();
 	const inFlight = useInFlightTurns();
 	const optimistic = useOptimisticPrompts(chatTabId);
 	const [lastError, setLastError] = useState<string | null>(null);
@@ -83,6 +94,7 @@ export function useAgentTurns({
 		mutationFn: (input: {
 			chatTabId: string;
 			initialPrompt: string | null;
+			linkedDirectories: readonly string[];
 			resumeSessionId?: string | null;
 			turn: AgentTurnOptions;
 		}) =>
@@ -90,6 +102,7 @@ export function useAgentTurns({
 				...input.turn,
 				chatTabId: input.chatTabId,
 				initialPrompt: input.initialPrompt,
+				linkedDirectories: input.linkedDirectories,
 				resumeSessionId: input.resumeSessionId ?? null,
 				workspaceCwd,
 				workspaceId,
@@ -97,6 +110,12 @@ export function useAgentTurns({
 		onSuccess: (result, variables) => {
 			if (result.session) {
 				const openedSessionId = result.session.id;
+				// Record what the runtime was actually launched with, so the composer
+				// can tell the user when a directory linked later is not readable yet.
+				store.set(
+					chatAppliedLinkedDirectoriesAtomFamily(variables.chatTabId),
+					variables.linkedDirectories,
+				);
 				setPendingSessionByTab((previous) => ({
 					...previous,
 					[variables.chatTabId]: openedSessionId,
@@ -168,6 +187,7 @@ export function useAgentTurns({
 				openSessionMutation.mutateAsync({
 					chatTabId,
 					initialPrompt: activeSessionId ? null : initialPrompt,
+					linkedDirectories: linkedDirectoriesRequest(),
 					resumeSessionId: activeSessionId,
 					turn,
 				}),
@@ -183,6 +203,7 @@ export function useAgentTurns({
 			activeSessionId,
 			chatTabId,
 			inFlight,
+			linkedDirectoriesRequest,
 			openSessionMutation,
 			persistedActiveSession,
 		],

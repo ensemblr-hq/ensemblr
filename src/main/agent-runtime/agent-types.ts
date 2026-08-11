@@ -128,6 +128,13 @@ export interface AgentSessionRequest {
 	executable?: AgentExecutableSnapshot | null;
 	/** Working directory for the launched process — typically the workspace path. */
 	workspaceCwd: string;
+	/**
+	 * Absolute paths outside `workspaceCwd` the session may read. Runtimes that
+	 * sandbox by working directory take these at launch, so the set is fixed for
+	 * the life of the session; runtimes that do not sandbox ignore them and see
+	 * the same paths announced in the prompt.
+	 */
+	linkedDirectories?: readonly string[];
 	/** Caller-supplied env overlay. `null` or `undefined` values are treated as "unset". */
 	env?: Record<string, string | null | undefined>;
 	/**

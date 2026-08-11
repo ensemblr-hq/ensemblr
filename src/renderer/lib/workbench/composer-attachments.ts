@@ -4,8 +4,9 @@ import {
 	writeWorkspaceImageAttachment,
 } from '@/renderer/api/ensemblr-queries';
 import { i18n } from '@/renderer/lib/i18n';
+import { issueDocumentFilename } from '@/renderer/lib/workbench/issue-document';
 import type {
-	ExternalAttachment,
+	ComposerAttachment,
 	WorkspaceFileSummary,
 } from '@/renderer/types/workbench';
 import type { WorkspaceFileEntryWire } from '@/shared/ipc/contracts/workspace-files';
@@ -28,14 +29,88 @@ const NON_RASTER_IMAGE_TYPES: ReadonlySet<string> = new Set(['image/svg+xml']);
 const SMALL_FILE_MAX_BYTES = 10 * 1024 * 1024;
 
 /**
- * Outcome of persisting a batch of pasted/dropped files: copied files become
- * workspace-file chips, large resolvable files become path-only externals, and
- * the first failure (if any) surfaces as a user-facing message.
+ * How much of a pasted block the chip keeps for its preview. Long enough to
+ * fill the card's two-line clamp at any sensible width, short enough that the
+ * serialized draft does not carry the whole paste twice.
+ */
+const PASTED_TEXT_PREVIEW_CHARS = 240;
+
+/** Filename every pasted-text attachment is persisted under. */
+const PASTED_TEXT_FILENAME = 'pasted-text.txt';
+
+/**
+ * Outcome of persisting a batch of pasted/dropped files: every file that landed
+ * becomes an attachment, and the first failure (if any) surfaces as a
+ * user-facing message.
  */
 export interface AttachPastedFilesResult {
+	attachments: ComposerAttachment[];
 	error: string | null;
-	savedExternals: ExternalAttachment[];
-	savedFiles: WorkspaceFileSummary[];
+}
+
+/**
+ * Builds the attachment for a workspace file or directory the user referenced.
+ * @param entry - The file-tree row the mention or chip resolved to.
+ * @returns The composer attachment for that entry.
+ */
+export function workspaceFileAttachment(
+	entry: WorkspaceFileSummary,
+): ComposerAttachment {
+	if (entry.kind === 'directory') {
+		return {
+			id: `wsdir:${entry.path}`,
+			kind: 'workspace-directory',
+			label: entry.name,
+			path: entry.path,
+		};
+	}
+	return {
+		id: `wsfile:${entry.path}`,
+		isIgnored: entry.isIgnored,
+		kind: 'workspace-file',
+		label: entry.name,
+		path: entry.path,
+	};
+}
+
+/**
+ * Builds the attachment for a block of pasted text already written to the
+ * store, carrying the preview and line count its chip renders.
+ * @param path - Workspace-relative path the text was persisted to.
+ * @param text - The full pasted text.
+ * @returns The composer attachment for that paste.
+ */
+function pastedTextAttachment(path: string, text: string): ComposerAttachment {
+	return {
+		id: `wsfile:${path}`,
+		kind: 'pasted-text',
+		label: path.split('/').at(-1) ?? path,
+		lineCount: text.split('\n').length,
+		path,
+		preview: text.replace(/^\s*\n+/, '').slice(0, PASTED_TEXT_PREVIEW_CHARS),
+	};
+}
+
+/**
+ * Adds attachments to a list, skipping any whose id is already present so
+ * re-attaching the same thing is a no-op rather than a duplicate chip.
+ * @param current - The list to extend.
+ * @param incoming - Attachments to append.
+ * @returns A new list, or `current` unchanged when nothing was new.
+ */
+export function appendAttachments(
+	current: readonly ComposerAttachment[],
+	incoming: readonly ComposerAttachment[],
+): readonly ComposerAttachment[] {
+	const seen = new Set(current.map((entry) => entry.id));
+	const added = incoming.filter((entry) => {
+		if (seen.has(entry.id)) {
+			return false;
+		}
+		seen.add(entry.id);
+		return true;
+	});
+	return added.length > 0 ? [...current, ...added] : current;
 }
 
 /** Extracts every file from a browser clipboard or drag payload. */
@@ -146,11 +221,16 @@ function attachmentName(file: File): string | undefined {
 	return file.name || undefined;
 }
 
-/** Copies one file into the workspace, choosing the image or file write path. */
+/**
+ * Copies one file into the workspace, choosing the image or file write path.
+ * @param file - The file to persist.
+ * @param workspaceCwd - Absolute workspace root the copy belongs to.
+ * @returns The stored file's row, carrying the path the store placed it at.
+ */
 async function saveCopy(
 	file: File,
 	workspaceCwd: string,
-): Promise<WorkspaceFileSummary> {
+): Promise<WorkspaceFileEntryWire> {
 	const contentBase64 = await readFileAsBase64(file);
 	const result = shouldWriteAsImage(file)
 		? await writeWorkspaceImageAttachment({
@@ -167,42 +247,99 @@ async function saveCopy(
 	if (result.error || !result.file) {
 		throw new Error(result.error?.message ?? saveFailureMessage());
 	}
-	return toWorkspaceFileSummary(result.file);
+	return result.file;
 }
 
 /**
- * Persists pasted/dropped files: small ones are copied into the workspace
- * (raster images under `.context/images/`, everything else under
- * `.context/attachments/`); large ones are referenced by absolute path when
- * resolvable, otherwise copied as a fallback. Files saved before a failure are
- * still returned alongside the error so partial success is preserved.
+ * Persists a long pasted block as a text attachment so a wall of pasted output
+ * becomes a chip instead of burying the draft. Content-addressed, so pasting the
+ * same block into several chats stores it once.
+ * @param text - The pasted text.
+ * @param workspaceCwd - Absolute workspace root the text is saved under.
+ * @returns The attachment for the stored paste.
+ */
+export async function attachPastedText(
+	text: string,
+	workspaceCwd: string,
+): Promise<ComposerAttachment> {
+	const file = new File([text], PASTED_TEXT_FILENAME, { type: 'text/plain' });
+	const saved = await saveCopy(file, workspaceCwd);
+	return pastedTextAttachment(saved.path, text);
+}
+
+/**
+ * Writes a rendered issue document into the workspace and returns the chip for
+ * it. The whole issue lands on disk, so the agent reads it as a file rather than
+ * being handed a summary line and left to fetch the rest itself.
+ * @param document - The rendered markdown body.
+ * @param provider - Tracker the issue came from, which picks the chip's brand mark.
+ * @param reference - Human issue reference, such as `THE-106` or `#42`.
+ * @param workspaceCwd - Absolute workspace root the document is saved under.
+ * @returns The composer attachment for the stored issue.
+ */
+export async function attachIssueDocument({
+	document,
+	provider,
+	reference,
+	workspaceCwd,
+}: {
+	document: string;
+	provider: 'github' | 'linear';
+	reference: string;
+	workspaceCwd: string;
+}): Promise<ComposerAttachment> {
+	const file = new File(
+		[document],
+		issueDocumentFilename(provider, reference),
+		{
+			type: 'text/markdown',
+		},
+	);
+	const saved = await saveCopy(file, workspaceCwd);
+	return {
+		id: `issue:${provider}:${reference}`,
+		kind: 'issue',
+		label: reference,
+		path: saved.path,
+		provider,
+	};
+}
+
+/**
+ * Persists pasted/dropped files into the workspace's content-addressed
+ * attachment store; files too large to copy are referenced by absolute path when
+ * one is resolvable, otherwise copied as a fallback. Files saved before a failure
+ * are still returned alongside the error so partial success is preserved.
  * @param files - The pasted or dropped files to persist.
  * @param workspaceCwd - Absolute workspace root the files belong to.
+ * @returns The attachments that landed, plus the first failure message if any.
  */
 export async function attachPastedFiles(
 	files: readonly File[],
 	workspaceCwd: string,
 ): Promise<AttachPastedFilesResult> {
-	const savedFiles: WorkspaceFileSummary[] = [];
-	const savedExternals: ExternalAttachment[] = [];
+	const attachments: ComposerAttachment[] = [];
 	let error: string | null = null;
 	try {
 		for (const file of files) {
 			if (file.size > SMALL_FILE_MAX_BYTES) {
 				const absolutePath = getPathForFile(file);
 				if (absolutePath) {
-					savedExternals.push({
+					attachments.push({
 						absolutePath,
-						name: file.name || basename(absolutePath),
+						id: `external:${absolutePath}`,
+						kind: 'external-file',
+						label: file.name || basename(absolutePath),
 						sizeBytes: file.size,
 					});
 					continue;
 				}
 			}
-			savedFiles.push(await saveCopy(file, workspaceCwd));
+			const saved = await saveCopy(file, workspaceCwd);
+			attachments.push(workspaceFileAttachment(toWorkspaceFileSummary(saved)));
 		}
 	} catch (cause) {
 		error = cause instanceof Error ? cause.message : saveFailureMessage();
 	}
-	return { error, savedExternals, savedFiles };
+	return { attachments, error };
 }
