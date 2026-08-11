@@ -576,7 +576,6 @@
 			"composer-focus": "Focus composer",
 			"composer-newline": "Insert newline in composer",
 			"composer-queue": "Queue message as a follow-up",
-			"composer-remove-last-mention": "Remove last mention attachment",
 			"composer-submit": "Send message",
 			"composer-submit-with-mod": "Send message",
 			"composer-toggle-model-picker": "Toggle model picker",

@@ -1,16 +1,16 @@
-import { useAtom, useAtomValue } from 'jotai';
+import { useAtomValue } from 'jotai';
 import {
 	type ChangeEvent,
-	type ClipboardEvent as ReactClipboardEvent,
 	type DragEvent as ReactDragEvent,
+	type RefObject,
 	useCallback,
 	useEffect,
 	useRef,
 	useState,
 } from 'react';
 
+import type { ComposerEditorHandle } from '@/renderer/components/workbench-shell/conversation-panel/composer/editor';
 import {
-	appendAttachments,
 	attachPastedFiles,
 	attachPastedText,
 	getTransferFiles,
@@ -33,36 +33,40 @@ const PASTE_ATTACHMENT_THRESHOLD = 5_000;
  * it: the file picker, paste (files and long-text conversion), drag-and-drop,
  * and the cross-component inbox other panels push through.
  *
- * One ordered list covers every source, so the order the user attached things in
- * is the order the outgoing prompt carries. Everything is written to the
- * workspace's content-addressed store the moment it is attached, so every chip
- * carries a real path and re-attaching the same bytes costs nothing.
+ * The chips themselves live in the editor document, at the position the user put
+ * them, so every mutation here is an editor operation and the atom this reads is
+ * the mirror the editor publishes. Everything is written to the workspace's
+ * content-addressed store the moment it is attached, so every chip carries a
+ * real path and re-attaching the same bytes costs nothing.
  * @param chatTabId - Chat tab the attachment list is scoped to
+ * @param editorRef - Handle onto the draft the chips are inserted into
  * @param insertPlainText - Fallback for a long paste whose write failed
  * @param workspaceCwd - Absolute workspace path pasted files are saved under
- * @returns The list, its setter, the pending error, and the DOM handlers
+ * @returns The list, the pending error, and the DOM handlers
  */
 export function useComposerAttachments({
 	chatTabId,
+	editorRef,
 	insertPlainText,
 	workspaceCwd,
 }: {
 	chatTabId: string;
+	editorRef: RefObject<ComposerEditorHandle | null>;
 	insertPlainText: (text: string) => void;
 	workspaceCwd: string;
 }) {
 	const fileInputRef = useRef<HTMLInputElement | null>(null);
-	const [attachments, setAttachments] = useAtom(
-		composerAttachmentsAtomFamily(chatTabId),
-	);
+	const attachments = useAtomValue(composerAttachmentsAtomFamily(chatTabId));
 	const [attachmentError, setAttachmentError] = useState<string | null>(null);
 	const autoConvertLong = useAtomValue(autoConvertLongTextAtom);
 
 	const addAttachments = useCallback(
 		(incoming: readonly ComposerAttachment[]) => {
-			setAttachments((prev) => appendAttachments(prev, incoming));
+			for (const entry of incoming) {
+				editorRef.current?.insertAttachment(entry);
+			}
 		},
-		[setAttachments],
+		[editorRef],
 	);
 
 	// Drain externally-pushed attachments (transcript chips, plan handoff, fork).
@@ -71,9 +75,11 @@ export function useComposerAttachments({
 		if (attachmentInbox.pending.length === 0) {
 			return;
 		}
-		addAttachments(attachmentInbox.pending);
+		for (const entry of attachmentInbox.pending) {
+			editorRef.current?.insertAttachment(entry);
+		}
 		attachmentInbox.clear();
-	}, [addAttachments, attachmentInbox]);
+	}, [attachmentInbox, editorRef]);
 
 	const handlePastedFiles = useCallback(
 		async (files: readonly File[]) => {
@@ -106,39 +112,56 @@ export function useComposerAttachments({
 		[addAttachments, insertPlainText, workspaceCwd],
 	);
 
-	/** Handles file pastes and long-text paste conversion for the composer. */
-	const handlePaste = useCallback(
-		(event: ReactClipboardEvent<HTMLTextAreaElement>) => {
-			const files = getTransferFiles(event.clipboardData);
+	/**
+	 * Claims a pasted payload the editor should not inline: any file, and a
+	 * paste long enough to bury the draft.
+	 * @param data - The clipboard payload
+	 * @returns True when the paste was taken over as an attachment
+	 */
+	const consumePastedTransfer = useCallback(
+		(data: DataTransfer): boolean => {
+			const files = getTransferFiles(data);
 			if (files.length > 0) {
-				event.preventDefault();
 				void handlePastedFiles(files);
-				return;
+				return true;
 			}
 			if (!autoConvertLong) {
-				return;
+				return false;
 			}
-			const text = event.clipboardData.getData('text/plain');
+			const text = data.getData('text/plain');
 			if (text.length < PASTE_ATTACHMENT_THRESHOLD) {
-				return;
+				return false;
 			}
-			event.preventDefault();
 			void handlePastedText(text);
+			return true;
 		},
 		[autoConvertLong, handlePastedFiles, handlePastedText],
 	);
 
-	/** Accepts files dropped onto the composer, saving them like a paste. */
-	const handleDrop = useCallback(
-		(event: ReactDragEvent<HTMLElement>) => {
-			const files = getTransferFiles(event.dataTransfer);
+	/**
+	 * Claims files dropped onto the composer, saving them like a paste.
+	 * @param data - The drag payload
+	 * @returns True when the drop carried files and was taken over
+	 */
+	const consumeDroppedTransfer = useCallback(
+		(data: DataTransfer): boolean => {
+			const files = getTransferFiles(data);
 			if (files.length === 0) {
-				return;
+				return false;
 			}
-			event.preventDefault();
 			void handlePastedFiles(files);
+			return true;
 		},
 		[handlePastedFiles],
+	);
+
+	const handleDrop = useCallback(
+		(event: ReactDragEvent<HTMLElement>) => {
+			if (consumeDroppedTransfer(event.dataTransfer)) {
+				event.preventDefault();
+			}
+		},
+		[consumeDroppedTransfer],
 	);
 
 	/** Signals the composer as a valid drop target so `handleDrop` can fire. */
@@ -162,15 +185,17 @@ export function useComposerAttachments({
 	const removeAttachment = useCallback(
 		(id: string) => {
 			setAttachmentError(null);
-			setAttachments((prev) => prev.filter((entry) => entry.id !== id));
+			editorRef.current?.removeAttachment(id);
 		},
-		[setAttachments],
+		[editorRef],
 	);
 
 	return {
 		addAttachments,
 		attachmentError,
 		attachments,
+		consumeDroppedTransfer,
+		consumePastedTransfer,
 		fileInputRef,
 		handleAddAttachment: useCallback(() => {
 			fileInputRef.current?.click();
@@ -178,10 +203,8 @@ export function useComposerAttachments({
 		handleDragOver,
 		handleDrop,
 		handleFileChange,
-		handlePaste,
 		hasChips: attachments.length > 0,
 		removeAttachment,
 		setAttachmentError,
-		setAttachments,
 	};
 }

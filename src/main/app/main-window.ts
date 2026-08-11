@@ -47,6 +47,10 @@ export function createMainWindow({
 		webPreferences: {
 			contextIsolation: true,
 			nodeIntegration: false,
+			// Chromium's built-in PDF viewer is a plugin, and Electron ships plugins
+			// off; without this the file preview's PDF frame renders empty. It is the
+			// only plugin modern Chromium still carries, so this grants nothing else.
+			plugins: true,
 			preload: path.join(__dirname, 'preload.js'),
 		},
 	});

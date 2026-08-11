@@ -102,10 +102,6 @@ function shortcutName(t: TFunction): Record<ShortcutId, string> {
 			'settings:shortcuts.name.composer-queue',
 			'Queue message as a follow-up',
 		),
-		'composer.removeLastMention': t(
-			'settings:shortcuts.name.composer-remove-last-mention',
-			'Remove last mention attachment',
-		),
 		'composer.submit': t(
 			'settings:shortcuts.name.composer-submit',
 			'Send message',

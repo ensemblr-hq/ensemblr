@@ -26,6 +26,7 @@
 		"keep-open": "Keep open",
 		"open": "Open",
 		"open-in": "Open in",
+		"open-named": "Open {{label}}",
 		"picking": "Picking…",
 		"pin": "Pin",
 		"remove": "Remove",

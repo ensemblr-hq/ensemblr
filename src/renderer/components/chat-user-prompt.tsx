@@ -3,14 +3,38 @@ import {
 	parsePromptAttachments,
 } from '@/renderer/lib/agent-timeline';
 import { cn } from '@/renderer/lib/utils';
+import type { ParsedPromptPart } from '@/renderer/types/agent-timeline';
 import { ChatAttachmentChip } from './chat-attachment-chip';
 import { useFilePreviewOpener } from './workbench-shell/conversation-panel/file-preview-context';
 
 /**
+ * Pairs each parsed part with a key drawn from what it holds. Content alone is
+ * not unique — the same folder can be referenced twice in one message — so a
+ * repeat is distinguished by how many identical parts came before it.
+ * @param parts - The prompt's runs and attachments, in document order
+ * @returns The same parts, each with a key unique among its siblings
+ */
+function keyedParts(
+	parts: readonly ParsedPromptPart[],
+): readonly { key: string; part: ParsedPromptPart }[] {
+	const occurrences = new Map<string, number>();
+	return parts.map((part) => {
+		const identity =
+			part.kind === 'text'
+				? `text:${part.text}`
+				: `file:${part.attachment.path}`;
+		const seen = occurrences.get(identity) ?? 0;
+		occurrences.set(identity, seen + 1);
+		return { key: `${identity}#${seen}`, part };
+	});
+}
+
+/**
  * Right-aligned compact user prompt card. Pulls `<attached_file>` markers (and
- * the `Referenced workspace folders` header) out of the persisted prompt text
- * and shows the typed message first, followed by inline attachment chips. Reads
- * as a single horizontal strip rather than a tall bubble.
+ * the `Referenced workspace folders` header) out of the persisted prompt text and
+ * lays the typed runs and the attachment chips out in the order they were sent,
+ * so the message reads back the way it was composed. Reads as a single horizontal
+ * strip rather than a tall bubble.
  *
  * A `/skill:name` invocation shows here as that command; the mapper has already
  * lifted the expanded `SKILL.md` into the assistant turn as a "Skill activated"
@@ -23,10 +47,9 @@ export function ChatUserPrompt({
 	className?: string;
 	prompt: string;
 }) {
-	const { attachments, text } = parsePromptAttachments(prompt);
+	const { parts } = parsePromptAttachments(prompt);
 	const openFilePreview = useFilePreviewOpener();
-	const hasBubble = attachments.length > 0 || text.length > 0;
-	if (!hasBubble) {
+	if (parts.length === 0) {
 		return null;
 	}
 	return (
@@ -37,17 +60,22 @@ export function ChatUserPrompt({
 			)}
 			data-role='user-prompt'
 		>
-			{text.length > 0 ? (
-				<span className='whitespace-pre-wrap break-words text-foreground/90 leading-5'>
-					{text}
-				</span>
-			) : null}
-			{attachments.map((attachment) => {
-				const isFile = attachment.content.length > 0;
+			{keyedParts(parts).map(({ key, part }) => {
+				if (part.kind === 'text') {
+					return (
+						<span
+							className='whitespace-pre-wrap break-words text-foreground/90 leading-5'
+							key={key}
+						>
+							{part.text}
+						</span>
+					);
+				}
+				const { attachment } = part;
 				return (
 					<ChatAttachmentChip
-						key={`${attachment.path}`}
-						kind={isFile ? 'file' : 'folder'}
+						key={key}
+						kind={attachment.content.length > 0 ? 'file' : 'folder'}
 						label={chipLabelForPath(attachment.path)}
 						onActivate={
 							openFilePreview

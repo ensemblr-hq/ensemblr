@@ -1,38 +1,18 @@
 import { useTranslation } from 'react-i18next';
 import type { ComposerStateApi } from '@/renderer/hooks/workbench-shell/composer/use-composer-state';
-import type { ComposerAttachment } from '@/renderer/types/workbench';
-import { AttachmentChip } from './attachment-chip';
 import { LinkedDirectoryChip } from './linked-directory-chip';
-import { PastedTextChip } from './pasted-text-chip';
 
 /**
- * Renders one attachment as the chip its kind calls for: a pasted block shows a
- * preview card, since its filename says nothing about which paste it is.
- */
-function ComposerChip({
-	attachment,
-	onRemove,
-}: {
-	attachment: ComposerAttachment;
-	onRemove: () => void;
-}) {
-	if (attachment.kind === 'pasted-text') {
-		return (
-			<PastedTextChip
-				lineCount={attachment.lineCount}
-				onRemove={onRemove}
-				preview={attachment.preview}
-			/>
-		);
-	}
-	return <AttachmentChip attachment={attachment} onRemove={onRemove} />;
-}
-
-/**
- * The strip above the composer textarea: attachment chips, the attachment
- * error, and the blocked-follow-up notice. Split out of `ComposerPanel` so the
- * panel stays a layout shell and each notice's render condition lives next to
- * the thing it describes. Renders nothing when there is nothing to say.
+ * The strip above the composer editor: the directories this chat has been given
+ * access to, the attachment error, and the blocked-follow-up notice. Split out
+ * of `ComposerPanel` so the panel stays a layout shell and each notice's render
+ * condition lives next to the thing it describes. Renders nothing when there is
+ * nothing to say.
+ *
+ * Attachment chips are not here — they live inline in the draft, at the position
+ * the user put them. A linked directory is not part of any one message: it stays
+ * granted across sends, so it stays above the text where it cannot be mistaken
+ * for something the next send carries.
  */
 export function ComposerNotices({ state }: { state: ComposerStateApi }) {
 	const { t } = useTranslation();
@@ -41,7 +21,7 @@ export function ComposerNotices({ state }: { state: ComposerStateApi }) {
 	);
 	return (
 		<>
-			{state.hasChips || state.linkedDirectories.length > 0 ? (
+			{state.linkedDirectories.length > 0 ? (
 				<div className='flex flex-wrap items-end gap-1.5'>
 					{state.linkedDirectories.map((directory) => (
 						<LinkedDirectoryChip
@@ -50,13 +30,6 @@ export function ComposerNotices({ state }: { state: ComposerStateApi }) {
 							onRemove={() => state.unlinkDirectory(directory.path)}
 							path={directory.path}
 							pending={pendingPaths.has(directory.path)}
-						/>
-					))}
-					{state.attachments.map((attachment) => (
-						<ComposerChip
-							attachment={attachment}
-							key={attachment.id}
-							onRemove={() => state.removeAttachment(attachment.id)}
 						/>
 					))}
 				</div>

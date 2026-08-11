@@ -1,5 +1,6 @@
 import { languageForFilePath } from '@/renderer/lib/language-from-path';
 import type { ReadWorkspaceFileResult } from '@/shared/ipc/contracts/workspace-files';
+import { PREVIEW_PDF_MIME_TYPE } from '@/shared/preview-media';
 
 /**
  * Builds an embeddable data URL for image payloads returned by file preview.
@@ -19,13 +20,32 @@ function imageSourceForPreview(result: ReadWorkspaceFileResult): string | null {
 }
 
 /**
- * How the preview should render a read result: an embeddable image beats every
- * text mode, and a `.md` file shows its formatted preview only when the toggle
- * is on and it is not an image.
+ * The base64 body of a PDF the preview should hand to the embedded viewer.
+ * Chromium refuses to navigate a frame to a `data:` URL, so the caller turns
+ * this into a blob URL rather than embedding it inline the way an image is.
+ * @param result - File-read result from the workspace preview IPC.
+ * @returns The base64 PDF body, or null when the result is not a PDF.
+ */
+function pdfContentForPreview(result: ReadWorkspaceFileResult): string | null {
+	if (
+		result.contentEncoding !== 'base64' ||
+		result.mimeType !== PREVIEW_PDF_MIME_TYPE ||
+		!result.content
+	) {
+		return null;
+	}
+
+	return result.content;
+}
+
+/**
+ * How the preview should render a read result: bytes the browser can render on
+ * its own — an image, a PDF — beat every text mode, and a `.md` file shows its
+ * formatted preview only when the toggle is on and it is not one of those.
  * @param filePath - The workspace-relative path being previewed.
  * @param result - File-read result from the workspace preview IPC.
  * @param markdownPreviewEnabled - Whether the formatted-markdown toggle is on.
- * @returns The image source (or null), and the markdown/formatted-preview flags.
+ * @returns The image source and PDF body (each or null), and the markdown flags.
  */
 export function resolvePreviewMode(
 	filePath: string,
@@ -34,14 +54,18 @@ export function resolvePreviewMode(
 ): {
 	imageSource: string | null;
 	isMarkdown: boolean;
+	pdfContent: string | null;
 	showFormattedPreview: boolean;
 } {
 	const imageSource = imageSourceForPreview(result);
+	const pdfContent = pdfContentForPreview(result);
 	const isMarkdown = languageForFilePath(filePath) === 'markdown';
 	return {
 		imageSource,
 		isMarkdown,
-		showFormattedPreview: isMarkdown && markdownPreviewEnabled && !imageSource,
+		pdfContent,
+		showFormattedPreview:
+			isMarkdown && markdownPreviewEnabled && !imageSource && !pdfContent,
 	};
 }
 

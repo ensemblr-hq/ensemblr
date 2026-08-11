@@ -100,6 +100,16 @@ export type ComposerAttachment =
 	  };
 
 /**
+ * One run of the composer draft, in the order it sits in the document: a stretch
+ * of typed text, or a chip standing where the user put it. The send pipeline
+ * walks these so the outgoing prompt reads in the order the user arranged, rather
+ * than hoisting every attachment to one end of the message.
+ */
+export type ComposerDraftSegment =
+	| { attachment: ComposerAttachment; kind: 'attachment' }
+	| { kind: 'text'; text: string };
+
+/**
  * A directory outside the workspace that a chat has been given access to. Unlike
  * a {@link ComposerAttachment} this is not cleared on send: it stays linked for
  * the chat until the user removes it, and rides every `openAgentSession` call so

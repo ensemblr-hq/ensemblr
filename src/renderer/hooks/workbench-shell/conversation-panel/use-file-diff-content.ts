@@ -106,9 +106,16 @@ export function useFileDiffContent({
 	});
 	const fileData = fullFile.data;
 
+	// A read that came back base64 is an image or a PDF; there is no source to
+	// show beside the patch, and handing the code surface base64 would fill it
+	// with megabytes of noise.
+	const fullFileIsText = fileData?.contentEncoding !== 'base64';
+
 	return {
 		fullFileContent:
-			fileData && !fileData.error ? (fileData.content ?? null) : null,
+			fileData && !fileData.error && fullFileIsText
+				? (fileData.content ?? null)
+				: null,
 		fullFileContentPending: fullFileEnabled && !fullFile.isFetched,
 		isTruncated: loaded?.isTruncated ?? false,
 		patch,

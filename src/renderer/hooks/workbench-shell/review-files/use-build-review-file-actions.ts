@@ -13,7 +13,7 @@ import type {
 	ReviewFileSummary,
 } from '@/renderer/types/workbench';
 import type { WorkspaceGitDiffScope } from '@/shared/ipc/contracts/workspace-git';
-import { isPreviewableImagePath } from '@/shared/preview-image';
+import { isPreviewableImagePath } from '@/shared/preview-media';
 
 /**
  * Assembles the shared action bundle every review file row consumes through

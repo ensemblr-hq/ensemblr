@@ -28,6 +28,7 @@ export default interface Resources {
 			'keep-open': 'Keep open';
 			open: 'Open';
 			'open-in': 'Open in';
+			'open-named': 'Open {{label}}';
 			picking: 'Picking…';
 			pin: 'Pin';
 			remove: 'Remove';
@@ -1909,7 +1910,6 @@ export default interface Resources {
 				'composer-focus': 'Focus composer';
 				'composer-newline': 'Insert newline in composer';
 				'composer-queue': 'Queue message as a follow-up';
-				'composer-remove-last-mention': 'Remove last mention attachment';
 				'composer-submit': 'Send message';
 				'composer-submit-with-mod': 'Send message';
 				'composer-toggle-model-picker': 'Toggle model picker';
@@ -2395,6 +2395,7 @@ export default interface Resources {
 				unreadable: 'Could not read {{filePath}}.';
 			};
 			'image-alt': 'Preview of {{filePath}}';
+			'pdf-title': 'Preview of {{filePath}}';
 		};
 		'file-tree': {
 			'collapse-folder': 'Collapse {{path}}';

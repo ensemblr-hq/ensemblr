@@ -219,6 +219,32 @@ describe('createListWorkspaceFilesService.read', () => {
 		expect(result.contentEncoding).toBe('utf8');
 		expect(result.mimeType).toBeUndefined();
 	});
+
+	test('reads a PDF as base64 so the preview can embed it', async () => {
+		const cwd = seedRepo();
+		const bytes = Buffer.from('%PDF-1.7\n%\xe2\xe3\xcf\xd3\n', 'binary');
+		writeFileSync(path.join(cwd, 'spec.pdf'), bytes);
+
+		const result = await readWorkspaceFile(cwd, 'spec.pdf');
+
+		expect(result.error).toBeUndefined();
+		expect(result.content).toBe(bytes.toString('base64'));
+		expect(result.contentEncoding).toBe('base64');
+		expect(result.mimeType).toBe('application/pdf');
+		expect(result.sizeBytes).toBe(bytes.length);
+	});
+
+	test('falls back to utf8 source when a .pdf does not carry the PDF signature', async () => {
+		const cwd = seedRepo();
+		writeFileSync(path.join(cwd, 'not-really.pdf'), 'plain text, not a pdf\n');
+
+		const result = await readWorkspaceFile(cwd, 'not-really.pdf');
+
+		expect(result.error).toBeUndefined();
+		expect(result.content).toBe('plain text, not a pdf\n');
+		expect(result.contentEncoding).toBe('utf8');
+		expect(result.mimeType).toBeUndefined();
+	});
 });
 
 describe('createListWorkspaceFilesService.writeImageAttachment', () => {

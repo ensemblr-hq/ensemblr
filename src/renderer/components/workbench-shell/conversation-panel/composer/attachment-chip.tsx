@@ -35,28 +35,52 @@ function AttachmentIcon({ attachment }: { attachment: ComposerAttachment }) {
  * Compact chip for one composer attachment, whatever its source: a VSCode-style
  * icon and the attachment's label inside a rounded outlined pill. The label
  * truncates rather than widening the chip, so one long path cannot push the
- * chips below it onto another row.
+ * text after it onto another line.
+ *
+ * Given `onActivate` the label becomes a button that opens the file; without it
+ * the chip is inert, which is how a directory and an out-of-workspace file
+ * render, since the preview panel has nothing to show for either.
  */
 export function AttachmentChip({
 	attachment,
+	onActivate,
 	onRemove,
 }: {
 	attachment: ComposerAttachment;
+	onActivate?: () => void;
 	onRemove: () => void;
 }) {
 	const { t } = useTranslation();
 	const label = attachment.label;
+	const body = (
+		<>
+			<AttachmentIcon attachment={attachment} />
+			<span className='truncate font-medium'>{label}</span>
+		</>
+	);
 
 	return (
 		<span
 			className={cn(
-				'group/chip inline-flex h-6 max-w-xs items-center gap-1.5 rounded-md border border-border bg-background px-1.5 text-xs',
+				'group/chip inline-flex h-5 max-w-xs items-center gap-1.5 rounded-md border border-border bg-background px-1.5 text-xs',
 				'hover:border-border/80',
 			)}
 			title={label}
 		>
-			<AttachmentIcon attachment={attachment} />
-			<span className='truncate font-medium'>{label}</span>
+			{onActivate ? (
+				<button
+					aria-label={t('common:actions.open-named', 'Open {{label}}', {
+						label,
+					})}
+					className='inline-flex min-w-0 cursor-pointer items-center gap-1.5 text-left'
+					onClick={onActivate}
+					type='button'
+				>
+					{body}
+				</button>
+			) : (
+				body
+			)}
 			<button
 				aria-label={t('common:actions.remove-named', 'Remove {{label}}', {
 					label,

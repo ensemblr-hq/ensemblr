@@ -10,10 +10,32 @@ vi.mock('@/renderer/api/ensemblr-queries', () => ({
 }));
 
 import {
-	serializeComposerAttachments,
+	serializeComposerDraft,
 	serializeLinkedDirectories,
 } from '../../src/renderer/lib/workbench/mention-payload';
-import type { ComposerAttachment } from '../../src/renderer/types/workbench';
+import type {
+	ComposerAttachment,
+	ComposerDraftSegment,
+} from '../../src/renderer/types/workbench';
+
+/** Wraps attachments as the chip-only draft the old attachment-list tests sent. */
+function chips(
+	...attachments: readonly ComposerAttachment[]
+): readonly ComposerDraftSegment[] {
+	return attachments.map((attachment) => ({
+		attachment,
+		kind: 'attachment' as const,
+	}));
+}
+
+function directoryAttachment(path: string): ComposerAttachment {
+	return {
+		id: `wsdir:${path}`,
+		kind: 'workspace-directory',
+		label: path.split('/').pop() ?? path,
+		path,
+	};
+}
 
 function fileAttachment(path: string): ComposerAttachment {
 	return {
@@ -41,13 +63,10 @@ beforeEach(() => {
 	readWorkspaceFile.mockReset();
 });
 
-describe('serializeComposerAttachments', () => {
-	test('returns an empty string when there is nothing attached', async () => {
+describe('serializeComposerDraft', () => {
+	test('returns an empty string when the draft is blank', async () => {
 		expect(
-			await serializeComposerAttachments({
-				attachments: [],
-				workspaceCwd: '/repo',
-			}),
+			await serializeComposerDraft({ segments: [], workspaceCwd: '/repo' }),
 		).toBe('');
 	});
 
@@ -58,11 +77,11 @@ describe('serializeComposerAttachments', () => {
 			sizeBytes: 11,
 		});
 
-		const text = await serializeComposerAttachments({
-			attachments: [
+		const text = await serializeComposerDraft({
+			segments: chips(
 				fileAttachment('.context/attachments/aa11bb/notes.txt'),
 				fileAttachment('.context/attachments/cc22dd/report.pdf'),
-			],
+			),
 			workspaceCwd: '/repo',
 		});
 
@@ -82,11 +101,11 @@ describe('serializeComposerAttachments', () => {
 	});
 
 	test('lists each external file by absolute path with a path-only placeholder', async () => {
-		const text = await serializeComposerAttachments({
-			attachments: [
+		const text = await serializeComposerDraft({
+			segments: chips(
 				externalAttachment('/Users/me/big.mov', 42_000_000),
 				externalAttachment('/Users/me/data.zip', 88_000_000),
-			],
+			),
 			workspaceCwd: '/repo',
 		});
 
@@ -96,48 +115,101 @@ describe('serializeComposerAttachments', () => {
 		expect(readWorkspaceFile).not.toHaveBeenCalled();
 	});
 
-	test('collects directories into one leading referenced-folders block', async () => {
-		const text = await serializeComposerAttachments({
-			attachments: [
-				{
-					id: 'wsdir:src/renderer',
-					kind: 'workspace-directory',
-					label: 'renderer',
-					path: 'src/renderer',
-				},
-				externalAttachment('/Users/me/big.mov', 42_000_000),
-				{
-					id: 'wsdir:src/main',
-					kind: 'workspace-directory',
-					label: 'main',
-					path: 'src/main',
-				},
-			],
+	test('collects adjacent directories into one referenced-folders block', async () => {
+		const text = await serializeComposerDraft({
+			segments: chips(
+				directoryAttachment('src/renderer'),
+				directoryAttachment('src/main'),
+			),
 			workspaceCwd: '/repo',
 		});
 
-		expect(text.startsWith('Referenced workspace folders:\n')).toBe(true);
-		expect(text).toContain('@src/renderer\n@src/main');
-		expect(text.match(/Referenced workspace folders:/g)).toHaveLength(1);
+		expect(text).toBe(
+			'Referenced workspace folders:\n@src/renderer\n@src/main',
+		);
 	});
 
-	test('keeps sections in the order the user attached them', async () => {
+	test('gives a directory its own header when another block splits the run', async () => {
+		const text = await serializeComposerDraft({
+			segments: chips(
+				directoryAttachment('src/renderer'),
+				externalAttachment('/Users/me/big.mov', 42_000_000),
+				directoryAttachment('src/main'),
+			),
+			workspaceCwd: '/repo',
+		});
+
+		expect(text.match(/Referenced workspace folders:/g)).toHaveLength(2);
+		expect(text.indexOf('@src/renderer')).toBeLessThan(
+			text.indexOf('/Users/me/big.mov'),
+		);
+		expect(text.indexOf('/Users/me/big.mov')).toBeLessThan(
+			text.indexOf('@src/main'),
+		);
+	});
+
+	test('keeps blocks in the order the user attached them', async () => {
 		readWorkspaceFile.mockResolvedValue({
 			content: 'inlined',
 			path: 'notes.md',
 			sizeBytes: 7,
 		});
 
-		const text = await serializeComposerAttachments({
-			attachments: [
+		const text = await serializeComposerDraft({
+			segments: chips(
 				externalAttachment('/Users/me/big.mov', 42_000_000),
 				fileAttachment('notes.md'),
-			],
+			),
 			workspaceCwd: '/repo',
 		});
 
 		expect(text.indexOf('/Users/me/big.mov')).toBeLessThan(
 			text.indexOf('notes.md'),
+		);
+	});
+
+	test('lands each attachment where its chip sat in the sentence', async () => {
+		readWorkspaceFile.mockResolvedValue({
+			content: 'inlined',
+			path: 'notes.md',
+			sizeBytes: 7,
+		});
+
+		const text = await serializeComposerDraft({
+			segments: [
+				{ kind: 'text', text: 'compare ' },
+				...chips(fileAttachment('notes.md')),
+				{ kind: 'text', text: ' against ' },
+				...chips(externalAttachment('/Users/me/big.mov', 42_000_000)),
+				{ kind: 'text', text: ' and report back' },
+			],
+			workspaceCwd: '/repo',
+		});
+
+		expect(text).toBe(
+			[
+				'compare',
+				'<attached_file path="notes.md">\ninlined\n</attached_file>',
+				'against',
+				'<attached_file path="/Users/me/big.mov">\n[external file — inspect this path directly]\n</attached_file>',
+				'and report back',
+			].join('\n\n'),
+		);
+	});
+
+	test('drops the whitespace a chip left behind rather than emitting a blank block', async () => {
+		const text = await serializeComposerDraft({
+			segments: [
+				{ kind: 'text', text: '  ' },
+				...chips(directoryAttachment('src/main')),
+				{ kind: 'text', text: ' ' },
+				...chips(directoryAttachment('src/renderer')),
+			],
+			workspaceCwd: '/repo',
+		});
+
+		expect(text).toBe(
+			'Referenced workspace folders:\n@src/main\n@src/renderer',
 		);
 	});
 });

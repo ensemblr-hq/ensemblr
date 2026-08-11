@@ -439,7 +439,8 @@
 			"too-large": "{{filePath}} is too large to preview.",
 			"unreadable": "Could not read {{filePath}}."
 		},
-		"image-alt": "Preview of {{filePath}}"
+		"image-alt": "Preview of {{filePath}}",
+		"pdf-title": "Preview of {{filePath}}"
 	},
 	"file-tree": {
 		"collapse-folder": "Collapse {{path}}",

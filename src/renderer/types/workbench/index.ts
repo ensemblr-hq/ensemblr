@@ -11,6 +11,7 @@ export type { AutocompleteKind, AutocompleteState } from './autocomplete';
 export type { CheckpointRestoreTarget } from './checkpoint';
 export type {
 	ComposerAttachment,
+	ComposerDraftSegment,
 	GroupedOptions,
 	LinkedDirectory,
 	LinkedIssueComposerSeedInput,

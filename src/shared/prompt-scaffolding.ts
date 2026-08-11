@@ -63,45 +63,26 @@ export function userPreferencesBlockPattern(): RegExp {
 }
 
 /**
- * Fresh start-anchored regex matching a leading referenced-folders block, with
- * the `@folder` lines in capture group 1. Non-global: it extracts the single
- * block the composer places at the top of a message.
- * @returns A new `RegExp` anchored to a leading referenced-folders block.
- */
-export function leadingReferencedFoldersPattern(): RegExp {
-	return new RegExp(`^${REFERENCED_FOLDERS_HEADER}\\n((?:@[^\\n]+\\n?)+)\\s*`);
-}
-
-/**
- * Fresh global regex matching a referenced-folders block anywhere in the text,
- * for stripping interleaved blocks a start-anchored pattern would miss.
+ * Fresh global regex matching a referenced-folders block wherever it appears,
+ * with the `@folder` lines in capture group 1. Not start-anchored: a chip sits
+ * where the user put it, so the block can open a message or fall mid-sentence.
  * @returns A new global `RegExp` for referenced-folders blocks.
  */
 export function referencedFoldersBlockPattern(): RegExp {
 	return new RegExp(
-		`${REFERENCED_FOLDERS_HEADER}\\n(?:@[^\\n]+\\n?)+\\s*`,
+		`${REFERENCED_FOLDERS_HEADER}\\n((?:@[^\\n]+\\n?)+)\\s*`,
 		'g',
 	);
 }
 
 /**
- * Fresh start-anchored regex matching a leading linked-directories block, with
- * the path lines in capture group 1. Non-global: it extracts the single block the
- * composer places at the top of a message.
- * @returns A new `RegExp` anchored to a leading linked-directories block.
- */
-export function leadingLinkedDirectoriesPattern(): RegExp {
-	return new RegExp(`^${LINKED_DIRECTORIES_HEADER}\\n((?:/[^\\n]+\\n?)+)\\s*`);
-}
-
-/**
- * Fresh global regex matching a linked-directories block anywhere in the text,
- * for stripping interleaved blocks a start-anchored pattern would miss.
+ * Fresh global regex matching a linked-directories block wherever it appears,
+ * with the path lines in capture group 1.
  * @returns A new global `RegExp` for linked-directories blocks.
  */
 export function linkedDirectoriesBlockPattern(): RegExp {
 	return new RegExp(
-		`${LINKED_DIRECTORIES_HEADER}\\n(?:/[^\\n]+\\n?)+\\s*`,
+		`${LINKED_DIRECTORIES_HEADER}\\n((?:/[^\\n]+\\n?)+)\\s*`,
 		'g',
 	);
 }

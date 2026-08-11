@@ -3,76 +3,134 @@
  * user-typed message.
  *
  * The composer serializes mention/upload attachments as
- * `<attached_file path="...">content</attached_file>` blocks alongside the
- * user's typed text (see `formatAttachedFileSection`), and agent actions inline
- * a composed prompt the same way. The `general` master prompt is injected as a
- * `<user_preferences>` block. The renderer round-trips the same shape from the
- * persisted event stream. `<attached_file>` blocks are surfaced as chips wherever
- * they appear; the `<user_preferences>` block is stripped from the visible
- * message entirely (the agent still receives it in the raw prompt).
+ * `<attached_file path="...">content</attached_file>` blocks interleaved with the
+ * user's typed text, at the position the chip sat in the sentence (see
+ * `serializeComposerDraft`), and agent actions inline a composed prompt the same
+ * way. The `general` master prompt is injected as a `<user_preferences>` block.
+ * The renderer round-trips the same shape from the persisted event stream, so the
+ * message reads back in the order it was sent; the `<user_preferences>` block is
+ * dropped from the visible message entirely (the agent still receives it in the
+ * raw prompt).
  */
 
 import type {
 	ParsedPrompt,
 	ParsedPromptAttachment,
+	ParsedPromptPart,
 } from '@/renderer/types/agent-timeline';
 import {
 	attachedFileBlockPattern,
-	leadingLinkedDirectoriesPattern,
-	leadingReferencedFoldersPattern,
+	linkedDirectoriesBlockPattern,
+	referencedFoldersBlockPattern,
 	userPreferencesBlockPattern,
 } from '@/shared/prompt-scaffolding';
 
+/** One scaffolding block located in the prompt, with the span it occupies. */
+interface ScaffoldingBlock {
+	attachments: readonly ParsedPromptAttachment[];
+	end: number;
+	start: number;
+}
+
 /**
- * Splits a persisted prompt into its attachment blocks (referenced workspace
- * folders and `<attached_file>` markers, in order of appearance) and the
- * remaining typed text. The linked-directories preamble is stripped without
- * becoming an attachment — it describes the chat, not the message.
+ * Locates every `<attached_file>` block, each one an attachment of its own.
  * @param prompt - The raw persisted prompt text
- * @returns The extracted attachments and the remaining trimmed message text
+ * @returns The blocks found, in order of appearance
  */
-export function parsePromptAttachments(prompt: string): ParsedPrompt {
-	let remaining = prompt;
-	const attachments: ParsedPromptAttachment[] = [];
+function attachedFileBlocks(prompt: string): ScaffoldingBlock[] {
+	return [...prompt.matchAll(attachedFileBlockPattern())].map((match) => ({
+		attachments: [
+			{
+				content: match[2] ?? '',
+				path: (match[1] ?? '').replaceAll('&quot;', '"'),
+			},
+		],
+		end: match.index + match[0].length,
+		start: match.index,
+	}));
+}
 
-	// Dropped rather than collected: linked directories are a standing grant the
-	// composer re-sends with every message, so a chip per turn would stack the
-	// same rows down the whole transcript and read as a per-message attachment.
-	const linkedMatch = leadingLinkedDirectoriesPattern().exec(remaining);
-	if (linkedMatch) {
-		remaining = remaining.slice(linkedMatch[0].length);
-	}
-
-	const folderMatch = leadingReferencedFoldersPattern().exec(remaining);
-	if (folderMatch) {
-		const block = folderMatch[1] ?? '';
-		const paths = block
+/**
+ * Locates every referenced-folders block, whose `@folder` lines each become a
+ * contentless attachment so the message shows one chip per folder.
+ * @param prompt - The raw persisted prompt text
+ * @returns The blocks found, in order of appearance
+ */
+function referencedFolderBlocks(prompt: string): ScaffoldingBlock[] {
+	return [...prompt.matchAll(referencedFoldersBlockPattern())].map((match) => ({
+		attachments: (match[1] ?? '')
 			.split('\n')
 			.map((line) => line.trim())
 			.filter((line) => line.startsWith('@'))
-			.map((line) => line.slice(1));
-		for (const path of paths) {
-			attachments.push({ content: '', path });
-		}
-		remaining = remaining.slice(folderMatch[0].length);
+			.map((line) => ({ content: '', path: line.slice(1) })),
+		end: match.index + match[0].length,
+		start: match.index,
+	}));
+}
+
+/**
+ * Locates the blocks that are stripped without leaving a chip: the linked
+ * directories, which are a standing grant the composer re-sends with every
+ * message rather than an attachment on this one, and the user preferences, which
+ * are context for the agent and not something to show back to the user.
+ * @param prompt - The raw persisted prompt text
+ * @returns The blocks found, in order of appearance
+ */
+function droppedBlocks(prompt: string): ScaffoldingBlock[] {
+	return [
+		...prompt.matchAll(linkedDirectoriesBlockPattern()),
+		...prompt.matchAll(userPreferencesBlockPattern()),
+	].map((match) => ({
+		attachments: [],
+		end: match.index + match[0].length,
+		start: match.index,
+	}));
+}
+
+/**
+ * Appends a run of typed text, dropping it when it is only the whitespace that
+ * separated two blocks.
+ * @param parts - The parts collected so far
+ * @param text - The raw run between two blocks
+ */
+function pushText(parts: ParsedPromptPart[], text: string): void {
+	const trimmed = text.replace(/\n{3,}/g, '\n\n').trim();
+	if (trimmed.length > 0) {
+		parts.push({ kind: 'text', text: trimmed });
 	}
+}
 
-	remaining = remaining.replace(
-		attachedFileBlockPattern(),
-		(_match, rawPath: string, content: string) => {
-			attachments.push({
-				content: content ?? '',
-				path: (rawPath ?? '').replaceAll('&quot;', '"'),
-			});
-			return '';
-		},
-	);
+/**
+ * Splits a persisted prompt into the typed runs and the attachment blocks
+ * (referenced workspace folders and `<attached_file>` markers), in the order they
+ * appear — which is the order the composer laid them out.
+ * @param prompt - The raw persisted prompt text
+ * @returns The prompt's parts, ready to render
+ */
+export function parsePromptAttachments(prompt: string): ParsedPrompt {
+	const blocks = [
+		...attachedFileBlocks(prompt),
+		...referencedFolderBlocks(prompt),
+		...droppedBlocks(prompt),
+	].sort((left, right) => left.start - right.start);
 
-	// User preferences are context for the agent, not something to show back to
-	// the user — strip the block from the visible message without a chip.
-	remaining = remaining.replace(userPreferencesBlockPattern(), '');
+	const parts: ParsedPromptPart[] = [];
+	let cursor = 0;
+	for (const block of blocks) {
+		// A header inside an inlined file body matches too; the outer block already
+		// consumed that span, so anything starting behind the cursor is not a block.
+		if (block.start < cursor) {
+			continue;
+		}
+		pushText(parts, prompt.slice(cursor, block.start));
+		for (const attachment of block.attachments) {
+			parts.push({ attachment, kind: 'attachment' });
+		}
+		cursor = block.end;
+	}
+	pushText(parts, prompt.slice(cursor));
 
-	return { attachments, text: remaining.replace(/\n{3,}/g, '\n\n').trim() };
+	return { parts };
 }
 
 /** Convenience: just the chip-displayable path basename. */
