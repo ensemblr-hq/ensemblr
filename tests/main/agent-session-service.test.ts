@@ -1039,3 +1039,46 @@ test('a fork from an earlier turn falls back to the transcript', async (t) => {
 
 	assert.equal(summaryCalls.at(-1)?.agentSummary, null);
 });
+
+test('a streaming delta keeps its subagent link on the broadcast row', async (t) => {
+	const fixture = openFixture(t);
+	const parents: Array<string | undefined> = [];
+	const { fake, service } = createService(fixture.database, {
+		eventSink: ({ event }) => {
+			const envelope = event.payload;
+			if (
+				envelope?.kind === 'message' &&
+				envelope.payload.kind === 'text-delta'
+			) {
+				parents.push(envelope.parentToolCallId);
+			}
+		},
+	});
+
+	const snapshot = await service.openSession({
+		executable: createReadyExecutable(),
+		workspaceCwd: '/tmp/ensemblr/svc/ws',
+		workspaceId: fixture.workspaceId,
+	});
+	await service.submitPrompt({ prompt: 'do work', sessionId: snapshot.id });
+
+	const runtime = fake.getOpenSessions()[0];
+	assert.ok(runtime, 'expected one open runtime session');
+	runtime.emit({
+		at: '2026-06-08T00:00:00.000Z',
+		parentToolCallId: 'toolu_task_1',
+		payload: { kind: 'text-delta', text: 'delegate ' },
+		role: 'agent',
+		turnId: 'fake-turn',
+		type: 'message',
+	});
+	runtime.emit({
+		at: '2026-06-08T00:00:01.000Z',
+		payload: { kind: 'text-delta', text: 'main thread' },
+		role: 'agent',
+		turnId: 'fake-turn',
+		type: 'message',
+	});
+
+	assert.deepEqual(parents, ['toolu_task_1', undefined]);
+});

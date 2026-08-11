@@ -2,6 +2,7 @@ import type { DynamicToolUIPart } from 'ai';
 import { i18n } from '@/renderer/lib/i18n';
 import type {
 	AgentToolOutput,
+	ParentedDynamicToolUIPart,
 	UIMessagePart,
 } from '@/renderer/types/agent-timeline';
 import type {
@@ -9,6 +10,7 @@ import type {
 	AgentWireMessagePart,
 	AgentWireMessagePayload,
 } from '@/shared/ipc/contracts/agent-session';
+import { parentToolCallIdOf } from './subagent-parts.ts';
 
 /**
  * Builds an `input-available` dynamic tool part from a Pi `tool-call` payload.
@@ -16,6 +18,10 @@ import type {
  * Falls back to the wire event id when the tool call does not carry its own
  * id, and to a generic `'tool'` label when the name is missing — these
  * fallbacks keep the part renderable rather than dropping it silently.
+ * @param source - The wire `tool-call` part or payload
+ * @param event - The persisted event frame the call arrived on
+ * @param parentToolCallId - Tool call whose subagent made this one, or null on the main thread
+ * @returns The `input-available` dynamic tool part
  */
 export function buildToolCallPart(
 	source: Extract<
@@ -23,10 +29,12 @@ export function buildToolCallPart(
 		{ kind: 'tool-call' }
 	>,
 	event: AgentSessionEventWire,
-): DynamicToolUIPart {
+	parentToolCallId: string | null = null,
+): ParentedDynamicToolUIPart {
 	const input = isPlainObject(source.input) ? source.input : {};
 	return {
 		input,
+		...(parentToolCallId ? { parentToolCallId } : {}),
 		state: 'input-available',
 		toolCallId: source.toolCallId || event.id,
 		toolName: source.name || 'tool',
@@ -38,6 +46,10 @@ export function buildToolCallPart(
  * Builds an `output-available` or `output-error` dynamic tool part from a Pi
  * `tool-result` payload. The output is normalized before being attached so the
  * UI does not have to peer into Pi's MCP-style `{ content: [...] }` envelope.
+ * @param source - The wire `tool-result` part or payload
+ * @param event - The persisted event frame the result arrived on
+ * @param parentToolCallId - Tool call whose subagent produced this result, or null on the main thread
+ * @returns The settled dynamic tool part
  */
 export function buildToolResultPart(
 	source: Extract<
@@ -45,12 +57,15 @@ export function buildToolResultPart(
 		{ kind: 'tool-result' }
 	>,
 	event: AgentSessionEventWire,
-): DynamicToolUIPart {
+	parentToolCallId: string | null = null,
+): ParentedDynamicToolUIPart {
 	const normalizedOutput = normalizeToolOutput(source.output);
+	const link = parentToolCallId ? { parentToolCallId } : {};
 	if (source.isError) {
 		return {
 			errorText: normalizeToolError(normalizedOutput),
 			input: {},
+			...link,
 			state: 'output-error',
 			toolCallId: source.toolCallId || event.id,
 			toolName: 'tool',
@@ -60,6 +75,7 @@ export function buildToolResultPart(
 	return {
 		input: {},
 		output: normalizedOutput,
+		...link,
 		state: 'output-available',
 		toolCallId: source.toolCallId || event.id,
 		toolName: 'tool',
@@ -120,7 +136,12 @@ const STATE_RANK: Record<string, number> = {
 
 /**
  * Combines two dynamic-tool parts for the same call, keeping the higher-state
- * winner while preserving the richer input and the more specific tool name.
+ * winner while preserving the richer input, the more specific tool name, and the
+ * subagent link.
+ *
+ * The link is carried explicitly because a result normally outranks the call it
+ * settles and is built without one, so spreading the winner alone would drop the
+ * nesting the moment a subagent's tool finished.
  * @param previousPart - The part already stored for this tool call
  * @param incomingPart - The newly observed part for the same tool call
  * @returns The merged dynamic-tool part
@@ -128,15 +149,18 @@ const STATE_RANK: Record<string, number> = {
 function mergeDynamicToolParts(
 	previousPart: DynamicToolUIPart,
 	incomingPart: DynamicToolUIPart,
-): DynamicToolUIPart {
+): ParentedDynamicToolUIPart {
 	const previousRank = STATE_RANK[previousPart.state] ?? 0;
 	const incomingRank = STATE_RANK[incomingPart.state] ?? 0;
 	const winner = incomingRank >= previousRank ? incomingPart : previousPart;
+	const parentToolCallId =
+		parentToolCallIdOf(previousPart) ?? parentToolCallIdOf(incomingPart);
 	return {
 		...winner,
+		...(parentToolCallId ? { parentToolCallId } : {}),
 		input: pickRicherInput(previousPart.input, incomingPart.input),
 		toolName: pickToolName(previousPart.toolName, incomingPart.toolName),
-	} as DynamicToolUIPart;
+	} as ParentedDynamicToolUIPart;
 }
 
 /**

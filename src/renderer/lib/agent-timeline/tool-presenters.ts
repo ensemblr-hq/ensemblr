@@ -45,6 +45,7 @@ const IMAGE_READ_PLACEHOLDER = /^Read image file \[[^[\]]+\]$/;
  * turn would mean re-serializing every payload on every render.
  */
 const TOOL_GLYPHS: Record<string, ToolGlyph> = {
+	agent: 'bot',
 	bash: 'terminal',
 	cli: 'terminal',
 	edit: 'file-pen',
@@ -61,6 +62,7 @@ const TOOL_GLYPHS: Record<string, ToolGlyph> = {
 	skill: 'biceps-flexed',
 	str_replace: 'file-pen',
 	str_replace_editor: 'file-pen',
+	task: 'bot',
 	view: 'file-text',
 	write: 'file-plus',
 	write_file: 'file-plus',
@@ -552,10 +554,44 @@ function presentSkill(part: DynamicToolUIPart): ToolPresenterResult {
 	};
 }
 
+/**
+ * Delegates a slice of the turn to a subagent. The wire name is the same for
+ * every delegation, so a turn that spawned three of them would read as three
+ * identical rows; what it was spawned as and what it was asked to do are the two
+ * things that tell them apart, and both travel in the arguments.
+ *
+ * The result is the subagent's own closing report — prose, not a payload — so it
+ * renders as markdown rather than the generic input/output JSON. The rows the
+ * subagent produced along the way are nested into this one by the timeline, not
+ * by the presenter.
+ * @param part - The `task` tool part to project
+ * @returns The row's title, badge, preview, and body
+ */
+function presentSubagent(part: DynamicToolUIPart): ToolPresenterResult {
+	const input = inputOf(part);
+	const subagentType = stringField(input, 'subagent_type', 'subagentType');
+	const task = stringField(input, 'description', 'name', 'prompt');
+	const report = outputOf(part)?.text.trim() ?? '';
+
+	return {
+		badge: null,
+		body: report ? { kind: 'markdown', text: report } : { kind: 'empty' },
+		preview: task === null ? null : { font: 'sans', text: task },
+		title:
+			subagentType === null
+				? i18n.t('workbench:tool-call.subagent.title', 'Sub-agent')
+				: i18n.t('workbench:tool-call.subagent.named', 'Sub-agent: {{type}}', {
+						type: subagentType,
+					}),
+		tone: 'default',
+	};
+}
+
 const PRESENTERS: Record<
 	string,
 	(part: DynamicToolUIPart) => ToolPresenterResult
 > = {
+	agent: presentSubagent,
 	bash: presentBash,
 	cli: presentBash,
 	edit: presentEdit,
@@ -572,6 +608,7 @@ const PRESENTERS: Record<
 	skill: presentSkill,
 	str_replace: presentEdit,
 	str_replace_editor: presentEdit,
+	task: presentSubagent,
 	view: presentRead,
 	write: presentWrite,
 	write_file: presentWrite,

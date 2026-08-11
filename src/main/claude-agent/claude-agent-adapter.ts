@@ -601,6 +601,10 @@ function buildQueryOptions({
 		canUseTool: buildCanUseTool({ canUseTool, mode }),
 		cwd: metadata.cwd,
 		env: stripLaunchContextEnv({ ...baseEnv, ...metadata.env }),
+		// Without this the SDK forwards only a subagent's tool_use/tool_result
+		// blocks, so a `Task` card would nest tool rows with none of the prose that
+		// explains them.
+		forwardSubagentText: true,
 		includePartialMessages: true,
 		...(effort ? { effort } : {}),
 		thinking: CLAUDE_THINKING_CONFIG,

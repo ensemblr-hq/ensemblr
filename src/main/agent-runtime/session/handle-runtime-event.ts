@@ -107,7 +107,14 @@ export function createRuntimeEventHandler({
 			eventType: event.type,
 			id: `delta:${sessionId}:${active.lastBroadcastOrdinal}:${active.deltaCounter}`,
 			ordinal: active.lastBroadcastOrdinal + active.deltaCounter * 1e-6,
-			payload: { kind: 'message', payload: event.payload, role: event.role },
+			payload: {
+				kind: 'message',
+				...(event.parentToolCallId
+					? { parentToolCallId: event.parentToolCallId }
+					: {}),
+				payload: event.payload,
+				role: event.role,
+			},
 			stream: 'protocol',
 			turnId: active.activeTurnId,
 		};

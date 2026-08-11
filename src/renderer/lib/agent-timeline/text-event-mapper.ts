@@ -2,6 +2,7 @@ import type {
 	StreamingTextPart,
 	UIMessagePart,
 } from '@/renderer/types/agent-timeline';
+import { parentToolCallIdOf } from './subagent-parts.ts';
 
 /**
  * Folds an incoming streaming text or reasoning part into the parts array,
@@ -12,17 +13,27 @@ import type {
  * deltas do not retroactively bleed into a paragraph that has already been
  * sealed (e.g. by an intervening tool call). When no live buffer is found the
  * delta is pushed as a fresh streaming entry.
+ *
+ * Only a buffer belonging to the same thread can be joined: Claude interleaves a
+ * subagent's deltas with the main thread's, so matching on type alone would
+ * splice a delegate's prose into the middle of the agent's own paragraph.
  */
 export function mergeStreamingTextPart(
 	merged: UIMessagePart[],
 	incoming: StreamingTextPart,
 ): UIMessagePart[] {
+	const incomingOwner = parentToolCallIdOf(incoming);
 	for (let index = merged.length - 1; index >= 0; index -= 1) {
 		const candidate = merged[index];
 		if (candidate === undefined) {
 			continue;
 		}
-		if (isStreamingTextPart(candidate) && candidate.type === incoming.type) {
+		const isSameThread = parentToolCallIdOf(candidate) === incomingOwner;
+		if (
+			isSameThread &&
+			isStreamingTextPart(candidate) &&
+			candidate.type === incoming.type
+		) {
 			const next = [...merged];
 			next[index] = {
 				...candidate,
@@ -33,6 +44,7 @@ export function mergeStreamingTextPart(
 		// Stop scanning once we cross any non-streaming-of-same-type boundary so
 		// deltas don't fold into a paragraph emitted before a tool ran.
 		if (
+			isSameThread &&
 			(candidate.type === 'text' || candidate.type === 'reasoning') &&
 			candidate.type === incoming.type &&
 			'state' in candidate &&
@@ -45,17 +57,29 @@ export function mergeStreamingTextPart(
 }
 
 /**
- * Removes any in-flight streaming parts of the given type from `parts`.
+ * Removes the given thread's in-flight streaming parts of `type` from `parts`.
  *
  * Called when a `done` text or reasoning part arrives so the finalized copy
- * supersedes whatever was being streamed in.
+ * supersedes whatever was being streamed in. Scoped to the thread that sealed,
+ * so a subagent finishing its prose cannot delete the main agent's in-flight
+ * paragraph — or the other way round.
+ * @param parts - The parts accumulated for the turn so far
+ * @param type - Which streaming parts the arriving seal supersedes
+ * @param parentToolCallId - Thread that sealed, or null for the main thread
+ * @returns The parts with that thread's matching streaming entries removed
  */
 export function dropStreamingPartsOfType(
 	parts: readonly UIMessagePart[],
 	type: 'text' | 'reasoning',
+	parentToolCallId: string | null = null,
 ): UIMessagePart[] {
 	return parts.filter(
-		(part) => !(isStreamingTextPart(part) && part.type === type),
+		(part) =>
+			!(
+				isStreamingTextPart(part) &&
+				part.type === type &&
+				parentToolCallIdOf(part) === parentToolCallId
+			),
 	);
 }
 

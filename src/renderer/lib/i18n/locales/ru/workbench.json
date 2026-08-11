@@ -963,6 +963,10 @@
 			"named": "Скилл: {{name}}",
 			"title": "Навык"
 		},
+		"subagent": {
+			"named": "Суб-агент: {{type}}",
+			"title": "Суб-агент"
+		},
 		"write": {
 			"title": "Запись"
 		}

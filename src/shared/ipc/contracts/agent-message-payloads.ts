@@ -104,6 +104,15 @@ export type AgentPersistedEnvelope =
 	| { kind: 'error'; error: AgentWireError }
 	| {
 			kind: 'message';
+			/**
+			 * Tool call whose subagent produced this message, absent on the main
+			 * thread. Claude Code forwards a `Task`'s messages flat at top level
+			 * tagged with the call that spawned them, so this is what lets the
+			 * timeline re-nest them under that call's card. Runtimes without
+			 * subagents never set it and rows persisted before it existed omit it —
+			 * absent always means main thread.
+			 */
+			parentToolCallId?: string;
 			payload: AgentWireMessagePayload;
 			role: 'agent' | 'tool' | 'user';
 	  }

@@ -1,15 +1,21 @@
 import type { DynamicToolUIPart, UIMessage } from 'ai';
 import { useMemo } from 'react';
 import {
+	countNestedToolCalls,
+	dropEchoedSubagentReports,
 	glyphForToolCall,
+	groupSubagentActivity,
 	isHiddenEnsemblrToolCall,
+	parentToolCallIdOf,
 } from '@/renderer/lib/agent-timeline';
 import { customMessageDataOf, skillPartDataOf } from '@/renderer/lib/pi';
 import { cn } from '@/renderer/lib/utils';
+import type { TimelineActivityNode } from '@/renderer/types/agent-timeline';
 import type { ChatAssistantTurnTiming } from '@/renderer/types/chat';
 import type { ToolGlyph } from '@/renderer/types/tool-presentation';
 
 import { ChatMessageText } from './chat-message-text';
+import { ChatSubagentCall } from './chat-subagent-call';
 import {
 	ChatCustomMessage,
 	ChatReasoningCollapsible,
@@ -60,8 +66,12 @@ export function ChatAssistantTurn({
 	);
 
 	const hasFinal = finalParts.length > 0;
-	const activityRows = activityParts.map((part, index) => (
-		<ActivityPart key={`${message.id}:a:${index}`} part={part} />
+	const activityNodes = useMemo(
+		() => groupSubagentActivity(activityParts),
+		[activityParts],
+	);
+	const activityRows = activityNodes.map((node) => (
+		<ActivityNodeRow key={`${message.id}:a:${node.key}`} node={node} />
 	));
 	const toolGlyphs = useMemo(
 		() => collectActivityGlyphs(activityParts),
@@ -131,6 +141,26 @@ export function ChatAssistantTurn({
 	);
 }
 
+/**
+ * Renders one activity row and, when a subagent ran inside it, the rows it
+ * produced. Recursion lives here rather than in the card so the card needs to
+ * know nothing about part types, and so a row that turns out to have no children
+ * renders exactly as it did before subagents were nested at all.
+ */
+function ActivityNodeRow({ node }: { node: TimelineActivityNode }) {
+	const { part } = node;
+	if (node.children.length === 0 || part.type !== 'dynamic-tool') {
+		return <ActivityPart part={part} />;
+	}
+	return (
+		<ChatSubagentCall part={part} toolCallCount={countNestedToolCalls(node)}>
+			{node.children.map((child) => (
+				<ActivityNodeRow key={child.key} node={child} />
+			))}
+		</ChatSubagentCall>
+	);
+}
+
 /** Renders one pre-answer activity part: reasoning, a tool call, a skill activation, injected context, or muted intermediate commentary. */
 function ActivityPart({ part }: { part: UIMessage['parts'][number] }) {
 	if (part.type === 'reasoning') {
@@ -168,12 +198,13 @@ function ActivityPart({ part }: { part: UIMessage['parts'][number] }) {
  * of the turn — the split below promotes only the text that trails the last part,
  * so a hidden call left in place would fold the answer away with it. Reasoning
  * blocks whose runtime redacted the prose go too: dropping them here, rather than
- * at the row, also keeps them out of the summary's message count.
+ * at the row, also keeps them out of the summary's message count. So does a
+ * subagent's closing prose, which its own card already shows as the body.
  * @param parts - The turn's parts, in the order it produced them
  * @returns The parts the timeline renders
  */
 function visibleTurnParts(parts: UIMessage['parts']): UIMessage['parts'] {
-	return parts.filter((part) => {
+	const painted = parts.filter((part) => {
 		if (part.type === 'reasoning') {
 			return part.text.trim().length > 0;
 		}
@@ -182,6 +213,7 @@ function visibleTurnParts(parts: UIMessage['parts']): UIMessage['parts'] {
 			!isHiddenEnsemblrToolCall(part as DynamicToolUIPart)
 		);
 	});
+	return dropEchoedSubagentReports(painted);
 }
 
 /**
@@ -190,6 +222,10 @@ function visibleTurnParts(parts: UIMessage['parts']): UIMessage['parts'] {
  * "answer" is only promoted once the stream settles, which prevents an
  * intermediate text chunk from being mistaken for the response and locking
  * earlier activity into a premature collapse.
+ *
+ * A subagent's own closing prose is never the turn's answer, however late it
+ * lands: it belongs to the delegation that produced it, and promoting it would
+ * both lift it out of its card and hide the agent's real response behind it.
  */
 function splitTurnParts(
 	parts: UIMessage['parts'],
@@ -205,7 +241,10 @@ function splitTurnParts(
 	for (let index = parts.length - 1; index >= 0; index -= 1) {
 		const part = parts[index];
 		const isFinalText =
-			part?.type === 'text' && 'state' in part && part.state === 'done';
+			part?.type === 'text' &&
+			'state' in part &&
+			part.state === 'done' &&
+			parentToolCallIdOf(part) === null;
 		if (!isFinalText) {
 			break;
 		}

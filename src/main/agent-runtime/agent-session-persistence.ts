@@ -36,7 +36,14 @@ export function eventPayload(event: AgentEvent): AgentPersistedEnvelope {
 				kind: 'error',
 			};
 		case 'message':
-			return { kind: 'message', payload: event.payload, role: event.role };
+			return {
+				kind: 'message',
+				...(event.parentToolCallId
+					? { parentToolCallId: event.parentToolCallId }
+					: {}),
+				payload: event.payload,
+				role: event.role,
+			};
 		case 'metadata':
 			return {
 				kind: 'metadata',

@@ -9,8 +9,8 @@ import type {
 	AgentSessionStatus,
 } from '../agent-runtime/agent-types.ts';
 import {
-	createStreamedReasoning,
-	type StreamedReasoning,
+	createStreamedReasoningByThread,
+	type StreamedReasoningByThread,
 } from './streamed-reasoning.ts';
 import { toolResultDetails } from './tool-result-details.ts';
 
@@ -90,7 +90,7 @@ export function createSdkMessageNormalizer({
 	let contextTokens = 0;
 	let mainModel: string | null = null;
 	let reported: AgentContextUsage | null = null;
-	const reasoning = createStreamedReasoning();
+	const reasoningByThread = createStreamedReasoningByThread();
 
 	const at = (): string => now().toISOString();
 
@@ -106,7 +106,15 @@ export function createSdkMessageNormalizer({
 	const messageEvent = (
 		payload: AgentMessagePayload,
 		role: 'agent' | 'tool' | 'user',
-	): AgentEvent => ({ at: at(), payload, role, turnId, type: 'message' });
+		parentToolCallId?: string | null,
+	): AgentEvent => ({
+		at: at(),
+		...(parentToolCallId ? { parentToolCallId } : {}),
+		payload,
+		role,
+		turnId,
+		type: 'message',
+	});
 
 	/**
 	 * Emits a usage snapshot when the reading has actually moved. Stays silent
@@ -159,7 +167,8 @@ export function createSdkMessageNormalizer({
 	/**
 	 * Seals one assistant turn and, for main-thread responses only, re-reads the
 	 * live occupancy from it. Subagent responses (`parent_tool_use_id` set) are
-	 * measured against their own window, so they never restate the user's.
+	 * measured against their own near-empty window, so letting them through would
+	 * sawtooth the gauge; their events still flow, tagged with the parent call.
 	 * @param message - The `assistant` SDK message.
 	 * @returns The seal and its tool calls, plus a usage snapshot when one is due.
 	 */
@@ -168,10 +177,10 @@ export function createSdkMessageNormalizer({
 	): readonly AgentEvent[] => {
 		const events = [
 			...transitionTo('streaming'),
-			...normalizeAssistant(message, messageEvent, reasoning),
+			...normalizeAssistant(message, messageEvent, reasoningByThread),
 		];
 
-		if (message.parent_tool_use_id !== null) {
+		if (readString(message.parent_tool_use_id) !== null) {
 			return events;
 		}
 
@@ -227,7 +236,7 @@ export function createSdkMessageNormalizer({
 				case 'system':
 					return handleSystem(message);
 				case 'stream_event':
-					return normalizeStreamEvent(message, messageEvent, reasoning);
+					return normalizeStreamEvent(message, messageEvent, reasoningByThread);
 				case 'assistant':
 					return handleAssistant(message);
 				case 'user':
@@ -245,10 +254,14 @@ export function createSdkMessageNormalizer({
 	};
 }
 
-/** Emits a normalized message event for one payload and role. */
+/**
+ * Emits a normalized message event for one payload and role, tagged with the
+ * tool call whose subagent produced it when it did not come from the main thread.
+ */
 type MessageEventFactory = (
 	payload: AgentMessagePayload,
 	role: 'agent' | 'tool' | 'user',
+	parentToolCallId?: string | null,
 ) => AgentEvent;
 
 /**
@@ -262,16 +275,18 @@ type MessageEventFactory = (
  * place the text ever appears and the seal has to be refilled from it.
  * @param message - The `stream_event` SDK message.
  * @param messageEvent - Factory that stamps the current turn onto an event.
- * @param reasoning - Buffer collecting this message's reasoning text.
+ * @param reasoningByThread - Per-thread buffers collecting reasoning text.
  * @returns Normalized events, empty for stream events with no timeline effect.
  */
 function normalizeStreamEvent(
 	message: Extract<SDKMessage, { type: 'stream_event' }>,
 	messageEvent: MessageEventFactory,
-	reasoning: StreamedReasoning,
+	reasoningByThread: StreamedReasoningByThread,
 ): readonly AgentEvent[] {
 	const event = message.event as unknown as Record<string, unknown>;
 	const eventType = readString(event.type);
+	const parentToolCallId = readString(message.parent_tool_use_id);
+	const reasoning = reasoningByThread.forThread(parentToolCallId);
 
 	if (eventType === 'message_start') {
 		reasoning.reset();
@@ -286,7 +301,9 @@ function normalizeStreamEvent(
 
 	if (readString(delta.type) === 'text_delta') {
 		const text = readString(delta.text);
-		return text ? [messageEvent({ kind: 'text-delta', text }, 'agent')] : [];
+		return text
+			? [messageEvent({ kind: 'text-delta', text }, 'agent', parentToolCallId)]
+			: [];
 	}
 
 	if (readString(delta.type) === 'thinking_delta') {
@@ -298,7 +315,13 @@ function normalizeStreamEvent(
 		if (blockIndex !== null) {
 			reasoning.append(blockIndex, text);
 		}
-		return [messageEvent({ kind: 'reasoning-delta', text }, 'agent')];
+		return [
+			messageEvent(
+				{ kind: 'reasoning-delta', text },
+				'agent',
+				parentToolCallId,
+			),
+		];
 	}
 
 	return [];
@@ -326,21 +349,28 @@ function readBlockIndex(value: unknown): number | null {
  * `tool_execution_start` so a tool card opens as soon as the call is known.
  * @param message - The `assistant` SDK message.
  * @param messageEvent - Factory that stamps the current turn onto an event.
- * @param reasoning - Text banked from this message's `thinking_delta` events.
+ * @param reasoningByThread - Per-thread buffers holding text banked from `thinking_delta` events.
  * @returns The seal followed by its tool-call events.
  */
 function normalizeAssistant(
 	message: Extract<SDKMessage, { type: 'assistant' }>,
 	messageEvent: MessageEventFactory,
-	reasoning: StreamedReasoning,
+	reasoningByThread: StreamedReasoningByThread,
 ): readonly AgentEvent[] {
+	const parentToolCallId = readString(message.parent_tool_use_id);
+	const reasoning = reasoningByThread.forThread(parentToolCallId);
+
 	const parts = readBlocks(message.message?.content).flatMap((block, index) =>
 		toMessagePart(block, reasoning.take(index)),
 	);
 	reasoning.reset();
 
 	return [
-		messageEvent({ kind: 'message', parts, role: 'assistant' }, 'agent'),
+		messageEvent(
+			{ kind: 'message', parts, role: 'assistant' },
+			'agent',
+			parentToolCallId,
+		),
 		...parts.flatMap((part) =>
 			part.kind === 'tool-call'
 				? [
@@ -352,6 +382,7 @@ function normalizeAssistant(
 								toolCallId: part.toolCallId,
 							},
 							'tool',
+							parentToolCallId,
 						),
 					]
 				: [],
@@ -393,6 +424,8 @@ function normalizeUser(
 			? toolResultDetails(message.tool_use_result)
 			: null;
 
+	const parentToolCallId = readString(message.parent_tool_use_id);
+
 	return toolResults.map((block) =>
 		messageEvent(
 			{
@@ -402,6 +435,7 @@ function normalizeUser(
 				toolCallId: readString(block.tool_use_id) ?? 'tool-call',
 			},
 			'tool',
+			parentToolCallId,
 		),
 	);
 }
