@@ -465,9 +465,15 @@ export interface NotifyOrchestratorArgs {
 /**
  * Upper bounds on an `askUserQuestion` questionnaire. The counts are small on
  * purpose: the dialog is a decision aid, not a form, and every option must stay
- * reachable by a single number key. `maxHeaderLength` is a trim point rather
- * than a rejection — the header is only ever a pager dot's accessible name, so
- * losing a questionnaire over it costs the agent a round trip and buys nothing.
+ * reachable by a single number key. `maxHeaderLength` and
+ * `maxDescriptionLength` are trim points rather than rejections — losing a
+ * questionnaire over either costs the agent a round trip and buys nothing.
+ *
+ * The description is the one field the dialog renders in full rather than on a
+ * single line, because an option's description is where an agent puts the
+ * recommendation the choice turns on. It is capped generously — several
+ * sentences — so the card holds a real argument, and the row list scrolls once
+ * the options outgrow it.
  */
 export const ASK_USER_QUESTION_LIMITS = {
 	maxQuestions: 4,
@@ -475,6 +481,7 @@ export const ASK_USER_QUESTION_LIMITS = {
 	minOptions: 2,
 	maxHeaderLength: 64,
 	maxLabelLength: 80,
+	maxDescriptionLength: 400,
 } as const;
 
 /**

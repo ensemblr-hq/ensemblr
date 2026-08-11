@@ -174,6 +174,57 @@ describe('validateArgs', () => {
 		}
 	});
 
+	// The dialog renders a description in full rather than on one line, so the
+	// cap is what stops six of them from crowding the conversation off screen.
+	it('trims a runaway option description instead of rejecting the questionnaire', () => {
+		const longDescription = 'Ship it. '.repeat(80);
+		const result = validateArgs('askUserQuestion', {
+			questions: [
+				{
+					options: [
+						{ description: longDescription, label: 'Islands' },
+						{ label: 'Vanilla' },
+					],
+					question: 'Which rendering approach?',
+				},
+			],
+		});
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			const { questions } = result.value as {
+				questions: { options: { description?: string }[] }[];
+			};
+			const trimmed = questions[0]?.options[0]?.description ?? '';
+			expect(trimmed).toHaveLength(
+				ASK_USER_QUESTION_LIMITS.maxDescriptionLength,
+			);
+			expect(longDescription.startsWith(trimmed)).toBe(true);
+		}
+	});
+
+	it('keeps a several-sentence option description whole', () => {
+		const description =
+			'Cheapest to land and the one I would take: it reuses the resolver we already ship, so nothing new has to be tested. The tradeoff is that a second provider would need its own branch here later.';
+		const result = validateArgs('askUserQuestion', {
+			questions: [
+				{
+					options: [
+						{ description, label: 'Reuse the resolver' },
+						{ label: 'Rewrite it' },
+					],
+					question: 'Which rendering approach?',
+				},
+			],
+		});
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			const { questions } = result.value as {
+				questions: { options: { description?: string }[] }[];
+			};
+			expect(questions[0]?.options[0]?.description).toBe(description);
+		}
+	});
+
 	it('accepts the header that used to blow the old 16-character cap', () => {
 		expect(
 			validateArgs('askUserQuestion', {
