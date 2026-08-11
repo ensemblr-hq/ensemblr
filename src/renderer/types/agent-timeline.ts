@@ -96,10 +96,18 @@ export interface ParsedPromptAttachment {
 	path: string;
 }
 
-/** A parsed user prompt split into its leading file attachments and typed text. */
+/** One run of a parsed prompt: a stretch of the typed message, or an attachment. */
+export type ParsedPromptPart =
+	| { attachment: ParsedPromptAttachment; kind: 'attachment' }
+	| { kind: 'text'; text: string };
+
+/**
+ * A parsed user prompt, as the message renders it back: the typed runs and the
+ * attachments in the order the composer sent them, with the scaffolding that
+ * describes the chat rather than the message already dropped.
+ */
 export interface ParsedPrompt {
-	attachments: readonly ParsedPromptAttachment[];
-	text: string;
+	parts: readonly ParsedPromptPart[];
 }
 
 /**

@@ -1,6 +1,5 @@
 import { type ReactNode, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Textarea } from '@/renderer/components/ui/textarea';
 import { useHotkey } from '@/renderer/hooks/use-hotkey';
 import { useComposerState } from '@/renderer/hooks/workbench-shell/composer/use-composer-state';
 import { cn } from '@/renderer/lib/utils';
@@ -8,6 +7,7 @@ import { useConsumeComposerFocusRequest } from '@/renderer/state/composer';
 import type { ComposerShellState } from '@/renderer/types/workbench';
 import { ComposerControls } from './composer/composer-controls';
 import { ComposerNotices } from './composer/composer-notices';
+import { ComposerEditor } from './composer/editor';
 import { ComposerFocusHint } from './composer/focus-hint';
 import { IssuePickerDialog } from './composer/issue-picker-dialog';
 import { ConnectedLastUnreadButton } from './composer/last-unread-button';
@@ -48,11 +48,11 @@ export function ComposerPanel({
 	const [issuePickerOpen, setIssuePickerOpen] = useState(false);
 	const [directoryPickerOpen, setDirectoryPickerOpen] = useState(false);
 
-	const focusTextarea = useCallback(() => {
-		state.textareaRef.current?.focus();
-	}, [state.textareaRef]);
-	useHotkey('composer.focus', focusTextarea);
-	useConsumeComposerFocusRequest(chatTabId, focusTextarea);
+	const focusEditor = useCallback(() => {
+		state.editorRef.current?.focus();
+	}, [state.editorRef]);
+	useHotkey('composer.focus', focusEditor);
+	useConsumeComposerFocusRequest(chatTabId, focusEditor);
 
 	const pickersDisabled = composer.disabled || state.isStreaming;
 	const toggleModelPicker = useCallback(() => {
@@ -92,22 +92,25 @@ export function ComposerPanel({
 					'Ask to make changes, @mention files, run /commands',
 				);
 
-	const textareaBlock = (
+	const editorBlock = (
 		<div className='relative' ref={state.anchorRef}>
-			<Textarea
-				aria-label={t('workbench:composer.aria-label', 'Agent composer')}
-				className='sleek-scrollbar max-h-64 min-h-28 resize-none px-0 py-0 text-sm leading-relaxed shadow-none placeholder:text-muted-foreground/70 focus-visible:ring-0'
+			<ComposerEditor
+				ariaLabel={t('workbench:composer.aria-label', 'Agent composer')}
 				disabled={composer.disabled}
+				handleRef={state.editorRef}
+				initialSeed={{
+					attachments: state.initialDraft.attachments,
+					text: state.initialDraft.text,
+				}}
+				initialSnapshot={state.initialDraft.snapshot}
+				key={chatTabId}
 				onBlur={() => setFocused(false)}
-				onChange={state.handleChange}
+				onDraftChange={state.handleDraftChange}
+				onDroppedTransfer={state.consumeDroppedTransfer}
 				onFocus={() => setFocused(true)}
 				onKeyDown={state.handleKeyDown}
-				onPaste={state.handlePaste}
-				onSelect={state.handleSelect}
+				onPastedTransfer={state.consumePastedTransfer}
 				placeholder={placeholder}
-				ref={state.textareaRef}
-				value={state.value}
-				variant='bare'
 			/>
 			<ComposerFocusHint
 				focused={focused}
@@ -167,7 +170,7 @@ export function ComposerPanel({
 							slashLoading={state.slashLoading}
 							slashMatches={state.slashMatches}
 						>
-							{textareaBlock}
+							{editorBlock}
 						</ComposerAutocompletePopover>
 
 						<ComposerControls

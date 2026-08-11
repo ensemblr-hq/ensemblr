@@ -3,8 +3,11 @@ import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
+import { AttachmentChip } from '@/renderer/components/workbench-shell/conversation-panel/composer/attachment-chip';
 import { ComposerNotices } from '@/renderer/components/workbench-shell/conversation-panel/composer/composer-notices';
+import { PastedTextChip } from '@/renderer/components/workbench-shell/conversation-panel/composer/pasted-text-chip';
 import type { ComposerStateApi } from '@/renderer/hooks/workbench-shell/composer/use-composer-state';
+import { attachmentPreviewPath } from '@/renderer/lib/workbench/composer-attachments';
 import type {
 	ComposerAttachment,
 	LinkedDirectory,
@@ -15,7 +18,7 @@ const LONG_PREVIEW = `function boom() {\n\tthrow new Error('kaboom');\n}`;
 
 function pastedText(
 	overrides: Partial<Extract<ComposerAttachment, { kind: 'pasted-text' }>> = {},
-): ComposerAttachment {
+): Extract<ComposerAttachment, { kind: 'pasted-text' }> {
 	return {
 		id: 'wsfile:.context/attachments/ee33ff/pasted-text.txt',
 		kind: 'pasted-text',
@@ -27,33 +30,16 @@ function pastedText(
 	};
 }
 
-function renderNotices(
-	attachments: readonly ComposerAttachment[],
-	removeAttachment = vi.fn(),
-	linked: {
-		linkedDirectories?: readonly LinkedDirectory[];
-		pendingLinkedDirectories?: readonly LinkedDirectory[];
-		unlinkDirectory?: (path: string) => void;
-	} = {},
-) {
-	const unlinkDirectory = linked.unlinkDirectory ?? vi.fn();
-	const state = {
-		attachmentError: null,
-		attachments,
-		blockedNotice: false,
-		hasChips: attachments.length > 0,
-		linkedDirectories: linked.linkedDirectories ?? [],
-		pendingLinkedDirectories: linked.pendingLinkedDirectories ?? [],
-		removeAttachment,
-		unlinkDirectory,
-	} as unknown as ComposerStateApi;
-	renderWithProviders(<ComposerNotices state={state} />);
-	return { removeAttachment, unlinkDirectory };
-}
-
 describe('pasted-text chip', () => {
 	it('shows the preview and a pluralised line count instead of a bare filename', () => {
-		renderNotices([pastedText()]);
+		const attachment = pastedText();
+		renderWithProviders(
+			<PastedTextChip
+				lineCount={attachment.lineCount}
+				onRemove={vi.fn()}
+				preview={attachment.preview}
+			/>,
+		);
 
 		expect(
 			screen.getByText(LONG_PREVIEW, { collapseWhitespace: false }),
@@ -63,60 +49,171 @@ describe('pasted-text chip', () => {
 	});
 
 	it('uses the singular form for a one-line paste', () => {
-		renderNotices([pastedText({ lineCount: 1 })]);
+		renderWithProviders(
+			<PastedTextChip
+				lineCount={1}
+				onRemove={vi.fn()}
+				preview={LONG_PREVIEW}
+			/>,
+		);
 
 		expect(screen.getByText('Pasted text · 1 line')).toBeInTheDocument();
 	});
 
-	it('removes the attachment by id when the remove button is pressed', async () => {
-		const { removeAttachment } = renderNotices([pastedText()]);
+	it('removes the attachment when the remove button is pressed', async () => {
+		const onRemove = vi.fn();
+		renderWithProviders(
+			<PastedTextChip
+				lineCount={128}
+				onRemove={onRemove}
+				preview={LONG_PREVIEW}
+			/>,
+		);
 
 		await userEvent.click(
 			screen.getByRole('button', { name: /Remove Pasted text/ }),
 		);
 
-		expect(removeAttachment).toHaveBeenCalledWith(
-			'wsfile:.context/attachments/ee33ff/pasted-text.txt',
-		);
+		expect(onRemove).toHaveBeenCalledTimes(1);
 	});
 
+	it('opens the stored paste when the preview is pressed', async () => {
+		const onActivate = vi.fn();
+		renderWithProviders(
+			<PastedTextChip
+				lineCount={128}
+				onActivate={onActivate}
+				onRemove={vi.fn()}
+				preview={LONG_PREVIEW}
+			/>,
+		);
+
+		await userEvent.click(
+			screen.getByRole('button', { name: /Open Pasted text/ }),
+		);
+
+		expect(onActivate).toHaveBeenCalledTimes(1);
+	});
+});
+
+describe('attachment chip', () => {
 	it('renders the plain chip for a workspace file, not the preview card', () => {
-		renderNotices([
-			{
-				id: 'wsfile:src/app.ts',
-				kind: 'workspace-file',
-				label: 'app.ts',
-				path: 'src/app.ts',
-			},
-		]);
+		renderWithProviders(
+			<AttachmentChip
+				attachment={{
+					id: 'wsfile:src/app.ts',
+					kind: 'workspace-file',
+					label: 'app.ts',
+					path: 'src/app.ts',
+				}}
+				onRemove={vi.fn()}
+			/>,
+		);
 
 		expect(screen.getByText('app.ts')).toBeInTheDocument();
 		expect(screen.queryByText(/Pasted text/)).not.toBeInTheDocument();
 	});
 
 	it('labels an issue chip with its reference rather than the document filename', () => {
-		renderNotices([
-			{
-				id: 'issue:linear:THE-106',
-				kind: 'issue',
-				label: 'THE-106',
-				path: '.context/attachments/aa11bb/linear-issue-the-106.md',
-				provider: 'linear',
-			},
-			{
+		renderWithProviders(
+			<AttachmentChip
+				attachment={{
+					id: 'issue:linear:THE-106',
+					kind: 'issue',
+					label: 'THE-106',
+					path: '.context/attachments/aa11bb/linear-issue-the-106.md',
+					provider: 'linear',
+				}}
+				onRemove={vi.fn()}
+			/>,
+		);
+
+		expect(screen.getByText('THE-106')).toBeInTheDocument();
+		expect(
+			screen.queryByText('linear-issue-the-106.md'),
+		).not.toBeInTheDocument();
+	});
+
+	it('opens the file when given an activate handler', async () => {
+		const onActivate = vi.fn();
+		renderWithProviders(
+			<AttachmentChip
+				attachment={{
+					id: 'wsfile:src/app.ts',
+					kind: 'workspace-file',
+					label: 'app.ts',
+					path: 'src/app.ts',
+				}}
+				onActivate={onActivate}
+				onRemove={vi.fn()}
+			/>,
+		);
+
+		await userEvent.click(screen.getByRole('button', { name: 'Open app.ts' }));
+
+		expect(onActivate).toHaveBeenCalledTimes(1);
+	});
+
+	it('stays inert without one, so the remove button is the only control', () => {
+		renderWithProviders(
+			<AttachmentChip
+				attachment={{
+					id: 'wsdir:src',
+					kind: 'workspace-directory',
+					label: 'src',
+					path: 'src',
+				}}
+				onRemove={vi.fn()}
+			/>,
+		);
+
+		expect(screen.getAllByRole('button')).toHaveLength(1);
+		expect(screen.queryByRole('button', { name: /^Open/ })).toBeNull();
+	});
+});
+
+describe('attachmentPreviewPath', () => {
+	it('gives the repo-relative path for everything the preview can read', () => {
+		expect(
+			attachmentPreviewPath({
+				id: 'wsfile:src/app.ts',
+				kind: 'workspace-file',
+				label: 'app.ts',
+				path: 'src/app.ts',
+			}),
+		).toBe('src/app.ts');
+		expect(attachmentPreviewPath(pastedText())).toBe(
+			'.context/attachments/ee33ff/pasted-text.txt',
+		);
+		expect(
+			attachmentPreviewPath({
 				id: 'issue:github:#42',
 				kind: 'issue',
 				label: '#42',
 				path: '.context/attachments/cc22dd/github-issue-42.md',
 				provider: 'github',
-			},
-		]);
+			}),
+		).toBe('.context/attachments/cc22dd/github-issue-42.md');
+	});
 
-		expect(screen.getByText('THE-106')).toBeInTheDocument();
-		expect(screen.getByText('#42')).toBeInTheDocument();
+	it('gives nothing for a directory or a file left outside the workspace', () => {
 		expect(
-			screen.queryByText('linear-issue-the-106.md'),
-		).not.toBeInTheDocument();
+			attachmentPreviewPath({
+				id: 'wsdir:src',
+				kind: 'workspace-directory',
+				label: 'src',
+				path: 'src',
+			}),
+		).toBeNull();
+		expect(
+			attachmentPreviewPath({
+				absolutePath: '/Users/me/Downloads/huge.zip',
+				id: 'external:/Users/me/Downloads/huge.zip',
+				kind: 'external-file',
+				label: 'huge.zip',
+				sizeBytes: 20_000_000,
+			}),
+		).toBeNull();
 	});
 });
 
@@ -125,24 +222,43 @@ const VAULT: LinkedDirectory = {
 	path: '/Users/me/Documents/Obsidian/Vault 111',
 };
 
+function renderNotices(
+	linked: {
+		linkedDirectories?: readonly LinkedDirectory[];
+		pendingLinkedDirectories?: readonly LinkedDirectory[];
+		unlinkDirectory?: (path: string) => void;
+	} = {},
+) {
+	const unlinkDirectory = linked.unlinkDirectory ?? vi.fn();
+	const state = {
+		attachmentError: null,
+		attachments: [],
+		blockedNotice: false,
+		hasChips: false,
+		linkedDirectories: linked.linkedDirectories ?? [],
+		pendingLinkedDirectories: linked.pendingLinkedDirectories ?? [],
+		unlinkDirectory,
+	} as unknown as ComposerStateApi;
+	renderWithProviders(<ComposerNotices state={state} />);
+	return { unlinkDirectory };
+}
+
 describe('linked-directory chip', () => {
 	it('shows the name over the absolute path it granted', () => {
-		renderNotices([], vi.fn(), { linkedDirectories: [VAULT] });
+		renderNotices({ linkedDirectories: [VAULT] });
 
 		expect(screen.getByText('Vault 111')).toBeInTheDocument();
 		expect(screen.getByText(VAULT.path)).toBeInTheDocument();
 	});
 
-	it('renders with no attachments at all, since a link is not a draft attachment', () => {
-		renderNotices([], vi.fn(), { linkedDirectories: [VAULT] });
+	it('stays above the draft, since a link is not part of any one message', () => {
+		renderNotices({ linkedDirectories: [VAULT] });
 
 		expect(screen.getByText('Vault 111')).toBeInTheDocument();
 	});
 
 	it('unlinks by path when the remove button is pressed', async () => {
-		const { unlinkDirectory } = renderNotices([], vi.fn(), {
-			linkedDirectories: [VAULT],
-		});
+		const { unlinkDirectory } = renderNotices({ linkedDirectories: [VAULT] });
 
 		await userEvent.click(
 			screen.getByRole('button', { name: /Remove Vault 111/ }),
@@ -152,13 +268,13 @@ describe('linked-directory chip', () => {
 	});
 
 	it('warns only while a directory is linked after the session opened', () => {
-		renderNotices([], vi.fn(), { linkedDirectories: [VAULT] });
+		renderNotices({ linkedDirectories: [VAULT] });
 
 		expect(screen.queryByText(/from the next session/)).not.toBeInTheDocument();
 	});
 
 	it('explains that a directory linked mid-session is not readable yet', () => {
-		renderNotices([], vi.fn(), {
+		renderNotices({
 			linkedDirectories: [VAULT],
 			pendingLinkedDirectories: [VAULT],
 		});

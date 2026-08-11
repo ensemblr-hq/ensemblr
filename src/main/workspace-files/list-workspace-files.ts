@@ -15,7 +15,11 @@ import type {
 	WriteWorkspaceImageAttachmentRequest,
 	WriteWorkspaceImageAttachmentResult,
 } from '../../shared/ipc/contracts/workspace-files';
-import { previewImageMimeTypeForPath } from '../../shared/preview-image.ts';
+import {
+	PREVIEW_PDF_MIME_TYPE,
+	pdfBytesLookValid,
+	previewEmbedMimeTypeForPath,
+} from '../../shared/preview-media.ts';
 import type { LocalCommandService } from '../commands/local-command';
 import {
 	writeContextActionPrompt,
@@ -199,7 +203,7 @@ export function createListWorkspaceFilesService({
 				}
 				return buildFilePreviewResult({
 					buffer: await readFile(target.absolutePath),
-					previewImageMimeType: readable.previewImageMimeType,
+					previewEmbedMimeType: readable.previewEmbedMimeType,
 					relativePath: target.relativePath,
 					sizeBytes: readable.sizeBytes,
 				});
@@ -535,7 +539,7 @@ async function resolveReadablePreviewFile(params: {
 	requestPath: string;
 	workspaceCwd: string;
 }): Promise<
-	| { ok: true; previewImageMimeType: string | null; sizeBytes: number }
+	| { ok: true; previewEmbedMimeType: string | null; sizeBytes: number }
 	| { ok: false; result: ReadWorkspaceFileResult }
 > {
 	const { absolutePath, relativePath, requestPath, workspaceCwd } = params;
@@ -550,8 +554,8 @@ async function resolveReadablePreviewFile(params: {
 			},
 		};
 	}
-	const previewImageMimeType = previewImageMimeTypeForPath(relativePath);
-	const maxPreviewBytes = previewImageMimeType
+	const previewEmbedMimeType = previewEmbedMimeTypeForPath(relativePath);
+	const maxPreviewBytes = previewEmbedMimeType
 		? MAX_CONTEXT_IMAGE_BYTES
 		: MAX_READ_BYTES;
 	if (fileStat.size > maxPreviewBytes) {
@@ -580,7 +584,7 @@ async function resolveReadablePreviewFile(params: {
 			},
 		};
 	}
-	return { ok: true, previewImageMimeType, sizeBytes: fileStat.size };
+	return { ok: true, previewEmbedMimeType, sizeBytes: fileStat.size };
 }
 
 /**
@@ -592,19 +596,19 @@ async function resolveReadablePreviewFile(params: {
  */
 function buildFilePreviewResult(params: {
 	buffer: Buffer;
-	previewImageMimeType: string | null;
+	previewEmbedMimeType: string | null;
 	relativePath: string;
 	sizeBytes: number;
 }): ReadWorkspaceFileResult {
-	const { buffer, previewImageMimeType, relativePath, sizeBytes } = params;
+	const { buffer, previewEmbedMimeType, relativePath, sizeBytes } = params;
 	if (
-		previewImageMimeType &&
-		previewImageBytesLookValid(buffer, relativePath)
+		previewEmbedMimeType &&
+		previewBytesLookValid(buffer, relativePath, previewEmbedMimeType)
 	) {
 		return {
 			content: buffer.toString('base64'),
 			contentEncoding: 'base64',
-			mimeType: previewImageMimeType,
+			mimeType: previewEmbedMimeType,
 			path: relativePath,
 			sizeBytes,
 		};
@@ -618,15 +622,24 @@ function buildFilePreviewResult(params: {
 }
 
 /**
- * Confirms a preview file's leading bytes match its declared image type, so a
- * mislabeled text or binary file falls back to the source view instead of a
- * broken `<img>`. Extensions without a known prefix signature (e.g. the AVIF
- * container) are allowed through unvalidated.
+ * Confirms a preview file's leading bytes match the type its extension declares,
+ * so a mislabeled text or binary file falls back to the source view instead of a
+ * broken `<img>` or an embedded viewer fed something that is not a document.
+ * Extensions without a known prefix signature (e.g. the AVIF container) are
+ * allowed through unvalidated.
  * @param buffer - Decoded file contents.
  * @param filePath - Workspace-relative file path whose extension declares the type.
- * @returns True when the bytes are consistent with the declared image type.
+ * @param mimeType - The preview MIME type resolved for that extension.
+ * @returns True when the bytes are consistent with the declared type.
  */
-function previewImageBytesLookValid(buffer: Buffer, filePath: string): boolean {
+function previewBytesLookValid(
+	buffer: Buffer,
+	filePath: string,
+	mimeType: string,
+): boolean {
+	if (mimeType === PREVIEW_PDF_MIME_TYPE) {
+		return pdfBytesLookValid(buffer);
+	}
 	const extension = signatureExtensionForPreview(filePath);
 	if (!extension) {
 		return true;

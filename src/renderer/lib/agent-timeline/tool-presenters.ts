@@ -10,7 +10,7 @@ import type {
 	ToolPresentation,
 	ToolPreviewDescriptor,
 } from '@/renderer/types/tool-presentation';
-import { isPreviewableImagePath } from '@/shared/preview-image';
+import { isPreviewableImagePath } from '@/shared/preview-media';
 import { ensemblrToolGlyph } from './ensemblr-tool-presentation';
 import { parseNumberedFileBody } from './numbered-file-body';
 import { shellCommandTitle } from './shell-command-title';

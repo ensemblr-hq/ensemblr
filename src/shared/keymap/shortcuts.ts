@@ -111,10 +111,6 @@ export const SHORTCUTS = {
 		scope: 'composer',
 		bindings: [{ key: 'j', modifiers: ['mod'] }],
 	},
-	'composer.removeLastMention': {
-		scope: 'composer',
-		bindings: [{ key: 'Backspace' }],
-	},
 	'autocomplete.next': {
 		scope: 'autocomplete',
 		bindings: [{ key: 'ArrowDown' }],

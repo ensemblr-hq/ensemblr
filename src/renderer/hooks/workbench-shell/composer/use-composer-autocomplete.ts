@@ -1,12 +1,7 @@
 import { useSetAtom } from 'jotai';
-import {
-	type Dispatch,
-	type RefObject,
-	type SetStateAction,
-	useCallback,
-	useState,
-} from 'react';
+import { type RefObject, useCallback, useState } from 'react';
 
+import type { ComposerEditorHandle } from '@/renderer/components/workbench-shell/conversation-panel/composer/editor';
 import { detectAutocomplete } from '@/renderer/hooks/workbench-shell/composer/use-autocomplete';
 import { useMentionMatches } from '@/renderer/hooks/workbench-shell/composer/use-mention-matches';
 import { useSlashCommands } from '@/renderer/hooks/workbench-shell/composer/use-slash-commands';
@@ -20,7 +15,6 @@ import {
 import type {
 	AutocompleteKind,
 	AutocompleteState,
-	ComposerAttachment,
 	ComposerShellState,
 	WorkspaceFileSummary,
 } from '@/renderer/types/workbench';
@@ -46,19 +40,23 @@ function stepActiveIndex(stored: number, delta: number, total: number): number {
 }
 
 /**
- * Splits the draft around the token the caret sits in, so a pick can rewrite
- * just that token and leave the rest of the sentence intact.
+ * The span a mention pick replaces. A chip already reads as one space in the
+ * draft, so the spaces around the `@` token go with it — otherwise every pick
+ * would leave a double space where the token used to be.
  * @param value - The whole draft
  * @param token - Where the detected token starts and ends
- * @returns The text before and after the token
+ * @returns The span the chip is written over
  */
-function splitAroundToken(
+function mentionReplacementRange(
 	value: string,
 	token: { tokenEnd: number; tokenStart: number },
-): { after: string; before: string } {
+): { end: number; start: number } {
 	return {
-		after: value.slice(token.tokenEnd),
-		before: value.slice(0, token.tokenStart),
+		end: value[token.tokenEnd] === ' ' ? token.tokenEnd + 1 : token.tokenEnd,
+		start:
+			token.tokenStart > 0 && value[token.tokenStart - 1] === ' '
+				? token.tokenStart - 1
+				: token.tokenStart,
 	};
 }
 
@@ -68,25 +66,22 @@ function splitAroundToken(
  * applies a pick back into the draft.
  *
  * A `/`-command picked on an otherwise empty draft submits straight away; every
- * other pick rewrites the token in place and restores the caret after it.
+ * other pick rewrites the token in place — a mention becomes a chip sitting
+ * where the token was, so the attachment stays in the sentence.
  * @param input - The live draft, the composer shell, and the sinks a pick writes to
- * @returns The open state, the match lists, and the handlers the textarea binds to
+ * @returns The open state, the match lists, and the handlers the editor binds to
  */
 export function useComposerAutocomplete({
-	addAttachments,
 	composer,
+	editorRef,
 	onSubmitSlashCommand,
 	setAttachmentError,
-	setValue,
-	textareaRef,
 	value,
 }: {
-	addAttachments: (incoming: readonly ComposerAttachment[]) => void;
 	composer: ComposerShellState;
+	editorRef: RefObject<ComposerEditorHandle | null>;
 	onSubmitSlashCommand: (text: string) => void;
 	setAttachmentError: (error: string | null) => void;
-	setValue: Dispatch<SetStateAction<string>>;
-	textareaRef: RefObject<HTMLTextAreaElement | null>;
 	value: string;
 }) {
 	const [autocomplete, setAutocomplete] =
@@ -122,53 +117,30 @@ export function useComposerAutocomplete({
 		setActiveIndex(0);
 	}, []);
 
-	/** Restores focus and the caret after a pick has rewritten the draft. */
-	const restoreCaret = useCallback(
-		(caret: number) => {
-			requestAnimationFrame(() => {
-				const textarea = textareaRef.current;
-				if (!textarea) {
-					return;
-				}
-				textarea.focus();
-				textarea.setSelectionRange(caret, caret);
-			});
-		},
-		[textareaRef],
-	);
-
 	const replaceToken = useCallback(
-		(insert: string, keepTrailingSpace = true) => {
-			const { after, before } = splitAroundToken(value, autocomplete);
-			const trailing = keepTrailingSpace ? ' ' : '';
-			setValue(`${before}${insert}${trailing}${after}`);
+		(insert: string) => {
+			editorRef.current?.replaceRangeWithText(
+				autocomplete.tokenStart,
+				autocomplete.tokenEnd,
+				`${insert} `,
+			);
 			dismissAutocomplete();
-			restoreCaret(before.length + insert.length + trailing.length);
 		},
-		[autocomplete, dismissAutocomplete, restoreCaret, value, setValue],
+		[autocomplete, dismissAutocomplete, editorRef],
 	);
 
 	const onMentionSelect = useCallback(
 		(entry: WorkspaceFileSummary) => {
 			setAttachmentError(null);
-			const { after, before } = splitAroundToken(value, autocomplete);
-			const trimmedBefore = before.trimEnd();
-			setValue(
-				`${trimmedBefore}${trimmedBefore.length > 0 ? ' ' : ''}${after.trimStart()}`,
+			const range = mentionReplacementRange(value, autocomplete);
+			editorRef.current?.replaceRangeWithAttachment(
+				range.start,
+				range.end,
+				workspaceFileAttachment(entry),
 			);
-			addAttachments([workspaceFileAttachment(entry)]);
 			dismissAutocomplete();
-			restoreCaret(trimmedBefore.length + 1);
 		},
-		[
-			addAttachments,
-			autocomplete,
-			dismissAutocomplete,
-			restoreCaret,
-			setAttachmentError,
-			setValue,
-			value,
-		],
+		[autocomplete, dismissAutocomplete, editorRef, setAttachmentError, value],
 	);
 
 	const onSlashSelect = useCallback(
@@ -176,13 +148,12 @@ export function useComposerAutocomplete({
 			recordSlashUsage((usage) =>
 				recordSlashCommandUse(usage, command, Date.now()),
 			);
-			const { after, before } = splitAroundToken(value, autocomplete);
 			const slashText = `/${command}`;
-			const replacesWholeDraft =
-				before.trim().length === 0 && after.trim().length === 0;
-			if (autoSubmit && replacesWholeDraft) {
+			const outsideToken =
+				value.slice(0, autocomplete.tokenStart) +
+				value.slice(autocomplete.tokenEnd);
+			if (autoSubmit && outsideToken.trim().length === 0) {
 				dismissAutocomplete();
-				setValue('');
 				onSubmitSlashCommand(slashText);
 				return;
 			}
@@ -194,7 +165,6 @@ export function useComposerAutocomplete({
 			onSubmitSlashCommand,
 			recordSlashUsage,
 			replaceToken,
-			setValue,
 			value,
 		],
 	);
@@ -242,17 +212,6 @@ export function useComposerAutocomplete({
 		autocompleteTotal,
 		confirmAutocomplete,
 		dismissAutocomplete,
-		/** Re-detects the token under the caret after a click or arrow move. */
-		handleSelect: useCallback(() => {
-			const textarea = textareaRef.current;
-			if (!textarea) {
-				return;
-			}
-			updateAutocomplete(
-				textarea.value,
-				textarea.selectionStart ?? textarea.value.length,
-			);
-		}, [textareaRef, updateAutocomplete]),
 		mentionMatches,
 		onMentionSelect,
 		onSlashSelect,

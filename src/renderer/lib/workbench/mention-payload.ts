@@ -1,6 +1,7 @@
 import { readWorkspaceFile } from '@/renderer/api/ensemblr-queries';
 import type {
 	ComposerAttachment,
+	ComposerDraftSegment,
 	LinkedDirectory,
 } from '@/renderer/types/workbench';
 import {
@@ -118,62 +119,116 @@ export function serializeLinkedDirectories(
 }
 
 /**
- * Formats the composer's ordered attachment list into the text payload appended
- * to the user's prompt when sent to the agent.
+ * Formats the composer draft into the text payload sent to the agent, keeping
+ * the order the user arranged it in: each typed run and each attachment block
+ * lands where its chip sat in the sentence, rather than every attachment being
+ * hoisted to one end of the message.
  *
- * Directories collect into one leading header so the agent knows the user
- * referenced them without expecting inline content. Text files are read over IPC
- * and inlined in an `<attached_file>` block; images, binaries, and externally
- * referenced paths get a placeholder so the agent sees the path without the
- * prompt being flooded with bytes.
+ * Text files are read over IPC and inlined in an `<attached_file>` block; images,
+ * binaries, and externally referenced paths get a placeholder so the agent sees
+ * the path without the prompt being flooded with bytes. Adjacent directory chips
+ * collect into one referenced-folders header — they carry no inline content, so a
+ * header apiece would be noise.
  *
  * Throws when a file read fails, so the caller can surface the error to the
  * user before clearing the composer.
- * @param attachments - The composer's attachments, in the order the user added them.
+ * @param segments - The draft's text runs and chips, in document order.
  * @param workspaceCwd - Absolute workspace root the relative paths resolve against.
- * @returns The block of attachment sections, or an empty string when there are none.
+ * @returns The serialized prompt body, or an empty string when the draft is blank.
  */
-export async function serializeComposerAttachments({
-	attachments,
+export async function serializeComposerDraft({
+	segments,
 	workspaceCwd,
 }: {
-	attachments: readonly ComposerAttachment[];
+	segments: readonly ComposerDraftSegment[];
 	workspaceCwd: string;
 }): Promise<string> {
-	if (attachments.length === 0) {
-		return '';
-	}
-
-	const sections: string[] = [];
-	const directories = attachments.filter(
-		(entry) => entry.kind === 'workspace-directory',
-	);
-	if (directories.length > 0) {
-		sections.push(
-			`${REFERENCED_FOLDERS_HEADER}\n${directories.map((entry) => `@${entry.path}`).join('\n')}`,
-		);
-	}
-
-	// Reads are independent, so issue them together before walking the list;
-	// each result keys back to its attachment so the emitted sections stay in the
-	// user's original order.
+	// Reads are independent, so issue them together before walking the draft;
+	// each result keys back to its attachment so the emitted blocks stay in the
+	// order the user put them in.
 	const contentByAttachment = await readAttachmentContents(
-		attachments,
+		draftAttachments(segments),
 		workspaceCwd,
 	);
-	for (const attachment of attachments) {
-		if (attachment.kind === 'workspace-directory') {
+
+	const blocks: string[] = [];
+	const pendingFolders: string[] = [];
+	for (const segment of segments) {
+		const folder = referencedFolderPath(segment);
+		if (folder) {
+			pendingFolders.push(folder);
 			continue;
 		}
-		sections.push(
-			formatAttachedFileSection(
-				attachmentPromptPath(attachment),
-				contentByAttachment.get(attachment.id) ?? ATTACHMENT_PLACEHOLDER,
-			),
-		);
+		const block = segmentBlock(segment, contentByAttachment);
+		if (!block) {
+			continue;
+		}
+		if (pendingFolders.length > 0) {
+			blocks.push(referencedFoldersBlock(pendingFolders));
+			pendingFolders.splice(0);
+		}
+		blocks.push(block);
+	}
+	if (pendingFolders.length > 0) {
+		blocks.push(referencedFoldersBlock(pendingFolders));
 	}
 
-	return sections.join('\n\n');
+	return blocks.join('\n\n');
+}
+
+/**
+ * Every chip the draft carries, in document order.
+ * @param segments - The draft's text runs and chips.
+ * @returns The attachments behind the chips.
+ */
+function draftAttachments(
+	segments: readonly ComposerDraftSegment[],
+): readonly ComposerAttachment[] {
+	return segments.flatMap((segment) =>
+		segment.kind === 'attachment' ? [segment.attachment] : [],
+	);
+}
+
+/**
+ * The workspace folder a segment references, when it is a directory chip.
+ * @param segment - The draft segment being walked.
+ * @returns The repo-relative folder path, or null for anything else.
+ */
+function referencedFolderPath(segment: ComposerDraftSegment): string | null {
+	return segment.kind === 'attachment' &&
+		segment.attachment.kind === 'workspace-directory'
+		? segment.attachment.path
+		: null;
+}
+
+/**
+ * Announces a run of directory chips under one header, since a folder carries no
+ * inline content for the agent to read.
+ * @param paths - Repo-relative folder paths, in the order their chips appear.
+ * @returns The referenced-folders block.
+ */
+function referencedFoldersBlock(paths: readonly string[]): string {
+	return `${REFERENCED_FOLDERS_HEADER}\n${paths.map((path) => `@${path}`).join('\n')}`;
+}
+
+/**
+ * The prompt block one segment contributes: the trimmed typed run, or the
+ * attachment's `<attached_file>` marker.
+ * @param segment - The draft segment being walked.
+ * @param contentByAttachment - Inlined bodies resolved for this draft.
+ * @returns The block, or null when the segment carries nothing to send.
+ */
+function segmentBlock(
+	segment: ComposerDraftSegment,
+	contentByAttachment: ReadonlyMap<string, string>,
+): string | null {
+	if (segment.kind === 'text') {
+		return segment.text.trim() || null;
+	}
+	return formatAttachedFileSection(
+		attachmentPromptPath(segment.attachment),
+		contentByAttachment.get(segment.attachment.id) ?? ATTACHMENT_PLACEHOLDER,
+	);
 }
 
 /**

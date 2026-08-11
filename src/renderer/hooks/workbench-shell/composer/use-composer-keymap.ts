@@ -6,40 +6,36 @@ import type { KeymapBinding } from '@/renderer/types/keymap';
 import type { AutocompleteKind } from '@/renderer/types/workbench';
 
 /**
- * Keyboard bindings for the composer textarea: autocomplete navigation and
- * confirm, backspace-removes-the-last-mention, send, and explicit queue.
+ * Keyboard bindings for the composer editor: autocomplete navigation and
+ * confirm, send, and explicit queue.
  *
  * Each binding returns `false` when it does not apply, which hands the key back
- * to the textarea's native handling — that is how Enter still inserts a newline
- * with no autocomplete open, and how Backspace still deletes a character while
- * the draft has text.
+ * to the editor's own handling — that is how Enter still inserts a newline with
+ * no autocomplete open. Backspace is not bound: an attachment is a node in the
+ * document now, so the editor already deletes a whole chip on its own.
  * @param input - What is currently open, what can be acted on, and the actions
- * @returns The keydown handler to bind to the textarea
+ * @returns The keydown handler to bind to the editor
  */
 export function useComposerKeymap({
 	autocompleteKind,
 	canConfirmAutocomplete,
-	canRemoveLastMention,
 	onConfirmAutocomplete,
 	onDismissAutocomplete,
 	onQueue,
-	onRemoveLastMention,
 	onStepActiveIndex,
 	onSubmit,
 	submitsOnBareEnter,
 }: {
 	autocompleteKind: AutocompleteKind;
 	canConfirmAutocomplete: boolean;
-	canRemoveLastMention: boolean;
 	onConfirmAutocomplete: () => void;
 	onDismissAutocomplete: () => void;
 	onQueue: () => void;
-	onRemoveLastMention: () => void;
 	onStepActiveIndex: (delta: number) => void;
 	onSubmit: () => void;
 	submitsOnBareEnter: boolean;
-}): (event: ReactKeyboardEvent<HTMLTextAreaElement>) => void {
-	const keymapBindings = useMemo<readonly KeymapBinding<HTMLTextAreaElement>[]>(
+}): (event: ReactKeyboardEvent<HTMLElement>) => void {
+	const keymapBindings = useMemo<readonly KeymapBinding<HTMLElement>[]>(
 		() => [
 			[
 				'autocomplete.next',
@@ -78,15 +74,6 @@ export function useComposerKeymap({
 				},
 			],
 			[
-				'composer.removeLastMention',
-				() => {
-					if (!canRemoveLastMention) {
-						return false;
-					}
-					onRemoveLastMention();
-				},
-			],
-			[
 				'composer.submit',
 				(event) => {
 					if (event.nativeEvent.isComposing) {
@@ -119,11 +106,9 @@ export function useComposerKeymap({
 		[
 			autocompleteKind,
 			canConfirmAutocomplete,
-			canRemoveLastMention,
 			onConfirmAutocomplete,
 			onDismissAutocomplete,
 			onQueue,
-			onRemoveLastMention,
 			onStepActiveIndex,
 			onSubmit,
 			submitsOnBareEnter,

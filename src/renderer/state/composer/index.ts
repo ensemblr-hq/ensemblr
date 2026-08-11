@@ -15,6 +15,7 @@ export {
 } from './composer-attachments';
 export {
 	composerAttachmentsAtomFamily,
+	composerEditorStateAtomFamily,
 	composerValueAtomFamily,
 	forgetComposerDraft,
 } from './composer-drafts';

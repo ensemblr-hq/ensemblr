@@ -1,14 +1,11 @@
 import { useAtomValue } from 'jotai';
-import {
-	type Dispatch,
-	type SetStateAction,
-	useCallback,
-	useState,
-} from 'react';
+import type { EditorState } from 'lexical';
+import { type RefObject, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import type { ComposerEditorHandle } from '@/renderer/components/workbench-shell/conversation-panel/composer/editor';
 import {
-	serializeComposerAttachments,
+	serializeComposerDraft,
 	serializeLinkedDirectories,
 } from '@/renderer/lib/workbench/mention-payload';
 import {
@@ -20,18 +17,32 @@ import {
 	followUpBehaviorAtom,
 } from '@/renderer/state/preferences';
 import type {
-	ComposerAttachment,
+	ComposerDraftSegment,
 	ComposerShellState,
 } from '@/renderer/types/workbench';
 
-/** The text and attachments one send carries. */
+/**
+ * What one send carries. `segments` is the draft in document order, so the
+ * outgoing prompt reads the way the composer did; `text` is the same draft
+ * flattened, for the emptiness check and for restoring a failed send.
+ * `snapshot` is the editor document it came from, kept so that restore puts the
+ * chips back in the sentence rather than bunched at the end.
+ */
 interface ComposerDraft {
-	attachments: readonly ComposerAttachment[];
+	segments: readonly ComposerDraftSegment[];
+	snapshot?: EditorState | null;
 	text: string;
 }
 
-/** An empty draft, for the sends that carry a payload and nothing else. */
-const EMPTY_DRAFT: ComposerDraft = { attachments: [], text: '' };
+/**
+ * A send that carries text and nothing else — a queued Checks chore, a primed
+ * agent action, an auto-submitted slash command.
+ * @param text - The prompt to send
+ * @returns The draft for that text
+ */
+function textDraft(text: string): ComposerDraft {
+	return { segments: [{ kind: 'text', text }], text };
+}
 
 /**
  * Whether a draft carries nothing worth sending.
@@ -39,7 +50,10 @@ const EMPTY_DRAFT: ComposerDraft = { attachments: [], text: '' };
  * @returns True when there is no text and no attachment
  */
 function isEmptyDraft(draft: ComposerDraft): boolean {
-	return draft.text.trim().length === 0 && draft.attachments.length === 0;
+	return (
+		draft.text.trim().length === 0 &&
+		!draft.segments.some((segment) => segment.kind === 'attachment')
+	);
 }
 
 /**
@@ -48,23 +62,25 @@ function isEmptyDraft(draft: ComposerDraft): boolean {
  * Follow-up behavior setting onto the runtime's mid-turn delivery frames. Also
  * drains the two external channels — primed agent actions and Checks-panel
  * chores — through the same path so they respect the same rules.
- * @param input - The composer shell, the live draft, and the setters a send clears
+ *
+ * The draft arrives as a reader rather than a value so a send always serializes
+ * what the editor holds at the moment it fires, not what it held at the last
+ * render.
+ * @param input - The composer shell, a reader for the live draft, and the setters a send clears
  * @returns The submit callbacks plus the pending and blocked-notice flags
  */
 export function useComposerSubmit({
 	chatTabId,
 	composer,
-	draft,
+	editorRef,
+	readDraft,
 	setAttachmentError,
-	setAttachments,
-	setValue,
 }: {
 	chatTabId: string;
 	composer: ComposerShellState;
-	draft: ComposerDraft;
+	editorRef: RefObject<ComposerEditorHandle | null>;
+	readDraft: () => ComposerDraft;
 	setAttachmentError: (error: string | null) => void;
-	setAttachments: Dispatch<SetStateAction<readonly ComposerAttachment[]>>;
-	setValue: Dispatch<SetStateAction<string>>;
 }) {
 	const { t } = useTranslation();
 	const [pending, setPending] = useState(false);
@@ -82,35 +98,33 @@ export function useComposerSubmit({
 			if (composer.disabled || pending || isEmptyDraft(outgoing)) {
 				return;
 			}
-			const { attachments, text } = outgoing;
+			const { segments, snapshot, text } = outgoing;
 			setPending(true);
 			setAttachmentError(null);
 			try {
-				const attachmentText = await serializeComposerAttachments({
-					attachments,
+				const body = await serializeComposerDraft({
+					segments,
 					workspaceCwd: composer.workspaceCwd,
 				});
-				const payload = [
-					serializeLinkedDirectories(linkedDirectories),
-					attachmentText,
-					text.trim(),
-				]
+				const payload = [serializeLinkedDirectories(linkedDirectories), body]
 					.filter(Boolean)
 					.join('\n\n');
 				// Clear the composer before awaiting onSubmit. onSubmit renders an
-				// optimistic prompt synchronously, so leaving the textarea populated
+				// optimistic prompt synchronously, so leaving the draft populated
 				// during its async round-trip shows the prompt in two places at once.
-				setValue('');
-				setAttachments([]);
+				editorRef.current?.clear();
 				try {
 					await composer.onSubmit(
 						payload,
 						streamingBehavior ? { streamingBehavior } : undefined,
 					);
 				} catch (cause) {
-					// Restore the unsent text so the user does not lose their input.
-					setValue(text);
-					setAttachments([...attachments]);
+					// Restore the unsent draft so the user does not lose their input.
+					if (snapshot) {
+						editorRef.current?.restore(snapshot);
+					} else {
+						editorRef.current?.setText(text);
+					}
 					throw cause;
 				}
 			} catch (cause) {
@@ -126,15 +140,7 @@ export function useComposerSubmit({
 				setPending(false);
 			}
 		},
-		[
-			composer,
-			linkedDirectories,
-			pending,
-			setAttachmentError,
-			setAttachments,
-			setValue,
-			t,
-		],
+		[composer, editorRef, linkedDirectories, pending, setAttachmentError, t],
 	);
 
 	// Maps the Follow-up behavior setting onto Pi's native mid-turn delivery:
@@ -168,18 +174,14 @@ export function useComposerSubmit({
 	 */
 	const deliverPrimedAction = useCallback(
 		(payload: string, autoSubmit: boolean) => {
-			const hasDraft = draft.text.trim().length > 0;
+			const hasDraft = readDraft().text.trim().length > 0;
 			if (autoSubmit && !hasDraft) {
-				void submitText({ ...EMPTY_DRAFT, text: payload });
+				void submitText(textDraft(payload));
 				return;
 			}
-			setValue((current) =>
-				current.trim().length > 0
-					? `${current.trimEnd()}\n\n${payload}`
-					: payload,
-			);
+			editorRef.current?.appendText(hasDraft ? `\n\n${payload}` : payload);
 		},
-		[draft.text, submitText, setValue],
+		[editorRef, readDraft, submitText],
 	);
 	useComposerPrimedActionConsumer(
 		chatTabId,
@@ -208,7 +210,7 @@ export function useComposerSubmit({
 			) {
 				return false;
 			}
-			dispatchSubmit({ ...EMPTY_DRAFT, text });
+			dispatchSubmit(textDraft(text));
 			return true;
 		},
 		[
@@ -226,15 +228,18 @@ export function useComposerSubmit({
 		dispatchSubmit,
 		followUp,
 		handleSubmit: useCallback(
-			() => dispatchSubmit(draft),
-			[dispatchSubmit, draft],
+			() => dispatchSubmit(readDraft()),
+			[dispatchSubmit, readDraft],
 		),
 		pending,
 		// Cmd+J explicitly queues the current draft as a follow-up regardless of the
 		// Follow-up setting; when idle it just sends normally.
 		queueCurrent: useCallback(() => {
-			void submitText(draft, composer.isStreaming ? 'followUp' : undefined);
-		}, [composer.isStreaming, draft, submitText]),
+			void submitText(
+				readDraft(),
+				composer.isStreaming ? 'followUp' : undefined,
+			);
+		}, [composer.isStreaming, readDraft, submitText]),
 		setBlockedNotice,
 	};
 }

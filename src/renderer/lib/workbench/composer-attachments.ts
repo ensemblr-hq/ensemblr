@@ -92,25 +92,24 @@ function pastedTextAttachment(path: string, text: string): ComposerAttachment {
 }
 
 /**
- * Adds attachments to a list, skipping any whose id is already present so
- * re-attaching the same thing is a no-op rather than a duplicate chip.
- * @param current - The list to extend.
- * @param incoming - Attachments to append.
- * @returns A new list, or `current` unchanged when nothing was new.
+ * The workspace-relative path a chip can open in the file preview, or null when
+ * there is nothing the preview panel could show. A directory has no file to
+ * read, and an oversize external file was left outside the workspace, which the
+ * main process refuses to read.
+ * @param attachment - The attachment behind the chip.
+ * @returns The repo-relative path to preview, or null.
  */
-export function appendAttachments(
-	current: readonly ComposerAttachment[],
-	incoming: readonly ComposerAttachment[],
-): readonly ComposerAttachment[] {
-	const seen = new Set(current.map((entry) => entry.id));
-	const added = incoming.filter((entry) => {
-		if (seen.has(entry.id)) {
-			return false;
-		}
-		seen.add(entry.id);
-		return true;
-	});
-	return added.length > 0 ? [...current, ...added] : current;
+export function attachmentPreviewPath(
+	attachment: ComposerAttachment,
+): string | null {
+	switch (attachment.kind) {
+		case 'issue':
+		case 'pasted-text':
+		case 'workspace-file':
+			return attachment.path;
+		default:
+			return null;
+	}
 }
 
 /** Extracts every file from a browser clipboard or drag payload. */

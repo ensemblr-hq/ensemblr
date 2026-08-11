@@ -447,7 +447,8 @@
 			"too-large": "{{filePath}} слишком велик для предпросмотра.",
 			"unreadable": "Не удалось прочитать {{filePath}}."
 		},
-		"image-alt": "Предпросмотр {{filePath}}"
+		"image-alt": "Предпросмотр {{filePath}}",
+		"pdf-title": "Предпросмотр {{filePath}}"
 	},
 	"file-tree": {
 		"collapse-folder": "Свернуть {{path}}",

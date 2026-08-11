@@ -47,3 +47,37 @@ export function previewImageMimeTypeForPath(filePath: string): string | null {
 export function isPreviewableImagePath(filePath: string): boolean {
 	return previewImageMimeTypeForPath(filePath) !== null;
 }
+
+/** MIME type of the one document format the preview embeds rather than decodes. */
+export const PREVIEW_PDF_MIME_TYPE = 'application/pdf';
+
+/** Leading bytes every PDF carries: `%PDF-`. */
+const PDF_SIGNATURE = [0x25, 0x50, 0x44, 0x46, 0x2d] as const;
+
+/**
+ * Resolve the MIME type a file preview should hand the renderer as raw bytes
+ * rather than as source text — an image it decodes, or a PDF it embeds. Kept
+ * apart from {@link isPreviewableImagePath}, which answers the narrower "is this
+ * an image" question the review and timeline surfaces ask.
+ * @param filePath - Workspace-relative file path.
+ * @returns The MIME type to return bytes under, or null to read it as text.
+ */
+export function previewEmbedMimeTypeForPath(filePath: string): string | null {
+	if (fileNameExtension(filePath) === 'pdf') {
+		return PREVIEW_PDF_MIME_TYPE;
+	}
+	return previewImageMimeTypeForPath(filePath);
+}
+
+/**
+ * Confirm bytes really are a PDF, so a renamed executable cannot be handed to
+ * the embedded viewer on the strength of its extension alone.
+ * @param bytes - Leading bytes of the file being previewed.
+ * @returns True when the payload starts with the PDF signature.
+ */
+export function pdfBytesLookValid(bytes: Uint8Array): boolean {
+	if (bytes.length < PDF_SIGNATURE.length) {
+		return false;
+	}
+	return PDF_SIGNATURE.every((byte, index) => bytes[index] === byte);
+}

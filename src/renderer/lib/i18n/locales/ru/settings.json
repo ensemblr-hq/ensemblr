@@ -584,7 +584,6 @@
 			"composer-focus": "Перейти в поле ввода",
 			"composer-newline": "Перенос строки в поле ввода",
 			"composer-queue": "Поставить сообщение в очередь",
-			"composer-remove-last-mention": "Удалить последнее вложение-упоминание",
 			"composer-submit": "Отправить сообщение",
 			"composer-submit-with-mod": "Отправить сообщение",
 			"composer-toggle-model-picker": "Переключить выбор модели",

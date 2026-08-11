@@ -439,7 +439,8 @@
 			"too-large": "Το {{filePath}} είναι πολύ μεγάλο για προεπισκόπηση.",
 			"unreadable": "Δεν ήταν δυνατή η ανάγνωση του {{filePath}}."
 		},
-		"image-alt": "Προεπισκόπηση του {{filePath}}"
+		"image-alt": "Προεπισκόπηση του {{filePath}}",
+		"pdf-title": "Προεπισκόπηση του {{filePath}}"
 	},
 	"file-tree": {
 		"collapse-folder": "Σύμπτυξη {{path}}",

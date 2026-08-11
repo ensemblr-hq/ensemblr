@@ -1,5 +1,6 @@
 import { atom } from 'jotai';
 import { atomFamily } from 'jotai-family';
+import type { EditorState } from 'lexical';
 import type { ComposerAttachment } from '@/renderer/types/workbench';
 
 /**
@@ -22,6 +23,18 @@ export const composerAttachmentsAtomFamily = atomFamily((_chatTabId: string) =>
 );
 
 /**
+ * Per-chat editor document, keyed by chat-tab id. The text and attachment atoms
+ * above are flat mirrors of it; this one keeps the interleaving, so a draft that
+ * comes back after a tab switch still has its chips in the sentence rather than
+ * bunched at the end. Holds the committed `EditorState` rather than its JSON —
+ * Lexical seeds a fresh editor from one directly, so a tab switch costs no
+ * serialization. In-memory only, like the rest of the draft.
+ */
+export const composerEditorStateAtomFamily = atomFamily((_chatTabId: string) =>
+	atom<EditorState | null>(null),
+);
+
+/**
  * Evicts a chat's draft atoms from their families. Call only when a chat tab is
  * permanently deleted — closed-but-restorable tabs must keep their draft, matching
  * how {@link forgetChatOverrides} treats model/thinking picks. The atoms are
@@ -32,4 +45,5 @@ export const composerAttachmentsAtomFamily = atomFamily((_chatTabId: string) =>
 export function forgetComposerDraft(chatTabId: string): void {
 	composerValueAtomFamily.remove(chatTabId);
 	composerAttachmentsAtomFamily.remove(chatTabId);
+	composerEditorStateAtomFamily.remove(chatTabId);
 }

@@ -19,7 +19,6 @@ vi.mock('@/renderer/api/ensemblr-queries', () => ({
 }));
 
 import {
-	appendAttachments,
 	attachPastedFiles,
 	attachPastedText,
 } from '../../src/renderer/lib/workbench/composer-attachments';
@@ -132,10 +131,13 @@ describe('attachPastedText', () => {
 		);
 	});
 
-	test('dedupes to one chip when the same paste is stored twice', async () => {
+	// The store is content-addressed, so the same bytes come back under the same
+	// id — which is what lets the editor refuse a duplicate chip for a paste the
+	// draft already holds.
+	test('gives the same paste the same id however often it is stored', async () => {
 		const first = await attachPastedText('same paste', '/repo');
 		const second = await attachPastedText('same paste', '/repo');
 
-		expect(appendAttachments([first], [second])).toEqual([first]);
+		expect(second.id).toBe(first.id);
 	});
 });
