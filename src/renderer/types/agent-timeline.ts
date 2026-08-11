@@ -6,13 +6,39 @@
  * particular runtime spells its wire frames.
  */
 
-import type { UIMessage } from 'ai';
+import type { DynamicToolUIPart, UIMessage } from 'ai';
 
 /** UI-message role of a mapped agent turn: user, assistant, or system. */
 export type UIRole = UIMessage['role'];
 
 /** A single part of a mapped `UIMessage` (text, reasoning, or dynamic-tool). */
 export type UIMessagePart = UIMessage['parts'][number];
+
+/**
+ * A timeline part carrying the subagent link the runtime may stamp on it.
+ *
+ * Claude Code forwards a `Task`'s messages flat alongside the main thread's, so
+ * the link is the only thing that says which rows ran inside which delegation.
+ * It is absent on runtimes without subagents and on rows persisted before it
+ * shipped, where absent always means the main thread — read it through
+ * `parentToolCallIdOf` rather than trusting the field.
+ */
+export type ParentedUIMessagePart = UIMessagePart & {
+	parentToolCallId?: string | null;
+};
+
+/** A tool part carrying the subagent link, as {@link ParentedUIMessagePart}. */
+export type ParentedDynamicToolUIPart = DynamicToolUIPart & {
+	parentToolCallId?: string | null;
+};
+
+/** One activity row and, for a subagent call, the rows that ran inside it. */
+export interface TimelineActivityNode {
+	children: readonly TimelineActivityNode[];
+	/** React key: the tool call's id, or the part's position when it has none. */
+	key: string;
+	part: UIMessagePart;
+}
 
 /** Text or reasoning part that is still streaming deltas. */
 export type StreamingTextPart = Extract<

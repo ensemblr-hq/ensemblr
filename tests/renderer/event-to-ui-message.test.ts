@@ -5,6 +5,7 @@ import {
 	eventsToUIMessages,
 	noticeMetadataOf,
 } from '../../src/renderer/lib/agent-timeline/event-to-ui-message';
+import { parentToolCallIdOf } from '../../src/renderer/lib/agent-timeline/subagent-parts';
 import type {
 	AgentPersistedEnvelope,
 	AgentSessionEventWire,
@@ -870,5 +871,149 @@ describe('eventsToUIMessages', () => {
 
 			expect(messages, `reason=${reason}`).toEqual([]);
 		}
+	});
+});
+
+describe('subagent attribution', () => {
+	test('stamps the owning tool call onto a subagent tool call', () => {
+		const messages = eventsToUIMessages([
+			event({
+				id: 'evt-call',
+				payload: {
+					kind: 'message',
+					parentToolCallId: 'task-1',
+					payload: {
+						input: { pattern: 'foo' },
+						kind: 'tool-call',
+						name: 'Grep',
+						toolCallId: 'call-1',
+					},
+					role: 'tool',
+				},
+			}),
+		]);
+
+		expect(parentToolCallIdOf(messages[0]?.parts[0] as never)).toBe('task-1');
+	});
+
+	test('keeps the link when the result outranks the call it settles', () => {
+		const messages = eventsToUIMessages([
+			event({
+				id: 'evt-call',
+				ordinal: 0,
+				payload: {
+					kind: 'message',
+					parentToolCallId: 'task-1',
+					payload: {
+						input: { pattern: 'foo' },
+						kind: 'tool-call',
+						name: 'Grep',
+						toolCallId: 'call-1',
+					},
+					role: 'tool',
+				},
+			}),
+			event({
+				id: 'evt-result',
+				ordinal: 1,
+				payload: {
+					kind: 'message',
+					parentToolCallId: 'task-1',
+					payload: {
+						isError: false,
+						kind: 'tool-result',
+						output: { content: [{ text: 'match', type: 'text' }] },
+						toolCallId: 'call-1',
+					},
+					role: 'tool',
+				},
+			}),
+		]);
+
+		const parts = messages.flatMap((message) => message.parts);
+		expect(parts).toHaveLength(1);
+		expect(parts[0]?.type === 'dynamic-tool' && parts[0].state).toBe(
+			'output-available',
+		);
+		expect(parentToolCallIdOf(parts[0] as never)).toBe('task-1');
+	});
+
+	test('does not concatenate a subagent delta into the main thread buffer', () => {
+		const messages = eventsToUIMessages([
+			event({
+				id: 'evt-main',
+				ordinal: 0,
+				payload: {
+					kind: 'message',
+					payload: { kind: 'text-delta', text: 'main ' },
+					role: 'agent',
+				},
+			}),
+			event({
+				id: 'evt-sub',
+				ordinal: 1,
+				payload: {
+					kind: 'message',
+					parentToolCallId: 'task-1',
+					payload: { kind: 'text-delta', text: 'delegate' },
+					role: 'agent',
+				},
+			}),
+		]);
+
+		const parts = messages.flatMap((message) => message.parts);
+		expect(parts).toHaveLength(2);
+		expect(
+			parts.map((part) => (part.type === 'text' ? part.text : '')),
+		).toEqual(['main ', 'delegate']);
+	});
+
+	test('does not let a subagent seal drop the main thread streaming text', () => {
+		const messages = eventsToUIMessages([
+			event({
+				id: 'evt-main',
+				ordinal: 0,
+				payload: {
+					kind: 'message',
+					payload: { kind: 'text-delta', text: 'still writing' },
+					role: 'agent',
+				},
+			}),
+			event({
+				id: 'evt-sub',
+				ordinal: 1,
+				payload: {
+					kind: 'message',
+					parentToolCallId: 'task-1',
+					payload: { kind: 'text', text: 'delegate report' },
+					role: 'agent',
+				},
+			}),
+		]);
+
+		const texts = messages
+			.flatMap((message) => message.parts)
+			.flatMap((part) => (part.type === 'text' ? [part.text] : []));
+		expect(texts).toEqual(['still writing', 'delegate report']);
+	});
+
+	test('leaves rows without a link unowned, as Pi and pre-existing rows are', () => {
+		const messages = eventsToUIMessages([
+			event({
+				id: 'evt-call',
+				payload: {
+					kind: 'message',
+					payload: {
+						input: {},
+						kind: 'tool-call',
+						name: 'Grep',
+						toolCallId: 'call-1',
+					},
+					role: 'tool',
+				},
+			}),
+		]);
+
+		expect(parentToolCallIdOf(messages[0]?.parts[0] as never)).toBeNull();
 	});
 });

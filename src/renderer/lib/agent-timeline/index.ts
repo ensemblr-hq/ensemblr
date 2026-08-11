@@ -30,6 +30,12 @@ export {
 	chipLabelForPath,
 	parsePromptAttachments,
 } from './prompt-attachment-parser.ts';
+export {
+	countNestedToolCalls,
+	dropEchoedSubagentReports,
+	groupSubagentActivity,
+	parentToolCallIdOf,
+} from './subagent-parts.ts';
 export { parseToolDiagnostics } from './tool-diagnostics.ts';
 export {
 	classifyToolOutput,

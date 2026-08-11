@@ -286,6 +286,12 @@ export type AgentEvent =
 	  }
 	| {
 			at: string;
+			/**
+			 * Tool call whose subagent produced this message, absent on the main
+			 * thread. Mirrors the Claude SDK's `parent_tool_use_id`; adapters whose
+			 * runtime has no subagents leave it unset.
+			 */
+			parentToolCallId?: string;
 			payload: AgentMessagePayload;
 			role: 'agent' | 'tool' | 'user';
 			turnId: string | null;

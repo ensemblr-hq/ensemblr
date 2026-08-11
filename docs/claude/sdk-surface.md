@@ -25,6 +25,7 @@ of `buildPiSessionArgs` for Pi.
 | `canUseTool` | set only in `approval-required` | The per-tool approval card; falls back to an allow-and-warn placeholder when the composition root wired no gate |
 | `cwd` | `metadata.cwd` | The workspace worktree |
 | `env` | `stripLaunchContextEnv({ ...baseEnv, ...metadata.env })` | `baseEnv` is the login-shell env (ADR 0003 / ADR 0031) so a Finder-launched app still finds `claude`; the strip drops the macOS/Electron launch-context keys that would make LaunchServices re-attribute the child to Ensemblr |
+| `forwardSubagentText` | `true` | Without it a subagent forwards only its `tool_use`/`tool_result` blocks, so a `Task` card nests tool rows with none of the prose that explains them |
 | `includePartialMessages` | `true` | Required for `stream_event` deltas — without it the timeline has no streaming text |
 | `effort` | `low` \| `medium` \| `high` \| `xhigh` \| `max` | From `toClaudeEffortLevel(request.thinkingLevel)` |
 | `thinking` | `{ type: 'adaptive', display: 'summarized' }`, always | `CLAUDE_THINKING_CONFIG`. Supersedes the deprecated `maxThinkingTokens` option, which is ignored once this is set. Unconditional because the flag it becomes is sticky for the life of the process — a session opened `disabled` could never turn reasoning back on — so `off` is expressed by zeroing the budget after the open instead. The display is not cosmetic: a non-interactive session that names none has its thinking forced to `omitted`, and an omitted block reaches the timeline as a signature with no prose |
@@ -139,7 +140,7 @@ main model.
 | `stream_event` | `content_block_delta` / `text_delta` | `message` · `text-delta` (broadcast, never persisted) |
 | `stream_event` | `content_block_delta` / `thinking_delta` | `message` · `reasoning-delta`, **and** banks the text under the block index |
 | `stream_event` | `content_block_delta` / `input_json_delta` | dropped — the wire union has no partial-tool-input variant and the seal delivers the complete input a moment later |
-| `assistant` | — | `status`→`streaming`; `message` seal (`text` / `reasoning` / `tool-call` parts); one `message` · `tool-call` per `tool_use` block; `context-usage` when this is a main-thread response |
+| `assistant` | — | `status`→`streaming`; `message` seal (`text` / `reasoning` / `tool-call` parts); one `message` · `tool-call` per `tool_use` block; `context-usage` when this is a main-thread response. Every emitted event carries `parentToolCallId` when the message came from a subagent |
 | `user` | tool output | one `message` · `tool-result` per `tool_result` block |
 | `user` | prompt echo | dropped — the adapter already emitted the prompt on submit |
 | `result` | any | `context-usage` (window from `modelUsage`); `status`→`idle` |
@@ -181,8 +182,29 @@ complete hunks; `type: 'create'` is skipped. See
 | `percent` | `tokens / contextWindow * 100`, or `null` when no window is known |
 
 A message with `parent_tool_use_id !== null` is a subagent response: it seals
-normally but never updates occupancy. No snapshot is emitted until both halves
-are non-zero, and an unchanged reading is not re-emitted.
+normally but never updates occupancy, because it is measured against its own
+near-empty window and letting it through would sawtooth the gauge. No snapshot is
+emitted until both halves are non-zero, and an unchanged reading is not
+re-emitted.
+
+## Subagent attribution
+
+The SDK forwards a `Task`'s messages **flat at top level**, tagged
+`parent_tool_use_id` — never nested. The normalizer copies that id onto every
+event the message produces as `AgentEvent.parentToolCallId`, which rides inside
+`agent_session_events.payload_json` (optional, so Pi rows and rows persisted
+before it existed are byte-identical and read as main-thread). The renderer
+re-nests the flat stream into a card per delegation from that id alone.
+
+| SDK message | Where the id lands |
+|---|---|
+| `assistant` | the `message` seal **and** each `tool-call` it fans out |
+| `user` | each `tool-result` |
+| `stream_event` | `text-delta` and `reasoning-delta` |
+
+Reasoning is banked per thread, not per session: an interleaved subagent's
+`message_start` must not clear the main thread's buffer, and its `thinking_delta`
+blocks number from zero just as the main thread's do.
 
 ## Adapter-emitted events the SDK has no say in
 

@@ -2905,6 +2905,10 @@ export default interface Resources {
 				named: 'Skill: {{name}}';
 				title: 'Skill';
 			};
+			subagent: {
+				named: 'Sub-agent: {{type}}';
+				title: 'Sub-agent';
+			};
 			write: {
 				title: 'Write';
 			};

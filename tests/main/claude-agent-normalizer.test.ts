@@ -1097,3 +1097,196 @@ test('a non-plan tool call is not mistaken for a plan submission', () => {
 		true,
 	);
 });
+
+test('stamps a subagent assistant seal and its tool calls with the parent call', () => {
+	const { normalize } = createNormalizer();
+	normalize(initMessage());
+
+	const events = normalize({
+		message: {
+			content: [
+				{ text: 'searching', type: 'text' },
+				{
+					id: 'toolu_5',
+					input: { pattern: 'x' },
+					name: 'Grep',
+					type: 'tool_use',
+				},
+			],
+			usage: { input_tokens: 10, output_tokens: 5 },
+		},
+		parent_tool_use_id: 'toolu_task_1',
+		type: 'assistant',
+	});
+
+	const messages = events.filter((event) => event.type === 'message');
+	assert.equal(messages.length, 2);
+	assert.equal(
+		messages.every(
+			(event) =>
+				event.type === 'message' && event.parentToolCallId === 'toolu_task_1',
+		),
+		true,
+	);
+});
+
+test('a subagent response never restates the main thread context usage', () => {
+	const { normalize, observeContextUsage } = createNormalizer();
+	normalize(initMessage());
+	observeContextUsage({ contextWindow: 200_000, tokens: 1_000 });
+
+	const events = normalize({
+		message: {
+			content: [{ text: 'delegate prose', type: 'text' }],
+			usage: { input_tokens: 50, output_tokens: 5 },
+		},
+		parent_tool_use_id: 'toolu_task_1',
+		type: 'assistant',
+	});
+
+	assert.equal(
+		events.some((event) => event.type === 'context-usage'),
+		false,
+	);
+});
+
+test('a main-thread response still reports context usage and carries no parent', () => {
+	const { normalize, observeContextUsage } = createNormalizer();
+	normalize(initMessage());
+	observeContextUsage({ contextWindow: 200_000, tokens: 1_000 });
+
+	const events = normalize({
+		message: {
+			content: [{ text: 'my own answer', type: 'text' }],
+			usage: { input_tokens: 4_000, output_tokens: 200 },
+		},
+		parent_tool_use_id: null,
+		type: 'assistant',
+	});
+
+	assert.equal(
+		events.some((event) => event.type === 'context-usage'),
+		true,
+	);
+	const [seal] = events.filter((event) => event.type === 'message');
+	assert.equal(
+		seal !== undefined && Object.hasOwn(seal, 'parentToolCallId'),
+		false,
+	);
+});
+
+test('an absent parent field is read as the main thread, not as a subagent', () => {
+	const { normalize, observeContextUsage } = createNormalizer();
+	normalize(initMessage());
+	observeContextUsage({ contextWindow: 200_000, tokens: 1_000 });
+
+	const events = normalize({
+		message: {
+			content: [{ text: 'no parent field at all', type: 'text' }],
+			usage: { input_tokens: 4_000, output_tokens: 200 },
+		},
+		type: 'assistant',
+	});
+
+	assert.equal(
+		events.some((event) => event.type === 'context-usage'),
+		true,
+	);
+});
+
+test('stamps a subagent tool result with the parent call', () => {
+	const { normalize } = createNormalizer();
+	normalize(initMessage());
+
+	const events = normalize({
+		message: {
+			content: [
+				{
+					content: [{ text: 'match', type: 'text' }],
+					tool_use_id: 'toolu_5',
+					type: 'tool_result',
+				},
+			],
+		},
+		parent_tool_use_id: 'toolu_task_1',
+		type: 'user',
+	});
+
+	assert.equal(events.length, 1);
+	const [result] = events;
+	assert.equal(
+		result?.type === 'message' && result.parentToolCallId,
+		'toolu_task_1',
+	);
+});
+
+test('stamps a subagent text delta with the parent call', () => {
+	const { normalize } = createNormalizer();
+	normalize(initMessage());
+
+	const events = normalize({
+		event: {
+			delta: { text: 'partial', type: 'text_delta' },
+			index: 0,
+			type: 'content_block_delta',
+		},
+		parent_tool_use_id: 'toolu_task_1',
+		type: 'stream_event',
+	});
+
+	assert.equal(events.length, 1);
+	const [delta] = events;
+	assert.equal(
+		delta?.type === 'message' && delta.parentToolCallId,
+		'toolu_task_1',
+	);
+});
+
+test('keeps interleaved subagents attributed to their own parent call', () => {
+	const { normalize } = createNormalizer();
+	normalize(initMessage());
+
+	const parents = ['toolu_task_a', 'toolu_task_b', null].flatMap((parent) =>
+		normalize({
+			message: { content: [{ text: 'work', type: 'text' }] },
+			parent_tool_use_id: parent,
+			type: 'assistant',
+		})
+			.filter((event) => event.type === 'message')
+			.map((event) =>
+				event.type === 'message' ? (event.parentToolCallId ?? null) : null,
+			),
+	);
+
+	assert.deepEqual(parents, ['toolu_task_a', 'toolu_task_b', null]);
+});
+
+test('banks reasoning per thread so a subagent cannot refill the main seal', () => {
+	const { normalize } = createNormalizer();
+	normalize(initMessage());
+
+	normalize(thinkingDelta('main thread reasoning'));
+	normalize({
+		event: {
+			delta: { thinking: 'delegate reasoning', type: 'thinking_delta' },
+			index: 0,
+			type: 'content_block_delta',
+		},
+		parent_tool_use_id: 'toolu_task_1',
+		type: 'stream_event',
+	});
+
+	const events = normalize(
+		sealedThinking([{ signature: 'sig', thinking: '', type: 'thinking' }]),
+	);
+	const [seal] = events.filter((event) => event.type === 'message');
+	const parts =
+		seal?.type === 'message' && seal.payload.kind === 'message'
+			? seal.payload.parts
+			: [];
+
+	assert.deepEqual(
+		parts.map((part) => (part.kind === 'reasoning' ? part.text : null)),
+		['main thread reasoning'],
+	);
+});

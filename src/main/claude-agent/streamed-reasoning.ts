@@ -32,7 +32,45 @@ export interface StreamedReasoning {
 }
 
 /**
- * Creates an empty {@link StreamedReasoning} buffer for one session.
+ * Holds one {@link StreamedReasoning} buffer per conversation thread.
+ *
+ * Claude forwards a subagent's stream events interleaved with the main thread's,
+ * and both number their content blocks from zero, so a single session-wide
+ * buffer would let one thread's `message_start` clear the other's banked text
+ * and let one thread's seal consume reasoning the other produced.
+ */
+export interface StreamedReasoningByThread {
+	/**
+	 * The buffer owned by one thread, created on first use.
+	 * @param parentToolCallId - Tool call whose subagent owns the thread, or null on the main thread.
+	 * @returns That thread's reasoning buffer.
+	 */
+	forThread: (parentToolCallId: string | null) => StreamedReasoning;
+}
+
+/**
+ * Creates an empty per-thread {@link StreamedReasoning} registry for one session.
+ * @returns A registry that hands each thread its own buffer.
+ */
+export function createStreamedReasoningByThread(): StreamedReasoningByThread {
+	const buffersByThread = new Map<string, StreamedReasoning>();
+
+	return {
+		forThread: (parentToolCallId) => {
+			const threadKey = parentToolCallId ?? '';
+			const existing = buffersByThread.get(threadKey);
+			if (existing) {
+				return existing;
+			}
+			const created = createStreamedReasoning();
+			buffersByThread.set(threadKey, created);
+			return created;
+		},
+	};
+}
+
+/**
+ * Creates an empty {@link StreamedReasoning} buffer for one thread.
  * @returns A buffer scoped to the assistant message currently streaming.
  */
 export function createStreamedReasoning(): StreamedReasoning {

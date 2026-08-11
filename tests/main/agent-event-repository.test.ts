@@ -256,3 +256,61 @@ test('stderr events are stored on a separate stream and never marked protocol', 
 	});
 	assert.equal(events[0]?.stream, 'stderr');
 });
+
+test('a subagent link round-trips through payload_json', (t) => {
+	const fixture = openFixture(t);
+
+	appendAgentEvent({
+		database: fixture.database,
+		input: {
+			branchId: fixture.branchId,
+			eventType: 'message',
+			payload: {
+				kind: 'message',
+				parentToolCallId: 'toolu_task_1',
+				payload: { kind: 'text', text: 'delegate prose' },
+				role: 'agent',
+			},
+			turnId: fixture.turnId,
+		},
+	});
+
+	const [stored] = listEventsByBranch({
+		branchId: fixture.branchId,
+		database: fixture.database,
+	});
+	assert.deepEqual(stored?.payload, {
+		kind: 'message',
+		parentToolCallId: 'toolu_task_1',
+		payload: { kind: 'text', text: 'delegate prose' },
+		role: 'agent',
+	});
+});
+
+test('a row written without a subagent link reads back without the key', (t) => {
+	const fixture = openFixture(t);
+
+	appendAgentEvent({
+		database: fixture.database,
+		input: {
+			branchId: fixture.branchId,
+			eventType: 'message',
+			payload: {
+				kind: 'message',
+				payload: { kind: 'text', text: 'main thread prose' },
+				role: 'agent',
+			},
+			turnId: fixture.turnId,
+		},
+	});
+
+	const [stored] = listEventsByBranch({
+		branchId: fixture.branchId,
+		database: fixture.database,
+	});
+	assert.equal(
+		stored !== undefined &&
+			Object.hasOwn(stored.payload ?? {}, 'parentToolCallId'),
+		false,
+	);
+});

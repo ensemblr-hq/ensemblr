@@ -23,6 +23,7 @@ import {
 	buildErrorMessage,
 	buildInterruptedMessage,
 } from './diagnostic-event-mapper';
+import { parentToolCallIdOf } from './subagent-parts.ts';
 import {
 	dropStreamingPartsOfType,
 	isDoneTextPart,
@@ -528,7 +529,11 @@ function handleMessageEnvelope(
 
 	const incomingParts = mergeParts(
 		[],
-		projectMessagePayload(event, envelope.payload),
+		projectMessagePayload(
+			event,
+			envelope.payload,
+			envelope.parentToolCallId ?? null,
+		),
 	);
 	if (incomingParts.length === 0) {
 		// Nothing to render (e.g., an unknown frame variant). Skip without
@@ -563,46 +568,66 @@ function handleMessageEnvelope(
  * Projects a single message payload into one or more UI parts. The variant
  * map keeps the renderer ignorant of Pi's wire shapes — the adapter has
  * already normalized them.
+ * @param event - The persisted event frame carrying the payload
+ * @param payload - The normalized message payload
+ * @param parentToolCallId - Tool call whose subagent produced it, or null on the main thread
+ * @returns The UI parts for this payload
  */
 function projectMessagePayload(
 	event: AgentEventFrame,
 	payload: AgentWireMessagePayload,
+	parentToolCallId: string | null,
 ): UIMessagePart[] {
+	const link = parentToolCallId ? { parentToolCallId } : {};
 	switch (payload.kind) {
 		case 'text':
 			return payload.text
-				? [{ state: 'done', text: payload.text, type: 'text' }]
+				? [{ ...link, state: 'done', text: payload.text, type: 'text' }]
 				: [];
 		case 'reasoning':
-			return [{ state: 'done', text: payload.text, type: 'reasoning' }];
+			return [
+				{ ...link, state: 'done', text: payload.text, type: 'reasoning' },
+			];
 		case 'custom':
 			return payload.text
 				? [
-						buildCustomMessagePart({
-							customType: payload.customType,
-							display: payload.display,
-							text: payload.text,
-						}),
+						{
+							...buildCustomMessagePart({
+								customType: payload.customType,
+								display: payload.display,
+								text: payload.text,
+							}),
+							...link,
+						},
 					]
 				: [];
 		case 'text-delta':
 			return payload.text
-				? [{ state: 'streaming', text: payload.text, type: 'text' }]
+				? [{ ...link, state: 'streaming', text: payload.text, type: 'text' }]
 				: [];
 		case 'reasoning-delta':
 			return payload.text
-				? [{ state: 'streaming', text: payload.text, type: 'reasoning' }]
+				? [
+						{
+							...link,
+							state: 'streaming',
+							text: payload.text,
+							type: 'reasoning',
+						},
+					]
 				: [];
 		case 'prompt':
 			return payload.prompt
-				? [{ state: 'done', text: payload.prompt, type: 'text' }]
+				? [{ ...link, state: 'done', text: payload.prompt, type: 'text' }]
 				: [];
 		case 'tool-call':
-			return [buildToolCallPart(payload, event)];
+			return [buildToolCallPart(payload, event, parentToolCallId)];
 		case 'tool-result':
-			return [buildToolResultPart(payload, event)];
+			return [buildToolResultPart(payload, event, parentToolCallId)];
 		case 'message':
-			return payload.parts.flatMap((part) => projectMessagePart(part, event));
+			return payload.parts.flatMap((part) =>
+				projectMessagePart(part, event, parentToolCallId),
+			);
 		case 'unknown':
 			return [];
 		default: {
@@ -618,23 +643,26 @@ function projectMessagePayload(
  * text, reasoning, and tool call/result variants.
  * @param part - A single wire message part
  * @param event - The persisted Pi event frame the part belongs to
+ * @param parentToolCallId - Tool call whose subagent produced it, or null on the main thread
  * @returns The UI parts for this part, or an empty array when it has no content
  */
 function projectMessagePart(
 	part: AgentWireMessagePart,
 	event: AgentEventFrame,
+	parentToolCallId: string | null,
 ): UIMessagePart[] {
+	const link = parentToolCallId ? { parentToolCallId } : {};
 	switch (part.kind) {
 		case 'text':
 			return part.text
-				? [{ state: 'done', text: part.text, type: 'text' }]
+				? [{ ...link, state: 'done', text: part.text, type: 'text' }]
 				: [];
 		case 'reasoning':
-			return [{ state: 'done', text: part.text, type: 'reasoning' }];
+			return [{ ...link, state: 'done', text: part.text, type: 'reasoning' }];
 		case 'tool-call':
-			return [buildToolCallPart(part, event)];
+			return [buildToolCallPart(part, event, parentToolCallId)];
 		case 'tool-result':
-			return [buildToolResultPart(part, event)];
+			return [buildToolResultPart(part, event, parentToolCallId)];
 		default: {
 			const exhaustive: never = part;
 			void exhaustive;
@@ -658,7 +686,11 @@ function mergeParts(
 			continue;
 		}
 		if (isDoneTextPart(incomingPart)) {
-			merged = dropStreamingPartsOfType(merged, incomingPart.type);
+			merged = dropStreamingPartsOfType(
+				merged,
+				incomingPart.type,
+				parentToolCallIdOf(incomingPart),
+			);
 			merged.push(incomingPart);
 			continue;
 		}

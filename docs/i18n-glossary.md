@@ -35,6 +35,7 @@ Rules of thumb:
 | Checkpoint | Контрольная точка | Σημείο ελέγχου | |
 | Harness | Харнесс | Harness | The Claude Code / Codex terminal integration. Ensemblr-specific. |
 | Agent | Агент | Πράκτορας | |
+| Sub-agent | Суб-агент | Υποπράκτορας | An agent another agent delegated to — Claude Code's `Task` tool, and Ensemblr's own spawned conversations. Both terms were already fixed by the control-tool copy; this row records them. |
 | Conversation | Диалог | Συνομιλία | The chat tab's thread. |
 | Chat | Чат | Συνομιλία | The tab as the user opens it — `New chat` is `Новый чат`/`Νέα συνομιλία`. Russian splits the two: the thing you open is a `чат`, the thread inside it is a `диалог`. Greek uses `συνομιλία` for both. One exception in Russian: a chat that is over — a closed tab in history, a transcript offered to the composer — is named for the thread it left behind, so `Untitled chat` is `Диалог без названия` (`session-tabs.untitled-closed`, `review:file-diff.untitled-chat`). |
 | Turn | Ход | Γύρος | One agent request/response cycle. |
