@@ -24,7 +24,7 @@ import { WorkspaceDiffStats } from '@/renderer/components/workbench-shell/worksp
 import { useWorkspaceBusy } from '@/renderer/hooks/workspace/use-workspace-busy';
 import { cn } from '@/renderer/lib/utils';
 import { getWorkspaceSidebarState } from '@/renderer/lib/workbench';
-import { useWorkspaceUnread } from '@/renderer/state/workspace';
+import { useWorkspaceIsUnread } from '@/renderer/state/workspace';
 import type { WorkspaceSidebarStateKind } from '@/renderer/types/components';
 import type { WorkspaceShellModel } from '@/renderer/types/workbench';
 
@@ -87,7 +87,7 @@ export function WorkspaceCard({
 }) {
 	const { t } = useTranslation();
 	const menu = useBoardWorkspaceMenuController();
-	const isUnread = useWorkspaceUnread(workspace.id);
+	const isUnread = useWorkspaceIsUnread(workspace.id);
 	const hasDiffStats =
 		workspace.changeSummary.additions > 0 ||
 		workspace.changeSummary.deletions > 0;

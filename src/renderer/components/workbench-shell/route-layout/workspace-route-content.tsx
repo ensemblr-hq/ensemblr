@@ -22,6 +22,7 @@ import { configuredPreviewUrls } from '@/renderer/lib/workbench/preview-urls';
 import { isDockTab } from '@/renderer/lib/workbench/route-search';
 import { useAgentComposerController } from '@/renderer/state/composer';
 import { repoSettingsOverrideAtomFamily } from '@/renderer/state/preferences';
+import { usePublishActiveChat } from '@/renderer/state/unread';
 import {
 	usePublishWorkspaceDockActivity,
 	useSessionTabState,
@@ -126,6 +127,12 @@ export function WorkspaceRouteContent({
 			sharedActionPreference(settingsResolution, 'general'),
 		),
 		workspaceCwd: activeWorkspace.pathLabel,
+		workspaceId: activeWorkspace.id,
+	});
+	usePublishActiveChat({
+		agentSessionId:
+			agentComposer.activeSessionId ?? activeSession.agentSessionId,
+		chatTabId: activeSession.chatTabId,
 		workspaceId: activeWorkspace.id,
 	});
 	const { closeGuard, guardedSessionNavigation } = useGuardedSessionClose({

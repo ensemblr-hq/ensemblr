@@ -86,6 +86,9 @@ const LayoutModelContext = makeShellContext<WorkbenchLayoutModel>(
 );
 export const WorkbenchLayoutModelProvider = LayoutModelContext.Provider;
 export const useWorkbenchLayoutRouteModel = LayoutModelContext.use;
+/** Non-throwing variant, for composer chrome the playground mounts standalone. */
+export const useWorkbenchLayoutRouteModelOptional =
+	LayoutModelContext.useOptional;
 
 const WorkspaceMainContentCtx = makeShellContext<WorkspaceMainContentState>(
 	'useWorkspaceMainContent',

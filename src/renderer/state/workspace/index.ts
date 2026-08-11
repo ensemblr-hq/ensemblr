@@ -4,6 +4,7 @@ export {
 	useWorkspaceBoardOrder,
 	useWorkspaceBoardStatus,
 	useWorkspaceBoardStatuses,
+	useWorkspaceIsUnread,
 	useWorkspaceUnread,
 } from './board-state';
 export {

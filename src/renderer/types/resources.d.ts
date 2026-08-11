@@ -2117,6 +2117,9 @@ export default interface Resources {
 			'attachment-failed': 'Failed to attach selected file.';
 			'blocked-follow-up': 'Follow-ups are blocked while the agent is working — stop the turn or wait for it to finish.';
 			'focus-hint': '<key>{{shortcut}}</key><label>to focus</label>';
+			'last-unread': 'Last unread';
+			'last-unread-tooltip': 'Jump to the newest unread chat in {{workspace}}';
+			'last-unread-tooltip-generic': 'Jump to the newest unread chat';
 			model: {
 				pending: 'Model pending';
 			};
@@ -2752,6 +2755,7 @@ export default interface Resources {
 				toggle: 'Toggle Pi debug panel';
 			};
 			'new-tab': 'New chat tab';
+			unread: 'Unread messages';
 			untitled: 'New chat';
 			'untitled-closed': 'Untitled chat';
 		};
@@ -2957,6 +2961,8 @@ export default interface Resources {
 			'dock-activity': 'Dock activity running';
 			'open-aria': 'Open workspace {{workspace}}';
 			'open-busy-aria': 'Open workspace {{workspace}}; dock activity running';
+			unread_one: '{{count}} unread chat';
+			unread_other: '{{count}} unread chats';
 		};
 		'workspace-landing': {
 			'branch-source': {

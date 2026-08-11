@@ -50,11 +50,3 @@ test('marking a workspace unread and read toggles the id', () => {
 	act(() => result.current.actions.markWorkspaceRead('w1'));
 	expect(result.current.unread).toEqual([]);
 });
-
-test('toggleWorkspaceUnread flips the unread state', () => {
-	const { result } = renderBoardState();
-	act(() => result.current.actions.toggleWorkspaceUnread('w1'));
-	expect(result.current.unread).toEqual(['w1']);
-	act(() => result.current.actions.toggleWorkspaceUnread('w1'));
-	expect(result.current.unread).toEqual([]);
-});

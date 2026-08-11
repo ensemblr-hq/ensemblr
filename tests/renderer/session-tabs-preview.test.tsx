@@ -69,6 +69,7 @@ function renderStrip(isPreview: boolean) {
 			onSessionTabRestore={() => undefined}
 			onSessionTabsReorder={() => undefined}
 			sessions={sessions}
+			unreadKeys={new Set()}
 		/>,
 	);
 	return { pinned, ...rendered };

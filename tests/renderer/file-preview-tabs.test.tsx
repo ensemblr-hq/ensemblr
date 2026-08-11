@@ -76,6 +76,7 @@ describe('file preview tabs', () => {
 				onSessionTabRestore={() => undefined}
 				onSessionTabsReorder={() => undefined}
 				sessions={[previewSession]}
+				unreadKeys={new Set()}
 			/>,
 		);
 
@@ -106,6 +107,7 @@ describe('file preview tabs', () => {
 					onSessionTabRestore={() => undefined}
 					onSessionTabsReorder={() => undefined}
 					sessions={[previewSession]}
+					unreadKeys={new Set()}
 				/>
 			</Provider>,
 		);
@@ -190,6 +192,7 @@ describe('session tab close controls', () => {
 				onSessionTabRestore={() => undefined}
 				onSessionTabsReorder={() => undefined}
 				sessions={[chatA, chatB]}
+				unreadKeys={new Set()}
 			/>,
 		);
 
@@ -224,6 +227,7 @@ describe('session tab close controls', () => {
 				onSessionTabRestore={() => undefined}
 				onSessionTabsReorder={() => undefined}
 				sessions={[chatA]}
+				unreadKeys={new Set()}
 			/>,
 		);
 
@@ -243,6 +247,7 @@ describe('session tab close controls', () => {
 				onSessionTabRestore={() => undefined}
 				onSessionTabsReorder={() => undefined}
 				sessions={[previewSession]}
+				unreadKeys={new Set()}
 			/>,
 		);
 

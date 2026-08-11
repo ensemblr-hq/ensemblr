@@ -7,6 +7,7 @@ import type { WorkspaceShellModel } from '@/renderer/types/workbench';
 
 import { WorkspaceDiffStats } from './diff-stats';
 import { DockActivityDot } from './dock-activity-dot';
+import { WorkspaceUnreadDot } from './unread-dot';
 
 /** What a sidebar row renders inside its button, live state already resolved. */
 interface WorkspaceSidebarItemContentProps {
@@ -15,6 +16,8 @@ interface WorkspaceSidebarItemContentProps {
 	isPendingCreation: boolean;
 	isUnread: boolean;
 	sidebarState: ReturnType<typeof getWorkspaceSidebarState>;
+	/** Chats in this workspace waiting to be read; zero renders no dot. */
+	unreadCount: number;
 	workspace: WorkspaceShellModel;
 }
 
@@ -30,6 +33,7 @@ export function WorkspaceSidebarItemContent({
 	isPendingCreation,
 	isUnread,
 	sidebarState,
+	unreadCount,
 	workspace,
 }: WorkspaceSidebarItemContentProps) {
 	const { t } = useTranslation();
@@ -58,6 +62,9 @@ export function WorkspaceSidebarItemContent({
 						{workspace.name}
 					</span>
 					<div className='flex shrink-0 items-center gap-1.5'>
+						{unreadCount > 0 ? (
+							<WorkspaceUnreadDot count={unreadCount} />
+						) : null}
 						{hasDiffStats ? <WorkspaceDiffStats workspace={workspace} /> : null}
 						{dockActivityState ? (
 							<DockActivityDot state={dockActivityState} />

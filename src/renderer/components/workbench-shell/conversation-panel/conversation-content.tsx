@@ -8,6 +8,7 @@ import {
 } from '@/renderer/lib/workbench';
 import { usePiRawFrameCapture } from '@/renderer/state/pi';
 import { developerModeAtom } from '@/renderer/state/preferences';
+import { useWorkspaceUnreadKeys } from '@/renderer/state/unread';
 import type {
 	ComposerShellState,
 	SessionTabModel,
@@ -87,6 +88,7 @@ export function WorkspaceConversationContent({
 	const debugSessionId =
 		activeSession.agentSessionId ?? composer.activeAgentSessionId ?? null;
 	const isChatTab = (activeSession.kind ?? 'chat') === 'chat';
+	const unreadKeys = useWorkspaceUnreadKeys(activeWorkspace.id);
 
 	const { openFilePreview, openTurnDiff, resolveWorkspacePath } =
 		useConversationOpeners({
@@ -110,6 +112,7 @@ export function WorkspaceConversationContent({
 				onSessionTabRestore={onSessionTabRestore}
 				onSessionTabsReorder={onSessionTabsReorder}
 				sessions={sessionTabs}
+				unreadKeys={unreadKeys}
 			/>
 			{isChatTab ? (
 				<ChatTabBody

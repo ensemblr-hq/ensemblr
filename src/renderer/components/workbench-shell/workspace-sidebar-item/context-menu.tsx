@@ -23,11 +23,12 @@ import {
 	BOARD_STATUS_PRESENTATION,
 	boardStatusLabel,
 } from '@/renderer/lib/workbench/board-status-presentation';
+import { useUnreadChatActions } from '@/renderer/state/unread';
 import {
 	BOARD_STATUS_ORDER,
 	useWorkspaceBoardActions,
 	useWorkspaceBoardStatus,
-	useWorkspaceUnread,
+	useWorkspaceIsUnread,
 } from '@/renderer/state/workspace';
 import type { WorkspaceShellModel } from '@/renderer/types/workbench';
 import {
@@ -63,11 +64,22 @@ export function WorkspaceContextMenuContent({
 }) {
 	const { t } = useTranslation();
 	const currentStatus = useWorkspaceBoardStatus(workspace.id);
-	const isUnread = useWorkspaceUnread(workspace.id);
-	const { setWorkspaceBoardStatus, toggleWorkspaceUnread } =
+	const isUnread = useWorkspaceIsUnread(workspace.id);
+	const { markWorkspaceRead, markWorkspaceUnread, setWorkspaceBoardStatus } =
 		useWorkspaceBoardActions();
+	const { clearWorkspace } = useUnreadChatActions();
 	const currentStatusPresentation = BOARD_STATUS_PRESENTATION[currentStatus];
 	const CurrentStatusIcon = currentStatusPresentation.icon;
+
+	/** Marking read has to clear the per-chat marks too, or the row stays lit. */
+	function toggleUnread() {
+		if (isUnread) {
+			clearWorkspace(workspace.id);
+			markWorkspaceRead(workspace.id);
+			return;
+		}
+		markWorkspaceUnread(workspace.id);
+	}
 
 	return (
 		<ContextMenuContent
@@ -79,9 +91,7 @@ export function WorkspaceContextMenuContent({
 			className='w-56 bg-muted p-1'
 		>
 			<ContextMenuGroup>
-				<SidebarContextMenuItem
-					onSelect={() => toggleWorkspaceUnread(workspace.id)}
-				>
+				<SidebarContextMenuItem onSelect={toggleUnread}>
 					<MailIcon aria-hidden='true' />
 					<span className='min-w-0 flex-1'>
 						{isUnread

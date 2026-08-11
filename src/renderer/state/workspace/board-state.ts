@@ -2,6 +2,8 @@ import { useAtomValue, useSetAtom } from 'jotai';
 import { selectAtom } from 'jotai/utils';
 import { useMemo } from 'react';
 
+import { useWorkspaceUnreadCount } from '@/renderer/state/unread';
+
 import { moveToColumnEnd, reorderBoardOrder } from './board-order';
 import {
 	applyBoardStatus,
@@ -32,7 +34,6 @@ interface WorkspaceBoardActions {
 		workspaceId: string,
 		status: WorkspaceBoardStatus,
 	) => void;
-	toggleWorkspaceUnread: (workspaceId: string) => void;
 }
 
 /**
@@ -76,10 +77,12 @@ export function useWorkspaceBoardStatus(
 }
 
 /**
- * Reads whether a single workspace is marked unread, scoped so only the
- * affected row re-renders on change.
+ * Reads the manual "mark unread" flag for one workspace, scoped so only the
+ * affected row re-renders on change. Callers rendering a workspace almost always
+ * want {@link useWorkspaceIsUnread} instead — this answers only half the
+ * question.
  * @param workspaceId - Workspace whose unread flag to read.
- * @returns True when the workspace is unread.
+ * @returns True when the workspace was manually marked unread.
  */
 export function useWorkspaceUnread(workspaceId: string): boolean {
 	const unreadAtom = useMemo(
@@ -90,6 +93,20 @@ export function useWorkspaceUnread(workspaceId: string): boolean {
 		[workspaceId],
 	);
 	return useAtomValue(unreadAtom);
+}
+
+/**
+ * Whether a workspace should read as unread wherever it is listed. Folds both
+ * sources — the manual flag the context menu sets, and whether any of its chats
+ * is waiting to be read — so the sidebar row, the board card, and the context
+ * menu cannot drift apart on the answer.
+ * @param workspaceId - Workspace to test.
+ * @returns True when either source says unread.
+ */
+export function useWorkspaceIsUnread(workspaceId: string): boolean {
+	const isManuallyUnread = useWorkspaceUnread(workspaceId);
+	const unreadCount = useWorkspaceUnreadCount(workspaceId);
+	return isManuallyUnread || unreadCount > 0;
 }
 
 /**
@@ -136,12 +153,6 @@ export function useWorkspaceBoardActions(): WorkspaceBoardActions {
 			setWorkspaceBoardStatus: (workspaceId, status) =>
 				setBoardStatus((statusByWorkspaceId) =>
 					applyBoardStatus(statusByWorkspaceId, workspaceId, status),
-				),
-			toggleWorkspaceUnread: (workspaceId) =>
-				setUnreadWorkspaceIds((workspaceIds) =>
-					workspaceIds.includes(workspaceId)
-						? workspaceIds.filter((id) => id !== workspaceId)
-						: [...workspaceIds, workspaceId],
 				),
 		}),
 		[setBoardOrder, setBoardStatus, setUnreadWorkspaceIds],

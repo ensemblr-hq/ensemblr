@@ -12,6 +12,7 @@ import { TabScrollerScene } from './tab-scroller-preview.tsx';
 import { TimelinePreview } from './timeline-preview.tsx';
 import { ToolApprovalScene } from './tool-approval-preview.tsx';
 import { TurnSummaryPreview } from './turn-summary-preview.tsx';
+import { UnreadScene } from './unread-preview.tsx';
 import { ViewersScene } from './viewers-preview.tsx';
 
 /**
@@ -99,6 +100,12 @@ export const SCENE_GROUPS = [
 				label: 'tabs',
 				render: () => <TabScrollerScene />,
 				source: 'playground/tab-scroller-preview.tsx',
+			},
+			{
+				id: 'unread',
+				label: 'unread',
+				render: () => <UnreadScene />,
+				source: 'playground/unread-preview.tsx',
 			},
 			{
 				id: 'viewers',
