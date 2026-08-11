@@ -133,7 +133,7 @@
 		"description": "How chats behave day to day: the language Ensemblr speaks, how messages are sent, and what it does while an agent is working.",
 		"follow-up": {
 			"block": "Block",
-			"description": "Queue messages to send after the agent finishes, or steer the agent mid-turn. Use ⌘J to queue.",
+			"description": "Steer the agent mid-turn, queue messages until it finishes, or hold them until you send them. A queued message stays editable. {{shortcut}} queues in any mode.",
 			"label": "Follow-up behavior",
 			"queue": "Queue",
 			"steer": "Steer"

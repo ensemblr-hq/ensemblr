@@ -5,6 +5,7 @@ export {
 	getComposerState,
 	resolveComposerProvider,
 	resolveContextUsage,
+	resolveSendIntent,
 	showContextIndicator,
 	showsComposer,
 } from './composer';

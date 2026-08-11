@@ -1,13 +1,23 @@
 import { useTranslation } from 'react-i18next';
 import type { ComposerStateApi } from '@/renderer/hooks/workbench-shell/composer/use-composer-state';
+import { formatShortcut } from '@/shared/keymap';
 import { LinkedDirectoryChip } from './linked-directory-chip';
+
+/** Keyboard shortcut that queues the current draft, named in the held notice. */
+const QUEUE_SHORTCUT = formatShortcut('composer.queue');
 
 /**
  * The strip above the composer editor: the directories this chat has been given
- * access to, the attachment error, and the blocked-follow-up notice. Split out
+ * access to, the attachment error, and the held-follow-up notice. Split out
  * of `ComposerPanel` so the panel stays a layout shell and each notice's render
  * condition lives next to the thing it describes. Renders nothing when there is
  * nothing to say.
+ *
+ * The held notice reads off `sendIntent`, which is derived per render. The flag
+ * it replaced was latched on a rejected keypress, so it outlived the turn that
+ * justified it and followed the user onto an idle tab. It is the only surface
+ * for that state: a chip in the controls row said the same thing at the same
+ * time, and one state announced twice reads as two.
  *
  * Attachment chips are not here — they live inline in the draft, at the position
  * the user put them. A linked directory is not part of any one message: it stays
@@ -50,11 +60,12 @@ export function ComposerNotices({ state }: { state: ComposerStateApi }) {
 					{state.attachmentError}
 				</div>
 			) : null}
-			{state.blockedNotice ? (
+			{state.sendIntent === 'hold' ? (
 				<output className='text-muted-foreground text-xs'>
 					{t(
 						'workbench:composer.blocked-follow-up',
-						'Follow-ups are blocked while the agent is working — stop the turn or wait for it to finish.',
+						'Follow-ups are held while the agent works — sending or {{shortcut}} adds to the queue, and you send it from there once the agent finishes.',
+						{ shortcut: QUEUE_SHORTCUT },
 					)}
 				</output>
 			) : null}

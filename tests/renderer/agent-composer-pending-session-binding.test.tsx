@@ -159,7 +159,7 @@ describe('agent composer pending-session binding', () => {
 		const { openAgentSession, releaseOpen } = installDeferredOpenBridge();
 		const { rerender, result } = renderControllerForTab(SUBMITTING_TAB_ID);
 
-		let submitted: Promise<void> | undefined;
+		let submitted: Promise<unknown> | undefined;
 		await act(async () => {
 			submitted = result.current.onSubmit('start the chat');
 			await flush();
@@ -181,7 +181,7 @@ describe('agent composer pending-session binding', () => {
 		const { releaseOpen } = installDeferredOpenBridge();
 		const { rerender, result } = renderControllerForTab(SUBMITTING_TAB_ID);
 
-		let submitted: Promise<void> | undefined;
+		let submitted: Promise<unknown> | undefined;
 		await act(async () => {
 			submitted = result.current.onSubmit('start the chat');
 			await flush();
@@ -205,7 +205,7 @@ describe('agent composer pending-session binding', () => {
 		const { releaseOpen } = installDeferredOpenBridge();
 		const { rerender, result } = renderControllerForTab(SUBMITTING_TAB_ID);
 
-		let submitted: Promise<void> | undefined;
+		let submitted: Promise<unknown> | undefined;
 		await act(async () => {
 			submitted = result.current.onSubmit('start the chat');
 			await flush();
@@ -227,7 +227,7 @@ describe('agent composer pending-session binding', () => {
 		const { releaseOpen, submitAgentPrompt } = installDeferredOpenBridge();
 		const { rerender, result } = renderControllerForTab(SUBMITTING_TAB_ID);
 
-		let submitted: Promise<void> | undefined;
+		let submitted: Promise<unknown> | undefined;
 		await act(async () => {
 			submitted = result.current.onSubmit('start the chat');
 			await flush();

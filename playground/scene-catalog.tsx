@@ -1,6 +1,7 @@
 import { AnswerPreview } from './answer-preview.tsx';
 import { CommentPreviewScene } from './comment-preview.tsx';
 import { ComposerScene } from './composer-preview.tsx';
+import { ComposerQueueScene } from './composer-queue-preview.tsx';
 import { ConflictsScene } from './conflicts-preview.tsx';
 import { ConversationScrollScene } from './conversation-scroll-preview.tsx';
 import { FilePreviewScene } from './file-preview.tsx';
@@ -54,6 +55,12 @@ export const SCENE_GROUPS = [
 				label: 'composer',
 				render: () => <ComposerScene />,
 				source: 'playground/composer-preview.tsx',
+			},
+			{
+				id: 'composer-queue',
+				label: 'composer queue',
+				render: () => <ComposerQueueScene />,
+				source: 'playground/composer-queue-preview.tsx',
 			},
 			{
 				id: 'tool-approval',

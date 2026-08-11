@@ -383,8 +383,9 @@ export default interface Resources {
 		'tool-approval': {
 			'allow-session': 'Allow for this session';
 			'deny-label': 'Deny tool call';
+			'esc-hint': '<key>Esc</key> to deny';
 			headline: 'Claude wants to use {{tool}}.';
-			'key-hints': '1 allow · 2 allow for session · 3 deny · Esc deny';
+			'more-fields': '+{{extra}} more';
 			'section-label': 'Tool approval request';
 			status: 'Approval required for {{tool}}.';
 		};
@@ -1467,7 +1468,7 @@ export default interface Resources {
 			description: 'How chats behave day to day: the language Ensemblr speaks, how messages are sent, and what it does while an agent is working.';
 			'follow-up': {
 				block: 'Block';
-				description: 'Queue messages to send after the agent finishes, or steer the agent mid-turn. Use ⌘J to queue.';
+				description: 'Steer the agent mid-turn, queue messages until it finishes, or hold them until you send them. A queued message stays editable. {{shortcut}} queues in any mode.';
 				label: 'Follow-up behavior';
 				queue: 'Queue';
 				steer: 'Steer';
@@ -2107,7 +2108,7 @@ export default interface Resources {
 		composer: {
 			'aria-label': 'Agent composer';
 			'attachment-failed': 'Failed to attach selected file.';
-			'blocked-follow-up': 'Follow-ups are blocked while the agent is working — stop the turn or wait for it to finish.';
+			'blocked-follow-up': 'Follow-ups are held while the agent works — sending or {{shortcut}} adds to the queue, and you send it from there once the agent finishes.';
 			'focus-hint': '<key>{{shortcut}}</key><label>to focus</label>';
 			'last-unread': 'Last unread';
 			'last-unread-tooltip': 'Jump to the newest unread chat in {{workspace}}';
@@ -2129,6 +2130,8 @@ export default interface Resources {
 				placeholder: 'Ask the agent to continue {{session}}';
 			};
 			'send-tooltip': 'Send message';
+			'send-tooltip-hold': 'Hold until you send it';
+			'send-tooltip-queue': 'Queue for when the agent finishes';
 			'setup-blocked': {
 				placeholder: 'Fix setup blockers before sending a prompt.';
 				reason_one: '{{count}} required setup check needs attention.';
@@ -2403,6 +2406,20 @@ export default interface Resources {
 		};
 		'file-tree-menu': {
 			actions: '{{path}} actions';
+		};
+		'follow-up-queue': {
+			'aria-label_one': '{{count}} message queued';
+			'aria-label_other': '{{count}} messages queued';
+			attachments_one: '{{count}} attachment';
+			attachments_other: '{{count}} attachments';
+			clear: 'Clear all';
+			edit: 'Edit in composer';
+			'edit-blocked': 'Send or clear the current draft first';
+			heading: 'Queued';
+			paused: 'Queued · paused';
+			remove: 'Remove from queue';
+			reorder: 'Reorder, position {{position}}';
+			'send-now': 'Send now';
 		};
 		fork: {
 			'new-tab-title': 'Forked chat';

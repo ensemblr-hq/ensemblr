@@ -381,8 +381,9 @@
 	"tool-approval": {
 		"allow-session": "Allow for this session",
 		"deny-label": "Deny tool call",
+		"esc-hint": "<key>Esc</key> to deny",
 		"headline": "Claude wants to use {{tool}}.",
-		"key-hints": "1 allow · 2 allow for session · 3 deny · Esc deny",
+		"more-fields": "+{{extra}} more",
 		"section-label": "Tool approval request",
 		"status": "Approval required for {{tool}}."
 	},

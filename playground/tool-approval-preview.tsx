@@ -6,7 +6,7 @@ import type {
 	ToolApprovalRequestedBroadcast,
 } from '@/shared/agent-tool-approval';
 
-/** The three shapes of prompt the card has to read well in. */
+/** The shapes of prompt the card has to read well in. */
 const REQUESTS: readonly ToolApprovalRequestedBroadcast[] = [
 	{
 		agentSessionId: 'session-1',
@@ -37,6 +37,28 @@ const REQUESTS: readonly ToolApprovalRequestedBroadcast[] = [
 		requestId: 'req-read',
 		title: 'Claude wants to read report.csv',
 		toolName: 'Read',
+	},
+	{
+		agentSessionId: 'session-1',
+		description:
+			'This migration rewrites every row in the sessions table and cannot be rolled back once it starts.',
+		input: {
+			command:
+				'psql "$DATABASE_URL" -c "BEGIN; ALTER TABLE sessions DROP COLUMN legacy_payload; UPDATE sessions SET migrated_at = now() WHERE migrated_at IS NULL; COMMIT;" \\\n  && npm run db:verify -- --strict --table sessions',
+			description: 'run the sessions migration',
+			run_in_background: 'false',
+			timeout: '600000',
+			working_directory: '/Users/me/code/ensemblr',
+		},
+		requestId: 'req-long',
+		title: 'Claude wants to run a database migration',
+		toolName: 'Bash',
+	},
+	{
+		agentSessionId: 'session-1',
+		input: { query: 'sessions table migration rollback postgres' },
+		requestId: 'req-unknown',
+		toolName: 'mcp__postgres__run_query',
 	},
 ];
 

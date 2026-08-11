@@ -21,7 +21,9 @@ import { useWorkspaceAgentBusy } from '@/renderer/hooks/workspace/use-workspace-
 import { areStringArraysEqual } from '@/renderer/lib/ordered-ids';
 import {
 	forgetComposerDraft,
+	forgetFollowUpQueue,
 	useDropComposerSubmits,
+	useHoldFollowUpQueue,
 } from '@/renderer/state/composer';
 import { useConversationScrollOffsets } from '@/renderer/state/conversation-scroll';
 import { forgetChatOverrides } from '@/renderer/state/preferences';
@@ -131,6 +133,7 @@ export function useSessionTabState({
 	const queryClient = useQueryClient();
 	const scrollOffsets = useConversationScrollOffsets();
 	const dropComposerSubmits = useDropComposerSubmits();
+	const holdFollowUpQueue = useHoldFollowUpQueue();
 	// Live window titles agent harnesses emit via OSC escapes, keyed by their
 	// backing terminal id, so a running agent's own conversation title surfaces
 	// on its tab (falling back to the harness label until one arrives). Display
@@ -192,13 +195,19 @@ export function useSessionTabState({
 			});
 		},
 		onSuccess: (result, { chatTabId }) => {
-			// Drop per-chat overrides and the composer draft only for hard-deleted
-			// tabs; tabs marked closed remain restorable and must keep their
-			// model/thinking picks and unsent draft.
+			// Drop per-chat overrides, the composer draft, and the follow-up queue
+			// only for hard-deleted tabs; tabs marked closed remain restorable and
+			// must keep their model/thinking picks and everything unsent.
 			if (result.deleted) {
 				forgetChatOverrides(chatTabId);
 				forgetComposerDraft(chatTabId);
+				forgetFollowUpQueue(chatTabId);
 				scrollOffsets.forget(chatTabId);
+			} else {
+				// A restorable tab keeps its queue, but pauses it: the user walked away
+				// from those messages, so reopening the tab has to show them waiting
+				// rather than drain them into the first turn that happens to end.
+				holdFollowUpQueue(chatTabId);
 			}
 			// Queued auto-submits are not restorable the way a draft is: they drain
 			// only through a mounted composer, which a closed tab no longer has. Drop

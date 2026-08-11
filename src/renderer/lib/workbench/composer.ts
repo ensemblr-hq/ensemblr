@@ -1,8 +1,11 @@
 import { i18n } from '@/renderer/lib/i18n';
+import type { FollowUpBehavior } from '@/renderer/state/preferences';
 import type {
 	ComposerContextUsage,
 	ComposerModelOption,
+	ComposerSendIntent,
 	ComposerShellState,
+	ComposerSubmitOutcome,
 	ComposerThinkingOption,
 	SessionTabModel,
 	WorkspaceFileSummary,
@@ -125,7 +128,7 @@ export function getComposerState({
 	onSubmit: (
 		prompt: string,
 		options?: { streamingBehavior?: 'steer' | 'followUp' },
-	) => Promise<void> | void;
+	) => Promise<ComposerSubmitOutcome>;
 	onThinkingChange: (thinkingLevel: string) => void;
 	planMode: boolean;
 	setupDiagnostics: SetupDiagnosticsSnapshot | null;
@@ -221,4 +224,22 @@ export function getComposerState({
 					{ session: activeSession.label.toLowerCase() },
 				),
 	};
+}
+
+/**
+ * Resolves what pressing Send would do, given the behavior and whether a turn is
+ * running. Derived per render rather than latched: the flag this replaces went
+ * stale the moment a turn ended and survived a switch onto an idle tab.
+ * @param behavior - The Follow-up behavior setting
+ * @param isStreaming - Whether the agent is mid-turn
+ * @returns Where the next send goes
+ */
+export function resolveSendIntent(
+	behavior: FollowUpBehavior,
+	isStreaming: boolean,
+): ComposerSendIntent {
+	if (!isStreaming || behavior === 'steer') {
+		return 'send';
+	}
+	return behavior === 'block' ? 'hold' : 'queue';
 }

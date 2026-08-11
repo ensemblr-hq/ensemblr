@@ -1,3 +1,4 @@
+import type { TFunction } from 'i18next';
 import { useAtomValue } from 'jotai';
 import { ArrowUpIcon, SquareIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
@@ -19,10 +20,14 @@ import {
 	alwaysShowContextUsageAtom,
 	sendShortcutAtom,
 } from '@/renderer/state/preferences';
-import type { ComposerShellState } from '@/renderer/types/workbench';
+import type {
+	ComposerSendIntent,
+	ComposerShellState,
+} from '@/renderer/types/workbench';
 import { formatShortcut } from '@/shared/keymap';
 import { AttachmentMenu } from './attachment-menu';
 import { ContextIndicator } from './context-indicator';
+import { FollowUpQueuePanel } from './follow-up-queue-panel';
 import { McpServersPanel } from './mcp-servers-panel';
 import { ModelPicker } from './model-picker';
 import { PlanModeToggle } from './plan-mode-toggle';
@@ -91,6 +96,17 @@ export function ComposerControls({
 				/>
 			</div>
 			<div className='flex items-center gap-1'>
+				<FollowUpQueuePanel
+					disabled={composer.disabled}
+					entries={state.followUpQueue}
+					held={state.queueStalled}
+					onClear={state.clearQueue}
+					onEdit={state.hasContent ? null : state.restoreQueued}
+					onMove={state.moveQueued}
+					onRemove={state.removeQueued}
+					onReorder={state.reorderQueue}
+					onSendNow={state.flushQueueNow}
+				/>
 				{provider === 'claude' ? (
 					<McpServersPanel
 						cwd={composer.workspaceCwd}
@@ -118,6 +134,26 @@ export function ComposerControls({
 }
 
 /**
+ * What the Send button promises, so the control names its own outcome instead of
+ * leaving the user to infer it from a setting three screens away.
+ * @param intent - Where the next send goes
+ * @param t - Translator from the calling component, so the line follows the UI language
+ * @returns The tooltip's leading sentence
+ */
+function sendTooltipLabel(intent: ComposerSendIntent, t: TFunction): string {
+	if (intent === 'queue') {
+		return t(
+			'workbench:composer.send-tooltip-queue',
+			'Queue for when the agent finishes',
+		);
+	}
+	if (intent === 'hold') {
+		return t('workbench:composer.send-tooltip-hold', 'Hold until you send it');
+	}
+	return t('workbench:composer.send-tooltip', 'Send message');
+}
+
+/**
  * The send / stop control and its tooltip. Stop shows only while the agent
  * is working AND there is nothing to send — the moment the user drafts a
  * follow-up the control becomes Send, so a live turn never hides the ability
@@ -139,7 +175,7 @@ function SubmitControl({
 			<Button
 				aria-label={t('common:actions.stop', 'Stop')}
 				className='rounded-md'
-				onClick={() => void composer.onStop()}
+				onClick={() => void state.handleStop()}
 				size='icon-sm'
 				type='button'
 				variant='outline'
@@ -177,7 +213,7 @@ function SubmitControl({
 					composer.disabledReason
 				) : (
 					<>
-						{t('workbench:composer.send-tooltip', 'Send message')}
+						{sendTooltipLabel(state.sendIntent, t)}
 						<span className='ml-2 text-muted-foreground'>
 							{sendShortcutHint}
 						</span>

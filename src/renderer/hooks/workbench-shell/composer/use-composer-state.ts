@@ -20,6 +20,7 @@ import { useComposerKeymap } from '@/renderer/hooks/workbench-shell/composer/use
 import { useComposerSubmit } from '@/renderer/hooks/workbench-shell/composer/use-composer-submit';
 import { useIssueAttachments } from '@/renderer/hooks/workbench-shell/composer/use-issue-attachments';
 import { useLinkedDirectories } from '@/renderer/hooks/workbench-shell/composer/use-linked-directories';
+import { resolveSendIntent } from '@/renderer/lib/workbench';
 import {
 	composerAttachmentsAtomFamily,
 	composerEditorStateAtomFamily,
@@ -32,9 +33,11 @@ import type {
 	AutocompleteState,
 	ComposerAttachment,
 	ComposerDraftSegment,
+	ComposerSendIntent,
 	ComposerShellState,
 	LinkedDirectory,
 	MentionMatch,
+	QueuedFollowUp,
 	SlashCommandMatch,
 	WorkspaceFileSummary,
 } from '@/renderer/types/workbench';
@@ -65,12 +68,27 @@ export interface ComposerStateApi {
 	attachGithubIssue: (issue: RepositoryIssueWire) => Promise<void>;
 	/** Writes a Linear issue (with its comments) out and attaches it. */
 	attachLinearIssue: (issue: LinearIssueWire) => Promise<void>;
+	/** Clears every entry this chat has queued. */
+	clearQueue: () => void;
+	/** Messages waiting for the current turn to end, in the order they will send. */
+	followUpQueue: readonly QueuedFollowUp[];
+	/** Sends the head of a stalled queue now, resuming automatic draining with it. */
+	flushQueueNow: () => void;
 	/**
-	 * True after a mid-stream submit was dropped because the Follow-up behavior is
-	 * set to "block". Lets the composer explain the no-op instead of swallowing
-	 * the keypress silently. Cleared on the next edit or submit.
+	 * True while the queue is waiting on the user rather than on the agent: after
+	 * a stop or a failed flush, or once a `block`-mode queue outlives its turn.
 	 */
-	blockedNotice: boolean;
+	queueStalled: boolean;
+	/** Moves a queued entry one place towards the front or the back. */
+	moveQueued: (id: string, direction: 'down' | 'up') => void;
+	/** Drops one queued entry without sending it. */
+	removeQueued: (id: string) => void;
+	/** Applies an explicit queue order, which is what a drag hands back. */
+	reorderQueue: (orderedIds: readonly string[]) => void;
+	/** Takes a queued entry back into the composer to edit, chips and all. */
+	restoreQueued: (id: string) => void;
+	/** What pressing Send would do right now: send, queue, or hold. */
+	sendIntent: ComposerSendIntent;
 	autocomplete: AutocompleteState;
 	autocompleteActive: boolean;
 	autocompleteKind: AutocompleteKind;
@@ -92,6 +110,8 @@ export interface ComposerStateApi {
 	handleDrop: (event: ReactDragEvent<HTMLElement>) => void;
 	handleFileChange: (event: ChangeEvent<HTMLInputElement>) => void;
 	handleKeyDown: (event: ReactKeyboardEvent<HTMLElement>) => void;
+	/** Stops the running turn and pauses the queue rather than draining into the gap. */
+	handleStop: () => Promise<void>;
 	handleSubmit: () => Promise<void> | void;
 	hasChips: boolean;
 	/** True when the composer holds any draft text or attachment. */
@@ -324,13 +344,16 @@ export function useComposerState({
 	}, [seedText, value, setValue]);
 
 	const {
-		blockedNotice,
 		dispatchSubmit,
+		flushQueueNow,
+		handleStop,
 		followUp,
 		handleSubmit,
 		pending,
+		queue,
 		queueCurrent,
-		setBlockedNotice,
+		queueStalled,
+		restoreQueued,
 	} = useComposerSubmit({
 		chatTabId,
 		composer,
@@ -381,16 +404,9 @@ export function useComposerState({
 					: change.attachments,
 			);
 			setEditorState(change.snapshot);
-			setBlockedNotice(false);
 			updateAutocomplete(change.text, change.caret);
 		},
-		[
-			setAttachments,
-			setBlockedNotice,
-			setEditorState,
-			setValue,
-			updateAutocomplete,
-		],
+		[setAttachments, setEditorState, setValue, updateAutocomplete],
 	);
 
 	// Surfaces outside the composer — the diff viewer's "Add to chat", a plan
@@ -432,26 +448,27 @@ export function useComposerState({
 	const hasContent = value.trim().length > 0 || attachments.length > 0;
 	// A normal (idle) send: enabled only when nothing is streaming.
 	const canSubmit = !composer.disabled && !isStreaming && hasContent;
-	// A send that is valid even mid-turn (steer / follow-up). Lets the composer
-	// keep showing an enabled Send button while the agent works so a drafted follow-up
-	// is deliverable instead of being hidden behind the Stop button. Under the
-	// `block` follow-up mode a mid-turn send would only surface the blocked
-	// notice, so the button stays disabled rather than presenting an enabled
-	// control that no-ops.
-	const canSend =
-		!composer.disabled &&
-		!pending &&
-		hasContent &&
-		!(composer.isStreaming && followUp === 'block');
+	// Live mid-turn under every behavior: each one now has somewhere for the draft
+	// to go, and the send tooltip names which.
+	const canSend = !composer.disabled && !pending && hasContent;
+	const sendIntent = resolveSendIntent(followUp, composer.isStreaming);
 
 	return {
+		clearQueue: queue.clear,
+		followUpQueue: queue.entries,
+		flushQueueNow,
+		moveQueued: queue.move,
+		queueStalled,
+		removeQueued: queue.remove,
+		reorderQueue: queue.reorder,
+		restoreQueued,
+		sendIntent,
 		activeIndex,
 		anchorRef,
 		attachGithubIssue,
 		attachLinearIssue,
 		attachmentError,
 		attachments,
-		blockedNotice,
 		autocomplete,
 		autocompleteActive,
 		autocompleteKind,
@@ -469,6 +486,7 @@ export function useComposerState({
 		handleDrop,
 		handleFileChange,
 		handleKeyDown,
+		handleStop,
 		handleSubmit,
 		hasChips,
 		hasContent,

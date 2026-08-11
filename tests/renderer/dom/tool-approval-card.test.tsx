@@ -29,11 +29,31 @@ test('names the tool and shows the command the user is deciding about', () => {
 	renderCard();
 
 	expect(screen.getByLabelText('Tool approval request')).toBeInTheDocument();
-	expect(screen.getByText('Bash')).toBeInTheDocument();
 	expect(screen.getByText('rm -rf build')).toBeInTheDocument();
 	expect(
 		screen.getByText('Claude wants to use Bash.', { exact: false }),
 	).toBeInTheDocument();
+});
+
+test('pins the raw tool name only when the headline used a friendlier one', () => {
+	renderCard({
+		agentSessionId: 'session-1',
+		displayName: 'Edit file',
+		input: { file_path: '/tmp/a.ts' },
+		requestId: 'req-named',
+		toolName: 'Edit',
+	});
+
+	expect(
+		screen.getByText('Claude wants to use Edit file.'),
+	).toBeInTheDocument();
+	expect(screen.getByText('Edit')).toBeInTheDocument();
+});
+
+test('leaves the tool name off when the headline already said it', () => {
+	renderCard();
+
+	expect(screen.queryByText('Bash')).not.toBeInTheDocument();
 });
 
 test('shows the file path for an edit rather than the first field it finds', () => {
@@ -46,6 +66,30 @@ test('shows the file path for an edit rather than the first field it finds', () 
 
 	expect(screen.getByText('/tmp/a.ts')).toBeInTheDocument();
 	expect(screen.getByText('replace_all: false')).toBeInTheDocument();
+});
+
+test('labels the field the decision turns on rather than showing a bare value', () => {
+	renderCard();
+
+	expect(screen.getByText('command')).toBeInTheDocument();
+});
+
+test('says how many arguments it left off instead of dropping them silently', () => {
+	renderCard({
+		agentSessionId: 'session-1',
+		input: {
+			command: 'npm run build',
+			description: 'build',
+			one: '1',
+			three: '3',
+			timeout: '1000',
+			two: '2',
+		},
+		requestId: 'req-many',
+		toolName: 'Bash',
+	});
+
+	expect(screen.getByText('+1 more')).toBeInTheDocument();
 });
 
 test("prefers Claude Code's own prompt sentence when it supplies one", () => {

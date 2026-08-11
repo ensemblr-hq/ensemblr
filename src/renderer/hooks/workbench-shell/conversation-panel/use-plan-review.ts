@@ -5,7 +5,10 @@ import {
 	useDismissPlanReview,
 	usePendingPlanReview,
 } from '@/renderer/state/plan-mode';
-import type { WorkspaceShellModel } from '@/renderer/types/workbench';
+import type {
+	ComposerSubmitOutcome,
+	WorkspaceShellModel,
+} from '@/renderer/types/workbench';
 import type { ExitPlanModeBroadcast } from '@/shared/agent-control';
 import { usePlanHandoff } from './use-plan-handoff';
 
@@ -16,7 +19,7 @@ const APPROVAL_PROMPT = 'Approved — implement the plan.';
 interface PlanReviewInput {
 	chatTabId: string;
 	onPlanModeChange: (planMode: boolean) => void;
-	onSubmit: (prompt: string) => Promise<void> | void;
+	onSubmit: (prompt: string) => Promise<ComposerSubmitOutcome>;
 	agentSessionId: string | null;
 	workspace: WorkspaceShellModel;
 }

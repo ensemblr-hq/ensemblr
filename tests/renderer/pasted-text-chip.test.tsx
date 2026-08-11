@@ -233,10 +233,11 @@ function renderNotices(
 	const state = {
 		attachmentError: null,
 		attachments: [],
-		blockedNotice: false,
+		followUpQueue: [],
 		hasChips: false,
 		linkedDirectories: linked.linkedDirectories ?? [],
 		pendingLinkedDirectories: linked.pendingLinkedDirectories ?? [],
+		sendIntent: 'send',
 		unlinkDirectory,
 	} as unknown as ComposerStateApi;
 	renderWithProviders(<ComposerNotices state={state} />);

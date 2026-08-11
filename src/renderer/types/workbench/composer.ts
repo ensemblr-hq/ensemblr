@@ -1,3 +1,5 @@
+import type { EditorState } from 'lexical';
+
 import type { MatchRange } from '@/renderer/lib/workbench/fuzzy-score';
 import type {
 	AgentProviderSlashCommandScope,
@@ -108,6 +110,42 @@ export type ComposerAttachment =
 export type ComposerDraftSegment =
 	| { attachment: ComposerAttachment; kind: 'attachment' }
 	| { kind: 'text'; text: string };
+
+/**
+ * What a send will do right now. `send` covers every idle send and a mid-turn
+ * `steer`; `queue` and `hold` are the two mid-turn holds, differing only in
+ * whether the queue drains on its own. One value drives all four of the
+ * composer's status surfaces, so they cannot disagree.
+ */
+export type ComposerSendIntent = 'hold' | 'queue' | 'send';
+
+/**
+ * Where a queued follow-up came from, which decides both how its row reads and
+ * whether it drains on its own. A `user` message queued under the `block`
+ * behavior waits for the user to send it; a `chore` was already announced as
+ * handed over by the Checks panel, so it always drains when the agent frees up.
+ */
+export type QueuedFollowUpSource = 'chore' | 'user';
+
+/**
+ * One message waiting to go to the agent once the current turn ends.
+ *
+ * Carries the whole draft rather than a serialized prompt: attachment content is
+ * read at send time, so freezing it at queue time would hand the agent a file as
+ * it looked several minutes earlier, and putting an entry back in the composer
+ * to edit needs the document to restore chips where the user left them.
+ */
+export interface QueuedFollowUp {
+	id: string;
+	/** ISO timestamp the entry was queued at, for ordering and for the row's meta. */
+	queuedAt: string;
+	segments: readonly ComposerDraftSegment[];
+	/** Lexical document to restore on edit; null for a text-only enqueue. */
+	snapshot: EditorState | null;
+	source: QueuedFollowUpSource;
+	/** Flattened draft text, for the row preview and the emptiness check. */
+	text: string;
+}
 
 /**
  * A directory outside the workspace that a chat has been given access to. Unlike

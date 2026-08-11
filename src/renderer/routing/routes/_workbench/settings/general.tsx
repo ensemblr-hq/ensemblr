@@ -39,6 +39,7 @@ const TOOL_CALL_TOGGLE_HINT = formatShortcut('toolCalls.toggleCollapse');
 const SEND_ENTER_HINT = formatShortcut('composer.submit');
 const SEND_MOD_ENTER_HINT = formatShortcut('composer.submitWithMod');
 const NEWLINE_HINT = formatShortcut('composer.newline');
+const QUEUE_HINT = formatShortcut('composer.queue');
 
 /** General settings panel for the send shortcut, follow-up behavior, notifications, and other core chat preferences. */
 function GeneralSettings() {
@@ -144,7 +145,8 @@ function GeneralSettings() {
 				}
 				description={t(
 					'settings:general.follow-up.description',
-					'Queue messages to send after the agent finishes, or steer the agent mid-turn. Use ⌘J to queue.',
+					'Steer the agent mid-turn, queue messages until it finishes, or hold them until you send them. A queued message stays editable. {{shortcut}} queues in any mode.',
+					{ shortcut: QUEUE_HINT },
 				)}
 				label={t('settings:general.follow-up.label', 'Follow-up behavior')}
 				modified={followUp !== DEFAULTS.followUpBehavior}

@@ -627,14 +627,26 @@ export function presenterFor(
 }
 
 /**
+ * Resolves the icon a tool answers to from its name alone, for surfaces holding
+ * a call that has not run yet and so have no part to project — the approval
+ * card is the one that matters, and it must paint the same mark the timeline
+ * will paint once the call goes through.
+ * @param toolName - The tool name as the runtime reported it
+ * @returns The glyph for the tool's name
+ */
+export function glyphForToolName(toolName: string): ToolGlyph {
+	return (
+		TOOL_GLYPHS[toolName.toLowerCase()] ??
+		ensemblrToolGlyph(toolName) ??
+		'wrench'
+	);
+}
+
+/**
  * Resolves the icon a tool answers to at rest, before any failure is considered.
  * @param part - The tool part to identify
  * @returns The glyph for the tool's name
  */
 export function restingGlyph(part: DynamicToolUIPart): ToolGlyph {
-	return (
-		TOOL_GLYPHS[part.toolName.toLowerCase()] ??
-		ensemblrToolGlyph(part.toolName) ??
-		'wrench'
-	);
+	return glyphForToolName(part.toolName);
 }
