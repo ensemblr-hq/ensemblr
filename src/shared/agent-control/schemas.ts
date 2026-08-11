@@ -274,7 +274,11 @@ const askUserQuestionOptionSchema = z.strictObject({
 		.refine((label) => !reservedLabels.has(label.toLowerCase()), {
 			message: 'Label is reserved by the dialog; choose a different wording.',
 		}),
-	description: nonEmpty.optional(),
+	description: nonEmpty
+		.transform((description) =>
+			description.slice(0, ASK_USER_QUESTION_LIMITS.maxDescriptionLength),
+		)
+		.optional(),
 });
 
 const askUserQuestionItemSchema = z.strictObject({

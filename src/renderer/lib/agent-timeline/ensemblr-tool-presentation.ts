@@ -140,16 +140,15 @@ export function isHiddenEnsemblrToolCall(part: DynamicToolUIPart): boolean {
 }
 
 /**
- * Steps one dotted-path segment, reading an array by numeric index or, on `*`,
- * across every element, so a batched call is reachable either by its first item
- * or as the whole set.
+ * Steps one dotted-path segment, reading an array only through `*` — across
+ * every element — so a batched call is reachable as the whole set.
  * @param value - The value the walk has reached so far
  * @param segment - The segment to step through
  * @returns The values the segment reaches, empty when it reaches none
  */
 function stepPathSegment(value: unknown, segment: string): unknown[] {
 	if (Array.isArray(value)) {
-		return segment === '*' ? value : [value[Number(segment)]];
+		return segment === '*' ? value : [];
 	}
 	if (typeof value !== 'object' || value === null) {
 		return [];
@@ -160,7 +159,7 @@ function stepPathSegment(value: unknown, segment: string): unknown[] {
 /**
  * Walks a dotted path into a tool call's arguments.
  * @param input - The tool call's input bag
- * @param path - Dotted path, e.g. `comments.0.filePath` or `comments.*.filePath`
+ * @param path - Dotted path, e.g. `comments.*.filePath`
  * @returns Every value the path reaches, in order; empty when a segment is
  * missing
  */

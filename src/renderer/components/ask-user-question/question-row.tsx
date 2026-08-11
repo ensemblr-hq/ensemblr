@@ -89,7 +89,7 @@ export function QuestionOptionRow({
 					{row.label}
 				</span>
 				{row.description ? (
-					<span className='block truncate text-muted-foreground text-xs leading-4'>
+					<span className='block text-muted-foreground text-xs leading-4'>
 						{row.description}
 					</span>
 				) : null}

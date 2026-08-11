@@ -49,6 +49,8 @@ interface Questionnaire {
 	inputRef: React.RefObject<HTMLInputElement | null>;
 	/** Attach to the dialog shell; it holds DOM focus while rows are navigated. */
 	shellRef: React.RefObject<HTMLElement | null>;
+	/** Attach to the focused row so navigating past the fold scrolls it in. */
+	focusedRowRef: React.RefObject<HTMLLIElement | null>;
 }
 
 /**
@@ -71,6 +73,7 @@ export function useQuestionnaire({
 	const [state, setState] = useState(() => createQuestionnaireState(questions));
 	const inputRef = useRef<HTMLInputElement>(null);
 	const shellRef = useRef<HTMLElement>(null);
+	const focusedRowRef = useRef<HTMLLIElement>(null);
 	const finishRef = useRef(onFinish);
 	const stateRef = useRef(state);
 	// Sync in an effect, not during render: render must stay pure so React can
@@ -113,11 +116,13 @@ export function useQuestionnaire({
 
 	// Row focus is virtual, so DOM focus has to be pulled back to the shell after
 	// every move. Left on a row's button, a later Enter would activate that stale
-	// button instead of the row the user can see is focused.
+	// button instead of the row the user can see is focused. Nothing native
+	// scrolls a virtual move either, so the capped row list is walked by hand.
 	const focusTarget = state.typing
 		? 'free-text'
 		: `row-${state.pageIndex}-${state.focusIndex}`;
 	useEffect(() => {
+		focusedRowRef.current?.scrollIntoView({ block: 'nearest' });
 		if (focusTarget === 'free-text') {
 			inputRef.current?.focus();
 			return;
@@ -125,5 +130,5 @@ export function useQuestionnaire({
 		shellRef.current?.focus();
 	}, [focusTarget]);
 
-	return { handleKeyDown, inputRef, run, shellRef, state };
+	return { focusedRowRef, handleKeyDown, inputRef, run, shellRef, state };
 }

@@ -32,10 +32,11 @@ export function AskUserQuestionCard({
 	questions: readonly AskUserQuestionItem[];
 }) {
 	const { t } = useTranslation();
-	const { handleKeyDown, inputRef, run, shellRef, state } = useQuestionnaire({
-		onFinish,
-		questions,
-	});
+	const { focusedRowRef, handleKeyDown, inputRef, run, shellRef, state } =
+		useQuestionnaire({
+			onFinish,
+			questions,
+		});
 	const question = state.questions[state.pageIndex];
 
 	if (!question) {
@@ -68,6 +69,7 @@ export function AskUserQuestionCard({
 				</header>
 
 				<QuestionRows
+					focusedRowRef={focusedRowRef}
 					inputRef={inputRef}
 					onKeyDown={handleKeyDown}
 					run={run}
