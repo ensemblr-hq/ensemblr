@@ -2,9 +2,10 @@ import { toSlug } from './slug.ts';
 
 /**
  * Surnames of well-known composers spanning classical, romantic, modernist,
- * contemporary, film, and game-music eras. Used to seed a workspace name when
- * the user clicks the project-header "+" button. Agents may rename the
- * workspace later, so this is only a deterministic-looking placeholder.
+ * contemporary, film, and game-music eras, plus the Greek and Cypriot
+ * traditions. Used to seed a workspace name when the user clicks the
+ * project-header "+" button. Agents may rename the workspace later, so this is
+ * only a deterministic-looking placeholder.
  *
  * Entries are restricted to ASCII letters and spaces. The backend slug
  * pipeline (`/[^a-z0-9]+/g` → `-`) collapses spaces into dashes, so a name
@@ -185,6 +186,38 @@ const COMPOSER_SURNAMES: readonly string[] = [
 	'Vreeland',
 	'Deriviere',
 	'Brower',
+	// Greek
+	'Mantzaros',
+	'Carrer',
+	'Samaras',
+	'Lavrangas',
+	'Kalomiris',
+	'Skalkottas',
+	'Mitropoulos',
+	'Christou',
+	'Xenakis',
+	'Theodorakis',
+	'Hatzidakis',
+	'Markopoulos',
+	'Xarhakos',
+	'Mamangakis',
+	'Logothetis',
+	'Aperghis',
+	'Karaindrou',
+	'Mikroutsikos',
+	'Spanoudakis',
+	'Papadimitriou',
+	'Hatzis',
+	// Cypriot
+	'Michaelides',
+	'Tokas',
+	'Loizos',
+	'Karageorgis',
+	'Kavallaris',
+	'Christodoulides',
+	'Kyriakides',
+	'Stylianou',
+	'Skordis',
 ];
 
 /**
