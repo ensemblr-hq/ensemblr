@@ -96,6 +96,17 @@ const navigationSnapshot: RepositoryWorkspaceNavigationSnapshot = {
 	],
 };
 
+function withRepositoryOneWorkspaces(
+	workspaces: RepositoryWorkspaceNavigationWorkspace[],
+): RepositoryWorkspaceNavigationSnapshot {
+	return {
+		...navigationSnapshot,
+		repositories: navigationSnapshot.repositories.map((repository) =>
+			repository.id === 'repo-1' ? { ...repository, workspaces } : repository,
+		),
+	};
+}
+
 test('maps SQLite navigation snapshot into workbench shell projects', () => {
 	const projects = mapNavigationSnapshotToProjects(navigationSnapshot);
 
@@ -457,10 +468,69 @@ test('resolves route, stored, and first workspace selections in order', () => {
 				workspaceId: 'missing',
 			},
 		}),
+	).toBeNull();
+	expect(
+		resolveWorkspaceNavigationSelection({
+			projects,
+		}),
 	).toMatchObject({
 		source: 'first',
 		workspace: {
 			id: 'workspace-1',
+		},
+	});
+});
+
+test('holds on Welcome when the stored project has no workspaces left', () => {
+	const projects = mapNavigationSnapshotToProjects(
+		withRepositoryOneWorkspaces([]),
+	);
+
+	expect(
+		resolveWorkspaceNavigationSelection({
+			projects,
+			storedSelection: {
+				projectId: 'repo-1',
+				workspaceId: 'workspace-1',
+			},
+		}),
+	).toBeNull();
+});
+
+test('falls back inside the stored project when its stored workspace is gone', () => {
+	const projects = mapNavigationSnapshotToProjects(
+		withRepositoryOneWorkspaces([
+			{
+				archivedAt: null,
+				baseBranch: 'master',
+				branchName: 'philipp/the-121',
+				createdAt: '2026-06-06T00:00:00.000Z',
+				id: 'workspace-1b',
+				metadata: {},
+				name: 'THE-121 Sibling',
+				path: '/Users/alice/Ensemblr/workspaces/ensemblr/the-121',
+				repositoryId: 'repo-1',
+				slug: 'the-121',
+				updatedAt: '2026-06-06T00:00:00.000Z',
+			},
+		]),
+	);
+
+	expect(
+		resolveWorkspaceNavigationSelection({
+			projects,
+			storedSelection: {
+				projectId: 'repo-1',
+				workspaceId: 'workspace-1',
+			},
+		}),
+	).toMatchObject({
+		project: {
+			id: 'repo-1',
+		},
+		source: 'first',
+		workspace: {
+			id: 'workspace-1b',
 		},
 	});
 });

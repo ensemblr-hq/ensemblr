@@ -89,7 +89,6 @@ export function ProjectNavigationGroups({
 
 	const handleProjectLifecycleAction = useArchiveProjectAction({
 		activeProjectId: activeProject?.id ?? null,
-		orderedProjects,
 	});
 
 	const { create: handleCreateWorkspace, creatingProjectIds } =

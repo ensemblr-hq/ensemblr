@@ -321,17 +321,16 @@ export function useCreateWorkspaceFromProject(): CreateWorkspaceActionResult {
 	};
 }
 
-/** Dependencies for the archive-project navigation action hook. */
-interface ArchiveProjectActionDeps {
-	activeProjectId: string | null;
-	orderedProjects: ProjectShellModel[];
-}
-
-/** Handles cache invalidation and fallback navigation after a project archive. */
+/**
+ * Refreshes the workspace list caches after a project archive, and sends the
+ * user to Welcome when the archived project is the one currently on screen.
+ * @returns A callback to invoke with the id of the project that was archived.
+ */
 export function useArchiveProjectAction({
 	activeProjectId,
-	orderedProjects,
-}: ArchiveProjectActionDeps) {
+}: {
+	activeProjectId: string | null;
+}) {
 	const navigate = useNavigate();
 	const router = useRouter();
 
@@ -347,24 +346,11 @@ export function useArchiveProjectAction({
 				return;
 			}
 
-			const fallbackProject = orderedProjects.find(
-				(project) => project.id !== archivedProjectId,
-			);
-			const fallbackWorkspace = fallbackProject?.workspaces[0];
-
-			if (fallbackProject && fallbackWorkspace) {
-				await navigate({
-					params: {
-						projectId: fallbackProject.id,
-						workspaceId: fallbackWorkspace.id,
-					},
-					to: '/projects/$projectId/workspaces/$workspaceId',
-				});
-				return;
-			}
-
-			await navigate({ to: '/' });
+			// Welcome sticks only because the persisted selection still names the
+			// archived project, which the index loader treats as a hard stop;
+			// clearing that key here would redirect into an unrelated project.
+			await navigate({ replace: true, to: '/' });
 		},
-		[activeProjectId, navigate, orderedProjects, router],
+		[activeProjectId, navigate, router],
 	);
 }
