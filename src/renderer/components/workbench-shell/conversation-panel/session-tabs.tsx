@@ -111,6 +111,7 @@ export function SessionTabs({
 	onSessionTabRestore,
 	onSessionTabsReorder,
 	sessions,
+	unreadKeys,
 }: {
 	activeSession: SessionTabModel;
 	closedSessions: SessionTabModel[];
@@ -130,6 +131,11 @@ export function SessionTabs({
 		draggedSessionId: string,
 	) => void;
 	sessions: SessionTabModel[];
+	/**
+	 * Tab ids and session ids of this workspace's unread chats. Both, because a
+	 * chat marked while the workspace was closed knows only its session id.
+	 */
+	unreadKeys: ReadonlySet<string>;
 }) {
 	const { t } = useTranslation();
 	const [isOpening, setIsOpening] = useState(false);
@@ -228,6 +234,7 @@ export function SessionTabs({
 									onSelect={onSessionTabChange}
 									openChatTabCount={openChatTabCount}
 									session={session}
+									unreadKeys={unreadKeys}
 								/>
 							);
 						})}
@@ -289,12 +296,34 @@ export function SessionTabs({
 	);
 }
 
+/**
+ * Whether a tab holds something the user has not read, matched on either id
+ * because a mark made while the workspace was closed carries only the session.
+ * @param session - The tab to test
+ * @param unreadKeys - Ids of the workspace's unread chats
+ * @returns True when the tab is unread
+ */
+function isSessionUnread(
+	session: SessionTabModel,
+	unreadKeys: ReadonlySet<string>,
+): boolean {
+	if (unreadKeys.size === 0) {
+		return false;
+	}
+	return (
+		unreadKeys.has(session.chatTabId) ||
+		(session.agentSessionId !== null && unreadKeys.has(session.agentSessionId))
+	);
+}
+
 /** Props for a single reorderable session tab. */
 interface SessionTabProps {
 	session: SessionTabModel;
 	isActive: boolean;
 	canReorderTabs: boolean;
 	isDraggingTab: boolean;
+	/** Ids of the workspace's unread chats; the tab matches itself against them. */
+	unreadKeys: ReadonlySet<string>;
 	/** Count of open chat tabs; a chat tab hides its close control when it is the last one. */
 	openChatTabCount: number;
 	onSelect: (sessionId: string) => void;
@@ -317,11 +346,14 @@ function SessionTab({
 	onPin,
 	onDragStart,
 	onDragEnd,
+	unreadKeys,
 }: SessionTabProps) {
 	const { t } = useTranslation();
 	const isChatKind = (session.kind ?? 'chat') === 'chat';
 	const canClose = isChatKind ? openChatTabCount > 1 : true;
 	const showCloseControls = canClose && !isDraggingTab;
+	const showUnreadDot =
+		!isActive && !isDraggingTab && isSessionUnread(session, unreadKeys);
 	const didDragRef = useRef(false);
 
 	/** Marks this tab as dragged so the synthesized click does not select it. */
@@ -367,12 +399,26 @@ function SessionTab({
 					<SessionTabIcon session={session} />
 				</span>
 				<span
-					className={cn('truncate', session.isPreview && 'italic')}
+					className={cn(
+						'truncate',
+						session.isPreview && 'italic',
+						showUnreadDot && 'pr-3 font-medium text-foreground',
+					)}
 					title={session.fullLabel ?? session.label}
 				>
 					{session.label}
 				</span>
 			</button>
+			{showUnreadDot ? (
+				<span
+					className='pointer-events-none absolute top-1/2 right-2 size-1.5 -translate-y-1/2 rounded-full bg-primary transition-opacity group-hover/session-tab:opacity-0'
+					data-session-tab-unread='true'
+				>
+					<span className='sr-only'>
+						{t('workbench:session-tabs.unread', 'Unread messages')}
+					</span>
+				</span>
+			) : null}
 			{showCloseControls ? (
 				<span aria-hidden='true' className={SESSION_TAB_CLOSE_FADE_CLASS} />
 			) : null}

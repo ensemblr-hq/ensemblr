@@ -5,9 +5,10 @@ import { useMemo } from 'react';
 import { useLivePullRequestModel } from '@/renderer/hooks/workbench-shell/route-layout/use-live-pull-request-model';
 import { useWorkspaceBusy } from '@/renderer/hooks/workspace/use-workspace-busy';
 import { getWorkspaceSidebarState } from '@/renderer/lib/workbench';
+import { useWorkspaceUnreadCount } from '@/renderer/state/unread';
 import {
 	getRunningDockActivityState,
-	useWorkspaceUnread,
+	useWorkspaceIsUnread,
 	type WorkspaceDockActivityState,
 	workspaceDockActivityByWorkspaceAtom,
 } from '@/renderer/state/workspace';
@@ -24,6 +25,10 @@ import type { WorkspaceShellModel } from '@/renderer/types/workbench';
  * which adds no subscriptions or re-renders — so the dot's freshness is not
  * uniform across rows. Agent runtime activity flows through `agentBusy` so it
  * takes spinner priority without disturbing cached `workspace.status` semantics.
+ *
+ * `isUnread` comes from `useWorkspaceIsUnread`, which folds the manual flag and
+ * the per-chat marks; the bold label answers either, while only the chat count
+ * draws the dot.
  * @param isActive - Whether this row is the workspace currently open
  * @param workspace - The workspace the row stands for
  * @returns The derived state the row renders from
@@ -35,7 +40,8 @@ export function useWorkspaceSidebarRow({
 	isActive: boolean;
 	workspace: WorkspaceShellModel;
 }) {
-	const isUnread = useWorkspaceUnread(workspace.id);
+	const isUnread = useWorkspaceIsUnread(workspace.id);
+	const unreadCount = useWorkspaceUnreadCount(workspace.id);
 	const agentBusy = useWorkspaceBusy(workspace.id);
 	const livePullRequest = useLivePullRequestModel({
 		changeSummary: workspace.changeSummary,
@@ -68,5 +74,6 @@ export function useWorkspaceSidebarRow({
 			workspace.changeSummary.deletions > 0,
 		isUnread,
 		sidebarState: getWorkspaceSidebarState(liveWorkspace, { agentBusy }),
+		unreadCount,
 	};
 }

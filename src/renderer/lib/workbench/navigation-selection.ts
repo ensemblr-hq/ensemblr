@@ -137,6 +137,31 @@ export function findWorkspaceNavigationSelection(
 }
 
 /**
+ * Locates a workspace by its id alone, scanning every project. An unread mark
+ * records the workspace an agent spoke in but never the project above it, so
+ * jumping to one has to recover the pair before it can build a route.
+ * @param projects - Projects to search
+ * @param workspaceId - Workspace to find
+ * @returns The (project, workspace) pair, or null when no project holds it
+ */
+export function findWorkspaceSelectionById(
+	projects: ProjectShellModel[],
+	workspaceId: string,
+): WorkspaceNavigationSelection | null {
+	for (const project of projects) {
+		const workspace = project.workspaces.find(
+			(candidate) =>
+				candidate.id === workspaceId && !candidate.isPendingCreation,
+		);
+		if (workspace) {
+			return { project, source: 'route', workspace };
+		}
+	}
+
+	return null;
+}
+
+/**
  * Picks the session to surface for a workspace, preferring an explicit id and
  * falling back to the first session or a placeholder.
  */

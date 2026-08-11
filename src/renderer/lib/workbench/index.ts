@@ -31,6 +31,7 @@ export {
 } from './navigation-model';
 export {
 	findWorkspaceNavigationSelection,
+	findWorkspaceSelectionById,
 	getPreferredSession,
 	resolveWorkspaceNavigationRenderState,
 	resolveWorkspaceNavigationSelection,

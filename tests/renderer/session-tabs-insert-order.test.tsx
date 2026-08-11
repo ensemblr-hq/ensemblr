@@ -59,6 +59,7 @@ function StripHarness({ onSwap }: { onSwap: (swap: () => void) => void }) {
 			onSessionTabRestore={() => undefined}
 			onSessionTabsReorder={() => undefined}
 			sessions={sessions}
+			unreadKeys={new Set()}
 		/>
 	);
 }
@@ -99,6 +100,7 @@ test('asks for append placement from the strip new-tab button', async () => {
 			onSessionTabRestore={() => undefined}
 			onSessionTabsReorder={() => undefined}
 			sessions={sessions}
+			unreadKeys={new Set()}
 		/>,
 	);
 

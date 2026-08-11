@@ -54,8 +54,13 @@ export function WorkspaceSidebarItem({
 		archiveBoundary.boundary,
 	);
 	const { renderWorkspaceLink } = useNavigation();
-	const { dockActivityState, hasDiffStats, isUnread, sidebarState } =
-		useWorkspaceSidebarRow({ isActive, workspace });
+	const {
+		dockActivityState,
+		hasDiffStats,
+		isUnread,
+		sidebarState,
+		unreadCount,
+	} = useWorkspaceSidebarRow({ isActive, workspace });
 	const isPendingCreation = workspace.isPendingCreation === true;
 
 	const buttonContent = (
@@ -65,6 +70,7 @@ export function WorkspaceSidebarItem({
 			isPendingCreation={isPendingCreation}
 			isUnread={isUnread}
 			sidebarState={sidebarState}
+			unreadCount={unreadCount}
 			workspace={workspace}
 		/>
 	);

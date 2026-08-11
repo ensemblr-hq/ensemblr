@@ -11,6 +11,7 @@ import type { ComposerShellState } from '@/renderer/types/workbench';
 import { ComposerControls } from './composer/composer-controls';
 import { ComposerNotices } from './composer/composer-notices';
 import { ComposerFocusHint } from './composer/focus-hint';
+import { ConnectedLastUnreadButton } from './composer/last-unread-button';
 import { ComposerAutocompletePopover } from './composer/mention-popover';
 import { getNextThinkingId } from './composer/thinking-picker';
 
@@ -114,62 +115,67 @@ export function ComposerPanel({
 
 	return (
 		<footer className='shrink-0 bg-background px-4 pt-2 pb-5'>
-			{/* biome-ignore lint/a11y/noStaticElementInteractions: drop zone is a passive file target, not a keyboard/pointer control */}
-			<div
-				className={cn(
-					'relative mx-auto flex w-full max-w-4xl flex-col overflow-hidden rounded-xl border border-border bg-pane/80 shadow-panel transition-shadow',
-					composer.planMode
-						? 'border-accent-strong/50 border-dashed'
-						: focused && 'ring-1 ring-ring/40',
-				)}
-				onDragOver={state.handleDragOver}
-				onDrop={state.handleDrop}
-			>
-				{planReview}
-				<div className='flex flex-col gap-2 px-4 pt-3 pb-2.5'>
-					<input
-						accept='*/*'
-						aria-label={t(
-							'workbench:composer.upload-input.aria-label',
-							'Upload attachment',
-						)}
-						className='hidden'
-						multiple
-						onChange={state.handleFileChange}
-						ref={state.fileInputRef}
-						tabIndex={-1}
-						type='file'
-					/>
+			<div className='relative mx-auto w-full max-w-4xl'>
+				<div className='pointer-events-none absolute -top-9 right-0 z-10 flex justify-end *:pointer-events-auto'>
+					<ConnectedLastUnreadButton />
+				</div>
+				{/* biome-ignore lint/a11y/noStaticElementInteractions: drop zone is a passive file target, not a keyboard/pointer control */}
+				<div
+					className={cn(
+						'relative flex w-full flex-col overflow-hidden rounded-xl border border-border bg-pane/80 shadow-panel transition-shadow',
+						composer.planMode
+							? 'border-accent-strong/50 border-dashed'
+							: focused && 'ring-1 ring-ring/40',
+					)}
+					onDragOver={state.handleDragOver}
+					onDrop={state.handleDrop}
+				>
+					{planReview}
+					<div className='flex flex-col gap-2 px-4 pt-3 pb-2.5'>
+						<input
+							accept='*/*'
+							aria-label={t(
+								'workbench:composer.upload-input.aria-label',
+								'Upload attachment',
+							)}
+							className='hidden'
+							multiple
+							onChange={state.handleFileChange}
+							ref={state.fileInputRef}
+							tabIndex={-1}
+							type='file'
+						/>
 
-					<ComposerNotices state={state} />
+						<ComposerNotices state={state} />
 
-					<ComposerAutocompletePopover
-						activeIndex={state.activeIndex}
-						kind={state.autocomplete.kind}
-						mentionMatches={state.mentionMatches}
-						onHover={state.setActiveIndex}
-						onMentionSelect={state.onMentionSelect}
-						onOpenChange={(open) => {
-							if (!open) {
-								state.dismissAutocomplete();
-							}
-						}}
-						onSlashSelect={state.onSlashSelect}
-						slashLoading={state.slashLoading}
-						slashMatches={state.slashMatches}
-					>
-						{textareaBlock}
-					</ComposerAutocompletePopover>
+						<ComposerAutocompletePopover
+							activeIndex={state.activeIndex}
+							kind={state.autocomplete.kind}
+							mentionMatches={state.mentionMatches}
+							onHover={state.setActiveIndex}
+							onMentionSelect={state.onMentionSelect}
+							onOpenChange={(open) => {
+								if (!open) {
+									state.dismissAutocomplete();
+								}
+							}}
+							onSlashSelect={state.onSlashSelect}
+							slashLoading={state.slashLoading}
+							slashMatches={state.slashMatches}
+						>
+							{textareaBlock}
+						</ComposerAutocompletePopover>
 
-					<ComposerControls
-						composer={composer}
-						modelPickerOpen={modelPickerOpen}
-						onLinkIssue={() => setIssuePickerOpen(true)}
-						onModelPickerOpenChange={setModelPickerOpen}
-						pickersDisabled={pickersDisabled}
-						state={state}
-						workspaceId={workspaceId}
-					/>
+						<ComposerControls
+							composer={composer}
+							modelPickerOpen={modelPickerOpen}
+							onLinkIssue={() => setIssuePickerOpen(true)}
+							onModelPickerOpenChange={setModelPickerOpen}
+							pickersDisabled={pickersDisabled}
+							state={state}
+							workspaceId={workspaceId}
+						/>
+					</div>
 				</div>
 			</div>
 			<LinearIssuePickerDialog

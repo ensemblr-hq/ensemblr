@@ -159,6 +159,9 @@
 		"attachment-failed": "Не удалось прикрепить выбранный файл.",
 		"blocked-follow-up": "Дополнения заблокированы, пока агент работает — остановите ход или дождитесь его завершения.",
 		"focus-hint": "<key>{{shortcut}}</key><label>для фокуса</label>",
+		"last-unread": "Последнее непрочитанное",
+		"last-unread-tooltip": "Перейти к последнему непрочитанному чату в рабочей области {{workspace}}",
+		"last-unread-tooltip-generic": "Перейти к последнему непрочитанному чату",
 		"model": {
 			"pending": "Модель ожидается"
 		},
@@ -806,6 +809,7 @@
 			"toggle": "Переключить панель отладки Pi"
 		},
 		"new-tab": "Новая вкладка чата",
+		"unread": "Непрочитанные сообщения",
 		"untitled": "Новый чат",
 		"untitled-closed": "Диалог без названия"
 	},
@@ -1016,7 +1020,11 @@
 		"creating-tooltip": "{{workspace}} создаётся",
 		"dock-activity": "В доке идёт активность",
 		"open-aria": "Открыть рабочую область {{workspace}}",
-		"open-busy-aria": "Открыть рабочую область {{workspace}}; в доке идёт активность"
+		"open-busy-aria": "Открыть рабочую область {{workspace}}; в доке идёт активность",
+		"unread_one": "{{count}} непрочитанный чат",
+		"unread_few": "{{count}} непрочитанных чата",
+		"unread_many": "{{count}} непрочитанных чатов",
+		"unread_other": "{{count}} непрочитанного чата"
 	},
 	"workspace-landing": {
 		"branch-source": {
