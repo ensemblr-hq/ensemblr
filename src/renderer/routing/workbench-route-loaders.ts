@@ -66,9 +66,11 @@ export async function loadShellWorkbenchRoute({
 }
 
 /**
- * Loader for the workbench index route. Redirects to the last-selected active
- * workspace, or the first available workspace, and leaves Welcome visible when
- * no non-archived workspace exists.
+ * Loader for the workbench index route. Redirects to the last-selected
+ * workspace, or to another workspace in that same project when the stored one
+ * is gone; only a launch with nothing stored yet redirects to the first
+ * workspace anywhere. Welcome stays visible when the stored project is gone or
+ * empty, and when no non-archived workspace exists at all.
  * @param input - Parent match and query client used to refresh navigation.
  */
 export async function loadWorkbenchIndexRoute({
@@ -401,7 +403,10 @@ export async function loadWorkspaceChatRoute({
 	}
 }
 
-/** Resolves the fallback workspace selection from persisted/first-available. */
+/**
+ * Resolves the launch workspace selection from the persisted pair, falling back
+ * to the first workspace anywhere only when nothing has been stored yet.
+ */
 function resolveFallbackWorkspaceSelection(projects: ProjectShellModel[]) {
 	return resolveWorkspaceNavigationSelection({
 		projects,

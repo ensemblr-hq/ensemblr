@@ -12,8 +12,12 @@ import { createPlaceholderSession } from './navigation-model';
 
 /**
  * Picks the active workspace selection, preferring the URL route, then the
- * stored workspace, then the first workspace in the stored project, then the
- * first available workspace anywhere.
+ * stored workspace, then the first workspace in the stored project.
+ *
+ * A stored selection is a hard project boundary: once the user has been
+ * somewhere, emptying or removing that project holds on Welcome rather than
+ * dropping them into an unrelated project. The first-available-anywhere
+ * fallback is therefore reserved for a launch with nothing stored yet.
  */
 export function resolveWorkspaceNavigationSelection({
 	projects,
@@ -35,24 +39,19 @@ export function resolveWorkspaceNavigationSelection({
 		);
 	}
 
-	const storedWorkspaceSelection = storedSelection
-		? findWorkspaceNavigationSelection(
+	if (storedSelection) {
+		return (
+			findWorkspaceNavigationSelection(
 				projects,
 				storedSelection.projectId,
 				storedSelection.workspaceId,
 				'stored',
-			)
-		: null;
+			) ??
+			getFirstWorkspaceSelectionInProject(projects, storedSelection.projectId)
+		);
+	}
 
-	const storedProjectSelection = storedSelection
-		? getFirstWorkspaceSelectionInProject(projects, storedSelection.projectId)
-		: null;
-
-	return (
-		storedWorkspaceSelection ??
-		storedProjectSelection ??
-		getFirstWorkspaceSelection(projects)
-	);
+	return getFirstWorkspaceSelection(projects);
 }
 
 /**
@@ -180,8 +179,9 @@ export function resolveWorkspaceRouteParams(
 
 /**
  * Returns the first available workspace within a specific project, used to keep
- * launch routing inside the last-active project when its stored workspace is
- * gone before falling back to the first project globally.
+ * routing inside the last-active project when its stored workspace is gone.
+ * Returns null when the project itself is gone or has no workspaces left, which
+ * is what holds the app on Welcome instead of crossing into another project.
  */
 function getFirstWorkspaceSelectionInProject(
 	projects: ProjectShellModel[],

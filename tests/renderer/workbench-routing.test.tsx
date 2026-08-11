@@ -406,6 +406,30 @@ test('falls back to the stored project when its workspace is gone', async () => 
 	});
 });
 
+test('holds workbench launch on welcome when the stored project is gone', async () => {
+	Object.defineProperty(globalThis, 'window', {
+		configurable: true,
+		value: {
+			localStorage: {
+				getItem: () =>
+					JSON.stringify({
+						projectId: 'archived-project',
+						workspaceId: 'archived-workspace',
+					}),
+			},
+		},
+	});
+	const queryClient = new QueryClient();
+	const loaderData = await loadWorkbenchRouteData(queryClient);
+
+	const result = await loadWorkbenchIndexRoute({
+		parentMatchPromise: Promise.resolve({ loaderData }),
+		queryClient,
+	});
+
+	expect(result).toBeUndefined();
+});
+
 test('redirects missing workspace routes to the welcome screen', async () => {
 	const redirectOptions = await catchWorkspaceRouteRedirect({
 		params: {
