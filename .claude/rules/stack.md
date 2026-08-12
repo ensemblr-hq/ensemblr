@@ -4,7 +4,7 @@ The versions this repo is pinned to, and the constraints that are not obvious
 from `package.json`. Policies for *how* to use the stack (npm, Biome, Jotai,
 Tailwind scale, JSDoc) live in `AGENTS.md` — this file is the stack itself.
 
-Verified against `package.json` at `0.1.0` on 2026-08-08. Re-check before
+Verified against `package.json` at `0.1.0-beta.2` on 2026-08-12. Re-check before
 asserting a version.
 
 ## Platform
@@ -22,13 +22,20 @@ asserting a version.
 wrong major compiles `macos-alias`/`fs-xattr` for that major so a later Node 24
 `make` dies on `NODE_MODULE_VERSION` mismatch.
 
+**`@types/node` stays on `^24`, tracking the runtime rather than the latest
+release.** Electron 43 embeds Node 24, so typing against a newer major makes the
+compiler accept APIs that do not exist at runtime — a green `npm run typecheck`
+then ships a `TypeError`. Dependabot proposes the bump anyway, because it reads
+`@types/node` as an ordinary devDependency rather than a mirror of `engines`;
+decline it until the Electron major moves.
+
 `.npmrc` sets `legacy-peer-deps=true` because `@electron-forge/plugin-fuses@7`
 declares a stale peer range (`@electron/fuses@^1`) against the v2 this repo pins.
 Leave it.
 
 ## Language and build
 
-- **TypeScript 6**, `strict: true`, `noImplicitAny: true`, `moduleResolution: "bundler"`,
+- **TypeScript 7**, `strict: true`, `noImplicitAny: true`, `moduleResolution: "bundler"`,
   `target`/`lib` ES2022, `allowImportingTsExtensions: true`. Path alias `@/*` → `./src/*`.
 - **Vite 8** — four configs: `vite.main.config.mts`, `vite.preload.config.mts`,
   `vite.renderer.config.mts`, `vite.playground.config.mts`.
