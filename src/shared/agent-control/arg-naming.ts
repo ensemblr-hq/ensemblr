@@ -21,6 +21,7 @@ import type { AgentControlOp } from './contracts.ts';
  */
 export const CANONICAL_ARG_KEYS = {
 	agentSessionId: 'Identifier of an agent conversation.',
+	ansi: 'Return raw terminal bytes with their escape sequences, not readable text.',
 	assigneeId: 'Identifier of the person an issue is assigned to.',
 	chatTabId: 'Identifier of a chat tab in the workspace.',
 	command: 'Shell command a guarded tool call is about to run.',
@@ -50,6 +51,7 @@ export const CANONICAL_ARG_KEYS = {
 	reason: 'Why a signal was raised.',
 	refresh: 'Re-read from the remote source instead of serving the cache.',
 	reports: 'How much of each child report to return.',
+	restart: 'Replace whatever is already running instead of being refused.',
 	scriptName: 'Name of a run script the repository configures.',
 	stat: 'Return counts and totals only, with no body text.',
 	stateId: 'Identifier of the workflow state a tracker issue sits in.',

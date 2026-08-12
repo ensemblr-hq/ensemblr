@@ -30,6 +30,7 @@ import {
 	type ControlAudience,
 	EXIT_PLAN_MODE_LIMITS,
 	LINEAR_AGENT_LIMITS,
+	SET_SUMMARY_LIMITS,
 	WORKSPACE_BOARD_STATUSES,
 	withheldControlOps,
 } from '../../shared/agent-control.ts';
@@ -116,14 +117,16 @@ export const TOOL_DEFS: readonly McpToolDef[] = [
 		name: 'ensemblr_set_branch_name',
 		op: 'setBranchName',
 		description:
-			'Name the work: renames this workspace AND its git branch together from one kebab-case slug (2-5 words, e.g. "add-dark-mode"), keeping any `prefix/` segment of the current branch. Call it once, early, as soon as you know what the work is called. It applies while the git branch still carries the name it was cut with; a workspace the user has already titled keeps that title and only its branch moves. A reply saying nothing changed is a settled outcome, not a fault to retry — except when the USER asks for a different branch name in so many words, which is what userRequested: true is for. Renaming the branch any other way, `git branch -m` included, desyncs the workspace from git. This names the workspace and branch, not your terminal tab, which titles itself from your own session log.',
+			'Name the work: renames this workspace AND its git branch together from one kebab-case slug (2-5 words, e.g. "add-dark-mode") passed as `name`, keeping any `prefix/` segment of the current branch. Call it once, early, as soon as you know what the work is called. It applies while the git branch still carries the name it was cut with; a workspace the user has already titled keeps that title and only its branch moves. A reply saying nothing changed is a settled outcome, not a fault to retry — except when the USER asks for a different branch name in so many words, which is what userRequested: true is for. Renaming the branch any other way, `git branch -m` included, desyncs the workspace from git. This names the workspace and branch, not your terminal tab, which titles itself from your own session log.',
 		shape: { name: z.string(), userRequested: z.boolean().optional() },
 	},
 	{
 		name: 'ensemblr_set_summary',
 		op: 'setSummary',
-		description:
-			"Record the session summary the app keeps for this chat tab, replacing whatever is on file. Call it once the turn's work is done: `title` is a short topic line and `summary` is markdown covering the decisions made, the files touched, and what is still open. Writing it yourself is what keeps the record useful — the app's fallback only dumps the raw transcript. This does NOT rename the tab.",
+		description: `Record the session summary the app keeps for this chat tab, replacing whatever is on file. Call it once the turn's work is done: \`title\` is a short topic line of at most ${SET_SUMMARY_LIMITS.maxTitleLength} characters and \`summary\` is markdown of at most ${SET_SUMMARY_LIMITS.maxSummaryLength}, covering the decisions made, the files touched, and what is still open. Either one over its limit is stored truncated rather than rejected, and the result says what was cut — so a long summary costs you the tail of it, never the whole call. Writing it yourself is what keeps the record useful — the app's fallback only dumps the raw transcript. This does NOT rename the tab.`,
+		// The limits are named in the description, not declared on the shape: a
+		// client that validates its own inputs would reject an over-long summary
+		// locally, which is exactly the lost record the truncation exists to prevent.
 		shape: { title: z.string(), summary: z.string() },
 	},
 	{
@@ -143,10 +146,11 @@ export const TOOL_DEFS: readonly McpToolDef[] = [
 		name: 'ensemblr_start_terminal',
 		op: 'startTerminal',
 		description:
-			'Start a dock terminal: the setup script, a run script, or an interactive spawn terminal. A repository can configure several named run scripts (a dev server, a playground, an unsigned build), so with kind=run call ensemblr_list_run_scripts FIRST and pass the scriptName you actually want — omitting it silently starts whichever one the repository marks default, which is rarely the one you meant. Only one run script runs per workspace at a time.',
+			'Start a dock terminal: the setup script, a run script, or an interactive spawn terminal. A repository can configure several named run scripts (a dev server, a playground, an unsigned build), so with kind=run call ensemblr_list_run_scripts FIRST and pass the scriptName you actually want — omitting it silently starts whichever one the repository marks default, which is rarely the one you meant. Only one script of a kind runs per workspace at a time: a second start is refused with `conflict`, and that refusal names the terminal already holding the slot so you can read or stop it without listing anything. Pass restart: true to replace it instead.',
 		shape: {
 			kind: z.enum(['setup', 'run', 'spawn']),
 			scriptName: z.string().optional(),
+			restart: z.boolean().optional(),
 		},
 	},
 	{
@@ -361,8 +365,13 @@ export const TOOL_DEFS: readonly McpToolDef[] = [
 	{
 		name: 'ensemblr_read_terminal_output',
 		op: 'readTerminalOutput',
-		description: 'Read the current scrollback of a terminal or harness.',
-		shape: { terminalId: z.string() },
+		description:
+			"Read the current scrollback of a terminal or harness, by id or — like ensemblr_start_terminal and ensemblr_stop_terminal — by kind, which reads this workspace's running setup or run script without your having to list terminals for its id. Pass exactly one of the two; the result echoes the terminalId it read. The text comes back readable: escape sequences dropped, overwritten progress lines resolved, repaint blank-line runs collapsed. Pass ansi: true only when you need the raw bytes, colour codes and cursor moves included.",
+		shape: {
+			terminalId: z.string().optional(),
+			kind: startStop.optional(),
+			ansi: z.boolean().optional(),
+		},
 	},
 	{
 		name: 'ensemblr_wait_for_agents',

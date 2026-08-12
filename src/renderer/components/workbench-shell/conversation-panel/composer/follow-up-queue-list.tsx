@@ -2,15 +2,15 @@ import {
 	GripVerticalIcon,
 	PaperclipIcon,
 	PencilIcon,
+	SendHorizontalIcon,
 	XIcon,
 } from 'lucide-react';
 import { Reorder, useDragControls, useMotionValue } from 'motion/react';
-import type { CSSProperties, KeyboardEvent, PointerEvent } from 'react';
+import type { KeyboardEvent, PointerEvent, ReactNode } from 'react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/renderer/components/ui/button';
-import { ScrollArea } from '@/renderer/components/ui/scroll-area';
 import {
 	Tooltip,
 	TooltipContent,
@@ -19,7 +19,6 @@ import {
 import { useRaisedShadow } from '@/renderer/hooks/use-raised-shadow';
 import { cn } from '@/renderer/lib/utils';
 import type { QueuedFollowUp } from '@/renderer/types/workbench';
-import { getQueueHeight } from './follow-up-queue-height';
 
 /** Wiring for one row's drag handle, which doubles as its position marker. */
 interface DragHandleProps {
@@ -49,6 +48,10 @@ interface FollowUpQueueListProps {
 	onMove: (id: string, direction: 'down' | 'up') => void;
 	onRemove: (id: string) => void;
 	onReorder: (orderedIds: readonly string[]) => void;
+	/** Sends one entry out of turn; null while the composer cannot send at all. */
+	onSteer: ((id: string) => void) | null;
+	/** True while a turn is running, which is what makes the out-of-turn send a steer. */
+	streaming: boolean;
 }
 
 /** How the rows behave, shared by every row so they cannot drift apart. */
@@ -57,6 +60,9 @@ interface QueueRowActions {
 	onEdit: ((id: string) => void) | null;
 	onMove: (id: string, direction: 'down' | 'up') => void;
 	onRemove: (id: string) => void;
+	/** Null while the composer cannot send at all. */
+	onSteer: ((id: string) => void) | null;
+	streaming: boolean;
 }
 
 /**
@@ -97,12 +103,15 @@ function DragHandle({
 					position,
 				},
 			)}
-			className='group/handle -ml-0.5 flex h-6 w-5 shrink-0 cursor-grab touch-none items-center justify-center rounded-sm text-muted-foreground focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50 active:cursor-grabbing'
+			className={cn(
+				'group/handle flex h-6 w-5 shrink-0 cursor-grab touch-none items-center justify-center rounded-sm focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50 active:cursor-grabbing',
+				isFirst ? 'text-accent-strong' : 'text-muted-foreground',
+			)}
 			onKeyDown={handleKeyDown}
 			onPointerDown={onPointerDown}
 			type='button'
 		>
-			<span className='text-xxs tabular-nums group-hover/row:hidden group-focus-visible/handle:hidden'>
+			<span className='font-medium text-xxs tabular-nums group-hover/row:hidden group-focus-visible/handle:hidden'>
 				{position}
 			</span>
 			<GripVerticalIcon className='hidden size-3.5 group-hover/row:block group-focus-visible/handle:block' />
@@ -111,10 +120,55 @@ function DragHandle({
 }
 
 /**
+ * One icon action on a queued row. Wrapped in a span so the tooltip still fires
+ * over a disabled button, which is the whole point of the blocked variants —
+ * they have to say why they cannot be used.
+ *
+ * One label serves the tooltip and the accessible name, so a blocked action
+ * cannot show its reason to a pointer and read as available to a screen reader.
+ * The caller resolves which label applies before passing it.
+ */
+function QueueRowAction({
+	children,
+	label,
+	onClick,
+}: {
+	children: ReactNode;
+	label: string;
+	/** Null renders the action disabled; `label` then carries the reason. */
+	onClick: (() => void) | null;
+}) {
+	return (
+		<Tooltip>
+			<TooltipTrigger asChild>
+				<span>
+					<Button
+						aria-label={label}
+						className='rounded-md text-muted-foreground hover:text-foreground'
+						disabled={onClick === null}
+						onClick={() => onClick?.()}
+						size='icon-xs'
+						type='button'
+						variant='ghost'
+					>
+						{children}
+					</Button>
+				</span>
+			</TooltipTrigger>
+			<TooltipContent>{label}</TooltipContent>
+		</Tooltip>
+	);
+}
+
+/**
  * One queued message: a handle that says where it sits, what it says, and the
- * two things that can be done to it. A chore keeps the same shape but reads
- * muted, because it was queued by the Checks panel rather than typed here and
- * will drain on its own under every Follow-up behavior.
+ * three things that can be done to it. The head reads in the accent colour and
+ * is labelled as next, because the order rows sit in is the order they send and
+ * nothing else on the row says which one the agent gets first.
+ *
+ * A chore keeps the same shape but reads muted, because it was queued by the
+ * Checks panel rather than typed here and will drain on its own under every
+ * Follow-up behavior.
  */
 function FollowUpQueueRow({
 	actions,
@@ -131,10 +185,31 @@ function FollowUpQueueRow({
 	const attachmentCount = entry.segments.filter(
 		(segment) => segment.kind === 'attachment',
 	).length;
+	const steerLabel =
+		actions.onSteer === null
+			? t(
+					'workbench:follow-up-queue.steer-blocked',
+					'The agent cannot take a message right now',
+				)
+			: actions.streaming
+				? t('workbench:follow-up-queue.steer', 'Steer the agent with this now')
+				: t('workbench:follow-up-queue.send-immediately', 'Send this now');
+	const editLabel =
+		actions.onEdit === null
+			? t(
+					'workbench:follow-up-queue.edit-blocked',
+					'Send or clear the current draft first',
+				)
+			: t('workbench:follow-up-queue.edit', 'Edit in composer');
 
 	return (
 		<Reorder.Item
-			className='group/row flex list-none items-start gap-1.5 rounded-md border border-transparent bg-popover px-1 py-1.5 hover:border-border/60 hover:bg-secondary/50'
+			className={cn(
+				'group/row flex list-none items-center gap-1.5 rounded-md border px-1 py-1 transition-colors',
+				isFirst
+					? 'border-accent-strong/25 bg-accent-strong/5'
+					: 'border-transparent hover:border-border/60 hover:bg-secondary/50',
+			)}
 			dragControls={dragControls}
 			dragListener={false}
 			id={entry.id}
@@ -151,10 +226,10 @@ function FollowUpQueueRow({
 				onPointerDown={(event) => dragControls.start(event)}
 				position={position}
 			/>
-			<div className='flex min-w-0 flex-1 flex-col gap-0.5 pt-0.5'>
+			<div className='flex min-w-0 flex-1 flex-col gap-1'>
 				<p
 					className={cn(
-						'line-clamp-2 text-xs leading-snug',
+						'line-clamp-2 break-words text-xs leading-snug',
 						entry.source === 'chore'
 							? 'text-muted-foreground italic'
 							: 'text-foreground',
@@ -162,77 +237,51 @@ function FollowUpQueueRow({
 				>
 					{entry.text.trim()}
 				</p>
-				{attachmentCount > 0 ? (
-					<span className='inline-flex items-center gap-1 text-muted-foreground text-xxs'>
-						<PaperclipIcon className='size-3' />
-						{t('workbench:follow-up-queue.attachments', {
-							count: attachmentCount,
-							defaultValue_one: '{{count}} attachment',
-							defaultValue_other: '{{count}} attachments',
-						})}
+				{isFirst || attachmentCount > 0 ? (
+					<span className='flex items-center gap-2 text-xxs leading-none'>
+						{isFirst ? (
+							<span className='font-medium text-accent-strong uppercase tracking-wide'>
+								{t('workbench:follow-up-queue.next', 'Next')}
+							</span>
+						) : null}
+						{attachmentCount > 0 ? (
+							<span className='inline-flex items-center gap-1 text-muted-foreground'>
+								<PaperclipIcon className='size-3' />
+								{t('workbench:follow-up-queue.attachments', {
+									count: attachmentCount,
+									defaultValue_one: '{{count}} attachment',
+									defaultValue_other: '{{count}} attachments',
+								})}
+							</span>
+						) : null}
 					</span>
 				) : null}
 			</div>
-			<div className='flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity focus-within:opacity-100 group-hover/row:opacity-100'>
-				<EditButton entryId={entry.id} onEdit={actions.onEdit} />
-				<Button
-					aria-label={t(
-						'workbench:follow-up-queue.remove',
-						'Remove from queue',
-					)}
-					className='size-6 rounded-md'
+			<div className='flex shrink-0 items-center gap-0.5'>
+				<QueueRowAction
+					label={steerLabel}
+					onClick={
+						actions.onSteer === null ? null : () => actions.onSteer?.(entry.id)
+					}
+				>
+					<SendHorizontalIcon className='size-3' />
+				</QueueRowAction>
+				<QueueRowAction
+					label={editLabel}
+					onClick={
+						actions.onEdit === null ? null : () => actions.onEdit?.(entry.id)
+					}
+				>
+					<PencilIcon className='size-3' />
+				</QueueRowAction>
+				<QueueRowAction
+					label={t('workbench:follow-up-queue.remove', 'Remove from queue')}
 					onClick={() => actions.onRemove(entry.id)}
-					size='icon-sm'
-					type='button'
-					variant='ghost'
 				>
 					<XIcon className='size-3' />
-				</Button>
+				</QueueRowAction>
 			</div>
 		</Reorder.Item>
-	);
-}
-
-/**
- * Puts a queued message back in the composer. Disabled rather than degraded when
- * a draft is already there: editing restores the message's chips where the user
- * put them, and appending it as plain text instead would quietly drop them.
- */
-function EditButton({
-	entryId,
-	onEdit,
-}: {
-	entryId: string;
-	onEdit: ((id: string) => void) | null;
-}) {
-	const { t } = useTranslation();
-
-	return (
-		<Tooltip>
-			<TooltipTrigger asChild>
-				<span>
-					<Button
-						aria-label={t('workbench:follow-up-queue.edit', 'Edit in composer')}
-						className='size-6 rounded-md'
-						disabled={onEdit === null}
-						onClick={() => onEdit?.(entryId)}
-						size='icon-sm'
-						type='button'
-						variant='ghost'
-					>
-						<PencilIcon className='size-3' />
-					</Button>
-				</span>
-			</TooltipTrigger>
-			<TooltipContent>
-				{onEdit === null
-					? t(
-							'workbench:follow-up-queue.edit-blocked',
-							'Send or clear the current draft first',
-						)
-					: t('workbench:follow-up-queue.edit', 'Edit in composer')}
-			</TooltipContent>
-		</Tooltip>
 	);
 }
 
@@ -240,9 +289,15 @@ function EditButton({
  * The queued messages, in the order they will be sent, reorderable by dragging a
  * row's handle.
  *
- * Split out of the popover so the same list can be rendered open — a Radix
- * popover cannot be pinned open, which is the only way the playground can show
- * this at every queue depth.
+ * Split out of the stack around it so the same list can be rendered on its own,
+ * which is how the playground shows it at every queue depth without standing up
+ * a composer to hold it.
+ *
+ * Scrolls natively under `sleek-scrollbar` rather than through Radix
+ * `ScrollArea`, so the box hugs however tall the rows actually came out. Rows
+ * vary — one line, two clamped lines, and a head that carries a meta line — so
+ * the definite height an overlay viewport needs could only ever be an average,
+ * and it left short queues sitting in dead space.
  */
 export function FollowUpQueueList({
 	entries,
@@ -250,6 +305,8 @@ export function FollowUpQueueList({
 	onMove,
 	onRemove,
 	onReorder,
+	onSteer,
+	streaming,
 }: FollowUpQueueListProps) {
 	// Motion settles a dropped row into its slot, so the dragged order has to hold
 	// until release; committing per crossing yanks the row out from under the cursor.
@@ -257,10 +314,13 @@ export function FollowUpQueueList({
 	const committedIds = entries.map((entry) => entry.id);
 	const orderedIds = dragging ?? committedIds;
 	const byId = new Map(entries.map((entry) => [entry.id, entry] as const));
-	const scrollAreaStyle: CSSProperties = {
-		height: getQueueHeight(entries.length),
+	const actions: QueueRowActions = {
+		onEdit,
+		onMove,
+		onRemove,
+		onSteer,
+		streaming,
 	};
-	const actions: QueueRowActions = { onEdit, onMove, onRemove };
 
 	const commitDrag = () => {
 		if (dragging) {
@@ -270,7 +330,7 @@ export function FollowUpQueueList({
 	};
 
 	return (
-		<ScrollArea className='-mr-1.5 pr-1.5' style={scrollAreaStyle}>
+		<div className='sleek-scrollbar max-h-44 overflow-y-auto overscroll-contain'>
 			<Reorder.Group
 				axis='y'
 				className='m-0! flex list-none flex-col gap-0.5 p-0!'
@@ -292,6 +352,6 @@ export function FollowUpQueueList({
 					) : null;
 				})}
 			</Reorder.Group>
-		</ScrollArea>
+		</div>
 	);
 }

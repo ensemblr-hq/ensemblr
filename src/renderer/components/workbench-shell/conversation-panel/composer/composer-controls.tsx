@@ -26,7 +26,6 @@ import type {
 import { formatShortcut } from '@/shared/keymap';
 import { AttachmentMenu } from './attachment-menu';
 import { ContextIndicator } from './context-indicator';
-import { FollowUpQueuePanel } from './follow-up-queue-panel';
 import { McpServersPanel } from './mcp-servers-panel';
 import { ModelPicker } from './model-picker';
 import { PlanModeToggle } from './plan-mode-toggle';
@@ -95,17 +94,6 @@ export function ComposerControls({
 				/>
 			</div>
 			<div className='-mr-1.5 flex items-center gap-1'>
-				<FollowUpQueuePanel
-					disabled={composer.disabled}
-					entries={state.followUpQueue}
-					held={state.queueStalled}
-					onClear={state.clearQueue}
-					onEdit={state.hasContent ? null : state.restoreQueued}
-					onMove={state.moveQueued}
-					onRemove={state.removeQueued}
-					onReorder={state.reorderQueue}
-					onSendNow={state.flushQueueNow}
-				/>
 				{provider === 'claude' ? (
 					<McpServersPanel
 						cwd={composer.workspaceCwd}

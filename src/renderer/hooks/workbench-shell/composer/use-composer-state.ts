@@ -74,6 +74,8 @@ export interface ComposerStateApi {
 	followUpQueue: readonly QueuedFollowUp[];
 	/** Sends the head of a stalled queue now, resuming automatic draining with it. */
 	flushQueueNow: () => void;
+	/** True once a stop or a failed send has paused the queue outright. */
+	queuePaused: boolean;
 	/**
 	 * True while the queue is waiting on the user rather than on the agent: after
 	 * a stop or a failed flush, or once a `block`-mode queue outlives its turn.
@@ -87,6 +89,8 @@ export interface ComposerStateApi {
 	reorderQueue: (orderedIds: readonly string[]) => void;
 	/** Takes a queued entry back into the composer to edit, chips and all. */
 	restoreQueued: (id: string) => void;
+	/** Sends one queued entry out of turn — a steer frame mid-turn, a plain send idle. */
+	steerQueued: (id: string) => void;
 	/** What pressing Send would do right now: send, queue, or hold. */
 	sendIntent: ComposerSendIntent;
 	autocomplete: AutocompleteState;
@@ -355,6 +359,7 @@ export function useComposerState({
 		queueCurrent,
 		queueStalled,
 		restoreQueued,
+		steerQueued,
 	} = useComposerSubmit({
 		chatTabId,
 		composer,
@@ -459,11 +464,13 @@ export function useComposerState({
 		followUpQueue: queue.entries,
 		flushQueueNow,
 		moveQueued: queue.move,
+		queuePaused: queue.held,
 		queueStalled,
 		removeQueued: queue.remove,
 		reorderQueue: queue.reorder,
 		restoreQueued,
 		sendIntent,
+		steerQueued,
 		activeIndex,
 		anchorRef,
 		attachGithubIssue,

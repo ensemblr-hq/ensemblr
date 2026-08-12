@@ -2415,11 +2415,17 @@ export default interface Resources {
 			clear: 'Clear all';
 			edit: 'Edit in composer';
 			'edit-blocked': 'Send or clear the current draft first';
-			heading: 'Queued';
-			paused: 'Queued · paused';
+			next: 'Next';
 			remove: 'Remove from queue';
 			reorder: 'Reorder, position {{position}}';
-			'send-now': 'Send now';
+			resume: 'Resume';
+			'send-immediately': 'Send this now';
+			'send-next': 'Send next';
+			'status-draining': 'Sending one at a time as the agent finishes';
+			'status-paused': 'Paused — nothing sends until you resume';
+			'status-waiting': 'Held back — send them yourself when you are ready';
+			steer: 'Steer the agent with this now';
+			'steer-blocked': 'The agent cannot take a message right now';
 		};
 		fork: {
 			'new-tab-title': 'Forked chat';

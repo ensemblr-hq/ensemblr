@@ -9,6 +9,7 @@ import { ComposerControls } from './composer/composer-controls';
 import { ComposerNotices } from './composer/composer-notices';
 import { ComposerEditor } from './composer/editor';
 import { ComposerFocusHint } from './composer/focus-hint';
+import { FollowUpQueueStack } from './composer/follow-up-queue-stack';
 import { IssuePickerDialog } from './composer/issue-picker-dialog';
 import { ConnectedLastUnreadButton } from './composer/last-unread-button';
 import { LinkDirectoryDialog } from './composer/link-directory-dialog';
@@ -141,6 +142,21 @@ function ComposerPanelBody({
 				<div className='pointer-events-none absolute -top-9 right-0 z-10 flex justify-end *:pointer-events-auto'>
 					<ConnectedLastUnreadButton />
 				</div>
+				<FollowUpQueueStack
+					entries={state.followUpQueue}
+					onClear={state.clearQueue}
+					onEdit={state.hasContent ? null : state.restoreQueued}
+					onMove={state.moveQueued}
+					onRemove={state.removeQueued}
+					onReorder={state.reorderQueue}
+					onSendNow={state.flushQueueNow}
+					onSteer={
+						composer.disabled || state.pending ? null : state.steerQueued
+					}
+					paused={state.queuePaused}
+					stalled={state.queueStalled}
+					streaming={state.isStreaming}
+				/>
 				{/* biome-ignore lint/a11y/noStaticElementInteractions: drop zone is a passive file target, not a keyboard/pointer control */}
 				<div
 					className={cn(

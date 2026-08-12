@@ -80,6 +80,7 @@ Rules of thumb:
 | Queue | В очередь | Σε ουρά | |
 | Held | Удерживается | Κρατείται | A follow-up the `block` behavior keeps out of a running turn. |
 | Paused | Пауза | Παύση | A queue that will not drain until the user says so. Distinct from Held: held is the setting, paused is the queue's state. |
+| Next | Следующее | Επόμενο | The queued message the agent gets first. Neuter in both languages because it qualifies `сообщение`/`μήνυμα`, not the queue. |
 | Archive | Архивировать | Αρχειοθέτηση | |
 | Discard | Отменить изменения | Απόρριψη | Destructive; never plain "Отменить" (= Undo). |
 | Undo | Отменить | Αναίρεση | |

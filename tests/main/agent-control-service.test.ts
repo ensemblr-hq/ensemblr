@@ -1152,6 +1152,271 @@ describe('agent-control service: delegation', () => {
 		}
 	});
 
+	// The refusal knows exactly which session it collided with, and an agent that
+	// cannot see the dock has no other way to reach it. Withholding the id cost a
+	// listTerminals round trip to recover what the refusal already knew.
+	it('names the terminal a refused start collided with', async () => {
+		const ports = makePorts();
+		vi.mocked(ports.terminals.startTerminal).mockResolvedValue({
+			ok: false,
+			code: 'script-already-running',
+			message: 'The run script "dev" is already running.',
+			terminalId: 'term-dev',
+		});
+		const { service } = setup({ ports });
+		const result = await service.invoke({
+			op: 'startTerminal',
+			token: 'tok-caller',
+			rawArgs: { kind: 'run', scriptName: 'playground' },
+		});
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.error).toContain('term-dev');
+			expect(result.error).toContain('restart: true');
+		}
+	});
+
+	it('forwards restart to the terminal port', async () => {
+		const ports = makePorts();
+		const { service } = setup({ ports });
+		await service.invoke({
+			op: 'startTerminal',
+			token: 'tok-caller',
+			rawArgs: { kind: 'run', restart: true, scriptName: 'dev' },
+		});
+		expect(ports.terminals.startTerminal).toHaveBeenCalledWith(
+			expect.objectContaining({ restart: true, scriptName: 'dev' }),
+		);
+	});
+
+	// A caller that just started a run script knows its kind, not its id. Making
+	// it list every terminal to read the one it started is a round trip the start
+	// call could have saved it.
+	it('reads a script terminal by kind, echoing the id it resolved', async () => {
+		const ports = makePorts();
+		vi.mocked(ports.terminals.listTerminals).mockResolvedValue([
+			{
+				terminalId: 'term-stale',
+				kind: 'run-script',
+				scriptName: 'dev',
+				status: 'exited',
+				workspaceId: 'ws',
+			},
+			{
+				terminalId: 'term-run',
+				kind: 'run-script',
+				scriptName: 'playground',
+				status: 'running',
+				workspaceId: 'ws',
+			},
+		]);
+		const { service } = setup({ ports });
+		const result = await service.invoke({
+			op: 'readTerminalOutput',
+			token: 'tok-caller',
+			rawArgs: { kind: 'run' },
+		});
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			expect(result.data).toEqual({ terminalId: 'term-run', output: 'output' });
+		}
+		expect(ports.terminals.readOutput).toHaveBeenCalledWith({
+			ansi: false,
+			terminalId: 'term-run',
+		});
+	});
+
+	it('answers not-found when no script of that kind is running', async () => {
+		const ports = makePorts();
+		const { service } = setup({ ports });
+		const result = await service.invoke({
+			op: 'readTerminalOutput',
+			token: 'tok-caller',
+			rawArgs: { kind: 'setup' },
+		});
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.code).toBe('not-found');
+		}
+		expect(ports.terminals.readOutput).not.toHaveBeenCalled();
+	});
+
+	// Scrollback carries whatever the terminal has been shown, so reading one in
+	// another workspace is the same crossing writing to it would be — and this op
+	// is the one the surface withholds from nobody.
+	it('refuses a terminal id belonging to another workspace', async () => {
+		const ports = makePorts({ terminalWorkspace: 'ws-other' });
+		const { service } = setup({ ports });
+		const result = await service.invoke({
+			op: 'readTerminalOutput',
+			token: 'tok-caller',
+			rawArgs: { terminalId: 'term-elsewhere' },
+		});
+
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.code).toBe('denied-scope');
+		}
+		expect(ports.terminals.readOutput).not.toHaveBeenCalled();
+	});
+
+	it('does not resolve a workspace for a kind selector it scopes itself', async () => {
+		const ports = makePorts({ terminalWorkspace: 'ws-other' });
+		vi.mocked(ports.terminals.listTerminals).mockResolvedValue([
+			{
+				terminalId: 'term-run',
+				kind: 'run-script',
+				scriptName: 'dev',
+				status: 'running',
+				workspaceId: 'ws',
+			},
+		]);
+		const { service } = setup({ ports });
+		const result = await service.invoke({
+			op: 'readTerminalOutput',
+			token: 'tok-caller',
+			rawArgs: { kind: 'run' },
+		});
+
+		expect(result.ok).toBe(true);
+		expect(ports.terminals.resolveTerminalWorkspace).not.toHaveBeenCalled();
+	});
+
+	it('passes ansi through to the port when the caller asks for raw bytes', async () => {
+		const ports = makePorts();
+		const { service } = setup({ ports });
+		await service.invoke({
+			op: 'readTerminalOutput',
+			token: 'tok-caller',
+			rawArgs: { ansi: true, terminalId: 'term-1' },
+		});
+		expect(ports.terminals.readOutput).toHaveBeenCalledWith({
+			ansi: true,
+			terminalId: 'term-1',
+		});
+	});
+
+	// A summary is the heaviest payload on the surface and the one whose whole
+	// point is to survive the turn. Rejecting an over-long one spent a
+	// multi-kilobyte re-emit per attempt and risked the record being dropped
+	// rather than shortened.
+	it('stores an over-long summary truncated rather than refusing it', async () => {
+		const ports = makePorts();
+		vi.mocked(ports.sessionNaming.setSummary).mockResolvedValue({
+			capturedAtOrdinal: 4,
+			message: 'Recorded.',
+		});
+		const { service } = setup({ ports });
+		const result = await service.invoke({
+			op: 'setSummary',
+			token: 'tok-caller',
+			rawArgs: { summary: 'a'.repeat(4_200), title: 'Topic' },
+		});
+
+		expect(result.ok).toBe(true);
+		expect(ports.sessionNaming.setSummary).toHaveBeenCalledWith(
+			expect.objectContaining({ summary: 'a'.repeat(4_000) }),
+		);
+		if (result.ok) {
+			expect(result.data).toMatchObject({
+				truncated: [{ field: 'summary', limit: 4_000, submittedLength: 4_200 }],
+			});
+		}
+	});
+
+	// Fixing the one field it was told about and resubmitting would have got the
+	// caller cut again on the other, which is the round trip truncation exists to
+	// avoid in the first place.
+	it('reports both fields when both are over their caps', async () => {
+		const ports = makePorts();
+		vi.mocked(ports.sessionNaming.setSummary).mockResolvedValue({
+			capturedAtOrdinal: 4,
+			message: 'Recorded.',
+		});
+		const { service } = setup({ ports });
+		const result = await service.invoke({
+			op: 'setSummary',
+			token: 'tok-caller',
+			rawArgs: { summary: 'a'.repeat(4_200), title: 'T'.repeat(120) },
+		});
+
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			expect(result.data).toMatchObject({
+				truncated: [
+					{ field: 'summary', limit: 4_000, submittedLength: 4_200 },
+					{ field: 'title', limit: 80, submittedLength: 120 },
+				],
+			});
+			const { message } = result.data as { message: string };
+			expect(message).toContain('4200');
+			expect(message).toContain('120');
+		}
+	});
+
+	// `slice` cuts by code unit, so a summary that ran over on an emoji stored a
+	// lone surrogate — not a character anything reading the record can render.
+	it('cuts a summary between characters, not through one', async () => {
+		const ports = makePorts();
+		vi.mocked(ports.sessionNaming.setSummary).mockResolvedValue({
+			capturedAtOrdinal: 4,
+			message: 'Recorded.',
+		});
+		const { service } = setup({ ports });
+		await service.invoke({
+			op: 'setSummary',
+			token: 'tok-caller',
+			rawArgs: { summary: 'Body.', title: `${'T'.repeat(79)}🙂` },
+		});
+
+		expect(ports.sessionNaming.setSummary).toHaveBeenCalledWith(
+			expect.objectContaining({ title: 'T'.repeat(79) }),
+		);
+	});
+
+	it('names the limit and the length submitted in the message it returns', async () => {
+		const ports = makePorts();
+		vi.mocked(ports.sessionNaming.setSummary).mockResolvedValue({
+			capturedAtOrdinal: 4,
+			message: 'Recorded.',
+		});
+		const { service } = setup({ ports });
+		const result = await service.invoke({
+			op: 'setSummary',
+			token: 'tok-caller',
+			rawArgs: { summary: 'Body.', title: 'T'.repeat(120) },
+		});
+
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			const { message } = result.data as { message: string };
+			expect(message).toContain('120');
+			expect(message).toContain('80');
+		}
+	});
+
+	it('reports nothing truncated for a summary that fits', async () => {
+		const ports = makePorts();
+		vi.mocked(ports.sessionNaming.setSummary).mockResolvedValue({
+			capturedAtOrdinal: 4,
+			message: 'Recorded.',
+		});
+		const { service } = setup({ ports });
+		const result = await service.invoke({
+			op: 'setSummary',
+			token: 'tok-caller',
+			rawArgs: { summary: 'Body.', title: 'Topic' },
+		});
+
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			expect(result.data).toEqual({
+				capturedAtOrdinal: 4,
+				message: 'Recorded.',
+			});
+		}
+	});
+
 	// A wrong guess is cheap to make and cheap to correct, so it must not cost a
 	// spawn: the retry that names the right script has to still fit the quota.
 	it('does not spend the spawn budget on a script that never launched', async () => {

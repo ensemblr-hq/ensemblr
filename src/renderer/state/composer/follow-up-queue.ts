@@ -120,6 +120,17 @@ export function createFollowUp(
 	};
 }
 
+/**
+ * A queued entry lifted out of the queue, with the place it was holding. The two
+ * travel together because every caller that takes an entry may have to put it
+ * back, and putting it anywhere but where it came from silently reorders a queue
+ * the user arranged by hand.
+ */
+export interface TakenFollowUp {
+	entry: QueuedFollowUp;
+	index: number;
+}
+
 /** Everything a composer needs to read and drive one chat's follow-up queue. */
 export interface FollowUpQueueApi {
 	clear: () => void;
@@ -134,10 +145,14 @@ export interface FollowUpQueueApi {
 	/** Applies an explicit id order, which is what a drag hands back. */
 	reorder: (orderedIds: readonly string[]) => void;
 	remove: (id: string) => void;
-	/** Puts an entry back at the head, for a flush that could not be delivered. */
-	requeue: (entry: QueuedFollowUp) => void;
-	/** Removes an entry and hands it back, for editing it in the composer. */
-	take: (id: string) => QueuedFollowUp | null;
+	/**
+	 * Puts an entry back where it was, for a send that could not be delivered.
+	 * Omitting the index puts it at the head, which is where the flush took it
+	 * from.
+	 */
+	requeue: (entry: QueuedFollowUp, index?: number) => void;
+	/** Removes an entry and hands it back with its place, for an edit or an out-of-turn send. */
+	take: (id: string) => TakenFollowUp | null;
 	/** Removes and returns the head, for the flush. */
 	takeNext: () => QueuedFollowUp | null;
 }
@@ -180,15 +195,21 @@ export function useFollowUpQueue(chatTabId: string): FollowUpQueueApi {
 			remove: (id) => update((queue) => removeFollowUp(queue, id)),
 			reorder: (orderedIds) =>
 				update((queue) => reorderFollowUps(queue, orderedIds)),
-			requeue: (entry) => update((queue) => [entry, ...queue]),
+			requeue: (entry, index = 0) =>
+				update((queue) => [
+					...queue.slice(0, index),
+					entry,
+					...queue.slice(index),
+				]),
 			take: (id) => {
-				const queueAtom = followUpQueueAtomFamily(chatTabId);
-				const found =
-					store.get(queueAtom).find((entry) => entry.id === id) ?? null;
-				if (found) {
-					update((queue) => removeFollowUp(queue, id));
+				const queue = store.get(followUpQueueAtomFamily(chatTabId));
+				const index = queue.findIndex((entry) => entry.id === id);
+				const found = queue[index];
+				if (!found) {
+					return null;
 				}
-				return found;
+				update((current) => removeFollowUp(current, id));
+				return { entry: found, index };
 			},
 			takeNext: () => {
 				const queueAtom = followUpQueueAtomFamily(chatTabId);

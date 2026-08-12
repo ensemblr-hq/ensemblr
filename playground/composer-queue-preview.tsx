@@ -87,13 +87,14 @@ function buildQueueEntries(
 }
 
 /**
- * The composer's follow-up queue: the chip that counts it, the panel that edits
- * it, and the four surfaces that say what a mid-turn send will do.
+ * The composer's follow-up queue: the stack pinned above the composer, the
+ * status line that says whether it moves on its own, and the surfaces that say
+ * what a mid-turn send will do.
  *
- * Driven through the shipped `ComposerPanel` rather than the panel alone,
- * because the queue chip only means anything beside the send button it changes
- * the behaviour of — and because the block status has to be read against the
- * placeholder and notices strip it has to agree with.
+ * Driven through the shipped `ComposerPanel` rather than the stack alone,
+ * because the stack only means anything sitting on the composer it feeds — and
+ * because the block status has to be read against the placeholder and notices
+ * strip it has to agree with.
  */
 export function ComposerQueueScene() {
 	const [client] = useState(createPlaygroundQueryClient);
@@ -219,8 +220,8 @@ export function ComposerQueueScene() {
 				</SceneControls>
 
 				<SceneSection
-					label='live composer — queue chip, block status, send tooltip'
-					note='type and send while streaming: steer goes to the runtime, queue and block land in the chip beside the send button'
+					label='live composer — the queue stack, block status, send tooltip'
+					note='type and send while streaming: steer goes to the runtime, queue and block land in the stack above the composer'
 				>
 					<div className='overflow-hidden rounded-md border border-border'>
 						<ComposerPanel
@@ -233,11 +234,11 @@ export function ComposerQueueScene() {
 				</SceneSection>
 
 				<SceneSection
-					label='the queue list, pinned open'
-					note='the popover cannot be held open from here, so the list renders on its own — same component the panel wraps'
+					label='the queue list on its own'
+					note='the rows without the stack chrome around them, at depths the live composer is awkward to hold'
 				>
 					<QueueListCase
-						caption='3 queued — row 2 carries a chip, row 3 is a Checks chore'
+						caption='3 queued — row 1 is next, row 2 carries a chip, row 3 is a Checks chore'
 						count={3}
 					/>
 					<QueueListCase
@@ -253,6 +254,11 @@ export function ComposerQueueScene() {
 						count={2}
 						editable={false}
 					/>
+					<QueueListCase
+						caption='idle — the out-of-turn send is a plain send, not a steer'
+						count={2}
+						streaming={false}
+					/>
 				</SceneSection>
 			</div>
 		</QueryClientProvider>
@@ -264,10 +270,12 @@ function QueueListCase({
 	caption,
 	count,
 	editable = true,
+	streaming = true,
 }: {
 	caption: string;
 	count: number;
 	editable?: boolean;
+	streaming?: boolean;
 }) {
 	const [entries, setEntries] = useState(() =>
 		buildQueueEntries(count, 'short'),
@@ -278,7 +286,7 @@ function QueueListCase({
 			<span className='font-mono text-muted-foreground text-xxs'>
 				{caption}
 			</span>
-			<div className='w-80 rounded-md border border-border bg-popover p-1.5'>
+			<div className='flex w-full max-w-2xl flex-col gap-1 rounded-xl border border-border bg-pane/60 p-1.5'>
 				<FollowUpQueueList
 					entries={entries}
 					onEdit={
@@ -295,6 +303,8 @@ function QueueListCase({
 					onReorder={(orderedIds) =>
 						setEntries((current) => reorderFollowUps(current, orderedIds))
 					}
+					onSteer={(id) => setEntries((current) => removeFollowUp(current, id))}
+					streaming={streaming}
 				/>
 			</div>
 		</div>

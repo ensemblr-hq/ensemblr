@@ -95,6 +95,33 @@ describe('validateArgs', () => {
 		expect(validateArgs('stopTerminal', {}).ok).toBe(false);
 	});
 
+	it('takes the same terminalId-or-kind selector for readTerminalOutput', () => {
+		expect(validateArgs('readTerminalOutput', { terminalId: 't1' }).ok).toBe(
+			true,
+		);
+		expect(
+			validateArgs('readTerminalOutput', { ansi: true, kind: 'run' }).ok,
+		).toBe(true);
+		expect(
+			validateArgs('readTerminalOutput', { kind: 'run', terminalId: 't1' }).ok,
+		).toBe(false);
+		expect(validateArgs('readTerminalOutput', {}).ok).toBe(false);
+	});
+
+	it('accepts restart on a script start and refuses it on a spawn', () => {
+		expect(
+			validateArgs('startTerminal', { kind: 'run', restart: true }).ok,
+		).toBe(true);
+		const spawned = validateArgs('startTerminal', {
+			kind: 'spawn',
+			restart: true,
+		});
+		expect(spawned.ok).toBe(false);
+		if (!spawned.ok) {
+			expect(spawned.reason).toContain('restart');
+		}
+	});
+
 	it('requires filePath for file/diff tabs and commentBody for comment tabs', () => {
 		expect(
 			validateArgs('openTab', { variant: 'file', filePath: 'a.ts' }).ok,
@@ -131,24 +158,25 @@ describe('validateArgs', () => {
 		);
 	});
 
-	it('requires both a title and a body for setSummary, within their caps', () => {
+	it('requires both a title and a body for setSummary', () => {
 		expect(
 			validateArgs('setSummary', { summary: '- Did the thing', title: 'Topic' })
 				.ok,
 		).toBe(true);
 		expect(validateArgs('setSummary', { title: 'Topic' }).ok).toBe(false);
-		expect(
-			validateArgs('setSummary', {
-				summary: 'body',
-				title: 'a'.repeat(81),
-			}).ok,
-		).toBe(false);
+		expect(validateArgs('setSummary', { summary: 'body' }).ok).toBe(false);
+	});
+
+	// The caps live in the service, which truncates. Rejecting at the boundary
+	// would spend a multi-kilobyte re-emit to say "shorter" and risk the record
+	// being dropped rather than shortened.
+	it('accepts a setSummary over its caps, leaving the limits to truncation', () => {
 		expect(
 			validateArgs('setSummary', {
 				summary: 'a'.repeat(4001),
-				title: 'Topic',
+				title: 'a'.repeat(81),
 			}).ok,
-		).toBe(false);
+		).toBe(true);
 	});
 
 	it('trims a long askUserQuestion header instead of rejecting the questionnaire', () => {

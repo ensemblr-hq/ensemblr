@@ -32,7 +32,7 @@ const NUDGE_PREAMBLE = `${SESSION_BRIEF_NUDGE_HEADER} — the app tracks this fo
 
 /** Bullet asking the agent to replace the prompt-derived tab title. */
 const TITLE_BULLET =
-	'- Tab title: this tab is still carrying a title derived from the prompt rather than chosen. Call `ensemblr_set_name` with a short, specific title for what this conversation is actually about.';
+	'- Tab title: this tab is still carrying a title derived from the prompt rather than chosen. Call `ensemblr_set_name` with `title` set to a short, specific label for what this conversation is actually about.';
 
 /** Bullet asking the agent to record what the turn covered. */
 const SUMMARY_BULLET =

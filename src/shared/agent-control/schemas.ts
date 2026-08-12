@@ -15,7 +15,6 @@ import {
 	EXIT_PLAN_MODE_LIMITS,
 	LINEAR_AGENT_LIMITS,
 	SET_BRANCH_NAME_LIMITS,
-	SET_SUMMARY_LIMITS,
 	WORKSPACE_BOARD_STATUSES,
 } from './contracts.ts';
 
@@ -67,9 +66,13 @@ const setBranchNameSchema = z.strictObject({
 	userRequested: z.boolean().optional(),
 });
 
+// Deliberately uncapped here: SET_SUMMARY_LIMITS is applied by truncation in the
+// service, not by rejection at the boundary. A `.max()` on the body would spend a
+// multi-kilobyte round trip to say "shorter", and the transport already bounds the
+// payload at the control server's body limit.
 const setSummarySchema = z.strictObject({
-	title: nonEmpty.max(SET_SUMMARY_LIMITS.maxTitleLength),
-	summary: nonEmpty.max(SET_SUMMARY_LIMITS.maxSummaryLength),
+	title: nonEmpty,
+	summary: nonEmpty,
 });
 
 const sendFollowUpSchema = z.strictObject({
@@ -90,9 +93,14 @@ const startTerminalSchema = z
 	.strictObject({
 		kind: z.enum(['setup', 'run', 'spawn']),
 		scriptName: nonEmpty.optional(),
+		restart: z.boolean().optional(),
 	})
 	.refine((value) => !value.scriptName || value.kind === 'run', {
 		message: 'scriptName applies to kind "run" only.',
+	})
+	.refine((value) => !value.restart || value.kind !== 'spawn', {
+		message:
+			'restart applies to the setup and run scripts only; a spawn terminal has nothing to replace.',
 	});
 
 const terminalIdOrKindSchema = z
@@ -146,9 +154,15 @@ const readConversationSchema = z.strictObject({
 	ordinal: z.number().int().min(0).optional(),
 });
 
-const readTerminalOutputSchema = z.strictObject({
-	terminalId: nonEmpty,
-});
+const readTerminalOutputSchema = z
+	.strictObject({
+		terminalId: nonEmpty.optional(),
+		kind: z.enum(['setup', 'run']).optional(),
+		ansi: z.boolean().optional(),
+	})
+	.refine((value) => Boolean(value.terminalId) !== Boolean(value.kind), {
+		message: 'Provide exactly one of terminalId or kind.',
+	});
 
 const focusTabSchema = z.strictObject({
 	chatTabId: nonEmpty,

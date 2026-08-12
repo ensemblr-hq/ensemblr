@@ -15,9 +15,10 @@ const QUEUE_SHORTCUT = formatShortcut('composer.queue');
  *
  * The held notice reads off `sendIntent`, which is derived per render. The flag
  * it replaced was latched on a rejected keypress, so it outlived the turn that
- * justified it and followed the user onto an idle tab. It is the only surface
- * for that state: a chip in the controls row said the same thing at the same
- * time, and one state announced twice reads as two.
+ * justified it and followed the user onto an idle tab. It says what a send is
+ * about to do while nothing is queued yet; once something is, the stack above
+ * the composer says it with the messages in hand, and one state announced twice
+ * reads as two.
  *
  * Attachment chips are not here — they live inline in the draft, at the position
  * the user put them. A linked directory is not part of any one message: it stays
@@ -60,7 +61,7 @@ export function ComposerNotices({ state }: { state: ComposerStateApi }) {
 					{state.attachmentError}
 				</div>
 			) : null}
-			{state.sendIntent === 'hold' ? (
+			{state.sendIntent === 'hold' && state.followUpQueue.length === 0 ? (
 				<output className='text-muted-foreground text-xs'>
 					{t(
 						'workbench:composer.blocked-follow-up',

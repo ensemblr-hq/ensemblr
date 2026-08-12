@@ -22,6 +22,12 @@ export interface TerminalDiagnostic {
 	code: string;
 	message: string;
 	severity: TerminalDiagnosticSeverity;
+	/**
+	 * The session this diagnostic is about, when it is about one that already
+	 * exists — the script holding the workspace when a second start is refused.
+	 * A caller that cannot see the dock has no other way to reach it.
+	 */
+	terminalId?: string;
 }
 
 /** IPC-safe snapshot of one terminal session. */
