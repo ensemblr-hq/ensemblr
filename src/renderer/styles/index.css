@@ -89,26 +89,44 @@
 	--ensemblr-if-light: initial;
 	--ensemblr-if-dark: ;
 
-	--ensemblr-canvas: var(--ensemblr-if-light, oklch(0.965 0.003 265))
-		var(--ensemblr-if-dark, oklch(0.135 0.006 35));
-	--ensemblr-toolbar: var(--ensemblr-if-light, oklch(0.94 0.004 265 / 92%))
-		var(--ensemblr-if-dark, oklch(0.18 0.006 35 / 94%));
+	/*
+	 * Two deliberately opposite casts. Light runs cool (hue 265) so a white card
+	 * reads as paper against it; dark runs warm (hue 35) so the deepest surface
+	 * is an off-black rather than a neutral void. Chroma is higher in dark than
+	 * the numbers suggest is needed — perceived saturation collapses as lightness
+	 * drops, so 0.006 at L 0.17 reads as flat grey where 0.009 reads as charcoal.
+	 */
+	--ensemblr-canvas: var(--ensemblr-if-light, oklch(0.955 0.004 265))
+		var(--ensemblr-if-dark, oklch(0.21 0.009 35));
+	--ensemblr-toolbar: var(--ensemblr-if-light, oklch(0.923 0.005 265 / 92%))
+		var(--ensemblr-if-dark, oklch(0.235 0.009 35 / 94%));
 	--ensemblr-surface: var(--ensemblr-if-light, oklch(0.995 0 0))
-		var(--ensemblr-if-dark, oklch(0.16 0.006 35));
-	--ensemblr-pane: var(--ensemblr-if-light, oklch(0.94 0.004 265))
-		var(--ensemblr-if-dark, oklch(0.205 0.006 35));
-	--ensemblr-pane-strong: var(--ensemblr-if-light, oklch(0.89 0.006 265))
-		var(--ensemblr-if-dark, oklch(0.26 0.006 35));
-	--ensemblr-ink: var(--ensemblr-if-light, oklch(0.21 0.004 265))
-		var(--ensemblr-if-dark, oklch(0.91 0.006 75));
-	--ensemblr-muted-ink: var(--ensemblr-if-light, oklch(0.52 0.006 265))
-		var(--ensemblr-if-dark, oklch(0.67 0.006 75));
-	--ensemblr-accent: var(--ensemblr-if-light, oklch(0.609 0.111 222))
-		var(--ensemblr-if-dark, oklch(0.675 0.123 221));
+		var(--ensemblr-if-dark, oklch(0.248 0.009 35));
+	--ensemblr-pane: var(--ensemblr-if-light, oklch(0.917 0.006 265))
+		var(--ensemblr-if-dark, oklch(0.285 0.009 35));
+	--ensemblr-pane-strong: var(--ensemblr-if-light, oklch(0.862 0.008 265))
+		var(--ensemblr-if-dark, oklch(0.335 0.009 35));
+	--ensemblr-ink: var(--ensemblr-if-light, oklch(0.185 0.006 265))
+		var(--ensemblr-if-dark, oklch(0.905 0.008 75));
+	/*
+	 * Both cuts are set by `--ensemblr-pane-strong`, not by the canvas: it doubles
+	 * as shadcn's `--accent`, so muted text has to clear AA on a hovered or
+	 * selected row — the tightest pairing it appears in, and a good step past what
+	 * the canvas alone would ask for.
+	 */
+	--ensemblr-muted-ink: var(--ensemblr-if-light, oklch(0.465 0.008 265))
+		var(--ensemblr-if-dark, oklch(0.71 0.008 75));
+	/*
+	 * The accent is a text colour before it is a fill — `text-accent-strong`,
+	 * markdown links, and `bg-accent-strong/10` badges that print the same hue on
+	 * its own tint. Both cuts are set by that tint case, which is the tightest.
+	 */
+	--ensemblr-accent: var(--ensemblr-if-light, oklch(0.55 0.118 222))
+		var(--ensemblr-if-dark, oklch(0.75 0.123 221));
 	--ensemblr-accent-foreground: var(--ensemblr-if-light, oklch(0.99 0 0))
-		var(--ensemblr-if-dark, oklch(0.14 0.006 35));
-	--ensemblr-border: var(--ensemblr-if-light, oklch(0.82 0.006 265))
-		var(--ensemblr-if-dark, oklch(0.31 0.006 35));
+		var(--ensemblr-if-dark, oklch(0.21 0.009 35));
+	--ensemblr-border: var(--ensemblr-if-light, oklch(0.792 0.008 265))
+		var(--ensemblr-if-dark, oklch(0.375 0.009 35));
 	/*
 	 * The dark cut of an accent token, named rather than inlined. A two-cut token
 	 * collapses to one value at `:root` and is inherited already resolved, so a
@@ -116,14 +134,26 @@
 	 * cannot re-derive the dark reading from the token itself. Naming the cut is
 	 * what lets that surface borrow it instead of restating the colour.
 	 */
-	--ensemblr-ring-on-dark: oklch(0.675 0.123 221);
-	--ensemblr-ring: var(--ensemblr-if-light, oklch(0.609 0.111 222))
+	--ensemblr-ring-on-dark: oklch(0.75 0.123 221);
+	--ensemblr-ring: var(--ensemblr-if-light, oklch(0.55 0.118 222))
 		var(--ensemblr-if-dark, var(--ensemblr-ring-on-dark));
-	--ensemblr-status-ok: var(--ensemblr-if-light, oklch(0.61 0.18 151))
-		var(--ensemblr-if-dark, oklch(0.74 0.18 151));
-	--ensemblr-status-warning: var(--ensemblr-if-light, oklch(0.68 0.15 73))
-		var(--ensemblr-if-dark, oklch(0.77 0.13 73));
-	--ensemblr-status-danger-on-dark: oklch(0.68 0.15 28);
+	/*
+	 * The light cuts sit darker than their dark counterparts by more than the
+	 * polarity flip alone would give: a mid-lightness hue that reads as a clear
+	 * signal on an off-black canvas washes out on a near-white one, and amber is
+	 * the worst of them, so warning takes the largest step down.
+	 *
+	 * The dark cuts are set by the badge case, not the plain-text one: a status
+	 * badge prints its text on a 10-12% fill of the same hue, so the fill lightens
+	 * the very background that text is measured against. That is why they rose
+	 * when the dark surfaces did — the fill rides on the surface beneath it, so
+	 * lifting the canvas off black eats the badge's contrast unless these follow.
+	 */
+	--ensemblr-status-ok: var(--ensemblr-if-light, oklch(0.585 0.185 151))
+		var(--ensemblr-if-dark, oklch(0.76 0.18 151));
+	--ensemblr-status-warning: var(--ensemblr-if-light, oklch(0.64 0.155 73))
+		var(--ensemblr-if-dark, oklch(0.81 0.13 73));
+	--ensemblr-status-danger-on-dark: oklch(0.79 0.15 28);
 	--ensemblr-status-danger: var(--ensemblr-if-light, oklch(0.58 0.19 28))
 		var(--ensemblr-if-dark, var(--ensemblr-status-danger-on-dark));
 	/*
@@ -160,14 +190,22 @@
 	 * Code surface. Owned by the app theme, not by the picked Shiki theme: a code
 	 * block reads as a panel of the app first and a syntax sample second, so its
 	 * background and border follow light/dark while only the token colours inside
-	 * come from Settings → Appearance → Code theme.
+	 * come from Settings → Appearance → Code theme. It also takes the mode's own
+	 * hue — cool in light, warm in dark — so a code block does not read as a cool
+	 * inset cut into a warm panel.
+	 *
+	 * Both cuts stay clear of `--ensemblr-surface`, which is what `--card` points
+	 * at and what a code block almost always sits on. Light reads it as a recess
+	 * below a white card; dark cannot do that by going lighter without colliding
+	 * with `--ensemblr-pane`, so it recesses too, landing between the canvas and
+	 * the card rather than on top of either.
 	 */
-	--ensemblr-code: var(--ensemblr-if-light, oklch(0.945 0.004 265))
-		var(--ensemblr-if-dark, oklch(0.18 0.004 265));
-	--ensemblr-code-foreground: var(--ensemblr-if-light, oklch(0.22 0.004 265))
-		var(--ensemblr-if-dark, oklch(0.93 0.004 265));
-	--ensemblr-code-border: var(--ensemblr-if-light, oklch(0.86 0.004 265))
-		var(--ensemblr-if-dark, oklch(0.3 0.004 265));
+	--ensemblr-code: var(--ensemblr-if-light, oklch(0.923 0.006 265))
+		var(--ensemblr-if-dark, oklch(0.222 0.009 35));
+	--ensemblr-code-foreground: var(--ensemblr-if-light, oklch(0.195 0.006 265))
+		var(--ensemblr-if-dark, oklch(0.905 0.008 75));
+	--ensemblr-code-border: var(--ensemblr-if-light, oklch(0.832 0.006 265))
+		var(--ensemblr-if-dark, oklch(0.375 0.009 35));
 	/*
 	 * One rhythm for every code surface in the app — chat code block, file
 	 * viewer, diff viewer, and the diff preview inside a tool row all stack their
@@ -198,30 +236,41 @@
 	 * widths.
 	 */
 	--ensemblr-scrollbar-size: 0.375rem;
-	/* The terminal is a dark panel in both modes, so it takes no second cut. */
-	--ensemblr-terminal: oklch(0.155 0.006 35);
-	--ensemblr-terminal-foreground: oklch(0.88 0.006 75);
-	--ensemblr-terminal-muted: oklch(0.63 0.006 75);
-	--ensemblr-terminal-border: oklch(0.31 0.006 35);
-	--ensemblr-diff-addition: var(--ensemblr-if-light, oklch(0.94 0.041 151))
-		var(--ensemblr-if-dark, oklch(0.22 0.052 151));
+	/*
+	 * The terminal is a dark panel in both modes, so it takes no second cut. It
+	 * sits one step under `--ensemblr-canvas`'s dark cut on purpose: the terminal
+	 * stays the deepest surface in the window even after the app floor lifts off
+	 * black.
+	 */
+	--ensemblr-terminal: oklch(0.195 0.009 35);
+	--ensemblr-terminal-foreground: oklch(0.885 0.008 75);
+	--ensemblr-terminal-muted: oklch(0.66 0.008 75);
+	--ensemblr-terminal-border: oklch(0.375 0.009 35);
+	/*
+	 * Diff row tints are measured against `--ensemblr-code`, not the canvas — a
+	 * diff always renders on the code surface. Each cut keeps its lift over that
+	 * surface, so the tint stays legible in both modes rather than merging into
+	 * the panel it sits on.
+	 */
+	--ensemblr-diff-addition: var(--ensemblr-if-light, oklch(0.912 0.05 151))
+		var(--ensemblr-if-dark, oklch(0.262 0.052 151));
 	--ensemblr-diff-addition-foreground: var(
 			--ensemblr-if-light,
-			oklch(0.37 0.11 151)
+			oklch(0.355 0.115 151)
 		)
 		var(--ensemblr-if-dark, oklch(0.78 0.18 151));
-	--ensemblr-diff-deletion: var(--ensemblr-if-light, oklch(0.94 0.035 28))
-		var(--ensemblr-if-dark, oklch(0.22 0.045 28));
+	--ensemblr-diff-deletion: var(--ensemblr-if-light, oklch(0.912 0.045 28))
+		var(--ensemblr-if-dark, oklch(0.262 0.045 28));
 	--ensemblr-diff-deletion-foreground: var(
 			--ensemblr-if-light,
-			oklch(0.43 0.14 28)
+			oklch(0.41 0.145 28)
 		)
 		var(--ensemblr-if-dark, oklch(0.74 0.15 28));
-	--ensemblr-diff-modified: var(--ensemblr-if-light, oklch(0.94 0.028 73))
-		var(--ensemblr-if-dark, oklch(0.24 0.035 73));
+	--ensemblr-diff-modified: var(--ensemblr-if-light, oklch(0.915 0.038 73))
+		var(--ensemblr-if-dark, oklch(0.282 0.035 73));
 	--ensemblr-diff-modified-foreground: var(
 			--ensemblr-if-light,
-			oklch(0.43 0.08 73)
+			oklch(0.41 0.085 73)
 		)
 		var(--ensemblr-if-dark, oklch(0.78 0.13 73));
 	--ensemblr-traffic-light-safe-inline: 5.75rem;
@@ -232,10 +281,10 @@
 	--card-foreground: var(--ensemblr-ink);
 	--popover: var(--ensemblr-surface);
 	--popover-foreground: var(--ensemblr-ink);
-	--primary: var(--ensemblr-if-light, oklch(0.24 0.006 265))
-		var(--ensemblr-if-dark, oklch(0.84 0.007 75));
+	--primary: var(--ensemblr-if-light, oklch(0.205 0.006 265))
+		var(--ensemblr-if-dark, oklch(0.855 0.008 75));
 	--primary-foreground: var(--ensemblr-if-light, oklch(0.99 0 0))
-		var(--ensemblr-if-dark, oklch(0.14 0.006 35));
+		var(--ensemblr-if-dark, oklch(0.21 0.009 35));
 	--secondary: var(--ensemblr-pane);
 	--secondary-foreground: var(--ensemblr-ink);
 	--muted: var(--ensemblr-pane);
@@ -252,13 +301,13 @@
 	--chart-4: oklch(0.537 0.098 222);
 	--chart-5: oklch(0.675 0.123 221);
 	--radius: 0.55rem;
-	--sidebar: var(--ensemblr-if-light, oklch(0.925 0.004 265 / 96%))
-		var(--ensemblr-if-dark, oklch(0.17 0.006 35 / 97%));
+	--sidebar: var(--ensemblr-if-light, oklch(0.908 0.005 265 / 96%))
+		var(--ensemblr-if-dark, oklch(0.228 0.009 35 / 97%));
 	--sidebar-foreground: var(--ensemblr-ink);
 	--sidebar-primary: var(--primary);
 	--sidebar-primary-foreground: var(--primary-foreground);
-	--sidebar-accent: var(--ensemblr-if-light, oklch(0.89 0.006 265))
-		var(--ensemblr-if-dark, oklch(0.235 0.006 35));
+	--sidebar-accent: var(--ensemblr-if-light, oklch(0.862 0.008 265))
+		var(--ensemblr-if-dark, oklch(0.3 0.009 35));
 	--sidebar-accent-foreground: var(--ensemblr-ink);
 	--sidebar-border: var(--ensemblr-border);
 	--sidebar-ring: var(--ensemblr-ring);
@@ -293,13 +342,13 @@
  * specificity, wins over `.dark`).
  */
 .env-dev {
-	--ensemblr-toolbar: oklch(0.9 0.055 74 / 92%);
-	--ensemblr-accent: oklch(0.7 0.14 74);
+	--ensemblr-toolbar: oklch(0.885 0.058 74 / 92%);
+	--ensemblr-accent: oklch(0.55 0.145 74);
 }
 
 .dark.env-dev {
-	--ensemblr-toolbar: oklch(0.22 0.05 74 / 94%);
-	--ensemblr-accent: oklch(0.75 0.13 74);
+	--ensemblr-toolbar: oklch(0.275 0.05 74 / 94%);
+	--ensemblr-accent: oklch(0.78 0.13 74);
 }
 
 /*
@@ -313,52 +362,52 @@
  */
 .a11y-protanopia,
 .a11y-deuteranopia {
-	--ensemblr-status-ok: oklch(0.61 0.18 244);
-	--ensemblr-status-warning: oklch(0.68 0.15 76.8);
+	--ensemblr-status-ok: oklch(0.585 0.185 244);
+	--ensemblr-status-warning: oklch(0.64 0.155 76.8);
 	--ensemblr-status-danger: oklch(0.58 0.19 47.5);
-	--ensemblr-diff-addition: oklch(0.94 0.041 244);
-	--ensemblr-diff-addition-foreground: oklch(0.37 0.11 244);
-	--ensemblr-diff-deletion: oklch(0.94 0.035 47.5);
-	--ensemblr-diff-deletion-foreground: oklch(0.43 0.14 47.5);
-	--ensemblr-diff-modified: oklch(0.94 0.028 76.8);
-	--ensemblr-diff-modified-foreground: oklch(0.43 0.08 76.8);
+	--ensemblr-diff-addition: oklch(0.912 0.05 244);
+	--ensemblr-diff-addition-foreground: oklch(0.355 0.115 244);
+	--ensemblr-diff-deletion: oklch(0.912 0.045 47.5);
+	--ensemblr-diff-deletion-foreground: oklch(0.41 0.145 47.5);
+	--ensemblr-diff-modified: oklch(0.915 0.038 76.8);
+	--ensemblr-diff-modified-foreground: oklch(0.41 0.085 76.8);
 }
 
 .dark.a11y-protanopia,
 .dark.a11y-deuteranopia {
-	--ensemblr-status-ok: oklch(0.74 0.18 244);
-	--ensemblr-status-warning: oklch(0.77 0.13 76.8);
-	--ensemblr-status-danger: oklch(0.68 0.15 47.5);
-	--ensemblr-diff-addition: oklch(0.22 0.052 244);
+	--ensemblr-status-ok: oklch(0.76 0.18 244);
+	--ensemblr-status-warning: oklch(0.81 0.13 76.8);
+	--ensemblr-status-danger: oklch(0.79 0.15 47.5);
+	--ensemblr-diff-addition: oklch(0.262 0.052 244);
 	--ensemblr-diff-addition-foreground: oklch(0.78 0.18 244);
-	--ensemblr-diff-deletion: oklch(0.22 0.045 47.5);
+	--ensemblr-diff-deletion: oklch(0.262 0.045 47.5);
 	--ensemblr-diff-deletion-foreground: oklch(0.74 0.15 47.5);
-	--ensemblr-diff-modified: oklch(0.24 0.035 76.8);
+	--ensemblr-diff-modified: oklch(0.282 0.035 76.8);
 	--ensemblr-diff-modified-foreground: oklch(0.78 0.13 76.8);
 }
 
 /* Tritanopia: add/ok → green 165.5°, remove/danger → magenta 346.3°, warning → vermillion 47.5°. */
 .a11y-tritanopia {
-	--ensemblr-status-ok: oklch(0.61 0.18 165.5);
-	--ensemblr-status-warning: oklch(0.68 0.15 47.5);
+	--ensemblr-status-ok: oklch(0.585 0.185 165.5);
+	--ensemblr-status-warning: oklch(0.64 0.155 47.5);
 	--ensemblr-status-danger: oklch(0.58 0.19 346.3);
-	--ensemblr-diff-addition: oklch(0.94 0.041 165.5);
-	--ensemblr-diff-addition-foreground: oklch(0.37 0.11 165.5);
-	--ensemblr-diff-deletion: oklch(0.94 0.035 346.3);
-	--ensemblr-diff-deletion-foreground: oklch(0.43 0.14 346.3);
-	--ensemblr-diff-modified: oklch(0.94 0.028 47.5);
-	--ensemblr-diff-modified-foreground: oklch(0.43 0.08 47.5);
+	--ensemblr-diff-addition: oklch(0.912 0.05 165.5);
+	--ensemblr-diff-addition-foreground: oklch(0.355 0.115 165.5);
+	--ensemblr-diff-deletion: oklch(0.912 0.045 346.3);
+	--ensemblr-diff-deletion-foreground: oklch(0.41 0.145 346.3);
+	--ensemblr-diff-modified: oklch(0.915 0.038 47.5);
+	--ensemblr-diff-modified-foreground: oklch(0.41 0.085 47.5);
 }
 
 .dark.a11y-tritanopia {
-	--ensemblr-status-ok: oklch(0.74 0.18 165.5);
-	--ensemblr-status-warning: oklch(0.77 0.13 47.5);
-	--ensemblr-status-danger: oklch(0.68 0.15 346.3);
-	--ensemblr-diff-addition: oklch(0.22 0.052 165.5);
+	--ensemblr-status-ok: oklch(0.76 0.18 165.5);
+	--ensemblr-status-warning: oklch(0.81 0.13 47.5);
+	--ensemblr-status-danger: oklch(0.79 0.15 346.3);
+	--ensemblr-diff-addition: oklch(0.262 0.052 165.5);
 	--ensemblr-diff-addition-foreground: oklch(0.78 0.18 165.5);
-	--ensemblr-diff-deletion: oklch(0.22 0.045 346.3);
+	--ensemblr-diff-deletion: oklch(0.262 0.045 346.3);
 	--ensemblr-diff-deletion-foreground: oklch(0.74 0.15 346.3);
-	--ensemblr-diff-modified: oklch(0.24 0.035 47.5);
+	--ensemblr-diff-modified: oklch(0.282 0.035 47.5);
 	--ensemblr-diff-modified-foreground: oklch(0.78 0.13 47.5);
 }
 
