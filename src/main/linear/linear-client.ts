@@ -195,7 +195,7 @@ const METADATA_CONNECTION_KEYS = {
  * Builds the Linear GraphQL client. Direct GraphQL is used instead of
  * `@linear/sdk` because cache sync needs flat field selections in a single
  * request per page; the SDK lazily resolves relations, which would fan out
- * into N+1 requests (see `docs/product/linear-api-discovery.md`).
+ * into N+1 requests.
  * @param options - Token source and optional fetch/api overrides.
  * @returns A fresh {@link LinearClient}.
  */

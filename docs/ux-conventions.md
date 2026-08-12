@@ -1,21 +1,17 @@
 # UX Conventions
 
-Date: 2026-08-08
-
 This document records the workflows and information architecture Ensemblr has settled on, and the visual design, copy, branding, icons, and runtime-specific agent behavior that carry them.
 
-> **Status (2026-08-08):** Ensemblr is no longer a single-runtime app. ADR 0042
-> added Claude Code as a second first-class agent runtime alongside Pi (#226–#237),
-> so "Pi" below should be read as "the chat's agent runtime" wherever the
-> statement is not genuinely Pi-specific. A chat is pinned to one provider; the
-> shared surface lives in `src/main/agent-runtime/`, with `pi-agent/` and
-> `claude-agent/` as sibling adapters.
+> **Two runtimes:** ADR 0042 added Claude Code as a second first-class agent
+> runtime alongside Pi, so "Pi" below should be read as "the chat's agent
+> runtime" wherever the statement is not genuinely Pi-specific. A chat is pinned
+> to one provider; the shared surface lives in `src/main/agent-runtime/`, with
+> `pi-agent/` and `claude-agent/` as sibling adapters.
 
 ## Current Shell Contract
 
-As of 2026-08-08, the implemented workbench shell is the product source of
-truth for layout and visible affordances. See
-`docs/product/current-shell-inventory.md`.
+The implemented workbench shell is the product source of truth for layout and
+visible affordances.
 
 The shell is composed from file-based TanStack routes under
 `src/renderer/routing/routes/` (see
@@ -213,7 +209,7 @@ Ensemblr equivalent:
 5. Implement workspace core: worktree creation, default branch/remote, copied files, setup script, placeholder naming, context folder.
 6. **Complete.** Implement Pi timeline: session creation, event rendering, tool calls, runtime errors, retry/fork actions, composer controls.
 7. **Complete.** Wire terminal dock: replace dock placeholder logs with setup/run output, named terminals, rerun/stop/run controls, PTY lifecycle.
-8. **Complete.** Wire file/diff panel: all-files tree, changes tree, diff body, source filtering, discard controls, and search are live. Inline local line comments shipped with the rich diff viewer (THE-152, #151, `diff-viewer/diff-comment-thread.tsx`); #211 unified the file preview, turn diff, and workspace file diff behind one code surface.
+8. **Complete.** Wire file/diff panel: all-files tree, changes tree, diff body, source filtering, discard controls, and search are live. Inline local line comments shipped with the rich diff viewer (#151, `diff-viewer/diff-comment-thread.tsx`); #211 unified the file preview, turn diff, and workspace file diff behind one code surface.
 9. **Complete.** Wire PR/checks panel: no-PR state, uncommitted state, PR metadata, CI/deployments, comments, todos, ready-to-merge state, and merge confirmation are live. PR comment bodies are readable in-app (#209) and open as their own tab (#207, #208); the deployed-build preview link is wired (#196, #197); merge conflicts surface in the panel with a "Resolve" action that hands the conflict to the agent (#215); resolved review comments render struck through and bulk-add sends only the unresolved ones (#234).
 10. Implement repository action preferences: review, create PR, fix errors, resolve conflicts, branch rename, and general agent instructions.
 11. Complete the polish/settings surface: appearance previews, keyboard shortcuts, command palette, diagnostics, and source-status polish. Voice remains post-core deferred.

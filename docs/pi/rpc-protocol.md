@@ -233,7 +233,7 @@ in `multi-tool-chain` capture.
 4. Truncation behavior for very long tool output (`details.truncation`,
    `fullOutputPath` fields seen in `rpc.md` bash examples).
 
-## Capability discovery (ENS-035 / THE-135)
+## Capability discovery
 
 Probed live on 2026-06-11 against pi `0.79.1` (then a Bun-global install; the
 project has since moved to npm — ADR 0038), via
