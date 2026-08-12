@@ -2,8 +2,15 @@
 	"name": "ensemblr",
 	"productName": "Ensemblr",
 	"version": "0.1.0",
-	"description": "A Pi-native macOS workbench for isolated coding-agent workflows.",
+	"description": "A macOS workbench for isolated, multi-agent coding workflows.",
 	"homepage": "https://www.ensemblr.dev",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/ensemblr-hq/ensemblr.git"
+	},
+	"bugs": {
+		"url": "https://github.com/ensemblr-hq/ensemblr/issues"
+	},
 	"main": ".vite/build/main.js",
 	"private": true,
 	"packageManager": "npm@11.17.0",

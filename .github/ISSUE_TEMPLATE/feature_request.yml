@@ -1,0 +1,44 @@
+name: Feature request
+description: Suggest something Ensemblr should do.
+labels: [enhancement]
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Ensemblr does not chase feature parity with other tools — that was retired as a product target
+        (ADR 0048). Scope is judged against the five commitments below, so please say which one your
+        request serves.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What are you trying to do, and what makes it hard today? Describe the situation, not the solution.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: commitment
+    attributes:
+      label: Which product commitment does this serve?
+      options:
+        - Isolation is the product
+        - The agent runtime is pluggable and never privileged
+        - The agent can drive the app under permission
+        - Review is local-first and ends in GitHub
+        - Configuration is committed, legible, and ours
+        - None of these
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What you have in mind
+      description: Optional. A sketch of the behaviour, not a design.
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: What you do instead today
