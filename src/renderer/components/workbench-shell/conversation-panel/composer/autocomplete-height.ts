@@ -13,9 +13,8 @@ const POPOVER_CHROME_HEIGHT_REM = 0.75;
  * parent and leaves the list overflowing the popover with no scrollbar, so the
  * height is measured out here and clamped against the space the popover has.
  *
- * A sibling of `getRosterHeight` and `getQueueHeight` rather than a shared
- * helper: this list carries no header, so its chrome is the popover's own
- * padding and nothing else.
+ * A sibling of `getRosterHeight` rather than a shared helper: this list carries
+ * no header, so its chrome is the popover's own padding and nothing else.
  * @param rowCount - How many rows are about to be rendered.
  * @returns A CSS length for the scroll container.
  */

@@ -242,25 +242,37 @@ export function useComposerSubmit({
 	);
 
 	/**
-	 * Sends an entry the queue handed over, putting it back at the head and
-	 * pausing the queue when it does not land. One place owns what a failed
-	 * queued send means, so the automatic flush and the user's "Send now" cannot
-	 * recover from it differently.
+	 * Sends an entry the queue handed over, putting it back where it came from
+	 * and pausing the queue when it does not land. One place owns what a failed
+	 * queued send means, so the automatic flush, the header's resume, and a row's
+	 * steer cannot recover from it differently.
+	 *
+	 * `restoreAt` is what keeps that shared recovery honest for a row that was not
+	 * the head: the flush only ever hands over the front of the queue, but a steer
+	 * can lift the third message out, and dropping that one back at the front on a
+	 * failure reorders a queue the user arranged deliberately.
 	 * @param entry - The entry taken off the queue
+	 * @param options - Where to put it back on a failure, and the frame to deliver it in mid-turn
 	 * @returns Whether it was delivered
 	 */
 	const submitQueued = useCallback(
-		async (entry: QueuedFollowUp): Promise<boolean> => {
+		async (
+			entry: QueuedFollowUp,
+			options?: {
+				restoreAt?: number;
+				streamingBehavior?: 'steer' | 'followUp';
+			},
+		): Promise<boolean> => {
 			const delivered = await submitText(
 				{
 					segments: entry.segments,
 					snapshot: entry.snapshot,
 					text: entry.text,
 				},
-				{ fromQueue: true },
+				{ fromQueue: true, streamingBehavior: options?.streamingBehavior },
 			);
 			if (!delivered) {
-				queue.requeue(entry);
+				queue.requeue(entry, options?.restoreAt);
 				queue.hold();
 			}
 			return delivered;
@@ -430,14 +442,38 @@ export function useComposerSubmit({
 		 */
 		restoreQueued: useCallback(
 			(id: string) => {
-				const entry = queue.take(id);
-				if (!entry) {
+				const taken = queue.take(id);
+				if (!taken) {
 					return;
 				}
-				restoreDraft(editorRef, entry.snapshot, entry.text);
+				restoreDraft(editorRef, taken.entry.snapshot, taken.entry.text);
 				editorRef.current?.focus();
 			},
 			[editorRef, queue],
+		),
+		/**
+		 * Sends one queued entry out of turn: mid-turn it goes as a steer frame,
+		 * reaching the agent inside the work it is already doing; idle it is an
+		 * ordinary send that jumps the rest of the queue.
+		 *
+		 * Deliberately leaves a paused queue paused. Steering one message is a
+		 * decision about that message, and resuming the whole queue off the back of
+		 * it would send everything the user had parked behind it. A send that does
+		 * not land puts the row back in the place it was steered out of, so a
+		 * failure costs the user nothing but the attempt.
+		 */
+		steerQueued: useCallback(
+			(id: string) => {
+				const taken = queue.take(id);
+				if (!taken) {
+					return;
+				}
+				void submitQueued(taken.entry, {
+					restoreAt: taken.index,
+					streamingBehavior: composer.isStreaming ? 'steer' : undefined,
+				});
+			},
+			[composer.isStreaming, queue, submitQueued],
 		),
 	};
 }
