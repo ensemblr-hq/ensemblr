@@ -138,6 +138,10 @@ Adding another unbundled or native dependency means updating **both**
   or Homebrew `node@24` and then execs the command unchanged.
 - **App icon.** Regenerate with `npm run icon:generate`
   (`scripts/generate-app-icon.mjs`).
+- **README wordmark.** `assets/wordmark.gif` is the animated dot-matrix mark at
+  the top of the README, generated from the same glyphs as the in-app wordmark.
+  Regenerate with `npm run wordmark:generate`
+  (`scripts/generate-wordmark-gif.mjs`); it needs ImageMagick on PATH.
 
 ## See also
 

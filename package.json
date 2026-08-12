@@ -32,6 +32,7 @@
 		"i18n:lint": "i18next-cli lint",
 		"icon:generate": "node scripts/generate-app-icon.mjs",
 		"avatar:generate": "node scripts/generate-avatar.mjs",
+		"wordmark:generate": "node scripts/generate-wordmark-gif.mjs",
 		"format": "biome format --write .",
 		"lint": "biome lint .",
 		"test:commands": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/local-command.test.ts",
