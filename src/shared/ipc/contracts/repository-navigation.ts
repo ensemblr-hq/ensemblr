@@ -9,6 +9,7 @@ import type {
 	ReviewCommentsChangedBroadcast,
 	TabsChangedBroadcast,
 } from '../../agent-control.ts';
+import type { MenuCommandBroadcast, MenuContext } from '../../menu-commands.ts';
 
 /** Open-ended metadata bag attached to a repository or workspace in the navigation tree. */
 export interface RepositoryWorkspaceNavigationMetadata {
@@ -86,10 +87,19 @@ export interface ShellApi {
 	closeWindow: () => Promise<void>;
 	ensureWindowWidth: (minimumWidth: number) => Promise<void>;
 	/**
-	 * Subscribes to the application menu's "Close Tab" (⌘/Ctrl+W) request,
-	 * broadcast to the focused window. Returns an unsubscribe function.
+	 * Subscribes to native application-menu commands, broadcast to the focused
+	 * window when the user picks an item. Returns an unsubscribe function.
 	 */
-	onCloseActiveTabRequest: (listener: () => void) => () => void;
+	onMenuCommand: (
+		listener: (payload: MenuCommandBroadcast) => void,
+	) => () => void;
+	/**
+	 * Reports which menu commands currently have a renderer handler, plus the
+	 * entries filling the dynamic submenus, so the menu can disable what does not
+	 * apply. Sent on registry changes; the main process rebuilds only on a real
+	 * difference.
+	 */
+	reportMenuContext: (context: MenuContext) => Promise<void>;
 	/**
 	 * Subscribes to agent-control focus requests (an agent asked to bring a tab,
 	 * dock terminal, or review panel to the foreground). Returns an unsubscribe

@@ -1,10 +1,9 @@
 import { useCallback, useMemo } from 'react';
-
-import { useRegisterCloseAction } from '@/renderer/state/close-action';
 import {
 	type useAgentComposerController,
 	useStopAgentSession,
 } from '@/renderer/state/composer';
+import { useMenuCommand } from '@/renderer/state/menu-commands';
 import {
 	resolveRunningCloseTarget,
 	useCloseRunningChatGuard,
@@ -67,7 +66,7 @@ export function useGuardedSessionClose({
 		agentComposer.onStop,
 		sessionNavigation.closeActiveOrReset,
 	]);
-	useRegisterCloseAction(requestActiveClose);
+	useMenuCommand('tab.close', requestActiveClose);
 
 	const requestTabClose = useCallback(
 		(targetId: string) => {

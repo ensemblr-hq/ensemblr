@@ -58,7 +58,7 @@ export function useCloseRunningChatGuard(): CloseRunningChatGuard {
 
 	// Memoised so the returned surface is referentially stable across renders.
 	// Callers thread it through `useCallback`/`useMemo` deps and into
-	// `useRegisterCloseAction`; an unstable object would re-run those every
+	// `useMenuCommand`; an unstable object would re-run those every
 	// render and defeat their memoisation.
 	return useMemo(
 		() => ({

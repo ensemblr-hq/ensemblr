@@ -55,6 +55,10 @@ import {
 	sessionTabVariants,
 } from '@/renderer/lib/workbench/session-tabs-variants';
 import { useRequestComposerFocus } from '@/renderer/state/composer';
+import {
+	useMenuCommand,
+	useMenuDynamicEntries,
+} from '@/renderer/state/menu-commands';
 import { useDebugPanelToggle } from '@/renderer/state/pi';
 import { developerModeAtom } from '@/renderer/state/preferences';
 import { shouldSelectOnTabClick } from '@/renderer/state/workspace';
@@ -204,6 +208,18 @@ export function SessionTabs({
 		onSelectSession: selectSession,
 		orderedSessionIds,
 	});
+
+	const chatTabEntries = useMemo(
+		() =>
+			orderedSessionIds.flatMap((sessionId) => {
+				const session = sessionById.get(sessionId);
+				return session
+					? [{ id: session.id, label: session.fullLabel ?? session.label }]
+					: [];
+			}),
+		[orderedSessionIds, sessionById],
+	);
+	useMenuDynamicEntries('chatTabs', chatTabEntries);
 
 	return (
 		<div className='flex h-10 shrink-0 items-center justify-between gap-3 border-border border-b bg-background pr-3'>
@@ -557,6 +573,7 @@ function HarnessLauncherMenu({
 	useHotkey('agents.open', () => setOpen(true), {
 		enabled: !noHarnessesDetected,
 	});
+	useMenuCommand('agents.open', () => setOpen(true), !noHarnessesDetected);
 
 	/** Launches the chosen harness, focuses the new tab, then closes the menu. */
 	function handleLaunch(harnessId: string, harnessLabel: string) {

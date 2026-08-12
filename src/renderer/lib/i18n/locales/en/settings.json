@@ -583,6 +583,9 @@
 			"dialog-submit": "Submit dialog form",
 			"diff-comment-submit": "Submit diff comment",
 			"files-search": "Open file search",
+			"help-shortcuts": "Open keyboard shortcuts",
+			"layout-toggle-dock": "Toggle dock",
+			"layout-toggle-right-sidebar": "Toggle right sidebar",
 			"model-picker-select-by-index": "Select model by index (1-9)",
 			"palette-open": "Open command palette",
 			"question-submit": "Submit answers to an agent question",
@@ -595,6 +598,7 @@
 			"tab-next": "Next tab",
 			"tab-prev": "Previous tab",
 			"tab-select-by-index": "Select tab by index (⌘1–8, ⌘9 last)",
+			"terminal-new": "New terminal",
 			"tool-calls-toggle-collapse": "Expand or collapse all tool calls",
 			"workspace-new": "New workspace"
 		},

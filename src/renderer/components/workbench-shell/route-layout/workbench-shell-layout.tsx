@@ -38,9 +38,9 @@ export function WorkbenchShellLayout() {
 	const loaderData = workbenchRouteApi.useLoaderData();
 	const routeState = useWorkbenchShellRouteState();
 	// ⌘/Ctrl+W for non-workspace shell views (welcome, project, etc.) needs no
-	// handler here: with nothing registered, `CloseActionProvider` falls back to
-	// closing the window. The workspace view registers its own action in
-	// `WorkspaceRouteContent`.
+	// handler here: `tab.close` is reported as always available, so the item
+	// stays enabled and `useMenuCommandBridge` falls back to closing the window.
+	// The workspace view registers its own action in `WorkspaceRouteContent`.
 	const { model, navigation, setupDiagnostics } = useWorkbenchLayoutModel({
 		loaderData,
 		routeState,

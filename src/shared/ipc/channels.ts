@@ -14,7 +14,8 @@ export const IPC_CHANNELS = {
 	getSystemLanguages: 'ensemblr:get-system-languages',
 	openExternal: 'ensemblr:open-external',
 	bindAgentSessionToChatTab: 'ensemblr:bind-agent-session-to-chat-tab',
-	closeActiveTab: 'ensemblr:close-active-tab',
+	menuCommand: 'ensemblr:menu-command',
+	menuContext: 'ensemblr:menu-context',
 	agentControlFocusView: 'ensemblr:agent-control-focus-view',
 	agentControlTabsChanged: 'ensemblr:agent-control-tabs-changed',
 	agentControlReviewCommentsChanged:

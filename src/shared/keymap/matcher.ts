@@ -186,8 +186,10 @@ export function matchesShortcut(
 }
 
 /**
- * Electron accelerator string registered for a shortcut, consumed by
- * main-process menu code.
+ * Electron accelerator string for a shortcut, consumed by main-process menu
+ * code. Attaching one to a menu item claims the chord — on macOS there is no
+ * display-only accelerator — so only the commands flagged `ownsAccelerator` in
+ * `src/shared/menu-commands.ts` ever ask for it.
  * @param id - Identifier of the shortcut to resolve
  * @returns The accelerator string, or undefined when the shortcut has none
  */

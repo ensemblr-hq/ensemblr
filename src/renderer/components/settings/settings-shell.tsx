@@ -8,7 +8,7 @@ import { ScrollArea } from '@/renderer/components/ui/scroll-area';
 import { TooltipProvider } from '@/renderer/components/ui/tooltip';
 import { useCloseSettings } from '@/renderer/hooks/use-close-settings';
 import { workbenchRouteApi } from '@/renderer/hooks/workbench-shell/route-layout/use-workbench-layout-model';
-import { useRegisterCloseAction } from '@/renderer/state/close-action';
+import { useMenuCommand } from '@/renderer/state/menu-commands';
 import { settingsActiveRepoIdAtom } from '@/renderer/state/settings-ui';
 import type { SettingsScope } from '@/renderer/types/settings';
 
@@ -24,7 +24,7 @@ export function SettingsShell() {
 	// ⌘/Ctrl+W closes settings — return to the screen Settings was opened from
 	// (root fallback), matching the ← Back button. Settings renders outside the
 	// workbench shell, so it registers its own close action while mounted.
-	useRegisterCloseAction(useCloseSettings());
+	useMenuCommand('tab.close', useCloseSettings());
 	const loaderData = workbenchRouteApi.useLoaderData();
 	const projects = loaderData.projects;
 	const lastRepoId = useAtomValue(settingsActiveRepoIdAtom);

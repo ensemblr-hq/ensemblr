@@ -4,6 +4,10 @@ import { useHotkey } from '@/renderer/hooks/use-hotkey';
 import { useComposerState } from '@/renderer/hooks/workbench-shell/composer/use-composer-state';
 import { cn } from '@/renderer/lib/utils';
 import { useConsumeComposerFocusRequest } from '@/renderer/state/composer';
+import {
+	useMenuCommand,
+	useMenuCommandChecked,
+} from '@/renderer/state/menu-commands';
 import type { ComposerShellState } from '@/renderer/types/workbench';
 import { ComposerControls } from './composer/composer-controls';
 import { ComposerNotices } from './composer/composer-notices';
@@ -69,6 +73,7 @@ function ComposerPanelBody({
 		state.editorRef.current?.focus();
 	}, [state.editorRef]);
 	useHotkey('composer.focus', focusEditor);
+	useMenuCommand('composer.focus', focusEditor);
 	useConsumeComposerFocusRequest(chatTabId, focusEditor);
 
 	const pickersDisabled = composer.disabled || state.isStreaming;
@@ -100,6 +105,24 @@ function ComposerPanelBody({
 	useHotkey('composer.togglePlanMode', togglePlanMode, {
 		enabled: !pickersDisabled,
 	});
+
+	useMenuCommand(
+		'composer.toggleModelPicker',
+		toggleModelPicker,
+		!pickersDisabled && composer.availableModels.length > 0,
+	);
+	useMenuCommand(
+		'composer.cycleThinking',
+		cycleThinking,
+		!pickersDisabled && composer.availableThinkingLevels.length > 0,
+	);
+	useMenuCommand('composer.togglePlanMode', togglePlanMode, !pickersDisabled);
+	useMenuCommandChecked('composer.togglePlanMode', composer.planMode);
+	useMenuCommand(
+		'composer.submit',
+		() => void state.handleSubmit(),
+		!composer.disabled && !state.isStreaming,
+	);
 
 	const placeholder =
 		composer.placeholder.length > 0

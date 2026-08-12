@@ -17,6 +17,10 @@ import { useDiscardChanges } from '@/renderer/hooks/workbench-shell/review-files
 import { useReviewableChanges } from '@/renderer/hooks/workbench-shell/review-files/use-reviewable-changes';
 import { useWorkspaceConflicts } from '@/renderer/hooks/workbench-shell/review-files/use-workspace-conflicts';
 import { cn } from '@/renderer/lib/utils';
+import {
+	useMenuCommand,
+	useMenuCommandChecked,
+} from '@/renderer/state/menu-commands';
 import { changesViewModeAtom } from '@/renderer/state/workspace';
 import type {
 	ReviewPanelTab,
@@ -90,6 +94,7 @@ export function ReviewPanel({
 		setIsFileSearchOpen(true);
 	}, []);
 	useHotkey('files.search', openFileSearch);
+	useMenuCommand('files.search', openFileSearch);
 
 	// ⌥⌘U jumps straight to the uncommitted change set, switching tabs if needed.
 	const showUncommitted = useCallback(() => {
@@ -97,6 +102,20 @@ export function ReviewPanel({
 		setSource({ kind: 'uncommitted' });
 	}, [onTabChange, setSource]);
 	useHotkey('changes.uncommitted', showUncommitted);
+	useMenuCommand('changes.uncommitted', showUncommitted);
+
+	const showFilesTab = useCallback(() => onTabChange('files'), [onTabChange]);
+	const showChangesTab = useCallback(
+		() => onTabChange('changes'),
+		[onTabChange],
+	);
+	const showChecksTab = useCallback(() => onTabChange('checks'), [onTabChange]);
+	useMenuCommand('panel.files', showFilesTab);
+	useMenuCommand('panel.changes', showChangesTab);
+	useMenuCommand('panel.checks', showChecksTab);
+	useMenuCommandChecked('panel.files', activeTab === 'files');
+	useMenuCommandChecked('panel.changes', activeTab === 'changes');
+	useMenuCommandChecked('panel.checks', activeTab === 'checks');
 
 	const {
 		discardTarget,
@@ -104,6 +123,11 @@ export function ReviewPanel({
 		handleDiscardDialogChange,
 		handleDiscardFile,
 	} = useDiscardChanges({ sourceFiles, workspace });
+	useMenuCommand(
+		'review.discardChanges',
+		handleDiscardAll,
+		discardablePaths.size > 0,
+	);
 
 	return (
 		<Tabs
