@@ -1,3 +1,7 @@
+<p align="center">
+  <img alt="Ensemblr" src="./assets/wordmark.gif" width="588">
+</p>
+
 # Ensemblr
 
 **A macOS workbench for isolated, multi-agent coding workflows.**
@@ -10,7 +14,7 @@ permission-gated control surface — **Ensemblr Control** — lets agents drive 
 
 ![The Ensemblr dashboard board, with workspace cards spread across the Backlog, In progress, In review, and Done columns.](./docs/guide/images/00-hero-dashboard.png)
 
-- **Version:** `0.1.0` (pre-1.0, polish stage)
+- **Version:** [`0.1.0-beta.1`](https://github.com/ensemblr-hq/ensemblr/releases/tag/v0.1.0-beta.1) (pre-1.0, polish stage)
 - **Platform:** macOS on Apple silicon
 - **License:** MIT
 
@@ -20,22 +24,27 @@ permission-gated control surface — **Ensemblr Control** — lets agents drive 
 
 Ensemblr is **pre-1.0, in the polish stage**. The core workflows — isolated workspaces, Pi and Claude Code
 agent sessions, the review and PR flow, and the GitHub / Linear / git integrations — are implemented and
-wired to real services. **There is no published binary yet**; today you build it yourself. See
-[`CHANGELOG.md`](./CHANGELOG.md) for recent changes.
+wired to real services. The first public build is out as a **beta**; expect rough edges and breaking
+changes before 1.0. See [`CHANGELOG.md`](./CHANGELOG.md) for recent changes.
 
 ## Install
 
-No release build has been published yet. Until one is, build from source on an Apple silicon Mac with
-Node 24.x:
+**[Download Ensemblr 0.1.0-beta.1 (.dmg, Apple silicon)](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.0-beta.1/Ensemblr-0.1.0-arm64.dmg)** — open it and drag Ensemblr to Applications.
+
+The build is code-signed with a Developer ID certificate, hardened-runtime, notarized by Apple, and
+stapled, so it opens without a Gatekeeper prompt and validates offline. Every build is on the
+[Releases page](https://github.com/ensemblr-hq/ensemblr/releases).
+
+To build it yourself instead, on an Apple silicon Mac with Node 24.x:
 
 ```bash
 npm install
 npm run make          # .dmg + .zip under out/make/
 ```
 
-A build is signed and notarized only when Apple API credentials are present in the environment; without
-them you get an unsigned build that Gatekeeper will hold on first launch. The full path — prerequisites,
-channels, unsigned builds, and where Ensemblr keeps its data — is
+A build of your own is signed and notarized only when Apple API credentials are present in the
+environment; without them you get an unsigned build that Gatekeeper will hold on first launch. The full
+path — prerequisites, channels, unsigned builds, and where Ensemblr keeps its data — is
 [`docs/guide/01-install.md`](./docs/guide/01-install.md).
 
 ## Requirements

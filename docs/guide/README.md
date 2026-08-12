@@ -5,12 +5,12 @@ rather than use it, start at [`../onboarding.md`](../onboarding.md) and
 [`../../CONTRIBUTING.md`](../../CONTRIBUTING.md) instead.
 
 Ensemblr runs on macOS, Apple silicon only. It is pre-1.0, and this guide
-describes version `0.1.0`. The app itself ships in English, Russian, and Greek;
-this guide is English only.
+describes version [`0.1.0-beta.1`](https://github.com/ensemblr-hq/ensemblr/releases/tag/v0.1.0-beta.1).
+The app itself ships in English, Russian, and Greek; this guide is English only.
 
 ## Read in order
 
-1. [**Install**](./01-install.md) — building it, what a signed build needs, build channels, and where Ensemblr keeps its data.
+1. [**Install**](./01-install.md) — downloading the signed build, building it yourself, build channels, and where Ensemblr keeps its data.
 2. [**Requirements**](./02-requirements.md) — every setup check the app runs, what each one needs, and why you need only *one* agent runtime.
 3. [**First run**](./03-first-run.md) — the setup wizard, choosing a root directory, adding a project, creating your first workspace.
 4. [**Concepts**](./04-concepts.md) — workspace, base branch, runtime versus harness, permission modes, the board. The vocabulary the rest of the guide uses.

@@ -5,15 +5,29 @@ arm64 `.app`, keeps its secrets in the macOS Keychain, and reads battery state
 through macOS APIs. There is no Intel build, no Linux build, and no Windows
 build.
 
-## There is no download yet
+## Download
 
-Ensemblr has not shipped a binary. No release has been tagged, and the Releases
-page is empty:
+The current build is **`0.1.0-beta.1`**:
+
+- [**`Ensemblr-0.1.0-arm64.dmg`**](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.0-beta.1/Ensemblr-0.1.0-arm64.dmg)
+  — the disk image. Open it and drag Ensemblr to `/Applications`.
+- [`Ensemblr-darwin-arm64-0.1.0.zip`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.0-beta.1/Ensemblr-darwin-arm64-0.1.0.zip)
+  — the same `.app`, zipped, if you would rather not mount an image.
+
+Every build is on the Releases page:
 
 <https://github.com/ensemblr-hq/ensemblr/releases>
 
-That is where the first `.dmg` will appear. Until then, the only way to run
-Ensemblr is to build it from source, which the rest of this page covers.
+The released build is code-signed with a Developer ID certificate, runs under the
+hardened runtime, and is notarized by Apple and stapled — both the `.app` and the
+`.dmg` carry their own ticket, so Gatekeeper clears them on first open without a
+network round-trip and without the right-click dance below. It is a **beta**: pre-1.0,
+with breaking changes expected before 1.0.
+
+The app reports its version as `0.1.0`. The `-beta.1` suffix marks the release,
+not the build inside it.
+
+Building from source is the other path, and the rest of this page covers it.
 
 ## Building it yourself
 
@@ -62,8 +76,9 @@ an unpacked `.app` straight to `out/` and skips the disk-image step.
 
 ### Signing, notarization, and Gatekeeper
 
-A build is code-signed and notarized **only** when all three App Store Connect
-credentials are present in the environment:
+A build **of your own** is code-signed and notarized only when all three App
+Store Connect credentials are present in the environment (the published release
+above already is):
 
 | Variable | What it holds |
 | --- | --- |

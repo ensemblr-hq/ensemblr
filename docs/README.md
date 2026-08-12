@@ -6,6 +6,8 @@ dive in here.
 
 ## Using Ensemblr
 
+The current build is [`0.1.0-beta.1`](https://github.com/ensemblr-hq/ensemblr/releases/tag/v0.1.0-beta.1) — signed, notarized, Apple silicon. [Download the `.dmg`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.0-beta.1/Ensemblr-0.1.0-arm64.dmg).
+
 - [`guide/`](./guide) — the user guide: [install](./guide/01-install.md), [requirements](./guide/02-requirements.md), [first run](./guide/03-first-run.md), [concepts](./guide/04-concepts.md), and the day-to-day surfaces through to [troubleshooting](./guide/14-troubleshooting.md). Start at [`guide/README.md`](./guide/README.md).
 
 ## Working on Ensemblr

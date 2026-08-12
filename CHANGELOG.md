@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.0-beta.1] - 2026-08-12
+
+First public build — signed, notarized, Apple silicon.
+[Release](https://github.com/ensemblr-hq/ensemblr/releases/tag/v0.1.0-beta.1) ·
+[`.dmg`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.0-beta.1/Ensemblr-0.1.0-arm64.dmg)
+
 ### Added
 
 - **English, Russian, and Greek — the App and Its Agents** (`e7ab199`, #246; `b68621e`, #248; `685a438`, #249; `5ba397f`, #250): Ensemblr ships in three languages. i18next 26 + react-i18next 17 carry bundled catalogues for `en`, `ru`, and `el` across eight namespaces (`common`, `errors`, `git`, `linear`, `onboarding`, `review`, `settings`, `workbench`), with no empty `ru`/`el` value. English is extracted from the `t('key', 'Default English')` call sites and never hand-written; `ru` and `el` are hand-filled against [`docs/i18n-glossary.md`](docs/i18n-glossary.md), which fixes the product vocabulary up front. The full contract lives in [`.claude/rules/i18n.md`](.claude/rules/i18n.md).
