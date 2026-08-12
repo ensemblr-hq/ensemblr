@@ -4,6 +4,7 @@ export type {
 	PtySpawnOptions,
 } from './pty-backend';
 export { createNodePtyBackend } from './pty-backend';
+export { toReadableScrollback } from './scrollback-text';
 export type { ScrollbackBuffer } from './terminal-scrollback';
 export {
 	createScrollbackBuffer,

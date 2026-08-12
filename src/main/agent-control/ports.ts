@@ -279,7 +279,13 @@ export interface ConversationPort {
  */
 export type StartTerminalOutcome =
 	| { ok: true; terminalId: string }
-	| { ok: false; code: string; message: string };
+	| {
+			ok: false;
+			code: string;
+			message: string;
+			/** The session the refusal is about, when one already holds the slot. */
+			terminalId?: string;
+	  };
 
 /** Dock terminal operations plus their scope-check and read helpers. */
 export interface TerminalPort {
@@ -289,6 +295,8 @@ export interface TerminalPort {
 		kind: StartTerminalKind;
 		/** Named run script to start; omitted starts the repository's default. */
 		scriptName?: string;
+		/** Replace a script of this kind that is already running. */
+		restart?: boolean;
 	}) => Promise<StartTerminalOutcome>;
 	/** The run scripts the workspace's repository offers, in declaration order. */
 	listRunScripts: (input: {
@@ -303,7 +311,14 @@ export interface TerminalPort {
 		terminalId: string;
 		input: string;
 	}) => Promise<void>;
-	readOutput: (terminalId: string) => Promise<string | null>;
+	/**
+	 * A terminal's scrollback, rendered readable unless `ansi` asks for the raw
+	 * PTY bytes. Null when the terminal holds no output.
+	 */
+	readOutput: (input: {
+		terminalId: string;
+		ansi: boolean;
+	}) => Promise<string | null>;
 	listTerminals: (input: {
 		workspaceId: string;
 	}) => Promise<readonly AgentControlTerminalInfo[]>;

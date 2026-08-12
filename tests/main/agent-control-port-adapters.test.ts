@@ -991,4 +991,70 @@ describe('agent-control port adapters: run scripts', () => {
 			message: 'The setup script could not be started.',
 		});
 	});
+
+	// The lifecycle service knows which session refused the launch. Dropping it
+	// here is what left a caller with a conflict it could not act on.
+	it('carries the colliding terminal id out of the refusal', async () => {
+		const ports = withScripts({
+			runScript: {
+				diagnostics: [
+					{
+						code: 'script-already-running',
+						message: 'The run script "dev" is already running.',
+						severity: 'warning',
+						terminalId: 'term-dev',
+					},
+				],
+				session: null,
+			},
+		});
+		expect(
+			await ports.terminals.startTerminal({
+				kind: 'run',
+				workspaceCwd: '/tmp/ws',
+				workspaceId: 'ws',
+			}),
+		).toMatchObject({ ok: false, terminalId: 'term-dev' });
+	});
+});
+
+/**
+ * Builds ports over a terminal-service stub holding one session's scrollback.
+ */
+const withScrollback = (
+	scrollback: string | null,
+): ReturnType<typeof createAgentControlPorts> => {
+	const { deps } = makeDeps();
+	return createAgentControlPorts({
+		...deps,
+		terminalService: { getSnapshot: () => ({ scrollback, session: null }) },
+	} as unknown as PortAdapterDeps);
+};
+
+const ESC = String.fromCharCode(27);
+
+describe('agent-control port adapters: terminal output', () => {
+	it('renders scrollback readable by default', async () => {
+		const ports = withScrollback(
+			`${ESC}[32mLocal${ESC}[39m: http://localhost:5199/\r\n`,
+		);
+		expect(
+			await ports.terminals.readOutput({ ansi: false, terminalId: 'term-1' }),
+		).toBe('Local: http://localhost:5199/');
+	});
+
+	it('hands back the raw bytes when the caller asks for ansi', async () => {
+		const raw = `${ESC}[32mLocal${ESC}[39m: http://localhost:5199/\r\n`;
+		const ports = withScrollback(raw);
+		expect(
+			await ports.terminals.readOutput({ ansi: true, terminalId: 'term-1' }),
+		).toBe(raw);
+	});
+
+	it('reports a buffer of nothing but escapes as no output', async () => {
+		const ports = withScrollback(`${ESC}[2J${ESC}[H`);
+		expect(
+			await ports.terminals.readOutput({ ansi: false, terminalId: 'term-1' }),
+		).toBeNull();
+	});
 });

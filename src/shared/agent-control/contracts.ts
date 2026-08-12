@@ -222,6 +222,11 @@ export interface SetBranchNameResult {
  * markdown heading, so it matches the plan-title ceiling; the body sits
  * deliberately below the transcript cap, since a session record that grows to
  * transcript size has stopped being a summary.
+ *
+ * Both are enforced by truncation rather than rejection. A summary is the most
+ * token-heavy payload on the surface and the only one whose whole point is to
+ * survive the turn: refusing an over-long one costs a multi-kilobyte re-emit and
+ * risks the record being dropped rather than shortened.
  */
 export const SET_SUMMARY_LIMITS = {
 	maxSummaryLength: 4_000,
@@ -244,6 +249,21 @@ export interface SetSummaryArgs {
 export interface SetSummaryResult {
 	capturedAtOrdinal: number;
 	message: string;
+	/**
+	 * Every field cut to fit {@link SET_SUMMARY_LIMITS}, in submission order.
+	 * Absent rather than empty on a submission that fit, so a caller can tell a
+	 * stored record from a shortened one without parsing the message. Both fields
+	 * can be over at once, and a caller that fixes only the one it was told about
+	 * would resubmit and be cut again.
+	 */
+	truncated?: readonly SetSummaryTruncation[];
+}
+
+/** What `setSummary` cut from one field to fit its limit. */
+export interface SetSummaryTruncation {
+	field: 'summary' | 'title';
+	limit: number;
+	submittedLength: number;
 }
 
 /** Args for `sendFollowUp`: submit a follow-up prompt into an existing conversation. */
@@ -274,6 +294,12 @@ export interface StartTerminalArgs {
 	 * `listRunScripts`. Omitted starts the repository's default script.
 	 */
 	scriptName?: string;
+	/**
+	 * Replace a script of this kind that is already running (`kind: 'setup'` and
+	 * `'run'` only). Without it a second start is refused with `conflict`, which
+	 * is the affordance that refusal points the caller at.
+	 */
+	restart?: boolean;
 }
 
 /** Args for `stopTerminal`: stop a dock terminal by id, or a script terminal by kind. */
@@ -380,7 +406,21 @@ export interface ReadConversationResult {
 
 /** Args for `readTerminalOutput`: read a terminal's current scrollback. */
 export interface ReadTerminalOutputArgs {
+	terminalId?: string;
+	/** Read the workspace's setup or run script terminal without knowing its id. */
+	kind?: 'setup' | 'run';
+	/**
+	 * Keep the raw PTY bytes — escape sequences, cursor moves, repaint blanks —
+	 * instead of the readable text the read returns by default.
+	 */
+	ansi?: boolean;
+}
+
+/** A terminal's scrollback, with the terminal a logical selector resolved to. */
+export interface ReadTerminalOutputResult {
 	terminalId: string;
+	/** Scrollback text, or null when the terminal holds none. */
+	output: string | null;
 }
 
 /** How a blocking wait returns: on the first child, or once all have settled. */

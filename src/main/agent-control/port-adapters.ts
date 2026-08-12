@@ -57,7 +57,7 @@ import {
 	setChatTabMetadata,
 } from '../storage/repositories/chat-tab-repository.ts';
 import { listAllWorkspaceRows } from '../storage/repositories/workspace-repository.ts';
-import type { TerminalService } from '../terminal';
+import { type TerminalService, toReadableScrollback } from '../terminal';
 import type { WorkspaceGitService } from '../workspace-git';
 import type { BoardStatusStore } from './board-status-store.ts';
 import { makeLinearPort } from './linear-ports.ts';
@@ -748,6 +748,7 @@ function toStartTerminalOutcome(
 		ok: false,
 		code: diagnostic?.code ?? 'terminal-not-started',
 		message: diagnostic?.message ?? fallbackMessage,
+		...(diagnostic?.terminalId && { terminalId: diagnostic.terminalId }),
 	};
 }
 
@@ -758,7 +759,7 @@ function toStartTerminalOutcome(
  */
 function makeTerminalPort(deps: PortAdapterDeps): TerminalPort {
 	return {
-		startTerminal: async ({ workspaceId, kind, scriptName }) => {
+		startTerminal: async ({ workspaceId, kind, scriptName, restart }) => {
 			if (kind === 'spawn') {
 				return toStartTerminalOutcome(
 					await deps.terminalService.create({
@@ -772,6 +773,7 @@ function makeTerminalPort(deps: PortAdapterDeps): TerminalPort {
 			return toStartTerminalOutcome(
 				await deps.scriptLifecycleService.runScript({
 					kind,
+					restart: restart === true,
 					scriptName: scriptName ?? null,
 					workspaceId,
 				}),
@@ -804,8 +806,14 @@ function makeTerminalPort(deps: PortAdapterDeps): TerminalPort {
 		writeTerminal: async ({ terminalId, input }) => {
 			deps.terminalService.write(terminalId, input);
 		},
-		readOutput: async (terminalId) =>
-			deps.terminalService.getSnapshot(terminalId).scrollback ?? null,
+		readOutput: async ({ terminalId, ansi }) => {
+			const scrollback =
+				deps.terminalService.getSnapshot(terminalId).scrollback ?? null;
+			if (scrollback === null || ansi) {
+				return scrollback;
+			}
+			return toReadableScrollback(scrollback) || null;
+		},
 		listTerminals: async ({
 			workspaceId,
 		}): Promise<readonly AgentControlTerminalInfo[]> =>

@@ -339,6 +339,7 @@ export function createScriptLifecycleService({
 					'script-already-running',
 					describeRunningScript(launch.kind, activeSession.scriptName),
 					'warning',
+					activeSession.id,
 				);
 			}
 
@@ -353,6 +354,7 @@ export function createScriptLifecycleService({
 					'script-restart-timeout',
 					`The running ${launch.kind} script did not stop in time; the restart was aborted.`,
 					'warning',
+					activeSession.id,
 				);
 			}
 		}
@@ -693,14 +695,24 @@ export function createScriptLifecycleService({
 	};
 }
 
-/** Builds a failed create-result with one diagnostic. */
+/**
+ * Builds a failed create-result with one diagnostic.
+ * @param code - Stable diagnostic code.
+ * @param message - Human-readable reason no session started.
+ * @param severity - How loudly the dock should report it.
+ * @param terminalId - Session the refusal is about, when one already holds the slot.
+ * @returns A session-less create result carrying that diagnostic.
+ */
 function failure(
 	code: string,
 	message: string,
 	severity: 'error' | 'info' | 'warning' = 'error',
+	terminalId?: string,
 ): CreateTerminalSessionResult {
 	return {
-		diagnostics: [{ code, message, severity }],
+		diagnostics: [
+			{ code, message, severity, ...(terminalId && { terminalId }) },
+		],
 		session: null,
 	};
 }

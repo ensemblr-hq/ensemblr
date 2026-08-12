@@ -38,12 +38,15 @@ import type {
 	PendingAgent,
 	ReadConversationArgs,
 	ReadTerminalOutputArgs,
+	ReadTerminalOutputResult,
 	ResolveDiffCommentsArgs,
 	SendFollowUpArgs,
 	SetBranchNameArgs,
 	SetNameArgs,
 	SetNameResult,
 	SetSummaryArgs,
+	SetSummaryResult,
+	SetSummaryTruncation,
 	SetWorkspaceStatusArgs,
 	SpawnChatTabArgs,
 	StartConversationArgs,
@@ -62,6 +65,7 @@ import {
 	buildSessionBriefNudge,
 	isWriteOp,
 	resolveAgentRole,
+	SET_SUMMARY_LIMITS,
 	subAgentControlOpDenial,
 	validateArgs,
 } from '../../shared/agent-control.ts';
@@ -222,6 +226,68 @@ function fail(
 }
 
 /**
+ * Cuts one `setSummary` field to its limit rather than refusing the submission.
+ * A summary is the most token-heavy payload on the surface and exists to survive
+ * the turn, so an over-long one is stored short with the loss reported back —
+ * rejecting it costs a multi-kilobyte re-emit and risks losing the record.
+ * @param field - Which field is being clamped, for the report.
+ * @param value - The agent's submitted text.
+ * @param limit - Its ceiling from {@link SET_SUMMARY_LIMITS}.
+ * @returns The text to store, plus what was cut when anything was.
+ */
+function clampSummaryField(
+	field: SetSummaryTruncation['field'],
+	value: string,
+	limit: number,
+): { text: string; truncated?: SetSummaryTruncation } {
+	if (value.length <= limit) {
+		return { text: value };
+	}
+	return {
+		text: sliceWholeCharacters(value, limit),
+		truncated: { field, limit, submittedLength: value.length },
+	};
+}
+
+/**
+ * Cuts a string to a code-unit limit without splitting a surrogate pair. A plain
+ * `slice` on a summary that ends on an emoji at the boundary stores a lone
+ * surrogate, which is not a character any reader of the record can render.
+ * @param value - The text to cut.
+ * @param limit - Ceiling in UTF-16 code units.
+ * @returns The text cut to at most `limit` units, one shorter when the cut landed inside a pair.
+ */
+function sliceWholeCharacters(value: string, limit: number): string {
+	const cut = value.slice(0, limit);
+	const lastUnit = cut.charCodeAt(cut.length - 1);
+	const splitsAPair = lastUnit >= 0xd800 && lastUnit <= 0xdbff;
+	return splitsAPair ? cut.slice(0, -1) : cut;
+}
+
+/**
+ * Says what `setSummary` cut, one clause per field. Both fields can be over at
+ * once, and a caller told about only one of them would resubmit the other
+ * unchanged and be cut again.
+ * @param truncations - Every field that was clamped, in submission order.
+ * @returns The sentence appended to the record's own message.
+ */
+function describeSummaryTruncations(
+	truncations: readonly SetSummaryTruncation[],
+): string {
+	const listed = truncations
+		.map(
+			({ field, limit, submittedLength }) =>
+				`the ${field} was ${submittedLength} characters against a cap of ${limit}`,
+		)
+		.join(', and ');
+	const outcome =
+		truncations.length > 1
+			? 'each was stored truncated rather than rejected — write them shorter next time.'
+			: 'it was stored truncated rather than rejected — write it shorter next time.';
+	return `${listed.charAt(0).toUpperCase()}${listed.slice(1)}, so ${outcome}`;
+}
+
+/**
  * Control-envelope code for each way a script launch declines, so a caller can
  * branch on the outcome before reading the prose: a name that resolves to
  * nothing is `not-found`, a run script already holding the workspace is
@@ -244,6 +310,24 @@ const START_TERMINAL_ERROR_CODES: Readonly<
  */
 function startTerminalErrorCode(code: string): AgentControlErrorCode {
 	return START_TERMINAL_ERROR_CODES[code] ?? 'internal';
+}
+
+/**
+ * Closes a refused launch with the id of the terminal it collided with. The
+ * lifecycle service knows exactly which session is holding the slot, and an
+ * agent that cannot see the dock has no other way to reach it — withholding it
+ * costs a `listTerminals` round trip to recover what the refusal already knew.
+ * @param message - The lifecycle diagnostic's own prose.
+ * @param terminalId - The session already holding the slot, when there is one.
+ * @returns The message an agent receives.
+ */
+function describeStartTerminalRefusal(
+	message: string,
+	terminalId: string | undefined,
+): string {
+	return terminalId
+		? `${message} It is terminal ${terminalId}: read it with ensemblr_read_terminal_output, stop it with ensemblr_stop_terminal, or pass restart: true to replace it.`
+		: message;
 }
 
 /**
@@ -345,7 +429,8 @@ function waitOutcome(outcome: {
 }
 
 /**
- * Confirms a resolved workspace matches the caller's, for write-scope checks.
+ * Confirms a resolved workspace matches the caller's, for the scope checks every
+ * op that names a resource by id runs before touching it.
  * @param actualWorkspaceId - Owning workspace of the target, or null when missing.
  * @param origin - Resolved caller identity.
  * @returns Null when in scope, otherwise a failure envelope.
@@ -360,7 +445,7 @@ function outOfScope(
 	if (actualWorkspaceId !== origin.workspaceId) {
 		return fail(
 			'denied-scope',
-			'Writes are limited to the agent’s own workspace.',
+			'Access is limited to the agent’s own workspace.',
 		);
 	}
 	return null;
@@ -680,13 +765,32 @@ export function createAgentControlService({
 				'Recording a session summary is limited to native chat conversations.',
 			);
 		}
-		return ok(
-			await ports.sessionNaming.setSummary({
-				origin,
-				summary: args.summary,
-				title: args.title,
-			}),
+		const summary = clampSummaryField(
+			'summary',
+			args.summary,
+			SET_SUMMARY_LIMITS.maxSummaryLength,
 		);
+		const title = clampSummaryField(
+			'title',
+			args.title,
+			SET_SUMMARY_LIMITS.maxTitleLength,
+		);
+		const recorded = await ports.sessionNaming.setSummary({
+			origin,
+			summary: summary.text,
+			title: title.text,
+		});
+		const truncated = [summary.truncated, title.truncated].filter(
+			(entry): entry is SetSummaryTruncation => entry !== undefined,
+		);
+		if (truncated.length === 0) {
+			return ok(recorded);
+		}
+		return ok({
+			...recorded,
+			message: `${recorded.message} ${describeSummaryTruncations(truncated)}`,
+			truncated,
+		} satisfies SetSummaryResult);
 	};
 
 	/**
@@ -798,12 +902,85 @@ export function createAgentControlService({
 			workspaceCwd: origin.workspaceCwd,
 			kind: args.kind,
 			...(args.scriptName ? { scriptName: args.scriptName } : {}),
+			...(args.restart ? { restart: true } : {}),
 		});
 		if (!started.ok) {
-			return fail(startTerminalErrorCode(started.code), started.message);
+			return fail(
+				startTerminalErrorCode(started.code),
+				describeStartTerminalRefusal(started.message, started.terminalId),
+			);
 		}
 		guardrails.recordSpawn(origin.sessionId);
 		return ok({ terminalId: started.terminalId });
+	};
+
+	/**
+	 * Reads a terminal's scrollback, by id or by the logical selector the start
+	 * and stop ops take. Resolving `kind` here is what keeps a caller that started
+	 * a run script from having to list every terminal to read the one it started.
+	 *
+	 * An id is scope-checked exactly as `stopTerminal` and `writeTerminal` check
+	 * theirs: scrollback carries whatever the terminal has been shown, so reading
+	 * one belonging to another workspace is the same crossing writing to it would
+	 * be. A `kind` selector is already scoped by the lookup it resolves through.
+	 * @param origin - Resolved caller identity.
+	 * @param args - Which terminal to read, and whether to keep the raw bytes.
+	 * @returns The scrollback with the terminal it came from, or `not-found`.
+	 */
+	const handleReadTerminalOutput = async (
+		origin: AgentControlOrigin,
+		args: ReadTerminalOutputArgs,
+	): Promise<AgentControlResult<unknown>> => {
+		if (args.terminalId) {
+			const owner = await ports.terminals.resolveTerminalWorkspace(
+				args.terminalId,
+			);
+			const scoped = outOfScope(owner, origin);
+			if (scoped) {
+				return scoped;
+			}
+		}
+		const terminalId =
+			args.terminalId ?? (await resolveScriptTerminal(origin, args.kind));
+		if (!terminalId) {
+			return fail(
+				'not-found',
+				`No ${args.kind} script is running in this workspace, so there is no output to read.`,
+			);
+		}
+		return ok({
+			terminalId,
+			output: await ports.terminals.readOutput({
+				terminalId,
+				ansi: args.ansi === true,
+			}),
+		} satisfies ReadTerminalOutputResult);
+	};
+
+	/**
+	 * Finds the workspace's live setup or run script terminal, which is what a
+	 * `kind` selector names. Only one script of a kind runs per workspace, so the
+	 * first live match is the only one.
+	 * @param origin - Resolved caller identity.
+	 * @param kind - Which script terminal to find.
+	 * @returns Its terminal id, or null when no such script is running.
+	 */
+	const resolveScriptTerminal = async (
+		origin: AgentControlOrigin,
+		kind: 'setup' | 'run' | undefined,
+	): Promise<string | null> => {
+		if (!kind) {
+			return null;
+		}
+		const terminals = await ports.terminals.listTerminals({
+			workspaceId: origin.workspaceId,
+		});
+		return (
+			terminals.find(
+				(terminal) =>
+					terminal.kind === `${kind}-script` && terminal.status === 'running',
+			)?.terminalId ?? null
+		);
 	};
 
 	const handleStopTerminal = async (
@@ -1301,10 +1478,8 @@ export function createAgentControlService({
 		openTab: ({ args, origin }) => handleOpenTab(origin, args as OpenTabArgs),
 		readConversation: ({ args }) =>
 			ports.conversations.readTranscript(args as ReadConversationArgs).then(ok),
-		readTerminalOutput: ({ args }) =>
-			ports.terminals
-				.readOutput((args as ReadTerminalOutputArgs).terminalId)
-				.then(ok),
+		readTerminalOutput: ({ args, origin }) =>
+			handleReadTerminalOutput(origin, args as ReadTerminalOutputArgs),
 		resolveDiffComments: ({ args, origin }) =>
 			ports.review
 				.resolveComments({

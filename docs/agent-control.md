@@ -181,14 +181,33 @@ refused.
 | Tool | Arguments | Gate | Withheld from |
 | --- | --- | --- | --- |
 | `ensemblr_launch_harness` | **`harnessId: string`** | write, spawn | sub-agent |
-| `ensemblr_start_terminal` | **`kind: 'setup' \| 'run' \| 'spawn'`**, `scriptName?: string` | write, spawn | sub-agent |
+| `ensemblr_start_terminal` | **`kind: 'setup' \| 'run' \| 'spawn'`**, `scriptName?: string`, `restart?: boolean` | write, spawn | sub-agent |
 | `ensemblr_list_run_scripts` | *(none)* | read | sub-agent\* |
 | `ensemblr_stop_terminal` | `terminalId?: string`, `kind?: 'setup' \| 'run'` — exactly one | write | sub-agent |
 | `ensemblr_write_terminal` | **`terminalId: string`**, **`input: string`** | write | sub-agent |
-| `ensemblr_read_terminal_output` | **`terminalId: string`** | read | — |
+| `ensemblr_read_terminal_output` | `terminalId?: string`, `kind?: 'setup' \| 'run'` — exactly one, `ansi?: boolean` | read | — |
 
 `scriptName` is accepted only with `kind: 'run'`; any other pairing is rejected.
+`restart` is accepted only with `kind: 'setup'` or `'run'`, and replaces a script
+of that kind already running — which is otherwise refused with `conflict`. That
+refusal names the terminal already holding the slot in its message, so recovering
+the id costs no extra call.
 See [Run scripts](./considerations/agent-orchestration-playbook.md#run-scripts).
+
+`ensemblr_read_terminal_output` takes the same logical selector the start and stop
+ops take, so a caller that started a run script can read it without listing
+terminals for its id, and the result echoes the `terminalId` it read. A
+`terminalId` is scope-checked like every other id the surface takes: reading a
+terminal outside the caller's own workspace is refused with `denied-scope`. A
+`kind` selector is scoped by the lookup that resolves it.
+
+Scrollback comes back rendered readable unless `ansi: true` asks for the raw PTY
+bytes: escape sequences dropped, repaint blank-line runs collapsed, and the two
+cursor moves that change what the text says resolved — a carriage return
+rewriting its line, and the backspaces a spinner or percentage counter walks back
+over. One thing that rendering cannot recover is the head of a filled buffer: the
+scrollback trims from the front, so a long-running script's first line is a
+fragment and a colour code cut before its `ESC` reads as ordinary text.
 
 ### Tabs, focus, and the board
 
@@ -213,6 +232,14 @@ See [Run scripts](./considerations/agent-orchestration-playbook.md#run-scripts).
 | `ensemblr_set_name` | **`title: string`** | write | no chat tab |
 | `ensemblr_set_branch_name` | **`name: string`** (≤ 120 chars), `userRequested?: boolean` | write | sub-agent |
 | `ensemblr_set_summary` | **`title: string`** (≤ 80), **`summary: string`** (≤ 4,000) | write | no chat tab |
+
+`ensemblr_set_summary` enforces both limits by truncation, not rejection: an
+over-long field is stored cut to its cap and the result carries `truncated`, one
+entry per field cut, each naming the field, the limit, and the length submitted.
+Both fields can be over at once and both are reported, so a caller does not fix
+one and get cut again on the other. It is the surface's most token-heavy payload
+and the one whose whole point is to survive the turn, so refusing it would spend
+a multi-kilobyte re-emit and risk losing the record.
 
 ### Reading a conversation
 

@@ -73,7 +73,7 @@ export interface ControlAudience {
  * The bookkeeping block a root receives: it owns the workspace name because the
  * name describes the whole body of work.
  */
-const ORCHESTRATOR_LEGIBILITY = `- Keep the workspace legible: name your tab (\`ensemblr_set_name\`), name the workspace and its git branch together from one kebab-case slug (\`ensemblr_set_branch_name\`), and record what the conversation has covered (\`ensemblr_set_summary\`).
+const ORCHESTRATOR_LEGIBILITY = `- Keep the workspace legible: name your tab (\`ensemblr_set_name\`, argument \`title\`), name the workspace and its git branch together from one kebab-case slug (\`ensemblr_set_branch_name\`, argument \`name\`), and record what the conversation has covered (\`ensemblr_set_summary\`, arguments \`title\` and \`summary\`).
 
 Keeping the workspace legible is your job, not the user's, and it is bookkeeping — do it as part of your turn, without narrating it or asking permission. Name the tab on your first turn, before the work; refresh the summary at the end of every turn. The app tracks what is still outstanding and reminds you each turn, so follow the reminder when you see one — it is live state, and it is what asks for the workspace and branch, because the user can switch that off and a standing line here could not see it. A reply saying nothing changed is a settled outcome, not a fault to retry. When the USER asks for a different branch name in so many words, \`ensemblr_set_branch_name\` with \`userRequested: true\` is how you give it to them — never \`git branch -m\`, which moves the branch behind the app and leaves the workspace pointing at one that no longer exists. Naming is one-shot per tab, and the summary is what the tab is worth to you tomorrow.`;
 
@@ -84,7 +84,7 @@ Keeping the workspace legible is your job, not the user's, and it is bookkeeping
  * so listing the tool here would only send a child hunting for a call it cannot
  * make — the same reason the harness variant omits the Pi-only tools.
  */
-const SUBAGENT_LEGIBILITY = `- Keep the workspace legible: name your tab (\`ensemblr_set_name\`) and record what the conversation has covered (\`ensemblr_set_summary\`).
+const SUBAGENT_LEGIBILITY = `- Keep the workspace legible: name your tab (\`ensemblr_set_name\`, argument \`title\`) and record what the conversation has covered (\`ensemblr_set_summary\`, arguments \`title\` and \`summary\`).
 
 Keeping your own tab legible is your job, not the user's, and it is bookkeeping — do it as part of your turn, without narrating it or asking permission. Name the tab on your first turn, before the work; refresh the summary at the end of every turn. Naming the WORKSPACE and its git branch is not yours: that name describes the whole body of work rather than the one unit you were handed, so \`ensemblr_set_branch_name\` belongs to the root conversation that spawned you and is refused here. If the work deserves a different name, say so in your report and let your orchestrator make the call.`;
 
@@ -143,7 +143,7 @@ Resolve only what you actually fixed. A comment you deferred, could not reproduc
 /** Everything a root may drive: the whole control surface. */
 const ORCHESTRATOR_INVENTORY = `- Conversations: open a chat tab and start a Pi sub-agent (\`ensemblr_start_conversation\`), steer one (\`ensemblr_send_follow_up\`), name your own tab (\`ensemblr_set_name\`), close a tab (\`ensemblr_close_tab\`).
 - Harnesses: launch Claude Code / Codex in a terminal (\`ensemblr_launch_harness\`).
-- Terminals: start/stop the setup script, a run script, or a spawn terminal (\`ensemblr_start_terminal\`/\`ensemblr_stop_terminal\`); type into one (\`ensemblr_write_terminal\`); read its output (\`ensemblr_read_terminal_output\`). A repository configures its run scripts by name — a dev server, a playground, an unsigned build — so call \`ensemblr_list_run_scripts\` and pass the \`scriptName\` you want; starting a run script without one takes the repository's default, which is rarely the one you meant.
+- Terminals: start/stop the setup script, a run script, or a spawn terminal (\`ensemblr_start_terminal\`/\`ensemblr_stop_terminal\`); type into one (\`ensemblr_write_terminal\`); read its output (\`ensemblr_read_terminal_output\`, by \`terminalId\` or by \`kind\`, cleaned of escape codes unless you ask for \`ansi\`). A repository configures its run scripts by name — a dev server, a playground, an unsigned build — so call \`ensemblr_list_run_scripts\` and pass the \`scriptName\` you want; starting a run script without one takes the repository's default, which is rarely the one you meant. Only one script of a kind runs at a time: starting a second is refused with \`conflict\`, and that refusal names the terminal already holding the slot, which \`restart: true\` replaces.
 - Focus & inspect: bring a tab/terminal or the Files/Changes/Checks panel forward (\`ensemblr_focus_tab\`/\`ensemblr_focus_dock_tab\`/\`ensemblr_focus_panel\`); list workspaces/tabs/terminals; read a conversation's status or last message; audit what a conversation actually did, tool calls included (\`ensemblr_read_conversation\`).
 ${REVIEW_INVENTORY}
 ${LINEAR_INVENTORY}
@@ -158,7 +158,7 @@ ${LINEAR_INVENTORY}
  * each other in one prompt — and the app now refuses every one of them by role,
  * so a child that went looking would only spend a turn on a refusal.
  */
-const SUBAGENT_INVENTORY = `- Focus & inspect: bring a tab/terminal or the Files/Changes/Checks panel forward (\`ensemblr_focus_tab\`/\`ensemblr_focus_dock_tab\`/\`ensemblr_focus_panel\`); list workspaces/tabs/terminals; read a conversation's status or last message; audit what a conversation actually did, tool calls included (\`ensemblr_read_conversation\`); read a terminal's output (\`ensemblr_read_terminal_output\`).
+const SUBAGENT_INVENTORY = `- Focus & inspect: bring a tab/terminal or the Files/Changes/Checks panel forward (\`ensemblr_focus_tab\`/\`ensemblr_focus_dock_tab\`/\`ensemblr_focus_panel\`); list workspaces/tabs/terminals; read a conversation's status or last message; audit what a conversation actually did, tool calls included (\`ensemblr_read_conversation\`); read a terminal's output (\`ensemblr_read_terminal_output\`, by \`terminalId\` or by \`kind\`, cleaned of escape codes unless you ask for \`ansi\`).
 ${REVIEW_INVENTORY}
 ${LINEAR_INVENTORY_READS}
 - Board: read your workspace's kanban status (\`ensemblr_get_workspace_status\`); \`ensemblr_list_workspaces\` shows every workspace's.
@@ -297,7 +297,7 @@ export const HARNESS_AWARENESS = `You are running inside Ensemblr, a desktop cod
 
 What you can drive:
 - Pi sub-agents: start one in a fresh chat tab (\`ensemblr_start_conversation\`), steer it (\`ensemblr_send_follow_up\`), block until children settle (\`ensemblr_wait_for_agents\`), read a child's status or last message, audit what it actually did (\`ensemblr_read_conversation\`), close its tab (\`ensemblr_close_tab\`).
-- Harnesses & terminals: launch another CLI harness (\`ensemblr_launch_harness\`); start/stop the setup script, a run script, or a spawn terminal (\`ensemblr_start_terminal\`/\`ensemblr_stop_terminal\`); type into one (\`ensemblr_write_terminal\`); read its output (\`ensemblr_read_terminal_output\`). A repository configures its run scripts by name — a dev server, a playground, an unsigned build — so call \`ensemblr_list_run_scripts\` and pass the \`scriptName\` you want; starting a run script without one takes the repository's default, which is rarely the one you meant.
+- Harnesses & terminals: launch another CLI harness (\`ensemblr_launch_harness\`); start/stop the setup script, a run script, or a spawn terminal (\`ensemblr_start_terminal\`/\`ensemblr_stop_terminal\`); type into one (\`ensemblr_write_terminal\`); read its output (\`ensemblr_read_terminal_output\`, by \`terminalId\` or by \`kind\`, cleaned of escape codes unless you ask for \`ansi\`). A repository configures its run scripts by name — a dev server, a playground, an unsigned build — so call \`ensemblr_list_run_scripts\` and pass the \`scriptName\` you want; starting a run script without one takes the repository's default, which is rarely the one you meant. Only one script of a kind runs at a time: starting a second is refused with \`conflict\`, and that refusal names the terminal already holding the slot, which \`restart: true\` replaces.
 - Focus & inspect: bring a tab/terminal or the Files/Changes/Checks panel forward (\`ensemblr_focus_tab\`/\`ensemblr_focus_dock_tab\`/\`ensemblr_focus_panel\`); list workspaces, tabs, and terminals. Reads may span every open workspace.
 ${REVIEW_INVENTORY}
 ${LINEAR_INVENTORY}
@@ -373,7 +373,7 @@ const planModeInspectBullets = (
 	linear: string,
 	board: string,
 ): string =>
-	`- Focus & inspect: bring a tab/terminal or the Files/Changes/Checks panel forward (\`ensemblr_focus_tab\`/\`ensemblr_focus_dock_tab\`/\`ensemblr_focus_panel\`); list workspaces/tabs/terminals; read a conversation's status or last message; audit what a conversation actually did, tool calls included (\`ensemblr_read_conversation\`); read terminal output (\`ensemblr_read_terminal_output\`). Reads may span every open workspace.
+	`- Focus & inspect: bring a tab/terminal or the Files/Changes/Checks panel forward (\`ensemblr_focus_tab\`/\`ensemblr_focus_dock_tab\`/\`ensemblr_focus_panel\`); list workspaces/tabs/terminals; read a conversation's status or last message; audit what a conversation actually did, tool calls included (\`ensemblr_read_conversation\`); read terminal output (\`ensemblr_read_terminal_output\`, by \`terminalId\` or by \`kind\`, cleaned of escape codes unless you ask for \`ansi\`). Reads may span every open workspace.
 ${PLAN_MODE_REVIEW}
 ${linear}
 ${legibility}
@@ -386,10 +386,10 @@ const PLAN_MODE_ORCHESTRATOR_BOARD = `- Board: read and set your workspace's kan
 const PLAN_MODE_SUBAGENT_BOARD = `- Board: read your workspace's kanban status (\`ensemblr_get_workspace_status\`). Moving the board is not yours: it describes the whole workspace rather than the question you were handed, so \`ensemblr_set_workspace_status\` is refused here.`;
 
 /** The planning root's naming bullet: it owns the workspace name. */
-const PLAN_MODE_ORCHESTRATOR_LEGIBILITY = `- Keep the workspace legible: name your tab (\`ensemblr_set_name\`), name the workspace and its git branch together from one kebab-case slug (\`ensemblr_set_branch_name\`), and record what the conversation has covered (\`ensemblr_set_summary\`). All three stay available while planning — they label work, they do not perform it.`;
+const PLAN_MODE_ORCHESTRATOR_LEGIBILITY = `- Keep the workspace legible: name your tab (\`ensemblr_set_name\`, argument \`title\`), name the workspace and its git branch together from one kebab-case slug (\`ensemblr_set_branch_name\`, argument \`name\`), and record what the conversation has covered (\`ensemblr_set_summary\`, arguments \`title\` and \`summary\`). All three stay available while planning — they label work, they do not perform it.`;
 
 /** The planning investigator's: its own tab and summary, never the workspace. */
-const PLAN_MODE_SUBAGENT_LEGIBILITY = `- Keep your tab legible: name it (\`ensemblr_set_name\`) and record what the conversation has covered (\`ensemblr_set_summary\`). Both stay available while planning — they label work, they do not perform it. Naming the WORKSPACE and its git branch is not yours: \`ensemblr_set_branch_name\` belongs to the orchestrator that spawned you and is refused here.`;
+const PLAN_MODE_SUBAGENT_LEGIBILITY = `- Keep your tab legible: name it (\`ensemblr_set_name\`, argument \`title\`) and record what the conversation has covered (\`ensemblr_set_summary\`, arguments \`title\` and \`summary\`). Both stay available while planning — they label work, they do not perform it. Naming the WORKSPACE and its git branch is not yours: \`ensemblr_set_branch_name\` belongs to the orchestrator that spawned you and is refused here.`;
 
 /** Closing sentences of the blocked-set paragraph, shared by both roles. */
 const PLAN_MODE_ENFORCEMENT_TAIL = `That enforcement is deliberate — do not look for a way around it. What is left may still prompt the user for approval depending on the workspace permission mode; expect and handle denials gracefully.`;

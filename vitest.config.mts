@@ -60,6 +60,7 @@ export default defineConfig({
 			'tests/main/list-workspace-files.test.ts',
 			'tests/main/open-target-paths.test.ts',
 			'tests/main/workspace-pr-sweeper.test.ts',
+			'tests/main/terminal-scrollback-text.test.ts',
 			'tests/main/agent-control-service.test.ts',
 			'tests/main/agent-control-guardrails.test.ts',
 			'tests/main/agent-control-origin-registry.test.ts',

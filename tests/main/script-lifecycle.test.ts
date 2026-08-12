@@ -406,6 +406,21 @@ test('a blocked run launch names the run script already holding the workspace', 
 	assert.match(second.diagnostics[0]?.message ?? '', /run script "dev"/);
 });
 
+test('a blocked launch reports the session already holding the slot', async (t) => {
+	const { service } = createServiceFixture(t, { run: 'npm run dev' });
+
+	const first = await service.runScript({
+		kind: 'run',
+		workspaceId: WORKSPACE_ID,
+	});
+	const second = await service.runScript({
+		kind: 'run',
+		workspaceId: WORKSPACE_ID,
+	});
+
+	assert.equal(second.diagnostics[0]?.terminalId, first.session?.id);
+});
+
 test('a blocked setup launch keeps the kind-only wording', async (t) => {
 	const { service } = createServiceFixture(t, { setup: 'npm install' });
 
