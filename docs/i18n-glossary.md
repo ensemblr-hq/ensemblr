@@ -96,6 +96,19 @@ Rules of thumb:
 | Push | Push | Push | Git; untranslated. |
 | Merge | Merge | Merge | Git; untranslated. |
 
+## Native menu bar
+
+The menu-bar titles sit side by side across the top of the screen, so they take
+the shortest form that still reads. Submenu items inside them use the full term
+from **Core nouns** — the width budget there is generous.
+
+| English | Русский | Ελληνικά | Note |
+| --- | --- | --- | --- |
+| Workspace *(menu title)* | Пространство | Χώρος | Short form for the menu-bar title only; the full `Рабочее пространство`/`Χώρος εργασίας` is 20 and 14 characters and does not fit beside `Файл`/`Правка`/`Вид`. Submenu items keep the full term. **Flag for native review:** `Пространство` alone can read as "space", and only the neighbouring menu titles disambiguate it. |
+| Create PR | Создать PR… | Δημιουργία PR… | `PR` stays `PR` per the `Pull request` row above. `Создать pull request…` is 21 characters. |
+| Open Config File | Файл конфигурации | Αρχείο ρυθμίσεων | The English is already shortened from "Open Configuration File"; the verb is carried by the menu it sits in. |
+| Run *(script toggle)* | Запуск | Εκτέλεση | The menu item that starts or stops the active run script, checked while it runs. Distinct from the `Run script` row above, which names the configured script itself. |
+
 ## Settings-page section names
 
 | English | Русский | Ελληνικά |

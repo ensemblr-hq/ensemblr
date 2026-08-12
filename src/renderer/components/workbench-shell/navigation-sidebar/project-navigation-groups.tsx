@@ -13,6 +13,10 @@ import {
 	useCreateWorkspaceFromProject,
 } from '@/renderer/hooks/workbench-shell/navigation-sidebar/use-project-navigation-actions';
 import { useRemoveWorkspaceAction } from '@/renderer/hooks/workbench-shell/use-remove-workspace-action';
+import {
+	useMenuCommand,
+	useMenuDynamicEntries,
+} from '@/renderer/state/menu-commands';
 import type {
 	AddProjectActionId,
 	AddProjectMenuModel,
@@ -96,6 +100,54 @@ export function ProjectNavigationGroups({
 
 	const queryClient = useQueryClient();
 	const handleArchiveBrowseChange = useArchiveBrowseChange();
+
+	// ⌘N targets the repository on screen, falling back to the first in the
+	// sidebar so the shortcut still works from the dashboard.
+	const newWorkspaceProject = activeProject ?? orderedProjects.at(0) ?? null;
+	useMenuCommand(
+		'workspace.new',
+		() => {
+			if (newWorkspaceProject) {
+				handleCreateWorkspace(newWorkspaceProject);
+			}
+		},
+		Boolean(newWorkspaceProject) &&
+			!creatingProjectIds.has(newWorkspaceProject?.id ?? ''),
+	);
+
+	const recents = addProjectMenu?.recents ?? [];
+	useMenuDynamicEntries(
+		'recentProjects',
+		recents.map((recent) => ({
+			id: recent.path,
+			label: recent.name ?? recent.path,
+		})),
+	);
+	useMenuCommand(
+		'project.openRecent',
+		(path) => {
+			const recent = recents.find((candidate) => candidate.path === path);
+			if (recent) {
+				onOpenRecentProject?.(recent);
+			}
+		},
+		Boolean(onOpenRecentProject) && recents.length > 0,
+	);
+	useMenuCommand(
+		'project.addFromGithub',
+		() => onAddProject?.('open-github'),
+		Boolean(onAddProject),
+	);
+	useMenuCommand(
+		'project.addFromLocal',
+		() => onAddProject?.('open-local'),
+		Boolean(onAddProject),
+	);
+	useMenuCommand(
+		'project.quickStart',
+		() => onAddProject?.('quick-start'),
+		Boolean(onAddProject),
+	);
 
 	return (
 		<>

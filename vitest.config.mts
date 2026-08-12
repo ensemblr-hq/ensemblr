@@ -50,6 +50,7 @@ export default defineConfig({
 			'tests/main/worktree-placement.test.ts',
 			'tests/main/external-links-policy.test.ts',
 			'tests/main/app-settings-service.test.ts',
+			'tests/main/menu-build.test.ts',
 			'tests/main/menu-strings.test.ts',
 			'tests/main/open-in-editor.test.ts',
 			'tests/main/workspace-scripts-handler.test.ts',

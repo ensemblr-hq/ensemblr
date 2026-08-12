@@ -1,4 +1,5 @@
 import { useHotkey } from '@/renderer/hooks/use-hotkey';
+import { useMenuCommand } from '@/renderer/state/menu-commands';
 
 /**
  * Keyboard navigation for the session tab strip: open, pin, cycle forward and
@@ -54,6 +55,16 @@ export function useSessionTabShortcuts({
 		const position = Number.parseInt(event.key, 10);
 		if (!Number.isNaN(position)) {
 			selectTabByPosition(position);
+		}
+	});
+
+	useMenuCommand('tab.new', onOpenTab);
+	useMenuCommand('tab.keepOpen', () => onPinTab(activeSessionId));
+	useMenuCommand('tab.next', () => cycleTab(1), orderedSessionIds.length > 1);
+	useMenuCommand('tab.prev', () => cycleTab(-1), orderedSessionIds.length > 1);
+	useMenuCommand('tab.selectByIndex', (sessionId) => {
+		if (sessionId) {
+			onSelectSession(sessionId);
 		}
 	});
 }

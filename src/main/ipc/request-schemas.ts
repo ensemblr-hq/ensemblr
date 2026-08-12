@@ -77,6 +77,7 @@ export {
 	updateLinearIssueRequestSchema,
 } from './request-schemas/linear.ts';
 export { linkedDirectoryRequestSchema } from './request-schemas/linked-directories.ts';
+export { menuContextSchema } from './request-schemas/menu.ts';
 export {
 	archiveRepositoryRequestSchema,
 	archiveWorkspaceRequestSchema,

@@ -1,7 +1,9 @@
 import { useSetAtom } from 'jotai';
 import { type ComponentType, useCallback, useRef } from 'react';
+import { useWorkspaceMenuCommands } from '@/renderer/components/workbench-shell/workspace-menu-commands';
 import { useAgentActionRunner } from '@/renderer/hooks/workbench-shell/review-actions/use-agent-action-runner';
 import { useDockController } from '@/renderer/hooks/workbench-shell/use-dock-controller';
+import { useLayoutMenuCommands } from '@/renderer/hooks/workbench-shell/use-layout-menu-commands';
 import { useRightSidebarController } from '@/renderer/hooks/workbench-shell/use-right-sidebar-controller';
 import { useRouteProfilerMount } from '@/renderer/lib/instrumentation';
 import {
@@ -65,6 +67,8 @@ export function WorkspaceWorkbenchContent({
 
 	const rightSidebar = useRightSidebarController();
 	const dock = useDockController();
+	useLayoutMenuCommands(dock, rightSidebar);
+	const workspaceMenuDialogs = useWorkspaceMenuCommands(activeWorkspace);
 	const setDirectoryRevealRequest = useSetAtom(
 		workspaceDirectoryRevealRequestAtom,
 	);
@@ -219,6 +223,7 @@ export function WorkspaceWorkbenchContent({
 						</CommentPreviewOpenerProvider>
 					</ReviewFilePreviewOpenerProvider>
 				</WorkspaceFileDiffOpenerProvider>
+				{workspaceMenuDialogs}
 			</ReviewActionsProvider>
 		</WorkbenchLayoutProvider>
 	);

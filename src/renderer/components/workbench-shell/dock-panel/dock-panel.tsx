@@ -22,6 +22,7 @@ import {
 } from '@/renderer/components/ui/tabs';
 import { useWorkbenchLayout } from '@/renderer/components/workbench-shell/shell-contexts';
 import { useRunScriptHotkey } from '@/renderer/hooks/workbench-shell/dock-panel/use-run-script-hotkey';
+import { useDockMenuCommands } from '@/renderer/hooks/workbench-shell/use-dock-menu-commands';
 import { selectActiveRunScript } from '@/renderer/lib/terminal';
 import { cn } from '@/renderer/lib/utils';
 import { DEFAULT_DOCK_TAB } from '@/renderer/lib/workbench';
@@ -73,6 +74,12 @@ export function DockPanel({
 	});
 
 	useRunScriptHotkey(workspace.scripts.run.status, actions, activeRunScript);
+	useDockMenuCommands(
+		workspace.scripts.run.status,
+		actions,
+		activeRunScript,
+		workspace.runScripts,
+	);
 
 	return (
 		<Tabs

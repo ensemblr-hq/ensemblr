@@ -130,6 +130,18 @@ function shortcutName(t: TFunction): Record<ShortcutId, string> {
 			'settings:shortcuts.name.files-search',
 			'Open file search',
 		),
+		'help.shortcuts': t(
+			'settings:shortcuts.name.help-shortcuts',
+			'Open keyboard shortcuts',
+		),
+		'layout.toggleDock': t(
+			'settings:shortcuts.name.layout-toggle-dock',
+			'Toggle dock',
+		),
+		'layout.toggleRightSidebar': t(
+			'settings:shortcuts.name.layout-toggle-right-sidebar',
+			'Toggle right sidebar',
+		),
 		'modelPicker.selectByIndex': t(
 			'settings:shortcuts.name.model-picker-select-by-index',
 			'Select model by index (1-9)',
@@ -166,6 +178,7 @@ function shortcutName(t: TFunction): Record<ShortcutId, string> {
 			'settings:shortcuts.name.tab-select-by-index',
 			'Select tab by index (⌘1–8, ⌘9 last)',
 		),
+		'terminal.new': t('settings:shortcuts.name.terminal-new', 'New terminal'),
 		'toolCalls.toggleCollapse': t(
 			'settings:shortcuts.name.tool-calls-toggle-collapse',
 			'Expand or collapse all tool calls',

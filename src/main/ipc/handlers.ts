@@ -19,6 +19,7 @@ import {
 } from '../github/index.ts';
 import type { LinearAuthService, LinearService } from '../linear';
 import { createLinkedDirectoryService } from '../linked-directories/index.ts';
+import type { MenuContextStore } from '../menu';
 import type { OpenTargetService } from '../open-target';
 import type { PiExecutableService } from '../pi-runtime';
 import type { PlanModeRegistry } from '../plan-mode';
@@ -68,6 +69,7 @@ import { registerGithubHandlers } from './handlers/github';
 import { registerHealthHandlers } from './handlers/health';
 import { registerLinearHandlers } from './handlers/linear';
 import { registerLinkedDirectoryHandlers } from './handlers/linked-directories';
+import { registerMenuHandlers } from './handlers/menu';
 import { registerNavigationHandlers } from './handlers/navigation';
 import { registerOpenTargetHandlers } from './handlers/open-target';
 import { registerRepositoryHandlers } from './handlers/repository';
@@ -119,6 +121,10 @@ interface RegisterIpcHandlersOptions {
 	localCommandService: LocalCommandService;
 	localRepositoryImportService: LocalRepositoryImportService;
 	localRepositoryRegistrationService: LocalRepositoryRegistrationService;
+	/** Holds the menu context the renderer reports, shared with the menu rebuild. */
+	menuContextStore: MenuContextStore;
+	/** Reinstalls the native application menu from the current settings and menu context. */
+	rebuildMenu: () => void;
 	/** Fired after an in-app App-settings write so side-effects can re-read. */
 	onAppSettingsUpdated?: () => void;
 	openTargetService: OpenTargetService;
@@ -179,8 +185,10 @@ export function registerIpcHandlers({
 	localCommandService,
 	localRepositoryImportService,
 	localRepositoryRegistrationService,
+	menuContextStore,
 	onAppSettingsUpdated,
 	openTargetService,
+	rebuildMenu,
 	piExecutableService,
 	agentModelCatalog,
 	agentSessionService,
@@ -206,6 +214,7 @@ export function registerIpcHandlers({
 	});
 
 	registerWindowHandlers();
+	registerMenuHandlers({ menuContextStore, rebuildMenu });
 	registerAppSettingsHandlers({ appSettingsService, onAppSettingsUpdated });
 	registerEnvironmentHandlers({ environmentVariablesService });
 	registerHealthHandlers({ configService, databaseService });

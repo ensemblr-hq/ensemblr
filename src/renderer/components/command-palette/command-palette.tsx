@@ -27,6 +27,7 @@ import {
 	CommandShortcut,
 } from '@/renderer/components/ui/command';
 import { useHotkey } from '@/renderer/hooks/use-hotkey';
+import { useMenuCommand } from '@/renderer/state/menu-commands';
 import { themeAtom } from '@/renderer/state/preferences';
 import { formatShortcut } from '@/shared/keymap';
 
@@ -55,10 +56,17 @@ export function CommandPalette() {
 	const close = useCallback(() => setOpen(false), []);
 
 	useHotkey('palette.open', openPalette);
-	useHotkey('settings.open', () => {
+	useMenuCommand('palette.open', openPalette);
+
+	// The menu owns ⌘, and so the renderer never sees that keydown while the
+	// palette is mounted. Registering the same close-then-navigate the hotkey
+	// runs keeps the palette from being left open behind the settings route.
+	const openSettings = useCallback(() => {
 		close();
 		navigate({ to: '/settings/general' });
-	});
+	}, [close, navigate]);
+	useHotkey('settings.open', openSettings);
+	useMenuCommand('settings.open', openSettings);
 
 	const go = useCallback(
 		(action: () => void) => () => {

@@ -35,7 +35,17 @@ export interface Binding {
 	readonly modifiers?: readonly Modifier[];
 }
 
-/** Definition of a shortcut: its scope, key bindings, and optional Electron accelerator. */
+/**
+ * Definition of a shortcut: its scope, key bindings, and optional Electron
+ * accelerator.
+ *
+ * `accelerator` belongs only to a chord the native menu is allowed to claim. On
+ * macOS a menu item's key equivalent is matched by AppKit before the renderer
+ * sees the keydown, so an accelerator is never merely decorative — a
+ * `composer`- or `dialog`-scoped chord must not carry one, or the menu steals it
+ * from the layer that knows which of several handlers applies. Which commands
+ * claim theirs is `ownsAccelerator` in `src/shared/menu-commands.ts`.
+ */
 export interface ShortcutDef {
 	readonly scope: Scope;
 	readonly bindings: readonly Binding[];
@@ -56,6 +66,27 @@ export const SHORTCUTS = {
 	'sidebar.toggle': {
 		scope: 'global',
 		bindings: [{ key: 'b', modifiers: ['mod'] }],
+		accelerator: 'CommandOrControl+B',
+	},
+	'layout.toggleRightSidebar': {
+		scope: 'menu',
+		bindings: [{ key: 'b', modifiers: ['mod', 'alt'] }],
+		accelerator: 'CommandOrControl+Alt+B',
+	},
+	'layout.toggleDock': {
+		scope: 'menu',
+		bindings: [{ key: 'j', modifiers: ['mod', 'alt'] }],
+		accelerator: 'CommandOrControl+Alt+J',
+	},
+	'help.shortcuts': {
+		scope: 'menu',
+		bindings: [{ key: '/', modifiers: ['mod'] }],
+		accelerator: 'CommandOrControl+/',
+	},
+	'terminal.new': {
+		scope: 'menu',
+		bindings: [{ key: '`', modifiers: ['ctrl', 'shift'] }],
+		accelerator: 'Control+Shift+`',
 	},
 	'palette.open': {
 		scope: 'global',
@@ -70,6 +101,7 @@ export const SHORTCUTS = {
 	'files.search': {
 		scope: 'global',
 		bindings: [{ key: 'p', modifiers: ['mod'] }],
+		accelerator: 'CommandOrControl+P',
 	},
 	'composer.focus': {
 		scope: 'composer',
@@ -143,6 +175,7 @@ export const SHORTCUTS = {
 	'toolCalls.toggleCollapse': {
 		scope: 'global',
 		bindings: [{ key: 'o', modifiers: ['ctrl'] }],
+		accelerator: 'Control+O',
 	},
 	'tab.close': {
 		scope: 'menu',
@@ -152,18 +185,22 @@ export const SHORTCUTS = {
 	'tab.new': {
 		scope: 'global',
 		bindings: [{ key: 't', modifiers: ['mod'] }],
+		accelerator: 'CommandOrControl+T',
 	},
 	'tab.keepOpen': {
 		scope: 'global',
 		bindings: [{ key: 'Enter', modifiers: ['mod', 'shift'] }],
+		accelerator: 'CommandOrControl+Shift+Return',
 	},
 	'tab.next': {
 		scope: 'global',
 		bindings: [{ key: ']', modifiers: ['mod', 'shift'] }],
+		accelerator: 'CommandOrControl+Shift+]',
 	},
 	'tab.prev': {
 		scope: 'global',
 		bindings: [{ key: '[', modifiers: ['mod', 'shift'] }],
+		accelerator: 'CommandOrControl+Shift+[',
 	},
 	'tab.selectByIndex': {
 		scope: 'global',
@@ -172,10 +209,12 @@ export const SHORTCUTS = {
 	'changes.uncommitted': {
 		scope: 'global',
 		bindings: [{ key: 'u', modifiers: ['mod', 'alt'] }],
+		accelerator: 'CommandOrControl+Alt+U',
 	},
 	'run.start': {
 		scope: 'global',
 		bindings: [{ key: 'r', modifiers: ['mod'] }],
+		accelerator: 'CommandOrControl+R',
 	},
 	'agents.open': {
 		scope: 'global',

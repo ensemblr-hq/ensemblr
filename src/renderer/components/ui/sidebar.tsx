@@ -23,6 +23,10 @@ import {
 import { useHotkey } from '@/renderer/hooks/use-hotkey';
 import { useIsMobile } from '@/renderer/hooks/use-mobile';
 import { cn } from '@/renderer/lib/utils';
+import {
+	useMenuCommand,
+	useMenuCommandChecked,
+} from '@/renderer/state/menu-commands';
 import { sidebarOpenAtom } from '@/renderer/state/sidebar';
 
 const SIDEBAR_WIDTH = '16rem';
@@ -88,6 +92,8 @@ function SidebarProvider({
 	}, [isMobile, setOpen]);
 
 	useHotkey('sidebar.toggle', toggleSidebar);
+	useMenuCommand('layout.toggleSidebar', toggleSidebar);
+	useMenuCommandChecked('layout.toggleSidebar', open);
 
 	// We add a state so that we can do data-state="expanded" or "collapsed".
 	// This makes it easier to style the sidebar with Tailwind classes.

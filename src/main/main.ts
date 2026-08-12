@@ -93,7 +93,7 @@ import {
 	createLinearClient,
 	createLinearService,
 } from './linear';
-import { installApplicationMenu } from './menu';
+import { installApplicationMenu, MenuContextStore } from './menu';
 import { createOpenTargetService } from './open-target';
 import { createPiCliRpcAdapter, resolvePiSlashCommands } from './pi-agent';
 import {
@@ -928,7 +928,11 @@ app.whenReady().then(() => {
 	rootDirectoryService.ensure();
 	void sharedRootAdoptionService.reconcile();
 	const readAppSettings = () => appSettingsService.read();
-	installApplicationMenu(readAppSettings);
+	const menuContextStore = new MenuContextStore();
+	const rebuildMenu = () => {
+		installApplicationMenu(readAppSettings, menuContextStore.current);
+	};
+	rebuildMenu();
 	// config.json is the source of truth; live-reload the renderer when it's
 	// edited outside the app (the service suppresses echoes of its own writes).
 	appSettingsService.startWatching((settings) => {
@@ -936,7 +940,7 @@ app.whenReady().then(() => {
 			settings,
 		} satisfies AppSettingsChangedBroadcast);
 		agentActivityMonitor.refresh();
-		installApplicationMenu(readAppSettings);
+		rebuildMenu();
 	});
 	// Live-reload the non-App config sections (linear, security, managed,
 	// environment, repositoryDefaults, repositoryRules) so external config.json
@@ -983,8 +987,10 @@ app.whenReady().then(() => {
 		// the next restart.
 		onAppSettingsUpdated: () => {
 			agentActivityMonitor.refresh();
-			installApplicationMenu(readAppSettings);
+			rebuildMenu();
 		},
+		menuContextStore,
+		rebuildMenu,
 		repositoryConfigService,
 		rootDirectoryService,
 		scriptLifecycleService,

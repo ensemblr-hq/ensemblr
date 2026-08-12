@@ -1,8 +1,12 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useOpenTargetShortcuts } from '@/renderer/hooks/workbench-shell/use-open-target-shortcuts';
 import { useOpenTargets } from '@/renderer/hooks/workbench-shell/use-open-targets';
+import {
+	useMenuCommand,
+	useMenuDynamicEntries,
+} from '@/renderer/state/menu-commands';
 import type { WorkspaceShellModel } from '@/renderer/types/workbench';
 
 import { OpenTargetSplitButton } from './open-target-split-button';
@@ -27,6 +31,28 @@ export function OpenWorkspaceMenu({
 		openTargets,
 		primaryTarget,
 	});
+
+	const targetEntries = useMemo(
+		() =>
+			(openTargets ?? []).map((target) => ({
+				id: target.id,
+				label: target.label,
+			})),
+		[openTargets],
+	);
+	useMenuDynamicEntries('openTargets', targetEntries);
+	useMenuCommand(
+		'workspace.openIn',
+		(targetId) => {
+			const target = (openTargets ?? []).find(
+				(candidate) => candidate.id === targetId,
+			);
+			if (target) {
+				void invokeTarget(target);
+			}
+		},
+		(openTargets?.length ?? 0) > 0,
+	);
 
 	if (!openTargets || !primaryTarget) {
 		return null;

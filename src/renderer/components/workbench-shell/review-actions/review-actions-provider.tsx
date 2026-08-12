@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 
 import { reviewMergeSettingsQuery } from '@/renderer/api/ensemblr-queries';
 import { usePullRequestRefresh } from '@/renderer/hooks/workbench-shell/review-actions/use-pull-request-refresh';
+import { useReviewMenuCommands } from '@/renderer/hooks/workbench-shell/review-actions/use-review-menu-commands';
 import { useReviewMutations } from '@/renderer/hooks/workbench-shell/review-actions/use-review-mutations';
 import { useWorkspaceBusy } from '@/renderer/hooks/workspace/use-workspace-busy';
 import { buildCommitAndPushPrompt } from '@/renderer/lib/workbench/checks-pr-prompts';
@@ -125,6 +126,8 @@ export function ReviewActionsProvider({
 			runAgentAction,
 		],
 	);
+
+	useReviewMenuCommands(value);
 
 	return (
 		<ReviewActionsContextProvider value={value}>

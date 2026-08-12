@@ -27,6 +27,7 @@ import type {
 	TerminalOutputBroadcast,
 } from '../../shared/ipc/contracts/terminal';
 import type { WorkspaceFilesChangedBroadcast } from '../../shared/ipc/contracts/workspace-files';
+import type { MenuCommandBroadcast } from '../../shared/menu-commands';
 
 /**
  * Keys of {@link EnsemblrApi} that represent typed `ipcRenderer.invoke`
@@ -38,7 +39,7 @@ type InvokeKey = Exclude<
 	| 'onAppSettingsChanged'
 	| 'onConfigChanged'
 	| 'onCloneGithubRepositoryProgress'
-	| 'onCloseActiveTabRequest'
+	| 'onMenuCommand'
 	| 'onAskUserQuestion'
 	| 'onAskUserQuestionClosed'
 	| 'onAgentToolApprovalRequested'
@@ -60,6 +61,7 @@ const CHANNEL_OVERRIDES = {
 	answerUserQuestion: IPC_CHANNELS.agentControlAnswerUserQuestion,
 	prepareCloneGithubRepository: IPC_CHANNELS.cloneGithubRepositoryPrepare,
 	reportBoardStatus: IPC_CHANNELS.agentControlReportBoardStatus,
+	reportMenuContext: IPC_CHANNELS.menuContext,
 	resolveSettings: IPC_CHANNELS.settingsResolution,
 	startCloneGithubRepository: IPC_CHANNELS.cloneGithubRepositoryStart,
 } as const satisfies Partial<Record<InvokeKey, string>>;
@@ -218,8 +220,8 @@ export function createEnsemblrApi(): EnsemblrApi {
 				IPC_CHANNELS.cloneGithubRepositoryProgress,
 				listener,
 			),
-		onCloseActiveTabRequest: (listener) =>
-			subscribe<void>(IPC_CHANNELS.closeActiveTab, listener),
+		onMenuCommand: (listener) =>
+			subscribe<MenuCommandBroadcast>(IPC_CHANNELS.menuCommand, listener),
 		onAgentControlFocusView: (listener) =>
 			subscribe<FocusViewBroadcast>(
 				IPC_CHANNELS.agentControlFocusView,
@@ -275,6 +277,7 @@ export function createEnsemblrApi(): EnsemblrApi {
 			),
 		reportBoardStatus: (statusByWorkspaceId) =>
 			invoke('reportBoardStatus', statusByWorkspaceId),
+		reportMenuContext: (context) => invoke('reportMenuContext', context),
 		onAgentSessionEvent: (listener) =>
 			subscribe<AgentSessionEventBroadcast>(
 				IPC_CHANNELS.agentSessionEvent,

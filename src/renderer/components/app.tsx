@@ -1,11 +1,16 @@
 import { Outlet } from '@tanstack/react-router';
-import { useSetAtom } from 'jotai';
+import { useAtom } from 'jotai';
 import { useCallback } from 'react';
 
+import { useAppMenuCommands } from '@/renderer/hooks/use-app-menu-commands';
 import { useConfigReloadSync } from '@/renderer/hooks/use-config-reload-sync';
 import { useHotkey } from '@/renderer/hooks/use-hotkey';
 import { useAskUserQuestionSync } from '@/renderer/state/ask-user-question';
-import { CloseActionProvider } from '@/renderer/state/close-action';
+import {
+	useMenuCommand,
+	useMenuCommandBridge,
+	useMenuCommandChecked,
+} from '@/renderer/state/menu-commands';
 import { usePlanModeSync, usePlanReviewSync } from '@/renderer/state/plan-mode';
 import {
 	toolCallCollapseAtom,
@@ -28,18 +33,22 @@ export function App() {
 	usePlanReviewSync();
 	usePlanModeSync();
 
+	useMenuCommandBridge();
+	useAppMenuCommands();
+
 	// App-wide toggle for the tool-call expand/collapse default (⌃O / Ctrl+O).
-	const setToolCallCollapse = useSetAtom(toolCallCollapseAtom);
+	const [toolCallCollapse, setToolCallCollapse] = useAtom(toolCallCollapseAtom);
 	const toggleToolCallCollapse = useCallback(() => {
 		setToolCallCollapse((prev) =>
 			prev === 'expanded' ? 'collapsed' : 'expanded',
 		);
 	}, [setToolCallCollapse]);
 	useHotkey('toolCalls.toggleCollapse', toggleToolCallCollapse);
-
-	return (
-		<CloseActionProvider>
-			<Outlet />
-		</CloseActionProvider>
+	useMenuCommand('toolCalls.toggleCollapse', toggleToolCallCollapse);
+	useMenuCommandChecked(
+		'toolCalls.toggleCollapse',
+		toolCallCollapse === 'collapsed',
 	);
+
+	return <Outlet />;
 }
