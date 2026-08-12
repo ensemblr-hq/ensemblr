@@ -38,8 +38,9 @@ const SUB_AGENT_SESSION: SessionTabModel = {
  * carry the derived fields (`modelLabel`, `thinkingLabel`, `disabled`) the
  * production path would compute rather than a hand-written partial. The default
  * session is a sub-agent's because that is the composer-less case most of these
- * fixtures exercise; override `activeSession` for anything else, since
- * `getComposerState` derives the placeholder from its label.
+ * fixtures exercise; override `activeSession` for anything else. The placeholder
+ * follows whether a turn has run, so a fixture that wants the first-message copy
+ * clears both `activeAgentSessionId` and the session's own `agentSessionId`.
  */
 export function createComposerShellState(
 	overrides: {
