@@ -11,8 +11,10 @@ permissions:
   pull-requests: write
 
 jobs:
+  # macOS, not ubuntu: `mod` resolves to ⌘ on darwin and Ctrl elsewhere, so the
+  # keymap suites fail on Linux against an app that only ships for macOS.
   verify:
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v5
 
