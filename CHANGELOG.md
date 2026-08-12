@@ -9,6 +9,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.0-beta.2] - 2026-08-12
+
+Dependency maintenance on top of beta.1 — no behaviour change. Signed, notarized, Apple silicon.
+[Release](https://github.com/ensemblr-hq/ensemblr/releases/tag/v0.1.0-beta.2) ·
+[`.dmg`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.0-beta.2/Ensemblr-0.1.0-beta.2-arm64.dmg)
+
+### Changed
+
+- **Dependency updates** (#267, #269–#273): TypeScript 6 → 7, Electron 43.1 → 43.3, Vite 8.1 → 8.2,
+  `ai` 7.0.17 → 7.0.58, `radix-ui` 1.6.2 → 1.6.7, `lucide-react` 1.23 → 1.31, `jotai-family` 1.0.2 → 1.1.0,
+  `@testing-library/jest-dom` 6 → 7, plus the rest of the dev-dependency group. CI actions moved to
+  `actions/checkout@v7` and `actions/setup-node@v7`. Each PR was verified against master separately, so the
+  lockfiles were resolved against trees the others had not seen; reinstalling reconciled them and dropped 102
+  stale packages.
+- **`@types/node` held at `^24`** — Electron 43 embeds Node 24, so typing against `^26` buys a compiler that
+  accepts APIs the runtime does not have. Dependabot reads it as an ordinary devDependency rather than a
+  mirror of `engines`; the constraint is now recorded in [`.claude/rules/stack.md`](.claude/rules/stack.md).
+- **README wordmark** (`146f52a`): the loop runs 16s instead of 4s, holding a full flicker cycle at the low
+  end of the app's 12–20s range rather than compressing it past recognition, and the canvas moved to
+  GitHub's `#0d1117` so the mark sits flush in the README instead of reading as a near-black card.
+
 ## [0.1.0-beta.1] - 2026-08-12
 
 First public build — signed, notarized, Apple silicon.

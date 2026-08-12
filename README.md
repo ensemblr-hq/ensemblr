@@ -14,7 +14,7 @@ permission-gated control surface — **Ensemblr Control** — lets agents drive 
 
 ![The Ensemblr dashboard board, with workspace cards spread across the Backlog, In progress, In review, and Done columns.](./docs/guide/images/00-hero-dashboard.png)
 
-- **Version:** [`0.1.0-beta.1`](https://github.com/ensemblr-hq/ensemblr/releases/tag/v0.1.0-beta.1) (pre-1.0, polish stage)
+- **Version:** [`0.1.0-beta.2`](https://github.com/ensemblr-hq/ensemblr/releases/tag/v0.1.0-beta.2) (pre-1.0, polish stage)
 - **Platform:** macOS on Apple silicon
 - **License:** MIT
 
@@ -29,7 +29,7 @@ changes before 1.0. See [`CHANGELOG.md`](./CHANGELOG.md) for recent changes.
 
 ## Install
 
-**[Download Ensemblr 0.1.0-beta.1 (.dmg, Apple silicon)](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.0-beta.1/Ensemblr-0.1.0-arm64.dmg)** — open it and drag Ensemblr to Applications.
+**[Download Ensemblr 0.1.0-beta.2 (.dmg, Apple silicon)](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.0-beta.2/Ensemblr-0.1.0-beta.2-arm64.dmg)** — open it and drag Ensemblr to Applications.
 
 The build is code-signed with a Developer ID certificate, hardened-runtime, notarized by Apple, and
 stapled, so it opens without a Gatekeeper prompt and validates offline. Every build is on the

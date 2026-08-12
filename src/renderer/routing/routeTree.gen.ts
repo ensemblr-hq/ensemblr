@@ -9,118 +9,88 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as OnboardingRouteImport } from './routes/onboarding'
 import { Route as WorkbenchRouteImport } from './routes/_workbench'
-import { Route as DebugPiReplayRouteImport } from './routes/debug.pi-replay'
-import { Route as WorkbenchSettingsRouteImport } from './routes/_workbench/settings'
+import { Route as OnboardingRouteImport } from './routes/onboarding'
 import { Route as WorkbenchShellRouteImport } from './routes/_workbench/_shell'
-import { Route as WorkbenchSettingsIndexRouteImport } from './routes/_workbench/settings/index'
+import { Route as WorkbenchSettingsRouteImport } from './routes/_workbench/settings'
+import { Route as DebugPiReplayRouteImport } from './routes/debug.pi-replay'
 import { Route as WorkbenchShellIndexRouteImport } from './routes/_workbench/_shell/index'
-import { Route as WorkbenchSettingsShortcutsRouteImport } from './routes/_workbench/settings/shortcuts'
-import { Route as WorkbenchSettingsProvidersRouteImport } from './routes/_workbench/settings/providers'
-import { Route as WorkbenchSettingsModelsRouteImport } from './routes/_workbench/settings/models'
-import { Route as WorkbenchSettingsIntegrationsRouteImport } from './routes/_workbench/settings/integrations'
-import { Route as WorkbenchSettingsGitRouteImport } from './routes/_workbench/settings/git'
-import { Route as WorkbenchSettingsGeneralRouteImport } from './routes/_workbench/settings/general'
-import { Route as WorkbenchSettingsExperimentalRouteImport } from './routes/_workbench/settings/experimental'
-import { Route as WorkbenchSettingsEnvironmentRouteImport } from './routes/_workbench/settings/environment'
-import { Route as WorkbenchSettingsDiagnosticsRouteImport } from './routes/_workbench/settings/diagnostics'
-import { Route as WorkbenchSettingsAppearanceRouteImport } from './routes/_workbench/settings/appearance'
-import { Route as WorkbenchShellHistoryRouteImport } from './routes/_workbench/_shell/history'
 import { Route as WorkbenchShellDashboardRouteImport } from './routes/_workbench/_shell/dashboard'
-import { Route as WorkbenchSettingsRepoIndexRouteImport } from './routes/_workbench/settings/repo/index'
+import { Route as WorkbenchShellHistoryRouteImport } from './routes/_workbench/_shell/history'
+import { Route as WorkbenchSettingsIndexRouteImport } from './routes/_workbench/settings/index'
+import { Route as WorkbenchSettingsAppearanceRouteImport } from './routes/_workbench/settings/appearance'
+import { Route as WorkbenchSettingsDiagnosticsRouteImport } from './routes/_workbench/settings/diagnostics'
+import { Route as WorkbenchSettingsEnvironmentRouteImport } from './routes/_workbench/settings/environment'
+import { Route as WorkbenchSettingsExperimentalRouteImport } from './routes/_workbench/settings/experimental'
+import { Route as WorkbenchSettingsGeneralRouteImport } from './routes/_workbench/settings/general'
+import { Route as WorkbenchSettingsGitRouteImport } from './routes/_workbench/settings/git'
+import { Route as WorkbenchSettingsIntegrationsRouteImport } from './routes/_workbench/settings/integrations'
+import { Route as WorkbenchSettingsModelsRouteImport } from './routes/_workbench/settings/models'
+import { Route as WorkbenchSettingsProvidersRouteImport } from './routes/_workbench/settings/providers'
+import { Route as WorkbenchSettingsShortcutsRouteImport } from './routes/_workbench/settings/shortcuts'
 import { Route as WorkbenchShellLinearIndexRouteImport } from './routes/_workbench/_shell/linear/index'
-import { Route as WorkbenchSettingsRepoRepoIdRouteImport } from './routes/_workbench/settings/repo/$repoId'
 import { Route as WorkbenchShellLinearIssueIdRouteImport } from './routes/_workbench/_shell/linear/$issueId'
 import { Route as WorkbenchShellProjectsProjectIdRouteRouteImport } from './routes/_workbench/_shell/projects/$projectId/route'
+import { Route as WorkbenchSettingsRepoIndexRouteImport } from './routes/_workbench/settings/repo/index'
+import { Route as WorkbenchSettingsRepoRepoIdRouteImport } from './routes/_workbench/settings/repo/$repoId'
 import { Route as WorkbenchSettingsRepoRepoIdIndexRouteImport } from './routes/_workbench/settings/repo/$repoId/index'
-import { Route as WorkbenchSettingsRepoRepoIdSecurityRouteImport } from './routes/_workbench/settings/repo/$repoId/security'
-import { Route as WorkbenchSettingsRepoRepoIdScriptsRouteImport } from './routes/_workbench/settings/repo/$repoId/scripts'
-import { Route as WorkbenchSettingsRepoRepoIdMiscRouteImport } from './routes/_workbench/settings/repo/$repoId/misc'
-import { Route as WorkbenchSettingsRepoRepoIdGitRouteImport } from './routes/_workbench/settings/repo/$repoId/git'
-import { Route as WorkbenchSettingsRepoRepoIdEnvironmentRouteImport } from './routes/_workbench/settings/repo/$repoId/environment'
 import { Route as WorkbenchSettingsRepoRepoIdActionsRouteImport } from './routes/_workbench/settings/repo/$repoId/actions'
+import { Route as WorkbenchSettingsRepoRepoIdEnvironmentRouteImport } from './routes/_workbench/settings/repo/$repoId/environment'
+import { Route as WorkbenchSettingsRepoRepoIdGitRouteImport } from './routes/_workbench/settings/repo/$repoId/git'
+import { Route as WorkbenchSettingsRepoRepoIdMiscRouteImport } from './routes/_workbench/settings/repo/$repoId/misc'
+import { Route as WorkbenchSettingsRepoRepoIdScriptsRouteImport } from './routes/_workbench/settings/repo/$repoId/scripts'
+import { Route as WorkbenchSettingsRepoRepoIdSecurityRouteImport } from './routes/_workbench/settings/repo/$repoId/security'
 import { Route as WorkbenchShellProjectsProjectIdWorkspacesWorkspaceIdRouteRouteImport } from './routes/_workbench/_shell/projects/$projectId/workspaces/$workspaceId/route'
 import { Route as WorkbenchShellProjectsProjectIdWorkspacesWorkspaceIdIndexRouteImport } from './routes/_workbench/_shell/projects/$projectId/workspaces/$workspaceId/index'
 import { Route as WorkbenchShellProjectsProjectIdWorkspacesWorkspaceIdChatsChatIdRouteImport } from './routes/_workbench/_shell/projects/$projectId/workspaces/$workspaceId/chats/$chatId'
 
+const WorkbenchRoute = WorkbenchRouteImport.update({
+  id: '/_workbench',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const OnboardingRoute = OnboardingRouteImport.update({
   id: '/onboarding',
   path: '/onboarding',
   getParentRoute: () => rootRouteImport,
 } as any)
-const WorkbenchRoute = WorkbenchRouteImport.update({
-  id: '/_workbench',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const DebugPiReplayRoute = DebugPiReplayRouteImport.update({
-  id: '/debug/pi-replay',
-  path: '/debug/pi-replay',
-  getParentRoute: () => rootRouteImport,
+const WorkbenchShellRoute = WorkbenchShellRouteImport.update({
+  id: '/_shell',
+  getParentRoute: () => WorkbenchRoute,
 } as any)
 const WorkbenchSettingsRoute = WorkbenchSettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
   getParentRoute: () => WorkbenchRoute,
 } as any)
-const WorkbenchShellRoute = WorkbenchShellRouteImport.update({
-  id: '/_shell',
-  getParentRoute: () => WorkbenchRoute,
-} as any)
-const WorkbenchSettingsIndexRoute = WorkbenchSettingsIndexRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => WorkbenchSettingsRoute,
+const DebugPiReplayRoute = DebugPiReplayRouteImport.update({
+  id: '/debug/pi-replay',
+  path: '/debug/pi-replay',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const WorkbenchShellIndexRoute = WorkbenchShellIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => WorkbenchShellRoute,
 } as any)
-const WorkbenchSettingsShortcutsRoute =
-  WorkbenchSettingsShortcutsRouteImport.update({
-    id: '/shortcuts',
-    path: '/shortcuts',
-    getParentRoute: () => WorkbenchSettingsRoute,
-  } as any)
-const WorkbenchSettingsProvidersRoute =
-  WorkbenchSettingsProvidersRouteImport.update({
-    id: '/providers',
-    path: '/providers',
-    getParentRoute: () => WorkbenchSettingsRoute,
-  } as any)
-const WorkbenchSettingsModelsRoute = WorkbenchSettingsModelsRouteImport.update({
-  id: '/models',
-  path: '/models',
+const WorkbenchShellDashboardRoute = WorkbenchShellDashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
+  getParentRoute: () => WorkbenchShellRoute,
+} as any)
+const WorkbenchShellHistoryRoute = WorkbenchShellHistoryRouteImport.update({
+  id: '/history',
+  path: '/history',
+  getParentRoute: () => WorkbenchShellRoute,
+} as any)
+const WorkbenchSettingsIndexRoute = WorkbenchSettingsIndexRouteImport.update({
+  id: '/',
+  path: '/',
   getParentRoute: () => WorkbenchSettingsRoute,
 } as any)
-const WorkbenchSettingsIntegrationsRoute =
-  WorkbenchSettingsIntegrationsRouteImport.update({
-    id: '/integrations',
-    path: '/integrations',
-    getParentRoute: () => WorkbenchSettingsRoute,
-  } as any)
-const WorkbenchSettingsGitRoute = WorkbenchSettingsGitRouteImport.update({
-  id: '/git',
-  path: '/git',
-  getParentRoute: () => WorkbenchSettingsRoute,
-} as any)
-const WorkbenchSettingsGeneralRoute =
-  WorkbenchSettingsGeneralRouteImport.update({
-    id: '/general',
-    path: '/general',
-    getParentRoute: () => WorkbenchSettingsRoute,
-  } as any)
-const WorkbenchSettingsExperimentalRoute =
-  WorkbenchSettingsExperimentalRouteImport.update({
-    id: '/experimental',
-    path: '/experimental',
-    getParentRoute: () => WorkbenchSettingsRoute,
-  } as any)
-const WorkbenchSettingsEnvironmentRoute =
-  WorkbenchSettingsEnvironmentRouteImport.update({
-    id: '/environment',
-    path: '/environment',
+const WorkbenchSettingsAppearanceRoute =
+  WorkbenchSettingsAppearanceRouteImport.update({
+    id: '/appearance',
+    path: '/appearance',
     getParentRoute: () => WorkbenchSettingsRoute,
   } as any)
 const WorkbenchSettingsDiagnosticsRoute =
@@ -129,26 +99,50 @@ const WorkbenchSettingsDiagnosticsRoute =
     path: '/diagnostics',
     getParentRoute: () => WorkbenchSettingsRoute,
   } as any)
-const WorkbenchSettingsAppearanceRoute =
-  WorkbenchSettingsAppearanceRouteImport.update({
-    id: '/appearance',
-    path: '/appearance',
+const WorkbenchSettingsEnvironmentRoute =
+  WorkbenchSettingsEnvironmentRouteImport.update({
+    id: '/environment',
+    path: '/environment',
     getParentRoute: () => WorkbenchSettingsRoute,
   } as any)
-const WorkbenchShellHistoryRoute = WorkbenchShellHistoryRouteImport.update({
-  id: '/history',
-  path: '/history',
-  getParentRoute: () => WorkbenchShellRoute,
+const WorkbenchSettingsExperimentalRoute =
+  WorkbenchSettingsExperimentalRouteImport.update({
+    id: '/experimental',
+    path: '/experimental',
+    getParentRoute: () => WorkbenchSettingsRoute,
+  } as any)
+const WorkbenchSettingsGeneralRoute =
+  WorkbenchSettingsGeneralRouteImport.update({
+    id: '/general',
+    path: '/general',
+    getParentRoute: () => WorkbenchSettingsRoute,
+  } as any)
+const WorkbenchSettingsGitRoute = WorkbenchSettingsGitRouteImport.update({
+  id: '/git',
+  path: '/git',
+  getParentRoute: () => WorkbenchSettingsRoute,
 } as any)
-const WorkbenchShellDashboardRoute = WorkbenchShellDashboardRouteImport.update({
-  id: '/dashboard',
-  path: '/dashboard',
-  getParentRoute: () => WorkbenchShellRoute,
+const WorkbenchSettingsIntegrationsRoute =
+  WorkbenchSettingsIntegrationsRouteImport.update({
+    id: '/integrations',
+    path: '/integrations',
+    getParentRoute: () => WorkbenchSettingsRoute,
+  } as any)
+const WorkbenchSettingsModelsRoute = WorkbenchSettingsModelsRouteImport.update({
+  id: '/models',
+  path: '/models',
+  getParentRoute: () => WorkbenchSettingsRoute,
 } as any)
-const WorkbenchSettingsRepoIndexRoute =
-  WorkbenchSettingsRepoIndexRouteImport.update({
-    id: '/repo/',
-    path: '/repo/',
+const WorkbenchSettingsProvidersRoute =
+  WorkbenchSettingsProvidersRouteImport.update({
+    id: '/providers',
+    path: '/providers',
+    getParentRoute: () => WorkbenchSettingsRoute,
+  } as any)
+const WorkbenchSettingsShortcutsRoute =
+  WorkbenchSettingsShortcutsRouteImport.update({
+    id: '/shortcuts',
+    path: '/shortcuts',
     getParentRoute: () => WorkbenchSettingsRoute,
   } as any)
 const WorkbenchShellLinearIndexRoute =
@@ -156,12 +150,6 @@ const WorkbenchShellLinearIndexRoute =
     id: '/linear/',
     path: '/linear/',
     getParentRoute: () => WorkbenchShellRoute,
-  } as any)
-const WorkbenchSettingsRepoRepoIdRoute =
-  WorkbenchSettingsRepoRepoIdRouteImport.update({
-    id: '/repo/$repoId',
-    path: '/repo/$repoId',
-    getParentRoute: () => WorkbenchSettingsRoute,
   } as any)
 const WorkbenchShellLinearIssueIdRoute =
   WorkbenchShellLinearIssueIdRouteImport.update({
@@ -175,34 +163,28 @@ const WorkbenchShellProjectsProjectIdRouteRoute =
     path: '/projects/$projectId',
     getParentRoute: () => WorkbenchShellRoute,
   } as any)
+const WorkbenchSettingsRepoIndexRoute =
+  WorkbenchSettingsRepoIndexRouteImport.update({
+    id: '/repo/',
+    path: '/repo/',
+    getParentRoute: () => WorkbenchSettingsRoute,
+  } as any)
+const WorkbenchSettingsRepoRepoIdRoute =
+  WorkbenchSettingsRepoRepoIdRouteImport.update({
+    id: '/repo/$repoId',
+    path: '/repo/$repoId',
+    getParentRoute: () => WorkbenchSettingsRoute,
+  } as any)
 const WorkbenchSettingsRepoRepoIdIndexRoute =
   WorkbenchSettingsRepoRepoIdIndexRouteImport.update({
     id: '/',
     path: '/',
     getParentRoute: () => WorkbenchSettingsRepoRepoIdRoute,
   } as any)
-const WorkbenchSettingsRepoRepoIdSecurityRoute =
-  WorkbenchSettingsRepoRepoIdSecurityRouteImport.update({
-    id: '/security',
-    path: '/security',
-    getParentRoute: () => WorkbenchSettingsRepoRepoIdRoute,
-  } as any)
-const WorkbenchSettingsRepoRepoIdScriptsRoute =
-  WorkbenchSettingsRepoRepoIdScriptsRouteImport.update({
-    id: '/scripts',
-    path: '/scripts',
-    getParentRoute: () => WorkbenchSettingsRepoRepoIdRoute,
-  } as any)
-const WorkbenchSettingsRepoRepoIdMiscRoute =
-  WorkbenchSettingsRepoRepoIdMiscRouteImport.update({
-    id: '/misc',
-    path: '/misc',
-    getParentRoute: () => WorkbenchSettingsRepoRepoIdRoute,
-  } as any)
-const WorkbenchSettingsRepoRepoIdGitRoute =
-  WorkbenchSettingsRepoRepoIdGitRouteImport.update({
-    id: '/git',
-    path: '/git',
+const WorkbenchSettingsRepoRepoIdActionsRoute =
+  WorkbenchSettingsRepoRepoIdActionsRouteImport.update({
+    id: '/actions',
+    path: '/actions',
     getParentRoute: () => WorkbenchSettingsRepoRepoIdRoute,
   } as any)
 const WorkbenchSettingsRepoRepoIdEnvironmentRoute =
@@ -211,10 +193,28 @@ const WorkbenchSettingsRepoRepoIdEnvironmentRoute =
     path: '/environment',
     getParentRoute: () => WorkbenchSettingsRepoRepoIdRoute,
   } as any)
-const WorkbenchSettingsRepoRepoIdActionsRoute =
-  WorkbenchSettingsRepoRepoIdActionsRouteImport.update({
-    id: '/actions',
-    path: '/actions',
+const WorkbenchSettingsRepoRepoIdGitRoute =
+  WorkbenchSettingsRepoRepoIdGitRouteImport.update({
+    id: '/git',
+    path: '/git',
+    getParentRoute: () => WorkbenchSettingsRepoRepoIdRoute,
+  } as any)
+const WorkbenchSettingsRepoRepoIdMiscRoute =
+  WorkbenchSettingsRepoRepoIdMiscRouteImport.update({
+    id: '/misc',
+    path: '/misc',
+    getParentRoute: () => WorkbenchSettingsRepoRepoIdRoute,
+  } as any)
+const WorkbenchSettingsRepoRepoIdScriptsRoute =
+  WorkbenchSettingsRepoRepoIdScriptsRouteImport.update({
+    id: '/scripts',
+    path: '/scripts',
+    getParentRoute: () => WorkbenchSettingsRepoRepoIdRoute,
+  } as any)
+const WorkbenchSettingsRepoRepoIdSecurityRoute =
+  WorkbenchSettingsRepoRepoIdSecurityRouteImport.update({
+    id: '/security',
+    path: '/security',
     getParentRoute: () => WorkbenchSettingsRepoRepoIdRoute,
   } as any)
 const WorkbenchShellProjectsProjectIdWorkspacesWorkspaceIdRouteRoute =
@@ -454,13 +454,6 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/onboarding': {
-      id: '/onboarding'
-      path: '/onboarding'
-      fullPath: '/onboarding'
-      preLoaderRoute: typeof OnboardingRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/_workbench': {
       id: '/_workbench'
       path: ''
@@ -468,19 +461,12 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof WorkbenchRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/debug/pi-replay': {
-      id: '/debug/pi-replay'
-      path: '/debug/pi-replay'
-      fullPath: '/debug/pi-replay'
-      preLoaderRoute: typeof DebugPiReplayRouteImport
+    '/onboarding': {
+      id: '/onboarding'
+      path: '/onboarding'
+      fullPath: '/onboarding'
+      preLoaderRoute: typeof OnboardingRouteImport
       parentRoute: typeof rootRouteImport
-    }
-    '/_workbench/settings': {
-      id: '/_workbench/settings'
-      path: '/settings'
-      fullPath: '/settings'
-      preLoaderRoute: typeof WorkbenchSettingsRouteImport
-      parentRoute: typeof WorkbenchRoute
     }
     '/_workbench/_shell': {
       id: '/_workbench/_shell'
@@ -489,95 +475,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof WorkbenchShellRouteImport
       parentRoute: typeof WorkbenchRoute
     }
-    '/_workbench/settings/': {
-      id: '/_workbench/settings/'
-      path: '/'
-      fullPath: '/settings/'
-      preLoaderRoute: typeof WorkbenchSettingsIndexRouteImport
-      parentRoute: typeof WorkbenchSettingsRoute
+    '/_workbench/settings': {
+      id: '/_workbench/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof WorkbenchSettingsRouteImport
+      parentRoute: typeof WorkbenchRoute
+    }
+    '/debug/pi-replay': {
+      id: '/debug/pi-replay'
+      path: '/debug/pi-replay'
+      fullPath: '/debug/pi-replay'
+      preLoaderRoute: typeof DebugPiReplayRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/_workbench/_shell/': {
       id: '/_workbench/_shell/'
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof WorkbenchShellIndexRouteImport
-      parentRoute: typeof WorkbenchShellRoute
-    }
-    '/_workbench/settings/shortcuts': {
-      id: '/_workbench/settings/shortcuts'
-      path: '/shortcuts'
-      fullPath: '/settings/shortcuts'
-      preLoaderRoute: typeof WorkbenchSettingsShortcutsRouteImport
-      parentRoute: typeof WorkbenchSettingsRoute
-    }
-    '/_workbench/settings/providers': {
-      id: '/_workbench/settings/providers'
-      path: '/providers'
-      fullPath: '/settings/providers'
-      preLoaderRoute: typeof WorkbenchSettingsProvidersRouteImport
-      parentRoute: typeof WorkbenchSettingsRoute
-    }
-    '/_workbench/settings/models': {
-      id: '/_workbench/settings/models'
-      path: '/models'
-      fullPath: '/settings/models'
-      preLoaderRoute: typeof WorkbenchSettingsModelsRouteImport
-      parentRoute: typeof WorkbenchSettingsRoute
-    }
-    '/_workbench/settings/integrations': {
-      id: '/_workbench/settings/integrations'
-      path: '/integrations'
-      fullPath: '/settings/integrations'
-      preLoaderRoute: typeof WorkbenchSettingsIntegrationsRouteImport
-      parentRoute: typeof WorkbenchSettingsRoute
-    }
-    '/_workbench/settings/git': {
-      id: '/_workbench/settings/git'
-      path: '/git'
-      fullPath: '/settings/git'
-      preLoaderRoute: typeof WorkbenchSettingsGitRouteImport
-      parentRoute: typeof WorkbenchSettingsRoute
-    }
-    '/_workbench/settings/general': {
-      id: '/_workbench/settings/general'
-      path: '/general'
-      fullPath: '/settings/general'
-      preLoaderRoute: typeof WorkbenchSettingsGeneralRouteImport
-      parentRoute: typeof WorkbenchSettingsRoute
-    }
-    '/_workbench/settings/experimental': {
-      id: '/_workbench/settings/experimental'
-      path: '/experimental'
-      fullPath: '/settings/experimental'
-      preLoaderRoute: typeof WorkbenchSettingsExperimentalRouteImport
-      parentRoute: typeof WorkbenchSettingsRoute
-    }
-    '/_workbench/settings/environment': {
-      id: '/_workbench/settings/environment'
-      path: '/environment'
-      fullPath: '/settings/environment'
-      preLoaderRoute: typeof WorkbenchSettingsEnvironmentRouteImport
-      parentRoute: typeof WorkbenchSettingsRoute
-    }
-    '/_workbench/settings/diagnostics': {
-      id: '/_workbench/settings/diagnostics'
-      path: '/diagnostics'
-      fullPath: '/settings/diagnostics'
-      preLoaderRoute: typeof WorkbenchSettingsDiagnosticsRouteImport
-      parentRoute: typeof WorkbenchSettingsRoute
-    }
-    '/_workbench/settings/appearance': {
-      id: '/_workbench/settings/appearance'
-      path: '/appearance'
-      fullPath: '/settings/appearance'
-      preLoaderRoute: typeof WorkbenchSettingsAppearanceRouteImport
-      parentRoute: typeof WorkbenchSettingsRoute
-    }
-    '/_workbench/_shell/history': {
-      id: '/_workbench/_shell/history'
-      path: '/history'
-      fullPath: '/history'
-      preLoaderRoute: typeof WorkbenchShellHistoryRouteImport
       parentRoute: typeof WorkbenchShellRoute
     }
     '/_workbench/_shell/dashboard': {
@@ -587,11 +503,88 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof WorkbenchShellDashboardRouteImport
       parentRoute: typeof WorkbenchShellRoute
     }
-    '/_workbench/settings/repo/': {
-      id: '/_workbench/settings/repo/'
-      path: '/repo'
-      fullPath: '/settings/repo/'
-      preLoaderRoute: typeof WorkbenchSettingsRepoIndexRouteImport
+    '/_workbench/_shell/history': {
+      id: '/_workbench/_shell/history'
+      path: '/history'
+      fullPath: '/history'
+      preLoaderRoute: typeof WorkbenchShellHistoryRouteImport
+      parentRoute: typeof WorkbenchShellRoute
+    }
+    '/_workbench/settings/': {
+      id: '/_workbench/settings/'
+      path: '/'
+      fullPath: '/settings/'
+      preLoaderRoute: typeof WorkbenchSettingsIndexRouteImport
+      parentRoute: typeof WorkbenchSettingsRoute
+    }
+    '/_workbench/settings/appearance': {
+      id: '/_workbench/settings/appearance'
+      path: '/appearance'
+      fullPath: '/settings/appearance'
+      preLoaderRoute: typeof WorkbenchSettingsAppearanceRouteImport
+      parentRoute: typeof WorkbenchSettingsRoute
+    }
+    '/_workbench/settings/diagnostics': {
+      id: '/_workbench/settings/diagnostics'
+      path: '/diagnostics'
+      fullPath: '/settings/diagnostics'
+      preLoaderRoute: typeof WorkbenchSettingsDiagnosticsRouteImport
+      parentRoute: typeof WorkbenchSettingsRoute
+    }
+    '/_workbench/settings/environment': {
+      id: '/_workbench/settings/environment'
+      path: '/environment'
+      fullPath: '/settings/environment'
+      preLoaderRoute: typeof WorkbenchSettingsEnvironmentRouteImport
+      parentRoute: typeof WorkbenchSettingsRoute
+    }
+    '/_workbench/settings/experimental': {
+      id: '/_workbench/settings/experimental'
+      path: '/experimental'
+      fullPath: '/settings/experimental'
+      preLoaderRoute: typeof WorkbenchSettingsExperimentalRouteImport
+      parentRoute: typeof WorkbenchSettingsRoute
+    }
+    '/_workbench/settings/general': {
+      id: '/_workbench/settings/general'
+      path: '/general'
+      fullPath: '/settings/general'
+      preLoaderRoute: typeof WorkbenchSettingsGeneralRouteImport
+      parentRoute: typeof WorkbenchSettingsRoute
+    }
+    '/_workbench/settings/git': {
+      id: '/_workbench/settings/git'
+      path: '/git'
+      fullPath: '/settings/git'
+      preLoaderRoute: typeof WorkbenchSettingsGitRouteImport
+      parentRoute: typeof WorkbenchSettingsRoute
+    }
+    '/_workbench/settings/integrations': {
+      id: '/_workbench/settings/integrations'
+      path: '/integrations'
+      fullPath: '/settings/integrations'
+      preLoaderRoute: typeof WorkbenchSettingsIntegrationsRouteImport
+      parentRoute: typeof WorkbenchSettingsRoute
+    }
+    '/_workbench/settings/models': {
+      id: '/_workbench/settings/models'
+      path: '/models'
+      fullPath: '/settings/models'
+      preLoaderRoute: typeof WorkbenchSettingsModelsRouteImport
+      parentRoute: typeof WorkbenchSettingsRoute
+    }
+    '/_workbench/settings/providers': {
+      id: '/_workbench/settings/providers'
+      path: '/providers'
+      fullPath: '/settings/providers'
+      preLoaderRoute: typeof WorkbenchSettingsProvidersRouteImport
+      parentRoute: typeof WorkbenchSettingsRoute
+    }
+    '/_workbench/settings/shortcuts': {
+      id: '/_workbench/settings/shortcuts'
+      path: '/shortcuts'
+      fullPath: '/settings/shortcuts'
+      preLoaderRoute: typeof WorkbenchSettingsShortcutsRouteImport
       parentRoute: typeof WorkbenchSettingsRoute
     }
     '/_workbench/_shell/linear/': {
@@ -600,13 +593,6 @@ declare module '@tanstack/react-router' {
       fullPath: '/linear/'
       preLoaderRoute: typeof WorkbenchShellLinearIndexRouteImport
       parentRoute: typeof WorkbenchShellRoute
-    }
-    '/_workbench/settings/repo/$repoId': {
-      id: '/_workbench/settings/repo/$repoId'
-      path: '/repo/$repoId'
-      fullPath: '/settings/repo/$repoId'
-      preLoaderRoute: typeof WorkbenchSettingsRepoRepoIdRouteImport
-      parentRoute: typeof WorkbenchSettingsRoute
     }
     '/_workbench/_shell/linear/$issueId': {
       id: '/_workbench/_shell/linear/$issueId'
@@ -622,6 +608,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof WorkbenchShellProjectsProjectIdRouteRouteImport
       parentRoute: typeof WorkbenchShellRoute
     }
+    '/_workbench/settings/repo/': {
+      id: '/_workbench/settings/repo/'
+      path: '/repo'
+      fullPath: '/settings/repo/'
+      preLoaderRoute: typeof WorkbenchSettingsRepoIndexRouteImport
+      parentRoute: typeof WorkbenchSettingsRoute
+    }
+    '/_workbench/settings/repo/$repoId': {
+      id: '/_workbench/settings/repo/$repoId'
+      path: '/repo/$repoId'
+      fullPath: '/settings/repo/$repoId'
+      preLoaderRoute: typeof WorkbenchSettingsRepoRepoIdRouteImport
+      parentRoute: typeof WorkbenchSettingsRoute
+    }
     '/_workbench/settings/repo/$repoId/': {
       id: '/_workbench/settings/repo/$repoId/'
       path: '/'
@@ -629,32 +629,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof WorkbenchSettingsRepoRepoIdIndexRouteImport
       parentRoute: typeof WorkbenchSettingsRepoRepoIdRoute
     }
-    '/_workbench/settings/repo/$repoId/security': {
-      id: '/_workbench/settings/repo/$repoId/security'
-      path: '/security'
-      fullPath: '/settings/repo/$repoId/security'
-      preLoaderRoute: typeof WorkbenchSettingsRepoRepoIdSecurityRouteImport
-      parentRoute: typeof WorkbenchSettingsRepoRepoIdRoute
-    }
-    '/_workbench/settings/repo/$repoId/scripts': {
-      id: '/_workbench/settings/repo/$repoId/scripts'
-      path: '/scripts'
-      fullPath: '/settings/repo/$repoId/scripts'
-      preLoaderRoute: typeof WorkbenchSettingsRepoRepoIdScriptsRouteImport
-      parentRoute: typeof WorkbenchSettingsRepoRepoIdRoute
-    }
-    '/_workbench/settings/repo/$repoId/misc': {
-      id: '/_workbench/settings/repo/$repoId/misc'
-      path: '/misc'
-      fullPath: '/settings/repo/$repoId/misc'
-      preLoaderRoute: typeof WorkbenchSettingsRepoRepoIdMiscRouteImport
-      parentRoute: typeof WorkbenchSettingsRepoRepoIdRoute
-    }
-    '/_workbench/settings/repo/$repoId/git': {
-      id: '/_workbench/settings/repo/$repoId/git'
-      path: '/git'
-      fullPath: '/settings/repo/$repoId/git'
-      preLoaderRoute: typeof WorkbenchSettingsRepoRepoIdGitRouteImport
+    '/_workbench/settings/repo/$repoId/actions': {
+      id: '/_workbench/settings/repo/$repoId/actions'
+      path: '/actions'
+      fullPath: '/settings/repo/$repoId/actions'
+      preLoaderRoute: typeof WorkbenchSettingsRepoRepoIdActionsRouteImport
       parentRoute: typeof WorkbenchSettingsRepoRepoIdRoute
     }
     '/_workbench/settings/repo/$repoId/environment': {
@@ -664,11 +643,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof WorkbenchSettingsRepoRepoIdEnvironmentRouteImport
       parentRoute: typeof WorkbenchSettingsRepoRepoIdRoute
     }
-    '/_workbench/settings/repo/$repoId/actions': {
-      id: '/_workbench/settings/repo/$repoId/actions'
-      path: '/actions'
-      fullPath: '/settings/repo/$repoId/actions'
-      preLoaderRoute: typeof WorkbenchSettingsRepoRepoIdActionsRouteImport
+    '/_workbench/settings/repo/$repoId/git': {
+      id: '/_workbench/settings/repo/$repoId/git'
+      path: '/git'
+      fullPath: '/settings/repo/$repoId/git'
+      preLoaderRoute: typeof WorkbenchSettingsRepoRepoIdGitRouteImport
+      parentRoute: typeof WorkbenchSettingsRepoRepoIdRoute
+    }
+    '/_workbench/settings/repo/$repoId/misc': {
+      id: '/_workbench/settings/repo/$repoId/misc'
+      path: '/misc'
+      fullPath: '/settings/repo/$repoId/misc'
+      preLoaderRoute: typeof WorkbenchSettingsRepoRepoIdMiscRouteImport
+      parentRoute: typeof WorkbenchSettingsRepoRepoIdRoute
+    }
+    '/_workbench/settings/repo/$repoId/scripts': {
+      id: '/_workbench/settings/repo/$repoId/scripts'
+      path: '/scripts'
+      fullPath: '/settings/repo/$repoId/scripts'
+      preLoaderRoute: typeof WorkbenchSettingsRepoRepoIdScriptsRouteImport
+      parentRoute: typeof WorkbenchSettingsRepoRepoIdRoute
+    }
+    '/_workbench/settings/repo/$repoId/security': {
+      id: '/_workbench/settings/repo/$repoId/security'
+      path: '/security'
+      fullPath: '/settings/repo/$repoId/security'
+      preLoaderRoute: typeof WorkbenchSettingsRepoRepoIdSecurityRouteImport
       parentRoute: typeof WorkbenchSettingsRepoRepoIdRoute
     }
     '/_workbench/_shell/projects/$projectId/workspaces/$workspaceId': {
