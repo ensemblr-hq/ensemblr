@@ -15,7 +15,7 @@ export function ScriptEmptyState({
 	title: string;
 }) {
 	return (
-		<div className='flex h-full items-center justify-center bg-terminal p-4 text-terminal-foreground'>
+		<div className='terminal-surface flex h-full items-center justify-center p-4'>
 			<div className='flex max-w-72 flex-col items-center gap-2 text-center'>
 				<div className='grid size-8 place-items-center rounded-md border border-terminal-border bg-terminal-muted/10'>
 					<SquareTerminalIcon aria-hidden='true' className='size-4' />

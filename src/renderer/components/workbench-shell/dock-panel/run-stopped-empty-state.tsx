@@ -17,7 +17,7 @@ export function RunStoppedEmptyState({
 	const { t } = useTranslation();
 
 	return (
-		<div className='flex h-full items-center justify-center bg-terminal p-4 text-terminal-foreground'>
+		<div className='terminal-surface flex h-full items-center justify-center p-4'>
 			<div className='flex flex-col items-center gap-5 text-center'>
 				<PlayIcon
 					aria-hidden='true'

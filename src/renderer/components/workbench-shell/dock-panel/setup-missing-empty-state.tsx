@@ -17,7 +17,7 @@ export function SetupMissingEmptyState({
 	const { t } = useTranslation();
 
 	return (
-		<div className='flex h-full items-center justify-center bg-terminal p-4 text-terminal-foreground'>
+		<div className='terminal-surface flex h-full items-center justify-center p-4'>
 			<div className='flex w-full max-w-md flex-col items-center gap-4 rounded-lg border border-terminal-border border-dashed p-8 text-center'>
 				<div className='font-medium text-sm'>
 					{t('workbench:setup-script.missing.title', 'Add setup script')}

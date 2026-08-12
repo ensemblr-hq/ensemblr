@@ -16,7 +16,7 @@ export function SetupNotRunEmptyState({
 	const { t } = useTranslation();
 
 	return (
-		<div className='flex h-full items-center justify-center bg-terminal p-4 text-terminal-foreground'>
+		<div className='terminal-surface flex h-full items-center justify-center p-4'>
 			<div className='flex flex-col items-center gap-2 text-center'>
 				<div className='font-medium text-sm'>
 					{t('workbench:setup-script.not-run.title', 'No setup script output')}

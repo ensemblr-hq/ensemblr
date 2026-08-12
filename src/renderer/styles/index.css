@@ -13,7 +13,12 @@
  */
 @source "../../../node_modules/streamdown/dist/*.js";
 
-@custom-variant dark (&:is(.dark *));
+/*
+ * `.terminal-surface` counts as dark for variant purposes: that panel keeps the
+ * terminal's dark cut whatever the window mode is, so a primitive's `dark:`
+ * branch is the correct one there. The class itself is defined further down.
+ */
+@custom-variant dark (&:is(.dark *, .terminal-surface *));
 
 @font-face {
 	font-display: swap;
@@ -104,14 +109,23 @@
 		var(--ensemblr-if-dark, oklch(0.14 0.006 35));
 	--ensemblr-border: var(--ensemblr-if-light, oklch(0.82 0.006 265))
 		var(--ensemblr-if-dark, oklch(0.31 0.006 35));
+	/*
+	 * The dark cut of an accent token, named rather than inlined. A two-cut token
+	 * collapses to one value at `:root` and is inherited already resolved, so a
+	 * surface that is dark in *both* window modes — `.terminal-surface` below —
+	 * cannot re-derive the dark reading from the token itself. Naming the cut is
+	 * what lets that surface borrow it instead of restating the colour.
+	 */
+	--ensemblr-ring-on-dark: oklch(0.675 0.123 221);
 	--ensemblr-ring: var(--ensemblr-if-light, oklch(0.609 0.111 222))
-		var(--ensemblr-if-dark, oklch(0.675 0.123 221));
+		var(--ensemblr-if-dark, var(--ensemblr-ring-on-dark));
 	--ensemblr-status-ok: var(--ensemblr-if-light, oklch(0.61 0.18 151))
 		var(--ensemblr-if-dark, oklch(0.74 0.18 151));
 	--ensemblr-status-warning: var(--ensemblr-if-light, oklch(0.68 0.15 73))
 		var(--ensemblr-if-dark, oklch(0.77 0.13 73));
+	--ensemblr-status-danger-on-dark: oklch(0.68 0.15 28);
 	--ensemblr-status-danger: var(--ensemblr-if-light, oklch(0.58 0.19 28))
-		var(--ensemblr-if-dark, oklch(0.68 0.15 28));
+		var(--ensemblr-if-dark, var(--ensemblr-status-danger-on-dark));
 	/*
 	 * Third-party brand colours, for the provider marks in onboarding and
 	 * Settings → Providers. Deliberately NOT theme colours: they are the vendors'
@@ -705,6 +719,63 @@
 			transparent 12px
 		);
 		background-size: 100% 12px;
+	}
+
+	/*
+	 * A panel that keeps the terminal's dark cut in both modes. The component
+	 * tokens are re-pointed for the subtree because a shadcn primitive dropped on
+	 * this surface otherwise reads the window's palette: in light mode an
+	 * `outline` Button resolves to a white chip carrying near-white terminal ink,
+	 * so its label disappears. `@theme inline` substitutes these at the use site,
+	 * so re-declaring them here reaches every descendant. The list mirrors the
+	 * `:root` block token for token so a gap is visible by comparison — a token
+	 * left out does not fall back to something neutral, it silently keeps
+	 * following the window.
+	 *
+	 * Two limits a control here has to respect:
+	 *
+	 * - `@custom-variant dark` matches `.terminal-surface *`, so a primitive's
+	 *   `dark:` branch fires here and any variant that expresses its dark reading
+	 *   that way (`outline`, `ghost`, `secondary`) matches dark mode for free. A
+	 *   variant that instead reads a token — `default` reads `--primary` — only
+	 *   matches because that token is re-pointed below. The variant is
+	 *   descendant-only: a `dark:` utility on the element carrying this class
+	 *   does not fire.
+	 * - The `--ensemblr-*` cuts do not flip, and cannot be made to: they compute
+	 *   at `:root` and inherit already resolved. So `bg-code`, `bg-pane`,
+	 *   `bg-surface`, `text-ink`, `text-status-*`, and `bg-diff-*` still follow
+	 *   the *window* inside this subtree, while the semantic utilities backed by
+	 *   the tokens below (`bg-muted`, `text-foreground`, `border-border`) follow
+	 *   the terminal. Reach for the semantic one here. Where a dark reading of an
+	 *   `--ensemblr-*` token is genuinely needed, name its cut as
+	 *   `--ensemblr-ring-on-dark` does and borrow that.
+	 */
+	.terminal-surface {
+		--ensemblr-terminal-lift: color-mix(
+			in oklch,
+			var(--ensemblr-terminal),
+			var(--ensemblr-terminal-foreground) 8%
+		);
+		--background: var(--ensemblr-terminal);
+		--foreground: var(--ensemblr-terminal-foreground);
+		--card: var(--ensemblr-terminal);
+		--card-foreground: var(--ensemblr-terminal-foreground);
+		--popover: var(--ensemblr-terminal);
+		--popover-foreground: var(--ensemblr-terminal-foreground);
+		--primary: var(--ensemblr-terminal-foreground);
+		--primary-foreground: var(--ensemblr-terminal);
+		--secondary: var(--ensemblr-terminal-lift);
+		--secondary-foreground: var(--ensemblr-terminal-foreground);
+		--muted: var(--ensemblr-terminal-lift);
+		--muted-foreground: var(--ensemblr-terminal-muted);
+		--accent: var(--ensemblr-terminal-lift);
+		--accent-foreground: var(--ensemblr-terminal-foreground);
+		--destructive: var(--ensemblr-status-danger-on-dark);
+		--border: var(--ensemblr-terminal-border);
+		--input: var(--ensemblr-terminal-border);
+		--ring: var(--ensemblr-ring-on-dark);
+		background-color: var(--ensemblr-terminal);
+		color: var(--ensemblr-terminal-foreground);
 	}
 }
 
