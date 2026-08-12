@@ -1,0 +1,174 @@
+# Installing Ensemblr
+
+Ensemblr runs on **macOS with Apple silicon only**. The app is packaged as an
+arm64 `.app`, keeps its secrets in the macOS Keychain, and reads battery state
+through macOS APIs. There is no Intel build, no Linux build, and no Windows
+build.
+
+## There is no download yet
+
+Ensemblr has not shipped a binary. No release has been tagged, and the Releases
+page is empty:
+
+<https://github.com/ensemblr-hq/ensemblr/releases>
+
+That is where the first `.dmg` will appear. Until then, the only way to run
+Ensemblr is to build it from source, which the rest of this page covers.
+
+## Building it yourself
+
+### Prerequisites
+
+| Requirement | Version | Check |
+| --- | --- | --- |
+| macOS | Apple silicon (arm64) | `uname -m` reports `arm64` |
+| Node | **exactly 24.x** | `node -v` |
+| npm | 11.17.0 | `npm -v` |
+| git | any recent | `git --version` |
+
+The Node pin is enforced, not advisory. `package.json` declares
+`engines: ">=24 <25"`, and `.nvmrc` and `mise.toml` both pin 24. A version gate
+runs at two points: on `npm install` (as `preinstall`) and again before
+`package`, `build`, and `make`. If you use `mise`, the pin applies
+automatically; otherwise `nvm use` reads `.nvmrc`.
+
+Ignoring the pin fails in ways that do not look like a Node problem — see
+[Troubleshooting](./14-troubleshooting.md) for the two symptoms.
+
+### Build
+
+```bash
+git clone https://github.com/ensemblr-hq/ensemblr.git
+cd ensemblr
+npm install
+npm run make
+open out/make/
+```
+
+`npm install` does two things worth knowing about beyond fetching packages: it
+runs the Node-version gate first, and afterwards it marks `node-pty`'s prebuilt
+`spawn-helper` binaries executable. They ship without the exec bit, and skipping
+that step surfaces much later as a terminal that will not open.
+
+`npm run make` writes distributables to `out/make/`:
+
+- a **`.dmg`** (ULFO format) — the primary distributable
+- a **`.zip`** — a zipped `.app` for direct download
+
+Drag the `.app` out of the `.dmg` into `/Applications` as usual.
+
+If you only want to run the app and not distribute it, `npm run package` writes
+an unpacked `.app` straight to `out/` and skips the disk-image step.
+
+### Signing, notarization, and Gatekeeper
+
+A build is code-signed and notarized **only** when all three App Store Connect
+credentials are present in the environment:
+
+| Variable | What it holds |
+| --- | --- |
+| `APPLE_API_KEY_PATH` | Path to the `.p8` key file |
+| `APPLE_API_KEY_ID` | The key id |
+| `APPLE_API_ISSUER` | The issuer id |
+
+Miss any one of them and the same `npm run make` produces an **unsigned** build
+instead of failing. If you have no Apple developer credentials, be explicit
+about it:
+
+```bash
+npm run make:unsigned
+```
+
+An unsigned app has a consequence you will hit on first launch: macOS
+Gatekeeper refuses to open it, usually reporting that Ensemblr "is damaged and
+can't be opened" or that it "cannot be opened because the developer cannot be
+verified". Nothing is damaged — the app simply carries no notarization ticket.
+
+To open it anyway:
+
+1. In Finder, locate `Ensemblr.app`.
+2. **Right-click** (or Control-click) it and choose **Open**.
+3. Confirm **Open** in the dialog.
+
+macOS remembers the exception, so subsequent launches work from the Dock or
+Spotlight. Double-clicking it the first time does *not* offer that choice — the
+right-click path is the one that works.
+
+### Build channels
+
+`ENSEMBLR_BUILD_CHANNEL` scopes both the bundle id and the product name:
+
+| Channel | Command | Bundle id | Product name |
+| --- | --- | --- | --- |
+| `release` (default) | `npm run make` | `dev.ensemblr.app` | Ensemblr |
+| `canary` | `npm run make:canary` | `dev.ensemblr.app.canary` | Ensemblr Canary |
+| `dev` | `npm run make:dev` | `dev.ensemblr.app.dev` | Ensemblr Dev |
+
+This matters to you, not just to the packager. A bundle id is what macOS Launch
+Services uses to tell one installed app from another, and what Electron uses to
+pick the userData directory. Because the channels do not share an id, you can
+keep a canary build beside a release build without the two fighting over which
+one macOS opens, and each keeps its own database, settings, and secrets. Two
+builds sharing one id is what previously made a stray Dock tile flash during
+workspace creation.
+
+[`../build-and-release.md`](../build-and-release.md) has the full packaging
+matrix, the entitlements, and the notarization detail.
+
+## Where Ensemblr keeps things on disk
+
+Four locations, and nothing outside them:
+
+| What | Where |
+| --- | --- |
+| App settings | `~/.config/ensemblr/config.json` |
+| Projects, workspaces, agent sessions, board state | `~/Library/Application Support/dev.ensemblr.app/ensemblr.db` |
+| Secrets (Linear OAuth token) | macOS Keychain, service `dev.ensemblr.app.secret-store` |
+| Your repositories, worktrees, and archived context | The root directory you pick during setup — `~/Ensemblr` unless you change it |
+
+The canary and dev channels use their own bundle-id-scoped Application Support
+directory, so the paths above describe a release build.
+
+The root directory is the only one that holds your own work. See
+[First run](./03-first-run.md) for what Ensemblr creates inside it.
+
+## Uninstalling
+
+Ensemblr has no uninstaller. Removing it is four deletions, in whatever order
+suits you:
+
+```bash
+# 1. The app itself
+rm -rf /Applications/Ensemblr.app
+
+# 2. App settings
+rm -rf ~/.config/ensemblr
+
+# 3. Local state — projects, workspaces, sessions, board
+rm -rf ~/Library/Application\ Support/dev.ensemblr.app
+
+# 4. Keychain secrets
+security delete-generic-password -s dev.ensemblr.app.secret-store
+```
+
+Your **root directory is deliberately not on that list.** It holds the cloned
+repositories and git worktrees your work actually lives in. Delete it only once
+you have confirmed everything you care about is pushed. Ensemblr also preserves
+each archived workspace's handoff files under `archived-contexts/` inside it.
+
+Step 4 removes one Keychain entry at a time; run it repeatedly if Ensemblr
+stored several. You can also find them in Keychain Access by searching for
+`dev.ensemblr.app.secret-store`.
+
+Uninstalling does not touch anything the agent runtimes own — your `~/.claude`
+directory, your Pi configuration, and your `gh` credentials all belong to those
+tools and survive.
+
+## Next
+
+- [Requirements](./02-requirements.md) — what has to be on the machine before
+  Ensemblr will open a workspace, expressed as the app's own setup checks.
+- [First run](./03-first-run.md) — the setup wizard, the root directory, and
+  your first workspace.
+- [Troubleshooting](./14-troubleshooting.md) — if the build or the first launch
+  went wrong.

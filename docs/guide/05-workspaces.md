@@ -1,0 +1,201 @@
+# Workspaces
+
+A workspace is one stream of work: its own git worktree, its own branch, its own
+agent sessions and terminals, its own review path. This page follows one from
+creation to archive.
+
+If the terms here are unfamiliar, read [`04-concepts.md`](./04-concepts.md)
+first — especially the difference between the **base branch** and the branch a
+workspace **owns**.
+
+## Creating a workspace
+
+The create dialog offers three tabs. Each lists things you can start work from:
+
+| Tab | Source | What the workspace does with the branch |
+| --- | --- | --- |
+| **Pull requests** | open pull requests on the project | takes over the PR's head branch |
+| **Branches** | local and remote branches | takes over that branch |
+| **Issues** | GitHub issues and Linear issues | cuts a fresh branch — an issue has none yet |
+
+The row's action button tells you which it will be: **Use branch** takes one
+over, **Create** cuts a new one. The project's default branch is the exception on
+the Branches tab — it always creates, because the project folder already has it
+checked out and because "start something new off `main`" is what picking it
+means.
+
+A branch or PR head another active workspace already holds offers **Open** and
+**Duplicate branch** instead. Git allows a branch in one worktree at a time, so
+taking it over twice would only fail.
+
+![The create-workspace dialog on the Branches tab, offering Open and Duplicate branch on a branch another workspace already holds.](./images/05-create-workspace.png)
+
+Before the worktree is made, Ensemblr fetches the base branch and fast-forwards
+your local copy of it, so a new branch starts from current work rather than from
+whatever you last pulled. This is **best effort**. Offline, no upstream
+configured, a diverged base, a dirty tree, the base checked out in another
+worktree — every one of those is skipped silently and creation proceeds from the
+local base you already have. You can create workspaces on a plane.
+
+## Adopt or cut, and what follows from it
+
+The choice above has consequences for the rest of the workspace's life:
+
+| | Adopted branch | Cut branch |
+| --- | --- | --- |
+| Name | keeps its own | generated (below) |
+| Commits | join that branch's history | start a new one |
+| Pushing | lands on whatever pull request already tracks the branch | needs a new pull request |
+| On archive | **never** deleted — the workspace did not create it | can be deleted, if you opted in |
+
+See [ADR 0043](../adr/0043-adopt-an-existing-branch-instead-of-always-forking.md)
+for the full reasoning.
+
+## Branch naming
+
+A workspace that **cuts** a branch does not get its final name at creation. It
+starts on a placeholder, and after your first agent turn the branch is renamed
+from what you actually asked for: a kebab-case slug, lower-cased, capped at 40
+characters at a word boundary. "Add a dark mode toggle to the settings page"
+becomes `add-dark-mode-toggle-to-the-settings`.
+
+A prefix is prepended when one is configured:
+
+| Source | Behaviour |
+| --- | --- |
+| `[git] branch_prefix` in `.ensemblr/settings.toml` | always wins — it is the team's shared choice |
+| **GitHub username** (app default) | your `gh` login, e.g. `yourname/add-dark-mode` |
+| **Custom** | a literal prefix you type |
+| **None** | no prefix |
+
+Two limits worth knowing. Automatic naming only applies while the workspace still
+carries its generated placeholder name — once you rename it, the name is yours
+and nothing overwrites it. And it only applies to a branch the workspace **cut**;
+an adopted branch keeps the name it arrived with.
+
+## Copying files into a new workspace
+
+A fresh worktree has no gitignored files — no `.env`, no local credentials. Since
+those are exactly what a dev server needs, Ensemblr copies a declared set of them
+in at creation. It asks git which gitignored files match your patterns, so
+nothing tracked and nothing unmatched is touched.
+
+The pattern list comes from the first of these that declares one:
+
+1. `.worktreeinclude` in the project root — a legacy one-path-per-line list, still read
+2. `file_include_globs` in `.ensemblr/settings.toml` — the committed, shared choice
+3. your personal patterns, set in the app
+4. the built-in default, `.env*`
+
+Committed config outranks a personal override deliberately: a team that has
+agreed on a list gets that list.
+
+## Setup scripts on creation
+
+If the project declares `[scripts] setup`, it runs when the workspace opens —
+`npm install`, `bundle install`, whatever gets the tree ready.
+
+It does not run every time. Ensemblr fingerprints the resolved setup command
+together with the contents of every dependency lockfile it finds (npm, yarn,
+pnpm, bun, Cargo, poetry, Go, Bundler, Composer and peers), and skips the run
+when the fingerprint has not moved. Reopening an untouched workspace costs
+nothing.
+
+The fingerprint tracks **declared** dependencies, not installed state. Deleting
+`node_modules` without touching a lockfile will not re-trigger setup — reinstall
+explicitly. See
+[ADR 0034](../adr/0034-skip-unchanged-workspace-setup-runs.md).
+
+Set `auto_run_after_setup = true` under `[scripts]` and a successful setup (exit
+code 0) chains straight into the project's default run script, so a new workspace
+comes up with its dev server already running.
+
+Both are covered in [`07-terminals-and-run-scripts.md`](./07-terminals-and-run-scripts.md)
+and [`12-repository-settings.md`](./12-repository-settings.md).
+
+## The board
+
+Every workspace is a card in one of five columns: **Backlog**, **In Progress**,
+**In Review**, **Done**, **Canceled**. Drag a card to move it between columns or
+to reorder within one — the order you set is kept. Each card has an action menu
+for the things you do to a whole workspace without opening it.
+
+![The dashboard board, with workspace cards spread across the Backlog, In progress, In review, and Done columns, each showing its branch and its diff size.](./images/00-hero-dashboard.png)
+
+Agents can move their own workspace across the board too, which is how a
+delegated run reports itself finished without interrupting you. Note that what an
+agent may *not* do is close out the **Linear** issue behind the work: an update
+targeting a completed or canceled state is refused, so agent work goes as far as
+In Review and you decide whether it is done. See
+[`09-agent-control.md`](./09-agent-control.md).
+
+## Retargeting the base branch
+
+The base branch is the merge target and nothing else, so changing it is cheap.
+Pick a different target and Ensemblr updates the stored base — the worktree, your
+branch, and your commits are not touched. What follows the new target is the
+diff, the merge-conflict check, and the branch a pull request would open into.
+
+Conflicts are reported against the base: if the base moves ahead of you in a way
+your branch cannot merge cleanly, the workspace says so and points at the files.
+Resolving them is part of the review flow —
+[`08-reviewing-changes.md`](./08-reviewing-changes.md).
+
+## Continuing finished work
+
+When a workspace's pull request has merged and you want to keep going in the same
+place, **continue** it. Ensemblr branches onto a numbered successor — `bach`
+becomes `bach-v2`, `bach-v2` becomes `bach-v3` — forking from the base branch and
+checking the new branch out. A name already taken is skipped, so a repeat
+continue never collides with a branch an earlier one left behind.
+
+Three things to expect:
+
+- Uncommitted work carries over untouched.
+- The merged branch stays exactly where it is, so the old pull request keeps its
+  history; the workspace simply stops resolving to it.
+- If the base branch could not be resolved, the successor forks from your current
+  HEAD instead and the result carries a warning saying so.
+
+## Archiving and history
+
+Archiving is not deleting. When you archive a workspace, its `.context/` folder —
+the handoff notes, plans, and attachments accumulated during the work — is copied
+into the Ensemblr root's `archived-contexts/` directory alongside a metadata
+record. The directory is stamped with the workspace and a timestamp and is never
+reused; archiving the same workspace twice is refused rather than overwriting.
+
+From the History screen you can browse everything archived for a project,
+**restore** one (which brings back its `.context/`, recreating the worktree first
+if the archive removed it), or **permanently delete** it — which purges the
+preserved directory, the worktree and branch if still present, and the record.
+
+Two settings under `[git]` govern the git side:
+
+| Setting | Default | Effect |
+| --- | --- | --- |
+| `delete_local_branch_on_archive` | off | also delete the workspace's local branch when archiving |
+| `archive_after_merge` | off | archive the workspace automatically once its pull request merges |
+
+A branch the workspace **adopted** is never deleted regardless — it was not the
+workspace's to destroy. See
+[ADR 0027](../adr/0027-use-workspace-archive-lifecycle.md).
+
+## Opening a workspace elsewhere
+
+A workspace is a normal directory on disk, and the workbench header has an
+"Open in…" menu for handing it to another app: Finder, your editor, a terminal,
+a source-control GUI.
+
+Only apps you actually have installed appear — Ensemblr detects them through
+macOS Launch Services and shows their real icons, so the menu never offers you
+something that would fail to open. ⌘O opens your primary editor, ⌘⇧C copies the
+path, and `1`–`9` pick entries while the menu is open. See
+[ADR 0028](../adr/0028-use-launch-services-for-open-workspace-in-app.md).
+
+## See also
+
+- [`06-agents.md`](./06-agents.md) — working in a workspace with an agent.
+- [`08-reviewing-changes.md`](./08-reviewing-changes.md) — the review flow.
+- [`12-repository-settings.md`](./12-repository-settings.md) — everything in `.ensemblr/settings.toml`.
+- [`14-troubleshooting.md`](./14-troubleshooting.md) — when creation or archive fails.
