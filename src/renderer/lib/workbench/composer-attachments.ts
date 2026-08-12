@@ -4,9 +4,15 @@ import {
 	writeWorkspaceImageAttachment,
 } from '@/renderer/api/ensemblr-queries';
 import { i18n } from '@/renderer/lib/i18n';
+import {
+	commentAnchorLabel,
+	commentDocumentFilename,
+	renderCommentDocument,
+} from '@/renderer/lib/workbench/comment-document';
 import { issueDocumentFilename } from '@/renderer/lib/workbench/issue-document';
 import type {
 	ComposerAttachment,
+	PullRequestCommentSummary,
 	WorkspaceFileSummary,
 } from '@/renderer/types/workbench';
 import type { WorkspaceFileEntryWire } from '@/shared/ipc/contracts/workspace-files';
@@ -93,9 +99,10 @@ function pastedTextAttachment(path: string, text: string): ComposerAttachment {
 
 /**
  * The workspace-relative path a chip can open in the file preview, or null when
- * there is nothing the preview panel could show. A directory has no file to
- * read, and an oversize external file was left outside the workspace, which the
- * main process refuses to read.
+ * the file preview is not where the chip should go. A directory has no file to
+ * read, an oversize external file was left outside the workspace (which the main
+ * process refuses to read), and a review comment opens its own preview panel
+ * rather than the markdown document it was written to.
  * @param attachment - The attachment behind the chip.
  * @returns The repo-relative path to preview, or null.
  */
@@ -301,6 +308,61 @@ export async function attachIssueDocument({
 		label: reference,
 		path: saved.path,
 		provider,
+	};
+}
+
+/**
+ * What a review-comment chip reads: the comment's diff anchor, falling back to
+ * its author for a thread that hangs off the pull request rather than a line. A
+ * local comment always carries a path, so the author branch only ever serves a
+ * remote one — whose `author` really is a person, not the location.
+ * @param comment - The comment behind the chip.
+ * @returns The chip label; never empty.
+ */
+function reviewCommentLabel(comment: PullRequestCommentSummary): string {
+	return (
+		commentAnchorLabel(comment) ||
+		comment.author?.trim() ||
+		i18n.t('review:comment.attachment-label', 'Review comment')
+	);
+}
+
+/**
+ * Writes a rendered review comment into the workspace and returns the chip for
+ * it. The whole thread lands on disk, so the agent reads it as a file instead of
+ * the composer pasting an excerpt into the middle of the user's sentence.
+ *
+ * The comment rides along on the attachment so the chip can open its preview
+ * without going back to GitHub or the database for a thread already in hand.
+ * @param comment - The review comment being attached.
+ * @param prNumber - The pull request the comment belongs to, when known.
+ * @param workspaceCwd - Absolute workspace root the document is saved under.
+ * @returns The composer attachment for the stored comment.
+ */
+export async function attachReviewComment({
+	comment,
+	prNumber,
+	workspaceCwd,
+}: {
+	comment: PullRequestCommentSummary;
+	prNumber?: number;
+	workspaceCwd: string;
+}): Promise<ComposerAttachment> {
+	const file = new File(
+		[renderCommentDocument(comment, prNumber)],
+		commentDocumentFilename(comment),
+		{ type: 'text/markdown' },
+	);
+	const saved = await saveCopy(file, workspaceCwd);
+	return {
+		comment: {
+			...comment,
+			...(typeof prNumber === 'number' ? { prNumber } : {}),
+		},
+		id: `review-comment:${comment.id}`,
+		kind: 'review-comment',
+		label: reviewCommentLabel(comment),
+		path: saved.path,
 	};
 }
 

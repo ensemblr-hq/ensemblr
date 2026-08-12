@@ -9,9 +9,11 @@
 
 export type { AgentComposerControllerState } from './agent-composer';
 export { useAgentComposerController } from './agent-composer';
+export type { ComposerAttachmentTarget } from './composer-attachments';
 export {
 	useComposerAttachmentDispatcher,
 	useComposerAttachmentInbox,
+	useComposerAttachmentInsert,
 } from './composer-attachments';
 export {
 	composerAttachmentsAtomFamily,

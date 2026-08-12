@@ -20,6 +20,7 @@ import { Button } from '@/renderer/components/ui/button';
 import { Input } from '@/renderer/components/ui/input';
 import { ScrollArea } from '@/renderer/components/ui/scroll-area';
 import { PanelAlert } from '@/renderer/components/workbench-shell/panel-alert';
+import { useReviewCommentAttachments } from '@/renderer/hooks/workbench-shell/composer/use-review-comment-attachments';
 import { useReviewableChanges } from '@/renderer/hooks/workbench-shell/review-files/use-reviewable-changes';
 import { useWorkspaceConflicts } from '@/renderer/hooks/workbench-shell/review-files/use-workspace-conflicts';
 import {
@@ -33,8 +34,6 @@ import {
 	seedPrDetails,
 } from '@/renderer/lib/workbench/pr-details-draft';
 import {
-	formatAllCommentsContext,
-	formatCommentContext,
 	formatTodoContext,
 	isOutstandingComment,
 } from '@/renderer/lib/workbench/review-context';
@@ -226,6 +225,7 @@ export function ChecksPanel({ workspace }: { workspace: WorkspaceShellModel }) {
 					localComments.length ? (
 						<CommentsSection
 							comments={localComments}
+							workspaceCwd={workspace.pathLabel}
 							workspaceId={workspace.id}
 						/>
 					) : undefined
@@ -421,6 +421,7 @@ function ChecksPullRequestPanel({
 				<CommentsSection
 					comments={comments}
 					prNumber={pullRequest.number}
+					workspaceCwd={workspace.pathLabel}
 					workspaceId={workspace.id}
 				/>
 
@@ -479,22 +480,28 @@ function ConflictsSection({
 
 /**
  * "Comments" section listing GitHub review comments and Ensemblr-local notes
- * together. Each row opens a read-only preview, adds itself to chat, or hides for
- * the session; the header adds every visible *outstanding* comment to chat at
- * once, since a resolved thread is work already done and only dilutes the ask.
- * Session hides are keyed by workspace so they never leak across a switch.
+ * together. Each row opens a read-only preview, adds itself to chat as a chip, or
+ * hides for the session; the header adds every visible *outstanding* comment to
+ * chat at once, since a resolved thread is work already done and only dilutes the
+ * ask. Session hides are keyed by workspace so they never leak across a switch.
  */
 function CommentsSection({
 	comments,
 	prNumber,
+	workspaceCwd,
 	workspaceId,
 }: {
 	comments: readonly PullRequestCommentSummary[];
 	prNumber?: number;
+	/** Absolute workspace root the comment documents are written under. */
+	workspaceCwd: string;
 	workspaceId: string;
 }) {
 	const { t } = useTranslation();
-	const insertIntoComposer = useComposerInsert();
+	const { attachComment, attachComments } = useReviewCommentAttachments({
+		prNumber,
+		workspaceCwd,
+	});
 	const openCommentPreview = useCommentPreviewOpener();
 	const openWorkspaceFileDiff = useWorkspaceFileDiffOpener();
 
@@ -510,12 +517,6 @@ function CommentsSection({
 	);
 	const outstandingComments = visibleComments.filter(isOutstandingComment);
 
-	const addCommentToChat = (comment: PullRequestCommentSummary) => {
-		insertIntoComposer(formatCommentContext(comment, prNumber));
-		toast.success(
-			t('review:comment.added-to-chat.title', 'Comment added to chat.'),
-		);
-	};
 	const hideComment = (id: string) => {
 		setHidden((current) => ({
 			ids: new Set(current.ids).add(id),
@@ -542,15 +543,7 @@ function CommentsSection({
 				}
 				label={t('review:checks.comments', 'Comments')}
 				onAction={() => {
-					insertIntoComposer(
-						formatAllCommentsContext(outstandingComments, prNumber),
-					);
-					toast.success(
-						t(
-							'review:comments.added-to-chat.title',
-							'Outstanding comments added to chat.',
-						),
-					);
+					attachComments(outstandingComments);
 				}}
 			/>
 			{visibleComments.length ? (
@@ -558,7 +551,9 @@ function CommentsSection({
 					<PullRequestCommentRow
 						comment={comment}
 						key={comment.id}
-						onAddToChat={() => addCommentToChat(comment)}
+						onAddToChat={() => {
+							attachComment(comment);
+						}}
 						onHide={() => hideComment(comment.id)}
 						onJumpToLine={jumpToLine(comment)}
 						onOpenPreview={

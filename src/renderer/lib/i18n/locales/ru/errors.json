@@ -26,6 +26,15 @@
 		"read-failed": {
 			"message": "Не удалось прочитать вставленный файл."
 		},
+		"review-comment-failed": {
+			"message": "Не удалось прикрепить комментарий."
+		},
+		"review-comments-failed": {
+			"message_one": "Не удалось прикрепить {{count}} комментарий из {{total}}.",
+			"message_few": "Не удалось прикрепить {{count}} комментария из {{total}}.",
+			"message_many": "Не удалось прикрепить {{count}} комментариев из {{total}}.",
+			"message_other": "Не удалось прикрепить {{count}} комментария из {{total}}."
+		},
 		"save-failed": {
 			"message": "Не удалось сохранить вставленный файл."
 		}

@@ -6,7 +6,11 @@ import type {
 	AgentProviderSlashCommandSource,
 } from '@/shared/ipc/contracts/agent-provider';
 
-import type { ComposerModelOption, WorkspaceFileSummary } from './workspace';
+import type {
+	CommentPreviewPayload,
+	ComposerModelOption,
+	WorkspaceFileSummary,
+} from './workspace';
 
 /**
  * One selectable row in the model selector: a model plus whether the chat's
@@ -99,6 +103,18 @@ export type ComposerAttachment =
 			path: string;
 			/** Which tracker the issue came from; the chip wears its brand mark. */
 			provider: 'github' | 'linear';
+	  }
+	| {
+			/**
+			 * The whole comment, so the chip opens its preview without going back to
+			 * GitHub or the database for a thread the user is already looking at.
+			 */
+			comment: CommentPreviewPayload;
+			id: string;
+			kind: 'review-comment';
+			label: string;
+			/** Path of the markdown document the comment was written out to. */
+			path: string;
 	  };
 
 /**

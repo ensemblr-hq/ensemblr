@@ -26,6 +26,13 @@
 		"read-failed": {
 			"message": "Pasted file could not be read."
 		},
+		"review-comment-failed": {
+			"message": "Comment could not be attached."
+		},
+		"review-comments-failed": {
+			"message_one": "{{count}} of {{total}} comments could not be attached.",
+			"message_other": "{{count}} of {{total}} comments could not be attached."
+		},
 		"save-failed": {
 			"message": "Pasted file could not be saved."
 		}

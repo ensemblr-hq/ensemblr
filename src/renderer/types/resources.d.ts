@@ -455,6 +455,13 @@ export default interface Resources {
 			'read-failed': {
 				message: 'Pasted file could not be read.';
 			};
+			'review-comment-failed': {
+				message: 'Comment could not be attached.';
+			};
+			'review-comments-failed': {
+				message_one: '{{count}} of {{total}} comments could not be attached.';
+				message_other: '{{count}} of {{total}} comments could not be attached.';
+			};
 			'save-failed': {
 				message: 'Pasted file could not be saved.';
 			};
@@ -1214,9 +1221,10 @@ export default interface Resources {
 		comment: {
 			'add-to-chat': 'Add comment to chat';
 			'added-to-chat': {
-				title: 'Comment added to chat.';
+				title: 'Comment is attached to the chat.';
 			};
 			'agent-badge': 'Agent';
+			'attachment-label': 'Review comment';
 			'composer-label': 'New line comment';
 			'composer-placeholder': 'Add a local review comment on this line…';
 			delete: 'Delete comment';
@@ -1237,9 +1245,6 @@ export default interface Resources {
 				'add-to-chat': 'Add comment to chat';
 				'open-external': 'Open comment on {{provider}}';
 			};
-			'added-to-chat': {
-				title: 'Comment added to chat.';
-			};
 			'reply-count_one': '{{count}} reply';
 			'reply-count_other': '{{count}} replies';
 			state: {
@@ -1249,7 +1254,9 @@ export default interface Resources {
 		};
 		comments: {
 			'added-to-chat': {
-				title: 'Outstanding comments added to chat.';
+				capped_one: '{{count}} of {{total}} comments attached — add the rest from their rows.';
+				capped_other: '{{count}} of {{total}} comments attached — add the rest from their rows.';
+				title: 'Outstanding comments are attached to the chat.';
 			};
 		};
 		'diff-toolbar': {

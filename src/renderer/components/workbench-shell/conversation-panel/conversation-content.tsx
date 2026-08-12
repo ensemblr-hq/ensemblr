@@ -228,7 +228,12 @@ function ActiveAuxiliaryPanel({
 		);
 	}
 	if (activeSession.kind === 'document' && activeSession.commentPreview) {
-		return <CommentPreviewPanel comment={activeSession.commentPreview} />;
+		return (
+			<CommentPreviewPanel
+				comment={activeSession.commentPreview}
+				workspaceCwd={activeWorkspace.pathLabel}
+			/>
+		);
 	}
 	return (
 		<FilePreviewPanel

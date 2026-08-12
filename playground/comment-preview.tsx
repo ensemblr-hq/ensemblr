@@ -123,7 +123,10 @@ export function CommentPreviewScene() {
 					className='flex h-80 flex-col overflow-hidden rounded-md border border-border bg-surface'
 					key={comment.id}
 				>
-					<CommentPreviewPanel comment={{ ...comment, prNumber: 42 }} />
+					<CommentPreviewPanel
+						comment={{ ...comment, prNumber: 42 }}
+						workspaceCwd='/tmp/ensemblr-playground'
+					/>
 				</div>
 			))}
 		</div>

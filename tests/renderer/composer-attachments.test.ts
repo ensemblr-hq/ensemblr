@@ -19,9 +19,12 @@ vi.mock('@/renderer/api/ensemblr-queries', () => ({
 }));
 
 import {
+	attachmentPreviewPath,
 	attachPastedFiles,
 	attachPastedText,
+	attachReviewComment,
 } from '../../src/renderer/lib/workbench/composer-attachments';
+import type { PullRequestCommentSummary } from '../../src/renderer/types/workbench';
 
 function savedRow(path: string) {
 	return {
@@ -139,5 +142,91 @@ describe('attachPastedText', () => {
 		const second = await attachPastedText('same paste', '/repo');
 
 		expect(second.id).toBe(first.id);
+	});
+});
+
+describe('attachReviewComment', () => {
+	const COMMENT: PullRequestCommentSummary = {
+		author: 'octocat',
+		body: 'Guard this branch.',
+		detail: 'Guard this branch.',
+		id: 'c1',
+		isResolved: false,
+		line: 57,
+		path: 'src/app/page.tsx',
+		provider: 'github',
+	};
+
+	beforeEach(() => {
+		writeWorkspaceFileAttachment.mockResolvedValue(
+			savedRow(
+				'.context/attachments/ab12cd/review-comment-github-page-tsx-57.md',
+			),
+		);
+	});
+
+	test('writes the comment as a markdown document and chips it', async () => {
+		const attachment = await attachReviewComment({
+			comment: COMMENT,
+			prNumber: 9,
+			workspaceCwd: '/repo',
+		});
+
+		expect(writeWorkspaceFileAttachment).toHaveBeenCalledTimes(1);
+		expect(attachment).toMatchObject({
+			id: 'review-comment:c1',
+			kind: 'review-comment',
+			label: 'page.tsx:57',
+			path: '.context/attachments/ab12cd/review-comment-github-page-tsx-57.md',
+		});
+	});
+
+	// The chip opens the preview panel itself, so it carries the whole thread
+	// rather than sending the user's click back to GitHub for it.
+	test('carries the comment and its pull request number for the preview', async () => {
+		const attachment = await attachReviewComment({
+			comment: COMMENT,
+			prNumber: 9,
+			workspaceCwd: '/repo',
+		});
+
+		if (attachment.kind !== 'review-comment') {
+			throw new Error('Expected a review-comment attachment.');
+		}
+		expect(attachment.comment.id).toBe('c1');
+		expect(attachment.comment.prNumber).toBe(9);
+	});
+
+	test('omits the pull request number for a comment with no pull request', async () => {
+		const attachment = await attachReviewComment({
+			comment: { ...COMMENT, provider: 'local' },
+			workspaceCwd: '/repo',
+		});
+
+		if (attachment.kind !== 'review-comment') {
+			throw new Error('Expected a review-comment attachment.');
+		}
+		expect(attachment.comment.prNumber).toBeUndefined();
+	});
+
+	// Sending the chip to the file preview would show the serialized document
+	// rather than the comment, which is not what the user clicked on.
+	test('is not previewable as a file', async () => {
+		const attachment = await attachReviewComment({
+			comment: COMMENT,
+			workspaceCwd: '/repo',
+		});
+
+		expect(attachmentPreviewPath(attachment)).toBeNull();
+	});
+
+	test('propagates a write failure so the caller can surface it', async () => {
+		writeWorkspaceFileAttachment.mockResolvedValueOnce({
+			error: { code: 'write-failed', message: 'disk full' },
+		});
+
+		await expect(
+			attachReviewComment({ comment: COMMENT, workspaceCwd: '/repo' }),
+		).rejects.toThrow('disk full');
 	});
 });

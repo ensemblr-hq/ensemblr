@@ -73,12 +73,15 @@ export function useForkConversation({
 				);
 			}
 			const { relativePath, title } = result.summary;
-			dispatchAttachment(chatTabId, {
-				id: `wsfile:${relativePath}`,
-				kind: 'workspace-file',
-				label: title ?? relativePath.split('/').at(-1) ?? relativePath,
-				path: relativePath,
-			});
+			dispatchAttachment(
+				{ chatTabId },
+				{
+					id: `wsfile:${relativePath}`,
+					kind: 'workspace-file',
+					label: title ?? relativePath.split('/').at(-1) ?? relativePath,
+					path: relativePath,
+				},
+			);
 		},
 		[branchId, dispatchAttachment, sessionId, t],
 	);

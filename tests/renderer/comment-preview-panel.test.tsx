@@ -37,11 +37,13 @@ const COMMENT: CommentPreviewPayload = {
 	url: 'https://github.com/acme/app/pull/42#discussion_r1',
 };
 
+const WORKSPACE_CWD = '/tmp/ensemblr-workspace';
+
 /** Renders the preview panel for one comment inside a fresh Jotai store. */
 function renderPanel(comment: CommentPreviewPayload = COMMENT) {
 	renderWithProviders(
 		<Provider store={createStore()}>
-			<CommentPreviewPanel comment={comment} />
+			<CommentPreviewPanel comment={comment} workspaceCwd={WORKSPACE_CWD} />
 		</Provider>,
 	);
 }
@@ -90,7 +92,7 @@ test('the diff anchor jumps to the line when an opener is available', () => {
 	renderWithProviders(
 		<Provider store={createStore()}>
 			<WorkspaceFileDiffOpenerProvider value={openWorkspaceFileDiff}>
-				<CommentPreviewPanel comment={COMMENT} />
+				<CommentPreviewPanel comment={COMMENT} workspaceCwd={WORKSPACE_CWD} />
 			</WorkspaceFileDiffOpenerProvider>
 		</Provider>,
 	);

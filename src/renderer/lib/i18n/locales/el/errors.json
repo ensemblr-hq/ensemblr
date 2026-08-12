@@ -26,6 +26,13 @@
 		"read-failed": {
 			"message": "Δεν ήταν δυνατή η ανάγνωση του επικολλημένου αρχείου."
 		},
+		"review-comment-failed": {
+			"message": "Δεν ήταν δυνατή η επισύναψη του σχολίου."
+		},
+		"review-comments-failed": {
+			"message_one": "Δεν επισυνάφθηκε {{count}} από {{total}} σχόλια.",
+			"message_other": "Δεν επισυνάφθηκαν {{count}} από {{total}} σχόλια."
+		},
 		"save-failed": {
 			"message": "Δεν ήταν δυνατή η αποθήκευση του επικολλημένου αρχείου."
 		}

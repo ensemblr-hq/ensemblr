@@ -70,7 +70,7 @@ export function useComposerAttachments({
 	);
 
 	// Drain externally-pushed attachments (transcript chips, plan handoff, fork).
-	const attachmentInbox = useComposerAttachmentInbox(chatTabId);
+	const attachmentInbox = useComposerAttachmentInbox(chatTabId, workspaceCwd);
 	useEffect(() => {
 		if (attachmentInbox.pending.length === 0) {
 			return;

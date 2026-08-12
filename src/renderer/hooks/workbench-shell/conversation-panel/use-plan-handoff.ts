@@ -61,12 +61,15 @@ export function usePlanHandoff(workspace: WorkspaceShellModel): {
 					'Implement the attached plan.',
 				);
 				if (planPath) {
-					dispatchAttachment(chatTabId, {
-						id: `wsfile:${planPath}`,
-						kind: 'workspace-file',
-						label: planPath.split('/').at(-1) ?? planPath,
-						path: planPath,
-					});
+					dispatchAttachment(
+						{ chatTabId },
+						{
+							id: `wsfile:${planPath}`,
+							kind: 'workspace-file',
+							label: planPath.split('/').at(-1) ?? planPath,
+							path: planPath,
+						},
+					);
 				}
 				await queryClient.invalidateQueries({
 					queryKey: ensemblrQueryKeys.chatTabs(workspace.id),

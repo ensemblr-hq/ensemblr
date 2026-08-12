@@ -87,7 +87,10 @@ describe('markdown document column', () => {
 
 	test('caps the comment preview at the same measure', () => {
 		const { container } = renderWithProviders(
-			<CommentPreviewPanel comment={COMMENT} />,
+			<CommentPreviewPanel
+				comment={COMMENT}
+				workspaceCwd='/tmp/ensemblr-workspace'
+			/>,
 		);
 		const column = container
 			.querySelector('.ensemblr-answer')
@@ -100,7 +103,10 @@ describe('markdown document column', () => {
 	test('both previews render the shared column rather than their own', () => {
 		const file = renderMarkdownPreview();
 		const comment = renderWithProviders(
-			<CommentPreviewPanel comment={COMMENT} />,
+			<CommentPreviewPanel
+				comment={COMMENT}
+				workspaceCwd='/tmp/ensemblr-workspace'
+			/>,
 		);
 
 		const fileColumn =
@@ -118,7 +124,10 @@ describe('markdown document column', () => {
 
 	test('lands the comment header on the column its body reads on', () => {
 		const { container } = renderWithProviders(
-			<CommentPreviewPanel comment={COMMENT} />,
+			<CommentPreviewPanel
+				comment={COMMENT}
+				workspaceCwd='/tmp/ensemblr-workspace'
+			/>,
 		);
 		const columns = container.querySelectorAll('div.max-w-3xl');
 
