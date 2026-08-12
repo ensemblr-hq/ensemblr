@@ -330,7 +330,7 @@ export function ModelPicker({
 						)}
 					</p>
 				) : (
-					<ScrollArea className='pr-3.5' style={scrollAreaStyle}>
+					<ScrollArea className='-mr-1.5 pr-1.5' style={scrollAreaStyle}>
 						<ModelOptionsList
 							favouriteIds={favouriteIds}
 							groups={groups}

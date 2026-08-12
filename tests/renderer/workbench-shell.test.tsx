@@ -304,7 +304,10 @@ test('renders the Conductor-style workbench shell regions', () => {
 	expect(markup).toContain('Open app settings');
 	expect(markup).toContain('Open current workspace in VS Code');
 	expect(markup).toContain('Open current workspace app options');
-	expect(markup).toContain('Ask the agent to continue review shell');
+	expect(markup).toContain(
+		'Ask to make changes, @mention files, run /commands',
+	);
+	expect(markup).not.toContain('Ask the agent to continue');
 	expect(markup).toContain('Requires confirmation');
 	expect(markup).not.toContain('Open pull request menu');
 	expect(markup).not.toContain('Open workspace menu');

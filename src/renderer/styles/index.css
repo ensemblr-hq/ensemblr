@@ -874,6 +874,13 @@
 	--answer-heading-trail: 0.6em;
 	--answer-list-gap: 0.375em;
 	line-height: 1.65;
+	/*
+	 * A URL, an import path, or a stack frame written as one unbroken token has no
+	 * break opportunity of its own. The answer column is narrow enough in a split
+	 * pane that a single one would otherwise push a horizontal scrollbar onto the
+	 * whole surface rather than wrapping.
+	 */
+	overflow-wrap: break-word;
 	text-underline-offset: 0.2em;
 }
 
@@ -919,6 +926,15 @@
 	margin-block-start: calc(var(--answer-block-gap) * 1.75);
 }
 
+/*
+ * Balancing is for the short, few-word lines a heading is; over a paragraph it
+ * costs layout work and evens out lines that were already fine. Prose wants the
+ * cheaper rule that only pulls back a one-word last line.
+ */
+.ensemblr-answer :is(p, li) {
+	text-wrap: pretty;
+}
+
 .ensemblr-answer :is(h1, h2, h3, h4, h5, h6) {
 	font-family: var(--font-heading);
 	font-weight: 600;
@@ -936,7 +952,7 @@
 }
 
 .ensemblr-answer h3 {
-	font-size: 1.0625em;
+	font-size: 1.125em;
 }
 
 /*
@@ -959,8 +975,38 @@
 	list-style-type: disc;
 }
 
+/*
+ * A nested list is only indented by one step, which on its own leaves two levels
+ * of the same dot reading as one flat run. Changing the marker per level is what
+ * separates them without spending more indent the column cannot spare.
+ */
+.ensemblr-answer ul ul {
+	list-style-type: circle;
+}
+
+.ensemblr-answer ul ul ul {
+	list-style-type: square;
+}
+
 .ensemblr-answer ol {
 	list-style-type: decimal;
+}
+
+.ensemblr-answer ol ol {
+	list-style-type: lower-alpha;
+}
+
+.ensemblr-answer ol ol ol {
+	list-style-type: lower-roman;
+}
+
+/*
+ * A list belongs to the paragraph that introduces it, so it sits closer to that
+ * paragraph than two unrelated blocks sit to each other. Without this the lead-in
+ * line and its own items read as two blocks at the same remove from each other.
+ */
+.ensemblr-answer > p + :is(ul, ol) {
+	margin-block-start: calc(var(--answer-block-gap) * 0.55);
 }
 
 .ensemblr-answer li {
@@ -983,12 +1029,49 @@
 	margin-block: 0;
 }
 
+/*
+ * A task list carries its state in the checkbox, so the bullet beside it is a
+ * second marker saying nothing. Dropping it also reclaims the indent the
+ * checkbox needs, which keeps the item's text on the same column as an ordinary
+ * list's.
+ *
+ * Both arms are needed: a tight list leaves the checkbox a direct child of the
+ * item, a loose one nests it in the paragraph remark-gfm keeps. The `> p >` step
+ * stays explicit rather than a descendant match, so an item holding a nested task
+ * sublist keeps its own marker.
+ */
+.ensemblr-answer li:has(> input[type="checkbox"]),
+.ensemblr-answer li:has(> p > input[type="checkbox"]) {
+	list-style: none;
+	margin-inline-start: -1.2em;
+}
+
+.ensemblr-answer li input[type="checkbox"] {
+	accent-color: var(--color-accent-strong);
+	margin-inline-end: 0.5em;
+	vertical-align: -0.1em;
+}
+
 .ensemblr-answer blockquote {
 	border-inline-start: 2px solid
 		color-mix(in oklch, var(--color-foreground) 20%, transparent);
 	color: var(--color-muted-foreground);
 	font-style: normal;
 	padding-inline-start: 1em;
+}
+
+/*
+ * The flow rhythm above only reaches the answer's own children, so a quote
+ * holding more than one paragraph — a bot pasting a review body, an agent
+ * quoting an error and its explanation — inherits Streamdown's utility margins
+ * instead and spaces its lines to a different beat than the prose around it.
+ */
+.ensemblr-answer blockquote > * {
+	margin-block: 0;
+}
+
+.ensemblr-answer blockquote > * + * {
+	margin-block-start: var(--answer-block-gap);
 }
 
 .ensemblr-answer hr {
@@ -1001,6 +1084,13 @@
 .ensemblr-answer [data-streamdown="link"] {
 	color: var(--color-accent-strong);
 	font-weight: inherit;
+	/*
+	 * Streamdown sets `wrap-anywhere` on every link, which breaks a link's text at
+	 * whatever character the line ends on even when the whole thing would have fit
+	 * the next one — a project name in a table cell comes out as three stacked
+	 * fragments. Breaking only what cannot fit a line still contains a bare URL.
+	 */
+	overflow-wrap: break-word;
 	text-decoration-color: color-mix(
 		in oklch,
 		var(--color-accent-strong) 40%,
@@ -1131,6 +1221,13 @@
 	border-block-end: 1px solid
 		color-mix(in oklch, var(--color-foreground) 8%, transparent);
 	line-height: 1.45;
+	/*
+	 * The prose wrapping the root sets has to stop at the table, which carries its
+	 * own scroll frame: a narrow pane should push the columns past the frame and
+	 * scroll them, not break a project name into three stacked fragments to make
+	 * the whole table fit.
+	 */
+	overflow-wrap: normal;
 	padding: 0.5em 0.875em;
 	text-align: start;
 	vertical-align: top;

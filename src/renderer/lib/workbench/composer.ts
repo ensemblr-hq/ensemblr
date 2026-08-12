@@ -88,6 +88,34 @@ export function resolveComposerProvider(
 }
 
 /**
+ * What the composer invites, keyed off what the chat *is* rather than what it is
+ * called. The chat's own title used to be interpolated in here, which restated
+ * the tab label the user is already looking at, grew with it, and said nothing
+ * about what to type.
+ * @param planMode - Whether the next turn plans instead of editing.
+ * @param hasStarted - Whether the chat has already run a turn.
+ * @returns The placeholder to render.
+ */
+function getReadyPlaceholder(planMode: boolean, hasStarted: boolean): string {
+	if (planMode) {
+		return i18n.t(
+			'workbench:composer.plan-mode.placeholder',
+			'Describe what you want planned',
+		);
+	}
+	if (hasStarted) {
+		return i18n.t(
+			'workbench:composer.follow-up.placeholder',
+			'Send a follow-up',
+		);
+	}
+	return i18n.t(
+		'workbench:composer.placeholder',
+		'Ask to make changes, @mention files, run /commands',
+	);
+}
+
+/**
  * Computes the composer shell state from setup readiness, the active session,
  * and an agent controller. Disables the composer while setup is not yet ready
  * and while agent runtime checks fail. Sub-agent tabs never reach here — they
@@ -213,16 +241,10 @@ export function getComposerState({
 		...base,
 		disabled: false,
 		disabledReason: null,
-		placeholder: planMode
-			? i18n.t(
-					'workbench:composer.plan-mode.placeholder',
-					'Describe what you want built — the agent will plan it with you before touching any files',
-				)
-			: i18n.t(
-					'workbench:composer.ready.placeholder',
-					'Ask the agent to continue {{session}}',
-					{ session: activeSession.label.toLowerCase() },
-				),
+		placeholder: getReadyPlaceholder(
+			planMode,
+			Boolean(activeAgentSessionId ?? activeSession.agentSessionId),
+		),
 	};
 }
 

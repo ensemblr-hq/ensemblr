@@ -14,6 +14,14 @@ import { formatShortcut } from '@/shared/keymap';
 const SHORTCUT_HINT = formatShortcut('composer.togglePlanMode');
 
 /**
+ * Accent tint for the pressed chip. The `subtle` variant claims `aria-pressed:`
+ * for its own grey pressed look, so the accent tint only wins when declared
+ * under that same variant.
+ */
+const PRESSED_TINT_CLASSES =
+	'aria-pressed:bg-accent-strong/10 aria-pressed:text-accent-strong hover:aria-pressed:bg-accent-strong/15 hover:aria-pressed:text-accent-strong';
+
+/**
  * Toggle-style Plan Mode chip. While on, the agent is hard-blocked from editing
  * files and restricted to read-only shell commands until the user approves a
  * plan. Tinted with the accent hue so it never reads as the amber thinking chip.
@@ -48,21 +56,18 @@ export function PlanModeToggle({
 								)
 					}
 					aria-pressed={value}
-					// The `subtle` variant claims `aria-pressed:` for its own grey
-					// pressed look, so the accent tint only wins when declared under
-					// that same variant.
 					className={cn(
-						'h-7 rounded-md px-2 font-medium',
-						value &&
-							'aria-pressed:bg-accent-strong/10 aria-pressed:text-accent-strong hover:aria-pressed:bg-accent-strong/15 hover:aria-pressed:text-accent-strong',
+						'rounded-md font-medium',
+						value && 'px-2',
+						value && PRESSED_TINT_CLASSES,
 					)}
 					disabled={disabled}
 					onClick={handleClick}
-					size='sm'
+					size={value ? 'sm' : 'icon-sm'}
 					type='button'
 					variant='subtle'
 				>
-					<MapIcon />
+					<MapIcon className='size-3.5' />
 					{value ? <span>{t('workbench:plan-mode.chip', 'Plan')}</span> : null}
 				</Button>
 			</TooltipTrigger>

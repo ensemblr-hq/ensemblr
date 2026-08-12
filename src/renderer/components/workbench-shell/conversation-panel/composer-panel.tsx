@@ -15,22 +15,8 @@ import { LinkDirectoryDialog } from './composer/link-directory-dialog';
 import { ComposerAutocompletePopover } from './composer/mention-popover';
 import { getNextThinkingId } from './composer/thinking-picker';
 
-/**
- * Sticky bottom composer wired to pi's session service. Mirrors reference
- * design — tall textarea, model + thinking chips, paperclip menu, context
- * indicator, send button. Owns inline @ file-mention picker (Portal anchored
- * to textarea wrapper) and / slash-command palette. Domain state (value,
- * autocomplete, attachments, keymap) lives in `useComposerState`; this file
- * stays as a thin wiring/JSX layer.
- */
-export function ComposerPanel({
-	chatTabId,
-	composer,
-	planReview,
-	repositoryId,
-	seedText,
-	workspaceId,
-}: {
+/** Props for the composer panel and the per-chat body it mounts. */
+interface ComposerPanelProps {
 	chatTabId: string;
 	composer: ComposerShellState;
 	/** Plan review header rendered inside the composer card, above the textarea. */
@@ -40,7 +26,37 @@ export function ComposerPanel({
 	seedText?: string;
 	/** Workspace whose dock hosts terminals the control row hands work off to. */
 	workspaceId: string;
-}) {
+}
+
+/**
+ * Sticky bottom composer wired to pi's session service. Mirrors reference
+ * design — tall textarea, model + thinking chips, paperclip menu, context
+ * indicator, send button. Owns inline @ file-mention picker (Portal anchored
+ * to textarea wrapper) and / slash-command palette. Domain state (value,
+ * autocomplete, attachments, keymap) lives in `useComposerState`; this file
+ * stays as a thin wiring/JSX layer.
+ *
+ * The body is keyed by chat tab here rather than at the call site, because
+ * everything it holds outside the draft atoms — the editor's document, the
+ * mirrored draft refs, the in-flight send flag, the pickers — belongs to one
+ * chat, and `useComposerState` seeds the draft once per mount. The route reuses
+ * this component across `$chatId` and `$workspaceId`, so a caller that had to
+ * remember the key would seed the draft read at its first mount back into every
+ * chat opened afterwards.
+ */
+export function ComposerPanel(props: ComposerPanelProps) {
+	return <ComposerPanelBody {...props} key={props.chatTabId} />;
+}
+
+/** One chat's composer. Mounted afresh per chat tab; see {@link ComposerPanel}. */
+function ComposerPanelBody({
+	chatTabId,
+	composer,
+	planReview,
+	repositoryId,
+	seedText,
+	workspaceId,
+}: ComposerPanelProps) {
 	const { t } = useTranslation();
 	const state = useComposerState({ chatTabId, composer, seedText });
 	const [focused, setFocused] = useState(false);
@@ -103,7 +119,6 @@ export function ComposerPanel({
 					text: state.initialDraft.text,
 				}}
 				initialSnapshot={state.initialDraft.snapshot}
-				key={chatTabId}
 				onBlur={() => setFocused(false)}
 				onDraftChange={state.handleDraftChange}
 				onDroppedTransfer={state.consumeDroppedTransfer}

@@ -249,8 +249,9 @@ export function useComposerState({
 	const setAttachments = useSetAtom(composerAttachmentsAtomFamily(chatTabId));
 	const setEditorState = useSetAtom(composerEditorStateAtomFamily(chatTabId));
 
-	// Read once: the editor takes ownership of the draft from here on, and
-	// re-reading would fight the mirror it publishes back into these atoms. The
+	// Read once per mount, which is once per chat because `ComposerPanel` keys its
+	// body by chat tab: the editor takes ownership of the draft from here on,
+	// and re-reading would fight the mirror it publishes back into these atoms. The
 	// segments are seeded flat and replaced by the real interleaving the moment
 	// the editor mounts and publishes — only the editor knows where in the
 	// sentence the chips sit, and until it is up all the atoms carry is text

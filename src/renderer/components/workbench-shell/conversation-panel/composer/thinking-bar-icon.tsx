@@ -14,7 +14,12 @@ const ICON_WIDTH =
 	BAR_HEIGHTS.length * BAR_WIDTH +
 	(BAR_HEIGHTS.length - 1) * BAR_GAP;
 
-/** Renders five progressive bars illustrating the selected thinking strength. */
+/**
+ * Renders five progressive bars illustrating the selected thinking strength.
+ * Sized with `size-*` rather than a height and an auto width, so the glyph keeps
+ * the 14px box every other composer chip icon uses: `Button` sizes any icon whose
+ * class carries no `size-` utility to 16px, and this one would grow with it.
+ */
 export function ThinkingBarIcon({
 	className,
 	strength,
@@ -26,7 +31,7 @@ export function ThinkingBarIcon({
 	return (
 		<svg
 			aria-hidden='true'
-			className={cn('h-3.5 w-auto', className)}
+			className={cn('size-3.5', className)}
 			fill='none'
 			height='14'
 			role='img'

@@ -239,9 +239,9 @@ export function McpServersPanel({
 					<PopoverTrigger asChild>
 						<Button
 							aria-label={t('workbench:mcp-servers.aria-label', 'MCP servers')}
-							className='h-7 rounded-md px-2 font-medium'
+							className='rounded-md'
 							disabled={disabled}
-							size='sm'
+							size='icon-sm'
 							type='button'
 							variant='subtle'
 						>
@@ -284,7 +284,7 @@ export function McpServersPanel({
 							: emptyRosterMessage(data, t)}
 					</p>
 				) : (
-					<ScrollArea className='pr-3.5' style={scrollAreaStyle}>
+					<ScrollArea className='-mr-1.5 pr-1.5' style={scrollAreaStyle}>
 						<div className='flex flex-col'>
 							{servers.map((server) => (
 								<McpServerRow

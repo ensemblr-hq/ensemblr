@@ -12,6 +12,7 @@ import {
 import type { ReadWorkspaceFileResult } from '@/shared/ipc/contracts/workspace-files';
 import { PREVIEW_PDF_MIME_TYPE } from '@/shared/preview-media';
 
+import { DOCUMENT_BODY_CLASSES } from './document-column';
 import { resolvePreviewMode } from './file-preview-helpers';
 
 /**
@@ -75,8 +76,10 @@ export function FilePreviewBody({
 
 	if (showFormattedPreview) {
 		return (
-			<div className='sleek-scrollbar min-h-0 flex-1 overflow-auto p-4'>
-				<MessageResponse>{content}</MessageResponse>
+			<div className='sleek-scrollbar min-h-0 flex-1 overflow-auto'>
+				<div className={DOCUMENT_BODY_CLASSES}>
+					<MessageResponse>{content}</MessageResponse>
+				</div>
 			</div>
 		);
 	}

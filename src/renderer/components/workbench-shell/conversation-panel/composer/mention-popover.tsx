@@ -15,12 +15,10 @@ import type {
 	SlashCommandMatch,
 	WorkspaceFileSummary,
 } from '@/renderer/types/workbench';
+import { getAutocompleteHeight } from './autocomplete-height';
 import { AutocompleteRow } from './autocomplete-list';
 import { MatchHighlight } from './match-highlight';
 
-const MAX_AUTOCOMPLETE_HEIGHT_REM = 24;
-const AUTOCOMPLETE_ROW_HEIGHT_REM = 2.25;
-const AUTOCOMPLETE_VERTICAL_PADDING_REM = 0.5;
 const LOADING_PLACEHOLDER_ROWS = 5;
 
 /** Props for the textarea-anchored @ and / autocomplete popover. */
@@ -46,16 +44,6 @@ function formatSlashCommandSecondary(match: SlashCommandMatch): ReactNode {
 	return <span className='truncate'>{match.item.description}</span>;
 }
 
-/** Estimates popover list height so Radix ScrollArea owns overflow correctly. */
-function getAutocompleteHeight(rowCount: number): string {
-	const visibleRows = Math.max(1, rowCount);
-	const estimatedHeightRem =
-		AUTOCOMPLETE_VERTICAL_PADDING_REM +
-		visibleRows * AUTOCOMPLETE_ROW_HEIGHT_REM;
-
-	return `min(${estimatedHeightRem}rem, min(${MAX_AUTOCOMPLETE_HEIGHT_REM}rem, var(--radix-popover-content-available-height, ${MAX_AUTOCOMPLETE_HEIGHT_REM}rem)))`;
-}
-
 /** Wraps autocomplete options in shadcn's native scroll area and scrollbar. */
 function AutocompleteScrollArea({
 	children,
@@ -67,8 +55,8 @@ function AutocompleteScrollArea({
 	const style: CSSProperties = { height: getAutocompleteHeight(rowCount) };
 
 	return (
-		<ScrollArea className='pr-2' style={style}>
-			<div className='p-1'>{children}</div>
+		<ScrollArea className='-mr-1.5 pr-1.5' style={style}>
+			{children}
 		</ScrollArea>
 	);
 }
@@ -242,7 +230,7 @@ export function ComposerAutocompletePopover({
 			<PopoverAnchor asChild>{children}</PopoverAnchor>
 			<PopoverContent
 				align='start'
-				className='w-(--radix-popover-trigger-width) min-w-80 max-w-2xl overflow-hidden p-0'
+				className='w-(--radix-popover-trigger-width) min-w-80 max-w-2xl overflow-hidden p-1.5'
 				onOpenAutoFocus={(event) => event.preventDefault()}
 				side='top'
 				sideOffset={8}
