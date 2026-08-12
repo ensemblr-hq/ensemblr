@@ -26,9 +26,9 @@ describe('stripCommentMetadata', () => {
 	});
 
 	test('drops a marker spanning several lines', () => {
-		const body = '<!--\nlinear-linkback\nid: THE-106\n-->\nLinked to THE-106';
+		const body = '<!--\nlinear-linkback\nid: ENG-106\n-->\nLinked to ENG-106';
 
-		expect(stripCommentMetadata(body)).toBe('Linked to THE-106');
+		expect(stripCommentMetadata(body)).toBe('Linked to ENG-106');
 	});
 
 	test('keeps a short in-page anchor definition, which is real content', () => {

@@ -178,7 +178,7 @@ const makePorts = (
 		}),
 		updateIssue: vi.fn().mockResolvedValue({
 			issue: null,
-			message: 'THE-1 updated.',
+			message: 'ENG-1 updated.',
 			status: 'ok',
 		}),
 	},
@@ -1753,7 +1753,7 @@ describe('agent-control service: review', () => {
 // and the sub-agent role the only two gates left to get right.
 describe('agent-control service: linear', () => {
 	const LINEAR_READS = {
-		linearGetIssue: { issueId: 'THE-106' },
+		linearGetIssue: { issueId: 'ENG-106' },
 		linearGetMetadata: {},
 		linearListIssues: { query: 'composer' },
 	} as const;
@@ -1761,9 +1761,9 @@ describe('agent-control service: linear', () => {
 	const LINEAR_WRITES = {
 		linearCreateComment: {
 			commentBody: 'Done on the branch.',
-			issueId: 'THE-1',
+			issueId: 'ENG-1',
 		},
-		linearUpdateIssue: { issueId: 'THE-1', stateId: 's-review' },
+		linearUpdateIssue: { issueId: 'ENG-1', stateId: 's-review' },
 	} as const;
 
 	it('dispatches each read to its port with the args as sent', async () => {
@@ -1779,7 +1779,7 @@ describe('agent-control service: linear', () => {
 			expect(result.ok, op).toBe(true);
 		}
 		expect(ports.linear.listIssues).toHaveBeenCalledWith({ query: 'composer' });
-		expect(ports.linear.getIssue).toHaveBeenCalledWith({ issueId: 'THE-106' });
+		expect(ports.linear.getIssue).toHaveBeenCalledWith({ issueId: 'ENG-106' });
 		expect(ports.linear.getMetadata).toHaveBeenCalledWith({});
 	});
 
@@ -1810,12 +1810,12 @@ describe('agent-control service: linear', () => {
 		await service.invoke({
 			op: 'linearCreateComment',
 			token: 'tok-caller',
-			rawArgs: { body: 'Verified.', identifier: 'THE-106' },
+			rawArgs: { body: 'Verified.', identifier: 'ENG-106' },
 		});
 
 		expect(ports.linear.createComment).toHaveBeenCalledWith({
 			commentBody: 'Verified.',
-			issueId: 'THE-106',
+			issueId: 'ENG-106',
 		});
 	});
 
@@ -1828,7 +1828,7 @@ describe('agent-control service: linear', () => {
 		const result = await service.invoke({
 			op: 'linearUpdateIssue',
 			token: 'tok-caller',
-			rawArgs: { issueId: 'THE-1' },
+			rawArgs: { issueId: 'ENG-1' },
 		});
 
 		expect(result.ok).toBe(false);
@@ -1909,12 +1909,12 @@ describe('agent-control service: linear', () => {
 		const update = await service.invoke({
 			op: 'linearUpdateIssue',
 			token: 'tok-caller',
-			rawArgs: { issueId: 'THE-1', stateId: 's-review' },
+			rawArgs: { issueId: 'ENG-1', stateId: 's-review' },
 		});
 		const comment = await service.invoke({
 			op: 'linearCreateComment',
 			token: 'tok-caller',
-			rawArgs: { commentBody: 'Found the seam.', issueId: 'THE-1' },
+			rawArgs: { commentBody: 'Found the seam.', issueId: 'ENG-1' },
 		});
 
 		expect(update.ok).toBe(false);

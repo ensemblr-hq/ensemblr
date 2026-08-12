@@ -279,7 +279,7 @@ export async function attachPastedText(
  * being handed a summary line and left to fetch the rest itself.
  * @param document - The rendered markdown body.
  * @param provider - Tracker the issue came from, which picks the chip's brand mark.
- * @param reference - Human issue reference, such as `THE-106` or `#42`.
+ * @param reference - Human issue reference, such as `ENG-106` or `#42`.
  * @param workspaceCwd - Absolute workspace root the document is saved under.
  * @returns The composer attachment for the stored issue.
  */

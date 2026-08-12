@@ -103,9 +103,9 @@ test('isLinearDataStale: respects the freshness window', () => {
 test('formatLinearIssueContext: renders identifier, title, url, and excerpt', () => {
 	const context = formatLinearIssueContext(createLinearIssueFixture());
 
-	expect(context).toContain('Linear issue THE-143:');
+	expect(context).toContain('Linear issue ENG-143:');
 	expect(context).toContain('Linear OAuth PKCE and Token Lifecycle');
-	expect(context).toContain('https://linear.app/acme/issue/THE-143');
+	expect(context).toContain('https://linear.app/acme/issue/ENG-143');
 	expect(context).toContain('Implement OAuth PKCE login');
 });
 
@@ -115,7 +115,7 @@ test('formatLinearIssueContext: omits the excerpt without a description', () => 
 	);
 
 	expect(context).toBe(
-		'Linear issue THE-143: Linear OAuth PKCE and Token Lifecycle\nhttps://linear.app/acme/issue/THE-143',
+		'Linear issue ENG-143: Linear OAuth PKCE and Token Lifecycle\nhttps://linear.app/acme/issue/ENG-143',
 	);
 });
 
@@ -133,7 +133,7 @@ test('mapLinearIssuesToWorkspaceSources: produces linear issue picker sources', 
 		createLinearIssueFixture(),
 		createLinearIssueFixture({
 			id: 'issue-2',
-			identifier: 'THE-150',
+			identifier: 'ENG-150',
 			stateName: null,
 			title: 'Terminal polish',
 		}),
@@ -144,7 +144,7 @@ test('mapLinearIssuesToWorkspaceSources: produces linear issue picker sources', 
 			id: 'issue-1',
 			kind: 'issue',
 			provider: 'linear',
-			reference: 'THE-143',
+			reference: 'ENG-143',
 			subtitle: 'Todo',
 			title: 'Linear OAuth PKCE and Token Lifecycle',
 		},
@@ -152,7 +152,7 @@ test('mapLinearIssuesToWorkspaceSources: produces linear issue picker sources', 
 			id: 'issue-2',
 			kind: 'issue',
 			provider: 'linear',
-			reference: 'THE-150',
+			reference: 'ENG-150',
 			subtitle: undefined,
 			title: 'Terminal polish',
 		},

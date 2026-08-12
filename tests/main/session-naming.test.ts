@@ -53,7 +53,7 @@ function openFixture(): Fixture {
 	database
 		.prepare(
 			`INSERT INTO workspaces (id, repository_id, slug, name, path, branch_name, metadata_json)
-			 VALUES ('ws-n', 'repo-n', 'n', 'N', '/tmp/ensemblr/n/ws', 'psoldunov/placeholder', '{}')`,
+			 VALUES ('ws-n', 'repo-n', 'n', 'N', '/tmp/ensemblr/n/ws', 'octocat/placeholder', '{}')`,
 		)
 		.run();
 

@@ -10,7 +10,7 @@ describe('bareBranchName', () => {
 
 	it('leaves an already-bare name alone', () => {
 		expect(bareBranchName('master')).toBe('master');
-		expect(bareBranchName('psoldunov/feature-x')).toBe('psoldunov/feature-x');
+		expect(bareBranchName('octocat/feature-x')).toBe('octocat/feature-x');
 	});
 
 	it('only strips a leading qualifier', () => {

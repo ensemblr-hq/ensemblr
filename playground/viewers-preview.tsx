@@ -69,7 +69,7 @@ const COMMENTS = new Map<string, readonly DiffComment[]>([
 		'I4',
 		[
 			{
-				author: 'philipp',
+				author: 'octocat',
 				body: 'Worth pulling the host table out to config — a third provider is already queued.',
 				id: 'local-1',
 				source: 'local',
@@ -97,7 +97,7 @@ const COMMENTS = new Map<string, readonly DiffComment[]>([
 		'N35',
 		[
 			{
-				author: 'philipp',
+				author: 'octocat',
 				body: 'Handled in the follow-up.',
 				id: 'local-2',
 				isResolved: true,

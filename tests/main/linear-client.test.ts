@@ -46,7 +46,7 @@ const ISSUE_NODE = {
 	description: 'Body',
 	dueDate: null,
 	id: 'issue-1',
-	identifier: 'THE-1',
+	identifier: 'ENG-1',
 	labels: { nodes: [] },
 	priority: 2,
 	project: null,
@@ -54,7 +54,7 @@ const ISSUE_NODE = {
 	team: { id: 'team-1', key: 'THE', name: 'Theatre' },
 	title: 'First issue',
 	updatedAt: '2026-06-11T00:00:00.000Z',
-	url: 'https://linear.app/x/issue/THE-1',
+	url: 'https://linear.app/x/issue/ENG-1',
 };
 
 async function expectServiceError(
@@ -182,7 +182,7 @@ test('listIssues: sends bearer auth and the team filter, maps nodes', async () =
 
 	assert.strictEqual(page.hasNextPage, true);
 	assert.strictEqual(page.endCursor, 'cursor-1');
-	assert.strictEqual(page.nodes[0]?.identifier, 'THE-1');
+	assert.strictEqual(page.nodes[0]?.identifier, 'ENG-1');
 	assert.strictEqual(requests[0]?.headers.authorization, 'Bearer token-1');
 	assert.deepStrictEqual(
 		(requests[0]?.body.variables as Record<string, unknown> | undefined)
@@ -196,7 +196,7 @@ test('getIssue: maps a missing issue to not-found', async () => {
 		Response.json({ data: { issue: null } }),
 	);
 
-	await expectServiceError(client.getIssue('THE-404'), (error) => {
+	await expectServiceError(client.getIssue('ENG-404'), (error) => {
 		assert.strictEqual(error.code, 'not-found');
 	});
 });

@@ -338,8 +338,8 @@ test('probe reports a signed-in account and a healthy roll-up', async () => {
 	const { queryFn, stub } = createQueryStub({
 		account: {
 			apiProvider: 'firstParty',
-			email: 'philipp@theswisscheese.com',
-			organization: 'The Swiss Cheese',
+			email: 'dev@example.com',
+			organization: 'Example Org',
 			subscriptionType: 'Max 20x',
 			tokenSource: 'keychain',
 		},
@@ -371,8 +371,8 @@ test('probe reports a signed-in account and a healthy roll-up', async () => {
 	expect(readiness.version).toBe('2.1.220 (Claude Code)');
 	expect(readiness.account).toEqual({
 		apiProvider: 'firstParty',
-		email: 'philipp@theswisscheese.com',
-		organization: 'The Swiss Cheese',
+		email: 'dev@example.com',
+		organization: 'Example Org',
 		subscriptionType: 'Max 20x',
 		tokenSource: 'keychain',
 	});

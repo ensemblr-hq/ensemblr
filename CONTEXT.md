@@ -1,4 +1,3 @@
-<!-- TODO: Purge from git history when v1 is live -->
 # Ensemblr
 
 Ensemblr is a macOS workbench for running coding-agent work in isolated project workspaces. Isolation is the product: every stream of work gets its own worktree, branch, and review path. **Pi** and **Claude Code** are its two first-class agent runtimes, each driving native chat tabs behind one adapter contract; third-party CLIs also run alongside them as terminal harnesses, and a permission-gated control surface lets agents drive the app itself.

@@ -12,14 +12,14 @@ function createWorkspaceRow(
 	return {
 		archivedAt: null,
 		baseBranch: 'main',
-		branchName: 'feat/the-143-linear-oauth',
+		branchName: 'feat/eng-143-linear-oauth',
 		createdAt: '2026-06-11T12:00:00.000Z',
 		id: 'workspace-1',
 		metadata,
-		name: 'THE-143 Linear OAuth',
-		path: '/tmp/workspaces/the-143',
+		name: 'ENG-143 Linear OAuth',
+		path: '/tmp/workspaces/eng-143',
 		repositoryId: 'repository-1',
-		slug: 'the-143-linear-oauth',
+		slug: 'eng-143-linear-oauth',
 		updatedAt: '2026-06-11T12:00:00.000Z',
 	};
 }
@@ -42,12 +42,12 @@ function createRepositoryRow(
 
 const LINKED_ISSUE_METADATA = {
 	id: 'issue-1',
-	identifier: 'THE-143',
+	identifier: 'ENG-143',
 	provider: 'linear',
 	teamKey: 'THE',
 	teamName: 'Theseus',
 	title: 'Linear OAuth PKCE and Token Lifecycle',
-	url: 'https://linear.app/acme/issue/THE-143',
+	url: 'https://linear.app/acme/issue/ENG-143',
 };
 
 test('landing summary maps linked-issue metadata to the linked-issue kind', () => {
@@ -59,14 +59,14 @@ test('landing summary maps linked-issue metadata to the linked-issue kind', () =
 
 	const landing = projects[0]?.workspaces[0]?.landingSummary;
 	expect(landing?.kind).toBe('linked-issue');
-	expect(landing?.headline).toBe('Workspace created from THE-143');
+	expect(landing?.headline).toBe('Workspace created from ENG-143');
 	expect(landing?.linkedIssue).toEqual({
 		provider: 'linear',
-		reference: 'THE-143',
+		reference: 'ENG-143',
 		remoteId: 'issue-1',
 		subtitle: 'Theseus',
 		title: 'Linear OAuth PKCE and Token Lifecycle',
-		url: 'https://linear.app/acme/issue/THE-143',
+		url: 'https://linear.app/acme/issue/ENG-143',
 	});
 });
 

@@ -100,7 +100,7 @@ function conflictLandingSummary(): WorkspaceLandingSummary {
 	return {
 		branchSource: {
 			baseBranch: BASE_BRANCH,
-			branchName: 'psoldunov/merge-conflicts',
+			branchName: 'octocat/merge-conflicts',
 			detail: `Branched from ${BASE_BRANCH}`,
 		},
 		copiedFiles: { count: 0, detail: 'Nothing to copy', state: 'copied' },

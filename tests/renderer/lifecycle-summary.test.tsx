@@ -14,14 +14,14 @@ import {
 test('workspaceSummaryRows lists workspace, branch, and path', () => {
 	const rows = workspaceSummaryRows({
 		...getDefaultWorkspace(),
-		branchName: 'psoldunov/fix-archive',
+		branchName: 'octocat/fix-archive',
 		name: 'ottawa',
 		pathLabel: '~/Projects/ensemblr/ottawa',
 	});
 
 	expect(rows).toEqual([
 		{ label: 'Workspace', value: 'ottawa' },
-		{ label: 'Branch', mono: true, value: 'psoldunov/fix-archive' },
+		{ label: 'Branch', mono: true, value: 'octocat/fix-archive' },
 		{ label: 'Path', mono: true, value: '~/Projects/ensemblr/ottawa' },
 	]);
 });

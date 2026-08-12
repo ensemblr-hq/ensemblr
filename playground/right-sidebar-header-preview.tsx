@@ -256,7 +256,7 @@ function ChildComponentStates() {
 							<PullRequestNumberButton
 								number={15}
 								tone={tone}
-								url='https://github.com/psoldunov/ensemblr/pull/15'
+								url='https://github.com/ensemblr-hq/ensemblr/pull/15'
 							/>
 						</PillCell>
 					))}

@@ -28,7 +28,7 @@ const COMMENT: CommentPreviewPayload = {
 	provider: 'github-actions',
 	replies: [
 		{
-			author: 'psoldunov',
+			author: 'octocat',
 			body: 'Moved it behind a dynamic import.',
 			createdAt: '2026-07-20T10:00:00.000Z',
 			id: 'c2',

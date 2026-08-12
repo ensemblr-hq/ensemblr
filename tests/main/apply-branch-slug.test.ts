@@ -15,7 +15,7 @@ const database = {} as never;
 
 function workspaceRow(overrides: Record<string, unknown> = {}) {
 	return {
-		branchName: 'psoldunov/bach',
+		branchName: 'octocat/bach',
 		metadataJson: JSON.stringify({ placeholderName: true }),
 		name: 'bach',
 		...overrides,
@@ -41,7 +41,7 @@ describe('applyBranchSlug', () => {
 		const renameWorkspace = vi
 			.fn()
 			.mockResolvedValue(
-				renameResult('add-dark-mode', 'psoldunov/add-dark-mode'),
+				renameResult('add-dark-mode', 'octocat/add-dark-mode'),
 			);
 
 		const result = await applyBranchSlug({
@@ -53,14 +53,14 @@ describe('applyBranchSlug', () => {
 		});
 
 		expect(renameWorkspace).toHaveBeenCalledWith({
-			branchName: 'psoldunov/add-dark-mode',
+			branchName: 'octocat/add-dark-mode',
 			name: 'add-dark-mode',
 			requirePlaceholderName: true,
 			workspaceId: 'ws-1',
 		});
 		expect(result).toMatchObject({
 			applied: true,
-			branchName: 'psoldunov/add-dark-mode',
+			branchName: 'octocat/add-dark-mode',
 			name: 'add-dark-mode',
 		});
 	});
@@ -68,7 +68,7 @@ describe('applyBranchSlug', () => {
 	test('reports an already-named workspace as settled without renaming it', async () => {
 		selectWorkspace.mockReturnValue(
 			workspaceRow({
-				branchName: 'psoldunov/add-dark-mode',
+				branchName: 'octocat/add-dark-mode',
 				metadataJson: JSON.stringify({
 					placeholderName: true,
 					renamedAt: '2026-06-16T00:00:00Z',
@@ -107,7 +107,7 @@ describe('applyBranchSlug', () => {
 		expect(renameWorkspace).not.toHaveBeenCalled();
 		expect(result).toMatchObject({
 			applied: false,
-			branchName: 'psoldunov/bach',
+			branchName: 'octocat/bach',
 			name: 'bach',
 		});
 		expect(result.message).toContain('turned off');
@@ -134,7 +134,7 @@ describe('applyBranchSlug', () => {
 		selectWorkspace.mockReturnValue(workspaceRow());
 		const renameWorkspace = vi
 			.fn()
-			.mockResolvedValue(renameResult('bach', 'psoldunov/bach', false));
+			.mockResolvedValue(renameResult('bach', 'octocat/bach', false));
 
 		const result = await applyBranchSlug({
 			database,
@@ -166,7 +166,7 @@ describe('applyBranchSlug', () => {
 		const renameWorkspace = vi
 			.fn()
 			.mockImplementation(async ({ name }: { name: string }) =>
-				renameResult(name, `psoldunov/${name}`),
+				renameResult(name, `octocat/${name}`),
 			);
 
 		await applyBranchSlug({
@@ -250,14 +250,14 @@ describe('applyBranchSlug: a branch the user asked to rename', () => {
 	test('renames a named branch when the user asked for it', async () => {
 		selectWorkspace.mockReturnValue(
 			workspaceRow({
-				branchName: 'psoldunov/add-dark-mode',
+				branchName: 'octocat/add-dark-mode',
 				metadataJson: JSON.stringify({ branchNamed: true }),
 				name: 'add-dark-mode',
 			}),
 		);
 		const renameWorkspace = vi
 			.fn()
-			.mockResolvedValue(renameResult('add-dark-mode', 'psoldunov/dark-theme'));
+			.mockResolvedValue(renameResult('add-dark-mode', 'octocat/dark-theme'));
 
 		const result = await applyBranchSlug({
 			database,
@@ -269,14 +269,14 @@ describe('applyBranchSlug: a branch the user asked to rename', () => {
 		});
 
 		expect(renameWorkspace).toHaveBeenCalledWith({
-			branchName: 'psoldunov/dark-theme',
+			branchName: 'octocat/dark-theme',
 			name: 'add-dark-mode',
 			requirePlaceholderName: false,
 			workspaceId: 'ws-1',
 		});
 		expect(result).toMatchObject({
 			applied: true,
-			branchName: 'psoldunov/dark-theme',
+			branchName: 'octocat/dark-theme',
 		});
 	});
 
@@ -338,7 +338,7 @@ describe('applyBranchSlug: a workspace the user has already titled', () => {
 		);
 		const renameWorkspace = vi
 			.fn()
-			.mockResolvedValue(renameResult('My Feature', 'psoldunov/add-dark-mode'));
+			.mockResolvedValue(renameResult('My Feature', 'octocat/add-dark-mode'));
 
 		const result = await applyBranchSlug({
 			database,
@@ -349,14 +349,14 @@ describe('applyBranchSlug: a workspace the user has already titled', () => {
 		});
 
 		expect(renameWorkspace).toHaveBeenCalledWith({
-			branchName: 'psoldunov/add-dark-mode',
+			branchName: 'octocat/add-dark-mode',
 			name: 'My Feature',
 			requirePlaceholderName: true,
 			workspaceId: 'ws-1',
 		});
 		expect(result).toMatchObject({
 			applied: true,
-			branchName: 'psoldunov/add-dark-mode',
+			branchName: 'octocat/add-dark-mode',
 			name: 'My Feature',
 		});
 		expect(result.message).toContain('keeps the name "My Feature"');
@@ -369,7 +369,7 @@ describe('applyBranchSlug: a workspace the user has already titled', () => {
 		selectWorkspace.mockReturnValue(workspaceRow());
 		const renameWorkspace = vi
 			.fn()
-			.mockResolvedValue(renameResult('bach', 'psoldunov/add-dark-mode'));
+			.mockResolvedValue(renameResult('bach', 'octocat/add-dark-mode'));
 
 		const result = await applyBranchSlug({
 			database,
@@ -380,7 +380,7 @@ describe('applyBranchSlug: a workspace the user has already titled', () => {
 		});
 
 		expect(renameWorkspace).toHaveBeenCalledWith({
-			branchName: 'psoldunov/add-dark-mode',
+			branchName: 'octocat/add-dark-mode',
 			name: 'add-dark-mode',
 			requirePlaceholderName: true,
 			workspaceId: 'ws-1',

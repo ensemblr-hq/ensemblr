@@ -18,7 +18,7 @@ const COMMENTS: GithubCommentWire[] = [
 			'',
 			'| Project | Deployment | Actions | Updated (UTC) |',
 			'| :--- | :----- | :------ | :------ |',
-			'| <a href="https://vercel.com/almost-always/inherence-dev"><sup><img src="https://vercel.com/api/www/avatar?projectId=prj_i7a8&teamId=team_WVtS&s=32" width="16" height="16" align="middle" alt="" /></sup></a> [inherence-dev](https://vercel.com/almost-always/inherence-dev) | ![Ready](https://vercel.com/static/status/ready.svg) [Ready](https://vercel.com/almost-always/inherence-dev/9BrxSVBp8f1xECeMNFLxEz9eD2od) | [Preview](https://inherence-dev-git-psoldunov-import-cryptog-a81bba-almost-always.vercel.app) | Aug 4, 2026 6:33am |',
+			'| <a href="https://vercel.com/almost-always/inherence-dev"><sup><img src="https://vercel.com/api/www/avatar?projectId=prj_i7a8&teamId=team_WVtS&s=32" width="16" height="16" align="middle" alt="" /></sup></a> [inherence-dev](https://vercel.com/almost-always/inherence-dev) | ![Ready](https://vercel.com/static/status/ready.svg) [Ready](https://vercel.com/almost-always/inherence-dev/9BrxSVBp8f1xECeMNFLxEz9eD2od) | [Preview](https://inherence-dev-git-octocat-import-cryptog-a81bba-almost-always.vercel.app) | Aug 4, 2026 6:33am |',
 			'',
 		].join('\n'),
 		createdAt: '2026-08-04T09:12:00.000Z',
@@ -61,7 +61,7 @@ const COMMENTS: GithubCommentWire[] = [
 		path: 'src/app/(site)/cryptography/page.tsx',
 		replies: [
 			{
-				author: 'psoldunov',
+				author: 'octocat',
 				body: 'Moved the import behind `next/dynamic`, so the route stays client-safe.',
 				createdAt: '2026-08-04T10:02:00.000Z',
 				id: 'actions-2-reply',
@@ -79,7 +79,7 @@ const SUMMARIES = buildPullRequestShellModel({
 		branchSync: {
 			ahead: 0,
 			behind: 0,
-			branchName: 'psoldunov/import-cryptography-page',
+			branchName: 'octocat/import-cryptography-page',
 			hasUpstream: true,
 		},
 		pullRequest: {
@@ -90,7 +90,7 @@ const SUMMARIES = buildPullRequestShellModel({
 			comments: COMMENTS,
 			deletions: 3,
 			deployments: [],
-			headRefName: 'psoldunov/import-cryptography-page',
+			headRefName: 'octocat/import-cryptography-page',
 			headRefOid: 'abc123',
 			isDraft: false,
 			mergeable: 'mergeable',

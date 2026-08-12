@@ -921,7 +921,7 @@ export type LinearAgentStatus =
  */
 export interface AgentLinearIssue {
 	id: string;
-	/** Human key, e.g. `THE-106` — what a branch, PR, or commit cites. */
+	/** Human key, e.g. `ENG-106` — what a branch, PR, or commit cites. */
 	identifier: string;
 	title: string;
 	url: string;
@@ -1001,7 +1001,7 @@ export interface LinearListIssuesResult extends LinearAgentOutcome {
 
 /** Args for `linearGetIssue`: read one issue with its comments. */
 export interface LinearGetIssueArgs {
-	/** Issue uuid or its human identifier, e.g. `THE-106`. */
+	/** Issue uuid or its human identifier, e.g. `ENG-106`. */
 	issueId: string;
 	refresh?: boolean;
 }

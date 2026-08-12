@@ -66,7 +66,7 @@ function createDatabaseFixture(t: TestContext): DatabaseSync {
 		mkdirSync(worktreePath, { recursive: true });
 		insertWorkspaceRow({
 			baseBranch: 'main',
-			branchName: `philipp/${workspace.name}`,
+			branchName: `octocat/${workspace.name}`,
 			database: connection.database,
 			id: workspace.id,
 			metadataJson: '{}',

@@ -18,7 +18,7 @@ function linearIssue(
 		description: 'The composer drops attachments on send.',
 		dueDate: null,
 		id: 'issue-1',
-		identifier: 'THE-106',
+		identifier: 'ENG-106',
 		labels: [{ color: null, id: 'l1', name: 'bug' }],
 		priority: 1,
 		projectId: null,
@@ -30,10 +30,10 @@ function linearIssue(
 		syncedAt: null,
 		teamId: null,
 		teamKey: null,
-		teamName: 'The Swiss Cheese',
+		teamName: 'Example Org',
 		title: 'Attachments vanish on send',
 		updatedAt: '2026-08-11T10:00:00.000Z',
-		url: 'https://linear.app/x/issue/THE-106',
+		url: 'https://linear.app/x/issue/ENG-106',
 		...overrides,
 	};
 }
@@ -56,8 +56,8 @@ function githubIssue(
 
 describe('issueDocumentFilename', () => {
 	test('builds a readable filename from the issue reference', () => {
-		expect(issueDocumentFilename('linear', 'THE-106')).toBe(
-			'linear-issue-the-106.md',
+		expect(issueDocumentFilename('linear', 'ENG-106')).toBe(
+			'linear-issue-eng-106.md',
 		);
 		expect(issueDocumentFilename('github', '#42')).toBe('github-issue-42.md');
 	});
@@ -80,8 +80,8 @@ describe('formatLinearIssueDocument', () => {
 			},
 		]);
 
-		expect(document).toContain('# THE-106: Attachments vanish on send');
-		expect(document).toContain('- **URL:** https://linear.app/x/issue/THE-106');
+		expect(document).toContain('# ENG-106: Attachments vanish on send');
+		expect(document).toContain('- **URL:** https://linear.app/x/issue/ENG-106');
 		expect(document).toContain('- **Status:** In Progress');
 		expect(document).toContain('- **Priority:** Urgent');
 		expect(document).toContain('- **Assignee:** Ada');

@@ -52,15 +52,15 @@ INSERT INTO repositories (id, slug, name, path, default_branch)
 VALUES ('repo-upgrade', 'upgrade', 'Upgrade', '/tmp/ensemblr/upgrade', 'main');
 
 INSERT INTO workspaces (id, repository_id, slug, name, path, branch_name, base_branch)
-VALUES ('ws-upgrade', 'repo-upgrade', 'the-130', 'THE-130', '/tmp/ensemblr/workspaces/the-130', 'philipp/the-130', 'main');
+VALUES ('ws-upgrade', 'repo-upgrade', 'eng-130', 'ENG-130', '/tmp/ensemblr/workspaces/eng-130', 'octocat/eng-130', 'main');
 
 INSERT INTO pi_sessions (
 	id, workspace_id, pi_session_id, executable_id, executable_path, model,
 	thinking_level, status, last_error, cwd, label, closed_at, metadata_json
 )
 VALUES
-	('pi-session-1', 'ws-upgrade', 'runtime-session-42', 'pi-default', '/usr/local/bin/pi', 'gpt-5.5', 'high', 'streaming', NULL, '/tmp/ensemblr/workspaces/the-130', 'Main chat', NULL, '{"seeded":"one"}'),
-	('pi-session-2', 'ws-upgrade', NULL, NULL, NULL, NULL, NULL, 'closed', 'spawn failed', '/tmp/ensemblr/workspaces/the-130', NULL, '2026-06-01T00:00:00.000Z', '{}');
+	('pi-session-1', 'ws-upgrade', 'runtime-session-42', 'pi-default', '/usr/local/bin/pi', 'gpt-5.5', 'high', 'streaming', NULL, '/tmp/ensemblr/workspaces/eng-130', 'Main chat', NULL, '{"seeded":"one"}'),
+	('pi-session-2', 'ws-upgrade', NULL, NULL, NULL, NULL, NULL, 'closed', 'spawn failed', '/tmp/ensemblr/workspaces/eng-130', NULL, '2026-06-01T00:00:00.000Z', '{}');
 
 INSERT INTO pi_session_branches (id, pi_session_id, parent_branch_id, forked_from_turn_id, kind, label, metadata_json)
 VALUES
@@ -351,7 +351,7 @@ INSERT INTO repositories (id, slug, name, path, default_branch)
 VALUES ('repo-1', 'ensemblr', 'Ensemblr', '/tmp/ensemblr/repo', 'master');
 
 INSERT INTO workspaces (id, repository_id, slug, name, path, branch_name, base_branch)
-VALUES ('workspace-1', 'repo-1', 'the-103', 'THE-103', '/tmp/ensemblr/workspaces/the-103', 'philipp/the-103', 'master');
+VALUES ('workspace-1', 'repo-1', 'eng-103', 'ENG-103', '/tmp/ensemblr/workspaces/eng-103', 'octocat/eng-103', 'master');
 
 INSERT INTO settings (id, scope, scope_id, key, value_json)
 VALUES ('setting-1', 'repository', 'repo-1', 'setup.autoRun', 'false');
@@ -372,7 +372,7 @@ INSERT INTO todos (id, workspace_id, session_id, title, position)
 VALUES ('todo-1', 'workspace-1', 'session-1', 'Add migrations', 1);
 
 INSERT INTO integration_metadata (id, provider, resource_type, resource_id, external_id, metadata_json)
-VALUES ('integration-1', 'linear', 'issue', 'THE-103', 'THE-103', '{"status":"In Progress"}');
+VALUES ('integration-1', 'linear', 'issue', 'ENG-103', 'ENG-103', '{"status":"In Progress"}');
 
 INSERT INTO process_records (id, workspace_id, session_id, kind, status, pid, command_label)
 VALUES ('process-1', 'workspace-1', 'session-1', 'system', 'running', 1234, 'database smoke test');
@@ -426,10 +426,10 @@ INSERT INTO repositories (id, slug, name, path, default_branch)
 VALUES ('repo-agent-1', 'agent-runtime', 'Agent Runtime', '/tmp/ensemblr/agent-runtime', 'main');
 
 INSERT INTO workspaces (id, repository_id, slug, name, path, branch_name, base_branch)
-VALUES ('ws-agent-1', 'repo-agent-1', 'the-128', 'THE-128', '/tmp/ensemblr/workspaces/the-128', 'philipp/the-128', 'main');
+VALUES ('ws-agent-1', 'repo-agent-1', 'eng-128', 'ENG-128', '/tmp/ensemblr/workspaces/eng-128', 'octocat/eng-128', 'main');
 
 INSERT INTO agent_sessions (id, workspace_id, runtime_session_id, executable_id, model, status, cwd)
-VALUES ('agent-session-1', 'ws-agent-1', 'agent-runtime-session-7', 'pi-default', 'gpt-5.5', 'streaming', '/tmp/ensemblr/workspaces/the-128');
+VALUES ('agent-session-1', 'ws-agent-1', 'agent-runtime-session-7', 'pi-default', 'gpt-5.5', 'streaming', '/tmp/ensemblr/workspaces/eng-128');
 
 INSERT INTO agent_session_branches (id, agent_session_id, kind)
 VALUES ('branch-main', 'agent-session-1', 'main');
@@ -508,10 +508,10 @@ INSERT INTO repositories (id, slug, name, path, default_branch)
 VALUES ('repo-agent-2', 'agent-runtime-2', 'Agent Runtime 2', '/tmp/ensemblr/agent-runtime-2', 'main');
 
 INSERT INTO workspaces (id, repository_id, slug, name, path)
-VALUES ('ws-agent-2', 'repo-agent-2', 'the-129', 'THE-129', '/tmp/ensemblr/workspaces/the-129');
+VALUES ('ws-agent-2', 'repo-agent-2', 'eng-129', 'ENG-129', '/tmp/ensemblr/workspaces/eng-129');
 
 INSERT INTO agent_sessions (id, workspace_id, status, cwd)
-VALUES ('agent-session-2', 'ws-agent-2', 'idle', '/tmp/ensemblr/workspaces/the-129');
+VALUES ('agent-session-2', 'ws-agent-2', 'idle', '/tmp/ensemblr/workspaces/eng-129');
 
 INSERT INTO agent_session_branches (id, agent_session_id, kind)
 VALUES ('branch-cascade', 'agent-session-2', 'main');
@@ -602,7 +602,7 @@ test('migration 014 carries pre-existing pi_* rows into the agent_* tables', (t)
 		[
 			{
 				closed_at: null,
-				cwd: '/tmp/ensemblr/workspaces/the-130',
+				cwd: '/tmp/ensemblr/workspaces/eng-130',
 				executable_id: 'pi-default',
 				executable_path: '/usr/local/bin/pi',
 				id: 'pi-session-1',
@@ -618,7 +618,7 @@ test('migration 014 carries pre-existing pi_* rows into the agent_* tables', (t)
 			},
 			{
 				closed_at: '2026-06-01T00:00:00.000Z',
-				cwd: '/tmp/ensemblr/workspaces/the-130',
+				cwd: '/tmp/ensemblr/workspaces/eng-130',
 				executable_id: null,
 				executable_path: null,
 				id: 'pi-session-2',
@@ -1175,7 +1175,7 @@ INSERT INTO workspaces (
 	metadata_json
 )
 VALUES
-	('workspace-1', 'repo-1', 'the-120', 'THE-120', '/tmp/ensemblr/workspaces/the-120', 'philipp/the-120', 'master', NULL, '{"linearIssue":"THE-120"}'),
+	('workspace-1', 'repo-1', 'eng-120', 'ENG-120', '/tmp/ensemblr/workspaces/eng-120', 'octocat/eng-120', 'master', NULL, '{"linearIssue":"ENG-120"}'),
 	('workspace-archived', 'repo-1', 'archived', 'Archived', '/tmp/ensemblr/workspaces/archived', 'archived', 'master', '2026-06-01T00:00:00.000Z', '{}'),
 	('workspace-2', 'repo-2', 'draft', 'Draft', '/tmp/agent-lab/workspaces/draft', NULL, NULL, NULL, '{bad');
 `);
@@ -1200,7 +1200,7 @@ VALUES
 	);
 	assert.equal(
 		snapshot.repositories[1]?.workspaces[0]?.metadata.linearIssue,
-		'THE-120',
+		'ENG-120',
 	);
 });
 
@@ -1271,7 +1271,7 @@ INSERT INTO repositories (id, slug, name, path, default_branch)
 VALUES ('repo-untitled', 'untitled', 'Untitled', '/tmp/ensemblr/untitled', 'main');
 
 INSERT INTO workspaces (id, repository_id, slug, name, path, branch_name, base_branch)
-VALUES ('ws-untitled', 'repo-untitled', 'the-200', 'THE-200', '/tmp/ensemblr/workspaces/the-200', 'philipp/the-200', 'main');
+VALUES ('ws-untitled', 'repo-untitled', 'eng-200', 'ENG-200', '/tmp/ensemblr/workspaces/eng-200', 'octocat/eng-200', 'main');
 
 INSERT INTO chat_tabs (id, workspace_id, kind, title, full_title, position, metadata_json)
 VALUES

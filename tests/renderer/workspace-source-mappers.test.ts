@@ -25,7 +25,7 @@ function branch(
 	return {
 		hasWorkspace: false,
 		isDefault: false,
-		name: 'psoldunov/feature-x',
+		name: 'octocat/feature-x',
 		workspaceId: null,
 		...over,
 	};
@@ -225,13 +225,13 @@ test('the default branch row offers Create, not Use branch', () => {
 // raw branch name or PR title through fails creation with `name-invalid`.
 test('a slashed branch name is sanitized into a usable workspace name', () => {
 	const seed = workspaceSeedFromSourceItem(
-		{ branch: branch({ name: 'psoldunov/feat/nested-x' }), kind: 'branch' },
+		{ branch: branch({ name: 'octocat/feat/nested-x' }), kind: 'branch' },
 		'use-branch',
 	);
 
-	expect(seed.name).toBe('psoldunov feat nested-x');
+	expect(seed.name).toBe('octocat feat nested-x');
 	expect(seed.branchPlan).toEqual({
-		branch: 'psoldunov/feat/nested-x',
+		branch: 'octocat/feat/nested-x',
 		kind: 'adopt',
 	});
 });

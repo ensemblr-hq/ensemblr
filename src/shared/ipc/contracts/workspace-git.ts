@@ -1,6 +1,6 @@
 /**
- * Wire contracts for workspace git status and unified file diffs (THE-150,
- * THE-151). Git/worktree state is the source of truth; the renderer only
+ * Wire contracts for workspace git status and unified file diffs (ENG-150,
+ * ENG-151). Git/worktree state is the source of truth; the renderer only
  * receives derived rows and patches.
  */
 

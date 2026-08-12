@@ -549,7 +549,7 @@ carrying one out. Both are purely additive if that changes.
 Ids, not names: `stateId`, `assigneeId`, and `teamId` are Linear uuids, which is
 what makes `ensemblr_linear_get_metadata` the first call of any update sequence.
 `issueId` is the exception and takes either the uuid or the human identifier
-(`THE-106`) — an identifier misses the local cache and always reaches Linear.
+(`ENG-123`) — an identifier misses the local cache and always reaches Linear.
 
 ## Orchestration in practice
 

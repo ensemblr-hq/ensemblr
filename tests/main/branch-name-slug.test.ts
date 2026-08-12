@@ -16,8 +16,8 @@ import {
 
 describe('composeRenamedBranch', () => {
 	test('preserves a single-segment prefix', () => {
-		expect(composeRenamedBranch('psoldunov/bach', 'add-dark-mode')).toBe(
-			'psoldunov/add-dark-mode',
+		expect(composeRenamedBranch('octocat/bach', 'add-dark-mode')).toBe(
+			'octocat/add-dark-mode',
 		);
 	});
 
@@ -38,8 +38,8 @@ describe('composeRenamedBranch', () => {
 
 describe('joinBranchName', () => {
 	test('joins a prefix and slug with a single slash', () => {
-		expect(joinBranchName('psoldunov', 'add-dark-mode')).toBe(
-			'psoldunov/add-dark-mode',
+		expect(joinBranchName('octocat', 'add-dark-mode')).toBe(
+			'octocat/add-dark-mode',
 		);
 	});
 
@@ -48,9 +48,7 @@ describe('joinBranchName', () => {
 	});
 
 	test('collapses trailing slash(es) on the prefix', () => {
-		expect(joinBranchName('psoldunov/', 'fix-login')).toBe(
-			'psoldunov/fix-login',
-		);
+		expect(joinBranchName('octocat/', 'fix-login')).toBe('octocat/fix-login');
 		expect(joinBranchName('team/feature//', 'fix-login')).toBe(
 			'team/feature/fix-login',
 		);
@@ -59,33 +57,33 @@ describe('joinBranchName', () => {
 
 describe('nextContinuationBranchName', () => {
 	test('appends a -v1 marker to an unmarked branch', () => {
-		expect(nextContinuationBranchName('psoldunov/bach', [])).toBe(
-			'psoldunov/bach-v1',
+		expect(nextContinuationBranchName('octocat/bach', [])).toBe(
+			'octocat/bach-v1',
 		);
 	});
 
 	test('bumps an existing marker instead of stacking a second one', () => {
-		expect(nextContinuationBranchName('psoldunov/bach-v1', [])).toBe(
-			'psoldunov/bach-v2',
+		expect(nextContinuationBranchName('octocat/bach-v1', [])).toBe(
+			'octocat/bach-v2',
 		);
-		expect(nextContinuationBranchName('psoldunov/bach-v9', [])).toBe(
-			'psoldunov/bach-v10',
+		expect(nextContinuationBranchName('octocat/bach-v9', [])).toBe(
+			'octocat/bach-v10',
 		);
 	});
 
 	test('skips names already taken in the repository', () => {
 		expect(
-			nextContinuationBranchName('psoldunov/bach', [
-				'psoldunov/bach',
-				'psoldunov/bach-v1',
-				'psoldunov/bach-v2',
+			nextContinuationBranchName('octocat/bach', [
+				'octocat/bach',
+				'octocat/bach-v1',
+				'octocat/bach-v2',
 			]),
-		).toBe('psoldunov/bach-v3');
+		).toBe('octocat/bach-v3');
 	});
 
 	test('bumps a branch that already ends in a dash-v version', () => {
-		expect(nextContinuationBranchName('psoldunov/bump-eslint-v9', [])).toBe(
-			'psoldunov/bump-eslint-v10',
+		expect(nextContinuationBranchName('octocat/bump-eslint-v9', [])).toBe(
+			'octocat/bump-eslint-v10',
 		);
 	});
 
@@ -105,14 +103,12 @@ describe('nextContinuationBranchName', () => {
 
 describe('branchNameFromRef', () => {
 	test('strips the local branch prefix', () => {
-		expect(branchNameFromRef('refs/heads/psoldunov/bach')).toBe(
-			'psoldunov/bach',
-		);
+		expect(branchNameFromRef('refs/heads/octocat/bach')).toBe('octocat/bach');
 	});
 
 	test('strips the remote prefix and its remote segment', () => {
-		expect(branchNameFromRef('refs/remotes/origin/psoldunov/bach')).toBe(
-			'psoldunov/bach',
+		expect(branchNameFromRef('refs/remotes/origin/octocat/bach')).toBe(
+			'octocat/bach',
 		);
 		expect(branchNameFromRef('refs/remotes/upstream/bach-v1')).toBe('bach-v1');
 	});

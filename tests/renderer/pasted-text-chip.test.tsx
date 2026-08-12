@@ -118,19 +118,19 @@ describe('attachment chip', () => {
 		renderWithProviders(
 			<AttachmentChip
 				attachment={{
-					id: 'issue:linear:THE-106',
+					id: 'issue:linear:ENG-106',
 					kind: 'issue',
-					label: 'THE-106',
-					path: '.context/attachments/aa11bb/linear-issue-the-106.md',
+					label: 'ENG-106',
+					path: '.context/attachments/aa11bb/linear-issue-eng-106.md',
 					provider: 'linear',
 				}}
 				onRemove={vi.fn()}
 			/>,
 		);
 
-		expect(screen.getByText('THE-106')).toBeInTheDocument();
+		expect(screen.getByText('ENG-106')).toBeInTheDocument();
 		expect(
-			screen.queryByText('linear-issue-the-106.md'),
+			screen.queryByText('linear-issue-eng-106.md'),
 		).not.toBeInTheDocument();
 	});
 

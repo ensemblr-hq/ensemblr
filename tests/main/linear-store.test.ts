@@ -47,14 +47,14 @@ function createIssue(
 		description: 'Fix the OAuth callback flow.',
 		dueDate: null,
 		id: 'issue-1',
-		identifier: 'THE-143',
+		identifier: 'ENG-143',
 		priority: 1,
 		projectId: 'project-1',
 		remoteUpdatedAt: '2026-06-10T12:00:00.000Z',
 		stateId: 'state-1',
 		teamId: 'team-1',
 		title: 'Linear OAuth PKCE and Token Lifecycle',
-		url: 'https://linear.app/acme/issue/THE-143',
+		url: 'https://linear.app/acme/issue/ENG-143',
 		...overrides,
 	};
 }
@@ -66,7 +66,7 @@ test('upsertIssues: inserts and reads back a full issue record', (t) => {
 	const issue = store.getIssue('issue-1');
 
 	assert.ok(issue);
-	assert.strictEqual(issue.identifier, 'THE-143');
+	assert.strictEqual(issue.identifier, 'ENG-143');
 	assert.strictEqual(issue.priority, 1);
 	assert.deepStrictEqual(issue.data, { labels: ['bug'] });
 	assert.strictEqual(issue.syncedAt, NOW.toISOString());
@@ -93,8 +93,8 @@ test('getIssueByIdentifier: resolves cached issues by human identifier', (t) => 
 
 	store.upsertIssues([createIssue()]);
 
-	assert.strictEqual(store.getIssueByIdentifier('THE-143')?.id, 'issue-1');
-	assert.strictEqual(store.getIssueByIdentifier('THE-999'), null);
+	assert.strictEqual(store.getIssueByIdentifier('ENG-143')?.id, 'issue-1');
+	assert.strictEqual(store.getIssueByIdentifier('ENG-999'), null);
 });
 
 test('listIssues: filters by team, query, and archive state', (t) => {
@@ -104,14 +104,14 @@ test('listIssues: filters by team, query, and archive state', (t) => {
 		createIssue(),
 		createIssue({
 			id: 'issue-2',
-			identifier: 'THE-150',
+			identifier: 'ENG-150',
 			teamId: 'team-2',
 			title: 'Terminal dock polish',
 		}),
 		createIssue({
 			archivedAt: '2026-06-01T00:00:00.000Z',
 			id: 'issue-3',
-			identifier: 'THE-101',
+			identifier: 'ENG-101',
 			title: 'Archived issue',
 		}),
 	]);
@@ -129,7 +129,7 @@ test('listIssues: filters by team, query, and archive state', (t) => {
 		['issue-1'],
 	);
 	assert.deepStrictEqual(
-		store.listIssues({ query: 'THE-150' }).map((issue) => issue.id),
+		store.listIssues({ query: 'ENG-150' }).map((issue) => issue.id),
 		['issue-2'],
 	);
 	assert.strictEqual(store.listIssues({ includeArchived: true }).length, 3);
@@ -139,7 +139,7 @@ test('listIssues: escapes SQL LIKE wildcards in the query', (t) => {
 	const { store } = createFixture(t);
 
 	store.upsertIssues([
-		createIssue({ id: 'issue-2', identifier: 'THE-150', title: '100% done' }),
+		createIssue({ id: 'issue-2', identifier: 'ENG-150', title: '100% done' }),
 		createIssue(),
 	]);
 

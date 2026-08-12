@@ -54,16 +54,16 @@ const navigationSnapshot: RepositoryWorkspaceNavigationSnapshot = {
 				{
 					archivedAt: null,
 					baseBranch: 'master',
-					branchName: 'philipp/the-120',
+					branchName: 'octocat/eng-120',
 					createdAt: '2026-06-06T00:00:00.000Z',
 					id: 'workspace-1',
 					metadata: {
-						linearIssue: 'THE-120',
+						linearIssue: 'ENG-120',
 					},
-					name: 'THE-120 Sidebar nav',
-					path: '/Users/alice/Ensemblr/workspaces/ensemblr/the-120',
+					name: 'ENG-120 Sidebar nav',
+					path: '/Users/alice/Ensemblr/workspaces/ensemblr/eng-120',
 					repositoryId: 'repo-1',
-					slug: 'the-120',
+					slug: 'eng-120',
 					updatedAt: '2026-06-06T00:00:00.000Z',
 				},
 			],
@@ -120,9 +120,9 @@ test('maps SQLite navigation snapshot into workbench shell projects', () => {
 		},
 	});
 	expect(projects[0]?.workspaces[0]).toMatchObject({
-		branchName: 'philipp/the-120',
+		branchName: 'octocat/eng-120',
 		id: 'workspace-1',
-		name: 'THE-120 Sidebar nav',
+		name: 'ENG-120 Sidebar nav',
 		projectId: 'repo-1',
 		sourceSummary: 'targets master',
 	});
@@ -147,7 +147,7 @@ test('builds branch-scoped change summary targets from navigation rows', () => {
 	).toEqual([
 		{
 			scope: { baseRef: 'master', kind: 'branch' },
-			workspaceCwd: '/Users/alice/Ensemblr/workspaces/ensemblr/the-120',
+			workspaceCwd: '/Users/alice/Ensemblr/workspaces/ensemblr/eng-120',
 			workspaceId: 'workspace-1',
 		},
 		{
@@ -503,14 +503,14 @@ test('falls back inside the stored project when its stored workspace is gone', (
 			{
 				archivedAt: null,
 				baseBranch: 'master',
-				branchName: 'philipp/the-121',
+				branchName: 'octocat/eng-121',
 				createdAt: '2026-06-06T00:00:00.000Z',
 				id: 'workspace-1b',
 				metadata: {},
-				name: 'THE-121 Sibling',
-				path: '/Users/alice/Ensemblr/workspaces/ensemblr/the-121',
+				name: 'ENG-121 Sibling',
+				path: '/Users/alice/Ensemblr/workspaces/ensemblr/eng-121',
 				repositoryId: 'repo-1',
-				slug: 'the-121',
+				slug: 'eng-121',
 				updatedAt: '2026-06-06T00:00:00.000Z',
 			},
 		]),
@@ -673,7 +673,7 @@ test('renders live navigation records and true empty repository state', () => {
 		),
 	);
 
-	expect(populatedMarkup).toContain('THE-120 Sidebar nav');
+	expect(populatedMarkup).toContain('ENG-120 Sidebar nav');
 	expect(populatedMarkup).toContain('Draft workspace');
 	expect(populatedMarkup).not.toContain('2 repos');
 	expect(populatedMarkup).not.toContain('2 workspaces');

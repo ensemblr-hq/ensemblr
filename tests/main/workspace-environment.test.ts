@@ -157,7 +157,7 @@ function seedWorkspace({
 
 	insertWorkspaceRow({
 		baseBranch,
-		branchName: `philipp/${workspaceName}`,
+		branchName: `octocat/${workspaceName}`,
 		database,
 		id: workspaceId,
 		metadataJson,

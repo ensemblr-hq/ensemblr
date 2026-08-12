@@ -7,7 +7,7 @@
  */
 
 /**
- * Joins a branch prefix and slug as `<prefix>/<slug>` (e.g. `psoldunov/bach`),
+ * Joins a branch prefix and slug as `<prefix>/<slug>` (e.g. `octocat/bach`),
  * collapsing any trailing slash(es) on the prefix so the separator is always a
  * single `/`. An empty prefix yields the bare slug.
  * @param prefix - The resolved prefix (possibly empty).
@@ -21,7 +21,7 @@ export function joinBranchName(prefix: string, slug: string): string {
 
 /**
  * Re-slugs a branch in place, keeping any `prefix/` segment it already carries
- * (e.g. `psoldunov/bach` → `psoldunov/add-dark-mode`). A prefix-less branch (or
+ * (e.g. `octocat/bach` → `octocat/add-dark-mode`). A prefix-less branch (or
  * a leading-slash edge case) becomes the bare slug.
  * @param currentBranch - The workspace's existing branch name.
  * @param slug - The kebab-case slug to land on.

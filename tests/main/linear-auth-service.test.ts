@@ -134,7 +134,7 @@ function createFetchStub({
 		if (url.includes('/graphql')) {
 			return Response.json({
 				data: {
-					organization: { name: 'Swiss Cheese', urlKey: 'swiss-cheese' },
+					organization: { name: 'Example Org', urlKey: 'example-org' },
 					viewer: { email: 'alice@example.com', name: 'Alice' },
 				},
 			});
@@ -213,7 +213,7 @@ test('startLogin: completes the PKCE flow and stores tokens outside SQLite', asy
 	assert.ok(result.status === 'connected');
 	assert.strictEqual(result.snapshot.state, 'connected');
 	assert.strictEqual(result.snapshot.userName, 'Alice');
-	assert.strictEqual(result.snapshot.organizationName, 'Swiss Cheese');
+	assert.strictEqual(result.snapshot.organizationName, 'Example Org');
 
 	const accessToken = await secretStore.read({
 		key: 'linear-access-token',

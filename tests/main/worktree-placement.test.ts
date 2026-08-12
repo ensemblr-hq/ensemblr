@@ -35,11 +35,11 @@ test('does not match a branch whose name only prefixes a held one', () => {
 test('matches nested branch names in full', () => {
 	const stdout = [
 		'worktree /repos/app-workspaces/app/ravel',
-		'branch refs/heads/psoldunov/feat/nested',
+		'branch refs/heads/octocat/feat/nested',
 		'',
 	].join('\n');
 
-	expect(readWorktreePathForBranch(stdout, 'psoldunov/feat/nested')).toBe(
+	expect(readWorktreePathForBranch(stdout, 'octocat/feat/nested')).toBe(
 		'/repos/app-workspaces/app/ravel',
 	);
 	expect(readWorktreePathForBranch(stdout, 'nested')).toBeNull();

@@ -15,9 +15,9 @@ test('keeps an already-valid name untouched', () => {
 });
 
 test('turns a slashed branch name into an accepted display name', () => {
-	const name = toWorkspaceDisplayName('psoldunov/feature-x');
+	const name = toWorkspaceDisplayName('octocat/feature-x');
 
-	expect(name).toBe('psoldunov feature-x');
+	expect(name).toBe('octocat feature-x');
 	expectAccepted(name);
 });
 

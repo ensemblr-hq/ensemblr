@@ -88,12 +88,12 @@ test('reports a timeout with an actionable message, not the progress preamble', 
 			// preamble to stderr before the kill.
 			failure: failure('timeout'),
 			status: 'failure',
-			stderr: "Preparing worktree (new branch 'psoldunov/marianelli')",
+			stderr: "Preparing worktree (new branch 'octocat/marianelli')",
 		}),
 	]);
 
 	const outcome = await runWorktreeAdd({
-		branchName: 'psoldunov/marianelli',
+		branchName: 'octocat/marianelli',
 		placement: { forkRef: 'main', kind: 'create' },
 		localCommandService: service,
 		repositoryPath: '/repo',
@@ -117,12 +117,12 @@ test('surfaces the real fatal line when it follows the progress preamble', async
 			failure: failure('nonzero-exit'),
 			status: 'failure',
 			stderr:
-				"Preparing worktree (new branch 'psoldunov/marianelli')\nfatal: invalid reference: refs/heads/psoldunov/marianelli",
+				"Preparing worktree (new branch 'octocat/marianelli')\nfatal: invalid reference: refs/heads/octocat/marianelli",
 		}),
 	]);
 
 	const outcome = await runWorktreeAdd({
-		branchName: 'psoldunov/marianelli',
+		branchName: 'octocat/marianelli',
 		placement: { forkRef: 'main', kind: 'create' },
 		localCommandService: service,
 		repositoryPath: '/repo',
@@ -132,7 +132,7 @@ test('surfaces the real fatal line when it follows the progress preamble', async
 	assert.equal(outcome.status, 'failure');
 	assert.equal(
 		outcome.status === 'failure' ? outcome.message : '',
-		'fatal: invalid reference: refs/heads/psoldunov/marianelli',
+		'fatal: invalid reference: refs/heads/octocat/marianelli',
 	);
 });
 

@@ -80,7 +80,7 @@ test('prepare validates an https GitHub URL and resolves the default target', as
 	});
 
 	const result = await service.prepare({
-		url: 'https://github.com/psoldunov/ensemblr.git',
+		url: 'https://github.com/ensemblr-hq/ensemblr.git',
 	});
 
 	assert.equal(result.ok, true);
@@ -90,9 +90,9 @@ test('prepare validates an https GitHub URL and resolves the default target', as
 	assert.equal(result.preparation.repositoryName, 'ensemblr');
 	assert.equal(
 		result.preparation.sanitizedUrl,
-		'https://github.com/psoldunov/ensemblr.git',
+		'https://github.com/ensemblr-hq/ensemblr.git',
 	);
-	assert.equal(result.preparation.validatedUrl, 'psoldunov/ensemblr');
+	assert.equal(result.preparation.validatedUrl, 'ensemblr-hq/ensemblr');
 	assert.equal(
 		result.preparation.targetPath,
 		path.join(repositoriesPath, 'ensemblr'),
@@ -112,14 +112,14 @@ test('prepare accepts ssh and shorthand URL forms', async (t) => {
 	});
 
 	const ssh = await service.prepare({
-		url: 'git@github.com:psoldunov/ensemblr.git',
+		url: 'git@github.com:ensemblr-hq/ensemblr.git',
 	});
 	assert.equal(ssh.ok, true);
 	if (ssh.ok) {
-		assert.equal(ssh.preparation.validatedUrl, 'psoldunov/ensemblr');
+		assert.equal(ssh.preparation.validatedUrl, 'ensemblr-hq/ensemblr');
 	}
 
-	const shorthand = await service.prepare({ url: 'psoldunov/ensemblr' });
+	const shorthand = await service.prepare({ url: 'ensemblr-hq/ensemblr' });
 	assert.equal(shorthand.ok, true);
 	if (shorthand.ok) {
 		assert.equal(shorthand.preparation.repositoryName, 'ensemblr');
@@ -167,7 +167,7 @@ test('prepare rejects a relative destination override', async (t) => {
 
 	const result = await service.prepare({
 		destinationPath: 'relative/path',
-		url: 'https://github.com/psoldunov/ensemblr.git',
+		url: 'https://github.com/ensemblr-hq/ensemblr.git',
 	});
 
 	assert.equal(result.ok, false);
@@ -188,7 +188,7 @@ test('prepare auto-suffixes the target when the default path is already on disk'
 	});
 
 	const result = await service.prepare({
-		url: 'https://github.com/psoldunov/ensemblr.git',
+		url: 'https://github.com/ensemblr-hq/ensemblr.git',
 	});
 
 	assert.equal(result.ok, true);
@@ -220,9 +220,9 @@ test('prepare rejects the clone when another repository already tracks the remot
 			fixedNow().toISOString(),
 			fixedNow().toISOString(),
 			JSON.stringify({
-				remoteUrl: 'git@github.com:psoldunov/ensemblr.git',
+				remoteUrl: 'git@github.com:ensemblr-hq/ensemblr.git',
 			}),
-			'github.com/psoldunov/ensemblr',
+			'github.com/ensemblr-hq/ensemblr',
 		);
 
 	const databaseService: EnsemblrDatabaseService = {
@@ -252,7 +252,7 @@ test('prepare rejects the clone when another repository already tracks the remot
 
 	const result = await service.prepare({
 		// HTTPS form of the existing SSH remote — pre-flight should still match.
-		url: 'https://github.com/psoldunov/ensemblr.git',
+		url: 'https://github.com/ensemblr-hq/ensemblr.git',
 	});
 
 	assert.equal(result.ok, false);
@@ -302,7 +302,7 @@ test('start spawns gh, streams progress, and registers on success', async (t) =>
 	});
 
 	const preparation = await service.prepare({
-		url: 'https://github.com/psoldunov/ensemblr.git',
+		url: 'https://github.com/ensemblr-hq/ensemblr.git',
 	});
 	assert.equal(preparation.ok, true);
 	if (!preparation.ok) {
@@ -391,7 +391,7 @@ test('start falls back to git when gh is not installed', async (t) => {
 	});
 
 	const preparation = await service.prepare({
-		url: 'https://github.com/psoldunov/ensemblr.git',
+		url: 'https://github.com/ensemblr-hq/ensemblr.git',
 	});
 	assert.equal(preparation.ok, true);
 	if (!preparation.ok) {
@@ -426,7 +426,7 @@ test('start reports git-not-installed when both binaries are missing', async (t)
 	});
 
 	const preparation = await service.prepare({
-		url: 'https://github.com/psoldunov/ensemblr.git',
+		url: 'https://github.com/ensemblr-hq/ensemblr.git',
 	});
 	assert.equal(preparation.ok, true);
 	if (!preparation.ok) {
@@ -459,7 +459,7 @@ test('start surfaces register-failed when registration rejects the cloned repo',
 	});
 
 	const preparation = await service.prepare({
-		url: 'https://github.com/psoldunov/ensemblr.git',
+		url: 'https://github.com/ensemblr-hq/ensemblr.git',
 	});
 	assert.equal(preparation.ok, true);
 	if (!preparation.ok) {

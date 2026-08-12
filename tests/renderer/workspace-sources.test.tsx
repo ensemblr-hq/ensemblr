@@ -28,7 +28,7 @@ test('provides row actions per source', () => {
 		id: 'i1',
 		kind: 'issue',
 		provider: 'linear',
-		title: 'THE-1',
+		title: 'ENG-1',
 	};
 	const branchWithWorkspace: WorkspaceSource = {
 		hasWorkspace: true,

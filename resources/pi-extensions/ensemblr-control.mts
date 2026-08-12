@@ -931,10 +931,10 @@ export default function ensemblrControl(pi: ExtensionAPI): void {
 	tool(
 		'ensemblr_linear_get_issue',
 		'linearGetIssue',
-		'Read one Linear issue with its description, labels, and comment thread. issueId takes either the uuid or the human identifier (THE-106); an identifier always goes to Linear rather than the local cache. The description is truncated and only the most recent comments are returned — the result says how many were dropped. Check `status`: `not-found` means the id is wrong, `not-connected` means Linear is not linked.',
+		'Read one Linear issue with its description, labels, and comment thread. issueId takes either the uuid or the human identifier (ENG-106); an identifier always goes to Linear rather than the local cache. The description is truncated and only the most recent comments are returned — the result says how many were dropped. Check `status`: `not-found` means the id is wrong, `not-connected` means Linear is not linked.',
 		Type.Object({
 			issueId: Type.String({
-				description: 'Issue uuid, or its human identifier such as THE-106.',
+				description: 'Issue uuid, or its human identifier such as ENG-106.',
 			}),
 			refresh: Type.Optional(Type.Boolean()),
 		}),
@@ -953,7 +953,7 @@ export default function ensemblrControl(pi: ExtensionAPI): void {
 		'Post a comment on a Linear issue. The whole team reads it and nothing here can edit or delete it afterwards, so write it as you would a comment of your own: what you did, what you found, what is still open. Use it to record progress on a ticket rather than to talk to the user, who reads your reply instead.',
 		Type.Object({
 			issueId: Type.String({
-				description: 'Issue uuid, or its human identifier such as THE-106.',
+				description: 'Issue uuid, or its human identifier such as ENG-106.',
 			}),
 			commentBody: Type.String({ maxLength: 8000 }),
 		}),
@@ -964,7 +964,7 @@ export default function ensemblrControl(pi: ExtensionAPI): void {
 		'Change a Linear issue: its workflow state, assignee, priority (0 none, 1 urgent, 2 high, 3 medium, 4 low), title, or description. Pass at least one of those alongside issueId. stateId and assigneeId are ids from ensemblr_linear_get_metadata, never names. A state whose type is `completed` or `canceled` is REFUSED whatever you pass — agent work never closes a ticket here, and marking one canceled is the same call under a different label. Take it to In Review and say in your reply that it is ready; the user decides whether it is done.',
 		Type.Object({
 			issueId: Type.String({
-				description: 'Issue uuid, or its human identifier such as THE-106.',
+				description: 'Issue uuid, or its human identifier such as ENG-106.',
 			}),
 			stateId: Type.Optional(
 				Type.String({

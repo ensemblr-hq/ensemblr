@@ -26,13 +26,13 @@ const issueWire = (
 ): LinearIssueWire => ({
 	archivedAt: null,
 	assigneeId: 'u-1',
-	assigneeName: 'Philipp',
+	assigneeName: 'Ada',
 	cycleId: null,
 	cycleName: null,
 	description: 'Wire Linear into agent-control.',
 	dueDate: null,
 	id: 'i-1',
-	identifier: 'THE-106',
+	identifier: 'ENG-106',
 	labels: [{ color: null, id: 'l-1', name: 'agent' }],
 	priority: 2,
 	projectId: 'p-1',
@@ -44,17 +44,17 @@ const issueWire = (
 	syncedAt: '2026-08-08T00:00:00.000Z',
 	teamId: 't-1',
 	teamKey: 'THE',
-	teamName: 'The Swiss Cheese',
+	teamName: 'Example Org',
 	title: 'Expose Linear to agents',
 	updatedAt: '2026-08-08T00:00:00.000Z',
-	url: 'https://linear.app/the/issue/THE-106',
+	url: 'https://linear.app/the/issue/ENG-106',
 	...overrides,
 });
 
 const commentWire = (
 	overrides: Partial<LinearCommentWire> = {},
 ): LinearCommentWire => ({
-	authorName: 'Philipp',
+	authorName: 'Ada',
 	body: 'looks good',
 	createdAt: '2026-08-08T00:00:00.000Z',
 	id: 'c-1',
@@ -162,10 +162,10 @@ describe('linear port: availability', () => {
 
 		const results = await Promise.all([
 			port.listIssues({}),
-			port.getIssue({ issueId: 'THE-1' }),
+			port.getIssue({ issueId: 'ENG-1' }),
 			port.getMetadata({}),
-			port.createComment({ commentBody: 'hi', issueId: 'THE-1' }),
-			port.updateIssue({ issueId: 'THE-1', priority: 1 }),
+			port.createComment({ commentBody: 'hi', issueId: 'ENG-1' }),
+			port.updateIssue({ issueId: 'ENG-1', priority: 1 }),
 		]);
 
 		for (const result of results) {
@@ -213,7 +213,7 @@ describe('linear port: availability', () => {
 			},
 		});
 
-		const result = await makeLinearPort(deps).getIssue({ issueId: 'THE-999' });
+		const result = await makeLinearPort(deps).getIssue({ issueId: 'ENG-999' });
 
 		expect(result.status).toBe('not-found');
 		expect(result.issue).toBeNull();
@@ -233,7 +233,7 @@ describe('linear port: availability', () => {
 
 		const result = await makeLinearPort(deps).createComment({
 			commentBody: 'note',
-			issueId: 'THE-106',
+			issueId: 'ENG-106',
 		});
 
 		expect(result.status).toBe('failed');
@@ -272,7 +272,7 @@ describe('linear port: the Done guard', () => {
 		});
 
 		const result = await makeLinearPort(deps).updateIssue({
-			issueId: 'THE-106',
+			issueId: 'ENG-106',
 			stateId: 's-done',
 		});
 
@@ -292,7 +292,7 @@ describe('linear port: the Done guard', () => {
 		});
 
 		const result = await makeLinearPort(deps).updateIssue({
-			issueId: 'THE-106',
+			issueId: 'ENG-106',
 			stateId: 's-cancelled',
 		});
 
@@ -310,13 +310,13 @@ describe('linear port: the Done guard', () => {
 
 		const result = await makeLinearPort(deps).updateIssue({
 			assigneeId: 'u-2',
-			issueId: 'THE-106',
+			issueId: 'ENG-106',
 			stateId: 's-review',
 		});
 
 		expect(result.status).toBe('ok');
 		expect(service.updateIssue).toHaveBeenCalledWith({
-			id: 'THE-106',
+			id: 'ENG-106',
 			input: {
 				assigneeId: 'u-2',
 				description: undefined,
@@ -335,7 +335,7 @@ describe('linear port: the Done guard', () => {
 		});
 
 		const result = await makeLinearPort(deps).updateIssue({
-			issueId: 'THE-106',
+			issueId: 'ENG-106',
 			stateId: 's-unknown',
 		});
 
@@ -355,7 +355,7 @@ describe('linear port: the Done guard', () => {
 		});
 
 		const result = await makeLinearPort(deps).updateIssue({
-			issueId: 'THE-106',
+			issueId: 'ENG-106',
 			stateId: 's-untyped',
 		});
 
@@ -375,7 +375,7 @@ describe('linear port: the Done guard', () => {
 		});
 
 		const result = await makeLinearPort(deps).updateIssue({
-			issueId: 'THE-106',
+			issueId: 'ENG-106',
 			stateId: 's-started',
 		});
 
@@ -390,7 +390,7 @@ describe('linear port: the Done guard', () => {
 		const { deps, service } = makeDeps();
 
 		const result = await makeLinearPort(deps).updateIssue({
-			issueId: 'THE-106',
+			issueId: 'ENG-106',
 			title: 'Expose Linear to agents, gated',
 		});
 
@@ -406,7 +406,7 @@ describe('linear port: payload budget', () => {
 		const issues = Array.from({ length: 60 }, (_, index) =>
 			issueWire({
 				id: `i-${index}`,
-				identifier: `THE-${index}`,
+				identifier: `ENG-${index}`,
 				title: 'x'.repeat(1_000),
 			}),
 		);
@@ -433,11 +433,11 @@ describe('linear port: payload budget', () => {
 		expect(result.truncated).toBe(false);
 		expect(result.omittedIssues).toBe(0);
 		expect(result.issues[0]).toMatchObject({
-			assignee: 'Philipp',
-			identifier: 'THE-106',
+			assignee: 'Ada',
+			identifier: 'ENG-106',
 			state: 'In Progress',
 			stateType: 'started',
-			team: 'The Swiss Cheese',
+			team: 'Example Org',
 		});
 	});
 
@@ -451,7 +451,7 @@ describe('linear port: payload budget', () => {
 			},
 		});
 
-		const result = await makeLinearPort(deps).getIssue({ issueId: 'THE-106' });
+		const result = await makeLinearPort(deps).getIssue({ issueId: 'ENG-106' });
 
 		expect(result.truncated).toBe(true);
 		expect(result.issue?.description).toContain('shortened');
@@ -477,7 +477,7 @@ describe('linear port: payload budget', () => {
 			},
 		});
 
-		const result = await makeLinearPort(deps).getIssue({ issueId: 'THE-106' });
+		const result = await makeLinearPort(deps).getIssue({ issueId: 'ENG-106' });
 
 		expect(result.omittedComments).toBe(0);
 		expect(result.comments.at(0)?.body).toContain('shortened');
@@ -496,7 +496,7 @@ describe('linear port: payload budget', () => {
 			},
 		});
 
-		const result = await makeLinearPort(deps).getIssue({ issueId: 'THE-106' });
+		const result = await makeLinearPort(deps).getIssue({ issueId: 'ENG-106' });
 
 		expect(result.truncated).toBe(false);
 		expect(result.omittedComments).toBe(0);
@@ -517,7 +517,7 @@ describe('linear port: payload budget', () => {
 			},
 		});
 
-		const result = await makeLinearPort(deps).getIssue({ issueId: 'THE-106' });
+		const result = await makeLinearPort(deps).getIssue({ issueId: 'ENG-106' });
 
 		expect(result.comments).toHaveLength(
 			LINEAR_AGENT_LIMITS.maxReturnedComments,
@@ -543,7 +543,7 @@ describe('linear port: payload budget', () => {
 			},
 		});
 
-		const result = await makeLinearPort(deps).getIssue({ issueId: 'THE-106' });
+		const result = await makeLinearPort(deps).getIssue({ issueId: 'ENG-106' });
 
 		expect(result.comments.length).toBeLessThan(40);
 		expect(result.omittedComments).toBe(40 - result.comments.length);
@@ -595,14 +595,14 @@ describe('linear port: writes', () => {
 
 		const result = await makeLinearPort(deps).createComment({
 			commentBody: 'Verified on the branch.',
-			issueId: 'THE-106',
+			issueId: 'ENG-106',
 		});
 
 		expect(result.status).toBe('ok');
 		expect(result.commentId).toBe('c-new');
 		expect(service.createComment).toHaveBeenCalledWith({
 			body: 'Verified on the branch.',
-			issueId: 'THE-106',
+			issueId: 'ENG-106',
 		});
 	});
 });

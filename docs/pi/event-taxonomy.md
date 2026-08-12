@@ -253,7 +253,7 @@ documented protocol). Do not edit by hand — edit the script and regenerate.
 | Field | Presence | Types | Example |
 |---|---|---|---|
 | `isError` | always | boolean | `false` |
-| `result` | always | object | `{"content":[{"type":"text","text":"total 24\ndrwxr-xr-x@  6 psoldunov  s…` |
+| `result` | always | object | `{"content":[{"type":"text","text":"total 24\ndrwxr-xr-x@  6 octocat  s…` |
 | `toolCallId` | always | string | `"call_QU6bPGQrXO2Yo4QmB0bRoD06\|fc_09542730afe39126016a29f39b013881919d92…` |
 | `toolName` | always | string | `"bash"` |
 | `type` | always | string | `"tool_execution_end"` |

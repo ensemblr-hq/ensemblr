@@ -1,6 +1,6 @@
 /**
- * Wire contracts for the `gh`-backed GitHub integration (THE-154, THE-155,
- * THE-158). All GitHub access goes through the authenticated `gh` CLI per ADR
+ * Wire contracts for the `gh`-backed GitHub integration (ENG-154, ENG-155,
+ * ENG-158). All GitHub access goes through the authenticated `gh` CLI per ADR
  * 0013 — no app-owned OAuth or API client.
  */
 
@@ -130,7 +130,7 @@ export interface GithubPullRequestSnapshotWire {
 	syncedAt: string;
 }
 
-// --- Commit / push / PR create (THE-154) -------------------------------------
+// --- Commit / push / PR create (ENG-154) -------------------------------------
 
 /** Request to commit a workspace's changes with a message. */
 export interface CommitWorkspaceChangesRequest {
@@ -180,7 +180,7 @@ export interface CreatePullRequestResult {
 	pullRequestUrl?: string;
 }
 
-// --- PR metadata snapshot (THE-155) ------------------------------------------
+// --- PR metadata snapshot (ENG-155) ------------------------------------------
 
 /** Request for a workspace's PR metadata snapshot, optionally forcing a refresh. */
 export interface GetPullRequestSnapshotRequest {
@@ -198,7 +198,7 @@ export interface GetPullRequestSnapshotResult {
 	snapshot: GithubPullRequestSnapshotWire | null;
 }
 
-// --- Merge (THE-158) ----------------------------------------------------------
+// --- Merge (ENG-158) ----------------------------------------------------------
 
 /** How to merge a pull request: merge commit, squash, or rebase. */
 export type GithubMergeMethod = 'merge' | 'rebase' | 'squash';

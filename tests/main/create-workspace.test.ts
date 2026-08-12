@@ -802,13 +802,13 @@ test('create honors caller-supplied branchName and baseBranch', async (t) => {
 
 	const result = await service.create({
 		baseBranch: 'develop',
-		branchName: 'philipp/the-121',
+		branchName: 'octocat/eng-121',
 		name: 'ticket',
 		repositoryId: harness.repositoryId,
 	});
 
 	assert.equal(result.status, 'success');
-	assert.equal(result.workspace?.branchName, 'philipp/the-121');
+	assert.equal(result.workspace?.branchName, 'octocat/eng-121');
 	assert.equal(result.workspace?.baseBranch, 'develop');
 	if (!result.workspace) {
 		throw new Error('workspace missing');
@@ -818,7 +818,7 @@ test('create honors caller-supplied branchName and baseBranch', async (t) => {
 		'--abbrev-ref',
 		'HEAD',
 	]);
-	assert.equal(headBranch, 'philipp/the-121');
+	assert.equal(headBranch, 'octocat/eng-121');
 });
 
 test('create applies the user custom branch prefix', async (t) => {
@@ -1513,7 +1513,7 @@ test('rejects a branch plan whose ref could smuggle a git option', async (t) => 
 
 test('adopting a nested branch name does not fail on workspace-name rules', async (t) => {
 	const harness = createHarness(t);
-	commitOnBranch(harness.repositoryPath, 'psoldunov/feature-x', 'feature.txt');
+	commitOnBranch(harness.repositoryPath, 'octocat/feature-x', 'feature.txt');
 
 	const service = createWorkspaceService({
 		databaseService: harness.databaseService,
@@ -1523,17 +1523,17 @@ test('adopting a nested branch name does not fail on workspace-name rules', asyn
 	});
 
 	const result = await service.create({
-		branchPlan: { branch: 'psoldunov/feature-x', kind: 'adopt' },
+		branchPlan: { branch: 'octocat/feature-x', kind: 'adopt' },
 		// The picker seeds the name from the branch, and a slash is not a legal
 		// workspace-name character, so an unsanitized seed fails with
 		// `name-invalid` before git is ever reached.
-		name: toWorkspaceDisplayName('psoldunov/feature-x') ?? undefined,
+		name: toWorkspaceDisplayName('octocat/feature-x') ?? undefined,
 		repositoryId: harness.repositoryId,
 	});
 
 	assert.equal(result.status, 'success');
-	assert.equal(result.workspace?.branchName, 'psoldunov/feature-x');
-	assert.equal(result.workspace?.name, 'psoldunov feature-x');
+	assert.equal(result.workspace?.branchName, 'octocat/feature-x');
+	assert.equal(result.workspace?.name, 'octocat feature-x');
 });
 
 test('rejects a raw nested branch name so sanitizing stays the caller’s job', async (t) => {
@@ -1546,7 +1546,7 @@ test('rejects a raw nested branch name so sanitizing stays the caller’s job', 
 	});
 
 	const result = await service.create({
-		name: 'psoldunov/feature-x',
+		name: 'octocat/feature-x',
 		repositoryId: harness.repositoryId,
 	});
 

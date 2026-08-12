@@ -22,7 +22,7 @@ export interface IssueDocumentComment {
  * Builds the filename an issue document is stored under, so the chip's tooltip
  * and the agent's `<attached_file path>` both name the issue rather than a hash.
  * @param provider - Tracker the issue came from.
- * @param reference - Human issue reference, such as `THE-106` or `#42`.
+ * @param reference - Human issue reference, such as `ENG-106` or `#42`.
  * @returns A conservative filename stem plus its `.md` extension.
  */
 export function issueDocumentFilename(

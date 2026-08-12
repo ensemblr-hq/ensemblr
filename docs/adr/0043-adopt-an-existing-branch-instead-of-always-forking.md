@@ -175,7 +175,7 @@ row while `bach` stays behind, so the name read as free right up to the point
 Allocation now folds every local branch into the same taken set the composer
 surname pool and the slug suffixer already consult. Branch *segments* count too:
 callers allocate the slug rather than the whole prefixed branch, so `bach` has to
-read as taken when `psoldunov/bach` exists.
+read as taken when `octocat/bach` exists.
 
 Only a plan that cuts consults that set. Adoption checks an existing branch out,
 so letting branches steer the slug there would drop every adopted workspace into

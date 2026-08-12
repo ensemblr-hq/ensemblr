@@ -427,7 +427,7 @@ describe('agent-control port adapters: branch naming', () => {
 			diagnostics: [],
 			status: 'success',
 			workspace: {
-				branchName: 'psoldunov/add-dark-mode',
+				branchName: 'octocat/add-dark-mode',
 				name: 'add-dark-mode',
 			},
 		});
@@ -439,7 +439,7 @@ describe('agent-control port adapters: branch naming', () => {
 			renameWorkspace,
 		});
 		vi.mocked(selectWorkspaceWithRepositoryById).mockReturnValue({
-			branchName: 'psoldunov/bach',
+			branchName: 'octocat/bach',
 			metadataJson: JSON.stringify({ placeholderName: true }),
 			name: 'bach',
 		} as ReturnType<typeof selectWorkspaceWithRepositoryById>);

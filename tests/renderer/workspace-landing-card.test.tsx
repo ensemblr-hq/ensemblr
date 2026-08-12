@@ -14,7 +14,7 @@ test('local-branch landing card surfaces repo name, branch, and copied count', (
 	const markup = renderCard({
 		branchSource: {
 			baseBranch: 'origin/master',
-			branchName: 'psoldunov/stockholm',
+			branchName: 'octocat/stockholm',
 			detail: 'Worktree branched from master.',
 		},
 		copiedFiles: {
@@ -36,7 +36,7 @@ test('local-branch landing card surfaces repo name, branch, and copied count', (
 	expect(markup).toContain('data-landing-card-kind="local-branch"');
 	expect(markup).toContain('ensemblr');
 	expect(markup).toContain('stockholm');
-	expect(markup).toContain('psoldunov/stockholm');
+	expect(markup).toContain('octocat/stockholm');
 	expect(markup).toContain('>master<');
 	expect(markup).not.toContain('origin/master');
 	expect(markup).toContain('665');

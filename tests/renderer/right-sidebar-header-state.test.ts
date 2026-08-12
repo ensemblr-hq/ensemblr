@@ -70,7 +70,7 @@ test('an open PR with no status to report stays blank, never showing its title',
 			number: 118,
 			state: 'open',
 			status: 'idle',
-			title: 'THE-118 Wire Linear issue flow',
+			title: 'ENG-118 Wire Linear issue flow',
 		},
 	};
 
@@ -90,7 +90,7 @@ test('an open PR keeps the status label the gh snapshot derived', () => {
 			number: 118,
 			state: 'open',
 			status: 'idle',
-			title: 'THE-118 Wire Linear issue flow',
+			title: 'ENG-118 Wire Linear issue flow',
 		},
 	};
 
@@ -187,7 +187,7 @@ test('an agent turn freezes the header without erasing the PR status', () => {
 });
 
 test('a PR with no status to report falls back to Working... while busy', () => {
-	const quietPr = workspaceWithPr({ label: '', title: 'THE-118 Wire Linear' });
+	const quietPr = workspaceWithPr({ label: '', title: 'ENG-118 Wire Linear' });
 
 	expect(
 		getRightSidebarHeaderState(quietPr, false, { agentBusy: true }),

@@ -35,7 +35,7 @@ describe('buildSessionBriefNudge', () => {
 		const nudge = buildSessionBriefNudge(
 			naming({
 				branch: {
-					current: 'psoldunov/bach',
+					current: 'octocat/bach',
 					eligible: true,
 					namesWorkspace: true,
 				},
@@ -43,7 +43,7 @@ describe('buildSessionBriefNudge', () => {
 		);
 
 		expect(nudge).toContain('ensemblr_set_branch_name');
-		expect(nudge).toContain('psoldunov/bach');
+		expect(nudge).toContain('octocat/bach');
 		expect(nudge).not.toContain('ensemblr_set_name`');
 	});
 
@@ -51,7 +51,7 @@ describe('buildSessionBriefNudge', () => {
 		const nudge = buildSessionBriefNudge(
 			naming({
 				branch: {
-					current: 'psoldunov/bach',
+					current: 'octocat/bach',
 					eligible: false,
 					namesWorkspace: true,
 				},
@@ -63,7 +63,7 @@ describe('buildSessionBriefNudge', () => {
 		expect(nudge).toContain('ensemblr_set_name');
 		expect(nudge).toContain('ensemblr_set_summary');
 		expect(nudge).not.toContain('ensemblr_set_branch_name');
-		expect(nudge).not.toContain('psoldunov/bach');
+		expect(nudge).not.toContain('octocat/bach');
 	});
 
 	test('omits the branch clause when the workspace has no branch', () => {
@@ -84,7 +84,7 @@ describe('buildSessionBriefNudge', () => {
 		const nudge = buildSessionBriefNudge(
 			naming({
 				branch: {
-					current: 'psoldunov/bach',
+					current: 'octocat/bach',
 					eligible: true,
 					namesWorkspace: false,
 				},
@@ -100,7 +100,7 @@ describe('buildSessionBriefNudge', () => {
 		const nudge = buildSessionBriefNudge(
 			naming({
 				branch: {
-					current: 'psoldunov/bach',
+					current: 'octocat/bach',
 					eligible: true,
 					namesWorkspace: true,
 				},
@@ -138,7 +138,7 @@ describe('buildSessionBriefNudge', () => {
 			buildSessionBriefNudge(
 				naming({
 					branch: {
-						current: 'psoldunov/bach',
+						current: 'octocat/bach',
 						eligible: true,
 						namesWorkspace: true,
 					},
@@ -160,7 +160,7 @@ describe('buildSessionBriefNudge', () => {
 			buildSessionBriefNudge(
 				naming({
 					branch: {
-						current: 'psoldunov/bach',
+						current: 'octocat/bach',
 						eligible: true,
 						namesWorkspace: true,
 					},

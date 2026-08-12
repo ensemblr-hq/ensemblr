@@ -44,7 +44,7 @@ export const UNREAD_ROW_CASES = [
 		unreadCount: 0,
 		workspace: workspaceCase({
 			additions: 0,
-			branchName: 'psoldunov/composer-polish',
+			branchName: 'octocat/composer-polish',
 			deletions: 0,
 			id: 'row-read',
 			name: 'Composer polish',
@@ -55,7 +55,7 @@ export const UNREAD_ROW_CASES = [
 		unreadCount: 1,
 		workspace: workspaceCase({
 			additions: 0,
-			branchName: 'psoldunov/timeline-descriptors',
+			branchName: 'octocat/timeline-descriptors',
 			deletions: 0,
 			id: 'row-unread-one',
 			name: 'Timeline descriptors',
@@ -66,7 +66,7 @@ export const UNREAD_ROW_CASES = [
 		unreadCount: 9,
 		workspace: workspaceCase({
 			additions: 0,
-			branchName: 'psoldunov/keymap-regressions',
+			branchName: 'octocat/keymap-regressions',
 			deletions: 0,
 			id: 'row-unread-many',
 			name: 'Keymap regressions',
@@ -77,7 +77,7 @@ export const UNREAD_ROW_CASES = [
 		unreadCount: 3,
 		workspace: workspaceCase({
 			additions: 628,
-			branchName: 'psoldunov/workbench-shell-rework',
+			branchName: 'octocat/workbench-shell-rework',
 			deletions: 31,
 			id: 'row-unread-busy',
 			name: 'Workbench shell rework with a very long name',

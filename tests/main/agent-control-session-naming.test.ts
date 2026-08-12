@@ -87,7 +87,7 @@ describe('setBranchName', () => {
 		const { invoke } = setup({
 			setBranchName: vi.fn().mockResolvedValue({
 				applied: false,
-				branchName: 'psoldunov/add-dark-mode',
+				branchName: 'octocat/add-dark-mode',
 				message: 'already named; do not call this tool again in this session.',
 				name: 'add-dark-mode',
 			}),
@@ -233,7 +233,7 @@ describe('getSessionBrief', () => {
 	it('renders the upkeep block from the naming state', async () => {
 		const { invoke } = setup({
 			readBrief: vi.fn().mockResolvedValue({
-				branch: { current: 'psoldunov/bach', eligible: true },
+				branch: { current: 'octocat/bach', eligible: true },
 				summaryStale: true,
 				titleNeeded: true,
 			}),
@@ -246,7 +246,7 @@ describe('getSessionBrief', () => {
 			const { nudge } = result.data as { nudge: string | null };
 			expect(nudge).toContain(SESSION_BRIEF_NUDGE_HEADER);
 			expect(nudge).toContain('ensemblr_set_name');
-			expect(nudge).toContain('psoldunov/bach');
+			expect(nudge).toContain('octocat/bach');
 			expect(nudge).toContain('ensemblr_set_summary');
 		}
 	});

@@ -15,7 +15,7 @@ const READY_PREVIEW_DEPLOYMENT: PullRequestPreviewDeploymentSummary = {
 	provider: 'vercel',
 	source: 'github-deployment',
 	status: 'ready',
-	url: 'https://ensemblr-git-the-118.vercel.app',
+	url: 'https://ensemblr-git-eng-118.vercel.app',
 };
 
 /**
@@ -103,7 +103,7 @@ function workspaceForState(overrides: {
 	return {
 		...base,
 		changeSummary: { ...base.changeSummary, files: overrides.files ?? 4 },
-		githubRepo: { owner: 'psoldunov', repo: 'ensemblr' },
+		githubRepo: { owner: 'octocat', repo: 'ensemblr' },
 		id: overrides.id,
 		pathLabel: `~/Ensemblr/workspaces/${overrides.id}`,
 		pullRequest: {
@@ -115,7 +115,7 @@ function workspaceForState(overrides: {
 			status: overrides.status ?? 'idle',
 			title: overrides.title ?? '',
 			url: overrides.number
-				? `https://github.com/psoldunov/ensemblr/pull/${overrides.number.toString()}`
+				? `https://github.com/ensemblr-hq/ensemblr/pull/${overrides.number.toString()}`
 				: undefined,
 		},
 	};
@@ -158,7 +158,7 @@ export const HEADER_STATE_FIXTURES: readonly HeaderStateFixture[] = [
 			number: 118,
 			state: 'open',
 			status: 'idle',
-			title: 'THE-118 Wire Linear issue flow',
+			title: 'ENG-118 Wire Linear issue flow',
 		}),
 	},
 	{

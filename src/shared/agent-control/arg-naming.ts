@@ -34,7 +34,7 @@ export const CANONICAL_ARG_KEYS = {
 	fromOrdinal: 'Inclusive lower bound when paging a transcript.',
 	harnessId: 'Identifier of a third-party agent harness.',
 	input: 'Raw text written into a terminal, keystrokes included.',
-	issueId: 'Identifier of a tracker issue, or its human key such as THE-106.',
+	issueId: 'Identifier of a tracker issue, or its human key such as ENG-106.',
 	kind: 'Which of a fixed set of variants an op acts on.',
 	message: 'Prose addressed to a human or to the orchestrator.',
 	mode: 'How an op behaves across several targets.',

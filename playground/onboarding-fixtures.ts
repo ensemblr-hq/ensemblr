@@ -288,7 +288,7 @@ function buildLinearCheck(
 		detail: isProbing
 			? 'Checking the connected Linear account…'
 			: connected
-				? 'Linear is connected as Philipp (The Swiss Cheese).'
+				? 'Linear is connected as Ada (Example Org).'
 				: 'Linear is not connected. Sign in to browse issues from inside Ensemblr.',
 		id: 'linear-oauth',
 		remediations: connected

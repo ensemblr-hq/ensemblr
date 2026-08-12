@@ -17,7 +17,7 @@ export function createLinearIssueFixture(
 		description: 'Implement OAuth PKCE login against the Linear API.',
 		dueDate: null,
 		id: 'issue-1',
-		identifier: 'THE-143',
+		identifier: 'ENG-143',
 		labels: [{ color: '#eb5757', id: 'label-1', name: 'bug' }],
 		priority: 2,
 		projectId: 'project-1',
@@ -32,7 +32,7 @@ export function createLinearIssueFixture(
 		teamName: 'Theseus',
 		title: 'Linear OAuth PKCE and Token Lifecycle',
 		updatedAt: '2026-06-10T12:00:00.000Z',
-		url: 'https://linear.app/acme/issue/THE-143',
+		url: 'https://linear.app/acme/issue/ENG-143',
 		...overrides,
 	};
 }
@@ -43,8 +43,8 @@ export function createLinearConnectionFixture(
 ): LinearConnectionSnapshot {
 	return {
 		expiresAt: '2026-06-12T00:00:00.000Z',
-		organizationName: 'Swiss Cheese',
-		organizationUrlKey: 'swiss-cheese',
+		organizationName: 'Example Org',
+		organizationUrlKey: 'example-org',
 		scopes: ['read', 'write'],
 		state: 'connected',
 		updatedAt: '2026-06-11T00:00:00.000Z',

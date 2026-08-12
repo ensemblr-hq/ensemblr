@@ -585,7 +585,7 @@ export async function readOriginTrackingRef({
  * and a branch outlives the workspace that cut it, so a caller allocating a name
  * has to steer around branches no database row mentions. Segments are included
  * because callers allocate the slug, not the whole prefixed branch: `bach` has
- * to read as taken when `psoldunov/bach` exists.
+ * to read as taken when `octocat/bach` exists.
  * @param options - Git command dependencies.
  * @returns Lowercased branch names and segments; empty when git cannot answer.
  */

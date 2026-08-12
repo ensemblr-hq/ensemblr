@@ -119,14 +119,14 @@ test('filterGithubRepositories ranks an owner-only match above a description-onl
 });
 
 test('filterGithubRepositories AND-matches multiple whitespace-separated tokens', () => {
-	const match = repo({ fullName: 'psoldunov/ensemblr' });
-	const missingToken = repo({ fullName: 'psoldunov/other' });
+	const match = repo({ fullName: 'ensemblr-hq/ensemblr' });
+	const missingToken = repo({ fullName: 'octocat/other' });
 	const results = filterGithubRepositories(
 		[match, missingToken],
-		'psoldunov ensemblr',
+		'ensemblr-hq ensemblr',
 	);
 	expect(results.map((entry) => entry.fullName)).toEqual([
-		'psoldunov/ensemblr',
+		'ensemblr-hq/ensemblr',
 	]);
 });
 

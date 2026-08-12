@@ -216,27 +216,27 @@ describe('ensemblrToolLabel', () => {
 	});
 
 	// The identifier is the whole point of a Linear row: `Updated a Linear issue`
-	// says nothing a user can act on, while `Updated a Linear issue: THE-106` is
+	// says nothing a user can act on, while `Updated a Linear issue: ENG-106` is
 	// the ticket they can go and look at.
 	test('reads the Linear tools with the ticket they acted on', () => {
 		expect(
 			ensemblrToolLabel(
 				'ensemblr_linear_update_issue',
-				{ issueId: 'THE-106', stateId: 's-review' },
+				{ issueId: 'ENG-106', stateId: 's-review' },
 				false,
 			),
 		).toEqual({
 			badge: null,
 			glyph: 'ticket-check',
-			title: 'Updated a Linear issue: THE-106',
+			title: 'Updated a Linear issue: ENG-106',
 		});
 		expect(
 			ensemblrToolLabel(
 				'ensemblr_linear_create_comment',
-				{ commentBody: 'shipped', issueId: 'THE-106' },
+				{ commentBody: 'shipped', issueId: 'ENG-106' },
 				true,
 			)?.title,
-		).toBe('Commenting on a Linear issue: THE-106');
+		).toBe('Commenting on a Linear issue: ENG-106');
 		expect(
 			ensemblrToolLabel(
 				'ensemblr_linear_list_issues',
@@ -259,10 +259,10 @@ describe('ensemblrToolLabel', () => {
 		expect(
 			ensemblrToolLabel(
 				'ensemblr_linear_get_issue',
-				{ identifier: 'THE-42' },
+				{ identifier: 'ENG-42' },
 				false,
 			)?.title,
-		).toBe('Read a Linear issue: THE-42');
+		).toBe('Read a Linear issue: ENG-42');
 		expect(
 			ensemblrToolLabel(
 				'ensemblr_linear_list_issues',

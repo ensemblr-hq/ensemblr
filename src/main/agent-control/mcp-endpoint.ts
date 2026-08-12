@@ -275,7 +275,7 @@ export const TOOL_DEFS: readonly McpToolDef[] = [
 		name: 'ensemblr_linear_get_issue',
 		op: 'linearGetIssue',
 		description:
-			'Read one Linear issue with its description, labels, and comment thread. issueId takes either the uuid or the human identifier (THE-106); an identifier always goes to Linear rather than the local cache. The description is truncated and only the most recent comments are returned — the result says how many were dropped. Check `status`: `not-found` means the id is wrong, `not-connected` means Linear is not linked.',
+			'Read one Linear issue with its description, labels, and comment thread. issueId takes either the uuid or the human identifier (ENG-106); an identifier always goes to Linear rather than the local cache. The description is truncated and only the most recent comments are returned — the result says how many were dropped. Check `status`: `not-found` means the id is wrong, `not-connected` means Linear is not linked.',
 		shape: { issueId: z.string(), refresh: z.boolean().optional() },
 	},
 	{

@@ -39,9 +39,9 @@ describe('parseDeepLink', () => {
 	});
 
 	test('parses linear issue', () => {
-		expect(parseDeepLink('ensemblr://linear/THE-161')).toEqual({
+		expect(parseDeepLink('ensemblr://linear/ENG-161')).toEqual({
 			kind: 'linear-issue',
-			issueId: 'THE-161',
+			issueId: 'ENG-161',
 		});
 	});
 
@@ -64,7 +64,7 @@ describe('isAllowedExternalUrl', () => {
 		expect(isAllowedExternalUrl('https://github.com/x/y/pull/1')).toBe(true);
 	});
 	test('allows linear', () => {
-		expect(isAllowedExternalUrl('https://linear.app/x/issue/THE-1')).toBe(true);
+		expect(isAllowedExternalUrl('https://linear.app/x/issue/ENG-1')).toBe(true);
 	});
 	test('allows localhost', () => {
 		expect(isAllowedExternalUrl('http://localhost:3000')).toBe(true);

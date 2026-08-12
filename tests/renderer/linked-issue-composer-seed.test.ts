@@ -17,13 +17,13 @@ test('includes the heading, full body, and link', () => {
 
 test('omits the body block when there is no description', () => {
 	const seed = formatLinkedIssueComposerSeed({
-		reference: 'THE-1',
+		reference: 'ENG-1',
 		title: 'Wire the picker',
-		url: 'https://linear.app/the/issue/THE-1',
+		url: 'https://linear.app/acme/issue/ENG-1',
 	});
 
 	expect(seed).toBe(
-		'THE-1 Wire the picker\n\nhttps://linear.app/the/issue/THE-1',
+		'ENG-1 Wire the picker\n\nhttps://linear.app/acme/issue/ENG-1',
 	);
 });
 

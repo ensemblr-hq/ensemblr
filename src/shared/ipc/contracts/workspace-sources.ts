@@ -20,7 +20,7 @@ export interface RepositoryBranchWire {
 	hasWorkspace: boolean;
 	/** True for the repository's default branch; pinned to the top of the list. */
 	isDefault: boolean;
-	/** Bare branch name, e.g. `master` or `psoldunov/feature-x`. */
+	/** Bare branch name, e.g. `master` or `octocat/feature-x`. */
 	name: string;
 	/** Id of the active workspace tracking this branch when {@link hasWorkspace}. */
 	workspaceId: string | null;

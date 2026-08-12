@@ -151,10 +151,10 @@ test('list maps gh api JSON into GithubRepositoryEntry rows', async () => {
 	const stdout = JSON.stringify([
 		{
 			description: 'A repository for ensemblr',
-			full_name: 'psoldunov/ensemblr',
+			full_name: 'ensemblr-hq/ensemblr',
 			owner: {
 				avatar_url: 'https://avatars.githubusercontent.com/u/1?v=4',
-				login: 'psoldunov',
+				login: 'octocat',
 			},
 			private: false,
 			updated_at: '2026-06-06T17:30:00.000Z',
@@ -180,7 +180,7 @@ test('list maps gh api JSON into GithubRepositoryEntry rows', async () => {
 
 	assert.equal(result.status, 'success');
 	assert.equal(result.entries.length, 2);
-	assert.equal(result.entries[0]?.fullName, 'psoldunov/ensemblr');
+	assert.equal(result.entries[0]?.fullName, 'ensemblr-hq/ensemblr');
 	assert.equal(result.entries[0]?.isPrivate, false);
 	assert.equal(
 		result.entries[0]?.avatarUrl,

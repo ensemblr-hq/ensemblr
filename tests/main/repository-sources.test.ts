@@ -85,7 +85,7 @@ test('parseBranches reads the default branch and sorts names newest-commit-first
 				refs: {
 					nodes: [
 						{
-							name: 'psoldunov/fix-y',
+							name: 'octocat/fix-y',
 							target: { committedDate: '2026-06-10T00:00:00Z' },
 						},
 						{
@@ -93,7 +93,7 @@ test('parseBranches reads the default branch and sorts names newest-commit-first
 							target: { committedDate: '2026-06-01T00:00:00Z' },
 						},
 						{
-							name: 'psoldunov/feature-x',
+							name: 'octocat/feature-x',
 							target: { committedDate: '2026-06-20T00:00:00Z' },
 						},
 					],
@@ -106,8 +106,8 @@ test('parseBranches reads the default branch and sorts names newest-commit-first
 
 	assert.equal(parsed?.defaultBranch, 'master');
 	assert.deepEqual(parsed?.names, [
-		'psoldunov/feature-x',
-		'psoldunov/fix-y',
+		'octocat/feature-x',
+		'octocat/fix-y',
 		'master',
 	]);
 });
@@ -193,7 +193,7 @@ test('listBranches pins the default branch first and marks hasWorkspace', async 
 				refs: {
 					nodes: [
 						{
-							name: 'psoldunov/feature-x',
+							name: 'octocat/feature-x',
 							target: { committedDate: '2026-06-20T00:00:00Z' },
 						},
 						{
@@ -201,7 +201,7 @@ test('listBranches pins the default branch first and marks hasWorkspace', async 
 							target: { committedDate: '2026-06-01T00:00:00Z' },
 						},
 						{
-							name: 'psoldunov/fix-y',
+							name: 'octocat/fix-y',
 							target: { committedDate: '2026-06-10T00:00:00Z' },
 						},
 					],
@@ -214,7 +214,7 @@ test('listBranches pins the default branch first and marks hasWorkspace', async 
 	);
 	const service = createRepositorySourcesService({
 		databaseService: fakeDatabaseService([
-			{ branchName: 'psoldunov/feature-x', id: 'ws-1' },
+			{ branchName: 'octocat/feature-x', id: 'ws-1' },
 		]),
 		localCommandService: commandService,
 		resolveRepositoryPath: () => '/repo',
@@ -226,12 +226,10 @@ test('listBranches pins the default branch first and marks hasWorkspace', async 
 	// Default branch is always topmost; the rest keep GitHub's order.
 	assert.deepEqual(
 		result.branches.map((b) => b.name),
-		['master', 'psoldunov/feature-x', 'psoldunov/fix-y'],
+		['master', 'octocat/feature-x', 'octocat/fix-y'],
 	);
 	assert.equal(result.branches[0]?.isDefault, true);
-	const featureX = result.branches.find(
-		(b) => b.name === 'psoldunov/feature-x',
-	);
+	const featureX = result.branches.find((b) => b.name === 'octocat/feature-x');
 	assert.equal(featureX?.hasWorkspace, true);
 	assert.equal(featureX?.workspaceId, 'ws-1');
 	// Sourced live from GitHub via gh GraphQL, not local refs.

@@ -17,7 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Only prose Ensemblr authors is localized. Passthrough text — thrown `Error` messages, git and `gh` stderr, upstream service diagnostics — carries no code and surfaces as it arrived
   - Agent prose follows the app: `buildLanguageDirective` in `src/shared/agent-control/language-directive.ts` renders one block naming the reader's language, appended by every playbook surface — Pi per turn over `getSessionBrief`, Claude in the per-turn preamble, a harness in both its `AGENTS.md` playbook and `instructions`. English resolves to *no* directive, so an English-defaulted app does not become an English-only agent for a user who types Russian
   - An untitled chat tab stores the empty string rather than the literal `New chat`, with the renderer painting the localized placeholder over it (migration `015` blanks the stored literal, and `titleProvenance` spares a title someone deliberately chose). Closed-tab timestamps render through `Intl.RelativeTimeFormat`
-  - `npm run check` runs `i18n:lint` plus `scripts/check-hardcoded-strings.mjs`, which covers i18next-cli's blind spot: prose in an object literal, a const table, or a template literal. [`docs/i18n-audit-2026-08-09.md`](docs/i18n-audit-2026-08-09.md) records the audit findings
+  - `npm run check` runs `i18n:lint` plus `scripts/check-hardcoded-strings.mjs`, which covers i18next-cli's blind spot: prose in an object literal, a const table, or a template literal. `docs/i18n-audit-2026-08-09.md` recorded the audit findings (removed before the public release)
 
 - **First-Run Setup Wizard** (`7ddd7d7`, #247): A first launch opens `/onboarding` instead of the workbench — a welcome moment, a language picker, one screen per gate (agent CLI, GitHub CLI, Linear), and a terminal screen naming whatever is still unresolved. Both exits, finishing and skipping, record `app.onboarding.completedAt`, so the wizard never nags. The agent-CLI gate is **either-or**: Ensemblr needs *an* agent runtime, never a particular one, so a machine carrying only Pi or only Claude Code reads as ready and the skipped runtime dims instead of turning red. The same rule governs the diagnostics rollup — `setupDiagnostics` resolves the gate onto each check's blocking flag before computing `blocked`. Both gates read one table, `AGENT_RUNTIME_CHECK_GROUPS` in `src/shared/setup-checks.ts`, because a second hand-written copy would let the wizard call a machine ready that diagnostics still reports as blocked. Adds the `claude-executable` setup check (deliberately narrower than the provider readiness probe, which opens a throwaway SDK session), and moves the playground's scenes into a registry with a sidebar so the wizard can be driven from fixtures.
 
@@ -111,7 +111,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Dock Terminal Session Restoration** (`923b86f`, #155; `432c0f0`, #165): Dock terminals (setup/run/spawn and agent terminals) restore across app restart with clean scrollback.
 
-- **Rich Diff Viewer with Inline Review Comments** (`fc7c610`, #151, THE-152): The Changes tab renders a rich diff viewer with review comments anchored inline to specific lines.
+- **Rich Diff Viewer with Inline Review Comments** (`fc7c610`, #151): The Changes tab renders a rich diff viewer with review comments anchored inline to specific lines.
 
 - **Pull Request Check Status List** (`daae03b`, #137): The pull-request panel shows a per-check CI status list.
 
@@ -472,7 +472,7 @@ Ensemblr follows a pre-1.0 semantic versioning approach where:
 | `2cd2140` | 2026-07-20 | feat(workbench): session tab keyboard shortcuts (#154) |
 | `d9acabd` | 2026-07-20 | feat(agents): derive Codex/Vibe conversation titles (#153) |
 | `ab8304e` | 2026-07-20 | feat(agents): harness launch and session tabs (#152) |
-| `fc7c610` | 2026-07-20 | Rich diff viewer with inline review comments (#151, THE-152) |
+| `fc7c610` | 2026-07-20 | Rich diff viewer with inline review comments (#151) |
 | `611525c` | 2026-07-20 | Consolidate session naming, preserve stopped chat tabs (#149) |
 | `289946d` | 2026-07-19 | feat(build): sign and notarize macOS DMG builds (#148) |
 | `a512e95` | 2026-07-19 | feat(renderer): preserve per-chat model, remove Help nav (#147) |

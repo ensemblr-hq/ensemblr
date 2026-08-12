@@ -19,12 +19,22 @@ Windows path.
 | **GitHub CLI** | PR and check data; Ensemblr stores no GitHub token | `gh auth status` |
 | `codex` / `vibe` _(optional)_ | Terminal harnesses; each appears only when its binary is on `PATH` | `which codex` |
 
-The two runtimes are gated differently. **Pi is part of the blocking setup gate**
-(`src/main/setup/setup-checks-pi.ts` — executable, RPC startup, provider/model
-readiness), so you need it to get past setup. **Claude Code is not** — it has a
-readiness probe (`src/main/agent-providers/claude-readiness-probe.ts`) surfaced in
-**Settings → Providers**, where you can also point at a binary that is not on
-`PATH`, but a missing `claude` does not block the app.
+**The two runtimes are gated against each other, not individually.** Ensemblr
+needs *an* agent runtime, not a particular one, so satisfying either one alone
+gets you past setup. Both have a readiness probe surfaced in **Settings →
+Providers**, where you can also point at a binary that is not on `PATH`.
+
+The two surfaces that ask the question do not ask it identically. The
+diagnostics rollup resolves `AGENT_RUNTIME_CHECK_GROUPS`
+(`src/shared/setup-checks.ts`) onto each check's `blocking` flag —
+`claude: ['claude-executable']` against `pi: ['pi-executable',
+'pi-agent-directory', 'pi-rpc', 'pi-provider-model']`. The onboarding wizard's
+`agent-cli` step carries its own narrower list in
+`src/renderer/lib/onboarding/gates.ts` — `['pi-executable',
+'claude-executable']` under an `any` gate — so the wizard clears on either
+executable while diagnostics still holds Pi to its RPC and provider checks.
+Diagnostics is the stricter authority; the JSDoc on `AGENT_RUNTIME_CHECK_GROUPS`
+claiming both gates read that one table is stale.
 
 ### The Node 24 pin is load-bearing
 
@@ -174,9 +184,8 @@ changed set, per [`../.claude/rules/code-review.md`](../.claude/rules/code-revie
 
 ## 8. Branches, issues, and PRs
 
-- Linear is the tracker: team **The Swiss Cheese**, project **Ensemble**, issue
-  prefix **THE**. Local roadmap ids like `ENS-006` are *not* Linear keys — use
-  `THE-106` style identifiers in branches, commits, and PR titles.
+- Issues live in the project's tracker. When a change is backed by one, use its
+  identifier in the branch name, the commits, and the PR title.
 - Conventional Commits: `<type>: <description>` with types `feat`, `fix`,
   `refactor`, `docs`, `test`, `chore`, `perf`, `ci`.
 - Move a finished ticket to **In Review**, never to **Done**.
@@ -196,4 +205,7 @@ changed set, per [`../.claude/rules/code-review.md`](../.claude/rules/code-revie
 | New agent runtime | A sibling adapter folder under `src/main/` implementing the `src/main/agent-runtime/` contract — never a branch inside `pi-agent/` or `claude-agent/` ([ADR 0042](./adr/0042-add-claude-code-as-a-second-first-class-agent-runtime.md)) |
 | New agent control op | A service first, then a port in `src/main/agent-control/ports.ts` — control never adds capability code of its own |
 | New pure-logic test under `tests/main/` | The explicit `include` array in `vitest.config.mts` — it is not a glob |
-| A decision worth recording | The next numbered ADR in `docs/adr/`, and bump the count in all four places it appears: `docs/README.md`, both places in `README.md` (the project-structure block and the further-reading list), and §4 of this file |
+| New setup check | `src/shared/ipc/contracts/setup.ts` → `SETUP_CHECK_ORDER` in `src/main/setup/setup-diagnostics.ts` → the implementation under `src/main/setup/` → the check table in `docs/guide/02-requirements.md` |
+| New `.ensemblr/settings.toml` key | The field map in `src/main/config/repository-config.ts` → the reference table in `docs/guide/12-repository-settings.md` |
+| New keyboard shortcut | `SHORTCUTS` in `src/shared/keymap/shortcuts.ts` → the scope table in `docs/guide/13-keyboard-shortcuts.md` |
+| A decision worth recording | The next numbered ADR in `docs/adr/`, and bump the count in all three places it appears: `docs/README.md`, the documentation list in `README.md`, and §4 of this file |

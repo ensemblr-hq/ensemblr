@@ -26,7 +26,7 @@ const GITHUB_COMMENT: PullRequestCommentSummary = {
 	provider: 'github',
 	replies: [
 		{
-			author: 'psoldunov',
+			author: 'octocat',
 			body: 'Fixed.',
 			createdAt: '2026-07-20T10:00:00.000Z',
 			id: 'c2',
@@ -47,7 +47,7 @@ describe('renderCommentDocument', () => {
 		expect(document).toContain('- **Thread state:** Unresolved');
 		expect(document).toContain('Line one\n\nLine two');
 		expect(document).toContain('## Replies (1)');
-		expect(document).toContain('**psoldunov** — 2026-07-20T10:00:00.000Z');
+		expect(document).toContain('**octocat** — 2026-07-20T10:00:00.000Z');
 		expect(document).toContain('Fixed.');
 	});
 
@@ -106,7 +106,7 @@ describe('renderCommentDocument', () => {
 	// would have told the agent a Linear thread lived on a pull request.
 	test('a Linear comment is not labelled as GitHub', () => {
 		const document = renderCommentDocument({
-			author: 'philipp',
+			author: 'octocat',
 			body: 'Ship it.',
 			detail: 'Ship it.',
 			id: 'lin-1',

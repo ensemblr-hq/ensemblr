@@ -4,7 +4,7 @@ These instructions apply to this repository.
 
 ## Project Naming
 
-- This project was previously called `piductor`, then `Ensemble`. If agents find references to `piductor` or `Ensemble` in code, documentation, branches, commits, issues, or planning notes, interpret them as references to `Ensemblr` unless the local context clearly says otherwise. The current product name is `Ensemblr` (domain `ensemblr.dev`); the Linear project of record is still named `Ensemble`.
+- This project was previously called `piductor`, then `Ensemble`. If agents find references to `piductor` or `Ensemble` in code, documentation, branches, commits, issues, or planning notes, interpret them as references to `Ensemblr` unless the local context clearly says otherwise. The current product name is `Ensemblr` (domain `ensemblr.dev`).
 
 ## App Scaffolding Requires Current Official Docs
 
@@ -140,11 +140,8 @@ Every function, hook, React component, Jotai atom, and IPC contract in `src/main
 
 See @.claude/rules/code-review.md — when the `code-review` skill runs, run `react-doctor` and `fallow` as its final step.
 
-## Linear And Pull Request Workflow
+## Issue Tracker And Pull Request Workflow
 
-- Linear project lookup defaults: team `The Swiss Cheese`, project `Ensemble`, issue key prefix `THE`.
-- Local planning IDs such as `ENS-006` are roadmap IDs, not Linear issue keys. Use Linear issue identifiers such as `THE-106` for branch names, PR titles, commits, and status updates.
-- When asked to grab the next issue, inspect Linear project `Ensemble` first, then use `docs/product/linear-issues.md`, `docs/product/linear-milestones.md`, and `docs/product/implementation-roadmap.md` to confirm roadmap order, dependencies, and acceptance criteria. The frozen `ENS-*` dependency graph is archived at `docs/product/archive/dependency-map.md`.
-- Never mark Linear tickets as `Done` from agent work. When implementation and verification are complete, move the ticket to `In Review`.
-- Never create a pull request unless the user explicitly asks for one in the current task. Do not infer PR creation from completed work, Linear-backed work, or branch readiness.
-- When creating a pull request for Linear-backed work, include the actual Linear issue code in the PR title, for example `THE-105`. Do not use only a local planning ID such as `ENS-005`.
+- Never mark a tracker issue as `Done` from agent work. When implementation and verification are complete, move it to `In Review` and let a human decide whether it is finished.
+- Never create a pull request unless the user explicitly asks for one in the current task. Do not infer PR creation from completed work, tracker-backed work, or branch readiness.
+- When a change is backed by a tracker issue, put that issue's identifier in the branch name, the commits, and the PR title.

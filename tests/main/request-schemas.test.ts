@@ -87,12 +87,12 @@ const GITHUB_LINKED_ISSUE = {
 
 const LINEAR_LINKED_ISSUE = {
 	id: 'issue-uuid',
-	identifier: 'THE-1',
+	identifier: 'ENG-1',
 	provider: 'linear',
 	teamKey: 'THE',
 	teamName: 'Theseus',
 	title: 'Wire the picker',
-	url: 'https://linear.app/the/issue/THE-1',
+	url: 'https://linear.app/the/issue/ENG-1',
 } as const;
 
 // Regression: a GitHub-issue create sends `provider: 'github'`. The schema once
@@ -113,7 +113,7 @@ test('accepts a GitHub-provider linked issue and keeps the repository id', () =>
 test('accepts a Linear-provider linked issue and keeps the repository id', () => {
 	const parsed = parseCreateWorkspaceRequest({
 		linkedIssue: LINEAR_LINKED_ISSUE,
-		name: 'THE-1 Wire the picker',
+		name: 'ENG-1 Wire the picker',
 		repositoryId: 'repo-1',
 	});
 

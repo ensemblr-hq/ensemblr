@@ -37,7 +37,7 @@ const piCaller = {
 
 function workspaceRow(overrides: Record<string, unknown> = {}) {
 	return {
-		branchName: 'psoldunov/bach',
+		branchName: 'octocat/bach',
 		metadataJson: JSON.stringify({ placeholderName: true }),
 		...overrides,
 	};
@@ -164,7 +164,7 @@ describe('readSessionBriefNaming: summary staleness', () => {
 describe('readSessionBriefNaming: workspace naming eligibility', () => {
 	test('reports the branch as nameable while the placeholder name stands', () => {
 		expect(read().branch).toEqual({
-			current: 'psoldunov/bach',
+			current: 'octocat/bach',
 			eligible: true,
 			namesWorkspace: true,
 		});
@@ -177,7 +177,7 @@ describe('readSessionBriefNaming: workspace naming eligibility', () => {
 		const brief = read({ caller: { ...piCaller, isSubAgent: true } });
 
 		expect(brief.branch).toEqual({
-			current: 'psoldunov/bach',
+			current: 'octocat/bach',
 			eligible: false,
 			namesWorkspace: true,
 		});
@@ -186,7 +186,7 @@ describe('readSessionBriefNaming: workspace naming eligibility', () => {
 	test('reports a renamed workspace as no longer nameable', () => {
 		selectWorkspaceWithRepositoryById.mockReturnValue(
 			workspaceRow({
-				branchName: 'psoldunov/add-dark-mode',
+				branchName: 'octocat/add-dark-mode',
 				metadataJson: JSON.stringify({
 					placeholderName: true,
 					renamedAt: '2026-06-16T00:00:00Z',
@@ -195,7 +195,7 @@ describe('readSessionBriefNaming: workspace naming eligibility', () => {
 		);
 
 		expect(read().branch).toEqual({
-			current: 'psoldunov/add-dark-mode',
+			current: 'octocat/add-dark-mode',
 			eligible: false,
 			namesWorkspace: false,
 		});
@@ -211,7 +211,7 @@ describe('readSessionBriefNaming: workspace naming eligibility', () => {
 
 	test('reports nothing nameable when the user turned naming off', () => {
 		expect(read({ namingEnabled: false }).branch).toEqual({
-			current: 'psoldunov/bach',
+			current: 'octocat/bach',
 			eligible: false,
 			namesWorkspace: true,
 		});
@@ -242,7 +242,7 @@ describe('readSessionBriefNaming: workspace naming eligibility', () => {
 		);
 
 		expect(read().branch).toEqual({
-			current: 'psoldunov/bach',
+			current: 'octocat/bach',
 			eligible: true,
 			namesWorkspace: false,
 		});
@@ -251,7 +251,7 @@ describe('readSessionBriefNaming: workspace naming eligibility', () => {
 	test('stops asking once a rename has moved the branch', () => {
 		selectWorkspaceWithRepositoryById.mockReturnValue(
 			workspaceRow({
-				branchName: 'psoldunov/add-dark-mode',
+				branchName: 'octocat/add-dark-mode',
 				metadataJson: JSON.stringify({
 					branchNamed: true,
 					placeholderName: true,
@@ -277,7 +277,7 @@ describe('readSessionBriefNaming: callers without a chat tab', () => {
 
 		expect(brief).toEqual({
 			branch: {
-				current: 'psoldunov/bach',
+				current: 'octocat/bach',
 				eligible: true,
 				namesWorkspace: true,
 			},
@@ -292,7 +292,7 @@ describe('readSessionBriefNaming: callers without a chat tab', () => {
 
 		expect(read()).toEqual({
 			branch: {
-				current: 'psoldunov/bach',
+				current: 'octocat/bach',
 				eligible: true,
 				namesWorkspace: true,
 			},

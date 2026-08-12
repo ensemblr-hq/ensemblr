@@ -622,7 +622,7 @@ describe('comment summaries', () => {
 			path: 'src/app/page.tsx',
 			replies: [
 				{
-					author: 'psoldunov',
+					author: 'octocat',
 					body: 'Fixed.',
 					createdAt: '2026-07-20T10:00:00.000Z',
 					id: 'c2',
@@ -639,7 +639,7 @@ describe('comment summaries', () => {
 			path: 'src/app/page.tsx',
 			replies: [
 				{
-					author: 'psoldunov',
+					author: 'octocat',
 					body: 'Fixed.',
 					createdAt: '2026-07-20T10:00:00.000Z',
 					id: 'c2',

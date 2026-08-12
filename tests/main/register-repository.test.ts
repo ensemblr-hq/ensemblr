@@ -81,7 +81,7 @@ test('registers a valid git repository and writes an absolute path', async (t) =
 		gitProbe: gitProbeStub({
 			defaultBranch: 'master',
 			isGitRepository: true,
-			remoteUrl: 'git@github.com:psoldunov/ensemblr.git',
+			remoteUrl: 'git@github.com:ensemblr-hq/ensemblr.git',
 			topLevel: directory,
 		}),
 		loadConfig: loadRepositoryConfig,
@@ -96,7 +96,7 @@ test('registers a valid git repository and writes an absolute path', async (t) =
 	assert.equal(result.repository?.defaultBranch, 'master');
 	assert.equal(
 		result.repository?.remoteUrl,
-		'git@github.com:psoldunov/ensemblr.git',
+		'git@github.com:ensemblr-hq/ensemblr.git',
 	);
 	assert.equal(result.repository?.name, path.basename(directory));
 	assert.equal(result.repository?.createdAt, '2026-06-07T12:00:00.000Z');
@@ -126,7 +126,7 @@ test('registers a valid git repository and writes an absolute path', async (t) =
 		unknown
 	>;
 	assert.equal(metadata.adoptionMode, 'adopt-in-place');
-	assert.equal(metadata.remoteUrl, 'git@github.com:psoldunov/ensemblr.git');
+	assert.equal(metadata.remoteUrl, 'git@github.com:ensemblr-hq/ensemblr.git');
 	assert.equal(metadata.registeredAt, '2026-06-07T12:00:00.000Z');
 	assert.ok(Array.isArray(metadata.settingsSources));
 });
@@ -242,7 +242,7 @@ test('honours an explicit name override so folder suffixes do not leak into the 
 		gitProbe: gitProbeStub({
 			defaultBranch: 'main',
 			isGitRepository: true,
-			remoteUrl: 'git@github.com:psoldunov/haartz-next.git',
+			remoteUrl: 'git@github.com:octocat/haartz-next.git',
 			topLevel: suffixed,
 		}),
 		loadConfig: loadRepositoryConfig,
@@ -265,7 +265,7 @@ test('rejects a re-add when another repository tracks the same remote URL', asyn
 		database,
 		gitProbe: gitProbeStub({
 			isGitRepository: true,
-			remoteUrl: 'https://github.com/psoldunov/haartz-next.git',
+			remoteUrl: 'https://github.com/octocat/haartz-next.git',
 			topLevel: first,
 		}),
 		loadConfig: loadRepositoryConfig,
@@ -279,7 +279,7 @@ test('rejects a re-add when another repository tracks the same remote URL', asyn
 		gitProbe: gitProbeStub({
 			isGitRepository: true,
 			// Equivalent SSH form of the same upstream — should still collide.
-			remoteUrl: 'git@github.com:psoldunov/haartz-next',
+			remoteUrl: 'git@github.com:octocat/haartz-next',
 			topLevel: second,
 		}),
 		loadConfig: loadRepositoryConfig,

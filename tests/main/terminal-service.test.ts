@@ -60,7 +60,7 @@ function createDatabaseFixture(t: TestContext): DatabaseSync {
 	});
 	insertWorkspaceRow({
 		baseBranch: 'main',
-		branchName: 'philipp/monterrey',
+		branchName: 'octocat/monterrey',
 		database: connection.database,
 		id: WORKSPACE_ID,
 		metadataJson: '{}',

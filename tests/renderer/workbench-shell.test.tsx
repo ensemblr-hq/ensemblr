@@ -271,7 +271,7 @@ test('renders the workbench shell regions', () => {
 	expect(markup).toContain('data-workspace-sidebar-state="pr-ready"');
 	expect(markup).toContain('Workbench shell rework');
 	expect(markup).toContain('Review shell');
-	// THE-130: the mock chat fixture is gone. With no active Pi session in
+	// ENG-130: the mock chat fixture is gone. With no active Pi session in
 	// the fixture, the chat surface renders the new-chat empty state.
 	expect(markup).toContain('New chat empty state');
 	expect(markup).not.toContain('Mock agent chat');
@@ -280,7 +280,7 @@ test('renders the workbench shell regions', () => {
 	expect(markup).toContain('Close Review shell tab');
 	expect(markup).toContain('Close Setup notes tab');
 	expect(markup).toContain('Open closed chat tabs');
-	expect(markup).toContain('psoldunov avatar');
+	expect(markup).toContain('octocat avatar');
 	expect(markup).toContain('lucide-folder-git-2');
 	expect(markup).toContain('All files');
 	expect(markup).toContain('Changes');
@@ -296,7 +296,7 @@ test('renders the workbench shell regions', () => {
 	expect(markup).toContain('#13');
 	expect(markup).toContain('Working...');
 	expect(markup).toContain('Agent working');
-	expect(markup).toContain('THE-102 Rework workbench shell');
+	expect(markup).toContain('ENG-102 Rework workbench shell');
 	expect(markup).toContain('Add all to chat');
 	// Reworked comment rows expose hover actions; "Hide comment" is unique to the
 	// new row, so its presence proves the rebuilt Comments section rendered.
@@ -470,8 +470,8 @@ test('models project owner avatars with repo-icon fallback', () => {
 	const [ensemblrProject, agentLabProject] = shellFixtureProjects;
 
 	expect(ensemblrProject.owner).toEqual({
-		avatarUrl: 'https://github.com/psoldunov.png',
-		name: 'psoldunov',
+		avatarUrl: 'https://github.com/octocat.png',
+		name: 'octocat',
 	});
 	expect(agentLabProject.owner).toEqual({
 		name: 'agent-lab',
@@ -527,7 +527,7 @@ test('renders merge-ready pull request state in the right header', () => {
 			},
 			status: 'ready-to-merge',
 			title: 'Ready fixture',
-			url: 'https://github.com/psoldunov/ensemblr/pull/29',
+			url: 'https://github.com/ensemblr-hq/ensemblr/pull/29',
 		},
 	};
 	const activeProject: ProjectShellModel = {
@@ -550,7 +550,7 @@ test('renders merge-ready pull request state in the right header', () => {
 
 	expect(markup).toContain('#29');
 	expect(markup).toContain(
-		'href="https://github.com/psoldunov/ensemblr/pull/29"',
+		'href="https://github.com/ensemblr-hq/ensemblr/pull/29"',
 	);
 	expect(markup).toContain('Ready to merge');
 	expect(markup).toContain('data-workspace-sidebar-state="pr-ready"');
@@ -563,7 +563,7 @@ test('renders merge-ready pull request state in the right header', () => {
 	expect(markup).toContain('>Checks</h3>');
 	expect(markup).toContain('data-check-status="ready"');
 	expect(markup).toContain(
-		'href="https://github.com/psoldunov/ensemblr/actions/runs/102"',
+		'href="https://github.com/ensemblr-hq/ensemblr/actions/runs/102"',
 	);
 	expect(markup).not.toContain('Deployments');
 	expect(markup).toContain('All required checks passed.');
@@ -1007,7 +1007,7 @@ test('keeps blocked setup inside the workbench and disables the composer', () =>
 		),
 	);
 
-	// THE-130: the chat tab no longer hosts diagnostic UI. Blocked-setup
+	// ENG-130: the chat tab no longer hosts diagnostic UI. Blocked-setup
 	// status lives in the sidebar footer (with a link to /settings/diagnostics)
 	// and the composer disables silently — no panel inside the chat scroll.
 	expect(markup).not.toContain('Setup keeps the shell in place');

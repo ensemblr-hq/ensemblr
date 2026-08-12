@@ -57,14 +57,14 @@ function createIssueData(
 		dueDate: null,
 		labels: [{ color: '#f00', id: 'label-1', name: 'bug' }],
 		id: 'issue-1',
-		identifier: 'THE-143',
+		identifier: 'ENG-143',
 		priority: 1,
 		project: { id: 'project-1', name: 'Ensemblr' },
 		state: { color: '#888', id: 'state-1', name: 'Todo', type: 'unstarted' },
 		team: { id: 'team-1', key: 'THE', name: 'Theseus' },
 		title: 'Linear OAuth',
 		updatedAt: '2026-06-10T12:00:00.000Z',
-		url: 'https://linear.app/acme/issue/THE-143',
+		url: 'https://linear.app/acme/issue/ENG-143',
 		...overrides,
 	};
 }
@@ -103,7 +103,7 @@ function createFakeClient(options: FakeClientOptions = {}) {
 			calls.push('createIssue');
 			return createIssueData({
 				id: 'issue-new',
-				identifier: 'THE-200',
+				identifier: 'ENG-200',
 				title: input.title,
 			});
 		},
@@ -185,7 +185,7 @@ test('listIssues: syncs from the client on a cold cache and serves cached rows',
 	assert.ok(result.status === 'ok');
 	assert.strictEqual(result.source, 'remote');
 	assert.strictEqual(result.issues.length, 1);
-	assert.strictEqual(result.issues[0]?.identifier, 'THE-143');
+	assert.strictEqual(result.issues[0]?.identifier, 'ENG-143');
 	assert.strictEqual(result.issues[0]?.teamKey, 'THE');
 	assert.strictEqual(result.issues[0]?.stateName, 'Todo');
 	assert.strictEqual(result.issues[0]?.cycleName, 'Cycle 12');
@@ -208,7 +208,7 @@ test('listIssues: follows pagination cursors across pages', async (t) => {
 	const { calls, service } = createServiceFixture(t, {
 		issuePages: [
 			page([createIssueData()], 'cursor-1'),
-			page([createIssueData({ id: 'issue-2', identifier: 'THE-144' })]),
+			page([createIssueData({ id: 'issue-2', identifier: 'ENG-144' })]),
 		],
 	});
 
@@ -254,7 +254,7 @@ test('listIssues: filters cached rows by query', async (t) => {
 				createIssueData(),
 				createIssueData({
 					id: 'issue-2',
-					identifier: 'THE-150',
+					identifier: 'ENG-150',
 					title: 'Terminal polish',
 				}),
 			]),
@@ -278,7 +278,7 @@ test('getIssue: serves the remote payload and caches comments', async (t) => {
 
 	assert.ok(result.status === 'ok');
 	assert.strictEqual(result.source, 'remote');
-	assert.strictEqual(result.issue.identifier, 'THE-143');
+	assert.strictEqual(result.issue.identifier, 'ENG-143');
 	assert.strictEqual(result.comments.length, 1);
 	assert.strictEqual(result.comments[0]?.authorName, 'Bob');
 
@@ -345,7 +345,7 @@ test('createIssue/updateIssue/createComment: mutate remotely and refresh the cac
 		title: 'New issue',
 	});
 	assert.ok(created.status === 'ok');
-	assert.strictEqual(created.issue.identifier, 'THE-200');
+	assert.strictEqual(created.issue.identifier, 'ENG-200');
 
 	const updated = await service.updateIssue({
 		id: 'issue-new',

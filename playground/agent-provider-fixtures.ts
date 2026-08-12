@@ -39,8 +39,8 @@ function connectedClaudeReadiness(): AgentProviderReadinessWire {
 	return {
 		account: {
 			apiProvider: 'anthropic',
-			email: 'philipp@theswisscheese.com',
-			organization: 'The Swiss Cheese',
+			email: 'dev@example.com',
+			organization: 'Example Org',
 			subscriptionType: 'Max 20x',
 			tokenSource: 'keychain',
 		},
@@ -163,7 +163,7 @@ function piReadiness(): AgentProviderReadinessWire {
 		account: null,
 		checks: [
 			{
-				detail: '/Users/psoldunov/.local/bin/pi',
+				detail: '/Users/dev/.local/bin/pi',
 				id: 'executable',
 				label: 'Executable',
 				logs: null,
@@ -201,7 +201,7 @@ function piReadiness(): AgentProviderReadinessWire {
 				status: 'failure',
 			},
 		],
-		executablePath: '/Users/psoldunov/.local/bin/pi',
+		executablePath: '/Users/dev/.local/bin/pi',
 		executableSource: 'configured',
 		provider: 'pi',
 		status: 'failure',
@@ -292,9 +292,9 @@ export function resolveFixtureAgentProviderExecutablePath(
 	if (readBridgeProvider(payload) === 'pi') {
 		return {
 			error: null,
-			overridePath: '/Users/psoldunov/.local/bin/pi',
+			overridePath: '/Users/dev/.local/bin/pi',
 			provider: 'pi',
-			resolvedPath: '/Users/psoldunov/.local/bin/pi',
+			resolvedPath: '/Users/dev/.local/bin/pi',
 			source: 'sqlite',
 			status: 'ok',
 		};

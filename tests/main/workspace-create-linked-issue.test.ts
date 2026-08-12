@@ -19,12 +19,12 @@ const fixedNow = () => new Date('2026-06-11T12:00:00.000Z');
 
 const LINKED_ISSUE: WorkspaceLinkedIssueInput = {
 	id: 'issue-1',
-	identifier: 'THE-143',
+	identifier: 'ENG-143',
 	provider: 'linear',
 	teamKey: 'THE',
 	teamName: 'Theseus',
 	title: 'Linear OAuth PKCE and Token Lifecycle',
-	url: 'https://linear.app/acme/issue/THE-143',
+	url: 'https://linear.app/acme/issue/ENG-143',
 };
 
 function createHarness(t: TestContext) {
@@ -112,9 +112,9 @@ test('create with linkedIssue persists issue metadata and the integration link r
 	});
 
 	const result = await service.create({
-		branchName: 'feat/the-143-linear-oauth-pkce-and-token-life',
+		branchName: 'feat/eng-143-linear-oauth-pkce-and-token-life',
 		linkedIssue: LINKED_ISSUE,
-		name: 'THE-143 Linear OAuth PKCE and Token Lifecycle',
+		name: 'ENG-143 Linear OAuth PKCE and Token Lifecycle',
 		repositoryId: harness.repositoryId,
 	});
 
@@ -122,7 +122,7 @@ test('create with linkedIssue persists issue metadata and the integration link r
 	assert.ok(result.workspace);
 	assert.strictEqual(
 		result.workspace.branchName,
-		'feat/the-143-linear-oauth-pkce-and-token-life',
+		'feat/eng-143-linear-oauth-pkce-and-token-life',
 	);
 	assert.deepStrictEqual(result.workspace.metadata.linkedIssue, LINKED_ISSUE);
 
