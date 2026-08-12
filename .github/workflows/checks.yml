@@ -11,6 +11,27 @@ permissions:
   pull-requests: write
 
 jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+
+      - name: Biome, Tailwind scale, i18n lint, hardcoded strings
+        run: npm run check
+
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Vitest
+        run: npm run test
+
   scan:
     runs-on: ubuntu-latest
     steps:
