@@ -24,7 +24,7 @@ export function ComposerFocusHint({
 	return (
 		<span
 			aria-hidden='true'
-			className='pointer-events-none absolute top-0 right-0 text-muted-foreground/60 text-xs'
+			className='pointer-events-none absolute top-0 right-0 text-muted-foreground/60 text-xs leading-relaxed'
 		>
 			<Trans
 				components={{

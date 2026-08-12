@@ -5,7 +5,6 @@ import {
 	GithubLogo,
 	LinearLogo,
 } from '@/renderer/components/workbench-shell/source-provider-logo';
-import { cn } from '@/renderer/lib/utils';
 import { getWorkspaceFileIconName } from '@/renderer/lib/workbench';
 import type { ComposerAttachment } from '@/renderer/types/workbench';
 
@@ -61,10 +60,7 @@ export function AttachmentChip({
 
 	return (
 		<span
-			className={cn(
-				'group/chip inline-flex h-5 max-w-xs items-center gap-1.5 rounded-md border border-border bg-background px-1.5 text-xs',
-				'hover:border-border/80',
-			)}
+			className='group/chip inline-flex h-5 max-w-xs items-center gap-1.5 rounded-md border border-border bg-background px-1.5 text-xs'
 			title={label}
 		>
 			{onActivate ? (

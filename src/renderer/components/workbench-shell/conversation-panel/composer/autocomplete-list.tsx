@@ -54,11 +54,11 @@ export function AutocompleteRow({
 					{icon}
 				</span>
 			) : null}
-			<span className='w-72 shrink-0 truncate font-medium text-foreground'>
+			<span className='w-72 min-w-0 truncate font-medium text-foreground'>
 				{primary}
 			</span>
 			{secondary ? (
-				<span className='min-w-0 flex-1 truncate text-left text-muted-foreground text-xs'>
+				<span className='min-w-0 flex-1 basis-auto truncate text-left text-muted-foreground text-xs'>
 					{secondary}
 				</span>
 			) : null}

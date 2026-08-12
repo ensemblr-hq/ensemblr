@@ -11,7 +11,6 @@ import {
 	TooltipTrigger,
 } from '@/renderer/components/ui/tooltip';
 import type { ComposerStateApi } from '@/renderer/hooks/workbench-shell/composer/use-composer-state';
-import { cn } from '@/renderer/lib/utils';
 import {
 	resolveComposerProvider,
 	showContextIndicator,
@@ -72,7 +71,7 @@ export function ComposerControls({
 
 	return (
 		<div className='flex items-center justify-between gap-2'>
-			<div className='flex min-w-0 items-center gap-1.5'>
+			<div className='-ml-1.5 flex min-w-0 items-center gap-1'>
 				<ModelPicker
 					disabled={pickersDisabled}
 					lockedProvider={composer.lockedProvider}
@@ -95,7 +94,7 @@ export function ComposerControls({
 					value={composer.planMode}
 				/>
 			</div>
-			<div className='flex items-center gap-1'>
+			<div className='-mr-1.5 flex items-center gap-1'>
 				<FollowUpQueuePanel
 					disabled={composer.disabled}
 					entries={state.followUpQueue}
@@ -188,11 +187,7 @@ function SubmitControl({
 	const sendButton = (
 		<Button
 			aria-label={t('common:actions.send', 'Send')}
-			className={cn(
-				'rounded-md',
-				!state.canSend &&
-					'bg-muted text-muted-foreground hover:bg-muted hover:text-muted-foreground',
-			)}
+			className='rounded-md'
 			disabled={!state.canSend}
 			onClick={() => void state.handleSubmit()}
 			size='icon-sm'

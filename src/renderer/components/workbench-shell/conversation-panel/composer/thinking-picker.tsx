@@ -86,6 +86,7 @@ export function ThinkingPicker({
 			: undefined;
 	const levelLabel =
 		selected?.label ?? t('workbench:thinking-picker.off', 'Off');
+	const showsLabel = strength > 0;
 
 	return (
 		<Tooltip>
@@ -104,19 +105,19 @@ export function ThinkingPicker({
 									{ level: levelLabel },
 								)
 					}
-					className={cn('h-7 rounded-md px-2 font-medium', tintClass)}
+					className={cn(
+						'rounded-md font-medium',
+						showsLabel && 'px-2',
+						tintClass,
+					)}
 					disabled={disabled}
 					onClick={handleClick}
-					size='sm'
+					size={showsLabel ? 'sm' : 'icon-sm'}
 					type='button'
 					variant='subtle'
 				>
 					<ThinkingBarIcon strength={strength} />
-					{strength > 0 ? (
-						<span>
-							{selected?.label ?? t('workbench:thinking-picker.off', 'Off')}
-						</span>
-					) : null}
+					{showsLabel ? <span>{levelLabel}</span> : null}
 				</Button>
 			</TooltipTrigger>
 			<TooltipContent sideOffset={4}>

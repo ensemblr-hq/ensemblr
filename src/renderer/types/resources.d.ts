@@ -2110,6 +2110,9 @@ export default interface Resources {
 			'attachment-failed': 'Failed to attach selected file.';
 			'blocked-follow-up': 'Follow-ups are held while the agent works — sending or {{shortcut}} adds to the queue, and you send it from there once the agent finishes.';
 			'focus-hint': '<key>{{shortcut}}</key><label>to focus</label>';
+			'follow-up': {
+				placeholder: 'Send a follow-up';
+			};
 			'last-unread': 'Last unread';
 			'last-unread-tooltip': 'Jump to the newest unread chat in {{workspace}}';
 			'last-unread-tooltip-generic': 'Jump to the newest unread chat';
@@ -2124,10 +2127,7 @@ export default interface Resources {
 			};
 			placeholder: 'Ask to make changes, @mention files, run /commands';
 			'plan-mode': {
-				placeholder: 'Describe what you want built — the agent will plan it with you before touching any files';
-			};
-			ready: {
-				placeholder: 'Ask the agent to continue {{session}}';
+				placeholder: 'Describe what you want planned';
 			};
 			'send-tooltip': 'Send message';
 			'send-tooltip-hold': 'Hold until you send it';

@@ -34,13 +34,17 @@ const chatSession = (isSubAgent: boolean): SessionTabModel => ({
 const composerStateFor = (
 	session: SessionTabModel,
 	overrides: {
+		activeAgentSessionId?: string | null;
 		isStreaming?: boolean;
 		setupDiagnostics?: SetupDiagnosticsSnapshot | null;
 		setupError?: string | null;
 	} = {},
 ) =>
 	getComposerState({
-		activeAgentSessionId: 'agent-1',
+		activeAgentSessionId:
+			overrides.activeAgentSessionId === undefined
+				? 'agent-1'
+				: overrides.activeAgentSessionId,
 		activeSession: session,
 		availableModels: [],
 		availableThinkingLevels: [],
@@ -78,8 +82,25 @@ describe('sub-agent composer', () => {
 
 		expect(composer.disabled).toBe(false);
 		expect(composer.disabledReason).toBeNull();
+	});
+
+	// The placeholder used to interpolate the chat's own title, which restated the
+	// tab label beside it and grew with it. It now names the state instead.
+	test('invites a follow-up once the chat has run a turn', () => {
+		const composer = composerStateFor(chatSession(false));
+
+		expect(composer.placeholder).toBe('Send a follow-up');
+		expect(composer.placeholder).not.toContain('Ask the agent to continue');
+	});
+
+	test('invites a first message on a chat that has never run', () => {
+		const composer = composerStateFor(
+			{ ...chatSession(false), agentSessionId: null },
+			{ activeAgentSessionId: null },
+		);
+
 		expect(composer.placeholder).toBe(
-			'Ask the agent to continue astro inventory',
+			'Ask to make changes, @mention files, run /commands',
 		);
 	});
 

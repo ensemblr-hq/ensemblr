@@ -270,7 +270,7 @@ export function FollowUpQueueList({
 	};
 
 	return (
-		<ScrollArea className='pr-3.5' style={scrollAreaStyle}>
+		<ScrollArea className='-mr-1.5 pr-1.5' style={scrollAreaStyle}>
 			<Reorder.Group
 				axis='y'
 				className='m-0! flex list-none flex-col gap-0.5 p-0!'
