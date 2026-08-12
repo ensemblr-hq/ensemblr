@@ -1,24 +1,15 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAtomCallback } from 'jotai/utils';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import {
-	agentSessionsForWorkspaceQuery,
 	closeChatTab,
 	ensemblrQueryKeys,
-	listChatTabsQuery,
-	listClosedChatTabsWithSummaryQuery,
-	openChatTab,
 	removeOpenChatTabFromCache,
-	reorderChatTabs,
 	restoreChatTab,
-	writeOpenedChatTabToCache,
-	writeReorderedChatTabsToCache,
 } from '@/renderer/api/ensemblr-queries';
-import { useAgentSessionStatusInvalidation } from '@/renderer/hooks/workspace/use-agent-session-status-invalidation';
 import { useWorkspaceAgentBusy } from '@/renderer/hooks/workspace/use-workspace-agent-busy';
-import { areStringArraysEqual } from '@/renderer/lib/ordered-ids';
 import {
 	forgetComposerDraft,
 	forgetFollowUpQueue,
@@ -37,19 +28,9 @@ import type {
 	SessionTabPlacement,
 	SessionTabState,
 } from '@/renderer/types/workbench-shell';
-import type { AgentSessionSnapshotWire } from '@/shared/ipc/contracts/agent-session';
-import type {
-	ChatTabWire,
-	CloseChatTabRequest,
-	ClosedChatTabEntryWire,
-	ListChatTabsResult,
-	OpenChatTabRequest,
-} from '@/shared/ipc/contracts/chat-tab';
-import { parseWorkspaceGitDiffScope } from '@/shared/ipc/contracts/workspace-git';
+import type { CloseChatTabRequest } from '@/shared/ipc/contracts/chat-tab';
 import { useWorkspaceChatBootstrap } from './chat-tab-bootstrap';
 import { useChatTabOpenMutations } from './chat-tab-open-mutations';
-import { parseCommentPreview } from './comment-preview-tab';
-import { usePreviewTabSlot } from './preview-tab-slot';
 import { sessionVisitOrderByWorkspaceAtom } from './selection-atoms';
 import { decideActiveClose } from './session-tab-close';
 import { useSessionTabCloseFlow } from './session-tab-close-flow';
@@ -58,10 +39,7 @@ import { useSessionTabModels } from './session-tab-models';
 import { useSessionTabOpeners } from './session-tab-openers';
 import { useSessionTabReorder } from './session-tab-reorder';
 import { useTerminalTabLiveTitles } from './terminal-tab-live-titles';
-import {
-	readHarnessSessionId,
-	resumeRestoredTerminalTab,
-} from './terminal-tab-restore';
+import { resumeRestoredTerminalTab } from './terminal-tab-restore';
 import { useTerminalTabAutoResume } from './terminal-tab-resume';
 
 /** Result returned after closing a tab, allowing callers to handle a replacement. */
