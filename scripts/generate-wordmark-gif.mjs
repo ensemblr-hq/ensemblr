@@ -7,11 +7,16 @@
  * `src/renderer/components/welcome/welcome-wordmark.tsx`: per-pixel flicker plus
  * a periodic chromatic-split glitch burst (red/cyan ghosts offset either side of
  * a skewed main layer). The app's timings run on a 9-17s burst interval and
- * 12-20s flicker cycles, which no README-sized loop can hold, so the timeline is
- * compressed into one seamless 4s loop: every pixel runs exactly one flicker
- * cycle per loop at a random phase, and one burst fires mid-loop. Compressing
- * this way preserves the *density* of the original — roughly 6% of pixels dipped
- * at any instant — rather than its literal periods.
+ * 12-20s flicker cycles. One seamless 16s loop holds a flicker cycle at the low
+ * end of that range: every pixel runs exactly one cycle per loop at a random
+ * phase, and one burst fires mid-loop. The burst interval is the part that stays
+ * compressed — a loop cannot hold a 9-17s gap between bursts and also start and
+ * end quiet — so the loop preserves the *density* of the original, roughly 6% of
+ * pixels dipped at any instant, rather than its literal burst period.
+ *
+ * The canvas is GitHub's dark page background rather than the app's own
+ * `--ensemblr-canvas`, so the mark sits flush in the README instead of reading
+ * as a near-black card on a dark page.
  *
  * Rasterization follows `icon-art.mjs`: ImageMagick MVG `-draw` primitives, not
  * an SVG rasterizer, because the machine has no `rsvg-convert`/Inkscape delegate
@@ -26,7 +31,6 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runTool } from './icon-art.mjs';
 import {
-	COLOR_CANVAS,
 	COLOR_GHOST_CYAN,
 	COLOR_GHOST_RED,
 	COLOR_INK,
@@ -35,6 +39,10 @@ import {
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const ASSETS_DIR = join(ROOT, 'assets');
 const OUTPUT = join(ASSETS_DIR, 'wordmark.gif');
+
+// GitHub's dark canvas, not an app design token — this GIF only ever renders on
+// a GitHub README, where matching that page keeps the mark from showing a seam.
+const COLOR_CANVAS = '#0d1117';
 
 // Dot-matrix glyphs, copied verbatim from GLYPHS in welcome-wordmark.tsx.
 const GLYPHS = {
@@ -68,8 +76,11 @@ const GLITCH_SHIFT = CELL * 0.11;
 const GHOST_OPACITY = 0.75;
 const GLITCH_SKEW_DEGREES = -2;
 
-const LOOP_MS = 4000;
-const FRAME_COUNT = 80;
+// Frame count scales with the loop so the delay stays a whole 5cs (20fps): GIF
+// delays are centisecond integers, and a loop that does not divide evenly drifts
+// the burst away from the moment the glitch constants place it.
+const LOOP_MS = 16_000;
+const FRAME_COUNT = 320;
 const FRAME_DELAY_CENTISECONDS = Math.round(LOOP_MS / FRAME_COUNT / 10);
 const GIF_COLORS = 128;
 

@@ -139,9 +139,12 @@ Adding another unbundled or native dependency means updating **both**
 - **App icon.** Regenerate with `npm run icon:generate`
   (`scripts/generate-app-icon.mjs`).
 - **README wordmark.** `assets/wordmark.gif` is the animated dot-matrix mark at
-  the top of the README, generated from the same glyphs as the in-app wordmark.
-  Regenerate with `npm run wordmark:generate`
-  (`scripts/generate-wordmark-gif.mjs`); it needs ImageMagick on PATH.
+  the top of the README, generated from the same glyphs as the in-app wordmark —
+  a 16s loop at 20fps on GitHub's `#0d1117` page background, so it sits flush in
+  the README rather than as a card of the app's own near-black. Regenerate with
+  `npm run wordmark:generate` (`scripts/generate-wordmark-gif.mjs`); it needs
+  ImageMagick on PATH. `LOOP_MS` and `FRAME_COUNT` move together — the GIF delay
+  is a whole centisecond, so keep `LOOP_MS / FRAME_COUNT` at a multiple of 10.
 
 ## See also
 
