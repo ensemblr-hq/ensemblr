@@ -210,8 +210,8 @@ function ReviewFileStats({ file }: { file: ReviewFileSummary }) {
 }
 
 /**
- * Trailing status square, mirroring the way Conductor marks rows: a plus for new
- * files, a centered dot for in-place edits, a minus for deletions, and a warning
+ * Trailing status square marking how a file changed: a plus for new files, a
+ * centered dot for in-place edits, a minus for deletions, and a warning
  * triangle for a file git could not merge. Purely a status marker — opening the
  * diff is the row's own click.
  */

@@ -4,7 +4,7 @@ Status: discovery complete — recommendation: defer to post-core. 2026-06-11.
 
 ## Question
 
-Can Ensemblr offer Conductor-style "spotlight testing" — running a workspace's
+Can Ensemblr offer "spotlight testing" — running a workspace's
 changes inside the root checkout's app process — without overwriting root
 changes or breaking workspace isolation?
 
@@ -12,9 +12,8 @@ changes or breaking workspace isolation?
 
 Spotlight testing points the *root* repository checkout at a *workspace*'s
 changes so a long-running root app (dev server, simulator build) picks them up
-without restarting from the worktree. Conductor exposes a `spotlight_testing` config
-key. In Ensemblr's single-file model, any such key would live in the committed
-`.ensemblr/settings.toml`; it is unused today.
+without restarting from the worktree. In Ensemblr's single-file model, any such
+key would live in the committed `.ensemblr/settings.toml`; it is unused today.
 
 ## Candidate sync strategies
 

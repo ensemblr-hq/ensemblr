@@ -1,8 +1,8 @@
-# UX Parity
+# UX Conventions
 
 Date: 2026-08-08
 
-Ensemblr should match Conductor's observable workflows and information architecture where practical, while using distinct Ensemblr visual design, copy, branding, icons, and runtime-specific agent behavior.
+This document records the workflows and information architecture Ensemblr has settled on, and the visual design, copy, branding, icons, and runtime-specific agent behavior that carry them.
 
 > **Status (2026-08-08):** Ensemblr is no longer a single-runtime app. ADR 0042
 > added Claude Code as a second first-class agent runtime alongside Pi (#226–#237),
@@ -39,9 +39,8 @@ work should deepen those services rather than redesigning the shell or moving
 major surfaces unless a later product decision explicitly supersedes the
 implemented direction.
 
-The current shell is the intended closest match to Conductor's own shell. Lost
-or unavailable screenshot evidence should not cause agents to reopen settled
-shell layout decisions.
+The current shell is the settled intended layout. Lost or unavailable screenshot
+evidence should not cause agents to reopen settled shell layout decisions.
 
 The visible chat transcript and prompt composer are backed by a live agent
 runtime — Pi or Claude Code, pinned per chat. Prompt submission, stop,
@@ -73,8 +72,8 @@ Ensemblr equivalent:
   that crosses shell modules, such as pinned workspace IDs, collapsed project
   IDs, project order, dashboard board status/order, unread workspace IDs, and
   closed session tab IDs.
-- Use an Ensemblr-specific React/shadcn visual language, not Conductor's visual identity.
-- Preserve the same pane hierarchy so Conductor users can transfer workflows.
+- Use an Ensemblr-specific React/shadcn visual language.
+- Preserve the pane hierarchy so users can transfer workflows between releases.
 - Keep app diagnostics in the left sidebar footer/status area. Do not render app
   setup diagnostics in the lower Setup dock.
 - Treat the current shell as locked product direction. Later service tickets should deepen live services inside the existing sidebar, dashboard, timeline, review panel, and dock regions instead of creating new regions.
@@ -84,8 +83,8 @@ Ensemblr equivalent:
 - Settings is a separate full-window settings view with a Back to app action.
 - Settings sidebar has app-wide sections first and local project sections below.
 - Main settings forms are narrow, centered, row-based, and mostly inline-editable.
-- App settings cover General, Models, Providers, Environment, Git, Appearance, Integrations, and (under "More") Diagnostics, Experimental, and Advanced. Providers was removed in the 2026-07-19 single-runtime pass and reinstated by #226 as the agent-runtime surface: one tab per first-class runtime (Pi, then Claude Code) with its executable, readiness, accounts, and settings-file location. The aggregate setup gate still lives in Diagnostics, and Ensemblr stores no provider tokens.
-- Repository settings are selected from the same sidebar and expose path, branch, remote, preview, copy, script, spotlight, instruction, and removal controls.
+- App settings cover General, Models, Providers, Environment, Git, Appearance, Integrations, and (under "More") Diagnostics, Shortcuts, and Experimental. Providers was removed in the 2026-07-19 single-runtime pass and reinstated by #226 as the agent-runtime surface: one tab per first-class runtime (Pi, then Claude Code) with its executable, readiness, accounts, and settings-file location. The aggregate setup gate still lives in Diagnostics, and Ensemblr stores no provider tokens. #248 removed the catch-all **Advanced** page — root directory moved to General, terminal scrollback to Appearance, the Pi executable override into Providers — and added a read-only **Shortcuts** reference.
+- Repository settings are selected from the same sidebar and expose path, branch, remote, preview, copy, script, spotlight, instruction, and removal controls, plus a **Security** page holding the workspace permission mode (#248).
 
 Ensemblr equivalent:
 
@@ -113,7 +112,7 @@ Ensemblr equivalent:
 Ensemblr equivalent:
 
 - Create a git worktree workspace, show branch/copy/setup status, and open the Pi composer immediately.
-- Auto-generated placeholder names are acceptable, but Ensemblr should not copy Conductor's naming style if it is distinctive.
+- Auto-generated placeholder names are acceptable, and should read in Ensemblr's own voice.
 
 ### Agent Timeline
 
@@ -183,17 +182,27 @@ Ensemblr equivalent:
 
 ## Pi-Specific Changes
 
-| Conductor concept | Ensemblr equivalent |
-| --- | --- |
-| Claude Code and Codex providers | Two first-class agent runtimes: **Claude Code** (in-process `@anthropic-ai/claude-agent-sdk`) and **Pi** (CLI RPC). Both are siblings under `src/main/agent-runtime/`; Settings → Providers is the per-runtime readiness surface. Codex remains a terminal harness only, not an agent provider. See ADR 0042. |
-| Claude/Codex model defaults | App-wide default model and thinking level on Settings → Models, resolved per chat against the pinned runtime's own catalogue. |
-| Claude/Codex config sync | Each runtime keeps its own user environment: Pi discovers `~/.pi/agent`, project `.pi`, skills, prompts, themes, and context files; Claude Code uses the user's own `claude` configuration, slash commands, and MCP roster (#228). Ensemblr duplicates neither. |
-| Claude tool approvals | Workspace permission modes, enforced in-app for Claude (ADR 0042, decision 7) and mapped to Pi tool restrictions where available. Plan mode (#184) is a separate per-chat hold: Claude uses its native plan mode, Pi is gated through the shipped extension's `tool_call` hook. |
-| Retry in new chat | Agent session tree fork/continuation behavior plus file checkpoint policy. Ensemblr does not enable the Claude SDK's own file checkpointing (ADR 0042, decision 6). |
-| Review/create-PR/fix prompt templates | Repository action templates stored per user/repository with source precedence. |
-| Provider environment catalog | Runtime-relevant provider/env catalog plus generic environment variables. |
-| Conductor root path labels | Ensemblr root directory, with optional Conductor-compatible shared root support. |
-| `CONDUCTOR_*` environment variables | Native `ENSEMBLR_*` variables. |
+- **Runtimes.** Two first-class agent runtimes: **Claude Code** (in-process
+  `@anthropic-ai/claude-agent-sdk`) and **Pi** (CLI RPC). Both are siblings under
+  `src/main/agent-runtime/`; Settings → Providers is the per-runtime readiness surface. Codex
+  remains a terminal harness only, not an agent provider. See ADR 0042.
+- **Model defaults.** App-wide default model and thinking level on Settings → Models, resolved per
+  chat against the pinned runtime's own catalogue.
+- **Runtime configuration.** Each runtime keeps its own user environment: Pi discovers
+  `~/.pi/agent`, project `.pi`, skills, prompts, themes, and context files; Claude Code uses the
+  user's own `claude` configuration, slash commands, and MCP roster (#228). Ensemblr duplicates
+  neither.
+- **Tool approvals.** Workspace permission modes, enforced in-app for Claude (ADR 0042, decision 7)
+  and mapped to Pi tool restrictions where available. Plan mode (#184) is a separate per-chat hold:
+  Claude uses its native plan mode, Pi is gated through the shipped extension's `tool_call` hook.
+- **Retry and checkpoints.** Agent session tree fork/continuation behavior plus file checkpoint
+  policy. Ensemblr does not enable the Claude SDK's own file checkpointing (ADR 0042, decision 6).
+- **Prompt templates.** Repository action templates for review, create-PR, and fix, stored per
+  user/repository with source precedence.
+- **Environment.** Runtime-relevant provider/env catalog plus generic environment variables.
+  Workspace paths are labelled against the Ensemblr root directory — which may optionally be a root
+  shared with another workspace manager (ADR 0011) — and the variables Ensemblr exports into a
+  workspace are natively named `ENSEMBLR_*`.
 
 ## Prioritized Implementation Checklist
 
@@ -207,5 +216,5 @@ Ensemblr equivalent:
 8. **Complete.** Wire file/diff panel: all-files tree, changes tree, diff body, source filtering, discard controls, and search are live. Inline local line comments shipped with the rich diff viewer (THE-152, #151, `diff-viewer/diff-comment-thread.tsx`); #211 unified the file preview, turn diff, and workspace file diff behind one code surface.
 9. **Complete.** Wire PR/checks panel: no-PR state, uncommitted state, PR metadata, CI/deployments, comments, todos, ready-to-merge state, and merge confirmation are live. PR comment bodies are readable in-app (#209) and open as their own tab (#207, #208); the deployed-build preview link is wired (#196, #197); merge conflicts surface in the panel with a "Resolve" action that hands the conflict to the agent (#215); resolved review comments render struck through and bulk-add sends only the unresolved ones (#234).
 10. Implement repository action preferences: review, create PR, fix errors, resolve conflicts, branch rename, and general agent instructions.
-11. Add polish/settings parity: appearance previews, keyboard shortcuts, command palette, diagnostics, and source-status polish. Voice remains post-core deferred.
+11. Complete the polish/settings surface: appearance previews, keyboard shortcuts, command palette, diagnostics, and source-status polish. Voice remains post-core deferred.
 12. Revisit advanced integrations: Graphite stack support and cloud/remote workspace SSH behavior. Linear issue workflows are v1 scope, and GitHub workflows stay on `gh`/`gh api`.

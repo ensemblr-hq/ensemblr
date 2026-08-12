@@ -1,4 +1,4 @@
-# 0023. Use Conductor-Style Merge Confirmation
+# 0023. Use a Two-Step Merge Confirmation
 
 Date: 2026-06-04
 
@@ -8,13 +8,13 @@ Accepted
 
 ## Context
 
-Conductor's checks and PR flow presents merge readiness in the Checks panel. When checks pass, the merge action is prominent and ready. After selecting merge, Conductor presents a confirmation/final action flow, including archive behavior.
+Ensemblr presents merge readiness in the Checks panel. When checks pass, the merge action should be prominent and ready — but merge is irreversible from the app's side and often carries archive behavior with it, so a single click on a prominent button is the wrong ergonomics.
 
-Ensemblr uses `gh` CLI for v1 GitHub integration and targets Conductor parity for PR/check/merge workflows.
+Ensemblr uses the `gh` CLI for v1 GitHub integration, so a merge issued from the app lands on the remote immediately.
 
 ## Decision
 
-Ensemblr will use a Conductor-style merge confirmation flow.
+Ensemblr will use a two-step merge confirmation flow.
 
 Merge policy:
 
@@ -34,7 +34,7 @@ Recommended defaults:
 
 ## Consequences
 
-- Ensemblr matches Conductor's two-step ready/confirm merge ergonomics.
+- Merge readiness and merge execution are separate steps, so a prominent ready state cannot fire the action by itself.
 - Merge is treated as an externally visible irreversible action requiring confirmation.
 - The Checks panel must model blockers, check state, comments, todos, and archive-on-merge state.
 - `gh` command failures must be shown with clear remediation and no hidden retry loops.

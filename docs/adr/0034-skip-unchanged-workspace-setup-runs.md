@@ -6,8 +6,8 @@ Date: 2026-07-15
 
 Accepted
 
-Extends [0014](0014-use-conductor-style-setup-gate.md) (Conductor-style setup
-gate), which re-ran the setup script on every workspace open.
+Extends [0014](0014-gate-the-app-on-prerequisite-checks.md) (the prerequisite
+setup gate), which re-ran the setup script on every workspace open.
 
 ## Context
 

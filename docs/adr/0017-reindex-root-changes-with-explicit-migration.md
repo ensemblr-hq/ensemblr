@@ -8,7 +8,7 @@ Accepted
 
 ## Context
 
-Ensemblr uses a configurable root directory for managed repositories, workspaces, and archived contexts. Conductor's settings copy warns that changing the root can delete existing repos and workspaces. Ensemblr also targets shared-root interoperability with Conductor, so destructive root behavior would be risky.
+Ensemblr uses a configurable root directory for managed repositories, workspaces, and archived contexts. A root change that deletes existing repos and workspaces would destroy real work, and Ensemblr additionally supports sharing that root with another workspace manager, so destructive root behavior could take out data Ensemblr does not own.
 
 ## Decision
 
@@ -21,11 +21,11 @@ Migration behavior:
 - Reindex/adopt is the default root-change behavior.
 - Moving repositories/workspaces from one root to another is an explicit migration action.
 - Deleting old root contents is an explicit destructive action requiring confirmation.
-- If the new root is shared with Conductor, Ensemblr applies the shared-root interoperability rules.
+- If the new root is shared with another workspace manager, Ensemblr applies the shared-root interoperability rules.
 
 ## Consequences
 
-- Root changes are safer and better aligned with Conductor interoperability.
+- Root changes are safer and consistent with shared-root interoperability.
 - Users may have orphaned old roots until they explicitly clean them up.
 - The UI must clearly explain the difference between switching roots, migrating contents, and deleting contents.
 - SQLite records must reconcile against filesystem/git reality after root changes.

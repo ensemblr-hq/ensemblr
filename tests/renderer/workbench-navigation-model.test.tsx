@@ -130,7 +130,7 @@ test('maps SQLite navigation snapshot into workbench shell projects', () => {
 		branchName: 'main',
 		sourceSummary: 'repository default branch main',
 	});
-	expect(JSON.stringify(projects)).not.toContain('Conductor shell rework');
+	expect(JSON.stringify(projects)).not.toContain('Workbench shell rework');
 });
 
 test('maps repositories array identically to snapshot mapping', () => {
@@ -677,7 +677,7 @@ test('renders live navigation records and true empty repository state', () => {
 	expect(populatedMarkup).toContain('Draft workspace');
 	expect(populatedMarkup).not.toContain('2 repos');
 	expect(populatedMarkup).not.toContain('2 workspaces');
-	expect(populatedMarkup).not.toContain('Conductor shell rework');
+	expect(populatedMarkup).not.toContain('Workbench shell rework');
 	expect(emptyMarkup).toContain('No repositories yet');
 	expect(emptyMarkup).toContain('Dashboard');
 	expect(emptyMarkup).toContain('Repositories');

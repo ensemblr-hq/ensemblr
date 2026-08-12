@@ -2,7 +2,7 @@
 
 Date: 2026-07-15
 
-No onboarding screenshots were captured under `.context/conductor-screens/01-onboarding/`. This flow is inferred from ADR 0014 and from the setup, provider, root, repository, clone, and workspace screens in the screenshot inventory.
+No onboarding screenshots were captured. This flow is inferred from ADR 0014 and from the setup, provider, root, repository, clone, and workspace screens in the screenshot inventory.
 
 ## Implementation Status (2026-07-15)
 
@@ -56,7 +56,7 @@ Ensemblr should not drop users into a workspace that cannot run the core workflo
 
 2. Root directory selection
 
-   Choose or confirm the Ensemblr root directory. Default to `~/Ensemblr`. Show that managed repositories, workspaces, and archived contexts live under this root. Warn before using a non-empty or shared Conductor root.
+   Choose or confirm the Ensemblr root directory. Default to `~/Ensemblr`. Show that managed repositories, workspaces, and archived contexts live under this root. Warn before using a non-empty root, or one shared with another workspace manager.
 
 3. Core local tooling checks
 
@@ -64,7 +64,7 @@ Ensemblr should not drop users into a workspace that cannot run the core workflo
 
 4. GitHub checks
 
-   Verify `gh` is installed and `gh auth status` succeeds. If not, show installation/auth instructions. This is required for Conductor-like PR/checks/merge parity in v1.
+   Verify `gh` is installed and `gh auth status` succeeds. If not, show installation/auth instructions. This is required for the PR/checks/merge flow in v1.
 
 5. Pi runtime checks
 
@@ -148,7 +148,7 @@ action kinds behave as:
 
 ### Shared or Non-Empty Root Warning
 
-- Show: the selected root may contain existing Conductor/Ensemblr-managed content.
+- Show: the selected root may already hold Ensemblr-managed content, or content another workspace manager put there.
 - Actions: adopt/reindex existing workspaces when supported, choose another root, or continue with explicit confirmation.
 - Blocking: only if unsafe or not writable.
 
@@ -186,7 +186,7 @@ shown.
 
 ## Ensemblr-Specific Copy and UI Guidance
 
-- Do not use Conductor screenshots as visual templates.
+- Do not use another app's screenshots as visual templates.
 - Use Ensemblr labels, icons, empty states, and remediation copy.
 - Keep first-run language explicit about local execution and Pi environment preservation.
 - Make every failed check actionable with a retry button and log details.

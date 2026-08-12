@@ -8,7 +8,7 @@ Accepted
 
 ## Context
 
-ADR 0001 chose an Electron + React renderer, and `docs/product/ux-parity.md`
+ADR 0001 chose an Electron + React renderer, and `docs/product/ux-conventions.md`
 and `docs/product/linear-milestones.md` already name TanStack Router as the
 renderer navigation library. The first implementation defined routes by hand in
 `src/renderer/routing/router.tsx` with `createRoute`, rendered a single `App`

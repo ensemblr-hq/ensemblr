@@ -8,9 +8,9 @@ Accepted
 
 ## Context
 
-Conductor's documented security model is local execution: agents run on the user's Mac with access to files, terminals, and tools available to the user's account. Some actions may ask for approval before continuing. macOS may also prompt when protected locations are accessed. Enterprise data privacy disables features requiring external AI providers.
+Ensemblr's security model is local execution: agents run on the user's Mac with the files, terminals, and tools the user's own account can reach. Some actions may ask for approval before continuing. macOS may also prompt when protected locations are accessed. Enterprise data privacy disables features requiring external AI providers.
 
-Ensemblr targets Conductor parity and launches a selected Pi-compatible CLI executable in RPC mode for v1. Pi can run tools, load packages/extensions/skills/prompts/themes from the user's Pi environment, and supports restricting tool availability through allowed/excluded tools. The desired default UX is that once the user creates or opens a workspace, the agent can work freely inside that workspace without constant approval prompts.
+Ensemblr launches a selected Pi-compatible CLI executable in RPC mode for v1. Pi can run tools, load packages/extensions/skills/prompts/themes from the user's Pi environment, and supports restricting tool availability through allowed/excluded tools. The desired default UX is that once the user creates or opens a workspace, the agent can work freely inside that workspace without constant approval prompts.
 
 ## Decision
 
@@ -43,7 +43,7 @@ Security principles:
 - Ensemblr must clearly communicate that agents run locally with the user's account permissions.
 - macOS permission prompts may still appear when protected locations are accessed.
 - Ensemblr must preserve Pi environment compatibility by default, including user skills/extensions/plugins/configuration from `~/.pi`.
-- Enterprise data privacy must be supported at user and repository levels, following Conductor-compatible semantics where possible.
+- Enterprise data privacy must be supported at both the user and the repository level.
 
 Implementation guardrails:
 
@@ -56,11 +56,11 @@ Implementation guardrails:
 
 ### Approval-required by default
 
-This would reduce risk but would interrupt normal coding work and diverge from the desired Conductor-like workspace experience.
+This would reduce risk but would interrupt normal coding work and undercut the intended workspace experience.
 
 ### Full sandboxing in v1
 
-A strict sandbox would reduce risk but would likely break Pi compatibility, local development workflows, and Conductor parity. It is deferred.
+A strict sandbox would reduce risk but would likely break Pi compatibility and ordinary local development workflows. It is deferred.
 
 ### Disable Pi extensions by default
 
@@ -68,7 +68,7 @@ This would improve isolation but violate the requirement that `~/.pi` skills/ext
 
 ## Consequences
 
-- Ensemblr matches the expected Conductor-like ergonomics: agents can work freely in a workspace.
+- Ensemblr delivers the intended ergonomics: agents can work freely inside a workspace.
 - The workspace boundary becomes security-critical and must be explained clearly.
 - CLI RPC v1 improves process isolation versus embedded SDK, but Ensemblr still runs local commands and tools with the user's account permissions.
 - Stricter permission modes remain available for sensitive repositories or review-only workflows.

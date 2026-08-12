@@ -256,10 +256,10 @@ test('renders root directory change confirmation copy', () => {
 		'Delete or cleanup is a separate destructive action.',
 	);
 	expect(markup).toContain(
-		'Shared Conductor root continuity covers filesystem, git, and config only',
+		'Shared root continuity covers filesystem, git, and config only',
 	);
 	expect(markup).toContain('/Users/alice/Ensemblr');
-	expect(markup).toContain('/Users/alice/Conductor');
+	expect(markup).toContain('/Users/alice/SharedRoot');
 	expect(markup).toContain('Switch root');
 });
 
@@ -275,7 +275,7 @@ test('renders reconciliation errors as a danger apply result', () => {
 				{
 					code: 'reconcile-directory-read-failed',
 					message: 'Failed to read workspaces during root reconciliation.',
-					path: '/Users/alice/Conductor/workspaces',
+					path: '/Users/alice/SharedRoot/workspaces',
 					severity: 'error',
 				},
 			],
@@ -307,7 +307,7 @@ test('renders reconciliation errors as a danger apply result', () => {
 	expect(markup).not.toContain(
 		'Failed to read workspaces during root reconciliation.',
 	);
-	expect(markup).toContain('/Users/alice/Conductor/workspaces');
+	expect(markup).toContain('/Users/alice/SharedRoot/workspaces');
 });
 
 test('keeps a diagnostic message that carries detail the code cannot', () => {
@@ -355,45 +355,45 @@ function createRootDirectoryPreview(): RootDirectoryChangePreview {
 				code: 'shared-root-content',
 				message:
 					'Managed directory "repos" already contains content; it may be a shared or previously used root.',
-				path: '/Users/alice/Conductor/repos',
+				path: '/Users/alice/SharedRoot/repos',
 				severity: 'warning',
 			},
 		],
 		newRoot: {
-			archivedContextsPath: '/Users/alice/Conductor/archived-contexts',
+			archivedContextsPath: '/Users/alice/SharedRoot/archived-contexts',
 			createdPaths: [],
 			diagnostics: [
 				{
 					code: 'shared-root-content',
 					message:
 						'Managed directory "repos" already contains content; it may be a shared or previously used root.',
-					path: '/Users/alice/Conductor/repos',
+					path: '/Users/alice/SharedRoot/repos',
 					severity: 'warning',
 				},
 			],
 			managedPaths: [
 				{
 					key: 'repos',
-					path: '/Users/alice/Conductor/repos',
+					path: '/Users/alice/SharedRoot/repos',
 					status: 'present',
 				},
 				{
 					key: 'workspaces',
-					path: '/Users/alice/Conductor/workspaces',
+					path: '/Users/alice/SharedRoot/workspaces',
 					status: 'present',
 				},
 				{
 					key: 'archived-contexts',
-					path: '/Users/alice/Conductor/archived-contexts',
+					path: '/Users/alice/SharedRoot/archived-contexts',
 					status: 'present',
 				},
 			],
-			path: '/Users/alice/Conductor',
-			repositoriesPath: '/Users/alice/Conductor/repos',
+			path: '/Users/alice/SharedRoot',
+			repositoriesPath: '/Users/alice/SharedRoot/repos',
 			setting: null,
 			source: 'sqlite',
 			status: 'warning',
-			workspacesPath: '/Users/alice/Conductor/workspaces',
+			workspacesPath: '/Users/alice/SharedRoot/workspaces',
 		},
 		oldRoot: {
 			archivedContextsPath: '/Users/alice/Ensemblr/archived-contexts',

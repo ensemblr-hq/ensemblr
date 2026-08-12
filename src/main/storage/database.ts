@@ -685,6 +685,54 @@ WHERE title = 'New chat'
 	AND json_extract(metadata_json, '$.titleProvenance') IS NULL;
 `,
 	},
+	{
+		id: '016_root_directory_source_union',
+		version: 16,
+		// 003 admitted a provenance value for the multi-file repository config
+		// format dropped in ADR 0030. It was never a member of
+		// `SettingsResolutionSource` and nothing ever wrote it, so no row can carry
+		// it and the copy below does not remap: a row that somehow held it should
+		// fail the new CHECK loudly rather than be silently rewritten. A CHECK is
+		// schema and 003 is append-only, so the value is retired by rebuilding the
+		// table rather than by editing 003. SQLite cannot alter a CHECK in place;
+		// the copy-drop-rename below is the standard rebuild, and it leaves a
+		// database migrated from 015 and one created from scratch agreeing byte for
+		// byte in `sqlite_master`.
+		sql: `
+CREATE TABLE root_directories_new (
+	id TEXT PRIMARY KEY,
+	path TEXT NOT NULL UNIQUE,
+	source TEXT NOT NULL CHECK (source IN ('built-in-default', 'config-default', 'managed-config', 'ensemblr-config', 'sqlite')),
+	status TEXT NOT NULL CHECK (status IN ('ok', 'warning', 'error')),
+	repositories_path TEXT NOT NULL,
+	workspaces_path TEXT NOT NULL,
+	archived_contexts_path TEXT NOT NULL,
+	first_seen_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+	last_seen_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+	metadata_json TEXT NOT NULL DEFAULT '{}'
+) STRICT;
+
+INSERT INTO root_directories_new
+SELECT
+	id,
+	path,
+	source,
+	status,
+	repositories_path,
+	workspaces_path,
+	archived_contexts_path,
+	first_seen_at,
+	last_seen_at,
+	metadata_json
+FROM root_directories;
+
+DROP INDEX idx_root_directories_status;
+DROP TABLE root_directories;
+ALTER TABLE root_directories_new RENAME TO root_directories;
+
+CREATE INDEX idx_root_directories_status ON root_directories(status);
+`,
+	},
 ];
 
 /** Highest declared migration version embedded in this build. */

@@ -59,12 +59,22 @@ packaged app ships without them.
 | Async data | TanStack Query, TanStack Virtual |
 | State | Jotai (+ `jotai-family` for parameterized atoms) |
 | Terminal | `@xterm/xterm` 6 |
+| Composer editor | `lexical` + `@lexical/react` 0.49, plain-text mode only |
 | Markdown | `streamdown` + Shiki, with the `@streamdown/{cjk,code,math,mermaid}` plugins wired in `src/renderer/components/message.tsx` |
 | Diff rendering | `react-diff-view`, tokenized through Shiki |
 | Layout / motion | `react-resizable-panels`, `motion` (imported as `motion/react`) |
 | Drag and drop | `@atlaskit/pragmatic-drag-and-drop` (+ `-hitbox`), used by the dashboard board |
 | Validation | Zod 4 |
 | i18n | `i18next` 26 + `react-i18next` 17; catalogues bundled as JSON under `src/renderer/lib/i18n/locales/` |
+
+**Lexical is confined to the composer editor.** Everything that imports it lives
+under
+`src/renderer/components/workbench-shell/conversation-panel/composer/editor/`,
+behind that folder's `index.ts`. The editor publishes the draft back out as plain
+text plus its runs and chips in document order, so the autocomplete engine and
+the send pipeline never learn a rich-text editor is involved
+([ADR 0047](../../docs/adr/0047-model-composer-attachments-as-one-ordered-list-in-a-lexical-draft.md)).
+A Lexical import outside that folder means the linearizer is missing a case.
 
 The `ai` package (Vercel AI SDK 7) is a **type-only** dependency of the renderer:
 the agent timeline models turns as `UIMessage` / `DynamicToolUIPart`. Every one

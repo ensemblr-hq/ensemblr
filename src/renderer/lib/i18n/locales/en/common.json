@@ -141,7 +141,7 @@
 		"applying": "Applying",
 		"change-description": "Switch Ensemblr to the selected root and reindex/adopt from that filesystem layout after confirmation.",
 		"change-title": "Change root directory",
-		"continuity-note": "Shared Conductor root continuity covers filesystem, git, and config only; chat/session/checkpoint continuity is not guaranteed across apps.",
+		"continuity-note": "Shared root continuity covers filesystem, git, and config only; chat/session/checkpoint continuity is not guaranteed across apps.",
 		"current-root": "Current root",
 		"no-blocking-warnings": "No blocking root warnings.",
 		"no-current-root": "No current root snapshot",

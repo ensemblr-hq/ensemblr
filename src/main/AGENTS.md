@@ -24,7 +24,8 @@ These instructions apply to everything under `src/main/`.
   - `environment/` for environment variable catalog and assembly.
   - `github/` and `linear/` for the `gh` CLI wrapper and PR sweeper, and Linear OAuth, client, and store.
   - `ipc/` for main-process IPC handler registration and request validation.
-  - `menu/` for native Electron menus.
+  - `linked-directories/` for read grants over directories outside a workspace, and the app-global recents list behind them.
+  - `menu/` for the native Electron menu bar: one builder per menu behind `createMenuItemFactory`, composed by `application-menu.ts`, labelled from `menu-strings.ts`, and enabled from the renderer's command report.
   - `open-target/` for external editor and app detection and launch.
   - `repository/` for repository registration, git probing, and lifecycle.
   - `review/` for Ensemblr-local review comments and todos.
@@ -34,8 +35,9 @@ These instructions apply to everything under `src/main/`.
   - `setup/` for setup diagnostics orchestration.
   - `storage/` for SQLite connections, migrations, and the per-aggregate repository modules.
   - `terminal/` for `node-pty` PTY sessions and scrollback.
-  - `workspace-files/` and `workspace-git/` for workspace file watching and listing, and git status, commits, and worktrees.
+  - `workspace-files/` and `workspace-git/` for workspace file watching and listing, the content-addressed composer attachment store, path-safety and image-signature checks, and git status, commits, and worktrees.
 - Do not add new root-level files under `src/main/` unless Electron Forge or Vite needs them as entrypoints.
+- Main returns locale-neutral codes, never English labels — it cannot reach the renderer's i18n instance, so adding a code here is a user-facing change that owes the renderer mapper a `t()` case with `ru` and `el` filled. `menu/menu-strings.ts` is the one exception: it holds all three languages itself, because the menu bar is built before any renderer exists.
 - Adding an agent runtime means a new adapter folder beside `pi-agent/` and `claude-agent/`, a provider id in `src/shared/agent-provider.ts`, and an entry in the client's adapter map. Keep runtime-specific flags, SDK option names, and wire shapes out of `agent-runtime/`.
 
 ## Public Surfaces

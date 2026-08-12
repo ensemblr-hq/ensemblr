@@ -21,11 +21,11 @@ Date: 2026-06-04 (status reviewed 2026-08-08)
 > `run` command (ADR 0041). Milestone 5's "Big terminal mode" was satisfied by
 > the terminal dock and is not a separate setting.
 
-Ensemblr targets Conductor feature parity. MVP sequencing is about implementation order, not reduced product ambition.
+Ensemblr targets the full workbench. MVP sequencing is about implementation order, not reduced product ambition.
 
 ## Principle
 
-Build every major Conductor workflow in thin vertical slices before polishing visual details.
+Build every major workflow in thin vertical slices before polishing visual details.
 
 ## Milestone 0: Product Foundation
 
@@ -45,7 +45,7 @@ Build every major Conductor workflow in thin vertical slices before polishing vi
 - Managed root layout: `repos/`, `workspaces/`, `archived-contexts/`.
 - Create git worktree workspace with branch.
 - Create workspace from Linear issue.
-- Discover/adopt existing workspaces from shared Conductor root.
+- Discover/adopt existing workspaces from a shared root.
 - Create `.context/` in each workspace.
 - Files-to-copy behavior.
 - Setup script execution.
@@ -100,7 +100,7 @@ Build every major Conductor workflow in thin vertical slices before polishing vi
 - Packaging, signing, notarization, and auto-update.
 - SDK sidecar process isolation.
 - Managed/bundled Pi runtime installer.
-- Full Conductor checkpoint-ref interoperability.
+- Full checkpoint-ref interoperability with another workspace manager.
 - Voice mode.
 - Graphite stack support.
 - Cloud or remote workspace SSH settings.

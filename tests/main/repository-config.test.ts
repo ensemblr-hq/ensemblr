@@ -627,10 +627,10 @@ test('personal SQLite fills keys .ensemblr/settings.toml omits', (t) => {
 	);
 });
 
-test('legacy conductor.json / ensemblr.json on disk are ignored', (t) => {
+test('legacy and foreign config files on disk are ignored', (t) => {
 	const fixture = createRepositoryFixture(t);
 	fixture.write(
-		'conductor.json',
+		'workspaces.json',
 		JSON.stringify({ scripts: { run: 'legacy' } }),
 	);
 	fixture.write(
@@ -638,8 +638,8 @@ test('legacy conductor.json / ensemblr.json on disk are ignored', (t) => {
 		JSON.stringify({ scripts: { run: 'old-native' } }),
 	);
 	fixture.write(
-		'.conductor/settings.toml',
-		'[scripts]\nrun = "bun run conductor"\n',
+		'.workspaces/settings.toml',
+		'[scripts]\nrun = "npm run legacy"\n',
 	);
 
 	const loaded = loadRepositoryConfig({

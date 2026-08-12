@@ -10,7 +10,7 @@ Supersedes [0022](0022-limit-open-chat-tabs-to-five.md).
 
 ## Context
 
-ADR 0022 capped open chat tabs at five per workspace for Conductor parity and to
+ADR 0022 capped open chat tabs at five per workspace as a borrowed convention and to
 bound Pi session/UI resource usage. In practice the cap blocked users mid-flow:
 opening a sixth chat surfaced a warning toast and a soft no-op, forcing a close
 before a new conversation could start. The parity argument no longer outweighs
@@ -33,7 +33,6 @@ Rules:
 ## Consequences
 
 - Users can keep as many concurrent chat sessions open as they want.
-- Ensemblr no longer matches Conductor's observed five-tab behavior; parity docs
-  are updated to reflect the intentional divergence.
+- The borrowed five-tab convention is abandoned as an intentional divergence.
 - Open Pi session/UI resource usage is bounded only by user behavior, not by a
   fixed ceiling.

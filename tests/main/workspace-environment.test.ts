@@ -214,18 +214,27 @@ test('assemble injects native ENSEMBLR_* runtime variables', async (t) => {
 	assert.ok(isWorkspacePort(assembly.port));
 });
 
-test('assemble does not expose CONDUCTOR_* mirrors', async (t) => {
+test('assemble exposes workspace identity only under the ENSEMBLR_ prefix', async (t) => {
 	const database = createDatabaseFixture(t);
 	const { workspaceId } = seedWorkspace({ database });
 	const { service } = createService({ database });
 
 	const assembly = await service.assemble({ workspaceId });
 
-	assert.equal(assembly.env.CONDUCTOR_WORKSPACE_NAME, undefined);
-	assert.equal(assembly.env.CONDUCTOR_WORKSPACE_PATH, undefined);
-	assert.equal(assembly.env.CONDUCTOR_ROOT_PATH, undefined);
-	assert.equal(assembly.env.CONDUCTOR_DEFAULT_BRANCH, undefined);
-	assert.equal(assembly.env.CONDUCTOR_PORT, undefined);
+	const identitySuffixes = [
+		'_WORKSPACE_NAME',
+		'_WORKSPACE_PATH',
+		'_ROOT_PATH',
+		'_DEFAULT_BRANCH',
+		'_PORT',
+	];
+	const mirrored = Object.keys(assembly.env).filter(
+		(key) =>
+			!key.startsWith('ENSEMBLR_') &&
+			identitySuffixes.some((suffix) => key.endsWith(suffix)),
+	);
+
+	assert.deepEqual(mirrored, []);
 });
 
 test('assemble layers configured variables with workspace > repository > app precedence', async (t) => {

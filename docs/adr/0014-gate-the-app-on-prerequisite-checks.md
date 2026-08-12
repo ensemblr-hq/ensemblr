@@ -1,4 +1,4 @@
-# 0014. Use a Conductor-Style Setup Gate
+# 0014. Gate the App on Prerequisite Checks
 
 Date: 2026-06-04
 
@@ -8,13 +8,13 @@ Accepted
 
 ## Context
 
-Conductor checks setup before users create workspaces or run agents. Public docs describe checks for GitHub authentication in the terminal environment and at least one authenticated agent provider.
+Ensemblr depends on a substantial amount of local machine state before any workspace can be created or any agent can run: a local SQLite database, a managed root directory, git, shell/process execution, an authenticated GitHub CLI, Linear OAuth for Linear workflows, and a selected Pi-compatible CLI executable that answers over RPC.
 
-Ensemblr targets Conductor parity and uses a selected Pi-compatible CLI executable as the agent runtime. Ensemblr also requires a local SQLite database, a managed root directory, git, shell/process execution, GitHub CLI, Linear OAuth for Linear workflows, and Pi RPC readiness.
+Every one of those failing produces a different symptom, and each surfaces deep inside a flow — workspace creation, the PR flow, or Pi session startup — far from its cause.
 
 ## Decision
 
-Ensemblr will use a Conductor-style setup gate adapted for Pi CLI RPC.
+Ensemblr will gate the app behind prerequisite setup checks, adapted for Pi CLI RPC.
 
 Required v1 checks:
 
@@ -35,7 +35,7 @@ The app is not considered ready until required checks pass. Each failed check mu
 
 ### Let users enter the app with warnings
 
-This would reduce first-run friction, but it diverges from Conductor's setup model and would produce confusing failures later in workspace creation, PR flow, or Pi session startup.
+This would reduce first-run friction, but it trades one clear up-front check for confusing failures later in workspace creation, PR flow, or Pi session startup.
 
 ### Embedded Pi SDK readiness checks
 
@@ -43,7 +43,7 @@ This was accepted in ADR 0005 but superseded by ADR 0025. Ensemblr should valida
 
 ## Consequences
 
-- Ensemblr's first-run experience closely matches Conductor's prerequisite model.
+- Ensemblr's first run reports every missing prerequisite in one place, before the user starts work.
 - Setup checks become a reusable diagnostics surface for troubleshooting.
 - The implementation needs stable check identifiers, statuses, remediation copy, and logs.
 - The setup gate must support executable override for users who want a wrapper or alternate launcher such as `oh-my-pi`.

@@ -46,6 +46,7 @@ Rules of thumb:
 | Run script | Скрипт запуска | Σενάριο εκτέλεσης | Configured per repository, by name. |
 | Setup script | Скрипт настройки | Σενάριο εγκατάστασης | |
 | Spawn terminal | Дополнительный терминал | Πρόσθετο τερματικό | Literally "spawn" reads as biology in both; use "additional". |
+| Scrollback | Буфер прокрутки | Ιστορικό κύλισης | How many lines a terminal pane retains. Russian takes the buffer metaphor (`буфер прокрутки`); Greek takes the history one (`ιστορικό κύλισης`) — a literal `buffer κύλισης` mixes scripts for no gain. |
 | Plan mode | Режим плана | Λειτουργία σχεδίου | |
 | Board | Доска | Πίνακας εργασιών | The kanban dashboard. |
 | Setting | Настройка | Ρύθμιση | |

@@ -8,12 +8,11 @@ Accepted
 
 ## Context
 
-ADR 0010 fixes a Conductor-style root directory with a top-level
-`archived-contexts/` folder, and the Conductor parity matrix in
-`docs/product/conductor-parity.md` names archive as a workspace lifecycle
-action that runs an archive script first and preserves the per-workspace
-`.context/` handoff folder. `ENS-025` (Linear `THE-125`) raises the matching
-concrete requirements:
+ADR [0010](0010-use-a-user-visible-managed-root-directory.md) fixes a managed
+root directory with a top-level `archived-contexts/` folder. Archive is a
+workspace lifecycle action that runs an archive script first and preserves the
+per-workspace `.context/` handoff folder. `ENS-025` (Linear `THE-125`) raises
+the matching concrete requirements:
 
 - Archive must never silently delete unknown content.
 - The lifecycle must prepare a hook surface that `ENS-038` (Setup/Run/Archive

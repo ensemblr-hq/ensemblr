@@ -111,7 +111,7 @@ test('an untracked file surfaces its status letter', () => {
 	expect(markup).not.toContain('text-status-danger');
 });
 
-test('each row shows a Conductor-style status square for its git state', () => {
+test('each row shows a status square for its git state', () => {
 	expect(renderRow(modifiedFile, { showPath: true })).toContain(
 		'aria-label="Modified"',
 	);

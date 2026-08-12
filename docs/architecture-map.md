@@ -45,9 +45,10 @@ each exposing its public surface through `index.ts`.
 | Process execution | `commands/` | Local process and shell execution |
 | Config | `config/` | Declarative config loading, settings resolution, repository config |
 | Environment | `environment/` | Environment-variable catalogue and assembly |
-| IPC | `ipc/` | Handler registration (`handlers/`, 28 modules), request validation (`request-schemas/`), permission gate |
+| IPC | `ipc/` | Handler registration (`handlers/`, 30 modules), request validation (`request-schemas/`, 18 modules), permission gate |
 | Integrations | `github/`, `linear/` | `gh` CLI wrapper, PR snapshots; Linear OAuth + client + store |
-| Native menus | `menu/` | Electron application menus |
+| Linked directories | `linked-directories/` | Read grants for directories outside a workspace, plus the app-global recents list behind them |
+| Native menus | `menu/` | One builder per menu behind `createMenuItemFactory`, driven by the renderer's command report and the localized `menu-strings.ts` table |
 | Open targets | `open-target/` | External editor/app detection and launch |
 | Repositories | `repository/` | Registration, git probing, lifecycle |
 | Review | `review/` | Ensemblr-local review comments and todos |
@@ -56,8 +57,8 @@ each exposing its public surface through `index.ts`.
 | Secrets | `secrets/` | Keychain-backed storage and metadata (ADR&nbsp;0018) |
 | Setup | `setup/` | Setup diagnostics orchestration |
 | Storage | `storage/` | SQLite connection (`database.ts`), migrations, `repositories/`, `tx.ts` |
-| Terminal | `terminal/` | `node-pty` PTY sessions |
-| Workspace files / git | `workspace-files/`, `workspace-git/` | File watching and listing; git status, commits, worktrees |
+| Terminal | `terminal/` | `node-pty` PTY sessions, plus the scrollback renderer that makes an agent's terminal read legible |
+| Workspace files / git | `workspace-files/`, `workspace-git/` | File watching and listing, the content-addressed composer attachment store (`context-attachments.ts`), path safety (`workspace-paths.ts`) and image-signature checks (`workspace-images.ts`); git status, commits, worktrees |
 
 Do not add root-level files under `src/main/` unless Electron Forge or Vite needs
 them as an entrypoint.
@@ -80,15 +81,15 @@ A new feature is split across these buckets, not given a folder of its own.
 | Bucket | Holds | Concern folders inside |
 | --- | --- | --- |
 | `api/` | TanStack Query clients, query options, preload-backed access | `ensemblr/` |
-| `components/` | React components and UI composition | `workbench-shell/`, `conversation/`, `diff-viewer/`, `code-surface/`, `settings/`, `setup-diagnostics/`, `git/`, `linear/`, `command-palette/`, `ask-user-question/`, `tool-collapsible/`, `pi-replay/`, `welcome/`, `ui/` (vendored shadcn) |
+| `components/` | React components and UI composition | `workbench-shell/`, `conversation/`, `diff-viewer/`, `code-surface/`, `settings/`, `setup-diagnostics/`, `onboarding/`, `git/`, `linear/`, `command-palette/`, `ask-user-question/`, `tool-approval/`, `tool-collapsible/`, `pi-replay/`, `welcome/`, `ui/` (vendored shadcn) |
 | `config/` | Stable renderer constants (route stale times, knobs) | — |
-| `hooks/` | Renderer hooks that are not durable shared state | `workbench-shell/`, `workspace/`, `conversation/`, `code-surface/`, `settings/`, `setup-diagnostics/`, `preferences/`, `git/`, `linear/`, `ask-user-question/`, `welcome/` |
-| `lib/` | Runtime helpers grouped by concern | `workbench/`, `agent-timeline/`, `conversation/`, `diff/`, `code/`, `github/`, `linear/`, `pi/`, `pi-replay/`, `terminal/`, `instrumentation/`, `ask-user-question/`, `welcome/` |
+| `hooks/` | Renderer hooks that are not durable shared state | `workbench-shell/`, `workspace/`, `conversation/`, `code-surface/`, `setup-diagnostics/`, `preferences/`, `git/`, `linear/`, `ask-user-question/`, `welcome/` |
+| `lib/` | Runtime helpers grouped by concern | `workbench/`, `agent-timeline/`, `conversation/`, `diff/`, `code/`, `github/`, `linear/`, `pi/`, `pi-replay/`, `terminal/`, `i18n/` (i18next instance + bundled `locales/`), `onboarding/`, `instrumentation/`, `ask-user-question/`, `welcome/`, plus the code→`t()` mappers `failure-text/`, `setup-check-text/`, `provider-check-text/` |
 | `fixtures/` | Fixture/demo data production code may still consume | `workbench/` |
 | `routing/` | TanStack Router file routes + generated tree | `routes/` |
-| `state/` | Durable Jotai state | `workspace/`, `composer/`, `pi/`, `plan-mode/`, `preferences/`, `dialogs/`, `recents/`, `sidebar/`, `settings-ui/`, `tool-approval/`, `ask-user-question/`, `conversation-scroll/`, `close-action/` |
+| `state/` | Durable Jotai state | `workspace/`, `composer/`, `pi/`, `plan-mode/`, `preferences/`, `dialogs/`, `recents/`, `sidebar/`, `settings-ui/`, `slash-commands/`, `tool-approval/`, `ask-user-question/`, `conversation-scroll/`, `menu-commands/`, `unread/` |
 | `styles/` | CSS entrypoint (`index.css`) and font assets | — |
-| `types/` | Exported renderer types and ambient declarations | `workbench/`, `workbench-shell/`, `components/` |
+| `types/` | Exported renderer types and ambient declarations | `workbench/`, `workbench-shell/`, `components/`, `onboarding/` |
 
 Never create a concern folder directly under `src/renderer/` (no
 `src/renderer/workbench/`). The concern goes inside the right bucket:
@@ -113,10 +114,11 @@ atom.
 The only code both processes may import. Two shapes coexist:
 
 - **Single-file concerns** — plain root modules (`config.ts`, `permissions.ts`,
-  `github.ts`, `slug.ts`, …); 23 `.ts` files sit at the shared root in total.
+  `github.ts`, `slug.ts`, `menu-commands.ts`, …); 26 `.ts` files sit at the
+  shared root in total.
 - **Multi-file concerns** — an implementation directory behind a stable
   entrypoint, in one of two forms:
-  - `<concern>/index.ts` — `ipc/` (34 contract modules under `ipc/contracts/`,
+  - `<concern>/index.ts` — `ipc/` (35 contract modules under `ipc/contracts/`,
     plus `channels.ts` and `handler-map.ts`), `pi-rpc/`, `keymap/`.
   - `<concern>.ts` + `<concern>/` — `agent-control`, `plan-mode`, `scripts`,
     `terminal`. This is the form `electron --test` can resolve, so prefer it for
@@ -125,7 +127,7 @@ The only code both processes may import. Two shapes coexist:
 Never import renderer UI, main-process services, Electron, or `node:fs` from
 here.
 
-## Two request paths
+## Three request paths
 
 **1. Renderer → main (IPC).** Adding a call touches four files, in order:
 
@@ -147,16 +149,34 @@ then delegates through a **port** (`ports.ts`, `port-adapters.ts`,
 own — if an operation does not exist as a service, it does not exist as a control
 op. See [`agent-control.md`](./agent-control.md) and ADR&nbsp;0040.
 
+**3. Native menu → renderer (menu command bus).** The macOS menu bar is built in
+main but its items are owned by the renderer. `src/renderer/state/menu-commands/`
+registers a handler per `MenuCommandId` as a stack — the innermost registration
+wins, so overlapping route transitions restore the right one — and reports the
+set of live commands plus the entries filling the dynamic submenus over
+`menuContext`. `src/main/menu/` rebuilds from that report, but only when the
+report actually changes the menu, and dispatches a click back over `menuCommand`.
+The command table, the reported context shape, and the equality check that skips
+no-op rebuilds all live in `src/shared/menu-commands.ts`; the labels live in
+`src/main/menu/menu-strings.ts`, the one main-process string catalogue. An
+accelerator is attached only to a command flagged `ownsAccelerator`, because on
+macOS AppKit matches a key equivalent before the web contents sees it and
+Electron's `registerAccelerator: false` escape hatch is Windows/Linux only — so a
+chord the renderer must disambiguate (`CommandOrControl+Return` is four different
+submits) carries no menu accelerator at all. See ADR&nbsp;0046.
+
 ## Where state persists
 
 | Data | Location |
 | --- | --- |
-| Repositories, workspaces, sessions, events, chat tabs, settings | SQLite at `~/Library/Application Support/dev.ensemblr.app/ensemblr.db` |
+| Repositories, workspaces, sessions, events, chat tabs, settings, linked-directory recents | SQLite at `~/Library/Application Support/dev.ensemblr.app/ensemblr.db` |
 | App settings | `~/.config/ensemblr/config.json` (ADR&nbsp;0029) |
 | Per-repository config | Committed `.ensemblr/settings.toml` (ADR&nbsp;0030, ADR&nbsp;0041) |
+| Composer attachments | Content-addressed under the workspace's `.context/attachments/<digest>/` |
 | Secrets | macOS Keychain (ADR&nbsp;0018) |
 | Per-turn checkpoints | Git refs in the workspace (ADR&nbsp;0012) |
 | Managed repos, workspaces, archived context | The Ensemblr Root Directory (ADR&nbsp;0010) |
+| Unread chat marks, slash-command catalogue cache | Renderer `localStorage`, via persisted Jotai atoms |
 
 Schema changes go through the numbered migration list in
 `src/main/storage/database.ts`; `tests/main/database.test.ts` asserts the exact
@@ -166,9 +186,9 @@ migration ids, so a new migration must be added to both.
 
 | Suite | Runner | Count |
 | --- | --- | --- |
-| `tests/main/**` | `electron --test` (`ELECTRON_RUN_AS_NODE=1`), plus the pure-logic files listed one-by-one in `vitest.config.mts` — an explicit list, not a glob, so it never drags in the Electron-only suites | 137 files |
-| `tests/renderer/**` | Vitest (`node` env; DOM files opt in per file) | 193 files (16 under `dom/`) |
-| `tests/shared/**` | Vitest | 28 files |
+| `tests/main/**` | `electron --test` (`ELECTRON_RUN_AS_NODE=1`), plus the pure-logic files listed one-by-one in `vitest.config.mts` — an explicit list, not a glob, so it never drags in the Electron-only suites | 154 files |
+| `tests/renderer/**` | Vitest (`node` env; DOM files opt in per file) | 244 files (24 under `dom/`) |
+| `tests/shared/**` | Vitest | 31 files |
 
 See [`onboarding.md`](./onboarding.md#6-running-the-tests) for which runner a new
 test should use.

@@ -40,7 +40,7 @@ export const shellFixtureProjects: ProjectShellModel[] = [
 					setupStatus: 'warning',
 				}),
 				id: 'san-antonio',
-				name: 'Conductor shell rework',
+				name: 'Workbench shell rework',
 				pathLabel: '~/Ensemblr/workspaces/ensemblr/san-antonio',
 				projectId: 'ensemblr',
 				pullRequest: {
@@ -84,7 +84,7 @@ export const shellFixtureProjects: ProjectShellModel[] = [
 						},
 					],
 					description: [
-						'Reworks the scaffolded renderer into a fixture-backed Conductor-style workbench shell with project/workspace sidebar, chat tabs, center timeline/composer, right review/checks panel, PR-state header, and setup/run/terminal dock.',
+						'Reworks the scaffolded renderer into a fixture-backed workbench shell with project/workspace sidebar, chat tabs, center timeline/composer, right review/checks panel, PR-state header, and setup/run/terminal dock.',
 						'Adds TanStack Router/Query for renderer navigation and preload-backed snapshots, replacing Jotai route state and removing the old scaffold/demo surfaces.',
 						'Updates product docs so future repository, terminal, file, diff, checks, and settings tickets wire live data into existing shell regions instead of creating them.',
 						'Validation: `bun run check`, `bun run typecheck`, `bun run test:renderer`.',
@@ -148,7 +148,7 @@ export const shellFixtureProjects: ProjectShellModel[] = [
 						agentSessionId: null,
 						status: 'idle',
 						summary:
-							'Fixture session showing the Conductor-style pane hierarchy before Pi RPC is wired.',
+							'Fixture session showing the pane hierarchy before Pi RPC is wired.',
 						updatedLabel: '2m ago',
 					},
 					{

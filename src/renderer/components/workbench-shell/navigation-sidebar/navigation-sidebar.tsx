@@ -131,8 +131,8 @@ export function WorkspaceNavigationSidebar({
 /**
  * Bottom-of-sidebar footer: app health badge plus a single-line setup status
  * with a deep link to /settings/diagnostics. Rendered only in developer mode —
- * general users get a chat surface free of diagnostic UI, matching Conductor,
- * and rely on the composer's blocked-setup message instead.
+ * general users get a chat surface free of diagnostic UI and rely on the
+ * composer's blocked-setup message instead.
  */
 function SidebarHealthFooter({
 	health,

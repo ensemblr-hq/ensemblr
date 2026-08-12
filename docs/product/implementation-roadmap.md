@@ -1,6 +1,6 @@
 # Implementation Roadmap
 
-Date: 2026-08-08
+Date: 2026-08-12 (last full pass 2026-08-08)
 
 This roadmap converts the accepted ADRs and product parity docs into a Linear-ready implementation plan. It is an implementation roadmap, not a product-decision source. Accepted ADRs remain the source of truth when there is a conflict.
 
@@ -12,7 +12,7 @@ Implementation*.
 
 ## Scope Baseline
 
-V1 builds a multi-runtime Electron desktop app with Conductor-style local workspace, agent, terminal, review, GitHub, Linear, and settings workflows. Milestone 4 was written when Pi was the only runtime; ADR 0042 made Claude Code a peer, so "Pi runtime" below means "agent runtime" except where a line is genuinely Pi-specific.
+V1 builds a multi-runtime Electron desktop app with local workspace, agent, terminal, review, GitHub, Linear, and settings workflows. Milestone 4 was written when Pi was the only runtime; ADR 0042 made Claude Code a peer, so "Pi runtime" below means "agent runtime" except where a line is genuinely Pi-specific.
 
 In scope for v1:
 
@@ -27,20 +27,20 @@ In scope for v1:
 - Pi runtime through selected CLI-compatible executable launched as `--mode rpc` from workspace `cwd`.
 - Claude Code runtime as a peer of Pi, driven in-process through `@anthropic-ai/claude-agent-sdk` against the user's own `claude` binary (the SDK's per-platform binary is deliberately not packaged). Both sit behind the shared adapter contract in `src/main/agent-runtime/`; a chat is pinned to one provider. See ADR 0042.
 - Preservation of each runtime's own user environment: Pi's `~/.pi/agent`, project `.pi`, context files, sessions, skills, extensions, prompts, themes, tools, and provider/model configuration; Claude Code's own configuration, slash commands, and MCP roster.
-- Git worktree workspace creation, workspace adoption from shared Conductor roots, `.context` folder support, and archive lifecycle.
+- Git worktree workspace creation, workspace adoption from shared roots, `.context` folder support, and archive lifecycle.
 - xterm.js terminal dock backed by main-process PTY/process supervision.
 - Git-backed checkpoints under `refs/ensemblr/checkpoints/<workspace-id>/<turn-id>`.
 - First-class Linear OAuth integration with issue create/read/update/comment and workspace creation from issues.
 - GitHub PR/check/comment/merge workflows through authenticated `gh` CLI and `gh api`.
 - Settings shell, repository settings, keyboard shortcuts, command palette, deep links, diagnostics, and non-deferred polish.
-- Implemented Conductor-style workbench shell contract for the sidebar, dashboard board, workspace chat tabs, right review panel, PR-state header, and setup/run/terminal dock. The shell composes `WorkbenchFrame` (`src/renderer/components/workbench-shell/frame.tsx`) and `WorkspaceWorkbenchContent` (`src/renderer/components/workbench-shell/workspace-content.tsx`) under file-based TanStack routes, with private feature folders under `src/renderer/components/workbench-shell/<feature>/`, shell providers in `src/renderer/components/workbench-shell/shell-contexts.tsx`, the no-project shell in `src/renderer/components/workbench-empty-state.tsx`, the welcome landing in `src/renderer/components/welcome.tsx`, Jotai atoms in `src/renderer/state/workspace`, and shared shell types in `src/renderer/types/workbench-shell/`. Live repository/workspace, terminal, file, diff, checks, Linear, GitHub, and Pi services are now wired across the main workflows; remaining work should deepen those services instead of rebuilding the shell.
+- Implemented the workbench shell contract for the sidebar, dashboard board, workspace chat tabs, right review panel, PR-state header, and setup/run/terminal dock. The shell composes `WorkbenchFrame` (`src/renderer/components/workbench-shell/frame.tsx`) and `WorkspaceWorkbenchContent` (`src/renderer/components/workbench-shell/workspace-content.tsx`) under file-based TanStack routes, with private feature folders under `src/renderer/components/workbench-shell/<feature>/`, shell providers in `src/renderer/components/workbench-shell/shell-contexts.tsx`, the no-project shell in `src/renderer/components/workbench-empty-state.tsx`, the welcome landing in `src/renderer/components/welcome.tsx`, Jotai atoms in `src/renderer/state/workspace`, and shared shell types in `src/renderer/types/workbench-shell/`. Live repository/workspace, terminal, file, diff, checks, Linear, GitHub, and Pi services are now wired across the main workflows; remaining work should deepen those services instead of rebuilding the shell.
 
 Explicitly deferred until post-core:
 
 - Packaging, signing, notarization, and auto-update.
 - SDK sidecar runtime fallback.
 - Managed or bundled Pi runtime installer.
-- Full Conductor checkpoint-ref interoperability.
+- Full checkpoint-ref interoperability with another workspace manager.
 - Voice mode.
 - Graphite stack support.
 - Cloud or remote workspace SSH settings.
@@ -84,11 +84,25 @@ Explicitly deferred until post-core:
 | 8. Settings and Parity Polish | Providers settings screen reinstated as the agent-runtime surface (per-runtime executable, readiness, accounts, settings file) | #226 (069cd0b) |
 | — (toolchain) | The nub toolchain was adopted to replace npm and reverted the same day; npm remains the package manager per ADR 0038. The adopting commit cites "ADR 0039", which is *Remove Open Chat Tab Limit* — no nub ADR exists in `docs/adr/`. | #176, #178 (79eab44, 4b1108b) |
 
+### Completed since 2026-08-09
+
+| Milestone | Completed Items | PR / Commit |
+| --- | --- | --- |
+| 8. Settings and Parity Polish | **English, Russian, and Greek** across the app and its agents: i18next 26 + react-i18next 17, eight bundled namespaces, main-process language resolution seeded through the preload snapshot, a localized native menu table, locale-neutral codes from `shared`/`main` with renderer mappers, and `buildLanguageDirective` steering agent prose. Catalogues at 100% in both `ru` and `el` | #246, #248, #249, #250 (e7ab199 … 5ba397f) |
+| 8. Settings and Parity Polish | **First-run setup wizard** at `/onboarding` — welcome, language picker, one screen per gate, terminal screen; either-or agent-CLI gate shared with the diagnostics rollup through `AGENT_RUNTIME_CHECK_GROUPS`; new `claude-executable` setup check | #247 (7ddd7d7) |
+| 8. Settings and Parity Polish | **Settings restructured**: Advanced removed and its rows rehomed, new Shortcuts reference and per-repository Security page, shared settings primitives extracted, diagnostics and readiness checks localized | #248 (b68621e) |
+| 4. Agent Runtime and Timeline | **Composer attachments as one ordered list in a Lexical draft** — files, pasted images and long text, `@`-mentions, issues, review-comment threads, and linked directories as inline chips; content-addressed `.context/attachments/` store; PDF preview — ADR 0047 | #256, #257, #261 (75da912, 36464ec, cd4ff13) |
+| 4. Agent Runtime and Timeline | **Visible follow-up queue** — per-tab, reorderable, editable, out-of-turn sendable, pinned above the composer with a status line | #258, #260 (0d48d19, a73d16f) |
+| 4. Agent Runtime and Timeline | Per-chat unread marks replacing the workspace-level flag; a sub-agent's work nested inside the call that spawned it; slash catalogue cached and ranked by pick history; skill rows named; control tool calls labelled from either runtime; timeline folded incrementally | #241, #242, #243, #245, #253, #255 (d28e249 … 41eb972) |
+| 4. Agent Runtime and Timeline | **Gated Linear reads and writes for agents** — five ops behind `linear-ports.ts`, with `completed`/`canceled` states refused fail-closed, payload budgets, and a typed `status` word instead of throws | #244 (973a3d1) |
+| 8. Settings and Parity Polish | **Native menu bar driven by a renderer command bus** — 6 menus to 9, per-command handler stacks, rebuild gated on context equality, accelerators only where `ownsAccelerator` — ADR 0046 | #264 (5cf92de) |
+| 8. Settings and Parity Polish | Palette retune (dark off near-black, light cool cast reduced) holding WCAG AA as surfaces moved; `.terminal-surface` re-points component tokens so dock empty states stop reading the window palette in light mode | #262, #263 (14ba2f0, 2b55290) |
+
 ## Roadmap Sequence
 
 | Milestone | Focus | Exit criteria |
 | --- | --- | --- |
-| 1. Foundation | App shell, storage, config, root, Keychain, process boundary. | The app can boot into the implemented Conductor-style shell contract, persist metadata, load config, resolve settings, create managed directories, and run local commands through main-process services. |
+| 1. Foundation | App shell, storage, config, root, Keychain, process boundary. | The app can boot into the implemented shell contract, persist metadata, load config, resolve settings, create managed directories, and run local commands through main-process services. |
 | 2. Setup Gate and Configuration | First-run diagnostics, `gh` requirement, Pi executable discovery, root warnings, env/secrets, repo config parsing. | Users cannot enter core workflows until required checks pass; each failure has remediation; Linear is offered but only blocks Linear workflows. |
 | 3. Repository and Workspace Core | Add/open/clone repositories, worktree workspace creation, files-to-copy, landing state, adoption, archive context. | A user can register or clone a project, create/adopt a workspace, see it in the sidebar, and land in a ready workspace shell. |
 | 4. Pi CLI RPC Runtime and Agent Timeline | RPC client, process supervision, Pi sessions, composer, timeline, checkpoints, capability discovery. | A user can start a Pi session in a workspace and see structured events, errors, controls, and checkpoint-backed turn state; an interactive chat-pane UX/UI session has recorded the accepted agent chat experience. |
@@ -106,11 +120,11 @@ Explicitly deferred until post-core:
 - Each ticket should fit one agent/workspace when practical.
 - Treat the current workbench shell as the structural UI contract. Later tickets should replace fixture/local renderer data through TanStack Query and IPC-backed services rather than rebuilding navigation, review, PR header, chat tab, composer placement, or dock regions.
 - Keep durable renderer-only UI state in concern-owned Jotai atom modules under `src/renderer/state/`, and keep shared exported renderer types under `src/renderer/types/`.
-- Treat the current shell as the closest intended Conductor-shell match. Lost or unavailable screenshots are not a reason to restart shell parity design.
+- Treat the current shell as the settled intended layout. Lost or unavailable screenshots are not a reason to restart shell design.
 - Preserve the implemented agent-runtime boundary: structured sessions, model/thinking controls, attachments, stop/submit, plan mode, and checkpoint-aware timeline behavior now exist and should be extended through `AgentClient` and the session services in `src/main/agent-runtime/` rather than replaced.
 - A new agent runtime is a new adapter folder beside `pi-agent/` and `claude-agent/`, never a branch inside an existing one. Nothing runtime-specific belongs above the adapter line (ADR 0042).
 - Prefer boundaries that keep implementations testable: `AgentClient`, `GitHubService`, `LinearService`, `ConfigService`, `SecretStore`, `TerminalService`, and `WorkspaceService`. `GitHubService` is a `gh`/`gh api` command boundary, not an app-owned GitHub auth client.
-- Do not read or write Conductor's private SQLite database.
+- Do not read or write another workspace manager's private SQLite database.
 - Do not pass Pi disabling flags by default.
 - Do not store raw secrets in JSON or SQLite.
 - Do not silently delete, rewrite, or rename shared-root content.
@@ -175,12 +189,10 @@ If another ticket encounters ambiguity that would alter behavior, create a new D
 
 - `CONTEXT.md`
 - `docs/adr/*.md`
-- `docs/product/conductor-parity.md`
 - `docs/product/current-shell-inventory.md`
 - `docs/product/archive/mvp-sequencing.md` (archived)
-- `docs/product/ux-parity.md`
+- `docs/product/ux-conventions.md`
 - `docs/product/onboarding-flow.md`
 - `docs/product/settings-inventory.md`
-- `docs/product/screen-inventory.md`
 - `docs/product/open-decisions.md`
 - `docs/product/docs-consistency-audit.md`

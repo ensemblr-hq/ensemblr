@@ -43,11 +43,11 @@ would pay the translation tax again.
 ### 1. Drive Claude Code through `@anthropic-ai/claude-agent-sdk`, in-process
 
 Add the SDK as an npm dependency and drive it from the main process, with a
-user-settable executable override. This is what Conductor does; inspecting its
-bundled runtime yields verbatim SDK internals (`CLAUDE_CODE_ENTRYPOINT="sdk-ts"`,
+user-settable executable override. The SDK internals this relies on are
+`CLAUDE_CODE_ENTRYPOINT="sdk-ts"`,
 `--output-format stream-json --verbose --input-format stream-json`, `--resume=`,
 and the option names `pathToClaudeCodeExecutable`, `forkSession`,
-`settingSources`, `permissionMode`).
+`settingSources`, and `permissionMode`.
 
 **Streaming-input mode is mandatory.** `interrupt()`, `setModel()` and
 `setPermissionMode()` exist only when `prompt` is an
