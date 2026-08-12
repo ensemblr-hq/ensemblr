@@ -8,7 +8,7 @@ Accepted
 
 ## Context
 
-Conductor has account/integration surfaces in settings. Ensemblr's v1 target is local Conductor-style workflow parity adapted for Pi: local workspaces, Pi CLI RPC runtime, `gh` CLI auth, repository settings, review flow, and local app metadata.
+An account/integration surface in settings is a plausible thing for an app of this shape to grow. Ensemblr's v1 target is the local workflow adapted for Pi: local workspaces, Pi CLI RPC runtime, `gh` CLI auth, repository settings, review flow, and local app metadata.
 
 An Ensemblr cloud account would require auth, backend services, account lifecycle, token storage, and product scope that is not needed for v1 local workflow parity.
 

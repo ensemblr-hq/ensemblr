@@ -8,7 +8,7 @@ Accepted
 
 ## Context
 
-Screenshot inventory surfaced a React profiler/developer diagnostics setting. This is not core to Conductor-style local workspace, agent, terminal, review, or PR parity.
+Settings inventory surfaced a React profiler/developer diagnostics setting. This is not core to the local workspace, agent, terminal, review, or PR workflow.
 
 ## Decision
 

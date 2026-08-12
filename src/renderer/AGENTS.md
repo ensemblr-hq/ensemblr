@@ -28,6 +28,7 @@ These instructions apply to everything under `src/renderer/`.
 - Do not keep fixture data inside components. Import it from `fixtures/<concern>/`.
 - Do not keep hooks inside component folders. Every `use-*.ts` belongs in `hooks/<concern>/`, mirroring the component sub-concern (for example `hooks/workbench-shell/composer/use-autocomplete.ts`). Components import them from there.
 - Do not keep runtime utilities inside component folders. Pure helpers belong in `lib/<concern>/`.
+- **Lexical stays inside the composer editor.** Every import of `lexical` or `@lexical/react` lives under `components/workbench-shell/conversation-panel/composer/editor/`, behind that folder's `index.ts`. The editor publishes the draft out as plain text plus its runs and chips in document order, so autocomplete, the send pipeline, and the follow-up queue never learn a rich-text editor is involved. A Lexical import outside that folder means the linearizer is missing a case — see [ADR 0047](../../docs/adr/0047-model-composer-attachments-as-one-ordered-list-in-a-lexical-draft.md).
 
 ## Routing
 

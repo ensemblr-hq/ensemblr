@@ -92,7 +92,7 @@ working directory to Console.app as forensics for any surviving relaunch
 trigger.
 
 **Dev is deliberately excluded from the lock.** Dev builds share one
-`Ensemblr (DEV)` userData across Conductor workspaces, so a lock there would kill
+`Ensemblr (DEV)` userData across parallel workspaces, so a lock there would kill
 the second dogfooding instance. The lock is gated behind `!isDev` and acquired
 after `app.setName` so it keys on the correct userData.
 
@@ -129,7 +129,7 @@ intentional and cheap (a shallow object copy).
 - The packaged app is now strictly single-instance. Any future "open a second
   window" affordance must go through the existing window/IPC, not a second
   process.
-- Dev builds remain multi-instance for Conductor dogfooding; the lock is a
+- Dev builds remain multi-instance for parallel-workspace dogfooding; the lock is a
   packaged-only behavior, so dev and packaged diverge here by design.
 - The strip is duplicated across ~11 call sites. New spawn sites must apply
   `stripLaunchContextEnv` at their boundary; the shared-source strip only covers

@@ -6,7 +6,7 @@ Date: 2026-07-08
 
 Accepted
 
-Supersedes [0007](0007-support-conductor-compatible-repository-config.md).
+Supersedes ADR 0007 (removed).
 
 The read-only clauses below are superseded for **script settings** by
 [0041](0041-write-repository-scripts-to-ensemblr-settings-toml.md): the Scripts
@@ -15,14 +15,14 @@ resolve from SQLite. The rest of this decision stands.
 
 ## Context
 
-ADR 0007 committed Ensemblr to a Conductor-compatible repository configuration model. It layered several on-disk files (`conductor.json`, `.conductor/settings.toml`, `.conductor/settings.local.toml`, and the Ensemblr-native `ensemblr.json`), mirrored every `ENSEMBLR_*` workspace variable as a `CONDUCTOR_*` compatibility variable, and shipped a `conductor.json`→`ensemblr.json` migration path.
+ADR 0007 committed Ensemblr to a repository configuration model built for drop-in compatibility with another workspace manager. It layered several on-disk files — a JSON file at the repository root, a committed and a local TOML file under a dotted config directory, and the Ensemblr-native `ensemblr.json` — mirrored every `ENSEMBLR_*` workspace variable under a second environment-variable prefix, and shipped a migration path from that foreign JSON file to `ensemblr.json`.
 
 In practice that model added cost without a matching payoff:
 
 - Multiple config files with overlapping keys made precedence hard to explain and hard to debug.
-- The `CONDUCTOR_*` mirrors and the `conductorCompatibility` setting doubled the environment surface scripts had to reason about.
+- The mirrored environment prefix and the compatibility toggle that switched it on doubled the environment surface scripts had to reason about.
 - The migration module had no UI caller and was never reachable — it was dead code.
-- Ensemblr is its own product; anchoring repository config to Conductor's filenames blurred ownership and complicated future Pi-specific settings.
+- Ensemblr is its own product; anchoring repository config to another product's filenames blurred ownership and complicated future Pi-specific settings.
 
 Ensemblr still wants one committed, team-shareable place to declare repository behavior (setup/run/archive scripts, run mode, files-to-copy, preview URL, action preferences), plus personal per-user overrides that never touch the repository.
 
@@ -31,9 +31,9 @@ Ensemblr still wants one committed, team-shareable place to declare repository b
 Ensemblr uses a single on-disk repository configuration file: `.ensemblr/settings.toml`.
 
 - **One file, TOML.** `.ensemblr/settings.toml` at the repository root is the only repository config file Ensemblr reads. It is authored by hand and committed to the repository. (ADR 0041 later made the Scripts settings screen write its `[scripts]` block; every other section remains read-only to the app.) Because each workspace is a git worktree, the file is read from the **active workspace worktree** root rather than the primary clone, so a branch-local edit to `.ensemblr/settings.toml` takes effect for the workspace on that branch.
-- **Files removed.** `conductor.json`, `.conductor/settings.toml`, `.conductor/settings.local.toml`, and `ensemblr.json` are no longer read. Any left on disk are silently ignored.
-- **No migration.** The `conductor.json`→`ensemblr.json` migration feature is removed. Old files are not converted; they are ignored.
-- **`ENSEMBLR_*` only.** Workspace scripts, terminals, and Pi sessions receive `ENSEMBLR_WORKSPACE_NAME`, `ENSEMBLR_WORKSPACE_PATH`, `ENSEMBLR_ROOT_PATH`, `ENSEMBLR_DEFAULT_BRANCH`, and `ENSEMBLR_PORT`. All `CONDUCTOR_*` compatibility variables and the `conductorCompatibility` setting are removed.
+- **Files removed.** The foreign root JSON file, both TOML files under the dotted config directory, and `ensemblr.json` are no longer read. Any left on disk are silently ignored.
+- **No migration.** The migration from the foreign JSON file to `ensemblr.json` is removed. Old files are not converted; they are ignored.
+- **`ENSEMBLR_*` only.** Workspace scripts, terminals, and Pi sessions receive `ENSEMBLR_WORKSPACE_NAME`, `ENSEMBLR_WORKSPACE_PATH`, `ENSEMBLR_ROOT_PATH`, `ENSEMBLR_DEFAULT_BRANCH`, and `ENSEMBLR_PORT`. Every mirrored compatibility variable, and the setting that enabled them, are removed.
 - **`.worktreeinclude` retained.** `.worktreeinclude` remains a separate, generic files-to-copy list. It is unchanged and still wins for files-to-copy patterns when present.
 - **Personal overrides in SQLite.** Per-user repository settings are stored in Ensemblr's SQLite database and edited through the repository settings screens. This is the editable "local config"; the app writes SQLite, never `.ensemblr/settings.toml`. (ADR 0041 moved script settings out of SQLite entirely; the Git and Misc screens still work this way.)
 
@@ -51,9 +51,9 @@ Note that `.ensemblr/settings.toml` now outranks personal SQLite settings per ke
 
 ## Alternatives Considered
 
-### Keep the Conductor-compatible multi-file model (ADR 0007)
+### Keep the multi-file compatibility model (ADR 0007)
 
-Retaining `conductor.json`/`.conductor/*.toml`/`ensemblr.json` plus `CONDUCTOR_*` mirrors would preserve drop-in compatibility for existing Conductor repositories. Rejected: the compatibility surface was large, the precedence was hard to explain, the migration path was dead, and the model diluted Ensemblr's product ownership.
+Retaining the foreign root JSON file, both dotted-directory TOML files, and `ensemblr.json`, plus the mirrored environment prefix, would preserve drop-in compatibility for repositories already configured for that other app. Rejected: the compatibility surface was large, the precedence was hard to explain, the migration path was dead, and the model diluted Ensemblr's product ownership.
 
 ### Keep personal SQLite above the committed file
 
@@ -62,8 +62,8 @@ Leaving SQLite as the top repository authority (the ADR 0007 order) would let ea
 ## Consequences
 
 - Repository configuration is a single committed, hand-authored file, so precedence and provenance are easy to explain and debug.
-- Removing `CONDUCTOR_*` is a breaking change for any script that relied on those variables; such scripts must switch to the `ENSEMBLR_*` names.
-- Repositories that only ever had `conductor.json` or `ensemblr.json` (and no `.ensemblr/settings.toml` and no personal SQLite edits) resolve to built-in defaults; `.worktreeinclude` still copies files.
+- Removing the mirrored environment prefix is a breaking change for any script that relied on those variables; such scripts must switch to the `ENSEMBLR_*` names.
+- Repositories that only ever had one of the removed config files (and no `.ensemblr/settings.toml` and no personal SQLite edits) resolve to built-in defaults; `.worktreeinclude` still copies files.
 - The Scripts settings screen edits personal SQLite values; users cannot edit the committed file from the app, and a SQLite edit is shadowed whenever the committed file defines the same key. (Reversed by ADR 0041 — the Scripts screen now edits the committed file directly.)
 - Config resolves from the active workspace worktree, so committing an edited `.ensemblr/settings.toml` on a branch changes the Setup/Run/Archive scripts for that workspace once the file watcher refreshes the settings snapshot.
-- Docs, ADRs, and planning issues that described the old multi-file model or `CONDUCTOR_*` env must point to this decision.
+- Docs, ADRs, and planning issues that described the old multi-file model or its mirrored environment prefix must point to this decision.

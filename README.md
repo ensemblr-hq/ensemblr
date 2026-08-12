@@ -3,7 +3,7 @@
 **A macOS workbench for isolated, multi-agent coding workflows.**
 
 Ensemblr is a native macOS desktop app (Electron) for running coding-agent work in isolated project
-workspaces. It borrows the workspace-and-review operating model from [Conductor](https://conductor.build).
+workspaces. Isolation is the product: every stream of work gets its own worktree, branch, and review path.
 **Pi** and **Claude Code** are its two first-class agent runtimes, driven on the app's own chat surface;
 third-party CLIs (Codex, Vibe, and the `claude` TUI) also run as terminal harnesses, and a
 permission-gated control surface — **Ensemblr Control** — lets agents drive the app itself.
@@ -37,9 +37,13 @@ The core vocabulary (see [`CONTEXT.md`](./CONTEXT.md)):
 | **Orchestrator / Sub-agent** | Roles in multi-agent work: a root orchestrator delegates; a spawned sub-agent does its unit of work itself and never delegates onward. |
 | **Review Flow** | Inspect changes, run checks, create a PR, merge accepted work, or archive rejected work. |
 | **Ensemblr Root Directory** | The user-visible directory where Ensemblr stores managed repositories, workspaces, and archived workspace context. |
+| **Attachment** | Anything the user pins into a composer draft as a chip — a file, a pasted image or text block, an issue, a review-comment thread — carried to the agent in the order it was attached. |
+| **Linked Directory** | A read grant over a directory outside the workspace, held per chat and passed to the runtime at session open. |
+| **Follow-Up Queue** | The per-tab list of messages sent while a turn is running, visible and editable until it drains. |
 
-A guiding goal is **Conductor parity** — matching Conductor's publicly observable workflows and
-capabilities, except where a runtime's own behavior requires a different implementation.
+The scope rests on **five commitments**: isolation is the product; the agent runtime is pluggable and
+never privileged; the agent can drive the app under permission; review is local-first and ends in
+GitHub; configuration is committed, legible, and ours.
 
 ---
 
@@ -87,11 +91,21 @@ Two runtimes share one chat surface — the same timeline, tool cards, checkpoin
 - Sessions persist per workspace to SQLite with tree-structured session branching, session naming, and
   auto-generated summaries — all above the adapter line, in `src/main/agent-runtime/`.
 - Streaming conversation timeline with a model picker, thinking-level picker, tool-approval prompts, and a
-  context-window gauge.
+  context-window gauge. A delegated sub-agent's rows, prose, and reasoning nest inside the call that
+  spawned it rather than reading as the main agent's own work.
 - **Plan mode**: an agent can be held to read-only tools until it submits a plan, which is written to a
   file and surfaced for review before execution resumes.
-- Composer accepts pasted image attachments and `@`-mention file payloads, resolved through the
-  workspace-files service and rendered as attachment chips.
+- **Composer attachments**: files, pasted images and long text, `@`-mentions, Linear/GitHub issues, and
+  review-comment threads all attach as chips *inline in the draft*, in the order the user placed them.
+  Payloads are written to a content-addressed store under `.context/attachments/`, and an issue or comment
+  thread is serialized to a whole markdown document rather than a summary line
+  ([ADR&nbsp;0047](./docs/adr/0047-model-composer-attachments-as-one-ordered-list-in-a-lexical-draft.md)).
+- **Linked directories**: grant a chat read access to a directory outside its workspace; the grant is
+  per chat, sticky across sends, and reaches the runtime at session open.
+- **Follow-up queue**: messages sent mid-turn land in a per-tab queue pinned above the composer — listed,
+  reorderable, editable, and removable until they drain, with each row sendable out of turn.
+- **Per-chat unread marks**: agent activity marks the individual chat, so the sidebar row, the session tab,
+  and a cross-workspace "Last unread" pill all point at the tab that is actually waiting.
 - Git-backed checkpoints capture per-turn state so you can restore an earlier point.
 - Activity monitoring drives macOS notifications and power-state handling while the agent works.
 - **Terminal harnesses** — the `claude` TUI, OpenAI Codex, and Mistral Vibe launch in workspace terminal
@@ -105,7 +119,9 @@ Two runtimes share one chat surface — the same timeline, tool cards, checkpoin
 - Agents can **drive the app itself** through a permission-gated, guardrailed control surface — Pi via
   a shipped Pi extension, native Claude Code and MCP-client terminal harnesses via an embedded MCP server.
 - The `ensemblr_*` tools spawn/steer/close conversations, launch harnesses, run terminals, open
-  file/diff/comment tabs, focus panels, and move the workspace across the board.
+  file/diff/comment tabs, focus panels, read and write Linear issues, and move the workspace across the
+  board. Linear writes are withheld from sub-agents, and no op can move an issue to a `completed` or
+  `canceled` state — agent work stops at In Review, enforced in the port rather than documented.
 - **Multi-agent orchestration**: a root orchestrator delegates independent workstreams to sub-agents,
   then *delegate → wait → evaluate → integrate*; live sub-agent status surfaces in the dock.
 - Control actions follow the workspace permission mode (read-only / approval-required /
@@ -162,8 +178,10 @@ Two runtimes share one chat surface — the same timeline, tool cards, checkpoin
 
 - App and repository settings are persisted to `~/.config/ensemblr/config.json` (layered user /
   repository / workspace) and apply on a live config reload — no restart.
-- Panes: General, Providers, Models, Appearance, Git, Environment, Integrations, Advanced, Experimental,
-  Diagnostics, plus per-repository settings.
+- App panes: General, Models, Providers, Environment, Git, Appearance, Integrations, then Diagnostics,
+  Shortcuts, and Experimental under "More". Per-repository panes: Environment, Git, Scripts, Actions,
+  Security, Misc. There is no catch-all Advanced page — its rows live where they belong (root directory in
+  General, terminal scrollback in Appearance, the Pi executable override in Providers).
 - **Providers** — per-runtime executable override, readiness checks, account/login command, and a link to
   the runtime's own settings file. **Models** — per-runtime model visibility.
 - Git defaults: branch-prefix source, auto-rename workspace on branch, delete local branch on archive,
@@ -172,6 +190,31 @@ Two runtimes share one chat surface — the same timeline, tool cards, checkpoin
   ([ADR&nbsp;0041](./docs/adr/0041-write-repository-scripts-to-ensemblr-settings-toml.md)).
 - Setup diagnostics with per-check remediation actions.
 - Appearance settings for theme, accessible colors, code theme, markdown style, mono/terminal fonts, and terminal font size.
+- A read-only **Shortcuts** reference, and a per-repository **Security** page holding the workspace
+  permission mode.
+
+### First run & language
+
+- A first launch opens a **setup wizard** instead of the workbench: a welcome moment, a language picker,
+  one screen per gate (agent CLI, GitHub CLI, Linear), and a terminal screen naming what is still
+  unresolved. The agent-CLI gate is either-or — a machine carrying only Pi *or* only Claude Code reads as
+  ready, and both the wizard and the diagnostics rollup resolve it from one table.
+- The app ships in **English, Russian, and Greek**. The render language resolves in the main process and is
+  seeded through the preload shell snapshot, so the first paint is already in the user's language; the
+  native menu bar rebuilds from its own string table on a language change.
+- **Agents answer in the app's language too.** `buildLanguageDirective` renders one block naming the
+  reader's language, appended to every playbook surface — Pi per turn, Claude in the per-turn preamble, a
+  harness in its `AGENTS.md` playbook. English resolves to no directive at all.
+- Translation is a completion contract, not a backlog: a key a change adds ships with `ru` and `el` filled
+  in the same change. See [`.claude/rules/i18n.md`](./.claude/rules/i18n.md) and
+  [`docs/i18n-glossary.md`](./docs/i18n-glossary.md).
+
+### Menus & window
+
+- A native macOS menu bar of 9 menus, driven by a renderer command bus: the renderer reports which commands
+  are live and what fills the dynamic submenus, main enables items from that report and rebuilds only when
+  the report changes the menu
+  ([ADR&nbsp;0046](./docs/adr/0046-drive-the-native-menu-bar-from-a-renderer-command-bus.md)).
 
 ---
 
@@ -185,6 +228,8 @@ Two runtimes share one chat surface — the same timeline, tool cards, checkpoin
 | Routing | TanStack Router (file-based) |
 | Async data | TanStack Query, TanStack Virtual |
 | State | Jotai |
+| Composer editor | Lexical (`lexical` + `@lexical/react`), plain-text mode with decorator-node chips |
+| Localization | i18next 26 + react-i18next 17 — `en` / `ru` / `el`, catalogues bundled as JSON |
 | Terminal | xterm.js 6 + `node-pty` |
 | Markdown | `streamdown` + Shiki |
 | Agent runtimes | Pi (CLI RPC) + Claude Code (`@anthropic-ai/claude-agent-sdk`); Codex / Vibe / `claude` TUI as terminal harnesses |
@@ -259,22 +304,25 @@ src/
 │                 repository · workspace-git · workspace-files · review · github · linear
 │                 terminal · scripts · storage · config · environment · secrets · setup
 │                 ipc · app · menu · open-target · root · pi-ipc · pi-runtime
+│                 linked-directories
 ├── preload/    Context-isolated IPC bridge (bridge/ensemblr-api.ts). Entry: preload.ts.
 ├── renderer/   React UI, organized type-first: api · components · config · fixtures ·
 │               hooks · lib · routing · state · styles · types. Entry: main.tsx.
-└── shared/     Cross-process contracts: Zod config, ipc/ (channels + 34 contract modules),
+└── shared/     Cross-process contracts: Zod config, ipc/ (channels + 35 contract modules),
                 agent-control, harness registry (agents.ts), scripts, plan-mode, keymap,
-                terminal, pi-rpc
+                terminal, pi-rpc, menu-commands
 
 resources/      Shipped Pi extensions (`pi-extensions/ensemblr-control.mts`)
 playground/     Vite-only component preview harness (`npm run dev:playground`)
 
 docs/
-├── adr/            Architecture Decision Records (45, `0001`–`0045`)
+├── adr/            Architecture Decision Records (47, `0001`–`0047`)
 ├── onboarding.md · architecture-map.md — clone-to-first-PR runbook & directory index
 ├── agent-control.md · harnesses.md · build-and-release.md — feature & operator guides
+├── i18n-glossary.md — the ru/el product vocabulary translations are held to
 ├── considerations/ Design records (Ensemblr Control, orchestration playbook, Deno migration)
 ├── pi/             Pi integration (RPC protocol, event taxonomy)
+├── claude/         Claude Code runtime guide and SDK surface reference
 ├── product/        Roadmap, parity notes, shell/settings inventories
 └── refactor/       Refactor plans
 
@@ -306,9 +354,11 @@ Ensemblr is organized around four runtime boundaries:
   (see [ADR&nbsp;0026](./docs/adr/0026-use-file-based-tanstack-routing.md)). Durable cross-module state is
   modeled as Jotai atoms under `src/renderer/state/`; async data flows through TanStack Query over the
   preload bridge.
-- **`src/shared`** — cross-process contracts: the Zod config schema, 34 typed IPC contract modules
+- **`src/shared`** — cross-process contracts: the Zod config schema, 35 typed IPC contract modules
   (`src/shared/ipc/contracts/`), the agent-control contracts and harness registry, run-script parsing,
-  plan-mode tool guards, keymap definitions, and Pi-RPC parsing.
+  plan-mode tool guards, keymap definitions, the menu command table, and Pi-RPC parsing. It returns
+  locale-neutral codes rather than English labels — it cannot reach the renderer's i18n instance, so a
+  label it returned would be English forever.
 
 **Agent runtime layer.** `src/main/agent-runtime/` owns the adapter contract, the `AgentClient`, and
 session persistence, naming, and summaries. `pi-agent/` and `claude-agent/` are *siblings* implementing
@@ -344,13 +394,21 @@ This repository has explicit contributor policies — see [`AGENTS.md`](./AGENTS
 - **Biome** for lint + format (no ESLint/Prettier):
 
   ```bash
-  npm run check       # biome check + Tailwind class check
+  npm run check       # biome check + Tailwind class check + i18n lint + hardcoded-string scan
   npm run check:fix   # apply safe fixes (format + import organization)
   npm run format      # format only
   npm run lint        # lint only
   npm run typecheck   # tsc --noEmit across three projects: tsconfig.json,
                       # tsconfig.scripts.json, tsconfig.tests.json
   npm run doctor      # react-doctor diagnostics (npx react-doctor@latest)
+  ```
+
+- **Localization.** A user-facing string is a catalogue key, and a key a change adds ships translated:
+
+  ```bash
+  npm run i18n:extract  # regenerate locales/en + empty ru/el skeletons from the t() call sites
+  npm run i18n:types    # regenerate src/renderer/types/i18next.d.ts
+  npm run i18n:status   # per-locale completion — none of your keys may be listed
   ```
 
 - **Tailwind scale.** No px-based arbitrary utilities (e.g. `w-[13px]`); `npm run check` enforces this via
@@ -411,10 +469,12 @@ See `package.json` for the full list of `test:*` scripts.
 - [`docs/agent-control.md`](./docs/agent-control.md) — Ensemblr Control & orchestration.
 - [`docs/harnesses.md`](./docs/harnesses.md) — the two first-class runtimes vs. the terminal harnesses.
 - [`docs/build-and-release.md`](./docs/build-and-release.md) — packaging, signing, notarization, channels.
-- [`docs/adr/`](./docs/adr) — 45 Architecture Decision Records.
+- [`docs/adr/`](./docs/adr) — 47 Architecture Decision Records.
+- [`docs/i18n-glossary.md`](./docs/i18n-glossary.md) — the Russian and Greek product vocabulary;
+  [`.claude/rules/i18n.md`](./.claude/rules/i18n.md) is the completion contract.
 - [`docs/considerations/`](./docs/considerations) — design records (Ensemblr Control, orchestration).
 - [`docs/pi/`](./docs/pi) — Pi RPC protocol and event taxonomy.
-- [`docs/product/`](./docs/product) — roadmap, Conductor parity, shell/settings inventories.
+- [`docs/product/`](./docs/product) — roadmap, UX conventions, shell/settings inventories.
 - [`docs/refactor/`](./docs/refactor) — refactor plans.
 - [`LICENSE`](./LICENSE) — MIT license.
 

@@ -59,7 +59,7 @@ Source:
 - `docs/adr/0001-electron-react-shadcn.md`
 - `docs/adr/0026-use-file-based-tanstack-routing.md`
 - `docs/product/archive/mvp-sequencing.md` (archived)
-- `docs/product/ux-parity.md`
+- `docs/product/ux-conventions.md`
 
 Implementation notes:
 - Keep native capabilities in Electron main, not the renderer.
@@ -78,18 +78,18 @@ Define the initial Ensemblr-owned visual system using shadcn/ui source, Tailwind
 Scope:
 - Add shadcn/ui component foundation as owned source.
 - Define color, spacing, typography, radius, pane, code, diff, and terminal tokens.
-- Own and maintain the implemented Conductor-style shell contract: project/workspace sidebar, project/branch header, open-workspace launcher, chat tabs, center timeline/composer placement, right PR header, All files/Changes/Checks panel, and lower Setup/Run/Terminal dock.
+- Own and maintain the implemented shell contract: project/workspace sidebar, project/branch header, open-workspace launcher, chat tabs, center timeline/composer placement, right PR header, All files/Changes/Checks panel, and lower Setup/Run/Terminal dock.
 - Keep shell components split behind the `WorkbenchFrame` / `WorkspaceWorkbenchContent` entrypoints (`src/renderer/components/workbench-shell/frame.tsx` and `workspace-content.tsx`) and the private feature folders under `src/renderer/components/workbench-shell/<feature>/`, with shared renderer shell state in `src/renderer/state/workspace` and shared shell types in `src/renderer/types/workbench-shell/`.
 - Build compact shell primitives for sidebar, tabs, panels, dock, forms, dialogs, banners, and status badges.
 - Keep fixture/local renderer models clearly separated from shell layout; live services wire in later tickets.
 
 Out of scope:
-- Pixel-copying Conductor visuals.
+- Pixel-copying another app's visuals.
 - Final appearance settings UI.
 
 Acceptance criteria:
 - Core shell components render from Ensemblr-owned tokens.
-- The style direction is distinct from Conductor and not stock shadcn defaults.
+- The style direction is Ensemblr's own and not stock shadcn defaults.
 - Setup-blocked state disables the composer while keeping the workbench visible and surfacing app diagnostics in the left sidebar footer/status area.
 - The lower Setup dock remains reserved for workspace/project setup command output, such as dependency install logs.
 - The visible shell matches `docs/product/current-shell-inventory.md`; placeholder actions are documented as placeholders or open decisions.
@@ -102,7 +102,7 @@ Verification:
 Source:
 - `docs/adr/0001-electron-react-shadcn.md`
 - `docs/product/current-shell-inventory.md`
-- `docs/product/ux-parity.md`
+- `docs/product/ux-conventions.md`
 - `docs/product/settings-inventory.md`
 
 Implementation notes:
@@ -141,7 +141,6 @@ Verification:
 
 Source:
 - `docs/adr/0008-use-sqlite-with-declarative-user-config.md`
-- `docs/product/conductor-parity.md`
 - `docs/product/settings-inventory.md`
 
 Implementation notes:
@@ -294,7 +293,7 @@ Verification:
 - Manual smoke test for default root creation in a safe temporary profile.
 
 Source:
-- `docs/adr/0010-use-conductor-style-root-directory.md`
+- `docs/adr/0010-use-a-user-visible-managed-root-directory.md`
 - `docs/adr/0017-reindex-root-changes-with-explicit-migration.md`
 
 Implementation notes:
@@ -332,7 +331,7 @@ Verification:
 
 Source:
 - `docs/adr/0001-electron-react-shadcn.md`
-- `docs/adr/0014-use-conductor-style-setup-gate.md`
+- `docs/adr/0014-gate-the-app-on-prerequisite-checks.md`
 - `docs/adr/0025-use-pi-cli-rpc-with-executable-discovery.md`
 
 Implementation notes:
@@ -346,7 +345,7 @@ Priority: P0
 Dependencies: ENS-003, ENS-007, ENS-008
 
 Summary:
-Build the Conductor-style setup gate model and UI for required Ensemblr readiness checks.
+Build the setup gate model and UI for required Ensemblr readiness checks.
 
 Scope:
 - Define stable check IDs, statuses, remediation actions, log references, and retry behavior.
@@ -369,9 +368,8 @@ Verification:
 - Integration tests with fake check providers.
 
 Source:
-- `docs/adr/0014-use-conductor-style-setup-gate.md`
+- `docs/adr/0014-gate-the-app-on-prerequisite-checks.md`
 - `docs/product/onboarding-flow.md`
-- `docs/product/screen-inventory.md`
 
 Implementation notes:
 - Treat setup checks as reusable diagnostics after first launch.
@@ -408,7 +406,7 @@ Verification:
 
 Source:
 - `docs/adr/0013-use-gh-cli-for-v1-github-integration.md`
-- `docs/adr/0014-use-conductor-style-setup-gate.md`
+- `docs/adr/0014-gate-the-app-on-prerequisite-checks.md`
 - `docs/product/onboarding-flow.md`
 
 Implementation notes:
@@ -486,7 +484,7 @@ Verification:
 
 Source:
 - `docs/adr/0003-preserve-pi-user-environment.md`
-- `docs/adr/0014-use-conductor-style-setup-gate.md`
+- `docs/adr/0014-gate-the-app-on-prerequisite-checks.md`
 - `docs/adr/0025-use-pi-cli-rpc-with-executable-discovery.md`
 
 Implementation notes:
@@ -562,7 +560,6 @@ Verification:
 Source:
 - `docs/adr/0018-use-keychain-for-secrets.md`
 - `docs/product/settings-inventory.md`
-- `docs/product/screen-inventory.md`
 
 Implementation notes:
 - Do not duplicate Pi-owned provider secrets unless explicitly configured as Ensemblr-specific secrets.
@@ -598,7 +595,6 @@ Verification:
 
 Source:
 - `docs/adr/0030-use-ensemblr-settings-toml-as-sole-repository-config.md`
-- `docs/product/conductor-parity.md`
 - `docs/product/settings-inventory.md`
 
 Implementation notes:
@@ -629,19 +625,19 @@ Acceptance criteria:
 - Changing root never deletes old root contents automatically.
 - New root is validated for writable managed layout.
 - Reconciliation is invoked and errors are surfaced.
-- Shared Conductor root language is clear about filesystem/git/config continuity only.
+- Shared-root language is clear about filesystem/git/config continuity only.
 
 Verification:
 - Integration tests with temporary old and new roots.
 - UI tests for confirmation and warning copy.
 
 Source:
-- `docs/adr/0010-use-conductor-style-root-directory.md`
-- `docs/adr/0011-support-conductor-root-interoperability.md`
+- `docs/adr/0010-use-a-user-visible-managed-root-directory.md`
+- `docs/adr/0011-scope-shared-root-interoperability-to-filesystem-and-git.md`
 - `docs/adr/0017-reindex-root-changes-with-explicit-migration.md`
 
 Implementation notes:
-- Never read or write Conductor's private SQLite database.
+- Never read or write another workspace manager's private SQLite database.
 
 ## ENS-017 Project Add Menu and Recents
 
@@ -676,8 +672,6 @@ Verification:
 
 Source:
 - `docs/product/current-shell-inventory.md`
-- `docs/product/screen-inventory.md`
-- `docs/product/conductor-parity.md`
 - `docs/product/onboarding-flow.md`
 
 Implementation notes:
@@ -716,8 +710,6 @@ Verification:
 
 Source:
 - `docs/product/open-decisions.md`
-- `docs/product/conductor-parity.md`
-- `docs/product/screen-inventory.md`
 
 Implementation notes:
 - The exact local-project open flow is a screenshot gap; keep the implementation conservative and documented.
@@ -754,8 +746,6 @@ Verification:
 - Manual clone of a safe test repository if credentials permit.
 
 Source:
-- `docs/product/screen-inventory.md`
-- `docs/product/conductor-parity.md`
 - `docs/adr/0013-use-gh-cli-for-v1-github-integration.md`
 
 Implementation notes:
@@ -798,12 +788,10 @@ Verification:
 
 Source:
 - `docs/product/current-shell-inventory.md`
-- `docs/product/ux-parity.md`
-- `docs/product/screen-inventory.md`
-- `docs/product/conductor-parity.md`
+- `docs/product/ux-conventions.md`
 
 Implementation notes:
-- Keep Ensemblr labels and identity distinct while preserving Conductor-like information architecture.
+- Keep Ensemblr labels and identity distinct while preserving the settled information architecture.
 
 ## ENS-021 Git Worktree Workspace Creation
 
@@ -837,9 +825,8 @@ Verification:
 - Manual `git worktree list --porcelain` check after workspace creation.
 
 Source:
-- `docs/adr/0006-target-conductor-feature-parity.md`
-- `docs/adr/0010-use-conductor-style-root-directory.md`
-- `docs/product/screen-inventory.md`
+- `docs/adr/0006-target-a-complete-parallel-workspace-workbench.md`
+- `docs/adr/0010-use-a-user-visible-managed-root-directory.md`
 
 Implementation notes:
 - Keep one workspace per shippable stream of work as the default model.
@@ -876,11 +863,9 @@ Verification:
 
 Source:
 - `docs/adr/0030-use-ensemblr-settings-toml-as-sole-repository-config.md`
-- `docs/product/conductor-parity.md`
-- `docs/product/screen-inventory.md`
 
 Implementation notes:
-- Preserve `.worktreeinclude` files-to-copy behavior without relying on Conductor private state.
+- Preserve `.worktreeinclude` files-to-copy behavior without relying on another app's private state.
 
 ## ENS-023 Workspace Landing Summary and First Composer Surface
 
@@ -916,12 +901,11 @@ Verification:
 
 Source:
 - `docs/product/current-shell-inventory.md`
-- `docs/product/screen-inventory.md`
-- `docs/product/ux-parity.md`
+- `docs/product/ux-conventions.md`
 - `docs/product/onboarding-flow.md`
 
 Implementation notes:
-- Do not copy Conductor placeholder naming style if it is distinctive.
+- Placeholder names should read in Ensemblr's own voice.
 
 ## ENS-024 Shared-Root Workspace Adoption and Reconciliation
 
@@ -931,7 +915,7 @@ Priority: P0
 Dependencies: ENS-007, ENS-015, ENS-016, ENS-021
 
 Summary:
-Discover and adopt repositories/workspaces from a shared Conductor-style root using filesystem and git metadata only.
+Discover and adopt repositories/workspaces from a shared root using filesystem and git metadata only.
 
 Scope:
 - Scan `<root>/repos/<repo-slug>` and `<root>/workspaces/<repo-slug>/<workspace-slug>`.
@@ -941,26 +925,22 @@ Scope:
 - Detect possible active workspace collisions.
 
 Out of scope:
-- Reading/writing Conductor private SQLite database.
-- Importing Claude/Codex sessions, Conductor local comments, or private terminal state.
+- Reading/writing another workspace manager's private SQLite database.
+- Importing Claude/Codex sessions, another app's local comments, or private terminal state.
 
 Acceptance criteria:
-- Valid Conductor-created worktrees can appear in Ensemblr.
+- Valid worktrees another workspace manager created can appear in Ensemblr.
 - Unknown files/directories are left untouched.
 - Adoption is idempotent and repairs stale SQLite records where safe.
 - The UI can distinguish created vs adopted workspaces.
 
 Verification:
 - Fixture tests with shared root, valid worktrees, invalid directories, deleted worktrees, and stale SQLite rows.
-- Manual adoption of a temporary Conductor-shaped root.
+- Manual adoption of a temporary shared-root fixture.
 
 Source:
-- `docs/adr/0011-support-conductor-root-interoperability.md`
-- `docs/adr/0015-adopt-conductor-workspaces-from-shared-root.md`
-- `docs/product/conductor-parity.md`
-
-Implementation notes:
-- Do not require or interpret a `.conductor` folder for v1.
+- `docs/adr/0011-scope-shared-root-interoperability-to-filesystem-and-git.md`
+- `docs/adr/0015-adopt-existing-workspaces-from-a-shared-root.md`
 
 ## ENS-025 Workspace Archive and Context Lifecycle
 
@@ -995,8 +975,7 @@ Verification:
 - Fixture tests for `.context` preservation and branch cleanup settings.
 
 Source:
-- `docs/product/conductor-parity.md`
-- `docs/adr/0010-use-conductor-style-root-directory.md`
+- `docs/adr/0010-use-a-user-visible-managed-root-directory.md`
 - `docs/adr/0016-use-workspace-trusted-local-execution.md`
 
 Implementation notes:
@@ -1074,7 +1053,7 @@ Verification:
 Source:
 - `docs/adr/0003-preserve-pi-user-environment.md`
 - `docs/adr/0025-use-pi-cli-rpc-with-executable-discovery.md`
-- `docs/product/ux-parity.md`
+- `docs/product/ux-conventions.md`
 
 Implementation notes:
 - Keep stderr and protocol events distinct in storage and UI.
@@ -1150,8 +1129,7 @@ Verification:
 
 Source:
 - `docs/product/current-shell-inventory.md`
-- `docs/product/ux-parity.md`
-- `docs/product/screen-inventory.md`
+- `docs/product/ux-conventions.md`
 - `docs/adr/0025-use-pi-cli-rpc-with-executable-discovery.md`
 
 Implementation notes:
@@ -1189,9 +1167,7 @@ Verification:
 
 Source:
 - `docs/product/current-shell-inventory.md`
-- `docs/product/ux-parity.md`
-- `docs/product/screen-inventory.md`
-- `docs/product/conductor-parity.md`
+- `docs/product/ux-conventions.md`
 
 Implementation notes:
 - Do not treat Pi RPC as a terminal transcript; keep the event model structured.
@@ -1229,8 +1205,7 @@ Verification:
 
 Source:
 - `docs/product/current-shell-inventory.md`
-- `docs/product/ux-parity.md`
-- `docs/product/screen-inventory.md`
+- `docs/product/ux-conventions.md`
 - `docs/product/open-decisions.md`
 
 Implementation notes:
@@ -1248,7 +1223,7 @@ Discover how Pi CLI/RPC supports retry, retry-in-new-chat, session tree navigati
 
 Scope:
 - Identify available Pi CLI/RPC commands/events for session branching and continuation.
-- Determine how to map Conductor-style retry and retry-in-new-chat actions to Pi session tree behavior.
+- Determine how to map retry and retry-in-new-chat actions to Pi session tree behavior.
 - Determine how checkpoint restore should interact with continuation state.
 - Document gaps and fallback behavior.
 
@@ -1269,7 +1244,7 @@ Verification:
 Source:
 - `docs/adr/0012-use-git-backed-checkpoints-for-pi-turns.md`
 - `docs/product/open-decisions.md`
-- `docs/product/ux-parity.md`
+- `docs/product/ux-conventions.md`
 
 Implementation notes:
 - Ensemblr-visible continuation can diverge from underlying Pi session history in v1 if clearly explained.
@@ -1292,7 +1267,7 @@ Scope:
 
 Out of scope:
 - Restore UI and turn diff UI.
-- Reusing Conductor checkpoint refs.
+- Reusing another workspace manager's checkpoint refs.
 
 Acceptance criteria:
 - A checkpoint is recorded before each supported Pi user prompt.
@@ -1306,7 +1281,6 @@ Verification:
 
 Source:
 - `docs/adr/0012-use-git-backed-checkpoints-for-pi-turns.md`
-- `docs/product/conductor-parity.md`
 
 Implementation notes:
 - Avoid destructive git operations and do not touch unrelated refs.
@@ -1329,7 +1303,7 @@ Scope:
 - Do not destructively edit Pi session files.
 
 Out of scope:
-- Full Conductor checkpoint-ref interoperability.
+- Full checkpoint-ref interoperability with another workspace manager.
 - Pi session-history mutation.
 
 Acceptance criteria:
@@ -1344,7 +1318,6 @@ Verification:
 
 Source:
 - `docs/adr/0012-use-git-backed-checkpoints-for-pi-turns.md`
-- `docs/product/conductor-parity.md`
 - `docs/product/docs-consistency-audit.md`
 
 Implementation notes:
@@ -1459,8 +1432,6 @@ Verification:
 
 Source:
 - `docs/adr/0002-xterm-terminal-renderer.md`
-- `docs/product/conductor-parity.md`
-- `docs/product/screen-inventory.md`
 
 Implementation notes:
 - Main process owns PTY supervision; renderer only renders terminal data.
@@ -1505,8 +1476,7 @@ Verification:
 Source:
 - `docs/product/current-shell-inventory.md`
 - `docs/adr/0002-xterm-terminal-renderer.md`
-- `docs/product/ux-parity.md`
-- `docs/product/screen-inventory.md`
+- `docs/product/ux-conventions.md`
 
 Implementation notes:
 - Keep Pi RPC timeline separate from manual/raw terminal sessions.
@@ -1547,8 +1517,6 @@ Verification:
 
 Source:
 - `docs/adr/0030-use-ensemblr-settings-toml-as-sole-repository-config.md`
-- `docs/product/conductor-parity.md`
-- `docs/product/screen-inventory.md`
 
 Implementation notes:
 - Scripts must use resolved repository config and environment variables.
@@ -1583,7 +1551,6 @@ Verification:
 
 Source:
 - `docs/adr/0030-use-ensemblr-settings-toml-as-sole-repository-config.md`
-- `docs/product/conductor-parity.md`
 - `docs/product/settings-inventory.md`
 
 Implementation notes:
@@ -1621,7 +1588,6 @@ Verification:
 
 Source:
 - `docs/adr/0030-use-ensemblr-settings-toml-as-sole-repository-config.md`
-- `docs/product/conductor-parity.md`
 
 Implementation notes:
 - Store enough process metadata to recover after app reload.
@@ -1658,7 +1624,6 @@ Verification:
 Source:
 - `docs/product/open-decisions.md`
 - `docs/product/settings-inventory.md`
-- `docs/product/conductor-parity.md`
 
 Implementation notes:
 - Explicit repository preview URL templates are safer than aggressive log scraping.
@@ -1695,7 +1660,6 @@ Verification:
 Source:
 - `docs/product/open-decisions.md`
 - `docs/product/settings-inventory.md`
-- `docs/product/screen-inventory.md`
 
 Implementation notes:
 - Treat this as high-risk until conflict behavior is proven.
@@ -1845,7 +1809,6 @@ Verification:
 
 Source:
 - `docs/adr/0024-use-linear-oauth-for-v1-issue-integration.md`
-- `docs/product/conductor-parity.md`
 - `docs/product/onboarding-flow.md`
 
 Implementation notes:
@@ -1883,7 +1846,6 @@ Verification:
 
 Source:
 - `docs/adr/0024-use-linear-oauth-for-v1-issue-integration.md`
-- `docs/product/conductor-parity.md`
 
 Implementation notes:
 - Treat field-level support as capability-dependent and schema-driven.
@@ -1921,7 +1883,6 @@ Verification:
 Source:
 - `docs/adr/0024-use-linear-oauth-for-v1-issue-integration.md`
 - `docs/product/onboarding-flow.md`
-- `docs/product/conductor-parity.md`
 
 Implementation notes:
 - Use same worktree creation path as local/GitHub workspace creation.
@@ -1960,7 +1921,6 @@ Verification:
 Source:
 - `docs/product/current-shell-inventory.md`
 - `docs/adr/0024-use-linear-oauth-for-v1-issue-integration.md`
-- `docs/product/conductor-parity.md`
 
 Implementation notes:
 - Linear remains source of truth for issue state.
@@ -1999,9 +1959,7 @@ Verification:
 
 Source:
 - `docs/product/current-shell-inventory.md`
-- `docs/product/conductor-parity.md`
-- `docs/product/ux-parity.md`
-- `docs/product/screen-inventory.md`
+- `docs/product/ux-conventions.md`
 
 Implementation notes:
 - Git/worktree state is source of truth for files and diffs.
@@ -2040,9 +1998,7 @@ Verification:
 
 Source:
 - `docs/product/current-shell-inventory.md`
-- `docs/product/screen-inventory.md`
-- `docs/product/conductor-parity.md`
-- `docs/product/ux-parity.md`
+- `docs/product/ux-conventions.md`
 
 Implementation notes:
 - The screenshot set lacks full line-comment details, so keep diff viewer extensible.
@@ -2078,8 +2034,6 @@ Verification:
 - Component tests for add/edit/resolve flows.
 
 Source:
-- `docs/product/conductor-parity.md`
-- `docs/product/screen-inventory.md`
 - `docs/adr/0008-use-sqlite-with-declarative-user-config.md`
 
 Implementation notes:
@@ -2116,9 +2070,7 @@ Verification:
 - UI tests for adding file/diff/comment/check context to composer.
 
 Source:
-- `docs/product/conductor-parity.md`
-- `docs/product/ux-parity.md`
-- `docs/product/screen-inventory.md`
+- `docs/product/ux-conventions.md`
 
 Implementation notes:
 - If Pi context usage is unavailable, use conservative size limits until `ENS-035` clarifies capability.
@@ -2156,8 +2108,6 @@ Verification:
 
 Source:
 - `docs/adr/0013-use-gh-cli-for-v1-github-integration.md`
-- `docs/product/screen-inventory.md`
-- `docs/product/conductor-parity.md`
 
 Implementation notes:
 - Keep `GitHubService` as the command boundary for `gh` and `gh api`.
@@ -2197,8 +2147,6 @@ Verification:
 
 Source:
 - `docs/adr/0013-use-gh-cli-for-v1-github-integration.md`
-- `docs/product/conductor-parity.md`
-- `docs/product/screen-inventory.md`
 
 Implementation notes:
 - Authenticated `gh api` is part of `gh` coverage; do not add app-owned GitHub OAuth/API as a fallback.
@@ -2284,9 +2232,7 @@ Verification:
 
 Source:
 - `docs/product/current-shell-inventory.md`
-- `docs/product/screen-inventory.md`
-- `docs/product/ux-parity.md`
-- `docs/product/conductor-parity.md`
+- `docs/product/ux-conventions.md`
 
 Implementation notes:
 - Keep merge action disabled or hidden until `ENS-058` lands.
@@ -2299,7 +2245,7 @@ Priority: P0
 Dependencies: ENS-013, ENS-055, ENS-057
 
 Summary:
-Implement Conductor-style ready-to-merge action and explicit final merge confirmation through `gh pr merge`.
+Implement the ready-to-merge action and explicit final merge confirmation through `gh pr merge`.
 
 Scope:
 - Compute merge readiness from PR/check/comment/todo/blocker state.
@@ -2323,9 +2269,8 @@ Verification:
 - Manual test in safe repository if available.
 
 Source:
-- `docs/adr/0023-use-conductor-style-merge-confirmation.md`
+- `docs/adr/0023-use-a-two-step-merge-confirmation.md`
 - `docs/adr/0013-use-gh-cli-for-v1-github-integration.md`
-- `docs/product/screen-inventory.md`
 
 Implementation notes:
 - Merge is externally visible and should be treated as irreversible/high-impact.
@@ -2362,8 +2307,6 @@ Verification:
 
 Source:
 - `docs/product/settings-inventory.md`
-- `docs/product/screen-inventory.md`
-- `docs/product/conductor-parity.md`
 
 Implementation notes:
 - Store Pi-specific shared templates in the committed `.ensemblr/settings.toml` when shared config is appropriate.
@@ -2399,7 +2342,7 @@ Verification:
 - Manual safe test in temporary repository.
 
 Source:
-- `docs/adr/0023-use-conductor-style-merge-confirmation.md`
+- `docs/adr/0023-use-a-two-step-merge-confirmation.md`
 - `docs/product/settings-inventory.md`
 
 Implementation notes:
@@ -2439,8 +2382,7 @@ Verification:
 Source:
 - `docs/product/settings-inventory.md`
 - `docs/product/current-shell-inventory.md`
-- `docs/product/screen-inventory.md`
-- `docs/product/ux-parity.md`
+- `docs/product/ux-conventions.md`
 - `docs/product/open-decisions.md`
 
 Implementation notes:
@@ -2480,8 +2422,7 @@ Verification:
 Source:
 - `docs/product/current-shell-inventory.md`
 - `docs/product/settings-inventory.md`
-- `docs/product/screen-inventory.md`
-- `docs/product/ux-parity.md`
+- `docs/product/ux-conventions.md`
 
 Implementation notes:
 - Do not expose deferred account/cloud features as active v1 settings.
@@ -2520,7 +2461,6 @@ Verification:
 
 Source:
 - `docs/product/settings-inventory.md`
-- `docs/product/screen-inventory.md`
 - `docs/adr/0019-defer-ensemblr-account-for-v1.md`
 - `docs/adr/0024-use-linear-oauth-for-v1-issue-integration.md`
 
@@ -2559,7 +2499,6 @@ Verification:
 
 Source:
 - `docs/product/settings-inventory.md`
-- `docs/product/screen-inventory.md`
 - `docs/adr/0030-use-ensemblr-settings-toml-as-sole-repository-config.md`
 
 Implementation notes:
@@ -2581,7 +2520,7 @@ Scope:
 - Persist preferences in SQLite with optional config defaults.
 
 Out of scope:
-- Copying Conductor color palette or typography.
+- Copying another app's color palette or typography.
 - Production React profiler controls.
 
 Acceptance criteria:
@@ -2596,7 +2535,6 @@ Verification:
 
 Source:
 - `docs/product/settings-inventory.md`
-- `docs/product/screen-inventory.md`
 - `docs/adr/0001-electron-react-shadcn.md`
 
 Implementation notes:
@@ -2636,8 +2574,7 @@ Verification:
 
 Source:
 - `docs/product/current-shell-inventory.md`
-- `docs/product/conductor-parity.md`
-- `docs/product/ux-parity.md`
+- `docs/product/ux-conventions.md`
 - `docs/product/settings-inventory.md`
 
 Implementation notes:
@@ -2676,8 +2613,7 @@ Verification:
 
 Source:
 - `docs/product/current-shell-inventory.md`
-- `docs/product/conductor-parity.md`
-- `docs/product/ux-parity.md`
+- `docs/product/ux-conventions.md`
 
 Implementation notes:
 - Production URL scheme registration may need packaging follow-up but local handler logic can be built now.
@@ -2714,7 +2650,6 @@ Verification:
 
 Source:
 - `docs/product/onboarding-flow.md`
-- `docs/product/screen-inventory.md`
 - `docs/product/docs-consistency-audit.md`
 
 Implementation notes:
@@ -2767,7 +2702,7 @@ Priority: P2
 Dependencies: ENS-030, ENS-062
 
 Summary:
-Decide whether Ensemblr should support Conductor's remove/soften AI-certainty phrase setting.
+Decide whether Ensemblr should support a remove/soften AI-certainty phrase setting.
 
 Scope:
 - Evaluate whether the setting makes sense for Pi output.

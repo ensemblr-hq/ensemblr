@@ -1,10 +1,10 @@
 # Open Decisions
 
-Date: 2026-08-08
+Date: 2026-08-12 (last full pass 2026-08-08)
 
 ## Screenshot Gaps Remaining
 
-- Exact onboarding screen sequence. No onboarding PNGs were captured; `docs/product/onboarding-flow.md` is inferred.
+- ~~Exact onboarding screen sequence. No onboarding PNGs were captured; `docs/product/onboarding-flow.md` is inferred.~~ **Resolved 2026-08-09 (#247):** Ensemblr shipped its own wizard at `/onboarding` — a welcome moment, a language picker, one screen per gate (agent CLI, GitHub CLI, Linear), and a terminal screen. The agent-CLI gate is either-or. `docs/product/ux-conventions.md` §First-Run Onboarding describes what shipped.
 - Exact workspace creation form/modal. Screenshots show the success landing state, not the create form.
 - Exact local-project open flow and quick-start flow. Screenshots show the add menu and GitHub clone modal only.
 - Clone/auth/path failure states. Screenshots show form and progress, not failures.
@@ -39,11 +39,10 @@ Date: 2026-08-08
 
 - Pi CLI/RPC APIs for session tree navigation/forking beyond the current chat-tab model, retry-in-new-chat behavior, and compaction UI.
 - Pi CLI/RPC API for browser control. Model listing, model/thinking selection, permission brokering, plan mode, and context usage are all wired.
-- How to represent agent sessions when a workspace is adopted from Conductor.
+- How to represent agent sessions when a workspace is adopted from a shared root another workspace manager created.
 - Exact review-thread/comment mutation coverage through first-class `gh` and authenticated `gh api`; any gaps should be documented as unsupported or limited rather than solved with an app-owned GitHub auth layer.
 - Linear archive/delete schema and permission support. Create/read/update/comment and workspace-from-issue are resolved v1 scope, but field-level SDK/GraphQL mapping, pagination, filtering, labels, cycles, and metadata caching still need implementation discovery.
-- Conductor checkpoint git refs, if any, and whether they can be safely detected without relying on private app DB.
-- Whether a `.conductor` folder exists in any real repositories and whether it has a documented/public meaning for workspace adoption (Ensemblr no longer reads it for repository config; see ADR 0030).
+- Whether another workspace manager's checkpoint git refs, if any, can be safely detected without relying on its private app DB.
 - Which current command/menu placeholders should be keyboard-shortcut/global-command entries before their backing services exist.
 
 ## Resolved Since Screenshot Review

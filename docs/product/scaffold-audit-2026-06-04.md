@@ -61,7 +61,7 @@ The reference scaffold produced these relevant files:
 > and the guardrail hooks block direct `bun`/`bunx`/`pnpm`/`yarn` calls. See the
 > "Package Manager → npm" entry in [`CHANGELOG.md`](../../CHANGELOG.md) and the
 > Package Manager Policy in [`AGENTS.md`](../../AGENTS.md). The Bun details below
-> (and the `bun` commands under Conductor Configuration and Verification) are
+> (and the `bun` commands under External Host Configuration and Verification) are
 > retained as a record of the original scaffold.
 
 - Root `package.json` sets `packageManager` to Bun and root dependencies were installed with `bun add` / `bun add -d`.
@@ -94,10 +94,10 @@ Electron Forge's official Vite TypeScript template is not a React template. Reac
 
 - Renamed Vite config files from `.ts` to `.mts`.
 - Added React and Tailwind plugins to the renderer config.
-- Added `CONDUCTOR_PORT` support with `strictPort: true`.
+- Added host-supplied port support with `strictPort: true`.
 
 Reason:
-Current React/Tailwind Vite plugins are ESM-only, and the `.mts` config avoids Vite's CommonJS config loading failure. `CONDUCTOR_PORT` lets Conductor run multiple workspaces concurrently.
+Current React/Tailwind Vite plugins are ESM-only, and the `.mts` config avoids Vite's CommonJS config loading failure. A host-supplied port variable let an external workspace host run multiple workspaces concurrently.
 
 ### TypeScript Config
 
@@ -154,17 +154,19 @@ Reason:
 Reason:
 `ENS-001` requires basic routing between app shell, setup gate placeholder, workspace shell placeholder, and settings placeholder. ADR 0001 requires React, Tailwind, and a compact Ensemblr-owned UI direction.
 
-### Conductor Configuration
+### External Host Configuration
 
 > **Historical (2026-06-04):** This dated snapshot predates the single-file
-> repository config model. Ensemblr no longer reads `conductor.json` or
-> `CONDUCTOR_*`; the sole on-disk repository config is the committed
-> `.ensemblr/settings.toml`, and workspace variables are `ENSEMBLR_*` only. See
+> repository config model. The scaffold originally carried a compatibility
+> config for an external workspace host: a JSON file naming `setup` and `run`
+> scripts plus a run-script mode, and a host-supplied port environment variable
+> read by the Vite renderer. Ensemblr reads neither today — the sole on-disk
+> repository config is the committed `.ensemblr/settings.toml`, and workspace
+> variables are `ENSEMBLR_*` only. See
 > [ADR 0030](../adr/0030-use-ensemblr-settings-toml-as-sole-repository-config.md).
-> The `conductor.json` / `CONDUCTOR_PORT` details below are retained as a record
-> of the original scaffold.
+> The shape below is retained as a record of the original scaffold.
 
-- Added `conductor.json` with:
+- Added a JSON compatibility config declaring:
 
 ```json
 {
@@ -177,7 +179,7 @@ Reason:
 ```
 
 Reason:
-Conductor setup/run commands should use the repository's Bun policy and the Vite renderer now honors `CONDUCTOR_PORT`.
+The host's setup/run commands should use the repository's Bun policy, and the Vite renderer honored the host-supplied port variable.
 
 ## Verification
 
@@ -188,7 +190,7 @@ Commands run successfully (historical — Bun). The current npm equivalents are
 ```sh
 bun run typecheck
 bun run build
-CONDUCTOR_PORT=5317 bun run dev
+bun run dev   # with the host-supplied port set to 5317
 ```
 
 The dev smoke test showed the Vite renderer at `http://localhost:5317/` and launched Electron. The process was stopped afterward.

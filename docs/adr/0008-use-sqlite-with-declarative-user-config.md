@@ -8,7 +8,7 @@ Accepted
 
 ## Context
 
-Ensemblr targets Conductor feature parity. Conductor stores local app metadata in an app-support SQLite database with tables for repositories, workspaces, sessions, session messages, terminal sessions, settings, environment variables, attachments, diff comments, port forwards, and cleanup state.
+Ensemblr needs a local store for mutable app metadata: repositories, workspaces, sessions, session messages, terminal sessions, settings, environment variables, attachments, diff comments, port forwards, and cleanup state.
 
 Ensemblr needs the same class of durable local metadata: projects, workspaces, Pi sessions, session events, terminal panes, repository settings overrides, UI state, comments, checks, PR metadata, checkpoints, port allocation, and process state.
 
@@ -16,7 +16,7 @@ At the same time, Ensemblr should support declarative user-managed settings so u
 
 ## Decision
 
-Ensemblr will use a local SQLite database as the primary store for mutable app metadata, matching Conductor's storage shape.
+Ensemblr will use a local SQLite database as the primary store for mutable app metadata.
 
 Ensemblr will also support declarative user configuration under `~/.config/ensemblr/`.
 
@@ -50,7 +50,7 @@ Declarative config must not be the primary store for high-churn runtime state su
 
 ### SQLite only
 
-Using only SQLite would match Conductor closely and simplify implementation, but it would make dotfile management and managed declarative setup harder.
+Using only SQLite would simplify the implementation, but it would make dotfile management and managed declarative setup harder.
 
 ### Declarative config only
 
@@ -62,7 +62,7 @@ Keeping all state inside repositories would make state portable, but it would po
 
 ## Consequences
 
-- Ensemblr can match Conductor's local metadata model while supporting dotfile-managed configuration.
+- Ensemblr gets a durable local metadata store while still supporting dotfile-managed configuration.
 - The implementation needs a configuration resolution layer that merges declarative config, personal SQLite settings, repository files, and defaults.
 - The app must show which config source won for debuggability.
 - The declarative config schema should be versioned and validated.

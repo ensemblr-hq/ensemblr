@@ -81,7 +81,8 @@ Read these in order:
    *Project*, *Harness*, *Ensemblr Control*, *Session Branch* and the rest have
    precise meanings here, and each entry lists the terms to avoid.
 2. [`architecture-map.md`](./architecture-map.md) — which directory owns which
-   concern, and the two request paths (IPC, and agent → app control).
+   concern, and the three request paths (IPC, agent → app control, and the menu
+   command bus).
 3. [`../AGENTS.md`](../AGENTS.md) — the binding contributor policies, plus the
    scoped `AGENTS.md` for whichever subtree you are editing.
 4. [`../.claude/rules/stack.md`](../.claude/rules/stack.md) — the pinned versions
@@ -90,10 +91,14 @@ Read these in order:
    `tailwind.config.js`), and
    [`../.claude/rules/patterns.md`](../.claude/rules/patterns.md) for the
    structural rules a change has to respect.
-5. [`adr/`](./adr) — 45 Architecture Decision Records. When something looks odd,
+5. [`adr/`](./adr) — 47 Architecture Decision Records. When something looks odd,
    the ADR usually explains it. Start with
    [0042](./adr/0042-add-claude-code-as-a-second-first-class-agent-runtime.md) if
    you are touching the agent layer.
+6. [`../.claude/rules/i18n.md`](../.claude/rules/i18n.md) — the app ships in
+   English, Russian, and Greek, and a user-facing string your change adds is not
+   finished until all three read it. The catalogues are at 100% in both `ru` and
+   `el`, so a missing value is the only gap in the tree, not one of many.
 
 ## 5. Make a change
 
@@ -109,6 +114,11 @@ The house style is enforced, not suggested. Before writing code:
   fails on them.
 - **Jotai** is the only app-level store. No Redux, Zustand, Valtio, or a
   hand-rolled global.
+- **Every user-facing string is a catalogue key**, and `ru` and `el` ship filled
+  in the same change: `t('<ns>:<surface>.<element>', 'Default English')`, then
+  `npm run i18n:extract` → fill the empty values → `npm run i18n:types` →
+  `npm run i18n:status`. Never hand-edit `locales/en/**`; it is generated from the
+  call sites.
 
 ## 6. Running the tests
 
@@ -142,10 +152,11 @@ from `bun:test` — Bun is not the runner and the enforcement hook blocks the CL
 ## 7. Before you push
 
 ```bash
-npm run check       # Biome check + the Tailwind class check
+npm run check       # Biome + the Tailwind class check + i18n lint + hardcoded-string scan
 npm run check:fix   # apply safe fixes (format + import organization)
 npm run typecheck   # tsc --noEmit across app, scripts/, and tests/
 npm run test
+npm run i18n:status # if you touched a user-facing string — must stay at 100% ru/el
 ```
 
 `npm run typecheck` covers **three** projects — `tsconfig.json`,
@@ -179,7 +190,9 @@ changed set, per [`../.claude/rules/code-review.md`](../.claude/rules/code-revie
 | New route | A file under `src/renderer/routing/routes/`; let the Vite plugin regenerate `routeTree.gen.ts` |
 | New durable UI state | `src/renderer/state/<concern>/`, re-exported from that folder's `index.ts` |
 | New DB table or column | A numbered migration in `src/main/storage/database.ts`, plus its id in `tests/main/database.test.ts` |
-| New main-process concern | A folder under `src/main/` with an `index.ts`; add it to `src/main/AGENTS.md` **and** to `entry` in `.fallowrc.jsonc`, or fallow reports the barrel's re-exports as dead code |
+| New main-process concern | A folder under `src/main/` with an `index.ts`; add it to `src/main/AGENTS.md`. Main-process barrels are deliberately **not** listed in `.fallowrc.jsonc` — they are reachable from `src/main/main.ts`, so a genuinely unused export in one should still surface. Shared and renderer concern barrels *are* listed there |
+| New user-facing string | A `t('<ns>:<key>', 'Default English')` call site, then `npm run i18n:extract` and hand-fill `locales/ru/**` and `locales/el/**`; add the term to `docs/i18n-glossary.md` if it is new |
+| New native menu item | An id in `src/shared/menu-commands.ts` → a label in all three languages in `src/main/menu/menu-strings.ts` → an entry in the relevant `src/main/menu/<name>-menu.ts` → a `useMenuCommand` registration in the renderer surface that owns the action ([ADR 0046](./adr/0046-drive-the-native-menu-bar-from-a-renderer-command-bus.md)) |
 | New agent runtime | A sibling adapter folder under `src/main/` implementing the `src/main/agent-runtime/` contract — never a branch inside `pi-agent/` or `claude-agent/` ([ADR 0042](./adr/0042-add-claude-code-as-a-second-first-class-agent-runtime.md)) |
 | New agent control op | A service first, then a port in `src/main/agent-control/ports.ts` — control never adds capability code of its own |
 | New pure-logic test under `tests/main/` | The explicit `include` array in `vitest.config.mts` — it is not a glob |

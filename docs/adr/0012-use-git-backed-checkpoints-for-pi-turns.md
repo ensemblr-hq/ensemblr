@@ -8,7 +8,7 @@ Accepted
 
 ## Context
 
-Conductor supports checkpoints: automatic snapshots of an agent's code changes that let users inspect what changed turn by turn and revert to an earlier user message. Public docs describe checkpoints as local private Git refs captured before supported agent responses.
+Ensemblr needs checkpoints: automatic snapshots of an agent's code changes that let users inspect what changed turn by turn and revert to an earlier user message. The natural implementation is a local private Git ref captured before each supported agent response.
 
 Ensemblr needs equivalent behavior for Pi sessions. Pi also has tree-structured session history, so conversation history and file-state checkpoints must be modeled separately.
 
@@ -47,13 +47,13 @@ Pi's tree-structured sessions are useful for conversation branching, but they do
 
 Editing Pi's session JSONL files could make Ensemblr's visible history match a destructive restore, but it risks corrupting Pi state and diverging from Pi's own session semantics. This is rejected for v1.
 
-### Use Conductor checkpoint refs
+### Reuse a foreign tool's checkpoint refs
 
-Ensemblr could try to discover and reuse Conductor checkpoint refs. This may be investigated later for shared-root interoperability, but it is not a safe dependency for v1 because Conductor's private ref format is not a public contract.
+Ensemblr could try to discover and reuse checkpoint refs another workspace manager left in the repository. This may be investigated later for shared-root interoperability, but it is not a safe dependency for v1 because such private ref formats are not public contracts.
 
 ## Consequences
 
-- Ensemblr can show turn-by-turn code changes and restore file state like Conductor.
+- Ensemblr can show turn-by-turn code changes and restore file state.
 - Pi session history remains intact even after Ensemblr restores a file checkpoint.
 - The UI must clearly explain that restoring a checkpoint affects workspace files and Ensemblr-visible continuation state, not necessarily deleting Pi's underlying session history.
 - The implementation must avoid destructive git operations that affect unrelated user changes outside the selected restore scope.

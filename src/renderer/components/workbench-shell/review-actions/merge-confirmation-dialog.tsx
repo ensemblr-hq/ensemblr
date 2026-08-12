@@ -14,7 +14,7 @@ import {
 import type { WorkspaceShellModel } from '@/renderer/types/workbench';
 
 /**
- * Conductor-style final merge confirmation (ADR 0023). Summarizes branch, PR,
+ * Final merge confirmation (ADR 0023). Summarizes branch, PR,
  * check state, unresolved comments/todos, and post-merge archive behavior.
  * Merge runs only from this dialog — never directly from the header button.
  */

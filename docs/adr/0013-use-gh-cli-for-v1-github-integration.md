@@ -8,9 +8,9 @@ Accepted
 
 ## Context
 
-Ensemblr targets Conductor parity for review and pull request workflows: creating PRs, pushing branches, showing PR metadata, displaying CI/status checks, surfacing GitHub review comments, sending feedback back to the agent, resolving handled comments, opening PRs in GitHub, and merging when ready.
+Ensemblr needs a complete review and pull request workflow: creating PRs, pushing branches, showing PR metadata, displaying CI/status checks, surfacing GitHub review comments, sending feedback back to the agent, resolving handled comments, opening PRs in GitHub, and merging when ready.
 
-Conductor's public docs state that Conductor checks for GitHub authentication in the terminal environment during setup, tells users to verify with `gh auth status`, and requires GitHub plus at least one agent provider to use the app.
+Every one of those actions already exists as a `gh` subcommand that runs against the user's own GitHub authentication. The alternative is re-implementing an authenticated GitHub client inside the app, plus token storage, and asking the user to authenticate a second time on a machine that already holds working GitHub credentials.
 
 Implementing first-party GitHub OAuth and API integration would add product and security complexity that is unnecessary for a local-first developer app. Developer users commonly authenticate GitHub through the GitHub CLI.
 
@@ -39,7 +39,7 @@ V1 GitHub behavior:
 
 ### Optional gh CLI
 
-Making `gh` optional would allow local-only usage, but it would diverge from Conductor's setup model and weaken review/PR/check parity.
+Making `gh` optional would allow local-only usage, but review, PRs, and checks are core surfaces, and silently dropping them at first run produces confusing failures later in the workflow.
 
 ### Rejected App-Owned GitHub OAuth and REST/GraphQL APIs
 
@@ -47,7 +47,7 @@ An app-owned API integration would provide more control and a polished app-nativ
 
 ### Git only, no GitHub integration
 
-Local git-only review would be simpler, but it would miss major Conductor parity features around PRs, checks, comments, and merge readiness.
+Local git-only review would be simpler, but it would miss the PR, check, comment, and merge-readiness workflows the product is built around.
 
 ### GitHub app installation
 
@@ -55,7 +55,7 @@ A GitHub App could support richer organization workflows, but it is too heavy fo
 
 ## Consequences
 
-- Ensemblr's setup flow matches Conductor's GitHub prerequisite model.
+- Ensemblr's setup flow states the GitHub prerequisite up front, rather than letting the user discover it when the PR flow fails.
 - V1 can ship useful PR/check workflows quickly for users who already have `gh` configured.
 - Ensemblr does not store GitHub tokens.
 - UX must clearly report when `gh` is missing, unauthenticated, or lacks permissions.

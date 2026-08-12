@@ -8,9 +8,9 @@ Superseded by [0039](0039-remove-open-chat-tab-limit.md) (2026-07-21). Chat tabs
 
 ## Context
 
-Conductor supports multiple open chat tabs in a workspace. The screenshot review and user observation indicate Conductor allows five open chat tabs. Document previews are separate and do not count against the chat-tab limit.
+Ensemblr supports multiple open chat tabs in a workspace. Five is the conventional cap in tools of this shape. Document previews are separate and do not count against the chat-tab limit.
 
-Ensemblr should match this behavior for Conductor parity and to avoid unbounded Pi session/UI resource usage.
+Adopting that convention avoids unbounded Pi session/UI resource usage.
 
 ## Decision
 
@@ -25,7 +25,7 @@ Rules:
 
 ## Consequences
 
-- Ensemblr matches observed Conductor tab behavior.
+- Ensemblr follows the conventional five-tab cap.
 - Memory and Pi session UI resource usage are bounded.
 - The workspace data model must distinguish chat tabs from preview tabs.
 - The active Pi session history may contain more sessions than are currently open as tabs.

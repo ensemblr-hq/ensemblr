@@ -40,7 +40,7 @@ in siblings:
   `<concern>/index.ts` (`ipc/`, `keymap/`, `pi-rpc/`)
 - `src/renderer/state/<concern>/index.ts`, `src/renderer/lib/<concern>/index.ts`,
   `src/renderer/types/<concern>/index.ts`, `src/renderer/components/**/index.ts`
-- `src/main/<concern>/index.ts` — all 30 main concerns have one
+- `src/main/<concern>/index.ts` — all 31 main concerns have one
 
 Import from the barrel outside the concern; import siblings directly inside it.
 The shared and renderer barrels above are registered as entries in
@@ -80,12 +80,20 @@ existing semantics must be preserved exactly.
 validates, resolves its origin from an injected per-workspace bearer token,
 checks scope and the workspace permission mode, applies fork-bomb guardrails,
 then delegates through a **port** (`ports.ts`, `port-adapters.ts`,
-`review-ports.ts`) to a service that already exists.
+`review-ports.ts`, `linear-ports.ts`) to a service that already exists.
 
 **Control adds no capability code of its own.** If an operation is not already a
 service, build the service first. Both bridges — Pi via `POST /invoke`, MCP
 harnesses via `POST /mcp` — funnel into the one service so the two surfaces
 cannot drift.
+
+**The port is where policy lives, not the handler.** `linear-ports.ts` is the
+worked example: it refuses any target state whose Linear type is `completed` or
+`canceled` and fails closed on an unknown id, so "agent work stops at In Review"
+is enforced rather than documented; it fits every result to
+`MAX_AGENT_PAYLOAD_CHARS` and reports what it cut; and it maps the service's
+typed failure envelope onto one `status` word so nothing throws across the
+boundary.
 
 ## Policy in `shared/`, enforced over the control server
 
@@ -99,6 +107,28 @@ The shipped Pi extension cannot import from `src/` at runtime, so it asks the ap
 per intercepted tool call rather than carrying its own copy. Follow that shape
 for any security-sensitive classifier: one implementation in `shared/`, queried
 across the boundary. A second copy is a parity test waiting to fail.
+
+## The renderer owns what a native menu item means
+
+The macOS menu bar is built in main, but every command it fires belongs to the
+renderer. `src/shared/menu-commands.ts` holds the command table, the reported
+context, and the equality check; the renderer registers a handler per command as
+a **stack** (route transitions overlap, so a slot lets the departing route clear
+the arriving one's handler) and reports which commands are live; main enables
+items from that report and rebuilds only when the report changes the menu.
+
+Adding an item means four places: the id in `src/shared/menu-commands.ts`, the
+label in `src/main/menu/menu-strings.ts` in all three languages, the entry in the
+relevant `src/main/menu/<name>-menu.ts` builder, and a `useMenuCommand`
+registration in the surface that owns the action. Skipping the last yields a
+permanently disabled item — the correct failure, since it is visible.
+
+An accelerator attaches only to a command flagged `ownsAccelerator`: on macOS
+AppKit matches a key equivalent before the web contents sees it, and Electron's
+`registerAccelerator: false` is Windows/Linux only, so a menu item that *shows* a
+shortcut also *claims* it. A chord the renderer has to disambiguate across
+surfaces gets no menu accelerator. See
+[ADR 0046](../../docs/adr/0046-drive-the-native-menu-bar-from-a-renderer-command-bus.md).
 
 ## Provider-neutral agent runtime
 

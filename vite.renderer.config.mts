@@ -4,9 +4,9 @@ import { tanstackRouter } from '@tanstack/router-plugin/vite';
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
 
-const conductorPort = Number.parseInt(process.env.CONDUCTOR_PORT ?? '', 10);
-const devServerPort = Number.isFinite(conductorPort)
-	? conductorPort
+const workspacePort = Number.parseInt(process.env.ENSEMBLR_PORT ?? '', 10);
+const devServerPort = Number.isFinite(workspacePort)
+	? workspacePort
 	: undefined;
 
 export default defineConfig({

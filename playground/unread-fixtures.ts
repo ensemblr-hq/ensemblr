@@ -77,10 +77,10 @@ export const UNREAD_ROW_CASES = [
 		unreadCount: 3,
 		workspace: workspaceCase({
 			additions: 628,
-			branchName: 'psoldunov/conductor-shell-rework',
+			branchName: 'psoldunov/workbench-shell-rework',
 			deletions: 31,
 			id: 'row-unread-busy',
-			name: 'Conductor shell rework with a very long name',
+			name: 'Workbench shell rework with a very long name',
 		}),
 	},
 ] as const;

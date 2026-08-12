@@ -26,12 +26,12 @@ Exit criteria:
 
 - Electron main and React renderer can start in development.
 - Renderer uses TanStack Router for durable navigation/search state and TanStack Query for preload/backend snapshots.
-- The Conductor-style shell contract exists with live project/workspace rows, chat tabs, dashboard board, right review panel tabs, PR-state header, and setup/run/terminal dock regions.
+- The workbench shell contract exists with live project/workspace rows, chat tabs, dashboard board, right review panel tabs, PR-state header, and setup/run/terminal dock regions.
 - Live services are wired into the locked shell layout through TanStack Query, typed IPC, and app services rather than by rebuilding shell regions.
 - Main-process services expose typed IPC boundaries for storage, config, root, secrets, and local commands.
 - SQLite migrations run against a local app-support database and test database.
 - Secrets can be stored through a Keychain abstraction and mocked in tests.
-- App and repository settings can be resolved from known sources without touching Pi or Conductor private state.
+- App and repository settings can be resolved from known sources without touching another app's private state.
 - The managed root layout can be created or inspected safely.
 
 Primary source:
@@ -43,7 +43,7 @@ Primary source:
 ## 2. Setup Gate and Configuration
 
 Goal:
-Make first launch and readiness checks explicit, actionable, and aligned with Conductor-style prerequisites while adapting to Pi CLI RPC.
+Make first launch and readiness checks explicit and actionable, gating the app on its prerequisites while adapting to Pi CLI RPC.
 
 Included issues:
 
@@ -97,15 +97,13 @@ Exit criteria:
 - Users can create a git worktree workspace from the configured branch source. **Extended by #225:** creation carries a `branchPlan` — `adopt` takes over an existing branch, `create` cuts a fresh one at a fork point — and the base branch is a separate, selectable merge target (#216).
 - `.context/` exists for workspace handoff files.
 - Eligible gitignored files are copied through `.worktreeinclude`, the committed `.ensemblr/settings.toml`, or defaults.
-- Workspaces under a shared Conductor root can be adopted through filesystem/git metadata only.
+- Workspaces under a shared root can be adopted through filesystem/git metadata only.
 - Archive behavior is explicit, preserves unknown content, and prepares archive-script execution for the scripts milestone.
 
 Primary source:
 
-- ADR 0006, 0007, 0010, 0011, 0015, 0017
-- `docs/product/conductor-parity.md`
-- `docs/product/screen-inventory.md`
-- `docs/product/ux-parity.md`
+- ADR 0006, 0010, 0011, 0015, 0017
+- `docs/product/ux-conventions.md`
 
 ## 4. Agent Runtime and Timeline
 
@@ -141,7 +139,7 @@ Primary source:
 
 - ADR 0002, 0003, 0012, 0016, 0022, 0025, 0040, 0042
 - `docs/product/open-decisions.md`
-- `docs/product/ux-parity.md`
+- `docs/product/ux-conventions.md`
 
 ## 5. Terminal, Scripts, and Processes
 
@@ -169,9 +167,7 @@ Exit criteria:
 
 Primary source:
 
-- ADR 0002, 0007, 0016, 0041
-- `docs/product/conductor-parity.md`
-- `docs/product/screen-inventory.md`
+- ADR 0002, 0016, 0041
 - `docs/product/settings-inventory.md`
 
 ## 6. Linear Integration
@@ -202,7 +198,6 @@ Exit criteria:
 Primary source:
 
 - ADR 0018, 0024
-- `docs/product/conductor-parity.md`
 - `docs/product/open-decisions.md`
 
 ## 7. GitHub, Review, Checks, and Merge
@@ -237,9 +232,7 @@ Exit criteria:
 Primary source:
 
 - ADR 0012, 0013, 0023
-- `docs/product/conductor-parity.md`
-- `docs/product/screen-inventory.md`
-- `docs/product/ux-parity.md`
+- `docs/product/ux-conventions.md`
 
 ## 8. Settings and Parity Polish
 

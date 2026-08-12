@@ -286,5 +286,5 @@ full read of `dist/modes/rpc/rpc-types.d.ts` (`RpcCommand` union) and
   `-e`), browser control (no core support), separate review model (model
   picker per session covers the need — a "review with different model" flow
   should open a new session).
-- **Decision Needed:** none of the deferred gaps block v1 — no Conductor-parity
-  feature in scope depends on plan/fast/browser modes.
+- **Decision Needed:** none of the deferred gaps block v1 — no feature in scope
+  depends on plan/fast/browser modes.

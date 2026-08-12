@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Conductor scripts (and any other non-interactive shell) never source the
-# mise/nvm shell hooks, so `npm ci` there runs under whatever Node is first on
+# Repository setup and run scripts execute in a non-interactive shell, which
+# never sources the mise/nvm shell hooks, so `npm ci` there runs under whatever
+# Node is first on
 # PATH — Homebrew's Node 26 — which the preinstall guard rejects, and which
 # would otherwise compile macos-alias/fs-xattr for the wrong ABI. Put the Node
 # pinned in .nvmrc on PATH first, then hand the command over. Falls through to

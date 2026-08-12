@@ -238,7 +238,7 @@ function renderWorkbench(
 	);
 }
 
-test('renders the Conductor-style workbench shell regions', () => {
+test('renders the workbench shell regions', () => {
 	const markup = renderWorkbench(
 		createSnapshot(
 			[
@@ -260,8 +260,8 @@ test('renders the Conductor-style workbench shell regions', () => {
 	expect(markup).toContain('Reorder repository ensemblr');
 	expect(markup).not.toContain('2 repos');
 	expect(markup).not.toContain('5 workspaces');
-	expect(markup).toContain('Open workspace Conductor shell rework');
-	expect(markup).toContain('Archive workspace Conductor shell rework');
+	expect(markup).toContain('Open workspace Workbench shell rework');
+	expect(markup).toContain('Archive workspace Workbench shell rework');
 	expect(markup).toContain('data-permission-boundary="confirmation-required"');
 	expect(markup).toContain('data-slot="reorder-list-group"');
 	expect(markup).toContain('data-slot="reorder-list-item"');
@@ -269,7 +269,7 @@ test('renders the Conductor-style workbench shell regions', () => {
 	expect(markup).toContain('data-workspace-sidebar-state="pr-checking"');
 	expect(markup).toContain('data-workspace-sidebar-state="workspace-working"');
 	expect(markup).toContain('data-workspace-sidebar-state="pr-ready"');
-	expect(markup).toContain('Conductor shell rework');
+	expect(markup).toContain('Workbench shell rework');
 	expect(markup).toContain('Review shell');
 	// THE-130: the mock chat fixture is gone. With no active Pi session in
 	// the fixture, the chat surface renders the new-chat empty state.
@@ -350,7 +350,7 @@ test('does not mark a workspace active on static workbench routes', () => {
 	);
 
 	expect(markup).toContain('Dashboard');
-	expect(markup).toContain('Conductor shell rework');
+	expect(markup).toContain('Workbench shell rework');
 	expect(markup.match(/data-active="true"/g)).toHaveLength(1);
 });
 
@@ -454,7 +454,7 @@ test('marks workspace rows with running dock activity', () => {
 
 	expect(markup).toContain('data-workspace-dock-activity="running"');
 	expect(markup).toContain(
-		'Open workspace Conductor shell rework; dock activity running',
+		'Open workspace Workbench shell rework; dock activity running',
 	);
 });
 

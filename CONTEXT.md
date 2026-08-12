@@ -1,21 +1,17 @@
 <!-- TODO: Purge from git history when v1 is live -->
 # Ensemblr
 
-Ensemblr is a macOS workbench for running coding-agent work in isolated project workspaces. It borrows the workspace-and-review operating model from Conductor. **Pi** and **Claude Code** are its two first-class agent runtimes, each driving native chat tabs behind one adapter contract; third-party CLIs also run alongside them as terminal harnesses, and a permission-gated control surface lets agents drive the app itself.
+Ensemblr is a macOS workbench for running coding-agent work in isolated project workspaces. Isolation is the product: every stream of work gets its own worktree, branch, and review path. **Pi** and **Claude Code** are its two first-class agent runtimes, each driving native chat tabs behind one adapter contract; third-party CLIs also run alongside them as terminal harnesses, and a permission-gated control surface lets agents drive the app itself.
 
 ## Language
 
 **Ensemblr**:
 The product being built: a native desktop application for managing coding-agent work across projects and workspaces.
-_Avoid_: Conductor clone, Pi Conductor
+_Avoid_: Workspace manager clone, Pi wrapper
 
 **Ensemblr Root Directory**:
 The user-visible directory where Ensemblr stores managed repositories, workspaces, and archived workspace context.
 _Avoid_: App support directory, project folder
-
-**Conductor Parity Target**:
-The product goal that Ensemblr should match Conductor's publicly observable workflows and capabilities, except where runtime-specific behavior requires a different implementation.
-_Avoid_: Copying Conductor, visual clone
 
 **Project**:
 A tracked codebase that Ensemblr can open, configure, and use as the source for isolated workspaces.
@@ -72,3 +68,27 @@ _Avoid_: Task, npm script, dev server
 **Review Flow**:
 The process of inspecting workspace changes, running checks, resolving merge conflicts, creating a pull request, merging accepted work, or archiving rejected work.
 _Avoid_: Diff screen, done state
+
+**Attachment**:
+Anything the user pins into a composer draft as a chip — a workspace file, a pasted image or long text block, a Linear or GitHub issue, a review-comment thread. Attachments form one ordered list, and the outgoing prompt carries each one at the position its chip sat in the sentence.
+_Avoid_: Upload, mention, context block
+
+**Linked Directory**:
+A read grant over a directory outside the workspace, held per chat, sticky across sends, and handed to the runtime when the session opens. It is a grant, not an attachment — nothing is copied or serialized, and symlinks are deliberately left unresolved.
+_Avoid_: Mounted folder, external workspace
+
+**Follow-Up Queue**:
+The per-tab list holding messages the user sent while a turn was still running. It stays listed, reorderable, editable, and removable until it drains, rather than disappearing into a runtime frame nobody can read back.
+_Avoid_: Message backlog, pending prompts
+
+**Unread Mark**:
+A record that agent activity landed in a chat the user was not reading. Marks are per chat, not per workspace, so reading one tab does not silence its siblings, and a mark is dropped once its chat becomes unreachable.
+_Avoid_: Notification, badge
+
+**Menu Command**:
+A named action the native menu bar can invoke, defined once in `src/shared/menu-commands.ts`. The renderer owns the handler and reports which commands are live; the main process enables items from that report. A command with no registered handler renders as a disabled item.
+_Avoid_: Menu item, shortcut, accelerator
+
+**App Language**:
+The language Ensemblr renders in — English, Russian, or Greek. It governs the window, the native menu bar, and the prose agents write back (replies, tab names, workspace summaries, review comments), which is steered by a language directive appended to every playbook rather than by a translated prompt.
+_Avoid_: Locale, translation setting

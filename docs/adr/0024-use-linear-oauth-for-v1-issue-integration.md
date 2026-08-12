@@ -8,7 +8,7 @@ Accepted
 
 ## Context
 
-Ensemblr targets Conductor feature parity, including creating workspaces from Linear issues. The product also needs first-class Linear issue management: login, issue browsing, issue CRUD, comments, status updates, and workspace creation from selected issues.
+Ensemblr needs to create workspaces directly from Linear issues, plus first-class Linear issue management around it: login, issue browsing, issue CRUD, comments, status updates, and workspace creation from selected issues.
 
 Linear's public API is GraphQL and supports OAuth2 authentication and personal API keys. Linear recommends OAuth2 for applications used by others. The official TypeScript SDK supports OAuth access tokens.
 
@@ -65,7 +65,7 @@ Using a Linear MCP server could provide issue operations through agent tooling, 
 
 ### Defer Linear integration
 
-Rejected. Linear workspace creation is part of the desired Conductor parity target and is explicitly required for v1.
+Rejected. Creating a workspace from a Linear issue is explicitly required for v1.
 
 ## Consequences
 

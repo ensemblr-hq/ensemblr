@@ -25,10 +25,9 @@ are saved and then ignored, labelled "your edit is saved but shadowed until that
 key is removed". Both states ask the user to hand-edit a file the app is
 perfectly capable of writing, and the second one silently discards their work.
 
-Conductor, whose repository config model Ensemblr tracks, writes its own
-`settings.toml` from the app and rewrites legacy `scripts.run` strings into
-`[scripts.run.<id>]` tables when it does. Ensemblr's read-only stance was the
-divergence, not the parity.
+A settings file the app reads but refuses to write is a half-implementation:
+the app already knows the schema, already parses it, and already renders every
+key as a form control. The read-only stance was the anomaly.
 
 ## Decision
 
@@ -70,8 +69,8 @@ The repository Scripts settings screen reads and writes
   workspace.
 - **New key: `[scripts] auto_run_after_setup`.** The auto-run-after-setup toggle
   had no TOML spelling and could only live in SQLite. It is now a boolean
-  `[scripts]` key, snake_case like the existing `run_mode`. It is Ensemblr-only;
-  Conductor has no equivalent.
+  `[scripts]` key, snake_case like the existing `run_mode`. It is Ensemblr-only,
+  with no external counterpart.
 
 Keys the screen writes, all under `[scripts]`: `setup`, `archive`, `run_mode`,
 `auto_run_after_setup`, and one `[scripts.run.<name>]` table per run script with

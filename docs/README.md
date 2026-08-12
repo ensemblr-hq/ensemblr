@@ -19,12 +19,13 @@ dive in here.
 
 - [`pi/`](./pi) — Pi integration internals: the [RPC protocol](./pi/rpc-protocol.md) and [event taxonomy](./pi/event-taxonomy.md).
 - [`claude/`](./claude) — Claude Code runtime internals: the [runtime guide](./claude/README.md) (adapter wiring, discovery, live-discovered slash commands / MCP roster / model catalogue, effort, context measurement) and the [SDK surface reference](./claude/sdk-surface.md). [ADR 0042](./adr/0042-add-claude-code-as-a-second-first-class-agent-runtime.md) is the decision record.
-- [`adr/`](./adr) — **45** Architecture Decision Records (`0001`–`0045`), the accepted decisions and their supersessions.
+- [`adr/`](./adr) — **47** Architecture Decision Records (`0001`–`0047`), the accepted decisions and their supersessions.
+- [`i18n-glossary.md`](./i18n-glossary.md) — the Russian and Greek product vocabulary every translation is held to, and [`i18n-audit-2026-08-09.md`](./i18n-audit-2026-08-09.md), the string-by-string audit behind the three-language release. The completion contract itself is [`.claude/rules/i18n.md`](../.claude/rules/i18n.md).
 - [`considerations/`](./considerations) — design records and forward-looking notes: the [Ensemblr Control design](./considerations/agent-control-layer.md), the [orchestration playbook](./considerations/agent-orchestration-playbook.md), and a [Deno-desktop migration study](./considerations/deno-desktop-migration.md).
 
 ## Product & planning
 
-- [`product/`](./product) — roadmap, Conductor-parity notes, screen/settings/shell inventories, and discovery snapshots. Spent planning artifacts live under [`product/archive/`](./product/archive).
+- [`product/`](./product) — roadmap, UX conventions, settings/shell inventories, and discovery snapshots. Spent planning artifacts live under [`product/archive/`](./product/archive).
 - [`refactor/`](./refactor) — refactor plans (e.g. the workbench composition refactor).
 
 ## Repository docs

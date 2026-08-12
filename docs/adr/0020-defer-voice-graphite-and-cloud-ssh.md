@@ -8,7 +8,7 @@ Accepted
 
 ## Context
 
-Screenshot inventory surfaced Conductor settings or affordances related to voice mode, Graphite stack support, and cloud/remote workspace SSH key settings. These features may be part of broader Conductor parity, but they are not required for the core local Pi workspace, agent, terminal, review, and PR workflow.
+Settings inventory surfaced candidate affordances for voice mode, Graphite stack support, and cloud/remote workspace SSH key settings. These may be worth having eventually, but none of them is required for the core local Pi workspace, agent, terminal, review, and PR workflow.
 
 ## Decision
 
@@ -25,6 +25,6 @@ Deferred items:
 
 ## Consequences
 
-- Milestone 0-5 can stay focused on local Conductor-style parity.
+- Milestone 0-5 can stay focused on the core local workspace workflow.
 - Settings inventory should mark these as deferred rather than unresolved blockers.
 - Future implementation must revisit UX screenshots and integration requirements before adding them.

@@ -143,7 +143,7 @@ export default interface Resources {
 			applying: 'Applying';
 			'change-description': 'Switch Ensemblr to the selected root and reindex/adopt from that filesystem layout after confirmation.';
 			'change-title': 'Change root directory';
-			'continuity-note': 'Shared Conductor root continuity covers filesystem, git, and config only; chat/session/checkpoint continuity is not guaranteed across apps.';
+			'continuity-note': 'Shared root continuity covers filesystem, git, and config only; chat/session/checkpoint continuity is not guaranteed across apps.';
 			'current-root': 'Current root';
 			'no-blocking-warnings': 'No blocking root warnings.';
 			'no-current-root': 'No current root snapshot';
@@ -1358,7 +1358,7 @@ export default interface Resources {
 				description: 'Syntax highlighting for code blocks and editors. Each theme follows the app theme, using its light cut in light mode and its dark cut in dark mode.';
 				label: 'Code theme';
 			};
-			description: 'Theme, syntax highlighting, and the fonts used for code, diffs, and the integrated terminal.';
+			description: 'Theme, syntax highlighting, the fonts used for code, diffs, and the integrated terminal, and how much scrollback each terminal pane holds.';
 			'markdown-style': {
 				compact: 'Compact';
 				default: 'Default';
@@ -1472,7 +1472,7 @@ export default interface Resources {
 				description: 'Always show context usage. By default, only shown when more than 70% is used.';
 				label: 'Always show context usage';
 			};
-			description: 'How chats behave day to day: the language Ensemblr speaks, how messages are sent, and what it does while an agent is working.';
+			description: 'How chats behave day to day: the language Ensemblr speaks, how messages are sent, what it does while an agent is working, and where it keeps its repositories.';
 			'follow-up': {
 				block: 'Block';
 				description: 'Steer the agent mid-turn, queue messages until it finishes, or hold them until you send them. A queued message stays editable. {{shortcut}} queues in any mode.';
@@ -2580,7 +2580,7 @@ export default interface Resources {
 			};
 			group: 'Directories';
 			loading: 'Loading directories…';
-			missing: 'Missing';
+			missing: 'Missing — select to remove';
 			'search-placeholder': 'Search directories…';
 			title: 'Link directory';
 		};

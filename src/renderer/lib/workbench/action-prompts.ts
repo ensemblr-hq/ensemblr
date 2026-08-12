@@ -12,9 +12,9 @@ import { clampReviewContext } from './review-context';
 
 /**
  * Fixed built-in base prompt for each agent action, adapted from the
- * `base-prompt-examples/` reference prompts to Ensemblr's runtime. Conductor's
- * `mcp__conductor__*` diff tools are replaced by the git-diff workflow the
- * examples already document as a fallback. These are not user-overridable; per
+ * `base-prompt-examples/` reference prompts to Ensemblr's runtime. The MCP diff
+ * tools those examples assume are replaced by the git-diff workflow they already
+ * document as a fallback. These are not user-overridable; per
  * action customization rides in the settings preferences (see
  * {@link USER_PREF_ADDON}). `general` has no base prompt — it is delivered as a
  * master prompt of user preferences only (see {@link wrapWithMasterPrompt}).

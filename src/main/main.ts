@@ -189,7 +189,7 @@ if (isDev) {
 // running instance via the `second-instance` handler below instead. The lock is
 // a file lock under userData, so it catches direct-exec relaunches too, not just
 // `open`-routed ones. Dev is excluded: dev builds share one `Ensemblr (DEV)`
-// userData across Conductor workspaces, so a lock there would kill the second
+// userData across dogfooding workspaces, so a lock there would kill the second
 // dogfooding instance. Acquired after `setName` so it keys on the right userData.
 const hasSingleInstanceLock = isDev || app.requestSingleInstanceLock();
 if (!hasSingleInstanceLock) {

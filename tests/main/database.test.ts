@@ -31,6 +31,7 @@ const EXPECTED_MIGRATIONS = [
 	'013_pi_session_provider',
 	'014_agent_session_vocabulary',
 	'015_untitled_chat_tab_placeholder',
+	'016_root_directory_source_union',
 ];
 
 const AGENT_VOCABULARY_MIGRATION_VERSION = 14;

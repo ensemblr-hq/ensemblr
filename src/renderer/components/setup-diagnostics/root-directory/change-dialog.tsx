@@ -127,7 +127,7 @@ export function RootDirectoryChangeContent({
 						<p className='mt-1 text-muted-foreground'>
 							{t(
 								'common:root-directory.continuity-note',
-								'Shared Conductor root continuity covers filesystem, git, and config only; chat/session/checkpoint continuity is not guaranteed across apps.',
+								'Shared root continuity covers filesystem, git, and config only; chat/session/checkpoint continuity is not guaranteed across apps.',
 							)}
 						</p>
 					</section>

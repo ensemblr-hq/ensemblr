@@ -613,7 +613,7 @@
 		},
 		"group": "Directories",
 		"loading": "Loading directories…",
-		"missing": "Missing",
+		"missing": "Missing — select to remove",
 		"search-placeholder": "Search directories…",
 		"title": "Link directory"
 	},

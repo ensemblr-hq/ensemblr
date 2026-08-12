@@ -81,9 +81,9 @@ export const DEFAULT_RUN_SCRIPT_ICON: RunScriptIconName = 'play';
 export const LEGACY_RUN_SCRIPT_NAME = 'run';
 
 /**
- * Environment Ensemblr runs workspaces in. Conductor's `available_in` also
- * names cloud sandboxes; Ensemblr is local-only, so a script that excludes this
- * value is filtered out rather than shown and failed at launch.
+ * Environment Ensemblr runs workspaces in. The `available_in` key also names
+ * cloud sandboxes; Ensemblr is local-only, so a script that excludes this value
+ * is filtered out rather than shown and failed at launch.
  */
 export const LOCAL_RUN_ENVIRONMENT = 'local';
 

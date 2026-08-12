@@ -11,7 +11,7 @@ Accepted
 The workbench header carries an "Open workspace in…" split button and dropdown
 (Finder, VS Code, Zed, Ghostty, Warp, Terminal, GitHub Desktop, Copy path,
 plus a longer set of editors / terminals / source-control GUIs visible only
-when installed). It matches Conductor's launcher and is documented in
+when installed). It is documented in
 `docs/product/current-shell-inventory.md`. Before this change the menu was
 purely cosmetic — every entry shipped with `installed: true`, no click
 handlers, no keyboard bindings.
