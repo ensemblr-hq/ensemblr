@@ -29,15 +29,12 @@ describe('evaluatePlanModeTool', () => {
 		expect(evaluatePlanModeTool({ tool: 'bash' }).blocked).toBe(true);
 	});
 
-	it.each([
-		'read',
-		'grep',
-		'find',
-		'ls',
-		'ensemblr_ask_user_question',
-	])('leaves %s untouched', (tool) => {
-		expect(evaluatePlanModeTool({ tool })).toEqual({ blocked: false });
-	});
+	it.each(['read', 'grep', 'find', 'ls', 'ensemblr_ask_user_question'])(
+		'leaves %s untouched',
+		(tool) => {
+			expect(evaluatePlanModeTool({ tool })).toEqual({ blocked: false });
+		},
+	);
 
 	it('always points the agent at the way out of plan mode', () => {
 		expect(evaluatePlanModeTool({ tool: 'write' }).reason).toContain(

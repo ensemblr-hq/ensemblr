@@ -14,23 +14,26 @@ const HEADER_TONES: PullRequestHeaderTone[] = [
 	'ready',
 ];
 
-test.each(
-	HEADER_TONES,
-)('a ready deployment defers to the %s header tone', (headerTone) => {
-	expect(resolvePreviewPillTone(headerTone, 'ready')).toBe(headerTone);
-});
+test.each(HEADER_TONES)(
+	'a ready deployment defers to the %s header tone',
+	(headerTone) => {
+		expect(resolvePreviewPillTone(headerTone, 'ready')).toBe(headerTone);
+	},
+);
 
-test.each(
-	HEADER_TONES,
-)('a still-building deployment outranks the %s header tone', (headerTone) => {
-	expect(resolvePreviewPillTone(headerTone, 'pending')).toBe('pending');
-});
+test.each(HEADER_TONES)(
+	'a still-building deployment outranks the %s header tone',
+	(headerTone) => {
+		expect(resolvePreviewPillTone(headerTone, 'pending')).toBe('pending');
+	},
+);
 
-test.each(
-	HEADER_TONES,
-)('a failed deployment outranks the %s header tone', (headerTone) => {
-	expect(resolvePreviewPillTone(headerTone, 'blocked')).toBe('blocked');
-});
+test.each(HEADER_TONES)(
+	'a failed deployment outranks the %s header tone',
+	(headerTone) => {
+		expect(resolvePreviewPillTone(headerTone, 'blocked')).toBe('blocked');
+	},
+);
 
 const TINTED_TONES: PullRequestHeaderTone[] = [
 	'blocked',

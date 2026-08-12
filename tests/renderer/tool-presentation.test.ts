@@ -480,13 +480,12 @@ describe('presentReasoning', () => {
 
 	// A runtime that redacts its reasoning ships the block's signature and no
 	// prose. There is no row to project for it.
-	test.each([
-		'',
-		'   ',
-		'\n\t',
-	])('projects nothing for a block carrying %j', (text) => {
-		expect(presentReasoning(text)).toBeNull();
-	});
+	test.each(['', '   ', '\n\t'])(
+		'projects nothing for a block carrying %j',
+		(text) => {
+			expect(presentReasoning(text)).toBeNull();
+		},
+	);
 });
 
 describe('presentCustomMessage', () => {
