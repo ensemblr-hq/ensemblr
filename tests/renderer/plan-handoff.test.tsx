@@ -55,7 +55,7 @@ const renderHandoff = () => {
 	const { result } = renderHook(
 		() => ({
 			handoff: usePlanHandoff(workspace),
-			inbox: useComposerAttachmentInbox(NEW_TAB_ID),
+			inbox: useComposerAttachmentInbox(NEW_TAB_ID, '/repo'),
 		}),
 		{ wrapper },
 	);

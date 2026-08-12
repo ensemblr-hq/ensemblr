@@ -7,19 +7,25 @@
  */
 
 import '@testing-library/jest-dom/vitest';
-import { fireEvent, screen } from '@testing-library/react';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { createStore, Provider } from 'jotai';
-import { beforeEach, expect, test, vi } from 'vitest';
+import { useEffect } from 'react';
+import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 
 import { ensemblrQueryKeys } from '../../src/renderer/api/ensemblr-queries';
 import { ChecksPanel } from '../../src/renderer/components/workbench-shell/checks-panel/checks-panel';
 import { PullRequestCommentRow } from '../../src/renderer/components/workbench-shell/checks-panel/pr-rows';
 import { getDefaultWorkspace } from '../../src/renderer/fixtures/workbench';
-import { useComposerInsertConsumer } from '../../src/renderer/state/composer';
-import type { WorkspaceShellModel } from '../../src/renderer/types/workbench';
+import { useComposerAttachmentInbox } from '../../src/renderer/state/composer';
+import type {
+	ComposerAttachment,
+	WorkspaceShellModel,
+} from '../../src/renderer/types/workbench';
 import type { ReviewCommentWire } from '../../src/shared/ipc/contracts/review-comments';
 import {
+	clearEnsemblrApi,
 	createTestQueryClient,
+	installEnsemblrApi,
 	installLocalStorage,
 	renderWithProviders,
 } from './support/dom';
@@ -48,17 +54,28 @@ const unresolvedComment: Comment = {
 	provider: 'github',
 };
 
-/** Drains the composer insert queue into a spy so inserts are assertable. */
-function ComposerInsertProbe({
-	onInsert,
+/** Drains the composer attachment inbox into a spy so chips are assertable. */
+function ComposerAttachmentProbe({
+	onAttach,
+	workspaceCwd,
 }: {
-	onInsert: (text: string) => void;
+	onAttach: (attachment: ComposerAttachment) => void;
+	workspaceCwd: string;
 }) {
-	useComposerInsertConsumer(onInsert);
+	const { clear, pending } = useComposerAttachmentInbox('chat-1', workspaceCwd);
+	useEffect(() => {
+		if (pending.length === 0) {
+			return;
+		}
+		for (const attachment of pending) {
+			onAttach(attachment);
+		}
+		clear();
+	}, [clear, onAttach, pending]);
 	return null;
 }
 
-/** Renders the Checks panel over a PR with the given comments, plus an insert spy. */
+/** Renders the Checks panel over a PR with the given comments, plus a chip spy. */
 function renderChecksPanel({
 	comments,
 	localComments = [],
@@ -71,11 +88,14 @@ function renderChecksPanel({
 	client.setQueryData(ensemblrQueryKeys.reviewComments(workspace.id), {
 		comments: localComments,
 	});
-	const onInsert = vi.fn();
+	const onAttach = vi.fn();
 
 	renderWithProviders(
 		<Provider store={createStore()}>
-			<ComposerInsertProbe onInsert={onInsert} />
+			<ComposerAttachmentProbe
+				onAttach={onAttach}
+				workspaceCwd={workspace.pathLabel}
+			/>
 			<ChecksPanel
 				workspace={{
 					...workspace,
@@ -91,11 +111,26 @@ function renderChecksPanel({
 		{ client },
 	);
 
-	return { onInsert };
+	return { onAttach };
 }
 
 beforeEach(() => {
 	installLocalStorage();
+	installEnsemblrApi({
+		writeWorkspaceFileAttachment: (request: { name?: string }) =>
+			Promise.resolve({
+				file: {
+					isIgnored: true,
+					kind: 'file',
+					name: request.name ?? 'attachment.md',
+					path: `.context/attachments/ab12cd/${request.name ?? 'attachment.md'}`,
+				},
+			}),
+	});
+});
+
+afterEach(() => {
+	clearEnsemblrApi();
 });
 
 test('a resolved comment strikes its text through and badges it Resolved', () => {
@@ -125,18 +160,62 @@ test('a comment with no resolution state renders neither badge', () => {
 	expect(screen.queryByText('Unresolved')).toBeNull();
 });
 
-test('"Add all to chat" hands over the outstanding comments only', () => {
-	const { onInsert } = renderChecksPanel({
+// One chip per comment rather than one block for the batch, so the user can drop
+// a single comment from what they are about to send.
+test('"Add all to chat" chips the outstanding comments only', async () => {
+	const { onAttach } = renderChecksPanel({
 		comments: [resolvedComment, unresolvedComment],
 	});
 
 	fireEvent.click(screen.getByRole('button', { name: 'Add all to chat' }));
 
-	expect(onInsert).toHaveBeenCalledTimes(1);
-	const inserted = onInsert.mock.calls[0]?.[0] as string;
-	expect(inserted).toContain(unresolvedComment.detail);
-	expect(inserted).not.toContain(resolvedComment.detail);
-	expect(inserted).toContain('Review comments for PR #138 (1):');
+	await waitFor(() => {
+		expect(onAttach).toHaveBeenCalledTimes(1);
+	});
+	expect(onAttach).toHaveBeenCalledWith(
+		expect.objectContaining({
+			id: `review-comment:${unresolvedComment.id}`,
+			kind: 'review-comment',
+			label: 'index.ts:12',
+		}),
+	);
+});
+
+test('a single comment row chips just that comment', async () => {
+	const { onAttach } = renderChecksPanel({ comments: [unresolvedComment] });
+
+	fireEvent.click(screen.getByRole('button', { name: 'Add comment to chat' }));
+
+	await waitFor(() => {
+		expect(onAttach).toHaveBeenCalledTimes(1);
+	});
+	expect(onAttach).toHaveBeenCalledWith(
+		expect.objectContaining({ id: `review-comment:${unresolvedComment.id}` }),
+	);
+});
+
+// Each comment becomes a document the composer inlines whole, so an unbounded
+// batch on a busy pull request would spend the agent's context before the user's
+// own question is read. The overflow stays on its rows rather than vanishing.
+test('"Add all to chat" caps the batch instead of chipping every comment', async () => {
+	const many = Array.from({ length: 14 }, (_, index) => ({
+		...unresolvedComment,
+		id: `comment-open-${index}`,
+		line: index + 1,
+	}));
+	const { onAttach } = renderChecksPanel({ comments: many });
+
+	fireEvent.click(screen.getByRole('button', { name: 'Add all to chat' }));
+
+	await waitFor(() => {
+		expect(onAttach).toHaveBeenCalledTimes(10);
+	});
+	expect(onAttach).toHaveBeenCalledWith(
+		expect.objectContaining({ id: 'review-comment:comment-open-0' }),
+	);
+	expect(onAttach).not.toHaveBeenCalledWith(
+		expect.objectContaining({ id: 'review-comment:comment-open-10' }),
+	);
 });
 
 test('the header drops "Add all to chat" once every comment is resolved', () => {

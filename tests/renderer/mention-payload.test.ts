@@ -214,6 +214,54 @@ describe('serializeComposerDraft', () => {
 	});
 });
 
+// A review-comment chip is serialized by the same path-driven rules as any other
+// stored document, so a change to those rules must not quietly turn the comment
+// into a placeholder the agent cannot read.
+describe('serializeComposerDraft with a review comment', () => {
+	test('inlines the comment document where the chip sat in the sentence', async () => {
+		readWorkspaceFile.mockResolvedValue({
+			content: '# Review comment on page.tsx:57',
+			path: '.context/attachments/ab12cd/review-comment-github-page-tsx-57.md',
+			sizeBytes: 31,
+		});
+
+		const text = await serializeComposerDraft({
+			segments: [
+				{ kind: 'text', text: 'address' },
+				{
+					attachment: {
+						comment: {
+							body: 'Guard this.',
+							detail: 'Guard this.',
+							id: 'c1',
+							provider: 'github',
+						},
+						id: 'review-comment:c1',
+						kind: 'review-comment',
+						label: 'page.tsx:57',
+						path: '.context/attachments/ab12cd/review-comment-github-page-tsx-57.md',
+					},
+					kind: 'attachment',
+				},
+				{ kind: 'text', text: 'please' },
+			],
+			workspaceCwd: '/repo',
+		});
+
+		expect(text).toBe(
+			[
+				'address',
+				'',
+				'<attached_file path=".context/attachments/ab12cd/review-comment-github-page-tsx-57.md">',
+				'# Review comment on page.tsx:57',
+				'</attached_file>',
+				'',
+				'please',
+			].join('\n'),
+		);
+	});
+});
+
 describe('serializeLinkedDirectories', () => {
 	test('returns an empty string when nothing is linked', () => {
 		expect(serializeLinkedDirectories([])).toBe('');

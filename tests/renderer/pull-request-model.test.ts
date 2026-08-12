@@ -3,8 +3,6 @@ import { describe, expect, test } from 'vitest';
 import { buildPullRequestShellModel } from '../../src/renderer/lib/workbench/pull-request-model';
 import {
 	clampReviewContext,
-	formatAllCommentsContext,
-	formatCommentContext,
 	REVIEW_CONTEXT_CHAR_LIMIT,
 } from '../../src/renderer/lib/workbench/review-context';
 import type {
@@ -652,87 +650,6 @@ describe('comment summaries', () => {
 });
 
 describe('review context formatting', () => {
-	test('a comment context block carries the whole body and its replies', () => {
-		const text = formatCommentContext(
-			{
-				author: 'octocat',
-				body: 'Line one\n\nLine two',
-				detail: 'Line one',
-				id: 'c1',
-				isResolved: false,
-				line: 57,
-				path: 'src/app/page.tsx',
-				provider: 'github',
-				replies: [{ author: 'psoldunov', body: 'Fixed.', id: 'c2' }],
-			},
-			9,
-		);
-
-		expect(text).toContain('GitHub comment on PR #9 on src/app/page.tsx:57:');
-		expect(text).toContain('Line one\n\nLine two');
-		expect(text).toContain('Reply from psoldunov:\nFixed.');
-		expect(text).toContain('Thread is unresolved.');
-	});
-
-	// Adding a single resolved row to chat stays available, so the block has to say
-	// the thread is closed or Pi reads settled feedback as work still to do.
-	test('a resolved thread says so, and one with no state says neither', () => {
-		const resolved = formatCommentContext({
-			body: 'Handled.',
-			detail: 'Handled.',
-			id: 'c1',
-			isResolved: true,
-			provider: 'github',
-		});
-		const stateless = formatCommentContext({
-			body: 'React Doctor found 2 issues',
-			detail: 'React Doctor found 2 issues',
-			id: 'c2',
-			provider: 'github-actions',
-		});
-
-		expect(resolved).toContain('Thread is resolved.');
-		expect(stateless).not.toContain('Thread is resolved.');
-		expect(stateless).not.toContain('Thread is unresolved.');
-	});
-
-	test('all-comments context numbers each comment', () => {
-		const text = formatAllCommentsContext(
-			[
-				{ body: 'first', detail: 'a: first', id: '1', provider: 'github' },
-				{ body: 'second', detail: 'b: second', id: '2', provider: 'local' },
-			],
-			9,
-		);
-
-		expect(text).toContain('1. GitHub comment on PR #9 — a: first');
-		expect(text).toContain('2. Local review comment — b: second');
-	});
-
-	// The row summary no longer embeds the author or the file, so the bulk block
-	// has to attribute and anchor each line itself or Pi cannot tell the comments
-	// apart, let alone find what they point at.
-	test('all-comments context attributes and anchors each comment', () => {
-		const text = formatAllCommentsContext(
-			[
-				{
-					author: 'octocat',
-					body: 'needs a guard',
-					detail: 'needs a guard',
-					id: '1',
-					line: 12,
-					path: 'src/main/index.ts',
-					provider: 'github',
-				},
-			],
-			9,
-		);
-
-		expect(text).toContain(
-			'1. octocat — GitHub comment on PR #9 on src/main/index.ts:12 — needs a guard',
-		);
-	});
-
 	test('clampReviewContext truncates oversized payloads with a marker', () => {
 		const text = clampReviewContext('x'.repeat(REVIEW_CONTEXT_CHAR_LIMIT + 10));
 

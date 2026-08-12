@@ -43,6 +43,7 @@ const AGENT_FACING_PATHS = [
 	'src/renderer/lib/workbench/action-prompts.ts',
 	'src/renderer/lib/workbench/checks-pr-prompts.ts',
 	'src/renderer/lib/workbench/review-context.ts',
+	'src/renderer/lib/workbench/comment-document.ts',
 	'src/renderer/lib/workbench/mention-payload.ts',
 	'src/renderer/state/composer/agent-turns.ts',
 	'src/renderer/hooks/workbench-shell/composer/use-ask-agent-setup-script.ts',

@@ -1,17 +1,15 @@
 import { ExternalLinkIcon, MessageSquarePlusIcon } from 'lucide-react';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { toast } from 'sonner';
 
 import { CommentMarkdown } from '@/renderer/components/comment-markdown';
 import { Button } from '@/renderer/components/ui/button';
 import { ScrollArea } from '@/renderer/components/ui/scroll-area';
+import { useReviewCommentAttachments } from '@/renderer/hooks/workbench-shell/composer/use-review-comment-attachments';
 import { cn } from '@/renderer/lib/utils';
 import { formatCommentLocation } from '@/renderer/lib/workbench/comment-body';
 import { getProviderLabel } from '@/renderer/lib/workbench/provider-label';
 import { formatRowDate } from '@/renderer/lib/workbench/relative-time';
-import { formatCommentContext } from '@/renderer/lib/workbench/review-context';
-import { useComposerInsert } from '@/renderer/state/composer';
 import type {
 	CommentPreviewPayload,
 	PullRequestCommentReplySummary,
@@ -27,23 +25,21 @@ import { useWorkspaceFileDiffOpener } from './file-preview-context';
  * Read-only preview of a single PR comment, opened as a main-surface `document`
  * tab from the Checks panel. The full body renders as markdown, with the diff
  * anchor, timestamp, and thread replies alongside it; the comment's own "Add to
- * chat" reuses the same context formatter the Checks panel uses.
+ * chat" drops the same chip the Checks panel does.
  */
 export function CommentPreviewPanel({
 	comment,
+	workspaceCwd,
 }: {
 	comment: CommentPreviewPayload;
+	/** Absolute workspace root the comment document is written under. */
+	workspaceCwd: string;
 }) {
-	const { t } = useTranslation();
-	const insertIntoComposer = useComposerInsert();
+	const { attachComment } = useReviewCommentAttachments({
+		prNumber: comment.prNumber,
+		workspaceCwd,
+	});
 	const openWorkspaceFileDiff = useWorkspaceFileDiffOpener();
-
-	const addToChat = useCallback(() => {
-		insertIntoComposer(formatCommentContext(comment, comment.prNumber));
-		toast.success(
-			t('review:comment-preview.added-to-chat.title', 'Comment added to chat.'),
-		);
-	}, [comment, insertIntoComposer, t]);
 
 	const { line, path } = comment;
 	const jumpToLine = useCallback(() => {
@@ -58,7 +54,9 @@ export function CommentPreviewPanel({
 		<div className='flex min-h-0 flex-1 flex-col overflow-hidden'>
 			<CommentPreviewHeader
 				comment={comment}
-				onAddToChat={addToChat}
+				onAddToChat={() => {
+					attachComment(comment);
+				}}
 				onJumpToLine={canJumpToLine ? jumpToLine : undefined}
 			/>
 			<ScrollArea className='min-h-0 flex-1'>

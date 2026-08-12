@@ -85,12 +85,15 @@ function TranscriptChip({
 		// raw path when the prefix does not match — the read will then error
 		// visibly instead of silently attaching the wrong file.
 		const relativePath = toWorkspaceRelative(workspaceCwd, entry.summaryPath);
-		dispatch(activeChatTabId, {
-			id: `transcript:${entry.tab.id}`,
-			kind: 'workspace-file',
-			label,
-			path: relativePath,
-		});
+		dispatch(
+			{ chatTabId: activeChatTabId },
+			{
+				id: `transcript:${entry.tab.id}`,
+				kind: 'workspace-file',
+				label,
+				path: relativePath,
+			},
+		);
 	};
 
 	return (
