@@ -37,6 +37,28 @@ export interface PtyBackend {
 }
 
 /**
+ * Wraps a PTY stream listener so an exception it throws never travels back into
+ * node-pty's native callback.
+ * @param listener - Listener supplied by the terminal service
+ * @returns The listener, guarded against throwing across the native boundary
+ */
+function isolateListener<TEvent>(
+	listener: (event: TEvent) => void,
+): (event: TEvent) => void {
+	return (event) => {
+		try {
+			listener(event);
+		} catch (error) {
+			// node-pty dispatches exit from a native thread-safe-function callback.
+			// node-addon-api rethrows whatever escapes it, and when the JS
+			// environment is already tearing down at quit that rethrow fails and
+			// aborts the process (SIGABRT) instead of surfacing as an exception.
+			console.error('[terminal] pty listener threw', error);
+		}
+	};
+}
+
+/**
  * Builds the production backend backed by node-pty.
  * @returns A node-pty backed {@link PtyBackend}.
  */
@@ -54,8 +76,8 @@ export function createNodePtyBackend(): PtyBackend {
 
 			return {
 				kill: (signal) => pty.kill(signal),
-				onData: (listener) => pty.onData(listener),
-				onExit: (listener) => pty.onExit(listener),
+				onData: (listener) => pty.onData(isolateListener(listener)),
+				onExit: (listener) => pty.onExit(isolateListener(listener)),
 				pid: pty.pid,
 				resize: (nextCols, nextRows) => pty.resize(nextCols, nextRows),
 				write: (data) => pty.write(data),

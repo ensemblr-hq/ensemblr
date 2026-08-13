@@ -180,6 +180,7 @@ function createServiceFixture(
 			sessionId: null,
 			title: null,
 		}),
+		shutdownGraceMs = 50,
 	}: {
 		backend: PtyBackend;
 		cwd?: string;
@@ -189,6 +190,7 @@ function createServiceFixture(
 			cwd: string,
 			options?: ReadAgentConversationTitleOptions,
 		) => Promise<AgentConversationInfo>;
+		shutdownGraceMs?: number;
 	},
 ) {
 	const database = createDatabaseFixture(t);
@@ -208,6 +210,7 @@ function createServiceFixture(
 		onLifecycle: (event) => lifecycleEvents.push(event),
 		onOutput: (event) => outputEvents.push(event),
 		readConversationInfo,
+		shutdownGraceMs,
 		workspaceEnvironmentService: createWorkspaceEnvironmentStub(cwd),
 	});
 
@@ -859,7 +862,7 @@ test('a run-script session does not persist its output to .context', async (t) =
 	assert.equal(readTerminalOutput(cwd, terminalId), null);
 });
 
-test('disposeAll flushes open dock terminals before killing them', async (t) => {
+test('shutdown flushes open dock terminals before killing them', async (t) => {
 	const cwd = createWorktreeCwd(t);
 	const fake = createFakePty();
 	const backend: PtyBackend = { spawn: () => fake.pty };
@@ -869,9 +872,131 @@ test('disposeAll flushes open dock terminals before killing them', async (t) => 
 	const terminalId = result.session?.id ?? '';
 	fake.emitData('mid-session output');
 
-	service.disposeAll();
+	const shutdown = service.shutdown();
+	fake.emitExit(0);
+	await shutdown;
 
 	assert.equal(readTerminalOutput(cwd, terminalId), 'mid-session output');
+});
+
+test('shutdown resolves only once the pty child has reported its exit', async (t) => {
+	const fake = createFakePty();
+	const backend: PtyBackend = { spawn: () => fake.pty };
+	const { service } = createServiceFixture(t, { backend });
+
+	await service.create({ workspaceId: WORKSPACE_ID });
+
+	let resolved = false;
+	const shutdown = service.shutdown().then(() => {
+		resolved = true;
+	});
+
+	assert.deepEqual(fake.killSignals, ['SIGHUP']);
+	await delay(20);
+	assert.equal(resolved, false);
+
+	fake.emitExit(0);
+	await shutdown;
+
+	assert.equal(resolved, true);
+	// The child died on SIGHUP, so quit never escalates.
+	assert.deepEqual(fake.killSignals, ['SIGHUP']);
+});
+
+test('shutdown escalates to SIGKILL when the child ignores SIGHUP', async (t) => {
+	const fake = createFakePty();
+	const backend: PtyBackend = { spawn: () => fake.pty };
+	const { service } = createServiceFixture(t, {
+		backend,
+		shutdownGraceMs: 20,
+	});
+
+	await service.create({ workspaceId: WORKSPACE_ID });
+
+	await service.shutdown();
+
+	assert.deepEqual(fake.killSignals, ['SIGHUP', 'SIGKILL']);
+});
+
+test('shutdown is idempotent across the quit path', async (t) => {
+	const fake = createFakePty();
+	const backend: PtyBackend = { spawn: () => fake.pty };
+	const { service } = createServiceFixture(t, { backend });
+
+	await service.create({ workspaceId: WORKSPACE_ID });
+
+	const first = service.shutdown();
+	const second = service.shutdown();
+	fake.emitExit(0);
+	await Promise.all([first, second]);
+
+	assert.equal(first, second);
+	assert.deepEqual(fake.killSignals, ['SIGHUP']);
+});
+
+test('shutdown skips a child that exited while its agent row was still finalizing', async (t) => {
+	const fake = createFakePty();
+	const backend: PtyBackend = { spawn: () => fake.pty };
+	let releaseConversationRead = (): void => undefined;
+	const { service } = createServiceFixture(t, {
+		backend,
+		// Held open so the agent session stays mid-finalize when quit arrives:
+		// its row still reads 'running' and its pty is still non-null even though
+		// the child is already gone.
+		readConversationInfo: () =>
+			new Promise<AgentConversationInfo>((resolve) => {
+				releaseConversationRead = () =>
+					resolve({ fullTitle: null, sessionId: null, title: null });
+			}),
+		shutdownGraceMs: 1_000,
+	});
+
+	await service.create({
+		harnessId: 'claude',
+		kind: 'agent',
+		workspaceId: WORKSPACE_ID,
+	});
+
+	fake.emitExit(0);
+	await service.shutdown();
+
+	// Nothing to signal and nothing to wait for: a listener attached now would
+	// never fire, so both graces would have burned before quit gave up.
+	assert.deepEqual(fake.killSignals, []);
+
+	releaseConversationRead();
+});
+
+test('a session created during shutdown is wound down with the rest', async (t) => {
+	const first = createFakePty();
+	const second = createFakePty();
+	const spawns = [first.pty, second.pty];
+	const backend: PtyBackend = { spawn: () => spawns.shift() ?? second.pty };
+	const { service } = createServiceFixture(t, {
+		backend,
+		shutdownGraceMs: 1_000,
+	});
+
+	await service.create({ workspaceId: WORKSPACE_ID });
+
+	const quitting = service.shutdown();
+	await service.create({ workspaceId: WORKSPACE_ID });
+
+	assert.deepEqual(second.killSignals, ['SIGHUP']);
+
+	let settled = false;
+	void quitting.then(() => {
+		settled = true;
+	});
+
+	first.emitExit(0);
+	await delay(20);
+	assert.equal(settled, false);
+
+	second.emitExit(0);
+	await quitting;
+
+	assert.equal(settled, true);
 });
 
 test('a workspace restores its open interactive terminals after restart', async (t) => {
@@ -892,7 +1017,9 @@ test('a workspace restores its open interactive terminals after restart', async 
 	const originalId = opened.session?.id ?? '';
 	first.emitData('prior shell output');
 	// Quit with the tab still open: flush, then the row stays 'running'.
-	before.disposeAll();
+	const quitting = before.shutdown();
+	first.emitExit(0);
+	await quitting;
 
 	const after = createTerminalService({
 		backend: { spawn: () => second.pty },
@@ -952,12 +1079,12 @@ test('integration: a real PTY dock tab survives quit and restores after restart'
 		before.getSnapshot(originalId).scrollback.includes('restore-me'),
 	);
 
-	// Quit with the tab open: disposeAll SIGHUPs the real shell. Give the exit a
-	// window to fire — the fix detaches the exit handler before signalling, so it
-	// can neither finalize the row nor delete the log. Without it, the exiting
-	// `cat` would trip finalizeSession and the restore below would find nothing.
-	before.disposeAll();
-	await delay(400);
+	// Quit with the tab open: shutdown SIGHUPs the real shell and waits for it to
+	// die, so no exit can land while Electron tears the environment down. The
+	// replacement exit handler can neither finalize the row nor delete the log —
+	// without it the exiting `cat` would trip finalizeSession and the restore
+	// below would find nothing.
+	await before.shutdown();
 
 	assert.match(readTerminalOutput(cwd, originalId) ?? '', /restore-me/);
 
@@ -975,7 +1102,7 @@ test('integration: a real PTY dock tab survives quit and restores after restart'
 	assert.equal(restorable[0]?.id, originalId);
 	assert.match(restorable[0]?.output ?? '', /restore-me/);
 
-	after.disposeAll();
+	await after.shutdown();
 });
 
 test('agent sessions are never offered as restorable dock terminals', async (t) => {
@@ -997,7 +1124,9 @@ test('agent sessions are never offered as restorable dock terminals', async (t) 
 		workspaceId: WORKSPACE_ID,
 	});
 	fake.emitData('agent tui output');
-	before.disposeAll();
+	const quitting = before.shutdown();
+	fake.emitExit(0);
+	await quitting;
 
 	const after = createTerminalService({
 		backend: { spawn: () => createFakePty().pty },

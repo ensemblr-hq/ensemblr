@@ -60,6 +60,13 @@ const DEFAULT_ROWS = 24;
 const MIN_DIMENSION = 2;
 const MAX_DIMENSION = 1_000;
 const DEFAULT_KILL_GRACE_MS = 5_000;
+/**
+ * How long quit waits for a signalled PTY child to actually exit, applied once
+ * after SIGHUP and again after the SIGKILL escalation. Deliberately far shorter
+ * than {@link DEFAULT_KILL_GRACE_MS}: both waits have to fit inside the app's
+ * bounded quit window.
+ */
+const DEFAULT_SHUTDOWN_GRACE_MS = 1_000;
 // Defense-in-depth against a compromised renderer flooding the PTY buffer.
 const MAX_WRITE_BYTES = 65_536;
 
@@ -152,7 +159,6 @@ export interface TerminalService {
 	create: (
 		options: CreateTerminalSessionOptions,
 	) => Promise<CreateTerminalSessionResult>;
-	disposeAll: () => void;
 	getSnapshot: (terminalId: string) => TerminalSnapshotResult;
 	kill: (terminalId: string) => TerminalSessionSnapshot | null;
 	list: (workspaceId: string) => TerminalSessionSnapshot[];
@@ -170,6 +176,13 @@ export interface TerminalService {
 	listRestorable: (workspaceId: string) => RestorableTerminal[];
 	recoverStaleSessions: () => void;
 	resize: (terminalId: string, cols: number, rows: number) => void;
+	/**
+	 * Winds every live session down for app quit and resolves once each PTY child
+	 * has actually exited, or the bounded grace elapses. Idempotent: later calls
+	 * return the first call's promise. A session created after this is called is
+	 * wound down on creation rather than left running.
+	 */
+	shutdown: () => Promise<void>;
 	/**
 	 * Resolves `true` once the session is no longer running (immediately for
 	 * unknown or already-ended sessions), or `false` when `timeoutMs` elapses
@@ -242,6 +255,8 @@ export interface CreateTerminalServiceOptions {
 	 * fish rejects, so the user's interactive shell must not leak in here.
 	 */
 	scriptShell?: string;
+	/** Per-signal grace {@link TerminalService.shutdown} waits for a child to exit. */
+	shutdownGraceMs?: number;
 	workspaceEnvironmentService: WorkspaceEnvironmentService;
 }
 
@@ -297,7 +312,15 @@ interface TrackedSession {
 	 */
 	titleScanBuffer: string;
 	pty: PtyProcess | null;
+	/**
+	 * Whether the PTY child has reported its exit. Set synchronously by the exit
+	 * subscription, ahead of the asynchronous finalization an agent session runs,
+	 * so `snapshot.status` is not mistaken for a statement about the live child.
+	 */
+	ptyExited: boolean;
 	scrollback: ScrollbackBuffer;
+	/** Whether quit has already wound this session down, so it is not signalled twice. */
+	shutdownStarted: boolean;
 	snapshot: TerminalSessionSnapshot;
 	stopRequested: boolean;
 }
@@ -462,9 +485,16 @@ export function createTerminalService({
 	resolveBaseEnv = () => process.env,
 	resolveScrollbackLimit = () => DEFAULT_SCROLLBACK_LIMIT,
 	scriptShell = resolveScriptShell(),
+	shutdownGraceMs = DEFAULT_SHUTDOWN_GRACE_MS,
 	workspaceEnvironmentService,
 }: CreateTerminalServiceOptions): TerminalService {
 	const sessions = new Map<string, TrackedSession>();
+	let shutdownInFlight: Promise<void> | null = null;
+	// Latched by the first shutdown so a session created during the quit grace is
+	// wound down too: `shutdown()` is idempotent, so the later `will-quit` call
+	// reuses the in-flight promise and would never reach a newcomer on its own.
+	let shuttingDown = false;
+	const shutdownExits: Promise<void>[] = [];
 	// Dock terminals that were open at the previous quit, captured on startup
 	// before their rows are marked stale. Consumed one-shot by listRestorable so
 	// a renderer remount does not re-offer an already-relaunched tab.
@@ -839,7 +869,7 @@ export function createTerminalService({
 
 		// A terminated session's row is no longer restorable, so drop its persisted
 		// log rather than leaving a secret-bearing orphan. Quit is the exception:
-		// disposeAll disposes each exit subscription before signalling the PTY, so
+		// shutdown replaces each exit subscription before signalling the PTY, so
 		// this never runs during shutdown, keeping the still-'running' row and its
 		// log recoverable on next launch.
 		discardSessionOutput(session);
@@ -1013,7 +1043,9 @@ export function createTerminalService({
 			titlePollTimer: null,
 			titleScanBuffer: '',
 			pty,
+			ptyExited: false,
 			scrollback: buildSessionScrollback(seedOutput),
+			shutdownStarted: false,
 			snapshot: {
 				agentBusy: false,
 				harnessSessionId: null,
@@ -1063,6 +1095,7 @@ export function createTerminalService({
 			}
 		});
 		session.exitSubscription = pty.onExit(({ exitCode }) => {
+			session.ptyExited = true;
 			// Plain terminals have no session log to read; finalize synchronously so
 			// callers observe the exit immediately. Agent tabs first read their log
 			// one last time to capture a just-written native session id before the
@@ -1201,6 +1234,16 @@ export function createTerminalService({
 		attachSessionStreams(session, spawned.pty);
 
 		sessions.set(session.snapshot.id, session);
+
+		// Racing quit: hand the child straight to the in-flight shutdown rather
+		// than persisting a 'running' row the next launch would offer as
+		// restorable, or arming a poll timer nothing will ever clear.
+		if (shuttingDown) {
+			windDownPendingSessions();
+
+			return { diagnostics, session: { ...session.snapshot } };
+		}
+
 		startConversationInfoPolling(session);
 
 		const persistenceWarning = persistNewSession(session, harnessId, shell);
@@ -1249,33 +1292,135 @@ export function createTerminalService({
 		return { ...session.snapshot };
 	}
 
+	/**
+	 * Resolves `true` if `pending` settles inside `graceMs`, `false` once the
+	 * grace elapses.
+	 * @param pending - Work to bound
+	 * @param graceMs - How long to wait before giving up on it
+	 * @returns Whether `pending` settled inside the grace window
+	 */
+	function withinGrace(
+		pending: Promise<unknown>,
+		graceMs: number,
+	): Promise<boolean> {
+		return Promise.race([
+			pending.then(() => true),
+			new Promise<boolean>((resolve) => {
+				setTimeout(() => resolve(false), graceMs).unref?.();
+			}),
+		]);
+	}
+
+	/**
+	 * Flushes one session's scrollback, detaches its live handlers, and asks its
+	 * PTY child to exit.
+	 *
+	 * The exit handler is replaced rather than kept: finalizeSession would flip
+	 * the row to 'exited' and delete the just-written log, leaving an open tab
+	 * unrecoverable across the quit. The replacement only reports the exit, so
+	 * the row stays 'running' and the next launch can restore it. The data
+	 * handler goes entirely — output arriving after the final flush is
+	 * unrecorded, and its broadcast would reach a window that is already gone.
+	 *
+	 * Liveness comes from `ptyExited` rather than `snapshot.status`: an agent
+	 * session finalizes asynchronously, so its row still reads 'running' for up
+	 * to {@link FINAL_CONVERSATION_READ_TIMEOUT_MS} after the child is gone, and
+	 * a listener subscribed to an already-exited PTY would never fire.
+	 * @param session - Session to wind down
+	 * @returns Resolves once the child exits, immediately when it is already gone
+	 */
+	function beginSessionShutdown(session: TrackedSession): Promise<void> {
+		flushSessionOutput(session);
+		session.dataSubscription?.dispose();
+		session.dataSubscription = null;
+		session.exitSubscription?.dispose();
+		session.exitSubscription = null;
+
+		const { pty } = session;
+
+		if (!pty || session.ptyExited || session.snapshot.status !== 'running') {
+			return Promise.resolve();
+		}
+
+		const exited = new Promise<void>((resolve) => {
+			session.exitSubscription = pty.onExit(() => {
+				session.ptyExited = true;
+				resolve();
+			});
+		});
+
+		session.stopRequested = true;
+		pty.kill('SIGHUP');
+
+		return exited;
+	}
+
+	/**
+	 * Winds down every session quit has not reached yet, accumulating the exits
+	 * so a session created mid-shutdown is still awaited rather than orphaned.
+	 */
+	function windDownPendingSessions(): void {
+		for (const session of sessions.values()) {
+			if (session.shutdownStarted) {
+				continue;
+			}
+
+			session.shutdownStarted = true;
+			shutdownExits.push(beginSessionShutdown(session));
+		}
+	}
+
+	/**
+	 * Waits for every collected exit, re-reading `shutdownExits` after each batch
+	 * so a session `create` appended mid-wait is awaited too — `Promise.all`
+	 * snapshots its argument, and the latecomer arrives after that snapshot.
+	 */
+	async function allShutdownExitsSettled(): Promise<void> {
+		let awaited = 0;
+
+		while (awaited < shutdownExits.length) {
+			const batch = shutdownExits.slice(awaited);
+
+			awaited = shutdownExits.length;
+			await Promise.all(batch);
+		}
+	}
+
+	/**
+	 * Winds every live session down and waits for its PTY child to actually die.
+	 *
+	 * Quit must not leave a child dying in the window Electron spends destroying
+	 * the JS environment: node-pty reports the exit from a native thread-safe
+	 * function, and node-addon-api aborts the process when that call lands on a
+	 * torn-down environment. Signalling without waiting — the old behaviour —
+	 * made that the likely case rather than the unlucky one.
+	 * @returns Resolves once every child has exited or both graces have elapsed
+	 */
+	async function runShutdown(): Promise<void> {
+		shuttingDown = true;
+		windDownPendingSessions();
+
+		if (shutdownExits.length === 0) {
+			return;
+		}
+
+		if (await withinGrace(allShutdownExitsSettled(), shutdownGraceMs)) {
+			return;
+		}
+
+		for (const session of sessions.values()) {
+			if (session.ptyExited) {
+				continue;
+			}
+
+			session.pty?.kill('SIGKILL');
+		}
+
+		await withinGrace(allShutdownExitsSettled(), shutdownGraceMs);
+	}
+
 	return {
 		create,
-		disposeAll: () => {
-			// Same SIGHUP→grace→SIGKILL path as kill(); the escalation timers are
-			// unref'd, so a quitting app exits without waiting and the kernel
-			// reaps anything that ignored SIGHUP once the PTY closes.
-			//
-			// Flush each session's scrollback and DETACH its exit handler before
-			// signalling the PTY. A real shell exits on SIGHUP, and node-pty can
-			// deliver 'exit' in the window Electron spends tearing down after
-			// `will-quit` returns — which would run finalizeSession, flipping the
-			// row to 'exited' and deleting the just-written log, leaving the open
-			// tab unrecoverable. Detaching first keeps the row 'running' and its
-			// log intact so the next launch can restore it.
-			for (const session of sessions.values()) {
-				flushSessionOutput(session);
-				session.exitSubscription?.dispose();
-				session.exitSubscription = null;
-			}
-			for (const terminalId of sessions.keys()) {
-				try {
-					kill(terminalId);
-				} catch {
-					// Session vanished mid-iteration; nothing left to stop.
-				}
-			}
-		},
 		getSnapshot: (terminalId) => {
 			const session = sessions.get(terminalId);
 
@@ -1384,6 +1529,11 @@ export function createTerminalService({
 				rows: normalizedRows,
 			};
 			session.pty?.resize(normalizedCols, normalizedRows);
+		},
+		shutdown: () => {
+			shutdownInFlight ??= runShutdown();
+
+			return shutdownInFlight;
 		},
 		write: (terminalId, data) => {
 			const session = requireSession(terminalId);

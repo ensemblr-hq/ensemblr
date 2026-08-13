@@ -195,7 +195,6 @@ function createTerminalServiceFake({
 
 			return { diagnostics: [], session };
 		},
-		disposeAll: () => undefined,
 		getSnapshot: (terminalId) => ({
 			lastSeq: 0,
 			scrollback: '',
@@ -223,6 +222,7 @@ function createTerminalServiceFake({
 		listRestorable: () => [],
 		recoverStaleSessions: () => undefined,
 		resize: () => undefined,
+		shutdown: () => Promise.resolve(),
 		waitForExit: (terminalId, timeoutMs) =>
 			new Promise((resolve) => {
 				const start = Date.now();

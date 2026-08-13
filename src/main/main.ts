@@ -1007,9 +1007,11 @@ app.whenReady().then(() => {
 });
 
 let isShuttingDownAgents = false;
-// Terminate the Pi RPC children before the process exits. `close()` now resolves
-// only once each child has actually exited, so awaiting the client shutdowns
-// keeps orphaned `pi --mode rpc` processes from surviving app quit. `before-quit`
+// Terminate the Pi RPC children and the terminal PTY children before the process
+// exits. Both shutdowns resolve only once each child has actually exited, which
+// keeps orphaned `pi --mode rpc` processes from surviving app quit and keeps a
+// dying PTY from reporting its exit into a half-destroyed JS environment — where
+// node-pty's native callback aborts the process instead of surfacing. `before-quit`
 // is synchronous, so defer the real quit until the async shutdown settles; a
 // bounded race guarantees a wedged child can never block quit indefinitely.
 //
@@ -1025,7 +1027,7 @@ app.on('before-quit', (event) => {
 	event.preventDefault();
 	void (async () => {
 		await Promise.race([
-			Promise.allSettled([agentClient.shutdown()]),
+			Promise.allSettled([agentClient.shutdown(), terminalService.shutdown()]),
 			new Promise((resolve) => setTimeout(resolve, 3000)),
 		]);
 		app.quit();
@@ -1037,7 +1039,10 @@ app.on('will-quit', () => {
 	configService.stop();
 	agentActivityMonitor.dispose();
 	void agentControlServer?.close();
-	terminalService.disposeAll();
+	// Backstop for a quit that skipped the `before-quit` grace: the synchronous
+	// half (flush, detach, SIGHUP) still runs before this returns, and a shutdown
+	// already in flight is reused rather than restarted.
+	void terminalService.shutdown();
 	ipcHandlersHandle?.dispose();
 	workspaceFilesWatcher.stopAll();
 	databaseService.close();
