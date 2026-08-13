@@ -4,8 +4,9 @@ How to install, set up, and use Ensemblr. If you want to *work on* Ensemblr
 rather than use it, start at [`../onboarding.md`](../onboarding.md) and
 [`../../CONTRIBUTING.md`](../../CONTRIBUTING.md) instead.
 
-Ensemblr runs on macOS, Apple silicon only. It is pre-1.0, and this guide
-describes version [`0.1.0-beta.1`](https://github.com/ensemblr-hq/ensemblr/releases/tag/v0.1.0-beta.1).
+Ensemblr runs on macOS, Apple silicon only. You bring your own agent CLI — Pi or
+Claude Code, one is enough — plus `git` and an authenticated `gh`. It is pre-1.0,
+and this guide describes version [`0.1.0-beta.3`](https://github.com/ensemblr-hq/ensemblr/releases/tag/v0.1.0-beta.3).
 The app itself ships in English, Russian, and Greek; this guide is English only.
 
 ## Read in order

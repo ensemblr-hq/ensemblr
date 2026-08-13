@@ -4,13 +4,21 @@
 
 # Ensemblr
 
-**A macOS workbench for isolated, multi-agent coding workflows.**
+**A macOS orchestrator for multi-agent coding work, driving the Pi CLI or the Claude Code CLI — whichever
+you already run.**
 
-Ensemblr is a native macOS desktop app for running coding-agent work in isolated project workspaces.
-Isolation is the product: every stream of work gets its own worktree, branch, and review path.
-**Pi** and **Claude Code** are its two first-class agent runtimes, driven on the app's own chat surface;
-third-party CLIs (Codex, Vibe, and the `claude` TUI) also run as terminal harnesses, and a
-permission-gated control surface — **Ensemblr Control** — lets agents drive the app itself.
+The agent inside a workspace can drive the app itself: spawn sub-agents into their own chat tabs, delegate
+a unit of work to each, block until they finish, read their reports, and integrate the results. That
+permission-gated surface is **Ensemblr Control**, and the worktree manager underneath it exists to make it
+safe — every stream of work gets its own git worktree, branch, and review path, so a fan-out of agents
+cannot collide.
+
+**Apple silicon Macs only. Bring your own agent CLI — Pi or Claude Code, one is enough. `git` and an
+authenticated `gh` are required.**
+
+No Ensemblr account, no sign-in, no cloud sync, no telemetry. State is a local SQLite database, secrets go
+to the macOS Keychain, GitHub tokens stay with `gh` and are never copied anywhere, and the app ships no
+agent binary of its own — it drives the one you installed.
 
 ![The Ensemblr dashboard board, with workspace cards spread across the Backlog, In progress, In review, and Done columns.](./docs/guide/images/00-hero-dashboard.png)
 
@@ -86,23 +94,31 @@ documented in [`docs/guide/02-requirements.md`](./docs/guide/02-requirements.md)
 
 ## What it does
 
-**Isolated workspaces.** Start a workspace from an existing branch, a GitHub PR, or a Linear issue. Each
-one is a git worktree with its own branch, working tree, agent sessions, run state, and review path. A
-workspace either *adopts* an existing branch or *cuts* a fresh one; the base branch is fetched and
-fast-forwarded first, and can be retargeted later without touching the worktree. A dashboard board groups
-workspaces into Backlog, In progress, In review, Done, and Canceled.
+**Agents drive the app — that is the point.** Ensemblr Control is a permission-gated surface that lets an
+agent spawn conversations, launch harnesses, run terminals, open file and diff tabs, read the workspace
+diff and leave review comments on it, read and write Linear issues, ask you a multiple-choice question, and
+move its workspace across the board. Pi reaches it through a shipped extension; Claude Code and any
+MCP-capable harness reach the same operations through an embedded MCP server, so the two surfaces cannot
+drift.
+
+**Multi-agent orchestration, not just a fan-out button.** The root agent delegates a unit of work per
+sub-agent, each in its own tab and its own context, then blocks on `ensemblr_wait_for_agents` until they
+report back — no hand-rolled polling loop. Sub-agents do their own work and never delegate onward, so the
+tree stays one level deep. Depth, spawn count, and spawn rate are capped. Linear writes are withheld from
+sub-agents, and nothing at any depth can move an issue to a completed or canceled state: agent work stops
+at In Review, enforced in code rather than in a prompt.
 
 **Two agent runtimes, one chat surface.** Pi runs as a CLI in RPC mode; Claude Code is driven through the
 Agent SDK against *your own* `claude` binary — Ensemblr ships none. Both share the same timeline, tool
 cards, model and thinking pickers, tool-approval prompts, git-backed checkpoints, session branching, and
 composer attachments. **Plan mode** holds an agent to read-only tools until it submits a plan, enforced per
-tool call rather than by instruction.
+tool call rather than by instruction, and inherited by every sub-agent it spawns.
 
-**Agents can drive the app.** Ensemblr Control is a permission-gated surface that lets an agent spawn
-conversations, launch harnesses, run terminals, open file and diff tabs, read and write issues, and move
-its workspace across the board — Pi through a shipped extension, Claude Code and MCP-capable harnesses
-through an embedded MCP server. Linear writes are withheld from sub-agents, and nothing can move an issue
-to a completed or canceled state: agent work stops at In Review, enforced in code.
+**A worktree manager underneath.** Start a workspace from an existing branch, a GitHub PR, or a Linear
+issue. Each one is a git worktree with its own branch, working tree, agent sessions, run state, and review
+path. A workspace either *adopts* an existing branch or *cuts* a fresh one; the base branch is fetched and
+fast-forwarded first, and can be retargeted later without touching the worktree. A dashboard board groups
+workspaces into Backlog, In progress, In review, Done, and Canceled.
 
 **Local-first review that ends in GitHub.** One panel with Files, Changes, and Checks. Source-scoped diffs,
 per-file discard, a live file tree, and review comments anchored to specific lines that agents can read,
@@ -117,9 +133,29 @@ lifecycle, with setup fingerprinted so an unchanged workspace skips it.
 **Three languages.** The app ships in English, Russian, and Greek — window, native menu bar, and the prose
 agents write back. A user-facing string a change adds ships translated in the same change.
 
-The scope rests on **five commitments**: isolation is the product; the agent runtime is pluggable and never
-privileged; the agent can drive the app under permission; review is local-first and ends in GitHub;
+The scope rests on **five commitments**: the agent can drive the app under permission; isolation is the
+product; the agent runtime is pluggable and never privileged; review is local-first and ends in GitHub;
 configuration is committed, legible, and ours.
+
+---
+
+## What it stores, and where
+
+There is no Ensemblr account to create, nothing to sign in to, and nothing synced off your machine.
+
+- **No account, no server.** Ensemblr talks to GitHub, Linear, and your agent CLIs directly. There is no
+  Ensemblr backend in the path and no telemetry.
+- **GitHub tokens stay with `gh`.** Ensemblr stores none — no token field in settings, no OAuth screen, no
+  second place one can leak from. It shells out to the CLI you already authenticated.
+- **Secrets live in the macOS Keychain**, never a file and never an environment variable. Linear's OAuth
+  tokens go straight there; the app can list what it holds without reading it back.
+- **State is a local SQLite database** (Node 24's built-in `node:sqlite`), alongside worktrees under a root
+  directory you choose.
+- **No agent binary ships in the app.** Your `pi` and `claude` installs, your credentials, your models,
+  your config — the ~260 MB the Claude Agent SDK would bundle is deliberately left out.
+
+The threat model, including what is explicitly *out* of scope, is [`SECURITY.md`](./SECURITY.md); what each
+integration stores is [`docs/guide/10-integrations.md`](./docs/guide/10-integrations.md).
 
 ---
 

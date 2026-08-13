@@ -1,12 +1,14 @@
 # Ensemblr Documentation
 
-Documentation for Ensemblr — a macOS workbench for isolated, multi-agent coding
-workflows. Start with the root [`README.md`](../README.md) for an overview, then
-dive in here.
+Documentation for Ensemblr — a macOS orchestrator for multi-agent coding work,
+driving the Pi CLI or the Claude Code CLI. Agents drive the app itself through
+**Ensemblr Control**; the worktree manager underneath keeps a fan-out of them
+from colliding. Start with the root [`README.md`](../README.md) for an overview,
+then dive in here.
 
 ## Using Ensemblr
 
-The current build is [`0.1.0-beta.1`](https://github.com/ensemblr-hq/ensemblr/releases/tag/v0.1.0-beta.1) — signed, notarized, Apple silicon. [Download the `.dmg`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.0-beta.1/Ensemblr-0.1.0-arm64.dmg).
+The current build is [`0.1.0-beta.3`](https://github.com/ensemblr-hq/ensemblr/releases/tag/v0.1.0-beta.3) — signed, notarized, Apple silicon only. [Download the `.dmg`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.0-beta.3/Ensemblr-0.1.0-beta.3-arm64.dmg). You bring your own agent CLI — Pi or Claude Code, one is enough — plus `git` and an authenticated `gh`.
 
 - [`guide/`](./guide) — the user guide: [install](./guide/01-install.md), [requirements](./guide/02-requirements.md), [first run](./guide/03-first-run.md), [concepts](./guide/04-concepts.md), and the day-to-day surfaces through to [troubleshooting](./guide/14-troubleshooting.md). Start at [`guide/README.md`](./guide/README.md).
 
