@@ -20,7 +20,11 @@ No Ensemblr account, no sign-in, no cloud sync, no telemetry. State is a local S
 to the macOS Keychain, GitHub tokens stay with `gh` and are never copied anywhere, and the app ships no
 agent binary of its own — it drives the one you installed.
 
-![The Ensemblr dashboard board, with workspace cards spread across the Backlog, In progress, In review, and Done columns.](./docs/guide/images/00-hero-dashboard.png)
+<video src="https://github.com/user-attachments/assets/c5db8e14-0a89-474d-ad6a-994769b3e71b" controls muted loop playsinline>
+  <a href="https://github.com/user-attachments/assets/c5db8e14-0a89-474d-ad6a-994769b3e71b">Watch Ensemblr Control drive the app (60 seconds, no audio)</a>
+</video>
+
+*Ensemblr Control driving the app from inside a workspace: the agent names its own tab, moves the workspace to In progress, starts a run script, then delegates to two sub-agents in their own chat tabs and launches a Claude Code harness in a terminal.*
 
 - **Version:** [`0.1.0-beta.3`](https://github.com/ensemblr-hq/ensemblr/releases/tag/v0.1.0-beta.3) (pre-1.0, polish stage)
 - **Platform:** macOS on Apple silicon
