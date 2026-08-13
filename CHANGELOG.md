@@ -9,6 +9,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.0-beta.3] - 2026-08-13
+
+Terminal shutdown fixes on top of beta.2. Signed, notarized, Apple silicon.
+[Release](https://github.com/ensemblr-hq/ensemblr/releases/tag/v0.1.0-beta.3) ·
+[`.dmg`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.0-beta.3/Ensemblr-0.1.0-beta.3-arm64.dmg)
+
+### Fixed
+
+- **Quit no longer abandons a dying PTY child.** `TerminalService.disposeAll()` signalled each shell and
+  returned immediately, so a child could report its exit while Electron was already destroying the JS
+  environment — node-pty dispatches that callback from a native thread-safe function, and node-addon-api
+  aborts the process (SIGABRT) rather than surfacing it. Quit now waits for each child to actually exit,
+  bounded by a SIGHUP → 1s → SIGKILL → 1s escalation that fits inside the app's quit window, and a PTY
+  stream listener can no longer throw across the native boundary.
+- **An agent tab exiting just before quit no longer kills every other terminal.** Agent sessions finalize
+  asynchronously, so for up to two seconds after the child is gone the session row still reads `running`.
+  Shutdown took that as a live child and waited on an exit event that had already fired, stalling both grace
+  windows and then SIGKILLing terminals that were seconds away from exiting cleanly.
+- **A terminal created during the quit grace is wound down with the rest** instead of surviving as an
+  orphaned child with a live exit handler.
+
 ## [0.1.0-beta.2] - 2026-08-12
 
 Dependency maintenance on top of beta.1 — no behaviour change. Signed, notarized, Apple silicon.
