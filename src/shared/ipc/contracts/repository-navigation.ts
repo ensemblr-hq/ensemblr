@@ -126,6 +126,14 @@ export interface ShellApi {
 		listener: (payload: FocusChatBroadcast) => void,
 	) => () => void;
 	/**
+	 * Subscribes to notification-sound requests, sent by the main process
+	 * alongside a desktop notification it has already decided to show. Returns an
+	 * unsubscribe function. The renderer owns the audio because the main process
+	 * cannot play a bundled sound file, so there is no payload — main applied both
+	 * the desktop-notification and notification-sound settings before sending.
+	 */
+	onNotificationSoundRequested: (listener: () => void) => () => void;
+	/**
 	 * Subscribes to agent-control tab-set changes (an agent opened or closed a
 	 * tab). Returns an unsubscribe function. The renderer refreshes its tab list
 	 * only for the window showing the payload's workspace.

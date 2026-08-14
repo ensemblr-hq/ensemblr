@@ -66,6 +66,11 @@ export const desktopNotificationsAtom = settingAtom(
 	'general',
 	'desktopNotifications',
 );
+/** Whether a chat needing attention plays the app's notification chime. */
+export const notificationSoundAtom = settingAtom(
+	'general',
+	'notificationSound',
+);
 export const autoConvertLongTextAtom = settingAtom(
 	'general',
 	'autoConvertLongText',

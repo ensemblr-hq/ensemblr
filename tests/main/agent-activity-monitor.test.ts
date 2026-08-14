@@ -277,6 +277,44 @@ describe('createAgentActivityMonitor — notifications', () => {
 		expect(h.notifications).toHaveLength(0);
 	});
 
+	test('asks for the chime by default', () => {
+		const h = makeMonitor({
+			readSettings: () => settings({ desktopNotifications: true }),
+		});
+		finishTurn(h);
+		expect(h.notifications[0]?.playSound).toBe(true);
+	});
+
+	test('still notifies, silently, when the chime is switched off', () => {
+		const h = makeMonitor({
+			readSettings: () =>
+				settings({ desktopNotifications: true, notificationSound: false }),
+		});
+		finishTurn(h);
+		expect(h.notifications).toHaveLength(1);
+		expect(h.notifications[0]?.playSound).toBe(false);
+	});
+
+	test('the chime does not survive notifications being switched off', () => {
+		const h = makeMonitor({
+			readSettings: () =>
+				settings({ desktopNotifications: false, notificationSound: true }),
+		});
+		finishTurn(h);
+		expect(h.notifications).toHaveLength(0);
+	});
+
+	test('carries the chime flag on a raised question too', () => {
+		const h = makeMonitor({
+			readSettings: () => settings({ desktopNotifications: true }),
+		});
+		h.monitor.notifyQuestionRaised({
+			agentSessionId: 's1',
+			workspaceId: 'w1',
+		});
+		expect(h.notifications[0]?.playSound).toBe(true);
+	});
+
 	test('stays quiet for the idle a user-requested stop settles', () => {
 		const h = makeMonitor({
 			readSettings: () => settings({ desktopNotifications: true }),

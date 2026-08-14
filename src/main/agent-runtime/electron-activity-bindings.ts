@@ -44,9 +44,27 @@ function openChatFromNotification(target: FocusChatBroadcast): void {
 }
 
 /**
+ * Asks every window to play the app's notification chime. The audio lives in the
+ * renderer because the main process cannot play an arbitrary sound file, so the
+ * decision is made here and only the playback crosses the bridge.
+ */
+function requestNotificationSound(): void {
+	for (const window of BrowserWindow.getAllWindows()) {
+		if (!window.isDestroyed()) {
+			window.webContents.send(IPC_CHANNELS.notificationSoundRequested);
+		}
+	}
+}
+
+/**
  * Shows a desktop notification titled with the chat that produced it; clicking
  * it raises the app and opens that chat, crossing workspaces when it lives in
  * another one.
+ *
+ * The notification is always `silent`: Ensemblr plays its own chime from the
+ * renderer, and leaving macOS free to play its default tone would stack two
+ * sounds on every notification. A user who switches the chime off wants
+ * silence, not the system tone back.
  * @param notification - The rendered title and body plus the chat to open.
  */
 export function electronNotify(notification: AgentNotification): void {
@@ -55,10 +73,14 @@ export function electronNotify(notification: AgentNotification): void {
 	}
 	const shown = new Notification({
 		body: notification.body,
+		silent: true,
 		title: notification.title,
 	});
 	shown.on('click', () => openChatFromNotification(notification.target));
 	shown.show();
+	if (notification.playSound) {
+		requestNotificationSound();
+	}
 }
 
 /** True when any non-destroyed app window currently has focus. */

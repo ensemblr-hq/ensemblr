@@ -5,6 +5,7 @@ import { useCallback } from 'react';
 import { useAppMenuCommands } from '@/renderer/hooks/use-app-menu-commands';
 import { useConfigReloadSync } from '@/renderer/hooks/use-config-reload-sync';
 import { useHotkey } from '@/renderer/hooks/use-hotkey';
+import { useNotificationSoundSync } from '@/renderer/hooks/use-notification-sound-sync';
 import { useAskUserQuestionSync } from '@/renderer/state/ask-user-question';
 import {
 	useMenuCommand,
@@ -28,6 +29,7 @@ export function App() {
 	useLanguageEffect();
 	useAppSettingsSync();
 	useConfigReloadSync();
+	useNotificationSoundSync();
 	useAskUserQuestionSync();
 	useToolApprovalSync();
 	usePlanReviewSync();

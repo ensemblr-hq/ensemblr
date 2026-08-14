@@ -73,6 +73,8 @@ Rules of thumb:
 | Managed root | Управляемый корневой каталог | Διαχειριζόμενος ριζικός κατάλογος | The root plus the directories Ensemblr creates under it. |
 | Diagnostic | Диагностика | Διαγνωστικό | One coded problem a failed operation reports; the renderer translates it from the code, never from main's English. |
 | Unread | Непрочитанный | Αδιάβαστο | A chat tab an agent has spoken in since the user last looked at it. Russian agrees with the noun it qualifies (`непрочитанный чат`, `непрочитанные сообщения`); Greek likewise (`αδιάβαστη συνομιλία`, `αδιάβαστα μηνύματα`). Never `новый`/`νέο` — that says the chat is new, not that it is waiting. |
+| Notification | Уведомление | Ειδοποίηση | The macOS desktop notification Ensemblr posts when a chat needs the user. The settings label keeps the qualifier — `Уведомления на рабочем столе`/`Ειδοποιήσεις επιφάνειας εργασίας` — because the app also has in-app markers. |
+| Notification sound | Звук уведомлений | Ήχος ειδοποιήσεων | The chime played alongside that notification. Plural in both languages: the switch governs every notification, not one. Never `сигнал`/`σήμα`, which reads as an alarm. |
 
 ## Core verbs
 

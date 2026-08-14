@@ -15,9 +15,14 @@ interface AgentActivityEvent {
 	workspaceId: string;
 }
 
-/** A desktop notification, and the chat clicking it should open. */
+/**
+ * A desktop notification, and the chat clicking it should open. `playSound`
+ * carries the `notificationSound` setting as read when the notification was
+ * raised, so the renderer that owns the audio never re-derives the gate.
+ */
 export interface AgentNotification {
 	body: string;
+	playSound: boolean;
 	target: FocusChatBroadcast;
 	title: string;
 }
@@ -251,6 +256,7 @@ export function createAgentActivityMonitor(
 				tabTitle: target.tabTitle,
 				workspaceName: target.workspaceName,
 			}),
+			playSound: options.readSettings().general.notificationSound,
 			target: {
 				agentSessionId,
 				chatTabId: target.chatTabId,
