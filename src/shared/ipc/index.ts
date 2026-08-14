@@ -207,6 +207,10 @@ export type {
 	RecordLinkedDirectoryResult,
 } from './contracts/linked-directories';
 export type {
+	ActiveChatContext,
+	FocusChatBroadcast,
+} from './contracts/notifications';
+export type {
 	QuickStartApi,
 	QuickStartProjectDiagnostic,
 	QuickStartProjectDiagnosticCode,

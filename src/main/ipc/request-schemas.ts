@@ -18,6 +18,7 @@
  * test must continue to pass. Any deviation is annotated in the owning module.
  */
 
+export { activeChatContextSchema } from './request-schemas/active-chat.ts';
 export {
 	agentProviderRequestSchema,
 	listAgentProviderMcpServersRequestSchema,

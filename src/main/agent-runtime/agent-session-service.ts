@@ -113,6 +113,12 @@ interface AgentSessionServiceOptions {
 	 * session starts in Plan Mode.
 	 */
 	isPlanModeActive?: (agentSessionId: string) => boolean;
+	/**
+	 * Announces a stop the user asked for, before the abort settles the turn to
+	 * `idle`. The desktop notifier listens so a cancelled turn is not announced as
+	 * one that finished on its own.
+	 */
+	onSessionAborted?: (sessionId: string) => void;
 	/** Derived tab-titling queue, fired at open and each turn-idle. */
 	queueNaming: QueueNamingPort;
 	/** Injects the agent-control env (control URL + token) into each agent child. */
@@ -224,6 +230,7 @@ export function createAgentSessionService({
 	eventSink,
 	agentClient,
 	isPlanModeActive = () => false,
+	onSessionAborted,
 	queueNaming,
 	resolveAgentControlEnv,
 	resolvePermissionMode = () => DEFAULT_PERMISSION_MODE,
@@ -248,6 +255,7 @@ export function createAgentSessionService({
 		eventSink,
 		isPlanModeActive,
 		now,
+		onSessionAborted,
 		persistRuntimeEvent,
 		agentClient,
 		queueNaming,

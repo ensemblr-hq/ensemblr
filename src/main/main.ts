@@ -49,6 +49,7 @@ import {
 	type AgentExecutableSnapshot,
 	createAgentClient,
 } from './agent-runtime';
+import { ActiveChatStore } from './agent-runtime/active-chat-store';
 import { createAgentActivityMonitor } from './agent-runtime/agent-activity-monitor';
 import { createAgentSessionService } from './agent-runtime/agent-session-service';
 import {
@@ -58,6 +59,7 @@ import {
 } from './agent-runtime/electron-activity-bindings';
 import { readMacosBattery } from './agent-runtime/macos-battery';
 import { createSessionNaming } from './agent-runtime/naming/session-naming';
+import { resolveNotificationTarget } from './agent-runtime/notification-target';
 import { createSessionSummaryWriter } from './agent-runtime/session-summary-writer';
 import { createHarnessDetectionService } from './agents';
 import { createMainWindow } from './app/main-window';
@@ -244,19 +246,34 @@ const configService = createEnsemblrConfigService(
 const appSettingsService = createAppSettingsService(
 	isDev ? { configPath: devConfigPath } : {},
 );
+const databaseService = createEnsemblrDatabaseService(
+	isDev ? { databasePath: devDatabasePath } : {},
+);
+// The chat the renderer last reported as on screen, so a desktop notification is
+// suppressed for that chat alone rather than for the whole app.
+const activeChatStore = new ActiveChatStore();
 // Drives the caffeinate power-blocker + "agent finished" desktop notifications,
 // gated live by the General settings in config.json.
 const agentActivityMonitor = createAgentActivityMonitor({
 	isAppFocused: electronIsAppFocused,
+	/** Reports whether the user is looking at exactly this chat right now. */
+	isChatOnScreen: (workspaceId, agentSessionId) =>
+		activeChatStore.isOnScreen(workspaceId, agentSessionId),
 	notify: electronNotify,
 	powerControls: electronPowerControls,
 	readBattery: readMacosBattery,
+	/** Resolves the language notification copy is rendered in. */
+	readLanguage: () => resolveAppLanguage(),
 	/** Reads the latest app settings so the monitor can gate itself live. */
 	readSettings: () => appSettingsService.read(),
+	/** Names the workspace and tab a notification describes, and spots sub-agents. */
+	resolveTarget: (workspaceId, agentSessionId) =>
+		resolveNotificationTarget(
+			databaseService.getConnection()?.database,
+			workspaceId,
+			agentSessionId,
+		),
 });
-const databaseService = createEnsemblrDatabaseService(
-	isDev ? { databasePath: devDatabasePath } : {},
-);
 const localCommandService = createLocalCommandService();
 const environmentVariablesService = createEnvironmentVariablesService({
 	configService,
@@ -544,7 +561,11 @@ const agentSessionService = createAgentSessionService({
 				window.webContents.send(IPC_CHANNELS.agentSessionEvent, payload);
 			}
 		}
-		agentActivityMonitor.handle({ event: payload.event, sessionId });
+		agentActivityMonitor.handle({
+			event: payload.event,
+			sessionId,
+			workspaceId,
+		});
 		if (event.eventType === 'shutdown') {
 			agentControlService?.releaseSession(sessionId);
 		}
@@ -552,6 +573,8 @@ const agentSessionService = createAgentSessionService({
 	agentClient,
 	/** Reports whether the chat behind this session has Plan Mode switched on. */
 	isPlanModeActive: (sessionId) => planModeRegistry.isActive(sessionId),
+	/** Keeps the stop the user just asked for from notifying as a finished turn. */
+	onSessionAborted: (sessionId) => agentActivityMonitor.noteUserStop(sessionId),
 	queueNaming: sessionNamingQueue,
 	resolveAgentControlEnv,
 	/** Reads the workspace permission mode each new agent session must honour. */
@@ -723,9 +746,19 @@ ipcMain.handle(
 	},
 );
 const askUserQuestionCoordinator = createAskUserQuestionCoordinator({
-	/** Pushes an agent's questionnaire to every window; only the owning chat renders it. */
-	broadcastAsk: (payload) =>
-		broadcastToAllWindows(IPC_CHANNELS.agentControlAskUserQuestion, payload),
+	/**
+	 * Pushes an agent's questionnaire to every window; only the owning chat
+	 * renders it. Fires once per ask, so the desktop notification riding along
+	 * needs no dedupe of its own — a blocked agent is the one state that wants
+	 * the user more than a finished turn does.
+	 */
+	broadcastAsk: (payload) => {
+		broadcastToAllWindows(IPC_CHANNELS.agentControlAskUserQuestion, payload);
+		agentActivityMonitor.notifyQuestionRaised({
+			agentSessionId: payload.agentSessionId,
+			workspaceId: payload.workspaceId,
+		});
+	},
 	/** Tells renderers to drop a questionnaire whose session ended unanswered. */
 	broadcastClosed: (payload) =>
 		broadcastToAllWindows(
@@ -951,6 +984,7 @@ app.whenReady().then(() => {
 		} satisfies ConfigChangedBroadcast);
 	});
 	ipcHandlersHandle = registerIpcHandlers({
+		activeChatStore,
 		agentProviderService,
 		appSettingsService,
 		archiveRepositoryService,

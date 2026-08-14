@@ -107,6 +107,12 @@ interface AgentSessionLifecycleOptions {
 	/** Reads a session's Plan Mode state off the plan-mode registry. */
 	isPlanModeActive: (agentSessionId: string) => boolean;
 	now: () => Date;
+	/**
+	 * Announces a stop the user asked for, before the abort settles the turn to
+	 * `idle`. The desktop notifier listens so a cancelled turn does not read as
+	 * one that finished on its own.
+	 */
+	onSessionAborted?: (sessionId: string) => void;
 	persistRuntimeEvent: PersistRuntimeEventPort;
 	agentClient: AgentClient;
 	/** Derived tab titling, fired at open and every turn-idle. */
@@ -166,6 +172,7 @@ export function createAgentSessionLifecycle({
 	eventSink,
 	isPlanModeActive,
 	now,
+	onSessionAborted,
 	persistRuntimeEvent,
 	agentClient,
 	queueNaming,
@@ -308,6 +315,10 @@ export function createAgentSessionLifecycle({
 		if (!active) {
 			return;
 		}
+		// Announce the stop before the abort, because aborting settles the turn to
+		// `idle` on its way out and a listener told only afterwards would already
+		// have read that as a turn finishing by itself.
+		onSessionAborted?.(request.sessionId);
 		// Start the owed summary before aborting so it snapshots the active session,
 		// but never block the user's explicit stop on archival summary work. The
 		// flush reads the transcript synchronously before its first await, so the

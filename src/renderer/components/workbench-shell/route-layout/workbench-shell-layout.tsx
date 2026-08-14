@@ -30,6 +30,7 @@ import type {
 	WorkbenchShellRouteState,
 } from '@/renderer/types/components';
 import { WorkbenchLayoutModelProvider } from '../shell-contexts';
+import { NotificationFocusBridge } from './notification-focus-bridge';
 
 /** Workbench shell layout — builds the layout model and renders the navigation frame. */
 export function WorkbenchShellLayout() {
@@ -67,6 +68,7 @@ export function WorkbenchShellLayout() {
 					resolveWorkspaceRouteSearch={model.resolveWorkspaceRouteSearch}
 				>
 					<WorkbenchLayoutModelProvider value={model}>
+						<NotificationFocusBridge />
 						<Outlet />
 					</WorkbenchLayoutModelProvider>
 				</WorkbenchFrame>

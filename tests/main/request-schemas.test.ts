@@ -1,6 +1,7 @@
 import { expect, test } from 'vitest';
 
 import {
+	activeChatContextSchema,
 	launchAgentHarnessRequestSchema,
 	openChatTabRequestSchema,
 	parseCreateWorkspaceRequest,
@@ -225,4 +226,43 @@ test('rejects a repository-settings patch with a missing repository id', () => {
 		parseUpdateRepositorySettingsRequest({ repositoryId: '', settings: {} }),
 	).toBeNull();
 	expect(parseUpdateRepositorySettingsRequest('garbage')).toBeNull();
+});
+
+test('activeChatContextSchema accepts a chat and the no-chat-open null', () => {
+	expect(
+		activeChatContextSchema.parse({
+			agentSessionId: 'session-1',
+			chatTabId: 'tab-1',
+			workspaceId: 'ws-1',
+		}),
+	).toEqual({
+		agentSessionId: 'session-1',
+		chatTabId: 'tab-1',
+		workspaceId: 'ws-1',
+	});
+	expect(
+		activeChatContextSchema.parse({
+			agentSessionId: null,
+			chatTabId: 'tab-1',
+			workspaceId: 'ws-1',
+		}),
+	).toEqual({ agentSessionId: null, chatTabId: 'tab-1', workspaceId: 'ws-1' });
+	expect(activeChatContextSchema.parse(null)).toBeNull();
+});
+
+test('activeChatContextSchema rejects a report missing either required id', () => {
+	expect(
+		activeChatContextSchema.safeParse({
+			agentSessionId: 'session-1',
+			chatTabId: '',
+			workspaceId: 'ws-1',
+		}).success,
+	).toBe(false);
+	expect(
+		activeChatContextSchema.safeParse({
+			agentSessionId: 'session-1',
+			chatTabId: 'tab-1',
+		}).success,
+	).toBe(false);
+	expect(activeChatContextSchema.safeParse('garbage').success).toBe(false);
 });
