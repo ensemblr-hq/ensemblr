@@ -58,6 +58,10 @@ Rules of thumb:
 | Attachment | Вложение | Συνημμένο | |
 | Pasted text | Вставленный текст | Επικολλημένο κείμενο | A long clipboard paste the composer stored as an attachment. Named for the act, not the file — "вставка"/"επικόλληση" reads as the gesture, and the chip labels a thing. |
 | Token | Токен | Διακριτικό | Model context unit. Localized in both — it is not git porcelain and not a proper noun. |
+| Dictation | Диктовка | Υπαγόρευση | Speaking a prompt into the composer. The feature, and the verb on its control (`Продиктовать`/`Υπαγόρευση`). |
+| Transcription | Транскрибация | Μεταγραφή | Turning the recorded clip into text. Russian takes `транскрибация` over `расшифровка`, which also reads as *decryption*; Greek takes `μεταγραφή` over the much longer `απομαγνητοφώνηση`. |
+| Microphone | Микрофон | Μικρόφωνο | |
+| API key | Ключ API | Κλειδί API | `API` stays Latin in both — it is an initialism, not a translatable noun. |
 | Remote | Удалённый | Απομακρυσμένο | The adjective is localized; the remote's *name* (`origin`) is not. |
 | Merged | Выполнен merge | Έγινε merge | Past-tense PR status. `merge` stays borrowed per the git-porcelain rule; only the auxiliary is localized. |
 | Setup wizard | Мастер настройки | Οδηγός εγκατάστασης | The first-run gate. "Мастер"/"οδηγός" is the platform word for a wizard; never "волшебник"/"μάγος". |

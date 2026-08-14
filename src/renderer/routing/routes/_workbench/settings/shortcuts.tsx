@@ -110,6 +110,10 @@ function shortcutName(t: TFunction): Record<ShortcutId, string> {
 			'settings:shortcuts.name.composer-submit-with-mod',
 			'Send message',
 		),
+		'composer.toggleDictation': t(
+			'settings:shortcuts.name.composer-toggle-dictation',
+			'Start or stop dictation',
+		),
 		'composer.togglePlanMode': t(
 			'settings:shortcuts.name.composer-toggle-plan-mode',
 			'Toggle plan mode',

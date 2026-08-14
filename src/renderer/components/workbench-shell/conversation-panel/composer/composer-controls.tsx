@@ -11,6 +11,7 @@ import {
 	TooltipTrigger,
 } from '@/renderer/components/ui/tooltip';
 import type { ComposerStateApi } from '@/renderer/hooks/workbench-shell/composer/use-composer-state';
+import type { DictationControl } from '@/renderer/hooks/workbench-shell/composer/use-dictation';
 import {
 	resolveComposerProvider,
 	showContextIndicator,
@@ -26,6 +27,7 @@ import type {
 import { formatShortcut } from '@/shared/keymap';
 import { AttachmentMenu } from './attachment-menu';
 import { ContextIndicator } from './context-indicator';
+import { DictationButton } from './dictation-button';
 import { McpServersPanel } from './mcp-servers-panel';
 import { ModelPicker } from './model-picker';
 import { PlanModeToggle } from './plan-mode-toggle';
@@ -34,6 +36,7 @@ import { ThinkingPicker } from './thinking-picker';
 /** Wiring for the composer's bottom control row. */
 interface ComposerControlsProps {
 	composer: ComposerShellState;
+	dictation: DictationControl;
 	modelPickerOpen: boolean;
 	onLinkDirectory: () => void;
 	onLinkIssue: () => void;
@@ -53,6 +56,7 @@ interface ComposerControlsProps {
  */
 export function ComposerControls({
 	composer,
+	dictation,
 	modelPickerOpen,
 	onLinkDirectory,
 	onLinkIssue,
@@ -104,6 +108,7 @@ export function ComposerControls({
 				{showContextIndicator(composer, alwaysShowContext) ? (
 					<ContextIndicator usage={composer.contextUsage} />
 				) : null}
+				<DictationButton dictation={dictation} />
 				<AttachmentMenu
 					disabled={composer.disabled}
 					onAddAttachment={state.handleAddAttachment}

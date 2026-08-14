@@ -153,6 +153,11 @@
 		"aria-label": "Agent composer",
 		"attachment-failed": "Failed to attach selected file.",
 		"blocked-follow-up": "Follow-ups are held while the agent works — sending or {{shortcut}} adds to the queue, and you send it from there once the agent finishes.",
+		"dictation": {
+			"start": "Dictate a prompt",
+			"stop": "Stop dictation",
+			"transcribing": "Transcribing…"
+		},
 		"focus-hint": "<key>{{shortcut}}</key><label>to focus</label>",
 		"follow-up": {
 			"placeholder": "Send a follow-up"

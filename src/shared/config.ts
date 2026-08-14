@@ -65,6 +65,22 @@ const gitSettingsSchema = z.object({
 	setUpstreamOnPush: z.boolean().catch(true),
 });
 
+/**
+ * Voice dictation for the composer. Non-secret configuration only — the API key
+ * lives in the macOS Keychain via the secret store, never in `config.json`.
+ *
+ * `baseUrl` points at any OpenAI-compatible `/v1` root, so OpenAI, Groq, and a
+ * locally-run `whisper-server` are all reachable without a code change. The app
+ * ships English-only, so `language` is fixed at `en`; the field exists so
+ * widening later is a value change rather than a schema migration.
+ */
+const dictationSettingsSchema = z.object({
+	enabled: z.boolean().catch(false),
+	baseUrl: z.string().catch('https://api.openai.com/v1'),
+	model: z.string().catch('gpt-4o-mini-transcribe'),
+	language: z.enum(['en']).catch('en'),
+});
+
 /** Experimental user defaults that can feed repository behavior. */
 const experimentalSettingsSchema = z.object({
 	autoRunAfterSetup: z.boolean().catch(false),
@@ -117,6 +133,7 @@ const appSettingsSchema = z.object({
 	providers: providerSettingsSchema,
 	git: gitSettingsSchema,
 	appearance: appearanceSettingsSchema,
+	dictation: dictationSettingsSchema,
 	experimental: experimentalSettingsSchema,
 	onboarding: onboardingSettingsSchema,
 });
@@ -133,6 +150,8 @@ export type ProviderSettings = AppSettings['providers'];
 export type GitSettings = AppSettings['git'];
 /** The `appearance` section of App settings. */
 export type AppearanceSettings = AppSettings['appearance'];
+/** The `dictation` section of App settings. */
+export type DictationSettings = AppSettings['dictation'];
 /** The `experimental` section of App settings. */
 export type ExperimentalSettings = AppSettings['experimental'];
 /** The `onboarding` first-run state section of App settings. */
@@ -145,6 +164,7 @@ export interface AppSettingsPatch {
 	providers?: Partial<ProviderSettings>;
 	git?: Partial<GitSettings>;
 	appearance?: Partial<AppearanceSettings>;
+	dictation?: Partial<DictationSettings>;
 	experimental?: Partial<ExperimentalSettings>;
 	onboarding?: Partial<OnboardingSettings>;
 }
@@ -156,6 +176,7 @@ export const appSettingsPatchSchema = z.object({
 	providers: providerSettingsSchema.partial().optional(),
 	git: gitSettingsSchema.partial().optional(),
 	appearance: appearanceSettingsSchema.partial().optional(),
+	dictation: dictationSettingsSchema.partial().optional(),
 	experimental: experimentalSettingsSchema.partial().optional(),
 	onboarding: onboardingSettingsSchema.partial().optional(),
 });
@@ -167,6 +188,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = appSettingsSchema.parse({
 	providers: {},
 	git: {},
 	appearance: {},
+	dictation: {},
 	experimental: {},
 	onboarding: {},
 });
@@ -191,6 +213,7 @@ export function parseAppSettings(raw: unknown): AppSettings {
 		providers: asRecord(record.providers),
 		git: asRecord(record.git),
 		appearance: asRecord(record.appearance),
+		dictation: asRecord(record.dictation),
 		experimental: asRecord(record.experimental),
 		onboarding: asRecord(record.onboarding),
 	});
@@ -208,6 +231,7 @@ export function mergeAppSettings(
 		providers: { ...current.providers, ...patch.providers },
 		git: { ...current.git, ...patch.git },
 		appearance: { ...current.appearance, ...patch.appearance },
+		dictation: { ...current.dictation, ...patch.dictation },
 		experimental: { ...current.experimental, ...patch.experimental },
 		onboarding: { ...current.onboarding, ...patch.onboarding },
 	};

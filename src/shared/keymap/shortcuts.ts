@@ -119,6 +119,10 @@ export const SHORTCUTS = {
 		scope: 'composer',
 		bindings: [{ key: 'p', modifiers: ['alt', 'shift'] }],
 	},
+	'composer.toggleDictation': {
+		scope: 'composer',
+		bindings: [{ key: 'd', modifiers: ['alt'] }],
+	},
 	'composer.submit': {
 		scope: 'composer',
 		bindings: [{ key: 'Enter' }],

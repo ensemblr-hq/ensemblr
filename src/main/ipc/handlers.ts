@@ -14,6 +14,7 @@ import type {
 	EnsemblrConfigService,
 	RepositoryConfigService,
 } from '../config';
+import type { DictationService } from '../dictation';
 import type { EnvironmentVariablesService } from '../environment';
 import {
 	createGithubService,
@@ -67,6 +68,7 @@ import { registerAppSettingsHandlers } from './handlers/app-settings';
 import { registerChatTabHandlers } from './handlers/chat-tab';
 import { registerCheckpointHandlers } from './handlers/checkpoint';
 import { registerCloneHandlers } from './handlers/clone';
+import { registerDictationHandlers } from './handlers/dictation';
 import { registerEnvironmentHandlers } from './handlers/environment';
 import { registerGithubHandlers } from './handlers/github';
 import { registerHealthHandlers } from './handlers/health';
@@ -112,6 +114,7 @@ interface RegisterIpcHandlersOptions {
 	deleteArchivedWorkspaceService: DeleteArchivedWorkspaceService;
 	deleteRepositoryService: DeleteRepositoryService;
 	deleteWorkspaceService: DeleteWorkspaceService;
+	dictationService: DictationService;
 	environmentVariablesService: EnvironmentVariablesService;
 	githubCloneService: GithubCloneService;
 	harnessDetectionService: HarnessDetectionService;
@@ -180,6 +183,7 @@ export function registerIpcHandlers({
 	deleteArchivedWorkspaceService,
 	deleteRepositoryService,
 	deleteWorkspaceService,
+	dictationService,
 	environmentVariablesService,
 	githubCloneService,
 	githubRepositoryListService,
@@ -226,6 +230,7 @@ export function registerIpcHandlers({
 	registerMenuHandlers({ menuContextStore, rebuildMenu });
 	registerActiveChatHandlers({ activeChatStore });
 	registerAppSettingsHandlers({ appSettingsService, onAppSettingsUpdated });
+	registerDictationHandlers({ dictationService });
 	registerEnvironmentHandlers({ environmentVariablesService });
 	registerHealthHandlers({ configService, databaseService });
 	registerShellSnapshotHandlers({

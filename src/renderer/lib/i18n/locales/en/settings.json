@@ -66,6 +66,30 @@
 		},
 		"title": "Diagnostics"
 	},
+	"dictation": {
+		"api-key": {
+			"description": "Stored in the macOS Keychain, never in a config file. Ensemblr sends it only to the endpoint above.",
+			"label": "API key",
+			"placeholder": "Paste your API key",
+			"replace": "Replace"
+		},
+		"base-url": {
+			"description": "Root of an OpenAI-compatible API. Ensemblr posts to its /audio/transcriptions path.",
+			"insecure": "This address is not encrypted, so your API key would be sent over the network in the clear. Use https, or a local address.",
+			"invalid": "Enter a full address starting with https:// or http://.",
+			"label": "API endpoint"
+		},
+		"description": "Speak a prompt into the composer. Ensemblr records while you hold the control open, then sends the clip to the transcription service you configure here. English only for now.",
+		"enabled": {
+			"description": "Shows a microphone in the composer control row, toggled with {{shortcut}}. It stays hidden until an API key is stored.",
+			"label": "Enable dictation"
+		},
+		"model": {
+			"description": "Transcription model id, for example gpt-4o-mini-transcribe or whisper-large-v3-turbo.",
+			"label": "Model"
+		},
+		"title": "Dictation"
+	},
 	"environment": {
 		"add": "Add environment variable",
 		"description": "Environment variables used by Ensemblr and passed to agent sessions, scripts, and terminals.",
@@ -588,6 +612,7 @@
 			"composer-queue": "Queue message as a follow-up",
 			"composer-submit": "Send message",
 			"composer-submit-with-mod": "Send message",
+			"composer-toggle-dictation": "Start or stop dictation",
 			"composer-toggle-model-picker": "Toggle model picker",
 			"composer-toggle-plan-mode": "Toggle plan mode",
 			"dialog-submit": "Submit dialog form",

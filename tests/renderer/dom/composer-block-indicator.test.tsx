@@ -27,7 +27,9 @@ function renderNotices(behavior: FollowUpBehavior, isStreaming: boolean) {
 		sendIntent: resolveSendIntent(behavior, isStreaming),
 		unlinkDirectory: vi.fn(),
 	} as unknown as ComposerStateApi;
-	renderWithProviders(<ComposerNotices state={state} />);
+	renderWithProviders(
+		<ComposerNotices dictationFailure={null} state={state} />,
+	);
 }
 
 describe('the held-follow-up notice', () => {

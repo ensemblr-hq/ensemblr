@@ -156,6 +156,13 @@ const config: ForgeConfig = {
 		// Per-channel bundle id so dogfood builds never share the release's
 		// LaunchServices registration (the Dock-flash root cause). See ADR 0032.
 		appBundleId: APP_BUNDLE_IDS[buildChannel],
+		// macOS kills a process that touches the microphone without a usage
+		// description rather than prompting, so composer dictation needs this key
+		// alongside the `com.apple.security.device.audio-input` entitlement.
+		extendInfo: {
+			NSMicrophoneUsageDescription:
+				'Ensemblr uses the microphone to dictate prompts into the composer. Audio is sent to the transcription provider you configure and is never stored.',
+		},
 		extraResource: ['resources/pi-extensions'],
 		// Packager resolves the platform extension (`icon.icns` on macOS).
 		// Regenerate with `npm run icon:generate`.
