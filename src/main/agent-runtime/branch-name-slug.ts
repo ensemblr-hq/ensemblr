@@ -48,6 +48,7 @@ export function sanitizeBranchSlug(text: string): string | null {
 interface WorkspaceNamingMetadata {
 	adoptedBranch?: unknown;
 	branchNamed?: unknown;
+	branchProvisional?: unknown;
 	placeholderName?: unknown;
 	renamedAt?: unknown;
 }
@@ -89,4 +90,46 @@ export function isBranchNameable(metadata: WorkspaceNamingMetadata): boolean {
 		return !metadata.branchNamed;
 	}
 	return isWorkspaceNameable(metadata);
+}
+
+/**
+ * Reports whether the workspace carries a name the app derived from the user's
+ * first prompt rather than one anybody chose.
+ *
+ * Deliberately not a gate: a provisional workspace is still nameable by both
+ * predicates above, because the point of naming it provisionally is to fill the
+ * board without spending the agent's one naming call. This only distinguishes
+ * "nothing has named this yet" from "the app guessed" — which is what stops the
+ * namer running twice, and what picks the wording the upkeep block asks with.
+ * @param metadata - The workspace's parsed metadata.
+ * @returns True when the current name is the app's provisional guess.
+ */
+export function isBranchProvisional(
+	metadata: WorkspaceNamingMetadata,
+): boolean {
+	return metadata.branchProvisional === true;
+}
+
+/**
+ * Reports whether the app may guess this workspace's name from the user's first
+ * prompt.
+ *
+ * Deliberately narrower than the two gates above, which ask whether *somebody*
+ * may name the workspace. A guess is only ever an improvement on a generated
+ * placeholder, so a workspace anybody has already titled keeps the name it was
+ * given even while its branch stays nameable — the app moving a titled
+ * workspace's branch onto a slug derived from one prompt is a rename nobody
+ * asked for. A workspace the app has already guessed at is left alone too, which
+ * is what stops the branch moving again on every prompt of a planning session.
+ * @param metadata - The workspace's parsed metadata.
+ * @returns True when a provisional rename may run.
+ */
+export function isProvisionallyNameable(
+	metadata: WorkspaceNamingMetadata,
+): boolean {
+	return (
+		isBranchNameable(metadata) &&
+		isWorkspaceNameable(metadata) &&
+		!isBranchProvisional(metadata)
+	);
 }

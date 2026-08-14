@@ -58,6 +58,7 @@ import {
 	electronPowerControls,
 } from './agent-runtime/electron-activity-bindings';
 import { readMacosBattery } from './agent-runtime/macos-battery';
+import { createProvisionalWorkspaceNaming } from './agent-runtime/naming/provisional-workspace-naming';
 import { createSessionNaming } from './agent-runtime/naming/session-naming';
 import { resolveNotificationTarget } from './agent-runtime/notification-target';
 import { createSessionSummaryWriter } from './agent-runtime/session-summary-writer';
@@ -1003,6 +1004,26 @@ app.whenReady().then(() => {
 			snapshot,
 		} satisfies ConfigChangedBroadcast);
 	});
+	// Names a planning workspace from its first prompt, so the board stops showing
+	// a generated placeholder for the whole interview. Provisional by design: it
+	// leaves both naming gates open, so the agent's own `ensemblr_set_branch_name`
+	// still lands as a first naming rather than being refused as a second.
+	const provisionalNamingQueue = createProvisionalWorkspaceNaming({
+		databaseService,
+		namingEnabled: () => appSettingsService.read().git.renameWorkspaceOnBranch,
+		/** Announces a landed guess on both channels the agent's own rename uses. */
+		onRenamed: ({ sessionId, workspaceId }) => {
+			// The tabs broadcast alone refreshes the chat-tab queries and nothing
+			// else; the sidebar reads the workspace name from a cached navigation
+			// query that only this timeline event invalidates, so dropping it would
+			// move the row in SQLite and leave the board on the placeholder.
+			agentSessionService.appendWorkspaceRenamed(sessionId);
+			broadcastToAllWindows(IPC_CHANNELS.agentControlTabsChanged, {
+				workspaceId,
+			});
+		},
+		renameWorkspace: renameWorkspaceService.rename,
+	});
 	ipcHandlersHandle = registerIpcHandlers({
 		activeChatStore,
 		agentProviderService,
@@ -1034,6 +1055,7 @@ app.whenReady().then(() => {
 		agentModelCatalog,
 		agentSessionService,
 		planModeRegistry,
+		provisionalNamingQueue,
 		quickStartProjectService,
 		renameWorkspaceService,
 		// The in-app write is echo-suppressed and so never reaches the watcher

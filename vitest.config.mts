@@ -37,6 +37,8 @@ export default defineConfig({
 			'tests/main/linked-directory-recents.test.ts',
 			'tests/main/linked-directory-service.test.ts',
 			'tests/main/apply-branch-slug.test.ts',
+			'tests/main/provisional-branch-slug.test.ts',
+			'tests/main/provisional-workspace-naming.test.ts',
 			'tests/main/agent-summary.test.ts',
 			'tests/main/session-brief-naming.test.ts',
 			'tests/main/session-naming.test.ts',

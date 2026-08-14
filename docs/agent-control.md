@@ -279,6 +279,43 @@ one and get cut again on the other. It is the surface's most token-heavy payload
 and the one whose whole point is to survive the turn, so refusing it would spend
 a multi-kilobyte re-emit and risk losing the record.
 
+#### Provisional naming in Plan Mode
+
+Planning delays `ensemblr_set_branch_name` the longest — the agent reads,
+interviews, and writes a plan before it names anything — so the app names the
+workspace itself when a Plan Mode session opens or submits, from the user's
+prompt alone. `deriveProvisionalBranchSlug`
+(`src/main/agent-runtime/naming/provisional-branch-slug.ts`) trims the opening
+pleasantry and caps at five meaningful words; the queue in
+`provisional-workspace-naming.ts` applies it through the same
+`applyBranchSlug` gate the agent's own call passes through.
+
+The rename is marked `provisional`, which writes `branchProvisional: true` and
+deliberately leaves `renamedAt` and `branchNamed` unwritten. Both
+`isWorkspaceNameable` and `isBranchNameable` therefore still report true, so the
+guess costs the agent nothing: its one naming call still lands as a first
+naming. `branchProvisional` does two jobs — it stops the namer guessing again on
+the next prompt, and it switches the upkeep block's branch bullet to asking for a
+*better* name rather than a first one.
+
+Because those two gates stay open, a provisional rename is admitted by a third,
+narrower one: `isProvisionallyNameable` requires the workspace to still carry its
+generated placeholder *and* to be unguessed. A guess only ever improves on a
+placeholder, so the app never moves the branch of a workspace somebody has
+titled. Both `applyBranchSlug` and the rename service's own synchronous re-check
+consult it, so two namers racing the same row cannot both apply.
+
+A landed guess is announced the same two ways the agent's `setBranchName` is: an
+`agentControlTabsChanged` broadcast, and a `workspace-renamed` timeline metadata
+event. The event is the load-bearing one — the sidebar's workspace name comes
+from a cached navigation query that nothing else invalidates — and it renders
+nothing in the transcript, so the guess stays silent.
+
+The queue is fire-and-forget and never fails a turn. It declines when the user
+has turned `git.renameWorkspaceOnBranch` off, when the branch was adopted rather
+than cut, when somebody has already named the workspace, and when the prompt
+yields no usable slug.
+
 ### Reading a conversation
 
 | Tool | Arguments | Gate | Withheld from |

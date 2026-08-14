@@ -167,6 +167,7 @@ describe('readSessionBriefNaming: workspace naming eligibility', () => {
 			current: 'octocat/bach',
 			eligible: true,
 			namesWorkspace: true,
+			provisional: false,
 		});
 	});
 
@@ -180,6 +181,7 @@ describe('readSessionBriefNaming: workspace naming eligibility', () => {
 			current: 'octocat/bach',
 			eligible: false,
 			namesWorkspace: true,
+			provisional: false,
 		});
 	});
 
@@ -198,6 +200,28 @@ describe('readSessionBriefNaming: workspace naming eligibility', () => {
 			current: 'octocat/add-dark-mode',
 			eligible: false,
 			namesWorkspace: false,
+			provisional: false,
+		});
+	});
+
+	// The provisional name fills the board without settling anything, so both
+	// gates stay open and the agent's own call still lands as a first naming.
+	test('reports a provisionally named workspace as still nameable', () => {
+		selectWorkspaceWithRepositoryById.mockReturnValue(
+			workspaceRow({
+				branchName: 'octocat/add-dark-mode',
+				metadataJson: JSON.stringify({
+					branchProvisional: true,
+					placeholderName: true,
+				}),
+			}),
+		);
+
+		expect(read().branch).toEqual({
+			current: 'octocat/add-dark-mode',
+			eligible: true,
+			namesWorkspace: true,
+			provisional: true,
 		});
 	});
 
@@ -214,6 +238,7 @@ describe('readSessionBriefNaming: workspace naming eligibility', () => {
 			current: 'octocat/bach',
 			eligible: false,
 			namesWorkspace: true,
+			provisional: false,
 		});
 	});
 
@@ -224,6 +249,7 @@ describe('readSessionBriefNaming: workspace naming eligibility', () => {
 			current: null,
 			eligible: false,
 			namesWorkspace: false,
+			provisional: false,
 		});
 	});
 
@@ -245,6 +271,7 @@ describe('readSessionBriefNaming: workspace naming eligibility', () => {
 			current: 'octocat/bach',
 			eligible: true,
 			namesWorkspace: false,
+			provisional: false,
 		});
 	});
 
@@ -280,6 +307,7 @@ describe('readSessionBriefNaming: callers without a chat tab', () => {
 				current: 'octocat/bach',
 				eligible: true,
 				namesWorkspace: true,
+				provisional: false,
 			},
 			summaryStale: false,
 			titleNeeded: false,
@@ -295,6 +323,7 @@ describe('readSessionBriefNaming: callers without a chat tab', () => {
 				current: 'octocat/bach',
 				eligible: true,
 				namesWorkspace: true,
+				provisional: false,
 			},
 			summaryStale: false,
 			titleNeeded: false,
@@ -311,7 +340,12 @@ describe('readSessionBriefNaming: callers without a chat tab', () => {
 describe('readSessionBriefNaming: degradation', () => {
 	test('reports nothing outstanding without a database', () => {
 		expect(read({ database: null })).toEqual({
-			branch: { current: null, eligible: false, namesWorkspace: false },
+			branch: {
+				current: null,
+				eligible: false,
+				namesWorkspace: false,
+				provisional: false,
+			},
 			summaryStale: false,
 			titleNeeded: false,
 		});
@@ -325,7 +359,12 @@ describe('readSessionBriefNaming: degradation', () => {
 		});
 
 		expect(read()).toEqual({
-			branch: { current: null, eligible: false, namesWorkspace: false },
+			branch: {
+				current: null,
+				eligible: false,
+				namesWorkspace: false,
+				provisional: false,
+			},
 			summaryStale: false,
 			titleNeeded: false,
 		});
