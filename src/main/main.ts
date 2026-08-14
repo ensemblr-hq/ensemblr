@@ -576,6 +576,9 @@ const agentSessionService = createAgentSessionService({
 	/** Keeps the stop the user just asked for from notifying as a finished turn. */
 	onSessionAborted: (sessionId) => agentActivityMonitor.noteUserStop(sessionId),
 	queueNaming: sessionNamingQueue,
+	/** Reads the delegation mechanism each new Claude Code session opens under. */
+	readClaudeSubagentMode: () =>
+		appSettingsService.read().providers.claudeSubagentMode,
 	resolveAgentControlEnv,
 	/** Reads the workspace permission mode each new agent session must honour. */
 	resolvePermissionMode: () =>

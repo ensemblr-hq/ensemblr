@@ -19,6 +19,7 @@ export {
 	branchPrefixCustomAtom,
 	branchPrefixSourceAtom,
 	caffeinateWhileRunningAtom,
+	claudeSubagentModeAtom,
 	codeLigaturesAtom,
 	codeThemeAtom,
 	defaultChatModelAtom,

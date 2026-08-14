@@ -1568,9 +1568,14 @@ export function createAgentControlService({
 	const describeAudience = async (token: string): Promise<ControlAudience> => {
 		const origin = originRegistry.resolveByToken(token);
 		if (!origin) {
-			return { hasChatTab: false, role: 'orchestrator' };
+			return {
+				delegation: 'ensemblr',
+				hasChatTab: false,
+				role: 'orchestrator',
+			};
 		}
 		return {
+			delegation: origin.delegation,
 			hasChatTab: originHasChatTab(origin),
 			role: await resolveRole(origin),
 		};

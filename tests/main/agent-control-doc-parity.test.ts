@@ -29,6 +29,7 @@ const DOC_TOOLS = parseToolReference(DOC);
 const DOC_TOOLS_BY_NAME = new Map(DOC_TOOLS.map((tool) => [tool.name, tool]));
 
 const CHAT_TAB_ONLY_OPS = withheldControlOps({
+	delegation: 'ensemblr',
 	hasChatTab: false,
 	role: 'orchestrator',
 });

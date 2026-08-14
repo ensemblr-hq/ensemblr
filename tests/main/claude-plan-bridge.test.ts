@@ -12,6 +12,7 @@ import { CONTEXT_USAGE } from './helpers/claude-context-usage.ts';
 const TOKEN = 'tok-claude-1';
 
 const ORIGIN: AgentControlOrigin = {
+	delegation: 'ensemblr',
 	depth: 0,
 	parentSessionId: null,
 	sessionId: 'sess-1',

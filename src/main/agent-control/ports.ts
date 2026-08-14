@@ -38,6 +38,7 @@ import type {
 	SetBranchNameResult,
 	SetSummaryResult,
 	StartTerminalKind,
+	SubagentMechanism,
 	WorkspaceBoardStatusValue,
 } from '../../shared/agent-control.ts';
 import type { AgentProviderId } from '../../shared/agent-provider.ts';
@@ -69,6 +70,13 @@ export interface AgentControlEnvIdentity {
 	sessionId: string;
 	parentSessionId?: string | null;
 	species?: AgentSpecies;
+	/**
+	 * Which delegation mechanism the session is opening under. Resolved by the
+	 * caller and pinned here rather than read per request, so the tool list the
+	 * control server serves cannot drift from the deny list the runtime fixed at
+	 * session open. Defaults to `ensemblr` for a caller that does not say.
+	 */
+	delegation?: SubagentMechanism;
 }
 
 /**
@@ -93,6 +101,7 @@ export interface AgentControlOrigin {
 	parentSessionId: string | null;
 	depth: number;
 	species: AgentSpecies;
+	delegation: SubagentMechanism;
 }
 
 /**

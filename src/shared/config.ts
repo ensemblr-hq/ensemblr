@@ -1,9 +1,12 @@
 import { z } from 'zod';
 
+import { SUBAGENT_MECHANISMS } from './agent-control/subagent-mechanism.ts';
+
 /**
  * Schema + defaults for the user-facing **App settings** persisted in
  * `~/.config/ensemblr/config.json` under the `app` key (`app.general`,
- * `app.models`, `app.git`, `app.appearance`, `app.experimental`). This is the
+ * `app.models`, `app.providers`, `app.git`, `app.appearance`,
+ * `app.experimental`). This is the
  * single source of truth shared by the main process (read/validate/write) and
  * the renderer (defaults + types).
  *
@@ -36,6 +39,15 @@ const modelSettingsSchema = z.object({
 	reviewModel: z.string().nullable().catch(null),
 	reviewThinkingLevel: z.string().nullable().catch(null),
 	hiddenModels: z.array(z.string()).catch([]),
+});
+
+// Per-runtime preferences, keyed by the runtime they bite for. `claudeSubagentMode`
+// picks which delegation mechanism a first-class Claude Code chat holds: `ensemblr`
+// spawns visible chat tabs through the control tools and denies Claude's own
+// sub-agent tool, `native` does the reverse. Pi has no native sub-agent mechanism
+// and ignores the setting.
+const providerSettingsSchema = z.object({
+	claudeSubagentMode: z.enum(SUBAGENT_MECHANISMS).catch('ensemblr'),
 });
 
 // Git user-scope defaults. Field names mirror the repository-resolution keys
@@ -101,6 +113,7 @@ const appearanceSettingsSchema = z.object({
 const appSettingsSchema = z.object({
 	general: generalSettingsSchema,
 	models: modelSettingsSchema,
+	providers: providerSettingsSchema,
 	git: gitSettingsSchema,
 	appearance: appearanceSettingsSchema,
 	experimental: experimentalSettingsSchema,
@@ -113,6 +126,8 @@ export type AppSettings = z.infer<typeof appSettingsSchema>;
 export type GeneralSettings = AppSettings['general'];
 /** The `models` section of App settings. */
 type ModelSettings = AppSettings['models'];
+/** The `providers` per-runtime preferences section of App settings. */
+export type ProviderSettings = AppSettings['providers'];
 /** The `git` user-scope defaults section of App settings. */
 export type GitSettings = AppSettings['git'];
 /** The `appearance` section of App settings. */
@@ -126,6 +141,7 @@ export type OnboardingSettings = AppSettings['onboarding'];
 export interface AppSettingsPatch {
 	general?: Partial<GeneralSettings>;
 	models?: Partial<ModelSettings>;
+	providers?: Partial<ProviderSettings>;
 	git?: Partial<GitSettings>;
 	appearance?: Partial<AppearanceSettings>;
 	experimental?: Partial<ExperimentalSettings>;
@@ -136,6 +152,7 @@ export interface AppSettingsPatch {
 export const appSettingsPatchSchema = z.object({
 	general: generalSettingsSchema.partial().optional(),
 	models: modelSettingsSchema.partial().optional(),
+	providers: providerSettingsSchema.partial().optional(),
 	git: gitSettingsSchema.partial().optional(),
 	appearance: appearanceSettingsSchema.partial().optional(),
 	experimental: experimentalSettingsSchema.partial().optional(),
@@ -146,6 +163,7 @@ export const appSettingsPatchSchema = z.object({
 export const DEFAULT_APP_SETTINGS: AppSettings = appSettingsSchema.parse({
 	general: {},
 	models: {},
+	providers: {},
 	git: {},
 	appearance: {},
 	experimental: {},
@@ -169,6 +187,7 @@ export function parseAppSettings(raw: unknown): AppSettings {
 	const result = appSettingsSchema.safeParse({
 		general: asRecord(record.general),
 		models: asRecord(record.models),
+		providers: asRecord(record.providers),
 		git: asRecord(record.git),
 		appearance: asRecord(record.appearance),
 		experimental: asRecord(record.experimental),
@@ -185,6 +204,7 @@ export function mergeAppSettings(
 	return {
 		general: { ...current.general, ...patch.general },
 		models: { ...current.models, ...patch.models },
+		providers: { ...current.providers, ...patch.providers },
 		git: { ...current.git, ...patch.git },
 		appearance: { ...current.appearance, ...patch.appearance },
 		experimental: { ...current.experimental, ...patch.experimental },
