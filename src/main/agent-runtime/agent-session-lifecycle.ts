@@ -24,7 +24,10 @@ import type {
 } from './agent-session-types.ts';
 import type { SessionNamingInput } from './naming/session-naming.ts';
 import type { ActiveSessionMap } from './session/active-session.ts';
-import type { TurnPreambleResolver } from './session/agent-control-wiring.ts';
+import type {
+	SubagentMechanismReader,
+	TurnPreambleResolver,
+} from './session/agent-control-wiring.ts';
 import {
 	createRuntimeEventHandler,
 	type PersistRuntimeEventPort,
@@ -112,6 +115,8 @@ interface AgentSessionLifecycleOptions {
 	/** Derived tab titling, fired at open and every turn-idle. */
 	queueNaming: QueueNamingPort;
 	requireDatabase: () => DatabaseSync;
+	/** Reads the delegation mechanism a Claude Code session must open under. */
+	readClaudeSubagentMode?: SubagentMechanismReader;
 	/** Injects the agent-control env (control URL + token) into each agent child. */
 	resolveAgentControlEnv?: AgentControlEnvResolver;
 	/** Renders the per-turn upkeep block for runtimes whose system prompt is fixed at open. */
@@ -169,6 +174,7 @@ export function createAgentSessionLifecycle({
 	persistRuntimeEvent,
 	agentClient,
 	queueNaming,
+	readClaudeSubagentMode,
 	requireDatabase,
 	resolveAgentControlEnv,
 	resolvePermissionMode,
@@ -201,6 +207,7 @@ export function createAgentSessionLifecycle({
 		now,
 		agentClient,
 		queueNaming,
+		readClaudeSubagentMode,
 		resolveAgentControlEnv,
 		resolvePermissionMode,
 		resolveProviderExecutable,

@@ -1,3 +1,4 @@
+import type { SubagentMechanism } from '../../shared/agent-control';
 import type { AgentProviderId } from '../../shared/agent-provider';
 import type {
 	AgentWireMessagePart,
@@ -153,6 +154,13 @@ export interface AgentSessionRequest {
 	planMode?: boolean;
 	/** Ensemblr Control MCP endpoint, for runtimes that speak MCP natively. */
 	controlMcp?: AgentControlMcpConfig | null;
+	/**
+	 * Which delegation mechanism the session opens under. A runtime shipping a
+	 * sub-agent tool of its own denies that tool under `ensemblr`, so the user's
+	 * choice is enforced rather than merely stated in the playbook. Runtimes with
+	 * no sub-agent tool ignore it. Defaults to `ensemblr`.
+	 */
+	delegation?: SubagentMechanism;
 	/** Extra instructions appended to the runtime's own system prompt. */
 	systemPromptAppend?: string | null;
 	/**

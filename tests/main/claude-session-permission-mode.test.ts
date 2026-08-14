@@ -40,6 +40,12 @@ const MUTATING_TOOLS = [
 	'Write',
 ];
 
+// Every session here opens under the default `ensemblr` delegation mechanism,
+// which denies Claude's own sub-agent tool on top of whatever the permission
+// mode already withheld. `claude-subagent-mode.test.ts` owns that axis; these
+// assertions carry it so a permission-mode change cannot silently drop it.
+const NATIVE_SUBAGENT_TOOLS = ['Agent', 'Task'];
+
 const cleanups: Array<() => void> = [];
 
 afterEach(() => {
@@ -193,7 +199,7 @@ describe('Claude session options: the workspace permission mode reaches the SDK'
 
 		expect(options.permissionMode).toBe('bypassPermissions');
 		expect(options.allowDangerouslySkipPermissions).toBe(true);
-		expect(options.disallowedTools).toBeUndefined();
+		expect(options.disallowedTools).toEqual(NATIVE_SUBAGENT_TOOLS);
 		expect(options.canUseTool).toBeUndefined();
 	});
 
@@ -201,7 +207,10 @@ describe('Claude session options: the workspace permission mode reaches the SDK'
 		const options = await openClaudeSession({ mode: 'read-only' });
 
 		expect(options.permissionMode).toBe('plan');
-		expect(options.disallowedTools).toEqual(MUTATING_TOOLS);
+		expect(options.disallowedTools).toEqual([
+			...MUTATING_TOOLS,
+			...NATIVE_SUBAGENT_TOOLS,
+		]);
 	});
 
 	it('gates each tool call when the user picked approval-required', async () => {
@@ -519,7 +528,10 @@ describe('the whole composition: service to SDK', () => {
 		const options = await resumeClaudeSessionThroughService('read-only');
 
 		expect(options.permissionMode).toBe('plan');
-		expect(options.disallowedTools).toEqual(MUTATING_TOOLS);
+		expect(options.disallowedTools).toEqual([
+			...MUTATING_TOOLS,
+			...NATIVE_SUBAGENT_TOOLS,
+		]);
 		expect(options.allowDangerouslySkipPermissions).not.toBe(true);
 	});
 

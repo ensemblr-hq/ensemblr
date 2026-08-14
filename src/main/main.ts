@@ -553,6 +553,9 @@ const agentSessionService = createAgentSessionService({
 	/** Reports whether the chat behind this session has Plan Mode switched on. */
 	isPlanModeActive: (sessionId) => planModeRegistry.isActive(sessionId),
 	queueNaming: sessionNamingQueue,
+	/** Reads the delegation mechanism each new Claude Code session opens under. */
+	readClaudeSubagentMode: () =>
+		appSettingsService.read().providers.claudeSubagentMode,
 	resolveAgentControlEnv,
 	/** Reads the workspace permission mode each new agent session must honour. */
 	resolvePermissionMode: () =>

@@ -60,6 +60,7 @@ const setup = (
 		resolveAgentControlWiring({
 			parentSessionId: input.parentSessionId ?? null,
 			provider: input.provider,
+			readClaudeSubagentMode: undefined,
 			resolveAgentControlEnv,
 			resolveTurnPreamble: undefined,
 			sessionId: input.sessionId,
@@ -157,6 +158,7 @@ describe('agent-control wiring: the control MCP endpoint', () => {
 		const wiring = resolveAgentControlWiring({
 			parentSessionId: null,
 			provider: 'claude',
+			readClaudeSubagentMode: undefined,
 			resolveAgentControlEnv: undefined,
 			resolveTurnPreamble: undefined,
 			sessionId: 'claude-1',
@@ -165,6 +167,7 @@ describe('agent-control wiring: the control MCP endpoint', () => {
 
 		expect(wiring).toEqual({
 			controlMcp: null,
+			delegation: 'ensemblr',
 			env: undefined,
 			resolveTurnPreamble: null,
 			systemPromptAppend: null,
@@ -197,6 +200,7 @@ describe('agent-control wiring: the per-turn upkeep block', () => {
 				resolveAgentControlWiring({
 					parentSessionId: null,
 					provider,
+					readClaudeSubagentMode: undefined,
 					resolveAgentControlEnv,
 					resolveTurnPreamble: async (id) => {
 						asked.push(id);

@@ -93,6 +93,18 @@ export const reviewThinkingLevelAtom = settingAtom(
 );
 export const hiddenModelsAtom = settingAtom('models', 'hiddenModels');
 
+// ─── Providers ──────────────────────────────────────────────────────────────────
+/**
+ * Which delegation mechanism a Claude Code chat opens under: `ensemblr` spawns
+ * sub-agents into their own chat tabs and denies Claude's built-in sub-agent
+ * tool, `native` does the reverse. Read at session open, so a change reaches the
+ * next chat rather than the one already running.
+ */
+export const claudeSubagentModeAtom = settingAtom(
+	'providers',
+	'claudeSubagentMode',
+);
+
 // ─── Git (user defaults) ────────────────────────────────────────────────────────
 // Atom names stay friendly; the backing keys mirror the repo-resolution keys so
 // the same values feed `resolveSettings` as the `user-default` source.

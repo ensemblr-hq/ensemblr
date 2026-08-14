@@ -32,7 +32,7 @@ each exposing its public surface through `index.ts`.
 | --- | --- | --- |
 | Agent surface (provider-neutral) | `agent-runtime/` | Adapter contract, `AgentClient`, session service, persistence, naming, summaries |
 | Pi adapter | `pi-agent/` | Pi CLI RPC wire frames (`cli-rpc/`), payload normalizer, slash commands |
-| Claude adapter | `claude-agent/` | Claude Code adapter, MCP config + roster, model catalogue, readiness |
+| Claude adapter | `claude-agent/` | Claude Code adapter, MCP config + roster, model catalogue, readiness, sub-agent mechanism |
 | Pi runtime discovery | `pi-runtime/` | Pi executable discovery, readiness checks |
 | Pi transport plumbing | `pi-ipc/` | JSONL line stream shared by `pi-runtime/` and `pi-agent/`; no protocol knowledge |
 | Provider catalogue | `agent-providers/` | Model catalogue, executable overrides, readiness probes across runtimes |

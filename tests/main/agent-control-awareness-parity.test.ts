@@ -4,6 +4,7 @@ import { TOOL_DEFS } from '../../src/main/agent-control/index.ts';
 import {
 	ASK_USER_QUESTION_LIMITS,
 	HARNESS_AWARENESS,
+	NATIVE_ORCHESTRATOR_AWARENESS,
 	ORCHESTRATOR_AWARENESS,
 	PLAN_MODE_ORCHESTRATOR_AWARENESS,
 	PLAN_MODE_SUBAGENT_AWARENESS,
@@ -13,6 +14,7 @@ import {
 	SUBAGENT_UNUSABLE_OPS,
 	SUBAGENT_WITHHELD_OPS,
 	subAgentControlOpDenial,
+	withheldControlOps,
 } from '../../src/shared/agent-control.ts';
 import {
 	PLAN_MODE_GUARDED_TOOLS,
@@ -30,6 +32,20 @@ const PLAN_MODE_PLAYBOOKS = [
 	PLAN_MODE_ORCHESTRATOR_AWARENESS,
 	PLAN_MODE_SUBAGENT_AWARENESS,
 ] as const;
+
+/**
+ * The tool names a root delegating through its own runtime does not hold,
+ * derived from the policy rather than restated, so an op added to the axis is
+ * covered without editing this file.
+ */
+const NATIVE_WITHHELD_TOOL_NAMES = ((): readonly string[] => {
+	const ops = withheldControlOps({
+		delegation: 'native',
+		hasChatTab: true,
+		role: 'orchestrator',
+	});
+	return TOOL_DEFS.filter((def) => ops.has(def.op)).map((def) => def.name);
+})();
 
 /**
  * Extracts the value of a named `const <name> = \`...\`` template literal from the
@@ -104,6 +120,50 @@ describe('agent-control AWARENESS parity', () => {
 		expect(
 			extractEmbeddedAwareness(readExtensionSource(), 'SUBAGENT_AWARENESS'),
 		).toBe(SUBAGENT_AWARENESS);
+	});
+
+	// The native variant is the playbook for a root whose runtime delegates
+	// through its own sub-agent tool. Its tool list has the chat-tab spawn ops
+	// withheld, so it may name one only in the sentence that says the tool is
+	// gone — anywhere else sends it hunting for a tool it does not hold. Scoped
+	// by paragraph rather than by substring so rewording the inventory cannot
+	// quietly reintroduce one.
+	it('names a withheld spawn tool only where it says the tool is absent', () => {
+		const paragraphs = NATIVE_ORCHESTRATOR_AWARENESS.split('\n\n');
+		const absence = paragraphs.filter((paragraph) =>
+			paragraph.includes(
+				'absent from your list rather than merely discouraged',
+			),
+		);
+
+		expect(absence).toHaveLength(1);
+		expect(NATIVE_WITHHELD_TOOL_NAMES.length).toBeGreaterThan(0);
+		expect(NATIVE_ORCHESTRATOR_AWARENESS).toContain(
+			"YOUR OWN runtime's sub-agent tool",
+		);
+		for (const name of NATIVE_WITHHELD_TOOL_NAMES) {
+			expect(absence[0], name).toContain(name);
+			for (const paragraph of paragraphs) {
+				if (paragraph === absence[0]) continue;
+				expect(paragraph, name).not.toContain(name);
+			}
+		}
+	});
+
+	// Everything that is a property of the work rather than of the mechanism has
+	// to survive the swap, or picking the built-in tool quietly drops the rules
+	// that make a fan-out worth doing.
+	it('keeps the mechanism-independent rules in the native variant', () => {
+		expect(NATIVE_ORCHESTRATOR_AWARENESS).toContain(
+			'Your last message is your answer to the user',
+		);
+		expect(NATIVE_ORCHESTRATOR_AWARENESS).toContain(
+			'Split the work before you split the agents',
+		);
+		expect(NATIVE_ORCHESTRATOR_AWARENESS).toContain('Verify before you rely');
+		expect(NATIVE_ORCHESTRATOR_AWARENESS).toContain(
+			'`ensemblr_ask_user_question`',
+		);
 	});
 
 	// A sub-agent that writes its findings mid-turn and signs off with a pointer

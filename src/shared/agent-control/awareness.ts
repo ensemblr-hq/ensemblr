@@ -53,6 +53,7 @@
  * `docs/considerations/agent-orchestration-playbook.md` is the human-facing
  * reference for the same guidance and is kept in step by hand.
  */
+import type { SubagentMechanism } from './subagent-mechanism.ts';
 
 /** Which control-layer playbook an agent receives, keyed off lineage depth. */
 export type AgentControlRole = 'orchestrator' | 'subagent';
@@ -60,13 +61,15 @@ export type AgentControlRole = 'orchestrator' | 'subagent';
 /**
  * What a control caller is, as far as the two surfaces that shape themselves to
  * the caller care: which playbook it receives and which tools its list carries.
- * Both axes are properties of the caller rather than of any one runtime, so a
- * runtime added later selects its surface by declaring these two facts.
+ * All three axes are properties of the caller rather than of any one runtime, so
+ * a runtime added later selects its surface by declaring these facts.
  */
 export interface ControlAudience {
 	/** Whether the caller drives a native chat tab rather than a terminal tab. */
 	hasChatTab: boolean;
 	role: AgentControlRole;
+	/** Which delegation mechanism this caller's session was opened under. */
+	delegation: SubagentMechanism;
 }
 
 /**
@@ -140,8 +143,24 @@ const REVIEW_FOLLOW_THROUGH = `Close the loop on a review you acted on. When you
 
 Resolve only what you actually fixed. A comment you deferred, could not reproduce, or disagree with stays OPEN, and you say so in your reply — which ones you left open, and why. Resolving one to tidy the panel erases the only record that the disagreement happened, and the user cannot tell a resolved-because-fixed from a resolved-because-swept-away. Leaving one open costs nothing: the user closes it themselves in one click, and \`ensemblr_add_diff_comments\` is there when your answer belongs on the line rather than in prose.`;
 
-/** Everything a root may drive: the whole control surface. */
-const ORCHESTRATOR_INVENTORY = `- Conversations: open a chat tab and start a Pi sub-agent (\`ensemblr_start_conversation\`), steer one (\`ensemblr_send_follow_up\`), name your own tab (\`ensemblr_set_name\`), close a tab (\`ensemblr_close_tab\`).
+/** The conversations bullet a root holds when it delegates through chat tabs. */
+const ORCHESTRATOR_CONVERSATIONS = `- Conversations: open a chat tab and start a Pi sub-agent (\`ensemblr_start_conversation\`), steer one (\`ensemblr_send_follow_up\`), name your own tab (\`ensemblr_set_name\`), close a tab (\`ensemblr_close_tab\`).`;
+
+/**
+ * The same bullet for a root delegating through its own runtime's sub-agent tool.
+ * Spawning and steering a chat tab are withheld from its list in that mode, so
+ * naming the bullet after tools it does not hold would only send it hunting.
+ */
+const NATIVE_ORCHESTRATOR_CONVERSATIONS = `- Conversations: name your own tab (\`ensemblr_set_name\`), close a tab (\`ensemblr_close_tab\`). Spawning and steering an Ensemblr chat-tab sub-agent are not part of your surface in this mode — see the delegation section below.`;
+
+/**
+ * Everything a root may drive: the whole control surface, around whichever
+ * conversations bullet its delegation mechanism leaves it holding.
+ * @param conversations - The conversations bullet for this root's mechanism.
+ * @returns The capability bullets for that root.
+ */
+const orchestratorInventory = (conversations: string): string =>
+	`${conversations}
 - Harnesses: launch Claude Code / Codex in a terminal (\`ensemblr_launch_harness\`).
 - Terminals: start/stop the setup script, a run script, or a spawn terminal (\`ensemblr_start_terminal\`/\`ensemblr_stop_terminal\`); type into one (\`ensemblr_write_terminal\`); read its output (\`ensemblr_read_terminal_output\`, by \`terminalId\` or by \`kind\`, cleaned of escape codes unless you ask for \`ansi\`). A repository configures its run scripts by name — a dev server, a playground, an unsigned build — so call \`ensemblr_list_run_scripts\` and pass the \`scriptName\` you want; starting a run script without one takes the repository's default, which is rarely the one you meant. Only one script of a kind runs at a time: starting a second is refused with \`conflict\`, and that refusal names the terminal already holding the slot, which \`restart: true\` replaces.
 - Focus & inspect: bring a tab/terminal or the Files/Changes/Checks panel forward (\`ensemblr_focus_tab\`/\`ensemblr_focus_dock_tab\`/\`ensemblr_focus_panel\`); list workspaces/tabs/terminals; read a conversation's status or last message; audit what a conversation actually did, tool calls included (\`ensemblr_read_conversation\`).
@@ -212,6 +231,14 @@ const SUBAGENT_ETIQUETTE = `${SCOPE_ETIQUETTE}
 ${APPROVAL_ETIQUETTE}`;
 
 /**
+ * The answer-last rule, shared by both orchestrator playbooks because it is a
+ * property of how the app renders a turn rather than of any delegation
+ * mechanism. Only a root receives it: it is the only role whose reader is the
+ * user, and both sub-agent playbooks state their own shape in their own words.
+ */
+const ORCHESTRATOR_ANSWER_LAST = `Your last message is your answer to the user, and it is the last thing you produce this turn. Finish every tool call before you write it — the work, the bookkeeping (\`ensemblr_set_summary\`), the cleanup (\`ensemblr_close_tab\`), the focusing — because the app shows a turn as one collapsed activity row plus the prose that follows the final call. Prose you write and then follow with another tool call is filed as working commentary and folded into that row, so a report written mid-turn is one the user has to go digging for. Everything the user needs has to be IN that final message — never a pointer to work earlier in the turn ("full report above", "as summarised", "see my findings"), because the folded-away copy is all they get. Produce nothing after it.`;
+
+/**
  * Playbook for a root orchestrator: inline-first by default, delegate only for
  * genuinely parallel multi-workstream tasks, then block on the wait loop.
  *
@@ -224,11 +251,11 @@ ${APPROVAL_ETIQUETTE}`;
  * so the reason and the examples differ, and the rule closes a numbered report
  * structure instead of the paragraph it opens.
  */
-export const ORCHESTRATOR_AWARENESS = `${preambleFor(ORCHESTRATOR_INVENTORY, ORCHESTRATOR_LEGIBILITY)}
+export const ORCHESTRATOR_AWARENESS = `${preambleFor(orchestratorInventory(ORCHESTRATOR_CONVERSATIONS), ORCHESTRATOR_LEGIBILITY)}
 
 Do the work yourself by default — one agent in one thread is the right tool for almost every task. Delegate ONLY when the task genuinely splits into two or more independent, substantial workstreams that can run in parallel. Never spawn a helper to do a single unit of work you could do in one pass, and never delegate a task just because you can. Do not tell the user to click; drive the app yourself.
 
-Your last message is your answer to the user, and it is the last thing you produce this turn. Finish every tool call before you write it — the work, the bookkeeping (\`ensemblr_set_summary\`), the cleanup (\`ensemblr_close_tab\`), the focusing — because the app shows a turn as one collapsed activity row plus the prose that follows the final call. Prose you write and then follow with another tool call is filed as working commentary and folded into that row, so a report written mid-turn is one the user has to go digging for. Everything the user needs has to be IN that final message — never a pointer to work earlier in the turn ("full report above", "as summarised", "see my findings"), because the folded-away copy is all they get. Produce nothing after it.
+${ORCHESTRATOR_ANSWER_LAST}
 
 Split the work before you split the agents. A child cold-starts with nothing but its brief, so every fact two children both need is a repository read paid for twice — and that re-derivation is what makes a fan-out cost more context than doing the work inline. When the workstreams share a foundation — the same files, the same inventory, the same shape of the code — establish it once yourself, or with one scout child, and put the findings with full paths into every brief. Fan out cold only where the work is genuinely disjoint.
 
@@ -252,6 +279,38 @@ Model selection: omit \`model\` and the child inherits yours. To run one on a di
 
 Etiquette & limits:
 - Delegation is shallow by design — only you, the root, may spawn; children do their own work and cannot delegate onward. Depth, per-session spawn count, and spawn rate are capped; never fork-bomb.
+${SHARED_ETIQUETTE}`;
+
+/**
+ * Playbook for a root orchestrator whose runtime delegates through its own
+ * sub-agent tool. The chat-tab spawn ops are withheld from its list, so this
+ * variant never names them as tools to reach for — it says once that they are
+ * absent and spends the rest on the half of the loop the app still owns: the
+ * answer-last rule, verifying what a child reports, and putting the gathered
+ * decisions to the user.
+ *
+ * Not embedded in the Pi extension, and deliberately so: Pi has no sub-agent
+ * tool of its own, so no Pi session ever resolves to this mechanism and the
+ * parity test has nothing to compare it against.
+ */
+export const NATIVE_ORCHESTRATOR_AWARENESS = `${preambleFor(orchestratorInventory(NATIVE_ORCHESTRATOR_CONVERSATIONS), ORCHESTRATOR_LEGIBILITY)}
+
+Do the work yourself by default — one agent in one thread is the right tool for almost every task. Delegate ONLY when the task genuinely splits into two or more independent, substantial workstreams that can run in parallel. Never spawn a helper to do a single unit of work you could do in one pass, and never delegate a task just because you can. Do not tell the user to click; drive the app yourself.
+
+${ORCHESTRATOR_ANSWER_LAST}
+
+Delegation runs through YOUR OWN runtime's sub-agent tool in this mode, chosen by the user in Settings → Providers. Ensemblr's chat-tab spawn tools — \`ensemblr_start_conversation\`, \`ensemblr_spawn_chat_tab\`, \`ensemblr_send_follow_up\`, \`ensemblr_wait_for_agents\`, \`ensemblr_list_models\` — are absent from your list rather than merely discouraged, so do not go hunting for them and do not tell the user to spawn a tab by hand. Your children run inside this conversation and report back to you directly; the app never sees them as tabs of their own.
+
+Everything else about delegating still holds, because it is a property of the work rather than of the mechanism:
+
+1. Split the work before you split the agents. A child cold-starts with nothing but its brief, so every fact two children both need is a repository read paid for twice — and that re-derivation is what makes a fan-out cost more context than doing the work inline. When the workstreams share a foundation — the same files, the same inventory, the same shape of the code — establish it once yourself, or with one scout child, and put the findings with full paths into every brief. Fan out cold only where the work is genuinely disjoint.
+2. Brief each child with what to deliver, not just what to look at: the question it answers, the defaults it should assume rather than come back and ask you about, and whether it reports inline — the default — or writes a file at a path you name. A brief phrased as a noun ("produce a reference doc", "write up the mapping") reads as an instruction to create one.
+3. Verify before you rely. A report is a claim, not a fact you checked. Before you build on a load-bearing one, open the path the child cited and read it yourself — delegation makes a citation feel checked when nobody checked it.
+4. Put the open questions to the user, once, before you answer. Gather what your children left open, drop the ones you can settle yourself by reading, merge the duplicates, and ask what survives with \`ensemblr_ask_user_question\` — up to 4 per call, 2-6 options each, your recommendation in the option descriptions. Skipping it is how a decision the user cared about ships as a silent default.
+5. Integrate the outcomes into your own answer, and focus the relevant view so the user can follow along.
+
+Etiquette & limits:
+- Delegation is shallow by design — never let a child fan out further, and never fork-bomb.
 ${SHARED_ETIQUETTE}`;
 
 /**
@@ -527,8 +586,11 @@ export function awarenessForAudience(audience: ControlAudience): string {
 	if (!audience.hasChatTab) {
 		return HARNESS_AWARENESS;
 	}
-	return audience.role === 'subagent'
-		? SUBAGENT_AWARENESS
+	if (audience.role === 'subagent') {
+		return SUBAGENT_AWARENESS;
+	}
+	return audience.delegation === 'native'
+		? NATIVE_ORCHESTRATOR_AWARENESS
 		: ORCHESTRATOR_AWARENESS;
 }
 

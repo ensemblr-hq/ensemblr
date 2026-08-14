@@ -76,6 +76,21 @@ role table refuses a marked child `denied-scope`, and the depth cap — default 
 caller at depth ≥ 1 `denied-depth`. The role check is the durable one; the cap is what stops a root
 from fork-bombing.
 
+### Which mechanism delegates
+
+Claude Code has a sub-agent tool of its own; Pi does not. Settings → Providers → Claude Code picks
+which one a Claude chat delegates with, and the unpicked one is *absent* rather than discouraged:
+
+- **Ensemblr chat tabs** (default) — the loop below, with `Agent`/`Task` denied through the SDK.
+- **Claude Code built-in** — its own sub-agent tool, with `ensemblr_start_conversation`,
+  `ensemblr_spawn_chat_tab`, `ensemblr_send_follow_up`, `ensemblr_wait_for_agents`, and
+  `ensemblr_list_models` withheld from the tool list. Everything in this document that is a property
+  of the *work* rather than of the mechanism — split before you fan out, brief for a deliverable,
+  verify before you rely, gather the open questions — still applies.
+
+The mechanism is fixed when the chat opens, so a change reaches the next chat. See
+[The delegation-mechanism axis](../agent-control.md#the-delegation-mechanism-axis).
+
 ### The answer goes last
 
 Your last message is your answer to the user, and it is the last thing you produce in the turn. Every

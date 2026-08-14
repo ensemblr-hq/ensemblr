@@ -21,8 +21,8 @@ import { watchConfigFile } from './watch-config-file.ts';
 const WATCH_DEBOUNCE_MS = 120;
 
 /**
- * Owns the App-settings slice (`app.general`, `app.models`, `app.git`,
- * `app.appearance`, `app.experimental`, `app.onboarding`) of
+ * Owns the App-settings slice (`app.general`, `app.models`, `app.providers`,
+ * `app.git`, `app.appearance`, `app.experimental`, `app.onboarding`) of
  * `~/.config/ensemblr/config.json` — the source of truth. Creates the file with
  * defaults on first use, applies section-scoped patches via an atomic
  * temp-write+rename, and watches for external edits (echo-suppressed against its
@@ -92,6 +92,7 @@ export function createAppSettingsService(
 		return parseAppSettings({
 			general: app.general,
 			models: app.models,
+			providers: app.providers,
 			git: app.git,
 			appearance: app.appearance,
 			experimental: app.experimental,
@@ -108,6 +109,7 @@ export function createAppSettingsService(
 			app: {
 				general: DEFAULT_APP_SETTINGS.general,
 				models: DEFAULT_APP_SETTINGS.models,
+				providers: DEFAULT_APP_SETTINGS.providers,
 				git: DEFAULT_APP_SETTINGS.git,
 				appearance: DEFAULT_APP_SETTINGS.appearance,
 				experimental: DEFAULT_APP_SETTINGS.experimental,
@@ -134,6 +136,7 @@ export function createAppSettingsService(
 				...app,
 				general: next.general,
 				models: next.models,
+				providers: next.providers,
 				git: next.git,
 				appearance: next.appearance,
 				experimental: next.experimental,

@@ -138,19 +138,42 @@ const CHAT_TAB_ONLY_OPS: ReadonlySet<AgentControlOp> = new Set([
 ]);
 
 /**
- * Every op a caller's tool list leaves out, folding both withholding axes into
- * one answer: the chat-tab ops a caller without a tab cannot use, and the ops a
- * spawned sub-agent is denied or has no use for. Listing a tool the service would
- * only refuse teaches the model to keep reaching for it, which is the same
- * argument on both axes.
- * @param audience - Whether the caller has a chat tab, and its lineage role.
+ * Ops withheld from a root whose runtime delegates through its own sub-agent
+ * tool. The user picked one mechanism, so the other is absent rather than
+ * available-but-discouraged — an orchestrator holding both picks whichever its
+ * training favours, which is the failure this axis exists to stop.
+ *
+ * The conversation reads (`getConversationStatus`, `getLastMessage`,
+ * `readConversation`) and `closeTab` are deliberately absent from this set: they
+ * act on the tabs the user already has open, not only on children. `listModels`
+ * is here because its one use is choosing a spawned child's model.
+ */
+const NATIVE_DELEGATION_WITHHELD_OPS: ReadonlySet<AgentControlOp> = new Set([
+	'spawnChatTab',
+	'startConversation',
+	'sendFollowUp',
+	'waitForAgents',
+	'listModels',
+]);
+
+/**
+ * Every op a caller's tool list leaves out, folding all three withholding axes
+ * into one answer: the chat-tab ops a caller without a tab cannot use, the ops a
+ * spawned sub-agent is denied or has no use for, and the spawn ops a root
+ * delegating through its own runtime does not hold. Listing a tool the service
+ * would only refuse teaches the model to keep reaching for it, which is the same
+ * argument on every axis.
+ * @param audience - Whether the caller has a chat tab, its lineage role, and its delegation mechanism.
  * @returns The ops to withhold from that caller's tool list.
  */
 export function withheldControlOps(
 	audience: ControlAudience,
 ): ReadonlySet<AgentControlOp> {
+	const delegatesNatively =
+		audience.role === 'orchestrator' && audience.delegation === 'native';
 	return new Set([
 		...(audience.hasChatTab ? [] : CHAT_TAB_ONLY_OPS),
 		...(audience.role === 'subagent' ? SUBAGENT_WITHHELD_OPS : []),
+		...(delegatesNatively ? NATIVE_DELEGATION_WITHHELD_OPS : []),
 	]);
 }
