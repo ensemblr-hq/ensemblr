@@ -41,7 +41,7 @@ const SHORT_MESSAGES: readonly string[] = [
 ];
 
 const LONG_MESSAGE =
-	'When you get to the flush hook, remember the falling edge is the only safe trigger — reading `isStreaming` directly fires against a composer that merely mounted idle, and that would drain the whole queue into a session nobody started. Add the regression test alongside it.';
+	'When you get to the flush hook, remember the composer is not permanently mounted — the ask_user_question card replaces it and a tab switch unmounts it — so a turn can end with nothing there to notice. Read the standing state rather than the transition, and add the regression test alongside it.';
 
 /**
  * Builds a queue of the requested depth. The second entry carries an attachment

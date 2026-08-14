@@ -162,9 +162,14 @@ function QueueRowAction({
 
 /**
  * One queued message: a handle that says where it sits, what it says, and the
- * three things that can be done to it. The head reads in the accent colour and
- * is labelled as next, because the order rows sit in is the order they send and
- * nothing else on the row says which one the agent gets first.
+ * three things that can be done to it.
+ *
+ * The head is marked by colour and position alone — accent border, accent tint,
+ * accent position number, top of the list. A fifth signal spelling it out took a
+ * line of its own on that row only, which is what made the stack read ragged, so
+ * the word survives as screen-reader text. The drag handle already announces
+ * which place a row holds, so that leaves the tint and the border silent rather
+ * than the whole set.
  *
  * A chore keeps the same shape but reads muted, because it was queued by the
  * Checks panel rather than typed here and will drain on its own under every
@@ -227,6 +232,11 @@ function FollowUpQueueRow({
 				position={position}
 			/>
 			<div className='flex min-w-0 flex-1 flex-col gap-1'>
+				{isFirst ? (
+					<span className='sr-only'>
+						{t('workbench:follow-up-queue.next', 'Next')}
+					</span>
+				) : null}
 				<p
 					className={cn(
 						'line-clamp-2 break-words text-xs leading-snug',
@@ -237,23 +247,14 @@ function FollowUpQueueRow({
 				>
 					{entry.text.trim()}
 				</p>
-				{isFirst || attachmentCount > 0 ? (
-					<span className='flex items-center gap-2 text-xxs leading-none'>
-						{isFirst ? (
-							<span className='font-medium text-accent-strong uppercase tracking-wide'>
-								{t('workbench:follow-up-queue.next', 'Next')}
-							</span>
-						) : null}
-						{attachmentCount > 0 ? (
-							<span className='inline-flex items-center gap-1 text-muted-foreground'>
-								<PaperclipIcon className='size-3' />
-								{t('workbench:follow-up-queue.attachments', {
-									count: attachmentCount,
-									defaultValue_one: '{{count}} attachment',
-									defaultValue_other: '{{count}} attachments',
-								})}
-							</span>
-						) : null}
+				{attachmentCount > 0 ? (
+					<span className='inline-flex items-center gap-1 text-muted-foreground text-xxs leading-none'>
+						<PaperclipIcon className='size-3' />
+						{t('workbench:follow-up-queue.attachments', {
+							count: attachmentCount,
+							defaultValue_one: '{{count}} attachment',
+							defaultValue_other: '{{count}} attachments',
+						})}
 					</span>
 				) : null}
 			</div>
@@ -295,9 +296,9 @@ function FollowUpQueueRow({
  *
  * Scrolls natively under `sleek-scrollbar` rather than through Radix
  * `ScrollArea`, so the box hugs however tall the rows actually came out. Rows
- * vary — one line, two clamped lines, and a head that carries a meta line — so
- * the definite height an overlay viewport needs could only ever be an average,
- * and it left short queues sitting in dead space.
+ * vary — one line, two clamped lines, and an attachment row that carries a meta
+ * line under them — so the definite height an overlay viewport needs could only
+ * ever be an average, and it left short queues sitting in dead space.
  */
 export function FollowUpQueueList({
 	entries,

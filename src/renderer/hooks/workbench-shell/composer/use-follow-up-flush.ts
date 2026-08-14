@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useState } from 'react';
 
 import type { FollowUpQueueApi } from '@/renderer/state/composer';
 import type { FollowUpBehavior } from '@/renderer/state/preferences';
@@ -42,21 +42,29 @@ function hasSendableHead(
 }
 
 /**
- * Sends queued follow-ups once the agent stops, one per turn end.
+ * Sends queued follow-ups whenever the agent is not working, one at a time.
  *
- * Keys off the falling edge of `isStreaming` rather than its current value: the
- * queue only exists because a turn was running, so "not streaming" on its own
- * would fire against a composer that had simply mounted idle. Sending the head
- * raises `isStreaming` again, so the next entry goes on the next edge — which
- * makes ordering trivially FIFO, gives each queued message its own turn, and
- * leaves the remainder queued and visible if one fails partway through.
+ * Reads the standing state rather than the falling edge of `isStreaming`. The
+ * composer is not permanently mounted — `ComposerSlot` swaps it out for the
+ * `ask_user_question` and tool-approval cards, and switching chat tabs unmounts
+ * it outright — so a turn that ends while it is away leaves no edge for it to
+ * witness on the way back. Waiting for the next one strands the queue for good,
+ * because the turn it is waiting on is the one it was supposed to start.
  *
- * The edge is remembered rather than read once, because the two reasons a flush
- * can be refused are not alike. A composer that is momentarily busy or disabled
- * will free up, so the edge waits for it; a queue that is held or whose head
- * will not go on its own has answered the edge, and it is dropped. Reading the
- * edge once would let a turn that ended during a send strand the queue until
- * some later turn happened to end.
+ * `held` is what says a queue must not drain on its own, and every path that
+ * means it sets it: a stop, a failed send, and closing a tab with messages still
+ * waiting. Together with the `block` behavior that is the whole of "leave this
+ * alone", so an idle agent and a sendable head need no further permission.
+ *
+ * Sending the head raises `isStreaming` again, so the next entry waits for that
+ * turn in its own right. Ordering stays FIFO, each queued message gets its own
+ * turn, and a send that fails leaves the remainder queued and visible.
+ *
+ * That one message per turn is not structural — it holds because `isStreaming`
+ * describes the turn this send just started by the time `submit` resolves, which
+ * is what `submitMutation` in `agent-turns.ts` awaits its session refetch for.
+ * Reading a pre-submit snapshot there would send the rest of the queue into the
+ * running turn, so that await is load-bearing and says so at its own call site.
  * @param input - The behavior, streaming state, whether the composer can send, the queue, and the send pipeline
  */
 export function useFollowUpFlush({
@@ -73,21 +81,15 @@ export function useFollowUpFlush({
 	/** Sends one entry the queue handed over; resolves false when it could not be delivered. */
 	submit: (entry: QueuedFollowUp) => Promise<boolean>;
 }): void {
-	const wasStreamingRef = useRef(isStreaming);
-	const turnEndedRef = useRef(false);
-	const flushingRef = useRef(false);
+	// State rather than a ref: clearing it is what reconsiders the rest of the
+	// queue. A ref re-renders nothing, so the next entry would wait on whatever
+	// unrelated state happened to change next.
+	const [flushing, setFlushing] = useState(false);
 
 	useEffect(() => {
-		if (isStreaming) {
-			turnEndedRef.current = false;
-		} else if (wasStreamingRef.current) {
-			turnEndedRef.current = true;
-		}
-		wasStreamingRef.current = isStreaming;
-		if (!turnEndedRef.current || flushingRef.current || !canSend) {
+		if (isStreaming || flushing || !canSend) {
 			return;
 		}
-		turnEndedRef.current = false;
 		if (!hasSendableHead(queue, behavior)) {
 			return;
 		}
@@ -95,9 +97,7 @@ export function useFollowUpFlush({
 		if (!next) {
 			return;
 		}
-		flushingRef.current = true;
-		void submit(next).finally(() => {
-			flushingRef.current = false;
-		});
-	}, [behavior, canSend, isStreaming, queue, submit]);
+		setFlushing(true);
+		void submit(next).finally(() => setFlushing(false));
+	}, [behavior, canSend, flushing, isStreaming, queue, submit]);
 }

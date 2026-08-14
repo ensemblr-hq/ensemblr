@@ -144,10 +144,15 @@ export function useAgentTurns({
 				sessionId: input.sessionId,
 				streamingBehavior: input.streamingBehavior,
 			}),
-		onSuccess: () =>
-			queryClient.invalidateQueries({
+		// Awaited, unlike its siblings here, because `useFollowUpFlush` re-reads
+		// `isStreaming` the moment this mutation resolves: until the refetch lands
+		// the cache still describes the idle session from before the submit, and the
+		// flush would send the next queued message into the turn just started.
+		onSuccess: async () => {
+			await queryClient.invalidateQueries({
 				queryKey: ensemblrQueryKeys.agentSessionsForWorkspace(workspaceId),
-			}),
+			});
+		},
 	});
 
 	const stopMutation = useMutation({
