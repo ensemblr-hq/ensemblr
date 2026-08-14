@@ -36,6 +36,13 @@ function renderStopControl() {
 	renderWithProviders(
 		<ComposerControls
 			composer={composer}
+			dictation={{
+				available: false,
+				elapsedMs: 0,
+				failure: null,
+				phase: 'idle',
+				toggle: vi.fn(),
+			}}
 			modelPickerOpen={false}
 			onLinkDirectory={vi.fn()}
 			onLinkIssue={vi.fn()}

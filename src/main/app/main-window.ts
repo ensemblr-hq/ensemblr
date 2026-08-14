@@ -2,6 +2,7 @@ import path from 'node:path';
 import { BrowserWindow, screen } from 'electron';
 
 import { routeExternalLinksToBrowser } from './external-links';
+import { restrictMediaPermissions } from './media-permissions';
 import {
 	DEFAULT_MAIN_WINDOW_HEIGHT,
 	DEFAULT_MAIN_WINDOW_WIDTH,
@@ -58,6 +59,11 @@ export function createMainWindow({
 	if (windowStateStore) {
 		trackMainWindowState({ mainWindow, store: windowStateStore });
 	}
+
+	// Composer dictation needs the microphone; nothing in the app needs any other
+	// device permission, so the rest are denied instead of left to Electron's
+	// permissive default.
+	restrictMediaPermissions(mainWindow.webContents.session);
 
 	// Send every external link to the default system browser. In dev the renderer
 	// is served from the Vite origin (treated as internal); in prod it is a file:

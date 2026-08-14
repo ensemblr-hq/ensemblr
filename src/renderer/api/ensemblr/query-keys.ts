@@ -37,6 +37,9 @@ export const ensemblrQueryKeys = {
 	/** Query key for the GitHub repository list, scoped to full or recent. */
 	githubRepositoryList: (scope: 'full' | 'recent' = 'recent') =>
 		[...ensemblrQueryKeys.all, 'github-repository-list', scope] as const,
+	/** Query key for whether a dictation API key is on file. */
+	dictationKeyStatus: () =>
+		[...ensemblrQueryKeys.all, 'dictation-key-status'] as const,
 	/** Query key for the backend health check. */
 	health: () => [...ensemblrQueryKeys.all, 'health'] as const,
 	/** Query key for the Linear connection status. */

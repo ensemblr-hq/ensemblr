@@ -240,7 +240,9 @@ function renderNotices(
 		sendIntent: 'send',
 		unlinkDirectory,
 	} as unknown as ComposerStateApi;
-	renderWithProviders(<ComposerNotices state={state} />);
+	renderWithProviders(
+		<ComposerNotices dictationFailure={null} state={state} />,
+	);
 	return { unlinkDirectory };
 }
 

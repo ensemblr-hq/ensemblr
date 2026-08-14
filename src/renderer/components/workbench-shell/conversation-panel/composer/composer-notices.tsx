@@ -1,5 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import type { ComposerStateApi } from '@/renderer/hooks/workbench-shell/composer/use-composer-state';
+import { failureText } from '@/renderer/lib/failure-text';
+import type { DictationFailure } from '@/shared/ipc/contracts/dictation';
 import { formatShortcut } from '@/shared/keymap';
 import { LinkedDirectoryChip } from './linked-directory-chip';
 
@@ -25,13 +27,25 @@ const QUEUE_SHORTCUT = formatShortcut('composer.queue');
  * granted across sends, so it stays above the text where it cannot be mistaken
  * for something the next send carries.
  */
-export function ComposerNotices({ state }: { state: ComposerStateApi }) {
+export function ComposerNotices({
+	dictationFailure,
+	state,
+}: {
+	dictationFailure: DictationFailure | null;
+	state: ComposerStateApi;
+}) {
 	const { t } = useTranslation();
 	const pendingPaths = new Set(
 		state.pendingLinkedDirectories.map((directory) => directory.path),
 	);
+	const dictationMessage = failureText(t, dictationFailure);
 	return (
 		<>
+			{dictationMessage ? (
+				<div className='text-destructive text-xs' role='alert'>
+					{dictationMessage}
+				</div>
+			) : null}
 			{state.linkedDirectories.length > 0 ? (
 				<div className='flex flex-wrap items-end gap-1.5'>
 					{state.linkedDirectories.map((directory) => (

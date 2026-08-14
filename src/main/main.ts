@@ -86,6 +86,7 @@ import {
 	migrateAllRepositoryScriptSettings,
 	resolveEnsemblrConfigPath,
 } from './config';
+import { createDictationService } from './dictation';
 import {
 	createEnvironmentVariablesService,
 	createToolchainPathResolver,
@@ -282,6 +283,13 @@ const localCommandService = createLocalCommandService();
 const environmentVariablesService = createEnvironmentVariablesService({
 	configService,
 	databaseService,
+	secretStoreFactory: createSecretStore,
+});
+const dictationService = createDictationService({
+	/** Hands the service the open SQLite handle its secret store persists into. */
+	databaseFactory: () => databaseService.getConnection()?.database ?? null,
+	/** Reads the latest dictation settings so a config edit applies to the next clip. */
+	readSettings: () => appSettingsService.read(),
 	secretStoreFactory: createSecretStore,
 });
 const settingsResolutionService = createEnsemblrConfigResolutionService({
@@ -1038,6 +1046,7 @@ app.whenReady().then(() => {
 		deleteArchivedWorkspaceService,
 		deleteRepositoryService,
 		deleteWorkspaceService,
+		dictationService,
 		environmentVariablesService,
 		githubCloneService,
 		githubRepositoryListService,
