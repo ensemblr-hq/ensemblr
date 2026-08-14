@@ -185,6 +185,7 @@ export function createAgentControlIntegration(
 			workspaceCwd: cwd,
 			species: identity.species ?? 'pi',
 			parentSessionId: identity.parentSessionId ?? null,
+			delegation: identity.delegation,
 		});
 		const marked = deps.isSpawnedSubAgent?.(identity.sessionId) === true;
 		return {

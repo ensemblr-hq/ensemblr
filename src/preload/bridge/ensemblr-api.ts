@@ -22,6 +22,7 @@ import type { EnsemblrApi } from '../../shared/ipc/contracts/api';
 import type { AppSettingsChangedBroadcast } from '../../shared/ipc/contracts/app-settings';
 import type { CloneGithubRepositoryProgressEvent } from '../../shared/ipc/contracts/clone';
 import type { ConfigChangedBroadcast } from '../../shared/ipc/contracts/health';
+import type { FocusChatBroadcast } from '../../shared/ipc/contracts/notifications';
 import type {
 	TerminalLifecycleBroadcast,
 	TerminalOutputBroadcast,
@@ -60,6 +61,7 @@ type InvokeKey = Exclude<
 const CHANNEL_OVERRIDES = {
 	answerUserQuestion: IPC_CHANNELS.agentControlAnswerUserQuestion,
 	prepareCloneGithubRepository: IPC_CHANNELS.cloneGithubRepositoryPrepare,
+	reportActiveChat: IPC_CHANNELS.activeChatContext,
 	reportBoardStatus: IPC_CHANNELS.agentControlReportBoardStatus,
 	reportMenuContext: IPC_CHANNELS.menuContext,
 	resolveSettings: IPC_CHANNELS.settingsResolution,
@@ -278,6 +280,9 @@ export function createEnsemblrApi(): EnsemblrApi {
 		reportBoardStatus: (statusByWorkspaceId) =>
 			invoke('reportBoardStatus', statusByWorkspaceId),
 		reportMenuContext: (context) => invoke('reportMenuContext', context),
+		reportActiveChat: (context) => invoke('reportActiveChat', context),
+		onFocusChatRequested: (listener) =>
+			subscribe<FocusChatBroadcast>(IPC_CHANNELS.focusChatRequested, listener),
 		onAgentSessionEvent: (listener) =>
 			subscribe<AgentSessionEventBroadcast>(
 				IPC_CHANNELS.agentSessionEvent,

@@ -7,6 +7,7 @@
  */
 import { randomUUID } from 'node:crypto';
 
+import type { SubagentMechanism } from '../../shared/agent-control.ts';
 import type { AgentControlOrigin, AgentSpecies } from './ports.ts';
 
 /** Details supplied when registering a freshly spawned agent session. */
@@ -17,6 +18,13 @@ export interface RegisterOriginInput {
 	species: AgentSpecies;
 	/** Session id of the agent that spawned this one, when any. */
 	parentSessionId?: string | null;
+	/**
+	 * Delegation mechanism this session opened under. Pinned at registration
+	 * rather than read per request: a runtime fixes its own deny list at session
+	 * open, so a live-read tool list could leave a session holding neither
+	 * mechanism after the user flips the setting mid-run.
+	 */
+	delegation?: SubagentMechanism;
 }
 
 /** Registry surface used by the bridges (register) and the service (resolve). */
@@ -70,6 +78,7 @@ export function createOriginRegistry(
 			parentSessionId,
 			depth: resolveDepth(parentSessionId),
 			species: input.species,
+			delegation: input.delegation ?? 'ensemblr',
 		};
 		byToken.set(origin.token, origin);
 		bySession.set(origin.sessionId, origin);

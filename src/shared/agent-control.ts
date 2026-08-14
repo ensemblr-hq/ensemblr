@@ -16,6 +16,7 @@ export type {
 export {
 	awarenessForAudience,
 	HARNESS_AWARENESS,
+	NATIVE_ORCHESTRATOR_AWARENESS,
 	ORCHESTRATOR_AWARENESS,
 	PLAN_MODE_ORCHESTRATOR_AWARENESS,
 	PLAN_MODE_SUBAGENT_AWARENESS,
@@ -36,6 +37,11 @@ export {
 	buildSessionBriefNudge,
 	SESSION_BRIEF_NUDGE_HEADER,
 } from './agent-control/session-brief.ts';
+export type { SubagentMechanism } from './agent-control/subagent-mechanism.ts';
+export {
+	isSubagentMechanism,
+	SUBAGENT_MECHANISMS,
+} from './agent-control/subagent-mechanism.ts';
 export {
 	SUBAGENT_UNUSABLE_OPS,
 	SUBAGENT_WITHHELD_OPS,

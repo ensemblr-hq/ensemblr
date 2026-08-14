@@ -10,6 +10,7 @@ import type {
 	TabsChangedBroadcast,
 } from '../../agent-control.ts';
 import type { MenuCommandBroadcast, MenuContext } from '../../menu-commands.ts';
+import type { ActiveChatContext, FocusChatBroadcast } from './notifications.ts';
 
 /** Open-ended metadata bag attached to a repository or workspace in the navigation tree. */
 export interface RepositoryWorkspaceNavigationMetadata {
@@ -108,6 +109,21 @@ export interface ShellApi {
 	 */
 	onAgentControlFocusView: (
 		listener: (payload: FocusViewBroadcast) => void,
+	) => () => void;
+	/**
+	 * Reports the chat currently on screen so the main process can suppress a
+	 * desktop notification for that chat alone rather than for the whole app.
+	 * Null when no chat is open. Fire-and-forget from the renderer.
+	 */
+	reportActiveChat: (context: ActiveChatContext | null) => Promise<void>;
+	/**
+	 * Subscribes to notification clicks (the user clicked a desktop notification
+	 * for a finished or blocked chat). Returns an unsubscribe function. Every
+	 * window receives it and the payload may name a workspace this window is not
+	 * showing, so the handler navigates rather than filtering.
+	 */
+	onFocusChatRequested: (
+		listener: (payload: FocusChatBroadcast) => void,
 	) => () => void;
 	/**
 	 * Subscribes to agent-control tab-set changes (an agent opened or closed a

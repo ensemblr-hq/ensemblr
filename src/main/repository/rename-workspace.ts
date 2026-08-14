@@ -9,6 +9,7 @@ import type {
 } from '../../shared/ipc/contracts/workspace';
 import {
 	isBranchNameable,
+	isProvisionallyNameable,
 	isWorkspaceNameable,
 } from '../agent-runtime/branch-name-slug.ts';
 import type { LocalCommandService } from '../commands/local-command';
@@ -24,9 +25,27 @@ import { parseMetadata } from './metadata.ts';
 import { toSlug } from './slug.ts';
 import { validateGitRef } from './validate-git-ref.ts';
 import { validateWorkspaceName as validateWorkspaceNameShared } from './workspace-validation.ts';
+/**
+ * A rename request plus the main-process-only flag that marks it provisional.
+ * The flag is not on {@link RenameWorkspaceRequest} because it never crosses
+ * IPC: only the app's own Plan Mode namer sets it, and a renderer that could
+ * would be asking for a rename that does not settle the name.
+ */
+export interface RenameWorkspaceInput extends RenameWorkspaceRequest {
+	/**
+	 * Name the workspace without settling it: the row moves, but `renamedAt` and
+	 * `branchNamed` stay unwritten so `isWorkspaceNameable` and
+	 * `isBranchNameable` both still report true and the agent's one naming call
+	 * is left intact. `branchProvisional` is stamped instead, which is what stops
+	 * the namer running twice and what the upkeep block reads to ask for a better
+	 * name.
+	 */
+	provisional?: boolean;
+}
+
 /** Public surface of the workspace rename service. */
 export interface RenameWorkspaceService {
-	rename: (request: RenameWorkspaceRequest) => Promise<RenameWorkspaceResult>;
+	rename: (request: RenameWorkspaceInput) => Promise<RenameWorkspaceResult>;
 }
 
 /** Options for {@link createRenameWorkspaceService}. */
@@ -131,6 +150,7 @@ export function createRenameWorkspaceService({
 				database,
 				localCommandService,
 				name: plan.nextName,
+				provisional: request.provisional === true,
 				rollbackBranch:
 					branchRenamed && source.branchName && plan.nextBranch
 						? { from: plan.nextBranch, to: source.branchName }
@@ -196,7 +216,7 @@ function planRename({
 	source,
 }: {
 	database: DatabaseSync;
-	request: RenameWorkspaceRequest;
+	request: RenameWorkspaceInput;
 	source: SourceWorkspace;
 }): RenamePlan {
 	// Race guard for automatic naming: re-check both gates against the freshly-read
@@ -207,6 +227,13 @@ function planRename({
 	// is not.
 	const metadata = parseMetadata(source.metadataJson);
 	if (request.requirePlaceholderName && !isBranchNameable(metadata)) {
+		return { kind: 'no-op' };
+	}
+	// A provisional guess re-checks its own narrower gate here too. The gates
+	// above stay open by design once the app has guessed, so without this a second
+	// namer racing the first would read a row nobody had settled and move the
+	// branch again.
+	if (request.provisional && !isProvisionallyNameable(metadata)) {
 		return { kind: 'no-op' };
 	}
 
@@ -321,6 +348,7 @@ function resolveNextBranch({
  * @param database - Open database handle
  * @param localCommandService - Command runner used for the rollback git call
  * @param name - Display name the row should end on
+ * @param provisional - Whether to stamp the row as provisionally named rather than settled
  * @param rollbackBranch - Branch rename to undo on failure, or null when none was applied
  * @param source - The workspace row as it currently stands
  * @param timestamp - Rename timestamp written to the row
@@ -332,6 +360,7 @@ async function writeRenamedRow({
 	database,
 	localCommandService,
 	name,
+	provisional,
 	rollbackBranch,
 	source,
 	timestamp,
@@ -341,6 +370,7 @@ async function writeRenamedRow({
 	database: DatabaseSync;
 	localCommandService: LocalCommandService;
 	name: string;
+	provisional: boolean;
 	rollbackBranch: { from: string; to: string } | null;
 	source: SourceWorkspace;
 	timestamp: string;
@@ -353,6 +383,7 @@ async function writeRenamedRow({
 			id: source.id,
 			metadataJson: source.metadataJson,
 			name,
+			provisional,
 			timestamp,
 		});
 		return null;
@@ -485,6 +516,7 @@ function updateWorkspaceRow({
 	id,
 	metadataJson,
 	name,
+	provisional,
 	timestamp,
 }: {
 	branchName: string | null;
@@ -493,6 +525,7 @@ function updateWorkspaceRow({
 	id: string;
 	metadataJson: string;
 	name: string;
+	provisional: boolean;
 	timestamp: string;
 }): void {
 	withTransaction(database, () => {
@@ -500,7 +533,12 @@ function updateWorkspaceRow({
 			branchName,
 			database,
 			id,
-			metadataJson: bumpRenameMetadata(metadataJson, timestamp, branchNamed),
+			metadataJson: bumpRenameMetadata({
+				branchNamed,
+				metadataJson,
+				provisional,
+				timestamp,
+			}),
 			name,
 			timestamp,
 		});
@@ -549,22 +587,35 @@ function adoptedBranchDiagnostic(
  * Stamps `metadata.renamedAt` so consumers can see when the rename happened,
  * plus `metadata.branchNamed` so the auto-naming gate can tell a retitled
  * workspace from one whose branch actually moved.
- * @param metadataJson - The workspace's stored metadata JSON.
- * @param timestamp - Rename timestamp to record.
- * @param branchNamed - Whether the git branch now carries a chosen name.
+ *
+ * A provisional rename writes neither: the app picked that name from the user's
+ * first prompt, not from knowing the work, so leaving both gates open is what
+ * lets the agent replace it with its one real naming call. It records
+ * `branchProvisional` instead, which keeps the namer from running a second time
+ * and tells the upkeep block to ask for a better name rather than a first one.
+ * @param input - The stored metadata, the rename timestamp, whether the branch now carries a chosen name, and whether this rename is provisional.
  * @returns The metadata blob to persist.
  */
-function bumpRenameMetadata(
-	metadataJson: string,
-	timestamp: string,
-	branchNamed: boolean,
-): string {
+function bumpRenameMetadata({
+	branchNamed,
+	metadataJson,
+	provisional,
+	timestamp,
+}: {
+	branchNamed: boolean;
+	metadataJson: string;
+	provisional: boolean;
+	timestamp: string;
+}): string {
 	const existing = parseMetadata(metadataJson);
-	const next = {
-		...existing,
-		branchNamed,
-		renamedAt: timestamp,
-	};
+	const next = provisional
+		? { ...existing, branchProvisional: true }
+		: {
+				...existing,
+				branchNamed,
+				branchProvisional: false,
+				renamedAt: timestamp,
+			};
 	return JSON.stringify(next);
 }
 

@@ -16,6 +16,7 @@ import {
 	type AgentSessionService,
 	snapshotToWire,
 } from '../../agent-runtime/agent-session-service.ts';
+import type { QueueProvisionalNamingPort } from '../../agent-runtime/naming/provisional-workspace-naming';
 import type { PiExecutableService } from '../../pi-runtime';
 import { isBlockedByPiExecutable } from '../../pi-runtime/pi-executable-gate.ts';
 import type { PlanModeRegistry } from '../../plan-mode';
@@ -38,6 +39,7 @@ export function registerAgentSessionHandlers({
 	agentSessionService,
 	piExecutableService,
 	planModeRegistry,
+	provisionalNamingQueue,
 	withPermissionGate,
 }: {
 	/**
@@ -58,6 +60,13 @@ export function registerAgentSessionHandlers({
 	 * would unblock a conversation nobody asked to unblock.
 	 */
 	planModeRegistry: PlanModeRegistry;
+	/**
+	 * Names a planning workspace from the prompt that opened or drove it. Fired
+	 * only while Plan Mode is on: outside it an agent names the workspace on its
+	 * first turn anyway, and guessing ahead of that would spend a branch move to
+	 * beat it by seconds.
+	 */
+	provisionalNamingQueue: QueueProvisionalNamingPort;
 	withPermissionGate: WithPermissionGate;
 }): void {
 	ipcMain.handle(
@@ -96,6 +105,13 @@ export function registerAgentSessionHandlers({
 				if (request.planMode !== undefined) {
 					planModeRegistry.setActive(snapshot.id, request.planMode);
 				}
+				if (request.planMode === true && request.initialPrompt) {
+					provisionalNamingQueue({
+						prompt: request.initialPrompt,
+						sessionId: snapshot.id,
+						workspaceId: request.workspaceId,
+					});
+				}
 				return { session: snapshotToWire(snapshot) };
 			} catch (cause) {
 				return {
@@ -118,6 +134,13 @@ export function registerAgentSessionHandlers({
 				);
 				if (request.planMode !== undefined) {
 					planModeRegistry.setActive(request.sessionId, request.planMode);
+				}
+				if (planModeRegistry.isActive(request.sessionId)) {
+					provisionalNamingQueue({
+						prompt: request.prompt,
+						sessionId: request.sessionId,
+						workspaceId: null,
+					});
 				}
 				const acknowledgement = await agentSessionService.submitPrompt({
 					model: request.model ?? null,

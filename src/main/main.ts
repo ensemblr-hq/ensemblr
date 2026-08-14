@@ -1,7 +1,7 @@
 import os from 'node:os';
 import path from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
-import { app, BrowserWindow, ipcMain, shell } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron';
 import { parseAskUserQuestionReply } from '../shared/agent-control.ts';
 import type { AgentProviderId } from '../shared/agent-provider.ts';
 import {
@@ -49,6 +49,7 @@ import {
 	type AgentExecutableSnapshot,
 	createAgentClient,
 } from './agent-runtime';
+import { ActiveChatStore } from './agent-runtime/active-chat-store';
 import { createAgentActivityMonitor } from './agent-runtime/agent-activity-monitor';
 import { createAgentSessionService } from './agent-runtime/agent-session-service';
 import {
@@ -57,10 +58,14 @@ import {
 	electronPowerControls,
 } from './agent-runtime/electron-activity-bindings';
 import { readMacosBattery } from './agent-runtime/macos-battery';
+import { createProvisionalWorkspaceNaming } from './agent-runtime/naming/provisional-workspace-naming';
 import { createSessionNaming } from './agent-runtime/naming/session-naming';
+import { resolveNotificationTarget } from './agent-runtime/notification-target';
 import { createSessionSummaryWriter } from './agent-runtime/session-summary-writer';
 import { createHarnessDetectionService } from './agents';
 import { createMainWindow } from './app/main-window';
+import { createQuitCoordinator } from './app/quit-coordinator';
+import { createQuitGuard } from './app/quit-guard';
 import { createMainWindowStateStore } from './app/window-state';
 import { createChatTabService } from './chat-tabs/chat-tab-service.ts';
 import { persistTerminalAgentSessionId } from './chat-tabs/persist-terminal-agent-session.ts';
@@ -143,6 +148,7 @@ import {
 	createEnsemblrDatabaseService,
 	resolveDefaultDatabasePath,
 } from './storage';
+import { getChatTabByAgentSessionId } from './storage/repositories/chat-tab-repository.ts';
 import { getWorkspacePathById } from './storage/repositories/workspace-repository.ts';
 import { createTerminalService } from './terminal';
 import {
@@ -244,19 +250,34 @@ const configService = createEnsemblrConfigService(
 const appSettingsService = createAppSettingsService(
 	isDev ? { configPath: devConfigPath } : {},
 );
+const databaseService = createEnsemblrDatabaseService(
+	isDev ? { databasePath: devDatabasePath } : {},
+);
+// The chat the renderer last reported as on screen, so a desktop notification is
+// suppressed for that chat alone rather than for the whole app.
+const activeChatStore = new ActiveChatStore();
 // Drives the caffeinate power-blocker + "agent finished" desktop notifications,
 // gated live by the General settings in config.json.
 const agentActivityMonitor = createAgentActivityMonitor({
 	isAppFocused: electronIsAppFocused,
+	/** Reports whether the user is looking at exactly this chat right now. */
+	isChatOnScreen: (workspaceId, agentSessionId) =>
+		activeChatStore.isOnScreen(workspaceId, agentSessionId),
 	notify: electronNotify,
 	powerControls: electronPowerControls,
 	readBattery: readMacosBattery,
+	/** Resolves the language notification copy is rendered in. */
+	readLanguage: () => resolveAppLanguage(),
 	/** Reads the latest app settings so the monitor can gate itself live. */
 	readSettings: () => appSettingsService.read(),
+	/** Names the workspace and tab a notification describes, and spots sub-agents. */
+	resolveTarget: (workspaceId, agentSessionId) =>
+		resolveNotificationTarget(
+			databaseService.getConnection()?.database,
+			workspaceId,
+			agentSessionId,
+		),
 });
-const databaseService = createEnsemblrDatabaseService(
-	isDev ? { databasePath: devDatabasePath } : {},
-);
 const localCommandService = createLocalCommandService();
 const environmentVariablesService = createEnvironmentVariablesService({
 	configService,
@@ -544,7 +565,11 @@ const agentSessionService = createAgentSessionService({
 				window.webContents.send(IPC_CHANNELS.agentSessionEvent, payload);
 			}
 		}
-		agentActivityMonitor.handle({ event: payload.event, sessionId });
+		agentActivityMonitor.handle({
+			event: payload.event,
+			sessionId,
+			workspaceId,
+		});
 		if (event.eventType === 'shutdown') {
 			agentControlService?.releaseSession(sessionId);
 		}
@@ -552,7 +577,12 @@ const agentSessionService = createAgentSessionService({
 	agentClient,
 	/** Reports whether the chat behind this session has Plan Mode switched on. */
 	isPlanModeActive: (sessionId) => planModeRegistry.isActive(sessionId),
+	/** Keeps the stop the user just asked for from notifying as a finished turn. */
+	onSessionAborted: (sessionId) => agentActivityMonitor.noteUserStop(sessionId),
 	queueNaming: sessionNamingQueue,
+	/** Reads the delegation mechanism each new Claude Code session opens under. */
+	readClaudeSubagentMode: () =>
+		appSettingsService.read().providers.claudeSubagentMode,
 	resolveAgentControlEnv,
 	/** Reads the workspace permission mode each new agent session must honour. */
 	resolvePermissionMode: () =>
@@ -723,9 +753,19 @@ ipcMain.handle(
 	},
 );
 const askUserQuestionCoordinator = createAskUserQuestionCoordinator({
-	/** Pushes an agent's questionnaire to every window; only the owning chat renders it. */
-	broadcastAsk: (payload) =>
-		broadcastToAllWindows(IPC_CHANNELS.agentControlAskUserQuestion, payload),
+	/**
+	 * Pushes an agent's questionnaire to every window; only the owning chat
+	 * renders it. Fires once per ask, so the desktop notification riding along
+	 * needs no dedupe of its own — a blocked agent is the one state that wants
+	 * the user more than a finished turn does.
+	 */
+	broadcastAsk: (payload) => {
+		broadcastToAllWindows(IPC_CHANNELS.agentControlAskUserQuestion, payload);
+		agentActivityMonitor.notifyQuestionRaised({
+			agentSessionId: payload.agentSessionId,
+			workspaceId: payload.workspaceId,
+		});
+	},
 	/** Tells renderers to drop a questionnaire whose session ended unanswered. */
 	broadcastClosed: (payload) =>
 		broadcastToAllWindows(
@@ -871,6 +911,10 @@ const mainWindowStateStore = createMainWindowStateStore({
  * the user. A renderer keeps its pending questions in memory only, and an
  * `askUserQuestion` call has no timeout to fall back on, so a window that
  * reloads would otherwise lose the card while the agent stayed blocked on it.
+ *
+ * Closing this window quits the app (see `window-all-closed`), so the quit
+ * confirmation runs here rather than downstream: by the time `window-all-closed`
+ * fires the window is destroyed, and the dialog has nothing left to attach to.
  */
 function openMainWindow(): void {
 	const window = createMainWindow({ windowStateStore: mainWindowStateStore });
@@ -880,6 +924,16 @@ function openMainWindow(): void {
 				IPC_CHANNELS.agentControlAskUserQuestion,
 				payload,
 			);
+		}
+	});
+	window.on('close', (event) => {
+		const replayClose = (): void => {
+			if (!window.isDestroyed()) {
+				window.close();
+			}
+		};
+		if (quitCoordinator.handleWindowClose(replayClose)) {
+			event.preventDefault();
 		}
 	});
 }
@@ -950,7 +1004,28 @@ app.whenReady().then(() => {
 			snapshot,
 		} satisfies ConfigChangedBroadcast);
 	});
+	// Names a planning workspace from its first prompt, so the board stops showing
+	// a generated placeholder for the whole interview. Provisional by design: it
+	// leaves both naming gates open, so the agent's own `ensemblr_set_branch_name`
+	// still lands as a first naming rather than being refused as a second.
+	const provisionalNamingQueue = createProvisionalWorkspaceNaming({
+		databaseService,
+		namingEnabled: () => appSettingsService.read().git.renameWorkspaceOnBranch,
+		/** Announces a landed guess on both channels the agent's own rename uses. */
+		onRenamed: ({ sessionId, workspaceId }) => {
+			// The tabs broadcast alone refreshes the chat-tab queries and nothing
+			// else; the sidebar reads the workspace name from a cached navigation
+			// query that only this timeline event invalidates, so dropping it would
+			// move the row in SQLite and leave the board on the placeholder.
+			agentSessionService.appendWorkspaceRenamed(sessionId);
+			broadcastToAllWindows(IPC_CHANNELS.agentControlTabsChanged, {
+				workspaceId,
+			});
+		},
+		renameWorkspace: renameWorkspaceService.rename,
+	});
 	ipcHandlersHandle = registerIpcHandlers({
+		activeChatStore,
 		agentProviderService,
 		appSettingsService,
 		archiveRepositoryService,
@@ -980,6 +1055,7 @@ app.whenReady().then(() => {
 		agentModelCatalog,
 		agentSessionService,
 		planModeRegistry,
+		provisionalNamingQueue,
 		quickStartProjectService,
 		renameWorkspaceService,
 		// The in-app write is echo-suppressed and so never reaches the watcher
@@ -1006,25 +1082,59 @@ app.whenReady().then(() => {
 	openMainWindow();
 });
 
-let isShuttingDownAgents = false;
-// Terminate the Pi RPC children and the terminal PTY children before the process
-// exits. Both shutdowns resolve only once each child has actually exited, which
-// keeps orphaned `pi --mode rpc` processes from surviving app quit and keeps a
-// dying PTY from reporting its exit into a half-destroyed JS environment — where
-// node-pty's native callback aborts the process instead of surfacing. `before-quit`
-// is synchronous, so defer the real quit until the async shutdown settles; a
-// bounded race guarantees a wedged child can never block quit indefinitely.
-//
-// The approval gate fails closed first, before that grace period: a Claude
-// session in approval-required mode can still issue tool calls while the race
-// plays out, and by then no window is left to put them to the user.
-app.on('before-quit', (event) => {
-	if (isShuttingDownAgents) {
-		return;
-	}
-	isShuttingDownAgents = true;
+const quitGuard = createQuitGuard({
+	/** Shows the native quit confirmation, parented to the focused window. */
+	confirm: async (request) => {
+		const parentWindow = BrowserWindow.getFocusedWindow();
+		const { response } = parentWindow
+			? await dialog.showMessageBox(parentWindow, {
+					type: 'question',
+					...request,
+				})
+			: await dialog.showMessageBox({ type: 'question', ...request });
+		return response;
+	},
+	getLanguage: resolveAppLanguage,
+	/** Whether a window survives to host the dialog. */
+	hasWindow: () =>
+		BrowserWindow.getAllWindows().some((window) => !window.isDestroyed()),
+	/** Every agent-harness terminal, across all workspaces. */
+	listAgentTerminals: () => terminalService.listByKind('agent'),
+	listRunningSessions: agentActivityMonitor.listRunning,
+	/** Workspace id to display name, read once per prompt. */
+	listWorkspaceNames: async () => {
+		const { entries } = await listAllWorkspacesService.list();
+		return new Map(entries.map((entry) => [entry.id, entry.name]));
+	},
+	/** The chat's own title, or null before the database is open or a name lands. */
+	readChatTitle: (sessionId) => {
+		const database = databaseService.getConnection()?.database;
+		if (!database) {
+			return null;
+		}
+		return (
+			getChatTabByAgentSessionId({ agentSessionId: sessionId, database })
+				?.title ?? null
+		);
+	},
+});
+
+/**
+ * Terminates the Pi RPC children and the terminal PTY children, then re-issues
+ * the quit. Both shutdowns resolve only once each child has actually exited,
+ * which keeps orphaned `pi --mode rpc` processes from surviving app quit and
+ * keeps a dying PTY from reporting its exit into a half-destroyed JS environment
+ * — where node-pty's native callback aborts the process instead of surfacing.
+ * `before-quit` is synchronous, so the real quit is deferred until the async
+ * shutdown settles; a bounded race guarantees a wedged child can never block
+ * quit indefinitely.
+ *
+ * The approval gate fails closed first, before that grace period: a Claude
+ * session in approval-required mode can still issue tool calls while the race
+ * plays out, and by then no window is left to put them to the user.
+ */
+function beginAgentShutdown(): void {
 	claudeToolApproval.shutdown();
-	event.preventDefault();
 	void (async () => {
 		await Promise.race([
 			Promise.allSettled([agentClient.shutdown(), terminalService.shutdown()]),
@@ -1032,6 +1142,22 @@ app.on('before-quit', (event) => {
 		]);
 		app.quit();
 	})();
+}
+
+const quitCoordinator = createQuitCoordinator({
+	beginAgentShutdown,
+	confirmQuit: quitGuard.confirmQuit,
+	quit: () => app.quit(),
+});
+
+// Quitting kills every in-flight turn, so nothing is torn down until the guard
+// has had its say. Both phases defer the real quit and re-issue it themselves,
+// so every gesture — ⌘Q, the menu, the Dock, the window's own close button —
+// walks the same two steps.
+app.on('before-quit', (event) => {
+	if (quitCoordinator.handleBeforeQuit()) {
+		event.preventDefault();
+	}
 });
 
 app.on('will-quit', () => {

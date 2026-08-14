@@ -11,6 +11,7 @@
 import {
 	type AgentControlRole,
 	awarenessForAudience,
+	type SubagentMechanism,
 } from '../../../shared/agent-control.ts';
 import type { AgentProviderId } from '../../../shared/agent-provider.ts';
 import {
@@ -34,6 +35,52 @@ const SUBAGENT_ROLE: AgentControlRole = 'subagent';
  */
 const NATIVE_MCP_PROVIDERS: ReadonlySet<AgentProviderId> = new Set(['claude']);
 
+/**
+ * Runtimes that ship a sub-agent tool of their own, and so have two delegation
+ * mechanisms to choose between. A runtime absent from this set always resolves
+ * to `ensemblr`: withholding the chat-tab spawn ops from a runtime with nothing
+ * to fall back on would leave it unable to delegate at all.
+ */
+const NATIVE_SUBAGENT_PROVIDERS: ReadonlySet<AgentProviderId> = new Set([
+	'claude',
+]);
+
+/** Reads the user's chosen delegation mechanism for the Claude Code runtime. */
+export type SubagentMechanismReader = () => SubagentMechanism;
+
+/**
+ * Resolves the mechanism a session opens under from its lineage, the runtime it
+ * is pinned to, and the user's setting.
+ *
+ * A spawned child takes `ensemblr` whatever the setting says. The setting picks
+ * how a *root* fans out, and nested delegation is blocked on every other axis —
+ * `SUBAGENT_BLOCKED_OPS` refuses the spawn ops and `SUBAGENT_AWARENESS` says a
+ * child never fans out — so letting a child open under `native` would leave the
+ * runtime's own sub-agent tool live and route an unbounded fan-out around the
+ * depth cap.
+ * @param parentSessionId - The session that spawned this one, when any.
+ * @param provider - The runtime the session runs on.
+ * @param readClaudeSubagentMode - Reads the persisted Claude Code preference.
+ * @returns The mechanism to pin on this session.
+ */
+function resolveDelegation({
+	parentSessionId,
+	provider,
+	readClaudeSubagentMode,
+}: {
+	parentSessionId: string | null;
+	provider: AgentProviderId;
+	readClaudeSubagentMode: SubagentMechanismReader | undefined;
+}): SubagentMechanism {
+	if (parentSessionId) {
+		return 'ensemblr';
+	}
+	if (!NATIVE_SUBAGENT_PROVIDERS.has(provider) || !readClaudeSubagentMode) {
+		return 'ensemblr';
+	}
+	return readClaudeSubagentMode();
+}
+
 /** Resolves everything the app prepends to one agent session's turn. */
 export type TurnPreambleResolver = (
 	sessionId: string,
@@ -42,6 +89,13 @@ export type TurnPreambleResolver = (
 /** What the agent-control layer contributes to one session's open request. */
 export interface AgentControlWiring {
 	controlMcp: AgentControlMcpConfig | null;
+	/**
+	 * The mechanism pinned on this session, which the runtime adapter needs in
+	 * order to deny the mechanism the user did not pick. Reported even when the
+	 * control server is down, because the adapter's deny list does not depend on
+	 * the control tools being reachable.
+	 */
+	delegation: SubagentMechanism;
 	env: Record<string, string> | undefined;
 	resolveTurnPreamble: (() => Promise<string | null>) | null;
 	systemPromptAppend: string | null;
@@ -101,12 +155,13 @@ function readControlMcp(
  * every turn, while a runtime the app drives over MCP has its system prompt
  * fixed at session open and would otherwise never hear about naming the session
  * still owes, nor about a language switched since it opened.
- * @param input - Session identity, its runtime, the env resolver, and the turn-preamble resolver.
- * @returns The env overlay plus the MCP endpoint, playbook, and turn preamble, where they apply.
+ * @param input - Session identity, its runtime, the env resolver, the delegation-mode reader, and the turn-preamble resolver.
+ * @returns The env overlay plus the MCP endpoint, playbook, delegation mechanism, and turn preamble, where they apply.
  */
 export function resolveAgentControlWiring({
 	parentSessionId,
 	provider,
+	readClaudeSubagentMode,
 	resolveAgentControlEnv,
 	resolveTurnPreamble,
 	sessionId,
@@ -114,12 +169,19 @@ export function resolveAgentControlWiring({
 }: {
 	parentSessionId: string | null;
 	provider: AgentProviderId;
+	readClaudeSubagentMode: SubagentMechanismReader | undefined;
 	resolveAgentControlEnv: AgentControlEnvResolver | undefined;
 	resolveTurnPreamble: TurnPreambleResolver | undefined;
 	sessionId: string;
 	workspaceId: string;
 }): AgentControlWiring {
+	const delegation = resolveDelegation({
+		parentSessionId,
+		provider,
+		readClaudeSubagentMode,
+	});
 	const env = resolveAgentControlEnv?.({
+		delegation,
 		parentSessionId,
 		sessionId,
 		species: speciesForProvider(provider),
@@ -132,6 +194,7 @@ export function resolveAgentControlWiring({
 	if (!controlMcp) {
 		return {
 			controlMcp: null,
+			delegation,
 			env,
 			resolveTurnPreamble: null,
 			systemPromptAppend: null,
@@ -140,11 +203,13 @@ export function resolveAgentControlWiring({
 
 	return {
 		controlMcp,
+		delegation,
 		env,
 		resolveTurnPreamble: resolveTurnPreamble
 			? () => resolveTurnPreamble(sessionId)
 			: null,
 		systemPromptAppend: awarenessForAudience({
+			delegation,
 			hasChatTab: true,
 			role: readControlRole(env),
 		}),

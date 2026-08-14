@@ -2052,6 +2052,7 @@ describe('agent-control service: audience resolution', () => {
 		const { service } = setup({ ports: makePorts() });
 
 		expect(await service.describeAudience('tok-caller')).toEqual({
+			delegation: 'ensemblr',
 			hasChatTab: true,
 			role: 'orchestrator',
 		});
@@ -2061,6 +2062,7 @@ describe('agent-control service: audience resolution', () => {
 		const { service } = setup({ ports: makePorts(), species: 'claude' });
 
 		expect(await service.describeAudience('tok-caller')).toEqual({
+			delegation: 'ensemblr',
 			hasChatTab: true,
 			role: 'orchestrator',
 		});
@@ -2070,6 +2072,7 @@ describe('agent-control service: audience resolution', () => {
 		const { service } = setup({ ports: makePorts(), species: 'harness' });
 
 		expect(await service.describeAudience('tok-caller')).toEqual({
+			delegation: 'ensemblr',
 			hasChatTab: false,
 			role: 'orchestrator',
 		});
@@ -2082,6 +2085,7 @@ describe('agent-control service: audience resolution', () => {
 		});
 
 		expect(await service.describeAudience('tok-caller')).toEqual({
+			delegation: 'ensemblr',
 			hasChatTab: true,
 			role: 'subagent',
 		});
@@ -2093,6 +2097,7 @@ describe('agent-control service: audience resolution', () => {
 		const { service } = setup({ ports: makePorts() });
 
 		expect(await service.describeAudience('bogus')).toEqual({
+			delegation: 'ensemblr',
 			hasChatTab: false,
 			role: 'orchestrator',
 		});

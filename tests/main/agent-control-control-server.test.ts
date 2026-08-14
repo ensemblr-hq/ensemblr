@@ -16,7 +16,11 @@ const calls: AgentControlCommand[] = [];
 let server: ControlServer | null = null;
 
 const stubService: AgentControlService = {
-	describeAudience: async () => ({ hasChatTab: false, role: 'orchestrator' }),
+	describeAudience: async () => ({
+		delegation: 'ensemblr',
+		hasChatTab: false,
+		role: 'orchestrator',
+	}),
 	invoke: async (command) => {
 		calls.push(command);
 		if (command.token !== 'good') {
@@ -175,6 +179,7 @@ describe('control server', () => {
 				return { ok: true, data: { echoed: command.op } };
 			},
 			describeAudience: async () => ({
+				delegation: 'ensemblr',
 				hasChatTab: false,
 				role: 'orchestrator',
 			}),
@@ -241,6 +246,7 @@ describe('control server', () => {
 				return { ok: true, data: { echoed: command.op } };
 			},
 			describeAudience: async () => ({
+				delegation: 'ensemblr',
 				hasChatTab: false,
 				role: 'orchestrator',
 			}),

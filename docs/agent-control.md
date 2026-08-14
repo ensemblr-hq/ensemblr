@@ -126,16 +126,54 @@ working blind.
 
 ## The chat-tab axis
 
-Withholding runs on two axes, folded into one answer by `withheldControlOps`
+Withholding runs on three axes, folded into one answer by `withheldControlOps`
 (`src/shared/agent-control/subagent-policy.ts`). The second is `CHAT_TAB_ONLY_OPS`
 — `setName`, `setSummary`, `askUserQuestion`, and `exitPlanMode` — which the
 service refuses to any caller that drives no native chat tab. That is a property
 of the **caller**, not of a runtime: a terminal harness owns a tab that titles
 itself from its own session log, so all four would have nothing to act on, while
 every first-class runtime on the chat surface (Pi and Claude Code alike) holds
-them. `ControlAudience` carries exactly the two facts — `hasChatTab` and `role` —
-so a runtime added later selects its surface by declaring them rather than by
-being named.
+them. `ControlAudience` carries exactly three facts — `hasChatTab`, `role`, and
+`delegation` — so a runtime added later selects its surface by declaring them
+rather than by being named.
+
+## The delegation-mechanism axis
+
+Claude Code ships a sub-agent tool of its own (`Agent`, renamed from `Task` in
+Claude Code v2.1.63; both names still appear in permission-denial paths). A chat
+holding it *and* the Ensemblr spawn tools picks whichever its training favours,
+which in practice means the built-in one — so the orchestration playbook
+describes a loop the model never enters and the user loses the visible tabs.
+
+`app.providers.claudeSubagentMode` in `config.json` picks one, and both halves
+are enforced:
+
+| Mode | Claude's own tool | Ensemblr's spawn ops |
+| --- | --- | --- |
+| `ensemblr` (default) | denied via the SDK's `disallowedTools` | served |
+| `native` | left alone | withheld from the tool list |
+
+`NATIVE_DELEGATION_WITHHELD_OPS` is the third axis: `spawnChatTab`,
+`startConversation`, `sendFollowUp`, `waitForAgents`, and `listModels`. The
+conversation reads and `closeTab` stay — they act on tabs the user already has
+open, not only on children. `NATIVE_ORCHESTRATOR_AWARENESS` is the matching
+playbook, which names the runtime's own tool and says once that the spawn ops are
+absent rather than leaving it to be discovered.
+
+**The mechanism is pinned at session open**, on `AgentControlOrigin.delegation`.
+The SDK fixes `disallowedTools` when `query()` opens, so a live-read tool list
+would let the user flip the setting mid-session and leave that session holding
+neither mechanism. A change therefore reaches the next chat, not the open one.
+
+Pi is unaffected: it has no sub-agent tool of its own, so
+`resolveAgentControlWiring` pins every non-Claude runtime to `ensemblr`
+regardless of the setting. So is every spawned child, whatever its runtime — the
+setting picks how a *root* delegates. Nested delegation is blocked on the other
+axes already, so a child opened under `native` would keep its own sub-agent tool
+live and fan out around the depth cap. Terminal harnesses are unaffected too — their control
+token is minted per workspace and shared by every terminal in it, so the app
+cannot tell a Claude Code CLI from a Codex one and cannot vary the tool list per
+harness.
 
 ## Tool reference
 
@@ -240,6 +278,43 @@ Both fields can be over at once and both are reported, so a caller does not fix
 one and get cut again on the other. It is the surface's most token-heavy payload
 and the one whose whole point is to survive the turn, so refusing it would spend
 a multi-kilobyte re-emit and risk losing the record.
+
+#### Provisional naming in Plan Mode
+
+Planning delays `ensemblr_set_branch_name` the longest — the agent reads,
+interviews, and writes a plan before it names anything — so the app names the
+workspace itself when a Plan Mode session opens or submits, from the user's
+prompt alone. `deriveProvisionalBranchSlug`
+(`src/main/agent-runtime/naming/provisional-branch-slug.ts`) trims the opening
+pleasantry and caps at five meaningful words; the queue in
+`provisional-workspace-naming.ts` applies it through the same
+`applyBranchSlug` gate the agent's own call passes through.
+
+The rename is marked `provisional`, which writes `branchProvisional: true` and
+deliberately leaves `renamedAt` and `branchNamed` unwritten. Both
+`isWorkspaceNameable` and `isBranchNameable` therefore still report true, so the
+guess costs the agent nothing: its one naming call still lands as a first
+naming. `branchProvisional` does two jobs — it stops the namer guessing again on
+the next prompt, and it switches the upkeep block's branch bullet to asking for a
+*better* name rather than a first one.
+
+Because those two gates stay open, a provisional rename is admitted by a third,
+narrower one: `isProvisionallyNameable` requires the workspace to still carry its
+generated placeholder *and* to be unguessed. A guess only ever improves on a
+placeholder, so the app never moves the branch of a workspace somebody has
+titled. Both `applyBranchSlug` and the rename service's own synchronous re-check
+consult it, so two namers racing the same row cannot both apply.
+
+A landed guess is announced the same two ways the agent's `setBranchName` is: an
+`agentControlTabsChanged` broadcast, and a `workspace-renamed` timeline metadata
+event. The event is the load-bearing one — the sidebar's workspace name comes
+from a cached navigation query that nothing else invalidates — and it renders
+nothing in the transcript, so the guess stays silent.
+
+The queue is fire-and-forget and never fails a turn. It declines when the user
+has turned `git.renameWorkspaceOnBranch` off, when the branch was adopted rather
+than cut, when somebody has already named the workspace, and when the prompt
+yields no usable slug.
 
 ### Reading a conversation
 

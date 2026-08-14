@@ -33,6 +33,7 @@ import type { ActiveSession, ActiveSessionMap } from './active-session.ts';
 import {
 	type AgentControlWiring,
 	resolveAgentControlWiring,
+	type SubagentMechanismReader,
 	type TurnPreambleResolver,
 } from './agent-control-wiring.ts';
 import { attachSessionToChatTab } from './chat-tab-plumbing.ts';
@@ -90,6 +91,14 @@ interface SessionOpenerOptions {
 	/** Fires the derived-title attempt for a freshly opened session. */
 	queueNaming: (input: SessionNamingInput) => void;
 	/**
+	 * Reads the user's chosen delegation mechanism for the Claude Code runtime.
+	 * Called per open rather than captured once, so a mode the user changes
+	 * between sessions reaches the next one — and only the next one, because the
+	 * runtime fixes its own deny list at session open. Absent in tests, where
+	 * every session opens under `ensemblr`.
+	 */
+	readClaudeSubagentMode?: SubagentMechanismReader;
+	/**
 	 * Resolves the agent-control environment (control-server URL + per-session
 	 * token) injected into the agent child so it can call back into the app.
 	 * Absent in tests and when the control layer is disabled.
@@ -140,6 +149,7 @@ export function createSessionOpener({
 	now,
 	agentClient,
 	queueNaming,
+	readClaudeSubagentMode,
 	resolveAgentControlEnv,
 	resolvePermissionMode,
 	resolveProviderExecutable,
@@ -236,6 +246,7 @@ export function createSessionOpener({
 			control: resolveAgentControlWiring({
 				parentSessionId: request.parentSessionId ?? null,
 				provider: row.provider,
+				readClaudeSubagentMode,
 				resolveAgentControlEnv,
 				resolveTurnPreamble,
 				sessionId: row.id,
@@ -340,6 +351,7 @@ export function createSessionOpener({
 			control: resolveAgentControlWiring({
 				parentSessionId: request.parentSessionId ?? null,
 				provider,
+				readClaudeSubagentMode,
 				resolveAgentControlEnv,
 				resolveTurnPreamble,
 				sessionId: session.id,
@@ -537,6 +549,7 @@ async function createRuntimeSessionOrFail({
 		return await agentClient.createSession({
 			agentSessionId: sessionInput.agentSessionId,
 			controlMcp: control.controlMcp,
+			delegation: control.delegation,
 			env: control.env,
 			executable: sessionInput.executable,
 			label: sessionInput.label,

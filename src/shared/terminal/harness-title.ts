@@ -3,6 +3,10 @@
  * harness animates a leading spinner/decoration glyph while it is working and
  * sets a clean conversation title when idle, so the presence of that decoration
  * doubles as a "busy" signal and its absence yields the real title text.
+ *
+ * Shared rather than renderer-local: the renderer lights a tab from this, and
+ * main reads the same title to decide whether quitting would interrupt a
+ * harness mid-turn. A second copy would be a parity test waiting to fail.
  */
 
 /** Unicode braille block (U+2800–U+28FF): the frames many TUIs animate as spinners. */

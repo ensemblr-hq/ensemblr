@@ -4,6 +4,7 @@ import { createPlanSubmission } from '../../src/main/plan-mode/exit-plan-mode.ts
 import type { ExitPlanModeBroadcast } from '../../src/shared/agent-control.ts';
 
 const ORIGIN: AgentControlOrigin = {
+	delegation: 'ensemblr',
 	depth: 0,
 	parentSessionId: null,
 	sessionId: 'sess-1',

@@ -2,6 +2,7 @@ import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
 
 import { AgentProviderBrandTile } from '@/renderer/components/agent-provider-brand';
+import { ClaudeSubagentModeRow } from '@/renderer/components/settings/agent-providers/claude-subagent-mode-row';
 import { CopyCommandButton } from '@/renderer/components/settings/agent-providers/copy-command-button';
 import { ProviderAccountList } from '@/renderer/components/settings/agent-providers/provider-account-list';
 import { ProviderCheckRow } from '@/renderer/components/settings/agent-providers/provider-check-row';
@@ -145,6 +146,8 @@ export function ProviderTabPanel({
 					</ul>
 				</SettingRow>
 			) : null}
+
+			{descriptor.id === 'claude' ? <ClaudeSubagentModeRow /> : null}
 
 			<ProviderExecutableRow descriptor={descriptor} />
 

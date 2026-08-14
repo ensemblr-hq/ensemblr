@@ -81,7 +81,10 @@ import {
 	canSetTitle,
 	readTitleProvenance,
 } from './naming/title-provenance.ts';
-import type { TurnPreambleResolver } from './session/agent-control-wiring.ts';
+import type {
+	SubagentMechanismReader,
+	TurnPreambleResolver,
+} from './session/agent-control-wiring.ts';
 import type { SessionSummaryWriter } from './session-summary-writer.ts';
 
 export type {
@@ -113,8 +116,20 @@ interface AgentSessionServiceOptions {
 	 * session starts in Plan Mode.
 	 */
 	isPlanModeActive?: (agentSessionId: string) => boolean;
+	/**
+	 * Announces a stop the user asked for, before the abort settles the turn to
+	 * `idle`. The desktop notifier listens so a cancelled turn is not announced as
+	 * one that finished on its own.
+	 */
+	onSessionAborted?: (sessionId: string) => void;
 	/** Derived tab-titling queue, fired at open and each turn-idle. */
 	queueNaming: QueueNamingPort;
+	/**
+	 * Reads the delegation mechanism a Claude Code session must open under.
+	 * Omitted, every session opens under `ensemblr` — the mechanism the control
+	 * tools were built for.
+	 */
+	readClaudeSubagentMode?: SubagentMechanismReader;
 	/** Injects the agent-control env (control URL + token) into each agent child. */
 	resolveAgentControlEnv?: AgentControlEnvResolver;
 	/** Renders the per-turn upkeep block for runtimes whose system prompt is fixed at open. */
@@ -224,7 +239,9 @@ export function createAgentSessionService({
 	eventSink,
 	agentClient,
 	isPlanModeActive = () => false,
+	onSessionAborted,
 	queueNaming,
+	readClaudeSubagentMode,
 	resolveAgentControlEnv,
 	resolvePermissionMode = () => DEFAULT_PERMISSION_MODE,
 	resolveProviderExecutable,
@@ -248,9 +265,11 @@ export function createAgentSessionService({
 		eventSink,
 		isPlanModeActive,
 		now,
+		onSessionAborted,
 		persistRuntimeEvent,
 		agentClient,
 		queueNaming,
+		readClaudeSubagentMode,
 		requireDatabase: requireSessionDatabase,
 		resolveAgentControlEnv,
 		resolvePermissionMode,

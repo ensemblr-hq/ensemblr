@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { isHarnessTitleBusy } from '@/renderer/lib/terminal';
+import { isHarnessTitleBusy } from '@/shared/terminal';
 
 /** Live busy state of the agent terminals in one workspace. */
 interface WorkspaceAgentBusyState {

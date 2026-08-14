@@ -38,6 +38,7 @@ import {
 	type ClaudePlanSubmittedEvent,
 	detectPlanSubmission,
 } from './claude-plan-mode.ts';
+import { resolveDisallowedTools } from './claude-subagent-mode.ts';
 import {
 	CLAUDE_THINKING_CONFIG,
 	steerClaudeThinking,
@@ -595,11 +596,16 @@ function buildQueryOptions({
 	const effort = toClaudeEffortLevel(request.thinkingLevel);
 	const executablePath = request.executable?.command?.trim();
 	const mcpServers = buildClaudeMcpServers(request.controlMcp);
+	const disallowedTools = resolveDisallowedTools({
+		delegation: request.delegation ?? 'ensemblr',
+		permissionDisallowedTools: permission.disallowedTools,
+	});
 
 	const linkedDirectories = request.linkedDirectories ?? [];
 
 	return {
 		...permission,
+		...(disallowedTools ? { disallowedTools } : {}),
 		...(linkedDirectories.length > 0
 			? { additionalDirectories: [...linkedDirectories] }
 			: {}),

@@ -1,6 +1,8 @@
 import { atom, useSetAtom } from 'jotai';
 import { useEffect } from 'react';
 
+import { reportActiveChat } from '@/renderer/api/ensemblr';
+
 import { useUnreadChatActions } from './hooks';
 
 /** The chat the user is looking at right now, or null when none is open. */
@@ -19,7 +21,9 @@ export const activeChatIdentityAtom = atom<ActiveChatIdentity | null>(null);
 
 /**
  * Publishes the open chat's identity and clears its unread mark, which is what
- * makes viewing a tab the only thing that marks it read.
+ * makes viewing a tab the only thing that marks it read. The same identity goes
+ * to the main process, where the desktop notifier needs it to tell the chat the
+ * user is watching from the one that just finished in the background.
  *
  * Only the routed workspace mounts this, so the atom holds at most one entry.
  * The teardown is its own effect so switching tabs never blanks the identity
@@ -43,8 +47,15 @@ export function usePublishActiveChat({
 
 	useEffect(() => {
 		setActiveChat({ agentSessionId, chatTabId, workspaceId });
+		reportActiveChat({ agentSessionId, chatTabId, workspaceId });
 		clearChat({ agentSessionId, chatTabId, workspaceId });
 	}, [agentSessionId, chatTabId, clearChat, setActiveChat, workspaceId]);
 
-	useEffect(() => () => setActiveChat(null), [setActiveChat]);
+	useEffect(
+		() => () => {
+			setActiveChat(null);
+			reportActiveChat(null);
+		},
+		[setActiveChat],
+	);
 }

@@ -15,7 +15,20 @@
  */
 import type { DatabaseSync } from 'node:sqlite';
 
-import { getChatTabByAgentSessionId } from '../storage/repositories/chat-tab-repository.ts';
+import {
+	type ChatTabRow,
+	getChatTabByAgentSessionId,
+} from '../storage/repositories/chat-tab-repository.ts';
+
+/**
+ * Reads the marker off a tab row a caller already holds, so a caller that has
+ * fetched the row does not pay a second query to ask what it is.
+ * @param tab - The chat tab row, or null when the session has none.
+ * @returns True when the row carries the sub-agent marker.
+ */
+export function isTabMarkedSubAgent(tab: ChatTabRow | null): boolean {
+	return tab?.metadata.agentRole === 'subagent';
+}
 
 /**
  * Reports whether the chat tab bound to a Pi session is stamped as hosting a
@@ -34,11 +47,12 @@ export function isSessionTabMarkedSubAgent(
 		return false;
 	}
 	try {
-		const tab = getChatTabByAgentSessionId({
-			agentSessionId,
-			database,
-		});
-		return tab?.metadata.agentRole === 'subagent';
+		return isTabMarkedSubAgent(
+			getChatTabByAgentSessionId({
+				agentSessionId,
+				database,
+			}),
+		);
 	} catch (cause) {
 		console.warn('[agent-control] could not read a tab’s sub-agent marker.', {
 			cause: cause instanceof Error ? cause.message : String(cause),

@@ -6,11 +6,23 @@ import {
 	SESSION_BRIEF_NUDGE_HEADER,
 } from '../../src/shared/agent-control/session-brief';
 
+function branch(
+	overrides: Partial<SessionBriefNaming['branch']> = {},
+): SessionBriefNaming['branch'] {
+	return {
+		current: null,
+		eligible: false,
+		namesWorkspace: true,
+		provisional: false,
+		...overrides,
+	};
+}
+
 function naming(
 	overrides: Partial<SessionBriefNaming> = {},
 ): SessionBriefNaming {
 	return {
-		branch: { current: null, eligible: false, namesWorkspace: true },
+		branch: branch(),
 		summaryStale: false,
 		titleNeeded: false,
 		...overrides,
@@ -34,11 +46,7 @@ describe('buildSessionBriefNudge', () => {
 	test('names the branch tool and the current branch when still a placeholder', () => {
 		const nudge = buildSessionBriefNudge(
 			naming({
-				branch: {
-					current: 'octocat/bach',
-					eligible: true,
-					namesWorkspace: true,
-				},
+				branch: branch({ current: 'octocat/bach', eligible: true }),
 			}),
 		);
 
@@ -50,11 +58,7 @@ describe('buildSessionBriefNudge', () => {
 	test('never raises the branch tool when the user turned naming off', () => {
 		const nudge = buildSessionBriefNudge(
 			naming({
-				branch: {
-					current: 'octocat/bach',
-					eligible: false,
-					namesWorkspace: true,
-				},
+				branch: branch({ current: 'octocat/bach' }),
 				summaryStale: true,
 				titleNeeded: true,
 			}),
@@ -68,9 +72,7 @@ describe('buildSessionBriefNudge', () => {
 
 	test('omits the branch clause when the workspace has no branch', () => {
 		const nudge = buildSessionBriefNudge(
-			naming({
-				branch: { current: null, eligible: true, namesWorkspace: true },
-			}),
+			naming({ branch: branch({ eligible: true }) }),
 		);
 
 		expect(nudge).toContain('ensemblr_set_branch_name');
@@ -83,11 +85,11 @@ describe('buildSessionBriefNudge', () => {
 	test('asks for the branch alone once the user has titled the workspace', () => {
 		const nudge = buildSessionBriefNudge(
 			naming({
-				branch: {
+				branch: branch({
 					current: 'octocat/bach',
 					eligible: true,
 					namesWorkspace: false,
-				},
+				}),
 			}),
 		);
 
@@ -99,11 +101,7 @@ describe('buildSessionBriefNudge', () => {
 	test('warns the branch bullet off renaming the branch with git', () => {
 		const nudge = buildSessionBriefNudge(
 			naming({
-				branch: {
-					current: 'octocat/bach',
-					eligible: true,
-					namesWorkspace: true,
-				},
+				branch: branch({ current: 'octocat/bach', eligible: true }),
 			}),
 		);
 
@@ -137,11 +135,7 @@ describe('buildSessionBriefNudge', () => {
 		const nudge =
 			buildSessionBriefNudge(
 				naming({
-					branch: {
-						current: 'octocat/bach',
-						eligible: true,
-						namesWorkspace: true,
-					},
+					branch: branch({ current: 'octocat/bach', eligible: true }),
 					summaryStale: true,
 					titleNeeded: true,
 				}),
@@ -159,11 +153,7 @@ describe('buildSessionBriefNudge', () => {
 		const nudge =
 			buildSessionBriefNudge(
 				naming({
-					branch: {
-						current: 'octocat/bach',
-						eligible: true,
-						namesWorkspace: true,
-					},
+					branch: branch({ current: 'octocat/bach', eligible: true }),
 					summaryStale: true,
 					titleNeeded: true,
 				}),
@@ -172,5 +162,109 @@ describe('buildSessionBriefNudge', () => {
 		expect(
 			nudge.split('\n').filter((line) => line.startsWith('- ')),
 		).toHaveLength(3);
+	});
+});
+
+// Claude Code learns of Plan Mode only as the SDK's `permissionMode: 'plan'`,
+// which brings its own "MUST NOT run any non-readonly tools" instruction. The
+// Pi-only `PLAN_MODE_UPKEEP_CLAUSE` never reaches it, so the carve-out has to
+// ride in this block or every name is deferred until after the plan lands.
+describe('buildSessionBriefNudge in Plan Mode', () => {
+	const planning = naming({
+		branch: branch({ current: 'octocat/bach', eligible: true }),
+		summaryStale: true,
+		titleNeeded: true,
+	});
+
+	test('still renders nothing when no upkeep is outstanding', () => {
+		expect(buildSessionBriefNudge(naming(), true)).toBeNull();
+	});
+
+	test('states that every item stays allowed while planning', () => {
+		const nudge = buildSessionBriefNudge(planning, true) ?? '';
+
+		expect(nudge).toContain('You are planning, and every item below is still');
+		expect(nudge).toContain('A restriction on non-read-only tools does not');
+	});
+
+	test('tells the agent to name now rather than after the plan', () => {
+		const nudge = buildSessionBriefNudge(planning, true) ?? '';
+
+		expect(nudge).toContain('before you read the repository');
+		expect(nudge).toContain('rather than once the plan is approved');
+	});
+
+	// A planning agent produces nothing after `ensemblr_exit_plan_mode`, so the
+	// standard "before your closing answer" wording names a slot it never reaches.
+	test('retimes the summary call to before the plan is submitted', () => {
+		const nudge = buildSessionBriefNudge(planning, true) ?? '';
+
+		expect(nudge).toContain('before `ensemblr_exit_plan_mode`');
+		expect(nudge).not.toContain('BEFORE you write your closing answer');
+	});
+
+	test('asks for a better name once the app has named the workspace itself', () => {
+		const nudge =
+			buildSessionBriefNudge(
+				naming({
+					branch: branch({
+						current: 'octocat/add-dark-mode',
+						eligible: true,
+						provisional: true,
+					}),
+				}),
+				true,
+			) ?? '';
+
+		expect(nudge).toContain('ensemblr_set_branch_name');
+		expect(nudge).toContain('that was a guess');
+		expect(nudge).toContain('describes the work better');
+		expect(nudge).not.toContain('still has its generated placeholder name');
+	});
+
+	// `provisional` and `namesWorkspace` move independently: a workspace the user
+	// retitled before planning keeps that title through the agent's call too, so
+	// promising to rename it would describe a rename that will not happen.
+	test('still says the branch alone moves when the user has titled the workspace', () => {
+		const nudge =
+			buildSessionBriefNudge(
+				naming({
+					branch: branch({
+						current: 'octocat/add-dark-mode',
+						eligible: true,
+						namesWorkspace: false,
+						provisional: true,
+					}),
+				}),
+				true,
+			) ?? '';
+
+		expect(nudge).toContain('that was a guess');
+		expect(nudge).toContain('leaves the title the user chose alone');
+		expect(nudge).not.toContain('renames the workspace and the git branch');
+	});
+
+	test('keeps the git warning on the provisional branch bullet', () => {
+		const nudge =
+			buildSessionBriefNudge(
+				naming({
+					branch: branch({
+						current: 'octocat/add-dark-mode',
+						eligible: true,
+						provisional: true,
+					}),
+				}),
+				true,
+			) ?? '';
+
+		expect(nudge).toContain('git branch -m');
+	});
+
+	test('leaves the non-planning wording untouched', () => {
+		const nudge = buildSessionBriefNudge(planning) ?? '';
+
+		expect(nudge).not.toContain('You are planning');
+		expect(nudge).toContain('BEFORE you write your closing answer');
+		expect(nudge).toContain('Do it now and only once;');
 	});
 });

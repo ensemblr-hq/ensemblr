@@ -9,18 +9,22 @@ import type {
 import {
 	type ControlServer,
 	startControlServer,
+	TOOL_DEFS,
 } from '../../src/main/agent-control/index.ts';
 import type { ControlAudience } from '../../src/shared/agent-control.ts';
 import {
 	HARNESS_AWARENESS,
+	NATIVE_ORCHESTRATOR_AWARENESS,
 	ORCHESTRATOR_AWARENESS,
 	SUBAGENT_AWARENESS,
+	withheldControlOps,
 } from '../../src/shared/agent-control.ts';
 
 const calls: AgentControlCommand[] = [];
 let server: ControlServer | null = null;
 
 const HARNESS_ROOT: ControlAudience = {
+	delegation: 'ensemblr',
 	hasChatTab: false,
 	role: 'orchestrator',
 };
@@ -258,6 +262,7 @@ describe('agent-control MCP endpoint, per-origin surface', () => {
 
 	it('serves the chat-tab tools to a first-class root', async () => {
 		const names = await toolNamesFor({
+			delegation: 'ensemblr',
 			hasChatTab: true,
 			role: 'orchestrator',
 		});
@@ -267,6 +272,34 @@ describe('agent-control MCP endpoint, per-origin surface', () => {
 		}
 		expect(names).toContain('ensemblr_start_conversation');
 		expect(names).toContain('ensemblr_wait_for_agents');
+	});
+
+	// The user picked one delegation mechanism; a root holding both would pick
+	// whichever its training favours, which is the whole reason for the axis.
+	it('withholds the spawn tools from a root delegating through its own runtime', async () => {
+		const names = await toolNamesFor({
+			delegation: 'native',
+			hasChatTab: true,
+			role: 'orchestrator',
+		});
+
+		for (const tool of [
+			'ensemblr_start_conversation',
+			'ensemblr_spawn_chat_tab',
+			'ensemblr_send_follow_up',
+			'ensemblr_wait_for_agents',
+			'ensemblr_list_models',
+		] as const) {
+			expect(names, tool).not.toContain(tool);
+		}
+		// Its own tab, the reads over other tabs, and the questionnaire are not part
+		// of the choice and stay whichever mechanism the user picked.
+		for (const tool of CHAT_TAB_TOOLS) {
+			expect(names, tool).toContain(tool);
+		}
+		expect(names).toContain('ensemblr_read_conversation');
+		expect(names).toContain('ensemblr_get_last_message');
+		expect(names).toContain('ensemblr_close_tab');
 	});
 
 	it('withholds the chat-tab tools from a harness root', async () => {
@@ -281,7 +314,11 @@ describe('agent-control MCP endpoint, per-origin surface', () => {
 	// registrations; a first-class child over MCP has to land in the same place, or
 	// its list advertises a delegation surface the service refuses it.
 	it('withholds the delegation surface from a first-class sub-agent', async () => {
-		const names = await toolNamesFor({ hasChatTab: true, role: 'subagent' });
+		const names = await toolNamesFor({
+			delegation: 'ensemblr',
+			hasChatTab: true,
+			role: 'subagent',
+		});
 
 		expect(names).toContain('ensemblr_set_name');
 		expect(names).toContain('ensemblr_set_summary');
@@ -308,7 +345,11 @@ describe('agent-control MCP endpoint, per-origin surface', () => {
 	});
 
 	it('serves the orchestrator playbook to a first-class root', async () => {
-		const client = await connectAs({ hasChatTab: true, role: 'orchestrator' });
+		const client = await connectAs({
+			delegation: 'ensemblr',
+			hasChatTab: true,
+			role: 'orchestrator',
+		});
 
 		expect(client.getInstructions()).toBe(ORCHESTRATOR_AWARENESS);
 
@@ -316,7 +357,11 @@ describe('agent-control MCP endpoint, per-origin surface', () => {
 	});
 
 	it('serves the sub-agent playbook to a first-class sub-agent', async () => {
-		const client = await connectAs({ hasChatTab: true, role: 'subagent' });
+		const client = await connectAs({
+			delegation: 'ensemblr',
+			hasChatTab: true,
+			role: 'subagent',
+		});
 
 		expect(client.getInstructions()).toBe(SUBAGENT_AWARENESS);
 
@@ -351,7 +396,7 @@ describe('agent-control MCP endpoint, per-origin surface', () => {
 	// directive there; repeating it here would state it twice in one prompt.
 	it('leaves the directive off a caller the app prompts per turn', async () => {
 		const client = await connectAs(
-			{ hasChatTab: true, role: 'orchestrator' },
+			{ delegation: 'ensemblr', hasChatTab: true, role: 'orchestrator' },
 			'LANGUAGE: reply in Русский.',
 		);
 
@@ -362,7 +407,11 @@ describe('agent-control MCP endpoint, per-origin surface', () => {
 
 	it('names only tools a first-class root is actually served', async () => {
 		const served = new Set(
-			await toolNamesFor({ hasChatTab: true, role: 'orchestrator' }),
+			await toolNamesFor({
+				delegation: 'ensemblr',
+				hasChatTab: true,
+				role: 'orchestrator',
+			}),
 		);
 		const mentioned = new Set(
 			ORCHESTRATOR_AWARENESS.match(/ensemblr_[a-z_]+/g) ?? [],
@@ -370,5 +419,31 @@ describe('agent-control MCP endpoint, per-origin surface', () => {
 
 		expect(mentioned.size).toBeGreaterThan(0);
 		expect([...mentioned].filter((name) => !served.has(name))).toEqual([]);
+	});
+
+	// The same guard for the native variant, which alone may name a tool it does
+	// not hold — once, to say the tool is gone. Every other name in it still has
+	// to be one the list actually carries, and the absent ones still have to be
+	// absent.
+	it('names only served tools in the native playbook, bar the absent ones', async () => {
+		const audience: ControlAudience = {
+			delegation: 'native',
+			hasChatTab: true,
+			role: 'orchestrator',
+		};
+		const served = new Set(await toolNamesFor(audience));
+		const withheldOps = withheldControlOps(audience);
+		const withheld = new Set(
+			TOOL_DEFS.filter((def) => withheldOps.has(def.op)).map((def) => def.name),
+		);
+		const mentioned = new Set(
+			NATIVE_ORCHESTRATOR_AWARENESS.match(/ensemblr_[a-z_]+/g) ?? [],
+		);
+
+		expect(withheld.size).toBeGreaterThan(0);
+		expect([...withheld].filter((name) => served.has(name))).toEqual([]);
+		expect(
+			[...mentioned].filter((name) => !served.has(name) && !withheld.has(name)),
+		).toEqual([]);
 	});
 });

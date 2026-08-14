@@ -805,11 +805,12 @@ export function createAgentControlService({
 		origin: AgentControlOrigin,
 	): Promise<AgentControlResult<unknown>> => {
 		const naming = await ports.sessionNaming.readBrief(origin);
+		const planMode = isPlanning(origin);
 		return ok({
 			languageDirective: readLanguageDirective(),
 			naming,
-			nudge: buildSessionBriefNudge(naming),
-			planMode: isPlanning(origin),
+			nudge: buildSessionBriefNudge(naming, planMode),
+			planMode,
 		} satisfies GetSessionBriefResult);
 	};
 
@@ -1568,9 +1569,14 @@ export function createAgentControlService({
 	const describeAudience = async (token: string): Promise<ControlAudience> => {
 		const origin = originRegistry.resolveByToken(token);
 		if (!origin) {
-			return { hasChatTab: false, role: 'orchestrator' };
+			return {
+				delegation: 'ensemblr',
+				hasChatTab: false,
+				role: 'orchestrator',
+			};
 		}
 		return {
+			delegation: origin.delegation,
 			hasChatTab: originHasChatTab(origin),
 			role: await resolveRole(origin),
 		};
@@ -1584,7 +1590,10 @@ export function createAgentControlService({
 			return null;
 		}
 		const blocks = [
-			buildSessionBriefNudge(await ports.sessionNaming.readBrief(origin)),
+			buildSessionBriefNudge(
+				await ports.sessionNaming.readBrief(origin),
+				isPlanning(origin),
+			),
 			readLanguageDirective(),
 		].filter((block) => block !== null);
 		return blocks.length > 0 ? blocks.join('\n\n') : null;

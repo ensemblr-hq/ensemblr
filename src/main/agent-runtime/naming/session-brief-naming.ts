@@ -23,7 +23,11 @@ import { getMainBranchForSession } from '../../storage/repositories/agent-sessio
 import { getChatTabByAgentSessionId } from '../../storage/repositories/chat-tab-repository.ts';
 import { selectWorkspaceWithRepositoryById } from '../../storage/repositories/workspace-repository.ts';
 import { readAgentSummaryMarker } from '../agent-summary.ts';
-import { isBranchNameable, isWorkspaceNameable } from '../branch-name-slug.ts';
+import {
+	isBranchNameable,
+	isBranchProvisional,
+	isWorkspaceNameable,
+} from '../branch-name-slug.ts';
 
 /**
  * The caller fields the brief consults, satisfied structurally by a resolved
@@ -47,7 +51,12 @@ export interface SessionBriefCaller {
  */
 function nothingOutstanding(): SessionBriefNaming {
 	return {
-		branch: { current: null, eligible: false, namesWorkspace: false },
+		branch: {
+			current: null,
+			eligible: false,
+			namesWorkspace: false,
+			provisional: false,
+		},
 		summaryStale: false,
 		titleNeeded: false,
 	};
@@ -140,13 +149,19 @@ function readWorkspaceNaming({
 		| Record<string, unknown>
 		| undefined;
 	if (!row) {
-		return { current: null, eligible: false, namesWorkspace: false };
+		return {
+			current: null,
+			eligible: false,
+			namesWorkspace: false,
+			provisional: false,
+		};
 	}
 	const metadata = parseMetadata(String(row.metadataJson ?? ''));
 	return {
 		current: typeof row.branchName === 'string' ? row.branchName : null,
 		eligible: isBranchNameable(metadata) && namingEnabled(),
 		namesWorkspace: isWorkspaceNameable(metadata),
+		provisional: isBranchProvisional(metadata),
 	};
 }
 

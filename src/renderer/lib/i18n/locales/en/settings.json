@@ -393,6 +393,12 @@
 			"not-ready": "Not ready",
 			"unavailable": "Unavailable"
 		},
+		"subagent-mode": {
+			"description": "Ensemblr chat tabs spawn each sub-agent into its own tab you can watch and steer, and Claude Code’s own sub-agent tool is denied. Built-in keeps sub-agents inside this conversation and withholds the spawn tools instead. Applies to chats started after the change.",
+			"ensemblr": "Ensemblr chat tabs",
+			"label": "Sub-agents",
+			"native": "Claude Code built-in"
+		},
 		"tabs-aria-label": "Agent providers",
 		"title": "Providers"
 	},
