@@ -1,10 +1,28 @@
 /**
- * Workspace-file attachment IPC request schemas.
+ * Workspace-file IPC request schemas.
  *
- * **Strict:** handlers call `schema.parse(raw)` inside a try/catch, so a
- * malformed renderer payload throws and is reported as a handled error.
+ * **Strict:** the attachment-write handlers call `schema.parse(raw)` inside a
+ * try/catch, so a malformed renderer payload throws and is reported as a handled
+ * error.
+ *
+ * **Lenient (read):** {@link readWorkspaceFileRequestSchema} is used via
+ * `safeParse`, because the read handler already answers in a typed error
+ * envelope the preview surface renders. It had no validator at all before the
+ * preview was widened to accept absolute paths, so there are no prior semantics
+ * to preserve here.
  */
 import { z } from 'zod';
+
+/**
+ * {@link import('../../../shared/ipc').ReadWorkspaceFileRequest}. `path` may be
+ * absolute, `~`-prefixed, or repo-relative — the preview reads outside the
+ * workspace root, and `resolvePreviewPath` in the service decides the scope. The
+ * length cap keeps a malformed payload from reaching the filesystem call.
+ */
+export const readWorkspaceFileRequestSchema = z.object({
+	path: z.string().min(1).max(4096),
+	workspaceCwd: z.string().min(1).max(4096),
+});
 
 /**
  * {@link import('../../../shared/ipc').WriteWorkspaceImageAttachmentRequest}.

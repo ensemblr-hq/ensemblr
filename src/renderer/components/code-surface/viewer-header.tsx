@@ -14,11 +14,14 @@ import { getWorkspaceFileIconNameForPath } from '@/renderer/lib/workbench';
  */
 export function CodeViewerHeader({
 	actions,
+	badge,
 	icon,
 	title,
 }: {
 	/** Right-aligned controls and status text. */
 	actions?: ReactNode;
+	/** Status marker shown next to the path, such as an out-of-workspace flag. */
+	badge?: ReactNode;
 	/** Replaces the file-type icon derived from `title`. */
 	icon?: ReactNode;
 	title: string;
@@ -36,6 +39,7 @@ export function CodeViewerHeader({
 				className='font-mono text-muted-foreground text-xs'
 				path={title}
 			/>
+			{badge}
 			{actions ? (
 				<div className='ml-auto flex shrink-0 items-center gap-1'>
 					{actions}

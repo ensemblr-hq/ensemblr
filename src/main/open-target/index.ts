@@ -1,6 +1,6 @@
 export {
 	resolveOpenTargetPath,
-	sanitizeWorkspaceRelativePath,
+	sanitizeOpenTargetPath,
 } from './open-target-paths';
 export {
 	collectRegistryValidationErrors,

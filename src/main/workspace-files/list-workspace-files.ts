@@ -32,10 +32,12 @@ import {
 	MAX_CONTEXT_IMAGE_BYTES,
 	signatureExtensionForPreview,
 } from './workspace-images.ts';
+import type { PreviewPathScope } from './workspace-paths.ts';
 import {
 	hasErrorCode,
 	ignoredEntry,
 	isWithinWorkspaceReal,
+	resolvePreviewPath,
 	resolveWorkspacePath,
 } from './workspace-paths.ts';
 
@@ -180,7 +182,7 @@ export function createListWorkspaceFilesService({
 				};
 			}
 
-			const target = resolveWorkspacePath({
+			const target = resolvePreviewPath({
 				pathValue: request.path,
 				workspaceCwd: cwdResult.cwd,
 			});
@@ -194,8 +196,9 @@ export function createListWorkspaceFilesService({
 			try {
 				const readable = await resolveReadablePreviewFile({
 					absolutePath: target.absolutePath,
-					relativePath: target.relativePath,
+					displayPath: target.displayPath,
 					requestPath: request.path,
+					scope: target.scope,
 					workspaceCwd: cwdResult.cwd,
 				});
 				if (!readable.ok) {
@@ -203,8 +206,9 @@ export function createListWorkspaceFilesService({
 				}
 				return buildFilePreviewResult({
 					buffer: await readFile(target.absolutePath),
+					displayPath: target.displayPath,
+					isExternal: target.scope === 'external',
 					previewEmbedMimeType: readable.previewEmbedMimeType,
-					relativePath: target.relativePath,
 					sizeBytes: readable.sizeBytes,
 				});
 			} catch (cause) {
@@ -525,24 +529,28 @@ function collectDirectories(filePaths: readonly string[]): readonly string[] {
 }
 
 /**
- * Validates that a resolved workspace path is a readable, in-workspace file
- * within the preview size cap, returning its preview MIME type on success or a
- * typed failure result. The stat, size, and symlink-containment checks run in
- * the order the security model requires (size cap before the real-path check).
- * @param params - Absolute and workspace-relative paths, the original request
- *   path for error echoing, and the workspace root for containment checks.
+ * Validates that a resolved path is a readable file within the preview size cap,
+ * returning its preview MIME type on success or a typed failure result. The
+ * stat, size, and symlink-containment checks run in the order the security model
+ * requires (size cap before the real-path check). Containment applies only to a
+ * `workspace`-scoped path: an `external` one was already cleared to live outside
+ * the root, so re-checking it would refuse every file it exists to allow.
+ * @param params - Absolute path, the path to echo in errors, the original
+ *   request path, the resolved scope, and the workspace root.
  * @returns The preview MIME type and size on success, or a failure result.
  */
 async function resolveReadablePreviewFile(params: {
 	absolutePath: string;
-	relativePath: string;
+	displayPath: string;
 	requestPath: string;
+	scope: PreviewPathScope;
 	workspaceCwd: string;
 }): Promise<
 	| { ok: true; previewEmbedMimeType: string | null; sizeBytes: number }
 	| { ok: false; result: ReadWorkspaceFileResult }
 > {
-	const { absolutePath, relativePath, requestPath, workspaceCwd } = params;
+	const { absolutePath, displayPath, requestPath, scope, workspaceCwd } =
+		params;
 	const fileStat = await stat(absolutePath);
 	if (!fileStat.isFile()) {
 		return {
@@ -554,7 +562,7 @@ async function resolveReadablePreviewFile(params: {
 			},
 		};
 	}
-	const previewEmbedMimeType = previewEmbedMimeTypeForPath(relativePath);
+	const previewEmbedMimeType = previewEmbedMimeTypeForPath(displayPath);
 	const maxPreviewBytes = previewEmbedMimeType
 		? MAX_CONTEXT_IMAGE_BYTES
 		: MAX_READ_BYTES;
@@ -571,7 +579,10 @@ async function resolveReadablePreviewFile(params: {
 			},
 		};
 	}
-	if (!(await isWithinWorkspaceReal(workspaceCwd, absolutePath))) {
+	if (
+		scope === 'workspace' &&
+		!(await isWithinWorkspaceReal(workspaceCwd, absolutePath))
+	) {
 		return {
 			ok: false,
 			result: {
@@ -588,35 +599,40 @@ async function resolveReadablePreviewFile(params: {
 }
 
 /**
- * Builds the preview payload for a validated, in-workspace file: a base64 image
- * result when the bytes match a browser-previewable type, otherwise utf8 source.
+ * Builds the preview payload for a validated file: a base64 image result when
+ * the bytes match a browser-previewable type, otherwise utf8 source.
  * @param params - Decoded file buffer, its declared preview MIME type (or null),
- *   the workspace-relative path, and the on-disk size in bytes.
+ *   the path to echo back, whether that path is outside the workspace, and the
+ *   on-disk size in bytes.
  * @returns A base64 image or utf8 source preview result.
  */
 function buildFilePreviewResult(params: {
 	buffer: Buffer;
+	displayPath: string;
+	isExternal: boolean;
 	previewEmbedMimeType: string | null;
-	relativePath: string;
 	sizeBytes: number;
 }): ReadWorkspaceFileResult {
-	const { buffer, previewEmbedMimeType, relativePath, sizeBytes } = params;
+	const { buffer, displayPath, isExternal, previewEmbedMimeType, sizeBytes } =
+		params;
 	if (
 		previewEmbedMimeType &&
-		previewBytesLookValid(buffer, relativePath, previewEmbedMimeType)
+		previewBytesLookValid(buffer, displayPath, previewEmbedMimeType)
 	) {
 		return {
 			content: buffer.toString('base64'),
 			contentEncoding: 'base64',
+			isExternal,
 			mimeType: previewEmbedMimeType,
-			path: relativePath,
+			path: displayPath,
 			sizeBytes,
 		};
 	}
 	return {
 		content: buffer.toString('utf8'),
 		contentEncoding: 'utf8',
-		path: relativePath,
+		isExternal,
+		path: displayPath,
 		sizeBytes,
 	};
 }

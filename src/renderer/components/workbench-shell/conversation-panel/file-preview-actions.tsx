@@ -15,6 +15,10 @@ import { formatSizeBytes, resolvePreviewMode } from './file-preview-helpers';
 /**
  * Toolbar actions for the file preview header: size, open-in menu, and the
  * markdown-preview and word-wrap toggles shown only where they apply.
+ *
+ * The open-in menu is handed `result.path` rather than the tab's own path: for
+ * a file outside the workspace the tab may still carry the `~/…` form the agent
+ * wrote, while the result echoes the path main already expanded and resolved.
  */
 export function FilePreviewActions({
 	filePath,
@@ -43,7 +47,10 @@ export function FilePreviewActions({
 					{formatSizeBytes(result.sizeBytes)}
 				</span>
 			) : null}
-			<OpenInToolbarMenu filePath={filePath} workspaceId={workspaceId} />
+			<OpenInToolbarMenu
+				filePath={result.path || filePath}
+				workspaceId={workspaceId}
+			/>
 			{isMarkdown && !imageSource ? (
 				<IconToggle
 					active={markdownPreview}

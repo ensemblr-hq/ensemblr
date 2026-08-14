@@ -16,6 +16,9 @@ describe('previewImageMimeTypeForPath', () => {
 		expect(previewImageMimeTypeForPath('assets/shot.webp')).toBe('image/webp');
 		expect(previewImageMimeTypeForPath('assets/shot.avif')).toBe('image/avif');
 		expect(previewImageMimeTypeForPath('assets/old.bmp')).toBe('image/bmp');
+		expect(previewImageMimeTypeForPath('assets/favicon.ico')).toBe(
+			'image/x-icon',
+		);
 	});
 
 	test('matches the extension case-insensitively', () => {
@@ -42,6 +45,8 @@ describe('previewImageMimeTypeForPath', () => {
 describe('isPreviewableImagePath', () => {
 	test('answers true only for paths the image preview can render', () => {
 		expect(isPreviewableImagePath('docs/diagram.png')).toBe(true);
+		expect(isPreviewableImagePath('assets/shot.webp')).toBe(true);
+		expect(isPreviewableImagePath('assets/favicon.ico')).toBe(true);
 		expect(isPreviewableImagePath('docs/diagram.svg')).toBe(false);
 		expect(isPreviewableImagePath('package.json')).toBe(false);
 	});

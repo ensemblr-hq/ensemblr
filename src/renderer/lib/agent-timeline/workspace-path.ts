@@ -37,14 +37,31 @@ export function toWorkspaceLookupPath(
 }
 
 /**
- * Reduces a lookup path to plain workspace-relative segments, dropping the `./`
- * and `/` prefixes an agent may write and resolving `.`/`..` away so no chip can
- * name a file outside the workspace root.
- * @param lookupPath - Workspace-relative path as the agent reported it
- * @returns The segment-normalized path, or null when it is empty or climbs above the root
+ * Whether a path names a location the workspace file tree can never hold, so it
+ * should go straight to the preview rather than through a tree lookup. `~/` is
+ * included because the main process expands it against the home directory.
+ * @param filePath - Path already stripped of any workspace-root prefix.
+ * @returns True when the path is absolute or home-relative.
  */
-function toContainedLookupPath(lookupPath: string): string | null {
+export function isOutsideWorkspacePath(filePath: string): boolean {
+	return filePath.startsWith('/') || filePath.startsWith('~/');
+}
+
+/**
+ * Reduces a lookup path to plain workspace-relative segments, dropping the `./`
+ * prefix an agent may write and resolving `.`/`..` away. A climb that escapes
+ * the workspace root is re-anchored on the root and reported as external, so
+ * `../sibling-worktree/file.ts` names something the preview can still read.
+ * @param lookupPath - Workspace-relative path as the agent reported it
+ * @param workspaceCwd - Absolute workspace root, needed to anchor an escaping climb
+ * @returns The normalized path and its scope, or null when it is empty or cannot be anchored
+ */
+function normalizeLookupPath(
+	lookupPath: string,
+	workspaceCwd: string | null,
+): { path: string; scope: 'external' | 'workspace' } | null {
 	const segments: string[] = [];
+	let climbedOut = 0;
 	for (const segment of lookupPath.split('/')) {
 		if (segment === '' || segment === '.') {
 			continue;
@@ -54,11 +71,27 @@ function toContainedLookupPath(lookupPath: string): string | null {
 			continue;
 		}
 		if (segments.length === 0) {
-			return null;
+			climbedOut += 1;
+			continue;
 		}
 		segments.pop();
 	}
-	return segments.length > 0 ? segments.join('/') : null;
+	if (climbedOut === 0) {
+		return segments.length > 0
+			? { path: segments.join('/'), scope: 'workspace' }
+			: null;
+	}
+	const rootSegments = (workspaceCwd ?? '').split('/').filter(Boolean);
+	if (rootSegments.length < climbedOut) {
+		return null;
+	}
+	const anchored = [
+		...rootSegments.slice(0, rootSegments.length - climbedOut),
+		...segments,
+	];
+	return anchored.length > 0
+		? { path: `/${anchored.join('/')}`, scope: 'external' }
+		: null;
 }
 
 /**
@@ -92,8 +125,18 @@ function entriesEndingWith(
  * than opening the wrong file.
  *
  * An empty tree means "not loaded yet" or "not a git repo", not "nothing
- * exists", so the resolver answers optimistically there — still only for a path
- * that stays inside the workspace root.
+ * exists", so the resolver answers optimistically there.
+ *
+ * A path outside the workspace root bypasses the tree entirely. Agents write to
+ * `/tmp` and `~/.claude/` constantly, and the tree can never hold those, so a
+ * miss there must not read as "this file does not exist" — it resolves as
+ * external and the preview reads it by absolute path.
+ *
+ * An external match is always reported as `kind: 'file'`. Nothing here can tell
+ * a file from a directory off-tree, and the two guesses fail differently: a
+ * directory guessed as a file opens a preview that says so, while a file
+ * guessed as a directory reveals nothing and loses the content the user asked
+ * for. The recoverable guess wins.
  *
  * @param files - Current workspace file tree.
  * @param workspaceCwd - Absolute workspace root, used to relativize absolute paths.
@@ -106,7 +149,11 @@ export function createWorkspacePathResolver(
 	const byPath = new Map<string, WorkspacePathMatch>();
 	const byName = new Map<string, WorkspacePathMatch[]>();
 	for (const file of files) {
-		const entry: WorkspacePathMatch = { kind: file.kind, path: file.path };
+		const entry: WorkspacePathMatch = {
+			kind: file.kind,
+			path: file.path,
+			scope: 'workspace',
+		};
 		byPath.set(file.path, entry);
 		const name = file.path.split('/').at(-1) ?? file.path;
 		byName.set(name, [...(byName.get(name) ?? []), entry]);
@@ -114,14 +161,20 @@ export function createWorkspacePathResolver(
 	const isTreeKnown = byPath.size > 0;
 
 	return (filePath: string) => {
-		const lookupPath = toContainedLookupPath(
-			toWorkspaceLookupPath(filePath, workspaceCwd),
-		);
-		if (lookupPath === null) {
+		const relativized = toWorkspaceLookupPath(filePath, workspaceCwd);
+		if (isOutsideWorkspacePath(relativized)) {
+			return { kind: 'file', path: relativized, scope: 'external' };
+		}
+		const normalized = normalizeLookupPath(relativized, workspaceCwd);
+		if (normalized === null) {
 			return null;
 		}
+		if (normalized.scope === 'external') {
+			return { kind: 'file', path: normalized.path, scope: 'external' };
+		}
+		const lookupPath = normalized.path;
 		if (!isTreeKnown) {
-			return { kind: 'file', path: lookupPath };
+			return { kind: 'file', path: lookupPath, scope: 'workspace' };
 		}
 		const exact = byPath.get(lookupPath);
 		if (exact) {

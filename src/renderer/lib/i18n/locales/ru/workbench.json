@@ -443,13 +443,14 @@
 		},
 		"failure": {
 			"invalid-cwd": "Каталог рабочего пространства недоступен.",
-			"invalid-path": "{{filePath}} находится за пределами этого рабочего пространства.",
+			"invalid-path": "Предпросмотр не может открыть путь {{filePath}}.",
 			"not-file": "{{filePath}} — это каталог, предпросмотр невозможен.",
-			"not-found": "{{filePath}} не существует в этом рабочем пространстве.",
+			"not-found": "{{filePath}} не существует.",
 			"too-large": "{{filePath}} слишком велик для предпросмотра.",
 			"unreadable": "Не удалось прочитать {{filePath}}."
 		},
 		"image-alt": "Предпросмотр {{filePath}}",
+		"outside-workspace": "Вне рабочего пространства",
 		"pdf-title": "Предпросмотр {{filePath}}"
 	},
 	"file-tree": {

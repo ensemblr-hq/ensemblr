@@ -21,7 +21,10 @@ interface OpenInFileMenuProps {
 	/** The control that opens the menu, wired to the dropdown trigger via `asChild`. */
 	children: ReactNode;
 	copyTarget: WorkspaceOpenTarget | undefined;
-	/** Workspace-relative path handed to whichever target is picked. */
+	/**
+	 * Path handed to whichever target is picked: workspace-relative for a file
+	 * in the tree, absolute for one the preview opened outside the root.
+	 */
 	filePath: string;
 	invokeTarget: OpenTargetsState['invokeTarget'];
 	onOpenChange?: (open: boolean) => void;

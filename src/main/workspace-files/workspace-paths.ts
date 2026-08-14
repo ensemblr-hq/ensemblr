@@ -3,9 +3,15 @@
  * store. Both resolve caller-supplied paths against a workspace root and must
  * agree on what "inside the workspace" means, so the checks live here rather
  * than being duplicated on either side.
+ *
+ * Two policies live here, and the difference is the point. Anything that feeds
+ * an agent's context goes through {@link resolveWorkspacePath} and is confined
+ * to the workspace; the read-only file preview goes through
+ * {@link resolvePreviewPath} and may look outside it.
  */
 
 import { realpath } from 'node:fs/promises';
+import { homedir } from 'node:os';
 import path from 'node:path';
 import type { WorkspaceFileEntryWire } from '../../shared/ipc/contracts/workspace-files';
 
@@ -48,6 +54,87 @@ export function resolveWorkspacePath({
 		absolutePath,
 		ok: true,
 		relativePath: relativePath.split(path.sep).join('/'),
+	};
+}
+
+/** Whether a resolved path stayed inside the workspace or escaped it. */
+export type PreviewPathScope = 'external' | 'workspace';
+
+/** A path cleared for preview reading, or the reason it was refused. */
+export type ResolvedPreviewPath =
+	| {
+			absolutePath: string;
+			displayPath: string;
+			ok: true;
+			scope: PreviewPathScope;
+	  }
+	| { message: string; ok: false };
+
+/**
+ * Expands a leading `~` to the current user's home directory, since agents write
+ * paths like `~/.claude/plans/notes.md` that no filesystem call resolves itself.
+ * @param rawPath - Trimmed path as the caller supplied it.
+ * @returns The path with any leading `~` replaced by the home directory.
+ */
+function expandHomePath(rawPath: string): string {
+	if (rawPath === '~') {
+		return homedir();
+	}
+	return rawPath.startsWith('~/')
+		? path.join(homedir(), rawPath.slice(2))
+		: rawPath;
+}
+
+/**
+ * Resolves a path for the read-only file preview, which — unlike the attachment
+ * store — may look outside the workspace. Agents routinely write to `/tmp` or
+ * `~/.claude/`, and refusing to show the user a file their own agent just wrote
+ * helps nobody; the agent already reads the whole disk through its own tools.
+ * Paths that do resolve inside the workspace still report as `workspace` so the
+ * caller keeps applying symlink containment to them.
+ *
+ * Scope is decided by where the path lands, not by the form it arrived in:
+ * `../sibling/notes.md` and the absolute path it denotes both resolve external.
+ * Treating the two differently would refuse a file by the shape of its spelling
+ * while reading the same bytes one line down.
+ *
+ * {@link resolveWorkspacePath} is deliberately left alone rather than relaxed:
+ * it still guards the attachment store, which decides what an agent can pull
+ * into its own context, and that must stay workspace-only.
+ * @param pathValue - Absolute, `~`-prefixed, or repo-relative path to preview.
+ * @param workspaceCwd - Absolute workspace root.
+ * @returns The absolute path plus the path to echo back, or a failure message.
+ */
+export function resolvePreviewPath({
+	pathValue,
+	workspaceCwd,
+}: {
+	pathValue: string;
+	workspaceCwd: string;
+}): ResolvedPreviewPath {
+	const rawPath = expandHomePath(pathValue.trim());
+	if (!rawPath) {
+		return { message: 'Preview path must not be empty.', ok: false };
+	}
+	const absolutePath = path.resolve(workspaceCwd, rawPath);
+	const relativePath = path.relative(workspaceCwd, absolutePath);
+	if (
+		relativePath === '..' ||
+		relativePath.startsWith(`..${path.sep}`) ||
+		path.isAbsolute(relativePath)
+	) {
+		return {
+			absolutePath,
+			displayPath: absolutePath,
+			ok: true,
+			scope: 'external',
+		};
+	}
+	return {
+		absolutePath,
+		displayPath: relativePath.split(path.sep).join('/'),
+		ok: true,
+		scope: 'workspace',
 	};
 }
 

@@ -15,7 +15,7 @@ import type { AppSettingsService } from '../../config';
 import { isRepositoryConfigPathAllowed } from '../../config';
 import { ensureRepositoryConfigFile } from '../../config/repository-config-file.ts';
 import type { OpenTargetService } from '../../open-target';
-import { sanitizeWorkspaceRelativePath } from '../../open-target/open-target-paths';
+import { sanitizeOpenTargetPath } from '../../open-target/open-target-paths';
 import type { EnsemblrDatabaseService } from '../../storage';
 import { getWorkspacePathById } from '../../storage/repositories/workspace-repository';
 
@@ -104,7 +104,7 @@ export function registerOpenTargetHandlers({
 				};
 			}
 
-			const relativePath = sanitizeWorkspaceRelativePath(request.relativePath);
+			const relativePath = sanitizeOpenTargetPath(request.relativePath);
 			if (relativePath === null) {
 				return { ok: false, error: 'Path must stay inside the workspace.' };
 			}

@@ -29,4 +29,25 @@ describe('chat message attachment chips', () => {
 		expect(markup).toContain('<code>Vue.js</code>');
 		expect(markup).not.toContain('title="Node.js"');
 	});
+
+	test('renders an absolute path outside the workspace as a chip', () => {
+		const markup = renderToStaticMarkup(
+			<ChatMessageText
+				text={'Wrote `/tmp/scratch.md` and `~/.claude/plans/plan.md`.'}
+			/>,
+		);
+
+		expect(markup).toContain('title="/tmp/scratch.md"');
+		expect(markup).toContain('title="~/.claude/plans/plan.md"');
+		expect(markup).not.toContain('<code>/tmp/scratch.md</code>');
+	});
+
+	test('leaves an absolute path with no file extension as prose', () => {
+		const markup = renderToStaticMarkup(
+			<ChatMessageText text={'Resolved via `/usr/bin/env` on PATH.'} />,
+		);
+
+		expect(markup).toContain('<code>/usr/bin/env</code>');
+		expect(markup).not.toContain('title="/usr/bin/env"');
+	});
 });

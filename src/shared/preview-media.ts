@@ -9,6 +9,7 @@ const PREVIEW_IMAGE_MIME_TYPE_BY_EXTENSION: Readonly<Record<string, string>> = {
 	avif: 'image/avif',
 	bmp: 'image/bmp',
 	gif: 'image/gif',
+	ico: 'image/x-icon',
 	jpeg: 'image/jpeg',
 	jpg: 'image/jpeg',
 	png: 'image/png',

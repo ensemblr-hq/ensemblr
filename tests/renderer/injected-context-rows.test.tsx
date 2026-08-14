@@ -40,7 +40,11 @@ function renderRow(ui: ReactElement) {
 	return renderWithProviders(
 		<Provider store={store}>
 			<WorkspacePathResolverProvider
-				value={(filePath: string) => ({ kind: 'file', path: filePath })}
+				value={(filePath: string) => ({
+					kind: 'file',
+					path: filePath,
+					scope: 'workspace',
+				})}
 			>
 				<FilePreviewOpenerProvider value={() => undefined}>
 					{ui}

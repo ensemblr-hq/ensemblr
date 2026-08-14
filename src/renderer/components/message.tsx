@@ -11,6 +11,7 @@ import { Streamdown } from 'streamdown';
 import {
 	attachmentPathFromInlineCode,
 	chipLabelForPath,
+	isOutsideWorkspacePath,
 } from '@/renderer/lib/agent-timeline';
 import { toBundledLanguage } from '@/renderer/lib/language-from-path';
 import { cn } from '@/renderer/lib/utils';
@@ -203,7 +204,11 @@ function placeInlinePath(
 	resolveWorkspacePath: WorkspacePathResolver | null,
 ): WorkspacePathMatch | null {
 	if (!resolveWorkspacePath) {
-		return { kind: 'file', path: attachmentPath };
+		return {
+			kind: 'file',
+			path: attachmentPath,
+			scope: isOutsideWorkspacePath(attachmentPath) ? 'external' : 'workspace',
+		};
 	}
 	return resolveWorkspacePath(attachmentPath);
 }

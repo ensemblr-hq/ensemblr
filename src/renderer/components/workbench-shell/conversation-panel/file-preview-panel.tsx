@@ -7,6 +7,7 @@ import {
 	readWorkspaceFile,
 } from '@/renderer/api/ensemblr-queries';
 import { CodeViewerHeader } from '@/renderer/components/code-surface';
+import { Badge } from '@/renderer/components/ui/badge';
 import type { ReadWorkspaceFileFailureCode } from '@/shared/ipc/contracts/workspace-files';
 
 import { FilePreviewActions } from './file-preview-actions';
@@ -97,6 +98,16 @@ export function FilePreviewPanel({
 						workspaceId={workspaceId}
 					/>
 				}
+				badge={
+					result.isExternal ? (
+						<Badge className='shrink-0' variant='outline'>
+							{t(
+								'workbench:file-preview.outside-workspace',
+								'Outside workspace',
+							)}
+						</Badge>
+					) : null
+				}
 				title={filePath}
 			/>
 			<FilePreviewBody filePath={filePath} result={result} />
@@ -120,8 +131,10 @@ function describeReadFailure(
 		case 'not-found':
 			return t(
 				'workbench:file-preview.failure.not-found',
-				'{{filePath}} does not exist in this workspace.',
-				{ filePath },
+				'{{filePath}} does not exist.',
+				{
+					filePath,
+				},
 			);
 		case 'not-file':
 			return t(
@@ -138,7 +151,7 @@ function describeReadFailure(
 		case 'invalid-path':
 			return t(
 				'workbench:file-preview.failure.invalid-path',
-				'{{filePath}} is outside this workspace.',
+				'{{filePath}} is not a path this preview can open.',
 				{ filePath },
 			);
 		case 'invalid-cwd':
