@@ -177,6 +177,7 @@ function registerHandlers({
 			release: () => undefined,
 			setActive: () => undefined,
 		},
+		provisionalNamingQueue: () => undefined,
 		withPermissionGate: () => undefined,
 	});
 

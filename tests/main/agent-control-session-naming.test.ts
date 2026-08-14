@@ -24,6 +24,7 @@ const idleBrief = {
 
 function setup(
 	overrides: {
+		planMode?: boolean;
 		readBrief?: unknown;
 		setBranchName?: unknown;
 		setName?: unknown;
@@ -60,7 +61,11 @@ function setup(
 		harnesses: { launchHarness: vi.fn() },
 		language: { getLanguage: () => overrides.language ?? 'en' },
 		permissions: { getMode: () => 'workspace-trusted' },
-		planMode: { exit: vi.fn(), isActive: () => false, releaseSession: vi.fn() },
+		planMode: {
+			exit: vi.fn(),
+			isActive: () => overrides.planMode ?? false,
+			releaseSession: vi.fn(),
+		},
 		sessionNaming: {
 			readBrief: overrides.readBrief ?? vi.fn().mockResolvedValue(idleBrief),
 			setBranchName: overrides.setBranchName ?? vi.fn(),
@@ -317,5 +322,44 @@ describe('readTurnPreamble', () => {
 		const { service } = setup({ language: 'ru' });
 
 		expect(await service.readTurnPreamble('unknown')).toBeNull();
+	});
+
+	// This is the only channel a directly-prompted runtime has. Claude Code sees
+	// Plan Mode as the SDK's `permissionMode: 'plan'` and never receives the
+	// Pi-only plan-mode playbook, so without the carve-out here it reads its own
+	// "MUST NOT run any non-readonly tools" and defers every naming call until
+	// after the plan is approved.
+	it('carries the plan-mode carve-out while the session is planning', async () => {
+		const { service } = setup({
+			planMode: true,
+			readBrief: vi.fn().mockResolvedValue({
+				branch: { current: 'octocat/bach', eligible: true },
+				summaryStale: true,
+				titleNeeded: true,
+			}),
+		});
+
+		const preamble = (await service.readTurnPreamble(CALLER)) ?? '';
+
+		expect(preamble).toContain(
+			'You are planning, and every item below is still',
+		);
+		expect(preamble).toContain('A restriction on non-read-only tools does not');
+		expect(preamble).toContain('before `ensemblr_exit_plan_mode`');
+	});
+
+	it('keeps the standard wording when the session is not planning', async () => {
+		const { service } = setup({
+			readBrief: vi.fn().mockResolvedValue({
+				branch: { current: 'octocat/bach', eligible: true },
+				summaryStale: true,
+				titleNeeded: true,
+			}),
+		});
+
+		const preamble = (await service.readTurnPreamble(CALLER)) ?? '';
+
+		expect(preamble).not.toContain('You are planning');
+		expect(preamble).toContain('BEFORE you write your closing answer');
 	});
 });

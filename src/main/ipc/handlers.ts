@@ -4,6 +4,7 @@ import type {
 } from '../agent-providers';
 import type { AgentSessionService } from '../agent-runtime';
 import type { ActiveChatStore } from '../agent-runtime/active-chat-store.ts';
+import type { QueueProvisionalNamingPort } from '../agent-runtime/naming/provisional-workspace-naming';
 import type { HarnessDetectionService } from '../agents/index.ts';
 import { createChatTabService } from '../chat-tabs/index.ts';
 import type { LocalCommandService } from '../commands/local-command';
@@ -137,6 +138,8 @@ interface RegisterIpcHandlersOptions {
 	agentModelCatalog: AgentModelCatalogService;
 	agentSessionService: AgentSessionService;
 	planModeRegistry: PlanModeRegistry;
+	/** Names a planning workspace from its first prompt, ahead of the agent. */
+	provisionalNamingQueue: QueueProvisionalNamingPort;
 	quickStartProjectService: QuickStartProjectService;
 	renameWorkspaceService: RenameWorkspaceService;
 	repositoryConfigService: RepositoryConfigService;
@@ -198,6 +201,7 @@ export function registerIpcHandlers({
 	agentModelCatalog,
 	agentSessionService,
 	planModeRegistry,
+	provisionalNamingQueue,
 	quickStartProjectService,
 	renameWorkspaceService,
 	repositoryConfigService,
@@ -271,6 +275,7 @@ export function registerIpcHandlers({
 		agentSessionService,
 		piExecutableService,
 		planModeRegistry,
+		provisionalNamingQueue,
 		withPermissionGate,
 	});
 	registerChatTabHandlers({

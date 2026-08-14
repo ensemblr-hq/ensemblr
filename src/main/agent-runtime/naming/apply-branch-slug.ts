@@ -33,6 +33,7 @@ import { parseMetadata } from '../../repository/metadata.ts';
 import { selectWorkspaceWithRepositoryById } from '../../storage/repositories/workspace-repository.ts';
 import {
 	isBranchNameable,
+	isProvisionallyNameable,
 	isWorkspaceNameable,
 	sanitizeBranchSlug,
 } from '../branch-name-slug.ts';
@@ -65,7 +66,13 @@ export class BranchSlugRejected extends Error {
  * `git.renameWorkspaceOnBranch` setting and is a hard gate that `userRequested`
  * does not lift: when it is off nothing is renamed and the caller is told to
  * stop, whatever the workspace's placeholder state.
- * @param input - The workspace to name, the raw slug, whether the user asked for this rename by name, the user's naming setting, and the rename service.
+ * `provisional` marks a name the app guessed from the user's first prompt rather
+ * than one anybody chose. Such a rename deliberately leaves both naming gates
+ * open, so it fills the board without spending the agent's one call, and it
+ * passes the narrower {@link isProvisionallyNameable} instead: a guess only ever
+ * improves on a generated placeholder, so it never runs over a workspace
+ * somebody has titled, nor a second time over a name it already guessed.
+ * @param input - The workspace to name, the raw slug, whether the user asked for this rename by name, whether this is the app's own provisional guess, the user's naming setting, and the rename service.
  * @returns Whether the name was applied, plus the resulting name and branch.
  * @throws {BranchSlugRejected} When the workspace is unknown, the slug is unusable, or the branch collides with an existing one.
  */
@@ -73,6 +80,7 @@ export async function applyBranchSlug({
 	database,
 	name,
 	namingEnabled,
+	provisional = false,
 	renameWorkspace,
 	userRequested = false,
 	workspaceId,
@@ -80,6 +88,7 @@ export async function applyBranchSlug({
 	database: DatabaseSync;
 	name: string;
 	namingEnabled: boolean;
+	provisional?: boolean;
 	renameWorkspace: RenameWorkspaceService['rename'];
 	userRequested?: boolean;
 	workspaceId: string;
@@ -108,11 +117,15 @@ export async function applyBranchSlug({
 	if (!isBranchNameable(metadata) && !userRequested) {
 		return alreadyNamed(target);
 	}
+	if (provisional && !isProvisionallyNameable(metadata)) {
+		return alreadyNamed(target);
+	}
 
 	const nextBranch = composeRenamedBranch(target.branchName ?? '', slug);
 	const result = await renameWorkspace({
 		branchName: nextBranch,
 		name: isWorkspaceNameable(metadata) ? slug : target.name,
+		provisional,
 		requirePlaceholderName: !userRequested,
 		workspaceId,
 	});

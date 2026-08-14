@@ -707,6 +707,12 @@ export interface SessionBriefNaming {
 		 * user has titled it, at which point only the branch moves.
 		 */
 		namesWorkspace: boolean;
+		/**
+		 * Whether the name on the workspace is the app's own guess, derived from
+		 * the first prompt so a planning workspace is never blank on the board.
+		 * The agent is asked to improve it rather than to supply a first name.
+		 */
+		provisional: boolean;
 	};
 	/** Turns have landed since the recorded summary was written. */
 	summaryStale: boolean;

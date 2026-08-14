@@ -471,7 +471,7 @@ const PLAN_MODE_STALE_CONTEXT_TAIL = `A summary of an earlier session, a remembe
  * served to one would describe a prompt it will not receive and a call that
  * would be refused.
  */
-const PLAN_MODE_NAMING_CLAUSE = `If the upkeep block also asks for the workspace and branch, name them (\`ensemblr_set_branch_name\`) in the same breath; planning is when you know best what the work is called. If it does not, leave them alone — the user has turned that off.`;
+const PLAN_MODE_NAMING_CLAUSE = `If the upkeep block also asks for the workspace and branch, name them (\`ensemblr_set_branch_name\`) in the same breath, before you start reading rather than once the plan is approved; planning is when you know best what the work is called, and until you do the board shows the user a workspace whose name says nothing about what it is doing. That holds when the block says the app has already named it provisionally: that name is a guess made from the first prompt alone, and replacing it is still yours. If the block does not ask at all, leave them alone — the user has turned that off.`;
 
 /**
  * Self-contained playbook served in place of {@link ORCHESTRATOR_AWARENESS} for
