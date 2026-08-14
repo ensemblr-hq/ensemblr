@@ -110,6 +110,16 @@ stopping silently. Decisions that are yours to make are collected by the
 orchestrator and put to you in one questionnaire, instead of four children
 interrupting you separately.
 
+**Claude Code can delegate its own way instead.** Settings → Providers → Claude
+Code → **Sub-agents** switches a first-class Claude chat between Ensemblr's chat
+tabs (the default, described above) and the runtime's built-in sub-agent tool,
+which keeps children inside the conversation. Exactly one is ever live: picking
+one withholds the other, so the model is never holding the playbook for one
+mechanism and the tools for the other. The choice is fixed when a chat opens, so
+it applies to chats you start afterwards. Pi has no sub-agent tool of its own,
+and a spawned child always delegates through chat tabs whatever the setting says
+— that is what keeps the depth cap meaningful.
+
 ## Full tool reference
 
 This page covers what you see. The complete tool list — every operation, its

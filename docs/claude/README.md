@@ -647,10 +647,14 @@ client. Pi takes neither the endpoint nor the role playbook, because its bundled
 extension *is* its MCP client and reads the same env overlay itself.
 
 **The two surfaces are told apart by `ControlAudience`, never by runtime name.**
-`ControlAudience` (`src/shared/agent-control/awareness.ts`) has exactly two
-fields — `hasChatTab` and `role` (`orchestrator` \| `subagent`) — and the file
-says why: both axes are properties of the caller rather than of any one runtime,
-so a runtime added later selects its surface by declaring those two facts.
+`ControlAudience` (`src/shared/agent-control/awareness.ts`) has exactly three
+fields — `hasChatTab`, `role` (`orchestrator` \| `subagent`), and `delegation`
+(`ensemblr` \| `native`, the mechanism the session was opened under, #277) — and
+the file says why: every axis is a property of the caller rather than of any one
+runtime, so a runtime added later selects its surface by declaring those facts.
+`withheldControlOps` folds all three into one answer, on the same argument each
+time: listing a tool the service would only refuse teaches the model to keep
+reaching for it.
 `AgentSpecies` in `src/main/agent-control/ports.ts` is `'pi' | 'claude' |
 'harness'`, and the gates read `originHasChatTab(origin)` against
 `CHAT_TAB_SPECIES`, not an equality test.

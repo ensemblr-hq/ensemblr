@@ -7,11 +7,11 @@ build.
 
 ## Download
 
-The current build is **`0.1.0-beta.1`**:
+The current build is **`0.1.0-beta.4`**:
 
-- [**`Ensemblr-0.1.0-arm64.dmg`**](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.0-beta.1/Ensemblr-0.1.0-arm64.dmg)
+- [**`Ensemblr-0.1.0-beta.4-arm64.dmg`**](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.0-beta.4/Ensemblr-0.1.0-beta.4-arm64.dmg)
   — the disk image. Open it and drag Ensemblr to `/Applications`.
-- [`Ensemblr-darwin-arm64-0.1.0.zip`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.0-beta.1/Ensemblr-darwin-arm64-0.1.0.zip)
+- [`Ensemblr-darwin-arm64-0.1.0-beta.4.zip`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.0-beta.4/Ensemblr-darwin-arm64-0.1.0-beta.4.zip)
   — the same `.app`, zipped, if you would rather not mount an image.
 
 Every build is on the Releases page:
@@ -24,8 +24,9 @@ hardened runtime, and is notarized by Apple and stapled — both the `.app` and 
 network round-trip and without the right-click dance below. It is a **beta**: pre-1.0,
 with breaking changes expected before 1.0.
 
-The app reports its version as `0.1.0`. The `-beta.1` suffix marks the release,
-not the build inside it.
+The app reports the full version, suffix included — `0.1.0-beta.4` in Settings →
+Diagnostics and in the bundle's `CFBundleShortVersionString`. It matches the
+release tag, so a bug report only has to quote one string.
 
 Building from source is the other path, and the rest of this page covers it.
 

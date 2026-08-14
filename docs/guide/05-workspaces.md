@@ -73,6 +73,15 @@ carries its generated placeholder name — once you rename it, the name is yours
 and nothing overwrites it. And it only applies to a branch the workspace **cut**;
 an adopted branch keeps the name it arrived with.
 
+**A plan-mode workspace is named before the agent gets there.** A planning
+interview can run for a long time before the agent has anything worth naming the
+work after, which used to leave a placeholder sitting on the board for the whole
+of it. Ensemblr now derives a **provisional** name from your opening prompt the
+moment a plan-mode session starts, with no model in the loop, so the board reads
+correctly within a second. The guess is explicitly marked provisional: the
+agent's own naming call still counts as the first real naming and replaces it for
+free. Rename the workspace yourself at any point and both stop.
+
 ## Copying files into a new workspace
 
 A fresh worktree has no gitignored files — no `.env`, no local credentials. Since

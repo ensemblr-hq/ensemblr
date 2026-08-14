@@ -82,7 +82,8 @@ How chats behave day to day, plus where Ensemblr keeps its repositories.
 | Language | Interface language. `System` follows your macOS language order. Also governs the native menu bar and the prose agents write back. | System, English, Русский, Ελληνικά | System |
 | Send messages with | Which key sends a composer message. The other one inserts a newline. | `↵`, `⌘↵` | `↵` |
 | Follow-up behavior | What happens to a message you send while the agent is still working. `Steer` interrupts mid-turn, `Queue` holds it until the turn ends, `Block` holds it until you send it yourself. A queued message stays editable. `⌘J` queues in any mode. | Steer, Queue, Block | Steer |
-| Desktop notifications | Notify you when an agent finishes working in a chat. | On / off | On |
+| Desktop notifications | Notify you when a chat finishes a turn or stops to ask you something. One notification per chat, titled with the chat's own name; clicking it focuses that chat. | On / off | On |
+| Notification sound | Play a chime alongside the notification when a chat needs your attention. | On / off | On |
 | Caffeinate while agents are running | Keep your Mac awake while an agent is working. Shuts off below 10% battery. | On / off | Off |
 | Always show context usage | Show the context meter at all times instead of only past 70% used. | On / off | On |
 | Auto-convert long text | Turn pasted text over 5,000 characters into a text attachment instead of inlining it. | On / off | On |
@@ -170,6 +171,20 @@ and you run it in a terminal. It never captures the credential.
 **Settings file.** Claude Code reads its own configuration from
 `~/.claude/settings.json`. The pane links out to it — Ensemblr never edits that
 file. Change permissions, hooks, or MCP servers there.
+
+**Sub-agents** (Claude Code only). Which mechanism a first-class Claude Code chat
+delegates through. Only one is ever live in a session, so a model is never
+holding the playbook for one and the tools for the other.
+
+| Option | What the chat gets | What it loses |
+| --- | --- | --- |
+| **Ensemblr chat tabs** (default) | Each sub-agent spawns into its own tab you can watch and steer | Claude Code's built-in sub-agent tool is denied |
+| **Claude Code built-in** | Sub-agents run inside the conversation, the way the CLI does it | The spawn control tools are withheld |
+
+The mechanism is fixed when a chat opens, so a change applies to chats started
+after it, not to ones already running. Pi has no sub-agent tool of its own and
+ignores the setting — it always delegates through chat tabs. The reasoning is in
+[ADR 0049](../adr/0049-let-the-user-pick-claude-codes-subagent-mechanism.md).
 
 If a check fails, [14. Troubleshooting](./14-troubleshooting.md) has the
 remediation steps and [2. Requirements](./02-requirements.md) lists what has to

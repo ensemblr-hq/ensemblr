@@ -30,7 +30,7 @@ each exposing its public surface through `index.ts`.
 
 | Concern | Folder | Owns |
 | --- | --- | --- |
-| Agent surface (provider-neutral) | `agent-runtime/` | Adapter contract, `AgentClient`, session service, persistence, naming, summaries |
+| Agent surface (provider-neutral) | `agent-runtime/` | Adapter contract, `AgentClient`, session service, persistence, naming (including the provisional plan-mode slug), summaries, desktop notifications and the active-chat store they are suppressed against |
 | Pi adapter | `pi-agent/` | Pi CLI RPC wire frames (`cli-rpc/`), payload normalizer, slash commands |
 | Claude adapter | `claude-agent/` | Claude Code adapter, MCP config + roster, model catalogue, readiness, sub-agent mechanism |
 | Pi runtime discovery | `pi-runtime/` | Pi executable discovery, readiness checks |
@@ -39,13 +39,13 @@ each exposing its public surface through `index.ts`.
 | Harness detection | `agents/` | Which spawnable harnesses are installed on PATH, and their trusted launch commands |
 | Agent → app control | `agent-control/` | Loopback control server, MCP endpoint, ports/adapters, guardrails, origin registry |
 | Plan mode | `plan-mode/` | Per-session plan registry, plan-file writing, plan submission — the enforcement classifiers live in `src/shared/plan-mode/` |
-| App lifecycle | `app/` | `BrowserWindow` creation, window state |
+| App lifecycle | `app/` | `BrowserWindow` creation, window state, and the quit guard + coordinator that confirm a quit while agents are still running |
 | Chat tabs | `chat-tabs/` | Tab service, preview slot, terminal-session persistence |
 | Checkpoints | `checkpoints/` | Git-backed per-turn checkpoints (ADR&nbsp;0012) |
 | Process execution | `commands/` | Local process and shell execution |
 | Config | `config/` | Declarative config loading, settings resolution, repository config |
 | Environment | `environment/` | Environment-variable catalogue and assembly |
-| IPC | `ipc/` | Handler registration (`handlers/`, 30 modules), request validation (`request-schemas/`, 18 modules), permission gate |
+| IPC | `ipc/` | Handler registration (`handlers/`, 31 modules), request validation (`request-schemas/`, 19 modules), permission gate |
 | Integrations | `github/`, `linear/` | `gh` CLI wrapper, PR snapshots; Linear OAuth + client + store |
 | Linked directories | `linked-directories/` | Read grants for directories outside a workspace, plus the app-global recents list behind them |
 | Native menus | `menu/` | One builder per menu behind `createMenuItemFactory`, driven by the renderer's command report and the localized `menu-strings.ts` table |
@@ -84,7 +84,7 @@ A new feature is split across these buckets, not given a folder of its own.
 | `components/` | React components and UI composition | `workbench-shell/`, `conversation/`, `diff-viewer/`, `code-surface/`, `settings/`, `setup-diagnostics/`, `onboarding/`, `git/`, `linear/`, `command-palette/`, `ask-user-question/`, `tool-approval/`, `tool-collapsible/`, `pi-replay/`, `welcome/`, `ui/` (vendored shadcn) |
 | `config/` | Stable renderer constants (route stale times, knobs) | — |
 | `hooks/` | Renderer hooks that are not durable shared state | `workbench-shell/`, `workspace/`, `conversation/`, `code-surface/`, `setup-diagnostics/`, `preferences/`, `git/`, `linear/`, `ask-user-question/`, `welcome/` |
-| `lib/` | Runtime helpers grouped by concern | `workbench/`, `agent-timeline/`, `conversation/`, `diff/`, `code/`, `github/`, `linear/`, `pi/`, `pi-replay/`, `terminal/`, `i18n/` (i18next instance + bundled `locales/`), `onboarding/`, `instrumentation/`, `ask-user-question/`, `welcome/`, plus the code→`t()` mappers `failure-text/`, `setup-check-text/`, `provider-check-text/` |
+| `lib/` | Runtime helpers grouped by concern | `workbench/`, `agent-timeline/`, `conversation/`, `diff/`, `code/`, `github/`, `linear/`, `pi/`, `pi-replay/`, `terminal/`, `i18n/` (i18next instance + bundled `locales/`), `onboarding/`, `instrumentation/`, `ask-user-question/`, `welcome/`, `notification-sound/` (the bundled chime and its player), plus the code→`t()` mappers `failure-text/`, `setup-check-text/`, `provider-check-text/` |
 | `fixtures/` | Fixture/demo data production code may still consume | `workbench/` |
 | `routing/` | TanStack Router file routes + generated tree | `routes/` |
 | `state/` | Durable Jotai state | `workspace/`, `composer/`, `pi/`, `plan-mode/`, `preferences/`, `dialogs/`, `recents/`, `sidebar/`, `settings-ui/`, `slash-commands/`, `tool-approval/`, `ask-user-question/`, `conversation-scroll/`, `menu-commands/`, `unread/` |
@@ -118,7 +118,7 @@ The only code both processes may import. Two shapes coexist:
   shared root in total.
 - **Multi-file concerns** — an implementation directory behind a stable
   entrypoint, in one of two forms:
-  - `<concern>/index.ts` — `ipc/` (35 contract modules under `ipc/contracts/`,
+  - `<concern>/index.ts` — `ipc/` (36 contract modules under `ipc/contracts/`,
     plus `channels.ts` and `handler-map.ts`), `pi-rpc/`, `keymap/`.
   - `<concern>.ts` + `<concern>/` — `agent-control`, `plan-mode`, `scripts`,
     `terminal`. This is the form `electron --test` can resolve, so prefer it for
@@ -186,9 +186,9 @@ migration ids, so a new migration must be added to both.
 
 | Suite | Runner | Count |
 | --- | --- | --- |
-| `tests/main/**` | `electron --test` (`ELECTRON_RUN_AS_NODE=1`), plus the pure-logic files listed one-by-one in `vitest.config.mts` — an explicit list, not a glob, so it never drags in the Electron-only suites | 154 files |
-| `tests/renderer/**` | Vitest (`node` env; DOM files opt in per file) | 244 files (24 under `dom/`) |
-| `tests/shared/**` | Vitest | 31 files |
+| `tests/main/**` | `electron --test` (`ELECTRON_RUN_AS_NODE=1`), plus the pure-logic files listed one-by-one in `vitest.config.mts` — an explicit list, not a glob, so it never drags in the Electron-only suites | 155 files |
+| `tests/renderer/**` | Vitest (`node` env; DOM files opt in per file) | 245 files (24 under `dom/`) |
+| `tests/shared/**` | Vitest | 32 files |
 
 See [`onboarding.md`](./onboarding.md#6-running-the-tests) for which runner a new
 test should use.
