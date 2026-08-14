@@ -514,18 +514,77 @@ describe('buildPullRequestShellModel', () => {
 		);
 	});
 
-	test('sync errors are preserved alongside cached PR data', () => {
+	test('sync errors are translated alongside cached PR data', () => {
 		const model = buildPullRequestShellModel({
 			changeSummary: NO_CHANGES,
 			localComments: [],
 			snapshot: createSnapshot(createPullRequest()),
-			syncError: 'connection refused',
+			syncFailure: {
+				code: 'detached-head',
+				message: 'could not determine current branch: not on any branch',
+				output: 'could not determine current branch: not on any branch',
+			},
 			todos: [],
 		});
 
-		expect(model.syncError).toBe('connection refused');
-		expect(model.detail).toContain('connection refused');
+		expect(model.syncError?.message).toBe(
+			'This workspace is not on a branch, so GitHub has nothing to match it against. Check out a branch, then retry.',
+		);
+		expect(model.detail).toContain('not on a branch');
 		expect(model.number).toBe(7);
+	});
+
+	test('gh output is demoted to the detail slot, never used as the explanation', () => {
+		const model = buildPullRequestShellModel({
+			changeSummary: NO_CHANGES,
+			localComments: [],
+			snapshot: null,
+			syncFailure: {
+				code: 'command-failed',
+				message: 'fatal: could not read Username for https://github.com',
+				output: 'fatal: could not read Username for https://github.com',
+			},
+			todos: [],
+		});
+
+		expect(model.syncError?.detail).toBe(
+			'fatal: could not read Username for https://github.com',
+		);
+		expect(model.syncError?.message).toBe('The command failed.');
+	});
+
+	test('gh output that only repeats the explanation is dropped', () => {
+		const model = buildPullRequestShellModel({
+			changeSummary: NO_CHANGES,
+			localComments: [],
+			snapshot: null,
+			syncFailure: {
+				code: 'no-remote',
+				message: 'This repository has no remote configured.',
+				output: 'This repository has no remote configured.',
+			},
+			todos: [],
+		});
+
+		expect(model.syncError?.detail).toBeUndefined();
+	});
+
+	// gh wrote nothing, so `message` is main's own English fallback. Demoting it
+	// would put an untranslated sentence in a Russian panel dressed as gh output.
+	test('main’s fallback prose is never demoted as gh output', () => {
+		const model = buildPullRequestShellModel({
+			changeSummary: NO_CHANGES,
+			localComments: [],
+			snapshot: null,
+			syncFailure: {
+				code: 'command-failed',
+				message: 'gh pr view failed in workspace.',
+			},
+			todos: [],
+		});
+
+		expect(model.syncError?.detail).toBeUndefined();
+		expect(model.syncError?.message).toBe('The command failed.');
 	});
 
 	test('merged PR reports merged label and idle status', () => {

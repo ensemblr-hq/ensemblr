@@ -128,6 +128,18 @@ export interface ExternalAttachment {
 	sizeBytes: number;
 }
 
+/**
+ * Panel copy for a failed git or `gh` command: the explanation in the reader's
+ * language, plus the command's own output when it says more than the
+ * explanation does. Owned here rather than beside either producer, because the
+ * model, the copy builders in `lib/workbench/`, and `PanelAlert` all have to
+ * agree on it.
+ */
+export interface CommandFailureCopy {
+	detail?: string;
+	message: string;
+}
+
 // --- Pull request -----------------------------------------------------------
 
 export type PullRequestShellStatus =
@@ -515,8 +527,8 @@ export interface WorkspaceShellModel {
 		/** GitHub PR state; absent before a snapshot lands (treated as open). */
 		state?: 'closed' | 'merged' | 'open';
 		status: PullRequestShellStatus;
-		/** Last refresh error from the gh metadata service, when one occurred. */
-		syncError?: string;
+		/** Last refresh failure from the gh metadata service, already translated. */
+		syncError?: CommandFailureCopy;
 		/** ISO timestamp of the last successful gh snapshot refresh. */
 		syncedAt?: string;
 		title: string;

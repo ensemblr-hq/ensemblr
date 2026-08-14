@@ -120,7 +120,14 @@ export type WorkspaceGitFailureCode =
  */
 export interface WorkspaceGitFailure {
 	code: WorkspaceGitFailureCode;
+	/**
+	 * Locale-neutral English for the support bundle. Falls back to our own prose
+	 * when git wrote no stderr, so it is never safe to render verbatim — the
+	 * renderer translates `code` and demotes `output`.
+	 */
 	message: string;
+	/** Git's own stderr, present only when it wrote any. */
+	output?: string;
 }
 
 /** Changed-file rows and their aggregate summary, or a typed error on failure. */

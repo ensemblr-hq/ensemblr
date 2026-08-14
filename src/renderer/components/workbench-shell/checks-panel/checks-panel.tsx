@@ -373,7 +373,7 @@ function ChecksPullRequestPanel({
 			>
 				{pullRequest.syncError ? (
 					<PanelAlert
-						detail={pullRequest.syncError}
+						{...pullRequest.syncError}
 						title={t(
 							'review:checks.sync-error.title',
 							'Could not refresh from GitHub',

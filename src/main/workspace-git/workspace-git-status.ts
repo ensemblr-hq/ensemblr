@@ -14,7 +14,7 @@ import type {
 	GetWorkspaceMergeConflictsRequest,
 	GetWorkspaceMergeConflictsResult,
 	WorkspaceGitDiffScope,
-	WorkspaceGitFailureCode,
+	WorkspaceGitFailure,
 	WorkspaceGitFileWire,
 } from '../../shared/ipc/contracts/workspace-git';
 import type { LocalCommandService } from '../commands/local-command';
@@ -22,6 +22,7 @@ import type { LocalCommandService } from '../commands/local-command';
 import { resolveWorkspaceCwd } from '../workspace-files/index.ts';
 import {
 	classifyGitFailure,
+	gitFailure,
 	gitFailureMessage,
 } from './workspace-git-failures.ts';
 import { readMergeConflicts } from './workspace-git-merge-conflicts.ts';
@@ -156,7 +157,10 @@ export function createWorkspaceGitService({
 		async getStatus(request) {
 			const cwd = resolveWorkspaceCwd(request.workspaceCwd);
 			if (!cwd.ok) {
-				return emptyStatusResult('invalid-cwd', cwd.message);
+				return emptyStatusResult({
+					code: 'invalid-cwd',
+					message: cwd.message,
+				});
 			}
 			const scope: WorkspaceGitDiffScope = request.scope ?? {
 				kind: 'working-tree',
@@ -269,8 +273,7 @@ export function createWorkspaceGitService({
 		]);
 		if (statusResult.status !== 'success') {
 			return emptyStatusResult(
-				classifyGitFailure(statusResult.stderr),
-				gitFailureMessage(statusResult, 'git status failed in workspace.'),
+				gitFailure(statusResult, 'git status failed in workspace.'),
 			);
 		}
 
@@ -340,8 +343,7 @@ export function createWorkspaceGitService({
 		]);
 		if (nameStatusResult.status !== 'success') {
 			return emptyStatusResult(
-				classifyGitFailure(nameStatusResult.stderr),
-				gitFailureMessage(nameStatusResult, 'git diff failed in workspace.'),
+				gitFailure(nameStatusResult, 'git diff failed in workspace.'),
 			);
 		}
 
@@ -778,11 +780,10 @@ function isNoCommitsYet(stderr: string): boolean {
 
 /** Builds the failed-status result shape with empty rows. */
 function emptyStatusResult(
-	code: WorkspaceGitFailureCode,
-	message: string,
+	error: WorkspaceGitFailure,
 ): GetWorkspaceGitStatusResult {
 	return {
-		error: { code, message },
+		error,
 		files: [],
 		summary: { additions: 0, deletions: 0, files: 0 },
 	};

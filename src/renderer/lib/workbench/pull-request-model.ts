@@ -1,5 +1,6 @@
 import { i18n } from '@/renderer/lib/i18n';
 import type {
+	CommandFailureCopy,
 	PullRequestCheckSummary,
 	PullRequestCommentReplySummary,
 	PullRequestCommentSummary,
@@ -12,6 +13,7 @@ import { deriveOpenPullRequestStatus } from '@/shared/github-pr-presentation';
 import type {
 	GithubCheckWire,
 	GithubCommentWire,
+	GithubFailure,
 	GithubPullRequestSnapshotWire,
 	GithubPullRequestWire,
 } from '@/shared/ipc/contracts/github';
@@ -25,6 +27,7 @@ import {
 	stripCommentMetadata,
 	summarizeCommentBody,
 } from './comment-body';
+import { describeCommandFailure } from './git-failure-copy';
 import { derivePreviewDeployment } from './preview-deployment';
 
 /** Inputs for building the workspace shell PR model: local changes, review rows, and the gh snapshot. */
@@ -32,7 +35,8 @@ interface BuildPullRequestShellModelInput {
 	changeSummary: WorkspaceShellModel['changeSummary'];
 	localComments: readonly ReviewCommentWire[];
 	snapshot: GithubPullRequestSnapshotWire | null;
-	syncError?: string;
+	/** The coded failure the last gh refresh reported, when one failed. */
+	syncFailure?: GithubFailure;
 	todos: readonly ReviewTodoWire[];
 }
 
@@ -46,13 +50,16 @@ export function buildPullRequestShellModel({
 	changeSummary,
 	localComments,
 	snapshot,
-	syncError,
+	syncFailure,
 	todos,
 }: BuildPullRequestShellModelInput): WorkspaceShellModel['pullRequest'] {
 	const gitStatus = buildGitStatus(changeSummary, snapshot);
 	const todoSummaries = buildTodoSummaries(todos);
 	const localCommentSummaries = buildLocalCommentSummaries(localComments);
 	const pullRequest = snapshot?.pullRequest ?? null;
+	const syncError = syncFailure
+		? describeCommandFailure(syncFailure)
+		: undefined;
 
 	if (!snapshot || !pullRequest) {
 		return {
@@ -60,7 +67,7 @@ export function buildPullRequestShellModel({
 			comments: localCommentSummaries,
 			description: [],
 			detail: syncError
-				? syncErrorDetail(syncError)
+				? syncErrorDetail(syncError.message)
 				: i18n.t(
 						'git:pull-request.detail.no-pull-request',
 						'No pull request for this branch yet.',
@@ -309,14 +316,14 @@ function deriveLabel(
 
 /**
  * Renders the detail line shown when the gh refresh itself failed.
- * @param syncError - The message the failed refresh reported
+ * @param message - The translated explanation of the refresh failure
  * @returns The detail line naming the refresh failure
  */
-function syncErrorDetail(syncError: string): string {
+function syncErrorDetail(message: string): string {
 	return i18n.t(
 		'git:pull-request.detail.sync-failed',
 		'Could not refresh GitHub state: {{error}}',
-		{ error: syncError },
+		{ error: message },
 	);
 }
 
@@ -332,10 +339,10 @@ function deriveDetail({
 }: {
 	pullRequest: GithubPullRequestWire;
 	status: PullRequestShellStatus;
-	syncError?: string;
+	syncError?: CommandFailureCopy;
 }): string {
 	if (syncError) {
-		return syncErrorDetail(syncError);
+		return syncErrorDetail(syncError.message);
 	}
 	if (pullRequest.state === 'merged') {
 		return i18n.t(

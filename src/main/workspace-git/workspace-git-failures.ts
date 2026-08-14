@@ -3,7 +3,10 @@
  * rather than inside the service so every git-backed module reports a failure
  * the same way, and so both stay trivially unit-testable.
  */
-import type { WorkspaceGitFailureCode } from '../../shared/ipc/contracts/workspace-git';
+import type {
+	WorkspaceGitFailure,
+	WorkspaceGitFailureCode,
+} from '../../shared/ipc/contracts/workspace-git';
 
 /**
  * What git's own exit codes mean, for the rare failure where git exits without
@@ -38,6 +41,31 @@ export function gitFailureMessage(
 		return fallback;
 	}
 	return GIT_EXIT_CODE_REASONS[String(failure.exitCode)] ?? failure.message;
+}
+
+/**
+ * The typed failure for a git invocation that did not succeed: the code the UI
+ * branches on, our best English for the support bundle, and git's own stderr
+ * kept apart from it. The split is what lets the renderer demote real command
+ * output without ever showing `fallback` — prose we wrote — as if git had said
+ * it, which would read as untranslated English to a Russian or Greek reader.
+ * @param result - Outcome of the failed git invocation.
+ * @param fallback - Copy to use when git wrote nothing to stderr.
+ * @returns The failure to hand the renderer.
+ */
+export function gitFailure(
+	result: {
+		failure?: { exitCode: number | null; message: string };
+		stderr: string;
+	},
+	fallback: string,
+): WorkspaceGitFailure {
+	const output = result.stderr.trim();
+	return {
+		code: classifyGitFailure(result.stderr),
+		message: gitFailureMessage(result, fallback),
+		...(output ? { output } : {}),
+	};
 }
 
 /**
