@@ -6,10 +6,6 @@
  * `@/renderer/lib/terminal/xterm-adapter`.
  */
 export {
-	isHarnessTitleBusy,
-	stripHarnessTitleDecoration,
-} from './harness-title';
-export {
 	buildWorkspaceScriptSummaries,
 	scriptSummaryToDockStatus,
 	selectActiveRunScript,

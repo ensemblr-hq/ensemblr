@@ -8,7 +8,7 @@ import {
 } from './notification-strings.ts';
 import type { NotificationTarget } from './notification-target.ts';
 
-/** One persisted agent event plus the chat it belongs to. */
+/** One persisted agent event plus the session and workspace it belongs to. */
 interface AgentActivityEvent {
 	event: AgentSessionEventWire;
 	sessionId: string;
@@ -20,6 +20,12 @@ export interface AgentNotification {
 	body: string;
 	target: FocusChatBroadcast;
 	title: string;
+}
+
+/** A session the monitor currently believes is mid-turn, and where it lives. */
+export interface RunningAgentSession {
+	sessionId: string;
+	workspaceId: string;
 }
 
 /** Thin seam over Electron's `powerSaveBlocker` so the monitor stays testable. */
@@ -79,6 +85,8 @@ interface AgentActivityMonitor {
 		workspaceId: string;
 		agentSessionId: string;
 	}) => void;
+	/** Every session currently mid-turn, across all workspaces. */
+	listRunning: () => readonly RunningAgentSession[];
 	/** Re-evaluate the power blocker (e.g. after a settings change). */
 	refresh: () => void;
 	/** Release the blocker and timers (call on app quit). */
@@ -127,6 +135,11 @@ function defaultSchedule(callback: () => void, ms: number): () => void {
  * Streaming state is derived from persisted `status` / `shutdown` events, so the
  * monitor never has to poll session rows. Settings are read live on each
  * relevant event, so toggling a switch takes effect without a restart.
+ *
+ * That same state is the process-wide answer to "which sessions are working
+ * right now", which {@link listRunning} exposes for the quit guard. It is more
+ * accurate than the persisted rows for this: the set starts empty at boot, so a
+ * prior run that died mid-turn leaves no phantom entry behind.
  */
 export function createAgentActivityMonitor(
 	options: AgentActivityMonitorOptions,
@@ -141,7 +154,7 @@ export function createAgentActivityMonitor(
 	const scheduleInterval = options.scheduleInterval ?? defaultSchedule;
 	const now = options.now ?? Date.now;
 
-	const streamingSessions = new Set<string>();
+	const streamingSessions = new Map<string, string>();
 	const userStoppedSessions = new Set<string>();
 	let blockerId: number | null = null;
 	let cancelPoll: (() => void) | null = null;
@@ -259,7 +272,7 @@ export function createAgentActivityMonitor(
 			const active =
 				payload.status === 'streaming' || payload.status === 'starting';
 			if (active) {
-				streamingSessions.add(sessionId);
+				streamingSessions.set(sessionId, workspaceId);
 			} else {
 				const wasActive = streamingSessions.delete(sessionId);
 				const stoppedByUser = userStoppedSessions.delete(sessionId);
@@ -277,6 +290,12 @@ export function createAgentActivityMonitor(
 		}
 	};
 
+	const listRunning = (): readonly RunningAgentSession[] =>
+		[...streamingSessions].map(([sessionId, workspaceId]) => ({
+			sessionId,
+			workspaceId,
+		}));
+
 	const dispose = (): void => {
 		cancelPoll?.();
 		cancelPoll = null;
@@ -291,6 +310,7 @@ export function createAgentActivityMonitor(
 	return {
 		dispose,
 		handle,
+		listRunning,
 		noteUserStop: (sessionId) => {
 			userStoppedSessions.add(sessionId);
 		},
