@@ -34,6 +34,7 @@ export const IPC_CHANNELS = {
 	agentToolApprovalRequested: 'ensemblr:agent-tool-approval-requested',
 	activeChatContext: 'ensemblr:active-chat-context',
 	focusChatRequested: 'ensemblr:focus-chat-requested',
+	notificationSoundRequested: 'ensemblr:notification-sound-requested',
 	closeChatTab: 'ensemblr:close-chat-tab',
 	closeWindow: 'ensemblr:close-window',
 	cloneGithubRepositoryPrepare: 'ensemblr:clone-github-repository:prepare',

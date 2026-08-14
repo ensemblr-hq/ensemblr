@@ -32,6 +32,7 @@ export {
 	languageAtom,
 	markdownStyleAtom,
 	monoFontAtom,
+	notificationSoundAtom,
 	renameWorkspaceOnBranchAtom,
 	reviewModelAtom,
 	reviewThinkingLevelAtom,

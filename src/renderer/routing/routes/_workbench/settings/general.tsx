@@ -20,6 +20,7 @@ import {
 	desktopNotificationsAtom,
 	followUpBehaviorAtom,
 	languageAtom,
+	notificationSoundAtom,
 	sendShortcutAtom,
 	toolCallCollapseAtom,
 } from '@/renderer/state/preferences';
@@ -48,6 +49,9 @@ function GeneralSettings() {
 	const [sendShortcut, setSendShortcut] = useAtom(sendShortcutAtom);
 	const [followUp, setFollowUp] = useAtom(followUpBehaviorAtom);
 	const [notifications, setNotifications] = useAtom(desktopNotificationsAtom);
+	const [notificationSound, setNotificationSound] = useAtom(
+		notificationSoundAtom,
+	);
 	const [autoConvertLong, setAutoConvertLong] = useAtom(
 		autoConvertLongTextAtom,
 	);
@@ -167,6 +171,25 @@ function GeneralSettings() {
 				)}
 				modified={notifications !== DEFAULTS.desktopNotifications}
 				onReset={() => setNotifications(DEFAULTS.desktopNotifications)}
+			/>
+
+			<SettingRow
+				control={
+					<Switch
+						checked={notificationSound}
+						onCheckedChange={setNotificationSound}
+					/>
+				}
+				description={t(
+					'settings:general.notification-sound.description',
+					'Play a sound when a chat needs your attention.',
+				)}
+				label={t(
+					'settings:general.notification-sound.label',
+					'Notification sound',
+				)}
+				modified={notificationSound !== DEFAULTS.notificationSound}
+				onReset={() => setNotificationSound(DEFAULTS.notificationSound)}
 			/>
 
 			<SettingRow

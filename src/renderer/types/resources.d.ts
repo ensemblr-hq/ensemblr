@@ -1485,6 +1485,10 @@ export default interface Resources {
 				label: 'Language';
 				system: 'System';
 			};
+			'notification-sound': {
+				description: 'Play a sound when a chat needs your attention.';
+				label: 'Notification sound';
+			};
 			notifications: {
 				description: 'Get notified when an agent finishes working in a chat.';
 				label: 'Desktop notifications';

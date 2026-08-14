@@ -283,6 +283,8 @@ export function createEnsemblrApi(): EnsemblrApi {
 		reportActiveChat: (context) => invoke('reportActiveChat', context),
 		onFocusChatRequested: (listener) =>
 			subscribe<FocusChatBroadcast>(IPC_CHANNELS.focusChatRequested, listener),
+		onNotificationSoundRequested: (listener) =>
+			subscribe<void>(IPC_CHANNELS.notificationSoundRequested, listener),
 		onAgentSessionEvent: (listener) =>
 			subscribe<AgentSessionEventBroadcast>(
 				IPC_CHANNELS.agentSessionEvent,

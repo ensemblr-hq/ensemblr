@@ -30,3 +30,19 @@ export function subscribeFocusChatRequests(
 	}
 	return api.onFocusChatRequested(listener);
 }
+
+/**
+ * Subscribes to the main process's request to play the notification chime, sent
+ * with a desktop notification it has already gated. Returns an unsubscribe fn.
+ * @param listener - Runs once per notification that should be audible.
+ * @returns The unsubscribe function.
+ */
+export function subscribeNotificationSoundRequests(
+	listener: () => void,
+): () => void {
+	const api = getEnsemblrApiOrNull();
+	if (!api) {
+		return () => undefined;
+	}
+	return api.onNotificationSoundRequested(listener);
+}

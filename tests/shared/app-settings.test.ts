@@ -125,6 +125,18 @@ describe('parseAppSettings', () => {
 		expect(parsed.models.hiddenModels).toEqual([]);
 	});
 
+	test('defaults the notification chime on, and falls back when garbled', () => {
+		expect(DEFAULT_APP_SETTINGS.general.notificationSound).toBe(true);
+		expect(
+			parseAppSettings({ general: { notificationSound: 'loud' } }).general
+				.notificationSound,
+		).toBe(true);
+		expect(
+			parseAppSettings({ general: { notificationSound: false } }).general
+				.notificationSound,
+		).toBe(false);
+	});
+
 	test('drops unknown keys', () => {
 		const parsed = parseAppSettings({
 			general: { sendShortcut: 'enter', nope: true },

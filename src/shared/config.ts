@@ -27,6 +27,7 @@ const generalSettingsSchema = z.object({
 	// asserts the two agree.
 	language: z.enum(['system', 'en', 'ru', 'el']).catch('system'),
 	desktopNotifications: z.boolean().catch(true),
+	notificationSound: z.boolean().catch(true),
 	autoConvertLongText: z.boolean().catch(true),
 	alwaysShowContextUsage: z.boolean().catch(true),
 	caffeinateWhileRunning: z.boolean().catch(false),
