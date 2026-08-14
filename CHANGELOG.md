@@ -9,6 +9,94 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.0-beta.4] - 2026-08-14
+
+Notifications you can act on, a delegation switch for Claude Code, and a quit that asks first.
+Signed, notarized, Apple silicon.
+[Release](https://github.com/ensemblr-hq/ensemblr/releases/tag/v0.1.0-beta.4) ·
+[`.dmg`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.0-beta.4/Ensemblr-0.1.0-beta.4-arm64.dmg)
+
+### Added
+
+- **Pick how Claude Code delegates** (#277). A first-class Claude Code chat held two ways to fan out —
+  the runtime's own sub-agent tool and `ensemblr_start_conversation`, which opens a real chat tab you can
+  watch, steer, and audit — and nothing arbitrated between them, so the model reached for the built-in one
+  while the orchestration playbook described a loop it never entered. `app.providers.claudeSubagentMode`
+  (Settings → Providers → Claude Code) now picks one, and **both directions are enforced** so the mechanism
+  you did not pick is absent rather than discouraged: `ensemblr` merges `Agent` and `Task` into the SDK's
+  `disallowedTools`, `native` withholds the spawn control ops and hands the session a native-orchestrator
+  briefing instead of the chat-tab playbook. The mechanism is pinned when a session opens — the SDK fixes
+  `disallowedTools` at `query()`, so a mid-session flip would leave that session able to delegate by neither
+  — and a change therefore reaches the next chat. Pi has no sub-agent tool of its own and always delegates
+  through chat tabs; so does every spawned child, on either runtime, since a child under `native` would
+  route an unbounded fan-out around the depth cap.
+  [ADR 0049](docs/adr/0049-let-the-user-pick-claude-codes-subagent-mechanism.md).
+- **Quitting with agents running asks first** (#278). Quit used to kill every in-flight turn without
+  warning. A native confirmation now names the chats about to be interrupted, with **Quit Anyway** and
+  **Cancel**; the copy lives in `src/main/app/quit-guard-strings.ts` in all three languages.
+- **A chime when a chat needs you** (#287). A `notificationSound` general setting (default on) plays a
+  bundled chime alongside the desktop notification, so a finished agent is audible without watching the
+  window. The OS notification is posted `silent` so macOS does not stack its own tone on top — switching
+  the chime off buys silence, not the system sound back. The listener is mounted at the app root rather
+  than in the workbench shell, because `/settings` is a sibling route and a shell-scoped listener would
+  leave the screen holding the switch with no sound at all.
+- **A planning workspace is named before the agent gets there** (#280). A workspace kept its generated
+  placeholder for the whole of a Plan Mode interview. Ensemblr now derives a **provisional** name from the
+  opening prompt when a plan-mode session opens or submits — no model in the loop, so a slow provider can
+  never leave the board blank — and marks it provisional, so the agent's own naming call still lands as a
+  first naming and replaces it for free. A workspace somebody has titled is never moved.
+  [ADR 0050](docs/adr/0050-name-a-planning-workspace-before-the-agent-does.md).
+- **Preview files agents write outside the workspace** (#281). Agents routinely write to `/tmp`, `~/.claude/`,
+  and sibling worktrees; clicking one of those paths in a chat used to open a preview reporting the file did
+  not exist. The read-only preview now resolves absolute and `~/` paths where they point, re-anchors an
+  escaping `../` climb on the workspace root instead of refusing it, and badges anything outside the worktree
+  **Outside workspace** so a bare basename cannot pass for an in-repo file. This widens *preview only* — the
+  attachment store, which decides what an agent can pull into its own context, stays workspace-only with
+  symlink containment intact. `.ico` is recognised end to end, and the `read-workspace-file` IPC payload
+  gained the Zod schema it never had.
+
+### Changed
+
+- **Public copy leads with Ensemblr Control and the two runtimes** (#274, #275). The README, `docs/README.md`,
+  `docs/guide/README.md`, and `CONTEXT.md` now open on the orchestrator rather than the worktree manager, and
+  the README hero is a video of Ensemblr Control driving the app — naming its own tab, moving the board,
+  starting a run script, delegating to sub-agents, launching a harness — instead of a static board screenshot.
+  The video is hosted as a release attachment: `raw.githubusercontent` serves `.mp4` as
+  `application/octet-stream`, so a repo-hosted file downloads instead of playing, and it would have added
+  6 MB to every clone.
+- **react-doctor is back at 100, by fixing the code rather than muting it** (#289). The `doctor.config.jsonc`
+  override list had grown to 30 entries, most covering findings that no longer reproduce or that pointed at
+  real problems. Four settings routes were split so each component owns a file — `integrations.tsx`,
+  `models.tsx`, `repo/misc.tsx`, and `repo/scripts.tsx` shed 762 lines between them into
+  `components/settings/<section>/` — `getNextThinkingId` moved out of a component file into
+  `lib/workbench/thinking-strength.ts`, the settings debounce window is hoisted into its own hook, and the
+  three environment layers in `workspace-environment.ts` are assembled in parallel. Seven overrides remain,
+  each verified to suppress a finding that still reproduces. Adds `knip.jsonc`, without which react-doctor's
+  dead-code pass could not see the playground's HTML-entry chain and reported all 34 of its files as unused.
+- **BEHAVIOUR CHANGE:** every Claude Code session now carries `disallowedTools: ['Agent', 'Task']` under the
+  default `ensemblr` sub-agent mechanism, including `bypassPermissions` sessions that previously carried none.
+
+### Fixed
+
+- **Notifications are per chat, not per app** (#276). The gate was `isAppFocused()` alone, so any focused
+  window swallowed the notification for every other chat — the common case being an agent finishing in a
+  background workspace while you read a different one. The renderer now reports the chat on screen, main
+  holds it in `ActiveChatStore`, and a notification is suppressed only when that exact chat is on screen in
+  a focused window. **Clicking a notification opens the chat it was about**, through the existing unread-jump
+  path, falling back to the workspace when the tab is closed. Copy is specific and localized: the tab's own
+  name as the title, the workspace in the body. Three states changed outcome — a chat hosting somebody's
+  sub-agent stays silent rather than firing one notification per child, an `idle` that is only the tail of a
+  stop you asked for stays silent, and an agent blocked on a questionnaire now notifies, being the one state
+  that wants you more than a finished turn does.
+- **The follow-up queue drains even when the composer was not watching** (#288). The flush rode the falling
+  edge of `isStreaming`, which required the composer to be mounted at the moment a turn ended — but
+  `ComposerSlot` swaps it out for the `ask_user_question` and tool-approval cards, and switching chat tabs
+  unmounts it outright. A turn that ended while it was away left no edge to witness, and the queue waited for
+  a next turn only it was going to start. The flush now reads the agent's standing state instead. The head
+  row also drops its visible "Next" label, which took a line of its own and made the stack read ragged; the
+  accent border, tint, position number, and top-of-list placement still mark it, and the word survives as
+  screen-reader text.
+
 ## [0.1.0-beta.3] - 2026-08-13
 
 Terminal shutdown fixes on top of beta.2. Signed, notarized, Apple silicon.

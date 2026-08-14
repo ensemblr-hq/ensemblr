@@ -70,6 +70,20 @@ The diff toolbar carries split versus unified view, word wrap, hidden
 characters, a **File** mode showing the whole file rather than only its hunks,
 and the Viewed toggle.
 
+### Files outside the workspace
+
+Agents write to `/tmp`, to `~/.claude/`, and to sibling worktrees, and they cite
+those paths in chat. Clicking one opens it in the same read-only viewer instead
+of reporting a file that does not exist. Absolute paths and `~/` paths are read
+where they point; a relative path that climbs out of the worktree is re-anchored
+on the workspace root rather than refused.
+
+Anything resolved outside the worktree is badged **Outside workspace** in the
+viewer header, so a bare filename can never pass for a file in the repository.
+This widens *preview only*. What an agent may pull into its own context through
+the attachment store is still confined to the workspace root, symlink
+containment included.
+
 ## Review comments
 
 Click the gutter on any diff line to leave a **review comment**. Comments are

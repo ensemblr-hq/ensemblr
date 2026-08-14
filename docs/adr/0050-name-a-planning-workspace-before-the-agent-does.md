@@ -1,4 +1,4 @@
-# 0049. Name a Planning Workspace Before the Agent Does
+# 0050. Name a Planning Workspace Before the Agent Does
 
 Date: 2026-08-14
 

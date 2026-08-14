@@ -229,8 +229,23 @@ yourself.
 ## Notifications and language
 
 Desktop notifications are on by default and can be turned off in app settings.
-There is also an option to keep the Mac awake while an agent is running, so a
-long turn is not cut short by sleep.
+They are **per chat, not per app**: a chat that finishes a turn or stops to ask
+you something posts its own notification, titled with that chat's name and
+naming its workspace in the body, so a fan-out of agents produces one line per
+agent rather than one line for the window. Clicking a notification brings
+Ensemblr forward and opens the chat it came from.
+
+A **notification sound** rides alongside, on by default and switchable
+separately — the chat can chime without the notification banner, or the other
+way round. There is also an option to keep the Mac awake while an agent is
+running, so a long turn is not cut short by sleep.
+
+## Quitting with agents still running
+
+Quitting while any chat is mid-turn raises a native confirmation first, naming
+the chats that are about to be interrupted. **Quit Anyway** goes through and
+stops them; **Cancel** leaves everything running. Nothing is quietly killed, and
+nothing blocks a quit you meant.
 
 Agents write back in the language the app is set to — replies, tab titles,
 workspace summaries, review comments, and the questions they put to you. Code,
