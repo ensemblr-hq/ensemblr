@@ -12,6 +12,12 @@ export type { AppFailureCode } from './codes';
 export interface CodedFailure {
 	code: string;
 	message: string;
+	/**
+	 * The command's own stderr, when the failure came from one and it wrote any.
+	 * Distinct from `message`, which falls back to prose main wrote and so is
+	 * never safe to render as the command's words.
+	 */
+	output?: string;
 }
 
 /**

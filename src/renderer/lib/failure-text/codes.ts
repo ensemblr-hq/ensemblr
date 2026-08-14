@@ -216,6 +216,11 @@ export const APP_FAILURE_TEXT: Record<
 			'errors:failure.destination-required',
 			'No destination was provided and the managed root has none to fall back on.',
 		),
+	'detached-head': (t) =>
+		t(
+			'errors:failure.detached-head',
+			'This workspace is not on a branch, so GitHub has nothing to match it against. Check out a branch, then retry.',
+		),
 	'dictation-disabled': (t) =>
 		t(
 			'errors:failure.dictation-disabled',

@@ -693,6 +693,9 @@
 		"options": "Open current workspace app options",
 		"primary": "Open current workspace in {{target}}"
 	},
+	"panel-alert": {
+		"output": "Command output"
+	},
 	"permission-boundary": {
 		"allowed": "Allowed",
 		"blocked": "Blocked",

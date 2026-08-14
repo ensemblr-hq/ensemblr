@@ -14,14 +14,15 @@ export function classifyCommandFailure(
 	fallbackMessage: string,
 ): GithubFailure {
 	const stderr = result.stderr.toLowerCase();
-	const message =
-		result.stderr.trim() || result.failure?.message || fallbackMessage;
+	const output = result.stderr.trim();
+	const message = output || result.failure?.message || fallbackMessage;
 
 	const code = classifyStderr(stderr, result);
 	const remediation = remediationFor(code);
 	return {
 		code,
 		message,
+		...(output ? { output } : {}),
 		...(remediation ? { remediation } : {}),
 	};
 }
@@ -34,6 +35,14 @@ const STDERR_SIGNATURES: readonly {
 	{
 		code: 'gh-not-installed',
 		markers: ['command not found', 'no such file or directory'],
+	},
+	{
+		code: 'detached-head',
+		markers: [
+			'could not determine current branch',
+			'not on any branch',
+			'head is not a symbolic ref',
+		],
 	},
 	{
 		code: 'gh-not-authenticated',

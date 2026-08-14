@@ -56,7 +56,7 @@ export function ChecksNoPullRequestState({
 			>
 				{workspace.pullRequest.syncError ? (
 					<PanelAlert
-						detail={workspace.pullRequest.syncError}
+						{...workspace.pullRequest.syncError}
 						title={t(
 							'review:checks.sync-error.title',
 							'Could not refresh from GitHub',

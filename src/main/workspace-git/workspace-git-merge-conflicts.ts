@@ -8,10 +8,7 @@
 import type { GetWorkspaceMergeConflictsResult } from '../../shared/ipc/contracts/workspace-git';
 import type { LocalCommandResult } from '../commands/local-command';
 
-import {
-	classifyGitFailure,
-	gitFailureMessage,
-} from './workspace-git-failures.ts';
+import { gitFailure } from './workspace-git-failures.ts';
 import { parseMergeTreeConflicts } from './workspace-git-parsers.ts';
 
 /** Remote whose tracking branches a pull request merges against. */
@@ -82,10 +79,7 @@ export async function readMergeConflicts(
 		return { paths: parseMergeTreeConflicts(result.stdout) };
 	}
 	return {
-		error: {
-			code: classifyGitFailure(result.stderr),
-			message: gitFailureMessage(result, 'git merge-tree failed in workspace.'),
-		},
+		error: gitFailure(result, 'git merge-tree failed in workspace.'),
 		paths: [],
 	};
 }

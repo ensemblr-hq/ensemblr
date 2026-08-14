@@ -550,6 +550,7 @@ export default interface Resources {
 			'destination-not-writable': 'Ensemblr cannot write to that location. Pick a writable one.';
 			'destination-path-relative': 'The destination path must be absolute.';
 			'destination-required': 'No destination was provided and the managed root has none to fall back on.';
+			'detached-head': 'This workspace is not on a branch, so GitHub has nothing to match it against. Check out a branch, then retry.';
 			'dictation-disabled': 'Dictation is turned off in Settings.';
 			'dictation-empty-transcript': 'No speech was detected in the recording.';
 			'dictation-invalid-endpoint': 'The transcription endpoint must be a full http:// or https:// address.';
@@ -2709,6 +2710,9 @@ export default interface Resources {
 		'open-workspace-menu': {
 			options: 'Open current workspace app options';
 			primary: 'Open current workspace in {{target}}';
+		};
+		'panel-alert': {
+			output: 'Command output';
 		};
 		'permission-boundary': {
 			allowed: 'Allowed';

@@ -64,6 +64,7 @@ export type {
 } from './right-sidebar-header';
 export type { WorkbenchRouteSearch } from './routing';
 export type {
+	CommandFailureCopy,
 	CommentPreviewPayload,
 	ComposerContextUsage,
 	ComposerModelOption,
