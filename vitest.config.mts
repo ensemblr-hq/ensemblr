@@ -13,12 +13,21 @@ import { defineConfig } from 'vitest/config';
  * `electron --test`; the pure-logic main-process suites that only need the
  * `node` env are wired in one-by-one below (not a `tests/main/**` glob, which
  * would drag in the electron-only suites).
+ *
+ * `electron` is aliased to a stub because several of those suites reach
+ * `src/main/agent-control/main-integration.ts` through the concern's barrel.
+ * Outside an Electron process the real module downloads the packaged binary on
+ * import, which made a hermetic unit test depend on a ~100 MB network fetch. A
+ * suite that needs Electron behaviour still mocks the module itself.
  */
 export default defineConfig({
 	plugins: [react()],
 	resolve: {
 		alias: {
 			'@': fileURLToPath(new URL('./src', import.meta.url)),
+			electron: fileURLToPath(
+				new URL('./tests/main/support/electron-stub.ts', import.meta.url),
+			),
 		},
 	},
 	test: {
