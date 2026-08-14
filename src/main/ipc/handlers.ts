@@ -3,6 +3,7 @@ import type {
 	AgentProviderService,
 } from '../agent-providers';
 import type { AgentSessionService } from '../agent-runtime';
+import type { ActiveChatStore } from '../agent-runtime/active-chat-store.ts';
 import type { HarnessDetectionService } from '../agents/index.ts';
 import { createChatTabService } from '../chat-tabs/index.ts';
 import type { LocalCommandService } from '../commands/local-command';
@@ -57,6 +58,7 @@ import type {
 	WorkspaceFilesWatcher,
 } from '../workspace-files';
 import { createWorkspaceGitService } from '../workspace-git';
+import { registerActiveChatHandlers } from './handlers/active-chat';
 import { registerAgentProviderHandlers } from './handlers/agent-provider';
 import { registerAgentSessionHandlers } from './handlers/agent-session';
 import { registerAgentHandlers } from './handlers/agents';
@@ -121,6 +123,8 @@ interface RegisterIpcHandlersOptions {
 	localCommandService: LocalCommandService;
 	localRepositoryImportService: LocalRepositoryImportService;
 	localRepositoryRegistrationService: LocalRepositoryRegistrationService;
+	/** Holds the chat the renderer reports as on screen, read by the desktop notifier. */
+	activeChatStore: ActiveChatStore;
 	/** Holds the menu context the renderer reports, shared with the menu rebuild. */
 	menuContextStore: MenuContextStore;
 	/** Reinstalls the native application menu from the current settings and menu context. */
@@ -187,6 +191,7 @@ export function registerIpcHandlers({
 	localRepositoryRegistrationService,
 	menuContextStore,
 	onAppSettingsUpdated,
+	activeChatStore,
 	openTargetService,
 	rebuildMenu,
 	piExecutableService,
@@ -215,6 +220,7 @@ export function registerIpcHandlers({
 
 	registerWindowHandlers();
 	registerMenuHandlers({ menuContextStore, rebuildMenu });
+	registerActiveChatHandlers({ activeChatStore });
 	registerAppSettingsHandlers({ appSettingsService, onAppSettingsUpdated });
 	registerEnvironmentHandlers({ environmentVariablesService });
 	registerHealthHandlers({ configService, databaseService });

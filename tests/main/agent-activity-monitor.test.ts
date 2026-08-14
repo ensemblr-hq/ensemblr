@@ -1,9 +1,11 @@
 import { describe, expect, test } from 'vitest';
 import {
 	type AgentActivityMonitorOptions,
+	type AgentNotification,
 	type BatterySnapshot,
 	createAgentActivityMonitor,
 } from '../../src/main/agent-runtime/agent-activity-monitor';
+import type { NotificationTarget } from '../../src/main/agent-runtime/notification-target';
 import {
 	type AppSettings,
 	DEFAULT_APP_SETTINGS,
@@ -36,11 +38,20 @@ function statusEvent(status: string): AgentSessionEventWire {
 	};
 }
 
+/** The chat every notification test resolves to unless it overrides the port. */
+const TARGET: NotificationTarget = {
+	chatTabId: 'tab-1',
+	isSubAgent: false,
+	tabTitle: 'Fix the notifier',
+	workspaceId: 'w1',
+	workspaceName: 'vangelis',
+};
+
 interface Harness {
 	monitor: ReturnType<typeof createAgentActivityMonitor>;
 	starts: number;
 	stops: number;
-	notifications: number;
+	notifications: AgentNotification[];
 }
 
 function makeMonitor(
@@ -48,12 +59,17 @@ function makeMonitor(
 		readSettings: () => AppSettings;
 	},
 ): Harness {
-	const counters = { notifications: 0, starts: 0, stops: 0 };
+	const counters = {
+		notifications: [] as AgentNotification[],
+		starts: 0,
+		stops: 0,
+	};
 	const monitor = createAgentActivityMonitor({
 		isAppFocused: () => false,
-		notify: () => {
-			counters.notifications += 1;
+		notify: (notification) => {
+			counters.notifications.push(notification);
 		},
+		resolveTarget: () => TARGET,
 		// Run the battery poll synchronously-cancellable but never auto-fire.
 		scheduleInterval: () => () => undefined,
 		powerControls: {
@@ -86,11 +102,19 @@ describe('createAgentActivityMonitor — caffeinate', () => {
 		const h = makeMonitor({
 			readSettings: () => settings({ caffeinateWhileRunning: true }),
 		});
-		h.monitor.handle({ event: statusEvent('streaming'), sessionId: 's1' });
+		h.monitor.handle({
+			event: statusEvent('streaming'),
+			sessionId: 's1',
+			workspaceId: 'w1',
+		});
 		await flush(); // first battery sample resolves, then the blocker engages
 		expect(h.starts).toBe(1);
 		expect(h.stops).toBe(0);
-		h.monitor.handle({ event: statusEvent('idle'), sessionId: 's1' });
+		h.monitor.handle({
+			event: statusEvent('idle'),
+			sessionId: 's1',
+			workspaceId: 'w1',
+		});
 		expect(h.stops).toBe(1);
 	});
 
@@ -98,7 +122,11 @@ describe('createAgentActivityMonitor — caffeinate', () => {
 		const h = makeMonitor({
 			readSettings: () => settings({ caffeinateWhileRunning: false }),
 		});
-		h.monitor.handle({ event: statusEvent('streaming'), sessionId: 's1' });
+		h.monitor.handle({
+			event: statusEvent('streaming'),
+			sessionId: 's1',
+			workspaceId: 'w1',
+		});
 		await flush();
 		expect(h.starts).toBe(0);
 	});
@@ -107,13 +135,29 @@ describe('createAgentActivityMonitor — caffeinate', () => {
 		const h = makeMonitor({
 			readSettings: () => settings({ caffeinateWhileRunning: true }),
 		});
-		h.monitor.handle({ event: statusEvent('streaming'), sessionId: 's1' });
+		h.monitor.handle({
+			event: statusEvent('streaming'),
+			sessionId: 's1',
+			workspaceId: 'w1',
+		});
 		await flush();
-		h.monitor.handle({ event: statusEvent('streaming'), sessionId: 's2' });
+		h.monitor.handle({
+			event: statusEvent('streaming'),
+			sessionId: 's2',
+			workspaceId: 'w1',
+		});
 		expect(h.starts).toBe(1); // single blocker for both
-		h.monitor.handle({ event: statusEvent('idle'), sessionId: 's1' });
+		h.monitor.handle({
+			event: statusEvent('idle'),
+			sessionId: 's1',
+			workspaceId: 'w1',
+		});
 		expect(h.stops).toBe(0); // s2 still running
-		h.monitor.handle({ event: statusEvent('idle'), sessionId: 's2' });
+		h.monitor.handle({
+			event: statusEvent('idle'),
+			sessionId: 's2',
+			workspaceId: 'w1',
+		});
 		expect(h.stops).toBe(1);
 	});
 
@@ -123,7 +167,11 @@ describe('createAgentActivityMonitor — caffeinate', () => {
 			readBattery: () => Promise.resolve(lowBattery),
 			readSettings: () => settings({ caffeinateWhileRunning: true }),
 		});
-		h.monitor.handle({ event: statusEvent('streaming'), sessionId: 's1' });
+		h.monitor.handle({
+			event: statusEvent('streaming'),
+			sessionId: 's1',
+			workspaceId: 'w1',
+		});
 		await flush();
 		expect(h.starts).toBe(0);
 	});
@@ -133,7 +181,11 @@ describe('createAgentActivityMonitor — caffeinate', () => {
 			readBattery: () => Promise.resolve({ charging: true, percent: 5 }),
 			readSettings: () => settings({ caffeinateWhileRunning: true }),
 		});
-		h.monitor.handle({ event: statusEvent('streaming'), sessionId: 's1' });
+		h.monitor.handle({
+			event: statusEvent('streaming'),
+			sessionId: 's1',
+			workspaceId: 'w1',
+		});
 		await flush();
 		expect(h.starts).toBe(1);
 	});
@@ -153,7 +205,11 @@ describe('createAgentActivityMonitor — caffeinate', () => {
 			},
 			readSettings: () => settings({ caffeinateWhileRunning: true }),
 		});
-		h.monitor.handle({ event: statusEvent('streaming'), sessionId: 's1' });
+		h.monitor.handle({
+			event: statusEvent('streaming'),
+			sessionId: 's1',
+			workspaceId: 'w1',
+		});
 		await flush();
 		expect(h.starts).toBe(1);
 		// Battery drains below the cutoff; the next poll re-samples and releases.
@@ -167,7 +223,11 @@ describe('createAgentActivityMonitor — caffeinate', () => {
 		const h = makeMonitor({
 			readSettings: () => settings({ caffeinateWhileRunning: true }),
 		});
-		h.monitor.handle({ event: statusEvent('streaming'), sessionId: 's1' });
+		h.monitor.handle({
+			event: statusEvent('streaming'),
+			sessionId: 's1',
+			workspaceId: 'w1',
+		});
 		await flush();
 		h.monitor.dispose();
 		expect(h.stops).toBe(1);
@@ -175,24 +235,54 @@ describe('createAgentActivityMonitor — caffeinate', () => {
 });
 
 describe('createAgentActivityMonitor — notifications', () => {
+	/** Runs a session through a full streaming-then-idle turn. */
+	function finishTurn(h: Harness, sessionId = 's1', workspaceId = 'w1'): void {
+		h.monitor.handle({
+			event: statusEvent('streaming'),
+			sessionId,
+			workspaceId,
+		});
+		h.monitor.handle({ event: statusEvent('idle'), sessionId, workspaceId });
+	}
+
 	test('notifies when a turn finishes (setting on, app unfocused)', () => {
 		const h = makeMonitor({
 			isAppFocused: () => false,
 			readSettings: () => settings({ desktopNotifications: true }),
 		});
-		h.monitor.handle({ event: statusEvent('streaming'), sessionId: 's1' });
-		h.monitor.handle({ event: statusEvent('idle'), sessionId: 's1' });
-		expect(h.notifications).toBe(1);
+		finishTurn(h);
+		expect(h.notifications).toHaveLength(1);
 	});
 
-	test('stays quiet when the app is focused', () => {
+	test('notifies for a background chat even while the app is focused', () => {
 		const h = makeMonitor({
 			isAppFocused: () => true,
+			isChatOnScreen: (_workspaceId, agentSessionId) =>
+				agentSessionId === 'on-screen',
 			readSettings: () => settings({ desktopNotifications: true }),
 		});
-		h.monitor.handle({ event: statusEvent('streaming'), sessionId: 's1' });
-		h.monitor.handle({ event: statusEvent('idle'), sessionId: 's1' });
-		expect(h.notifications).toBe(0);
+		finishTurn(h, 'background');
+		expect(h.notifications).toHaveLength(1);
+	});
+
+	test('stays quiet for the chat on screen in a focused window', () => {
+		const h = makeMonitor({
+			isAppFocused: () => true,
+			isChatOnScreen: (_workspaceId, agentSessionId) => agentSessionId === 's1',
+			readSettings: () => settings({ desktopNotifications: true }),
+		});
+		finishTurn(h);
+		expect(h.notifications).toHaveLength(0);
+	});
+
+	test('notifies for the chat on screen when the window is not focused', () => {
+		const h = makeMonitor({
+			isAppFocused: () => false,
+			isChatOnScreen: () => true,
+			readSettings: () => settings({ desktopNotifications: true }),
+		});
+		finishTurn(h);
+		expect(h.notifications).toHaveLength(1);
 	});
 
 	test('stays quiet when notifications are disabled', () => {
@@ -200,9 +290,8 @@ describe('createAgentActivityMonitor — notifications', () => {
 			isAppFocused: () => false,
 			readSettings: () => settings({ desktopNotifications: false }),
 		});
-		h.monitor.handle({ event: statusEvent('streaming'), sessionId: 's1' });
-		h.monitor.handle({ event: statusEvent('idle'), sessionId: 's1' });
-		expect(h.notifications).toBe(0);
+		finishTurn(h);
+		expect(h.notifications).toHaveLength(0);
 	});
 
 	test('does not notify on a never-streaming idle blip', () => {
@@ -210,7 +299,136 @@ describe('createAgentActivityMonitor — notifications', () => {
 			isAppFocused: () => false,
 			readSettings: () => settings({ desktopNotifications: true }),
 		});
-		h.monitor.handle({ event: statusEvent('idle'), sessionId: 's1' });
-		expect(h.notifications).toBe(0);
+		h.monitor.handle({
+			event: statusEvent('idle'),
+			sessionId: 's1',
+			workspaceId: 'w1',
+		});
+		expect(h.notifications).toHaveLength(0);
+	});
+
+	test('stays quiet for a chat hosting a sub-agent', () => {
+		const h = makeMonitor({
+			readSettings: () => settings({ desktopNotifications: true }),
+			resolveTarget: () => ({ ...TARGET, isSubAgent: true }),
+		});
+		finishTurn(h);
+		expect(h.notifications).toHaveLength(0);
+	});
+
+	test('stays quiet when the chat cannot be resolved', () => {
+		const h = makeMonitor({
+			readSettings: () => settings({ desktopNotifications: true }),
+			resolveTarget: () => null,
+		});
+		finishTurn(h);
+		expect(h.notifications).toHaveLength(0);
+	});
+
+	test('stays quiet for the idle a user-requested stop settles', () => {
+		const h = makeMonitor({
+			readSettings: () => settings({ desktopNotifications: true }),
+		});
+		h.monitor.handle({
+			event: statusEvent('streaming'),
+			sessionId: 's1',
+			workspaceId: 'w1',
+		});
+		h.monitor.noteUserStop('s1');
+		h.monitor.handle({
+			event: statusEvent('idle'),
+			sessionId: 's1',
+			workspaceId: 'w1',
+		});
+		expect(h.notifications).toHaveLength(0);
+	});
+
+	test('a stop only silences the turn it stopped', () => {
+		const h = makeMonitor({
+			readSettings: () => settings({ desktopNotifications: true }),
+		});
+		h.monitor.handle({
+			event: statusEvent('streaming'),
+			sessionId: 's1',
+			workspaceId: 'w1',
+		});
+		h.monitor.noteUserStop('s1');
+		h.monitor.handle({
+			event: statusEvent('idle'),
+			sessionId: 's1',
+			workspaceId: 'w1',
+		});
+		finishTurn(h);
+		expect(h.notifications).toHaveLength(1);
+	});
+
+	test('names the tab in the title and the workspace in the body', () => {
+		const h = makeMonitor({
+			readLanguage: () => 'en',
+			readSettings: () => settings({ desktopNotifications: true }),
+		});
+		finishTurn(h);
+		expect(h.notifications[0]?.title).toBe('Fix the notifier');
+		expect(h.notifications[0]?.body).toBe('Finished in vangelis');
+	});
+
+	test('carries the chat a click should open', () => {
+		const h = makeMonitor({
+			readSettings: () => settings({ desktopNotifications: true }),
+		});
+		finishTurn(h, 's7', 'w9');
+		expect(h.notifications[0]?.target).toEqual({
+			agentSessionId: 's7',
+			chatTabId: 'tab-1',
+			workspaceId: 'w9',
+		});
+	});
+
+	test('falls back to a localized title when the tab is unnamed', () => {
+		const h = makeMonitor({
+			readLanguage: () => 'ru',
+			readSettings: () => settings({ desktopNotifications: true }),
+			resolveTarget: () => ({ ...TARGET, tabTitle: null }),
+		});
+		finishTurn(h);
+		expect(h.notifications[0]?.title).toBe('Чат без названия');
+		expect(h.notifications[0]?.body).toBe('Завершено в vangelis');
+	});
+
+	test('announces a questionnaire an agent is blocked on', () => {
+		const h = makeMonitor({
+			readLanguage: () => 'en',
+			readSettings: () => settings({ desktopNotifications: true }),
+		});
+		h.monitor.notifyQuestionRaised({
+			agentSessionId: 's1',
+			workspaceId: 'w1',
+		});
+		expect(h.notifications[0]?.body).toBe(
+			'Waiting for your answer in vangelis',
+		);
+	});
+
+	test('a questionnaire respects the on-screen and sub-agent gates', () => {
+		const onScreen = makeMonitor({
+			isAppFocused: () => true,
+			isChatOnScreen: () => true,
+			readSettings: () => settings({ desktopNotifications: true }),
+		});
+		onScreen.monitor.notifyQuestionRaised({
+			agentSessionId: 's1',
+			workspaceId: 'w1',
+		});
+		expect(onScreen.notifications).toHaveLength(0);
+
+		const child = makeMonitor({
+			readSettings: () => settings({ desktopNotifications: true }),
+			resolveTarget: () => ({ ...TARGET, isSubAgent: true }),
+		});
+		child.monitor.notifyQuestionRaised({
+			agentSessionId: 's1',
+			workspaceId: 'w1',
+		});
+		expect(child.notifications).toHaveLength(0);
 	});
 });

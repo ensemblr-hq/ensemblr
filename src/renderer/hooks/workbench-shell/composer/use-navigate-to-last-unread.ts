@@ -7,7 +7,7 @@ import { listChatTabsQuery } from '@/renderer/api/ensemblr-queries';
 import { useWorkbenchLayoutRouteModelOptional } from '@/renderer/components/workbench-shell/shell-contexts';
 import { findWorkspaceSelectionById } from '@/renderer/lib/workbench';
 import {
-	type UnreadChatEntry,
+	type UnreadChatRef,
 	useUnreadChatActions,
 } from '@/renderer/state/unread';
 
@@ -17,12 +17,12 @@ import {
  * session no longer has an open tab, leaving the caller to fall back to the
  * workspace's own preferred chat.
  * @param queryClient - Cache the tab list is fetched through
- * @param target - The unread mark being jumped to
+ * @param target - The chat being jumped to
  * @returns The chat tab id, or null
  */
 async function resolveChatTabId(
 	queryClient: QueryClient,
-	target: UnreadChatEntry,
+	target: UnreadChatRef,
 ): Promise<string | null> {
 	try {
 		const result = await queryClient.fetchQuery(
@@ -38,10 +38,11 @@ async function resolveChatTabId(
 }
 
 /**
- * Returns a callback that opens the chat behind an unread mark, crossing into
- * another workspace when that is where it lives.
+ * Returns a callback that opens the chat a reference names — an unread mark, or
+ * a clicked desktop notification — crossing into another workspace when that is
+ * where it lives.
  *
- * A mark made while its workspace was closed carries no tab id, because the
+ * A reference made while its workspace was closed carries no tab id, because the
  * session-to-tab mapping only exists for a workspace whose tabs are loaded. That
  * one lookup is paid here, on click, rather than on every streamed event. When
  * it comes back empty — the tab was closed since — the workspace still opens, on
@@ -50,10 +51,10 @@ async function resolveChatTabId(
  * Both dead ends drop the mark rather than leaving it. Only opening the chat
  * itself clears one otherwise, so a mark whose tab or workspace is gone would
  * pin the jump control open forever on something the user cannot reach.
- * @returns A callback taking the unread mark to jump to.
+ * @returns A callback taking the chat to jump to.
  */
 export function useNavigateToLastUnread(): (
-	target: UnreadChatEntry,
+	target: UnreadChatRef,
 ) => Promise<void> {
 	const navigate = useNavigate();
 	const queryClient = useQueryClient();
@@ -61,7 +62,7 @@ export function useNavigateToLastUnread(): (
 	const { clearChat } = useUnreadChatActions();
 
 	return useCallback(
-		async (target: UnreadChatEntry) => {
+		async (target: UnreadChatRef) => {
 			if (!layoutModel) {
 				return;
 			}

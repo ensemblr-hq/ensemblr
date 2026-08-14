@@ -56,6 +56,7 @@ export default defineConfig({
 			'tests/main/workspace-scripts-handler.test.ts',
 			'tests/main/workspace-files-watcher.test.ts',
 			'tests/main/agent-activity-monitor.test.ts',
+			'tests/main/notification-target.test.ts',
 			'tests/main/macos-battery.test.ts',
 			'tests/main/workspace-commits.test.ts',
 			'tests/main/list-workspace-files.test.ts',
