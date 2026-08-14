@@ -16,7 +16,10 @@ vi.mock('@/renderer/api/ensemblr-queries', () => ({
 
 import type { ComposerEditorHandle } from '../../src/renderer/components/workbench-shell/conversation-panel/composer/editor';
 import { useComposerSubmit } from '../../src/renderer/hooks/workbench-shell/composer/use-composer-submit';
-import { followUpQueueAtomFamily } from '../../src/renderer/state/composer';
+import {
+	followUpQueueAtomFamily,
+	followUpQueueHeldAtomFamily,
+} from '../../src/renderer/state/composer';
 import {
 	appSettingsAtom,
 	type FollowUpBehavior,
@@ -46,13 +49,15 @@ function mount({
 	chatTabId = CHAT_TAB_ID,
 	disabled = false,
 	isStreaming,
+	store = createStore(),
 }: {
 	behavior: FollowUpBehavior;
 	chatTabId?: string;
 	disabled?: boolean;
 	isStreaming: boolean;
+	/** Pass a seeded store to mount onto a queue that already has entries. */
+	store?: ReturnType<typeof createStore>;
 }) {
-	const store = createStore();
 	store.set(appSettingsAtom, {
 		...DEFAULT_APP_SETTINGS,
 		general: { ...DEFAULT_APP_SETTINGS.general, followUpBehavior: behavior },
@@ -108,7 +113,29 @@ function mount({
 			});
 		});
 
-	return { editor, editorRef, onStop, onSubmit, queued, send, store, view };
+	return {
+		editor,
+		editorRef,
+		/** Ends the running turn, the way a status event from the runtime does. */
+		endTurn: () => act(() => view.rerender({ disabled, streaming: false })),
+		onStop,
+		onSubmit,
+		queued,
+		send,
+		store,
+		/**
+		 * Makes a landed send leave the agent busy, which is what the runtime does:
+		 * it records the turn before it acknowledges the prompt. Without it the
+		 * streaming flag never moves, and "one message per turn" would be an
+		 * artifact of the harness rather than something the flush enforces.
+		 */
+		takeTurnsOnSend: () =>
+			onSubmit.mockImplementation(() => {
+				act(() => view.rerender({ disabled, streaming: true }));
+				return Promise.resolve({});
+			}),
+		view,
+	};
 }
 
 /** The prompt each `onSubmit` call carried, in call order. */
@@ -177,16 +204,17 @@ describe('mid-turn routing', () => {
 
 describe('flushing when the turn ends', () => {
 	test('the queue drains from the head once the agent stops', async () => {
-		const { onSubmit, queued, send, view } = mount({
+		const { endTurn, onSubmit, queued, send, takeTurnsOnSend } = mount({
 			behavior: 'queue',
 			isStreaming: true,
 		});
+		takeTurnsOnSend();
 
 		send('first');
 		send('second');
 		expect(queued()).toHaveLength(2);
 
-		act(() => view.rerender({ streaming: false }));
+		endTurn();
 
 		await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
 		expect(prompts(onSubmit)).toEqual(['first']);
@@ -194,34 +222,94 @@ describe('flushing when the turn ends', () => {
 	});
 
 	test('one entry goes per turn end, not the whole queue at once', async () => {
-		// Sending the head raises isStreaming again, so the rest wait for the next
-		// falling edge. That is what keeps each queued message its own turn.
-		const { onSubmit, queued, send, view } = mount({
+		// Sending the head leaves the agent busy again, so the rest wait for that
+		// turn in its own right. That is what keeps each queued message its own turn.
+		const { endTurn, onSubmit, queued, send, takeTurnsOnSend } = mount({
 			behavior: 'queue',
 			isStreaming: true,
 		});
+		takeTurnsOnSend();
 
 		send('first');
 		send('second');
 
-		act(() => view.rerender({ streaming: false }));
+		endTurn();
 		await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
 
-		act(() => view.rerender({ streaming: true }));
-		act(() => view.rerender({ streaming: false }));
+		endTurn();
 
 		await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(2));
 		expect(prompts(onSubmit)).toEqual(['first', 'second']);
 		expect(queued()).toHaveLength(0);
 	});
 
-	test('staying idle does not re-fire the flush', async () => {
-		const { onSubmit, send, view } = mount({
+	test('a composer that mounts onto an idle agent drains what is waiting', async () => {
+		// The composer is not permanently mounted: `ComposerSlot` swaps it out for
+		// the ask_user_question and tool-approval cards, and switching chat tabs
+		// unmounts it. A turn that ends while it is away offers no transition to
+		// witness, so a flush that waited for one would strand the queue for good —
+		// the turn it is waiting on is the one it was supposed to start.
+		const store = createStore();
+		store.set(followUpQueueAtomFamily(CHAT_TAB_ID), [
+			{
+				id: 'queued-while-away',
+				queuedAt: '2026-08-14T20:00:00.000Z',
+				segments: [{ kind: 'text', text: 'sent while I was gone' }],
+				snapshot: null,
+				source: 'user',
+				text: 'sent while I was gone',
+			},
+		]);
+		const { onSubmit, queued } = mount({
+			behavior: 'queue',
+			isStreaming: false,
+			store,
+		});
+
+		await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+		expect(prompts(onSubmit)).toEqual(['sent while I was gone']);
+		expect(queued()).toHaveLength(0);
+	});
+
+	test('a queue paused before the composer went away stays paused', async () => {
+		// Reopening a closed tab restores its queue held, so mounting onto one must
+		// not be read as an agent that just went idle with work waiting.
+		const store = createStore();
+		store.set(followUpQueueAtomFamily(CHAT_TAB_ID), [
+			{
+				id: 'parked',
+				queuedAt: '2026-08-14T20:00:00.000Z',
+				segments: [{ kind: 'text', text: 'parked' }],
+				snapshot: null,
+				source: 'user',
+				text: 'parked',
+			},
+		]);
+		store.set(followUpQueueHeldAtomFamily(CHAT_TAB_ID), true);
+		const { onSubmit, queued } = mount({
+			behavior: 'queue',
+			isStreaming: false,
+			store,
+		});
+
+		await new Promise((resolve) => setTimeout(resolve, 0));
+
+		expect(onSubmit).not.toHaveBeenCalled();
+		expect(queued()).toHaveLength(1);
+	});
+
+	test('an idle rerender does not send a second entry while the first is in flight', async () => {
+		// The head is taken before its send resolves, so nothing about the queue
+		// stops the next one going out; the in-flight latch is the only thing that
+		// does, and idle rerenders are exactly when it is asked to hold.
+		const { onSubmit, queued, send, view } = mount({
 			behavior: 'queue',
 			isStreaming: true,
 		});
+		onSubmit.mockImplementation(() => new Promise(() => undefined));
 
-		send('only');
+		send('first');
+		send('second');
 		act(() => view.rerender({ streaming: false }));
 		await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
 
@@ -229,6 +317,7 @@ describe('flushing when the turn ends', () => {
 		act(() => view.rerender({ streaming: false }));
 
 		expect(onSubmit).toHaveBeenCalledTimes(1);
+		expect(queued().map((entry) => entry.text)).toEqual(['second']);
 	});
 
 	test('a block-mode queue sits still when the turn ends', async () => {
