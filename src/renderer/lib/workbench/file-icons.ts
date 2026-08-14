@@ -48,6 +48,7 @@ const fileIconByExtension: Record<string, string> = {
 	go: 'file-type-go',
 	htm: 'file-type-html',
 	html: 'file-type-html',
+	ico: 'file-type-image',
 	jpeg: 'file-type-image',
 	jpg: 'file-type-image',
 	js: 'file-type-js',

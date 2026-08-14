@@ -94,8 +94,11 @@ const INLINE_ATTACHMENT_LIBRARY_NAMES = new Set([
 	'vue.js',
 ]);
 
+// The leading `/` alternative admits absolute paths, which agents use for the
+// files they write outside the workspace; the extension and filename allowlists
+// below still gate the result, so `/usr/bin/env` stays prose.
 const INLINE_ATTACHMENT_SAFE_PATH_PATTERN =
-	/^(?:~\/|\.{1,2}\/)?[A-Za-z0-9._@+:-]+(?:\/[A-Za-z0-9._@+:-]+)*$/;
+	/^(?:\/|~\/|\.{1,2}\/)?[A-Za-z0-9._@+:-]+(?:\/[A-Za-z0-9._@+:-]+)*$/;
 
 /**
  * Returns a previewable path when an inline-code value looks like a file

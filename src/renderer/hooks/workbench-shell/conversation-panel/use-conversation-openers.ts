@@ -50,13 +50,13 @@ export function useConversationOpeners({
 	const openFilePreview = useCallback(
 		(filePath: string) => {
 			const resolved = resolveWorkspacePath(filePath);
-			const relativePath =
+			const previewPath =
 				resolved?.path ?? toWorkspaceLookupPath(filePath, workspaceCwd);
 			if (resolved?.kind === 'directory') {
-				onDirectoryReveal(relativePath);
+				onDirectoryReveal(previewPath);
 				return;
 			}
-			void onFilePreviewOpen({ filePath: relativePath }).then((result) => {
+			void onFilePreviewOpen({ filePath: previewPath }).then((result) => {
 				if (result) {
 					onSessionTabChange(result.chatTabId);
 				}

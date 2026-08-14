@@ -9,14 +9,16 @@ import {
 	readFileSync,
 	rmSync,
 	statSync,
+	symlinkSync,
 	writeFileSync,
 } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { homedir, tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, test } from 'vitest';
 
 import { createLocalCommandService } from '../../src/main/commands/local-command';
 import { createListWorkspaceFilesService } from '../../src/main/workspace-files/list-workspace-files';
+import { resolvePreviewPath } from '../../src/main/workspace-files/workspace-paths';
 
 const tempDirs: string[] = [];
 
@@ -244,6 +246,176 @@ describe('createListWorkspaceFilesService.read', () => {
 		expect(result.content).toBe('plain text, not a pdf\n');
 		expect(result.contentEncoding).toBe('utf8');
 		expect(result.mimeType).toBeUndefined();
+	});
+
+	test('reads an .ico as base64 so the preview renders it as an image', async () => {
+		const cwd = seedRepo();
+		const bytes = Buffer.from([0x00, 0x00, 0x01, 0x00, 0x01, 0x00]);
+		writeFileSync(path.join(cwd, 'favicon.ico'), bytes);
+
+		const result = await readWorkspaceFile(cwd, 'favicon.ico');
+
+		expect(result.error).toBeUndefined();
+		expect(result.content).toBe(bytes.toString('base64'));
+		expect(result.contentEncoding).toBe('base64');
+		expect(result.mimeType).toBe('image/x-icon');
+	});
+
+	test('falls back to utf8 source when an .ico does not carry the icon signature', async () => {
+		const cwd = seedRepo();
+		writeFileSync(
+			path.join(cwd, 'not-really.ico'),
+			'plain text, not an icon\n',
+		);
+
+		const result = await readWorkspaceFile(cwd, 'not-really.ico');
+
+		expect(result.error).toBeUndefined();
+		expect(result.content).toBe('plain text, not an icon\n');
+		expect(result.contentEncoding).toBe('utf8');
+		expect(result.mimeType).toBeUndefined();
+	});
+
+	test('reads a file outside the workspace by absolute path', async () => {
+		const cwd = seedRepo();
+		const outside = mkdtempSync(path.join(tmpdir(), 'ensemblr-outside-'));
+		tempDirs.push(outside);
+		const outsidePath = path.join(outside, 'scratch.md');
+		writeFileSync(outsidePath, '# written by an agent\n');
+
+		const result = await readWorkspaceFile(cwd, outsidePath);
+
+		expect(result.error).toBeUndefined();
+		expect(result.content).toBe('# written by an agent\n');
+		expect(result.contentEncoding).toBe('utf8');
+		expect(result.isExternal).toBe(true);
+		expect(result.path).toBe(outsidePath);
+	});
+
+	test('reads an image outside the workspace as base64', async () => {
+		const cwd = seedRepo();
+		const outside = mkdtempSync(path.join(tmpdir(), 'ensemblr-outside-'));
+		tempDirs.push(outside);
+		const outsidePath = path.join(outside, 'shot.png');
+		const bytes = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a]);
+		writeFileSync(outsidePath, bytes);
+
+		const result = await readWorkspaceFile(cwd, outsidePath);
+
+		expect(result.error).toBeUndefined();
+		expect(result.contentEncoding).toBe('base64');
+		expect(result.mimeType).toBe('image/png');
+		expect(result.isExternal).toBe(true);
+	});
+
+	test('reports an absolute path inside the workspace as relative and internal', async () => {
+		const cwd = seedRepo();
+
+		const result = await readWorkspaceFile(cwd, path.join(cwd, 'README.md'));
+
+		expect(result.error).toBeUndefined();
+		expect(result.content).toBe('# demo\n');
+		expect(result.isExternal).toBe(false);
+		expect(result.path).toBe('README.md');
+	});
+
+	test('reads a relative climb the same way it reads the absolute path it denotes', async () => {
+		const cwd = seedRepo();
+		const outside = mkdtempSync(path.join(tmpdir(), 'ensemblr-sibling-'));
+		tempDirs.push(outside);
+		const outsidePath = path.join(outside, 'notes.md');
+		writeFileSync(outsidePath, '# sibling worktree\n');
+
+		const climbed = await readWorkspaceFile(
+			cwd,
+			path.relative(cwd, outsidePath),
+		);
+		const absolute = await readWorkspaceFile(cwd, outsidePath);
+
+		expect(climbed).toEqual(absolute);
+		expect(climbed.error).toBeUndefined();
+		expect(climbed.content).toBe('# sibling worktree\n');
+		expect(climbed.isExternal).toBe(true);
+		expect(climbed.path).toBe(outsidePath);
+	});
+
+	test('still refuses a symlink inside the workspace whose target escapes it', async () => {
+		const cwd = seedRepo();
+		const outside = mkdtempSync(path.join(tmpdir(), 'ensemblr-outside-'));
+		tempDirs.push(outside);
+		const secretPath = path.join(outside, 'secret.txt');
+		writeFileSync(secretPath, 'do not leak\n');
+		symlinkSync(secretPath, path.join(cwd, 'link.txt'));
+
+		const result = await readWorkspaceFile(cwd, 'link.txt');
+
+		expect(result.error?.code).toBe('invalid-path');
+	});
+});
+
+describe('resolvePreviewPath', () => {
+	test('expands a leading tilde against the home directory', () => {
+		const resolved = resolvePreviewPath({
+			pathValue: '~/.claude/plans/plan.md',
+			workspaceCwd: '/repo',
+		});
+
+		expect(resolved.ok).toBe(true);
+		if (!resolved.ok) {
+			return;
+		}
+		expect(resolved.absolutePath).toBe(
+			path.join(homedir(), '.claude/plans/plan.md'),
+		);
+		expect(resolved.scope).toBe('external');
+	});
+
+	test('normalizes an absolute path before deciding its scope', () => {
+		const resolved = resolvePreviewPath({
+			pathValue: '/repo/src/../README.md',
+			workspaceCwd: '/repo',
+		});
+
+		expect(resolved).toEqual({
+			absolutePath: '/repo/README.md',
+			displayPath: 'README.md',
+			ok: true,
+			scope: 'workspace',
+		});
+	});
+
+	test('gives a relative climb and its absolute form the same answer', () => {
+		expect(
+			resolvePreviewPath({
+				pathValue: '../sibling/notes.md',
+				workspaceCwd: '/repos/app',
+			}),
+		).toEqual(
+			resolvePreviewPath({
+				pathValue: '/repos/sibling/notes.md',
+				workspaceCwd: '/repos/app',
+			}),
+		);
+	});
+
+	test('resolves a relative path against the workspace root', () => {
+		expect(
+			resolvePreviewPath({
+				pathValue: './src/../README.md',
+				workspaceCwd: '/repo',
+			}),
+		).toEqual({
+			absolutePath: '/repo/README.md',
+			displayPath: 'README.md',
+			ok: true,
+			scope: 'workspace',
+		});
+	});
+
+	test('refuses an empty path', () => {
+		expect(
+			resolvePreviewPath({ pathValue: '   ', workspaceCwd: '/repo' }).ok,
+		).toBe(false);
 	});
 });
 

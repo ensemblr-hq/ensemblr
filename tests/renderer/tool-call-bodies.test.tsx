@@ -124,6 +124,7 @@ function renderRow(ui: ReactElement) {
 				value={(filePath: string) => ({
 					kind: filePath.includes('.') ? 'file' : 'directory',
 					path: filePath,
+					scope: 'workspace',
 				})}
 			>
 				<FilePreviewOpenerProvider value={() => undefined}>

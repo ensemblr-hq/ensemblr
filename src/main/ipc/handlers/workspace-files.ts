@@ -6,7 +6,6 @@ import type {
 	ListWorkspaceFilesResult,
 	ReadWorkspaceDirectoryRequest,
 	ReadWorkspaceDirectoryResult,
-	ReadWorkspaceFileRequest,
 	ReadWorkspaceFileResult,
 	WatchWorkspaceFilesRequest,
 	WriteWorkspaceActionPromptResult,
@@ -19,6 +18,7 @@ import type {
 } from '../../workspace-files';
 import type { WithPermissionGate } from '../permission-gate';
 import {
+	readWorkspaceFileRequestSchema,
 	writeWorkspaceActionPromptRequestSchema,
 	writeWorkspaceFileAttachmentRequestSchema,
 	writeWorkspaceImageAttachmentRequestSchema,
@@ -44,11 +44,19 @@ export function registerWorkspaceFilesHandlers({
 	);
 	ipcMain.handle(
 		IPC_CHANNELS.readWorkspaceFile,
-		(
-			_event,
-			request: ReadWorkspaceFileRequest,
-		): Promise<ReadWorkspaceFileResult> =>
-			listWorkspaceFilesService.read(request),
+		async (_event, raw: unknown): Promise<ReadWorkspaceFileResult> => {
+			const parsed = readWorkspaceFileRequestSchema.safeParse(raw);
+			if (!parsed.success) {
+				return {
+					error: {
+						code: 'invalid-path',
+						message: 'Preview request was malformed.',
+					},
+					path: '',
+				};
+			}
+			return listWorkspaceFilesService.read(parsed.data);
+		},
 	);
 	ipcMain.handle(
 		IPC_CHANNELS.readWorkspaceDirectory,

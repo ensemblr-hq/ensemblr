@@ -51,5 +51,6 @@ export {
 export { glyphForToolName } from './tool-presenters.ts';
 export {
 	createWorkspacePathResolver,
+	isOutsideWorkspacePath,
 	toWorkspaceLookupPath,
 } from './workspace-path.ts';

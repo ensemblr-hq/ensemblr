@@ -17,7 +17,10 @@ export function OpenInToolbarMenu({
 	filePath,
 	workspaceId,
 }: {
-	/** Workspace-relative path of the file the toolbar is showing. */
+	/**
+	 * Path of the file the toolbar is showing: workspace-relative in the tree,
+	 * absolute when the preview opened a file outside the workspace root.
+	 */
 	filePath: string;
 	workspaceId: string;
 }) {

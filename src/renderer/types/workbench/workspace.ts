@@ -94,14 +94,24 @@ export interface WorkspaceFileSummary {
 /** A workspace file-tree entry that a path written by an agent was matched to. */
 export interface WorkspacePathMatch {
 	kind: 'directory' | 'file';
-	/** Canonical workspace-relative path; may be longer than the one asked for. */
+	/**
+	 * Canonical workspace-relative path; may be longer than the one asked for.
+	 * Absolute when `scope` is `external`, since no relative form exists.
+	 */
 	path: string;
+	/**
+	 * Whether the match came from the workspace file tree or names a file outside
+	 * the workspace root, which the tree can never hold.
+	 */
+	scope: 'external' | 'workspace';
 }
 
 /**
  * Matches a path an agent wrote against the workspace file tree. Returns null
  * when the tree does not hold it, which is what makes a chip inert rather than
- * opening a preview onto a file that was deleted, moved, or never existed.
+ * opening a preview onto a file that was deleted, moved, or never existed. A
+ * path outside the workspace root resolves as `external` instead: the tree has
+ * no opinion on it, but the preview can still read it.
  */
 export type WorkspacePathResolver = (
 	filePath: string,

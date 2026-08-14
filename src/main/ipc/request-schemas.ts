@@ -122,6 +122,7 @@ export {
 	rootDirectoryChangeRequestSchema,
 } from './request-schemas/root.ts';
 export {
+	readWorkspaceFileRequestSchema,
 	writeWorkspaceActionPromptRequestSchema,
 	writeWorkspaceFileAttachmentRequestSchema,
 	writeWorkspaceImageAttachmentRequestSchema,

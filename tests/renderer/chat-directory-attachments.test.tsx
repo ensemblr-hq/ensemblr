@@ -45,6 +45,7 @@ describe('directory attachment chips', () => {
 				value={(path) => ({
 					kind: path === 'src/renderer' ? 'directory' : 'file',
 					path,
+					scope: 'workspace',
 				})}
 			>
 				<FilePreviewOpenerProvider value={openPreview}>

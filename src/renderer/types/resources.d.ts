@@ -2402,13 +2402,14 @@ export default interface Resources {
 			};
 			failure: {
 				'invalid-cwd': 'The workspace directory is unavailable.';
-				'invalid-path': '{{filePath}} is outside this workspace.';
+				'invalid-path': '{{filePath}} is not a path this preview can open.';
 				'not-file': '{{filePath}} is a directory and cannot be previewed.';
-				'not-found': '{{filePath}} does not exist in this workspace.';
+				'not-found': '{{filePath}} does not exist.';
 				'too-large': '{{filePath}} is too large to preview.';
 				unreadable: 'Could not read {{filePath}}.';
 			};
 			'image-alt': 'Preview of {{filePath}}';
+			'outside-workspace': 'Outside workspace';
 			'pdf-title': 'Preview of {{filePath}}';
 		};
 		'file-tree': {

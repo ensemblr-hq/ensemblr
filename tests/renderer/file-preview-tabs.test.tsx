@@ -154,6 +154,192 @@ describe('file preview tabs', () => {
 			container.querySelector('[data-icon="vscode-icons:file-type-image"]'),
 		).toBeTruthy();
 	});
+
+	test('renders an .ico as an image preview', () => {
+		const iconPath = 'assets/favicon.ico';
+		const client = createTestQueryClient();
+		client.setQueryData(ensemblrQueryKeys.filePreview(workspaceCwd, iconPath), {
+			content: previewImageContent,
+			contentEncoding: 'base64',
+			mimeType: 'image/x-icon',
+			path: iconPath,
+			sizeBytes: 8,
+		});
+
+		renderWithProviders(
+			<FilePreviewPanel
+				filePath={iconPath}
+				workspaceCwd={workspaceCwd}
+				workspaceId='workspace-1'
+			/>,
+			{ client },
+		);
+
+		expect(
+			screen
+				.getByRole('img', { name: `Preview of ${iconPath}` })
+				.getAttribute('src'),
+		).toBe(`data:image/x-icon;base64,${previewImageContent}`);
+	});
+
+	test('marks a file outside the workspace so its basename cannot mislead', () => {
+		const outsidePath = '/tmp/scratch.md';
+		const client = createTestQueryClient();
+		client.setQueryData(
+			ensemblrQueryKeys.filePreview(workspaceCwd, outsidePath),
+			{
+				content: '# scratch\n',
+				contentEncoding: 'utf8',
+				isExternal: true,
+				path: outsidePath,
+				sizeBytes: 10,
+			},
+		);
+
+		renderWithProviders(
+			<FilePreviewPanel
+				filePath={outsidePath}
+				workspaceCwd={workspaceCwd}
+				workspaceId='workspace-1'
+			/>,
+			{ client },
+		);
+
+		expect(screen.queryByText('Outside workspace')).toBeTruthy();
+	});
+
+	test('leaves a workspace file unmarked', () => {
+		const client = createTestQueryClient();
+		client.setQueryData(
+			ensemblrQueryKeys.filePreview(workspaceCwd, previewFilePath),
+			{
+				content: 'const x = 1;\n',
+				contentEncoding: 'utf8',
+				isExternal: false,
+				path: previewFilePath,
+				sizeBytes: 13,
+			},
+		);
+
+		renderWithProviders(
+			<FilePreviewPanel
+				filePath={previewFilePath}
+				workspaceCwd={workspaceCwd}
+				workspaceId='workspace-1'
+			/>,
+			{ client },
+		);
+
+		expect(screen.queryByText('Outside workspace')).toBeNull();
+	});
+
+	test.each([
+		['not-found', 'src/gone.ts', 'src/gone.ts does not exist.'],
+		['not-file', 'src/lib', 'src/lib is a directory and cannot be previewed.'],
+		['too-large', 'dump.log', 'dump.log is too large to preview.'],
+		[
+			'invalid-path',
+			'bad::path',
+			'bad::path is not a path this preview can open.',
+		],
+		['read-failed', 'locked.ts', 'Could not read locked.ts.'],
+	])('explains a %s failure in the rendered message', (code, path, message) => {
+		const client = createTestQueryClient();
+		client.setQueryData(ensemblrQueryKeys.filePreview(workspaceCwd, path), {
+			error: { code, message: 'main-process detail' },
+			path,
+		});
+
+		renderWithProviders(
+			<FilePreviewPanel
+				filePath={path}
+				workspaceCwd={workspaceCwd}
+				workspaceId='workspace-1'
+			/>,
+			{ client },
+		);
+
+		expect(screen.getByText(message)).toBeTruthy();
+	});
+
+	test('hands the open-in menu the resolved path, not the tilde form the tab carries', () => {
+		const tabPath = '~/.claude/plans/plan.md';
+		const resolvedPath = '/Users/dev/.claude/plans/plan.md';
+		const openWorkspaceInTarget = vi.fn(async () => ({ ok: true as const }));
+		installEnsemblrApi({
+			getAppSettings: async () => DEFAULT_APP_SETTINGS,
+			openWorkspaceInTarget,
+			updateAppSettings: async () => DEFAULT_APP_SETTINGS,
+		});
+
+		const client = createTestQueryClient();
+		client.setQueryData(ensemblrQueryKeys.workspaceOpenTargets(), {
+			targets: [
+				{
+					behavior: 'launch-app',
+					iconName: 'vscode-icons:file-type-vscode',
+					id: 'vscode',
+					installed: true,
+					isPrimary: true,
+					kind: 'editor',
+					label: 'VS Code',
+					numberShortcutLabel: '1',
+				},
+			],
+		});
+		client.setQueryData(ensemblrQueryKeys.filePreview(workspaceCwd, tabPath), {
+			content: '# plan\n',
+			contentEncoding: 'utf8',
+			isExternal: true,
+			path: resolvedPath,
+			sizeBytes: 7,
+		});
+
+		renderWithProviders(
+			<FilePreviewPanel
+				filePath={tabPath}
+				workspaceCwd={workspaceCwd}
+				workspaceId='workspace-1'
+			/>,
+			{ client },
+		);
+
+		fireEvent.keyDown(screen.getByRole('button', { name: 'Open in' }), {
+			key: 'ArrowDown',
+		});
+		fireEvent.click(screen.getByRole('menuitem', { name: /VS Code/ }));
+
+		expect(openWorkspaceInTarget).toHaveBeenCalledWith({
+			relativePath: resolvedPath,
+			relativePathKind: 'file',
+			targetId: 'vscode',
+			workspaceId: 'workspace-1',
+		});
+	});
+
+	test('explains an invalid-cwd failure without naming a path', () => {
+		const client = createTestQueryClient();
+		client.setQueryData(
+			ensemblrQueryKeys.filePreview(workspaceCwd, previewFilePath),
+			{
+				error: { code: 'invalid-cwd', message: 'main-process detail' },
+				path: previewFilePath,
+			},
+		);
+
+		renderWithProviders(
+			<FilePreviewPanel
+				filePath={previewFilePath}
+				workspaceCwd={workspaceCwd}
+				workspaceId='workspace-1'
+			/>,
+			{ client },
+		);
+
+		expect(
+			screen.getByText('The workspace directory is unavailable.'),
+		).toBeTruthy();
+	});
 });
 
 const chatA: SessionTabModel = {

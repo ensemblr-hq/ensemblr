@@ -128,6 +128,7 @@ export function TimelinePreview() {
 			value={(path: string) => ({
 				kind: path.includes('.') ? 'file' : 'directory',
 				path,
+				scope: path.startsWith('/') ? 'external' : 'workspace',
 			})}
 		>
 			<FilePreviewOpenerProvider value={() => undefined}>

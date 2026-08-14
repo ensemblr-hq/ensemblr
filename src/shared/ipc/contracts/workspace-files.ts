@@ -92,6 +92,12 @@ export interface ReadWorkspaceFileResult {
 		code: ReadWorkspaceFileFailureCode;
 		message: string;
 	};
+	/**
+	 * True when the file lives outside the workspace root, so `path` echoes an
+	 * absolute path rather than a workspace-relative one and the viewer marks it
+	 * as external.
+	 */
+	isExternal?: boolean;
 	mimeType?: string;
 	path: string;
 	sizeBytes?: number;
