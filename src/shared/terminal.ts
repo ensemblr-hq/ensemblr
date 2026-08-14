@@ -8,6 +8,10 @@ export {
 	extractPreviewPort,
 } from './terminal/detect-preview-url.ts';
 export {
+	isHarnessTitleBusy,
+	stripHarnessTitleDecoration,
+} from './terminal/harness-title.ts';
+export {
 	scrollbackMbToBytes,
 	scrollbackMbToLines,
 } from './terminal/scrollback.ts';
