@@ -47,6 +47,10 @@ const TARGET: NotificationTarget = {
 	workspaceName: 'vangelis',
 };
 
+function statusFor(status: string, sessionId: string, workspaceId = 'w1') {
+	return { event: statusEvent(status), sessionId, workspaceId };
+}
+
 interface Harness {
 	monitor: ReturnType<typeof createAgentActivityMonitor>;
 	starts: number;
@@ -102,19 +106,11 @@ describe('createAgentActivityMonitor — caffeinate', () => {
 		const h = makeMonitor({
 			readSettings: () => settings({ caffeinateWhileRunning: true }),
 		});
-		h.monitor.handle({
-			event: statusEvent('streaming'),
-			sessionId: 's1',
-			workspaceId: 'w1',
-		});
+		h.monitor.handle(statusFor('streaming', 's1'));
 		await flush(); // first battery sample resolves, then the blocker engages
 		expect(h.starts).toBe(1);
 		expect(h.stops).toBe(0);
-		h.monitor.handle({
-			event: statusEvent('idle'),
-			sessionId: 's1',
-			workspaceId: 'w1',
-		});
+		h.monitor.handle(statusFor('idle', 's1'));
 		expect(h.stops).toBe(1);
 	});
 
@@ -122,11 +118,7 @@ describe('createAgentActivityMonitor — caffeinate', () => {
 		const h = makeMonitor({
 			readSettings: () => settings({ caffeinateWhileRunning: false }),
 		});
-		h.monitor.handle({
-			event: statusEvent('streaming'),
-			sessionId: 's1',
-			workspaceId: 'w1',
-		});
+		h.monitor.handle(statusFor('streaming', 's1'));
 		await flush();
 		expect(h.starts).toBe(0);
 	});
@@ -135,29 +127,13 @@ describe('createAgentActivityMonitor — caffeinate', () => {
 		const h = makeMonitor({
 			readSettings: () => settings({ caffeinateWhileRunning: true }),
 		});
-		h.monitor.handle({
-			event: statusEvent('streaming'),
-			sessionId: 's1',
-			workspaceId: 'w1',
-		});
+		h.monitor.handle(statusFor('streaming', 's1'));
 		await flush();
-		h.monitor.handle({
-			event: statusEvent('streaming'),
-			sessionId: 's2',
-			workspaceId: 'w1',
-		});
+		h.monitor.handle(statusFor('streaming', 's2'));
 		expect(h.starts).toBe(1); // single blocker for both
-		h.monitor.handle({
-			event: statusEvent('idle'),
-			sessionId: 's1',
-			workspaceId: 'w1',
-		});
+		h.monitor.handle(statusFor('idle', 's1'));
 		expect(h.stops).toBe(0); // s2 still running
-		h.monitor.handle({
-			event: statusEvent('idle'),
-			sessionId: 's2',
-			workspaceId: 'w1',
-		});
+		h.monitor.handle(statusFor('idle', 's2'));
 		expect(h.stops).toBe(1);
 	});
 
@@ -167,11 +143,7 @@ describe('createAgentActivityMonitor — caffeinate', () => {
 			readBattery: () => Promise.resolve(lowBattery),
 			readSettings: () => settings({ caffeinateWhileRunning: true }),
 		});
-		h.monitor.handle({
-			event: statusEvent('streaming'),
-			sessionId: 's1',
-			workspaceId: 'w1',
-		});
+		h.monitor.handle(statusFor('streaming', 's1'));
 		await flush();
 		expect(h.starts).toBe(0);
 	});
@@ -181,11 +153,7 @@ describe('createAgentActivityMonitor — caffeinate', () => {
 			readBattery: () => Promise.resolve({ charging: true, percent: 5 }),
 			readSettings: () => settings({ caffeinateWhileRunning: true }),
 		});
-		h.monitor.handle({
-			event: statusEvent('streaming'),
-			sessionId: 's1',
-			workspaceId: 'w1',
-		});
+		h.monitor.handle(statusFor('streaming', 's1'));
 		await flush();
 		expect(h.starts).toBe(1);
 	});
@@ -205,11 +173,7 @@ describe('createAgentActivityMonitor — caffeinate', () => {
 			},
 			readSettings: () => settings({ caffeinateWhileRunning: true }),
 		});
-		h.monitor.handle({
-			event: statusEvent('streaming'),
-			sessionId: 's1',
-			workspaceId: 'w1',
-		});
+		h.monitor.handle(statusFor('streaming', 's1'));
 		await flush();
 		expect(h.starts).toBe(1);
 		// Battery drains below the cutoff; the next poll re-samples and releases.
@@ -223,11 +187,7 @@ describe('createAgentActivityMonitor — caffeinate', () => {
 		const h = makeMonitor({
 			readSettings: () => settings({ caffeinateWhileRunning: true }),
 		});
-		h.monitor.handle({
-			event: statusEvent('streaming'),
-			sessionId: 's1',
-			workspaceId: 'w1',
-		});
+		h.monitor.handle(statusFor('streaming', 's1'));
 		await flush();
 		h.monitor.dispose();
 		expect(h.stops).toBe(1);
@@ -237,12 +197,8 @@ describe('createAgentActivityMonitor — caffeinate', () => {
 describe('createAgentActivityMonitor — notifications', () => {
 	/** Runs a session through a full streaming-then-idle turn. */
 	function finishTurn(h: Harness, sessionId = 's1', workspaceId = 'w1'): void {
-		h.monitor.handle({
-			event: statusEvent('streaming'),
-			sessionId,
-			workspaceId,
-		});
-		h.monitor.handle({ event: statusEvent('idle'), sessionId, workspaceId });
+		h.monitor.handle(statusFor('streaming', sessionId, workspaceId));
+		h.monitor.handle(statusFor('idle', sessionId, workspaceId));
 	}
 
 	test('notifies when a turn finishes (setting on, app unfocused)', () => {
@@ -299,11 +255,7 @@ describe('createAgentActivityMonitor — notifications', () => {
 			isAppFocused: () => false,
 			readSettings: () => settings({ desktopNotifications: true }),
 		});
-		h.monitor.handle({
-			event: statusEvent('idle'),
-			sessionId: 's1',
-			workspaceId: 'w1',
-		});
+		h.monitor.handle(statusFor('idle', 's1'));
 		expect(h.notifications).toHaveLength(0);
 	});
 
@@ -329,17 +281,9 @@ describe('createAgentActivityMonitor — notifications', () => {
 		const h = makeMonitor({
 			readSettings: () => settings({ desktopNotifications: true }),
 		});
-		h.monitor.handle({
-			event: statusEvent('streaming'),
-			sessionId: 's1',
-			workspaceId: 'w1',
-		});
+		h.monitor.handle(statusFor('streaming', 's1'));
 		h.monitor.noteUserStop('s1');
-		h.monitor.handle({
-			event: statusEvent('idle'),
-			sessionId: 's1',
-			workspaceId: 'w1',
-		});
+		h.monitor.handle(statusFor('idle', 's1'));
 		expect(h.notifications).toHaveLength(0);
 	});
 
@@ -347,17 +291,9 @@ describe('createAgentActivityMonitor — notifications', () => {
 		const h = makeMonitor({
 			readSettings: () => settings({ desktopNotifications: true }),
 		});
-		h.monitor.handle({
-			event: statusEvent('streaming'),
-			sessionId: 's1',
-			workspaceId: 'w1',
-		});
+		h.monitor.handle(statusFor('streaming', 's1'));
 		h.monitor.noteUserStop('s1');
-		h.monitor.handle({
-			event: statusEvent('idle'),
-			sessionId: 's1',
-			workspaceId: 'w1',
-		});
+		h.monitor.handle(statusFor('idle', 's1'));
 		finishTurn(h);
 		expect(h.notifications).toHaveLength(1);
 	});
@@ -430,5 +366,54 @@ describe('createAgentActivityMonitor — notifications', () => {
 			workspaceId: 'w1',
 		});
 		expect(child.notifications).toHaveLength(0);
+	});
+});
+
+describe('createAgentActivityMonitor — listRunning', () => {
+	test('starts empty, so a crashed prior run leaves no phantom entry', () => {
+		const h = makeMonitor({ readSettings: () => settings({}) });
+		expect(h.monitor.listRunning()).toEqual([]);
+	});
+
+	test('reports each streaming session with its workspace', () => {
+		const h = makeMonitor({ readSettings: () => settings({}) });
+		h.monitor.handle(statusFor('streaming', 's1', 'w1'));
+		h.monitor.handle(statusFor('starting', 's2', 'w2'));
+		expect(h.monitor.listRunning()).toEqual([
+			{ sessionId: 's1', workspaceId: 'w1' },
+			{ sessionId: 's2', workspaceId: 'w2' },
+		]);
+	});
+
+	test('drops a session once it goes idle', () => {
+		const h = makeMonitor({ readSettings: () => settings({}) });
+		h.monitor.handle(statusFor('streaming', 's1', 'w1'));
+		h.monitor.handle(statusFor('streaming', 's2', 'w2'));
+		h.monitor.handle(statusFor('idle', 's1', 'w1'));
+		expect(h.monitor.listRunning()).toEqual([
+			{ sessionId: 's2', workspaceId: 'w2' },
+		]);
+	});
+
+	test('drops a session on shutdown', () => {
+		const h = makeMonitor({ readSettings: () => settings({}) });
+		h.monitor.handle(statusFor('streaming', 's1', 'w1'));
+		h.monitor.handle({
+			event: {
+				...statusEvent('streaming'),
+				eventType: 'shutdown',
+				payload: { kind: 'shutdown', reason: 'closed' } as never,
+			},
+			sessionId: 's1',
+			workspaceId: 'w1',
+		});
+		expect(h.monitor.listRunning()).toEqual([]);
+	});
+
+	test('dispose clears the set', () => {
+		const h = makeMonitor({ readSettings: () => settings({}) });
+		h.monitor.handle(statusFor('streaming', 's1', 'w1'));
+		h.monitor.dispose();
+		expect(h.monitor.listRunning()).toEqual([]);
 	});
 });

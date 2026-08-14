@@ -1,7 +1,7 @@
 import os from 'node:os';
 import path from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
-import { app, BrowserWindow, ipcMain, shell } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron';
 import { parseAskUserQuestionReply } from '../shared/agent-control.ts';
 import type { AgentProviderId } from '../shared/agent-provider.ts';
 import {
@@ -63,6 +63,8 @@ import { resolveNotificationTarget } from './agent-runtime/notification-target';
 import { createSessionSummaryWriter } from './agent-runtime/session-summary-writer';
 import { createHarnessDetectionService } from './agents';
 import { createMainWindow } from './app/main-window';
+import { createQuitCoordinator } from './app/quit-coordinator';
+import { createQuitGuard } from './app/quit-guard';
 import { createMainWindowStateStore } from './app/window-state';
 import { createChatTabService } from './chat-tabs/chat-tab-service.ts';
 import { persistTerminalAgentSessionId } from './chat-tabs/persist-terminal-agent-session.ts';
@@ -145,6 +147,7 @@ import {
 	createEnsemblrDatabaseService,
 	resolveDefaultDatabasePath,
 } from './storage';
+import { getChatTabByAgentSessionId } from './storage/repositories/chat-tab-repository.ts';
 import { getWorkspacePathById } from './storage/repositories/workspace-repository.ts';
 import { createTerminalService } from './terminal';
 import {
@@ -907,6 +910,10 @@ const mainWindowStateStore = createMainWindowStateStore({
  * the user. A renderer keeps its pending questions in memory only, and an
  * `askUserQuestion` call has no timeout to fall back on, so a window that
  * reloads would otherwise lose the card while the agent stayed blocked on it.
+ *
+ * Closing this window quits the app (see `window-all-closed`), so the quit
+ * confirmation runs here rather than downstream: by the time `window-all-closed`
+ * fires the window is destroyed, and the dialog has nothing left to attach to.
  */
 function openMainWindow(): void {
 	const window = createMainWindow({ windowStateStore: mainWindowStateStore });
@@ -916,6 +923,16 @@ function openMainWindow(): void {
 				IPC_CHANNELS.agentControlAskUserQuestion,
 				payload,
 			);
+		}
+	});
+	window.on('close', (event) => {
+		const replayClose = (): void => {
+			if (!window.isDestroyed()) {
+				window.close();
+			}
+		};
+		if (quitCoordinator.handleWindowClose(replayClose)) {
+			event.preventDefault();
 		}
 	});
 }
@@ -1043,25 +1060,59 @@ app.whenReady().then(() => {
 	openMainWindow();
 });
 
-let isShuttingDownAgents = false;
-// Terminate the Pi RPC children and the terminal PTY children before the process
-// exits. Both shutdowns resolve only once each child has actually exited, which
-// keeps orphaned `pi --mode rpc` processes from surviving app quit and keeps a
-// dying PTY from reporting its exit into a half-destroyed JS environment — where
-// node-pty's native callback aborts the process instead of surfacing. `before-quit`
-// is synchronous, so defer the real quit until the async shutdown settles; a
-// bounded race guarantees a wedged child can never block quit indefinitely.
-//
-// The approval gate fails closed first, before that grace period: a Claude
-// session in approval-required mode can still issue tool calls while the race
-// plays out, and by then no window is left to put them to the user.
-app.on('before-quit', (event) => {
-	if (isShuttingDownAgents) {
-		return;
-	}
-	isShuttingDownAgents = true;
+const quitGuard = createQuitGuard({
+	/** Shows the native quit confirmation, parented to the focused window. */
+	confirm: async (request) => {
+		const parentWindow = BrowserWindow.getFocusedWindow();
+		const { response } = parentWindow
+			? await dialog.showMessageBox(parentWindow, {
+					type: 'question',
+					...request,
+				})
+			: await dialog.showMessageBox({ type: 'question', ...request });
+		return response;
+	},
+	getLanguage: resolveAppLanguage,
+	/** Whether a window survives to host the dialog. */
+	hasWindow: () =>
+		BrowserWindow.getAllWindows().some((window) => !window.isDestroyed()),
+	/** Every agent-harness terminal, across all workspaces. */
+	listAgentTerminals: () => terminalService.listByKind('agent'),
+	listRunningSessions: agentActivityMonitor.listRunning,
+	/** Workspace id to display name, read once per prompt. */
+	listWorkspaceNames: async () => {
+		const { entries } = await listAllWorkspacesService.list();
+		return new Map(entries.map((entry) => [entry.id, entry.name]));
+	},
+	/** The chat's own title, or null before the database is open or a name lands. */
+	readChatTitle: (sessionId) => {
+		const database = databaseService.getConnection()?.database;
+		if (!database) {
+			return null;
+		}
+		return (
+			getChatTabByAgentSessionId({ agentSessionId: sessionId, database })
+				?.title ?? null
+		);
+	},
+});
+
+/**
+ * Terminates the Pi RPC children and the terminal PTY children, then re-issues
+ * the quit. Both shutdowns resolve only once each child has actually exited,
+ * which keeps orphaned `pi --mode rpc` processes from surviving app quit and
+ * keeps a dying PTY from reporting its exit into a half-destroyed JS environment
+ * — where node-pty's native callback aborts the process instead of surfacing.
+ * `before-quit` is synchronous, so the real quit is deferred until the async
+ * shutdown settles; a bounded race guarantees a wedged child can never block
+ * quit indefinitely.
+ *
+ * The approval gate fails closed first, before that grace period: a Claude
+ * session in approval-required mode can still issue tool calls while the race
+ * plays out, and by then no window is left to put them to the user.
+ */
+function beginAgentShutdown(): void {
 	claudeToolApproval.shutdown();
-	event.preventDefault();
 	void (async () => {
 		await Promise.race([
 			Promise.allSettled([agentClient.shutdown(), terminalService.shutdown()]),
@@ -1069,6 +1120,22 @@ app.on('before-quit', (event) => {
 		]);
 		app.quit();
 	})();
+}
+
+const quitCoordinator = createQuitCoordinator({
+	beginAgentShutdown,
+	confirmQuit: quitGuard.confirmQuit,
+	quit: () => app.quit(),
+});
+
+// Quitting kills every in-flight turn, so nothing is torn down until the guard
+// has had its say. Both phases defer the real quit and re-issue it themselves,
+// so every gesture — ⌘Q, the menu, the Dock, the window's own close button —
+// walks the same two steps.
+app.on('before-quit', (event) => {
+	if (quitCoordinator.handleBeforeQuit()) {
+		event.preventDefault();
+	}
 });
 
 app.on('will-quit', () => {
