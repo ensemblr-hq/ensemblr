@@ -8,28 +8,15 @@ import {
 	TooltipTrigger,
 } from '@/renderer/components/ui/tooltip';
 import { cn } from '@/renderer/lib/utils';
-import { getThinkingStrength } from '@/renderer/lib/workbench/thinking-strength';
+import {
+	getNextThinkingId,
+	getThinkingStrength,
+} from '@/renderer/lib/workbench/thinking-strength';
 import type { ComposerThinkingOption } from '@/renderer/types/workbench';
 import type { AgentProviderId } from '@/shared/agent-provider';
 import { getThinkingAxis } from '@/shared/agent-thinking';
 
 import { ThinkingBarIcon } from './thinking-bar-icon';
-
-/** Computes the next thinking-level id when cycling through the available options. */
-export function getNextThinkingId(
-	options: readonly ComposerThinkingOption[],
-	value: string | null,
-): string | null {
-	if (options.length === 0) {
-		return null;
-	}
-	const currentIndex = Math.max(
-		0,
-		options.findIndex((option) => option.id === value),
-	);
-	const nextIndex = (currentIndex + 1) % options.length;
-	return options[nextIndex]?.id ?? null;
-}
 
 /**
  * Toggle-style thinking-level chip. Clicking cycles to the next level the

@@ -6,20 +6,14 @@ import { useTranslation } from 'react-i18next';
 
 import { agentModelsQuery } from '@/renderer/api/ensemblr';
 import { ModelVisibilityList } from '@/renderer/components/settings/model-visibility-list';
+import { ModelSelect } from '@/renderer/components/settings/models/model-select';
+import { ThinkingLevelSelect } from '@/renderer/components/settings/models/thinking-level-select';
 import { SettingRow } from '@/renderer/components/settings/setting-row';
 import {
 	SettingsErrorState,
 	SettingsLoadingState,
 } from '@/renderer/components/settings/settings-async-state';
 import { SettingsSection } from '@/renderer/components/settings/settings-section';
-import {
-	Select,
-	SelectContent,
-	SelectItem,
-	SelectTrigger,
-	SelectValue,
-} from '@/renderer/components/ui/select';
-import { thinkingLevelLabel } from '@/renderer/lib/workbench/thinking-labels';
 import {
 	defaultChatModelAtom,
 	defaultChatThinkingLevelAtom,
@@ -31,7 +25,6 @@ import {
 	type AgentProviderId,
 	normalizeAgentProviderId,
 } from '@/shared/agent-provider';
-import { getThinkingAxis } from '@/shared/agent-thinking';
 import type { AgentModelOption } from '@/shared/ipc/contracts/agent-models';
 
 /** Route for the Models settings section; renders the models panel populated from agent capability discovery. */
@@ -203,84 +196,6 @@ function ModelsSettings() {
 				<ModelVisibilityList />
 			</SettingRow>
 		</SettingsSection>
-	);
-}
-
-/** Select dropdown for choosing a model from the visible list; disabled when no models are available. */
-function ModelSelect({
-	ariaLabel,
-	models,
-	onChange,
-	placeholder,
-	value,
-}: {
-	ariaLabel: string;
-	models: readonly AgentModelOption[];
-	onChange: (next: string | null) => void;
-	placeholder: string;
-	value: string | null;
-}) {
-	const disabled = models.length === 0;
-	return (
-		<Select
-			disabled={disabled}
-			onValueChange={(next) => onChange(next || null)}
-			value={value ?? ''}
-		>
-			<SelectTrigger aria-label={ariaLabel} className='w-44' size='sm'>
-				<SelectValue placeholder={placeholder} />
-			</SelectTrigger>
-			<SelectContent>
-				{models.map((model) => (
-					<SelectItem key={model.id} value={model.id}>
-						{model.displayName}
-					</SelectItem>
-				))}
-			</SelectContent>
-		</Select>
-	);
-}
-
-/** Select dropdown for choosing a thinking level; renders nothing when the model exposes no levels. */
-function ThinkingLevelSelect({
-	ariaLabel,
-	levels,
-	onChange,
-	provider,
-	value,
-}: {
-	ariaLabel: string;
-	levels: readonly string[];
-	onChange: (next: string | null) => void;
-	/** Runtime whose vocabulary labels the levels; Claude's dial is effort, pi's is thinking. */
-	provider: AgentProviderId;
-	value: string | null | undefined;
-}) {
-	const { t } = useTranslation();
-
-	if (levels.length === 0) {
-		return null;
-	}
-	const placeholder =
-		getThinkingAxis(provider) === 'effort'
-			? t('settings:models.thinking.effort-placeholder', 'Effort level')
-			: t('settings:models.thinking.thinking-placeholder', 'Thinking level');
-	return (
-		<Select
-			onValueChange={(next) => onChange(next || null)}
-			value={value ?? ''}
-		>
-			<SelectTrigger aria-label={ariaLabel} className='w-40' size='sm'>
-				<SelectValue placeholder={placeholder} />
-			</SelectTrigger>
-			<SelectContent>
-				{levels.map((level) => (
-					<SelectItem key={level} value={level}>
-						{thinkingLevelLabel(t, level)}
-					</SelectItem>
-				))}
-			</SelectContent>
-		</Select>
 	);
 }
 
