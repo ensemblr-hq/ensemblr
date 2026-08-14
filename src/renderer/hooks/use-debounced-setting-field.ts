@@ -1,5 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 
+/** Debounce window before a settings field edit is persisted. */
+export const SETTING_SAVE_DEBOUNCE_MS = 500;
+
 /**
  * Local text state seeded from a persisted value that commits edits on a
  * debounce and re-seeds only when the persisted value changes for an external

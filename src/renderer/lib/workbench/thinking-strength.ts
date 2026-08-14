@@ -1,4 +1,7 @@
-import type { ThinkingBarStrength } from '@/renderer/types/workbench';
+import type {
+	ComposerThinkingOption,
+	ThinkingBarStrength,
+} from '@/renderer/types/workbench';
 import type { AgentProviderId } from '@/shared/agent-provider';
 import { listThinkingLevels } from '@/shared/agent-thinking';
 
@@ -22,4 +25,26 @@ export function getThinkingStrength(
 	}
 	const index = listThinkingLevels(provider).indexOf(level.toLowerCase());
 	return index > 0 ? (Math.min(index, MAX_STRENGTH) as ThinkingBarStrength) : 0;
+}
+
+/**
+ * Computes the next thinking-level id when cycling through the available
+ * options, wrapping back to the first once the list runs out.
+ * @param options - The runtime's thinking levels, in ladder order.
+ * @param value - The currently selected level id, or null when none is set.
+ * @returns The next level's id, or null when the runtime offers none.
+ */
+export function getNextThinkingId(
+	options: readonly ComposerThinkingOption[],
+	value: string | null,
+): string | null {
+	if (options.length === 0) {
+		return null;
+	}
+	const currentIndex = Math.max(
+		0,
+		options.findIndex((option) => option.id === value),
+	);
+	const nextIndex = (currentIndex + 1) % options.length;
+	return options[nextIndex]?.id ?? null;
 }

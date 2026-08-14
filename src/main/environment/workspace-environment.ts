@@ -155,19 +155,23 @@ export function createWorkspaceEnvironmentService({
 		const env: Record<string, string> = {};
 		const redactValues = new Set<string>();
 
-		// Configured variables, least- to most-specific scope.
-		const layers = [
+		const layersLeastToMostSpecific = [
 			{ scope: 'app' as const, scopeId: undefined },
 			{ scope: 'repository' as const, scopeId: workspace.repositoryId },
 			{ scope: 'workspace' as const, scopeId: workspace.id },
 		];
 
-		for (const layer of layers) {
-			const assembly = await environmentVariablesService.assembleEnvironment({
-				includeSecrets,
-				scope: layer.scope,
-				scopeId: layer.scopeId,
-			});
+		const assemblies = await Promise.all(
+			layersLeastToMostSpecific.map((layer) =>
+				environmentVariablesService.assembleEnvironment({
+					includeSecrets,
+					scope: layer.scope,
+					scopeId: layer.scopeId,
+				}),
+			),
+		);
+
+		for (const assembly of assemblies) {
 			diagnostics.push(...assembly.diagnostics);
 
 			for (const [key, value] of Object.entries(assembly.env)) {

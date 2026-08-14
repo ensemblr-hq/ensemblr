@@ -1,0 +1,39 @@
+{
+	// Knip is NOT a dependency of this repo and is never run. This file exists
+	// because react-doctor's dead-code pass reads its entry points from a knip
+	// config (`loadKnipConfig` → `collectKnipPatterns(config, "entry")`) and has
+	// no entry field of its own. Without it the playground scans as unreachable:
+	// its chain starts at `vite.playground.config.mts` → `playground/index.html`
+	// → `main.tsx`, and an HTML entry is not a resolvable import edge, so all 34
+	// playground files reported `deslop/unused-file`.
+	//
+	// Declaring entries REPLACES react-doctor's auto-detection rather than adding
+	// to it, so every entry point has to be listed here or the rest of the tree
+	// reports as dead. This list mirrors `entry` in `.fallowrc.jsonc` — keep the
+	// two in sync when adding an entry point.
+	"entry": [
+		"src/main/main.ts",
+		"src/preload/preload.ts",
+		"src/renderer/main.tsx",
+		"forge.config.ts",
+		"i18next.config.ts",
+		"vite.main.config.mts",
+		"vite.preload.config.mts",
+		"vite.renderer.config.mts",
+		"vite.playground.config.mts",
+		"playground/main.tsx",
+		"tests/**/*.test.{ts,tsx}",
+		"scripts/**/*.{mjs,ts}",
+		"resources/pi-extensions/*.mts",
+		"src/shared/ipc/index.ts",
+		"src/shared/pi-rpc/index.ts",
+		"src/shared/keymap/index.ts",
+		"src/shared/plan-mode.ts",
+		"src/shared/scripts.ts",
+		"src/shared/terminal.ts",
+		"src/renderer/state/*/index.ts",
+		"src/renderer/lib/*/index.ts",
+		"src/renderer/types/*/index.ts",
+		"src/renderer/components/**/index.ts"
+	]
+}

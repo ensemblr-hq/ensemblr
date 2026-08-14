@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useHotkey } from '@/renderer/hooks/use-hotkey';
 import { useComposerState } from '@/renderer/hooks/workbench-shell/composer/use-composer-state';
 import { cn } from '@/renderer/lib/utils';
+import { getNextThinkingId } from '@/renderer/lib/workbench/thinking-strength';
 import { useConsumeComposerFocusRequest } from '@/renderer/state/composer';
 import {
 	useMenuCommand,
@@ -18,7 +19,6 @@ import { IssuePickerDialog } from './composer/issue-picker-dialog';
 import { ConnectedLastUnreadButton } from './composer/last-unread-button';
 import { LinkDirectoryDialog } from './composer/link-directory-dialog';
 import { ComposerAutocompletePopover } from './composer/mention-popover';
-import { getNextThinkingId } from './composer/thinking-picker';
 
 /** Props for the composer panel and the per-chat body it mounts. */
 interface ComposerPanelProps {
