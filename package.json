@@ -150,7 +150,7 @@
 		"react-dom": "^19.2.7",
 		"react-i18next": "^17.0.11",
 		"react-resizable-panels": "^4.12.1",
-		"shiki": "^4.3.1",
+		"shiki": "^4.4.3",
 		"sonner": "^2.0.8",
 		"streamdown": "^2.5.0",
 		"tailwind-merge": "^3.6.0",
@@ -193,6 +193,7 @@
 	"overrides": {
 		"@electron/node-gyp": "10.2.0-electron.1",
 		"linkify-it": "^5.0.2",
+		"shiki": "$shiki",
 		"tar": "^7.5.19",
 		"tmp": "^0.2.7"
 	},
