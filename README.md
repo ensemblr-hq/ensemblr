@@ -2,7 +2,7 @@
   <img alt="Ensemblr" src="./assets/wordmark.gif" width="588">
 </p>
 
-# Ensemblr
+# Ensemblr™
 
 **A macOS orchestrator for multi-agent coding work, driving the Pi CLI or the Claude Code CLI — whichever
 you already run.**
@@ -28,7 +28,7 @@ agent binary of its own — it drives the one you installed.
 
 - **Version:** [`0.1.0-beta.4`](https://github.com/ensemblr-hq/ensemblr/releases/tag/v0.1.0-beta.4) (pre-1.0, polish stage)
 - **Platform:** macOS on Apple silicon
-- **License:** MIT
+- **License:** Apache-2.0
 
 ---
 
@@ -214,6 +214,18 @@ Security reports go to [`SECURITY.md`](./SECURITY.md), never to a public issue.
 
 ## License
 
-[MIT](./LICENSE) © Philipp Soldunov
+Licensed under the [Apache License, Version 2.0](./LICENSE). Copyright 2026 Philipp Soldunov.
+
+Bundled third-party components and their licenses are listed in [`NOTICE`](./NOTICE).
+
+### Trademark
+
+Ensemblr™ is a trademark of Philipp Soldunov (EUTM application pending).
+
+The Apache 2.0 license covers this source code. It does not grant any
+right to use the Ensemblr name, logo, or branding. You may state that
+your project is derived from or compatible with Ensemblr. You may not
+name your fork or distribution "Ensemblr", nor use the name or logo in
+a way that suggests endorsement by or affiliation with the project.
 
 Built with love in Cyprus 🇨🇾

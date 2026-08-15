@@ -1,0 +1,29 @@
+Ensemblr
+Copyright 2026 Philipp Soldunov
+
+This product bundles the third-party components listed below, each under its
+own license. Their full license texts ship with the files they cover.
+
+- JetBrains Mono Nerd Font (JetBrainsMonoNerdFontMono-{Regular,Bold,Italic,BoldItalic}.ttf)
+  Copyright 2020 The JetBrains Mono Project Authors
+  (https://github.com/JetBrains/JetBrainsMono)
+  Patched by the Nerd Fonts project (https://github.com/ryanoasis/nerd-fonts).
+  Licensed under the SIL Open Font License 1.1.
+  Full text: src/renderer/styles/fonts/JetBrainsMonoNerdFontMono-OFL.txt
+
+- node-pty
+  Copyright (c) 2012-2015, Christopher Jeffrey (https://github.com/chjj/)
+  Licensed under the MIT License.
+  Full text: node_modules/node-pty/LICENSE in the packaged application.
+
+- @anthropic-ai/claude-agent-sdk
+  Copyright Anthropic PBC. All rights reserved.
+  Not open source. Use is subject to the legal agreements at
+  https://code.claude.com/docs/en/legal-and-compliance.
+  Full text: node_modules/@anthropic-ai/claude-agent-sdk/LICENSE.md in the
+  packaged application.
+
+The remaining dependencies are compiled into the renderer and main bundles by
+Vite. None of them ships a NOTICE file requiring propagation under Apache
+License 2.0 section 4(d). Their licenses (MIT, ISC, BSD-3-Clause, Apache-2.0,
+CC0-1.0) are recorded in package-lock.json.
