@@ -6,6 +6,13 @@ import type {
 	AgentNotification,
 	PowerSaveControls,
 } from './agent-activity-monitor.ts';
+import { createNotificationRetainer } from './notification-retention.ts';
+
+/**
+ * Holds every shown notification so a click minutes later still reaches its
+ * handler; see {@link createNotificationRetainer} for why the reference matters.
+ */
+const notificationRetainer = createNotificationRetainer();
 
 /** Electron `powerSaveBlocker` adapter for the activity monitor. */
 export const electronPowerControls: PowerSaveControls = {
@@ -61,6 +68,11 @@ function requestNotificationSound(): void {
  * it raises the app and opens that chat, crossing workspaces when it lives in
  * another one.
  *
+ * The shown notification is handed to the retainer before it is displayed:
+ * Electron drops a collected notification out of Notification Center along with
+ * its click handler, and a background turn is precisely the one the user gets
+ * back to late.
+ *
  * The notification is always `silent`: Ensemblr plays its own chime from the
  * renderer, and leaving macOS free to play its default tone would stack two
  * sounds on every notification. A user who switches the chime off wants
@@ -77,6 +89,7 @@ export function electronNotify(notification: AgentNotification): void {
 		title: notification.title,
 	});
 	shown.on('click', () => openChatFromNotification(notification.target));
+	notificationRetainer.retain(shown);
 	shown.show();
 	if (notification.playSound) {
 		requestNotificationSound();
