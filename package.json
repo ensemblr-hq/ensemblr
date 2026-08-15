@@ -116,7 +116,7 @@
 		"@atlaskit/pragmatic-drag-and-drop": "^2.0.1",
 		"@atlaskit/pragmatic-drag-and-drop-hitbox": "^2.0.0",
 		"@iconify-json/logos": "^1.2.11",
-		"@iconify-json/vscode-icons": "^1.2.65",
+		"@iconify-json/vscode-icons": "^1.2.71",
 		"@iconify/react": "^6.0.2",
 		"@lexical/react": "^0.49.0",
 		"@modelcontextprotocol/sdk": "^1.30.0",
