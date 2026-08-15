@@ -7,13 +7,11 @@ import type { ReactNode } from 'react';
 import { act } from 'react';
 import { beforeEach, expect, test, vi } from 'vitest';
 
-const { listChatTabs, navigate, navigateToWorkspace, onFocusChatRequested } =
-	vi.hoisted(() => ({
-		listChatTabs: vi.fn(),
-		navigate: vi.fn(),
-		navigateToWorkspace: vi.fn(),
-		onFocusChatRequested: vi.fn(),
-	}));
+const { listChatTabs, navigate, navigateToWorkspace } = vi.hoisted(() => ({
+	listChatTabs: vi.fn(),
+	navigate: vi.fn(),
+	navigateToWorkspace: vi.fn(),
+}));
 
 vi.mock('@tanstack/react-router', () => ({ useNavigate: () => navigate }));
 
@@ -27,6 +25,7 @@ vi.mock('@/renderer/api/ensemblr-queries', () => ({
 import { NotificationFocusBridge } from '../../src/renderer/components/workbench-shell/route-layout/notification-focus-bridge';
 import { WorkbenchLayoutModelProvider } from '../../src/renderer/components/workbench-shell/shell-contexts';
 import { shellFixtureProjects } from '../../src/renderer/fixtures/workbench';
+import { pendingNotificationFocusAtom } from '../../src/renderer/state/unread';
 import type { WorkbenchLayoutModel } from '../../src/renderer/types/workbench-shell';
 import type { FocusChatBroadcast } from '../../src/shared/ipc/contracts/notifications';
 import { createTestQueryClient } from './support/dom';
@@ -40,13 +39,9 @@ const layoutModel = {
 	resolveWorkspaceRouteSearch: () => ({ dock: 'setup', review: 'files' }),
 } as unknown as WorkbenchLayoutModel;
 
-/**
- * Mounts the bridge and hands back the listener it registered, so a case can
- * fire a notification click the way the main process would.
- */
-function mountBridge(): (payload: FocusChatBroadcast) => void {
+/** Mounts the bridge over a store a case can park a focus request in. */
+function mountBridge(store = createStore()) {
 	const client = createTestQueryClient();
-	const store = createStore();
 	const wrapper = ({ children }: { children: ReactNode }) => (
 		<Provider store={store}>
 			<QueryClientProvider client={client}>
@@ -56,28 +51,33 @@ function mountBridge(): (payload: FocusChatBroadcast) => void {
 			</QueryClientProvider>
 		</Provider>
 	);
-	render(<NotificationFocusBridge />, { wrapper });
-	return onFocusChatRequested.mock.calls[0][0];
+	return render(<NotificationFocusBridge />, { wrapper });
+}
+
+/** Parks the chat a clicked notification named, the way the root sync does. */
+async function park(
+	store: ReturnType<typeof createStore>,
+	payload: FocusChatBroadcast,
+): Promise<void> {
+	await act(async () => {
+		store.set(pendingNotificationFocusAtom, payload);
+	});
 }
 
 beforeEach(() => {
 	listChatTabs.mockReset();
 	navigate.mockReset();
 	navigateToWorkspace.mockReset();
-	onFocusChatRequested.mockReset();
-	onFocusChatRequested.mockReturnValue(() => undefined);
-	window.ensemblr = { onFocusChatRequested } as never;
 	window.localStorage?.clear();
 });
 
 test('opens the chat a clicked notification names', async () => {
-	const click = mountBridge();
-	await act(async () => {
-		click({
-			agentSessionId: 'session-7',
-			chatTabId: 'tab-7',
-			workspaceId: workspace.id,
-		});
+	const store = createStore();
+	mountBridge(store);
+	await park(store, {
+		agentSessionId: 'session-7',
+		chatTabId: 'tab-7',
+		workspaceId: workspace.id,
 	});
 
 	expect(navigate).toHaveBeenCalledWith({
@@ -89,6 +89,21 @@ test('opens the chat a clicked notification names', async () => {
 		search: { dock: 'setup', review: 'files' },
 		to: '/projects/$projectId/workspaces/$workspaceId/chats/$chatId',
 	});
+	expect(store.get(pendingNotificationFocusAtom)).toBeNull();
+});
+
+test('drains a request parked before the shell mounted', async () => {
+	const store = createStore();
+	store.set(pendingNotificationFocusAtom, {
+		agentSessionId: 'session-7',
+		chatTabId: 'tab-7',
+		workspaceId: workspace.id,
+	});
+	await act(async () => {
+		mountBridge(store);
+	});
+
+	expect(navigate.mock.calls[0][0].params.chatId).toBe('tab-7');
 });
 
 test('resolves the tab itself when main could not', async () => {
@@ -96,13 +111,12 @@ test('resolves the tab itself when main could not', async () => {
 		closed: [],
 		open: [{ agentSessionId: 'session-7', id: 'tab-7' }],
 	});
-	const click = mountBridge();
-	await act(async () => {
-		click({
-			agentSessionId: 'session-7',
-			chatTabId: null,
-			workspaceId: workspace.id,
-		});
+	const store = createStore();
+	mountBridge(store);
+	await park(store, {
+		agentSessionId: 'session-7',
+		chatTabId: null,
+		workspaceId: workspace.id,
 	});
 
 	expect(listChatTabs).toHaveBeenCalledWith(workspace.id);
@@ -111,34 +125,14 @@ test('resolves the tab itself when main could not', async () => {
 
 test('falls back to the workspace when the tab is gone', async () => {
 	listChatTabs.mockResolvedValue({ closed: [], open: [] });
-	const click = mountBridge();
-	await act(async () => {
-		click({
-			agentSessionId: 'session-7',
-			chatTabId: null,
-			workspaceId: workspace.id,
-		});
+	const store = createStore();
+	mountBridge(store);
+	await park(store, {
+		agentSessionId: 'session-7',
+		chatTabId: null,
+		workspaceId: workspace.id,
 	});
 
 	expect(navigate).not.toHaveBeenCalled();
 	expect(navigateToWorkspace).toHaveBeenCalledWith(project.id, workspace.id);
-});
-
-test('unsubscribes on unmount', () => {
-	const unsubscribe = vi.fn();
-	onFocusChatRequested.mockReturnValue(unsubscribe);
-	const client = createTestQueryClient();
-	const store = createStore();
-	const view = render(
-		<Provider store={store}>
-			<QueryClientProvider client={client}>
-				<WorkbenchLayoutModelProvider value={layoutModel}>
-					<NotificationFocusBridge />
-				</WorkbenchLayoutModelProvider>
-			</QueryClientProvider>
-		</Provider>,
-	);
-	view.unmount();
-
-	expect(unsubscribe).toHaveBeenCalled();
 });

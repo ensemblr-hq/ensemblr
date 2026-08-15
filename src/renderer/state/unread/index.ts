@@ -30,3 +30,7 @@ export {
 	useWorkspaceUnreadCount,
 	useWorkspaceUnreadKeys,
 } from './hooks';
+export {
+	pendingNotificationFocusAtom,
+	useNotificationFocusSync,
+} from './notification-focus';
