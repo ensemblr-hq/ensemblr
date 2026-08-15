@@ -110,7 +110,7 @@
 		"name": "Philipp Soldunov",
 		"email": "69530789+psoldunov@users.noreply.github.com"
 	},
-	"license": "MIT",
+	"license": "Apache-2.0",
 	"dependencies": {
 		"@anthropic-ai/claude-agent-sdk": "^0.3.223",
 		"@atlaskit/pragmatic-drag-and-drop": "^2.0.1",

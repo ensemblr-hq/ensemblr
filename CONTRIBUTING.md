@@ -10,7 +10,9 @@ change is a conversation before a diff.
   and that is a bad outcome for the time you spent on it.
 - **Security issues never go in a public issue.** See [`SECURITY.md`](./SECURITY.md).
 
-Contributions are accepted under the [MIT license](./LICENSE). There is no CLA and no DCO sign-off.
+Contributions are accepted under the [Apache License 2.0](./LICENSE): per section 5, any contribution you
+deliberately submit for inclusion is licensed under Apache 2.0 unless you state otherwise. There is no CLA
+and no DCO sign-off.
 
 ## Getting set up
 

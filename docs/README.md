@@ -40,4 +40,4 @@ The current build is [`0.1.0-beta.4`](https://github.com/ensemblr-hq/ensemblr/re
 - [`../AGENTS.md`](../AGENTS.md) — contributor policies (npm, Biome, Jotai, Tailwind, JSDoc). Each `src/*` subtree has its own scoped `AGENTS.md`.
 - [`../.claude/rules/`](../.claude/rules) — the binding rule files `AGENTS.md` defers to: [`stack.md`](../.claude/rules/stack.md) (pinned versions and non-obvious constraints), [`patterns.md`](../.claude/rules/patterns.md) (structural patterns), [`jsdoc.md`](../.claude/rules/jsdoc.md), [`comments.md`](../.claude/rules/comments.md), [`i18n.md`](../.claude/rules/i18n.md) (translation completeness), [`code-review.md`](../.claude/rules/code-review.md).
 - [`../SECURITY.md`](../SECURITY.md) — the threat model and how to report a vulnerability.
-- [`../LICENSE`](../LICENSE) — MIT license.
+- [`../LICENSE`](../LICENSE) — Apache License 2.0. [`../NOTICE`](../NOTICE) carries the bundled third-party attributions.

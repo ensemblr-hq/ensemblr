@@ -2,7 +2,7 @@
   <img alt="Ensemblr" src="./assets/wordmark.gif" width="588">
 </p>
 
-# Ensemblr
+# Ensemblr™
 
 **A macOS orchestrator for multi-agent coding work, driving the Pi CLI or the Claude Code CLI — whichever
 you already run.**
@@ -28,7 +28,7 @@ agent binary of its own — it drives the one you installed.
 
 - **Version:** [`0.1.0-beta.4`](https://github.com/ensemblr-hq/ensemblr/releases/tag/v0.1.0-beta.4) (pre-1.0, polish stage)
 - **Platform:** macOS on Apple silicon
-- **License:** MIT
+- **License:** Apache-2.0
 
 ---
 
@@ -58,6 +58,37 @@ A build of your own is signed and notarized only when Apple API credentials are 
 environment; without them you get an unsigned build that Gatekeeper will hold on first launch. The full
 path — prerequisites, channels, unsigned builds, and where Ensemblr keeps its data — is
 [`docs/guide/01-install.md`](./docs/guide/01-install.md).
+
+## Prerequisites
+
+Ensemblr drives CLIs you install and authenticate yourself — it ships no agent binary and holds no provider
+key. On a clean Apple silicon Mac:
+
+```bash
+# 1 — Homebrew
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+
+# 2 — GitHub CLI
+brew install gh
+
+# 3 — at least one agent runtime; either one on its own is enough
+brew install --cask claude-code             # Claude Code
+curl -fsSL https://pi.dev/install.sh | sh   # Pi
+
+# 4 — authenticate GitHub
+gh auth login --hostname github.com
+
+# 5 — authenticate the runtime you installed
+claude                                      # complete the login prompt, or /login inside a session
+pi --list-models                            # verifies your Pi providers resolve
+```
+
+`git` comes with the Xcode command line tools — `xcode-select --install` if `git --version` fails.
+
+Claude Code also installs with the official script, which is what the app itself offers when that check
+fails: `curl -fsSL https://claude.ai/install.sh | bash`. Pi providers are configured in Pi, not in
+Ensemblr; the Providers settings tab reports what `pi --list-models` returns and lets you point Ensemblr at
+a specific executable.
 
 ## Requirements
 
@@ -214,6 +245,18 @@ Security reports go to [`SECURITY.md`](./SECURITY.md), never to a public issue.
 
 ## License
 
-[MIT](./LICENSE) © Philipp Soldunov
+Licensed under the [Apache License, Version 2.0](./LICENSE). Copyright 2026 Philipp Soldunov.
+
+Bundled third-party components and their licenses are listed in [`NOTICE`](./NOTICE).
+
+### Trademark
+
+Ensemblr™ is a trademark of Philipp Soldunov (EUTM application pending).
+
+The Apache 2.0 license covers this source code. It does not grant any
+right to use the Ensemblr name, logo, or branding. You may state that
+your project is derived from or compatible with Ensemblr. You may not
+name your fork or distribution "Ensemblr", nor use the name or logo in
+a way that suggests endorsement by or affiliation with the project.
 
 Built with love in Cyprus 🇨🇾
