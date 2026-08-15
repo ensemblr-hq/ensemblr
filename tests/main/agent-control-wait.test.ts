@@ -116,6 +116,7 @@ const makePorts = (
 	planMode: {
 		activateForSpawn: vi.fn(),
 		exit: vi.fn(),
+		hasSubmittedPlan: vi.fn().mockReturnValue(false),
 		isActive: vi.fn().mockReturnValue(false),
 		releaseSession: vi.fn(),
 	},

@@ -77,6 +77,7 @@ const makeDeps = (): {
 		planMode: {
 			activateForSpawn: vi.fn(),
 			exit: vi.fn(),
+			hasSubmittedPlan: vi.fn(() => false),
 			isActive: vi.fn(() => false),
 			releaseSession: vi.fn(),
 		},

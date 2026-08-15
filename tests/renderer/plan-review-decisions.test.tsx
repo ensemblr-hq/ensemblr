@@ -3,18 +3,25 @@
 import { act, renderHook } from '@testing-library/react';
 import { Provider } from 'jotai';
 import type { ReactNode } from 'react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { WorkspaceShellModel } from '../../src/renderer/types/workbench';
 import type { ExitPlanModeBroadcast } from '../../src/shared/agent-control';
+import { clearEnsemblrApi, installEnsemblrApi } from './support/dom';
 
-const { dismissPlanReview, handOff, pendingReview, requestComposerFocus } =
-	vi.hoisted(() => ({
-		dismissPlanReview: vi.fn(),
-		handOff: vi.fn(),
-		pendingReview: { current: null as ExitPlanModeBroadcast | null },
-		requestComposerFocus: vi.fn(),
-	}));
+const {
+	dismissPlanReview,
+	handOff,
+	pendingReview,
+	requestComposerFocus,
+	setAgentPlanMode,
+} = vi.hoisted(() => ({
+	dismissPlanReview: vi.fn(),
+	handOff: vi.fn(),
+	pendingReview: { current: null as ExitPlanModeBroadcast | null },
+	requestComposerFocus: vi.fn(),
+	setAgentPlanMode: vi.fn(),
+}));
 
 vi.mock('@/renderer/state/plan-mode', () => ({
 	useDismissPlanReview: () => dismissPlanReview,
@@ -61,6 +68,8 @@ const renderReview = () => {
 
 beforeEach(() => {
 	vi.clearAllMocks();
+	installEnsemblrApi({ setAgentPlanMode });
+	setAgentPlanMode.mockResolvedValue(undefined);
 	handOff.mockResolvedValue('tab-new');
 	pendingReview.current = {
 		agentSessionId: SESSION_ID,
@@ -69,6 +78,10 @@ beforeEach(() => {
 		title: 'Add Plan Mode',
 		workspaceId: 'ws-1',
 	};
+});
+
+afterEach(() => {
+	clearEnsemblrApi();
 });
 
 describe('usePlanReview', () => {
@@ -138,6 +151,23 @@ describe('usePlanReview', () => {
 
 			expect(dismissPlanReview).not.toHaveBeenCalled();
 			expect(onPlanModeChange).not.toHaveBeenCalled();
+			expect(setAgentPlanMode).not.toHaveBeenCalled();
+		});
+
+		// Nothing is submitted to this session again, so the toggle has no prompt to
+		// ride over. Main would keep the session planning with a plan still awaiting
+		// a decision, and answer the next control follow-up with "resubmit it".
+		it('tells main planning is over, since no prompt will carry the toggle', async () => {
+			const { result } = renderReview();
+
+			await act(async () => {
+				result.current.handOff();
+			});
+
+			expect(setAgentPlanMode).toHaveBeenCalledWith({
+				planMode: false,
+				sessionId: SESSION_ID,
+			});
 		});
 	});
 

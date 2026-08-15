@@ -8,6 +8,7 @@ import {
 	createOriginRegistry,
 	type GuardrailConfig,
 } from '../../src/main/agent-control/index.ts';
+import { PLAN_REFINEMENT_DIRECTIVE } from '../../src/shared/agent-control.ts';
 import type { AppLanguage } from '../../src/shared/i18n.ts';
 import type { PermissionMode } from '../../src/shared/permissions.ts';
 
@@ -23,6 +24,7 @@ const makePorts = (
 		conversationWorkspace: string | null;
 		terminalWorkspace: string | null;
 		planning: boolean;
+		planSubmitted: boolean;
 		spawnedSubAgent: boolean;
 		language: AppLanguage;
 	}> = {},
@@ -189,6 +191,7 @@ const makePorts = (
 	planMode: {
 		activateForSpawn: vi.fn(),
 		exit: vi.fn().mockResolvedValue({ planPath: 'p.md', summary: 'saved' }),
+		hasSubmittedPlan: vi.fn().mockReturnValue(overrides.planSubmitted ?? false),
 		isActive: vi.fn().mockReturnValue(overrides.planning ?? false),
 		releaseSession: vi.fn(),
 	},
@@ -2044,6 +2047,40 @@ describe('agent-control service: chat-tab ops by species', () => {
 		});
 
 		expect(result).toMatchObject({ data: { planMode: true }, ok: true });
+	});
+
+	it('tells a planning caller whose plan is under review to submit again', async () => {
+		const ports = makePorts({ planning: true, planSubmitted: true });
+		const { service } = setup({ ports });
+
+		const result = await service.invoke({
+			op: 'getSessionBrief',
+			token: 'tok-caller',
+			rawArgs: {},
+		});
+
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			expect(result.data).toMatchObject({
+				planRefinement: PLAN_REFINEMENT_DIRECTIVE,
+			});
+		}
+	});
+
+	it('carries no refinement directive once the user turned Plan Mode off', async () => {
+		const ports = makePorts({ planning: false, planSubmitted: true });
+		const { service } = setup({ ports });
+
+		const result = await service.invoke({
+			op: 'getSessionBrief',
+			token: 'tok-caller',
+			rawArgs: {},
+		});
+
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			expect(result.data).toMatchObject({ planRefinement: null });
+		}
 	});
 });
 

@@ -147,6 +147,21 @@ block to the prompt **the runtime receives**, never to the one the app persisted
 carried it. Pi needs none of this; its extension pulls the same block over
 `getSessionBrief` on `before_agent_start`.
 
+The refinement directive rides the same channel. Once a session submits a plan,
+`PlanModeRegistry` marks it as awaiting the user, and every turn it takes until
+Plan Mode goes off carries `PLAN_REFINEMENT_DIRECTIVE` — the block that tells it
+to fold the user's changes in and end the turn on another `ExitPlanMode` rather
+than in prose. Approve and Hand off turn the toggle off, which clears the mark;
+the `planMode: true` the renderer re-sends on every submit does not.
+
+Each of those two answers states the new toggle to main itself. Approve's prompt
+would carry it anyway, but Hand off submits nothing to the session it leaves
+behind, so it calls `setAgentPlanMode` — the one write of that flag which does
+not ride a prompt. Without it main keeps the session planning with a plan still
+awaiting a decision, and the orchestrator's next `sendFollowUp` (which reaches
+`agentSessionService.submitPrompt` directly, never the IPC handler) would answer
+with "resubmit your plan" for work already moved to another chat.
+
 ### Known parity gap
 
 Pi streams partial tool output through `tool_execution_update`, so a long `bash`

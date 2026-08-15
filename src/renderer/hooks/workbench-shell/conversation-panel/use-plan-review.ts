@@ -40,6 +40,11 @@ interface PlanReview {
  * blocked call: approve turns Plan Mode off and starts the implementation turn,
  * refine hands the user back their own composer with Plan Mode still on, and
  * hand off moves the plan into a fresh chat.
+ *
+ * Both answers that end planning tell the main process so directly. Approve's
+ * prompt would carry the toggle anyway; hand off sends no prompt, and a session
+ * main still believes is planning keeps its tools gated and greets an
+ * orchestrator's follow-up with the "resubmit your plan" directive.
  * @param input - Chat identity, composer callbacks, and the owning workspace.
  * @returns The pending review and its decision handlers.
  */
@@ -84,6 +89,13 @@ export function usePlanReview({
 				return;
 			}
 			onPlanModeChange(false);
+			// Approve carries the new toggle to main on the prompt it submits; this
+			// one submits nothing to this session, so main would keep treating it as
+			// planning with a plan still awaiting a decision.
+			void window.ensemblr?.setAgentPlanMode({
+				planMode: false,
+				sessionId: reviewSessionId,
+			});
 			dismissPlanReview(reviewSessionId);
 		});
 	}, [

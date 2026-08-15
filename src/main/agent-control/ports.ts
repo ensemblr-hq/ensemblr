@@ -514,6 +514,11 @@ export interface PlanModePort {
 	 * the promise the agent is given that only the user's approval ends planning.
 	 */
 	activateForSpawn: (sessionId: string) => void;
+	/**
+	 * Whether the session already handed a plan to the user, which makes this
+	 * turn a refinement round it has to close with another submission.
+	 */
+	hasSubmittedPlan: (sessionId: string) => boolean;
 	/** Forgets a session's Plan Mode state once it ends. */
 	releaseSession: (sessionId: string) => void;
 }

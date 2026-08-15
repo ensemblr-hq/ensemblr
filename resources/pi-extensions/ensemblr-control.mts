@@ -178,7 +178,7 @@ When you and the user share an understanding, hand the plan over and stop:
 Their decision comes back to you as your NEXT prompt, not as the tool result:
 
 - Approve — they send you an approval prompt with Plan Mode off. Implement the plan, starting immediately.
-- Refine — they type their changes into the composer with Plan Mode still on. Fold them in and call the tool again with the revised plan.
+- Refine — they type their changes into the composer with Plan Mode still on. Their message arrives looking like any other prompt, and answering it in prose is the one wrong move: it leaves them a revision with nothing to approve. Fold the changes in and end that turn by calling the tool again with the WHOLE revised plan, never a note of what you changed.
 - Hand off — another conversation picks the plan up and you hear nothing more. Nothing is expected of you.`;
 
 /**
@@ -476,9 +476,10 @@ function callerModelId(ctx: { model?: { id?: string } } | undefined) {
 /**
  * Asks the app for this turn's brief: whether the conversation is in Plan Mode,
  * so the planning playbook stands in for the role one only while planning, the
- * upkeep block naming whatever the session still owes, and the directive putting
- * user-facing prose in the app's language. The app renders both blocks, so this
- * file holds no second copy of their wording to drift.
+ * upkeep block naming whatever the session still owes, the directive telling a
+ * planning turn to resubmit a plan the user is already reading, and the one
+ * putting user-facing prose in the app's language. The app renders every block,
+ * so this file holds no second copy of their wording to drift.
  *
  * A transport failure reports "not planning, nothing to append": the prompt
  * text is cosmetic, and real Plan Mode enforcement lives in the `tool_call`
@@ -488,16 +489,23 @@ function callerModelId(ctx: { model?: { id?: string } } | undefined) {
 async function fetchSessionBrief(): Promise<{
 	planning: boolean;
 	nudge: string | null;
+	planRefinement: string | null;
 	languageDirective: string | null;
 }> {
 	const result = await invoke('getSessionBrief', {}, undefined);
 	if (!result.ok) {
-		return { languageDirective: null, nudge: null, planning: false };
+		return {
+			languageDirective: null,
+			nudge: null,
+			planning: false,
+			planRefinement: null,
+		};
 	}
 	const brief = result.data as
 		| {
 				planMode?: boolean;
 				nudge?: string | null;
+				planRefinement?: string | null;
 				languageDirective?: string | null;
 		  }
 		| undefined;
@@ -508,6 +516,8 @@ async function fetchSessionBrief(): Promise<{
 				: null,
 		nudge: typeof brief?.nudge === 'string' ? brief.nudge : null,
 		planning: brief?.planMode === true,
+		planRefinement:
+			typeof brief?.planRefinement === 'string' ? brief.planRefinement : null,
 	};
 }
 
@@ -533,12 +543,14 @@ export default function ensemblrControl(pi: ExtensionAPI): void {
 	}
 
 	pi.on('before_agent_start', async (event) => {
-		const { languageDirective, nudge, planning } = await fetchSessionBrief();
+		const { languageDirective, nudge, planning, planRefinement } =
+			await fetchSessionBrief();
 		const playbook = planning ? PLAN_MODE_AWARENESS_FOR_ROLE : AWARENESS;
 		const blocks = [
 			event.systemPrompt,
 			playbook,
 			nudge,
+			planRefinement,
 			languageDirective,
 		].filter((block) => typeof block === 'string' && block.length > 0);
 		return { systemPrompt: blocks.join('\n\n') };

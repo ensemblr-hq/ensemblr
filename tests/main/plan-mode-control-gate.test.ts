@@ -67,6 +67,7 @@ const makePorts = (planningSessions: ReadonlySet<string>): AgentControlPorts =>
 		ask: { ask: vi.fn(), releaseSession: vi.fn() },
 		planMode: {
 			exit: vi.fn().mockResolvedValue({ planPath: 'p.md', summary: 'saved' }),
+			hasSubmittedPlan: vi.fn(() => false),
 			isActive: vi.fn((sessionId: string) => planningSessions.has(sessionId)),
 			activateForSpawn: vi.fn(),
 			releaseSession: vi.fn(),
