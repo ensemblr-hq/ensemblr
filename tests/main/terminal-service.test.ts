@@ -665,6 +665,25 @@ test('list scopes sessions to the requested workspace', async (t) => {
 	assert.equal(service.list('other-workspace').length, 0);
 });
 
+test('list without a workspace returns sessions from every workspace', async (t) => {
+	const fakes = [createFakePty(), createFakePty()];
+	const backend: PtyBackend = {
+		spawn: () => (fakes.shift() as ReturnType<typeof createFakePty>).pty,
+	};
+	const { service } = createServiceFixture(t, { backend });
+
+	await service.create({ workspaceId: WORKSPACE_ID });
+	await service.create({ workspaceId: 'workspace-2' });
+
+	assert.deepEqual(
+		service
+			.list()
+			.map((session) => session.workspaceId)
+			.sort(),
+		[WORKSPACE_ID, 'workspace-2'],
+	);
+});
+
 test('interactive sessions use the user shell; script commands use the script shell', async (t) => {
 	const spawnedArgs: string[][] = [];
 	const spawnedFiles: string[] = [];

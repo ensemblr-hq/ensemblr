@@ -22,7 +22,7 @@ import {
 	getComposerState,
 	normalizeWorkbenchSearch,
 } from '../../src/renderer/lib/workbench';
-import { workspaceDockActivityByWorkspaceAtom } from '../../src/renderer/state/workspace';
+import { terminalActivitySnapshotsAtom } from '../../src/renderer/state/workspace';
 import type {
 	DockTabId,
 	ProjectShellModel,
@@ -440,8 +440,12 @@ test('renders additional user terminal tabs as independent interactive sessions'
 test('marks workspace rows with running dock activity', () => {
 	const activeWorkspace = getDefaultWorkspace();
 	const store = createStore();
-	store.set(workspaceDockActivityByWorkspaceAtom, {
-		[activeWorkspace.id]: 'running',
+	store.set(terminalActivitySnapshotsAtom, {
+		'run-1': {
+			kind: 'run-script',
+			status: 'running',
+			workspaceId: activeWorkspace.id,
+		},
 	});
 	const markup = renderWorkbench(
 		null,
@@ -454,6 +458,34 @@ test('marks workspace rows with running dock activity', () => {
 
 	expect(markup).toContain('data-workspace-dock-activity="running"');
 	expect(markup).toContain(
+		'Open workspace Workbench shell rework; dock activity running',
+	);
+});
+
+test('keeps the dock activity dot on rows whose workspace is not open', () => {
+	const activeWorkspace = getDefaultWorkspace();
+	const store = createStore();
+	store.set(terminalActivitySnapshotsAtom, {
+		'setup-1': {
+			kind: 'setup-script',
+			status: 'running',
+			workspaceId: 'linear-issue-flow',
+		},
+	});
+	const markup = renderWorkbench(
+		null,
+		activeWorkspace,
+		DEFAULT_REVIEW_TAB,
+		DEFAULT_DOCK_TAB,
+		shellFixtureProjects,
+		store,
+	);
+
+	expect(markup).toContain('data-workspace-dock-activity="setup-running"');
+	expect(markup).toContain(
+		'Open workspace Linear issue flow; dock activity running',
+	);
+	expect(markup).not.toContain(
 		'Open workspace Workbench shell rework; dock activity running',
 	);
 });

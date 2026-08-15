@@ -155,12 +155,17 @@ export interface KillTerminalResult {
 	session: TerminalSessionSnapshot | null;
 }
 
-/** Request to list a workspace's terminal sessions. */
+/** Request to list terminal sessions. */
 export interface ListTerminalSessionsRequest {
-	workspaceId: string;
+	/**
+	 * Workspace to scope the listing to. Omit to list every live session across
+	 * all workspaces, which is how the sidebar seeds activity badges for
+	 * workspaces whose route is not mounted.
+	 */
+	workspaceId?: string;
 }
 
-/** The terminal sessions belonging to a workspace. */
+/** The listed terminal sessions. */
 export interface ListTerminalSessionsResult {
 	sessions: TerminalSessionSnapshot[];
 }
