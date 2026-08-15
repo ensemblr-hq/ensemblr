@@ -17,6 +17,26 @@ const PREVIEW_IMAGE_MIME_TYPE_BY_EXTENSION: Readonly<Record<string, string>> = {
 };
 
 /**
+ * Image MIME types keyed by extension that no browser engine decodes, so the
+ * preview names the format rather than embedding an `<img>` that renders broken.
+ * They are still image files a user can click in the tree, and the difference
+ * between "we know this is a TIFF and cannot show it" and "these bytes are not
+ * text" is what keeps the preview from dumping the file as mojibake.
+ */
+const UNRENDERABLE_IMAGE_MIME_TYPE_BY_EXTENSION: Readonly<
+	Record<string, string>
+> = {
+	heic: 'image/heic',
+	heif: 'image/heif',
+	jxl: 'image/jxl',
+	tif: 'image/tiff',
+	tiff: 'image/tiff',
+};
+
+/** Leading bytes sniffed when deciding whether a payload reads as text. */
+const TEXT_SNIFF_BYTES = 8000;
+
+/**
  * Lowercase extension of a path's file name, treating a leading-dot name such as
  * `.gitignore` as extensionless the way `path.extname` does.
  * @param filePath - Workspace-relative or absolute file path.
@@ -47,6 +67,34 @@ export function previewImageMimeTypeForPath(filePath: string): string | null {
  */
 export function isPreviewableImagePath(filePath: string): boolean {
 	return previewImageMimeTypeForPath(filePath) !== null;
+}
+
+/**
+ * Resolve the image MIME type a path declares, whether or not a browser can
+ * decode it. Wider than {@link previewImageMimeTypeForPath} on purpose: a
+ * preview that cannot embed the bytes still names the format it refused.
+ * @param filePath - Workspace-relative file path.
+ * @returns The image MIME type, or null when the extension names no image.
+ */
+export function imageMimeTypeForPath(filePath: string): string | null {
+	const extension = fileNameExtension(filePath);
+
+	return (
+		PREVIEW_IMAGE_MIME_TYPE_BY_EXTENSION[extension] ??
+		UNRENDERABLE_IMAGE_MIME_TYPE_BY_EXTENSION[extension] ??
+		null
+	);
+}
+
+/**
+ * Heuristically classify bytes as text the way git does: a NUL byte in the
+ * leading sample means binary. An empty file counts as text — it has nothing in
+ * it that could fail to decode.
+ * @param bytes - Leading bytes of the file being classified.
+ * @returns True when the sample carries no NUL byte.
+ */
+export function bytesLookLikeText(bytes: Uint8Array): boolean {
+	return !bytes.subarray(0, TEXT_SNIFF_BYTES).includes(0);
 }
 
 /** MIME type of the one document format the preview embeds rather than decodes. */

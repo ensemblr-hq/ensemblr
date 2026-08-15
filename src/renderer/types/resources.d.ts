@@ -2452,6 +2452,12 @@ export default interface Resources {
 				'wrap-off': 'Disable word wrap';
 				'wrap-on': 'Enable word wrap';
 			};
+			binary: {
+				'invalid-document': '{{filePath}} is not a valid PDF ({{size}}).';
+				'invalid-image': '{{filePath}} is not a valid {{format}} image ({{size}}).';
+				'not-text': '{{filePath}} is not text and cannot be previewed ({{size}}).';
+				'unsupported-image': '{{format}} images cannot be displayed here ({{size}}).';
+			};
 			empty: {
 				loading: 'Loading {{filePath}}…';
 				'no-file': 'This tab has no file associated with it.';

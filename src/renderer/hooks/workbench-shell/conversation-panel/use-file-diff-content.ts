@@ -106,10 +106,10 @@ export function useFileDiffContent({
 	});
 	const fileData = fullFile.data;
 
-	// A read that came back base64 is an image or a PDF; there is no source to
-	// show beside the patch, and handing the code surface base64 would fill it
-	// with megabytes of noise.
-	const fullFileIsText = fileData?.contentEncoding !== 'base64';
+	// Only a utf8 read has source to show beside the patch: base64 is an image or
+	// a PDF and would fill the code surface with megabytes of noise, and binary
+	// carries no content at all.
+	const fullFileIsText = fileData?.contentEncoding === 'utf8';
 
 	return {
 		fullFileContent:

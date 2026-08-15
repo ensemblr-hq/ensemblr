@@ -1,6 +1,8 @@
 import { describe, expect, test } from 'vitest';
 
 import {
+	bytesLookLikeText,
+	imageMimeTypeForPath,
 	isPreviewableImagePath,
 	pdfBytesLookValid,
 	previewEmbedMimeTypeForPath,
@@ -72,6 +74,54 @@ describe('previewEmbedMimeTypeForPath', () => {
 		expect(previewEmbedMimeTypeForPath('src/main/index.ts')).toBeNull();
 		expect(previewEmbedMimeTypeForPath('assets/icon.svg')).toBeNull();
 		expect(previewEmbedMimeTypeForPath('.pdf')).toBeNull();
+	});
+});
+
+describe('imageMimeTypeForPath', () => {
+	test('names the formats no browser engine decodes', () => {
+		expect(imageMimeTypeForPath('scans/page.tiff')).toBe('image/tiff');
+		expect(imageMimeTypeForPath('scans/page.tif')).toBe('image/tiff');
+		expect(imageMimeTypeForPath('photos/IMG_0001.HEIC')).toBe('image/heic');
+		expect(imageMimeTypeForPath('photos/shot.heif')).toBe('image/heif');
+		expect(imageMimeTypeForPath('photos/shot.jxl')).toBe('image/jxl');
+	});
+
+	test('still names the formats the preview can embed', () => {
+		expect(imageMimeTypeForPath('assets/shot.webp')).toBe('image/webp');
+		expect(imageMimeTypeForPath('assets/logo.png')).toBe('image/png');
+	});
+
+	test('leaves non-images unnamed', () => {
+		expect(imageMimeTypeForPath('src/main/index.ts')).toBeNull();
+		expect(imageMimeTypeForPath('docs/spec.pdf')).toBeNull();
+		expect(imageMimeTypeForPath('assets/icon.svg')).toBeNull();
+	});
+
+	test('keeps the unrenderable formats out of the embeddable set', () => {
+		expect(previewEmbedMimeTypeForPath('scans/page.tiff')).toBeNull();
+		expect(isPreviewableImagePath('photos/IMG_0001.HEIC')).toBe(false);
+	});
+});
+
+describe('bytesLookLikeText', () => {
+	test('reads a NUL-free payload as text', () => {
+		expect(bytesLookLikeText(new TextEncoder().encode('hello\nworld'))).toBe(
+			true,
+		);
+	});
+
+	test('reads a NUL byte in the leading sample as binary', () => {
+		expect(bytesLookLikeText(new Uint8Array([0x68, 0x00, 0x69]))).toBe(false);
+	});
+
+	test('ignores a NUL past the sniffed sample', () => {
+		const bytes = new Uint8Array(9000).fill(0x61);
+		bytes[8500] = 0;
+		expect(bytesLookLikeText(bytes)).toBe(true);
+	});
+
+	test('counts an empty file as text', () => {
+		expect(bytesLookLikeText(new Uint8Array())).toBe(true);
 	});
 });
 

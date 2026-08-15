@@ -442,6 +442,12 @@
 			"wrap-off": "Выключить перенос строк",
 			"wrap-on": "Включить перенос строк"
 		},
+		"binary": {
+			"invalid-document": "{{filePath}} не является корректным PDF ({{size}}).",
+			"invalid-image": "{{filePath}} не является корректным изображением {{format}} ({{size}}).",
+			"not-text": "{{filePath}} не является текстом, предпросмотр недоступен ({{size}}).",
+			"unsupported-image": "Изображения {{format}} нельзя показать здесь ({{size}})."
+		},
 		"empty": {
 			"loading": "Загрузка {{filePath}}…",
 			"no-file": "С этой вкладкой не связан ни один файл."

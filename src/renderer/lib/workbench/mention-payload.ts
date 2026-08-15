@@ -286,6 +286,9 @@ async function readAttachmentContent(
 			`Could not attach ${attachment.path}: ${result.error.message}`,
 		);
 	}
+	if (result.contentEncoding === 'binary') {
+		return null;
+	}
 	return result.content ?? '';
 }
 
