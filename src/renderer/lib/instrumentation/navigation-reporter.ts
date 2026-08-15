@@ -60,7 +60,6 @@ export function logNavigationProfile(
 	console.info(
 		'active matches',
 		matches.map((match) => ({
-			fetchCount: match.fetchCount,
 			id: match.id,
 			isFetching: match.isFetching,
 			loaderDeps: stableJson(match.loaderDeps),
