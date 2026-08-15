@@ -20,6 +20,7 @@ import { useComposerKeymap } from '@/renderer/hooks/workbench-shell/composer/use
 import { useComposerSubmit } from '@/renderer/hooks/workbench-shell/composer/use-composer-submit';
 import { useIssueAttachments } from '@/renderer/hooks/workbench-shell/composer/use-issue-attachments';
 import { useLinkedDirectories } from '@/renderer/hooks/workbench-shell/composer/use-linked-directories';
+import { joinDictatedText } from '@/renderer/lib/dictation';
 import { resolveSendIntent } from '@/renderer/lib/workbench';
 import {
 	composerAttachmentsAtomFamily,
@@ -121,6 +122,8 @@ export interface ComposerStateApi {
 	/** True when the composer holds any draft text or attachment. */
 	hasContent: boolean;
 	insertText: (text: string) => void;
+	/** Drops a dictated phrase in at the caret, spaced to read as prose. */
+	insertDictatedText: (text: string) => void;
 	isStreaming: boolean;
 	/** Grants this chat's agent access to a directory outside the workspace. */
 	linkDirectory: (
@@ -274,6 +277,9 @@ export function useComposerState({
 	});
 	const initialDraft = initialState.draft;
 	const mirroredTextRef = useRef(initialDraft.text);
+	// Where the caret last sat, so an insertion can space itself against the text
+	// it lands after rather than against the end of the draft.
+	const caretRef = useRef(initialDraft.text.length);
 	const snapshotRef = useRef<EditorState | null>(initialDraft.snapshot);
 	const segmentsRef = useRef<readonly ComposerDraftSegment[]>(
 		initialState.segments,
@@ -298,6 +304,25 @@ export function useComposerState({
 		}
 		const separator = mirroredTextRef.current.trim().length > 0 ? '\n\n' : '';
 		editor.appendText(`${separator}${text}`);
+		editor.focus();
+	}, []);
+
+	// Dictation lands mid-sentence rather than as its own block, so it inserts at
+	// the caret with a single space rather than appending after a blank line the
+	// way a pasted context block does.
+	const insertDictatedText = useCallback((text: string) => {
+		const editor = editorRef.current;
+		if (!editor) {
+			return;
+		}
+		const phrase = joinDictatedText(
+			mirroredTextRef.current.slice(0, caretRef.current),
+			text,
+		);
+		if (!phrase) {
+			return;
+		}
+		editor.insertText(phrase);
 		editor.focus();
 	}, []);
 
@@ -401,6 +426,7 @@ export function useComposerState({
 	const handleDraftChange = useCallback(
 		(change: ComposerDraftChange) => {
 			mirroredTextRef.current = change.text;
+			caretRef.current = change.caret;
 			snapshotRef.current = change.snapshot;
 			segmentsRef.current = change.segments;
 			setValue(change.text);
@@ -499,6 +525,7 @@ export function useComposerState({
 		hasChips,
 		hasContent,
 		initialDraft,
+		insertDictatedText,
 		insertText,
 		isStreaming,
 		linkDirectory,

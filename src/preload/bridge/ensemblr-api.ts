@@ -169,6 +169,10 @@ export function createEnsemblrApi(): EnsemblrApi {
 		importLocalRepository: (request) =>
 			invoke('importLocalRepository', request),
 		killTerminalSession: (request) => invoke('killTerminalSession', request),
+		clearDictationApiKey: () => invoke('clearDictationApiKey'),
+		dictationKeyStatus: () => invoke('dictationKeyStatus'),
+		setDictationApiKey: (request) => invoke('setDictationApiKey', request),
+		transcribeAudio: (request) => invoke('transcribeAudio', request),
 		linearCancelLogin: () => invoke('linearCancelLogin'),
 		linearConnectionStatus: () => invoke('linearConnectionStatus'),
 		linearCreateComment: (request) => invoke('linearCreateComment', request),

@@ -2,6 +2,7 @@ import type { TFunction } from 'i18next';
 
 import type { CheckpointFailureCode } from '@/shared/ipc/contracts/checkpoint';
 import type { CloneGithubRepositoryDiagnosticCode } from '@/shared/ipc/contracts/clone';
+import type { DictationFailureCode } from '@/shared/ipc/contracts/dictation';
 import type { GithubFailureCode } from '@/shared/ipc/contracts/github';
 import type { QuickStartProjectDiagnosticCode } from '@/shared/ipc/contracts/quick-start';
 import type {
@@ -47,6 +48,7 @@ export type AppFailureCode =
 	| DeleteArchivedWorkspaceDiagnosticCode
 	| DeleteRepositoryDiagnosticCode
 	| DeleteWorkspaceDiagnosticCode
+	| DictationFailureCode
 	| FilesToCopyDiagnosticCode
 	| GithubFailureCode
 	| ListWorkspaceFilesFailureCode
@@ -213,6 +215,86 @@ export const APP_FAILURE_TEXT: Record<
 		t(
 			'errors:failure.destination-required',
 			'No destination was provided and the managed root has none to fall back on.',
+		),
+	'detached-head': (t) =>
+		t(
+			'errors:failure.detached-head',
+			'This workspace is not on a branch, so GitHub has nothing to match it against. Check out a branch, then retry.',
+		),
+	'dictation-disabled': (t) =>
+		t(
+			'errors:failure.dictation-disabled',
+			'Dictation is turned off in Settings.',
+		),
+	'dictation-empty-transcript': (t) =>
+		t(
+			'errors:failure.dictation-empty-transcript',
+			'No speech was detected in the recording.',
+		),
+	'dictation-invalid-endpoint': (t) =>
+		t(
+			'errors:failure.dictation-invalid-endpoint',
+			'The transcription endpoint must be a full http:// or https:// address.',
+		),
+	'dictation-key-store-unavailable': (t) =>
+		t(
+			'errors:failure.dictation-key-store-unavailable',
+			'The stored transcription API key could not be read from the Keychain.',
+		),
+	'dictation-microphone-denied': (t) =>
+		t(
+			'errors:failure.dictation-microphone-denied',
+			'Ensemblr needs microphone access. Grant it in System Settings › Privacy & Security › Microphone.',
+		),
+	'dictation-microphone-missing': (t) =>
+		t(
+			'errors:failure.dictation-microphone-missing',
+			'No microphone was found.',
+		),
+	'dictation-network': (t) =>
+		t(
+			'errors:failure.dictation-network',
+			'The transcription provider could not be reached.',
+		),
+	'dictation-no-api-key': (t) =>
+		t(
+			'errors:failure.dictation-no-api-key',
+			'Add a transcription API key in Settings to dictate.',
+		),
+	'dictation-not-configured': (t) =>
+		t(
+			'errors:failure.dictation-not-configured',
+			'Dictation has no transcription endpoint configured.',
+		),
+	'dictation-provider-error': (t) =>
+		t(
+			'errors:failure.dictation-provider-error',
+			'The transcription provider rejected the recording.',
+		),
+	'dictation-rate-limited': (t) =>
+		t(
+			'errors:failure.dictation-rate-limited',
+			'The transcription provider is rate-limiting requests.',
+		),
+	'dictation-recorder-unavailable': (t) =>
+		t(
+			'errors:failure.dictation-recorder-unavailable',
+			'Audio recording is not available in this build.',
+		),
+	'dictation-timeout': (t) =>
+		t(
+			'errors:failure.dictation-timeout',
+			'The transcription request timed out.',
+		),
+	'dictation-too-large': (t) =>
+		t(
+			'errors:failure.dictation-too-large',
+			'The recording is too long to transcribe in one request.',
+		),
+	'dictation-unauthorized': (t) =>
+		t(
+			'errors:failure.dictation-unauthorized',
+			'The transcription API key was rejected.',
 		),
 	'diff-failed': (t) =>
 		t('errors:failure.diff-failed', 'The diff could not be produced.'),

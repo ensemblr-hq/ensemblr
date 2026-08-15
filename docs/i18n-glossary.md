@@ -47,6 +47,7 @@ Rules of thumb:
 | Setup script | Скрипт настройки | Σενάριο εγκατάστασης | |
 | Spawn terminal | Дополнительный терминал | Πρόσθετο τερματικό | Literally "spawn" reads as biology in both; use "additional". |
 | Scrollback | Буфер прокрутки | Ιστορικό κύλισης | How many lines a terminal pane retains. Russian takes the buffer metaphor (`буфер прокрутки`); Greek takes the history one (`ιστορικό κύλισης`) — a literal `buffer κύλισης` mixes scripts for no gain. |
+| Command output | Вывод команды | Έξοδος εντολής | Verbatim stderr/stdout a failed `git` or `gh` call wrote, shown demoted under the explanation. Both terms were already fixed by `errors:failure.parse-failed`; this row records them. |
 | Plan mode | Режим плана | Λειτουργία σχεδίου | |
 | Board | Доска | Πίνακας εργασιών | The kanban dashboard. |
 | Setting | Настройка | Ρύθμιση | |
@@ -58,6 +59,10 @@ Rules of thumb:
 | Attachment | Вложение | Συνημμένο | |
 | Pasted text | Вставленный текст | Επικολλημένο κείμενο | A long clipboard paste the composer stored as an attachment. Named for the act, not the file — "вставка"/"επικόλληση" reads as the gesture, and the chip labels a thing. |
 | Token | Токен | Διακριτικό | Model context unit. Localized in both — it is not git porcelain and not a proper noun. |
+| Dictation | Диктовка | Υπαγόρευση | Speaking a prompt into the composer. The feature, and the verb on its control (`Продиктовать`/`Υπαγόρευση`). |
+| Transcription | Транскрибация | Μεταγραφή | Turning the recorded clip into text. Russian takes `транскрибация` over `расшифровка`, which also reads as *decryption*; Greek takes `μεταγραφή` over the much longer `απομαγνητοφώνηση`. |
+| Microphone | Микрофон | Μικρόφωνο | |
+| API key | Ключ API | Κλειδί API | `API` stays Latin in both — it is an initialism, not a translatable noun. |
 | Remote | Удалённый | Απομακρυσμένο | The adjective is localized; the remote's *name* (`origin`) is not. |
 | Merged | Выполнен merge | Έγινε merge | Past-tense PR status. `merge` stays borrowed per the git-porcelain rule; only the auxiliary is localized. |
 | Setup wizard | Мастер настройки | Οδηγός εγκατάστασης | The first-run gate. "Мастер"/"οδηγός" is the platform word for a wizard; never "волшебник"/"μάγος". |

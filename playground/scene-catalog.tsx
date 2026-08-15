@@ -4,6 +4,7 @@ import { ComposerScene } from './composer-preview.tsx';
 import { ComposerQueueScene } from './composer-queue-preview.tsx';
 import { ConflictsScene } from './conflicts-preview.tsx';
 import { ConversationScrollScene } from './conversation-scroll-preview.tsx';
+import { FailureBannerScene } from './failure-banner-preview.tsx';
 import { FilePreviewScene } from './file-preview.tsx';
 import { OnboardingScene } from './onboarding-preview.tsx';
 import { ProvidersScene } from './providers-preview.tsx';
@@ -96,6 +97,12 @@ export const SCENE_GROUPS = [
 				label: 'conflicts',
 				render: () => <ConflictsScene />,
 				source: 'playground/conflicts-preview.tsx',
+			},
+			{
+				id: 'failure-banner',
+				label: 'failure banner',
+				render: () => <FailureBannerScene />,
+				source: 'playground/failure-banner-preview.tsx',
 			},
 		],
 	},

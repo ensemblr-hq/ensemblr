@@ -70,9 +70,7 @@ export function useLivePullRequestModel({
 			changeSummary,
 			localComments: reviewCommentsData?.comments ?? [],
 			snapshot: prSnapshotData.snapshot,
-			...(prSnapshotData.error
-				? { syncError: prSnapshotData.error.message }
-				: {}),
+			...(prSnapshotData.error ? { syncFailure: prSnapshotData.error } : {}),
 			todos: reviewTodosData?.todos ?? [],
 		});
 	}, [

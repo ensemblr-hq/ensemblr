@@ -550,6 +550,22 @@ export default interface Resources {
 			'destination-not-writable': 'Ensemblr cannot write to that location. Pick a writable one.';
 			'destination-path-relative': 'The destination path must be absolute.';
 			'destination-required': 'No destination was provided and the managed root has none to fall back on.';
+			'detached-head': 'This workspace is not on a branch, so GitHub has nothing to match it against. Check out a branch, then retry.';
+			'dictation-disabled': 'Dictation is turned off in Settings.';
+			'dictation-empty-transcript': 'No speech was detected in the recording.';
+			'dictation-invalid-endpoint': 'The transcription endpoint must be a full http:// or https:// address.';
+			'dictation-key-store-unavailable': 'The stored transcription API key could not be read from the Keychain.';
+			'dictation-microphone-denied': 'Ensemblr needs microphone access. Grant it in System Settings › Privacy & Security › Microphone.';
+			'dictation-microphone-missing': 'No microphone was found.';
+			'dictation-network': 'The transcription provider could not be reached.';
+			'dictation-no-api-key': 'Add a transcription API key in Settings to dictate.';
+			'dictation-not-configured': 'Dictation has no transcription endpoint configured.';
+			'dictation-provider-error': 'The transcription provider rejected the recording.';
+			'dictation-rate-limited': 'The transcription provider is rate-limiting requests.';
+			'dictation-recorder-unavailable': 'Audio recording is not available in this build.';
+			'dictation-timeout': 'The transcription request timed out.';
+			'dictation-too-large': 'The recording is too long to transcribe in one request.';
+			'dictation-unauthorized': 'The transcription API key was rejected.';
 			'diff-failed': 'The diff could not be produced.';
 			'dirty-state': 'The working tree has uncommitted changes.';
 			'gh-not-authenticated': 'GitHub CLI is not signed in. Run gh auth login, then retry.';
@@ -1408,6 +1424,30 @@ export default interface Resources {
 			};
 			title: 'Diagnostics';
 		};
+		dictation: {
+			'api-key': {
+				description: 'Stored in the macOS Keychain, never in a config file. Ensemblr sends it only to the endpoint above.';
+				label: 'API key';
+				placeholder: 'Paste your API key';
+				replace: 'Replace';
+			};
+			'base-url': {
+				description: 'Root of an OpenAI-compatible API. Ensemblr posts to its /audio/transcriptions path.';
+				insecure: 'This address is not encrypted, so your API key would be sent over the network in the clear. Use https, or a local address.';
+				invalid: 'Enter a full address starting with https:// or http://.';
+				label: 'API endpoint';
+			};
+			description: 'Speak a prompt into the composer. Ensemblr records while you hold the control open, then sends the clip to the transcription service you configure here. English only for now.';
+			enabled: {
+				description: 'Shows a microphone in the composer control row, toggled with {{shortcut}}. It stays hidden until an API key is stored.';
+				label: 'Enable dictation';
+			};
+			model: {
+				description: 'Transcription model id, for example gpt-4o-mini-transcribe or whisper-large-v3-turbo.';
+				label: 'Model';
+			};
+			title: 'Dictation';
+		};
 		environment: {
 			add: 'Add environment variable';
 			description: 'Environment variables used by Ensemblr and passed to agent sessions, scripts, and terminals.';
@@ -1930,6 +1970,7 @@ export default interface Resources {
 				'composer-queue': 'Queue message as a follow-up';
 				'composer-submit': 'Send message';
 				'composer-submit-with-mod': 'Send message';
+				'composer-toggle-dictation': 'Start or stop dictation';
 				'composer-toggle-model-picker': 'Toggle model picker';
 				'composer-toggle-plan-mode': 'Toggle plan mode';
 				'dialog-submit': 'Submit dialog form';
@@ -2130,6 +2171,11 @@ export default interface Resources {
 			'aria-label': 'Agent composer';
 			'attachment-failed': 'Failed to attach selected file.';
 			'blocked-follow-up': 'Follow-ups are held while the agent works — sending or {{shortcut}} adds to the queue, and you send it from there once the agent finishes.';
+			dictation: {
+				start: 'Dictate a prompt';
+				stop: 'Stop dictation';
+				transcribing: 'Transcribing…';
+			};
 			'focus-hint': '<key>{{shortcut}}</key><label>to focus</label>';
 			'follow-up': {
 				placeholder: 'Send a follow-up';
@@ -2664,6 +2710,9 @@ export default interface Resources {
 		'open-workspace-menu': {
 			options: 'Open current workspace app options';
 			primary: 'Open current workspace in {{target}}';
+		};
+		'panel-alert': {
+			output: 'Command output';
 		};
 		'permission-boundary': {
 			allowed: 'Allowed';

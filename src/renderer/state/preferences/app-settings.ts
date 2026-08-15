@@ -161,6 +161,13 @@ export const terminalScrollbackMbAtom = settingAtom(
 	'terminalScrollbackMb',
 );
 
+/** Whether the composer shows its dictation control. */
+export const dictationEnabledAtom = settingAtom('dictation', 'enabled');
+/** OpenAI-compatible API root the transcription request is posted to. */
+export const dictationBaseUrlAtom = settingAtom('dictation', 'baseUrl');
+/** Transcription model id sent with each clip. */
+export const dictationModelAtom = settingAtom('dictation', 'model');
+
 /**
  * Hydrates {@link appSettingsAtom} from `config.json` on mount and live-reloads
  * it when the file is edited outside the app. Mount once at the app root.

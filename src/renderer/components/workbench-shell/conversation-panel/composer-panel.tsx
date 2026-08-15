@@ -1,7 +1,11 @@
+import { useQuery } from '@tanstack/react-query';
+import { useAtomValue } from 'jotai';
 import { type ReactNode, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { dictationKeyStatusQuery } from '@/renderer/api/ensemblr';
 import { useHotkey } from '@/renderer/hooks/use-hotkey';
 import { useComposerState } from '@/renderer/hooks/workbench-shell/composer/use-composer-state';
+import { useDictation } from '@/renderer/hooks/workbench-shell/composer/use-dictation';
 import { cn } from '@/renderer/lib/utils';
 import { getNextThinkingId } from '@/renderer/lib/workbench/thinking-strength';
 import { useConsumeComposerFocusRequest } from '@/renderer/state/composer';
@@ -9,6 +13,7 @@ import {
 	useMenuCommand,
 	useMenuCommandChecked,
 } from '@/renderer/state/menu-commands';
+import { dictationEnabledAtom } from '@/renderer/state/preferences';
 import type { ComposerShellState } from '@/renderer/types/workbench';
 import { ComposerControls } from './composer/composer-controls';
 import { ComposerNotices } from './composer/composer-notices';
@@ -116,6 +121,24 @@ function ComposerPanelBody({
 		cycleThinking,
 		!pickersDisabled && composer.availableThinkingLevels.length > 0,
 	);
+	// The mic is hidden rather than disabled when dictation is off or has no key:
+	// a permanently dead control in the row teaches nothing, while its absence
+	// sends the user to the settings row that can actually turn it on.
+	const dictationEnabled = useAtomValue(dictationEnabledAtom);
+	const { data: dictationKeyStatus } = useQuery({
+		...dictationKeyStatusQuery,
+		enabled: dictationEnabled,
+	});
+	const dictationVisible =
+		dictationEnabled && (dictationKeyStatus?.configured ?? false);
+	const dictation = useDictation({
+		enabled: dictationVisible && !composer.disabled,
+		onTranscript: state.insertDictatedText,
+	});
+	useHotkey('composer.toggleDictation', dictation.toggle, {
+		enabled: dictationVisible && !composer.disabled,
+	});
+
 	useMenuCommand('composer.togglePlanMode', togglePlanMode, !pickersDisabled);
 	useMenuCommandChecked('composer.togglePlanMode', composer.planMode);
 	useMenuCommand(
@@ -207,7 +230,10 @@ function ComposerPanelBody({
 							type='file'
 						/>
 
-						<ComposerNotices state={state} />
+						<ComposerNotices
+							dictationFailure={dictation.failure}
+							state={state}
+						/>
 
 						<ComposerAutocompletePopover
 							activeIndex={state.activeIndex}
@@ -229,6 +255,7 @@ function ComposerPanelBody({
 
 						<ComposerControls
 							composer={composer}
+							dictation={dictation}
 							modelPickerOpen={modelPickerOpen}
 							onLinkDirectory={() => setDirectoryPickerOpen(true)}
 							onLinkIssue={() => setIssuePickerOpen(true)}

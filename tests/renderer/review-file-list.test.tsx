@@ -150,6 +150,7 @@ test('a generic read failure leads with plain copy and demotes the raw error', (
 	const markup = renderError({
 		code: 'command-failed',
 		message: 'fatal: bad revision HEAD',
+		output: 'fatal: bad revision HEAD',
 	});
 
 	expect(markup).toContain('Could not read changes');
@@ -158,10 +159,24 @@ test('a generic read failure leads with plain copy and demotes the raw error', (
 	expect(markup).toContain('fatal: bad revision HEAD');
 });
 
+// git wrote nothing, so `message` is our own English fallback. Demoting it would
+// put an untranslated sentence in a Russian panel dressed as git's words.
+test('a read failure with no git output shows the explanation alone', () => {
+	const markup = renderError({
+		code: 'command-failed',
+		message: 'git status failed in workspace.',
+	});
+
+	expect(markup).toContain('Could not read changes');
+	expect(markup).not.toContain('git status failed in workspace.');
+});
+
 test('a missing git repository is named instead of shown as a raw git error', () => {
 	const markup = renderError({
 		code: 'not-a-git-repo',
 		message:
+			'fatal: not a git repository (or any of the parent directories): .git',
+		output:
 			'fatal: not a git repository (or any of the parent directories): .git',
 	});
 

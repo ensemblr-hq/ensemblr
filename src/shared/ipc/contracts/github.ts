@@ -7,6 +7,7 @@
 /** Stable failure classification for git/gh review-flow operations. */
 export type GithubFailureCode =
 	| 'command-failed'
+	| 'detached-head'
 	| 'dirty-state'
 	| 'gh-not-authenticated'
 	| 'gh-not-installed'
@@ -21,7 +22,14 @@ export type GithubFailureCode =
 /** A failed git/gh operation, with its code, message, and optional remediation hint. */
 export interface GithubFailure {
 	code: GithubFailureCode;
+	/**
+	 * Locale-neutral English for the support bundle. Falls back to our own prose
+	 * when the command wrote no stderr, so it is never safe to render verbatim —
+	 * the renderer translates `code` and demotes `output`.
+	 */
 	message: string;
+	/** The command's own stderr, present only when it wrote any. */
+	output?: string;
 	/** Actionable next step shown beside the error (e.g. run `gh auth login`). */
 	remediation?: string;
 }
