@@ -2,12 +2,15 @@ import { expect, test } from 'vitest';
 
 import {
 	activeChatContextSchema,
+	addInfisicalAccountRequestSchema,
+	infisicalLinkScopeRequestSchema,
 	launchAgentHarnessRequestSchema,
 	openChatTabRequestSchema,
 	parseCreateWorkspaceRequest,
 	parseGithubRepositoryListRequest,
 	parseUpdateRepositorySettingsRequest,
 	resumeAgentHarnessRequestSchema,
+	setInfisicalLinkRequestSchema,
 } from '../../src/main/ipc/request-schemas.ts';
 
 test('openChatTabRequestSchema accepts the terminal tab kind', () => {
@@ -265,4 +268,70 @@ test('activeChatContextSchema rejects a report missing either required id', () =
 		}).success,
 	).toBe(false);
 	expect(activeChatContextSchema.safeParse('garbage').success).toBe(false);
+});
+
+test('addInfisicalAccountRequestSchema requires both halves of the credential', () => {
+	expect(() =>
+		addInfisicalAccountRequestSchema.parse({
+			clientId: 'id',
+			clientSecret: '',
+			label: 'Work',
+			siteUrl: 'https://app.infisical.com',
+		}),
+	).toThrow();
+	expect(() =>
+		addInfisicalAccountRequestSchema.parse({
+			clientId: '',
+			clientSecret: 'secret',
+			label: 'Work',
+			siteUrl: 'https://app.infisical.com',
+		}),
+	).toThrow();
+});
+
+test('addInfisicalAccountRequestSchema accepts a blank label', () => {
+	expect(
+		addInfisicalAccountRequestSchema.parse({
+			clientId: 'id',
+			clientSecret: 'secret',
+			label: '',
+			siteUrl: 'https://infisical.example.com',
+		}).label,
+	).toBe('');
+});
+
+test('infisicalLinkScopeRequestSchema rejects a scope that cannot be linked', () => {
+	expect(
+		infisicalLinkScopeRequestSchema.parse({
+			scope: 'repository',
+			scopeId: 'repo-1',
+		}).scope,
+	).toBe('repository');
+	expect(() =>
+		infisicalLinkScopeRequestSchema.parse({ scope: 'app', scopeId: '' }),
+	).toThrow();
+});
+
+test('setInfisicalLinkRequestSchema requires a project and an environment', () => {
+	expect(() =>
+		setInfisicalLinkRequestSchema.parse({
+			accountId: 'acc-1',
+			environmentSlug: '',
+			projectId: 'proj-1',
+			scope: 'repository',
+			scopeId: 'repo-1',
+		}),
+	).toThrow();
+});
+
+test('setInfisicalLinkRequestSchema leaves the optional flags unset', () => {
+	const parsed = setInfisicalLinkRequestSchema.parse({
+		accountId: 'acc-1',
+		environmentSlug: 'dev',
+		projectId: 'proj-1',
+		scope: 'repository',
+		scopeId: 'repo-1',
+	});
+	expect(parsed.recursive).toBeUndefined();
+	expect(parsed.secretPath).toBeUndefined();
 });

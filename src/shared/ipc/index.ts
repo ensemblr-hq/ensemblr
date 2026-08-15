@@ -169,6 +169,26 @@ export type {
 	HealthSnapshot,
 } from './contracts/health';
 export type {
+	AddInfisicalAccountRequest,
+	InfisicalAccountListFailure,
+	InfisicalAccountMutationResult,
+	InfisicalAccountRequest,
+	InfisicalAccountSnapshot,
+	InfisicalAccountsResult,
+	InfisicalApi,
+	InfisicalEnvironmentSnapshot,
+	InfisicalFailure,
+	InfisicalFailureCode,
+	InfisicalLinkResult,
+	InfisicalLinkScope,
+	InfisicalLinkScopeRequest,
+	InfisicalLinkSnapshot,
+	InfisicalProjectSnapshot,
+	InfisicalProjectsResult,
+	InfisicalSyncResult,
+	SetInfisicalLinkRequest,
+} from './contracts/infisical';
+export type {
 	CreateLinearCommentRequest,
 	CreateLinearCommentResult,
 	CreateLinearIssueRequest,

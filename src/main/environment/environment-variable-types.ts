@@ -24,10 +24,32 @@ export interface SqliteEnvironmentRow {
 	value_json: string;
 }
 
+/**
+ * Values a linked Infisical project supplies for one scope, plus a
+ * locale-neutral reason when the answer is degraded — served from a stale
+ * cache, unreachable, or waiting on the user to pick a local account.
+ */
+export interface InfisicalScopeResolution {
+	degradedReason: 'no-account' | 'stale-cache' | 'unavailable' | null;
+	values: Record<string, string>;
+}
+
+/**
+ * Resolves a scope's Infisical values. Injected rather than imported so this
+ * module never depends on `src/main/infisical/`, and so tests can supply a fake
+ * without a network or a Keychain. It must never throw: an empty result is
+ * always a valid answer.
+ */
+export type InfisicalEnvironmentResolver = (
+	scope: NormalizedScope,
+) => Promise<InfisicalScopeResolution>;
+
 /** Internal: accumulated state used to render a snapshot or assembled env. */
 export interface EnvironmentState {
 	catalogByKey: Map<string, EnvironmentVariableCatalogEntrySnapshot>;
 	diagnostics: EnvironmentVariableDiagnostic[];
+	/** Values a linked Infisical project supplies, keyed by variable name. */
+	infisicalValues: Map<string, string>;
 	invalidKeys: Set<string>;
 	plainValues: Map<string, PlainValueCandidate>;
 	requiredKeys: Set<string>;

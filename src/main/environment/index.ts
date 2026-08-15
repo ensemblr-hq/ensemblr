@@ -1,4 +1,9 @@
 export type {
+	InfisicalEnvironmentResolver,
+	InfisicalScopeResolution,
+	NormalizedScope,
+} from './environment-variable-types';
+export type {
 	CreateEnvironmentVariablesServiceOptions,
 	EnvironmentFileInput,
 	EnvironmentFilesScopeInput,

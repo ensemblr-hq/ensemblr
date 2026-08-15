@@ -10,6 +10,7 @@ import {
 	HeartPulseIcon,
 	KeyboardIcon,
 	KeyRoundIcon,
+	LockKeyholeIcon,
 	PlugZapIcon,
 	PuzzleIcon,
 	ScrollIcon,
@@ -129,6 +130,12 @@ function repoNav(t: TFunction): RepoNavItem[] {
 			section: 'environment',
 		},
 		{
+			icon: LockKeyholeIcon,
+			kind: 'repo',
+			label: t('settings:repo-nav.secrets', 'Secrets'),
+			section: 'secrets',
+		},
+		{
 			icon: GitBranchIcon,
 			kind: 'repo',
 			label: t('settings:repo-nav.git', 'Git'),
@@ -167,6 +174,7 @@ const REPO_SECTION_TARGETS = {
 	git: '/settings/repo/$repoId/git',
 	misc: '/settings/repo/$repoId/misc',
 	scripts: '/settings/repo/$repoId/scripts',
+	secrets: '/settings/repo/$repoId/secrets',
 	security: '/settings/repo/$repoId/security',
 } as const;
 

@@ -733,6 +733,86 @@ ALTER TABLE root_directories_new RENAME TO root_directories;
 CREATE INDEX idx_root_directories_status ON root_directories(status);
 `,
 	},
+	{
+		id: '017_infisical_accounts_and_links',
+		version: 17,
+		// `infisical_accounts` deliberately has no column for the client secret:
+		// it lives in the Keychain keyed by the account id, so a database copied
+		// off the machine carries no credential. `infisical_links` holds only the
+		// per-machine half of a link — which account resolves it, and when it last
+		// synced — because the project half is committed to the repository's
+		// `.ensemblr/settings.toml` instead.
+		sql: `
+CREATE TABLE infisical_accounts (
+	id TEXT PRIMARY KEY,
+	label TEXT NOT NULL,
+	site_url TEXT NOT NULL,
+	client_id TEXT NOT NULL,
+	last_verified_at TEXT,
+	last_error_code TEXT,
+	created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+	updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+	UNIQUE(site_url, client_id)
+) STRICT;
+
+CREATE TABLE infisical_links (
+	scope TEXT NOT NULL CHECK (scope IN ('repository', 'workspace')),
+	scope_id TEXT NOT NULL,
+	account_id TEXT REFERENCES infisical_accounts(id) ON DELETE SET NULL,
+	site_url TEXT,
+	project_id TEXT NOT NULL,
+	project_name TEXT,
+	environment_slug TEXT NOT NULL,
+	-- Named folder_path rather than secret_path: it holds the Infisical folder
+	-- to read, never a secret value, and database.test.ts asserts that no column
+	-- name looks like it stores one.
+	folder_path TEXT NOT NULL DEFAULT '/',
+	recursive INTEGER NOT NULL DEFAULT 0 CHECK (recursive IN (0, 1)),
+	enabled INTEGER NOT NULL DEFAULT 1 CHECK (enabled IN (0, 1)),
+	last_synced_at TEXT,
+	created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+	updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+	PRIMARY KEY(scope, scope_id)
+) STRICT;
+
+CREATE INDEX idx_infisical_links_account_id ON infisical_links(account_id);
+`,
+	},
+	{
+		id: '018_infisical_link_folder_path',
+		version: 18,
+		// 017 first shipped its path column as `secret_path`, which trips the
+		// "no column name looks like it stores a secret" assertion in
+		// `database.test.ts`. Migrations are keyed by id and never re-run, so
+		// editing 017 in place fixed a fresh install while leaving any database
+		// that already applied it on the old column — and every write then failed
+		// on the missing `folder_path`. The table holds only local link state and
+		// nothing has been released, so recreating it unconditionally is both
+		// cheaper and safer than a conditional rename: the result is identical
+		// whichever variant 017 left behind.
+		sql: `
+DROP TABLE IF EXISTS infisical_links;
+
+CREATE TABLE infisical_links (
+	scope TEXT NOT NULL CHECK (scope IN ('repository', 'workspace')),
+	scope_id TEXT NOT NULL,
+	account_id TEXT REFERENCES infisical_accounts(id) ON DELETE SET NULL,
+	site_url TEXT,
+	project_id TEXT NOT NULL,
+	project_name TEXT,
+	environment_slug TEXT NOT NULL,
+	folder_path TEXT NOT NULL DEFAULT '/',
+	recursive INTEGER NOT NULL DEFAULT 0 CHECK (recursive IN (0, 1)),
+	enabled INTEGER NOT NULL DEFAULT 1 CHECK (enabled IN (0, 1)),
+	last_synced_at TEXT,
+	created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+	updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+	PRIMARY KEY(scope, scope_id)
+) STRICT;
+
+CREATE INDEX idx_infisical_links_account_id ON infisical_links(account_id);
+`,
+	},
 ];
 
 /** Highest declared migration version embedded in this build. */

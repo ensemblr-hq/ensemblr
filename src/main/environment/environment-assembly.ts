@@ -62,6 +62,34 @@ export function readEnvFileLayer({
 }
 
 /**
+ * Read the layer a linked Infisical project supplies. It sits above env files
+ * and below explicit local values, so a variable set by hand in Ensemblr still
+ * wins while a developer debugs against a local service. Every value is
+ * redacted from command output, because everything Infisical stores is a
+ * secret.
+ * @param state - Resolved environment state carrying the Infisical values
+ * @returns The Infisical layer
+ */
+export function readInfisicalLayer(state: EnvironmentState): EnvironmentLayer {
+	const env: Record<string, string> = {};
+	const redactValues: string[] = [];
+
+	for (const [key, value] of state.infisicalValues) {
+		if (isReservedEnvironmentVariableKey(key, state.catalogByKey)) {
+			continue;
+		}
+
+		env[key] = value;
+
+		if (value) {
+			redactValues.push(value);
+		}
+	}
+
+	return { diagnostics: [], env, redactValues };
+}
+
+/**
  * Read the explicit plain-value layer, skipping reserved keys and any key the
  * secret store owns.
  * @param state - Resolved environment state carrying the plain candidates

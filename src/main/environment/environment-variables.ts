@@ -19,6 +19,7 @@ import {
 	EMPTY_ENVIRONMENT_LAYER,
 	missingRequiredDiagnostics,
 	readEnvFileLayer,
+	readInfisicalLayer,
 	readPlainLayer,
 	readSecretLayer,
 } from './environment-assembly.ts';
@@ -35,7 +36,10 @@ import {
 } from './environment-variable-keys.ts';
 import { resolveEnvironmentVariables } from './environment-variable-resolution.ts';
 import { createVariableSnapshots } from './environment-variable-snapshots.ts';
-import type { NormalizedScope } from './environment-variable-types.ts';
+import type {
+	InfisicalEnvironmentResolver,
+	NormalizedScope,
+} from './environment-variable-types.ts';
 import { envFilePathExists } from './parse-env-file.ts';
 import {
 	deletePlainSetting,
@@ -147,6 +151,11 @@ export interface CreateEnvironmentVariablesServiceOptions {
 	database?: DatabaseSync | null;
 	databaseService?: EnsemblrDatabaseService;
 	now?: () => Date;
+	/**
+	 * Resolves a scope's linked Infisical values. Injected so this module never
+	 * depends on `src/main/infisical/`; omitted, the Infisical layer is empty.
+	 */
+	resolveInfisical?: InfisicalEnvironmentResolver | null;
 	secretStore?: SecretStore;
 	secretStoreFactory?: (database: DatabaseSync) => SecretStore | null;
 }
@@ -177,6 +186,7 @@ export function createEnvironmentVariablesService({
 	database = undefined,
 	databaseService,
 	now = () => new Date(),
+	resolveInfisical = null,
 	secretStore,
 	secretStoreFactory = createDefaultSecretStore,
 }: CreateEnvironmentVariablesServiceOptions): EnvironmentVariablesService {
@@ -223,6 +233,7 @@ export function createEnvironmentVariablesService({
 			database: databaseConnection,
 			now,
 			requiredKeys: options.requiredKeys,
+			resolveInfisical,
 			scope,
 			secretStore: getSecretStore(databaseConnection),
 		});
@@ -269,21 +280,31 @@ export function createEnvironmentVariablesService({
 			database: databaseConnection,
 			now,
 			requiredKeys: options.requiredKeys,
+			resolveInfisical:
+				(options.includeSecrets ?? true) ? resolveInfisical : null,
 			scope: normalizeScope(options),
 			secretStore: getSecretStore(databaseConnection),
 		});
-		// Env-file values are the lowest precedence within the scope, explicit
-		// plain variables override them, and resolved secrets override both.
+		// Env-file values are the lowest precedence within the scope, a linked
+		// Infisical project overrides them, explicit plain variables override
+		// that, and resolved secrets override everything.
 		const envFiles = readEnvFileLayer({ database: databaseConnection, state });
+		const infisical = readInfisicalLayer(state);
 		const plain = readPlainLayer(state);
 		const secrets =
 			(options.includeSecrets ?? true)
 				? await readSecretLayer(state)
 				: EMPTY_ENVIRONMENT_LAYER;
 
-		const env = { ...envFiles.env, ...plain.env, ...secrets.env };
+		const env = {
+			...envFiles.env,
+			...infisical.env,
+			...plain.env,
+			...secrets.env,
+		};
 		state.diagnostics.push(
 			...envFiles.diagnostics,
+			...infisical.diagnostics,
 			...plain.diagnostics,
 			...secrets.diagnostics,
 			...missingRequiredDiagnostics({ env, requiredKeys: state.requiredKeys }),
@@ -292,7 +313,11 @@ export function createEnvironmentVariablesService({
 		return {
 			diagnostics: state.diagnostics,
 			env,
-			redactValues: [...envFiles.redactValues, ...secrets.redactValues],
+			redactValues: [
+				...envFiles.redactValues,
+				...infisical.redactValues,
+				...secrets.redactValues,
+			],
 		};
 	}
 

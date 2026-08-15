@@ -20,6 +20,7 @@ import {
 	createGithubService,
 	createWorkspacePrStatusSweeper,
 } from '../github/index.ts';
+import type { InfisicalService } from '../infisical';
 import type { LinearAuthService, LinearService } from '../linear';
 import { createLinkedDirectoryService } from '../linked-directories/index.ts';
 import type { MenuContextStore } from '../menu';
@@ -72,6 +73,7 @@ import { registerDictationHandlers } from './handlers/dictation';
 import { registerEnvironmentHandlers } from './handlers/environment';
 import { registerGithubHandlers } from './handlers/github';
 import { registerHealthHandlers } from './handlers/health';
+import { registerInfisicalHandlers } from './handlers/infisical';
 import { registerLinearHandlers } from './handlers/linear';
 import { registerLinkedDirectoryHandlers } from './handlers/linked-directories';
 import { registerMenuHandlers } from './handlers/menu';
@@ -116,6 +118,8 @@ interface RegisterIpcHandlersOptions {
 	deleteWorkspaceService: DeleteWorkspaceService;
 	dictationService: DictationService;
 	environmentVariablesService: EnvironmentVariablesService;
+	/** Resolves the Infisical service, which is rebuilt when the database connection changes. */
+	getInfisicalService: () => InfisicalService | null;
 	githubCloneService: GithubCloneService;
 	harnessDetectionService: HarnessDetectionService;
 	githubRepositoryListService: GithubRepositoryListService;
@@ -185,6 +189,7 @@ export function registerIpcHandlers({
 	deleteWorkspaceService,
 	dictationService,
 	environmentVariablesService,
+	getInfisicalService,
 	githubCloneService,
 	githubRepositoryListService,
 	harnessDetectionService,
@@ -232,6 +237,7 @@ export function registerIpcHandlers({
 	registerAppSettingsHandlers({ appSettingsService, onAppSettingsUpdated });
 	registerDictationHandlers({ dictationService });
 	registerEnvironmentHandlers({ environmentVariablesService });
+	registerInfisicalHandlers({ getInfisicalService });
 	registerHealthHandlers({ configService, databaseService });
 	registerShellSnapshotHandlers({
 		appSettingsService,

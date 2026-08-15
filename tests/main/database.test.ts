@@ -32,6 +32,8 @@ const EXPECTED_MIGRATIONS = [
 	'014_agent_session_vocabulary',
 	'015_untitled_chat_tab_placeholder',
 	'016_root_directory_source_union',
+	'017_infisical_accounts_and_links',
+	'018_infisical_link_folder_path',
 ];
 
 const AGENT_VOCABULARY_MIGRATION_VERSION = 14;
@@ -244,6 +246,8 @@ test('opens an isolated database and applies foundation migrations', (t) => {
 		'chat_tabs',
 		'checkpoints',
 		'comments',
+		'infisical_accounts',
+		'infisical_links',
 		'integration_metadata',
 		'linear_comments',
 		'linear_issues',

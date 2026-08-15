@@ -27,6 +27,7 @@ export type EnvironmentVariableDiagnosticSeverity =
 /** Where an environment variable's resolved value came from. */
 export type EnvironmentVariableSource =
 	| SettingsResolutionSource
+	| 'infisical'
 	| 'runtime'
 	| 'secret-metadata';
 

@@ -11,6 +11,7 @@ import type { DictationApi } from './dictation';
 import type { EnvironmentApi } from './environment';
 import type { GithubApi } from './github';
 import type { HealthApi } from './health';
+import type { InfisicalApi } from './infisical';
 import type { LinearApi } from './linear';
 import type { LinkedDirectoriesApi } from './linked-directories';
 import type { OpenTargetApi } from './open-target';
@@ -70,6 +71,7 @@ export interface EnsemblrApi
 		AgentProviderApi,
 		AgentToolApprovalApi,
 		LinearApi,
+		InfisicalApi,
 		LinkedDirectoriesApi,
 		DictationApi,
 		OpenTargetApi {}

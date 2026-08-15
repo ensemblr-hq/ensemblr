@@ -14,8 +14,10 @@ import {
 	readEnvironmentVariableValue,
 	unsetEnvironmentVariable,
 } from '@/renderer/api/ensemblr';
+import { Badge } from '@/renderer/components/ui/badge';
 import { Button } from '@/renderer/components/ui/button';
 import { Spinner } from '@/renderer/components/ui/spinner';
+import { InfisicalLogo } from '@/renderer/components/workbench-shell/source-provider-logo';
 import type {
 	EnvironmentVariableScope,
 	EnvironmentVariableSnapshot,
@@ -42,6 +44,9 @@ export function EnvironmentVariableRow({
 	const [loading, setLoading] = useState(false);
 
 	const isSecret = variable.valueKind === 'secret';
+	// A linked Infisical project owns this value, so there is nothing local to
+	// reveal, edit, or delete — Ensemblr resolves it at launch and caches it.
+	const isInfisical = variable.source === 'infisical';
 
 	const handleToggleReveal = async () => {
 		if (revealed) {
@@ -88,49 +93,68 @@ export function EnvironmentVariableRow({
 				<code className='truncate font-mono text-foreground text-xs'>
 					{variable.key}
 				</code>
+				{isInfisical ? (
+					<Badge
+						className='shrink-0 gap-1 font-normal text-xxs'
+						variant='outline'
+					>
+						<InfisicalLogo className='size-3' />
+						{/* i18next-instrument-ignore */}
+						Infisical
+					</Badge>
+				) : null}
 			</div>
 			<div className='flex shrink-0 items-center gap-2'>
-				<Button
-					aria-label={
-						revealed
-							? t('settings:environment.row.hide-value', 'Hide value')
-							: t('settings:environment.row.show-value', 'Show value')
-					}
-					disabled={loading}
-					onClick={() => void handleToggleReveal()}
-					size='icon-xs'
-					variant='ghost'
-				>
-					{loading ? (
-						<Spinner className='size-3.5' />
-					) : revealed ? (
-						<EyeIcon aria-hidden='true' className='size-3.5' />
-					) : (
-						<EyeOffIcon aria-hidden='true' className='size-3.5' />
-					)}
-				</Button>
+				{isInfisical ? null : (
+					<Button
+						aria-label={
+							revealed
+								? t('settings:environment.row.hide-value', 'Hide value')
+								: t('settings:environment.row.show-value', 'Show value')
+						}
+						disabled={loading}
+						onClick={() => void handleToggleReveal()}
+						size='icon-xs'
+						variant='ghost'
+					>
+						{loading ? (
+							<Spinner className='size-3.5' />
+						) : revealed ? (
+							<EyeIcon aria-hidden='true' className='size-3.5' />
+						) : (
+							<EyeOffIcon aria-hidden='true' className='size-3.5' />
+						)}
+					</Button>
+				)}
 				<code className='max-w-60 truncate font-mono text-muted-foreground text-xs'>
 					{revealed ? (revealedValue ?? '') : MASK}
 				</code>
 			</div>
 			<div className='flex shrink-0 items-center gap-1'>
-				<Button
-					aria-label={t('settings:environment.row.edit', 'Edit variable')}
-					onClick={() => onEdit(variable.key)}
-					size='icon-xs'
-					variant='ghost'
-				>
-					<PencilIcon aria-hidden='true' className='size-3.5' />
-				</Button>
-				<Button
-					aria-label={t('settings:environment.row.delete', 'Delete variable')}
-					disabled={deleteMutation.isPending}
-					onClick={() => deleteMutation.mutate()}
-					size='icon-xs'
-					variant='ghost'
-				>
-					<Trash2Icon aria-hidden='true' className='size-3.5' />
-				</Button>
+				{isInfisical ? null : (
+					<>
+						<Button
+							aria-label={t('settings:environment.row.edit', 'Edit variable')}
+							onClick={() => onEdit(variable.key)}
+							size='icon-xs'
+							variant='ghost'
+						>
+							<PencilIcon aria-hidden='true' className='size-3.5' />
+						</Button>
+						<Button
+							aria-label={t(
+								'settings:environment.row.delete',
+								'Delete variable',
+							)}
+							disabled={deleteMutation.isPending}
+							onClick={() => deleteMutation.mutate()}
+							size='icon-xs'
+							variant='ghost'
+						>
+							<Trash2Icon aria-hidden='true' className='size-3.5' />
+						</Button>
+					</>
+				)}
 			</div>
 		</div>
 	);

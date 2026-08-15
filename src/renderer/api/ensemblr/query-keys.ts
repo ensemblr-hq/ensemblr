@@ -42,6 +42,15 @@ export const ensemblrQueryKeys = {
 		[...ensemblrQueryKeys.all, 'dictation-key-status'] as const,
 	/** Query key for the backend health check. */
 	health: () => [...ensemblrQueryKeys.all, 'health'] as const,
+	/** Query key for the configured Infisical account list. */
+	infisicalAccounts: () =>
+		[...ensemblrQueryKeys.all, 'infisical-accounts'] as const,
+	/** Query key for the Infisical link attached to one scope. */
+	infisicalLink: (scope: string, scopeId: string) =>
+		[...ensemblrQueryKeys.all, 'infisical-link', scope, scopeId] as const,
+	/** Query key for the projects reachable across every Infisical account. */
+	infisicalProjects: () =>
+		[...ensemblrQueryKeys.all, 'infisical-projects'] as const,
 	/** Query key for the Linear connection status. */
 	linearConnection: () =>
 		[...ensemblrQueryKeys.all, 'linear-connection'] as const,

@@ -4,6 +4,7 @@ import type { CheckpointFailureCode } from '@/shared/ipc/contracts/checkpoint';
 import type { CloneGithubRepositoryDiagnosticCode } from '@/shared/ipc/contracts/clone';
 import type { DictationFailureCode } from '@/shared/ipc/contracts/dictation';
 import type { GithubFailureCode } from '@/shared/ipc/contracts/github';
+import type { InfisicalFailureCode } from '@/shared/ipc/contracts/infisical';
 import type { QuickStartProjectDiagnosticCode } from '@/shared/ipc/contracts/quick-start';
 import type {
 	ArchiveRepositoryDiagnosticCode,
@@ -51,6 +52,7 @@ export type AppFailureCode =
 	| DictationFailureCode
 	| FilesToCopyDiagnosticCode
 	| GithubFailureCode
+	| InfisicalFailureCode
 	| ListWorkspaceFilesFailureCode
 	| QuickStartProjectDiagnosticCode
 	| ReadWorkspaceDirectoryFailureCode
@@ -118,6 +120,63 @@ export const APP_FAILURE_TEXT: Record<
 			'errors:failure.archived-contexts-directory-missing',
 			'The managed root has no archived-contexts directory. Configure the root directory first.',
 		),
+	'infisical-account-exists': (t) =>
+		t(
+			'errors:failure.infisical-account-exists',
+			'That Client ID is already configured for this Infisical instance.',
+		),
+	'infisical-account-not-found': (t) =>
+		t(
+			'errors:failure.infisical-account-not-found',
+			'That Infisical account is no longer configured.',
+		),
+	'infisical-invalid-credentials': (t) =>
+		t(
+			'errors:failure.infisical-invalid-credentials',
+			'Infisical rejected these credentials. Check the Client ID and Client Secret, then retry.',
+		),
+	'infisical-invalid-request': (t) =>
+		t(
+			'errors:failure.infisical-invalid-request',
+			'Infisical rejected the request. Check the instance URL and the selected project.',
+		),
+	'infisical-network': (t) =>
+		t(
+			'errors:failure.infisical-network',
+			'Infisical could not be reached. Check your connection, then retry.',
+		),
+	'infisical-not-linked': (t) =>
+		t(
+			'errors:failure.infisical-not-linked',
+			'This repository is not linked to an Infisical project yet.',
+		),
+	'infisical-permission-denied': (t) =>
+		t(
+			'errors:failure.infisical-permission-denied',
+			'This machine identity may not read that project. Grant it access in Infisical, then retry.',
+		),
+	'infisical-project-not-found': (t) =>
+		t(
+			'errors:failure.infisical-project-not-found',
+			'That Infisical project or environment no longer exists.',
+		),
+	'infisical-rate-limited': (t) =>
+		t(
+			'errors:failure.infisical-rate-limited',
+			'Infisical is rate limiting requests. Wait a moment, then retry.',
+		),
+	'infisical-secret-store-unavailable': (t) =>
+		t(
+			'errors:failure.infisical-secret-store-unavailable',
+			'The macOS Keychain is unavailable, so the Infisical client secret could not be read.',
+		),
+	'infisical-server-error': (t) =>
+		t(
+			'errors:failure.infisical-server-error',
+			'Infisical returned an unexpected error. Try again shortly.',
+		),
+	'infisical-unknown': (t) =>
+		t('errors:failure.infisical-unknown', 'The Infisical operation failed.'),
 	auth: (t) =>
 		t(
 			'errors:failure.auth',

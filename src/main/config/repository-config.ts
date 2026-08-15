@@ -54,6 +54,7 @@ const TOML_FIELD_MAP: ReadonlyMap<string, string> = new Map([
 	['environment_variables', 'environmentVariables'],
 	['file_include_globs', 'filesToCopy'],
 	['git', 'git'],
+	['infisical', 'infisical'],
 	['prompts', 'prompts'],
 	['spotlight_testing', 'spotlightTesting'],
 	['claude_executable_path', 'claudeExecutablePath'],

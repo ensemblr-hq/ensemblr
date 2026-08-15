@@ -574,6 +574,18 @@ export default interface Resources {
 			'git-init-failed': 'The repository could not be initialized.';
 			'git-not-installed': 'git was not found in PATH. Install git, then retry.';
 			'git-worktree-failed': 'The worktree could not be created.';
+			'infisical-account-exists': 'That Client ID is already configured for this Infisical instance.';
+			'infisical-account-not-found': 'That Infisical account is no longer configured.';
+			'infisical-invalid-credentials': 'Infisical rejected these credentials. Check the Client ID and Client Secret, then retry.';
+			'infisical-invalid-request': 'Infisical rejected the request. Check the instance URL and the selected project.';
+			'infisical-network': 'Infisical could not be reached. Check your connection, then retry.';
+			'infisical-not-linked': 'This repository is not linked to an Infisical project yet.';
+			'infisical-permission-denied': 'This machine identity may not read that project. Grant it access in Infisical, then retry.';
+			'infisical-project-not-found': 'That Infisical project or environment no longer exists.';
+			'infisical-rate-limited': 'Infisical is rate limiting requests. Wait a moment, then retry.';
+			'infisical-secret-store-unavailable': 'The macOS Keychain is unavailable, so the Infisical client secret could not be read.';
+			'infisical-server-error': 'Infisical returned an unexpected error. Try again shortly.';
+			'infisical-unknown': 'The Infisical operation failed.';
 			'invalid-attachment': 'That attachment could not be read.';
 			'invalid-cwd': 'The workspace path must be an absolute directory.';
 			'invalid-image': 'That attachment is not a valid image.';
@@ -1600,6 +1612,27 @@ export default interface Resources {
 		};
 		integrations: {
 			description: 'Third-party services Ensemblr can sign in to on your behalf. Each one is optional and can be disconnected at any time.';
+			infisical: {
+				add: 'Add account';
+				'add-description': 'Create a Machine Identity in Infisical under Organization Access Control, give it access to the projects you want, then paste its Universal Auth credentials here. The Client Secret is stored in the macOS Keychain.';
+				'add-submit': 'Add account';
+				'add-title': 'Add an Infisical account';
+				adding: 'Connecting…';
+				'client-id': 'Client ID';
+				'client-secret': 'Client Secret';
+				description: 'Machine Identities Ensemblr uses to read secrets from Infisical. Add one per organization or instance; each Client Secret is stored in the macOS Keychain.';
+				empty: 'No Infisical accounts yet. Add one to link a repository to a project.';
+				'label-field': 'Name';
+				'label-placeholder': 'Work org';
+				loading: 'Loading Infisical accounts…';
+				'site-url': 'Instance URL';
+				'state-connected': 'Connected';
+				'state-error': 'Not working';
+				'state-unverified': 'Not checked';
+				test: 'Re-check';
+				testing: 'Checking…';
+				verified: 'Credentials work.';
+			};
 			linear: {
 				'browse-issues': 'Browse issues';
 				checking: 'Checking the Linear connection…';
@@ -1845,6 +1878,45 @@ export default interface Resources {
 				description: 'Per-repository git defaults. These override your user-scope git settings for this repo only.';
 				title: 'Git';
 			};
+			infisical: {
+				'account-unavailable': 'Projects from {{account}} are missing from this list: that account could not be reached.';
+				environment: 'Environment';
+				'environment-description': 'Which Infisical environment this repository resolves against.';
+				'environment-placeholder': 'Pick an environment';
+				loading: 'Loading your Infisical accounts…';
+				'no-accounts-action': 'Open Integrations';
+				'no-accounts-description': 'Ensemblr reads secrets through a Machine Identity. Add one to link this repository to an Infisical project.';
+				'no-accounts-title': 'No Infisical account yet';
+				path: 'Secret path';
+				'path-description': 'Folder inside the environment to read. Use / for the root.';
+				project: 'Project';
+				'project-description': 'Written to .ensemblr/settings.toml so everyone who clones this repository points at the same project.';
+				'project-placeholder': 'Pick a project';
+				'projects-empty': 'Infisical answered, but none of your accounts can see a project. A Machine Identity only sees a project once it has been added to it — open the project in Infisical, then Project Settings → Access Control → Machine Identities → Add identity, and re-open this page.';
+				'projects-loading': 'Loading projects…';
+				recursive: 'Include sub-folders';
+				'recursive-description': 'Also read secrets from folders nested under that path.';
+				'resolved-keys_one': '{{count}} variable resolved';
+				'resolved-keys_other': '{{count}} variables resolved';
+				save: 'Save link';
+				saving: 'Saving…';
+				summary: {
+					'never-synced': 'never synced';
+					none: 'No project linked';
+					'none-detail': 'Pick a project below to resolve its secrets into every workspace, terminal, and agent.';
+					'state-linked': 'Linked';
+					'state-none': 'Not linked';
+					'state-pending': 'Not saved yet';
+					'synced-at': 'synced {{when}}';
+				};
+				sync: 'Sync now';
+				syncing: 'Syncing…';
+				unlink: 'Unlink';
+				'unlink-confirm': 'Confirm unlink';
+				'unreachable-project': 'This repository points at project {{projectId}}, which none of your accounts can see. Add your Machine Identity to it in Infisical, or pick a different project.';
+				unsaved: 'Unsaved changes to this link.';
+				'unsaved-incomplete': 'Pick a project and an environment to save this link.';
+			};
 			misc: {
 				description: 'Repository paths, preview URLs, files-to-copy patterns, and lifecycle.';
 				title: 'Misc';
@@ -1884,6 +1956,10 @@ export default interface Resources {
 				loading: 'Reading scripts…';
 				title: 'Scripts';
 			};
+			secrets: {
+				description: 'Link this repository to an Infisical project so its secrets resolve into every workspace, terminal, and agent. Values are read at launch and never written into the repository.';
+				title: 'Secrets';
+			};
 			security: {
 				'committed-note': 'A committed <file>.ensemblr/settings.toml</file> value shared with the team still wins over this personal override — a repository can raise its own floor and you cannot lower it locally.';
 				description: 'How much an agent may do on its own in this repository. Applies to every workspace of the repo, and to the tools agents reach over the control server.';
@@ -1916,6 +1992,7 @@ export default interface Resources {
 			group: 'Repository';
 			misc: 'Misc';
 			scripts: 'Scripts';
+			secrets: 'Secrets';
 			security: 'Security';
 		};
 		'root-directory': {
