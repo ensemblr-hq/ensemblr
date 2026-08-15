@@ -434,7 +434,31 @@
 			"native": "Встроенные в Claude Code"
 		},
 		"tabs-aria-label": "Провайдеры агентов",
-		"title": "Провайдеры"
+		"title": "Провайдеры",
+		"usage": {
+			"description": "Какая часть тарифа по этим учётным данным уже израсходована.",
+			"empty": "Провайдер не сообщил лимиты тарифа.",
+			"label": "Использование тарифа",
+			"not-applicable": "Эта сессия аутентифицируется вне тарифа claude.ai, поэтому лимиты тарифа к ней не применяются.",
+			"resets-in-days_one": "Сброс через {{count}} день",
+			"resets-in-days_few": "Сброс через {{count}} дня",
+			"resets-in-days_many": "Сброс через {{count}} дней",
+			"resets-in-days_other": "Сброс через {{count}} дня",
+			"resets-in-hours_one": "Сброс через {{count}} час",
+			"resets-in-hours_few": "Сброс через {{count}} часа",
+			"resets-in-hours_many": "Сброс через {{count}} часов",
+			"resets-in-hours_other": "Сброс через {{count}} часа",
+			"resets-now": "Сброс сейчас",
+			"window": {
+				"five-hour": "Сессия",
+				"overage": "Сверх тарифа",
+				"seven-day": "Неделя",
+				"seven-day-oauth-apps": "Неделя (приложения)",
+				"seven-day-opus": "Неделя (Opus)",
+				"seven-day-overage-included": "Неделя (сверх тарифа)",
+				"seven-day-sonnet": "Неделя (Sonnet)"
+			}
+		}
 	},
 	"repo": {
 		"actions": {

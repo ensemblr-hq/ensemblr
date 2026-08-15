@@ -63,6 +63,7 @@ export function createPiReadinessProbe({
 					? 'failure'
 					: 'success',
 				updatedAt: snapshot.generatedAt,
+				usage: null,
 				version: readProbeVersion(snapshot),
 			} satisfies AgentProviderReadinessWire;
 		},

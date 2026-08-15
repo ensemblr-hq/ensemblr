@@ -1021,9 +1021,113 @@ test('SDK message types Ensemblr does not model are dropped, not forwarded as un
 	const { normalize } = createNormalizer();
 	normalize(initMessage());
 
-	assert.deepEqual(normalize({ type: 'rate_limit_event' }), []);
 	assert.deepEqual(normalize({ subtype: 'status', type: 'system' }), []);
 	assert.deepEqual(normalize({ type: 'tool_use_summary' }), []);
+});
+
+test('a rate_limit_event becomes a plan-limit carrying the window that moved', () => {
+	const { normalize } = createNormalizer();
+	normalize(initMessage());
+
+	assert.deepEqual(
+		normalize({
+			rate_limit_info: {
+				rateLimitType: 'five_hour',
+				resetsAt: 1_786_024_800,
+				status: 'allowed_warning',
+				utilization: 82,
+			},
+			type: 'rate_limit_event',
+		}),
+		[
+			{
+				at: NOW.toISOString(),
+				limit: {
+					status: 'allowed-warning',
+					window: {
+						displayName: null,
+						id: 'five_hour',
+						resetsAt: '2026-08-06T14:00:00.000Z',
+						utilization: 82,
+					},
+				},
+				type: 'plan-limit',
+			},
+		],
+	);
+});
+
+test('a rate_limit_event naming no window is dropped rather than guessed at', () => {
+	const { normalize } = createNormalizer();
+	normalize(initMessage());
+
+	assert.deepEqual(normalize({ type: 'rate_limit_event' }), []);
+	assert.deepEqual(
+		normalize({
+			rate_limit_info: { status: 'allowed' },
+			type: 'rate_limit_event',
+		}),
+		[],
+	);
+});
+
+test('a sealed turn reports the session cost its result carries', () => {
+	const { normalize } = createNormalizer();
+	normalize(initMessage());
+	const events = normalize({
+		modelUsage: {
+			'claude-opus-5': {
+				cacheCreationInputTokens: 900,
+				cacheReadInputTokens: 20_000,
+				contextWindow: 200_000,
+				costUSD: 0.42,
+				inputTokens: 1_000,
+				outputTokens: 395,
+			},
+		},
+		subtype: 'success',
+		total_cost_usd: 0.42,
+		type: 'result',
+	});
+
+	assert.deepEqual(
+		events.filter((event) => event.type === 'session-cost'),
+		[
+			{
+				at: NOW.toISOString(),
+				cost: {
+					models: [
+						{
+							cacheCreationInputTokens: 900,
+							cacheReadInputTokens: 20_000,
+							costUsd: 0.42,
+							inputTokens: 1_000,
+							model: 'claude-opus-5',
+							outputTokens: 395,
+						},
+					],
+					totalCostUsd: 0.42,
+				},
+				type: 'session-cost',
+			},
+		],
+	);
+});
+
+test('a result reporting its totals zeroed leaves the cost gauge alone', () => {
+	const { normalize } = createNormalizer();
+	normalize(initMessage());
+	const events = normalize({
+		modelUsage: {},
+		subtype: 'error_during_execution',
+		total_cost_usd: 0,
+		type: 'result',
+	});
+
+	assert.deepEqual(
+		events.filter((event) => event.type === 'session-cost'),
+		[],
+	);
 });
 
 test('settleTurn returns an aborted turn to idle', () => {

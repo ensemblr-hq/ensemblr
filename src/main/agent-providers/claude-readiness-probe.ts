@@ -10,8 +10,10 @@ import type {
 	AgentProviderAccountWire,
 	AgentProviderCheckWire,
 	AgentProviderReadinessWire,
+	AgentProviderUsageWire,
 	SetupRemediationWire,
 } from '../../shared/ipc/contracts/agent-provider';
+import { readPlanUsage } from '../claude-agent/claude-usage.ts';
 import type {
 	LocalCommandResult,
 	LocalCommandService,
@@ -46,6 +48,15 @@ const DEFAULT_VERSION_TIMEOUT_MS = 5000;
  * the runtime wedges mid-negotiation.
  */
 const DEFAULT_SESSION_TIMEOUT_MS = 20_000;
+
+/**
+ * How long the plan-usage read gets, separately from the session deadline. It
+ * leaves the runtime for the claude.ai usage endpoint, so it is the one part of
+ * the probe that can hang on the network — and it is additive, so a slow answer
+ * must cost the usage panel alone rather than the account and MCP rows that
+ * would otherwise have rendered.
+ */
+const DEFAULT_USAGE_TIMEOUT_MS = 8000;
 const MS_PER_SECOND = 1000;
 const VERSION_MAX_OUTPUT_BYTES = 4096;
 
@@ -82,6 +93,7 @@ export interface CreateClaudeReadinessProbeOptions {
 	/** Resolves the login-shell env so a Finder-launched app still finds `claude`. */
 	resolveBaseEnv?: () => NodeJS.ProcessEnv | Promise<NodeJS.ProcessEnv>;
 	sessionTimeoutMs?: number;
+	usageTimeoutMs?: number;
 	versionTimeoutMs?: number;
 }
 
@@ -91,6 +103,8 @@ interface ClaudeSessionProbeResult {
 	/** Why the capabilities could not be read, ready to render; `null` on success. */
 	errorDetail: ProviderDetailFields | null;
 	mcpServers: readonly McpServerStatus[];
+	/** Plan rate-limit usage, or `null` when the runtime would not report it. */
+	usage: AgentProviderUsageWire | null;
 }
 
 /**
@@ -121,6 +135,7 @@ export function createClaudeReadinessProbe({
 	queryFn = query,
 	resolveBaseEnv = () => process.env,
 	sessionTimeoutMs = DEFAULT_SESSION_TIMEOUT_MS,
+	usageTimeoutMs = DEFAULT_USAGE_TIMEOUT_MS,
 	versionTimeoutMs = DEFAULT_VERSION_TIMEOUT_MS,
 }: CreateClaudeReadinessProbeOptions): AgentProviderReadinessProbe {
 	let inFlightProbe: Promise<AgentProviderReadinessWire> | null = null;
@@ -134,6 +149,7 @@ export function createClaudeReadinessProbe({
 				queryFn,
 				resolveBaseEnv,
 				sessionTimeoutMs,
+				usageTimeoutMs,
 				versionTimeoutMs,
 			}).finally(() => {
 				inFlightProbe = null;
@@ -160,6 +176,7 @@ async function runClaudeProbe({
 	queryFn,
 	resolveBaseEnv,
 	sessionTimeoutMs,
+	usageTimeoutMs,
 	versionTimeoutMs,
 }: {
 	executableService: AgentProviderExecutableService;
@@ -168,6 +185,7 @@ async function runClaudeProbe({
 	queryFn: typeof query;
 	resolveBaseEnv: () => NodeJS.ProcessEnv | Promise<NodeJS.ProcessEnv>;
 	sessionTimeoutMs: number;
+	usageTimeoutMs: number;
 	versionTimeoutMs: number;
 }): Promise<AgentProviderReadinessWire> {
 	const executable = await executableService.getSnapshot();
@@ -178,6 +196,7 @@ async function runClaudeProbe({
 			queryFn,
 			resolveBaseEnv,
 			sessionTimeoutMs,
+			usageTimeoutMs,
 		}),
 	]);
 	const checks = [
@@ -197,6 +216,7 @@ async function runClaudeProbe({
 			? 'failure'
 			: 'success',
 		updatedAt: now().toISOString(),
+		usage: session.usage,
 		version: readVersion(versionResult),
 	} satisfies AgentProviderReadinessWire;
 }
@@ -240,7 +260,7 @@ async function runVersionProbe({
  * a deadline. When it elapses the probe aborts the controller the SDK owns and
  * returns a normal failure, rather than awaiting a promise that never settles
  * and leaking the child.
- * @param input - Executable path, the query seam, the env resolver, and the deadline.
+ * @param input - Executable path, the query seam, the env resolver, and the deadlines.
  * @returns The account and MCP roster, or the failure that prevented reading them.
  */
 async function probeClaudeSession({
@@ -248,14 +268,21 @@ async function probeClaudeSession({
 	queryFn,
 	resolveBaseEnv,
 	sessionTimeoutMs,
+	usageTimeoutMs,
 }: {
 	executablePath: string;
 	queryFn: typeof query;
 	resolveBaseEnv: () => NodeJS.ProcessEnv | Promise<NodeJS.ProcessEnv>;
 	sessionTimeoutMs: number;
+	usageTimeoutMs: number;
 }): Promise<ClaudeSessionProbeResult> {
 	if (!executablePath) {
-		return { account: null, errorDetail: noExecutableDetail(), mcpServers: [] };
+		return {
+			account: null,
+			errorDetail: noExecutableDetail(),
+			mcpServers: [],
+			usage: null,
+		};
 	}
 
 	const baseEnv = await resolveBaseEnv();
@@ -278,6 +305,7 @@ async function probeClaudeSession({
 			abortController,
 			session,
 			sessionTimeoutMs,
+			usageTimeoutMs,
 		});
 	} catch (cause) {
 		return {
@@ -286,6 +314,7 @@ async function probeClaudeSession({
 				detail: cause instanceof Error ? cause.message : String(cause),
 			},
 			mcpServers: [],
+			usage: null,
 		};
 	} finally {
 		prompts.close();
@@ -294,25 +323,31 @@ async function probeClaudeSession({
 }
 
 /**
- * Reads the session's account and MCP roster under a deadline. When the
- * deadline wins, the abort controller the SDK owns is signalled so the child is
- * torn down instead of left negotiating behind an await nobody can cancel.
- * @param input - The open session, the controller aborting it, and the deadline.
+ * Reads the session's account and MCP roster under a deadline, alongside the
+ * plan usage on a deadline of its own. When the capability deadline wins, the
+ * abort controller the SDK owns is signalled so the child is torn down instead
+ * of left negotiating behind an await nobody can cancel.
+ * @param input - The open session, the controller aborting it, and the deadlines.
  * @returns The capabilities, or the timeout reported as a normal failure.
  */
 async function readSessionCapabilities({
 	abortController,
 	session,
 	sessionTimeoutMs,
+	usageTimeoutMs,
 }: {
 	abortController: AbortController;
 	session: ReturnType<typeof query>;
 	sessionTimeoutMs: number;
+	usageTimeoutMs: number;
 }): Promise<ClaudeSessionProbeResult> {
-	const capabilities = await raceDeadline(
-		Promise.all([session.accountInfo(), session.mcpServerStatus()]),
-		sessionTimeoutMs,
-	);
+	const [capabilities, usage] = await Promise.all([
+		raceDeadline(
+			Promise.all([session.accountInfo(), session.mcpServerStatus()]),
+			sessionTimeoutMs,
+		),
+		raceDeadline(readPlanUsage(session), usageTimeoutMs),
+	]);
 
 	if (capabilities === DEADLINE_EXCEEDED) {
 		abortController.abort();
@@ -321,12 +356,18 @@ async function readSessionCapabilities({
 			account: null,
 			errorDetail: describeSessionTimeout(sessionTimeoutMs),
 			mcpServers: [],
+			usage: null,
 		};
 	}
 
 	const [account, mcpServers] = capabilities;
 
-	return { account, errorDetail: null, mcpServers };
+	return {
+		account,
+		errorDetail: null,
+		mcpServers,
+		usage: usage === DEADLINE_EXCEEDED ? null : usage,
+	};
 }
 
 /**

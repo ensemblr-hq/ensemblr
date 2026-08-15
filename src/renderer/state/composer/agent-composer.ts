@@ -1,19 +1,11 @@
 import { useQuery } from '@tanstack/react-query';
 import { useAtom, useStore } from 'jotai';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback } from 'react';
 
-import {
-	agentSessionEventsQuery,
-	agentSessionsForWorkspaceQuery,
-} from '@/renderer/api/ensemblr-queries';
-import { resolveContextUsage } from '@/renderer/lib/workbench';
-import {
-	type TaggedContextUsage,
-	toComposerContextUsage,
-	useAgentSessionEventSync,
-} from '@/renderer/state/composer/agent-session-event-sync';
+import { agentSessionsForWorkspaceQuery } from '@/renderer/api/ensemblr-queries';
 import { useAgentTurns } from '@/renderer/state/composer/agent-turns';
 import { useComposerModelSelection } from '@/renderer/state/composer/composer-model-selection';
+import { useLiveSessionUsage } from '@/renderer/state/composer/session-usage';
 import {
 	chatLinkedDirectoriesAtomFamily,
 	chatPlanModeAtomFamily,
@@ -21,14 +13,12 @@ import {
 import type {
 	ComposerContextUsage,
 	ComposerModelOption,
+	ComposerPlanUsage,
 	ComposerSubmitOutcome,
 	ComposerThinkingOption,
 } from '@/renderer/types/workbench';
 import type { AgentProviderId } from '@/shared/agent-provider';
-import type {
-	AgentSessionEventWire,
-	PiStreamingBehavior,
-} from '@/shared/ipc/contracts/agent-session';
+import type { PiStreamingBehavior } from '@/shared/ipc/contracts/agent-session';
 
 /** State and callbacks the agent composer controller exposes to the composer UI. */
 export interface AgentComposerControllerState {
@@ -53,6 +43,8 @@ export interface AgentComposerControllerState {
 	) => Promise<ComposerSubmitOutcome>;
 	onThinkingChange: (thinkingLevel: string) => void;
 	planMode: boolean;
+	/** Plan windows and running cost this chat's session has reported. */
+	planUsage: ComposerPlanUsage | null;
 	thinkingLevel: string | null;
 }
 
@@ -91,9 +83,6 @@ export function useAgentComposerController({
 
 	const [planMode, setPlanMode] = useAtom(chatPlanModeAtomFamily(chatTabId));
 	const store = useStore();
-	const [liveContextUsage, setLiveContextUsage] =
-		useState<TaggedContextUsage | null>(null);
-
 	/**
 	 * Builds the Plan Mode half of a turn snapshot, reading the store at call time.
 	 * Approving a plan turns the toggle off and submits in the same tick, and a
@@ -162,34 +151,15 @@ export function useAgentComposerController({
 		)?.agentProvider,
 		sessionProvider: activeSessionSnapshot?.provider,
 	});
-	const activeBranchId = activeSessionSnapshot?.branchId ?? '';
-	const { data: contextEventsData } = useQuery(
-		agentSessionEventsQuery(activeBranchId),
-	);
-	const persistedContextUsage = useMemo(
-		() => latestContextUsageFromEvents(contextEventsData?.events ?? []),
-		[contextEventsData?.events],
-	);
-	// Live usage is tagged by session id; a stale snapshot from a previous
-	// session is treated as absent so the gauge falls back to persisted state
-	// without needing a reset-on-change effect.
-	const measuredContextUsage =
-		liveContextUsage && liveContextUsage.sessionId === activeSessionId
-			? liveContextUsage.usage
-			: persistedContextUsage;
-	const contextUsage = resolveContextUsage(
-		measuredContextUsage,
-		availableModels.find((option) => option.id === modelId),
-	);
+	const { contextUsage, planUsage } = useLiveSessionUsage({
+		activeSessionId,
+		branchId: activeSessionSnapshot?.branchId ?? '',
+		model: availableModels.find((option) => option.id === modelId),
+		workspaceId,
+	});
 	const isAgentSessionStreaming =
 		activeSessionSnapshot?.runtimeOpen === true &&
 		(activeSessionStatus === 'starting' || activeSessionStatus === 'streaming');
-
-	useAgentSessionEventSync({
-		activeSessionId,
-		onContextUsage: setLiveContextUsage,
-		workspaceId,
-	});
 
 	const onModelChange = useCallback(
 		(nextModelId: string) => {
@@ -227,6 +197,7 @@ export function useAgentComposerController({
 		onSubmit,
 		onThinkingChange,
 		planMode: planMode === true,
+		planUsage,
 		thinkingLevel,
 	};
 }
@@ -256,17 +227,4 @@ function resolveLockedProvider({
 		return null;
 	}
 	return sessionProvider ?? selectedModelProvider ?? null;
-}
-
-/** Finds the newest persisted context usage event for the active session. */
-function latestContextUsageFromEvents(
-	events: readonly AgentSessionEventWire[],
-): ComposerContextUsage | null {
-	for (let index = events.length - 1; index >= 0; index -= 1) {
-		const payload = events[index]?.payload;
-		if (payload?.kind === 'context-usage') {
-			return toComposerContextUsage(payload.usage);
-		}
-	}
-	return null;
 }

@@ -54,6 +54,11 @@ Rules of thumb:
 | Model | Модель | Μοντέλο | |
 | Thinking level | Уровень размышления | Επίπεδο σκέψης | |
 | Context usage | Использование контекста | Χρήση περιβάλλοντος | |
+| Plan (subscription) | Тариф | Συνδρομή | The claude.ai subscription tier the account bills against. Deliberately **not** `план`/`σχέδιο`, which `Plan mode` already owns — the two are unrelated concepts and sharing a word makes "plan limits" read as a limit on planning. |
+| Plan usage | Использование тарифа | Χρήση συνδρομής | How much of the subscription's rate-limit windows is spent. Mirrors `Context usage` in both languages. |
+| Limit window | Окно лимита | Παράθυρο ορίου | One rolling rate-limit period (5-hour, weekly). Named for the period, not the ceiling. |
+| Resets | Сброс | Επαναφορά | When a limit window starts over. The noun in both, so `Resets in 3h` reads as `Сброс через 3 часа`/`Επαναφορά σε 3 ώρες`. |
+| Extra usage (overage) | Сверх тарифа | Επιπλέον χρήση | Spend past the plan's included allowance, billed on top of it. Russian takes the prepositional phrase rather than a noun — `перерасход` reads as an accounting overrun the user caused, not as a bucket the plan offers. |
 | Issue | Задача | Ζήτημα | Linear issue. |
 | Tool call | Вызов инструмента | Κλήση εργαλείου | |
 | Attachment | Вложение | Συνημμένο | |

@@ -8,6 +8,7 @@ import { ProviderAccountList } from '@/renderer/components/settings/agent-provid
 import { ProviderCheckRow } from '@/renderer/components/settings/agent-providers/provider-check-row';
 import { ProviderExecutableRow } from '@/renderer/components/settings/agent-providers/provider-executable-row';
 import { ProviderSettingsFileRow } from '@/renderer/components/settings/agent-providers/provider-settings-file-row';
+import { ProviderUsagePanel } from '@/renderer/components/settings/agent-providers/provider-usage-panel';
 import { SettingRow } from '@/renderer/components/settings/setting-row';
 import { SettingsLoadingState } from '@/renderer/components/settings/settings-async-state';
 import { StatusBadge } from '@/renderer/components/status-badge';
@@ -122,6 +123,19 @@ export function ProviderTabPanel({
 					stack
 				>
 					<ProviderAccountList account={readiness.account} />
+				</SettingRow>
+			) : null}
+
+			{readiness?.usage ? (
+				<SettingRow
+					description={t(
+						'settings:providers.usage.description',
+						'How much of the plan behind these credentials is already spent.',
+					)}
+					label={t('settings:providers.usage.label', 'Plan usage')}
+					stack
+				>
+					<ProviderUsagePanel usage={readiness.usage} />
 				</SettingRow>
 			) : null}
 

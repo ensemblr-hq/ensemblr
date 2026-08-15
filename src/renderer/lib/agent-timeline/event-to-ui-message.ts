@@ -483,6 +483,8 @@ function handleEvent(
 			return null;
 		}
 		case 'context-usage':
+		case 'plan-limit':
+		case 'session-cost':
 		case 'status':
 		case 'metadata':
 			return pending;

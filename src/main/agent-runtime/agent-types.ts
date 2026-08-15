@@ -1,6 +1,8 @@
 import type { SubagentMechanism } from '../../shared/agent-control';
 import type { AgentProviderId } from '../../shared/agent-provider';
 import type {
+	AgentPlanLimitWire,
+	AgentSessionCostWire,
 	AgentWireMessagePart,
 	AgentWireMessagePayload,
 } from '../../shared/ipc/contracts/agent-session';
@@ -282,12 +284,32 @@ export interface AgentContextUsage {
 	tokens: number | null;
 }
 
+/**
+ * Plan rate-limit window reported by a session. Only runtimes backed by a
+ * claude.ai subscription report these; an API-key, Bedrock, or Vertex session has
+ * no plan limits to report and emits none.
+ */
+export type AgentPlanLimit = AgentPlanLimitWire;
+
+/** Running cost totals a session reports for itself. */
+export type AgentSessionCost = AgentSessionCostWire;
+
 /** Discriminated event stream emitted by a session. */
 export type AgentEvent =
 	| {
 			at: string;
 			type: 'context-usage';
 			usage: AgentContextUsage;
+	  }
+	| {
+			at: string;
+			cost: AgentSessionCost;
+			type: 'session-cost';
+	  }
+	| {
+			at: string;
+			limit: AgentPlanLimit;
+			type: 'plan-limit';
 	  }
 	| {
 			at: string;

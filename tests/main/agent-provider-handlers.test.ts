@@ -82,6 +82,7 @@ function createProbe(provider: 'claude' | 'pi'): AgentProviderReadinessProbe {
 				provider,
 				status: 'success',
 				updatedAt: '2026-08-07T00:00:00.000Z',
+				usage: null,
 				version: null,
 			} satisfies AgentProviderReadinessWire;
 		},

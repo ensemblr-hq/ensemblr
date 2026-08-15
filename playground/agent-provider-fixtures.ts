@@ -97,6 +97,36 @@ function connectedClaudeReadiness(): AgentProviderReadinessWire {
 		provider: 'claude',
 		status: 'success',
 		updatedAt: PROBED_AT,
+		usage: {
+			available: true,
+			limits: [
+				{
+					displayName: null,
+					id: 'five_hour',
+					resetsAt: '2026-08-07T14:00:00.000Z',
+					utilization: 62,
+				},
+				{
+					displayName: null,
+					id: 'seven_day',
+					resetsAt: '2026-08-11T09:00:00.000Z',
+					utilization: 31,
+				},
+				{
+					displayName: null,
+					id: 'seven_day_opus',
+					resetsAt: '2026-08-11T09:00:00.000Z',
+					utilization: 88,
+				},
+				{
+					displayName: 'Fable',
+					id: 'Fable',
+					resetsAt: '2026-08-11T09:00:00.000Z',
+					utilization: null,
+				},
+			],
+			subscriptionType: 'max',
+		},
 		version: '2.1.220',
 	};
 }
@@ -148,6 +178,7 @@ function signedOutClaudeReadiness(): AgentProviderReadinessWire {
 		provider: 'claude',
 		status: 'failure',
 		updatedAt: PROBED_AT,
+		usage: null,
 		version: '2.1.220',
 	};
 }
@@ -206,6 +237,7 @@ function piReadiness(): AgentProviderReadinessWire {
 		provider: 'pi',
 		status: 'failure',
 		updatedAt: PROBED_AT,
+		usage: null,
 		version: '0.42.1',
 	};
 }

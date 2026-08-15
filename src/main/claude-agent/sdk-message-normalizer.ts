@@ -8,6 +8,7 @@ import type {
 	AgentModelMetadata,
 	AgentSessionStatus,
 } from '../agent-runtime/agent-types.ts';
+import { toPlanLimit, toSessionCost } from './claude-usage.ts';
 import {
 	createStreamedReasoningByThread,
 	type StreamedReasoningByThread,
@@ -203,6 +204,16 @@ export function createSdkMessageNormalizer({
 		contextWindow =
 			readContextWindow(message.modelUsage, mainModel) || contextWindow;
 		events.push(...reportUsage());
+		// A crashed or startup-failed turn can report its totals zeroed, and the
+		// figure is the session's running total rather than this turn's share — so
+		// reporting one would walk the gauge backwards to nothing.
+		if (Number.isFinite(message.total_cost_usd) && message.total_cost_usd > 0) {
+			events.push({
+				at: at(),
+				cost: toSessionCost(message.total_cost_usd, message.modelUsage),
+				type: 'session-cost',
+			});
+		}
 
 		if (message.subtype !== 'success') {
 			events.push({
@@ -219,6 +230,18 @@ export function createSdkMessageNormalizer({
 
 		events.push(...transitionTo('idle'));
 		return events;
+	};
+
+	/**
+	 * Turns a pushed rate-limit frame into a plan-limit event. The runtime emits
+	 * one whenever a window moves, so the composer gauge tracks the plan without
+	 * the app ever asking.
+	 */
+	const handleRateLimit = (
+		message: Extract<SDKMessage, { type: 'rate_limit_event' }>,
+	): readonly AgentEvent[] => {
+		const limit = toPlanLimit(message.rate_limit_info);
+		return limit ? [{ at: at(), limit, type: 'plan-limit' }] : [];
 	};
 
 	return {
@@ -243,6 +266,8 @@ export function createSdkMessageNormalizer({
 					return normalizeUser(message, messageEvent);
 				case 'result':
 					return handleResult(message);
+				case 'rate_limit_event':
+					return handleRateLimit(message);
 				default:
 					return [];
 			}

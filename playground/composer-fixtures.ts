@@ -116,6 +116,24 @@ export function useComposerStub({
 			onThinkingChange: () => undefined,
 			placeholder: '',
 			planMode,
+			planUsage: {
+				limits: [
+					{
+						displayName: null,
+						id: 'five_hour',
+						resetsAt: '2026-08-15T21:00:00.000Z',
+						utilization: 47,
+					},
+					{
+						displayName: null,
+						id: 'seven_day',
+						resetsAt: '2026-08-19T09:00:00.000Z',
+						utilization: 73,
+					},
+				],
+				status: 'allowed',
+				totalCostUsd: 1.284,
+			},
 			thinkingLabel: 'Think',
 			thinkingLevel: 'think',
 			workspaceCwd: WORKSPACE_CWD,

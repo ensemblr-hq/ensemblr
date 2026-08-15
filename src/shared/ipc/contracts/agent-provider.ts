@@ -1,4 +1,5 @@
 import type { AgentProviderId } from '../../agent-provider';
+import type { AgentPlanLimitWindowWire } from './agent-message-payloads';
 import type {
 	SetupCheckLogSnapshot,
 	SetupMessageParams,
@@ -191,6 +192,19 @@ export interface ListAgentProviderSlashCommandsResult {
 }
 
 /**
+ * Plan usage the runtime reports for the signed-in account, covering the whole
+ * plan rather than one session. `available` is false for API-key, Bedrock, and
+ * Vertex sessions, where plan limits do not apply at all — a different answer
+ * from every window reading zero, and the page has to say so rather than draw
+ * empty gauges.
+ */
+export interface AgentProviderUsageWire {
+	available: boolean;
+	limits: readonly AgentPlanLimitWindowWire[];
+	subscriptionType: string | null;
+}
+
+/**
  * Provider-neutral readiness snapshot. Both tabs of the Providers page render
  * from this one shape; the provider-specific richness lives in `checks[]`.
  */
@@ -203,6 +217,8 @@ export interface AgentProviderReadinessWire {
 	provider: AgentProviderId;
 	status: AgentProviderReadinessStatus;
 	updatedAt: string;
+	/** Plan rate-limit usage, when the runtime reports any. Pi reports `null`. */
+	usage: AgentProviderUsageWire | null;
 	version: string | null;
 }
 

@@ -202,6 +202,7 @@
 	},
 	"context-usage": {
 		"aria-label": "Context usage",
+		"aria-label-with-plan": "Context and plan usage",
 		"gauge-title": "Context usage gauge",
 		"heading": "Context",
 		"unavailable": "Context window unavailable for this model.",
@@ -742,6 +743,12 @@
 			"refine": "Refine"
 		},
 		"aria-label": "Plan review"
+	},
+	"plan-usage": {
+		"estimate-note": "Cost is this session’s own estimate, not a bill.",
+		"heading": "Plan usage",
+		"status-rejected": "Plan limit reached. Turns fail until a window resets.",
+		"status-warning": "Close to the plan limit."
 	},
 	"preview": {
 		"choose-url": "Choose preview URL",
