@@ -553,6 +553,7 @@ export const StackTraceFrames = memo(
 						)}
 						key={frame.raw}
 					>
+						{/* i18next-instrument-ignore -- V8 stack-frame porcelain */}
 						<span className='text-muted-foreground'>at </span>
 						{frame.functionName && (
 							<span className={frame.isInternal ? '' : 'text-foreground'}>

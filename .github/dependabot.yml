@@ -9,6 +9,12 @@ updates:
     groups:
       dev-dependencies:
         dependency-type: development
+    ignore:
+      # @types/node mirrors the Node major that Electron embeds (24), not the
+      # latest release; a newer major type-checks green and fails at runtime.
+      - dependency-name: "@types/node"
+        update-types:
+          - version-update:semver-major
 
   - package-ecosystem: github-actions
     directory: /
