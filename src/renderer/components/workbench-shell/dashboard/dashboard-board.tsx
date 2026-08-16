@@ -1,6 +1,8 @@
-import { useCallback, useMemo } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { refreshBoardIssues } from '@/renderer/api/ensemblr';
 import { SidebarInset, SidebarTrigger } from '@/renderer/components/ui/sidebar';
 import { WorkbenchPlaceholderPage } from '@/renderer/components/workbench-shell/route-layout';
 import {
@@ -8,71 +10,42 @@ import {
 	useWorkbenchLayoutRouteModel,
 } from '@/renderer/components/workbench-shell/shell-contexts';
 import { useBoardDragMonitor } from '@/renderer/hooks/workbench-shell/dashboard/use-board-drag';
+import { useBoardIssues } from '@/renderer/hooks/workbench-shell/dashboard/use-board-issues';
+import { filterBoardCards } from '@/renderer/lib/workbench/filter-board-cards';
+import { groupBoardCards } from '@/renderer/lib/workbench/group-board-cards';
 import { planBoardDrop } from '@/renderer/lib/workbench/plan-board-drop';
 import { SHELL_INSET_CLASS } from '@/renderer/lib/workbench/shell-inset';
 import {
 	BOARD_STATUS_ORDER,
-	orderColumnWorkspaceIds,
-	resolveBoardStatus,
+	useBoardFilters,
+	useBoardIssueDismissals,
 	useWorkspaceBoardActions,
 	useWorkspaceBoardOrder,
 	useWorkspaceBoardStatuses,
 	type WorkspaceBoardStatus,
 } from '@/renderer/state/workspace';
-import type { ProjectShellModel } from '@/renderer/types/workbench';
-import type { BoardCard, BoardDrop } from '@/renderer/types/workbench-shell';
-import { BoardColumn } from './board-column';
+import type {
+	BoardDrop,
+	BoardIssueCard,
+} from '@/renderer/types/workbench-shell';
+
+import {
+	AssignIssueDialog,
+	type AssignIssueRequest,
+} from './assign-issue-dialog';
+import { BoardColumn, type BoardColumnActions } from './board-column';
+import { BoardToolbar } from './board-toolbar';
 import {
 	BoardWorkspaceMenuProvider,
 	useBoardWorkspaceMenu,
 } from './board-workspace-menu';
 
-/** Flattens the display projects into board cards, skipping optimistic rows. */
-function toBoardCards(projects: ProjectShellModel[]): BoardCard[] {
-	const cards: BoardCard[] = [];
-	for (const project of projects) {
-		for (const workspace of project.workspaces) {
-			if (workspace.isPendingCreation === true) {
-				continue;
-			}
-			cards.push({ project, workspace });
-		}
-	}
-	return cards;
-}
-
-/** Buckets board cards into one list per status, ordered by the board order. */
-function groupCardsByStatus(
-	cards: BoardCard[],
-	statusByWorkspaceId: Record<string, WorkspaceBoardStatus>,
-	order: string[],
-): Record<WorkspaceBoardStatus, BoardCard[]> {
-	const cardByWorkspaceId = new Map(
-		cards.map((card) => [card.workspace.id, card]),
-	);
-	const idsByStatus = Object.fromEntries(
-		BOARD_STATUS_ORDER.map((status) => [status, [] as string[]]),
-	) as Record<WorkspaceBoardStatus, string[]>;
-	for (const card of cards) {
-		const status = resolveBoardStatus(statusByWorkspaceId, card.workspace.id);
-		idsByStatus[status].push(card.workspace.id);
-	}
-	return Object.fromEntries(
-		BOARD_STATUS_ORDER.map((status) => [
-			status,
-			orderColumnWorkspaceIds(order, idsByStatus[status]).flatMap((id) => {
-				const card = cardByWorkspaceId.get(id);
-				return card ? [card] : [];
-			}),
-		]),
-	) as Record<WorkspaceBoardStatus, BoardCard[]>;
-}
-
 /**
- * Dashboard Kanban board: every workspace across all projects as a card in its
- * board-status column, with drag-to-reassign and in-column reordering both
- * persisted. Shows the setup placeholder while setup is blocked and keeps empty
- * columns visible when no workspaces remain.
+ * Dashboard Kanban board. Backlog holds the work that has no workspace yet —
+ * unstarted Linear issues and unassigned open GitHub issues — and every other
+ * column holds workspaces, with drag-to-reassign and in-column reordering both
+ * persisted. Dragging an issue rightward is how a workspace gets created from
+ * it; nothing is ever written back to Linear or GitHub.
  */
 export function DashboardBoard() {
 	const { t } = useTranslation();
@@ -81,11 +54,63 @@ export function DashboardBoard() {
 	const statusByWorkspaceId = useWorkspaceBoardStatuses();
 	const order = useWorkspaceBoardOrder();
 	const { reorderBoard, setWorkspaceBoardStatus } = useWorkspaceBoardActions();
+	const { dismiss, dismissedKeys, restore } = useBoardIssueDismissals();
+	const boardFilters = useBoardFilters();
+	const { backlogIssues, dismissedIssues, error, isLoading } = useBoardIssues(
+		model.displayProjects,
+	);
+	const [assignRequest, setAssignRequest] = useState<AssignIssueRequest | null>(
+		null,
+	);
+	const queryClient = useQueryClient();
+	const [isRefreshing, setIsRefreshing] = useState(false);
+
+	const handleRefresh = useCallback(() => {
+		setIsRefreshing(true);
+		void refreshBoardIssues(
+			queryClient,
+			model.displayProjects.map((project) => project.id),
+		).finally(() => setIsRefreshing(false));
+	}, [model.displayProjects, queryClient]);
+
+	const openAssignDialog = useCallback(
+		(issue: BoardIssueCard, targetStatus: WorkspaceBoardStatus) =>
+			setAssignRequest({ issue, targetStatus }),
+		[],
+	);
+	const issuesByKey = useMemo(
+		() =>
+			new Map(
+				[...backlogIssues, ...dismissedIssues].map((issue) => [
+					issue.key,
+					issue,
+				]),
+			),
+		[backlogIssues, dismissedIssues],
+	);
+
+	const sort = boardFilters.filters.sort;
+	const allowReorder = sort === 'manual';
 
 	const handleDrop = useCallback(
 		(drop: BoardDrop) => {
-			const plan = planBoardDrop(drop, statusByWorkspaceId);
+			const plan = planBoardDrop(drop, statusByWorkspaceId, sort);
 			if (!plan) {
+				return;
+			}
+			if (plan.kind === 'dismiss-issue') {
+				dismiss(plan.issueKey);
+				return;
+			}
+			if (plan.kind === 'restore-issue') {
+				restore(plan.issueKey);
+				return;
+			}
+			if (plan.kind === 'assign-issue') {
+				const issue = issuesByKey.get(plan.issueKey);
+				if (issue) {
+					openAssignDialog(issue, plan.targetStatus);
+				}
 				return;
 			}
 			setWorkspaceBoardStatus(plan.sourceId, plan.targetStatus);
@@ -97,17 +122,53 @@ export function DashboardBoard() {
 				targetStatus: plan.targetStatus,
 			});
 		},
-		[reorderBoard, setWorkspaceBoardStatus, statusByWorkspaceId],
+		[
+			dismiss,
+			issuesByKey,
+			openAssignDialog,
+			reorderBoard,
+			restore,
+			setWorkspaceBoardStatus,
+			sort,
+			statusByWorkspaceId,
+		],
 	);
 	useBoardDragMonitor(handleDrop);
 
-	const cards = useMemo(
-		() => toBoardCards(model.displayProjects),
-		[model.displayProjects],
-	);
 	const grouped = useMemo(
-		() => groupCardsByStatus(cards, statusByWorkspaceId, order),
-		[cards, statusByWorkspaceId, order],
+		() =>
+			groupBoardCards({
+				backlogIssues,
+				dismissedIssues,
+				order,
+				projects: model.displayProjects,
+				statusByWorkspaceId,
+			}),
+		[
+			backlogIssues,
+			dismissedIssues,
+			model.displayProjects,
+			order,
+			statusByWorkspaceId,
+		],
+	);
+	const columns = useMemo(
+		() =>
+			BOARD_STATUS_ORDER.map((status) => ({
+				cards: filterBoardCards(grouped[status], boardFilters.filters),
+				status,
+				totalCount: grouped[status].length,
+			})),
+		[boardFilters.filters, grouped],
+	);
+	const columnActions = useMemo<BoardColumnActions>(
+		() => ({
+			onAssignIssue: openAssignDialog,
+			onDismissIssue: dismiss,
+			onOpenWorkspace: model.navigateToWorkspace,
+			onRestoreIssue: restore,
+		}),
+		[dismiss, model.navigateToWorkspace, openAssignDialog, restore],
 	);
 	const { controller: workspaceMenu, dialogs: workspaceMenuDialogs } =
 		useBoardWorkspaceMenu();
@@ -119,25 +180,48 @@ export function DashboardBoard() {
 	return (
 		<SidebarInset className={SHELL_INSET_CLASS}>
 			<main className='flex min-w-0 flex-1 flex-col overflow-hidden'>
-				<header className='native-toolbar flex h-12 shrink-0 items-center gap-2.5 border-border border-b px-4 font-medium text-sm'>
+				<header className='native-toolbar flex h-12 shrink-0 items-center gap-2.5 overflow-hidden border-border border-b px-4 font-medium text-sm'>
 					<SidebarTrigger className='sidebar-collapsed-trigger' />
-					<span>{t('workbench:dashboard.title', 'Dashboard')}</span>
+					<span className='shrink-0'>
+						{t('workbench:dashboard.title', 'Dashboard')}
+					</span>
+					<BoardToolbar
+						filters={boardFilters}
+						isRefreshing={isRefreshing}
+						onRefresh={handleRefresh}
+						projects={model.displayProjects}
+					/>
 				</header>
 				<BoardWorkspaceMenuProvider controller={workspaceMenu}>
 					<div className='min-h-0 flex-1 overflow-x-auto p-4'>
 						<div className='mx-auto flex h-full w-max gap-3'>
-							{BOARD_STATUS_ORDER.map((status) => (
+							{columns.map((column) => (
 								<BoardColumn
-									cards={grouped[status]}
-									key={status}
-									onOpenWorkspace={model.navigateToWorkspace}
-									status={status}
+									actions={columnActions}
+									allowReorder={allowReorder}
+									cards={column.cards}
+									isLoadingIssues={isLoading}
+									issuesError={error}
+									key={column.status}
+									status={column.status}
+									totalCount={column.totalCount}
 								/>
 							))}
 						</div>
 					</div>
 				</BoardWorkspaceMenuProvider>
 				{workspaceMenuDialogs}
+				<AssignIssueDialog
+					onAssigned={setWorkspaceBoardStatus}
+					onOpenWorkspace={model.navigateToWorkspace}
+					onOpenChange={(open) => {
+						if (!open) {
+							setAssignRequest(null);
+						}
+					}}
+					projects={model.displayProjects}
+					request={assignRequest}
+				/>
 			</main>
 		</SidebarInset>
 	);

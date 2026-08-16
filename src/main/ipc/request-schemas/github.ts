@@ -45,8 +45,19 @@ export const mergePullRequestRequestSchema = z.object({
 
 /**
  * {@link import('../../../shared/ipc/contracts/workspace-sources').ListRepositoryBranchesRequest}
- * and its PR/issue siblings — all just a repository id.
+ * and its PR sibling — both just a repository id.
  */
 export const listRepositorySourcesRequestSchema = z.object({
 	repositoryId: z.string().min(1),
 });
+
+/**
+ * {@link import('../../../shared/ipc/contracts/workspace-sources').ListRepositoryIssuesRequest}
+ * — a repository id, the flag that bypasses the persisted issue cache, and the
+ * flag that narrows the list to unassigned issues for the dashboard board.
+ */
+export const listRepositoryIssuesRequestSchema =
+	listRepositorySourcesRequestSchema.extend({
+		refresh: z.boolean().optional(),
+		unassignedOnly: z.boolean().optional(),
+	});

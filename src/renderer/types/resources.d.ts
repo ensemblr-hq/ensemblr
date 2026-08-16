@@ -2564,6 +2564,7 @@ export default interface Resources {
 				empty: 'No repositories found.';
 				search: 'Search repositories…';
 				select: 'Select repository';
+				selected: 'Selected';
 			};
 			search: {
 				branch: 'Search by name';
@@ -2573,6 +2574,17 @@ export default interface Resources {
 			title: 'Create workspace from source';
 		};
 		dashboard: {
+			'assign-issue': {
+				confirm: 'Create workspace';
+				'created-in-column': 'Workspace created from {{issue}} in {{status}}';
+				creating: 'Creating…';
+				description: 'A new workspace for {{issue}} lands in {{status}}. The issue itself is not changed in Linear or GitHub.';
+				open: 'Open';
+				repository: 'Repository';
+				'repository-missing': 'Repository not in Ensemblr';
+				'repository-required': 'Pick a repository to create the workspace in.';
+				title: 'Create workspace from issue';
+			};
 			card: {
 				'pull-request-aria': 'Pull request #{{number}} {{state}}';
 				state: {
@@ -2589,9 +2601,50 @@ export default interface Resources {
 				};
 			};
 			column: {
-				'aria-label': '{{status}} column, {{workspaces}}';
+				'card-count_one': '{{count}} card';
+				'card-count_other': '{{count}} cards';
+				'count-filtered': '{{shown}}/{{total}}';
+				empty: 'Nothing here yet';
+				'empty-filtered': 'No cards match the filter';
+				label: '{{status}} column, {{cards}}';
+				'label-filtered': '{{status}} column, {{shown}} of {{total}} cards shown';
+				loading: 'Loading issues…';
+			};
+			'issue-card': {
+				'create-workspace': 'Create workspace…';
+				'create-workspace-aria': 'Create a workspace from issue {{issue}}';
+				dismiss: 'Dismiss from board';
+				'menu-aria': '{{issue}} issue actions';
+				'more-labels': '+{{overflow}}';
+				'open-aria': 'Open issue {{issue}}';
+				restore: 'Move back to Backlog';
 			};
 			title: 'Dashboard';
+			toolbar: {
+				clear: 'Clear board filters';
+				'facet-empty': 'Nothing to show.';
+				refresh: 'Refresh issues from GitHub and Linear';
+				repository: 'Repositories';
+				'repository-count_one': '{{count}} repository';
+				'repository-count_other': '{{count}} repositories';
+				search: 'Filter cards…';
+				'search-aria': 'Filter board cards';
+				sort: {
+					manual: 'Manual order';
+					priority: 'Priority';
+					updated: 'Recently updated';
+				};
+				'sort-aria': 'Sort cards';
+				source: {
+					github: 'GitHub issues';
+					linear: 'Linear issues';
+					workspace: 'Workspaces';
+				};
+				'source-count_one': '{{count}} source';
+				'source-count_other': '{{count}} sources';
+				'source-search': 'Search sources…';
+				sources: 'Sources';
+			};
 		};
 		'delete-repository': {
 			description: "Permanently removes the repository and {{workspaces}} from Ensemblr. Each workspace's worktree folder is deleted and its local branch is dropped. The repository folder stays on disk so you can re-register it later. This cannot be undone.";
@@ -2868,6 +2921,7 @@ export default interface Resources {
 			nav: {
 				dashboard: 'Dashboard';
 				history: 'History';
+				linear: 'Linear';
 				settings: 'Settings';
 				'settings-aria': 'Open app settings';
 			};

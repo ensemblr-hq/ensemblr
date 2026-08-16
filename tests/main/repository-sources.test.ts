@@ -70,6 +70,43 @@ function fakeDatabaseService(
 		prepare: () => ({
 			all: () => activeRows,
 			get: () => ({ path: '/repo' }),
+			run: () => undefined,
+		}),
+	};
+	return {
+		getConnection: () => ({ database }),
+	} as unknown as EnsemblrDatabaseService;
+}
+
+/** One cached issue row, enough to satisfy the cache's element guard. */
+const CACHED_ISSUE = {
+	assigneeLogins: [],
+	authorLogin: 'octocat',
+	body: '',
+	labels: [],
+	number: 7,
+	state: 'OPEN',
+	title: 'Cached',
+	updatedAt: '2020-01-01T00:00:00Z',
+	url: 'https://github.com/o/r/issues/7',
+};
+
+/**
+ * A database whose `integration_metadata` read answers with a cached issue list,
+ * so the degradable branches of `listIssues` can be exercised.
+ */
+function fakeDatabaseServiceWithCache(cached: {
+	issues: unknown[];
+	syncedAt: string;
+}): EnsemblrDatabaseService {
+	const database = {
+		prepare: (sql: string) => ({
+			all: () => [],
+			get: () =>
+				sql.includes('integration_metadata')
+					? { metadata_json: JSON.stringify(cached) }
+					: { path: '/repo' },
+			run: () => undefined,
 		}),
 	};
 	return {
@@ -164,6 +201,7 @@ test('parsePullRequests returns null for non-JSON', () => {
 test('parseIssues flattens label names and tolerates missing labels', () => {
 	const stdout = JSON.stringify([
 		{
+			assignees: [{ login: 'octocat' }],
 			author: { login: 'octocat' },
 			body: 'Repro: open the picker.',
 			labels: [{ name: 'bug' }, { name: 'p1' }],
@@ -179,8 +217,10 @@ test('parseIssues flattens label names and tolerates missing labels', () => {
 	const rows = parseIssues(stdout);
 
 	assert.deepEqual(rows?.[0]?.labels, ['bug', 'p1']);
+	assert.deepEqual(rows?.[0]?.assigneeLogins, ['octocat']);
 	assert.equal(rows?.[0]?.body, 'Repro: open the picker.');
 	assert.deepEqual(rows?.[1]?.labels, []);
+	assert.deepEqual(rows?.[1]?.assigneeLogins, []);
 	assert.equal(rows?.[1]?.body, '');
 	assert.equal(rows?.[1]?.number, 41);
 });
@@ -373,6 +413,87 @@ test('listIssues degrades to a typed error when gh fails', async () => {
 		result.status === 'error' && result.error.code,
 		'gh-not-authenticated',
 	);
+});
+
+// A cached list standing in for a failed refresh is still `ok` — the rows are
+// real, just old — but dropping the failure makes stale issues indistinguishable
+// from current ones, and both consumers read only `status`.
+test('listIssues serves the cache with staleError when gh fails', async () => {
+	const { service: commandService } = stubCommandService(() =>
+		buildResult('gh', {
+			failure: {
+				code: 'nonzero-exit',
+				exitCode: 1,
+				message: 'auth',
+				signal: null,
+			},
+			status: 'failure',
+			stderr: 'gh: authentication required; run gh auth login',
+		}),
+	);
+	const service = createRepositorySourcesService({
+		databaseService: fakeDatabaseServiceWithCache({
+			issues: [CACHED_ISSUE],
+			syncedAt: '2020-01-01T00:00:00.000Z',
+		}),
+		localCommandService: commandService,
+		resolveRepositoryPath: () => '/repo',
+	});
+
+	const result = await service.listIssues({
+		refresh: true,
+		repositoryId: 'repo-1',
+	});
+
+	assert.equal(result.status, 'ok');
+	assert.equal(result.status === 'ok' && result.source, 'cache');
+	assert.equal(result.issues.length, 1);
+	assert.equal(
+		result.status === 'ok' && result.staleError?.code,
+		'gh-not-authenticated',
+	);
+	assert.equal(
+		result.status === 'ok' && result.syncedAt,
+		'2020-01-01T00:00:00.000Z',
+	);
+});
+
+test('listIssues serves a fresh cache without a staleError', async () => {
+	const { calls, service: commandService } = stubCommandService(() =>
+		buildResult('gh', { status: 'success', stdout: '[]' }),
+	);
+	const service = createRepositorySourcesService({
+		databaseService: fakeDatabaseServiceWithCache({
+			issues: [CACHED_ISSUE],
+			syncedAt: new Date().toISOString(),
+		}),
+		localCommandService: commandService,
+		resolveRepositoryPath: () => '/repo',
+	});
+
+	const result = await service.listIssues({ repositoryId: 'repo-1' });
+
+	assert.equal(result.status, 'ok');
+	assert.equal(result.status === 'ok' && result.staleError, undefined);
+	// A fresh cache answers without shelling out at all.
+	assert.equal(calls.length, 0);
+});
+
+test('listIssues asks gh for unassigned issues only when the board asks', async () => {
+	const { calls, service: commandService } = stubCommandService(() =>
+		buildResult('gh', { status: 'success', stdout: '[]' }),
+	);
+	const service = createRepositorySourcesService({
+		databaseService: fakeDatabaseService([]),
+		localCommandService: commandService,
+		resolveRepositoryPath: () => '/repo',
+	});
+
+	await service.listIssues({ repositoryId: 'repo-1', unassignedOnly: true });
+	await service.listIssues({ repositoryId: 'repo-1' });
+
+	assert.deepEqual(calls[0]?.args?.slice(-2), ['--search', 'no:assignee']);
+	assert.equal(calls[1]?.args?.includes('--search'), false);
 });
 
 test('listBranches reports an error when the repository is unknown', async () => {

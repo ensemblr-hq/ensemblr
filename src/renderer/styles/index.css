@@ -751,6 +751,7 @@
 	[role="button"],
 	[role="menuitem"],
 	[data-slot="button"],
+	[data-slot="select-trigger"],
 	[data-slot="sidebar-menu-button"],
 	[data-slot="tabs-trigger"] {
 		-webkit-app-region: no-drag;

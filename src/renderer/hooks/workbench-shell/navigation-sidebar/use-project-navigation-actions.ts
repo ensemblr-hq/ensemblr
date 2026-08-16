@@ -45,12 +45,24 @@ export function useArchiveBrowseChange() {
 	);
 }
 
+/** How a caller wants the post-create hop handled. */
+interface CreateWorkspaceOptions {
+	/**
+	 * Whether to route to the new workspace. The dashboard board opts out: an
+	 * issue drag is a triage gesture, and yanking the user into the workspace
+	 * would cost them the board position they were working through.
+	 */
+	navigate?: boolean;
+}
+
 /** State and `create` handler exposed by the create-workspace action hook. */
 interface CreateWorkspaceActionResult {
+	/** Creates the workspace and resolves with its id, or null when creation failed. */
 	create: (
 		project: ProjectShellModel,
 		seed?: WorkspaceCreationSeed,
-	) => Promise<void>;
+		options?: CreateWorkspaceOptions,
+	) => Promise<string | null>;
 	creatingProjectIds: ReadonlySet<string>;
 	error: string | null;
 	isCreating: boolean;
@@ -222,7 +234,11 @@ function removeCreatingProjectId(
 	return next;
 }
 
-/** Creates a workspace with an optimistic sidebar row, then routes to the real workspace. */
+/**
+ * Creates a workspace with an optimistic sidebar row, then routes to the real
+ * workspace. Resolves with the new workspace's id so a caller that has follow-up
+ * work for it — the dashboard board sets its column — can act on the result.
+ */
 export function useCreateWorkspaceFromProject(): CreateWorkspaceActionResult {
 	const navigate = useNavigate();
 	const router = useRouter();
@@ -237,12 +253,16 @@ export function useCreateWorkspaceFromProject(): CreateWorkspaceActionResult {
 	const [error, setError] = useState<string | null>(null);
 
 	const create = useCallback(
-		async (project: ProjectShellModel, seed?: WorkspaceCreationSeed) => {
+		async (
+			project: ProjectShellModel,
+			seed?: WorkspaceCreationSeed,
+			options?: CreateWorkspaceOptions,
+		): Promise<string | null> => {
 			if (!isEnsemblrApiAvailable()) {
-				return;
+				return null;
 			}
 			if (pendingProjectIds.current.has(project.id)) {
-				return;
+				return null;
 			}
 
 			const name = resolveWorkspaceName(project, seed);
@@ -277,12 +297,17 @@ export function useCreateWorkspaceFromProject(): CreateWorkspaceActionResult {
 					const message = getCreateWorkspaceFailureMessage(result);
 					setError(message);
 					toast.error(message);
-					return;
+					return null;
 				}
 
 				const created = result.workspace;
 				replacePendingWorkspaceInCache(pendingWorkspaceId, result);
 				void invalidateWorkspaceListViews(queryClient).catch(() => undefined);
+
+				if (options?.navigate === false) {
+					void router.invalidate().catch(() => undefined);
+					return created.id;
+				}
 
 				try {
 					await navigate({
@@ -298,11 +323,13 @@ export function useCreateWorkspaceFromProject(): CreateWorkspaceActionResult {
 					// post-create route hop failed. The router resolves it on the next
 					// navigation, so this must not surface as a create failure.
 				}
+				return created.id;
 			} catch (cause) {
 				removePendingWorkspaceFromCache(pendingWorkspaceId);
 				const message = getCreateWorkspaceExceptionMessage(cause);
 				setError(message);
 				toast.error(message);
+				return null;
 			} finally {
 				pendingProjectIds.current.delete(project.id);
 				setCreatingProjectIds((current) =>

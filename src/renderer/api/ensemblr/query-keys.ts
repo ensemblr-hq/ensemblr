@@ -108,8 +108,13 @@ export const ensemblrQueryKeys = {
 	repositoryBranchesAll: () =>
 		[...ensemblrQueryKeys.all, 'repository-branches'] as const,
 	/** Query key for a repository's issues. */
-	repositoryIssues: (repositoryId: string) =>
-		[...ensemblrQueryKeys.all, 'repository-issues', repositoryId] as const,
+	repositoryIssues: (repositoryId: string, unassignedOnly = false) =>
+		[
+			...ensemblrQueryKeys.all,
+			'repository-issues',
+			repositoryId,
+			unassignedOnly ? 'unassigned' : 'all',
+		] as const,
 	/** Query key for a repository's pull requests. */
 	repositoryPullRequests: (repositoryId: string) =>
 		[

@@ -64,6 +64,9 @@ Rules of thumb:
 | Todo *(state bucket)* | К выполнению | Προς υλοποίηση | The bucket between `Backlog` and `In progress` — accepted work nobody has started. Kept as a phrase rather than borrowing `Todo`, which reads as a code marker in both languages. |
 | Triage *(state bucket)* | Разбор | Διαλογή | Linear's intake queue: filed but not yet accepted into a team's flow. Russian takes `Разбор` over the transliterated `Триаж`, which is medical; Greek takes `Διαλογή`, the ordinary sorting sense. |
 | Assignee | Исполнитель | Υπεύθυνος | Who an issue is assigned to. `Unassigned` is the negated phrase, not a separate noun: `Без исполнителя`/`Χωρίς υπεύθυνο`. |
+| Unassigned | Без исполнителя | Χωρίς υπεύθυνο | The negated `Assignee` above, promoted to its own row because the dashboard board defines its GitHub backlog by it: an open issue nobody is on. Never `неназначенная`/`μη ανατεθειμένο`, which describe the issue rather than the missing person and read as jargon in both languages. |
+| Backlog issue | Задача в бэклоге | Ζήτημα σε εκκρεμότητα | The unit the dashboard's Backlog column holds: an issue with no Ensemblr workspace yet. Takes `Бэклог`/`Εκκρεμότητες` from `Board status` below rather than coining a second word for the same column. Russian keeps the prepositional phrase — `бэклог-задача` reads as a compound noun the product does not have. |
+| Source *(of a board card)* | Источник | Προέλευση | Where a dashboard card came from: an Ensemblr workspace, a Linear issue, or a GitHub issue. The toolbar facet is `Источники`/`Προελεύσεις`. Deliberately **not** the `Create workspace from source` picker's own wording, which enumerates branch/PR/issue rather than provider — the board facet names the provider. Russian takes `Источник` over `Происхождение`, which reads as provenance rather than a filterable category. |
 | Label *(Linear)* | Метка | Ετικέτα | The colored tag a team puts on an issue. Russian takes `Метка` over `Ярлык`, which reads as a desktop shortcut; Greek takes `Ετικέτα`. An unset optional field is the negated phrase throughout the editor, matching `Assignee`: `Без статуса`/`Χωρίς κατάσταση`, `Без проекта`/`Χωρίς έργο`, `Без цикла`/`Χωρίς κύκλο`. |
 | Cycle *(Linear)* | Цикл | Κύκλος | Linear's fixed-length iteration. Deliberately not `Спринт`/`Σπριντ`: Linear does not call it a sprint, and the editor's picker has to match the word the user sees in Linear itself. |
 | Sort / Group *(list controls)* | Сортировка / Группировка | Ταξινόμηση / Ομαδοποίηση | The two pickers over a list. Nominative in every language, because each control's own value is what its trigger displays — a dative "по приоритету" reads as a fragment on a chip. |
@@ -87,6 +90,7 @@ Rules of thumb:
 | Permission mode | Режим разрешений | Λειτουργία δικαιωμάτων | How much an agent may do unattended. |
 | Keyboard shortcut | Горячая клавиша | Συντόμευση πληκτρολογίου | Shortened to "Горячие клавиши"/"Συντομεύσεις" in the nav, where the column is tight. |
 | Board status | Статус на доске | Κατάσταση πίνακα | The kanban column a workspace sits in: `Бэклог`/`Εκκρεμότητες`, `В работе`/`Σε εξέλιξη`, `На ревью`/`Σε αξιολόγηση`, `Готово`/`Ολοκληρώθηκε`, `Отменено`/`Ακυρώθηκε`. |
+| Linear *(nav entry)* | Linear | Linear | The sidebar entry for the Linear issue browser. A proper noun, so it stays English in all three and is never transliterated to `Линеар`/`Λίνεαρ`. Replaced the generic `Issues`/`Задачи`/`Ζητήματα` label, which collided with the `Issue` row above once the dashboard board started holding GitHub issues too. |
 | Actions bot | Бот Actions | Bot του Actions | The GitHub Actions commenter. `Actions` is the product name and stays; only the noun in front of it is localized. |
 | Managed root | Управляемый корневой каталог | Διαχειριζόμενος ριζικός κατάλογος | The root plus the directories Ensemblr creates under it. |
 | Diagnostic | Диагностика | Διαγνωστικό | One coded problem a failed operation reports; the renderer translates it from the code, never from main's English. |
@@ -125,6 +129,10 @@ Rules of thumb:
 | Approve | Разрешить | Έγκριση | Tool approval. |
 | Deny | Отклонить | Άρνηση | |
 | Connect | Подключить | Σύνδεση | Linking an integration such as Linear or the GitHub CLI. |
+| Assign an issue *(to a workspace)* | Создать рабочее пространство из задачи | Δημιουργία χώρου εργασίας από ζήτημα | Dragging a `Backlog issue` out of Backlog, which creates a workspace seeded from it. All three languages say **create a workspace from the issue**, never "assign"/`назначить`/`ανάθεση`: nothing is written back to Linear or GitHub (ADR 0024), and an assignment verb would promise the issue's own assignee changed. |
+| Dismiss *(a backlog issue)* | Убрать с доски | Απόκρυψη από τον πίνακα | Hiding an issue from the board without touching it in Linear or GitHub. Deliberately not `Отклонить`/`Απόρριψη`, which `Deny` and `Discard` already own and which imply a decision about the work itself. The inverse reuses `Restore` above. |
+| Refresh | Обновить | Ανανέωση | Re-fetching remote data. Both languages already use this form across the issue, PR, MCP-server, and provider surfaces; reuse it rather than coining `Перезагрузить`/`Επαναφόρτωση`, which read as reloading the app. |
+| Selected | Выбрано | Επιλεγμένο | Screen-reader-only checked state on a picker row, where the tick glyph is `aria-hidden`. Neuter short form, because it qualifies nothing on the page — it is announced on its own. |
 | Spawn | Запустить | Εκκίνηση | Starting a sub-agent. |
 | Clone | Клонировать | Κλωνοποίηση | |
 | Push | Push | Push | Git; untranslated. |

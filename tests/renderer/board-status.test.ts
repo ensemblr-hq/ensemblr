@@ -8,6 +8,7 @@ import {
 	BOARD_STATUS_ORDER,
 	DEFAULT_BOARD_STATUS,
 	resolveBoardStatus,
+	WORKSPACE_BOARD_STATUSES_ASSIGNABLE,
 } from '../../src/renderer/state/workspace';
 
 describe('resolveBoardStatus', () => {
@@ -17,6 +18,14 @@ describe('resolveBoardStatus', () => {
 
 	test('falls back to the default status when unset', () => {
 		expect(resolveBoardStatus({}, 'w1')).toBe(DEFAULT_BOARD_STATUS);
+	});
+
+	test('a workspace defaults to In progress, never the issues-only Backlog', () => {
+		expect(DEFAULT_BOARD_STATUS).toBe('in-progress');
+	});
+
+	test('coerces a status stored before Backlog became issues-only', () => {
+		expect(resolveBoardStatus({ w1: 'backlog' }, 'w1')).toBe('in-progress');
 	});
 });
 
@@ -39,11 +48,22 @@ describe('applyBoardStatus', () => {
 		const empty = {};
 		expect(applyBoardStatus(empty, 'w1', DEFAULT_BOARD_STATUS)).toBe(empty);
 	});
+
+	test('coerces a Backlog write onto the default, clearing a stale entry', () => {
+		expect(applyBoardStatus({ w1: 'done' }, 'w1', 'backlog')).toEqual({});
+		expect(applyBoardStatus({ w1: 'backlog' }, 'w1', 'backlog')).toEqual({});
+	});
 });
 
 describe('board status metadata', () => {
 	test('the default status is part of the column order', () => {
 		expect(BOARD_STATUS_ORDER).toContain(DEFAULT_BOARD_STATUS);
+	});
+
+	test('every column but Backlog can be assigned to a workspace', () => {
+		expect(WORKSPACE_BOARD_STATUSES_ASSIGNABLE).toEqual(
+			BOARD_STATUS_ORDER.filter((status) => status !== 'backlog'),
+		);
 	});
 
 	test('every ordered status has a label', () => {

@@ -13,6 +13,7 @@ export function StaticNavigationItem({
 	icon,
 	isActive,
 	label,
+	onPrefetch,
 	onSelect,
 	target,
 }: {
@@ -20,6 +21,8 @@ export function StaticNavigationItem({
 	icon: ReactElement;
 	isActive: boolean;
 	label: string;
+	/** Warms the destination's data on hover or focus, before the click lands. */
+	onPrefetch?: () => void;
 	onSelect: (target: WorkbenchStaticNavigationTarget) => void;
 	target: WorkbenchStaticNavigationTarget;
 }) {
@@ -38,6 +41,8 @@ export function StaticNavigationItem({
 				asChild={Boolean(renderStaticLink)}
 				isActive={isActive}
 				onClick={renderStaticLink ? undefined : () => onSelect(target)}
+				onFocus={onPrefetch}
+				onPointerEnter={onPrefetch}
 				tooltip={label}
 			>
 				{renderStaticLink ? renderStaticLink(target, content) : content}

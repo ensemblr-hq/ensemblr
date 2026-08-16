@@ -1,7 +1,9 @@
+import { useQueryClient } from '@tanstack/react-query';
 import type { TFunction } from 'i18next';
 import { useAtomValue } from 'jotai';
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { prefetchBoardIssues } from '@/renderer/api/ensemblr';
 import { StatusBadge } from '@/renderer/components/status-badge';
 import { ScrollArea } from '@/renderer/components/ui/scroll-area';
 import {
@@ -73,6 +75,15 @@ export function WorkspaceNavigationSidebar({
 	const [renameWorkspaceTarget, setRenameWorkspaceTarget] =
 		useState<WorkspaceShellModel | null>(null);
 	const developerMode = useAtomValue(developerModeAtom);
+	const queryClient = useQueryClient();
+	const prefetchIssues = useCallback(
+		() =>
+			prefetchBoardIssues(
+				queryClient,
+				projects.map((project) => project.id),
+			),
+		[projects, queryClient],
+	);
 
 	return (
 		<Sidebar className='border-sidebar-border' collapsible='offcanvas'>
@@ -85,6 +96,7 @@ export function WorkspaceNavigationSidebar({
 			<SidebarContent className='overflow-visible'>
 				<SidebarPrimaryNavigation
 					activeView={activeView}
+					onPrefetchIssues={prefetchIssues}
 					onStaticNavigationSelect={onStaticNavigationSelect}
 				/>
 				<ScrollArea className='flex min-h-0 flex-1 flex-col'>

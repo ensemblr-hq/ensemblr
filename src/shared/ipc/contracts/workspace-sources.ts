@@ -54,6 +54,14 @@ export interface RepositoryPullRequestWire {
 
 /** A GitHub issue offered as a workspace source. */
 export interface RepositoryIssueWire {
+	/**
+	 * Logins of everyone assigned to the issue. Empty means unassigned, which is
+	 * what the dashboard board treats as backlog. The list is narrowed to
+	 * unassigned issues by `gh issue list --search 'no:assignee'` before it is
+	 * cached, so this is empty for every row the board reads; it stays on the wire
+	 * because the create-from picker shows assignees on its own unfiltered list.
+	 */
+	assigneeLogins: string[];
 	authorLogin: string | null;
 	/** Raw issue body markdown; seeds the first-prompt composer draft. */
 	body: string;
@@ -75,9 +83,20 @@ export interface ListRepositoryPullRequestsRequest {
 	repositoryId: string;
 }
 
-/** Request to list a repository's issues. */
+/**
+ * Request to list a repository's issues. Issues are cached in SQLite between
+ * runs, so an ordinary call may answer from that cache; `refresh` skips it.
+ */
 export interface ListRepositoryIssuesRequest {
+	/** Forces a fresh `gh issue list` and rewrites the cache with the result. */
+	refresh?: boolean;
 	repositoryId: string;
+	/**
+	 * Narrows the list to unassigned issues, which is the dashboard board's
+	 * backlog. Applied by `gh` rather than after the fact, because `--limit`
+	 * counts rows GitHub returns. The two variants cache separately.
+	 */
+	unassignedOnly?: boolean;
 }
 
 /** The repository's branches, or an empty list with a typed error when `gh` fails. */
@@ -94,9 +113,25 @@ export type ListRepositoryPullRequestsResult =
 			status: 'error';
 	  };
 
-/** The repository's issues, or an empty list with a typed error when `gh` fails. */
+/**
+ * The repository's issues, or an empty list with a typed error when `gh` fails
+ * and no cached list survives to stand in for it. `source` says whether the rows
+ * came off SQLite or straight from `gh`, and `syncedAt` dates them either way.
+ *
+ * When `gh` fails but a cached list does survive, the result is still `ok` — the
+ * rows are real, just old — and `staleError` carries the failure that stopped
+ * them being refreshed. A surface that drops it renders stale issues that are
+ * indistinguishable from current ones, so both consumers say so instead.
+ */
 export type ListRepositoryIssuesResult =
-	| { issues: RepositoryIssueWire[]; status: 'ok' }
+	| {
+			issues: RepositoryIssueWire[];
+			source: 'cache' | 'remote';
+			/** Why the refresh failed, when these rows are a cached stand-in. */
+			staleError?: GithubFailure;
+			status: 'ok';
+			syncedAt: string;
+	  }
 	| { error: GithubFailure; issues: RepositoryIssueWire[]; status: 'error' };
 
 /** IPC surface for the create-from-source picker's repository data. */

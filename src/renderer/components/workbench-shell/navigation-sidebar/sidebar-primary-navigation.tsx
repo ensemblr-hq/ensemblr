@@ -7,6 +7,7 @@ import {
 	SidebarMenu,
 	SidebarSeparator,
 } from '@/renderer/components/ui/sidebar';
+import { LinearLogo } from '@/renderer/components/workbench-shell/source-provider-logo';
 import type {
 	WorkbenchActiveView,
 	WorkbenchStaticNavigationTarget,
@@ -14,12 +15,15 @@ import type {
 
 import { StaticNavigationItem } from './static-navigation-item';
 
-/** Top-of-sidebar static navigation group (dashboard, history, settings). */
+/** Top-of-sidebar static navigation group (dashboard, Linear, history, settings). */
 export function SidebarPrimaryNavigation({
 	activeView,
+	onPrefetchIssues,
 	onStaticNavigationSelect,
 }: {
 	activeView: WorkbenchActiveView;
+	/** Warms the issue lists the dashboard and Issues views both read. */
+	onPrefetchIssues: () => void;
 	onStaticNavigationSelect: (target: WorkbenchStaticNavigationTarget) => void;
 }) {
 	const { t } = useTranslation();
@@ -36,8 +40,17 @@ export function SidebarPrimaryNavigation({
 								'workbench:navigation-sidebar.nav.dashboard',
 								'Dashboard',
 							)}
+							onPrefetch={onPrefetchIssues}
 							onSelect={onStaticNavigationSelect}
 							target='dashboard'
+						/>
+						<StaticNavigationItem
+							icon={<LinearLogo aria-hidden='true' className='size-3.5!' />}
+							isActive={activeView === 'linear'}
+							label={t('workbench:navigation-sidebar.nav.linear', 'Linear')}
+							onPrefetch={onPrefetchIssues}
+							onSelect={onStaticNavigationSelect}
+							target='issues'
 						/>
 						<StaticNavigationItem
 							icon={<HistoryIcon aria-hidden='true' />}

@@ -66,6 +66,7 @@ export {
 	commitWorkspaceChangesRequestSchema,
 	createPullRequestRequestSchema,
 	getPullRequestSnapshotRequestSchema,
+	listRepositoryIssuesRequestSchema,
 	listRepositorySourcesRequestSchema,
 	mergePullRequestRequestSchema,
 	pushWorkspaceBranchRequestSchema,

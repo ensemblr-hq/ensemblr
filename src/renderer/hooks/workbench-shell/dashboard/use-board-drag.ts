@@ -2,11 +2,15 @@ import { monitorForElements } from '@atlaskit/pragmatic-drag-and-drop/element/ad
 import { extractClosestEdge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge';
 import { useEffect } from 'react';
 
+import { BOARD_CARD_DRAG_TYPE } from '@/renderer/components/workbench-shell/dashboard/use-card-dnd';
 import {
 	BOARD_STATUS_ORDER,
 	type WorkspaceBoardStatus,
 } from '@/renderer/state/workspace';
-import type { BoardDrop } from '@/renderer/types/workbench-shell';
+import type {
+	BoardCardKind,
+	BoardDrop,
+} from '@/renderer/types/workbench-shell';
 
 /** Drag-and-drop payload carried on a source or drop target. */
 type DragData = Record<string | symbol, unknown>;
@@ -24,45 +28,69 @@ function isBoardStatus(value: unknown): value is WorkspaceBoardStatus {
 	);
 }
 
+/** Narrows an unknown drag payload value to a board card kind. */
+function isBoardCardKind(value: unknown): value is BoardCardKind {
+	return value === 'issue' || value === 'workspace';
+}
+
+/** Reads the `{ cardId, cardKind }` pair off a card's drag payload. */
+function readCard(data: DragData): { id: string; kind: BoardCardKind } | null {
+	return typeof data.cardId === 'string' && isBoardCardKind(data.cardKind)
+		? { id: data.cardId, kind: data.cardKind }
+		: null;
+}
+
+/**
+ * Reads the status of the column enclosing the pointer. A card target is nested
+ * inside its column's target, so this is set for a card drop too — without it a
+ * drop onto a card has to guess the column from the card's kind, and an issue
+ * card sits in Canceled once it has been dismissed.
+ */
+function readColumnStatus(
+	dropTargets: readonly DropTargetData[],
+): WorkspaceBoardStatus | null {
+	const status = dropTargets.find((entry) => entry.data.type === 'board-column')
+		?.data.status;
+	return isBoardStatus(status) ? status : null;
+}
+
 /** Resolves a drop landing on another card, with the closest insertion edge. */
 function resolveCardDrop(
-	sourceId: string,
+	source: { id: string; kind: BoardCardKind },
 	dropTargets: readonly DropTargetData[],
 ): BoardDrop | null {
 	const target = dropTargets.find(
-		(entry) => entry.data.type === 'workspace-card',
+		(entry) => entry.data.type === BOARD_CARD_DRAG_TYPE,
 	);
-	if (!target) {
-		return null;
-	}
-	const targetCardId = target.data.workspaceId;
-	if (typeof targetCardId !== 'string') {
+	const targetCard = target ? readCard(target.data) : null;
+	if (!target || !targetCard) {
 		return null;
 	}
 	return {
 		edge: extractClosestEdge(target.data),
-		sourceId,
-		targetCardId,
-		targetColumnStatus: null,
+		sourceId: source.id,
+		sourceKind: source.kind,
+		targetCardId: targetCard.id,
+		targetCardKind: targetCard.kind,
+		targetColumnStatus: readColumnStatus(dropTargets),
 	};
 }
 
 /** Resolves a drop landing on a column's empty space. */
 function resolveColumnDrop(
-	sourceId: string,
+	source: { id: string; kind: BoardCardKind },
 	dropTargets: readonly DropTargetData[],
 ): BoardDrop | null {
-	const target = dropTargets.find(
-		(entry) => entry.data.type === 'board-column',
-	);
-	const status = target?.data.status;
-	if (!isBoardStatus(status)) {
+	const status = readColumnStatus(dropTargets);
+	if (!status) {
 		return null;
 	}
 	return {
 		edge: null,
-		sourceId,
+		sourceId: source.id,
+		sourceKind: source.kind,
 		targetCardId: null,
+		targetCardKind: null,
 		targetColumnStatus: status,
 	};
 }
@@ -79,13 +107,13 @@ export function resolveBoardDrop(
 	sourceData: DragData,
 	dropTargets: readonly DropTargetData[],
 ): BoardDrop | null {
-	const sourceId = sourceData.workspaceId;
-	if (typeof sourceId !== 'string') {
+	const source = readCard(sourceData);
+	if (!source) {
 		return null;
 	}
 	return (
-		resolveCardDrop(sourceId, dropTargets) ??
-		resolveColumnDrop(sourceId, dropTargets)
+		resolveCardDrop(source, dropTargets) ??
+		resolveColumnDrop(source, dropTargets)
 	);
 }
 
@@ -98,7 +126,7 @@ export function useBoardDragMonitor(onDrop: (drop: BoardDrop) => void): void {
 	useEffect(
 		() =>
 			monitorForElements({
-				canMonitor: ({ source }) => source.data.type === 'workspace-card',
+				canMonitor: ({ source }) => source.data.type === BOARD_CARD_DRAG_TYPE,
 				onDrop: ({ location, source }) => {
 					const drop = resolveBoardDrop(
 						source.data,
