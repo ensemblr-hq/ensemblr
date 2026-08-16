@@ -1,4 +1,7 @@
 {
+	"browse": {
+		"title": "Ζητήματα Linear"
+	},
 	"comment-composer": {
 		"label": "Προσθήκη σχολίου",
 		"markdown-hint": "Υποστηρίζεται Markdown",

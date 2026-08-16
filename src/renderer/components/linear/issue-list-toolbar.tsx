@@ -5,7 +5,6 @@ import {
 	RefreshCwIcon,
 	SearchIcon,
 } from 'lucide-react';
-import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/renderer/components/ui/button';
@@ -29,6 +28,7 @@ import {
 	ToggleGroup,
 	ToggleGroupItem,
 } from '@/renderer/components/ui/toggle-group';
+import { useRefreshSpin } from '@/renderer/hooks/linear/use-refresh-spin';
 import type {
 	LinearIssueGrouping,
 	LinearIssueScope,
@@ -44,9 +44,6 @@ export const ALL_ACCOUNTS = 'all';
 
 /** Sentinel option value meaning "do not narrow by team". */
 export const ALL_TEAMS = 'all';
-
-/** One full rotation of Tailwind's `animate-spin`, which runs on a 1s cycle. */
-const SPIN_TURN_MS = 1000;
 
 const SCOPES: readonly LinearIssueScope[] = ['active', 'closed', 'all'];
 const SORTS: readonly LinearIssueSort[] = [
@@ -169,11 +166,7 @@ export function LinearIssueFilterBar({
 	);
 }
 
-/**
- * Refresh control that always completes one full turn of the icon. A cache-first
- * refetch resolves before a browser paints, so keying the spin purely off the
- * query's in-flight flag left a click with no visible response at all.
- */
+/** Refresh control that always completes one full turn of the icon. */
 function LinearRefreshButton({
 	onRefresh,
 	refreshing,
@@ -182,26 +175,14 @@ function LinearRefreshButton({
 	refreshing: boolean;
 }) {
 	const { t } = useTranslation();
-	const [spinning, setSpinning] = useState(false);
-
-	useEffect(() => {
-		if (!spinning) {
-			return;
-		}
-
-		const timer = window.setTimeout(() => setSpinning(false), SPIN_TURN_MS);
-
-		return () => window.clearTimeout(timer);
-	}, [spinning]);
-
-	const active = spinning || refreshing;
+	const { active, start } = useRefreshSpin(refreshing);
 
 	return (
 		<Button
 			aria-label={t('linear:issue-list.refresh', 'Refresh issues')}
 			disabled={active}
 			onClick={() => {
-				setSpinning(true);
+				start();
 				onRefresh();
 			}}
 			size='icon'

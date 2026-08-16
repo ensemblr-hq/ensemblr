@@ -20,6 +20,7 @@ import {
 	DropdownMenuTrigger,
 } from '@/renderer/components/ui/dropdown-menu';
 import { useWorkbenchLayoutRouteModel } from '@/renderer/components/workbench-shell/shell-contexts';
+import { useRefreshSpin } from '@/renderer/hooks/linear/use-refresh-spin';
 import { useCopyToClipboard } from '@/renderer/hooks/use-copy-to-clipboard';
 import { useCreateWorkspaceFromProject } from '@/renderer/hooks/workbench-shell/navigation-sidebar/use-project-navigation-actions';
 import { buildWorkspaceSeedFromLinearIssue } from '@/renderer/lib/linear';
@@ -60,16 +61,7 @@ export function LinearIssueDetailHeader({
 			<IssueBreadcrumb issue={issue} />
 			<span className='ml-auto flex shrink-0 items-center gap-1'>
 				<CopyIssueLinkButton url={issue.url} />
-				<IconAction
-					icon={
-						<RefreshCwIcon
-							className={isRefreshing ? 'animate-spin' : undefined}
-						/>
-					}
-					label={t('linear:issue-detail.refresh', 'Refresh issue')}
-					onClick={onRefresh}
-					{...(isRefreshing ? { disabled: true } : {})}
-				/>
+				<RefreshIssueButton isRefreshing={isRefreshing} onRefresh={onRefresh} />
 				<Button asChild size='icon-sm' variant='ghost'>
 					<a
 						aria-label={t(
@@ -143,6 +135,30 @@ function IconAction({
 		>
 			{icon}
 		</Button>
+	);
+}
+
+/** Refetches the issue, always completing one full turn of the icon. */
+function RefreshIssueButton({
+	isRefreshing,
+	onRefresh,
+}: {
+	isRefreshing: boolean;
+	onRefresh: () => void;
+}) {
+	const { t } = useTranslation();
+	const { active, start } = useRefreshSpin(isRefreshing);
+
+	return (
+		<IconAction
+			disabled={active}
+			icon={<RefreshCwIcon className={active ? 'animate-spin' : undefined} />}
+			label={t('linear:issue-detail.refresh', 'Refresh issue')}
+			onClick={() => {
+				start();
+				onRefresh();
+			}}
+		/>
 	);
 }
 

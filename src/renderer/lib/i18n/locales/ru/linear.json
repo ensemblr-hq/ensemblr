@@ -1,4 +1,7 @@
 {
+	"browse": {
+		"title": "Задачи Linear"
+	},
 	"comment-composer": {
 		"label": "Добавить комментарий",
 		"markdown-hint": "Поддерживается Markdown",

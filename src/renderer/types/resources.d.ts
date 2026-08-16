@@ -1023,6 +1023,9 @@ export default interface Resources {
 		};
 	};
 	linear: {
+		browse: {
+			title: 'Linear issues';
+		};
 		'comment-composer': {
 			label: 'Add a comment';
 			'markdown-hint': 'Markdown supported';
