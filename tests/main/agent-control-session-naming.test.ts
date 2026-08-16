@@ -10,6 +10,8 @@ import type { AgentSpecies } from '../../src/main/agent-control/ports.ts';
 import { BranchSlugRejected } from '../../src/main/agent-runtime/naming/apply-branch-slug.ts';
 import {
 	buildLanguageDirective,
+	PLAN_REFINEMENT_DIRECTIVE,
+	PLAN_REFINEMENT_HEADER,
 	SESSION_BRIEF_NUDGE_HEADER,
 } from '../../src/shared/agent-control.ts';
 import type { AppLanguage } from '../../src/shared/i18n.ts';
@@ -25,6 +27,7 @@ const idleBrief = {
 function setup(
 	overrides: {
 		planMode?: boolean;
+		planSubmitted?: boolean;
 		readBrief?: unknown;
 		setBranchName?: unknown;
 		setName?: unknown;
@@ -63,6 +66,7 @@ function setup(
 		permissions: { getMode: () => 'workspace-trusted' },
 		planMode: {
 			exit: vi.fn(),
+			hasSubmittedPlan: () => overrides.planSubmitted ?? false,
 			isActive: () => overrides.planMode ?? false,
 			releaseSession: vi.fn(),
 		},
@@ -322,6 +326,45 @@ describe('readTurnPreamble', () => {
 		const { service } = setup({ language: 'ru' });
 
 		expect(await service.readTurnPreamble('unknown')).toBeNull();
+	});
+
+	it('tells a refinement turn to close on another plan submission', async () => {
+		const { service } = setup({ planMode: true, planSubmitted: true });
+
+		expect(await service.readTurnPreamble(CALLER)).toBe(
+			PLAN_REFINEMENT_DIRECTIVE,
+		);
+	});
+
+	it('leaves the directive off a planning turn with no plan under review', async () => {
+		const { service } = setup({ planMode: true });
+
+		expect(await service.readTurnPreamble(CALLER)).toBeNull();
+	});
+
+	it('orders the refinement directive after the upkeep block and before the language one', async () => {
+		const { service } = setup({
+			language: 'ru',
+			planMode: true,
+			planSubmitted: true,
+			readBrief: vi.fn().mockResolvedValue({
+				branch: { current: null, eligible: false },
+				summaryStale: true,
+				titleNeeded: false,
+			}),
+		});
+
+		const preamble = (await service.readTurnPreamble(CALLER)) ?? '';
+
+		expect(preamble.indexOf(SESSION_BRIEF_NUDGE_HEADER)).toBeGreaterThanOrEqual(
+			0,
+		);
+		expect(preamble.indexOf(PLAN_REFINEMENT_HEADER)).toBeGreaterThan(
+			preamble.indexOf(SESSION_BRIEF_NUDGE_HEADER),
+		);
+		expect(
+			preamble.indexOf(buildLanguageDirective('ru') ?? ''),
+		).toBeGreaterThan(preamble.indexOf(PLAN_REFINEMENT_HEADER));
 	});
 
 	// This is the only channel a directly-prompted runtime has. Claude Code sees

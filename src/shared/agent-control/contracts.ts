@@ -720,9 +720,10 @@ export interface SessionBriefNaming {
 
 /**
  * Result of `getSessionBrief`: everything the Pi extension needs to assemble
- * this turn's system prompt in one round trip. `nudge` and `languageDirective`
- * are both rendered by the app rather than the extension so there is no second
- * copy of the wording to drift — the extension appends strings it never authors.
+ * this turn's system prompt in one round trip. `nudge`, `planRefinement`, and
+ * `languageDirective` are all rendered by the app rather than the extension so
+ * there is no second copy of the wording to drift — the extension appends
+ * strings it never authors.
  */
 export interface GetSessionBriefResult {
 	/** Whether the calling session is currently planning. */
@@ -730,6 +731,12 @@ export interface GetSessionBriefResult {
 	naming: SessionBriefNaming;
 	/** Ready-to-append upkeep block, or null when nothing is outstanding. */
 	nudge: string | null;
+	/**
+	 * Ready-to-append directive telling a planning session to close this turn by
+	 * submitting the revised plan, or null when no plan of its own is waiting on
+	 * the user.
+	 */
+	planRefinement: string | null;
 	/**
 	 * Ready-to-append instruction to write user-facing prose in the app's
 	 * language, or null when the app is in English and the model's own

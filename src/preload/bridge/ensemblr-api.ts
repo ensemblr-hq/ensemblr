@@ -371,6 +371,7 @@ export function createEnsemblrApi(): EnsemblrApi {
 		openAgentProviderSettingsFile: (request) =>
 			invoke('openAgentProviderSettingsFile', request),
 		selectRootDirectory: () => invoke('selectRootDirectory'),
+		setAgentPlanMode: (request) => invoke('setAgentPlanMode', request),
 		setEnvironmentVariable: (request) =>
 			invoke('setEnvironmentVariable', request),
 		setupDiagnostics: () => invoke('setupDiagnostics'),

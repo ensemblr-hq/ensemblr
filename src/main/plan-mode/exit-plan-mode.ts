@@ -33,6 +33,11 @@ interface PlanSubmissionOptions {
 	broadcastReview: (payload: ExitPlanModeBroadcast) => void;
 	/** Whether any window is available to host the review panel. */
 	hasRenderer: () => boolean;
+	/**
+	 * Records that this session now has a plan under review, so the turn that
+	 * carries the user's decision is told to close on another submission.
+	 */
+	markSubmitted: (agentSessionId: string) => void;
 	/** Writes the plan markdown so the agent never needs the blocked `write` tool. */
 	planFileWriter: PlanFileWriter;
 	/**
@@ -68,6 +73,7 @@ export function createPlanSubmission({
 	broadcastReview,
 	createRequestId = randomUUID,
 	hasRenderer,
+	markSubmitted,
 	planFileWriter,
 	postPlanMessage,
 }: PlanSubmissionOptions): PlanSubmission {
@@ -100,6 +106,7 @@ export function createPlanSubmission({
 		submit: async ({ args, origin }) => {
 			const planPath = await savePlan(origin, args);
 			postPlanMessage({ plan: args.plan, sessionId: origin.sessionId });
+			markSubmitted(origin.sessionId);
 			if (!hasRenderer()) {
 				return { planPath, summary: NO_RENDERER_SUMMARY };
 			}

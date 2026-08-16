@@ -25,6 +25,7 @@ import {
 	listAgentSessionEventsRequestSchema,
 	listAgentSessionsRequestSchema,
 	openAgentSessionRequestSchema,
+	setAgentPlanModeRequestSchema,
 	stopAgentSessionRequestSchema,
 	submitAgentPromptRequestSchema,
 	writeForkSummaryRequestSchema,
@@ -58,6 +59,10 @@ export function registerAgentSessionHandlers({
 	 * this tab, not that it is off — a spawned child inherits Plan Mode through the
 	 * control layer, and clearing that from a request which never mentioned it
 	 * would unblock a conversation nobody asked to unblock.
+	 *
+	 * `setAgentPlanMode` covers the one decision that changes the toggle without
+	 * sending a prompt: handing a plan off to another chat leaves this session with
+	 * nothing more to say, so nothing would otherwise carry the new value over.
 	 */
 	planModeRegistry: PlanModeRegistry;
 	/**
@@ -157,6 +162,14 @@ export function registerAgentSessionHandlers({
 					error: cause instanceof Error ? cause.message : 'Submit failed.',
 				};
 			}
+		},
+	);
+
+	ipcMain.handle(
+		IPC_CHANNELS.setAgentPlanMode,
+		(_event, raw: unknown): void => {
+			const request = setAgentPlanModeRequestSchema.parse(raw);
+			planModeRegistry.setActive(request.sessionId, request.planMode);
 		},
 	);
 

@@ -91,6 +91,7 @@ const makeDeps = (input: {
 		planMode: {
 			activateForSpawn: vi.fn(),
 			exit: vi.fn(),
+			hasSubmittedPlan: vi.fn(() => false),
 			isActive: vi.fn(() => false),
 			releaseSession: vi.fn(),
 		},
@@ -478,6 +479,7 @@ describe('startConversation rollback on submit failure', () => {
 			planMode: {
 				activateForSpawn: vi.fn(),
 				exit: vi.fn(),
+				hasSubmittedPlan: vi.fn(() => false),
 				isActive: vi.fn(() => false),
 				releaseSession: releasePlanMode,
 			},

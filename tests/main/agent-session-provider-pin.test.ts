@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { AgentSessionService } from '../../src/main/agent-runtime/agent-session-service.ts';
 import type { PiExecutableSnapshot } from '../../src/main/pi-runtime/pi-executable.ts';
+import { IPC_CHANNELS } from '../../src/shared/ipc/channels.ts';
 import {
 	type AgentModelOption,
 	asModelVendorId,
@@ -129,9 +130,11 @@ let recorded: RecordedService;
 function registerHandlers({
 	listClaudeModels = async () => CLAUDE_MODELS,
 	piExecutable = createReadyExecutable(),
+	setActive = () => undefined,
 }: {
 	listClaudeModels?: () => Promise<readonly AgentModelOption[]>;
 	piExecutable?: PiExecutableSnapshot;
+	setActive?: (agentSessionId: string, active: boolean) => void;
 } = {}): Map<string, (event: unknown, raw: unknown) => Promise<unknown>> {
 	handle.mockReset();
 	recorded = {
@@ -173,9 +176,11 @@ function registerHandlers({
 			saveOverride: () => ({ canceled: false }),
 		},
 		planModeRegistry: {
+			hasSubmittedPlan: () => false,
 			isActive: () => false,
+			markSubmitted: () => undefined,
 			release: () => undefined,
-			setActive: () => undefined,
+			setActive,
 		},
 		provisionalNamingQueue: () => undefined,
 		withPermissionGate: () => undefined,
@@ -328,6 +333,36 @@ describe("Plan Mode reaches the opener on a chat's first session", () => {
 	});
 });
 
+// Handing a plan to another chat is the one answer that ends planning without
+// submitting anything, so the toggle has no prompt to ride over and the renderer
+// states it on its own channel instead.
+describe('the renderer can end Plan Mode without submitting a prompt', () => {
+	it('mirrors the toggle straight into the registry', async () => {
+		const setActive = vi.fn();
+		const channels = registerHandlers({ setActive });
+
+		await channels.get(IPC_CHANNELS.setAgentPlanMode)?.(null, {
+			planMode: false,
+			sessionId: 'session-1',
+		});
+
+		expect(setActive).toHaveBeenCalledWith('session-1', false);
+	});
+
+	it('rejects a request with no session rather than clearing an unnamed one', () => {
+		const setActive = vi.fn();
+		const channels = registerHandlers({ setActive });
+
+		expect(() =>
+			channels.get(IPC_CHANNELS.setAgentPlanMode)?.(null, {
+				planMode: false,
+				sessionId: '',
+			}),
+		).toThrow();
+		expect(setActive).not.toHaveBeenCalled();
+	});
+});
+
 describe('a spawned sub-agent starts in Plan Mode rather than joining it late', () => {
 	/**
 	 * Spawns a conversation through the control layer and returns the open
@@ -371,6 +406,7 @@ describe('a spawned sub-agent starts in Plan Mode rather than joining it late', 
 			planMode: {
 				activateForSpawn,
 				exit: vi.fn(),
+				hasSubmittedPlan: vi.fn(() => false),
 				isActive: vi.fn(() => false),
 				releaseSession: vi.fn(),
 			},

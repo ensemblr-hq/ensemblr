@@ -61,6 +61,12 @@ export const submitAgentPromptRequestSchema = z.object({
 	thinkingLevel: optionalNullableString,
 });
 
+/** {@link import('../../../shared/ipc').SetAgentPlanModeRequest}. */
+export const setAgentPlanModeRequestSchema = z.object({
+	planMode: z.boolean(),
+	sessionId: z.string().min(1),
+});
+
 /** {@link import('../../../shared/ipc').StopAgentSessionRequest}. */
 export const stopAgentSessionRequestSchema = z.object({
 	reason: z.string().optional(),

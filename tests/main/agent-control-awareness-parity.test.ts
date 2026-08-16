@@ -8,6 +8,7 @@ import {
 	ORCHESTRATOR_AWARENESS,
 	PLAN_MODE_ORCHESTRATOR_AWARENESS,
 	PLAN_MODE_SUBAGENT_AWARENESS,
+	PLAN_REFINEMENT_HEADER,
 	roleForDepth,
 	SESSION_BRIEF_NUDGE_HEADER,
 	SUBAGENT_AWARENESS,
@@ -552,6 +553,25 @@ describe('agent-control AWARENESS parity', () => {
 		expect(readExtensionSource()).toMatch(
 			/planning\s*\?\s*PLAN_MODE_AWARENESS_FOR_ROLE\s*:\s*AWARENESS/,
 		);
+	});
+
+	// The app renders every one of these blocks and the extension only appends
+	// them, so a field added to `GetSessionBriefResult` that nobody splices in
+	// here reaches Pi as nothing at all. `readTurnPreamble` joins the same three
+	// in the same order for the runtimes the app prompts directly; asserting the
+	// order pins the two hand-maintained copies of that sequence together.
+	it('appends every rendered brief block, in the order the app joins them', () => {
+		expect(readExtensionSource()).toMatch(
+			/event\.systemPrompt,\s*playbook,\s*nudge,\s*planRefinement,\s*languageDirective,/,
+		);
+	});
+
+	it('reads the refinement block off the brief rather than authoring one', () => {
+		const source = readExtensionSource();
+		expect(source).toMatch(
+			/planRefinement:\s*\n?\s*typeof brief\?\.planRefinement === 'string'/,
+		);
+		expect(source).not.toContain(PLAN_REFINEMENT_HEADER);
 	});
 
 	// One read of the role env var feeds both the role playbook and the plan-mode

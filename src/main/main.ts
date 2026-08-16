@@ -800,6 +800,8 @@ const planSubmission = createPlanSubmission({
 	/** Reports whether any window is alive to host the review panel. */
 	hasRenderer: () =>
 		BrowserWindow.getAllWindows().some((window) => !window.isDestroyed()),
+	/** Marks the plan as under review, so the next turn is told to resubmit. */
+	markSubmitted: (sessionId) => planModeRegistry.markSubmitted(sessionId),
 	planFileWriter: createPlanFileWriter(),
 	/** Posts the plan into the submitting chat's timeline so the user always sees it. */
 	postPlanMessage: ({ sessionId, plan }) =>
@@ -871,6 +873,8 @@ agentControlService = createAgentControlService({
 			exit: planSubmission.submit,
 			/** Reports whether the calling agent session is still planning. */
 			isActive: planModeRegistry.isActive,
+			/** Reports whether that session's plan is already awaiting the user. */
+			hasSubmittedPlan: planModeRegistry.hasSubmittedPlan,
 			/** Starts a spawned child planning; narrowed to on-only on purpose. */
 			activateForSpawn: (sessionId) =>
 				planModeRegistry.setActive(sessionId, true),

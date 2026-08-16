@@ -30,6 +30,7 @@ export {
 	listAgentSessionEventsRequestSchema,
 	listAgentSessionsRequestSchema,
 	openAgentSessionRequestSchema,
+	setAgentPlanModeRequestSchema,
 	stopAgentSessionRequestSchema,
 	submitAgentPromptRequestSchema,
 	writeForkSummaryRequestSchema,

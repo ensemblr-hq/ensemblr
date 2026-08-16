@@ -524,7 +524,7 @@ When you and the user share an understanding, hand the plan over and stop:
 Their decision comes back to you as your NEXT prompt, not as the tool result:
 
 - Approve — they send you an approval prompt with Plan Mode off. Implement the plan, starting immediately.
-- Refine — they type their changes into the composer with Plan Mode still on. Fold them in and call the tool again with the revised plan.
+- Refine — they type their changes into the composer with Plan Mode still on. Their message arrives looking like any other prompt, and answering it in prose is the one wrong move: it leaves them a revision with nothing to approve. Fold the changes in and end that turn by calling the tool again with the WHOLE revised plan, never a note of what you changed.
 - Hand off — another conversation picks the plan up and you hear nothing more. Nothing is expected of you.`;
 
 /**

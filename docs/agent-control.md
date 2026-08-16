@@ -381,6 +381,13 @@ nothing reaches them over MCP. A first-class runtime driven over MCP has its
 system prompt fixed at session open and receives the same upkeep block through
 `resolveTurnPreamble` instead.
 
+The brief carries a second per-turn block, `planRefinement`, for a session whose
+submitted plan is still in front of the user. That is the Refine turn: the user's
+changes arrive as an ordinary prompt, and without the block the agent answers in
+prose and leaves them a revision they cannot approve. It rides both channels the
+upkeep block does, so Pi and Claude Code are told the same thing — close this
+turn by submitting the whole revised plan again.
+
 ### Choosing a model for a child
 
 A spawn never crosses the **agent runtime** axis (`pi` | `claude`), which is

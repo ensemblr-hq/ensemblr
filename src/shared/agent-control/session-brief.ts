@@ -1,5 +1,7 @@
 /**
- * Renders the per-turn upkeep block appended to an agent's system prompt.
+ * Renders the per-turn blocks appended to an agent's system prompt: the upkeep
+ * block naming what the session still owes, and the directive a turn carries
+ * when a plan it submitted is already in front of the user.
  *
  * The three naming tools are also described in the role playbooks, but a
  * playbook is static: a long skill invocation, or Plan Mode's instruction that
@@ -163,3 +165,37 @@ export function buildSessionBriefNudge(
 	const preamble = planMode ? PLAN_MODE_NUDGE_PREAMBLE : NUDGE_PREAMBLE;
 	return `${preamble}\n\n${bullets.join('\n')}`;
 }
+
+/**
+ * Opening line of the refinement directive. Exported so a test can locate the
+ * block inside a preamble it was joined into, which asserting on the whole
+ * directive cannot do.
+ */
+export const PLAN_REFINEMENT_HEADER = 'PLAN AWAITING REVISION';
+
+/**
+ * Appended to every turn a session takes while a plan it submitted is still
+ * awaiting a decision — the turn the Refine button produces.
+ *
+ * The playbooks already say a refinement ends in another submission, but they
+ * say it in a list of three outcomes read once, several turns and one whole plan
+ * ago. What actually arrives is a bare message, indistinguishable from an
+ * ordinary follow-up, and the agent answers it in prose: the revision is real,
+ * the plan file and the review bar are not, and the reader is left with a
+ * refinement they cannot approve. This block is rebuilt from live state instead,
+ * so the instruction is in front of the model on the turn it applies to.
+ *
+ * It says "whoever asked for the plan" rather than "the user" because a spawned
+ * sub-agent reaches this too: `planModeFollowUpDenial` lets an orchestrator
+ * follow up into a child that is itself planning, so the message answering a
+ * child's plan comes from its parent.
+ *
+ * It names both plan-exit tools because both runtimes read it: Pi submits
+ * through the control op, and Claude Code through its own native tool, and this
+ * block rides the channel each of them already has.
+ */
+export const PLAN_REFINEMENT_DIRECTIVE = `${PLAN_REFINEMENT_HEADER} — you already submitted a plan and whoever asked for it is reading it. The message that follows is the answer to that plan, not a new request, and Plan Mode is still on: you are still planning, and you implement nothing.
+
+End this turn the way you ended the last one. Fold what they asked for into the plan and submit the WHOLE revised plan through the same plan-exit tool you used before — \`ensemblr_exit_plan_mode\`, or your runtime's own \`ExitPlanMode\`. Pass the full plan rather than a note of what changed: the app posts what you pass and that is what they read and approve, so a submission naming only the edits replaces their plan with a fragment.
+
+Stopping at prose is the one outcome this turn must not have — it leaves them a revision with nothing to approve it from. If the message is a question rather than a change, answer it and submit anyway: \`ensemblr_ask_user_question\` returns inside this turn, so a clarification you need costs you nothing, and a plan that needed no edit is resubmitted unchanged.`;

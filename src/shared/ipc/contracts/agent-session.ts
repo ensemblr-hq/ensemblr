@@ -167,6 +167,17 @@ export interface StopAgentSessionResult {
 	ok: boolean;
 }
 
+/**
+ * Mirror the chat's Plan Mode toggle into the main process without sending a
+ * prompt. Every other write of this flag rides `openAgentSession` or
+ * `submitAgentPrompt`; hand-off turns the toggle off and submits nothing, so it
+ * needs its own channel or main keeps treating the session as still planning.
+ */
+export interface SetAgentPlanModeRequest {
+	planMode: boolean;
+	sessionId: string;
+}
+
 /** List agent sessions persisted for a workspace. */
 export interface ListAgentSessionsRequest {
 	workspaceId: string;
@@ -264,6 +275,7 @@ export interface AgentSessionApi {
 	openAgentSession: (
 		request: OpenAgentSessionRequest,
 	) => Promise<OpenAgentSessionResult>;
+	setAgentPlanMode: (request: SetAgentPlanModeRequest) => Promise<void>;
 	stopAgentSession: (
 		request: StopAgentSessionRequest,
 	) => Promise<StopAgentSessionResult>;

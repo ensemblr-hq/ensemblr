@@ -64,6 +64,7 @@ import {
 	buildLanguageDirective,
 	buildSessionBriefNudge,
 	isWriteOp,
+	PLAN_REFINEMENT_DIRECTIVE,
 	resolveAgentRole,
 	SET_SUMMARY_LIMITS,
 	subAgentControlOpDenial,
@@ -476,6 +477,18 @@ export function createAgentControlService({
 		originHasChatTab(origin) && ports.planMode.isActive(origin.sessionId);
 
 	/**
+	 * The refinement directive for a planning caller whose plan is already in
+	 * front of the user, so the turn carrying their answer is told to end in
+	 * another submission rather than in prose.
+	 * @param origin - Resolved caller identity.
+	 * @returns The directive to append, or null when no plan is under review.
+	 */
+	const readPlanRefinement = (origin: AgentControlOrigin): string | null =>
+		isPlanning(origin) && ports.planMode.hasSubmittedPlan(origin.sessionId)
+			? PLAN_REFINEMENT_DIRECTIVE
+			: null;
+
+	/**
 	 * This turn's language directive, read from the setting rather than captured
 	 * so a language switched mid-session reaches the next turn.
 	 * @returns The directive to append, or null when the app is in English.
@@ -811,6 +824,7 @@ export function createAgentControlService({
 			naming,
 			nudge: buildSessionBriefNudge(naming, planMode),
 			planMode,
+			planRefinement: readPlanRefinement(origin),
 		} satisfies GetSessionBriefResult);
 	};
 
@@ -1594,6 +1608,7 @@ export function createAgentControlService({
 				await ports.sessionNaming.readBrief(origin),
 				isPlanning(origin),
 			),
+			readPlanRefinement(origin),
 			readLanguageDirective(),
 		].filter((block) => block !== null);
 		return blocks.length > 0 ? blocks.join('\n\n') : null;

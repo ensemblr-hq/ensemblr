@@ -22,6 +22,7 @@ const setup = (
 	options: { hasRenderer?: boolean; writeFails?: boolean } = {},
 ) => {
 	const reviews: ExitPlanModeBroadcast[] = [];
+	const markSubmitted = vi.fn();
 	const postPlanMessage = vi.fn();
 	const writePlanFile = options.writeFails
 		? vi.fn().mockRejectedValue(new Error('disk full'))
@@ -31,10 +32,11 @@ const setup = (
 		broadcastReview: (payload) => reviews.push(payload),
 		createRequestId: () => `req-${++nextId}`,
 		hasRenderer: () => options.hasRenderer ?? true,
+		markSubmitted,
 		planFileWriter: { writePlanFile },
 		postPlanMessage,
 	});
-	return { postPlanMessage, reviews, submission, writePlanFile };
+	return { markSubmitted, postPlanMessage, reviews, submission, writePlanFile };
 };
 
 describe('plan submission', () => {
@@ -122,6 +124,22 @@ describe('plan submission', () => {
 		});
 		expect(result.planPath).toBe(PLAN_PATH);
 		expect(result.summary).toContain('never saw the review panel');
+	});
+
+	it('marks the session as awaiting a decision, so the refine turn is told to resubmit', async () => {
+		const { markSubmitted, submission } = setup();
+
+		await submission.submit({ args: ARGS, origin: ORIGIN });
+
+		expect(markSubmitted).toHaveBeenCalledWith('sess-1');
+	});
+
+	it('marks it even when no window showed the review, since the plan still stands', async () => {
+		const { markSubmitted, submission } = setup({ hasRenderer: false });
+
+		await submission.submit({ args: ARGS, origin: ORIGIN });
+
+		expect(markSubmitted).toHaveBeenCalledWith('sess-1');
 	});
 
 	it('still reviews the plan when the file could not be written', async () => {

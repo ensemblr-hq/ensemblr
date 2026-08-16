@@ -35,6 +35,8 @@ export { buildPlanSubmittedResult } from './agent-control/plan-mode.ts';
 export * from './agent-control/schemas.ts';
 export {
 	buildSessionBriefNudge,
+	PLAN_REFINEMENT_DIRECTIVE,
+	PLAN_REFINEMENT_HEADER,
 	SESSION_BRIEF_NUDGE_HEADER,
 } from './agent-control/session-brief.ts';
 export type { SubagentMechanism } from './agent-control/subagent-mechanism.ts';
