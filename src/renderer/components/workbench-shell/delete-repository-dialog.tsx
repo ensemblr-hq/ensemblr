@@ -38,7 +38,11 @@ export function DeleteRepositoryDialog({
 	project: ProjectShellModel | null;
 }) {
 	return (
-		<Dialog onOpenChange={onOpenChange} open={open}>
+		// Never open without a project: callers that hold `open` and `project` in
+		// separate state drop the project the moment it is deleted, and an open
+		// dialog with nothing to render is an empty shell whose overlay still eats
+		// every click, leaving the app unusable with no way to dismiss it.
+		<Dialog onOpenChange={onOpenChange} open={open && project !== null}>
 			<DialogContent className='sm:max-w-md'>
 				{project ? (
 					<DeleteRepositoryDialogForm
@@ -85,8 +89,11 @@ function DeleteRepositoryDialogForm({
 		const result = await deleteRepository({ repositoryId: project.id });
 
 		if (result.status === 'success') {
-			await onDeleted(project.id);
+			// Close before the post-removal work: `onDeleted` navigates away from the
+			// deleted repository, and awaiting that first leaves the modal — and its
+			// pointer-events overlay — up for as long as navigation takes to settle.
 			onOpenChange(false);
+			await onDeleted(project.id);
 			return;
 		}
 

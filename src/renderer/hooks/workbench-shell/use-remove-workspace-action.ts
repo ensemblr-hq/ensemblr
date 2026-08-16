@@ -5,7 +5,11 @@ import { useCallback } from 'react';
 
 import { invalidateWorkspaceListViews } from '@/renderer/api/ensemblr';
 import { forgetLastRunScript } from '@/renderer/state/preferences';
-import { forgetWorkspaceViewedChangesAtom } from '@/renderer/state/workspace';
+import {
+	forgetWorkspaceViewedChangesAtom,
+	lastWorkspaceNavigationRenderStateAtom,
+	lastWorkspaceSelectionAtom,
+} from '@/renderer/state/workspace';
 import { deleteLastUsedOpenTarget } from '@/renderer/state/workspace/open-target-history';
 
 /**
@@ -23,12 +27,28 @@ export function useRemoveWorkspaceAction(options: {
 	const queryClient = useQueryClient();
 	const router = useRouter();
 	const forgetViewedChanges = useSetAtom(forgetWorkspaceViewedChangesAtom);
+	const setLastWorkspaceSelection = useSetAtom(lastWorkspaceSelectionAtom);
+	const setLastNavigationRenderState = useSetAtom(
+		lastWorkspaceNavigationRenderStateAtom,
+	);
 
 	return useCallback(
 		async (removedWorkspaceId: string) => {
 			deleteLastUsedOpenTarget(removedWorkspaceId);
 			forgetLastRunScript(removedWorkspaceId);
 			forgetViewedChanges(removedWorkspaceId);
+			// Both of these name a workspace that no longer exists. The stored pair is
+			// persisted, and the render state is the fallback the shell holds up while
+			// navigation resolves, so leaving either pointing at the removed workspace
+			// keeps resolving a selection the loaders then have to redirect away from.
+			setLastWorkspaceSelection((selection) =>
+				selection?.workspaceId === removedWorkspaceId ? null : selection,
+			);
+			setLastNavigationRenderState((renderState) =>
+				renderState?.selection.workspace.id === removedWorkspaceId
+					? null
+					: renderState,
+			);
 
 			if (activeWorkspaceId === removedWorkspaceId) {
 				await navigate({ replace: true, to: '/' });
@@ -37,6 +57,14 @@ export function useRemoveWorkspaceAction(options: {
 			await invalidateWorkspaceListViews(queryClient);
 			await router.invalidate();
 		},
-		[activeWorkspaceId, forgetViewedChanges, navigate, queryClient, router],
+		[
+			activeWorkspaceId,
+			forgetViewedChanges,
+			navigate,
+			queryClient,
+			router,
+			setLastNavigationRenderState,
+			setLastWorkspaceSelection,
+		],
 	);
 }

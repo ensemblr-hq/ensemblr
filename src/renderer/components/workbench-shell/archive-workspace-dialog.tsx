@@ -37,8 +37,12 @@ export function ArchiveWorkspaceDialog({
 	open: boolean;
 	workspace: WorkspaceShellModel | null;
 }) {
+	// Never open without a workspace: callers that hold `open` and `workspace` in
+	// separate state drop the workspace the moment it is archived, and an open
+	// dialog with nothing to render is an empty shell whose overlay still eats
+	// every click, leaving the app unusable with no way to dismiss it.
 	return (
-		<Dialog onOpenChange={onOpenChange} open={open}>
+		<Dialog onOpenChange={onOpenChange} open={open && workspace !== null}>
 			<DialogContent className='sm:max-w-md'>
 				{workspace ? (
 					<ArchiveWorkspaceDialogForm
@@ -89,8 +93,11 @@ function ArchiveWorkspaceDialogForm({
 		});
 
 		if (result.status === 'success') {
-			await onArchived(workspace.id);
+			// Close before the post-archive work: `onArchived` navigates away from the
+			// archived workspace, and awaiting that first leaves the modal — and its
+			// pointer-events overlay — up for as long as navigation takes to settle.
 			onOpenChange(false);
+			await onArchived(workspace.id);
 			return;
 		}
 
