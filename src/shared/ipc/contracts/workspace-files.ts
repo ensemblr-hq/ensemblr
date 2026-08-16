@@ -81,11 +81,31 @@ export type ReadWorkspaceFileFailureCode =
 	| 'read-failed'
 	| 'too-large';
 
-/** Encoding used for the read-workspace-file content payload. */
-export type ReadWorkspaceFileContentEncoding = 'base64' | 'utf8';
+/**
+ * Encoding used for the read-workspace-file content payload. `binary` carries no
+ * `content`: the bytes decode as neither an embeddable image nor text, so the
+ * preview names the file instead of rendering it.
+ */
+export type ReadWorkspaceFileContentEncoding = 'base64' | 'binary' | 'utf8';
+
+/**
+ * Why a `binary` read has nothing to render. `invalid-image` means the extension
+ * names a format the browser could draw but the bytes are not that format;
+ * `invalid-document` is the same mismatch for the one document format the
+ * preview embeds, a `.pdf` that is not a PDF; `unsupported-image` means a real
+ * image format no engine decodes (TIFF, HEIC); `not-text` covers everything
+ * else.
+ */
+export type ReadWorkspaceFileBinaryReason =
+	| 'invalid-document'
+	| 'invalid-image'
+	| 'not-text'
+	| 'unsupported-image';
 
 /** The file's contents and size, or a typed error on failure. */
 export interface ReadWorkspaceFileResult {
+	/** Set only on a `binary` read, naming what the preview could not do. */
+	binaryReason?: ReadWorkspaceFileBinaryReason;
 	content?: string;
 	contentEncoding?: ReadWorkspaceFileContentEncoding;
 	error?: {

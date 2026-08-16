@@ -25,6 +25,7 @@ import type {
 	WriteWorkspaceImageAttachmentRequest,
 	WriteWorkspaceImageAttachmentResult,
 } from '../../shared/ipc/contracts/workspace-files';
+import { bytesLookLikeText } from '../../shared/preview-media.ts';
 import { resolveWorkspaceCwd } from './workspace-cwd.ts';
 import {
 	extensionForImageMimeType,
@@ -525,18 +526,7 @@ function resolveAttachmentExtension(ext: string, buffer: Buffer): string {
 	if (cleaned) {
 		return cleaned;
 	}
-	return looksLikeText(buffer) ? 'txt' : 'bin';
-}
-
-/**
- * Heuristically classifies a payload as text, mirroring git's binary check: a
- * NUL byte in the leading sample means binary, otherwise treat it as text.
- * @param buffer - Decoded file bytes.
- * @returns True when the leading sample contains no NUL byte.
- */
-function looksLikeText(buffer: Buffer): boolean {
-	const sample = buffer.subarray(0, 8000);
-	return sample.length > 0 && !sample.includes(0);
+	return bytesLookLikeText(buffer) ? 'txt' : 'bin';
 }
 
 /**

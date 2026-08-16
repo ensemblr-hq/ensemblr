@@ -276,6 +276,182 @@ describe('createListWorkspaceFilesService.read', () => {
 		expect(result.mimeType).toBeUndefined();
 	});
 
+	test('reads a WEBP as base64 rather than as source', async () => {
+		const cwd = seedRepo();
+		const bytes = Buffer.concat([
+			Buffer.from('RIFF'),
+			Buffer.from([0x24, 0x00, 0x00, 0x00]),
+			Buffer.from('WEBP'),
+			Buffer.from('VP8 '),
+		]);
+		writeFileSync(path.join(cwd, 'shot.webp'), bytes);
+
+		const result = await readWorkspaceFile(cwd, 'shot.webp');
+
+		expect(result.error).toBeUndefined();
+		expect(result.content).toBe(bytes.toString('base64'));
+		expect(result.contentEncoding).toBe('base64');
+		expect(result.mimeType).toBe('image/webp');
+	});
+
+	test('reads an AVIF as base64 once its ftyp brand checks out', async () => {
+		const cwd = seedRepo();
+		const bytes = Buffer.concat([
+			Buffer.from([0x00, 0x00, 0x00, 0x1c]),
+			Buffer.from('ftypavif'),
+			Buffer.from([0x00, 0x00, 0x00, 0x00]),
+		]);
+		writeFileSync(path.join(cwd, 'shot.avif'), bytes);
+
+		const result = await readWorkspaceFile(cwd, 'shot.avif');
+
+		expect(result.error).toBeUndefined();
+		expect(result.contentEncoding).toBe('base64');
+		expect(result.mimeType).toBe('image/avif');
+	});
+
+	test('refuses a HEIC wearing an .avif extension instead of embedding it', async () => {
+		const cwd = seedRepo();
+		const bytes = Buffer.concat([
+			Buffer.from([0x00, 0x00, 0x00, 0x1c]),
+			Buffer.from('ftypheic'),
+			Buffer.from([0x00, 0x00, 0x00, 0x00]),
+		]);
+		writeFileSync(path.join(cwd, 'not-really.avif'), bytes);
+
+		const result = await readWorkspaceFile(cwd, 'not-really.avif');
+
+		expect(result.contentEncoding).toBe('binary');
+		expect(result.binaryReason).toBe('invalid-image');
+		expect(result.content).toBeUndefined();
+	});
+
+	test('names a TIFF as an unsupported image rather than decoding it as source', async () => {
+		const cwd = seedRepo();
+		const bytes = Buffer.from([0x49, 0x49, 0x2a, 0x00, 0x08, 0x00, 0x00, 0x00]);
+		writeFileSync(path.join(cwd, 'scan.tiff'), bytes);
+
+		const result = await readWorkspaceFile(cwd, 'scan.tiff');
+
+		expect(result.error).toBeUndefined();
+		expect(result.contentEncoding).toBe('binary');
+		expect(result.binaryReason).toBe('unsupported-image');
+		expect(result.mimeType).toBe('image/tiff');
+		expect(result.content).toBeUndefined();
+		expect(result.sizeBytes).toBe(bytes.length);
+	});
+
+	test('names a scan-sized TIFF rather than refusing it on the text size cap', async () => {
+		const cwd = seedRepo();
+		const bytes = Buffer.concat([
+			Buffer.from([0x49, 0x49, 0x2a, 0x00]),
+			Buffer.alloc(600 * 1024),
+		]);
+		writeFileSync(path.join(cwd, 'scan.tiff'), bytes);
+
+		const result = await readWorkspaceFile(cwd, 'scan.tiff');
+
+		expect(result.error).toBeUndefined();
+		expect(result.contentEncoding).toBe('binary');
+		expect(result.binaryReason).toBe('unsupported-image');
+		expect(result.mimeType).toBe('image/tiff');
+		expect(result.sizeBytes).toBe(bytes.length);
+	});
+
+	test('names a phone-sized HEIC rather than refusing it on the text size cap', async () => {
+		const cwd = seedRepo();
+		const bytes = Buffer.concat([
+			Buffer.from([0x00, 0x00, 0x00, 0x1c]),
+			Buffer.from('ftypheic'),
+			Buffer.alloc(2 * 1024 * 1024),
+		]);
+		writeFileSync(path.join(cwd, 'IMG_0001.heic'), bytes);
+
+		const result = await readWorkspaceFile(cwd, 'IMG_0001.heic');
+
+		expect(result.error).toBeUndefined();
+		expect(result.contentEncoding).toBe('binary');
+		expect(result.binaryReason).toBe('unsupported-image');
+		expect(result.mimeType).toBe('image/heic');
+	});
+
+	test('still refuses an oversized non-image on size', async () => {
+		const cwd = seedRepo();
+		writeFileSync(path.join(cwd, 'huge.ts'), 'x'.repeat(600 * 1024));
+
+		const result = await readWorkspaceFile(cwd, 'huge.ts');
+
+		expect(result.error?.code).toBe('too-large');
+		expect(result.contentEncoding).toBeUndefined();
+	});
+
+	test('reports a .pdf whose bytes are not a PDF as an invalid document', async () => {
+		const cwd = seedRepo();
+		const bytes = Buffer.from([0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00]);
+		writeFileSync(path.join(cwd, 'spec.pdf'), bytes);
+
+		const result = await readWorkspaceFile(cwd, 'spec.pdf');
+
+		expect(result.error).toBeUndefined();
+		expect(result.contentEncoding).toBe('binary');
+		expect(result.binaryReason).toBe('invalid-document');
+		expect(result.mimeType).toBeUndefined();
+		expect(result.content).toBeUndefined();
+	});
+
+	test('reads an AVIF branded mif1 with avif among its compatible brands', async () => {
+		const cwd = seedRepo();
+		const bytes = Buffer.concat([
+			Buffer.from([0x00, 0x00, 0x00, 0x1c]),
+			Buffer.from('ftypmif1'),
+			Buffer.from([0x00, 0x00, 0x00, 0x00]),
+			Buffer.from('mif1avifmiaf'),
+		]);
+		writeFileSync(path.join(cwd, 'shot.avif'), bytes);
+
+		const result = await readWorkspaceFile(cwd, 'shot.avif');
+
+		expect(result.error).toBeUndefined();
+		expect(result.contentEncoding).toBe('base64');
+		expect(result.mimeType).toBe('image/avif');
+	});
+
+	test('reports a .webp whose bytes are not a WebP as an invalid image', async () => {
+		const cwd = seedRepo();
+		const bytes = Buffer.from([0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00]);
+		writeFileSync(path.join(cwd, 'broken.webp'), bytes);
+
+		const result = await readWorkspaceFile(cwd, 'broken.webp');
+
+		expect(result.contentEncoding).toBe('binary');
+		expect(result.binaryReason).toBe('invalid-image');
+		expect(result.mimeType).toBe('image/webp');
+		expect(result.content).toBeUndefined();
+	});
+
+	test('reports a non-image binary as not text', async () => {
+		const cwd = seedRepo();
+		const bytes = Buffer.from([0xca, 0xfe, 0xba, 0xbe, 0x00, 0x00, 0x00, 0x01]);
+		writeFileSync(path.join(cwd, 'tool.bin'), bytes);
+
+		const result = await readWorkspaceFile(cwd, 'tool.bin');
+
+		expect(result.contentEncoding).toBe('binary');
+		expect(result.binaryReason).toBe('not-text');
+		expect(result.mimeType).toBeUndefined();
+		expect(result.content).toBeUndefined();
+	});
+
+	test('reads an empty file as empty source rather than as binary', async () => {
+		const cwd = seedRepo();
+		writeFileSync(path.join(cwd, 'empty.txt'), '');
+
+		const result = await readWorkspaceFile(cwd, 'empty.txt');
+
+		expect(result.contentEncoding).toBe('utf8');
+		expect(result.content).toBe('');
+	});
+
 	test('reads a file outside the workspace by absolute path', async () => {
 		const cwd = seedRepo();
 		const outside = mkdtempSync(path.join(tmpdir(), 'ensemblr-outside-'));
@@ -487,6 +663,90 @@ describe('createListWorkspaceFilesService.writeImageAttachment', () => {
 		expect(result.file?.path).toBe(
 			`.context/attachments/${sha256Prefix(bytes)}/shot.webp`,
 		);
+	});
+
+	test('accepts an AVIF payload carrying an ftyp brand it recognizes', async () => {
+		const bytes = Buffer.concat([
+			Buffer.from([0x00, 0x00, 0x00, 0x1c]),
+			Buffer.from('ftypavis'),
+			Buffer.from([0x00, 0x00, 0x00, 0x00]),
+		]);
+		const result = await workspaceFilesService().writeImageAttachment({
+			contentBase64: bytes.toString('base64'),
+			mimeType: 'image/avif',
+			name: 'shot.avif',
+			workspaceCwd: seedRepo(),
+		});
+
+		expect(result.error).toBeUndefined();
+		expect(result.file?.path).toBe(
+			`.context/attachments/${sha256Prefix(bytes)}/shot.avif`,
+		);
+	});
+
+	test('rejects an ISOBMFF payload whose brand is not AVIF', async () => {
+		const bytes = Buffer.concat([
+			Buffer.from([0x00, 0x00, 0x00, 0x1c]),
+			Buffer.from('ftypheic'),
+			Buffer.from([0x00, 0x00, 0x00, 0x00]),
+		]);
+		const result = await workspaceFilesService().writeImageAttachment({
+			contentBase64: bytes.toString('base64'),
+			mimeType: 'image/avif',
+			workspaceCwd: seedRepo(),
+		});
+
+		expect(result.error?.code).toBe('invalid-image');
+		expect(result.file).toBeUndefined();
+	});
+
+	test('rejects a HEIC listing only HEIF brands as compatible', async () => {
+		const bytes = Buffer.concat([
+			Buffer.from([0x00, 0x00, 0x00, 0x1c]),
+			Buffer.from('ftypmif1'),
+			Buffer.from([0x00, 0x00, 0x00, 0x00]),
+			Buffer.from('mif1heicmiaf'),
+		]);
+		const result = await workspaceFilesService().writeImageAttachment({
+			contentBase64: bytes.toString('base64'),
+			mimeType: 'image/avif',
+			workspaceCwd: seedRepo(),
+		});
+
+		expect(result.error?.code).toBe('invalid-image');
+		expect(result.file).toBeUndefined();
+	});
+
+	test('rejects a truncated ftyp box that carries no brand list', async () => {
+		const bytes = Buffer.concat([
+			Buffer.from([0x00, 0x00, 0x00, 0x1c]),
+			Buffer.from('ftypav'),
+		]);
+		const result = await workspaceFilesService().writeImageAttachment({
+			contentBase64: bytes.toString('base64'),
+			mimeType: 'image/avif',
+			workspaceCwd: seedRepo(),
+		});
+
+		expect(result.error?.code).toBe('invalid-image');
+		expect(result.file).toBeUndefined();
+	});
+
+	test('accepts an icon under either MIME spelling browsers report', async () => {
+		const bytes = Buffer.from([0x00, 0x00, 0x01, 0x00, 0x01, 0x00]);
+		for (const mimeType of ['image/x-icon', 'image/vnd.microsoft.icon']) {
+			const result = await workspaceFilesService().writeImageAttachment({
+				contentBase64: bytes.toString('base64'),
+				mimeType,
+				name: 'favicon.ico',
+				workspaceCwd: seedRepo(),
+			});
+
+			expect(result.error).toBeUndefined();
+			expect(result.file?.path).toBe(
+				`.context/attachments/${sha256Prefix(bytes)}/favicon.ico`,
+			);
+		}
 	});
 
 	test('rejects a RIFF payload that is not WEBP (e.g. a WAV mislabeled as webp)', async () => {

@@ -421,6 +421,7 @@ export type {
 	ListWorkspaceFilesResult,
 	ReadWorkspaceDirectoryRequest,
 	ReadWorkspaceDirectoryResult,
+	ReadWorkspaceFileBinaryReason,
 	ReadWorkspaceFileContentEncoding,
 	ReadWorkspaceFileFailureCode,
 	ReadWorkspaceFileRequest,

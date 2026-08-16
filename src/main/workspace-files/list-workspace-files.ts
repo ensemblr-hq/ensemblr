@@ -5,6 +5,7 @@ import type {
 	ListWorkspaceFilesResult,
 	ReadWorkspaceDirectoryRequest,
 	ReadWorkspaceDirectoryResult,
+	ReadWorkspaceFileBinaryReason,
 	ReadWorkspaceFileRequest,
 	ReadWorkspaceFileResult,
 	WorkspaceFileEntryWire,
@@ -16,6 +17,8 @@ import type {
 	WriteWorkspaceImageAttachmentResult,
 } from '../../shared/ipc/contracts/workspace-files';
 import {
+	bytesLookLikeText,
+	imageMimeTypeForPath,
 	PREVIEW_PDF_MIME_TYPE,
 	pdfBytesLookValid,
 	previewEmbedMimeTypeForPath,
@@ -194,14 +197,14 @@ export function createListWorkspaceFilesService({
 			}
 
 			try {
-				const readable = await resolveReadablePreviewFile({
+				const readable = await resolvePreviewRead({
 					absolutePath: target.absolutePath,
 					displayPath: target.displayPath,
 					requestPath: request.path,
 					scope: target.scope,
 					workspaceCwd: cwdResult.cwd,
 				});
-				if (!readable.ok) {
+				if (!readable.needsBytes) {
 					return readable.result;
 				}
 				return buildFilePreviewResult({
@@ -529,32 +532,37 @@ function collectDirectories(filePaths: readonly string[]): readonly string[] {
 }
 
 /**
- * Validates that a resolved path is a readable file within the preview size cap,
- * returning its preview MIME type on success or a typed failure result. The
- * stat, size, and symlink-containment checks run in the order the security model
- * requires (size cap before the real-path check). Containment applies only to a
- * `workspace`-scoped path: an `external` one was already cleared to live outside
- * the root, so re-checking it would refuse every file it exists to allow.
+ * Decides whether a resolved path's bytes are worth reading, answering the whole
+ * request itself when they are not. The stat, size, and symlink-containment
+ * checks run in the order the security model requires (size cap before the
+ * real-path check). Containment applies only to a `workspace`-scoped path: an
+ * `external` one was already cleared to live outside the root, so re-checking it
+ * would refuse every file it exists to allow.
+ *
+ * An oversize file the preview could never render anyway — a 40 MB TIFF, a phone
+ * HEIC — is named rather than refused on size, since "too large to preview"
+ * would promise that a smaller one would have worked.
  * @param params - Absolute path, the path to echo in errors, the original
  *   request path, the resolved scope, and the workspace root.
- * @returns The preview MIME type and size on success, or a failure result.
+ * @returns The preview MIME type and size when the bytes are still needed, or
+ *   the finished result when they are not.
  */
-async function resolveReadablePreviewFile(params: {
+async function resolvePreviewRead(params: {
 	absolutePath: string;
 	displayPath: string;
 	requestPath: string;
 	scope: PreviewPathScope;
 	workspaceCwd: string;
 }): Promise<
-	| { ok: true; previewEmbedMimeType: string | null; sizeBytes: number }
-	| { ok: false; result: ReadWorkspaceFileResult }
+	| { needsBytes: true; previewEmbedMimeType: string | null; sizeBytes: number }
+	| { needsBytes: false; result: ReadWorkspaceFileResult }
 > {
 	const { absolutePath, displayPath, requestPath, scope, workspaceCwd } =
 		params;
 	const fileStat = await stat(absolutePath);
 	if (!fileStat.isFile()) {
 		return {
-			ok: false,
+			needsBytes: false,
 			result: {
 				error: { code: 'not-file', message: 'Selected path is not a file.' },
 				path: requestPath,
@@ -567,16 +575,28 @@ async function resolveReadablePreviewFile(params: {
 		? MAX_CONTEXT_IMAGE_BYTES
 		: MAX_READ_BYTES;
 	if (fileStat.size > maxPreviewBytes) {
+		const unrenderableImageMimeType = previewEmbedMimeType
+			? null
+			: imageMimeTypeForPath(displayPath);
 		return {
-			ok: false,
-			result: {
-				error: {
-					code: 'too-large',
-					message: 'Selected file is too large to preview.',
-				},
-				path: requestPath,
-				sizeBytes: fileStat.size,
-			},
+			needsBytes: false,
+			result: unrenderableImageMimeType
+				? {
+						binaryReason: 'unsupported-image',
+						contentEncoding: 'binary',
+						isExternal: scope === 'external',
+						mimeType: unrenderableImageMimeType,
+						path: displayPath,
+						sizeBytes: fileStat.size,
+					}
+				: {
+						error: {
+							code: 'too-large',
+							message: 'Selected file is too large to preview.',
+						},
+						path: requestPath,
+						sizeBytes: fileStat.size,
+					},
 		};
 	}
 	if (
@@ -584,7 +604,7 @@ async function resolveReadablePreviewFile(params: {
 		!(await isWithinWorkspaceReal(workspaceCwd, absolutePath))
 	) {
 		return {
-			ok: false,
+			needsBytes: false,
 			result: {
 				error: {
 					code: 'invalid-path',
@@ -595,16 +615,19 @@ async function resolveReadablePreviewFile(params: {
 			},
 		};
 	}
-	return { ok: true, previewEmbedMimeType, sizeBytes: fileStat.size };
+	return { needsBytes: true, previewEmbedMimeType, sizeBytes: fileStat.size };
 }
 
 /**
- * Builds the preview payload for a validated file: a base64 image result when
- * the bytes match a browser-previewable type, otherwise utf8 source.
+ * Builds the preview payload for a validated file: a base64 result when the
+ * bytes match a browser-previewable type, utf8 source when they read as text,
+ * and an empty `binary` result otherwise. That last case is what keeps a format
+ * no engine decodes — a TIFF, a HEIC, an executable, a `.webp` whose bytes are
+ * not really a WebP — from reaching the code surface as mojibake.
  * @param params - Decoded file buffer, its declared preview MIME type (or null),
  *   the path to echo back, whether that path is outside the workspace, and the
  *   on-disk size in bytes.
- * @returns A base64 image or utf8 source preview result.
+ * @returns A base64, utf8, or binary preview result.
  */
 function buildFilePreviewResult(params: {
 	buffer: Buffer;
@@ -628,13 +651,45 @@ function buildFilePreviewResult(params: {
 			sizeBytes,
 		};
 	}
+	if (bytesLookLikeText(buffer)) {
+		return {
+			content: buffer.toString('utf8'),
+			contentEncoding: 'utf8',
+			isExternal,
+			path: displayPath,
+			sizeBytes,
+		};
+	}
+	const imageMimeType = imageMimeTypeForPath(displayPath);
 	return {
-		content: buffer.toString('utf8'),
-		contentEncoding: 'utf8',
+		binaryReason: binaryReasonFor(imageMimeType, previewEmbedMimeType),
+		contentEncoding: 'binary',
 		isExternal,
+		mimeType: imageMimeType ?? undefined,
 		path: displayPath,
 		sizeBytes,
 	};
+}
+
+/**
+ * Names why a preview fell through to bytes it cannot render, along two axes:
+ * whether the extension names an image or a document, and whether the preview
+ * could have drawn that format at all. That separates "this .webp is not a
+ * WebP" from "Ensemblr cannot show TIFFs", which are opposite things to do
+ * something about, and keeps a PDF that is not a PDF from being called an image.
+ * @param imageMimeType - The image type the extension declares, or null.
+ * @param previewEmbedMimeType - The type the preview would have embedded, or
+ *   null when the extension names nothing embeddable.
+ * @returns The reason the renderer explains the empty preview with.
+ */
+function binaryReasonFor(
+	imageMimeType: string | null,
+	previewEmbedMimeType: string | null,
+): ReadWorkspaceFileBinaryReason {
+	if (imageMimeType) {
+		return previewEmbedMimeType ? 'invalid-image' : 'unsupported-image';
+	}
+	return previewEmbedMimeType ? 'invalid-document' : 'not-text';
 }
 
 /**

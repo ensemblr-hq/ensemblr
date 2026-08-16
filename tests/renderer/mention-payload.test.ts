@@ -100,6 +100,25 @@ describe('serializeComposerDraft', () => {
 		});
 	});
 
+	test('announces a text-extension file the read refused as binary by path', async () => {
+		readWorkspaceFile.mockResolvedValue({
+			binaryReason: 'not-text',
+			contentEncoding: 'binary',
+			path: 'exports/data.csv',
+			sizeBytes: 4096,
+		});
+
+		const text = await serializeComposerDraft({
+			segments: chips(fileAttachment('exports/data.csv')),
+			workspaceCwd: '/repo',
+		});
+
+		expect(text).toContain(
+			'[attachment saved in the workspace — inspect this file directly if needed]',
+		);
+		expect(text).not.toContain('<attached_file path="exports/data.csv"></');
+	});
+
 	test('lists each external file by absolute path with a path-only placeholder', async () => {
 		const text = await serializeComposerDraft({
 			segments: chips(

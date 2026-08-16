@@ -70,6 +70,19 @@ export function resolvePreviewMode(
 }
 
 /**
+ * Short display name for the format a binary preview refused, read off the MIME
+ * subtype so `.tif` and `.tiff` both name themselves TIFF.
+ * @param mimeType - MIME type the read resolved for the path.
+ * @returns The format name in caps, such as `TIFF` or `HEIC`.
+ */
+export function previewFormatLabel(mimeType: string): string {
+	return mimeType
+		.slice(mimeType.indexOf('/') + 1)
+		.replace(/^x-/, '')
+		.toUpperCase();
+}
+
+/**
  * Format a byte count as a B/KB/MB string.
  * @param sizeBytes - The size in bytes.
  * @returns The formatted, human-readable size.
