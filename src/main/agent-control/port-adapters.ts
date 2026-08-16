@@ -53,6 +53,7 @@ import type { RenameWorkspaceService } from '../repository';
 import type { ReviewService } from '../review';
 import type { ScriptLifecycleService } from '../scripts/script-lifecycle-service.ts';
 import type { EnsemblrDatabaseService } from '../storage';
+import type { ChatTabRow } from '../storage/repositories/chat-tab-repository.ts';
 import {
 	getChatTabById,
 	setChatTabMetadata,
@@ -191,18 +192,82 @@ function makeWorkspacePort(deps: PortAdapterDeps): WorkspacePort {
 }
 
 /**
+ * Reads a tab row straight from the repository, bypassing the chat-tab service
+ * so a close can be inspected before and after it is attempted.
+ * @param deps - Adapter collaborators.
+ * @param chatTabId - Tab to read.
+ * @returns The row, or null when it is gone or the database is not connected.
+ */
+function readTabRow(
+	deps: PortAdapterDeps,
+	chatTabId: string,
+): ChatTabRow | null {
+	const database = deps.databaseService.getConnection()?.database;
+	if (!database) {
+		return null;
+	}
+	return getChatTabById({ database, id: chatTabId }) ?? null;
+}
+
+/**
+ * Whether a tab is still in the open set, for telling a close that landed from
+ * one the service refused. A read that throws answers "still open": a stale
+ * unread mark is recoverable, while claiming a close that did not happen retires
+ * the mark of a tab still on screen.
+ * @param deps - Adapter collaborators.
+ * @param chatTabId - Tab to check.
+ * @returns True while the row is present with no close timestamp.
+ */
+function isTabStillOpen(deps: PortAdapterDeps, chatTabId: string): boolean {
+	try {
+		return readTabRow(deps, chatTabId)?.closedAt === null;
+	} catch {
+		return true;
+	}
+}
+
+/**
+ * Builds the broadcast for an attempted close, naming the chat only when one
+ * really left the open set. `chatTabService.closeTab` is a no-op for a tab that
+ * is already closed and for a workspace's last open chat, and a payload claiming
+ * a close that did not happen would retire the unread mark of a tab still on
+ * screen. Non-chat tabs are never named: only a chat carries an unread mark.
+ * @param deps - Adapter collaborators.
+ * @param closed - The tab the close was attempted on, as known before the call.
+ * @returns The broadcast to send.
+ */
+function toTabsChangedAfterClose(
+	deps: PortAdapterDeps,
+	closed: {
+		agentSessionId: string | null;
+		chatTabId: string;
+		isChat: boolean;
+		workspaceId: string;
+	},
+): TabsChangedBroadcast {
+	if (!closed.isChat || isTabStillOpen(deps, closed.chatTabId)) {
+		return { workspaceId: closed.workspaceId };
+	}
+	return {
+		closedChat: {
+			agentSessionId: closed.agentSessionId,
+			chatTabId: closed.chatTabId,
+		},
+		workspaceId: closed.workspaceId,
+	};
+}
+
+/**
  * Builds the chat/terminal tab port over the chat-tab service and repository.
  * @param deps - Adapter collaborators.
  * @returns The tab port.
  */
 function makeTabPort(deps: PortAdapterDeps): TabPort {
-	const workspaceOfTab = (chatTabId: string): string | null => {
-		const database = deps.databaseService.getConnection()?.database;
-		if (!database) {
-			return null;
-		}
-		return getChatTabById({ database, id: chatTabId })?.workspaceId ?? null;
-	};
+	const readTab = (chatTabId: string): ChatTabRow | null =>
+		readTabRow(deps, chatTabId);
+
+	const workspaceOfTab = (chatTabId: string): string | null =>
+		readTab(chatTabId)?.workspaceId ?? null;
 
 	return {
 		spawnChatTab: async ({ workspaceId, title }) => {
@@ -215,11 +280,21 @@ function makeTabPort(deps: PortAdapterDeps): TabPort {
 			return { chatTabId: tab.id };
 		},
 		closeTab: async ({ chatTabId }) => {
-			const workspaceId = workspaceOfTab(chatTabId);
-			deps.chatTabService.closeTab({ chatTabId });
-			if (workspaceId) {
-				deps.broadcastTabsChanged({ workspaceId });
+			// Read before the close: an emptied tab is hard-deleted, taking the agent
+			// session id the renderer's unread mark is keyed by with it.
+			const closing = readTab(chatTabId);
+			if (!closing) {
+				return;
 			}
+			deps.chatTabService.closeTab({ chatTabId });
+			deps.broadcastTabsChanged(
+				toTabsChangedAfterClose(deps, {
+					agentSessionId: closing.agentSessionId,
+					chatTabId,
+					isChat: closing.kind === 'chat',
+					workspaceId: closing.workspaceId,
+				}),
+			);
 		},
 		openNonChatTab: async ({
 			workspaceId,
@@ -614,7 +689,14 @@ async function rollbackConversation(
 	if (target.openedTabId) {
 		try {
 			deps.chatTabService.closeTab({ chatTabId: target.openedTabId });
-			deps.broadcastTabsChanged({ workspaceId: target.workspaceId });
+			deps.broadcastTabsChanged(
+				toTabsChangedAfterClose(deps, {
+					agentSessionId: target.agentSessionId,
+					chatTabId: target.openedTabId,
+					isChat: true,
+					workspaceId: target.workspaceId,
+				}),
+			);
 		} catch (cause) {
 			console.warn('[agent-control] could not close a failed spawn tab.', {
 				cause: cause instanceof Error ? cause.message : String(cause),

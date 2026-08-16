@@ -1217,6 +1217,21 @@ export interface FocusViewBroadcast {
  * an unrelated refetch.
  */
 export interface TabsChangedBroadcast {
+	/**
+	 * The chat a close really retired. The renderer drops its unread mark:
+	 * nothing but reading a chat clears one, so a tab an agent closed before
+	 * anyone looked at it would otherwise leave the sidebar dot and the jump
+	 * control aimed at a chat that is gone.
+	 *
+	 * Absent unless a chat tab actually left the open set. A close of a terminal
+	 * or file tab carries no mark to retire, and `closeTab` is a no-op for a tab
+	 * that is already closed and for a workspace's last open chat — naming one of
+	 * those would clear the mark of a tab still on screen.
+	 */
+	closedChat?: {
+		agentSessionId: string | null;
+		chatTabId: string;
+	};
 	workspaceId: string;
 }
 

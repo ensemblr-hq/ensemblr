@@ -26,7 +26,14 @@ import {
 } from './support/spawn-model-resolver.ts';
 
 vi.mock('../../src/main/storage/repositories/chat-tab-repository.ts', () => ({
-	getChatTabById: vi.fn(() => ({ workspaceId: 'ws', metadata: {} })),
+	getChatTabById: vi.fn(() => ({
+		agentSessionId: null,
+		closedAt: null,
+		id: 'tab-1',
+		kind: 'chat',
+		metadata: {},
+		workspaceId: 'ws',
+	})),
 	getChatTabByAgentSessionId: vi.fn(() => null),
 	setChatTabMetadata: vi.fn(),
 }));
@@ -91,6 +98,45 @@ const makeDeps = (): {
 	};
 };
 
+/** Builds an open chat-tab row as the repository returns it. */
+function openChatRow(
+	overrides: Record<string, unknown> = {},
+): Record<string, unknown> {
+	return {
+		agentSessionId: null,
+		closedAt: null,
+		id: 'tab-1',
+		kind: 'chat',
+		metadata: {},
+		workspaceId: 'ws',
+		...overrides,
+	};
+}
+
+/**
+ * Queues the rows the tab port reads before and after an attempted close, so a
+ * refused close (the row is still open afterwards) can be told from a real one.
+ * `after` is omitted where the port never gets that far.
+ */
+function stubCloseOutcome(
+	before: Record<string, unknown> | null,
+	after?: Record<string, unknown> | null,
+): void {
+	const asRow = (value: Record<string, unknown> | null) =>
+		value as unknown as ReturnType<typeof getChatTabById>;
+	vi.mocked(getChatTabById).mockReturnValueOnce(asRow(before));
+	if (after !== undefined) {
+		vi.mocked(getChatTabById).mockReturnValueOnce(asRow(after));
+	}
+}
+
+beforeEach(() => {
+	vi.mocked(getChatTabById).mockReset();
+	vi.mocked(getChatTabById).mockImplementation(
+		() => openChatRow() as unknown as ReturnType<typeof getChatTabById>,
+	);
+});
+
 describe('agent-control port adapters: tab-change broadcast', () => {
 	let deps: PortAdapterDeps;
 	let broadcastTabsChanged: ReturnType<typeof vi.fn>;
@@ -118,6 +164,51 @@ describe('agent-control port adapters: tab-change broadcast', () => {
 	});
 
 	it('broadcasts the owning workspace after closing a tab', async () => {
+		stubCloseOutcome(openChatRow(), null);
+		const ports = createAgentControlPorts(deps);
+		await ports.tabs.closeTab({ chatTabId: 'tab-1' });
+		expect(broadcastTabsChanged).toHaveBeenCalledWith({
+			closedChat: { agentSessionId: null, chatTabId: 'tab-1' },
+			workspaceId: 'ws',
+		});
+	});
+
+	it('names the closed chat and its session so the renderer can retire its unread mark', async () => {
+		stubCloseOutcome(openChatRow({ agentSessionId: 'session-a' }), {
+			...openChatRow({ agentSessionId: 'session-a' }),
+			closedAt: '2026-08-16T00:00:00.000Z',
+		});
+		const ports = createAgentControlPorts(deps);
+		await ports.tabs.closeTab({ chatTabId: 'tab-1' });
+		expect(broadcastTabsChanged).toHaveBeenCalledWith({
+			closedChat: { agentSessionId: 'session-a', chatTabId: 'tab-1' },
+			workspaceId: 'ws',
+		});
+	});
+
+	it('stays silent when the closing tab has no row to name', async () => {
+		vi.mocked(getChatTabById).mockReturnValueOnce(
+			null as unknown as ReturnType<typeof getChatTabById>,
+		);
+		const ports = createAgentControlPorts(deps);
+		await ports.tabs.closeTab({ chatTabId: 'tab-gone' });
+		expect(broadcastTabsChanged).not.toHaveBeenCalled();
+	});
+
+	it('names no chat when the close was refused and the tab is still open', async () => {
+		stubCloseOutcome(
+			openChatRow({ agentSessionId: 'session-a' }),
+			openChatRow({ agentSessionId: 'session-a' }),
+		);
+		const ports = createAgentControlPorts(deps);
+		await ports.tabs.closeTab({ chatTabId: 'tab-1' });
+		expect(broadcastTabsChanged).toHaveBeenCalledWith({ workspaceId: 'ws' });
+	});
+
+	it('names no chat when the closed tab was not a chat', async () => {
+		stubCloseOutcome(
+			openChatRow({ agentSessionId: 'session-a', kind: 'terminal' }),
+		);
 		const ports = createAgentControlPorts(deps);
 		await ports.tabs.closeTab({ chatTabId: 'tab-1' });
 		expect(broadcastTabsChanged).toHaveBeenCalledWith({ workspaceId: 'ws' });

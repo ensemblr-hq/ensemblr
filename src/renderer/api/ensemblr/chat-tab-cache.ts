@@ -35,7 +35,14 @@ export function writeOpenedChatTabToCache({
 	);
 }
 
-/** Removes a closed tab from the open-tab cache before IPC/refetch completes. */
+/**
+ * Removes a closed tab from the open-tab cache before IPC/refetch completes, and
+ * hands back the row it dropped. The row is the last place the tab's agent
+ * session id is still readable, which the caller needs to retire state keyed by
+ * the session rather than by the tab.
+ * @param options - The closing tab, the query client, and its workspace
+ * @returns The removed open-tab row, or null when the cache held none
+ */
 export function removeOpenChatTabFromCache({
 	chatTabId,
 	queryClient,
@@ -44,7 +51,11 @@ export function removeOpenChatTabFromCache({
 	chatTabId: string;
 	queryClient: QueryClient;
 	workspaceId: string;
-}): void {
+}): ChatTabWire | null {
+	const removed =
+		queryClient
+			.getQueryData<ListChatTabsResult>(ensemblrQueryKeys.chatTabs(workspaceId))
+			?.open.find((tab) => tab.id === chatTabId) ?? null;
 	queryClient.setQueryData<ListChatTabsResult>(
 		ensemblrQueryKeys.chatTabs(workspaceId),
 		(current) => {
@@ -57,6 +68,7 @@ export function removeOpenChatTabFromCache({
 			};
 		},
 	);
+	return removed;
 }
 
 /** Reorders open tabs optimistically while preserving unknown stale rows at the end. */
