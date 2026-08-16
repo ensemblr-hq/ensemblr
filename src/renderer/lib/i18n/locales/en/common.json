@@ -233,6 +233,7 @@
 			"git-timeout": "Git version check timed out.",
 			"git-unknown-error": "Unknown git check error.",
 			"linear-connected": "Linear is connected.",
+			"linear-connected-accounts": "Linear is connected to {{count}} accounts ({{organizations}}).",
 			"linear-connected-as": "Linear is connected as {{identity}}.",
 			"linear-connected-with-organization": "Linear is connected as {{identity}} ({{organization}}).",
 			"linear-not-configured": "Linear OAuth is not configured. Add app.linear.clientId to the Ensemblr config to enable Linear workflows. Linear is optional for local and GitHub-only workflows.",

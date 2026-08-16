@@ -187,7 +187,7 @@ export function createEnsemblrApi(): EnsemblrApi {
 		linearConnectionStatus: () => invoke('linearConnectionStatus'),
 		linearCreateComment: (request) => invoke('linearCreateComment', request),
 		linearCreateIssue: (request) => invoke('linearCreateIssue', request),
-		linearDisconnect: () => invoke('linearDisconnect'),
+		linearDisconnect: (request) => invoke('linearDisconnect', request),
 		linearGetIssue: (request) => invoke('linearGetIssue', request),
 		linearListIssues: (request) => invoke('linearListIssues', request),
 		linearMetadata: (request) => invoke('linearMetadata', request),

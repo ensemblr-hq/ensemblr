@@ -62,6 +62,7 @@ const PARAMS = {
 	message: 'boom',
 	modelCount: 9,
 	organization: 'Acme',
+	organizations: 'Acme, Client Co',
 	path: '/opt/homebrew/bin/pi',
 	plan: 'Max',
 	probeDetail: 'pi 1.2.3',

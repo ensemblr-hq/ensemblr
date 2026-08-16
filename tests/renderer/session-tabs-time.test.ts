@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { i18n } from '../../src/renderer/lib/i18n';
-import { formatRelativeClosedAt } from '../../src/renderer/lib/workbench/relative-time';
+import { formatRelativeTimestamp } from '../../src/renderer/lib/workbench/relative-time';
 
 const NOW = new Date('2026-06-08T12:00:00.000Z').getTime();
 let dateSpy: ReturnType<typeof vi.spyOn> | null = null;
@@ -15,41 +15,45 @@ afterEach(() => {
 	dateSpy = null;
 });
 
-test('formatRelativeClosedAt renders sub-minute deltas as "just now"', () => {
-	expect(formatRelativeClosedAt('2026-06-08T11:59:59.000Z')).toBe('just now');
+test('formatRelativeTimestamp renders sub-minute deltas as "just now"', () => {
+	expect(formatRelativeTimestamp('2026-06-08T11:59:59.000Z')).toBe('just now');
 });
 
-test('formatRelativeClosedAt renders minute-scale deltas', () => {
-	expect(formatRelativeClosedAt('2026-06-08T11:55:00.000Z')).toMatch(
+test('formatRelativeTimestamp renders minute-scale deltas', () => {
+	expect(formatRelativeTimestamp('2026-06-08T11:55:00.000Z')).toMatch(
 		/^5 min\.? ago$/,
 	);
 });
 
-test('formatRelativeClosedAt renders hour-scale deltas', () => {
-	expect(formatRelativeClosedAt('2026-06-08T09:00:00.000Z')).toMatch(
+test('formatRelativeTimestamp renders hour-scale deltas', () => {
+	expect(formatRelativeTimestamp('2026-06-08T09:00:00.000Z')).toMatch(
 		/^3 hr\.? ago$/,
 	);
 });
 
-test('formatRelativeClosedAt renders day-scale deltas', () => {
-	expect(formatRelativeClosedAt('2026-06-06T12:00:00.000Z')).toBe('2 days ago');
+test('formatRelativeTimestamp renders day-scale deltas', () => {
+	expect(formatRelativeTimestamp('2026-06-06T12:00:00.000Z')).toBe(
+		'2 days ago',
+	);
 });
 
-test('formatRelativeClosedAt returns the input when unparseable', () => {
-	expect(formatRelativeClosedAt('not-an-iso-timestamp')).toBe(
+test('formatRelativeTimestamp returns the input when unparseable', () => {
+	expect(formatRelativeTimestamp('not-an-iso-timestamp')).toBe(
 		'not-an-iso-timestamp',
 	);
 });
 
-test('formatRelativeClosedAt follows the active language', async () => {
+test('formatRelativeTimestamp follows the active language', async () => {
 	await i18n.changeLanguage('ru');
-	expect(formatRelativeClosedAt('2026-06-08T11:59:59.000Z')).toBe('только что');
-	expect(formatRelativeClosedAt('2026-06-06T12:00:00.000Z')).toMatch(
+	expect(formatRelativeTimestamp('2026-06-08T11:59:59.000Z')).toBe(
+		'только что',
+	);
+	expect(formatRelativeTimestamp('2026-06-06T12:00:00.000Z')).toMatch(
 		/^2 дн\.? назад$/,
 	);
 
 	await i18n.changeLanguage('el');
-	expect(formatRelativeClosedAt('2026-06-08T11:55:00.000Z')).toMatch(
+	expect(formatRelativeTimestamp('2026-06-08T11:55:00.000Z')).toMatch(
 		/^πριν από 5 λεπ\.?$/,
 	);
 });

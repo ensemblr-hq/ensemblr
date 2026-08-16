@@ -107,7 +107,8 @@ import type {
 	GetLinearIssueResult,
 	GetLinearMetadataRequest,
 	GetLinearMetadataResult,
-	LinearConnectionSnapshot,
+	LinearConnectionSummary,
+	LinearDisconnectRequest,
 	LinearDisconnectResult,
 	LinearLoginResult,
 	ListLinearIssuesRequest,
@@ -397,7 +398,7 @@ export interface IpcHandlerMap {
 	[IPC_CHANNELS.linearCancelLogin]: IpcHandlerEntry<void, void>;
 	[IPC_CHANNELS.linearConnectionStatus]: IpcHandlerEntry<
 		void,
-		LinearConnectionSnapshot
+		LinearConnectionSummary
 	>;
 	[IPC_CHANNELS.linearCreateComment]: IpcHandlerEntry<
 		CreateLinearCommentRequest,
@@ -408,7 +409,7 @@ export interface IpcHandlerMap {
 		MutateLinearIssueResult
 	>;
 	[IPC_CHANNELS.linearDisconnect]: IpcHandlerEntry<
-		void,
+		LinearDisconnectRequest,
 		LinearDisconnectResult
 	>;
 	[IPC_CHANNELS.linearGetIssue]: IpcHandlerEntry<

@@ -1,5 +1,5 @@
 import { i18n } from '@/renderer/lib/i18n';
-import { formatRelativeClosedAt } from '@/renderer/lib/workbench/relative-time';
+import { formatRelativeTimestamp } from '@/renderer/lib/workbench/relative-time';
 import type { SessionTabModel } from '@/renderer/types/workbench';
 import type { AgentSessionSnapshotWire } from '@/shared/ipc/contracts/agent-session';
 import type {
@@ -166,7 +166,7 @@ export function toClosedSessionTabModel(
 		label: entry.tab.title || entry.summaryTitle || untitledClosedTabLabel(),
 		status: 'idle',
 		summary: entry.summaryPath,
-		updatedLabel: formatRelativeClosedAt(entry.closedAt),
+		updatedLabel: formatRelativeTimestamp(entry.closedAt),
 	};
 	// Terminal (harness) tabs keep their harness identity so the history row shows
 	// the harness icon and a restore can reattach the exact conversation. The

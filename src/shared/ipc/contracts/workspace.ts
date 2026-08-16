@@ -39,6 +39,12 @@ export interface CreateWorkspaceDiagnostic {
 
 /** Linked remote issue persisted on a workspace created from an issue. */
 export interface WorkspaceLinkedIssueInput extends LinkedIssueRef {
+	/**
+	 * Linear account the issue belongs to; omitted for GitHub issues. This is
+	 * what lets a workspace's later Linear work — status updates, agent ops —
+	 * reach the right organization without the user naming it again.
+	 */
+	accountId?: string;
 	/** Issue body/description, seeded into the first-prompt composer draft. */
 	description?: string;
 	provider: 'github' | 'linear';

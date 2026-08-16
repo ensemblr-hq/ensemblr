@@ -30,7 +30,6 @@ import type { EnsemblrDatabaseService } from '../../src/main/storage/database.ts
 import type {
 	ConfigStatusSnapshot,
 	DatabaseHealthSnapshot,
-	LinearConnectionSnapshot,
 	RootDirectorySnapshot,
 	SetupCheckGroupId,
 	SetupCheckId,
@@ -520,22 +519,18 @@ function createProvider(
 }
 
 function createLinearAuthService(): LinearAuthService {
-	const snapshot: LinearConnectionSnapshot = {
-		expiresAt: null,
-		organizationName: null,
-		organizationUrlKey: null,
-		scopes: [],
-		state: 'disconnected',
-		updatedAt: null,
-		userEmail: null,
-		userName: null,
-	};
-
 	return {
 		cancelLogin: async () => {},
-		disconnect: async () => ({ snapshot, status: 'disconnected' }),
+		disconnect: async () => ({
+			status: 'disconnected',
+			summary: { accounts: [], state: 'disconnected' },
+		}),
 		getAccessToken: async () => 'token',
-		getConnectionStatus: async () => snapshot,
+		getConnectionSummary: async () => ({
+			accounts: [],
+			state: 'disconnected',
+		}),
+		listAccounts: async () => [],
 		startLogin: async () => ({
 			failure: { code: 'not-configured', message: 'not configured' },
 			status: 'error',

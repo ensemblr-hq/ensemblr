@@ -54,16 +54,34 @@ export const ensemblrQueryKeys = {
 	/** Query key for the Linear connection status. */
 	linearConnection: () =>
 		[...ensemblrQueryKeys.all, 'linear-connection'] as const,
-	/** Query key for a single Linear issue by id. */
-	linearIssue: (issueId: string) =>
+	/**
+	 * Query key for a single Linear issue, scoped to the account the read names.
+	 * An identifier is unique only inside one organization, and a read that names
+	 * its account resolves where an unscoped one cannot, so the two are separate
+	 * cache entries.
+	 */
+	linearIssue: (issueId: string, accountId?: string) =>
+		[
+			...ensemblrQueryKeys.all,
+			'linear-issue',
+			issueId,
+			accountId ?? '',
+		] as const,
+	/** Prefix matching one issue's cache entries across every account scoping. */
+	linearIssueAll: (issueId: string) =>
 		[...ensemblrQueryKeys.all, 'linear-issue', issueId] as const,
 	/** Query key for a filtered Linear issue list. */
-	linearIssues: (filter: { query?: string; teamId?: string }) =>
+	linearIssues: (filter: {
+		accountId?: string;
+		query?: string;
+		teamId?: string;
+	}) =>
 		[
 			...ensemblrQueryKeys.all,
 			'linear-issues',
 			filter.teamId ?? '',
 			filter.query ?? '',
+			filter.accountId ?? '',
 		] as const,
 	/** Prefix matching every cached issue list regardless of filter. */
 	linearIssuesAll: () => [...ensemblrQueryKeys.all, 'linear-issues'] as const,

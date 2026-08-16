@@ -1,6 +1,10 @@
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 
+import { type AppLanguage, FALLBACK_LANGUAGE } from '../../shared/i18n.ts';
+
+import { linearCallbackPageStrings } from './linear-callback-page-strings.ts';
+
 const DEFAULT_CALLBACK_PATH = '/callback';
 const DEFAULT_TIMEOUT_MS = 5 * 60 * 1000;
 const LOOPBACK_HOST = '127.0.0.1';
@@ -14,8 +18,20 @@ export const LINEAR_CALLBACK_PORTS: readonly number[] = [
 	48752, 48753, 48754, 48755, 48756,
 ];
 
-const CALLBACK_RESPONSE_HTML = `<!doctype html>
-<html lang="en">
+/**
+ * Renders the page the browser lands on after the OAuth redirect.
+ *
+ * Deliberately says nothing about whether the sign-in succeeded: this fires the
+ * moment the redirect arrives, before the token exchange and regardless of
+ * whether Linear sent back a denial, so any claim of success would be a guess.
+ * @param language - The app's resolved UI language.
+ * @returns The full HTML document to serve.
+ */
+function renderCallbackPage(language: AppLanguage): string {
+	const { body, heading } = linearCallbackPageStrings(language);
+
+	return `<!doctype html>
+<html lang="${language}">
 	<head>
 		<meta charset="utf-8" />
 		<title>Ensemblr</title>
@@ -27,11 +43,12 @@ const CALLBACK_RESPONSE_HTML = `<!doctype html>
 	</head>
 	<body>
 		<main>
-			<h1>Linear connected</h1>
-			<p>You can close this tab and return to Ensemblr.</p>
+			<h1>${heading}</h1>
+			<p>${body}</p>
 		</main>
 	</body>
 </html>`;
+}
 
 /** Error thrown when the loopback callback flow ends without a callback. */
 export class LinearOauthCallbackError extends Error {
@@ -64,15 +81,17 @@ export interface LinearOauthCallbackServer {
  * that resolves the first request hitting the callback path. The server only
  * ever serves one login attempt and must be closed by the caller in every
  * outcome.
- * @param options - Optional callback path, port list, and timeout overrides.
+ * @param options - Optional callback path, port list, timeout, and page language.
  * @returns A {@link LinearOauthCallbackServer} bound to `127.0.0.1`.
  */
 export async function startLinearOauthCallbackServer({
 	callbackPath = DEFAULT_CALLBACK_PATH,
+	language = FALLBACK_LANGUAGE,
 	ports = LINEAR_CALLBACK_PORTS,
 	timeoutMs = DEFAULT_TIMEOUT_MS,
 }: {
 	callbackPath?: string;
+	language?: AppLanguage;
 	ports?: readonly number[];
 	timeoutMs?: number;
 } = {}): Promise<LinearOauthCallbackServer> {
@@ -98,7 +117,7 @@ export async function startLinearOauthCallbackServer({
 		}
 
 		response.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
-		response.end(CALLBACK_RESPONSE_HTML);
+		response.end(renderCallbackPage(language));
 
 		if (!settled) {
 			settled = true;

@@ -1,7 +1,9 @@
 {
 	"comment-composer": {
 		"label": "Добавить комментарий",
+		"markdown-hint": "Поддерживается Markdown",
 		"placeholder": "Добавить комментарий…",
+		"post-failed": "Не удалось отправить комментарий. Проверьте соединение и повторите.",
 		"posting": "Отправка…",
 		"submit": "Комментировать"
 	},
@@ -11,8 +13,8 @@
 			"title": "Linear не настроен"
 		},
 		"not-connected": {
-			"description": "Подключите Linear в настройках интеграций, чтобы просматривать задачи, управлять ими из Ensemblr и создавать рабочие пространства из задач.",
-			"title": "Linear не подключён"
+			"description": "Подключите Linear в настройках интеграций, чтобы просматривать задачи, управлять ими из Ensemblr и создавать рабочие пространства из задач. Добавьте несколько аккаунтов, чтобы работать с разными организациями.",
+			"title": "Нет подключённых аккаунтов Linear"
 		},
 		"open-settings": "Открыть настройки интеграций",
 		"reconnect-required": {
@@ -25,6 +27,10 @@
 		"trigger": "Создать рабочее пространство"
 	},
 	"failure": {
+		"account-partial_one": "Не удалось прочитать одну организацию, поэтому её задачи отсутствуют: {{details}}",
+		"account-partial_few": "Не удалось прочитать {{count}} организации, поэтому их задачи отсутствуют: {{details}}",
+		"account-partial_many": "Не удалось прочитать {{count}} организаций, поэтому их задачи отсутствуют: {{details}}",
+		"account-partial_other": "Не удалось прочитать {{count}} организации, поэтому их задачи отсутствуют: {{details}}",
 		"not-connected": "Linear не подключён. Войдите в настройках интеграций.",
 		"not-found": "Эта задача Linear больше не существует или недоступна вам.",
 		"permission-denied": "У вашего аккаунта Linear нет прав на это действие.",
@@ -38,28 +44,50 @@
 	},
 	"issue-detail": {
 		"back": "Назад к задачам",
+		"comments": "Комментарии",
+		"copy-link": "Скопировать ссылку на задачу",
+		"find-person": "Найти человека…",
+		"find-priority": "Найти приоритет…",
+		"find-status": "Найти статус…",
+		"link-copied": "Ссылка скопирована",
 		"load-failed": "Не удалось загрузить эту задачу Linear.",
 		"no-comments": "Комментариев пока нет.",
 		"no-description": "Описания нет.",
+		"no-options": "Выбирать нечего.",
+		"no-people": "Подходящих людей нет.",
 		"open-external": "Открыть в Linear",
+		"properties": "Свойства",
+		"quick-update-failed": "Не удалось сохранить изменение в Linear.",
 		"refresh": "Обновить задачу",
-		"unknown-author": "Неизвестно"
+		"set-assignee": "Изменить исполнителя",
+		"set-priority": "Изменить приоритет",
+		"set-status": "Изменить статус",
+		"unknown-author": "Неизвестно",
+		"updated": "Обновлено {{when}}"
 	},
 	"issue-editor": {
-		"description-create": "Создайте задачу в подключённом рабочем пространстве Linear.",
+		"assignee-none": "Без исполнителя",
+		"cycle-none": "Без цикла",
+		"cycle-number": "Цикл {{number}}",
+		"description-create": "Создайте задачу в подключённом рабочем пространстве Linear. Выбранная команда определяет, в какую организацию она попадёт.",
 		"description-edit": "Обновите те поля, которые разрешают ваши права в Linear.",
+		"due-date-clear": "Убрать срок",
 		"field": {
 			"assignee": "Исполнитель",
 			"cycle": "Цикл",
 			"description": "Описание задачи",
-			"description-placeholder": "Описание (markdown)",
+			"description-placeholder": "Добавьте описание…",
 			"due-date": "Срок выполнения",
+			"labels": "Метки",
 			"priority": "Приоритет",
 			"project": "Проект",
 			"status": "Статус",
 			"team": "Команда",
 			"title": "Название задачи"
 		},
+		"labels-empty": "Подходящих меток нет.",
+		"labels-remove": "Убрать метку",
+		"labels-search": "Найти метку…",
 		"priority": {
 			"high": "Высокий",
 			"low": "Низкий",
@@ -67,24 +95,59 @@
 			"none": "Без приоритета",
 			"urgent": "Срочный"
 		},
+		"project-none": "Без проекта",
 		"save-failed": "Не удалось сохранить задачу. Проверьте соединение и повторите.",
 		"saving": "Сохранение…",
+		"status-none": "Без статуса",
 		"submit-create": "Создать задачу",
 		"submit-edit": "Сохранить изменения",
+		"submit-hint": "⌘↵ — сохранить",
+		"team-first": "Выберите команду, чтобы задать статус, исполнителя, проект, цикл и метки.",
 		"team-required": "Выберите команду для новой задачи.",
-		"title-create": "Новая задача Linear",
+		"teams-empty": "Из подключённых аккаунтов Linear пока не загружено ни одной команды.",
+		"title-create": "Новая задача",
 		"title-edit": "Изменить {{identifier}}",
-		"title-required": "Нужен заголовок.",
-		"unset-option": "{{field}}: нет"
+		"title-required": "Нужен заголовок."
 	},
 	"issue-list": {
+		"all-accounts": "Все организации",
 		"all-teams": "Все команды",
+		"count_one": "{{count}} задача",
+		"count_few": "{{count}} задачи",
+		"count_many": "{{count}} задач",
+		"count_other": "{{count}} задачи",
 		"empty": "Задачи Linear пока не кэшированы. Обновите, чтобы синхронизировать из Linear.",
+		"empty-closed": "Закрытых задач пока нет.",
+		"empty-scope": "Все задачи здесь закрыты. Переключитесь на «Все», чтобы увидеть их.",
 		"empty-search": "Задачи по запросу не найдены.",
+		"group": "Группировка",
+		"group-by": {
+			"assignee": "Исполнитель",
+			"none": "Без группировки",
+			"priority": "Приоритет",
+			"status": "Статус"
+		},
 		"new-issue": "Новая задача",
 		"refresh": "Обновить задачи",
+		"scope": {
+			"active": "Активные",
+			"all": "Все",
+			"closed": "Закрытые"
+		},
 		"search-label": "Поиск задач Linear",
-		"search-placeholder": "Поиск по идентификатору или названию…"
+		"search-placeholder": "Поиск по идентификатору или названию…",
+		"sort": "Сортировка",
+		"sort-by": {
+			"priority": "Приоритет",
+			"status": "Статус",
+			"title": "Название",
+			"updated": "Обновление"
+		},
+		"unassigned": "Без исполнителя"
+	},
+	"issue-row": {
+		"due": "Срок: {{date}}",
+		"priority": "Приоритет: {{priority}}"
 	},
 	"linked-issue": {
 		"connect": "Подключить Linear",
@@ -108,5 +171,13 @@
 		"medium": "Средний",
 		"none": "Без приоритета",
 		"urgent": "Срочный"
+	},
+	"state-bucket": {
+		"backlog": "Бэклог",
+		"canceled": "Отменено",
+		"completed": "Готово",
+		"started": "В работе",
+		"triage": "Разбор",
+		"unstarted": "К выполнению"
 	}
 }

@@ -7,7 +7,7 @@ import {
 	linearIssuesQuery,
 	repositoryIssuesQuery,
 } from '@/renderer/api/ensemblr';
-import { LinearStateBadge } from '@/renderer/components/linear/issue-meta-badges';
+import { LinearStateBadge } from '@/renderer/components/linear/issue-state-badge';
 import {
 	Command,
 	CommandDialog,
@@ -21,7 +21,10 @@ import {
 	GithubLogo,
 	LinearLogo,
 } from '@/renderer/components/workbench-shell/source-provider-logo';
-import { deriveLinearGateState } from '@/renderer/lib/linear';
+import {
+	deriveLinearGateState,
+	describeLinearAccountFailures,
+} from '@/renderer/lib/linear';
 import type { LinearIssueWire } from '@/shared/ipc/contracts/linear';
 import type { RepositoryIssueWire } from '@/shared/ipc/contracts/workspace-sources';
 
@@ -90,6 +93,10 @@ export function IssuePickerDialog({
 			isLoading: connectionLoading,
 		}).kind === 'ready';
 	const linearRows = linearReady ? (linearData?.issues ?? []) : [];
+	const linearAccountFailures = linearReady
+		? (linearData?.accountFailures ?? [])
+		: [];
+	const showLinearOrganizations = (connectionData?.accounts.length ?? 0) > 1;
 	const githubRows = useMemo(
 		() => matchGithubIssues(githubData?.issues ?? [], query),
 		[githubData?.issues, query],
@@ -138,7 +145,11 @@ export function IssuePickerDialog({
 								<CommandItem
 									className='h-11'
 									key={issue.id}
-									keywords={[issue.identifier, issue.title]}
+									keywords={[
+										issue.identifier,
+										issue.title,
+										...(issue.organizationName ? [issue.organizationName] : []),
+									]}
 									onSelect={() => pick({ issue, provider: 'linear' })}
 									value={`linear:${issue.id}`}
 								>
@@ -149,9 +160,15 @@ export function IssuePickerDialog({
 									<span className='min-w-0 flex-1 truncate text-[0.8125rem]'>
 										{issue.title}
 									</span>
+									{showLinearOrganizations && issue.organizationName ? (
+										<span className='shrink-0 truncate text-muted-foreground text-xxs'>
+											{issue.organizationName}
+										</span>
+									) : null}
 									<LinearStateBadge
 										color={issue.stateColor}
 										name={issue.stateName}
+										stateType={issue.stateType}
 									/>
 								</CommandItem>
 							))}
@@ -181,11 +198,16 @@ export function IssuePickerDialog({
 						</CommandGroup>
 					) : null}
 				</CommandList>
+				{linearAccountFailures.length > 0 ? (
+					<p className='mx-1 mb-1 rounded-lg bg-status-warning/5 px-2 py-1.5 text-status-warning text-xs'>
+						{describeLinearAccountFailures(linearAccountFailures)}
+					</p>
+				) : null}
 				{linearReady ? null : (
 					<p className='mx-1 mb-1 rounded-lg bg-muted/40 px-2 py-1.5 text-muted-foreground text-xs'>
 						{t(
 							'workbench:issue-picker.linear-not-connected',
-							'Linear is not connected, so only GitHub issues are listed. Sign in from integration settings.',
+							'No Linear account is connected, so only GitHub issues are listed. Sign in from integration settings.',
 						)}
 					</p>
 				)}

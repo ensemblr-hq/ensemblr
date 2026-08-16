@@ -81,6 +81,7 @@ export {
 	createLinearIssueRequestSchema,
 	getLinearIssueRequestSchema,
 	getLinearMetadataRequestSchema,
+	linearDisconnectRequestSchema,
 	listLinearIssuesRequestSchema,
 	updateLinearIssueRequestSchema,
 } from './request-schemas/linear.ts';

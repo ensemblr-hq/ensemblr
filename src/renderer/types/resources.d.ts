@@ -235,6 +235,7 @@ export default interface Resources {
 				'git-timeout': 'Git version check timed out.';
 				'git-unknown-error': 'Unknown git check error.';
 				'linear-connected': 'Linear is connected.';
+				'linear-connected-accounts': 'Linear is connected to {{count}} accounts ({{organizations}}).';
 				'linear-connected-as': 'Linear is connected as {{identity}}.';
 				'linear-connected-with-organization': 'Linear is connected as {{identity}} ({{organization}}).';
 				'linear-not-configured': 'Linear OAuth is not configured. Add app.linear.clientId to the Ensemblr config to enable Linear workflows. Linear is optional for local and GitHub-only workflows.';
@@ -543,8 +544,11 @@ export default interface Resources {
 			'branch-rename-failed': 'The branch could not be renamed.';
 			'branch-rollback-failed': 'The branch change failed and could not be rolled back.';
 			'branch-unresolved': 'Could not determine which branch this workspace is on.';
+			'callback-failed': 'Ensemblr could not open the local port Linear sends you back to. Close other Ensemblr windows, then retry.';
+			'callback-timeout': 'Linear did not answer in time. Try signing in again.';
 			'command-failed': 'The command failed.';
 			'copy-failed': 'The files could not be copied.';
+			'database-error': 'The local database is unavailable, so the Linear account was not saved.';
 			'database-unavailable': 'The local database is unavailable, so nothing was changed.';
 			'destination-exists': 'Something already exists at the destination. Remove it or pick another location.';
 			'destination-not-writable': 'Ensemblr cannot write to that location. Pick a writable one.';
@@ -568,6 +572,7 @@ export default interface Resources {
 			'dictation-unauthorized': 'The transcription API key was rejected.';
 			'diff-failed': 'The diff could not be produced.';
 			'dirty-state': 'The working tree has uncommitted changes.';
+			'exchange-failed': 'Linear rejected the sign-in. Try again.';
 			'gh-not-authenticated': 'GitHub CLI is not signed in. Run gh auth login, then retry.';
 			'gh-not-installed': 'GitHub CLI was not found in PATH. Install it, then retry.';
 			'git-failed': 'The git command failed.';
@@ -596,6 +601,9 @@ export default interface Resources {
 			'invalid-worktree': 'The worktree does not belong to this repository.';
 			'job-unknown': 'The clone job has expired or was never prepared. Start a new clone.';
 			'lifecycle-hook-failed': 'A lifecycle hook failed.';
+			'linear-unknown': 'The Linear operation failed.';
+			'login-canceled': 'The Linear sign-in was canceled.';
+			'login-in-progress': 'A Linear sign-in is already waiting for the browser.';
 			'managed-directory-create-failed': 'A managed directory could not be created under the root.';
 			'managed-directory-missing': 'A managed directory is missing from the root.';
 			'managed-directory-read-failed': 'A managed directory could not be read.';
@@ -609,10 +617,13 @@ export default interface Resources {
 			'name-invalid': 'That name is not valid.';
 			'name-required': 'Enter a name.';
 			network: 'GitHub is unreachable. Check your connection and retry.';
+			'network-error': 'Linear could not be reached. Check your connection, then retry.';
 			'no-checkpoint': 'No checkpoint was captured for this turn.';
 			'no-pull-request': 'This branch has no pull request.';
 			'no-remote': 'This repository has no remote configured.';
 			'not-a-git-repo': 'That folder is not a git repository.';
+			'not-configured': 'Linear sign-in is not configured on this machine.';
+			'not-connected': 'No Linear account is connected.';
 			'not-directory': 'That path is not a directory.';
 			'not-file': 'That path is not a file.';
 			'not-found': 'That path was not found.';
@@ -628,6 +639,7 @@ export default interface Resources {
 			'reconcile-directory-read-failed': 'A directory under the root could not be read during the scan.';
 			'reconcile-path-stat-failed': 'A path under the root could not be inspected during the scan.';
 			'reconcile-workspace-repository-not-directory': "A workspace's repository folder is not a directory.";
+			'refresh-failed': 'The Linear token expired and could not be refreshed. Reconnect the account.';
 			'register-failed': 'The repository could not be registered.';
 			'remote-already-registered': 'This repository is already registered with Ensemblr.';
 			'repositories-path-missing': 'The managed root has no workspaces directory. Configure the root directory first.';
@@ -661,9 +673,11 @@ export default interface Resources {
 			'root-stat-failed': 'The root directory could not be inspected.';
 			'root-unavailable': 'The managed root is unavailable, so the operation was skipped.';
 			'root-unwritable': 'The root directory is not writable.';
+			'secret-store-error': 'The macOS Keychain is unavailable, so the Linear token could not be read.';
 			'shared-root-content': 'The root directory holds files Ensemblr does not manage.';
 			'source-path-missing': 'A source path no longer exists, so it was skipped.';
 			'spawn-error': 'The process could not be started.';
+			'state-mismatch': 'The Linear sign-in reply did not match this attempt, so it was rejected.';
 			'too-large': 'That file is too large.';
 			'tracked-skipped': 'That path is tracked by git, so it was skipped.';
 			'unarchive-aborted-by-hook': 'An unarchive hook stopped the operation.';
@@ -1011,7 +1025,9 @@ export default interface Resources {
 	linear: {
 		'comment-composer': {
 			label: 'Add a comment';
+			'markdown-hint': 'Markdown supported';
 			placeholder: 'Add a comment…';
+			'post-failed': 'Posting the comment failed. Check your connection and try again.';
 			posting: 'Posting…';
 			submit: 'Comment';
 		};
@@ -1021,8 +1037,8 @@ export default interface Resources {
 				title: 'Linear is not configured';
 			};
 			'not-connected': {
-				description: 'Connect Linear from integration settings to browse issues, manage them from Ensemblr, and create workspaces from issues.';
-				title: 'Linear is not connected';
+				description: 'Connect Linear from integration settings to browse issues, manage them from Ensemblr, and create workspaces from issues. Add more than one account to work across organizations.';
+				title: 'No Linear account is connected';
 			};
 			'open-settings': 'Open integration settings';
 			'reconnect-required': {
@@ -1035,6 +1051,8 @@ export default interface Resources {
 			trigger: 'Create workspace';
 		};
 		failure: {
+			'account-partial_one': 'One organization could not be read, so its issues are missing: {{details}}';
+			'account-partial_other': '{{count}} organizations could not be read, so their issues are missing: {{details}}';
 			'not-connected': 'Linear is not connected. Sign in from integration settings.';
 			'not-found': 'This Linear issue no longer exists or is not visible to you.';
 			'permission-denied': 'Your Linear account does not have permission for this action.';
@@ -1048,28 +1066,50 @@ export default interface Resources {
 		};
 		'issue-detail': {
 			back: 'Back to issues';
+			comments: 'Comments';
+			'copy-link': 'Copy issue link';
+			'find-person': 'Find a person…';
+			'find-priority': 'Find a priority…';
+			'find-status': 'Find a status…';
+			'link-copied': 'Link copied';
 			'load-failed': 'This Linear issue could not be loaded.';
 			'no-comments': 'No comments yet.';
 			'no-description': 'No description.';
+			'no-options': 'Nothing to choose.';
+			'no-people': 'No matching person.';
 			'open-external': 'Open in Linear';
+			properties: 'Properties';
+			'quick-update-failed': 'That change could not be saved to Linear.';
 			refresh: 'Refresh issue';
+			'set-assignee': 'Change assignee';
+			'set-priority': 'Change priority';
+			'set-status': 'Change status';
 			'unknown-author': 'Unknown';
+			updated: 'Updated {{when}}';
 		};
 		'issue-editor': {
-			'description-create': 'Create an issue in the connected Linear workspace.';
+			'assignee-none': 'Unassigned';
+			'cycle-none': 'No cycle';
+			'cycle-number': 'Cycle {{number}}';
+			'description-create': 'Create an issue in a connected Linear workspace. The team you choose decides which organization it lands in.';
 			'description-edit': 'Update fields where your Linear permissions allow.';
+			'due-date-clear': 'Clear due date';
 			field: {
 				assignee: 'Assignee';
 				cycle: 'Cycle';
 				description: 'Issue description';
-				'description-placeholder': 'Description (markdown)';
+				'description-placeholder': 'Add a description…';
 				'due-date': 'Due date';
+				labels: 'Labels';
 				priority: 'Priority';
 				project: 'Project';
 				status: 'Status';
 				team: 'Team';
 				title: 'Issue title';
 			};
+			'labels-empty': 'No matching label.';
+			'labels-remove': 'Remove label';
+			'labels-search': 'Find a label…';
 			priority: {
 				high: 'High';
 				low: 'Low';
@@ -1077,24 +1117,57 @@ export default interface Resources {
 				none: 'No priority';
 				urgent: 'Urgent';
 			};
+			'project-none': 'No project';
 			'save-failed': 'Saving the issue failed. Check your connection and try again.';
 			saving: 'Saving…';
+			'status-none': 'No status';
 			'submit-create': 'Create issue';
 			'submit-edit': 'Save changes';
+			'submit-hint': '⌘↵ to save';
+			'team-first': 'Choose a team to set status, assignee, project, cycle, and labels.';
 			'team-required': 'Choose a team for the new issue.';
-			'title-create': 'New Linear issue';
+			'teams-empty': 'No teams have loaded from your connected Linear accounts yet.';
+			'title-create': 'New issue';
 			'title-edit': 'Edit {{identifier}}';
 			'title-required': 'A title is required.';
-			'unset-option': '{{field}}: none';
 		};
 		'issue-list': {
+			'all-accounts': 'All organizations';
 			'all-teams': 'All teams';
+			count_one: '{{count}} issue';
+			count_other: '{{count}} issues';
 			empty: 'No Linear issues are cached yet. Refresh to sync from Linear.';
+			'empty-closed': 'No closed issues here yet.';
+			'empty-scope': 'Every issue here is closed. Switch to All to see them.';
 			'empty-search': 'No issues match your search.';
+			group: 'Group by';
+			'group-by': {
+				assignee: 'Assignee';
+				none: 'No grouping';
+				priority: 'Priority';
+				status: 'Status';
+			};
 			'new-issue': 'New issue';
 			refresh: 'Refresh issues';
+			scope: {
+				active: 'Active';
+				all: 'All';
+				closed: 'Closed';
+			};
 			'search-label': 'Search Linear issues';
 			'search-placeholder': 'Search by identifier or title…';
+			sort: 'Sort by';
+			'sort-by': {
+				priority: 'Priority';
+				status: 'Status';
+				title: 'Title';
+				updated: 'Updated';
+			};
+			unassigned: 'Unassigned';
+		};
+		'issue-row': {
+			due: 'Due {{date}}';
+			priority: 'Priority: {{priority}}';
 		};
 		'linked-issue': {
 			connect: 'Connect Linear';
@@ -1118,6 +1191,14 @@ export default interface Resources {
 			medium: 'Medium';
 			none: 'No priority';
 			urgent: 'Urgent';
+		};
+		'state-bucket': {
+			backlog: 'Backlog';
+			canceled: 'Canceled';
+			completed: 'Done';
+			started: 'In progress';
+			triage: 'Triage';
+			unstarted: 'Todo';
 		};
 	};
 	onboarding: {
@@ -1636,22 +1717,22 @@ export default interface Resources {
 				verified: 'Credentials work.';
 			};
 			linear: {
+				add: 'Add account';
 				'browse-issues': 'Browse issues';
 				checking: 'Checking the Linear connection…';
-				connect: 'Connect';
-				connected: 'Connected to Linear.';
-				'connected-as': 'Connected as {{identity}}.';
-				'connected-as-in': 'Connected as {{identity}} in {{organization}}.';
+				'connected-count_one': 'One account connected. Add another to work across organizations.';
+				'connected-count_other': '{{count}} accounts connected. Their issues appear together, each tagged with its organization.';
 				disconnect: 'Disconnect';
-				disconnected: 'Connect Linear to browse issues, manage them from Ensemblr, and create workspaces from issues.';
-				disconnecting: 'Disconnecting…';
+				'disconnect-confirm': 'Confirm disconnect';
+				disconnected: 'Connect Linear to browse issues, manage them from Ensemblr, and create workspaces from issues. Add more than one account to work across organizations.';
 				'not-configured': 'Add app.linear.clientId to ~/.config/ensemblr/config.json to enable Linear sign-in. Linear is optional for local and GitHub-only workflows.';
-				reconnect: 'Reconnect';
-				'reconnect-required': 'The stored Linear token expired and cannot be refreshed automatically. Reconnect to continue using Linear workflows.';
+				'reconnect-required': 'Every connected Linear account has an expired token that cannot be refreshed automatically. Reconnect to continue using Linear workflows.';
 				'state-connected': 'Connected';
 				'state-disconnected': 'Disconnected';
 				'state-not-configured': 'Not configured';
 				'state-reconnect': 'Reconnect required';
+				'unknown-user': 'Unknown Linear user';
+				'unnamed-organization': 'Unnamed organization';
 				waiting: 'Waiting for browser…';
 			};
 			title: 'Integrations';
@@ -2706,7 +2787,7 @@ export default interface Resources {
 			empty: 'No issues match your search.';
 			'group-github': 'GitHub';
 			'group-linear': 'Linear';
-			'linear-not-connected': 'Linear is not connected, so only GitHub issues are listed. Sign in from integration settings.';
+			'linear-not-connected': 'No Linear account is connected, so only GitHub issues are listed. Sign in from integration settings.';
 			loading: 'Loading issues…';
 			'search-placeholder': 'Search by identifier, number, or title…';
 			title: 'Attach issue';

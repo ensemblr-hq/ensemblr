@@ -813,6 +813,103 @@ CREATE TABLE infisical_links (
 CREATE INDEX idx_infisical_links_account_id ON infisical_links(account_id);
 `,
 	},
+	{
+		id: '019_linear_accounts',
+		version: 19,
+		// `linear_accounts` deliberately has no token column: access and refresh
+		// tokens live in the Keychain keyed by the account id (ADR 0024, ADR 0052),
+		// so a database copied off the machine carries no credential.
+		//
+		// The four cache tables from 009 are recreated rather than altered. They are
+		// a refreshable mirror of Linear, which stays the source of truth, so the
+		// only cost is one resync — whereas backfilling `account_id` would need an
+		// account row that does not exist until the Keychain adoption pass has run
+		// on first launch, long after migrations complete.
+		sql: `
+CREATE TABLE linear_accounts (
+	id TEXT PRIMARY KEY,
+	organization_id TEXT NOT NULL,
+	organization_name TEXT,
+	organization_url_key TEXT,
+	user_id TEXT NOT NULL,
+	user_name TEXT,
+	user_email TEXT,
+	scopes_json TEXT NOT NULL DEFAULT '[]',
+	expires_at TEXT,
+	-- Named can_refresh rather than has_refresh_token: it records whether the
+	-- grant can be renewed without the user, never a token value, and
+	-- database.test.ts asserts that no column name looks like it stores one.
+	can_refresh INTEGER NOT NULL DEFAULT 0 CHECK (can_refresh IN (0, 1)),
+	last_error_code TEXT,
+	created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+	updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+	UNIQUE(organization_id, user_id)
+) STRICT;
+
+DROP TABLE IF EXISTS linear_comments;
+DROP TABLE IF EXISTS linear_issues;
+DROP TABLE IF EXISTS linear_resources;
+DROP TABLE IF EXISTS linear_sync_state;
+
+CREATE TABLE linear_issues (
+	id TEXT PRIMARY KEY,
+	account_id TEXT NOT NULL REFERENCES linear_accounts(id) ON DELETE CASCADE,
+	identifier TEXT NOT NULL,
+	title TEXT NOT NULL,
+	description TEXT,
+	team_id TEXT,
+	project_id TEXT,
+	state_id TEXT,
+	assignee_id TEXT,
+	priority INTEGER,
+	due_date TEXT,
+	url TEXT NOT NULL DEFAULT '',
+	archived_at TEXT,
+	remote_updated_at TEXT,
+	data_json TEXT NOT NULL DEFAULT '{}',
+	synced_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+) STRICT;
+
+CREATE INDEX idx_linear_issues_identifier ON linear_issues(account_id, identifier);
+CREATE INDEX idx_linear_issues_team_id ON linear_issues(account_id, team_id);
+CREATE INDEX idx_linear_issues_remote_updated_at ON linear_issues(remote_updated_at);
+
+CREATE TABLE linear_resources (
+	id TEXT PRIMARY KEY,
+	account_id TEXT NOT NULL REFERENCES linear_accounts(id) ON DELETE CASCADE,
+	kind TEXT NOT NULL CHECK (kind IN ('team', 'project', 'state', 'label', 'cycle', 'user')),
+	team_id TEXT,
+	name TEXT NOT NULL,
+	data_json TEXT NOT NULL DEFAULT '{}',
+	synced_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+) STRICT;
+
+CREATE INDEX idx_linear_resources_kind ON linear_resources(account_id, kind, team_id);
+
+CREATE TABLE linear_comments (
+	id TEXT PRIMARY KEY,
+	account_id TEXT NOT NULL REFERENCES linear_accounts(id) ON DELETE CASCADE,
+	issue_id TEXT NOT NULL,
+	author_name TEXT,
+	body TEXT NOT NULL DEFAULT '',
+	remote_created_at TEXT,
+	data_json TEXT NOT NULL DEFAULT '{}',
+	synced_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+) STRICT;
+
+CREATE INDEX idx_linear_comments_issue_id ON linear_comments(issue_id);
+
+CREATE TABLE linear_sync_state (
+	account_id TEXT NOT NULL REFERENCES linear_accounts(id) ON DELETE CASCADE,
+	scope TEXT NOT NULL,
+	cursor TEXT,
+	status TEXT NOT NULL DEFAULT 'idle' CHECK (status IN ('idle', 'syncing', 'error')),
+	error_code TEXT,
+	synced_at TEXT,
+	PRIMARY KEY(account_id, scope)
+) STRICT;
+`,
+	},
 ];
 
 /** Highest declared migration version embedded in this build. */

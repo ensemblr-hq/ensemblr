@@ -1,29 +1,30 @@
 import { Link } from '@tanstack/react-router';
+import { PlusIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/renderer/components/ui/button';
 import { Spinner } from '@/renderer/components/ui/spinner';
-import type { LinearConnectionSnapshot } from '@/shared/ipc/contracts/linear';
+import type { LinearConnectionSummary } from '@/shared/ipc/contracts/linear';
 
-/** Connect, disconnect, and cancel controls whose buttons reflect the current Linear connection state. */
+/**
+ * Row-level Linear controls: add another account, browse the merged issue list,
+ * or cancel a login already waiting on the browser. Disconnecting is per-account
+ * and lives on the account itself.
+ */
 export function LinearConnectionControls({
-	isDisconnecting,
 	isLoggingIn,
 	onCancel,
 	onConnect,
-	onDisconnect,
-	snapshot,
+	summary,
 }: {
-	isDisconnecting: boolean;
 	isLoggingIn: boolean;
 	onCancel: () => void;
 	onConnect: () => void;
-	onDisconnect: () => void;
-	snapshot: LinearConnectionSnapshot | undefined;
+	summary: LinearConnectionSummary | undefined;
 }) {
 	const { t } = useTranslation();
 
-	if (!snapshot) {
+	if (!summary) {
 		return <Spinner className='size-4' />;
 	}
 
@@ -41,37 +42,25 @@ export function LinearConnectionControls({
 		);
 	}
 
-	if (snapshot.state === 'connected') {
-		return (
-			<div className='flex items-center gap-2'>
+	return (
+		<div className='flex items-center gap-2'>
+			{summary.accounts.length > 0 ? (
 				<Button asChild size='sm' variant='ghost'>
 					<Link to='/linear'>
 						{t('settings:integrations.linear.browse-issues', 'Browse issues')}
 					</Link>
 				</Button>
-				<Button
-					disabled={isDisconnecting}
-					onClick={onDisconnect}
-					size='sm'
-					variant='outline'
-				>
-					{isDisconnecting
-						? t('settings:integrations.linear.disconnecting', 'Disconnecting…')
-						: t('settings:integrations.linear.disconnect', 'Disconnect')}
-				</Button>
-			</div>
-		);
-	}
-
-	return (
-		<Button
-			disabled={snapshot.state === 'not-configured'}
-			onClick={onConnect}
-			size='sm'
-		>
-			{snapshot.state === 'reconnect-required'
-				? t('settings:integrations.linear.reconnect', 'Reconnect')
-				: t('settings:integrations.linear.connect', 'Connect')}
-		</Button>
+			) : null}
+			<Button
+				disabled={summary.state === 'not-configured'}
+				onClick={onConnect}
+				size='sm'
+				type='button'
+				variant='outline'
+			>
+				<PlusIcon aria-hidden='true' className='size-3.5' />
+				{t('settings:integrations.linear.add', 'Add account')}
+			</Button>
+		</div>
 	);
 }

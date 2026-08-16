@@ -1,10 +1,23 @@
 export {
+	type CreateLinearAccountStoreOptions,
+	createLinearAccountStore,
+	type LinearAccountIdentity,
+	type LinearAccountRecord,
+	type LinearAccountStore,
+	type LinearAccountTokens,
+	toAccountSnapshot,
+} from './linear-account-store.ts';
+export {
 	type CreateLinearAuthServiceOptions,
 	createLinearAuthService,
 	LinearAuthError,
 	type LinearAuthService,
 	type LinearOauthConfig,
 } from './linear-auth-service.ts';
+export {
+	type LinearCallbackPageStrings,
+	linearCallbackPageStrings,
+} from './linear-callback-page-strings.ts';
 export {
 	type CreateLinearClientOptions,
 	createLinearClient,

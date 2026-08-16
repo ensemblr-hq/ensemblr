@@ -11,6 +11,7 @@ export type LinearResourceKind =
 
 /** Cached Linear issue row (mirror of the `linear_issues` table). */
 export interface LinearIssueRecord {
+	accountId: string;
 	archivedAt: string | null;
 	assigneeId: string | null;
 	data: Record<string, unknown>;
@@ -30,6 +31,7 @@ export interface LinearIssueRecord {
 
 /** Cached Linear metadata resource row (`linear_resources`). */
 export interface LinearResourceRecord {
+	accountId: string;
 	data: Record<string, unknown>;
 	id: string;
 	kind: LinearResourceKind;
@@ -40,6 +42,7 @@ export interface LinearResourceRecord {
 
 /** Cached Linear comment row (`linear_comments`). */
 export interface LinearCommentRecord {
+	accountId: string;
 	authorName: string | null;
 	body: string;
 	data: Record<string, unknown>;
@@ -49,8 +52,9 @@ export interface LinearCommentRecord {
 	syncedAt: string;
 }
 
-/** Per-scope sync bookkeeping row (`linear_sync_state`). */
+/** Per-account, per-scope sync bookkeeping row (`linear_sync_state`). */
 export interface LinearSyncStateRecord {
+	accountId: string;
 	cursor: string | null;
 	errorCode: string | null;
 	scope: string;
@@ -59,17 +63,33 @@ export interface LinearSyncStateRecord {
 }
 
 /** Upsert payload for {@link LinearStore.upsertIssues}. */
-export type LinearIssueUpsert = Omit<LinearIssueRecord, 'syncedAt'>;
+export type LinearIssueUpsert = Omit<
+	LinearIssueRecord,
+	'accountId' | 'syncedAt'
+>;
 /** Upsert payload for {@link LinearStore.upsertResources}. */
-type LinearResourceUpsert = Omit<LinearResourceRecord, 'syncedAt'>;
+type LinearResourceUpsert = Omit<
+	LinearResourceRecord,
+	'accountId' | 'syncedAt'
+>;
 /** Upsert payload for {@link LinearStore.upsertComments}. */
-type LinearCommentUpsert = Omit<LinearCommentRecord, 'syncedAt'>;
+type LinearCommentUpsert = Omit<LinearCommentRecord, 'accountId' | 'syncedAt'>;
 
-/** Filter for {@link LinearStore.listIssues}. */
+/**
+ * Filter for {@link LinearStore.listIssues}. Omitting `accountId` reads across
+ * every connected account, which is what the merged browse list wants.
+ */
 interface LinearIssueListFilter {
+	accountId?: string;
 	includeArchived?: boolean;
 	limit?: number;
 	query?: string;
+	teamId?: string;
+}
+
+/** Filter for {@link LinearStore.listResources}. */
+interface LinearResourceListFilter {
+	accountId?: string;
 	teamId?: string;
 }
 
@@ -77,18 +97,31 @@ interface LinearIssueListFilter {
 export interface LinearStore {
 	deleteIssue: (id: string) => void;
 	getIssue: (id: string) => LinearIssueRecord | null;
-	getIssueByIdentifier: (identifier: string) => LinearIssueRecord | null;
-	getSyncState: (scope: string) => LinearSyncStateRecord | null;
+	getIssueByIdentifier: (
+		accountId: string,
+		identifier: string,
+	) => LinearIssueRecord | null;
+	getSyncState: (
+		accountId: string,
+		scope: string,
+	) => LinearSyncStateRecord | null;
 	listComments: (issueId: string) => LinearCommentRecord[];
 	listIssues: (filter?: LinearIssueListFilter) => LinearIssueRecord[];
 	listResources: (
 		kind: LinearResourceKind,
-		teamId?: string,
+		filter?: LinearResourceListFilter,
 	) => LinearResourceRecord[];
 	setSyncState: (state: LinearSyncStateRecord) => void;
-	upsertComments: (issueId: string, comments: LinearCommentUpsert[]) => void;
-	upsertIssues: (issues: LinearIssueUpsert[]) => void;
-	upsertResources: (resources: LinearResourceUpsert[]) => void;
+	upsertComments: (
+		accountId: string,
+		issueId: string,
+		comments: LinearCommentUpsert[],
+	) => void;
+	upsertIssues: (accountId: string, issues: LinearIssueUpsert[]) => void;
+	upsertResources: (
+		accountId: string,
+		resources: LinearResourceUpsert[],
+	) => void;
 }
 
 /** Options for {@link createLinearStore}. */
@@ -102,6 +135,9 @@ const DEFAULT_LIST_LIMIT = 100;
 /**
  * Builds the SQLite cache DAO used by the Linear service. Every write is an
  * idempotent upsert keyed by the remote Linear id, so repeated syncs converge.
+ * Rows carry the account they came from: Linear ids are globally unique, but
+ * `identifier` (`ENG-1`) is not, and disconnecting an account must take exactly
+ * its own rows with it.
  * @param options - Open database handle and optional clock.
  * @returns A fresh {@link LinearStore}.
  */
@@ -133,24 +169,29 @@ export function createLinearStore({
 			return row ? mapIssueRow(row) : null;
 		},
 
-		getIssueByIdentifier: (identifier) => {
+		getIssueByIdentifier: (accountId, identifier) => {
 			const row = database
-				.prepare('SELECT * FROM linear_issues WHERE identifier = ?')
-				.get(identifier) as IssueRow | undefined;
+				.prepare(
+					'SELECT * FROM linear_issues WHERE account_id = ? AND identifier = ?',
+				)
+				.get(accountId, identifier) as IssueRow | undefined;
 
 			return row ? mapIssueRow(row) : null;
 		},
 
-		getSyncState: (scope) => {
+		getSyncState: (accountId, scope) => {
 			const row = database
-				.prepare('SELECT * FROM linear_sync_state WHERE scope = ?')
-				.get(scope) as SyncStateRow | undefined;
+				.prepare(
+					'SELECT * FROM linear_sync_state WHERE account_id = ? AND scope = ?',
+				)
+				.get(accountId, scope) as SyncStateRow | undefined;
 
 			if (!row) {
 				return null;
 			}
 
 			return {
+				accountId: row.account_id,
 				cursor: row.cursor,
 				errorCode: row.error_code,
 				scope: row.scope,
@@ -176,6 +217,11 @@ export function createLinearStore({
 
 			if (!filter.includeArchived) {
 				clauses.push('archived_at IS NULL');
+			}
+
+			if (filter.accountId) {
+				clauses.push('account_id = ?');
+				parameters.push(filter.accountId);
 			}
 
 			if (filter.teamId) {
@@ -206,20 +252,26 @@ export function createLinearStore({
 			return rows.map(mapIssueRow);
 		},
 
-		listResources: (kind, teamId) => {
-			const rows = teamId
-				? (database
-						.prepare(
-							`SELECT * FROM linear_resources
-							 WHERE kind = ? AND (team_id = ? OR team_id IS NULL)
-							 ORDER BY name ASC`,
-						)
-						.all(kind, teamId) as unknown as ResourceRow[])
-				: (database
-						.prepare(
-							'SELECT * FROM linear_resources WHERE kind = ? ORDER BY name ASC',
-						)
-						.all(kind) as unknown as ResourceRow[]);
+		listResources: (kind, filter = {}) => {
+			const clauses = ['kind = ?'];
+			const parameters: string[] = [kind];
+
+			if (filter.accountId) {
+				clauses.push('account_id = ?');
+				parameters.push(filter.accountId);
+			}
+
+			if (filter.teamId) {
+				clauses.push('(team_id = ? OR team_id IS NULL)');
+				parameters.push(filter.teamId);
+			}
+
+			const rows = database
+				.prepare(
+					`SELECT * FROM linear_resources WHERE ${clauses.join(' AND ')}
+					 ORDER BY name ASC`,
+				)
+				.all(...parameters) as unknown as ResourceRow[];
 
 			return rows.map(mapResourceRow);
 		},
@@ -227,15 +279,16 @@ export function createLinearStore({
 		setSyncState: (state) => {
 			database
 				.prepare(
-					`INSERT INTO linear_sync_state (scope, cursor, status, error_code, synced_at)
-					 VALUES (?, ?, ?, ?, ?)
-					 ON CONFLICT(scope) DO UPDATE SET
+					`INSERT INTO linear_sync_state (account_id, scope, cursor, status, error_code, synced_at)
+					 VALUES (?, ?, ?, ?, ?, ?)
+					 ON CONFLICT(account_id, scope) DO UPDATE SET
 						cursor = excluded.cursor,
 						status = excluded.status,
 						error_code = excluded.error_code,
 						synced_at = excluded.synced_at`,
 				)
 				.run(
+					state.accountId,
 					state.scope,
 					state.cursor,
 					state.status,
@@ -244,12 +297,13 @@ export function createLinearStore({
 				);
 		},
 
-		upsertComments: (issueId, comments) => {
+		upsertComments: (accountId, issueId, comments) => {
 			const statement = database.prepare(
 				`INSERT INTO linear_comments
-					(id, issue_id, author_name, body, remote_created_at, data_json, synced_at)
-				 VALUES (?, ?, ?, ?, ?, ?, ?)
+					(id, account_id, issue_id, author_name, body, remote_created_at, data_json, synced_at)
+				 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 				 ON CONFLICT(id) DO UPDATE SET
+					account_id = excluded.account_id,
 					issue_id = excluded.issue_id,
 					author_name = excluded.author_name,
 					body = excluded.body,
@@ -262,6 +316,7 @@ export function createLinearStore({
 			for (const comment of comments) {
 				statement.run(
 					comment.id,
+					accountId,
 					issueId,
 					comment.authorName,
 					comment.body,
@@ -272,14 +327,15 @@ export function createLinearStore({
 			}
 		},
 
-		upsertIssues: (issues) => {
+		upsertIssues: (accountId, issues) => {
 			const statement = database.prepare(
 				`INSERT INTO linear_issues
-					(id, identifier, title, description, team_id, project_id, state_id,
+					(id, account_id, identifier, title, description, team_id, project_id, state_id,
 					 assignee_id, priority, due_date, url, archived_at, remote_updated_at,
 					 data_json, synced_at)
-				 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+				 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 				 ON CONFLICT(id) DO UPDATE SET
+					account_id = excluded.account_id,
 					identifier = excluded.identifier,
 					title = excluded.title,
 					description = excluded.description,
@@ -300,6 +356,7 @@ export function createLinearStore({
 			for (const issue of issues) {
 				statement.run(
 					issue.id,
+					accountId,
 					issue.identifier,
 					issue.title,
 					issue.description,
@@ -318,11 +375,12 @@ export function createLinearStore({
 			}
 		},
 
-		upsertResources: (resources) => {
+		upsertResources: (accountId, resources) => {
 			const statement = database.prepare(
-				`INSERT INTO linear_resources (id, kind, team_id, name, data_json, synced_at)
-				 VALUES (?, ?, ?, ?, ?, ?)
+				`INSERT INTO linear_resources (id, account_id, kind, team_id, name, data_json, synced_at)
+				 VALUES (?, ?, ?, ?, ?, ?, ?)
 				 ON CONFLICT(id) DO UPDATE SET
+					account_id = excluded.account_id,
 					kind = excluded.kind,
 					team_id = excluded.team_id,
 					name = excluded.name,
@@ -334,6 +392,7 @@ export function createLinearStore({
 			for (const resource of resources) {
 				statement.run(
 					resource.id,
+					accountId,
 					resource.kind,
 					resource.teamId,
 					resource.name,
@@ -347,6 +406,7 @@ export function createLinearStore({
 
 /** Raw `linear_issues` table row (snake_case columns). */
 interface IssueRow {
+	account_id: string;
 	archived_at: string | null;
 	assignee_id: string | null;
 	data_json: string;
@@ -366,6 +426,7 @@ interface IssueRow {
 
 /** Raw `linear_resources` table row (snake_case columns). */
 interface ResourceRow {
+	account_id: string;
 	data_json: string;
 	id: string;
 	kind: LinearResourceKind;
@@ -376,6 +437,7 @@ interface ResourceRow {
 
 /** Raw `linear_comments` table row (snake_case columns). */
 interface CommentRow {
+	account_id: string;
 	author_name: string | null;
 	body: string;
 	data_json: string;
@@ -387,6 +449,7 @@ interface CommentRow {
 
 /** Raw `linear_sync_state` table row (snake_case columns). */
 interface SyncStateRow {
+	account_id: string;
 	cursor: string | null;
 	error_code: string | null;
 	scope: string;
@@ -401,6 +464,7 @@ interface SyncStateRow {
  */
 function mapIssueRow(row: IssueRow): LinearIssueRecord {
 	return {
+		accountId: row.account_id,
 		archivedAt: row.archived_at,
 		assigneeId: row.assignee_id,
 		data: parseJsonRecord(row.data_json),
@@ -426,6 +490,7 @@ function mapIssueRow(row: IssueRow): LinearIssueRecord {
  */
 function mapResourceRow(row: ResourceRow): LinearResourceRecord {
 	return {
+		accountId: row.account_id,
 		data: parseJsonRecord(row.data_json),
 		id: row.id,
 		kind: row.kind,
@@ -442,6 +507,7 @@ function mapResourceRow(row: ResourceRow): LinearResourceRecord {
  */
 function mapCommentRow(row: CommentRow): LinearCommentRecord {
 	return {
+		accountId: row.account_id,
 		authorName: row.author_name,
 		body: row.body,
 		data: parseJsonRecord(row.data_json),

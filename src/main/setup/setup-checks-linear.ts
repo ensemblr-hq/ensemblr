@@ -1,4 +1,4 @@
-import type { LinearConnectionSnapshot } from '../../shared/ipc/contracts/linear';
+import type { LinearConnectionSummary } from '../../shared/ipc/contracts/linear';
 import type {
 	SetupCheckStatus,
 	SetupRemediationAction,
@@ -48,12 +48,12 @@ export function getLinearConnectionCheck(deps: LinearCheckDeps) {
 			status: 'warning',
 		}),
 		run: async () => {
-			const snapshot = await deps.linearAuthService.getConnectionStatus();
+			const summary = await deps.linearAuthService.getConnectionSummary();
 
 			return {
-				...describeConnection(snapshot),
+				...describeConnection(summary),
 				remediationActions: LINEAR_REMEDIATION_ACTIONS,
-				status: statusForConnection(snapshot),
+				status: statusForConnection(summary),
 			};
 		},
 		title: 'Linear connection',
@@ -63,43 +63,29 @@ export function getLinearConnectionCheck(deps: LinearCheckDeps) {
 }
 
 /**
- * Map a Linear connection snapshot to a setup-check status.
- * @param snapshot - Current Linear connection state
- * @returns `'success'` when connected, otherwise `'warning'`
+ * Map a Linear connection summary to a setup-check status.
+ * @param summary - Current Linear connection summary
+ * @returns `'success'` when at least one account is connected, otherwise `'warning'`
  */
 function statusForConnection(
-	snapshot: LinearConnectionSnapshot,
+	summary: LinearConnectionSummary,
 ): SetupCheckStatus {
-	return snapshot.state === 'connected' ? 'success' : 'warning';
+	return summary.state === 'connected' ? 'success' : 'warning';
 }
 
 /**
- * Build the user-facing detail describing the Linear connection state.
- * @param snapshot - Current Linear connection state
+ * Build the user-facing detail describing the Linear connection state. Several
+ * accounts may be connected, so the multi-account case names the organizations
+ * rather than picking one to report.
+ * @param summary - Current Linear connection summary
  * @returns The detail fields for the check result
  */
-function describeConnection(snapshot: LinearConnectionSnapshot) {
-	switch (snapshot.state) {
-		case 'connected': {
-			const identity = snapshot.userName ?? snapshot.userEmail;
-			const organization = snapshot.organizationName;
-
-			if (identity && organization) {
-				return authoredDetail(
-					'linear-connected-with-organization',
-					`Linear is connected as ${identity} (${organization}).`,
-					{ identity, organization },
-				);
-			}
-
-			return identity
-				? authoredDetail(
-						'linear-connected-as',
-						`Linear is connected as ${identity}.`,
-						{ identity },
-					)
-				: authoredDetail('linear-connected', 'Linear is connected.');
-		}
+function describeConnection(summary: LinearConnectionSummary) {
+	switch (summary.state) {
+		case 'connected':
+			return describeConnectedAccounts(
+				summary.accounts.filter((account) => account.state === 'connected'),
+			);
 		case 'not-configured':
 			return authoredDetail(
 				'linear-not-configured',
@@ -108,12 +94,73 @@ function describeConnection(snapshot: LinearConnectionSnapshot) {
 		case 'reconnect-required':
 			return authoredDetail(
 				'linear-reconnect-required',
-				'The stored Linear token expired and cannot be refreshed. Reconnect Linear from integration settings.',
+				'Every connected Linear account has an expired token that cannot be refreshed. Reconnect from integration settings.',
 			);
 		default:
 			return authoredDetail(
 				'linear-not-connected',
-				'Linear is not connected. Sign in from integration settings to enable Linear workflows.',
+				'No Linear account is connected. Sign in from integration settings to enable Linear workflows.',
 			);
 	}
+}
+
+/**
+ * Describe the accounts that are working. Several are named as a count plus
+ * their organizations; one is named the way it always was, so the common case
+ * reads no differently than before multi-account.
+ * @param accounts - Accounts whose own state is `connected`
+ * @returns The detail fields for the check result
+ */
+function describeConnectedAccounts(
+	accounts: LinearConnectionSummary['accounts'],
+) {
+	if (accounts.length > 1) {
+		const organizations = organizationList(accounts);
+
+		return authoredDetail(
+			'linear-connected-accounts',
+			`Linear is connected to ${accounts.length} accounts (${organizations}).`,
+			{ count: String(accounts.length), organizations },
+		);
+	}
+
+	const account = accounts[0];
+	const identity = account?.userName ?? account?.userEmail;
+	const organization = account?.organizationName;
+
+	if (identity && organization) {
+		return authoredDetail(
+			'linear-connected-with-organization',
+			`Linear is connected as ${identity} (${organization}).`,
+			{ identity, organization },
+		);
+	}
+
+	return identity
+		? authoredDetail(
+				'linear-connected-as',
+				`Linear is connected as ${identity}.`,
+				{ identity },
+			)
+		: authoredDetail('linear-connected', 'Linear is connected.');
+}
+
+/**
+ * Render an account list as a readable organization enumeration. An account
+ * Linear named neither an organization nor an identity for is left out rather
+ * than listed by id: the id is a UUID that tells the reader nothing, and the
+ * count beside the list already accounts for it.
+ * @param accounts - Connected accounts to name
+ * @returns The comma-separated organization names
+ */
+function organizationList(
+	accounts: LinearConnectionSummary['accounts'],
+): string {
+	return accounts
+		.map(
+			(account) =>
+				account.organizationName ?? account.userName ?? account.userEmail,
+		)
+		.filter((name): name is string => name !== null && name !== undefined)
+		.join(', ');
 }

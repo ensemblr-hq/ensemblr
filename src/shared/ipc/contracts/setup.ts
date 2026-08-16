@@ -82,6 +82,7 @@ export type SetupDetailCode =
 	| 'git-timeout'
 	| 'git-unknown-error'
 	| 'linear-connected'
+	| 'linear-connected-accounts'
 	| 'linear-connected-as'
 	| 'linear-connected-with-organization'
 	| 'linear-not-configured'

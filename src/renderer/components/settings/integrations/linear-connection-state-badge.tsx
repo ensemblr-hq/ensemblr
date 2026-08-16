@@ -1,21 +1,21 @@
 import { useTranslation } from 'react-i18next';
 
 import { Badge } from '@/renderer/components/ui/badge';
-import type { LinearConnectionSnapshot } from '@/shared/ipc/contracts/linear';
+import type { LinearConnectionState } from '@/shared/ipc/contracts/linear';
 
-/** Badge showing the Linear connection state, or nothing while the snapshot is loading. */
+/** Badge showing a Linear connection state, or nothing while it is still loading. */
 export function LinearConnectionStateBadge({
-	snapshot,
+	state,
 }: {
-	snapshot: LinearConnectionSnapshot | undefined;
+	state: LinearConnectionState | undefined;
 }) {
 	const { t } = useTranslation();
 
-	if (!snapshot) {
+	if (!state) {
 		return null;
 	}
 
-	switch (snapshot.state) {
+	switch (state) {
 		case 'connected':
 			return (
 				<Badge variant='secondary'>

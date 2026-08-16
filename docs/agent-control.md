@@ -349,15 +349,17 @@ a `..` segment comes back as `invalid-args` rather than reaching git.
 
 | Tool | Arguments | Gate | Withheld from |
 | --- | --- | --- | --- |
-| `ensemblr_linear_list_issues` | `query?: string`, `teamId?: string`, `refresh?: boolean` | read | — |
-| `ensemblr_linear_get_issue` | **`issueId: string`**, `refresh?: boolean` | read | — |
-| `ensemblr_linear_get_metadata` | `refresh?: boolean` | read | — |
-| `ensemblr_linear_create_comment` | **`issueId: string`**, **`commentBody: string`** (≤ 8,000) | write | sub-agent |
-| `ensemblr_linear_update_issue` | **`issueId: string`**, `stateId?: string`, `assigneeId?: string`, `priority?: number` (0–4), `title?: string` (≤ 255), `description?: string` (≤ 32,000) | write | sub-agent |
+| `ensemblr_linear_list_issues` | `accountId?: string`, `query?: string`, `teamId?: string`, `refresh?: boolean` | read | — |
+| `ensemblr_linear_get_issue` | `accountId?: string`, **`issueId: string`**, `refresh?: boolean` | read | — |
+| `ensemblr_linear_get_metadata` | `accountId?: string`, `refresh?: boolean` | read | — |
+| `ensemblr_linear_create_comment` | `accountId?: string`, **`issueId: string`**, **`commentBody: string`** (≤ 8,000) | write | sub-agent |
+| `ensemblr_linear_update_issue` | `accountId?: string`, **`issueId: string`**, `stateId?: string`, `assigneeId?: string`, `priority?: number` (0–4), `title?: string` (≤ 255), `description?: string` (≤ 32,000) | write | sub-agent |
 
 `linearUpdateIssue` needs at least one field beyond `issueId`, and a `stateId`
 whose workflow type is `completed` or `canceled` is refused. `linearUpdateIssue`
-is also refused in Plan Mode. See [Talking to Linear](#talking-to-linear).
+is also refused in Plan Mode. Several Linear accounts can be connected at once,
+so `accountId` is optional on every one of these and resolved from what the call
+already names. See [Talking to Linear](#talking-to-linear).
 
 ### Asking the user, and Plan Mode
 
@@ -575,13 +577,18 @@ expose a deliberate subset of it to agents, over
 `LinearService` the renderer's tracker views already use. No Linear GraphQL or
 cache logic lives in the control layer.
 
-**Nothing here is workspace-scoped.** Linear is an app-level integration bound to
-one account, so `LinearPort` takes no workspace argument and the op handlers drop
-`origin` entirely — there is no workspace a caller could point at that is not its
-own, and equally no filter narrowing a read to the work in front of it. One
-account can span several teams, which is why every tool description and playbook
-bullet says so outright and points at `teamId`: an agent told the list is "this
-workspace's" stops narrowing and reads a stranger's ticket as its own.
+**No read is narrowed to your workspace.** Linear is an app-level integration:
+one account spans several teams, several accounts can be connected at once, and
+nothing filters a list down to the work in front of you. Every tool description
+and playbook bullet says so outright and points at `teamId`, because an agent
+told the list is "this workspace's" stops narrowing and reads a stranger's ticket
+as its own.
+
+`LinearPort` does take the calling `workspaceId`, and the op handlers pass
+`origin` through — but only to recover the account a workspace created from an
+issue already belongs to, so an agent working that ticket does not have to name
+the organization it came from. That is a *fallback*, applied after the entity
+named has been resolved, never a scope: see the resolution order below.
 
 **Assume it is not connected.** Most workspaces have no Linear account linked at
 all, and an unlinked integration is not an empty backlog. Every op answers with a
@@ -632,6 +639,19 @@ Ids, not names: `stateId`, `assigneeId`, and `teamId` are Linear uuids, which is
 what makes `ensemblr_linear_get_metadata` the first call of any update sequence.
 `issueId` is the exception and takes either the uuid or the human identifier
 (`ENG-123`) — an identifier misses the local cache and always reaches Linear.
+
+**Several accounts can be connected at once, and ids never cross between them.**
+`accountId` is optional everywhere: a read resolves it from the entity named (a
+cached issue, a team's owning account), then from the workspace's own linked
+issue, then from the only account there is. The order matters and is enforced,
+not just documented — the workspace's account is passed to the service as
+`fallbackAccountId` and applied strictly *after* the entity lookup, so a
+workspace's organization can never quietly win over the issue an agent actually
+named. `listIssues` is the deliberate exception and merges every account by
+default, because seeing both organizations at once is what a search is for. When
+resolution is genuinely ambiguous — an identifier such as `ENG-1` existing in two
+organizations — the op refuses and lists the accounts on the result rather than
+guessing one.
 
 ## Orchestration in practice
 

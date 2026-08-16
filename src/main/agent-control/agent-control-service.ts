@@ -1456,16 +1456,41 @@ export function createAgentControlService({
 		getWorkspaceStatus: ({ origin }) => handleGetWorkspaceStatus(origin),
 		launchHarness: ({ args, origin }) =>
 			handleLaunchHarness(origin, args as LaunchHarnessArgs),
-		linearCreateComment: ({ args }) =>
-			ports.linear.createComment(args as LinearCreateCommentArgs).then(ok),
-		linearGetIssue: ({ args }) =>
-			ports.linear.getIssue(args as LinearGetIssueArgs).then(ok),
-		linearGetMetadata: ({ args }) =>
-			ports.linear.getMetadata(args as LinearGetMetadataArgs).then(ok),
-		linearListIssues: ({ args }) =>
-			ports.linear.listIssues(args as LinearListIssuesArgs).then(ok),
-		linearUpdateIssue: ({ args }) =>
-			ports.linear.updateIssue(args as LinearUpdateIssueArgs).then(ok),
+		linearCreateComment: ({ args, origin }) =>
+			ports.linear
+				.createComment({
+					...(args as LinearCreateCommentArgs),
+					workspaceId: origin.workspaceId,
+				})
+				.then(ok),
+		linearGetIssue: ({ args, origin }) =>
+			ports.linear
+				.getIssue({
+					...(args as LinearGetIssueArgs),
+					workspaceId: origin.workspaceId,
+				})
+				.then(ok),
+		linearGetMetadata: ({ args, origin }) =>
+			ports.linear
+				.getMetadata({
+					...(args as LinearGetMetadataArgs),
+					workspaceId: origin.workspaceId,
+				})
+				.then(ok),
+		linearListIssues: ({ args, origin }) =>
+			ports.linear
+				.listIssues({
+					...(args as LinearListIssuesArgs),
+					workspaceId: origin.workspaceId,
+				})
+				.then(ok),
+		linearUpdateIssue: ({ args, origin }) =>
+			ports.linear
+				.updateIssue({
+					...(args as LinearUpdateIssueArgs),
+					workspaceId: origin.workspaceId,
+				})
+				.then(ok),
 		listModels: ({ origin }) =>
 			ports.conversations
 				.listModels({ runtime: originRuntime(origin) })

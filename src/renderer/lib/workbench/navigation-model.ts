@@ -547,6 +547,9 @@ function readLinkedIssueMetadata(
 	}
 
 	return {
+		...(typeof record.accountId === 'string'
+			? { accountId: record.accountId }
+			: {}),
 		...(typeof record.description === 'string'
 			? { description: record.description }
 			: {}),

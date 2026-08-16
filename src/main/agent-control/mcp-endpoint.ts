@@ -264,8 +264,9 @@ export const TOOL_DEFS: readonly McpToolDef[] = [
 		name: 'ensemblr_linear_list_issues',
 		op: 'linearListIssues',
 		description:
-			"Search the connected Linear account's issues. This is NOT scoped to your workspace — Linear is an app-level integration and one account can span several teams, so narrow with query (free text over identifier, title, and description) or teamId rather than reading the whole list as the work in front of you. Reads a local cache and syncs from Linear when it has gone stale, so it is cheap to call; pass refresh=true only when you need the very latest. Descriptions are NOT returned — read one issue with ensemblr_linear_get_issue. Check `status` before acting on the result: `not-connected` means the user has not linked Linear at all, which is a different answer from an empty list.",
+			"Search the connected Linear accounts' issues. This is NOT scoped to your workspace — Linear is an app-level integration, SEVERAL accounts can be connected at once, and one account can span several teams, so narrow with query (free text over identifier, title, and description), teamId, or accountId rather than reading the whole list as the work in front of you. Every row names the accountId and organization it came from; pass that accountId back on any write, because an id from one organization is never valid in another. Reads a local cache and syncs from Linear when it has gone stale, so it is cheap to call; pass refresh=true only when you need the very latest. Descriptions are NOT returned — read one issue with ensemblr_linear_get_issue. Check `status` before acting on the result: `not-connected` means the user has not linked Linear at all, which is a different answer from an empty list.",
 		shape: {
+			accountId: z.string().optional(),
 			query: z.string().optional(),
 			teamId: z.string().optional(),
 			refresh: z.boolean().optional(),
@@ -275,15 +276,22 @@ export const TOOL_DEFS: readonly McpToolDef[] = [
 		name: 'ensemblr_linear_get_issue',
 		op: 'linearGetIssue',
 		description:
-			'Read one Linear issue with its description, labels, and comment thread. issueId takes either the uuid or the human identifier (ENG-106); an identifier always goes to Linear rather than the local cache. The description is truncated and only the most recent comments are returned — the result says how many were dropped. Check `status`: `not-found` means the id is wrong, `not-connected` means Linear is not linked.',
-		shape: { issueId: z.string(), refresh: z.boolean().optional() },
+			'Read one Linear issue with its description, labels, and comment thread. issueId takes either the uuid or the human identifier (ENG-106); an identifier always goes to Linear rather than the local cache. accountId is optional — the issue is looked up in the account your workspace was created from, then in the only one connected — but an identifier such as ENG-106 can exist in two organizations at once, and that is refused rather than guessed, with the accounts listed so you can name one. The description is truncated and only the most recent comments are returned — the result says how many were dropped. Check `status`: `not-found` means the id is wrong, `not-connected` means Linear is not linked.',
+		shape: {
+			accountId: z.string().optional(),
+			issueId: z.string(),
+			refresh: z.boolean().optional(),
+		},
 	},
 	{
 		name: 'ensemblr_linear_get_metadata',
 		op: 'linearGetMetadata',
 		description:
-			'List the Linear teams, projects, workflow states, labels, and users the connected account can see, each with the id ensemblr_linear_update_issue takes. The account is not scoped to your workspace, so expect teams that have nothing to do with the work here. Call this FIRST whenever you are about to set a state, an assignee, or a project — those arguments are ids, not names, and this is the only place to turn one into the other. Cycles are not returned; nothing on this surface sets one.',
-		shape: { refresh: z.boolean().optional() },
+			'List the Linear teams, projects, workflow states, labels, and users a connected account can see, each with the id ensemblr_linear_update_issue takes and the accountId it belongs to. Defaults to the account your workspace was created from; pass accountId to read another, or when the workspace has no linked issue and several accounts are connected. An id from one account is never valid in another. The account is not scoped to your workspace, so expect teams that have nothing to do with the work here. Call this FIRST whenever you are about to set a state, an assignee, or a project — those arguments are ids, not names, and this is the only place to turn one into the other. Cycles are not returned; nothing on this surface sets one.',
+		shape: {
+			accountId: z.string().optional(),
+			refresh: z.boolean().optional(),
+		},
 	},
 	{
 		name: 'ensemblr_linear_create_comment',
@@ -291,6 +299,7 @@ export const TOOL_DEFS: readonly McpToolDef[] = [
 		description:
 			'Post a comment on a Linear issue. The whole team reads it and nothing here can edit or delete it afterwards, so write it as you would a comment of your own: what you did, what you found, what is still open. Use it to record progress on a ticket rather than to talk to the user, who reads your reply instead.',
 		shape: {
+			accountId: z.string().optional(),
 			issueId: z.string(),
 			commentBody: z.string().max(LINEAR_AGENT_LIMITS.maxCommentLength),
 		},
@@ -301,6 +310,7 @@ export const TOOL_DEFS: readonly McpToolDef[] = [
 		description:
 			'Change a Linear issue: its workflow state, assignee, priority (0 none, 1 urgent, 2 high, 3 medium, 4 low), title, or description. Pass at least one of those alongside issueId. stateId and assigneeId are ids from ensemblr_linear_get_metadata, never names. A state whose type is `completed` or `canceled` is REFUSED whatever you pass — agent work never closes a ticket here, and marking one canceled is the same call under a different label. Take it to In Review and say in your reply that it is ready; the user decides whether it is done.',
 		shape: {
+			accountId: z.string().optional(),
 			issueId: z.string(),
 			stateId: z.string().optional(),
 			assigneeId: z.string().optional(),

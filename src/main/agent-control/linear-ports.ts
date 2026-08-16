@@ -19,6 +19,7 @@ import type {
 	AgentLinearIssue,
 	AgentLinearIssueDetail,
 	AgentLinearResource,
+	LinearAccountRef,
 	LinearAgentStatus,
 	LinearCreateCommentResult,
 	LinearGetIssueResult,
@@ -33,6 +34,7 @@ import {
 } from '../../shared/agent-control.ts';
 import type {
 	GetLinearMetadataResult,
+	LinearAccountFailure,
 	LinearCommentWire,
 	LinearIssueWire,
 	LinearMetadataWire,
@@ -40,10 +42,23 @@ import type {
 	LinearServiceFailure,
 } from '../../shared/ipc/contracts/linear.ts';
 import type { LinearService } from '../linear';
+import type { EnsemblrDatabaseService } from '../storage';
+import {
+	parseMetadata,
+	selectWorkspaceMetadataJson,
+} from '../storage/repositories';
 import type { LinearPort } from './ports.ts';
 
 /** Collaborators the Linear port delegates to. */
 export interface LinearPortDeps {
+	/** Reads the calling workspace's linked issue, for the default account. */
+	databaseService: EnsemblrDatabaseService;
+	/**
+	 * Names the connected accounts so a failed op can hand the agent the choice
+	 * it could not make for itself. Returns an empty list when Linear is not
+	 * composed into this build.
+	 */
+	listLinearAccounts: () => Promise<readonly LinearAccountRef[]>;
 	/**
 	 * The app's Linear service, or null when the app was composed without one.
 	 * Nullable so a build that omits the integration answers `not-connected`
@@ -177,9 +192,11 @@ function truncationNote(
 /** Flattens a wire issue into the fields an agent acts on. */
 function toAgentIssue(issue: LinearIssueWire): AgentLinearIssue {
 	return {
+		accountId: issue.accountId,
 		assignee: issue.assigneeName,
 		id: issue.id,
 		identifier: issue.identifier,
+		organization: issue.organizationName,
 		priority: issue.priority,
 		project: issue.projectName,
 		state: issue.stateName,
@@ -264,6 +281,7 @@ function fitComments(
 /** Flattens a wire metadata row into the id, name, and two qualifiers an agent uses. */
 function toAgentResource(resource: LinearResourceWire): AgentLinearResource {
 	return {
+		accountId: resource.accountId,
 		id: resource.id,
 		key: resource.key,
 		name: resource.name,
@@ -356,13 +374,17 @@ function unclassifiableCause(
  * an id that matched nothing, and takes the same refusal.
  * @param service - The Linear service the states are read from.
  * @param stateId - The workflow state the update would move the issue into.
+ * @param accountId - Account the agent named, narrowing the state lookup; when absent the lookup spans every account, because a state id is a UUID that identifies its account on its own.
  * @returns The model-facing refusal, or null when the state is not terminal.
  */
 async function terminalStateRefusal(
 	service: LinearService,
 	stateId: string,
+	accountId: string | undefined,
 ): Promise<string | null> {
-	const metadata = await service.getMetadata();
+	const metadata = await service.getMetadata(
+		accountId ? { accountId } : undefined,
+	);
 	const state = metadata.metadata.states.find((row) => row.id === stateId);
 	if (!state || state.type === null) {
 		return `Refused: this app will not move an issue into a state it cannot classify, and ${unclassifiableCause(metadata, state)}. Call ensemblr_linear_get_metadata and pass a state id from the list it returns.`;
@@ -374,6 +396,110 @@ async function terminalStateRefusal(
 }
 
 /**
+ * Reads the Linear account a workspace was created against, so an agent working
+ * a ticket does not have to name the organization it already came from.
+ * @param deps - Port collaborators holding the database service.
+ * @param workspaceId - Workspace the control op originated in.
+ * @returns The linked issue's account id, or null when there is none.
+ */
+function workspaceAccountId(
+	deps: LinearPortDeps,
+	workspaceId: string,
+): string | null {
+	const database = deps.databaseService.getConnection()?.database;
+
+	if (!database) {
+		return null;
+	}
+
+	const metadataJson = selectWorkspaceMetadataJson({
+		database,
+		id: workspaceId,
+	});
+
+	if (!metadataJson) {
+		return null;
+	}
+
+	const { linkedIssue } = parseMetadata(metadataJson) as {
+		linkedIssue?: { accountId?: unknown; provider?: unknown };
+	};
+
+	return linkedIssue?.provider === 'linear' &&
+		typeof linkedIssue.accountId === 'string'
+		? linkedIssue.accountId
+		: null;
+}
+
+/**
+ * Names the accounts a merged read could not finish, so a short list does not
+ * read as a complete one.
+ * @param failures - Per-account failures the service reported.
+ * @returns The sentence to append, or an empty string when every account answered.
+ */
+function accountFailureNote(failures: readonly LinearAccountFailure[]): string {
+	return failures.length === 0
+		? ''
+		: ` ${failures.length} account(s) could not be read (${failures
+				.map(
+					(entry) =>
+						`${entry.organizationName ?? entry.accountId}: ${entry.failure.message}`,
+				)
+				.join('; ')}), so anything they hold is missing here.`;
+}
+
+/**
+ * Attaches the account list to a failed outcome when more than one is connected.
+ * A failure an agent can fix by naming an account is only actionable if it can
+ * see which accounts exist.
+ * @param accounts - Every connected account.
+ * @returns The `accounts` field to spread onto the outcome, empty when moot.
+ */
+function accountChoice(accounts: readonly LinearAccountRef[]): {
+	accounts?: readonly LinearAccountRef[];
+} {
+	return accounts.length > 1 ? { accounts } : {};
+}
+
+/**
+ * Names the accounts a search actually covered. Saying "every connected account"
+ * after narrowing to one invites the agent to conclude the others hold nothing.
+ * @param accountId - Account the search was narrowed to, if any.
+ * @returns The clause describing the scope that was searched.
+ */
+function searchScope(accountId: string | undefined): string {
+	return accountId
+		? `in Linear account "${accountId}"`
+		: 'across every connected Linear account';
+}
+
+/**
+ * Spreads a fallback account onto a service request, omitting the key entirely
+ * when there is none so an `exactOptionalPropertyTypes` request never carries an
+ * explicit undefined.
+ * @param fallbackAccountId - Account to fall back to, if the workspace has one.
+ * @returns The `fallbackAccountId` field to spread, empty when there is none.
+ */
+function withFallback(fallbackAccountId: string | undefined): {
+	fallbackAccountId?: string;
+} {
+	return fallbackAccountId ? { fallbackAccountId } : {};
+}
+
+/**
+ * Lists the connected accounts for a failure path, where the list is context for
+ * a message rather than the answer. A read that is already failing must not fail
+ * differently because the account lookup threw too.
+ * @param deps - Port collaborators holding the account lookup.
+ * @returns The connected accounts, or an empty list when they cannot be read.
+ */
+async function accountsForFailure(
+	deps: LinearPortDeps,
+): Promise<readonly LinearAccountRef[]> {
+	return deps.listLinearAccounts().catch(() => []);
+}
+
+/**
  * Builds the Linear port over the app's Linear data service.
  * @param deps - Port collaborators.
  * @returns The Linear port.
@@ -381,8 +507,24 @@ async function terminalStateRefusal(
 export function makeLinearPort(deps: LinearPortDeps): LinearPort {
 	const { linearService } = deps;
 
+	/**
+	 * The calling workspace's account, offered to the service as a *fallback*
+	 * rather than a scope. ADR 0052 resolves the entity before the workspace, so
+	 * passing this as `accountId` would let a workspace's organization silently
+	 * win over the issue the agent actually named — and would skip the refusal an
+	 * identifier matching two accounts is supposed to raise.
+	 * @param workspaceId - Workspace the op originated in.
+	 * @returns The workspace's account id, or undefined when it has none.
+	 */
+	function fallbackAccount(workspaceId: string): string | undefined {
+		return workspaceAccountId(deps, workspaceId) ?? undefined;
+	}
+
 	return {
-		listIssues: async ({ query, refresh, teamId }) => {
+		// Deliberately not defaulted to the workspace's account: a search is the one
+		// op where seeing every organization at once is the point, and an agent
+		// that wants one narrows with `accountId`.
+		listIssues: async ({ accountId, query, refresh, teamId }) => {
 			if (!linearService) {
 				return {
 					...unavailable(),
@@ -392,7 +534,12 @@ export function makeLinearPort(deps: LinearPortDeps): LinearPort {
 					truncated: false,
 				} satisfies LinearListIssuesResult;
 			}
-			const result = await linearService.listIssues({ query, refresh, teamId });
+			const result = await linearService.listIssues({
+				...(accountId ? { accountId } : {}),
+				query,
+				refresh,
+				teamId,
+			});
 			const fitted = fitRows(
 				result.issues.map(toAgentIssue),
 				MAX_AGENT_PAYLOAD_CHARS,
@@ -400,11 +547,12 @@ export function makeLinearPort(deps: LinearPortDeps): LinearPort {
 			const cut = truncationNote(
 				fitted.omitted,
 				'issue',
-				'narrow the search with `query` or `teamId`.',
+				'narrow the search with `query`, `teamId`, or `accountId`.',
 			);
 			if (result.status === 'error') {
 				const outcome = failed(result.failure);
 				return {
+					...accountChoice(await accountsForFailure(deps)),
 					issues: fitted.kept,
 					message: `${outcome.message} The ${fitted.kept.length} issue(s) here are what the local cache already held.${cut}`,
 					omittedIssues: fitted.omitted,
@@ -413,9 +561,10 @@ export function makeLinearPort(deps: LinearPortDeps): LinearPort {
 					truncated: fitted.omitted > 0,
 				} satisfies LinearListIssuesResult;
 			}
+			const partial = accountFailureNote(result.accountFailures);
 			return {
 				issues: fitted.kept,
-				message: `${fitted.kept.length} issue(s), read from the ${result.source}. Descriptions are omitted here — read one with ensemblr_linear_get_issue.${cut}`,
+				message: `${fitted.kept.length} issue(s) ${searchScope(accountId)}, read from the ${result.source}. Descriptions are omitted here — read one with ensemblr_linear_get_issue.${cut}${partial}`,
 				omittedIssues: fitted.omitted,
 				source: result.source,
 				status: 'ok',
@@ -423,7 +572,7 @@ export function makeLinearPort(deps: LinearPortDeps): LinearPort {
 			} satisfies LinearListIssuesResult;
 		},
 
-		getIssue: async ({ issueId, refresh }) => {
+		getIssue: async ({ accountId, issueId, refresh, workspaceId }) => {
 			if (!linearService) {
 				return {
 					...unavailable(),
@@ -434,10 +583,16 @@ export function makeLinearPort(deps: LinearPortDeps): LinearPort {
 					truncated: false,
 				} satisfies LinearGetIssueResult;
 			}
-			const result = await linearService.getIssue({ id: issueId, refresh });
+			const result = await linearService.getIssue({
+				...(accountId ? { accountId } : {}),
+				...withFallback(fallbackAccount(workspaceId)),
+				id: issueId,
+				refresh,
+			});
 			if (result.status === 'error') {
 				return {
 					...failed(result.failure),
+					...accountChoice(await accountsForFailure(deps)),
 					comments: [],
 					issue: null,
 					omittedComments: 0,
@@ -455,7 +610,7 @@ export function makeLinearPort(deps: LinearPortDeps): LinearPort {
 			return {
 				comments: thread.kept,
 				issue,
-				message: `${issue.identifier} "${issue.title}" is in ${issue.state ?? 'no state'}, read from the ${result.source}.${cut}`,
+				message: `${issue.identifier} "${issue.title}" is in ${issue.state ?? 'no state'}, read from the ${result.source}. It belongs to ${issue.organization ?? 'an unnamed organization'}, whose accountId is "${issue.accountId}" — pass that accountId on any write.${cut}`,
 				omittedComments: thread.omitted,
 				source: result.source,
 				status: 'ok',
@@ -466,7 +621,7 @@ export function makeLinearPort(deps: LinearPortDeps): LinearPort {
 			} satisfies LinearGetIssueResult;
 		},
 
-		getMetadata: async ({ refresh }) => {
+		getMetadata: async ({ accountId, refresh, workspaceId }) => {
 			if (!linearService) {
 				return {
 					...unavailable(),
@@ -476,17 +631,22 @@ export function makeLinearPort(deps: LinearPortDeps): LinearPort {
 					truncated: false,
 				} satisfies LinearGetMetadataResult;
 			}
-			const result = await linearService.getMetadata({ refresh });
+			const scope = accountId ?? fallbackAccount(workspaceId);
+			const result = await linearService.getMetadata({
+				...(scope ? { accountId: scope } : {}),
+				refresh,
+			});
 			const fitted = fitMetadata(result.metadata);
 			const cut = truncationNote(
 				fitted.omitted,
 				'row',
-				'the states and teams an update needs are kept first.',
+				'the states and teams an update needs are kept first; narrow with `accountId`.',
 			);
 			if (result.status === 'error') {
 				const outcome = failed(result.failure);
 				return {
 					...fitted.rows,
+					...accountChoice(await accountsForFailure(deps)),
 					message: `${outcome.message} The rows here are what the local cache already held.${cut}`,
 					omittedResources: fitted.omitted,
 					status: outcome.status,
@@ -494,9 +654,10 @@ export function makeLinearPort(deps: LinearPortDeps): LinearPort {
 					truncated: fitted.omitted > 0,
 				} satisfies LinearGetMetadataResult;
 			}
+			const partial = accountFailureNote(result.accountFailures);
 			return {
 				...fitted.rows,
-				message: `Teams, projects, workflow states, labels, and users, as synced at ${result.metadata.syncedAt ?? 'an unknown time'}. Cycles are not returned — nothing on this surface sets one.${cut}`,
+				message: `Teams, projects, workflow states, labels, and users, as synced at ${result.metadata.syncedAt ?? 'an unknown time'}. Every row names its accountId, and an id from one account is never valid in another. Cycles are not returned — nothing on this surface sets one.${cut}${partial}`,
 				omittedResources: fitted.omitted,
 				status: 'ok',
 				syncedAt: result.metadata.syncedAt,
@@ -504,16 +665,22 @@ export function makeLinearPort(deps: LinearPortDeps): LinearPort {
 			} satisfies LinearGetMetadataResult;
 		},
 
-		createComment: async ({ commentBody, issueId }) => {
+		createComment: async ({ accountId, commentBody, issueId, workspaceId }) => {
 			if (!linearService) {
 				return { ...unavailable(), commentId: null };
 			}
 			const result = await linearService.createComment({
+				...(accountId ? { accountId } : {}),
+				...withFallback(fallbackAccount(workspaceId)),
 				body: commentBody,
 				issueId,
 			});
 			if (result.status === 'error') {
-				return { ...failed(result.failure), commentId: null };
+				return {
+					...failed(result.failure),
+					...accountChoice(await accountsForFailure(deps)),
+					commentId: null,
+				};
 			}
 			return {
 				commentId: result.comment.id,
@@ -523,28 +690,40 @@ export function makeLinearPort(deps: LinearPortDeps): LinearPort {
 		},
 
 		updateIssue: async ({
+			accountId,
 			assigneeId,
 			description,
 			issueId,
 			priority,
 			stateId,
 			title,
+			workspaceId,
 		}) => {
 			if (!linearService) {
 				return { ...unavailable(), issue: null };
 			}
 			if (stateId) {
-				const refusal = await terminalStateRefusal(linearService, stateId);
+				const refusal = await terminalStateRefusal(
+					linearService,
+					stateId,
+					accountId,
+				);
 				if (refusal) {
 					return { issue: null, message: refusal, status: 'refused' };
 				}
 			}
 			const result = await linearService.updateIssue({
+				...(accountId ? { accountId } : {}),
+				...withFallback(fallbackAccount(workspaceId)),
 				id: issueId,
 				input: { assigneeId, description, priority, stateId, title },
 			});
 			if (result.status === 'error') {
-				return { ...failed(result.failure), issue: null };
+				return {
+					...failed(result.failure),
+					...accountChoice(await accountsForFailure(deps)),
+					issue: null,
+				};
 			}
 			const issue = toAgentIssue(result.issue);
 			return {

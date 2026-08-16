@@ -10,8 +10,9 @@ import { LinearLogo } from '@/renderer/components/workbench-shell/source-provide
 import { deriveLinearGateState } from '@/renderer/lib/linear';
 
 /**
- * Gates Linear surfaces on the connection state: renders children when
- * connected, otherwise shows sign-in / configuration remediation.
+ * Gates Linear surfaces on the aggregate connection state: renders children as
+ * soon as one account is usable, otherwise shows sign-in / configuration
+ * remediation.
  */
 export function LinearConnectionGate({ children }: { children: ReactNode }) {
 	const { t } = useTranslation();
@@ -51,7 +52,7 @@ export function LinearConnectionGate({ children }: { children: ReactNode }) {
 							)
 						: t(
 								'linear:connection-gate.not-connected.title',
-								'Linear is not connected',
+								'No Linear account is connected',
 							)}
 			</p>
 			<p className='max-w-sm text-muted-foreground text-xs leading-relaxed'>
@@ -62,7 +63,7 @@ export function LinearConnectionGate({ children }: { children: ReactNode }) {
 						)
 					: t(
 							'linear:connection-gate.not-connected.description',
-							'Connect Linear from integration settings to browse issues, manage them from Ensemblr, and create workspaces from issues.',
+							'Connect Linear from integration settings to browse issues, manage them from Ensemblr, and create workspaces from issues. Add more than one account to work across organizations.',
 						)}
 			</p>
 			<Button asChild size='sm' variant='outline'>

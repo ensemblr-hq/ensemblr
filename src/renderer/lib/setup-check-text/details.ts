@@ -203,6 +203,12 @@ export const SETUP_DETAIL_TEXT: Record<
 		),
 	'linear-connected': (t) =>
 		t('common:setup-check.detail.linear-connected', 'Linear is connected.'),
+	'linear-connected-accounts': (t, params) =>
+		t(
+			'common:setup-check.detail.linear-connected-accounts',
+			'Linear is connected to {{count}} accounts ({{organizations}}).',
+			params,
+		),
 	'linear-connected-as': (t, params) =>
 		t(
 			'common:setup-check.detail.linear-connected-as',

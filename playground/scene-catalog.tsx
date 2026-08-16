@@ -6,6 +6,8 @@ import { ConflictsScene } from './conflicts-preview.tsx';
 import { ConversationScrollScene } from './conversation-scroll-preview.tsx';
 import { FailureBannerScene } from './failure-banner-preview.tsx';
 import { FilePreviewScene } from './file-preview.tsx';
+import { LinearIssueEditorScene } from './linear-issue-editor-preview.tsx';
+import { LinearIssuePropertiesScene } from './linear-issue-properties-preview.tsx';
 import { OnboardingScene } from './onboarding-preview.tsx';
 import { ProvidersScene } from './providers-preview.tsx';
 import { RightSidebarHeaderScene } from './right-sidebar-header-preview.tsx';
@@ -132,6 +134,23 @@ export const SCENE_GROUPS = [
 				label: 'starting',
 				render: () => <StartingStatePreview />,
 				source: 'playground/starting-state-preview.tsx',
+			},
+		],
+	},
+	{
+		label: 'linear',
+		scenes: [
+			{
+				id: 'issue-editor',
+				label: 'issue editor',
+				render: () => <LinearIssueEditorScene />,
+				source: 'playground/linear-issue-editor-preview.tsx',
+			},
+			{
+				id: 'issue-properties',
+				label: 'issue properties',
+				render: () => <LinearIssuePropertiesScene />,
+				source: 'playground/linear-issue-properties-preview.tsx',
 			},
 		],
 	},

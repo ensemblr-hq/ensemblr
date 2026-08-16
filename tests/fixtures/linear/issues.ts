@@ -1,5 +1,6 @@
 import type {
-	LinearConnectionSnapshot,
+	LinearAccountSnapshot,
+	LinearConnectionSummary,
 	LinearIssueWire,
 	LinearServiceFailure,
 } from '@/shared/ipc';
@@ -9,6 +10,7 @@ export function createLinearIssueFixture(
 	overrides: Partial<LinearIssueWire> = {},
 ): LinearIssueWire {
 	return {
+		accountId: 'account-1',
 		archivedAt: null,
 		assigneeId: 'user-1',
 		assigneeName: 'Alice',
@@ -19,6 +21,7 @@ export function createLinearIssueFixture(
 		id: 'issue-1',
 		identifier: 'ENG-143',
 		labels: [{ color: '#eb5757', id: 'label-1', name: 'bug' }],
+		organizationName: 'Example Org',
 		priority: 2,
 		projectId: 'project-1',
 		projectName: 'Ensemblr',
@@ -37,19 +40,34 @@ export function createLinearIssueFixture(
 	};
 }
 
-/** Builds a Linear connection snapshot fixture. */
-export function createLinearConnectionFixture(
-	overrides: Partial<LinearConnectionSnapshot> = {},
-): LinearConnectionSnapshot {
+/** Builds a single connected Linear account fixture. */
+export function createLinearAccountFixture(
+	overrides: Partial<LinearAccountSnapshot> = {},
+): LinearAccountSnapshot {
 	return {
 		expiresAt: '2026-06-12T00:00:00.000Z',
+		id: 'account-1',
+		lastErrorCode: null,
+		organizationId: 'org-1',
 		organizationName: 'Example Org',
 		organizationUrlKey: 'example-org',
 		scopes: ['read', 'write'],
 		state: 'connected',
 		updatedAt: '2026-06-11T00:00:00.000Z',
 		userEmail: 'alice@example.com',
+		userId: 'user-1',
 		userName: 'Alice',
+		...overrides,
+	};
+}
+
+/** Builds a Linear connection summary fixture holding one connected account. */
+export function createLinearConnectionFixture(
+	overrides: Partial<LinearConnectionSummary> = {},
+): LinearConnectionSummary {
+	return {
+		accounts: [createLinearAccountFixture()],
+		state: 'connected',
 		...overrides,
 	};
 }

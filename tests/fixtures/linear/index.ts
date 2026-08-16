@@ -1,4 +1,5 @@
 export {
+	createLinearAccountFixture,
 	createLinearConnectionFixture,
 	createLinearFailureFixture,
 	createLinearIssueFixture,

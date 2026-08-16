@@ -934,6 +934,14 @@ export type LinearAgentStatus =
  */
 export interface AgentLinearIssue {
 	id: string;
+	/**
+	 * Linear account the issue belongs to. Several can be connected, and `ENG-1`
+	 * is unique inside an organization but not between two, so an op acting on a
+	 * merged list carries this back rather than the identifier alone.
+	 */
+	accountId: string;
+	/** Owning account's Linear organization, for a human-readable disambiguator. */
+	organization: string | null;
 	/** Human key, e.g. `ENG-106` — what a branch, PR, or commit cites. */
 	identifier: string;
 	title: string;
@@ -970,6 +978,8 @@ export interface AgentLinearComment {
  */
 export interface AgentLinearResource {
 	id: string;
+	/** Linear account this row belongs to; pass it back when creating or updating. */
+	accountId: string;
 	name: string;
 	/** Short team key (`THE`) for a team; null for every other kind. */
 	key: string | null;
@@ -987,10 +997,31 @@ export interface AgentLinearResource {
 export interface LinearAgentOutcome {
 	status: LinearAgentStatus;
 	message: string;
+	/**
+	 * The connected accounts, listed on a failed op when more than one is
+	 * connected — an ambiguity refusal is the case that needs them, but any
+	 * failure an agent might fix by naming an account is only actionable if it can
+	 * see which accounts exist. Omitted on success, and omitted whenever a single
+	 * account is connected, so the common answer spends no budget repeating a
+	 * choice that was never in question.
+	 */
+	accounts?: readonly LinearAccountRef[];
 }
 
-/** Args for `linearListIssues`: search the workspace's Linear issues. */
+/** One connected Linear account, as named back to an agent that must pick one. */
+export interface LinearAccountRef {
+	accountId: string;
+	organization: string | null;
+	user: string | null;
+}
+
+/**
+ * Args for `linearListIssues`: search the connected accounts' Linear issues.
+ * Omitting `accountId` searches every connected account at once.
+ */
 export interface LinearListIssuesArgs {
+	/** Narrow the search to one connected Linear account. */
+	accountId?: string;
 	/** Free-text match over identifier, title, and description. */
 	query?: string;
 	teamId?: string;
@@ -1014,6 +1045,8 @@ export interface LinearListIssuesResult extends LinearAgentOutcome {
 
 /** Args for `linearGetIssue`: read one issue with its comments. */
 export interface LinearGetIssueArgs {
+	/** Account owning the issue; needed only when an identifier is ambiguous. */
+	accountId?: string;
 	/** Issue uuid or its human identifier, e.g. `ENG-106`. */
 	issueId: string;
 	refresh?: boolean;
@@ -1031,6 +1064,8 @@ export interface LinearGetIssueResult extends LinearAgentOutcome {
 
 /** Args for `linearGetMetadata`: read the id↔name tables an update needs. */
 export interface LinearGetMetadataArgs {
+	/** Narrow the tables to one connected Linear account. */
+	accountId?: string;
 	refresh?: boolean;
 }
 
@@ -1052,6 +1087,8 @@ export interface LinearGetMetadataResult extends LinearAgentOutcome {
 
 /** Args for `linearCreateComment`: post a comment on a Linear issue. */
 export interface LinearCreateCommentArgs {
+	/** Account owning the issue; needed only when an identifier is ambiguous. */
+	accountId?: string;
 	issueId: string;
 	commentBody: string;
 }
@@ -1072,6 +1109,8 @@ export interface LinearCreateCommentResult extends LinearAgentOutcome {
  * required, since an update carrying nothing is a wasted round trip.
  */
 export interface LinearUpdateIssueArgs {
+	/** Account owning the issue; needed only when an identifier is ambiguous. */
+	accountId?: string;
 	issueId: string;
 	/** Workflow state to move the issue into; a Done or Canceled state is refused. */
 	stateId?: string;

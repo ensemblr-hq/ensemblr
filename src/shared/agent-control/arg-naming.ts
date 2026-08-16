@@ -20,6 +20,8 @@ import type { AgentControlOp } from './contracts.ts';
  * concept cannot reach a model.
  */
 export const CANONICAL_ARG_KEYS = {
+	accountId:
+		'Identifier of one connected tracker account. Several can be connected at once, and an id from one is never valid in another.',
 	agentSessionId: 'Identifier of an agent conversation.',
 	ansi: 'Return raw terminal bytes with their escape sequences, not readable text.',
 	assigneeId: 'Identifier of the person an issue is assigned to.',
