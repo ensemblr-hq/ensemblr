@@ -428,7 +428,27 @@
 			"native": "Ενσωματωμένο Claude Code"
 		},
 		"tabs-aria-label": "Πάροχοι πρακτόρων",
-		"title": "Πάροχοι"
+		"title": "Πάροχοι",
+		"usage": {
+			"description": "Πόσο από τη συνδρομή πίσω από αυτά τα διαπιστευτήρια έχει ήδη καταναλωθεί.",
+			"empty": "Ο πάροχος δεν ανέφερε όρια συνδρομής.",
+			"label": "Χρήση συνδρομής",
+			"not-applicable": "Αυτή η συνεδρία πιστοποιείται εκτός συνδρομής claude.ai, οπότε δεν ισχύουν όρια συνδρομής.",
+			"resets-in-days_one": "Επαναφορά σε {{count}} ημέρα",
+			"resets-in-days_other": "Επαναφορά σε {{count}} ημέρες",
+			"resets-in-hours_one": "Επαναφορά σε {{count}} ώρα",
+			"resets-in-hours_other": "Επαναφορά σε {{count}} ώρες",
+			"resets-now": "Επαναφορά τώρα",
+			"window": {
+				"five-hour": "Συνεδρία",
+				"overage": "Επιπλέον χρήση",
+				"seven-day": "Εβδομάδα",
+				"seven-day-oauth-apps": "Εβδομάδα (εφαρμογές)",
+				"seven-day-opus": "Εβδομάδα (Opus)",
+				"seven-day-overage-included": "Εβδομάδα (επιπλέον χρήση)",
+				"seven-day-sonnet": "Εβδομάδα (Sonnet)"
+			}
+		}
 	},
 	"repo": {
 		"actions": {

@@ -106,7 +106,10 @@ export function ComposerControls({
 					/>
 				) : null}
 				{showContextIndicator(composer, alwaysShowContext) ? (
-					<ContextIndicator usage={composer.contextUsage} />
+					<ContextIndicator
+						planUsage={composer.planUsage}
+						usage={composer.contextUsage}
+					/>
 				) : null}
 				<DictationButton dictation={dictation} />
 				<AttachmentMenu

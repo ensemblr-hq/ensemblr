@@ -53,6 +53,22 @@ export function eventPayload(event: AgentEvent): AgentPersistedEnvelope {
 					status: event.metadata.status,
 				},
 			};
+		case 'plan-limit':
+			return {
+				kind: 'plan-limit',
+				limit: {
+					status: event.limit.status,
+					window: { ...event.limit.window },
+				},
+			};
+		case 'session-cost':
+			return {
+				cost: {
+					models: event.cost.models.map((model) => ({ ...model })),
+					totalCostUsd: event.cost.totalCostUsd,
+				},
+				kind: 'session-cost',
+			};
 		case 'shutdown':
 			return { kind: 'shutdown', reason: event.reason };
 		case 'status':

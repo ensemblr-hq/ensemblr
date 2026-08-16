@@ -94,6 +94,58 @@ export interface AgentContextUsageWire {
 }
 
 /**
+ * One plan rate-limit window. `id` is the runtime's own window key — `five_hour`
+ * and `seven_day` are the ones every subscription reports; per-model buckets
+ * arrive with a server-supplied `displayName` instead of a name the app knows.
+ */
+export interface AgentPlanLimitWindowWire {
+	displayName: string | null;
+	id: string;
+	/** ISO 8601 instant the window resets, or null when the runtime reported none. */
+	resetsAt: string | null;
+	/** Share of the window already consumed, 0-100, or null when unreported. */
+	utilization: number | null;
+}
+
+/**
+ * Whether the account may still spend against a window. `allowed-warning` is the
+ * runtime's own "close to the ceiling" signal, not a threshold the app derives.
+ */
+export type AgentPlanLimitStatusWire =
+	| 'allowed'
+	| 'allowed-warning'
+	| 'rejected';
+
+/**
+ * Single-window rate-limit snapshot a runtime pushes as utilization moves. One
+ * event describes one window, so a session reports several over its life.
+ */
+export interface AgentPlanLimitWire {
+	status: AgentPlanLimitStatusWire;
+	window: AgentPlanLimitWindowWire;
+}
+
+/** Token and cost totals one model accumulated within a session. */
+export interface AgentModelCostWire {
+	cacheCreationInputTokens: number;
+	cacheReadInputTokens: number;
+	costUsd: number;
+	inputTokens: number;
+	model: string;
+	outputTokens: number;
+}
+
+/**
+ * Running cost a session has accumulated, as its runtime estimates it. Cumulative
+ * from the session's own start: a resumed session begins again at zero, so this is
+ * what this conversation spent rather than what the chat has cost over its life.
+ */
+export interface AgentSessionCostWire {
+	models: readonly AgentModelCostWire[];
+	totalCostUsd: number;
+}
+
+/**
  * Tagged union persisted into `agent_session_events.payload_json` and replayed
  * on the renderer. Each variant maps 1:1 to an `AgentEvent` discriminant; the
  * envelope shape is stable so the renderer can match on `envelope.kind` without
@@ -117,6 +169,8 @@ export type AgentPersistedEnvelope =
 			role: 'agent' | 'tool' | 'user';
 	  }
 	| { kind: 'metadata'; metadata: AgentWireMetadata }
+	| { kind: 'plan-limit'; limit: AgentPlanLimitWire }
+	| { cost: AgentSessionCostWire; kind: 'session-cost' }
 	| {
 			kind: 'status';
 			previous: AgentSessionStatusWire;

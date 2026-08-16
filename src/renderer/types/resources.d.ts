@@ -1787,6 +1787,26 @@ export default interface Resources {
 			};
 			'tabs-aria-label': 'Agent providers';
 			title: 'Providers';
+			usage: {
+				description: 'How much of the plan behind these credentials is already spent.';
+				empty: 'The provider reported no plan limits.';
+				label: 'Plan usage';
+				'not-applicable': 'This session authenticates outside a claude.ai plan, so no plan limits apply to it.';
+				'resets-in-days_one': 'Resets in {{count}}d';
+				'resets-in-days_other': 'Resets in {{count}}d';
+				'resets-in-hours_one': 'Resets in {{count}}h';
+				'resets-in-hours_other': 'Resets in {{count}}h';
+				'resets-now': 'Resets now';
+				window: {
+					'five-hour': 'Session';
+					overage: 'Extra usage';
+					'seven-day': 'Weekly';
+					'seven-day-oauth-apps': 'Weekly (apps)';
+					'seven-day-opus': 'Weekly (Opus)';
+					'seven-day-overage-included': 'Weekly (extra usage)';
+					'seven-day-sonnet': 'Weekly (Sonnet)';
+				};
+			};
 		};
 		repo: {
 			actions: {
@@ -2220,6 +2240,7 @@ export default interface Resources {
 		};
 		'context-usage': {
 			'aria-label': 'Context usage';
+			'aria-label-with-plan': 'Context and plan usage';
 			'gauge-title': 'Context usage gauge';
 			heading: 'Context';
 			unavailable: 'Context window unavailable for this model.';
@@ -2766,6 +2787,12 @@ export default interface Resources {
 				refine: 'Refine';
 			};
 			'aria-label': 'Plan review';
+		};
+		'plan-usage': {
+			'estimate-note': 'Cost is this session’s own estimate, not a bill.';
+			heading: 'Plan usage';
+			'status-rejected': 'Plan limit reached. Turns fail until a window resets.';
+			'status-warning': 'Close to the plan limit.';
 		};
 		preview: {
 			'choose-url': 'Choose preview URL';

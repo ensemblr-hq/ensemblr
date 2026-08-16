@@ -185,12 +185,16 @@ function createQueryStub({
 	account,
 	mcpServers = [],
 	stall = false,
+	stallUsage = false,
 	throwOnAccount,
+	usage,
 }: {
 	account?: Record<string, unknown>;
 	mcpServers?: readonly { name: string; status: string }[];
 	stall?: boolean;
+	stallUsage?: boolean;
 	throwOnAccount?: string;
+	usage?: Record<string, unknown>;
 }): { queryFn: never; stub: QueryStub } {
 	const stub: QueryStub = {
 		closed: 0,
@@ -220,6 +224,15 @@ function createQueryStub({
 				stub.closed += 1;
 			},
 			mcpServerStatus: async () => mcpServers,
+			usage_EXPERIMENTAL_MAY_CHANGE_DO_NOT_RELY_ON_THIS_API_YET: async () => {
+				if (stallUsage) {
+					return new Promise(() => undefined);
+				}
+				if (!usage) {
+					throw new Error('unknown control request: get_usage');
+				}
+				return usage;
+			},
 		};
 	};
 
@@ -251,10 +264,12 @@ function createProbe({
 	localCommandService = createCommandService(),
 	queryFn,
 	sessionTimeoutMs,
+	usageTimeoutMs,
 }: {
 	localCommandService?: LocalCommandService;
 	queryFn: never;
 	sessionTimeoutMs?: number;
+	usageTimeoutMs?: number;
 }): AgentProviderReadinessProbe {
 	return createClaudeReadinessProbe({
 		executableService: createExecutableService({
@@ -267,6 +282,7 @@ function createProbe({
 		now: () => NOW,
 		queryFn,
 		sessionTimeoutMs,
+		usageTimeoutMs,
 	});
 }
 
@@ -383,6 +399,72 @@ test('probe reports a signed-in account and a healthy roll-up', async () => {
 		'mcp',
 	]);
 	expect(stub.closed).toBe(1);
+});
+
+test('probe carries the plan windows the runtime reports', async () => {
+	const { queryFn } = createQueryStub({
+		account: { email: 'dev@example.com' },
+		usage: {
+			rate_limits: {
+				five_hour: { resets_at: '2026-08-07T05:00:00.000Z', utilization: 62 },
+				seven_day: { resets_at: '2026-08-11T09:00:00.000Z', utilization: 31 },
+			},
+			rate_limits_available: true,
+			subscription_type: 'max',
+		},
+	});
+
+	const readiness = await createProbe({ queryFn }).probe();
+
+	expect(readiness.usage).toEqual({
+		available: true,
+		limits: [
+			{
+				displayName: null,
+				id: 'five_hour',
+				resetsAt: '2026-08-07T05:00:00.000Z',
+				utilization: 62,
+			},
+			{
+				displayName: null,
+				id: 'seven_day',
+				resetsAt: '2026-08-11T09:00:00.000Z',
+				utilization: 31,
+			},
+		],
+		subscriptionType: 'max',
+	});
+});
+
+test('a hanging usage endpoint costs the usage panel, not the account row', async () => {
+	const { queryFn } = createQueryStub({
+		account: { email: 'dev@example.com' },
+		mcpServers: [{ name: 'linear', status: 'connected' }],
+		stallUsage: true,
+	});
+
+	const readiness = await createProbe({ queryFn, usageTimeoutMs: 10 }).probe();
+
+	expect(readiness.usage).toBeNull();
+	expect(readiness.account).toMatchObject({ email: 'dev@example.com' });
+	expect(readiness.status).toBe('success');
+	expect(readiness.checks.map((check) => check.status)).not.toContain(
+		'failure',
+	);
+});
+
+test('a runtime that cannot report usage still probes as ready', async () => {
+	const { queryFn } = createQueryStub({
+		account: { email: 'dev@example.com' },
+	});
+
+	const readiness = await createProbe({ queryFn }).probe();
+
+	expect(readiness.usage).toBeNull();
+	expect(readiness.status).toBe('success');
+	expect(readiness.checks.map((check) => check.status)).not.toContain(
+		'failure',
+	);
 });
 
 test('probe never inherits the harness permission bypass', async () => {

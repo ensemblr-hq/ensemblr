@@ -3,6 +3,7 @@ import type { FollowUpBehavior } from '@/renderer/state/preferences';
 import type {
 	ComposerContextUsage,
 	ComposerModelOption,
+	ComposerPlanUsage,
 	ComposerSendIntent,
 	ComposerShellState,
 	ComposerSubmitOutcome,
@@ -53,8 +54,11 @@ export function resolveContextUsage(
 }
 
 /**
- * Decides whether the context gauge is worth showing. It is noise at low usage,
- * so by default it appears only past 70% of the window; the setting forces it on.
+ * Decides whether the context gauge is worth showing. Context alone is noise at
+ * low usage, so by default it appears only past 70% of the window; the setting
+ * forces it on. Plan usage overrides both — a session's spend against its plan
+ * is the popover's other half and has nowhere else to surface, so once a runtime
+ * has reported any the control has to be reachable.
  * @param composer - Composer shell state carrying the current usage.
  * @param alwaysShow - The user's always-show-context preference.
  * @returns True when the gauge should render.
@@ -63,6 +67,10 @@ export function showContextIndicator(
 	composer: ComposerShellState,
 	alwaysShow: boolean,
 ): boolean {
+	const plan = composer.planUsage;
+	if (plan && (plan.limits.length > 0 || plan.totalCostUsd !== null)) {
+		return true;
+	}
 	const usage = composer.contextUsage;
 	if (!usage || usage.maxTokens <= 0) {
 		return alwaysShow;
@@ -136,6 +144,7 @@ export function getComposerState({
 	onSubmit,
 	onThinkingChange,
 	planMode,
+	planUsage,
 	setupDiagnostics,
 	setupError,
 	thinkingLevel,
@@ -159,6 +168,7 @@ export function getComposerState({
 	) => Promise<ComposerSubmitOutcome>;
 	onThinkingChange: (thinkingLevel: string) => void;
 	planMode: boolean;
+	planUsage?: ComposerPlanUsage | null;
 	setupDiagnostics: SetupDiagnosticsSnapshot | null;
 	setupError: string | null;
 	thinkingLevel: string | null;
@@ -188,6 +198,7 @@ export function getComposerState({
 		onSubmit,
 		onThinkingChange,
 		planMode,
+		planUsage: planUsage ?? null,
 		workspaceCwd: workspaceCwd ?? '',
 		thinkingLabel: thinkingLabelText,
 		thinkingLevel,

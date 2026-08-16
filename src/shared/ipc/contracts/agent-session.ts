@@ -9,6 +9,10 @@ import type { AgentModelCatalog } from './agent-models.ts';
 export type {
 	AgentEventStreamWire,
 	AgentPersistedEnvelope,
+	AgentPlanLimitStatusWire,
+	AgentPlanLimitWindowWire,
+	AgentPlanLimitWire,
+	AgentSessionCostWire,
 	AgentSessionStatusWire,
 	AgentWireError,
 	AgentWireMessagePart,

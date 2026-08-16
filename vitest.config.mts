@@ -126,6 +126,8 @@ export default defineConfig({
 			'tests/main/claude-context-usage-probe.test.ts',
 			'tests/main/claude-turn-preamble.test.ts',
 			'tests/main/claude-thinking-display.test.ts',
+			'tests/main/claude-usage.test.ts',
+			'tests/main/agent-event-payload.test.ts',
 		],
 		coverage: {
 			provider: 'istanbul',

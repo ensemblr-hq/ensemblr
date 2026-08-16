@@ -68,6 +68,7 @@ export type {
 	CommentPreviewPayload,
 	ComposerContextUsage,
 	ComposerModelOption,
+	ComposerPlanUsage,
 	ComposerShellState,
 	ComposerSubmitOutcome,
 	ComposerThinkingOption,

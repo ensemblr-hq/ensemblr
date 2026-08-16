@@ -1,5 +1,9 @@
 import type { AgentProviderId } from '@/shared/agent-provider';
 import type { ModelVendorId } from '@/shared/ipc/contracts/agent-models';
+import type {
+	AgentPlanLimitStatusWire,
+	AgentPlanLimitWindowWire,
+} from '@/shared/ipc/contracts/agent-session';
 import type { HealthSnapshot } from '@/shared/ipc/contracts/health';
 import type { WorkspaceOpenTargetSnapshot } from '@/shared/ipc/contracts/open-target';
 // `WorkspaceOpenTarget` is re-exported here for the renderer's query result
@@ -347,6 +351,21 @@ export interface ComposerContextUsage {
 }
 
 /**
+ * What a chat has spent, as its own session reports it: the plan windows the
+ * runtime has named so far and the running cost. Both halves arrive
+ * independently — a session can report a window before its first turn seals and
+ * a cost before any window moves — so either may be empty while the other is not.
+ */
+export interface ComposerPlanUsage {
+	/** Newest reading per window, in the order the runtime first named them. */
+	limits: readonly AgentPlanLimitWindowWire[];
+	/** Whether the account may still spend against the tightest window. */
+	status: AgentPlanLimitStatusWire;
+	/** Running session cost in USD, or null until a turn seals. */
+	totalCostUsd: number | null;
+}
+
+/**
  * What a submit reports back. The composer clears the draft before awaiting, so
  * a send that failed has to say so or the message is gone with nothing but a
  * `lastError` to show for it. An outcome rather than a rejection: throwing would
@@ -384,6 +403,8 @@ export interface ComposerShellState {
 	placeholder: string;
 	/** Whether this chat is planning: mutating tools are blocked until a plan is approved. */
 	planMode: boolean;
+	/** Plan windows and running cost for this chat; null when none reported yet. */
+	planUsage: ComposerPlanUsage | null;
 	thinkingLabel: string;
 	thinkingLevel: string | null;
 	workspaceCwd: string;

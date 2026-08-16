@@ -156,6 +156,7 @@ export function WorkspaceRouteContent({
 		onSubmit: agentComposer.onSubmit,
 		onThinkingChange: agentComposer.onThinkingChange,
 		planMode: agentComposer.planMode,
+		planUsage: agentComposer.planUsage,
 		setupDiagnostics: setupDiagnosticsState.setupDiagnostics,
 		setupError: setupDiagnosticsState.setupDiagnosticsError,
 		thinkingLevel: agentComposer.thinkingLevel,
