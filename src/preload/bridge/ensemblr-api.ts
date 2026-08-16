@@ -168,6 +168,16 @@ export function createEnsemblrApi(): EnsemblrApi {
 		health: () => invoke('health'),
 		importLocalRepository: (request) =>
 			invoke('importLocalRepository', request),
+		infisicalAccounts: () => invoke('infisicalAccounts'),
+		infisicalAddAccount: (request) => invoke('infisicalAddAccount', request),
+		infisicalClearLink: (request) => invoke('infisicalClearLink', request),
+		infisicalLink: (request) => invoke('infisicalLink', request),
+		infisicalProjects: () => invoke('infisicalProjects'),
+		infisicalRemoveAccount: (request) =>
+			invoke('infisicalRemoveAccount', request),
+		infisicalSetLink: (request) => invoke('infisicalSetLink', request),
+		infisicalSync: (request) => invoke('infisicalSync', request),
+		infisicalTestAccount: (request) => invoke('infisicalTestAccount', request),
 		killTerminalSession: (request) => invoke('killTerminalSession', request),
 		clearDictationApiKey: () => invoke('clearDictationApiKey'),
 		dictationKeyStatus: () => invoke('dictationKeyStatus'),

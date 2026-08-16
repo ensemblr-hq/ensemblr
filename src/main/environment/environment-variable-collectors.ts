@@ -13,10 +13,30 @@ import {
 	isSecretEnvironmentVariableKey,
 } from './environment-variable-keys.ts';
 import type {
+	InfisicalEnvironmentResolver,
 	NormalizedScope,
 	PlainValueCandidate,
 	SqliteEnvironmentRow,
 } from './environment-variable-types.ts';
+
+/** Diagnostic messages for each way an Infisical resolution can be degraded. */
+const INFISICAL_DEGRADED_DIAGNOSTICS = {
+	'no-account': {
+		code: 'infisical-account-unresolved',
+		message:
+			'This scope is linked to an Infisical project, but no local account matches its instance.',
+	},
+	'stale-cache': {
+		code: 'infisical-cache-stale',
+		message:
+			'Infisical could not be reached; cached values from the last successful sync were used.',
+	},
+	unavailable: {
+		code: 'infisical-unavailable',
+		message:
+			'Infisical could not be reached and no cached values are available for this scope.',
+	},
+} as const;
 
 /**
  * Pulls plain env-var defaults from the declarative `environment` config block,
@@ -159,6 +179,73 @@ export function collectSqlitePlainValues({
 			source: 'sqlite',
 			value: parsed,
 		});
+	}
+
+	return values;
+}
+
+/**
+ * Resolves the values a linked Infisical project supplies for the scope. A
+ * resolver failure, a stale cache, or an unresolved account all degrade to a
+ * warning rather than an error: Infisical being unreachable must never stop a
+ * workspace from opening.
+ * @param input - Scope, resolver, and diagnostic sink.
+ * @returns Map of `key -> value`, empty when nothing is linked.
+ */
+export async function collectInfisicalValues({
+	diagnostics,
+	invalidKeys,
+	resolveInfisical,
+	scope,
+}: {
+	diagnostics: EnvironmentVariableDiagnostic[];
+	invalidKeys: Set<string>;
+	resolveInfisical: InfisicalEnvironmentResolver | null;
+	scope: NormalizedScope;
+}): Promise<Map<string, string>> {
+	const values = new Map<string, string>();
+
+	if (!resolveInfisical || scope.scope === 'app') {
+		return values;
+	}
+
+	let resolution: Awaited<ReturnType<InfisicalEnvironmentResolver>>;
+
+	try {
+		resolution = await resolveInfisical(scope);
+	} catch (error) {
+		diagnostics.push({
+			code: 'infisical-unavailable',
+			message:
+				error instanceof Error
+					? error.message
+					: 'Infisical values could not be resolved.',
+			severity: 'warning',
+		});
+
+		return values;
+	}
+
+	if (resolution.degradedReason) {
+		diagnostics.push({
+			...INFISICAL_DEGRADED_DIAGNOSTICS[resolution.degradedReason],
+			severity: 'warning',
+		});
+	}
+
+	for (const [key, value] of Object.entries(resolution.values)) {
+		if (!isEnvironmentVariableKey(key)) {
+			invalidKeys.add(key);
+			diagnostics.push({
+				code: 'invalid-infisical-variable-key',
+				key,
+				message: `Infisical secret "${key}" is not a valid environment variable name and was skipped.`,
+				severity: 'warning',
+			});
+			continue;
+		}
+
+		values.set(key, value);
 	}
 
 	return values;

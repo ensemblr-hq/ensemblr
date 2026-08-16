@@ -9,12 +9,14 @@ import {
 } from './environment-variable-catalog.ts';
 import {
 	collectConfigDefaults,
+	collectInfisicalValues,
 	collectSecretMetadata,
 	collectSqlitePlainValues,
 } from './environment-variable-collectors.ts';
 import { isEnvironmentVariableKey } from './environment-variable-keys.ts';
 import type {
 	EnvironmentState,
+	InfisicalEnvironmentResolver,
 	NormalizedScope,
 	PlainValueCandidate,
 } from './environment-variable-types.ts';
@@ -25,6 +27,7 @@ interface ResolveEnvironmentVariablesOptions {
 	database: DatabaseSync | null;
 	now: () => Date;
 	requiredKeys?: readonly string[];
+	resolveInfisical: InfisicalEnvironmentResolver | null;
 	scope: NormalizedScope;
 	secretStore: SecretStore | null;
 }
@@ -42,6 +45,7 @@ export async function resolveEnvironmentVariables({
 	database,
 	now: _now,
 	requiredKeys: requestedRequiredKeys,
+	resolveInfisical,
 	scope,
 	secretStore,
 }: ResolveEnvironmentVariablesOptions): Promise<EnvironmentState> {
@@ -87,13 +91,24 @@ export async function resolveEnvironmentVariables({
 		}
 	}
 
-	const secretMetadata = await collectSecretMetadata({
-		diagnostics,
-		scope,
-		secretStore,
-	});
+	// Run together: the Infisical fetch crosses the network while the secret
+	// metadata read only touches the Keychain, so awaiting them in sequence
+	// would add the slower one's latency to every workspace launch.
+	const [infisicalValues, secretMetadata] = await Promise.all([
+		collectInfisicalValues({
+			diagnostics,
+			invalidKeys,
+			resolveInfisical,
+			scope,
+		}),
+		collectSecretMetadata({
+			diagnostics,
+			scope,
+			secretStore,
+		}),
+	]);
 
-	for (const key of secretMetadata.keys()) {
+	for (const key of [...infisicalValues.keys(), ...secretMetadata.keys()]) {
 		if (!catalogByKey.has(key)) {
 			catalogByKey.set(key, {
 				...createCustomCatalogEntry(key),
@@ -105,6 +120,7 @@ export async function resolveEnvironmentVariables({
 	return {
 		catalogByKey,
 		diagnostics,
+		infisicalValues,
 		invalidKeys,
 		plainValues,
 		requiredKeys,

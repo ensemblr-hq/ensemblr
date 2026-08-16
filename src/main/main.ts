@@ -92,6 +92,15 @@ import {
 	createToolchainPathResolver,
 	createWorkspaceEnvironmentService,
 } from './environment';
+import {
+	createInfisicalAccountStore,
+	createInfisicalApi,
+	createInfisicalCache,
+	createInfisicalClient,
+	createInfisicalLinkStore,
+	createInfisicalService,
+	type InfisicalService,
+} from './infisical';
 import { type IpcHandlersHandle, registerIpcHandlers } from './ipc';
 import { readPermissionModeFromSnapshot } from './ipc/permission-gate.ts';
 import {
@@ -280,9 +289,68 @@ const agentActivityMonitor = createAgentActivityMonitor({
 		),
 });
 const localCommandService = createLocalCommandService();
+
+// Rebuilt whenever the underlying connection changes, because the account store,
+// the value cache, and the link store all bind to one open SQLite handle.
+let infisicalRuntime: {
+	database: DatabaseSync;
+	service: InfisicalService;
+} | null = null;
+
+/**
+ * Resolves the Infisical service against the currently open database, building
+ * it on first use. Returns null before the database is open, which is the same
+ * answer as "nothing is linked".
+ * @returns The Infisical service, or null when storage is unavailable.
+ */
+const getInfisicalService = (): InfisicalService | null => {
+	const database = databaseService.getConnection()?.database ?? null;
+
+	if (!database) {
+		infisicalRuntime = null;
+		return null;
+	}
+
+	if (infisicalRuntime?.database === database) {
+		return infisicalRuntime.service;
+	}
+
+	const secretStore = createSecretStore(database);
+	const accountStore = createInfisicalAccountStore({ database, secretStore });
+	const service = createInfisicalService({
+		accountStore,
+		cache: createInfisicalCache({ secretStore }),
+		client: createInfisicalClient({ accountStore, api: createInfisicalApi() }),
+		linkStore: createInfisicalLinkStore({ database }),
+	});
+
+	infisicalRuntime = { database, service };
+
+	return service;
+};
+
 const environmentVariablesService = createEnvironmentVariablesService({
 	configService,
 	databaseService,
+	/**
+	 * Resolves a scope's linked Infisical values for the environment layer. App
+	 * scope is never linked, and an unavailable service resolves to nothing
+	 * rather than failing the assembly.
+	 */
+	resolveInfisical: async (scope) => {
+		const empty = { degradedReason: null, values: {} } as const;
+
+		if (scope.scope === 'app') {
+			return empty;
+		}
+
+		return (
+			(await getInfisicalService()?.resolveForScope({
+				scope: scope.scope,
+				scopeId: scope.scopeId,
+			})) ?? empty
+		);
+	},
 	secretStoreFactory: createSecretStore,
 });
 const dictationService = createDictationService({
@@ -1052,6 +1120,7 @@ app.whenReady().then(() => {
 		deleteWorkspaceService,
 		dictationService,
 		environmentVariablesService,
+		getInfisicalService,
 		githubCloneService,
 		githubRepositoryListService,
 		harnessDetectionService,

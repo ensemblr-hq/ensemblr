@@ -15,6 +15,7 @@ export * from './environment';
 export * from './github';
 export * from './health';
 export * from './history';
+export * from './infisical';
 export * from './invalidate-workspace-list-views';
 export * from './linear';
 export * from './linked-directories';

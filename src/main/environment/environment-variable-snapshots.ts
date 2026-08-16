@@ -3,6 +3,7 @@ import type {
 	EnvironmentVariableSnapshot,
 	EnvironmentVariableValueKind,
 } from '../../shared/ipc/contracts/environment';
+import { maskSecret } from '../secrets/normalize.ts';
 import type { SecretMetadata } from '../secrets/secret-store';
 import { getCatalogEntryForKey } from './environment-variable-catalog.ts';
 import {
@@ -26,6 +27,7 @@ export function createVariableSnapshots(
 ): EnvironmentVariableSnapshot[] {
 	const keys = new Set([
 		...state.catalogByKey.keys(),
+		...state.infisicalValues.keys(),
 		...state.plainValues.keys(),
 		...state.secretMetadata.keys(),
 		...state.invalidKeys,
@@ -138,6 +140,23 @@ function createVariableSnapshot(
 			source: plainValue.source,
 			status: valueKind === 'secret' ? 'masked' : 'set',
 			valueKind,
+		};
+	}
+
+	const infisicalValue = state.infisicalValues.get(key);
+
+	if (infisicalValue !== undefined) {
+		return {
+			catalog,
+			characterCount: infisicalValue.length,
+			key,
+			maskedDisplay: maskSecret(infisicalValue),
+			required,
+			scope: state.scope.scope,
+			scopeId: state.scope.scopeId,
+			source: 'infisical',
+			status: 'masked',
+			valueKind: 'secret',
 		};
 	}
 

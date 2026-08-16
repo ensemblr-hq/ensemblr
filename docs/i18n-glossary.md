@@ -86,6 +86,13 @@ Rules of thumb:
 | Unread | Непрочитанный | Αδιάβαστο | A chat tab an agent has spoken in since the user last looked at it. Russian agrees with the noun it qualifies (`непрочитанный чат`, `непрочитанные сообщения`); Greek likewise (`αδιάβαστη συνομιλία`, `αδιάβαστα μηνύματα`). Never `новый`/`νέο` — that says the chat is new, not that it is waiting. |
 | Notification | Уведомление | Ειδοποίηση | The macOS desktop notification Ensemblr posts when a chat needs the user. The settings label keeps the qualifier — `Уведомления на рабочем столе`/`Ειδοποιήσεις επιφάνειας εργασίας` — because the app also has in-app markers. |
 | Notification sound | Звук уведомлений | Ήχος ειδοποιήσεων | The chime played alongside that notification. Plural in both languages: the switch governs every notification, not one. Never `сигнал`/`σήμα`, which reads as an alarm. |
+| Secret | Секрет | Μυστικό | One stored credential — an API key, a token, a connection string. Russian takes `секрет` rather than `тайна`, which reads as a personal confidence; Greek `μυστικό` is the term the local developer community uses. |
+| Machine Identity | Machine Identity | Machine Identity | Infisical's own product term for a non-human credential. Untranslated in both languages: it is the label on the Infisical screen the user has to open, so translating it would send them looking for something that is not there. |
+| Client ID / Client Secret | Client ID / Client Secret | Client ID / Client Secret | The two Universal Auth fields, untranslated for the same reason as `Machine Identity` — they are copied verbatim off the Infisical screen. |
+| Infisical project | Проект Infisical | Έργο Infisical | The Infisical-side container a repository links to. Takes the `Project` noun already fixed above, qualified by the proper noun so it is never confused with an Ensemblr project. |
+| Secret path | Путь к секретам | Διαδρομή μυστικών | The folder inside an Infisical environment Ensemblr reads. Russian uses `путь к` rather than a bare genitive so it reads as a filesystem-style path, which is what it is. |
+| Instance URL | Адрес инстанса | Διεύθυνση instance | Which Infisical deployment an account talks to — cloud US, cloud EU, or self-hosted. `Инстанс`/`instance` is left borrowed in both: it is infrastructure vocabulary developers use in English daily. |
+| Link *(repository ↔ Infisical project)* | Связь | Σύνδεση | The saved pairing itself, and the state badges over it: `Связано`/`Συνδεδεμένο`, `Не связано`/`Χωρίς σύνδεση`, `Отвязать`/`Αποσύνδεση`. Deliberately **not** the composer's `Link (a directory or issue)` → `Прикрепить`: that verb attaches a thing to a chat, while this noun names a persistent relation between two systems. |
 
 ## Core verbs
 
@@ -140,6 +147,7 @@ from **Core nouns** — the width budget there is generous.
 | Shortcuts | Горячие клавиши | Συντομεύσεις |
 | Experimental | Экспериментальные | Πειραματικά |
 | Environment | Окружение | Περιβάλλον |
+| Secrets | Секреты | Μυστικά |
 | Security | Безопасность | Ασφάλεια |
 | Actions | Действия | Ενέργειες |
 | Scripts | Скрипты | Σενάρια |

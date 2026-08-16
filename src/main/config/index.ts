@@ -42,6 +42,7 @@ export {
 	normalizeSettingsResolutionRequest,
 	resolveSettings,
 } from './config-resolution.ts';
+export { isPlainRecord } from './json-utils.ts';
 export type {
 	LoadedRepositoryConfig,
 	LoadRepositoryConfigOptions,
@@ -63,6 +64,11 @@ export type {
 	WriteRepositoryScriptsResult,
 } from './repository-scripts-writer.ts';
 export { writeRepositoryScripts } from './repository-scripts-writer.ts';
+export type { WriteRepositorySettingsResult } from './repository-settings-writer.ts';
+export {
+	readRepositorySettings,
+	rewriteRepositorySettings,
+} from './repository-settings-writer.ts';
 
 /** Service exposed to IPC handlers for inspecting per-repository config. */
 export interface RepositoryConfigService {

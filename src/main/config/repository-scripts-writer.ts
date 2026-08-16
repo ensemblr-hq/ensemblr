@@ -3,22 +3,16 @@
  * `.ensemblr/settings.toml`, which is their sole store (ADR 0041). The rewrite
  * is whole-file: values in other sections survive, comments do not.
  */
-import { mkdirSync, renameSync, writeFileSync } from 'node:fs';
-import path from 'node:path';
-
-import { dump } from 'js-toml';
-
 import {
 	DEFAULT_RUN_SCRIPT_ICON,
 	type RunScriptDefinition,
 	type RunScriptMode,
 } from '../../shared/scripts.ts';
-import { formatErrorMessage, isPlainRecord } from './json-utils.ts';
+import { isPlainRecord } from './json-utils.ts';
 import {
-	ENSEMBLR_DIRECTORY,
-	ENSEMBLR_SETTINGS_FILENAME,
-} from './repository-config.ts';
-import { readTomlFile } from './repository-config-loaders.ts';
+	rewriteRepositorySettings,
+	type WriteRepositorySettingsResult,
+} from './repository-settings-writer.ts';
 
 /**
  * The Scripts settings screen's fields, plus the repository they belong to.
@@ -37,9 +31,7 @@ export interface WriteRepositoryScriptsInput {
 }
 
 /** Outcome of a write, carrying a message the IPC layer can log on failure. */
-export type WriteRepositoryScriptsResult =
-	| { ok: true; path: string }
-	| { message: string; ok: false };
+export type WriteRepositoryScriptsResult = WriteRepositorySettingsResult;
 
 /**
  * `[scripts]` keys this module owns. Anything else in the table is a key the
@@ -64,57 +56,13 @@ const MANAGED_SCRIPT_KEYS: ReadonlySet<string> = new Set([
 export function writeRepositoryScripts(
 	input: WriteRepositoryScriptsInput,
 ): WriteRepositoryScriptsResult {
-	const configPath = path.join(
-		input.repositoryPath,
-		ENSEMBLR_DIRECTORY,
-		ENSEMBLR_SETTINGS_FILENAME,
-	);
-	const existing = readTomlFile({ sourcePath: configPath });
-
-	if (existing.status === 'invalid') {
-		return {
-			message:
-				existing.diagnostics.at(0)?.message ??
-				'.ensemblr/settings.toml could not be read.',
-			ok: false,
-		};
-	}
-
-	const record = existing.record ?? {};
-
-	try {
-		writeTomlFile(configPath, {
+	return rewriteRepositorySettings({
+		repositoryPath: input.repositoryPath,
+		rewrite: (record) => ({
 			...record,
 			scripts: buildScriptsTable(asScriptsTable(record.scripts), input),
-		});
-
-		return { ok: true, path: configPath };
-	} catch (error) {
-		return {
-			message: formatErrorMessage(
-				error,
-				'Failed to write .ensemblr/settings.toml.',
-			),
-			ok: false,
-		};
-	}
-}
-
-/**
- * Serialises a config record and replaces the file atomically, so a crash
- * mid-write cannot leave a half-written config the loader would reject.
- * @param configPath - Absolute path of the config file.
- * @param record - The full config record to serialise.
- */
-function writeTomlFile(
-	configPath: string,
-	record: Record<string, unknown>,
-): void {
-	const temporaryPath = `${configPath}.tmp`;
-
-	mkdirSync(path.dirname(configPath), { recursive: true });
-	writeFileSync(temporaryPath, dump(record), 'utf8');
-	renameSync(temporaryPath, configPath);
+		}),
+	});
 }
 
 /**

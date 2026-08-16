@@ -2,6 +2,7 @@ import { createFileRoute } from '@tanstack/react-router';
 import { useTranslation } from 'react-i18next';
 
 import { DictationSection } from '@/renderer/components/settings/dictation/dictation-section';
+import { InfisicalAccountsRow } from '@/renderer/components/settings/integrations/infisical-accounts-row';
 import { LinearConnectionRow } from '@/renderer/components/settings/integrations/linear-connection-row';
 import { SettingsSection } from '@/renderer/components/settings/settings-section';
 
@@ -24,6 +25,7 @@ function IntegrationsSettings() {
 				title={t('settings:integrations.title', 'Integrations')}
 			>
 				<LinearConnectionRow />
+				<InfisicalAccountsRow />
 			</SettingsSection>
 			<DictationSection />
 		</>

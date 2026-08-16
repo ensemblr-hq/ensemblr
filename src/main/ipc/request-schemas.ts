@@ -71,6 +71,12 @@ export {
 	pushWorkspaceBranchRequestSchema,
 } from './request-schemas/github.ts';
 export {
+	addInfisicalAccountRequestSchema,
+	infisicalAccountRequestSchema,
+	infisicalLinkScopeRequestSchema,
+	setInfisicalLinkRequestSchema,
+} from './request-schemas/infisical.ts';
+export {
 	createLinearCommentRequestSchema,
 	createLinearIssueRequestSchema,
 	getLinearIssueRequestSchema,
