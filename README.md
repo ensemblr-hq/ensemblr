@@ -26,7 +26,7 @@ agent binary of its own — it drives the one you installed.
 
 *Ensemblr Control driving the app from inside a workspace: the agent names its own tab, moves the workspace to In progress, starts a run script, then delegates to two sub-agents in their own chat tabs and launches a Claude Code harness in a terminal.*
 
-- **Version:** [`0.1.0-beta.4`](https://github.com/ensemblr-hq/ensemblr/releases/tag/v0.1.0-beta.4) (pre-1.0, polish stage)
+- **Version:** [`0.1.0-beta.5`](https://github.com/ensemblr-hq/ensemblr/releases/tag/v0.1.0-beta.5) (pre-1.0, polish stage)
 - **Platform:** macOS on Apple silicon
 - **License:** Apache-2.0
 
@@ -41,7 +41,7 @@ changes before 1.0. See [`CHANGELOG.md`](./CHANGELOG.md) for recent changes.
 
 ## Install
 
-**[Download Ensemblr 0.1.0-beta.4 (.dmg, Apple silicon)](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.0-beta.4/Ensemblr-0.1.0-beta.4-arm64.dmg)** — open it and drag Ensemblr to Applications.
+**[Download Ensemblr 0.1.0-beta.5 (.dmg, Apple silicon)](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.0-beta.5/Ensemblr-0.1.0-beta.5-arm64.dmg)** — open it and drag Ensemblr to Applications.
 
 The build is code-signed with a Developer ID certificate, hardened-runtime, notarized by Apple, and
 stapled, so it opens without a Gatekeeper prompt and validates offline. Every build is on the
@@ -118,7 +118,7 @@ documented in [`docs/guide/02-requirements.md`](./docs/guide/02-requirements.md)
 **Working on Ensemblr** — [`CONTRIBUTING.md`](./CONTRIBUTING.md) ·
 [`docs/onboarding.md`](./docs/onboarding.md) (clone → run → first change) ·
 [`docs/architecture-map.md`](./docs/architecture-map.md) (which directory owns which concern) ·
-[`docs/adr/`](./docs/adr) (47 Architecture Decision Records) ·
+[`docs/adr/`](./docs/adr) (51 Architecture Decision Records) ·
 [`docs/agent-control.md`](./docs/agent-control.md) ·
 [`docs/harnesses.md`](./docs/harnesses.md) ·
 [`docs/build-and-release.md`](./docs/build-and-release.md) ·
@@ -154,6 +154,18 @@ issue. Each one is a git worktree with its own branch, working tree, agent sessi
 path. A workspace either *adopts* an existing branch or *cuts* a fresh one; the base branch is fetched and
 fast-forwarded first, and can be retargeted later without touching the worktree. A dashboard board groups
 workspaces into Backlog, In progress, In review, Done, and Canceled.
+
+**A board that starts before the workspace does.** Backlog also carries the work that has no workspace yet
+— unstarted Linear issues and unassigned open GitHub issues — and dragging one rightward is what creates
+the workspace from it. Nothing is ever written back to the tracker: dismissing an issue hides it locally,
+and its own status stays yours to change. GitHub issues are cached locally so the board paints at app
+start rather than waiting on a `gh` call per repository, and says so when it is showing cached rows.
+
+**Integrations that account for more than one account.** Connect any number of Linear organizations at
+once — every one syncs, and browse, search, and the issue pickers show them all with the organization on
+each row. Link a repository to an Infisical project and its secrets resolve live into every workspace,
+terminal, and agent at launch, never written into the repository. Claude Code sessions surface what the
+account has spent against its claude.ai plan, per rate-limit window, next to the session's running cost.
 
 **Local-first review that ends in GitHub.** One panel with Files, Changes, and Checks. Source-scoped diffs,
 per-file discard, a live file tree, and review comments anchored to specific lines that agents can read,
@@ -215,7 +227,7 @@ Full glossary in [`CONTEXT.md`](./CONTEXT.md); the user-facing tour is
 | Area | Choice |
 | --- | --- |
 | Desktop shell | Electron 43, Electron Forge 7 (Vite plugin, Fuses hardening) |
-| UI | React 19, TypeScript 6 (strict) |
+| UI | React 19, TypeScript 7 (strict) |
 | Styling | Tailwind CSS 4, shadcn/ui (`radix-nova`) + Radix UI, Lucide icons |
 | Routing | TanStack Router (file-based) |
 | Async data | TanStack Query, TanStack Virtual |

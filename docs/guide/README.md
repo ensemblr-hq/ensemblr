@@ -6,7 +6,7 @@ rather than use it, start at [`../onboarding.md`](../onboarding.md) and
 
 Ensemblr runs on macOS, Apple silicon only. You bring your own agent CLI — Pi or
 Claude Code, one is enough — plus `git` and an authenticated `gh`. It is pre-1.0,
-and this guide describes version [`0.1.0-beta.4`](https://github.com/ensemblr-hq/ensemblr/releases/tag/v0.1.0-beta.4).
+and this guide describes version [`0.1.0-beta.5`](https://github.com/ensemblr-hq/ensemblr/releases/tag/v0.1.0-beta.5).
 The app itself ships in English, Russian, and Greek; this guide is English only.
 
 ## Read in order
@@ -15,12 +15,12 @@ The app itself ships in English, Russian, and Greek; this guide is English only.
 2. [**Requirements**](./02-requirements.md) — every setup check the app runs, what each one needs, and why you need only *one* agent runtime.
 3. [**First run**](./03-first-run.md) — the setup wizard, choosing a root directory, adding a project, creating your first workspace.
 4. [**Concepts**](./04-concepts.md) — workspace, base branch, runtime versus harness, permission modes, the board. The vocabulary the rest of the guide uses.
-5. [**Workspaces**](./05-workspaces.md) — creating, adopting versus cutting a branch, branch names, setup scripts, the board, archiving.
+5. [**Workspaces**](./05-workspaces.md) — creating, adopting versus cutting a branch, branch names, setup scripts, the board and its issue backlog, archiving.
 6. [**Agents**](./06-agents.md) — Pi and Claude Code, models and reasoning levels, permission modes, plan mode, checkpoints, attachments.
 7. [**Terminals and run scripts**](./07-terminals-and-run-scripts.md) — the dock, named run scripts, the ⌘R default, terminal harnesses.
 8. [**Reviewing changes**](./08-reviewing-changes.md) — Files, Changes, Checks; review comments; opening and merging a pull request.
 9. [**Agent control**](./09-agent-control.md) — what an agent can do to the app itself, and what it is refused.
-10. [**Integrations**](./10-integrations.md) — GitHub, Linear, git, and what Ensemblr stores about each.
+10. [**Integrations**](./10-integrations.md) — GitHub, Linear (one account or several), Infisical, git, and what Ensemblr stores about each.
 11. [**App settings**](./11-app-settings.md) — every settings pane and what it controls.
 12. [**Repository settings**](./12-repository-settings.md) — the `.ensemblr/settings.toml` reference.
 13. [**Keyboard shortcuts**](./13-keyboard-shortcuts.md) — every shortcut, by scope.

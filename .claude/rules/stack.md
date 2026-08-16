@@ -4,7 +4,7 @@ The versions this repo is pinned to, and the constraints that are not obvious
 from `package.json`. Policies for *how* to use the stack (npm, Biome, Jotai,
 Tailwind scale, JSDoc) live in `AGENTS.md` — this file is the stack itself.
 
-Verified against `package.json` at `0.1.0-beta.4` on 2026-08-14. Re-check before
+Verified against `package.json` at `0.1.0-beta.5` on 2026-08-16. Re-check before
 asserting a version.
 
 ## Platform
@@ -115,11 +115,16 @@ a primitive gets reformatted to house style.
 
 - **SQLite via `node:sqlite` (`DatabaseSync`)** — Node 24's built-in. There is no
   `better-sqlite3` or `sql.js` dependency; do not add one.
-- **TOML** — `js-toml`, used only by `src/main/config/` to read and write the
+- **TOML** — `js-toml`, read and written through `src/main/config/`, which owns
+  the atomic writer both the scripts and the Infisical link writers share for the
   committed `.ensemblr/settings.toml`.
 - **Secrets** — macOS Keychain, never a file or env var.
 - **GitHub** — shells out to the `gh` CLI. Ensemblr stores no GitHub token.
-- **Linear** — OAuth, with a loopback callback server.
+- **Linear** — OAuth, with a loopback callback server. Many accounts at once
+  (ADR 0052): identity in SQLite, tokens in the Keychain keyed per account.
+- **Infisical** — a hand-written REST client against four endpoints, authenticated
+  with a Machine Identity (Universal Auth), no `@infisical/sdk` (ADR 0051). It is
+  an environment *layer*, resolved live per launch, never materialized to disk.
 - **Agent control** — `@modelcontextprotocol/sdk` over a loopback HTTP server.
 - **Agent runtimes** — Pi via CLI RPC; Claude Code via `@anthropic-ai/claude-agent-sdk`
   against the user's own `claude` binary (the SDK's ~260 MB per-platform binary is
@@ -127,7 +132,7 @@ a primitive gets reformatted to house style.
 
 ## Tooling
 
-- **Biome 2.5.7** is the only linter and formatter — no ESLint, no Prettier.
+- **Biome 2.5.8** is the only linter and formatter — no ESLint, no Prettier.
   Tabs for indentation; single quotes for JS **and** JSX.
   Config uses `linter.rules.preset: "recommended"`; the older
   `linter.rules.recommended: true` was deprecated in Biome 2.5, so do not

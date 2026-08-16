@@ -138,6 +138,24 @@ targeting a completed or canceled state is refused, so agent work goes as far as
 In Review and you decide whether it is done. See
 [`09-agent-control.md`](./09-agent-control.md).
 
+### Work that has no workspace yet
+
+Backlog holds more than workspaces. It also carries **tracker issues nothing has
+been started from** — unstarted Linear issues from every connected account, and
+open GitHub issues nobody is assigned to. An issue card is not a workspace;
+**dragging one rightward is what creates the workspace from it**, with the same
+naming, branch, and seeded prompt the Issues tab of the create dialog produces.
+
+Nothing on the board is ever written back to Linear or GitHub. Dropping an issue
+on **Canceled** dismisses it here and nowhere else — the issue's own status in
+the tracker stays yours to change.
+
+The toolbar above the board carries search, repository and source facets, three
+sort orders, and a manual refresh. GitHub issues are cached locally, so the
+board paints at app start rather than waiting on a call per repository; when a
+refresh fails and the cache stands in, the rows are real but old and the board
+tells you so.
+
 ## Retargeting the base branch
 
 The base branch is the merge target and nothing else, so changing it is cheap.

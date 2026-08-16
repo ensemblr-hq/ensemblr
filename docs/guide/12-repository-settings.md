@@ -73,8 +73,8 @@ your file byte-for-byte intact.
 | `enterprise_data_privacy` | boolean | Accepted and validated; see below. |
 | `spotlight_testing` | table | Accepted and validated; see below. |
 
-Blocks — `[git]`, `[scripts]`, `[scripts.run.<name>]`, `[prompts]` — are
-documented in their own sections below.
+Blocks — `[git]`, `[infisical]`, `[scripts]`, `[scripts.run.<name>]`,
+`[prompts]` — are documented in their own sections below.
 
 ### Keys that are accepted but do nothing
 
@@ -100,6 +100,44 @@ you got the type wrong for a key that has no effect either way.
 To actually pin the executable a runtime uses, set it in **Settings → Providers**
 — see [11. App settings](./11-app-settings.md). That override applies app-wide,
 not per repository.
+
+---
+
+## `[infisical]`
+
+Which Infisical project this repository's secrets come from. Written by
+**Settings → Repo → Secrets**, and committed on purpose: a teammate who clones
+the repository is already pointed at the right secrets and only has to add a
+Machine Identity of their own.
+
+**No credential is ever written here.** The identity — instance URL, client id,
+client secret — is per-machine state, kept in SQLite with its secret in the
+macOS Keychain.
+
+| Key | Type | What it does |
+| --- | --- | --- |
+| `project_id` | string | The Infisical project id. Required — the block is ignored without it. |
+| `environment` | string | The environment slug to read, e.g. `dev`. Required. |
+| `path` | string | Secret path within the environment. Defaults to `/`. |
+| `recursive` | boolean | Also read folders nested under `path`. Defaults to `false`. |
+| `site_url` | string | Instance URL, for self-hosted or EU-cloud deployments. |
+| `project_name` | string | The project's display name, kept so the pane can name it before a fetch. |
+
+```toml
+[infisical]
+project_id = "8f1c0c74-1f7c-4c0a-9e2d-0b1a2c3d4e5f"
+environment = "dev"
+path = "/"
+recursive = false
+site_url = "https://app.infisical.com"
+project_name = "ensemblr"
+```
+
+Values resolve live at every launch, so a rotated secret takes effect on the
+next terminal, script, or agent you start. Keys the app does not model survive a
+rewrite untouched. The rest of the integration — accounts, the resolution order,
+what happens when Infisical is unreachable — is in
+[10. Integrations](./10-integrations.md).
 
 ---
 

@@ -64,6 +64,26 @@ entitled to:
 All four are deferred until something asks for them, so opening the app spawns
 nothing. [`../claude/README.md`](../claude/README.md) has the details.
 
+### Plan usage and session cost
+
+Claude Code reports what your account has spent against its claude.ai plan, and
+two surfaces show it.
+
+- **Settings → Providers** draws a bar per rate-limit window, read once per
+  readiness probe. It runs on its own short deadline, so a slow usage endpoint
+  costs that panel alone and never the rest of the page.
+- **The composer's context hover card** carries the same windows for this chat's
+  own session, plus a running cost estimate. "How much room is left" is one
+  question over two horizons, so it is one control rather than two gauges
+  competing on the same row.
+
+Both readings persist like any other event, so reopening a chat replays its
+gauges instead of blanking them until the next turn. A crashed turn that reports
+a zero cost is dropped rather than walked backwards, and a live reading layers
+over the replayed one rather than replacing it.
+
+Plan usage is a Claude Code fact and appears only on Claude chats.
+
 ## Choosing a model and reasoning level
 
 The composer's model picker groups models by their inference provider — the
@@ -155,10 +175,18 @@ Three properties make this a mode rather than a polite request:
 - **Sub-agents inherit it.** A planning agent that fans out investigators gets
   planning investigators — none of them can edit the repository either.
 
+Sending a plan back for refinement reminds the agent to **resubmit** when it is
+done. Without that, a refine turn reads as ordinary conversation and the agent
+answers in prose instead of putting the revised plan back through the panel.
+
 Claude Code uses its own native plan mode; Ensemblr routes the result into the
 same review path, so both runtimes save to the same place and raise the same
 panel. See
 [ADR 0044](../adr/0044-enforce-plan-mode-fail-closed-at-the-control-channel.md).
+
+A plan-mode workspace is also named from your opening prompt before the agent
+gets there, and marked provisional so the agent's own naming call still replaces
+it ([ADR 0050](../adr/0050-name-a-planning-workspace-before-the-agent-does.md)).
 
 ## Checkpoints and session branching
 
@@ -198,6 +226,11 @@ moment you attach them, keyed by content — so an attachment has a real path th
 agent can re-read, and the same file attached twice is stored once. A referenced
 thing is written out as a document rather than summarised into a line of prose.
 
+A workspace created from a tracker issue opens with that issue **already
+attached** as a document, once per chat, rather than with a summary flattened
+into the draft box — so the agent reads the body and the comments instead of
+whatever survived truncation. Remove the chip and it stays removed.
+
 See [ADR 0047](../adr/0047-model-composer-attachments-as-one-ordered-list-in-a-lexical-draft.md).
 
 ## Linked directories
@@ -225,6 +258,11 @@ elsewhere. Marks are per chat, not per workspace, so reading one tab does not
 clear its siblings — a workspace with three agents running keeps three separate
 answers to "is there anything new here". You can also mark a workspace unread
 yourself.
+
+A mark is retired when its chat is **read** or when its tab **closes** — whether
+you closed it or the agent did. A chat an agent opened, used, and closed before
+anyone looked at it therefore leaves no dot pointing at a tab that is no longer
+there.
 
 ## Notifications and language
 

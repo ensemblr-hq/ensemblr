@@ -15,6 +15,13 @@ An agent with Control can:
   ones it has addressed
 - read Linear issues, comment on one, and move it along
 - move its workspace across the board
+
+A workspace created from a tracker issue tells its agent so. The chat carries a
+standing block naming that issue and the moments at which the ticket is expected
+to move, so the agent keeps the ticket current instead of waiting for you to ask
+for each transition by hand. What that block permits is cut to what the caller
+may actually do — a sub-agent is denied tracker writes, a planning agent is
+denied the move.
 - name its own tab and record a summary of what the conversation covered
 - **ask you a question** and block until you answer
 
@@ -65,10 +72,17 @@ code, so a prompt cannot talk its way past them:
   is *completed* or *canceled* is refused — both, because closing a ticket as
   canceled is the same act under a different name. Agent work goes as far as
   **In Review** and you decide whether it is done.
+- **A planning agent may not move the ticket either.** It has not implemented
+  anything yet, so In Review would claim work that does not exist.
 - **The guard fails closed.** A state the app cannot classify — an unknown id, a
   stale cache, a metadata read that could not reach Linear — is refused too. An
   unclassifiable state might be a Done column, and the point is that Ensemblr
   never posts an agent's "finished" to a tracker your team reads.
+- **A write never guesses which organization it means.** With several Linear
+  accounts connected, an ambiguous target is refused with the candidates named
+  rather than resolved by chance. A workspace created from an issue defaults to
+  that issue's account, and that default is applied only after the entity itself
+  has been looked up, so it can never mask an issue that belongs elsewhere.
 
 A refusal comes back to the agent as a modelled answer naming the recovery, not
 as a crash, so it can correct course rather than retry blindly.

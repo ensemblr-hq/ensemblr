@@ -84,6 +84,22 @@ _Avoid_: Message backlog, pending prompts
 A record that agent activity landed in a chat the user was not reading. Marks are per chat, not per workspace, so reading one tab does not silence its siblings, and a mark is dropped once its chat becomes unreachable.
 _Avoid_: Notification, badge
 
+**Backlog Issue**:
+A tracker issue on the dashboard board that no workspace has been started from yet — an unstarted Linear issue or an unassigned open GitHub issue. It sits in Backlog beside workspace cards; dragging it rightward is what creates the workspace. Nothing the board does is written back to the tracker.
+_Avoid_: Ticket card, todo, task card
+
+**Linked Issue**:
+The tracker issue a workspace was created from, persisted on the workspace and surfaced to its agent as a standing block naming the issue and the moments the ticket is expected to move. It is what lets an agent keep the ticket current instead of the user asking for each transition by hand.
+_Avoid_: Attached issue (that names a composer attachment), parent ticket
+
+**Linear Account**:
+One connected Linear organization. Several can be connected at once; each syncs independently, owns its cached issues, and keeps its tokens in the Keychain under its own account id. A read may merge accounts, a write is always scoped to exactly one, and an ambiguous target is refused rather than guessed.
+_Avoid_: Linear connection, workspace (that is Linear's own word for an organization, and Ensemblr's for something else)
+
+**Secrets Link**:
+The binding between a repository and an Infisical project, split by sensitivity: the project half — instance URL, project id, environment, path — is committed to `.ensemblr/settings.toml`, while the Machine Identity that resolves it is per-machine state with its client secret in the Keychain. Values resolve live at every launch as an environment layer and are never materialized into the repository.
+_Avoid_: Secret sync, vault import, secret store (that names Ensemblr's own Keychain-backed store)
+
 **Menu Command**:
 A named action the native menu bar can invoke, defined once in `src/shared/menu-commands.ts`. The renderer owns the handler and reports which commands are live; the main process enables items from that report. A command with no registered handler renders as a disabled item.
 _Avoid_: Menu item, shortcut, accelerator

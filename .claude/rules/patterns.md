@@ -40,7 +40,7 @@ in siblings:
   `<concern>/index.ts` (`ipc/`, `keymap/`, `pi-rpc/`)
 - `src/renderer/state/<concern>/index.ts`, `src/renderer/lib/<concern>/index.ts`,
   `src/renderer/types/<concern>/index.ts`, `src/renderer/components/**/index.ts`
-- `src/main/<concern>/index.ts` — all 31 main concerns have one
+- `src/main/<concern>/index.ts` — all 33 main concerns have one
 
 Import from the barrel outside the concern; import siblings directly inside it.
 The shared and renderer barrels above are registered as entries in

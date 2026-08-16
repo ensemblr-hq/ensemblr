@@ -93,6 +93,24 @@ a permissions error.
 step. To confirm it took, `ls -l node_modules/node-pty/prebuilds/*/spawn-helper`
 — each should be mode `755`.
 
+### An Infisical secret is missing from a terminal or agent
+
+**Cause.** One of four, in the order worth checking. The repository has no link
+(**Settings → Repo → Secrets** shows no project). The link resolves to no local
+account — the project half is committed and the Machine Identity is not, so a
+freshly cloned repository needs an account added under **Settings →
+Integrations**. The secret lives under a path the link does not cover, and
+`recursive` is off. Or a value you set by hand is winning: the layer order is
+`env files < infisical < local rows < Ensemblr secrets`, and everything to the
+right of Infisical overrides it.
+
+**Fix.** Check the link and the account first, then widen `path` or turn on
+`recursive`. Values resolve at **launch**, so a terminal or agent started before
+the change keeps the old environment — restart it. If Infisical was unreachable,
+the workspace still opens: the layer falls back to the last resolved values and
+warns rather than failing, so an unexplained *stale* value is the signature of a
+failed fetch rather than a bad link.
+
 ### `gh-auth` is red although I am logged in
 
 **Cause.** The check runs exactly this:

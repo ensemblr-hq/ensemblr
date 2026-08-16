@@ -165,6 +165,13 @@ provider reports nothing, the pane says so rather than guessing.
 
 ![The Providers pane on the Claude Code tab, with the account, organization, plan, and API provider rows above the runtime's readiness checks.](./images/11-settings-providers-claude.png)
 
+**Plan usage** (Claude Code only). A bar per claude.ai rate-limit window,
+showing what the account has spent against its plan. It is read once per
+readiness probe, on its own short deadline — a slow usage endpoint costs this
+panel alone and leaves the account and MCP rows intact. The same windows,
+scoped to one chat's session and paired with that session's running cost, sit in
+the composer's context hover card ([6. Agents](./06-agents.md)).
+
 **Sign-in is interactive.** Ensemblr copies the login command to your clipboard
 and you run it in a terminal. It never captures the credential.
 
@@ -195,11 +202,22 @@ be installed first.
 Environment variables Ensemblr uses itself and passes to agent sessions,
 scripts, and terminals.
 
-Variables can come from two places:
+Variables can come from three places:
 
 - **Rows you add** in the pane, each a name and a value.
 - **Env files** you point at. Add a file and its variables load from disk. In
   the native file picker, press `⌘⇧.` to reveal hidden files — `.env` is hidden.
+- **An Infisical project**, when the repository's Secrets pane links one. Those
+  values are fetched live at every launch and never edited here.
+
+They layer in a fixed order, later winning:
+
+```
+env files  <  infisical  <  rows you add  <  Ensemblr secrets
+```
+
+A value you set by hand therefore beats one Infisical resolved, which is what
+debugging against a local service expects.
 
 **Secret values are masked.** A variable is treated as secret when the built-in
 catalogue says so, or — for a variable you invent — when its name looks
@@ -307,6 +325,7 @@ can be disconnected at any time.
 | Integration | States | Notes |
 | --- | --- | --- |
 | Linear | Connected, Disconnected, Reconnect required, Not configured | Connect to browse Linear issues, manage them from Ensemblr, and create workspaces from issues. |
+| Infisical | one row per configured account | Machine-Identity accounts that repository secret links resolve through. |
 
 Linear needs a client id before it can be connected at all: add
 `app.linear.clientId` to `~/.config/ensemblr/config.json`. Without it the pane
@@ -315,6 +334,18 @@ never need it.
 
 `Reconnect required` means the stored token expired and could not be refreshed
 automatically. Reconnecting is a full sign-in, in your browser.
+
+**Linear is a list, not a switch.** Connect as many organizations as you need;
+each is its own row with its own state, and a row that needs reconnecting says
+so without disturbing the others. Disconnecting one takes its cached issues and
+its Keychain entries with it and leaves the rest alone.
+
+**Infisical** lists the Machine Identity accounts on this machine, with add,
+re-check, and remove. An account is the credential half of a secrets link; the
+project half lives in the repository's own **Secrets** pane, and is committed.
+Removing an account arms on the first click rather than deleting on it —
+Infisical shows a Universal Auth client secret exactly once, so there is no
+undo. Details in [10. Integrations](./10-integrations.md).
 
 GitHub is not on this pane. Ensemblr shells out to the `gh` CLI and stores no
 GitHub token of its own. See [10. Integrations](./10-integrations.md).
@@ -361,7 +392,7 @@ Developer-only controls and early automation defaults.
 
 ## Repository panes
 
-Switching the scope toggle to **Repo** gives you six panes for the repository
+Switching the scope toggle to **Repo** gives you seven panes for the repository
 selected in the picker. They do not all write to the same place, and that
 matters — one set is committed and reviewed like code, the other is personal to
 your machine.
@@ -369,11 +400,18 @@ your machine.
 | Pane | Writes to | Shared with your team? |
 | --- | --- | --- |
 | Environment | Local state, with secret values in the macOS Keychain | No |
+| **Secrets** | **`.ensemblr/settings.toml`** `[infisical]` — the committed file | **Yes** |
 | Git | Local state | No |
 | **Scripts** | **`.ensemblr/settings.toml`** — the committed file | **Yes** |
 | Actions | Local state, layered under the committed `[prompts]` block | Partly |
 | Security | Local state, for the agent permission mode | No |
 | Misc | Local state | No |
+
+**Secrets** links this repository to an Infisical project. It asks which
+project, never which account: projects are listed across every configured
+account at once and each row carries the account that reached it, so picking the
+project settles the account. Save stays hidden until something actually changed.
+What is committed is the project, environment, and path — never a credential.
 
 Only the Scripts pane writes the committed file. Saving there rewrites
 `.ensemblr/settings.toml` — every other section of the file survives by value,

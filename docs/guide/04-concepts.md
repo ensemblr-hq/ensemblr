@@ -143,6 +143,10 @@ Every workspace sits in one of five columns:
 You drag cards between columns and reorder within one. Agents can move their own
 workspace too.
 
+Backlog also carries **tracker issues no workspace exists for yet** — unstarted
+Linear issues and unassigned open GitHub issues. Dragging one rightward creates
+the workspace from it. Nothing the board does is written back to the tracker.
+
 _You'll see this in_ [`05-workspaces.md`](./05-workspaces.md).
 
 ## Permission modes
@@ -205,6 +209,8 @@ where you cannot see them.
 
 A record that agent activity landed in a chat you were not reading. Marks are per
 chat, not per workspace, so catching up on one tab does not silence its siblings.
+A mark is retired when you read the chat or when its tab closes, so a chat an
+agent opened and closed on its own leaves no dot behind.
 
 ## Run script
 

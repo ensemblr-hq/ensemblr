@@ -1,8 +1,9 @@
 # Integrations
 
-Ensemblr talks to four things outside itself: GitHub through the `gh` CLI,
-Linear over OAuth, git through the native binary, and macOS through Launch
-Services. Two of them need a one-time setup step; the other two need nothing.
+Ensemblr talks to five things outside itself: GitHub through the `gh` CLI,
+Linear over OAuth, Infisical over its API, git through the native binary, and
+macOS through Launch Services. The first three need a setup step; the other two
+need nothing.
 
 The connection state for each lives in **Settings → Integrations**, and the
 setup gate that checks them at first run is described in
@@ -39,10 +40,19 @@ What the integration powers:
 | Merging | `gh pr merge`, from the two-step merge confirmation |
 | Repository browsing | lists the repositories your account can see, when you add a project from GitHub |
 | Publishing a project | `gh repo create` publishes a new local project to GitHub |
+| The board backlog | reads each project's **unassigned** open issues, so work with no workspace yet has a place to sit |
 
 GitHub is treated as the source of truth for remote state: Ensemblr caches what
 it fetched so the panel paints instantly, then refreshes from GitHub, and tells
 you when a refresh failed rather than showing you a stale result.
+
+Board issues are cached locally as well, so the dashboard paints at app start
+instead of waiting on a `gh issue list` per repository. When `gh` fails and the
+cache stands in for it, the rows shown are real but old, and the board says so
+rather than presenting them as current. The backlog query asks GitHub for
+unassigned issues directly rather than filtering them afterwards — a page limit
+counts the rows GitHub returns, so filtering after the fact would empty the
+backlog of any repository whose newest open issues happen to all be assigned.
 
 Review and merge flow is on [`./08-reviewing-changes.md`](./08-reviewing-changes.md).
 
@@ -58,10 +68,32 @@ ports registered as redirect URIs on that application — Linear matches redirec
 URIs exactly, so a random port could never match. The server takes one callback
 and shuts down.
 
-The access and refresh tokens go straight to the macOS Keychain; only non-secret
-connection metadata is kept locally. Disconnecting from settings revokes the
-token with Linear rather than just forgetting it. Ensemblr requests the `read`
-and `write` scopes.
+The access and refresh tokens go straight to the macOS Keychain, keyed per
+account; only non-secret connection metadata is kept locally. Disconnecting from
+settings revokes the token with Linear rather than just forgetting it. Ensemblr
+requests the `read` and `write` scopes.
+
+### More than one account
+
+A Linear OAuth application installs into one organization at a time, so an
+account per organization is the normal case rather than an edge one. **Connect
+as many as you need** ([ADR 0052](../adr/0052-support-multiple-linear-accounts.md)).
+Every connected account syncs, and browse, search, the composer's issue picker,
+and the workspace-from-issue picker show all of them at once, each row tagged
+with the organization it came from.
+
+- **A read that spans accounts is merged, not chosen.** When one organization is
+  reauthorizing, its rows drop out and the surface names it, rather than the
+  whole list going blank.
+- **A write is scoped to exactly one account.** Which one follows from the issue
+  named; a workspace created from an issue defaults to the account that issue
+  came from. When the target is genuinely ambiguous, the call is refused with
+  the candidate accounts named rather than guessed at — an issue id from one
+  organization is never valid in another.
+- **Disconnecting an account takes its cached issues with it**, and its Keychain
+  entries. The accounts you keep are untouched.
+
+A connection made before this landed is adopted automatically on first read.
 
 If you run your own Linear OAuth application — a self-hosted setup, or a
 workspace whose admins will not approve a third-party app — set
@@ -72,16 +104,84 @@ What the integration powers:
 
 | Surface | What it does |
 | --- | --- |
-| Issue browsing | search and read issues visible to your account, with their comments, team, project, status, labels, and assignee |
+| Issue browsing | search and read issues visible to any connected account, with their comments, team, project, status, labels, and assignee — plus an inline editor for the properties rail |
+| The board backlog | unstarted issues appear in Backlog; dragging one rightward is what creates the workspace from it |
 | Workspace from an issue | create a workspace directly from an issue, seeding its name, branch, and initial prompt from the issue title and identifier |
 | Attaching to a chat | pick an issue in the composer and attach it as a chip; the whole issue is serialized as a markdown document for the agent to read |
 | Agent reads | agents can list and read issues and the metadata tables (teams, projects, states, labels, users) through Ensemblr Control |
 | Agent writes | agents can update an issue and comment on it |
 
+A workspace created from an issue now **tells its agent so**: the chat opens
+with that issue attached as a document, and the agent is given the issue's
+identity along with the moments at which it is expected to move the ticket. The
+ticket therefore tracks the work without you asking for each transition by hand.
+
 Agent writes are gated: an agent **cannot move an issue into a state Linear
 classifies as completed or canceled**, and an unknown state id fails closed
-rather than being attempted. That is enforced at the control boundary, not
-merely instructed — see [`./09-agent-control.md`](./09-agent-control.md).
+rather than being attempted. A sub-agent is refused tracker writes outright and
+reports back through its parent instead, and a planning agent is refused the
+move — In Review would claim an implementation that does not exist yet. That is
+enforced at the control boundary, not merely instructed — see
+[`./09-agent-control.md`](./09-agent-control.md).
+
+Nothing on the board writes back to Linear. Dismissing an issue from the board
+hides it locally; the issue's own status stays yours to change
+([ADR 0024](../adr/0024-use-linear-oauth-for-v1-issue-integration.md)).
+
+## Infisical
+
+Link a repository to an **Infisical** project and its secrets resolve into every
+workspace, terminal, run script, and agent that repository launches
+([ADR 0051](../adr/0051-resolve-infisical-secrets-as-a-live-environment-layer.md)).
+Nothing is written into the repository, and nothing is copied into Ensemblr's
+own secret store.
+
+Setup is two halves, split by sensitivity:
+
+| Half | Where it goes | What it holds |
+| --- | --- | --- |
+| The **account** | SQLite, with its client secret in the Keychain | a Machine Identity — instance URL, client id, client secret |
+| The **project** | the committed `.ensemblr/settings.toml` | instance URL, project id, environment, path |
+
+Because the project half is committed, a teammate who clones the repository is
+already pointed at the right secrets and only has to add an identity of their
+own. **Settings → Integrations** owns the accounts list (add, re-check, remove);
+the repository's own **Secrets** screen owns the link.
+
+Authentication is Infisical's **Universal Auth**, not OAuth: an Infisical OAuth
+application is registered per organization by an admin, so there is no globally
+registered Ensemblr client to ship the way there is for Linear. One Machine
+Identity paste works against cloud US, cloud EU, and any self-hosted instance.
+Create one under Organization Access Control → Identities, give it access to the
+project, and paste its client id and secret.
+
+The Secrets screen asks which **project**, never which account: Ensemblr lists
+projects across every configured account at once and each row carries the
+account that reached it, so picking the project settles the account. An account
+that cannot be listed drops out of the list by name rather than failing the
+whole screen.
+
+Three properties worth knowing:
+
+- **Pull only.** Ensemblr never writes a secret back to Infisical.
+- **Every launch resolves live.** There is no freshness window — a rotated
+  secret takes effect on the next terminal, script, or agent you start. The
+  Keychain-held copy is a *failure* fallback, read only when the fetch fails,
+  never as a cache.
+- **Local values still win.** The layer sits between env files and the values
+  you set by hand:
+
+  ```
+  env files  <  infisical  <  plain (local)  <  Ensemblr secrets
+  ```
+
+Infisical being unreachable never blocks a workspace: the resolver serves the
+stored fallback and warns, or yields an empty layer and warns. Every resolved
+value joins the output redactor, so it is scrubbed from terminal output like any
+other secret.
+
+The `[infisical]` block itself is documented in
+[`./12-repository-settings.md`](./12-repository-settings.md).
 
 ## git
 
@@ -149,6 +249,11 @@ Two credentials are deliberately **not** Ensemblr's:
 - **Pi's provider credentials stay in the Pi user environment**, where Pi put
   them. Ensemblr duplicates none of it unless you explicitly configure an
   Ensemblr-owned secret of your own.
+
+**Infisical secrets are not stored at all** — they resolve live at launch. What
+does reach the Keychain is the Machine Identity's client secret, plus a copy of
+each resolved value kept solely so an unreachable Infisical does not take a
+workspace down with it.
 
 ## See also
 

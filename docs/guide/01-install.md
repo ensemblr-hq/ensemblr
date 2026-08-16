@@ -7,11 +7,11 @@ build.
 
 ## Download
 
-The current build is **`0.1.0-beta.4`**:
+The current build is **`0.1.0-beta.5`**:
 
-- [**`Ensemblr-0.1.0-beta.4-arm64.dmg`**](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.0-beta.4/Ensemblr-0.1.0-beta.4-arm64.dmg)
+- [**`Ensemblr-0.1.0-beta.5-arm64.dmg`**](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.0-beta.5/Ensemblr-0.1.0-beta.5-arm64.dmg)
   — the disk image. Open it and drag Ensemblr to `/Applications`.
-- [`Ensemblr-darwin-arm64-0.1.0-beta.4.zip`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.0-beta.4/Ensemblr-darwin-arm64-0.1.0-beta.4.zip)
+- [`Ensemblr-darwin-arm64-0.1.0-beta.5.zip`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.0-beta.5/Ensemblr-darwin-arm64-0.1.0-beta.5.zip)
   — the same `.app`, zipped, if you would rather not mount an image.
 
 Every build is on the Releases page:
@@ -24,7 +24,7 @@ hardened runtime, and is notarized by Apple and stapled — both the `.app` and 
 network round-trip and without the right-click dance below. It is a **beta**: pre-1.0,
 with breaking changes expected before 1.0.
 
-The app reports the full version, suffix included — `0.1.0-beta.4` in Settings →
+The app reports the full version, suffix included — `0.1.0-beta.5` in Settings →
 Diagnostics and in the bundle's `CFBundleShortVersionString`. It matches the
 release tag, so a bug report only has to quote one string.
 
@@ -139,7 +139,7 @@ Four locations, and nothing outside them:
 | --- | --- |
 | App settings | `~/.config/ensemblr/config.json` |
 | Projects, workspaces, agent sessions, board state | `~/Library/Application Support/dev.ensemblr.app/ensemblr.db` |
-| Secrets (Linear OAuth token) | macOS Keychain, service `dev.ensemblr.app.secret-store` |
+| Secrets (Linear OAuth tokens, Infisical client secrets) | macOS Keychain, service `dev.ensemblr.app.secret-store` |
 | Your repositories, worktrees, and archived context | The root directory you pick during setup — `~/Ensemblr` unless you change it |
 
 The canary and dev channels use their own bundle-id-scoped Application Support

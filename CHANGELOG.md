@@ -9,6 +9,120 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.0-beta.5] - 2026-08-16
+
+A board that starts before the workspace does, secrets that resolve themselves, and Linear as a list
+rather than a switch. Signed, notarized, Apple silicon.
+[Release](https://github.com/ensemblr-hq/ensemblr/releases/tag/v0.1.0-beta.5) ·
+[`.dmg`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.0-beta.5/Ensemblr-0.1.0-beta.5-arm64.dmg)
+
+### Added
+
+- **Tracker issues on the dashboard board** (#304). Backlog now holds the work that has no workspace yet
+  — unstarted Linear issues and unassigned open GitHub issues — and dragging one rightward is how a
+  workspace gets created from it. Dropping on Canceled dismisses an issue locally; nothing is ever written
+  back to Linear or GitHub, so an issue's own status stays the user's to change
+  ([ADR 0024](./docs/adr/0024-use-linear-oauth-for-v1-issue-integration.md)). A toolbar adds search,
+  repository and source facets, three sort modes, and a manual refresh. GitHub issues are cached in SQLite
+  so the board paints at app start instead of waiting on a `gh issue list` per repository; when `gh` fails
+  and the cache stands in for it the result stays `ok` — the rows are real, just old — and carries the
+  failure so the surface can say so rather than showing stale issues that look current. The backlog query
+  asks `gh` for `no:assignee` directly rather than filtering renderer-side, because `--limit` counts the
+  rows GitHub returns and filtering after the fact empties the backlog of any repository whose newest open
+  issues happen to all be assigned.
+- **Agents that keep their ticket current** (#304). The tools to move a ticket have been there since
+  Linear landed; what was missing was the fact that there *is* a ticket. A workspace created from an issue
+  persists it on its metadata, and the app now renders a **LINKED ISSUE** block naming the issue and the
+  trigger for each call, cut to what the caller may actually do to a tracker — a sub-agent is denied both
+  tracker writes and hands back through its report, and a planning agent is denied the move because In
+  Review would claim an implementation that does not exist yet. The block is rendered from live workspace
+  state rather than written into a playbook, and appended after whichever playbook won, which is also what
+  keeps Plan Mode from losing it. The composer is seeded with the same issue as a **document**, so the
+  agent reads the body and comments instead of whatever survived truncation.
+- **Many Linear accounts, not one** (#303). Lift the assumption that there is exactly one Linear
+  connection ([ADR 0052](./docs/adr/0052-support-multiple-linear-accounts.md)). Every connected account
+  syncs, and the browse list, composer issue picker, search, and workspace-from-issue picker show all of
+  them at once, each row tagged with its organization. `linear_accounts` (migration 019) holds identity and
+  grant metadata only; access and refresh tokens live in the Keychain at `linear-access-token:<accountId>`
+  / `linear-refresh-token:<accountId>`, so a database copied off the machine carries no credential.
+  `accountId` is optional everywhere and resolved from the entity named, in a fixed order — the account
+  passed, the account owning the entity, the caller's fallback, then the only connected account — with the
+  fallback applied strictly *after* the entity lookup so a caller's default can never mask an entity that
+  belongs elsewhere. Ambiguity is refused with the accounts named rather than guessed; `listIssues` is the
+  deliberate exception and merges every account, returning `accountFailures` alongside a partial result so
+  one reauthorizing organization removes its own rows instead of blanking the list. Also lands an issue
+  browse and detail UI with a properties rail, inline quick-update, comments, and an editor.
+- **Infisical secrets as a live environment layer** (#302). Link a repository to an Infisical project and
+  its secrets resolve into every workspace, terminal, and agent at launch, read live and never written into
+  the repository ([ADR 0051](./docs/adr/0051-resolve-infisical-secrets-as-a-live-environment-layer.md)).
+  The link is split by sensitivity: the project half (instance URL, project id, environment, path) goes
+  into the committed `.ensemblr/settings.toml` so a teammate who clones is already pointed at the right
+  secrets, while the account row lives in SQLite and its client secret in the Keychain. Authentication is a
+  Machine Identity (Universal Auth), not OAuth, because an Infisical OAuth app is registered per
+  organization and there is no globally registered Ensemblr client to ship. The layer sits between env
+  files and explicit local values — `env files < infisical < plain < Ensemblr secrets` — so a value set by
+  hand still wins. There is deliberately no freshness window: the Keychain-held copy is a *failure*
+  fallback, not a latency cache, because a stored value served while Infisical is reachable would hand a
+  script a credential that has already been revoked. The resolver never throws; Infisical being unreachable
+  must never be why a workspace will not open.
+- **Claude plan usage and session cost** (#300). Claude Code reports what an account has spent against its
+  claude.ai plan, and two surfaces now show it: the Providers page draws a bar per rate-limit window, read
+  once per readiness probe, and the composer's context hover card carries the same windows for the chat's
+  own session plus the running cost estimate — "how much room is left" is one question over two horizons
+  and deserves one control. Two new agent events carry it, `plan-limit` off the SDK's pushed
+  `rate_limit_event` and `session-cost` off a sealed turn's `result`; both persist like every other event,
+  so reopening a chat replays its gauge instead of blanking it. The plan read runs on its own 8s deadline
+  rather than the probe's 20s one, so a slow endpoint costs the usage panel alone.
+
+### Changed
+
+- **Dock activity badges stay live across workspaces** (#301). Dock activity was published by the mounted
+  workspace route, so a sidebar row lost its running badge the moment the user navigated away, and inactive
+  rows fell back to a navigation snapshot whose setup/run dock tabs are always built as `idle` — they never
+  showed one at all. Terminal activity is now tracked once in the workbench frame: `TerminalService.list()`
+  takes an optional workspace id and returns every live session when it is omitted, and the renderer folds
+  that listing plus lifecycle and output broadcasts into app-wide atoms the sidebar derives one badge state
+  per workspace from. Teardown resets the shared active-terminal set and the seed replaces the session map
+  rather than merging onto it, so a terminal whose exit broadcast landed while nothing was subscribed
+  cannot keep a running dot forever.
+- **A refine turn reminds the agent to resubmit** (#298). Sending a plan back for refinement read as
+  ordinary conversation, so the agent answered in prose instead of putting the revised plan back through
+  the panel.
+- **Lifecycle dialogs close before post-removal navigation** (#304). Archive, delete, and rename awaited
+  their callback before closing, and that callback navigates away from the removed workspace — so the modal
+  and its pointer-events overlay stayed up for as long as navigation took to settle, which reads as the
+  whole app freezing. The removal has already committed by then. The dialog also refuses to open with a
+  null target, which previously left an empty shell whose overlay still ate every click.
+
+### Fixed
+
+- **A chat's unread mark is retired when its tab closes** (#305). Reading a chat was the only thing that
+  cleared its mark, so a tab an agent closed before anyone looked at it left the sidebar dot standing and
+  the composer's jump control aimed at a chat that no longer exists. Both close paths now retire it. Agent
+  closes ride a new optional `closedChat` on `TabsChangedBroadcast`, and the port names the chat only when
+  one really left the open set — a payload claiming a close that did not happen would clear the mark of a
+  tab still on screen, and a read that throws answers "still open" for the same reason: a stale mark is
+  recoverable, a false clear is not. User closes clear on mutation *success* rather than on mutate, because
+  a close that throws puts the tab back and the mark has to come with it.
+- **A clicked desktop notification opens its chat** (#297).
+- **Images and binaries the preview cannot draw are named rather than mangled** (#299). A `.webp` was
+  accepted on its RIFF prefix alone — which also matches WAV and AVI — and any file whose bytes failed
+  validation fell through to the utf8 source view, so a real image reached the code surface as mojibake.
+  Adds a third `binary` content encoding that carries no content, plus a typed reason the renderer explains
+  it with: an extension that lies about being an image or a PDF, a real image format no engine decodes
+  (TIFF, HEIC, JXL), or bytes that are simply not text. Signature validation becomes a table of the two
+  shapes real formats take, so WebP is pinned by its `WEBP` fourcc and AVIF by any brand in its `ftyp` box
+  rather than by the major brand alone.
+
+### Documentation
+
+- Refreshed the guide, the architecture map, and the stack rules for everything above: the board's issue
+  backlog ([5](./docs/guide/05-workspaces.md), [4](./docs/guide/04-concepts.md)), Infisical and
+  multi-account Linear ([10](./docs/guide/10-integrations.md), [11](./docs/guide/11-app-settings.md)), the
+  `[infisical]` block ([12](./docs/guide/12-repository-settings.md)), plan usage, the seeded linked issue,
+  and the plan-refine reminder ([6](./docs/guide/06-agents.md)), and the linked-issue block's refusals
+  ([9](./docs/guide/09-agent-control.md)).
+
 ## [0.1.0-beta.4] - 2026-08-14
 
 Notifications you can act on, a delegation switch for Claude Code, and a quit that asks first.
