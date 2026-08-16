@@ -24,7 +24,6 @@ import { useAgentComposerController } from '@/renderer/state/composer';
 import { repoSettingsOverrideAtomFamily } from '@/renderer/state/preferences';
 import { usePublishActiveChat } from '@/renderer/state/unread';
 import {
-	usePublishWorkspaceDockActivity,
 	useSessionTabState,
 	useWorkspacePanelTabState,
 } from '@/renderer/state/workspace';
@@ -101,10 +100,6 @@ export function WorkspaceRouteContent({
 		}),
 		[liveWorkspace, settingsResolution],
 	);
-	usePublishWorkspaceDockActivity({
-		dockTabs: workspaceWithLiveDockTabs.dockTabs,
-		workspaceId: activeWorkspace.id,
-	});
 	// Tab preference validation must see the LIVE dock tabs (terminal:<id>),
 	// not the placeholder model, or terminal tab clicks bounce back to setup.
 	const panelTabs = useWorkspacePanelTabState({

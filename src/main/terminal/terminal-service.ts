@@ -161,7 +161,11 @@ export interface TerminalService {
 	) => Promise<CreateTerminalSessionResult>;
 	getSnapshot: (terminalId: string) => TerminalSnapshotResult;
 	kill: (terminalId: string) => TerminalSessionSnapshot | null;
-	list: (workspaceId: string) => TerminalSessionSnapshot[];
+	/**
+	 * Live sessions of one workspace, or of every workspace when `workspaceId` is
+	 * omitted — the renderer seeds its cross-workspace activity badges that way.
+	 */
+	list: (workspaceId?: string) => TerminalSessionSnapshot[];
 	/**
 	 * Every live session of one kind, across all workspaces. Backs the
 	 * `nonconcurrent` run mode, which has to reach outside the launching
@@ -1440,6 +1444,7 @@ export function createTerminalService({
 		kill,
 		list: (workspaceId) =>
 			Array.from(sessions.values()).flatMap((session) =>
+				workspaceId === undefined ||
 				session.snapshot.workspaceId === workspaceId
 					? [{ ...session.snapshot }]
 					: [],

@@ -7,7 +7,6 @@ import { useWorkspaceBusy } from '@/renderer/hooks/workspace/use-workspace-busy'
 import { getWorkspaceSidebarState } from '@/renderer/lib/workbench';
 import { useWorkspaceUnreadCount } from '@/renderer/state/unread';
 import {
-	getRunningDockActivityState,
 	useWorkspaceIsUnread,
 	type WorkspaceDockActivityState,
 	workspaceDockActivityByWorkspaceAtom,
@@ -22,9 +21,13 @@ import type { WorkspaceShellModel } from '@/renderer/types/workbench';
  * The active row shares the header's live PR snapshot (same query key), so its
  * icon flips to ready-to-merge in the same render as the header rather than one
  * navigation poll later. Inactive rows keep the navigation snapshot's PR state,
- * which adds no subscriptions or re-renders — so the dot's freshness is not
+ * which adds no subscriptions or re-renders — so the PR icon's freshness is not
  * uniform across rows. Agent runtime activity flows through `agentBusy` so it
  * takes spinner priority without disturbing cached `workspace.status` semantics.
+ *
+ * Dock activity is uniform across rows: it comes from the app-wide terminal
+ * activity the workbench frame watches, not from this workspace's dock, which
+ * only exists while its route is mounted.
  *
  * `isUnread` comes from `useWorkspaceIsUnread`, which folds the manual flag and
  * the per-chat marks; the bold label answers either, while only the chat count
@@ -59,7 +62,7 @@ export function useWorkspaceSidebarRow({
 			),
 		[workspace.id],
 	);
-	const liveDockActivityState = useAtomValue(liveDockActivityAtom);
+	const dockActivityState = useAtomValue(liveDockActivityAtom);
 
 	const liveWorkspace =
 		livePullRequest === workspace.pullRequest
@@ -67,8 +70,7 @@ export function useWorkspaceSidebarRow({
 			: { ...workspace, pullRequest: livePullRequest };
 
 	return {
-		dockActivityState:
-			liveDockActivityState ?? getRunningDockActivityState(workspace.dockTabs),
+		dockActivityState,
 		hasDiffStats:
 			workspace.changeSummary.additions > 0 ||
 			workspace.changeSummary.deletions > 0,

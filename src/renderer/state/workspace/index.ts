@@ -21,11 +21,6 @@ export {
 	useSettleDiffLineReveal,
 } from './diff-line-reveal';
 export {
-	getRunningDockActivityState,
-	usePublishWorkspaceDockActivity,
-} from './dock-activity';
-export type { WorkspaceDockActivityState } from './layout-atoms';
-export {
 	activeDockTabByWorkspaceAtom,
 	activeReviewTabByWorkspaceAtom,
 	changesSourceByWorkspaceAtom,
@@ -34,7 +29,6 @@ export {
 	rightSidebarCollapsedAtom,
 	rightSidebarSizePercentAtom,
 	workspaceDirectoryRevealRequestAtom,
-	workspaceDockActivityByWorkspaceAtom,
 } from './layout-atoms';
 export { useProjectNavigationState } from './navigation';
 export {
@@ -58,6 +52,18 @@ export {
 	orderedProjectIdsAtom,
 	pinnedWorkspaceIdsAtom,
 } from './structure-atoms';
+export type {
+	TerminalActivitySnapshot,
+	WorkspaceDockActivityState,
+} from './terminal-activity';
+export {
+	activeTerminalIdsAtom,
+	computeWorkspaceDockActivity,
+	reduceTerminalActivitySnapshot,
+	terminalActivitySnapshotsAtom,
+	workspaceDockActivityByWorkspaceAtom,
+} from './terminal-activity';
+export { useWatchTerminalActivity } from './terminal-activity-watch';
 export { useCloseRunningChatGuard } from './use-close-running-chat-guard';
 export type { ViewedChangesState } from './viewed-changes';
 export {
