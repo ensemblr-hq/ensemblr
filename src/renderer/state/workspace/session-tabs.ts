@@ -18,6 +18,7 @@ import {
 } from '@/renderer/state/composer';
 import { useConversationScrollOffsets } from '@/renderer/state/conversation-scroll';
 import { forgetChatOverrides } from '@/renderer/state/preferences';
+import { useUnreadChatActions } from '@/renderer/state/unread';
 import type { LiveTerminalTitle } from '@/renderer/state/workspace/terminal-tab-title';
 import type {
 	PullRequestCommentSummary,
@@ -112,6 +113,7 @@ export function useSessionTabState({
 	const scrollOffsets = useConversationScrollOffsets();
 	const dropComposerSubmits = useDropComposerSubmits();
 	const holdFollowUpQueue = useHoldFollowUpQueue();
+	const { clearChat } = useUnreadChatActions();
 	// Live window titles agent harnesses emit via OSC escapes, keyed by their
 	// backing terminal id, so a running agent's own conversation title surfaces
 	// on its tab (falling back to the harness label until one arrives). Display
@@ -165,14 +167,24 @@ export function useSessionTabState({
 	const closeMutation = useMutation({
 		mutationFn: (request: CloseChatTabRequest) => closeChatTab(request),
 		onError: invalidateChatTabs,
-		onMutate: ({ chatTabId }: CloseChatTabRequest) => {
-			removeOpenChatTabFromCache({
+		onMutate: ({ chatTabId }: CloseChatTabRequest) => ({
+			// The removed row is the last place the tab's agent session id is
+			// readable, and `onSuccess` needs it after the cache has dropped it.
+			removed: removeOpenChatTabFromCache({
 				chatTabId,
 				queryClient,
 				workspaceId,
+			}),
+		}),
+		onSuccess: (result, { chatTabId }, context) => {
+			// Reading a chat is otherwise the only thing that retires its unread mark.
+			// Cleared on success rather than on mutate because nothing restores a mark:
+			// a close that throws puts the tab back, and the mark has to come with it.
+			clearChat({
+				agentSessionId: context?.removed?.agentSessionId ?? null,
+				chatTabId,
+				workspaceId,
 			});
-		},
-		onSuccess: (result, { chatTabId }) => {
 			// Drop per-chat overrides, the composer draft, and the follow-up queue
 			// only for hard-deleted tabs; tabs marked closed remain restorable and
 			// must keep their model/thinking picks and everything unsent.

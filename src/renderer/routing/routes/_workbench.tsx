@@ -6,6 +6,7 @@ import {
 	WorkbenchRoutePending,
 } from '@/renderer/components/workbench-shell/route-boundaries';
 import { WORKBENCH_ROUTE_STALE_TIME_MS } from '@/renderer/config/routing';
+import { useClearUnreadOnAgentTabClose } from '@/renderer/hooks/workspace/use-clear-unread-on-agent-tab-close';
 import { profileRouteLoader } from '@/renderer/lib/instrumentation';
 import { loadWorkbenchRouteData } from '@/renderer/routing/workbench-route-loaders';
 
@@ -40,8 +41,15 @@ export const Route = createFileRoute('/_workbench')({
 	staleTime: WORKBENCH_ROUTE_STALE_TIME_MS,
 });
 
-/** Pathless layout route that fetches workbench data and renders descendants. */
+/**
+ * Pathless layout route that fetches workbench data and renders descendants.
+ * Mounted above the shell rather than inside it so Settings stays subscribed to
+ * agent tab closes: an unread mark is persisted while the broadcast that retires
+ * it is not, so an unmounted listener strands the mark for good.
+ */
 function WorkbenchDataLayoutRoute() {
+	useClearUnreadOnAgentTabClose();
+
 	return (
 		<>
 			<Outlet />
