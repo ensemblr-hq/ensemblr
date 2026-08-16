@@ -23,6 +23,7 @@ import {
 } from '@/renderer/state/tool-approval';
 import type {
 	ComposerShellState,
+	WorkspaceLinkedIssueSummary,
 	WorkspaceShellModel,
 } from '@/renderer/types/workbench';
 import type { AskUserQuestionAnswer } from '@/shared/agent-control';
@@ -35,12 +36,15 @@ export function ComposerSlot({
 	chatTabId,
 	composer,
 	agentSessionId,
+	seedLinkedIssue,
 	seedText,
 	workspace,
 }: {
 	chatTabId: string;
 	composer: ComposerShellState;
 	agentSessionId: string | null;
+	/** Issue an issue-created workspace came from, attached to the draft once. */
+	seedLinkedIssue?: WorkspaceLinkedIssueSummary;
 	seedText?: string;
 	workspace: WorkspaceShellModel;
 }) {
@@ -117,6 +121,7 @@ export function ComposerSlot({
 					/>
 				) : null
 			}
+			seedLinkedIssue={seedLinkedIssue}
 			seedText={seedText}
 			workspaceId={workspace.id}
 		/>

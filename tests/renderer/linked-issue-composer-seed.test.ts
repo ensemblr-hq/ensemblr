@@ -2,49 +2,30 @@ import { expect, test } from 'vitest';
 
 import { formatLinkedIssueComposerSeed } from '../../src/renderer/lib/workbench/linked-issue-composer-seed.ts';
 
-test('includes the heading, full body, and link', () => {
+test('seeds the draft with the issue headline', () => {
 	const seed = formatLinkedIssueComposerSeed({
-		description: 'Steps to reproduce:\n1. open\n2. crash',
 		reference: '#44',
 		title: 'Dedup recents',
-		url: 'https://github.com/o/r/issues/44',
 	});
 
-	expect(seed).toBe(
-		'#44 Dedup recents\n\nSteps to reproduce:\n1. open\n2. crash\n\nhttps://github.com/o/r/issues/44',
-	);
+	expect(seed).toBe('#44 Dedup recents');
 });
 
-test('omits the body block when there is no description', () => {
+// The body and the link live in the attachment chip's document now. Pasting them
+// here too would hand the agent the same text twice and leave the only complete
+// copy inside a textbox the user can clear before sending.
+test('carries neither the body nor the link, which the attachment holds', () => {
 	const seed = formatLinkedIssueComposerSeed({
 		reference: 'ENG-1',
 		title: 'Wire the picker',
-		url: 'https://linear.app/acme/issue/ENG-1',
 	});
 
-	expect(seed).toBe(
-		'ENG-1 Wire the picker\n\nhttps://linear.app/acme/issue/ENG-1',
+	expect(seed).toBe('ENG-1 Wire the picker');
+	expect(seed).not.toContain('\n');
+});
+
+test('trims a headline whose title is empty', () => {
+	expect(formatLinkedIssueComposerSeed({ reference: '#7', title: '' })).toBe(
+		'#7',
 	);
-});
-
-test('omits the link when there is no url', () => {
-	const seed = formatLinkedIssueComposerSeed({
-		description: 'Body only.',
-		reference: '#7',
-		title: 'Local issue',
-	});
-
-	expect(seed).toBe('#7 Local issue\n\nBody only.');
-});
-
-test('truncates a pathologically long body with an ellipsis', () => {
-	const seed = formatLinkedIssueComposerSeed({
-		description: 'x'.repeat(10_000),
-		reference: '#7',
-		title: 'Huge',
-	});
-
-	expect(seed.endsWith('…')).toBe(true);
-	// Heading + 8000-char body cap + ellipsis — nowhere near the 10k input.
-	expect(seed.length).toBeLessThan(8100);
 });

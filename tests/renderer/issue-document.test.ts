@@ -44,6 +44,7 @@ function githubIssue(
 	overrides: Partial<RepositoryIssueWire> = {},
 ): RepositoryIssueWire {
 	return {
+		assigneeLogins: [],
 		authorLogin: 'octocat',
 		body: 'Steps to reproduce:\n\n1. Paste a file\n2. Send',
 		labels: ['bug', 'composer'],

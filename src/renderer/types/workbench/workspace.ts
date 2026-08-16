@@ -574,6 +574,12 @@ export interface WorkspaceShellModel {
 	sessions: SessionTabModel[];
 	sourceSummary: string;
 	status: WorkspaceStatus;
+	/**
+	 * ISO timestamp of the workspace's last change, carried from the navigation
+	 * snapshot so the dashboard board can sort by recency. Absent on optimistic
+	 * rows the snapshot has not replaced yet.
+	 */
+	updatedAt?: string;
 	workspaceFiles: WorkspaceFileSummary[];
 }
 
