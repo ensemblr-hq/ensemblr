@@ -370,7 +370,8 @@
 		"repository": {
 			"empty": "Репозитории не найдены.",
 			"search": "Поиск репозиториев…",
-			"select": "Выберите репозиторий"
+			"select": "Выберите репозиторий",
+			"selected": "Выбрано"
 		},
 		"search": {
 			"branch": "Поиск по имени",
@@ -380,6 +381,17 @@
 		"title": "Создать рабочее пространство из источника"
 	},
 	"dashboard": {
+		"assign-issue": {
+			"confirm": "Создать рабочее пространство",
+			"created-in-column": "Рабочее пространство создано из {{issue}} в колонке «{{status}}»",
+			"creating": "Создание…",
+			"description": "Новое рабочее пространство для {{issue}} попадёт в колонку «{{status}}». Сама задача в Linear или GitHub не меняется.",
+			"open": "Открыть",
+			"repository": "Репозиторий",
+			"repository-missing": "Репозитория нет в Ensemblr",
+			"repository-required": "Выберите репозиторий, в котором создать рабочее пространство.",
+			"title": "Создать рабочее пространство из задачи"
+		},
 		"card": {
 			"pull-request-aria": "Pull request #{{number}} {{state}}",
 			"state": {
@@ -396,9 +408,56 @@
 			}
 		},
 		"column": {
-			"aria-label": "Колонка {{status}}, {{workspaces}}"
+			"card-count_one": "{{count}} карточка",
+			"card-count_few": "{{count}} карточки",
+			"card-count_many": "{{count}} карточек",
+			"card-count_other": "{{count}} карточки",
+			"count-filtered": "{{shown}}/{{total}}",
+			"empty": "Пока пусто",
+			"empty-filtered": "Нет карточек по фильтру",
+			"label": "Колонка {{status}}, {{cards}}",
+			"label-filtered": "Колонка {{status}}, показано {{shown}} из {{total}} карточек",
+			"loading": "Загрузка задач…"
 		},
-		"title": "Доска"
+		"issue-card": {
+			"create-workspace": "Создать рабочее пространство…",
+			"create-workspace-aria": "Создать рабочее пространство из задачи {{issue}}",
+			"dismiss": "Убрать с доски",
+			"menu-aria": "Действия для задачи {{issue}}",
+			"more-labels": "+{{overflow}}",
+			"open-aria": "Открыть задачу {{issue}}",
+			"restore": "Вернуть в бэклог"
+		},
+		"title": "Доска",
+		"toolbar": {
+			"clear": "Сбросить фильтры доски",
+			"facet-empty": "Показывать нечего.",
+			"refresh": "Обновить задачи из GitHub и Linear",
+			"repository": "Репозитории",
+			"repository-count_one": "{{count}} репозиторий",
+			"repository-count_few": "{{count}} репозитория",
+			"repository-count_many": "{{count}} репозиториев",
+			"repository-count_other": "{{count}} репозитория",
+			"search": "Фильтр карточек…",
+			"search-aria": "Фильтровать карточки доски",
+			"sort": {
+				"manual": "Ручной порядок",
+				"priority": "Приоритет",
+				"updated": "По обновлению"
+			},
+			"sort-aria": "Сортировать карточки",
+			"source": {
+				"github": "Задачи GitHub",
+				"linear": "Задачи Linear",
+				"workspace": "Рабочие пространства"
+			},
+			"source-count_one": "{{count}} источник",
+			"source-count_few": "{{count}} источника",
+			"source-count_many": "{{count}} источников",
+			"source-count_other": "{{count}} источника",
+			"source-search": "Поиск источников…",
+			"sources": "Источники"
+		}
 	},
 	"delete-repository": {
 		"description": "Репозиторий и {{workspaces}} безвозвратно удаляются из Ensemblr. У каждого рабочего пространства удаляются каталог worktree и локальная ветка. Папка репозитория остаётся на диске, чтобы его можно было зарегистрировать заново. Отменить это действие нельзя.",
@@ -687,6 +746,7 @@
 		"nav": {
 			"dashboard": "Доска",
 			"history": "История",
+			"linear": "Linear",
 			"settings": "Настройки",
 			"settings-aria": "Открыть настройки приложения"
 		},

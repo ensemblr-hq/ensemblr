@@ -23,6 +23,7 @@ import {
 import { withTransaction } from '../storage/tx.ts';
 import { ARCHIVED_REPOSITORY_MARKER } from './archived-marker.ts';
 import { runBranchDelete, runWorktreeRemove } from './git-ops.ts';
+import { deleteCachedRepositoryIssues } from './issue-cache.ts';
 
 /** Public surface of the repository delete (destructive) service. */
 export interface DeleteRepositoryService {
@@ -247,7 +248,10 @@ function removeWorkspaceDirectory({
 }
 
 /**
- * Delete a repository's workspace rows and its own row within one transaction.
+ * Delete a repository's workspace rows, its cached issue lists, and its own row
+ * within one transaction. `integration_metadata` has no foreign key back to
+ * `repositories`, so the cached issue bodies outlive the repository unless they
+ * are dropped here.
  * @param options - Open database and the repository id whose rows are removed
  */
 function deleteRepositoryRows({
@@ -259,6 +263,7 @@ function deleteRepositoryRows({
 }): void {
 	withTransaction(database, () => {
 		deleteWorkspaceRowsByRepository({ database, repositoryId });
+		deleteCachedRepositoryIssues({ database, repositoryId });
 		deleteRepositoryRowById({ database, id: repositoryId });
 	});
 }

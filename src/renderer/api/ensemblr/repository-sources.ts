@@ -18,6 +18,10 @@ const SOURCES_STALE_MS = 60_000;
 // and the Open/Duplicate ↔ Use-branch state — refresh without reopening the
 // dialog. Only fires while the query has an active observer (the dialog is open).
 const BRANCHES_REFETCH_MS = 15_000;
+// Issues back a whole board, not a picker opened on demand, and main already
+// serves them from SQLite between runs. Holding them longer keeps a tab switch
+// back to the dashboard off the `gh` path entirely.
+const ISSUES_STALE_MS = 5 * 60_000;
 
 /** Query options for the repository's remote git branches (via `gh`). */
 export function repositoryBranchesQuery(repositoryId: string) {
@@ -49,17 +53,82 @@ export function repositoryPullRequestsQuery(repositoryId: string) {
 	});
 }
 
-/** Query options for the repository's open GitHub issues (via `gh`). */
-export function repositoryIssuesQuery(repositoryId: string) {
+/**
+ * Query options for the repository's open GitHub issues. Main answers these from
+ * a SQLite cache while it is fresh, so this query is what the dashboard board
+ * paints from at app start rather than a cold `gh issue list` per repository.
+ * `unassignedOnly` is the board's backlog variant — it is a different list from
+ * the pickers', narrowed by `gh` rather than after the fact, so it carries its
+ * own query key and its own cache row.
+ */
+export function repositoryIssuesQuery(
+	repositoryId: string,
+	unassignedOnly = false,
+) {
 	return queryOptions({
 		queryFn: (): Promise<ListRepositoryIssuesResult> =>
 			profileElectronIpcCall(
 				{ channel: 'ensemblr:list-repository-issues', usesDatabase: true },
-				() => getEnsemblrApi().listRepositoryIssues({ repositoryId }),
+				() =>
+					getEnsemblrApi().listRepositoryIssues({
+						repositoryId,
+						unassignedOnly,
+					}),
 			),
-		queryKey: ensemblrQueryKeys.repositoryIssues(repositoryId),
-		staleTime: SOURCES_STALE_MS,
+		queryKey: ensemblrQueryKeys.repositoryIssues(repositoryId, unassignedOnly),
+		staleTime: ISSUES_STALE_MS,
 	});
+}
+
+/**
+ * Warms the dashboard board's issue lists — one per repository plus the shared
+ * Linear list. Called as the board mounts so the `gh` calls that miss the cache
+ * overlap the board's first paint instead of following it.
+ * @param queryClient - The app's query client.
+ * @param repositoryIds - Every repository whose issues the board shows.
+ */
+export function prefetchBoardIssues(
+	queryClient: QueryClient,
+	repositoryIds: readonly string[],
+): void {
+	void queryClient.prefetchQuery(linearIssuesQuery({}));
+	for (const repositoryId of repositoryIds) {
+		if (repositoryId) {
+			void queryClient.prefetchQuery(repositoryIssuesQuery(repositoryId, true));
+		}
+	}
+}
+
+/**
+ * Re-lists every repository's board issues from `gh`, bypassing the SQLite cache.
+ * Backs the board toolbar's refresh, which is the only way out of a stale list
+ * when `gh` has been failing and the cache has been standing in for it.
+ * @param queryClient - The app's query client.
+ * @param repositoryIds - Every repository whose issues the board shows.
+ * @returns Resolves once every repository has been re-listed.
+ */
+export async function refreshBoardIssues(
+	queryClient: QueryClient,
+	repositoryIds: readonly string[],
+): Promise<void> {
+	await Promise.all([
+		queryClient.fetchQuery(linearIssuesQuery({})),
+		...repositoryIds.filter(Boolean).map((repositoryId) =>
+			queryClient.fetchQuery({
+				...repositoryIssuesQuery(repositoryId, true),
+				queryFn: (): Promise<ListRepositoryIssuesResult> =>
+					profileElectronIpcCall(
+						{ channel: 'ensemblr:list-repository-issues', usesDatabase: true },
+						() =>
+							getEnsemblrApi().listRepositoryIssues({
+								refresh: true,
+								repositoryId,
+								unassignedOnly: true,
+							}),
+					),
+			}),
+		),
+	]);
 }
 
 /**

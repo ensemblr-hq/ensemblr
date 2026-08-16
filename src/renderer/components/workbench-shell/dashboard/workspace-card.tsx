@@ -1,16 +1,5 @@
-import { combine } from '@atlaskit/pragmatic-drag-and-drop/combine';
-import {
-	draggable,
-	dropTargetForElements,
-} from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
-import {
-	attachClosestEdge,
-	type Edge,
-	extractClosestEdge,
-} from '@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge';
 import type { TFunction } from 'i18next';
 import { GitBranchIcon } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { Badge } from '@/renderer/components/ui/badge';
@@ -27,47 +16,9 @@ import { getWorkspaceSidebarState } from '@/renderer/lib/workbench';
 import { useWorkspaceIsUnread } from '@/renderer/state/workspace';
 import type { WorkspaceSidebarStateKind } from '@/renderer/types/components';
 import type { WorkspaceShellModel } from '@/renderer/types/workbench';
-
+import { BoardDropIndicator } from './board-drop-indicator';
 import { useBoardWorkspaceMenuController } from './board-workspace-menu';
-
-/** Wires a card element as both a drag source and an edge-aware drop target. */
-function useCardDnd(workspaceId: string) {
-	const ref = useRef<HTMLDivElement | null>(null);
-	const [isDragging, setIsDragging] = useState(false);
-	const [closestEdge, setClosestEdge] = useState<Edge | null>(null);
-
-	useEffect(() => {
-		const element = ref.current;
-		if (!element) {
-			return undefined;
-		}
-		return combine(
-			draggable({
-				element,
-				getInitialData: () => ({ type: 'workspace-card', workspaceId }),
-				onDragStart: () => setIsDragging(true),
-				onDrop: () => setIsDragging(false),
-			}),
-			dropTargetForElements({
-				canDrop: ({ source }) =>
-					source.data.type === 'workspace-card' &&
-					source.data.workspaceId !== workspaceId,
-				element,
-				getData: ({ element: target, input }) =>
-					attachClosestEdge(
-						{ type: 'workspace-card', workspaceId },
-						{ allowedEdges: ['top', 'bottom'], element: target, input },
-					),
-				getIsSticky: () => true,
-				onDrag: ({ self }) => setClosestEdge(extractClosestEdge(self.data)),
-				onDragLeave: () => setClosestEdge(null),
-				onDrop: () => setClosestEdge(null),
-			}),
-		);
-	}, [workspaceId]);
-
-	return { closestEdge, isDragging, ref };
-}
+import { useCardDnd } from './use-card-dnd';
 
 /**
  * Draggable board card for a single workspace. Dragging it to another column
@@ -75,12 +26,17 @@ function useCardDnd(workspaceId: string) {
  * clicking opens the workspace; right-clicking opens the same workspace context
  * menu the sidebar uses (minus the sidebar-only pin action). The label renders
  * bold while the workspace is unread, mirroring the sidebar.
+ *
+ * Keeps its grab cursor under every sort: a non-manual sort only takes away
+ * in-column reordering, and the card still drags between columns.
  */
 export function WorkspaceCard({
+	allowReorder,
 	onOpen,
 	projectName,
 	workspace,
 }: {
+	allowReorder: boolean;
 	onOpen: () => void;
 	projectName: string;
 	workspace: WorkspaceShellModel;
@@ -91,27 +47,31 @@ export function WorkspaceCard({
 	const hasDiffStats =
 		workspace.changeSummary.additions > 0 ||
 		workspace.changeSummary.deletions > 0;
-	const { closestEdge, isDragging, ref } = useCardDnd(workspace.id);
+	const { closestEdge, isDragging, ref } = useCardDnd(
+		workspace.id,
+		'workspace',
+		allowReorder,
+	);
 
 	return (
 		<ContextMenu>
 			<ContextMenuTrigger asChild>
 				<div
 					className={cn(
-						'relative cursor-grab transition-opacity',
+						'relative cursor-grab transition-opacity active:cursor-grabbing',
 						isDragging && 'opacity-50',
 					)}
 					ref={ref}
 				>
 					<BoardDropIndicator edge={closestEdge} />
-					<Card className='gap-0 border border-foreground/10 py-0 ring-0 hover:border-foreground/20'>
+					<Card className='gap-0 overflow-hidden border border-foreground/10 py-0 ring-0 transition-colors hover:border-foreground/20'>
 						<button
 							aria-label={t(
 								'workbench:workspace-item.open-aria',
 								'Open workspace {{workspace}}',
 								{ workspace: workspace.name },
 							)}
-							className='flex w-full flex-col gap-2 px-3 py-2.5 text-left'
+							className='flex w-full flex-col gap-2 px-3 py-2.5 text-left focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50'
 							onClick={onOpen}
 							type='button'
 						>
@@ -147,22 +107,6 @@ export function WorkspaceCard({
 				workspace={workspace}
 			/>
 		</ContextMenu>
-	);
-}
-
-/** Thin insertion line shown at the card's top or bottom edge while dragging over it. */
-function BoardDropIndicator({ edge }: { edge: Edge | null }) {
-	if (edge !== 'top' && edge !== 'bottom') {
-		return null;
-	}
-	return (
-		<div
-			aria-hidden='true'
-			className={cn(
-				'pointer-events-none absolute inset-x-0 h-0.5 rounded-full bg-primary',
-				edge === 'top' ? '-top-1' : '-bottom-1',
-			)}
-		/>
 	);
 }
 

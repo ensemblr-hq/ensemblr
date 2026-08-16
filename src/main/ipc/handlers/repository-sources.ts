@@ -2,7 +2,10 @@ import { ipcMain } from 'electron';
 
 import { IPC_CHANNELS } from '../../../shared/ipc/channels';
 import type { RepositorySourcesService } from '../../repository';
-import { listRepositorySourcesRequestSchema } from '../request-schemas.ts';
+import {
+	listRepositoryIssuesRequestSchema,
+	listRepositorySourcesRequestSchema,
+} from '../request-schemas.ts';
 
 /**
  * Registers read-only IPC handlers for the create-from-source picker (branches,
@@ -28,7 +31,7 @@ export function registerRepositorySourcesHandlers({
 	);
 	ipcMain.handle(IPC_CHANNELS.listRepositoryIssues, (_event, raw: unknown) =>
 		repositorySourcesService.listIssues(
-			listRepositorySourcesRequestSchema.parse(raw),
+			listRepositoryIssuesRequestSchema.parse(raw),
 		),
 	);
 }

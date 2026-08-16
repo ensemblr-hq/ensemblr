@@ -95,6 +95,7 @@ export default defineConfig({
 			'tests/main/agent-control-port-adapters.test.ts',
 			'tests/main/agent-control-review-ports.test.ts',
 			'tests/main/agent-control-linear-ports.test.ts',
+			'tests/main/agent-control-workspace-linked-issue.test.ts',
 			'tests/main/agent-control-harness-launch-config.test.ts',
 			'tests/main/agent-control-harness-playbook-file.test.ts',
 			'tests/main/agent-control-model-resolution.test.ts',
@@ -133,6 +134,7 @@ export default defineConfig({
 			'tests/main/claude-thinking-display.test.ts',
 			'tests/main/claude-usage.test.ts',
 			'tests/main/agent-event-payload.test.ts',
+			'tests/main/repository-issue-assignees.test.ts',
 		],
 		coverage: {
 			provider: 'istanbul',

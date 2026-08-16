@@ -12,8 +12,10 @@ import { type App, BrowserWindow, dialog } from 'electron';
 
 import {
 	buildLanguageDirective,
+	buildLinkedIssueDirective,
 	HARNESS_AWARENESS,
 	resolveAgentRole,
+	type WorkspaceLinkedIssue,
 } from '../../shared/agent-control.ts';
 import type { AppLanguage } from '../../shared/i18n.ts';
 import {
@@ -38,6 +40,12 @@ interface AgentControlIntegrationDeps {
 	getServerUrl: () => string | null;
 	/** The language the app renders in, for the harness playbook's directive. */
 	getLanguage: () => AppLanguage;
+	/**
+	 * Reads the issue a workspace was created from, for the linked-issue block in
+	 * the harness playbook. Omitted, a harness launches with no prose about the
+	 * ticket and moves it only when asked.
+	 */
+	readLinkedIssue?: (workspaceId: string) => WorkspaceLinkedIssue | null;
 	/**
 	 * Whether a session was spawned as somebody's sub-agent, read from the durable
 	 * tab marker rather than lineage. Omitted, the role falls back to spawn depth,
@@ -84,8 +92,8 @@ function resolvePiControlExtensionPath(app: App): string | null {
 }
 
 /**
- * Writes the harness playbook into its own directory under `userData` and
- * returns that directory, or null when the write fails — a harness then
+ * Writes the harness playbook into a per-workspace directory under `userData`
+ * and returns that directory, or null when the write fails — a harness then
  * launches with MCP tools but no prose about them, which beats not launching.
  *
  * Called per launch rather than once at construction: `main.ts` requires the
@@ -95,34 +103,45 @@ function resolvePiControlExtensionPath(app: App): string | null {
  * it if anything removed it. It lives alone in its directory because Vibe
  * trusts the whole directory it is pointed at.
  *
- * Every workspace shares this one file, so a launch can land while an earlier
- * harness is still reading it. Writing through a staging file and renaming makes
- * the swap atomic: a concurrent reader sees the previous playbook or the new one
- * and never a half-truncated prompt. A staging file left behind by a failed
- * write is inert — a harness reads only `AGENTS.md` — and the next write reuses
- * and consumes it.
+ * The directory is keyed by workspace because the file is no longer the same for
+ * every one: it carries the linked-issue directive, which names the ticket *this*
+ * workspace was created from. One shared file would hand every harness whichever
+ * workspace launched last. Two launches in the same workspace still race, so the
+ * write goes through a staging file and a rename: a concurrent reader sees the
+ * previous playbook or the new one and never a half-truncated prompt. A staging
+ * file left behind by a failed write is inert — a harness reads only `AGENTS.md`
+ * — and the next write reuses and consumes it.
  *
- * Writing per launch also re-resolves the language directive per launch, which
- * is the only channel a harness has for it: it reads this file once at startup
- * and the app never prompts it again.
+ * Writing per launch also re-resolves both directives per launch, which is the
+ * only reliable channel a harness has for them: it reads this file once at
+ * startup and the app never prompts it again.
  * @param app - The Electron app, for the `userData` path.
  * @param language - The language the app is rendering in.
+ * @param workspaceId - Workspace the harness is launching into, keying its directory.
+ * @param issueDirective - The workspace's linked-issue block, or null when it has none.
  * @returns Absolute path to the directory holding the playbook, or null.
  */
 function writeHarnessInstructions(
 	app: App,
 	language: AppLanguage,
+	workspaceId: string,
+	issueDirective: string | null,
 ): string | null {
-	const directory = path.join(app.getPath('userData'), 'harness-instructions');
+	const directory = path.join(
+		app.getPath('userData'),
+		'harness-instructions',
+		workspaceId,
+	);
 	const playbook = path.join(directory, HARNESS_INSTRUCTIONS_FILENAME);
 	const staging = `${playbook}.tmp`;
-	const directive = buildLanguageDirective(language);
-	const contents = directive
-		? `${HARNESS_AWARENESS}\n\n${directive}`
-		: HARNESS_AWARENESS;
+	const blocks = [
+		HARNESS_AWARENESS,
+		buildLanguageDirective(language),
+		issueDirective,
+	].filter((block) => block !== null);
 	try {
 		mkdirSync(directory, { recursive: true });
-		writeFileSync(staging, `${contents}\n`, 'utf8');
+		writeFileSync(staging, `${blocks.join('\n\n')}\n`, 'utf8');
 		renameSync(staging, playbook);
 		return directory;
 	} catch {
@@ -206,6 +225,8 @@ export function createAgentControlIntegration(
 			instructionsDirectory: writeHarnessInstructions(
 				deps.app,
 				deps.getLanguage(),
+				workspaceId,
+				buildLinkedIssueDirective(deps.readLinkedIssue?.(workspaceId) ?? null),
 			),
 			token:
 				resolveAgentControlEnv({

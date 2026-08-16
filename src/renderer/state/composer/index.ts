@@ -18,6 +18,7 @@ export {
 export {
 	composerAttachmentsAtomFamily,
 	composerEditorStateAtomFamily,
+	composerLinkedIssueSeededAtomFamily,
 	composerValueAtomFamily,
 	forgetComposerDraft,
 } from './composer-drafts';

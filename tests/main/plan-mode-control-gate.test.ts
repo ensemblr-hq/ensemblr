@@ -88,6 +88,7 @@ const makePorts = (planningSessions: ReadonlySet<string>): AgentControlPorts =>
 				.fn()
 				.mockResolvedValue({ capturedAtOrdinal: 3, message: 'ok' }),
 		},
+		linear: { readLinkedIssue: vi.fn().mockReturnValue(null) },
 	}) as unknown as AgentControlPorts;
 
 /**

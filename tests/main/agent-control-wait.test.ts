@@ -103,6 +103,7 @@ const makePorts = (
 		resolveComments: vi.fn(),
 	},
 	linear: {
+		readLinkedIssue: vi.fn().mockReturnValue(null),
 		listIssues: vi.fn(),
 		getIssue: vi.fn(),
 		getMetadata: vi.fn(),

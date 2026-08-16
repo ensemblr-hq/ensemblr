@@ -17,6 +17,11 @@ import { classifyCommandFailure } from '../github/gh-failures.ts';
 import type { EnsemblrDatabaseService } from '../storage';
 import { selectRepositoryPathById } from '../storage/repositories/repository-row-repository.ts';
 import { listActiveWorkspaceBranchRowsByRepository } from '../storage/repositories/workspace-repository.ts';
+import {
+	type CachedRepositoryIssues,
+	readCachedRepositoryIssues,
+	writeCachedRepositoryIssues,
+} from './issue-cache.ts';
 
 const GH_TIMEOUT_MS = 45_000;
 const GH_MAX_OUTPUT_BYTES = 4 * 1024 * 1024;
@@ -24,7 +29,20 @@ const LIST_LIMIT = 50;
 const BRANCH_LIST_LIMIT = 100;
 const PR_JSON_FIELDS =
 	'number,title,headRefName,baseRefName,author,isDraft,state,updatedAt,url,isCrossRepository';
-const ISSUE_JSON_FIELDS = 'number,title,state,updatedAt,author,labels,url,body';
+const ISSUE_JSON_FIELDS =
+	'number,title,state,updatedAt,author,assignees,labels,url,body';
+// The dashboard board's backlog is the unassigned issues only, and `--limit`
+// counts rows GitHub returns rather than rows that survive a later filter — so
+// filtering renderer-side shows an empty backlog for any repository whose newest
+// 50 open issues all happen to be assigned. `no:assignee` is a search qualifier,
+// not a flag. The create-from and composer pickers want every issue, so this is
+// per-request and the two lists cache separately.
+const UNASSIGNED_SEARCH = 'no:assignee';
+// `gh issue list` costs about a second per repository, and the dashboard board
+// fans it out across every repository at once. Serving the SQLite cache for this
+// long keeps the board's first paint off that path; a triage backlog does not
+// need second-level freshness, and `refresh` bypasses it when a caller does.
+const ISSUE_CACHE_TTL_MS = 5 * 60_000;
 
 /**
  * Branches that live on the GitHub remote, plus the default branch name so the
@@ -44,6 +62,38 @@ const BRANCHES_QUERY = `query($owner: String!, $name: String!) {
     }
   }
 }`;
+
+/**
+ * Whether a cached issue list is old enough to be worth re-running `gh` for. An
+ * unparseable timestamp counts as expired, so a corrupt row refreshes itself.
+ * @param cached - The cached list to date.
+ * @returns True when the cache should be refreshed rather than served.
+ */
+function isCacheExpired(cached: CachedRepositoryIssues): boolean {
+	const syncedAt = Date.parse(cached.syncedAt);
+	return Number.isNaN(syncedAt) || Date.now() - syncedAt >= ISSUE_CACHE_TTL_MS;
+}
+
+/**
+ * Shapes a cached issue list as a successful list result. `staleError` is set
+ * only when the cache is standing in for a refresh that failed — without it the
+ * renderer cannot tell rows it could not refresh from rows it did.
+ * @param cached - The cached list to serve.
+ * @param staleError - The failure that stopped the refresh, when there was one.
+ * @returns The result the renderer receives, marked as cache-sourced.
+ */
+function servedFromCache(
+	cached: CachedRepositoryIssues,
+	staleError?: GithubFailure,
+): ListRepositoryIssuesResult {
+	return {
+		issues: cached.issues,
+		source: 'cache',
+		...(staleError ? { staleError } : {}),
+		status: 'ok',
+		syncedAt: cached.syncedAt,
+	};
+}
 
 /** Lists branches / PRs / GitHub issues for the create-from-source picker. */
 export interface RepositorySourcesService {
@@ -88,6 +138,45 @@ export function createRepositorySourcesService({
 			}
 			return selectRepositoryPathById({ database, id: repositoryId });
 		});
+
+	/**
+	 * Reads a repository's persisted issue list, if the database is open.
+	 * @param repositoryId - ID of the repository whose cached issues to read
+	 * @returns The cached issues, or null when there are none to serve
+	 */
+	function readIssueCache(
+		repositoryId: string,
+		unassignedOnly: boolean,
+	): CachedRepositoryIssues | null {
+		const database = databaseService.getConnection()?.database ?? null;
+		return database
+			? readCachedRepositoryIssues({ database, repositoryId, unassignedOnly })
+			: null;
+	}
+
+	/**
+	 * Persists a repository's freshly listed issues for the next app start.
+	 * @param repositoryId - ID of the repository the issues belong to
+	 * @param issues - The issues `gh` just returned
+	 * @param syncedAt - ISO timestamp the issues were read at
+	 */
+	function writeIssueCache(
+		repositoryId: string,
+		issues: RepositoryIssueWire[],
+		syncedAt: string,
+		unassignedOnly: boolean,
+	): void {
+		const database = databaseService.getConnection()?.database ?? null;
+		if (database) {
+			writeCachedRepositoryIssues({
+				database,
+				issues,
+				repositoryId,
+				syncedAt,
+				unassignedOnly,
+			});
+		}
+	}
 
 	/**
 	 * Build a branch-name to workspace-id map for a repository's active workspaces.
@@ -258,6 +347,12 @@ export function createRepositorySourcesService({
 				return { error: repositoryMissing(), issues: [], status: 'error' };
 			}
 
+			const unassignedOnly = request.unassignedOnly === true;
+			const cached = readIssueCache(request.repositoryId, unassignedOnly);
+			if (!request.refresh && cached && !isCacheExpired(cached)) {
+				return servedFromCache(cached);
+			}
+
 			const result = await runGh(repositoryPath, [
 				'issue',
 				'list',
@@ -265,20 +360,24 @@ export function createRepositorySourcesService({
 				ISSUE_JSON_FIELDS,
 				'--limit',
 				String(LIST_LIMIT),
+				...(unassignedOnly ? ['--search', UNASSIGNED_SEARCH] : []),
 			]);
 			if (!result.ok) {
-				return { error: result.error, issues: [], status: 'error' };
+				return cached
+					? servedFromCache(cached, result.error)
+					: { error: result.error, issues: [], status: 'error' };
 			}
 
 			const issues = parseIssues(result.stdout);
 			if (!issues) {
-				return {
-					error: parseFailure('gh issue list'),
-					issues: [],
-					status: 'error',
-				};
+				const failure = parseFailure('gh issue list');
+				return cached
+					? servedFromCache(cached, failure)
+					: { error: failure, issues: [], status: 'error' };
 			}
-			return { issues, status: 'ok' };
+			const syncedAt = new Date().toISOString();
+			writeIssueCache(request.repositoryId, issues, syncedAt, unassignedOnly);
+			return { issues, source: 'remote', status: 'ok', syncedAt };
 		},
 	};
 }
@@ -361,8 +460,9 @@ export function parsePullRequests(stdout: string): ParsedPullRequest[] | null {
 export function parseIssues(stdout: string): RepositoryIssueWire[] | null {
 	return parseNumberedRows(stdout, (record, shared) => ({
 		...shared,
+		assigneeLogins: readObjectListField(record.assignees, 'login'),
 		body: readStringField(record.body),
-		labels: readLabelNames(record.labels),
+		labels: readObjectListField(record.labels, 'name'),
 	}));
 }
 
@@ -441,21 +541,27 @@ function readAuthorLogin(author: unknown): string | null {
 	return null;
 }
 
-/** Reads `gh` label `{ name }[]` into a flat name list. */
-function readLabelNames(labels: unknown): string[] {
-	if (!Array.isArray(labels)) {
+/**
+ * Flattens a `gh` list of objects onto one of their string properties, which is
+ * how labels (`{ name }[]`) and assignees (`{ login }[]`) both arrive.
+ * @param values - The raw `gh` field, expected to be an array of objects
+ * @param key - Property to read off each entry
+ * @returns The non-empty string values, in order
+ */
+function readObjectListField(values: unknown, key: string): string[] {
+	if (!Array.isArray(values)) {
 		return [];
 	}
-	const names: string[] = [];
-	for (const label of labels) {
-		if (label && typeof label === 'object') {
-			const name = (label as Record<string, unknown>).name;
-			if (typeof name === 'string' && name) {
-				names.push(name);
+	const read: string[] = [];
+	for (const entry of values) {
+		if (entry && typeof entry === 'object') {
+			const value = (entry as Record<string, unknown>)[key];
+			if (typeof value === 'string' && value) {
+				read.push(value);
 			}
 		}
 	}
-	return names;
+	return read;
 }
 
 /** Failure returned when the repository id resolves to no path. */

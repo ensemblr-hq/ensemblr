@@ -69,3 +69,4 @@ export {
 	type WorkspacePort,
 } from './ports.ts';
 export { isSessionTabMarkedSubAgent } from './sub-agent-marker.ts';
+export { readWorkspaceLinkedIssue } from './workspace-linked-issue.ts';

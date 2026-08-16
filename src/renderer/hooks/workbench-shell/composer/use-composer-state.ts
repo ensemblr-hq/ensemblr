@@ -20,6 +20,7 @@ import { useComposerKeymap } from '@/renderer/hooks/workbench-shell/composer/use
 import { useComposerSubmit } from '@/renderer/hooks/workbench-shell/composer/use-composer-submit';
 import { useIssueAttachments } from '@/renderer/hooks/workbench-shell/composer/use-issue-attachments';
 import { useLinkedDirectories } from '@/renderer/hooks/workbench-shell/composer/use-linked-directories';
+import { useLinkedIssueSeed } from '@/renderer/hooks/workbench-shell/composer/use-linked-issue-seed';
 import { joinDictatedText } from '@/renderer/lib/dictation';
 import { resolveSendIntent } from '@/renderer/lib/workbench';
 import {
@@ -41,6 +42,7 @@ import type {
 	QueuedFollowUp,
 	SlashCommandMatch,
 	WorkspaceFileSummary,
+	WorkspaceLinkedIssueSummary,
 } from '@/renderer/types/workbench';
 import type { LinearIssueWire } from '@/shared/ipc/contracts/linear';
 import type { RecordLinkedDirectoryFailureCode } from '@/shared/ipc/contracts/linked-directories';
@@ -50,7 +52,12 @@ import type { RepositoryIssueWire } from '@/shared/ipc/contracts/workspace-sourc
 interface UseComposerStateArgs {
 	chatTabId: string;
 	composer: ComposerShellState;
-	/** Initial context (e.g. linked-issue summary) applied to an untouched composer. */
+	/**
+	 * The issue an issue-created workspace came from, pre-attached to the draft
+	 * once so the agent holds the whole issue rather than an editable paraphrase.
+	 */
+	seedLinkedIssue?: WorkspaceLinkedIssueSummary;
+	/** Initial context (e.g. linked-issue headline) applied to an untouched composer. */
 	seedText?: string;
 }
 
@@ -65,10 +72,10 @@ export interface ComposerStateApi {
 	attachmentError: string | null;
 	/** Everything the draft carries alongside its text, in the order it was added. */
 	attachments: readonly ComposerAttachment[];
-	/** Writes a GitHub issue out as a markdown document and attaches it. */
-	attachGithubIssue: (issue: RepositoryIssueWire) => Promise<void>;
-	/** Writes a Linear issue (with its comments) out and attaches it. */
-	attachLinearIssue: (issue: LinearIssueWire) => Promise<void>;
+	/** Writes a GitHub issue out as a markdown document and attaches it; false when it failed. */
+	attachGithubIssue: (issue: RepositoryIssueWire) => Promise<boolean>;
+	/** Writes a Linear issue (with its comments) out and attaches it; false when it failed. */
+	attachLinearIssue: (issue: LinearIssueWire) => Promise<boolean>;
 	/** Clears every entry this chat has queued. */
 	clearQueue: () => void;
 	/** Messages waiting for the current turn to end, in the order they will send. */
@@ -246,6 +253,7 @@ function slashCommandDraft(
 export function useComposerState({
 	chatTabId,
 	composer,
+	seedLinkedIssue,
 	seedText,
 }: UseComposerStateArgs): ComposerStateApi {
 	const editorRef = useRef<ComposerEditorHandle | null>(null);
@@ -354,10 +362,17 @@ export function useComposerState({
 		unlinkDirectory,
 	} = useLinkedDirectories({ chatTabId });
 
-	const { attachGithubIssue, attachLinearIssue } = useIssueAttachments({
-		addAttachments,
-		setAttachmentError,
-		workspaceCwd: composer.workspaceCwd,
+	const { attachGithubIssue, attachLinearIssue, attachLinkedIssue } =
+		useIssueAttachments({
+			addAttachments,
+			setAttachmentError,
+			workspaceCwd: composer.workspaceCwd,
+		});
+
+	useLinkedIssueSeed({
+		attachLinkedIssue,
+		chatTabId,
+		...(seedLinkedIssue ? { linkedIssue: seedLinkedIssue } : {}),
 	});
 
 	// Drain review-context insertions queued from the Checks panel / diff views.

@@ -1,38 +1,20 @@
 /**
  * Builds the first-prompt composer draft for a workspace created from an issue:
- * a heading line (`reference title`), the full issue body, and the issue link.
- * Offered for the user to edit and send — never auto-submitted.
+ * one headline reading `reference title`. Offered for the user to edit and send
+ * — never auto-submitted.
  *
- * Distinct from the compact `format{Github,Linear}IssueContext` citations (used
- * when manually inserting an issue link): this seed pastes the issue *contents*,
- * so the body is included in full, capped only to stop a pathological body from
- * flooding the composer.
+ * Deliberately *not* the issue's contents. Those ride along as an attachment
+ * chip carrying the full issue document, so pasting the body here too would send
+ * the agent the same text twice and put the only complete copy behind an
+ * editable, deletable textbox. The headline stays so the draft reads as being
+ * about something rather than opening blank.
  */
 
 import type { LinkedIssueComposerSeedInput } from '@/renderer/types/workbench';
 
-/** Upper bound on the pasted issue body; longer bodies are truncated with `…`. */
-const COMPOSER_BODY_MAX = 8000;
-
-/** Formats a linked issue's contents into the first-prompt composer draft. */
+/** Formats a linked issue's headline into the first-prompt composer draft. */
 export function formatLinkedIssueComposerSeed(
 	issue: LinkedIssueComposerSeedInput,
 ): string {
-	const header = `${issue.reference} ${issue.title}`.trim();
-	const description = issue.description?.trim();
-	const body = description
-		? `\n\n${truncateBody(description, COMPOSER_BODY_MAX)}`
-		: '';
-	const link = issue.url ? `\n\n${issue.url}` : '';
-	return `${header}${body}${link}`;
-}
-
-/**
- * Truncates text to a maximum length, appending an ellipsis when it is clipped.
- * @param text - The text to truncate
- * @param maxLength - Maximum length before truncation
- * @returns The original text, or a clipped version ending in an ellipsis
- */
-function truncateBody(text: string, maxLength: number): string {
-	return text.length > maxLength ? `${text.slice(0, maxLength)}…` : text;
+	return `${issue.reference} ${issue.title}`.trim();
 }

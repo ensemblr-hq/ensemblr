@@ -362,7 +362,8 @@
 		"repository": {
 			"empty": "Δεν βρέθηκαν αποθετήρια.",
 			"search": "Αναζήτηση αποθετηρίων…",
-			"select": "Επιλογή αποθετηρίου"
+			"select": "Επιλογή αποθετηρίου",
+			"selected": "Επιλεγμένο"
 		},
 		"search": {
 			"branch": "Αναζήτηση με βάση το όνομα",
@@ -372,6 +373,17 @@
 		"title": "Δημιουργία χώρου εργασίας από πηγή"
 	},
 	"dashboard": {
+		"assign-issue": {
+			"confirm": "Δημιουργία χώρου εργασίας",
+			"created-in-column": "Δημιουργήθηκε χώρος εργασίας από {{issue}} στη στήλη «{{status}}»",
+			"creating": "Δημιουργία…",
+			"description": "Ένας νέος χώρος εργασίας για το {{issue}} μπαίνει στη στήλη «{{status}}». Το ίδιο το ζήτημα δεν αλλάζει σε Linear ή GitHub.",
+			"open": "Άνοιγμα",
+			"repository": "Αποθετήριο",
+			"repository-missing": "Το αποθετήριο δεν είναι στο Ensemblr",
+			"repository-required": "Επιλέξτε το αποθετήριο στο οποίο θα δημιουργηθεί ο χώρος εργασίας.",
+			"title": "Δημιουργία χώρου εργασίας από ζήτημα"
+		},
 		"card": {
 			"pull-request-aria": "Pull request #{{number}} {{state}}",
 			"state": {
@@ -388,9 +400,50 @@
 			}
 		},
 		"column": {
-			"aria-label": "Στήλη {{status}}, {{workspaces}}"
+			"card-count_one": "{{count}} κάρτα",
+			"card-count_other": "{{count}} κάρτες",
+			"count-filtered": "{{shown}}/{{total}}",
+			"empty": "Τίποτα ακόμη",
+			"empty-filtered": "Καμία κάρτα δεν ταιριάζει στο φίλτρο",
+			"label": "Στήλη {{status}}, {{cards}}",
+			"label-filtered": "Στήλη {{status}}, εμφανίζονται {{shown}} από {{total}} κάρτες",
+			"loading": "Φόρτωση ζητημάτων…"
 		},
-		"title": "Πίνακας εργασιών"
+		"issue-card": {
+			"create-workspace": "Δημιουργία χώρου εργασίας…",
+			"create-workspace-aria": "Δημιουργία χώρου εργασίας από το ζήτημα {{issue}}",
+			"dismiss": "Απόκρυψη από τον πίνακα",
+			"menu-aria": "Ενέργειες για το ζήτημα {{issue}}",
+			"more-labels": "+{{overflow}}",
+			"open-aria": "Άνοιγμα ζητήματος {{issue}}",
+			"restore": "Επιστροφή στις εκκρεμότητες"
+		},
+		"title": "Πίνακας εργασιών",
+		"toolbar": {
+			"clear": "Καθαρισμός φίλτρων πίνακα",
+			"facet-empty": "Δεν υπάρχει τίποτα.",
+			"refresh": "Ανανέωση ζητημάτων από GitHub και Linear",
+			"repository": "Αποθετήρια",
+			"repository-count_one": "{{count}} αποθετήριο",
+			"repository-count_other": "{{count}} αποθετήρια",
+			"search": "Φίλτρο καρτών…",
+			"search-aria": "Φιλτράρισμα καρτών πίνακα",
+			"sort": {
+				"manual": "Χειροκίνητη σειρά",
+				"priority": "Προτεραιότητα",
+				"updated": "Πρόσφατη ενημέρωση"
+			},
+			"sort-aria": "Ταξινόμηση καρτών",
+			"source": {
+				"github": "Ζητήματα GitHub",
+				"linear": "Ζητήματα Linear",
+				"workspace": "Χώροι εργασίας"
+			},
+			"source-count_one": "{{count}} προέλευση",
+			"source-count_other": "{{count}} προελεύσεις",
+			"source-search": "Αναζήτηση προελεύσεων…",
+			"sources": "Προελεύσεις"
+		}
 	},
 	"delete-repository": {
 		"description": "Το αποθετήριο και {{workspaces}} αφαιρούνται οριστικά από το Ensemblr. Ο φάκελος worktree κάθε χώρου εργασίας διαγράφεται και ο τοπικός του κλάδος αφαιρείται. Ο φάκελος του αποθετηρίου παραμένει στον δίσκο, ώστε να μπορείτε να τον καταχωρίσετε ξανά αργότερα. Αυτή η ενέργεια δεν αναιρείται.",
@@ -667,6 +720,7 @@
 		"nav": {
 			"dashboard": "Πίνακας εργασιών",
 			"history": "Ιστορικό",
+			"linear": "Linear",
 			"settings": "Ρυθμίσεις",
 			"settings-aria": "Άνοιγμα ρυθμίσεων εφαρμογής"
 		},

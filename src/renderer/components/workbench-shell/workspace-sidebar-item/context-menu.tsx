@@ -25,10 +25,10 @@ import {
 } from '@/renderer/lib/workbench/board-status-presentation';
 import { useUnreadChatActions } from '@/renderer/state/unread';
 import {
-	BOARD_STATUS_ORDER,
 	useWorkspaceBoardActions,
 	useWorkspaceBoardStatus,
 	useWorkspaceIsUnread,
+	WORKSPACE_BOARD_STATUSES_ASSIGNABLE,
 } from '@/renderer/state/workspace';
 import type { WorkspaceShellModel } from '@/renderer/types/workbench';
 import {
@@ -123,7 +123,7 @@ export function WorkspaceContextMenuContent({
 					</ContextMenuSubTrigger>
 					<ContextMenuSubContent className='w-48 bg-muted p-1'>
 						<ContextMenuGroup>
-							{BOARD_STATUS_ORDER.map((status) => {
+							{WORKSPACE_BOARD_STATUSES_ASSIGNABLE.map((status) => {
 								const presentation = BOARD_STATUS_PRESENTATION[status];
 								return (
 									<WorkspaceStatusMenuItem

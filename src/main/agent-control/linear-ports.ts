@@ -19,6 +19,7 @@ import type {
 	AgentLinearIssue,
 	AgentLinearIssueDetail,
 	AgentLinearResource,
+	AgentLinearViewer,
 	LinearAccountRef,
 	LinearAgentStatus,
 	LinearCreateCommentResult,
@@ -43,9 +44,8 @@ import type {
 } from '../../shared/ipc/contracts/linear.ts';
 import type { LinearService } from '../linear';
 import type { EnsemblrDatabaseService } from '../storage';
-import { parseMetadata } from '../storage/repositories/metadata-json.ts';
-import { selectWorkspaceMetadataJson } from '../storage/repositories/workspace-repository.ts';
 import type { LinearPort } from './ports.ts';
+import { readWorkspaceLinkedIssue } from './workspace-linked-issue.ts';
 
 /** Collaborators the Linear port delegates to. */
 export interface LinearPortDeps {
@@ -70,6 +70,12 @@ const TERMINAL_STATE_TYPES: ReadonlySet<string> = new Set(
 	LINEAR_TERMINAL_STATE_TYPES,
 );
 
+// The refusal message is assembled after `fitMetadata` has spent the payload
+// budget, so its state list is the one part of a Linear result that is not
+// bounded by `MAX_AGENT_PAYLOAD_CHARS`. A team with dozens of workflow states is
+// unusual but not impossible, and the agent only needs enough to pick one.
+const MAX_LISTED_STATES = 12;
+
 const NOT_CONNECTED_MESSAGE =
 	'Linear is not connected. The user connects it in Settings → Integrations; nothing you can pass will change this, so say so rather than retrying.';
 
@@ -92,9 +98,34 @@ function statusFor(failure: LinearServiceFailure): LinearAgentStatus {
 }
 
 /**
+ * Names what to do about each failure Linear's API reports, because the one thing
+ * these codes have in common is that retrying the identical call is wrong for all
+ * but one of them. Without a clause per code a model reads `Linear failed (…)` and
+ * reaches for the same call again — immediately for a rate limit that wanted a
+ * wait, and repeatedly for a permission error only the user can clear.
+ * @param failure - The service's typed failure envelope.
+ * @returns The recovery clause to append, empty for a code with nothing useful to add.
+ */
+function recoveryFor(failure: LinearServiceFailure): string {
+	switch (failure.code) {
+		case 'rate-limited':
+			return failure.retryAfterSeconds === null
+				? ' Linear is rate-limiting this token and did not say for how long. Get on with the rest of the work and try once more later in the turn, rather than retrying in a loop.'
+				: ` Wait ${failure.retryAfterSeconds}s before trying again; a retry inside that window is refused the same way.`;
+		case 'permission-denied':
+			return " The connected Linear account is not allowed to do this — its OAuth scopes or the team's own permissions forbid it. Nothing you pass will change that, so do not retry: name the refused call in your reply and let the user widen the connection in Settings → Integrations.";
+		case 'invalid-request':
+			return ' Linear rejected the arguments rather than failing to reach them, so the identical call fails identically. Re-read the ids with ensemblr_linear_get_metadata — an id belonging to another account is the usual cause — before trying again.';
+		case 'network':
+			return ' Linear could not be reached. One retry is reasonable; a second failure means the network is down rather than flaky, so report it instead of looping.';
+		default:
+			return '';
+	}
+}
+
+/**
  * Renders the prose an agent reads on a failure, naming the recovery rather than
- * only the fault. A rate limit is the one case where waiting is the right move,
- * so its retry window is spelled out when Linear supplied one.
+ * only the fault.
  * @param failure - The service's typed failure envelope.
  * @param status - The agent-facing status the failure mapped to.
  * @returns The message to carry on the result.
@@ -107,13 +138,9 @@ function messageFor(
 		return NOT_CONNECTED_MESSAGE;
 	}
 	if (status === 'not-found') {
-		return `Linear has no such issue: ${failure.message} Check the id or identifier, or search with ensemblr_linear_list_issues.`;
+		return `Linear could not find something this call named: ${failure.message} An issue id or identifier is the usual cause — check it, or search with ensemblr_linear_list_issues. A stateId, assigneeId, or teamId misses the same way, and each is valid only in the account that issued it, so re-read them with ensemblr_linear_get_metadata under the right accountId.`;
 	}
-	const retry =
-		failure.retryAfterSeconds === null
-			? ''
-			: ` Retry in ${failure.retryAfterSeconds}s.`;
-	return `Linear failed (${failure.code}): ${failure.message}${retry}`;
+	return `Linear failed (${failure.code}): ${failure.message}${recoveryFor(failure)}`;
 }
 
 /** The outcome fields every failed Linear op reports. */
@@ -192,6 +219,7 @@ function toAgentIssue(issue: LinearIssueWire): AgentLinearIssue {
 	return {
 		accountId: issue.accountId,
 		assignee: issue.assigneeName,
+		assigneeId: issue.assigneeId,
 		id: issue.id,
 		identifier: issue.identifier,
 		organization: issue.organizationName,
@@ -211,6 +239,7 @@ function toAgentIssue(issue: LinearIssueWire): AgentLinearIssue {
 function toAgentIssueDetail(issue: LinearIssueWire): AgentLinearIssueDetail {
 	return {
 		...toAgentIssue(issue),
+		cycle: issue.cycleName,
 		description: issue.description
 			? clampText(
 					issue.description,
@@ -362,6 +391,45 @@ function unclassifiableCause(
 }
 
 /**
+ * States the refused update could have named instead, drawn from the same team as
+ * the state it did name. A refusal that only says "call get_metadata" costs the
+ * agent a round trip it does not need — the classification already read every
+ * state in that team, so the alternatives are in hand.
+ * @param states - Every cached workflow state the lookup covered.
+ * @param target - The refused state, whose team scopes the alternatives.
+ * @returns The clause naming the states that are allowed, or an empty string when none are.
+ */
+function nonTerminalStatesNote(
+	states: readonly LinearResourceWire[],
+	target: LinearResourceWire,
+): string {
+	const allowed = states.flatMap((row) =>
+		row.teamId === target.teamId &&
+		row.type !== null &&
+		!TERMINAL_STATE_TYPES.has(row.type)
+			? [`"${row.name}" (${row.id})`]
+			: [],
+	);
+	if (allowed.length === 0) {
+		return '';
+	}
+	const listed = allowed.slice(0, MAX_LISTED_STATES);
+	const rest =
+		allowed.length > listed.length
+			? ` (${allowed.length - listed.length} more; call \`ensemblr_linear_get_metadata\` for the rest)`
+			: '';
+	return ` The states you may move it into on that team are ${listed.join(', ')}${rest}.`;
+}
+
+/**
+ * Says that a refused update changed nothing at all. An agent that passed a title
+ * alongside the state otherwise assumes the title landed and the state did not,
+ * and never re-sends it.
+ */
+const NOTHING_APPLIED =
+	'Nothing in this call was applied — not the state, and not any other field you passed alongside it, so re-send those on their own if you still want them.';
+
+/**
  * Reports why an agent may not move an issue into a state, or null when it may.
  *
  * Fails closed on purpose. A state the cached metadata cannot classify might be
@@ -383,12 +451,13 @@ async function terminalStateRefusal(
 	const metadata = await service.getMetadata(
 		accountId ? { accountId } : undefined,
 	);
-	const state = metadata.metadata.states.find((row) => row.id === stateId);
+	const states = metadata.metadata.states;
+	const state = states.find((row) => row.id === stateId);
 	if (!state || state.type === null) {
-		return `Refused: this app will not move an issue into a state it cannot classify, and ${unclassifiableCause(metadata, state)}. Call ensemblr_linear_get_metadata and pass a state id from the list it returns.`;
+		return `Refused: this app will not move an issue into a state it cannot classify, and ${unclassifiableCause(metadata, state)}. Call ensemblr_linear_get_metadata and pass a state id from the list it returns. ${NOTHING_APPLIED}`;
 	}
 	if (TERMINAL_STATE_TYPES.has(state.type)) {
-		return `Refused: "${state.name}" is a ${state.type} state, and agent work never closes a ticket here — marking it canceled is the same call under a different label. Move it to In Review instead and say in your reply that it is ready; the user decides whether it is done.`;
+		return `Refused: "${state.name}" is a ${state.type} state, and agent work never closes a ticket here — marking it canceled is the same call under a different label. Move it to In Review instead and say in your reply that it is ready; the user decides whether it is done.${nonTerminalStatesNote(states, state)} ${NOTHING_APPLIED}`;
 	}
 	return null;
 }
@@ -404,29 +473,11 @@ function workspaceAccountId(
 	deps: LinearPortDeps,
 	workspaceId: string,
 ): string | null {
-	const database = deps.databaseService.getConnection()?.database;
-
-	if (!database) {
-		return null;
-	}
-
-	const metadataJson = selectWorkspaceMetadataJson({
-		database,
-		id: workspaceId,
+	const linked = readWorkspaceLinkedIssue({
+		databaseService: deps.databaseService,
+		workspaceId,
 	});
-
-	if (!metadataJson) {
-		return null;
-	}
-
-	const { linkedIssue } = parseMetadata(metadataJson) as {
-		linkedIssue?: { accountId?: unknown; provider?: unknown };
-	};
-
-	return linkedIssue?.provider === 'linear' &&
-		typeof linkedIssue.accountId === 'string'
-		? linkedIssue.accountId
-		: null;
+	return linked?.provider === 'linear' ? linked.accountId : null;
 }
 
 /**
@@ -485,16 +536,42 @@ function withFallback(fallbackAccountId: string | undefined): {
 }
 
 /**
- * Lists the connected accounts for a failure path, where the list is context for
- * a message rather than the answer. A read that is already failing must not fail
- * differently because the account lookup threw too.
+ * Lists the connected accounts without ever throwing. Every caller here wants the
+ * list as context on an answer it is already producing — the choice attached to a
+ * failure, or the `viewer` rows on a metadata read — so an account lookup that
+ * fails must degrade to an empty list rather than change how the op ends.
  * @param deps - Port collaborators holding the account lookup.
  * @returns The connected accounts, or an empty list when they cannot be read.
  */
-async function accountsForFailure(
+async function listAccountsSafely(
 	deps: LinearPortDeps,
 ): Promise<readonly LinearAccountRef[]> {
 	return deps.listLinearAccounts().catch(() => []);
+}
+
+/**
+ * Names who each account in a metadata read's scope is connected as, so an agent
+ * taking a ticket on the user's behalf has a `userId` to assign it to instead of
+ * matching display names against the users table.
+ * @param accounts - Every connected account.
+ * @param scope - The account the read was narrowed to, if any.
+ * @returns The viewer rows for the accounts the read covered.
+ */
+function viewerRows(
+	accounts: readonly LinearAccountRef[],
+	scope: string | undefined,
+): readonly AgentLinearViewer[] {
+	return accounts.flatMap((account) =>
+		!scope || account.accountId === scope
+			? [
+					{
+						accountId: account.accountId,
+						name: account.user,
+						userId: account.userId,
+					},
+				]
+			: [],
+	);
 }
 
 /**
@@ -519,6 +596,12 @@ export function makeLinearPort(deps: LinearPortDeps): LinearPort {
 	}
 
 	return {
+		readLinkedIssue: (workspaceId) =>
+			readWorkspaceLinkedIssue({
+				databaseService: deps.databaseService,
+				workspaceId,
+			}),
+
 		// Deliberately not defaulted to the workspace's account: a search is the one
 		// op where seeing every organization at once is the point, and an agent
 		// that wants one narrows with `accountId`.
@@ -550,7 +633,7 @@ export function makeLinearPort(deps: LinearPortDeps): LinearPort {
 			if (result.status === 'error') {
 				const outcome = failed(result.failure);
 				return {
-					...accountChoice(await accountsForFailure(deps)),
+					...accountChoice(await listAccountsSafely(deps)),
 					issues: fitted.kept,
 					message: `${outcome.message} The ${fitted.kept.length} issue(s) here are what the local cache already held.${cut}`,
 					omittedIssues: fitted.omitted,
@@ -590,7 +673,7 @@ export function makeLinearPort(deps: LinearPortDeps): LinearPort {
 			if (result.status === 'error') {
 				return {
 					...failed(result.failure),
-					...accountChoice(await accountsForFailure(deps)),
+					...accountChoice(await listAccountsSafely(deps)),
 					comments: [],
 					issue: null,
 					omittedComments: 0,
@@ -627,39 +710,46 @@ export function makeLinearPort(deps: LinearPortDeps): LinearPort {
 					omittedResources: 0,
 					syncedAt: null,
 					truncated: false,
+					viewer: [],
 				} satisfies LinearGetMetadataResult;
 			}
 			const scope = accountId ?? fallbackAccount(workspaceId);
-			const result = await linearService.getMetadata({
-				...(scope ? { accountId: scope } : {}),
-				refresh,
-			});
+			const [accounts, result] = await Promise.all([
+				listAccountsSafely(deps),
+				linearService.getMetadata({
+					...(scope ? { accountId: scope } : {}),
+					refresh,
+				}),
+			]);
 			const fitted = fitMetadata(result.metadata);
 			const cut = truncationNote(
 				fitted.omitted,
 				'row',
 				'the states and teams an update needs are kept first; narrow with `accountId`.',
 			);
+			const viewer = viewerRows(accounts, scope);
 			if (result.status === 'error') {
 				const outcome = failed(result.failure);
 				return {
 					...fitted.rows,
-					...accountChoice(await accountsForFailure(deps)),
+					...accountChoice(accounts),
 					message: `${outcome.message} The rows here are what the local cache already held.${cut}`,
 					omittedResources: fitted.omitted,
 					status: outcome.status,
 					syncedAt: result.metadata.syncedAt,
 					truncated: fitted.omitted > 0,
+					viewer,
 				} satisfies LinearGetMetadataResult;
 			}
 			const partial = accountFailureNote(result.accountFailures);
 			return {
 				...fitted.rows,
-				message: `Teams, projects, workflow states, labels, and users, as synced at ${result.metadata.syncedAt ?? 'an unknown time'}. Every row names its accountId, and an id from one account is never valid in another. Cycles are not returned — nothing on this surface sets one.${cut}${partial}`,
+				message: `Teams, projects, workflow states, labels, and users, as synced at ${result.metadata.syncedAt ?? 'an unknown time'}. Every row names its accountId, and an id from one account is never valid in another. \`viewer\` names the Linear user each account is connected as — assign an issue to that \`userId\` when you take it on the user's behalf. Cycles are not returned — nothing on this surface sets one.${cut}${partial}`,
 				omittedResources: fitted.omitted,
 				status: 'ok',
 				syncedAt: result.metadata.syncedAt,
 				truncated: fitted.omitted > 0,
+				viewer,
 			} satisfies LinearGetMetadataResult;
 		},
 
@@ -676,7 +766,7 @@ export function makeLinearPort(deps: LinearPortDeps): LinearPort {
 			if (result.status === 'error') {
 				return {
 					...failed(result.failure),
-					...accountChoice(await accountsForFailure(deps)),
+					...accountChoice(await listAccountsSafely(deps)),
 					commentId: null,
 				};
 			}
@@ -719,7 +809,7 @@ export function makeLinearPort(deps: LinearPortDeps): LinearPort {
 			if (result.status === 'error') {
 				return {
 					...failed(result.failure),
-					...accountChoice(await accountsForFailure(deps)),
+					...accountChoice(await listAccountsSafely(deps)),
 					issue: null,
 				};
 			}

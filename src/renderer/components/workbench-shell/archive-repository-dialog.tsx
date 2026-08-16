@@ -38,7 +38,11 @@ export function ArchiveRepositoryDialog({
 	project: ProjectShellModel | null;
 }) {
 	return (
-		<Dialog onOpenChange={onOpenChange} open={open}>
+		// Never open without a project: callers that hold `open` and `project` in
+		// separate state drop the project the moment it is archived, and an open
+		// dialog with nothing to render is an empty shell whose overlay still eats
+		// every click, leaving the app unusable with no way to dismiss it.
+		<Dialog onOpenChange={onOpenChange} open={open && project !== null}>
 			<DialogContent className='sm:max-w-md'>
 				{project ? (
 					<ArchiveRepositoryDialogForm
@@ -90,8 +94,11 @@ function ArchiveRepositoryDialogForm({
 		});
 
 		if (result.status === 'success') {
-			await onArchived(project.id);
+			// Close before the post-archive work: `onArchived` navigates away from the
+			// archived repository, and awaiting that first leaves the modal — and its
+			// pointer-events overlay — up for as long as navigation takes to settle.
 			onOpenChange(false);
+			await onArchived(project.id);
 			return;
 		}
 

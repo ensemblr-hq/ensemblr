@@ -138,9 +138,22 @@ export function useWorkspaceSourcePicker({
 	]);
 }
 
-/** Pulls the typed failure out of a degradable list result, else null. */
+/**
+ * Pulls the typed failure out of a degradable list result, else null. An `ok`
+ * result carrying `staleError` counts: its rows came off the cache because the
+ * refresh failed, and silently showing them makes a stale list look current.
+ */
 function errorOf(
-	data: { error?: GithubFailure; status: 'error' | 'ok' } | undefined,
+	data:
+		| {
+				error?: GithubFailure;
+				staleError?: GithubFailure;
+				status: 'error' | 'ok';
+		  }
+		| undefined,
 ): GithubFailure | null {
-	return data?.status === 'error' ? (data.error ?? null) : null;
+	if (data?.status === 'error') {
+		return data.error ?? null;
+	}
+	return data?.staleError ?? null;
 }

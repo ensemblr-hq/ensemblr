@@ -131,7 +131,7 @@ test('keeps the dashboard board accessible when no workspace exists', () => {
 	for (const status of BOARD_STATUS_ORDER) {
 		expect(
 			screen.getByRole('region', {
-				name: `${boardStatusLabel(i18n.t, status)} column, 0 workspaces`,
+				name: `${boardStatusLabel(i18n.t, status)} column, 0 cards`,
 			}),
 		).toBeTruthy();
 	}

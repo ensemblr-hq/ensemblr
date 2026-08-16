@@ -40,6 +40,7 @@ import type {
 	StartTerminalKind,
 	SubagentMechanism,
 	WorkspaceBoardStatusValue,
+	WorkspaceLinkedIssue,
 } from '../../shared/agent-control.ts';
 import type { AgentProviderId } from '../../shared/agent-provider.ts';
 import type { AppLanguage } from '../../shared/i18n.ts';
@@ -451,6 +452,16 @@ export interface LinearPort {
 	updateIssue: (
 		input: LinearPortInput<LinearUpdateIssueArgs>,
 	) => Promise<LinearUpdateIssueResult>;
+	/**
+	 * Reads the issue a workspace was created from, for the linked-issue directive
+	 * rather than for an op — no control op returns this, because the fact reaches
+	 * the agent as a standing instruction on every turn instead of as something it
+	 * has to think to ask for.
+	 *
+	 * Synchronous and local: it reads the workspace's own metadata row, never
+	 * Linear, which is what makes it affordable on the per-turn path.
+	 */
+	readLinkedIssue: (workspaceId: string) => WorkspaceLinkedIssue | null;
 }
 
 /** An agent's Linear args plus the workspace whose linked account defaults them. */

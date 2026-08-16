@@ -137,7 +137,7 @@ test('adds a disabled pending workspace before create IPC resolves', async () =>
 	});
 	createWorkspace.mockReturnValue(createResultPromise);
 	const view = renderHook(() => useCreateWorkspaceFromProject());
-	let createPromise: Promise<void> = Promise.resolve();
+	let createPromise: Promise<string | null> = Promise.resolve(null);
 
 	await act(async () => {
 		createPromise = view.result.current.create(project, {

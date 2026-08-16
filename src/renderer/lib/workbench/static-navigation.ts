@@ -4,6 +4,7 @@ import type { WorkbenchStaticNavigationTarget } from '@/renderer/types/workbench
 type WorkbenchStaticRouteTo =
 	| '/dashboard'
 	| '/history'
+	| '/linear'
 	| '/settings'
 	| '/settings/repo/$repoId/environment';
 
@@ -19,6 +20,9 @@ const literalRouteByTarget: Record<
 > = {
 	dashboard: '/dashboard',
 	history: '/history',
+	// The issues entry lands on the Linear browse screen, which is the only
+	// in-app issue list; GitHub issues are only ever opened in the browser.
+	issues: '/linear',
 	settings: '/settings',
 };
 

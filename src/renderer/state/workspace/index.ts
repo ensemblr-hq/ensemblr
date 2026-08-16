@@ -1,3 +1,20 @@
+export type {
+	BoardCardSource,
+	BoardFilters,
+	BoardFiltersState,
+	BoardSortMode,
+} from './board-filters';
+export {
+	BOARD_CARD_SOURCES,
+	BOARD_SORT_MODES,
+	boardFiltersAtom,
+	DEFAULT_BOARD_FILTERS,
+	useBoardFilters,
+} from './board-filters';
+export {
+	dismissedBoardIssueKeysAtom,
+	useBoardIssueDismissals,
+} from './board-issue-dismissals';
 export { orderColumnWorkspaceIds } from './board-order';
 export {
 	useWorkspaceBoardActions,
@@ -12,6 +29,7 @@ export {
 	BOARD_STATUS_ORDER,
 	DEFAULT_BOARD_STATUS,
 	resolveBoardStatus,
+	WORKSPACE_BOARD_STATUSES_ASSIGNABLE,
 	type WorkspaceBoardStatus,
 } from './board-status';
 export { installAgentControlBoardStatusSync } from './board-status-sync';

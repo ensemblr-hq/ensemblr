@@ -49,6 +49,8 @@ Keeping the workspace legible is your job, not the user's, and it is bookkeeping
 
 Write every file path you mention in prose as its full path from the workspace root, in backticks — \`src/renderer/components/message.tsx\`, never a bare \`message.tsx\` or a trailing fragment like \`components/message.tsx\`. The app renders those as chips the user clicks to open the file, and it can only do that for a path it can place in the file tree.
 
+Keep a tracked issue current as you work it, without being asked. When you start implementing against an issue, move it into a started state and assign it to the connected Linear user (\`viewer\` on \`ensemblr_linear_get_metadata\`) if nobody holds it; when the work becomes reviewable — verified, or a pull request opened — move it to \`In Review\` in that same turn and say in your reply that you did. A change that shipped while its ticket still reads In Progress is the tracker lying to the whole team, and the user should not have to ask you to stop it doing that.
+
 Close the loop on a review you acted on. When you change the code a review comment asked you to change, mark that comment resolved with \`ensemblr_resolve_diff_comments\` in the same turn you made the fix — \`ensemblr_get_diff_comments\` hands you the \`id\` of each one, and you can close a whole pass in a single batched call. An open comment is a live claim that the finding still stands, so a queue of comments you already addressed forces the user to re-read every one to work out which two are left, and sends the next agent to re-fix code that is already fixed.
 
 Resolve only what you actually fixed. A comment you deferred, could not reproduce, or disagree with stays OPEN, and you say so in your reply — which ones you left open, and why. Resolving one to tidy the panel erases the only record that the disagreement happened, and the user cannot tell a resolved-because-fixed from a resolved-because-swept-away. Leaving one open costs nothing: the user closes it themselves in one click, and \`ensemblr_add_diff_comments\` is there when your answer belongs on the line rather than in prose.
@@ -491,10 +493,12 @@ async function fetchSessionBrief(): Promise<{
 	nudge: string | null;
 	planRefinement: string | null;
 	languageDirective: string | null;
+	issueDirective: string | null;
 }> {
 	const result = await invoke('getSessionBrief', {}, undefined);
 	if (!result.ok) {
 		return {
+			issueDirective: null,
 			languageDirective: null,
 			nudge: null,
 			planning: false,
@@ -507,9 +511,12 @@ async function fetchSessionBrief(): Promise<{
 				nudge?: string | null;
 				planRefinement?: string | null;
 				languageDirective?: string | null;
+				issueDirective?: string | null;
 		  }
 		| undefined;
 	return {
+		issueDirective:
+			typeof brief?.issueDirective === 'string' ? brief.issueDirective : null,
 		languageDirective:
 			typeof brief?.languageDirective === 'string'
 				? brief.languageDirective
@@ -543,8 +550,13 @@ export default function ensemblrControl(pi: ExtensionAPI): void {
 	}
 
 	pi.on('before_agent_start', async (event) => {
-		const { languageDirective, nudge, planning, planRefinement } =
-			await fetchSessionBrief();
+		const {
+			issueDirective,
+			languageDirective,
+			nudge,
+			planning,
+			planRefinement,
+		} = await fetchSessionBrief();
 		const playbook = planning ? PLAN_MODE_AWARENESS_FOR_ROLE : AWARENESS;
 		const blocks = [
 			event.systemPrompt,
@@ -552,6 +564,7 @@ export default function ensemblrControl(pi: ExtensionAPI): void {
 			nudge,
 			planRefinement,
 			languageDirective,
+			issueDirective,
 		].filter((block) => typeof block === 'string' && block.length > 0);
 		return { systemPrompt: blocks.join('\n\n') };
 	});
@@ -949,7 +962,7 @@ export default function ensemblrControl(pi: ExtensionAPI): void {
 	tool(
 		'ensemblr_linear_get_issue',
 		'linearGetIssue',
-		'Read one Linear issue with its description, labels, and comment thread. issueId takes either the uuid or the human identifier (ENG-106); an identifier always goes to Linear rather than the local cache. accountId is optional — the issue is looked up in the account your workspace was created from, then in the only one connected — but an identifier such as ENG-106 can exist in two organizations at once, and that is refused rather than guessed, with the accounts listed so you can name one. The description is truncated and only the most recent comments are returned — the result says how many were dropped. Check `status`: `not-found` means the id is wrong, `not-connected` means Linear is not linked.',
+		'Read one Linear issue with its description, labels, cycle, and comment thread. Call it before you change any code on a tracked issue: the description and the thread carry requirements, decisions, and rejected approaches your prompt does not, and re-deriving them from the code is how an agent rebuilds something the ticket already ruled out. issueId takes either the uuid or the human identifier (ENG-106); an identifier always goes to Linear rather than the local cache. accountId is optional — the issue is looked up in the account your workspace was created from, then in the only one connected — but an identifier such as ENG-106 can exist in two organizations at once, and that is refused rather than guessed, with the accounts listed so you can name one. The description is truncated and only the most recent comments are returned — the result says how many were dropped. Check `status`: `not-found` means the id is wrong, `not-connected` means Linear is not linked.',
 		Type.Object({
 			accountId: Type.Optional(
 				Type.String({
@@ -966,7 +979,7 @@ export default function ensemblrControl(pi: ExtensionAPI): void {
 	tool(
 		'ensemblr_linear_get_metadata',
 		'linearGetMetadata',
-		'List the Linear teams, projects, workflow states, labels, and users a connected account can see, each with the id ensemblr_linear_update_issue takes and the accountId it belongs to. Defaults to the account your workspace was created from; pass accountId to read another, or when the workspace has no linked issue and several accounts are connected. An id from one account is never valid in another. The account is not scoped to your workspace, so expect teams that have nothing to do with the work here. Call this FIRST whenever you are about to set a state, an assignee, or a project — those arguments are ids, not names, and this is the only place to turn one into the other. Cycles are not returned; nothing on this surface sets one.',
+		"List the Linear teams, projects, workflow states, labels, and users a connected account can see, each with the id ensemblr_linear_update_issue takes and the accountId it belongs to. Call this FIRST whenever you are about to set a state or an assignee — those arguments are ids, not names, and this is the only place to turn one into the other. It also returns `viewer`, the Linear user each account is connected as: that `userId` is who to pass as assigneeId when you take a ticket on the user's behalf, because an agent has no Linear identity of its own. Defaults to the account your workspace was created from; pass accountId to read another, or when the workspace has no linked issue and several accounts are connected. An id from one account is never valid in another. The account is not scoped to your workspace, so expect teams that have nothing to do with the work here. Cycles are not returned; nothing on this surface sets one.",
 		Type.Object({
 			accountId: Type.Optional(
 				Type.String({
@@ -980,7 +993,7 @@ export default function ensemblrControl(pi: ExtensionAPI): void {
 	tool(
 		'ensemblr_linear_create_comment',
 		'linearCreateComment',
-		'Post a comment on a Linear issue. The whole team reads it and nothing here can edit or delete it afterwards, so write it as you would a comment of your own: what you did, what you found, what is still open. Use it to record progress on a ticket rather than to talk to the user, who reads your reply instead.',
+		'Post a comment on a Linear issue. Call this when you settle something the ticket should record and the user did not ask you to record it: a decision you made, a constraint you hit, an approach you rejected and why, or a question you had to answer yourself. Once per turn, at the end — not per file. The whole team reads it and nothing here can edit or delete it afterwards, so write it as you would a comment of your own, and do not restate your reply to the user, who reads that already.',
 		Type.Object({
 			accountId: Type.Optional(
 				Type.String({
@@ -997,7 +1010,7 @@ export default function ensemblrControl(pi: ExtensionAPI): void {
 	tool(
 		'ensemblr_linear_update_issue',
 		'linearUpdateIssue',
-		'Change a Linear issue: its workflow state, assignee, priority (0 none, 1 urgent, 2 high, 3 medium, 4 low), title, or description. Pass at least one of those alongside issueId. stateId and assigneeId are ids from ensemblr_linear_get_metadata, never names. A state whose type is `completed` or `canceled` is REFUSED whatever you pass — agent work never closes a ticket here, and marking one canceled is the same call under a different label. Take it to In Review and say in your reply that it is ready; the user decides whether it is done.',
+		'Change a Linear issue: its workflow state, assignee, priority (0 none, 1 urgent, 2 high, 3 medium, 4 low), title, or description. Pass at least one of those alongside issueId. Call it on two triggers without being asked, when the issue is the one your workspace was created from: WHEN YOU BEGIN IMPLEMENTING, to move it into a started state and assign it to the `viewer` userId if it has no assignee; and WHEN THE WORK IS READY FOR A HUMAN — verified, or a pull request opened — to move it to In Review in that same turn. Leaving a shipped change sitting In Progress is the failure this tool exists to prevent. stateId and assigneeId are ids from ensemblr_linear_get_metadata, never names. A state whose type is `completed` or `canceled` is REFUSED whatever you pass, and a refused call applies none of the other fields either — agent work never closes a ticket here, and marking one canceled is the same call under a different label. Take it to In Review, say in your reply that you did, and let the user decide whether it is done.',
 		Type.Object({
 			accountId: Type.Optional(
 				Type.String({

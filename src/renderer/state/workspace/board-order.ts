@@ -1,7 +1,4 @@
-import {
-	DEFAULT_BOARD_STATUS,
-	type WorkspaceBoardStatus,
-} from './board-status';
+import { resolveBoardStatus, type WorkspaceBoardStatus } from './board-status';
 
 /**
  * Sorts a column's workspace ids by their position in the persisted board
@@ -11,8 +8,8 @@ import {
  * @returns The column ids sorted for display.
  */
 export function orderColumnWorkspaceIds(
-	order: string[],
-	columnWorkspaceIds: string[],
+	order: readonly string[],
+	columnWorkspaceIds: readonly string[],
 ): string[] {
 	const indexById = new Map(order.map((id, index) => [id, index]));
 	return [...columnWorkspaceIds].sort(
@@ -68,8 +65,7 @@ export function moveToColumnEnd(
 	const withoutSource = order.filter((id) => id !== sourceId);
 	let insertIndex = 0;
 	withoutSource.forEach((id, index) => {
-		const status = statusByWorkspaceId[id] ?? DEFAULT_BOARD_STATUS;
-		if (status === targetStatus) {
+		if (resolveBoardStatus(statusByWorkspaceId, id) === targetStatus) {
 			insertIndex = index + 1;
 		}
 	});

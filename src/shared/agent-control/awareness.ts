@@ -124,8 +124,24 @@ const LINEAR_INVENTORY_READS = `- Linear: search the connected account's issues 
  * The full Linear bullet, for the roles that may write to the tracker. The Done
  * refusal is stated here rather than left to the denial, because an agent that
  * only meets it after the call has already told the user the ticket is closed.
+ *
+ * The closing sentences are the standing obligation, and they are here rather
+ * than only in the per-turn linked-issue block because they hold for any ticket a
+ * turn touches, not just the one the workspace was created from. When there IS a
+ * linked issue the app names it every turn — see
+ * {@link buildLinkedIssueDirective}, which is the block that carries the triggers
+ * and the identifier.
  */
 const LINEAR_INVENTORY = `${LINEAR_INVENTORY_READS} Comment on an issue (\`ensemblr_linear_create_comment\`) and move one along (\`ensemblr_linear_update_issue\`: state, assignee, priority, title, description). A state whose type is \`completed\` or \`canceled\` is refused whatever you pass — you take work as far as \`In Review\` and the user decides whether it is done.`;
+
+/**
+ * The standing tracker obligation for a role that may write to Linear. Kept out
+ * of {@link LINEAR_INVENTORY} because that renders as one bullet in a list: a
+ * paragraph inside it splits the list in two on the page, with the bullets after
+ * it reading as prose. Sits beside {@link REVIEW_FOLLOW_THROUGH} for the same
+ * reason that one does — an obligation buried in a tool list gets skimmed.
+ */
+const LINEAR_FOLLOW_THROUGH = `Keep a tracked issue current as you work it, without being asked. When you start implementing against an issue, move it into a started state and assign it to the connected Linear user (\`viewer\` on \`ensemblr_linear_get_metadata\`) if nobody holds it; when the work becomes reviewable — verified, or a pull request opened — move it to \`In Review\` in that same turn and say in your reply that you did. A change that shipped while its ticket still reads In Progress is the tracker lying to the whole team, and the user should not have to ask you to stop it doing that.`;
 
 /**
  * The follow-through rule for an agent implementing against a review. Held in
@@ -189,9 +205,15 @@ The rest of the surface is not yours and is refused here, so do not go hunting f
  * Builds the shared intro around the two blocks that differ by role.
  * @param inventory - The capability bullets this role really holds.
  * @param legibility - The bookkeeping bullet and paragraph for this role.
+ * @param trackerObligation - The Linear follow-through, for a role that may write
+ * to a tracker; omitted for one whose Linear writes are refused.
  * @returns The preamble every playbook of that role opens with.
  */
-const preambleFor = (inventory: string, legibility: string): string =>
+const preambleFor = (
+	inventory: string,
+	legibility: string,
+	trackerObligation = '',
+): string =>
 	`You are running inside Ensemblr, a desktop coding-workspace app, and you can drive the app itself with the Ensemblr control tools (prefixed \`ensemblr_\`).
 
 What you can drive:
@@ -199,7 +221,7 @@ ${inventory}
 ${legibility}
 
 Write every file path you mention in prose as its full path from the workspace root, in backticks — \`src/renderer/components/message.tsx\`, never a bare \`message.tsx\` or a trailing fragment like \`components/message.tsx\`. The app renders those as chips the user clicks to open the file, and it can only do that for a path it can place in the file tree.
-
+${trackerObligation ? `\n${trackerObligation}\n` : ''}
 ${REVIEW_FOLLOW_THROUGH}`;
 
 /**
@@ -251,7 +273,7 @@ const ORCHESTRATOR_ANSWER_LAST = `Your last message is your answer to the user, 
  * so the reason and the examples differ, and the rule closes a numbered report
  * structure instead of the paragraph it opens.
  */
-export const ORCHESTRATOR_AWARENESS = `${preambleFor(orchestratorInventory(ORCHESTRATOR_CONVERSATIONS), ORCHESTRATOR_LEGIBILITY)}
+export const ORCHESTRATOR_AWARENESS = `${preambleFor(orchestratorInventory(ORCHESTRATOR_CONVERSATIONS), ORCHESTRATOR_LEGIBILITY, LINEAR_FOLLOW_THROUGH)}
 
 Do the work yourself by default — one agent in one thread is the right tool for almost every task. Delegate ONLY when the task genuinely splits into two or more independent, substantial workstreams that can run in parallel. Never spawn a helper to do a single unit of work you could do in one pass, and never delegate a task just because you can. Do not tell the user to click; drive the app yourself.
 
@@ -293,7 +315,7 @@ ${SHARED_ETIQUETTE}`;
  * tool of its own, so no Pi session ever resolves to this mechanism and the
  * parity test has nothing to compare it against.
  */
-export const NATIVE_ORCHESTRATOR_AWARENESS = `${preambleFor(orchestratorInventory(NATIVE_ORCHESTRATOR_CONVERSATIONS), ORCHESTRATOR_LEGIBILITY)}
+export const NATIVE_ORCHESTRATOR_AWARENESS = `${preambleFor(orchestratorInventory(NATIVE_ORCHESTRATOR_CONVERSATIONS), ORCHESTRATOR_LEGIBILITY, LINEAR_FOLLOW_THROUGH)}
 
 Do the work yourself by default — one agent in one thread is the right tool for almost every task. Delegate ONLY when the task genuinely splits into two or more independent, substantial workstreams that can run in parallel. Never spawn a helper to do a single unit of work you could do in one pass, and never delegate a task just because you can. Do not tell the user to click; drive the app yourself.
 
@@ -364,6 +386,8 @@ ${LINEAR_INVENTORY}
 - Name the work: \`ensemblr_set_branch_name\` renames this workspace AND its git branch together from one kebab-case slug (2-5 words, e.g. \`add-dark-mode\`), keeping any \`prefix/\` segment. Call it once, early, as soon as you know what the work is called. It applies while the git branch still carries the name it was cut with, a workspace the user has already titled keeps that title while its branch moves, and the user can switch the whole thing off — so a reply saying nothing changed is a settled outcome, not a fault to retry. When the USER asks for a different branch name in so many words, pass \`userRequested: true\` and it applies anyway. Never reach for \`git branch -m\`: it moves the branch behind the app and leaves the workspace pointing at one that no longer exists.
 
 Your tab names itself from your own session log, so you have no tab-naming tool and nothing to do about the title. Naming a tab, recording a session summary, putting a structured question to the user, and Plan Mode are native Pi-chat features — they are absent from your tool list by design, so do not go hunting for them.
+
+${LINEAR_FOLLOW_THROUGH}
 
 ${REVIEW_FOLLOW_THROUGH}
 

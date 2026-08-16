@@ -35,6 +35,17 @@ export const composerEditorStateAtomFamily = atomFamily((_chatTabId: string) =>
 );
 
 /**
+ * Whether this chat has already been handed its workspace's linked issue as an
+ * attachment, keyed by chat-tab id. Lives beside the draft rather than in the
+ * component because the seed must survive a remount and a route change, and
+ * because removing the chip has to stick — a per-mount ref would re-attach the
+ * issue the moment the user navigated away and back.
+ */
+export const composerLinkedIssueSeededAtomFamily = atomFamily(
+	(_chatTabId: string) => atom(false),
+);
+
+/**
  * Evicts a chat's draft atoms from their families. Call only when a chat tab is
  * permanently deleted — closed-but-restorable tabs must keep their draft, matching
  * how {@link forgetChatOverrides} treats model/thinking picks. The atoms are
@@ -46,4 +57,5 @@ export function forgetComposerDraft(chatTabId: string): void {
 	composerValueAtomFamily.remove(chatTabId);
 	composerAttachmentsAtomFamily.remove(chatTabId);
 	composerEditorStateAtomFamily.remove(chatTabId);
+	composerLinkedIssueSeededAtomFamily.remove(chatTabId);
 }

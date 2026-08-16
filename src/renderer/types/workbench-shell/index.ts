@@ -6,7 +6,12 @@
  * For domain model types — projects, workspaces, sessions, dock tabs,
  * review, pull requests — see `types/workbench/`.
  */
-export type { BoardCard, BoardDrop } from './dashboard';
+export type {
+	BoardCard,
+	BoardCardKind,
+	BoardDrop,
+	BoardIssueCard,
+} from './dashboard';
 export type { WorkbenchLayoutModel } from './layout';
 export type {
 	ChangesSource,

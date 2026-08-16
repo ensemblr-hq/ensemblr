@@ -10,9 +10,12 @@ import type { AgentSpecies } from '../../src/main/agent-control/ports.ts';
 import { BranchSlugRejected } from '../../src/main/agent-runtime/naming/apply-branch-slug.ts';
 import {
 	buildLanguageDirective,
+	buildLinkedIssueDirective,
+	LINKED_ISSUE_DIRECTIVE_HEADER,
 	PLAN_REFINEMENT_DIRECTIVE,
 	PLAN_REFINEMENT_HEADER,
 	SESSION_BRIEF_NUDGE_HEADER,
+	type WorkspaceLinkedIssue,
 } from '../../src/shared/agent-control.ts';
 import type { AppLanguage } from '../../src/shared/i18n.ts';
 
@@ -22,6 +25,14 @@ const idleBrief = {
 	branch: { current: null, eligible: false },
 	summaryStale: false,
 	titleNeeded: false,
+};
+
+const LINKED_ISSUE: WorkspaceLinkedIssue = {
+	accountId: 'acct-1',
+	identifier: 'ENG-106',
+	provider: 'linear',
+	title: 'Expose Linear to agents',
+	url: 'https://linear.app/the/issue/ENG-106',
 };
 
 function setup(
@@ -34,6 +45,8 @@ function setup(
 		setSummary?: unknown;
 		species?: AgentSpecies;
 		language?: AppLanguage;
+		linkedIssue?: WorkspaceLinkedIssue;
+		subAgent?: boolean;
 	} = {},
 ) {
 	const registry = createOriginRegistry({ generateToken: () => 'tok' });
@@ -51,7 +64,7 @@ function setup(
 		},
 		confirm: { confirm: vi.fn().mockResolvedValue(true) },
 		conversations: {
-			isSpawnedSubAgent: vi.fn().mockResolvedValue(false),
+			isSpawnedSubAgent: vi.fn().mockResolvedValue(overrides.subAgent ?? false),
 			setName:
 				overrides.setName ??
 				vi.fn().mockResolvedValue({
@@ -63,6 +76,9 @@ function setup(
 		focus: { focusDockTab: vi.fn(), focusPanel: vi.fn(), focusTab: vi.fn() },
 		harnesses: { launchHarness: vi.fn() },
 		language: { getLanguage: () => overrides.language ?? 'en' },
+		linear: {
+			readLinkedIssue: vi.fn().mockReturnValue(overrides.linkedIssue ?? null),
+		},
 		permissions: { getMode: () => 'workspace-trusted' },
 		planMode: {
 			exit: vi.fn(),
@@ -279,6 +295,58 @@ describe('getSessionBrief', () => {
 		}
 	});
 
+	// The Pi extension appends whatever this field holds, so a brief that omits it
+	// reaches Pi as nothing at all however good the directive is.
+	it('carries the linked-issue directive for a workspace with an issue', async () => {
+		const { invoke } = setup({ linkedIssue: LINKED_ISSUE });
+
+		const result = await invoke('getSessionBrief');
+
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			expect(result.data).toMatchObject({
+				issueDirective: buildLinkedIssueDirective(LINKED_ISSUE),
+			});
+		}
+	});
+
+	it('carries no linked-issue directive for a workspace with none', async () => {
+		const { invoke } = setup();
+
+		const result = await invoke('getSessionBrief');
+
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			expect(result.data).toMatchObject({ issueDirective: null });
+		}
+	});
+
+	// The role decides which triggers the block names, and a sub-agent is refused
+	// both tracker writes. Hardcoding `'orchestrator'` here would still satisfy
+	// every other case, and would send a spawned child at an op it cannot call.
+	it('cuts the linked-issue directive to a sub-agent role', async () => {
+		const { invoke } = setup({ linkedIssue: LINKED_ISSUE, subAgent: true });
+
+		const result = await invoke('getSessionBrief');
+
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			expect(result.data).toMatchObject({
+				issueDirective: buildLinkedIssueDirective(LINKED_ISSUE, 'subagent'),
+			});
+			expect(result.data).toMatchObject({
+				issueDirective: expect.stringContaining(
+					'refused to a spawned sub-agent',
+				),
+			});
+			expect(result.data).not.toMatchObject({
+				issueDirective: expect.stringContaining(
+					"move the issue to your team's In Review state",
+				),
+			});
+		}
+	});
+
 	it('carries no language directive for an English app', async () => {
 		const { invoke } = setup();
 
@@ -365,6 +433,36 @@ describe('readTurnPreamble', () => {
 		expect(
 			preamble.indexOf(buildLanguageDirective('ru') ?? ''),
 		).toBeGreaterThan(preamble.indexOf(PLAN_REFINEMENT_HEADER));
+	});
+
+	// The directive is what makes an agent move a ticket unprompted, and a static
+	// playbook cannot carry it: it names an issue only this workspace has.
+	it('names the workspace linked issue on every turn', async () => {
+		const { service } = setup({ linkedIssue: LINKED_ISSUE });
+
+		const preamble = (await service.readTurnPreamble(CALLER)) ?? '';
+
+		expect(preamble).toContain(LINKED_ISSUE_DIRECTIVE_HEADER);
+		expect(preamble).toContain('ENG-106');
+	});
+
+	it('leaves the issue block off a workspace with no linked issue', async () => {
+		const { service } = setup();
+
+		expect(await service.readTurnPreamble(CALLER)).toBeNull();
+	});
+
+	// `linearUpdateIssue` is denied while planning, so the block a planning turn
+	// receives must not be the one that tells it to move the ticket.
+	it('cuts the issue block to what a planning turn may actually do', async () => {
+		const { service } = setup({ linkedIssue: LINKED_ISSUE, planMode: true });
+
+		const preamble = (await service.readTurnPreamble(CALLER)) ?? '';
+
+		expect(preamble).toContain(
+			buildLinkedIssueDirective(LINKED_ISSUE, 'orchestrator', true) ?? '',
+		);
+		expect(preamble).toContain('refused while you are planning');
 	});
 
 	// This is the only channel a directly-prompted runtime has. Claude Code sees

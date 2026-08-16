@@ -14,7 +14,10 @@ import {
 	useMenuCommandChecked,
 } from '@/renderer/state/menu-commands';
 import { dictationEnabledAtom } from '@/renderer/state/preferences';
-import type { ComposerShellState } from '@/renderer/types/workbench';
+import type {
+	ComposerShellState,
+	WorkspaceLinkedIssueSummary,
+} from '@/renderer/types/workbench';
 import { ComposerControls } from './composer/composer-controls';
 import { ComposerNotices } from './composer/composer-notices';
 import { ComposerEditor } from './composer/editor';
@@ -33,6 +36,8 @@ interface ComposerPanelProps {
 	planReview?: ReactNode;
 	/** Repository whose GitHub issues the attachment menu offers. */
 	repositoryId: string;
+	/** Issue an issue-created workspace came from, attached to the draft once. */
+	seedLinkedIssue?: WorkspaceLinkedIssueSummary;
 	seedText?: string;
 	/** Workspace whose dock hosts terminals the control row hands work off to. */
 	workspaceId: string;
@@ -64,11 +69,17 @@ function ComposerPanelBody({
 	composer,
 	planReview,
 	repositoryId,
+	seedLinkedIssue,
 	seedText,
 	workspaceId,
 }: ComposerPanelProps) {
 	const { t } = useTranslation();
-	const state = useComposerState({ chatTabId, composer, seedText });
+	const state = useComposerState({
+		chatTabId,
+		composer,
+		...(seedLinkedIssue ? { seedLinkedIssue } : {}),
+		...(seedText ? { seedText } : {}),
+	});
 	const [focused, setFocused] = useState(false);
 	const [modelPickerOpen, setModelPickerOpen] = useState(false);
 	const [issuePickerOpen, setIssuePickerOpen] = useState(false);

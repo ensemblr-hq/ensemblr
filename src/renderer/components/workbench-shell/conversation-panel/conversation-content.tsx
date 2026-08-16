@@ -12,6 +12,7 @@ import { useWorkspaceUnreadKeys } from '@/renderer/state/unread';
 import type {
 	ComposerShellState,
 	SessionTabModel,
+	WorkspaceLinkedIssueSummary,
 	WorkspaceShellModel,
 } from '@/renderer/types/workbench';
 import type { SessionTabPlacement } from '@/renderer/types/workbench-shell';
@@ -171,15 +172,10 @@ function ChatTabBody({
 						/>
 					</div>
 					{showsComposer(activeSession) ? (
-						<ComposerSlot
-							chatTabId={activeSession.chatTabId}
+						<LinkedIssueComposerSlot
+							activeSession={activeSession}
+							activeWorkspace={activeWorkspace}
 							composer={composer}
-							agentSessionId={activeSession.agentSessionId ?? null}
-							seedText={getLinkedIssueComposerSeed(
-								activeWorkspace,
-								activeSession,
-							)}
-							workspace={activeWorkspace}
 						/>
 					) : (
 						<SubAgentStatusPanel composer={composer} />
@@ -245,26 +241,49 @@ function ActiveAuxiliaryPanel({
 }
 
 /**
- * Composer seed for issue-created workspaces: the issue contents (heading, body,
- * link) are offered as the first-prompt draft (no agent session yet); the user
- * edits and presses send — nothing is auto-submitted.
+ * The composer for a chat, seeded from the workspace's linked issue when it has
+ * one. Split out so the seed is resolved once and handed to both slots — the
+ * attachment and the headline — rather than recomputed inline in the tree.
  */
-function getLinkedIssueComposerSeed(
+function LinkedIssueComposerSlot({
+	activeSession,
+	activeWorkspace,
+	composer,
+}: {
+	activeSession: SessionTabModel;
+	activeWorkspace: WorkspaceShellModel;
+	composer: ComposerShellState;
+}) {
+	const seedLinkedIssue = getSeedLinkedIssue(activeWorkspace, activeSession);
+	return (
+		<ComposerSlot
+			agentSessionId={activeSession.agentSessionId ?? null}
+			chatTabId={activeSession.chatTabId}
+			composer={composer}
+			seedLinkedIssue={seedLinkedIssue}
+			seedText={
+				seedLinkedIssue
+					? formatLinkedIssueComposerSeed(seedLinkedIssue)
+					: undefined
+			}
+			workspace={activeWorkspace}
+		/>
+	);
+}
+
+/**
+ * The issue an issue-created workspace should open with, or undefined once the
+ * chat has a session. Feeds both first-prompt seeds: the attachment chip, which
+ * carries the whole issue document to the agent, and the one-line headline in
+ * the draft text.
+ * @param workspace - The workspace the composer belongs to.
+ * @param session - The chat tab the composer is mounted for.
+ * @returns The linked issue, or undefined when there is none to seed.
+ */
+function getSeedLinkedIssue(
 	workspace: WorkspaceShellModel,
 	session: SessionTabModel,
-): string | undefined {
+): WorkspaceLinkedIssueSummary | undefined {
 	const linkedIssue = workspace.landingSummary?.linkedIssue;
-
-	if (!linkedIssue || session.agentSessionId) {
-		return undefined;
-	}
-
-	return formatLinkedIssueComposerSeed({
-		...(linkedIssue.description !== undefined
-			? { description: linkedIssue.description }
-			: {}),
-		reference: linkedIssue.reference,
-		title: linkedIssue.title,
-		...(linkedIssue.url !== undefined ? { url: linkedIssue.url } : {}),
-	});
+	return linkedIssue && !session.agentSessionId ? linkedIssue : undefined;
 }

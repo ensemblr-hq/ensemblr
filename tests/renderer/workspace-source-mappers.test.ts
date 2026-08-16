@@ -55,6 +55,7 @@ function githubIssue(
 	over: Partial<RepositoryIssueWire> = {},
 ): RepositoryIssueWire {
 	return {
+		assigneeLogins: [],
 		authorLogin: 'octocat',
 		body: 'Repro steps',
 		labels: ['bug'],

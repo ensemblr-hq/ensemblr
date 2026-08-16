@@ -41,7 +41,11 @@ export function RenameWorkspaceDialog({
 	workspace: WorkspaceShellModel | null;
 }) {
 	return (
-		<Dialog onOpenChange={onOpenChange} open={open}>
+		// Never open without a workspace: callers that hold `open` and `workspace`
+		// in separate state drop the workspace the moment it goes away, and an open
+		// dialog with nothing to render is an empty shell whose overlay still eats
+		// every click, leaving the app unusable with no way to dismiss it.
+		<Dialog onOpenChange={onOpenChange} open={open && workspace !== null}>
 			<DialogContent className='gap-4 sm:max-w-lg'>
 				{workspace ? (
 					<RenameWorkspaceDialogForm

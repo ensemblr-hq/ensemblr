@@ -172,6 +172,7 @@ function mapWorkspaceNavigationSnapshot(
 			? i18n.t('workbench:workspace-source.creating', 'creating workspace')
 			: getWorkspaceSourceSummary(repository, workspace),
 		status: isPendingCreation ? 'working' : 'idle',
+		updatedAt: workspace.updatedAt,
 		workspaceFiles: [],
 	};
 }
