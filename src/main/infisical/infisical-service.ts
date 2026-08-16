@@ -21,6 +21,7 @@ import type { InfisicalCache } from './infisical-cache.ts';
 import type { InfisicalClient } from './infisical-client.ts';
 import type { InfisicalLinkStore } from './infisical-link-store.ts';
 import {
+	type InfisicalRepositoryConfigBlock,
 	readInfisicalRepositoryConfig,
 	writeInfisicalRepositoryConfig,
 } from './infisical-repository-config.ts';
@@ -198,6 +199,29 @@ export function createInfisicalService({
 	}
 
 	/**
+	 * Reads every secret a link points at, as one `key -> value` map.
+	 * @param link - The link naming the account, project, environment, and path.
+	 * @returns The resolved values.
+	 */
+	async function readLinkValues(
+		link: InfisicalLinkSnapshot & { accountId: string },
+	): Promise<Record<string, string>> {
+		const secrets = await client.listSecrets({
+			accountId: link.accountId,
+			query: {
+				environment: link.environmentSlug,
+				projectId: link.projectId,
+				recursive: link.recursive,
+				secretPath: link.secretPath,
+			},
+		});
+
+		return Object.fromEntries(
+			secrets.map((secret) => [secret.key, secret.value]),
+		);
+	}
+
+	/**
 	 * Fetches a link's secrets, writing the result to the cache on success and
 	 * falling back to it on failure.
 	 * @param link - The link to resolve.
@@ -218,18 +242,10 @@ export function createInfisicalService({
 		}
 
 		try {
-			const secrets = await client.listSecrets({
+			const values = await readLinkValues({
+				...link,
 				accountId: link.accountId,
-				query: {
-					environment: link.environmentSlug,
-					projectId: link.projectId,
-					recursive: link.recursive,
-					secretPath: link.secretPath,
-				},
 			});
-			const values = Object.fromEntries(
-				secrets.map((secret) => [secret.key, secret.value]),
-			);
 
 			await cache.write({ ...scopeKey, values });
 			linkStore.recordSync({ ...scopeKey, syncedAt: now().toISOString() });
@@ -243,6 +259,36 @@ export function createInfisicalService({
 				values: cached?.values ?? {},
 			};
 		}
+	}
+
+	/**
+	 * Rewrites the repository's committed `[infisical]` block, reporting a
+	 * failure rather than swallowing it: a config that could not be written is a
+	 * link nobody who clones the repository will inherit, and the local half has
+	 * already saved by the time this runs.
+	 * @param repositoryId - Repository whose committed config is rewritten.
+	 * @param block - The block to commit, or null to clear it.
+	 * @returns The failure that stopped the write, or null.
+	 */
+	function commitRepositoryBlock(
+		repositoryId: string,
+		block: InfisicalRepositoryConfigBlock | null,
+	): InfisicalFailure | null {
+		const repositoryPath = linkStore.readRepositoryPath(repositoryId);
+
+		if (!repositoryPath) {
+			return null;
+		}
+
+		const result = writeInfisicalRepositoryConfig({ block, repositoryPath });
+
+		return result.ok
+			? null
+			: {
+					code: 'infisical-config-write-failed',
+					message: result.message,
+					retryAfterSeconds: null,
+				};
 	}
 
 	/**
@@ -325,15 +371,13 @@ export function createInfisicalService({
 				linkStore.clear({ scope, scopeId });
 				await cache.clear({ scope, scopeId });
 
-				if (scope === 'repository') {
-					const repositoryPath = linkStore.readRepositoryPath(scopeId);
-
-					if (repositoryPath) {
-						writeInfisicalRepositoryConfig({ block: null, repositoryPath });
-					}
-				}
-
-				return { failure: null, link: null };
+				return {
+					failure:
+						scope === 'repository'
+							? commitRepositoryBlock(scopeId, null)
+							: null,
+					link: null,
+				};
 			} catch (error) {
 				return { failure: toFailure(error), link: null };
 			}
@@ -465,26 +509,18 @@ export function createInfisicalService({
 
 				await cache.clear({ scope: request.scope, scopeId: request.scopeId });
 
-				if (request.scope === 'repository') {
-					const repositoryPath = linkStore.readRepositoryPath(request.scopeId);
-
-					if (repositoryPath) {
-						writeInfisicalRepositoryConfig({
-							block: {
-								environmentSlug: request.environmentSlug.trim(),
-								projectId: request.projectId.trim(),
-								projectName: request.projectName?.trim() || null,
-								recursive,
-								secretPath,
-								siteUrl: account.siteUrl,
-							},
-							repositoryPath,
-						});
-					}
-				}
-
 				return {
-					failure: null,
+					failure:
+						request.scope === 'repository'
+							? commitRepositoryBlock(request.scopeId, {
+									environmentSlug: request.environmentSlug.trim(),
+									projectId: request.projectId.trim(),
+									projectName: request.projectName?.trim() || null,
+									recursive,
+									secretPath,
+									siteUrl: account.siteUrl,
+								})
+							: null,
 					link: resolveLink(request.scope, request.scopeId),
 				};
 			} catch (error) {
@@ -522,18 +558,10 @@ export function createInfisicalService({
 
 			try {
 				await cache.clear({ scope, scopeId });
-				const secrets = await client.listSecrets({
+				const values = await readLinkValues({
+					...link,
 					accountId: link.accountId,
-					query: {
-						environment: link.environmentSlug,
-						projectId: link.projectId,
-						recursive: link.recursive,
-						secretPath: link.secretPath,
-					},
 				});
-				const values = Object.fromEntries(
-					secrets.map((secret) => [secret.key, secret.value]),
-				);
 				const entry = await cache.write({ scope, scopeId, values });
 
 				linkStore.recordSync({ scope, scopeId, syncedAt: entry.fetchedAt });

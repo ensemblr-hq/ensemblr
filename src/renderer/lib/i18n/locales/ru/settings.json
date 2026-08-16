@@ -257,6 +257,7 @@
 			"label-field": "Название",
 			"label-placeholder": "Рабочая организация",
 			"loading": "Загрузка учётных записей Infisical…",
+			"remove-confirm": "Подтвердить удаление",
 			"site-url": "Адрес инстанса",
 			"state-connected": "Подключено",
 			"state-error": "Не работает",

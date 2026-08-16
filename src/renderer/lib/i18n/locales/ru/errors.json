@@ -151,6 +151,7 @@
 		"git-worktree-failed": "Не удалось создать worktree.",
 		"infisical-account-exists": "Этот Client ID уже настроен для данного инстанса Infisical.",
 		"infisical-account-not-found": "Эта учётная запись Infisical больше не настроена.",
+		"infisical-config-write-failed": "Связь работает на этом компьютере, но обновить .ensemblr/settings.toml не удалось, поэтому те, кто клонирует репозиторий, её не получат.",
 		"infisical-invalid-credentials": "Infisical отклонил эти учётные данные. Проверьте Client ID и Client Secret и повторите попытку.",
 		"infisical-invalid-request": "Infisical отклонил запрос. Проверьте адрес инстанса и выбранный проект.",
 		"infisical-network": "Не удалось связаться с Infisical. Проверьте подключение и повторите попытку.",

@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import {
 	addInfisicalAccount,
 	ensemblrQueryKeys,
+	unexpectedFailure,
 } from '@/renderer/api/ensemblr';
 import { Button } from '@/renderer/components/ui/button';
 import {
@@ -49,6 +50,8 @@ export function InfisicalAccountDialog({
 
 	const add = useMutation({
 		mutationFn: addInfisicalAccount,
+		onError: (error) =>
+			setErrorMessage(failureText(t, unexpectedFailure(error))),
 		onSuccess: async (result) => {
 			if (result.failure) {
 				setErrorMessage(failureText(t, result.failure));

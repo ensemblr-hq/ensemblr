@@ -576,6 +576,7 @@ export default interface Resources {
 			'git-worktree-failed': 'The worktree could not be created.';
 			'infisical-account-exists': 'That Client ID is already configured for this Infisical instance.';
 			'infisical-account-not-found': 'That Infisical account is no longer configured.';
+			'infisical-config-write-failed': 'The link works on this machine, but .ensemblr/settings.toml could not be updated, so nobody who clones this repository will inherit it.';
 			'infisical-invalid-credentials': 'Infisical rejected these credentials. Check the Client ID and Client Secret, then retry.';
 			'infisical-invalid-request': 'Infisical rejected the request. Check the instance URL and the selected project.';
 			'infisical-network': 'Infisical could not be reached. Check your connection, then retry.';
@@ -1625,6 +1626,7 @@ export default interface Resources {
 				'label-field': 'Name';
 				'label-placeholder': 'Work org';
 				loading: 'Loading Infisical accounts…';
+				'remove-confirm': 'Confirm remove';
 				'site-url': 'Instance URL';
 				'state-connected': 'Connected';
 				'state-error': 'Not working';

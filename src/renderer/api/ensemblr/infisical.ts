@@ -5,6 +5,7 @@ import type {
 	AddInfisicalAccountRequest,
 	InfisicalAccountMutationResult,
 	InfisicalAccountsResult,
+	InfisicalFailure,
 	InfisicalLinkResult,
 	InfisicalLinkScopeRequest,
 	InfisicalProjectsResult,
@@ -13,6 +14,24 @@ import type {
 } from '@/shared/ipc/contracts/infisical';
 
 import { ensemblrQueryKeys, getEnsemblrApi } from './query-keys';
+
+/**
+ * Wraps a rejection from this boundary in the envelope every caller already
+ * renders. The service itself never throws, but the main-process handlers parse
+ * their payload strictly, so a malformed request rejects the `invoke` — and an
+ * unhandled rejection would otherwise leave the surface silent. The message is
+ * the thrown detail only: the `infisical-unknown` headline the user reads comes
+ * from the translated failure map.
+ * @param error - The value the IPC call rejected with.
+ * @returns The failure envelope to display.
+ */
+export function unexpectedFailure(error: unknown): InfisicalFailure {
+	return {
+		code: 'infisical-unknown',
+		message: error instanceof Error ? error.message : '',
+		retryAfterSeconds: null,
+	};
+}
 
 /** Query options for the configured Infisical accounts. */
 export const infisicalAccountsQuery = queryOptions({

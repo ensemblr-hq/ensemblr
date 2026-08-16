@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import type { DatabaseSync } from 'node:sqlite';
 
 import type { InfisicalFailureCode } from '../../shared/ipc/contracts/infisical';
-import { maskSecret } from '../secrets';
+import { maskSecret } from '../secrets/normalize.ts';
 import type { SecretStore } from '../secrets/secret-store';
 import { InfisicalApiError, normalizeSiteUrl } from './infisical-api.ts';
 

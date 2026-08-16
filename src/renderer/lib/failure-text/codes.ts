@@ -130,6 +130,11 @@ export const APP_FAILURE_TEXT: Record<
 			'errors:failure.infisical-account-not-found',
 			'That Infisical account is no longer configured.',
 		),
+	'infisical-config-write-failed': (t) =>
+		t(
+			'errors:failure.infisical-config-write-failed',
+			'The link works on this machine, but .ensemblr/settings.toml could not be updated, so nobody who clones this repository will inherit it.',
+		),
 	'infisical-invalid-credentials': (t) =>
 		t(
 			'errors:failure.infisical-invalid-credentials',

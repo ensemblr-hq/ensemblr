@@ -1,4 +1,10 @@
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import {
+	mkdirSync,
+	mkdtempSync,
+	readFileSync,
+	rmSync,
+	writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
@@ -188,6 +194,51 @@ describe('createInfisicalService.setLink', () => {
 			recursive: true,
 			secretPath: '/backend',
 		});
+	});
+
+	test('reports a committed config that could not be written, keeping the local half', async () => {
+		mkdirSync(path.join(repositoryPath, '.ensemblr'), { recursive: true });
+		writeFileSync(
+			path.join(repositoryPath, '.ensemblr', 'settings.toml'),
+			'this is not = = valid toml',
+			'utf8',
+		);
+
+		const result = await service.setLink({
+			accountId,
+			environmentSlug: 'dev',
+			projectId: 'proj_1',
+			scope: 'repository',
+			scopeId: 'repo-1',
+		});
+
+		expect(result.failure?.code).toBe('infisical-config-write-failed');
+		expect(result.link?.projectId).toBe('proj_1');
+		expect(
+			service.getLink({ scope: 'repository', scopeId: 'repo-1' }).link,
+		).not.toBeNull();
+	});
+
+	test('reports a committed config that could not be cleared', async () => {
+		await service.setLink({
+			accountId,
+			environmentSlug: 'dev',
+			projectId: 'proj_1',
+			scope: 'repository',
+			scopeId: 'repo-1',
+		});
+		writeFileSync(
+			path.join(repositoryPath, '.ensemblr', 'settings.toml'),
+			'this is not = = valid toml',
+			'utf8',
+		);
+
+		const result = await service.clearLink({
+			scope: 'repository',
+			scopeId: 'repo-1',
+		});
+
+		expect(result.failure?.code).toBe('infisical-config-write-failed');
 	});
 });
 

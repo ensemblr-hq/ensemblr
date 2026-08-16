@@ -123,6 +123,60 @@ describe('InfisicalAccountsRow', () => {
 		});
 	});
 
+	test('removes an account only on a second, confirming click', async () => {
+		const infisicalRemoveAccount = vi.fn(async () => ({
+			account: null,
+			failure: null,
+		}));
+		installEnsemblrApi({
+			infisicalAccounts: vi.fn(async () => ({
+				accounts: [account()],
+				failure: null,
+			})),
+			infisicalRemoveAccount,
+		});
+
+		renderWithProviders(<InfisicalAccountsRow />);
+		await userEvent.click(
+			await screen.findByRole('button', { name: 'Remove' }),
+		);
+
+		expect(infisicalRemoveAccount).not.toHaveBeenCalled();
+
+		await userEvent.click(
+			await screen.findByRole('button', { name: 'Confirm remove' }),
+		);
+
+		await waitFor(() => {
+			expect(infisicalRemoveAccount).toHaveBeenCalledWith({
+				accountId: 'acc-1',
+			});
+		});
+	});
+
+	test('surfaces a rejected IPC call rather than failing silently', async () => {
+		installEnsemblrApi({
+			infisicalAccounts: vi.fn(async () => ({
+				accounts: [account()],
+				failure: null,
+			})),
+			infisicalTestAccount: vi.fn(async () => {
+				throw new Error('Invalid request payload');
+			}),
+		});
+
+		renderWithProviders(<InfisicalAccountsRow />);
+		await userEvent.click(
+			await screen.findByRole('button', { name: 'Re-check' }),
+		);
+
+		await waitFor(() => {
+			expect(
+				screen.getByText('The Infisical operation failed.'),
+			).toBeInTheDocument();
+		});
+	});
+
 	test('confirms a successful re-check in the live region, not in row layout', async () => {
 		installEnsemblrApi({
 			infisicalAccounts: vi.fn(async () => ({

@@ -147,6 +147,7 @@
 		"git-worktree-failed": "Δεν ήταν δυνατή η δημιουργία του worktree.",
 		"infisical-account-exists": "Αυτό το Client ID έχει ήδη ρυθμιστεί για αυτό το instance του Infisical.",
 		"infisical-account-not-found": "Αυτός ο λογαριασμός Infisical δεν είναι πλέον ρυθμισμένος.",
+		"infisical-config-write-failed": "Η σύνδεση λειτουργεί σε αυτόν τον υπολογιστή, αλλά το .ensemblr/settings.toml δεν ενημερώθηκε, οπότε όποιος κλωνοποιήσει το repository δεν θα την κληρονομήσει.",
 		"infisical-invalid-credentials": "Το Infisical απέρριψε αυτά τα διαπιστευτήρια. Ελέγξτε το Client ID και το Client Secret και δοκιμάστε ξανά.",
 		"infisical-invalid-request": "Το Infisical απέρριψε το αίτημα. Ελέγξτε τη διεύθυνση του instance και το επιλεγμένο έργο.",
 		"infisical-network": "Δεν ήταν δυνατή η σύνδεση με το Infisical. Ελέγξτε τη σύνδεσή σας και δοκιμάστε ξανά.",

@@ -255,6 +255,7 @@
 			"label-field": "Name",
 			"label-placeholder": "Work org",
 			"loading": "Loading Infisical accounts…",
+			"remove-confirm": "Confirm remove",
 			"site-url": "Instance URL",
 			"state-connected": "Connected",
 			"state-error": "Not working",

@@ -1,7 +1,7 @@
 import { RefreshCwIcon } from 'lucide-react';
-import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { ConfirmDestructiveButton } from '@/renderer/components/settings/confirm-destructive-button';
 import { StatusBadge } from '@/renderer/components/status-badge';
 import { Button } from '@/renderer/components/ui/button';
 import { InfisicalLogo } from '@/renderer/components/workbench-shell/source-provider-logo';
@@ -79,7 +79,19 @@ export function InfisicalLinkSummary({
 							? t('settings:repo.infisical.syncing', 'Syncing…')
 							: t('settings:repo.infisical.sync', 'Sync now')}
 					</Button>
-					<UnlinkButton disabled={unlinking} onConfirm={onUnlink} />
+					{/* Unlinking rewrites the committed `.ensemblr/settings.toml` for
+					    everyone who clones the repository, which is too much to hang off
+					    one stray click. */}
+					<ConfirmDestructiveButton
+						armedLabel={t(
+							'settings:repo.infisical.unlink-confirm',
+							'Confirm unlink',
+						)}
+						disabled={unlinking}
+						label={t('settings:repo.infisical.unlink', 'Unlink')}
+						onConfirm={onUnlink}
+						size='sm'
+					/>
 				</div>
 			) : null}
 		</div>
@@ -143,49 +155,6 @@ function LinkStateBadge({ link }: { link: InfisicalLinkSnapshot | null }) {
 		<StatusBadge tone='ok'>
 			{t('settings:repo.infisical.summary.state-linked', 'Linked')}
 		</StatusBadge>
-	);
-}
-
-/**
- * Destructive unlink, gated behind a second click on the same button. Unlinking
- * rewrites the committed `.ensemblr/settings.toml` for everyone who clones the
- * repository, which is too much to hang off one stray click.
- */
-function UnlinkButton({
-	disabled,
-	onConfirm,
-}: {
-	disabled: boolean;
-	onConfirm: () => void;
-}) {
-	const { t } = useTranslation();
-	const [armed, setArmed] = useState(false);
-
-	return (
-		<Button
-			className={cn(
-				'text-muted-foreground hover:bg-destructive/10 hover:text-destructive',
-				armed && 'bg-destructive/10 text-destructive',
-			)}
-			disabled={disabled}
-			onBlur={() => setArmed(false)}
-			onClick={() => {
-				if (!armed) {
-					setArmed(true);
-					return;
-				}
-
-				setArmed(false);
-				onConfirm();
-			}}
-			size='sm'
-			type='button'
-			variant='ghost'
-		>
-			{armed
-				? t('settings:repo.infisical.unlink-confirm', 'Confirm unlink')
-				: t('settings:repo.infisical.unlink', 'Unlink')}
-		</Button>
 	);
 }
 

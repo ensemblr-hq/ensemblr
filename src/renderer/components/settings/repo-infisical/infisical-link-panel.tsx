@@ -11,6 +11,7 @@ import {
 	infisicalProjectsQuery,
 	setInfisicalLink,
 	syncInfisicalLink,
+	unexpectedFailure,
 } from '@/renderer/api/ensemblr';
 import { SettingRow } from '@/renderer/components/settings/setting-row';
 import { SettingsLoadingState } from '@/renderer/components/settings/settings-async-state';
@@ -67,6 +68,7 @@ export function InfisicalLinkPanel({ repoId }: { repoId: string }) {
 	const [syncedKeys, setSyncedKeys] = useState<string[] | null>(null);
 
 	const form = resolveInfisicalLinkForm({
+		accounts,
 		draft,
 		link,
 		projects,
@@ -81,6 +83,7 @@ export function InfisicalLinkPanel({ repoId }: { repoId: string }) {
 
 	const save = useMutation({
 		mutationFn: setInfisicalLink,
+		onError: (error) => setFailure(unexpectedFailure(error)),
 		onSuccess: async (result) => {
 			setFailure(result.failure);
 
@@ -94,6 +97,7 @@ export function InfisicalLinkPanel({ repoId }: { repoId: string }) {
 
 	const clear = useMutation({
 		mutationFn: () => clearInfisicalLink(scopeRequest),
+		onError: (error) => setFailure(unexpectedFailure(error)),
 		onSuccess: async (result) => {
 			setFailure(result.failure);
 			setSyncedKeys(null);
@@ -104,6 +108,7 @@ export function InfisicalLinkPanel({ repoId }: { repoId: string }) {
 
 	const sync = useMutation({
 		mutationFn: () => syncInfisicalLink(scopeRequest),
+		onError: (error) => setFailure(unexpectedFailure(error)),
 		onSuccess: async (result) => {
 			setFailure(result.failure);
 			setSyncedKeys(result.failure ? null : result.keys);

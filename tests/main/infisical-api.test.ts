@@ -124,6 +124,40 @@ describe('createInfisicalApi.login', () => {
 		).rejects.toMatchObject({ code: 'infisical-network' });
 	});
 
+	test('times out a response whose body never arrives', async () => {
+		const fetchImpl = vi.fn(
+			async (_url: string, init?: RequestInit) =>
+				new Response(
+					new ReadableStream({
+						/**
+						 * Streams headers and then nothing, standing in for a server that
+						 * stalls mid-body. Only the request signal ends it.
+						 * @param controller - Stream controller for the stalled body.
+						 */
+						start(controller) {
+							init?.signal?.addEventListener('abort', () =>
+								controller.error(
+									Object.assign(new Error('aborted'), { name: 'AbortError' }),
+								),
+							);
+						},
+					}),
+				),
+		);
+		const api = createInfisicalApi({
+			fetchImpl: fetchImpl as never,
+			timeoutMs: 20,
+		});
+
+		await expect(
+			api.login({
+				clientId: 'id',
+				clientSecret: 'secret',
+				siteUrl: 'https://app.infisical.com',
+			}),
+		).rejects.toMatchObject({ code: 'infisical-network' });
+	});
+
 	test('reads the retry hint off a 429', async () => {
 		const fetchImpl = stubFetch({
 			body: { message: 'slow down' },

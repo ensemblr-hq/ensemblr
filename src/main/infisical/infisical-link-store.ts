@@ -36,8 +36,6 @@ export interface InfisicalLinkStore {
 	clear: (input: { scope: InfisicalLinkScope; scopeId: string }) => void;
 	/** Resolves a repository's absolute path, used to reach its committed config. */
 	readRepositoryPath: (repositoryId: string) => string | null;
-	/** Resolves the repository a workspace belongs to, so it can inherit its link. */
-	readWorkspaceRepositoryId: (workspaceId: string) => string | null;
 	recordSync: (input: {
 		scope: InfisicalLinkScope;
 		scopeId: string;
@@ -80,14 +78,6 @@ export function createInfisicalLinkStore({
 				.get(repositoryId);
 
 			return readStringColumn(row, 'path');
-		},
-
-		readWorkspaceRepositoryId: (workspaceId) => {
-			const row = database
-				.prepare('SELECT repository_id FROM workspaces WHERE id = ?')
-				.get(workspaceId);
-
-			return readStringColumn(row, 'repository_id');
 		},
 
 		recordSync: ({ scope, scopeId, syncedAt }) => {

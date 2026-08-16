@@ -6,6 +6,7 @@ export type InfisicalFailureCode =
 	| 'database-unavailable'
 	| 'infisical-account-exists'
 	| 'infisical-account-not-found'
+	| 'infisical-config-write-failed'
 	| 'infisical-invalid-credentials'
 	| 'infisical-invalid-request'
 	| 'infisical-network'

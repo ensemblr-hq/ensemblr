@@ -255,6 +255,7 @@
 			"label-field": "Όνομα",
 			"label-placeholder": "Οργανισμός εργασίας",
 			"loading": "Φόρτωση λογαριασμών Infisical…",
+			"remove-confirm": "Επιβεβαίωση αφαίρεσης",
 			"site-url": "Διεύθυνση instance",
 			"state-connected": "Συνδέθηκε",
 			"state-error": "Δεν λειτουργεί",

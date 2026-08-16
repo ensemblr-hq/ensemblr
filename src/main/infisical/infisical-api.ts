@@ -160,9 +160,14 @@ export function createInfisicalApi({
 		const controller = new AbortController();
 		const timeout = setTimeout(() => controller.abort(), timeoutMs);
 		let response: Response;
+		let bodyText: string;
 
+		// The deadline has to span the body read too: a server that sends headers
+		// and then stalls the stream would otherwise leave the read pending
+		// forever, wedging every environment assembly waiting on this scope.
 		try {
 			response = await fetchImpl(url, { ...init, signal: controller.signal });
+			bodyText = await response.text();
 		} catch (error) {
 			throw new InfisicalApiError(
 				'infisical-network',
@@ -172,8 +177,6 @@ export function createInfisicalApi({
 		} finally {
 			clearTimeout(timeout);
 		}
-
-		const bodyText = await response.text();
 
 		if (!response.ok) {
 			throw toApiError({ bodyText, operation, response });

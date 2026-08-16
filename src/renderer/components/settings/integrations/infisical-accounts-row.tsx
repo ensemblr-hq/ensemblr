@@ -9,7 +9,9 @@ import {
 	infisicalAccountsQuery,
 	removeInfisicalAccount,
 	testInfisicalAccount,
+	unexpectedFailure,
 } from '@/renderer/api/ensemblr';
+import { ConfirmDestructiveButton } from '@/renderer/components/settings/confirm-destructive-button';
 import { InfisicalAccountDialog } from '@/renderer/components/settings/integrations/infisical-account-dialog';
 import { SettingRow } from '@/renderer/components/settings/setting-row';
 import { Badge } from '@/renderer/components/ui/badge';
@@ -108,6 +110,8 @@ function InfisicalAccountItem({
 
 	const test = useMutation({
 		mutationFn: () => testInfisicalAccount(account.id),
+		onError: (error) =>
+			setFailureMessage(failureText(t, unexpectedFailure(error))),
 		onSuccess: async (result) => {
 			setFailureMessage(failureText(t, result.failure));
 			setJustVerified(!result.failure);
@@ -117,6 +121,8 @@ function InfisicalAccountItem({
 
 	const remove = useMutation({
 		mutationFn: () => removeInfisicalAccount(account.id),
+		onError: (error) =>
+			setFailureMessage(failureText(t, unexpectedFailure(error))),
 		onSuccess: async (result) => {
 			setFailureMessage(failureText(t, result.failure));
 			await invalidateAccounts();
@@ -175,16 +181,19 @@ function InfisicalAccountItem({
 						)}
 						{t('settings:integrations.infisical.test', 'Re-check')}
 					</Button>
-					<Button
-						className='text-muted-foreground hover:bg-destructive/10 hover:text-destructive'
+					{/* Removing an account deletes its Client Secret from the Keychain,
+					    and Infisical shows a Universal Auth secret exactly once — so
+					    there is no undo short of minting a new Machine Identity. */}
+					<ConfirmDestructiveButton
+						armedLabel={t(
+							'settings:integrations.infisical.remove-confirm',
+							'Confirm remove',
+						)}
 						disabled={remove.isPending}
-						onClick={() => remove.mutate()}
+						label={t('common:actions.remove', 'Remove')}
+						onConfirm={() => remove.mutate()}
 						size='xs'
-						type='button'
-						variant='ghost'
-					>
-						{t('common:actions.remove', 'Remove')}
-					</Button>
+					/>
 				</div>
 			</div>
 			<p className='sr-only' role='status'>

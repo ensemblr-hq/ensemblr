@@ -121,6 +121,13 @@ a warning. Infisical being unreachable must never be the reason a workspace
 cannot open,
 and `tests/main/environment-infisical-layer.test.ts` asserts exactly that.
 
+That guarantee needs a request deadline that spans the **response body**, not
+just the connection: a server which sends headers and then stalls the stream
+would leave the read pending with no error to degrade on, and because the
+in-flight map only evicts on settle, every later resolution of that scope would
+join the same dead promise. `createInfisicalApi` therefore holds one abort timer
+across both awaits.
+
 ## Consequences
 
 **The link is split by sensitivity.** The project half — instance URL, project
@@ -130,6 +137,14 @@ at the right secrets. The credential half never leaves the machine: the account
 row is in SQLite (migration `017_infisical_accounts_and_links`) and the client
 secret is in the Keychain. `infisical_accounts` deliberately has **no column**
 for the secret, so a database copied off the machine carries no credential.
+
+Both halves are written through `src/main/config/repository-settings-writer.ts`,
+which every committed section shares: a config that does not parse is left
+untouched rather than clobbered, and the replacement is atomic. A write that
+does not happen is reported as `infisical-config-write-failed` rather than
+swallowed — the local half has already saved by then, so the link works on this
+machine while nobody who clones the repository inherits it, and that is a state
+the user has to be told about rather than shown a green checkmark for.
 
 **Which account resolves a committed link is a local choice.** Ensemblr matches
 on instance URL and adopts the account when exactly one matches; an ambiguous

@@ -5,17 +5,12 @@
  * already pointed at the right secrets. It never carries a credential: which
  * local account resolves it is per-machine state held in SQLite.
  */
-import { mkdirSync, renameSync, writeFileSync } from 'node:fs';
-import path from 'node:path';
-
-import { dump } from 'js-toml';
-
-import { formatErrorMessage, isPlainRecord } from '../config/json-utils.ts';
 import {
-	ENSEMBLR_DIRECTORY,
-	ENSEMBLR_SETTINGS_FILENAME,
-} from '../config/repository-config.ts';
-import { readTomlFile } from '../config/repository-config-loaders.ts';
+	isPlainRecord,
+	readRepositorySettings,
+	rewriteRepositorySettings,
+	type WriteRepositorySettingsResult,
+} from '../config';
 
 /** TOML table this module owns. */
 const INFISICAL_TABLE_KEY = 'infisical';
@@ -44,9 +39,7 @@ export interface InfisicalRepositoryConfigBlock {
 }
 
 /** Outcome of a committed-config write, carrying a message the caller can log. */
-export type WriteInfisicalConfigResult =
-	| { message: string; ok: false }
-	| { ok: true; path: string };
+export type WriteInfisicalConfigResult = WriteRepositorySettingsResult;
 
 /**
  * Reads the committed `[infisical]` block for a repository.
@@ -57,13 +50,13 @@ export type WriteInfisicalConfigResult =
 export function readInfisicalRepositoryConfig(
 	repositoryPath: string,
 ): InfisicalRepositoryConfigBlock | null {
-	const existing = readTomlFile({ sourcePath: configPathFor(repositoryPath) });
+	const record = readRepositorySettings(repositoryPath);
 
-	if (existing.status !== 'loaded' || !existing.record) {
+	if (!record) {
 		return null;
 	}
 
-	const table = existing.record[INFISICAL_TABLE_KEY];
+	const table = record[INFISICAL_TABLE_KEY];
 
 	if (!isPlainRecord(table)) {
 		return null;
@@ -100,39 +93,19 @@ export function writeInfisicalRepositoryConfig({
 	block: InfisicalRepositoryConfigBlock | null;
 	repositoryPath: string;
 }): WriteInfisicalConfigResult {
-	const configPath = configPathFor(repositoryPath);
-	const existing = readTomlFile({ sourcePath: configPath });
-
-	if (existing.status === 'invalid') {
-		return {
-			message:
-				existing.diagnostics.at(0)?.message ??
-				'.ensemblr/settings.toml could not be read.',
-			ok: false,
-		};
-	}
-
-	const record = existing.record ?? {};
-	const nextTable = buildInfisicalTable(
-		isPlainRecord(record[INFISICAL_TABLE_KEY])
-			? record[INFISICAL_TABLE_KEY]
-			: {},
-		block,
-	);
-
-	try {
-		writeTomlFile(configPath, withInfisicalTable(record, nextTable));
-
-		return { ok: true, path: configPath };
-	} catch (error) {
-		return {
-			message: formatErrorMessage(
-				error,
-				'Failed to write .ensemblr/settings.toml.',
+	return rewriteRepositorySettings({
+		repositoryPath,
+		rewrite: (record) =>
+			withInfisicalTable(
+				record,
+				buildInfisicalTable(
+					isPlainRecord(record[INFISICAL_TABLE_KEY])
+						? record[INFISICAL_TABLE_KEY]
+						: {},
+					block,
+				),
 			),
-			ok: false,
-		};
-	}
+	});
 }
 
 /**
@@ -186,36 +159,6 @@ function buildInfisicalTable(
 		...(block.recursive ? { recursive: true } : {}),
 		...(block.siteUrl ? { site_url: block.siteUrl } : {}),
 	};
-}
-
-/**
- * Serialises a config record and replaces the file atomically, so a crash
- * mid-write cannot leave a half-written config the loader would reject.
- * @param configPath - Absolute path of the config file.
- * @param record - The full config record to serialise.
- */
-function writeTomlFile(
-	configPath: string,
-	record: Record<string, unknown>,
-): void {
-	const temporaryPath = `${configPath}.tmp`;
-
-	mkdirSync(path.dirname(configPath), { recursive: true });
-	writeFileSync(temporaryPath, dump(record), 'utf8');
-	renameSync(temporaryPath, configPath);
-}
-
-/**
- * Resolves the committed config path for a repository.
- * @param repositoryPath - Absolute path of the repository.
- * @returns Absolute path of `.ensemblr/settings.toml`.
- */
-function configPathFor(repositoryPath: string): string {
-	return path.join(
-		repositoryPath,
-		ENSEMBLR_DIRECTORY,
-		ENSEMBLR_SETTINGS_FILENAME,
-	);
 }
 
 /**
