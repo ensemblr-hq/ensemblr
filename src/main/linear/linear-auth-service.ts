@@ -35,10 +35,7 @@ import {
 	LINEAR_TOKEN_URL,
 	parseOauthCallback,
 } from './linear-oauth.ts';
-import {
-	LinearOauthCallbackError,
-	startLinearOauthCallbackServer,
-} from './linear-oauth-callback-server.ts';
+import { startLinearOauthCallbackServer } from './linear-oauth-callback-server.ts';
 
 const LINEAR_GRAPHQL_URL = 'https://api.linear.app/graphql';
 /**

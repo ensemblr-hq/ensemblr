@@ -43,10 +43,8 @@ import type {
 } from '../../shared/ipc/contracts/linear.ts';
 import type { LinearService } from '../linear';
 import type { EnsemblrDatabaseService } from '../storage';
-import {
-	parseMetadata,
-	selectWorkspaceMetadataJson,
-} from '../storage/repositories';
+import { parseMetadata } from '../storage/repositories/metadata-json.ts';
+import { selectWorkspaceMetadataJson } from '../storage/repositories/workspace-repository.ts';
 import type { LinearPort } from './ports.ts';
 
 /** Collaborators the Linear port delegates to. */

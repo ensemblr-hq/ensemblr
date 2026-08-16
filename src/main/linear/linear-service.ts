@@ -10,11 +10,8 @@ import type {
 	GetLinearMetadataResult,
 	LinearAccountFailure,
 	LinearAccountSnapshot,
-	LinearCommentWire,
-	LinearIssueWire,
 	LinearMetadataWire,
 	LinearResourceWire,
-	LinearServiceFailure,
 	ListLinearIssuesRequest,
 	ListLinearIssuesResult,
 	MutateLinearIssueResult,
@@ -23,13 +20,11 @@ import type {
 import type { EnsemblrDatabaseService } from '../storage';
 import {
 	type LinearClient,
-	type LinearCommentData,
 	type LinearIssueData,
 	LinearServiceError,
 } from './linear-client.ts';
 import {
 	createLinearStore,
-	type LinearIssueRecord,
 	type LinearResourceKind,
 	type LinearStore,
 } from './linear-store.ts';
