@@ -158,7 +158,12 @@ const makeDeps = (
 		databaseService: stubDatabaseService(),
 		linearService: service as unknown as LinearService,
 		listLinearAccounts: async () => [
-			{ accountId: 'acct-1', organization: 'Example Org', user: 'Ada' },
+			{
+				accountId: 'acct-1',
+				organization: 'Example Org',
+				user: 'Ada',
+				userId: 'u-1',
+			},
 		],
 	};
 	return { deps, service };
@@ -297,7 +302,7 @@ describe('linear port: availability', () => {
 		});
 
 		expect(result.status).toBe('failed');
-		expect(result.message).toContain('Retry in 30s');
+		expect(result.message).toContain('Wait 30s before trying again');
 		expect(result.commentId).toBeNull();
 	});
 
@@ -766,8 +771,18 @@ describe('multi-account resolution', () => {
 		const port = portFor({
 			...deps,
 			listLinearAccounts: async () => [
-				{ accountId: 'acct-1', organization: 'Example Org', user: 'Ada' },
-				{ accountId: 'acct-2', organization: 'Client Co', user: 'Ada' },
+				{
+					accountId: 'acct-1',
+					organization: 'Example Org',
+					user: 'Ada',
+					userId: 'u-1',
+				},
+				{
+					accountId: 'acct-2',
+					organization: 'Client Co',
+					user: 'Ada',
+					userId: 'u-2',
+				},
 			],
 		});
 
@@ -775,8 +790,18 @@ describe('multi-account resolution', () => {
 
 		expect(result.status).toBe('failed');
 		expect(result.accounts).toEqual([
-			{ accountId: 'acct-1', organization: 'Example Org', user: 'Ada' },
-			{ accountId: 'acct-2', organization: 'Client Co', user: 'Ada' },
+			{
+				accountId: 'acct-1',
+				organization: 'Example Org',
+				user: 'Ada',
+				userId: 'u-1',
+			},
+			{
+				accountId: 'acct-2',
+				organization: 'Client Co',
+				user: 'Ada',
+				userId: 'u-2',
+			},
 		]);
 	});
 
@@ -847,5 +872,235 @@ describe('multi-account resolution', () => {
 		expect(result.truncated).toBe(false);
 		expect(result.omittedIssues).toBe(0);
 		expect(result.message).toContain('Client Co');
+	});
+});
+
+// An agent has no Linear identity of its own, so "take this ticket" resolves to
+// the human whose account the app acts through. Without a userId on the result
+// the only route left is matching a display name against the users table, which
+// two people sharing a first name break silently.
+describe('linear port: naming the connected user', () => {
+	it('reports the viewer for every account a metadata read covered', async () => {
+		const { deps } = makeDeps();
+
+		const result = await portFor(deps).getMetadata({});
+
+		expect(result.viewer).toEqual([
+			{ accountId: 'acct-1', name: 'Ada', userId: 'u-1' },
+		]);
+		expect(result.message).toContain('viewer');
+	});
+
+	it('narrows the viewer rows to the account the read was scoped to', async () => {
+		const { deps } = makeDeps();
+		const port = portFor({
+			...deps,
+			listLinearAccounts: async () => [
+				{
+					accountId: 'acct-1',
+					organization: 'Example Org',
+					user: 'Ada',
+					userId: 'u-1',
+				},
+				{
+					accountId: 'acct-2',
+					organization: 'Client Co',
+					user: 'Grace',
+					userId: 'u-2',
+				},
+			],
+		});
+
+		const result = await port.getMetadata({ accountId: 'acct-2' });
+
+		expect(result.viewer).toEqual([
+			{ accountId: 'acct-2', name: 'Grace', userId: 'u-2' },
+		]);
+	});
+
+	// A metadata read that already degraded to the cache still has to answer the
+	// assignee question: the account list comes from the local store, not Linear.
+	it('still reports the viewer when the metadata read itself failed', async () => {
+		const { deps } = makeDeps({
+			getMetadata: {
+				accountFailures: [],
+				failure: failure(),
+				metadata: metadataOk().metadata,
+				status: 'error',
+			},
+		});
+
+		const result = await portFor(deps).getMetadata({});
+
+		expect(result.status).toBe('failed');
+		expect(result.viewer).toHaveLength(1);
+	});
+
+	// The account lookup is context on an answer already being produced, so it may
+	// never change how the op ends.
+	it('degrades to no viewer rather than failing when accounts cannot be read', async () => {
+		const { deps } = makeDeps();
+		const port = portFor({
+			...deps,
+			listLinearAccounts: async () => {
+				throw new Error('keychain locked');
+			},
+		});
+
+		const result = await port.getMetadata({});
+
+		expect(result.status).toBe('ok');
+		expect(result.viewer).toEqual([]);
+	});
+});
+
+describe('linear port: the fields a single issue read adds', () => {
+	it('carries the cycle and the assignee id a list view omits', async () => {
+		const { deps } = makeDeps({
+			getIssue: {
+				comments: [],
+				issue: issueWire({ cycleName: 'Cycle 12' }),
+				source: 'cache',
+				status: 'ok',
+			},
+		});
+
+		const result = await portFor(deps).getIssue({ issueId: 'ENG-106' });
+
+		expect(result.issue?.cycle).toBe('Cycle 12');
+		expect(result.issue?.assigneeId).toBe('u-1');
+	});
+
+	it('reports no cycle for a team that runs none', async () => {
+		const result = await portFor(makeDeps().deps).getIssue({
+			issueId: 'ENG-106',
+		});
+
+		expect(result.issue?.cycle).toBeNull();
+	});
+});
+
+// Every one of these codes means something different about whether to try again,
+// and a message that only names the fault leaves a model to guess — which it
+// resolves by retrying the identical call.
+describe('linear port: what a failure tells the agent to do', () => {
+	const messageFor = async (
+		override: Partial<LinearServiceFailure>,
+	): Promise<string> => {
+		const { deps } = makeDeps({
+			updateIssue: { failure: failure(override), status: 'error' },
+		});
+		const result = await portFor(deps).updateIssue({
+			issueId: 'ENG-106',
+			priority: 2,
+		});
+		return result.message;
+	};
+
+	it('tells a rate-limited caller how long to wait', async () => {
+		expect(
+			await messageFor({ code: 'rate-limited', retryAfterSeconds: 45 }),
+		).toContain('Wait 45s before trying again');
+	});
+
+	it('tells a rate-limited caller with no window to get on with other work', async () => {
+		const message = await messageFor({
+			code: 'rate-limited',
+			retryAfterSeconds: null,
+		});
+
+		expect(message).toContain('rather than retrying in a loop');
+	});
+
+	it('tells a permission failure not to retry at all', async () => {
+		expect(await messageFor({ code: 'permission-denied' })).toContain(
+			'do not retry',
+		);
+	});
+
+	it('sends a rejected argument back through the metadata read', async () => {
+		expect(await messageFor({ code: 'invalid-request' })).toContain(
+			'ensemblr_linear_get_metadata',
+		);
+	});
+
+	it('allows a network failure exactly one retry', async () => {
+		expect(await messageFor({ code: 'network' })).toContain(
+			'One retry is reasonable',
+		);
+	});
+
+	// `not-found` reaches this op from a bad stateId or assigneeId as often as from
+	// a bad issue id, so a message naming only the issue misdirects the fix.
+	it('names every id a not-found could have come from', async () => {
+		const message = await messageFor({ code: 'not-found' });
+
+		expect(message).toContain('stateId');
+		expect(message).toContain('assigneeId');
+	});
+});
+
+describe('linear port: the terminal-state refusal', () => {
+	const doneState = stateWire({
+		id: 's-done',
+		name: 'Done',
+		type: 'completed',
+	});
+
+	it('names the states the issue could have moved into instead', async () => {
+		const { deps } = makeDeps({
+			getMetadata: metadataOk([
+				doneState,
+				stateWire({ id: 's-review', name: 'In Review', type: 'started' }),
+			]),
+		});
+
+		const result = await portFor(deps).updateIssue({
+			issueId: 'ENG-106',
+			stateId: 's-done',
+		});
+
+		expect(result.status).toBe('refused');
+		expect(result.message).toContain('"In Review" (s-review)');
+	});
+
+	// A refused update applies nothing, including the title that rode along with
+	// the state. An agent that assumes otherwise never re-sends it.
+	it('says that no other field in the call was applied either', async () => {
+		const { deps, service } = makeDeps({
+			getMetadata: metadataOk([doneState]),
+		});
+
+		const result = await portFor(deps).updateIssue({
+			issueId: 'ENG-106',
+			stateId: 's-done',
+			title: 'Renamed',
+		});
+
+		expect(result.message).toContain('Nothing in this call was applied');
+		expect(service.updateIssue).not.toHaveBeenCalled();
+	});
+
+	// States belong to a team, so offering another team's columns would send the
+	// agent at an id Linear rejects.
+	it('offers no alternative from another team', async () => {
+		const { deps } = makeDeps({
+			getMetadata: metadataOk([
+				doneState,
+				stateWire({
+					id: 's-other',
+					name: 'Triage',
+					teamId: 't-2',
+					type: 'unstarted',
+				}),
+			]),
+		});
+
+		const result = await portFor(deps).updateIssue({
+			issueId: 'ENG-106',
+			stateId: 's-done',
+		});
+
+		expect(result.message).not.toContain('Triage');
 	});
 });

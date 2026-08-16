@@ -276,7 +276,7 @@ export const TOOL_DEFS: readonly McpToolDef[] = [
 		name: 'ensemblr_linear_get_issue',
 		op: 'linearGetIssue',
 		description:
-			'Read one Linear issue with its description, labels, and comment thread. issueId takes either the uuid or the human identifier (ENG-106); an identifier always goes to Linear rather than the local cache. accountId is optional — the issue is looked up in the account your workspace was created from, then in the only one connected — but an identifier such as ENG-106 can exist in two organizations at once, and that is refused rather than guessed, with the accounts listed so you can name one. The description is truncated and only the most recent comments are returned — the result says how many were dropped. Check `status`: `not-found` means the id is wrong, `not-connected` means Linear is not linked.',
+			'Read one Linear issue with its description, labels, cycle, and comment thread. Call it before you change any code on a tracked issue: the description and the thread carry requirements, decisions, and rejected approaches your prompt does not, and re-deriving them from the code is how an agent rebuilds something the ticket already ruled out. issueId takes either the uuid or the human identifier (ENG-106); an identifier always goes to Linear rather than the local cache. accountId is optional — the issue is looked up in the account your workspace was created from, then in the only one connected — but an identifier such as ENG-106 can exist in two organizations at once, and that is refused rather than guessed, with the accounts listed so you can name one. The description is truncated and only the most recent comments are returned — the result says how many were dropped. Check `status`: `not-found` means the id is wrong, `not-connected` means Linear is not linked.',
 		shape: {
 			accountId: z.string().optional(),
 			issueId: z.string(),
@@ -287,7 +287,7 @@ export const TOOL_DEFS: readonly McpToolDef[] = [
 		name: 'ensemblr_linear_get_metadata',
 		op: 'linearGetMetadata',
 		description:
-			'List the Linear teams, projects, workflow states, labels, and users a connected account can see, each with the id ensemblr_linear_update_issue takes and the accountId it belongs to. Defaults to the account your workspace was created from; pass accountId to read another, or when the workspace has no linked issue and several accounts are connected. An id from one account is never valid in another. The account is not scoped to your workspace, so expect teams that have nothing to do with the work here. Call this FIRST whenever you are about to set a state, an assignee, or a project — those arguments are ids, not names, and this is the only place to turn one into the other. Cycles are not returned; nothing on this surface sets one.',
+			"List the Linear teams, projects, workflow states, labels, and users a connected account can see, each with the id ensemblr_linear_update_issue takes and the accountId it belongs to. Call this FIRST whenever you are about to set a state or an assignee — those arguments are ids, not names, and this is the only place to turn one into the other. It also returns `viewer`, the Linear user each account is connected as: that `userId` is who to pass as assigneeId when you take a ticket on the user's behalf, because an agent has no Linear identity of its own. Defaults to the account your workspace was created from; pass accountId to read another, or when the workspace has no linked issue and several accounts are connected. An id from one account is never valid in another. The account is not scoped to your workspace, so expect teams that have nothing to do with the work here. Cycles are not returned; nothing on this surface sets one.",
 		shape: {
 			accountId: z.string().optional(),
 			refresh: z.boolean().optional(),
@@ -297,7 +297,7 @@ export const TOOL_DEFS: readonly McpToolDef[] = [
 		name: 'ensemblr_linear_create_comment',
 		op: 'linearCreateComment',
 		description:
-			'Post a comment on a Linear issue. The whole team reads it and nothing here can edit or delete it afterwards, so write it as you would a comment of your own: what you did, what you found, what is still open. Use it to record progress on a ticket rather than to talk to the user, who reads your reply instead.',
+			'Post a comment on a Linear issue. Call this when you settle something the ticket should record and the user did not ask you to record it: a decision you made, a constraint you hit, an approach you rejected and why, or a question you had to answer yourself. Once per turn, at the end — not per file. The whole team reads it and nothing here can edit or delete it afterwards, so write it as you would a comment of your own, and do not restate your reply to the user, who reads that already.',
 		shape: {
 			accountId: z.string().optional(),
 			issueId: z.string(),
@@ -308,7 +308,7 @@ export const TOOL_DEFS: readonly McpToolDef[] = [
 		name: 'ensemblr_linear_update_issue',
 		op: 'linearUpdateIssue',
 		description:
-			'Change a Linear issue: its workflow state, assignee, priority (0 none, 1 urgent, 2 high, 3 medium, 4 low), title, or description. Pass at least one of those alongside issueId. stateId and assigneeId are ids from ensemblr_linear_get_metadata, never names. A state whose type is `completed` or `canceled` is REFUSED whatever you pass — agent work never closes a ticket here, and marking one canceled is the same call under a different label. Take it to In Review and say in your reply that it is ready; the user decides whether it is done.',
+			'Change a Linear issue: its workflow state, assignee, priority (0 none, 1 urgent, 2 high, 3 medium, 4 low), title, or description. Pass at least one of those alongside issueId. Call it on two triggers without being asked, when the issue is the one your workspace was created from: WHEN YOU BEGIN IMPLEMENTING, to move it into a started state and assign it to the `viewer` userId if it has no assignee; and WHEN THE WORK IS READY FOR A HUMAN — verified, or a pull request opened — to move it to In Review in that same turn. Leaving a shipped change sitting In Progress is the failure this tool exists to prevent. stateId and assigneeId are ids from ensemblr_linear_get_metadata, never names. A state whose type is `completed` or `canceled` is REFUSED whatever you pass, and a refused call applies none of the other fields either — agent work never closes a ticket here, and marking one canceled is the same call under a different label. Take it to In Review, say in your reply that you did, and let the user decide whether it is done.',
 		shape: {
 			accountId: z.string().optional(),
 			issueId: z.string(),
@@ -454,23 +454,35 @@ export function toolDefsFor(audience: ControlAudience): readonly McpToolDef[] {
 
 /**
  * Resolves the `instructions` a connection carries: the caller's playbook, plus
- * the language directive for a caller with no per-turn channel to receive it on.
- * A caller with a chat tab is one the app prompts itself and already appends the
- * directive per turn, so adding it here would only say the same thing twice.
+ * the language and linked-issue directives for a caller with no per-turn channel
+ * to receive them on. A caller with a chat tab is one the app prompts itself and
+ * already appends both per turn, so adding them here would only say the same
+ * thing twice.
+ *
+ * The playbook file is written once per launch, so a harness whose workspace was
+ * linked to a ticket after it started never sees the file's copy — and Codex has
+ * no such file at all. This channel is read on every tool-list request, so it is
+ * where a ticket linked mid-session reaches a harness.
  * @param service - Agent-control service holding the resolved app language.
  * @param audience - Whether the caller has a chat tab, and its lineage role.
+ * @param token - The caller's bearer token, for the workspace behind it.
  * @returns The instructions to serve alongside this caller's tool list.
  */
-function instructionsFor(
+async function instructionsFor(
 	service: AgentControlService,
 	audience: ControlAudience,
-): string {
+	token: string,
+): Promise<string> {
 	const playbook = awarenessForAudience(audience);
 	if (audience.hasChatTab) {
 		return playbook;
 	}
-	const directive = service.readLanguageDirective();
-	return directive ? `${playbook}\n\n${directive}` : playbook;
+	const blocks = [
+		playbook,
+		service.readLanguageDirective(),
+		await service.readIssueDirective(token),
+	].filter((block) => block !== null);
+	return blocks.join('\n\n');
 }
 
 /**
@@ -481,14 +493,14 @@ function instructionsFor(
  * @param audience - Whether the caller has a chat tab, and its lineage role.
  * @returns A configured, not-yet-connected MCP server.
  */
-function buildMcpServer(
+async function buildMcpServer(
 	service: AgentControlService,
 	token: string,
 	audience: ControlAudience,
-): McpServer {
+): Promise<McpServer> {
 	const server = new McpServer(
 		{ name: 'ensemblr-control', version: '1.0.0' },
-		{ instructions: instructionsFor(service, audience) },
+		{ instructions: await instructionsFor(service, audience, token) },
 	);
 	for (const def of toolDefsFor(audience)) {
 		server.registerTool(
@@ -521,7 +533,7 @@ export async function handleMcpRequest(
 	service: AgentControlService,
 	token: string,
 ): Promise<void> {
-	const server = buildMcpServer(
+	const server = await buildMcpServer(
 		service,
 		token,
 		await service.describeAudience(token),

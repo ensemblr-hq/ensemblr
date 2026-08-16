@@ -31,6 +31,10 @@ export {
 export * from './agent-control/contracts.ts';
 export { buildConversationTranscript } from './agent-control/conversation-transcript.ts';
 export { buildLanguageDirective } from './agent-control/language-directive.ts';
+export {
+	buildLinkedIssueDirective,
+	LINKED_ISSUE_DIRECTIVE_HEADER,
+} from './agent-control/linked-issue-directive.ts';
 export { buildPlanSubmittedResult } from './agent-control/plan-mode.ts';
 export * from './agent-control/schemas.ts';
 export {

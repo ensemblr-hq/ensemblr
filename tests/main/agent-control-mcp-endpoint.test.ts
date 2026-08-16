@@ -36,12 +36,14 @@ const HARNESS_ROOT: ControlAudience = {
 const makeStubService = (
 	audience: ControlAudience = HARNESS_ROOT,
 	languageDirective: string | null = null,
+	issueDirective: string | null = null,
 ): AgentControlService => ({
 	describeAudience: async () => audience,
 	invoke: async (command) => {
 		calls.push(command);
 		return { ok: true, data: { echoed: command.op, args: command.rawArgs } };
 	},
+	readIssueDirective: async () => issueDirective,
 	readLanguageDirective: () => languageDirective,
 	readTurnPreamble: async () => null,
 	releaseSession: () => {},
@@ -53,9 +55,10 @@ const stubService: AgentControlService = makeStubService();
 const connectAs = async (
 	audience: ControlAudience,
 	languageDirective: string | null = null,
+	issueDirective: string | null = null,
 ): Promise<Client> => {
 	server = await startControlServer(
-		makeStubService(audience, languageDirective),
+		makeStubService(audience, languageDirective, issueDirective),
 	);
 	return await connect('good');
 };
@@ -398,6 +401,41 @@ describe('agent-control MCP endpoint, per-origin surface', () => {
 		const client = await connectAs(
 			{ delegation: 'ensemblr', hasChatTab: true, role: 'orchestrator' },
 			'LANGUAGE: reply in Русский.',
+		);
+
+		expect(client.getInstructions()).toBe(ORCHESTRATOR_AWARENESS);
+
+		await client.close();
+	});
+
+	// The playbook file a harness reads is written once per launch, so a workspace
+	// whose ticket was linked after that launch has this connection as its only
+	// channel — and Codex has no instructions file at all.
+	it('appends the linked-issue directive for a harness, after the language one', async () => {
+		const language = 'LANGUAGE: reply in Ελληνικά.';
+		const issue = 'LINKED ISSUE: this workspace was created from ENG-106.';
+		const client = await connectAs(HARNESS_ROOT, language, issue);
+
+		expect(client.getInstructions()).toBe(
+			`${HARNESS_AWARENESS}\n\n${language}\n\n${issue}`,
+		);
+
+		await client.close();
+	});
+
+	it('serves the playbook alone for a workspace with no linked issue', async () => {
+		const client = await connectAs(HARNESS_ROOT, null, null);
+
+		expect(client.getInstructions()).toBe(HARNESS_AWARENESS);
+
+		await client.close();
+	});
+
+	it('leaves the linked-issue directive off a caller prompted per turn', async () => {
+		const client = await connectAs(
+			{ delegation: 'ensemblr', hasChatTab: true, role: 'orchestrator' },
+			null,
+			'LINKED ISSUE: this workspace was created from ENG-106.',
 		);
 
 		expect(client.getInstructions()).toBe(ORCHESTRATOR_AWARENESS);

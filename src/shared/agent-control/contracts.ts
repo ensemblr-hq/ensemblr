@@ -743,6 +743,12 @@ export interface GetSessionBriefResult {
 	 * language-mirroring should stand.
 	 */
 	languageDirective: string | null;
+	/**
+	 * Ready-to-append instruction to keep the workspace's linked Linear issue
+	 * current, cut to what this caller's role and mode may actually do to a
+	 * tracker, or null when the workspace was not created from a Linear issue.
+	 */
+	issueDirective: string | null;
 }
 
 /** Args for `focusTab`: bring a session tab (chat/terminal/diff/…) to the foreground. */
@@ -951,6 +957,11 @@ export interface AgentLinearIssue {
 	/** Linear's workflow category behind `state`, e.g. `started`, `completed`. */
 	stateType: string | null;
 	assignee: string | null;
+	/**
+	 * Assignee's Linear user id, so an agent can tell whether the issue is already
+	 * assigned to the account's own `viewer` without matching display names.
+	 */
+	assigneeId: string | null;
 	priority: number | null;
 	team: string | null;
 	project: string | null;
@@ -962,6 +973,8 @@ export interface AgentLinearIssueDetail extends AgentLinearIssue {
 	/** Truncated to {@link LINEAR_AGENT_LIMITS.maxReturnedDescriptionChars}. */
 	description: string | null;
 	labels: readonly string[];
+	/** Cycle the issue is scheduled in, or null when the team runs none. */
+	cycle: string | null;
 }
 
 /** One comment on a Linear issue, truncated to the returned-body cap. */
@@ -1013,6 +1026,42 @@ export interface LinearAccountRef {
 	accountId: string;
 	organization: string | null;
 	user: string | null;
+	/**
+	 * Linear user id the account is authorized as. Carried because it is the one
+	 * answer an agent cannot look up: `assigneeId` takes an id, and matching the
+	 * `user` display name against the users table is a guess two people with the
+	 * same first name break.
+	 */
+	userId: string;
+}
+
+/**
+ * The Linear user one in-scope account is connected as, as `linearGetMetadata`
+ * reports it. Named `viewer` after Linear's own term for the authenticated user:
+ * an agent has no Linear identity of its own, so "assign it to me" resolves to
+ * the human whose account the app is acting through.
+ */
+export interface AgentLinearViewer {
+	accountId: string;
+	userId: string;
+	name: string | null;
+}
+
+/**
+ * The remote issue a workspace was created from, as the app reads it back off the
+ * workspace's own metadata. Local state rather than a Linear read: it costs one
+ * SQLite lookup, which is what lets the linked-issue directive be rendered on
+ * every turn. Nothing here is live — the state the issue is actually in comes
+ * from `linearGetIssue`.
+ */
+export interface WorkspaceLinkedIssue {
+	provider: 'github' | 'linear';
+	/** Human key the branch, commits, and pull request cite, e.g. `ENG-106`. */
+	identifier: string;
+	title: string;
+	url: string | null;
+	/** Linear account owning the issue; null for GitHub and pre-ADR-0052 workspaces. */
+	accountId: string | null;
 }
 
 /**
@@ -1080,6 +1129,13 @@ export interface LinearGetMetadataResult extends LinearAgentOutcome {
 	states: readonly AgentLinearResource[];
 	labels: readonly AgentLinearResource[];
 	users: readonly AgentLinearResource[];
+	/**
+	 * Who each in-scope account is connected as. Returned on every read rather than
+	 * only on a failure the way `accounts` is: an agent taking a ticket on the
+	 * user's behalf needs a `userId` to assign it to, and this op already exists to
+	 * turn what an agent knows into the ids a write takes.
+	 */
+	viewer: readonly AgentLinearViewer[];
 	/** Rows dropped to fit the payload budget, across every kind. */
 	omittedResources: number;
 	truncated: boolean;

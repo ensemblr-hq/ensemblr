@@ -35,6 +35,7 @@ import {
 	createGuardrails,
 	createOriginRegistry,
 	isSessionTabMarkedSubAgent,
+	readWorkspaceLinkedIssue,
 	startControlServer,
 } from './agent-control';
 import {
@@ -478,6 +479,9 @@ const {
 	/** Reads the control server's URL lazily, null until the server is listening. */
 	getServerUrl: () => agentControlServer?.url ?? null,
 	getLanguage: resolveAppLanguage,
+	/** Reads the ticket a workspace came from, for the harness playbook's issue block. */
+	readLinkedIssue: (workspaceId) =>
+		readWorkspaceLinkedIssue({ databaseService, workspaceId }),
 	/** Reads the durable sub-agent marker so a resumed child keeps its playbook. */
 	isSpawnedSubAgent: (agentSessionId) =>
 		isSessionTabMarkedSubAgent(
@@ -939,6 +943,7 @@ agentControlService = createAgentControlService({
 				accountId: account.id,
 				organization: account.organizationName,
 				user: account.userName ?? account.userEmail,
+				userId: account.userId,
 			})),
 		piExecutableService,
 		spawnModelResolver,

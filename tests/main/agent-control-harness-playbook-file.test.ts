@@ -16,12 +16,24 @@ import {
 } from '../../src/main/agent-control/index.ts';
 import {
 	buildLanguageDirective,
+	buildLinkedIssueDirective,
 	HARNESS_AWARENESS,
+	LINKED_ISSUE_DIRECTIVE_HEADER,
+	type WorkspaceLinkedIssue,
 } from '../../src/shared/agent-control.ts';
 import type { AppLanguage } from '../../src/shared/i18n.ts';
 
 const WORKSPACE = 'ws-1';
 const SERVER_URL = 'http://127.0.0.1:4321';
+const INSTRUCTIONS = HARNESS_INSTRUCTIONS_FILENAME;
+
+const LINKED_ISSUE: WorkspaceLinkedIssue = {
+	accountId: 'acct-1',
+	identifier: 'ENG-106',
+	provider: 'linear',
+	title: 'Expose Linear to agents',
+	url: 'https://linear.app/the/issue/ENG-106',
+};
 
 const userDataDirectories: string[] = [];
 
@@ -32,7 +44,10 @@ const userDataDirectories: string[] = [];
  * @param language - The language the app reports while the harness launches.
  * @returns The launch command's decoration and the playbook file's contents.
  */
-const launchHarness = (language: AppLanguage) => {
+const launchHarness = (
+	language: AppLanguage,
+	linkedIssue: WorkspaceLinkedIssue | null = null,
+) => {
 	const userData = mkdtempSync(path.join(tmpdir(), 'ensemblr-harness-'));
 	userDataDirectories.push(userData);
 	const { augmentHarnessCommand } = createAgentControlIntegration({
@@ -44,6 +59,7 @@ const launchHarness = (language: AppLanguage) => {
 		getLanguage: () => language,
 		getServerUrl: () => SERVER_URL,
 		originRegistry: createOriginRegistry({ generateToken: () => 'tok' }),
+		readLinkedIssue: () => linkedIssue,
 		resolveWorkspaceCwd: () => '/tmp/ws-1',
 	});
 
@@ -51,11 +67,7 @@ const launchHarness = (language: AppLanguage) => {
 	return {
 		command,
 		playbook: readFileSync(
-			path.join(
-				userData,
-				'harness-instructions',
-				HARNESS_INSTRUCTIONS_FILENAME,
-			),
+			path.join(userData, 'harness-instructions', WORKSPACE, INSTRUCTIONS),
 			'utf8',
 		),
 	};
@@ -99,8 +111,35 @@ describe('the harness playbook file', () => {
 			`--append-system-prompt-file '${path.join(
 				userDataDirectories.at(-1) ?? '',
 				'harness-instructions',
-				HARNESS_INSTRUCTIONS_FILENAME,
+				WORKSPACE,
+				INSTRUCTIONS,
 			)}'`,
 		);
+	});
+
+	// The file is keyed by workspace precisely because of this block: one shared
+	// file would hand every harness the ticket of whichever workspace launched
+	// last, which is worse than naming no ticket at all.
+	it('names the workspace linked issue so a harness moves it unprompted', () => {
+		const { playbook } = launchHarness('en', LINKED_ISSUE);
+
+		expect(playbook).toBe(
+			`${HARNESS_AWARENESS}\n\n${buildLinkedIssueDirective(LINKED_ISSUE)}\n`,
+		);
+		expect(playbook).toContain('ENG-106');
+	});
+
+	it('leaves the issue block out for a workspace with no linked issue', () => {
+		expect(launchHarness('en').playbook).not.toContain(
+			LINKED_ISSUE_DIRECTIVE_HEADER,
+		);
+	});
+
+	// A GitHub-linked workspace has no control op that could move its issue, so a
+	// block telling the harness to keep it current would name no tool at all.
+	it('leaves the issue block out for a GitHub-linked workspace', () => {
+		expect(
+			launchHarness('en', { ...LINKED_ISSUE, provider: 'github' }).playbook,
+		).not.toContain(LINKED_ISSUE_DIRECTIVE_HEADER);
 	});
 });

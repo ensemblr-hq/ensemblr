@@ -21,6 +21,41 @@ export const readExtensionSource = (): string =>
 	);
 
 /**
+ * Reads `src/shared/agent-control/contracts.ts`, the other half of every parity
+ * assertion that holds the extension against the contract it cannot import.
+ * @returns The contract module's source.
+ */
+const readContractsSource = (): string =>
+	readFileSync(
+		fileURLToPath(
+			new URL(
+				'../../../src/shared/agent-control/contracts.ts',
+				import.meta.url,
+			),
+		),
+		'utf8',
+	);
+
+/**
+ * Names the ready-to-append directive fields on `GetSessionBriefResult` — the
+ * ones typed `string | null`, which is what a block the app renders and a caller
+ * only appends looks like. Derived rather than listed so that adding a fifth
+ * directive to the contract fails this test instead of shipping it unspliced.
+ * @returns Every directive field name, in declaration order.
+ */
+export function readSessionBriefDirectiveFields(): string[] {
+	const body = readContractsSource().match(
+		/interface GetSessionBriefResult\s*\{([\s\S]*?)\n\}/,
+	)?.[1];
+	if (!body) {
+		throw new Error('GetSessionBriefResult not found in contracts.ts');
+	}
+	return [...body.matchAll(/^\t([A-Za-z]+): string \| null;$/gm)].map(
+		(match) => match[1],
+	);
+}
+
+/**
  * Matches one `tool(name, op, description, …)` registration in the extension,
  * capturing the three leading string literals. The description alternates
  * between quote styles across registrations, so the closing quote is

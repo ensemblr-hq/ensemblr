@@ -361,6 +361,11 @@ is also refused in Plan Mode. Several Linear accounts can be connected at once,
 so `accountId` is optional on every one of these and resolved from what the call
 already names. See [Talking to Linear](#talking-to-linear).
 
+`linearGetMetadata` also returns `viewer`, one row per in-scope account naming the
+Linear `userId` that account is authorized as. An agent has no Linear identity of
+its own, so that id is what "assign this to me" resolves to; without it the only
+route to an `assigneeId` is matching a display name against the users table.
+
 ### Asking the user, and Plan Mode
 
 | Tool | Arguments | Gate | Withheld from |
@@ -618,6 +623,23 @@ never posts an agent's "finished" to a tracker the team reads. A row without a
 type is unclassifiable on strictly less information than a missing one, so it
 takes the same refusal rather than being read as "not terminal".
 
+Both refusals name the alternatives and say that **nothing in the call was
+applied** — not the state, and not a `title` or `priority` that rode along with
+it. The terminal refusal lists the non-terminal states of the same team by name
+and id, because the classification already read every state in that team, so
+making the agent spend a second `getMetadata` round trip is waste. An agent that
+assumes a partial write landed never re-sends the fields that did not.
+
+**Every other failure names its own recovery.** `recoveryFor` maps each
+`LinearServiceFailureCode` onto what to do next, because the one thing these codes
+share is that retrying the identical call is right for exactly one of them:
+`rate-limited` gets the retry window when Linear supplied one and "get on with
+other work" when it did not, `permission-denied` says not to retry at all and to
+report it, `invalid-request` sends the ids back through `getMetadata`, and
+`network` allows exactly one retry. `not-found` names every id it could have come
+from — `stateId` and `assigneeId` miss as often as `issueId` — rather than only
+the issue.
+
 **Payloads are budgeted like the workspace diff.** Every result is fitted to
 `MAX_AGENT_PAYLOAD_CHARS` and says what it cut: `listIssues` returns no
 descriptions at all (a hundred issues carrying theirs is what turns a list into a
@@ -625,7 +647,9 @@ context spend) and reports `omittedIssues`; `getIssue` clamps the description,
 keeps the most recent comments, and reports `omittedComments`; `getMetadata`
 fills one shared budget in priority order — states, teams, users, projects,
 labels — so a workspace with hundreds of labels cannot crowd out the states an
-update needs. Cycles are not returned at all, because no op here sets one.
+update needs. `getMetadata` returns no cycle rows, because no op here sets one;
+`getIssue` does report the cycle an issue is *in*, which is schedule context an
+agent reads rather than a field it writes.
 
 **The update surface is deliberately small.** `linearUpdateIssue` takes `stateId`,
 `assigneeId`, `priority`, `title`, and `description` and nothing else. Labels,
@@ -652,6 +676,48 @@ default, because seeing both organizations at once is what a search is for. When
 resolution is genuinely ambiguous — an identifier such as `ENG-1` existing in two
 organizations — the op refuses and lists the accounts on the result rather than
 guessing one.
+
+### The linked-issue directive
+
+Having the tools is not the same as using them. A workspace created from an issue
+persists that issue on its own metadata, and for as long as nothing told the agent
+so, every state change happened because the user asked for one by hand — which is
+the same as it not happening. What was missing was never a capability; it was the
+*fact*.
+
+`buildLinkedIssueDirective` (`src/shared/agent-control/linked-issue-directive.ts`)
+renders that fact as a standing block: the identifier, the title, the `accountId`
+every write has to be scoped to, and one named trigger per lifecycle step — read
+the issue before changing code, move it to a started state and take the assignee
+slot when implementation begins, comment when something is settled, move it to
+`In Review` the moment the work is reviewable. A trigger is what produces the
+behaviour; a description of what a tool does produces nothing.
+
+It is rendered by the app rather than written into a playbook for the same reason
+the language directive and the upkeep block are: the shipped Pi extension carries
+byte-identical copies of the playbooks that a parity test polices, and those
+copies must stay flat literals, so a block built from live state has no literal to
+compare. It also means Plan Mode cannot lose it — the plan-mode playbooks replace
+the role playbook, and this rides after whichever one won.
+
+**Both axes that decide what an agent may do to a tracker are arguments**, so the
+block never names a call the caller would be refused. A spawned sub-agent is
+denied `linearCreateComment` and `linearUpdateIssue`, so its variant asks it to
+name the state it thinks the issue should be in *in its report*; a planning root is
+denied `linearUpdateIssue`, so its variant keeps the read and the comment and says
+to put the target state in the plan. Role wins over mode, because a planning
+sub-agent is denied strictly more.
+
+Three channels carry it, matching the three the language directive uses:
+`getSessionBrief` (Pi, spliced by the extension as `issueDirective`),
+`readTurnPreamble` (the runtimes the app prompts directly), and the MCP server's
+`instructions` plus the harness playbook file (callers with no per-turn hook). The
+playbook file is written **per workspace** for this block's sake — one shared file
+would hand every harness whichever workspace launched last.
+
+A workspace linked to a **GitHub** issue gets no block. There is no GitHub issue op
+on this surface, so a directive there would state an obligation with no tool that
+could discharge it.
 
 ## Orchestration in practice
 

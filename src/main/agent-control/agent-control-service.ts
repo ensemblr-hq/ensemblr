@@ -62,6 +62,7 @@ import type {
 import {
 	briefReport,
 	buildLanguageDirective,
+	buildLinkedIssueDirective,
 	buildSessionBriefNudge,
 	isWriteOp,
 	PLAN_REFINEMENT_DIRECTIVE,
@@ -143,6 +144,16 @@ export interface AgentControlService {
 	 * @returns The directive to append, or null when the app is in English.
 	 */
 	readLanguageDirective: () => string | null;
+	/**
+	 * Renders the linked-issue directive for one caller, for the MCP server's
+	 * `instructions` field — the only per-workspace channel a caller whose whole
+	 * surface is MCP has. Takes a token rather than a session id because that is
+	 * what an MCP request carries, and the workspace behind it is what decides
+	 * whether there is an issue to name at all.
+	 * @param token - The caller's bearer token.
+	 * @returns The directive to append, or null when there is no Linear issue or the token is unknown.
+	 */
+	readIssueDirective: (token: string) => Promise<string | null>;
 	/**
 	 * Releases all per-session state (pending orchestrator signal, spawn
 	 * counters, origin token) when an agent session ends, keeping the in-memory
@@ -516,6 +527,23 @@ export function createAgentControlService({
 		);
 
 	/**
+	 * This turn's linked-issue directive, cut to what the caller may actually do to
+	 * a tracker. Rendered per turn rather than captured because both inputs move:
+	 * Plan Mode toggles mid-session, and a sub-agent marker is written when a child
+	 * is spawned.
+	 * @param origin - Resolved caller identity.
+	 * @returns The directive to append, or null when the workspace has no Linear issue.
+	 */
+	const readIssueDirectiveForOrigin = async (
+		origin: AgentControlOrigin,
+	): Promise<string | null> =>
+		buildLinkedIssueDirective(
+			ports.linear.readLinkedIssue(origin.workspaceId),
+			await resolveRole(origin),
+			isPlanning(origin),
+		);
+
+	/**
 	 * Blocks the ops that belong to the orchestrator rather than to the one unit of
 	 * work a child was handed, whatever mode it is in. Runs before the plan-mode
 	 * gate because the role is a durable fact about the session while planning is a
@@ -820,6 +848,7 @@ export function createAgentControlService({
 		const naming = await ports.sessionNaming.readBrief(origin);
 		const planMode = isPlanning(origin);
 		return ok({
+			issueDirective: await readIssueDirectiveForOrigin(origin),
 			languageDirective: readLanguageDirective(),
 			naming,
 			nudge: buildSessionBriefNudge(naming, planMode),
@@ -1635,8 +1664,14 @@ export function createAgentControlService({
 			),
 			readPlanRefinement(origin),
 			readLanguageDirective(),
+			await readIssueDirectiveForOrigin(origin),
 		].filter((block) => block !== null);
 		return blocks.length > 0 ? blocks.join('\n\n') : null;
+	};
+
+	const readIssueDirective = async (token: string): Promise<string | null> => {
+		const origin = originRegistry.resolveByToken(token);
+		return origin ? readIssueDirectiveForOrigin(origin) : null;
 	};
 
 	const releaseSession = (sessionId: string): void => {
@@ -1650,6 +1685,7 @@ export function createAgentControlService({
 	return {
 		describeAudience,
 		invoke,
+		readIssueDirective,
 		readLanguageDirective,
 		readTurnPreamble,
 		releaseSession,

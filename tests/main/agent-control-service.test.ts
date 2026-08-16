@@ -144,6 +144,7 @@ const makePorts = (
 		}),
 	},
 	linear: {
+		readLinkedIssue: vi.fn().mockReturnValue(null),
 		listIssues: vi.fn().mockResolvedValue({
 			issues: [],
 			message: '0 issue(s).',
