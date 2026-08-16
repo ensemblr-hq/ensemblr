@@ -71,6 +71,8 @@ export default defineConfig({
 			'tests/main/agent-activity-monitor.test.ts',
 			'tests/main/notification-target.test.ts',
 			'tests/main/notification-strings.test.ts',
+			'tests/main/notification-retention.test.ts',
+			'tests/main/electron-notify.test.ts',
 			'tests/main/quit-guard.test.ts',
 			'tests/main/quit-guard-strings.test.ts',
 			'tests/main/quit-coordinator.test.ts',
