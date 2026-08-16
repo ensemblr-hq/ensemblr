@@ -30,7 +30,7 @@ import {
 import type { WorkspaceLinkedIssueSummary } from '@/renderer/types/workbench';
 import type { LinearIssueWire } from '@/shared/ipc/contracts/linear';
 
-import { LinearStateBadge } from './issue-meta-badges';
+import { LinearStateBadge } from './issue-state-badge';
 
 /**
  * Linked Linear issue surface for a workspace: reference, live status chip,
@@ -71,7 +71,7 @@ function LinearLinkedIssueStatus({
 		isFetching: detailFetching,
 		isLoading: detailLoading,
 		refetch: refetchDetail,
-	} = useQuery(linearIssueQuery(remoteId));
+	} = useQuery(linearIssueQuery(remoteId, linkedIssue.accountId));
 	// Capture mount-time clock once so the stale-data check stays out of JSX
 	// (avoids react-doctor flagging `new Date()` in render). Staleness threshold
 	// is minutes, so a per-mount snapshot is fine.
@@ -132,6 +132,7 @@ function LinearLinkedIssueStatus({
 			<LinearStateBadge
 				color={result.issue.stateColor}
 				name={result.issue.stateName}
+				stateType={result.issue.stateType}
 			/>
 			{result.issue.archivedAt ? (
 				<Badge variant='secondary'>
@@ -173,7 +174,7 @@ function SetStatusMenu({ issue }: { issue: LinearIssueWire }) {
 				return;
 			}
 			await queryClient.invalidateQueries({
-				queryKey: ensemblrQueryKeys.linearIssue(issue.id),
+				queryKey: ensemblrQueryKeys.linearIssueAll(issue.id),
 			});
 		},
 	});

@@ -440,6 +440,8 @@ export type WorkspaceLinkedIssueProvider = 'github' | 'linear';
 
 /** Describes the issue that seeded a workspace when one is linked. */
 export interface WorkspaceLinkedIssueSummary {
+	/** Linear account the issue belongs to; absent for GitHub and pre-0052 workspaces. */
+	accountId?: string;
 	/** Issue body/description, seeded into the first-prompt composer draft. */
 	description?: string;
 	provider: WorkspaceLinkedIssueProvider;

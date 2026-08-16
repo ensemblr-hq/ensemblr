@@ -6,8 +6,9 @@ import type {
 } from '@/renderer/types/linear';
 import type { WorkspaceSource } from '@/renderer/types/workbench';
 import type {
+	LinearAccountFailure,
 	LinearCommentWire,
-	LinearConnectionSnapshot,
+	LinearConnectionSummary,
 	LinearIssueWire,
 	LinearServiceFailure,
 } from '@/shared/ipc/contracts/linear';
@@ -36,15 +37,16 @@ function priorityLabel(priority: number): string {
 const STALE_AFTER_MS = 5 * 60 * 1000;
 
 /**
- * Derives the gate state shown before any Linear issue content renders.
- * @param options - Connection snapshot plus its loading flag.
+ * Derives the gate state shown before any Linear issue content renders. The
+ * aggregate state is what gates: one working account is enough to browse.
+ * @param options - Connection summary plus its loading flag.
  * @returns A {@link LinearGateState}.
  */
 export function deriveLinearGateState({
 	connection,
 	isLoading,
 }: {
-	connection: LinearConnectionSnapshot | undefined;
+	connection: LinearConnectionSummary | undefined;
 	isLoading: boolean;
 }): LinearGateState {
 	if (isLoading || !connection) {
@@ -113,6 +115,55 @@ export function describeLinearFailure(failure: LinearServiceFailure): string {
 				'Linear is unreachable. Showing cached data where available.',
 			);
 	}
+}
+
+/**
+ * User-facing copy naming the accounts a merged read could not reach, so a
+ * short list is not mistaken for a complete one.
+ * @param failures - Per-account failures reported alongside a partial result
+ * @returns The warning sentence naming each organization and its reason
+ */
+export function describeLinearAccountFailures(
+	failures: readonly LinearAccountFailure[],
+): string {
+	return i18n.t(
+		'linear:failure.account-partial',
+		'{{count}} organizations could not be read, so their issues are missing: {{details}}',
+		{
+			count: failures.length,
+			defaultValue_one:
+				'One organization could not be read, so its issues are missing: {{details}}',
+			details: failures
+				.map(
+					(entry) =>
+						`${entry.organizationName ?? entry.accountId} — ${describeLinearFailure(entry.failure)}`,
+				)
+				.join('; '),
+		},
+	);
+}
+
+/**
+ * Up to two initials for an avatar disc. Falls back to the leading characters of
+ * a single-word name, which is what an email-shaped Linear display name is.
+ * @param name - The person's display name
+ * @returns One or two uppercase characters
+ */
+export function linearInitials(name: string): string {
+	const words = name
+		.trim()
+		.split(/[\s._-]+/)
+		.filter(Boolean);
+
+	if (words.length === 0) {
+		return '';
+	}
+
+	if (words.length === 1) {
+		return (words[0] ?? '').slice(0, 2).toUpperCase();
+	}
+
+	return `${words[0]?.[0] ?? ''}${words[1]?.[0] ?? ''}`.toUpperCase();
 }
 
 /** True when a cached row's `syncedAt` is older than the freshness window. */
@@ -190,17 +241,25 @@ export function formatLinearIssueDocument(
 
 /**
  * Maps cached Linear issues into create-workspace dialog sources so the
- * "Create from…" picker lists live issues instead of fixtures.
+ * "Create from…" picker lists live issues instead of fixtures. The subtitle
+ * names the organization when the rows span more than one, since `ENG-1` is
+ * unique inside an organization but not between two.
  */
 export function mapLinearIssuesToWorkspaceSources(
 	issues: LinearIssueWire[],
 ): WorkspaceSource[] {
+	const spansAccounts =
+		new Set(issues.map((issue) => issue.accountId)).size > 1;
+
 	return issues.map((issue) => ({
 		id: issue.id,
 		kind: 'issue',
 		provider: 'linear',
 		reference: issue.identifier,
-		subtitle: issue.stateName ?? undefined,
+		subtitle:
+			[spansAccounts ? issue.organizationName : null, issue.stateName]
+				.filter((part) => part !== null)
+				.join(' · ') || undefined,
 		title: issue.title,
 	}));
 }
@@ -216,6 +275,7 @@ export function buildWorkspaceSeedFromLinearIssue(
 ): LinearWorkspaceSeed {
 	return {
 		linkedIssue: {
+			accountId: issue.accountId,
 			...(issue.description ? { description: issue.description } : {}),
 			id: issue.id,
 			identifier: issue.identifier,

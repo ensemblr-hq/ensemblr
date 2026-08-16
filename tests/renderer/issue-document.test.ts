@@ -10,6 +10,7 @@ function linearIssue(
 	overrides: Partial<LinearIssueWire> = {},
 ): LinearIssueWire {
 	return {
+		accountId: 'account-1',
 		archivedAt: null,
 		assigneeId: null,
 		assigneeName: 'Ada',
@@ -20,6 +21,7 @@ function linearIssue(
 		id: 'issue-1',
 		identifier: 'ENG-106',
 		labels: [{ color: null, id: 'l1', name: 'bug' }],
+		organizationName: 'Example Org',
 		priority: 1,
 		projectId: null,
 		projectName: 'Ensemble',

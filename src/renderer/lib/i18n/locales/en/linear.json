@@ -1,7 +1,12 @@
 {
+	"browse": {
+		"title": "Linear issues"
+	},
 	"comment-composer": {
 		"label": "Add a comment",
+		"markdown-hint": "Markdown supported",
 		"placeholder": "Add a comment…",
+		"post-failed": "Posting the comment failed. Check your connection and try again.",
 		"posting": "Posting…",
 		"submit": "Comment"
 	},
@@ -11,8 +16,8 @@
 			"title": "Linear is not configured"
 		},
 		"not-connected": {
-			"description": "Connect Linear from integration settings to browse issues, manage them from Ensemblr, and create workspaces from issues.",
-			"title": "Linear is not connected"
+			"description": "Connect Linear from integration settings to browse issues, manage them from Ensemblr, and create workspaces from issues. Add more than one account to work across organizations.",
+			"title": "No Linear account is connected"
 		},
 		"open-settings": "Open integration settings",
 		"reconnect-required": {
@@ -25,6 +30,8 @@
 		"trigger": "Create workspace"
 	},
 	"failure": {
+		"account-partial_one": "One organization could not be read, so its issues are missing: {{details}}",
+		"account-partial_other": "{{count}} organizations could not be read, so their issues are missing: {{details}}",
 		"not-connected": "Linear is not connected. Sign in from integration settings.",
 		"not-found": "This Linear issue no longer exists or is not visible to you.",
 		"permission-denied": "Your Linear account does not have permission for this action.",
@@ -38,28 +45,50 @@
 	},
 	"issue-detail": {
 		"back": "Back to issues",
+		"comments": "Comments",
+		"copy-link": "Copy issue link",
+		"find-person": "Find a person…",
+		"find-priority": "Find a priority…",
+		"find-status": "Find a status…",
+		"link-copied": "Link copied",
 		"load-failed": "This Linear issue could not be loaded.",
 		"no-comments": "No comments yet.",
 		"no-description": "No description.",
+		"no-options": "Nothing to choose.",
+		"no-people": "No matching person.",
 		"open-external": "Open in Linear",
+		"properties": "Properties",
+		"quick-update-failed": "That change could not be saved to Linear.",
 		"refresh": "Refresh issue",
-		"unknown-author": "Unknown"
+		"set-assignee": "Change assignee",
+		"set-priority": "Change priority",
+		"set-status": "Change status",
+		"unknown-author": "Unknown",
+		"updated": "Updated {{when}}"
 	},
 	"issue-editor": {
-		"description-create": "Create an issue in the connected Linear workspace.",
+		"assignee-none": "Unassigned",
+		"cycle-none": "No cycle",
+		"cycle-number": "Cycle {{number}}",
+		"description-create": "Create an issue in a connected Linear workspace. The team you choose decides which organization it lands in.",
 		"description-edit": "Update fields where your Linear permissions allow.",
+		"due-date-clear": "Clear due date",
 		"field": {
 			"assignee": "Assignee",
 			"cycle": "Cycle",
 			"description": "Issue description",
-			"description-placeholder": "Description (markdown)",
+			"description-placeholder": "Add a description…",
 			"due-date": "Due date",
+			"labels": "Labels",
 			"priority": "Priority",
 			"project": "Project",
 			"status": "Status",
 			"team": "Team",
 			"title": "Issue title"
 		},
+		"labels-empty": "No matching label.",
+		"labels-remove": "Remove label",
+		"labels-search": "Find a label…",
 		"priority": {
 			"high": "High",
 			"low": "Low",
@@ -67,24 +96,57 @@
 			"none": "No priority",
 			"urgent": "Urgent"
 		},
+		"project-none": "No project",
 		"save-failed": "Saving the issue failed. Check your connection and try again.",
 		"saving": "Saving…",
+		"status-none": "No status",
 		"submit-create": "Create issue",
 		"submit-edit": "Save changes",
+		"submit-hint": "⌘↵ to save",
+		"team-first": "Choose a team to set status, assignee, project, cycle, and labels.",
 		"team-required": "Choose a team for the new issue.",
-		"title-create": "New Linear issue",
+		"teams-empty": "No teams have loaded from your connected Linear accounts yet.",
+		"title-create": "New issue",
 		"title-edit": "Edit {{identifier}}",
-		"title-required": "A title is required.",
-		"unset-option": "{{field}}: none"
+		"title-required": "A title is required."
 	},
 	"issue-list": {
+		"all-accounts": "All organizations",
 		"all-teams": "All teams",
+		"count_one": "{{count}} issue",
+		"count_other": "{{count}} issues",
 		"empty": "No Linear issues are cached yet. Refresh to sync from Linear.",
+		"empty-closed": "No closed issues here yet.",
+		"empty-scope": "Every issue here is closed. Switch to All to see them.",
 		"empty-search": "No issues match your search.",
+		"group": "Group by",
+		"group-by": {
+			"assignee": "Assignee",
+			"none": "No grouping",
+			"priority": "Priority",
+			"status": "Status"
+		},
 		"new-issue": "New issue",
 		"refresh": "Refresh issues",
+		"scope": {
+			"active": "Active",
+			"all": "All",
+			"closed": "Closed"
+		},
 		"search-label": "Search Linear issues",
-		"search-placeholder": "Search by identifier or title…"
+		"search-placeholder": "Search by identifier or title…",
+		"sort": "Sort by",
+		"sort-by": {
+			"priority": "Priority",
+			"status": "Status",
+			"title": "Title",
+			"updated": "Updated"
+		},
+		"unassigned": "Unassigned"
+	},
+	"issue-row": {
+		"due": "Due {{date}}",
+		"priority": "Priority: {{priority}}"
 	},
 	"linked-issue": {
 		"connect": "Connect Linear",
@@ -108,5 +170,13 @@
 		"medium": "Medium",
 		"none": "No priority",
 		"urgent": "Urgent"
+	},
+	"state-bucket": {
+		"backlog": "Backlog",
+		"canceled": "Canceled",
+		"completed": "Done",
+		"started": "In progress",
+		"triage": "Triage",
+		"unstarted": "Todo"
 	}
 }

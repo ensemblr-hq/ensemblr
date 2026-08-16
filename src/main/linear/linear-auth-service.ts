@@ -1,16 +1,30 @@
-import { randomUUID } from 'node:crypto';
 import type { DatabaseSync } from 'node:sqlite';
 
+import { type AppLanguage, FALLBACK_LANGUAGE } from '../../shared/i18n.ts';
 import type {
-	LinearAuthFailure,
-	LinearAuthFailureCode,
-	LinearConnectionSnapshot,
+	LinearAccountSnapshot,
+	LinearConnectionState,
+	LinearConnectionSummary,
 	LinearDisconnectResult,
 	LinearLoginResult,
 } from '../../shared/ipc/contracts/linear';
 import type { EnsemblrConfigService } from '../config';
 import type { SecretStore } from '../secrets';
 import type { EnsemblrDatabaseService } from '../storage';
+import {
+	createLinearAccountStore,
+	type LinearAccountRecord,
+	type LinearAccountStore,
+	toAccountSnapshot,
+} from './linear-account-store.ts';
+import { LinearAuthError } from './linear-auth-error.ts';
+import { formatError, toFailure, truncate } from './linear-auth-failures.ts';
+import {
+	adoptLegacyConnection,
+	nullViewer,
+	UNRESOLVED_ORGANIZATION_ID,
+	type ViewerIdentity,
+} from './linear-legacy-adoption.ts';
 import {
 	BUILT_IN_LINEAR_CLIENT_ID,
 	buildLinearAuthorizeUrl,
@@ -21,42 +35,17 @@ import {
 	LINEAR_TOKEN_URL,
 	parseOauthCallback,
 } from './linear-oauth.ts';
-import {
-	LinearOauthCallbackError,
-	startLinearOauthCallbackServer,
-} from './linear-oauth-callback-server.ts';
+import { startLinearOauthCallbackServer } from './linear-oauth-callback-server.ts';
 
 const LINEAR_GRAPHQL_URL = 'https://api.linear.app/graphql';
-const ACCESS_TOKEN_KEY = 'linear-access-token';
-const REFRESH_TOKEN_KEY = 'linear-refresh-token';
 /**
  * User-managed secret for custom confidential OAuth apps. Never written by the
- * app and deliberately survives disconnect, like `app.linear.clientId`.
+ * app and deliberately survives disconnect, like `app.linear.clientId`. It
+ * belongs to the OAuth client rather than to any one account, so it stays
+ * app-scoped even though tokens are now per-account.
  */
 const CLIENT_SECRET_KEY = 'linear-client-secret';
-const CONNECTION_RESOURCE_TYPE = 'connection';
-const CONNECTION_RESOURCE_ID = 'default';
 const EXPIRY_SKEW_MS = 60_000;
-
-/** Typed error thrown by every Linear auth operation. */
-export class LinearAuthError extends Error {
-	readonly code: LinearAuthFailureCode;
-
-	/**
-	 * @param code - Machine-readable failure category.
-	 * @param message - Human-readable description.
-	 * @param options - Optional cause for diagnostics.
-	 */
-	constructor(
-		code: LinearAuthFailureCode,
-		message: string,
-		options: { cause?: unknown } = {},
-	) {
-		super(message, { cause: options.cause });
-		this.name = 'LinearAuthError';
-		this.code = code;
-	}
-}
 
 /** Linear OAuth client settings declared in `~/.config/ensemblr/config.json`. */
 export interface LinearOauthConfig {
@@ -67,9 +56,10 @@ export interface LinearOauthConfig {
 /** Public surface of the Linear auth service. */
 export interface LinearAuthService {
 	cancelLogin: () => Promise<void>;
-	disconnect: () => Promise<LinearDisconnectResult>;
-	getAccessToken: () => Promise<string>;
-	getConnectionStatus: () => Promise<LinearConnectionSnapshot>;
+	disconnect: (accountId: string) => Promise<LinearDisconnectResult>;
+	getAccessToken: (accountId: string) => Promise<string>;
+	getConnectionSummary: () => Promise<LinearConnectionSummary>;
+	listAccounts: () => Promise<LinearAccountSnapshot[]>;
 	startLogin: () => Promise<LinearLoginResult>;
 }
 
@@ -81,6 +71,9 @@ export interface CreateLinearAuthServiceOptions {
 	configService: EnsemblrConfigService;
 	databaseService: EnsemblrDatabaseService;
 	fetchImpl?: typeof fetch;
+	/** Language the browser-facing OAuth callback page is served in. */
+	getLanguage?: () => AppLanguage;
+	idFactory?: () => string;
 	now?: () => Date;
 	openExternal: (url: string) => Promise<void>;
 	secretStoreFactory: (database: DatabaseSync) => SecretStore | null;
@@ -94,17 +87,6 @@ interface TokenResponse {
 	scopes: string[];
 }
 
-/** Non-secret Linear connection metadata persisted in SQLite alongside the stored tokens. */
-interface ConnectionMetadata {
-	expiresAt: string | null;
-	hasRefreshToken: boolean;
-	organizationName: string | null;
-	organizationUrlKey: string | null;
-	scopes: string[];
-	userEmail: string | null;
-	userName: string | null;
-}
-
 /** Handle to an in-flight login, exposing a way to cancel it. */
 interface PendingLogin {
 	cancel: () => Promise<void>;
@@ -112,8 +94,9 @@ interface PendingLogin {
 
 /**
  * Builds the Linear OAuth service that owns login, refresh, disconnect, and
- * connection-status reporting. Tokens live exclusively in the secret store;
- * SQLite only ever holds non-secret connection metadata.
+ * per-account status reporting. Several accounts may be connected at once; each
+ * one's tokens live exclusively in the secret store, and SQLite only ever holds
+ * non-secret identity and grant metadata.
  * @param options - Service dependencies (config, database, secrets, browser opener).
  * @returns A fresh {@link LinearAuthService}.
  */
@@ -124,12 +107,27 @@ export function createLinearAuthService({
 	configService,
 	databaseService,
 	fetchImpl = fetch,
+	getLanguage = () => FALLBACK_LANGUAGE,
+	idFactory,
 	now = () => new Date(),
 	openExternal,
 	secretStoreFactory,
 }: CreateLinearAuthServiceOptions): LinearAuthService {
 	let pendingLogin: PendingLogin | null = null;
-	let refreshInFlight: Promise<string> | null = null;
+	const refreshInFlight = new Map<string, Promise<string>>();
+
+	/**
+	 * Clear the in-progress login only when the caller still owns the slot. A
+	 * login that lost the slot to a later attempt must not free that attempt's
+	 * claim on its way out, or the guard stops holding and `cancelLogin` cancels
+	 * a flow that already finished.
+	 * @param slot - The claim the finishing login took
+	 */
+	function releasePendingLogin(slot: PendingLogin): void {
+		if (pendingLogin === slot) {
+			pendingLogin = null;
+		}
+	}
 
 	/**
 	 * Return the open database connection, throwing when it is not available.
@@ -152,7 +150,7 @@ export function createLinearAuthService({
 	 * Return the platform secret store, throwing when no backend is available.
 	 * @returns The secret store for app-scoped secrets
 	 */
-	function getSecretStore(): SecretStore {
+	function requireSecretStore(): SecretStore {
 		const store = secretStoreFactory(getDatabase());
 
 		if (!store) {
@@ -163,6 +161,21 @@ export function createLinearAuthService({
 		}
 
 		return store;
+	}
+
+	/**
+	 * Build the account store over the current database and secret backend.
+	 * @returns A store bound to the open connection
+	 */
+	function getAccountStore(): LinearAccountStore {
+		const database = getDatabase();
+
+		return createLinearAccountStore({
+			database,
+			...(idFactory ? { idFactory } : {}),
+			now,
+			secretStore: secretStoreFactory(database),
+		});
 	}
 
 	/**
@@ -196,174 +209,22 @@ export function createLinearAuthService({
 	}
 
 	/**
-	 * Read an app-scoped secret, wrapping backend failures as a Linear auth error.
-	 * @param key - Secret key to read
-	 * @returns The stored secret value, or null when it is not set
+	 * Read the app-scoped OAuth client secret, if the user configured one.
+	 * @returns The stored client secret, or null when it is not set
 	 */
-	async function readSecret(key: string): Promise<string | null> {
+	async function readClientSecret(): Promise<string | null> {
 		try {
-			return await getSecretStore().read({ key, scope: 'app' });
+			return await requireSecretStore().read({
+				key: CLIENT_SECRET_KEY,
+				scope: 'app',
+			});
 		} catch (error) {
 			throw new LinearAuthError(
 				'secret-store-error',
-				`Reading the "${key}" secret failed.`,
+				'Reading the Linear client secret failed.',
 				{ cause: error },
 			);
 		}
-	}
-
-	/**
-	 * Create or update an app-scoped secret, wrapping backend failures as an error.
-	 * @param key - Secret key to persist
-	 * @param value - Secret value to store
-	 */
-	async function writeSecret(key: string, value: string): Promise<void> {
-		const store = getSecretStore();
-		const input = {
-			displayName: `Linear ${key}`,
-			key,
-			scope: 'app' as const,
-			value,
-		};
-
-		try {
-			const existing = await store.read({ key, scope: 'app' });
-
-			if (existing === null) {
-				await store.create(input);
-			} else {
-				await store.update(input);
-			}
-		} catch (error) {
-			throw new LinearAuthError(
-				'secret-store-error',
-				`Persisting the "${key}" secret failed.`,
-				{ cause: error },
-			);
-		}
-	}
-
-	/**
-	 * Best-effort deletion of an app-scoped secret; never throws so disconnect can proceed.
-	 * @param key - Secret key to delete
-	 */
-	async function deleteSecret(key: string): Promise<void> {
-		try {
-			await getSecretStore().delete({ key, scope: 'app' });
-		} catch {
-			// Best-effort: missing entries and keychain errors must not block disconnect.
-		}
-	}
-
-	/**
-	 * Read and parse the stored Linear connection metadata row.
-	 * @returns The parsed metadata, or null when absent or malformed
-	 */
-	function readConnectionMetadata(): ConnectionMetadata | null {
-		const row = getDatabase()
-			.prepare(
-				`SELECT metadata_json FROM integration_metadata
-				 WHERE provider = 'linear' AND resource_type = ? AND resource_id = ?`,
-			)
-			.get(CONNECTION_RESOURCE_TYPE, CONNECTION_RESOURCE_ID) as
-			| { metadata_json: string }
-			| undefined;
-
-		if (!row) {
-			return null;
-		}
-
-		try {
-			const parsed = JSON.parse(
-				row.metadata_json,
-			) as Partial<ConnectionMetadata>;
-
-			return {
-				expiresAt: parsed.expiresAt ?? null,
-				hasRefreshToken: parsed.hasRefreshToken ?? false,
-				organizationName: parsed.organizationName ?? null,
-				organizationUrlKey: parsed.organizationUrlKey ?? null,
-				scopes: parsed.scopes ?? [],
-				userEmail: parsed.userEmail ?? null,
-				userName: parsed.userName ?? null,
-			};
-		} catch {
-			return null;
-		}
-	}
-
-	/**
-	 * Upsert the Linear connection metadata row, stamping the sync time.
-	 * @param metadata - Connection metadata to persist
-	 */
-	function writeConnectionMetadata(metadata: ConnectionMetadata): void {
-		const timestamp = now().toISOString();
-		getDatabase()
-			.prepare(
-				`INSERT INTO integration_metadata
-					(id, provider, resource_type, resource_id, external_id, synced_at, metadata_json)
-				 VALUES (?, 'linear', ?, ?, '', ?, ?)
-				 ON CONFLICT(provider, resource_type, resource_id, external_id)
-				 DO UPDATE SET metadata_json = excluded.metadata_json,
-					synced_at = excluded.synced_at,
-					updated_at = excluded.synced_at`,
-			)
-			.run(
-				randomUUID(),
-				CONNECTION_RESOURCE_TYPE,
-				CONNECTION_RESOURCE_ID,
-				timestamp,
-				JSON.stringify(metadata),
-			);
-	}
-
-	/** Delete the stored Linear connection metadata row. */
-	function deleteConnectionMetadata(): void {
-		getDatabase()
-			.prepare(
-				`DELETE FROM integration_metadata
-				 WHERE provider = 'linear' AND resource_type = ? AND resource_id = ?`,
-			)
-			.run(CONNECTION_RESOURCE_TYPE, CONNECTION_RESOURCE_ID);
-	}
-
-	/**
-	 * Read the last-updated timestamp of the connection metadata row.
-	 * @returns The ISO `updated_at` value, or null when no row exists
-	 */
-	function readConnectionUpdatedAt(): string | null {
-		const row = getDatabase()
-			.prepare(
-				`SELECT updated_at FROM integration_metadata
-				 WHERE provider = 'linear' AND resource_type = ? AND resource_id = ?`,
-			)
-			.get(CONNECTION_RESOURCE_TYPE, CONNECTION_RESOURCE_ID) as
-			| { updated_at: string }
-			| undefined;
-
-		return row?.updated_at ?? null;
-	}
-
-	/**
-	 * Compose a connection snapshot for the renderer from a state and metadata.
-	 * @param state - Connection state to report
-	 * @param metadata - Stored metadata to project, when present
-	 * @returns The connection snapshot
-	 */
-	function buildSnapshot(
-		state: LinearConnectionSnapshot['state'],
-		metadata: ConnectionMetadata | null,
-	): LinearConnectionSnapshot {
-		return {
-			expiresAt: metadata?.expiresAt ?? null,
-			organizationName: metadata?.organizationName ?? null,
-			organizationUrlKey: metadata?.organizationUrlKey ?? null,
-			scopes: metadata?.scopes ?? [],
-			state,
-			updatedAt: readConnectionUpdatedAt(),
-			userEmail: metadata?.userEmail ?? null,
-			userName: metadata?.userName ?? null,
-		};
 	}
 
 	/**
@@ -377,6 +238,51 @@ export function createLinearAuthService({
 		}
 
 		return now().getTime() + EXPIRY_SKEW_MS >= Date.parse(expiresAt);
+	}
+
+	/**
+	 * Project a stored account onto the snapshot the renderer reads.
+	 * @param record - Stored account record
+	 * @returns The account snapshot with its resolved state
+	 */
+	function snapshotOf(record: LinearAccountRecord): LinearAccountSnapshot {
+		return toAccountSnapshot(record, isExpired(record.expiresAt));
+	}
+
+	/**
+	 * Return the account store with the legacy connection already adopted.
+	 * @returns A store whose account list reflects any pre-upgrade connection
+	 */
+	async function getAdoptedStore(): Promise<LinearAccountStore> {
+		const store = getAccountStore();
+		await adoptLegacyConnection(
+			{ fetchViewer, getDatabase, secretStoreFactory },
+			store,
+		);
+
+		return store;
+	}
+
+	/**
+	 * Reduce every account's state to the single word the setup check and the
+	 * onboarding gate ask for.
+	 * @param accounts - Snapshots of every connected account
+	 * @returns The aggregate connection state
+	 */
+	function summarizeState(
+		accounts: LinearAccountSnapshot[],
+	): LinearConnectionState {
+		if (!getOauthConfig()) {
+			return 'not-configured';
+		}
+
+		if (accounts.length === 0) {
+			return 'disconnected';
+		}
+
+		return accounts.some((account) => account.state === 'connected')
+			? 'connected'
+			: 'reconnect-required';
 	}
 
 	/**
@@ -445,20 +351,16 @@ export function createLinearAuthService({
 
 	/**
 	 * Fetch the authenticated viewer and organization details from Linear's
-	 * GraphQL API, returning all-null values on any failure.
+	 * GraphQL API, returning all-null values on any failure. The ids matter as
+	 * much as the names: they key the account row.
 	 * @param accessToken - Bearer access token for the request
 	 * @returns The viewer and organization fields, each null when unavailable
 	 */
-	async function fetchViewer(accessToken: string): Promise<{
-		organizationName: string | null;
-		organizationUrlKey: string | null;
-		userEmail: string | null;
-		userName: string | null;
-	}> {
+	async function fetchViewer(accessToken: string): Promise<ViewerIdentity> {
 		try {
 			const response = await fetchImpl(LINEAR_GRAPHQL_URL, {
 				body: JSON.stringify({
-					query: '{ viewer { email name } organization { name urlKey } }',
+					query: '{ viewer { id email name } organization { id name urlKey } }',
 				}),
 				headers: {
 					authorization: `Bearer ${accessToken}`,
@@ -473,15 +375,17 @@ export function createLinearAuthService({
 
 			const payload = (await response.json()) as {
 				data?: {
-					organization?: { name?: string; urlKey?: string };
-					viewer?: { email?: string; name?: string };
+					organization?: { id?: string; name?: string; urlKey?: string };
+					viewer?: { email?: string; id?: string; name?: string };
 				};
 			};
 
 			return {
+				organizationId: payload.data?.organization?.id ?? null,
 				organizationName: payload.data?.organization?.name ?? null,
 				organizationUrlKey: payload.data?.organization?.urlKey ?? null,
 				userEmail: payload.data?.viewer?.email ?? null,
+				userId: payload.data?.viewer?.id ?? null,
 				userName: payload.data?.viewer?.name ?? null,
 			};
 		} catch {
@@ -512,23 +416,12 @@ export function createLinearAuthService({
 	}
 
 	/**
-	 * Persist an access token, plus the refresh token when the response carries one.
-	 * @param tokens - Token set to write to the secret store
-	 */
-	async function persistTokens(tokens: TokenResponse): Promise<void> {
-		await writeSecret(ACCESS_TOKEN_KEY, tokens.accessToken);
-
-		if (tokens.refreshToken) {
-			await writeSecret(REFRESH_TOKEN_KEY, tokens.refreshToken);
-		}
-	}
-
-	/**
-	 * Exchange the stored refresh token for a new access token and update the
-	 * persisted tokens and connection metadata.
+	 * Exchange one account's refresh token for a new access token and update its
+	 * stored tokens and grant metadata.
+	 * @param accountId - Account whose grant is being refreshed
 	 * @returns The freshly issued access token
 	 */
-	async function refreshAccessToken(): Promise<string> {
+	async function refreshAccessToken(accountId: string): Promise<string> {
 		const config = getOauthConfig();
 
 		if (!config) {
@@ -538,50 +431,92 @@ export function createLinearAuthService({
 			);
 		}
 
-		const refreshToken = await readSecret(REFRESH_TOKEN_KEY);
+		const store = getAccountStore();
+		const refreshToken = await store.readRefreshToken(accountId);
 
 		if (!refreshToken) {
+			store.recordError(accountId, 'refresh-failed');
 			throw new LinearAuthError(
 				'refresh-failed',
-				'No Linear refresh token is stored. Reconnect Linear to continue.',
+				'No Linear refresh token is stored for this account. Reconnect it to continue.',
 			);
 		}
 
-		const clientSecret = await readSecret(CLIENT_SECRET_KEY);
-		const tokens = await requestToken({
-			client_id: config.clientId,
-			...(clientSecret ? { client_secret: clientSecret } : {}),
-			grant_type: 'refresh_token',
-			refresh_token: refreshToken,
-		});
+		const clientSecret = await readClientSecret();
 
-		await persistTokens(tokens);
+		try {
+			const tokens = await requestToken({
+				client_id: config.clientId,
+				...(clientSecret ? { client_secret: clientSecret } : {}),
+				grant_type: 'refresh_token',
+				refresh_token: refreshToken,
+			});
 
-		const existing = readConnectionMetadata();
-		writeConnectionMetadata({
-			expiresAt: tokens.expiresAt,
-			hasRefreshToken:
-				tokens.refreshToken !== null || existing?.hasRefreshToken === true,
-			organizationName: existing?.organizationName ?? null,
-			organizationUrlKey: existing?.organizationUrlKey ?? null,
-			scopes:
-				tokens.scopes.length > 0 ? tokens.scopes : (existing?.scopes ?? []),
-			userEmail: existing?.userEmail ?? null,
-			userName: existing?.userName ?? null,
-		});
+			await store.writeTokens(accountId, tokens);
+			store.recordGrant(accountId, {
+				canRefresh:
+					tokens.refreshToken !== null ||
+					store.get(accountId)?.canRefresh === true,
+				expiresAt: tokens.expiresAt,
+				scopes:
+					tokens.scopes.length > 0
+						? tokens.scopes
+						: (store.get(accountId)?.scopes ?? []),
+			});
 
-		return tokens.accessToken;
+			return tokens.accessToken;
+		} catch (error) {
+			store.recordError(
+				accountId,
+				error instanceof LinearAuthError ? error.code : 'refresh-failed',
+			);
+			throw error;
+		}
+	}
+
+	/**
+	 * Drop an account adopted without a resolved identity once the real identity
+	 * for the same organization arrives, so adoption offline cannot leave a
+	 * duplicate behind.
+	 *
+	 * Matching requires a url key on both sides. An adopted row whose organization
+	 * could not be named at all matches nothing: deleting it on the strength of
+	 * "it is unidentified and so is any organization" would take an unrelated
+	 * account's row, its Keychain entries, and — through the cascade — its whole
+	 * cached issue list, on the user's next login to a different organization.
+	 * @param store - Account store to clean up
+	 * @param viewer - Identity resolved by the completed login
+	 */
+	async function replaceUnresolvedAccount(
+		store: LinearAccountStore,
+		viewer: ViewerIdentity,
+	): Promise<void> {
+		if (viewer.organizationUrlKey === null) {
+			return;
+		}
+
+		const stale = store
+			.list()
+			.find(
+				(account) =>
+					account.organizationId === UNRESOLVED_ORGANIZATION_ID &&
+					account.organizationUrlKey === viewer.organizationUrlKey,
+			);
+
+		if (stale) {
+			await store.delete(stale.id);
+		}
 	}
 
 	/**
 	 * Finish the OAuth login: validate the callback, exchange the code for tokens,
-	 * persist them with viewer metadata, and return the connection snapshot.
+	 * persist them against the resolved account, and return its snapshot.
 	 * @param searchParams - Query params from the OAuth callback URL
 	 * @param expectedState - State value expected to match the callback
 	 * @param verifier - PKCE code verifier for the token exchange
 	 * @param redirectUri - Redirect URI used in the authorization request
 	 * @param config - Resolved Linear OAuth client config
-	 * @returns The connection snapshot after a successful login
+	 * @returns The snapshot of the account that was connected
 	 */
 	async function completeLogin(
 		searchParams: URLSearchParams,
@@ -589,7 +524,7 @@ export function createLinearAuthService({
 		verifier: string,
 		redirectUri: string,
 		config: LinearOauthConfig,
-	): Promise<LinearConnectionSnapshot> {
+	): Promise<LinearAccountSnapshot> {
 		const parsed = parseOauthCallback({ expectedState, searchParams });
 
 		if (!parsed.ok) {
@@ -601,7 +536,9 @@ export function createLinearAuthService({
 			);
 		}
 
-		const clientSecret = await readSecret(CLIENT_SECRET_KEY);
+		requireSecretStore();
+
+		const clientSecret = await readClientSecret();
 		const tokens = await requestToken({
 			client_id: config.clientId,
 			...(clientSecret ? { client_secret: clientSecret } : {}),
@@ -611,17 +548,37 @@ export function createLinearAuthService({
 			redirect_uri: redirectUri,
 		});
 
-		await persistTokens(tokens);
-
 		const viewer = await fetchViewer(tokens.accessToken);
-		writeConnectionMetadata({
+
+		if (!viewer.organizationId || !viewer.userId) {
+			throw new LinearAuthError(
+				'exchange-failed',
+				'Linear did not identify the signed-in user, so the account could not be saved.',
+			);
+		}
+
+		const store = await getAdoptedStore();
+		await replaceUnresolvedAccount(store, viewer);
+
+		const account = store.upsertIdentity({
+			canRefresh: tokens.refreshToken !== null,
 			expiresAt: tokens.expiresAt,
-			hasRefreshToken: tokens.refreshToken !== null,
+			organizationId: viewer.organizationId,
+			organizationName: viewer.organizationName,
+			organizationUrlKey: viewer.organizationUrlKey,
 			scopes: tokens.scopes.length > 0 ? tokens.scopes : [...config.scopes],
-			...viewer,
+			userEmail: viewer.userEmail,
+			userId: viewer.userId,
+			userName: viewer.userName,
 		});
 
-		return buildSnapshot('connected', readConnectionMetadata());
+		await store.writeTokens(account.id, tokens);
+
+		if (tokens.refreshToken === null) {
+			await store.clearRefreshToken(account.id);
+		}
+
+		return snapshotOf(account);
 	}
 
 	return {
@@ -629,14 +586,11 @@ export function createLinearAuthService({
 			await pendingLogin?.cancel();
 		},
 
-		disconnect: async () => {
+		disconnect: async (accountId) => {
 			try {
-				const accessToken = await readSecret(ACCESS_TOKEN_KEY).catch(
-					() => null,
-				);
-				const refreshToken = await readSecret(REFRESH_TOKEN_KEY).catch(
-					() => null,
-				);
+				const store = await getAdoptedStore();
+				const accessToken = await store.readAccessToken(accountId);
+				const refreshToken = await store.readRefreshToken(accountId);
 
 				// Refresh token first: revoking it invalidates the whole grant.
 				if (refreshToken) {
@@ -647,69 +601,56 @@ export function createLinearAuthService({
 					await revokeToken(accessToken, 'access_token');
 				}
 
-				await deleteSecret(ACCESS_TOKEN_KEY);
-				await deleteSecret(REFRESH_TOKEN_KEY);
-				deleteConnectionMetadata();
+				await store.delete(accountId);
+				refreshInFlight.delete(accountId);
 
-				const state = getOauthConfig() ? 'disconnected' : 'not-configured';
+				const accounts = store.list().map(snapshotOf);
 
 				return {
-					snapshot: buildSnapshot(
-						state === 'disconnected' ? 'disconnected' : 'not-configured',
-						null,
-					),
 					status: 'disconnected',
+					summary: { accounts, state: summarizeState(accounts) },
 				};
 			} catch (error) {
 				return { failure: toFailure(error), status: 'error' };
 			}
 		},
 
-		getAccessToken: async () => {
-			const accessToken = await readSecret(ACCESS_TOKEN_KEY);
+		getAccessToken: async (accountId) => {
+			const store = await getAdoptedStore();
+			const accessToken = await store.readAccessToken(accountId);
 
 			if (!accessToken) {
 				throw new LinearAuthError(
 					'not-connected',
-					'Linear is not connected. Sign in from integration settings.',
+					'This Linear account is not connected. Sign in from integration settings.',
 				);
 			}
 
-			const metadata = readConnectionMetadata();
-
-			if (!isExpired(metadata?.expiresAt ?? null)) {
+			if (!isExpired(store.get(accountId)?.expiresAt ?? null)) {
 				return accessToken;
 			}
 
-			refreshInFlight ??= refreshAccessToken().finally(() => {
-				refreshInFlight = null;
-			});
+			const inFlight =
+				refreshInFlight.get(accountId) ??
+				refreshAccessToken(accountId).finally(() => {
+					refreshInFlight.delete(accountId);
+				});
+			refreshInFlight.set(accountId, inFlight);
 
-			return refreshInFlight;
+			return inFlight;
 		},
 
-		getConnectionStatus: async () => {
+		getConnectionSummary: async () => {
 			if (!getOauthConfig()) {
-				return buildSnapshot('not-configured', readConnectionMetadata());
+				return { accounts: [], state: 'not-configured' };
 			}
 
-			const accessToken = await readSecret(ACCESS_TOKEN_KEY).catch(() => null);
+			const accounts = (await getAdoptedStore()).list().map(snapshotOf);
 
-			if (!accessToken) {
-				return buildSnapshot('disconnected', null);
-			}
-
-			const metadata = readConnectionMetadata();
-
-			if (
-				isExpired(metadata?.expiresAt ?? null) &&
-				!metadata?.hasRefreshToken
-			) {
-				return buildSnapshot('reconnect-required', metadata);
-			}
-
-			return buildSnapshot('connected', metadata);
+			return { accounts, state: summarizeState(accounts) };
 		},
+
+		listAccounts: async () => (await getAdoptedStore()).list().map(snapshotOf),
 
 		startLogin: async () => {
 			const config = getOauthConfig();
@@ -735,6 +676,9 @@ export function createLinearAuthService({
 				};
 			}
 
+			const slot: PendingLogin = { cancel: async () => undefined };
+			pendingLogin = slot;
+
 			const { challenge, verifier } = createPkcePair();
 			const state = createOauthState();
 
@@ -742,12 +686,15 @@ export function createLinearAuthService({
 
 			try {
 				server = await startLinearOauthCallbackServer({
+					language: getLanguage(),
 					...(callbackPorts === undefined ? {} : { ports: callbackPorts }),
 					...(callbackTimeoutMs === undefined
 						? {}
 						: { timeoutMs: callbackTimeoutMs }),
 				});
 			} catch (error) {
+				releasePendingLogin(slot);
+
 				return {
 					failure: {
 						code: 'callback-failed',
@@ -757,7 +704,7 @@ export function createLinearAuthService({
 				};
 			}
 
-			pendingLogin = { cancel: () => server.close() };
+			slot.cancel = () => server.close();
 
 			try {
 				await openExternal(
@@ -771,7 +718,7 @@ export function createLinearAuthService({
 				);
 
 				const searchParams = await server.waitForCallback();
-				const snapshot = await completeLogin(
+				const account = await completeLogin(
 					searchParams,
 					state,
 					verifier,
@@ -779,68 +726,16 @@ export function createLinearAuthService({
 					config,
 				);
 
-				return { snapshot, status: 'connected' };
+				return { account, status: 'connected' };
 			} catch (error) {
 				return { failure: toFailure(error), status: 'error' };
 			} finally {
-				pendingLogin = null;
+				releasePendingLogin(slot);
 				await server.close();
 			}
 		},
 	};
 }
 
-/**
- * Build an all-null viewer/organization record used as a fallback.
- * @returns A viewer record with every field set to null
- */
-function nullViewer() {
-	return {
-		organizationName: null,
-		organizationUrlKey: null,
-		userEmail: null,
-		userName: null,
-	};
-}
-
-/**
- * Map a thrown error to a structured Linear auth failure for the renderer.
- * @param error - The caught error
- * @returns The corresponding failure with a code and message
- */
-function toFailure(error: unknown): LinearAuthFailure {
-	if (error instanceof LinearAuthError) {
-		return { code: error.code, message: error.message };
-	}
-
-	if (error instanceof LinearOauthCallbackError) {
-		return {
-			code:
-				error.code === 'callback-timeout'
-					? 'callback-timeout'
-					: 'login-canceled',
-			message: error.message,
-		};
-	}
-
-	return { code: 'callback-failed', message: formatError(error) };
-}
-
-/**
- * Extract a human-readable message from an unknown error value.
- * @param error - The value to format
- * @returns The error message, or the value stringified
- */
-function formatError(error: unknown): string {
-	return error instanceof Error ? error.message : String(error);
-}
-
-/**
- * Truncate text to a maximum length, appending an ellipsis when shortened.
- * @param text - Text to truncate
- * @param maxLength - Maximum length before truncation
- * @returns The original text, or a truncated copy with a trailing ellipsis
- */
-function truncate(text: string, maxLength: number): string {
-	return text.length > maxLength ? `${text.slice(0, maxLength)}…` : text;
-}
+/** Re-exported so callers keep importing the auth error from the service. */
+export { LinearAuthError } from './linear-auth-error.ts';

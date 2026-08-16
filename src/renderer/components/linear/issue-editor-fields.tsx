@@ -1,8 +1,8 @@
 import type { TFunction } from 'i18next';
+import { FolderIcon, RefreshCwIcon, UserIcon, UsersIcon } from 'lucide-react';
+import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { Badge } from '@/renderer/components/ui/badge';
-import { Input } from '@/renderer/components/ui/input';
 import {
 	Select,
 	SelectContent,
@@ -10,22 +10,39 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from '@/renderer/components/ui/select';
-import { UNSET_FIELD } from '@/renderer/lib/linear';
+import {
+	describeLinearAccountFailures,
+	resolveLinearStateBucket,
+	UNSET_FIELD,
+} from '@/renderer/lib/linear';
+import { cn } from '@/renderer/lib/utils';
 import type { LinearIssueEditorFields } from '@/renderer/types/linear';
 import type {
+	LinearAccountFailure,
 	LinearMetadataWire,
 	LinearResourceWire,
 } from '@/shared/ipc/contracts/linear';
 
+import { IssueEditorDueDate } from './issue-editor-due-date';
+import { IssueEditorLabelPicker } from './issue-editor-labels';
+import { LinearPriorityIcon, LinearStateIcon } from './issue-glyphs';
+
+/** One row of a picker: the value, its label, and the glyph that fronts it. */
+interface EditorOption {
+	icon?: ReactNode;
+	label: string;
+	value: string;
+}
+
 /**
- * Linear's five priority levels as picker options, built per render so the
- * labels follow the active language.
+ * Linear's five priority levels as picker options, each fronted by the same
+ * bar glyph the issue list uses so the two surfaces read alike. `0` is one of
+ * the five rather than an unset sentinel: it is how Linear stores a priority
+ * that was deliberately cleared.
  * @param t - Translation function from the calling component
- * @returns Priority options in the select's own shape
+ * @returns Priority options in the picker's own shape
  */
-function buildPriorityOptions(
-	t: TFunction,
-): Array<{ label: string; value: string }> {
+function buildPriorityOptions(t: TFunction): EditorOption[] {
 	return [
 		{
 			label: t('linear:issue-editor.priority.none', 'No priority'),
@@ -35,14 +52,36 @@ function buildPriorityOptions(
 		{ label: t('linear:issue-editor.priority.high', 'High'), value: '2' },
 		{ label: t('linear:issue-editor.priority.medium', 'Medium'), value: '3' },
 		{ label: t('linear:issue-editor.priority.low', 'Low'), value: '4' },
-	];
+	].map((option) => ({
+		...option,
+		icon: <LinearPriorityIcon priority={Number(option.value)} />,
+	}));
 }
 
 /** Shared shape of the editor's picker sections: current fields plus the patch sink. */
 interface IssueEditorSectionProps {
+	/** Account the edited issue belongs to; narrows every picker to its rows. */
+	accountId: string | null;
 	fields: LinearIssueEditorFields;
 	metadata: LinearMetadataWire | null;
 	update: (patch: Partial<LinearIssueEditorFields>) => void;
+}
+
+/**
+ * Narrow Linear resources to one account's rows. Metadata arrives merged across
+ * every connected account, and an id from one organization is never valid in
+ * another — a state picker offering both would build a request Linear rejects.
+ * @param resources - Merged Linear resources
+ * @param accountId - Account to keep, or null before a team is chosen
+ * @returns The account's resources, or all of them while no account is resolved
+ */
+function filterByAccount(
+	resources: LinearResourceWire[],
+	accountId: string | null,
+): LinearResourceWire[] {
+	return accountId === null
+		? resources
+		: resources.filter((resource) => resource.accountId === accountId);
 }
 
 /**
@@ -65,53 +104,134 @@ function filterByTeam(
 }
 
 /**
- * Turn Linear resources into the `{ label, value }` pairs {@link EditorSelect}
- * renders, so every picker reads the same way.
- * @param resources - Named Linear resources such as teams, users, or projects
- * @returns Options in the select's own shape
+ * Turn Linear resources into the options {@link EditorSelect} renders, so every
+ * picker reads the same way.
+ * @param resources - Named Linear resources such as users, projects, or cycles
+ * @param icon - Glyph drawn ahead of each name
+ * @returns Options in the picker's own shape
  */
 function toOptions(
-	resources: Array<{ id: string; name: string }> | undefined,
-): Array<{ label: string; value: string }> {
-	return (resources ?? []).map((resource) => ({
+	resources: LinearResourceWire[],
+	icon?: ReactNode,
+): EditorOption[] {
+	return resources.map((resource) => ({
+		icon,
 		label: resource.name,
 		value: resource.id,
 	}));
 }
 
-/** Labeled select used for the issue editor's picker fields, with an optional "none" option. */
+/**
+ * Workflow states as options, each drawn with the ring glyph in the state's own
+ * Linear color so status reads before its name does.
+ * @param states - The team's workflow states
+ * @returns Options in the picker's own shape
+ */
+function toStateOptions(states: LinearResourceWire[]): EditorOption[] {
+	return states.map((state) => ({
+		icon: (
+			<LinearStateIcon
+				bucket={resolveLinearStateBucket({ stateType: state.type })}
+				color={state.color}
+			/>
+		),
+		label: state.name,
+		value: state.id,
+	}));
+}
+
+/**
+ * Cycles as options, named by their number when the team never named the
+ * iteration itself — Linear returns `name: null` there, and the id it is
+ * replaced with printed a raw UUID in the picker.
+ * @param cycles - The team's cycles
+ * @param t - Translation function from the calling component
+ * @returns Options in the picker's own shape
+ */
+function toCycleOptions(
+	cycles: LinearResourceWire[],
+	t: TFunction,
+): EditorOption[] {
+	return cycles.map((cycle) => ({
+		icon: <RefreshCwIcon className='text-muted-foreground' />,
+		label: describeCycle(cycle, t),
+		value: cycle.id,
+	}));
+}
+
+/**
+ * Name one cycle: its own name when a team gave it one, otherwise the number
+ * Linear counts it by.
+ * @param cycle - Cycle resource from the metadata cache
+ * @param t - Translation function from the calling component
+ * @returns The name to show in the picker
+ */
+function describeCycle(cycle: LinearResourceWire, t: TFunction): string {
+	const named = cycle.name.length > 0 && cycle.name !== cycle.id;
+
+	if (named || cycle.key === null) {
+		return cycle.name;
+	}
+
+	return t('linear:issue-editor.cycle-number', 'Cycle {{number}}', {
+		number: cycle.key,
+	});
+}
+
+/**
+ * Compact pill select used across the editor's meta row. An unset field shows
+ * the field's own name rather than a `Status: none` sentence, so the row scans
+ * as a set of chips instead of a paragraph. The sentinel is passed to Radix as
+ * the value rather than `undefined`, which it reads as "uncontrolled" and would
+ * leave the pill showing a stale selection after a reset.
+ */
 function EditorSelect({
-	allowUnset = false,
-	'aria-label': ariaLabel,
+	ariaLabel,
+	className,
+	disabled,
+	emptyIcon,
 	onChange,
 	options,
 	placeholder,
+	unsetLabel,
 	value,
 }: {
-	allowUnset?: boolean;
-	'aria-label': string;
+	ariaLabel: string;
+	className?: string;
+	disabled?: boolean;
+	emptyIcon: ReactNode;
 	onChange: (value: string) => void;
-	options: Array<{ label: string; value: string }>;
+	options: EditorOption[];
 	placeholder: string;
-	value: string | undefined;
+	unsetLabel?: string;
+	value: string;
 }) {
-	const { t } = useTranslation();
+	const isUnset = value === UNSET_FIELD || value === '';
+	const selectedOption = options.find((option) => option.value === value);
 
 	return (
-		<Select onValueChange={onChange} value={value}>
-			<SelectTrigger aria-label={ariaLabel} size='sm'>
-				<SelectValue placeholder={placeholder} />
+		<Select
+			disabled={disabled}
+			onValueChange={onChange}
+			value={isUnset ? UNSET_FIELD : value}
+		>
+			<SelectTrigger
+				aria-label={ariaLabel}
+				className={cn(className, isUnset ? 'text-muted-foreground' : null)}
+				size='sm'
+			>
+				{isUnset ? emptyIcon : selectedOption?.icon}
+				<SelectValue>
+					{isUnset ? placeholder : selectedOption?.label}
+				</SelectValue>
 			</SelectTrigger>
 			<SelectContent>
-				{allowUnset ? (
-					<SelectItem value={UNSET_FIELD}>
-						{t('linear:issue-editor.unset-option', '{{field}}: none', {
-							field: placeholder,
-						})}
-					</SelectItem>
+				{unsetLabel ? (
+					<SelectItem value={UNSET_FIELD}>{unsetLabel}</SelectItem>
 				) : null}
 				{options.map((option) => (
 					<SelectItem key={option.value} value={option.value}>
+						{option.icon}
 						{option.label}
 					</SelectItem>
 				))}
@@ -121,18 +241,132 @@ function EditorSelect({
 }
 
 /**
- * The issue editor's picker grid: team (creation only), status, priority,
- * assignee, project, cycle, and due date. Status and cycle narrow to the
- * selected team, and switching team clears the fields that team scoped.
+ * Team picker for a new issue. It sits above the rest because the chosen team
+ * decides the account, and every other picker narrows to it. An account the
+ * merged read could not reach is named in the list, so a short roster of teams
+ * is not mistaken for the whole one.
  */
-export function IssueEditorFieldGrid({
+export function IssueEditorTeamPicker({
+	accountFailures,
+	metadata,
+	onChange,
+	value,
+}: {
+	accountFailures: readonly LinearAccountFailure[];
+	metadata: LinearMetadataWire | null;
+	onChange: (teamId: string) => void;
+	value: string;
+}) {
+	const { t } = useTranslation();
+	const label = t('linear:issue-editor.field.team', 'Team');
+	const teams = metadata?.teams ?? [];
+	const spansAccounts = new Set(teams.map((team) => team.accountId)).size > 1;
+	const selected = teams.find((team) => team.id === value);
+
+	return (
+		<Select onValueChange={onChange} value={value || undefined}>
+			<SelectTrigger aria-label={label} className='max-w-52' size='sm'>
+				{selected ? null : <UsersIcon className='text-muted-foreground' />}
+				<SelectValue placeholder={label}>{selected?.name}</SelectValue>
+			</SelectTrigger>
+			{/* Radix aligns the menu to an item, and bails without positioning when
+			    there is none — so a teamless menu anchors to the trigger instead. */}
+			<SelectContent position={teams.length === 0 ? 'popper' : 'item-aligned'}>
+				{accountFailures.length > 0 ? (
+					<p className='max-w-72 text-pretty px-2 py-1.5 text-status-warning text-xs'>
+						{describeLinearAccountFailures(accountFailures)}
+					</p>
+				) : null}
+				{teams.length === 0 && accountFailures.length === 0 ? (
+					<p className='max-w-72 text-pretty px-2 py-1.5 text-muted-foreground text-xs'>
+						{t(
+							'linear:issue-editor.teams-empty',
+							'No teams have loaded from your connected Linear accounts yet.',
+						)}
+					</p>
+				) : null}
+				{teams.map((team) => (
+					<SelectItem key={team.id} value={team.id}>
+						<span className='flex flex-col items-start'>
+							{team.name}
+							{spansAccounts && team.organizationName ? (
+								<span className='text-muted-foreground text-xs'>
+									{team.organizationName}
+								</span>
+							) : null}
+						</span>
+					</SelectItem>
+				))}
+			</SelectContent>
+		</Select>
+	);
+}
+
+/**
+ * Narrow every merged resource list the meta row offers down to what the issue
+ * being edited can actually reference: the selected team's account first, then
+ * the team itself. Empty until a team is chosen — a merged list spanning
+ * accounts offers ids the target team would reject.
+ * @param metadata - Linear metadata merged across every connected account
+ * @param accountId - Account the selected team belongs to, or null before one is chosen
+ * @param teamId - Selected team, or an unset sentinel
+ * @returns The scoped resource lists, plus whether a team is selected at all
+ */
+function scopeEditorResources(
+	metadata: LinearMetadataWire | null,
+	accountId: string | null,
+	teamId: string,
+): {
+	cycles: LinearResourceWire[];
+	hasTeam: boolean;
+	labels: LinearResourceWire[];
+	projects: LinearResourceWire[];
+	states: LinearResourceWire[];
+	users: LinearResourceWire[];
+} {
+	const hasTeam = teamId !== '' && teamId !== UNSET_FIELD;
+
+	if (!hasTeam) {
+		return {
+			cycles: [],
+			hasTeam,
+			labels: [],
+			projects: [],
+			states: [],
+			users: [],
+		};
+	}
+
+	const forAccount = (resources: LinearResourceWire[] | undefined) =>
+		filterByAccount(resources ?? [], accountId);
+	const forTeam = (resources: LinearResourceWire[] | undefined) =>
+		filterByTeam(forAccount(resources), teamId);
+
+	return {
+		cycles: forTeam(metadata?.cycles),
+		hasTeam,
+		labels: forTeam(metadata?.labels),
+		projects: forAccount(metadata?.projects),
+		states: forTeam(metadata?.states),
+		users: forAccount(metadata?.users),
+	};
+}
+
+/**
+ * The editor's meta row: status, priority, assignee, project, cycle, due date,
+ * and labels as one wrapping band of pills. Everything the team scopes stays
+ * disabled until a team is chosen, because a merged list spanning accounts
+ * offers ids the target team would reject.
+ */
+export function IssueEditorMetaRow({
+	accountId,
 	fields,
 	metadata,
-	mode,
 	update,
-}: IssueEditorSectionProps & { mode: 'create' | 'edit' }) {
+}: IssueEditorSectionProps) {
 	const { t } = useTranslation();
-	const teamLabel = t('linear:issue-editor.field.team', 'Team');
+	const { cycles, hasTeam, labels, projects, states, users } =
+		scopeEditorResources(metadata, accountId, fields.teamId);
 	const statusLabel = t('linear:issue-editor.field.status', 'Status');
 	const priorityLabel = t('linear:issue-editor.field.priority', 'Priority');
 	const assigneeLabel = t('linear:issue-editor.field.assignee', 'Assignee');
@@ -140,112 +374,79 @@ export function IssueEditorFieldGrid({
 	const cycleLabel = t('linear:issue-editor.field.cycle', 'Cycle');
 
 	return (
-		<div className='grid grid-cols-2 gap-2'>
-			{mode === 'create' ? (
-				<EditorSelect
-					aria-label={teamLabel}
-					onChange={(teamId) =>
-						update({
-							cycleId: UNSET_FIELD,
-							labelIds: [],
-							stateId: UNSET_FIELD,
-							teamId,
-						})
-					}
-					options={toOptions(metadata?.teams)}
-					placeholder={teamLabel}
-					value={fields.teamId || undefined}
-				/>
-			) : null}
+		<div className='flex flex-wrap items-center gap-1.5'>
 			<EditorSelect
-				aria-label={statusLabel}
-				allowUnset
+				ariaLabel={statusLabel}
+				className='max-w-48'
+				disabled={!hasTeam}
+				emptyIcon={<LinearStateIcon bucket='unstarted' />}
 				onChange={(stateId) => update({ stateId })}
-				options={toOptions(filterByTeam(metadata?.states ?? [], fields.teamId))}
+				options={toStateOptions(states)}
 				placeholder={statusLabel}
+				unsetLabel={t('linear:issue-editor.status-none', 'No status')}
 				value={fields.stateId}
 			/>
 			<EditorSelect
-				aria-label={priorityLabel}
-				allowUnset
+				ariaLabel={priorityLabel}
+				className='max-w-40'
+				emptyIcon={<LinearPriorityIcon priority={null} />}
 				onChange={(priority) => update({ priority })}
 				options={buildPriorityOptions(t)}
 				placeholder={priorityLabel}
 				value={fields.priority}
 			/>
 			<EditorSelect
-				aria-label={assigneeLabel}
-				allowUnset
+				ariaLabel={assigneeLabel}
+				className='max-w-48'
+				disabled={!hasTeam}
+				emptyIcon={<UserIcon className='text-muted-foreground' />}
 				onChange={(assigneeId) => update({ assigneeId })}
-				options={toOptions(metadata?.users)}
+				options={toOptions(
+					users,
+					<UserIcon className='text-muted-foreground' />,
+				)}
 				placeholder={assigneeLabel}
+				unsetLabel={t('linear:issue-editor.assignee-none', 'Unassigned')}
 				value={fields.assigneeId}
 			/>
-			<EditorSelect
-				aria-label={projectLabel}
-				allowUnset
-				onChange={(projectId) => update({ projectId })}
-				options={toOptions(metadata?.projects)}
-				placeholder={projectLabel}
-				value={fields.projectId}
-			/>
-			<EditorSelect
-				aria-label={cycleLabel}
-				allowUnset
-				onChange={(cycleId) => update({ cycleId })}
-				options={toOptions(filterByTeam(metadata?.cycles ?? [], fields.teamId))}
-				placeholder={cycleLabel}
-				value={fields.cycleId}
-			/>
-			<Input
-				aria-label={t('linear:issue-editor.field.due-date', 'Due date')}
-				onChange={(event) => update({ dueDate: event.target.value })}
-				type='date'
+			{hasTeam && projects.length === 0 ? null : (
+				<EditorSelect
+					ariaLabel={projectLabel}
+					className='max-w-56'
+					disabled={!hasTeam}
+					emptyIcon={<FolderIcon className='text-muted-foreground' />}
+					onChange={(projectId) => update({ projectId })}
+					options={toOptions(
+						projects,
+						<FolderIcon className='text-muted-foreground' />,
+					)}
+					placeholder={projectLabel}
+					unsetLabel={t('linear:issue-editor.project-none', 'No project')}
+					value={fields.projectId}
+				/>
+			)}
+			{hasTeam && cycles.length === 0 ? null : (
+				<EditorSelect
+					ariaLabel={cycleLabel}
+					className='max-w-40'
+					disabled={!hasTeam}
+					emptyIcon={<RefreshCwIcon className='text-muted-foreground' />}
+					onChange={(cycleId) => update({ cycleId })}
+					options={toCycleOptions(cycles, t)}
+					placeholder={cycleLabel}
+					unsetLabel={t('linear:issue-editor.cycle-none', 'No cycle')}
+					value={fields.cycleId}
+				/>
+			)}
+			<IssueEditorDueDate
+				onChange={(dueDate) => update({ dueDate })}
 				value={fields.dueDate}
 			/>
-		</div>
-	);
-}
-
-/**
- * Toggleable label chips for the selected team, hidden entirely when the team
- * exposes none.
- */
-export function IssueEditorLabelPicker({
-	fields,
-	metadata,
-	update,
-}: IssueEditorSectionProps) {
-	const teamLabels = filterByTeam(metadata?.labels ?? [], fields.teamId);
-	const selectedLabelIds = new Set(fields.labelIds);
-
-	if (teamLabels.length === 0) {
-		return null;
-	}
-
-	return (
-		<div className='flex flex-wrap items-center gap-1.5'>
-			{teamLabels.map((label) => {
-				const selected = selectedLabelIds.has(label.id);
-
-				return (
-					<button
-						key={label.id}
-						onClick={() =>
-							update({
-								labelIds: selected
-									? fields.labelIds.filter((id) => id !== label.id)
-									: [...fields.labelIds, label.id],
-							})
-						}
-						type='button'
-					>
-						<Badge variant={selected ? 'default' : 'outline'}>
-							{label.name}
-						</Badge>
-					</button>
-				);
-			})}
+			<IssueEditorLabelPicker
+				labels={labels}
+				onChange={(labelIds) => update({ labelIds })}
+				selectedIds={fields.labelIds}
+			/>
 		</div>
 	);
 }

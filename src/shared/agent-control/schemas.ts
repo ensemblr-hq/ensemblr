@@ -215,22 +215,30 @@ const resolveDiffCommentsSchema = z.strictObject({
 	commentIds: z.array(nonEmpty).min(1).max(DIFF_COMMENT_LIMITS.maxComments),
 });
 
+// Several Linear accounts can be connected at once. `accountId` stays optional
+// on every op because the port resolves it — from the entity named, from the
+// calling workspace's linked issue, or from the only account there is — and
+// refuses with the account list rather than guessing when it cannot.
 const linearListIssuesSchema = z.strictObject({
+	accountId: nonEmpty.optional(),
 	query: nonEmpty.optional(),
 	teamId: nonEmpty.optional(),
 	refresh: z.boolean().optional(),
 });
 
 const linearGetIssueSchema = z.strictObject({
+	accountId: nonEmpty.optional(),
 	issueId: nonEmpty,
 	refresh: z.boolean().optional(),
 });
 
 const linearGetMetadataSchema = z.strictObject({
+	accountId: nonEmpty.optional(),
 	refresh: z.boolean().optional(),
 });
 
 const linearCreateCommentSchema = z.strictObject({
+	accountId: nonEmpty.optional(),
 	issueId: nonEmpty,
 	commentBody: nonEmpty.max(LINEAR_AGENT_LIMITS.maxCommentLength),
 });
@@ -249,6 +257,7 @@ const linearPriority = z.number().int().min(0).max(4);
 
 const linearUpdateIssueSchema = z
 	.strictObject({
+		accountId: nonEmpty.optional(),
 		issueId: nonEmpty,
 		stateId: nonEmpty.optional(),
 		assigneeId: nonEmpty.optional(),

@@ -73,7 +73,7 @@ export function useIssueAttachments({
 			(issue: LinearIssueWire) =>
 				attach('linear', issue.identifier, async () => {
 					const detail = await queryClient
-						.fetchQuery(linearIssueQuery(issue.id))
+						.fetchQuery(linearIssueQuery(issue.id, issue.accountId))
 						.catch(() => null);
 					return detail?.status === 'ok'
 						? formatLinearIssueDocument(detail.issue, detail.comments)

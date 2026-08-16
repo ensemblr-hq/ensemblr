@@ -13,6 +13,22 @@ import {
 import { openEnsemblrDatabase } from '../../src/main/storage/database.ts';
 
 const NOW = new Date('2026-06-11T00:00:00.000Z');
+const ACCOUNT = 'account-1';
+const OTHER_ACCOUNT = 'account-2';
+
+/**
+ * Inserts the account rows every cached row points at. The cache is scoped by
+ * account and the foreign keys are enforced, so a fixture without them cannot
+ * write a single issue.
+ */
+function seedAccounts(database: DatabaseSync): void {
+	const statement = database.prepare(
+		`INSERT INTO linear_accounts (id, organization_id, organization_name, user_id)
+		 VALUES (?, ?, ?, ?)`,
+	);
+	statement.run(ACCOUNT, 'org-1', 'Example Org', 'viewer-1');
+	statement.run(OTHER_ACCOUNT, 'org-2', 'Client Co', 'viewer-2');
+}
 
 function createFixture(t: TestContext): {
 	database: DatabaseSync;
@@ -27,6 +43,8 @@ function createFixture(t: TestContext): {
 		connection.database.close();
 		rmSync(directory, { force: true, recursive: true });
 	});
+
+	seedAccounts(connection.database);
 
 	return {
 		database: connection.database,
@@ -62,7 +80,7 @@ function createIssue(
 test('upsertIssues: inserts and reads back a full issue record', (t) => {
 	const { store } = createFixture(t);
 
-	store.upsertIssues([createIssue()]);
+	store.upsertIssues(ACCOUNT, [createIssue()]);
 	const issue = store.getIssue('issue-1');
 
 	assert.ok(issue);
@@ -75,8 +93,8 @@ test('upsertIssues: inserts and reads back a full issue record', (t) => {
 test('upsertIssues: re-upserting the same id is idempotent and refreshes fields', (t) => {
 	const { database, store } = createFixture(t);
 
-	store.upsertIssues([createIssue()]);
-	store.upsertIssues([
+	store.upsertIssues(ACCOUNT, [createIssue()]);
+	store.upsertIssues(ACCOUNT, [
 		createIssue({ stateId: 'state-2', title: 'Updated title' }),
 	]);
 
@@ -91,16 +109,19 @@ test('upsertIssues: re-upserting the same id is idempotent and refreshes fields'
 test('getIssueByIdentifier: resolves cached issues by human identifier', (t) => {
 	const { store } = createFixture(t);
 
-	store.upsertIssues([createIssue()]);
+	store.upsertIssues(ACCOUNT, [createIssue()]);
 
-	assert.strictEqual(store.getIssueByIdentifier('ENG-143')?.id, 'issue-1');
-	assert.strictEqual(store.getIssueByIdentifier('ENG-999'), null);
+	assert.strictEqual(
+		store.getIssueByIdentifier(ACCOUNT, 'ENG-143')?.id,
+		'issue-1',
+	);
+	assert.strictEqual(store.getIssueByIdentifier(ACCOUNT, 'ENG-999'), null);
 });
 
 test('listIssues: filters by team, query, and archive state', (t) => {
 	const { store } = createFixture(t);
 
-	store.upsertIssues([
+	store.upsertIssues(ACCOUNT, [
 		createIssue(),
 		createIssue({
 			id: 'issue-2',
@@ -138,7 +159,7 @@ test('listIssues: filters by team, query, and archive state', (t) => {
 test('listIssues: escapes SQL LIKE wildcards in the query', (t) => {
 	const { store } = createFixture(t);
 
-	store.upsertIssues([
+	store.upsertIssues(ACCOUNT, [
 		createIssue({ id: 'issue-2', identifier: 'ENG-150', title: '100% done' }),
 		createIssue(),
 	]);
@@ -152,7 +173,7 @@ test('listIssues: escapes SQL LIKE wildcards in the query', (t) => {
 test('upsertResources: stores metadata by kind and lists team-scoped entries', (t) => {
 	const { store } = createFixture(t);
 
-	store.upsertResources([
+	store.upsertResources(ACCOUNT, [
 		{ data: {}, id: 'team-1', kind: 'team', name: 'Theseus', teamId: null },
 		{ data: {}, id: 'state-1', kind: 'state', name: 'Todo', teamId: 'team-1' },
 		{
@@ -170,7 +191,9 @@ test('upsertResources: stores metadata by kind and lists team-scoped entries', (
 		['team-1'],
 	);
 	assert.deepStrictEqual(
-		store.listResources('state', 'team-1').map((resource) => resource.id),
+		store
+			.listResources('state', { teamId: 'team-1' })
+			.map((resource) => resource.id),
 		['state-3', 'state-1'],
 	);
 });
@@ -178,8 +201,8 @@ test('upsertResources: stores metadata by kind and lists team-scoped entries', (
 test('upsertComments: replaces comment content idempotently and orders by creation', (t) => {
 	const { store } = createFixture(t);
 
-	store.upsertIssues([createIssue()]);
-	store.upsertComments('issue-1', [
+	store.upsertIssues(ACCOUNT, [createIssue()]);
+	store.upsertComments(ACCOUNT, 'issue-1', [
 		{
 			authorName: 'Bob',
 			body: 'Second',
@@ -197,7 +220,7 @@ test('upsertComments: replaces comment content idempotently and orders by creati
 			remoteCreatedAt: '2026-06-10T10:00:00.000Z',
 		},
 	]);
-	store.upsertComments('issue-1', [
+	store.upsertComments(ACCOUNT, 'issue-1', [
 		{
 			authorName: 'Alice',
 			body: 'First (edited)',
@@ -218,8 +241,8 @@ test('upsertComments: replaces comment content idempotently and orders by creati
 test('deleteIssue: removes the issue and its cached comments', (t) => {
 	const { store } = createFixture(t);
 
-	store.upsertIssues([createIssue()]);
-	store.upsertComments('issue-1', [
+	store.upsertIssues(ACCOUNT, [createIssue()]);
+	store.upsertComments(ACCOUNT, 'issue-1', [
 		{
 			authorName: 'Alice',
 			body: 'First',
@@ -239,9 +262,10 @@ test('deleteIssue: removes the issue and its cached comments', (t) => {
 test('setSyncState: round-trips cursor and error bookkeeping', (t) => {
 	const { store } = createFixture(t);
 
-	assert.strictEqual(store.getSyncState('issues'), null);
+	assert.strictEqual(store.getSyncState(ACCOUNT, 'issues'), null);
 
 	store.setSyncState({
+		accountId: ACCOUNT,
 		cursor: 'cursor-1',
 		errorCode: null,
 		scope: 'issues',
@@ -249,6 +273,7 @@ test('setSyncState: round-trips cursor and error bookkeeping', (t) => {
 		syncedAt: NOW.toISOString(),
 	});
 	store.setSyncState({
+		accountId: ACCOUNT,
 		cursor: null,
 		errorCode: 'rate-limited',
 		scope: 'issues',
@@ -256,11 +281,117 @@ test('setSyncState: round-trips cursor and error bookkeeping', (t) => {
 		syncedAt: NOW.toISOString(),
 	});
 
-	assert.deepStrictEqual(store.getSyncState('issues'), {
+	assert.deepStrictEqual(store.getSyncState(ACCOUNT, 'issues'), {
+		accountId: ACCOUNT,
 		cursor: null,
 		errorCode: 'rate-limited',
 		scope: 'issues',
 		status: 'error',
 		syncedAt: NOW.toISOString(),
 	});
+});
+
+// `ENG-1` is unique inside a Linear organization but not between two of them, so
+// an identifier lookup that ignored the account would answer with whichever row
+// SQLite reached first.
+test('getIssueByIdentifier: keeps the same identifier apart across accounts', (t) => {
+	const { store } = createFixture(t);
+
+	store.upsertIssues(ACCOUNT, [createIssue()]);
+	store.upsertIssues(OTHER_ACCOUNT, [
+		createIssue({ id: 'issue-other', title: 'Same key, other org' }),
+	]);
+
+	assert.strictEqual(
+		store.getIssueByIdentifier(ACCOUNT, 'ENG-143')?.id,
+		'issue-1',
+	);
+	assert.strictEqual(
+		store.getIssueByIdentifier(OTHER_ACCOUNT, 'ENG-143')?.id,
+		'issue-other',
+	);
+});
+
+test('listIssues: merges every account by default and narrows on request', (t) => {
+	const { store } = createFixture(t);
+
+	store.upsertIssues(ACCOUNT, [createIssue()]);
+	store.upsertIssues(OTHER_ACCOUNT, [
+		createIssue({ id: 'issue-other', identifier: 'CLI-1' }),
+	]);
+
+	assert.strictEqual(store.listIssues().length, 2);
+	assert.deepStrictEqual(
+		store.listIssues({ accountId: OTHER_ACCOUNT }).map((issue) => issue.id),
+		['issue-other'],
+	);
+});
+
+test('listResources: narrows metadata to one account', (t) => {
+	const { store } = createFixture(t);
+
+	store.upsertResources(ACCOUNT, [
+		{ data: {}, id: 'team-1', kind: 'team', name: 'Theseus', teamId: null },
+	]);
+	store.upsertResources(OTHER_ACCOUNT, [
+		{ data: {}, id: 'team-9', kind: 'team', name: 'Client', teamId: null },
+	]);
+
+	assert.strictEqual(store.listResources('team').length, 2);
+	assert.deepStrictEqual(
+		store
+			.listResources('team', { accountId: OTHER_ACCOUNT })
+			.map((resource) => resource.id),
+		['team-9'],
+	);
+});
+
+// Disconnecting an account has to take its cached rows with it, or the browse
+// list keeps serving issues from an organization the user just signed out of.
+test('deleting an account cascades to its cached issues and sync state', (t) => {
+	const { database, store } = createFixture(t);
+
+	store.upsertIssues(ACCOUNT, [createIssue()]);
+	store.upsertIssues(OTHER_ACCOUNT, [createIssue({ id: 'issue-other' })]);
+	store.setSyncState({
+		accountId: ACCOUNT,
+		cursor: null,
+		errorCode: null,
+		scope: 'issues',
+		status: 'idle',
+		syncedAt: NOW.toISOString(),
+	});
+
+	database.prepare('DELETE FROM linear_accounts WHERE id = ?').run(ACCOUNT);
+
+	assert.strictEqual(store.getIssue('issue-1'), null);
+	assert.ok(store.getIssue('issue-other'));
+	assert.strictEqual(store.getSyncState(ACCOUNT, 'issues'), null);
+});
+
+test('setSyncState: keeps each account’s bookkeeping separate', (t) => {
+	const { store } = createFixture(t);
+
+	store.setSyncState({
+		accountId: ACCOUNT,
+		cursor: 'cursor-a',
+		errorCode: null,
+		scope: 'issues',
+		status: 'idle',
+		syncedAt: NOW.toISOString(),
+	});
+	store.setSyncState({
+		accountId: OTHER_ACCOUNT,
+		cursor: 'cursor-b',
+		errorCode: 'rate-limited',
+		scope: 'issues',
+		status: 'error',
+		syncedAt: NOW.toISOString(),
+	});
+
+	assert.strictEqual(store.getSyncState(ACCOUNT, 'issues')?.cursor, 'cursor-a');
+	assert.strictEqual(
+		store.getSyncState(OTHER_ACCOUNT, 'issues')?.status,
+		'error',
+	);
 });

@@ -243,6 +243,7 @@
 			"git-timeout": "Время проверки версии Git истекло.",
 			"git-unknown-error": "Неизвестная ошибка проверки git.",
 			"linear-connected": "Linear подключён.",
+			"linear-connected-accounts": "Linear подключён к {{count}} аккаунтам ({{organizations}}).",
 			"linear-connected-as": "Linear подключён как {{identity}}.",
 			"linear-connected-with-organization": "Linear подключён как {{identity}} ({{organization}}).",
 			"linear-not-configured": "OAuth для Linear не настроен. Добавьте app.linear.clientId в конфигурацию Ensemblr, чтобы включить сценарии Linear. Linear необязателен для локальных сценариев и сценариев только с GitHub.",

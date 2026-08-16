@@ -16,8 +16,35 @@ import {
 	type EnsemblrDatabaseService,
 	openEnsemblrDatabase,
 } from '../../src/main/storage/database.ts';
+import type { LinearAccountSnapshot } from '../../src/shared/ipc/contracts/linear.ts';
 
 const NOW = new Date('2026-06-11T00:00:00.000Z');
+const ACCOUNT = 'account-1';
+const OTHER_ACCOUNT = 'account-2';
+
+/**
+ * The account snapshots the service lists. Ids are what the cache rows and the
+ * per-account clients are keyed by, so a fixture needs matching rows in SQLite.
+ */
+function accountSnapshot(
+	id: string,
+	organizationName: string,
+): LinearAccountSnapshot {
+	return {
+		expiresAt: null,
+		id,
+		lastErrorCode: null,
+		organizationId: `org-${id}`,
+		organizationName,
+		organizationUrlKey: organizationName.toLowerCase(),
+		scopes: ['read', 'write'],
+		state: 'connected',
+		updatedAt: NOW.toISOString(),
+		userEmail: 'alice@example.com',
+		userId: `viewer-${id}`,
+		userName: 'Alice',
+	};
+}
 
 function createDatabaseServiceFixture(t: TestContext): EnsemblrDatabaseService {
 	const directory = mkdtempSync(path.join(tmpdir(), 'ensemblr-linear-svc-'));
@@ -29,6 +56,18 @@ function createDatabaseServiceFixture(t: TestContext): EnsemblrDatabaseService {
 		connection.database.close();
 		rmSync(directory, { force: true, recursive: true });
 	});
+
+	const insertAccount = connection.database.prepare(
+		`INSERT INTO linear_accounts (id, organization_id, organization_name, user_id)
+		 VALUES (?, ?, ?, ?)`,
+	);
+	insertAccount.run(ACCOUNT, `org-${ACCOUNT}`, 'Example Org', 'viewer-1');
+	insertAccount.run(
+		OTHER_ACCOUNT,
+		`org-${OTHER_ACCOUNT}`,
+		'Client Co',
+		'viewer-2',
+	);
 
 	return {
 		close: () => {},
@@ -168,8 +207,9 @@ function createServiceFixture(t: TestContext, options: FakeClientOptions = {}) {
 	const databaseService = createDatabaseServiceFixture(t);
 	const fake = createFakeClient(options);
 	const service = createLinearService({
-		client: fake.client,
+		clientFactory: () => fake.client,
 		databaseService,
+		listAccounts: async () => [accountSnapshot(ACCOUNT, 'Example Org')],
 		now: () => NOW,
 	});
 
@@ -227,23 +267,28 @@ test('listIssues: degrades to cached rows when the remote sync fails', async (t)
 	await service.listIssues();
 
 	const failing = createLinearService({
-		client: createFakeClient({
-			listIssuesError: new LinearServiceError(
-				'rate-limited',
-				'Rate limit reached.',
-				{ retryAfterSeconds: 30 },
-			),
-		}).client,
+		clientFactory: () =>
+			createFakeClient({
+				listIssuesError: new LinearServiceError(
+					'rate-limited',
+					'Rate limit reached.',
+					{ retryAfterSeconds: 30 },
+				),
+			}).client,
 		databaseService,
+		listAccounts: async () => [accountSnapshot(ACCOUNT, 'Example Org')],
 		now: () => new Date(NOW.getTime() + 10 * 60 * 1000),
 	});
 
 	const result = await failing.listIssues();
 
-	assert.strictEqual(result.status, 'error');
-	assert.ok(result.status === 'error');
-	assert.strictEqual(result.failure.code, 'rate-limited');
-	assert.strictEqual(result.failure.retryAfterSeconds, 30);
+	// A failed sync narrows the answer rather than replacing it: the account's
+	// own failure travels alongside the rows the cache still holds.
+	assert.ok(result.status === 'ok');
+	assert.strictEqual(result.accountFailures.length, 1);
+	assert.strictEqual(result.accountFailures[0]?.failure.code, 'rate-limited');
+	assert.strictEqual(result.accountFailures[0]?.failure.retryAfterSeconds, 30);
+	assert.strictEqual(result.accountFailures[0]?.accountId, ACCOUNT);
 	assert.strictEqual(result.issues.length, 1);
 });
 
@@ -292,13 +337,14 @@ test('getIssue: returns a typed failure for unknown issues', async (t) => {
 	const databaseService = createDatabaseServiceFixture(t);
 	const { client } = createFakeClient();
 	const service = createLinearService({
-		client: {
+		clientFactory: () => ({
 			...client,
 			getIssue: async () => {
 				throw new LinearServiceError('not-found', 'Issue missing.');
 			},
-		},
+		}),
 		databaseService,
+		listAccounts: async () => [accountSnapshot(ACCOUNT, 'Example Org')],
 		now: () => NOW,
 	});
 
@@ -393,13 +439,14 @@ test('mutations surface permission failures without touching the cache', async (
 	const databaseService = createDatabaseServiceFixture(t);
 	const { client } = createFakeClient();
 	const service = createLinearService({
-		client: {
+		clientFactory: () => ({
 			...client,
 			createIssue: async () => {
 				throw new LinearServiceError('permission-denied', 'No access.');
 			},
-		},
+		}),
 		databaseService,
+		listAccounts: async () => [accountSnapshot(ACCOUNT, 'Example Org')],
 		now: () => NOW,
 	});
 
@@ -414,4 +461,128 @@ test('mutations surface permission failures without touching the cache', async (
 		database.prepare('SELECT id FROM linear_issues').all().length,
 		0,
 	);
+});
+
+/**
+ * Builds a service over two connected accounts, each with its own fake client,
+ * so resolution and per-account failure isolation can be exercised. The
+ * single-account fixture above cannot reach either: with one account connected
+ * every ambiguity collapses and every merged read has nothing to merge.
+ */
+function createTwoAccountFixture(
+	t: TestContext,
+	options: {
+		otherClient?: Partial<LinearClient>;
+	} = {},
+) {
+	const databaseService = createDatabaseServiceFixture(t);
+	const first = createFakeClient();
+	const second = createFakeClient();
+	const clients: Record<string, LinearClient> = {
+		[ACCOUNT]: first.client,
+		[OTHER_ACCOUNT]: { ...second.client, ...options.otherClient },
+	};
+	const service = createLinearService({
+		clientFactory: (accountId) => clients[accountId] ?? first.client,
+		databaseService,
+		listAccounts: async () => [
+			accountSnapshot(ACCOUNT, 'Example Org'),
+			accountSnapshot(OTHER_ACCOUNT, 'Client Co'),
+		],
+		now: () => NOW,
+	});
+
+	return { databaseService, first, second, service };
+}
+
+/** Writes one cached issue row directly, to set up a resolution scenario. */
+function seedIssue(
+	databaseService: EnsemblrDatabaseService,
+	accountId: string,
+	id: string,
+	identifier: string,
+): void {
+	const database = databaseService.getConnection()?.database;
+	assert.ok(database);
+	database
+		.prepare(
+			`INSERT INTO linear_issues
+			 (id, account_id, identifier, title, team_id, remote_updated_at, synced_at)
+			 VALUES (?, ?, ?, ?, 'team-1', ?, ?)`,
+		)
+		.run(
+			id,
+			accountId,
+			identifier,
+			'Seeded',
+			NOW.toISOString(),
+			NOW.toISOString(),
+		);
+}
+
+test('getIssue: refuses an identifier that matches in two accounts rather than guessing', async (t) => {
+	const { databaseService, service } = createTwoAccountFixture(t);
+	seedIssue(databaseService, ACCOUNT, 'issue-a', 'ENG-1');
+	seedIssue(databaseService, OTHER_ACCOUNT, 'issue-b', 'ENG-1');
+
+	const result = await service.getIssue({ id: 'ENG-1' });
+
+	assert.ok(result.status === 'error');
+	assert.strictEqual(result.failure.code, 'invalid-request');
+	assert.match(result.failure.message, /Example Org/);
+	assert.match(result.failure.message, /Client Co/);
+});
+
+test('getIssue: the entity wins over the caller fallback, so a workspace cannot mask it', async (t) => {
+	const { databaseService, service } = createTwoAccountFixture(t);
+	seedIssue(databaseService, OTHER_ACCOUNT, 'issue-b', 'ENG-9');
+
+	const result = await service.getIssue({
+		fallbackAccountId: ACCOUNT,
+		id: 'ENG-9',
+	});
+
+	assert.ok(result.status === 'ok');
+	assert.strictEqual(result.issue.accountId, OTHER_ACCOUNT);
+});
+
+test('getIssue: a fallback still resolves an entity no account claims', async (t) => {
+	const { service } = createTwoAccountFixture(t);
+
+	const result = await service.getIssue({
+		fallbackAccountId: OTHER_ACCOUNT,
+		id: 'issue-unknown',
+	});
+
+	assert.ok(result.status === 'ok');
+	assert.strictEqual(result.issue.accountId, OTHER_ACCOUNT);
+});
+
+test('getIssue: refuses when neither the entity nor a fallback names an account', async (t) => {
+	const { service } = createTwoAccountFixture(t);
+
+	const result = await service.getIssue({ id: 'issue-unknown' });
+
+	assert.ok(result.status === 'error');
+	assert.strictEqual(result.failure.code, 'invalid-request');
+	assert.match(result.failure.message, /Name an accountId/);
+});
+
+test('listIssues: one account failing narrows the merged list instead of blanking it', async (t) => {
+	const { service } = createTwoAccountFixture(t, {
+		otherClient: {
+			listIssues: async () => {
+				throw new LinearServiceError('rate-limited', 'Slow down.');
+			},
+		},
+	});
+
+	const result = await service.listIssues();
+
+	assert.ok(result.status === 'ok');
+	assert.strictEqual(result.issues.length, 1);
+	assert.strictEqual(result.issues[0]?.accountId, ACCOUNT);
+	assert.strictEqual(result.accountFailures.length, 1);
+	assert.strictEqual(result.accountFailures[0]?.accountId, OTHER_ACCOUNT);
+	assert.strictEqual(result.accountFailures[0]?.organizationName, 'Client Co');
 });

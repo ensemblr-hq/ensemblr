@@ -5,6 +5,7 @@ import type { CloneGithubRepositoryDiagnosticCode } from '@/shared/ipc/contracts
 import type { DictationFailureCode } from '@/shared/ipc/contracts/dictation';
 import type { GithubFailureCode } from '@/shared/ipc/contracts/github';
 import type { InfisicalFailureCode } from '@/shared/ipc/contracts/infisical';
+import type { LinearAuthFailureCode } from '@/shared/ipc/contracts/linear';
 import type { QuickStartProjectDiagnosticCode } from '@/shared/ipc/contracts/quick-start';
 import type {
 	ArchiveRepositoryDiagnosticCode,
@@ -53,6 +54,7 @@ export type AppFailureCode =
 	| FilesToCopyDiagnosticCode
 	| GithubFailureCode
 	| InfisicalFailureCode
+	| LinearAuthFailureCode
 	| ListWorkspaceFilesFailureCode
 	| QuickStartProjectDiagnosticCode
 	| ReadWorkspaceDirectoryFailureCode
@@ -182,6 +184,62 @@ export const APP_FAILURE_TEXT: Record<
 		),
 	'infisical-unknown': (t) =>
 		t('errors:failure.infisical-unknown', 'The Infisical operation failed.'),
+	'callback-failed': (t) =>
+		t(
+			'errors:failure.callback-failed',
+			'Ensemblr could not open the local port Linear sends you back to. Close other Ensemblr windows, then retry.',
+		),
+	'linear-unknown': (t) =>
+		t('errors:failure.linear-unknown', 'The Linear operation failed.'),
+	'callback-timeout': (t) =>
+		t(
+			'errors:failure.callback-timeout',
+			'Linear did not answer in time. Try signing in again.',
+		),
+	'database-error': (t) =>
+		t(
+			'errors:failure.database-error',
+			'The local database is unavailable, so the Linear account was not saved.',
+		),
+	'exchange-failed': (t) =>
+		t(
+			'errors:failure.exchange-failed',
+			'Linear rejected the sign-in. Try again.',
+		),
+	'login-canceled': (t) =>
+		t('errors:failure.login-canceled', 'The Linear sign-in was canceled.'),
+	'login-in-progress': (t) =>
+		t(
+			'errors:failure.login-in-progress',
+			'A Linear sign-in is already waiting for the browser.',
+		),
+	'network-error': (t) =>
+		t(
+			'errors:failure.network-error',
+			'Linear could not be reached. Check your connection, then retry.',
+		),
+	'not-configured': (t) =>
+		t(
+			'errors:failure.not-configured',
+			'Linear sign-in is not configured on this machine.',
+		),
+	'not-connected': (t) =>
+		t('errors:failure.not-connected', 'No Linear account is connected.'),
+	'refresh-failed': (t) =>
+		t(
+			'errors:failure.refresh-failed',
+			'The Linear token expired and could not be refreshed. Reconnect the account.',
+		),
+	'secret-store-error': (t) =>
+		t(
+			'errors:failure.secret-store-error',
+			'The macOS Keychain is unavailable, so the Linear token could not be read.',
+		),
+	'state-mismatch': (t) =>
+		t(
+			'errors:failure.state-mismatch',
+			'The Linear sign-in reply did not match this attempt, so it was rejected.',
+		),
 	auth: (t) =>
 		t(
 			'errors:failure.auth',

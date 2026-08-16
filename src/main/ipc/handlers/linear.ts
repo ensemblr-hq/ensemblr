@@ -2,7 +2,7 @@ import { ipcMain } from 'electron';
 
 import { IPC_CHANNELS } from '../../../shared/ipc/channels';
 import type {
-	LinearConnectionSnapshot,
+	LinearConnectionSummary,
 	LinearDisconnectResult,
 	LinearLoginResult,
 } from '../../../shared/ipc/contracts/linear';
@@ -12,6 +12,7 @@ import {
 	createLinearIssueRequestSchema,
 	getLinearIssueRequestSchema,
 	getLinearMetadataRequestSchema,
+	linearDisconnectRequestSchema,
 	listLinearIssuesRequestSchema,
 	updateLinearIssueRequestSchema,
 } from '../request-schemas.ts';
@@ -29,8 +30,8 @@ export function registerLinearHandlers({
 }): void {
 	ipcMain.handle(
 		IPC_CHANNELS.linearConnectionStatus,
-		(): Promise<LinearConnectionSnapshot> => {
-			return linearAuthService.getConnectionStatus();
+		(): Promise<LinearConnectionSummary> => {
+			return linearAuthService.getConnectionSummary();
 		},
 	);
 
@@ -47,8 +48,10 @@ export function registerLinearHandlers({
 
 	ipcMain.handle(
 		IPC_CHANNELS.linearDisconnect,
-		(): Promise<LinearDisconnectResult> => {
-			return linearAuthService.disconnect();
+		(_event, raw: unknown): Promise<LinearDisconnectResult> => {
+			return linearAuthService.disconnect(
+				linearDisconnectRequestSchema.parse(raw).accountId,
+			);
 		},
 	);
 

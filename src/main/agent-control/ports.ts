@@ -429,23 +429,32 @@ export interface ReviewPort {
  * `status` on the result rather than as an exception the service would flatten
  * into one `internal` code.
  *
- * No member takes a workspace argument: Linear is an app-level integration bound
- * to one account, so there is nothing here an agent could point at a workspace
- * that is not its own.
+ * Every member takes the calling workspace, and only for account resolution:
+ * Linear is app-level, but several accounts can be connected at once, and a
+ * workspace created from an issue already records which one it came from. That
+ * is the default an agent should not have to be told. Nothing here reads or
+ * writes workspace state beyond that lookup.
  */
 export interface LinearPort {
-	listIssues: (input: LinearListIssuesArgs) => Promise<LinearListIssuesResult>;
-	getIssue: (input: LinearGetIssueArgs) => Promise<LinearGetIssueResult>;
+	listIssues: (
+		input: LinearPortInput<LinearListIssuesArgs>,
+	) => Promise<LinearListIssuesResult>;
+	getIssue: (
+		input: LinearPortInput<LinearGetIssueArgs>,
+	) => Promise<LinearGetIssueResult>;
 	getMetadata: (
-		input: LinearGetMetadataArgs,
+		input: LinearPortInput<LinearGetMetadataArgs>,
 	) => Promise<LinearGetMetadataResult>;
 	createComment: (
-		input: LinearCreateCommentArgs,
+		input: LinearPortInput<LinearCreateCommentArgs>,
 	) => Promise<LinearCreateCommentResult>;
 	updateIssue: (
-		input: LinearUpdateIssueArgs,
+		input: LinearPortInput<LinearUpdateIssueArgs>,
 	) => Promise<LinearUpdateIssueResult>;
 }
+
+/** An agent's Linear args plus the workspace whose linked account defaults them. */
+export type LinearPortInput<T> = T & { workspaceId: string };
 
 /**
  * Resolves the active permission mode. The mode is a global app setting (the

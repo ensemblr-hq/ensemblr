@@ -79,6 +79,7 @@ export default defineConfig({
 			'tests/main/electron-notify.test.ts',
 			'tests/main/quit-guard.test.ts',
 			'tests/main/quit-guard-strings.test.ts',
+			'tests/main/linear-callback-page-strings.test.ts',
 			'tests/main/quit-coordinator.test.ts',
 			'tests/main/macos-battery.test.ts',
 			'tests/main/workspace-commits.test.ts',

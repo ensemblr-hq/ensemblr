@@ -878,6 +878,7 @@ const planSubmission = createPlanSubmission({
 const linearAuthService = createLinearAuthService({
 	configService,
 	databaseService,
+	getLanguage: resolveAppLanguage,
 	/** Opens an external URL in the user's default browser. */
 	openExternal: (url) => shell.openExternal(url),
 	secretStoreFactory: createSecretStore,
@@ -886,11 +887,15 @@ const linearAuthService = createLinearAuthService({
 // agent-control ports need it: a control op reaching Linear runs long after
 // startup, but the port graph is assembled in one pass.
 const linearService = createLinearService({
-	client: createLinearClient({
-		/** Resolves the current Linear access token from the auth service. */
-		getAccessToken: () => linearAuthService.getAccessToken(),
-	}),
+	/** Binds a Linear client to one account's own access token. */
+	clientFactory: (accountId) =>
+		createLinearClient({
+			/** Resolves that account's current access token from the auth service. */
+			getAccessToken: () => linearAuthService.getAccessToken(accountId),
+		}),
 	databaseService,
+	/** Lists every connected Linear account for merged reads. */
+	listAccounts: () => linearAuthService.listAccounts(),
 });
 agentControlService = createAgentControlService({
 	guardrails: agentControlGuardrails,
@@ -928,6 +933,13 @@ agentControlService = createAgentControlService({
 		getLanguage: resolveAppLanguage,
 		harnessDetectionService,
 		linearService,
+		/** Names the connected Linear accounts for an agent that must pick one. */
+		listLinearAccounts: async () =>
+			(await linearAuthService.listAccounts()).map((account) => ({
+				accountId: account.id,
+				organization: account.organizationName,
+				user: account.userName ?? account.userEmail,
+			})),
 		piExecutableService,
 		spawnModelResolver,
 		agentSessionService,

@@ -1781,9 +1781,20 @@ describe('agent-control service: linear', () => {
 			});
 			expect(result.ok, op).toBe(true);
 		}
-		expect(ports.linear.listIssues).toHaveBeenCalledWith({ query: 'composer' });
-		expect(ports.linear.getIssue).toHaveBeenCalledWith({ issueId: 'ENG-106' });
-		expect(ports.linear.getMetadata).toHaveBeenCalledWith({});
+		// The calling workspace rides along on every Linear op: it is the default
+		// account when the agent names none, and it is added at dispatch rather
+		// than by the agent.
+		expect(ports.linear.listIssues).toHaveBeenCalledWith({
+			query: 'composer',
+			workspaceId: 'ws',
+		});
+		expect(ports.linear.getIssue).toHaveBeenCalledWith({
+			issueId: 'ENG-106',
+			workspaceId: 'ws',
+		});
+		expect(ports.linear.getMetadata).toHaveBeenCalledWith({
+			workspaceId: 'ws',
+		});
 	});
 
 	it('dispatches each write to its port', async () => {
@@ -1798,12 +1809,14 @@ describe('agent-control service: linear', () => {
 			});
 			expect(result.ok, op).toBe(true);
 		}
-		expect(ports.linear.createComment).toHaveBeenCalledWith(
-			LINEAR_WRITES.linearCreateComment,
-		);
-		expect(ports.linear.updateIssue).toHaveBeenCalledWith(
-			LINEAR_WRITES.linearUpdateIssue,
-		);
+		expect(ports.linear.createComment).toHaveBeenCalledWith({
+			...LINEAR_WRITES.linearCreateComment,
+			workspaceId: 'ws',
+		});
+		expect(ports.linear.updateIssue).toHaveBeenCalledWith({
+			...LINEAR_WRITES.linearUpdateIssue,
+			workspaceId: 'ws',
+		});
 	});
 
 	it('rewrites the near-miss keys a model reaches for', async () => {
@@ -1819,6 +1832,7 @@ describe('agent-control service: linear', () => {
 		expect(ports.linear.createComment).toHaveBeenCalledWith({
 			commentBody: 'Verified.',
 			issueId: 'ENG-106',
+			workspaceId: 'ws',
 		});
 	});
 

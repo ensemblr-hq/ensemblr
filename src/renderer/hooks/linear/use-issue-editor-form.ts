@@ -30,7 +30,8 @@ import type {
  * @param issue - Issue being edited, or undefined when creating a new one
  * @param onOpenChange - Closes the dialog once a save lands
  * @param open - Whether the dialog is open; gates the metadata query
- * @returns The fields, the picker metadata, and the handlers the dialog binds to
+ * @returns The fields, the picker metadata and the accounts it could not reach,
+ * and the handlers the dialog binds to
  */
 export function useIssueEditorForm({
 	issue,
@@ -62,13 +63,23 @@ export function useIssueEditorForm({
 		setError(null);
 	}
 
+	const metadata = metadataData ? metadataData.metadata : null;
+	// The chosen team decides the account: a team belongs to exactly one, and
+	// every other picker on the form has to narrow to the same organization.
+	const accountId =
+		issue?.accountId ??
+		metadata?.teams.find((team) => team.id === fields.teamId)?.accountId ??
+		null;
+
 	const mutation = useMutation({
 		mutationFn: async (): Promise<MutateLinearIssueResult | null> => {
 			if (issue) {
 				const request = buildUpdateIssueRequest(issue, fields);
 				return request ? updateLinearIssue(request) : null;
 			}
-			return createLinearIssue(buildCreateIssueRequest(fields));
+			return createLinearIssue(
+				buildCreateIssueRequest(fields, accountId ?? undefined),
+			);
 		},
 		onError: () => {
 			setError(
@@ -90,7 +101,7 @@ export function useIssueEditorForm({
 						queryKey: ensemblrQueryKeys.linearIssuesAll(),
 					}),
 					queryClient.invalidateQueries({
-						queryKey: ensemblrQueryKeys.linearIssue(result.issue.id),
+						queryKey: ensemblrQueryKeys.linearIssueAll(result.issue.id),
 					}),
 				]);
 			}
@@ -99,13 +110,13 @@ export function useIssueEditorForm({
 	});
 
 	return {
+		accountFailures: metadataData?.accountFailures ?? [],
+		accountId,
+		canSubmit: validateIssueEditorFields(fields, mode).ok,
 		error,
 		fields,
 		isSaving: mutation.isPending,
-		metadata:
-			metadataData?.status === 'ok' || metadataData?.status === 'error'
-				? metadataData.metadata
-				: null,
+		metadata,
 		mode,
 		submit: () => {
 			const validation = validateIssueEditorFields(fields, mode);

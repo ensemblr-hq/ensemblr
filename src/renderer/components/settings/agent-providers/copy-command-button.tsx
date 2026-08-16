@@ -1,8 +1,8 @@
 import { CheckIcon, ClipboardIcon } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/renderer/components/ui/button';
+import { useCopyToClipboard } from '@/renderer/hooks/use-copy-to-clipboard';
 
 /** How long the button reads "Copied" before reverting to its label. */
 const COPIED_FLASH_MS = 1800;
@@ -21,41 +21,14 @@ export function CopyCommandButton({
 	label: string;
 }) {
 	const { t } = useTranslation();
-	const [copied, setCopied] = useState(false);
-	const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-	useEffect(() => {
-		return () => {
-			if (timerRef.current) {
-				clearTimeout(timerRef.current);
-			}
-		};
-	}, []);
-
-	const copy = async () => {
-		try {
-			await navigator.clipboard.writeText(command);
-		} catch (error) {
-			console.error('Failed to copy command to clipboard:', error);
-			return;
-		}
-		setCopied(true);
-		if (timerRef.current) {
-			clearTimeout(timerRef.current);
-		}
-		timerRef.current = setTimeout(() => {
-			timerRef.current = null;
-			setCopied(false);
-		}, COPIED_FLASH_MS);
-	};
-
+	const { copied, copy } = useCopyToClipboard(COPIED_FLASH_MS);
 	const Icon = copied ? CheckIcon : ClipboardIcon;
 
 	return (
 		<Button
 			data-copy-command={command}
 			onClick={() => {
-				void copy();
+				void copy(command);
 			}}
 			size='xs'
 			type='button'

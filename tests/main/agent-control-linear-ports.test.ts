@@ -21,9 +21,12 @@ import type {
 	MutateLinearIssueResult,
 } from '../../src/shared/ipc/contracts/linear.ts';
 
+const WORKSPACE_ID = 'ws-1';
+
 const issueWire = (
 	overrides: Partial<LinearIssueWire> = {},
 ): LinearIssueWire => ({
+	accountId: 'acct-1',
 	archivedAt: null,
 	assigneeId: 'u-1',
 	assigneeName: 'Ada',
@@ -34,6 +37,7 @@ const issueWire = (
 	id: 'i-1',
 	identifier: 'ENG-106',
 	labels: [{ color: null, id: 'l-1', name: 'agent' }],
+	organizationName: 'Example Org',
 	priority: 2,
 	projectId: 'p-1',
 	projectName: 'Ensemble',
@@ -64,11 +68,13 @@ const commentWire = (
 const stateWire = (
 	overrides: Partial<LinearResourceWire> = {},
 ): LinearResourceWire => ({
+	accountId: 'acct-1',
 	color: null,
 	id: 's-started',
 	key: null,
 	kind: 'state',
 	name: 'In Progress',
+	organizationName: 'Example Org',
 	teamId: 't-1',
 	type: 'started',
 	...overrides,
@@ -87,6 +93,7 @@ const metadataOk = (
 	states: readonly LinearResourceWire[] = [stateWire()],
 	overrides: Partial<GetLinearMetadataResult & { status: 'ok' }> = {},
 ): GetLinearMetadataResult => ({
+	accountFailures: [],
 	metadata: {
 		cycles: [],
 		labels: [],
@@ -135,6 +142,7 @@ const makeDeps = (
 			.mockResolvedValue(overrides.getMetadata ?? metadataOk()),
 		listIssues: vi.fn().mockResolvedValue(
 			overrides.listIssues ?? {
+				accountFailures: [],
 				issues: [issueWire()],
 				source: 'cache',
 				status: 'ok',
@@ -147,9 +155,59 @@ const makeDeps = (
 			),
 	} satisfies Record<keyof LinearService, unknown>;
 	const deps: LinearPortDeps = {
+		databaseService: stubDatabaseService(),
 		linearService: service as unknown as LinearService,
+		listLinearAccounts: async () => [
+			{ accountId: 'acct-1', organization: 'Example Org', user: 'Ada' },
+		],
 	};
 	return { deps, service };
+};
+
+/**
+ * A database service with no open connection. The port's workspace lookup reads
+ * the linked issue's account through it, and every test here passes the account
+ * explicitly or relies on the service resolving it, so an absent connection is
+ * the honest stub rather than a gap.
+ */
+const stubDatabaseService = (): LinearPortDeps['databaseService'] =>
+	({
+		getConnection: () => null,
+	}) as unknown as LinearPortDeps['databaseService'];
+
+/** Port deps with Linear absent entirely, for the not-composed path. */
+const nullDeps = (): LinearPortDeps => ({
+	databaseService: stubDatabaseService(),
+	linearService: null,
+	listLinearAccounts: async () => [],
+});
+
+/**
+ * Wraps the port so each call carries the calling workspace the ops take for
+ * account resolution, keeping the tests about Linear rather than about plumbing.
+ * @param deps - Port collaborators under test.
+ * @returns The port with `workspaceId` supplied on every call.
+ */
+const portFor = (deps: LinearPortDeps) => {
+	const port = makeLinearPort(deps);
+
+	return {
+		createComment: (
+			args: Omit<Parameters<typeof port.createComment>[0], 'workspaceId'>,
+		) => port.createComment({ ...args, workspaceId: WORKSPACE_ID }),
+		getIssue: (
+			args: Omit<Parameters<typeof port.getIssue>[0], 'workspaceId'>,
+		) => port.getIssue({ ...args, workspaceId: WORKSPACE_ID }),
+		getMetadata: (
+			args: Omit<Parameters<typeof port.getMetadata>[0], 'workspaceId'>,
+		) => port.getMetadata({ ...args, workspaceId: WORKSPACE_ID }),
+		listIssues: (
+			args: Omit<Parameters<typeof port.listIssues>[0], 'workspaceId'>,
+		) => port.listIssues({ ...args, workspaceId: WORKSPACE_ID }),
+		updateIssue: (
+			args: Omit<Parameters<typeof port.updateIssue>[0], 'workspaceId'>,
+		) => port.updateIssue({ ...args, workspaceId: WORKSPACE_ID }),
+	};
 };
 
 // Linear is unconnected in most workspaces. An op that threw, or that answered
@@ -158,7 +216,7 @@ const makeDeps = (
 // forever.
 describe('linear port: availability', () => {
 	it('answers every op without Linear composed at all', async () => {
-		const port = makeLinearPort({ linearService: null });
+		const port = portFor(nullDeps());
 
 		const results = await Promise.all([
 			port.listIssues({}),
@@ -177,13 +235,14 @@ describe('linear port: availability', () => {
 	it('reports a disconnected account as not-connected, not as a failure', async () => {
 		const { deps } = makeDeps({
 			listIssues: {
+				accountFailures: [],
 				failure: failure({ code: 'not-connected', message: 'No token.' }),
 				issues: [],
 				status: 'error',
 			},
 		});
 
-		const result = await makeLinearPort(deps).listIssues({});
+		const result = await portFor(deps).listIssues({});
 
 		expect(result.status).toBe('not-connected');
 		expect(result.issues).toEqual([]);
@@ -194,13 +253,14 @@ describe('linear port: availability', () => {
 	it('folds a stale authorization into the same not-connected answer', async () => {
 		const { deps } = makeDeps({
 			getMetadata: {
+				accountFailures: [],
 				failure: failure({ code: 'reconnect-required', message: 'Expired.' }),
 				metadata: metadataOk().metadata,
 				status: 'error',
 			},
 		});
 
-		const result = await makeLinearPort(deps).getMetadata({});
+		const result = await portFor(deps).getMetadata({});
 
 		expect(result.status).toBe('not-connected');
 	});
@@ -213,7 +273,7 @@ describe('linear port: availability', () => {
 			},
 		});
 
-		const result = await makeLinearPort(deps).getIssue({ issueId: 'ENG-999' });
+		const result = await portFor(deps).getIssue({ issueId: 'ENG-999' });
 
 		expect(result.status).toBe('not-found');
 		expect(result.issue).toBeNull();
@@ -231,7 +291,7 @@ describe('linear port: availability', () => {
 			},
 		});
 
-		const result = await makeLinearPort(deps).createComment({
+		const result = await portFor(deps).createComment({
 			commentBody: 'note',
 			issueId: 'ENG-106',
 		});
@@ -246,13 +306,14 @@ describe('linear port: availability', () => {
 	it('still hands back the cached rows a failed refresh left behind', async () => {
 		const { deps } = makeDeps({
 			listIssues: {
+				accountFailures: [],
 				failure: failure(),
 				issues: [issueWire()],
 				status: 'error',
 			},
 		});
 
-		const result = await makeLinearPort(deps).listIssues({ refresh: true });
+		const result = await portFor(deps).listIssues({ refresh: true });
 
 		expect(result.status).toBe('failed');
 		expect(result.issues).toHaveLength(1);
@@ -271,7 +332,7 @@ describe('linear port: the Done guard', () => {
 			]),
 		});
 
-		const result = await makeLinearPort(deps).updateIssue({
+		const result = await portFor(deps).updateIssue({
 			issueId: 'ENG-106',
 			stateId: 's-done',
 		});
@@ -291,7 +352,7 @@ describe('linear port: the Done guard', () => {
 			]),
 		});
 
-		const result = await makeLinearPort(deps).updateIssue({
+		const result = await portFor(deps).updateIssue({
 			issueId: 'ENG-106',
 			stateId: 's-cancelled',
 		});
@@ -308,7 +369,7 @@ describe('linear port: the Done guard', () => {
 			]),
 		});
 
-		const result = await makeLinearPort(deps).updateIssue({
+		const result = await portFor(deps).updateIssue({
 			assigneeId: 'u-2',
 			issueId: 'ENG-106',
 			stateId: 's-review',
@@ -334,7 +395,7 @@ describe('linear port: the Done guard', () => {
 			getMetadata: metadataOk([stateWire()]),
 		});
 
-		const result = await makeLinearPort(deps).updateIssue({
+		const result = await portFor(deps).updateIssue({
 			issueId: 'ENG-106',
 			stateId: 's-unknown',
 		});
@@ -354,7 +415,7 @@ describe('linear port: the Done guard', () => {
 			]),
 		});
 
-		const result = await makeLinearPort(deps).updateIssue({
+		const result = await portFor(deps).updateIssue({
 			issueId: 'ENG-106',
 			stateId: 's-untyped',
 		});
@@ -368,13 +429,14 @@ describe('linear port: the Done guard', () => {
 	it('refuses when the states cannot be read at all', async () => {
 		const { deps, service } = makeDeps({
 			getMetadata: {
+				accountFailures: [],
 				failure: failure({ message: 'Linear is down.' }),
 				metadata: metadataOk([]).metadata,
 				status: 'error',
 			},
 		});
 
-		const result = await makeLinearPort(deps).updateIssue({
+		const result = await portFor(deps).updateIssue({
 			issueId: 'ENG-106',
 			stateId: 's-started',
 		});
@@ -389,7 +451,7 @@ describe('linear port: the Done guard', () => {
 	it('skips the state lookup when no state is being set', async () => {
 		const { deps, service } = makeDeps();
 
-		const result = await makeLinearPort(deps).updateIssue({
+		const result = await portFor(deps).updateIssue({
 			issueId: 'ENG-106',
 			title: 'Expose Linear to agents, gated',
 		});
@@ -411,10 +473,15 @@ describe('linear port: payload budget', () => {
 			}),
 		);
 		const { deps } = makeDeps({
-			listIssues: { issues, source: 'remote', status: 'ok' },
+			listIssues: {
+				accountFailures: [],
+				issues,
+				source: 'remote',
+				status: 'ok',
+			},
 		});
 
-		const result = await makeLinearPort(deps).listIssues({});
+		const result = await portFor(deps).listIssues({});
 
 		expect(result.truncated).toBe(true);
 		expect(result.omittedIssues).toBeGreaterThan(0);
@@ -428,7 +495,7 @@ describe('linear port: payload budget', () => {
 	it('reports an untruncated list as complete', async () => {
 		const { deps } = makeDeps();
 
-		const result = await makeLinearPort(deps).listIssues({});
+		const result = await portFor(deps).listIssues({});
 
 		expect(result.truncated).toBe(false);
 		expect(result.omittedIssues).toBe(0);
@@ -451,7 +518,7 @@ describe('linear port: payload budget', () => {
 			},
 		});
 
-		const result = await makeLinearPort(deps).getIssue({ issueId: 'ENG-106' });
+		const result = await portFor(deps).getIssue({ issueId: 'ENG-106' });
 
 		expect(result.truncated).toBe(true);
 		expect(result.issue?.description).toContain('shortened');
@@ -477,7 +544,7 @@ describe('linear port: payload budget', () => {
 			},
 		});
 
-		const result = await makeLinearPort(deps).getIssue({ issueId: 'ENG-106' });
+		const result = await portFor(deps).getIssue({ issueId: 'ENG-106' });
 
 		expect(result.omittedComments).toBe(0);
 		expect(result.comments.at(0)?.body).toContain('shortened');
@@ -496,7 +563,7 @@ describe('linear port: payload budget', () => {
 			},
 		});
 
-		const result = await makeLinearPort(deps).getIssue({ issueId: 'ENG-106' });
+		const result = await portFor(deps).getIssue({ issueId: 'ENG-106' });
 
 		expect(result.truncated).toBe(false);
 		expect(result.omittedComments).toBe(0);
@@ -517,7 +584,7 @@ describe('linear port: payload budget', () => {
 			},
 		});
 
-		const result = await makeLinearPort(deps).getIssue({ issueId: 'ENG-106' });
+		const result = await portFor(deps).getIssue({ issueId: 'ENG-106' });
 
 		expect(result.comments).toHaveLength(
 			LINEAR_AGENT_LIMITS.maxReturnedComments,
@@ -543,7 +610,7 @@ describe('linear port: payload budget', () => {
 			},
 		});
 
-		const result = await makeLinearPort(deps).getIssue({ issueId: 'ENG-106' });
+		const result = await portFor(deps).getIssue({ issueId: 'ENG-106' });
 
 		expect(result.comments.length).toBeLessThan(40);
 		expect(result.omittedComments).toBe(40 - result.comments.length);
@@ -566,6 +633,7 @@ describe('linear port: payload budget', () => {
 			);
 		const { deps } = makeDeps({
 			getMetadata: {
+				accountFailures: [],
 				metadata: {
 					cycles: [],
 					labels: bulk('label', 60),
@@ -579,7 +647,7 @@ describe('linear port: payload budget', () => {
 			},
 		});
 
-		const result = await makeLinearPort(deps).getMetadata({});
+		const result = await portFor(deps).getMetadata({});
 
 		expect(result.states).toHaveLength(10);
 		expect(result.teams).toHaveLength(5);
@@ -593,7 +661,7 @@ describe('linear port: writes', () => {
 	it('posts the comment body under the key the service expects', async () => {
 		const { deps, service } = makeDeps();
 
-		const result = await makeLinearPort(deps).createComment({
+		const result = await portFor(deps).createComment({
 			commentBody: 'Verified on the branch.',
 			issueId: 'ENG-106',
 		});
@@ -604,5 +672,180 @@ describe('linear port: writes', () => {
 			body: 'Verified on the branch.',
 			issueId: 'ENG-106',
 		});
+	});
+});
+
+/**
+ * A database service whose workspace row carries a linked Linear issue, so the
+ * port's fallback lookup resolves an account. The stub above returns no
+ * connection, which makes every fallback path unreachable.
+ */
+const linkedWorkspaceDatabaseService = (
+	accountId: string | null,
+): LinearPortDeps['databaseService'] =>
+	({
+		getConnection: () => ({
+			database: {
+				prepare: () => ({
+					get: () => ({
+						metadataJson: JSON.stringify({
+							linkedIssue:
+								accountId === null
+									? { identifier: 'ENG-1', provider: 'linear' }
+									: { accountId, identifier: 'ENG-1', provider: 'linear' },
+						}),
+					}),
+				}),
+			},
+		}),
+	}) as unknown as LinearPortDeps['databaseService'];
+
+describe('multi-account resolution', () => {
+	// ADR 0052 resolves the entity before the workspace. Passing the workspace's
+	// account as `accountId` would let it win over the issue the agent named, and
+	// would make the ambiguity refusal unreachable for any linked workspace.
+	it('offers the workspace account as a fallback, never as a scope', async () => {
+		const { deps, service } = makeDeps();
+		const port = portFor({
+			...deps,
+			databaseService: linkedWorkspaceDatabaseService('acct-2'),
+		});
+
+		await port.getIssue({ issueId: 'ENG-106' });
+
+		expect(service.getIssue).toHaveBeenCalledWith(
+			expect.objectContaining({
+				fallbackAccountId: 'acct-2',
+				id: 'ENG-106',
+			}),
+		);
+		expect(service.getIssue).toHaveBeenCalledWith(
+			expect.not.objectContaining({ accountId: expect.anything() }),
+		);
+	});
+
+	it('passes an explicit accountId through and still offers the fallback', async () => {
+		const { deps, service } = makeDeps();
+		const port = portFor({
+			...deps,
+			databaseService: linkedWorkspaceDatabaseService('acct-2'),
+		});
+
+		await port.updateIssue({ accountId: 'acct-9', issueId: 'ENG-106' });
+
+		expect(service.updateIssue).toHaveBeenCalledWith(
+			expect.objectContaining({ accountId: 'acct-9' }),
+		);
+	});
+
+	it('omits the fallback when the workspace has no linked account', async () => {
+		const { deps, service } = makeDeps();
+		const port = portFor({
+			...deps,
+			databaseService: linkedWorkspaceDatabaseService(null),
+		});
+
+		await port.createComment({ commentBody: 'hi', issueId: 'ENG-106' });
+
+		expect(service.createComment).toHaveBeenCalledWith(
+			expect.not.objectContaining({ fallbackAccountId: expect.anything() }),
+		);
+	});
+
+	it('names the accounts on a failure so the agent can retry informed', async () => {
+		const { deps } = makeDeps({
+			getIssue: {
+				failure: {
+					code: 'invalid-request',
+					message: '"ENG-1" matches an issue in 2 connected Linear accounts.',
+					retryAfterSeconds: null,
+				},
+				status: 'error',
+			} satisfies GetLinearIssueResult,
+		});
+		const port = portFor({
+			...deps,
+			listLinearAccounts: async () => [
+				{ accountId: 'acct-1', organization: 'Example Org', user: 'Ada' },
+				{ accountId: 'acct-2', organization: 'Client Co', user: 'Ada' },
+			],
+		});
+
+		const result = await port.getIssue({ issueId: 'ENG-1' });
+
+		expect(result.status).toBe('failed');
+		expect(result.accounts).toEqual([
+			{ accountId: 'acct-1', organization: 'Example Org', user: 'Ada' },
+			{ accountId: 'acct-2', organization: 'Client Co', user: 'Ada' },
+		]);
+	});
+
+	// A read that is already failing must not fail differently because the
+	// account lookup threw too — that loses the recovery prose the agent needs.
+	it('survives listLinearAccounts throwing on a failure path', async () => {
+		const { deps } = makeDeps({
+			getIssue: {
+				failure: {
+					code: 'network',
+					message: 'Linear is unreachable.',
+					retryAfterSeconds: null,
+				},
+				status: 'error',
+			} satisfies GetLinearIssueResult,
+		});
+		const port = portFor({
+			...deps,
+			listLinearAccounts: async () => {
+				throw new Error('The Ensemblr database is not open.');
+			},
+		});
+
+		const result = await port.getIssue({ issueId: 'ENG-1' });
+
+		expect(result.status).toBe('failed');
+		expect(result.message).toContain('Linear is unreachable.');
+		expect(result.accounts).toBeUndefined();
+	});
+
+	it('names the account it searched instead of claiming it read them all', async () => {
+		const { deps } = makeDeps();
+		const port = portFor(deps);
+
+		const scoped = await port.listIssues({ accountId: 'acct-1' });
+		const merged = await port.listIssues({});
+
+		expect(scoped.message).toContain('in Linear account "acct-1"');
+		expect(merged.message).toContain('across every connected Linear account');
+	});
+
+	// `truncated` tells the agent to narrow its query. An account that failed is
+	// reported in the message instead, so flagging it here sends the agent
+	// chasing a payload budget that was never the problem.
+	it('does not report truncation when only an account failed', async () => {
+		const { deps } = makeDeps({
+			listIssues: {
+				accountFailures: [
+					{
+						accountId: 'acct-2',
+						failure: {
+							code: 'rate-limited',
+							message: 'Slow down.',
+							retryAfterSeconds: 30,
+						},
+						organizationName: 'Client Co',
+					},
+				],
+				issues: [issueWire()],
+				source: 'cache',
+				status: 'ok',
+			} satisfies ListLinearIssuesResult,
+		});
+		const port = portFor(deps);
+
+		const result = await port.listIssues({});
+
+		expect(result.truncated).toBe(false);
+		expect(result.omittedIssues).toBe(0);
+		expect(result.message).toContain('Client Co');
 	});
 });

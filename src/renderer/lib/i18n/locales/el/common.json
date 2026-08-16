@@ -233,6 +233,7 @@
 			"git-timeout": "Ο έλεγχος έκδοσης Git έληξε.",
 			"git-unknown-error": "Άγνωστο σφάλμα ελέγχου git.",
 			"linear-connected": "Το Linear είναι συνδεδεμένο.",
+			"linear-connected-accounts": "Το Linear είναι συνδεδεμένο σε {{count}} λογαριασμούς ({{organizations}}).",
 			"linear-connected-as": "Το Linear είναι συνδεδεμένο ως {{identity}}.",
 			"linear-connected-with-organization": "Το Linear είναι συνδεδεμένο ως {{identity}} ({{organization}}).",
 			"linear-not-configured": "Το OAuth του Linear δεν είναι ρυθμισμένο. Προσθέστε το app.linear.clientId στις ρυθμίσεις του Ensemblr για να ενεργοποιήσετε τις ροές Linear. Το Linear είναι προαιρετικό για τοπικές ροές και ροές μόνο με GitHub.",

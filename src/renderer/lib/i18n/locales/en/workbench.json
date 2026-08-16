@@ -589,7 +589,7 @@
 		"empty": "No issues match your search.",
 		"group-github": "GitHub",
 		"group-linear": "Linear",
-		"linear-not-connected": "Linear is not connected, so only GitHub issues are listed. Sign in from integration settings.",
+		"linear-not-connected": "No Linear account is connected, so only GitHub issues are listed. Sign in from integration settings.",
 		"loading": "Loading issues…",
 		"search-placeholder": "Search by identifier, number, or title…",
 		"title": "Attach issue"

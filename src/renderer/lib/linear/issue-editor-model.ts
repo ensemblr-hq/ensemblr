@@ -15,6 +15,41 @@ import type {
 export const UNSET_FIELD = '__unset__';
 
 /**
+ * Reads Linear's `YYYY-MM-DD` due date as a local calendar day. `new Date(iso)`
+ * would parse it as UTC midnight and render as the previous day west of
+ * Greenwich, so the parts are handed to the local-time constructor instead.
+ * @param value - Stored due date, or an empty string when unset
+ * @returns The local date, or undefined when the value is empty or malformed
+ */
+export function parseIssueDueDate(value: string): Date | undefined {
+	const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+
+	if (!match) {
+		return undefined;
+	}
+
+	const [, year, month, day] = match;
+	const parsed = new Date(Number(year), Number(month) - 1, Number(day), 12);
+	const rolledOver =
+		parsed.getMonth() !== Number(month) - 1 || parsed.getDate() !== Number(day);
+
+	return rolledOver ? undefined : parsed;
+}
+
+/**
+ * Writes a picked calendar day back as the `YYYY-MM-DD` string Linear stores,
+ * using local parts so the day the user clicked is the day that is sent.
+ * @param date - Day chosen in the calendar
+ * @returns The ISO calendar date
+ */
+export function formatIssueDueDate(date: Date): string {
+	const month = String(date.getMonth() + 1).padStart(2, '0');
+	const day = String(date.getDate()).padStart(2, '0');
+
+	return `${date.getFullYear()}-${month}-${day}`;
+}
+
+/**
  * Builds the editor's initial fields, seeded from an existing issue when
  * editing or empty for creation.
  */
@@ -38,6 +73,28 @@ export function createIssueEditorFields(
 	};
 }
 
+/**
+ * Patch that moves the editor to another team, clearing every field the new
+ * team's own account scopes. Teams, states, cycles, and labels belong to a team;
+ * assignees and projects belong to the organization behind it — so a value
+ * carried over from the previous team names a row the target account does not
+ * have, and Linear rejects the write.
+ * @param teamId - Team the editor is switching to
+ * @returns The patch to apply to the editor's fields
+ */
+export function buildTeamChangeFields(
+	teamId: string,
+): Partial<LinearIssueEditorFields> {
+	return {
+		assigneeId: UNSET_FIELD,
+		cycleId: UNSET_FIELD,
+		labelIds: [],
+		projectId: UNSET_FIELD,
+		stateId: UNSET_FIELD,
+		teamId,
+	};
+}
+
 /** Validates the form fields for the given editor mode. */
 export function validateIssueEditorFields(
 	fields: LinearIssueEditorFields,
@@ -54,11 +111,18 @@ export function validateIssueEditorFields(
 	return { ok: true };
 }
 
-/** Maps editor fields to the `issueCreate` request payload. */
+/**
+ * Maps editor fields to the `issueCreate` request payload.
+ * @param fields - Current editor field values
+ * @param accountId - Account the chosen team belongs to, when it is known
+ * @returns The create request for the main-process service
+ */
 export function buildCreateIssueRequest(
 	fields: LinearIssueEditorFields,
+	accountId?: string,
 ): CreateLinearIssueRequest {
 	return {
+		...(accountId ? { accountId } : {}),
 		teamId: fields.teamId,
 		title: fields.title.trim(),
 		...buildOptionalFields(fields),
@@ -67,7 +131,9 @@ export function buildCreateIssueRequest(
 
 /**
  * Maps editor fields to an `issueUpdate` request containing only fields that
- * differ from the original issue. Returns `null` when nothing changed.
+ * differ from the original issue. A cleared due date is sent as `null`, which is
+ * how Linear distinguishes "unset this" from "leave it alone". Returns `null`
+ * when nothing changed.
  */
 export function buildUpdateIssueRequest(
 	original: LinearIssueWire,
@@ -119,15 +185,17 @@ export function buildUpdateIssueRequest(
 		input.priority = Number.parseInt(fields.priority, 10);
 	}
 
-	if (fields.dueDate !== originalFields.dueDate && fields.dueDate !== '') {
-		input.dueDate = fields.dueDate;
+	if (fields.dueDate !== originalFields.dueDate) {
+		input.dueDate = fields.dueDate === '' ? null : fields.dueDate;
 	}
 
 	if (!areLabelIdsEqual(fields.labelIds, originalFields.labelIds)) {
 		input.labelIds = fields.labelIds;
 	}
 
-	return Object.keys(input).length > 0 ? { id: original.id, input } : null;
+	return Object.keys(input).length > 0
+		? { accountId: original.accountId, id: original.id, input }
+		: null;
 }
 
 /**

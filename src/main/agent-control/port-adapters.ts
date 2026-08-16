@@ -13,6 +13,7 @@ import type {
 	AgentControlWorkspaceInfo,
 	BoardStatusBroadcast,
 	FocusViewBroadcast,
+	LinearAccountRef,
 	PlanModeChangedBroadcast,
 	ReviewCommentsChangedBroadcast,
 	TabsChangedBroadcast,
@@ -107,6 +108,11 @@ export interface PortAdapterDeps {
 	 * is; the port answers `not-connected` either way.
 	 */
 	linearService: LinearService | null;
+	/**
+	 * Names the connected Linear accounts, so a failed Linear op can hand the
+	 * agent the choice it could not make. Empty when Linear is not composed in.
+	 */
+	listLinearAccounts: () => Promise<readonly LinearAccountRef[]>;
 	/** Names a workspace and its git branch together, for `setBranchName`. */
 	renameWorkspace: RenameWorkspaceService['rename'];
 	getPermissionMode: () => PermissionMode;

@@ -87,8 +87,15 @@ export interface LinearIssueCreateInput {
 	title: string;
 }
 
-/** Input for `issueUpdate` (all fields optional). */
-export type LinearIssueUpdateInput = Partial<LinearIssueCreateInput>;
+/**
+ * Input for `issueUpdate` (all fields optional). `dueDate` accepts `null`
+ * because Linear clears the date on an explicit null and ignores an absent key.
+ */
+export type LinearIssueUpdateInput = Partial<
+	Omit<LinearIssueCreateInput, 'dueDate'>
+> & {
+	dueDate?: string | null;
+};
 
 /** Boundary over the Linear GraphQL API with typed error mapping. */
 export interface LinearClient {
@@ -579,9 +586,26 @@ function mapMetadataNode(node: MetadataNode): LinearResourceData {
 	return {
 		data,
 		id: node.id,
-		name: typeof node.name === 'string' ? node.name : node.id,
+		name: resolveMetadataName(node),
 		teamId: team?.id ?? null,
 	};
+}
+
+/**
+ * Resolve the display name of a metadata node. A cycle Linear never named
+ * carries `name: null` but always a `number`, so it stays empty here and the
+ * renderer labels it from the number — falling back to the id printed a raw
+ * UUID in the picker.
+ * @param node - Raw metadata node from the GraphQL response.
+ * @returns The node's own name, an empty string for an unnamed numbered node,
+ * or the id when there is nothing else to show.
+ */
+function resolveMetadataName(node: MetadataNode): string {
+	if (typeof node.name === 'string' && node.name.length > 0) {
+		return node.name;
+	}
+
+	return typeof node.number === 'number' ? '' : node.id;
 }
 
 /**

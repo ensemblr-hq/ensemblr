@@ -14,6 +14,7 @@ import {
 } from './agent-provider-fixtures.ts';
 import { installPlaygroundBridge } from './bridge.ts';
 import { resolveFixtureMergeConflicts } from './conflicts-fixtures.ts';
+import { resolveFixtureLinearMetadata } from './linear-issue-editor-fixtures.ts';
 import { Playground } from './playground.tsx';
 import { resolveFixtureGitStatus } from './right-sidebar-header-fixtures.ts';
 
@@ -28,6 +29,7 @@ installPlaygroundBridge({
 	getAgentProviderReadiness: resolveFixtureAgentProviderReadiness,
 	getWorkspaceGitStatus: resolveFixtureGitStatus,
 	getWorkspaceMergeConflicts: resolveFixtureMergeConflicts,
+	linearMetadata: resolveFixtureLinearMetadata,
 	listAgentProviderMcpServers: resolveFixtureAgentProviderMcpServers,
 	listWorkspaceOpenTargets: resolveFixtureOpenTargets,
 	openAgentProviderSettingsFile: resolveFixtureOpenProviderSettingsFile,

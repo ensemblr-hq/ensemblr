@@ -6,6 +6,20 @@
  */
 import { z } from 'zod';
 
+/**
+ * Account selector shared by every Linear request. Optional throughout: the
+ * service resolves the owning account from the entity a request names, and only
+ * an ambiguous read needs the caller to pick one.
+ */
+const linearAccountId = z.string().min(1).optional();
+
+/**
+ * Account to fall back to when the entity a request names resolves no account of
+ * its own. Applied strictly after the entity lookup, so it can never mask an
+ * entity that belongs elsewhere nor pre-empt an ambiguity refusal.
+ */
+const linearFallbackAccountId = z.string().min(1).optional();
+
 /** Issue fields shared by the Linear create and update request schemas. */
 const linearIssueFieldsShape = {
 	assigneeId: z.string().min(1).optional(),
@@ -22,6 +36,7 @@ const linearIssueFieldsShape = {
 /** {@link import('../../../shared/ipc').ListLinearIssuesRequest}. */
 export const listLinearIssuesRequestSchema = z
 	.object({
+		accountId: linearAccountId,
 		query: z.string().optional(),
 		refresh: z.boolean().optional(),
 		teamId: z.string().min(1).optional(),
@@ -31,6 +46,8 @@ export const listLinearIssuesRequestSchema = z
 
 /** {@link import('../../../shared/ipc').GetLinearIssueRequest}. */
 export const getLinearIssueRequestSchema = z.object({
+	accountId: linearAccountId,
+	fallbackAccountId: linearFallbackAccountId,
 	id: z.string().min(1),
 	refresh: z.boolean().optional(),
 });
@@ -38,6 +55,7 @@ export const getLinearIssueRequestSchema = z.object({
 /** {@link import('../../../shared/ipc').GetLinearMetadataRequest}. */
 export const getLinearMetadataRequestSchema = z
 	.object({
+		accountId: linearAccountId,
 		refresh: z.boolean().optional(),
 	})
 	.optional()
@@ -46,15 +64,20 @@ export const getLinearMetadataRequestSchema = z
 /** {@link import('../../../shared/ipc').CreateLinearIssueRequest}. */
 export const createLinearIssueRequestSchema = z.object({
 	...linearIssueFieldsShape,
+	accountId: linearAccountId,
+	fallbackAccountId: linearFallbackAccountId,
 	teamId: z.string().min(1),
 	title: z.string().min(1),
 });
 
 /** {@link import('../../../shared/ipc').UpdateLinearIssueRequest}. */
 export const updateLinearIssueRequestSchema = z.object({
+	accountId: linearAccountId,
+	fallbackAccountId: linearFallbackAccountId,
 	id: z.string().min(1),
 	input: z.object({
 		...linearIssueFieldsShape,
+		dueDate: z.string().nullable().optional(),
 		teamId: z.string().min(1).optional(),
 		title: z.string().min(1).optional(),
 	}),
@@ -62,6 +85,13 @@ export const updateLinearIssueRequestSchema = z.object({
 
 /** {@link import('../../../shared/ipc').CreateLinearCommentRequest}. */
 export const createLinearCommentRequestSchema = z.object({
+	accountId: linearAccountId,
 	body: z.string().min(1),
+	fallbackAccountId: linearFallbackAccountId,
 	issueId: z.string().min(1),
+});
+
+/** {@link import('../../../shared/ipc').LinearDisconnectRequest}. */
+export const linearDisconnectRequestSchema = z.object({
+	accountId: z.string().min(1),
 });

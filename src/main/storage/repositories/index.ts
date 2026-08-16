@@ -80,6 +80,7 @@ export {
 	readLinkedDirectoryRecents,
 	writeLinkedDirectoryRecents,
 } from './linked-directory-repository.ts';
+export { parseMetadata, serializeMetadata } from './metadata-json.ts';
 export type {
 	DeleteRepositoryRowByIdOptions,
 	InsertRepositoryRowOptions,

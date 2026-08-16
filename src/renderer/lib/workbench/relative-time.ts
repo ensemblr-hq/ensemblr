@@ -59,19 +59,20 @@ function shortRelativeFormatter(locale: string): Intl.RelativeTimeFormat {
 }
 
 /**
- * Renders a closed-at ISO timestamp as the compact relative label on a
- * closed-tab history row. Returns the raw input when it cannot be parsed, so a
- * malformed row still shows something instead of throwing.
- * @param closedAtIso - ISO timestamp the tab was closed at
+ * Renders a past ISO timestamp as a compact relative label — the closed-tab
+ * history rows and the Linear comment thread both date themselves this way.
+ * Returns the raw input when it cannot be parsed, so a malformed row still shows
+ * something instead of throwing.
+ * @param iso - ISO timestamp of the event
  * @returns The label in the active UI language
  */
-export function formatRelativeClosedAt(closedAtIso: string): string {
-	const closedAt = Date.parse(closedAtIso);
-	if (Number.isNaN(closedAt)) {
-		return closedAtIso;
+export function formatRelativeTimestamp(iso: string): string {
+	const timestamp = Date.parse(iso);
+	if (Number.isNaN(timestamp)) {
+		return iso;
 	}
 
-	const elapsed = Date.now() - closedAt;
+	const elapsed = Date.now() - timestamp;
 	if (elapsed < MINUTE_MS) {
 		return i18n.t('workbench:history.closed-at.just-now', 'just now');
 	}

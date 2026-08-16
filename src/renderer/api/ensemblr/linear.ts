@@ -7,6 +7,7 @@ import type {
 	CreateLinearIssueRequest,
 	GetLinearIssueResult,
 	GetLinearMetadataResult,
+	LinearAuthFailure,
 	LinearDisconnectResult,
 	LinearLoginResult,
 	ListLinearIssuesRequest,
@@ -39,9 +40,26 @@ export function cancelLinearLogin(): Promise<void> {
 	return getEnsemblrApi().linearCancelLogin();
 }
 
-/** Disconnects the Linear integration and clears stored tokens. */
-export function disconnectLinear(): Promise<LinearDisconnectResult> {
-	return getEnsemblrApi().linearDisconnect();
+/**
+ * Wraps a rejection from this boundary in the envelope every caller already
+ * renders. The auth service itself never throws, but the main-process handler
+ * parses its payload strictly, so a malformed request rejects the `invoke` — and
+ * an unhandled rejection would otherwise leave the surface silent.
+ * @param error - The value the IPC call rejected with.
+ * @returns The failure envelope to display.
+ */
+export function unexpectedLinearAuthFailure(error: unknown): LinearAuthFailure {
+	return {
+		code: 'linear-unknown',
+		message: error instanceof Error ? error.message : '',
+	};
+}
+
+/** Disconnects one Linear account and clears its stored tokens. */
+export function disconnectLinear(
+	accountId: string,
+): Promise<LinearDisconnectResult> {
+	return getEnsemblrApi().linearDisconnect({ accountId });
 }
 
 /** Query options for the cached Linear issue list. */
@@ -57,15 +75,23 @@ export function linearIssuesQuery(request: ListLinearIssuesRequest = {}) {
 	});
 }
 
-/** Query options for one Linear issue with comments. */
-export function linearIssueQuery(id: string) {
+/**
+ * Query options for one Linear issue with comments. `accountId` is optional
+ * because a cached issue already names its account; pass it when the caller
+ * knows it, so the read still resolves after the cache has been cleared.
+ */
+export function linearIssueQuery(id: string, accountId?: string) {
 	return queryOptions({
 		queryFn: (): Promise<GetLinearIssueResult> =>
 			profileElectronIpcCall(
 				{ channel: 'ensemblr:linear-get-issue', usesDatabase: true },
-				() => getEnsemblrApi().linearGetIssue({ id }),
+				() =>
+					getEnsemblrApi().linearGetIssue({
+						...(accountId ? { accountId } : {}),
+						id,
+					}),
 			),
-		queryKey: ensemblrQueryKeys.linearIssue(id),
+		queryKey: ensemblrQueryKeys.linearIssue(id, accountId),
 		staleTime: 5000,
 	});
 }
