@@ -14,6 +14,7 @@ import {
 } from '@/renderer/components/ui/context-menu';
 import { useReviewFilePreviewOpener } from '@/renderer/components/workbench-shell/conversation-panel/file-preview-context';
 import { PanelPlaceholder } from '@/renderer/components/workbench-shell/panel-placeholder';
+import { useAttachToChat } from '@/renderer/hooks/workbench-shell/composer/use-attach-to-chat';
 import { useWorkspaceFileTree } from '@/renderer/hooks/workbench-shell/review-files/use-workspace-file-tree';
 import { useOpenTargets } from '@/renderer/hooks/workbench-shell/use-open-targets';
 import { cn } from '@/renderer/lib/utils';
@@ -83,9 +84,7 @@ function WorkspaceFileTree({
 	const { copyTarget, invokeTarget, openInTargets } = useOpenTargets({
 		workspaceId,
 	});
-
-	const hasMenu =
-		openInTargets.length > 0 || Boolean(copyTarget) || Boolean(openFilePreview);
+	const { attachEntry } = useAttachToChat({ workspaceCwd });
 
 	const {
 		handleContextCapture,
@@ -94,7 +93,7 @@ function WorkspaceFileTree({
 		rows,
 		scrollRef,
 		virtualizer,
-	} = useWorkspaceFileTree({ files, hasMenu, workspaceCwd, workspaceId });
+	} = useWorkspaceFileTree({ files, workspaceCwd, workspaceId });
 
 	const listBody = (
 		<div
@@ -145,15 +144,14 @@ function WorkspaceFileTree({
 	return (
 		<ContextMenu>
 			<ContextMenuTrigger asChild>{listBody}</ContextMenuTrigger>
-			{hasMenu ? (
-				<AllFilesContextMenuContent
-					copyTarget={copyTarget}
-					invokeTarget={invokeTarget}
-					openFilePreview={openFilePreview}
-					openInTargets={openInTargets}
-					target={menuTarget}
-				/>
-			) : null}
+			<AllFilesContextMenuContent
+				copyTarget={copyTarget}
+				invokeTarget={invokeTarget}
+				onAttachToChat={attachEntry}
+				openFilePreview={openFilePreview}
+				openInTargets={openInTargets}
+				target={menuTarget}
+			/>
 		</ContextMenu>
 	);
 }

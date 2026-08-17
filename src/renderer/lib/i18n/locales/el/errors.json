@@ -17,6 +17,12 @@
 		}
 	},
 	"attachment": {
+		"file-diff-empty": {
+			"message": "Δεν υπάρχει diff για επισύναψη: {{label}}"
+		},
+		"file-diff-failed": {
+			"message": "Δεν ήταν δυνατή η επισύναψη του diff."
+		},
 		"issue-failed": {
 			"message": "Δεν ήταν δυνατή η επισύναψη του ζητήματος."
 		},
@@ -169,6 +175,7 @@
 		"invalid-pattern": "Μη έγκυρο μοτίβο.",
 		"invalid-repository": "Αυτό δεν είναι χρησιμοποιήσιμο αποθετήριο.",
 		"invalid-worktree": "Αυτό το worktree δεν ανήκει σε αυτό το αποθετήριο.",
+		"issues-disabled": "Τα ζητήματα είναι απενεργοποιημένα για αυτό το αποθετήριο στο GitHub.",
 		"job-unknown": "Η εργασία κλωνοποίησης έληξε ή δεν προετοιμάστηκε ποτέ. Ξεκινήστε νέα κλωνοποίηση.",
 		"lifecycle-hook-failed": "Ένα hook κύκλου ζωής απέτυχε.",
 		"linear-unknown": "Η ενέργεια στο Linear απέτυχε.",

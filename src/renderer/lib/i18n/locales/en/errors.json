@@ -17,6 +17,12 @@
 		}
 	},
 	"attachment": {
+		"file-diff-empty": {
+			"message": "{{label}} has no diff to attach."
+		},
+		"file-diff-failed": {
+			"message": "Diff could not be attached."
+		},
 		"issue-failed": {
 			"message": "Issue could not be attached."
 		},
@@ -169,6 +175,7 @@
 		"invalid-pattern": "That pattern is not valid.",
 		"invalid-repository": "That is not a usable repository.",
 		"invalid-worktree": "The worktree does not belong to this repository.",
+		"issues-disabled": "Issues are turned off for this repository on GitHub.",
 		"job-unknown": "The clone job has expired or was never prepared. Start a new clone.",
 		"lifecycle-hook-failed": "A lifecycle hook failed.",
 		"linear-unknown": "The Linear operation failed.",

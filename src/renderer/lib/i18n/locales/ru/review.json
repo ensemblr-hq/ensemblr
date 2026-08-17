@@ -126,7 +126,8 @@
 		"untitled-chat": "Диалог без названия"
 	},
 	"file-menu": {
-		"actions": "Действия для {{path}}"
+		"actions": "Действия для {{path}}",
+		"attach-diff-to-chat": "Прикрепить diff к диалогу"
 	},
 	"file-row": {
 		"discard": "Отменить изменения в {{path}}",

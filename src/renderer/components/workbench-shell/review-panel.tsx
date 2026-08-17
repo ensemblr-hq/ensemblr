@@ -183,6 +183,7 @@ export function ReviewPanel({
 					isLoading={isCommitLoading}
 					onDiscardFile={handleDiscardFile}
 					viewMode={changesViewMode}
+					workspaceCwd={workspace.pathLabel}
 					workspaceId={workspace.id}
 				/>
 			</TabsContent>

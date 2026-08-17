@@ -158,17 +158,13 @@ function useDirectoryReveal({
  * Tracks which row a right-click landed on so one shared context menu can serve
  * every row, and swallows a right-click that landed below the last row rather
  * than opening an empty menu.
- * @param hasMenu - Whether any menu action is available at all
  * @returns The row the menu should act on, and the capture handler that sets it
  */
-function useFileTreeContextMenu(hasMenu: boolean) {
+function useFileTreeContextMenu() {
 	const [menuTarget, setMenuTarget] = useState<FileTreeMenuTarget | null>(null);
 
 	const handleContextCapture = useCallback(
 		(event: MouseEvent<HTMLDivElement>) => {
-			if (!hasMenu) {
-				return;
-			}
 			const rowElement = (event.target as HTMLElement).closest<HTMLElement>(
 				'[data-row-path]',
 			);
@@ -184,7 +180,7 @@ function useFileTreeContextMenu(hasMenu: boolean) {
 					rowElement.dataset.rowKind === 'directory' ? 'directory' : 'file',
 			});
 		},
-		[hasMenu],
+		[],
 	);
 
 	return { handleContextCapture, menuTarget };
@@ -223,19 +219,16 @@ function useScrollToRevealedDirectory(
  * loaded ignored folders, the built tree flattened to visible rows, expansion
  * and reveal handling, and the shared right-click menu target.
  * @param files - The workspace's enumerated files
- * @param hasMenu - Whether any context-menu action is available
  * @param workspaceCwd - Absolute workspace path directory reads resolve against
  * @param workspaceId - Workspace the reveal requests are scoped to
  * @returns The rows to render plus the handlers the tree binds to
  */
 export function useWorkspaceFileTree({
 	files,
-	hasMenu,
 	workspaceCwd,
 	workspaceId,
 }: {
 	files: WorkspaceFileSummary[];
-	hasMenu: boolean;
 	workspaceCwd: string;
 	workspaceId: string;
 }) {
@@ -282,7 +275,7 @@ export function useWorkspaceFileTree({
 		[toggleDirectory, loadIgnoredDirectory],
 	);
 
-	const { handleContextCapture, menuTarget } = useFileTreeContextMenu(hasMenu);
+	const { handleContextCapture, menuTarget } = useFileTreeContextMenu();
 
 	const scrollRef = useRef<HTMLDivElement>(null);
 	const virtualizer = useVirtualizer({

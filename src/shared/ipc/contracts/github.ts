@@ -12,6 +12,7 @@ export type GithubFailureCode =
 	| 'gh-not-authenticated'
 	| 'gh-not-installed'
 	| 'invalid-cwd'
+	| 'issues-disabled'
 	| 'merge-blocked'
 	| 'no-pull-request'
 	| 'no-remote'

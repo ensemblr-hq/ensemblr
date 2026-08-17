@@ -105,6 +105,15 @@ export type ComposerAttachment =
 			provider: 'github' | 'linear';
 	  }
 	| {
+			/** Workspace-relative path the patch was taken against, for the tooltip. */
+			filePath: string;
+			id: string;
+			kind: 'file-diff';
+			label: string;
+			/** Path of the markdown document the patch was written out to. */
+			path: string;
+	  }
+	| {
 			/**
 			 * The whole comment, so the chip opens its preview without going back to
 			 * GitHub or the database for a thread the user is already looking at.

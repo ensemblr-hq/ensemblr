@@ -34,6 +34,7 @@ function makeActions(
 	overrides: Partial<ReviewFileActions> = {},
 ): ReviewFileActions {
 	return {
+		attachDiff: () => {},
 		copyTarget: undefined,
 		invokeTarget: async () => {},
 		isDiscardable: () => true,

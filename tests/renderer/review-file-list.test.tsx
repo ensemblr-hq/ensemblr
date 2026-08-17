@@ -41,6 +41,7 @@ function renderList(
 					files={files}
 					onDiscardFile={() => {}}
 					viewMode={viewMode}
+					workspaceCwd='/tmp/ws'
 					workspaceId='w1'
 				/>
 			</TooltipProvider>
@@ -60,6 +61,7 @@ function renderError(error: WorkspaceGitFailure) {
 					files={[]}
 					onDiscardFile={() => {}}
 					viewMode='list'
+					workspaceCwd='/tmp/ws'
 					workspaceId='w1'
 				/>
 			</TooltipProvider>
@@ -135,6 +137,7 @@ test('empty change set shows the empty state in either mode', () => {
 					files={[]}
 					onDiscardFile={() => {}}
 					viewMode='list'
+					workspaceCwd='/tmp/ws'
 					workspaceId='w1'
 				/>
 			</TooltipProvider>

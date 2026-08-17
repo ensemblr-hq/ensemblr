@@ -113,6 +113,7 @@ export function ConflictsScene() {
 								files={[...CONFLICTED_REVIEW_FILES]}
 								onDiscardFile={() => undefined}
 								viewMode='list'
+								workspaceCwd={workspace.pathLabel}
 								workspaceId={workspace.id}
 							/>
 						</div>

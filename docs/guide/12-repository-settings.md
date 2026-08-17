@@ -40,6 +40,30 @@ over `file_include_globs` below.
 
 ---
 
+## Editing it in an editor
+
+Ensemblr publishes a JSON Schema for this file. TOML has no schema language of
+its own, but [Taplo](https://taplo.tamasfe.dev/) — the engine behind the Even
+Better TOML extension — validates TOML against JSON Schema, so a directive on
+the first line buys you completion for every key, block, and icon name:
+
+```toml
+#:schema https://raw.githubusercontent.com/ensemblr-hq/ensemblr/master/schemas/settings.schema.json
+```
+
+A save from the Scripts pane drops every comment in the file, but this one
+directive is read back and restored, so wiring a repository up survives an edit
+from the app. The schema is committed at
+[`schemas/settings.schema.json`](../../schemas/settings.schema.json); its
+canonical id is `https://www.ensemblr.dev/schemas/settings.schema.json`, and
+[`schemas/README.md`](../../schemas/README.md) covers both config files.
+
+Ensemblr's own `.ensemblr/settings.toml` points at the checked-in copy with a
+relative path (`#:schema ../schemas/settings.schema.json`), which validates
+offline and always against the tree it ships with.
+
+---
+
 ## Diagnostics
 
 Ensemblr never silently drops a config file over one bad key. A key it does not
@@ -398,7 +422,8 @@ What that means in practice:
   section survives by value; the write is atomic (temp file plus rename).
 - **Comments and blank-line grouping are lost** on a save. The rewrite emits
   scalars ahead of sub-tables and no comments at all. If your file's comments
-  matter, edit it by hand instead.
+  matter, edit it by hand instead. The one exception is a leading `#:schema`
+  directive, which is read back and restored above the rewritten document.
 - A file that does not parse is never overwritten. The save fails with an error
   and your file is untouched.
 - If the workspace you have open commits different scripts on its branch, the

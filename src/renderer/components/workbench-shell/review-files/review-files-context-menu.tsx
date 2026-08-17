@@ -1,4 +1,10 @@
-import { CopyIcon, EyeIcon, PinIcon, Undo2Icon } from 'lucide-react';
+import {
+	CopyIcon,
+	EyeIcon,
+	PaperclipIcon,
+	PinIcon,
+	Undo2Icon,
+} from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import {
@@ -14,10 +20,10 @@ import { useReviewFileActions } from './review-file-actions-context';
 
 /**
  * Single shared right-click menu for the changes panel: View (the file's diff,
- * or its image preview) and Keep open (the same, as a permanent tab), "Open in
- * <app>" for every installed target, Copy path, and Discard changes — scoped to
- * whichever row the user right-clicked. Keep open is the keyboard-reachable
- * equivalent of double-clicking the row.
+ * or its image preview) and Keep open (the same, as a permanent tab), "Attach
+ * diff to chat", "Open in <app>" for every installed target, Copy path, and
+ * Discard changes — scoped to whichever row the user right-clicked. Keep open is
+ * the keyboard-reachable equivalent of double-clicking the row.
  *
  * One menu serves the whole list (the clicked row is captured into `target`)
  * instead of mounting a Radix menu per row. Renders nothing until a row is
@@ -30,6 +36,7 @@ export function ReviewFilesContextMenuContent({
 }) {
 	const { t } = useTranslation();
 	const {
+		attachDiff,
 		copyTarget,
 		invokeTarget,
 		isDiscardable,
@@ -77,6 +84,16 @@ export function ReviewFilesContextMenuContent({
 					</ContextMenuItem>
 				</>
 			) : null}
+			<ContextMenuItem
+				className='h-8 gap-2 px-2 text-[0.8125rem]'
+				onSelect={() => attachDiff(path)}
+			>
+				<PaperclipIcon aria-hidden='true' className='text-muted-foreground' />
+				<span className='min-w-0 flex-1'>
+					{t('review:file-menu.attach-diff-to-chat', 'Attach diff to chat')}
+				</span>
+			</ContextMenuItem>
+			{openInTargets.length || copyTarget ? <ContextMenuSeparator /> : null}
 			<OpenInTargetsSubmenu onSelect={invoke} openInTargets={openInTargets} />
 			{copyTarget ? (
 				<ContextMenuItem

@@ -46,6 +46,10 @@
 		"description": "Marks the workspace as archived and preserves its <0>.context/</0> handoff files under <1>archived-contexts/</1>. By default the worktree folder and local branch stay on disk; nothing is committed or pushed.",
 		"title": "Archive workspace?"
 	},
+	"attach-to-chat": {
+		"attached": "{{label}} is attached to the chat.",
+		"diff-attached": "Diff for {{label}} is attached to the chat."
+	},
 	"attachment-menu": {
 		"add-attachment": "Add attachment",
 		"aria-label": "Attachments",
@@ -405,6 +409,9 @@
 			"count-filtered": "{{shown}}/{{total}}",
 			"empty": "Nothing here yet",
 			"empty-filtered": "No cards match the filter",
+			"issues-error": {
+				"missing-from": "Backlog is missing issues from {{repositories}}."
+			},
 			"label": "{{status}} column, {{cards}}",
 			"label-filtered": "{{status}} column, {{shown}} of {{total}} cards shown",
 			"loading": "Loading issues…"

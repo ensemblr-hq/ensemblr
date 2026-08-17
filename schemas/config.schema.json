@@ -1,0 +1,680 @@
+{
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"$id": "https://www.ensemblr.dev/schemas/config.schema.json",
+	"title": "Ensemblr user config",
+	"description": "Schema for ~/.config/ensemblr/config.json, the user-scope source of truth for Ensemblr's App settings and declarative configuration. Ensemblr watches this file: an external edit applies immediately. Every field validates independently and falls back to its own default, so one bad value costs that value rather than the file.",
+	"type": "object",
+	"additionalProperties": false,
+	"properties": {
+		"$schema": {
+			"type": "string",
+			"description": "URL of this schema. Accepted and ignored by Ensemblr; editors use it for completion and validation.",
+			"format": "uri-reference"
+		},
+		"schemaVersion": {
+			"const": 1,
+			"default": 1,
+			"description": "Config schema version. Ensemblr supports 1; any other value is an error diagnostic and the whole file falls back to defaults."
+		},
+		"app": {
+			"$ref": "#/$defs/appSettings"
+		},
+		"environment": {
+			"$ref": "#/$defs/environmentVariables",
+			"description": "User-scope environment variables passed to agent sessions, run scripts, and terminals. Names must be valid POSIX identifiers and values must be strings. A secret-looking name (TOKEN, KEY, SECRET, PASSWORD, and similar) is rejected with a diagnostic — secret values belong in the macOS Keychain via Settings, never in this file."
+		},
+		"managed": {
+			"$ref": "#/$defs/managed"
+		},
+		"repositoryDefaults": {
+			"$ref": "#/$defs/repositorySettings",
+			"description": "Repository-scope defaults applied to every repository as the `user-default` source. A repository's committed .ensemblr/settings.toml and your personal per-repository rows both outrank these."
+		},
+		"repositoryRules": {
+			"type": "array",
+			"description": "Repository-scope defaults applied only to repositories whose path matches the rule. Rules apply in array order — a later matching rule overrides an earlier one — and every matching rule outranks `repositoryDefaults`.",
+			"items": {
+				"$ref": "#/$defs/repositoryRule"
+			}
+		},
+		"security": {
+			"type": "object",
+			"description": "User-scope security defaults, resolved under the `security.` key prefix.",
+			"additionalProperties": false,
+			"properties": {
+				"permissionMode": {
+					"$ref": "#/$defs/permissionMode"
+				}
+			}
+		},
+		"ui": {
+			"type": "object",
+			"description": "User-scope UI defaults, resolved under the `ui.` key prefix. Kept for declarative deployments; the settings window writes `app.appearance` instead.",
+			"additionalProperties": false,
+			"properties": {
+				"theme": {
+					"type": "string",
+					"enum": ["system", "light", "dark"],
+					"default": "system",
+					"description": "Color theme. `system` follows macOS."
+				}
+			}
+		}
+	},
+	"$defs": {
+		"appSettings": {
+			"type": "object",
+			"description": "The App settings the settings window reads and writes, one object per pane.",
+			"additionalProperties": false,
+			"properties": {
+				"general": {
+					"type": "object",
+					"description": "Settings → General.",
+					"additionalProperties": false,
+					"properties": {
+						"sendShortcut": {
+							"type": "string",
+							"enum": ["enter", "mod+enter"],
+							"default": "enter",
+							"description": "Key that sends a composer message. `enter` sends on Return; `mod+enter` sends on ⌘↵ and leaves Return for newlines."
+						},
+						"followUpBehavior": {
+							"type": "string",
+							"enum": ["steer", "queue", "block"],
+							"default": "steer",
+							"description": "What a message typed while an agent is still working does. `steer` interrupts with the new instruction, `queue` sends it after the turn, `block` refuses it until the turn ends."
+						},
+						"language": {
+							"type": "string",
+							"enum": ["system", "en", "ru", "el"],
+							"default": "system",
+							"description": "App language. `system` follows the macOS language when it is one Ensemblr ships."
+						},
+						"desktopNotifications": {
+							"type": "boolean",
+							"default": true,
+							"description": "Post a desktop notification when an agent finishes a turn in a background tab."
+						},
+						"notificationSound": {
+							"type": "boolean",
+							"default": true,
+							"description": "Play a sound with the notification."
+						},
+						"autoConvertLongText": {
+							"type": "boolean",
+							"default": true,
+							"description": "Convert a long pasted block into an attachment chip instead of inlining it in the composer."
+						},
+						"alwaysShowContextUsage": {
+							"type": "boolean",
+							"default": true,
+							"description": "Keep the context-usage meter visible rather than showing it only as the window fills."
+						},
+						"caffeinateWhileRunning": {
+							"type": "boolean",
+							"default": false,
+							"description": "Hold a power assertion while an agent or script is running so the Mac does not sleep mid-turn."
+						},
+						"toolCallCollapse": {
+							"type": "string",
+							"enum": ["collapsed", "expanded"],
+							"default": "collapsed",
+							"description": "Whether a tool call in the timeline starts collapsed or expanded."
+						}
+					}
+				},
+				"models": {
+					"type": "object",
+					"description": "Settings → Models.",
+					"additionalProperties": false,
+					"properties": {
+						"defaultModel": {
+							"type": ["string", "null"],
+							"default": null,
+							"description": "Model id new chats open with. `null` uses the runtime's own default."
+						},
+						"defaultThinkingLevel": {
+							"type": ["string", "null"],
+							"default": null,
+							"description": "Reasoning-effort id new chats open with. `null` uses the runtime's own default."
+						},
+						"reviewModel": {
+							"type": ["string", "null"],
+							"default": null,
+							"description": "Model id the Review action runs on. `null` falls back to `defaultModel`."
+						},
+						"reviewThinkingLevel": {
+							"type": ["string", "null"],
+							"default": null,
+							"description": "Reasoning-effort id the Review action runs on. `null` falls back to `defaultThinkingLevel`."
+						},
+						"hiddenModels": {
+							"type": "array",
+							"default": [],
+							"description": "Model ids hidden from the model picker. Hiding a model does not stop a session already pinned to it.",
+							"items": {
+								"type": "string"
+							}
+						}
+					}
+				},
+				"providers": {
+					"type": "object",
+					"description": "Settings → Providers. Per-runtime preferences.",
+					"additionalProperties": false,
+					"properties": {
+						"claudeSubagentMode": {
+							"type": "string",
+							"enum": ["ensemblr", "native"],
+							"default": "ensemblr",
+							"description": "Which delegation mechanism a first-class Claude Code chat holds. `ensemblr` spawns visible chat tabs through the control tools and denies Claude's own sub-agent tool; `native` does the reverse. Pi has no native sub-agent mechanism and ignores this."
+						}
+					}
+				},
+				"git": {
+					"type": "object",
+					"description": "Settings → Git. User-scope defaults; a repository's own `[git]` block outranks them.",
+					"additionalProperties": false,
+					"properties": {
+						"branchPrefixSource": {
+							"type": "string",
+							"enum": ["github-username", "custom", "none"],
+							"default": "github-username",
+							"description": "Where the prefix on a new workspace branch comes from. `github-username` resolves it through the gh CLI at workspace creation."
+						},
+						"branchPrefixCustom": {
+							"type": "string",
+							"default": "",
+							"description": "Prefix used when `branchPrefixSource` is `custom`."
+						},
+						"renameWorkspaceOnBranch": {
+							"type": "boolean",
+							"default": true,
+							"description": "Rename the workspace when its branch is renamed."
+						},
+						"deleteLocalBranchOnArchive": {
+							"type": "boolean",
+							"default": false,
+							"description": "Delete the local branch when a workspace is archived. The remote branch is untouched."
+						},
+						"archiveAfterMerge": {
+							"type": "boolean",
+							"default": false,
+							"description": "Archive a workspace automatically once its pull request merges."
+						},
+						"setUpstreamOnPush": {
+							"type": "boolean",
+							"default": true,
+							"description": "Configure new workspaces so a plain `git push` sets the branch upstream."
+						}
+					}
+				},
+				"appearance": {
+					"type": "object",
+					"description": "Settings → Appearance.",
+					"additionalProperties": false,
+					"properties": {
+						"theme": {
+							"type": "string",
+							"enum": ["system", "light", "dark"],
+							"default": "system",
+							"description": "Color theme. `system` follows macOS."
+						},
+						"accessibleColors": {
+							"type": "string",
+							"enum": ["default", "protanopia", "deuteranopia", "tritanopia"],
+							"default": "default",
+							"description": "Color-vision-deficiency palette applied to status and diff colors."
+						},
+						"codeTheme": {
+							"type": "string",
+							"enum": [
+								"catppuccin-mocha",
+								"catppuccin-latte",
+								"github-dark",
+								"github-light",
+								"one-dark-pro",
+								"solarized-dark"
+							],
+							"default": "catppuccin-mocha",
+							"description": "Syntax theme for code blocks and diffs. The value names a theme *family*: Ensemblr swaps in the light or dark cut to match the app theme, so the light-cut ids are equivalent to their dark siblings."
+						},
+						"monoFont": {
+							"type": "string",
+							"default": "JetBrainsMono Nerd Font Mono",
+							"description": "Monospace family for code blocks and diffs. Any font installed on the machine."
+						},
+						"codeLigatures": {
+							"type": "boolean",
+							"default": true,
+							"description": "Enable programming ligatures where the mono font provides them."
+						},
+						"markdownStyle": {
+							"type": "string",
+							"enum": ["default", "compact", "prose"],
+							"default": "default",
+							"description": "Density of rendered markdown in the timeline."
+						},
+						"terminalFont": {
+							"type": "string",
+							"default": "JetBrainsMono Nerd Font Mono",
+							"description": "Monospace family for terminals."
+						},
+						"terminalFontSize": {
+							"type": "integer",
+							"minimum": 8,
+							"maximum": 24,
+							"default": 12,
+							"description": "Terminal font size in points."
+						},
+						"terminalScrollbackMb": {
+							"type": "integer",
+							"minimum": 1,
+							"maximum": 200,
+							"default": 10,
+							"description": "Scrollback held per terminal, in megabytes."
+						}
+					}
+				},
+				"dictation": {
+					"type": "object",
+					"description": "Voice dictation for the composer. Non-secret configuration only — the API key lives in the macOS Keychain, never here.",
+					"additionalProperties": false,
+					"properties": {
+						"enabled": {
+							"type": "boolean",
+							"default": false,
+							"description": "Show the composer's mic control and accept dictation."
+						},
+						"baseUrl": {
+							"type": "string",
+							"default": "https://api.openai.com/v1",
+							"description": "Root of any OpenAI-compatible API, so OpenAI, Groq, or a local whisper-server all work without a code change.",
+							"format": "uri"
+						},
+						"model": {
+							"type": "string",
+							"default": "gpt-4o-mini-transcribe",
+							"description": "Transcription model id sent to that endpoint."
+						},
+						"language": {
+							"type": "string",
+							"enum": ["en"],
+							"default": "en",
+							"description": "Dictation language. Ships English-only; the field exists so widening later is a value change rather than a schema migration."
+						}
+					}
+				},
+				"experimental": {
+					"type": "object",
+					"description": "Settings → Experimental.",
+					"additionalProperties": false,
+					"properties": {
+						"autoRunAfterSetup": {
+							"type": "boolean",
+							"default": false,
+							"description": "Start the default run script automatically once a workspace's setup script exits 0."
+						},
+						"developerMode": {
+							"type": "boolean",
+							"default": false,
+							"description": "Expose developer-facing panels and diagnostics."
+						}
+					}
+				},
+				"onboarding": {
+					"type": "object",
+					"description": "First-run state, not a preference.",
+					"additionalProperties": false,
+					"properties": {
+						"completedAt": {
+							"type": ["string", "null"],
+							"default": null,
+							"description": "ISO timestamp at which the user left the onboarding wizard, by finishing or skipping it. `null` means it has never been shown — clearing this field by hand re-runs onboarding on the next launch.",
+							"format": "date-time"
+						}
+					}
+				}
+			}
+		},
+		"environmentVariables": {
+			"type": "object",
+			"description": "Environment variables as a name/value map.",
+			"propertyNames": {
+				"pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+			},
+			"additionalProperties": {
+				"type": "string"
+			}
+		},
+		"managed": {
+			"type": "object",
+			"description": "Policy-set values a user cannot override. A key listed under `locked` resolves from `managed.values` (or, failing that, from the matching `app` value) and its control is disabled in the settings window.",
+			"properties": {
+				"locked": {
+					"type": "object",
+					"description": "Boolean tree naming the locked keys, mirroring the shape of `app`. `{ \"general\": { \"language\": true } }` locks `general.language`.",
+					"additionalProperties": true
+				},
+				"values": {
+					"type": "object",
+					"description": "Values supplied for locked keys, mirroring the shape of `app`.",
+					"additionalProperties": true
+				}
+			},
+			"additionalProperties": true
+		},
+		"permissionMode": {
+			"type": "string",
+			"enum": ["workspace-trusted", "approval-required", "read-only"],
+			"default": "workspace-trusted",
+			"description": "How much an agent may do without asking. `workspace-trusted` lets it act inside the workspace, `approval-required` prompts per action, `read-only` refuses every write. An unrecognised value is reported and the default stands."
+		},
+		"repositoryRule": {
+			"type": "object",
+			"description": "One conditional block of repository defaults.",
+			"additionalProperties": false,
+			"properties": {
+				"match": {
+					"type": "object",
+					"description": "Which repositories the rule applies to. Omitted or empty applies it to all of them.",
+					"additionalProperties": false,
+					"properties": {
+						"path": {
+							"type": "string",
+							"minLength": 1,
+							"description": "Path fragment matched against the repository path on segment boundaries, case-insensitively: `api` matches /repos/api but not /repos/legacy-api. A non-empty `match` without a usable `path` matches nothing and reports a diagnostic."
+						}
+					}
+				},
+				"settings": {
+					"$ref": "#/$defs/repositorySettings",
+					"description": "Repository settings applied when the rule matches."
+				}
+			}
+		},
+		"repositorySettings": {
+			"type": "object",
+			"description": "Repository-scope settings. The same key vocabulary Ensemblr resolves from a repository's committed .ensemblr/settings.toml, spelled in camelCase here rather than the file's snake_case.",
+			"additionalProperties": false,
+			"properties": {
+				"archiveAfterMerge": {
+					"type": "boolean",
+					"default": false,
+					"description": "Archive a workspace automatically once its pull request merges."
+				},
+				"autoRunAfterSetup": {
+					"type": "boolean",
+					"default": false,
+					"description": "Start the default run script automatically once the setup script exits 0."
+				},
+				"branchFrom": {
+					"type": ["string", "null"],
+					"default": null,
+					"description": "Branch new workspaces fork from. `null` uses the repository's default branch."
+				},
+				"branchPrefix": {
+					"type": "string",
+					"description": "Prefix for new workspace branch names."
+				},
+				"deleteLocalBranchOnArchive": {
+					"type": "boolean",
+					"default": false,
+					"description": "Delete the local branch when a workspace is archived. The remote branch is untouched."
+				},
+				"setUpstreamOnPush": {
+					"type": "boolean",
+					"default": true,
+					"description": "Configure new workspaces so a plain `git push` sets the branch upstream."
+				},
+				"remoteOrigin": {
+					"type": ["string", "null"],
+					"default": null,
+					"description": "Remote Ensemblr treats as origin."
+				},
+				"runScriptMode": {
+					"type": "string",
+					"enum": ["concurrent", "nonconcurrent"],
+					"default": "concurrent",
+					"description": "Whether run scripts may run in several workspaces at once. An unrecognised value falls back to `concurrent`."
+				},
+				"filesToCopy": {
+					"type": "array",
+					"default": [".env*"],
+					"description": "Gitignore-style patterns for untracked files copied into every new workspace. A repository's .worktreeinclude outranks this.",
+					"items": {
+						"type": "string"
+					}
+				},
+				"previewUrls": {
+					"type": "array",
+					"default": [],
+					"description": "Preview URLs offered for a workspace.",
+					"items": {
+						"type": "string"
+					}
+				},
+				"previewUrlTemplate": {
+					"type": ["string", "null"],
+					"default": null,
+					"description": "Template a workspace's preview URL is built from."
+				},
+				"enterpriseDataPrivacy": {
+					"type": "boolean",
+					"description": "Accepted and type-checked; nothing reads it today."
+				},
+				"environmentVariables": {
+					"$ref": "#/$defs/environmentVariables",
+					"description": "Repository-scoped environment variables passed to agent sessions, scripts, and terminals."
+				},
+				"spotlightTesting": {
+					"type": "object",
+					"description": "Accepted and type-checked; nothing reads it today.",
+					"additionalProperties": true
+				},
+				"ampExecutablePath": {
+					"type": "string",
+					"description": "Accepted and type-checked; nothing reads it today. Pin a runtime's executable in Settings → Providers instead."
+				},
+				"claudeExecutablePath": {
+					"type": "string",
+					"description": "Accepted and type-checked; nothing reads it today. Pin a runtime's executable in Settings → Providers instead."
+				},
+				"codexExecutablePath": {
+					"type": "string",
+					"description": "Accepted and type-checked; nothing reads it today. Pin a runtime's executable in Settings → Providers instead."
+				},
+				"copilotExecutablePath": {
+					"type": "string",
+					"description": "Accepted and type-checked; nothing reads it today. Pin a runtime's executable in Settings → Providers instead."
+				},
+				"geminiExecutablePath": {
+					"type": "string",
+					"description": "Accepted and type-checked; nothing reads it today. Pin a runtime's executable in Settings → Providers instead."
+				},
+				"opencodeExecutablePath": {
+					"type": "string",
+					"description": "Accepted and type-checked; nothing reads it today. Pin a runtime's executable in Settings → Providers instead."
+				},
+				"piExecutablePath": {
+					"type": "string",
+					"description": "Accepted and type-checked; nothing reads it today. Pin a runtime's executable in Settings → Providers instead."
+				},
+				"actionPreferences": {
+					"type": "object",
+					"description": "Custom instructions attached to the workspace action buttons. The repository's committed `[prompts]` block outranks these.",
+					"additionalProperties": false,
+					"properties": {
+						"branchRename": {
+							"type": ["string", "null"],
+							"default": null,
+							"description": "Steers branch-name generation."
+						},
+						"codeReview": {
+							"type": ["string", "null"],
+							"default": null,
+							"description": "Steers the Review button."
+						},
+						"createPr": {
+							"type": ["string", "null"],
+							"default": null,
+							"description": "Steers the Create PR button."
+						},
+						"fixErrors": {
+							"type": ["string", "null"],
+							"default": null,
+							"description": "Steers the Fix errors button."
+						},
+						"general": {
+							"type": ["string", "null"],
+							"default": null,
+							"description": "Master prompt prepended to the first message of every new chat in the repository."
+						},
+						"resolveConflicts": {
+							"type": ["string", "null"],
+							"default": null,
+							"description": "Steers the Resolve conflicts button."
+						}
+					}
+				},
+				"scripts": {
+					"type": "object",
+					"description": "Repository scripts. A repository's committed `[scripts]` block outranks these.",
+					"additionalProperties": false,
+					"properties": {
+						"setup": {
+							"type": ["string", "null"],
+							"default": null,
+							"description": "Command run when a new workspace is created."
+						},
+						"archive": {
+							"type": ["string", "null"],
+							"default": null,
+							"description": "Command run before a workspace is archived."
+						},
+						"run": {
+							"type": ["string", "null"],
+							"default": null,
+							"description": "Legacy single run command, upgraded into one implicit run script named `run`. Ignored when `runScripts` is non-empty."
+						},
+						"runScripts": {
+							"type": "array",
+							"default": [],
+							"description": "Named run scripts, in declaration order.",
+							"items": {
+								"$ref": "#/$defs/runScript"
+							}
+						}
+					}
+				},
+				"security": {
+					"type": "object",
+					"description": "Repository-scope security settings.",
+					"additionalProperties": false,
+					"properties": {
+						"permissionMode": {
+							"$ref": "#/$defs/permissionMode"
+						}
+					}
+				}
+			}
+		},
+		"runScript": {
+			"type": "object",
+			"description": "One named run script, in the camelCase spelling the resolver reads. A repository's own [scripts.run.<name>] tables use the TOML spelling instead.",
+			"additionalProperties": false,
+			"required": ["name", "command"],
+			"properties": {
+				"name": {
+					"type": "string",
+					"minLength": 1,
+					"description": "Script name. Duplicates are dropped first-wins."
+				},
+				"command": {
+					"type": "string",
+					"minLength": 1,
+					"description": "Shell command to run. An entry without one is dropped."
+				},
+				"icon": {
+					"$ref": "#/$defs/runScriptIcon"
+				},
+				"isDefault": {
+					"type": "boolean",
+					"default": false,
+					"description": "Marks the script ⌘R and the Run button start. At most one script keeps it — a second is rejected and loaded as false."
+				},
+				"availableIn": {
+					"type": ["array", "null"],
+					"description": "Environments the script is offered in. Ensemblr is local-only, so a script that declares this without `local` is filtered out of the Run menu. Omitted means available.",
+					"items": {
+						"type": "string"
+					}
+				}
+			}
+		},
+		"runScriptIcon": {
+			"type": "string",
+			"default": "play",
+			"description": "One of the curated run-script icon names. The list is closed so a committed config can never name an icon that fails to render; anything outside it falls back to `play`.",
+			"enum": [
+				"activity",
+				"badge-check",
+				"blocks",
+				"book-open",
+				"box",
+				"bug",
+				"calculator",
+				"cloud",
+				"code",
+				"cog",
+				"component",
+				"container",
+				"cpu",
+				"database",
+				"download",
+				"eye",
+				"file-code",
+				"flame",
+				"flask-conical",
+				"folder",
+				"gauge",
+				"git-branch",
+				"git-merge",
+				"git-pull-request",
+				"globe",
+				"hammer",
+				"hard-drive",
+				"key",
+				"layers",
+				"layout-dashboard",
+				"list-checks",
+				"lock",
+				"microscope",
+				"monitor",
+				"network",
+				"package",
+				"paintbrush",
+				"palette",
+				"play",
+				"plug",
+				"refresh-cw",
+				"repeat",
+				"rocket",
+				"search",
+				"send",
+				"server",
+				"settings",
+				"shield-check",
+				"smartphone",
+				"sparkles",
+				"terminal",
+				"test-tube",
+				"timer",
+				"trending-up",
+				"upload",
+				"wrench",
+				"zap"
+			]
+		}
+	}
+}

@@ -94,6 +94,16 @@ The app ships in English, Russian, and Greek. A change that adds or edits a user
 - `src/shared/` and `src/main/` return locale-neutral codes rather than English labels, so adding a code there is a user-facing change: the renderer mapper needs its `t()` case and that key needs `ru` and `el`. A surface main draws itself keeps a const table instead — `src/main/menu/menu-strings.ts` for the menu bar, `src/main/agent-runtime/notification-strings.ts` for desktop notifications, `src/main/app/quit-guard-strings.ts` for the quit confirmation, `src/main/linear/linear-callback-page-strings.ts` for the browser page Linear's OAuth redirect lands on — and a new key adds all three languages there.
 - See @.claude/rules/i18n.md for the full contract: what counts as a user-facing surface, plural categories per locale, interpolation placeholders, agent-facing prose (which is steered by `buildLanguageDirective`, not translated), and when an `i18next-instrument-ignore` directive is legitimate.
 
+## Config File Schemas
+
+Ensemblr publishes a JSON Schema for each config file it reads: `schemas/config.schema.json` for `~/.config/ensemblr/config.json`, and `schemas/settings.schema.json` for a repository's `.ensemblr/settings.toml`.
+
+- A `.ensemblr/settings.toml` you author opens with Taplo's directive on its first line: `#:schema https://raw.githubusercontent.com/ensemblr-hq/ensemblr/master/schemas/settings.schema.json`. Inside this repository use the relative path `../schemas/settings.schema.json` instead. The Scripts pane restores an existing directive across a rewrite but never adds one, so it has to be written by hand.
+- A `config.json` you author by hand carries the matching `$schema` key. Ensemblr writes one into the file it creates itself, so an existing config usually has it already.
+- Adding, renaming, or retyping a key either file accepts updates the matching schema in the same change. The loader is the source of truth — the allowed top-level keys in `src/main/config/config-loader.ts`, the field maps in `src/main/config/repository-config.ts`, the repository defaults in `src/main/config/config-resolution.ts` — and the schema mirrors it.
+- `tests/main/published-schemas.test.ts` holds each schema to the loader it describes and fails on drift, so a key added to one and not the other is a red test rather than a silent gap.
+- See `schemas/README.md` for the canonical URLs and editor wiring.
+
 ## Scoped Agent Instructions
 
 - This root file contains repository-wide defaults. Before editing a subtree, check for the closest scoped `AGENTS.md`; scoped instructions are more specific and override these general rules.

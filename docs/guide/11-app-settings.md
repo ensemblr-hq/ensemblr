@@ -33,8 +33,27 @@ The first-run wizard also records its completion timestamp under
 again on the next launch. See [3. First run](./03-first-run.md).
 
 Other top-level keys the file accepts are `environment`, `managed`,
-`repositoryDefaults`, `repositoryRules`, `security`, `ui`, and `schemaVersion`.
-Any other top-level key is rejected with a diagnostic.
+`repositoryDefaults`, `repositoryRules`, `security`, `ui`, `schemaVersion`, and
+`$schema`. Any other top-level key is rejected with a diagnostic.
+
+### Editing it in an editor
+
+Ensemblr publishes a JSON Schema for this file, so an editor can complete every
+key, document it inline, and flag a typo before the app ever reads it. The
+config Ensemblr creates on first launch already carries the pointer:
+
+```json
+{
+	"$schema": "https://raw.githubusercontent.com/ensemblr-hq/ensemblr/master/schemas/config.schema.json",
+	"schemaVersion": 1
+}
+```
+
+`$schema` is accepted and ignored — it is not a setting. Add the line by hand to
+a config that predates it. The schema is committed at
+[`schemas/config.schema.json`](../../schemas/config.schema.json); its canonical
+id is `https://www.ensemblr.dev/schemas/config.schema.json`, and
+[`schemas/README.md`](../../schemas/README.md) covers both files.
 
 ### Live reload
 

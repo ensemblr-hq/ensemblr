@@ -34,6 +34,7 @@ function renderChangedFiles() {
 					files={[sourceFile]}
 					onDiscardFile={() => {}}
 					viewMode='list'
+					workspaceCwd='/tmp/ws'
 					workspaceId='w1'
 				/>
 			</ReviewFilePreviewOpenerProvider>

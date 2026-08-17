@@ -68,6 +68,7 @@ function renderList(store: ReturnType<typeof createStore>) {
 						files={[FIRST, SECOND]}
 						onDiscardFile={() => {}}
 						viewMode='list'
+						workspaceCwd='/tmp/ws'
 						workspaceId='w1'
 					/>
 				</TooltipProvider>

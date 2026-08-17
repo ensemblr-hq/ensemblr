@@ -64,6 +64,12 @@ export interface ReviewFileActions {
 	/** Discards the working-tree changes for a single file. */
 	onDiscardFile: (filePath: string) => void;
 	/**
+	 * Attaches one file's patch to the workspace's composer as a chip. The patch is
+	 * taken at the active source's scope, so a row listed from a commit attaches
+	 * that commit's diff rather than the working tree's.
+	 */
+	attachDiff: (filePath: string) => void;
+	/**
 	 * Whether a file can be discarded in the current view. Only working-tree
 	 * (uncommitted) files revert cleanly; committed-only files in the branch or
 	 * a specific-commit view are not discardable.

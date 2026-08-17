@@ -4,7 +4,6 @@ import { useTranslation } from 'react-i18next';
 
 import { ScrollArea } from '@/renderer/components/ui/scroll-area';
 import { Skeleton } from '@/renderer/components/ui/skeleton';
-import { failureText } from '@/renderer/lib/failure-text';
 import { cn } from '@/renderer/lib/utils';
 import {
 	BOARD_STATUS_PRESENTATION,
@@ -14,8 +13,9 @@ import type { WorkspaceBoardStatus } from '@/renderer/state/workspace';
 import type {
 	BoardCard,
 	BoardIssueCard,
+	BoardIssuesFailure,
 } from '@/renderer/types/workbench-shell';
-import type { GithubFailure } from '@/shared/ipc/contracts/github';
+import { BacklogIssuesError } from './backlog-issues-error';
 import { IssueCard } from './issue-card';
 import { BOARD_CARD_DRAG_TYPE } from './use-card-dnd';
 import { WorkspaceCard } from './workspace-card';
@@ -34,15 +34,15 @@ export interface BoardColumnActions {
 /**
  * A single dashboard board column for one board status. Acts as a drop target
  * for both card kinds; what a drop means is decided by `planBoardDrop`. Backlog
- * additionally reports the `gh` failure behind a missing repository's issues,
- * since a silently short list would read as "nothing to do".
+ * additionally names every repository whose `gh` list failed, since a silently
+ * short list would read as "nothing to do".
  */
 export function BoardColumn({
 	actions,
 	allowReorder,
 	cards,
 	isLoadingIssues,
-	issuesError,
+	issuesErrors,
 	status,
 	totalCount,
 }: {
@@ -52,7 +52,7 @@ export function BoardColumn({
 	cards: BoardCard[];
 	/** True while Backlog's issue lists are still in flight. */
 	isLoadingIssues: boolean;
-	issuesError: GithubFailure | null;
+	issuesErrors: readonly BoardIssuesFailure[];
 	status: WorkspaceBoardStatus;
 	/** Cards the column holds before the toolbar's filters narrow it. */
 	totalCount: number;
@@ -129,10 +129,8 @@ export function BoardColumn({
 						: cards.length}
 				</span>
 			</div>
-			{status === 'backlog' && issuesError ? (
-				<p className='px-3 pb-2 text-destructive text-xxs'>
-					{failureText(t, issuesError)}
-				</p>
+			{status === 'backlog' ? (
+				<BacklogIssuesError failures={issuesErrors} />
 			) : null}
 			<ScrollArea className='min-h-0 flex-1'>
 				{cards.length === 0 ? (

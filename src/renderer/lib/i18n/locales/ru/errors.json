@@ -17,6 +17,12 @@
 		}
 	},
 	"attachment": {
+		"file-diff-empty": {
+			"message": "У {{label}} нет diff для прикрепления."
+		},
+		"file-diff-failed": {
+			"message": "Не удалось прикрепить diff."
+		},
 		"issue-failed": {
 			"message": "Не удалось прикрепить задачу."
 		},
@@ -173,6 +179,7 @@
 		"invalid-pattern": "Недопустимый шаблон.",
 		"invalid-repository": "Это не пригодный репозиторий.",
 		"invalid-worktree": "Этот worktree не принадлежит данному репозиторию.",
+		"issues-disabled": "Задачи отключены для этого репозитория в GitHub.",
 		"job-unknown": "Задача клонирования истекла или не была подготовлена. Начните клонирование заново.",
 		"lifecycle-hook-failed": "Хук жизненного цикла завершился с ошибкой.",
 		"linear-unknown": "Операция с Linear не удалась.",

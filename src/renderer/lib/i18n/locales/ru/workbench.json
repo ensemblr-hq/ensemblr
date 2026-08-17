@@ -46,6 +46,10 @@
 		"description": "Рабочее пространство помечается как архивное, а его файлы передачи <0>.context/</0> сохраняются в <1>archived-contexts/</1>. По умолчанию каталог worktree и локальная ветка остаются на диске; ничего не коммитится и не отправляется через push.",
 		"title": "Архивировать рабочее пространство?"
 	},
+	"attach-to-chat": {
+		"attached": "Прикреплено к диалогу: {{label}}",
+		"diff-attached": "Diff для {{label}} прикреплён к диалогу."
+	},
 	"attachment-menu": {
 		"add-attachment": "Добавить файл",
 		"aria-label": "Вложения",
@@ -415,6 +419,9 @@
 			"count-filtered": "{{shown}}/{{total}}",
 			"empty": "Пока пусто",
 			"empty-filtered": "Нет карточек по фильтру",
+			"issues-error": {
+				"missing-from": "В бэклоге не хватает задач из {{repositories}}."
+			},
 			"label": "Колонка {{status}}, {{cards}}",
 			"label-filtered": "Колонка {{status}}, показано {{shown}} из {{total}} карточек",
 			"loading": "Загрузка задач…"

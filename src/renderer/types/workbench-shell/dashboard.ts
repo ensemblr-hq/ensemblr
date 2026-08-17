@@ -7,6 +7,7 @@ import type {
 	WorkspaceSourceItem,
 } from '@/renderer/types/workbench';
 import type { WorkspaceBoardStatusValue } from '@/shared/agent-control';
+import type { GithubFailure } from '@/shared/ipc/contracts/github';
 
 /** Which of the two board card shapes a card (or a drag) refers to. */
 export type BoardCardKind = 'issue' | 'workspace';
@@ -47,6 +48,24 @@ export type BoardCard =
 			project: ProjectShellModel;
 			workspace: WorkspaceShellModel;
 	  };
+
+/**
+ * One repository whose `gh issue list` failed, named so the Backlog column can
+ * say which repository is missing from it rather than reporting a bare code.
+ */
+export interface BoardIssuesFailure {
+	failure: GithubFailure;
+	projectName: string;
+}
+
+/**
+ * A failure several repositories hit the same way, with every repository it
+ * cost the board — what the Backlog column renders one row per.
+ */
+export interface GroupedBoardIssuesFailure {
+	failure: GithubFailure;
+	projectNames: string[];
+}
 
 /** A resolved board drop: the moved card, its kind, and where it landed. */
 export interface BoardDrop {

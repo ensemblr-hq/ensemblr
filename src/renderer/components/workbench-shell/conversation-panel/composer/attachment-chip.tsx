@@ -1,5 +1,5 @@
 import { Icon } from '@iconify/react';
-import { XIcon } from 'lucide-react';
+import { FileDiffIcon, XIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { ProviderMark } from '@/renderer/components/workbench-shell/checks-panel/provider-mark';
 import {
@@ -12,8 +12,9 @@ import type { ComposerAttachment } from '@/renderer/types/workbench';
 
 /**
  * The glyph that says where an attachment came from: a tracker issue or a review
- * comment wears its provider's brand mark, since the markdown document either
- * was written to would otherwise render as an anonymous file icon.
+ * comment wears its provider's brand mark, and a diff wears a compare mark, since
+ * the markdown document each was written to would otherwise render as an
+ * anonymous file icon.
  */
 function AttachmentIcon({ attachment }: { attachment: ComposerAttachment }) {
 	if (attachment.kind === 'review-comment') {
@@ -22,6 +23,14 @@ function AttachmentIcon({ attachment }: { attachment: ComposerAttachment }) {
 	if (attachment.kind === 'issue') {
 		const Logo = attachment.provider === 'linear' ? LinearLogo : GithubLogo;
 		return <Logo className='size-3.5 shrink-0' />;
+	}
+	if (attachment.kind === 'file-diff') {
+		return (
+			<FileDiffIcon
+				aria-hidden='true'
+				className='size-3.5 shrink-0 text-muted-foreground'
+			/>
+		);
 	}
 	return (
 		<Icon
@@ -37,13 +46,16 @@ function AttachmentIcon({ attachment }: { attachment: ComposerAttachment }) {
 
 /**
  * What the chip's tooltip says, which is the label unless the label is an
- * abbreviation of something longer: a review comment is labelled by its file's
- * basename, so two comments on same-named files in different directories read
- * identically until the tooltip names the full path.
+ * abbreviation of something longer: a review comment and a diff are both labelled
+ * by their file's basename, so two of them on same-named files in different
+ * directories read identically until the tooltip names the full path.
  * @param attachment - The attachment behind the chip
  * @returns The hover text; never empty
  */
 function attachmentTooltip(attachment: ComposerAttachment): string {
+	if (attachment.kind === 'file-diff') {
+		return attachment.filePath || attachment.label;
+	}
 	if (attachment.kind !== 'review-comment') {
 		return attachment.label;
 	}

@@ -15,7 +15,10 @@ import {
 } from '@/renderer/lib/workbench/board-issues';
 import { useBoardIssueDismissals } from '@/renderer/state/workspace';
 import type { ProjectShellModel } from '@/renderer/types/workbench';
-import type { BoardIssueCard } from '@/renderer/types/workbench-shell';
+import type {
+	BoardIssueCard,
+	BoardIssuesFailure,
+} from '@/renderer/types/workbench-shell';
 import type { GithubFailure } from '@/shared/ipc/contracts/github';
 import type { ListRepositoryIssuesResult } from '@/shared/ipc/contracts/workspace-sources';
 
@@ -23,8 +26,11 @@ import type { ListRepositoryIssuesResult } from '@/shared/ipc/contracts/workspac
 export interface BoardIssuesState {
 	backlogIssues: BoardIssueCard[];
 	dismissedIssues: BoardIssueCard[];
-	/** First `gh` failure across the repositories; the rest of the board stays usable. */
-	error: GithubFailure | null;
+	/**
+	 * Every repository whose `gh` list failed, named — the rest of the board stays
+	 * usable, so the column has to say which repositories it is missing.
+	 */
+	errors: BoardIssuesFailure[];
 	isLoading: boolean;
 }
 
@@ -70,8 +76,9 @@ function combineRepositoryIssues(
 /**
  * Loads the Backlog column: one `gh issue list` per repository plus the merged
  * Linear list, folded into board cards. Every source is degradable — a repository
- * whose `gh` call failed contributes nothing and surfaces its typed failure once,
- * matching how the create-from picker already behaves.
+ * whose `gh` call failed contributes nothing and is named in `errors`, so the
+ * column can say which repositories the list is short of rather than reading as
+ * "nothing to do".
  * @param projects - The projects whose repositories to list issues for.
  * @returns The backlog and dismissed issue cards, with loading and failure state.
  */
@@ -94,13 +101,13 @@ export function useBoardIssues(
 			})),
 		[projects, github.data],
 	);
-	const githubError = useMemo<GithubFailure | null>(
+	const githubErrors = useMemo<BoardIssuesFailure[]>(
 		() =>
-			github.data.reduce<GithubFailure | null>(
-				(found, data) => found ?? failureOf(data),
-				null,
-			),
-		[github.data],
+			projects.flatMap((project, index) => {
+				const failure = failureOf(github.data[index]);
+				return failure ? [{ failure, projectName: project.name }] : [];
+			}),
+		[projects, github.data],
 	);
 	const isLoading = linearResult.isLoading || github.isLoading;
 
@@ -122,7 +129,7 @@ export function useBoardIssues(
 	// every dismissal the user has.
 	const canPrune =
 		!isLoading &&
-		githubError === null &&
+		githubErrors.length === 0 &&
 		linearResult.isSuccess &&
 		!github.hasPending;
 	useEffect(() => {
@@ -137,7 +144,7 @@ export function useBoardIssues(
 	return {
 		backlogIssues: issues.backlog,
 		dismissedIssues: issues.dismissed,
-		error: githubError,
+		errors: githubErrors,
 		isLoading,
 	};
 }
