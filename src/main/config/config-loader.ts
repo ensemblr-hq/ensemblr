@@ -23,13 +23,12 @@ export const ENSEMBLR_CONFIG_SCHEMA_VERSION = 1;
 /**
  * URL of the published JSON Schema for `~/.config/ensemblr/config.json`, written
  * into a config file Ensemblr creates so an editor validates it without the user
- * wiring anything up. The schema's canonical `$id` is
- * `https://www.ensemblr.dev/schemas/config.schema.json`; this points at the
- * committed copy, which is what actually resolves until the site serves that
- * path. Source of truth: `schemas/config.schema.json`.
+ * wiring anything up. This is the schema's canonical `$id`, which the site now
+ * serves; the committed copy at `schemas/config.schema.json` remains the source
+ * of truth the published one is cut from.
  */
 export const ENSEMBLR_CONFIG_SCHEMA_URL =
-	'https://raw.githubusercontent.com/ensemblr-hq/ensemblr/master/schemas/config.schema.json';
+	'https://www.ensemblr.dev/schemas/config.schema.json';
 
 /** JSON Schema describing the supported top-level shape of the Ensemblr config. */
 export const ENSEMBLR_CONFIG_SCHEMA = {

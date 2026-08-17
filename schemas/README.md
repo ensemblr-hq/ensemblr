@@ -16,15 +16,18 @@ gets one too.
 
 ## URLs
 
-Each schema's canonical `$id` is under the product domain:
+Each schema's canonical `$id` is under the product domain, and the site serves
+it. Reference these:
 
 ```
 https://www.ensemblr.dev/schemas/config.schema.json
 https://www.ensemblr.dev/schemas/settings.schema.json
 ```
 
-Until the site serves those paths, reference the committed copies, which
-resolve today:
+The committed copies also resolve over raw.githubusercontent.com, which is what
+the canonical URLs are cut from. Prefer the product domain — it is the `$id`
+each schema declares, so an editor that follows a `$ref` or caches by `$id`
+agrees with the pointer it was given:
 
 ```
 https://raw.githubusercontent.com/ensemblr-hq/ensemblr/master/schemas/config.schema.json
@@ -39,7 +42,7 @@ by hand to a config that predates it:
 
 ```json
 {
-	"$schema": "https://raw.githubusercontent.com/ensemblr-hq/ensemblr/master/schemas/config.schema.json",
+	"$schema": "https://www.ensemblr.dev/schemas/config.schema.json",
 	"schemaVersion": 1,
 	"app": {}
 }
@@ -50,7 +53,7 @@ by hand to a config that predates it:
 **`settings.toml`** takes Taplo's directive as its first line:
 
 ```toml
-#:schema https://raw.githubusercontent.com/ensemblr-hq/ensemblr/master/schemas/settings.schema.json
+#:schema https://www.ensemblr.dev/schemas/settings.schema.json
 ```
 
 A save from Repo settings → Scripts re-serialises the whole file and drops every

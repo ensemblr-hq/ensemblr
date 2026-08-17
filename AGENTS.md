@@ -98,7 +98,7 @@ The app ships in English, Russian, and Greek. A change that adds or edits a user
 
 Ensemblr publishes a JSON Schema for each config file it reads: `schemas/config.schema.json` for `~/.config/ensemblr/config.json`, and `schemas/settings.schema.json` for a repository's `.ensemblr/settings.toml`.
 
-- A `.ensemblr/settings.toml` you author opens with Taplo's directive on its first line: `#:schema https://raw.githubusercontent.com/ensemblr-hq/ensemblr/master/schemas/settings.schema.json`. Inside this repository use the relative path `../schemas/settings.schema.json` instead. The Scripts pane restores an existing directive across a rewrite but never adds one, so it has to be written by hand.
+- A `.ensemblr/settings.toml` you author opens with Taplo's directive on its first line: `#:schema https://www.ensemblr.dev/schemas/settings.schema.json`. Inside this repository use the relative path `../schemas/settings.schema.json` instead. The Scripts pane restores an existing directive across a rewrite but never adds one, so it has to be written by hand.
 - A `config.json` you author by hand carries the matching `$schema` key. Ensemblr writes one into the file it creates itself, so an existing config usually has it already.
 - Adding, renaming, or retyping a key either file accepts updates the matching schema in the same change. The loader is the source of truth — the allowed top-level keys in `src/main/config/config-loader.ts`, the field maps in `src/main/config/repository-config.ts`, the repository defaults in `src/main/config/config-resolution.ts` — and the schema mirrors it.
 - `tests/main/published-schemas.test.ts` holds each schema to the loader it describes and fails on drift, so a key added to one and not the other is a red test rather than a silent gap.

@@ -27,8 +27,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `.ensemblr/settings.toml`, down to every enum, default, and curated run-script icon. `config.json`
   now accepts a `$schema` key — Ensemblr writes one into the file it creates on first launch — and
   `settings.toml` takes Taplo's `#:schema` directive, which a save from the Scripts pane restores
-  rather than dropping with the rest of the comments. `tests/main/published-schemas.test.ts` holds
-  the two schemas to the loaders they describe.
+  rather than dropping with the rest of the comments. Both are served at the canonical `$id` each
+  declares — `https://www.ensemblr.dev/schemas/config.schema.json` and
+  `https://www.ensemblr.dev/schemas/settings.schema.json` — which is what Ensemblr now writes into a
+  config it creates and what every doc points at. `tests/main/published-schemas.test.ts` holds the
+  two schemas to the loaders they describe.
 
 ### Fixed
 
