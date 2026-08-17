@@ -101,7 +101,7 @@ Read these in order:
    `tailwind.config.js`), and
    [`../.claude/rules/patterns.md`](../.claude/rules/patterns.md) for the
    structural rules a change has to respect.
-5. [`adr/`](./adr) — 51 Architecture Decision Records. When something looks odd,
+5. [`adr/`](./adr) — 52 Architecture Decision Records. When something looks odd,
    the ADR usually explains it. Start with
    [0042](./adr/0042-add-claude-code-as-a-second-first-class-agent-runtime.md) if
    you are touching the agent layer.

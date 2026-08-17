@@ -9,9 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.0-beta.6] - 2026-08-17
+
+A skill the agent reads instead of guessing from, config files an editor can complete, and a Backlog
+that says which repository failed. Signed, notarized, Apple silicon.
+[Release](https://github.com/ensemblr-hq/ensemblr/releases/tag/v0.1.0-beta.6) ·
+[`.dmg`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.0-beta.6/Ensemblr-0.1.0-beta.6-arm64.dmg)
+
 ### Added
 
-- **A bundled `ensemblr` Agent Skill, handed to every agent the app starts.** Ensemblr's own
+- **A bundled `ensemblr` Agent Skill, handed to every agent the app starts** (#307). Ensemblr's own
   playbook is always in an agent's context, so it could only ever afford tool etiquette — an agent
   asked to add a run script had no idea `.ensemblr/settings.toml` existed, let alone which keys it
   takes. The skill is the reference underneath it, read on demand: the workspace and worktree model,
@@ -21,8 +28,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `claude` harness's `--plugin-dir` — and it ships inside the app, so nothing is written into the
   user's repository or `~/.claude`. `tests/main/agent-skill-bundle.test.ts` holds the skill to the
   code it describes, so a tool or config key it names cannot drift into fiction
-  ([ADR 0053](docs/adr/0053-ship-a-bundled-ensemblr-skill-to-both-runtimes.md)).
-- **Public JSON Schemas for both config files.** `schemas/config.schema.json` describes
+  ([ADR 0053](./docs/adr/0053-ship-a-bundled-ensemblr-skill-to-both-runtimes.md)).
+- **Attach a file, a folder, or a diff straight to the chat** (#306). The Files tree and the Changes
+  list both hand a row to the composer from their right-click menus, so pointing an agent at
+  something you are already looking at no longer means retyping its path. A file or folder is
+  attached by reference; a diff has no file of its own, so its patch is written out as a markdown
+  document and the chip points at that — a thousand-line rewrite arrives as one chip instead of
+  burying the question under its own diff. The store is content-addressed, so re-attaching after the
+  agent touches the file again lands a fresh chip rather than being deduped against the stale one
+  ([ADR 0047](./docs/adr/0047-model-composer-attachments-as-one-ordered-list-in-a-lexical-draft.md)).
+- **Public JSON Schemas for both config files** (#306, #307). `schemas/config.schema.json` describes
   `~/.config/ensemblr/config.json` and `schemas/settings.schema.json` describes a repository's
   `.ensemblr/settings.toml`, down to every enum, default, and curated run-script icon. `config.json`
   now accepts a `$schema` key — Ensemblr writes one into the file it creates on first launch — and
@@ -33,11 +48,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   config it creates and what every doc points at. `tests/main/published-schemas.test.ts` holds the
   two schemas to the loaders they describe.
 
+### Changed
+
+- **Backlog names every repository whose issue list failed** (#306). A column that fans `gh issue
+  list` across every repository used to show the first failure alone, so one broken remote read as
+  "issues are broken" and the other nine went unmentioned. `useBoardIssues` now returns one failure
+  per repository, `groupBoardIssueFailures` folds repositories that failed the same way into one row,
+  and a banner is rendered per distinct failure. Grouping keys on the command's own output as well as
+  its code, because `gh` writes a different sentence per repository and the catch-all bucket says
+  nothing without it. A repository with issues turned off on GitHub has *no* issues rather than a
+  broken list, so `has disabled issues` is classified as `issues-disabled` and answers empty instead
+  of reddening every surface that fans the call.
+
 ### Fixed
 
-- **Dictation settings persist again.** `app.dictation` was neither read from nor written back to
-  `config.json`, so the endpoint, model, and enabled flag reset to their defaults on every launch and
-  a hand-edited value was ignored.
+- **The board's refresh button escapes the stale window again** (#306). `fetchQuery` honours
+  `staleTime` and resolves straight from cache while the row is fresh, so spreading the query options
+  into it made the toolbar's refresh a no-op for exactly as long as the data it was meant to replace
+  stayed fresh — the one thing that button exists to escape. It also awaits with `allSettled`: a
+  rejected fetch already lands as error state on its own query, and racing the rest to a rejection
+  dropped the caller's pending flag while the other repositories were still listing.
+- **Dictation settings persist again** (#306). `app.dictation` was neither read from nor written back
+  to `config.json`, so the endpoint, model, and enabled flag reset to their defaults on every launch
+  and a hand-edited value was ignored.
 
 ## [0.1.0-beta.5] - 2026-08-16
 

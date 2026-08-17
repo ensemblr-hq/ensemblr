@@ -4,7 +4,7 @@ The versions this repo is pinned to, and the constraints that are not obvious
 from `package.json`. Policies for *how* to use the stack (npm, Biome, Jotai,
 Tailwind scale, JSDoc) live in `AGENTS.md` — this file is the stack itself.
 
-Verified against `package.json` at `0.1.0-beta.5` on 2026-08-16. Re-check before
+Verified against `package.json` at `0.1.0-beta.6` on 2026-08-17. Re-check before
 asserting a version.
 
 ## Platform

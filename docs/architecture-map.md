@@ -115,11 +115,11 @@ atom.
 The only code both processes may import. Two shapes coexist:
 
 - **Single-file concerns** — plain root modules (`config.ts`, `permissions.ts`,
-  `github.ts`, `slug.ts`, `menu-commands.ts`, …); 26 `.ts` files sit at the
+  `github.ts`, `slug.ts`, `menu-commands.ts`, …); 27 `.ts` files sit at the
   shared root in total.
 - **Multi-file concerns** — an implementation directory behind a stable
   entrypoint, in one of two forms:
-  - `<concern>/index.ts` — `ipc/` (36 contract modules under `ipc/contracts/`,
+  - `<concern>/index.ts` — `ipc/` (38 contract modules under `ipc/contracts/`,
     plus `channels.ts` and `handler-map.ts`), `pi-rpc/`, `keymap/`.
   - `<concern>.ts` + `<concern>/` — `agent-control`, `plan-mode`, `scripts`,
     `terminal`. This is the form `electron --test` can resolve, so prefer it for
@@ -187,9 +187,9 @@ migration ids, so a new migration must be added to both.
 
 | Suite | Runner | Count |
 | --- | --- | --- |
-| `tests/main/**` | `electron --test` (`ELECTRON_RUN_AS_NODE=1`), plus the pure-logic files listed one-by-one in `vitest.config.mts` — an explicit list, not a glob, so it never drags in the Electron-only suites | 155 files |
-| `tests/renderer/**` | Vitest (`node` env; DOM files opt in per file) | 245 files (24 under `dom/`) |
-| `tests/shared/**` | Vitest | 32 files |
+| `tests/main/**` | `electron --test` (`ELECTRON_RUN_AS_NODE=1`), plus the pure-logic files listed one-by-one in `vitest.config.mts` — an explicit list, not a glob, so it never drags in the Electron-only suites | 171 files |
+| `tests/renderer/**` | Vitest (`node` env; DOM files opt in per file) | 274 files (26 under `dom/`) |
+| `tests/shared/**` | Vitest | 34 files |
 
 See [`onboarding.md`](./onboarding.md#6-running-the-tests) for which runner a new
 test should use.

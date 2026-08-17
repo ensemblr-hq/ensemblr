@@ -154,7 +154,17 @@ The toolbar above the board carries search, repository and source facets, three
 sort orders, and a manual refresh. GitHub issues are cached locally, so the
 board paints at app start rather than waiting on a call per repository; when a
 refresh fails and the cache stands in, the rows are real but old and the board
-tells you so.
+tells you so. Refresh always goes to the network — it is the button you press
+precisely when the cached rows are the problem, so it is not allowed to answer
+from the cache — and it stays spinning until every repository has finished,
+whether or not one of them failed.
+
+Because the backlog fans one `gh issue list` across every repository, it reports
+failures **per repository** rather than showing the first one and going quiet:
+one banner per distinct failure, with the repositories that failed the same way
+folded into a single row. A repository with issues switched off on GitHub is not
+a failure at all — it has no issues, so it contributes nothing to the backlog and
+raises nothing.
 
 ## Retargeting the base branch
 

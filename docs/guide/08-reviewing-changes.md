@@ -18,7 +18,9 @@ reasonably-sized ignored folder expands so you can browse it, while a large one
 such as `node_modules` stays collapsed rather than enumerating a subtree nobody
 wanted. **⌘P** opens a search over the same list.
 
-Selecting a file opens it in the file viewer.
+Selecting a file opens it in the file viewer. Right-click a row for **Attach to
+chat**, which drops the file — or the whole folder — into the composer as a chip,
+so pointing an agent at what you are looking at does not mean retyping its path.
 
 ## Changes
 
@@ -33,6 +35,13 @@ added and removed.
 | **Deleted** | tracked file removed |
 | **Renamed** | tracked file moved |
 | **Conflicted** | a merge conflict is open in this file |
+
+Right-clicking a row offers **Attach diff to chat**. A diff has no file of its
+own, so the patch is written out as a markdown document and the chip points at
+that — "explain what changed here" costs one chip rather than a screenful of diff
+pasted into the box. Re-attaching after the agent edits the file again lands a
+fresh chip, not the old one, because the attachment store is keyed by content
+([`06-agents.md`](./06-agents.md)).
 
 ### Choosing what you are looking at
 

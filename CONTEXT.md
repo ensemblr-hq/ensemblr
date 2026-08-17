@@ -69,7 +69,7 @@ The process of inspecting workspace changes, running checks, resolving merge con
 _Avoid_: Diff screen, done state
 
 **Attachment**:
-Anything the user pins into a composer draft as a chip — a workspace file, a pasted image or long text block, a Linear or GitHub issue, a review-comment thread. Attachments form one ordered list, and the outgoing prompt carries each one at the position its chip sat in the sentence.
+Anything the user pins into a composer draft as a chip — a workspace file or folder, a pasted image or long text block, a Linear or GitHub issue, a review-comment thread, a changed file's diff. Attachments form one ordered list, and the outgoing prompt carries each one at the position its chip sat in the sentence. A thing that exists on disk is attached by reference; a thing that does not — a diff, an issue — is written out as a document the chip points at.
 _Avoid_: Upload, mention, context block
 
 **Linked Directory**:
@@ -99,6 +99,10 @@ _Avoid_: Linear connection, workspace (that is Linear's own word for an organiza
 **Secrets Link**:
 The binding between a repository and an Infisical project, split by sensitivity: the project half — instance URL, project id, environment, path — is committed to `.ensemblr/settings.toml`, while the Machine Identity that resolves it is per-machine state with its client secret in the Keychain. Values resolve live at every launch as an environment layer and are never materialized into the repository.
 _Avoid_: Secret sync, vault import, secret store (that names Ensemblr's own Keychain-backed store)
+
+**Agent Skill**:
+The reference Ensemblr ships inside its own app bundle and hands to every agent it starts — the workspace and worktree model, the `ensemblr_*` tool surface, and every `.ensemblr/settings.toml` block. It is read on demand rather than held in context, which is what separates it from the playbook: the playbook is what an agent always knows, the skill is what it can look up. Nothing is installed into the user's repository or home directory.
+_Avoid_: Prompt, system prompt, playbook (that names the always-in-context text), plugin
 
 **Menu Command**:
 A named action the native menu bar can invoke, defined once in `src/shared/menu-commands.ts`. The renderer owns the handler and reports which commands are live; the main process enables items from that report. A command with no registered handler renders as a disabled item.

@@ -225,7 +225,9 @@ Anything you pin into a message becomes a chip sitting inline in your sentence:
 
 | Attachment | How you add it |
 | --- | --- |
-| A workspace file | `@`-mention it, or drop it in |
+| A workspace file | `@`-mention it, drop it in, or **Attach to chat** from the Files tree |
+| A folder | **Attach to chat** from the Files tree |
+| A file's diff | **Attach diff to chat** from the Changes list |
 | A pasted image | paste |
 | A long pasted text block | paste — converted to an attachment rather than flooding the box |
 | A Linear or GitHub issue | the issue picker |
@@ -240,6 +242,13 @@ Payloads are written to disk under the workspace's `.context/attachments/` at th
 moment you attach them, keyed by content — so an attachment has a real path the
 agent can re-read, and the same file attached twice is stored once. A referenced
 thing is written out as a document rather than summarised into a line of prose.
+
+A **file or folder is attached by reference**: the chip carries the path, and the
+agent opens it itself. A **diff has no file of its own**, so its patch is written
+out as a markdown document and the chip points at that — a thousand-line rewrite
+becomes one chip rather than burying your question under its own diff. Because
+the store is keyed by content, re-attaching a file after the agent has touched it
+lands a *fresh* chip instead of being folded into the stale one.
 
 A workspace created from a tracker issue opens with that issue **already
 attached** as a document, once per chat, rather than with a summary flattened

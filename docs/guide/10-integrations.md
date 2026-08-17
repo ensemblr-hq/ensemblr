@@ -54,6 +54,12 @@ unassigned issues directly rather than filtering them afterwards — a page limi
 counts the rows GitHub returns, so filtering after the fact would empty the
 backlog of any repository whose newest open issues happen to all be assigned.
 
+A repository with **Issues disabled** on GitHub is not an error. `gh` refuses the
+listing, Ensemblr recognises the refusal, and that repository simply contributes
+no issues — the backlog stays green rather than reddening because one project in
+the list does not use GitHub Issues. Failures that *are* real are reported per
+repository, so a broken token on one remote never hides the other nine.
+
 Review and merge flow is on [`./08-reviewing-changes.md`](./08-reviewing-changes.md).
 
 ## Linear

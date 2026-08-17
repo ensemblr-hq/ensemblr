@@ -186,11 +186,12 @@ _You'll see this in_ [`08-reviewing-changes.md`](./08-reviewing-changes.md).
 
 ## Attachment
 
-Anything you pin into a message as a chip: a workspace file, a pasted image or
-long text block, a Linear or GitHub issue, a review-comment thread. Attachments
-form **one ordered list**, and the outgoing prompt carries each one at the
-position its chip sat in your sentence — so "compare this against that" arrives
-with *this* and *that* still in the right places.
+Anything you pin into a message as a chip: a workspace file or folder, a pasted
+image or long text block, a Linear or GitHub issue, a review-comment thread, a
+changed file's diff. Attachments form **one ordered list**, and the outgoing
+prompt carries each one at the position its chip sat in your sentence — so
+"compare this against that" arrives with *this* and *that* still in the right
+places.
 
 ## Linked directory
 
