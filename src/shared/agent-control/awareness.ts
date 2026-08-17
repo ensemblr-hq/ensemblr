@@ -202,6 +202,30 @@ ${LINEAR_INVENTORY_READS}
 The rest of the surface is not yours and is refused here, so do not go hunting for it: starting or steering another conversation, launching a harness, starting/stopping/typing into a terminal, opening or closing tabs, moving the kanban board, naming the workspace and branch, commenting on or moving a Linear issue, and putting a question to the user all belong to the orchestrator that spawned you. Everything you would have used them for goes in your report instead.`;
 
 /**
+ * Points at the Agent Skill the app ships, which every runtime loads per launch.
+ * The playbook stays the guaranteed channel and carries what a turn cannot go
+ * without; the skill carries what would be waste to repeat every turn — the
+ * `.ensemblr/settings.toml` key reference, the run-script shape, the failure
+ * vocabulary — and is read on demand. Naming it here is what turns "the model
+ * might notice the description" into "the model was told where to look".
+ *
+ * Hedged on the skill being present, exactly as {@link HARNESS_SKILL_POINTER}
+ * is: this module builds one static string and cannot see whether
+ * `resolveAgentSkillBundle` found a bundle, so a session that launched without
+ * one would otherwise be told to read a skill it does not hold.
+ */
+const SKILL_POINTER = `Deeper reference than this playbook lives in the \`ensemblr\` skill, which Ensemblr loads into this session when it ships one. If it appears among your skills, read it before working on \`.ensemblr/settings.toml\`, a run script, the workspace/worktree and branch model, or anything about a control tool this playbook leaves unsaid — it is the reference, and guessing at a config key it documents is how a committed file ends up with a key nothing reads.`;
+
+/**
+ * The same pointer for a harness, hedged on the skill being present: Ensemblr
+ * loads it into a Claude harness with `--plugin-dir`, and the other harnesses
+ * have no skill surface to load it into. Phrased as a conditional so it reads as
+ * a fact where it is one and as silence where it is not, rather than sending a
+ * Codex session hunting for a skill it will never find.
+ */
+const HARNESS_SKILL_POINTER = `If an \`ensemblr\` skill appears among your skills, it is the reference underneath this playbook — read it before working on \`.ensemblr/settings.toml\`, a run script, the workspace/worktree and branch model, or anything about a control tool this playbook leaves unsaid.`;
+
+/**
  * Builds the shared intro around the two blocks that differ by role.
  * @param inventory - The capability bullets this role really holds.
  * @param legibility - The bookkeeping bullet and paragraph for this role.
@@ -221,6 +245,8 @@ ${inventory}
 ${legibility}
 
 Write every file path you mention in prose as its full path from the workspace root, in backticks — \`src/renderer/components/message.tsx\`, never a bare \`message.tsx\` or a trailing fragment like \`components/message.tsx\`. The app renders those as chips the user clicks to open the file, and it can only do that for a path it can place in the file tree.
+
+${SKILL_POINTER}
 ${trackerObligation ? `\n${trackerObligation}\n` : ''}
 ${REVIEW_FOLLOW_THROUGH}`;
 
@@ -387,6 +413,8 @@ ${LINEAR_INVENTORY}
 
 Your tab names itself from your own session log, so you have no tab-naming tool and nothing to do about the title. Naming a tab, recording a session summary, putting a structured question to the user, and Plan Mode are native Pi-chat features — they are absent from your tool list by design, so do not go hunting for them.
 
+${HARNESS_SKILL_POINTER}
+
 ${LINEAR_FOLLOW_THROUGH}
 
 ${REVIEW_FOLLOW_THROUGH}
@@ -418,7 +446,7 @@ ${SHARED_ETIQUETTE}`;
 const PLAN_MODE_HEADLINE = `PLAN MODE IS ON. While it stays on, this playbook replaces every other instruction you hold about how to work, and you implement nothing.`;
 
 /** The reading surface planning leaves intact, identical across both roles. */
-const PLAN_MODE_READ_BULLET = `- Read the repository: the \`read\` tool, and \`bash\` for read-only commands.`;
+const PLAN_MODE_READ_BULLET = `- Read the repository: the \`read\` tool, and \`bash\` for read-only commands. If an \`ensemblr\` skill appears among your skills, it reads like any other file — planning a change to \`.ensemblr/settings.toml\`, a run script, or the workspace and branch model is exactly when to open it, because a plan built on a guessed config key is a plan that fails at implementation.`;
 
 /**
  * The review bullet for a planning agent. All three ops survive planning, and

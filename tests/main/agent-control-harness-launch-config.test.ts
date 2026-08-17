@@ -8,6 +8,7 @@ import {
 
 const URL = 'http://127.0.0.1:53219';
 const INSTRUCTIONS = '/tmp/ensemblr/harness-instructions';
+const SKILL_PLUGIN = '/tmp/ensemblr/agent-skills';
 
 const context = (
 	overrides: Partial<HarnessLaunchContext> = {},
@@ -38,6 +39,40 @@ describe('buildHarnessLaunchDecoration', () => {
 		expect(joined).toContain(
 			`--append-system-prompt-file '${INSTRUCTIONS}/AGENTS.md'`,
 		);
+	});
+
+	it('loads the shipped skill into Claude Code as a session-only plugin', () => {
+		const joined = buildHarnessLaunchDecoration(
+			'claude',
+			URL,
+			INSTRUCTIONS,
+			SKILL_PLUGIN,
+		).flags.join(' ');
+		expect(joined).toContain(`--plugin-dir '${SKILL_PLUGIN}'`);
+	});
+
+	it('omits --plugin-dir when the bundle is missing', () => {
+		const joined = buildHarnessLaunchDecoration(
+			'claude',
+			URL,
+			INSTRUCTIONS,
+			null,
+		).flags.join(' ');
+		expect(joined).not.toContain('--plugin-dir');
+	});
+
+	// Codex plugins use their own manifest format and Vibe exposes no skill
+	// surface, so neither is handed the Claude plugin root.
+	it('passes the skill plugin to no harness but Claude', () => {
+		for (const harnessId of ['codex', 'vibe']) {
+			const { env, flags } = buildHarnessLaunchDecoration(
+				harnessId,
+				URL,
+				INSTRUCTIONS,
+				SKILL_PLUGIN,
+			);
+			expect([...env, ...flags].join(' ')).not.toContain(SKILL_PLUGIN);
+		}
 	});
 
 	it('builds Codex -c overrides using the token env var', () => {
@@ -106,6 +141,14 @@ describe('decorateHarnessCommand', () => {
 		const out = decorateHarnessCommand('claude --skip', context());
 		expect(out.startsWith('claude --skip ')).toBe(true);
 		expect(out).toContain('--mcp-config');
+	});
+
+	it('carries the skill plugin root through from the launch context', () => {
+		const out = decorateHarnessCommand(
+			'claude --skip',
+			context({ skillPluginDirectory: SKILL_PLUGIN }),
+		);
+		expect(out).toContain(`--plugin-dir '${SKILL_PLUGIN}'`);
 	});
 
 	it('prefixes Vibe’s env assignment before the command', () => {

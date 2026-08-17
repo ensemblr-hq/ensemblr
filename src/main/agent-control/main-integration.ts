@@ -52,6 +52,12 @@ interface AgentControlIntegrationDeps {
 	 * which reads a resumed sub-agent as a root orchestrator.
 	 */
 	isSpawnedSubAgent?: (agentSessionId: string) => boolean;
+	/**
+	 * Root of the shipped Agent Skill plugin, which the Claude harness loads with
+	 * `--plugin-dir`. Omitted, a harness launches with the playbook but without
+	 * the deeper reference behind it.
+	 */
+	skillPluginDirectory?: string | null;
 }
 
 /** The main-process primitives the agent-control layer contributes. */
@@ -228,6 +234,7 @@ export function createAgentControlIntegration(
 				workspaceId,
 				buildLinkedIssueDirective(deps.readLinkedIssue?.(workspaceId) ?? null),
 			),
+			skillPluginDirectory: deps.skillPluginDirectory ?? null,
 			token:
 				resolveAgentControlEnv({
 					workspaceId,

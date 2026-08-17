@@ -74,6 +74,13 @@ export interface CreateClaudeAgentAdapterOptions {
 	resolveBaseEnv?: () => NodeJS.ProcessEnv | Promise<NodeJS.ProcessEnv>;
 	/** Called when Claude submits a plan through its native `ExitPlanMode` tool. */
 	onPlanSubmitted?: (event: ClaudePlanSubmittedEvent) => void;
+	/**
+	 * Root of the local plugin carrying Ensemblr's shipped Agent Skill, loaded
+	 * per session so the skill never has to be installed into the user's
+	 * `~/.claude` or repository. Null when the bundle is missing, which drops the
+	 * option and leaves the session otherwise unchanged.
+	 */
+	pluginDirectory?: string | null;
 	/** Injection seam for tests; defaults to the SDK's own `query`. */
 	queryFn?: typeof query;
 }
@@ -104,6 +111,7 @@ export function createClaudeAgentAdapter(
 	const queryFn = options.queryFn ?? query;
 	const onPlanSubmitted = options.onPlanSubmitted;
 	const canUseTool = options.canUseTool;
+	const pluginDirectory = options.pluginDirectory ?? null;
 
 	const openSessions = new Set<AgentAdapterSession>();
 
@@ -117,6 +125,7 @@ export function createClaudeAgentAdapter(
 				now,
 				onClosed: (closed) => openSessions.delete(closed),
 				onPlanSubmitted,
+				pluginDirectory,
 				queryFn,
 				turnIdFactory,
 			});
@@ -147,6 +156,7 @@ function createClaudeSession({
 	now,
 	onClosed,
 	onPlanSubmitted,
+	pluginDirectory,
 	queryFn,
 	turnIdFactory,
 }: {
@@ -156,6 +166,7 @@ function createClaudeSession({
 	now: () => Date;
 	onClosed: (session: AgentAdapterSession) => void;
 	onPlanSubmitted?: CreateClaudeAgentAdapterOptions['onPlanSubmitted'];
+	pluginDirectory: string | null;
 	queryFn: typeof query;
 	turnIdFactory: () => string;
 }): AgentAdapterSession {
@@ -354,6 +365,7 @@ function createClaudeSession({
 				onStderr: (chunk) => {
 					stderr = `${stderr}${chunk}`.slice(-STDERR_RING_BYTES);
 				},
+				pluginDirectory,
 			}),
 			prompt: promptQueue.stream,
 		});
@@ -573,7 +585,7 @@ async function applyTurnSelection({
  * Maps the provider-neutral session request onto the SDK's `Options`. This is
  * the Claude counterpart of `buildPiSessionArgs`: every runtime-specific name
  * lives here and nowhere above the adapter seam.
- * @param input - Session inputs plus the base env and the stderr sink.
+ * @param input - Session inputs plus the base env, the stderr sink, and the shipped plugin root.
  * @returns The options for the opening `query()` call.
  */
 function buildQueryOptions({
@@ -581,11 +593,13 @@ function buildQueryOptions({
 	canUseTool,
 	input,
 	onStderr,
+	pluginDirectory,
 }: {
 	baseEnv: NodeJS.ProcessEnv;
 	canUseTool?: ClaudeCanUseTool;
 	input: AgentAdapterCreateSessionInput;
 	onStderr: (chunk: string) => void;
+	pluginDirectory: string | null;
 }): Options {
 	const { metadata, request } = input;
 	const mode = request.permissionMode ?? DEFAULT_PERMISSION_MODE;
@@ -624,6 +638,12 @@ function buildQueryOptions({
 			? { model: request.modelOverride.trim() }
 			: {}),
 		...(executablePath ? { pathToClaudeCodeExecutable: executablePath } : {}),
+		// The SDK's sibling `skills` option is a context *filter*, not a switch:
+		// naming ours there would hide every skill the user already has. Omitting
+		// it leaves the CLI's own defaults in place, which is what we want.
+		...(pluginDirectory
+			? { plugins: [{ path: pluginDirectory, type: 'local' as const }] }
+			: {}),
 		...resolveSdkSessionIdentity({
 			resumeRuntimeSession: request.resumeRuntimeSession === true,
 			runtimeSessionId: metadata.sessionId,
