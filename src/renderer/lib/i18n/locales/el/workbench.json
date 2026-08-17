@@ -46,6 +46,10 @@
 		"description": "Σημειώνει τον χώρο εργασίας ως αρχειοθετημένο και διατηρεί τα αρχεία παράδοσης <0>.context/</0> στο <1>archived-contexts/</1>. Από προεπιλογή, ο φάκελος worktree και ο τοπικός κλάδος παραμένουν στον δίσκο· δεν γίνεται commit ούτε push.",
 		"title": "Αρχειοθέτηση χώρου εργασίας;"
 	},
+	"attach-to-chat": {
+		"attached": "Επισυνάφθηκε στη συνομιλία: {{label}}",
+		"diff-attached": "Το diff για {{label}} επισυνάφθηκε στη συνομιλία."
+	},
 	"attachment-menu": {
 		"add-attachment": "Προσθήκη συνημμένου",
 		"aria-label": "Συνημμένα",
@@ -405,6 +409,9 @@
 			"count-filtered": "{{shown}}/{{total}}",
 			"empty": "Τίποτα ακόμη",
 			"empty-filtered": "Καμία κάρτα δεν ταιριάζει στο φίλτρο",
+			"issues-error": {
+				"missing-from": "Οι Εκκρεμότητες δεν περιλαμβάνουν ζητήματα από {{repositories}}."
+			},
 			"label": "Στήλη {{status}}, {{cards}}",
 			"label-filtered": "Στήλη {{status}}, εμφανίζονται {{shown}} από {{total}} κάρτες",
 			"loading": "Φόρτωση ζητημάτων…"

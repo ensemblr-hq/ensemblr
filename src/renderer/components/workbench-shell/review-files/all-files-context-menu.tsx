@@ -1,4 +1,4 @@
-import { CopyIcon, EyeIcon, PinIcon } from 'lucide-react';
+import { CopyIcon, EyeIcon, PaperclipIcon, PinIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import {
@@ -17,9 +17,9 @@ import { OpenInTargetsSubmenu } from './open-in-targets-submenu';
 
 /**
  * Renders the single shared right-click menu for the all-files tree: View and
- * Keep open for file rows, "Open in <app>" for every installed target, plus
- * "Copy path", scoped to whichever row the user right-clicked. Keep open is the
- * keyboard-reachable equivalent of double-clicking the row.
+ * Keep open for file rows, "Attach to chat", "Open in <app>" for every installed
+ * target, plus "Copy path", scoped to whichever row the user right-clicked. Keep
+ * open is the keyboard-reachable equivalent of double-clicking the row.
  *
  * One menu serves the whole tree (the row that was clicked is captured into
  * `target`) instead of mounting a Radix `ContextMenu` per row, so thousands of
@@ -27,6 +27,7 @@ import { OpenInTargetsSubmenu } from './open-in-targets-submenu';
  * is targeted.
  * @param copyTarget - The copy-path target, if available.
  * @param invokeTarget - Runs the chosen target against `target`'s path.
+ * @param onAttachToChat - Attaches the row to the workspace's composer as a chip.
  * @param openFilePreview - Opens a file row in the workbench, or `null` outside a conversation.
  * @param openInTargets - Installed "open in" targets (copy-path excluded).
  * @param target - The right-clicked row, or `null` when none.
@@ -34,12 +35,14 @@ import { OpenInTargetsSubmenu } from './open-in-targets-submenu';
 export function AllFilesContextMenuContent({
 	copyTarget,
 	invokeTarget,
+	onAttachToChat,
 	openFilePreview,
 	openInTargets,
 	target,
 }: {
 	copyTarget: WorkspaceOpenTarget | undefined;
 	invokeTarget: OpenTargetsState['invokeTarget'];
+	onAttachToChat: (target: FileTreeMenuTarget) => void;
 	openFilePreview: ReviewFilePreviewOpener | null;
 	openInTargets: readonly WorkspaceOpenTarget[];
 	target: FileTreeMenuTarget | null;
@@ -85,9 +88,18 @@ export function AllFilesContextMenuContent({
 							{t('common:actions.keep-open', 'Keep open')}
 						</span>
 					</ContextMenuItem>
-					{openInTargets.length || copyTarget ? <ContextMenuSeparator /> : null}
 				</>
 			) : null}
+			<ContextMenuItem
+				className='h-8 gap-2 px-2 text-[0.8125rem]'
+				onSelect={() => onAttachToChat(target)}
+			>
+				<PaperclipIcon aria-hidden='true' className='text-muted-foreground' />
+				<span className='min-w-0 flex-1'>
+					{t('common:actions.attach-to-chat', 'Attach to chat')}
+				</span>
+			</ContextMenuItem>
+			{openInTargets.length || copyTarget ? <ContextMenuSeparator /> : null}
 			<OpenInTargetsSubmenu onSelect={invoke} openInTargets={openInTargets} />
 			{copyTarget ? (
 				<ContextMenuItem

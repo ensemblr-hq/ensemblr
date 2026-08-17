@@ -478,6 +478,11 @@ export const APP_FAILURE_TEXT: Record<
 			'errors:failure.invalid-worktree',
 			'The worktree does not belong to this repository.',
 		),
+	'issues-disabled': (t) =>
+		t(
+			'errors:failure.issues-disabled',
+			'Issues are turned off for this repository on GitHub.',
+		),
 	'job-unknown': (t) =>
 		t(
 			'errors:failure.job-unknown',

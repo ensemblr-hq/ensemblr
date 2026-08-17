@@ -4,6 +4,7 @@ import {
 	useReviewFilePreviewOpener,
 	useWorkspaceFileDiffOpener,
 } from '@/renderer/components/workbench-shell/conversation-panel/file-preview-context';
+import { useAttachToChat } from '@/renderer/hooks/workbench-shell/composer/use-attach-to-chat';
 import { useOpenTargets } from '@/renderer/hooks/workbench-shell/use-open-targets';
 import { diffNewSideIsWorkingTree } from '@/renderer/lib/diff/scope';
 import { reviewFileRevision } from '@/renderer/lib/workbench/review-files';
@@ -24,6 +25,7 @@ import { isPreviewableImagePath } from '@/shared/preview-media';
  * @param discardablePaths - Paths that can be discarded; others hide the discard action
  * @param files - The change set's file rows
  * @param onDiscardFile - Discards one uncommitted file
+ * @param workspaceCwd - Absolute workspace root attached diffs are written under
  * @param workspaceId - Workspace the rows belong to
  * @returns The action bundle plus the viewed predicate the flat list sorts by
  */
@@ -32,12 +34,14 @@ export function useBuildReviewFileActions({
 	discardablePaths,
 	files,
 	onDiscardFile,
+	workspaceCwd,
 	workspaceId,
 }: {
 	diffScope: WorkspaceGitDiffScope | undefined;
 	discardablePaths: ReadonlySet<string> | undefined;
 	files: ReviewFileSummary[];
 	onDiscardFile: (filePath: string) => void;
+	workspaceCwd: string;
 	workspaceId: string;
 }): {
 	actions: ReviewFileActions;
@@ -82,8 +86,11 @@ export function useBuildReviewFileActions({
 		[isPathViewed],
 	);
 
+	const { attachDiff } = useAttachToChat({ scope: diffScope, workspaceCwd });
+
 	const actions = useMemo<ReviewFileActions>(
 		() => ({
+			attachDiff,
 			copyTarget,
 			invokeTarget,
 			isDiscardable,
@@ -93,6 +100,7 @@ export function useBuildReviewFileActions({
 			openInTargets,
 		}),
 		[
+			attachDiff,
 			copyTarget,
 			invokeTarget,
 			isDiscardable,

@@ -14,7 +14,10 @@ import {
 	mergeAppSettings,
 	parseAppSettings,
 } from '../../shared/config.ts';
-import { resolveEnsemblrConfigPath } from './config-loader.ts';
+import {
+	ENSEMBLR_CONFIG_SCHEMA_URL,
+	resolveEnsemblrConfigPath,
+} from './config-loader.ts';
 import { watchConfigFile } from './watch-config-file.ts';
 
 /** Coalesces the burst of fs events an editor emits for a single save. */
@@ -22,11 +25,12 @@ const WATCH_DEBOUNCE_MS = 120;
 
 /**
  * Owns the App-settings slice (`app.general`, `app.models`, `app.providers`,
- * `app.git`, `app.appearance`, `app.experimental`, `app.onboarding`) of
- * `~/.config/ensemblr/config.json` — the source of truth. Creates the file with
- * defaults on first use, applies section-scoped patches via an atomic
- * temp-write+rename, and watches for external edits (echo-suppressed against its
- * own writes). Other config keys are preserved untouched.
+ * `app.git`, `app.appearance`, `app.dictation`, `app.experimental`,
+ * `app.onboarding`) of `~/.config/ensemblr/config.json` — the source of truth.
+ * Creates the file with defaults and a `$schema` pointer on first use, applies
+ * section-scoped patches via an atomic temp-write+rename, and watches for
+ * external edits (echo-suppressed against its own writes). Other config keys are
+ * preserved untouched.
  */
 export interface AppSettingsService {
 	getPath(): string;
@@ -95,6 +99,7 @@ export function createAppSettingsService(
 			providers: app.providers,
 			git: app.git,
 			appearance: app.appearance,
+			dictation: app.dictation,
 			experimental: app.experimental,
 			onboarding: app.onboarding,
 		});
@@ -105,6 +110,7 @@ export function createAppSettingsService(
 			return;
 		}
 		writeRaw({
+			$schema: ENSEMBLR_CONFIG_SCHEMA_URL,
 			schemaVersion: 1,
 			app: {
 				general: DEFAULT_APP_SETTINGS.general,
@@ -112,6 +118,7 @@ export function createAppSettingsService(
 				providers: DEFAULT_APP_SETTINGS.providers,
 				git: DEFAULT_APP_SETTINGS.git,
 				appearance: DEFAULT_APP_SETTINGS.appearance,
+				dictation: DEFAULT_APP_SETTINGS.dictation,
 				experimental: DEFAULT_APP_SETTINGS.experimental,
 				onboarding: DEFAULT_APP_SETTINGS.onboarding,
 			},
@@ -139,6 +146,7 @@ export function createAppSettingsService(
 				providers: next.providers,
 				git: next.git,
 				appearance: next.appearance,
+				dictation: next.dictation,
 				experimental: next.experimental,
 				onboarding: next.onboarding,
 			},

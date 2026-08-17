@@ -5,7 +5,7 @@
  * does not parse is left untouched rather than clobbered, and the replacement
  * is atomic so a crash mid-write cannot leave a half-written config behind.
  */
-import { mkdirSync, renameSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
 import { dump } from 'js-toml';
@@ -16,6 +16,9 @@ import {
 	ENSEMBLR_SETTINGS_FILENAME,
 } from './repository-config.ts';
 import { readTomlFile } from './repository-config-loaders.ts';
+
+/** Taplo's schema directive, which must be the first line of the document. */
+const SCHEMA_DIRECTIVE_PATTERN = /^#:schema[ \t]+\S+$/;
 
 /** Outcome of a rewrite, carrying a message the caller can surface on failure. */
 export type WriteRepositorySettingsResult =
@@ -53,7 +56,8 @@ export function readRepositorySettings(
 /**
  * Rewrites a repository's committed settings by passing the record already on
  * disk through `rewrite`. Sections the callback leaves alone survive the
- * round-trip; comments do not, because the file is re-serialised whole.
+ * round-trip; comments do not, because the file is re-serialised whole — except
+ * a leading `#:schema` directive, which is restored above the document.
  * @param input - The repository, and the transform to apply to its record.
  * @returns The written path, or the reason the write did not happen.
  */
@@ -77,7 +81,11 @@ export function rewriteRepositorySettings({
 	}
 
 	try {
-		writeTomlFile(configPath, rewrite(existing.record ?? {}));
+		writeTomlFile(
+			configPath,
+			rewrite(existing.record ?? {}),
+			readSchemaDirective(configPath),
+		);
 
 		return { ok: true, path: configPath };
 	} catch (error) {
@@ -92,18 +100,46 @@ export function rewriteRepositorySettings({
 }
 
 /**
+ * Reads back the `#:schema` directive a hand-written config opens with, so the
+ * rewrite below can restore it. Every other comment is lost to re-serialisation;
+ * this one is what points an editor at the published schema, so losing it would
+ * silently disable validation for everyone who clones the repository.
+ * @param configPath - Absolute path of the config file.
+ * @returns The directive line, or null when the file has none.
+ */
+function readSchemaDirective(configPath: string): string | null {
+	let firstLine: string;
+
+	try {
+		firstLine = readFileSync(configPath, 'utf8').split('\n', 1).at(0) ?? '';
+	} catch {
+		return null;
+	}
+
+	const directive = firstLine.trimEnd();
+
+	return SCHEMA_DIRECTIVE_PATTERN.test(directive) ? directive : null;
+}
+
+/**
  * Serialises a config record and replaces the file atomically, so a crash
  * mid-write cannot leave a half-written config the loader would reject.
  * @param configPath - Absolute path of the config file.
  * @param record - The full config record to serialise.
+ * @param schemaDirective - The `#:schema` line to restore above the document.
  */
 function writeTomlFile(
 	configPath: string,
 	record: Record<string, unknown>,
+	schemaDirective: string | null,
 ): void {
 	const temporaryPath = `${configPath}.tmp`;
+	const document = dump(record);
+	const serialized = schemaDirective
+		? `${schemaDirective}\n\n${document}`
+		: document;
 
 	mkdirSync(path.dirname(configPath), { recursive: true });
-	writeFileSync(temporaryPath, dump(record), 'utf8');
+	writeFileSync(temporaryPath, serialized, 'utf8');
 	renameSync(temporaryPath, configPath);
 }

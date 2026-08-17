@@ -20,11 +20,23 @@ export type { ConfigDiagnostic, ConfigStatusSnapshot };
 /** Schema version embedded in `~/.config/ensemblr/config.json`. */
 export const ENSEMBLR_CONFIG_SCHEMA_VERSION = 1;
 
+/**
+ * URL of the published JSON Schema for `~/.config/ensemblr/config.json`, written
+ * into a config file Ensemblr creates so an editor validates it without the user
+ * wiring anything up. The schema's canonical `$id` is
+ * `https://www.ensemblr.dev/schemas/config.schema.json`; this points at the
+ * committed copy, which is what actually resolves until the site serves that
+ * path. Source of truth: `schemas/config.schema.json`.
+ */
+export const ENSEMBLR_CONFIG_SCHEMA_URL =
+	'https://raw.githubusercontent.com/ensemblr-hq/ensemblr/master/schemas/config.schema.json';
+
 /** JSON Schema describing the supported top-level shape of the Ensemblr config. */
 export const ENSEMBLR_CONFIG_SCHEMA = {
 	$schema: 'https://json-schema.org/draft/2020-12/schema',
 	additionalProperties: false,
 	properties: {
+		$schema: { type: 'string' },
 		app: { type: 'object' },
 		environment: { type: 'object' },
 		managed: { type: 'object' },
@@ -96,7 +108,15 @@ const CONFIG_DIRECTORY = '.config/ensemblr';
 const CONFIG_FILENAME = 'config.json';
 /** Coalesce burst fs events (editor rename-replace fires several) before reloading. */
 const CONFIG_WATCH_DEBOUNCE_MS = 100;
-const ALLOWED_TOP_LEVEL_KEYS = new Set([
+/**
+ * Top-level keys this loader accepts; anything else earns an
+ * `unknown-top-level-key` diagnostic. Exported so
+ * `schemas/config.schema.json` can be held to it — the published schema is
+ * `additionalProperties: false`, so a key accepted here but missing there
+ * renders as an editor error on a perfectly valid config.
+ */
+export const ALLOWED_TOP_LEVEL_KEYS: ReadonlySet<string> = new Set([
+	'$schema',
 	'app',
 	'environment',
 	'managed',

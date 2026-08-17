@@ -44,6 +44,7 @@ export function ReviewFileList({
 	isLoading = false,
 	onDiscardFile,
 	viewMode,
+	workspaceCwd,
 	workspaceId,
 }: {
 	/**
@@ -63,6 +64,8 @@ export function ReviewFileList({
 	isLoading?: boolean;
 	onDiscardFile: (filePath: string) => void;
 	viewMode: ChangesViewMode;
+	/** Absolute workspace root an attached diff is written under. */
+	workspaceCwd: string;
 	workspaceId: string;
 }) {
 	const { t } = useTranslation();
@@ -76,6 +79,7 @@ export function ReviewFileList({
 		discardablePaths,
 		files: markedFiles,
 		onDiscardFile,
+		workspaceCwd,
 		workspaceId,
 	});
 

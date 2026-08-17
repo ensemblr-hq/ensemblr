@@ -37,6 +37,10 @@ const STDERR_SIGNATURES: readonly {
 		markers: ['command not found', 'no such file or directory'],
 	},
 	{
+		code: 'issues-disabled',
+		markers: ['has disabled issues'],
+	},
+	{
 		code: 'detached-head',
 		markers: [
 			'could not determine current branch',

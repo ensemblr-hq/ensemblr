@@ -9,6 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Public JSON Schemas for both config files.** `schemas/config.schema.json` describes
+  `~/.config/ensemblr/config.json` and `schemas/settings.schema.json` describes a repository's
+  `.ensemblr/settings.toml`, down to every enum, default, and curated run-script icon. `config.json`
+  now accepts a `$schema` key — Ensemblr writes one into the file it creates on first launch — and
+  `settings.toml` takes Taplo's `#:schema` directive, which a save from the Scripts pane restores
+  rather than dropping with the rest of the comments. `tests/main/published-schemas.test.ts` holds
+  the two schemas to the loaders they describe.
+
+### Fixed
+
+- **Dictation settings persist again.** `app.dictation` was neither read from nor written back to
+  `config.json`, so the endpoint, model, and enabled flag reset to their defaults on every launch and
+  a hand-edited value was ignored.
+
 ## [0.1.0-beta.5] - 2026-08-16
 
 A board that starts before the workspace does, secrets that resolve themselves, and Linear as a list

@@ -9,6 +9,10 @@ import {
 	commentDocumentFilename,
 	renderCommentDocument,
 } from '@/renderer/lib/workbench/comment-document';
+import {
+	diffDocumentFilename,
+	renderDiffDocument,
+} from '@/renderer/lib/workbench/diff-document';
 import { issueDocumentFilename } from '@/renderer/lib/workbench/issue-document';
 import type {
 	ComposerAttachment,
@@ -56,11 +60,13 @@ export interface AttachPastedFilesResult {
 
 /**
  * Builds the attachment for a workspace file or directory the user referenced.
+ * Takes only the fields the chip is built from, so a caller holding a path and a
+ * kind — the file tree's right-click menu — does not have to invent a row id.
  * @param entry - The file-tree row the mention or chip resolved to.
  * @returns The composer attachment for that entry.
  */
 export function workspaceFileAttachment(
-	entry: WorkspaceFileSummary,
+	entry: Omit<WorkspaceFileSummary, 'id'>,
 ): ComposerAttachment {
 	if (entry.kind === 'directory') {
 		return {
@@ -110,6 +116,7 @@ export function attachmentPreviewPath(
 	attachment: ComposerAttachment,
 ): string | null {
 	switch (attachment.kind) {
+		case 'file-diff':
 		case 'issue':
 		case 'pasted-text':
 		case 'workspace-file':
@@ -308,6 +315,44 @@ export async function attachIssueDocument({
 		label: reference,
 		path: saved.path,
 		provider,
+	};
+}
+
+/**
+ * Writes a file's unified patch into the workspace and returns the chip for it.
+ * The patch lands on disk rather than being pasted into the draft, so a
+ * thousand-line rewrite becomes one chip instead of burying the user's question
+ * under its own diff — the send pipeline inlines the document at submit.
+ *
+ * The store is content-addressed, so the chip's id changes when the diff does:
+ * re-attaching after the agent touches the file again lands a fresh chip rather
+ * than being deduped against the stale one.
+ * @param filePath - Workspace-relative path the patch was taken against.
+ * @param patch - The unified patch text.
+ * @param workspaceCwd - Absolute workspace root the document is saved under.
+ * @returns The composer attachment for the stored diff.
+ */
+export async function attachFileDiff({
+	filePath,
+	patch,
+	workspaceCwd,
+}: {
+	filePath: string;
+	patch: string;
+	workspaceCwd: string;
+}): Promise<ComposerAttachment> {
+	const file = new File(
+		[renderDiffDocument({ filePath, patch })],
+		diffDocumentFilename(filePath),
+		{ type: 'text/markdown' },
+	);
+	const saved = await saveCopy(file, workspaceCwd);
+	return {
+		filePath,
+		id: `file-diff:${saved.path}`,
+		kind: 'file-diff',
+		label: filePath.split('/').at(-1) ?? filePath,
+		path: saved.path,
 	};
 }
 

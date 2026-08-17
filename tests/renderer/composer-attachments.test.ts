@@ -19,6 +19,7 @@ vi.mock('@/renderer/api/ensemblr-queries', () => ({
 }));
 
 import {
+	attachFileDiff,
 	attachmentPreviewPath,
 	attachPastedFiles,
 	attachPastedText,
@@ -227,6 +228,87 @@ describe('attachReviewComment', () => {
 
 		await expect(
 			attachReviewComment({ comment: COMMENT, workspaceCwd: '/repo' }),
+		).rejects.toThrow('disk full');
+	});
+});
+
+describe('attachFileDiff', () => {
+	const PATCH = [
+		'@@ -1,2 +1,2 @@',
+		'-const a = 1;',
+		'+const a = 2;',
+		' const b = 3;',
+	].join('\n');
+
+	beforeEach(() => {
+		writeWorkspaceFileAttachment.mockResolvedValue(
+			savedRow('.context/attachments/ef34gh/diff-src-app-ts.md'),
+		);
+	});
+
+	test('writes the patch as a markdown document and chips it by basename', async () => {
+		const attachment = await attachFileDiff({
+			filePath: 'src/app.ts',
+			patch: PATCH,
+			workspaceCwd: '/repo',
+		});
+
+		expect(writeWorkspaceFileAttachment).toHaveBeenCalledTimes(1);
+		expect(attachment).toMatchObject({
+			filePath: 'src/app.ts',
+			id: 'file-diff:.context/attachments/ef34gh/diff-src-app-ts.md',
+			kind: 'file-diff',
+			label: 'app.ts',
+			path: '.context/attachments/ef34gh/diff-src-app-ts.md',
+		});
+	});
+
+	// The store is content-addressed, so the id tracks the document's path: a
+	// re-attach after the file changes again lands a fresh chip instead of being
+	// deduped away against the stale one.
+	test('keys the id on the stored document so a changed diff is not deduped', async () => {
+		const first = await attachFileDiff({
+			filePath: 'src/app.ts',
+			patch: PATCH,
+			workspaceCwd: '/repo',
+		});
+		writeWorkspaceFileAttachment.mockResolvedValueOnce(
+			savedRow('.context/attachments/zz99yy/diff-src-app-ts.md'),
+		);
+		const second = await attachFileDiff({
+			filePath: 'src/app.ts',
+			patch: `${PATCH}\n+const c = 4;`,
+			workspaceCwd: '/repo',
+		});
+
+		expect(second.id).not.toBe(first.id);
+	});
+
+	// The document is what the agent reads at send, and what the user gets when
+	// they click the chip.
+	test('is previewable as the document it was written to', async () => {
+		const attachment = await attachFileDiff({
+			filePath: 'src/app.ts',
+			patch: PATCH,
+			workspaceCwd: '/repo',
+		});
+
+		expect(attachmentPreviewPath(attachment)).toBe(
+			'.context/attachments/ef34gh/diff-src-app-ts.md',
+		);
+	});
+
+	test('propagates a write failure so the caller can surface it', async () => {
+		writeWorkspaceFileAttachment.mockResolvedValueOnce({
+			error: { code: 'write-failed', message: 'disk full' },
+		});
+
+		await expect(
+			attachFileDiff({
+				filePath: 'src/app.ts',
+				patch: PATCH,
+				workspaceCwd: '/repo',
+			}),
 		).rejects.toThrow('disk full');
 	});
 });

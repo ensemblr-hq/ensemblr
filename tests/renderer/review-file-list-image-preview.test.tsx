@@ -56,6 +56,7 @@ function renderChanges(options: {
 					files={options.files ?? [imageFile, sourceFile, deletedImageFile]}
 					onDiscardFile={() => {}}
 					viewMode={options.viewMode ?? 'list'}
+					workspaceCwd='/tmp/ws'
 					workspaceId='w1'
 				/>
 			</ReviewFilePreviewOpenerProvider>
@@ -200,6 +201,7 @@ describe('ReviewFileList image routing', () => {
 					files={[imageFile, sourceFile]}
 					onDiscardFile={() => {}}
 					viewMode='list'
+					workspaceCwd='/tmp/ws'
 					workspaceId='w1'
 				/>
 			</ReviewFilePreviewOpenerProvider>,

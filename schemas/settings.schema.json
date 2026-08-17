@@ -1,0 +1,359 @@
+{
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"$id": "https://www.ensemblr.dev/schemas/settings.schema.json",
+	"title": "Ensemblr repository settings",
+	"description": "Schema for .ensemblr/settings.toml, the single committed file Ensemblr reads for per-repository configuration. It is checked in and reviewed like code, and it outranks every reader's personal repository settings. Because each workspace is a git worktree, the file is read from the active workspace's worktree rather than the primary clone. An unrecognised key or a mistyped value becomes a warning diagnostic naming its exact path and is skipped; everything else in the file still loads.",
+	"type": "object",
+	"additionalProperties": false,
+	"properties": {
+		"environment_variables": {
+			"type": "object",
+			"description": "Repository-scoped environment variables, passed to agent sessions, scripts, and terminals. Names must be valid POSIX identifiers. Never put a secret here — the file is committed; link an Infisical project or use the Keychain-backed rows in Settings instead.",
+			"propertyNames": {
+				"pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+			},
+			"additionalProperties": {
+				"type": "string"
+			}
+		},
+		"file_include_globs": {
+			"type": "array",
+			"default": [".env*"],
+			"description": "Gitignore-style patterns for untracked files copied into every new workspace. A .worktreeinclude file in the repository root outranks this.",
+			"items": {
+				"type": "string"
+			}
+		},
+		"enterprise_data_privacy": {
+			"type": "boolean",
+			"description": "Accepted and type-checked; nothing reads it today."
+		},
+		"spotlight_testing": {
+			"type": "object",
+			"description": "Accepted and type-checked; nothing reads it today.",
+			"additionalProperties": true
+		},
+		"amp_executable_path": {
+			"$ref": "#/$defs/inertExecutablePath",
+			"description": "Accepted and type-checked; nothing reads it today. Pin the Amp executable in Settings → Providers instead — that override is app-wide, not per repository."
+		},
+		"claude_executable_path": {
+			"$ref": "#/$defs/inertExecutablePath",
+			"description": "Accepted and type-checked; nothing reads it today. Pin the Claude Code executable in Settings → Providers instead — that override is app-wide, not per repository."
+		},
+		"codex_executable_path": {
+			"$ref": "#/$defs/inertExecutablePath",
+			"description": "Accepted and type-checked; nothing reads it today. Pin the Codex executable in Settings → Providers instead — that override is app-wide, not per repository."
+		},
+		"copilot_executable_path": {
+			"$ref": "#/$defs/inertExecutablePath",
+			"description": "Accepted and type-checked; nothing reads it today. Pin the Copilot executable in Settings → Providers instead — that override is app-wide, not per repository."
+		},
+		"gemini_executable_path": {
+			"$ref": "#/$defs/inertExecutablePath",
+			"description": "Accepted and type-checked; nothing reads it today. Pin the Gemini executable in Settings → Providers instead — that override is app-wide, not per repository."
+		},
+		"opencode_executable_path": {
+			"$ref": "#/$defs/inertExecutablePath",
+			"description": "Accepted and type-checked; nothing reads it today. Also accepted as `open_code_executable_path`. Pin the opencode executable in Settings → Providers instead — that override is app-wide, not per repository."
+		},
+		"open_code_executable_path": {
+			"$ref": "#/$defs/inertExecutablePath",
+			"description": "Historical spelling of `opencode_executable_path`. Accepted and type-checked; nothing reads it today."
+		},
+		"pi_executable_path": {
+			"$ref": "#/$defs/inertExecutablePath",
+			"description": "Accepted and type-checked; nothing reads it today. Pin the Pi executable in Settings → Providers instead — that override is app-wide, not per repository."
+		},
+		"git": {
+			"type": "object",
+			"description": "Per-repository git defaults. Each key overrides the matching user-scope Git setting for this repository.",
+			"additionalProperties": false,
+			"properties": {
+				"branch_from": {
+					"type": "string",
+					"description": "Branch new workspaces fork from."
+				},
+				"branch_prefix": {
+					"type": "string",
+					"description": "Prefix for new workspace branch names."
+				},
+				"branchPrefix": {
+					"type": "string",
+					"deprecated": true,
+					"description": "Historical camelCase spelling of `branch_prefix`, still accepted so configs written before the snake_case convention keep resolving. It is the only camelCase [git] key accepted — prefer `branch_prefix`."
+				},
+				"remote_origin": {
+					"type": "string",
+					"description": "Remote Ensemblr treats as origin."
+				},
+				"delete_local_branch_on_archive": {
+					"type": "boolean",
+					"description": "Delete the local branch when a workspace is archived. The remote branch is untouched."
+				},
+				"archive_after_merge": {
+					"type": "boolean",
+					"description": "Archive a workspace automatically once its pull request merges."
+				},
+				"set_upstream_on_push": {
+					"type": "boolean",
+					"description": "Configure new workspaces so a plain `git push` sets the branch upstream."
+				}
+			}
+		},
+		"infisical": {
+			"type": "object",
+			"description": "Which Infisical project this repository's secrets come from, so a teammate who clones the repository is already pointed at the right ones. No credential is ever written here — the Machine Identity is per-machine state, kept in SQLite with its secret in the macOS Keychain. Written by Settings → Repo → Secrets. Keys Ensemblr does not model survive a rewrite untouched.",
+			"required": ["project_id", "environment"],
+			"additionalProperties": true,
+			"properties": {
+				"project_id": {
+					"type": "string",
+					"minLength": 1,
+					"description": "Infisical project id. Required — the block is ignored without it."
+				},
+				"environment": {
+					"type": "string",
+					"minLength": 1,
+					"description": "Environment slug to read, for example `dev`. Required — the block is ignored without it."
+				},
+				"path": {
+					"type": "string",
+					"default": "/",
+					"description": "Secret path within the environment."
+				},
+				"recursive": {
+					"type": "boolean",
+					"default": false,
+					"description": "Also read folders nested under `path`."
+				},
+				"site_url": {
+					"type": "string",
+					"description": "Instance URL, for a self-hosted or EU-cloud deployment.",
+					"format": "uri"
+				},
+				"project_name": {
+					"type": "string",
+					"description": "Project display name, kept so the Secrets pane can name the project before a fetch."
+				}
+			}
+		},
+		"prompts": {
+			"type": "object",
+			"description": "Team-shared custom instructions attached to the workspace action buttons. A personal preference typed into Repo → Actions wins over the committed text for that reader only. Prefer the canonical snake_case spelling; the aliases exist so files written before the convention settled keep resolving.",
+			"additionalProperties": false,
+			"properties": {
+				"code_review": {
+					"type": "string",
+					"description": "Steers the Review button."
+				},
+				"review": {
+					"type": "string",
+					"deprecated": true,
+					"description": "Alias of `code_review`."
+				},
+				"codeReview": {
+					"type": "string",
+					"deprecated": true,
+					"description": "Alias of `code_review`."
+				},
+				"create_pr": {
+					"type": "string",
+					"description": "Steers the Create PR button."
+				},
+				"createPr": {
+					"type": "string",
+					"deprecated": true,
+					"description": "Alias of `create_pr`."
+				},
+				"fix_errors": {
+					"type": "string",
+					"description": "Steers the Fix errors button."
+				},
+				"fix_check_errors": {
+					"type": "string",
+					"deprecated": true,
+					"description": "Alias of `fix_errors`."
+				},
+				"fixCheckErrors": {
+					"type": "string",
+					"deprecated": true,
+					"description": "Alias of `fix_errors`."
+				},
+				"fixErrors": {
+					"type": "string",
+					"deprecated": true,
+					"description": "Alias of `fix_errors`."
+				},
+				"resolve_conflicts": {
+					"type": "string",
+					"description": "Steers the Resolve conflicts button."
+				},
+				"resolveConflicts": {
+					"type": "string",
+					"deprecated": true,
+					"description": "Alias of `resolve_conflicts`."
+				},
+				"branch_rename": {
+					"type": "string",
+					"description": "Steers branch-name generation."
+				},
+				"branch_naming": {
+					"type": "string",
+					"deprecated": true,
+					"description": "Alias of `branch_rename`."
+				},
+				"branchNaming": {
+					"type": "string",
+					"deprecated": true,
+					"description": "Alias of `branch_rename`."
+				},
+				"branchRename": {
+					"type": "string",
+					"deprecated": true,
+					"description": "Alias of `branch_rename`."
+				},
+				"general": {
+					"type": "string",
+					"description": "Master prompt prepended to the first message of every new chat in this repository."
+				}
+			}
+		},
+		"scripts": {
+			"type": "object",
+			"description": "Setup, archive, and run scripts. Repo settings → Scripts reads and writes this block; a save rewrites the whole file, so comments and blank-line grouping are lost.",
+			"additionalProperties": false,
+			"properties": {
+				"setup": {
+					"type": "string",
+					"description": "Command run when a new workspace is created."
+				},
+				"archive": {
+					"type": "string",
+					"description": "Command run before a workspace is archived."
+				},
+				"run": {
+					"description": "Either the legacy single run command, or a table of [scripts.run.<name>] sub-tables. The legacy string is upgraded into one implicit script named `run`, iconed `play` and flagged default — and is ignored entirely when named sub-tables exist.",
+					"oneOf": [
+						{
+							"type": "string",
+							"description": "Legacy single run command."
+						},
+						{
+							"type": "object",
+							"description": "Named run scripts, keyed by script name. `dev-server` renders in the UI as `Dev server`; a duplicate name is dropped first-wins.",
+							"additionalProperties": {
+								"$ref": "#/$defs/runScript"
+							}
+						}
+					]
+				},
+				"run_mode": {
+					"type": "string",
+					"enum": ["concurrent", "nonconcurrent"],
+					"default": "concurrent",
+					"description": "Whether run scripts may run in several workspaces at once. `concurrent` allows it; `nonconcurrent` runs one at a time. An unrecognised value falls back to `concurrent` rather than failing."
+				},
+				"auto_run_after_setup": {
+					"type": "boolean",
+					"default": false,
+					"description": "Start the default run script automatically once the setup script exits 0."
+				}
+			}
+		}
+	},
+	"$defs": {
+		"inertExecutablePath": {
+			"type": "string"
+		},
+		"runScript": {
+			"type": "object",
+			"description": "One named run script. Only `command` is load-bearing: an entry without one is dropped and reported, while every other field degrades to its default.",
+			"additionalProperties": false,
+			"required": ["command"],
+			"properties": {
+				"command": {
+					"type": "string",
+					"minLength": 1,
+					"description": "Shell command to run. Required — an entry with no command, or an empty one, is dropped."
+				},
+				"icon": {
+					"type": "string",
+					"default": "play",
+					"description": "One of the curated icon names. The list is closed so a committed config can never name an icon that fails to render; anything outside it falls back to `play`.",
+					"enum": [
+						"activity",
+						"badge-check",
+						"blocks",
+						"book-open",
+						"box",
+						"bug",
+						"calculator",
+						"cloud",
+						"code",
+						"cog",
+						"component",
+						"container",
+						"cpu",
+						"database",
+						"download",
+						"eye",
+						"file-code",
+						"flame",
+						"flask-conical",
+						"folder",
+						"gauge",
+						"git-branch",
+						"git-merge",
+						"git-pull-request",
+						"globe",
+						"hammer",
+						"hard-drive",
+						"key",
+						"layers",
+						"layout-dashboard",
+						"list-checks",
+						"lock",
+						"microscope",
+						"monitor",
+						"network",
+						"package",
+						"paintbrush",
+						"palette",
+						"play",
+						"plug",
+						"refresh-cw",
+						"repeat",
+						"rocket",
+						"search",
+						"send",
+						"server",
+						"settings",
+						"shield-check",
+						"smartphone",
+						"sparkles",
+						"terminal",
+						"test-tube",
+						"timer",
+						"trending-up",
+						"upload",
+						"wrench",
+						"zap"
+					]
+				},
+				"default": {
+					"type": "boolean",
+					"default": false,
+					"description": "Marks the script ⌘R and the Run button start. At most one script keeps it: a second table setting it is rejected with a diagnostic and loaded as false, so the first declared default wins. When no script sets it, the first declared script is used."
+				},
+				"available_in": {
+					"type": "array",
+					"description": "Environments the script is offered in. The key also names cloud sandboxes; Ensemblr is local-only, so a script that declares this without `local` is filtered out of the Run menu rather than offered and failed at launch. Omitting the key leaves the script available.",
+					"items": {
+						"type": "string"
+					}
+				}
+			}
+		}
+	}
+}

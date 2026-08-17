@@ -105,14 +105,17 @@ export function prefetchBoardIssues(
  * when `gh` has been failing and the cache has been standing in for it.
  * @param queryClient - The app's query client.
  * @param repositoryIds - Every repository whose issues the board shows.
- * @returns Resolves once every repository has been re-listed.
+ * @returns Resolves once every repository has settled, successfully or not.
  */
 export async function refreshBoardIssues(
 	queryClient: QueryClient,
 	repositoryIds: readonly string[],
 ): Promise<void> {
-	await Promise.all([
-		queryClient.fetchQuery(linearIssuesQuery({})),
+	// `allSettled`, not `all`: a rejected `fetchQuery` already lands as error
+	// state on its own query, and racing the rest to a rejection would drop the
+	// caller's pending flag while the other repositories are still listing.
+	await Promise.allSettled([
+		queryClient.fetchQuery({ ...linearIssuesQuery({}), staleTime: 0 }),
 		...repositoryIds.filter(Boolean).map((repositoryId) =>
 			queryClient.fetchQuery({
 				...repositoryIssuesQuery(repositoryId, true),
@@ -126,6 +129,11 @@ export async function refreshBoardIssues(
 								unassignedOnly: true,
 							}),
 					),
+				// `fetchQuery` honours `staleTime` and resolves straight from cache
+				// when the row is fresh, so the query options spread above would skip
+				// the refreshing `queryFn` for the whole `ISSUES_STALE_MS` window —
+				// leaving the button that exists to escape a stale list a no-op.
+				staleTime: 0,
 			}),
 		),
 	]);

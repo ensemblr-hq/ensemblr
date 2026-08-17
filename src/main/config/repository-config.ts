@@ -361,6 +361,24 @@ const SCRIPT_BEHAVIOUR_FIELDS = new Map<
 ]);
 
 /**
+ * Every TOML key this loader accepts, grouped by the block that owns it. Exists
+ * so `schemas/settings.schema.json` can be held to the loader it describes: the
+ * published schema is `additionalProperties: false`, so a key accepted here but
+ * missing there renders as an editor error on a perfectly valid setting.
+ */
+export const REPOSITORY_CONFIG_KEYS: {
+	git: string[];
+	prompts: string[];
+	scripts: string[];
+	topLevel: string[];
+} = {
+	git: [...GIT_FIELD_MAP.keys()],
+	prompts: [...PROMPT_FIELD_MAP.keys()],
+	scripts: [...SCRIPT_FIELD_MAP.keys(), ...SCRIPT_BEHAVIOUR_FIELDS.keys()],
+	topLevel: [...TOML_FIELD_MAP.keys(), 'scripts'],
+};
+
+/**
  * Normalises the `scripts` block (setup/run/archive plus the behaviour keys
  * `run_mode` and `auto_run_after_setup`), collecting diagnostics for
  * unsupported keys and mistyped values.

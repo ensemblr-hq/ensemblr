@@ -11,6 +11,8 @@ export type {
 	BoardCardKind,
 	BoardDrop,
 	BoardIssueCard,
+	BoardIssuesFailure,
+	GroupedBoardIssuesFailure,
 } from './dashboard';
 export type { WorkbenchLayoutModel } from './layout';
 export type {

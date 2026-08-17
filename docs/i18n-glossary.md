@@ -72,6 +72,7 @@ Rules of thumb:
 | Sort / Group *(list controls)* | Сортировка / Группировка | Ταξινόμηση / Ομαδοποίηση | The two pickers over a list. Nominative in every language, because each control's own value is what its trigger displays — a dative "по приоритету" reads as a fragment on a chip. |
 | Tool call | Вызов инструмента | Κλήση εργαλείου | |
 | Attachment | Вложение | Συνημμένο | |
+| Attach to chat *(verb)* | Прикрепить к диалогу | Επισύναψη στη συνομιλία | The right-click action on a Files-tree row and a Changes row that hands the thing to the agent as a chip. Russian uses `прикрепить`, agreeing with `Link (a directory or issue)`, and `диалог` rather than `чат` because the content lands in the thread, not on the tab — matching `Comment is attached to the chat` → `Комментарий прикреплён к диалогу`. Greek `Επισύναψη`, the verb behind `Συνημμένο`, not the `Προσθήκη` of `Add to chat`. |
 | Pasted text | Вставленный текст | Επικολλημένο κείμενο | A long clipboard paste the composer stored as an attachment. Named for the act, not the file — "вставка"/"επικόλληση" reads as the gesture, and the chip labels a thing. |
 | Token | Токен | Διακριτικό | Model context unit. Localized in both — it is not git porcelain and not a proper noun. |
 | Dictation | Диктовка | Υπαγόρευση | Speaking a prompt into the composer. The feature, and the verb on its control (`Продиктовать`/`Υπαγόρευση`). |

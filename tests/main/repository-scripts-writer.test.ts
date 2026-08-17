@@ -257,6 +257,40 @@ review = "Focus on tests."
 	});
 });
 
+test('restores a leading #:schema directive across a rewrite', (t) => {
+	const fixture = createRepositoryFixture(t);
+	const directive = '#:schema ../schemas/settings.schema.json';
+	fixture.write(`${directive}\n\n# dropped\n[scripts]\nsetup = "npm ci"\n`);
+
+	const result = writeRepositoryScripts(
+		writeInput(fixture.repositoryPath, { setup: 'npm run bootstrap' }),
+	);
+
+	assert.equal(result.ok, true);
+	const written = fixture.read();
+	assert.equal(written.split('\n').at(0), directive);
+	assert.equal(written.includes('# dropped'), false);
+	assert.deepEqual(fixture.readRecord(), {
+		scripts: {
+			auto_run_after_setup: false,
+			run_mode: 'concurrent',
+			setup: 'npm run bootstrap',
+		},
+	});
+});
+
+test('leaves a config without a directive free of one', (t) => {
+	const fixture = createRepositoryFixture(t);
+
+	assert.equal(
+		writeRepositoryScripts(
+			writeInput(fixture.repositoryPath, { setup: 'npm ci' }),
+		).ok,
+		true,
+	);
+	assert.equal(fixture.read().startsWith('#:schema'), false);
+});
+
 test('leaves an unparseable config untouched and reports the failure', (t) => {
 	const fixture = createRepositoryFixture(t);
 	const broken = '[scripts\nsetup = "npm ci"\n';

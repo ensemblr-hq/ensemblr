@@ -108,6 +108,28 @@ describe('createAppSettingsService', () => {
 		expect(onDisk.app.general.desktopNotifications).toBe(false);
 	});
 
+	test('persists dictation settings and reads them back', () => {
+		const configPath = tmpConfigPath();
+		const service = createAppSettingsService({ configPath });
+
+		const next = service.update({
+			dictation: { enabled: true, model: 'whisper-1' },
+		});
+		expect(next.dictation.enabled).toBe(true);
+		expect(next.dictation.model).toBe('whisper-1');
+		expect(next.dictation.baseUrl).toBe('https://api.openai.com/v1');
+
+		expect(service.read().dictation.enabled).toBe(true);
+		expect(readJson(configPath).app.dictation.model).toBe('whisper-1');
+	});
+
+	test('writes a $schema pointer into the config it creates', () => {
+		const configPath = tmpConfigPath();
+		createAppSettingsService({ configPath }).read();
+
+		expect(readJson(configPath).$schema).toContain('config.schema.json');
+	});
+
 	test('reads externally-written values, defaulting invalid fields', () => {
 		const configPath = tmpConfigPath();
 		writeFileSync(

@@ -7,6 +7,7 @@ export default interface Resources {
 			approve: 'Approve';
 			archive: 'Archive';
 			archiving: 'Archiving…';
+			'attach-to-chat': 'Attach to chat';
 			back: 'Back';
 			browse: 'Browse';
 			cancel: 'Cancel';
@@ -447,6 +448,12 @@ export default interface Resources {
 			};
 		};
 		attachment: {
+			'file-diff-empty': {
+				message: '{{label}} has no diff to attach.';
+			};
+			'file-diff-failed': {
+				message: 'Diff could not be attached.';
+			};
 			'issue-failed': {
 				message: 'Issue could not be attached.';
 			};
@@ -599,6 +606,7 @@ export default interface Resources {
 			'invalid-pattern': 'That pattern is not valid.';
 			'invalid-repository': 'That is not a usable repository.';
 			'invalid-worktree': 'The worktree does not belong to this repository.';
+			'issues-disabled': 'Issues are turned off for this repository on GitHub.';
 			'job-unknown': 'The clone job has expired or was never prepared. Start a new clone.';
 			'lifecycle-hook-failed': 'A lifecycle hook failed.';
 			'linear-unknown': 'The Linear operation failed.';
@@ -1414,6 +1422,7 @@ export default interface Resources {
 		};
 		'file-menu': {
 			actions: '{{path}} actions';
+			'attach-diff-to-chat': 'Attach diff to chat';
 		};
 		'file-row': {
 			discard: 'Discard changes to {{path}}';
@@ -2247,6 +2256,10 @@ export default interface Resources {
 			description: 'Marks the workspace as archived and preserves its <0>.context/</0> handoff files under <1>archived-contexts/</1>. By default the worktree folder and local branch stay on disk; nothing is committed or pushed.';
 			title: 'Archive workspace?';
 		};
+		'attach-to-chat': {
+			attached: '{{label}} is attached to the chat.';
+			'diff-attached': 'Diff for {{label}} is attached to the chat.';
+		};
 		'attachment-menu': {
 			'add-attachment': 'Add attachment';
 			'aria-label': 'Attachments';
@@ -2606,6 +2619,9 @@ export default interface Resources {
 				'count-filtered': '{{shown}}/{{total}}';
 				empty: 'Nothing here yet';
 				'empty-filtered': 'No cards match the filter';
+				'issues-error': {
+					'missing-from': 'Backlog is missing issues from {{repositories}}.';
+				};
 				label: '{{status}} column, {{cards}}';
 				'label-filtered': '{{status}} column, {{shown}} of {{total}} cards shown';
 				loading: 'Loading issues…';

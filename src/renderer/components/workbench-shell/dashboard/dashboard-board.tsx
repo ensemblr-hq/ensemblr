@@ -56,7 +56,7 @@ export function DashboardBoard() {
 	const { reorderBoard, setWorkspaceBoardStatus } = useWorkspaceBoardActions();
 	const { dismiss, dismissedKeys, restore } = useBoardIssueDismissals();
 	const boardFilters = useBoardFilters();
-	const { backlogIssues, dismissedIssues, error, isLoading } = useBoardIssues(
+	const { backlogIssues, dismissedIssues, errors, isLoading } = useBoardIssues(
 		model.displayProjects,
 	);
 	const [assignRequest, setAssignRequest] = useState<AssignIssueRequest | null>(
@@ -201,7 +201,7 @@ export function DashboardBoard() {
 									allowReorder={allowReorder}
 									cards={column.cards}
 									isLoadingIssues={isLoading}
-									issuesError={error}
+									issuesErrors={errors}
 									key={column.status}
 									status={column.status}
 									totalCount={column.totalCount}

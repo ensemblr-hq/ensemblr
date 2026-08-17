@@ -496,6 +496,40 @@ test('listIssues asks gh for unassigned issues only when the board asks', async 
 	assert.equal(calls[1]?.args?.includes('--search'), false);
 });
 
+// `gh issue list` exits 1 on a repository whose issues are turned off, but the
+// dashboard board fans this call out across every repository at once — one such
+// repository must not redden the whole Backlog column with an unactionable
+// "The command failed."
+test('listIssues answers with an empty list when the repository has issues disabled', async () => {
+	const { service: commandService } = stubCommandService(() =>
+		buildResult('gh', {
+			failure: {
+				code: 'nonzero-exit',
+				exitCode: 1,
+				message: '',
+				signal: null,
+			},
+			status: 'failure',
+			stderr: "the 'acme/widgets' repository has disabled issues",
+		}),
+	);
+	const service = createRepositorySourcesService({
+		databaseService: fakeDatabaseService([]),
+		localCommandService: commandService,
+		resolveRepositoryPath: () => '/repo',
+	});
+
+	const result = await service.listIssues({
+		repositoryId: 'repo-1',
+		unassignedOnly: true,
+	});
+
+	assert.equal(result.status, 'ok');
+	assert.equal(result.issues.length, 0);
+	assert.equal(result.status === 'ok' && result.staleError, undefined);
+	assert.equal(result.status === 'ok' && result.source, 'remote');
+});
+
 test('listBranches reports an error when the repository is unknown', async () => {
 	const { service: commandService } = stubCommandService(() =>
 		buildResult('git', { status: 'success', stdout: '' }),

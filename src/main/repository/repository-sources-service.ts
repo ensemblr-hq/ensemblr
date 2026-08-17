@@ -179,6 +179,24 @@ export function createRepositorySourcesService({
 	}
 
 	/**
+	 * Caches an issue list `gh` just produced and shapes it as the remote-sourced
+	 * result both the listed and the issues-disabled paths return.
+	 * @param repositoryId - ID of the repository the issues belong to
+	 * @param issues - The issues to cache and return
+	 * @param unassignedOnly - Which of the two cached lists this one is
+	 * @returns The successful issue-list result to hand the caller
+	 */
+	function recordListedIssues(
+		repositoryId: string,
+		issues: RepositoryIssueWire[],
+		unassignedOnly: boolean,
+	): ListRepositoryIssuesResult {
+		const syncedAt = new Date().toISOString();
+		writeIssueCache(repositoryId, issues, syncedAt, unassignedOnly);
+		return { issues, source: 'remote', status: 'ok', syncedAt };
+	}
+
+	/**
 	 * Build a branch-name to workspace-id map for a repository's active workspaces.
 	 * @param repositoryId - ID of the repository whose workspace rows are read
 	 * @param select - Query that returns the workspace rows for the repository
@@ -363,6 +381,12 @@ export function createRepositorySourcesService({
 				...(unassignedOnly ? ['--search', UNASSIGNED_SEARCH] : []),
 			]);
 			if (!result.ok) {
+				// A repository with issues turned off on GitHub has no issues rather
+				// than a broken list, so it answers empty; an error would redden every
+				// surface that fans this call out across all repositories at once.
+				if (result.error.code === 'issues-disabled') {
+					return recordListedIssues(request.repositoryId, [], unassignedOnly);
+				}
 				return cached
 					? servedFromCache(cached, result.error)
 					: { error: result.error, issues: [], status: 'error' };
@@ -375,9 +399,7 @@ export function createRepositorySourcesService({
 					? servedFromCache(cached, failure)
 					: { error: failure, issues: [], status: 'error' };
 			}
-			const syncedAt = new Date().toISOString();
-			writeIssueCache(request.repositoryId, issues, syncedAt, unassignedOnly);
-			return { issues, source: 'remote', status: 'ok', syncedAt };
+			return recordListedIssues(request.repositoryId, issues, unassignedOnly);
 		},
 	};
 }
