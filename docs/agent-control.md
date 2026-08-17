@@ -44,6 +44,51 @@ applies guardrails, and delegates to the app's existing services through ports.
 The architecture decision is [ADR 0040](./adr/0040-use-loopback-control-server-for-agent-app-control.md);
 the full design record is [`considerations/agent-control-layer.md`](./considerations/agent-control-layer.md).
 
+## The playbook and the skill behind it
+
+Two channels carry what an agent knows about Ensemblr, and the split is
+deliberate.
+
+The **playbook** (`src/shared/agent-control/awareness.ts`) is injected into every
+session's system prompt. It is always in context, so it carries only what a turn
+cannot go without: the tool inventory the caller really holds, the etiquette, and
+the bookkeeping.
+
+The **skill** is an Agent Skill in `resources/agent-skills/`, shipped inside the
+app package and loaded per launch. Only its name and description sit in context;
+the body is read on demand. It carries what would be waste to repeat every turn —
+the `.ensemblr/settings.toml` key reference, the run-script shape, the worktree
+model, the failure vocabulary. The playbook names it, so an agent is told where
+to look rather than left to notice a description.
+
+One directory serves every runtime, because a Claude Code plugin root and a Pi
+skill directory nest rather than conflict:
+
+| Runtime | How it loads |
+| --- | --- |
+| Pi (`pi --mode rpc`) | `--skill <bundle>/skills/ensemblr`, beside the control extension's `-e` |
+| Native Claude (Agent SDK) | `plugins: [{ type: 'local', path: <bundle> }]` |
+| Claude harness (TUI) | `--plugin-dir <bundle>` |
+
+Nothing is written into the user's repository or into `~/.claude`, so the skill
+is scoped to sessions Ensemblr launched and leaves nothing behind. Paths are
+resolved by `src/main/agent-skills/`, which reports `null` when the bundle is
+absent — a runtime then launches exactly as it did before skills existed.
+
+The SDK's sibling `skills` option is deliberately **not** set: it is a context
+filter, so naming ours there would hide every skill the user already has.
+
+Both slash-command listers name the bundle too
+(`src/main/pi-agent/pi-slash-commands.ts`,
+`src/main/claude-agent/claude-slash-commands.ts`). Discovery runs its own
+resource loader, so a skill loaded only at session open would work at runtime yet
+be missing from the composer's catalogue.
+
+`tests/main/agent-skill-bundle.test.ts` holds the skill to the surfaces it
+describes: every `ensemblr_*` tool it names must exist in `AGENT_CONTROL_OPS`,
+and every `settings.toml` key must exist in `schemas/settings.schema.json`.
+The decision is [ADR 0053](./adr/0053-ship-a-bundled-ensemblr-skill-to-both-runtimes.md).
+
 ## Permissions
 
 Control actions follow the **workspace permission mode** (the same setting that

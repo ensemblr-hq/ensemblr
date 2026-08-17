@@ -38,6 +38,7 @@ export default defineConfig({
 			'tests/renderer/**/*.test.{ts,tsx}',
 			'tests/shared/**/*.test.ts',
 			'tests/scripts/**/*.test.mjs',
+			'tests/main/agent-skill-bundle.test.ts',
 			'tests/main/branch-name-slug.test.ts',
 			'tests/main/dictation-service.test.ts',
 			'tests/main/pi-wire-content-blocks.test.ts',

@@ -56,6 +56,7 @@ interface SdkCreateAgentSessionResult {
 interface SdkModule {
 	AuthStorage?: SdkStaticFactory;
 	DefaultResourceLoader?: new (options: {
+		additionalSkillPaths?: string[];
 		agentDir: string;
 		cwd: string;
 		settingsManager: unknown;
@@ -89,11 +90,13 @@ const AUTO_SUBMIT_NAMES = new Set([
  * commands are used only as a static fallback when the SDK cannot be loaded.
  * @param executable - Resolved Pi executable snapshot.
  * @param cwd - Workspace directory whose project-local resources should load.
+ * @param shippedSkillPath - Ensemblr's own skill directory, which sits outside every location the SDK discovers, or null.
  * @returns Slash commands plus provenance and fallback errors.
  */
 export async function resolvePiSlashCommands(
 	executable: PiExecutableSnapshot,
 	cwd?: string,
+	shippedSkillPath?: string | null,
 ): Promise<ListAgentProviderSlashCommandsResult> {
 	if (!isExecutableReady(executable)) {
 		return {
@@ -117,6 +120,7 @@ export async function resolvePiSlashCommands(
 			commands: await resolveLivePiSlashCommands(
 				packageRoot,
 				normalizeWorkspaceCwd(cwd),
+				shippedSkillPath ?? null,
 			),
 			error: null,
 			source: 'runtime',
@@ -137,11 +141,13 @@ export async function resolvePiSlashCommands(
  * Resolves live extension, prompt-template, and skill commands through the SDK.
  * @param packageRoot - Installed Pi package root.
  * @param workspaceCwd - Workspace directory for project resources.
+ * @param shippedSkillPath - Ensemblr's own skill directory, or null.
  * @returns Prompt-invokable slash commands.
  */
 async function resolveLivePiSlashCommands(
 	packageRoot: string,
 	workspaceCwd: string,
+	shippedSkillPath: string | null,
 ): Promise<AgentProviderSlashCommandWire[]> {
 	const sdk = (await import(
 		pathToFileURL(path.join(packageRoot, 'dist', 'index.js')).href
@@ -156,6 +162,7 @@ async function resolveLivePiSlashCommands(
 		workspaceCwd,
 		settingsManager,
 		packageRoot,
+		shippedSkillPath,
 	);
 	await resourceLoader.reload?.();
 	const sessionManager = createSessionManager(sdk, workspaceCwd);
@@ -211,10 +218,15 @@ function createSettingsManager(
 
 /**
  * Creates a resource loader for workspace-scoped skills, prompts, and extensions.
+ *
+ * Ensemblr's own skill ships inside the app package and reaches a running Pi
+ * child through `--skill`, which discovery never sees — so it is named here too,
+ * or the composer would offer every skill except the one the app ships.
  * @param sdk - Dynamically imported Pi SDK module.
  * @param workspaceCwd - Workspace directory for project resources.
  * @param settingsManager - Settings manager shared with the loader.
  * @param packageRoot - Installed Pi package root for error messages.
+ * @param shippedSkillPath - Ensemblr's own skill directory, or null.
  * @returns SDK resource loader instance.
  */
 function createResourceLoader(
@@ -222,6 +234,7 @@ function createResourceLoader(
 	workspaceCwd: string,
 	settingsManager: unknown,
 	packageRoot: string,
+	shippedSkillPath: string | null,
 ): SdkResourceLoader {
 	const Loader = sdk.DefaultResourceLoader;
 	if (!Loader) {
@@ -233,6 +246,7 @@ function createResourceLoader(
 		agentDir: getAgentDir(sdk),
 		cwd: workspaceCwd,
 		settingsManager,
+		...(shippedSkillPath ? { additionalSkillPaths: [shippedSkillPath] } : {}),
 	});
 }
 

@@ -48,14 +48,14 @@ Better TOML extension — validates TOML against JSON Schema, so a directive on
 the first line buys you completion for every key, block, and icon name:
 
 ```toml
-#:schema https://raw.githubusercontent.com/ensemblr-hq/ensemblr/master/schemas/settings.schema.json
+#:schema https://www.ensemblr.dev/schemas/settings.schema.json
 ```
 
 A save from the Scripts pane drops every comment in the file, but this one
 directive is read back and restored, so wiring a repository up survives an edit
-from the app. The schema is committed at
-[`schemas/settings.schema.json`](../../schemas/settings.schema.json); its
-canonical id is `https://www.ensemblr.dev/schemas/settings.schema.json`, and
+from the app. That URL is the schema's canonical id and the site serves it; the
+copy it is cut from is committed at
+[`schemas/settings.schema.json`](../../schemas/settings.schema.json), and
 [`schemas/README.md`](../../schemas/README.md) covers both config files.
 
 Ensemblr's own `.ensemblr/settings.toml` points at the checked-in copy with a

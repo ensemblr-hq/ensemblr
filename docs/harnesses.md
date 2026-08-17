@@ -30,6 +30,7 @@ tell you which caller you are looking at:
 | Permissions | always `--dangerously-skip-permissions` (see below) | honours the workspace permission mode, like Pi |
 | Control origin | the workspace-level origin `ws:<id>`, shared with every terminal | its own per-session origin, with lineage (`parentSessionId`, `depth`) |
 | Playbook | `HARNESS_AWARENESS` | `ORCHESTRATOR_AWARENESS` / `SUBAGENT_AWARENESS` |
+| Shipped skill | `--plugin-dir <bundle>` | SDK `plugins: [{ type: 'local', … }]` |
 | Control tools | no chat-tab tools | full `ensemblr_*` set over the same MCP endpoint |
 | Spawning children | must pass `model` — the app cannot tell its runtime | may omit `model`; the child is pinned to the `claude` runtime |
 
@@ -110,11 +111,11 @@ loopback control server with a scoped bearer token — giving them the
 token itself never enters the command line; each harness reads it from the
 injected `ENSEMBLR_CONTROL_TOKEN` env var.
 
-| Harness | MCP config | Playbook |
-|---|---|---|
-| Claude Code | `--mcp-config '<json>'`, bearer header expands `${ENSEMBLR_CONTROL_TOKEN}` | `--append-system-prompt-file` |
-| Codex | `-c mcp_servers.ensemblr.url=…` + `-c mcp_servers.ensemblr.bearer_token_env_var=…` | none — reads the MCP server's `instructions` field as its tool-namespace description |
-| Mistral Vibe | `VIBE_MCP_SERVERS='<json>'` env prefix with `api_key_env` — Vibe has no MCP-config flag, only `VIBE_*` env vars | `--add-dir <dir>`, whose `AGENTS.md` it loads as project instructions |
+| Harness | MCP config | Playbook | Shipped skill |
+|---|---|---|---|
+| Claude Code | `--mcp-config '<json>'`, bearer header expands `${ENSEMBLR_CONTROL_TOKEN}` | `--append-system-prompt-file` | `--plugin-dir <bundle>` |
+| Codex | `-c mcp_servers.ensemblr.url=…` + `-c mcp_servers.ensemblr.bearer_token_env_var=…` | none — reads the MCP server's `instructions` field as its tool-namespace description | none — Codex plugins use their own manifest format |
+| Mistral Vibe | `VIBE_MCP_SERVERS='<json>'` env prefix with `api_key_env` — Vibe has no MCP-config flag, only `VIBE_*` env vars | `--add-dir <dir>`, whose `AGENTS.md` it loads as project instructions | none — Vibe exposes no skill surface |
 
 The playbook is `HARNESS_AWARENESS` (`src/shared/agent-control/awareness.ts`),
 rewritten to `<userData>/harness-instructions/AGENTS.md` on every harness launch
@@ -124,6 +125,15 @@ harness-shaped variant of the Pi role playbooks: a harness tab is a
 terminal titled from the harness's own session log, so the chat-tab tools
 (`ensemblr_set_name`, `ensemblr_set_summary`, `ensemblr_ask_user_question`, Plan
 Mode) are neither served over MCP nor mentioned.
+
+The **shipped skill** is the reference underneath that playbook: an Agent Skill
+in `resources/agent-skills/`, packaged as an `extraResource` and resolved by
+`src/main/agent-skills/`. The playbook is always in context and carries what a
+turn cannot go without; the skill is read on demand and carries the
+`.ensemblr/settings.toml` key reference, the run-script shape, and the failure
+vocabulary — none of which is worth paying for every turn. Only Claude Code
+reads it here, so `HARNESS_AWARENESS` names it conditionally rather than
+promising a skill Codex and Vibe will never see.
 
 > Vibe fails silently when the control server is unreachable — no error, no
 > stderr, exit 0, just no tools. To check the wiring, ask it to list the tools

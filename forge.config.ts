@@ -163,7 +163,7 @@ const config: ForgeConfig = {
 			NSMicrophoneUsageDescription:
 				'Ensemblr uses the microphone to dictate prompts into the composer. Audio is sent to the transcription provider you configure and is never stored.',
 		},
-		extraResource: ['resources/pi-extensions'],
+		extraResource: ['resources/pi-extensions', 'resources/agent-skills'],
 		// Packager resolves the platform extension (`icon.icns` on macOS).
 		// Regenerate with `npm run icon:generate`.
 		icon: './assets/icon',

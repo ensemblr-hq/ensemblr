@@ -63,6 +63,7 @@ import { createProvisionalWorkspaceNaming } from './agent-runtime/naming/provisi
 import { createSessionNaming } from './agent-runtime/naming/session-naming';
 import { resolveNotificationTarget } from './agent-runtime/notification-target';
 import { createSessionSummaryWriter } from './agent-runtime/session-summary-writer';
+import { resolveAgentSkillBundle } from './agent-skills';
 import { createHarnessDetectionService } from './agents';
 import { createMainWindow } from './app/main-window';
 import { createQuitCoordinator } from './app/quit-coordinator';
@@ -459,6 +460,10 @@ let agentControlServer: ControlServer | null = null;
 // control state on shutdown.
 let agentControlService: AgentControlService | null = null;
 
+// The shipped Agent Skill bundle, resolved once: Pi loads the skill directory
+// directly, both Claude paths load the plugin root it sits inside.
+const agentSkillBundle = resolveAgentSkillBundle(app);
+
 // The env resolver, harness-command augmenter, native confirm dialog, and
 // resolved Pi extension path all live behind one integration factory; main.ts
 // keeps only the composition. `getServerUrl` reads the mutable server ref
@@ -471,6 +476,7 @@ const {
 } = createAgentControlIntegration({
 	app,
 	originRegistry: agentControlOriginRegistry,
+	skillPluginDirectory: agentSkillBundle.pluginDirectory,
 	/** Resolves a workspace's checkout path, or null before the database is open. */
 	resolveWorkspaceCwd: (workspaceId) => {
 		const database = databaseService.getConnection()?.database;
@@ -501,9 +507,14 @@ const {
 const resolveAgentSpawnEnv = async (): Promise<NodeJS.ProcessEnv> =>
 	(await localCommandService.getEnvironment()).env;
 const piAgentAdapter = createPiCliRpcAdapter({
-	baseArgs: piControlExtensionPath
-		? ['--mode', 'rpc', '-e', piControlExtensionPath]
-		: undefined,
+	baseArgs: [
+		'--mode',
+		'rpc',
+		...(piControlExtensionPath ? ['-e', piControlExtensionPath] : []),
+		...(agentSkillBundle.skillDirectory
+			? ['--skill', agentSkillBundle.skillDirectory]
+			: []),
+	],
 	onRawFrame: broadcastRawFrame,
 	resolveBaseEnv: resolveAgentSpawnEnv,
 });
@@ -523,6 +534,7 @@ const claudeAgentAdapter = createClaudeAgentAdapter({
 		/** Saves the plan, posts it into the chat, and raises the review panel. */
 		submitPlan: (input) => planSubmission.submit(input),
 	}),
+	pluginDirectory: agentSkillBundle.pluginDirectory,
 	resolveBaseEnv: resolveAgentSpawnEnv,
 });
 /**
@@ -591,11 +603,16 @@ const agentProviderService = createAgentProviderService({
 	},
 	slashCommandCatalogs: {
 		claude: createClaudeSlashCommands({
+			pluginDirectory: agentSkillBundle.pluginDirectory,
 			resolveBaseEnv: resolveAgentSpawnEnv,
 			resolveExecutablePath: resolveClaudeExecutablePath,
 		}),
 		pi: async (cwd) =>
-			resolvePiSlashCommands(await piExecutableService.getSnapshot(), cwd),
+			resolvePiSlashCommands(
+				await piExecutableService.getSnapshot(),
+				cwd,
+				agentSkillBundle.skillDirectory,
+			),
 	},
 });
 const agentClient = createAgentClient({

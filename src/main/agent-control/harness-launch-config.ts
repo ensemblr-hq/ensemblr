@@ -74,15 +74,18 @@ function instructionsFile(directory: string | null): string | null {
 
 /**
  * Builds Claude Code's decoration: an inline `--mcp-config` whose bearer header
- * expands the token env var, plus the playbook appended to its system prompt.
- * Both flags work in an interactive launch alongside `--dangerously-skip-permissions`.
+ * expands the token env var, the playbook appended to its system prompt, and
+ * the shipped Agent Skill loaded as a session-only local plugin. All three work
+ * in an interactive launch alongside `--dangerously-skip-permissions`.
  * @param url - The control server's `/mcp` endpoint.
  * @param directory - Directory holding the harness playbook, or null.
+ * @param skillPluginDirectory - Root of the shipped skill plugin, or null.
  * @returns Claude's launch decoration.
  */
 function claudeDecoration(
 	url: string,
 	directory: string | null,
+	skillPluginDirectory: string | null,
 ): HarnessLaunchDecoration {
 	const config = JSON.stringify({
 		mcpServers: {
@@ -99,6 +102,9 @@ function claudeDecoration(
 		flags: [
 			`--mcp-config ${quote(config)}`,
 			...(file ? [`--append-system-prompt-file ${quote(file)}`] : []),
+			...(skillPluginDirectory
+				? [`--plugin-dir ${quote(skillPluginDirectory)}`]
+				: []),
 		],
 	};
 }
@@ -152,17 +158,19 @@ function vibeDecoration(
  * @param harnessId - Harness registry id (`claude`, `codex`, `vibe`, …).
  * @param baseUrl - Control server base URL (e.g. `http://127.0.0.1:53219`).
  * @param instructionsDirectory - Directory holding the harness playbook, or null.
+ * @param skillPluginDirectory - Root of the shipped skill plugin, or null. Only Claude reads it.
  * @returns The env assignments and flags to add.
  */
 export function buildHarnessLaunchDecoration(
 	harnessId: string,
 	baseUrl: string,
 	instructionsDirectory: string | null = null,
+	skillPluginDirectory: string | null = null,
 ): HarnessLaunchDecoration {
 	const url = `${baseUrl}/mcp`;
 	switch (harnessId) {
 		case 'claude':
-			return claudeDecoration(url, instructionsDirectory);
+			return claudeDecoration(url, instructionsDirectory, skillPluginDirectory);
 		case 'codex':
 			return codexDecoration(url);
 		case 'vibe':
@@ -180,6 +188,8 @@ export interface HarnessLaunchContext {
 	harnessId: string;
 	/** Directory holding the harness playbook, or null when it is unavailable. */
 	instructionsDirectory: string | null;
+	/** Root of the shipped Agent Skill plugin, or null when the bundle is missing. */
+	skillPluginDirectory?: string | null;
 	/**
 	 * Per-workspace control token, or null when unavailable. Used only as an
 	 * availability gate — it is never embedded in the command.
@@ -188,11 +198,12 @@ export interface HarnessLaunchContext {
 }
 
 /**
- * Decorates a harness launch command with its Ensemblr MCP config and
- * instructions, leaving it untouched when the control server is unreachable —
- * a playbook describing tools the harness cannot reach is worse than silence.
+ * Decorates a harness launch command with its Ensemblr MCP config, instructions,
+ * and shipped skill, leaving it untouched when the control server is
+ * unreachable — a playbook describing tools the harness cannot reach is worse
+ * than silence.
  * @param command - Registry-built launch command string.
- * @param context - Server URL, token, harness id, and playbook directory.
+ * @param context - Server URL, token, harness id, playbook directory, and skill plugin root.
  * @returns The command, decorated when applicable.
  */
 export function decorateHarnessCommand(
@@ -206,6 +217,7 @@ export function decorateHarnessCommand(
 		context.harnessId,
 		context.baseUrl,
 		context.instructionsDirectory,
+		context.skillPluginDirectory ?? null,
 	);
 	const prefix = env.length > 0 ? `${env.join(' ')} ` : '';
 	const suffix = flags.length > 0 ? ` ${flags.join(' ')}` : '';

@@ -1,0 +1,6 @@
+{
+	"name": "ensemblr",
+	"description": "Working inside the Ensemblr desktop coding workspace: control tools, repository settings, and the workspace/worktree model.",
+	"version": "0.1.0",
+	"skills": ["./skills/ensemblr"]
+}

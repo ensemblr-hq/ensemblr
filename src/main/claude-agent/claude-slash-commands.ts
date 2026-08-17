@@ -16,6 +16,12 @@ const DISCOVERY_PERMISSION_MODE = 'plan' as const;
 
 /** Options for {@link createClaudeSlashCommands}. */
 export interface CreateClaudeSlashCommandsOptions {
+	/**
+	 * Root of the shipped Agent Skill plugin, named here as well as at session
+	 * open — discovery reads its own `plugins`, so a skill the app loads per
+	 * session would otherwise be missing from the composer's catalogue.
+	 */
+	pluginDirectory?: string | null;
 	/** Injection seam for tests; defaults to the SDK's own `query`. */
 	queryFn?: typeof query;
 	/** Resolves the login-shell env, so a Finder-launched app still finds `claude`. */
@@ -53,6 +59,7 @@ function toWire(command: SlashCommand): AgentProviderSlashCommandWire {
  * @returns A function returning the commands for one workspace directory.
  */
 export function createClaudeSlashCommands({
+	pluginDirectory = null,
 	queryFn = query,
 	resolveBaseEnv = () => process.env,
 	resolveExecutablePath = () => null,
@@ -80,6 +87,9 @@ export function createClaudeSlashCommands({
 				env: stripLaunchContextEnv({ ...baseEnv }),
 				pathToClaudeCodeExecutable: executablePath,
 				permissionMode: DISCOVERY_PERMISSION_MODE,
+				...(pluginDirectory
+					? { plugins: [{ path: pluginDirectory, type: 'local' as const }] }
+					: {}),
 			},
 			prompt: promptQueue.stream,
 		});

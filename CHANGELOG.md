@@ -11,13 +11,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **A bundled `ensemblr` Agent Skill, handed to every agent the app starts.** Ensemblr's own
+  playbook is always in an agent's context, so it could only ever afford tool etiquette — an agent
+  asked to add a run script had no idea `.ensemblr/settings.toml` existed, let alone which keys it
+  takes. The skill is the reference underneath it, read on demand: the workspace and worktree model,
+  the full `ensemblr_*` tool surface with its argument and failure vocabulary, and every
+  `settings.toml` block down to the closed list of run-script icons. One directory in
+  `resources/agent-skills/` serves all three paths — `pi --skill`, the Agent SDK's `plugins`, and the
+  `claude` harness's `--plugin-dir` — and it ships inside the app, so nothing is written into the
+  user's repository or `~/.claude`. `tests/main/agent-skill-bundle.test.ts` holds the skill to the
+  code it describes, so a tool or config key it names cannot drift into fiction
+  ([ADR 0053](docs/adr/0053-ship-a-bundled-ensemblr-skill-to-both-runtimes.md)).
 - **Public JSON Schemas for both config files.** `schemas/config.schema.json` describes
   `~/.config/ensemblr/config.json` and `schemas/settings.schema.json` describes a repository's
   `.ensemblr/settings.toml`, down to every enum, default, and curated run-script icon. `config.json`
   now accepts a `$schema` key — Ensemblr writes one into the file it creates on first launch — and
   `settings.toml` takes Taplo's `#:schema` directive, which a save from the Scripts pane restores
-  rather than dropping with the rest of the comments. `tests/main/published-schemas.test.ts` holds
-  the two schemas to the loaders they describe.
+  rather than dropping with the rest of the comments. Both are served at the canonical `$id` each
+  declares — `https://www.ensemblr.dev/schemas/config.schema.json` and
+  `https://www.ensemblr.dev/schemas/settings.schema.json` — which is what Ensemblr now writes into a
+  config it creates and what every doc points at. `tests/main/published-schemas.test.ts` holds the
+  two schemas to the loaders they describe.
 
 ### Fixed
 

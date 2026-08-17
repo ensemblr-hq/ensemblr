@@ -26,6 +26,21 @@ complete, so its cards show a spinner until the result lands.
 
 See [ADR 0042](../adr/0042-add-claude-code-as-a-second-first-class-agent-runtime.md).
 
+## The `ensemblr` skill
+
+Every agent Ensemblr starts is handed a skill describing the app it is running
+in — the workspace and worktree model, the `ensemblr_*` control tools, and the
+full `.ensemblr/settings.toml` key reference. It loads on demand, so it costs the
+conversation almost nothing until a task actually needs it, and you can call it
+up yourself with `/skill:ensemblr` in a Pi chat or `/ensemblr:ensemblr` in a
+Claude one.
+
+It ships inside the app. Nothing is written into your repository or into your
+`~/.claude` and `~/.pi` directories, so it never appears in a workspace diff and
+never follows you into a `pi` or `claude` session you start yourself. Terminal
+harnesses get it too, where the harness supports skills — the `claude` TUI does;
+Codex and Vibe do not.
+
 ## Pi
 
 Ensemblr spawns **your** `pi` binary in RPC mode and talks to it over stdio. Your

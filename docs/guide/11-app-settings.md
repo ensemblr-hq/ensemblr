@@ -44,15 +44,15 @@ config Ensemblr creates on first launch already carries the pointer:
 
 ```json
 {
-	"$schema": "https://raw.githubusercontent.com/ensemblr-hq/ensemblr/master/schemas/config.schema.json",
+	"$schema": "https://www.ensemblr.dev/schemas/config.schema.json",
 	"schemaVersion": 1
 }
 ```
 
 `$schema` is accepted and ignored — it is not a setting. Add the line by hand to
-a config that predates it. The schema is committed at
-[`schemas/config.schema.json`](../../schemas/config.schema.json); its canonical
-id is `https://www.ensemblr.dev/schemas/config.schema.json`, and
+a config that predates it. That URL is the schema's canonical id and the site
+serves it; the copy it is cut from is committed at
+[`schemas/config.schema.json`](../../schemas/config.schema.json), and
 [`schemas/README.md`](../../schemas/README.md) covers both files.
 
 ### Live reload
