@@ -1,4 +1,4 @@
-#:schema ../schemas/settings.schema.json
+#:schema https://www.ensemblr.dev/schemas/settings.schema.json
 
 [scripts]
 setup = "npm ci"
