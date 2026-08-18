@@ -11,6 +11,7 @@ export default interface Resources {
 			back: 'Back';
 			browse: 'Browse';
 			cancel: 'Cancel';
+			close: 'Close';
 			configure: 'Configure';
 			connect: 'Connect';
 			continue: 'Continue';

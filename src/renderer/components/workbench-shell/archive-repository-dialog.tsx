@@ -5,18 +5,17 @@ import {
 	archiveRepository,
 	isEnsemblrApiAvailable,
 } from '@/renderer/api/ensemblr-queries';
-import { Button } from '@/renderer/components/ui/button';
 import {
 	Dialog,
 	DialogContent,
 	DialogDescription,
-	DialogFooter,
 	DialogHeader,
 	DialogTitle,
 } from '@/renderer/components/ui/dialog';
-import { ArchiveDiagnosticsList } from '@/renderer/components/workbench-shell/archive-diagnostics-list';
 import { CleanupToggle } from '@/renderer/components/workbench-shell/cleanup-toggle';
+import { LifecycleDialogActions } from '@/renderer/components/workbench-shell/lifecycle-dialog-actions';
 import { LifecycleSummary } from '@/renderer/components/workbench-shell/lifecycle-summary';
+import { useLifecycleDialogAction } from '@/renderer/hooks/workbench-shell/use-lifecycle-dialog-action';
 import { projectSummaryRows } from '@/renderer/lib/workbench/lifecycle-summary-rows';
 import type { ProjectShellModel } from '@/renderer/types/workbench';
 import type { ArchiveRepositoryDiagnostic } from '@/shared/ipc/contracts/repository';
@@ -57,8 +56,17 @@ export function ArchiveRepositoryDialog({
 	);
 }
 
-/** Progress stage of the repository archive flow. */
-type ArchiveStage = 'archiving' | 'failure' | 'idle';
+/**
+ * Wraps an unexpected archive-repository rejection as the diagnostic the dialog
+ * already renders — a denied permission gate throws rather than reporting.
+ * @param message - The thrown error's message
+ * @returns A diagnostic carrying it
+ */
+function archiveRepositoryFailure(
+	message: string,
+): ArchiveRepositoryDiagnostic {
+	return { code: 'repository-update-failed', message, severity: 'error' };
+}
 
 /** Inner archive form for a repository; owns the archiving state and opt-in branch cleanup. */
 function ArchiveRepositoryDialogForm({
@@ -71,53 +79,26 @@ function ArchiveRepositoryDialogForm({
 	project: ProjectShellModel;
 }) {
 	const { t } = useTranslation();
-	const [stage, setStage] = useState<ArchiveStage>('idle');
 	const [branchCleanup, setBranchCleanup] = useState(false);
-	const [diagnostics, setDiagnostics] = useState<ArchiveRepositoryDiagnostic[]>(
-		[],
-	);
-
-	const canArchive = stage !== 'archiving' && isEnsemblrApiAvailable();
 	const workspaceCount = project.workspaces.length;
 	const hasWorkspaces = workspaceCount > 0;
-
-	const handleArchive = useCallback(async () => {
-		if (!canArchive) {
-			return;
-		}
-		setStage('archiving');
-		setDiagnostics([]);
-
-		const result = await archiveRepository({
-			branchCleanup: branchCleanup && hasWorkspaces,
-			repositoryId: project.id,
-		});
-
-		if (result.status === 'success') {
-			// Close before the post-archive work: `onArchived` navigates away from the
-			// archived repository, and awaiting that first leaves the modal — and its
-			// pointer-events overlay — up for as long as navigation takes to settle.
-			onOpenChange(false);
-			await onArchived(project.id);
-			return;
-		}
-
-		setStage('failure');
-		setDiagnostics(result.diagnostics);
-	}, [
-		branchCleanup,
-		canArchive,
-		hasWorkspaces,
-		onArchived,
+	const { diagnostics, isBusy, start } = useLifecycleDialogAction({
+		failure: archiveRepositoryFailure,
 		onOpenChange,
-		project.id,
-	]);
+		onSucceeded: () => onArchived(project.id),
+		operationKey: `archive-repository:${project.id}`,
+		run: () =>
+			archiveRepository({
+				branchCleanup: branchCleanup && hasWorkspaces,
+				repositoryId: project.id,
+			}),
+	});
+
+	const canArchive = !isBusy && isEnsemblrApiAvailable();
 
 	const handleClose = useCallback(() => {
 		onOpenChange(false);
 	}, [onOpenChange]);
-
-	const isBusy = stage === 'archiving';
 
 	return (
 		<>
@@ -165,33 +146,17 @@ function ArchiveRepositoryDialogForm({
 				/>
 			) : null}
 
-			{stage === 'failure' && diagnostics.length > 0 ? (
-				<ArchiveDiagnosticsList
-					diagnostics={diagnostics}
-					testId='archive-repository-diagnostics'
-				/>
-			) : null}
-
-			<DialogFooter>
-				<Button
-					disabled={isBusy}
-					onClick={handleClose}
-					type='button'
-					variant='ghost'
-				>
-					{t('common:actions.cancel', 'Cancel')}
-				</Button>
-				<Button
-					disabled={!canArchive}
-					onClick={handleArchive}
-					type='button'
-					variant={branchCleanup ? 'destructive' : 'default'}
-				>
-					{isBusy
-						? t('common:actions.archiving', 'Archiving…')
-						: t('common:actions.archive', 'Archive')}
-				</Button>
-			</DialogFooter>
+			<LifecycleDialogActions
+				actionLabel={t('common:actions.archive', 'Archive')}
+				actionVariant={branchCleanup ? 'destructive' : 'default'}
+				busyLabel={t('common:actions.archiving', 'Archiving…')}
+				canAct={canArchive}
+				diagnostics={diagnostics}
+				diagnosticsTestId='archive-repository-diagnostics'
+				isBusy={isBusy}
+				onAct={start}
+				onClose={handleClose}
+			/>
 		</>
 	);
 }

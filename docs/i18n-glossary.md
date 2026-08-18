@@ -121,6 +121,7 @@ Rules of thumb:
 | Paused | Пауза | Παύση | A queue that will not drain until the user says so. Distinct from Held: held is the setting, paused is the queue's state. |
 | Next | Следующее | Επόμενο | The queued message the agent gets first. Neuter in both languages because it qualifies `сообщение`/`μήνυμα`, not the queue. |
 | Archive | Архивировать | Αρχειοθέτηση | |
+| Close | Закрыть | Κλείσιμο | Dismisses the surface and nothing else. A confirmation dialog swaps its `Cancel` for this once the run is in flight, because dismissing it no longer calls the operation back. |
 | Discard | Отменить изменения | Απόρριψη | Destructive; never plain "Отменить" (= Undo). |
 | Undo | Отменить | Αναίρεση | |
 | Restore | Восстановить | Επαναφορά | |

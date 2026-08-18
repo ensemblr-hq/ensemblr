@@ -1,21 +1,20 @@
-import { useCallback, useState } from 'react';
+import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import {
 	deleteRepository,
 	isEnsemblrApiAvailable,
 } from '@/renderer/api/ensemblr-queries';
-import { Button } from '@/renderer/components/ui/button';
 import {
 	Dialog,
 	DialogContent,
 	DialogDescription,
-	DialogFooter,
 	DialogHeader,
 	DialogTitle,
 } from '@/renderer/components/ui/dialog';
-import { ArchiveDiagnosticsList } from '@/renderer/components/workbench-shell/archive-diagnostics-list';
+import { LifecycleDialogActions } from '@/renderer/components/workbench-shell/lifecycle-dialog-actions';
 import { LifecycleSummary } from '@/renderer/components/workbench-shell/lifecycle-summary';
+import { useLifecycleDialogAction } from '@/renderer/hooks/workbench-shell/use-lifecycle-dialog-action';
 import { projectSummaryRows } from '@/renderer/lib/workbench/lifecycle-summary-rows';
 import type { ProjectShellModel } from '@/renderer/types/workbench';
 import type { DeleteRepositoryDiagnostic } from '@/shared/ipc/contracts/repository';
@@ -57,8 +56,15 @@ export function DeleteRepositoryDialog({
 	);
 }
 
-/** Progress stage of the repository delete flow. */
-type DeleteStage = 'deleting' | 'failure' | 'idle';
+/**
+ * Wraps an unexpected delete-repository rejection as the diagnostic the dialog
+ * already renders — a denied permission gate throws rather than reporting.
+ * @param message - The thrown error's message
+ * @returns A diagnostic carrying it
+ */
+function deleteRepositoryFailure(message: string): DeleteRepositoryDiagnostic {
+	return { code: 'repository-delete-failed', message, severity: 'error' };
+}
 
 /** Inner delete form for a repository; owns the deleting state and failure diagnostics. */
 function DeleteRepositoryDialogForm({
@@ -71,41 +77,20 @@ function DeleteRepositoryDialogForm({
 	project: ProjectShellModel;
 }) {
 	const { t } = useTranslation();
-	const [stage, setStage] = useState<DeleteStage>('idle');
-	const [diagnostics, setDiagnostics] = useState<DeleteRepositoryDiagnostic[]>(
-		[],
-	);
+	const { diagnostics, isBusy, start } = useLifecycleDialogAction({
+		failure: deleteRepositoryFailure,
+		onOpenChange,
+		onSucceeded: () => onDeleted(project.id),
+		operationKey: `delete-repository:${project.id}`,
+		run: () => deleteRepository({ repositoryId: project.id }),
+	});
 
-	const canDelete = stage !== 'deleting' && isEnsemblrApiAvailable();
+	const canDelete = !isBusy && isEnsemblrApiAvailable();
 	const workspaceCount = project.workspaces.length;
-
-	const handleDelete = useCallback(async () => {
-		if (!canDelete) {
-			return;
-		}
-		setStage('deleting');
-		setDiagnostics([]);
-
-		const result = await deleteRepository({ repositoryId: project.id });
-
-		if (result.status === 'success') {
-			// Close before the post-removal work: `onDeleted` navigates away from the
-			// deleted repository, and awaiting that first leaves the modal — and its
-			// pointer-events overlay — up for as long as navigation takes to settle.
-			onOpenChange(false);
-			await onDeleted(project.id);
-			return;
-		}
-
-		setStage('failure');
-		setDiagnostics(result.diagnostics);
-	}, [canDelete, onDeleted, onOpenChange, project.id]);
 
 	const handleClose = useCallback(() => {
 		onOpenChange(false);
 	}, [onOpenChange]);
-
-	const isBusy = stage === 'deleting';
 
 	return (
 		<>
@@ -130,33 +115,17 @@ function DeleteRepositoryDialogForm({
 
 			<LifecycleSummary rows={projectSummaryRows(project)} />
 
-			{stage === 'failure' && diagnostics.length > 0 ? (
-				<ArchiveDiagnosticsList
-					diagnostics={diagnostics}
-					testId='delete-repository-diagnostics'
-				/>
-			) : null}
-
-			<DialogFooter>
-				<Button
-					disabled={isBusy}
-					onClick={handleClose}
-					type='button'
-					variant='ghost'
-				>
-					{t('common:actions.cancel', 'Cancel')}
-				</Button>
-				<Button
-					disabled={!canDelete}
-					onClick={handleDelete}
-					type='button'
-					variant='destructive'
-				>
-					{isBusy
-						? t('common:actions.deleting', 'Deleting…')
-						: t('common:actions.delete', 'Delete')}
-				</Button>
-			</DialogFooter>
+			<LifecycleDialogActions
+				actionLabel={t('common:actions.delete', 'Delete')}
+				actionVariant='destructive'
+				busyLabel={t('common:actions.deleting', 'Deleting…')}
+				canAct={canDelete}
+				diagnostics={diagnostics}
+				diagnosticsTestId='delete-repository-diagnostics'
+				isBusy={isBusy}
+				onAct={start}
+				onClose={handleClose}
+			/>
 		</>
 	);
 }

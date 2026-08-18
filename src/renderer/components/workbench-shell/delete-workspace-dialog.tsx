@@ -1,21 +1,20 @@
-import { useCallback, useState } from 'react';
+import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import {
 	deleteWorkspace,
 	isEnsemblrApiAvailable,
 } from '@/renderer/api/ensemblr-queries';
-import { Button } from '@/renderer/components/ui/button';
 import {
 	Dialog,
 	DialogContent,
 	DialogDescription,
-	DialogFooter,
 	DialogHeader,
 	DialogTitle,
 } from '@/renderer/components/ui/dialog';
-import { ArchiveDiagnosticsList } from '@/renderer/components/workbench-shell/archive-diagnostics-list';
+import { LifecycleDialogActions } from '@/renderer/components/workbench-shell/lifecycle-dialog-actions';
 import { LifecycleSummary } from '@/renderer/components/workbench-shell/lifecycle-summary';
+import { useLifecycleDialogAction } from '@/renderer/hooks/workbench-shell/use-lifecycle-dialog-action';
 import { workspaceSummaryRows } from '@/renderer/lib/workbench/lifecycle-summary-rows';
 import type { WorkspaceShellModel } from '@/renderer/types/workbench';
 import type { DeleteWorkspaceDiagnostic } from '@/shared/ipc/contracts/workspace';
@@ -56,8 +55,15 @@ export function DeleteWorkspaceDialog({
 	);
 }
 
-/** Progress stage of the workspace delete flow. */
-type DeleteStage = 'deleting' | 'failure' | 'idle';
+/**
+ * Wraps an unexpected delete-workspace rejection as the diagnostic the dialog
+ * already renders — a denied permission gate throws rather than reporting.
+ * @param message - The thrown error's message
+ * @returns A diagnostic carrying it
+ */
+function deleteWorkspaceFailure(message: string): DeleteWorkspaceDiagnostic {
+	return { code: 'workspace-delete-failed', message, severity: 'error' };
+}
 
 /** Inner delete form for a workspace; owns the deleting state and failure diagnostics. */
 function DeleteWorkspaceDialogForm({
@@ -70,40 +76,19 @@ function DeleteWorkspaceDialogForm({
 	workspace: WorkspaceShellModel;
 }) {
 	const { t } = useTranslation();
-	const [stage, setStage] = useState<DeleteStage>('idle');
-	const [diagnostics, setDiagnostics] = useState<DeleteWorkspaceDiagnostic[]>(
-		[],
-	);
+	const { diagnostics, isBusy, start } = useLifecycleDialogAction({
+		failure: deleteWorkspaceFailure,
+		onOpenChange,
+		onSucceeded: () => onDeleted(workspace.id),
+		operationKey: `delete-workspace:${workspace.id}`,
+		run: () => deleteWorkspace({ workspaceId: workspace.id }),
+	});
 
-	const canDelete = stage !== 'deleting' && isEnsemblrApiAvailable();
-
-	const handleDelete = useCallback(async () => {
-		if (!canDelete) {
-			return;
-		}
-		setStage('deleting');
-		setDiagnostics([]);
-
-		const result = await deleteWorkspace({ workspaceId: workspace.id });
-
-		if (result.status === 'success') {
-			// Close before the post-removal work: `onDeleted` navigates away from the
-			// deleted workspace, and awaiting that first leaves the modal — and its
-			// pointer-events overlay — up for as long as navigation takes to settle.
-			onOpenChange(false);
-			await onDeleted(workspace.id);
-			return;
-		}
-
-		setStage('failure');
-		setDiagnostics(result.diagnostics);
-	}, [canDelete, onDeleted, onOpenChange, workspace.id]);
+	const canDelete = !isBusy && isEnsemblrApiAvailable();
 
 	const handleClose = useCallback(() => {
 		onOpenChange(false);
 	}, [onOpenChange]);
-
-	const isBusy = stage === 'deleting';
 
 	return (
 		<>
@@ -121,33 +106,17 @@ function DeleteWorkspaceDialogForm({
 
 			<LifecycleSummary rows={workspaceSummaryRows(workspace)} />
 
-			{stage === 'failure' && diagnostics.length > 0 ? (
-				<ArchiveDiagnosticsList
-					diagnostics={diagnostics}
-					testId='delete-workspace-diagnostics'
-				/>
-			) : null}
-
-			<DialogFooter>
-				<Button
-					disabled={isBusy}
-					onClick={handleClose}
-					type='button'
-					variant='ghost'
-				>
-					{t('common:actions.cancel', 'Cancel')}
-				</Button>
-				<Button
-					disabled={!canDelete}
-					onClick={handleDelete}
-					type='button'
-					variant='destructive'
-				>
-					{isBusy
-						? t('common:actions.deleting', 'Deleting…')
-						: t('common:actions.delete', 'Delete')}
-				</Button>
-			</DialogFooter>
+			<LifecycleDialogActions
+				actionLabel={t('common:actions.delete', 'Delete')}
+				actionVariant='destructive'
+				busyLabel={t('common:actions.deleting', 'Deleting…')}
+				canAct={canDelete}
+				diagnostics={diagnostics}
+				diagnosticsTestId='delete-workspace-diagnostics'
+				isBusy={isBusy}
+				onAct={start}
+				onClose={handleClose}
+			/>
 		</>
 	);
 }
