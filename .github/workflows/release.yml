@@ -151,3 +151,37 @@ jobs:
           if [ -n "${APPLE_API_KEY_PATH:-}" ]; then
             rm -f "$APPLE_API_KEY_PATH"
           fi
+
+  # ensemblr.dev pins a copy of the newest release — tag, download URLs, byte
+  # sizes and SHA-256 — and serves it whenever the GitHub API rate-limits the
+  # site's build, which for a shared serverless egress address is often. That pin
+  # is rewritten from this API by ensemblr-dev's own `sync` job, which also runs
+  # on a daily cron; this only decides whether the site is current in minutes or
+  # within a day. Nothing here is load-bearing for the release itself.
+  #
+  # A separate job rather than a step on `build`, deliberately: `build` holds a
+  # Developer ID private key in a keychain for the length of its run, and a token
+  # that can write to another repository has no business in that environment.
+  #
+  # Needs SITE_DISPATCH_TOKEN — a fine-grained PAT with `contents: write` on
+  # ensemblr-hq/ensemblr-dev, which is the permission repository_dispatch asks
+  # for. Without it this prints a notice and passes.
+  notify-site:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - name: Ask ensemblr-dev to sync its release pin
+        env:
+          GH_TOKEN: ${{ secrets.SITE_DISPATCH_TOKEN }}
+          TAG: ${{ github.event.release.tag_name || inputs.tag }}
+        run: |
+          set -euo pipefail
+          if [ -z "${GH_TOKEN}" ]; then
+            echo "::notice::SITE_DISPATCH_TOKEN is not set, so ensemblr.dev was not told about $TAG. Its daily cron picks the release up within 24 hours."
+            exit 0
+          fi
+          jq -n --arg tag "$TAG" \
+            '{event_type: "app-release-published", client_payload: {tag: $tag}}' \
+            | gh api repos/ensemblr-hq/ensemblr-dev/dispatches --method POST --input -
+          echo "::notice::Asked ensemblr-dev to pin $TAG."
