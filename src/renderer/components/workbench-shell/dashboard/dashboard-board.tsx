@@ -3,18 +3,18 @@ import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { refreshBoardIssues } from '@/renderer/api/ensemblr';
-import { SidebarInset, SidebarTrigger } from '@/renderer/components/ui/sidebar';
+import { SidebarTrigger } from '@/renderer/components/ui/sidebar';
 import { WorkbenchPlaceholderPage } from '@/renderer/components/workbench-shell/route-layout';
 import {
 	useSetupDiagnostics,
 	useWorkbenchLayoutRouteModel,
 } from '@/renderer/components/workbench-shell/shell-contexts';
+import { ShellScreen } from '@/renderer/components/workbench-shell/shell-screen';
 import { useBoardDragMonitor } from '@/renderer/hooks/workbench-shell/dashboard/use-board-drag';
 import { useBoardIssues } from '@/renderer/hooks/workbench-shell/dashboard/use-board-issues';
 import { filterBoardCards } from '@/renderer/lib/workbench/filter-board-cards';
 import { groupBoardCards } from '@/renderer/lib/workbench/group-board-cards';
 import { planBoardDrop } from '@/renderer/lib/workbench/plan-board-drop';
-import { SHELL_INSET_CLASS } from '@/renderer/lib/workbench/shell-inset';
 import {
 	BOARD_STATUS_ORDER,
 	useBoardFilters,
@@ -178,51 +178,49 @@ export function DashboardBoard() {
 		return <WorkbenchPlaceholderPage view='dashboard' />;
 	}
 	return (
-		<SidebarInset className={SHELL_INSET_CLASS}>
-			<main className='flex min-w-0 flex-1 flex-col overflow-hidden'>
-				<header className='native-toolbar flex h-12 shrink-0 items-center gap-2.5 overflow-hidden border-border border-b px-4 font-medium text-sm'>
-					<SidebarTrigger className='sidebar-collapsed-trigger' />
-					<span className='shrink-0'>
-						{t('workbench:dashboard.title', 'Dashboard')}
-					</span>
-					<BoardToolbar
-						filters={boardFilters}
-						isRefreshing={isRefreshing}
-						onRefresh={handleRefresh}
-						projects={model.displayProjects}
-					/>
-				</header>
-				<BoardWorkspaceMenuProvider controller={workspaceMenu}>
-					<div className='min-h-0 flex-1 overflow-x-auto p-4'>
-						<div className='mx-auto flex h-full w-max gap-3'>
-							{columns.map((column) => (
-								<BoardColumn
-									actions={columnActions}
-									allowReorder={allowReorder}
-									cards={column.cards}
-									isLoadingIssues={isLoading}
-									issuesErrors={errors}
-									key={column.status}
-									status={column.status}
-									totalCount={column.totalCount}
-								/>
-							))}
-						</div>
-					</div>
-				</BoardWorkspaceMenuProvider>
-				{workspaceMenuDialogs}
-				<AssignIssueDialog
-					onAssigned={setWorkspaceBoardStatus}
-					onOpenWorkspace={model.navigateToWorkspace}
-					onOpenChange={(open) => {
-						if (!open) {
-							setAssignRequest(null);
-						}
-					}}
+		<ShellScreen>
+			<header className='native-toolbar flex h-12 shrink-0 items-center gap-2.5 overflow-hidden border-border border-b px-4 font-medium text-sm'>
+				<SidebarTrigger className='sidebar-collapsed-trigger' />
+				<span className='shrink-0'>
+					{t('workbench:dashboard.title', 'Dashboard')}
+				</span>
+				<BoardToolbar
+					filters={boardFilters}
+					isRefreshing={isRefreshing}
+					onRefresh={handleRefresh}
 					projects={model.displayProjects}
-					request={assignRequest}
 				/>
-			</main>
-		</SidebarInset>
+			</header>
+			<BoardWorkspaceMenuProvider controller={workspaceMenu}>
+				<div className='min-h-0 flex-1 overflow-x-auto p-4'>
+					<div className='mx-auto flex h-full w-max gap-3'>
+						{columns.map((column) => (
+							<BoardColumn
+								actions={columnActions}
+								allowReorder={allowReorder}
+								cards={column.cards}
+								isLoadingIssues={isLoading}
+								issuesErrors={errors}
+								key={column.status}
+								status={column.status}
+								totalCount={column.totalCount}
+							/>
+						))}
+					</div>
+				</div>
+			</BoardWorkspaceMenuProvider>
+			{workspaceMenuDialogs}
+			<AssignIssueDialog
+				onAssigned={setWorkspaceBoardStatus}
+				onOpenWorkspace={model.navigateToWorkspace}
+				onOpenChange={(open) => {
+					if (!open) {
+						setAssignRequest(null);
+					}
+				}}
+				projects={model.displayProjects}
+				request={assignRequest}
+			/>
+		</ShellScreen>
 	);
 }

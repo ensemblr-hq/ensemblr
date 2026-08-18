@@ -1,11 +1,9 @@
-import { SidebarInset, SidebarTrigger } from '@/renderer/components/ui/sidebar';
+import { SidebarTrigger } from '@/renderer/components/ui/sidebar';
 import { WorkbenchFrame } from '@/renderer/components/workbench-shell/frame';
 import { NavigationProvider } from '@/renderer/components/workbench-shell/shell-contexts';
+import { ShellScreen } from '@/renderer/components/workbench-shell/shell-screen';
 import { useRouteProfilerMount } from '@/renderer/lib/instrumentation';
-import {
-	SHELL_FLOATING_TRIGGER_CLASS,
-	SHELL_INSET_CLASS,
-} from '@/renderer/lib/workbench/shell-inset';
+import { SHELL_FLOATING_TRIGGER_CLASS } from '@/renderer/lib/workbench/shell-inset';
 import type { NavigationContextValue } from '@/renderer/types/contexts';
 import type {
 	ProjectShellModel,
@@ -75,19 +73,17 @@ export function WorkbenchEmptyStateContent({
 	useRouteProfilerMount('WorkbenchEmptyStateContent');
 
 	return (
-		<SidebarInset className={SHELL_INSET_CLASS}>
+		<ShellScreen className='min-h-0 items-center justify-center px-8 py-10'>
 			<SidebarTrigger className={SHELL_FLOATING_TRIGGER_CLASS} />
-			<main className='flex min-h-0 flex-1 items-center justify-center px-8 py-10'>
-				<section className='max-w-md text-center'>
-					<h1 className='font-semibold text-2xl text-foreground tracking-normal'>
-						{emptyState.title}
-					</h1>
-					<p className='mt-3 text-muted-foreground text-sm leading-6'>
-						{emptyState.detail}
-					</p>
-				</section>
-			</main>
-		</SidebarInset>
+			<section className='max-w-md text-center'>
+				<h1 className='font-semibold text-2xl text-foreground tracking-normal'>
+					{emptyState.title}
+				</h1>
+				<p className='mt-3 text-muted-foreground text-sm leading-6'>
+					{emptyState.detail}
+				</p>
+			</section>
+		</ShellScreen>
 	);
 }
 

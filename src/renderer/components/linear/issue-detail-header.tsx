@@ -1,3 +1,4 @@
+import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import {
 	ArrowLeftIcon,
@@ -8,9 +9,10 @@ import {
 	PencilIcon,
 	RefreshCwIcon,
 } from 'lucide-react';
-import type { ReactNode } from 'react';
+import { type ReactNode, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { linearIssueQuery } from '@/renderer/api/ensemblr';
 import { Button } from '@/renderer/components/ui/button';
 import {
 	DropdownMenu,
@@ -19,12 +21,15 @@ import {
 	DropdownMenuLabel,
 	DropdownMenuTrigger,
 } from '@/renderer/components/ui/dropdown-menu';
+import { SidebarTrigger } from '@/renderer/components/ui/sidebar';
 import { useWorkbenchLayoutRouteModel } from '@/renderer/components/workbench-shell/shell-contexts';
 import { useRefreshSpin } from '@/renderer/hooks/linear/use-refresh-spin';
 import { useCopyToClipboard } from '@/renderer/hooks/use-copy-to-clipboard';
 import { useCreateWorkspaceFromProject } from '@/renderer/hooks/workbench-shell/navigation-sidebar/use-project-navigation-actions';
 import { buildWorkspaceSeedFromLinearIssue } from '@/renderer/lib/linear';
 import type { LinearIssueWire } from '@/shared/ipc/contracts/linear';
+
+import { LinearIssueEditorDialog } from './issue-editor-dialog';
 
 /** How long the copy button stays in its confirmed state before reverting. */
 const COPY_FEEDBACK_MS = 1500;
@@ -34,22 +39,24 @@ const COPY_FEEDBACK_MS = 1500;
  * where it lives, and every action that operates on the whole issue. It stays
  * put while the body scrolls, so the actions are reachable from the bottom of a
  * long comment thread.
+ *
+ * The bar renders above the connection gate and resolves the issue itself, so
+ * the sidebar trigger and the way back out survive the states where there is no
+ * issue to act on — loading, a failed load, and a Linear account that is not
+ * connected. Its query shares the body's cache entry rather than fetching twice.
  */
-export function LinearIssueDetailHeader({
-	isRefreshing,
-	issue,
-	onEdit,
-	onRefresh,
-}: {
-	isRefreshing: boolean;
-	issue: LinearIssueWire;
-	onEdit: () => void;
-	onRefresh: () => void;
-}) {
+export function LinearIssueDetailHeader({ issueId }: { issueId: string }) {
 	const { t } = useTranslation();
+	const {
+		data: result,
+		isFetching,
+		refetch,
+	} = useQuery(linearIssueQuery(issueId));
+	const issue = result?.status === 'ok' ? result.issue : null;
 
 	return (
 		<header className='native-toolbar flex h-12 shrink-0 items-center gap-2 border-border border-b px-3'>
+			<SidebarTrigger className='sidebar-collapsed-trigger' />
 			<Button asChild size='icon-sm' variant='ghost'>
 				<Link
 					aria-label={t('linear:issue-detail.back', 'Back to issues')}
@@ -58,6 +65,32 @@ export function LinearIssueDetailHeader({
 					<ArrowLeftIcon />
 				</Link>
 			</Button>
+			{issue ? (
+				<IssueCommands
+					isRefreshing={isFetching}
+					issue={issue}
+					onRefresh={() => void refetch()}
+				/>
+			) : null}
+		</header>
+	);
+}
+
+/** Breadcrumb plus every command that needs a resolved issue to act on. */
+function IssueCommands({
+	isRefreshing,
+	issue,
+	onRefresh,
+}: {
+	isRefreshing: boolean;
+	issue: LinearIssueWire;
+	onRefresh: () => void;
+}) {
+	const { t } = useTranslation();
+	const [editorOpen, setEditorOpen] = useState(false);
+
+	return (
+		<>
 			<IssueBreadcrumb issue={issue} />
 			<span className='ml-auto flex shrink-0 items-center gap-1'>
 				<CopyIssueLinkButton url={issue.url} />
@@ -76,12 +109,17 @@ export function LinearIssueDetailHeader({
 						<ExternalLinkIcon />
 					</a>
 				</Button>
-				<Button onClick={onEdit} size='sm' variant='ghost'>
+				<Button onClick={() => setEditorOpen(true)} size='sm' variant='ghost'>
 					<PencilIcon /> {t('common:actions.edit', 'Edit')}
 				</Button>
 				<CreateWorkspaceFromIssueButton issue={issue} />
 			</span>
-		</header>
+			<LinearIssueEditorDialog
+				issue={issue}
+				onOpenChange={setEditorOpen}
+				open={editorOpen}
+			/>
+		</>
 	);
 }
 

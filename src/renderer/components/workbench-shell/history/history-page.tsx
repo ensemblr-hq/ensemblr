@@ -8,7 +8,9 @@ import {
 	isEnsemblrApiAvailable,
 } from '@/renderer/api/ensemblr';
 import { ScrollArea } from '@/renderer/components/ui/scroll-area';
+import { SidebarTrigger } from '@/renderer/components/ui/sidebar';
 import { useWorkbenchLayoutRouteModel } from '@/renderer/components/workbench-shell/shell-contexts';
+import { ShellScreen } from '@/renderer/components/workbench-shell/shell-screen';
 import { bucketForDate } from '@/renderer/lib/workbench/relative-time';
 import type { WorkspaceHistoryEntry } from '@/shared/ipc/contracts/workspace';
 
@@ -28,7 +30,7 @@ interface HistoryGroupModel {
  * and buckets appear newest-first.
  */
 export function HistoryPage() {
-	const { i18n, t } = useTranslation();
+	const { i18n } = useTranslation();
 	const apiAvailable = isEnsemblrApiAvailable();
 	const { navigateToWorkspace } = useWorkbenchLayoutRouteModel();
 	const { data, isError, isLoading } = useQuery({
@@ -65,26 +67,8 @@ export function HistoryPage() {
 	);
 
 	return (
-		<main className='flex min-w-0 flex-1 flex-col overflow-hidden'>
-			<header className='native-toolbar flex h-12 shrink-0 items-center gap-2.5 border-border border-b px-3'>
-				<SearchIcon
-					aria-hidden='true'
-					className='size-4 shrink-0 text-muted-foreground'
-				/>
-				<input
-					aria-label={t('workbench:history.filter.label', 'Filter workspaces')}
-					className='h-full w-full min-w-0 max-w-xl bg-transparent text-sm outline-none placeholder:text-muted-foreground'
-					onChange={(event) => {
-						setFilter(event.target.value);
-					}}
-					placeholder={t(
-						'workbench:history.filter.placeholder',
-						'Filter workspaces…',
-					)}
-					value={filter}
-				/>
-			</header>
-
+		<ShellScreen>
+			<HistoryFilterBar onChange={setFilter} value={filter} />
 			<ScrollArea className='min-h-0 flex-1'>
 				<div className='flex flex-col gap-5 px-4 pt-2 pb-6'>
 					<HistoryBody
@@ -97,7 +81,40 @@ export function HistoryPage() {
 					/>
 				</div>
 			</ScrollArea>
-		</main>
+		</ShellScreen>
+	);
+}
+
+/** Toolbar carrying the collapsed-sidebar trigger and the client-side filter field. */
+function HistoryFilterBar({
+	onChange,
+	value,
+}: {
+	onChange: (value: string) => void;
+	value: string;
+}) {
+	const { t } = useTranslation();
+
+	return (
+		<header className='native-toolbar flex h-12 shrink-0 items-center gap-2.5 border-border border-b px-3'>
+			<SidebarTrigger className='sidebar-collapsed-trigger' />
+			<SearchIcon
+				aria-hidden='true'
+				className='size-4 shrink-0 text-muted-foreground'
+			/>
+			<input
+				aria-label={t('workbench:history.filter.label', 'Filter workspaces')}
+				className='h-full w-full min-w-0 max-w-xl bg-transparent text-sm outline-none placeholder:text-muted-foreground'
+				onChange={(event) => {
+					onChange(event.target.value);
+				}}
+				placeholder={t(
+					'workbench:history.filter.placeholder',
+					'Filter workspaces…',
+				)}
+				value={value}
+			/>
+		</header>
 	);
 }
 
