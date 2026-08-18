@@ -1,7 +1,8 @@
 // @vitest-environment happy-dom
 
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ArchiveRepositoryDialog } from '@/renderer/components/workbench-shell/archive-repository-dialog';
@@ -19,14 +20,18 @@ import {
 	renderWithProviders,
 } from './support/dom';
 
-/** Minimal workspace shell model the lifecycle dialogs read. */
-function workspace(): WorkspaceShellModel {
+/**
+ * Minimal workspace shell model the lifecycle dialogs read. The id is a
+ * parameter because the hook latches a run in flight by target id, so a test
+ * that deliberately leaves one hanging needs an id of its own.
+ */
+function workspace(id = 'ws-doomed'): WorkspaceShellModel {
 	return {
 		branchName: 'feature/doomed',
 		changeSummary: { additions: 0, deletions: 0, files: 0 },
-		id: 'ws-doomed',
+		id,
 		name: 'doomed',
-		pathLabel: '/tmp/ws-doomed',
+		pathLabel: `/tmp/${id}`,
 		pullRequest: {},
 		sessions: [],
 		workspaceFiles: [],
@@ -34,21 +39,118 @@ function workspace(): WorkspaceShellModel {
 }
 
 /** Minimal project shell model the repository lifecycle dialogs read. */
-function project(): ProjectShellModel {
+function project(id = 'repo-doomed'): ProjectShellModel {
 	return {
-		id: 'repo-doomed',
+		id,
 		name: 'doomed',
 		workspaces: [],
 	} as unknown as ProjectShellModel;
 }
 
+/**
+ * Mounts a lifecycle dialog the way every real call site does — one piece of
+ * state driving both `open` and the target — so a test can assert the dialog
+ * actually left the DOM rather than that a callback fired.
+ */
+function Host({
+	Component,
+	onSucceeded,
+	target,
+	targetId,
+}: {
+	// biome-ignore lint/suspicious/noExplicitAny: one host drives all four dialogs
+	Component: any;
+	onSucceeded: () => Promise<void> | void;
+	target: 'project' | 'workspace';
+	targetId?: string;
+}) {
+	const [openTarget, setOpenTarget] = useState<
+		ProjectShellModel | WorkspaceShellModel | null
+	>(target === 'project' ? project(targetId) : workspace(targetId));
+	const targetProps =
+		target === 'project' ? { project: openTarget } : { workspace: openTarget };
+
+	return (
+		<Component
+			onArchived={onSucceeded}
+			onDeleted={onSucceeded}
+			onOpenChange={(open: boolean) => {
+				if (!open) {
+					setOpenTarget(null);
+				}
+			}}
+			open={openTarget !== null}
+			{...targetProps}
+		/>
+	);
+}
+
+/**
+ * Mounts a dialog whose target survives being dismissed, the way the real menu
+ * call sites do: closing drops `open` but leaves the workspace in the list, so
+ * the user can open the same dialog again.
+ */
+function ReopenableHost({
+	onDeleted,
+	targetId,
+}: {
+	onDeleted: () => Promise<void> | void;
+	targetId: string;
+}) {
+	const [open, setOpen] = useState(true);
+
+	return (
+		<>
+			<button onClick={() => setOpen(true)} type='button'>
+				reopen
+			</button>
+			<DeleteWorkspaceDialog
+				onDeleted={onDeleted}
+				onOpenChange={setOpen}
+				open={open}
+				workspace={workspace(targetId)}
+			/>
+		</>
+	);
+}
+
+/** A promise that never settles, standing in for a navigation that stalls. */
+function never(): Promise<void> {
+	return new Promise<void>(() => {});
+}
+
+/**
+ * Finds a footer button by name. Scoped to the footer because `DialogContent`
+ * renders its own corner dismiss with the screen-reader name "Close", which
+ * would otherwise tie with the footer's own once the run is in flight.
+ */
+function footerButton(name: RegExp): HTMLElement {
+	const footer = document.querySelector('[data-slot="dialog-footer"]');
+	if (!footer) {
+		throw new Error('no lifecycle dialog footer on screen');
+	}
+	return within(footer as HTMLElement).getByRole('button', { name });
+}
+
+/** Whether the footer currently offers a button with this name. */
+function hasFooterButton(name: RegExp): boolean {
+	const footer = document.querySelector('[data-slot="dialog-footer"]');
+	return footer
+		? within(footer as HTMLElement).queryByRole('button', { name }) !== null
+		: false;
+}
+
 describe('lifecycle dialogs close independently of post-removal navigation', () => {
 	beforeEach(() => {
 		installEnsemblrApi({
-			archiveRepository: () => Promise.resolve({ status: 'success' }),
-			archiveWorkspace: () => Promise.resolve({ status: 'success' }),
-			deleteRepository: () => Promise.resolve({ status: 'success' }),
-			deleteWorkspace: () => Promise.resolve({ status: 'success' }),
+			archiveRepository: () =>
+				Promise.resolve({ diagnostics: [], status: 'success' }),
+			archiveWorkspace: () =>
+				Promise.resolve({ diagnostics: [], status: 'success' }),
+			deleteRepository: () =>
+				Promise.resolve({ diagnostics: [], status: 'success' }),
+			deleteWorkspace: () =>
+				Promise.resolve({ diagnostics: [], status: 'success' }),
 		});
 	});
 
@@ -56,27 +158,314 @@ describe('lifecycle dialogs close independently of post-removal navigation', () 
 		clearEnsemblrApi();
 	});
 
-	// The removal itself commits before the callback runs, so a callback that
-	// never settles — `useRemoveWorkspaceAction` awaits `navigate()`, which does
-	// not resolve while a redirect loop is bouncing — must not hold the modal up.
-	// The overlay captures pointer events, so a dialog that never closes reads to
-	// the user as the whole app freezing.
-	it('closes the delete dialog when onDeleted never settles', async () => {
-		const onOpenChange = vi.fn();
+	// The removal commits before the callback runs, so a callback that never
+	// settles — `useRemoveWorkspaceAction` awaits `navigate()`, which does not
+	// resolve while a redirect loop is bouncing — must not hold the modal up.
+	// Asserting on `onOpenChange` is not enough: React batches a plain close with
+	// everything the callback then does, so the dialog can stay on screen through
+	// a close that was "called". Assert it left the DOM.
+	it.each([
+		['delete workspace', DeleteWorkspaceDialog, 'workspace', /^delete$/i],
+		['archive workspace', ArchiveWorkspaceDialog, 'workspace', /^archive$/i],
+		['delete repository', DeleteRepositoryDialog, 'project', /^delete$/i],
+		['archive repository', ArchiveRepositoryDialog, 'project', /^archive$/i],
+	] as const)(
+		'removes the %s dialog from the DOM when the post-removal work never settles',
+		async (_name, Component, target, buttonName) => {
+			renderWithProviders(
+				<Host Component={Component} onSucceeded={never} target={target} />,
+			);
+
+			await userEvent.click(screen.getByRole('button', { name: buttonName }));
+
+			await waitFor(() => {
+				expect(screen.queryByRole('dialog')).toBeNull();
+			});
+		},
+	);
+
+	// The close has to be committed *before* the post-removal work starts, not
+	// merely called first: React batches a plain `setState` here with everything
+	// the callback then does — the navigation, the cache invalidation — into one
+	// commit, so the modal stays painted until that whole render lands and a
+	// navigation that stalls holds it up for good.
+	it.each([
+		['delete workspace', DeleteWorkspaceDialog, 'workspace', /^delete$/i],
+		['archive workspace', ArchiveWorkspaceDialog, 'workspace', /^archive$/i],
+		['delete repository', DeleteRepositoryDialog, 'project', /^delete$/i],
+		['archive repository', ArchiveRepositoryDialog, 'project', /^archive$/i],
+	] as const)(
+		'has the %s dialog off screen by the time the post-removal work starts',
+		async (_name, Component, target, buttonName) => {
+			let dialogAtHandoff: unknown = 'not called';
+			renderWithProviders(
+				<Host
+					Component={Component}
+					onSucceeded={() => {
+						dialogAtHandoff = document.querySelector('[role="dialog"]');
+						return never();
+					}}
+					target={target}
+				/>,
+			);
+
+			await userEvent.click(screen.getByRole('button', { name: buttonName }));
+
+			await waitFor(() => {
+				expect(dialogAtHandoff).not.toBe('not called');
+			});
+			expect(dialogAtHandoff).toBeNull();
+		},
+	);
+
+	// A rejected invoke — the permission gate denies the channel, or main is
+	// wedged — used to leave the dialog on "Deleting…" forever with both footer
+	// buttons disabled and nothing on screen explaining why.
+	it.each([
+		[
+			'delete workspace',
+			DeleteWorkspaceDialog,
+			'workspace',
+			'deleteWorkspace',
+			/^delete$/i,
+			'delete-workspace-diagnostics',
+		],
+		[
+			'archive workspace',
+			ArchiveWorkspaceDialog,
+			'workspace',
+			'archiveWorkspace',
+			/^archive$/i,
+			'archive-workspace-diagnostics',
+		],
+		[
+			'delete repository',
+			DeleteRepositoryDialog,
+			'project',
+			'deleteRepository',
+			/^delete$/i,
+			'delete-repository-diagnostics',
+		],
+		[
+			'archive repository',
+			ArchiveRepositoryDialog,
+			'project',
+			'archiveRepository',
+			/^archive$/i,
+			'archive-repository-diagnostics',
+		],
+	] as const)(
+		'shows a diagnostic and stays usable when the %s call rejects',
+		async (_name, Component, target, channel, buttonName, diagnosticsTestId) => {
+			const onSettled = vi.fn();
+			installEnsemblrApi({
+				[channel]: () => Promise.reject(new Error('Permission denied')),
+			});
+
+			renderWithProviders(
+				<Host Component={Component} onSucceeded={onSettled} target={target} />,
+			);
+
+			await userEvent.click(screen.getByRole('button', { name: buttonName }));
+
+			expect(await screen.findByTestId(diagnosticsTestId)).toBeTruthy();
+			expect(screen.getByRole('dialog')).toBeTruthy();
+			expect(onSettled).not.toHaveBeenCalled();
+			expect(
+				screen.getByRole('button', { name: /^cancel$/i }),
+			).not.toBeDisabled();
+			expect(
+				screen.getByRole('button', { name: buttonName }),
+			).not.toBeDisabled();
+		},
+	);
+
+	// A lifecycle hook can veto an archive, which reports `'aborted'` rather than
+	// `'failure'`. Treating anything that is not `'success'` as done would close
+	// the dialog and run the post-removal navigation on a workspace that is still
+	// there.
+	it.each([
+		[
+			'workspace',
+			ArchiveWorkspaceDialog,
+			'workspace',
+			'archiveWorkspace',
+			'archive-workspace-diagnostics',
+		],
+		[
+			'repository',
+			ArchiveRepositoryDialog,
+			'project',
+			'archiveRepository',
+			'archive-repository-diagnostics',
+		],
+	] as const)(
+		'keeps the %s archive dialog open when a hook aborts the run',
+		async (_name, Component, target, channel, diagnosticsTestId) => {
+			const onSettled = vi.fn();
+			installEnsemblrApi({
+				[channel]: () =>
+					Promise.resolve({
+						diagnostics: [
+							{
+								code: 'archive-aborted-by-hook',
+								message: 'A pre-archive hook vetoed the run.',
+								severity: 'error',
+							},
+						],
+						status: 'aborted',
+					}),
+			});
+
+			renderWithProviders(
+				<Host Component={Component} onSucceeded={onSettled} target={target} />,
+			);
+
+			await userEvent.click(screen.getByRole('button', { name: /^archive$/i }));
+
+			expect(await screen.findByTestId(diagnosticsTestId)).toBeTruthy();
+			expect(screen.getByRole('dialog')).toBeTruthy();
+			expect(onSettled).not.toHaveBeenCalled();
+		},
+	);
+
+	// The dismiss button stays live while the run is in flight — Escape, the
+	// overlay and the corner button all dismiss a busy dialog anyway, and an IPC
+	// that never answers would otherwise trap the user behind the overlay. It
+	// must not still read "Cancel" there: the removal has already committed and
+	// dismissing the dialog does not call it back.
+	it.each([
+		[
+			'delete workspace',
+			DeleteWorkspaceDialog,
+			'workspace',
+			'deleteWorkspace',
+			/^delete$/i,
+		],
+		[
+			'archive workspace',
+			ArchiveWorkspaceDialog,
+			'workspace',
+			'archiveWorkspace',
+			/^archive$/i,
+		],
+		[
+			'delete repository',
+			DeleteRepositoryDialog,
+			'project',
+			'deleteRepository',
+			/^delete$/i,
+		],
+		[
+			'archive repository',
+			ArchiveRepositoryDialog,
+			'project',
+			'archiveRepository',
+			/^archive$/i,
+		],
+	] as const)(
+		'offers Close rather than Cancel while the %s run is in flight',
+		async (name, Component, target, channel, buttonName) => {
+			installEnsemblrApi({ [channel]: () => never() });
+
+			renderWithProviders(
+				<Host
+					Component={Component}
+					onSucceeded={vi.fn()}
+					target={target}
+					targetId={`inflight-${name.replace(/ /g, '-')}`}
+				/>,
+			);
+
+			expect(footerButton(/^cancel$/i)).toBeTruthy();
+
+			await userEvent.click(screen.getByRole('button', { name: buttonName }));
+
+			await waitFor(() => {
+				expect(hasFooterButton(/^close$/i)).toBe(true);
+			});
+			expect(footerButton(/^close$/i)).not.toBeDisabled();
+			expect(hasFooterButton(/^cancel$/i)).toBe(false);
+		},
+	);
+
+	// Dismissing mid-run tears the form down, and reopening builds a fresh one
+	// with its own `isBusy`. Without a latch that outlives the mount, the second
+	// dialog happily fires a second destructive IPC over the first.
+	it('starts no second delete when the dialog is dismissed mid-run and reopened', async () => {
+		const deleteWorkspace = vi.fn(() => never());
+		installEnsemblrApi({ deleteWorkspace });
+
 		renderWithProviders(
-			<DeleteWorkspaceDialog
-				onDeleted={() => new Promise<void>(() => {})}
-				onOpenChange={onOpenChange}
-				open={true}
-				workspace={workspace()}
+			<ReopenableHost onDeleted={vi.fn()} targetId='ws-reopened' />,
+		);
+
+		await userEvent.click(screen.getByRole('button', { name: /^delete$/i }));
+		expect(deleteWorkspace).toHaveBeenCalledTimes(1);
+
+		await waitFor(() => {
+			expect(hasFooterButton(/^close$/i)).toBe(true);
+		});
+		await userEvent.click(footerButton(/^close$/i));
+		await waitFor(() => {
+			expect(screen.queryByRole('dialog')).toBeNull();
+		});
+
+		await userEvent.click(screen.getByRole('button', { name: /reopen/i }));
+		await userEvent.click(screen.getByRole('button', { name: /^delete$/i }));
+
+		expect(deleteWorkspace).toHaveBeenCalledTimes(1);
+	});
+
+	// Two clicks dispatched in one task both read the same render's `isBusy`, so
+	// a plain state guard lets both through and the destructive IPC runs twice.
+	it('starts the delete once when the action is fired twice in one task', async () => {
+		const deleteWorkspace = vi.fn(() =>
+			Promise.resolve({ diagnostics: [], status: 'success' }),
+		);
+		installEnsemblrApi({ deleteWorkspace });
+
+		renderWithProviders(
+			<Host
+				Component={DeleteWorkspaceDialog}
+				onSucceeded={never}
+				target='workspace'
+				targetId='ws-double-fired'
 			/>,
 		);
 
-		await userEvent.click(screen.getByRole('button', { name: /delete/i }));
+		const action = screen.getByRole('button', { name: /^delete$/i });
+		action.click();
+		action.click();
 
 		await waitFor(() => {
-			expect(onOpenChange).toHaveBeenCalledWith(false);
+			expect(deleteWorkspace).toHaveBeenCalled();
 		});
+		expect(deleteWorkspace).toHaveBeenCalledTimes(1);
+	});
+
+	// The dialog is already gone by the time the post-removal work runs, so a
+	// rejection there has nowhere to render. It must still not escape as an
+	// unhandled rejection — nothing awaits `start`, it is an `onClick`.
+	it('reports rather than swallows a post-removal callback that rejects', async () => {
+		const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+		renderWithProviders(
+			<Host
+				Component={DeleteWorkspaceDialog}
+				onSucceeded={() => Promise.reject(new Error('navigation exploded'))}
+				target='workspace'
+				targetId='ws-rejecting-callback'
+			/>,
+		);
+
+		await userEvent.click(screen.getByRole('button', { name: /^delete$/i }));
+
+		await waitFor(() => {
+			expect(logged).toHaveBeenCalled();
+		});
+		expect(screen.queryByRole('dialog')).toBeNull();
+		logged.mockRestore();
 	});
 
 	// `workspace-menu-commands.tsx` holds `open` and `workspace` in separate state,
@@ -100,53 +489,6 @@ describe('lifecycle dialogs close independently of post-removal navigation', () 
 			);
 
 			expect(screen.queryByRole('dialog')).toBeNull();
-		},
-	);
-
-	it('closes the archive dialog when onArchived never settles', async () => {
-		const onOpenChange = vi.fn();
-		renderWithProviders(
-			<ArchiveWorkspaceDialog
-				onArchived={() => new Promise<void>(() => {})}
-				onOpenChange={onOpenChange}
-				open={true}
-				workspace={workspace()}
-			/>,
-		);
-
-		await userEvent.click(screen.getByRole('button', { name: /^archive$/i }));
-
-		await waitFor(() => {
-			expect(onOpenChange).toHaveBeenCalledWith(false);
-		});
-	});
-
-	// The repository dialogs run the same flow over a slower removal — deleting a
-	// repository tears down every worktree and the clone — so the overlay is up
-	// for longer, and they are the pair most likely to be missed when the
-	// workspace dialogs are fixed on their own.
-	it.each([
-		['delete', DeleteRepositoryDialog, /^delete$/i],
-		['archive', ArchiveRepositoryDialog, /^archive$/i],
-	])(
-		'closes the repository %s dialog when its callback never settles',
-		async (_name, Component, buttonName) => {
-			const onOpenChange = vi.fn();
-			renderWithProviders(
-				<Component
-					onArchived={() => new Promise<void>(() => {})}
-					onDeleted={() => new Promise<void>(() => {})}
-					onOpenChange={onOpenChange}
-					open={true}
-					project={project()}
-				/>,
-			);
-
-			await userEvent.click(screen.getByRole('button', { name: buttonName }));
-
-			await waitFor(() => {
-				expect(onOpenChange).toHaveBeenCalledWith(false);
-			});
 		},
 	);
 
