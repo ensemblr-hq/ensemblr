@@ -25,7 +25,14 @@ jobs:
   # On `release: published` this checks out the tag, because that event sets
   # github.ref to it. A manual dispatch checks out the branch it was dispatched
   # from instead — the escape-hatch path verifies the branch, not the tag.
+  #
+  # The reserved `nightly` tag is skipped: nightly.yml publishes its rolling
+  # release out of a draft, which GitHub reports as `published` like any other.
+  # Without this the first nightly starts a release build that can only fail, at
+  # the package.json-matches-the-tag step. `github.event.release` is null on a
+  # dispatch, so the escape hatch is unaffected.
   verify:
+    if: ${{ !startsWith(github.event.release.tag_name, 'nightly') }}
     # Mirrors what checks.yml's `scan` job declares, because a called workflow's
     # job permissions are validated statically — a job skipped by `if:` is
     # validated too, so `run_scan: false` does not excuse the scope. Granted

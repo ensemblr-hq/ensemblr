@@ -172,8 +172,15 @@ The workflow refuses to build when `package.json`'s `version` does not match the
 tag with `v` stripped, or when the release is still a draft.
 
 The README's version line and `.dmg` download URL stay hand-edited; the job
-prints the exact two replacement lines to its run summary. The marketing site is
-a separate path — see THE-195.
+prints the exact two replacement lines to its run summary.
+
+**ensemblr.dev is updated by hand too, in its own repository** (`ensemblr-hq/ensemblr-dev`),
+by asking an agent there to re-pin after each release. It carries two download
+links — the newest `v<semver>` release and the rolling `nightly` — so neither
+pin is derived from "whatever is newest". Automating that bump was considered and
+dropped (THE-195): the site is re-pinned a handful of times a month, and a
+cross-repo token plus an auto-merging bump PR was more machinery than the chore
+was worth. See the prompt in that repository's own docs.
 
 ### Nightly
 
@@ -186,13 +193,24 @@ skips the build entirely when they match, so a quiet week republishes nothing.
 The version is stamped as `<version>-nightly.<YYYYMMDD>.g<short-sha>` into the
 build (never committed), so the About box names the commit.
 
-**It has no `schedule:` trigger yet, deliberately.** ensemblr.dev's
-`getLatestRelease()` takes the first non-draft release including prereleases, so
-the first published nightly would become the advertised download and redden the
-site's daily pin cron. The cron block lands once THE-195 teaches the site to skip
-the reserved `nightly` tag. Until then it is `workflow_dispatch`-only, and its
-`publish` input defaults to **false** so a manual run exercises the entire
-signing and notarization path without touching the release list.
+**It runs on a cron at `0 4 * * *` UTC, and on demand.** A scheduled run always
+publishes. A manual `workflow_dispatch` defaults its `publish` input to
+**false**, so it exercises the entire signing and notarization path without
+touching the release list:
+
+```bash
+gh workflow run nightly.yml                  # build and verify only
+gh workflow run nightly.yml -f publish=true  # and publish
+```
+
+04:00 UTC puts a finished build in the release list before the working day in
+Europe, and is far from the top of the hour GitHub's scheduler queues most
+heavily.
+
+A published nightly is a prerelease sitting above the newest `v<semver>` in
+`/releases`, so anything that reads "the newest release" gets the nightly. That
+is why ensemblr.dev pins its two download links explicitly rather than taking
+the first entry it finds.
 
 The tag scheme is a cross-repo contract, not an internal detail: `v<semver>` is a
 real release, the literal `nightly` is the nightly, and nothing else publishes.
