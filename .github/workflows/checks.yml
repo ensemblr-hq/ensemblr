@@ -5,10 +5,17 @@ on:
     branches: [master]
   push:
     branches: [master]
+  workflow_call:
+    inputs:
+      run_scan:
+        description: >-
+          Run the react-doctor scan. Callers building a tag pass false — the
+          scan diffs against master, which a release tag already is.
+        type: boolean
+        default: true
 
 permissions:
   contents: read
-  pull-requests: write
 
 jobs:
   # macOS, not ubuntu: `mod` resolves to ⌘ on darwin and Ctrl elsewhere, so the
@@ -35,15 +42,34 @@ jobs:
         run: npm run test
 
   scan:
+    # `inputs` is null on push/pull_request, so those keep running the scan; only
+    # a workflow_call passing false skips it.
+    if: ${{ inputs.run_scan == null || inputs.run_scan }}
     runs-on: ubuntu-latest
+    # Scoped to this job rather than the workflow: a called workflow cannot hold
+    # permissions its caller lacks, and release.yml has no use for these. It
+    # still has to grant them on the calling job, because a called workflow's
+    # job permissions are validated even when the job is skipped.
+    permissions:
+      contents: read
+      # Sticky summary comment, inline review comments, and the PR file list.
+      pull-requests: write
+      # The commit status, which is the only place the score surfaces on a push
+      # to master — the PR comment is skipped there.
+      statuses: write
     steps:
+      # Load-bearing for `scope: changed`: reaching the merge base is what lets
+      # the scan report only what the PR introduced rather than every issue in
+      # the changed files.
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
+      # These input names are the action's own and drifted once already — it
+      # only *warns* on an unknown input, so `diff` / `github-token` /
+      # `fail-on` / `verbose` silently fell back to defaults and the scan ran
+      # advisory and unscoped. Check action.yml before editing.
       - uses: millionco/react-doctor@v2
         with:
-          diff: master
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          fail-on: error
-          verbose: "true"
+          scope: changed
+          blocking: error

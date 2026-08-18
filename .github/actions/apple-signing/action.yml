@@ -1,0 +1,104 @@
+name: Apple signing
+description: >-
+  Import the Developer ID Application certificate into a throwaway keychain and
+  write the App Store Connect key to disk, exporting the three variables
+  forge.config.ts gates signing and notarization on.
+
+inputs:
+  certificate-p12:
+    description: Base64-encoded Developer ID Application certificate (.p12)
+    required: true
+  certificate-password:
+    description: Password the .p12 was exported with
+    required: true
+  keychain-password:
+    description: Password for the throwaway keychain this action creates
+    required: true
+  api-key-p8:
+    description: Base64-encoded App Store Connect API key (.p8)
+    required: true
+  api-key-id:
+    description: App Store Connect API key id
+    required: true
+  api-issuer:
+    description: App Store Connect API issuer id
+    required: true
+
+runs:
+  using: composite
+  steps:
+    # Fail before the build rather than 25 minutes in with an unsigned artifact:
+    # a missing secret is otherwise indistinguishable from a working build until
+    # the very end.
+    - name: Check every signing secret is present
+      shell: bash
+      env:
+        APPLE_CERT_P12: ${{ inputs.certificate-p12 }}
+        APPLE_CERT_PASSWORD: ${{ inputs.certificate-password }}
+        KEYCHAIN_PASSWORD: ${{ inputs.keychain-password }}
+        APPLE_API_KEY_P8: ${{ inputs.api-key-p8 }}
+        APPLE_API_KEY_ID: ${{ inputs.api-key-id }}
+        APPLE_API_ISSUER: ${{ inputs.api-issuer }}
+      run: |
+        set -euo pipefail
+        missing=""
+        for name in APPLE_CERT_P12 APPLE_CERT_PASSWORD KEYCHAIN_PASSWORD \
+                    APPLE_API_KEY_P8 APPLE_API_KEY_ID APPLE_API_ISSUER; do
+          if [ -z "${!name:-}" ]; then
+            missing="$missing $name"
+          fi
+        done
+        if [ -n "$missing" ]; then
+          echo "::error::Missing repository secret(s):$missing — see docs/build-and-release.md"
+          exit 1
+        fi
+
+    - name: Import the Developer ID certificate
+      shell: bash
+      env:
+        APPLE_CERT_P12: ${{ inputs.certificate-p12 }}
+        APPLE_CERT_PASSWORD: ${{ inputs.certificate-password }}
+        KEYCHAIN_PASSWORD: ${{ inputs.keychain-password }}
+      run: |
+        set -euo pipefail
+        KEYCHAIN_PATH="$RUNNER_TEMP/ensemblr-signing.keychain-db"
+        CERT_PATH="$RUNNER_TEMP/developer-id.p12"
+
+        security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+        echo "ENSEMBLR_SIGNING_KEYCHAIN=$KEYCHAIN_PATH" >> "$GITHUB_ENV"
+
+        security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+        security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+
+        printf '%s' "$APPLE_CERT_P12" | base64 -D > "$CERT_PATH"
+        security import "$CERT_PATH" -k "$KEYCHAIN_PATH" -P "$APPLE_CERT_PASSWORD" \
+          -T /usr/bin/codesign -T /usr/bin/security
+        rm -f "$CERT_PATH"
+
+        security set-key-partition-list -S apple-tool:,apple:,codesign: \
+          -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH" > /dev/null
+        security list-keychains -d user -s "$KEYCHAIN_PATH" login.keychain-db
+        security default-keychain -s "$KEYCHAIN_PATH"
+
+        if ! security find-identity -v -p codesigning "$KEYCHAIN_PATH" \
+             | grep -q "Developer ID Application"; then
+          echo "::error::APPLE_CERT_P12 holds no Developer ID Application identity."
+          exit 1
+        fi
+
+    - name: Write the App Store Connect key
+      shell: bash
+      env:
+        APPLE_API_KEY_P8: ${{ inputs.api-key-p8 }}
+        APPLE_API_KEY_ID: ${{ inputs.api-key-id }}
+        APPLE_API_ISSUER: ${{ inputs.api-issuer }}
+      run: |
+        set -euo pipefail
+        API_KEY_PATH="$RUNNER_TEMP/asc-api-key.p8"
+        printf '%s' "$APPLE_API_KEY_P8" | base64 -D > "$API_KEY_PATH"
+        chmod 600 "$API_KEY_PATH"
+        {
+          echo "APPLE_API_KEY_PATH=$API_KEY_PATH"
+          echo "APPLE_API_KEY_ID=$APPLE_API_KEY_ID"
+          echo "APPLE_API_ISSUER=$APPLE_API_ISSUER"
+        } >> "$GITHUB_ENV"

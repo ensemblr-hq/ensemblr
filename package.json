@@ -97,6 +97,7 @@
 		"make:unsigned": "ENSEMBLR_SKIP_SIGN=1 npm run make",
 		"package:dev": "ENSEMBLR_BUILD_CHANNEL=dev npm run package",
 		"package:unsigned": "ENSEMBLR_SKIP_SIGN=1 npm run package",
+		"verify:signing": "node scripts/verify-signed-artifacts.mjs",
 		"diagnose:dock-flash": "node scripts/diagnose-dock-flash.mjs",
 		"doctor": "npx react-doctor@latest",
 		"postinstall": "node scripts/fix-node-pty-permissions.mjs"

@@ -1,0 +1,183 @@
+name: Nightly
+
+# No `schedule:` yet, deliberately. ensemblr.dev's getLatestRelease() takes the
+# first non-draft entry from /releases — prereleases included — so the first
+# published nightly would become the advertised download and redden the site's
+# daily pin cron. THE-195 teaches the site to skip the reserved `nightly` tag;
+# the cron block lands once it ships. Until then this is dispatch-only, and
+# `publish` defaults to false so the whole signing path can be exercised
+# without touching the release list.
+on:
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: Publish to the rolling `nightly` release (off = build and verify only)
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: nightly
+  cancel-in-progress: false
+
+jobs:
+  # Cheap and on Linux: deciding whether to build at all must not cost a macOS
+  # runner. Compares master against the commit the `nightly` tag already points
+  # at, so a quiet week republishes nothing. Never keys off timestamps.
+  gate:
+    runs-on: ubuntu-latest
+    outputs:
+      changed: ${{ steps.compare.outputs.changed }}
+      sha: ${{ steps.compare.outputs.sha }}
+      short_sha: ${{ steps.compare.outputs.short_sha }}
+      version: ${{ steps.compare.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: master
+          fetch-depth: 0
+          fetch-tags: true
+
+      - id: compare
+        run: |
+          set -euo pipefail
+          head_sha=$(git rev-parse HEAD)
+          short_sha=$(git rev-parse --short=7 HEAD)
+          published=$(git rev-parse -q --verify refs/tags/nightly^{commit} || echo none)
+
+          # `g` prefix: an all-digit short sha with a leading zero is an invalid
+          # semver prerelease identifier, which git describe solves the same way.
+          base=$(node -p "require('./package.json').version")
+          echo "version=$base-nightly.$(date -u +%Y%m%d).g$short_sha" >> "$GITHUB_OUTPUT"
+          echo "sha=$head_sha" >> "$GITHUB_OUTPUT"
+          echo "short_sha=$short_sha" >> "$GITHUB_OUTPUT"
+
+          if [ "$published" = "$head_sha" ]; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "No change: master is still at \`$short_sha\`, which the current nightly already ships. Nothing built." \
+              >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "master moved to \`$short_sha\` (nightly had \`$published\`). Building." \
+              >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+  build:
+    needs: gate
+    if: needs.gate.outputs.changed == 'true'
+    runs-on: macos-15
+    timeout-minutes: 60
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      NIGHTLY_SHA: ${{ needs.gate.outputs.sha }}
+      NIGHTLY_VERSION: ${{ needs.gate.outputs.version }}
+      DMG_NAME: Ensemblr-Canary-arm64.dmg
+      ZIP_NAME: Ensemblr-Canary-darwin-arm64.zip
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.gate.outputs.sha }}
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      # Before the version stamp: `npm ci` requires package.json and the lockfile
+      # to agree, and the stamp deliberately breaks that agreement.
+      - run: npm ci
+
+      - name: Stamp the nightly version
+        run: npm pkg set version="$NIGHTLY_VERSION"
+
+      - uses: ./.github/actions/apple-signing
+        with:
+          certificate-p12: ${{ secrets.APPLE_CERT_P12 }}
+          certificate-password: ${{ secrets.APPLE_CERT_PASSWORD }}
+          keychain-password: ${{ secrets.KEYCHAIN_PASSWORD }}
+          api-key-p8: ${{ secrets.APPLE_API_KEY_P8 }}
+          api-key-id: ${{ secrets.APPLE_API_KEY_ID }}
+          api-issuer: ${{ secrets.APPLE_API_ISSUER }}
+
+      # Canary channel per ADR 0032: its own bundle id and product name, so an
+      # installed nightly can never take over the release's Launch Services
+      # registration. Notarized rather than merely signed — Gatekeeper blocks an
+      # un-notarized build on every machine except the one that made it.
+      - name: Build the signed, notarized canary
+        env:
+          ENSEMBLR_BUILD_CHANNEL: canary
+          ENSEMBLR_REQUIRE_SIGN: "1"
+        run: npm run make
+
+      - name: Verify every artifact is signed, notarized and stapled
+        run: npm run verify:signing
+
+      # Fixed filenames: the canary product name contains a space, and a rolling
+      # tag is only worth having if `--clobber` fully replaces yesterday's assets
+      # and the download URL stays bookmarkable. Version and commit live in the
+      # release body. Stapled tickets are inside the file, so renaming is safe.
+      - name: Rename artifacts to their stable nightly names
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/nightly"
+          cp "$(find out/make -type f -name '*.dmg' | head -1)" "$RUNNER_TEMP/nightly/$DMG_NAME"
+          cp "$(find out/make -type f -name '*.zip' | head -1)" "$RUNNER_TEMP/nightly/$ZIP_NAME"
+
+      # The `nightly` tag is what the gate reads, so it moves last, only once the
+      # assets are actually up. Moving it first would mark this commit published
+      # after a failed upload, and the next run would report "no change" and skip
+      # it for good. A first run creates the release as a draft for the same
+      # reason: a draft holds its tag unpushed until it is published.
+      - name: Publish the rolling nightly
+        if: ${{ github.event_name == 'schedule' || inputs.publish }}
+        run: |
+          set -euo pipefail
+          title="Ensemblr Nightly $NIGHTLY_VERSION"
+          notes=$(printf '%s\n' \
+            "Automated build of \`master\`. Not a release — see the \`v*\` tags for those." \
+            "" \
+            "- Version: \`$NIGHTLY_VERSION\`" \
+            "- Commit: $NIGHTLY_SHA" \
+            "- Channel: canary (installs as \"Ensemblr Canary\", alongside a release)")
+
+          if ! gh release view nightly > /dev/null 2>&1; then
+            gh release create nightly --draft --target "$NIGHTLY_SHA" \
+              --title "$title" --notes "$notes" --prerelease
+          fi
+
+          gh release upload nightly \
+            "$RUNNER_TEMP/nightly/$DMG_NAME" "$RUNNER_TEMP/nightly/$ZIP_NAME" --clobber
+
+          gh release edit nightly --title "$title" --notes "$notes" \
+            --prerelease --latest=false --draft=false
+
+          git tag -f nightly "$NIGHTLY_SHA"
+          git push -f origin refs/tags/nightly
+
+      - name: Summarise the run
+        if: always()
+        run: |
+          set -uo pipefail
+          {
+            echo "### Nightly \`$NIGHTLY_VERSION\`"
+            echo
+            echo "- Commit: \`$NIGHTLY_SHA\`"
+            if [ "${{ github.event_name == 'schedule' || inputs.publish }}" = "true" ]; then
+              echo "- Published to the rolling \`nightly\` release."
+            else
+              echo "- Built and verified only; nothing published (\`publish\` was off)."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Remove signing material
+        if: always()
+        run: |
+          set -uo pipefail
+          if [ -n "${ENSEMBLR_SIGNING_KEYCHAIN:-}" ]; then
+            security delete-keychain "$ENSEMBLR_SIGNING_KEYCHAIN" || true
+          fi
+          if [ -n "${APPLE_API_KEY_PATH:-}" ]; then
+            rm -f "$APPLE_API_KEY_PATH"
+          fi

@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import { execFile } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import { promisify } from 'node:util';
 import { FuseV1Options, FuseVersion } from '@electron/fuses';
 import { MakerDMG } from '@electron-forge/maker-dmg';
@@ -97,15 +98,76 @@ const notarizationEnabled = Boolean(
 		appleApiIssuer,
 );
 
+// Opt-in counterpart to ENSEMBLR_SKIP_SIGN, for builds that are only worth
+// producing signed: CI, and a local dry run of what CI will do. Without it a
+// missing credential yields an unsigned `.app` and exit code 0, so a release
+// job discovers the gap by shipping through it.
+const requireSigning = ['1', 'true', 'yes'].includes(
+	(process.env.ENSEMBLR_REQUIRE_SIGN ?? '').toLowerCase(),
+);
+
 /**
- * Notarize a signed DMG with Apple's notary service and staple the returned
+ * List every unmet prerequisite behind `notarizationEnabled`, so a build that
+ * demanded signing fails naming the credential it lacked rather than the bare
+ * fact that the output is unsigned.
+ * @returns One human-readable reason per unmet prerequisite, empty when signing is available
+ */
+function missingSigningPrerequisites(): string[] {
+	const reasons: string[] = [];
+	if (process.platform !== 'darwin') {
+		reasons.push(`platform is ${process.platform}, not darwin`);
+	}
+	if (skipSigning) reasons.push('ENSEMBLR_SKIP_SIGN is set');
+	if (!appleApiKey) reasons.push('APPLE_API_KEY_PATH is unset');
+	else if (!existsSync(appleApiKey)) {
+		reasons.push(
+			`APPLE_API_KEY_PATH points at a missing file (${appleApiKey})`,
+		);
+	}
+	if (!appleApiKeyId) reasons.push('APPLE_API_KEY_ID is unset');
+	if (!appleApiIssuer) reasons.push('APPLE_API_ISSUER is unset');
+	return reasons;
+}
+
+const unmetSigningPrerequisites = requireSigning
+	? missingSigningPrerequisites()
+	: [];
+
+if (unmetSigningPrerequisites.length > 0) {
+	throw new Error(
+		[
+			'ENSEMBLR_REQUIRE_SIGN is set, but this build would be unsigned:',
+			...unmetSigningPrerequisites.map((reason) => `  • ${reason}`),
+			'',
+			'Unset ENSEMBLR_REQUIRE_SIGN to allow an unsigned build.',
+		].join('\n'),
+	);
+}
+
+// codesign matches an identity by name prefix, so the common name is enough
+// while the keychain holds exactly one Developer ID Application certificate —
+// which is the case on a dev machine and on the throwaway keychain CI builds.
+// Override when a machine holds several and the prefix would be ambiguous.
+const signingIdentity =
+	process.env.APPLE_SIGNING_IDENTITY ?? 'Developer ID Application';
+
+/**
+ * Sign a DMG, notarize it with Apple's notary service, and staple the returned
  * ticket, so Gatekeeper validates the disk image offline on first open. The
- * `.app` inside is already stapled by osxNotarize during packaging; the DMG
- * container is a separate artifact Apple never saw, so it needs its own
- * submission before `stapler staple` can find a ticket.
- * @param dmgPath - Absolute path to the .dmg artifact to notarize and staple
+ * `.app` inside is already signed and stapled during packaging; the DMG
+ * container is a separate artifact Apple never saw, and stapling a ticket to an
+ * *unsigned* image leaves `spctl` with nothing to assess — it reports "no usable
+ * signature" however many times the image is notarized. Sign first, then submit.
+ * @param dmgPath - Absolute path to the .dmg artifact to sign, notarize and staple
  */
 async function stapleNotarizedDmg(dmgPath: string): Promise<void> {
+	await execFileAsync('codesign', [
+		'--sign',
+		signingIdentity,
+		'--timestamp',
+		'--force',
+		dmgPath,
+	]);
 	await execFileAsync('xcrun', [
 		'notarytool',
 		'submit',
@@ -167,8 +229,10 @@ const config: ForgeConfig = {
 		// Packager resolves the platform extension (`icon.icns` on macOS).
 		// Regenerate with `npm run icon:generate`.
 		icon: './assets/icon',
-		// Per-channel product name; also isolates userData (and the
-		// single-instance lock keyed on it) for non-release channels.
+		// Per-channel product name — the Dock, menu bar and Launch Services
+		// identity. userData is *not* per-channel despite deriving from this name:
+		// src/main/main.ts pins every packaged channel to the release's directory,
+		// and therefore to one shared single-instance lock (ADR 0054).
 		name: APP_NAMES[buildChannel],
 		// Keep only the Vite output plus node-pty (see PACKAGE_KEEP_* above);
 		// everything else is excluded from the package.

@@ -1,3 +1,4 @@
+import { mkdirSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
@@ -188,16 +189,41 @@ const isDev = !app.isPackaged;
 // live in different namespaces (dotfile path segment, reverse-DNS service id)
 // and carry their own dev markers below.
 const DEV_SUFFIX = ' (DEV)';
+// Product name of the release channel, and therefore the directory Electron
+// derives userData from. Mirrors APP_NAMES.release in forge.config.ts.
+const RELEASE_PRODUCT_NAME = 'Ensemblr';
 // The unpackaged dev build (`electron-forge start`) gets the explicit (DEV)
 // suffix so it reads its isolated userData below. A *packaged* build keeps the
 // product name forge baked in from its build channel (Ensemblr / Ensemblr
-// Canary / Ensemblr Dev — see forge.config.ts + ADR 0032): that name derives
-// the userData path and thus the single-instance lock, so each channel stays a
-// distinct app. Clobbering to 'Ensemblr' here would collapse every packaged
+// Canary / Ensemblr Dev — see forge.config.ts + ADR 0032), because that name is
+// what distinguishes the channels in the Dock, the menu bar and Launch
+// Services. Clobbering it to 'Ensemblr' here would collapse every packaged
 // channel back onto the release identity — the shared registration that lets
 // macOS relaunch a sibling build and flash a stray Dock tile.
 if (isDev) {
 	app.setName(`Ensemblr${DEV_SUFFIX}`);
+}
+
+// A packaged dogfood channel is the same install wearing a different name, so
+// it opens the release's state rather than a blank one. The SQLite database and
+// `~/.config/ensemblr/config.json` are already channel-independent — keyed on
+// `dev.ensemblr.app` and the home directory rather than the product name — and
+// only Electron's own userData followed the channel, stranding the
+// localStorage-backed recents, workspace selection and per-repo overrides in a
+// sibling directory. Pinning it to the release's directory also puts every
+// packaged channel behind one single-instance lock, which is the correct
+// reading now that they share one database file: two channels open on it at
+// once was never safe. This amends ADR 0032, whose bundle-id split stands.
+// `setPath` throws when the directory does not exist, which is the ordinary case
+// on a machine that installed a dogfood channel before ever installing a
+// release, so create it first.
+if (!isDev) {
+	const sharedUserData = path.join(
+		app.getPath('appData'),
+		RELEASE_PRODUCT_NAME,
+	);
+	mkdirSync(sharedUserData, { recursive: true });
+	app.setPath('userData', sharedUserData);
 }
 
 // A second launch of the packaged app — most often a spawned login shell that
@@ -208,7 +234,8 @@ if (isDev) {
 // a file lock under userData, so it catches direct-exec relaunches too, not just
 // `open`-routed ones. Dev is excluded: dev builds share one `Ensemblr (DEV)`
 // userData across dogfooding workspaces, so a lock there would kill the second
-// dogfooding instance. Acquired after `setName` so it keys on the right userData.
+// dogfooding instance. Acquired after the userData pin so it keys on the right
+// directory.
 const hasSingleInstanceLock = isDev || app.requestSingleInstanceLock();
 if (!hasSingleInstanceLock) {
 	// `exit(0)`, not `quit()`: this doomed instance still ran the whole module and
