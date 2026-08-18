@@ -38,7 +38,6 @@ interface ComposerPanelProps {
 	repositoryId: string;
 	/** Issue an issue-created workspace came from, attached to the draft once. */
 	seedLinkedIssue?: WorkspaceLinkedIssueSummary;
-	seedText?: string;
 	/** Workspace whose dock hosts terminals the control row hands work off to. */
 	workspaceId: string;
 }
@@ -70,7 +69,6 @@ function ComposerPanelBody({
 	planReview,
 	repositoryId,
 	seedLinkedIssue,
-	seedText,
 	workspaceId,
 }: ComposerPanelProps) {
 	const { t } = useTranslation();
@@ -78,7 +76,6 @@ function ComposerPanelBody({
 		chatTabId,
 		composer,
 		...(seedLinkedIssue ? { seedLinkedIssue } : {}),
-		...(seedText ? { seedText } : {}),
 	});
 	const [focused, setFocused] = useState(false);
 	const [modelPickerOpen, setModelPickerOpen] = useState(false);

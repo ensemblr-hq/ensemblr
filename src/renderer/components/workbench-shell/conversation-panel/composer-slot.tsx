@@ -37,7 +37,6 @@ export function ComposerSlot({
 	composer,
 	agentSessionId,
 	seedLinkedIssue,
-	seedText,
 	workspace,
 }: {
 	chatTabId: string;
@@ -45,7 +44,6 @@ export function ComposerSlot({
 	agentSessionId: string | null;
 	/** Issue an issue-created workspace came from, attached to the draft once. */
 	seedLinkedIssue?: WorkspaceLinkedIssueSummary;
-	seedText?: string;
 	workspace: WorkspaceShellModel;
 }) {
 	const pendingQuestion = usePendingAskUserQuestion(agentSessionId);
@@ -122,7 +120,6 @@ export function ComposerSlot({
 				) : null
 			}
 			seedLinkedIssue={seedLinkedIssue}
-			seedText={seedText}
 			workspaceId={workspace.id}
 		/>
 	);

@@ -27,10 +27,10 @@ interface PlanHandoffInput {
  * seeds its draft, attaches the plan file as a composer chip, and focuses it.
  * Nothing is submitted — the user reads the plan in place and sends when ready.
  *
- * The draft is written straight into the composer's draft atom rather than
- * passed as `seedText`, which a render-derived prop would skip once the draft is
- * non-empty, and the plan rides as a file chip rather than inlined text so the
- * new agent receives it as an attachment.
+ * The draft is written straight into the composer's draft atom, before the tab
+ * it belongs to has mounted a composer to receive a prop, and the plan rides as a
+ * file chip rather than inlined text so the new agent receives it as an
+ * attachment.
  */
 export function usePlanHandoff(workspace: WorkspaceShellModel): {
 	handOff: (input: PlanHandoffInput) => Promise<string | null>;

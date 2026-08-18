@@ -1,18 +1,15 @@
 import { useAtomValue } from 'jotai';
 import { XtermTerminal } from '@/renderer/components/workbench-shell/dock-panel/xterm-terminal';
 import { useConversationOpeners } from '@/renderer/hooks/workbench-shell/conversation-panel/use-conversation-openers';
+import { useLinkedIssueComposerSeed } from '@/renderer/hooks/workspace/use-linked-issue-composer-seed';
 import type { createWorkspacePathResolver } from '@/renderer/lib/agent-timeline';
-import {
-	formatLinkedIssueComposerSeed,
-	showsComposer,
-} from '@/renderer/lib/workbench';
+import { showsComposer } from '@/renderer/lib/workbench';
 import { usePiRawFrameCapture } from '@/renderer/state/pi';
 import { developerModeAtom } from '@/renderer/state/preferences';
 import { useWorkspaceUnreadKeys } from '@/renderer/state/unread';
 import type {
 	ComposerShellState,
 	SessionTabModel,
-	WorkspaceLinkedIssueSummary,
 	WorkspaceShellModel,
 } from '@/renderer/types/workbench';
 import type { SessionTabPlacement } from '@/renderer/types/workbench-shell';
@@ -241,9 +238,9 @@ function ActiveAuxiliaryPanel({
 }
 
 /**
- * The composer for a chat, seeded from the workspace's linked issue when it has
- * one. Split out so the seed is resolved once and handed to both slots — the
- * attachment and the headline — rather than recomputed inline in the tree.
+ * The composer for a chat, seeded from the workspace's linked issue while that
+ * issue is still waiting for its first conversation. Split out so the seed reads
+ * the workspace-wide gate once here rather than inline in the tree.
  */
 function LinkedIssueComposerSlot({
 	activeSession,
@@ -254,36 +251,19 @@ function LinkedIssueComposerSlot({
 	activeWorkspace: WorkspaceShellModel;
 	composer: ComposerShellState;
 }) {
-	const seedLinkedIssue = getSeedLinkedIssue(activeWorkspace, activeSession);
+	const agentSessionId = activeSession.agentSessionId ?? null;
+	const seedLinkedIssue = useLinkedIssueComposerSeed({
+		agentSessionId,
+		linkedIssue: activeWorkspace.landingSummary?.linkedIssue,
+		workspaceId: activeWorkspace.id,
+	});
 	return (
 		<ComposerSlot
-			agentSessionId={activeSession.agentSessionId ?? null}
+			agentSessionId={agentSessionId}
 			chatTabId={activeSession.chatTabId}
 			composer={composer}
 			seedLinkedIssue={seedLinkedIssue}
-			seedText={
-				seedLinkedIssue
-					? formatLinkedIssueComposerSeed(seedLinkedIssue)
-					: undefined
-			}
 			workspace={activeWorkspace}
 		/>
 	);
-}
-
-/**
- * The issue an issue-created workspace should open with, or undefined once the
- * chat has a session. Feeds both first-prompt seeds: the attachment chip, which
- * carries the whole issue document to the agent, and the one-line headline in
- * the draft text.
- * @param workspace - The workspace the composer belongs to.
- * @param session - The chat tab the composer is mounted for.
- * @returns The linked issue, or undefined when there is none to seed.
- */
-function getSeedLinkedIssue(
-	workspace: WorkspaceShellModel,
-	session: SessionTabModel,
-): WorkspaceLinkedIssueSummary | undefined {
-	const linkedIssue = workspace.landingSummary?.linkedIssue;
-	return linkedIssue && !session.agentSessionId ? linkedIssue : undefined;
 }
