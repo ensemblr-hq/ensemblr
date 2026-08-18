@@ -1,6 +1,18 @@
 import { defineConfig } from 'vite';
 
+import { resolveBuildChannel } from './src/shared/build-channel.ts';
+
 export default defineConfig({
+	// The channel the app reports itself as, baked in at build time from the same
+	// variable and the same helper `forge.config.ts` derives the bundle id and
+	// product name from — so the identity in the bundle and the update feed the
+	// app resolves can never disagree. Sniffing `app.getName()` instead would
+	// misread dev, which `src/main/main.ts` deliberately renames.
+	define: {
+		__ENSEMBLR_BUILD_CHANNEL__: JSON.stringify(
+			resolveBuildChannel(process.env.ENSEMBLR_BUILD_CHANNEL),
+		),
+	},
 	build: {
 		rollupOptions: {
 			external: [

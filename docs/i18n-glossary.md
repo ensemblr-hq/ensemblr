@@ -109,6 +109,8 @@ Rules of thumb:
 | Secret path | Путь к секретам | Διαδρομή μυστικών | The folder inside an Infisical environment Ensemblr reads. Russian uses `путь к` rather than a bare genitive so it reads as a filesystem-style path, which is what it is. |
 | Instance URL | Адрес инстанса | Διεύθυνση instance | Which Infisical deployment an account talks to — cloud US, cloud EU, or self-hosted. `Инстанс`/`instance` is left borrowed in both: it is infrastructure vocabulary developers use in English daily. |
 | Link *(repository ↔ Infisical project)* | Связь | Σύνδεση | The saved pairing itself, and the state badges over it: `Связано`/`Συνδεδεμένο`, `Не связано`/`Χωρίς σύνδεση`, `Отвязать`/`Αποσύνδεση`. Deliberately **not** the composer's `Link (a directory or issue)` → `Прикрепить`: that verb attaches a thing to a chat, while this noun names a persistent relation between two systems. |
+| Update *(a newer build)* | Обновление | Ενημέρωση | The build the in-app updater downloads, as a noun. Distinct from the `Refresh` verb below, which Russian also renders `Обновить`: the noun here is always `обновление`, and the action that looks for one is `Проверить обновления`/`Έλεγχος για ενημερώσεις` — never a bare `Обновить`, which would read as re-fetching the screen. |
+| Nightly *(the channel)* | Nightly | Nightly | The rolling build of `master`, published under the reserved `nightly` tag and installed as `Ensemblr Canary`. Untranslated in both, for the git-porcelain reason: the word is the tag name, the release title, and the download link on ensemblr.dev, so a localized badge would name something the user cannot find. |
 
 ## Core verbs
 
@@ -134,6 +136,7 @@ Rules of thumb:
 | Assign an issue *(to a workspace)* | Создать рабочее пространство из задачи | Δημιουργία χώρου εργασίας από ζήτημα | Dragging a `Backlog issue` out of Backlog, which creates a workspace seeded from it. All three languages say **create a workspace from the issue**, never "assign"/`назначить`/`ανάθεση`: nothing is written back to Linear or GitHub (ADR 0024), and an assignment verb would promise the issue's own assignee changed. |
 | Dismiss *(a backlog issue)* | Убрать с доски | Απόκρυψη από τον πίνακα | Hiding an issue from the board without touching it in Linear or GitHub. Deliberately not `Отклонить`/`Απόρριψη`, which `Deny` and `Discard` already own and which imply a decision about the work itself. The inverse reuses `Restore` above. |
 | Refresh | Обновить | Ανανέωση | Re-fetching remote data. Both languages already use this form across the issue, PR, MCP-server, and provider surfaces; reuse it rather than coining `Перезагрузить`/`Επαναφόρτωση`, which read as reloading the app. |
+| Restart *(into an update)* | Перезапустить | Επανεκκίνηση | Quitting and relaunching to finish installing a downloaded update. Russian keeps the imperative for the button (`Перезапустить`) and Greek the verbal noun (`Επανεκκίνηση`), matching how `Archive`/`Αρχειοθέτηση` already splits. Never `Перезагрузить`/`Επαναφόρτωση`, which `Refresh` above already warns off. |
 | Selected | Выбрано | Επιλεγμένο | Screen-reader-only checked state on a picker row, where the tick glyph is `aria-hidden`. Neuter short form, because it qualifies nothing on the page — it is announced on its own. |
 | Spawn | Запустить | Εκκίνηση | Starting a sub-agent. |
 | Clone | Клонировать | Κλωνοποίηση | |

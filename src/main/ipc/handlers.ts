@@ -56,6 +56,7 @@ import type { EnsemblrDatabaseService } from '../storage';
 import { getAgentSessionById } from '../storage/repositories/agent-session-repository';
 import { listActiveWorkspacePathRows } from '../storage/repositories/workspace-repository';
 import type { TerminalService } from '../terminal';
+import type { UpdateService } from '../updates';
 import type {
 	ListWorkspaceFilesService,
 	WorkspaceFilesWatcher,
@@ -89,6 +90,7 @@ import { registerSettingsHandlers } from './handlers/settings';
 import { registerSetupHandlers } from './handlers/setup';
 import { registerShellSnapshotHandlers } from './handlers/shell-snapshot';
 import { registerTerminalHandlers } from './handlers/terminal';
+import { registerUpdateHandlers } from './handlers/update';
 import { registerWindowHandlers } from './handlers/window';
 import { registerWorkspaceFilesHandlers } from './handlers/workspace-files';
 import { registerWorkspaceGitHandlers } from './handlers/workspace-git';
@@ -158,6 +160,7 @@ interface RegisterIpcHandlersOptions {
 	settingsResolutionService: EnsemblrConfigResolutionService;
 	terminalService: TerminalService;
 	unarchiveWorkspaceService: UnarchiveWorkspaceService;
+	updateService: UpdateService;
 	workspaceFilesWatcher: WorkspaceFilesWatcher;
 }
 
@@ -221,6 +224,7 @@ export function registerIpcHandlers({
 	settingsResolutionService,
 	sharedRootAdoptionService,
 	terminalService,
+	updateService,
 	unarchiveWorkspaceService,
 	workspaceFilesWatcher,
 }: RegisterIpcHandlersOptions): IpcHandlersHandle {
@@ -318,6 +322,7 @@ export function registerIpcHandlers({
 	});
 	registerSetupHandlers({ setupDiagnosticsService });
 	registerTerminalHandlers({ terminalService });
+	registerUpdateHandlers({ updateService });
 	registerAgentHandlers({
 		augmentHarnessCommand,
 		databaseService,

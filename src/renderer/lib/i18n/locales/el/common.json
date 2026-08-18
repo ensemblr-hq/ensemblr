@@ -422,6 +422,17 @@
 		"workspace-count_one": "{{count}} χώρος εργασίας",
 		"workspace-count_other": "{{count}} χώροι εργασίας"
 	},
+	"update": {
+		"check-failed": "Ο έλεγχος ενημερώσεων απέτυχε.",
+		"disabled": "Οι αυτόματες ενημερώσεις είναι απενεργοποιημένες. Ενεργοποιήστε τις στις «Ρυθμίσεις → Γενικά».",
+		"downloading": "Λήψη του Ensemblr {{version}}…",
+		"ready": {
+			"description": "Κάντε επανεκκίνηση για να ολοκληρωθεί η εγκατάσταση. Αν εκτελούνται πράκτορες, θα ερωτηθείτε πρώτα.",
+			"restart": "Επανεκκίνηση",
+			"title": "Το Ensemblr {{version}} είναι έτοιμο"
+		},
+		"up-to-date": "Το Ensemblr {{version}} είναι ενημερωμένο."
+	},
 	"welcome": {
 		"open-github-project": "Άνοιγμα έργου GitHub",
 		"open-project": "Άνοιγμα έργου",

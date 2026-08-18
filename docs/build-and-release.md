@@ -143,6 +143,10 @@ its isolated `Ensemblr (DEV)` state.
 
 `npm run package` writes the unpacked `.app` to `out/`.
 
+A third artifact exists only on the release, not in `out/`: both workflows write
+**`update-darwin-arm64.json`** and attach it beside the `.zip`. See
+[The update feed document](#the-update-feed-document) below.
+
 ## Releasing
 
 Releases are built by GitHub Actions on a `macos-15` runner, not on a laptop.
@@ -190,8 +194,15 @@ release whose assets are replaced each run (`Ensemblr-Canary-arm64.dmg`,
 `Ensemblr-Canary-darwin-arm64.zip`). It is change-gated: a cheap Linux job
 compares `master` against the commit the `nightly` tag already points at and
 skips the build entirely when they match, so a quiet week republishes nothing.
-The version is stamped as `<version>-nightly.<YYYYMMDD>.g<short-sha>` into the
-build (never committed), so the About box names the commit.
+The version is stamped as `<major>.<minor>.<patch>-nightly.<YYYYMMDD>.g<short-sha>`
+into the build (never committed), so the About box names the commit.
+
+**The base contributes no prerelease tail of its own**, even while
+`package.json` sits on `-beta.N`. The in-app updater orders one nightly against
+the next with `semver.gt`, and a retained tail makes `9-nightly` and
+`10-nightly` adjacent *string* identifiers — the newer build would compare
+lower and every canary install would report "up to date" for good. Stripped,
+the date is the first identifier that can differ, and dates order numerically.
 
 **It runs on a cron at `0 4 * * *` UTC, and on demand.** A scheduled run always
 publishes. A manual `workflow_dispatch` defaults its `publish` input to
@@ -215,6 +226,38 @@ the first entry it finds.
 The tag scheme is a cross-repo contract, not an internal detail: `v<semver>` is a
 real release, the literal `nightly` is the nightly, and nothing else publishes.
 See [ADR 0054](./adr/0054-build-releases-in-ci-and-reserve-the-nightly-tag.md).
+
+### The update feed document
+
+Both workflows attach **`update-darwin-arm64.json`** to every release. It is the
+Squirrel.Mac feed the in-app updater reads:
+
+```json
+{
+  "url": "https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.0-beta.8/Ensemblr-darwin-arm64-0.1.0-beta.8.zip",
+  "name": "0.1.0-beta.8",
+  "notes": "…the release body…",
+  "pub_date": "2026-08-18T04:00:00Z"
+}
+```
+
+`url` points at the **`.zip`** — Squirrel installs a zipped `.app` and cannot
+read a DMG. `name` is the exact version, which is what lets an installed build
+compare against `app.getVersion()` without parsing a tag or a release body. That
+matters most for the nightly: its tag never moves and its asset names are fixed
+on purpose, so this document is the only thing that changes from one night to the
+next.
+
+**The filename is a contract with `UPDATE_FEED_ASSET_NAME`**
+(`src/main/updates/release-feed.ts`). Renaming it in one place and not the other
+strands every installed build on its current version — the app reports
+`update-feed-malformed` rather than claiming to be up to date, so the breakage is
+visible, but it is still a breakage.
+
+A build only ever reads the releases for **its own channel** — the rolling
+`nightly` for canary, the highest-semver `v*` tag for release — and the two
+channels carry different bundle ids, so an update can never cross between them.
+See [ADR 0055](./adr/0055-resolve-updates-in-app-against-the-github-releases-api.md).
 
 ### Repository secrets
 
@@ -294,6 +337,7 @@ Adding another unbundled or native dependency means updating **both**
 ## See also
 
 - [ADR 0054](./adr/0054-build-releases-in-ci-and-reserve-the-nightly-tag.md) — why releases build in CI, the reserved tag namespace, and the shared channel state.
+- [ADR 0055](./adr/0055-resolve-updates-in-app-against-the-github-releases-api.md) — why the in-app updater resolves its own feed, and why `update.electronjs.org` cannot serve either channel.
 - [ADR 0031](./adr/0031-strip-launch-context-env-and-single-instance-lock.md), [ADR 0032](./adr/0032-channel-scoped-bundle-identity.md) — the Dock-flash fixes.
 - [ADR 0042](./adr/0042-add-claude-code-as-a-second-first-class-agent-runtime.md) — why the Claude binary is not packaged.
 - [`../.claude/rules/stack.md`](../.claude/rules/stack.md) — the pinned versions, the two `external` packages, and the `legacy-peer-deps` constraint.

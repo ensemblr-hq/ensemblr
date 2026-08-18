@@ -15,6 +15,7 @@ export {
 	appSettingsAtom,
 	archiveOnMergeAtom,
 	autoConvertLongTextAtom,
+	automaticUpdatesAtom,
 	autoRunAfterSetupAtom,
 	branchPrefixCustomAtom,
 	branchPrefixSourceAtom,

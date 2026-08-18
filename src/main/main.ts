@@ -2,7 +2,14 @@ import { mkdirSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
-import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron';
+import {
+	app,
+	autoUpdater,
+	BrowserWindow,
+	dialog,
+	ipcMain,
+	shell,
+} from 'electron';
 import { parseAskUserQuestionReply } from '../shared/agent-control.ts';
 import type { AgentProviderId } from '../shared/agent-provider.ts';
 import {
@@ -22,6 +29,7 @@ import type {
 	TerminalLifecycleBroadcast,
 	TerminalOutputBroadcast,
 } from '../shared/ipc/contracts/terminal';
+import type { UpdateStatusChangedBroadcast } from '../shared/ipc/contracts/update';
 import type { WorkspaceFilesChangedBroadcast } from '../shared/ipc/contracts/workspace-files';
 import { scrollbackMbToBytes } from '../shared/terminal.ts';
 import {
@@ -67,6 +75,7 @@ import { createSessionSummaryWriter } from './agent-runtime/session-summary-writ
 import { resolveAgentSkillBundle } from './agent-skills';
 import { createHarnessDetectionService } from './agents';
 import { createMainWindow } from './app/main-window';
+import type { QuitExit } from './app/quit-coordinator';
 import { createQuitCoordinator } from './app/quit-coordinator';
 import { createQuitGuard } from './app/quit-guard';
 import { createMainWindowStateStore } from './app/window-state';
@@ -164,6 +173,7 @@ import {
 import { getChatTabByAgentSessionId } from './storage/repositories/chat-tab-repository.ts';
 import { getWorkspacePathById } from './storage/repositories/workspace-repository.ts';
 import { createTerminalService } from './terminal';
+import { createAppUpdateService } from './updates';
 import {
 	createListWorkspaceFilesService,
 	createWorkspaceFilesWatcher,
@@ -1135,6 +1145,7 @@ app.whenReady().then(() => {
 			settings,
 		} satisfies AppSettingsChangedBroadcast);
 		agentActivityMonitor.refresh();
+		updateService.settingsChanged();
 		rebuildMenu();
 	});
 	// Live-reload the non-App config sections (linear, security, managed,
@@ -1206,6 +1217,7 @@ app.whenReady().then(() => {
 		// the next restart.
 		onAppSettingsUpdated: () => {
 			agentActivityMonitor.refresh();
+			updateService.settingsChanged();
 			rebuildMenu();
 		},
 		menuContextStore,
@@ -1219,9 +1231,15 @@ app.whenReady().then(() => {
 		sharedRootAdoptionService,
 		terminalService,
 		unarchiveWorkspaceService,
+		updateService,
 		workspaceFilesWatcher,
 	});
 	terminalService.recoverStaleSessions();
+	// Behind the single-instance guard, not at module scope: a doomed second
+	// instance runs the whole module before `app.exit(0)`, and arming Squirrel's
+	// listeners and the check timer there would be a side effect the
+	// construction-only rule above exists to keep out.
+	updateService.start();
 	openMainWindow();
 });
 
@@ -1275,14 +1293,23 @@ const quitGuard = createQuitGuard({
  * The approval gate fails closed first, before that grace period: a Claude
  * session in approval-required mode can still issue tool calls while the race
  * plays out, and by then no window is left to put them to the user.
+ *
+ * `quitAndInstall` is what ends a restart-to-install, and it belongs here rather
+ * than at the gesture: it issues its own quit, so calling it before the children
+ * are down would relaunch over a still-running Pi tree.
+ * @param exit - Whether this quit ends by exiting or by relaunching into a staged update
  */
-function beginAgentShutdown(): void {
+function beginAgentShutdown(exit: QuitExit): void {
 	claudeToolApproval.shutdown();
 	void (async () => {
 		await Promise.race([
 			Promise.allSettled([agentClient.shutdown(), terminalService.shutdown()]),
 			new Promise((resolve) => setTimeout(resolve, 3000)),
 		]);
+		if (exit === 'install-update') {
+			autoUpdater.quitAndInstall();
+			return;
+		}
 		app.quit();
 	})();
 }
@@ -1291,6 +1318,15 @@ const quitCoordinator = createQuitCoordinator({
 	beginAgentShutdown,
 	confirmQuit: quitGuard.confirmQuit,
 	quit: () => app.quit(),
+});
+
+const updateService = createAppUpdateService({
+	broadcast: (snapshot) =>
+		broadcastToAllWindows(IPC_CHANNELS.updateStatusChanged, {
+			snapshot,
+		} satisfies UpdateStatusChangedBroadcast),
+	isEnabled: () => appSettingsService.read().general.automaticUpdates,
+	requestInstall: quitCoordinator.requestInstallUpdate,
 });
 
 // Quitting kills every in-flight turn, so nothing is torn down until the guard
@@ -1306,6 +1342,7 @@ app.on('before-quit', (event) => {
 app.on('will-quit', () => {
 	appSettingsService.stop();
 	configService.stop();
+	updateService.stop();
 	agentActivityMonitor.dispose();
 	void agentControlServer?.close();
 	// Backstop for a quit that skipped the `before-quit` grace: the synchronous

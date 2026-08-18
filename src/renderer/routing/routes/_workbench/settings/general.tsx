@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { RootDirectoryRow } from '@/renderer/components/settings/root-directory-row';
 import { SettingRow } from '@/renderer/components/settings/setting-row';
 import { SettingsSection } from '@/renderer/components/settings/settings-section';
+import { SoftwareUpdateRows } from '@/renderer/components/settings/software-update-rows';
 import {
 	Select,
 	SelectContent,
@@ -264,6 +265,7 @@ function GeneralSettings() {
 			/>
 
 			<RootDirectoryRow />
+			<SoftwareUpdateRows />
 		</SettingsSection>
 	);
 }

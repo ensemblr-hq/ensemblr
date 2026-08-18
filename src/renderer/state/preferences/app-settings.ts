@@ -83,6 +83,13 @@ export const caffeinateWhileRunningAtom = settingAtom(
 	'general',
 	'caffeinateWhileRunning',
 );
+/**
+ * Whether Ensemblr may update itself. Off is a hard off — no check, no
+ * download, no install — for an install something else owns, a Homebrew cask
+ * most of all. Main reads it directly too, so a hand edit of `config.json`
+ * reaches the updater without the renderer.
+ */
+export const automaticUpdatesAtom = settingAtom('general', 'automaticUpdates');
 export const toolCallCollapseAtom = settingAtom('general', 'toolCallCollapse');
 
 // ─── Models ───────────────────────────────────────────────────────────────────

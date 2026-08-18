@@ -22,6 +22,7 @@ import {
 } from '@/renderer/state/preferences';
 import { useToolApprovalSync } from '@/renderer/state/tool-approval';
 import { useNotificationFocusSync } from '@/renderer/state/unread';
+import { useUpdateSync } from '@/renderer/state/updates';
 
 /** Root app component — delegates rendering to the active TanStack Router outlet. */
 export function App() {
@@ -36,6 +37,7 @@ export function App() {
 	useToolApprovalSync();
 	usePlanReviewSync();
 	usePlanModeSync();
+	useUpdateSync();
 
 	useMenuCommandBridge();
 	useAppMenuCommands();

@@ -424,6 +424,17 @@ export default interface Resources {
 			'workspace-count_one': '{{count}} workspace';
 			'workspace-count_other': '{{count}} workspaces';
 		};
+		update: {
+			'check-failed': 'The update check failed.';
+			disabled: 'Automatic updates are off. Turn them on in Settings → General.';
+			downloading: 'Downloading Ensemblr {{version}}…';
+			ready: {
+				description: 'Restart to finish installing. Agents still working are asked first.';
+				restart: 'Restart';
+				title: 'Ensemblr {{version}} is ready';
+			};
+			'up-to-date': 'Ensemblr {{version}} is up to date.';
+		};
 		welcome: {
 			'open-github-project': 'Open GitHub project';
 			'open-project': 'Open project';
@@ -692,6 +703,13 @@ export default interface Resources {
 			'unarchive-aborted-by-hook': 'An unarchive hook stopped the operation.';
 			'unsafe-root-content': 'The root directory holds content that is unsafe to manage.';
 			'unsupported-host': 'That host is not supported.';
+			'update-download-failed': 'The update could not be downloaded. Ensemblr will try again later.';
+			'update-feed-malformed': 'The update information could not be read.';
+			'update-feed-rate-limited': 'GitHub is rate-limiting update checks. Ensemblr will try again later.';
+			'update-feed-unreachable': 'Ensemblr could not reach GitHub to check for updates.';
+			'update-install-failed': 'Ensemblr could not restart into the update.';
+			'update-not-in-applications': 'Ensemblr updates itself only from the Applications folder. Move it there and reopen it.';
+			'update-unsupported-build': 'This build cannot update itself.';
 			'url-invalid': 'That repository URL is not valid.';
 			'url-required': 'Enter a repository URL.';
 			'workspace-already-archived': 'That workspace is already archived.';
@@ -1611,6 +1629,10 @@ export default interface Resources {
 				description: 'Convert pasted text over 5000 characters into text attachments.';
 				label: 'Auto-convert long text';
 			};
+			'automatic-updates': {
+				description: 'Check for a newer build, download it, and offer to restart into it. Turn this off if a package manager owns this copy — Homebrew, for instance — so the two never fight over the same bundle.';
+				label: 'Update Ensemblr automatically';
+			};
 			caffeinate: {
 				description: 'Prevent your Mac from sleeping while an agent is actively working. Shuts off below 10% battery.';
 				label: 'Caffeinate while agents are running';
@@ -1660,6 +1682,22 @@ export default interface Resources {
 			'tool-calls': {
 				description: 'Show all tool calls expanded by default instead of collapsed. Toggle with {{shortcut}}.';
 				label: "Don't collapse tool calls";
+			};
+			updates: {
+				channel: {
+					canary: 'Nightly';
+				};
+				check: 'Check for updates';
+				label: 'Ensemblr version';
+				restart: 'Restart to update';
+				status: {
+					checking: 'Checking…';
+					disabled: 'Ensemblr will not check for updates.';
+					downloading: 'Downloading {{version}}…';
+					error: 'The update check failed.';
+					idle: 'Ensemblr is up to date.';
+					ready: '{{version}} is ready — restart to install.';
+				};
 			};
 		};
 		git: {

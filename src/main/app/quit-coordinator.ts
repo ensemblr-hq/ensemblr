@@ -17,18 +17,31 @@
  * Every phase transition is synchronous with the gesture that caused it, so the
  * Electron handlers stay one-liners: they ask whether to `preventDefault()` and
  * do nothing else.
+ *
+ * Restarting into a downloaded update is a third gesture, and it enters here
+ * rather than calling `autoUpdater.quitAndInstall()` directly. That call issues
+ * its own `app.quit()`, which `before-quit` intercepts like any other — so a
+ * direct call would be confirmed, torn down, and then re-issued as a plain
+ * quit, silently discarding Squirrel's relaunch. The exit mode rides along the
+ * same path instead and decides only the final re-issue.
  */
 
 /** How far along the quit is: nobody asked, asking, answered, tearing down. */
 type QuitPhase = 'confirmed' | 'confirming' | 'idle' | 'shutting-down';
 
+/** What the quit ends in once the agents are down: exiting, or relaunching into an update. */
+export type QuitExit = 'install-update' | 'quit';
+
 /** Options for {@link createQuitCoordinator}. */
 export interface QuitCoordinatorOptions {
-	/** Tears the agent children down, then re-issues the quit itself. */
-	beginAgentShutdown: () => void;
+	/**
+	 * Tears the agent children down, then ends the process itself — exiting, or
+	 * handing off to Squirrel when the quit began as a restart-to-install.
+	 */
+	beginAgentShutdown: (exit: QuitExit) => void;
 	/** Asks the user whether the quit may interrupt the agents still working. */
 	confirmQuit: () => Promise<boolean>;
-	/** Re-issues the quit once the user has let one through. */
+	/** Re-issues the quit gesture once the user has let one through. */
 	quit: () => void;
 }
 
@@ -38,6 +51,12 @@ export interface QuitCoordinator {
 	handleBeforeQuit: () => boolean;
 	/** Handles a window `close`; true when the caller must `preventDefault()`. */
 	handleWindowClose: (replayClose: () => void) => boolean;
+	/**
+	 * Starts a quit that ends in Squirrel's relaunch. Ignored while another quit
+	 * gesture is already in flight, so a restart request can never repurpose a
+	 * ⌘Q the user has already been asked about.
+	 */
+	requestInstallUpdate: () => void;
 }
 
 /**
@@ -49,6 +68,7 @@ export function createQuitCoordinator(
 	options: QuitCoordinatorOptions,
 ): QuitCoordinator {
 	let phase: QuitPhase = 'idle';
+	let exit: QuitExit = 'quit';
 
 	/**
 	 * Puts the quit to the user, then replays the gesture that asked. A rejected
@@ -56,6 +76,9 @@ export function createQuitCoordinator(
 	 * window: a dialog that cannot be drawn must not be able to strand the app in
 	 * `confirming`, where every later quit gesture would be swallowed and only
 	 * Force Quit would remain.
+	 *
+	 * A refusal also clears the exit mode, so a declined restart-to-install
+	 * cannot leave the next ordinary ⌘Q relaunching into an update.
 	 * @param replayGesture - Re-issues the gesture once the user accepts.
 	 */
 	const ask = (replayGesture: () => void): void => {
@@ -73,7 +96,9 @@ export function createQuitCoordinator(
 			phase = confirmed ? 'confirmed' : 'idle';
 			if (confirmed) {
 				replayGesture();
+				return;
 			}
+			exit = 'quit';
 		})();
 	};
 
@@ -86,11 +111,19 @@ export function createQuitCoordinator(
 		}
 		if (phase === 'confirmed') {
 			phase = 'shutting-down';
-			options.beginAgentShutdown();
+			options.beginAgentShutdown(exit);
 			return true;
 		}
 		ask(options.quit);
 		return true;
+	};
+
+	const requestInstallUpdate = (): void => {
+		if (phase !== 'idle') {
+			return;
+		}
+		exit = 'install-update';
+		options.quit();
 	};
 
 	const handleWindowClose = (replayClose: () => void): boolean => {
@@ -104,5 +137,5 @@ export function createQuitCoordinator(
 		return true;
 	};
 
-	return { handleBeforeQuit, handleWindowClose };
+	return { handleBeforeQuit, handleWindowClose, requestInstallUpdate };
 }

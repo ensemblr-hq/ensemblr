@@ -31,6 +31,10 @@ const generalSettingsSchema = z.object({
 	autoConvertLongText: z.boolean().catch(true),
 	alwaysShowContextUsage: z.boolean().catch(true),
 	caffeinateWhileRunning: z.boolean().catch(false),
+	// Default on, and the one general setting main acts on without the renderer:
+	// off means the updater never checks, downloads, or installs, for an install
+	// a package manager owns (see docs/adr/0055).
+	automaticUpdates: z.boolean().catch(true),
 	toolCallCollapse: z.enum(['collapsed', 'expanded']).catch('collapsed'),
 });
 

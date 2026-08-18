@@ -32,6 +32,7 @@ export * from './repo-settings';
 export * from './repository-sources';
 export * from './settings';
 export * from './setup';
+export * from './updates';
 export * from './workspace-files';
 export * from './workspace-git';
 export * from './workspace-scripts';

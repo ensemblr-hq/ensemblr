@@ -14,6 +14,7 @@ import type {
 } from '@/shared/ipc/contracts/repository';
 import type { RootDirectoryDiagnosticCode } from '@/shared/ipc/contracts/root-directory';
 import type { SharedRootAdoptionDiagnosticCode } from '@/shared/ipc/contracts/shared-root-adoption';
+import type { UpdateFailureCode } from '@/shared/ipc/contracts/update';
 import type {
 	ArchiveWorkspaceDiagnosticCode,
 	ContinueWorkspaceBranchDiagnosticCode,
@@ -65,6 +66,7 @@ export type AppFailureCode =
 	| SetWorkspaceBaseBranchDiagnosticCode
 	| SharedRootAdoptionDiagnosticCode
 	| UnarchiveWorkspaceDiagnosticCode
+	| UpdateFailureCode
 	| WorkspaceGitFailureCode
 	| WriteWorkspaceFileAttachmentFailureCode
 	| WriteWorkspaceImageAttachmentFailureCode;
@@ -788,6 +790,41 @@ export const APP_FAILURE_TEXT: Record<
 		),
 	'unsupported-host': (t) =>
 		t('errors:failure.unsupported-host', 'That host is not supported.'),
+	'update-download-failed': (t) =>
+		t(
+			'errors:failure.update-download-failed',
+			'The update could not be downloaded. Ensemblr will try again later.',
+		),
+	'update-feed-malformed': (t) =>
+		t(
+			'errors:failure.update-feed-malformed',
+			'The update information could not be read.',
+		),
+	'update-feed-rate-limited': (t) =>
+		t(
+			'errors:failure.update-feed-rate-limited',
+			'GitHub is rate-limiting update checks. Ensemblr will try again later.',
+		),
+	'update-feed-unreachable': (t) =>
+		t(
+			'errors:failure.update-feed-unreachable',
+			'Ensemblr could not reach GitHub to check for updates.',
+		),
+	'update-install-failed': (t) =>
+		t(
+			'errors:failure.update-install-failed',
+			'Ensemblr could not restart into the update.',
+		),
+	'update-not-in-applications': (t) =>
+		t(
+			'errors:failure.update-not-in-applications',
+			'Ensemblr updates itself only from the Applications folder. Move it there and reopen it.',
+		),
+	'update-unsupported-build': (t) =>
+		t(
+			'errors:failure.update-unsupported-build',
+			'This build cannot update itself.',
+		),
 	'url-invalid': (t) =>
 		t('errors:failure.url-invalid', 'That repository URL is not valid.'),
 	'url-required': (t) =>
