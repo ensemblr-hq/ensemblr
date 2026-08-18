@@ -189,13 +189,18 @@ export interface ListLinearIssuesRequest {
 	teamId?: string;
 }
 
-/** Result of listing/searching Linear issues (cache-first, degradable). */
+/**
+ * Result of listing/searching Linear issues (cache-first, degradable).
+ * `syncing` marks a cached answer served ahead of a refresh that is still
+ * running, so the caller can poll for the newer rows rather than block on them.
+ */
 export type ListLinearIssuesResult =
 	| {
 			accountFailures: LinearAccountFailure[];
 			issues: LinearIssueWire[];
 			source: 'cache' | 'remote';
 			status: 'ok';
+			syncing?: boolean;
 	  }
 	| {
 			accountFailures: LinearAccountFailure[];
@@ -232,12 +237,16 @@ export interface GetLinearMetadataRequest {
 	refresh?: boolean;
 }
 
-/** Result of reading cached Linear metadata. */
+/**
+ * Result of reading cached Linear metadata. `syncing` marks a cached answer
+ * served ahead of a refresh that is still running.
+ */
 export type GetLinearMetadataResult =
 	| {
 			accountFailures: LinearAccountFailure[];
 			metadata: LinearMetadataWire;
 			status: 'ok';
+			syncing?: boolean;
 	  }
 	| {
 			accountFailures: LinearAccountFailure[];

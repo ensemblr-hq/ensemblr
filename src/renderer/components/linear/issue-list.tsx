@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import { useAtom } from 'jotai';
 import { useMemo, useState } from 'react';
@@ -8,8 +8,11 @@ import {
 	linearConnectionQuery,
 	linearIssuesQuery,
 	linearMetadataQuery,
+	refreshLinearIssues,
 } from '@/renderer/api/ensemblr';
 import { Skeleton } from '@/renderer/components/ui/skeleton';
+import { useLinearRefresh } from '@/renderer/hooks/linear/use-linear-refresh';
+import { useDebouncedValue } from '@/renderer/hooks/use-debounced-value';
 import {
 	describeLinearAccountFailures,
 	describeLinearFailure,
@@ -33,6 +36,9 @@ import {
 } from './issue-list-toolbar';
 import { LinearIssueRow } from './issue-row';
 
+/** How long the search box must hold still before the list is re-read. */
+const SEARCH_DEBOUNCE_MS = 250;
+
 /**
  * Linear issue browse list across every connected account: search, account and
  * team filters, a completion scope, and sortable, groupable rows. Rows are
@@ -42,6 +48,7 @@ import { LinearIssueRow } from './issue-row';
 export function LinearIssueList() {
 	const { i18n, t } = useTranslation();
 	const navigate = useNavigate();
+	const queryClient = useQueryClient();
 	const [query, setQuery] = useState('');
 	const [accountId, setAccountId] = useState<string>(ALL_ACCOUNTS);
 	const [teamId, setTeamId] = useState<string>(ALL_TEAMS);
@@ -49,6 +56,18 @@ export function LinearIssueList() {
 	const [scope, setScope] = useAtom(linearIssueScopeAtom);
 	const [sort, setSort] = useAtom(linearIssueSortAtom);
 	const [grouping, setGrouping] = useAtom(linearIssueGroupingAtom);
+	const settledQuery = useDebouncedValue(query, SEARCH_DEBOUNCE_MS);
+	const request = useMemo(
+		() => ({
+			...(accountId !== ALL_ACCOUNTS ? { accountId } : {}),
+			...(settledQuery ? { query: settledQuery } : {}),
+			...(teamId !== ALL_TEAMS ? { teamId } : {}),
+		}),
+		[accountId, settledQuery, teamId],
+	);
+	const refresh = useLinearRefresh(() =>
+		refreshLinearIssues(queryClient, request),
+	);
 
 	const { data: summary } = useQuery(linearConnectionQuery);
 	const { data: metadataData } = useQuery(linearMetadataQuery);
@@ -56,14 +75,7 @@ export function LinearIssueList() {
 		data: result,
 		isFetching: issuesFetching,
 		isLoading: issuesLoading,
-		refetch: refetchIssues,
-	} = useQuery(
-		linearIssuesQuery({
-			...(accountId !== ALL_ACCOUNTS ? { accountId } : {}),
-			...(query ? { query } : {}),
-			...(teamId !== ALL_TEAMS ? { teamId } : {}),
-		}),
-	);
+	} = useQuery(linearIssuesQuery(request));
 
 	const accounts = summary?.accounts ?? [];
 	const showAccountFilter = accounts.length > 1;
@@ -92,10 +104,10 @@ export function LinearIssueList() {
 				}}
 				onNewIssue={() => setEditorOpen(true)}
 				onQueryChange={setQuery}
-				onRefresh={() => void refetchIssues()}
+				onRefresh={refresh.start}
 				onTeamChange={setTeamId}
 				query={query}
-				refreshing={issuesFetching}
+				refreshing={issuesFetching || refresh.active}
 				showAccounts={showAccountFilter}
 				teamId={teamId}
 				teams={teams}

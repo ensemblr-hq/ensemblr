@@ -35,6 +35,7 @@ const EXPECTED_MIGRATIONS = [
 	'017_infisical_accounts_and_links',
 	'018_infisical_link_folder_path',
 	'019_linear_accounts',
+	'020_linear_comment_freshness',
 ];
 
 const AGENT_VOCABULARY_MIGRATION_VERSION = 14;

@@ -10,6 +10,7 @@ import {
 	linearConnectionQuery,
 	linearIssueQuery,
 	linearMetadataQuery,
+	refreshLinearIssue,
 	updateLinearIssue,
 } from '@/renderer/api/ensemblr';
 import { Badge } from '@/renderer/components/ui/badge';
@@ -22,6 +23,7 @@ import {
 	DropdownMenuTrigger,
 } from '@/renderer/components/ui/dropdown-menu';
 import { LinearLogo } from '@/renderer/components/workbench-shell/source-provider-logo';
+import { useLinearRefresh } from '@/renderer/hooks/linear/use-linear-refresh';
 import {
 	deriveLinearGateState,
 	describeLinearFailure,
@@ -66,12 +68,16 @@ function LinearLinkedIssueStatus({
 	const { data: connectionData, isLoading: connectionLoading } = useQuery(
 		linearConnectionQuery,
 	);
+	const queryClient = useQueryClient();
 	const {
 		data: result,
-		isFetching: detailFetching,
+		isFetching: queryFetching,
 		isLoading: detailLoading,
-		refetch: refetchDetail,
 	} = useQuery(linearIssueQuery(remoteId, linkedIssue.accountId));
+	const refresh = useLinearRefresh(() =>
+		refreshLinearIssue(queryClient, remoteId, linkedIssue.accountId),
+	);
+	const detailFetching = queryFetching || refresh.active;
 	// Capture mount-time clock once so the stale-data check stays out of JSX
 	// (avoids react-doctor flagging `new Date()` in render). Staleness threshold
 	// is minutes, so a per-mount snapshot is fine.
@@ -115,7 +121,7 @@ function LinearLinkedIssueStatus({
 							'linear:linked-issue.refresh',
 							'Refresh linked issue',
 						)}
-						onClick={() => void refetchDetail()}
+						onClick={refresh.start}
 						size='icon-sm'
 						variant='ghost'
 					>
@@ -148,7 +154,7 @@ function LinearLinkedIssueStatus({
 						'Refresh linked issue status',
 					)}
 					disabled={detailFetching}
-					onClick={() => void refetchDetail()}
+					onClick={refresh.start}
 					size='icon-sm'
 					variant='ghost'
 				>

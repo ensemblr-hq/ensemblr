@@ -115,6 +115,7 @@ function page<T>(nodes: T[], endCursor: string | null = null): LinearPage<T> {
 interface FakeClientOptions {
 	issuePages?: LinearPage<LinearIssueData>[];
 	listIssuesError?: LinearServiceError;
+	searchResults?: LinearIssueData[];
 	metadata?: Partial<
 		Record<
 			'cycle' | 'label' | 'project' | 'state' | 'team' | 'user',
@@ -177,9 +178,9 @@ function createFakeClient(options: FakeClientOptions = {}) {
 			calls.push(`listMetadata:${kind}`);
 			return page(options.metadata?.[kind] ?? []);
 		},
-		searchIssues: async () => {
-			calls.push('searchIssues');
-			return page([createIssueData()]);
+		searchIssues: async (term) => {
+			calls.push(`searchIssues:${term}`);
+			return page(options.searchResults ?? [createIssueData()]);
 		},
 		updateIssue: async (id, input) => {
 			calls.push('updateIssue');
@@ -262,25 +263,39 @@ test('listIssues: follows pagination cursors across pages', async (t) => {
 	);
 });
 
+/**
+ * A service sharing another fixture's database, whose client always fails and
+ * whose clock has advanced past the freshness window.
+ */
+function createFailingService(
+	databaseService: EnsemblrDatabaseService,
+	minutesLater = 10,
+) {
+	const fake = createFakeClient({
+		listIssuesError: new LinearServiceError(
+			'rate-limited',
+			'Rate limit reached.',
+			{ retryAfterSeconds: 30 },
+		),
+	});
+
+	return {
+		...fake,
+		service: createLinearService({
+			clientFactory: () => fake.client,
+			databaseService,
+			listAccounts: async () => [accountSnapshot(ACCOUNT, 'Example Org')],
+			now: () => new Date(NOW.getTime() + minutesLater * 60 * 1000),
+		}),
+	};
+}
+
 test('listIssues: degrades to cached rows when the remote sync fails', async (t) => {
 	const { databaseService, service } = createServiceFixture(t);
 	await service.listIssues();
 
-	const failing = createLinearService({
-		clientFactory: () =>
-			createFakeClient({
-				listIssuesError: new LinearServiceError(
-					'rate-limited',
-					'Rate limit reached.',
-					{ retryAfterSeconds: 30 },
-				),
-			}).client,
-		databaseService,
-		listAccounts: async () => [accountSnapshot(ACCOUNT, 'Example Org')],
-		now: () => new Date(NOW.getTime() + 10 * 60 * 1000),
-	});
-
-	const result = await failing.listIssues();
+	const failing = createFailingService(databaseService);
+	const result = await failing.service.listIssues({ refresh: true });
 
 	// A failed sync narrows the answer rather than replacing it: the account's
 	// own failure travels alongside the rows the cache still holds.
@@ -292,12 +307,200 @@ test('listIssues: degrades to cached rows when the remote sync fails', async (t)
 	assert.strictEqual(result.issues.length, 1);
 });
 
+test('listIssues: serves a stale cache at once and refreshes behind it', async (t) => {
+	const { databaseService, service } = createServiceFixture(t);
+	await service.listIssues();
+
+	const later = createLinearService({
+		clientFactory: () => createFakeClient().client,
+		databaseService,
+		listAccounts: async () => [accountSnapshot(ACCOUNT, 'Example Org')],
+		now: () => new Date(NOW.getTime() + 10 * 60 * 1000),
+	});
+	const result = await later.listIssues();
+
+	assert.ok(result.status === 'ok');
+	assert.strictEqual(result.source, 'cache');
+	assert.strictEqual(result.syncing, true);
+	assert.strictEqual(result.issues.length, 1);
+});
+
+test('listIssues: a failed sync is held back and keeps reporting itself', async (t) => {
+	const { databaseService, service } = createServiceFixture(t);
+	await service.listIssues();
+
+	const failing = createFailingService(databaseService);
+	await failing.service.listIssues({ refresh: true });
+	const attemptsAfterFailure = failing.calls.filter((call) =>
+		call.startsWith('listIssues'),
+	).length;
+	const next = await failing.service.listIssues();
+
+	assert.ok(next.status === 'ok');
+	assert.strictEqual(next.issues.length, 1);
+	assert.strictEqual(next.accountFailures[0]?.failure.code, 'rate-limited');
+	assert.strictEqual(
+		failing.calls.filter((call) => call.startsWith('listIssues')).length,
+		attemptsAfterFailure,
+	);
+});
+
+test('listIssues: a search keeps the hits Linear matched on description', async (t) => {
+	const { calls, service } = createServiceFixture(t, {
+		searchResults: [
+			createIssueData({
+				description: 'The OAuth redirect drops the state parameter.',
+				id: 'issue-7',
+				identifier: 'ENG-207',
+				title: 'Connection settings',
+			}),
+		],
+	});
+
+	// Linear's search matches descriptions, so re-reading its answer through a
+	// narrower predicate would throw away the rows it just cached.
+	const result = await service.listIssues({ query: 'redirect' });
+
+	assert.ok(result.status === 'ok');
+	assert.ok(calls.includes('searchIssues:redirect'));
+	assert.deepStrictEqual(
+		result.issues.map((issue) => issue.identifier),
+		['ENG-207'],
+	);
+});
+
+test('listIssues: a padded search term is trimmed for the cache read too', async (t) => {
+	const { calls, service } = createServiceFixture(t);
+
+	// The remote query is trimmed, so reading the cache back with the padded
+	// text would filter out everything the search just found.
+	const result = await service.listIssues({ query: '  OAuth  ' });
+
+	assert.ok(result.status === 'ok');
+	assert.ok(calls.includes('searchIssues:OAuth'));
+	assert.strictEqual(result.issues.length, 1);
+});
+
+test('listIssues: a repeated search inside the window costs no second query', async (t) => {
+	const { calls, service } = createServiceFixture(t);
+
+	await service.listIssues({ query: 'oauth' });
+	const second = await service.listIssues({ query: 'oauth' });
+
+	assert.ok(second.status === 'ok');
+	assert.strictEqual(second.source, 'cache');
+	assert.strictEqual(
+		calls.filter((call) => call.startsWith('searchIssues')).length,
+		1,
+	);
+});
+
+test('listIssues: a search leaves no sync-state row behind to accumulate', async (t) => {
+	const { databaseService, service } = createServiceFixture(t);
+
+	await service.listIssues({ query: 'oauth' });
+	await service.listIssues({ query: 'auth' });
+
+	const database = databaseService.getConnection()?.database;
+	assert.ok(database);
+	const rows = database
+		.prepare('SELECT scope FROM linear_sync_state')
+		.all() as unknown as Array<{ scope: string }>;
+
+	// A search scope is keyed by the text someone typed, so persisting it would
+	// grow a row per term ever searched and nothing would ever remove one.
+	assert.deepStrictEqual(
+		rows.map((row) => row.scope),
+		[],
+	);
+});
+
+test('listIssues: transient search scopes are evicted rather than kept forever', async (t) => {
+	const { calls, service } = createServiceFixture(t);
+	const queriesFor = (term: string) =>
+		calls.filter((call) => call === `searchIssues:${term}`).length;
+
+	await service.listIssues({ query: 'first-term' });
+	assert.strictEqual(queriesFor('first-term'), 1);
+
+	for (let index = 0; index < 80; index += 1) {
+		await service.listIssues({ query: `filler-${index}` });
+	}
+
+	// Past the coordinator's cap the oldest scope is dropped, so its freshness is
+	// forgotten and the term is queried again instead of remembered for the life
+	// of the process.
+	await service.listIssues({ query: 'first-term' });
+
+	assert.strictEqual(queriesFor('first-term'), 2);
+});
+
+test('listIssues: an account a cooldown holds back keeps reporting its failure', async (t) => {
+	let clock = NOW;
+	const { service } = createTwoAccountFixture(t, {
+		firstClient: { listIssues: async () => page([]) },
+		now: () => clock,
+		otherClient: {
+			listIssues: async () => {
+				throw new LinearServiceError('rate-limited', 'Slow down.', {
+					retryAfterSeconds: 3600,
+				});
+			},
+		},
+	});
+
+	const first = await service.listIssues();
+	assert.ok(first.status === 'ok');
+	assert.strictEqual(first.accountFailures[0]?.accountId, OTHER_ACCOUNT);
+
+	// Ten minutes on the healthy account is stale again, but the rate-limited one
+	// is still inside the hour Linear asked for and so is not synced this round.
+	// Reporting only what this round raised would drop its failure entirely.
+	clock = new Date(NOW.getTime() + 10 * 60 * 1000);
+	const second = await service.listIssues();
+
+	assert.ok(second.status === 'ok');
+	assert.strictEqual(second.issues.length, 0);
+	assert.strictEqual(second.accountFailures.length, 1);
+	assert.strictEqual(second.accountFailures[0]?.accountId, OTHER_ACCOUNT);
+	assert.strictEqual(second.accountFailures[0]?.failure.code, 'rate-limited');
+});
+
+test('listIssues: a failure cooldown expires and the next read retries', async (t) => {
+	const databaseService = createDatabaseServiceFixture(t);
+	const fake = createFakeClient({
+		listIssuesError: new LinearServiceError('network', 'Offline.'),
+	});
+	let clock = NOW;
+	const service = createLinearService({
+		clientFactory: () => fake.client,
+		databaseService,
+		failureCooldownMs: 60_000,
+		listAccounts: async () => [accountSnapshot(ACCOUNT, 'Example Org')],
+		now: () => clock,
+	});
+	const attempts = () =>
+		fake.calls.filter((call) => call.startsWith('listIssues')).length;
+
+	await service.listIssues();
+	assert.strictEqual(attempts(), 1);
+
+	clock = new Date(NOW.getTime() + 30 * 1000);
+	await service.listIssues();
+	assert.strictEqual(attempts(), 1);
+
+	clock = new Date(NOW.getTime() + 90 * 1000);
+	await service.listIssues();
+	assert.strictEqual(attempts(), 2);
+});
+
 test('listIssues: filters cached rows by query', async (t) => {
 	const { service } = createServiceFixture(t, {
 		issuePages: [
 			page([
 				createIssueData(),
 				createIssueData({
+					description: 'Tighten the dock resize handles.',
 					id: 'issue-2',
 					identifier: 'ENG-150',
 					title: 'Terminal polish',
@@ -331,6 +534,47 @@ test('getIssue: serves the remote payload and caches comments', async (t) => {
 	assert.ok(cached.status === 'ok');
 	assert.strictEqual(cached.source, 'cache');
 	assert.strictEqual(cached.comments.length, 1);
+});
+
+test('getIssue: fetches the thread for an issue the list sync cached', async (t) => {
+	const { calls, service } = createServiceFixture(t);
+
+	// The browse list writes the issue row without ever reading its comments, so
+	// a freshly listed issue must not be mistaken for one whose thread is loaded.
+	await service.listIssues();
+	const result = await service.getIssue({ id: 'issue-1' });
+
+	assert.ok(result.status === 'ok');
+	assert.strictEqual(result.source, 'remote');
+	assert.strictEqual(result.comments.length, 1);
+	assert.ok(calls.includes('getIssue:issue-1'));
+});
+
+test('getIssue: a mutation does not blank the thread it never read', async (t) => {
+	const { calls, service } = createServiceFixture(t);
+
+	await service.updateIssue({ id: 'issue-1', input: { title: 'Renamed' } });
+	const result = await service.getIssue({ id: 'issue-1' });
+
+	assert.ok(result.status === 'ok');
+	assert.strictEqual(result.comments.length, 1);
+	assert.ok(calls.includes('getIssue:issue-1'));
+});
+
+test('getIssue: one read is shared by concurrent callers', async (t) => {
+	const { calls, service } = createServiceFixture(t);
+
+	const [first, second] = await Promise.all([
+		service.getIssue({ id: 'issue-1' }),
+		service.getIssue({ id: 'issue-1' }),
+	]);
+
+	assert.ok(first?.status === 'ok');
+	assert.ok(second?.status === 'ok');
+	assert.strictEqual(
+		calls.filter((call) => call === 'getIssue:issue-1').length,
+		1,
+	);
 });
 
 test('getIssue: returns a typed failure for unknown issues', async (t) => {
@@ -472,6 +716,8 @@ test('mutations surface permission failures without touching the cache', async (
 function createTwoAccountFixture(
 	t: TestContext,
 	options: {
+		firstClient?: Partial<LinearClient>;
+		now?: () => Date;
 		otherClient?: Partial<LinearClient>;
 	} = {},
 ) {
@@ -479,7 +725,7 @@ function createTwoAccountFixture(
 	const first = createFakeClient();
 	const second = createFakeClient();
 	const clients: Record<string, LinearClient> = {
-		[ACCOUNT]: first.client,
+		[ACCOUNT]: { ...first.client, ...options.firstClient },
 		[OTHER_ACCOUNT]: { ...second.client, ...options.otherClient },
 	};
 	const service = createLinearService({
@@ -489,7 +735,7 @@ function createTwoAccountFixture(
 			accountSnapshot(ACCOUNT, 'Example Org'),
 			accountSnapshot(OTHER_ACCOUNT, 'Client Co'),
 		],
-		now: () => NOW,
+		now: options.now ?? (() => NOW),
 	});
 
 	return { databaseService, first, second, service };
