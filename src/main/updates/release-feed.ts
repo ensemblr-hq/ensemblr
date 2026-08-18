@@ -32,17 +32,17 @@ const MAX_FEED_BYTES = 64 * 1024;
 /**
  * The GitHub release fields this resolver reads. `unknown` elsewhere on the
  * object is expected — the API returns far more than this and none of it is
- * trusted.
+ * trusted. `prerelease` is deliberately absent: every Ensemblr release carries
+ * it, so reading it could only ever reject the whole feed.
  */
 const releaseSchema = z.object({
 	assets: z
 		.object({
-			browser_download_url: z.string().url(),
+			browser_download_url: z.url(),
 			name: z.string(),
 		})
 		.array(),
 	draft: z.boolean().optional(),
-	prerelease: z.boolean().optional(),
 	tag_name: z.string(),
 });
 
@@ -50,7 +50,7 @@ const releaseSchema = z.object({
 const feedDocumentSchema = z.object({
 	name: z.string().min(1),
 	notes: z.string().optional(),
-	url: z.string().url(),
+	url: z.url(),
 });
 
 /** One GitHub release, narrowed to the fields this resolver trusts. */
@@ -171,7 +171,9 @@ function pickRelease(
 }
 
 /**
- * Reads a response body without letting an unexpected payload grow unbounded.
+ * Reads a response body, abandoning it the moment it outgrows the limit rather
+ * than buffering whatever a wrong URL happened to return. A feed document is a
+ * handful of fields, so anything larger is already not one.
  * @param response - The response to read
  * @param limit - Maximum bytes to accept
  * @returns The body text, or null when it exceeded the limit
@@ -180,8 +182,23 @@ async function readBoundedText(
 	response: Response,
 	limit: number,
 ): Promise<string | null> {
-	const text = await response.text();
-	return text.length > limit ? null : text;
+	const declaredLength = Number(response.headers.get('content-length'));
+	if (Number.isFinite(declaredLength) && declaredLength > limit) {
+		return null;
+	}
+	if (!response.body) {
+		return null;
+	}
+	const chunks: Uint8Array[] = [];
+	let read = 0;
+	for await (const chunk of response.body as AsyncIterable<Uint8Array>) {
+		read += chunk.byteLength;
+		if (read > limit) {
+			return null;
+		}
+		chunks.push(chunk);
+	}
+	return new TextDecoder().decode(Buffer.concat(chunks));
 }
 
 /**

@@ -50,9 +50,17 @@ jobs:
           short_sha=$(git rev-parse --short=7 HEAD)
           published=$(git rev-parse -q --verify refs/tags/nightly^{commit} || echo none)
 
+          # The base contributes `<major>.<minor>.<patch>` only, never its own
+          # prerelease tail. The in-app updater orders one nightly against the
+          # next with `semver.gt`, and `0.1.0-beta.9-nightly.…` against
+          # `0.1.0-beta.10-nightly.…` compares `9-nightly` to `10-nightly` as
+          # *strings* — so the newer build would lose and every canary install
+          # would report "up to date" for good. Stripped, the date is the first
+          # identifier that can differ, and it orders numerically.
+          #
           # `g` prefix: an all-digit short sha with a leading zero is an invalid
           # semver prerelease identifier, which git describe solves the same way.
-          base=$(node -p "require('./package.json').version")
+          base=$(node -p "require('./package.json').version.split('-')[0]")
           echo "version=$base-nightly.$(date -u +%Y%m%d).g$short_sha" >> "$GITHUB_OUTPUT"
           echo "sha=$head_sha" >> "$GITHUB_OUTPUT"
           echo "short_sha=$short_sha" >> "$GITHUB_OUTPUT"

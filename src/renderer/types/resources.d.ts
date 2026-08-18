@@ -708,7 +708,7 @@ export default interface Resources {
 			'update-feed-rate-limited': 'GitHub is rate-limiting update checks. Ensemblr will try again later.';
 			'update-feed-unreachable': 'Ensemblr could not reach GitHub to check for updates.';
 			'update-install-failed': 'Ensemblr could not restart into the update.';
-			'update-not-in-applications': 'Ensemblr updates itself only from the Applications folder. Move it there, then check again.';
+			'update-not-in-applications': 'Ensemblr updates itself only from the Applications folder. Move it there and reopen it.';
 			'update-unsupported-build': 'This build cannot update itself.';
 			'url-invalid': 'That repository URL is not valid.';
 			'url-required': 'Enter a repository URL.';

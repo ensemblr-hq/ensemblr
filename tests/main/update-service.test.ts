@@ -57,6 +57,7 @@ function harness(overrides: Partial<UpdateServiceOptions> = {}) {
 		armed,
 		broadcasts,
 		fireDownloaded: () => handlers?.onDownloaded(),
+		fireError: () => handlers?.onError(new Error('Squirrel gave up')),
 		installs,
 		service,
 		setEnabled: (value: boolean) => {
@@ -153,6 +154,32 @@ describe('createUpdateService — the automatic-updates setting', () => {
 
 		expect(h.service.snapshot().state).toBe('disabled');
 		expect(h.service.snapshot().availableVersion).toBeNull();
+	});
+
+	test('a download that lands after the switch went off is dropped', async () => {
+		const h = harness();
+		h.service.start();
+		await vi.advanceTimersByTimeAsync(3 * 60 * 1000);
+		expect(h.service.snapshot().state).toBe('downloading');
+
+		h.setEnabled(false);
+		h.service.settingsChanged();
+		h.fireDownloaded();
+
+		expect(h.service.snapshot().state).toBe('disabled');
+	});
+
+	test('a Squirrel failure after the switch went off is dropped too', async () => {
+		const h = harness();
+		h.service.start();
+		await vi.advanceTimersByTimeAsync(3 * 60 * 1000);
+
+		h.setEnabled(false);
+		h.service.settingsChanged();
+		h.fireError();
+
+		expect(h.service.snapshot().state).toBe('disabled');
+		expect(h.service.snapshot().failure).toBeNull();
 	});
 
 	test('a staged update cannot be installed once updates are off', async () => {

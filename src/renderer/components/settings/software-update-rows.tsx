@@ -62,6 +62,10 @@ function statusLabel(snapshot: UpdateStatusSnapshot, t: TFunction): string {
  * The two Settings → General rows the in-app updater owns: the switch that hands
  * the install to something else, and the running version with whatever the
  * updater is doing about it.
+ *
+ * The switch stays usable on a build that can never update — it is a stored
+ * preference rather than a capability, and a dev build or a copy outside
+ * /Applications must still be able to set it for the packaged copy it becomes.
  */
 export function SoftwareUpdateRows() {
 	const { t } = useTranslation();
@@ -96,7 +100,6 @@ export function SoftwareUpdateRows() {
 				control={
 					<Switch
 						checked={automaticUpdates}
-						disabled={snapshot.state === 'unsupported'}
 						onCheckedChange={setAutomaticUpdates}
 					/>
 				}

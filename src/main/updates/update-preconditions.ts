@@ -58,7 +58,7 @@ export function checkUpdatePreconditions({
 		return {
 			code: 'update-not-in-applications',
 			message:
-				'Ensemblr updates itself only from /Applications. Move it there, then check again.',
+				'Ensemblr updates itself only from /Applications. Move it there and reopen it.',
 		};
 	}
 	return null;

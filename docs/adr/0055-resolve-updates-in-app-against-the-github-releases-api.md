@@ -93,6 +93,15 @@ rather than two.
 `UPDATE_FEED_ASSET_NAME` is therefore a contract with both workflows, in the same
 sense ADR 0054 made the tag scheme one.
 
+So is the shape of the version inside it. `semver.gt` is the only thing standing
+between two nightlies, and semver compares prerelease identifiers left to right,
+numerically only when *both* sides are all digits. A nightly stamped
+`0.1.0-beta.9-nightly.<date>` puts `9-nightly` in that position — alphanumeric,
+so `10-nightly` sorts *below* it and the canary channel would silently freeze the
+day `package.json` crossed `beta.9`. `nightly.yml` therefore strips the base to
+`<major>.<minor>.<patch>`, which leaves the date as the first identifier that can
+differ.
+
 ### Channels cannot cross
 
 The channel is baked into the main bundle by `vite.main.config.mts` from

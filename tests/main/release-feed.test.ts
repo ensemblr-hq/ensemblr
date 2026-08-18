@@ -181,7 +181,7 @@ describe('createReleaseFeed — version comparison', () => {
 		const { fetchImpl } = stubFetch({
 			[RELEASES_URL]: { body: [release('nightly')] },
 			[`https://github.com/${SLUG}/releases/download/nightly/${UPDATE_FEED_ASSET_NAME}`]:
-				{ body: feedDocument('0.1.0-beta.7-nightly.20260818.gabc1234') },
+				{ body: feedDocument('0.1.0-nightly.20260818.gabc1234') },
 		});
 		const feed = createReleaseFeed({ fetchImpl, repositorySlug: SLUG });
 
@@ -189,6 +189,29 @@ describe('createReleaseFeed — version comparison', () => {
 
 		expect(result).toMatchObject({ status: 'ok' });
 		expect(result).not.toEqual({ candidate: null, status: 'ok' });
+	});
+
+	// The base in `nightly.yml` is stripped to `<major>.<minor>.<patch>` for
+	// exactly this: keeping the `-beta.N` tail would put `9-nightly` and
+	// `10-nightly` in the same identifier slot, where semver compares them as
+	// strings and the newer build loses.
+	test('one nightly outranks the last across a beta bump of the base', async () => {
+		const { fetchImpl } = stubFetch({
+			[RELEASES_URL]: { body: [release('nightly')] },
+			[`https://github.com/${SLUG}/releases/download/nightly/${UPDATE_FEED_ASSET_NAME}`]:
+				{ body: feedDocument('0.1.0-nightly.20260902.gbbbbbbb') },
+		});
+		const feed = createReleaseFeed({ fetchImpl, repositorySlug: SLUG });
+
+		const result = await feed.resolve(
+			'canary',
+			'0.1.0-nightly.20260901.gaaaaaaa',
+		);
+
+		expect(result).toMatchObject({
+			candidate: { version: '0.1.0-nightly.20260902.gbbbbbbb' },
+			status: 'ok',
+		});
 	});
 
 	test('a build whose own version is not semver refuses rather than guessing', async () => {
@@ -243,6 +266,20 @@ describe('createReleaseFeed — failures and caching', () => {
 			[`https://github.com/${SLUG}/releases/download/v0.2.0/${UPDATE_FEED_ASSET_NAME}`]:
 				{ body: { name: 'latest', url: 'https://example.com/a.zip' } },
 		});
+		const feed = createReleaseFeed({ fetchImpl, repositorySlug: SLUG });
+
+		expect(await feed.resolve('release', '0.1.0')).toMatchObject({
+			failure: { code: 'update-feed-malformed' },
+			status: 'error',
+		});
+	});
+
+	test('a feed document larger than a feed document can be is malformed', async () => {
+		const oversized = 'x'.repeat(64 * 1024 + 1);
+		const fetchImpl = (async (url: string | URL) =>
+			String(url) === RELEASES_URL
+				? new Response(JSON.stringify([release('v0.2.0')]))
+				: new Response(oversized)) as unknown as typeof fetch;
 		const feed = createReleaseFeed({ fetchImpl, repositorySlug: SLUG });
 
 		expect(await feed.resolve('release', '0.1.0')).toMatchObject({

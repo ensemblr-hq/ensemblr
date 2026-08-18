@@ -141,6 +141,23 @@ export function createUpdateService(
 		return snapshot;
 	};
 
+	/**
+	 * Wraps a Squirrel callback so it is dropped once the user has switched
+	 * updates off. A download armed before the switch keeps running inside
+	 * Squirrel and reports back afterwards, and letting that reach the snapshot
+	 * would resurrect the offer `settingsChanged` just retracted — leaving a
+	 * restart prompt whose button `install` then refuses.
+	 * @param react - What the service does with the event while updates are on
+	 * @returns The guarded handler
+	 */
+	const whileEnabled =
+		<Args extends unknown[]>(react: (...args: Args) => void) =>
+		(...args: Args): void => {
+			if (options.isEnabled()) {
+				react(...args);
+			}
+		};
+
 	/** Stops the periodic check — nothing further to find, or nothing allowed. */
 	const stopSchedule = (): void => {
 		if (initialTimer) {
@@ -217,10 +234,6 @@ export function createUpdateService(
 	};
 
 	/**
-	 * Registers the Squirrel listeners and starts the schedule. A build that can
-	 * never update broadcasts its reason once and schedules nothing.
-	 */
-	/**
 	 * Arms the delayed first check and the interval after it. Separate from
 	 * `start` because turning updates back on resumes the schedule without
 	 * re-registering the Squirrel listeners.
@@ -247,11 +260,11 @@ export function createUpdateService(
 			return;
 		}
 		options.onUpdaterEvent({
-			onDownloaded: () => {
+			onDownloaded: whileEnabled(() => {
 				stopSchedule();
 				advance({ failure: null, state: 'ready' });
-			},
-			onError: (error) => {
+			}),
+			onError: whileEnabled((error: Error) => {
 				advance({
 					failure: {
 						code: 'update-download-failed',
@@ -259,10 +272,10 @@ export function createUpdateService(
 					},
 					state: 'error',
 				});
-			},
-			onNotAvailable: () => {
+			}),
+			onNotAvailable: whileEnabled(() => {
 				advance({ availableVersion: null, notes: null, state: 'idle' });
-			},
+			}),
 		});
 		if (options.isEnabled()) {
 			startSchedule();

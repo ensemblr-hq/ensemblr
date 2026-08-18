@@ -818,7 +818,7 @@ export const APP_FAILURE_TEXT: Record<
 	'update-not-in-applications': (t) =>
 		t(
 			'errors:failure.update-not-in-applications',
-			'Ensemblr updates itself only from the Applications folder. Move it there, then check again.',
+			'Ensemblr updates itself only from the Applications folder. Move it there and reopen it.',
 		),
 	'update-unsupported-build': (t) =>
 		t(

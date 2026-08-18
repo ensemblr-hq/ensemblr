@@ -194,8 +194,15 @@ release whose assets are replaced each run (`Ensemblr-Canary-arm64.dmg`,
 `Ensemblr-Canary-darwin-arm64.zip`). It is change-gated: a cheap Linux job
 compares `master` against the commit the `nightly` tag already points at and
 skips the build entirely when they match, so a quiet week republishes nothing.
-The version is stamped as `<version>-nightly.<YYYYMMDD>.g<short-sha>` into the
-build (never committed), so the About box names the commit.
+The version is stamped as `<major>.<minor>.<patch>-nightly.<YYYYMMDD>.g<short-sha>`
+into the build (never committed), so the About box names the commit.
+
+**The base contributes no prerelease tail of its own**, even while
+`package.json` sits on `-beta.N`. The in-app updater orders one nightly against
+the next with `semver.gt`, and a retained tail makes `9-nightly` and
+`10-nightly` adjacent *string* identifiers — the newer build would compare
+lower and every canary install would report "up to date" for good. Stripped,
+the date is the first identifier that can differ, and dates order numerically.
 
 **It runs on a cron at `0 4 * * *` UTC, and on demand.** A scheduled run always
 publishes. A manual `workflow_dispatch` defaults its `publish` input to

@@ -139,7 +139,7 @@ describe('SoftwareUpdateRows', () => {
 
 		expect(
 			screen.getByText(
-				'Ensemblr updates itself only from the Applications folder. Move it there, then check again.',
+				'Ensemblr updates itself only from the Applications folder. Move it there and reopen it.',
 			),
 		).toBeInTheDocument();
 		expect(screen.queryByText(/update-not-in-applications/)).toBeNull();
@@ -157,6 +157,20 @@ describe('SoftwareUpdateRows', () => {
 		);
 
 		expect(screen.getByRole('button')).toBeDisabled();
+	});
+
+	test('the preference stays settable on a build that can never update', () => {
+		renderRow(
+			snapshot({
+				failure: {
+					code: 'update-unsupported-build',
+					message: 'A development build updates by rebuilding it.',
+				},
+				state: 'unsupported',
+			}),
+		);
+
+		expect(screen.getByRole('switch')).toBeEnabled();
 	});
 
 	test('the check button calls through to the updater', async () => {
