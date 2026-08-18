@@ -78,6 +78,7 @@ export default defineConfig({
 			'tests/main/workspace-scripts-handler.test.ts',
 			'tests/main/workspace-files-watcher.test.ts',
 			'tests/main/agent-activity-monitor.test.ts',
+			'tests/main/active-chat-store.test.ts',
 			'tests/main/notification-target.test.ts',
 			'tests/main/notification-strings.test.ts',
 			'tests/main/notification-retention.test.ts',

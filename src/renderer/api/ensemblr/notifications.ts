@@ -1,5 +1,6 @@
 import type {
 	ActiveChatContext,
+	ChatTurnFinishedBroadcast,
 	FocusChatBroadcast,
 } from '@/shared/ipc/contracts/notifications';
 
@@ -29,6 +30,24 @@ export function subscribeFocusChatRequests(
 		return () => undefined;
 	}
 	return api.onFocusChatRequested(listener);
+}
+
+/**
+ * Subscribes to finished top-level turns, which is what the unread list is
+ * marked from. Main has already dropped a sub-agent's chat and a turn the user
+ * stopped — neither is visible from the renderer's session-event stream.
+ * Returns an unsubscribe fn.
+ * @param listener - Receives the chat that finished.
+ * @returns The unsubscribe function.
+ */
+export function subscribeChatTurnFinished(
+	listener: (payload: ChatTurnFinishedBroadcast) => void,
+): () => void {
+	const api = getEnsemblrApiOrNull();
+	if (!api) {
+		return () => undefined;
+	}
+	return api.onChatTurnFinished(listener);
 }
 
 /**

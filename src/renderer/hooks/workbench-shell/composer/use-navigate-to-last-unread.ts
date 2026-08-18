@@ -48,9 +48,14 @@ async function resolveChatTabId(
  * it comes back empty — the tab was closed since — the workspace still opens, on
  * its own preferred chat.
  *
- * Both dead ends drop the mark rather than leaving it. Only opening the chat
- * itself clears one otherwise, so a mark whose tab or workspace is gone would
- * pin the jump control open forever on something the user cannot reach.
+ * Once the workbench layout is in hand the mark is dropped whatever follows,
+ * because clicking the control *is* the gesture that says the chat has been
+ * read. Leaving it to the arriving chat to clear itself covers neither dead end
+ * — a tab or workspace that is gone is never arrived at — nor the case where the
+ * marked chat is the routed one already, where the navigation is a no-op and
+ * nothing downstream re-runs. Without a layout there is no jump control to have
+ * clicked, so that one path leaves the mark alone rather than retiring one on a
+ * gesture the user never made.
  * @returns A callback taking the chat to jump to.
  */
 export function useNavigateToLastUnread(): (
@@ -77,8 +82,8 @@ export function useNavigateToLastUnread(): (
 
 			const chatId =
 				target.chatTabId ?? (await resolveChatTabId(queryClient, target));
+			clearChat(target);
 			if (!chatId) {
-				clearChat(target);
 				layoutModel.navigateToWorkspace(
 					selection.project.id,
 					selection.workspace.id,

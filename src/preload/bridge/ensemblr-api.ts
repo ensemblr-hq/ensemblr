@@ -22,7 +22,10 @@ import type { EnsemblrApi } from '../../shared/ipc/contracts/api';
 import type { AppSettingsChangedBroadcast } from '../../shared/ipc/contracts/app-settings';
 import type { CloneGithubRepositoryProgressEvent } from '../../shared/ipc/contracts/clone';
 import type { ConfigChangedBroadcast } from '../../shared/ipc/contracts/health';
-import type { FocusChatBroadcast } from '../../shared/ipc/contracts/notifications';
+import type {
+	ChatTurnFinishedBroadcast,
+	FocusChatBroadcast,
+} from '../../shared/ipc/contracts/notifications';
 import type {
 	TerminalLifecycleBroadcast,
 	TerminalOutputBroadcast,
@@ -307,6 +310,11 @@ export function createEnsemblrApi(): EnsemblrApi {
 		reportActiveChat: (context) => invoke('reportActiveChat', context),
 		onFocusChatRequested: (listener) =>
 			subscribe<FocusChatBroadcast>(IPC_CHANNELS.focusChatRequested, listener),
+		onChatTurnFinished: (listener) =>
+			subscribe<ChatTurnFinishedBroadcast>(
+				IPC_CHANNELS.chatTurnFinished,
+				listener,
+			),
 		onNotificationSoundRequested: (listener) =>
 			subscribe<void>(IPC_CHANNELS.notificationSoundRequested, listener),
 		onAgentSessionEvent: (listener) =>

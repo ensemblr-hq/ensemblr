@@ -63,6 +63,7 @@ import { ActiveChatStore } from './agent-runtime/active-chat-store';
 import { createAgentActivityMonitor } from './agent-runtime/agent-activity-monitor';
 import { createAgentSessionService } from './agent-runtime/agent-session-service';
 import {
+	electronAnnounceTurnFinished,
 	electronIsAppFocused,
 	electronNotify,
 	electronPowerControls,
@@ -308,10 +309,10 @@ const activeChatStore = new ActiveChatStore();
 // Drives the caffeinate power-blocker + "agent finished" desktop notifications,
 // gated live by the General settings in config.json.
 const agentActivityMonitor = createAgentActivityMonitor({
+	announceTurnFinished: electronAnnounceTurnFinished,
 	isAppFocused: electronIsAppFocused,
 	/** Reports whether the user is looking at exactly this chat right now. */
-	isChatOnScreen: (workspaceId, agentSessionId) =>
-		activeChatStore.isOnScreen(workspaceId, agentSessionId),
+	isChatOnScreen: (chat) => activeChatStore.isOnScreen(chat),
 	notify: electronNotify,
 	powerControls: electronPowerControls,
 	readBattery: readMacosBattery,

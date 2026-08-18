@@ -1,8 +1,7 @@
 import { useAtomValue, useStore } from 'jotai';
 import { useEffect, useRef } from 'react';
 
-import { subscribeAgentSessionEvents } from '@/renderer/api/ensemblr';
-import { isFinishedTurnEvent } from '@/renderer/hooks/workbench-shell/route-layout/detect-pull-request-creation';
+import { subscribeChatTurnFinished } from '@/renderer/api/ensemblr';
 import { pendingAskUserQuestionsAtom } from '@/renderer/state/ask-user-question';
 import {
 	type ActiveChatIdentity,
@@ -12,9 +11,9 @@ import {
 import { useWorkspaceBoardActions } from '@/renderer/state/workspace';
 import type { AskUserQuestionBroadcast } from '@/shared/agent-control';
 
-/** Reads an event's ISO timestamp, falling back to now when it is unparseable. */
-function toTimestamp(createdAt: string): number {
-	const parsed = Date.parse(createdAt);
+/** Reads a broadcast's ISO timestamp, falling back to now when unparseable. */
+function toTimestamp(finishedAt: string): number {
+	const parsed = Date.parse(finishedAt);
 	return Number.isNaN(parsed) ? Date.now() : parsed;
 }
 
@@ -50,6 +49,15 @@ function pruneAnsweredQuestions(
  * looking at is never marked, and viewing a chat is what clears it — see
  * `usePublishActiveChat`.
  *
+ * Finished turns arrive already judged worth the user's attention, from the
+ * same main-process decision the desktop notifier hangs off. Deriving them here
+ * from the raw session-event stream instead would re-mark what that decision
+ * refuses: a sub-agent's chat, whose completion is its orchestrator's business,
+ * and the `idle` that trails a stop the user asked for. Neither is visible from
+ * a persisted event. Questionnaires stay local, because whether one still wants
+ * the user is renderer state — a question seen and left unanswered re-arms, and
+ * main has no way to know it was seen.
+ *
  * One global subscription (not one per row) covers every workspace, so a
  * background agent surfaces the moment it goes idle even from the welcome
  * screen. The subscription reads the chat on screen out of the store at event
@@ -73,24 +81,20 @@ export function useAutoMarkUnread(activeWorkspaceId: string | null): void {
 	const markedQuestionsRef = useRef(new Set<string>());
 
 	useEffect(() => {
-		const unsubscribe = subscribeAgentSessionEvents((broadcast) => {
-			const envelope = broadcast.event.payload;
-			if (!envelope || !isFinishedTurnEvent(envelope)) {
-				return;
-			}
+		const unsubscribe = subscribeChatTurnFinished((broadcast) => {
 			if (
 				isOnScreen(
 					store.get(activeChatIdentityAtom),
 					broadcast.workspaceId,
-					broadcast.sessionId,
+					broadcast.agentSessionId,
 				)
 			) {
 				return;
 			}
 			markChat({
-				agentSessionId: broadcast.sessionId,
-				chatTabId: null,
-				lastMessageAt: toTimestamp(broadcast.event.createdAt),
+				agentSessionId: broadcast.agentSessionId,
+				chatTabId: broadcast.chatTabId,
+				lastMessageAt: toTimestamp(broadcast.finishedAt),
 				reason: 'turn-finished',
 				workspaceId: broadcast.workspaceId,
 			});
