@@ -1,7 +1,7 @@
 {
 	"name": "ensemblr",
 	"productName": "Ensemblr",
-	"version": "0.1.0-beta.6",
+	"version": "0.1.0-beta.7",
 	"description": "A macOS workbench for isolated, multi-agent coding workflows.",
 	"homepage": "https://www.ensemblr.dev",
 	"repository": {

@@ -1,13 +1,16 @@
 name: Nightly
 
-# No `schedule:` yet, deliberately. ensemblr.dev's getLatestRelease() takes the
-# first non-draft entry from /releases — prereleases included — so the first
-# published nightly would become the advertised download and redden the site's
-# daily pin cron. THE-195 teaches the site to skip the reserved `nightly` tag;
-# the cron block lands once it ships. Until then this is dispatch-only, and
-# `publish` defaults to false so the whole signing path can be exercised
-# without touching the release list.
+# A scheduled run always publishes; a manual one defaults `publish` to false, so
+# the whole signing path stays exercisable without touching the release list.
+# Building is change-gated below, so a quiet night costs one Linux job.
+#
+# 04:00 UTC puts a finished build in the release list before the working day in
+# Europe. A published nightly outranks the newest `v<semver>` in /releases, so
+# ensemblr.dev pins its two download links explicitly rather than reading
+# whichever entry is newest.
 on:
+  schedule:
+    - cron: "0 4 * * *"
   workflow_dispatch:
     inputs:
       publish:

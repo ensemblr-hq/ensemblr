@@ -10,6 +10,14 @@ Amends [ADR 0032](0032-channel-scoped-bundle-identity.md), whose per-channel
 bundle id and product name stand. Only its claim that each channel is "a distinct
 app at runtime" changes: identity stays per-channel, state no longer does.
 
+**Updated 2026-08-18.** `nightly.yml` now carries `schedule: 0 4 * * *`, so the
+paragraph below on staying dispatch-only is historical. The ordering dependency
+it named is gone rather than satisfied: THE-195 was dropped, and ensemblr.dev now
+pins two download links — the newest `v<semver>` and the rolling `nightly` — by
+hand, re-pinned per release by an agent in that repository. A site that names
+both tags explicitly cannot be hijacked by whichever release happens to be
+newest, which is what the reserved-tag filter existed to prevent.
+
 ## Context
 
 Six releases (`v0.1.0-beta.1` … `v0.1.0-beta.6`) were cut by hand — `npm run
@@ -108,9 +116,9 @@ keeps its isolated `Ensemblr (DEV)` state.
 
 - Cutting a release is one command and no laptop. A packaging break surfaces on
   `master` rather than at ship time, because the nightly builds the same way.
-- **A nightly cannot publish from this repository until THE-195 lands.** That is
-  a deliberate ordering dependency, enforced by the absent `schedule:` block
-  rather than by remembering.
+- **The nightly outranks every release in `/releases`**, because it is the most
+  recently published entry every night. Anything downstream reading "the newest
+  release" gets it, so ensemblr.dev pins both tags by name instead (see Status).
 - Six repository secrets are now required. Until they exist, both workflows fail
   at their first step naming the missing ones.
 - The release job holds a Developer ID private key. The keychain is created per
