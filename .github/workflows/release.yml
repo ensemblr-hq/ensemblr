@@ -1,0 +1,151 @@
+name: Release
+
+# Cutting a release stays what it has always been: write the notes and run
+# `gh release create vX.Y.Z --notes-file …`. That fires `published`, and this
+# workflow builds the signed, notarized artifacts and attaches them. Pushing a
+# bare tag deliberately does nothing — there would be no notes to attach to.
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing tag to rebuild, e.g. v0.1.0-beta.6
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.event.release.tag_name || inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  # On `release: published` this checks out the tag, because that event sets
+  # github.ref to it. A manual dispatch checks out the branch it was dispatched
+  # from instead — the escape-hatch path verifies the branch, not the tag.
+  verify:
+    # `pull-requests: write` is what checks.yml's `scan` job declares, and a
+    # called workflow's job permissions are validated statically — a job skipped
+    # by `if:` is validated too, so `run_scan: false` does not excuse the scope.
+    # Granted here rather than at workflow level so `build` never holds it.
+    permissions:
+      contents: read
+      pull-requests: write
+    uses: ./.github/workflows/checks.yml
+    with:
+      run_scan: false
+
+  build:
+    needs: verify
+    # Pinned rather than macos-latest: an image bump must not silently change the
+    # signing and notarization toolchain under a release.
+    runs-on: macos-15
+    # Notarization is a round trip to Apple and routinely takes several minutes
+    # per artifact.
+    timeout-minutes: 60
+    env:
+      TAG: ${{ github.event.release.tag_name || inputs.tag }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.release.tag_name || inputs.tag }}
+
+      - name: Check the release exists and is published
+        run: |
+          set -uo pipefail
+          state=$(gh release view "$TAG" --json isDraft -q .isDraft 2>/dev/null || echo missing)
+          case "$state" in
+            false) ;;
+            true)
+              echo "::error::Release $TAG is still a draft. Publish it, then re-run."
+              exit 1 ;;
+            *)
+              echo "::error::No GitHub Release for $TAG. Cut one with notes first: gh release create $TAG --notes-file NOTES.md"
+              exit 1 ;;
+          esac
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+
+      - name: Check package.json matches the tag
+        run: |
+          set -euo pipefail
+          declared=$(node -p "require('./package.json').version")
+          if [ "$declared" != "${TAG#v}" ]; then
+            echo "::error::package.json version ($declared) does not match tag $TAG."
+            exit 1
+          fi
+
+      - uses: ./.github/actions/apple-signing
+        with:
+          certificate-p12: ${{ secrets.APPLE_CERT_P12 }}
+          certificate-password: ${{ secrets.APPLE_CERT_PASSWORD }}
+          keychain-password: ${{ secrets.KEYCHAIN_PASSWORD }}
+          api-key-p8: ${{ secrets.APPLE_API_KEY_P8 }}
+          api-key-id: ${{ secrets.APPLE_API_KEY_ID }}
+          api-issuer: ${{ secrets.APPLE_API_ISSUER }}
+
+      - name: Build the signed, notarized distributables
+        env:
+          ENSEMBLR_REQUIRE_SIGN: "1"
+        run: npm run make
+
+      - name: Verify every artifact is signed, notarized and stapled
+        run: npm run verify:signing
+
+      - name: Attach the distributables to the release
+        run: |
+          set -euo pipefail
+          find out/make -type f \( -name '*.dmg' -o -name '*.zip' \) \
+            > "$RUNNER_TEMP/assets.txt"
+          tr '\n' '\0' < "$RUNNER_TEMP/assets.txt" \
+            | xargs -0 gh release upload "$TAG" --clobber
+
+      - name: Set the prerelease flag from the tag
+        run: |
+          set -euo pipefail
+          case "$TAG" in
+            *-alpha*|*-beta*|*-rc*) gh release edit "$TAG" --prerelease --latest=false ;;
+            *) gh release edit "$TAG" --prerelease=false --latest ;;
+          esac
+
+      # The README's version line and .dmg link stay hand-edited; the exact asset
+      # name is only known once make has run, so print it rather than guess.
+      - name: Summarise the manual README edit
+        run: |
+          set -euo pipefail
+          version="${TAG#v}"
+          dmg=$(basename "$(grep '\.dmg$' "$RUNNER_TEMP/assets.txt" | head -1)")
+          base="https://github.com/${GITHUB_REPOSITORY}/releases"
+          {
+            echo "### Published \`$TAG\`"
+            echo
+            echo "Attached:"
+            while IFS= read -r asset; do echo "- \`$(basename "$asset")\`"; done \
+              < "$RUNNER_TEMP/assets.txt"
+            echo
+            echo "README still needs these two lines by hand:"
+            echo
+            echo '```markdown'
+            echo "- **Version:** [\`$version\`]($base/tag/$TAG) (pre-1.0, polish stage)"
+            echo "**[Download Ensemblr $version (.dmg, Apple silicon)]($base/download/$TAG/$dmg)** — open it and drag Ensemblr to Applications."
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Remove signing material
+        if: always()
+        run: |
+          set -uo pipefail
+          if [ -n "${ENSEMBLR_SIGNING_KEYCHAIN:-}" ]; then
+            security delete-keychain "$ENSEMBLR_SIGNING_KEYCHAIN" || true
+          fi
+          if [ -n "${APPLE_API_KEY_PATH:-}" ]; then
+            rm -f "$APPLE_API_KEY_PATH"
+          fi

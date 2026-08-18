@@ -11,6 +11,12 @@ Extends [0031](0031-strip-launch-context-env-and-single-instance-lock.md)
 env-inheritance and direct-exec relaunch paths but left the underlying
 bundle-id collision open.
 
+Amended by [0054](0054-build-releases-in-ci-and-reserve-the-nightly-tag.md)
+(2026-08-17). The per-channel bundle id and product name below stand; the claim
+that each channel is a distinct app *at runtime* does not. Every packaged
+channel now shares the release's `userData`, and therefore one single-instance
+lock — identity stays per-channel, state no longer does.
+
 ## Context
 
 After 0031 shipped, the packaged app still flashed a stray Ensemblr Dock tile

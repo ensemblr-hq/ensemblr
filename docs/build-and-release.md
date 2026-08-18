@@ -23,10 +23,11 @@ Signing entitlements are in `entitlements.plist` (hardened runtime).
 ## Commands
 
 ```bash
-npm run dev          # run the app in development (electron-forge start)
+npm run dev            # run the app in development (electron-forge start)
 
-npm run package      # build an unpacked .app under out/ (arm64)
-npm run make         # build distributables (.dmg + .zip) under out/make/
+npm run package        # build an unpacked .app under out/ (arm64)
+npm run make           # build distributables (.dmg + .zip) under out/make/
+npm run verify:signing # assert what make just produced is signed and notarized
 ```
 
 `npm run build` is an alias for `npm run package`. All three of `build`,
@@ -46,7 +47,8 @@ wrap them with environment variables:
 
 ¹ Signed and notarized **only** when the Apple credentials above are present and
 `ENSEMBLR_SKIP_SIGN` is not set; otherwise the same command produces an
-unsigned build instead of failing.
+unsigned build instead of failing — set `ENSEMBLR_REQUIRE_SIGN=1` to turn that
+into an error (see below).
 
 ## Signing & notarization
 
@@ -55,14 +57,48 @@ all three Apple credentials are present and signing was not skipped. When it is:
 
 - The packager signs each file with the `entitlements.plist` entitlements and a
   hardened runtime, then notarizes the `.app` (`osxSign` / `osxNotarize`).
-- A `postMake` hook notarizes and staples **each `.dmg`** separately (via
-  `xcrun notarytool submit --wait` + `xcrun stapler staple`), because the DMG
+- A `postMake` hook signs, notarizes and staples **each `.dmg`** separately
+  (`codesign --sign "$APPLE_SIGNING_IDENTITY" --timestamp`, then
+  `xcrun notarytool submit --wait` and `xcrun stapler staple`), because the DMG
   container is an artifact Apple never saw during packaging. Stapling lets
   Gatekeeper validate the disk image offline on first open.
+
+  **The `codesign` step is load-bearing and was missing until `v0.1.0-beta.6`.**
+  Stapling a ticket to an *unsigned* disk image leaves Gatekeeper nothing to
+  assess: `spctl` reports `no usable signature` on every assessment type no
+  matter how many times the image is notarized, and `stapler validate` passes
+  anyway, so the gap is invisible without an explicit check. Signed first, the
+  same image reports `accepted / source=Notarized Developer ID`.
+
+  `APPLE_SIGNING_IDENTITY` defaults to the prefix `Developer ID Application`,
+  which `codesign` resolves by name as long as the keychain holds exactly one
+  such certificate. Set it explicitly on a machine holding several.
 
 Set **`ENSEMBLR_SKIP_SIGN=1`** to force an unsigned, un-notarized build even when
 credentials are present — useful for fast local iteration that skips the
 signing/notarization cost.
+
+Set **`ENSEMBLR_REQUIRE_SIGN=1`** for the opposite: a build that is only worth
+producing signed. The gate above fails *open* — a missing credential yields an
+unsigned `.app` and exit code 0 — so a release that would ship unsigned is
+otherwise indistinguishable from one that would not until someone runs
+Gatekeeper against it. With this set, `forge.config.ts` throws before packaging
+and names the prerequisite it lacked. Both CI workflows set it.
+
+**`npm run verify:signing`** (`scripts/verify-signed-artifacts.mjs`) is the
+matching check on the artifacts themselves: it walks `out/` and asserts every
+`.app` carries a *Developer ID Application* signature (not an ad-hoc one),
+passes `spctl`, and has a stapled ticket — and the same for each `.dmg`. Each
+`.zip` is extracted with `ditto` and the `.app` inside it checked the same way,
+rather than assuming the zip maker captured the bundle already verified under
+`out/`. An empty `out/` fails, so a skipped build never reads as a pass. Run it
+after `npm run make`; both workflows run it before publishing anything.
+
+The `codesign` authority assertion is the load-bearing one, and it is applied to
+the `.dmg` as well as the `.app` on purpose: `stapler validate` passes on an
+unsigned image (see above) and `spctl --assess` exits 0 on *anything* once
+Gatekeeper assessments are disabled, so neither can be the only check standing
+between a broken container and a release.
 
 The app is additionally hardened via Electron Fuses (run-as-node disabled, cookie
 encryption on, ASAR integrity validation, load-only-from-ASAR).
@@ -85,6 +121,19 @@ creation — see [ADR 0032](./adr/0032-channel-scoped-bundle-identity.md) (and
 [ADR 0031](./adr/0031-strip-launch-context-env-and-single-instance-lock.md) for
 the env-strip + single-instance lock that closed the other path).
 
+**A packaged dogfood channel is the same install wearing a different name.** The
+identity is per-channel; the *state* is not. All three read one SQLite database
+(`~/Library/Application Support/dev.ensemblr.app/ensemblr.db`, keyed on the
+bundle id constant rather than the product name) and one
+`~/.config/ensemblr/config.json`, and `src/main/main.ts` pins Electron's
+`userData` to the release's directory for every packaged build so the
+localStorage-backed recents, workspace selection and per-repo overrides come
+along too. That also puts the channels behind one single-instance lock, which is
+the correct reading given they share a database file — launching Canary while
+Ensemblr is running folds into the running instance rather than opening a second
+writer. The unpackaged `electron-forge start` build is the exception and keeps
+its isolated `Ensemblr (DEV)` state.
+
 ## Outputs
 
 `npm run make` writes to `out/make/`:
@@ -93,6 +142,84 @@ the env-strip + single-instance lock that closed the other path).
 - **`.zip`** — a zipped `.app` for auto-update / direct download.
 
 `npm run package` writes the unpacked `.app` to `out/`.
+
+## Releasing
+
+Releases are built by GitHub Actions on a `macos-15` runner, not on a laptop.
+The local `npm run make` route above stays the escape hatch when CI is down or
+you need to bisect a packaging break.
+
+### Cutting a release
+
+**Write the notes and create the release. That is the whole ritual.**
+
+```bash
+gh release create v0.1.0-beta.7 --notes-file NOTES.md --prerelease
+```
+
+That creates the tag and fires `release: published`, which triggers
+[`.github/workflows/release.yml`](../.github/workflows/release.yml): it runs the
+full `checks.yml` suite, builds, signs, notarizes, verifies, then attaches the
+`.dmg` and `.zip` to the release you just made and corrects the prerelease flag
+from the tag (`-alpha` / `-beta` / `-rc` → prerelease, anything else → latest).
+
+**Pushing a bare `vX.Y.Z` tag does nothing on purpose** — there would be no notes
+to attach to, and the six existing releases are hand-written prose that
+`--generate-notes` would only degrade. If a tag exists but the build needs
+re-running, dispatch the workflow manually with that tag as its input.
+
+The workflow refuses to build when `package.json`'s `version` does not match the
+tag with `v` stripped, or when the release is still a draft.
+
+The README's version line and `.dmg` download URL stay hand-edited; the job
+prints the exact two replacement lines to its run summary. The marketing site is
+a separate path — see THE-195.
+
+### Nightly
+
+[`.github/workflows/nightly.yml`](../.github/workflows/nightly.yml) builds
+`master` on the **canary** channel and publishes it to a rolling `nightly`
+release whose assets are replaced each run (`Ensemblr-Canary-arm64.dmg`,
+`Ensemblr-Canary-darwin-arm64.zip`). It is change-gated: a cheap Linux job
+compares `master` against the commit the `nightly` tag already points at and
+skips the build entirely when they match, so a quiet week republishes nothing.
+The version is stamped as `<version>-nightly.<YYYYMMDD>.g<short-sha>` into the
+build (never committed), so the About box names the commit.
+
+**It has no `schedule:` trigger yet, deliberately.** ensemblr.dev's
+`getLatestRelease()` takes the first non-draft release including prereleases, so
+the first published nightly would become the advertised download and redden the
+site's daily pin cron. The cron block lands once THE-195 teaches the site to skip
+the reserved `nightly` tag. Until then it is `workflow_dispatch`-only, and its
+`publish` input defaults to **false** so a manual run exercises the entire
+signing and notarization path without touching the release list.
+
+The tag scheme is a cross-repo contract, not an internal detail: `v<semver>` is a
+real release, the literal `nightly` is the nightly, and nothing else publishes.
+See [ADR 0054](./adr/0054-build-releases-in-ci-and-reserve-the-nightly-tag.md).
+
+### Repository secrets
+
+Both workflows import signing material through
+[`.github/actions/apple-signing`](../.github/actions/apple-signing/action.yml),
+which creates a throwaway keychain and writes the App Store Connect key to
+`$RUNNER_TEMP`. Each workflow deletes both in an `if: always()` step, so nothing
+survives the job even on failure. All six must exist or the job fails at its
+first step naming the ones it lacked:
+
+| Secret | Value |
+| --- | --- |
+| `APPLE_API_KEY_P8` | base64 of the App Store Connect `.p8` |
+| `APPLE_API_KEY_ID` | the key id |
+| `APPLE_API_ISSUER` | the issuer id |
+| `APPLE_CERT_P12` | base64 of the Developer ID Application `.p12` |
+| `APPLE_CERT_PASSWORD` | password the `.p12` was exported with |
+| `KEYCHAIN_PASSWORD` | any throwaway string |
+
+`checks.yml` doubles as a `workflow_call` reusable workflow so the release path
+runs the same verification a PR does rather than a copy of it. Callers pass
+`run_scan: false`: react-doctor diffs against `master`, which a release tag
+already is.
 
 ## What ships inside the `.app`
 
@@ -148,6 +275,7 @@ Adding another unbundled or native dependency means updating **both**
 
 ## See also
 
+- [ADR 0054](./adr/0054-build-releases-in-ci-and-reserve-the-nightly-tag.md) — why releases build in CI, the reserved tag namespace, and the shared channel state.
 - [ADR 0031](./adr/0031-strip-launch-context-env-and-single-instance-lock.md), [ADR 0032](./adr/0032-channel-scoped-bundle-identity.md) — the Dock-flash fixes.
 - [ADR 0042](./adr/0042-add-claude-code-as-a-second-first-class-agent-runtime.md) — why the Claude binary is not packaged.
 - [`../.claude/rules/stack.md`](../.claude/rules/stack.md) — the pinned versions, the two `external` packages, and the `legacy-peer-deps` constraint.

@@ -5,10 +5,17 @@ on:
     branches: [master]
   push:
     branches: [master]
+  workflow_call:
+    inputs:
+      run_scan:
+        description: >-
+          Run the react-doctor scan. Callers building a tag pass false — the
+          scan diffs against master, which a release tag already is.
+        type: boolean
+        default: true
 
 permissions:
   contents: read
-  pull-requests: write
 
 jobs:
   # macOS, not ubuntu: `mod` resolves to ⌘ on darwin and Ctrl elsewhere, so the
@@ -35,7 +42,15 @@ jobs:
         run: npm run test
 
   scan:
+    # `inputs` is null on push/pull_request, so those keep running the scan; only
+    # a workflow_call passing false skips it.
+    if: ${{ inputs.run_scan == null || inputs.run_scan }}
     runs-on: ubuntu-latest
+    # Scoped to this job rather than the workflow: a called workflow cannot hold
+    # permissions its caller lacks, and release.yml has no use for pull-requests.
+    permissions:
+      contents: read
+      pull-requests: write
     steps:
       - uses: actions/checkout@v7
         with:
