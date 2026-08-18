@@ -26,13 +26,15 @@ jobs:
   # github.ref to it. A manual dispatch checks out the branch it was dispatched
   # from instead — the escape-hatch path verifies the branch, not the tag.
   verify:
-    # `pull-requests: write` is what checks.yml's `scan` job declares, and a
-    # called workflow's job permissions are validated statically — a job skipped
-    # by `if:` is validated too, so `run_scan: false` does not excuse the scope.
-    # Granted here rather than at workflow level so `build` never holds it.
+    # Mirrors what checks.yml's `scan` job declares, because a called workflow's
+    # job permissions are validated statically — a job skipped by `if:` is
+    # validated too, so `run_scan: false` does not excuse the scope. Granted
+    # here rather than at workflow level so `build`, which holds a Developer ID
+    # private key, never carries them. Keep in step with that job.
     permissions:
       contents: read
       pull-requests: write
+      statuses: write
     uses: ./.github/workflows/checks.yml
     with:
       run_scan: false
