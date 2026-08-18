@@ -9,12 +9,10 @@ import {
 	githubRepositoryListQuery,
 	isEnsemblrApiAvailable,
 } from '@/renderer/api/ensemblr-queries';
-import { SidebarInset, SidebarTrigger } from '@/renderer/components/ui/sidebar';
+import { SidebarTrigger } from '@/renderer/components/ui/sidebar';
+import { ShellScreen } from '@/renderer/components/workbench-shell/shell-screen';
 import { openLocalProjectFlow } from '@/renderer/lib/workbench/open-local-project-flow';
-import {
-	SHELL_FLOATING_TRIGGER_CLASS,
-	SHELL_INSET_CLASS,
-} from '@/renderer/lib/workbench/shell-inset';
+import { SHELL_FLOATING_TRIGGER_CLASS } from '@/renderer/lib/workbench/shell-inset';
 import {
 	cloneDialogOpenAtom,
 	localProjectImportDialogOpenAtom,
@@ -55,7 +53,7 @@ export function Welcome() {
 	}, [navigate, router, setLastWorkspaceSelection, setLocalProjectImportOpen]);
 
 	return (
-		<SidebarInset className={SHELL_INSET_CLASS}>
+		<ShellScreen className='min-h-0 items-center justify-center px-8 py-10'>
 			{/* Frameless welcome screen has no toolbar; this invisible top strip
 			    gives the window a draggable edge. Interactive children opt out of
 			    dragging via the global no-drag rule in styles/index.css. */}
@@ -64,33 +62,31 @@ export function Welcome() {
 				className='window-drag-region absolute inset-x-0 top-0 z-10 h-12'
 			/>
 			<SidebarTrigger className={SHELL_FLOATING_TRIGGER_CLASS} />
-			<main className='flex min-h-0 flex-1 items-center justify-center px-8 py-10'>
-				<section className='flex flex-col items-center gap-12'>
-					{/* fallow-ignore-next-line css-token-drift -- intentional sub-pixel blur softens the wordmark; no design token exists for it */}
-					<WelcomeWordmark className='blur-[0.046875rem]' />
-					<div className='flex flex-wrap items-center justify-center gap-3'>
-						<WelcomeActionCard
-							disabled={localProjectImportOpen}
-							icon={FolderIcon}
-							label={t('common:welcome.open-project', 'Open project')}
-							onClick={onOpenLocalProject}
-						/>
-						<WelcomeActionCard
-							icon={GlobeIcon}
-							label={t(
-								'common:welcome.open-github-project',
-								'Open GitHub project',
-							)}
-							onClick={() => setCloneOpen(true)}
-						/>
-						<WelcomeActionCard
-							icon={FolderPlusIcon}
-							label={t('common:welcome.quick-start', 'Quick start')}
-							onClick={() => setQuickStartOpen(true)}
-						/>
-					</div>
-				</section>
-			</main>
-		</SidebarInset>
+			<section className='flex flex-col items-center gap-12'>
+				{/* fallow-ignore-next-line css-token-drift -- intentional sub-pixel blur softens the wordmark; no design token exists for it */}
+				<WelcomeWordmark className='blur-[0.046875rem]' />
+				<div className='flex flex-wrap items-center justify-center gap-3'>
+					<WelcomeActionCard
+						disabled={localProjectImportOpen}
+						icon={FolderIcon}
+						label={t('common:welcome.open-project', 'Open project')}
+						onClick={onOpenLocalProject}
+					/>
+					<WelcomeActionCard
+						icon={GlobeIcon}
+						label={t(
+							'common:welcome.open-github-project',
+							'Open GitHub project',
+						)}
+						onClick={() => setCloneOpen(true)}
+					/>
+					<WelcomeActionCard
+						icon={FolderPlusIcon}
+						label={t('common:welcome.quick-start', 'Quick start')}
+						onClick={() => setQuickStartOpen(true)}
+					/>
+				</div>
+			</section>
+		</ShellScreen>
 	);
 }
