@@ -8,7 +8,6 @@ import { forgetLastRunScript } from '@/renderer/state/preferences';
 import {
 	forgetWorkspaceViewedChangesAtom,
 	lastWorkspaceNavigationRenderStateAtom,
-	lastWorkspaceSelectionAtom,
 } from '@/renderer/state/workspace';
 import { deleteLastUsedOpenTarget } from '@/renderer/state/workspace/open-target-history';
 
@@ -16,6 +15,12 @@ import { deleteLastUsedOpenTarget } from '@/renderer/state/workspace/open-target
  * Returns the shared post-removal action for archived or deleted workspaces.
  * It invalidates the workspace list and redirects only when the removed
  * workspace is active.
+ *
+ * The persisted workspace selection is deliberately kept: the index loader
+ * reads a stored pair whose workspace vanished as "open a sibling in that
+ * project, else stay on Welcome", while clearing it downgrades the hop to the
+ * first-launch rule and lands the user in an unrelated project's first
+ * workspace.
  * @param options - Active workspace identity used to choose the route fallback.
  * @returns A callback that removes one workspace from renderer navigation state.
  */
@@ -27,7 +32,6 @@ export function useRemoveWorkspaceAction(options: {
 	const queryClient = useQueryClient();
 	const router = useRouter();
 	const forgetViewedChanges = useSetAtom(forgetWorkspaceViewedChangesAtom);
-	const setLastWorkspaceSelection = useSetAtom(lastWorkspaceSelectionAtom);
 	const setLastNavigationRenderState = useSetAtom(
 		lastWorkspaceNavigationRenderStateAtom,
 	);
@@ -37,25 +41,29 @@ export function useRemoveWorkspaceAction(options: {
 			deleteLastUsedOpenTarget(removedWorkspaceId);
 			forgetLastRunScript(removedWorkspaceId);
 			forgetViewedChanges(removedWorkspaceId);
-			// Both of these name a workspace that no longer exists. The stored pair is
-			// persisted, and the render state is the fallback the shell holds up while
-			// navigation resolves, so leaving either pointing at the removed workspace
-			// keeps resolving a selection the loaders then have to redirect away from.
-			setLastWorkspaceSelection((selection) =>
-				selection?.workspaceId === removedWorkspaceId ? null : selection,
-			);
+			// The shell holds this render state up while navigation resolves, so one
+			// naming the removed workspace renders against a workspace that is gone.
 			setLastNavigationRenderState((renderState) =>
 				renderState?.selection.workspace.id === removedWorkspaceId
 					? null
 					: renderState,
 			);
 
-			if (activeWorkspaceId === removedWorkspaceId) {
+			const hopsToWelcome = activeWorkspaceId === removedWorkspaceId;
+
+			// Hop first: a list refresh landing while the shell still sits on the
+			// removed workspace leaves it selectionless, and the workspace layout
+			// answers that with its own redirect to Welcome — a second navigation.
+			if (hopsToWelcome) {
 				await navigate({ replace: true, to: '/' });
 			}
 
 			await invalidateWorkspaceListViews(queryClient);
-			await router.invalidate();
+
+			// The hop above already re-ran every loader on the destination route.
+			if (!hopsToWelcome) {
+				await router.invalidate();
+			}
 		},
 		[
 			activeWorkspaceId,
@@ -64,7 +72,6 @@ export function useRemoveWorkspaceAction(options: {
 			queryClient,
 			router,
 			setLastNavigationRenderState,
-			setLastWorkspaceSelection,
 		],
 	);
 }
