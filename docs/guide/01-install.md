@@ -7,12 +7,19 @@ build.
 
 ## Download
 
-The current build is **`0.1.0-beta.6`**:
+The current build is **`0.1.0-beta.7`**:
 
-- [**`Ensemblr-0.1.0-beta.6-arm64.dmg`**](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.0-beta.6/Ensemblr-0.1.0-beta.6-arm64.dmg)
+- [**`Ensemblr-0.1.0-beta.7-arm64.dmg`**](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.0-beta.7/Ensemblr-0.1.0-beta.7-arm64.dmg)
   — the disk image. Open it and drag Ensemblr to `/Applications`.
-- [`Ensemblr-darwin-arm64-0.1.0-beta.6.zip`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.0-beta.6/Ensemblr-darwin-arm64-0.1.0-beta.6.zip)
+- [`Ensemblr-darwin-arm64-0.1.0-beta.7.zip`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.0-beta.7/Ensemblr-darwin-arm64-0.1.0-beta.7.zip)
   — the same `.app`, zipped, if you would rather not mount an image.
+
+There is also a **nightly** build of `master` under the rolling
+[`nightly`](https://github.com/ensemblr-hq/ensemblr/releases/tag/nightly) tag —
+[`Ensemblr-Canary-arm64.dmg`](https://github.com/ensemblr-hq/ensemblr/releases/download/nightly/Ensemblr-Canary-arm64.dmg).
+It is signed and notarized the same way, but it is untested: it installs as
+"Ensemblr Canary" **alongside** a release rather than replacing it, and its
+assets are overwritten each night.
 
 Every build is on the Releases page:
 
@@ -24,7 +31,7 @@ hardened runtime, and is notarized by Apple and stapled — both the `.app` and 
 network round-trip and without the right-click dance below. It is a **beta**: pre-1.0,
 with breaking changes expected before 1.0.
 
-The app reports the full version, suffix included — `0.1.0-beta.6` in Settings →
+The app reports the full version, suffix included — `0.1.0-beta.7` in Settings →
 Diagnostics and in the bundle's `CFBundleShortVersionString`. It matches the
 release tag, so a bug report only has to quote one string.
 

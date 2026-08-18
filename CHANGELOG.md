@@ -9,6 +9,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.0-beta.7] - 2026-08-18
+
+Linear stops making you wait for the network, four dialogs stop being able to freeze the app, and
+releases build themselves. Signed, notarized, Apple silicon.
+[Release](https://github.com/ensemblr-hq/ensemblr/releases/tag/v0.1.0-beta.7) ·
+[`.dmg`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.0-beta.7/Ensemblr-0.1.0-beta.7-arm64.dmg)
+
+### Added
+
+- **Nightly builds.** `master` is built on the canary channel every night it has moved and published
+  to a rolling `nightly` tag. It installs as "Ensemblr Canary" alongside a release rather than
+  replacing it, and is signed and notarized the same way.
+- Linear search reaches Linear's own `searchIssues` rather than filtering whichever pages the browse
+  sync happened to have pulled, so a match outside the local pages is still found.
+
+### Changed
+
+- **Linear reads answer from cache.** A stale cache comes back immediately flagged `syncing`, the
+  refresh runs behind it, and only a cold cache waits. A failed sync backs off on Linear's own
+  retry-after; comment threads carry their own freshness; the six metadata kinds sync concurrently
+  instead of costing the sum of all six; GraphQL requests carry a 15s deadline. Adds migration
+  `020_linear_comment_freshness`.
+- **Releases build in CI.** Cutting one is `gh release create` and nothing else — GitHub Actions runs
+  the check suite, builds, signs, notarizes, verifies every artifact is stapled, and attaches the
+  `.dmg` and `.zip`. The DMG is codesigned before notarization; stapling a ticket to an unsigned disk
+  image leaves Gatekeeper nothing to assess, which every earlier beta shipped with.
+- The four archive and delete dialogs share one flow instead of carrying four copies of it, so a fix
+  to one reaches all of them.
+
+### Fixed
+
+- A stalled removal no longer reads as the whole app freezing. The modal close is flushed before the
+  post-removal work runs, so a navigation that stalls cannot hold up an overlay that eats every click.
+- A rejected removal — a denied permission gate, a wedged main process — shows the same diagnostics a
+  reported failure does, instead of a dead "Deleting…" dialog with both buttons unresponsive.
+- Dismissing a removal mid-run and reopening cannot fire a second destructive call over the first.
+- The Linear issue toolbar stays up in every load state instead of vanishing while the issue loads.
+- Archiving a workspace fires one navigation to Welcome, not two.
+- A workspace's linked issue is seeded into one chat rather than every chat in the workspace.
+- Shell screens no longer nest a second `<main>` inside the inset, which put two main landmarks in
+  front of assistive technology.
+
 ## [0.1.0-beta.6] - 2026-08-17
 
 A skill the agent reads instead of guessing from, config files an editor can complete, and a Backlog
