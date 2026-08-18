@@ -124,6 +124,7 @@ test('listIssues: filters by team, query, and archive state', (t) => {
 	store.upsertIssues(ACCOUNT, [
 		createIssue(),
 		createIssue({
+			description: 'Tighten the dock resize handles.',
 			id: 'issue-2',
 			identifier: 'ENG-150',
 			teamId: 'team-2',
@@ -131,6 +132,7 @@ test('listIssues: filters by team, query, and archive state', (t) => {
 		}),
 		createIssue({
 			archivedAt: '2026-06-01T00:00:00.000Z',
+			description: 'Long done.',
 			id: 'issue-3',
 			identifier: 'ENG-101',
 			title: 'Archived issue',
@@ -151,6 +153,12 @@ test('listIssues: filters by team, query, and archive state', (t) => {
 	);
 	assert.deepStrictEqual(
 		store.listIssues({ query: 'ENG-150' }).map((issue) => issue.id),
+		['issue-2'],
+	);
+	// Description too, so the filter agrees with what Linear's own search returns
+	// rather than discarding the rows a search just cached.
+	assert.deepStrictEqual(
+		store.listIssues({ query: 'resize' }).map((issue) => issue.id),
 		['issue-2'],
 	);
 	assert.strictEqual(store.listIssues({ includeArchived: true }).length, 3);
@@ -195,6 +203,27 @@ test('upsertResources: stores metadata by kind and lists team-scoped entries', (
 			.listResources('state', { teamId: 'team-1' })
 			.map((resource) => resource.id),
 		['state-3', 'state-1'],
+	);
+});
+
+test('markCommentsSynced: tracks thread freshness apart from the issue row', (t) => {
+	const { store } = createFixture(t);
+
+	store.upsertIssues(ACCOUNT, [createIssue()]);
+	assert.strictEqual(store.getIssue('issue-1')?.commentsSyncedAt, null);
+
+	store.markCommentsSynced('issue-1');
+	assert.strictEqual(
+		store.getIssue('issue-1')?.commentsSyncedAt,
+		NOW.toISOString(),
+	);
+
+	// Re-upserting the issue is what the list sync and the mutation refresh both
+	// do, and neither of them has read the thread.
+	store.upsertIssues(ACCOUNT, [createIssue({ title: 'Renamed' })]);
+	assert.strictEqual(
+		store.getIssue('issue-1')?.commentsSyncedAt,
+		NOW.toISOString(),
 	);
 });
 

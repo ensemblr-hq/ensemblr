@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import {
 	ArrowLeftIcon,
@@ -12,7 +12,7 @@ import {
 import { type ReactNode, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { linearIssueQuery } from '@/renderer/api/ensemblr';
+import { linearIssueQuery, refreshLinearIssue } from '@/renderer/api/ensemblr';
 import { Button } from '@/renderer/components/ui/button';
 import {
 	DropdownMenu,
@@ -23,6 +23,7 @@ import {
 } from '@/renderer/components/ui/dropdown-menu';
 import { SidebarTrigger } from '@/renderer/components/ui/sidebar';
 import { useWorkbenchLayoutRouteModel } from '@/renderer/components/workbench-shell/shell-contexts';
+import { useLinearRefresh } from '@/renderer/hooks/linear/use-linear-refresh';
 import { useRefreshSpin } from '@/renderer/hooks/linear/use-refresh-spin';
 import { useCopyToClipboard } from '@/renderer/hooks/use-copy-to-clipboard';
 import { useCreateWorkspaceFromProject } from '@/renderer/hooks/workbench-shell/navigation-sidebar/use-project-navigation-actions';
@@ -47,12 +48,12 @@ const COPY_FEEDBACK_MS = 1500;
  */
 export function LinearIssueDetailHeader({ issueId }: { issueId: string }) {
 	const { t } = useTranslation();
-	const {
-		data: result,
-		isFetching,
-		refetch,
-	} = useQuery(linearIssueQuery(issueId));
+	const queryClient = useQueryClient();
+	const { data: result, isFetching } = useQuery(linearIssueQuery(issueId));
 	const issue = result?.status === 'ok' ? result.issue : null;
+	const refresh = useLinearRefresh(() =>
+		refreshLinearIssue(queryClient, issueId, issue?.accountId),
+	);
 
 	return (
 		<header className='native-toolbar flex h-12 shrink-0 items-center gap-2 border-border border-b px-3'>
@@ -67,9 +68,9 @@ export function LinearIssueDetailHeader({ issueId }: { issueId: string }) {
 			</Button>
 			{issue ? (
 				<IssueCommands
-					isRefreshing={isFetching}
+					isRefreshing={isFetching || refresh.active}
 					issue={issue}
-					onRefresh={() => void refetch()}
+					onRefresh={refresh.start}
 				/>
 			) : null}
 		</header>

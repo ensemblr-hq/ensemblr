@@ -7,7 +7,7 @@ import type {
 	ListRepositoryPullRequestsResult,
 } from '@/shared/ipc/contracts/workspace-sources';
 
-import { linearIssuesQuery } from './linear';
+import { linearIssuesQuery, refreshLinearIssues } from './linear';
 import { ensemblrQueryKeys, getEnsemblrApi } from './query-keys';
 
 // Kept generous so reopening the picker (or flipping tabs) reuses cached rows
@@ -100,9 +100,10 @@ export function prefetchBoardIssues(
 }
 
 /**
- * Re-lists every repository's board issues from `gh`, bypassing the SQLite cache.
- * Backs the board toolbar's refresh, which is the only way out of a stale list
- * when `gh` has been failing and the cache has been standing in for it.
+ * Re-lists every repository's board issues from `gh` and Linear, bypassing both
+ * SQLite caches. Backs the board toolbar's refresh, which is the only way out of
+ * a stale list when a source has been failing and the cache has been standing in
+ * for it.
  * @param queryClient - The app's query client.
  * @param repositoryIds - Every repository whose issues the board shows.
  * @returns Resolves once every repository has settled, successfully or not.
@@ -115,7 +116,7 @@ export async function refreshBoardIssues(
 	// state on its own query, and racing the rest to a rejection would drop the
 	// caller's pending flag while the other repositories are still listing.
 	await Promise.allSettled([
-		queryClient.fetchQuery({ ...linearIssuesQuery({}), staleTime: 0 }),
+		refreshLinearIssues(queryClient),
 		...repositoryIds.filter(Boolean).map((repositoryId) =>
 			queryClient.fetchQuery({
 				...repositoryIssuesQuery(repositoryId, true),

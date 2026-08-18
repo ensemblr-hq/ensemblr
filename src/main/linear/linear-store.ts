@@ -14,6 +14,7 @@ export interface LinearIssueRecord {
 	accountId: string;
 	archivedAt: string | null;
 	assigneeId: string | null;
+	commentsSyncedAt: string | null;
 	data: Record<string, unknown>;
 	description: string | null;
 	dueDate: string | null;
@@ -62,10 +63,14 @@ export interface LinearSyncStateRecord {
 	syncedAt: string | null;
 }
 
-/** Upsert payload for {@link LinearStore.upsertIssues}. */
+/**
+ * Upsert payload for {@link LinearStore.upsertIssues}. `commentsSyncedAt` is
+ * absent because no issue write carries a thread: only
+ * {@link LinearStore.markCommentsSynced} moves it.
+ */
 export type LinearIssueUpsert = Omit<
 	LinearIssueRecord,
-	'accountId' | 'syncedAt'
+	'accountId' | 'commentsSyncedAt' | 'syncedAt'
 >;
 /** Upsert payload for {@link LinearStore.upsertResources}. */
 type LinearResourceUpsert = Omit<
@@ -77,7 +82,9 @@ type LinearCommentUpsert = Omit<LinearCommentRecord, 'accountId' | 'syncedAt'>;
 
 /**
  * Filter for {@link LinearStore.listIssues}. Omitting `accountId` reads across
- * every connected account, which is what the merged browse list wants.
+ * every connected account, which is what the merged browse list wants. `query`
+ * matches identifier, title, and description, so it agrees with what Linear's
+ * own `searchIssues` returns rather than discarding the hits it found.
  */
 interface LinearIssueListFilter {
 	accountId?: string;
@@ -111,6 +118,7 @@ export interface LinearStore {
 		kind: LinearResourceKind,
 		filter?: LinearResourceListFilter,
 	) => LinearResourceRecord[];
+	markCommentsSynced: (issueId: string) => void;
 	setSyncState: (state: LinearSyncStateRecord) => void;
 	upsertComments: (
 		accountId: string,
@@ -231,10 +239,12 @@ export function createLinearStore({
 
 			if (filter.query) {
 				clauses.push(
-					"(identifier LIKE ? ESCAPE '\\' OR title LIKE ? ESCAPE '\\')",
+					`(identifier LIKE ? ESCAPE '\\'
+					   OR title LIKE ? ESCAPE '\\'
+					   OR description LIKE ? ESCAPE '\\')`,
 				);
 				const pattern = `%${escapeLikePattern(filter.query)}%`;
-				parameters.push(pattern, pattern);
+				parameters.push(pattern, pattern, pattern);
 			}
 
 			const where = clauses.length > 0 ? `WHERE ${clauses.join(' AND ')}` : '';
@@ -274,6 +284,12 @@ export function createLinearStore({
 				.all(...parameters) as unknown as ResourceRow[];
 
 			return rows.map(mapResourceRow);
+		},
+
+		markCommentsSynced: (issueId) => {
+			database
+				.prepare('UPDATE linear_issues SET comments_synced_at = ? WHERE id = ?')
+				.run(timestamp(), issueId);
 		},
 
 		setSyncState: (state) => {
@@ -409,6 +425,7 @@ interface IssueRow {
 	account_id: string;
 	archived_at: string | null;
 	assignee_id: string | null;
+	comments_synced_at: string | null;
 	data_json: string;
 	description: string | null;
 	due_date: string | null;
@@ -467,6 +484,7 @@ function mapIssueRow(row: IssueRow): LinearIssueRecord {
 		accountId: row.account_id,
 		archivedAt: row.archived_at,
 		assigneeId: row.assignee_id,
+		commentsSyncedAt: row.comments_synced_at,
 		data: parseJsonRecord(row.data_json),
 		description: row.description,
 		dueDate: row.due_date,

@@ -1,13 +1,14 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { ArrowLeftIcon, RefreshCwIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
-import { linearIssueQuery } from '@/renderer/api/ensemblr';
+import { linearIssueQuery, refreshLinearIssue } from '@/renderer/api/ensemblr';
 import { ChatMessageText } from '@/renderer/components/chat-message-text';
 import { Badge } from '@/renderer/components/ui/badge';
 import { Button } from '@/renderer/components/ui/button';
 import { Skeleton } from '@/renderer/components/ui/skeleton';
+import { useLinearRefresh } from '@/renderer/hooks/linear/use-linear-refresh';
 import { describeLinearFailure } from '@/renderer/lib/linear';
 import { formatRelativeTimestamp } from '@/renderer/lib/workbench/relative-time';
 import type { LinearIssueWire } from '@/shared/ipc/contracts/linear';
@@ -25,11 +26,11 @@ import { LinearIssueProperties } from './issue-properties';
  */
 export function LinearIssueDetail({ issueId }: { issueId: string }) {
 	const { t } = useTranslation();
-	const {
-		data: result,
-		isLoading,
-		refetch,
-	} = useQuery(linearIssueQuery(issueId));
+	const queryClient = useQueryClient();
+	const retry = useLinearRefresh(() =>
+		refreshLinearIssue(queryClient, issueId),
+	);
+	const { data: result, isLoading } = useQuery(linearIssueQuery(issueId));
 
 	if (isLoading) {
 		return <IssueDetailSkeleton />;
@@ -53,7 +54,12 @@ export function LinearIssueDetail({ issueId }: { issueId: string }) {
 							{t('linear:issue-detail.back', 'Back to issues')}
 						</Link>
 					</Button>
-					<Button onClick={() => void refetch()} size='sm' variant='outline'>
+					<Button
+						disabled={retry.active}
+						onClick={retry.start}
+						size='sm'
+						variant='outline'
+					>
 						<RefreshCwIcon /> {t('common:actions.retry', 'Retry')}
 					</Button>
 				</div>

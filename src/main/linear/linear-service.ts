@@ -18,6 +18,7 @@ import type {
 	UpdateLinearIssueRequest,
 } from '../../shared/ipc/contracts/linear';
 import type { EnsemblrDatabaseService } from '../storage';
+import { createLinearAccountResolver } from './linear-account-resolution.ts';
 import {
 	type LinearClient,
 	type LinearIssueData,
@@ -28,6 +29,7 @@ import {
 	type LinearResourceKind,
 	type LinearStore,
 } from './linear-store.ts';
+import { createLinearSyncCoordinator } from './linear-sync.ts';
 import {
 	type AccountTarget,
 	accountFailure,
@@ -54,6 +56,20 @@ const METADATA_KINDS: readonly LinearResourceKind[] = [
 	'user',
 ];
 
+/**
+ * A sync scope: the key its freshness is recorded under, and whether that
+ * record belongs in `linear_sync_state`. A search scope's key is the text the
+ * user typed, so it is not durable — the table has no eviction and would
+ * otherwise grow a row for every term anyone ever searched.
+ */
+interface SyncScope {
+	durable: boolean;
+	key: string;
+}
+
+/** The scope each account's metadata sync is recorded under. */
+const METADATA_SCOPE: SyncScope = { durable: true, key: 'metadata' };
+
 /** Public surface of the Linear issue data service. */
 export interface LinearService {
 	createComment: (
@@ -78,6 +94,7 @@ export interface LinearService {
 export interface CreateLinearServiceOptions {
 	clientFactory: (accountId: string) => LinearClient;
 	databaseService: EnsemblrDatabaseService;
+	failureCooldownMs?: number;
 	listAccounts: () => Promise<LinearAccountSnapshot[]>;
 	maxSyncPages?: number;
 	now?: () => Date;
@@ -95,17 +112,29 @@ export interface CreateLinearServiceOptions {
  * blanking it. Writes resolve their account from the entity they name — the
  * cached issue, or the target team's owning account — so callers rarely have to
  * supply one.
+ *
+ * A read never blocks on the network when it has something to show: a stale
+ * cache is served straight away and flagged `syncing` while the refresh runs
+ * behind it. Only a cold cache waits.
  * @param options - Client factory, account lister, database, and freshness tuning.
  * @returns A fresh {@link LinearService}.
  */
 export function createLinearService({
 	clientFactory,
 	databaseService,
+	failureCooldownMs,
 	listAccounts,
 	maxSyncPages = DEFAULT_MAX_SYNC_PAGES,
 	now = () => new Date(),
 	staleAfterMs = DEFAULT_STALE_AFTER_MS,
 }: CreateLinearServiceOptions): LinearService {
+	const { locateIssueAccount, resolveTarget, resolveTargets } =
+		createLinearAccountResolver({ clientFactory, listAccounts });
+	const coordinator = createLinearSyncCoordinator({
+		...(failureCooldownMs === undefined ? {} : { failureCooldownMs }),
+		now,
+		staleAfterMs,
+	});
 	/**
 	 * Open a Linear store bound to the current database connection, throwing when
 	 * the Ensemblr database is not open.
@@ -126,236 +155,62 @@ export function createLinearService({
 	}
 
 	/**
-	 * Resolve the accounts an operation reads from, refusing when Linear has no
-	 * connected account at all or when a named one is unknown.
-	 * @param accountId - Account to narrow to, or undefined to read every account.
-	 * @returns The accounts to operate on, each with its own client.
+	 * The sync scope a browse read belongs to. A search is its own scope because
+	 * it is answered by a different Linear query than the paged list, and caching
+	 * the two under one key would let a narrow search mark the whole list fresh.
+	 * Its key is the search text, which is why it is not durable.
+	 * @param term - Trimmed search text, empty when browsing.
+	 * @param teamId - Team the read is narrowed to, if any.
+	 * @returns The scope this read syncs under.
 	 */
-	async function resolveTargets(accountId?: string): Promise<AccountTarget[]> {
-		const accounts = await listAccounts();
-
-		if (accounts.length === 0) {
-			throw new LinearServiceError(
-				'not-connected',
-				'No Linear account is connected. Connect one in Settings → Integrations.',
-			);
+	function issueScope(term: string, teamId?: string): SyncScope {
+		if (term) {
+			return { durable: false, key: `search:${term}` };
 		}
 
-		const selected = accountId
-			? accounts.filter((account) => account.id === accountId)
-			: accounts;
-
-		if (selected.length === 0) {
-			throw new LinearServiceError(
-				'invalid-request',
-				`No connected Linear account has the id "${accountId}".`,
-			);
-		}
-
-		return selected.map((account) => ({
-			account,
-			client: clientFactory(account.id),
-		}));
+		return { durable: true, key: teamId ? `issues:${teamId}` : 'issues' };
 	}
 
 	/**
-	 * Resolve the single account a write belongs to, in the order ADR 0052 fixes:
-	 * the account named, the account owning the entity, the caller's fallback,
-	 * then the only connected account. The fallback sits *after* the entity so a
-	 * caller-supplied default can never mask an entity that names another account,
-	 * nor pre-empt the refusal an ambiguous identifier is supposed to raise.
-	 * @param options - The named account, the entity lookup, the caller's fallback, and how to describe the entity.
-	 * @returns The resolved account with its client.
+	 * The store a scope records its freshness in, which is none for a transient
+	 * scope.
+	 * @param store - Store backing the current database connection.
+	 * @param scope - Scope being synced.
+	 * @returns The store to persist sync state in, or undefined.
 	 */
-	async function resolveTarget(options: {
-		accountId: string | undefined;
-		describe: string;
-		fallbackAccountId?: string | undefined;
-		locate: () => string | null;
-	}): Promise<AccountTarget> {
-		const { accountId, describe, fallbackAccountId, locate } = options;
-
-		if (accountId) {
-			const [target] = await resolveTargets(accountId);
-
-			if (!target) {
-				throw new LinearServiceError(
-					'invalid-request',
-					`No connected Linear account has the id "${accountId}".`,
-				);
-			}
-
-			return target;
-		}
-
-		const located = locate() ?? fallbackAccountId ?? null;
-
-		if (located) {
-			return resolveTarget({
-				accountId: located,
-				describe,
-				locate: () => null,
-			});
-		}
-
-		const targets = await resolveTargets();
-
-		if (targets.length === 1 && targets[0]) {
-			return targets[0];
-		}
-
-		throw new LinearServiceError(
-			'invalid-request',
-			`${describe} is not in any connected account's cache, so the account could not be resolved. Name an accountId.`,
-		);
-	}
-
-	/**
-	 * Find the account owning an issue, by cached id first and then by identifier
-	 * across accounts. `ENG-1` is unique inside an organization but not between
-	 * two of them, so a match in more than one account is refused rather than
-	 * guessed.
-	 * @param store - Store to search.
-	 * @param accounts - Accounts to consider.
-	 * @param issueId - Issue UUID or human identifier.
-	 * @returns The owning account id, or null when nothing matches.
-	 */
-	function locateIssueAccount(
+	function scopeStore(
 		store: LinearStore,
-		accounts: LinearAccountSnapshot[],
-		issueId: string,
-	): string | null {
-		const cached = store.getIssue(issueId);
-
-		if (cached) {
-			return cached.accountId;
-		}
-
-		const matches = accounts.filter((account) =>
-			store.getIssueByIdentifier(account.id, issueId),
-		);
-
-		if (matches.length > 1) {
-			throw new LinearServiceError(
-				'invalid-request',
-				`"${issueId}" matches an issue in ${matches.length} connected Linear accounts (${matches
-					.map((account) => account.organizationName ?? account.id)
-					.join(', ')}). Name an accountId.`,
-			);
-		}
-
-		return matches[0]?.id ?? null;
+		scope: SyncScope,
+	): LinearStore | undefined {
+		return scope.durable ? store : undefined;
 	}
 
 	/**
-	 * Decide whether a cached timestamp has aged past the staleness window.
-	 * @param syncedAt - ISO timestamp of the last sync, if any.
-	 * @returns True when the value is missing or older than the stale threshold.
-	 */
-	function isStale(syncedAt: string | null | undefined): boolean {
-		if (!syncedAt) {
-			return true;
-		}
-
-		return now().getTime() - Date.parse(syncedAt) > staleAfterMs;
-	}
-
-	/**
-	 * Sync up to `maxSyncPages` of one account's issues into the store, recording
-	 * sync-state transitions and re-throwing on failure.
+	 * Sync up to `maxSyncPages` of one account's issues into the store.
 	 * @param store - Store to upsert issues and sync state into.
 	 * @param target - Account and client to sync.
+	 * @param scope - Sync scope to record the attempt under.
 	 * @param teamId - Optional team to scope the sync to.
 	 */
-	async function syncIssues(
+	function syncIssues(
 		store: LinearStore,
 		target: AccountTarget,
+		scope: SyncScope,
 		teamId?: string,
 	): Promise<void> {
-		const accountId = target.account.id;
-		const scope = teamId ? `issues:${teamId}` : 'issues';
-		let cursor: string | null = null;
-
-		store.setSyncState({
-			accountId,
-			cursor: null,
-			errorCode: null,
-			scope,
-			status: 'syncing',
-			syncedAt: store.getSyncState(accountId, scope)?.syncedAt ?? null,
-		});
-
-		try {
-			for (let page = 0; page < maxSyncPages; page += 1) {
-				const result = await target.client.listIssues({
-					after: cursor,
-					...(teamId ? { teamId } : {}),
-				});
-				store.upsertIssues(accountId, result.nodes.map(issueDataToUpsert));
-				cursor = result.endCursor;
-
-				if (!result.hasNextPage) {
-					break;
-				}
-			}
-
-			store.setSyncState({
-				accountId,
-				cursor,
-				errorCode: null,
-				scope,
-				status: 'idle',
-				syncedAt: now().toISOString(),
-			});
-		} catch (error) {
-			store.setSyncState({
-				accountId,
-				cursor: null,
-				errorCode: error instanceof LinearServiceError ? error.code : 'network',
-				scope,
-				status: 'error',
-				syncedAt: store.getSyncState(accountId, scope)?.syncedAt ?? null,
-			});
-			throw error;
-		}
-	}
-
-	/**
-	 * Sync all metadata kinds (teams, projects, states, labels, cycles, users)
-	 * for one account into the store, recording sync-state transitions.
-	 * @param store - Store to upsert resources and sync state into.
-	 * @param target - Account and client to sync.
-	 */
-	async function syncMetadata(
-		store: LinearStore,
-		target: AccountTarget,
-	): Promise<void> {
-		const accountId = target.account.id;
-
-		store.setSyncState({
-			accountId,
-			cursor: null,
-			errorCode: null,
-			scope: 'metadata',
-			status: 'syncing',
-			syncedAt: store.getSyncState(accountId, 'metadata')?.syncedAt ?? null,
-		});
-
-		try {
-			for (const kind of METADATA_KINDS) {
+		return coordinator.runScopeSync({
+			accountId: target.account.id,
+			run: async () => {
 				let cursor: string | null = null;
 
 				for (let page = 0; page < maxSyncPages; page += 1) {
-					const result = await target.client.listMetadata(kind, cursor);
-					store.upsertResources(
-						accountId,
-						result.nodes.map((node) => ({
-							data: node.data,
-							id: node.id,
-							kind,
-							name: node.name,
-							teamId: node.teamId,
-						})),
+					const result = await target.client.listIssues({
+						after: cursor,
+						...(teamId ? { teamId } : {}),
+					});
+					store.upsertIssues(
+						target.account.id,
+						result.nodes.map(issueDataToUpsert),
 					);
 					cursor = result.endCursor;
 
@@ -363,27 +218,101 @@ export function createLinearService({
 						break;
 					}
 				}
-			}
 
-			store.setSyncState({
-				accountId,
-				cursor: null,
-				errorCode: null,
-				scope: 'metadata',
-				status: 'idle',
-				syncedAt: now().toISOString(),
-			});
-		} catch (error) {
-			store.setSyncState({
-				accountId,
-				cursor: null,
-				errorCode: error instanceof LinearServiceError ? error.code : 'network',
-				scope: 'metadata',
-				status: 'error',
-				syncedAt: store.getSyncState(accountId, 'metadata')?.syncedAt ?? null,
-			});
-			throw error;
+				return cursor;
+			},
+			scope: scope.key,
+			store: scopeStore(store, scope),
+		});
+	}
+
+	/**
+	 * Search one account's issues on Linear and cache the hits, so a search reaches
+	 * past the pages the browse sync happened to pull rather than filtering them.
+	 * @param store - Store to upsert matched issues into.
+	 * @param target - Account and client to search.
+	 * @param term - Trimmed search text.
+	 * @param scope - Sync scope to record the attempt under.
+	 */
+	function syncSearch(
+		store: LinearStore,
+		target: AccountTarget,
+		term: string,
+		scope: SyncScope,
+	): Promise<void> {
+		return coordinator.runScopeSync({
+			accountId: target.account.id,
+			run: async () => {
+				const result = await target.client.searchIssues(term);
+				store.upsertIssues(
+					target.account.id,
+					result.nodes.map(issueDataToUpsert),
+				);
+
+				return null;
+			},
+			scope: scope.key,
+			store: scopeStore(store, scope),
+		});
+	}
+
+	/**
+	 * Sync one metadata kind's pages for an account into the store.
+	 * @param store - Store to upsert resources into.
+	 * @param target - Account and client to sync.
+	 * @param kind - Resource kind to pull.
+	 */
+	async function syncMetadataKind(
+		store: LinearStore,
+		target: AccountTarget,
+		kind: LinearResourceKind,
+	): Promise<void> {
+		let cursor: string | null = null;
+
+		for (let page = 0; page < maxSyncPages; page += 1) {
+			const result = await target.client.listMetadata(kind, cursor);
+			store.upsertResources(
+				target.account.id,
+				result.nodes.map((node) => ({
+					data: node.data,
+					id: node.id,
+					kind,
+					name: node.name,
+					teamId: node.teamId,
+				})),
+			);
+			cursor = result.endCursor;
+
+			if (!result.hasNextPage) {
+				break;
+			}
 		}
+	}
+
+	/**
+	 * Sync all metadata kinds (teams, projects, states, labels, cycles, users) for
+	 * one account. The kinds run concurrently: they are six independent queries
+	 * against one rate-limit bucket, and running them in series made the first
+	 * metadata read of every freshness window cost the sum of all six.
+	 * @param store - Store to upsert resources and sync state into.
+	 * @param target - Account and client to sync.
+	 */
+	function syncMetadata(
+		store: LinearStore,
+		target: AccountTarget,
+	): Promise<void> {
+		return coordinator.runScopeSync({
+			accountId: target.account.id,
+			run: async () => {
+				await Promise.all(
+					METADATA_KINDS.map((kind) => syncMetadataKind(store, target, kind)),
+				);
+
+				return null;
+			},
+			scope: METADATA_SCOPE.key,
+			store: scopeStore(store, METADATA_SCOPE),
+		});
 	}
 
 	/**
@@ -446,29 +375,66 @@ export function createLinearService({
 	}
 
 	/**
-	 * Syncs every stale account concurrently and collects the ones that failed.
+	 * The accounts whose cache for one scope has to be refreshed before it is read.
+	 * @param store - Store holding the sync state.
+	 * @param targets - Accounts the read spans.
+	 * @param scope - Sync scope being read.
+	 * @param refresh - Whether the caller demanded a bypass of every freshness rule.
+	 * @returns The subset needing a remote sync.
+	 */
+	function staleTargets(
+		store: LinearStore,
+		targets: AccountTarget[],
+		scope: SyncScope,
+		refresh: boolean,
+	): AccountTarget[] {
+		return targets.filter((target) =>
+			coordinator.needsSync({
+				accountId: target.account.id,
+				refresh,
+				scope: scope.key,
+				store: scopeStore(store, scope),
+			}),
+		);
+	}
+
+	/**
+	 * The failures still standing against a scope, so an answer served from cache
+	 * says why it is not newer instead of looking merely quiet. An account whose
+	 * last attempt failed keeps reporting it until one succeeds.
+	 * @param targets - Accounts the read spans.
+	 * @param scope - Sync scope being read.
+	 * @returns The failures, one per account with an unresolved one.
+	 */
+	function recordedFailures(
+		targets: AccountTarget[],
+		scope: SyncScope,
+	): LinearAccountFailure[] {
+		return targets.flatMap((target) => {
+			const error = coordinator.lastFailure(target.account.id, scope.key);
+
+			return error === undefined ? [] : [accountFailure(target, error)];
+		});
+	}
+
+	/**
+	 * Syncs the given accounts concurrently and collects the ones that failed.
 	 *
 	 * Concurrent rather than serial because each account is a different Linear
 	 * organization behind its own token and therefore its own rate-limit bucket,
 	 * so a merged read costs the slowest account rather than the sum of them. The
 	 * store writes underneath are synchronous `node:sqlite` statements, which
 	 * cannot interleave across an await.
-	 * @param targets - Accounts the read spans.
-	 * @param isStaleFor - Whether one account's cache needs a remote sync.
+	 * @param targets - Accounts to sync.
 	 * @param sync - Performs one account's sync.
 	 * @returns The failures, one per account that could not be read.
 	 */
 	async function syncEachAccount(
 		targets: AccountTarget[],
-		isStaleFor: (target: AccountTarget) => boolean,
 		sync: (target: AccountTarget) => Promise<void>,
 	): Promise<LinearAccountFailure[]> {
 		const outcomes = await Promise.all(
 			targets.map(async (target) => {
-				if (!isStaleFor(target)) {
-					return null;
-				}
-
 				try {
 					await sync(target);
 					return null;
@@ -479,6 +445,49 @@ export function createLinearService({
 		);
 
 		return outcomes.filter((outcome) => outcome !== null);
+	}
+
+	/**
+	 * Syncs the pending accounts and reports every failure the answer has to
+	 * disclose. `pending` has already had the accounts a cooldown holds back
+	 * filtered out of it, and those accounts are exactly the ones whose last
+	 * attempt failed — so reporting only what this round raised would drop a
+	 * standing failure the moment some other account happened to need a sync.
+	 * @param targets - Accounts the read spans.
+	 * @param pending - The subset being synced now.
+	 * @param scope - Sync scope being read.
+	 * @param sync - Performs one account's sync.
+	 * @returns The failures this round raised, plus the ones still standing.
+	 */
+	async function syncPending(
+		targets: AccountTarget[],
+		pending: AccountTarget[],
+		scope: SyncScope,
+		sync: (target: AccountTarget) => Promise<void>,
+	): Promise<LinearAccountFailure[]> {
+		const syncing = new Set(pending);
+		const heldBack = targets.filter((target) => !syncing.has(target));
+
+		return [
+			...recordedFailures(heldBack, scope),
+			...(await syncEachAccount(pending, sync)),
+		];
+	}
+
+	/**
+	 * Starts a refresh behind an answer already being returned from cache. The
+	 * failure is not dropped: the coordinator records it on the scope's sync-state
+	 * row and holds the scope back for a cooldown, and the next read reports it.
+	 * @param targets - Accounts to refresh.
+	 * @param sync - Performs one account's sync.
+	 */
+	function syncInBackground(
+		targets: AccountTarget[],
+		sync: (target: AccountTarget) => Promise<void>,
+	): void {
+		for (const target of targets) {
+			void sync(target).catch(() => undefined);
+		}
 	}
 
 	/**
@@ -568,7 +577,12 @@ export function createLinearService({
 				const names = organizationNames([target]);
 				const cached = store.getIssue(id);
 
-				if (cached && !refresh && !isStale(cached.syncedAt)) {
+				if (
+					cached &&
+					!refresh &&
+					!coordinator.isStale(cached.syncedAt) &&
+					!coordinator.isStale(cached.commentsSyncedAt)
+				) {
 					return {
 						comments: store.listComments(id).map(commentRecordToWire),
 						issue: issueRecordToWire(cached, names),
@@ -578,7 +592,10 @@ export function createLinearService({
 				}
 
 				try {
-					const result = await target.client.getIssue(id);
+					const result = await coordinator.share(
+						`issue:${target.account.id}:${id}`,
+						() => target.client.getIssue(id),
+					);
 					store.upsertIssues(target.account.id, [
 						issueDataToUpsert(result.issue),
 					]);
@@ -589,6 +606,7 @@ export function createLinearService({
 							commentDataToUpsert(result.issue.id, comment),
 						),
 					);
+					store.markCommentsSynced(result.issue.id);
 
 					return {
 						comments: result.comments.nodes.map(commentDataToWire),
@@ -620,18 +638,37 @@ export function createLinearService({
 			try {
 				const store = getStore();
 				const targets = await resolveTargets(accountId);
-				const accountFailures = await syncEachAccount(
-					targets,
-					(target) =>
-						refresh ||
-						isStale(
-							store.getSyncState(target.account.id, 'metadata')?.syncedAt,
-						),
-					(target) => syncMetadata(store, target),
-				);
+				const pending = staleTargets(store, targets, METADATA_SCOPE, refresh);
+				const sync = (target: AccountTarget) => syncMetadata(store, target);
+
+				if (pending.length === 0) {
+					return {
+						accountFailures: recordedFailures(targets, METADATA_SCOPE),
+						metadata: readMetadata(store, targets),
+						status: 'ok',
+					};
+				}
+
+				const cachedMetadata = readMetadata(store, targets);
+
+				if (!refresh && cachedMetadata.teams.length > 0) {
+					syncInBackground(pending, sync);
+
+					return {
+						accountFailures: recordedFailures(targets, METADATA_SCOPE),
+						metadata: cachedMetadata,
+						status: 'ok',
+						syncing: true,
+					};
+				}
 
 				return {
-					accountFailures,
+					accountFailures: await syncPending(
+						targets,
+						pending,
+						METADATA_SCOPE,
+						sync,
+					),
 					metadata: readMetadata(store, targets),
 					status: 'ok',
 				};
@@ -649,29 +686,52 @@ export function createLinearService({
 			try {
 				const store = getStore();
 				const targets = await resolveTargets(accountId);
-				const scope = teamId ? `issues:${teamId}` : 'issues';
-				let source: 'cache' | 'remote' = 'cache';
-				const accountFailures = await syncEachAccount(
-					targets,
-					(target) =>
-						refresh ||
-						isStale(store.getSyncState(target.account.id, scope)?.syncedAt),
-					async (target) => {
-						await syncIssues(store, target, teamId);
-						source = 'remote';
-					},
-				);
-
+				const term = query?.trim() ?? '';
+				const scope = issueScope(term, teamId);
 				const names = organizationNames(targets);
-				const issues = store
-					.listIssues({
-						...(accountId ? { accountId } : {}),
-						...(query ? { query } : {}),
-						...(teamId ? { teamId } : {}),
-					})
-					.map((record) => issueRecordToWire(record, names));
+				const readCached = () =>
+					store
+						.listIssues({
+							...(accountId ? { accountId } : {}),
+							...(term ? { query: term } : {}),
+							...(teamId ? { teamId } : {}),
+						})
+						.map((record) => issueRecordToWire(record, names));
+				const pending = staleTargets(store, targets, scope, refresh);
 
-				return { accountFailures, issues, source, status: 'ok' };
+				if (pending.length === 0) {
+					return {
+						accountFailures: recordedFailures(targets, scope),
+						issues: readCached(),
+						source: 'cache',
+						status: 'ok',
+					};
+				}
+
+				const sync = (target: AccountTarget) =>
+					term
+						? syncSearch(store, target, term, scope)
+						: syncIssues(store, target, scope, teamId);
+				const cachedIssues = readCached();
+
+				if (!refresh && cachedIssues.length > 0) {
+					syncInBackground(pending, sync);
+
+					return {
+						accountFailures: recordedFailures(targets, scope),
+						issues: cachedIssues,
+						source: 'cache',
+						status: 'ok',
+						syncing: true,
+					};
+				}
+
+				return {
+					accountFailures: await syncPending(targets, pending, scope, sync),
+					issues: readCached(),
+					source: 'remote',
+					status: 'ok',
+				};
 			} catch (error) {
 				return {
 					accountFailures: [],

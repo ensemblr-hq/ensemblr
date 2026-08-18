@@ -21,12 +21,16 @@ import {
 	GithubLogo,
 	LinearLogo,
 } from '@/renderer/components/workbench-shell/source-provider-logo';
+import { useDebouncedValue } from '@/renderer/hooks/use-debounced-value';
 import {
 	deriveLinearGateState,
 	describeLinearAccountFailures,
 } from '@/renderer/lib/linear';
 import type { LinearIssueWire } from '@/shared/ipc/contracts/linear';
 import type { RepositoryIssueWire } from '@/shared/ipc/contracts/workspace-sources';
+
+/** How long the search box must hold still before Linear is queried again. */
+const SEARCH_DEBOUNCE_MS = 250;
 
 /** One issue the picker can hand back, tagged with the tracker it came from. */
 export type PickedIssue =
@@ -74,12 +78,13 @@ export function IssuePickerDialog({
 }) {
 	const { t } = useTranslation();
 	const [query, setQuery] = useState('');
+	const settledQuery = useDebouncedValue(query, SEARCH_DEBOUNCE_MS);
 	const { data: connectionData, isLoading: connectionLoading } = useQuery({
 		...linearConnectionQuery,
 		enabled: open,
 	});
 	const { data: linearData, isLoading: linearLoading } = useQuery({
-		...linearIssuesQuery(query ? { query } : {}),
+		...linearIssuesQuery(settledQuery ? { query: settledQuery } : {}),
 		enabled: open,
 	});
 	const { data: githubData, isLoading: githubLoading } = useQuery({

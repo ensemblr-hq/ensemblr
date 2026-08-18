@@ -128,7 +128,11 @@ export interface CreateLinearClientOptions {
 	apiUrl?: string;
 	fetchImpl?: typeof fetch;
 	getAccessToken: () => Promise<string>;
+	requestTimeoutMs?: number;
 }
+
+/** How long one Linear GraphQL request may run before it is abandoned. */
+const DEFAULT_REQUEST_TIMEOUT_MS = 15_000;
 
 const ISSUE_FIELDS = `
 	id
@@ -210,6 +214,7 @@ export function createLinearClient({
 	apiUrl = LINEAR_GRAPHQL_URL,
 	fetchImpl = fetch,
 	getAccessToken,
+	requestTimeoutMs = DEFAULT_REQUEST_TIMEOUT_MS,
 }: CreateLinearClientOptions): LinearClient {
 	/**
 	 * Send a GraphQL operation to Linear, mapping auth, rate-limit, and transport
@@ -236,11 +241,14 @@ export function createLinearClient({
 					'content-type': 'application/json',
 				},
 				method: 'POST',
+				signal: AbortSignal.timeout(requestTimeoutMs),
 			});
 		} catch (error) {
 			throw new LinearServiceError(
 				'network',
-				'Could not reach the Linear API.',
+				isTimeout(error)
+					? 'The Linear API did not respond in time.'
+					: 'Could not reach the Linear API.',
 				{ cause: error },
 			);
 		}
@@ -606,6 +614,16 @@ function resolveMetadataName(node: MetadataNode): string {
 	}
 
 	return typeof node.number === 'number' ? '' : node.id;
+}
+
+/**
+ * Whether a rejected `fetch` was abandoned by the request deadline rather than
+ * refused by the network.
+ * @param error - Value the fetch rejected with.
+ * @returns True when the request was aborted on timeout.
+ */
+function isTimeout(error: unknown): boolean {
+	return error instanceof Error && error.name === 'TimeoutError';
 }
 
 /**

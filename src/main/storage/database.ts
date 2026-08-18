@@ -910,6 +910,19 @@ CREATE TABLE linear_sync_state (
 ) STRICT;
 `,
 	},
+	{
+		id: '020_linear_comment_freshness',
+		version: 20,
+		// `synced_at` is stamped by every issue write, including the list sync and
+		// the mutation refresh, neither of which fetches comments. A thread is only
+		// fetched by the single-issue read, so its freshness needs its own column —
+		// otherwise a listed issue looks fresh while its thread has never loaded,
+		// and an issue with genuinely no comments is indistinguishable from one
+		// whose thread was never read.
+		sql: `
+ALTER TABLE linear_issues ADD COLUMN comments_synced_at TEXT;
+`,
+	},
 ];
 
 /** Highest declared migration version embedded in this build. */
