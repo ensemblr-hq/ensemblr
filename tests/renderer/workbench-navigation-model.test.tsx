@@ -535,6 +535,30 @@ test('falls back inside the stored project when its stored workspace is gone', (
 	});
 });
 
+test('leaves the shell selectionless once a refresh drops the routed workspace', () => {
+	const projects = mapNavigationSnapshotToProjects(
+		withRepositoryOneWorkspaces([]),
+	);
+
+	expect(
+		resolveWorkspaceNavigationSelection({
+			projects,
+			routeProjectId: 'repo-1',
+			routeWorkspaceId: 'workspace-1',
+		}),
+	).toBeNull();
+	expect(
+		resolveWorkspaceNavigationRenderState({
+			canUsePreviousState: true,
+			previousState: null,
+			projects,
+			routeProjectId: 'repo-1',
+			routeWorkspaceId: 'workspace-1',
+			selection: null,
+		}),
+	).toBeNull();
+});
+
 test('keeps previous navigation render state during transient loading gaps', () => {
 	const projects = mapNavigationSnapshotToProjects(navigationSnapshot);
 	const selection = resolveWorkspaceNavigationSelection({
