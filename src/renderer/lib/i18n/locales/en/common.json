@@ -422,6 +422,17 @@
 		"workspace-count_one": "{{count}} workspace",
 		"workspace-count_other": "{{count}} workspaces"
 	},
+	"update": {
+		"check-failed": "The update check failed.",
+		"disabled": "Automatic updates are off. Turn them on in Settings → General.",
+		"downloading": "Downloading Ensemblr {{version}}…",
+		"ready": {
+			"description": "Restart to finish installing. Agents still working are asked first.",
+			"restart": "Restart",
+			"title": "Ensemblr {{version}} is ready"
+		},
+		"up-to-date": "Ensemblr {{version}} is up to date."
+	},
 	"welcome": {
 		"open-github-project": "Open GitHub project",
 		"open-project": "Open project",

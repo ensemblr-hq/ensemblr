@@ -27,6 +27,7 @@ import type {
 	TerminalLifecycleBroadcast,
 	TerminalOutputBroadcast,
 } from '../../shared/ipc/contracts/terminal';
+import type { UpdateStatusChangedBroadcast } from '../../shared/ipc/contracts/update';
 import type { WorkspaceFilesChangedBroadcast } from '../../shared/ipc/contracts/workspace-files';
 import type { MenuCommandBroadcast } from '../../shared/menu-commands';
 
@@ -51,6 +52,7 @@ type InvokeKey = Exclude<
 	| 'onPiRawFrame'
 	| 'onTerminalLifecycle'
 	| 'onTerminalOutput'
+	| 'onUpdateStatusChanged'
 	| 'onWorkspaceFilesChanged'
 >;
 
@@ -166,6 +168,9 @@ export function createEnsemblrApi(): EnsemblrApi {
 			invoke('getWorkspaceMergeConflicts', request),
 		githubRepositoryList: (request) => invoke('githubRepositoryList', request),
 		health: () => invoke('health'),
+		updateStatus: () => invoke('updateStatus'),
+		checkForUpdates: () => invoke('checkForUpdates'),
+		installUpdate: () => invoke('installUpdate'),
 		importLocalRepository: (request) =>
 			invoke('importLocalRepository', request),
 		infisicalAccounts: () => invoke('infisicalAccounts'),
@@ -231,6 +236,11 @@ export function createEnsemblrApi(): EnsemblrApi {
 			),
 		onConfigChanged: (listener) =>
 			subscribe<ConfigChangedBroadcast>(IPC_CHANNELS.configChanged, listener),
+		onUpdateStatusChanged: (listener) =>
+			subscribe<UpdateStatusChangedBroadcast>(
+				IPC_CHANNELS.updateStatusChanged,
+				listener,
+			),
 		onCloneGithubRepositoryProgress: (listener) =>
 			subscribe<CloneGithubRepositoryProgressEvent>(
 				IPC_CHANNELS.cloneGithubRepositoryProgress,

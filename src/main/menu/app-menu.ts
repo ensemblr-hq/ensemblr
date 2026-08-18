@@ -25,6 +25,7 @@ export function buildAppMenu(
 			label: app.name,
 			submenu: [
 				{ label: labels.about, role: 'about' },
+				items.command('app.checkForUpdates', labels.checkForUpdates),
 				{ type: 'separator' },
 				items.command('settings.open', labels.settings),
 				{ type: 'separator' },

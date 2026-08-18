@@ -78,6 +78,7 @@ jobs:
       NIGHTLY_VERSION: ${{ needs.gate.outputs.version }}
       DMG_NAME: Ensemblr-Canary-arm64.dmg
       ZIP_NAME: Ensemblr-Canary-darwin-arm64.zip
+      FEED_NAME: update-darwin-arm64.json
     steps:
       - uses: actions/checkout@v7
         with:
@@ -128,6 +129,23 @@ jobs:
           cp "$(find out/make -type f -name '*.dmg' | head -1)" "$RUNNER_TEMP/nightly/$DMG_NAME"
           cp "$(find out/make -type f -name '*.zip' | head -1)" "$RUNNER_TEMP/nightly/$ZIP_NAME"
 
+      # Squirrel.Mac's feed document, read by the in-app updater
+      # (src/main/updates/release-feed.ts). The rolling tag keeps the URL fixed,
+      # so this document is the only thing that changes from one nightly to the
+      # next — which is exactly why the app reads the version out of it rather
+      # than off a tag that never moves. `$FEED_NAME` is a contract with
+      # UPDATE_FEED_ASSET_NAME.
+      - name: Write the update feed document
+        run: |
+          set -euo pipefail
+          jq -n \
+            --arg url "https://github.com/${GITHUB_REPOSITORY}/releases/download/nightly/${ZIP_NAME}" \
+            --arg name "$NIGHTLY_VERSION" \
+            --arg notes "Automated build of master at ${NIGHTLY_SHA}." \
+            --arg pub_date "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            '{url: $url, name: $name, notes: $notes, pub_date: $pub_date}' \
+            > "$RUNNER_TEMP/nightly/$FEED_NAME"
+
       # The `nightly` tag is what the gate reads, so it moves last, only once the
       # assets are actually up. Moving it first would mark this commit published
       # after a failed upload, and the next run would report "no change" and skip
@@ -151,7 +169,8 @@ jobs:
           fi
 
           gh release upload nightly \
-            "$RUNNER_TEMP/nightly/$DMG_NAME" "$RUNNER_TEMP/nightly/$ZIP_NAME" --clobber
+            "$RUNNER_TEMP/nightly/$DMG_NAME" "$RUNNER_TEMP/nightly/$ZIP_NAME" \
+            "$RUNNER_TEMP/nightly/$FEED_NAME" --clobber
 
           gh release edit nightly --title "$title" --notes "$notes" \
             --prerelease --latest=false --draft=false

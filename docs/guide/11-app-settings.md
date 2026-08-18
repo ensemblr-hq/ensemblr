@@ -108,6 +108,23 @@ How chats behave day to day, plus where Ensemblr keeps its repositories.
 | Auto-convert long text | Turn pasted text over 5,000 characters into a text attachment instead of inlining it. | On / off | On |
 | Don't collapse tool calls | Show tool calls expanded by default. Toggle per session with `⌃O`. | On / off | Off (collapsed) |
 | Ensemblr root directory | Where Ensemblr stores repositories, workspaces, and archived workspace context. | Any directory | `~/Ensemblr` |
+| Update Ensemblr automatically | Check for a newer build, download it, and offer to restart into it. Off is a hard off — no check, no download, no install. | On / off | On |
+| Ensemblr version | The running build, its channel, and what the updater is doing. `Check for updates` runs a check now; once a build is downloaded the button becomes `Restart to update`. | — | — |
+
+**Updating is automatic, restarting is not.** Ensemblr checks GitHub a couple of
+minutes after launch and every four hours after, downloads a newer build in the
+background, and then waits for you. Restarting goes through the same
+confirmation that guards ⌘Q, so agents mid-turn are never cut off without being
+named — declining leaves the update staged. A release build only ever updates to
+another release and Ensemblr Canary only ever to a newer nightly; a copy running
+outside `/Applications` says so rather than failing quietly.
+
+**Turn `Update Ensemblr automatically` off when something else owns this copy** —
+a Homebrew cask, or any package manager you would rather do the upgrading. Off
+is a hard off: no scheduled check, no check even when you pick
+`Ensemblr → Check for Updates…`, and no install. A build already downloaded is
+dropped rather than left offerable, so the two can never fight over the same
+bundle. Turning it back on checks immediately.
 
 **The root directory is here, not in an "Advanced" pane** — there is no Advanced
 pane. Pick an empty directory you do not edit by hand. Changing it reconciles

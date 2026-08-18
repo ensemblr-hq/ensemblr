@@ -10,38 +10,20 @@ import { FusesPlugin } from '@electron-forge/plugin-fuses';
 import { VitePlugin } from '@electron-forge/plugin-vite';
 import type { ForgeConfig } from '@electron-forge/shared-types';
 
-// Build channel drives the app's LaunchServices identity (bundle id + product
-// name). Every packaged build that shares one bundle id becomes an
-// interchangeable registration for that id: when macOS resolves
-// `dev.ensemblr.app` — e.g. while a spawned child touches LaunchServices during
-// workspace creation — it can relaunch a *different* registered copy, which
-// then hits the running instance's single-instance lock and quits, flashing a
-// stray Dock tile. Only the shipped release may claim the canonical id; every
-// dogfood build gets its own so it can never masquerade as (or collide with)
-// another channel. Release is the default so `npm run make`/`package` keep
-// producing the store build; dogfood builds opt in via `ENSEMBLR_BUILD_CHANNEL`
-// (see the `make:canary` / `make:dev` scripts). See docs/adr/0032.
-const KNOWN_CHANNELS = ['release', 'canary', 'dev'] as const;
-type BuildChannel = (typeof KNOWN_CHANNELS)[number];
-const requestedChannel = (
-	process.env.ENSEMBLR_BUILD_CHANNEL ?? 'release'
-).toLowerCase();
-const buildChannel: BuildChannel = (
-	KNOWN_CHANNELS as readonly string[]
-).includes(requestedChannel)
-	? (requestedChannel as BuildChannel)
-	: 'release';
+import {
+	APP_BUNDLE_IDS,
+	APP_NAMES,
+	resolveBuildChannel,
+} from './src/shared/build-channel.ts';
 
-const APP_BUNDLE_IDS: Record<BuildChannel, string> = {
-	release: 'dev.ensemblr.app',
-	canary: 'dev.ensemblr.app.canary',
-	dev: 'dev.ensemblr.app.dev',
-};
-const APP_NAMES: Record<BuildChannel, string> = {
-	release: 'Ensemblr',
-	canary: 'Ensemblr Canary',
-	dev: 'Ensemblr Dev',
-};
+// Build channel drives the app's LaunchServices identity (bundle id + product
+// name) — see `src/shared/build-channel.ts` for why each channel gets its own,
+// and docs/adr/0032. Release is the default so `npm run make`/`package` keep
+// producing the store build; dogfood builds opt in via `ENSEMBLR_BUILD_CHANNEL`
+// (see the `make:canary` / `make:dev` scripts). `vite.main.config.mts` resolves
+// the same variable through the same helper, so the identity forge bakes in and
+// the channel the app reports itself as can never disagree.
+const buildChannel = resolveBuildChannel(process.env.ENSEMBLR_BUILD_CHANNEL);
 
 // Files kept in the packaged app. The Vite plugin's default `ignore` excludes
 // everything outside `/.vite`, which would drop `node-pty` — a native module

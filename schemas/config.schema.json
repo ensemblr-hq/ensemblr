@@ -115,6 +115,11 @@
 							"default": false,
 							"description": "Hold a power assertion while an agent or script is running so the Mac does not sleep mid-turn."
 						},
+						"automaticUpdates": {
+							"type": "boolean",
+							"default": true,
+							"description": "Check GitHub for a newer build, download it, and offer to restart into it. Turn off when a package manager owns the install — Homebrew, for instance — so the two never fight over the same bundle."
+						},
 						"toolCallCollapse": {
 							"type": "string",
 							"enum": ["collapsed", "expanded"],

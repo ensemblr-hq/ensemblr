@@ -26,6 +26,7 @@ import type { SettingsApi } from './settings-resolution';
 import type { SetupApi } from './setup';
 import type { SharedRootApi } from './shared-root-adoption';
 import type { TerminalApi } from './terminal';
+import type { UpdateApi } from './update';
 import type { WorkspaceApi } from './workspace';
 import type { WorkspaceFilesApi } from './workspace-files';
 import type { WorkspaceGitApi } from './workspace-git';
@@ -74,4 +75,5 @@ export interface EnsemblrApi
 		InfisicalApi,
 		LinkedDirectoriesApi,
 		DictationApi,
-		OpenTargetApi {}
+		OpenTargetApi,
+		UpdateApi {}

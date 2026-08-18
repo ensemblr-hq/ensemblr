@@ -117,6 +117,27 @@ jobs:
           tr '\n' '\0' < "$RUNNER_TEMP/assets.txt" \
             | xargs -0 gh release upload "$TAG" --clobber
 
+      # Squirrel.Mac's feed document, read by the in-app updater
+      # (src/main/updates/release-feed.ts). Two things make it worth a separate
+      # asset rather than deriving the same facts in the app: it names the exact
+      # version, so nothing has to parse a tag or a release body, and it points
+      # at the `.zip` — Squirrel installs a zipped `.app` and cannot read a DMG.
+      # The filename is a contract with UPDATE_FEED_ASSET_NAME; renaming one
+      # without the other strands every installed build on its current version.
+      - name: Attach the update feed document
+        run: |
+          set -euo pipefail
+          zip=$(basename "$(grep '\.zip$' "$RUNNER_TEMP/assets.txt" | head -1)")
+          feed="$RUNNER_TEMP/update-darwin-arm64.json"
+          jq -n \
+            --arg url "https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/${zip}" \
+            --arg name "${TAG#v}" \
+            --arg notes "$(gh release view "$TAG" --json body -q .body)" \
+            --arg pub_date "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            '{url: $url, name: $name, notes: $notes, pub_date: $pub_date}' \
+            > "$feed"
+          gh release upload "$TAG" "$feed" --clobber
+
       - name: Set the prerelease flag from the tag
         run: |
           set -euo pipefail

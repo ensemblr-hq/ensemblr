@@ -49,6 +49,7 @@ export interface MenuCommandDef {
  * against `SHORTCUTS` by `tests/shared/menu-commands.test.ts`.
  */
 export const MENU_COMMANDS = {
+	'app.checkForUpdates': {},
 	'settings.open': { ownsAccelerator: true, shortcutId: 'settings.open' },
 
 	'workspace.new': { ownsAccelerator: true, shortcutId: 'workspace.new' },

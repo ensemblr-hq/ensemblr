@@ -31,9 +31,36 @@ hardened runtime, and is notarized by Apple and stapled — both the `.app` and 
 network round-trip and without the right-click dance below. It is a **beta**: pre-1.0,
 with breaking changes expected before 1.0.
 
-The app reports the full version, suffix included — `0.1.0-beta.7` in Settings →
-Diagnostics and in the bundle's `CFBundleShortVersionString`. It matches the
-release tag, so a bug report only has to quote one string.
+The app reports the full version, suffix included — `0.1.0-beta.7` in
+**Settings → General** and in the bundle's `CFBundleShortVersionString`. It
+matches the release tag, so a bug report only has to quote one string.
+
+## Staying up to date
+
+**Ensemblr updates itself.** An installed copy checks GitHub a couple of minutes
+after launch and every four hours after that, downloads a newer build in the
+background, and then offers to restart into it — you choose when. **Settings →
+General** shows the running version and the updater's state, and
+**Ensemblr → Check for Updates…** runs a check on the spot.
+
+Restarting goes through the same confirmation that guards ⌘Q: if agents are still
+working, Ensemblr asks before interrupting them, and declining leaves the
+downloaded update staged for whenever you are ready.
+
+Two things it deliberately will not do:
+
+- **Cross channels.** A release build only ever updates to another `v<semver>`
+  release, and Ensemblr Canary only ever to a newer nightly. They are separate
+  apps with separate bundle ids, so neither can replace the other.
+- **Update from anywhere but `/Applications`.** Replacing the bundle in place
+  needs a writable location, so a copy run straight from the mounted `.dmg`
+  reports that rather than failing quietly. Drag it to `/Applications` first.
+
+A build you compiled yourself does not update — rebuild it instead.
+
+If a package manager owns your copy, turn **Settings → General → Update Ensemblr
+automatically** off. Ensemblr then never checks, downloads, or installs, and
+leaves the upgrading to whatever installed it.
 
 Building from source is the other path, and the rest of this page covers it.
 

@@ -454,6 +454,17 @@
 		"workspace-count_many": "{{count}} рабочих пространств",
 		"workspace-count_other": "{{count}} рабочего пространства"
 	},
+	"update": {
+		"check-failed": "Не удалось проверить обновления.",
+		"disabled": "Автоматическое обновление отключено. Включить можно в «Настройки → Основные».",
+		"downloading": "Загрузка Ensemblr {{version}}…",
+		"ready": {
+			"description": "Перезапустите, чтобы завершить установку. Если агенты ещё работают, Ensemblr сначала спросит.",
+			"restart": "Перезапустить",
+			"title": "Ensemblr {{version}} готов к установке"
+		},
+		"up-to-date": "Ensemblr {{version}} — последняя версия."
+	},
 	"welcome": {
 		"open-github-project": "Открыть проект с GitHub",
 		"open-project": "Открыть проект",

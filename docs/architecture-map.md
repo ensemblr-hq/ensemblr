@@ -59,6 +59,7 @@ each exposing its public surface through `index.ts`.
 | Setup | `setup/` | Setup diagnostics orchestration |
 | Storage | `storage/` | SQLite connection (`database.ts`), migrations, `repositories/`, `tx.ts` |
 | Terminal | `terminal/` | `node-pty` PTY sessions, plus the scrollback renderer that makes an agent's terminal read legible |
+| Updates | `updates/` | The in-app updater: GitHub release resolution per build channel (`release-feed.ts`), the can-this-build-update gate (`update-preconditions.ts`), and the Squirrel.Mac state machine (ADR&nbsp;0055) |
 | Workspace files / git | `workspace-files/`, `workspace-git/` | File watching and listing, the content-addressed composer attachment store (`context-attachments.ts`), path safety (`workspace-paths.ts`) and image-signature checks (`workspace-images.ts`); git status, commits, worktrees |
 
 Do not add root-level files under `src/main/` unless Electron Forge or Vite needs

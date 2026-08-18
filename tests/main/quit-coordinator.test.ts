@@ -2,6 +2,7 @@ import { describe, expect, test, vi } from 'vitest';
 import {
 	createQuitCoordinator,
 	type QuitCoordinatorOptions,
+	type QuitExit,
 } from '../../src/main/app/quit-coordinator';
 
 /** Lets the coordinator's internal confirmation promise settle. */
@@ -11,9 +12,11 @@ function flush(): Promise<void> {
 
 function makeCoordinator(overrides: Partial<QuitCoordinatorOptions> = {}) {
 	const counts = { quits: 0, shutdowns: 0 };
+	const exits: QuitExit[] = [];
 	const coordinator = createQuitCoordinator({
-		beginAgentShutdown: () => {
+		beginAgentShutdown: (exit) => {
 			counts.shutdowns += 1;
+			exits.push(exit);
 		},
 		confirmQuit: () => Promise.resolve(true),
 		quit: () => {
@@ -21,7 +24,7 @@ function makeCoordinator(overrides: Partial<QuitCoordinatorOptions> = {}) {
 		},
 		...overrides,
 	});
-	return { coordinator, counts };
+	return { coordinator, counts, exits };
 }
 
 describe('createQuitCoordinator — before-quit', () => {
@@ -150,5 +153,62 @@ describe('createQuitCoordinator — a confirmation that throws', () => {
 		await flush();
 		expect(replayClose).toHaveBeenCalledTimes(1);
 		expect(h.coordinator.handleWindowClose(replayClose)).toBe(false);
+	});
+});
+
+describe('createQuitCoordinator — restart into an update', () => {
+	test('issues a quit gesture, which is what puts it to the user', async () => {
+		const confirmQuit = vi.fn(() => Promise.resolve(true));
+		const h = makeCoordinator({ confirmQuit });
+		h.coordinator.requestInstallUpdate();
+		expect(h.counts.quits).toBe(1);
+		expect(confirmQuit).not.toHaveBeenCalled();
+		h.coordinator.handleBeforeQuit();
+		await flush();
+		expect(confirmQuit).toHaveBeenCalledTimes(1);
+	});
+
+	test('the install exit survives the replay and reaches the teardown', async () => {
+		const h = makeCoordinator();
+		h.coordinator.requestInstallUpdate();
+		h.coordinator.handleBeforeQuit();
+		await flush();
+		h.coordinator.handleBeforeQuit();
+		expect(h.exits).toEqual(['install-update']);
+	});
+
+	test('an ordinary quit still tears down as a plain quit', async () => {
+		const h = makeCoordinator();
+		h.coordinator.handleBeforeQuit();
+		await flush();
+		h.coordinator.handleBeforeQuit();
+		expect(h.exits).toEqual(['quit']);
+	});
+
+	test('a refused restart leaves the next gesture an ordinary quit', async () => {
+		const confirmQuit = vi
+			.fn<() => Promise<boolean>>()
+			.mockResolvedValueOnce(false)
+			.mockResolvedValueOnce(true);
+		const h = makeCoordinator({ confirmQuit });
+		h.coordinator.requestInstallUpdate();
+		h.coordinator.handleBeforeQuit();
+		await flush();
+		expect(h.exits).toEqual([]);
+		h.coordinator.handleBeforeQuit();
+		await flush();
+		h.coordinator.handleBeforeQuit();
+		expect(h.exits).toEqual(['quit']);
+	});
+
+	test('a restart request cannot repurpose a quit already being confirmed', async () => {
+		const confirmQuit = vi.fn(() => Promise.resolve(true));
+		const h = makeCoordinator({ confirmQuit });
+		h.coordinator.handleBeforeQuit();
+		h.coordinator.requestInstallUpdate();
+		await flush();
+		h.coordinator.handleBeforeQuit();
+		expect(confirmQuit).toHaveBeenCalledTimes(1);
+		expect(h.exits).toEqual(['quit']);
 	});
 });

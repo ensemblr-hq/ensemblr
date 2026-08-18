@@ -146,6 +146,10 @@
 			"description": "Convert pasted text over 5000 characters into text attachments.",
 			"label": "Auto-convert long text"
 		},
+		"automatic-updates": {
+			"description": "Check for a newer build, download it, and offer to restart into it. Turn this off if a package manager owns this copy — Homebrew, for instance — so the two never fight over the same bundle.",
+			"label": "Update Ensemblr automatically"
+		},
 		"caffeinate": {
 			"description": "Prevent your Mac from sleeping while an agent is actively working. Shuts off below 10% battery.",
 			"label": "Caffeinate while agents are running"
@@ -195,6 +199,22 @@
 		"tool-calls": {
 			"description": "Show all tool calls expanded by default instead of collapsed. Toggle with {{shortcut}}.",
 			"label": "Don't collapse tool calls"
+		},
+		"updates": {
+			"channel": {
+				"canary": "Nightly"
+			},
+			"check": "Check for updates",
+			"label": "Ensemblr version",
+			"restart": "Restart to update",
+			"status": {
+				"checking": "Checking…",
+				"disabled": "Ensemblr will not check for updates.",
+				"downloading": "Downloading {{version}}…",
+				"error": "The update check failed.",
+				"idle": "Ensemblr is up to date.",
+				"ready": "{{version}} is ready — restart to install."
+			}
 		}
 	},
 	"git": {
