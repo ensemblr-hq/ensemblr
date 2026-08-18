@@ -1,4 +1,5 @@
 import { useState } from 'react';
+// react-doctor-disable-next-line -- The forced commit is the fix; startTransition would restore the batching. See the call below.
 import { flushSync } from 'react-dom';
 
 import { getErrorMessage } from '@/renderer/lib/error';
