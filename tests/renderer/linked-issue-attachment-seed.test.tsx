@@ -6,7 +6,10 @@ import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 
 import { useLinkedIssueSeed } from '@/renderer/hooks/workbench-shell/composer/use-linked-issue-seed';
-import { composerLinkedIssueSeededAtomFamily } from '@/renderer/state/composer';
+import {
+	composerLinkedIssueSeededAtomFamily,
+	composerValueAtomFamily,
+} from '@/renderer/state/composer';
 import type { WorkspaceLinkedIssueSummary } from '@/renderer/types/workbench';
 
 const linkedIssue: WorkspaceLinkedIssueSummary = {
@@ -60,6 +63,30 @@ describe('useLinkedIssueSeed', () => {
 
 		expect(attach).toHaveBeenCalledTimes(1);
 		expect(attach).toHaveBeenCalledWith(linkedIssue);
+	});
+
+	// The chip and the headline are one seed. They used to be two effects with two
+	// guards, which let a draft touched while the gate was still resolving keep the
+	// chip and silently lose the headline.
+	test('seeds the headline alongside the chip, under one claim', () => {
+		const attach = vi.fn(async () => true);
+
+		renderSeed({ attach, chatTabId: 'chat-1', store });
+
+		expect(store.get(composerValueAtomFamily('chat-1'))).toBe(
+			'#44 Dedup recents',
+		);
+		expect(attach).toHaveBeenCalledTimes(1);
+	});
+
+	test('leaves a draft the user has already typed in alone', () => {
+		const attach = vi.fn(async () => true);
+		store.set(composerValueAtomFamily('chat-1'), 'my own prompt');
+
+		renderSeed({ attach, chatTabId: 'chat-1', store });
+
+		expect(store.get(composerValueAtomFamily('chat-1'))).toBe('my own prompt');
+		expect(attach).toHaveBeenCalledTimes(1);
 	});
 
 	test('does not attach again on a remount, which a route change causes', () => {

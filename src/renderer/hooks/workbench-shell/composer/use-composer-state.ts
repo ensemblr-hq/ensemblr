@@ -57,8 +57,6 @@ interface UseComposerStateArgs {
 	 * once so the agent holds the whole issue rather than an editable paraphrase.
 	 */
 	seedLinkedIssue?: WorkspaceLinkedIssueSummary;
-	/** Initial context (e.g. linked-issue headline) applied to an untouched composer. */
-	seedText?: string;
 }
 
 /**
@@ -254,7 +252,6 @@ export function useComposerState({
 	chatTabId,
 	composer,
 	seedLinkedIssue,
-	seedText,
 }: UseComposerStateArgs): ComposerStateApi {
 	const editorRef = useRef<ComposerEditorHandle | null>(null);
 	const anchorRef = useRef<HTMLDivElement | null>(null);
@@ -377,16 +374,6 @@ export function useComposerState({
 
 	// Drain review-context insertions queued from the Checks panel / diff views.
 	useComposerInsertConsumer(insertText);
-
-	// Seed the composer once per mount for issue-created workspaces. Only an
-	// untouched composer is seeded so user input is never overwritten.
-	const seedAppliedRef = useRef(false);
-	useEffect(() => {
-		if (seedText && !seedAppliedRef.current && value === '') {
-			seedAppliedRef.current = true;
-			setValue(seedText);
-		}
-	}, [seedText, value, setValue]);
 
 	const {
 		dispatchSubmit,
