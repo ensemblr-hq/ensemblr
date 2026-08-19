@@ -54,15 +54,20 @@ jobs:
     # Notarization is a round trip to Apple and routinely takes several minutes
     # per artifact.
     timeout-minutes: 60
+    # No secret is declared at job level: everything here is in scope for `npm
+    # ci`, so a dependency lifecycle script would run with it in the
+    # environment. `GH_TOKEN` carries `contents: write`, so it is injected into
+    # each step that shells out to `gh` instead.
     env:
       TAG: ${{ github.event.release.tag_name || inputs.tag }}
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - uses: actions/checkout@v7
         with:
           ref: ${{ github.event.release.tag_name || inputs.tag }}
 
       - name: Check the release exists and is published
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -uo pipefail
           state=$(gh release view "$TAG" --json isDraft -q .isDraft 2>/dev/null || echo missing)
@@ -110,6 +115,8 @@ jobs:
         run: npm run verify:signing
 
       - name: Attach the distributables to the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           find out/make -type f \( -name '*.dmg' -o -name '*.zip' \) \
@@ -125,6 +132,8 @@ jobs:
       # The filename is a contract with UPDATE_FEED_ASSET_NAME; renaming one
       # without the other strands every installed build on its current version.
       - name: Attach the update feed document
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           zip=$(basename "$(grep '\.zip$' "$RUNNER_TEMP/assets.txt" | head -1)")
@@ -139,6 +148,8 @@ jobs:
           gh release upload "$TAG" "$feed" --clobber
 
       - name: Set the prerelease flag from the tag
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           case "$TAG" in

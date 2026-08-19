@@ -24,6 +24,7 @@ import {
 	openEnsemblrDatabase,
 } from '../../src/main/storage/database.ts';
 import { buildRootDirectoryStub } from './helpers/root-directory-stub.ts';
+import { buildWorkspaceTeardownStub } from './helpers/workspace-teardown-stub.ts';
 
 const fixedNow = () => new Date('2026-06-08T12:00:00.000Z');
 
@@ -177,18 +178,78 @@ async function seedWorkspace(harness: Harness, name: string) {
 function makeArchiveService(
 	harness: Harness,
 	lifecycle = createArchiveLifecycleService(),
+	teardown = buildWorkspaceTeardownStub(),
 ) {
 	return {
 		lifecycle,
+		teardown,
 		service: createArchiveWorkspaceService({
 			archiveLifecycleService: lifecycle,
 			databaseService: harness.databaseService,
 			localCommandService: createLocalCommandService(),
 			now: fixedNow,
 			rootDirectoryService: rootDirectoryStub(harness),
+			workspaceTeardownService: teardown,
 		}),
 	};
 }
+
+test('archive winds the workspace down so nothing keeps running unseen', async (t) => {
+	const harness = createHarness(t);
+	const workspace = await seedWorkspace(harness, 'still-busy');
+
+	const { service, teardown } = makeArchiveService(harness);
+
+	const result = await service.archive({ workspaceId: workspace.id });
+
+	assert.equal(result.status, 'success');
+	assert.deepEqual(teardown.calls, [
+		{ workspaceId: workspace.id, workspacePath: workspace.path },
+	]);
+});
+
+test('a vetoed archive costs the user nothing that was running', async (t) => {
+	const harness = createHarness(t);
+	const workspace = await seedWorkspace(harness, 'veto-me');
+
+	const lifecycle = createArchiveLifecycleService();
+	lifecycle.subscribe('pre-archive-workspace', () => ({
+		abort: { code: 'workspace-busy', message: 'Pi session is still running.' },
+	}));
+
+	const { service, teardown } = makeArchiveService(harness, lifecycle);
+
+	const result = await service.archive({ workspaceId: workspace.id });
+
+	assert.equal(result.status, 'aborted');
+	assert.deepEqual(
+		teardown.calls,
+		[],
+		'a hook that vetoes the archive must not have killed anything first',
+	);
+});
+
+test('archive reports what refused to wind down as a warning', async (t) => {
+	const harness = createHarness(t);
+	const workspace = await seedWorkspace(harness, 'stubborn-archive');
+
+	const { service } = makeArchiveService(
+		harness,
+		createArchiveLifecycleService(),
+		buildWorkspaceTeardownStub([
+			'Terminal term-9 did not exit within 5000ms; its output may continue.',
+		]),
+	);
+
+	const result = await service.archive({ workspaceId: workspace.id });
+
+	assert.equal(result.status, 'success');
+	const warning = result.diagnostics.find((diagnostic) =>
+		diagnostic.message.includes('term-9'),
+	);
+	assert.ok(warning, 'the teardown failure reaches the caller');
+	assert.equal(warning?.severity, 'warning');
+});
 
 test('lifecycle archive preserves .context/, stamps archived_at, leaves worktree + branch alone', async (t) => {
 	const harness = createHarness(t);

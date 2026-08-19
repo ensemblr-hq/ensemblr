@@ -27,6 +27,7 @@ import {
 	openEnsemblrDatabase,
 } from '../../src/main/storage/database.ts';
 import { buildRootDirectoryStub } from './helpers/root-directory-stub.ts';
+import { buildWorkspaceTeardownStub } from './helpers/workspace-teardown-stub.ts';
 
 const fixedNow = () => new Date('2026-06-08T12:00:00.000Z');
 const laterNow = () => new Date('2026-06-09T09:00:00.000Z');
@@ -187,6 +188,7 @@ function makeArchiveService(harness: Harness) {
 		localCommandService: createLocalCommandService(),
 		now: fixedNow,
 		rootDirectoryService: rootDirectoryStub(harness),
+		workspaceTeardownService: buildWorkspaceTeardownStub(),
 	});
 	const unarchive = createUnarchiveWorkspaceService({
 		archiveLifecycleService: lifecycle,
@@ -197,6 +199,7 @@ function makeArchiveService(harness: Harness) {
 	const purge = createDeleteArchivedWorkspaceService({
 		databaseService: harness.databaseService,
 		localCommandService: createLocalCommandService(),
+		workspaceTeardownService: buildWorkspaceTeardownStub(),
 	});
 	const list = createListArchivedWorkspacesService({
 		databaseService: harness.databaseService,
@@ -399,6 +402,7 @@ test('destructive repository delete wipes the archived-contexts subtree for that
 		databaseService: harness.databaseService,
 		localCommandService: createLocalCommandService(),
 		rootDirectoryService: rootDirectoryStub(harness),
+		workspaceTeardownService: buildWorkspaceTeardownStub(),
 	});
 
 	const result = await deleteRepo.delete({

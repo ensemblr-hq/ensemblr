@@ -479,7 +479,7 @@ export function createWorkspaceService({
 				repositoryPath: repository.path,
 				workspacePath: prepared.path,
 			});
-			cleanupWorkspaceDirectory(prepared.path);
+			await cleanupWorkspaceDirectory(prepared.path);
 			const message = error instanceof Error ? error.message : '';
 			// SQLite's UNIQUE(repository_id, slug) is the authoritative
 			// guard against concurrent same-slug workspace creation.

@@ -34,9 +34,11 @@ interface LifecycleResult<TDiagnostic extends LifecycleDiagnostic> {
  * a dialog mid-delete and reopening it would otherwise hand back a fresh, idle
  * form and let a second destructive IPC start over the first.
  *
- * The latch covers the IPC and nothing after it: `reportedOutcome` cannot throw,
- * so the key is released the moment the call answers, and post-removal work that
- * stalls never strands the target behind a latch it can no longer clear.
+ * The latch covers the IPC and nothing after it: the key is released in a
+ * `finally` the moment the call answers, so post-removal work that stalls never
+ * strands the target behind a latch it can no longer clear. A second attempt
+ * while the first is genuinely still in flight reports the failure rather than
+ * no-opping, so the button is never dead without saying why.
  */
 const runsInFlight = new Set<string>();
 
@@ -75,14 +77,23 @@ export function useLifecycleDialogAction<
 
 	const start = async (): Promise<void> => {
 		if (runsInFlight.has(operationKey)) {
+			// An earlier run of this exact operation is still waiting on its IPC.
+			// Returning silently left the action button dead with nothing on screen
+			// to explain why, so render the failure headline instead — there is no
+			// detail to add beyond the code the dialog already translates.
+			setDiagnostics([failure('')]);
 			return;
 		}
 		runsInFlight.add(operationKey);
 		setIsBusy(true);
 		setDiagnostics([]);
 
-		const result = await reportedOutcome(run, failure);
-		runsInFlight.delete(operationKey);
+		let result: LifecycleResult<TDiagnostic>;
+		try {
+			result = await reportedOutcome(run, failure);
+		} finally {
+			runsInFlight.delete(operationKey);
+		}
 
 		try {
 			if (result.status !== 'success') {

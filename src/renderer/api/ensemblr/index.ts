@@ -12,6 +12,7 @@ export * from './checkpoints';
 export * from './clone';
 export * from './dictation';
 export * from './environment';
+export * from './forget-workspace-in-list-views';
 export * from './github';
 export * from './health';
 export * from './history';

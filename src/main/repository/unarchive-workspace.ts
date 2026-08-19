@@ -1,4 +1,5 @@
-import { cpSync, existsSync, mkdirSync } from 'node:fs';
+import { existsSync } from 'node:fs';
+import { mkdir } from 'node:fs/promises';
 import path from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
 
@@ -22,6 +23,7 @@ import {
 } from './archive-diagnostics.ts';
 import type { ArchiveLifecycleService } from './archive-lifecycle.ts';
 import { toLifecycleTargets } from './archive-lifecycle-targets.ts';
+import { copyDirectoryTree } from './copy-directory.ts';
 import { runWorktreeAdd as runWorktreeAddShared } from './git-ops.ts';
 import {
 	hasWorkspaceRepositoryIdentity,
@@ -222,7 +224,7 @@ export function createUnarchiveWorkspaceService({
 				};
 			}
 
-			const contextRestored = restoreContextDirectory({
+			const contextRestored = await restoreContextDirectory({
 				diagnostics,
 				source,
 			});
@@ -341,13 +343,13 @@ async function runWorktreeAdd({
  * @param options - Diagnostics sink and the archived workspace to restore from
  * @returns True when the directory was restored, false when skipped or on failure
  */
-function restoreContextDirectory({
+async function restoreContextDirectory({
 	diagnostics,
 	source,
 }: {
 	diagnostics: UnarchiveWorkspaceDiagnostic[];
 	source: ArchivedWorkspace;
-}): boolean {
+}): Promise<boolean> {
 	if (!source.archivedContextPath) {
 		diagnostics.push({
 			code: 'archived-context-missing',
@@ -373,17 +375,9 @@ function restoreContextDirectory({
 	}
 
 	const targetContextDir = path.join(source.path, CONTEXT_DIRECTORY);
+
 	try {
-		mkdirSync(source.path, { recursive: true });
-		cpSync(preservedContextDir, targetContextDir, {
-			dereference: false,
-			errorOnExist: false,
-			force: true,
-			preserveTimestamps: true,
-			recursive: true,
-			verbatimSymlinks: true,
-		});
-		return true;
+		await mkdir(source.path, { recursive: true });
 	} catch (error) {
 		diagnostics.push({
 			code: 'archived-context-restore-failed',
@@ -396,6 +390,23 @@ function restoreContextDirectory({
 		});
 		return false;
 	}
+
+	const restored = await copyDirectoryTree(
+		preservedContextDir,
+		targetContextDir,
+	);
+
+	if (restored.error !== null) {
+		diagnostics.push({
+			code: 'archived-context-restore-failed',
+			message: restored.error,
+			path: targetContextDir,
+			severity: 'warning',
+		});
+		return false;
+	}
+
+	return true;
 }
 
 /**

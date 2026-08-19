@@ -1,4 +1,4 @@
-import { existsSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
 
@@ -24,6 +24,8 @@ import { withTransaction } from '../storage/tx.ts';
 import { ARCHIVED_REPOSITORY_MARKER } from './archived-marker.ts';
 import { runBranchDelete, runWorktreeRemove } from './git-ops.ts';
 import { deleteCachedRepositoryIssues } from './issue-cache.ts';
+import { removeDirectoryTree } from './remove-directory.ts';
+import type { WorkspaceTeardownService } from './workspace-teardown.ts';
 
 /** Public surface of the repository delete (destructive) service. */
 export interface DeleteRepositoryService {
@@ -35,6 +37,7 @@ export interface CreateDeleteRepositoryServiceOptions {
 	databaseService: EnsemblrDatabaseService;
 	localCommandService: LocalCommandService;
 	rootDirectoryService: EnsemblrRootDirectoryService;
+	workspaceTeardownService: WorkspaceTeardownService;
 }
 
 /** In-memory shape of a repository and its workspaces loaded for deletion. */
@@ -64,6 +67,7 @@ export function createDeleteRepositoryService({
 	databaseService,
 	localCommandService,
 	rootDirectoryService,
+	workspaceTeardownService,
 }: CreateDeleteRepositoryServiceOptions): DeleteRepositoryService {
 	return {
 		delete: async (request) => {
@@ -100,6 +104,19 @@ export function createDeleteRepositoryService({
 			const diagnostics: DeleteRepositoryDiagnostic[] = [];
 
 			for (const workspace of source.workspaces) {
+				const teardown = await workspaceTeardownService.teardown({
+					workspaceId: workspace.id,
+					workspacePath: workspace.path,
+				});
+				for (const message of teardown.failures) {
+					diagnostics.push({
+						code: 'workspace-cleanup-failed',
+						message,
+						severity: 'warning',
+						workspaceId: workspace.id,
+					});
+				}
+
 				const worktreeOutcome = await runWorktreeRemove({
 					localCommandService,
 					repositoryPath: source.path,
@@ -115,7 +132,7 @@ export function createDeleteRepositoryService({
 					});
 				}
 
-				removeWorkspaceDirectory({ diagnostics, workspace });
+				await removeWorkspaceDirectory({ diagnostics, workspace });
 
 				if (workspace.branchName) {
 					const branchOutcome = await runBranchDelete({
@@ -155,7 +172,7 @@ export function createDeleteRepositoryService({
 
 			writeArchivedMarker({ diagnostics, repositoryPath: source.path });
 
-			removeArchivedContextsForRepository({
+			await removeArchivedContextsForRepository({
 				diagnostics,
 				rootDirectoryService,
 				repositorySlug: source.slug,
@@ -222,28 +239,23 @@ function readRepository(
  * Remove a workspace's worktree directory, recording a warning diagnostic when it cannot be deleted.
  * @param options - Diagnostics sink and the workspace whose directory is removed
  */
-function removeWorkspaceDirectory({
+async function removeWorkspaceDirectory({
 	diagnostics,
 	workspace,
 }: {
 	diagnostics: DeleteRepositoryDiagnostic[];
 	workspace: SourceWorkspace;
-}): void {
-	try {
-		rmSync(workspace.path, { force: true, recursive: true });
-	} catch (error) {
-		if (existsSync(workspace.path)) {
-			diagnostics.push({
-				code: 'workspace-cleanup-failed',
-				message:
-					error instanceof Error
-						? error.message
-						: 'Failed to remove the workspace directory.',
-				path: workspace.path,
-				severity: 'warning',
-				workspaceId: workspace.id,
-			});
-		}
+}): Promise<void> {
+	const outcome = await removeDirectoryTree(workspace.path);
+
+	if (outcome.error !== null || !outcome.removed) {
+		diagnostics.push({
+			code: 'workspace-cleanup-failed',
+			message: outcome.error ?? 'Failed to remove the workspace directory.',
+			path: workspace.path,
+			severity: 'warning',
+			workspaceId: workspace.id,
+		});
 	}
 }
 
@@ -345,7 +357,7 @@ function isRepositoryRow(row: unknown): row is {
  * under this repo's slug folder should disappear along with the workspace
  * rows. Errors surface as warnings; the row deletion has already succeeded.
  */
-function removeArchivedContextsForRepository({
+async function removeArchivedContextsForRepository({
 	diagnostics,
 	repositorySlug,
 	rootDirectoryService,
@@ -353,7 +365,7 @@ function removeArchivedContextsForRepository({
 	diagnostics: DeleteRepositoryDiagnostic[];
 	repositorySlug: string;
 	rootDirectoryService: EnsemblrRootDirectoryService;
-}): void {
+}): Promise<void> {
 	const snapshot = rootDirectoryService.getSnapshot();
 	if (!snapshot?.archivedContextsPath) {
 		return;
@@ -365,15 +377,15 @@ function removeArchivedContextsForRepository({
 	if (!existsSync(repositoryArchivePath)) {
 		return;
 	}
-	try {
-		rmSync(repositoryArchivePath, { force: true, recursive: true });
-	} catch (error) {
+
+	const outcome = await removeDirectoryTree(repositoryArchivePath);
+
+	if (outcome.error !== null || !outcome.removed) {
 		diagnostics.push({
 			code: 'workspace-cleanup-failed',
 			message:
-				error instanceof Error
-					? error.message
-					: 'Failed to remove the archived-contexts directory for the repository.',
+				outcome.error ??
+				'Failed to remove the archived-contexts directory for the repository.',
 			path: repositoryArchivePath,
 			severity: 'warning',
 		});

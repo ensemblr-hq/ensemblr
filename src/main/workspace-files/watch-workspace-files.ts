@@ -52,6 +52,13 @@ export interface WorkspaceFilesWatcher {
 	watch: (workspaceCwd: string) => void;
 	/** Drop one watch reference; closes the OS watcher once it reaches zero. */
 	unwatch: (workspaceCwd: string) => void;
+	/**
+	 * Closes one directory's watcher whatever its reference count, for a
+	 * workspace being removed. `unwatch` cannot serve here: it drops a single
+	 * reference, and a workspace open in two windows would keep watching a
+	 * directory that is being unlinked.
+	 */
+	stopWatching: (workspaceCwd: string) => void;
 	/** Closes every watcher and pending timer; call on app quit. */
 	stopAll: () => void;
 }
@@ -106,6 +113,23 @@ export function createWorkspaceFilesWatcher({
 		entry.handle.close();
 	};
 
+	/**
+	 * Closes one directory's watcher and forgets it, whatever its reference
+	 * count. The single teardown path: `unwatch` reaching zero, a watcher error,
+	 * and `stopWatching` all end here so the three cannot drift.
+	 * @param workspaceCwd - Absolute path of the watched directory
+	 */
+	const closeWatch = (workspaceCwd: string): void => {
+		const entry = entries.get(workspaceCwd);
+
+		if (!entry) {
+			return;
+		}
+
+		closeEntry(entry);
+		entries.delete(workspaceCwd);
+	};
+
 	return {
 		watch(workspaceCwd) {
 			if (!path.isAbsolute(workspaceCwd)) {
@@ -132,12 +156,7 @@ export function createWorkspaceFilesWatcher({
 					// A watcher error (e.g. the directory was removed) must not crash
 					// main; drop the entry so a later watch() can re-establish it.
 					() => {
-						const current = entries.get(workspaceCwd);
-
-						if (current) {
-							closeEntry(current);
-							entries.delete(workspaceCwd);
-						}
+						closeWatch(workspaceCwd);
 					},
 				);
 			} catch {
@@ -161,9 +180,9 @@ export function createWorkspaceFilesWatcher({
 				return;
 			}
 
-			closeEntry(entry);
-			entries.delete(workspaceCwd);
+			closeWatch(workspaceCwd);
 		},
+		stopWatching: closeWatch,
 		stopAll() {
 			for (const entry of entries.values()) {
 				closeEntry(entry);

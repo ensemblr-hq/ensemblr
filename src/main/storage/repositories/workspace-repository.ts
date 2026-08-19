@@ -870,10 +870,13 @@ export interface ListWorkspaceRowsByPathPrefixOptions {
 }
 
 /**
- * Returns workspace rows whose `path` begins with `pathPrefix`. Used by the
- * shared-root stale detector — workspaces under the managed root that no
- * longer exist on disk are reaped from SQLite. The `LIKE ? || '%'` pattern
- * preserves the legacy index-friendly form.
+ * Returns live workspace rows whose `path` begins with `pathPrefix`. Used by the
+ * shared-root stale detector — workspaces under the managed root that no longer
+ * exist on disk are reaped from SQLite. Archived rows are excluded because
+ * archiving with branch cleanup deliberately removes the worktree while keeping
+ * the row, so reaping them turned every such archive into an unrecoverable
+ * delete on the next launch. The `LIKE ? || '%'` pattern preserves the legacy
+ * index-friendly form.
  */
 export function listWorkspaceRowsByPathPrefix({
 	database,
@@ -881,7 +884,7 @@ export function listWorkspaceRowsByPathPrefix({
 }: ListWorkspaceRowsByPathPrefixOptions): unknown[] {
 	return database
 		.prepare(
-			"SELECT id, path, metadata_json AS metadataJson FROM workspaces WHERE path LIKE ? || '%'",
+			"SELECT id, path, metadata_json AS metadataJson FROM workspaces WHERE path LIKE ? || '%' AND archived_at IS NULL",
 		)
 		.all(pathPrefix);
 }

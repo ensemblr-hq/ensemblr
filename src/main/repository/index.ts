@@ -124,3 +124,9 @@ export type {
 	UnarchiveWorkspaceService,
 } from './unarchive-workspace.ts';
 export { createUnarchiveWorkspaceService } from './unarchive-workspace.ts';
+export type {
+	WorkspaceTeardownPorts,
+	WorkspaceTeardownReport,
+	WorkspaceTeardownService,
+} from './workspace-teardown.ts';
+export { createWorkspaceTeardownService } from './workspace-teardown.ts';

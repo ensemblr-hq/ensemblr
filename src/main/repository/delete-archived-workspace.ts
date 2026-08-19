@@ -1,4 +1,4 @@
-import { existsSync, rmSync } from 'node:fs';
+import { existsSync } from 'node:fs';
 import type { DatabaseSync } from 'node:sqlite';
 
 import type {
@@ -11,7 +11,9 @@ import type { LocalCommandService } from '../commands/local-command';
 import type { EnsemblrDatabaseService } from '../storage';
 import { selectDeleteArchivedWorkspaceJoinById } from '../storage/repositories/workspace-repository.ts';
 import { runBranchDelete, runWorktreeRemove } from './git-ops.ts';
+import { removeDirectoryTree } from './remove-directory.ts';
 import { deleteWorkspaceRow } from './workspace-row-ops.ts';
+import type { WorkspaceTeardownService } from './workspace-teardown.ts';
 
 /** Public surface of the delete-archived-workspace service. */
 export interface DeleteArchivedWorkspaceService {
@@ -24,6 +26,7 @@ export interface DeleteArchivedWorkspaceService {
 export interface CreateDeleteArchivedWorkspaceServiceOptions {
 	databaseService: EnsemblrDatabaseService;
 	localCommandService: LocalCommandService;
+	workspaceTeardownService: WorkspaceTeardownService;
 }
 
 /** Archived-workspace row joined with its archive record, used to drive a permanent delete. */
@@ -47,6 +50,7 @@ interface ArchivedWorkspace {
 export function createDeleteArchivedWorkspaceService({
 	databaseService,
 	localCommandService,
+	workspaceTeardownService,
 }: CreateDeleteArchivedWorkspaceServiceOptions): DeleteArchivedWorkspaceService {
 	return {
 		delete: async (request) => {
@@ -90,6 +94,18 @@ export function createDeleteArchivedWorkspaceService({
 
 			const diagnostics: DeleteArchivedWorkspaceDiagnostic[] = [];
 
+			const teardown = await workspaceTeardownService.teardown({
+				workspaceId: source.id,
+				workspacePath: source.path,
+			});
+			for (const message of teardown.failures) {
+				diagnostics.push({
+					code: 'worktree-cleanup-failed',
+					message,
+					severity: 'warning',
+				});
+			}
+
 			let pathRemoved = !existsSync(source.path);
 			if (!pathRemoved) {
 				const worktreeOutcome = await runWorktreeRemove({
@@ -105,7 +121,7 @@ export function createDeleteArchivedWorkspaceService({
 						severity: 'warning',
 					});
 				}
-				pathRemoved = removeWorkspaceDirectory({
+				pathRemoved = await removeWorkspaceDirectory({
 					diagnostics,
 					workspacePath: source.path,
 				});
@@ -129,7 +145,7 @@ export function createDeleteArchivedWorkspaceService({
 				}
 			}
 
-			const contextRemoved = removeArchivedContextDirectory({
+			const contextRemoved = await removeArchivedContextDirectory({
 				diagnostics,
 				preservedPath: source.archivedContextPath,
 			});
@@ -216,28 +232,25 @@ function readArchivedWorkspace(
  * @param workspacePath - Absolute path of the worktree directory
  * @returns True when the directory no longer exists afterwards
  */
-function removeWorkspaceDirectory({
+async function removeWorkspaceDirectory({
 	diagnostics,
 	workspacePath,
 }: {
 	diagnostics: DeleteArchivedWorkspaceDiagnostic[];
 	workspacePath: string;
-}): boolean {
-	try {
-		rmSync(workspacePath, { force: true, recursive: true });
-	} catch (error) {
+}): Promise<boolean> {
+	const outcome = await removeDirectoryTree(workspacePath);
+
+	if (outcome.error !== null || !outcome.removed) {
 		diagnostics.push({
 			code: 'worktree-cleanup-failed',
-			message:
-				error instanceof Error
-					? error.message
-					: 'Failed to remove the workspace directory.',
+			message: outcome.error ?? 'Failed to remove the workspace directory.',
 			path: workspacePath,
 			severity: 'warning',
 		});
-		return !existsSync(workspacePath);
 	}
-	return !existsSync(workspacePath);
+
+	return outcome.removed;
 }
 
 /**
@@ -247,34 +260,34 @@ function removeWorkspaceDirectory({
  * @param preservedPath - Path of the preserved directory, or null when none was kept
  * @returns True when the directory is absent afterwards
  */
-function removeArchivedContextDirectory({
+async function removeArchivedContextDirectory({
 	diagnostics,
 	preservedPath,
 }: {
 	diagnostics: DeleteArchivedWorkspaceDiagnostic[];
 	preservedPath: string | null;
-}): boolean {
+}): Promise<boolean> {
 	if (!preservedPath) {
 		return false;
 	}
 	if (!existsSync(preservedPath)) {
 		return true;
 	}
-	try {
-		rmSync(preservedPath, { force: true, recursive: true });
-		return !existsSync(preservedPath);
-	} catch (error) {
+
+	const outcome = await removeDirectoryTree(preservedPath);
+
+	if (outcome.error !== null || !outcome.removed) {
 		diagnostics.push({
 			code: 'archived-context-cleanup-failed',
 			message:
-				error instanceof Error
-					? error.message
-					: 'Failed to remove the archived-contexts directory.',
+				outcome.error ?? 'Failed to remove the archived-contexts directory.',
 			path: preservedPath,
 			severity: 'warning',
 		});
 		return false;
 	}
+
+	return outcome.removed;
 }
 
 /**

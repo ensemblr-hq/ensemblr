@@ -64,6 +64,24 @@
 				"rules": ["react-doctor/async-await-in-loop"]
 			},
 			{
+				// Two consecutive awaits that the rule reads as independent, but each
+				// pair has an ordering constraint the AST cannot see. workspace-teardown
+				// stops the agent runtimes before it lists and kills the PTYs, because a
+				// live agent can open a terminal through agent control — listing first
+				// would miss any PTY started in between, and both phases are already
+				// individually deadlined so the ordering costs a bounded wait. In
+				// unarchive-workspace the `post-unarchive-workspace` hook must observe
+				// the finished workspace: it fires after `.context/` is copied back into
+				// the worktree, and racing it would let a subscriber read a half-restored
+				// tree. Both pairs also append to one shared `diagnostics` array, so
+				// Promise.all would interleave the reported order nondeterministically.
+				"files": [
+					"src/main/repository/unarchive-workspace.ts",
+					"src/main/repository/workspace-teardown.ts"
+				],
+				"rules": ["react-doctor/server-sequential-independent-await"]
+			},
+			{
 				// `probeContextUsage` guards on `closed` *after* awaiting
 				// `getContextUsage()` on purpose: the check asks whether the session
 				// shut down while that control request was in flight, so hoisting it

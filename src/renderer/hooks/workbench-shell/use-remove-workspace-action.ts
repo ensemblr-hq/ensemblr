@@ -1,9 +1,12 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { useNavigate, useRouter } from '@tanstack/react-router';
+import { useRouter } from '@tanstack/react-router';
 import { useSetAtom } from 'jotai';
 import { useCallback } from 'react';
 
-import { invalidateWorkspaceListViews } from '@/renderer/api/ensemblr';
+import {
+	forgetWorkspaceInListViews,
+	invalidateWorkspaceListViews,
+} from '@/renderer/api/ensemblr';
 import { forgetLastRunScript } from '@/renderer/state/preferences';
 import {
 	forgetWorkspaceViewedChangesAtom,
@@ -12,9 +15,19 @@ import {
 import { deleteLastUsedOpenTarget } from '@/renderer/state/workspace/open-target-history';
 
 /**
- * Returns the shared post-removal action for archived or deleted workspaces.
- * It invalidates the workspace list and redirects only when the removed
- * workspace is active.
+ * Returns the shared post-removal action for archived or deleted workspaces. It
+ * drops the workspace from the cached list views and refreshes them; removing
+ * the active one also hops the shell to Welcome.
+ *
+ * That hop is a consequence of the cached drop rather than a second call
+ * alongside it. Clearing the held render state and dropping the workspace from
+ * the navigation snapshot together leave `WorkspaceWorkbenchLayout` without a
+ * selection, and its own `<Navigate replace to='/'>` answers that. Calling
+ * `navigate()` here as well raced that redirect and ran the index loader — which
+ * can itself redirect to a sibling workspace — twice; awaiting it instead left a
+ * removed workspace in the sidebar for the life of the process whenever the
+ * navigation promise did not settle. Neither is needed: the drop is synchronous
+ * and cannot stall.
  *
  * The persisted workspace selection is deliberately kept: the index loader
  * reads a stored pair whose workspace vanished as "open a sibling in that
@@ -28,7 +41,6 @@ export function useRemoveWorkspaceAction(options: {
 	activeWorkspaceId: string | null;
 }) {
 	const { activeWorkspaceId } = options;
-	const navigate = useNavigate();
 	const queryClient = useQueryClient();
 	const router = useRouter();
 	const forgetViewedChanges = useSetAtom(forgetWorkspaceViewedChangesAtom);
@@ -51,24 +63,22 @@ export function useRemoveWorkspaceAction(options: {
 
 			const hopsToWelcome = activeWorkspaceId === removedWorkspaceId;
 
-			// Hop first: a list refresh landing while the shell still sits on the
-			// removed workspace leaves it selectionless, and the workspace layout
-			// answers that with its own redirect to Welcome — a second navigation.
-			if (hopsToWelcome) {
-				await navigate({ replace: true, to: '/' });
-			}
+			// The update the UI actually depends on, and the only step here that
+			// cannot stall: everything below re-reads through the main process.
+			// When the removed workspace is the active one this is also what takes
+			// the shell off it, via the layout's own redirect.
+			forgetWorkspaceInListViews(queryClient, removedWorkspaceId);
 
-			await invalidateWorkspaceListViews(queryClient);
-
-			// The hop above already re-ran every loader on the destination route.
-			if (!hopsToWelcome) {
-				await router.invalidate();
-			}
+			// That redirect re-runs every loader on the destination route, so the
+			// router only needs invalidating when the shell is staying put.
+			await Promise.allSettled([
+				invalidateWorkspaceListViews(queryClient),
+				hopsToWelcome ? Promise.resolve() : router.invalidate(),
+			]);
 		},
 		[
 			activeWorkspaceId,
 			forgetViewedChanges,
-			navigate,
 			queryClient,
 			router,
 			setLastNavigationRenderState,
