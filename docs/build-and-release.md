@@ -158,7 +158,7 @@ you need to bisect a packaging break.
 **Write the notes and create the release. That is the whole ritual.**
 
 ```bash
-gh release create v0.1.0-beta.7 --notes-file NOTES.md --prerelease
+gh release create v0.1.0-beta.8 --notes-file NOTES.md --prerelease
 ```
 
 That creates the tag and fires `release: published`, which triggers

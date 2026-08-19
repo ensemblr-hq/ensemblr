@@ -9,6 +9,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.0-beta.8] - 2026-08-19
+
+The app updates itself, and a chat you are reading stops marking itself unread. Signed, notarized,
+Apple silicon.
+[Release](https://github.com/ensemblr-hq/ensemblr/releases/tag/v0.1.0-beta.8) ·
+[`.dmg`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.0-beta.8/Ensemblr-0.1.0-beta.8-arm64.dmg)
+
+### Added
+
+- **In-app auto-update.** An installed copy checks GitHub a couple of minutes after launch and every
+  four hours after that, downloads a newer build in the background, and offers a restart into it —
+  you choose when. **Settings → General** shows the running version and the updater's state, and
+  **Ensemblr → Check for Updates…** runs a check on the spot. A build only ever reads its own
+  channel's releases — tagged `v*` for release, the rolling `nightly` for canary — and the two carry
+  different bundle ids, so an update cannot cross between them. Builds that cannot update at all —
+  non-darwin, unpackaged, the dev channel, a copy outside `/Applications` — say so instead of
+  failing. See [ADR 0055](./docs/adr/0055-resolve-updates-in-app-against-the-github-releases-api.md).
+- `app.general.automaticUpdates` (default on) turns the updater off entirely for a copy a package
+  manager owns. Off is a hard off: no schedule, no manual check, no install.
+- Both release workflows publish an `update-darwin-arm64.json` feed document beside the `.dmg` and
+  `.zip`, which is what lets an installed build compare versions without parsing a tag or a release
+  body.
+
+### Fixed
+
+- The chat you are reading no longer marks itself unread. "A turn finished" is decided by the
+  main-process activity monitor rather than derived from the raw session-event stream, so a chat
+  hosting somebody's sub-agent and an `idle` that is the tail of a stop you asked for no longer count.
+- The unread mark and the desktop notification no longer disagree about which chat is on screen: both
+  sides match on either session id, so a first paint, an agent-opened tab, or a resumed runtime cannot
+  slip a mark past the on-screen check.
+- The composer's jump-to-unread control retires the mark it acted on, instead of leaving it to the
+  arriving chat — which covered neither a tab that is gone nor a jump to the chat already routed.
+
 ## [0.1.0-beta.7] - 2026-08-18
 
 Linear stops making you wait for the network, four dialogs stop being able to freeze the app, and
