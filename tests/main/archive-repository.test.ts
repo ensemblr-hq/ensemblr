@@ -23,6 +23,7 @@ import {
 	openEnsemblrDatabase,
 } from '../../src/main/storage/database.ts';
 import { buildRootDirectoryStub } from './helpers/root-directory-stub.ts';
+import { buildWorkspaceTeardownStub } from './helpers/workspace-teardown-stub.ts';
 
 const fixedNow = () => new Date('2026-06-08T12:00:00.000Z');
 
@@ -178,6 +179,7 @@ function makeArchiveService(
 		localCommandService: createLocalCommandService(),
 		now: fixedNow,
 		rootDirectoryService: rootDirectoryStub(harness),
+		workspaceTeardownService: buildWorkspaceTeardownStub(),
 	});
 	const service = createArchiveRepositoryService({
 		archiveLifecycleService: lifecycle,

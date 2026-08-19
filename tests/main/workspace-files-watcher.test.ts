@@ -128,6 +128,75 @@ describe('createWorkspaceFilesWatcher', () => {
 		expect(changes).toEqual(['/abs/workspace']);
 	});
 
+	// A workspace open in two windows holds two references, so the `unwatch` the
+	// removal could issue would leave the OS watching a directory being unlinked.
+	test('stopWatching closes the OS watch whatever the reference count', async () => {
+		const changes: string[] = [];
+		const { startWatch, watches } = fakeWatchFactory();
+		const watcher = createWorkspaceFilesWatcher({
+			onChange: (cwd) => changes.push(cwd),
+			startWatch,
+		});
+
+		watcher.watch('/abs/workspace');
+		watcher.watch('/abs/workspace');
+
+		watcher.stopWatching('/abs/workspace');
+
+		expect(watches[0].closed).toBe(true);
+		watches[0].changed('src/a.ts');
+		await sleep(AFTER_DEBOUNCE_MS);
+		expect(changes).toEqual([]);
+	});
+
+	test('stopWatching leaves other workspaces watched', () => {
+		const { startWatch, watches } = fakeWatchFactory();
+		const watcher = createWorkspaceFilesWatcher({
+			onChange: () => undefined,
+			startWatch,
+		});
+
+		watcher.watch('/abs/one');
+		watcher.watch('/abs/two');
+
+		watcher.stopWatching('/abs/one');
+
+		expect(watches[0].closed).toBe(true);
+		expect(watches[1].closed).toBe(false);
+	});
+
+	test('stopWatching an unwatched cwd is a no-op', () => {
+		const { startWatch, watches } = fakeWatchFactory();
+		const watcher = createWorkspaceFilesWatcher({
+			onChange: () => undefined,
+			startWatch,
+		});
+
+		expect(() => watcher.stopWatching('/abs/never-watched')).not.toThrow();
+		expect(watches).toHaveLength(0);
+	});
+
+	// stopWatching drops the entry outright, so the next watch() has to establish
+	// a fresh OS watch rather than resurrect a closed one.
+	test('a watch after stopWatching starts a new OS watch', async () => {
+		const changes: string[] = [];
+		const { startWatch, watches } = fakeWatchFactory();
+		const watcher = createWorkspaceFilesWatcher({
+			onChange: (cwd) => changes.push(cwd),
+			startWatch,
+		});
+
+		watcher.watch('/abs/workspace');
+		watcher.stopWatching('/abs/workspace');
+		watcher.watch('/abs/workspace');
+
+		expect(watches).toHaveLength(2);
+		expect(watches[1].closed).toBe(false);
+		watches[1].changed('src/a.ts');
+		await sleep(AFTER_DEBOUNCE_MS);
+		expect(changes).toEqual(['/abs/workspace']);
+	});
+
 	test('drops the entry when the watcher errors', () => {
 		const { startWatch, watches } = fakeWatchFactory();
 		const watcher = createWorkspaceFilesWatcher({

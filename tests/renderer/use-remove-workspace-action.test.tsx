@@ -10,6 +10,7 @@ const {
 	navigate,
 	invalidate,
 	invalidateWorkspaceListViews,
+	forgetWorkspaceInListViews,
 	deleteLastUsedOpenTarget,
 	calls,
 } = vi.hoisted(() => {
@@ -23,6 +24,9 @@ const {
 		}),
 		invalidateWorkspaceListViews: vi.fn(async () => {
 			calls.push('invalidateWorkspaceListViews');
+		}),
+		forgetWorkspaceInListViews: vi.fn(() => {
+			calls.push('forgetWorkspaceInListViews');
 		}),
 		deleteLastUsedOpenTarget: vi.fn(),
 		calls,
@@ -40,6 +44,7 @@ vi.mock('@/renderer/api/ensemblr', () => ({
 		agentModels: () => ['pi-models'],
 		repositoryWorkspaceNavigation: () => ['nav'],
 	},
+	forgetWorkspaceInListViews,
 	invalidateWorkspaceListViews,
 	isEnsemblrApiAvailable: () => true,
 }));
@@ -83,7 +88,7 @@ beforeEach(() => {
 	calls.length = 0;
 });
 
-test('routes away from the archived workspace when it is the active one', async () => {
+test('drops the archived workspace from the lists when it is the active one', async () => {
 	const view = renderRemoveWorkspaceAction('san-antonio');
 
 	await act(async () => {
@@ -91,21 +96,51 @@ test('routes away from the archived workspace when it is the active one', async 
 	});
 
 	expect(deleteLastUsedOpenTarget).toHaveBeenCalledWith('san-antonio');
-	expect(navigate).toHaveBeenCalledWith({ replace: true, to: '/' });
+	expect(forgetWorkspaceInListViews).toHaveBeenCalledWith(
+		expect.anything(),
+		'san-antonio',
+	);
 	expect(invalidateWorkspaceListViews).toHaveBeenCalledTimes(1);
 });
 
-test('hops off the archived workspace before the lists drop it from under the shell', async () => {
+// The cached drop leaves the workspace layout selectionless and it redirects
+// itself. Navigating here as well put two replace-hops to '/' in flight at once,
+// and ran the index loader — which can redirect on to a sibling workspace —
+// twice against a cache still settling.
+test('leaves the hop to the layout instead of racing it with its own navigate', async () => {
 	const view = renderRemoveWorkspaceAction('san-antonio');
 
 	await act(async () => {
 		await view.result.current.remove('san-antonio');
 	});
 
-	expect(calls).toEqual(['navigate', 'invalidateWorkspaceListViews']);
+	expect(navigate).not.toHaveBeenCalled();
+	expect(calls).toEqual([
+		'forgetWorkspaceInListViews',
+		'invalidateWorkspaceListViews',
+	]);
 });
 
-test('skips the router invalidation the navigation already performed', async () => {
+// Everything after the drop re-reads through the main process, so none of it may
+// be what keeps a removed workspace on screen.
+test('drops the workspace from the lists before the refetch settles', async () => {
+	invalidateWorkspaceListViews.mockImplementationOnce(
+		() => new Promise<void>(() => {}),
+	);
+	const view = renderRemoveWorkspaceAction('san-antonio');
+
+	await act(async () => {
+		void view.result.current.remove('san-antonio');
+		await Promise.resolve();
+	});
+
+	expect(forgetWorkspaceInListViews).toHaveBeenCalledWith(
+		expect.anything(),
+		'san-antonio',
+	);
+});
+
+test('skips the router invalidation the layout redirect already performed', async () => {
 	const view = renderRemoveWorkspaceAction('san-antonio');
 
 	await act(async () => {

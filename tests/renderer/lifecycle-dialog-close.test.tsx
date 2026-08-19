@@ -417,6 +417,39 @@ describe('lifecycle dialogs close independently of post-removal navigation', () 
 		expect(deleteWorkspace).toHaveBeenCalledTimes(1);
 	});
 
+	// The latch used to `return` silently, which left the reopened dialog's button
+	// dead with nothing on screen saying why. A workspace that cannot be deleted
+	// and will not say so is indistinguishable from a frozen app.
+	it('reports the blocked retry instead of leaving the button dead', async () => {
+		const deleteWorkspace = vi.fn(() => never());
+		installEnsemblrApi({ deleteWorkspace });
+
+		renderWithProviders(
+			<ReopenableHost onDeleted={vi.fn()} targetId='ws-latched' />,
+		);
+
+		await userEvent.click(screen.getByRole('button', { name: /^delete$/i }));
+		await waitFor(() => {
+			expect(hasFooterButton(/^close$/i)).toBe(true);
+		});
+		await userEvent.click(footerButton(/^close$/i));
+		await waitFor(() => {
+			expect(screen.queryByRole('dialog')).toBeNull();
+		});
+
+		await userEvent.click(screen.getByRole('button', { name: /reopen/i }));
+		expect(screen.queryByTestId('delete-workspace-diagnostics')).toBeNull();
+
+		await userEvent.click(screen.getByRole('button', { name: /^delete$/i }));
+
+		await waitFor(() => {
+			expect(
+				screen.getByTestId('delete-workspace-diagnostics'),
+			).toBeInTheDocument();
+		});
+		expect(deleteWorkspace).toHaveBeenCalledTimes(1);
+	});
+
 	// Two clicks dispatched in one task both read the same render's `isBusy`, so
 	// a plain state guard lets both through and the destructive IPC runs twice.
 	it('starts the delete once when the action is fired twice in one task', async () => {

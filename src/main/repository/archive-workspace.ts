@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
-import { cpSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, writeFileSync } from 'node:fs';
+import { mkdir } from 'node:fs/promises';
 import path from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
 
@@ -26,8 +27,10 @@ import type { ArchiveLifecycleService } from './archive-lifecycle.ts';
 import { toLifecycleTargets } from './archive-lifecycle-targets.ts';
 import { insertArchiveRecord } from './archive-records.ts';
 import { readContinuedBranches } from './continued-branches.ts';
+import { copyDirectoryTree } from './copy-directory.ts';
 import { runBranchDelete, runWorktreeRemove } from './git-ops.ts';
 import { hasWorkspaceRepositoryIdentity, isRecord } from './row-guards.ts';
+import type { WorkspaceTeardownService } from './workspace-teardown.ts';
 
 /** Public surface of the workspace lifecycle archive service. */
 export interface ArchiveWorkspaceService {
@@ -43,6 +46,7 @@ export interface CreateArchiveWorkspaceServiceOptions {
 	localCommandService: LocalCommandService;
 	now?: () => Date;
 	rootDirectoryService: EnsemblrRootDirectoryService;
+	workspaceTeardownService: WorkspaceTeardownService;
 }
 
 /** Workspace + repository fields the lifecycle archive needs in one read. */
@@ -78,6 +82,7 @@ export function createArchiveWorkspaceService({
 	localCommandService,
 	now = () => new Date(),
 	rootDirectoryService,
+	workspaceTeardownService,
 }: CreateArchiveWorkspaceServiceOptions): ArchiveWorkspaceService {
 	return {
 		archive: async (request) => {
@@ -138,7 +143,7 @@ export function createArchiveWorkspaceService({
 			const archivedAt = now().toISOString();
 			const diagnostics: ArchiveWorkspaceDiagnostic[] = [];
 
-			const preserved = preserveContextDirectory({
+			const preserved = await preserveContextDirectory({
 				archivedAt,
 				archivedContextsRoot: rootSnapshot.archivedContextsPath,
 				diagnostics,
@@ -170,6 +175,22 @@ export function createArchiveWorkspaceService({
 					status: 'aborted',
 					workspace: null,
 				};
+			}
+
+			// An archived workspace leaves the navigation, so anything still running
+			// in it becomes an orphan the user can no longer see or stop. Detached
+			// only once the archive is certain to proceed: a hook that vetoes it
+			// must not cost the user their terminals and agent turns.
+			const teardown = await workspaceTeardownService.teardown({
+				workspaceId: source.id,
+				workspacePath: source.path,
+			});
+			for (const message of teardown.failures) {
+				diagnostics.push({
+					code: 'workspace-update-failed',
+					message,
+					severity: 'warning',
+				});
 			}
 
 			const recordId = `archive-${randomUUID()}`;
@@ -352,7 +373,7 @@ async function deleteBranchChain({
  * Records a diagnostic when the copy fails; returns `archivedContextPath: null`
  * so the lifecycle continues even if the user already wiped the directory.
  */
-function preserveContextDirectory({
+async function preserveContextDirectory({
 	archivedAt,
 	archivedContextsRoot,
 	diagnostics,
@@ -362,7 +383,7 @@ function preserveContextDirectory({
 	archivedContextsRoot: string;
 	diagnostics: ArchiveWorkspaceDiagnostic[];
 	source: SourceWorkspace;
-}): { archivedContextPath: string | null } {
+}): Promise<{ archivedContextPath: string | null }> {
 	const directoryName = `${source.slug}-${toFilesystemTimestamp(archivedAt)}`;
 	const archivedContextPath = path.join(
 		archivedContextsRoot,
@@ -381,7 +402,7 @@ function preserveContextDirectory({
 	}
 
 	try {
-		mkdirSync(archivedContextPath, { recursive: true });
+		await mkdir(archivedContextPath, { recursive: true });
 	} catch (error) {
 		diagnostics.push({
 			code: 'archived-context-copy-failed',
@@ -402,26 +423,19 @@ function preserveContextDirectory({
 		return { archivedContextPath };
 	}
 
-	try {
-		cpSync(
-			sourceContextDir,
-			path.join(archivedContextPath, CONTEXT_DIRECTORY),
-			{
-				dereference: false,
-				errorOnExist: false,
-				force: true,
-				preserveTimestamps: true,
-				recursive: true,
-				verbatimSymlinks: true,
-			},
-		);
-	} catch (error) {
+	// The terminals writing into this tree are torn down after the archive is
+	// certain to proceed, which is after this copy — so the retries inside
+	// `copyDirectoryTree` are what stop a scrollback flush rotating a file
+	// mid-walk from costing the user the whole preserved context.
+	const copied = await copyDirectoryTree(
+		sourceContextDir,
+		path.join(archivedContextPath, CONTEXT_DIRECTORY),
+	);
+
+	if (copied.error !== null) {
 		diagnostics.push({
 			code: 'archived-context-copy-failed',
-			message:
-				error instanceof Error
-					? error.message
-					: 'Failed to preserve the workspace .context directory.',
+			message: copied.error,
 			path: sourceContextDir,
 			severity: 'warning',
 		});

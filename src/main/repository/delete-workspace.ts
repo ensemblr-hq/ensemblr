@@ -1,4 +1,3 @@
-import { existsSync, rmSync } from 'node:fs';
 import type { DatabaseSync } from 'node:sqlite';
 
 import type {
@@ -12,7 +11,9 @@ import type { LocalCommandService } from '../commands/local-command';
 import type { EnsemblrDatabaseService } from '../storage';
 import { selectDeleteWorkspaceWithRepositoryById } from '../storage/repositories/workspace-repository.ts';
 import { runBranchDelete, runWorktreeRemove } from './git-ops.ts';
+import { removeDirectoryTree } from './remove-directory.ts';
 import { deleteWorkspaceRow } from './workspace-row-ops.ts';
+import type { WorkspaceTeardownService } from './workspace-teardown.ts';
 
 /** Public surface of the workspace delete (destructive) service. */
 export interface DeleteWorkspaceService {
@@ -23,6 +24,7 @@ export interface DeleteWorkspaceService {
 export interface CreateDeleteWorkspaceServiceOptions {
 	databaseService: EnsemblrDatabaseService;
 	localCommandService: LocalCommandService;
+	workspaceTeardownService: WorkspaceTeardownService;
 }
 
 /** In-memory shape of a workspace row and its repository path loaded for deletion. */
@@ -44,6 +46,7 @@ interface SourceWorkspace {
 export function createDeleteWorkspaceService({
 	databaseService,
 	localCommandService,
+	workspaceTeardownService,
 }: CreateDeleteWorkspaceServiceOptions): DeleteWorkspaceService {
 	return {
 		delete: async (request) => {
@@ -79,6 +82,22 @@ export function createDeleteWorkspaceService({
 
 			const diagnostics: DeleteWorkspaceDiagnostic[] = [];
 
+			// Detach every subsystem holding the worktree open before unlinking it.
+			// A PTY or agent child left running watches its own tree vanish and
+			// streams the fallout on an unthrottled channel for as long as it
+			// lives, which is until the app is killed.
+			const teardown = await workspaceTeardownService.teardown({
+				workspaceId: source.id,
+				workspacePath: source.path,
+			});
+			for (const message of teardown.failures) {
+				diagnostics.push({
+					code: 'workspace-delete-failed',
+					message,
+					severity: 'warning',
+				});
+			}
+
 			const worktreeOutcome = await runWorktreeRemove({
 				localCommandService,
 				repositoryPath: source.repositoryPath,
@@ -93,7 +112,7 @@ export function createDeleteWorkspaceService({
 				});
 			}
 
-			const pathRemoved = removeWorkspaceDirectory({
+			const pathRemoved = await removeWorkspaceDirectory({
 				diagnostics,
 				workspacePath: source.path,
 			});
@@ -181,29 +200,25 @@ function readWorkspace(
  * @param options - Diagnostics sink and the workspace path to remove
  * @returns True when the directory no longer exists afterward
  */
-function removeWorkspaceDirectory({
+async function removeWorkspaceDirectory({
 	diagnostics,
 	workspacePath,
 }: {
 	diagnostics: DeleteWorkspaceDiagnostic[];
 	workspacePath: string;
-}): boolean {
-	try {
-		rmSync(workspacePath, { force: true, recursive: true });
-	} catch (error) {
+}): Promise<boolean> {
+	const outcome = await removeDirectoryTree(workspacePath);
+
+	if (outcome.error !== null || !outcome.removed) {
 		diagnostics.push({
 			code: 'workspace-delete-failed',
-			message:
-				error instanceof Error
-					? error.message
-					: 'Failed to remove the workspace directory.',
+			message: outcome.error ?? 'Failed to remove the workspace directory.',
 			path: workspacePath,
 			severity: 'warning',
 		});
-		return !existsSync(workspacePath);
 	}
 
-	return !existsSync(workspacePath);
+	return outcome.removed;
 }
 
 /**

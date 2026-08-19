@@ -21,6 +21,7 @@ import {
 	openEnsemblrDatabase,
 } from '../../src/main/storage/database.ts';
 import { buildRootDirectoryStub } from './helpers/root-directory-stub.ts';
+import { buildWorkspaceTeardownStub } from './helpers/workspace-teardown-stub.ts';
 
 const fixedNow = () => new Date('2026-06-08T12:00:00.000Z');
 
@@ -183,6 +184,7 @@ test('delete drops every workspace and the repository row, preserves repo folder
 		databaseService: harness.databaseService,
 		localCommandService: createLocalCommandService(),
 		rootDirectoryService: rootDirectoryStub(harness),
+		workspaceTeardownService: buildWorkspaceTeardownStub(),
 	});
 
 	const result = await service.delete({ repositoryId: harness.repositoryId });
@@ -224,6 +226,7 @@ test('delete drops a sentinel file so the reconciler will not re-adopt the folde
 		databaseService: harness.databaseService,
 		localCommandService: createLocalCommandService(),
 		rootDirectoryService: rootDirectoryStub(harness),
+		workspaceTeardownService: buildWorkspaceTeardownStub(),
 	});
 
 	const result = await service.delete({ repositoryId: harness.repositoryId });
@@ -240,6 +243,7 @@ test('delete succeeds for a repository with no workspaces', async (t) => {
 		databaseService: harness.databaseService,
 		localCommandService: createLocalCommandService(),
 		rootDirectoryService: rootDirectoryStub(harness),
+		workspaceTeardownService: buildWorkspaceTeardownStub(),
 	});
 
 	const result = await service.delete({ repositoryId: harness.repositoryId });
@@ -263,6 +267,7 @@ test('delete succeeds even when a workspace directory was removed out-of-band', 
 		databaseService: harness.databaseService,
 		localCommandService: createLocalCommandService(),
 		rootDirectoryService: rootDirectoryStub(harness),
+		workspaceTeardownService: buildWorkspaceTeardownStub(),
 	});
 
 	const result = await service.delete({ repositoryId: harness.repositoryId });
@@ -280,6 +285,7 @@ test('delete rejects when the repository id is missing or unknown', async (t) =>
 		databaseService: harness.databaseService,
 		localCommandService: createLocalCommandService(),
 		rootDirectoryService: rootDirectoryStub(harness),
+		workspaceTeardownService: buildWorkspaceTeardownStub(),
 	});
 
 	const missing = await service.delete({ repositoryId: '' });

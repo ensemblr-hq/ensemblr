@@ -1,4 +1,4 @@
-import { existsSync, realpathSync, rmSync } from 'node:fs';
+import { existsSync, realpathSync } from 'node:fs';
 import path from 'node:path';
 
 import type {
@@ -15,6 +15,7 @@ import {
 	syncBaseRef,
 	type WorktreeBranchPlacement,
 } from './git-ops.ts';
+import { removeDirectoryTree } from './remove-directory.ts';
 import { validateGitRef } from './validate-git-ref.ts';
 
 const ORIGIN_REMOTE = 'origin';
@@ -99,17 +100,15 @@ export async function createWorktree({
 			},
 		};
 	}
-	cleanupWorkspaceDirectory(request.workspacePath);
+	await cleanupWorkspaceDirectory(request.workspacePath);
 	return { diagnostic: worktreeDiagnostic };
 }
 
 /** Removes a half-created workspace directory; failures are swallowed. */
-export function cleanupWorkspaceDirectory(workspacePath: string): void {
-	try {
-		rmSync(workspacePath, { force: true, recursive: true });
-	} catch {
-		// Best effort: leave any stuck files for the user to clean.
-	}
+export async function cleanupWorkspaceDirectory(
+	workspacePath: string,
+): Promise<void> {
+	await removeDirectoryTree(workspacePath);
 }
 
 /**

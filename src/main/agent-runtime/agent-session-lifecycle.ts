@@ -102,6 +102,13 @@ export type SpawnedChildrenPort = (sessionId: string) => readonly string[];
 /** Stop reason recorded on a sub-agent stopped because its orchestrator was. */
 const ORCHESTRATOR_STOPPED_REASON = 'orchestrator-stopped';
 
+/**
+ * Stop reason recorded on a turn aborted because its workspace was removed.
+ * Reached from the repository layer's pre-removal teardown; kept here so every
+ * stop reason the lifecycle records is declared in one place.
+ */
+export const WORKSPACE_REMOVED_STOP_REASON = 'workspace-removed';
+
 /** Dependencies and configuration for {@link createAgentSessionLifecycle}. */
 interface AgentSessionLifecycleOptions {
 	/** Pre-prompt git checkpoint capture (ADR 0012); absent in tests. */

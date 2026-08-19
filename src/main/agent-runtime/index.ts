@@ -25,6 +25,7 @@ export type {
 	CreateAgentClientOptions,
 } from './agent-client';
 export { AgentClientError, createAgentClient } from './agent-client';
+export { WORKSPACE_REMOVED_STOP_REASON } from './agent-session-lifecycle';
 export type {
 	AgentSessionOpenRequest,
 	AgentSessionService,

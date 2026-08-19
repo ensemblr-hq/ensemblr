@@ -58,6 +58,7 @@ import {
 import {
 	type AgentExecutableSnapshot,
 	createAgentClient,
+	WORKSPACE_REMOVED_STOP_REASON,
 } from './agent-runtime';
 import { ActiveChatStore } from './agent-runtime/active-chat-store';
 import { createAgentActivityMonitor } from './agent-runtime/agent-activity-monitor';
@@ -154,6 +155,7 @@ import {
 	createSharedRootAdoptionService,
 	createUnarchiveWorkspaceService,
 	createWorkspaceService,
+	createWorkspaceTeardownService,
 } from './repository';
 import { createReviewService } from './review';
 import {
@@ -772,11 +774,39 @@ const sharedRootAdoptionService = createSharedRootAdoptionService({
 	rootDirectoryService,
 });
 const archiveLifecycleService = createArchiveLifecycleService();
+// The terminal service, the file watcher, and the control service are all
+// constructed further down this module, so each port resolves its dependency
+// when a teardown actually runs rather than when this service is built.
+const workspaceTeardownService = createWorkspaceTeardownService({
+	killTerminal: (terminalId) => {
+		terminalService.kill(terminalId);
+	},
+	listAgentSessionIds: (workspaceId) =>
+		agentSessionService
+			.listSessionsForWorkspace(workspaceId)
+			.map((session) => session.id),
+	listTerminalIds: (workspaceId) =>
+		terminalService.list(workspaceId).map((session) => session.id),
+	releaseAgentControl: (sessionId) => {
+		agentControlService?.releaseSession(sessionId);
+	},
+	stopAgentSession: (sessionId) =>
+		agentSessionService.stopSession({
+			reason: WORKSPACE_REMOVED_STOP_REASON,
+			sessionId,
+		}),
+	stopWatchingFiles: (workspaceCwd) => {
+		workspaceFilesWatcher.stopWatching(workspaceCwd);
+	},
+	waitForTerminalExit: (terminalId, timeoutMs) =>
+		terminalService.waitForExit(terminalId, timeoutMs),
+});
 const archiveWorkspaceService = createArchiveWorkspaceService({
 	archiveLifecycleService,
 	databaseService,
 	localCommandService,
 	rootDirectoryService,
+	workspaceTeardownService,
 });
 const archiveRepositoryService = createArchiveRepositoryService({
 	archiveLifecycleService,
@@ -786,11 +816,13 @@ const archiveRepositoryService = createArchiveRepositoryService({
 const deleteWorkspaceService = createDeleteWorkspaceService({
 	databaseService,
 	localCommandService,
+	workspaceTeardownService,
 });
 const deleteRepositoryService = createDeleteRepositoryService({
 	databaseService,
 	localCommandService,
 	rootDirectoryService,
+	workspaceTeardownService,
 });
 const unarchiveWorkspaceService = createUnarchiveWorkspaceService({
 	archiveLifecycleService,
@@ -800,6 +832,7 @@ const unarchiveWorkspaceService = createUnarchiveWorkspaceService({
 const deleteArchivedWorkspaceService = createDeleteArchivedWorkspaceService({
 	databaseService,
 	localCommandService,
+	workspaceTeardownService,
 });
 const listAllWorkspacesService = createListAllWorkspacesService({
 	databaseService,

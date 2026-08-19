@@ -21,6 +21,7 @@ import {
 	openEnsemblrDatabase,
 } from '../../src/main/storage/database.ts';
 import { buildRootDirectoryStub } from './helpers/root-directory-stub.ts';
+import { buildWorkspaceTeardownStub } from './helpers/workspace-teardown-stub.ts';
 
 const fixedNow = () => new Date('2026-06-08T12:00:00.000Z');
 
@@ -169,6 +170,7 @@ test('delete removes the worktree, drops the branch, and deletes the row', async
 	const deleteService = createDeleteWorkspaceService({
 		databaseService: harness.databaseService,
 		localCommandService: createLocalCommandService(),
+		workspaceTeardownService: buildWorkspaceTeardownStub(),
 	});
 
 	const result = await deleteService.delete({ workspaceId: workspace.id });
@@ -198,6 +200,7 @@ test('delete succeeds even when the worktree directory was already removed', asy
 	const deleteService = createDeleteWorkspaceService({
 		databaseService: harness.databaseService,
 		localCommandService: createLocalCommandService(),
+		workspaceTeardownService: buildWorkspaceTeardownStub(),
 	});
 
 	const result = await deleteService.delete({ workspaceId: workspace.id });
@@ -207,11 +210,70 @@ test('delete succeeds even when the worktree directory was already removed', asy
 	assert.equal(workspaceRow(harness.databaseService, workspace.id), undefined);
 });
 
+test('delete winds the workspace down before the worktree is unlinked', async (t) => {
+	const harness = createHarness(t);
+	const workspace = await seedWorkspace(harness, 'still-running');
+
+	const order: string[] = [];
+	const teardown = buildWorkspaceTeardownStub();
+	const recordingTeardown = {
+		calls: teardown.calls,
+		/** Records the teardown against the directory it ran on, then delegates. */
+		teardown: async (input: { workspaceId: string; workspacePath: string }) => {
+			order.push(`teardown:${existsSync(input.workspacePath)}`);
+			return teardown.teardown(input);
+		},
+	};
+
+	const deleteService = createDeleteWorkspaceService({
+		databaseService: harness.databaseService,
+		localCommandService: createLocalCommandService(),
+		workspaceTeardownService: recordingTeardown,
+	});
+
+	const result = await deleteService.delete({ workspaceId: workspace.id });
+
+	assert.equal(result.status, 'success');
+	assert.deepEqual(recordingTeardown.calls, [
+		{ workspaceId: workspace.id, workspacePath: workspace.path },
+	]);
+	assert.deepEqual(
+		order,
+		['teardown:true'],
+		'teardown runs while the worktree is still on disk, not after',
+	);
+});
+
+test('delete reports what refused to wind down as a warning', async (t) => {
+	const harness = createHarness(t);
+	const workspace = await seedWorkspace(harness, 'stubborn');
+
+	const deleteService = createDeleteWorkspaceService({
+		databaseService: harness.databaseService,
+		localCommandService: createLocalCommandService(),
+		workspaceTeardownService: buildWorkspaceTeardownStub([
+			'Terminal term-1 did not exit within 5000ms; its output may continue.',
+		]),
+	});
+
+	const result = await deleteService.delete({ workspaceId: workspace.id });
+
+	assert.equal(result.status, 'success');
+	const warning = result.diagnostics.find((diagnostic) =>
+		diagnostic.message.includes('term-1'),
+	);
+	assert.ok(warning, 'the teardown failure reaches the caller');
+	assert.equal(warning?.severity, 'warning');
+	assert.equal(warning?.code, 'workspace-delete-failed');
+	assert.equal(workspaceRow(harness.databaseService, workspace.id), undefined);
+});
+
 test('delete rejects when the workspace id is missing or unknown', async (t) => {
 	const harness = createHarness(t);
 	const deleteService = createDeleteWorkspaceService({
 		databaseService: harness.databaseService,
 		localCommandService: createLocalCommandService(),
+		workspaceTeardownService: buildWorkspaceTeardownStub(),
 	});
 
 	const missingId = await deleteService.delete({ workspaceId: '' });
