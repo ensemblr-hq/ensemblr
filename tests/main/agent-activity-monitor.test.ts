@@ -11,6 +11,7 @@ import {
 	DEFAULT_APP_SETTINGS,
 } from '../../src/shared/config';
 import type { AgentSessionEventWire } from '../../src/shared/ipc/contracts/agent-session';
+import type { ChatTurnFinishedBroadcast } from '../../src/shared/ipc/contracts/notifications';
 
 /** Lets the deferred async battery sample resolve before assertions. */
 function flush(): Promise<void> {
@@ -56,6 +57,7 @@ interface Harness {
 	starts: number;
 	stops: number;
 	notifications: AgentNotification[];
+	announcements: ChatTurnFinishedBroadcast[];
 }
 
 function makeMonitor(
@@ -64,16 +66,23 @@ function makeMonitor(
 	},
 ): Harness {
 	const counters = {
+		announcements: [] as ChatTurnFinishedBroadcast[],
 		notifications: [] as AgentNotification[],
 		starts: 0,
 		stops: 0,
 	};
 	const monitor = createAgentActivityMonitor({
+		announceTurnFinished: (broadcast) => {
+			counters.announcements.push(broadcast);
+		},
 		isAppFocused: () => false,
 		notify: (notification) => {
 			counters.notifications.push(notification);
 		},
-		resolveTarget: () => TARGET,
+		// Echoes the workspace it was asked about, exactly as
+		// `resolveNotificationTarget` does — a target naming some other workspace is
+		// not a state the real port can produce.
+		resolveTarget: (workspaceId) => ({ ...TARGET, workspaceId }),
 		// Run the battery poll synchronously-cancellable but never auto-fire.
 		scheduleInterval: () => () => undefined,
 		powerControls: {
@@ -89,6 +98,9 @@ function makeMonitor(
 	});
 	return {
 		monitor,
+		get announcements() {
+			return counters.announcements;
+		},
 		get notifications() {
 			return counters.notifications;
 		},
@@ -213,8 +225,7 @@ describe('createAgentActivityMonitor — notifications', () => {
 	test('notifies for a background chat even while the app is focused', () => {
 		const h = makeMonitor({
 			isAppFocused: () => true,
-			isChatOnScreen: (_workspaceId, agentSessionId) =>
-				agentSessionId === 'on-screen',
+			isChatOnScreen: ({ agentSessionId }) => agentSessionId === 'on-screen',
 			readSettings: () => settings({ desktopNotifications: true }),
 		});
 		finishTurn(h, 'background');
@@ -224,11 +235,40 @@ describe('createAgentActivityMonitor — notifications', () => {
 	test('stays quiet for the chat on screen in a focused window', () => {
 		const h = makeMonitor({
 			isAppFocused: () => true,
-			isChatOnScreen: (_workspaceId, agentSessionId) => agentSessionId === 's1',
+			isChatOnScreen: ({ agentSessionId }) => agentSessionId === 's1',
 			readSettings: () => settings({ desktopNotifications: true }),
 		});
 		finishTurn(h);
 		expect(h.notifications).toHaveLength(0);
+	});
+
+	test('offers the resolved tab id, so a stale session id still reads as on screen', () => {
+		const asked: Array<string | null> = [];
+		const h = makeMonitor({
+			isAppFocused: () => true,
+			isChatOnScreen: ({ chatTabId }) => {
+				asked.push(chatTabId);
+				return chatTabId === 'tab-1';
+			},
+			readSettings: () => settings({ desktopNotifications: true }),
+		});
+		finishTurn(h);
+		expect(asked).toEqual(['tab-1']);
+		expect(h.notifications).toHaveLength(0);
+	});
+
+	test('asks about the workspace the turn finished in', () => {
+		const seen: string[] = [];
+		const h = makeMonitor({
+			isAppFocused: () => true,
+			isChatOnScreen: ({ workspaceId }) => {
+				seen.push(workspaceId);
+				return false;
+			},
+			readSettings: () => settings({ desktopNotifications: true }),
+		});
+		finishTurn(h, 's7', 'w9');
+		expect(seen).toEqual(['w9']);
 	});
 
 	test('notifies for the chat on screen when the window is not focused', () => {
@@ -404,6 +444,91 @@ describe('createAgentActivityMonitor — notifications', () => {
 			workspaceId: 'w1',
 		});
 		expect(child.notifications).toHaveLength(0);
+	});
+});
+
+describe('createAgentActivityMonitor — turn-finished announcements', () => {
+	/** Runs a session through a full streaming-then-idle turn. */
+	function finishTurn(h: Harness, sessionId = 's1', workspaceId = 'w1'): void {
+		h.monitor.handle(statusFor('streaming', sessionId, workspaceId));
+		h.monitor.handle(statusFor('idle', sessionId, workspaceId));
+	}
+
+	test('announces a finished turn with the chat and when it landed', () => {
+		const h = makeMonitor({
+			readSettings: () => settings({ desktopNotifications: true }),
+		});
+		finishTurn(h);
+		expect(h.announcements).toEqual([
+			{
+				agentSessionId: 's1',
+				chatTabId: 'tab-1',
+				finishedAt: '2026-01-01T00:00:00.000Z',
+				workspaceId: 'w1',
+			},
+		]);
+	});
+
+	test('announces even when the desktop notification is refused', () => {
+		const off = makeMonitor({
+			readSettings: () => settings({ desktopNotifications: false }),
+		});
+		finishTurn(off);
+		expect(off.notifications).toHaveLength(0);
+		expect(off.announcements).toHaveLength(1);
+
+		const onScreen = makeMonitor({
+			isAppFocused: () => true,
+			isChatOnScreen: () => true,
+			readSettings: () => settings({ desktopNotifications: true }),
+		});
+		finishTurn(onScreen);
+		expect(onScreen.notifications).toHaveLength(0);
+		expect(onScreen.announcements).toHaveLength(1);
+	});
+
+	test('stays silent for a sub-agent, so its tab never reads as unread', () => {
+		const h = makeMonitor({
+			readSettings: () => settings({ desktopNotifications: true }),
+			resolveTarget: () => ({ ...TARGET, isSubAgent: true }),
+		});
+		finishTurn(h);
+		expect(h.announcements).toEqual([]);
+	});
+
+	test('stays silent for the idle a user-requested stop settles', () => {
+		const h = makeMonitor({
+			readSettings: () => settings({ desktopNotifications: true }),
+		});
+		h.monitor.handle(statusFor('streaming', 's1'));
+		h.monitor.noteUserStop('s1');
+		h.monitor.handle(statusFor('idle', 's1'));
+		expect(h.announcements).toEqual([]);
+	});
+
+	test('stays silent on a never-streaming idle blip', () => {
+		const h = makeMonitor({
+			readSettings: () => settings({ desktopNotifications: true }),
+		});
+		h.monitor.handle(statusFor('idle', 's1'));
+		expect(h.announcements).toEqual([]);
+	});
+
+	test('stays silent when the chat cannot be resolved', () => {
+		const h = makeMonitor({
+			readSettings: () => settings({ desktopNotifications: true }),
+			resolveTarget: () => null,
+		});
+		finishTurn(h);
+		expect(h.announcements).toEqual([]);
+	});
+
+	test('a questionnaire is not a finished turn', () => {
+		const h = makeMonitor({
+			readSettings: () => settings({ desktopNotifications: true }),
+		});
+		h.monitor.notifyQuestionRaised({ agentSessionId: 's1', workspaceId: 'w1' });
+		expect(h.announcements).toEqual([]);
 	});
 });
 

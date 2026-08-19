@@ -6,16 +6,16 @@ import type { ReactNode } from 'react';
 import { act } from 'react';
 import { beforeEach, expect, test, vi } from 'vitest';
 
-import type { AgentSessionEventBroadcast } from '@/shared/ipc/contracts/agent-session';
+import type { ChatTurnFinishedBroadcast } from '@/shared/ipc/contracts/notifications';
 
 const { subscribers } = vi.hoisted(() => ({
-	subscribers: [] as Array<(broadcast: AgentSessionEventBroadcast) => void>,
+	subscribers: [] as Array<(broadcast: ChatTurnFinishedBroadcast) => void>,
 }));
 
 vi.mock('@/renderer/api/ensemblr', async (importOriginal) => ({
 	...(await importOriginal<typeof import('../../src/renderer/api/ensemblr')>()),
-	subscribeAgentSessionEvents: (
-		listener: (broadcast: AgentSessionEventBroadcast) => void,
+	subscribeChatTurnFinished: (
+		listener: (broadcast: ChatTurnFinishedBroadcast) => void,
 	) => {
 		subscribers.push(listener);
 		return () => {
@@ -32,22 +32,15 @@ import { unreadChatEntriesAtom } from '../../src/renderer/state/unread/atoms';
 /** A turn-finish broadcast for one session in one workspace. */
 function finishedTurn(
 	workspaceId: string,
-	sessionId: string,
-): AgentSessionEventBroadcast {
+	agentSessionId: string,
+	chatTabId: string | null = null,
+): ChatTurnFinishedBroadcast {
 	return {
-		event: {
-			branchId: 'branch-1',
-			createdAt: '2026-08-11T10:00:00.000Z',
-			eventType: 'status',
-			id: 'event-1',
-			ordinal: 1,
-			payload: { kind: 'status', previous: 'streaming', status: 'idle' },
-			stream: null,
-			turnId: 'turn-1',
-		},
-		sessionId,
+		agentSessionId,
+		chatTabId,
+		finishedAt: '2026-08-11T10:00:00.000Z',
 		workspaceId,
-	} as unknown as AgentSessionEventBroadcast;
+	};
 }
 
 /** Mounts the hook against an isolated store and exposes the unread list. */
@@ -67,7 +60,7 @@ function renderAutoMark(activeWorkspaceId: string | null = null) {
 }
 
 /** Delivers a broadcast to every mounted subscriber. */
-function emit(broadcast: AgentSessionEventBroadcast) {
+function emit(broadcast: ChatTurnFinishedBroadcast) {
 	act(() => {
 		for (const listener of [...subscribers]) {
 			listener(broadcast);
@@ -205,15 +198,8 @@ test('a question seen on screen re-arms when the user leaves it unanswered', () 
 	expect(view.result.current[0].agentSessionId).toBe('session-1');
 });
 
-test('a streaming event is not a turn boundary and marks nothing', () => {
+test('a mark keeps the tab main resolved, so it needs no lookup to jump to', () => {
 	const { view } = renderAutoMark(null);
-	const streaming = finishedTurn('ws-2', 'session-2');
-	emit({
-		...streaming,
-		event: {
-			...streaming.event,
-			payload: { kind: 'status', previous: 'starting', status: 'streaming' },
-		},
-	} as unknown as AgentSessionEventBroadcast);
-	expect(view.result.current).toEqual([]);
+	emit(finishedTurn('ws-2', 'session-2', 'tab-2'));
+	expect(view.result.current[0].chatTabId).toBe('tab-2');
 });

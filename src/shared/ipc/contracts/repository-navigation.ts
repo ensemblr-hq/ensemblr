@@ -10,7 +10,11 @@ import type {
 	TabsChangedBroadcast,
 } from '../../agent-control.ts';
 import type { MenuCommandBroadcast, MenuContext } from '../../menu-commands.ts';
-import type { ActiveChatContext, FocusChatBroadcast } from './notifications.ts';
+import type {
+	ActiveChatContext,
+	ChatTurnFinishedBroadcast,
+	FocusChatBroadcast,
+} from './notifications.ts';
 
 /** Open-ended metadata bag attached to a repository or workspace in the navigation tree. */
 export interface RepositoryWorkspaceNavigationMetadata {
@@ -124,6 +128,15 @@ export interface ShellApi {
 	 */
 	onFocusChatRequested: (
 		listener: (payload: FocusChatBroadcast) => void,
+	) => () => void;
+	/**
+	 * Subscribes to finished top-level turns, which is what the renderer marks a
+	 * chat unread from. Returns an unsubscribe function. Every window receives it
+	 * and the payload routinely names a workspace this window is not showing,
+	 * which is the case the unread list exists for.
+	 */
+	onChatTurnFinished: (
+		listener: (payload: ChatTurnFinishedBroadcast) => void,
 	) => () => void;
 	/**
 	 * Subscribes to notification-sound requests, sent by the main process

@@ -1,7 +1,10 @@
 import { app, BrowserWindow, Notification, powerSaveBlocker } from 'electron';
 
 import { IPC_CHANNELS } from '../../shared/ipc/channels.ts';
-import type { FocusChatBroadcast } from '../../shared/ipc/contracts/notifications.ts';
+import type {
+	ChatTurnFinishedBroadcast,
+	FocusChatBroadcast,
+} from '../../shared/ipc/contracts/notifications.ts';
 import type {
 	AgentNotification,
 	PowerSaveControls,
@@ -93,6 +96,22 @@ export function electronNotify(notification: AgentNotification): void {
 	shown.show();
 	if (notification.playSound) {
 		requestNotificationSound();
+	}
+}
+
+/**
+ * Tells every window that a top-level chat finished a turn, so the renderer can
+ * mark it unread. Sent to all of them rather than the focused one: the mark is
+ * app-wide state and the chat routinely lives in a workspace no window shows.
+ * @param broadcast - The chat that finished and when.
+ */
+export function electronAnnounceTurnFinished(
+	broadcast: ChatTurnFinishedBroadcast,
+): void {
+	for (const window of BrowserWindow.getAllWindows()) {
+		if (!window.isDestroyed()) {
+			window.webContents.send(IPC_CHANNELS.chatTurnFinished, broadcast);
+		}
 	}
 }
 

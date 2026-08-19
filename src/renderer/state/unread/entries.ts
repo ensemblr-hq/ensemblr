@@ -95,6 +95,22 @@ export function retainKnownWorkspaces(
 }
 
 /**
+ * Whether one chat still holds a mark. Backs the self-heal that drops a mark for
+ * the chat on screen, which cannot know up front which of the two ids the mark
+ * was recorded under — this is how it reaches the same either-id matching a
+ * clear uses without that rule leaving this module.
+ * @param entries - Current unread list.
+ * @param ref - The chat to look for.
+ * @returns True when a mark is held for that chat.
+ */
+export function isChatUnread(
+	entries: readonly UnreadChatEntry[],
+	ref: UnreadChatRef,
+): boolean {
+	return entries.some((entry) => matchesChat(entry, ref));
+}
+
+/**
  * The most recently marked chat still unread, wherever it lives.
  * @param entries - Current unread list.
  * @returns The newest entry, or null when nothing is unread.

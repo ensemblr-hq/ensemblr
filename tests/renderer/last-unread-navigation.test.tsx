@@ -96,6 +96,15 @@ test('routes straight to a mark that already knows its tab', async () => {
 	});
 });
 
+test('retires the mark it acted on, so a jump to the routed chat dismisses it', async () => {
+	const { result, store } = renderNavigate([target('tab-7')]);
+	await act(async () => {
+		await result.current(target('tab-7'));
+	});
+
+	expect(store.get(unreadChatEntriesAtom)).toEqual([]);
+});
+
 test('resolves the tab from the session id when the mark has none', async () => {
 	listChatTabs.mockResolvedValue({
 		closed: [],

@@ -1,7 +1,11 @@
 import type { AppSettings } from '../../shared/config.ts';
 import type { AppLanguage } from '../../shared/i18n.ts';
 import type { AgentSessionEventWire } from '../../shared/ipc/contracts/agent-session.ts';
-import type { FocusChatBroadcast } from '../../shared/ipc/contracts/notifications.ts';
+import type {
+	ChatTurnFinishedBroadcast,
+	FocusChatBroadcast,
+} from '../../shared/ipc/contracts/notifications.ts';
+import type { OnScreenChatRef } from './active-chat-store.ts';
 import {
 	type NotificationKind,
 	notificationText,
@@ -53,10 +57,22 @@ export interface AgentActivityMonitorOptions {
 	powerControls?: PowerSaveControls;
 	/** Emits a desktop notification; defaults to Electron `Notification`. */
 	notify?: (notification: AgentNotification) => void;
+	/**
+	 * Announces a finished top-level turn to every window, which is what the
+	 * renderer marks a chat unread from. Fires regardless of the notification
+	 * setting and of window focus: it says a chat is done, not that the OS should
+	 * interrupt.
+	 */
+	announceTurnFinished?: (broadcast: ChatTurnFinishedBroadcast) => void;
 	/** True when any app window is focused. */
 	isAppFocused?: () => boolean;
-	/** True when the renderer reports this exact chat as the one on screen. */
-	isChatOnScreen?: (workspaceId: string, agentSessionId: string) => boolean;
+	/**
+	 * True when the renderer reports this exact chat as the one on screen. Asked
+	 * with the tab id the target resolved as well as the session id, because the
+	 * renderer reports whichever session its tab list has resolved and that can
+	 * lag the one the runtime is running.
+	 */
+	isChatOnScreen?: (chat: OnScreenChatRef) => boolean;
 	/** Reads the workspace name, tab title, and sub-agent marker behind a session. */
 	resolveTarget?: (
 		workspaceId: string,
@@ -131,11 +147,23 @@ function defaultSchedule(callback: () => void, ms: number): () => void {
  * `caffeinateWhileRunning` (hold a power-save blocker while any session is
  * streaming) and `desktopNotifications`.
  *
- * A notification fires only when a chat genuinely wants the user: a top-level
- * agent that finished its turn, or one blocked on a questionnaire. Four things
- * refuse one — the setting being off, that chat already being on screen in a
- * focused window, the chat hosting somebody's sub-agent, and an `idle` that is
- * only the tail of a stop the user asked for.
+ * A chat wants the user when a top-level agent finishes its turn or blocks on a
+ * questionnaire. Three things refuse that outright — the chat hosting somebody's
+ * sub-agent, an `idle` that is only the tail of a stop the user asked for, and a
+ * chat {@link AgentActivityMonitorOptions.resolveTarget} cannot name at all —
+ * and the monitor is where all three are known, so it is the one place that
+ * decides. The third costs the unread mark as well as the notification, which
+ * the renderer's own event stream would have made anyway; a chat nobody can
+ * attribute is worth less than the wrong chat going bold.
+ *
+ * The decision fans out to two surfaces with different appetites.
+ * {@link AgentActivityMonitorOptions.announceTurnFinished} carries it to the
+ * renderer, which marks the chat unread; that must survive both the
+ * notification setting being off and the window having focus. The desktop
+ * notification applies those two on top. Keeping the shared half here is what
+ * stops the unread mark and the notification disagreeing about whose turn a
+ * sub-agent's is — the renderer sees only raw session events and can tell
+ * neither a sub-agent nor a user-requested stop from an ordinary finish.
  *
  * Streaming state is derived from persisted `status` / `shutdown` events, so the
  * monitor never has to poll session rows. Settings are read live on each
@@ -151,6 +179,8 @@ export function createAgentActivityMonitor(
 ): AgentActivityMonitor {
 	const power = options.powerControls ?? inertPowerControls;
 	const notify = options.notify ?? (() => undefined);
+	const announceTurnFinished =
+		options.announceTurnFinished ?? (() => undefined);
 	const isAppFocused = options.isAppFocused ?? (() => false);
 	const isChatOnScreen = options.isChatOnScreen ?? (() => false);
 	const resolveTarget = options.resolveTarget ?? (() => null);
@@ -229,24 +259,36 @@ export function createAgentActivityMonitor(
 	// this chat on screen in a focused window — not merely that the app has focus
 	// somewhere, which used to swallow every background chat's notification.
 	const shouldStaySilent = (
-		workspaceId: string,
 		agentSessionId: string,
+		target: NotificationTarget,
 	): boolean =>
 		!options.readSettings().general.desktopNotifications ||
-		(isAppFocused() && isChatOnScreen(workspaceId, agentSessionId));
+		(isAppFocused() &&
+			isChatOnScreen({
+				agentSessionId,
+				chatTabId: target.chatTabId,
+				workspaceId: target.workspaceId,
+			}));
 
-	const emitNotification = (
-		kind: NotificationKind,
+	// Resolved before the silence gate rather than after it, so the announcement
+	// still carries the sub-agent verdict when notifications are switched off.
+	// One indexed row read per turn end, never per streamed event.
+	const resolveAttentionTarget = (
 		workspaceId: string,
 		agentSessionId: string,
-	): void => {
-		if (shouldStaySilent(workspaceId, agentSessionId)) {
-			return;
-		}
+	): NotificationTarget | null => {
 		const target = resolveTarget(workspaceId, agentSessionId);
 		// A sub-agent finishing is its orchestrator's business, not the user's: a
 		// delegating turn would otherwise fire one notification per child.
-		if (!target || target.isSubAgent) {
+		return target && !target.isSubAgent ? target : null;
+	};
+
+	const emitNotification = (
+		kind: NotificationKind,
+		agentSessionId: string,
+		target: NotificationTarget,
+	): void => {
+		if (shouldStaySilent(agentSessionId, target)) {
 			return;
 		}
 		notify({
@@ -260,9 +302,27 @@ export function createAgentActivityMonitor(
 			target: {
 				agentSessionId,
 				chatTabId: target.chatTabId,
-				workspaceId,
+				workspaceId: target.workspaceId,
 			},
 		});
+	};
+
+	const reportTurnFinished = (
+		workspaceId: string,
+		agentSessionId: string,
+		finishedAt: string,
+	): void => {
+		const target = resolveAttentionTarget(workspaceId, agentSessionId);
+		if (!target) {
+			return;
+		}
+		announceTurnFinished({
+			agentSessionId,
+			chatTabId: target.chatTabId,
+			finishedAt,
+			workspaceId,
+		});
+		emitNotification('finished', agentSessionId, target);
 	};
 
 	const handle = ({
@@ -283,7 +343,7 @@ export function createAgentActivityMonitor(
 				const wasActive = streamingSessions.delete(sessionId);
 				const stoppedByUser = userStoppedSessions.delete(sessionId);
 				if (wasActive && !stoppedByUser && payload.status === 'idle') {
-					emitNotification('finished', workspaceId, sessionId);
+					reportTurnFinished(workspaceId, sessionId, event.createdAt);
 				}
 			}
 			reconcilePower();
@@ -320,8 +380,12 @@ export function createAgentActivityMonitor(
 		noteUserStop: (sessionId) => {
 			userStoppedSessions.add(sessionId);
 		},
-		notifyQuestionRaised: ({ agentSessionId, workspaceId }) =>
-			emitNotification('question', workspaceId, agentSessionId),
+		notifyQuestionRaised: ({ agentSessionId, workspaceId }) => {
+			const target = resolveAttentionTarget(workspaceId, agentSessionId);
+			if (target) {
+				emitNotification('question', agentSessionId, target);
+			}
+		},
 		refresh: reconcilePower,
 	};
 }

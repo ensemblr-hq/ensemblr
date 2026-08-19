@@ -26,3 +26,28 @@ export interface FocusChatBroadcast {
 	chatTabId: string | null;
 	workspaceId: string;
 }
+
+/**
+ * Main → renderer signal that a chat finished a turn the user should know
+ * about, broadcast to every window. The in-app unread mark hangs off this
+ * rather than off the raw session-event stream, so the two surfaces that tell a
+ * user a chat wants them — the desktop notification and the unread mark — share
+ * one decision instead of re-deriving it and disagreeing.
+ *
+ * What it already excludes: a sub-agent's chat, which is its orchestrator's
+ * business, and the `idle` that is only the tail of a stop the user asked for.
+ * Neither fact reaches the renderer any other way. What it does *not* apply is
+ * the desktop-notification setting or window focus — those gate the OS
+ * notification alone, and an unread mark that vanished with the setting would
+ * leave the app with no way to say a background chat is done.
+ *
+ * `chatTabId` is null when the session's tab could not be resolved, exactly as
+ * in {@link FocusChatBroadcast}.
+ */
+export interface ChatTurnFinishedBroadcast {
+	agentSessionId: string;
+	chatTabId: string | null;
+	/** ISO timestamp of the event that ended the turn, for display ordering. */
+	finishedAt: string;
+	workspaceId: string;
+}
