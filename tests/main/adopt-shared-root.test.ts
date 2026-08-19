@@ -339,6 +339,85 @@ test('marks stale repository rows but auto-deletes stale workspace rows', async 
 	assert.ok(!wsRow, 'stale workspace row deleted');
 });
 
+test('keeps an archived workspace whose worktree branch cleanup removed', async (t) => {
+	const harness = createHarness(t);
+	const archivedRepoPath = path.join(
+		harness.rootSnapshot.repositoriesPath,
+		'archived-host',
+	);
+	const archivedWorkspacePath = path.join(
+		harness.rootSnapshot.workspacesPath,
+		'archived-host',
+		'shipped',
+	);
+	const timestamp = fixedNow().toISOString();
+	harness.connection.database
+		.prepare(
+			`INSERT INTO repositories (id, slug, name, path, default_branch, created_at, updated_at, metadata_json)
+				VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		)
+		.run(
+			'repository-archived-host',
+			'archived-host',
+			'archived-host',
+			archivedRepoPath,
+			'main',
+			timestamp,
+			timestamp,
+			'{}',
+		);
+	harness.connection.database
+		.prepare(
+			`INSERT INTO workspaces (id, repository_id, slug, name, path, branch_name, base_branch, created_at, updated_at, archived_at, metadata_json)
+				VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		)
+		.run(
+			'workspace-shipped',
+			'repository-archived-host',
+			'shipped',
+			'shipped',
+			archivedWorkspacePath,
+			'shipped',
+			'main',
+			timestamp,
+			timestamp,
+			timestamp,
+			'{}',
+		);
+	harness.connection.database
+		.prepare(
+			`INSERT INTO archive_records (id, record_type, repository_id, workspace_id, repository_slug, workspace_slug, source_path, branch_cleanup, archived_at)
+				VALUES (?, 'workspace', ?, ?, ?, ?, ?, 1, ?)`,
+		)
+		.run(
+			'archive-shipped',
+			'repository-archived-host',
+			'workspace-shipped',
+			'archived-host',
+			'shipped',
+			archivedWorkspacePath,
+			timestamp,
+		);
+
+	const snapshot = await runReconcile(harness);
+
+	assert.equal(
+		snapshot.stale.workspaces.some(
+			(candidate) => candidate.id === 'workspace-shipped',
+		),
+		false,
+		'an archived workspace is not stale just because its worktree is gone',
+	);
+	assert.ok(
+		workspaceRow(harness, archivedWorkspacePath),
+		'archived workspace row survives reconciliation',
+	);
+	const archiveRecord = harness.connection.database
+		.prepare('SELECT id FROM archive_records WHERE workspace_id = ?')
+		.get('workspace-shipped');
+	assert.ok(archiveRecord, 'its archive record is not cascaded away');
+});
+
 test('does not delete a workspace created while reconciliation is scanning', async (t) => {
 	const harness = createHarness(t);
 	const repositoryPath = path.join(
