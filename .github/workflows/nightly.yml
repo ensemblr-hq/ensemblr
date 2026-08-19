@@ -80,8 +80,11 @@ jobs:
     if: needs.gate.outputs.changed == 'true'
     runs-on: macos-15
     timeout-minutes: 60
+    # No secret is declared at job level: everything here is in scope for `npm
+    # ci`, so a dependency lifecycle script would run with it in the
+    # environment. `GH_TOKEN` carries `contents: write`, so it is injected into
+    # the one step that shells out to `gh` instead.
     env:
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       NIGHTLY_SHA: ${{ needs.gate.outputs.sha }}
       NIGHTLY_VERSION: ${{ needs.gate.outputs.version }}
       DMG_NAME: Ensemblr-Canary-arm64.dmg
@@ -161,6 +164,8 @@ jobs:
       # reason: a draft holds its tag unpushed until it is published.
       - name: Publish the rolling nightly
         if: ${{ github.event_name == 'schedule' || inputs.publish }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           title="Ensemblr Nightly $NIGHTLY_VERSION"
