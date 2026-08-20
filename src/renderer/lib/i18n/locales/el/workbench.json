@@ -1087,6 +1087,32 @@
 			"named": "Υποπράκτορας: {{type}}",
 			"title": "Υποπράκτορας"
 		},
+		"task": {
+			"list_one": "{{count}} εργασία",
+			"list_other": "{{count}} εργασίες",
+			"list-empty": "Καμία εργασία",
+			"list-title": "Λίστα εργασιών",
+			"named": "Εργασία: {{subject}}",
+			"numbered": "Εργασία #{{number}}: {{subject}}",
+			"numbered-only": "Εργασία #{{number}}",
+			"output": "Έξοδος εργασίας: {{id}}",
+			"output-title": "Έξοδος εργασίας",
+			"planned_one": "Σχεδιάστηκε {{count}} εργασία",
+			"planned_other": "Σχεδιάστηκαν {{count}} εργασίες",
+			"status": {
+				"completed": "Ολοκληρώθηκε",
+				"deleted": "Διαγράφηκε",
+				"in-progress": "Σε εξέλιξη",
+				"pending": "Σε αναμονή",
+				"unknown": "Άγνωστο"
+			},
+			"stop-title": "Η εργασία σταμάτησε",
+			"stopped": "Η εργασία {{id}} σταμάτησε",
+			"title": "Εργασία",
+			"transition": "Εργασία #{{number}} → {{status}}",
+			"transition-only": "Εργασία → {{status}}",
+			"untitled": "Εργασία χωρίς τίτλο"
+		},
 		"write": {
 			"title": "Εγγραφή"
 		}

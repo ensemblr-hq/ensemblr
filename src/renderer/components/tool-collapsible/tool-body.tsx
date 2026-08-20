@@ -5,6 +5,7 @@ import { StackTraceDiagnostic } from '@/renderer/components/stack-trace-diagnost
 import { Terminal } from '@/renderer/components/terminal';
 import { cn } from '@/renderer/lib/utils';
 import type { ToolBodyDescriptor } from '@/renderer/types/tool-presentation';
+import { ToolChecklist } from './tool-checklist';
 import { ToolDiagnosticsList } from './tool-diagnostics-list';
 import { ToolDiffPreview } from './tool-diff-preview';
 import { ToolErrorOutput, ToolLabeledPanel } from './tool-panel';
@@ -55,6 +56,8 @@ function ToolPendingOutput() {
  */
 export function ToolBody({ body }: { body: ToolBodyDescriptor }) {
 	switch (body.kind) {
+		case 'checklist':
+			return <ToolChecklist items={body.items} />;
 		case 'code':
 			return (
 				<CodePanel

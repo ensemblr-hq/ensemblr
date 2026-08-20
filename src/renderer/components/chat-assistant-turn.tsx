@@ -3,6 +3,7 @@ import { useMemo } from 'react';
 import {
 	countNestedToolCalls,
 	dropEchoedSubagentReports,
+	foldTaskPlanRuns,
 	glyphForToolCall,
 	groupSubagentActivity,
 	isHiddenEnsemblrToolCall,
@@ -10,7 +11,10 @@ import {
 } from '@/renderer/lib/agent-timeline';
 import { customMessageDataOf, skillPartDataOf } from '@/renderer/lib/pi';
 import { cn } from '@/renderer/lib/utils';
-import type { TimelineActivityNode } from '@/renderer/types/agent-timeline';
+import type {
+	TimelineActivityNode,
+	TimelineActivityRow,
+} from '@/renderer/types/agent-timeline';
 import type { ChatAssistantTurnTiming } from '@/renderer/types/chat';
 import type { ToolGlyph } from '@/renderer/types/tool-presentation';
 
@@ -20,6 +24,7 @@ import {
 	ChatCustomMessage,
 	ChatReasoningCollapsible,
 	ChatSkillInvocation,
+	ChatTaskPlan,
 	ChatToolCall,
 } from './chat-tool-call';
 import { ChatTurnFooter } from './chat-turn-footer';
@@ -67,11 +72,11 @@ export function ChatAssistantTurn({
 
 	const hasFinal = finalParts.length > 0;
 	const activityNodes = useMemo(
-		() => groupSubagentActivity(activityParts),
+		() => foldTaskPlanRuns(groupSubagentActivity(activityParts)),
 		[activityParts],
 	);
-	const activityRows = activityNodes.map((node) => (
-		<ActivityNodeRow key={`${message.id}:a:${node.key}`} node={node} />
+	const activityRows = activityNodes.map((row) => (
+		<ActivityRow key={`${message.id}:a:${row.key}`} row={row} />
 	));
 	const toolGlyphs = useMemo(
 		() => collectActivityGlyphs(activityParts),
@@ -141,8 +146,17 @@ export function ChatAssistantTurn({
 	);
 }
 
+/** Renders one activity row: an ordinary node, or a folded run of task creations. */
+function ActivityRow({ row }: { row: TimelineActivityRow }) {
+	return row.kind === 'task-plan' ? (
+		<ChatTaskPlan parts={row.parts} />
+	) : (
+		<ActivityNodeRow node={row.node} />
+	);
+}
+
 /**
- * Renders one activity row and, when a subagent ran inside it, the rows it
+ * Renders one activity node and, when a subagent ran inside it, the rows it
  * produced. Recursion lives here rather than in the card so the card needs to
  * know nothing about part types, and so a row that turns out to have no children
  * renders exactly as it did before subagents were nested at all.
@@ -154,8 +168,8 @@ function ActivityNodeRow({ node }: { node: TimelineActivityNode }) {
 	}
 	return (
 		<ChatSubagentCall part={part} toolCallCount={countNestedToolCalls(node)}>
-			{node.children.map((child) => (
-				<ActivityNodeRow key={child.key} node={child} />
+			{foldTaskPlanRuns(node.children).map((child) => (
+				<ActivityRow key={child.key} row={child} />
 			))}
 		</ChatSubagentCall>
 	);

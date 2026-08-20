@@ -40,6 +40,14 @@ export interface TimelineActivityNode {
 	part: UIMessagePart;
 }
 
+/**
+ * One row the activity feed paints: an ordinary node, or the contiguous run of
+ * task-creating calls that the timeline folds into a single plan card.
+ */
+export type TimelineActivityRow =
+	| { key: string; kind: 'node'; node: TimelineActivityNode }
+	| { key: string; kind: 'task-plan'; parts: readonly DynamicToolUIPart[] };
+
 /** Text or reasoning part that is still streaming deltas. */
 export type StreamingTextPart = Extract<
 	UIMessagePart,

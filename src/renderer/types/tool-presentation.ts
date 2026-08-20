@@ -76,6 +76,28 @@ export interface ToolDiagnosticEntry {
 	source: string | null;
 }
 
+/** Where one checklist item stands, as the agent's own task list reports it. */
+export type ToolChecklistStatus =
+	| 'pending'
+	| 'in-progress'
+	| 'completed'
+	| 'unknown';
+
+/** One task rendered inside a checklist body. */
+export interface ToolChecklistItem {
+	/** Second line under the subject — a description or an owner; null when none. */
+	detail: string | null;
+	/**
+	 * Identity that survives the call it came from settling, so a plan still
+	 * streaming does not remount its rows as the harness answers with numbers.
+	 */
+	id: string;
+	/** The task's own number, painted as `#3`; null before one is assigned. */
+	number: string | null;
+	status: ToolChecklistStatus;
+	subject: string;
+}
+
 /** One labelled plain-text block inside a labelled-payload body. */
 export interface ToolPanelSectionDescriptor {
 	/** Painted verbatim — punctuation such as a trailing colon belongs here. */
@@ -91,6 +113,7 @@ export interface ToolPanelSectionDescriptor {
  * renderer.
  */
 export type ToolBodyDescriptor =
+	| { items: readonly ToolChecklistItem[]; kind: 'checklist' }
 	| {
 			code: string;
 			kind: 'code';
@@ -122,3 +145,12 @@ export interface ToolPresentation {
 	title: string;
 	tone: ToolTone;
 }
+
+/**
+ * Everything a presenter decides. The glyph normally follows from the tool's
+ * name, so it stays optional here; a presenter sets it only to override that
+ * default, e.g. an image `read` marking itself distinctly from a text one.
+ */
+export type ToolPresenterResult = Omit<ToolPresentation, 'glyph'> & {
+	glyph?: ToolGlyph;
+};

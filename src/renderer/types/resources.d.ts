@@ -3336,6 +3336,32 @@ export default interface Resources {
 				named: 'Sub-agent: {{type}}';
 				title: 'Sub-agent';
 			};
+			task: {
+				'list-empty': 'No tasks';
+				'list-title': 'Task list';
+				list_one: '{{count}} task';
+				list_other: '{{count}} tasks';
+				named: 'Task: {{subject}}';
+				numbered: 'Task #{{number}}: {{subject}}';
+				'numbered-only': 'Task #{{number}}';
+				output: 'Task output: {{id}}';
+				'output-title': 'Task output';
+				planned_one: 'Planned {{count}} task';
+				planned_other: 'Planned {{count}} tasks';
+				status: {
+					completed: 'Completed';
+					deleted: 'Deleted';
+					'in-progress': 'In progress';
+					pending: 'Pending';
+					unknown: 'Unknown';
+				};
+				'stop-title': 'Stopped task';
+				stopped: 'Stopped task {{id}}';
+				title: 'Task';
+				transition: 'Task #{{number}} → {{status}}';
+				'transition-only': 'Task → {{status}}';
+				untitled: 'Untitled task';
+			};
 			write: {
 				title: 'Write';
 			};
