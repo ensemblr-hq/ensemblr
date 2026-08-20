@@ -1,6 +1,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { ArrowLeftIcon, RefreshCwIcon } from 'lucide-react';
+import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { linearIssueQuery, refreshLinearIssue } from '@/renderer/api/ensemblr';
@@ -12,6 +13,7 @@ import { useLinearRefresh } from '@/renderer/hooks/linear/use-linear-refresh';
 import { describeLinearFailure } from '@/renderer/lib/linear';
 import { formatRelativeTimestamp } from '@/renderer/lib/workbench/relative-time';
 import type { LinearIssueWire } from '@/shared/ipc/contracts/linear';
+import { proxyLinearAssetImages } from '@/shared/linear-assets';
 
 import { LinearCommentComposer } from './comment-composer';
 import { LinearIssueComments } from './issue-comments';
@@ -79,8 +81,14 @@ export function LinearIssueDetail({ issueId }: { issueId: string }) {
 					<IssueTimeline issue={issue} />
 				</div>
 				<div className='order-2 flex min-w-0 flex-col gap-8 lg:order-none'>
-					<IssueDescription description={issue.description} />
-					<LinearIssueComments comments={result.comments} />
+					<IssueDescription
+						accountId={issue.accountId}
+						description={issue.description}
+					/>
+					<LinearIssueComments
+						accountId={issue.accountId}
+						comments={result.comments}
+					/>
 					<LinearCommentComposer issueId={issueId} />
 				</div>
 				<div className='order-1 lg:order-none'>
@@ -113,11 +121,25 @@ function IssueTimeline({ issue }: { issue: LinearIssueWire }) {
 	);
 }
 
-/** The issue body as markdown, or a note that Linear holds none. */
-function IssueDescription({ description }: { description: string | null }) {
+/**
+ * The issue body as markdown, or a note that Linear holds none. Embedded images
+ * are re-pointed at the authenticated asset scheme first — Linear serves them
+ * from private storage that answers 401 to the renderer's own request.
+ */
+function IssueDescription({
+	accountId,
+	description,
+}: {
+	accountId: string;
+	description: string | null;
+}) {
 	const { t } = useTranslation();
+	const body = useMemo(
+		() => (description ? proxyLinearAssetImages(description, accountId) : ''),
+		[accountId, description],
+	);
 
-	if (!description || description.trim().length === 0) {
+	if (body.trim().length === 0) {
 		return (
 			<p className='text-muted-foreground text-xs italic'>
 				{t('linear:issue-detail.no-description', 'No description.')}
@@ -125,7 +147,7 @@ function IssueDescription({ description }: { description: string | null }) {
 		);
 	}
 
-	return <ChatMessageText className='text-sm' text={description} />;
+	return <ChatMessageText className='text-sm' text={body} />;
 }
 
 /** Placeholder shaped like the loaded page, so the layout does not jump on arrival. */

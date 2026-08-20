@@ -126,6 +126,10 @@ export default interface Resources {
 			'still-working': 'Still working — large repositories with deep history can take a minute or two. The window will switch as soon as the workspace is ready.';
 			title: 'Opening local project…';
 		};
+		'message-image': {
+			unavailable: 'Image unavailable';
+			'unavailable-alt': '{{description}} (image unavailable)';
+		};
 		'pi-replay': {
 			'event-count_one': '{{count}} event';
 			'event-count_other': '{{count}} events';

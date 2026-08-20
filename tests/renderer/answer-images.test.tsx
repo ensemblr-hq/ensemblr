@@ -8,6 +8,7 @@
  * ragged rows. Images render bare and inline instead.
  */
 
+import { fireEvent } from '@testing-library/react';
 import { createStore, Provider } from 'jotai';
 import { expect, test } from 'vitest';
 
@@ -65,4 +66,37 @@ test('an image without a source renders nothing rather than a broken frame', () 
 	expect(container.querySelectorAll('[data-streamdown="image"]')).toHaveLength(
 		0,
 	);
+});
+
+// A host that refuses the fetch — an expired link, a private asset, an offline
+// machine — otherwise falls through to the platform's broken-image glyph, which
+// reads as a rendering fault in the app rather than as a missing picture.
+test('an image whose fetch fails is replaced by a placeholder carrying its alt text', () => {
+	const container = renderMarkdown('![A diagram](https://example.com/d.png)');
+	const image = container.querySelector('[data-streamdown="image"]');
+
+	expect(image).not.toBe(null);
+	if (image) {
+		fireEvent.error(image);
+	}
+
+	expect(container.querySelector('[data-streamdown="image"]')).toBe(null);
+	expect(
+		container.querySelector('[data-streamdown="image-unavailable"]')
+			?.textContent,
+	).toContain('A diagram');
+});
+
+test('an image with no alt text falls back to a named failure', () => {
+	const container = renderMarkdown('![](https://example.com/d.png)');
+	const image = container.querySelector('[data-streamdown="image"]');
+
+	if (image) {
+		fireEvent.error(image);
+	}
+
+	expect(
+		container.querySelector('[data-streamdown="image-unavailable"]')
+			?.textContent,
+	).toBe('Image unavailable');
 });

@@ -118,9 +118,12 @@ import {
 import { type IpcHandlersHandle, registerIpcHandlers } from './ipc';
 import { readPermissionModeFromSnapshot } from './ipc/permission-gate.ts';
 import {
+	createLinearAssetProxy,
 	createLinearAuthService,
 	createLinearClient,
 	createLinearService,
+	registerLinearAssetProtocol,
+	registerLinearAssetScheme,
 } from './linear';
 import { installApplicationMenu, MenuContextStore } from './menu';
 import { createOpenTargetService } from './open-target';
@@ -967,13 +970,27 @@ const planSubmission = createPlanSubmission({
 	postPlanMessage: ({ sessionId, plan }) =>
 		agentSessionService.appendAgentMessage({ sessionId, text: plan }),
 });
+// Declaring the scheme has to happen before `ready`, which module scope is; the
+// handler that serves it is registered inside `whenReady` below.
+registerLinearAssetScheme();
 const linearAuthService = createLinearAuthService({
 	configService,
 	databaseService,
 	getLanguage: resolveAppLanguage,
+	/** Releases the asset bytes cached under an account the user just disconnected. */
+	onDisconnect: (accountId) => linearAssetProxy.forgetAccount(accountId),
 	/** Opens an external URL in the user's default browser. */
 	openExternal: (url) => shell.openExternal(url),
 	secretStoreFactory: createSecretStore,
+});
+// Built at module scope so the auth service above can reach it on disconnect;
+// the scheme is only served once `whenReady` registers the handler below.
+const linearAssetProxy = createLinearAssetProxy({
+	/** Resolves one account's current Linear access token. */
+	getAccessToken: (accountId) => linearAuthService.getAccessToken(accountId),
+	/** Lists the accounts an asset request may name. */
+	listAccountIds: async () =>
+		(await linearAuthService.listAccounts()).map((account) => account.id),
 });
 // Built here rather than beside the other Linear wiring below because the
 // agent-control ports need it: a control op reaching Linear runs long after
@@ -1163,6 +1180,7 @@ app.whenReady().then(() => {
 
 	configService.load();
 	databaseService.open();
+	registerLinearAssetProtocol(linearAssetProxy);
 	moveRepositoryScriptsIntoCommittedConfig();
 	rootDirectoryService.ensure();
 	void sharedRootAdoptionService.reconcile();

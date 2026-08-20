@@ -1,9 +1,11 @@
 import { MessageSquareIcon } from 'lucide-react';
+import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { CommentMarkdown } from '@/renderer/components/comment-markdown';
 import { formatRelativeTimestamp } from '@/renderer/lib/workbench/relative-time';
 import type { LinearCommentWire } from '@/shared/ipc/contracts/linear';
+import { proxyLinearAssetImages } from '@/shared/linear-assets';
 
 import { LinearAvatar } from './issue-avatar';
 
@@ -13,8 +15,11 @@ import { LinearAvatar } from './issue-avatar';
  * design link into three lines of `>` and bracket noise.
  */
 export function LinearIssueComments({
+	accountId,
 	comments,
 }: {
+	/** Linear account the thread was read through, for its embedded images. */
+	accountId: string;
 	comments: LinearCommentWire[];
 }) {
 	const { t } = useTranslation();
@@ -35,7 +40,11 @@ export function LinearIssueComments({
 			) : (
 				<ul className='flex flex-col gap-4'>
 					{comments.map((comment) => (
-						<IssueComment comment={comment} key={comment.id} />
+						<IssueComment
+							accountId={accountId}
+							comment={comment}
+							key={comment.id}
+						/>
 					))}
 				</ul>
 			)}
@@ -44,10 +53,20 @@ export function LinearIssueComments({
 }
 
 /** One comment: who wrote it, when, and its markdown body. */
-function IssueComment({ comment }: { comment: LinearCommentWire }) {
+function IssueComment({
+	accountId,
+	comment,
+}: {
+	accountId: string;
+	comment: LinearCommentWire;
+}) {
 	const { t } = useTranslation();
 	const author =
 		comment.authorName ?? t('linear:issue-detail.unknown-author', 'Unknown');
+	const body = useMemo(
+		() => proxyLinearAssetImages(comment.body, accountId),
+		[accountId, comment.body],
+	);
 
 	return (
 		<li className='flex min-w-0 gap-2.5'>
@@ -67,7 +86,7 @@ function IssueComment({ comment }: { comment: LinearCommentWire }) {
 						</time>
 					) : null}
 				</div>
-				<CommentMarkdown body={comment.body} className='text-sm' />
+				<CommentMarkdown body={body} className='text-sm' />
 			</div>
 		</li>
 	);

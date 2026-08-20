@@ -7,6 +7,12 @@
  * hands back. Nothing here reads the database or the network: every function is
  * a pure projection, which is what makes them safe to call from any of the
  * service's branches.
+ *
+ * This is also the boundary where a Linear asset signature stops. Every URL the
+ * API embeds in a description or a comment carries a JWT that dies 300 seconds
+ * later, and both the cache and a reader outlive it — so nothing that leaves
+ * main keeps one. See `src/shared/linear-assets.ts` for how the renderer then
+ * loads the image.
  */
 
 import type {
@@ -18,6 +24,7 @@ import type {
 	LinearResourceWire,
 	LinearServiceFailure,
 } from '../../shared/ipc/contracts/linear';
+import { stripLinearAssetSignatures } from '../../shared/linear-assets.ts';
 import {
 	type LinearClient,
 	type LinearCommentData,
@@ -125,7 +132,7 @@ export function issueDataToWire(
 		assigneeName: assignee.name,
 		cycleId: cycle.id,
 		cycleName: cycle.name,
-		description: issue.description,
+		description: stripLinearAssetSignatures(issue.description),
 		dueDate: issue.dueDate,
 		id: issue.id,
 		identifier: issue.identifier,
@@ -221,7 +228,7 @@ export function issueRecordToWire(
 		assigneeName: readString(assignee?.name),
 		cycleId: readString(cycle?.id),
 		cycleName: readString(cycle?.name),
-		description: record.description,
+		description: stripLinearAssetSignatures(record.description),
 		dueDate: record.dueDate,
 		id: record.id,
 		identifier: record.identifier,
@@ -280,7 +287,7 @@ export function commentDataToWire(
 ): LinearCommentWire {
 	return {
 		authorName: comment.authorName,
-		body: comment.body,
+		body: stripLinearAssetSignatures(comment.body),
 		createdAt: comment.createdAt,
 		id: comment.id,
 	};
@@ -296,7 +303,7 @@ export function commentRecordToWire(
 ): LinearCommentWire {
 	return {
 		authorName: record.authorName,
-		body: record.body,
+		body: stripLinearAssetSignatures(record.body),
 		createdAt: record.remoteCreatedAt,
 		id: record.id,
 	};
