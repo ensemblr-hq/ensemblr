@@ -29,7 +29,8 @@ import type { SetupRemediationAction } from '@/shared/ipc/contracts/setup';
 /**
  * Providers settings page. Pi and Claude Code are true siblings here: one
  * {@link ProviderTabPanel} renders both tabs from `(descriptor, readiness)`,
- * and the section-level Refresh re-probes whichever tab is open. Terminal
+ * and the single section-level re-run re-probes whichever tab is open — the
+ * checks themselves carry only remediations specific to what failed. Terminal
  * harnesses (Codex, Vibe) are not agent providers and never appear.
  */
 export function AgentProvidersSection() {
@@ -59,10 +60,6 @@ export function AgentProvidersSection() {
 	};
 
 	const handleRemediation = async (action: SetupRemediationAction) => {
-		if (action.kind === 'retry') {
-			await refreshActiveProvider();
-			return;
-		}
 		if (action.kind === 'open-external' && action.target) {
 			await openExternalTarget(action.target);
 			return;
@@ -87,8 +84,8 @@ export function AgentProvidersSection() {
 						className={cn('size-4', isManualRetrying && 'animate-spin')}
 					/>
 					{isManualRetrying
-						? t('settings:providers.refreshing', 'Refreshing…')
-						: t('settings:providers.refresh', 'Refresh')}
+						? t('settings:providers.rerunning-checks', 'Re-running checks…')
+						: t('settings:providers.rerun-checks', 'Re-run checks')}
 				</Button>
 			}
 			description={t(

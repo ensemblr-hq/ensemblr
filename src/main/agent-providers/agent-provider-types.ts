@@ -1,7 +1,4 @@
-import type {
-	AgentProviderDescriptor,
-	AgentProviderId,
-} from '../../shared/agent-provider';
+import type { AgentProviderId } from '../../shared/agent-provider';
 import type {
 	AgentExecutablePathSnapshotWire,
 	AgentExecutableSelectionWire,
@@ -11,7 +8,6 @@ import type {
 	AgentProviderReadinessWire,
 	ListAgentProviderMcpServersResult,
 	ListAgentProviderSlashCommandsResult,
-	SetupRemediationWire,
 } from '../../shared/ipc/contracts/agent-provider';
 import type { ResolvedSettingSnapshot } from '../../shared/ipc/contracts/settings-resolution';
 import type { SetupMessageParams } from '../../shared/ipc/contracts/setup';
@@ -120,22 +116,6 @@ export function upstreamDetail(
 	message: string | null | undefined,
 ): ProviderDetailFields | null {
 	return message ? { detail: message } : null;
-}
-
-/**
- * The retry action every provider check offers. Shared so both probes emit one
- * remediation shape and only the runtime's own id and label differ.
- * @param descriptor - Runtime whose checks the retry re-runs.
- * @returns A `retry` remediation the Providers page wires to a refetch.
- */
-export function createRetryRemediation(
-	descriptor: AgentProviderDescriptor,
-): SetupRemediationWire {
-	return {
-		id: `retry-${descriptor.id}-readiness`,
-		kind: 'retry',
-		label: `Re-run ${descriptor.label} checks`,
-	};
 }
 
 /**

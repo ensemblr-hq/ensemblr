@@ -181,7 +181,6 @@
 			"open-git-install": "Open Git install docs",
 			"open-linear-settings": "Open integration settings",
 			"open-pi-provider-settings": "Open Pi provider settings",
-			"rerun-provider-checks": "Re-run {{provider}} checks",
 			"retry": "Retry check",
 			"retry-claude-executable": "Retry {{provider}} executable check",
 			"retry-config": "Retry config check",

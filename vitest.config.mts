@@ -131,6 +131,7 @@ export default defineConfig({
 			'tests/main/plan-mode-op-policy.test.ts',
 			'tests/main/agent-control-env-role.test.ts',
 			'tests/main/agent-provider-handlers.test.ts',
+			'tests/main/pi-provider-readiness-probe.test.ts',
 			'tests/main/claude-readiness.test.ts',
 			'tests/main/claude-subagent-mode.test.ts',
 			'tests/main/claude-agent-control-wiring.test.ts',

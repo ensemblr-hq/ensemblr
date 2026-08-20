@@ -559,7 +559,6 @@ test('probe fails the version and auth checks when no executable is found', asyn
 		'install-claude-code',
 		'open-claude-setup-docs',
 		'run-claude-login',
-		'retry-claude-readiness',
 	]);
 	expect(readiness.checks.find((check) => check.id === 'mcp')?.status).toBe(
 		'warning',
@@ -596,7 +595,6 @@ test('probe keeps the override remediation when a configured binary is unrunnabl
 	expect(executable?.detail).toContain('could not be run');
 	expect(executable?.remediations.map((action) => action.id)).toEqual([
 		'select-claude-executable',
-		'retry-claude-readiness',
 	]);
 });
 
@@ -694,9 +692,9 @@ test('probe fails when the session never answers within the deadline', async () 
 	expect(readiness.account).toBeNull();
 	expect(auth?.status).toBe('failure');
 	expect(auth?.detail).toContain('did not answer');
-	expect(auth?.remediations.map((action) => action.id)).toContain(
-		'retry-claude-readiness',
-	);
+	expect(auth?.remediations.map((action) => action.id)).toEqual([
+		'run-claude-login',
+	]);
 });
 
 test('probe closes the session and prompt stream when the deadline elapses', async () => {
