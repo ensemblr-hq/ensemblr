@@ -14,26 +14,25 @@ import { Skeleton } from '@/renderer/components/ui/skeleton';
 import { useLinearRefresh } from '@/renderer/hooks/linear/use-linear-refresh';
 import { useDebouncedValue } from '@/renderer/hooks/use-debounced-value';
 import {
+	ALL_ACCOUNTS,
+	ALL_TEAMS,
 	describeLinearAccountFailures,
 	describeLinearFailure,
 	type LinearIssueGroup,
 	type LinearIssueScope,
 	orderLinearIssues,
+	resolveLinearIssueFilters,
 } from '@/renderer/lib/linear';
 import {
 	linearIssueGroupingAtom,
 	linearIssueScopeAtom,
 	linearIssueSortAtom,
+	useLinearIssueFilters,
 } from '@/renderer/state/linear';
 import type { LinearIssueWire } from '@/shared/ipc/contracts/linear';
 import { LinearIssueEditorDialog } from './issue-editor-dialog';
 import { LinearPriorityIcon, LinearStateIcon } from './issue-glyphs';
-import {
-	ALL_ACCOUNTS,
-	ALL_TEAMS,
-	LinearIssueFilterBar,
-	LinearIssueViewBar,
-} from './issue-list-toolbar';
+import { LinearIssueFilterBar, LinearIssueViewBar } from './issue-list-toolbar';
 import { LinearIssueRow } from './issue-row';
 
 /** How long the search box must hold still before the list is re-read. */
@@ -41,22 +40,36 @@ const SEARCH_DEBOUNCE_MS = 250;
 
 /**
  * Linear issue browse list across every connected account: search, account and
- * team filters, a completion scope, and sortable, groupable rows. Rows are
- * merged rather than grouped by account, so each carries its organization when
- * the visible set actually spans more than one.
+ * team filters, a completion scope, and sortable, groupable rows. Every one of
+ * those is remembered, so opening an issue and coming back returns to the same
+ * view. Rows are merged rather than grouped by account, so each carries its
+ * organization when the visible set actually spans more than one.
  */
 export function LinearIssueList() {
 	const { i18n, t } = useTranslation();
 	const navigate = useNavigate();
 	const queryClient = useQueryClient();
-	const [query, setQuery] = useState('');
-	const [accountId, setAccountId] = useState<string>(ALL_ACCOUNTS);
-	const [teamId, setTeamId] = useState<string>(ALL_TEAMS);
 	const [editorOpen, setEditorOpen] = useState(false);
 	const [scope, setScope] = useAtom(linearIssueScopeAtom);
 	const [sort, setSort] = useAtom(linearIssueSortAtom);
 	const [grouping, setGrouping] = useAtom(linearIssueGroupingAtom);
-	const settledQuery = useDebouncedValue(query, SEARCH_DEBOUNCE_MS);
+	const { clear, filters, setAccountId, setQuery, setTeamId } =
+		useLinearIssueFilters();
+	const settledQuery = useDebouncedValue(filters.query, SEARCH_DEBOUNCE_MS);
+
+	const { data: summary } = useQuery(linearConnectionQuery);
+	const { data: metadataData } = useQuery(linearMetadataQuery);
+
+	const accounts = useMemo(() => summary?.accounts ?? [], [summary]);
+	const { accountId, teamId, teams } = useMemo(
+		() =>
+			resolveLinearIssueFilters({
+				accounts: summary?.accounts,
+				filters,
+				teams: metadataData?.metadata.teams,
+			}),
+		[filters, metadataData, summary],
+	);
 	const request = useMemo(
 		() => ({
 			...(accountId !== ALL_ACCOUNTS ? { accountId } : {}),
@@ -68,22 +81,13 @@ export function LinearIssueList() {
 	const refresh = useLinearRefresh(() =>
 		refreshLinearIssues(queryClient, request),
 	);
-
-	const { data: summary } = useQuery(linearConnectionQuery);
-	const { data: metadataData } = useQuery(linearMetadataQuery);
 	const {
 		data: result,
 		isFetching: issuesFetching,
 		isLoading: issuesLoading,
 	} = useQuery(linearIssuesQuery(request));
 
-	const accounts = summary?.accounts ?? [];
 	const showAccountFilter = accounts.length > 1;
-	const allTeams = metadataData ? metadataData.metadata.teams : [];
-	const teams =
-		accountId === ALL_ACCOUNTS
-			? allTeams
-			: allTeams.filter((team) => team.accountId === accountId);
 	const rows = useMemo(() => result?.issues ?? [], [result]);
 
 	// biome-ignore lint/correctness/useExhaustiveDependencies: group headings are named through the i18n singleton, so the language is a real input Biome cannot see.
@@ -98,15 +102,13 @@ export function LinearIssueList() {
 			<LinearIssueFilterBar
 				accountId={accountId}
 				accounts={accounts}
-				onAccountChange={(next) => {
-					setAccountId(next);
-					setTeamId(ALL_TEAMS);
-				}}
+				onAccountChange={setAccountId}
+				onClearFilters={clear}
 				onNewIssue={() => setEditorOpen(true)}
 				onQueryChange={setQuery}
 				onRefresh={refresh.start}
 				onTeamChange={setTeamId}
-				query={query}
+				query={filters.query}
 				refreshing={issuesFetching || refresh.active}
 				showAccounts={showAccountFilter}
 				teamId={teamId}
@@ -144,7 +146,12 @@ export function LinearIssueList() {
 				</div>
 			) : board.total === 0 ? (
 				<p className='rounded-lg border border-border border-dashed px-3 py-12 text-center text-muted-foreground text-xs'>
-					{emptyText({ hasRows: rows.length > 0, query, scope, t })}
+					{emptyText({
+						hasRows: rows.length > 0,
+						query: filters.query,
+						scope,
+						t,
+					})}
 				</p>
 			) : (
 				<div className='flex flex-col gap-4'>

@@ -12,7 +12,7 @@ import type {
  * @param suffix - Name of the preference being stored
  * @returns The prefixed storage key
  */
-const KEY = (suffix: string) => `ensemblr_linear_${suffix}`;
+export const KEY = (suffix: string) => `ensemblr_linear_${suffix}`;
 
 /**
  * Completion scope of the Linear browse list. Defaults to active work: a tracker

@@ -10,6 +10,17 @@ export {
 	validateIssueEditorFields,
 } from './issue-editor-model';
 export type {
+	LinearIssueFilters,
+	ResolvedLinearIssueFilters,
+} from './issue-filters';
+export {
+	ALL_ACCOUNTS,
+	ALL_TEAMS,
+	DEFAULT_LINEAR_ISSUE_FILTERS,
+	hasLinearIssueFilters,
+	resolveLinearIssueFilters,
+} from './issue-filters';
+export type {
 	LinearIssueBoard,
 	LinearIssueGroup,
 	LinearIssueGrouping,

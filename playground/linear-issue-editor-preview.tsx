@@ -1,11 +1,8 @@
 import { useState } from 'react';
 
 import { LinearIssueEditorDialog } from '@/renderer/components/linear/issue-editor-dialog';
-import {
-	ALL_ACCOUNTS,
-	ALL_TEAMS,
-	LinearIssueFilterBar,
-} from '@/renderer/components/linear/issue-list-toolbar';
+import { LinearIssueFilterBar } from '@/renderer/components/linear/issue-list-toolbar';
+import { ALL_ACCOUNTS, ALL_TEAMS } from '@/renderer/lib/linear';
 
 import {
 	createFixtureLinearIssue,
@@ -68,6 +65,11 @@ export function LinearIssueEditorScene() {
 					accountId={accountId}
 					accounts={FIXTURE_LINEAR_ACCOUNTS}
 					onAccountChange={setAccountId}
+					onClearFilters={() => {
+						setAccountId(ALL_ACCOUNTS);
+						setTeamId(ALL_TEAMS);
+						setQuery('');
+					}}
 					onNewIssue={() => {
 						setMode('create');
 						setOpen(true);
