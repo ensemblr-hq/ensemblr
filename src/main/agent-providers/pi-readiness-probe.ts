@@ -15,15 +15,11 @@ import { commandLog } from '../setup/index.ts';
 import type { AgentProviderReadinessProbe } from './agent-provider-types.ts';
 import {
 	authoredDetail,
-	createRetryRemediation,
 	toExecutableSource,
 	upstreamDetail,
 } from './agent-provider-types.ts';
 
 const PI_DESCRIPTOR = getAgentProviderDescriptor('pi');
-
-/** The retry action every Pi check offers. */
-const RETRY_REMEDIATION = createRetryRemediation(PI_DESCRIPTOR);
 
 /** Options for {@link createPiReadinessProbe}. */
 export interface CreatePiReadinessProbeOptions {
@@ -71,7 +67,11 @@ export function createPiReadinessProbe({
 	};
 }
 
-/** Builds the check reporting which `pi` binary was discovered. */
+/**
+ * Builds the check reporting which `pi` binary was discovered. The picker is
+ * offered only when the check is not passing and the override is not locked, so
+ * a green row carries no action, exactly as the Claude probe's does.
+ */
 function createExecutableCheck(
 	executable: PiExecutableSnapshot,
 ): AgentProviderCheckWire {
@@ -82,6 +82,7 @@ function createExecutableCheck(
 				? 'warning'
 				: 'failure';
 	const source = executable.source ?? 'unknown';
+	const canPickExecutable = status !== 'success' && !executable.setting?.locked;
 
 	return {
 		...(status === 'failure'
@@ -110,19 +111,16 @@ function createExecutableCheck(
 					},
 				]
 			: null,
-		remediations: [
-			...(executable.setting?.locked
-				? []
-				: [
-						{
-							id: 'select-pi-executable',
-							kind: 'select-path' as const,
-							label: `Select ${PI_DESCRIPTOR.label} executable`,
-							target: PI_DESCRIPTOR.executableSettingKey,
-						},
-					]),
-			RETRY_REMEDIATION,
-		],
+		remediations: canPickExecutable
+			? [
+					{
+						id: 'select-pi-executable',
+						kind: 'select-path' as const,
+						label: `Select ${PI_DESCRIPTOR.label} executable`,
+						target: PI_DESCRIPTOR.executableSettingKey,
+					},
+				]
+			: [],
 		status,
 	};
 }
@@ -160,7 +158,7 @@ function createAgentDirectoryCheck(
 				text: agentDirectory.source,
 			},
 		],
-		remediations: [RETRY_REMEDIATION],
+		remediations: [],
 		status: failed ? 'failure' : 'success',
 	};
 }
@@ -208,7 +206,7 @@ function createRpcSmokeCheck(rpc: PiRpcSmokeSnapshot): AgentProviderCheckWire {
 					]
 				: []),
 		],
-		remediations: [RETRY_REMEDIATION],
+		remediations: [],
 		status: failed ? 'failure' : 'success',
 	};
 }
@@ -241,7 +239,7 @@ function createProviderModelCheck(
 				providerModels.command ? `${providerModels.command} --list-models` : '',
 			),
 		],
-		remediations: [RETRY_REMEDIATION],
+		remediations: [],
 		status: failed ? 'failure' : 'success',
 	};
 }

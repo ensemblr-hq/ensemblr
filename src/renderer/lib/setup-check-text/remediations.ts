@@ -3,7 +3,6 @@ import type { TFunction } from 'i18next';
 import { getAgentProviderDescriptor } from '@/shared/agent-provider';
 
 const CLAUDE = getAgentProviderDescriptor('claude');
-const PI = getAgentProviderDescriptor('pi');
 
 /**
  * Button label per remediation id. Keyed by plain string and not by a union,
@@ -67,12 +66,6 @@ export const SETUP_REMEDIATION_LABEL: Record<string, (t: TFunction) => string> =
 				'Retry {{provider}} executable check',
 				{ provider: CLAUDE.label },
 			),
-		'retry-claude-readiness': (t) =>
-			t(
-				'common:setup-check.action.rerun-provider-checks',
-				'Re-run {{provider}} checks',
-				{ provider: CLAUDE.label },
-			),
 		'retry-config': (t) =>
 			t('common:setup-check.action.retry-config', 'Retry config check'),
 		'retry-database': (t) =>
@@ -109,12 +102,6 @@ export const SETUP_REMEDIATION_LABEL: Record<string, (t: TFunction) => string> =
 			t(
 				'common:setup-check.action.retry-pi-provider-model',
 				'Retry provider/model check',
-			),
-		'retry-pi-readiness': (t) =>
-			t(
-				'common:setup-check.action.rerun-provider-checks',
-				'Re-run {{provider}} checks',
-				{ provider: PI.label },
 			),
 		'retry-pi-rpc': (t) =>
 			t('common:setup-check.action.retry-pi-rpc', 'Retry Pi RPC check'),

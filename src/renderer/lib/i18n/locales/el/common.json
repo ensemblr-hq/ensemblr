@@ -181,7 +181,6 @@
 			"open-git-install": "Άνοιγμα τεκμηρίωσης εγκατάστασης Git",
 			"open-linear-settings": "Άνοιγμα ρυθμίσεων ενσωματώσεων",
 			"open-pi-provider-settings": "Άνοιγμα ρυθμίσεων παρόχων Pi",
-			"rerun-provider-checks": "Επανάληψη ελέγχων {{provider}}",
 			"retry": "Επανάληψη ελέγχου",
 			"retry-claude-executable": "Επανάληψη ελέγχου εκτελέσιμου {{provider}}",
 			"retry-config": "Επανάληψη ελέγχου ρυθμίσεων",

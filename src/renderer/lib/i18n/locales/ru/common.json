@@ -189,7 +189,6 @@
 			"open-git-install": "Открыть документацию по установке Git",
 			"open-linear-settings": "Открыть настройки интеграций",
 			"open-pi-provider-settings": "Открыть настройки провайдеров Pi",
-			"rerun-provider-checks": "Перепроверить {{provider}}",
 			"retry": "Повторить проверку",
 			"retry-claude-executable": "Повторить проверку исполняемого файла {{provider}}",
 			"retry-config": "Повторить проверку конфигурации",

@@ -441,8 +441,8 @@
 			"missing": "nothing — no executable resolved",
 			"path": "the executable found on PATH"
 		},
-		"refresh": "Refresh",
-		"refreshing": "Refreshing…",
+		"rerun-checks": "Re-run checks",
+		"rerunning-checks": "Re-running checks…",
 		"runtime": {
 			"probe-failed": "Ensemblr could not probe the {{command}} executable.",
 			"probing": "Probing the {{command}} executable…",

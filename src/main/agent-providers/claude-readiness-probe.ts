@@ -28,7 +28,6 @@ import type {
 } from './agent-provider-types.ts';
 import {
 	authoredDetail,
-	createRetryRemediation,
 	toExecutableSource,
 	upstreamDetail,
 } from './agent-provider-types.ts';
@@ -59,9 +58,6 @@ const DEFAULT_SESSION_TIMEOUT_MS = 20_000;
 const DEFAULT_USAGE_TIMEOUT_MS = 8000;
 const MS_PER_SECOND = 1000;
 const VERSION_MAX_OUTPUT_BYTES = 4096;
-
-/** The retry action every Claude check offers. */
-const RETRY_REMEDIATION = createRetryRemediation(CLAUDE_DESCRIPTOR);
 
 /** Sentinel {@link raceDeadline} resolves to when the deadline wins the race. */
 const DEADLINE_EXCEEDED = Symbol('claude-session-deadline');
@@ -483,7 +479,6 @@ function createExecutableCheck(
 					label: `Select ${CLAUDE_DESCRIPTOR.label} executable`,
 					target: CLAUDE_DESCRIPTOR.executableSettingKey,
 				},
-				RETRY_REMEDIATION,
 			],
 			status: 'failure',
 		};
@@ -504,7 +499,7 @@ function createExecutableCheck(
 		id: 'executable',
 		label: `${CLAUDE_DESCRIPTOR.label} executable`,
 		logs: null,
-		remediations: [RETRY_REMEDIATION],
+		remediations: [],
 		status: 'success',
 	};
 }
@@ -523,7 +518,7 @@ function createVersionCheck(
 			id: 'version',
 			label: 'Version',
 			logs: null,
-			remediations: [...createInstallRemediations(), RETRY_REMEDIATION],
+			remediations: createInstallRemediations(),
 			status: 'failure',
 		};
 	}
@@ -546,7 +541,7 @@ function createVersionCheck(
 			id: 'version',
 			label: 'Version',
 			logs,
-			remediations: [RETRY_REMEDIATION],
+			remediations: [],
 			status: 'failure',
 		};
 	}
@@ -556,7 +551,7 @@ function createVersionCheck(
 		id: 'version',
 		label: 'Version',
 		logs,
-		remediations: [RETRY_REMEDIATION],
+		remediations: [],
 		status: 'success',
 	};
 }
@@ -576,7 +571,7 @@ function createAuthCheck(
 			id: 'auth',
 			label: 'Authentication',
 			logs: null,
-			remediations: [RETRY_REMEDIATION],
+			remediations: [],
 			status: 'success',
 		};
 	}
@@ -593,7 +588,6 @@ function createAuthCheck(
 		remediations: [
 			...(executable.path ? [] : createInstallRemediations()),
 			...createLoginRemediations(),
-			RETRY_REMEDIATION,
 		],
 		status: 'failure',
 	};
@@ -612,7 +606,7 @@ function createMcpCheck(
 			id: 'mcp',
 			label: 'MCP servers',
 			logs: null,
-			remediations: [RETRY_REMEDIATION],
+			remediations: [],
 			status: 'warning',
 		};
 	}
@@ -631,7 +625,7 @@ function createMcpCheck(
 			id: 'mcp',
 			label: 'MCP servers',
 			logs: null,
-			remediations: [RETRY_REMEDIATION],
+			remediations: [],
 			status: 'warning',
 		};
 	}
@@ -647,7 +641,7 @@ function createMcpCheck(
 		id: 'mcp',
 		label: 'MCP servers',
 		logs: null,
-		remediations: [RETRY_REMEDIATION],
+		remediations: [],
 		status: 'success',
 	};
 }

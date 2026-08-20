@@ -183,7 +183,6 @@ export default interface Resources {
 				'open-git-install': 'Open Git install docs';
 				'open-linear-settings': 'Open integration settings';
 				'open-pi-provider-settings': 'Open Pi provider settings';
-				'rerun-provider-checks': 'Re-run {{provider}} checks';
 				retry: 'Retry check';
 				'retry-claude-executable': 'Retry {{provider}} executable check';
 				'retry-config': 'Retry config check';
@@ -1987,8 +1986,8 @@ export default interface Resources {
 				missing: 'nothing — no executable resolved';
 				path: 'the executable found on PATH';
 			};
-			refresh: 'Refresh';
-			refreshing: 'Refreshing…';
+			'rerun-checks': 'Re-run checks';
+			'rerunning-checks': 'Re-running checks…';
 			runtime: {
 				'probe-failed': 'Ensemblr could not probe the {{command}} executable.';
 				probing: 'Probing the {{command}} executable…';
