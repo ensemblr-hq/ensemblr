@@ -79,6 +79,21 @@ The diff toolbar carries split versus unified view, word wrap, hidden
 characters, a **File** mode showing the whole file rather than only its hunks,
 and the Viewed toggle.
 
+### Markdown files
+
+A markdown file opens as a **formatted preview**, and the toolbar's eye toggle
+switches to the raw source and back. A file that opens with a YAML frontmatter
+block — a plan file, a session summary, anything with `---` and a set of keys at
+the top — draws that block as a **metadata band** above the body, so the document
+starts at its real first heading instead of running its metadata together into
+one long title.
+
+Nothing there interprets YAML semantics. A block Ensemblr cannot read as a flat
+set of key/value entries is shown exactly as written, on the reasoning that
+metadata read wrong is worse than metadata read literally — so a document opening
+with two thematic breaks, or with a block that repeats a key, renders verbatim
+rather than being reshaped into a header it does not have.
+
 ### Files outside the workspace
 
 Agents write to `/tmp`, to `~/.claude/`, and to sibling worktrees, and they cite

@@ -9,6 +9,69 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.0-beta.10] - 2026-08-20
+
+A pasted wall of text stops pushing the answer off screen, a spent plan window reads as something you
+can act on, and every workspace remembers its own chat tab. Signed, notarized, Apple silicon.
+[Release](https://github.com/ensemblr-hq/ensemblr/releases/tag/v0.1.0-beta.10) ·
+[`.dmg`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.0-beta.10/Ensemblr-0.1.0-beta.10-arm64.dmg)
+
+### Added
+
+- **Long prompts clamp in the timeline.** A pasted stack trace or wall of build output used to push
+  the turn that answered it off screen. The prompt card now clamps at 16rem behind a bottom fade,
+  with a Show more / Show less control that appears only when there is something behind it. The text
+  stays verbatim — what you typed is never re-read as markdown — and long unbreakable runs such as
+  module ids and absolute paths wrap mid-token rather than stretching the card. Keyboard focus
+  reaching a hidden attachment chip unfolds the card, so a clamp never traps focus somewhere you
+  cannot see.
+- **A spent Claude plan window reads as a failure row.** Claude Code announces an exhausted plan
+  window as an ordinary assistant turn, so it rendered as the model's answer: a bare English sentence
+  with no icon, no severity, and nothing to press, on a turn that produced no answer at all. It is now
+  recognized and lifted onto the failure path as a `rate-limit` row, with the wait restated as a
+  translated badge that counts down to the reset the runtime named. Recognition is structural as well
+  as textual — a turn that did work and *then* mentioned a limit still reads as an answer, and a
+  subagent reporting one keeps it as its own. `rate-limit` also covers billing failures and exhausted
+  API quotas, which never clear on their own, so the row promises a reset only when the runtime
+  reported one and otherwise points at the plan and billing.
+- **A chat can re-read its plan usage on demand.** The composer's context card gained a refresh
+  control, so a gauge minutes out of date is one click from a fresh reading rather than something you
+  wait on the runtime to volunteer. Concurrent presses join the read already in flight instead of
+  queueing behind each other, and the manual path ignores the freshness interval a sealing turn
+  respects — asking is the signal that the figure on screen is the one you no longer trust. The card
+  moved from a hover card to a popover: a hover card's contents can be clicked but never focused, so
+  the gauge was unreachable to keyboard and screen-reader users the moment it grew an action. Opening
+  it is now a click. A chat with no runtime attached draws no control rather than one that always
+  fails.
+- **A markdown file's frontmatter draws as a metadata header.** A file opening with a YAML
+  frontmatter block rendered wrong in the formatted preview — CommonMark reads the opening `---` as a
+  thematic break and the closing one turns every key above it into a heading, so a document opened
+  with its metadata set as one run-on title. The block is now lifted out and drawn as a metadata band,
+  which lets the body start at its real first heading. Nothing interprets YAML semantics: a block that
+  does not group into flat key/value entries is shown as written, on the reasoning that metadata read
+  wrong is worse than metadata read literally.
+- **One Re-run checks button on the Providers page.** Every readiness check carried its own "Re-run
+  <provider> checks" remediation alongside the section-level control, so a failing tab offered the
+  same action up to five times over. A check now carries only remediations specific to what it found,
+  and the single section button re-probes whichever tab is open. It is relabelled Refresh → **Re-run
+  checks**, because nothing is re-fetched from a server: the app re-runs the local probes, which spawn
+  the runtime.
+
+### Fixed
+
+- Each workspace remembers its **own** focused chat tab. Switching between workspaces could overwrite
+  one workspace's remembered tab with a tab belonging to the workspace it was switching away from, so
+  returning to it landed on the wrong chat. Two independent causes: the routed chat id and the
+  workspace model arrive on separate router subscriptions, so a pending transition could pair the
+  incoming workspace with the outgoing one's model; and the substitute tab shown when a routed id is
+  not one of the workspace's own was being written over the real memory.
+- Renderer state is evicted for workspaces that no longer exist. Twelve stores are keyed by workspace
+  id and ten of them persisted, but only the viewed-changes map was ever cleaned up — so a machine
+  that has opened a few hundred workspaces carried a few hundred dead keys in each. Deleting a
+  workspace now drops its entry everywhere, and a reconciliation pass against the history feed clears
+  what a delete could not reach. **Archiving deliberately evicts nothing**: it is reversible, and an
+  unarchived workspace has to come back with its board column, pin, remembered tabs, and run script.
+
 ## [0.1.0-beta.9] - 2026-08-20
 
 A failed turn becomes something you can act on, Claude Code's task tools get real cards, and removing

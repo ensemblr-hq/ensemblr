@@ -92,10 +92,21 @@ two surfaces show it.
 - **Settings → Providers** draws a bar per rate-limit window, read once per
   readiness probe. It runs on its own short deadline, so a slow usage endpoint
   costs that panel alone and never the rest of the page.
-- **The composer's context hover card** carries the same windows for this chat's
-  own session, plus a running cost estimate. "How much room is left" is one
-  question over two horizons, so it is one control rather than two gauges
-  competing on the same row.
+- **The composer's context card** carries the same windows for this chat's own
+  session, plus a running cost estimate. "How much room is left" is one question
+  over two horizons, so it is one control rather than two gauges competing on the
+  same row. Click the gauge to open it — it is a popover, not a hover card, so
+  the controls inside it can be reached by keyboard and read by a screen reader.
+
+**You can ask for a fresher reading.** The card carries a **refresh** control, so
+a gauge you opened mid-turn is one click from a current figure rather than
+something you wait on the runtime to volunteer. Pressing it repeatedly costs the
+runtime one question — the presses join the read already in flight and settle on
+the same answer — and the manual path ignores the freshness interval a sealing
+turn respects, on the reasoning that asking is itself the signal that the figure
+on screen is the one you no longer trust. A chat with no runtime attached, a
+reopened chat replaying its persisted gauges among them, draws no control rather
+than one that would always fail.
 
 The composer's figures come from the same read: a session asks the account what
 every window stands at as it opens, and again after a turn seals if that answer
@@ -270,6 +281,19 @@ whatever survived truncation. Remove the chip and it stays removed.
 
 See [ADR 0047](../adr/0047-model-composer-attachments-as-one-ordered-list-in-a-lexical-draft.md).
 
+### Your message in the timeline
+
+Once sent, a message becomes a prompt card above the turn that answers it, and a
+long one **clamps** rather than pushing that answer off screen — a pasted stack
+trace or wall of build output stops at about sixteen lines behind a fade, with
+**Show more** to unfold it. The control appears only when something is actually
+hidden, so an ordinary sentence carries no chrome.
+
+The text is shown verbatim. What you typed is never re-read as markdown, so a
+prompt full of asterisks and backticks reads back as you wrote it. Attachment
+chips a clamp is covering stay reachable: tabbing to one unfolds the card rather
+than scrolling focus into a strip you cannot see.
+
 ## Linked directories
 
 To let an agent read something outside its workspace — a sibling repository, a
@@ -304,6 +328,20 @@ land.
 
 The answer a fatal failure interrupted is marked **incomplete**, so a cut-off
 turn reads as cut off instead of as finished.
+
+**A spent plan window is one of those failures.** Claude Code announces an
+exhausted claude.ai plan window as an ordinary assistant turn, which used to
+render as the model's answer — a bare English sentence on a turn that produced no
+answer at all. It is now a rate-limit row like any other, and when the runtime
+named a reset the row restates the wait as a badge counting down to it. The same
+row covers billing failures and exhausted API quotas, which never clear on their
+own, so it promises a reset only when there is one to promise and otherwise
+points you at your plan and billing. Either way **Continue** leads: whatever the
+account ran into has to clear before re-sending would help, and re-sending would
+start the work over.
+
+A turn that did real work and *then* mentioned a limit still reads as an answer,
+and a limit a sub-agent hit stays inside that sub-agent's own activity.
 
 ## The follow-up queue and unread marks
 

@@ -8,7 +8,7 @@ then dive in here.
 
 ## Using Ensemblr
 
-The current build is [`0.1.0-beta.9`](https://github.com/ensemblr-hq/ensemblr/releases/tag/v0.1.0-beta.9) — signed, notarized, Apple silicon only. [Download the `.dmg`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.0-beta.9/Ensemblr-0.1.0-beta.9-arm64.dmg). You bring your own agent CLI — Pi or Claude Code, one is enough — plus `git` and an authenticated `gh`.
+The current build is [`0.1.0-beta.10`](https://github.com/ensemblr-hq/ensemblr/releases/tag/v0.1.0-beta.10) — signed, notarized, Apple silicon only. [Download the `.dmg`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.0-beta.10/Ensemblr-0.1.0-beta.10-arm64.dmg). You bring your own agent CLI — Pi or Claude Code, one is enough — plus `git` and an authenticated `gh`.
 
 - [`guide/`](./guide) — the user guide: [install](./guide/01-install.md), [requirements](./guide/02-requirements.md), [first run](./guide/03-first-run.md), [concepts](./guide/04-concepts.md), and the day-to-day surfaces through to [troubleshooting](./guide/14-troubleshooting.md). Start at [`guide/README.md`](./guide/README.md).
 
@@ -28,7 +28,7 @@ The current build is [`0.1.0-beta.9`](https://github.com/ensemblr-hq/ensemblr/re
 
 - [`pi/`](./pi) — Pi integration internals: the [RPC protocol](./pi/rpc-protocol.md) and [event taxonomy](./pi/event-taxonomy.md).
 - [`claude/`](./claude) — Claude Code runtime internals: the [runtime guide](./claude/README.md) (adapter wiring, discovery, live-discovered slash commands / MCP roster / model catalogue, effort, context measurement) and the [SDK surface reference](./claude/sdk-surface.md). [ADR 0042](./adr/0042-add-claude-code-as-a-second-first-class-agent-runtime.md) is the decision record.
-- [`adr/`](./adr) — **53** Architecture Decision Records, numbered `0001`–`0054` (`0007` was withdrawn before acceptance), covering the accepted decisions and their supersessions. ADRs are historical records: some cite planning documents that were removed before the public release, and those references are left as written rather than rewritten after the fact.
+- [`adr/`](./adr) — **54** Architecture Decision Records, numbered `0001`–`0055` (`0007` was withdrawn before acceptance), covering the accepted decisions and their supersessions. ADRs are historical records: some cite planning documents that were removed before the public release, and those references are left as written rather than rewritten after the fact.
 - [`ux-conventions.md`](./ux-conventions.md) — the settled workflows, information architecture, visual design, copy, and icon conventions the shell is built to.
 - [`i18n-glossary.md`](./i18n-glossary.md) — the Russian and Greek product vocabulary every translation is held to. The completion contract itself is [`.claude/rules/i18n.md`](../.claude/rules/i18n.md).
 - [`considerations/`](./considerations) — design records and forward-looking notes: the [Ensemblr Control design](./considerations/agent-control-layer.md) and the [orchestration playbook](./considerations/agent-orchestration-playbook.md).

@@ -207,6 +207,14 @@ From the History screen you can browse everything archived for a project,
 if the archive removed it), or **permanently delete** it — which purges the
 preserved directory, the worktree and branch if still present, and the record.
 
+The same line separates what the app *remembers* about a workspace — its board
+column, whether it is pinned, which chat tab and terminal you had open, which run
+script you last used. **Archiving keeps all of it**, because a restored workspace
+should come back as you left it. **Deleting clears it**, so a machine that has
+opened hundreds of workspaces is not carrying a remembered tab for every one of
+them. Each workspace's memory is its own: switching between two of them and back
+lands you on the chat you were reading, not on whichever one you looked at last.
+
 Two settings under `[git]` govern the git side:
 
 | Setting | Default | Effect |

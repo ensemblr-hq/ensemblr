@@ -193,7 +193,12 @@ inline.
 | Authentication | Claude Code | Claude Code is installed *and* signed in |
 | MCP servers | Claude Code | How many MCP servers are configured and connected |
 
-Use **Refresh** to re-run every check for that runtime.
+Use **Re-run checks** to re-probe whichever tab is open. It is the only place
+that action lives: a check row carries only the remediations specific to what it
+found — a missing executable offers the picker, a signed-out runtime offers the
+login command — rather than repeating the section button once per failing row.
+The label says *re-run* rather than *refresh* because nothing is re-fetched from
+a server; Ensemblr re-runs the local probes, which spawn the runtime.
 
 **Account.** What the provider reports for the credentials Ensemblr will use:
 account, organization, plan, API provider, and credential source. If the
@@ -206,7 +211,8 @@ showing what the account has spent against its plan. It is read once per
 readiness probe, on its own short deadline — a slow usage endpoint costs this
 panel alone and leaves the account and MCP rows intact. The same windows,
 scoped to one chat's session and paired with that session's running cost, sit in
-the composer's context hover card ([6. Agents](./06-agents.md)).
+the composer's context card, which carries a refresh control of its own
+([6. Agents](./06-agents.md)).
 
 **Sign-in is interactive.** Ensemblr copies the login command to your clipboard
 and you run it in a terminal. It never captures the credential.
