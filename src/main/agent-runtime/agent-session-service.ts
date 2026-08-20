@@ -72,6 +72,7 @@ import {
 	readAgentSummaryMarker,
 	withAgentSummaryMarker,
 } from './agent-summary.ts';
+import { decodeHtmlEntities } from './naming/decode-html-entities.ts';
 import {
 	sanitizeChatTitle,
 	truncateChatTitle,
@@ -220,6 +221,20 @@ export interface AgentSessionService {
 	writeForkSummary: (
 		request: WriteForkSummaryRequest,
 	) => Promise<WriteForkSummaryResult>;
+}
+
+/**
+ * Reduces an agent-supplied summary title to the single line a markdown heading
+ * can hold. `session-summary-writer` interpolates the stored title straight into
+ * `# {title}`, so a line break in it silently demotes the rest of the heading to
+ * body text — whether the agent typed the break or encoded it. Deliberately not
+ * {@link sanitizeChatTitle}: a summary heading keeps the preambles, quotes, and
+ * trailing punctuation a chat tab strips.
+ * @param title - The title the agent passed to `ensemblr_set_summary`.
+ * @returns The decoded title on one line.
+ */
+function toSummaryHeading(title: string): string {
+	return decodeHtmlEntities(title).replace(/\s+/g, ' ').trim();
 }
 
 /**
@@ -444,7 +459,7 @@ export function createAgentSessionService({
 					body: summary,
 					branchId: target.branchId,
 					capturedAtOrdinal,
-					title,
+					title: toSummaryHeading(title),
 					updatedAt: new Date().toISOString(),
 				}),
 			});

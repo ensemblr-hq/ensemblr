@@ -60,4 +60,19 @@ describe('deriveProvisionalBranchSlug', () => {
 	test('keeps a bare pleasantry from slugging to nothing', () => {
 		expect(deriveProvisionalBranchSlug('please')).toBe('please');
 	});
+
+	test('leaves no entity fragment in a slug from an encoded prompt', () => {
+		expect(deriveProvisionalBranchSlug('Admin &amp; Management')).toBe(
+			'admin-management',
+		);
+		expect(deriveProvisionalBranchSlug('Compare &lt;div&gt; output')).toBe(
+			'compare-div-output',
+		);
+		expect(deriveProvisionalBranchSlug('Quote the &quot;title&quot;')).toBe(
+			'quote-title',
+		);
+		expect(deriveProvisionalBranchSlug('Admin &amp;amp; Management')).toBe(
+			'admin-management',
+		);
+	});
 });

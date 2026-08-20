@@ -230,6 +230,23 @@ describe('sanitizeBranchSlug', () => {
 		expect(sanitizeBranchSlug('!!!')).toBeNull();
 	});
 
+	test('leaves no entity fragment in a slug from an encoded name', () => {
+		expect(sanitizeBranchSlug('Admin &amp; Management')).toBe(
+			'admin-management',
+		);
+		expect(sanitizeBranchSlug('Compare &lt;div&gt; output')).toBe(
+			'compare-div-output',
+		);
+		expect(sanitizeBranchSlug('Admin &amp;amp; Management')).toBe(
+			'admin-management',
+		);
+	});
+
+	test('leaves no digits behind for an encoded whitespace control', () => {
+		expect(sanitizeBranchSlug('Fix&#10;login')).toBe('fix-login');
+		expect(sanitizeBranchSlug('Fix&#9;login')).toBe('fix-login');
+	});
+
 	test('caps length at a word boundary', () => {
 		const result = sanitizeBranchSlug(
 			'add a really long and very descriptive branch name here please',

@@ -43,6 +43,7 @@ export default defineConfig({
 			'tests/main/dictation-service.test.ts',
 			'tests/main/pi-wire-content-blocks.test.ts',
 			'tests/main/sanitize-title.test.ts',
+			'tests/main/decode-html-entities.test.ts',
 			'tests/main/title-provenance.test.ts',
 			'tests/main/derive-title-source.test.ts',
 			'tests/main/linked-directory-recents.test.ts',
