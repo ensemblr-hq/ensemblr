@@ -322,6 +322,80 @@ describe('agent-control service: gating', () => {
 	});
 });
 
+describe('agent-control service: review comments', () => {
+	// The comment roll-up lives in Checks, so the port pulls the user there
+	// rather than leaving the behaviour to a model remembering to focus.
+	it('lands the user in Checks after filing comments', async () => {
+		const ports = makePorts();
+		const { service } = setup({ ports });
+		const result = await service.invoke({
+			op: 'addDiffComments',
+			token: 'tok-caller',
+			rawArgs: { comments: [{ body: 'nit', filePath: 'src/a.ts' }] },
+		});
+		expect(result.ok).toBe(true);
+		expect(ports.focus.focusPanel).toHaveBeenCalledWith({
+			panel: 'checks',
+			workspaceId: 'ws',
+		});
+	});
+
+	it('lands the user in Checks after resolving comments', async () => {
+		const ports = makePorts();
+		const { service } = setup({ ports });
+		await service.invoke({
+			op: 'resolveDiffComments',
+			token: 'tok-caller',
+			rawArgs: { commentIds: ['c-1'] },
+		});
+		expect(ports.focus.focusPanel).toHaveBeenCalledWith({
+			panel: 'checks',
+			workspaceId: 'ws',
+		});
+	});
+
+	// Nothing closed means nothing new to look at, so moving the user would be a
+	// yank with no payload behind it.
+	it('leaves the user where they are when a resolve batch closes nothing', async () => {
+		const ports = makePorts();
+		vi.mocked(ports.review.resolveComments).mockResolvedValue({
+			alreadyResolved: ['c-1'],
+			message: 'Resolved nothing.',
+			notFound: [],
+			resolved: 0,
+			resolvedIds: [],
+		});
+		const { service } = setup({ ports });
+		await service.invoke({
+			op: 'resolveDiffComments',
+			token: 'tok-caller',
+			rawArgs: { commentIds: ['c-1'] },
+		});
+		expect(ports.focus.focusPanel).not.toHaveBeenCalled();
+	});
+
+	it('pulls focus once for a batch of comment ops in one turn', async () => {
+		const ports = makePorts();
+		const { service } = setup({ ports });
+		await service.invoke({
+			op: 'addDiffComments',
+			token: 'tok-caller',
+			rawArgs: { comments: [{ body: 'nit', filePath: 'src/a.ts' }] },
+		});
+		await service.invoke({
+			op: 'addDiffComments',
+			token: 'tok-caller',
+			rawArgs: { comments: [{ body: 'another', filePath: 'src/b.ts' }] },
+		});
+		await service.invoke({
+			op: 'resolveDiffComments',
+			token: 'tok-caller',
+			rawArgs: { commentIds: ['c-1'] },
+		});
+		expect(ports.focus.focusPanel).toHaveBeenCalledTimes(1);
+	});
+});
+
 describe('agent-control service: board status', () => {
 	it('setWorkspaceStatus targets the caller own workspace and returns ok', async () => {
 		const ports = makePorts();

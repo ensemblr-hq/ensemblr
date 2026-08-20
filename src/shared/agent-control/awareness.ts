@@ -98,8 +98,13 @@ Keeping your own tab legible is your job, not the user's, and it is bookkeeping 
  * — a whole-workspace diff is the one payload in this surface with no natural
  * ceiling, and the cheap probe is what stands between a model and thousands of
  * characters of patch it did not need.
+ *
+ * It names Checks rather than Changes as where comments are read, and says the
+ * app moves the user there, because both are true: the roll-up is the view that
+ * answers what a pass left open, and the port pulls focus to it so no model has
+ * to remember to.
  */
-const REVIEW_INVENTORY_READS = `- Review: read this workspace's diff (\`ensemblr_get_workspace_diff\`) — call it with \`stat: true\` FIRST to see which files changed and how large the diff is, then read the whole thing, or one file at a time with \`filePath\`; read the review comments already on it (\`ensemblr_get_diff_comments\`); leave your own against a file and line (\`ensemblr_add_diff_comments\`), which the user reads in the Changes panel.`;
+const REVIEW_INVENTORY_READS = `- Review: read this workspace's diff (\`ensemblr_get_workspace_diff\`) — call it with \`stat: true\` FIRST to see which files changed and how large the diff is, then read the whole thing, or one file at a time with \`filePath\`; read the review comments already on it (\`ensemblr_get_diff_comments\`); leave your own against a file and line (\`ensemblr_add_diff_comments\`), which the user reads as a list in the Checks panel. Ensemblr brings Checks forward itself after a comment op — once per batch, not once per call — so never spend an \`ensemblr_focus_panel\` call on it.`;
 
 /**
  * The full review bullet, for every role outside Plan Mode. Plan Mode gets

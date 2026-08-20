@@ -94,6 +94,12 @@ origin, so a comment you wrote never reads as one the user wrote.
   right surface when your answer belongs on the line rather than in prose.
 - `ensemblr_resolve_diff_comments` closes them, and takes a batch.
 
+**The user reads them as a list in Checks.** A comment renders in both panels —
+inline on its line in Changes, and in the Checks roll-up that answers what a pass
+left open — and the list is what someone handed six findings actually wants.
+Ensemblr brings Checks forward itself after a comment op, once per batch rather
+than once per call, so never spend an `ensemblr_focus_panel` call on it.
+
 **Resolve only what you actually fixed, in the turn you fixed it.** An open
 comment is a live claim that the finding still stands, so a queue of comments
 you already addressed forces the user to re-read every one. A comment you
