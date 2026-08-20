@@ -117,6 +117,20 @@ What the integration powers:
 | Agent reads | agents can list and read issues and the metadata tables (teams, projects, states, labels, users) through Ensemblr Control |
 | Agent writes | agents can update an issue and comment on it |
 
+**Images embedded in an issue or a comment load.** A `uploads.linear.app` URL is
+unauthenticated and the signed URL Linear hands back expires five minutes later,
+so the fetch happens in the main process against the owning account's token
+rather than in the renderer, and the expiring signature is stripped before
+anything crosses to the renderer or into an agent's context. A ticket left open
+for an hour still shows its screenshots; an image that genuinely fails falls back
+to a placeholder carrying its alt text.
+
+**The browse list remembers how you left it.** Search text, account, and team
+narrowing persist across a restart alongside the scope, sort, and grouping
+preferences, and the filter bar has a reset control. A stored filter that outlives
+what it names — an account since disconnected, a team since archived — falls back
+to its default rather than quietly emptying the list.
+
 A workspace created from an issue now **tells its agent so**: the chat opens
 with that issue attached as a document, and the agent is given the issue's
 identity along with the moments at which it is expected to move the ticket. The

@@ -9,6 +9,81 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.0-beta.9] - 2026-08-20
+
+A failed turn becomes something you can act on, Claude Code's task tools get real cards, and removing
+a workspace stops freezing the app. Signed, notarized, Apple silicon.
+[Release](https://github.com/ensemblr-hq/ensemblr/releases/tag/v0.1.0-beta.9) ·
+[`.dmg`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.0-beta.9/Ensemblr-0.1.0-beta.9-arm64.dmg)
+
+### Added
+
+- **Designed error states for agent chats.** A runtime failure used to render as one unstyled line of
+  provider English under the collapsed tool group. It is now a row driven by a thirteen-class
+  taxonomy grouped by what *you* can do about it: authored copy in your own language, the provider's
+  own sentence demoted into a disclosure, `role='alert'` so a failed turn is announced rather than
+  just tinted, and only the recoveries the class earns — a refusal hands the prompt back for editing
+  instead of offering a retry that would earn the same refusal, and a blocked tool call routes at the
+  repository's Security settings. Recoveries go through the composer, so a recovered turn inherits the
+  in-flight guards, the linked-directory preamble, and the Follow-up behavior. The assistant turn a
+  fatal failure interrupted is marked incomplete, so a cut-off answer reads as cut off.
+- **Claude Code's task tools have a real timeline presentation.** `TaskCreate`, `TaskUpdate`,
+  `TaskGet`, `TaskList`, `TaskOutput`, and `TaskStop` each have a presenter and a glyph instead of
+  falling through to a bare wrench row over a JSON dump, and a contiguous run of creates folds into
+  the one plan card it represents. Runs fold per level of the activity tree, so a plan a sub-agent
+  filed stays inside the delegation that filed it.
+- **A comment pass lands you in Checks.** An agent filing or resolving review comments now pulls the
+  Checks panel forward — the roll-up that answers "what did the agent leave me, and what is still
+  open" — rather than leaving you wherever you were. Enforced at the control boundary rather than
+  steered by prose, and coalesced per workspace on a 60-second window that every comment op extends,
+  so a pass pulls focus once however many calls it makes.
+- **Linear browse remembers its filters across a restart.** Search text, account, and team narrowing
+  join the scope, sort, and grouping preferences that were already persisted, and the filter bar gains
+  a reset control. A stored filter is narrowed to what still exists — an account since disconnected or
+  a team since archived falls back to its sentinel rather than quietly emptying the list.
+
+### Fixed
+
+- Removing or archiving a workspace no longer freezes the app. The recursive removal ran synchronously
+  on the main thread over a 1–2 GB worktree; it is now async with retries, everything running inside
+  the workspace is torn down first under bounded deadlines, and the renderer's list refresh no longer
+  waits on an unbounded navigation. Spawned git commands settle on `exit` plus a drain grace rather
+  than on `close`, which a backgrounded grandchild can hold open indefinitely.
+- Archiving with branch cleanup is a reversible archive again. The stale-workspace reaper read every
+  such archive as a workspace that had vanished from disk and deleted the row on the next launch,
+  cascading the archive record away with it.
+- **Images embedded in Linear issues and comments load.** The fetch moved to the main process, where
+  the account's OAuth token is; the expiring signature is stripped before anything crosses to the
+  renderer or into an agent's context, and the bytes are held in a size-bounded cache. A failed load
+  falls back to a placeholder carrying the alt text.
+- The follow-up queue no longer pauses on a benign rejection. A composer declining a send *this
+  instant* is now reported separately from a send that failed: only a failure holds the queue, a
+  rejected entry is re-attempted when the composer frees up, and the strip names which pause it was.
+  A closing chat discards what it still had queued, with the count in the toast.
+- A Claude session reads its whole plan usage as it opens, instead of building the composer gauge only
+  from pushed rate-limit frames — which could leave a window showing an empty bar it had never
+  measured. A window the account named but never measured is drawn as a hollow track rather than as a
+  bar at zero.
+- HTML entities are decoded in chat titles, session-summary headings, and branch slugs, so
+  `Admin &amp; Management` no longer reads as itself on a tab or cuts a branch named
+  `admin-amp-management`.
+- A blocking control call survives an MCP client's own timeout. `ensemblr_ask_user_question` promises
+  the agent it will wait as long as you need; every client applies a 60-second per-call timeout of its
+  own, so the ceiling is raised in all four launch paths and progress is beaten every 20 seconds while
+  a call is pending. The ops that are *not* supposed to block keep a bound of their own, and a client
+  that gives up withdraws the questionnaire instead of leaving you answering into a void.
+- The persisted pull-request status stays fresh. GitHub answers UNKNOWN on the first mergeability read
+  after the base branch moves, which demoted a ready pull request to a plain open one; the last
+  computed verdict is now carried forward for the same head commit, bounded by when GitHub last
+  actually computed it. The sweeper refreshes a workspace with a check in flight every 30 seconds and
+  everything else every two minutes, tracking per-workspace due times rather than sweeping the whole
+  list on one cadence.
+
+### Security
+
+- `GH_TOKEN` is scoped to the steps that shell out to `gh` in both release workflows, rather than
+  declared at job level where it was live in the environment `npm ci` runs lifecycle scripts in.
+
 ## [0.1.0-beta.8] - 2026-08-19
 
 The app updates itself, and a chat you are reading stops marking itself unread. Signed, notarized,

@@ -107,6 +107,12 @@ Resolving a comment strikes it through and drops it out of bulk actions — the
 Checks panel's **Add all to chat** attaches only the outstanding ones, on the
 grounds that a resolved thread is work already done.
 
+When an agent files or resolves comments, Ensemblr **brings the Checks tab
+forward** — the roll-up that answers "what did the agent just leave me, and what
+is still open", rather than six files to scroll. The pull is coalesced per
+workspace, so a pass that files ten comments pulls focus once however long it
+runs, and a resolve batch that closed nothing pulls nothing.
+
 Agents can read your comments, leave their own, and resolve the ones they
 addressed, through Ensemblr Control — see
 [`./09-agent-control.md`](./09-agent-control.md) and
@@ -140,7 +146,16 @@ request:
 - **Conflicts** — files conflicting with the base branch.
 
 GitHub state is refreshed from GitHub rather than trusted from cache; the panel
-says so when a refresh fails instead of showing you stale green.
+says so when a refresh fails instead of showing you stale green. A workspace with
+a check still running is refreshed every 30 seconds and everything else every two
+minutes, so a build finishing is noticed without polling ten idle workspaces at
+the same rate.
+
+GitHub computes mergeability lazily and answers "unknown" on the first read after
+the base branch moves. Ensemblr carries the last computed verdict forward for the
+same head commit instead of demoting a ready pull request to a plain open one, so
+the sidebar row, the header pill, and this panel agree. The carry is bounded by
+when GitHub last actually computed the answer rather than repeated indefinitely.
 
 ## Opening a pull request
 

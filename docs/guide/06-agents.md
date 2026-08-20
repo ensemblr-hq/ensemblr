@@ -24,6 +24,11 @@ One known difference in the timeline: Pi streams partial tool output, so a long
 `bash` fills its tool card as it runs. Claude Code returns each tool result
 complete, so its cards show a spinner until the result lands.
 
+Claude Code's task tools have cards of their own rather than raw JSON dumps, and
+a run of `TaskCreate` calls folds into the one plan card it represents instead of
+stacking as identical rows. Runs fold per level of the activity tree, so a plan a
+sub-agent filed stays inside the delegation that filed it.
+
 See [ADR 0042](../adr/0042-add-claude-code-as-a-second-first-class-agent-runtime.md).
 
 ## The `ensemblr` skill
@@ -278,6 +283,27 @@ Two deliberate behaviours:
 - **A directory linked mid-session is pending** until the chat reopens, and the
   composer says so. The runtime takes its roots at launch, so the honest answer
   is to tell you rather than let the agent hit an unexplained denial.
+
+## When a turn fails
+
+A turn that dies — a refusal, a rate limit, a crashed process, a dropped
+connection — ends in a **designed failure row** rather than a line of provider
+English under the last tool card. The row leads with copy in the app's language,
+says which kind of failure it was, and keeps the provider's own sentence in a
+disclosure underneath for when you want the raw text. It is announced rather than
+only tinted, so a screen reader reports the failure too.
+
+Each kind offers only the recoveries it earns. A transient failure offers a
+retry; a **refusal** hands your prompt back to the composer to edit, rather than
+a retry that would earn the same refusal; a **blocked tool call** routes you to
+the repository's Security settings, where the permission mode actually lives.
+Recoveries go through the composer, so a recovered turn inherits the same guards
+a typed message has — the in-flight check, the linked-directory preamble, the
+Follow-up behavior, and the composer's error strip when the send itself does not
+land.
+
+The answer a fatal failure interrupted is marked **incomplete**, so a cut-off
+turn reads as cut off instead of as finished.
 
 ## The follow-up queue and unread marks
 

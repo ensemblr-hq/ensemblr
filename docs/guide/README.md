@@ -6,7 +6,7 @@ rather than use it, start at [`../onboarding.md`](../onboarding.md) and
 
 Ensemblr runs on macOS, Apple silicon only. You bring your own agent CLI — Pi or
 Claude Code, one is enough — plus `git` and an authenticated `gh`. It is pre-1.0,
-and this guide describes version [`0.1.0-beta.8`](https://github.com/ensemblr-hq/ensemblr/releases/tag/v0.1.0-beta.8).
+and this guide describes version [`0.1.0-beta.9`](https://github.com/ensemblr-hq/ensemblr/releases/tag/v0.1.0-beta.9).
 The app itself ships in English, Russian, and Greek; this guide is English only.
 
 ## Read in order
