@@ -410,21 +410,23 @@ export function useComposerSubmit({
 	);
 
 	/**
-	 * Drains a Checks-panel chore (commit & push, create PR) through the same send
-	 * pipeline, bypassing the textarea. Mid-turn a chore is queued rather than
-	 * dispatched — under `steer` it would otherwise inject a background git chore
+	 * Drains a send raised outside the textarea — a Checks-panel chore (commit &
+	 * push, create PR), or a failed turn re-sent from its error row — through the
+	 * same pipeline a typed message takes. Mid-turn it is queued rather than
+	 * dispatched: under `steer` a background chore would otherwise be injected
 	 * into a turn doing something unrelated.
-	 * @param text - The chore prompt to hand to this chat's agent
+	 * @param text - The prompt to hand to this chat's agent
+	 * @param source - Who raised it, which decides how the queue drains it
 	 * @returns Whether it was accepted; the consumer retries whatever we refuse
 	 */
 	const submitFromChannel = useCallback(
-		(text: string): boolean => {
+		(text: string, source: QueuedFollowUpSource): boolean => {
 			if (composer.disabled || pending) {
 				return false;
 			}
 			const draft = textDraft(text);
 			if (composer.isStreaming && !isEmptyDraft(draft)) {
-				enqueueDraft(draft, 'chore');
+				enqueueDraft(draft, source);
 				return true;
 			}
 			void submitText(draft);
