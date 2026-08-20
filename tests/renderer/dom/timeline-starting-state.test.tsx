@@ -26,7 +26,10 @@ const WORKSPACE_ID = 'ws-1';
 const AGENT_SESSION_ID = 'agent-1';
 const BRANCH_ID = 'branch-1';
 
-const workspace = { id: WORKSPACE_ID } as unknown as WorkspaceShellModel;
+const workspace = {
+	id: WORKSPACE_ID,
+	projectId: 'project-1',
+} as unknown as WorkspaceShellModel;
 
 const chatTab: SessionTabModel = {
 	agentSessionId: AGENT_SESSION_ID,

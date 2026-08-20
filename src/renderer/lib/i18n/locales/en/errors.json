@@ -4,6 +4,60 @@
 			"title": "Could not prepare the action prompt."
 		}
 	},
+	"agent-failure": {
+		"context-overflow": {
+			"body": "The turn no longer fits in the model’s context window. Fork the chat to carry a summary into a fresh one.",
+			"title": "This chat is too long"
+		},
+		"credentials": {
+			"body": "Sign in again or update this runtime’s API key, then send the turn again.",
+			"title": "The provider rejected your credentials"
+		},
+		"network": {
+			"body": "The connection dropped before the turn finished. Check that you are online, then try again.",
+			"title": "Could not reach the provider"
+		},
+		"provider-overloaded": {
+			"body": "The model’s servers returned an error. This usually clears on its own — try the turn again in a moment.",
+			"title": "The provider is having trouble"
+		},
+		"provider-refused": {
+			"body": "The provider declined this request. Put the prompt back in the composer and reword it — sending the same words again earns the same refusal.",
+			"title": "The model declined to answer"
+		},
+		"provider-truncated": {
+			"body": "The provider stopped mid-answer, so the reply above is incomplete. Continue to pick up where it stopped.",
+			"title": "The answer was cut off"
+		},
+		"rate-limit": {
+			"body": "The provider is throttling this account. Wait for the window to reset, or switch to another model.",
+			"title": "You have hit a usage limit"
+		},
+		"runtime-crashed": {
+			"body": "The runtime exited before the turn finished. Sending the turn again starts it back up.",
+			"title": "The agent process stopped"
+		},
+		"runtime-missing": {
+			"body": "Ensemblr could not run this provider’s command. Check its executable path in settings.",
+			"title": "The agent runtime is not available"
+		},
+		"session-closed": {
+			"body": "The turn could not be delivered because the session is already closed. Start a new chat to keep going.",
+			"title": "This session has ended"
+		},
+		"tool-denied": {
+			"body": "The turn stopped because a tool was not allowed to run. Change the permission mode in this repository’s security settings, then continue.",
+			"title": "A tool call was blocked"
+		},
+		"unknown": {
+			"body": "The runtime reported a failure it did not classify. Its own words are in the details below.",
+			"title": "The turn ended with an error"
+		},
+		"workspace-invalid": {
+			"body": "The agent could not start in this workspace’s folder. Check that the folder still exists.",
+			"title": "The workspace folder is not usable"
+		}
+	},
 	"agent-launch": {
 		"failed": {
 			"description": "{{harness}} is not available.",

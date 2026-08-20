@@ -1,5 +1,6 @@
 import type { DynamicToolUIPart, UIMessage } from 'ai';
 import { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
 	countNestedToolCalls,
 	dropEchoedSubagentReports,
@@ -46,6 +47,7 @@ import { ChatWorkingIndicator } from './chat-turn-timer';
 export function ChatAssistantTurn({
 	className,
 	forkDisabled = false,
+	isIncomplete = false,
 	isStreaming,
 	message,
 	onForkToNewTab,
@@ -57,6 +59,8 @@ export function ChatAssistantTurn({
 	className?: string;
 	/** Disables the footer fork menu while a fork is already running. */
 	forkDisabled?: boolean;
+	/** True when a runtime failure cut this turn short, so it reads as unfinished. */
+	isIncomplete?: boolean;
 	isStreaming: boolean;
 	message: UIMessage;
 	onForkToNewTab?: () => void;
@@ -131,6 +135,7 @@ export function ChatAssistantTurn({
 			{finalRows.length > 0 ? (
 				<div className='flex flex-col gap-2 text-sm'>{finalRows}</div>
 			) : null}
+			{isIncomplete ? <IncompleteTurnMarker /> : null}
 			{!isStreaming ? (
 				<ChatTurnFooter
 					answerText={answerText}
@@ -152,6 +157,25 @@ function ActivityRow({ row }: { row: TimelineActivityRow }) {
 		<ChatTaskPlan parts={row.parts} />
 	) : (
 		<ActivityNodeRow node={row.node} />
+	);
+}
+
+/**
+ * Closes a turn a runtime failure cut short: a dashed rule under the partial
+ * answer, so a truncated reply is visibly unfinished rather than reading as one
+ * the agent chose to end there. The error row below it says what happened.
+ */
+function IncompleteTurnMarker() {
+	const { t } = useTranslation();
+
+	return (
+		<div
+			className='flex items-center gap-2 text-muted-foreground/70 text-xs'
+			data-role='turn-incomplete'
+		>
+			<span className='h-px flex-1 border-border/60 border-t border-dashed' />
+			{t('workbench:timeline.error.incomplete-turn', 'Answer cut short')}
+		</div>
 	);
 }
 

@@ -16,6 +16,7 @@ export { isHiddenEnsemblrToolCall } from './ensemblr-tool-presentation.ts';
 export {
 	createTimelineProjector,
 	eventsToUIMessages,
+	failureMetadataOf,
 	noticeMetadataOf,
 	turnMetadataOf,
 } from './event-to-ui-message.ts';

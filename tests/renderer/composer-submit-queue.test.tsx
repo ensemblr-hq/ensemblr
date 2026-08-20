@@ -11,10 +11,13 @@ import {
 	useDropComposerSubmits,
 } from '../../src/renderer/state/composer';
 import { activeChatTabByWorkspaceAtom } from '../../src/renderer/state/workspace/selection-atoms';
+import type { QueuedFollowUpSource } from '../../src/renderer/types/workbench';
 
 const WORKSPACE_ID = 'workspace-submit-queue';
 const BUSY_TAB_ID = 'chat-tab-busy';
 const IDLE_TAB_ID = 'chat-tab-idle';
+
+type ChannelSubmit = (text: string, source: QueuedFollowUpSource) => boolean;
 
 /** Renders the enqueue side and one consumer, both over the same Jotai store. */
 function renderQueue(activeChatTabId: string) {
@@ -29,9 +32,9 @@ function renderQueue(activeChatTabId: string) {
 	const enqueue = renderHook(() => useComposerSubmit(WORKSPACE_ID), {
 		wrapper,
 	});
-	const consumer = (chatTabId: string, submit: (text: string) => boolean) =>
+	const consumer = (chatTabId: string, submit: ChannelSubmit) =>
 		renderHook(
-			({ submit: current }: { submit: (text: string) => boolean }) =>
+			({ submit: current }: { submit: ChannelSubmit }) =>
 				useComposerSubmitConsumer(chatTabId, current),
 			{ initialProps: { submit }, wrapper },
 		);
@@ -49,7 +52,7 @@ describe('composer auto-submit queue', () => {
 		act(() => {
 			enqueue.result.current('commit and push');
 		});
-		expect(busySubmit).toHaveBeenCalledWith('commit and push');
+		expect(busySubmit).toHaveBeenCalledWith('commit and push', 'chore');
 
 		consumer(IDLE_TAB_ID, idleSubmit);
 
@@ -71,7 +74,7 @@ describe('composer auto-submit queue', () => {
 			mounted.rerender({ submit: free });
 		});
 
-		expect(free).toHaveBeenCalledWith('commit and push');
+		expect(free).toHaveBeenCalledWith('commit and push', 'chore');
 	});
 
 	test('a workspace with no recorded active chat tab queues nothing and reports it', () => {
@@ -98,6 +101,21 @@ describe('composer auto-submit queue', () => {
 		});
 
 		expect(queued).toBe(true);
+	});
+
+	// A turn re-sent from its error row is the user asking again, not a background
+	// chore, so the Follow-up behavior has to treat it the way it treats a typed
+	// message rather than always draining it.
+	test('carries the source a caller queued with through to the composer', () => {
+		const { consumer, enqueue } = renderQueue(BUSY_TAB_ID);
+		const submit = vi.fn(() => true);
+
+		consumer(BUSY_TAB_ID, submit);
+		act(() => {
+			enqueue.result.current('Continue', 'user');
+		});
+
+		expect(submit).toHaveBeenCalledWith('Continue', 'user');
 	});
 
 	test('dropping a closing tab discards the chore it was still holding', () => {
@@ -144,6 +162,6 @@ describe('composer auto-submit queue', () => {
 		act(() => {
 			mounted.rerender({ submit: free });
 		});
-		expect(free).toHaveBeenCalledWith('commit and push');
+		expect(free).toHaveBeenCalledWith('commit and push', 'chore');
 	});
 });

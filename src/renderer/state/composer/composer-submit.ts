@@ -3,11 +3,18 @@ import { useAtomCallback } from 'jotai/utils';
 import { useCallback, useEffect } from 'react';
 
 import { activeChatTabByWorkspaceAtom } from '@/renderer/state/workspace/selection-atoms';
+import type { QueuedFollowUpSource } from '@/renderer/types/workbench';
 
-/** One queued composer auto-submit (commit & push, create PR…). */
+/** One queued composer auto-submit (commit & push, create PR, a failed turn re-sent…). */
 export interface ComposerSubmitRequest {
 	chatTabId: string;
 	id: string;
+	/**
+	 * Who asked for this send, which decides how the follow-up queue treats it
+	 * mid-turn: a `chore` was announced as handed over and always drains, a `user`
+	 * send obeys the Follow-up behavior the way a typed message does.
+	 */
+	source: QueuedFollowUpSource;
 	text: string;
 }
 
@@ -34,24 +41,24 @@ const composerSubmitQueueAtom = atom<ComposerSubmitRequest[]>([]);
  * so a caller that announces the chore ("Asked the agent to…") can stay honest
  * when the workspace has no chat tab to hand it to.
  * @param workspaceId - Workspace whose active chat tab the prompt is aimed at
- * @returns Callback taking the prompt text and returning whether it was queued
+ * @returns Callback taking the prompt text and its source, returning whether it was queued
  */
 export function useComposerSubmit(
 	workspaceId: string,
-): (text: string) => boolean {
+): (text: string, source?: QueuedFollowUpSource) => boolean {
 	const setQueue = useSetAtom(composerSubmitQueueAtom);
 	const readActiveChatTabs = useAtomCallback(
 		useCallback((get) => get(activeChatTabByWorkspaceAtom), []),
 	);
 	return useCallback(
-		(text: string) => {
+		(text: string, source: QueuedFollowUpSource = 'chore') => {
 			const chatTabId = readActiveChatTabs()[workspaceId];
 			if (!chatTabId) {
 				return false;
 			}
 			setQueue((queue) => [
 				...queue,
-				{ chatTabId, id: crypto.randomUUID(), text },
+				{ chatTabId, id: crypto.randomUUID(), source, text },
 			]);
 			return true;
 		},
@@ -98,7 +105,7 @@ export function useDropComposerSubmits(): (chatTabId: string) => number {
  */
 export function useComposerSubmitConsumer(
 	chatTabId: string,
-	submit: (text: string) => boolean,
+	submit: (text: string, source: QueuedFollowUpSource) => boolean,
 ): void {
 	const [queue, setQueue] = useAtom(composerSubmitQueueAtom);
 
@@ -107,7 +114,9 @@ export function useComposerSubmitConsumer(
 			return;
 		}
 		const undelivered = queue.filter(
-			(request) => request.chatTabId !== chatTabId || !submit(request.text),
+			(request) =>
+				request.chatTabId !== chatTabId ||
+				!submit(request.text, request.source),
 		);
 		// Only rewrite the queue when at least one request was delivered. Writing
 		// an equal-length array would be a new reference and re-trigger this effect

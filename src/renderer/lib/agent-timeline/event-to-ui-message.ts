@@ -7,6 +7,7 @@ import {
 	skillInvocationKey,
 } from '@/renderer/lib/pi';
 import type {
+	AgentFailureMetadata,
 	AgentNoticeMetadata,
 	AgentTurnMetadata,
 	PendingGroup,
@@ -470,6 +471,7 @@ function handleEvent(
 				return pending;
 			}
 			flush(pending, result);
+			markTrailingTurnIncomplete(result);
 			result.push(errorMessage);
 			return null;
 		}
@@ -496,6 +498,32 @@ function handleEvent(
 			return pending;
 		}
 	}
+}
+
+/**
+ * Marks the assistant turn a fatal failure just closed as incomplete, in place,
+ * so the transcript shows a truncated answer as cut short instead of leaving it
+ * looking like one the agent finished.
+ *
+ * Only the row immediately before the error qualifies: a failure that lands
+ * after a user prompt, or as the very first row of a session, interrupted
+ * nothing the reader can see.
+ * @param result - Accumulator of finalized UI messages, whose last entry is stamped
+ */
+function markTrailingTurnIncomplete(result: UIMessage[]): void {
+	const index = result.length - 1;
+	const message = result[index];
+	if (message?.role !== 'assistant') {
+		return;
+	}
+	const metadata = turnMetadataOf(message);
+	if (!metadata) {
+		return;
+	}
+	result[index] = {
+		...message,
+		metadata: { ...metadata, incomplete: true } satisfies AgentTurnMetadata,
+	};
 }
 
 /**
@@ -759,6 +787,26 @@ export function noticeMetadataOf(
 		(metadata as AgentNoticeMetadata).notice === 'interrupted'
 	) {
 		return metadata as AgentNoticeMetadata;
+	}
+	return null;
+}
+
+/**
+ * Reads the runtime failure back off a mapped system message, if present.
+ * @param message - The mapped message to inspect
+ * @returns The failure the message stands for, or null when it is not an error row
+ */
+export function failureMetadataOf(
+	message: UIMessage,
+): AgentFailureMetadata | null {
+	const metadata = message.metadata;
+	if (
+		metadata &&
+		typeof metadata === 'object' &&
+		'failure' in metadata &&
+		typeof (metadata as AgentFailureMetadata).failure?.message === 'string'
+	) {
+		return metadata as AgentFailureMetadata;
 	}
 	return null;
 }

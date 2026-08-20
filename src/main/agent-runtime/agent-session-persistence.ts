@@ -1,5 +1,6 @@
 import type { DatabaseSync } from 'node:sqlite';
 
+import { classifyAgentFailure } from '../../shared/agent-failure.ts';
 import type { AgentPersistedEnvelope } from '../../shared/ipc/contracts/agent-session';
 import {
 	type AgentEventRow,
@@ -30,6 +31,7 @@ export function eventPayload(event: AgentEvent): AgentPersistedEnvelope {
 				error: {
 					code: event.error.code,
 					detail: event.error.detail ?? null,
+					failureClass: classifyAgentFailure(event.error),
 					message: event.error.message,
 					recoverable: event.error.recoverable,
 				},
