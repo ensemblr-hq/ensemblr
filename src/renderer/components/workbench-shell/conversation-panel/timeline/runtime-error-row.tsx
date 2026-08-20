@@ -20,6 +20,7 @@ import {
 	TriangleAlertIcon,
 	WifiOffIcon,
 } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { CopyResponseButton } from '@/renderer/components/copy-response-button';
@@ -37,6 +38,7 @@ import {
 	describeAgentFailure,
 } from '@/renderer/lib/agent-failure-text';
 import { looksLikeStackTrace } from '@/renderer/lib/agent-timeline';
+import { planWindowResetLabel } from '@/renderer/lib/plan-limit-text';
 import { cn } from '@/renderer/lib/utils';
 import type { AgentWireError } from '@/shared/ipc/contracts/agent-session';
 
@@ -129,9 +131,12 @@ export function RuntimeErrorRow({
 					className={cn('mt-0.5 size-4 shrink-0', severity.accent)}
 				/>
 				<div className='flex min-w-0 flex-col gap-1'>
-					<p className={cn('font-medium text-sm', severity.accent)}>
-						{readout.title}
-					</p>
+					<div className='flex flex-wrap items-center gap-2'>
+						<p className={cn('font-medium text-sm', severity.accent)}>
+							{readout.title}
+						</p>
+						<ResetBadge resetsAt={readout.resetsAt} />
+					</div>
 					<p className='text-muted-foreground text-xs'>{readout.body}</p>
 				</div>
 			</div>
@@ -150,6 +155,49 @@ export function RuntimeErrorRow({
 
 			<RuntimeErrorDetails detail={readout.detail} raw={readout.raw} />
 		</div>
+	);
+}
+
+/**
+ * How often the badge re-reads the clock. The label is phrased in whole hours,
+ * so a minute is finer than it needs and still cheap — the row this sits on is
+ * one of a handful on screen, and only while a reset is pending.
+ */
+const RESET_TICK_MS = 60_000;
+
+/**
+ * When a self-clearing failure lifts, phrased in the reader's language.
+ *
+ * The runtime names the same instant in its own sentence — "resets 5pm
+ * (Asia/Nicosia)" — but that sentence is English forever and lives in the fold,
+ * so the wait is stated here from the structured stamp instead. Renders nothing
+ * for a failure that named no reset, which is most of them.
+ *
+ * The label counts down rather than freezing at the value it had when the row
+ * mounted: the timeline memoizes settled rows, so a row left open across the
+ * whole wait would otherwise still read "Resets in 5h" at the moment it resets.
+ */
+function ResetBadge({ resetsAt }: { resetsAt: string | null }) {
+	const { t } = useTranslation();
+	const [now, setNow] = useState(() => Date.now());
+	const label = planWindowResetLabel(resetsAt, t, () => now);
+
+	useEffect(() => {
+		if (!resetsAt) {
+			return;
+		}
+		const tick = setInterval(() => setNow(Date.now()), RESET_TICK_MS);
+		return () => clearInterval(tick);
+	}, [resetsAt]);
+
+	if (!label) {
+		return null;
+	}
+
+	return (
+		<span className='rounded-full border border-border/60 bg-background/60 px-2 py-0.5 font-medium text-[0.6875rem] text-muted-foreground'>
+			{label}
+		</span>
 	);
 }
 

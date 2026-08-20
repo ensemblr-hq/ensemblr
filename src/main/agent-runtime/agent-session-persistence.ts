@@ -34,6 +34,7 @@ export function eventPayload(event: AgentEvent): AgentPersistedEnvelope {
 					failureClass: classifyAgentFailure(event.error),
 					message: event.error.message,
 					recoverable: event.error.recoverable,
+					resetsAt: event.error.resetsAt ?? null,
 				},
 				kind: 'error',
 			};

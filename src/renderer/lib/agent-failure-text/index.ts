@@ -33,6 +33,8 @@ export interface AgentFailureReadout extends AgentFailureDescription {
 	detail: string | null;
 	/** The runtime's own sentence, kept for the details disclosure and support bundles. */
 	raw: string;
+	/** ISO instant this failure clears on its own, or null when it names none. */
+	resetsAt: string | null;
 }
 
 /**
@@ -64,10 +66,12 @@ export function describeAgentFailure(
 	const failureClass = agentFailureClassOf(error);
 	const raw = error.message.trim();
 	const detail = error.detail?.trim() ?? '';
+	const resetsAt = error.resetsAt ?? null;
 	return {
-		...describeAgentFailureClass(t, failureClass),
+		...describeAgentFailureClass(t, failureClass, resetsAt),
 		detail: detail && detail !== raw ? detail : null,
 		failureClass,
 		raw,
+		resetsAt,
 	};
 }

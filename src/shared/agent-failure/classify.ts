@@ -46,7 +46,7 @@ const FAILURE_PROBES: readonly FailureProbe[] = [
 	{
 		failureClass: 'rate-limit',
 		pattern:
-			/\b429\b|rate[\s_-]?limit|too many requests|quota|usage limit|plan limit|billing|insufficient (credit|funds)/i,
+			/\b429\b|rate[\s_-]?limit|too many requests|quota|(usage|plan|session|weekly|hourly|\d+-hour) limit|limit will reset|billing|insufficient (credit|funds)/i,
 	},
 	{
 		failureClass: 'context-overflow',

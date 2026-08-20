@@ -476,7 +476,8 @@ export default interface Resources {
 				title: 'The answer was cut off';
 			};
 			'rate-limit': {
-				body: 'The provider is throttling this account. Wait for the window to reset, or switch to another model.';
+				body: 'This account has spent its plan window. Once the window resets, Continue picks the turn back up where it stopped.';
+				'body-open': 'The provider will not take another turn on this account. Wait for the limit to clear and press Continue, or check the plan and billing in settings.';
 				title: 'You have hit a usage limit';
 			};
 			'runtime-crashed': {

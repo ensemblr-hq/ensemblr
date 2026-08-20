@@ -30,6 +30,10 @@ describe('classifyAgentFailure', () => {
 		['503 Service Unavailable', 'provider-overloaded'],
 		['429 Too Many Requests', 'rate-limit'],
 		['You have exceeded your monthly quota.', 'rate-limit'],
+		["You've hit your session limit · resets 5pm (Asia/Nicosia)", 'rate-limit'],
+		['Claude usage limit reached', 'rate-limit'],
+		['5-hour limit reached ∙ resets 3pm', 'rate-limit'],
+		['Your limit will reset at 5pm (Asia/Nicosia).', 'rate-limit'],
 		['401 Unauthorized: invalid API key', 'credentials'],
 		['Not logged in. Please run /login.', 'credentials'],
 		['prompt is too long: 210331 tokens > 200000 maximum', 'context-overflow'],
@@ -53,6 +57,17 @@ describe('classifyAgentFailure', () => {
 				message: 'Failed to spawn the Pi RPC process.',
 			}),
 		).toBe('runtime-missing');
+	});
+
+	// The rate-limit probe sits above the context one, so its window vocabulary
+	// stays possessive rather than matching the bare word "limit".
+	test('does not read a context-window overflow as a plan limit', () => {
+		expect(
+			classifyAgentFailure({
+				code: 'adapter-failure',
+				message: 'The request exceeds the model context limit.',
+			}),
+		).toBe('context-overflow');
 	});
 
 	// An exit code in the 500s must not be read as a gateway error, which is why

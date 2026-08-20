@@ -42,6 +42,13 @@ export interface AgentError {
 	detail?: string;
 	message: string;
 	recoverable: boolean;
+	/**
+	 * ISO instant the failure clears on its own, set only by a runtime that
+	 * reported one structurally. A plan limit names its window's reset; the
+	 * renderer phrases it in the reader's language rather than repeating the
+	 * English time the runtime printed.
+	 */
+	resetsAt?: string | null;
 }
 
 /**

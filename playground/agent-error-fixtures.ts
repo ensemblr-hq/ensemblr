@@ -14,6 +14,15 @@ export interface AgentErrorFixture {
 }
 
 /**
+ * When the spent-plan fixture's window clears, relative to whenever the scene
+ * was loaded — a fixed instant would drift into the past and render every reload
+ * as "Resets now".
+ */
+const RESETS_IN_TWO_HOURS = new Date(
+	Date.now() + 2 * 60 * 60 * 1000,
+).toISOString();
+
+/**
  * The failures the scene cycles through, in taxonomy order. Coverage of every
  * class is not enforced here — the scene fills any gap with a pre-tagged
  * synthetic error, so a class added to the taxonomy still shows up.
@@ -37,6 +46,8 @@ export const AGENT_ERROR_FIXTURES: readonly AgentErrorFixture[] = [
 		},
 		label: 'overloaded',
 	},
+	// Paired with the next one on purpose: same class, no structured reset, so the
+	// row has to advise without promising a window that may not exist.
 	{
 		error: {
 			code: 'adapter-failure',
@@ -45,6 +56,18 @@ export const AGENT_ERROR_FIXTURES: readonly AgentErrorFixture[] = [
 			recoverable: false,
 		},
 		label: 'rate limit',
+	},
+	// Claude Code prints this as an ordinary assistant turn; the adapter lifts it
+	// onto the failure path, and the badge restates its reset from the stamp the
+	// runtime pushed rather than from the English clause in the sentence.
+	{
+		error: {
+			code: 'adapter-failure',
+			message: "You've hit your session limit · resets 5pm (Asia/Nicosia)",
+			recoverable: false,
+			resetsAt: RESETS_IN_TWO_HOURS,
+		},
+		label: 'plan window spent',
 	},
 	{
 		error: {

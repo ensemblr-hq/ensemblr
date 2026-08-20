@@ -95,8 +95,13 @@ const FAILURE_PRESENTATION: Readonly<
 		icon: 'scissors',
 		severity: 'warning',
 	},
+	// Continue leads: whatever the account ran into clears before a re-send would
+	// help, and picking the turn back up where it stopped is what the user wants
+	// once it has — re-sending the prompt would start the work over. Settings
+	// stays on the row for the members of this class that never clear on their
+	// own, where the plan itself is what needs attention.
 	'rate-limit': {
-		actions: ['retry', 'open-provider-settings'],
+		actions: ['continue', 'retry', 'open-provider-settings'],
 		icon: 'gauge',
 		severity: 'warning',
 	},
@@ -185,9 +190,14 @@ const FAILURE_TITLE: Readonly<
 		),
 };
 
-/** The authored explanation for each class: what happened, then what to do. */
+/**
+ * The authored explanation for each class: what happened, then what to do.
+ *
+ * `resetsAt` is passed to every entry and read by the one class whose advice
+ * depends on it; the rest ignore it.
+ */
 const FAILURE_BODY: Readonly<
-	Record<AgentFailureClass, (t: TFunction) => string>
+	Record<AgentFailureClass, (t: TFunction, resetsAt: string | null) => string>
 > = {
 	'context-overflow': (t) =>
 		t(
@@ -219,11 +229,20 @@ const FAILURE_BODY: Readonly<
 			'errors:agent-failure.provider-truncated.body',
 			'The provider stopped mid-answer, so the reply above is incomplete. Continue to pick up where it stopped.',
 		),
-	'rate-limit': (t) =>
-		t(
-			'errors:agent-failure.rate-limit.body',
-			'The provider is throttling this account. Wait for the window to reset, or switch to another model.',
-		),
+	// The class covers a plan window that clears on its own and a refusal that
+	// never does — a billing failure and an exhausted API quota classify here
+	// too. A reset instant is the only proof the app has of which one this is, so
+	// only the copy shown when one arrived is allowed to promise a reset.
+	'rate-limit': (t, resetsAt) =>
+		resetsAt
+			? t(
+					'errors:agent-failure.rate-limit.body',
+					'This account has spent its plan window. Once the window resets, Continue picks the turn back up where it stopped.',
+				)
+			: t(
+					'errors:agent-failure.rate-limit.body-open',
+					'The provider will not take another turn on this account. Wait for the limit to clear and press Continue, or check the plan and billing in settings.',
+				),
 	'runtime-crashed': (t) =>
 		t(
 			'errors:agent-failure.runtime-crashed.body',
@@ -261,15 +280,17 @@ const FAILURE_BODY: Readonly<
  * sentence under it, the icon, the severity, and the recoveries worth offering.
  * @param t - Translator bound to the active language
  * @param failureClass - The class the failure was tagged with
+ * @param resetsAt - ISO instant the failure clears on its own, or null when it named none
  * @returns Everything the error row renders, already translated
  */
 export function describeAgentFailureClass(
 	t: TFunction,
 	failureClass: AgentFailureClass,
+	resetsAt: string | null = null,
 ): AgentFailureDescription {
 	return {
 		...FAILURE_PRESENTATION[failureClass],
-		body: FAILURE_BODY[failureClass](t),
+		body: FAILURE_BODY[failureClass](t, resetsAt),
 		title: FAILURE_TITLE[failureClass](t),
 	};
 }
