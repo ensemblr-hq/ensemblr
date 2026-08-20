@@ -506,9 +506,9 @@ function makeConversationPort(deps: PortAdapterDeps): ConversationPort {
 			}
 			return applied;
 		},
-		waitForIdle: async (agentSessionId, timeoutMs) => {
+		waitForIdle: async (agentSessionId, timeoutMs, signal) => {
 			const deadline = Date.now() + timeoutMs;
-			while (Date.now() < deadline) {
+			while (Date.now() < deadline && !signal?.aborted) {
 				const status =
 					deps.agentSessionService.getSession(agentSessionId)?.status;
 				if (!status || IDLE_STATUSES.has(status)) {

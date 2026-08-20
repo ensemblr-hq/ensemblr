@@ -68,7 +68,10 @@ export interface AgentControlIntegration {
 		harnessId: string,
 		workspaceId: string,
 	) => string;
-	confirmAgentControlAction: (input: { summary: string }) => Promise<boolean>;
+	confirmAgentControlAction: (input: {
+		signal?: AbortSignal;
+		summary: string;
+	}) => Promise<boolean>;
 	/** Path to the shipped Pi control extension, or null to skip loading it. */
 	piControlExtensionPath: string | null;
 }
@@ -159,14 +162,27 @@ function writeHarnessInstructions(
  * Surfaces a native confirmation dialog when an agent-control write needs user
  * approval (approval-required mode). Harnesses have no confirm channel, so the
  * app owns the prompt for every species.
- * @param input - The resolved caller summary to show.
- * @returns True when the user approves the action.
+ *
+ * Electron offers no way to dismiss a message box the app itself opened, so a
+ * caller that goes away mid-prompt is answered by giving up on the dialog rather
+ * than by closing it: the box stays on screen until the user clicks, and their
+ * click is inert. That is the half that matters — the op never runs for a caller
+ * that stopped listening, which is what would otherwise start a terminal or
+ * launch a harness for nobody an hour after the fact.
+ * @param input - The caller summary to show, and the signal that abandons it.
+ * @returns True when the user approves the action, false when they decline or
+ *   the caller goes away first.
  */
 async function confirmAgentControlAction({
+	signal,
 	summary,
 }: {
+	signal?: AbortSignal;
 	summary: string;
 }): Promise<boolean> {
+	if (signal?.aborted) {
+		return false;
+	}
 	const parentWindow = BrowserWindow.getFocusedWindow();
 	const options = {
 		type: 'question' as const,
@@ -177,10 +193,14 @@ async function confirmAgentControlAction({
 		message: 'An agent requested to control Ensemblr.',
 		detail: summary,
 	};
-	const { response } = parentWindow
-		? await dialog.showMessageBox(parentWindow, options)
-		: await dialog.showMessageBox(options);
-	return response === 1;
+	const answered = parentWindow
+		? dialog.showMessageBox(parentWindow, options)
+		: dialog.showMessageBox(options);
+	const abandoned = new Promise<null>((resolve) => {
+		signal?.addEventListener('abort', () => resolve(null), { once: true });
+	});
+	const outcome = await Promise.race([answered, abandoned]);
+	return outcome?.response === 1;
 }
 
 /**

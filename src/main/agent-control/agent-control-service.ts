@@ -78,6 +78,10 @@ import {
 	planModeFollowUpDenial,
 } from '../../shared/plan-mode.ts';
 import { BranchSlugRejected } from '../agent-runtime/naming/apply-branch-slug.ts';
+import {
+	DISPATCH_TIMEOUT_MS,
+	withDispatchDeadline,
+} from './dispatch-deadline.ts';
 import type { Guardrails } from './guardrails.ts';
 import type { OriginRegistry } from './origin-registry.ts';
 import {
@@ -104,8 +108,17 @@ export interface AgentControlCommand {
 	callerModel?: string;
 	/**
 	 * Aborts when the caller goes away mid-call, so an op that blocks on a human
-	 * or a child can stop instead of finishing for nobody. Optional: the MCP
-	 * bridge omits it, as does any caller that cannot be cancelled.
+	 * or a child can stop instead of finishing for nobody. Both bridges supply
+	 * one — the MCP bridge forwards the request's own signal, which the SDK
+	 * aborts on a cancellation notice or a dropped connection — so a question
+	 * whose client gave up comes off screen rather than waiting for an answer
+	 * nobody will receive. Optional for a caller that cannot be cancelled.
+	 *
+	 * Every wait on this surface honours it: the questionnaire and the approval
+	 * prompt on the human side, `waitForAgents` and a `wait: true` spawn on the
+	 * child side. The approval prompt is native and cannot be withdrawn from
+	 * here, so what the signal buys there is that a click landing after the
+	 * caller has gone runs nothing.
 	 */
 	signal?: AbortSignal;
 }
@@ -183,6 +196,11 @@ interface AgentControlServiceOptions {
 	 * window, so a test can hold either still.
 	 */
 	scheduler?: WaitScheduler;
+	/**
+	 * Overrides how long a non-blocking op may run before the app answers for it;
+	 * tests scale it down. Defaults to {@link DISPATCH_TIMEOUT_MS}.
+	 */
+	dispatchTimeoutMs?: number;
 }
 
 /**
@@ -228,6 +246,15 @@ const REAL_SCHEDULER: WaitScheduler = {
 function ok<T>(data: T): AgentControlResult<T> {
 	return { ok: true, data };
 }
+
+/**
+ * Told to an agent whose approval prompt outlived the call that raised it. The
+ * dialog is native and cannot be taken off screen from here, so the guarantee is
+ * the one that matters: a click that lands after the caller has gone runs
+ * nothing.
+ */
+const ABANDONED_CONFIRMATION =
+	'The call was abandoned before the user answered the approval prompt, so the op did not run. Nothing was changed — ask again if you still need it.';
 
 /**
  * Builds a failure envelope.
@@ -478,6 +505,7 @@ export function createAgentControlService({
 	originRegistry,
 	guardrails,
 	scheduler = REAL_SCHEDULER,
+	dispatchTimeoutMs = DISPATCH_TIMEOUT_MS,
 }: AgentControlServiceOptions): AgentControlService {
 	/** Latest pending signal per child session id, set by `notifyOrchestrator`. */
 	const signalsByChild = new Map<string, OrchestratorSignal>();
@@ -612,6 +640,7 @@ export function createAgentControlService({
 	const gatePermission = async (
 		op: AgentControlOp,
 		origin: AgentControlOrigin,
+		signal: AbortSignal | undefined,
 	): Promise<AgentControlResult<never> | null> => {
 		const action = isWriteOp(op) ? 'app-control-write' : 'app-control-read';
 		const mode = ports.permissions.getMode();
@@ -619,14 +648,19 @@ export function createAgentControlService({
 		if (boundary === 'blocked') {
 			return fail('denied-permission', `Blocked by ${mode} permission mode.`);
 		}
-		if (boundary === 'confirmation-required') {
-			const approved = await ports.confirm.confirm({
-				origin,
-				summary: `Agent requests ${op} in workspace ${origin.workspaceId}.`,
-			});
-			if (!approved) {
-				return fail('denied-permission', 'The user declined the request.');
-			}
+		if (boundary !== 'confirmation-required') {
+			return null;
+		}
+		const approved = await ports.confirm.confirm({
+			origin,
+			signal,
+			summary: `Agent requests ${op} in workspace ${origin.workspaceId}.`,
+		});
+		if (signal?.aborted) {
+			return fail('timeout', ABANDONED_CONFIRMATION);
+		}
+		if (!approved) {
+			return fail('denied-permission', 'The user declined the request.');
 		}
 		return null;
 	};
@@ -646,6 +680,7 @@ export function createAgentControlService({
 	const waitIfRequested = async (
 		agentSessionId: string,
 		wait: boolean | undefined,
+		signal: AbortSignal | undefined,
 	): Promise<'completed' | 'timeout' | undefined> => {
 		if (!wait) {
 			return undefined;
@@ -653,6 +688,7 @@ export function createAgentControlService({
 		return ports.conversations.waitForIdle(
 			agentSessionId,
 			guardrails.waitTimeoutMs,
+			signal,
 		);
 	};
 
@@ -680,12 +716,15 @@ export function createAgentControlService({
 	 * @param origin - Resolved caller identity.
 	 * @param args - Prompt, optional tab, model, thinking level, title, and wait flag.
 	 * @param callerModel - The Pi extension's live-model hint, absent for MCP callers.
+	 * @param signal - Aborts when the spawning turn ends, so a `wait: true` poll
+	 *   stops instead of watching a child for a caller that has gone.
 	 * @returns The spawned conversation, or the reason it was refused.
 	 */
 	const handleStartConversation = async (
 		origin: AgentControlOrigin,
 		args: StartConversationArgs,
 		callerModel: string | undefined,
+		signal: AbortSignal | undefined,
 	): Promise<AgentControlResult<unknown>> => {
 		if (args.chatTabId) {
 			const owner = await ports.tabs.resolveTabWorkspace(args.chatTabId);
@@ -715,7 +754,11 @@ export function createAgentControlService({
 			return fail('invalid-args', started.reason);
 		}
 		guardrails.recordSpawn(origin.sessionId);
-		const result = await waitIfRequested(started.agentSessionId, args.wait);
+		const result = await waitIfRequested(
+			started.agentSessionId,
+			args.wait,
+			signal,
+		);
 		return ok({
 			agentSessionId: started.agentSessionId,
 			chatTabId: started.chatTabId,
@@ -873,11 +916,14 @@ export function createAgentControlService({
 	 * workspace whether a session it cannot see is planning.
 	 * @param origin - Resolved caller identity.
 	 * @param args - Target session, prompt, and whether to block on it.
+	 * @param signal - Aborts when the steering turn ends, so a `wait: true` poll
+	 *   stops instead of watching a child for a caller that has gone.
 	 * @returns The wait outcome, or a denial envelope.
 	 */
 	const handleSendFollowUp = async (
 		origin: AgentControlOrigin,
 		args: SendFollowUpArgs,
+		signal: AbortSignal | undefined,
 	): Promise<AgentControlResult<unknown>> => {
 		const owner = await ports.conversations.resolveConversationWorkspace(
 			args.agentSessionId,
@@ -907,7 +953,11 @@ export function createAgentControlService({
 			agentSessionId: args.agentSessionId,
 			prompt: args.prompt,
 		});
-		const result = await waitIfRequested(args.agentSessionId, args.wait);
+		const result = await waitIfRequested(
+			args.agentSessionId,
+			args.wait,
+			signal,
+		);
 		return ok({ result });
 	};
 
@@ -1597,8 +1647,8 @@ export function createAgentControlService({
 			handleReadTerminalOutput(origin, args as ReadTerminalOutputArgs),
 		resolveDiffComments: ({ args, origin }) =>
 			handleResolveDiffComments(origin, args as ResolveDiffCommentsArgs),
-		sendFollowUp: ({ args, origin }) =>
-			handleSendFollowUp(origin, args as SendFollowUpArgs),
+		sendFollowUp: ({ args, origin, signal }) =>
+			handleSendFollowUp(origin, args as SendFollowUpArgs, signal),
 		setBranchName: ({ args, origin }) =>
 			handleSetBranchName(origin, args as SetBranchNameArgs),
 		setName: ({ args, origin }) => handleSetName(origin, args as SetNameArgs),
@@ -1608,11 +1658,12 @@ export function createAgentControlService({
 			handleSetWorkspaceStatus(origin, args as SetWorkspaceStatusArgs),
 		spawnChatTab: ({ args, origin }) =>
 			handleSpawnChatTab(origin, args as SpawnChatTabArgs),
-		startConversation: ({ args, callerModel, origin }) =>
+		startConversation: ({ args, callerModel, origin, signal }) =>
 			handleStartConversation(
 				origin,
 				args as StartConversationArgs,
 				callerModel,
+				signal,
 			),
 		startTerminal: ({ args, origin }) =>
 			handleStartTerminal(origin, args as StartTerminalArgs),
@@ -1657,17 +1708,26 @@ export function createAgentControlService({
 		if (planModeDenied) {
 			return planModeDenied;
 		}
-		const permissionDenied = await gatePermission(command.op, origin);
+		const permissionDenied = await gatePermission(
+			command.op,
+			origin,
+			command.signal,
+		);
 		if (permissionDenied) {
 			return permissionDenied;
 		}
 		try {
-			return await dispatch(
+			return await withDispatchDeadline(
 				command.op,
-				origin,
-				validated.value,
-				command.callerModel,
-				command.signal,
+				() =>
+					dispatch(
+						command.op,
+						origin,
+						validated.value,
+						command.callerModel,
+						command.signal,
+					),
+				dispatchTimeoutMs,
 			);
 		} catch (error) {
 			const detail = error instanceof Error ? error.message : String(error);

@@ -212,6 +212,7 @@ const setup = (
 		ports?: AgentControlPorts;
 		guardrails?: Partial<GuardrailConfig>;
 		species?: AgentSpecies;
+		dispatchTimeoutMs?: number;
 	} = {},
 ) => {
 	const registry = createOriginRegistry({ generateToken: () => 'tok-caller' });
@@ -223,6 +224,7 @@ const setup = (
 	});
 	const ports = options.ports ?? makePorts();
 	const service = createAgentControlService({
+		dispatchTimeoutMs: options.dispatchTimeoutMs,
 		ports,
 		originRegistry: registry,
 		guardrails: createGuardrails(options.guardrails),
@@ -319,6 +321,116 @@ describe('agent-control service: gating', () => {
 			expect(result.code).toBe('denied-permission');
 		}
 		expect(ports.tabs.spawnChatTab).not.toHaveBeenCalled();
+	});
+
+	// The prompt is native and cannot be taken off screen, so the user may well
+	// click Allow an hour after the client gave up. The op must not run then:
+	// spawning a tab for a caller that stopped listening is the same failure
+	// `askUserQuestion` has, on the surface that fronts every gated write.
+	it('runs nothing when the caller goes away before the prompt is answered', async () => {
+		const controller = new AbortController();
+		const ports = makePorts({ mode: 'approval-required' });
+		ports.confirm.confirm = vi.fn(async ({ signal }) => {
+			controller.abort();
+			return !signal?.aborted;
+		});
+		const { service } = setup({ ports });
+
+		const result = await service.invoke({
+			op: 'spawnChatTab',
+			rawArgs: {},
+			signal: controller.signal,
+			token: 'tok-caller',
+		});
+
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.code).toBe('timeout');
+			expect(result.error).toMatch(/nothing was changed/i);
+		}
+		expect(ports.tabs.spawnChatTab).not.toHaveBeenCalled();
+	});
+
+	it('hands the prompt the caller’s signal so it can stop waiting', async () => {
+		const controller = new AbortController();
+		const ports = makePorts({ mode: 'approval-required', confirm: true });
+		const { service } = setup({ ports });
+
+		await service.invoke({
+			op: 'spawnChatTab',
+			rawArgs: {},
+			signal: controller.signal,
+			token: 'tok-caller',
+		});
+
+		expect(ports.confirm.confirm).toHaveBeenCalledWith(
+			expect.objectContaining({ signal: controller.signal }),
+		);
+	});
+});
+
+// The client-side ceiling is a day and applies per server, so the app has to
+// bound the ops that are not supposed to block — otherwise one wedged port holds
+// the agent for that day while the progress heartbeat reports it healthy.
+describe('agent-control service: the deadline on a non-blocking op', () => {
+	it('answers a wedged op instead of blocking on it forever', async () => {
+		const ports = makePorts();
+		ports.workspaces.listWorkspaces = vi.fn(() => new Promise<never>(() => {}));
+		const { service } = setup({ dispatchTimeoutMs: 20, ports });
+
+		const result = await service.invoke({
+			op: 'listWorkspaces',
+			rawArgs: {},
+			token: 'tok-caller',
+		});
+
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.code).toBe('timeout');
+		}
+	});
+
+	it('leaves a wait that blocks by design alone', async () => {
+		const ports = makePorts();
+		ports.conversations.waitForIdle = vi.fn(async () => {
+			await new Promise((tick) => setTimeout(tick, 60));
+			return 'completed' as const;
+		});
+		const { service } = setup({ dispatchTimeoutMs: 20, ports });
+
+		const result = await service.invoke({
+			op: 'sendFollowUp',
+			rawArgs: {
+				agentSessionId: 'child',
+				prompt: 'keep going',
+				wait: true,
+			},
+			token: 'tok-caller',
+		});
+
+		expect(result.ok).toBe(true);
+		expect(ports.conversations.waitForIdle).toHaveBeenCalledOnce();
+	});
+
+	it('stops a child wait once the caller goes away', async () => {
+		const controller = new AbortController();
+		const ports = makePorts();
+		const { service } = setup({ ports });
+
+		const call = service.invoke({
+			op: 'sendFollowUp',
+			rawArgs: { agentSessionId: 'child', prompt: 'keep going', wait: true },
+			signal: controller.signal,
+			token: 'tok-caller',
+		});
+		controller.abort();
+		await call;
+
+		expect(ports.conversations.waitForIdle).toHaveBeenCalledWith(
+			'child',
+			expect.any(Number),
+			controller.signal,
+		);
 	});
 });
 

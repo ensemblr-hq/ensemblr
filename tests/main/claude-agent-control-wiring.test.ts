@@ -9,6 +9,7 @@ import {
 	CONTROL_TOKEN_ENV_KEY,
 	createAgentControlIntegration,
 	createOriginRegistry,
+	MCP_TOOL_CALL_TIMEOUT_MS,
 } from '../../src/main/agent-control/index.ts';
 import { resolveAgentControlWiring } from '../../src/main/agent-runtime/session/agent-control-wiring.ts';
 import { buildClaudeMcpServers } from '../../src/main/claude-agent/claude-mcp-config.ts';
@@ -285,6 +286,22 @@ describe('agent-control wiring: the playbook appended to Claude', () => {
 		expect(servers.ensemblr).toMatchObject({
 			headers: { Authorization: `Bearer \${${CONTROL_TOKEN_ENV_KEY}}` },
 		});
+	});
+
+	// Claude's per-call timeout is a hard wall-clock limit that progress
+	// notifications do not extend, so raising it here is the only thing keeping
+	// `ensemblr_ask_user_question` open while the user is away.
+	it('raises the tool-call timeout past its MCP_TOOL_TIMEOUT default', () => {
+		const { wire } = setup();
+
+		const servers = buildClaudeMcpServers(
+			wire({ provider: 'claude', sessionId: 'root' }).controlMcp,
+		);
+
+		expect(servers.ensemblr).toMatchObject({
+			timeout: MCP_TOOL_CALL_TIMEOUT_MS,
+		});
+		expect(MCP_TOOL_CALL_TIMEOUT_MS).toBeGreaterThanOrEqual(3_600_000);
 	});
 
 	it('passes the token to the child through the env the reference resolves against', () => {

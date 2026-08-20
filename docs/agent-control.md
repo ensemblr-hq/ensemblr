@@ -474,10 +474,65 @@ whose `headersTimeout` defaults to five minutes, and it used to abort the call
 while the dialog stayed on screen, so the answer the user eventually gave was
 written to a dead socket and lost. Do not "tidy" that back to `fetch`.
 
+**And the client has to hold, which Ensemblr does not control — so it configures
+it.** Every MCP client applies a per-call timeout of its own, each defaulting to
+60 seconds: Codex's and Vibe's `tool_timeout_sec`, and — for Claude — the HTTP
+request timeout it derives from the same per-server `timeout` key, which is what
+actually aborts an http-transport call long before its own ~28-hour tool-call
+default does. Since the questionnaire needs a chat tab, the MCP caller that holds
+it is Claude's first-class runtime — a user who steps away for lunch would come
+back to a question the app is still holding open and an agent that abandoned it
+minutes in. Because Ensemblr launches these processes itself it writes the knob
+rather than inheriting it: `MCP_TOOL_CALL_TIMEOUT_MS` in
+`src/main/agent-control/mcp-tool-timeout.ts` is set to a day and lands in every
+launch config — `claude-mcp-config.ts` for the Agent SDK,
+`harness-launch-config.ts` for the three terminal harnesses. It is per server
+rather than per tool, which no client exposes, so the same constant covers the
+other two blocking ops a harness *does* hold: `waitForAgents`, capped at five
+minutes by its own guardrail, and a `wait: true` spawn.
+
+**Raising it per server means the app owes a bound per op.** A day is the right
+answer for the three ops that block by design and the wrong one for the other
+thirty-seven: before, a wedged port surfaced to the agent as its client's
+60-second timeout and the turn carried on; after, the same wedge would hold the
+agent for a day while the heartbeat reported it healthy. Port coverage does not
+close that on its own — `linear-client.ts` and `workspace-git-status.ts` bound
+themselves, the terminal, harness-launch and tab ports do not — so `invoke`
+applies `DISPATCH_TIMEOUT_MS` (`src/main/agent-control/dispatch-deadline.ts`) to
+every op except those four. A timed-out op is abandoned rather than cancelled,
+and the envelope says so: the effect may still land, so the agent is told to
+check the state rather than to retry.
+
+A pending call also beats a `notifications/progress` every 20 seconds against
+the `progressToken` the caller put in the request's `_meta` (`mcp-progress.ts`).
+None of these clients extends its timeout on progress — Claude documents its
+`timeout` as a hard wall-clock limit and Vibe hands the value to the Python
+SDK's `read_timeout_seconds`, which does not reset either — so this is the
+second line of defence, not the first: it keeps the call visibly alive for a
+client that *does* honour `resetTimeoutOnProgress`, and it stops a held ask
+being silent on the wire for as long as the user is away. A caller that sent no
+token gets nothing, because the spec has no way to address progress at a request
+that did not ask for it.
+
 A turn that ends before the user answers takes its questionnaire off screen:
 the socket closes unanswered, `/invoke` aborts the op, and the coordinator
 withdraws it. Without that the card would outlive its asker, look live, and
-block the session's next question forever.
+block the session's next question forever. The MCP bridge does the same, and has
+to: it forwards each request's own `AbortSignal` into the service, so a client
+that gave up — by cancellation notice or by dropping the connection — withdraws
+the dialog instead of leaving a user to answer into a void that nobody is
+listening to.
+
+The questionnaire is not the only thing on this surface that waits on a human.
+In approval-required mode the confirmation prompt fronts *every* gated op, so it
+carries the same signal — but it is a native `dialog.showMessageBox`, and
+Electron gives no way to dismiss a box the app opened. So an abandoned prompt is
+answered by giving up on the dialog rather than by closing it: the box stays up
+until the user clicks, and their click is inert. The guarantee is the one that
+matters — the op never runs for a caller that stopped listening, instead of
+starting a terminal or launching a harness for nobody an hour after the fact.
+The child-side waits honour the signal the plain way: `waitForAgents` and a
+`wait: true` spawn both stop polling the moment their caller goes.
 
 The reverse also has to hold: a window that reloads loses the card but not the
 call, since the renderer keeps its pending questions in memory only. Main

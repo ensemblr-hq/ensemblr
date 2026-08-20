@@ -104,6 +104,8 @@ export default defineConfig({
 			'tests/main/agent-control-origin-registry.test.ts',
 			'tests/main/agent-control-control-server.test.ts',
 			'tests/main/agent-control-mcp-endpoint.test.ts',
+			'tests/main/agent-control-mcp-progress.test.ts',
+			'tests/main/agent-control-dispatch-deadline.test.ts',
 			'tests/main/agent-control-port-adapters.test.ts',
 			'tests/main/agent-control-review-ports.test.ts',
 			'tests/main/agent-control-review-focus.test.ts',
