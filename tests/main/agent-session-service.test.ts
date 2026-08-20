@@ -893,6 +893,62 @@ test('setSessionSummary records the agent summary against the branch it describe
 	assert.equal(marker?.capturedAtOrdinal, recorded?.capturedAtOrdinal);
 });
 
+test('setSessionSummary decodes HTML entities in the summary heading', async (t) => {
+	const fixture = openFixture(t);
+	const { service } = createService(fixture.database);
+
+	const snapshot = await service.openSession({
+		executable: createReadyExecutable(),
+		workspaceCwd: '/tmp/ensemblr/svc/ws',
+		workspaceId: fixture.workspaceId,
+	});
+	const tabId = snapshot.openedTabs[0]?.id;
+	assert.ok(tabId);
+
+	service.setSessionSummary({
+		sessionId: snapshot.id,
+		summary: '- Split the admin surface',
+		title: 'Admin &amp; Management',
+	});
+
+	const marker = getChatTabById({ database: fixture.database, id: tabId })
+		?.metadata.agentSummary as Record<string, unknown> | undefined;
+	assert.equal(marker?.title, 'Admin & Management');
+});
+
+test('setSessionSummary keeps the summary heading on one line', async (t) => {
+	const fixture = openFixture(t);
+	const { service } = createService(fixture.database);
+
+	const snapshot = await service.openSession({
+		executable: createReadyExecutable(),
+		workspaceCwd: '/tmp/ensemblr/svc/ws',
+		workspaceId: fixture.workspaceId,
+	});
+	const tabId = snapshot.openedTabs[0]?.id;
+	assert.ok(tabId);
+
+	const readTitle = (): string => {
+		const marker = getChatTabById({ database: fixture.database, id: tabId })
+			?.metadata.agentSummary as Record<string, unknown> | undefined;
+		return marker?.title as string;
+	};
+
+	service.setSessionSummary({
+		sessionId: snapshot.id,
+		summary: '- Split the admin surface',
+		title: 'Admin&#10;Management',
+	});
+	assert.equal(readTitle(), 'Admin Management');
+
+	service.setSessionSummary({
+		sessionId: snapshot.id,
+		summary: '- Split the admin surface',
+		title: '  Admin\nManagement\tpanel  ',
+	});
+	assert.equal(readTitle(), 'Admin Management panel');
+});
+
 test('setSessionSummary resolves null for a session that has no tab', async (t) => {
 	const fixture = openFixture(t);
 	const { service } = createService(fixture.database);

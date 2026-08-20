@@ -49,6 +49,41 @@ describe('cleanTitleLine', () => {
 		);
 	});
 
+	test('decodes HTML entities the title arrived encoded with', () => {
+		expect(cleanTitleLine('Admin &amp; Management')).toBe('Admin & Management');
+		expect(cleanTitleLine('Compare &lt;div&gt; output')).toBe(
+			'Compare <div> output',
+		);
+		expect(cleanTitleLine('It&#39;s the billing flow')).toBe(
+			"It's the billing flow",
+		);
+		expect(cleanTitleLine('Admin &#38; Management')).toBe('Admin & Management');
+		expect(cleanTitleLine('Admin &#x26; Management')).toBe(
+			'Admin & Management',
+		);
+	});
+
+	test('collapses a decoded non-breaking space into a plain space', () => {
+		expect(cleanTitleLine('Admin&nbsp;panel')).toBe('Admin panel');
+	});
+
+	test('decodes doubly-escaped input down to one character', () => {
+		expect(cleanTitleLine('Admin &amp;amp; Management')).toBe(
+			'Admin & Management',
+		);
+	});
+
+	test('leaves a bare ampersand untouched', () => {
+		expect(cleanTitleLine('Admin & Management')).toBe('Admin & Management');
+	});
+
+	test('leaves the decoded title as prose rather than a slug', () => {
+		expect(cleanTitleLine('Admin &amp; Management')).not.toMatch(/-/);
+		expect(cleanTitleLine('Admin &amp; Management')).not.toBe(
+			'Admin and Management',
+		);
+	});
+
 	test('leaves an over-long title at full length', () => {
 		const long = 'Implement comprehensive workspace renaming pipeline system';
 		expect(cleanTitleLine(long)).toBe(long);
@@ -86,6 +121,13 @@ describe('sanitizeChatTitle', () => {
 		expect(sanitizeChatTitle('"Update billing flow."')).toEqual({
 			display: 'Update billing flow',
 			full: 'Update billing flow',
+		});
+	});
+
+	test('decodes entities in both the tab title and the tooltip form', () => {
+		expect(sanitizeChatTitle('Admin &amp; Management')).toEqual({
+			display: 'Admin & Management',
+			full: 'Admin & Management',
 		});
 	});
 
