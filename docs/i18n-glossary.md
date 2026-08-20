@@ -156,6 +156,7 @@ Rules of thumb:
 | Push | Push | Push | Git; untranslated. |
 | Merge | Merge | Merge | Git; untranslated. |
 | Quit anyway | Всё равно завершить | Τερματισμός ούτως ή άλλως | The button that lets a quit through while agents are still working (`src/main/app/quit-guard-strings.ts`). Takes the verb from the menu-bar `Quit` (`Завершить`/`Τερματισμός`) rather than coining a second one. **Flag for native review:** the Greek runs to 25 characters; a shorter idiom may exist. |
+| Show more / Show less | Развернуть / Свернуть | Ανάπτυξη / Σύμπτυξη | The control under a clipped block — a long user prompt in the timeline. Both languages say **expand**/**collapse** rather than translating "show more" literally (`Показать больше`/`Περισσότερα`): the app already fixed this pair on the answer-table and terminal-area controls, and the gesture is the same one. |
 
 ## Native menu bar
 

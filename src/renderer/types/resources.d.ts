@@ -3356,6 +3356,10 @@ export default interface Resources {
 				loading: 'Loading conversation';
 			};
 			'turn-stopped': 'You stopped this turn';
+			'user-prompt': {
+				'show-less': 'Show less';
+				'show-more': 'Show more';
+			};
 		};
 		'tool-call': {
 			bash: {

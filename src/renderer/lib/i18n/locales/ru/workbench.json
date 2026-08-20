@@ -1072,7 +1072,11 @@
 			"agent": "Запуск агента",
 			"loading": "Загрузка диалога"
 		},
-		"turn-stopped": "Вы остановили этот ход"
+		"turn-stopped": "Вы остановили этот ход",
+		"user-prompt": {
+			"show-less": "Свернуть",
+			"show-more": "Развернуть"
+		}
 	},
 	"tool-call": {
 		"bash": {
