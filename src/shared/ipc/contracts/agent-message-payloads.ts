@@ -1,3 +1,5 @@
+import type { AgentFailureClass } from '../../agent-failure.ts';
+
 /** Canonical session status union; the main-process repository aliases this. */
 export type AgentSessionStatusWire =
 	| 'idle'
@@ -9,10 +11,19 @@ export type AgentSessionStatusWire =
 /** Which stream a persisted agent event came from: the structured protocol channel or raw stderr. */
 export type AgentEventStreamWire = 'protocol' | 'stderr';
 
-/** Error shape carried across the wire on persisted error events. */
+/**
+ * Error shape carried across the wire on persisted error events.
+ *
+ * `code` is the transport-level origin the agent client raised; `failureClass`
+ * is the locale-neutral taxonomy the renderer keys designed copy and recovery
+ * actions off, tagged by main when the event is persisted. It is optional
+ * because rows written before the taxonomy shipped carry none — the renderer
+ * re-classifies those on read.
+ */
 export interface AgentWireError {
 	code?: string;
 	detail?: string | null;
+	failureClass?: AgentFailureClass;
 	message: string;
 	recoverable?: boolean;
 }

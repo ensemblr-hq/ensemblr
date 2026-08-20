@@ -1027,6 +1027,17 @@
 	},
 	"timeline": {
 		"aria-label": "Agent session timeline",
+		"error": {
+			"continue": "Continue",
+			"copy-detail": "Copy the runtime detail",
+			"details": "Runtime detail",
+			"edit-prompt": "Edit the prompt",
+			"fork": "Fork chat",
+			"incomplete-turn": "Answer cut short",
+			"open-permissions": "Permission settings",
+			"open-settings": "Open settings",
+			"retry": "Send again"
+		},
 		"load-failed": "Could not load timeline events.",
 		"runtime-error": "Runtime error",
 		"starting": {

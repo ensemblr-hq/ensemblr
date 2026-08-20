@@ -1,3 +1,4 @@
+import { AgentErrorScene } from './agent-error-preview.tsx';
 import { AnswerPreview } from './answer-preview.tsx';
 import { CommentPreviewScene } from './comment-preview.tsx';
 import { ComposerScene } from './composer-preview.tsx';
@@ -70,6 +71,12 @@ export const SCENE_GROUPS = [
 				label: 'tool approval',
 				render: () => <ToolApprovalScene />,
 				source: 'playground/tool-approval-preview.tsx',
+			},
+			{
+				id: 'agent-error',
+				label: 'agent error',
+				render: () => <AgentErrorScene />,
+				source: 'playground/agent-error-preview.tsx',
 			},
 		],
 	},

@@ -8,6 +8,8 @@
 
 import type { DynamicToolUIPart, UIMessage } from 'ai';
 
+import type { AgentWireError } from '@/shared/ipc/contracts/agent-session';
+
 /** UI-message role of a mapped agent turn: user, assistant, or system. */
 export type UIRole = UIMessage['role'];
 
@@ -82,6 +84,12 @@ export interface AgentTurnMetadata {
 	 */
 	promptAt?: string;
 	firstEventAt: string;
+	/**
+	 * Set when a fatal runtime failure closed this turn, so the transcript can
+	 * show the answer as cut short rather than leaving a truncated reply looking
+	 * like a finished one. Only ever set on assistant turns.
+	 */
+	incomplete?: boolean;
 	lastEventAt: string;
 	/** Highest persisted-event ordinal in the turn — the fork boundary. */
 	lastOrdinal: number;
@@ -96,6 +104,15 @@ export interface AgentTurnMetadata {
  */
 export interface AgentNoticeMetadata {
 	notice: 'interrupted';
+}
+
+/**
+ * Carries the whole runtime failure on the system-role message that stands for
+ * it, so the timeline's error row can key designed copy and recovery actions off
+ * the class rather than re-parsing the message text it already flattened.
+ */
+export interface AgentFailureMetadata {
+	failure: AgentWireError;
 }
 
 /** One file attachment parsed from a persisted user prompt (path + inlined content). */

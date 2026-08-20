@@ -1,6 +1,6 @@
 import type { UIMessage } from 'ai';
 import type { TFunction } from 'i18next';
-import { memo, useCallback } from 'react';
+import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ChatAssistantTurn } from '@/renderer/components/chat-assistant-turn';
 import { ChatWorkingIndicator } from '@/renderer/components/chat-turn-timer';
@@ -10,14 +10,18 @@ import {
 	ConversationContent,
 	ConversationScrollButton,
 } from '@/renderer/components/conversation';
-import { StackTraceDiagnostic } from '@/renderer/components/stack-trace-diagnostic';
 import { useForkConversation } from '@/renderer/hooks/workbench-shell/conversation-panel/use-fork-conversation';
 import { useCheckpointRestore } from '@/renderer/hooks/workbench-shell/timeline/use-checkpoint-restore';
+import {
+	type RuntimeErrorRecovery,
+	retryPromptsByMessageId,
+	useRuntimeErrorRecovery,
+} from '@/renderer/hooks/workbench-shell/timeline/use-runtime-error-recovery';
 import { useTimelineEvents } from '@/renderer/hooks/workbench-shell/timeline/use-timeline-events';
 import { useTimelineMessages } from '@/renderer/hooks/workbench-shell/timeline/use-timeline-messages';
 import { useTimelineSession } from '@/renderer/hooks/workbench-shell/timeline/use-timeline-session';
 import {
-	looksLikeStackTrace,
+	failureMetadataOf,
 	noticeMetadataOf,
 	turnMetadataOf,
 } from '@/renderer/lib/agent-timeline';
@@ -28,6 +32,7 @@ import type {
 } from '@/renderer/types/workbench';
 import { useTurnDiffOpener } from '../file-preview-context';
 import { RestoreCheckpointDialog } from './restore-checkpoint-dialog';
+import { RuntimeErrorRow } from './runtime-error-row';
 import { TimelineStartingState } from './timeline-starting-state';
 
 /**
@@ -120,6 +125,20 @@ export function AgentSessionTimeline({
 		isStreaming,
 	});
 
+	const forkFromEnd = useMemo(
+		() => (canFork ? () => fork.forkToNewTab() : null),
+		[canFork, fork.forkToNewTab],
+	);
+	const errorRecovery = useRuntimeErrorRecovery({
+		fork: forkFromEnd,
+		projectId: workspace.projectId,
+		workspaceId: workspace.id,
+	});
+	const retryPrompts = useMemo(
+		() => retryPromptsByMessageId(messages),
+		[messages],
+	);
+
 	if (agentSessionId && error) {
 		return (
 			<section
@@ -190,6 +209,7 @@ export function AgentSessionTimeline({
 					{messages.map((message, index) => (
 						<TimelineMessage
 							checkpointsByTurnId={checkpointsByTurnId}
+							errorRecovery={errorRecovery}
 							fork={canFork ? fork : null}
 							isLastMessage={index === messages.length - 1}
 							isStreaming={isStreaming}
@@ -197,6 +217,7 @@ export function AgentSessionTimeline({
 							message={message}
 							onRequestRestore={requestRestore}
 							onViewTurnDiff={openTurnDiff}
+							retryPrompt={retryPrompts.get(message.id) ?? null}
 						/>
 					))}
 					{pendingStartMs !== null ? (
@@ -230,26 +251,35 @@ export function AgentSessionTimeline({
  */
 const TimelineMessage = memo(function TimelineMessage({
 	checkpointsByTurnId,
+	errorRecovery,
 	fork,
 	isLastMessage,
 	isStreaming,
 	message,
 	onRequestRestore,
 	onViewTurnDiff,
+	retryPrompt,
 }: {
 	checkpointsByTurnId: ReadonlyMap<string, { label: string }>;
+	errorRecovery: RuntimeErrorRecovery;
 	fork: ReturnType<typeof useForkConversation> | null;
 	isLastMessage: boolean;
 	isStreaming: boolean;
 	message: UIMessage;
 	onRequestRestore: (target: { label: string; turnId: string }) => void;
 	onViewTurnDiff: ((input: { label: string; turnId: string }) => void) | null;
+	/** The prompt "Send again" re-sends, when this row is an error with one before it. */
+	retryPrompt: string | null;
 }) {
 	if (message.role === 'system') {
 		return noticeMetadataOf(message) ? (
 			<TurnInterrupted text={textFromMessage(message)} />
 		) : (
-			<RuntimeDiagnostic message={message} />
+			<RuntimeDiagnostic
+				message={message}
+				recovery={errorRecovery}
+				retryPrompt={retryPrompt}
+			/>
 		);
 	}
 
@@ -297,6 +327,7 @@ function AssistantTimelineTurn({
 	return (
 		<ChatAssistantTurn
 			forkDisabled={fork?.isForking ?? false}
+			isIncomplete={metadata?.incomplete ?? false}
 			isStreaming={isLiveTurn}
 			message={message}
 			onForkToNewTab={fork ? () => fork.forkToNewTab(upToOrdinal) : undefined}
@@ -360,25 +391,43 @@ function TurnInterrupted({ text }: { text: string }) {
 	);
 }
 
-/** Renders runtime failures outside the normal user/assistant bubble flow. */
-function RuntimeDiagnostic({ message }: { message: UIMessage }) {
-	const text = textFromMessage(message);
-	const isStackTrace = looksLikeStackTrace(text);
+/**
+ * Renders a runtime failure outside the normal user/assistant bubble flow, as
+ * the designed error row with whichever recoveries its class earns.
+ *
+ * A row whose metadata the projector could not attach — a message shaped like a
+ * diagnostic but built elsewhere — still renders, on its flattened text alone;
+ * the classifier reads that text and lands it in the `unknown` class rather
+ * than dropping the failure.
+ */
+function RuntimeDiagnostic({
+	message,
+	recovery,
+	retryPrompt,
+}: {
+	message: UIMessage;
+	recovery: RuntimeErrorRecovery;
+	retryPrompt: string | null;
+}) {
+	const failure = failureMetadataOf(message)?.failure ?? {
+		message: textFromMessage(message),
+	};
 
-	// Stack traces still need a container to stay legible; plain runtime errors
-	// render as a lean inline line — no box — per the timeline's quiet style.
-	if (isStackTrace) {
-		return (
-			<div className='rounded-md border border-status-warning/30 bg-status-warning/10 p-3 text-xs'>
-				<StackTraceDiagnostic
-					className='border-status-warning/30'
-					trace={text}
-				/>
-			</div>
-		);
-	}
-
-	return <p className='px-1 text-status-warning text-xs'>{text}</p>;
+	return (
+		<RuntimeErrorRow
+			failure={failure}
+			handlers={{
+				onContinue: recovery.continueTurn,
+				onEditPrompt: retryPrompt
+					? () => recovery.editPrompt(retryPrompt)
+					: undefined,
+				onFork: recovery.fork ?? undefined,
+				onOpenPermissions: recovery.openPermissions,
+				onOpenProviderSettings: recovery.openProviderSettings,
+				onRetry: retryPrompt ? () => recovery.retry(retryPrompt) : undefined,
+			}}
+		/>
+	);
 }
 
 /** Converts all text parts in a message into one diagnostic string. */

@@ -40,6 +40,13 @@ Rules of thumb:
 | Conversation | Диалог | Συνομιλία | The chat tab's thread. |
 | Chat | Чат | Συνομιλία | The tab as the user opens it — `New chat` is `Новый чат`/`Νέα συνομιλία`. Russian splits the two: the thing you open is a `чат`, the thread inside it is a `диалог`. Greek uses `συνομιλία` for both. One exception in Russian: a chat that is over — a closed tab in history, a transcript offered to the composer — is named for the thread it left behind, so `Untitled chat` is `Диалог без названия` (`session-tabs.untitled-closed`, `review:file-diff.untitled-chat`). |
 | Turn | Ход | Γύρος | One agent request/response cycle. |
+| Runtime *(agent)* | Среда выполнения | Περιβάλλον εκτέλεσης | The CLI or SDK behind a provider — Pi, Claude Code. Deliberately **not** `рантайм`/`runtime` transliterated: unlike git porcelain this is not a word the user types, and the error rows put it in a sentence. Russian keeps `Ошибка выполнения` for the short `Runtime error` headline already in the timeline. |
+| Provider *(agent)* | Провайдер | Πάροχος | Who serves the model, as distinct from the `Runtime` that talks to it. Singular of the `Providers`/`Провайдеры`/`Πάροχοι` settings section. |
+| Session *(agent)* | Сессия | Συνεδρία | One runtime process bound to a chat. Not `Conversation`/`Диалог` — a chat outlives the sessions that served it, and "session closed" does not mean the thread is gone. |
+| Context window | Контекстное окно | Παράθυρο περιβάλλοντος | The model's token ceiling for one turn. Takes `контекст`/`περιβάλλον` from `Context usage` rather than coining a second word. |
+| Credentials | Учётные данные | Διαπιστευτήρια | The API key or sign-in a provider rejects. Not `Токен`/`token`, which names the stored OAuth credential specifically. |
+| Prompt | Промпт | prompt | What the user sends the agent. Russian transliterates (`промпт`) — `запрос` is already `request` and `подсказка` reads as a UI hint. Greek keeps the English word, as the composer strings already do. |
+| Composer | Поле ввода | Πεδίο | Named for the box, not the feature: neither language has a noun for "composer" that a sentence can point at, so both say *the input field* (`Изменить в поле ввода`, `Επεξεργασία στο πεδίο`). |
 | Tab | Вкладка | Καρτέλα | |
 | Dock | Док | Dock | The bottom panel strip. |
 | Panel | Панель | Πίνακας | |
@@ -131,6 +138,9 @@ Rules of thumb:
 | Restore | Восстановить | Επαναφορά | |
 | Resume | Продолжить | Συνέχιση | |
 | Retry | Повторить | Επανάληψη | |
+| Continue *(a cut-off turn)* | Продолжить | Συνέχεια | The recovery on a runtime-error row: it sends the agent the word `Continue` so it resumes an answer the provider truncated. Distinct from `Retry` above, which re-sends the user's own prompt — Russian therefore keeps `Повторить` for retry and `Отправить снова` where the row has to say *which* prompt goes again. |
+| Fork *(a chat)* | Fork | Fork | Untranslated in both, like git porcelain — `Fork диалога`, `Fork συνομιλίας`. `Ответвить`/`διακλάδωση` reads as a branch of the repository, which forking a chat is not. |
+| Edit the prompt | Изменить промпт | Επεξεργασία prompt | The recovery on a refused turn: it puts the failed prompt back in the composer to reword rather than re-sending it. Distinct from `Retry`/`Continue` above, which both send something. |
 | Stop | Остановить | Διακοπή | |
 | Approve | Разрешить | Έγκριση | Tool approval. |
 | Deny | Отклонить | Άρνηση | |

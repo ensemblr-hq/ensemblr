@@ -3,7 +3,9 @@ import { describe, expect, test } from 'vitest';
 
 import {
 	eventsToUIMessages,
+	failureMetadataOf,
 	noticeMetadataOf,
+	turnMetadataOf,
 } from '../../src/renderer/lib/agent-timeline/event-to-ui-message';
 import { parentToolCallIdOf } from '../../src/renderer/lib/agent-timeline/subagent-parts';
 import type {
@@ -466,6 +468,84 @@ describe('eventsToUIMessages', () => {
 		expect(messageText(messages)).toContain('Boom');
 		expect(messageText(messages)).toContain('stack trace here');
 		expect(messageText(messages)).not.toContain('[fatal]');
+	});
+
+	test('carries the whole failure on the diagnostic so the row can key off it', () => {
+		const messages = eventsToUIMessages([
+			event({
+				eventType: 'error',
+				id: 'evt-error',
+				payload: {
+					error: {
+						code: 'adapter-failure',
+						failureClass: 'provider-truncated',
+						message: 'API Error: Server error mid-response.',
+						recoverable: false,
+					},
+					kind: 'error',
+				},
+			}),
+		]);
+
+		expect(failureMetadataOf(messages[0] as UIMessage)?.failure).toMatchObject({
+			code: 'adapter-failure',
+			failureClass: 'provider-truncated',
+		});
+	});
+
+	// A truncated answer that still renders as a finished one is half the bug:
+	// the reader cannot tell the agent stopped from the agent being done.
+	test('marks the assistant turn a fatal failure cut short as incomplete', () => {
+		const messages = eventsToUIMessages([
+			event({
+				id: 'evt-answer',
+				payload: {
+					kind: 'message',
+					payload: { kind: 'text', text: 'The migration touches four call' },
+					role: 'agent',
+				},
+				turnId: 'turn-1',
+			}),
+			event({
+				eventType: 'error',
+				id: 'evt-error',
+				ordinal: 1,
+				payload: {
+					error: { message: 'Boom', recoverable: false },
+					kind: 'error',
+				},
+			}),
+		]);
+
+		expect(messages[0]?.role).toBe('assistant');
+		expect(turnMetadataOf(messages[0] as UIMessage)?.incomplete).toBe(true);
+	});
+
+	test('leaves a turn alone when the failure did not interrupt one', () => {
+		const messages = eventsToUIMessages([
+			event({
+				id: 'evt-user',
+				payload: {
+					kind: 'message',
+					payload: { kind: 'prompt', prompt: 'Hello' },
+					role: 'user',
+				},
+				turnId: 'turn-1',
+			}),
+			event({
+				eventType: 'error',
+				id: 'evt-error',
+				ordinal: 1,
+				payload: {
+					error: { message: 'Boom', recoverable: false },
+					kind: 'error',
+				},
+			}),
+		]);
+
+		expect(
+			turnMetadataOf(messages[0] as UIMessage)?.incomplete,
+		).toBeUndefined();
 	});
 
 	test('drops stderr rows and recoverable errors as non-fatal noise', () => {

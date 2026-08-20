@@ -1,7 +1,10 @@
 import type { UIMessage } from 'ai';
 
 import { i18n } from '@/renderer/lib/i18n';
-import type { AgentNoticeMetadata } from '@/renderer/types/agent-timeline';
+import type {
+	AgentFailureMetadata,
+	AgentNoticeMetadata,
+} from '@/renderer/types/agent-timeline';
 import type {
 	AgentPersistedEnvelope,
 	AgentSessionEventWire,
@@ -18,6 +21,10 @@ import { describesGracefulTermination } from '@/shared/process-exit';
  * instead of interrupting the conversation. Graceful process exits are dropped
  * on message text as well: sessions recorded before the adapter stopped
  * reporting them still hold rows tagged fatal, and those replay on every load.
+ *
+ * The whole envelope rides along as metadata so the timeline's error row can
+ * key designed copy and recovery actions off the failure class; the flattened
+ * text stays as the fallback any plain-text reader of the message still gets.
  * @param event - The wire event carrying the envelope, whose id keys the message
  * @param envelope - The `error` envelope to project
  * @returns The system message, or null when the error is not fatal
@@ -39,6 +46,9 @@ export function buildErrorMessage(
 	const body = error.detail ? `\n${error.detail}` : '';
 	return {
 		id: `pi-event:${event.id}`,
+		metadata: {
+			failure: { ...error, message: head },
+		} satisfies AgentFailureMetadata,
 		parts: [{ state: 'done', text: `${head}${body}`, type: 'text' }],
 		role: 'system',
 	};
