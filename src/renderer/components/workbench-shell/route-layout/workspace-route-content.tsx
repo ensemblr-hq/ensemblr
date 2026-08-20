@@ -143,6 +143,7 @@ export function WorkspaceRouteContent({
 		availableThinkingLevels: agentComposer.availableThinkingLevels,
 		contextUsage: agentComposer.contextUsage,
 		isStreaming: agentComposer.isStreaming,
+		liveAgentSessionId: agentComposer.liveSessionId,
 		lockedProvider: agentComposer.lockedProvider,
 		modelId: agentComposer.modelId,
 		onModelChange: agentComposer.onModelChange,

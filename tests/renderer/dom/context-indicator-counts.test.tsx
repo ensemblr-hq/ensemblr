@@ -15,10 +15,10 @@ import { ContextIndicator } from '@/renderer/components/workbench-shell/conversa
 import type { ComposerContextUsage } from '@/renderer/types/workbench';
 import { renderWithProviders } from '../support/dom';
 
-/** Renders the gauge and hovers its trigger so the card's counts are queryable. */
+/** Renders the gauge and opens its card so the counts are queryable. */
 async function openCard(usage: ComposerContextUsage | null): Promise<void> {
 	renderWithProviders(<ContextIndicator usage={usage} />);
-	await userEvent.hover(screen.getByLabelText('Context usage'));
+	await userEvent.click(screen.getByLabelText('Context usage'));
 }
 
 test('names the window it was given on a chat that has run nothing yet', async () => {

@@ -110,13 +110,33 @@ function rejectAbortForSession(
 	};
 }
 
+// `refreshPlanUsage` is optional on the adapter contract, and the fake omits it
+// the way a runtime with no plan reporting does. A test about the answering path
+// opts one in.
+function answerPlanUsage(
+	adapter: AgentAdapter,
+	refreshPlanUsage: () => Promise<boolean>,
+): AgentAdapter {
+	return {
+		createSession: async (input) => ({
+			...(await adapter.createSession(input)),
+			refreshPlanUsage,
+		}),
+		shutdown: adapter.shutdown,
+	};
+}
+
 function resolveAdapter(
 	fake: ReturnType<typeof createFakeAgentAdapter>,
 	options: {
 		deferAbort?: boolean;
+		refreshPlanUsage?: () => Promise<boolean>;
 		rejectAbortFor?: (index: number) => boolean;
 	},
 ): AgentAdapter {
+	if (options.refreshPlanUsage) {
+		return answerPlanUsage(fake.adapter, options.refreshPlanUsage);
+	}
 	if (options.rejectAbortFor) {
 		return rejectAbortForSession(fake.adapter, options.rejectAbortFor);
 	}
@@ -128,6 +148,7 @@ function createService(
 	options: {
 		deferAbort?: boolean;
 		eventSink?: AgentSessionEventSink;
+		refreshPlanUsage?: () => Promise<boolean>;
 		rejectAbortFor?: (index: number) => boolean;
 		resolveSpawnedChildren?: (sessionId: string) => readonly string[];
 		sessionSummaryWriter?: SessionSummaryWriter;
@@ -1137,4 +1158,77 @@ test('a streaming delta keeps its subagent link on the broadcast row', async (t)
 	});
 
 	assert.deepEqual(parents, ['toolu_task_1', undefined]);
+});
+
+test('refreshPlanUsage reaches the live runtime and reports that it answered', async (t) => {
+	const fixture = openFixture(t);
+	let reads = 0;
+	const { service } = createService(fixture.database, {
+		refreshPlanUsage: async () => {
+			reads += 1;
+			return true;
+		},
+	});
+
+	const snapshot = await service.openSession({
+		executable: createReadyExecutable(),
+		workspaceCwd: '/tmp/ensemblr/svc/ws',
+		workspaceId: fixture.workspaceId,
+	});
+
+	assert.equal(await service.refreshPlanUsage(snapshot.id), true);
+	assert.equal(reads, 1);
+});
+
+test('refreshPlanUsage passes on a runtime that would not answer', async (t) => {
+	const fixture = openFixture(t);
+	const { service } = createService(fixture.database, {
+		refreshPlanUsage: async () => false,
+	});
+
+	const snapshot = await service.openSession({
+		executable: createReadyExecutable(),
+		workspaceCwd: '/tmp/ensemblr/svc/ws',
+		workspaceId: fixture.workspaceId,
+	});
+
+	assert.equal(await service.refreshPlanUsage(snapshot.id), false);
+});
+
+test('refreshPlanUsage answers false for a runtime that reports no plan usage', async (t) => {
+	const fixture = openFixture(t);
+	const { service } = createService(fixture.database);
+
+	const snapshot = await service.openSession({
+		executable: createReadyExecutable(),
+		workspaceCwd: '/tmp/ensemblr/svc/ws',
+		workspaceId: fixture.workspaceId,
+	});
+
+	assert.equal(
+		await service.refreshPlanUsage(snapshot.id),
+		false,
+		'an adapter that omits the capability must answer rather than throw',
+	);
+});
+
+// The case a chat reopened after a restart is in: the session row survives, and
+// `runtimeOpen` false is the only thing that says nothing is running behind it.
+test('refreshPlanUsage answers false once no runtime is attached to the session', async (t) => {
+	const fixture = openFixture(t);
+	const { service } = createService(fixture.database, {
+		refreshPlanUsage: async () => true,
+	});
+
+	const snapshot = await service.openSession({
+		executable: createReadyExecutable(),
+		workspaceCwd: '/tmp/ensemblr/svc/ws',
+		workspaceId: fixture.workspaceId,
+	});
+	assert.equal(snapshot.runtimeOpen, true);
+	await service.stopSession({ sessionId: snapshot.id });
+
+	assert.equal(service.getSession(snapshot.id)?.runtimeOpen, false);
+	assert.equal(await service.refreshPlanUsage(snapshot.id), false);
+	assert.equal(await service.refreshPlanUsage('no-such-session'), false);
 });

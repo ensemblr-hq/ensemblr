@@ -7,6 +7,7 @@ import type {
 	ListAgentSessionEventsResult,
 	ListAgentSessionsResult,
 	OpenAgentSessionResult,
+	RefreshAgentPlanUsageResult,
 	StopAgentSessionResult,
 	SubmitAgentPromptResult,
 	WriteForkSummaryResult,
@@ -25,6 +26,7 @@ import {
 	listAgentSessionEventsRequestSchema,
 	listAgentSessionsRequestSchema,
 	openAgentSessionRequestSchema,
+	refreshAgentPlanUsageRequestSchema,
 	setAgentPlanModeRequestSchema,
 	stopAgentSessionRequestSchema,
 	submitAgentPromptRequestSchema,
@@ -170,6 +172,22 @@ export function registerAgentSessionHandlers({
 		(_event, raw: unknown): void => {
 			const request = setAgentPlanModeRequestSchema.parse(raw);
 			planModeRegistry.setActive(request.sessionId, request.planMode);
+		},
+	);
+
+	ipcMain.handle(
+		IPC_CHANNELS.refreshAgentPlanUsage,
+		async (_event, raw: unknown): Promise<RefreshAgentPlanUsageResult> => {
+			try {
+				const request = refreshAgentPlanUsageRequestSchema.parse(raw);
+				const refreshed = await agentSessionService.refreshPlanUsage(
+					request.sessionId,
+				);
+				return { refreshed };
+			} catch (cause) {
+				console.warn('[agent-session] plan usage refresh failed.', cause);
+				return { refreshed: false };
+			}
 		},
 	);
 

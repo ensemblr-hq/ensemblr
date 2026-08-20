@@ -106,6 +106,7 @@ export function useComposerStub({
 			disabled,
 			disabledReason: null,
 			isStreaming,
+			liveAgentSessionId: 'playground-session',
 			lockedProvider,
 			modelId: MODELS[0].id,
 			modelLabel: MODELS[0].displayName,

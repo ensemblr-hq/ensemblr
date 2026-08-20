@@ -202,6 +202,13 @@ export interface AgentSessionService {
 		summary: string;
 	}) => { capturedAtOrdinal: number } | null;
 	/**
+	 * Asks an active session's runtime to re-read the account's plan windows now,
+	 * bypassing the freshness interval a sealing turn respects. What moved reaches
+	 * the renderer as an ordinary `plan-windows` event rather than through this
+	 * result, which reports only whether the runtime answered.
+	 */
+	refreshPlanUsage: (sessionId: string) => Promise<boolean>;
+	/**
 	 * Sets the display name of an active agent session via its runtime `/name`, then
 	 * mirrors the name onto its chat tab under the given provenance. A tab whose
 	 * title outranks the caller keeps it and comes back `applied: false`.
@@ -465,6 +472,7 @@ export function createAgentSessionService({
 			});
 			return { capturedAtOrdinal };
 		},
+		refreshPlanUsage: lifecycle.refreshPlanUsage,
 		setSessionName: async ({ sessionId, name, provenance }) => {
 			const database = requireSessionDatabase();
 			const applied = await lifecycle.setSessionName(sessionId, name);

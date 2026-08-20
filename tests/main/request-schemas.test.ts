@@ -9,6 +9,7 @@ import {
 	parseCreateWorkspaceRequest,
 	parseGithubRepositoryListRequest,
 	parseUpdateRepositorySettingsRequest,
+	refreshAgentPlanUsageRequestSchema,
 	resumeAgentHarnessRequestSchema,
 	setInfisicalLinkRequestSchema,
 } from '../../src/main/ipc/request-schemas.ts';
@@ -334,4 +335,15 @@ test('setInfisicalLinkRequestSchema leaves the optional flags unset', () => {
 	});
 	expect(parsed.recursive).toBeUndefined();
 	expect(parsed.secretPath).toBeUndefined();
+});
+
+test('refreshAgentPlanUsageRequestSchema requires a non-empty session id', () => {
+	expect(
+		refreshAgentPlanUsageRequestSchema.parse({ sessionId: 'agent-1' })
+			.sessionId,
+	).toBe('agent-1');
+	expect(() =>
+		refreshAgentPlanUsageRequestSchema.parse({ sessionId: '' }),
+	).toThrow();
+	expect(() => refreshAgentPlanUsageRequestSchema.parse({})).toThrow();
 });

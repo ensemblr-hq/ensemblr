@@ -3128,6 +3128,8 @@ export default interface Resources {
 		'plan-usage': {
 			'estimate-note': 'Cost is this session’s own estimate, not a bill.';
 			heading: 'Plan usage';
+			refresh: 'Refresh plan usage';
+			'refresh-failed': 'Could not refresh plan usage.';
 			'status-rejected': 'Plan limit reached. Turns fail until a window resets.';
 			'status-warning': 'Close to the plan limit.';
 		};

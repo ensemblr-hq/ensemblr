@@ -153,6 +153,12 @@ interface AgentSessionLifecycle {
 		request: AgentSessionOpenRequest,
 	) => Promise<AgentSessionSnapshot>;
 	/**
+	 * Asks an active session's runtime to re-read the account's plan windows now,
+	 * so what moved reaches the composer as a `plan-windows` event. Resolves false
+	 * when the session is not active or its runtime could not answer.
+	 */
+	refreshPlanUsage: (sessionId: string) => Promise<boolean>;
+	/**
 	 * Pushes a display name into the live agent runtime (`/name`) for an active
 	 * session, returning the chat tab it is bound to so the caller can mirror the
 	 * name onto the tab. Resolves null when the session is not currently active.
@@ -428,6 +434,13 @@ export function createAgentSessionLifecycle({
 			return { branch: active.branch, row: active.row };
 		},
 		openSession,
+		refreshPlanUsage: async (sessionId) => {
+			const active = activeSessions.get(sessionId);
+			if (!active) {
+				return false;
+			}
+			return active.agentRuntimeSession.refreshPlanUsage();
+		},
 		setSessionName: async (sessionId, name) => {
 			const active = activeSessions.get(sessionId);
 			if (!active) {

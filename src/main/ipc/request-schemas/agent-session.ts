@@ -67,6 +67,11 @@ export const setAgentPlanModeRequestSchema = z.object({
 	sessionId: z.string().min(1),
 });
 
+/** {@link import('../../../shared/ipc').RefreshAgentPlanUsageRequest}. */
+export const refreshAgentPlanUsageRequestSchema = z.object({
+	sessionId: z.string().min(1),
+});
+
 /** {@link import('../../../shared/ipc').StopAgentSessionRequest}. */
 export const stopAgentSessionRequestSchema = z.object({
 	reason: z.string().optional(),

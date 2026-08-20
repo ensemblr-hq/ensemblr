@@ -56,6 +56,13 @@ export interface AgentAdapterSession {
 	getMetadata: () => AgentSessionMetadata;
 	getState: () => Promise<AgentSessionState>;
 	id: AgentSessionId;
+	/**
+	 * Re-reads the account's plan windows now and emits what moved, resolving
+	 * whether the runtime answered. Optional: a runtime that reports no plan usage
+	 * at all omits it, and the client answers `false` on its behalf rather than
+	 * making every adapter carry a stub.
+	 */
+	refreshPlanUsage?: () => Promise<boolean>;
 	/** Sets the session's display name in the runtime, when it has one. */
 	setSessionName: (name: string) => Promise<void>;
 	subscribe: (listener: AgentEventListener) => AgentSubscription;

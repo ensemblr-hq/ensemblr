@@ -34,13 +34,13 @@ function planUsage(overrides: Partial<ComposerPlanUsage> = {}) {
 	} satisfies ComposerPlanUsage;
 }
 
-/** Renders the gauge and hovers its trigger so the card's content is queryable. */
+/** Renders the gauge and opens its card so the content is queryable. */
 async function openCard(
 	plan: ComposerPlanUsage | null,
 	label = 'Context and plan usage',
 ): Promise<void> {
 	renderWithProviders(<ContextIndicator planUsage={plan} usage={CONTEXT} />);
-	await userEvent.hover(screen.getByLabelText(label));
+	await userEvent.click(screen.getByLabelText(label));
 }
 
 test('shows every reported window and the running cost alongside the context', async () => {

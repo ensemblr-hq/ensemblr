@@ -39,6 +39,11 @@ export interface AgentSession {
 	getMetadata: () => AgentSessionMetadata;
 	getState: () => Promise<AgentSessionState>;
 	id: AgentSessionId;
+	/**
+	 * Re-reads the account's plan windows now, resolving false when this runtime
+	 * reports none, the session is closed, or the read failed.
+	 */
+	refreshPlanUsage: () => Promise<boolean>;
 	/** Sets the session's display name in the runtime, when it has one. */
 	setSessionName: (name: string) => Promise<void>;
 	subscribe: (listener: AgentEventListener) => AgentSubscription;
@@ -332,6 +337,12 @@ function wrapSession({
 			return adapterSession.getState();
 		},
 		id: adapterSession.id,
+		refreshPlanUsage: async () => {
+			if (closed || !adapterSession.refreshPlanUsage) {
+				return false;
+			}
+			return adapterSession.refreshPlanUsage();
+		},
 		setSessionName: (name) => {
 			ensureOpen('set session name on');
 			return adapterSession.setSessionName(name);

@@ -1,11 +1,15 @@
+import { useMutation } from '@tanstack/react-query';
+import { RefreshCwIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { toast } from 'sonner';
 
+import { refreshAgentPlanUsage } from '@/renderer/api/ensemblr-queries';
 import { Button } from '@/renderer/components/ui/button';
 import {
-	HoverCard,
-	HoverCardContent,
-	HoverCardTrigger,
-} from '@/renderer/components/ui/hover-card';
+	Popover,
+	PopoverContent,
+	PopoverTrigger,
+} from '@/renderer/components/ui/popover';
 import { Progress } from '@/renderer/components/ui/progress';
 import {
 	formatSessionCost,
@@ -13,6 +17,7 @@ import {
 	planWindowLabel,
 	planWindowResetLabel,
 } from '@/renderer/lib/plan-limit-text';
+import { cn } from '@/renderer/lib/utils';
 import type {
 	ComposerContextUsage,
 	ComposerPlanUsage,
@@ -55,6 +60,81 @@ function PlanWindowBar({
 	);
 }
 
+/** The card's plan re-read affordance, held open across the card's own closes. */
+interface PlanUsageRefresh {
+	isPending: boolean;
+	run: () => void;
+}
+
+/**
+ * Binds a re-read of the account's plan windows to the chat's live session, or
+ * reports that there is no runtime to ask.
+ *
+ * The gauge otherwise only moves when the runtime volunteers a reading — on a
+ * turn boundary, or on whichever window a push happens to name — so a user who
+ * opens the card mid-turn is reading a figure minutes out of date with no way to
+ * ask for a fresher one. The reading itself arrives on the session event stream
+ * like any other, which is why a click reports nothing but failure.
+ *
+ * This sits above the card rather than inside it because the card unmounts every
+ * time it closes: a pending flag owned by the popover's contents would reset the
+ * moment the user looked away, leaving an idle-looking control over a read that
+ * is still running.
+ * @param liveSessionId - Session whose runtime can answer, null when none can.
+ * @returns The affordance to draw, or null when there is nothing to ask.
+ */
+function usePlanUsageRefresh(
+	liveSessionId: string | null,
+): PlanUsageRefresh | null {
+	const { t } = useTranslation();
+	// react-doctor-disable-next-line -- The reading lands on the session event stream rather than in this call's result, so the gauge and the event cache are both already updated by the subscription; invalidating the branch here would re-read the transcript mid-stream and drop the deltas in flight.
+	const { isPending, mutateAsync } = useMutation({
+		mutationFn: (sessionId: string) => refreshAgentPlanUsage({ sessionId }),
+	});
+
+	if (liveSessionId === null) {
+		return null;
+	}
+
+	/** Runs the refresh and reports the one outcome the card cannot show itself. */
+	const refresh = async (): Promise<void> => {
+		const outcome = await mutateAsync(liveSessionId).catch(() => ({
+			refreshed: false,
+		}));
+		if (!outcome.refreshed) {
+			toast.error(
+				t(
+					'workbench:plan-usage.refresh-failed',
+					'Could not refresh plan usage.',
+				),
+			);
+		}
+	};
+
+	return { isPending, run: () => void refresh() };
+}
+
+/** The re-read control, spinning and inert while the runtime is being asked. */
+function PlanUsageRefreshButton({ isPending, run }: PlanUsageRefresh) {
+	const { t } = useTranslation();
+
+	return (
+		<Button
+			aria-label={t('workbench:plan-usage.refresh', 'Refresh plan usage')}
+			disabled={isPending}
+			onClick={run}
+			size='icon-xs'
+			type='button'
+			variant='subtle'
+		>
+			<RefreshCwIcon
+				aria-hidden='true'
+				className={cn(isPending && 'animate-spin')}
+			/>
+		</Button>
+	);
+}
+
 /**
  * The plan half of the context card: the runtime's spend verdict when it is
  * anything but plain `allowed`, a bar per reported window, the running session
@@ -62,9 +142,11 @@ function PlanWindowBar({
  */
 function PlanUsageSection({
 	cost,
+	refresh,
 	usage,
 }: {
 	cost: string | null;
+	refresh: PlanUsageRefresh | null;
 	usage: ComposerPlanUsage;
 }) {
 	const { t } = useTranslation();
@@ -76,11 +158,14 @@ function PlanUsageSection({
 				<span className='font-medium text-sm'>
 					{t('workbench:plan-usage.heading', 'Plan usage')}
 				</span>
-				{cost ? (
-					<span className='text-muted-foreground text-xs tabular-nums'>
-						{cost}
-					</span>
-				) : null}
+				<div className='-mr-1 flex items-center gap-1'>
+					{cost ? (
+						<span className='text-muted-foreground text-xs tabular-nums'>
+							{cost}
+						</span>
+					) : null}
+					{refresh ? <PlanUsageRefreshButton {...refresh} /> : null}
+				</div>
 			</div>
 			{verdict ? (
 				<p
@@ -136,18 +221,31 @@ function formatTokens(value: number): string {
 
 /**
  * Renders the composer context-window gauge, with the chat's plan usage and
- * running cost folded into the same hover card. Both answer "how much room is
+ * running cost folded into the same popover. Both answer "how much room is
  * left", one within the turn and one within the billing window, so they belong
  * behind one control rather than two competing gauges on the same row.
+ *
+ * A popover rather than a hover card because the card carries an action: a hover
+ * card's trigger closes it on blur and portals its content out of the trigger's
+ * tab position, so a control inside one can be clicked but never focused.
  */
 export function ContextIndicator({
+	liveSessionId = null,
 	planUsage = null,
 	usage,
 }: {
+	/**
+	 * Chat's session while its runtime is attached, which the card's refresh
+	 * control asks. Null for a chat whose runtime is detached — a chat reopened
+	 * after a restart still shows its persisted readings, and there is nothing
+	 * running to ask for fresher ones.
+	 */
+	liveSessionId?: string | null;
 	planUsage?: ComposerPlanUsage | null;
 	usage: ComposerContextUsage | null;
 }) {
 	const { i18n, t } = useTranslation();
+	const refresh = usePlanUsageRefresh(liveSessionId);
 	const used = usage?.usedTokens ?? 0;
 	const max = usage?.maxTokens ?? 0;
 	const percent = max > 0 ? Math.min(100, (used / max) * 100) : 0;
@@ -165,8 +263,8 @@ export function ContextIndicator({
 	);
 
 	return (
-		<HoverCard closeDelay={80} openDelay={150}>
-			<HoverCardTrigger asChild>
+		<Popover>
+			<PopoverTrigger asChild>
 				<Button
 					aria-label={
 						showsPlan
@@ -216,12 +314,8 @@ export function ContextIndicator({
 						) : null}
 					</svg>
 				</Button>
-			</HoverCardTrigger>
-			<HoverCardContent
-				align='end'
-				className='flex w-80 flex-col gap-2.5 p-4'
-				sideOffset={4}
-			>
+			</PopoverTrigger>
+			<PopoverContent align='end' className='w-80 p-4' sideOffset={4}>
 				<div className='flex items-center justify-between gap-6'>
 					<span className='font-medium text-sm'>
 						{t('workbench:context-usage.heading', 'Context')}
@@ -249,9 +343,9 @@ export function ContextIndicator({
 					</p>
 				)}
 				{showsPlan && planUsage ? (
-					<PlanUsageSection cost={cost} usage={planUsage} />
+					<PlanUsageSection cost={cost} refresh={refresh} usage={planUsage} />
 				) : null}
-			</HoverCardContent>
-		</HoverCard>
+			</PopoverContent>
+		</Popover>
 	);
 }

@@ -199,7 +199,7 @@ function createClaudeSession({
 	let appliedPlanMode: boolean | null = input.request.planMode === true;
 	let currentTurnId: string | null = null;
 	let planUsageReadAt: number | null = null;
-	let planUsageReadPending = false;
+	let planUsageRead: Promise<boolean> | null = null;
 	let pendingEvents: readonly AgentEvent[] = [];
 	let hasSubscribed = false;
 
@@ -279,33 +279,46 @@ function createClaudeSession({
 	 * on exactly the path most likely to hit it. A session with no plan behind it
 	 * — an API key, Bedrock, Vertex — answers with no windows, which is an answer:
 	 * it stamps, emits nothing, and is not asked again until the stamp goes stale.
+	 * @returns Whether the runtime answered, so a manual refresh can report that it did not.
 	 */
-	const probePlanUsage = async (): Promise<void> => {
-		if (!activeQuery || planUsageReadPending) {
-			return;
+	const readPlanWindows = async (): Promise<boolean> => {
+		if (!activeQuery) {
+			return false;
 		}
-		planUsageReadPending = true;
 		const askedAt = now().getTime();
-		const usage = await readPlanUsage(activeQuery).finally(() => {
-			planUsageReadPending = false;
-		});
+		const usage = await readPlanUsage(activeQuery);
 		if (!usage) {
 			console.warn('[claude-agent] could not read the account plan usage.', {
 				sessionId: agentSessionId,
 			});
-			return;
+			return false;
 		}
 		planUsageReadAt = askedAt;
 		// Guarded after the await, not before it: this asks whether the session died
 		// during the control round trip, which hoisting it would stop it answering.
 		if (closed || usage.limits.length === 0) {
-			return;
+			return true;
 		}
 		emit({
 			at: now().toISOString(),
 			type: 'plan-windows',
 			windows: usage.limits,
 		});
+		return true;
+	};
+
+	/**
+	 * Joins the caller onto the plan read already in flight rather than opening a
+	 * second control round trip, so a user hammering the composer's refresh
+	 * control costs the runtime one question and every caller settles on the same
+	 * answer.
+	 * @returns Whether the runtime answered.
+	 */
+	const probePlanUsage = (): Promise<boolean> => {
+		planUsageRead ??= readPlanWindows().finally(() => {
+			planUsageRead = null;
+		});
+		return planUsageRead;
 	};
 
 	/**
@@ -504,6 +517,13 @@ function createClaudeSession({
 		/** Returns the runtime state the session service persists. */
 		getState: async () => ({ sessionName }) as AgentSessionState,
 		id: metadata.id,
+		/**
+		 * Re-reads the account's plan windows on demand, ignoring the freshness
+		 * interval a sealing turn respects — the user asking is the signal that the
+		 * figure on screen is the one they no longer trust.
+		 * @returns Whether the runtime answered.
+		 */
+		refreshPlanUsage: () => probePlanUsage(),
 		/**
 		 * Records the session's display name.
 		 * @param name - Name to store, blank to clear it.

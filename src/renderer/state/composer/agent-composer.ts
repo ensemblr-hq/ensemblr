@@ -33,6 +33,14 @@ export interface AgentComposerControllerState {
 	 * every model is fair game. A chat pins on its first session and stays pinned.
 	 */
 	lockedProvider: AgentProviderId | null;
+	/**
+	 * This chat's session while a runtime child is actually attached to it, and
+	 * `null` otherwise. {@link AgentComposerControllerState.activeSessionId} names
+	 * the persisted session whether or not anything is running behind it, so a
+	 * control that has to reach the live runtime — asking it to re-read the plan —
+	 * reads this instead and offers itself only when there is something to ask.
+	 */
+	liveSessionId: string | null;
 	modelId: string | null;
 	onModelChange: (modelId: string) => void;
 	onPlanModeChange: (planMode: boolean) => void;
@@ -157,8 +165,9 @@ export function useAgentComposerController({
 		model: availableModels.find((option) => option.id === modelId),
 		workspaceId,
 	});
+	const isRuntimeOpen = activeSessionSnapshot?.runtimeOpen === true;
 	const isAgentSessionStreaming =
-		activeSessionSnapshot?.runtimeOpen === true &&
+		isRuntimeOpen &&
 		(activeSessionStatus === 'starting' || activeSessionStatus === 'streaming');
 
 	const onModelChange = useCallback(
@@ -189,6 +198,7 @@ export function useAgentComposerController({
 		contextUsage,
 		isStreaming: isAgentSessionStreaming || hasInFlightTurn,
 		lastError,
+		liveSessionId: isRuntimeOpen ? activeSessionId : null,
 		lockedProvider,
 		modelId,
 		onModelChange,
