@@ -178,6 +178,12 @@ tag with `v` stripped, or when the release is still a draft.
 The README's version line and `.dmg` download URL stay hand-edited; the job
 prints the exact two replacement lines to its run summary.
 
+**The Homebrew cask bumps itself.** The same job's `Bump the Homebrew cask` step
+rewrites `Casks/ensemblr.rb` in `ensemblr-hq/homebrew-tap` to the new version and
+checksum, so `brew install --cask ensemblr-hq/tap/ensemblr` tracks the release
+without a second ritual. It is covered in [The Homebrew tap](#the-homebrew-tap)
+below.
+
 **ensemblr.dev is updated by hand too, in its own repository** (`ensemblr-hq/ensemblr-dev`),
 by asking an agent there to re-pin after each release. It carries two download
 links — the newest `v<semver>` release and the rolling `nightly` — so neither
@@ -259,6 +265,46 @@ A build only ever reads the releases for **its own channel** — the rolling
 channels carry different bundle ids, so an update can never cross between them.
 See [ADR 0055](./adr/0055-resolve-updates-in-app-against-the-github-releases-api.md).
 
+### The Homebrew tap
+
+`brew install --cask ensemblr-hq/tap/ensemblr` is served by a second repository,
+[`ensemblr-hq/homebrew-tap`](https://github.com/ensemblr-hq/homebrew-tap), which
+holds one cask and nothing else.
+
+The release job bumps it. It reads the `.dmg` asset's `digest` field — GitHub's
+own hash of what it stored, rather than a re-hash of a local copy — rewrites the
+`version` and `sha256` stanzas, and commits through the Contents API, so the
+token never reaches a git remote. The step runs on `release: published` only: a
+`workflow_dispatch` rebuild of an older tag must not walk the cask backwards.
+
+The step carries **two tokens and keeps them apart**: the job's own
+`GITHUB_TOKEN` reads this repository's release, and `ENSEMBLR_TAP_TOKEN` only
+ever touches the tap. That split is what lets the PAT stay scoped to one
+repository — widening it to see a release would also make a leak of it able to
+rewrite this one.
+
+A missing or expired `ENSEMBLR_TAP_TOKEN` **fails the step**. By then the release
+is built, notarized and attached, so the failure is narrow and honest — the
+alternative, a warning nobody reads, leaves the tap serving an old version
+indefinitely. Re-mint the token, then re-run the job.
+
+Four things about the cask are not free choices, and each will look like a
+mistake to anyone who did not hit the underlying constraint:
+
+| Stanza | Why |
+| --- | --- |
+| `depends_on macos: :monterey` | Electron 43's floor, per the `43-x-y` branch README. `electron/electron@main` says Ventura — that is the current major, not the one this app pins. Homebrew deprecated the `">= :monterey"` string form; `brew style` rewrites it. |
+| `auto_updates true` | The in-app updater owns the bundle. `brew upgrade` therefore skips it, and only `--greedy` overrides that. Two updaters writing one bundle is how an install gets corrupted. |
+| a custom `:github_releases` livecheck | Every release is flagged `--prerelease`, so `:github_latest` finds nothing at all. The block accepts prereleases and keys off a leading `v`, which is also what excludes the rolling `nightly` tag. |
+| `zap trash:` without the root directory | The root (`~/Ensemblr` by default) holds cloned repositories and worktrees. A `zap` that took it would delete the user's work. |
+
+The tap's own CI runs `brew style`, `brew audit`, `brew fetch` (which is what
+catches a bump that wrote one of the two stanzas and not the other), and a
+`brew livecheck` that fails if it resolves nothing. The audit excludes exactly
+one check, `github_prerelease_version`: it enforces homebrew-cask's policy
+against shipping prereleases, which every Ensemblr release is until 1.0.
+Submitting to homebrew-cask upstream is out of scope for that same reason.
+
 ### Repository secrets
 
 Both workflows import signing material through
@@ -276,6 +322,21 @@ first step naming the ones it lacked:
 | `APPLE_CERT_P12` | base64 of the Developer ID Application `.p12` |
 | `APPLE_CERT_PASSWORD` | password the `.p12` was exported with |
 | `KEYCHAIN_PASSWORD` | any throwaway string |
+
+One further secret is read by the release workflow alone, and is not signing
+material:
+
+| Secret | Value |
+| --- | --- |
+| `ENSEMBLR_TAP_TOKEN` | fine-grained PAT, **Contents: read and write on `ensemblr-hq/homebrew-tap` only** |
+
+Mint it at **Settings → Developer settings → Personal access tokens →
+Fine-grained tokens** with `ensemblr-hq` as the resource owner and that one
+repository selected. Scope it no wider: it is injected as `GH_TOKEN` into a step
+that runs `gh`, and a token that could also write to `ensemblr-hq/ensemblr` would
+be a release workflow able to rewrite its own source. Fine-grained tokens expire,
+so a release failing at `Bump the Homebrew cask` usually means re-minting rather
+than debugging.
 
 `checks.yml` doubles as a `workflow_call` reusable workflow so the release path
 runs the same verification a PR does rather than a copy of it. Callers pass

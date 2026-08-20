@@ -5,6 +5,27 @@ arm64 `.app`, keeps its secrets in the macOS Keychain, and reads battery state
 through macOS APIs. There is no Intel build, no Linux build, and no Windows
 build.
 
+## Homebrew
+
+```bash
+brew install --cask ensemblr-hq/tap/ensemblr
+```
+
+The [tap](https://github.com/ensemblr-hq/homebrew-tap) carries the stable
+channel only. It declares Apple silicon and macOS Monterey as requirements, so
+`brew` refuses on a machine that cannot run the app rather than installing
+something that will not open.
+
+The cask is marked `auto_updates true` because Ensemblr updates itself (see
+[Staying up to date](#staying-up-to-date)), so a plain `brew upgrade` leaves it
+alone — two updaters writing the same bundle is how an install gets corrupted.
+To hand the job to Homebrew instead, turn **Settings → General → Update Ensemblr
+automatically** off and upgrade explicitly:
+
+```bash
+brew upgrade --cask --greedy ensemblr
+```
+
 ## Download
 
 The current build is **`0.1.0-beta.10`**:
@@ -167,25 +188,43 @@ matrix, the entitlements, and the notarization detail.
 
 ## Where Ensemblr keeps things on disk
 
-Four locations, and nothing outside them:
+Five locations, and nothing outside them:
 
 | What | Where |
 | --- | --- |
 | App settings | `~/.config/ensemblr/config.json` |
 | Projects, workspaces, agent sessions, board state | `~/Library/Application Support/dev.ensemblr.app/ensemblr.db` |
+| Window state, recents, per-repository overrides, Electron's own caches | `~/Library/Application Support/Ensemblr` |
 | Secrets (Linear OAuth tokens, Infisical client secrets) | macOS Keychain, service `dev.ensemblr.app.secret-store` |
 | Your repositories, worktrees, and archived context | The root directory you pick during setup — `~/Ensemblr` unless you change it |
 
-The canary and dev channels use their own bundle-id-scoped Application Support
-directory, so the paths above describe a release build.
+The two Application Support directories split along a real seam. The
+bundle-id-scoped one is Ensemblr's own SQLite store; the product-name one is
+Electron's `userData`, which every packaged channel is deliberately pinned to so
+a canary build opens the release's recents rather than a blank window. The dev
+build — `electron-forge start`, not a packaged app — keeps both under a `(DEV)`
+suffix instead, so dogfooding never writes over an installed copy's state.
 
 The root directory is the only one that holds your own work. See
 [First run](./03-first-run.md) for what Ensemblr creates inside it.
 
 ## Uninstalling
 
-Ensemblr has no uninstaller. Removing it is four deletions, in whatever order
-suits you:
+If Homebrew installed it, Homebrew removes it — `--zap` takes the application
+data with it:
+
+```bash
+brew uninstall --zap --cask ensemblr
+security delete-generic-password -s dev.ensemblr.app.secret-store
+```
+
+The Keychain entry needs its own line because `zap` cannot reach the Keychain at
+all. It removes one entry at a time, so run it repeatedly if Ensemblr stored
+several; they are also findable in Keychain Access by searching for
+`dev.ensemblr.app.secret-store`.
+
+Otherwise there is no uninstaller, and removing it is five deletions in whatever
+order suits you:
 
 ```bash
 # 1. The app itself
@@ -197,18 +236,18 @@ rm -rf ~/.config/ensemblr
 # 3. Local state — projects, workspaces, sessions, board
 rm -rf ~/Library/Application\ Support/dev.ensemblr.app
 
-# 4. Keychain secrets
+# 4. Window state, recents, Electron's caches
+rm -rf ~/Library/Application\ Support/Ensemblr
+
+# 5. Keychain secrets
 security delete-generic-password -s dev.ensemblr.app.secret-store
 ```
 
-Your **root directory is deliberately not on that list.** It holds the cloned
-repositories and git worktrees your work actually lives in. Delete it only once
-you have confirmed everything you care about is pushed. Ensemblr also preserves
-each archived workspace's handoff files under `archived-contexts/` inside it.
-
-Step 4 removes one Keychain entry at a time; run it repeatedly if Ensemblr
-stored several. You can also find them in Keychain Access by searching for
-`dev.ensemblr.app.secret-store`.
+Your **root directory is deliberately not on that list**, and `brew zap` does not
+touch it either. It holds the cloned repositories and git worktrees your work
+actually lives in. Delete it only once you have confirmed everything you care
+about is pushed. Ensemblr also preserves each archived workspace's handoff files
+under `archived-contexts/` inside it.
 
 Uninstalling does not touch anything the agent runtimes own — your `~/.claude`
 directory, your Pi configuration, and your `gh` credentials all belong to those

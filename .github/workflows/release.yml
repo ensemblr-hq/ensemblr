@@ -157,6 +157,79 @@ jobs:
             *) gh release edit "$TAG" --prerelease=false --latest ;;
           esac
 
+      # Bumps ensemblr-hq/homebrew-tap so `brew install --cask
+      # ensemblr-hq/tap/ensemblr` tracks the release without a hand edit
+      # (THE-197). Three things worth knowing:
+      #
+      # - The sha256 is read off the asset's `digest`, which GitHub computes over
+      #   what it actually stored. Re-hashing a local copy would only prove the
+      #   upload round-tripped.
+      # - The commit goes through the Contents API rather than a clone, so the
+      #   token never reaches a git remote or `git config`.
+      # - `release` only. A `workflow_dispatch` rebuild of an older tag must not
+      #   walk the cask backwards, and the tap is the one artifact here that is
+      #   not addressed by tag.
+      #
+      # Two tokens, and the split is the point. GITHUB_TOKEN reads this
+      # repository's release; ENSEMBLR_TAP_TOKEN — a fine-grained PAT with
+      # Contents: read and write on ensemblr-hq/homebrew-tap and nothing else —
+      # only ever touches the tap. Neither can act where the other does, so the
+      # PAT does not have to be widened to see a release, and a leak of it cannot
+      # rewrite this repository. A missing or expired PAT fails this step
+      # deliberately: the release is already published and intact by now, and a
+      # silent warning would leave the tap quietly serving an old version.
+      - name: Bump the Homebrew cask
+        if: github.event_name == 'release'
+        env:
+          RELEASE_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAP_TOKEN: ${{ secrets.ENSEMBLR_TAP_TOKEN }}
+          TAP_REPOSITORY: ensemblr-hq/homebrew-tap
+          CASK_PATH: Casks/ensemblr.rb
+        run: |
+          set -euo pipefail
+          if [ -z "${TAP_TOKEN:-}" ]; then
+            echo "::error::ENSEMBLR_TAP_TOKEN is not set, so the Homebrew cask cannot be bumped."
+            exit 1
+          fi
+
+          version="${TAG#v}"
+          dmg="Ensemblr-${version}-arm64.dmg"
+          digest=$(GH_TOKEN="$RELEASE_TOKEN" gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${TAG}" \
+            --jq ".assets[] | select(.name == \"${dmg}\") | .digest")
+          sha="${digest#sha256:}"
+          if ! printf '%s' "$sha" | grep -Eq '^[0-9a-f]{64}$'; then
+            echo "::error::No usable sha256 digest for $dmg (got '${digest:-nothing}')."
+            exit 1
+          fi
+
+          export GH_TOKEN="$TAP_TOKEN"
+          gh api "repos/${TAP_REPOSITORY}/contents/${CASK_PATH}" > "$RUNNER_TEMP/cask.json"
+          blob=$(jq -r .sha "$RUNNER_TEMP/cask.json")
+          jq -r .content "$RUNNER_TEMP/cask.json" | base64 --decode > "$RUNNER_TEMP/ensemblr.rb"
+
+          if grep -q "^  version \"${version}\"$" "$RUNNER_TEMP/ensemblr.rb"; then
+            echo "Cask is already at $version; nothing to push." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          sed -i '' \
+            -e "s|^  version \".*\"$|  version \"${version}\"|" \
+            -e "s|^  sha256 \".*\"$|  sha256 \"${sha}\"|" \
+            "$RUNNER_TEMP/ensemblr.rb"
+
+          # Both lines must have moved. A silent no-op sed would otherwise push a
+          # commit that changes nothing and leave the tap on the old version.
+          grep -q "^  version \"${version}\"$" "$RUNNER_TEMP/ensemblr.rb"
+          grep -q "^  sha256 \"${sha}\"$" "$RUNNER_TEMP/ensemblr.rb"
+
+          gh api --method PUT "repos/${TAP_REPOSITORY}/contents/${CASK_PATH}" \
+            -f "message=ensemblr ${version}" \
+            -f "content=$(base64 < "$RUNNER_TEMP/ensemblr.rb" | tr -d '\n')" \
+            -f "sha=${blob}" \
+            --silent
+
+          echo "Bumped \`${TAP_REPOSITORY}\` to \`${version}\`." >> "$GITHUB_STEP_SUMMARY"
+
       # The README's version line and .dmg link stay hand-edited; the exact asset
       # name is only known once make has run, so print it rather than guess.
       - name: Summarise the manual README edit
