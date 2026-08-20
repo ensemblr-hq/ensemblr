@@ -139,6 +139,7 @@ export const IPC_CHANNELS = {
 	writeWorkspaceImageAttachment: 'ensemblr:write-workspace-image-attachment',
 	writeWorkspaceFileAttachment: 'ensemblr:write-workspace-file-attachment',
 	writeWorkspaceActionPrompt: 'ensemblr:write-workspace-action-prompt',
+	refreshAgentPlanUsage: 'ensemblr:refresh-agent-plan-usage',
 	registerLocalRepository: 'ensemblr:register-local-repository',
 	renameWorkspace: 'ensemblr:rename-workspace',
 	reorderChatTabs: 'ensemblr:reorder-chat-tabs',

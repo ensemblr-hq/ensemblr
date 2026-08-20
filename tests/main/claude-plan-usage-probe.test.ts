@@ -12,6 +12,7 @@ import type {
 } from '@anthropic-ai/claude-agent-sdk';
 import { describe, expect, it } from 'vitest';
 
+import type { AgentAdapterSession } from '../../src/main/agent-runtime/agent-adapter.ts';
 import type {
 	AgentEvent,
 	AgentSessionMetadata,
@@ -116,8 +117,8 @@ function createQuery({
 }
 
 /**
- * Opens a session, lets it finish opening, then releases its turns and collects
- * every event it emitted across both phases.
+ * Opens a session, lets it finish opening, then releases its turns and hands
+ * back the session alongside every event it emitted across both phases.
  */
 async function openSession({
 	messages,
@@ -127,7 +128,7 @@ async function openSession({
 	messages?: readonly SDKMessage[];
 	now?: () => Date;
 	readUsage: () => Promise<SDKControlGetUsageResponse>;
-}): Promise<AgentEvent[]> {
+}): Promise<{ events: AgentEvent[]; session: AgentAdapterSession }> {
 	let release: () => void = () => undefined;
 	const released = new Promise<void>((resolve) => {
 		release = resolve;
@@ -146,7 +147,7 @@ async function openSession({
 	await settle();
 	release();
 	await settle();
-	return events;
+	return { events, session };
 }
 
 /** The windows each plan-windows event reported, in order. */
@@ -158,7 +159,7 @@ function reportedWindows(events: readonly AgentEvent[]) {
 
 describe('the plan a Claude session opens against', () => {
 	it('is read in full rather than waited for one pushed window at a time', async () => {
-		const events = await openSession({
+		const { events } = await openSession({
 			readUsage: async () => PLAN_RESPONSE,
 		});
 
@@ -187,7 +188,7 @@ describe('the plan a Claude session opens against', () => {
 	});
 
 	it('reports nothing when the runtime will not answer', async () => {
-		const events = await openSession({
+		const { events } = await openSession({
 			readUsage: async () => {
 				throw new Error('control request failed');
 			},
@@ -197,7 +198,7 @@ describe('the plan a Claude session opens against', () => {
 	});
 
 	it('reports nothing for an account with no plan behind it', async () => {
-		const events = await openSession({
+		const { events } = await openSession({
 			readUsage: async () =>
 				({
 					rate_limits: null,
@@ -226,7 +227,7 @@ describe('refreshing a Claude session’s plan reading', () => {
 
 	it('asks again on the next sealing turn when the opening read failed', async () => {
 		let reads = 0;
-		const events = await openSession({
+		const { events } = await openSession({
 			messages: [sealedTurn()],
 			readUsage: async () => {
 				reads += 1;
@@ -261,7 +262,7 @@ describe('refreshing a Claude session’s plan reading', () => {
 	it('re-reads once the last answer has gone stale', async () => {
 		let reads = 0;
 		let elapsedMs = 0;
-		const events = await openSession({
+		const { events } = await openSession({
 			messages: [sealedTurn()],
 			now: () => new Date(OPENED_AT.getTime() + elapsedMs),
 			readUsage: async () => {
@@ -273,5 +274,59 @@ describe('refreshing a Claude session’s plan reading', () => {
 
 		expect(reads).toBe(2);
 		expect(reportedWindows(events)).toHaveLength(2);
+	});
+});
+
+describe('a plan reading the user asks for', () => {
+	it('re-reads a reading the sealing path would have called fresh', async () => {
+		let reads = 0;
+		const { events, session } = await openSession({
+			readUsage: async () => {
+				reads += 1;
+				return PLAN_RESPONSE;
+			},
+		});
+
+		const refreshed = await session.refreshPlanUsage?.();
+		await settle();
+
+		expect(refreshed).toBe(true);
+		expect(reads).toBe(2);
+		expect(reportedWindows(events)).toHaveLength(2);
+	});
+
+	it('costs one round trip however many times it is asked at once', async () => {
+		let reads = 0;
+		const { session } = await openSession({
+			readUsage: async () => {
+				reads += 1;
+				await settle();
+				return PLAN_RESPONSE;
+			},
+		});
+
+		const answers = await Promise.all([
+			session.refreshPlanUsage?.(),
+			session.refreshPlanUsage?.(),
+			session.refreshPlanUsage?.(),
+		]);
+
+		expect(reads).toBe(2);
+		expect(answers).toEqual([true, true, true]);
+	});
+
+	it('reports that the runtime would not answer', async () => {
+		let reads = 0;
+		const { session } = await openSession({
+			readUsage: async () => {
+				reads += 1;
+				if (reads === 1) {
+					return PLAN_RESPONSE;
+				}
+				throw new Error('control request failed');
+			},
+		});
+
+		await expect(session.refreshPlanUsage?.()).resolves.toBe(false);
 	});
 });

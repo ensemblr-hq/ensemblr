@@ -46,6 +46,8 @@ import type {
 	OpenAgentSessionRequest,
 	OpenAgentSessionResult,
 	PiRawFrameBroadcast,
+	RefreshAgentPlanUsageRequest,
+	RefreshAgentPlanUsageResult,
 	StopAgentSessionRequest,
 	StopAgentSessionResult,
 	SubmitAgentPromptRequest,
@@ -523,6 +525,10 @@ export interface IpcHandlerMap {
 	[IPC_CHANNELS.writeWorkspaceActionPrompt]: IpcHandlerEntry<
 		WriteWorkspaceActionPromptRequest,
 		WriteWorkspaceActionPromptResult
+	>;
+	[IPC_CHANNELS.refreshAgentPlanUsage]: IpcHandlerEntry<
+		RefreshAgentPlanUsageRequest,
+		RefreshAgentPlanUsageResult
 	>;
 	[IPC_CHANNELS.registerLocalRepository]: IpcHandlerEntry<
 		RegisterLocalRepositoryRequest,

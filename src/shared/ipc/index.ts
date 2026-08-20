@@ -48,6 +48,8 @@ export type {
 	OpenAgentSessionResult,
 	PiRawFrameBroadcast,
 	PiRawFrameKind,
+	RefreshAgentPlanUsageRequest,
+	RefreshAgentPlanUsageResult,
 	StopAgentSessionRequest,
 	StopAgentSessionResult,
 	SubmitAgentPromptRequest,

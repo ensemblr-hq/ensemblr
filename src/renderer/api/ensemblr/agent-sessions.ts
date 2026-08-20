@@ -9,6 +9,8 @@ import type {
 	OpenAgentSessionRequest,
 	OpenAgentSessionResult,
 	PiRawFrameBroadcast,
+	RefreshAgentPlanUsageRequest,
+	RefreshAgentPlanUsageResult,
 	StopAgentSessionRequest,
 	StopAgentSessionResult,
 	SubmitAgentPromptRequest,
@@ -182,6 +184,20 @@ export function writeForkSummary(
 	return profileElectronIpcCall(
 		{ channel: 'ensemblr:write-fork-summary', usesDatabase: true },
 		() => getEnsemblrApi().writeForkSummary(request),
+	);
+}
+
+/**
+ * Asks an open session's runtime to re-read the account's plan windows now. The
+ * readings arrive on the session event stream, so the result says only whether
+ * the runtime answered.
+ */
+export function refreshAgentPlanUsage(
+	request: RefreshAgentPlanUsageRequest,
+): Promise<RefreshAgentPlanUsageResult> {
+	return profileElectronIpcCall(
+		{ channel: 'ensemblr:refresh-agent-plan-usage', usesDatabase: false },
+		() => getEnsemblrApi().refreshAgentPlanUsage(request),
 	);
 }
 

@@ -172,6 +172,26 @@ export interface StopAgentSessionResult {
 }
 
 /**
+ * Ask a session's runtime to re-read the account's plan windows right now,
+ * rather than waiting for the next turn to seal. The composer's gauge otherwise
+ * only moves when the runtime happens to report, which on a long turn is far
+ * later than the moment a user goes looking for the figure.
+ */
+export interface RefreshAgentPlanUsageRequest {
+	sessionId: string;
+}
+
+/**
+ * Result of a manual plan-usage refresh. The readings themselves arrive as
+ * ordinary `plan-windows` events, so this reports only whether the runtime
+ * answered: `false` covers a session that is no longer active, a runtime with no
+ * plan behind it, and a control request that failed.
+ */
+export interface RefreshAgentPlanUsageResult {
+	refreshed: boolean;
+}
+
+/**
  * Mirror the chat's Plan Mode toggle into the main process without sending a
  * prompt. Every other write of this flag rides `openAgentSession` or
  * `submitAgentPrompt`; hand-off turns the toggle off and submits nothing, so it
@@ -279,6 +299,9 @@ export interface AgentSessionApi {
 	openAgentSession: (
 		request: OpenAgentSessionRequest,
 	) => Promise<OpenAgentSessionResult>;
+	refreshAgentPlanUsage: (
+		request: RefreshAgentPlanUsageRequest,
+	) => Promise<RefreshAgentPlanUsageResult>;
 	setAgentPlanMode: (request: SetAgentPlanModeRequest) => Promise<void>;
 	stopAgentSession: (
 		request: StopAgentSessionRequest,

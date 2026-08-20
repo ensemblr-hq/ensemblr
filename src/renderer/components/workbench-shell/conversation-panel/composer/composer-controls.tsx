@@ -107,6 +107,7 @@ export function ComposerControls({
 				) : null}
 				{showContextIndicator(composer, alwaysShowContext) ? (
 					<ContextIndicator
+						liveSessionId={composer.liveAgentSessionId}
 						planUsage={composer.planUsage}
 						usage={composer.contextUsage}
 					/>

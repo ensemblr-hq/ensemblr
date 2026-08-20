@@ -394,6 +394,14 @@ export interface ComposerShellState {
 	 * model picker disables every other runtime's models.
 	 */
 	lockedProvider: AgentProviderId | null;
+	/**
+	 * This chat's session while a runtime child is attached to it, `null`
+	 * otherwise. {@link ComposerShellState.activeAgentSessionId} names the
+	 * persisted session either way — a chat reopened after a restart carries one
+	 * with nothing running behind it — so a control that has to reach the live
+	 * runtime reads this and hides itself when there is nothing to reach.
+	 */
+	liveAgentSessionId: string | null;
 	modelId: string | null;
 	modelLabel: string;
 	onModelChange: (modelId: string) => void;

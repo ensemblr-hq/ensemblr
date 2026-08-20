@@ -136,6 +136,7 @@ export function getComposerState({
 	availableThinkingLevels,
 	contextUsage,
 	isStreaming,
+	liveAgentSessionId,
 	lockedProvider,
 	modelId,
 	onModelChange,
@@ -157,6 +158,7 @@ export function getComposerState({
 	availableThinkingLevels: readonly ComposerThinkingOption[];
 	contextUsage?: ComposerContextUsage | null;
 	isStreaming: boolean;
+	liveAgentSessionId?: string | null;
 	lockedProvider: AgentProviderId | null;
 	modelId: string | null;
 	onModelChange: (modelId: string) => void;
@@ -189,6 +191,7 @@ export function getComposerState({
 		availableThinkingLevels,
 		contextUsage: contextUsage ?? null,
 		isStreaming,
+		liveAgentSessionId: liveAgentSessionId ?? null,
 		lockedProvider,
 		modelId,
 		modelLabel,
