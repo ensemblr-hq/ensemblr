@@ -6,6 +6,7 @@ import { CodeBlockContent } from '@/renderer/components/code-block';
 import { MessageResponse } from '@/renderer/components/message';
 import { usePdfObjectUrl } from '@/renderer/hooks/workbench-shell/conversation-panel/use-pdf-object-url';
 import { languageForFilePath } from '@/renderer/lib/language-from-path';
+import { splitMarkdownFrontmatter } from '@/renderer/lib/markdown-frontmatter';
 import {
 	filePreviewMarkdownPreviewAtom,
 	filePreviewWordWrapAtom,
@@ -22,6 +23,7 @@ import {
 	previewFormatLabel,
 	resolvePreviewMode,
 } from './file-preview-helpers';
+import { FrontmatterHeader } from './frontmatter-header';
 import { PanelMessage } from './panel-message';
 
 /**
@@ -99,10 +101,14 @@ export function FilePreviewBody({
 	}
 
 	if (showFormattedPreview) {
+		const { body, frontmatter } = splitMarkdownFrontmatter(content);
 		return (
 			<div className='sleek-scrollbar min-h-0 flex-1 overflow-auto'>
 				<div className={DOCUMENT_BODY_CLASSES}>
-					<MessageResponse>{content}</MessageResponse>
+					{frontmatter ? (
+						<FrontmatterHeader block={frontmatter} className='mb-5' />
+					) : null}
+					<MessageResponse>{body}</MessageResponse>
 				</div>
 			</div>
 		);
