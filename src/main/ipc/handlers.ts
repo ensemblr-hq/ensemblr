@@ -19,6 +19,7 @@ import type { EnvironmentVariablesService } from '../environment';
 import {
 	createGithubService,
 	createWorkspacePrStatusSweeper,
+	listSweepableWorkspaces,
 } from '../github/index.ts';
 import type { InfisicalService } from '../infisical';
 import type { LinearAuthService, LinearService } from '../linear';
@@ -54,7 +55,6 @@ import type { ScriptLifecycleService } from '../scripts';
 import type { SetupDiagnosticsService } from '../setup';
 import type { EnsemblrDatabaseService } from '../storage';
 import { getAgentSessionById } from '../storage/repositories/agent-session-repository';
-import { listActiveWorkspacePathRows } from '../storage/repositories/workspace-repository';
 import type { TerminalService } from '../terminal';
 import type { UpdateService } from '../updates';
 import type {
@@ -347,7 +347,7 @@ export function registerIpcHandlers({
 	const prStatusSweeper = createWorkspacePrStatusSweeper({
 		listActiveWorkspaces: () => {
 			const database = databaseService.getConnection()?.database ?? null;
-			return database ? listActiveWorkspacePathRows({ database }) : [];
+			return database ? listSweepableWorkspaces({ database }) : [];
 		},
 		refreshSnapshot: async ({ workspaceCwd, workspaceId }) => {
 			await githubService.getPullRequestSnapshot({ workspaceCwd, workspaceId });

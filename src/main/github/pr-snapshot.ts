@@ -4,9 +4,143 @@ import type {
 	GithubCommentWire,
 	GithubDeploymentWire,
 	GithubMergeableState,
+	GithubPullRequestSnapshotWire,
 	GithubPullRequestState,
 	GithubPullRequestWire,
 } from '../../shared/ipc/contracts/github';
+
+/**
+ * How long a carried-forward mergeability verdict may outlive the read that
+ * computed it. The carry exists to bridge GitHub's lazy recompute, which
+ * normally resolves by the next poll; past this window the app stops asserting a
+ * verdict GitHub has not confirmed and lets `unknown` through, which renders as
+ * a plain open pull request rather than a wrong "ready to merge".
+ */
+const MERGEABILITY_RETENTION_MS = 120_000;
+
+/** The mergeability fields {@link retainKnownMergeability} grafts onto a snapshot. */
+type MergeabilityFields = Pick<
+	GithubPullRequestWire,
+	'mergeable' | 'mergeableSyncedAt' | 'mergeStateStatus'
+>;
+
+/**
+ * Carries a previously computed mergeability forward when a fresh fetch reports
+ * `unknown` for the same head commit. GitHub computes mergeability lazily and
+ * answers `UNKNOWN` on the first read after the base branch moves, so writing it
+ * through demotes a ready pull request to a plain open one — the pill, the
+ * sidebar icon, and the Checks panel all read the derived status.
+ *
+ * The result is persisted, so the next call's `cached` may itself be a carried
+ * verdict. `mergeableSyncedAt` records when GitHub last computed the answer and
+ * is preserved rather than refreshed across a carry, which is what bounds the
+ * chain to {@link MERGEABILITY_RETENTION_MS} instead of letting it run forever.
+ * @param fetched - The snapshot just fetched from `gh`.
+ * @param cached - The last snapshot persisted for the same workspace, if any.
+ * @returns The snapshot to persist and return.
+ */
+export function retainKnownMergeability(
+	fetched: GithubPullRequestSnapshotWire,
+	cached: GithubPullRequestSnapshotWire | null,
+): GithubPullRequestSnapshotWire {
+	const pullRequest = fetched.pullRequest;
+	if (!pullRequest) {
+		return fetched;
+	}
+	const fields =
+		pullRequest.mergeable === 'unknown'
+			? retainableMergeability({
+					cached: cached?.pullRequest ?? null,
+					fetched: pullRequest,
+					fetchedAt: fetched.syncedAt,
+				})
+			: stampedMergeability(pullRequest, fetched.syncedAt);
+	if (!fields) {
+		return fetched;
+	}
+	return { ...fetched, pullRequest: { ...pullRequest, ...fields } };
+}
+
+/**
+ * The fetched pull request's own mergeability, stamped with the time GitHub
+ * computed it so a later `unknown` read can tell how long the verdict has stood.
+ * @param pullRequest - The freshly fetched pull request, with a computed verdict.
+ * @param fetchedAt - When the current snapshot was fetched.
+ * @returns The mergeability fields to persist.
+ */
+function stampedMergeability(
+	pullRequest: GithubPullRequestWire,
+	fetchedAt: string,
+): MergeabilityFields {
+	return { mergeable: pullRequest.mergeable, mergeableSyncedAt: fetchedAt };
+}
+
+/**
+ * The mergeability fields to graft onto an `unknown` read, or null when there is
+ * nothing trustworthy to carry: no cached verdict, a cached verdict that is
+ * itself `unknown`, one computed against a different head commit, or one that
+ * has outlived {@link MERGEABILITY_RETENTION_MS}.
+ *
+ * `mergeStateStatus` is gated on its own freshness rather than on `mergeable`.
+ * The two are separate GraphQL fields — branch protection can report `BLOCKED`
+ * while mergeability is still computing — so a cached `CLEAN` must not overwrite
+ * a status the fetch actually resolved.
+ * @param options - The cached pull request, the freshly fetched one, and the fetch timestamp.
+ * @returns The fields to carry forward, or null to keep the fetched values.
+ */
+function retainableMergeability({
+	cached,
+	fetched,
+	fetchedAt,
+}: {
+	cached: GithubPullRequestWire | null;
+	fetched: GithubPullRequestWire;
+	fetchedAt: string;
+}): MergeabilityFields | null {
+	if (
+		!cached ||
+		cached.mergeable === 'unknown' ||
+		cached.headRefOid !== fetched.headRefOid ||
+		isRetentionExpired(cached.mergeableSyncedAt, fetchedAt)
+	) {
+		return null;
+	}
+	const hasResolvedMergeState =
+		fetched.mergeStateStatus !== undefined &&
+		fetched.mergeStateStatus !== 'UNKNOWN';
+	return {
+		mergeable: cached.mergeable,
+		...(cached.mergeableSyncedAt
+			? { mergeableSyncedAt: cached.mergeableSyncedAt }
+			: {}),
+		...(cached.mergeStateStatus && !hasResolvedMergeState
+			? { mergeStateStatus: cached.mergeStateStatus }
+			: {}),
+	};
+}
+
+/**
+ * Whether a carried verdict has outlived its retention window. A cached verdict
+ * with no timestamp predates the stamping, and an unparseable one says nothing,
+ * so both count as expired and fall through to the fetched `unknown`.
+ * @param mergeableSyncedAt - When GitHub last computed the cached verdict.
+ * @param fetchedAt - When the current snapshot was fetched.
+ * @returns True when the cached verdict may no longer be carried.
+ */
+function isRetentionExpired(
+	mergeableSyncedAt: string | undefined,
+	fetchedAt: string,
+): boolean {
+	if (!mergeableSyncedAt) {
+		return true;
+	}
+	const computedMs = Date.parse(mergeableSyncedAt);
+	const fetchedMs = Date.parse(fetchedAt);
+	if (!Number.isFinite(computedMs) || !Number.isFinite(fetchedMs)) {
+		return true;
+	}
+	return fetchedMs - computedMs >= MERGEABILITY_RETENTION_MS;
+}
 
 /** JSON fields requested from `gh pr view --json`. */
 export const PR_VIEW_JSON_FIELDS = [

@@ -34,6 +34,7 @@ import {
 	parseDeployments,
 	parsePullRequestView,
 	parseReviewThreads,
+	retainKnownMergeability,
 } from './pr-snapshot.ts';
 
 const GIT_TIMEOUT_MS = 30_000;
@@ -598,14 +599,15 @@ export function createGithubService({
 				};
 			}
 
+			const snapshot = retainKnownMergeability(fetched.snapshot, cached);
 			if (database) {
 				writeCachedPullRequestSnapshot({
 					database,
-					snapshot: fetched.snapshot,
+					snapshot,
 					workspaceId: request.workspaceId,
 				});
 			}
-			return { fromCache: false, snapshot: fetched.snapshot };
+			return { fromCache: false, snapshot };
 		},
 
 		async mergePullRequest(request) {

@@ -114,6 +114,12 @@ export interface GithubPullRequestWire {
 	headRefOid: string;
 	isDraft: boolean;
 	mergeable: GithubMergeableState;
+	/**
+	 * When GitHub last answered `mergeable` with something other than `unknown`.
+	 * Bounds how long that verdict may be carried across subsequent `unknown`
+	 * reads; absent on snapshots cached before this field existed.
+	 */
+	mergeableSyncedAt?: string;
 	/** GraphQL mergeStateStatus (BLOCKED, CLEAN, DIRTY, …) when exposed. */
 	mergeStateStatus?: string;
 	number: number;
