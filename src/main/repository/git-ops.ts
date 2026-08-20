@@ -50,6 +50,16 @@ export const GIT_WORKTREE_TIMEOUT_MS = 15_000;
  */
 const GIT_WORKTREE_ADD_TIMEOUT_MS = 120_000;
 
+/**
+ * `git worktree remove --force` unlinks the whole checkout, which for a
+ * dependency-heavy worktree is tens of thousands of inodes — measured here at
+ * ~3s warm on 69k, and several times that on a cold file cache. It belongs with
+ * `add` rather than with git's fast metadata queries: the 15s cap now really
+ * does terminate the command, so a tight one would turn a slow-but-healthy
+ * removal into a failure that leaves half the tree behind.
+ */
+const GIT_WORKTREE_REMOVE_TIMEOUT_MS = 120_000;
+
 /** How many times to attempt `git worktree add` when it fails transiently. */
 const GIT_WORKTREE_ADD_MAX_ATTEMPTS = 3;
 
@@ -792,7 +802,7 @@ export async function runWorktreeRemove({
 			command: 'git',
 			cwd: repositoryPath,
 			maxOutputBytes: 16 * 1024,
-			timeoutMs: GIT_WORKTREE_TIMEOUT_MS,
+			timeoutMs: GIT_WORKTREE_REMOVE_TIMEOUT_MS,
 		});
 
 		if (result.status === 'success') {

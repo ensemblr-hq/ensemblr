@@ -8,6 +8,7 @@ import {
 	NavigationProvider,
 	SetupDiagnosticsProvider,
 } from '@/renderer/components/workbench-shell/shell-contexts';
+import { WorkspaceLifecycleDialogHost } from '@/renderer/components/workbench-shell/workspace-lifecycle-dialog-host';
 import {
 	useWorkbenchLayoutModel,
 	workbenchRouteApi,
@@ -77,6 +78,9 @@ export function WorkbenchShellLayout() {
 				<QuickStartDialog
 					onOpenChange={setQuickStartOpen}
 					open={quickStartOpen}
+				/>
+				<WorkspaceLifecycleDialogHost
+					activeWorkspaceId={model.activeWorkspace?.id ?? null}
 				/>
 			</SetupDiagnosticsProvider>
 		</NavigationProvider>

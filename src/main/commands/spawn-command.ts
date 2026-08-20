@@ -1,6 +1,11 @@
 import { spawn } from 'node:child_process';
 
 import { stripLaunchContextEnv } from '../environment/launch-env.ts';
+import {
+	createChildSettleGuard,
+	STREAM_DRAIN_GRACE_MS,
+	wireChildSettlement,
+} from './child-settle-guard.ts';
 import { createSanitizedLogs } from './command-redaction.ts';
 import {
 	createFailure,
@@ -19,6 +24,11 @@ import type {
 /**
  * Spawns the child process, captures stdout/stderr under the output cap,
  * enforces the timeout/abort signal, and resolves once the process exits.
+ *
+ * `timeoutMs` is a hard bound on the returned promise, not just on the child:
+ * settlement is driven by `'exit'` plus a drain grace rather than by `'close'`
+ * alone, because a grandchild holding the inherited pipes withholds `'close'`
+ * for as long as it lives. See {@link createChildSettleGuard}.
  * @param input - Pre-validated command, environment and limits.
  * @returns A {@link LocalCommandResult} for the completed (or terminated) process.
  */
@@ -69,6 +79,9 @@ export function runSpawnedCommand({
 		let terminationReason: TerminationReason | null = null;
 		let killTimer: NodeJS.Timeout | null = null;
 		let timeoutTimer: NodeJS.Timeout | null = null;
+		const settleGuard = createChildSettleGuard(() => {
+			settleFromChildState();
+		});
 
 		/**
 		 * Resolves the outer promise exactly once, clearing pending timers and
@@ -94,7 +107,10 @@ export function runSpawnedCommand({
 				clearTimeout(timeoutTimer);
 			}
 
+			settleGuard.clear();
 			signal?.removeEventListener('abort', abortListener);
+			child.stdout?.destroy();
+			child.stderr?.destroy();
 
 			const stdout = Buffer.concat(stdoutChunks, stdoutBytes).toString('utf8');
 			const stderr = Buffer.concat(stderrChunks, stderrBytes).toString('utf8');
@@ -129,8 +145,44 @@ export function runSpawnedCommand({
 		}
 
 		/**
-		 * Sends SIGTERM and schedules a SIGKILL fallback, recording the
-		 * termination cause for the eventual failure reason.
+		 * Assembles the result from whatever the child has reported so far. Shared
+		 * by `'close'` and by the settle guard, so a command that never closes its
+		 * pipes reports the same outcome it would have reported normally.
+		 */
+		function settleFromChildState(): void {
+			if (terminationReason) {
+				settle(
+					'failure',
+					createFailure(
+						terminationReason,
+						createTerminationMessage(terminationReason),
+						exitCode,
+						signalCode,
+					),
+				);
+				return;
+			}
+
+			if (exitCode === 0) {
+				settle('success');
+				return;
+			}
+
+			settle(
+				'failure',
+				createFailure(
+					'nonzero-exit',
+					`Command exited with code ${String(exitCode)}.`,
+					exitCode,
+					signalCode,
+				),
+			);
+		}
+
+		/**
+		 * Sends SIGTERM, schedules a SIGKILL fallback, and arms the settle deadline
+		 * that answers the caller even when the child reports neither exit nor
+		 * close, recording the termination cause for the eventual failure reason.
 		 * @param reason - Why the command is being terminated.
 		 */
 		function terminate(reason: TerminationReason): void {
@@ -139,6 +191,7 @@ export function runSpawnedCommand({
 			}
 
 			terminationReason = reason;
+			settleGuard.arm(killGraceMs + STREAM_DRAIN_GRACE_MS);
 
 			if (child.exitCode !== null || child.killed) {
 				return;
@@ -233,37 +286,14 @@ export function runSpawnedCommand({
 
 			settle('failure', failure);
 		});
-		child.on('close', (closedExitCode, closedSignal) => {
-			exitCode = closedExitCode;
-			signalCode = closedSignal;
-
-			if (terminationReason) {
-				settle(
-					'failure',
-					createFailure(
-						terminationReason,
-						createTerminationMessage(terminationReason),
-						exitCode,
-						signalCode,
-					),
-				);
-				return;
-			}
-
-			if (exitCode === 0) {
-				settle('success');
-				return;
-			}
-
-			settle(
-				'failure',
-				createFailure(
-					'nonzero-exit',
-					`Command exited with code ${String(exitCode)}.`,
-					exitCode,
-					signalCode,
-				),
-			);
+		wireChildSettlement({
+			child,
+			guard: settleGuard,
+			record: (exitedCode, exitedSignal) => {
+				exitCode = exitedCode;
+				signalCode = exitedSignal;
+			},
+			settle: settleFromChildState,
 		});
 	});
 }

@@ -182,7 +182,6 @@ export async function loadWorkspaceWorkbenchRoute({
 		routeProjectId: params.projectId,
 		routeWorkspaceId: params.workspaceId,
 	});
-
 	if (!currentSelection) {
 		throw redirectToWorkbenchWelcome();
 	}

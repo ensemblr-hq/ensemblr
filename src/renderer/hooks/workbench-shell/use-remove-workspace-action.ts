@@ -22,7 +22,8 @@ import { deleteLastUsedOpenTarget } from '@/renderer/state/workspace/open-target
  * That hop is a consequence of the cached drop rather than a second call
  * alongside it. Clearing the held render state and dropping the workspace from
  * the navigation snapshot together leave `WorkspaceWorkbenchLayout` without a
- * selection, and its own `<Navigate replace to='/'>` answers that. Calling
+ * selection, and its one-shot missing-selection layout effect answers that with
+ * a single `navigate({ replace: true, to: '/' })`. Calling
  * `navigate()` here as well raced that redirect and ran the index loader — which
  * can itself redirect to a sibling workspace — twice; awaiting it instead left a
  * removed workspace in the sidebar for the life of the process whenever the
