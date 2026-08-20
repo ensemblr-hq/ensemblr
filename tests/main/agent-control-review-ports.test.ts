@@ -410,7 +410,7 @@ describe('review port', () => {
 		]);
 		expect(result.added).toBe(2);
 		expect(result.commentIds).toEqual(['c-1', 'c-2']);
-		expect(result.message).toContain('Changes panel');
+		expect(result.message).toContain('Checks panel');
 	});
 
 	// The result promises the user can see the comments; the renderer only

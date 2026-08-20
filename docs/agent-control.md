@@ -545,8 +545,8 @@ parameter keys of all three surfaces against one another.
 ## Reviewing the diff
 
 The four review ops let an agent read the work in its workspace, annotate it
-where the user will find the annotation — on the line, in the Changes panel, not
-buried in a chat turn — and close what it has fixed.
+where the user will find the annotation — on the line, not buried in a chat turn
+— and close what it has fixed.
 
 **Scope is the review panel's scope.** `ensemblr_get_workspace_diff` resolves the
 workspace's `base_branch` and diffs from `merge-base(base, HEAD)` to the working
@@ -597,6 +597,23 @@ interval nor on window focus — so an agent's write would otherwise sit invisib
 until the panel remounted. `addDiffComments` broadcasts on
 `ensemblr:agent-control-review-comments-changed`, which the renderer turns into a
 cache invalidation for that workspace, the same shape `tabsChanged` already uses.
+
+**A comment op lands the user in Checks.** Comments render in two places: inline
+on their lines in Changes, and as a list in Checks, which is the view that
+answers "what did the agent just leave me, and what is still open". A pass that
+leaves six findings wants the list, so `addDiffComments` and a `resolveDiffComments`
+that actually closed something pull the review panel to Checks — through the same
+`focusPanel` broadcast the tool exposes, so there is no second focus mechanism.
+Enforced in `review-focus.ts` rather than steered in prose, for the reason
+`linear-ports.ts` enforces the tracker rules: behaviour that depends on a model
+remembering to call `ensemblr_focus_panel` is behaviour the user does not get.
+
+The pull is **coalesced per workspace on a 60-second window that every comment op
+extends**, so a pass pulls focus once however many calls it makes and however long
+it runs, and a pass an hour later pulls again. That is the whole answer to
+focus-stealing: one yank per pass, at the moment the pass has something to show. A
+resolve batch that closed nothing pulls no focus at all — the same condition the
+cache-invalidation broadcast is gated on.
 
 **Three of the four survive both gates.** The two reads are reads, allowed in
 every permission mode. `addDiffComments` and `resolveDiffComments` are writes and

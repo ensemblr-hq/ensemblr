@@ -242,7 +242,7 @@ export const TOOL_DEFS: readonly McpToolDef[] = [
 		name: 'ensemblr_add_diff_comments',
 		op: 'addDiffComments',
 		description:
-			"File review comments on this workspace's diff, anchored to a file and optionally a line. They appear in the Changes panel labelled as yours, so use them to leave findings on the code itself rather than describing a location in prose. Batch a review's comments into one call.",
+			"File review comments on this workspace's diff, anchored to a file and optionally a line. They are labelled as yours and roll up as a list in the Checks panel, which Ensemblr brings forward after the call, so use them to leave findings on the code itself rather than describing a location in prose. Batch a review's comments into one call.",
 		shape: {
 			comments: z.array(
 				z.object({

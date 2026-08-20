@@ -103,6 +103,7 @@ export default defineConfig({
 			'tests/main/agent-control-mcp-endpoint.test.ts',
 			'tests/main/agent-control-port-adapters.test.ts',
 			'tests/main/agent-control-review-ports.test.ts',
+			'tests/main/agent-control-review-focus.test.ts',
 			'tests/main/agent-control-linear-ports.test.ts',
 			'tests/main/agent-control-workspace-linked-issue.test.ts',
 			'tests/main/agent-control-harness-launch-config.test.ts',

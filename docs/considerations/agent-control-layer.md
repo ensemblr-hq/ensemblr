@@ -7,7 +7,7 @@
 > comments), #194 (audit a sub-agent's transcript; cascading stops), #223 (start a run script by
 > name), #224 (unbounded `ask_user_question`; canonical argument names), #232 (a spawned child's
 > runtime is shown; a chat's thinking level pins to its session), #236 (a spawned child is pinned to
-> its caller's agent runtime).
+> its caller's agent runtime), THE-202 (a diff-comment op lands the user in Checks).
 >
 > This file records **why** the layer is shaped the way it is. It is not the tool reference: the
 > authoritative, enumerated `ensemblr_*` surface — every tool, its argument names and types, its
@@ -154,8 +154,18 @@ Defined once in a shared contract (`src/shared/agent-control/`), consumed by bot
   for the window showing the payload's `workspaceId`, so focus is workspace-scoped. Focus ops are
   writes (mode-gated) but not spawns (no quota/depth).
 
-- `addDiffComments({ comments: [{ filePath, lineNumber?, body }] })` → `{ added, commentIds, message }` — file review comments on the caller's **own** workspace diff. Rows land in the `comments` table with `origin: 'agent'`, stamped by the port rather than taken from the args, and render in the Changes panel. Takes no `workspaceId`, so a cross-workspace write is unreachable by construction
+- `addDiffComments({ comments: [{ filePath, lineNumber?, body }] })` → `{ added, commentIds, message }` — file review comments on the caller's **own** workspace diff. Rows land in the `comments` table with `origin: 'agent'`, stamped by the port rather than taken from the args, and render twice: inline on their lines in Changes, and as a list in Checks. Takes no `workspaceId`, so a cross-workspace write is unreachable by construction
 - `resolveDiffComments({ commentIds })` → `{ resolved, resolvedIds, alreadyResolved, notFound, message }` — close the review comments the caller has fixed, so a review pass does not leave a queue of stale findings. Resolve-only: no reopen, no archive. The port lists the caller's own comments first and writes only ids in that set, so a foreign id lands in `notFound` without reaching the store; `notFound` merges "no such id", "another workspace's", and "archived" so the op is not an id-existence oracle. Unknown ids are reported rather than failing the call, because re-running the cleanup step after a restart is a legitimate no-op. Refused in Plan Mode — see below
+
+  **Either op lands the user in Checks** (THE-202). Checks is the view that answers "what did the
+  agent just leave me, and what is still open"; a pass leaving six findings wants that list, not six
+  files to scroll. `review-focus.ts` pulls it through the same `focusPanel` port the tool exposes, so
+  there is no second focus mechanism — and it is enforced rather than steered, for the reason
+  `linear-ports.ts` enforces the tracker rules: behaviour that depends on a model remembering to call
+  `ensemblr_focus_panel` is behaviour the user does not get. The pull is coalesced per workspace on a
+  60-second window that **every comment op extends**, so a pass pulls focus once however many calls it
+  makes and however long it runs, while a pass an hour later pulls again. A resolve batch that closed
+  nothing pulls no focus at all — the same condition the cache-invalidation broadcast is gated on.
 
 **Reads (cross-workspace):**
 - `listWorkspaces()`, `listTabs({ workspaceId? })`, `listTerminals({ workspaceId? })`

@@ -86,6 +86,7 @@ import {
 	originHasChatTab,
 	originRuntime,
 } from './ports.ts';
+import { createReviewFocus } from './review-focus.ts';
 
 /** A single inbound control command, as handed over by either bridge. */
 export interface AgentControlCommand {
@@ -176,7 +177,11 @@ interface AgentControlServiceOptions {
 	ports: AgentControlPorts;
 	originRegistry: OriginRegistry;
 	guardrails: Guardrails;
-	/** Overrides the wait-loop clock/sleep; defaults to the real scheduler. */
+	/**
+	 * Overrides the service clock and sleep; defaults to the real scheduler. Its
+	 * `now` drives both the wait-loop deadline and the review-focus coalescing
+	 * window, so a test can hold either still.
+	 */
 	scheduler?: WaitScheduler;
 }
 
@@ -476,6 +481,9 @@ export function createAgentControlService({
 }: AgentControlServiceOptions): AgentControlService {
 	/** Latest pending signal per child session id, set by `notifyOrchestrator`. */
 	const signalsByChild = new Map<string, OrchestratorSignal>();
+
+	/** Pulls the review panel to Checks after a comment op, once per burst. */
+	const reviewFocus = createReviewFocus(ports.focus, scheduler.now);
 
 	/**
 	 * Whether the caller is a chat conversation that is currently planning. Plan
@@ -1430,6 +1438,49 @@ export function createAgentControlService({
 		} satisfies AgentControlConversationStatus);
 	};
 
+	/**
+	 * Files the batch, then puts the user in front of it: the comment roll-up
+	 * lives in Checks, so a pass that leaves six findings lands them on the list
+	 * rather than in the file-by-file diff they would have to scroll to collect.
+	 * @param origin - Resolved caller identity.
+	 * @param args - The comments to file against this workspace's diff.
+	 * @returns How many were saved, and their new ids.
+	 */
+	const handleAddDiffComments = async (
+		origin: AgentControlOrigin,
+		args: AddDiffCommentsArgs,
+	): Promise<AgentControlResult<unknown>> => {
+		const result = await ports.review.addComments({
+			comments: args.comments,
+			workspaceId: origin.workspaceId,
+		});
+		reviewFocus.focusChecks(origin.workspaceId);
+		return ok(result);
+	};
+
+	/**
+	 * Resolving nothing pulls no focus: every id was already closed or matched no
+	 * open comment, so there is nothing new for the user to look at and moving
+	 * them would be a yank with no payload behind it. Same condition the port
+	 * broadcasts its cache invalidation on.
+	 * @param origin - Resolved caller identity.
+	 * @param args - The comment ids to close.
+	 * @returns The batch partitioned into resolved, already-resolved, and unknown.
+	 */
+	const handleResolveDiffComments = async (
+		origin: AgentControlOrigin,
+		args: ResolveDiffCommentsArgs,
+	): Promise<AgentControlResult<unknown>> => {
+		const result = await ports.review.resolveComments({
+			commentIds: args.commentIds,
+			workspaceId: origin.workspaceId,
+		});
+		if (result.resolved > 0) {
+			reviewFocus.focusChecks(origin.workspaceId);
+		}
+		return ok(result);
+	};
+
 	// getWorkspaceDiff / getDiffComments / addDiffComments / resolveDiffComments
 	// take their workspace from the origin rather than from an argument, so a
 	// cross-workspace read or write is unreachable by construction and there is
@@ -1437,12 +1488,7 @@ export function createAgentControlService({
 	// integration is bound to one account app-wide — so the same holds there.
 	const opHandlers: Record<AgentControlOp, OpHandler> = {
 		addDiffComments: ({ args, origin }) =>
-			ports.review
-				.addComments({
-					comments: (args as AddDiffCommentsArgs).comments,
-					workspaceId: origin.workspaceId,
-				})
-				.then(ok),
+			handleAddDiffComments(origin, args as AddDiffCommentsArgs),
 		askUserQuestion: ({ args, origin, signal }) =>
 			handleAskUserQuestion(origin, args as AskUserQuestionArgs, signal),
 		checkPlanModeTool: ({ args, origin }) =>
@@ -1550,12 +1596,7 @@ export function createAgentControlService({
 		readTerminalOutput: ({ args, origin }) =>
 			handleReadTerminalOutput(origin, args as ReadTerminalOutputArgs),
 		resolveDiffComments: ({ args, origin }) =>
-			ports.review
-				.resolveComments({
-					commentIds: (args as ResolveDiffCommentsArgs).commentIds,
-					workspaceId: origin.workspaceId,
-				})
-				.then(ok),
+			handleResolveDiffComments(origin, args as ResolveDiffCommentsArgs),
 		sendFollowUp: ({ args, origin }) =>
 			handleSendFollowUp(origin, args as SendFollowUpArgs),
 		setBranchName: ({ args, origin }) =>
