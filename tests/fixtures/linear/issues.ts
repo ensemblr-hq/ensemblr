@@ -2,6 +2,7 @@ import type {
 	LinearAccountSnapshot,
 	LinearConnectionSummary,
 	LinearIssueWire,
+	LinearResourceWire,
 	LinearServiceFailure,
 } from '@/shared/ipc';
 
@@ -68,6 +69,24 @@ export function createLinearConnectionFixture(
 	return {
 		accounts: [createLinearAccountFixture()],
 		state: 'connected',
+		...overrides,
+	};
+}
+
+/** Builds a cached Linear team resource fixture. */
+export function createLinearTeamFixture(
+	overrides: Partial<LinearResourceWire> = {},
+): LinearResourceWire {
+	return {
+		accountId: 'account-1',
+		color: '#5e6ad2',
+		id: 'team-1',
+		key: 'THE',
+		kind: 'team',
+		name: 'Theseus',
+		organizationName: 'Example Org',
+		teamId: null,
+		type: null,
 		...overrides,
 	};
 }

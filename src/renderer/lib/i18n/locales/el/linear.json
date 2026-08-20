@@ -113,6 +113,7 @@
 	"issue-list": {
 		"all-accounts": "Όλοι οι οργανισμοί",
 		"all-teams": "Όλες οι ομάδες",
+		"clear-filters": "Καθαρισμός φίλτρων",
 		"count_one": "{{count}} ζήτημα",
 		"count_other": "{{count}} ζητήματα",
 		"empty": "Δεν υπάρχουν ακόμη αποθηκευμένα ζητήματα Linear. Ανανεώστε για συγχρονισμό από το Linear.",

@@ -1172,6 +1172,7 @@ export default interface Resources {
 		'issue-list': {
 			'all-accounts': 'All organizations';
 			'all-teams': 'All teams';
+			'clear-filters': 'Clear filters';
 			count_one: '{{count}} issue';
 			count_other: '{{count}} issues';
 			empty: 'No Linear issues are cached yet. Refresh to sync from Linear.';

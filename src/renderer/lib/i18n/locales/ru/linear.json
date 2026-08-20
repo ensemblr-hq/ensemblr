@@ -115,6 +115,7 @@
 	"issue-list": {
 		"all-accounts": "Все организации",
 		"all-teams": "Все команды",
+		"clear-filters": "Сбросить фильтры",
 		"count_one": "{{count}} задача",
 		"count_few": "{{count}} задачи",
 		"count_many": "{{count}} задач",

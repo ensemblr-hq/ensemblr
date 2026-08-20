@@ -4,6 +4,7 @@ import {
 	PlusIcon,
 	RefreshCwIcon,
 	SearchIcon,
+	XIcon,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
@@ -29,21 +30,18 @@ import {
 	ToggleGroupItem,
 } from '@/renderer/components/ui/toggle-group';
 import { useRefreshSpin } from '@/renderer/hooks/linear/use-refresh-spin';
-import type {
-	LinearIssueGrouping,
-	LinearIssueScope,
-	LinearIssueSort,
+import {
+	ALL_ACCOUNTS,
+	ALL_TEAMS,
+	hasLinearIssueFilters,
+	type LinearIssueGrouping,
+	type LinearIssueScope,
+	type LinearIssueSort,
 } from '@/renderer/lib/linear';
 import type {
 	LinearAccountSnapshot,
 	LinearResourceWire,
 } from '@/shared/ipc/contracts/linear';
-
-/** Sentinel option value meaning "do not narrow by account". */
-export const ALL_ACCOUNTS = 'all';
-
-/** Sentinel option value meaning "do not narrow by team". */
-export const ALL_TEAMS = 'all';
 
 const SCOPES: readonly LinearIssueScope[] = ['active', 'closed', 'all'];
 const SORTS: readonly LinearIssueSort[] = [
@@ -64,6 +62,7 @@ export function LinearIssueFilterBar({
 	accountId,
 	accounts,
 	onAccountChange,
+	onClearFilters,
 	onNewIssue,
 	onQueryChange,
 	onRefresh,
@@ -77,6 +76,7 @@ export function LinearIssueFilterBar({
 	accountId: string;
 	accounts: readonly LinearAccountSnapshot[];
 	onAccountChange: (accountId: string) => void;
+	onClearFilters: () => void;
 	onNewIssue: () => void;
 	onQueryChange: (query: string) => void;
 	onRefresh: () => void;
@@ -94,6 +94,7 @@ export function LinearIssueFilterBar({
 		'All organizations',
 	);
 	const selectedTeam = teams.find((team) => team.id === teamId);
+	const narrowed = hasLinearIssueFilters({ accountId, query, teamId });
 
 	return (
 		<div className='flex items-center gap-2'>
@@ -157,6 +158,16 @@ export function LinearIssueFilterBar({
 						))}
 					</SelectContent>
 				</Select>
+			) : null}
+			{narrowed ? (
+				<Button
+					aria-label={t('linear:issue-list.clear-filters', 'Clear filters')}
+					onClick={onClearFilters}
+					size='icon-sm'
+					variant='ghost'
+				>
+					<XIcon aria-hidden='true' />
+				</Button>
 			) : null}
 			<LinearRefreshButton onRefresh={onRefresh} refreshing={refreshing} />
 			<Button onClick={onNewIssue}>

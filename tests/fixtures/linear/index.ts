@@ -3,4 +3,5 @@ export {
 	createLinearConnectionFixture,
 	createLinearFailureFixture,
 	createLinearIssueFixture,
+	createLinearTeamFixture,
 } from './issues';
