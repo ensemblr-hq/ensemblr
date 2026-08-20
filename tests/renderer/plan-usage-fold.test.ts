@@ -1,7 +1,8 @@
 /**
- * How a chat's plan gauge is assembled. The runtime reports one window per push
- * and the cost only when a turn seals, so the fold has to keep windows it was not
- * told about this time and survive a session's events being replayed from scratch.
+ * How a chat's plan gauge is assembled. The runtime polls every window when a
+ * session opens and pushes one window at a time after that, so the fold has to
+ * keep windows it was not told about this time, keep a figure a push declined to
+ * restate, and survive a session's events being replayed from scratch.
  */
 
 import { describe, expect, it } from 'vitest';
@@ -9,22 +10,25 @@ import { describe, expect, it } from 'vitest';
 import {
 	foldPlanUsage,
 	foldTaggedPlanUsage,
+	type PlanUsageReading,
 	planUsageFromEvents,
 	resolvePlanUsage,
+	toPlanUsageReading,
 } from '@/renderer/state/composer/plan-usage';
 import type {
 	AgentPlanLimitStatusWire,
+	AgentPlanLimitWindowWire,
 	AgentSessionEventWire,
 } from '@/shared/ipc/contracts/agent-session';
 
 /** A pushed reading for one window. */
 function limit(
 	id: string,
-	utilization: number,
+	utilization: number | null,
 	status: AgentPlanLimitStatusWire = 'allowed',
-) {
+): Extract<PlanUsageReading, { kind: 'limit' }> {
 	return {
-		cost: null,
+		kind: 'limit',
 		limit: {
 			status,
 			window: { displayName: null, id, resetsAt: null, utilization },
@@ -32,9 +36,27 @@ function limit(
 	};
 }
 
+/** A polled read naming every window the plan reports. */
+function windows(
+	...reported: readonly AgentPlanLimitWindowWire[]
+): Extract<PlanUsageReading, { kind: 'windows' }> {
+	return { kind: 'windows', windows: reported };
+}
+
+/** One window as a polled read describes it. */
+function window(
+	id: string,
+	utilization: number | null,
+	resetsAt: string | null = null,
+): AgentPlanLimitWindowWire {
+	return { displayName: null, id, resetsAt, utilization };
+}
+
 /** A sealed turn's cost reading. */
-function cost(totalCostUsd: number) {
-	return { cost: { models: [], totalCostUsd }, limit: null };
+function cost(
+	totalCostUsd: number,
+): Extract<PlanUsageReading, { kind: 'cost' }> {
+	return { cost: { models: [], totalCostUsd }, kind: 'cost' };
 }
 
 /** Wraps envelopes as the persisted events a session replays. */
@@ -54,12 +76,49 @@ function events(
 	);
 }
 
+describe('toPlanUsageReading', () => {
+	it('reads each plan envelope as the slice it describes', () => {
+		expect(
+			toPlanUsageReading({
+				kind: 'plan-limit',
+				limit: limit('five_hour', 20).limit,
+			})?.kind,
+		).toBe('limit');
+		expect(
+			toPlanUsageReading({
+				kind: 'plan-windows',
+				windows: [window('five_hour', 20)],
+			})?.kind,
+		).toBe('windows');
+		expect(
+			toPlanUsageReading({
+				cost: { models: [], totalCostUsd: 1 },
+				kind: 'session-cost',
+			})?.kind,
+		).toBe('cost');
+	});
+
+	it('leaves envelopes that say nothing about the plan to their own handlers', () => {
+		expect(
+			toPlanUsageReading({
+				kind: 'context-usage',
+				usage: { contextWindow: 200_000, percent: 10, tokens: 20_000 },
+			}),
+		).toBeNull();
+		expect(
+			toPlanUsageReading({ kind: 'shutdown', reason: 'completed' }),
+		).toBeNull();
+		expect(toPlanUsageReading(null)).toBeNull();
+		expect(toPlanUsageReading(undefined)).toBeNull();
+	});
+});
+
 describe('foldPlanUsage', () => {
 	it('keeps windows a later push did not mention', () => {
 		const first = foldPlanUsage(null, limit('five_hour', 20));
 		const second = foldPlanUsage(first, limit('seven_day', 55));
 
-		expect(second.limits.map((window) => window.id)).toEqual([
+		expect(second.limits.map((reported) => reported.id)).toEqual([
 			'five_hour',
 			'seven_day',
 		]);
@@ -102,6 +161,57 @@ describe('foldPlanUsage', () => {
 	it('starts a session with no cost rather than a zero it never measured', () => {
 		expect(foldPlanUsage(null, limit('five_hour', 20)).totalCostUsd).toBeNull();
 	});
+
+	it('seeds every window a polled read named', () => {
+		const polled = foldPlanUsage(
+			null,
+			windows(window('five_hour', 12), window('seven_day', 40)),
+		);
+
+		expect(polled.limits).toEqual([
+			{ displayName: null, id: 'five_hour', resetsAt: null, utilization: 12 },
+			{ displayName: null, id: 'seven_day', resetsAt: null, utilization: 40 },
+		]);
+	});
+
+	it('announces no verdict for a read, which judges nothing', () => {
+		expect(
+			foldPlanUsage(null, windows(window('five_hour', 12))).status,
+		).toBeNull();
+	});
+
+	it('leaves a pushed verdict standing when a later read names the same window', () => {
+		const rejected = foldPlanUsage(null, limit('five_hour', 95, 'rejected'));
+
+		expect(
+			foldPlanUsage(rejected, windows(window('five_hour', 96))).status,
+		).toBe('rejected');
+	});
+
+	it('keeps a polled figure a push declined to restate', () => {
+		const polled = foldPlanUsage(
+			null,
+			windows(window('five_hour', 12, '2026-08-15T04:00:00.000Z')),
+		);
+		const pushed = foldPlanUsage(polled, limit('five_hour', null));
+
+		expect(pushed.limits).toEqual([
+			{
+				displayName: null,
+				id: 'five_hour',
+				resetsAt: '2026-08-15T04:00:00.000Z',
+				utilization: 12,
+			},
+		]);
+	});
+
+	it('takes a reset window at zero rather than as an absent reading', () => {
+		const polled = foldPlanUsage(null, windows(window('five_hour', 88)));
+
+		expect(
+			foldPlanUsage(polled, limit('five_hour', 0)).limits.at(0)?.utilization,
+		).toBe(0);
+	});
 });
 
 describe('foldTaggedPlanUsage', () => {
@@ -115,7 +225,7 @@ describe('foldTaggedPlanUsage', () => {
 			sessionId: 'session-1',
 		});
 
-		expect(second.usage.limits.map((window) => window.id)).toEqual([
+		expect(second.usage.limits.map((reported) => reported.id)).toEqual([
 			'five_hour',
 			'seven_day',
 		]);
@@ -132,7 +242,7 @@ describe('foldTaggedPlanUsage', () => {
 		});
 
 		expect(second.sessionId).toBe('session-2');
-		expect(second.usage.limits.map((window) => window.id)).toEqual([
+		expect(second.usage.limits.map((reported) => reported.id)).toEqual([
 			'seven_day',
 		]);
 	});
@@ -160,6 +270,23 @@ describe('planUsageFromEvents', () => {
 			status: 'allowed',
 			totalCostUsd: 0.9,
 		});
+	});
+
+	it('replays a polled read, so a reopened chat shows every window', () => {
+		const usage = planUsageFromEvents(
+			events([
+				{
+					kind: 'plan-windows',
+					windows: [window('five_hour', 12), window('seven_day', 40)],
+				},
+				{ kind: 'plan-limit', limit: limit('five_hour', null).limit },
+			]),
+		);
+
+		expect(usage?.limits).toEqual([
+			{ displayName: null, id: 'five_hour', resetsAt: null, utilization: 12 },
+			{ displayName: null, id: 'seven_day', resetsAt: null, utilization: 40 },
+		]);
 	});
 
 	it('reports nothing for a session that never mentioned usage', () => {
@@ -202,7 +329,7 @@ describe('resolvePlanUsage', () => {
 	it('keeps the replayed windows when the live half only sealed a cost', () => {
 		const resolved = resolve(live(foldPlanUsage(null, cost(1.25))));
 
-		expect(resolved?.limits.map((window) => window.id)).toEqual([
+		expect(resolved?.limits.map((reported) => reported.id)).toEqual([
 			'five_hour',
 			'seven_day',
 		]);
@@ -232,11 +359,31 @@ describe('resolvePlanUsage', () => {
 		expect(resolved?.totalCostUsd).toBe(0.5);
 	});
 
-	it('takes the verdict from the live half only once a window has moved', () => {
+	it('takes the verdict from the live half only once one has been announced', () => {
 		const rejected = foldPlanUsage(null, limit('five_hour', 95, 'rejected'));
 
 		expect(resolve(live(rejected))?.status).toBe('rejected');
 		expect(resolve(live(foldPlanUsage(null, cost(2))))?.status).toBe('allowed');
+	});
+
+	it('keeps the replayed verdict when the live half has only polled', () => {
+		const warned = planUsageFromEvents(
+			events([
+				{
+					kind: 'plan-limit',
+					limit: limit('five_hour', 62, 'allowed-warning').limit,
+				},
+			]),
+		);
+		const polled = foldPlanUsage(null, windows(window('five_hour', 64)));
+
+		expect(
+			resolvePlanUsage({
+				live: live(polled),
+				persisted: warned,
+				sessionId: SESSION,
+			})?.status,
+		).toBe('allowed-warning');
 	});
 
 	it('ignores a live reading left over from the previous chat', () => {

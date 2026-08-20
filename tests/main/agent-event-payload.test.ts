@@ -61,6 +61,62 @@ describe('eventPayload', () => {
 		).toBe(10);
 	});
 
+	it('carries a polled plan read as the whole window list', () => {
+		const event: AgentEvent = {
+			at: AT,
+			type: 'plan-windows',
+			windows: [
+				{
+					displayName: null,
+					id: 'five_hour',
+					resetsAt: '2026-08-15T21:00:00.000Z',
+					utilization: 41,
+				},
+				{
+					displayName: 'Opus',
+					id: 'Opus',
+					resetsAt: null,
+					utilization: null,
+				},
+			],
+		};
+
+		expect(eventPayload(event)).toEqual({
+			kind: 'plan-windows',
+			windows: [
+				{
+					displayName: null,
+					id: 'five_hour',
+					resetsAt: '2026-08-15T21:00:00.000Z',
+					utilization: 41,
+				},
+				{ displayName: 'Opus', id: 'Opus', resetsAt: null, utilization: null },
+			],
+		});
+	});
+
+	it('copies each polled window rather than aliasing the read’s own objects', () => {
+		const window = {
+			displayName: null,
+			id: 'seven_day',
+			resetsAt: null,
+			utilization: 10,
+		};
+		const envelope = eventPayload({
+			at: AT,
+			type: 'plan-windows',
+			windows: [window],
+		});
+
+		window.utilization = 99;
+
+		expect(
+			envelope.kind === 'plan-windows'
+				? envelope.windows.at(0)?.utilization
+				: null,
+		).toBe(10);
+	});
+
 	it('carries a session cost with its per-model breakdown', () => {
 		const event: AgentEvent = {
 			at: AT,

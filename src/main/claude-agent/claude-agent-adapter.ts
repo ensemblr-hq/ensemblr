@@ -44,11 +44,22 @@ import {
 	steerClaudeThinking,
 	toClaudeEffortLevel,
 } from './claude-thinking.ts';
+import { readPlanUsage } from './claude-usage.ts';
 import { createPromptQueue } from './prompt-queue.ts';
 import { createSdkMessageNormalizer } from './sdk-message-normalizer.ts';
 
 /** Stderr the SDK forwards from the `claude` child, kept for error detail. */
 const STDERR_RING_BYTES = 64 * 1024;
+
+/**
+ * How long a plan reading stays fresh before a sealing turn re-reads it.
+ *
+ * The read leaves the runtime for the claude.ai usage endpoint, so it must not
+ * ride every turn; a window measured in hours moves slowly enough that five
+ * minutes of staleness is invisible, while a chat left open all afternoon still
+ * shows what the account currently stands at rather than what it did at open.
+ */
+const PLAN_USAGE_REFRESH_INTERVAL_MS = 5 * 60 * 1000;
 
 /** Options for {@link createClaudeAgentAdapter}. */
 export interface CreateClaudeAgentAdapterOptions {
@@ -187,6 +198,8 @@ function createClaudeSession({
 	// the next turn re-assert whichever way the toggle is pointing.
 	let appliedPlanMode: boolean | null = input.request.planMode === true;
 	let currentTurnId: string | null = null;
+	let planUsageReadAt: number | null = null;
+	let planUsageReadPending = false;
 	let pendingEvents: readonly AgentEvent[] = [];
 	let hasSubscribed = false;
 
@@ -250,6 +263,68 @@ function createClaudeSession({
 	const controlToken = input.request.controlMcp?.token ?? null;
 
 	/**
+	 * Asks the account what every plan window stands at and reports the answer as
+	 * one event.
+	 *
+	 * The pushed `rate_limit_event` frames the composer otherwise relies on name
+	 * only whichever window moved, and the SDK marks their utilization optional —
+	 * so a chat can know a window resets in two hours without ever learning how
+	 * much of it is gone. This read is where the figure comes from; the pushes
+	 * layer their fresher status and reset on top of it.
+	 *
+	 * Only an answer marks the reading fresh. A read that fails leaves the stamp
+	 * where it was so the next sealing turn asks again: the opening read runs
+	 * before the child has necessarily answered a control request, and counting
+	 * that failure as a reading would hold the card empty for the whole interval
+	 * on exactly the path most likely to hit it. A session with no plan behind it
+	 * — an API key, Bedrock, Vertex — answers with no windows, which is an answer:
+	 * it stamps, emits nothing, and is not asked again until the stamp goes stale.
+	 */
+	const probePlanUsage = async (): Promise<void> => {
+		if (!activeQuery || planUsageReadPending) {
+			return;
+		}
+		planUsageReadPending = true;
+		const askedAt = now().getTime();
+		const usage = await readPlanUsage(activeQuery).finally(() => {
+			planUsageReadPending = false;
+		});
+		if (!usage) {
+			console.warn('[claude-agent] could not read the account plan usage.', {
+				sessionId: agentSessionId,
+			});
+			return;
+		}
+		planUsageReadAt = askedAt;
+		// Guarded after the await, not before it: this asks whether the session died
+		// during the control round trip, which hoisting it would stop it answering.
+		if (closed || usage.limits.length === 0) {
+			return;
+		}
+		emit({
+			at: now().toISOString(),
+			type: 'plan-windows',
+			windows: usage.limits,
+		});
+	};
+
+	/**
+	 * Re-reads the plan once a turn seals, unless the last reading is still fresh.
+	 * Sealing a turn is the moment spend actually moved, and the interval is what
+	 * keeps a busy chat from spending a round trip on every one of them.
+	 */
+	const refreshStalePlanUsage = (): void => {
+		const readAt = planUsageReadAt;
+		const isFresh =
+			readAt !== null &&
+			now().getTime() - readAt < PLAN_USAGE_REFRESH_INTERVAL_MS;
+		if (isFresh) {
+			return;
+		}
+		void probePlanUsage();
+	};
+
+	/**
 	 * Emits one normalized event and reports it as a plan submission when it is
 	 * one, so plan mode sees the exit through the same stream as the timeline.
 	 *
@@ -261,6 +336,9 @@ function createClaudeSession({
 	 */
 	const forward = (event: AgentEvent): void => {
 		emit(event);
+		if (event.type === 'session-cost') {
+			refreshStalePlanUsage();
+		}
 		const submission = detectPlanSubmission(event);
 		if (!submission) {
 			return;
@@ -386,6 +464,7 @@ function createClaudeSession({
 
 	void pump();
 	void probeContextUsage();
+	void probePlanUsage();
 
 	const session: AgentAdapterSession = {
 		/**

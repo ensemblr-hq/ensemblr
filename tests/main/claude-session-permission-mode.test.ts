@@ -317,7 +317,10 @@ describe('Claude session options: the approval seam', () => {
 			behavior: 'allow',
 			updatedInput: { command: 'ls' },
 		});
-		expect(warn).toHaveBeenCalledTimes(1);
+		expect(warn).toHaveBeenCalledWith(
+			expect.stringContaining('no approval handler wired'),
+			{ toolName: 'Bash' },
+		);
 	});
 });
 

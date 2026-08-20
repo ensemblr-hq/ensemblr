@@ -25,6 +25,37 @@ const UNKNOWN_TOKENS = '—';
 const UNKNOWN_UTILIZATION = '—';
 
 /**
+ * The bar for one plan window, or a hollow track when the runtime named the
+ * window without measuring it. A filled bar at zero and an unmeasured window
+ * look identical, and of the two readings "you have used none of your plan" is
+ * the one a user acts on — so an unknown window is drawn as an outline it can
+ * never be mistaken for.
+ *
+ * Both readings are the same named progressbar, so the window is one thing to a
+ * screen reader whether or not it has been measured; the outline is the track
+ * itself, emptied and dashed, rather than a second element standing in for one.
+ */
+function PlanWindowBar({
+	label,
+	utilization,
+}: {
+	label: string;
+	utilization: number | null;
+}) {
+	return (
+		<Progress
+			aria-label={label}
+			className={
+				utilization === null
+					? 'h-1.5 border border-border border-dashed bg-transparent'
+					: 'h-1.5 bg-muted'
+			}
+			value={utilization}
+		/>
+	);
+}
+
+/**
  * The plan half of the context card: the runtime's spend verdict when it is
  * anything but plain `allowed`, a bar per reported window, the running session
  * cost, and the note that the cost is an estimate rather than a bill.
@@ -63,21 +94,19 @@ function PlanUsageSection({
 				</p>
 			) : null}
 			{usage.limits.map((window) => {
+				const label = planWindowLabel(window, t);
 				const resets = planWindowResetLabel(window.resetsAt, t);
 				return (
 					<div className='flex flex-col gap-1' key={window.id}>
 						<div className='flex items-center justify-between gap-6 text-xs'>
-							<span>{planWindowLabel(window, t)}</span>
+							<span>{label}</span>
 							<span className='text-muted-foreground tabular-nums'>
 								{window.utilization === null
 									? UNKNOWN_UTILIZATION
 									: `${Math.round(window.utilization)}%`}
 							</span>
 						</div>
-						<Progress
-							className='h-1.5 bg-muted'
-							value={window.utilization ?? 0}
-						/>
+						<PlanWindowBar label={label} utilization={window.utilization} />
 						{resets ? (
 							<span className='text-muted-foreground text-xs'>{resets}</span>
 						) : null}

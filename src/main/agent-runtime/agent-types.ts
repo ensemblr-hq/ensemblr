@@ -1,6 +1,7 @@
 import type { SubagentMechanism } from '../../shared/agent-control';
 import type { AgentProviderId } from '../../shared/agent-provider';
 import type {
+	AgentPlanLimitWindowWire,
 	AgentPlanLimitWire,
 	AgentSessionCostWire,
 	AgentWireMessagePart,
@@ -291,6 +292,12 @@ export interface AgentContextUsage {
  */
 export type AgentPlanLimit = AgentPlanLimitWire;
 
+/**
+ * One plan window as a read reports it, without the spend verdict a push
+ * carries. A runtime that can be asked for its whole plan answers in these.
+ */
+export type AgentPlanLimitWindow = AgentPlanLimitWindowWire;
+
 /** Running cost totals a session reports for itself. */
 export type AgentSessionCost = AgentSessionCostWire;
 
@@ -310,6 +317,11 @@ export type AgentEvent =
 			at: string;
 			limit: AgentPlanLimit;
 			type: 'plan-limit';
+	  }
+	| {
+			at: string;
+			type: 'plan-windows';
+			windows: readonly AgentPlanLimitWindow[];
 	  }
 	| {
 			at: string;

@@ -484,6 +484,7 @@ function handleEvent(
 		}
 		case 'context-usage':
 		case 'plan-limit':
+		case 'plan-windows':
 		case 'session-cost':
 		case 'status':
 		case 'metadata':

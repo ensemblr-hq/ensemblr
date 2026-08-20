@@ -359,8 +359,12 @@ export interface ComposerContextUsage {
 export interface ComposerPlanUsage {
 	/** Newest reading per window, in the order the runtime first named them. */
 	limits: readonly AgentPlanLimitWindowWire[];
-	/** Whether the account may still spend against the tightest window. */
-	status: AgentPlanLimitStatusWire;
+	/**
+	 * Whether the account may still spend against the tightest window, or null
+	 * until a runtime announces a verdict. A polled read reports where each
+	 * window stands without judging it, so windows can be known while this is not.
+	 */
+	status: AgentPlanLimitStatusWire | null;
 	/** Running session cost in USD, or null until a turn seals. */
 	totalCostUsd: number | null;
 }

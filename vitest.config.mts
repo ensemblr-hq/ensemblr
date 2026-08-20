@@ -142,6 +142,7 @@ export default defineConfig({
 			'tests/main/claude-turn-preamble.test.ts',
 			'tests/main/claude-thinking-display.test.ts',
 			'tests/main/claude-usage.test.ts',
+			'tests/main/claude-plan-usage-probe.test.ts',
 			'tests/main/agent-event-payload.test.ts',
 			'tests/main/repository-issue-assignees.test.ts',
 		],

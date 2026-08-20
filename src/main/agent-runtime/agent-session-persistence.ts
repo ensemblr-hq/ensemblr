@@ -61,6 +61,11 @@ export function eventPayload(event: AgentEvent): AgentPersistedEnvelope {
 					window: { ...event.limit.window },
 				},
 			};
+		case 'plan-windows':
+			return {
+				kind: 'plan-windows',
+				windows: event.windows.map((window) => ({ ...window })),
+			};
 		case 'session-cost':
 			return {
 				cost: {
