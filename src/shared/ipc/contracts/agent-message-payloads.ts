@@ -170,6 +170,15 @@ export type AgentPersistedEnvelope =
 	  }
 	| { kind: 'metadata'; metadata: AgentWireMetadata }
 	| { kind: 'plan-limit'; limit: AgentPlanLimitWire }
+	| {
+			kind: 'plan-windows';
+			/**
+			 * Every window the plan reports, read from the runtime in one round trip
+			 * rather than pushed. Carries no spend verdict: a read says where each
+			 * window stands, while `plan-limit` carries the verdict a push announced.
+			 */
+			windows: readonly AgentPlanLimitWindowWire[];
+	  }
 	| { cost: AgentSessionCostWire; kind: 'session-cost' }
 	| {
 			kind: 'status';

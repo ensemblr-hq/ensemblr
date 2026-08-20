@@ -1,5 +1,6 @@
 import type { ComposerPlanUsage } from '@/renderer/types/workbench';
 import type {
+	AgentPersistedEnvelope,
 	AgentPlanLimitWindowWire,
 	AgentPlanLimitWire,
 	AgentSessionCostWire,
@@ -9,7 +10,7 @@ import type {
 /** What the gauge starts from before a session has reported anything. */
 const EMPTY_USAGE: ComposerPlanUsage = {
 	limits: [],
-	status: 'allowed',
+	status: null,
 	totalCostUsd: null,
 };
 
@@ -17,6 +18,39 @@ const EMPTY_USAGE: ComposerPlanUsage = {
 export interface TaggedComposerPlanUsage {
 	sessionId: string;
 	usage: ComposerPlanUsage;
+}
+
+/**
+ * One thing a session can report about its plan. Each arrives on its own event
+ * and describes one slice of the picture, so a reading says which slice it is
+ * rather than restating figures it did not measure.
+ */
+export type PlanUsageReading =
+	| { cost: AgentSessionCostWire; kind: 'cost' }
+	| { kind: 'limit'; limit: AgentPlanLimitWire }
+	| { kind: 'windows'; windows: readonly AgentPlanLimitWindowWire[] };
+
+/**
+ * Reads a persisted envelope as a plan reading, so the live subscription and the
+ * replay agree on which envelopes describe the plan and on what each one says —
+ * the two paths carry the same events and would otherwise drift apart one
+ * envelope kind at a time.
+ * @param payload - The envelope a broadcast or a stored event carried.
+ * @returns The reading, or null when the envelope describes something else.
+ */
+export function toPlanUsageReading(
+	payload: AgentPersistedEnvelope | null | undefined,
+): PlanUsageReading | null {
+	switch (payload?.kind) {
+		case 'plan-limit':
+			return { kind: 'limit', limit: payload.limit };
+		case 'plan-windows':
+			return { kind: 'windows', windows: payload.windows };
+		case 'session-cost':
+			return { cost: payload.cost, kind: 'cost' };
+		default:
+			return null;
+	}
 }
 
 /**
@@ -29,11 +63,7 @@ export interface TaggedComposerPlanUsage {
  */
 export function foldTaggedPlanUsage(
 	previous: TaggedComposerPlanUsage | null,
-	reading: {
-		cost: AgentSessionCostWire | null;
-		limit: AgentPlanLimitWire | null;
-		sessionId: string;
-	},
+	reading: PlanUsageReading & { sessionId: string },
 ): TaggedComposerPlanUsage {
 	const continues = previous?.sessionId === reading.sessionId;
 	return {
@@ -45,31 +75,36 @@ export function foldTaggedPlanUsage(
 /**
  * Folds one plan reading into the running snapshot.
  *
- * A rate-limit push names a single window, so a reading replaces that window in
+ * A rate-limit push names a single window, so a reading updates that window in
  * place and leaves the rest standing — the alternative, treating each push as
- * the whole picture, would blank every other window the session had reported.
- * The spend verdict rides the newest push rather than being derived per window,
- * because that is what the runtime actually reports.
+ * the whole picture, would blank every other window the session had reported. A
+ * polled read names them all and updates each the same way, which is what lets a
+ * baseline and the pushes that follow it compose. The spend verdict rides the
+ * newest push and nothing else, because a read reports no verdict at all.
  * @param previous - Snapshot so far, or null before the first reading.
- * @param reading - The window that moved and the cost that sealed, either nullable.
+ * @param reading - What the session just reported about its plan.
  * @returns The updated snapshot.
  */
 export function foldPlanUsage(
 	previous: ComposerPlanUsage | null,
-	reading: {
-		cost: AgentSessionCostWire | null;
-		limit: AgentPlanLimitWire | null;
-	},
+	reading: PlanUsageReading,
 ): ComposerPlanUsage {
 	const base = previous ?? EMPTY_USAGE;
-	const limits = reading.limit
-		? replaceWindow(base.limits, reading.limit.window)
-		: base.limits;
-	return {
-		limits,
-		status: reading.limit ? reading.limit.status : base.status,
-		totalCostUsd: reading.cost ? reading.cost.totalCostUsd : base.totalCostUsd,
-	};
+	switch (reading.kind) {
+		case 'cost':
+			return { ...base, totalCostUsd: reading.cost.totalCostUsd };
+		case 'limit':
+			return {
+				...base,
+				limits: replaceWindow(base.limits, reading.limit.window),
+				status: reading.limit.status,
+			};
+		case 'windows':
+			return {
+				...base,
+				limits: reading.windows.reduce(replaceWindow, base.limits),
+			};
+	}
 }
 
 /**
@@ -120,13 +155,13 @@ function mergePlanUsage(
 	}
 	return {
 		limits: live.limits.reduce(replaceWindow, persisted.limits),
-		status: live.limits.length > 0 ? live.status : persisted.status,
+		status: live.status ?? persisted.status,
 		totalCostUsd: live.totalCostUsd ?? persisted.totalCostUsd,
 	};
 }
 
 /**
- * Swaps a window's newest reading into the list, appending it when the session
+ * Layers a window's newest reading over the list, appending it when the session
  * has not named that window before.
  * @param limits - Windows reported so far.
  * @param window - The reading that just landed.
@@ -140,7 +175,34 @@ function replaceWindow(
 	if (index === -1) {
 		return [...limits, window];
 	}
-	return limits.map((reported, at) => (at === index ? window : reported));
+	return limits.map((reported, at) =>
+		at === index ? mergeWindow(reported, window) : reported,
+	);
+}
+
+/**
+ * Layers a newer reading of one window over an older one, keeping the older
+ * figure wherever the newer reading measured nothing.
+ *
+ * The SDK marks a pushed frame's utilization optional, so a push announcing a
+ * status change can name a window and report no reading for it. Taking that
+ * literally would blank a percentage the account did report, which the gauge
+ * then draws as an empty bar. `0` is a measurement rather than an absence, so a
+ * window that genuinely reset still reads as empty.
+ * @param previous - The reading standing before this one.
+ * @param next - The reading that just landed.
+ * @returns The window as it now reads.
+ */
+function mergeWindow(
+	previous: AgentPlanLimitWindowWire,
+	next: AgentPlanLimitWindowWire,
+): AgentPlanLimitWindowWire {
+	return {
+		displayName: next.displayName ?? previous.displayName,
+		id: next.id,
+		resetsAt: next.resetsAt ?? previous.resetsAt,
+		utilization: next.utilization ?? previous.utilization,
+	};
 }
 
 /**
@@ -154,12 +216,9 @@ export function planUsageFromEvents(
 ): ComposerPlanUsage | null {
 	let usage: ComposerPlanUsage | null = null;
 	for (const event of events) {
-		const payload = event.payload;
-		if (payload?.kind === 'plan-limit') {
-			usage = foldPlanUsage(usage, { cost: null, limit: payload.limit });
-		}
-		if (payload?.kind === 'session-cost') {
-			usage = foldPlanUsage(usage, { cost: payload.cost, limit: null });
+		const reading = toPlanUsageReading(event.payload);
+		if (reading) {
+			usage = foldPlanUsage(usage, reading);
 		}
 	}
 	return usage;

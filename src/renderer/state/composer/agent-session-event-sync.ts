@@ -5,12 +5,12 @@ import {
 	ensemblrQueryKeys,
 	subscribeAgentSessionEvents,
 } from '@/renderer/api/ensemblr-queries';
+import {
+	type PlanUsageReading,
+	toPlanUsageReading,
+} from '@/renderer/state/composer/plan-usage';
 import type { ComposerContextUsage } from '@/renderer/types/workbench';
-import type {
-	AgentPersistedEnvelope,
-	AgentPlanLimitWire,
-	AgentSessionCostWire,
-} from '@/shared/ipc/contracts/agent-message-payloads';
+import type { AgentPersistedEnvelope } from '@/shared/ipc/contracts/agent-message-payloads';
 
 /** Live context usage, tagged with the session it was measured on. */
 export interface TaggedContextUsage {
@@ -18,16 +18,8 @@ export interface TaggedContextUsage {
 	usage: ComposerContextUsage;
 }
 
-/**
- * One live plan-usage reading, tagged with the session it came from. The two
- * halves arrive on separate events, so a reading carries whichever one moved and
- * leaves the other null rather than restating a figure it did not measure.
- */
-export interface TaggedPlanUsage {
-	cost: AgentSessionCostWire | null;
-	limit: AgentPlanLimitWire | null;
-	sessionId: string;
-}
+/** One live plan-usage reading, tagged with the session it came from. */
+export type TaggedPlanUsage = PlanUsageReading & { sessionId: string };
 
 /**
  * Converts the runtime's usage wire payload into the composer meter model.
@@ -90,7 +82,7 @@ function hasWorkspaceRenamedMetadata(
  * landed while that read was in flight.
  * @param activeSessionId - Session the composer is bound to, or null while new
  * @param onContextUsage - Records the newest usage reading for the gauge
- * @param onPlanUsage - Records a plan-window move or a sealed turn's cost
+ * @param onPlanUsage - Records a plan-window move, a polled read of every window, or a sealed turn's cost
  * @param workspaceId - Workspace whose broadcasts are relevant here
  */
 export function useAgentSessionEventSync({
@@ -114,36 +106,17 @@ export function useAgentSessionEventSync({
 			if (activeSessionId && broadcast.sessionId !== activeSessionId) {
 				return;
 			}
-			if (broadcast.event.eventType === 'context-usage') {
-				const payload = broadcast.event.payload;
-				if (payload?.kind === 'context-usage') {
-					onContextUsage({
-						sessionId: broadcast.sessionId,
-						usage: toComposerContextUsage(payload.usage),
-					});
-				}
+			const payload = broadcast.event.payload;
+			if (payload?.kind === 'context-usage') {
+				onContextUsage({
+					sessionId: broadcast.sessionId,
+					usage: toComposerContextUsage(payload.usage),
+				});
 				return;
 			}
-			if (broadcast.event.eventType === 'plan-limit') {
-				const payload = broadcast.event.payload;
-				if (payload?.kind === 'plan-limit') {
-					onPlanUsage({
-						cost: null,
-						limit: payload.limit,
-						sessionId: broadcast.sessionId,
-					});
-				}
-				return;
-			}
-			if (broadcast.event.eventType === 'session-cost') {
-				const payload = broadcast.event.payload;
-				if (payload?.kind === 'session-cost') {
-					onPlanUsage({
-						cost: payload.cost,
-						limit: null,
-						sessionId: broadcast.sessionId,
-					});
-				}
+			const planReading = toPlanUsageReading(payload);
+			if (planReading) {
+				onPlanUsage({ ...planReading, sessionId: broadcast.sessionId });
 				return;
 			}
 			if (broadcast.event.eventType === 'metadata') {

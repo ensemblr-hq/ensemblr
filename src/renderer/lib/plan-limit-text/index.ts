@@ -108,12 +108,12 @@ export function formatSessionCost(
  * Names the runtime's spend verdict for the plan, when it is worth saying. An
  * `allowed` verdict has nothing to add over the bars themselves, so it reads as
  * no message at all rather than as reassurance nobody asked for.
- * @param status - The verdict the runtime last reported.
+ * @param status - The verdict the runtime last reported, or null when it has reported none.
  * @param t - Translator from the calling component.
  * @returns The warning, or null when the plan is simply spendable.
  */
 export function planStatusLabel(
-	status: AgentPlanLimitStatusWire,
+	status: AgentPlanLimitStatusWire | null,
 	t: TFunction,
 ): string | null {
 	if (status === 'rejected') {

@@ -92,10 +92,18 @@ two surfaces show it.
   question over two horizons, so it is one control rather than two gauges
   competing on the same row.
 
+The composer's figures come from the same read: a session asks the account what
+every window stands at as it opens, and again after a turn seals if that answer
+has gone stale. The runtime's own pushes then layer their fresher reset and
+spend verdict on top, window by window — they name only whichever window moved
+and need not carry a percentage at all, which is why they are not the source.
+
 Both readings persist like any other event, so reopening a chat replays its
 gauges instead of blanking them until the next turn. A crashed turn that reports
 a zero cost is dropped rather than walked backwards, and a live reading layers
-over the replayed one rather than replacing it.
+over the replayed one rather than replacing it. A window the account named but
+never measured is drawn as a hollow outline rather than a bar at zero, which
+would read as spending nothing.
 
 Plan usage is a Claude Code fact and appears only on Claude chats.
 
