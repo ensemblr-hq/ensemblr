@@ -1,9 +1,13 @@
+import type { TFunction } from 'i18next';
 import { ClockIcon, PauseIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/renderer/components/ui/button';
 import { cn } from '@/renderer/lib/utils';
-import type { QueuedFollowUp } from '@/renderer/types/workbench';
+import type {
+	FollowUpQueueHoldReason,
+	QueuedFollowUp,
+} from '@/renderer/types/workbench';
 import { FollowUpQueueList } from './follow-up-queue-list';
 
 /** Wiring for the stack of queued messages sitting above the composer. */
@@ -15,12 +19,17 @@ interface FollowUpQueueStackProps {
 	onMove: (id: string, direction: 'down' | 'up') => void;
 	onRemove: (id: string) => void;
 	onReorder: (orderedIds: readonly string[]) => void;
-	/** Resumes a paused queue, sending the head straight away when the agent is idle. */
-	onSendNow: () => void;
+	/**
+	 * Resumes a paused queue, sending the head straight away when the agent is
+	 * idle. Null renders the control disabled, for a composer that cannot take a
+	 * send at all: it would refuse the entry, and a run of refusals pauses the
+	 * queue under a reason no error on screen accounts for.
+	 */
+	onSendNow: (() => void) | null;
 	/** Sends one entry out of turn; null while the composer cannot send at all. */
 	onSteer: ((id: string) => void) | null;
-	/** True once a stop or a failed send has paused the queue outright. */
-	paused: boolean;
+	/** Why a stop or a failed send paused the queue outright, or null while it is not paused. */
+	pauseReason: FollowUpQueueHoldReason | null;
 	/** True while the queue waits on the user rather than on the agent. */
 	stalled: boolean;
 	streaming: boolean;
@@ -29,10 +38,58 @@ interface FollowUpQueueStackProps {
 /**
  * Why the queue is sitting still, which is the one thing the old chip could not
  * say without being opened. `draining` goes on its own when the turn ends;
- * `paused` was stopped and stays stopped; `waiting` is the `block` behavior
+ * `paused` was stopped and stays stopped, for whichever of the two reasons
+ * {@link FollowUpQueueHoldReason} carries; `waiting` is the `block` behavior
  * holding a message the user has to release by hand.
  */
 type QueueStatus = 'draining' | 'paused' | 'waiting';
+
+/**
+ * What the strip says about itself. A pause names which pause it was: the two
+ * look identical on screen, so the wording is the only thing that tells a queue
+ * the user stopped from one whose session would not take the message, and a
+ * pause a user cannot account for is what made this read as arbitrary.
+ *
+ * Switched rather than chained so a reason added to
+ * {@link FollowUpQueueHoldReason} is a compile error here rather than a paused
+ * queue quietly rendering the draining line.
+ * @param pauseReason - Which pause it was, or null while the queue is not paused
+ * @param stalled - Whether an unpaused queue is waiting on the user
+ * @param t - The translator for the surrounding render
+ * @returns The status line to show beside the count
+ */
+function queueStatusLine(
+	pauseReason: FollowUpQueueHoldReason | null,
+	stalled: boolean,
+	t: TFunction,
+): string {
+	switch (pauseReason) {
+		case 'turn-stopped':
+			return t(
+				'workbench:follow-up-queue.status-paused-stopped',
+				'Paused — you stopped the turn these were waiting for',
+			);
+		case 'send-failed':
+			return t(
+				'workbench:follow-up-queue.status-paused-failed',
+				'Paused — the last message could not be sent',
+			);
+		case null:
+			return stalled
+				? t(
+						'workbench:follow-up-queue.status-waiting',
+						'Held back — send them yourself when you are ready',
+					)
+				: t(
+						'workbench:follow-up-queue.status-draining',
+						'Sending one at a time as the agent finishes',
+					);
+		default: {
+			const unhandled: never = pauseReason;
+			return unhandled;
+		}
+	}
+}
 
 /**
  * The stack of messages waiting for the current turn to end, pinned above the
@@ -56,7 +113,7 @@ export function FollowUpQueueStack({
 	onReorder,
 	onSendNow,
 	onSteer,
-	paused,
+	pauseReason,
 	stalled,
 	streaming,
 }: FollowUpQueueStackProps) {
@@ -66,7 +123,7 @@ export function FollowUpQueueStack({
 		return null;
 	}
 
-	const status: QueueStatus = paused
+	const status: QueueStatus = pauseReason
 		? 'paused'
 		: stalled
 			? 'waiting'
@@ -79,20 +136,7 @@ export function FollowUpQueueStack({
 		defaultValue_other: '{{count}} messages queued',
 	});
 
-	const statusLine = {
-		draining: t(
-			'workbench:follow-up-queue.status-draining',
-			'Sending one at a time as the agent finishes',
-		),
-		paused: t(
-			'workbench:follow-up-queue.status-paused',
-			'Paused — nothing sends until you resume',
-		),
-		waiting: t(
-			'workbench:follow-up-queue.status-waiting',
-			'Held back — send them yourself when you are ready',
-		),
-	}[status];
+	const statusLine = queueStatusLine(pauseReason, stalled, t);
 
 	return (
 		<section
@@ -120,12 +164,13 @@ export function FollowUpQueueStack({
 					{stalled ? (
 						<Button
 							className='rounded-md'
-							onClick={onSendNow}
+							disabled={onSendNow === null}
+							onClick={() => onSendNow?.()}
 							size='xs'
 							type='button'
 							variant='outline'
 						>
-							{paused
+							{pauseReason
 								? t('workbench:follow-up-queue.resume', 'Resume')
 								: t('workbench:follow-up-queue.send-next', 'Send next')}
 						</Button>

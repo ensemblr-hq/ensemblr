@@ -285,6 +285,14 @@ Type while a turn is running and your message joins the **follow-up queue**
 instead of disappearing. Queued messages stay listed, and you can reorder, edit,
 or remove them right up until they drain.
 
+Two things stop a queue draining, and the strip says which: **stopping a turn**
+parks the messages that turn was holding, so resuming is your call rather than
+something that happens the moment the agent falls silent, and a **send that
+fails** parks the rest rather than emptying them into a session that will not
+take them. Either way the strip offers Resume. Closing a chat **discards** what
+it still had queued — a queued message sends only through an open composer — and
+the app says how many it dropped.
+
 An **unread mark** appears on a chat where agent activity landed while you were
 elsewhere. Marks are per chat, not per workspace, so reading one tab does not
 clear its siblings — a workspace with three agents running keeps three separate

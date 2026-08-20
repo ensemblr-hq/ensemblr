@@ -43,13 +43,13 @@ export {
 	appendFollowUp,
 	createFollowUp,
 	followUpQueueAtomFamily,
-	followUpQueueHeldAtomFamily,
+	followUpQueueHoldReasonAtomFamily,
 	forgetFollowUpQueue,
 	moveFollowUp,
 	removeFollowUp,
 	reorderFollowUps,
+	useDropFollowUpQueue,
 	useFollowUpQueue,
-	useHoldFollowUpQueue,
 } from './follow-up-queue';
 export type { OptimisticPrompt } from './optimistic-prompts';
 export {

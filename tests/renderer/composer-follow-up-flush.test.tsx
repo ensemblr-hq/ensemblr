@@ -15,15 +15,19 @@ vi.mock('@/renderer/api/ensemblr-queries', () => ({
 }));
 
 import type { ComposerEditorHandle } from '../../src/renderer/components/workbench-shell/conversation-panel/composer/editor';
-import { useComposerSubmit } from '../../src/renderer/hooks/workbench-shell/composer/use-composer-submit';
+import {
+	MAX_QUEUED_DELIVERY_ATTEMPTS,
+	useComposerSubmit,
+} from '../../src/renderer/hooks/workbench-shell/composer/use-composer-submit';
 import {
 	followUpQueueAtomFamily,
-	followUpQueueHeldAtomFamily,
+	followUpQueueHoldReasonAtomFamily,
 } from '../../src/renderer/state/composer';
 import {
 	appSettingsAtom,
 	type FollowUpBehavior,
 } from '../../src/renderer/state/preferences';
+import type { QueuedFollowUp } from '../../src/renderer/types/workbench';
 import { DEFAULT_APP_SETTINGS } from '../../src/shared/config';
 import { createComposerShellState } from './support/composer';
 import { installLocalStorage } from './support/dom';
@@ -35,6 +39,18 @@ const OTHER_TAB_ID = 'chat-tab-other';
 interface MountProps {
 	disabled?: boolean;
 	streaming: boolean;
+}
+
+/** A queued entry to seed a store with, for a test that mounts onto a queue. */
+function queuedEntry(id: string, text: string): QueuedFollowUp {
+	return {
+		id,
+		queuedAt: '2026-08-14T20:00:00.000Z',
+		segments: [{ kind: 'text', text }],
+		snapshot: null,
+		source: 'user',
+		text,
+	};
 }
 
 /**
@@ -82,6 +98,7 @@ function mount({
 	);
 
 	const onStop = vi.fn(() => Promise.resolve());
+	const setAttachmentError = vi.fn<(error: string | null) => void>();
 	const initialProps: MountProps = { disabled, streaming: isStreaming };
 	const view = renderHook(
 		({ disabled: isDisabled, streaming }: MountProps) =>
@@ -99,12 +116,14 @@ function mount({
 					segments: [{ kind: 'text', text: 'draft' }],
 					text: 'draft',
 				}),
-				setAttachmentError: vi.fn(),
+				setAttachmentError,
 			}),
 		{ initialProps, wrapper },
 	);
 
 	const queued = () => store.get(followUpQueueAtomFamily(chatTabId));
+	const pauseReason = () =>
+		store.get(followUpQueueHoldReasonAtomFamily(chatTabId));
 	const send = (text: string) =>
 		act(() => {
 			view.result.current.dispatchSubmit({
@@ -120,8 +139,10 @@ function mount({
 		endTurn: () => act(() => view.rerender({ disabled, streaming: false })),
 		onStop,
 		onSubmit,
+		pauseReason,
 		queued,
 		send,
+		setAttachmentError,
 		store,
 		/**
 		 * Makes a landed send leave the agent busy, which is what the runtime does:
@@ -272,8 +293,9 @@ describe('flushing when the turn ends', () => {
 	});
 
 	test('a queue paused before the composer went away stays paused', async () => {
-		// Reopening a closed tab restores its queue held, so mounting onto one must
-		// not be read as an agent that just went idle with work waiting.
+		// The composer is swapped out and back for approval cards, so mounting onto
+		// a queue the user stopped must not be read as an agent that just went idle
+		// with work waiting.
 		const store = createStore();
 		store.set(followUpQueueAtomFamily(CHAT_TAB_ID), [
 			{
@@ -285,7 +307,7 @@ describe('flushing when the turn ends', () => {
 				text: 'parked',
 			},
 		]);
-		store.set(followUpQueueHeldAtomFamily(CHAT_TAB_ID), true);
+		store.set(followUpQueueHoldReasonAtomFamily(CHAT_TAB_ID), 'turn-stopped');
 		const { onSubmit, queued } = mount({
 			behavior: 'queue',
 			isStreaming: false,
@@ -336,7 +358,7 @@ describe('flushing when the turn ends', () => {
 	});
 
 	test('a stop pauses the queue rather than draining into the gap', async () => {
-		const { onSubmit, queued, send, view } = mount({
+		const { onSubmit, pauseReason, queued, send, view } = mount({
 			behavior: 'queue',
 			isStreaming: true,
 		});
@@ -351,10 +373,11 @@ describe('flushing when the turn ends', () => {
 
 		expect(onSubmit).not.toHaveBeenCalled();
 		expect(queued()).toHaveLength(1);
+		expect(pauseReason()).toBe('turn-stopped');
 	});
 
 	test('a failed send puts the entry back at the head and pauses', async () => {
-		const { onSubmit, queued, send, view } = mount({
+		const { onSubmit, pauseReason, queued, send, view } = mount({
 			behavior: 'queue',
 			isStreaming: true,
 		});
@@ -376,6 +399,7 @@ describe('flushing when the turn ends', () => {
 		await new Promise((resolve) => setTimeout(resolve, 0));
 
 		expect(onSubmit).toHaveBeenCalledTimes(1);
+		expect(pauseReason()).toBe('send-failed');
 	});
 
 	test('a failed send puts the entry back in one place, not two', async () => {
@@ -455,6 +479,163 @@ describe('flushing when the turn ends', () => {
 
 		expect(onSubmit).not.toHaveBeenCalled();
 		expect(store.get(followUpQueueAtomFamily(OTHER_TAB_ID))).toHaveLength(1);
+	});
+});
+
+describe('a send the composer will not take right now', () => {
+	test('goes back on the queue and lands once the composer frees up', async () => {
+		// The flush fires when a turn ends, which is exactly when the composer may
+		// still be settling the previous send. Reading that refusal as a failure is
+		// what stopped queues for a reason the user could neither see nor reproduce,
+		// so it retries instead — and nothing about the queue says paused meanwhile.
+		const store = createStore();
+		store.set(followUpQueueAtomFamily(CHAT_TAB_ID), [
+			queuedEntry('racing', 'racing the turn'),
+		]);
+		const { onSubmit, pauseReason, queued, view } = mount({
+			behavior: 'queue',
+			disabled: true,
+			isStreaming: false,
+			store,
+		});
+
+		await act(async () => {
+			view.result.current.flushQueueNow();
+		});
+
+		expect(onSubmit).not.toHaveBeenCalled();
+		expect(queued().map((entry) => entry.text)).toEqual(['racing the turn']);
+		expect(pauseReason()).toBeNull();
+
+		act(() => view.rerender({ disabled: false, streaming: false }));
+
+		await waitFor(() => expect(prompts(onSubmit)).toEqual(['racing the turn']));
+		expect(queued()).toHaveLength(0);
+		expect(pauseReason()).toBeNull();
+	});
+
+	test('puts a steered row back where it was steered from, still unpaused', async () => {
+		// A steer lifts a row out of the middle, so a refusal that dropped it at the
+		// front would reorder a queue the user arranged by hand.
+		const store = createStore();
+		store.set(followUpQueueAtomFamily(CHAT_TAB_ID), [
+			queuedEntry('a', 'first'),
+			queuedEntry('b', 'second'),
+			queuedEntry('c', 'third'),
+		]);
+		const { pauseReason, queued, view } = mount({
+			behavior: 'queue',
+			disabled: true,
+			isStreaming: true,
+			store,
+		});
+
+		await act(async () => {
+			view.result.current.steerQueued('c');
+		});
+
+		expect(queued().map((entry) => entry.text)).toEqual([
+			'first',
+			'second',
+			'third',
+		]);
+		expect(pauseReason()).toBeNull();
+	});
+
+	test('pauses once the refusals run out, rather than retrying forever', async () => {
+		// A composer that never frees up is a failure in slow motion: bounded
+		// attempts are what stop the queue spinning instead of saying so.
+		const store = createStore();
+		store.set(followUpQueueAtomFamily(CHAT_TAB_ID), [
+			queuedEntry('stuck', 'stuck'),
+		]);
+		const { onSubmit, pauseReason, view } = mount({
+			behavior: 'queue',
+			disabled: true,
+			isStreaming: false,
+			store,
+		});
+
+		for (
+			let attempt = 0;
+			attempt < MAX_QUEUED_DELIVERY_ATTEMPTS - 1;
+			attempt++
+		) {
+			await act(async () => {
+				view.result.current.flushQueueNow();
+			});
+		}
+		expect(pauseReason()).toBeNull();
+
+		await act(async () => {
+			view.result.current.flushQueueNow();
+		});
+
+		expect(onSubmit).not.toHaveBeenCalled();
+		expect(pauseReason()).toBe('send-failed');
+	});
+
+	test('says why it paused, since a refusal surfaces nothing on its own', async () => {
+		// The strip reads "the last message could not be sent", and only a real
+		// failure leaves an error behind it. Without one here that line is the sole
+		// account of a stopped queue for a send that was never even attempted.
+		const store = createStore();
+		store.set(followUpQueueAtomFamily(CHAT_TAB_ID), [
+			queuedEntry('stuck', 'stuck'),
+		]);
+		const { setAttachmentError, view } = mount({
+			behavior: 'queue',
+			disabled: true,
+			isStreaming: false,
+			store,
+		});
+
+		for (let attempt = 0; attempt < MAX_QUEUED_DELIVERY_ATTEMPTS; attempt++) {
+			await act(async () => {
+				view.result.current.flushQueueNow();
+			});
+		}
+
+		expect(setAttachmentError).toHaveBeenCalledWith(
+			'The composer never became ready for the queued message, so the queue is paused.',
+		);
+	});
+
+	test('counts refusals per entry, so steering another row does not reset the head', async () => {
+		// One shared slot would zero the head's run every time a different entry was
+		// turned away, putting the bound permanently out of reach for a queue the
+		// user keeps poking at.
+		const store = createStore();
+		store.set(followUpQueueAtomFamily(CHAT_TAB_ID), [
+			queuedEntry('head', 'head'),
+			queuedEntry('other', 'other'),
+		]);
+		const { pauseReason, view } = mount({
+			behavior: 'queue',
+			disabled: true,
+			isStreaming: false,
+			store,
+		});
+
+		for (
+			let attempt = 0;
+			attempt < MAX_QUEUED_DELIVERY_ATTEMPTS - 1;
+			attempt++
+		) {
+			await act(async () => {
+				view.result.current.flushQueueNow();
+			});
+			await act(async () => {
+				view.result.current.steerQueued('other');
+			});
+		}
+		expect(pauseReason()).toBeNull();
+
+		await act(async () => {
+			view.result.current.flushQueueNow();
+		});
+
+		expect(pauseReason()).toBe('send-failed');
 	});
 });
 

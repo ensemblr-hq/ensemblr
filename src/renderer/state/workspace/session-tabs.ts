@@ -12,9 +12,8 @@ import {
 import { useWorkspaceAgentBusy } from '@/renderer/hooks/workspace/use-workspace-agent-busy';
 import {
 	forgetComposerDraft,
-	forgetFollowUpQueue,
 	useDropComposerSubmits,
-	useHoldFollowUpQueue,
+	useDropFollowUpQueue,
 } from '@/renderer/state/composer';
 import { useConversationScrollOffsets } from '@/renderer/state/conversation-scroll';
 import { forgetChatOverrides } from '@/renderer/state/preferences';
@@ -112,7 +111,7 @@ export function useSessionTabState({
 	const queryClient = useQueryClient();
 	const scrollOffsets = useConversationScrollOffsets();
 	const dropComposerSubmits = useDropComposerSubmits();
-	const holdFollowUpQueue = useHoldFollowUpQueue();
+	const dropFollowUpQueue = useDropFollowUpQueue();
 	const { clearChat } = useUnreadChatActions();
 	// Live window titles agent harnesses emit via OSC escapes, keyed by their
 	// backing terminal id, so a running agent's own conversation title surfaces
@@ -185,24 +184,29 @@ export function useSessionTabState({
 				chatTabId,
 				workspaceId,
 			});
-			// Drop per-chat overrides, the composer draft, and the follow-up queue
-			// only for hard-deleted tabs; tabs marked closed remain restorable and
-			// must keep their model/thinking picks and everything unsent.
+			// Drop per-chat overrides and the composer draft only for hard-deleted
+			// tabs; tabs marked closed remain restorable and must keep their
+			// model/thinking picks and the draft in the box.
 			if (result.deleted) {
 				forgetChatOverrides(chatTabId);
 				forgetComposerDraft(chatTabId);
-				forgetFollowUpQueue(chatTabId);
 				scrollOffsets.forget(chatTabId);
-			} else {
-				// A restorable tab keeps its queue, but pauses it: the user walked away
-				// from those messages, so reopening the tab has to show them waiting
-				// rather than drain them into the first turn that happens to end.
-				holdFollowUpQueue(chatTabId);
 			}
-			// Queued auto-submits are not restorable the way a draft is: they drain
-			// only through a mounted composer, which a closed tab no longer has. Drop
-			// them either way and say so, rather than leave a chore the user was told
-			// had been handed over sitting undeliverable.
+			// Queued follow-ups and queued auto-submits are not restorable the way a
+			// draft is: both drain only through a mounted composer, which a closed tab
+			// no longer has. Drop them either way and say so, rather than leave the
+			// user a queue that comes back paused with no way to explain itself.
+			const droppedFollowUps = dropFollowUpQueue(chatTabId);
+			if (droppedFollowUps > 0) {
+				toast.warning(
+					t('errors:chat-tab.dropped-follow-ups.title', {
+						count: droppedFollowUps,
+						defaultValue_one: 'Cancelled a queued message for the closed chat.',
+						defaultValue_other:
+							'Cancelled {{count}} queued messages for the closed chat.',
+					}),
+				);
+			}
 			const droppedSubmits = dropComposerSubmits(chatTabId);
 			if (droppedSubmits > 0) {
 				toast.warning(

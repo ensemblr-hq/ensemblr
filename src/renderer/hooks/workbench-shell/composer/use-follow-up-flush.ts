@@ -34,7 +34,7 @@ function hasSendableHead(
 	queue: FollowUpQueueApi,
 	behavior: FollowUpBehavior,
 ): boolean {
-	if (queue.held) {
+	if (queue.holdReason !== null) {
 		return false;
 	}
 	const [head] = queue.entries;
@@ -51,10 +51,12 @@ function hasSendableHead(
  * witness on the way back. Waiting for the next one strands the queue for good,
  * because the turn it is waiting on is the one it was supposed to start.
  *
- * `held` is what says a queue must not drain on its own, and every path that
- * means it sets it: a stop, a failed send, and closing a tab with messages still
- * waiting. Together with the `block` behavior that is the whole of "leave this
- * alone", so an idle agent and a sendable head need no further permission.
+ * `holdReason` is what says a queue must not drain on its own, and both paths
+ * that mean it set it: a stop, and a send that genuinely failed. Together with
+ * the `block` behavior that is the whole of "leave this alone", so an idle agent
+ * and a sendable head need no further permission. A send the composer merely
+ * turned away sets nothing — the entry goes back on the queue, which is a change
+ * this effect re-reads, so it is re-attempted as soon as `canSend` allows.
  *
  * Sending the head raises `isStreaming` again, so the next entry waits for that
  * turn in its own right. Ordering stays FIFO, each queued message gets its own
@@ -78,8 +80,8 @@ export function useFollowUpFlush({
 	canSend: boolean;
 	isStreaming: boolean;
 	queue: FollowUpQueueApi;
-	/** Sends one entry the queue handed over; resolves false when it could not be delivered. */
-	submit: (entry: QueuedFollowUp) => Promise<boolean>;
+	/** Sends one entry the queue handed over, putting it back itself when it does not go. */
+	submit: (entry: QueuedFollowUp) => Promise<void>;
 }): void {
 	// State rather than a ref: clearing it is what reconsiders the rest of the
 	// queue. A ref re-renders nothing, so the next entry would wait on whatever

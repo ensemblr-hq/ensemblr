@@ -491,6 +491,10 @@ export default interface Resources {
 			};
 		};
 		'chat-tab': {
+			'dropped-follow-ups': {
+				title_one: 'Cancelled a queued message for the closed chat.';
+				title_other: 'Cancelled {{count}} queued messages for the closed chat.';
+			};
 			'dropped-submits': {
 				title_one: 'Cancelled a queued action for the closed chat.';
 				title_other: 'Cancelled {{count}} queued actions for the closed chat.';
@@ -2435,6 +2439,7 @@ export default interface Resources {
 			'plan-mode': {
 				placeholder: 'Describe what you want planned';
 			};
+			'queued-send-refused': 'The composer never became ready for the queued message, so the queue is paused.';
 			'send-tooltip': 'Send message';
 			'send-tooltip-hold': 'Hold until you send it';
 			'send-tooltip-queue': 'Queue for when the agent finishes';
@@ -2792,7 +2797,8 @@ export default interface Resources {
 			'send-immediately': 'Send this now';
 			'send-next': 'Send next';
 			'status-draining': 'Sending one at a time as the agent finishes';
-			'status-paused': 'Paused — nothing sends until you resume';
+			'status-paused-failed': 'Paused — the last message could not be sent';
+			'status-paused-stopped': 'Paused — you stopped the turn these were waiting for';
 			'status-waiting': 'Held back — send them yourself when you are ready';
 			steer: 'Steer the agent with this now';
 			'steer-blocked': 'The agent cannot take a message right now';

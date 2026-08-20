@@ -155,6 +155,12 @@ function ComposerPanelBody({
 		!composer.disabled && !state.isStreaming,
 	);
 
+	// Both queue controls hand an entry straight to the send pipeline, which
+	// refuses one outright while the composer cannot take a send. Offering them
+	// then would burn the queue's delivery attempts on a refusal the user can
+	// neither see nor act on.
+	const canDeliverQueued = !composer.disabled && !state.pending;
+
 	const placeholder =
 		composer.placeholder.length > 0
 			? composer.placeholder
@@ -203,11 +209,9 @@ function ComposerPanelBody({
 					onMove={state.moveQueued}
 					onRemove={state.removeQueued}
 					onReorder={state.reorderQueue}
-					onSendNow={state.flushQueueNow}
-					onSteer={
-						composer.disabled || state.pending ? null : state.steerQueued
-					}
-					paused={state.queuePaused}
+					onSendNow={canDeliverQueued ? state.flushQueueNow : null}
+					onSteer={canDeliverQueued ? state.steerQueued : null}
+					pauseReason={state.queuePauseReason}
 					stalled={state.queueStalled}
 					streaming={state.isStreaming}
 				/>
