@@ -16,7 +16,10 @@ const {
 	invalidateWorkspaceListViews: vi.fn().mockResolvedValue(undefined),
 	mergePullRequest: vi.fn().mockResolvedValue({ merged: true }),
 	refreshPullRequestSnapshot: vi.fn().mockResolvedValue(undefined),
-	removeWorkspace: vi.fn().mockResolvedValue(undefined),
+	removeWorkspace: {
+		archived: vi.fn().mockResolvedValue(undefined),
+		deleted: vi.fn().mockResolvedValue(undefined),
+	},
 }));
 
 vi.mock('@/renderer/api/ensemblr-queries', () => ({
@@ -99,7 +102,8 @@ test('uses the shared removal action after archiving a merged workspace', async 
 
 	await result.current.archiveAfterMergeMutation.mutateAsync();
 
-	expect(removeWorkspace).toHaveBeenCalledWith('san-antonio');
+	expect(removeWorkspace.archived).toHaveBeenCalledWith('san-antonio');
+	expect(removeWorkspace.deleted).not.toHaveBeenCalled();
 });
 
 test('refreshes list views but stays put when the workspace is not archived', async () => {
@@ -114,7 +118,7 @@ test('refreshes list views but stays put when the workspace is not archived', as
 	await waitFor(() => {
 		expect(invalidateWorkspaceListViews).toHaveBeenCalledTimes(1);
 	});
-	expect(removeWorkspace).not.toHaveBeenCalled();
+	expect(removeWorkspace.archived).not.toHaveBeenCalled();
 });
 
 test('refreshes list views but stays put when archiving throws', async () => {
@@ -126,5 +130,5 @@ test('refreshes list views but stays put when archiving throws', async () => {
 	await waitFor(() => {
 		expect(invalidateWorkspaceListViews).toHaveBeenCalledTimes(1);
 	});
-	expect(removeWorkspace).not.toHaveBeenCalled();
+	expect(removeWorkspace.archived).not.toHaveBeenCalled();
 });

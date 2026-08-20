@@ -92,7 +92,7 @@ export function useBoardWorkspaceMenu(): {
 	const dialogs = (
 		<>
 			<ArchiveWorkspaceDialog
-				onArchived={handleWorkspaceLifecycleAction}
+				onArchived={handleWorkspaceLifecycleAction.archived}
 				onOpenChange={(open) => {
 					if (!open) {
 						setArchiveTarget(null);
@@ -102,7 +102,7 @@ export function useBoardWorkspaceMenu(): {
 				workspace={archiveTarget}
 			/>
 			<DeleteWorkspaceDialog
-				onDeleted={handleWorkspaceLifecycleAction}
+				onDeleted={handleWorkspaceLifecycleAction.deleted}
 				onOpenChange={(open) => {
 					if (!open) {
 						setDeleteTarget(null);

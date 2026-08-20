@@ -102,8 +102,11 @@ export function WorkspaceRouteContent({
 	);
 	// Tab preference validation must see the LIVE dock tabs (terminal:<id>),
 	// not the placeholder model, or terminal tab clicks bounce back to setup.
+	// Never `activeSession.id`: it substitutes this workspace's first tab when the
+	// routed id is not one of its tabs, and persisting that erases what the
+	// workspace remembered.
 	const panelTabs = useWorkspacePanelTabState({
-		activeChatId: activeSession.id,
+		activeChatId: sessionNavigation.resolvedActiveChatId,
 		activeWorkspace: workspaceWithLiveDockTabs,
 		search,
 	});

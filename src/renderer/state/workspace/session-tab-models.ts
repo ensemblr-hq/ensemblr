@@ -31,7 +31,8 @@ import type { LiveTerminalTitle } from './terminal-tab-title';
  * strip is empty; the placeholder still backs `effectiveActiveSession` so
  * content keeps rendering meanwhile.
  * @param input - The routed tab, the workspace, and the live terminal overlays
- * @returns The tab models, the resolved active tab, and whether it is still resolving
+ * @returns The tab models, the resolved active tab, the routed id once confirmed
+ * to belong to this workspace, and whether it is still resolving
  */
 export function useSessionTabModels({
 	activeSession,
@@ -155,6 +156,13 @@ export function useSessionTabModels({
 		hasSettledTabList: hasLoadedChatTabs && !isFetchingChatTabs,
 		isResolvingActiveSession,
 		openTabCount: openTabs?.length ?? null,
+		/**
+		 * The routed tab id, but only once confirmed to be an open tab of this
+		 * workspace — null while resolving and for a routed id this workspace does
+		 * not own. What the per-workspace last-active-chat memory is written from,
+		 * since `effectiveActiveSession` substitutes a neighbour in those cases.
+		 */
+		resolvedActiveChatId: resolvedActiveSession?.id ?? null,
 		sessionTabs,
 	};
 }

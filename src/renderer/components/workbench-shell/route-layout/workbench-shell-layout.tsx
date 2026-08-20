@@ -15,6 +15,7 @@ import {
 } from '@/renderer/hooks/workbench-shell/route-layout/use-workbench-layout-model';
 import { useAutoMarkUnread } from '@/renderer/hooks/workspace/use-auto-mark-unread';
 import { useReconcileUnreadChats } from '@/renderer/hooks/workspace/use-reconcile-unread-chats';
+import { useReconcileWorkspaceState } from '@/renderer/hooks/workspace/use-reconcile-workspace-state';
 import { useRouteProfilerMount } from '@/renderer/lib/instrumentation';
 import {
 	getStringRouteParam,
@@ -49,6 +50,7 @@ export function WorkbenchShellLayout() {
 	});
 	useAutoMarkUnread(model.activeWorkspace?.id ?? null);
 	useReconcileUnreadChats(model.displayProjects);
+	useReconcileWorkspaceState();
 	const [cloneOpen, setCloneOpen] = useAtom(cloneDialogOpenAtom);
 	const [localProjectImportOpen] = useAtom(localProjectImportDialogOpenAtom);
 	const [quickStartOpen, setQuickStartOpen] = useAtom(quickStartDialogOpenAtom);

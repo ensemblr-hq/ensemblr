@@ -128,7 +128,7 @@ export function useReviewMutations({
 					const { [workspaceId]: _removed, ...rest } = current;
 					return rest;
 				});
-				await removeWorkspace(workspaceId);
+				await removeWorkspace.archived(workspaceId);
 				toast.success(
 					t('errors:workspace-archive.archived.title', 'Workspace archived.'),
 				);

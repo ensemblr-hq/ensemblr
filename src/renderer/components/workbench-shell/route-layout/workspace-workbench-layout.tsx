@@ -25,7 +25,6 @@ export function WorkspaceWorkbenchLayout() {
 	const model = useWorkbenchLayoutRouteModel();
 	const params = workspaceRouteApi.useParams();
 	const search = workspaceRouteApi.useSearch();
-	const chatId = useActiveWorkspaceChatId();
 	const navigate = useNavigate();
 	const selection =
 		findWorkspaceNavigationSelection(
@@ -33,6 +32,7 @@ export function WorkspaceWorkbenchLayout() {
 			params.projectId,
 			params.workspaceId,
 		) ?? model.displaySelection;
+	const chatId = useActiveWorkspaceChatId(selection?.workspace.id);
 	const isSelectionMissing = !selection;
 
 	// THE ARCHIVE/DELETE FREEZE LIVED HERE. Do not "simplify" this effect back
@@ -68,7 +68,13 @@ export function WorkspaceWorkbenchLayout() {
 }
 
 /**
- * Extracts the `$chatId` URL param when the active route exposes it.
+ * Extracts the `$chatId` URL param when the active route exposes it, ignoring
+ * any child match that belongs to a different workspace than the one this
+ * layout renders. The workspace id and the chat id arrive on two independent
+ * router subscriptions and a pending transition can surface the incoming
+ * workspace's chat beside the outgoing workspace's model; that pairing makes
+ * the route substitute the workspace's first tab and overwrite its remembered
+ * one, so a chat id is only trusted when its own match agrees on the workspace.
  *
  * Selects the primitive id rather than a params array — this is the second
  * half of the archive/delete freeze fix (see the effect in
@@ -80,15 +86,23 @@ export function WorkspaceWorkbenchLayout() {
  * `<Navigate>`'s layout effect, feeding the synchronous navigate/render loop
  * that froze the app. A string (or undefined) compares equal to itself, so
  * the layout now re-renders only when the chat id actually changes.
+ * @param workspaceId - Workspace the layout renders, or undefined when unresolved
+ * @returns The routed chat id for that workspace, or undefined
  */
-function useActiveWorkspaceChatId() {
+function useActiveWorkspaceChatId(workspaceId: string | undefined) {
 	return useChildMatches({
 		select: (matches): string | undefined => {
 			for (let index = matches.length - 1; index >= 0; index -= 1) {
-				const chatId = getStringRouteParam(
-					matches[index].params as unknown as Record<string, unknown>,
-					'chatId',
-				);
+				const matchParams = matches[index].params as unknown as Record<
+					string,
+					unknown
+				>;
+
+				if (getStringRouteParam(matchParams, 'workspaceId') !== workspaceId) {
+					continue;
+				}
+
+				const chatId = getStringRouteParam(matchParams, 'chatId');
 
 				if (chatId) {
 					return chatId;

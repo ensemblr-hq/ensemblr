@@ -239,8 +239,8 @@ export function ProjectNavigationGroups({
 				}}
 				onProjectArchived={handleProjectLifecycleAction}
 				onProjectDeleted={handleProjectLifecycleAction}
-				onWorkspaceArchived={handleWorkspaceLifecycleAction}
-				onWorkspaceDeleted={handleWorkspaceLifecycleAction}
+				onWorkspaceArchived={handleWorkspaceLifecycleAction.archived}
+				onWorkspaceDeleted={handleWorkspaceLifecycleAction.deleted}
 				orderedProjects={orderedProjects}
 				setArchiveProjectTarget={setArchiveProjectTarget}
 				setArchiveWorkspaceTarget={setArchiveWorkspaceTarget}

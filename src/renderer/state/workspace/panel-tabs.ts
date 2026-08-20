@@ -32,6 +32,10 @@ type ChatTabPreferences = Record<string, unknown>;
 /**
  * React hook that resolves the active review/dock/chat tab for the current
  * workspace from URL search params plus persisted per-workspace preferences.
+ *
+ * `activeChatId` accepts null so callers can hand over an id that has not
+ * resolved to one of this workspace's tabs yet: the chat memory is left as it
+ * is rather than overwritten with a substitute.
  * @param input - Active workspace, optional chat id, and URL search.
  * @returns The active tab values plus setter callbacks.
  */
@@ -40,7 +44,7 @@ export function useWorkspacePanelTabState({
 	activeWorkspace,
 	search,
 }: {
-	activeChatId?: string;
+	activeChatId?: string | null;
 	activeWorkspace: WorkspaceShellModel;
 	search?: WorkbenchRouteSearch;
 }) {

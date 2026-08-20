@@ -13,7 +13,7 @@ import {
 	sortReviewFilesByViewed,
 } from '../../src/renderer/lib/workbench/review-files';
 import {
-	forgetWorkspaceViewedChangesAtom,
+	forgetWorkspaceStateAtom,
 	MAX_VIEWED_MARKS_PER_WORKSPACE,
 	useViewedChanges,
 	viewedChangesByWorkspaceAtom,
@@ -323,7 +323,7 @@ describe('marks outlive the change set they were made against', () => {
 		act(() => mine.result.current.setViewed(FIRST.path, revision, true));
 		act(() => other.result.current.setViewed(FIRST.path, revision, true));
 
-		act(() => store.set(forgetWorkspaceViewedChangesAtom, 'w1'));
+		act(() => store.set(forgetWorkspaceStateAtom, 'w1'));
 
 		expect(store.get(viewedChangesByWorkspaceAtom)).toEqual({
 			w2: { [FIRST.path]: revision },

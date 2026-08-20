@@ -1,4 +1,4 @@
-import { atom, useAtom } from 'jotai';
+import { useAtom } from 'jotai';
 import { atomWithStorage } from 'jotai/utils';
 import { useCallback, useMemo } from 'react';
 
@@ -29,20 +29,6 @@ export const viewedChangesByWorkspaceAtom = atomWithStorage<
 >('ensemblr_workspace_viewed_changes_by_workspace', {}, undefined, {
 	getOnInit: true,
 });
-
-/**
- * Drops every mark held for one workspace. Call when a workspace is deleted or
- * archived — nothing else evicts a workspace's marks, and the map is persisted,
- * so without this it keeps them for the lifetime of the install.
- */
-export const forgetWorkspaceViewedChangesAtom = atom(
-	null,
-	(_get, set, workspaceId: string) => {
-		set(viewedChangesByWorkspaceAtom, (current) =>
-			workspaceId in current ? omitKey(current, workspaceId) : current,
-		);
-	},
-);
 
 /** Reading and writing one workspace's "viewed" marks. */
 export interface ViewedChangesState {
@@ -118,16 +104,4 @@ function nextMarks({
 	}
 	const retained = others.slice(1 - MAX_VIEWED_MARKS_PER_WORKSPACE);
 	return { ...Object.fromEntries(retained), [filePath]: revision };
-}
-
-/**
- * Copy of a record without one key.
- * @param record - The record to copy
- * @param key - Key to leave out
- * @returns A new record holding every other entry
- */
-function omitKey<T>(record: Record<string, T>, key: string): Record<string, T> {
-	return Object.fromEntries(
-		Object.entries(record).filter(([entryKey]) => entryKey !== key),
-	);
 }

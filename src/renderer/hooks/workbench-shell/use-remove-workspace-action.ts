@@ -1,7 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useRouter } from '@tanstack/react-router';
 import { useSetAtom } from 'jotai';
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 
 import {
 	forgetWorkspaceInListViews,
@@ -9,15 +9,30 @@ import {
 } from '@/renderer/api/ensemblr';
 import { forgetLastRunScript } from '@/renderer/state/preferences';
 import {
-	forgetWorkspaceViewedChangesAtom,
+	forgetWorkspaceStateAtom,
 	lastWorkspaceNavigationRenderStateAtom,
 } from '@/renderer/state/workspace';
 import { deleteLastUsedOpenTarget } from '@/renderer/state/workspace/open-target-history';
 
 /**
+ * The post-removal action, one entry per reason a workspace can leave the
+ * sidebar. Archiving is reversible from the History screen and the Browse
+ * archive dialog; deleting is not, and only deleting evicts remembered state.
+ */
+export interface WorkspaceRemovalActions {
+	archived: (archivedWorkspaceId: string) => Promise<void>;
+	deleted: (deletedWorkspaceId: string) => Promise<void>;
+}
+
+/**
  * Returns the shared post-removal action for archived or deleted workspaces. It
  * drops the workspace from the cached list views and refreshes them; removing
  * the active one also hops the shell to Welcome.
+ *
+ * Only a delete evicts the workspace's remembered state. An archived workspace
+ * can be unarchived, and it has to come back with its board column, its pin,
+ * its remembered tabs and its run script — `useReconcileWorkspaceState` is what
+ * finally collects those, once the workspace is purged for good.
  *
  * That hop is a consequence of the cached drop rather than a second call
  * alongside it. Clearing the held render state and dropping the workspace from
@@ -36,24 +51,21 @@ import { deleteLastUsedOpenTarget } from '@/renderer/state/workspace/open-target
  * first-launch rule and lands the user in an unrelated project's first
  * workspace.
  * @param options - Active workspace identity used to choose the route fallback.
- * @returns A callback that removes one workspace from renderer navigation state.
+ * @returns One removal callback per lifecycle reason.
  */
 export function useRemoveWorkspaceAction(options: {
 	activeWorkspaceId: string | null;
-}) {
+}): WorkspaceRemovalActions {
 	const { activeWorkspaceId } = options;
 	const queryClient = useQueryClient();
 	const router = useRouter();
-	const forgetViewedChanges = useSetAtom(forgetWorkspaceViewedChangesAtom);
+	const forgetWorkspaceState = useSetAtom(forgetWorkspaceStateAtom);
 	const setLastNavigationRenderState = useSetAtom(
 		lastWorkspaceNavigationRenderStateAtom,
 	);
 
-	return useCallback(
+	const dropFromNavigation = useCallback(
 		async (removedWorkspaceId: string) => {
-			deleteLastUsedOpenTarget(removedWorkspaceId);
-			forgetLastRunScript(removedWorkspaceId);
-			forgetViewedChanges(removedWorkspaceId);
 			// The shell holds this render state up while navigation resolves, so one
 			// naming the removed workspace renders against a workspace that is gone.
 			setLastNavigationRenderState((renderState) =>
@@ -77,12 +89,19 @@ export function useRemoveWorkspaceAction(options: {
 				hopsToWelcome ? Promise.resolve() : router.invalidate(),
 			]);
 		},
-		[
-			activeWorkspaceId,
-			forgetViewedChanges,
-			queryClient,
-			router,
-			setLastNavigationRenderState,
-		],
+		[activeWorkspaceId, queryClient, router, setLastNavigationRenderState],
+	);
+
+	return useMemo(
+		() => ({
+			archived: dropFromNavigation,
+			deleted: async (deletedWorkspaceId: string) => {
+				deleteLastUsedOpenTarget(deletedWorkspaceId);
+				forgetLastRunScript(deletedWorkspaceId);
+				forgetWorkspaceState(deletedWorkspaceId);
+				await dropFromNavigation(deletedWorkspaceId);
+			},
+		}),
+		[dropFromNavigation, forgetWorkspaceState],
 	);
 }

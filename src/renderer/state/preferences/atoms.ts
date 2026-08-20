@@ -154,18 +154,66 @@ export const lastRunScriptAtomFamily = atomFamily((workspaceId: string) =>
 	atomWithStorage<string | null>(KEY(`last_run_script_${workspaceId}`), null),
 );
 
+/** Shared prefix of every per-workspace last-run-script storage key. */
+const LAST_RUN_SCRIPT_KEY_PREFIX = KEY('last_run_script_');
+
 /**
  * Drops a workspace's remembered run script and its backing localStorage key.
- * Call when a workspace is archived or deleted — `atomWithStorage` leaves the
- * stored key behind otherwise, so it would accumulate one key per workspace the
- * install has ever opened.
+ * Call when a workspace is deleted — `atomWithStorage` leaves the stored key
+ * behind otherwise, so it would accumulate one key per workspace the install
+ * has ever opened. Archiving keeps the memory, since the workspace can be
+ * unarchived; {@link retainLastRunScripts} collects it once it cannot.
  */
 export function forgetLastRunScript(workspaceId: string): void {
 	lastRunScriptAtomFamily.remove(workspaceId);
 
 	if (typeof globalThis.localStorage !== 'undefined') {
-		globalThis.localStorage.removeItem(KEY(`last_run_script_${workspaceId}`));
+		globalThis.localStorage.removeItem(
+			`${LAST_RUN_SCRIPT_KEY_PREFIX}${workspaceId}`,
+		);
 	}
+}
+
+/**
+ * Drops the remembered run script of every workspace outside
+ * `existingWorkspaceIds`, collecting keys whose workspace was removed by a
+ * renderer that never ran {@link forgetLastRunScript} for it. The set must name
+ * archived workspaces too, or unarchiving one loses its script.
+ * @param existingWorkspaceIds - Every workspace still on record
+ */
+export function retainLastRunScripts(
+	existingWorkspaceIds: ReadonlySet<string>,
+): void {
+	if (
+		existingWorkspaceIds.size === 0 ||
+		typeof globalThis.localStorage === 'undefined'
+	) {
+		return;
+	}
+
+	for (const workspaceId of storedLastRunScriptWorkspaceIds()) {
+		if (!existingWorkspaceIds.has(workspaceId)) {
+			forgetLastRunScript(workspaceId);
+		}
+	}
+}
+
+/**
+ * Reads the workspace ids that currently hold a stored run-script key.
+ * @returns Every workspace id carried by a `last_run_script_*` storage key
+ */
+function storedLastRunScriptWorkspaceIds(): string[] {
+	const workspaceIds: string[] = [];
+
+	for (let index = 0; index < globalThis.localStorage.length; index += 1) {
+		const storageKey = globalThis.localStorage.key(index);
+
+		if (storageKey?.startsWith(LAST_RUN_SCRIPT_KEY_PREFIX)) {
+			workspaceIds.push(storageKey.slice(LAST_RUN_SCRIPT_KEY_PREFIX.length));
+		}
+	}
+
+	return workspaceIds;
 }
 
 // ─── Git (user defaults) ──────────────────────────────────────────────────────
