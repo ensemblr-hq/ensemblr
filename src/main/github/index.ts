@@ -3,6 +3,7 @@ export {
 	createGithubService,
 	type GithubService,
 } from './github-service.ts';
+export { listSweepableWorkspaces } from './sweepable-workspaces.ts';
 export {
 	createWorkspacePrStatusSweeper,
 	type SweepableWorkspace,

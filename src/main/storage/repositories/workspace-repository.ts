@@ -518,6 +518,59 @@ export function listActiveWorkspacePathRows({
 		.all() as unknown as ActiveWorkspacePathRow[];
 }
 
+/**
+ * `id` + worktree `path` for one non-archived workspace, plus the two slices of
+ * its cached GitHub snapshot that decide how often it needs refreshing. Both
+ * snapshot columns are null when the workspace has no cache row or the row does
+ * not hold parseable JSON.
+ */
+export interface ActiveWorkspacePrCheckRow {
+	/** The cached pull request's `checks` array, still JSON-encoded. */
+	checksJson: string | null;
+	id: string;
+	path: string;
+	/** The cached pull request's state (`open`, `merged`, `closed`). */
+	pullRequestState: string | null;
+}
+
+/**
+ * Returns every non-archived workspace alongside the cached pull request's state
+ * and checks, joined from `integration_metadata` in one statement. The PR-status
+ * sweeper reads this each tick to decide which workspaces are refreshing on the
+ * short cadence, so it narrows the snapshot in SQL rather than inflating each
+ * cached row's comments, body, and deployments to answer one question about
+ * checks. `json_valid` guards the extraction because the cache tolerates a
+ * malformed row rather than failing the whole listing.
+ * @param options - The open database connection.
+ * @returns One row per active workspace.
+ */
+export function listActiveWorkspacePrCheckRows({
+	database,
+}: {
+	database: DatabaseSync;
+}): ActiveWorkspacePrCheckRow[] {
+	return database
+		.prepare(
+			`SELECT
+				w.id AS id,
+				w.path AS path,
+				CASE WHEN json_valid(im.metadata_json)
+					THEN json_extract(im.metadata_json, '$.pullRequest.state')
+				END AS pullRequestState,
+				CASE WHEN json_valid(im.metadata_json)
+					THEN json_extract(im.metadata_json, '$.pullRequest.checks')
+				END AS checksJson
+			FROM workspaces w
+			LEFT JOIN integration_metadata im
+				ON im.provider = 'github'
+				AND im.resource_type = 'pull-request'
+				AND im.resource_id = w.id
+				AND im.external_id = ''
+			WHERE w.archived_at IS NULL`,
+		)
+		.all() as unknown as ActiveWorkspacePrCheckRow[];
+}
+
 /** Inputs for {@link listActiveWorkspaceMetadataRows}. */
 export interface ListActiveWorkspaceMetadataRowsOptions {
 	database: DatabaseSync;
