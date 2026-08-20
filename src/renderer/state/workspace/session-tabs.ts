@@ -72,6 +72,8 @@ export function useSessionTabState({
 }): SessionTabState & {
 	/** True while the routed tab has no row in the list yet, so its session is unknown. */
 	isResolvingActiveSession: boolean;
+	/** The routed tab id once confirmed to be an open tab of this workspace, else null. */
+	resolvedActiveChatId: string | null;
 	openSessionTab: (options?: {
 		placement?: SessionTabPlacement;
 	}) => Promise<OpenSessionTabHandlerResult | null>;
@@ -135,6 +137,7 @@ export function useSessionTabState({
 		closedSessions,
 		effectiveActiveSession,
 		isResolvingActiveSession,
+		resolvedActiveChatId,
 		sessionTabs,
 		hasSettledTabList,
 		openTabCount,
@@ -362,6 +365,7 @@ export function useSessionTabState({
 		openWorkspaceFileDiffTab,
 		pinSessionTab,
 		reorderSessionTabs,
+		resolvedActiveChatId,
 		restoreSessionTab,
 		sessionTabs,
 	};

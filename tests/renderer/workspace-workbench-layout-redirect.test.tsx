@@ -8,6 +8,12 @@ const navigateSpy = vi.fn();
 const model: {
 	current: Pick<WorkbenchLayoutModel, 'displayProjects' | 'displaySelection'>;
 } = { current: { displayProjects: [], displaySelection: null } };
+/** Child router matches the mocked `useChildMatches` hands to the selector. */
+const childMatches: { current: { params: Record<string, unknown> }[] } = {
+	current: [],
+};
+/** The `chatId` the layout last passed down to the route content. */
+const renderedChatId: { current: string | undefined } = { current: undefined };
 
 vi.mock('@tanstack/react-router', () => ({
 	getRouteApi: () => ({
@@ -15,7 +21,9 @@ vi.mock('@tanstack/react-router', () => ({
 		useSearch: () => ({}),
 	}),
 	useChildMatches: (options: { select?: (matches: unknown[]) => unknown }) =>
-		options.select ? options.select([]) : [],
+		options.select
+			? options.select(childMatches.current)
+			: childMatches.current,
 	useNavigate: () => navigateSpy,
 }));
 
@@ -26,7 +34,10 @@ vi.mock('@/renderer/components/workbench-shell/shell-contexts', () => ({
 vi.mock(
 	'@/renderer/components/workbench-shell/route-layout/workspace-route-content',
 	() => ({
-		WorkspaceRouteContent: () => null,
+		WorkspaceRouteContent: ({ chatId }: { chatId?: string }) => {
+			renderedChatId.current = chatId;
+			return null;
+		},
 	}),
 );
 
@@ -42,6 +53,8 @@ describe('WorkspaceWorkbenchLayout missing-selection redirect', () => {
 	beforeEach(() => {
 		navigateSpy.mockClear();
 		model.current = { displayProjects: [], displaySelection: null };
+		childMatches.current = [];
+		renderedChatId.current = undefined;
 	});
 
 	// Removing the active workspace drops it from live nav data while this
@@ -75,5 +88,73 @@ describe('WorkspaceWorkbenchLayout missing-selection redirect', () => {
 		rerender(<WorkspaceWorkbenchLayout />);
 
 		expect(navigateSpy).not.toHaveBeenCalled();
+	});
+});
+
+describe('WorkspaceWorkbenchLayout routed chat id', () => {
+	/** Puts `ws-a` in the nav data so the layout resolves a selection for it. */
+	function selectWorkspaceA() {
+		model.current = {
+			displayProjects: [
+				{
+					id: 'repo-1',
+					name: 'repo-1',
+					workspaces: [{ id: 'ws-a', name: 'ws-a' }],
+				},
+			] as unknown as WorkbenchLayoutModel['displayProjects'],
+			displaySelection: null,
+		};
+	}
+
+	beforeEach(() => {
+		navigateSpy.mockClear();
+		childMatches.current = [];
+		renderedChatId.current = undefined;
+		selectWorkspaceA();
+	});
+
+	it('passes the chat id down when the match names the rendered workspace', () => {
+		childMatches.current = [
+			{
+				params: { chatId: 'chat-1', projectId: 'repo-1', workspaceId: 'ws-a' },
+			},
+		];
+
+		render(<WorkspaceWorkbenchLayout />);
+
+		expect(renderedChatId.current).toBe('chat-1');
+	});
+
+	// The workspace id and the chat id arrive on two independent router
+	// subscriptions, so a pending transition can surface the incoming
+	// workspace's chat beside the outgoing workspace's model. Trusting that
+	// pairing made the route substitute this workspace's first tab and persist
+	// it over the tab the workspace actually remembered.
+	it('ignores a chat id belonging to another workspace', () => {
+		childMatches.current = [
+			{
+				params: { chatId: 'chat-b', projectId: 'repo-2', workspaceId: 'ws-b' },
+			},
+		];
+
+		render(<WorkspaceWorkbenchLayout />);
+
+		expect(renderedChatId.current).toBeUndefined();
+	});
+
+	it('takes the deepest match that agrees on the workspace', () => {
+		childMatches.current = [
+			{ params: { projectId: 'repo-1', workspaceId: 'ws-a' } },
+			{
+				params: { chatId: 'chat-1', projectId: 'repo-1', workspaceId: 'ws-a' },
+			},
+			{
+				params: { chatId: 'chat-b', projectId: 'repo-2', workspaceId: 'ws-b' },
+			},
+		];
+
+		render(<WorkspaceWorkbenchLayout />);
+
+		expect(renderedChatId.current).toBe('chat-1');
 	});
 });
