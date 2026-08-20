@@ -10,6 +10,10 @@ channels. The packaging config lives in `forge.config.ts`.
 - **macOS on Apple silicon** (builds are arm64-only).
 - **Node `>=24 <25`** — enforced by `scripts/require-node-version.mjs`, which
   `package`/`make` run first.
+- **An authenticated `gh`** — the whole release ritual is `gh release create`,
+  and a nightly is dispatched with `gh workflow run`. The runner ships `gh`
+  preinstalled, so the workflow's own `gh api` calls — the Homebrew cask bump
+  among them — need no install step.
 - For a **signed, notarized** build:
   - A **Developer ID Application** certificate in your login keychain.
   - An **App Store Connect API key**, supplied via environment variables (a
