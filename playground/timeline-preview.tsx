@@ -5,10 +5,33 @@ import {
 	ChatSkillInvocation,
 	ChatToolCall,
 } from '@/renderer/components/chat-tool-call';
+import { ChatUserPrompt } from '@/renderer/components/chat-user-prompt';
 import {
 	FilePreviewOpenerProvider,
 	WorkspacePathResolverProvider,
 } from '@/renderer/components/workbench-shell/conversation-panel/file-preview-context';
+
+const SHORT_PROMPT = 'Swap the Read row for the line-numbered body.';
+
+const PASTED_PROMPT = `We have merged some PR so db may be out of sync:
+
+## Error Type
+Runtime PrismaClientKnownRequestError
+
+## Error Message
+
+Invalid \`()=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$prisma$2e$ts__$5b$app$2d$rsc$5d$__$28$ecmascript$29$__.default.agency.findUnique()\` invocation in
+/Users/psoldunov/Ensemblr/workspaces/yeco-connect/lavrangas/.next/dev/server/chunks/ssr/[root-of-the-server]__6f2b1a._.js:3079:41
+
+  3078 async function getAgency(id) {
+→ 3079     const cached = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$queries$2f$cache$2e$ts__$28$ecmascript$29$__.cachedById)('agency', id,
+The column \`(not available)\` does not exist in the current database.
+
+  at <unknown> (src/lib/queries/agency.ts:61:17)
+  at getAgency (src/lib/queries/agency.ts:60:17)
+  at <anonymous> (src/lib/session.ts:147:17)
+
+Next.js version: 16.2.6 (Turbopack)`;
 
 const THINKING_TEXT = `The error variant is working correctly with the collapsed destructive chip display. Now I need to swap out the existing Read tool row to match the reference shape — keeping the file icon, updating the title to "Read 30 lines", and using the file badge button as a preview chip.
 
@@ -120,7 +143,9 @@ function toolPart(
  * Every tool row the app can render, built from realistic Pi payloads and
  * mounted through the real `ChatToolCall`, so a regression in the shipped
  * projection and body components shows up here rather than in hand-written
- * markup that can drift from them.
+ * markup that can drift from them. The two user prompts leading the scene cover
+ * the card at both ends of its range: one that fits, and a pasted stack trace
+ * long enough to clamp and wide enough to test the unbreakable-run wrapping.
  */
 export function TimelinePreview() {
 	return (
@@ -133,6 +158,10 @@ export function TimelinePreview() {
 		>
 			<FilePreviewOpenerProvider value={() => undefined}>
 				<div className='flex flex-col gap-1'>
+					<ChatUserPrompt prompt={SHORT_PROMPT} />
+
+					<ChatUserPrompt prompt={PASTED_PROMPT} />
+
 					<ChatReasoningCollapsible text={THINKING_TEXT} />
 
 					<ChatCustomMessage

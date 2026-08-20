@@ -154,6 +154,17 @@
 				"rules": ["react-doctor/use-lazy-motion"]
 			},
 			{
+				// `useClampedOverflow` writes `isClipped` from a layout effect because
+				// the value is a DOM measurement, not a derivation: it compares
+				// `scrollHeight` against `clientHeight`, both of which only exist after
+				// the browser has laid the clamped strip out. There is no render-time
+				// expression to hoist it into — the rule's usual fix — and the reading
+				// is deliberately held while the card is expanded so the collapse
+				// control does not retract itself.
+				"files": ["src/renderer/components/chat-user-prompt.tsx"],
+				"rules": ["react-doctor/no-derived-state-effect"]
+			},
+			{
 				// The agent-control MCP server intentionally exposes agent-control tools —
 				// that IS the product surface. It is gated behind loopback-only host
 				// checks (DNS-rebinding guard) and a per-request bearer token: see
