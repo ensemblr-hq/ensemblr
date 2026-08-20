@@ -87,6 +87,7 @@ function usePlanUsageRefresh(
 	liveSessionId: string | null,
 ): PlanUsageRefresh | null {
 	const { t } = useTranslation();
+	// react-doctor-disable-next-line -- The reading lands on the session event stream rather than in this call's result, so the gauge and the event cache are both already updated by the subscription; invalidating the branch here would re-read the transcript mid-stream and drop the deltas in flight.
 	const { isPending, mutateAsync } = useMutation({
 		mutationFn: (sessionId: string) => refreshAgentPlanUsage({ sessionId }),
 	});
