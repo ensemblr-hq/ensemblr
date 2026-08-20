@@ -111,11 +111,22 @@ loopback control server with a scoped bearer token — giving them the
 token itself never enters the command line; each harness reads it from the
 injected `ENSEMBLR_CONTROL_TOKEN` env var.
 
-| Harness | MCP config | Playbook | Shipped skill |
-|---|---|---|---|
-| Claude Code | `--mcp-config '<json>'`, bearer header expands `${ENSEMBLR_CONTROL_TOKEN}` | `--append-system-prompt-file` | `--plugin-dir <bundle>` |
-| Codex | `-c mcp_servers.ensemblr.url=…` + `-c mcp_servers.ensemblr.bearer_token_env_var=…` | none — reads the MCP server's `instructions` field as its tool-namespace description | none — Codex plugins use their own manifest format |
-| Mistral Vibe | `VIBE_MCP_SERVERS='<json>'` env prefix with `api_key_env` — Vibe has no MCP-config flag, only `VIBE_*` env vars | `--add-dir <dir>`, whose `AGENTS.md` it loads as project instructions | none — Vibe exposes no skill surface |
+| Harness | MCP config | Per-call timeout | Playbook | Shipped skill |
+|---|---|---|---|---|
+| Claude Code | `--mcp-config '<json>'`, bearer header expands `${ENSEMBLR_CONTROL_TOKEN}` | `timeout` (ms) in that JSON | `--append-system-prompt-file` | `--plugin-dir <bundle>` |
+| Codex | `-c mcp_servers.ensemblr.url=…` + `-c mcp_servers.ensemblr.bearer_token_env_var=…` | `-c mcp_servers.ensemblr.tool_timeout_sec=…`, unquoted — `-c` parses TOML, and a quoted number lands as a string the duration field rejects | none — reads the MCP server's `instructions` field as its tool-namespace description | none — Codex plugins use their own manifest format |
+| Mistral Vibe | `VIBE_MCP_SERVERS='<json>'` env prefix with `api_key_env` — Vibe has no MCP-config flag, only `VIBE_*` env vars | `tool_timeout_sec` in that JSON | `--add-dir <dir>`, whose `AGENTS.md` it loads as project instructions | none — Vibe exposes no skill surface |
+
+Every one of those three defaults to **60 seconds**, and a harness holds two
+control ops that block for longer: `ensemblr_wait_for_agents`, whose own
+guardrail allows five minutes, and a `wait: true` spawn. So Ensemblr writes the
+knob rather than inheriting it, from the one constant in
+`src/main/agent-control/mcp-tool-timeout.ts`. The Agent SDK path Claude Code's
+first-class runtime uses (`src/main/claude-agent/claude-mcp-config.ts`) sets the
+same `timeout` — and that path is the one that also holds
+`ensemblr_ask_user_question`, which a harness is never served. See
+[`agent-control.md`](./agent-control.md#how-the-questionnaire-behaves) for why
+raising it is the defence and progress notifications are only the second line.
 
 The playbook is `HARNESS_AWARENESS` (`src/shared/agent-control/awareness.ts`),
 rewritten to `<userData>/harness-instructions/AGENTS.md` on every harness launch

@@ -226,10 +226,15 @@ export interface ConversationPort {
 		agentSessionId: string;
 		name: string;
 	}) => Promise<{ applied: boolean; chatTabId: string; title: string } | null>;
-	/** Resolves once the session goes idle, or `'timeout'` after `timeoutMs`. */
+	/**
+	 * Resolves once the session goes idle, or `'timeout'` after `timeoutMs` — or
+	 * as soon as `signal` aborts, since a caller that has gone is not waiting for
+	 * the child any more.
+	 */
 	waitForIdle: (
 		agentSessionId: string,
 		timeoutMs: number,
+		signal?: AbortSignal,
 	) => Promise<'completed' | 'timeout'>;
 	/**
 	 * Live conversation status. Reads the in-memory snapshot only, with no
@@ -495,6 +500,12 @@ export interface ConfirmPort {
 	confirm: (input: {
 		origin: AgentControlOrigin;
 		summary: string;
+		/**
+		 * Aborts when the caller goes away while the prompt is up. An
+		 * implementation that cannot withdraw its dialog resolves false instead,
+		 * which is what stops a late approval firing an op nobody is waiting for.
+		 */
+		signal?: AbortSignal;
 	}) => Promise<boolean>;
 }
 

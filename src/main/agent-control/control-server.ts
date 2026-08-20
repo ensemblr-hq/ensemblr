@@ -234,11 +234,13 @@ async function handleInvoke(
  * @param req - Incoming request.
  * @param res - Server response.
  * @param service - Agent-control service the MCP tools delegate to.
+ * @param progressIntervalMs - Overrides the progress heartbeat; tests scale it down.
  */
 async function handleMcp(
 	req: IncomingMessage,
 	res: ServerResponse,
 	service: AgentControlService,
+	progressIntervalMs: number | undefined,
 ): Promise<void> {
 	const token = readToken(req);
 	if (!token) {
@@ -259,7 +261,7 @@ async function handleMcp(
 			return;
 		}
 	}
-	await handleMcpRequest(req, res, body, service, token);
+	await handleMcpRequest(req, res, body, service, token, progressIntervalMs);
 }
 
 /**
@@ -276,12 +278,12 @@ function sweepInterval(requestTimeoutMs: number): number {
 /**
  * Starts the loopback control server bound to 127.0.0.1 on an ephemeral port.
  * @param service - Agent-control service every request delegates to.
- * @param options - Overrides for the request-phase timeout; tests scale it down.
+ * @param options - Overrides for the request-phase timeout and the MCP progress heartbeat; tests scale both down.
  * @returns A promise resolving to the running server and its URL.
  */
 export function startControlServer(
 	service: AgentControlService,
-	options: { requestTimeoutMs?: number } = {},
+	options: { requestTimeoutMs?: number; progressIntervalMs?: number } = {},
 ): Promise<ControlServer> {
 	const requestTimeout = options.requestTimeoutMs ?? REQUEST_TIMEOUT_MS;
 	// Both settings only apply when Node reads them off the constructor options;
@@ -314,12 +316,19 @@ export function startControlServer(
 				return;
 			}
 			if (req.url === '/mcp') {
-				handleMcp(req, res, service).catch((error) => {
-					const detail = error instanceof Error ? error.message : String(error);
-					if (!res.headersSent) {
-						sendJson(res, 500, { ok: false, code: 'internal', error: detail });
-					}
-				});
+				handleMcp(req, res, service, options.progressIntervalMs).catch(
+					(error) => {
+						const detail =
+							error instanceof Error ? error.message : String(error);
+						if (!res.headersSent) {
+							sendJson(res, 500, {
+								ok: false,
+								code: 'internal',
+								error: detail,
+							});
+						}
+					},
+				);
 				return;
 			}
 			sendJson(res, 404, {

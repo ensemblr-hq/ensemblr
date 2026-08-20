@@ -4,6 +4,8 @@ import {
 	buildHarnessLaunchDecoration,
 	decorateHarnessCommand,
 	type HarnessLaunchContext,
+	MCP_TOOL_CALL_TIMEOUT_MS,
+	MCP_TOOL_CALL_TIMEOUT_SEC,
 } from '../../src/main/agent-control/index.ts';
 
 const URL = 'http://127.0.0.1:53219';
@@ -133,6 +135,39 @@ describe('buildHarnessLaunchDecoration', () => {
 			env: [],
 			flags: [],
 		});
+	});
+});
+
+// `ensemblr_ask_user_question` promises the agent it will wait for the user
+// however long they take, and every one of these clients would abandon the call
+// at 60 seconds on its own defaults. The launcher is the only place Ensemblr can
+// answer for them.
+describe('buildHarnessLaunchDecoration, per-call timeouts', () => {
+	const ONE_HOUR_SEC = 3600;
+
+	it('is set well past any plausible time away from the keyboard', () => {
+		expect(MCP_TOOL_CALL_TIMEOUT_SEC).toBeGreaterThanOrEqual(ONE_HOUR_SEC);
+		expect(MCP_TOOL_CALL_TIMEOUT_MS).toBe(MCP_TOOL_CALL_TIMEOUT_SEC * 1000);
+	});
+
+	it('raises Claude Code’s timeout in the milliseconds its config takes', () => {
+		const joined = buildHarnessLaunchDecoration('claude', URL).flags.join(' ');
+		expect(joined).toContain(`"timeout":${MCP_TOOL_CALL_TIMEOUT_MS}`);
+	});
+
+	// `-c` parses its value as TOML, so a quoted number would land as a string
+	// the duration field rejects and the whole launch would fail.
+	it('raises Codex’s tool_timeout_sec as an unquoted number of seconds', () => {
+		const joined = buildHarnessLaunchDecoration('codex', URL).flags.join(' ');
+		expect(joined).toContain(
+			`mcp_servers.ensemblr.tool_timeout_sec=${MCP_TOOL_CALL_TIMEOUT_SEC}'`,
+		);
+		expect(joined).not.toContain('tool_timeout_sec="');
+	});
+
+	it('raises Vibe’s tool_timeout_sec inside VIBE_MCP_SERVERS', () => {
+		const joined = buildHarnessLaunchDecoration('vibe', URL).env.join(' ');
+		expect(joined).toContain(`"tool_timeout_sec":${MCP_TOOL_CALL_TIMEOUT_SEC}`);
 	});
 });
 

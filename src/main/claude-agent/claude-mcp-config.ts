@@ -4,6 +4,7 @@ import {
 	CONTROL_TOKEN_ENV_KEY,
 	envVarReference,
 } from '../agent-control/control-env-keys.ts';
+import { MCP_TOOL_CALL_TIMEOUT_MS } from '../agent-control/mcp-tool-timeout.ts';
 import type { AgentControlMcpConfig } from '../agent-runtime/agent-types.ts';
 
 /**
@@ -24,6 +25,11 @@ const CONTROL_SERVER_NAME = 'ensemblr';
  * argument, so a literal token would be readable via `ps` by any process on the
  * machine. Claude expands the reference itself, exactly as the terminal-harness
  * launch decoration already relies on.
+ *
+ * `timeout` raises the per-call ceiling off the SDK's `MCP_TOOL_TIMEOUT`
+ * default, which `ensemblr_ask_user_question` would otherwise exhaust while the
+ * user is away from the keyboard. Claude documents it as a hard wall-clock
+ * limit that progress notifications do not extend, so this is the only lever.
  * @param control - Resolved control-server URL and this session's bearer token.
  * @returns The `mcpServers` option, or an empty map when control is unavailable.
  */
@@ -39,6 +45,7 @@ export function buildClaudeMcpServers(
 			headers: {
 				Authorization: `Bearer ${envVarReference(CONTROL_TOKEN_ENV_KEY)}`,
 			},
+			timeout: MCP_TOOL_CALL_TIMEOUT_MS,
 			type: 'http',
 			url: new URL('/mcp', control.url).toString(),
 		},

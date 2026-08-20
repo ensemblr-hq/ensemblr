@@ -15,6 +15,13 @@
  * server is a `VIBE_MCP_SERVERS` JSON assignment prefixed to the command —
  * which still carries the token variable's *name*, not its value.
  *
+ * Each server also carries a raised per-call timeout, because all three default
+ * to 60 seconds and a harness holds two control ops that block for longer:
+ * `ensemblr_wait_for_agents`, whose own guardrail allows five minutes, and a
+ * `wait: true` spawn. Claude takes milliseconds under `timeout`, Codex and Vibe
+ * seconds under `tool_timeout_sec`; the ceiling itself lives in
+ * `mcp-tool-timeout.ts`.
+ *
  * The instructions reach each harness differently, and Codex not at all. Claude
  * appends the file to its system prompt (`--append-system-prompt-file`); Vibe
  * discovers it as project instructions from an extra trusted root (`--add-dir`,
@@ -31,6 +38,10 @@
 import path from 'node:path';
 
 import { CONTROL_TOKEN_ENV_KEY, envVarReference } from './control-env-keys.ts';
+import {
+	MCP_TOOL_CALL_TIMEOUT_MS,
+	MCP_TOOL_CALL_TIMEOUT_SEC,
+} from './mcp-tool-timeout.ts';
 
 /** Env var carrying the per-workspace control token in a harness process. */
 const TOKEN_ENV_VAR = CONTROL_TOKEN_ENV_KEY;
@@ -74,9 +85,10 @@ function instructionsFile(directory: string | null): string | null {
 
 /**
  * Builds Claude Code's decoration: an inline `--mcp-config` whose bearer header
- * expands the token env var, the playbook appended to its system prompt, and
- * the shipped Agent Skill loaded as a session-only local plugin. All three work
- * in an interactive launch alongside `--dangerously-skip-permissions`.
+ * expands the token env var and whose `timeout` raises the per-call ceiling off
+ * Claude's `MCP_TOOL_TIMEOUT` default, the playbook appended to its system
+ * prompt, and the shipped Agent Skill loaded as a session-only local plugin. All
+ * work in an interactive launch alongside `--dangerously-skip-permissions`.
  * @param url - The control server's `/mcp` endpoint.
  * @param directory - Directory holding the harness playbook, or null.
  * @param skillPluginDirectory - Root of the shipped skill plugin, or null.
@@ -93,6 +105,7 @@ function claudeDecoration(
 				type: 'http',
 				url,
 				headers: { Authorization: `Bearer ${envVarReference(TOKEN_ENV_VAR)}` },
+				timeout: MCP_TOOL_CALL_TIMEOUT_MS,
 			},
 		},
 	});
@@ -110,9 +123,13 @@ function claudeDecoration(
 }
 
 /**
- * Builds Codex's decoration: `-c` overrides naming the server URL and the env
- * var holding its bearer token. Codex has no additive instructions flag, so the
- * playbook reaches it only as the MCP server's `instructions` field.
+ * Builds Codex's decoration: `-c` overrides naming the server URL, the env var
+ * holding its bearer token, and the per-call timeout that replaces Codex's
+ * 60-second `tool_timeout_sec` default. Codex has no additive instructions flag,
+ * so the playbook reaches it only as the MCP server's `instructions` field.
+ *
+ * The timeout override is deliberately unquoted: `-c` parses its value as TOML,
+ * and a quoted number would land as a string the duration field rejects.
  * @param url - The control server's `/mcp` endpoint.
  * @returns Codex's launch decoration.
  */
@@ -122,14 +139,15 @@ function codexDecoration(url: string): HarnessLaunchDecoration {
 		flags: [
 			`-c ${quote(`mcp_servers.ensemblr.url="${url}"`)}`,
 			`-c ${quote(`mcp_servers.ensemblr.bearer_token_env_var="${TOKEN_ENV_VAR}"`)}`,
+			`-c ${quote(`mcp_servers.ensemblr.tool_timeout_sec=${MCP_TOOL_CALL_TIMEOUT_SEC}`)}`,
 		],
 	};
 }
 
 /**
- * Builds Vibe's decoration: the server as a `VIBE_MCP_SERVERS` env assignment,
- * and the playbook's directory as an extra trusted root whose `AGENTS.md` Vibe
- * loads as project instructions.
+ * Builds Vibe's decoration: the server as a `VIBE_MCP_SERVERS` env assignment
+ * carrying the raised `tool_timeout_sec`, and the playbook's directory as an
+ * extra trusted root whose `AGENTS.md` Vibe loads as project instructions.
  * @param url - The control server's `/mcp` endpoint.
  * @param directory - Directory holding the harness playbook, or null.
  * @returns Vibe's launch decoration.
@@ -144,6 +162,7 @@ function vibeDecoration(
 			transport: 'streamable-http',
 			url,
 			api_key_env: TOKEN_ENV_VAR,
+			tool_timeout_sec: MCP_TOOL_CALL_TIMEOUT_SEC,
 		},
 	]);
 	return {

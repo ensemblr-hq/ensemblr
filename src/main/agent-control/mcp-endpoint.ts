@@ -15,6 +15,13 @@
  * tool the service would only refuse teaches the model to keep reaching for it,
  * which is why {@link withheldControlOps} answers both axes in one place rather
  * than each bridge inventing its own answer.
+ *
+ * A call that blocks on a human — `askUserQuestion` above all — is held open for
+ * as long as the user takes, so each one beats a progress notification while it
+ * waits and carries the caller's abort signal down into the service. Without the
+ * signal a client that gave up leaves its question on screen for a user to
+ * answer into a void; with it, the dialog is withdrawn the moment nobody is
+ * listening.
  */
 import type { IncomingMessage, ServerResponse } from 'node:http';
 
@@ -35,6 +42,7 @@ import {
 	withheldControlOps,
 } from '../../shared/agent-control.ts';
 import type { AgentControlService } from './agent-control-service.ts';
+import { withProgressHeartbeat } from './mcp-progress.ts';
 
 /** One MCP tool: its client-facing name, the control op, help text, and args. */
 export interface McpToolDef {
@@ -491,12 +499,14 @@ async function instructionsFor(
  * @param service - Agent-control service every tool delegates to.
  * @param token - Per-request bearer token identifying the caller.
  * @param audience - Whether the caller has a chat tab, and its lineage role.
+ * @param progressIntervalMs - Overrides the heartbeat interval; tests scale it down.
  * @returns A configured, not-yet-connected MCP server.
  */
 async function buildMcpServer(
 	service: AgentControlService,
 	token: string,
 	audience: ControlAudience,
+	progressIntervalMs: number | undefined,
 ): Promise<McpServer> {
 	const server = new McpServer(
 		{ name: 'ensemblr-control', version: '1.0.0' },
@@ -506,9 +516,23 @@ async function buildMcpServer(
 		server.registerTool(
 			def.name,
 			{ description: def.description, inputSchema: def.shape },
-			async (args: unknown) =>
+			async (args: unknown, extra) =>
 				toMcpResult(
-					await service.invoke({ op: def.op, token, rawArgs: args ?? {} }),
+					await withProgressHeartbeat(
+						{
+							intervalMs: progressIntervalMs,
+							progressToken: extra._meta?.progressToken,
+							sendNotification: extra.sendNotification,
+							toolName: def.name,
+						},
+						() =>
+							service.invoke({
+								op: def.op,
+								rawArgs: args ?? {},
+								signal: extra.signal,
+								token,
+							}),
+					),
 				),
 		);
 	}
@@ -525,6 +549,7 @@ async function buildMcpServer(
  * @param body - Parsed JSON-RPC body.
  * @param service - Agent-control service the tools delegate to.
  * @param token - Bearer token extracted from the request.
+ * @param progressIntervalMs - Overrides the heartbeat interval; tests scale it down.
  */
 export async function handleMcpRequest(
 	req: IncomingMessage,
@@ -532,11 +557,13 @@ export async function handleMcpRequest(
 	body: unknown,
 	service: AgentControlService,
 	token: string,
+	progressIntervalMs?: number,
 ): Promise<void> {
 	const server = await buildMcpServer(
 		service,
 		token,
 		await service.describeAudience(token),
+		progressIntervalMs,
 	);
 	const transport = new StreamableHTTPServerTransport({
 		sessionIdGenerator: undefined,

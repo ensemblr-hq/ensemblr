@@ -1,6 +1,7 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
-import { afterEach, describe, expect, it } from 'vitest';
+import { ProgressNotificationSchema } from '@modelcontextprotocol/sdk/types.js';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type {
 	AgentControlCommand,
@@ -192,6 +193,7 @@ describe('agent-control MCP endpoint', () => {
 				op: 'startTerminal',
 				token: 'secret-token',
 				rawArgs: { kind: 'run', scriptName: 'playground' },
+				signal: expect.any(AbortSignal),
 			},
 		]);
 		await client.close();
@@ -244,6 +246,7 @@ describe('agent-control MCP endpoint', () => {
 				op: 'startTerminal',
 				token: 'secret-token',
 				rawArgs: { kind: 'run' },
+				signal: expect.any(AbortSignal),
 			},
 		]);
 		const content = result.content as Array<{ type: string; text: string }>;
@@ -483,5 +486,170 @@ describe('agent-control MCP endpoint, per-origin surface', () => {
 		expect(
 			[...mentioned].filter((name) => !served.has(name) && !withheld.has(name)),
 		).toEqual([]);
+	});
+});
+
+/** A service whose every op blocks until the test releases it. */
+const makeBlockingService = (audience: ControlAudience = HARNESS_ROOT) => {
+	let announceStart: (command: AgentControlCommand) => void = () => {};
+	const started = new Promise<AgentControlCommand>((resolve) => {
+		announceStart = resolve;
+	});
+	let release: () => void = () => {};
+	const held = new Promise<void>((resolve) => {
+		release = resolve;
+	});
+	const service: AgentControlService = {
+		describeAudience: async () => audience,
+		invoke: async (command) => {
+			announceStart(command);
+			await held;
+			return { ok: true, data: { ok: true } };
+		},
+		readIssueDirective: async () => null,
+		readLanguageDirective: () => null,
+		readTurnPreamble: async () => null,
+		releaseSession: () => {},
+	};
+	return { release: () => release(), service, started };
+};
+
+const CHAT_TAB_ROOT: ControlAudience = {
+	delegation: 'ensemblr',
+	hasChatTab: true,
+	role: 'orchestrator',
+};
+
+// `ensemblr_ask_user_question` promises the agent it will wait however long the
+// user takes, and Ensemblr honours that on its own side. Nothing stops an MCP
+// client giving up first — so a pending call has to stay audible on the wire,
+// and the app has to learn when nobody is listening any more.
+describe('agent-control MCP endpoint, a call that outlives the client', () => {
+	it('beats progress notifications for as long as the call is pending', async () => {
+		const blocking = makeBlockingService(CHAT_TAB_ROOT);
+		server = await startControlServer(blocking.service, {
+			progressIntervalMs: 20,
+		});
+		const client = await connect('good');
+		const beats: { progress: number; message?: string }[] = [];
+
+		const call = client.callTool(
+			{
+				name: 'ensemblr_ask_user_question',
+				arguments: {
+					questions: [
+						{ question: 'Which?', options: [{ label: 'a' }, { label: 'b' }] },
+					],
+				},
+			},
+			undefined,
+			{
+				onprogress: (beat) => {
+					beats.push(beat);
+				},
+			},
+		);
+		await vi.waitFor(() => expect(beats.length).toBeGreaterThanOrEqual(3));
+		blocking.release();
+		await call;
+
+		// The count has to rise on every beat, or a client that resets its timeout
+		// on progress treats the repeats as one stalled update.
+		expect(beats.map((beat) => beat.progress)).toEqual(
+			beats.map((_, index) => index + 1),
+		);
+		expect(beats[0]?.message).toContain('ensemblr_ask_user_question');
+		await client.close();
+	});
+
+	it('sends no progress to a caller that asked for none', async () => {
+		const blocking = makeBlockingService(CHAT_TAB_ROOT);
+		server = await startControlServer(blocking.service, {
+			progressIntervalMs: 20,
+		});
+		const client = await connect('good');
+		const stray: unknown[] = [];
+		// Replaces the client's own progress handler, which would otherwise
+		// swallow a notification whose token it never handed out.
+		client.setNotificationHandler(
+			ProgressNotificationSchema,
+			(notification) => {
+				stray.push(notification);
+			},
+		);
+
+		const call = client.callTool({
+			name: 'ensemblr_list_workspaces',
+			arguments: {},
+		});
+		await blocking.started;
+		await new Promise((resolve) => setTimeout(resolve, 80));
+		blocking.release();
+		await call;
+
+		expect(stray).toEqual([]);
+		await client.close();
+	});
+
+	// The bug this suite exists for, in miniature: a client applying its own
+	// per-call timeout gives up while the app is still holding the question open,
+	// and every harness ships one — 60 seconds by default. Only raising it at
+	// launch fixes this, which is what `MCP_TOOL_CALL_TIMEOUT_MS` is for.
+	it('is abandoned by a client on its own timeout, however long the app holds', async () => {
+		const blocking = makeBlockingService(CHAT_TAB_ROOT);
+		server = await startControlServer(blocking.service);
+		const client = await connect('good');
+
+		const call = client.callTool(
+			{ name: 'ensemblr_list_workspaces', arguments: {} },
+			undefined,
+			{ timeout: 150 },
+		);
+
+		await expect(call).rejects.toThrow(/timed out/i);
+		blocking.release();
+		await client.close();
+	});
+
+	// The same call survives its client's timeout once the heartbeat is beating,
+	// for any client that honours the mechanism.
+	it('rides out that timeout for a client that resets on progress', async () => {
+		const blocking = makeBlockingService(CHAT_TAB_ROOT);
+		server = await startControlServer(blocking.service, {
+			progressIntervalMs: 20,
+		});
+		const client = await connect('good');
+
+		const call = client.callTool(
+			{ name: 'ensemblr_list_workspaces', arguments: {} },
+			undefined,
+			{ onprogress: () => {}, resetTimeoutOnProgress: true, timeout: 150 },
+		);
+		await new Promise((resolve) => setTimeout(resolve, 400));
+		blocking.release();
+
+		expect(await call).toMatchObject({ isError: false });
+		await client.close();
+	});
+
+	// A client that gave up leaves the questionnaire on screen for a user who
+	// answers it into a void. The signal is what withdraws the dialog instead.
+	it('aborts the control call once the client stops listening', async () => {
+		const blocking = makeBlockingService(CHAT_TAB_ROOT);
+		server = await startControlServer(blocking.service);
+		const client = await connect('good');
+
+		const call = client
+			.callTool({ name: 'ensemblr_list_workspaces', arguments: {} })
+			.catch(() => undefined);
+		const command = await blocking.started;
+		expect(command.signal?.aborted).toBe(false);
+
+		await client.close();
+		await vi.waitFor(() => {
+			expect(command.signal?.aborted).toBe(true);
+		});
+		blocking.release();
+		await call;
 	});
 });

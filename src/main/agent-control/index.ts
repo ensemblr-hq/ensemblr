@@ -22,6 +22,10 @@ export {
 	startControlServer,
 } from './control-server.ts';
 export {
+	DISPATCH_TIMEOUT_MS,
+	withDispatchDeadline,
+} from './dispatch-deadline.ts';
+export {
 	createGuardrails,
 	DEFAULT_GUARDRAIL_CONFIG,
 	type GuardrailConfig,
@@ -43,6 +47,11 @@ export {
 	TOOL_DEFS,
 	toolDefsFor,
 } from './mcp-endpoint.ts';
+export { withProgressHeartbeat } from './mcp-progress.ts';
+export {
+	MCP_TOOL_CALL_TIMEOUT_MS,
+	MCP_TOOL_CALL_TIMEOUT_SEC,
+} from './mcp-tool-timeout.ts';
 export {
 	createOriginRegistry,
 	type OriginRegistry,
