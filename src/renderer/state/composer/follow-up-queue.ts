@@ -2,7 +2,10 @@ import { atom, useAtomValue, useStore } from 'jotai';
 import { atomFamily } from 'jotai-family';
 import { useCallback, useMemo } from 'react';
 
-import type { QueuedFollowUp } from '@/renderer/types/workbench';
+import type {
+	FollowUpQueueHoldReason,
+	QueuedFollowUp,
+} from '@/renderer/types/workbench';
 
 /**
  * Messages waiting to reach a chat's agent once its current turn ends, keyed by
@@ -20,14 +23,16 @@ const followUpQueueAtomFamily = atomFamily((_chatTabId: string) =>
 );
 
 /**
- * Whether a chat's queue is paused, keyed by chat-tab id. Set when the user
- * stops a turn — a stop lowers the streaming flag exactly like a natural finish,
- * and draining into the silence the user just asked for would send the very
- * messages they were interrupting. Also set when a flush fails, so a broken
- * session cannot empty the queue into the void.
+ * Why a chat's queue is paused, keyed by chat-tab id, and null while it drains
+ * normally. Set when the user stops a turn — a stop lowers the streaming flag
+ * exactly like a natural finish, and draining into the silence the user just
+ * asked for would send the very messages they were interrupting — and when a
+ * send genuinely fails, so a broken session cannot empty the queue into the
+ * void. The reason travels with the flag because a pause the user cannot explain
+ * reads as the queue breaking rather than obeying them.
  */
-const followUpQueueHeldAtomFamily = atomFamily((_chatTabId: string) =>
-	atom(false),
+const followUpQueueHoldReasonAtomFamily = atomFamily((_chatTabId: string) =>
+	atom<FollowUpQueueHoldReason | null>(null),
 );
 
 /**
@@ -137,9 +142,9 @@ export interface FollowUpQueueApi {
 	entries: readonly QueuedFollowUp[];
 	/** Queues a draft and returns the entry it created. */
 	enqueue: (input: Omit<QueuedFollowUp, 'id' | 'queuedAt'>) => QueuedFollowUp;
-	/** True while the queue is paused and will not drain on its own. */
-	held: boolean;
-	hold: () => void;
+	/** Why the queue is paused and will not drain on its own, or null while it does. */
+	holdReason: FollowUpQueueHoldReason | null;
+	hold: (reason: FollowUpQueueHoldReason) => void;
 	move: (id: string, direction: 'down' | 'up') => void;
 	release: () => void;
 	/** Applies an explicit id order, which is what a drag hands back. */
@@ -168,7 +173,7 @@ export interface FollowUpQueueApi {
 export function useFollowUpQueue(chatTabId: string): FollowUpQueueApi {
 	const store = useStore();
 	const entries = useAtomValue(followUpQueueAtomFamily(chatTabId));
-	const held = useAtomValue(followUpQueueHeldAtomFamily(chatTabId));
+	const holdReason = useAtomValue(followUpQueueHoldReasonAtomFamily(chatTabId));
 
 	const update = useCallback(
 		(next: (queue: readonly QueuedFollowUp[]) => readonly QueuedFollowUp[]) => {
@@ -187,11 +192,13 @@ export function useFollowUpQueue(chatTabId: string): FollowUpQueueApi {
 				return entry;
 			},
 			entries,
-			held,
-			hold: () => store.set(followUpQueueHeldAtomFamily(chatTabId), true),
+			hold: (reason) =>
+				store.set(followUpQueueHoldReasonAtomFamily(chatTabId), reason),
+			holdReason,
 			move: (id, direction) =>
 				update((queue) => moveFollowUp(queue, id, direction)),
-			release: () => store.set(followUpQueueHeldAtomFamily(chatTabId), false),
+			release: () =>
+				store.set(followUpQueueHoldReasonAtomFamily(chatTabId), null),
 			remove: (id) => update((queue) => removeFollowUp(queue, id)),
 			reorder: (orderedIds) =>
 				update((queue) => reorderFollowUps(queue, orderedIds)),
@@ -221,38 +228,40 @@ export function useFollowUpQueue(chatTabId: string): FollowUpQueueApi {
 				return head;
 			},
 		}),
-		[chatTabId, entries, held, store, update],
+		[chatTabId, entries, holdReason, store, update],
 	);
 }
 
 /**
- * Evicts a chat's queue from the families. Call only when a chat tab is
- * permanently deleted, matching `forgetComposerDraft` — a closed but restorable
- * tab keeps its queue exactly as it keeps its draft.
+ * Evicts a chat's queue from the families, closed or deleted alike. A queued
+ * message drains only through a mounted composer, which a closed tab no longer
+ * has, so keeping one would park an undeliverable message the user has no memory
+ * of leaving — the same reason `dropComposerSubmits` discards queued chores.
  * @param chatTabId - Chat-tab id whose queue should be dropped
  */
 export function forgetFollowUpQueue(chatTabId: string): void {
 	followUpQueueAtomFamily.remove(chatTabId);
-	followUpQueueHeldAtomFamily.remove(chatTabId);
+	followUpQueueHoldReasonAtomFamily.remove(chatTabId);
 }
 
 /**
- * Pauses another chat's queue, for callers outside that chat's composer.
+ * Discards another chat's queue and reports how many messages went with it, for
+ * callers outside that chat's composer.
  *
- * The close path is the one that needs it: a tab closed with messages still
- * waiting keeps them, but reopening it a day later must not drain them into the
- * first turn that ends. Messages the user walked away from are exactly the ones
- * they have no memory of leaving, so they come back listed and paused.
- * @returns A callback that pauses the named chat's queue
+ * The close path is the one that needs it: the count is what lets the close say
+ * so, rather than silently dropping messages the user queued.
+ * @returns A callback that drops the named chat's queue and returns its length
  */
-export function useHoldFollowUpQueue(): (chatTabId: string) => void {
+export function useDropFollowUpQueue(): (chatTabId: string) => number {
 	const store = useStore();
 	return useCallback(
 		(chatTabId: string) => {
-			store.set(followUpQueueHeldAtomFamily(chatTabId), true);
+			const dropped = store.get(followUpQueueAtomFamily(chatTabId)).length;
+			forgetFollowUpQueue(chatTabId);
+			return dropped;
 		},
 		[store],
 	);
 }
 
-export { followUpQueueAtomFamily, followUpQueueHeldAtomFamily };
+export { followUpQueueAtomFamily, followUpQueueHoldReasonAtomFamily };

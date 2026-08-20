@@ -6,7 +6,7 @@ import { ComposerPanel } from '@/renderer/components/workbench-shell/conversatio
 import { FollowUpQueueList } from '@/renderer/components/workbench-shell/conversation-panel/composer/follow-up-queue-list';
 import {
 	followUpQueueAtomFamily,
-	followUpQueueHeldAtomFamily,
+	followUpQueueHoldReasonAtomFamily,
 	moveFollowUp,
 	removeFollowUp,
 	reorderFollowUps,
@@ -15,7 +15,10 @@ import {
 	type FollowUpBehavior,
 	followUpBehaviorAtom,
 } from '@/renderer/state/preferences';
-import type { QueuedFollowUp } from '@/renderer/types/workbench';
+import type {
+	FollowUpQueueHoldReason,
+	QueuedFollowUp,
+} from '@/renderer/types/workbench';
 
 import { useComposerStub } from './composer-fixtures.ts';
 import { createPlaygroundQueryClient } from './playground-query-client.ts';
@@ -104,7 +107,8 @@ export function ComposerQueueScene() {
 	const [disabled, setDisabled] = useState(false);
 	const [depth, setDepthState] = useState(3);
 	const [shape, setShapeState] = useState<'long' | 'short'>('short');
-	const [held, setHeldState] = useState(false);
+	const [pauseReason, setPauseReasonState] =
+		useState<FollowUpQueueHoldReason | null>(null);
 	const [lastAction, setLastAction] = useState<string | null>(null);
 
 	const chatTabId = 'playground-composer-queue-live';
@@ -151,11 +155,11 @@ export function ComposerQueueScene() {
 		[depth, seed],
 	);
 
-	const setHeld = useCallback(
-		(next: boolean) => {
-			setHeldState(next);
-			store.set(followUpQueueHeldAtomFamily(chatTabId), next);
-			setLastAction(next ? 'queue paused' : 'queue resumed');
+	const setPauseReason = useCallback(
+		(next: FollowUpQueueHoldReason | null) => {
+			setPauseReasonState(next);
+			store.set(followUpQueueHoldReasonAtomFamily(chatTabId), next);
+			setLastAction(next ? `queue paused — ${next}` : 'queue resumed');
 		},
 		[store],
 	);
@@ -208,7 +212,21 @@ export function ComposerQueueScene() {
 							/>
 						</ControlGroup>
 						<ControlGroup label='queue paused'>
-							<SceneOnOff isOn={held} onChange={setHeld} />
+							<SceneToggle
+								isActive={pauseReason === null}
+								label='no'
+								onClick={() => setPauseReason(null)}
+							/>
+							<SceneToggle
+								isActive={pauseReason === 'turn-stopped'}
+								label='turn stopped'
+								onClick={() => setPauseReason('turn-stopped')}
+							/>
+							<SceneToggle
+								isActive={pauseReason === 'send-failed'}
+								label='send failed'
+								onClick={() => setPauseReason('send-failed')}
+							/>
 						</ControlGroup>
 						<ControlGroup label='composer disabled'>
 							<SceneOnOff isOn={disabled} onChange={setDisabled} />

@@ -6,13 +6,19 @@ import { createStore, Provider } from 'jotai';
 import type { ReactNode } from 'react';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 
+const { toastWarning } = vi.hoisted(() => ({ toastWarning: vi.fn() }));
+
+vi.mock('sonner', () => ({ toast: { warning: toastWarning } }));
+
 import { ensemblrQueryKeys } from '../../src/renderer/api/ensemblr/query-keys';
 import { removeOpenChatTabFromCache } from '../../src/renderer/api/ensemblr-queries';
 import { useClearUnreadOnAgentTabClose } from '../../src/renderer/hooks/workspace/use-clear-unread-on-agent-tab-close';
+import { followUpQueueAtomFamily } from '../../src/renderer/state/composer';
 import type { UnreadChatEntry } from '../../src/renderer/state/unread/atoms';
 import { unreadChatEntriesAtom } from '../../src/renderer/state/unread/atoms';
 import { useSessionTabState } from '../../src/renderer/state/workspace';
 import type {
+	QueuedFollowUp,
 	SessionTabModel,
 	WorkspaceShellModel,
 } from '../../src/renderer/types/workbench';
@@ -76,6 +82,7 @@ let unsubscribe: ReturnType<typeof vi.fn>;
 
 beforeEach(() => {
 	installLocalStorage();
+	toastWarning.mockClear();
 	unsubscribe = vi.fn();
 	installEnsemblrApi({
 		onAgentControlTabsChanged: (
@@ -198,6 +205,18 @@ test('removing a tab before the cache has a snapshot reports nothing dropped', (
 	).toBeNull();
 });
 
+/** Builds a queued follow-up for the tab whose close is under test. */
+function queuedFollowUp(id: string, text: string): QueuedFollowUp {
+	return {
+		id,
+		queuedAt: '2026-08-19T00:00:00.000Z',
+		segments: [{ kind: 'text', text }],
+		snapshot: null,
+		source: 'user',
+		text,
+	};
+}
+
 /** Mounts `useSessionTabState` over a store seeded with one mark for `session-a`. */
 function renderCloseFlow(closeChatTab: () => Promise<unknown>) {
 	const activeSession: SessionTabModel = {
@@ -262,6 +281,41 @@ test('the user closing a tab clears the mark its session left behind', async () 
 	});
 
 	expect(store.get(unreadChatEntriesAtom)).toEqual([]);
+});
+
+test('closing a tab with messages queued drops them and says so', async () => {
+	// A queued follow-up drains only through a mounted composer, which a closed
+	// tab no longer has. Restoring one paused left the user a queue that would not
+	// move and could not explain itself, so the close discards it the way it
+	// already discards a queued chore.
+	const { store, view } = renderCloseFlow(
+		vi.fn(async () => ({ deleted: false, ok: true })),
+	);
+	store.set(followUpQueueAtomFamily('tab-a'), [
+		queuedFollowUp('queued-1', 'first'),
+		queuedFollowUp('queued-2', 'second'),
+	]);
+
+	await act(async () => {
+		await view.result.current.closeSessionTabAsync('tab-a');
+	});
+
+	expect(store.get(followUpQueueAtomFamily('tab-a'))).toEqual([]);
+	expect(toastWarning).toHaveBeenCalledWith(
+		'Cancelled 2 queued messages for the closed chat.',
+	);
+});
+
+test('closing a tab with nothing queued says nothing', async () => {
+	const { view } = renderCloseFlow(
+		vi.fn(async () => ({ deleted: false, ok: true })),
+	);
+
+	await act(async () => {
+		await view.result.current.closeSessionTabAsync('tab-a');
+	});
+
+	expect(toastWarning).not.toHaveBeenCalled();
 });
 
 test('a close that fails leaves the mark standing with the tab it belongs to', async () => {

@@ -44,6 +44,10 @@
 		}
 	},
 	"chat-tab": {
+		"dropped-follow-ups": {
+			"title_one": "Cancelled a queued message for the closed chat.",
+			"title_other": "Cancelled {{count}} queued messages for the closed chat."
+		},
 		"dropped-submits": {
 			"title_one": "Cancelled a queued action for the closed chat.",
 			"title_other": "Cancelled {{count}} queued actions for the closed chat."

@@ -1,6 +1,6 @@
 import { useAtomValue } from 'jotai';
 import type { EditorState } from 'lexical';
-import { type RefObject, useCallback, useState } from 'react';
+import { type RefObject, useCallback, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { ComposerEditorHandle } from '@/renderer/components/workbench-shell/conversation-panel/composer/editor';
@@ -36,6 +36,49 @@ interface ComposerDraft {
 	segments: readonly ComposerDraftSegment[];
 	snapshot?: EditorState | null;
 	text: string;
+}
+
+/**
+ * How far one send got, which is what tells a benign refusal apart from a broken
+ * session. `rejected` is the composer declining to take it this instant — a send
+ * already in flight, or a composer not yet ready — and surfaces nothing to the
+ * user, because nothing is wrong; `failed` is a send that was attempted and did
+ * not land, and always leaves an error on screen. Collapsing the two is what let
+ * a race pause a queue as if the session had broken.
+ */
+type ComposerSendOutcome = 'failed' | 'rejected' | 'sent';
+
+/**
+ * Every entry's run of refusals, keyed by entry id, so a queue the composer keeps
+ * turning away eventually stops asking. Keyed per entry rather than held as one
+ * slot because a steer on another row would otherwise wipe the head's run and
+ * leave the bound permanently out of reach.
+ */
+type QueuedDeliveryAttempts = ReadonlyMap<string, number>;
+
+/** No entry has been turned away, which is also what a landed send resets to. */
+const NO_DELIVERY_ATTEMPTS: QueuedDeliveryAttempts = new Map();
+
+/**
+ * How many times one queued entry may be turned away before the queue pauses for
+ * real. Bounded because a refusal the composer will never lift — an entry with
+ * nothing left to send, a composer disabled for good — would otherwise retry
+ * forever.
+ */
+export const MAX_QUEUED_DELIVERY_ATTEMPTS = 5;
+
+/**
+ * Counts one more refusal against one entry, leaving every other entry's run
+ * where it was.
+ * @param previous - The runs recorded so far
+ * @param entryId - Entry the composer has just turned away
+ * @returns A new map including this refusal
+ */
+function countAttempt(
+	previous: QueuedDeliveryAttempts,
+	entryId: string,
+): QueuedDeliveryAttempts {
+	return new Map(previous).set(entryId, (previous.get(entryId) ?? 0) + 1);
 }
 
 /**
@@ -177,6 +220,10 @@ export function useComposerSubmit({
 }) {
 	const { t } = useTranslation();
 	const [pending, setPending] = useState(false);
+	// A ref rather than state: a refusal already re-renders through the requeue,
+	// and counting it in state would make every attempt a second render for a
+	// number nothing on screen reads.
+	const attemptsRef = useRef<QueuedDeliveryAttempts>(NO_DELIVERY_ATTEMPTS);
 	const followUp = useAtomValue(followUpBehaviorAtom);
 	const queue = useFollowUpQueue(chatTabId);
 	const linkedDirectories = useAtomValue(
@@ -190,9 +237,9 @@ export function useComposerSubmit({
 				fromQueue?: boolean;
 				streamingBehavior?: 'steer' | 'followUp';
 			},
-		): Promise<boolean> => {
+		): Promise<ComposerSendOutcome> => {
 			if (composer.disabled || pending || isEmptyDraft(outgoing)) {
-				return false;
+				return 'rejected';
 			}
 			const { fromQueue, streamingBehavior } = options ?? {};
 			const draft = draftLifecycle(editorRef, outgoing, fromQueue);
@@ -219,9 +266,9 @@ export function useComposerSubmit({
 				if (outcome?.error) {
 					draft.restore();
 					setAttachmentError(outcome.error);
-					return false;
+					return 'failed';
 				}
-				return true;
+				return 'sent';
 			} catch (cause) {
 				draft.restore();
 				setAttachmentError(
@@ -233,7 +280,7 @@ export function useComposerSubmit({
 						),
 					),
 				);
-				return false;
+				return 'failed';
 			} finally {
 				setPending(false);
 			}
@@ -243,17 +290,26 @@ export function useComposerSubmit({
 
 	/**
 	 * Sends an entry the queue handed over, putting it back where it came from
-	 * and pausing the queue when it does not land. One place owns what a failed
-	 * queued send means, so the automatic flush, the header's resume, and a row's
-	 * steer cannot recover from it differently.
+	 * when it does not go. One place owns what an undelivered queued send means,
+	 * so the automatic flush, the header's resume, and a row's steer cannot
+	 * recover from it differently.
+	 *
+	 * Only a real failure pauses the queue. A send the composer merely turned away
+	 * goes back on the queue and is re-attempted the moment the composer can take
+	 * it — that refusal is a race between a turn ending and the previous send
+	 * settling, not a broken session, and pausing on it stopped queues for reasons
+	 * the user could neither see nor reproduce. A run of refusals at one entry does
+	 * eventually pause, since a composer that never frees up is a failure in slow
+	 * motion; that pause puts its own reason in the error strip, because a refusal
+	 * surfaces nothing on its own and `send-failed` must never be the only thing on
+	 * screen accounting for a stopped queue.
 	 *
 	 * `restoreAt` is what keeps that shared recovery honest for a row that was not
 	 * the head: the flush only ever hands over the front of the queue, but a steer
 	 * can lift the third message out, and dropping that one back at the front on a
 	 * failure reorders a queue the user arranged deliberately.
 	 * @param entry - The entry taken off the queue
-	 * @param options - Where to put it back on a failure, and the frame to deliver it in mid-turn
-	 * @returns Whether it was delivered
+	 * @param options - Where to put it back when it does not go, and the frame to deliver it in mid-turn
 	 */
 	const submitQueued = useCallback(
 		async (
@@ -262,8 +318,8 @@ export function useComposerSubmit({
 				restoreAt?: number;
 				streamingBehavior?: 'steer' | 'followUp';
 			},
-		): Promise<boolean> => {
-			const delivered = await submitText(
+		): Promise<void> => {
+			const outcome = await submitText(
 				{
 					segments: entry.segments,
 					snapshot: entry.snapshot,
@@ -271,13 +327,28 @@ export function useComposerSubmit({
 				},
 				{ fromQueue: true, streamingBehavior: options?.streamingBehavior },
 			);
-			if (!delivered) {
-				queue.requeue(entry, options?.restoreAt);
-				queue.hold();
+			if (outcome === 'sent') {
+				attemptsRef.current = NO_DELIVERY_ATTEMPTS;
+				return;
 			}
-			return delivered;
+			queue.requeue(entry, options?.restoreAt);
+			if (outcome === 'rejected') {
+				const attempts = countAttempt(attemptsRef.current, entry.id);
+				if ((attempts.get(entry.id) ?? 0) < MAX_QUEUED_DELIVERY_ATTEMPTS) {
+					attemptsRef.current = attempts;
+					return;
+				}
+				setAttachmentError(
+					t(
+						'workbench:composer.queued-send-refused',
+						'The composer never became ready for the queued message, so the queue is paused.',
+					),
+				);
+			}
+			attemptsRef.current = NO_DELIVERY_ATTEMPTS;
+			queue.hold('send-failed');
 		},
-		[queue, submitText],
+		[queue, setAttachmentError, submitText, t],
 	);
 
 	/**
@@ -385,7 +456,7 @@ export function useComposerSubmit({
 	// there is still nothing the user can do, so it stays false until the turn
 	// ends rather than offering a control that would no-op.
 	const queueStalled =
-		queue.held ||
+		queue.holdReason !== null ||
 		(!composer.isStreaming &&
 			queueHead !== undefined &&
 			!flushesAutomatically(queueHead, followUp));
@@ -399,7 +470,7 @@ export function useComposerSubmit({
 		 * the user was cutting short.
 		 */
 		handleStop: useCallback(async () => {
-			queue.hold();
+			queue.hold('turn-stopped');
 			await composer.onStop();
 		}, [composer, queue]),
 		/**

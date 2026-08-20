@@ -6,7 +6,10 @@ import { describe, expect, test, vi } from 'vitest';
 
 import { FollowUpQueueList } from '../../../src/renderer/components/workbench-shell/conversation-panel/composer/follow-up-queue-list';
 import { FollowUpQueueStack } from '../../../src/renderer/components/workbench-shell/conversation-panel/composer/follow-up-queue-stack';
-import type { QueuedFollowUp } from '../../../src/renderer/types/workbench';
+import type {
+	FollowUpQueueHoldReason,
+	QueuedFollowUp,
+} from '../../../src/renderer/types/workbench';
 import { renderWithProviders } from '../support/dom';
 
 /** Builds a queued entry, optionally carrying one attachment chip. */
@@ -72,7 +75,12 @@ function renderList(
 /** Renders the stack over the given entries, returning the spies for assertions. */
 function renderStack(
 	entries: readonly QueuedFollowUp[],
-	options: { paused?: boolean; stalled?: boolean } = {},
+	options: {
+		/** Mirrors a composer that cannot take a send, which nulls both controls. */
+		canDeliver?: boolean;
+		pauseReason?: FollowUpQueueHoldReason;
+		stalled?: boolean;
+	} = {},
 ) {
 	const onClear = vi.fn();
 	const onSendNow = vi.fn();
@@ -84,10 +92,10 @@ function renderStack(
 			onMove={vi.fn()}
 			onRemove={vi.fn()}
 			onReorder={vi.fn()}
-			onSendNow={onSendNow}
+			onSendNow={options.canDeliver === false ? null : onSendNow}
 			onSteer={vi.fn()}
-			paused={options.paused ?? false}
-			stalled={options.stalled ?? options.paused ?? false}
+			pauseReason={options.pauseReason ?? null}
+			stalled={options.stalled ?? options.pauseReason !== undefined}
 			streaming
 		/>,
 	);
@@ -128,19 +136,46 @@ describe('the queue stack', () => {
 		expect(screen.queryByRole('button', { name: 'Send next' })).toBeNull();
 	});
 
-	test('a paused queue says so and offers to resume', async () => {
+	test('a queue paused by a stop says which pause it was and offers to resume', async () => {
 		// A stalled queue is waiting on the user, not the agent, so it has to say so
 		// and hand them the control. Without it a block-mode queue has no exit.
 		const { onSendNow } = renderStack([entry('a', 'waiting')], {
-			paused: true,
+			pauseReason: 'turn-stopped',
 		});
 
 		expect(
-			screen.getByText('Paused — nothing sends until you resume'),
+			screen.getByText('Paused — you stopped the turn these were waiting for'),
 		).toBeInTheDocument();
 		await userEvent.click(screen.getByRole('button', { name: 'Resume' }));
 
 		expect(onSendNow).toHaveBeenCalledTimes(1);
+	});
+
+	test('a queue paused by a failed send names that instead', () => {
+		// The two pauses look identical on screen, so the wording is the only thing
+		// that tells a user who stopped nothing why their queue will not move.
+		renderStack([entry('a', 'waiting')], { pauseReason: 'send-failed' });
+
+		expect(
+			screen.getByText('Paused — the last message could not be sent'),
+		).toBeInTheDocument();
+		expect(screen.getByRole('button', { name: 'Resume' })).toBeInTheDocument();
+	});
+
+	test('resume is offered but disabled while the composer cannot send', async () => {
+		// Resuming hands the head straight to the send pipeline, which refuses it
+		// outright while the composer is busy — and a run of refusals pauses the
+		// queue. The control stays visible so the exit is still legible.
+		const { onSendNow } = renderStack([entry('a', 'waiting')], {
+			canDeliver: false,
+			pauseReason: 'turn-stopped',
+		});
+
+		const resume = screen.getByRole('button', { name: 'Resume' });
+		expect(resume).toBeDisabled();
+		await userEvent.click(resume);
+
+		expect(onSendNow).not.toHaveBeenCalled();
 	});
 
 	test('a block-mode queue is held back rather than paused', async () => {

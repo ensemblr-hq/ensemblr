@@ -153,6 +153,16 @@ export type ComposerSendIntent = 'hold' | 'queue' | 'send';
 export type QueuedFollowUpSource = 'chore' | 'user';
 
 /**
+ * Why a chat's follow-up queue is paused, so the strip can say which pause it
+ * was rather than only that one happened. `turn-stopped` is the turn the user
+ * interrupted, whose queued messages must not go out as if the interruption
+ * never happened; `send-failed` is a session that would not take the message, so
+ * draining the rest would empty the queue into the void. A composer that merely
+ * cannot accept a send this instant is neither — that send is retried.
+ */
+export type FollowUpQueueHoldReason = 'send-failed' | 'turn-stopped';
+
+/**
  * One message waiting to go to the agent once the current turn ends.
  *
  * Carries the whole draft rather than a serialized prompt: attachment content is

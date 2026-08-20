@@ -37,6 +37,7 @@ import type {
 	ComposerDraftSegment,
 	ComposerSendIntent,
 	ComposerShellState,
+	FollowUpQueueHoldReason,
 	LinkedDirectory,
 	MentionMatch,
 	QueuedFollowUp,
@@ -80,8 +81,8 @@ export interface ComposerStateApi {
 	followUpQueue: readonly QueuedFollowUp[];
 	/** Sends the head of a stalled queue now, resuming automatic draining with it. */
 	flushQueueNow: () => void;
-	/** True once a stop or a failed send has paused the queue outright. */
-	queuePaused: boolean;
+	/** Why a stop or a failed send paused the queue outright, or null while it is not paused. */
+	queuePauseReason: FollowUpQueueHoldReason | null;
 	/**
 	 * True while the queue is waiting on the user rather than on the agent: after
 	 * a stop or a failed flush, or once a `block`-mode queue outlives its turn.
@@ -492,7 +493,7 @@ export function useComposerState({
 		followUpQueue: queue.entries,
 		flushQueueNow,
 		moveQueued: queue.move,
-		queuePaused: queue.held,
+		queuePauseReason: queue.holdReason,
 		queueStalled,
 		removeQueued: queue.remove,
 		reorderQueue: queue.reorder,
