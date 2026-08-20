@@ -5,8 +5,10 @@ import { createCodePlugin } from '@streamdown/code';
 import { math } from '@streamdown/math';
 import { mermaid } from '@streamdown/mermaid';
 import { useAtomValue } from 'jotai';
+import { ImageOffIcon } from 'lucide-react';
 import type { ComponentProps, ReactNode } from 'react';
-import { Children, memo, useMemo } from 'react';
+import { Children, memo, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Streamdown } from 'streamdown';
 import {
 	attachmentPathFromInlineCode,
@@ -14,6 +16,7 @@ import {
 	isOutsideWorkspacePath,
 } from '@/renderer/lib/agent-timeline';
 import { toBundledLanguage } from '@/renderer/lib/language-from-path';
+import { MARKDOWN_REHYPE_PLUGINS } from '@/renderer/lib/markdown-rehype-plugins';
 import { cn } from '@/renderer/lib/utils';
 import {
 	markdownStyleAtom,
@@ -84,6 +87,7 @@ export const MessageResponse = memo(
 				)}
 				components={answerComponents}
 				plugins={plugins}
+				rehypePlugins={MARKDOWN_REHYPE_PLUGINS}
 				{...props}
 			/>
 		);
@@ -130,10 +134,40 @@ function MessageCodeBlock({ children, className }: FencedCodeProps) {
  * the fetch until the image scrolls into view keeps a thread nobody opened from
  * announcing itself, and dropping the referrer keeps the request from carrying
  * where in the app it came from.
+ *
+ * A host that refuses the fetch is the ordinary case rather than the exception —
+ * an expired link, a private asset, an offline machine — and the platform's
+ * answer to it is a broken-image glyph that reads as a rendering fault in the
+ * app. A failed load falls back to a placeholder carrying the alt text instead,
+ * which is the description the author wrote for exactly this.
  */
 function MessageImage({ className, node: _node, ...props }: MessageImageProps) {
+	const { t } = useTranslation();
+	const [failedSrc, setFailedSrc] = useState<string | null>(null);
 	if (!props.src) {
 		return null;
+	}
+	if (failedSrc === props.src) {
+		return (
+			<span
+				className={cn(
+					'inline-flex max-w-full items-center gap-1.5 rounded-md border border-border border-dashed bg-muted/40 px-2 py-1 align-middle text-muted-foreground text-xs',
+					className,
+				)}
+				data-streamdown='image-unavailable'
+			>
+				<ImageOffIcon aria-hidden='true' className='size-3.5 shrink-0' />
+				<span className='truncate'>
+					{props.alt
+						? t(
+								'common:message-image.unavailable-alt',
+								'{{description}} (image unavailable)',
+								{ description: props.alt },
+							)
+						: t('common:message-image.unavailable', 'Image unavailable')}
+				</span>
+			</span>
+		);
 	}
 	return (
 		<img
@@ -142,6 +176,7 @@ function MessageImage({ className, node: _node, ...props }: MessageImageProps) {
 			className={cn('inline-block max-w-full align-middle', className)}
 			data-streamdown='image'
 			loading='lazy'
+			onError={() => setFailedSrc(props.src ?? null)}
 			referrerPolicy='no-referrer'
 		/>
 	);

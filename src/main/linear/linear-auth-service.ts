@@ -75,6 +75,8 @@ export interface CreateLinearAuthServiceOptions {
 	getLanguage?: () => AppLanguage;
 	idFactory?: () => string;
 	now?: () => Date;
+	/** Notified after an account's grant is revoked, so caches keyed on it can drop it. */
+	onDisconnect?: (accountId: string) => void;
 	openExternal: (url: string) => Promise<void>;
 	secretStoreFactory: (database: DatabaseSync) => SecretStore | null;
 }
@@ -110,6 +112,7 @@ export function createLinearAuthService({
 	getLanguage = () => FALLBACK_LANGUAGE,
 	idFactory,
 	now = () => new Date(),
+	onDisconnect,
 	openExternal,
 	secretStoreFactory,
 }: CreateLinearAuthServiceOptions): LinearAuthService {
@@ -603,6 +606,7 @@ export function createLinearAuthService({
 
 				await store.delete(accountId);
 				refreshInFlight.delete(accountId);
+				onDisconnect?.(accountId);
 
 				const accounts = store.list().map(snapshotOf);
 

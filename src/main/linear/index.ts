@@ -8,6 +8,20 @@ export {
 	toAccountSnapshot,
 } from './linear-account-store.ts';
 export {
+	type CachedLinearAsset,
+	createLinearAssetCache,
+	type LinearAssetCache,
+} from './linear-asset-cache.ts';
+export {
+	registerLinearAssetProtocol,
+	registerLinearAssetScheme,
+} from './linear-asset-protocol.ts';
+export {
+	type CreateLinearAssetProxyOptions,
+	createLinearAssetProxy,
+	type LinearAssetProxy,
+} from './linear-asset-proxy.ts';
+export {
 	type CreateLinearAuthServiceOptions,
 	createLinearAuthService,
 	LinearAuthError,
