@@ -7,13 +7,14 @@ import type {
 	ToolBadgeDescriptor,
 	ToolBodyDescriptor,
 	ToolGlyph,
-	ToolPresentation,
+	ToolPresenterResult,
 	ToolPreviewDescriptor,
 } from '@/renderer/types/tool-presentation';
 import { isPreviewableImagePath } from '@/shared/preview-media';
 import { ensemblrToolGlyph } from './ensemblr-tool-presentation';
 import { parseNumberedFileBody } from './numbered-file-body';
 import { shellCommandTitle } from './shell-command-title';
+import { TASK_TOOL_GLYPHS, TASK_TOOL_PRESENTERS } from './task-tool-presenters';
 import { parseToolDiagnostics } from './tool-diagnostics';
 import { classifyToolOutput } from './tool-output-classifier';
 import {
@@ -45,6 +46,7 @@ const IMAGE_READ_PLACEHOLDER = /^Read image file \[[^[\]]+\]$/;
  * turn would mean re-serializing every payload on every render.
  */
 const TOOL_GLYPHS: Record<string, ToolGlyph> = {
+	...TASK_TOOL_GLYPHS,
 	agent: 'bot',
 	bash: 'terminal',
 	cli: 'terminal',
@@ -66,15 +68,6 @@ const TOOL_GLYPHS: Record<string, ToolGlyph> = {
 	view: 'file-text',
 	write: 'file-plus',
 	write_file: 'file-plus',
-};
-
-/**
- * Everything a presenter decides. The glyph normally follows from the tool's
- * name, so it stays optional here; a presenter sets it only to override that
- * default, e.g. an image `read` marking itself distinctly from a text one.
- */
-export type ToolPresenterResult = Omit<ToolPresentation, 'glyph'> & {
-	glyph?: ToolGlyph;
 };
 
 /**
@@ -591,6 +584,7 @@ const PRESENTERS: Record<
 	string,
 	(part: DynamicToolUIPart) => ToolPresenterResult
 > = {
+	...TASK_TOOL_PRESENTERS,
 	agent: presentSubagent,
 	bash: presentBash,
 	cli: presentBash,

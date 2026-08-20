@@ -1119,6 +1119,36 @@
 			"named": "Суб-агент: {{type}}",
 			"title": "Суб-агент"
 		},
+		"task": {
+			"list_one": "{{count}} задача",
+			"list_few": "{{count}} задачи",
+			"list_many": "{{count}} задач",
+			"list_other": "{{count}} задачи",
+			"list-empty": "Нет задач",
+			"list-title": "Список задач",
+			"named": "Задача: {{subject}}",
+			"numbered": "Задача #{{number}}: {{subject}}",
+			"numbered-only": "Задача #{{number}}",
+			"output": "Вывод задачи: {{id}}",
+			"output-title": "Вывод задачи",
+			"planned_one": "Запланирована {{count}} задача",
+			"planned_few": "Запланировано {{count}} задачи",
+			"planned_many": "Запланировано {{count}} задач",
+			"planned_other": "Запланировано {{count}} задачи",
+			"status": {
+				"completed": "Выполнено",
+				"deleted": "Удалено",
+				"in-progress": "В работе",
+				"pending": "В ожидании",
+				"unknown": "Неизвестно"
+			},
+			"stop-title": "Задача остановлена",
+			"stopped": "Задача {{id}} остановлена",
+			"title": "Задача",
+			"transition": "Задача #{{number}} → {{status}}",
+			"transition-only": "Задача → {{status}}",
+			"untitled": "Задача без названия"
+		},
 		"write": {
 			"title": "Запись"
 		}

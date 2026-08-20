@@ -36,6 +36,8 @@ export {
 	groupSubagentActivity,
 	parentToolCallIdOf,
 } from './subagent-parts.ts';
+export { foldTaskPlanRuns } from './task-plan-runs.ts';
+export { presentTaskPlan } from './task-tool-presenters.ts';
 export { parseToolDiagnostics } from './tool-diagnostics.ts';
 export {
 	classifyToolOutput,

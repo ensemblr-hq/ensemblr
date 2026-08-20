@@ -36,6 +36,7 @@ Rules of thumb:
 | Harness | Харнесс | Harness | The Claude Code / Codex terminal integration. Ensemblr-specific. |
 | Agent | Агент | Πράκτορας | |
 | Sub-agent | Суб-агент | Υποπράκτορας | An agent another agent delegated to — Claude Code's `Task` tool, and Ensemblr's own spawned conversations. Both terms were already fixed by the control-tool copy; this row records them. |
+| Task *(the agent's own)* | Задача | Εργασία | One item on the checklist an agent keeps for itself — Claude Code's `TaskCreate`/`TaskUpdate` tools, rendered in the timeline. Russian shares `Задача` with `Issue` below by an explicit decision: `Задание` was considered and rejected as stilted, and the two never share a surface — a task row lives in the chat timeline, a Linear issue in its own panel. Greek keeps them apart anyway (`Ζήτημα` for the issue, `Εργασία` here). Its states reuse the wording already fixed for a board: `Pending` → `В ожидании`/`Σε αναμονή`, `In progress` → `В работе`/`Σε εξέλιξη`, `Completed` → `Выполнено`/`Ολοκληρώθηκε`. |
 | Conversation | Диалог | Συνομιλία | The chat tab's thread. |
 | Chat | Чат | Συνομιλία | The tab as the user opens it — `New chat` is `Новый чат`/`Νέα συνομιλία`. Russian splits the two: the thing you open is a `чат`, the thread inside it is a `диалог`. Greek uses `συνομιλία` for both. One exception in Russian: a chat that is over — a closed tab in history, a transcript offered to the composer — is named for the thread it left behind, so `Untitled chat` is `Диалог без названия` (`session-tabs.untitled-closed`, `review:file-diff.untitled-chat`). |
 | Turn | Ход | Γύρος | One agent request/response cycle. |
@@ -59,7 +60,7 @@ Rules of thumb:
 | Limit window | Окно лимита | Παράθυρο ορίου | One rolling rate-limit period (5-hour, weekly). Named for the period, not the ceiling. |
 | Resets | Сброс | Επαναφορά | When a limit window starts over. The noun in both, so `Resets in 3h` reads as `Сброс через 3 часа`/`Επαναφορά σε 3 ώρες`. |
 | Extra usage (overage) | Сверх тарифа | Επιπλέον χρήση | Spend past the plan's included allowance, billed on top of it. Russian takes the prepositional phrase rather than a noun — `перерасход` reads as an accounting overrun the user caused, not as a bucket the plan offers. |
-| Issue | Задача | Ζήτημα | Linear issue. |
+| Issue | Задача | Ζήτημα | Linear issue. Russian shares `Задача` with `Task (the agent's own)` above; see that row for why the two are allowed to collide. |
 | Issue state bucket | — | — | Linear's normalized `stateType`, which the browse list groups by because a team names its own columns freely. Six rows, five of them reusing the `Board status` wording above so one word never means two things: `Backlog` → `Бэклог`/`Εκκρεμότητες`, `In progress` → `В работе`/`Σε εξέλιξη`, `Done` → `Готово`/`Ολοκληρώθηκε`, `Canceled` → `Отменено`/`Ακυρώθηκε`. |
 | Todo *(state bucket)* | К выполнению | Προς υλοποίηση | The bucket between `Backlog` and `In progress` — accepted work nobody has started. Kept as a phrase rather than borrowing `Todo`, which reads as a code marker in both languages. |
 | Triage *(state bucket)* | Разбор | Διαλογή | Linear's intake queue: filed but not yet accepted into a team's flow. Russian takes `Разбор` over the transliterated `Триаж`, which is medical; Greek takes `Διαλογή`, the ordinary sorting sense. |

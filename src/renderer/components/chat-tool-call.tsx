@@ -5,6 +5,7 @@ import {
 	presentCustomMessage,
 	presentReasoning,
 	presentSkillInvocation,
+	presentTaskPlan,
 	presentToolCall,
 } from '@/renderer/lib/agent-timeline';
 import type { PiCustomMessageData } from '@/renderer/types/agent-timeline';
@@ -27,6 +28,25 @@ export function ChatToolCall({ part }: { part: DynamicToolUIPart }) {
 	const presentation = useMemo(
 		() => presentToolCall(part),
 		[part, i18n.language],
+	);
+	return <ToolRow presentation={presentation} />;
+}
+
+/**
+ * The plan a run of task creations added up to, rendered as one checklist row
+ * rather than as one row per task. The agent files a plan a task at a time, and
+ * the run is the only place its shape survives.
+ */
+export function ChatTaskPlan({
+	parts,
+}: {
+	parts: readonly DynamicToolUIPart[];
+}) {
+	const { i18n } = useTranslation();
+	// biome-ignore lint/correctness/useExhaustiveDependencies: the presenter translates through the i18n singleton, so the language is a real input Biome cannot see.
+	const presentation = useMemo(
+		() => presentTaskPlan(parts),
+		[parts, i18n.language],
 	);
 	return <ToolRow presentation={presentation} />;
 }
