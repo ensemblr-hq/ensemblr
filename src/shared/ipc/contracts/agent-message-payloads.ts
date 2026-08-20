@@ -19,6 +19,9 @@ export type AgentEventStreamWire = 'protocol' | 'stderr';
  * actions off, tagged by main when the event is persisted. It is optional
  * because rows written before the taxonomy shipped carry none — the renderer
  * re-classifies those on read.
+ *
+ * `resetsAt` is the ISO instant a self-clearing failure lifts, carried only when
+ * the runtime reported one structurally rather than in prose.
  */
 export interface AgentWireError {
 	code?: string;
@@ -26,6 +29,7 @@ export interface AgentWireError {
 	failureClass?: AgentFailureClass;
 	message: string;
 	recoverable?: boolean;
+	resetsAt?: string | null;
 }
 
 /** Metadata payload carried on persisted metadata events. */

@@ -1057,6 +1057,214 @@ test('a rate_limit_event becomes a plan-limit carrying the window that moved', (
 	);
 });
 
+test('a plan-limit banner becomes a failure row rather than the turn answer', () => {
+	const { normalize } = createNormalizer();
+	normalize(initMessage());
+	normalize({
+		rate_limit_info: {
+			rateLimitType: 'five_hour',
+			resetsAt: 1_786_024_800,
+			status: 'rejected',
+			utilization: 100,
+		},
+		type: 'rate_limit_event',
+	});
+
+	const events = normalize({
+		message: {
+			content: [
+				{
+					text: "You've hit your session limit · resets 5pm (Asia/Nicosia)",
+					type: 'text',
+				},
+			],
+		},
+		parent_tool_use_id: null,
+		type: 'assistant',
+	});
+
+	assert.deepEqual(events, [
+		{
+			at: NOW.toISOString(),
+			error: {
+				code: 'adapter-failure',
+				message: "You've hit your session limit · resets 5pm (Asia/Nicosia)",
+				recoverable: false,
+				resetsAt: '2026-08-06T14:00:00.000Z',
+			},
+			type: 'error',
+		},
+	]);
+	assert.deepEqual(messagePayloads(events), []);
+});
+
+test('a banner arriving before any rejected window carries no reset', () => {
+	const { normalize } = createNormalizer();
+	normalize(initMessage());
+	normalize({
+		rate_limit_info: {
+			rateLimitType: 'five_hour',
+			resetsAt: 1_786_024_800,
+			status: 'allowed_warning',
+			utilization: 82,
+		},
+		type: 'rate_limit_event',
+	});
+
+	const [event] = normalize({
+		message: {
+			content: [{ text: 'Claude usage limit reached', type: 'text' }],
+		},
+		parent_tool_use_id: null,
+		type: 'assistant',
+	});
+
+	assert.equal(event?.type, 'error');
+	assert.equal(event?.type === 'error' ? event.error.resetsAt : 'unread', null);
+});
+
+test('a window reported spendable again clears the banked reset', () => {
+	const { normalize } = createNormalizer();
+	normalize(initMessage());
+	normalize({
+		rate_limit_info: {
+			rateLimitType: 'five_hour',
+			resetsAt: 1_786_024_800,
+			status: 'rejected',
+			utilization: 100,
+		},
+		type: 'rate_limit_event',
+	});
+	normalize({
+		rate_limit_info: {
+			rateLimitType: 'five_hour',
+			resetsAt: 1_786_060_000,
+			status: 'allowed',
+			utilization: 4,
+		},
+		type: 'rate_limit_event',
+	});
+
+	const [event] = normalize({
+		message: {
+			content: [{ text: 'Claude usage limit reached', type: 'text' }],
+		},
+		parent_tool_use_id: null,
+		type: 'assistant',
+	});
+
+	assert.equal(event?.type === 'error' ? event.error.resetsAt : 'unread', null);
+});
+
+test('a reset the plan has already moved past is not carried onto the banner', () => {
+	const { normalize } = createNormalizer();
+	normalize(initMessage());
+	normalize({
+		rate_limit_info: {
+			rateLimitType: 'five_hour',
+			resetsAt: 1_786_010_400,
+			status: 'rejected',
+			utilization: 100,
+		},
+		type: 'rate_limit_event',
+	});
+
+	const [event] = normalize({
+		message: {
+			content: [{ text: 'Claude usage limit reached', type: 'text' }],
+		},
+		parent_tool_use_id: null,
+		type: 'assistant',
+	});
+
+	assert.equal(event?.type === 'error' ? event.error.resetsAt : 'unread', null);
+});
+
+test('a banner delivered as string content is still lifted onto the failure path', () => {
+	const { normalize } = createNormalizer();
+	normalize(initMessage());
+
+	const [event] = normalize({
+		message: { content: 'Claude usage limit reached' },
+		parent_tool_use_id: null,
+		type: 'assistant',
+	});
+
+	assert.equal(event?.type, 'error');
+	assert.equal(
+		event?.type === 'error' ? event.error.message : null,
+		'Claude usage limit reached',
+	);
+});
+
+test('an answer that merely mentions a limit stays the turn answer', () => {
+	const { normalize } = createNormalizer();
+	normalize(initMessage());
+
+	const events = normalize({
+		message: {
+			content: [
+				{ text: 'The retry loop reached the limit of 5.', type: 'text' },
+			],
+		},
+		parent_tool_use_id: null,
+		type: 'assistant',
+	});
+
+	assert.deepEqual(messagePayloads(events), [
+		{
+			kind: 'message',
+			parts: [{ kind: 'text', text: 'The retry loop reached the limit of 5.' }],
+			role: 'assistant',
+		},
+	]);
+});
+
+test('a turn that did work before saying so keeps its tool calls', () => {
+	const { normalize } = createNormalizer();
+	normalize(initMessage());
+
+	const events = normalize({
+		message: {
+			content: [
+				{ id: 'toolu_1', input: {}, name: 'Read', type: 'tool_use' },
+				{ text: "You've hit your session limit", type: 'text' },
+			],
+		},
+		parent_tool_use_id: null,
+		type: 'assistant',
+	});
+
+	assert.equal(
+		events.some((event) => event.type === 'error'),
+		false,
+	);
+	assert.equal(messagePayloads(events).length, 2);
+});
+
+test('a subagent reporting a limit is left as its own answer', () => {
+	const { normalize } = createNormalizer();
+	normalize(initMessage());
+
+	const events = normalize({
+		message: {
+			content: [
+				{
+					text: "You've hit your session limit · resets 5pm (Asia/Nicosia)",
+					type: 'text',
+				},
+			],
+		},
+		parent_tool_use_id: 'toolu_1',
+		type: 'assistant',
+	});
+
+	assert.equal(
+		events.some((event) => event.type === 'error'),
+		false,
+	);
+});
+
 test('a rate_limit_event naming no window is dropped rather than guessed at', () => {
 	const { normalize } = createNormalizer();
 	normalize(initMessage());

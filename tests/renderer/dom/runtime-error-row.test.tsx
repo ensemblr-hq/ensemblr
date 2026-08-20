@@ -7,8 +7,8 @@
  * recoveries that can actually work for it.
  */
 
-import { render, screen } from '@testing-library/react';
-import { describe, expect, test, vi } from 'vitest';
+import { act, render, screen } from '@testing-library/react';
+import { afterEach, describe, expect, test, vi } from 'vitest';
 
 import { RuntimeErrorRow } from '../../../src/renderer/components/workbench-shell/conversation-panel/timeline/runtime-error-row';
 import { AGENT_FAILURE_CLASSES } from '../../../src/shared/agent-failure';
@@ -32,6 +32,12 @@ const ALL_HANDLERS = {
 };
 
 describe('RuntimeErrorRow', () => {
+	// Restored here rather than after the assertion that installs them: a failing
+	// expectation would otherwise leave the clock pinned for every test below it.
+	afterEach(() => {
+		vi.useRealTimers();
+	});
+
 	test('leads with authored copy rather than the provider string', () => {
 		render(<RuntimeErrorRow failure={TRUNCATED} handlers={ALL_HANDLERS} />);
 
@@ -167,6 +173,109 @@ describe('RuntimeErrorRow', () => {
 		expect(
 			screen.getByRole('button', { name: 'Permission settings' }),
 		).toBeInTheDocument();
+	});
+
+	// The plan window clears on its own, so the row that announces it has to be
+	// the one that picks the turn back up.
+	test('offers Continue on a spent plan window', () => {
+		render(
+			<RuntimeErrorRow
+				failure={{
+					failureClass: 'rate-limit',
+					message: "You've hit your session limit · resets 5pm (Asia/Nicosia)",
+				}}
+				handlers={ALL_HANDLERS}
+			/>,
+		);
+
+		expect(
+			screen.getByRole('button', { name: 'Continue' }),
+		).toBeInTheDocument();
+	});
+
+	// The runtime names the reset in English prose the fold keeps; the badge says
+	// the same thing from the structured stamp, so it can be translated.
+	test('states the wait from the stamp rather than the provider prose', () => {
+		vi.useFakeTimers();
+		vi.setSystemTime(new Date('2026-08-06T12:00:00.000Z'));
+
+		render(
+			<RuntimeErrorRow
+				failure={{
+					failureClass: 'rate-limit',
+					message: "You've hit your session limit · resets 5pm (Asia/Nicosia)",
+					resetsAt: '2026-08-06T14:00:00.000Z',
+				}}
+				handlers={ALL_HANDLERS}
+			/>,
+		);
+
+		expect(screen.getByText('Resets in 2h')).toBeInTheDocument();
+	});
+
+	// A row left open across the wait is the case the badge exists for, and the
+	// timeline memoizes settled rows, so nothing else would re-render it.
+	test('counts the wait down while the row stays open', () => {
+		vi.useFakeTimers();
+		vi.setSystemTime(new Date('2026-08-06T12:00:00.000Z'));
+
+		render(
+			<RuntimeErrorRow
+				failure={{
+					failureClass: 'rate-limit',
+					message: "You've hit your session limit",
+					resetsAt: '2026-08-06T14:00:00.000Z',
+				}}
+				handlers={ALL_HANDLERS}
+			/>,
+		);
+		expect(screen.getByText('Resets in 2h')).toBeInTheDocument();
+
+		act(() => {
+			vi.advanceTimersByTime(61 * 60 * 1000);
+		});
+
+		expect(screen.getByText('Resets in 1h')).toBeInTheDocument();
+	});
+
+	// A billing failure and an exhausted API quota classify as `rate-limit` too,
+	// and neither clears on its own — so only the reading backed by a reset
+	// instant is allowed to promise one.
+	test('promises a reset only when the runtime reported one', () => {
+		const { unmount } = render(
+			<RuntimeErrorRow
+				failure={{ failureClass: 'rate-limit', message: 'Billing problem.' }}
+				handlers={ALL_HANDLERS}
+			/>,
+		);
+
+		expect(screen.queryByText(/plan window/)).toBeNull();
+		expect(screen.getByText(/check the plan and billing/)).toBeInTheDocument();
+		unmount();
+
+		render(
+			<RuntimeErrorRow
+				failure={{
+					failureClass: 'rate-limit',
+					message: "You've hit your session limit",
+					resetsAt: '2099-01-01T00:00:00.000Z',
+				}}
+				handlers={ALL_HANDLERS}
+			/>,
+		);
+
+		expect(screen.getByText(/spent its plan window/)).toBeInTheDocument();
+	});
+
+	test('says nothing about a reset the runtime never named', () => {
+		render(
+			<RuntimeErrorRow
+				failure={{ failureClass: 'rate-limit', message: 'Limit.' }}
+				handlers={ALL_HANDLERS}
+			/>,
+		);
+
+		expect(screen.queryByText(/^Resets/)).toBeNull();
 	});
 
 	test('leaves a class with no workable recovery without a button row', () => {

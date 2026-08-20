@@ -26,6 +26,7 @@ import {
 } from './diagnostic-event-mapper';
 import { parentToolCallIdOf } from './subagent-parts.ts';
 import {
+	dropStreamedFailureEcho,
 	dropStreamingPartsOfType,
 	isDoneTextPart,
 	isStreamingTextPart,
@@ -470,7 +471,10 @@ function handleEvent(
 			if (!errorMessage) {
 				return pending;
 			}
-			flush(pending, result);
+			flush(
+				withoutStreamedFailureEcho(pending, envelope.error.message),
+				result,
+			);
 			markTrailingTurnIncomplete(result);
 			result.push(errorMessage);
 			return null;
@@ -498,6 +502,31 @@ function handleEvent(
 			return pending;
 		}
 	}
+}
+
+/**
+ * Strips the group a fatal failure is closing of streaming text that says
+ * exactly what the failure row is about to say.
+ *
+ * A group left holding nothing but that echo is dropped entirely rather than
+ * flushed: {@link finalizeGroup} substitutes an empty text part for a group with
+ * no parts, which would leave a blank assistant bubble above the error.
+ * @param pending - The group currently being accumulated, or null when none is open
+ * @param failureText - The runtime's own sentence, as the error row will render it
+ * @returns The group with the echo removed, or null when nothing else was in it
+ */
+function withoutStreamedFailureEcho(
+	pending: PendingGroup | null,
+	failureText: string,
+): PendingGroup | null {
+	if (pending?.role !== 'assistant') {
+		return pending;
+	}
+	const parts = dropStreamedFailureEcho(pending.parts, failureText);
+	if (parts.length === pending.parts.length) {
+		return pending;
+	}
+	return parts.length > 0 ? { ...pending, parts } : null;
 }
 
 /**

@@ -521,6 +521,74 @@ describe('eventsToUIMessages', () => {
 		expect(turnMetadataOf(messages[0] as UIMessage)?.incomplete).toBe(true);
 	});
 
+	// Claude Code streams its plan-limit banner as an ordinary answer before the
+	// adapter lifts it onto the failure path, and no seal ever supersedes those
+	// deltas — so without this the same sentence renders twice.
+	test('drops streamed text the failure row is about to restate', () => {
+		const banner = "You've hit your session limit · resets 5pm (Asia/Nicosia)";
+		const messages = eventsToUIMessages([
+			event({
+				id: 'delta:session-1:0:1',
+				ordinal: 1.000001,
+				payload: {
+					kind: 'message',
+					payload: { kind: 'text-delta', text: banner },
+					role: 'agent',
+				},
+				turnId: 'turn-1',
+			}),
+			event({
+				eventType: 'error',
+				id: 'evt-error',
+				ordinal: 2,
+				payload: {
+					error: {
+						failureClass: 'rate-limit',
+						message: banner,
+						recoverable: false,
+					},
+					kind: 'error',
+				},
+			}),
+		]);
+
+		expect(messages).toHaveLength(1);
+		expect(messages[0]?.role).toBe('system');
+	});
+
+	test('keeps streamed text a failure row does not restate', () => {
+		const messages = eventsToUIMessages([
+			event({
+				id: 'delta:session-1:0:1',
+				ordinal: 1.000001,
+				payload: {
+					kind: 'message',
+					payload: {
+						kind: 'text-delta',
+						text: 'The migration touches four call',
+					},
+					role: 'agent',
+				},
+				turnId: 'turn-1',
+			}),
+			event({
+				eventType: 'error',
+				id: 'evt-error',
+				ordinal: 2,
+				payload: {
+					error: { message: 'Boom', recoverable: false },
+					kind: 'error',
+				},
+			}),
+		]);
+
+		expect(messages.map((message) => message.role)).toEqual([
+			'assistant',
+			'system',
+		]);
+		expect(messageText(messages)).toContain('The migration touches four call');
+	});
+
 	test('leaves a turn alone when the failure did not interrupt one', () => {
 		const messages = eventsToUIMessages([
 			event({

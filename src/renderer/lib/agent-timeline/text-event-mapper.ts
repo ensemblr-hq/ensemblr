@@ -83,6 +83,52 @@ export function dropStreamingPartsOfType(
 	);
 }
 
+/**
+ * Removes the main thread's in-flight streaming text when the failure row about
+ * to follow it restates the very same sentence.
+ *
+ * A runtime that announces a failure in prose — Claude Code delivers its
+ * plan-limit banner as an ordinary assistant turn — streams that sentence as
+ * deltas before the adapter lifts it onto the failure path. No `done` part ever
+ * supersedes them, so without this the banner renders twice: once as the answer
+ * the turn never gave, and once inside the designed error row.
+ *
+ * Matching is exact once whitespace is collapsed, and only ever on the main
+ * thread. Text that merely resembles the failure is real content the turn
+ * produced before it died, and is kept.
+ * @param parts - The parts accumulated for the turn so far
+ * @param failureText - The runtime's own sentence, as the error row will render it
+ * @returns The parts with the echoed streaming text removed
+ */
+export function dropStreamedFailureEcho(
+	parts: readonly UIMessagePart[],
+	failureText: string,
+): UIMessagePart[] {
+	const failure = collapseWhitespace(failureText);
+	if (!failure) {
+		return [...parts];
+	}
+	return parts.filter(
+		(part) =>
+			!(
+				isStreamingTextPart(part) &&
+				part.type === 'text' &&
+				parentToolCallIdOf(part) === null &&
+				collapseWhitespace(part.text) === failure
+			),
+	);
+}
+
+/**
+ * Normalizes a runtime sentence for comparison, so a stream broken across delta
+ * boundaries still matches the seal that restates it.
+ * @param text - The sentence to normalize
+ * @returns The text trimmed with internal runs of whitespace collapsed to one space
+ */
+function collapseWhitespace(text: string): string {
+	return text.trim().replace(/\s+/g, ' ');
+}
+
 /** True when `part` is a text or reasoning part still accumulating deltas. */
 export function isStreamingTextPart(
 	part: UIMessagePart,

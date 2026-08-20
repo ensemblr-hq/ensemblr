@@ -9,6 +9,8 @@ import type {
 	AgentSessionStatus,
 } from '../agent-runtime/agent-types.ts';
 import { toPlanLimit, toSessionCost } from './claude-usage.ts';
+import { readLimitNotice } from './limit-notice.ts';
+import { isRecord, readBlocks } from './sdk-content-blocks.ts';
 import {
 	createStreamedReasoningByThread,
 	type StreamedReasoningByThread,
@@ -91,9 +93,26 @@ export function createSdkMessageNormalizer({
 	let contextTokens = 0;
 	let mainModel: string | null = null;
 	let reported: AgentContextUsage | null = null;
+	let exhaustedResetsAt: string | null = null;
 	const reasoningByThread = createStreamedReasoningByThread();
 
 	const at = (): string => now().toISOString();
+
+	/**
+	 * The banked reset, dropped once it has passed. A stamp the plan has already
+	 * moved past renders as "resets now" on a row the account is still locked out
+	 * of, which reads as an invitation to press Continue straight into the same
+	 * refusal — worse than saying nothing about the wait at all.
+	 * @returns The reset instant, or null when none is banked or it has elapsed.
+	 */
+	const unspentReset = (): string | null => {
+		if (!exhaustedResetsAt) {
+			return null;
+		}
+		return Date.parse(exhaustedResetsAt) > now().getTime()
+			? exhaustedResetsAt
+			: null;
+	};
 
 	const transitionTo = (next: AgentSessionStatus): readonly AgentEvent[] => {
 		if (status === next) {
@@ -170,12 +189,40 @@ export function createSdkMessageNormalizer({
 	 * live occupancy from it. Subagent responses (`parent_tool_use_id` set) are
 	 * measured against their own near-empty window, so letting them through would
 	 * sawtooth the gauge; their events still flow, tagged with the parent call.
+	 *
+	 * A main-thread message that is really a plan-limit banner never seals a turn
+	 * at all: it is the runtime speaking about the account rather than the model
+	 * answering, so it leaves as an `error` and the turn keeps no answer. The
+	 * renderer drops the deltas that streamed the same sentence, which is why the
+	 * error carries the banner verbatim rather than a rephrasing.
 	 * @param message - The `assistant` SDK message.
-	 * @returns The seal and its tool calls, plus a usage snapshot when one is due.
+	 * @returns The seal and its tool calls, plus a usage snapshot when one is due — or the lone failure a banner becomes.
 	 */
 	const handleAssistant = (
 		message: Extract<SDKMessage, { type: 'assistant' }>,
 	): readonly AgentEvent[] => {
+		const notice =
+			readString(message.parent_tool_use_id) === null
+				? readLimitNotice(message)
+				: null;
+		if (notice) {
+			// Fatal, not recoverable: the turn ended without an answer, and the
+			// timeline surfaces fatal errors only. Tagged recoverable the banner
+			// would vanish rather than become the row that offers Continue.
+			return [
+				{
+					at: at(),
+					error: {
+						code: 'adapter-failure',
+						message: notice,
+						recoverable: false,
+						resetsAt: unspentReset(),
+					},
+					type: 'error',
+				},
+			];
+		}
+
 		const events = [
 			...transitionTo('streaming'),
 			...normalizeAssistant(message, messageEvent, reasoningByThread),
@@ -236,12 +283,28 @@ export function createSdkMessageNormalizer({
 	 * Turns a pushed rate-limit frame into a plan-limit event. The runtime emits
 	 * one whenever a window moves, so the composer gauge tracks the plan without
 	 * the app ever asking.
+	 *
+	 * A frame that reports the plan as spent also banks its reset instant, which
+	 * is the only structured reading of "when does this clear" the session gets:
+	 * the banner the runtime prints a moment later names the time in English prose
+	 * the renderer cannot translate.
+	 *
+	 * A frame reporting the plan spendable again clears that stamp. Keeping it
+	 * would let a second, unrelated banner later in the same session inherit the
+	 * first window's reset, which by then has passed.
 	 */
 	const handleRateLimit = (
 		message: Extract<SDKMessage, { type: 'rate_limit_event' }>,
 	): readonly AgentEvent[] => {
 		const limit = toPlanLimit(message.rate_limit_info);
-		return limit ? [{ at: at(), limit, type: 'plan-limit' }] : [];
+		if (!limit) {
+			return [];
+		}
+		exhaustedResetsAt =
+			limit.status === 'rejected'
+				? (limit.window.resetsAt ?? exhaustedResetsAt)
+				: null;
+		return [{ at: at(), limit, type: 'plan-limit' }];
 	};
 
 	return {
@@ -610,29 +673,6 @@ function readModelMetadata(
 	model: string | undefined,
 ): AgentModelMetadata | null {
 	return model ? { id: model, provider: 'anthropic' } : null;
-}
-
-/**
- * Reads a message's `content` as an array of block records. String content —
- * the shorthand the SDK accepts for plain user text — is lifted into one text
- * block so both shapes normalize identically.
- * @param content - Raw `content` field off an SDK message.
- * @returns The blocks, empty when the content is neither a string nor an array.
- */
-function readBlocks(content: unknown): readonly Record<string, unknown>[] {
-	if (typeof content === 'string') {
-		return content ? [{ text: content, type: 'text' }] : [];
-	}
-	return Array.isArray(content) ? content.filter(isRecord) : [];
-}
-
-/**
- * Narrows an unknown value to a plain object.
- * @param value - Candidate value.
- * @returns True when `value` is a non-array object.
- */
-function isRecord(value: unknown): value is Record<string, unknown> {
-	return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 /**
