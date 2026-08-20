@@ -321,6 +321,38 @@ test('terminates commands on timeout', async () => {
 	assert.equal(result.failure?.code, 'timeout');
 });
 
+test('settles when a background grandchild keeps the inherited pipes open', async () => {
+	const service = createTestService();
+	const startedMs = Date.now();
+	const result = await service.run({
+		args: ['-c', 'sleep 5 & exec true'],
+		command: TEST_SHELL,
+	});
+
+	assert.equal(result.status, 'success');
+	assert.ok(
+		Date.now() - startedMs < 3000,
+		'the run must not wait for the grandchild to release the pipes',
+	);
+});
+
+test('honours the timeout when a background grandchild holds the pipes open', async () => {
+	const service = createTestService();
+	const startedMs = Date.now();
+	const result = await service.run({
+		args: ['-c', 'sleep 5 & exec sleep 5'],
+		command: TEST_SHELL,
+		timeoutMs: 25,
+	});
+
+	assert.equal(result.status, 'failure');
+	assert.equal(result.failure?.code, 'timeout');
+	assert.ok(
+		Date.now() - startedMs < 3000,
+		'the timeout must bound the promise, not just signal the child',
+	);
+});
+
 test('returns output truncation failure and retained output prefix', async () => {
 	const service = createTestService();
 	const result = await service.run({

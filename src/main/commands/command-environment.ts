@@ -1,6 +1,11 @@
 import { spawn } from 'node:child_process';
 import path from 'node:path';
 
+import {
+	createChildSettleGuard,
+	STREAM_DRAIN_GRACE_MS,
+	wireChildSettlement,
+} from './child-settle-guard.ts';
 import type {
 	CommandEnvironmentDiagnostic,
 	CommandEnvironmentSnapshot,
@@ -11,6 +16,8 @@ import type {
 
 const SHELL_ENVIRONMENT_BEGIN_SENTINEL = '__ENSEMBLR_SHELL_ENV_BEGIN__';
 const SHELL_ENVIRONMENT_END_SENTINEL = '__ENSEMBLR_SHELL_ENV_END__';
+/** Grace between SIGTERM and SIGKILL for a login shell that ignores the first. */
+const SHELL_KILL_GRACE_MS = 500;
 
 /**
  * Resolves the command environment by invoking the configured shell loader,
@@ -152,10 +159,22 @@ export function loadShellEnvironment({
 		const stdoutChunks: Buffer[] = [];
 		let settled = false;
 		let timedOut = false;
+		let killTimer: ReturnType<typeof setTimeout> | null = null;
+		let exitCode: number | null = null;
+		let signalCode: NodeJS.Signals | string | null = null;
+		const settleGuard = createChildSettleGuard(() => {
+			settleFromChildState();
+		});
 
 		const timer = setTimeout(() => {
 			timedOut = true;
+			settleGuard.arm(SHELL_KILL_GRACE_MS + STREAM_DRAIN_GRACE_MS);
 			child.kill('SIGTERM');
+			killTimer = setTimeout(() => {
+				if (child.exitCode === null) {
+					child.kill('SIGKILL');
+				}
+			}, SHELL_KILL_GRACE_MS);
 		}, timeoutMs);
 
 		/**
@@ -169,7 +188,26 @@ export function loadShellEnvironment({
 
 			settled = true;
 			clearTimeout(timer);
+
+			if (killTimer) {
+				clearTimeout(killTimer);
+			}
+
+			settleGuard.clear();
+			child.stdout?.destroy();
+			child.stderr?.destroy();
 			resolve(result);
+		}
+
+		/** Resolves with whatever the shell has reported so far. */
+		function settleFromChildState(): void {
+			settle({
+				exitCode,
+				signal: signalCode,
+				stderr: Buffer.concat(stderrChunks).toString('utf8'),
+				stdout: Buffer.concat(stdoutChunks).toString('utf8'),
+				timedOut,
+			});
 		}
 
 		child.stdout?.on('data', (chunk: Buffer) => stdoutChunks.push(chunk));
@@ -184,14 +222,14 @@ export function loadShellEnvironment({
 				timedOut,
 			});
 		});
-		child.on('close', (exitCode, signal) => {
-			settle({
-				exitCode,
-				signal,
-				stderr: Buffer.concat(stderrChunks).toString('utf8'),
-				stdout: Buffer.concat(stdoutChunks).toString('utf8'),
-				timedOut,
-			});
+		wireChildSettlement({
+			child,
+			guard: settleGuard,
+			record: (exitedCode, exitedSignal) => {
+				exitCode = exitedCode;
+				signalCode = exitedSignal;
+			},
+			settle: settleFromChildState,
 		});
 	});
 }

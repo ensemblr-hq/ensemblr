@@ -4,7 +4,7 @@ import {
 	useQuery,
 	useQueryClient,
 } from '@tanstack/react-query';
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import {
@@ -87,8 +87,13 @@ export function useWorkbenchQueries({
 		() => getNavigationWorkspaceChangeSummaryTargets(navigationRepositories),
 		[navigationRepositories],
 	);
-	const projects = useQueries({
-		combine: (results) =>
+	// `combine` has to be referentially stable: TanStack Query keys the combined
+	// result's structural sharing off this function's identity, so an inline
+	// arrow rebuilds the project list on every render. Downstream state keys off
+	// that list's identity, and a list that is new every render drives an
+	// unbounded render loop that pegs the renderer with no error to show for it.
+	const combineWorkspaceChangeSummaries = useCallback(
+		(results: Parameters<typeof collectWorkspaceChangeSummaryUpdates>[0]) =>
 			applyWorkspaceChangeSummaries(
 				baseProjects,
 				collectWorkspaceChangeSummaryUpdates(
@@ -96,6 +101,10 @@ export function useWorkbenchQueries({
 					workspaceChangeSummaryTargets,
 				),
 			),
+		[baseProjects, workspaceChangeSummaryTargets],
+	);
+	const projects = useQueries({
+		combine: combineWorkspaceChangeSummaries,
 		queries: workspaceChangeSummaryTargets.map((target) => ({
 			...workspaceGitStatusQuery(target.workspaceCwd, target.scope),
 			enabled: hasPreloadBridge && target.workspaceCwd.length > 0,

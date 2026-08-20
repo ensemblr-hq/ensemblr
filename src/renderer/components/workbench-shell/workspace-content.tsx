@@ -68,7 +68,7 @@ export function WorkspaceWorkbenchContent({
 	const rightSidebar = useRightSidebarController();
 	const dock = useDockController();
 	useLayoutMenuCommands(dock, rightSidebar);
-	const workspaceMenuDialogs = useWorkspaceMenuCommands(activeWorkspace);
+	useWorkspaceMenuCommands(activeWorkspace);
 	const setDirectoryRevealRequest = useSetAtom(
 		workspaceDirectoryRevealRequestAtom,
 	);
@@ -223,7 +223,6 @@ export function WorkspaceWorkbenchContent({
 						</CommentPreviewOpenerProvider>
 					</ReviewFilePreviewOpenerProvider>
 				</WorkspaceFileDiffOpenerProvider>
-				{workspaceMenuDialogs}
 			</ReviewActionsProvider>
 		</WorkbenchLayoutProvider>
 	);

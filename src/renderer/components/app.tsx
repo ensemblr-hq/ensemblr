@@ -5,6 +5,7 @@ import { useCallback } from 'react';
 import { useAppMenuCommands } from '@/renderer/hooks/use-app-menu-commands';
 import { useConfigReloadSync } from '@/renderer/hooks/use-config-reload-sync';
 import { useHotkey } from '@/renderer/hooks/use-hotkey';
+import { useModalInertBodyGuard } from '@/renderer/hooks/use-modal-inert-body-guard';
 import { useNotificationSoundSync } from '@/renderer/hooks/use-notification-sound-sync';
 import { useAskUserQuestionSync } from '@/renderer/state/ask-user-question';
 import {
@@ -38,6 +39,7 @@ export function App() {
 	usePlanReviewSync();
 	usePlanModeSync();
 	useUpdateSync();
+	useModalInertBodyGuard();
 
 	useMenuCommandBridge();
 	useAppMenuCommands();

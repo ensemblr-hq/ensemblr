@@ -1,5 +1,5 @@
-import { type ReactNode, useState } from 'react';
-import { useRemoveWorkspaceAction } from '@/renderer/hooks/workbench-shell/use-remove-workspace-action';
+import { useSetAtom } from 'jotai';
+import { workspaceLifecycleDialogAtom } from '@/renderer/state/dialogs';
 import {
 	useMenuCommand,
 	useMenuCommandChecked,
@@ -9,37 +9,33 @@ import {
 	useWorkspaceBoardStatus,
 } from '@/renderer/state/workspace';
 import type { WorkspaceShellModel } from '@/renderer/types/workbench';
-import { ArchiveWorkspaceDialog } from './archive-workspace-dialog';
-import { DeleteWorkspaceDialog } from './delete-workspace-dialog';
-import { RenameWorkspaceDialog } from './rename-workspace-dialog';
-
-/** Which lifecycle dialog the Workspace menu opened, or null when none is. */
-type ActiveWorkspaceDialog = 'archive' | 'delete' | 'rename' | null;
 
 /**
- * Registers the Workspace menu's commands for the workspace on screen, and
- * returns the lifecycle dialogs to mount once beside the shell.
+ * Registers the Workspace menu's commands for the workspace on screen.
  *
- * The dialogs are mounted here rather than reused from the sidebar row because
- * the menu acts on the *active* workspace, which the sidebar row for it may not
- * even be rendering — a collapsed sidebar or a filtered list would leave the
- * menu commands dead.
+ * The lifecycle dialogs they raise are mounted by
+ * `WorkspaceLifecycleDialogHost` at shell level, not here: confirming an archive
+ * or a delete removes this very workspace, which unmounts this view along with
+ * anything it had mounted. They are raised through an atom for the same reason
+ * they cannot be reused from the sidebar row — the menu acts on the *active*
+ * workspace, whose row a collapsed sidebar or a filtered list may not render at
+ * all.
  * @param workspace - The workspace currently on screen
- * @returns The dialog nodes the caller renders once
  */
-export function useWorkspaceMenuCommands(
-	workspace: WorkspaceShellModel,
-): ReactNode {
-	const [activeDialog, setActiveDialog] = useState<ActiveWorkspaceDialog>(null);
+export function useWorkspaceMenuCommands(workspace: WorkspaceShellModel): void {
 	const currentStatus = useWorkspaceBoardStatus(workspace.id);
 	const { setWorkspaceBoardStatus } = useWorkspaceBoardActions();
-	const handleWorkspaceRemoved = useRemoveWorkspaceAction({
-		activeWorkspaceId: workspace.id,
-	});
+	const requestLifecycleDialog = useSetAtom(workspaceLifecycleDialogAtom);
 
-	useMenuCommand('workspace.rename', () => setActiveDialog('rename'));
-	useMenuCommand('workspace.archive', () => setActiveDialog('archive'));
-	useMenuCommand('workspace.delete', () => setActiveDialog('delete'));
+	useMenuCommand('workspace.rename', () =>
+		requestLifecycleDialog({ kind: 'rename', workspace }),
+	);
+	useMenuCommand('workspace.archive', () =>
+		requestLifecycleDialog({ kind: 'archive', workspace }),
+	);
+	useMenuCommand('workspace.delete', () =>
+		requestLifecycleDialog({ kind: 'delete', workspace }),
+	);
 
 	useMenuCommand('workspace.status.backlog', () =>
 		setWorkspaceBoardStatus(workspace.id, 'backlog'),
@@ -72,39 +68,5 @@ export function useWorkspaceMenuCommands(
 	useMenuCommandChecked(
 		'workspace.status.cancelled',
 		currentStatus === 'canceled',
-	);
-
-	return (
-		<>
-			<ArchiveWorkspaceDialog
-				onArchived={handleWorkspaceRemoved}
-				onOpenChange={(open) => {
-					if (!open) {
-						setActiveDialog(null);
-					}
-				}}
-				open={activeDialog === 'archive'}
-				workspace={workspace}
-			/>
-			<DeleteWorkspaceDialog
-				onDeleted={handleWorkspaceRemoved}
-				onOpenChange={(open) => {
-					if (!open) {
-						setActiveDialog(null);
-					}
-				}}
-				open={activeDialog === 'delete'}
-				workspace={workspace}
-			/>
-			<RenameWorkspaceDialog
-				onOpenChange={(open) => {
-					if (!open) {
-						setActiveDialog(null);
-					}
-				}}
-				open={activeDialog === 'rename'}
-				workspace={workspace}
-			/>
-		</>
 	);
 }

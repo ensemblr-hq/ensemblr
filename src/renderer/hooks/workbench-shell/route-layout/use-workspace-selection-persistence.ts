@@ -119,12 +119,17 @@ export function useWorkspaceSelectionPersistence({
 				? currentSelection
 				: nextSelection,
 		);
+		// Deliberately not an identity check on `projects`: this atom feeds a memo
+		// that feeds this effect, so rewriting it whenever the list is merely a new
+		// array — which a refetch fan-out makes it — is an unbounded render loop.
+		// The held list is the *previous* snapshot by contract, so it only has to
+		// be replaced when it can no longer describe the current selection.
 		setLastWorkspaceNavigationRenderState((currentRenderState) =>
 			currentRenderState?.selection.project.id ===
 				currentSelection.project.id &&
 			currentRenderState.selection.workspace.id ===
 				currentSelection.workspace.id &&
-			currentRenderState.projects === projects
+			holdsSelection(currentRenderState.projects, currentSelection)
 				? currentRenderState
 				: {
 						projects,
@@ -144,4 +149,26 @@ export function useWorkspaceSelectionPersistence({
 		displayProjects,
 		displaySelection,
 	};
+}
+
+/**
+ * True when a held project list still contains the selected workspace, which is
+ * all the previous-state fallback needs of it.
+ * @param projects - The project list held in the render state
+ * @param selection - The selection that list has to be able to describe
+ * @returns Whether the selected workspace is still present in that list
+ */
+function holdsSelection(
+	projects: ProjectShellModel[],
+	selection: WorkspaceNavigationSelection,
+): boolean {
+	const project = projects.find(
+		(candidate) => candidate.id === selection.project.id,
+	);
+
+	return Boolean(
+		project?.workspaces.some(
+			(workspace) => workspace.id === selection.workspace.id,
+		),
+	);
 }
