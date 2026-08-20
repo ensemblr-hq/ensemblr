@@ -55,6 +55,8 @@ vi.mock('@/renderer/state/workspace/open-target-history', () => ({
 
 import { useRemoveWorkspaceAction } from '@/renderer/hooks/workbench-shell/use-remove-workspace-action';
 import { lastWorkspaceSelectionAtom } from '@/renderer/state/workspace';
+import { activeChatTabByWorkspaceAtom } from '@/renderer/state/workspace/selection-atoms';
+import { pinnedWorkspaceIdsAtom } from '@/renderer/state/workspace/structure-atoms';
 import { installLocalStorage } from './support/dom';
 
 /**
@@ -77,6 +79,7 @@ function renderRemoveWorkspaceAction(
 		() => ({
 			remove: useRemoveWorkspaceAction({ activeWorkspaceId }),
 			selection: useAtomValue(lastWorkspaceSelectionAtom),
+			store,
 		}),
 		{ wrapper },
 	);
@@ -88,11 +91,11 @@ beforeEach(() => {
 	calls.length = 0;
 });
 
-test('drops the archived workspace from the lists when it is the active one', async () => {
+test('drops the deleted workspace from the lists when it is the active one', async () => {
 	const view = renderRemoveWorkspaceAction('san-antonio');
 
 	await act(async () => {
-		await view.result.current.remove('san-antonio');
+		await view.result.current.remove.deleted('san-antonio');
 	});
 
 	expect(deleteLastUsedOpenTarget).toHaveBeenCalledWith('san-antonio');
@@ -103,6 +106,49 @@ test('drops the archived workspace from the lists when it is the active one', as
 	expect(invalidateWorkspaceListViews).toHaveBeenCalledTimes(1);
 });
 
+// Archiving is reversible from History and Browse archive, so an unarchived
+// workspace has to come back with the board column, pin, tabs and run script it
+// had. Only a delete may evict those.
+test('keeps the workspace memory when it is archived rather than deleted', async () => {
+	const view = renderRemoveWorkspaceAction('san-antonio');
+	const store = view.result.current.store;
+	store.set(activeChatTabByWorkspaceAtom, { 'san-antonio': 'tab-1' });
+	store.set(pinnedWorkspaceIdsAtom, ['san-antonio']);
+
+	await act(async () => {
+		await view.result.current.remove.archived('san-antonio');
+	});
+
+	expect(deleteLastUsedOpenTarget).not.toHaveBeenCalled();
+	expect(store.get(activeChatTabByWorkspaceAtom)).toEqual({
+		'san-antonio': 'tab-1',
+	});
+	expect(store.get(pinnedWorkspaceIdsAtom)).toEqual(['san-antonio']);
+	expect(forgetWorkspaceInListViews).toHaveBeenCalledWith(
+		expect.anything(),
+		'san-antonio',
+	);
+});
+
+test('clears the workspace memory when it is deleted', async () => {
+	const view = renderRemoveWorkspaceAction('san-antonio');
+	const store = view.result.current.store;
+	store.set(activeChatTabByWorkspaceAtom, {
+		'san-antonio': 'tab-1',
+		survivor: 'tab-2',
+	});
+	store.set(pinnedWorkspaceIdsAtom, ['san-antonio', 'survivor']);
+
+	await act(async () => {
+		await view.result.current.remove.deleted('san-antonio');
+	});
+
+	expect(store.get(activeChatTabByWorkspaceAtom)).toEqual({
+		survivor: 'tab-2',
+	});
+	expect(store.get(pinnedWorkspaceIdsAtom)).toEqual(['survivor']);
+});
+
 // The cached drop leaves the workspace layout selectionless and it redirects
 // itself. Navigating here as well put two replace-hops to '/' in flight at once,
 // and ran the index loader — which can redirect on to a sibling workspace —
@@ -111,7 +157,7 @@ test('leaves the hop to the layout instead of racing it with its own navigate', 
 	const view = renderRemoveWorkspaceAction('san-antonio');
 
 	await act(async () => {
-		await view.result.current.remove('san-antonio');
+		await view.result.current.remove.deleted('san-antonio');
 	});
 
 	expect(navigate).not.toHaveBeenCalled();
@@ -130,7 +176,7 @@ test('drops the workspace from the lists before the refetch settles', async () =
 	const view = renderRemoveWorkspaceAction('san-antonio');
 
 	await act(async () => {
-		void view.result.current.remove('san-antonio');
+		void view.result.current.remove.deleted('san-antonio');
 		await Promise.resolve();
 	});
 
@@ -144,7 +190,7 @@ test('skips the router invalidation the layout redirect already performed', asyn
 	const view = renderRemoveWorkspaceAction('san-antonio');
 
 	await act(async () => {
-		await view.result.current.remove('san-antonio');
+		await view.result.current.remove.deleted('san-antonio');
 	});
 
 	expect(invalidate).not.toHaveBeenCalled();
@@ -157,7 +203,7 @@ test('keeps the stored selection so the index loader falls back within its proje
 	});
 
 	await act(async () => {
-		await view.result.current.remove('san-antonio');
+		await view.result.current.remove.deleted('san-antonio');
 	});
 
 	expect(view.result.current.selection).toEqual({
@@ -166,11 +212,11 @@ test('keeps the stored selection so the index loader falls back within its proje
 	});
 });
 
-test('leaves navigation untouched when a background workspace is archived', async () => {
+test('leaves navigation untouched when a background workspace is removed', async () => {
 	const view = renderRemoveWorkspaceAction('san-antonio');
 
 	await act(async () => {
-		await view.result.current.remove('some-other-workspace');
+		await view.result.current.remove.deleted('some-other-workspace');
 	});
 
 	expect(navigate).not.toHaveBeenCalled();
@@ -182,7 +228,7 @@ test('still refreshes list views when there is no active workspace', async () =>
 	const view = renderRemoveWorkspaceAction(null);
 
 	await act(async () => {
-		await view.result.current.remove('san-antonio');
+		await view.result.current.remove.deleted('san-antonio');
 	});
 
 	expect(navigate).not.toHaveBeenCalled();

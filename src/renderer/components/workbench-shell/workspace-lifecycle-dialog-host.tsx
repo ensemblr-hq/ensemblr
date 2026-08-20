@@ -58,13 +58,13 @@ export function WorkspaceLifecycleDialogHost({
 	return (
 		<>
 			<ArchiveWorkspaceDialog
-				onArchived={handleWorkspaceRemoved}
+				onArchived={handleWorkspaceRemoved.archived}
 				onOpenChange={closeOnDismiss}
 				open={request?.kind === 'archive'}
 				workspace={workspace}
 			/>
 			<DeleteWorkspaceDialog
-				onDeleted={handleWorkspaceRemoved}
+				onDeleted={handleWorkspaceRemoved.deleted}
 				onOpenChange={closeOnDismiss}
 				open={request?.kind === 'delete'}
 				workspace={workspace}

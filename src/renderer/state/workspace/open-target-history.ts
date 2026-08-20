@@ -33,24 +33,47 @@ export function writeLastUsedOpenTarget(
 
 /**
  * Drops the last-used pointer for `workspaceId`. Should be called whenever a
- * workspace is deleted or archived so the per-workspace map does not grow
- * unbounded as workspaces accumulate.
+ * workspace is deleted so the per-workspace map does not grow unbounded as
+ * workspaces accumulate. Archiving keeps the pointer — the workspace can come
+ * back, and {@link retainLastUsedOpenTargets} collects it once it cannot.
  */
 export function deleteLastUsedOpenTarget(workspaceId: string): void {
+	retainMap((candidate) => candidate !== workspaceId);
+}
+
+/**
+ * Drops the pointers of every workspace outside `existingWorkspaceIds`,
+ * collecting entries whose workspace was removed by a renderer that never ran
+ * {@link deleteLastUsedOpenTarget} for it — another window, or a build that
+ * predates the eviction. The set must name archived workspaces too.
+ * @param existingWorkspaceIds - Every workspace still on record
+ */
+export function retainLastUsedOpenTargets(
+	existingWorkspaceIds: ReadonlySet<string>,
+): void {
+	if (existingWorkspaceIds.size === 0) {
+		return;
+	}
+	retainMap((candidate) => existingWorkspaceIds.has(candidate));
+}
+
+/**
+ * Rewrites the map with only the workspace ids `keepWorkspace` accepts, leaving
+ * storage untouched when every entry survives.
+ * @param keepWorkspace - Predicate deciding which workspace ids survive
+ */
+function retainMap(keepWorkspace: (workspaceId: string) => boolean): void {
 	if (typeof window === 'undefined') {
 		return;
 	}
-	const current = readMap();
-	if (!(workspaceId in current)) {
+	const entries = Object.entries(readMap());
+	const surviving = entries.filter(([workspaceId]) =>
+		keepWorkspace(workspaceId),
+	);
+	if (surviving.length === entries.length) {
 		return;
 	}
-	const next: Record<string, string> = {};
-	for (const [key, value] of Object.entries(current)) {
-		if (key !== workspaceId) {
-			next[key] = value;
-		}
-	}
-	writeMap(next);
+	writeMap(Object.fromEntries(surviving));
 }
 
 /**

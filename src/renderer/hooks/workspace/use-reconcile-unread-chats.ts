@@ -22,6 +22,12 @@ function collectWorkspaceIds(
  * workspace that is gone: the sidebar row it would light is unmounted, and the
  * jump control cannot route to it.
  *
+ * Deliberately not folded into `useReconcileWorkspaceState`, which looks like
+ * the same hook: that one retains against every workspace still on record so an
+ * archived workspace keeps the state its unarchive restores, while a mark is
+ * unreachable the moment its row leaves the sidebar. Same shape, opposite
+ * answer for an archived workspace.
+ *
  * An empty project list is treated as "not loaded yet" rather than "everything
  * was deleted", so a mark survives the first render before the loader resolves.
  * @param projects - The projects the shell is currently displaying

@@ -85,8 +85,11 @@ export { useWatchTerminalActivity } from './terminal-activity-watch';
 export { useCloseRunningChatGuard } from './use-close-running-chat-guard';
 export type { ViewedChangesState } from './viewed-changes';
 export {
-	forgetWorkspaceViewedChangesAtom,
 	MAX_VIEWED_MARKS_PER_WORKSPACE,
 	useViewedChanges,
 	viewedChangesByWorkspaceAtom,
 } from './viewed-changes';
+export {
+	forgetWorkspaceStateAtom,
+	pruneWorkspaceStateAtom,
+} from './workspace-state-eviction';
