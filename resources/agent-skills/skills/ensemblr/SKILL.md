@@ -84,7 +84,8 @@ summary.
   means, how results are truncated, and the delegation loop.
 - **[references/settings-toml.md](references/settings-toml.md)** — the complete
   `.ensemblr/settings.toml` reference: `[scripts]`, `[scripts.run.<name>]` with
-  its icon list, `[git]`, `[prompts]`, `[infisical]`, `environment_variables`,
+  its icon list, the injected `ENSEMBLR_*` variables a script is handed,
+  `[git]`, `[prompts]`, `[infisical]`, `environment_variables`,
   `file_include_globs`, the keys that are inert, and `~/.config/ensemblr/config.json`.
 - **[references/workspaces-and-git.md](references/workspaces-and-git.md)** — the
   worktree model, base branches, which files a new workspace inherits,
