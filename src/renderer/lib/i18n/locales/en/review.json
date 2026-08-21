@@ -100,7 +100,6 @@
 		"affected-file-count_other": "{{count}} files affected",
 		"description": "The working-tree changes are reverted to the last commit; a new file is deleted. This cannot be undone.",
 		"description-bulk": "Every working-tree change is reverted to the last commit and any new files are deleted. This cannot be undone.",
-		"submitting": "Discarding…",
 		"title": "Discard changes?",
 		"title-bulk": "Discard all changes?"
 	},

@@ -16,7 +16,6 @@ interface LifecycleDialogActionsProps {
 	actionLabel: string;
 	/** `destructive` whenever confirming would drop work that is not on a remote. */
 	actionVariant: 'default' | 'destructive';
-	busyLabel: string;
 	canAct: boolean;
 	diagnostics: LifecycleDialogDiagnostic[];
 	diagnosticsTestId: string;
@@ -34,11 +33,14 @@ interface LifecycleDialogActionsProps {
  * answers would otherwise trap the user behind the overlay. It reads "Close"
  * rather than "Cancel" while the run is in flight because dismissing the dialog
  * does not call the removal back — the operation has already committed.
+ *
+ * The confirm button keeps its idle label while the run is in flight and reports
+ * the run with a spinner, so the verb never changes under the cursor that just
+ * pressed it.
  */
 export function LifecycleDialogActions({
 	actionLabel,
 	actionVariant,
-	busyLabel,
 	canAct,
 	diagnostics,
 	diagnosticsTestId,
@@ -66,10 +68,11 @@ export function LifecycleDialogActions({
 				<Button
 					disabled={!canAct}
 					onClick={onAct}
+					pending={isBusy}
 					type='button'
 					variant={actionVariant}
 				>
-					{isBusy ? busyLabel : actionLabel}
+					{actionLabel}
 				</Button>
 			</DialogFooter>
 		</>

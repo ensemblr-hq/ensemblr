@@ -1,6 +1,17 @@
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/renderer/components/ui/button';
 
+/** Props for the sticky footer shared by the create/rename dialogs. */
+interface DialogActionFooterProps {
+	/** Retry handler shown only while the dialog is in its failure stage. */
+	onRetry: (() => void) | null;
+	onSubmit: () => void;
+	submitDisabled: boolean;
+	submitLabel: string;
+	/** Whether the submit action is in flight, which swaps the label for a spinner. */
+	submitPending?: boolean;
+}
+
 /**
  * Renders the sticky footer shared by the create/rename dialogs: an optional
  * retry button while the last attempt is failing, plus the primary submit
@@ -11,13 +22,8 @@ export function DialogActionFooter({
 	onSubmit,
 	submitDisabled,
 	submitLabel,
-}: {
-	/** Retry handler shown only while the dialog is in its failure stage. */
-	onRetry: (() => void) | null;
-	onSubmit: () => void;
-	submitDisabled: boolean;
-	submitLabel: string;
-}) {
+	submitPending = false,
+}: DialogActionFooterProps) {
 	const { t } = useTranslation();
 	return (
 		<div className='-mx-4 -mb-4 flex justify-end gap-2 rounded-b-xl border-border border-t bg-muted/40 px-4 py-3'>
@@ -35,6 +41,7 @@ export function DialogActionFooter({
 				className='h-8 gap-2'
 				disabled={submitDisabled}
 				onClick={onSubmit}
+				pending={submitPending}
 				type='button'
 			>
 				{submitLabel}

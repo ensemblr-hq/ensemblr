@@ -85,14 +85,12 @@ export function RootDirectoryRow() {
 		<SettingRow
 			control={
 				<Button
-					disabled={pickRoot.isPending}
 					onClick={() => pickRoot.mutate()}
+					pending={pickRoot.isPending}
 					size='sm'
 					variant='outline'
 				>
-					{pickRoot.isPending
-						? t('common:actions.picking', 'Picking…')
-						: t('common:actions.browse', 'Browse')}
+					{t('common:actions.browse', 'Browse')}
 				</Button>
 			}
 			description={t(

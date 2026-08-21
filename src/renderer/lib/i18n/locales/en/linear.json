@@ -25,7 +25,6 @@
 		}
 	},
 	"create-workspace": {
-		"creating": "Creating…",
 		"menu-label": "Create in repository",
 		"trigger": "Create workspace"
 	},
@@ -98,7 +97,6 @@
 		},
 		"project-none": "No project",
 		"save-failed": "Saving the issue failed. Check your connection and try again.",
-		"saving": "Saving…",
 		"status-none": "No status",
 		"submit-create": "Create issue",
 		"submit-edit": "Save changes",

@@ -109,7 +109,6 @@ function DeleteWorkspaceDialogForm({
 			<LifecycleDialogActions
 				actionLabel={t('common:actions.delete', 'Delete')}
 				actionVariant='destructive'
-				busyLabel={t('common:actions.deleting', 'Deleting…')}
 				canAct={canDelete}
 				diagnostics={diagnostics}
 				diagnosticsTestId='delete-workspace-diagnostics'

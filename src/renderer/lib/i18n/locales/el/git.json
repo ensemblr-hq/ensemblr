@@ -82,7 +82,6 @@
 		"confirm": "Επιβεβαίωση merge",
 		"confirm-override": "Merge ούτως ή άλλως",
 		"description": "Κάνει merge τον κλάδο <mono>{{branch}}</mono> μέσω <mono>{{command}}</mono>. Αυτή η ενέργεια είναι ορατή σε όλους στο αποθετήριο και δεν μπορεί να αναιρεθεί από το Ensemblr.",
-		"submitting": "Γίνεται merge…",
 		"title": "Merge του pull request",
 		"title-numbered": "Merge του pull request #{{number}}",
 		"todos-clear": "Δεν υπάρχουν ανοιχτές εργασίες",

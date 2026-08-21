@@ -1,4 +1,4 @@
-import { ArchiveIcon, FastForwardIcon, LoaderCircleIcon } from 'lucide-react';
+import { ArchiveIcon, FastForwardIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/renderer/components/ui/button';
@@ -34,18 +34,11 @@ export function MergedHeaderActions() {
 				className='h-7 rounded-md border-pr-merged-border border-dashed bg-background/70 px-2.5 text-pr-merged hover:bg-pr-merged-soft hover:text-pr-merged dark:border-pr-merged-border dark:bg-background/65 dark:hover:bg-pr-merged-soft'
 				disabled={isBusy}
 				onClick={reviewActions?.continueMergedWorkspace}
+				pending={reviewActions?.isContinuingMergedWorkspace ?? false}
 				size='sm'
 				variant='outline'
 			>
-				{reviewActions?.isContinuingMergedWorkspace ? (
-					<LoaderCircleIcon
-						aria-hidden='true'
-						className='animate-spin'
-						data-icon='inline-start'
-					/>
-				) : (
-					<FastForwardIcon aria-hidden='true' data-icon='inline-start' />
-				)}
+				<FastForwardIcon aria-hidden='true' data-icon='inline-start' />
 				{t('common:actions.continue', 'Continue')}
 			</Button>
 			<Button
@@ -53,17 +46,10 @@ export function MergedHeaderActions() {
 				data-permission-boundary={archiveBoundary.boundary}
 				disabled={isBusy}
 				onClick={reviewActions?.archiveMergedWorkspace}
+				pending={reviewActions?.isArchivingMergedWorkspace ?? false}
 				size='sm'
 			>
-				{reviewActions?.isArchivingMergedWorkspace ? (
-					<LoaderCircleIcon
-						aria-hidden='true'
-						className='animate-spin'
-						data-icon='inline-start'
-					/>
-				) : (
-					<ArchiveIcon aria-hidden='true' data-icon='inline-start' />
-				)}
+				<ArchiveIcon aria-hidden='true' data-icon='inline-start' />
 				{t('common:actions.archive', 'Archive')}
 			</Button>
 		</div>

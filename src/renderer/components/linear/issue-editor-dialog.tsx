@@ -168,15 +168,14 @@ export function LinearIssueEditorDialog({
 							{t('common:actions.cancel', 'Cancel')}
 						</Button>
 						<Button
-							disabled={isSaving || !canSubmit}
+							disabled={!canSubmit}
 							onClick={submit}
+							pending={isSaving}
 							size='sm'
 						>
-							{isSaving
-								? t('linear:issue-editor.saving', 'Saving…')
-								: isCreate
-									? t('linear:issue-editor.submit-create', 'Create issue')
-									: t('linear:issue-editor.submit-edit', 'Save changes')}
+							{isCreate
+								? t('linear:issue-editor.submit-create', 'Create issue')
+								: t('linear:issue-editor.submit-edit', 'Save changes')}
 						</Button>
 					</span>
 				</DialogFooter>

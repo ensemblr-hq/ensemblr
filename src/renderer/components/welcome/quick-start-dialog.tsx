@@ -206,11 +206,8 @@ function QuickStartDialogForm({
 				onRetry={stage === 'failure' ? retry : null}
 				onSubmit={handleCreate}
 				submitDisabled={!canCreate}
-				submitLabel={
-					stage === 'creating'
-						? t('common:quick-start.creating', 'Creating…')
-						: t('common:actions.create', 'Create')
-				}
+				submitLabel={t('common:actions.create', 'Create')}
+				submitPending={stage === 'creating'}
 			/>
 		</>
 	);

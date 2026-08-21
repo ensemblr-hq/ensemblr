@@ -10,6 +10,7 @@ import { FilePreviewScene } from './file-preview.tsx';
 import { LinearIssueEditorScene } from './linear-issue-editor-preview.tsx';
 import { LinearIssuePropertiesScene } from './linear-issue-properties-preview.tsx';
 import { OnboardingScene } from './onboarding-preview.tsx';
+import { PendingButtonsScene } from './pending-buttons-preview.tsx';
 import { ProvidersScene } from './providers-preview.tsx';
 import { RightSidebarHeaderScene } from './right-sidebar-header-preview.tsx';
 import { StartingStatePreview } from './starting-state-preview.tsx';
@@ -141,6 +142,12 @@ export const SCENE_GROUPS = [
 				label: 'starting',
 				render: () => <StartingStatePreview />,
 				source: 'playground/starting-state-preview.tsx',
+			},
+			{
+				id: 'pending-buttons',
+				label: 'pending buttons',
+				render: () => <PendingButtonsScene />,
+				source: 'playground/pending-buttons-preview.tsx',
 			},
 		],
 	},

@@ -238,13 +238,12 @@ function CreateWorkspaceFromIssueButton({ issue }: { issue: LinearIssueWire }) {
 		<DropdownMenu>
 			<DropdownMenuTrigger asChild>
 				<Button
-					disabled={isCreating || model.displayProjects.length === 0}
+					disabled={model.displayProjects.length === 0}
+					pending={isCreating}
 					size='sm'
 					variant='outline'
 				>
-					{isCreating
-						? t('linear:create-workspace.creating', 'Creating…')
-						: t('linear:create-workspace.trigger', 'Create workspace')}
+					{t('linear:create-workspace.trigger', 'Create workspace')}
 				</Button>
 			</DropdownMenuTrigger>
 			<DropdownMenuContent align='end' className='w-64 p-1'>

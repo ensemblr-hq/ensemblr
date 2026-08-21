@@ -14,7 +14,9 @@ export default defineConfig({
 	extract: {
 		input: ['src/renderer/**/*.{ts,tsx}'],
 		ignore: [
-			'src/renderer/components/ui/**',
+			// Vendored shadcn primitives, except `button.tsx`: this repo extended it
+			// with a `pending` state whose screen-reader label is first-party copy.
+			'src/renderer/components/ui/!(button).{ts,tsx}',
 			'src/renderer/routing/routeTree.gen.ts',
 			'src/renderer/fixtures/**',
 			// Type-only, and `i18next.d.ts` documents a `t()` call in prose the

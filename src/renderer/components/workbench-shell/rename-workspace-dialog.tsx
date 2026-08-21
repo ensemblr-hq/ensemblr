@@ -259,11 +259,8 @@ function RenameWorkspaceDialogForm({
 				onRetry={stage === 'failure' ? handleRetry : null}
 				onSubmit={handleRename}
 				submitDisabled={!canRename}
-				submitLabel={
-					stage === 'renaming'
-						? t('common:actions.renaming', 'Renaming…')
-						: t('common:actions.rename', 'Rename')
-				}
+				submitLabel={t('common:actions.rename', 'Rename')}
+				submitPending={stage === 'renaming'}
 			/>
 		</>
 	);

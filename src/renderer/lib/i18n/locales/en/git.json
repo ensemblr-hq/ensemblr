@@ -82,7 +82,6 @@
 		"confirm": "Confirm merge",
 		"confirm-override": "Merge anyway",
 		"description": "Merges <mono>{{branch}}</mono> through <mono>{{command}}</mono>. This action is visible to everyone on the repository and cannot be undone from Ensemblr.",
-		"submitting": "Merging…",
 		"title": "Merge pull request",
 		"title-numbered": "Merge pull request #{{number}}",
 		"todos-clear": "No open todos",

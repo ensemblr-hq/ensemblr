@@ -91,7 +91,9 @@ function InputGroupButton({
 	variant = 'ghost',
 	size = 'xs',
 	...props
-}: Omit<React.ComponentProps<typeof Button>, 'size'> &
+	// `asChild` is dropped as well as `size`: Button's props are a union keyed on
+	// it, and Omit flattens that union into a shape neither arm accepts back.
+}: Omit<React.ComponentProps<typeof Button>, 'size' | 'asChild'> &
 	VariantProps<typeof inputGroupButtonVariants>) {
 	return (
 		<Button

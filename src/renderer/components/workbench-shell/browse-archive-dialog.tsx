@@ -247,14 +247,16 @@ function BrowseArchiveDialogBody({
 											onClick={() => {
 												void handleUnarchive(entry);
 											}}
+											pending={isBusy && pendingAction === 'unarchive'}
 											size='sm'
 											type='button'
 											variant='default'
 										>
-											<ArchiveRestoreIcon aria-hidden='true' />
-											{isBusy && pendingAction === 'unarchive'
-												? t('common:actions.restoring', 'Restoring…')
-												: t('common:actions.unarchive', 'Unarchive')}
+											<ArchiveRestoreIcon
+												aria-hidden='true'
+												data-icon='inline-start'
+											/>
+											{t('common:actions.unarchive', 'Unarchive')}
 										</Button>
 										<Button
 											className='h-8'
@@ -262,17 +264,16 @@ function BrowseArchiveDialogBody({
 											onClick={() => {
 												void handleDelete(entry);
 											}}
+											pending={isBusy && pendingAction === 'delete'}
 											size='sm'
 											type='button'
 											variant='destructive'
 										>
-											<Trash2Icon aria-hidden='true' />
-											{isBusy && pendingAction === 'delete'
-												? t('common:actions.deleting', 'Deleting…')
-												: t(
-														'workbench:browse-archive.row.delete-permanently',
-														'Delete permanently',
-													)}
+											<Trash2Icon aria-hidden='true' data-icon='inline-start' />
+											{t(
+												'workbench:browse-archive.row.delete-permanently',
+												'Delete permanently',
+											)}
 										</Button>
 									</div>
 									{showDiagnostics ? (

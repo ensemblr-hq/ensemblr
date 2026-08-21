@@ -103,11 +103,11 @@ export function MergeConfirmationDialog({
 					</Button>
 					<Button
 						className='bg-status-ok text-primary-foreground hover:bg-status-ok/90'
-						disabled={isSubmitting}
 						onClick={onConfirm}
+						pending={isSubmitting}
 					>
 						<GitMergeIcon data-icon='inline-start' />
-						{mergeButtonLabel({ isReady, isSubmitting, t })}
+						{mergeButtonLabel({ isReady, t })}
 					</Button>
 				</DialogFooter>
 			</DialogContent>
@@ -275,22 +275,16 @@ function describeArchiveBehavior({
 /**
  * Label the confirm button, warning when the merge overrides readiness.
  * @param isReady - Whether the pull request reports as ready to merge
- * @param isSubmitting - Whether a merge is already in flight
  * @param t - The caller's translation function, so the copy follows the UI language
  * @returns The button label
  */
 function mergeButtonLabel({
 	isReady,
-	isSubmitting,
 	t,
 }: {
 	isReady: boolean;
-	isSubmitting: boolean;
 	t: TFunction;
 }): string {
-	if (isSubmitting) {
-		return t('git:merge-dialog.submitting', 'Merging…');
-	}
 	return isReady
 		? t('git:merge-dialog.confirm', 'Confirm merge')
 		: t('git:merge-dialog.confirm-override', 'Merge anyway');

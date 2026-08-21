@@ -90,7 +90,6 @@
 		"confirm": "Подтвердить merge",
 		"confirm-override": "Всё равно выполнить merge",
 		"description": "Выполняет merge ветки <mono>{{branch}}</mono> через <mono>{{command}}</mono>. Это действие видно всем в репозитории, и его нельзя отменить из Ensemblr.",
-		"submitting": "Выполняется merge…",
 		"title": "Выполнить merge pull request",
 		"title-numbered": "Выполнить merge pull request #{{number}}",
 		"todos-clear": "Открытых задач нет",

@@ -213,12 +213,11 @@ export function EnvironmentVariableSheet({
 					<Button
 						disabled={!canSave}
 						onClick={handleSubmit}
+						pending={mutation.isPending}
 						type='button'
 						variant='default'
 					>
-						{mutation.isPending
-							? t('common:actions.saving', 'Saving…')
-							: t('common:actions.save', 'Save')}
+						{t('common:actions.save', 'Save')}
 					</Button>
 				</SheetFooter>
 			</SheetContent>

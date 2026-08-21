@@ -89,14 +89,12 @@ export function ProviderExecutableRow({
 			control={
 				<div className='flex items-center gap-2'>
 					<Button
-						disabled={pick.isPending}
 						onClick={() => pick.mutate()}
+						pending={pick.isPending}
 						size='sm'
 						variant='outline'
 					>
-						{pick.isPending
-							? t('common:actions.picking', 'Picking…')
-							: t('common:actions.browse', 'Browse')}
+						{t('common:actions.browse', 'Browse')}
 					</Button>
 					<Button
 						disabled={!value}

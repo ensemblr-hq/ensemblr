@@ -584,7 +584,6 @@
 			"resolved-keys_many": "{{count}} переменных получено",
 			"resolved-keys_other": "{{count}} переменных получено",
 			"save": "Сохранить связь",
-			"saving": "Сохранение…",
 			"summary": {
 				"never-synced": "синхронизации не было",
 				"none": "Проект не выбран",

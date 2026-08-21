@@ -150,12 +150,11 @@ function DiscardChangesDialogForm({
 					className='h-8'
 					disabled={!canDiscard}
 					onClick={() => mutation.mutate()}
+					pending={mutation.isPending}
 					type='button'
 					variant='destructive'
 				>
-					{mutation.isPending
-						? t('review:discard-changes.submitting', 'Discarding…')
-						: t('common:actions.discard', 'Discard')}
+					{t('common:actions.discard', 'Discard')}
 				</Button>
 			</div>
 		</>
