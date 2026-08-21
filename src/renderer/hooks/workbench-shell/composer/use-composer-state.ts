@@ -67,7 +67,6 @@ interface UseComposerStateArgs {
  */
 export interface ComposerStateApi {
 	activeIndex: number;
-	anchorRef: RefObject<HTMLDivElement | null>;
 	attachmentError: string | null;
 	/** Everything the draft carries alongside its text, in the order it was added. */
 	attachments: readonly ComposerAttachment[];
@@ -255,7 +254,6 @@ export function useComposerState({
 	seedLinkedIssue,
 }: UseComposerStateArgs): ComposerStateApi {
 	const editorRef = useRef<ComposerEditorHandle | null>(null);
-	const anchorRef = useRef<HTMLDivElement | null>(null);
 	const store = useStore();
 
 	const [value, setValue] = useAtom(composerValueAtomFamily(chatTabId));
@@ -501,7 +499,6 @@ export function useComposerState({
 		sendIntent,
 		steerQueued,
 		activeIndex,
-		anchorRef,
 		attachGithubIssue,
 		attachLinearIssue,
 		attachmentError,

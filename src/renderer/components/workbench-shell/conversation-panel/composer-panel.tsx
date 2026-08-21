@@ -172,7 +172,7 @@ function ComposerPanelBody({
 
 	const editorBlock = (
 		<TextContextMenu>
-			<div className='relative' ref={state.anchorRef}>
+			<div className='relative'>
 				<ComposerEditor
 					ariaLabel={t('workbench:composer.aria-label', 'Agent composer')}
 					disabled={composer.disabled}
