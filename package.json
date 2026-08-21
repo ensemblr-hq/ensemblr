@@ -114,7 +114,7 @@
 	"license": "Apache-2.0",
 	"dependencies": {
 		"@anthropic-ai/claude-agent-sdk": "^0.3.223",
-		"@atlaskit/pragmatic-drag-and-drop": "^2.0.1",
+		"@atlaskit/pragmatic-drag-and-drop": "^3.0.0",
 		"@atlaskit/pragmatic-drag-and-drop-hitbox": "^2.0.0",
 		"@iconify-json/logos": "^1.2.12",
 		"@iconify-json/vscode-icons": "^1.2.73",
