@@ -139,7 +139,6 @@ function ArchiveWorkspaceDialogForm({
 			<LifecycleDialogActions
 				actionLabel={t('common:actions.archive', 'Archive')}
 				actionVariant={branchCleanup ? 'destructive' : 'default'}
-				busyLabel={t('common:actions.archiving', 'Archiving…')}
 				canAct={canArchive}
 				diagnostics={diagnostics}
 				diagnosticsTestId='archive-workspace-diagnostics'

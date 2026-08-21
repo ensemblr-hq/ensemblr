@@ -6,7 +6,6 @@ export default interface Resources {
 			allow: 'Allow';
 			approve: 'Approve';
 			archive: 'Archive';
-			archiving: 'Archiving…';
 			'attach-to-chat': 'Attach to chat';
 			back: 'Back';
 			browse: 'Browse';
@@ -22,29 +21,24 @@ export default interface Resources {
 			create: 'Create';
 			delete: 'Delete';
 			'delete-ellipsis': 'Delete…';
-			deleting: 'Deleting…';
 			deny: 'Deny';
 			discard: 'Discard';
 			'discard-changes': 'Discard changes';
 			edit: 'Edit';
+			'in-progress': 'In progress';
 			'keep-open': 'Keep open';
 			open: 'Open';
 			'open-in': 'Open in';
 			'open-named': 'Open {{label}}';
-			picking: 'Picking…';
 			pin: 'Pin';
 			remove: 'Remove';
 			'remove-named': 'Remove {{label}}';
-			removing: 'Removing…';
 			rename: 'Rename';
-			renaming: 'Renaming…';
 			'reset-managed-root': 'Reset to managed repos directory';
 			resolve: 'Resolve';
-			restoring: 'Restoring…';
 			retry: 'Retry';
 			'revert-to-default': 'Revert to default';
 			save: 'Save';
-			saving: 'Saving…';
 			send: 'Send';
 			stop: 'Stop';
 			'try-again': 'Try again';
@@ -137,7 +131,6 @@ export default interface Resources {
 		};
 		'quick-start': {
 			creates: 'Creates folder and repo <name>{{projectName}}</name>';
-			creating: 'Creating…';
 			description: 'Create a local folder and initialize a new git repository.';
 			'name-label': 'Project name';
 			'parent-label': 'Parent folder';
@@ -1042,7 +1035,6 @@ export default interface Resources {
 			confirm: 'Confirm merge';
 			'confirm-override': 'Merge anyway';
 			description: 'Merges <mono>{{branch}}</mono> through <mono>{{command}}</mono>. This action is visible to everyone on the repository and cannot be undone from Ensemblr.';
-			submitting: 'Merging…';
 			title: 'Merge pull request';
 			'title-numbered': 'Merge pull request #{{number}}';
 			'todos-clear': 'No open todos';
@@ -1138,7 +1130,6 @@ export default interface Resources {
 			};
 		};
 		'create-workspace': {
-			creating: 'Creating…';
 			'menu-label': 'Create in repository';
 			trigger: 'Create workspace';
 		};
@@ -1211,7 +1202,6 @@ export default interface Resources {
 			};
 			'project-none': 'No project';
 			'save-failed': 'Saving the issue failed. Check your connection and try again.';
-			saving: 'Saving…';
 			'status-none': 'No status';
 			'submit-create': 'Create issue';
 			'submit-edit': 'Save changes';
@@ -1487,7 +1477,6 @@ export default interface Resources {
 			'affected-file-count_other': '{{count}} files affected';
 			description: 'The working-tree changes are reverted to the last commit; a new file is deleted. This cannot be undone.';
 			'description-bulk': 'Every working-tree change is reverted to the last commit and any new files are deleted. This cannot be undone.';
-			submitting: 'Discarding…';
 			title: 'Discard changes?';
 			'title-bulk': 'Discard all changes?';
 		};
@@ -2116,7 +2105,6 @@ export default interface Resources {
 				'resolved-keys_one': '{{count}} variable resolved';
 				'resolved-keys_other': '{{count}} variables resolved';
 				save: 'Save link';
-				saving: 'Saving…';
 				summary: {
 					'never-synced': 'never synced';
 					none: 'No project linked';
@@ -2693,7 +2681,6 @@ export default interface Resources {
 			'assign-issue': {
 				confirm: 'Create workspace';
 				'created-in-column': 'Workspace created from {{issue}} in {{status}}';
-				creating: 'Creating…';
 				description: 'A new workspace for {{issue}} lands in {{status}}. The issue itself is not changed in Linear or GitHub.';
 				open: 'Open';
 				repository: 'Repository';

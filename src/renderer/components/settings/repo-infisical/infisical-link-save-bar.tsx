@@ -54,14 +54,13 @@ export function InfisicalLinkSaveBar({
 					{t('common:actions.discard', 'Discard')}
 				</Button>
 				<Button
-					disabled={!canSave || saving}
+					disabled={!canSave}
 					onClick={onSave}
+					pending={saving}
 					size='sm'
 					type='button'
 				>
-					{saving
-						? t('settings:repo.infisical.saving', 'Saving…')
-						: t('settings:repo.infisical.save', 'Save link')}
+					{t('settings:repo.infisical.save', 'Save link')}
 				</Button>
 			</div>
 		</div>

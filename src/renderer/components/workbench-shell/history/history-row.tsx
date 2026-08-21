@@ -93,10 +93,11 @@ export function HistoryRow({
 					<RowLabel archived entry={entry} />
 					<RowTrailing date={formatRowDate(entry.updatedAt)}>
 						<Button
-							disabled={pending || restoreBlocked || !apiAvailable}
+							disabled={restoreBlocked || !apiAvailable}
 							onClick={() => {
 								void handleUnarchive();
 							}}
+							pending={pending}
 							size='xs'
 							title={
 								restoreBlocked
@@ -109,9 +110,7 @@ export function HistoryRow({
 							type='button'
 							variant='subtle'
 						>
-							{pending
-								? t('common:actions.restoring', 'Restoring…')
-								: t('common:actions.unarchive', 'Unarchive')}
+							{t('common:actions.unarchive', 'Unarchive')}
 						</Button>
 					</RowTrailing>
 				</div>

@@ -381,7 +381,6 @@
 		"assign-issue": {
 			"confirm": "Create workspace",
 			"created-in-column": "Workspace created from {{issue}} in {{status}}",
-			"creating": "Creating…",
 			"description": "A new workspace for {{issue}} lands in {{status}}. The issue itself is not changed in Linear or GitHub.",
 			"open": "Open",
 			"repository": "Repository",

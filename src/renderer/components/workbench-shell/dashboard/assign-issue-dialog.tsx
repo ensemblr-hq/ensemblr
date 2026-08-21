@@ -1,22 +1,8 @@
-import {
-	CheckIcon,
-	ChevronsUpDownIcon,
-	FolderGit2Icon,
-	Loader2Icon,
-} from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 
 import { Button } from '@/renderer/components/ui/button';
-import {
-	Command,
-	CommandEmpty,
-	CommandGroup,
-	CommandInput,
-	CommandItem,
-	CommandList,
-} from '@/renderer/components/ui/command';
 import {
 	Dialog,
 	DialogContent,
@@ -182,18 +168,11 @@ export function AssignIssueDialog({
 						{t('common:actions.cancel', 'Cancel')}
 					</Button>
 					<Button
-						disabled={!project || isCreating}
+						disabled={!project}
 						onClick={() => void confirm()}
+						pending={isCreating}
 					>
-						{isCreating ? (
-							<Loader2Icon aria-hidden='true' className='animate-spin' />
-						) : null}
-						{isCreating
-							? t('workbench:dashboard.assign-issue.creating', 'Creating…')
-							: t(
-									'workbench:dashboard.assign-issue.confirm',
-									'Create workspace',
-								)}
+						{t('workbench:dashboard.assign-issue.confirm', 'Create workspace')}
 					</Button>
 				</DialogFooter>
 			</DialogContent>

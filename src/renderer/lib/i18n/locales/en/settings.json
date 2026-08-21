@@ -570,7 +570,6 @@
 			"resolved-keys_one": "{{count}} variable resolved",
 			"resolved-keys_other": "{{count}} variables resolved",
 			"save": "Save link",
-			"saving": "Saving…",
 			"summary": {
 				"never-synced": "never synced",
 				"none": "No project linked",

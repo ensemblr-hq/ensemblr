@@ -162,13 +162,11 @@ function RepoMiscSettings() {
 									</Button>
 								</DialogClose>
 								<Button
-									disabled={remove.isPending}
 									onClick={() => remove.mutate()}
+									pending={remove.isPending}
 									variant='destructive'
 								>
-									{remove.isPending
-										? t('common:actions.removing', 'Removing…')
-										: t('common:actions.remove', 'Remove')}
+									{t('common:actions.remove', 'Remove')}
 								</Button>
 							</DialogFooter>
 						</DialogContent>
