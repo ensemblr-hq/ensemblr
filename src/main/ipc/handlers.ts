@@ -90,6 +90,7 @@ import { registerSettingsHandlers } from './handlers/settings';
 import { registerSetupHandlers } from './handlers/setup';
 import { registerShellSnapshotHandlers } from './handlers/shell-snapshot';
 import { registerTerminalHandlers } from './handlers/terminal';
+import { registerTextEditingHandlers } from './handlers/text-editing';
 import { registerUpdateHandlers } from './handlers/update';
 import { registerWindowHandlers } from './handlers/window';
 import { registerWorkspaceFilesHandlers } from './handlers/workspace-files';
@@ -236,6 +237,7 @@ export function registerIpcHandlers({
 	});
 
 	registerWindowHandlers();
+	registerTextEditingHandlers();
 	registerMenuHandlers({ menuContextStore, rebuildMenu });
 	registerActiveChatHandlers({ activeChatStore });
 	registerAppSettingsHandlers({ appSettingsService, onAppSettingsUpdated });

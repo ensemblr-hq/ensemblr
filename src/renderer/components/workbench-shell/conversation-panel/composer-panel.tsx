@@ -3,6 +3,7 @@ import { useAtomValue } from 'jotai';
 import { type ReactNode, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { dictationKeyStatusQuery } from '@/renderer/api/ensemblr';
+import { TextContextMenu } from '@/renderer/components/text-context-menu';
 import { useHotkey } from '@/renderer/hooks/use-hotkey';
 import { useComposerState } from '@/renderer/hooks/workbench-shell/composer/use-composer-state';
 import { useDictation } from '@/renderer/hooks/workbench-shell/composer/use-dictation';
@@ -170,30 +171,32 @@ function ComposerPanelBody({
 				);
 
 	const editorBlock = (
-		<div className='relative' ref={state.anchorRef}>
-			<ComposerEditor
-				ariaLabel={t('workbench:composer.aria-label', 'Agent composer')}
-				disabled={composer.disabled}
-				handleRef={state.editorRef}
-				initialSeed={{
-					attachments: state.initialDraft.attachments,
-					text: state.initialDraft.text,
-				}}
-				initialSnapshot={state.initialDraft.snapshot}
-				onBlur={() => setFocused(false)}
-				onDraftChange={state.handleDraftChange}
-				onDroppedTransfer={state.consumeDroppedTransfer}
-				onFocus={() => setFocused(true)}
-				onKeyDown={state.handleKeyDown}
-				onPastedTransfer={state.consumePastedTransfer}
-				placeholder={placeholder}
-			/>
-			<ComposerFocusHint
-				focused={focused}
-				hasChips={state.hasChips}
-				value={state.value}
-			/>
-		</div>
+		<TextContextMenu>
+			<div className='relative' ref={state.anchorRef}>
+				<ComposerEditor
+					ariaLabel={t('workbench:composer.aria-label', 'Agent composer')}
+					disabled={composer.disabled}
+					handleRef={state.editorRef}
+					initialSeed={{
+						attachments: state.initialDraft.attachments,
+						text: state.initialDraft.text,
+					}}
+					initialSnapshot={state.initialDraft.snapshot}
+					onBlur={() => setFocused(false)}
+					onDraftChange={state.handleDraftChange}
+					onDroppedTransfer={state.consumeDroppedTransfer}
+					onFocus={() => setFocused(true)}
+					onKeyDown={state.handleKeyDown}
+					onPastedTransfer={state.consumePastedTransfer}
+					placeholder={placeholder}
+				/>
+				<ComposerFocusHint
+					focused={focused}
+					hasChips={state.hasChips}
+					value={state.value}
+				/>
+			</div>
+		</TextContextMenu>
 	);
 
 	return (

@@ -3,6 +3,7 @@ export default interface Resources {
 	common: {
 		actions: {
 			add: 'Add';
+			'add-to-dictionary': 'Add to dictionary';
 			allow: 'Allow';
 			approve: 'Approve';
 			archive: 'Archive';
@@ -15,10 +16,12 @@ export default interface Resources {
 			connect: 'Connect';
 			continue: 'Continue';
 			copied: 'Copied';
+			copy: 'Copy';
 			'copy-code': 'Copy code';
 			'copy-path': 'Copy path';
 			'copy-response': 'Copy response';
 			create: 'Create';
+			cut: 'Cut';
 			delete: 'Delete';
 			'delete-ellipsis': 'Delete…';
 			deny: 'Deny';
@@ -27,10 +30,13 @@ export default interface Resources {
 			edit: 'Edit';
 			'in-progress': 'In progress';
 			'keep-open': 'Keep open';
+			'no-suggestions': 'No suggestions';
 			open: 'Open';
 			'open-in': 'Open in';
 			'open-named': 'Open {{label}}';
+			paste: 'Paste';
 			pin: 'Pin';
+			redo: 'Redo';
 			remove: 'Remove';
 			'remove-named': 'Remove {{label}}';
 			rename: 'Rename';
@@ -39,10 +45,12 @@ export default interface Resources {
 			retry: 'Retry';
 			'revert-to-default': 'Revert to default';
 			save: 'Save';
+			'select-all': 'Select all';
 			send: 'Send';
 			stop: 'Stop';
 			'try-again': 'Try again';
 			unarchive: 'Unarchive';
+			undo: 'Undo';
 			unpin: 'Unpin';
 			view: 'View';
 		};

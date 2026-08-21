@@ -10,6 +10,7 @@ import {
 	ConversationContent,
 	ConversationScrollButton,
 } from '@/renderer/components/conversation';
+import { TextContextMenu } from '@/renderer/components/text-context-menu';
 import { useForkConversation } from '@/renderer/hooks/workbench-shell/conversation-panel/use-fork-conversation';
 import { useCheckpointRestore } from '@/renderer/hooks/workbench-shell/timeline/use-checkpoint-restore';
 import {
@@ -197,41 +198,43 @@ export function AgentSessionTimeline({
 			className='flex min-h-0 flex-1 flex-col'
 			data-timeline-state='ready'
 		>
-			<Conversation
-				className='min-h-0 w-full flex-1'
-				key={activeSession.chatTabId}
-			>
-				<ConversationContent
-					className='mx-auto w-full max-w-3xl gap-6 px-4 pt-5 pb-5'
-					followKey={promptCount}
-					scrollKey={activeSession.chatTabId}
+			<TextContextMenu>
+				<Conversation
+					className='min-h-0 w-full flex-1'
+					key={activeSession.chatTabId}
 				>
-					{messages.map((message, index) => (
-						<TimelineMessage
-							checkpointsByTurnId={checkpointsByTurnId}
-							errorRecovery={errorRecovery}
-							fork={canFork ? fork : null}
-							isLastMessage={index === messages.length - 1}
-							isStreaming={isStreaming}
-							key={message.id}
-							message={message}
-							onRequestRestore={requestRestore}
-							onViewTurnDiff={openTurnDiff}
-							retryPrompt={retryPrompts.get(message.id) ?? null}
-						/>
-					))}
-					{pendingStartMs !== null ? (
-						<div
-							className='flex w-full flex-col gap-2.5 text-foreground'
-							data-role='assistant-turn'
-							data-pending='true'
-						>
-							<ChatWorkingIndicator startMs={pendingStartMs} />
-						</div>
-					) : null}
-				</ConversationContent>
-				<ConversationScrollButton />
-			</Conversation>
+					<ConversationContent
+						className='mx-auto w-full max-w-3xl gap-6 px-4 pt-5 pb-5'
+						followKey={promptCount}
+						scrollKey={activeSession.chatTabId}
+					>
+						{messages.map((message, index) => (
+							<TimelineMessage
+								checkpointsByTurnId={checkpointsByTurnId}
+								errorRecovery={errorRecovery}
+								fork={canFork ? fork : null}
+								isLastMessage={index === messages.length - 1}
+								isStreaming={isStreaming}
+								key={message.id}
+								message={message}
+								onRequestRestore={requestRestore}
+								onViewTurnDiff={openTurnDiff}
+								retryPrompt={retryPrompts.get(message.id) ?? null}
+							/>
+						))}
+						{pendingStartMs !== null ? (
+							<div
+								className='flex w-full flex-col gap-2.5 text-foreground'
+								data-role='assistant-turn'
+								data-pending='true'
+							>
+								<ChatWorkingIndicator startMs={pendingStartMs} />
+							</div>
+						) : null}
+					</ConversationContent>
+					<ConversationScrollButton />
+				</Conversation>
+			</TextContextMenu>
 			<RestoreCheckpointDialog
 				hasOtherOpenSessions={hasOtherOpenSessions}
 				onCancel={restore.cancel}

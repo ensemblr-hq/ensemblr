@@ -17,6 +17,12 @@ import { resolveFixtureMergeConflicts } from './conflicts-fixtures.ts';
 import { resolveFixtureLinearMetadata } from './linear-issue-editor-fixtures.ts';
 import { Playground } from './playground.tsx';
 import { resolveFixtureGitStatus } from './right-sidebar-header-fixtures.ts';
+import {
+	recordFixtureDictionaryWord,
+	recordFixtureMisspellingReplacement,
+	recordFixtureTextEditCommand,
+	registerFixtureTextContextMenu,
+} from './text-context-menu-fixtures.ts';
 
 const rootElement = document.getElementById('root');
 
@@ -25,6 +31,7 @@ if (!rootElement) {
 }
 
 installPlaygroundBridge({
+	addWordToDictionary: recordFixtureDictionaryWord,
 	getAgentProviderExecutablePath: resolveFixtureAgentProviderExecutablePath,
 	getAgentProviderReadiness: resolveFixtureAgentProviderReadiness,
 	getWorkspaceGitStatus: resolveFixtureGitStatus,
@@ -32,7 +39,10 @@ installPlaygroundBridge({
 	linearMetadata: resolveFixtureLinearMetadata,
 	listAgentProviderMcpServers: resolveFixtureAgentProviderMcpServers,
 	listWorkspaceOpenTargets: resolveFixtureOpenTargets,
+	onTextContextMenu: registerFixtureTextContextMenu,
 	openAgentProviderSettingsFile: resolveFixtureOpenProviderSettingsFile,
+	replaceMisspelling: recordFixtureMisspellingReplacement,
+	runTextEditCommand: recordFixtureTextEditCommand,
 });
 
 const queryClient = new QueryClient({

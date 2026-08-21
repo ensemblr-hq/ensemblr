@@ -133,6 +133,11 @@ export {
 	rootDirectoryChangeRequestSchema,
 } from './request-schemas/root.ts';
 export {
+	addWordToDictionaryRequestSchema,
+	replaceMisspellingRequestSchema,
+	textEditCommandSchema,
+} from './request-schemas/text-editing.ts';
+export {
 	readWorkspaceFileRequestSchema,
 	writeWorkspaceActionPromptRequestSchema,
 	writeWorkspaceFileAttachmentRequestSchema,
