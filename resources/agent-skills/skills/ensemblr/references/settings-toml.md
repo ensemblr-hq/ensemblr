@@ -142,6 +142,36 @@ Still works, upgraded into one implicit script named `run`, `icon = "play"`,
 `[scripts.run.<name>]` tables exist** — with both present, the named tables win
 and the string is ignored.
 
+## Injected `ENSEMBLR_*` variables
+
+Every terminal Ensemblr launches — the setup script, a run script, a spawn
+terminal, a harness — is handed five reserved variables, populated per
+workspace. They are reserved: a same-named row in `environment_variables` or in
+Settings is overridden rather than honoured.
+
+| Variable | Value |
+| --- | --- |
+| `ENSEMBLR_PORT` | The workspace's own port, from the range `41000`–`41999`. Unique among active workspaces and stable across restarts. |
+| `ENSEMBLR_WORKSPACE_NAME` | The workspace's name. |
+| `ENSEMBLR_WORKSPACE_PATH` | Absolute path of the workspace's worktree. |
+| `ENSEMBLR_ROOT_PATH` | Absolute path of the Ensemblr root directory (`~/Ensemblr` by default). |
+| `ENSEMBLR_DEFAULT_BRANCH` | The workspace's base branch, falling back to the repository's default branch. Left unset with a diagnostic when neither is recorded. |
+
+**Your own chat session is not a terminal, so it does not have them.** A Pi or
+Claude Code session spawns under the login-shell environment, and a `Bash` call
+you make is a child of that — `echo $ENSEMBLR_PORT` there expands to nothing.
+That empty expansion is not evidence a script is wrong; read the values from
+Settings, or run the command through a terminal, where they are populated.
+
+**A command that binds a port takes `$ENSEMBLR_PORT` rather than a literal.**
+Several workspaces of one repository run side by side, so a hardcoded port means
+the second dev server dies on `EADDRINUSE`.
+
+```toml
+[scripts.run.dev]
+command = "npm run dev -- --port $ENSEMBLR_PORT"
+```
+
 ## `[git]`
 
 Per-repository git defaults, each overriding the matching user-scope setting.

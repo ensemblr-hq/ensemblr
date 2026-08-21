@@ -8,31 +8,16 @@ import { useComposerInsert } from '@/renderer/state/composer';
  * Composer seed for the setup-tab "Ask agent" affordance: directs the agent to
  * author the repository's `.ensemblr/settings.toml` scripts after inspecting the
  * project's tooling. Seeded for review, never auto-submitted.
+ *
+ * The schema itself is deliberately absent: the `ensemblr` skill ships the full
+ * `settings.toml` reference to the sessions Ensemblr launches, so restating it
+ * here would be a second copy to keep in sync with the loader.
  */
 const ASK_AGENT_SETUP_PROMPT = `Set up this repository's Ensemblr config so a fresh workspace can install its dependencies and start its common tasks.
 
-Inspect the project first (package manager, language toolchain, lockfiles, existing scripts), then create or update \`.ensemblr/settings.toml\`:
+Read the \`ensemblr\` skill's \`.ensemblr/settings.toml\` reference for the schema — the \`[scripts]\` setup command, the \`[scripts.run.<name>]\` tables and their icon list, and the \`ENSEMBLR_*\` variables every script is handed.
 
-- \`[scripts]\` \`setup\`: the command that installs dependencies / prepares a new workspace.
-- One \`[scripts.run.<name>]\` table per task worth a one-click button — the dev server, the test suite, lint/typecheck, a build. Each takes a \`command\`, and optionally an \`icon\`, \`default = true\` (the ⌘R target, at most one), and \`available_in = ["local"]\`.
-
-Every workspace gets its own \`$ENSEMBLR_PORT\`, so pass it to anything that binds a port instead of hardcoding one.
-
-Example:
-
-    [scripts]
-    setup = "<install command>"
-
-    [scripts.run.dev]
-    command = "<dev command using $ENSEMBLR_PORT>"
-    icon = "play"
-    default = true
-
-    [scripts.run.test]
-    command = "<test command>"
-    icon = "test-tube"
-
-Pick icon names from Ensemblr's set (play, server, terminal, test-tube, flask-conical, list-checks, hammer, rocket, bug, database, globe, zap, ...); an unknown name falls back to the default icon.
+Then inspect this project — package manager, language toolchain, lockfiles, existing scripts — and create or update \`.ensemblr/settings.toml\` with the setup command plus one run script per task worth a one-click button: the dev server, the test suite, lint/typecheck, a build.
 
 Use the commands that actually apply to this repo, then tell me what you chose and why.`;
 
