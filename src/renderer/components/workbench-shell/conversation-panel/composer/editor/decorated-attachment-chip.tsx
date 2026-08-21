@@ -48,6 +48,7 @@ export function DecoratedAttachmentChip({
 				onActivate={handleActivate}
 				onRemove={handleRemove}
 				preview={attachment.preview}
+				source={attachment.source}
 			/>
 		);
 	}

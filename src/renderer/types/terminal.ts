@@ -21,6 +21,8 @@ export interface TerminalRendererAdapter {
 	dispose: () => void;
 	fit: () => { cols: number; rows: number } | null;
 	focus: () => void;
+	/** The text the user has selected in the surface; empty when nothing is selected. */
+	getSelection: () => string;
 	onData: (listener: (data: string) => void) => () => void;
 	/** Live-updates the terminal typography; caller re-fits afterwards. */
 	setFont: (options: { fontFamily?: string; fontSize?: number }) => void;

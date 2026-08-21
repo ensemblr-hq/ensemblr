@@ -2,6 +2,11 @@ import type { TFunction } from 'i18next';
 import { useAtomValue } from 'jotai';
 import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
+import {
+	ContextMenu,
+	ContextMenuTrigger,
+} from '@/renderer/components/ui/context-menu';
+import { useTerminalSelectionMenu } from '@/renderer/hooks/workbench-shell/dock-panel/use-terminal-selection-menu';
 import { emitTerminalInput } from '@/renderer/lib/terminal';
 import {
 	createXtermAdapter,
@@ -16,6 +21,8 @@ import type { TerminalRendererAdapter } from '@/renderer/types/terminal';
 import type { TerminalSessionStatus } from '@/shared/ipc/contracts/terminal';
 import { scrollbackMbToLines } from '@/shared/terminal';
 
+import { TerminalContextMenuContent } from './terminal-context-menu';
+
 /** Builds the terminal CSS font stack, prepending the user's chosen font. */
 function buildTerminalFontFamily(font: string): string {
 	const trimmed = font.trim();
@@ -29,19 +36,28 @@ function buildTerminalFontFamily(font: string): string {
  * scrollback snapshot, streams output broadcasts, forwards keystrokes, and
  * keeps PTY dimensions in sync with the panel size. When `readOnly` is set the
  * surface streams output but never forwards input (Setup/Run panels).
+ *
+ * Right-clicking hands the current selection to the chat as an attachment chip.
  */
 export function XtermTerminal({
 	readOnly = false,
 	sessionStatus,
 	terminalId,
+	terminalLabel,
+	workspaceCwd,
 }: {
 	readOnly?: boolean;
 	sessionStatus: TerminalSessionStatus | null;
 	terminalId: string;
+	/** What this pane calls itself, which names an attached selection. */
+	terminalLabel: string;
+	workspaceCwd: string;
 }) {
 	const { t } = useTranslation();
 	const containerRef = useRef<HTMLDivElement | null>(null);
 	const adapterRef = useRef<TerminalRendererAdapter | null>(null);
+	const { onCloseAutoFocus, onOpenChange, selection } =
+		useTerminalSelectionMenu({ adapterRef, readOnly });
 	const terminalFont = useAtomValue(terminalFontAtom);
 	const terminalFontSize = useAtomValue(terminalFontSizeAtom);
 	const terminalScrollbackMb = useAtomValue(terminalScrollbackMbAtom);
@@ -227,17 +243,27 @@ export function XtermTerminal({
 	}, [scrollbackLines]);
 
 	return (
-		<div className='relative h-full min-h-0 w-full bg-sidebar'>
-			<div
-				className='h-full min-h-0 w-full px-2 pt-1 pb-3'
-				ref={containerRef}
-			/>
-			{exitNotice ? (
-				<div className='pointer-events-none absolute inset-x-0 bottom-0 border-border border-t bg-muted/80 px-3 py-1 text-muted-foreground text-xs'>
-					{exitNotice}
+		<ContextMenu onOpenChange={onOpenChange}>
+			<ContextMenuTrigger asChild>
+				<div className='relative h-full min-h-0 w-full bg-sidebar'>
+					<div
+						className='h-full min-h-0 w-full px-2 pt-1 pb-3'
+						ref={containerRef}
+					/>
+					{exitNotice ? (
+						<div className='pointer-events-none absolute inset-x-0 bottom-0 border-border border-t bg-muted/80 px-3 py-1 text-muted-foreground text-xs'>
+							{exitNotice}
+						</div>
+					) : null}
 				</div>
-			) : null}
-		</div>
+			</ContextMenuTrigger>
+			<TerminalContextMenuContent
+				onCloseAutoFocus={onCloseAutoFocus}
+				selection={selection}
+				terminalLabel={terminalLabel}
+				workspaceCwd={workspaceCwd}
+			/>
+		</ContextMenu>
 	);
 }
 

@@ -48,7 +48,8 @@
 	},
 	"attach-to-chat": {
 		"attached": "Прикреплено к диалогу: {{label}}",
-		"diff-attached": "Diff для {{label}} прикреплён к диалогу."
+		"diff-attached": "Diff для {{label}} прикреплён к диалогу.",
+		"selection-attached": "Выделение из терминала прикреплено к диалогу."
 	},
 	"attachment-menu": {
 		"add-attachment": "Добавить файл",
@@ -205,6 +206,16 @@
 		"setup-loading": {
 			"placeholder": "Проверки настройки ещё загружаются.",
 			"reason": "Ensemblr ещё проверяет готовность настройки."
+		},
+		"terminal-output": {
+			"summary_one": "Вывод терминала · {{count}} строка",
+			"summary_few": "Вывод терминала · {{count}} строки",
+			"summary_many": "Вывод терминала · {{count}} строк",
+			"summary_other": "Вывод терминала · {{count}} строки",
+			"summary-named_one": "{{label}} · {{count}} строка",
+			"summary-named_few": "{{label}} · {{count}} строки",
+			"summary-named_many": "{{label}} · {{count}} строк",
+			"summary-named_other": "{{label}} · {{count}} строки"
 		},
 		"thinking": {
 			"pending": "Размышление ожидается"
@@ -1040,6 +1051,10 @@
 		"aria-label": "Среда выполнения суб-агента"
 	},
 	"terminal": {
+		"menu": {
+			"actions": "Действия терминала",
+			"attach-selection": "Прикрепить выделение к диалогу"
+		},
 		"session-ended": "Сессия завершена.",
 		"session-failed": "Сессия завершилась с ошибкой.",
 		"session-stopped": "Сессия остановлена."

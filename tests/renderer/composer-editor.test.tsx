@@ -25,6 +25,27 @@ const README: ComposerAttachment = {
 	path: 'README.md',
 };
 
+const TERMINAL_OUTPUT: ComposerAttachment = {
+	id: 'wsfile:.context/attachments/aa44bb/terminal-selection.txt',
+	kind: 'pasted-text',
+	label: 'terminal-selection.txt',
+	lineCount: 2,
+	path: '.context/attachments/aa44bb/terminal-selection.txt',
+	preview: 'ALPHA_LINE_ONE\nBETA_LINE_TWO',
+	source: { kind: 'terminal', label: 'npm run dev' },
+};
+
+/** The host span Lexical mounts a chip into, for the nth chip in the draft. */
+function chipHost(index: number): HTMLElement {
+	const host = document.querySelectorAll<HTMLElement>(
+		'[data-lexical-decorator]',
+	)[index];
+	if (!host) {
+		throw new Error(`No chip host at ${index}`);
+	}
+	return host;
+}
+
 function mountEditor(
 	initial: {
 		attachments?: readonly ComposerAttachment[];
@@ -280,5 +301,24 @@ describe('composer editor', () => {
 			expect(latest()?.attachments).toEqual([APP_FILE]);
 		});
 		expect(latest()?.text).toBe('Implement the attached plan. !');
+	});
+
+	// A stored-text chip is nearly three lines tall. Pinned to one line box it
+	// overflows half its height above the line, where the draft's own scroll
+	// container clips the preview's first row clean off.
+	it('sizes a stored-text chip to its own height rather than one line box', async () => {
+		mountEditor({ attachments: [TERMINAL_OUTPUT] });
+
+		await waitFor(() => {
+			expect(chipHost(0).className).not.toContain('h-[1.625em]');
+		});
+	});
+
+	it('keeps a one-row chip pinned to a single line box', async () => {
+		mountEditor({ attachments: [APP_FILE] });
+
+		await waitFor(() => {
+			expect(chipHost(0).className).toContain('h-[1.625em]');
+		});
 	});
 });

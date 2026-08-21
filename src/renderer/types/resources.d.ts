@@ -536,6 +536,9 @@ export default interface Resources {
 			'save-failed': {
 				message: 'Pasted file could not be saved.';
 			};
+			'terminal-selection-failed': {
+				message: 'Terminal selection could not be attached.';
+			};
 		};
 		'chat-tab': {
 			'dropped-follow-ups': {
@@ -2349,6 +2352,7 @@ export default interface Resources {
 		'attach-to-chat': {
 			attached: '{{label}} is attached to the chat.';
 			'diff-attached': 'Diff for {{label}} is attached to the chat.';
+			'selection-attached': 'Terminal selection is attached to the chat.';
 		};
 		'attachment-menu': {
 			'add-attachment': 'Add attachment';
@@ -2497,6 +2501,12 @@ export default interface Resources {
 			'setup-loading': {
 				placeholder: 'Setup checks are still loading.';
 				reason: 'Ensemblr is still checking setup readiness.';
+			};
+			'terminal-output': {
+				'summary-named_one': '{{label}} · {{count}} line';
+				'summary-named_other': '{{label}} · {{count}} lines';
+				summary_one: 'Terminal output · {{count}} line';
+				summary_other: 'Terminal output · {{count}} lines';
 			};
 			thinking: {
 				pending: 'Thinking pending';
@@ -3312,6 +3322,10 @@ export default interface Resources {
 			'aria-label': 'Sub-agent runtime';
 		};
 		terminal: {
+			menu: {
+				actions: 'Terminal actions';
+				'attach-selection': 'Attach selection to chat';
+			};
 			'session-ended': 'Session ended.';
 			'session-failed': 'Session failed.';
 			'session-stopped': 'Session stopped.';

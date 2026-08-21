@@ -96,6 +96,9 @@
 		},
 		"save-failed": {
 			"message": "Pasted file could not be saved."
+		},
+		"terminal-selection-failed": {
+			"message": "Terminal selection could not be attached."
 		}
 	},
 	"chat-tab": {

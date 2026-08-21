@@ -27,6 +27,17 @@ export type SerializedAttachmentNode = Spread<
 const ATTACHMENT_TEXT_CONTENT = ' ';
 
 /**
+ * Whether a chip is taller than one line of text, which decides how its host
+ * element is sized. Only the stored-text chip is — it stacks a two-line preview
+ * over its meta row, where every other chip is a single row of label.
+ * @param attachment - The attachment behind the chip
+ * @returns True when the host must grow to the chip instead of clipping it
+ */
+function isMultiLineChip(attachment: ComposerAttachment): boolean {
+	return attachment.kind === 'pasted-text';
+}
+
+/**
  * One composer attachment living inline in the draft, at the position the user
  * put it. Decorator rather than text so the whole chip is one unit to the caret:
  * arrow keys step over it and Backspace deletes it whole.
@@ -86,17 +97,24 @@ export class AttachmentNode extends DecoratorNode<ReactNode> {
 	}
 
 	/**
-	 * Builds the host element the chip renders into. The host is exactly one line
-	 * box tall (`1.625em` is the editor's `leading-relaxed`) and top-aligned, so
-	 * its centre is the line's centre and the chip reads as sitting on the text
-	 * rather than riding above or below it — which is what every `vertical-align`
-	 * keyword does, since the chip is taller than the text's em box.
-	 * @returns An inline span one line tall, centring the chip inside it
+	 * Builds the host element the chip renders into. A one-row chip gets a host
+	 * exactly one line box tall (`1.625em` is the editor's `leading-relaxed`) and
+	 * top-aligned, so its centre is the line's centre and the chip reads as
+	 * sitting on the text rather than riding above or below it — which is what
+	 * every `vertical-align` keyword does, since the chip is taller than the
+	 * text's em box.
+	 *
+	 * A stored-text chip is nearly three lines tall, so that host would leave it
+	 * overflowing half its height above the line — where the draft's own scroll
+	 * container clips it. Such a chip sizes its host instead, growing the line
+	 * box to fit.
+	 * @returns An inline span hosting the chip, sized to the line or to the chip
 	 */
 	createDOM(): HTMLElement {
 		const host = document.createElement('span');
-		host.className =
-			'mx-0.5 inline-flex h-[1.625em] max-w-full items-center align-top';
+		host.className = isMultiLineChip(this.__attachment)
+			? 'mx-0.5 inline-flex max-w-full items-center align-middle'
+			: 'mx-0.5 inline-flex h-[1.625em] max-w-full items-center align-top';
 		return host;
 	}
 

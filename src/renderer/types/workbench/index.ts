@@ -13,6 +13,7 @@ export type {
 	ComposerAttachment,
 	ComposerDraftSegment,
 	ComposerSendIntent,
+	ComposerTextSource,
 	FollowUpQueueHoldReason,
 	GroupedOptions,
 	LinkedDirectory,

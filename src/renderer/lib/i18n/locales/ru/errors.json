@@ -98,6 +98,9 @@
 		},
 		"save-failed": {
 			"message": "Не удалось сохранить вставленный файл."
+		},
+		"terminal-selection-failed": {
+			"message": "Не удалось прикрепить выделение из терминала."
 		}
 	},
 	"chat-tab": {
