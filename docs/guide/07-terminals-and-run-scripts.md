@@ -37,6 +37,24 @@ The dock is not the only place a terminal can live — a coding-agent CLI launch
 as a harness opens its own terminal tab in the chat tab strip instead. See
 [Running a coding-agent CLI in a terminal](#running-a-coding-agent-cli-in-a-terminal).
 
+## Handing terminal output to an agent
+
+Select text in any terminal surface — a dock tab, a Setup or Run pane, a
+harness conversation's terminal — right-click it, and choose **Attach selection
+to chat**. The selection lands in the workspace's composer as an attachment
+chip, so a stack trace or a failing build reaches the agent as a file it can
+re-read rather than as clipboard text pasted into the middle of your sentence.
+With nothing selected the row is disabled.
+
+The chip names the pane the output came off, and so does the path the agent
+reads. Two panes printing the same bytes therefore stay two chips instead of
+collapsing into one. Attachments are covered in
+[`./06-agents.md`](./06-agents.md).
+
+One xterm behaviour is worth knowing: on macOS a right-click **outside** the
+current selection replaces it with the word under the cursor, so select first
+and right-click inside what you selected.
+
 ## The environment inside a workspace terminal
 
 An **interactive terminal** starts your login shell — read from your macOS user

@@ -241,10 +241,13 @@ Not every workspace ends in a merge, and the answer for one that does not is
 
 Archiving runs the repository's archive script, preserves the workspace's
 `.context/` handoff files under `archived-contexts/` in your Ensemblr root, and
-marks the workspace archived. By default the worktree folder and the local
-branch stay on disk; removing them is a separate opt-in checkbox in the dialog.
-An archived workspace can be restored later from **Browse archive…**, which
-rebuilds the worktree from the recorded base branch when branch cleanup ran.
+marks the workspace archived. Whether the worktree folder and local branch go
+with it follows **Settings → Git → Delete branch on archive** — the same setting
+the merge path above obeys, so archiving by hand and archiving on merge cannot
+disagree. The dialog states which of the two it is about to do before you press
+Archive. An archived workspace can be restored later from **Browse archive…**,
+which rebuilds the worktree from the recorded base branch when branch cleanup
+ran.
 
 **Delete** is the separate, explicitly named destructive action: it removes the
 worktree folder, drops the local branch, and deletes the workspace from

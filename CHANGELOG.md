@@ -9,6 +9,74 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.0-beta.11] - 2026-08-21
+
+`brew install` works, right-clicking text finally does something, and a terminal's output reaches the
+agent as an attachment instead of through the clipboard. Signed, notarized, Apple silicon.
+[Release](https://github.com/ensemblr-hq/ensemblr/releases/tag/v0.1.0-beta.11) ·
+[`.dmg`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.0-beta.11/Ensemblr-0.1.0-beta.11-arm64.dmg)
+
+### Added
+
+- **Homebrew.** `brew install --cask ensemblr-hq/tap/ensemblr` is now the first line of the install
+  instructions. The cask lives in [`ensemblr-hq/homebrew-tap`](https://github.com/ensemblr-hq/homebrew-tap)
+  and the release job bumps it, reading the `.dmg` asset's `digest` — GitHub's own hash of what it
+  stored, rather than a re-hash of a local copy — and committing through the Contents API, so the
+  token never reaches a git remote. It runs on `release: published` only: a rebuild of an older tag
+  must not walk the cask backwards. The cask declares Apple silicon and macOS Monterey, so `brew`
+  refuses on a machine that cannot run the app, and it is marked `auto_updates true` because the
+  in-app updater owns the bundle — two updaters writing one bundle is how an install gets corrupted.
+- **The text context menu is drawn in the app's own chrome.** Right-clicking the transcript or the
+  composer did nothing at all: Electron draws no context menu unless the app builds one, and a
+  renderer that cancels the DOM event to draw its own can never learn what the spellchecker flagged,
+  because Chromium reports the verdict, the selection, and the edit flags only at the browser layer
+  and only while that event goes uncancelled. Main now forwards the whole payload and the renderer
+  opens from the broadcast. The composer carries spelling suggestions, **Add to dictionary**, undo,
+  redo, cut, copy, paste, and select all; clipboard and spelling rows run back through `WebContents`
+  so paste fires the real edit command and a long paste still becomes an attachment chip. A read-only
+  surface such as the transcript narrows to Copy and Select all, where Copy reads the live DOM
+  selection rather than the kilobyte Chromium truncates a menu payload to, and Select all covers the
+  surface you right-clicked rather than the window.
+- **A terminal selection attaches to the chat.** Right-clicking a terminal surface — a dock tab, a
+  Setup or Run pane, a harness conversation's terminal — offers **Attach selection to chat**, which
+  writes the selected text into the workspace's attachment store and drops a chip into the composer.
+  A stack trace or a failing run reaches the agent as a file it can re-read rather than as clipboard
+  text pasted into the middle of the draft. Each selection is stored under a name saying which pane
+  it came off, so the chip and the agent's path both name the terminal and two panes printing the
+  same bytes stay two chips instead of collapsing into one in the content-addressed store.
+- **An in-flight button shows a spinner, not a different word.** Buttons swap whatever icon they
+  carry for a spinner and keep the idle label, so the verb never changes under the cursor that just
+  pressed it, and restate the run as screen-reader-only text so it stays in the accessible name.
+  Fifteen call sites drop their "Saving…" / "Save" ternary, retiring twelve translation keys in each
+  of the three languages for one shared string.
+
+### Changed
+
+- **Archiving a repository is gone; `Delete repository…` covers it.** Archiving a repository was a
+  one-way hide — it removed the repository from the sidebar and offered no unarchive path anywhere in
+  the app — so the surface is removed rather than given the missing inverse. A repository an earlier
+  build had stamped is restored by migration `021`, because with the archive surface gone nothing
+  would have brought it back. **Remove repository** in repository settings becomes **Delete
+  repository** and now runs the shared delete dialog, which reads the failure envelope the operation
+  answers with: the hand-rolled copy it replaces ignored it and navigated away showing nothing when a
+  delete failed.
+- **Workspace branch cleanup follows your git settings, not a checkbox.** The archive dialog's opt-in
+  checkbox is gone; archiving obeys **Delete branch on archive**, the same setting the
+  merge-then-archive flow obeys, so the two paths cannot disagree. It is resolved against the
+  worktree being archived rather than the repository root — two worktrees of one repository can carry
+  different committed `.ensemblr/settings.toml` — and Archive stays disabled until that answer
+  arrives, because an unanswered query reads as `false` and would silently skip the cleanup the
+  setting asked for. A resolver that fails outright says on screen that the worktree and branch are
+  being kept.
+
+### Fixed
+
+- The macOS traffic-light inset no longer indents the right sidebar's header. Collapsing the
+  navigation sidebar leaves the window controls over the leading toolbar, which takes padding to
+  clear them — but the rule matched any `.native-toolbar` under the sidebar inset, and the right
+  sidebar's header carries that class while sitting at the far side of the window. Both that rule and
+  its narrow-viewport twin now require the collapsed-sidebar trigger the padding actually exists for.
+
 ## [0.1.0-beta.10] - 2026-08-20
 
 A pasted wall of text stops pushing the answer off screen, a spent plan window reads as something you

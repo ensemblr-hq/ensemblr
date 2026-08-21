@@ -256,6 +256,7 @@ Anything you pin into a message becomes a chip sitting inline in your sentence:
 | A long pasted text block | paste — converted to an attachment rather than flooding the box |
 | A Linear or GitHub issue | the issue picker |
 | A review-comment thread | from the Changes panel |
+| A terminal's output | select it, then **Attach selection to chat** from the terminal's right-click menu |
 
 They form **one ordered list**, and the outgoing prompt carries each one at the
 position its chip sat in your sentence. "Compare this screenshot against this
@@ -273,6 +274,12 @@ out as a markdown document and the chip points at that — a thousand-line rewri
 becomes one chip rather than burying your question under its own diff. Because
 the store is keyed by content, re-attaching a file after the agent has touched it
 lands a *fresh* chip instead of being folded into the stale one.
+
+A **terminal selection** is stored under a name that says which pane it came off,
+so the chip and the path the agent reads both name the terminal — a stack trace
+from the Run tab and the same bytes printed in an interactive shell stay two
+chips rather than collapsing into one. See
+[`./07-terminals-and-run-scripts.md`](./07-terminals-and-run-scripts.md).
 
 A workspace created from a tracker issue opens with that issue **already
 attached** as a document, once per chat, rather than with a summary flattened
@@ -293,6 +300,24 @@ The text is shown verbatim. What you typed is never re-read as markdown, so a
 prompt full of asterisks and backticks reads back as you wrote it. Attachment
 chips a clamp is covering stay reachable: tabbing to one unfolds the card rather
 than scrolling focus into a strip you cannot see.
+
+### Right-clicking text
+
+Right-clicking the composer or the transcript opens Ensemblr's own text menu,
+drawn in the app's chrome rather than by macOS.
+
+In the **composer** it carries the full set: the spellchecker's suggestions for
+the word under the cursor and **Add to dictionary**, then Undo, Redo, Cut, Copy,
+Paste, and Select all. Paste runs the real edit command, so a long paste still
+becomes an attachment chip instead of flooding the box. Undo and redo are always
+offered — the composer keeps its own history, so a menu that greyed them out
+would be wrong as often as it was right.
+
+On the **transcript**, which you cannot type into, the menu narrows to Copy and
+Select all. Copy takes the whole selection however long it is, and Select all
+covers the surface you right-clicked rather than the entire window — the one row
+whose behaviour ⌘A would not reproduce, and the only one that shows no shortcut
+hint for that reason.
 
 ## Linked directories
 

@@ -46,7 +46,7 @@ The choice above has consequences for the rest of the workspace's life:
 | Name | keeps its own | generated (below) |
 | Commits | join that branch's history | start a new one |
 | Pushing | lands on whatever pull request already tracks the branch | needs a new pull request |
-| On archive | **never** deleted — the workspace did not create it | can be deleted, if you opted in |
+| On archive | **never** deleted — the workspace did not create it | deleted when **Delete branch on archive** is on |
 
 See [ADR 0043](../adr/0043-adopt-an-existing-branch-instead-of-always-forking.md)
 for the full reasoning.
@@ -221,6 +221,15 @@ Two settings under `[git]` govern the git side:
 | --- | --- | --- |
 | `delete_local_branch_on_archive` | off | also delete the workspace's local branch when archiving |
 | `archive_after_merge` | off | archive the workspace automatically once its pull request merges |
+
+`delete_local_branch_on_archive` is the **only** control over branch cleanup —
+the archive dialog carries no checkbox of its own, and archiving by hand does
+what merging then archiving does. It is resolved against the worktree being
+archived rather than the repository root, so two workspaces of one repository
+can answer differently if their committed `.ensemblr/settings.toml` differ. The
+dialog says which of the two it is about to do before you press Archive, and
+says the worktree and branch are being kept if the setting could not be read at
+all.
 
 A branch the workspace **adopted** is never deleted regardless — it was not the
 workspace's to destroy. See
