@@ -186,7 +186,11 @@ function getRowCount(
 	return slashCount;
 }
 
-/** Stable textarea-anchored popover that renders @ files or / commands. */
+/**
+ * Popover that renders @ files or / commands, anchored to the composer surface
+ * it is handed. It wraps that surface in its own anchor element, so a caller may
+ * pass any children without owing it a ref onto a DOM node.
+ */
 export function ComposerAutocompletePopover({
 	activeIndex,
 	children,
@@ -227,7 +231,10 @@ export function ComposerAutocompletePopover({
 
 	return (
 		<Popover onOpenChange={onOpenChange} open={open}>
-			<PopoverAnchor asChild>{children}</PopoverAnchor>
+			{/* Not `asChild`: React 19 passes ref as an ordinary prop, so a wrapper
+			    that drops it leaves Radix measuring nothing and parking the menu
+			    off-screen. */}
+			<PopoverAnchor>{children}</PopoverAnchor>
 			<PopoverContent
 				align='start'
 				className='w-(--radix-popover-trigger-width) min-w-80 max-w-2xl overflow-hidden p-1.5'
