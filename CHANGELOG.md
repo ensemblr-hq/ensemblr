@@ -9,6 +9,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.0-beta.14] - 2026-08-21
+
+A file or diff tab an agent opens is named after the file it targets instead of sitting in the strip
+as a chat nobody named. Signed, notarized, Apple silicon.
+[Release](https://github.com/ensemblr-hq/ensemblr/releases/tag/v0.1.0-beta.14) ·
+[`.dmg`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.0-beta.14/Ensemblr-0.1.0-beta.14-arm64.dmg)
+
+### Fixed
+
+- **An agent-opened file, diff, or comment tab read as "New chat".** `ensemblr_open_tab` stored a
+  blank title, and the tab strip's placeholder for a blank row was the chat one, so a diff of
+  `port-adapters.ts` claimed to be an unnamed conversation. File and diff tabs take their title from
+  the target's basename now — the same label the renderer's own openers stamp, and locale-neutral, so
+  writing it from the main process does not freeze the row into one language. A comment tab has no
+  path to name it and stays blank; the strip labels a blank **non-chat** row with a new localized
+  *Untitled* rather than the chat placeholder.
+
 ## [0.1.0-beta.12] - 2026-08-21
 
 The `@` and `/` menus land on the composer again instead of above the top of the window, and the

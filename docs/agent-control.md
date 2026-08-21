@@ -308,6 +308,12 @@ fragment and a colour code cut before its `ESC` reads as ordinary text.
 
 `file`/`diff` tabs need `filePath`; a `comment` tab needs `commentBody`.
 
+**A `file` or `diff` tab names itself after the file.** The op stamps the target's basename as the
+tab title, which is what the renderer's own openers do and is locale-neutral, so writing it from the
+main process does not freeze the row into one language. A `comment` tab has no path to name it and
+opens untitled, where the strip supplies a localized *Untitled* — the chat placeholder is reserved
+for chat rows, so a file tab never reads as a conversation nobody named.
+
 ### Naming and session record
 
 | Tool | Arguments | Gate | Withheld from |
