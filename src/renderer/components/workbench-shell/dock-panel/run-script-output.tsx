@@ -11,10 +11,15 @@ export function RunScriptOutputPanel({
 	onOpenSetupScripts,
 	onRunScript,
 	script,
+	tabLabel,
+	workspaceCwd,
 }: {
 	onOpenSetupScripts: () => void;
 	onRunScript: () => void;
 	script: WorkspaceScriptSummary;
+	/** The dock tab's own name, which names a selection attached from this pane. */
+	tabLabel: string;
+	workspaceCwd: string;
 }) {
 	const { t } = useTranslation();
 
@@ -47,6 +52,8 @@ export function RunScriptOutputPanel({
 			readOnly
 			sessionStatus={script.sessionStatus ?? null}
 			terminalId={script.terminalId}
+			terminalLabel={tabLabel}
+			workspaceCwd={workspaceCwd}
 		/>
 	);
 }

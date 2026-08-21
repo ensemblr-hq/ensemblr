@@ -15,6 +15,9 @@ interface SetupScriptOutputPanelProps {
 	onRunSetupScript: () => void;
 	onStopSetupScript: () => void;
 	script: WorkspaceScriptSummary;
+	/** The dock tab's own name, which names a selection attached from this pane. */
+	tabLabel: string;
+	workspaceCwd: string;
 }
 
 /** Renders the Setup script output or the appropriate empty state. */
@@ -24,6 +27,8 @@ export function SetupScriptOutputPanel({
 	onRunSetupScript,
 	onStopSetupScript,
 	script,
+	tabLabel,
+	workspaceCwd,
 }: SetupScriptOutputPanelProps) {
 	if (script.status === 'missing') {
 		return (
@@ -44,6 +49,8 @@ export function SetupScriptOutputPanel({
 				readOnly
 				sessionStatus={script.sessionStatus ?? null}
 				terminalId={script.terminalId}
+				terminalLabel={tabLabel}
+				workspaceCwd={workspaceCwd}
 			/>
 			<SetupActionButton
 				onRerun={onRunSetupScript}

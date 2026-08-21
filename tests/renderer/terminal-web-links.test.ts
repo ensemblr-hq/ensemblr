@@ -38,6 +38,9 @@ vi.mock('@xterm/xterm', () => ({
 		clear() {}
 		dispose() {}
 		focus() {}
+		getSelection() {
+			return '';
+		}
 		loadAddon() {}
 		onData() {
 			return { dispose() {} };

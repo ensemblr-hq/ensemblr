@@ -64,6 +64,8 @@ export function DockPanel({
 		? activeTab
 		: DEFAULT_DOCK_TAB;
 	const terminalTabs = workspace.dockTabs.filter(isTerminalDockTab);
+	const setupTabLabel = fixedDockTabLabel(workspace.dockTabs, 'setup');
+	const runTabLabel = fixedDockTabLabel(workspace.dockTabs, 'run');
 	const rememberedRunScript = useAtomValue(
 		lastRunScriptAtomFamily(workspace.id),
 	);
@@ -193,6 +195,8 @@ export function DockPanel({
 					onRunSetupScript={actions.onRunSetupScript}
 					onStopSetupScript={actions.onStopSetupScript}
 					script={workspace.scripts.setup}
+					tabLabel={setupTabLabel}
+					workspaceCwd={workspace.pathLabel}
 				/>
 			</TabsContent>
 			<TabsContent
@@ -204,6 +208,8 @@ export function DockPanel({
 					onOpenSetupScripts={actions.onOpenSetupScripts}
 					onRunScript={actions.onRunScript}
 					script={workspace.scripts.run}
+					tabLabel={runTabLabel}
+					workspaceCwd={workspace.pathLabel}
 				/>
 			</TabsContent>
 			{terminalTabs.map((tab) => (
@@ -216,6 +222,8 @@ export function DockPanel({
 					<XtermTerminal
 						sessionStatus={tab.sessionStatus}
 						terminalId={tab.terminalId}
+						terminalLabel={tab.label}
+						workspaceCwd={workspace.pathLabel}
 					/>
 				</TabsContent>
 			))}
@@ -284,6 +292,21 @@ function getDockTabIcon(tab: DockTabModel) {
 		case 'terminal':
 			return SquareTerminalIcon;
 	}
+}
+
+/**
+ * The name one of the two fixed dock tabs wears, which is what a selection
+ * attached from its pane is filed under. Empty when the tab is missing, which
+ * the chip falls back on rather than rendering a blank.
+ * @param tabs - The workspace's dock tabs
+ * @param id - Which fixed tab to name
+ * @returns The tab's label, or an empty string
+ */
+function fixedDockTabLabel(
+	tabs: readonly DockTabModel[],
+	id: 'run' | 'setup',
+): string {
+	return tabs.find((tab) => tab.id === id)?.label ?? '';
 }
 
 /** Type guard for terminal-kind dock tabs. */

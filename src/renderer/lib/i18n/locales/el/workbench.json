@@ -48,7 +48,8 @@
 	},
 	"attach-to-chat": {
 		"attached": "Επισυνάφθηκε στη συνομιλία: {{label}}",
-		"diff-attached": "Το diff για {{label}} επισυνάφθηκε στη συνομιλία."
+		"diff-attached": "Το diff για {{label}} επισυνάφθηκε στη συνομιλία.",
+		"selection-attached": "Η επιλογή από το τερματικό επισυνάφθηκε στη συνομιλία."
 	},
 	"attachment-menu": {
 		"add-attachment": "Προσθήκη συνημμένου",
@@ -197,6 +198,12 @@
 		"setup-loading": {
 			"placeholder": "Οι έλεγχοι εγκατάστασης φορτώνονται ακόμη.",
 			"reason": "Το Ensemblr ελέγχει ακόμη την ετοιμότητα εγκατάστασης."
+		},
+		"terminal-output": {
+			"summary_one": "Έξοδος τερματικού · {{count}} γραμμή",
+			"summary_other": "Έξοδος τερματικού · {{count}} γραμμές",
+			"summary-named_one": "{{label}} · {{count}} γραμμή",
+			"summary-named_other": "{{label}} · {{count}} γραμμές"
 		},
 		"thinking": {
 			"pending": "Σκέψη σε εκκρεμότητα"
@@ -1012,6 +1019,10 @@
 		"aria-label": "Περιβάλλον εκτέλεσης υποπράκτορα"
 	},
 	"terminal": {
+		"menu": {
+			"actions": "Ενέργειες τερματικού",
+			"attach-selection": "Επισύναψη επιλογής στη συνομιλία"
+		},
 		"session-ended": "Η συνεδρία τερματίστηκε.",
 		"session-failed": "Η συνεδρία απέτυχε.",
 		"session-stopped": "Η συνεδρία διακόπηκε."

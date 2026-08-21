@@ -4,6 +4,7 @@ import {
 	writeWorkspaceImageAttachment,
 } from '@/renderer/api/ensemblr-queries';
 import { i18n } from '@/renderer/lib/i18n';
+import { terminalSelectionFilename } from '@/renderer/lib/workbench/attachment-filename';
 import {
 	commentAnchorLabel,
 	commentDocumentFilename,
@@ -16,6 +17,7 @@ import {
 import { issueDocumentFilename } from '@/renderer/lib/workbench/issue-document';
 import type {
 	ComposerAttachment,
+	ComposerTextSource,
 	PullRequestCommentSummary,
 	WorkspaceFileSummary,
 } from '@/renderer/types/workbench';
@@ -86,13 +88,18 @@ export function workspaceFileAttachment(
 }
 
 /**
- * Builds the attachment for a block of pasted text already written to the
- * store, carrying the preview and line count its chip renders.
+ * Builds the attachment for a block of stored text, carrying the preview and
+ * line count its chip renders.
  * @param path - Workspace-relative path the text was persisted to.
- * @param text - The full pasted text.
- * @returns The composer attachment for that paste.
+ * @param text - The full text.
+ * @param source - Where the block came from; omitted for a clipboard paste.
+ * @returns The composer attachment for that block.
  */
-function pastedTextAttachment(path: string, text: string): ComposerAttachment {
+function pastedTextAttachment(
+	path: string,
+	text: string,
+	source?: ComposerTextSource,
+): ComposerAttachment {
 	return {
 		id: `wsfile:${path}`,
 		kind: 'pasted-text',
@@ -100,6 +107,7 @@ function pastedTextAttachment(path: string, text: string): ComposerAttachment {
 		lineCount: text.split('\n').length,
 		path,
 		preview: text.replace(/^\s*\n+/, '').slice(0, PASTED_TEXT_PREVIEW_CHARS),
+		...(source ? { source } : {}),
 	};
 }
 
@@ -278,6 +286,39 @@ export async function attachPastedText(
 	const file = new File([text], PASTED_TEXT_FILENAME, { type: 'text/plain' });
 	const saved = await saveCopy(file, workspaceCwd);
 	return pastedTextAttachment(saved.path, text);
+}
+
+/**
+ * Persists a selection taken from a terminal surface as a text attachment, so a
+ * stack trace or a failing run reaches the agent as a chip rather than being
+ * copied through the clipboard into the middle of the draft.
+ *
+ * Stored as a `.txt` named for the pane it came off, which is what both the
+ * chip's stored file and the agent's `<attached_file path>` read — so a
+ * selection announces which terminal produced it rather than arriving as
+ * anonymous output.
+ * @param label - What the terminal pane calls itself.
+ * @param text - The selected terminal text.
+ * @param workspaceCwd - Absolute workspace root the text is saved under.
+ * @returns The attachment for the stored selection.
+ */
+export async function attachTerminalSelection({
+	label,
+	text,
+	workspaceCwd,
+}: {
+	label: string;
+	text: string;
+	workspaceCwd: string;
+}): Promise<ComposerAttachment> {
+	const file = new File([text], await terminalSelectionFilename(label), {
+		type: 'text/plain',
+	});
+	const saved = await saveCopy(file, workspaceCwd);
+	return pastedTextAttachment(saved.path, text, {
+		kind: 'terminal',
+		label: label.trim(),
+	});
 }
 
 /**

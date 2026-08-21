@@ -9,12 +9,15 @@ import type {
 const writeWorkspaceImageAttachment =
 	vi.fn<() => Promise<WriteWorkspaceImageAttachmentResult>>();
 const writeWorkspaceFileAttachment =
-	vi.fn<() => Promise<WriteWorkspaceFileAttachmentResult>>();
+	vi.fn<
+		(request?: { name?: string }) => Promise<WriteWorkspaceFileAttachmentResult>
+	>();
 const getPathForFile = vi.fn<(file: File) => string>();
 
 vi.mock('@/renderer/api/ensemblr-queries', () => ({
 	getPathForFile: (file: File) => getPathForFile(file),
-	writeWorkspaceFileAttachment: () => writeWorkspaceFileAttachment(),
+	writeWorkspaceFileAttachment: (request: { name?: string }) =>
+		writeWorkspaceFileAttachment(request),
 	writeWorkspaceImageAttachment: () => writeWorkspaceImageAttachment(),
 }));
 
@@ -24,6 +27,7 @@ import {
 	attachPastedFiles,
 	attachPastedText,
 	attachReviewComment,
+	attachTerminalSelection,
 } from '../../src/renderer/lib/workbench/composer-attachments';
 import type { PullRequestCommentSummary } from '../../src/renderer/types/workbench';
 
@@ -143,6 +147,158 @@ describe('attachPastedText', () => {
 		const second = await attachPastedText('same paste', '/repo');
 
 		expect(second.id).toBe(first.id);
+	});
+
+	test('leaves the source unset so the chip reads as a clipboard paste', async () => {
+		const attachment = await attachPastedText('a paste', '/repo');
+
+		if (attachment.kind !== 'pasted-text') {
+			throw new Error('Expected a pasted-text attachment.');
+		}
+		expect(attachment.source).toBeUndefined();
+	});
+});
+
+describe('attachTerminalSelection', () => {
+	beforeEach(() => {
+		writeWorkspaceFileAttachment.mockResolvedValue(
+			savedRow('.context/attachments/aa44bb/npm-run-dev-selection.txt'),
+		);
+	});
+
+	/** The filename the store was asked to file the selection under. */
+	function storedFilename(): string | undefined {
+		return writeWorkspaceFileAttachment.mock.calls.at(-1)?.[0]?.name;
+	}
+
+	test('names the stored file for the pane and carries the pane on the chip', async () => {
+		const attachment = await attachTerminalSelection({
+			label: 'npm run dev',
+			text: 'error: boom\n  at main\n',
+			workspaceCwd: '/repo',
+		});
+
+		expect(storedFilename()).toBe('npm-run-dev-selection.txt');
+		expect(attachment).toMatchObject({
+			id: 'wsfile:.context/attachments/aa44bb/npm-run-dev-selection.txt',
+			kind: 'pasted-text',
+			label: 'npm-run-dev-selection.txt',
+			lineCount: 3,
+			path: '.context/attachments/aa44bb/npm-run-dev-selection.txt',
+			source: { kind: 'terminal', label: 'npm run dev' },
+		});
+		if (attachment.kind !== 'pasted-text') {
+			throw new Error('Expected a pasted-text attachment.');
+		}
+		expect(attachment.preview).toBe('error: boom\n  at main\n');
+	});
+
+	// The store keys on payload alone, so two panes printing the same bytes
+	// would collapse into one chip if the filename did not tell them apart.
+	test('keeps identical selections from two panes apart by filename', async () => {
+		await attachTerminalSelection({
+			label: 'Setup',
+			text: 'same bytes',
+			workspaceCwd: '/repo',
+		});
+		const first = storedFilename();
+		await attachTerminalSelection({
+			label: 'Terminal 2',
+			text: 'same bytes',
+			workspaceCwd: '/repo',
+		});
+
+		expect(first).toBe('setup-selection.txt');
+		expect(storedFilename()).toBe('terminal-2-selection.txt');
+	});
+
+	test('falls back to a generic filename for a pane with no name at all', async () => {
+		await attachTerminalSelection({
+			label: '   ',
+			text: 'boom',
+			workspaceCwd: '/repo',
+		});
+
+		expect(storedFilename()).toBe('terminal-selection.txt');
+	});
+
+	// The pane names that actually reach this are catalogue strings, and the
+	// stem alphabet is ASCII — so without the digest every Russian and Greek
+	// pane files under one name and the guarantee above holds only in English.
+	test.each([
+		['Настройка', 'Запуск'],
+		['Ρύθμιση', 'Εκτέλεση'],
+	])(
+		'keeps two localized panes apart when neither name survives the stem (%s / %s)',
+		async (setupLabel, runLabel) => {
+			await attachTerminalSelection({
+				label: setupLabel,
+				text: 'same bytes',
+				workspaceCwd: '/repo',
+			});
+			const first = storedFilename();
+			await attachTerminalSelection({
+				label: runLabel,
+				text: 'same bytes',
+				workspaceCwd: '/repo',
+			});
+			const second = storedFilename();
+
+			expect(first).toMatch(/^terminal-[0-9a-f]{8}-selection\.txt$/);
+			expect(second).toMatch(/^terminal-[0-9a-f]{8}-selection\.txt$/);
+			expect(first).not.toBe(second);
+		},
+	);
+
+	// `Терминал 1` and `Терминал 2` reduce to `1` and `2`, which are distinct but
+	// say nothing; two differently-named panes ending in the same digit would
+	// collide on the stem alone.
+	test('keeps two panes apart when their names reduce to the same stem', async () => {
+		await attachTerminalSelection({
+			label: 'Сборка 2',
+			text: 'same bytes',
+			workspaceCwd: '/repo',
+		});
+		const first = storedFilename();
+		await attachTerminalSelection({
+			label: 'Тесты 2',
+			text: 'same bytes',
+			workspaceCwd: '/repo',
+		});
+
+		expect(first).toMatch(/^2-[0-9a-f]{8}-selection\.txt$/);
+		expect(storedFilename()).not.toBe(first);
+	});
+
+	test('names a label the stem alphabet carries without a digest', async () => {
+		await attachTerminalSelection({
+			label: '  ///  ',
+			text: 'boom',
+			workspaceCwd: '/repo',
+		});
+		const punctuation = storedFilename();
+		await attachTerminalSelection({
+			label: 'Terminal 2',
+			text: 'boom',
+			workspaceCwd: '/repo',
+		});
+
+		expect(punctuation).toMatch(/^terminal-[0-9a-f]{8}-selection\.txt$/);
+		expect(storedFilename()).toBe('terminal-2-selection.txt');
+	});
+
+	test('propagates a write failure so the caller can surface it', async () => {
+		writeWorkspaceFileAttachment.mockResolvedValueOnce({
+			error: { code: 'write-failed', message: 'disk full' },
+		});
+
+		await expect(
+			attachTerminalSelection({
+				label: 'npm run dev',
+				text: 'boom',
+				workspaceCwd: '/repo',
+			}),
+		).rejects.toThrow('disk full');
 	});
 });
 

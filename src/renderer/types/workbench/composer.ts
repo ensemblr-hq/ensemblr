@@ -57,6 +57,18 @@ export interface MentionMatch {
 }
 
 /**
+ * The surface a stored block of text was taken off. `label` is what that pane
+ * calls itself — the dock tab's name, a harness conversation's live title — so
+ * the chip says which terminal the output came from rather than only that some
+ * terminal did. Empty when the pane has no name yet, which the chip falls back
+ * on rather than rendering a blank.
+ */
+export interface ComposerTextSource {
+	kind: 'terminal';
+	label: string;
+}
+
+/**
  * Everything the composer can carry alongside the typed message, in one ordered
  * list. `id` is what dedupes an add and targets a remove; `label` is what the
  * chip reads. The variants differ only in where their content lives — a
@@ -94,6 +106,11 @@ export type ComposerAttachment =
 			path: string;
 			/** Opening of the pasted text, capped so the chip can show what it holds. */
 			preview: string;
+			/**
+			 * Which surface the block was taken off, naming it on the chip. Unset for
+			 * an ordinary clipboard paste, which has no surface behind it.
+			 */
+			source?: ComposerTextSource;
 	  }
 	| {
 			id: string;

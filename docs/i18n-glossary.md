@@ -56,6 +56,7 @@ Rules of thumb:
 | Spawn terminal | Дополнительный терминал | Πρόσθετο τερματικό | Literally "spawn" reads as biology in both; use "additional". |
 | Scrollback | Буфер прокрутки | Ιστορικό κύλισης | How many lines a terminal pane retains. Russian takes the buffer metaphor (`буфер прокрутки`); Greek takes the history one (`ιστορικό κύλισης`) — a literal `buffer κύλισης` mixes scripts for no gain. |
 | Command output | Вывод команды | Έξοδος εντολής | Verbatim stderr/stdout a failed `git` or `gh` call wrote, shown demoted under the explanation. Both terms were already fixed by `errors:failure.parse-failed`; this row records them. |
+| Terminal output | Вывод терминала | Έξοδος τερματικού | What a terminal pane has printed, as the composer chip labels a selection taken from one. Built on `Command output` above rather than coining a second pattern — the chip names the surface the text came off, not the command that wrote it, because a selection may span several commands. |
 | Plan mode | Режим плана | Λειτουργία σχεδίου | |
 | Board | Доска | Πίνακας εργασιών | The kanban dashboard. |
 | Setting | Настройка | Ρύθμιση | |
@@ -83,6 +84,7 @@ Rules of thumb:
 | Attachment | Вложение | Συνημμένο | |
 | Attach to chat *(verb)* | Прикрепить к диалогу | Επισύναψη στη συνομιλία | The right-click action on a Files-tree row and a Changes row that hands the thing to the agent as a chip. Russian uses `прикрепить`, agreeing with `Link (a directory or issue)`, and `диалог` rather than `чат` because the content lands in the thread, not on the tab — matching `Comment is attached to the chat` → `Комментарий прикреплён к диалогу`. Greek `Επισύναψη`, the verb behind `Συνημμένο`, not the `Προσθήκη` of `Add to chat`. |
 | Pasted text | Вставленный текст | Επικολλημένο κείμενο | A long clipboard paste the composer stored as an attachment. Named for the act, not the file — "вставка"/"επικόλληση" reads as the gesture, and the chip labels a thing. |
+| Selection *(of terminal text)* | Выделение | Επιλογή | The text highlighted in a terminal pane, which its right-click menu attaches to the chat. Russian `выделение`, not `выбор` — the latter is a choice among options, which is what a picker offers. Greek `επιλογή` carries both senses and is unambiguous in the menu, where the only thing to select is text. |
 | Composer | Поле ввода | Πεδίο σύνθεσης | The box a prompt is typed into. Recorded now that a failure message names the surface rather than only labelling it: the accessible names (`composer.aria-label`) already read `Поле ввода для агента`/`Σύνθεση μηνύματος πράκτορα`, and body copy takes the same noun. Never `композер`/`συνθέτης` — both read as a music composer. |
 | Token | Токен | Διακριτικό | Model context unit. Localized in both — it is not git porcelain and not a proper noun. |
 | Dictation | Диктовка | Υπαγόρευση | Speaking a prompt into the composer. The feature, and the verb on its control (`Продиктовать`/`Υπαγόρευση`). |

@@ -7,6 +7,7 @@ import { workspaceFileDiffQuery } from '@/renderer/api/ensemblr-queries';
 import { failureText } from '@/renderer/lib/failure-text';
 import {
 	attachFileDiff,
+	attachTerminalSelection,
 	workspaceFileAttachment,
 } from '@/renderer/lib/workbench/composer-attachments';
 import { useComposerAttachmentInsert } from '@/renderer/state/composer';
@@ -24,18 +25,20 @@ function basename(path: string): string {
 }
 
 /**
- * Attaches a workspace entry or a file's diff to the chat as a composer chip, the
- * one path the Files tree and the Changes list both take from their right-click
- * menus. Both land in whichever composer is mounted on this workspace root, since
- * a review surface sits outside the conversation and the paths it carries are
- * workspace-relative.
+ * Attaches a workspace entry, a file's diff, or a block of selected text to the
+ * chat as a composer chip — the one path the Files tree, the Changes list, and
+ * the terminal right-click menu all take. Every one lands in whichever composer
+ * is mounted on this workspace root, since these surfaces sit outside the
+ * conversation and the paths they carry are workspace-relative.
  *
  * A file or folder is attached by reference — the agent reads it at send — while a
- * diff has no file of its own, so its patch is written out as a markdown document
- * first and the chip points at that.
+ * diff and a terminal selection have no file of their own, so each is written out
+ * to the workspace's attachment store first and the chip points at that. A
+ * selection carries the name of the pane it came off, which is what its chip
+ * reads and what the stored file is named for.
  * @param scope - Which diff a row's patch is taken at; the working tree by default
  * @param workspaceCwd - Absolute workspace root the attachments resolve against
- * @returns Callbacks attaching a tree row and attaching one file's diff
+ * @returns Callbacks attaching a tree row, one file's diff, and selected text
  */
 export function useAttachToChat({
 	scope,
@@ -46,6 +49,7 @@ export function useAttachToChat({
 }): {
 	attachDiff: (filePath: string) => void;
 	attachEntry: (target: FileTreeMenuTarget) => void;
+	attachSelection: (label: string, text: string) => void;
 } {
 	const { t } = useTranslation();
 	const queryClient = useQueryClient();
@@ -113,6 +117,21 @@ export function useAttachToChat({
 		[insertAttachment, queryClient, scope, t, workspaceCwd],
 	);
 
+	const attachSelection = useCallback(
+		async (label: string, text: string) => {
+			insertAttachment(
+				await attachTerminalSelection({ label, text, workspaceCwd }),
+			);
+			toast.success(
+				t(
+					'workbench:attach-to-chat.selection-attached',
+					'Terminal selection is attached to the chat.',
+				),
+			);
+		},
+		[insertAttachment, t, workspaceCwd],
+	);
+
 	return useMemo(
 		() => ({
 			attachDiff(filePath) {
@@ -126,7 +145,17 @@ export function useAttachToChat({
 				});
 			},
 			attachEntry,
+			attachSelection(label, text) {
+				void attachSelection(label, text).catch(() => {
+					toast.error(
+						t(
+							'errors:attachment.terminal-selection-failed.message',
+							'Terminal selection could not be attached.',
+						),
+					);
+				});
+			},
 		}),
-		[attachDiff, attachEntry, t],
+		[attachDiff, attachEntry, attachSelection, t],
 	);
 }

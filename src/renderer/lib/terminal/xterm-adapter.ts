@@ -79,6 +79,7 @@ export function createXtermAdapter({
 			return { cols: terminal.cols, rows: terminal.rows };
 		},
 		focus: () => terminal.focus(),
+		getSelection: () => terminal.getSelection(),
 		onData: (listener) => {
 			const subscription = terminal.onData(listener);
 

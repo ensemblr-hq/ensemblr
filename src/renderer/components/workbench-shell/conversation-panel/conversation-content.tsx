@@ -203,6 +203,8 @@ function ActiveAuxiliaryPanel({
 				<XtermTerminal
 					sessionStatus={null}
 					terminalId={activeSession.terminalId}
+					terminalLabel={activeSession.fullLabel ?? activeSession.label}
+					workspaceCwd={activeWorkspace.pathLabel}
 				/>
 			</div>
 		);

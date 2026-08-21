@@ -5,6 +5,8 @@
  * would make what the model reads vary by UI language.
  */
 
+import { filenameStem } from '@/renderer/lib/workbench/attachment-filename';
+
 /** One labelled metadata row in an issue document's header. */
 export interface IssueDocumentField {
 	label: string;
@@ -29,12 +31,7 @@ export function issueDocumentFilename(
 	provider: 'github' | 'linear',
 	reference: string,
 ): string {
-	const stem = reference
-		.trim()
-		.toLowerCase()
-		.replaceAll(/[^a-z0-9_-]+/g, '-')
-		.replaceAll(/^-+|-+$/g, '');
-	return `${provider}-issue-${stem || 'unknown'}.md`;
+	return `${provider}-issue-${filenameStem(reference) || 'unknown'}.md`;
 }
 
 /**

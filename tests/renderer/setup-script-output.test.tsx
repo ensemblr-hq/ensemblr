@@ -39,6 +39,8 @@ function renderPanel(
 	renderWithProviders(
 		<SetupScriptOutputPanel
 			script={scriptSummary()}
+			tabLabel='Setup'
+			workspaceCwd='/repo'
 			{...handlers}
 			{...props}
 		/>,
