@@ -6,6 +6,8 @@
  * existing call each op reuses.
  */
 
+import { posix as posixPath } from 'node:path';
+
 import type {
 	AgentControlModelList,
 	AgentControlTabInfo,
@@ -88,6 +90,18 @@ import { isSessionTabMarkedSubAgent } from './sub-agent-marker.ts';
  * empty string would read to the agent as a tab with no identity at all.
  */
 const UNNAMED_TAB_TITLE = 'New chat';
+
+/**
+ * Names a file or diff tab an agent opened after the file it targets, the same
+ * title the renderer's own openers stamp. A file name is locale-neutral, so
+ * writing it from here does not freeze the row into one language; a comment tab
+ * has no path to name it and opens untitled instead.
+ * @param filePath - Workspace-relative path the tab targets, when it has one
+ * @returns The tab title, or an empty string to leave the row untitled
+ */
+function fileTabTitle(filePath: string | undefined): string {
+	return filePath ? posixPath.basename(filePath) : '';
+}
 
 /** Collaborators the adapters delegate to; supplied by the composition root. */
 export interface PortAdapterDeps {
@@ -311,7 +325,12 @@ function makeTabPort(deps: PortAdapterDeps): TabPort {
 					: variant === 'diff'
 						? { filePath, turnId }
 						: { filePath };
-			const tab = deps.chatTabService.openTab({ kind, workspaceId, metadata });
+			const tab = deps.chatTabService.openTab({
+				kind,
+				metadata,
+				title: variant === 'comment' ? '' : fileTabTitle(filePath),
+				workspaceId,
+			});
 			deps.broadcastTabsChanged({ workspaceId });
 			return { chatTabId: tab.id };
 		},

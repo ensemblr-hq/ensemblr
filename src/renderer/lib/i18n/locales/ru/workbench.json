@@ -962,7 +962,8 @@
 		"new-tab": "Новая вкладка чата",
 		"unread": "Непрочитанные сообщения",
 		"untitled": "Новый чат",
-		"untitled-closed": "Диалог без названия"
+		"untitled-closed": "Диалог без названия",
+		"untitled-tab": "Без названия"
 	},
 	"setup-script": {
 		"add-manually": "Добавить вручную",

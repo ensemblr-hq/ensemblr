@@ -215,6 +215,54 @@ describe('agent-control port adapters: tab-change broadcast', () => {
 	});
 });
 
+describe('agent-control port adapters: non-chat tab titles', () => {
+	let deps: PortAdapterDeps;
+	let openTab: ReturnType<typeof vi.fn>;
+
+	beforeEach(() => {
+		const built = makeDeps();
+		deps = built.deps;
+		openTab = built.openTab;
+	});
+
+	it('names a file tab after the file it opens', async () => {
+		const ports = createAgentControlPorts(deps);
+		await ports.tabs.openNonChatTab({
+			workspaceId: 'ws',
+			variant: 'file',
+			filePath: 'src/renderer/components/message.tsx',
+		});
+		expect(openTab).toHaveBeenCalledWith(
+			expect.objectContaining({ kind: 'file', title: 'message.tsx' }),
+		);
+	});
+
+	it('names a diff tab after the file it diffs', async () => {
+		const ports = createAgentControlPorts(deps);
+		await ports.tabs.openNonChatTab({
+			workspaceId: 'ws',
+			variant: 'diff',
+			filePath: 'src/main/main.ts',
+		});
+		expect(openTab).toHaveBeenCalledWith(
+			expect.objectContaining({ kind: 'diff', title: 'main.ts' }),
+		);
+	});
+
+	it('leaves a comment tab untitled for the renderer to label', async () => {
+		const ports = createAgentControlPorts(deps);
+		await ports.tabs.openNonChatTab({
+			workspaceId: 'ws',
+			variant: 'comment',
+			commentBody: 'Looks good',
+			prNumber: 12,
+		});
+		expect(openTab).toHaveBeenCalledWith(
+			expect.objectContaining({ kind: 'document', title: '' }),
+		);
+	});
+});
+
 describe('agent-control port adapters: board status', () => {
 	it('setWorkspaceStatus updates the mirror and broadcasts', () => {
 		const { deps, broadcastBoardStatus, boardStatusStore } = makeDeps();

@@ -9,6 +9,7 @@ import type {
 import { parseWorkspaceGitDiffScope } from '@/shared/ipc/contracts/workspace-git';
 
 import { parseCommentPreview } from './comment-preview-tab';
+import { basenameOf } from './session-tab-titles';
 import { readHarnessSessionId } from './terminal-tab-restore';
 
 /** Shared identity fields every session-tab model carries, derived from the row. */
@@ -31,14 +32,23 @@ function metadataString(value: unknown, fallback: string): string {
 }
 
 /**
- * Label for an open tab the main process stored untitled. The row is blank by
+ * Label for an open tab the main process stored untitled. A chat row is blank by
  * design — a placeholder written there would be English forever — so the strip
  * supplies the wording, and `useSessionTabModels` re-derives it on a language
- * switch by keying its memo on the active language.
- * @returns The localized "New chat" placeholder
+ * switch by keying its memo on the active language. A non-chat row is named
+ * after the file it targets instead, so a file or diff tab never reads as a chat
+ * nobody has named.
+ * @param tab - The row being labelled
+ * @returns The file name the tab targets, or the localized placeholder
  */
-function untitledOpenTabLabel(): string {
-	return i18n.t('workbench:session-tabs.untitled', 'New chat');
+function untitledOpenTabLabel(tab: ChatTabWire): string {
+	if (tab.kind === 'chat') {
+		return i18n.t('workbench:session-tabs.untitled', 'New chat');
+	}
+	const filePath = metadataString(tab.metadata.filePath, '');
+	return filePath
+		? basenameOf(filePath)
+		: i18n.t('workbench:session-tabs.untitled-tab', 'Untitled');
 }
 
 /**
@@ -102,11 +112,11 @@ export function toSessionTabModel(
 	const base: SessionTabBaseFields = {
 		agentSessionId: tab.agentSessionId,
 		chatTabId: tab.id,
-		fullLabel: tab.fullTitle || tab.title || untitledOpenTabLabel(),
+		fullLabel: tab.fullTitle || tab.title || untitledOpenTabLabel(tab),
 		id: tab.id,
 		isPreview: tab.isPreview,
 		isSubAgent: tab.metadata.agentRole === 'subagent',
-		label: tab.title || untitledOpenTabLabel(),
+		label: tab.title || untitledOpenTabLabel(tab),
 		status: deriveTabStatus(agentSession),
 		summary: '',
 		updatedLabel: '',
