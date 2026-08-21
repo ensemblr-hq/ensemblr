@@ -78,6 +78,37 @@ test('an untitled closed tab reads as untitled, not as new', async () => {
 	);
 });
 
+test('an untitled file tab is named after the file it opens', async () => {
+	await i18n.changeLanguage('ru');
+	const fileTab: ChatTabWire = {
+		...untitledTab(),
+		kind: 'file',
+		metadata: { filePath: 'src/renderer/components/message.tsx' },
+	};
+	const model = toSessionTabModel(fileTab, undefined);
+	expect(model.label).toBe('message.tsx');
+	expect(model.fullLabel).toBe('message.tsx');
+});
+
+test('an untitled diff tab is named after the file it diffs', async () => {
+	const diffTab: ChatTabWire = {
+		...untitledTab(),
+		kind: 'diff',
+		metadata: { filePath: 'src/main/main.ts' },
+	};
+	expect(toSessionTabModel(diffTab, undefined).label).toBe('main.ts');
+});
+
+test('an untitled non-chat tab with no path reads as untitled, not as new', async () => {
+	const documentTab: ChatTabWire = { ...untitledTab(), kind: 'document' };
+
+	await i18n.changeLanguage('en');
+	expect(toSessionTabModel(documentTab, undefined).label).toBe('Untitled');
+
+	await i18n.changeLanguage('ru');
+	expect(toSessionTabModel(documentTab, undefined).label).toBe('Без названия');
+});
+
 test('a titled tab keeps its own title', async () => {
 	await i18n.changeLanguage('ru');
 	const titled: ChatTabWire = { ...untitledTab(), title: 'Fix the parser' };

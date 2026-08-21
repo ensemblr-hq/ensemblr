@@ -930,7 +930,8 @@
 		"new-tab": "Νέα καρτέλα συνομιλίας",
 		"unread": "Αδιάβαστα μηνύματα",
 		"untitled": "Νέα συνομιλία",
-		"untitled-closed": "Συνομιλία χωρίς τίτλο"
+		"untitled-closed": "Συνομιλία χωρίς τίτλο",
+		"untitled-tab": "Χωρίς τίτλο"
 	},
 	"setup-script": {
 		"add-manually": "Χειροκίνητη προσθήκη",

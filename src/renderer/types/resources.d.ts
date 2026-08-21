@@ -3237,6 +3237,7 @@ export default interface Resources {
 			unread: 'Unread messages';
 			untitled: 'New chat';
 			'untitled-closed': 'Untitled chat';
+			'untitled-tab': 'Untitled';
 		};
 		'setup-script': {
 			'add-manually': 'Add manually';
