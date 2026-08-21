@@ -162,7 +162,7 @@ you need to bisect a packaging break.
 **Write the notes and create the release. That is the whole ritual.**
 
 ```bash
-gh release create v0.1.0-beta.11 --notes-file NOTES.md --prerelease
+gh release create v0.1.0-beta.12 --notes-file NOTES.md --prerelease
 ```
 
 That creates the tag and fires `release: published`, which triggers
@@ -244,8 +244,8 @@ Squirrel.Mac feed the in-app updater reads:
 
 ```json
 {
-  "url": "https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.0-beta.11/Ensemblr-darwin-arm64-0.1.0-beta.11.zip",
-  "name": "0.1.0-beta.11",
+  "url": "https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.0-beta.12/Ensemblr-darwin-arm64-0.1.0-beta.12.zip",
+  "name": "0.1.0-beta.12",
   "notes": "…the release body…",
   "pub_date": "2026-08-18T04:00:00Z"
 }

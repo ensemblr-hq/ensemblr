@@ -9,6 +9,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.0-beta.12] - 2026-08-21
+
+The `@` and `/` menus land on the composer again instead of above the top of the window, and the
+setup-script prompt stops carrying its own copy of the settings schema. Signed, notarized, Apple
+silicon.
+[Release](https://github.com/ensemblr-hq/ensemblr/releases/tag/v0.1.0-beta.12) ·
+[`.dmg`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.0-beta.12/Ensemblr-0.1.0-beta.12-arm64.dmg)
+
+### Changed
+
+- **The setup-script prompt points at the skill instead of restating the schema.** The **Ask agent**
+  composer seed shipped a hand-maintained copy of the `.ensemblr/settings.toml` schema — the
+  `[scripts]` table, the run-script fields, a truncated icon list — which had to track the loader by
+  hand. The skill Ensemblr already ships to every session it launches carries the full reference, so
+  the seed sends the agent there and spends its own words on inspecting the project. That reference
+  now documents the injected `ENSEMBLR_*` variables too: the five keys, the 41000–41999 port range,
+  that they are reserved and override a same-named `environment_variables` row, and that only
+  terminal-launched processes get the overlay — an agent expanding `$ENSEMBLR_PORT` from its own Bash
+  call gets an empty string, not a broken script.
+
+### Fixed
+
+- **The `@` and `/` autocomplete menus opened off screen.** `PopoverAnchor asChild` was slotted onto a
+  function component that returns a fragment and forwards neither ref nor props onto a DOM node.
+  React 19 hands a function component `ref` as an ordinary prop, so it was dropped silently, Radix
+  measured nothing, and both menus parked at `translate(0, -200%)` — open, populated, and above the
+  top of the window. The popover renders its own anchor now, which also makes
+  `--radix-popover-trigger-width` resolve, so the menu tracks the composer's width up to `max-w-2xl`
+  rather than falling back to a fixed `min-w-80`.
+
 ## [0.1.0-beta.11] - 2026-08-21
 
 `brew install` works, right-clicking text finally does something, and a terminal's output reaches the
