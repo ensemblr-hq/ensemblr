@@ -349,11 +349,11 @@ export function useCreateWorkspaceFromProject(): CreateWorkspaceActionResult {
 }
 
 /**
- * Refreshes the workspace list caches after a project archive, and sends the
- * user to Welcome when the archived project is the one currently on screen.
- * @returns A callback to invoke with the id of the project that was archived.
+ * Refreshes the workspace list caches after a project is deleted, and sends the
+ * user to Welcome when the deleted project is the one currently on screen.
+ * @returns A callback to invoke with the id of the project that was removed.
  */
-export function useArchiveProjectAction({
+export function useDeleteProjectAction({
 	activeProjectId,
 }: {
 	activeProjectId: string | null;
@@ -362,14 +362,14 @@ export function useArchiveProjectAction({
 	const router = useRouter();
 
 	return useCallback(
-		async (archivedProjectId: string) => {
+		async (removedProjectId: string) => {
 			// Refresh both the sidebar navigation snapshot and the global History
-			// feed so an archive/delete from the sidebar reflects instantly while
-			// the History screen is mounted (mirrors the unarchive path).
+			// feed so a delete from the sidebar reflects instantly while the History
+			// screen is mounted (mirrors the unarchive path).
 			await invalidateWorkspaceListViews(queryClient);
 			await router.invalidate();
 
-			if (activeProjectId !== archivedProjectId) {
+			if (activeProjectId !== removedProjectId) {
 				return;
 			}
 

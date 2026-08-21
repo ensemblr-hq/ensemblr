@@ -68,7 +68,7 @@ function RepoGitSettings() {
 				}
 				description={t(
 					'settings:repo.delete-branch.description',
-					'Delete the local branch when archiving a workspace. Overrides your user-scope default for this repo.',
+					'Remove the worktree and delete the local branch whenever a workspace is archived. Overrides your user-scope default for this repo.',
 				)}
 				label={
 					<span className='flex items-center gap-2'>

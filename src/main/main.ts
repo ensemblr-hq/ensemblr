@@ -139,7 +139,6 @@ import {
 } from './plan-mode';
 import {
 	createArchiveLifecycleService,
-	createArchiveRepositoryService,
 	createArchiveWorkspaceService,
 	createContinueWorkspaceBranchService,
 	createDeleteArchivedWorkspaceService,
@@ -811,11 +810,6 @@ const archiveWorkspaceService = createArchiveWorkspaceService({
 	rootDirectoryService,
 	workspaceTeardownService,
 });
-const archiveRepositoryService = createArchiveRepositoryService({
-	archiveLifecycleService,
-	archiveWorkspaceService,
-	databaseService,
-});
 const deleteWorkspaceService = createDeleteWorkspaceService({
 	databaseService,
 	localCommandService,
@@ -1232,7 +1226,6 @@ app.whenReady().then(() => {
 		activeChatStore,
 		agentProviderService,
 		appSettingsService,
-		archiveRepositoryService,
 		archiveWorkspaceService: archiveWorkspaceServiceWithScript,
 		augmentHarnessCommand,
 		configService,

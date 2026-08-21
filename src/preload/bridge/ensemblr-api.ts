@@ -128,7 +128,6 @@ function subscribe<E>(
 export function createEnsemblrApi(): EnsemblrApi {
 	return {
 		addEnvFile: (request) => invoke('addEnvFile', request),
-		archiveRepository: (request) => invoke('archiveRepository', request),
 		launchAgentHarness: (request) => invoke('launchAgentHarness', request),
 		resumeAgentHarness: (request) => invoke('resumeAgentHarness', request),
 		listAgentHarnesses: () => invoke('listAgentHarnesses'),

@@ -231,7 +231,7 @@
 			"none": "None"
 		},
 		"delete-branch": {
-			"description": "Delete the local branch when archiving a workspace. To delete the remote branch, configure it on GitHub.",
+			"description": "Remove the worktree and delete the local branch whenever a workspace is archived, from the archive dialog and after a merge alike. To delete the remote branch, configure it on GitHub.",
 			"label": "Delete branch on archive"
 		},
 		"description": "Workspace branch defaults and lifecycle behavior. Repository-scope overrides win when set.",
@@ -532,8 +532,13 @@
 			"repository-default": "Repository default",
 			"search-placeholder": "Search or enter a ref…"
 		},
+		"delete": {
+			"row-description": "Drops this repository from Ensemblr and deletes every workspace worktree. The repository folder stays on disk.",
+			"row-label": "Delete repository",
+			"trigger": "Delete repository"
+		},
 		"delete-branch": {
-			"description": "Delete the local branch when archiving a workspace. Overrides your user-scope default for this repo.",
+			"description": "Remove the worktree and delete the local branch whenever a workspace is archived. Overrides your user-scope default for this repo.",
 			"label": "Delete branch on archive"
 		},
 		"environment": {
@@ -601,15 +606,8 @@
 			"name-placeholder": "Name",
 			"template-aria-label": "Preview URL template"
 		},
-		"remove": {
-			"description": "Removes the repository from Ensemblr. The on-disk directory at<path>{{path}}</path>is not deleted; delete it manually if you want it gone.",
-			"row-description": "Drops this repository from Ensemblr. Workspaces stop being tracked; nothing on disk is deleted.",
-			"row-label": "Remove repository",
-			"title": "Remove this repository?",
-			"trigger": "Remove repository"
-		},
 		"root-path": {
-			"description": "Do not move or delete this directory. Instead, remove the repository in Ensemblr.",
+			"description": "Do not move or delete this directory. Instead, delete the repository in Ensemblr.",
 			"label": "Root path"
 		},
 		"run-mode": {

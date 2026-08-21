@@ -2,7 +2,6 @@ import { ipcMain } from 'electron';
 import { IPC_CHANNELS } from '../../../shared/ipc/channels';
 import type { QuickStartProjectResult } from '../../../shared/ipc/contracts/quick-start';
 import type {
-	ArchiveRepositoryResult,
 	DeleteRepositoryResult,
 	LocalRepositorySelectionResult,
 	RegisterLocalRepositoryResult,
@@ -21,7 +20,6 @@ import type {
 	UnarchiveWorkspaceResult,
 } from '../../../shared/ipc/contracts/workspace';
 import type {
-	ArchiveRepositoryService,
 	ArchiveWorkspaceService,
 	ContinueWorkspaceBranchService,
 	CreateWorkspaceService,
@@ -40,7 +38,6 @@ import type {
 } from '../../repository';
 import type { WithPermissionGate } from '../permission-gate.ts';
 import {
-	parseArchiveRepositoryRequest,
 	parseArchiveWorkspaceRequest,
 	parseContinueWorkspaceBranchRequest,
 	parseCreateWorkspaceRequest,
@@ -58,7 +55,6 @@ import { showDirectorySelectionDialog } from './dialog-helpers.ts';
 
 /** Service dependencies used by the local-repository IPC handlers. */
 interface RepositoryHandlersOptions {
-	archiveRepositoryService: ArchiveRepositoryService;
 	archiveWorkspaceService: ArchiveWorkspaceService;
 	continueWorkspaceBranchService: ContinueWorkspaceBranchService;
 	createWorkspaceService: CreateWorkspaceService;
@@ -83,7 +79,6 @@ interface RepositoryHandlersOptions {
  * @param options - Required services.
  */
 export function registerRepositoryHandlers({
-	archiveRepositoryService,
 	archiveWorkspaceService,
 	continueWorkspaceBranchService,
 	createWorkspaceService,
@@ -172,13 +167,6 @@ export function registerRepositoryHandlers({
 			continueWorkspaceBranchService.continueBranch(
 				parseContinueWorkspaceBranchRequest(raw),
 			),
-	);
-
-	withPermissionGate(
-		IPC_CHANNELS.archiveRepository,
-		'repository-removal',
-		(_event, raw: unknown): Promise<ArchiveRepositoryResult> =>
-			archiveRepositoryService.archive(parseArchiveRepositoryRequest(raw)),
 	);
 
 	withPermissionGate(

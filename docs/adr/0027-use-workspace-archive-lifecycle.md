@@ -6,6 +6,21 @@ Date: 2026-06-08
 
 Accepted
 
+Amendment (2026-08-21): the repository half of this decision was removed. The
+`ensemblr:archive-repository` channel, `src/main/repository/archive-repository.ts`,
+and the `pre-archive-repository` / `post-archive-repository` hook stages no
+longer exist — archiving a repository was a one-way hide with no unarchive path,
+and `Delete repository…` already covers removing one. The workspace archive
+lifecycle described below stands, with one change: branch cleanup is no longer an
+opt-in checkbox on the archive dialog. It follows the repository's resolved
+`deleteLocalBranchOnArchive` setting, the same one the archive-after-merge flow
+obeys. `repositories.archived_at` and the `'repository'` arm of `archive_records`
+remain in the schema for rows written before this change, but migration
+`021_restore_archived_repositories` clears the column: with the archive surface
+gone, a repository an earlier build had stamped would sit permanently outside the
+sidebar with nothing left that could bring it back. The navigation query keeps
+its `archived_at IS NULL` filter as a guard rather than a live path.
+
 ## Context
 
 ADR [0010](0010-use-a-user-visible-managed-root-directory.md) fixes a managed

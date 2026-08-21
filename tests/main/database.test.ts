@@ -36,6 +36,7 @@ const EXPECTED_MIGRATIONS = [
 	'018_infisical_link_folder_path',
 	'019_linear_accounts',
 	'020_linear_comment_freshness',
+	'021_restore_archived_repositories',
 ];
 
 const AGENT_VOCABULARY_MIGRATION_VERSION = 14;
@@ -1220,10 +1221,10 @@ test('repository workspace navigation snapshot excludes archived repositories', 
 	});
 	t.after(() => connection.database.close());
 
-	// An archived repository (and its still-on-disk workspace) must never leak
-	// back into the sidebar — otherwise archiving a repo "comes back" on the
-	// next launch. The snapshot carries no archived flag, so the cut happens in
-	// SQL; this regression-tests that filter.
+	// Nothing stamps `repositories.archived_at` any more, but the filter is kept
+	// as a guard: the snapshot carries no archived flag for the renderer to act
+	// on, so a row that acquired the column again would reach a sidebar with no
+	// surface to unarchive it. This regression-tests that guard.
 	connection.database.exec(`
 INSERT INTO repositories (id, slug, name, path, default_branch, metadata_json, archived_at)
 VALUES
@@ -1322,5 +1323,55 @@ VALUES
 				title: 'New chat',
 			},
 		],
+	);
+});
+
+test('migration 021 restores repositories an earlier build had archived', (t) => {
+	const fixture = createTestDatabasePath();
+	t.after(fixture.cleanup);
+
+	const seeded = openEnsemblrDatabase({ databasePath: fixture.databasePath });
+	seeded.database.exec(`
+INSERT INTO repositories (id, slug, name, path, default_branch, metadata_json, archived_at)
+VALUES
+	('repo-live', 'live', 'Live', '/tmp/ensemblr/live', 'main', '{}', NULL),
+	('repo-stranded', 'stranded', 'Stranded', '/tmp/ensemblr/stranded', 'main', '{}', '2026-06-01T00:00:00.000Z');
+
+INSERT INTO workspaces (id, repository_id, slug, name, path, branch_name, base_branch, archived_at, metadata_json)
+VALUES ('ws-stranded', 'repo-stranded', 'gone', 'Gone', '/tmp/ensemblr/workspaces/gone', 'octocat/gone', 'main', '2026-06-01T00:00:00.000Z', '{}');
+`);
+	seeded.database
+		.prepare('DELETE FROM schema_migrations WHERE id = ?')
+		.run('021_restore_archived_repositories');
+	seeded.database.close();
+
+	const connection = openEnsemblrDatabase({
+		databasePath: fixture.databasePath,
+	});
+	t.after(() => connection.database.close());
+
+	assert.deepEqual(
+		readRows(
+			connection.database,
+			'SELECT id, archived_at FROM repositories ORDER BY id',
+		),
+		[
+			{ archived_at: null, id: 'repo-live' },
+			{ archived_at: null, id: 'repo-stranded' },
+		],
+	);
+
+	// The repository comes back; its workspaces stay archived, because a
+	// workspace archive is still a real state with its own unarchive path.
+	assert.deepEqual(
+		readRows(connection.database, 'SELECT id, archived_at FROM workspaces'),
+		[{ archived_at: '2026-06-01T00:00:00.000Z', id: 'ws-stranded' }],
+	);
+
+	assert.deepEqual(
+		getRepositoryWorkspaceNavigationSnapshot(
+			connection.database,
+		).repositories.map((repository) => repository.id),
+		['repo-live', 'repo-stranded'],
 	);
 });

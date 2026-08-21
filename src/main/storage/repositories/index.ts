@@ -88,7 +88,6 @@ export type {
 	RefreshRepositoryAdoptionRowOptions,
 	RepositoryLookupRow,
 	RepositoryPathRow,
-	SelectRepositoryForArchiveOptions,
 	SelectRepositoryForDeleteOptions,
 	SelectRepositoryIdByPathOptions,
 	SelectRepositoryIdByRemoteUrlOptions,
@@ -98,7 +97,6 @@ export type {
 	SelectRepositoryMetadataJsonOptions,
 	SelectRepositoryPathByIdOptions,
 	SelectRepositoryWithDefaultsByIdOptions,
-	StampRepositoryArchivedOptions,
 	UpdateRepositoryMetadataJsonOptions,
 } from './repository-row-repository.ts';
 export {
@@ -107,7 +105,6 @@ export {
 	listRepositoryRowsByPathPrefix,
 	refreshRepositoryAdoptionRow,
 	selectLiveRepositoryPaths,
-	selectRepositoryForArchive,
 	selectRepositoryForDelete,
 	selectRepositoryIdByPath,
 	selectRepositoryIdByRemoteUrl,
@@ -117,7 +114,6 @@ export {
 	selectRepositoryMetadataJson,
 	selectRepositoryPathById,
 	selectRepositoryWithDefaultsById,
-	stampRepositoryArchived,
 	updateRepositoryMetadataJson,
 } from './repository-row-repository.ts';
 export { getRepositoryWorkspaceNavigationSnapshot } from './repository-workspace-navigation-repository.ts';

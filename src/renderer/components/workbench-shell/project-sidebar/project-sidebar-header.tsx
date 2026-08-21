@@ -22,7 +22,6 @@ import { ProjectContextMenuContent } from './project-context-menu';
 /** Project group header with avatar, collapse toggle, and inline action buttons. */
 export function ProjectSidebarHeader({
 	isCollapsed,
-	onArchiveSelect,
 	onBrowseArchiveSelect,
 	onCreateFromSourcePrefetch,
 	onCreateFromSourceSelect,
@@ -36,7 +35,6 @@ export function ProjectSidebarHeader({
 }: {
 	isCollapsed: boolean;
 	isCreatingWorkspace?: boolean;
-	onArchiveSelect?: () => void;
 	onBrowseArchiveSelect?: () => void;
 	/** Warms the create-from picker's data before the dialog opens. */
 	onCreateFromSourcePrefetch?: () => void;
@@ -166,7 +164,6 @@ export function ProjectSidebarHeader({
 				</SidebarGroupLabel>
 			</ContextMenuTrigger>
 			<ProjectContextMenuContent
-				onArchiveSelect={onArchiveSelect}
 				onBrowseArchiveSelect={onBrowseArchiveSelect}
 				onCreateFromSourceSelect={onCreateFromSourceSelect}
 				onDeleteSelect={onDeleteSelect}

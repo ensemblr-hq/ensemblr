@@ -5,10 +5,6 @@
  * be wired without touching the runtime contract.
  */
 import type {
-	ArchiveRepositoryRequest,
-	ArchiveRepositoryResult,
-} from './repository';
-import type {
 	ArchiveWorkspaceRequest,
 	ArchiveWorkspaceResult,
 	DeleteArchivedWorkspaceRequest,
@@ -20,12 +16,10 @@ import type {
 	UnarchiveWorkspaceResult,
 } from './workspace';
 
-/** Lifecycle phase at which an archive hook fires — pre/post archive or unarchive of a repository or workspace. */
+/** Lifecycle phase at which an archive hook fires — pre or post archive or unarchive of a workspace. */
 export type ArchiveLifecycleStage =
-	| 'pre-archive-repository'
 	| 'pre-archive-workspace'
 	| 'pre-unarchive-workspace'
-	| 'post-archive-repository'
 	| 'post-archive-workspace'
 	| 'post-unarchive-workspace';
 
@@ -64,7 +58,7 @@ export interface ArchiveLifecycleWorkspaceTarget {
 	slug: string;
 }
 
-/** The repository being archived, as passed to lifecycle handlers. */
+/** The repository owning the workspace, as passed to lifecycle handlers. */
 export interface ArchiveLifecycleRepositoryTarget {
 	id: string;
 	name: string;
@@ -83,13 +77,10 @@ export interface ArchiveLifecycleContext {
 }
 
 /**
- * Archive lifecycle IPC surface — covers archive/unarchive of workspaces and
- * repositories plus the browse-archive listing and permanent purge.
+ * Archive lifecycle IPC surface — covers archive/unarchive of workspaces plus
+ * the browse-archive listing and permanent purge.
  */
 export interface ArchiveApi {
-	archiveRepository: (
-		request: ArchiveRepositoryRequest,
-	) => Promise<ArchiveRepositoryResult>;
 	archiveWorkspace: (
 		request: ArchiveWorkspaceRequest,
 	) => Promise<ArchiveWorkspaceResult>;
