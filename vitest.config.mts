@@ -67,6 +67,8 @@ export default defineConfig({
 			'tests/main/harness-detection-service.test.ts',
 			'tests/main/agent-conversation-title.test.ts',
 			'tests/main/request-schemas.test.ts',
+			'tests/main/text-context-menu-forwarding.test.ts',
+			'tests/main/text-edit-command-schema.test.ts',
 			'tests/main/validate-git-ref.test.ts',
 			'tests/main/worktree-placement.test.ts',
 			'tests/main/remove-directory.test.ts',

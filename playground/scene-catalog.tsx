@@ -15,6 +15,7 @@ import { ProvidersScene } from './providers-preview.tsx';
 import { RightSidebarHeaderScene } from './right-sidebar-header-preview.tsx';
 import { StartingStatePreview } from './starting-state-preview.tsx';
 import { TabScrollerScene } from './tab-scroller-preview.tsx';
+import { TextContextMenuScene } from './text-context-menu-preview.tsx';
 import { TimelinePreview } from './timeline-preview.tsx';
 import { ToolApprovalScene } from './tool-approval-preview.tsx';
 import { TurnSummaryPreview } from './turn-summary-preview.tsx';
@@ -66,6 +67,12 @@ export const SCENE_GROUPS = [
 				label: 'composer queue',
 				render: () => <ComposerQueueScene />,
 				source: 'playground/composer-queue-preview.tsx',
+			},
+			{
+				id: 'text-menu',
+				label: 'text menu',
+				render: () => <TextContextMenuScene />,
+				source: 'playground/text-context-menu-preview.tsx',
 			},
 			{
 				id: 'tool-approval',

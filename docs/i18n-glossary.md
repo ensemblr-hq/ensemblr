@@ -136,6 +136,13 @@ Rules of thumb:
 | Close | Закрыть | Κλείσιμο | Dismisses the surface and nothing else. A confirmation dialog swaps its `Cancel` for this once the run is in flight, because dismissing it no longer calls the operation back. |
 | Discard | Отменить изменения | Απόρριψη | Destructive; never plain "Отменить" (= Undo). |
 | Undo | Отменить | Αναίρεση | |
+| Redo | Повторить | Επανάληψη | The history command, and the same pair `Retry` above takes — the two never share a menu, so the collision is invisible. |
+| Cut | Вырезать | Αποκοπή | Clipboard operation, matching the Edit menu in `src/main/menu/menu-strings.ts`. |
+| Copy | Копировать | Αντιγραφή | Imperfective in Russian, as every other `Копировать …` row in the catalogue already is. The native Edit menu says `Скопировать`; leave that one alone — it is macOS's own register for a menu-bar item. |
+| Paste | Вставить | Επικόλληση | The act. The chip for what was pasted is `Pasted text` below. |
+| Select all | Выбрать все | Επιλογή όλων | On a read-only surface this means the transcript the user right-clicked, not the window. Sentence case in the catalogue, like every other `common:actions.*` label; the Edit menu in `src/main/menu/menu-strings.ts` keeps `Select All` because Title Case is macOS's register for a menu-bar item. |
+| Add to dictionary | Добавить в словарь | Προσθήκη στο λεξικό | Teaches the spellchecker a word for the whole user profile, not this window. macOS's own Edit menu says `Запомнить написание` for its `Learn Spelling`; this is a plainer label for a plainer action, so it is translated literally rather than borrowed. |
+| No suggestions | Нет вариантов | Καμία πρόταση | Shown disabled when the spellchecker flags a word but offers no correction. |
 | Restore | Восстановить | Επαναφορά | |
 | Resume | Продолжить | Συνέχιση | |
 | Retry | Повторить | Επανάληψη | |

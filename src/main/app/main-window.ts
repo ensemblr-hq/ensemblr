@@ -3,6 +3,7 @@ import { BrowserWindow, screen } from 'electron';
 
 import { routeExternalLinksToBrowser } from './external-links';
 import { restrictMediaPermissions } from './media-permissions';
+import { forwardTextContextMenus } from './text-context-menu-forwarding';
 import {
 	DEFAULT_MAIN_WINDOW_HEIGHT,
 	DEFAULT_MAIN_WINDOW_WIDTH,
@@ -64,6 +65,10 @@ export function createMainWindow({
 	// device permission, so the rest are denied instead of left to Electron's
 	// permissive default.
 	restrictMediaPermissions(mainWindow.webContents.session);
+
+	// The renderer draws the text context menu itself, but only Chromium knows
+	// the spellchecker's verdict for the word under the cursor.
+	forwardTextContextMenus(mainWindow.webContents);
 
 	// Send every external link to the default system browser. In dev the renderer
 	// is served from the Vite origin (treated as internal); in prod it is a file:

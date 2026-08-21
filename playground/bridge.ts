@@ -2,6 +2,17 @@
 type BridgeHandler = (payload: unknown) => unknown;
 
 /**
+ * Whether a bridge method registers a listener rather than answering a request.
+ * Both spellings on the preload surface hand back an unsubscribe function that
+ * a caller stores as an effect cleanup, so neither may be wrapped in a promise.
+ * @param method - Name of the method being read off the bridge.
+ * @returns True when the method is a subscription rather than a request.
+ */
+function isSubscription(method: string): boolean {
+	return method.startsWith('subscribe') || method.startsWith('on');
+}
+
+/**
  * Reads the workspace path out of a bridge request. Handlers receive `unknown`
  * because the stub bypasses the typed preload surface, so every fixture that
  * answers a per-workspace call has to narrow the same shape.
@@ -25,6 +36,9 @@ export function readBridgeWorkspaceCwd(payload: unknown): string {
  * an `undefined` result, so any polled query a scene drives has to answer here
  * rather than lean on the blanket no-op — seeding the cache is not enough, since
  * the query's own `refetchInterval` overrides the client's defaults.
+ *
+ * A handler for a `subscribe*` or `on*` method is handed the listener and must
+ * return the unsubscribe function synchronously, the way preload does.
  * @param handlers - Method-name to stand-in result, keyed as on the bridge.
  */
 export function installPlaygroundBridge(
@@ -37,10 +51,10 @@ export function installPlaygroundBridge(
 				if (typeof property !== 'string') {
 					return () => Promise.resolve(undefined);
 				}
-				if (property.startsWith('subscribe')) {
-					return () => () => undefined;
-				}
 				const handler = handlers[property];
+				if (isSubscription(property)) {
+					return handler ?? (() => () => undefined);
+				}
 				return handler
 					? (payload: unknown) => Promise.resolve(handler(payload))
 					: () => Promise.resolve(undefined);

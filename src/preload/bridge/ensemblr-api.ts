@@ -30,6 +30,7 @@ import type {
 	TerminalLifecycleBroadcast,
 	TerminalOutputBroadcast,
 } from '../../shared/ipc/contracts/terminal';
+import type { TextContextMenuTarget } from '../../shared/ipc/contracts/text-editing';
 import type { UpdateStatusChangedBroadcast } from '../../shared/ipc/contracts/update';
 import type { WorkspaceFilesChangedBroadcast } from '../../shared/ipc/contracts/workspace-files';
 import type { MenuCommandBroadcast } from '../../shared/menu-commands';
@@ -55,6 +56,7 @@ type InvokeKey = Exclude<
 	| 'onPiRawFrame'
 	| 'onTerminalLifecycle'
 	| 'onTerminalOutput'
+	| 'onTextContextMenu'
 	| 'onUpdateStatusChanged'
 	| 'onWorkspaceFilesChanged'
 >;
@@ -331,6 +333,8 @@ export function createEnsemblrApi(): EnsemblrApi {
 			),
 		onTerminalOutput: (listener) =>
 			subscribe<TerminalOutputBroadcast>(IPC_CHANNELS.terminalOutput, listener),
+		onTextContextMenu: (listener) =>
+			subscribe<TextContextMenuTarget>(IPC_CHANNELS.textContextMenu, listener),
 		onWorkspaceFilesChanged: (listener) =>
 			subscribe<WorkspaceFilesChangedBroadcast>(
 				IPC_CHANNELS.workspaceFilesChanged,
@@ -376,6 +380,9 @@ export function createEnsemblrApi(): EnsemblrApi {
 		restoreChatTab: (request) => invoke('restoreChatTab', request),
 		restoreCheckpoint: (request) => invoke('restoreCheckpoint', request),
 		rootDirectory: () => invoke('rootDirectory'),
+		addWordToDictionary: (request) => invoke('addWordToDictionary', request),
+		replaceMisspelling: (request) => invoke('replaceMisspelling', request),
+		runTextEditCommand: (command) => invoke('runTextEditCommand', command),
 		runWorkspaceScript: (request) => invoke('runWorkspaceScript', request),
 		saveReviewComment: (request) => invoke('saveReviewComment', request),
 		saveReviewTodo: (request) => invoke('saveReviewTodo', request),
