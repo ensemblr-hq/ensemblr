@@ -130,7 +130,7 @@ function GitSettings() {
 				}
 				description={t(
 					'settings:git.delete-branch.description',
-					'Delete the local branch when archiving a workspace. To delete the remote branch, configure it on GitHub.',
+					'Remove the worktree and delete the local branch whenever a workspace is archived, from the archive dialog and after a merge alike. To delete the remote branch, configure it on GitHub.',
 				)}
 				label={t(
 					'settings:git.delete-branch.label',

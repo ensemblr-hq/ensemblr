@@ -1,5 +1,4 @@
 import {
-	ArchiveIcon,
 	ArchiveRestoreIcon,
 	GitBranchPlusIcon,
 	PlusIcon,
@@ -28,14 +27,12 @@ const repositoryRemovalBoundary = classifyPermissionAction({
 
 /** Right-click context menu surfacing project workspace/settings actions. */
 export function ProjectContextMenuContent({
-	onArchiveSelect,
 	onBrowseArchiveSelect,
 	onCreateFromSourceSelect,
 	onDeleteSelect,
 	onRepositorySettingsSelect,
 	project,
 }: {
-	onArchiveSelect?: () => void;
 	onBrowseArchiveSelect?: () => void;
 	onCreateFromSourceSelect?: () => void;
 	onDeleteSelect?: () => void;
@@ -45,7 +42,6 @@ export function ProjectContextMenuContent({
 	const { t } = useTranslation();
 	const comingSoon = t('common:status.coming-soon', 'Coming soon');
 	const createFromSourceWired = Boolean(onCreateFromSourceSelect);
-	const archiveWired = Boolean(onArchiveSelect);
 	const browseArchiveWired = Boolean(onBrowseArchiveSelect);
 	const deleteWired = Boolean(onDeleteSelect);
 
@@ -101,17 +97,6 @@ export function ProjectContextMenuContent({
 			</ContextMenuGroup>
 			<ContextMenuSeparator />
 			<ContextMenuGroup>
-				<SidebarContextMenuItem
-					data-action-placeholder='repository-archive-confirmation'
-					data-permission-boundary={repositoryRemovalBoundary.boundary}
-					disabled={!archiveWired}
-					onSelect={onArchiveSelect}
-				>
-					<ArchiveIcon aria-hidden='true' />
-					<span className='min-w-0 flex-1'>
-						{t('workbench:repository-menu.archive', 'Archive repository')}
-					</span>
-				</SidebarContextMenuItem>
 				<SidebarContextMenuItem
 					data-action-placeholder='repository-delete-confirmation'
 					data-permission-boundary={repositoryRemovalBoundary.boundary}

@@ -12,11 +12,6 @@ export type {
 } from './archive-lifecycle.ts';
 export { createArchiveLifecycleService } from './archive-lifecycle.ts';
 export type {
-	ArchiveRepositoryService,
-	CreateArchiveRepositoryServiceOptions,
-} from './archive-repository.ts';
-export { createArchiveRepositoryService } from './archive-repository.ts';
-export type {
 	ArchiveWorkspaceService,
 	CreateArchiveWorkspaceServiceOptions,
 } from './archive-workspace.ts';

@@ -125,9 +125,14 @@ export const ensemblrQueryKeys = {
 	/** Query key for a workspace's review comments. */
 	reviewComments: (workspaceId: string) =>
 		[...ensemblrQueryKeys.all, 'review-comments', workspaceId] as const,
-	/** Query key for a repository's review merge settings. */
-	reviewMergeSettings: (repositoryId: string) =>
-		[...ensemblrQueryKeys.all, 'review-merge-settings', repositoryId] as const,
+	/** Query key for a repository's git lifecycle settings, scoped by the checkout they were resolved from. */
+	reviewMergeSettings: (repositoryId: string, repositoryPath: string) =>
+		[
+			...ensemblrQueryKeys.all,
+			'review-merge-settings',
+			repositoryId,
+			repositoryPath,
+		] as const,
 	/** Query key for a workspace's review to-dos. */
 	reviewTodos: (workspaceId: string) =>
 		[...ensemblrQueryKeys.all, 'review-todos', workspaceId] as const,

@@ -721,9 +721,28 @@
 		}
 	}
 
+	/* A collapsed nav sidebar leaves the traffic lights over the inset's leading
+	   toolbar, which is the one hosting the trigger that reopens it. Matching on
+	   that trigger rather than on `.native-toolbar` alone is what keeps the inset
+	   off the toolbars further right — the review sidebar's header sits nowhere
+	   near the window controls and needs no room for them.
+
+	   The narrow-viewport pair comes first so each selector is followed only by
+	   more specific ones; both set the same declarations, so the order is a
+	   readability constraint rather than a cascade one. */
+	@media (width < 48rem) {
+		.native-toolbar:has(.sidebar-collapsed-trigger) {
+			padding-inline-start: var(--ensemblr-traffic-light-safe-inline);
+		}
+
+		.sidebar-collapsed-trigger {
+			display: inline-flex;
+		}
+	}
+
 	[data-slot="sidebar"][data-collapsible="offcanvas"]
 		~ [data-slot="sidebar-inset"]
-		.native-toolbar {
+		.native-toolbar:has(.sidebar-collapsed-trigger) {
 		padding-inline-start: var(--ensemblr-traffic-light-safe-inline);
 	}
 
@@ -731,16 +750,6 @@
 		~ [data-slot="sidebar-inset"]
 		.sidebar-collapsed-trigger {
 		display: inline-flex;
-	}
-
-	@media (width < 48rem) {
-		.native-toolbar {
-			padding-inline-start: var(--ensemblr-traffic-light-safe-inline);
-		}
-
-		.sidebar-collapsed-trigger {
-			display: inline-flex;
-		}
 	}
 
 	a,

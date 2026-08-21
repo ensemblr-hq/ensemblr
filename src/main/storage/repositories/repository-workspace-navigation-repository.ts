@@ -79,9 +79,13 @@ ORDER BY w.created_at DESC, w.id DESC
 /**
  * Builds the repository/workspace navigation snapshot consumed by the renderer
  * sidebar, grouping non-archived workspaces under their parent repository.
- * Archived repositories are excluded entirely so they leave the sidebar on
- * archive and stay gone across restarts (the snapshot carries no archived flag
- * for the renderer to filter on, so the cut has to happen here).
+ *
+ * The repository query still filters on `archived_at`, but nothing sets it any
+ * more: archiving a repository was removed with the ADR 0027 amendment, and
+ * migration `021_restore_archived_repositories` cleared the rows an earlier
+ * build had stamped. The filter is kept as a guard, not as a live path — a row
+ * that acquires the column again would otherwise reach a sidebar with no
+ * surface to unarchive it.
  * @param database - Open SQLite connection or `null`.
  * @returns A navigation snapshot, empty when no database is available.
  */

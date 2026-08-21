@@ -216,35 +216,6 @@ export function selectLiveRepositoryPaths({
 	);
 }
 
-/** Inputs for {@link selectRepositoryForArchive}. */
-export interface SelectRepositoryForArchiveOptions {
-	database: DatabaseSync;
-	id: string;
-}
-
-/**
- * Returns the repository row projection used by the archive flow:
- * id, slug, name, path, archived_at. The raw row is returned so the
- * caller's type guards stay authoritative.
- */
-export function selectRepositoryForArchive({
-	database,
-	id,
-}: SelectRepositoryForArchiveOptions): unknown {
-	return database
-		.prepare(
-			`SELECT
-				id AS id,
-				slug AS slug,
-				name AS name,
-				path AS path,
-				archived_at AS archivedAt
-			FROM repositories
-			WHERE id = ?`,
-		)
-		.get(id);
-}
-
 /** Inputs for {@link selectRepositoryForDelete}. */
 export interface SelectRepositoryForDeleteOptions {
 	database: DatabaseSync;
@@ -354,31 +325,6 @@ export function refreshRepositoryAdoptionRow({
 				WHERE id = ?`,
 		)
 		.run(timestamp, defaultBranch, metadataJson, id);
-}
-
-/** Inputs for {@link stampRepositoryArchived}. */
-export interface StampRepositoryArchivedOptions {
-	archivedAt: string;
-	database: DatabaseSync;
-	id: string;
-}
-
-/**
- * Sets both `archived_at` and `updated_at` on a repository row so it enters
- * the archived lifecycle state.
- */
-export function stampRepositoryArchived({
-	archivedAt,
-	database,
-	id,
-}: StampRepositoryArchivedOptions): void {
-	database
-		.prepare(
-			`UPDATE repositories
-				SET archived_at = ?, updated_at = ?
-				WHERE id = ?`,
-		)
-		.run(archivedAt, archivedAt, id);
 }
 
 /** Inputs for {@link updateRepositoryMetadataJson}. */

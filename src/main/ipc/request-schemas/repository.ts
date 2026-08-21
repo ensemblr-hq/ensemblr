@@ -273,43 +273,6 @@ export function parseArchiveWorkspaceRequest(raw: unknown): {
 	return result;
 }
 
-/** {@link import('../../../shared/ipc').ArchiveRepositoryRequest}. */
-export const archiveRepositoryRequestSchema = z.object({
-	branchCleanup: optionalBoolean,
-	reason: optionalTrimmedString,
-	repositoryId: z.string(),
-});
-
-/**
- * Parses an archive-repository payload, falling back to `{ repositoryId: '' }`
- * on malformed input. The service emits a `repository-id-required` diagnostic.
- * @param raw - Raw IPC payload.
- * @returns The normalized archive-repository request.
- */
-export function parseArchiveRepositoryRequest(raw: unknown): {
-	branchCleanup?: boolean;
-	reason?: string;
-	repositoryId: string;
-} {
-	const parsed = archiveRepositoryRequestSchema.safeParse(raw);
-	if (!parsed.success) {
-		return { repositoryId: '' };
-	}
-	const { branchCleanup, reason, repositoryId } = parsed.data;
-	const result: {
-		branchCleanup?: boolean;
-		reason?: string;
-		repositoryId: string;
-	} = { repositoryId };
-	if (branchCleanup !== undefined) {
-		result.branchCleanup = branchCleanup;
-	}
-	if (reason !== undefined) {
-		result.reason = reason;
-	}
-	return result;
-}
-
 /** {@link import('../../../shared/ipc').DeleteWorkspaceRequest}. */
 export const deleteWorkspaceRequestSchema = z.object({
 	workspaceId: z.string(),

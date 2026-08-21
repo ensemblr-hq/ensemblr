@@ -246,13 +246,6 @@ export type {
 } from './contracts/quick-start';
 export type {
 	AdoptedRepositorySnapshot,
-	ArchivedRepositorySnapshot,
-	ArchiveRepositoryDiagnostic,
-	ArchiveRepositoryDiagnosticCode,
-	ArchiveRepositoryDiagnosticSeverity,
-	ArchiveRepositoryRequest,
-	ArchiveRepositoryResult,
-	ArchiveRepositoryStatus,
 	DeletedRepositorySnapshot,
 	DeleteRepositoryDiagnostic,
 	DeleteRepositoryDiagnosticCode,

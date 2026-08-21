@@ -1,29 +1,17 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { Trash2Icon } from 'lucide-react';
-import { useState } from 'react';
-import { Trans, useTranslation } from 'react-i18next';
+import { useCallback, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
-import {
-	getEnsemblrApi,
-	invalidateWorkspaceListViews,
-} from '@/renderer/api/ensemblr';
+import { invalidateWorkspaceListViews } from '@/renderer/api/ensemblr';
 import { FilesToCopySetting } from '@/renderer/components/settings/repo-misc/files-to-copy-setting';
 import { PreviewUrlsSetting } from '@/renderer/components/settings/repo-misc/preview-urls-setting';
 import { SettingRow } from '@/renderer/components/settings/setting-row';
 import { SettingsCodeValue } from '@/renderer/components/settings/settings-code-value';
 import { SettingsSection } from '@/renderer/components/settings/settings-section';
 import { Button } from '@/renderer/components/ui/button';
-import {
-	Dialog,
-	DialogClose,
-	DialogContent,
-	DialogDescription,
-	DialogFooter,
-	DialogHeader,
-	DialogTitle,
-	DialogTrigger,
-} from '@/renderer/components/ui/dialog';
+import { DeleteRepositoryDialog } from '@/renderer/components/workbench-shell/delete-repository-dialog';
 import { useRepoSettings } from '@/renderer/hooks/use-repo-settings';
 import { useRepoSettingsWriter } from '@/renderer/hooks/use-repo-settings-writer';
 import type { RepositoryPreviewUrl } from '@/shared/ipc/contracts/repository-settings';
@@ -59,7 +47,7 @@ export const Route = createFileRoute('/_workbench/settings/repo/$repoId/misc')({
 	component: RepoMiscSettings,
 });
 
-/** Repository-scoped Misc settings panel for root/workspace paths, preview URLs, files-to-copy globs, and repository removal. */
+/** Repository-scoped Misc settings panel for root/workspace paths, preview URLs, files-to-copy globs, and repository deletion. */
 function RepoMiscSettings() {
 	const { t } = useTranslation();
 	const { repoId } = Route.useParams();
@@ -67,18 +55,12 @@ function RepoMiscSettings() {
 	const save = useRepoSettingsWriter(repoId, project);
 	const navigate = useNavigate();
 	const queryClient = useQueryClient();
-	const [removeError, setRemoveError] = useState<string | null>(null);
+	const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
-	const remove = useMutation({
-		mutationFn: () =>
-			getEnsemblrApi().archiveRepository({ repositoryId: repoId }),
-		onSuccess: async () => {
-			await invalidateWorkspaceListViews(queryClient);
-			navigate({ to: '/settings/general' });
-		},
-		onError: (error) =>
-			setRemoveError(error instanceof Error ? error.message : String(error)),
-	});
+	const handleDeleted = useCallback(async () => {
+		await invalidateWorkspaceListViews(queryClient);
+		navigate({ to: '/settings/general' });
+	}, [navigate, queryClient]);
 
 	const seededPreviewUrls = personalPreviewUrls(resolved('previewUrls'));
 	const seededFilesToCopy = personalFilesToCopy(resolved('filesToCopy'));
@@ -94,7 +76,7 @@ function RepoMiscSettings() {
 			<SettingRow
 				description={t(
 					'settings:repo.root-path.description',
-					'Do not move or delete this directory. Instead, remove the repository in Ensemblr.',
+					'Do not move or delete this directory. Instead, delete the repository in Ensemblr.',
 				)}
 				label={t('settings:repo.root-path.label', 'Root path')}
 				stack
@@ -129,54 +111,28 @@ function RepoMiscSettings() {
 
 			<SettingRow
 				control={
-					<Dialog>
-						<DialogTrigger asChild>
-							<Button size='sm' variant='destructive'>
-								<Trash2Icon aria-hidden='true' data-icon='inline-start' />
-								{t('settings:repo.remove.trigger', 'Remove repository')}
-							</Button>
-						</DialogTrigger>
-						<DialogContent>
-							<DialogHeader>
-								<DialogTitle>
-									{t('settings:repo.remove.title', 'Remove this repository?')}
-								</DialogTitle>
-								<DialogDescription>
-									<Trans
-										components={{
-											path: <code className='mx-1 font-mono text-xs' />,
-										}}
-										defaults='Removes the repository from Ensemblr. The on-disk directory at<path>{{path}}</path>is not deleted; delete it manually if you want it gone.'
-										i18nKey='settings:repo.remove.description'
-										values={{ path: project?.pathLabel ?? '' }}
-									/>
-								</DialogDescription>
-							</DialogHeader>
-							{removeError ? (
-								<p className='text-status-danger text-xs'>{removeError}</p>
-							) : null}
-							<DialogFooter>
-								<DialogClose asChild>
-									<Button variant='ghost'>
-										{t('common:actions.cancel', 'Cancel')}
-									</Button>
-								</DialogClose>
-								<Button
-									onClick={() => remove.mutate()}
-									pending={remove.isPending}
-									variant='destructive'
-								>
-									{t('common:actions.remove', 'Remove')}
-								</Button>
-							</DialogFooter>
-						</DialogContent>
-					</Dialog>
+					<Button
+						disabled={!project}
+						onClick={() => setIsDeleteDialogOpen(true)}
+						size='sm'
+						variant='destructive'
+					>
+						<Trash2Icon aria-hidden='true' data-icon='inline-start' />
+						{t('settings:repo.delete.trigger', 'Delete repository')}
+					</Button>
 				}
 				description={t(
-					'settings:repo.remove.row-description',
-					'Drops this repository from Ensemblr. Workspaces stop being tracked; nothing on disk is deleted.',
+					'settings:repo.delete.row-description',
+					'Drops this repository from Ensemblr and deletes every workspace worktree. The repository folder stays on disk.',
 				)}
-				label={t('settings:repo.remove.row-label', 'Remove repository')}
+				label={t('settings:repo.delete.row-label', 'Delete repository')}
+			/>
+
+			<DeleteRepositoryDialog
+				onDeleted={handleDeleted}
+				onOpenChange={setIsDeleteDialogOpen}
+				open={isDeleteDialogOpen}
+				project={project ?? null}
 			/>
 		</SettingsSection>
 	);

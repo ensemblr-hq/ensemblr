@@ -9,8 +9,8 @@ import {
 } from '@/renderer/components/ui/sidebar';
 import {
 	useArchiveBrowseChange,
-	useArchiveProjectAction,
 	useCreateWorkspaceFromProject,
+	useDeleteProjectAction,
 } from '@/renderer/hooks/workbench-shell/navigation-sidebar/use-project-navigation-actions';
 import { useRemoveWorkspaceAction } from '@/renderer/hooks/workbench-shell/use-remove-workspace-action';
 import {
@@ -74,7 +74,6 @@ export function ProjectNavigationGroups({
 
 	const {
 		controller,
-		setArchiveProjectTarget,
 		setArchiveWorkspaceTarget,
 		setBrowseArchiveProject,
 		setCreateSourceProject,
@@ -83,15 +82,15 @@ export function ProjectNavigationGroups({
 		state,
 	} = useProjectNavigationDialogs();
 
-	// Lifecycle archive + destructive delete share the same post-action cache
+	// A workspace archive and a workspace delete share the same post-action cache
 	// invalidation + navigation fallback. The dialogs decide which IPC ran; the
-	// callback only sees the workspace/project id that disappeared from the
-	// active surface.
+	// callback only sees the workspace id that disappeared from the active
+	// surface.
 	const handleWorkspaceLifecycleAction = useRemoveWorkspaceAction({
 		activeWorkspaceId: activeWorkspace?.id ?? null,
 	});
 
-	const handleProjectLifecycleAction = useArchiveProjectAction({
+	const handleProjectDeleted = useDeleteProjectAction({
 		activeProjectId: activeProject?.id ?? null,
 	});
 
@@ -194,9 +193,6 @@ export function ProjectNavigationGroups({
 							onCreateWorkspaceSelect={() => {
 								void handleCreateWorkspace(project);
 							}}
-							onProjectArchiveSelect={() =>
-								controller.openArchiveProject(project)
-							}
 							onProjectBrowseArchiveSelect={() =>
 								controller.openBrowseArchive(project)
 							}
@@ -224,7 +220,6 @@ export function ProjectNavigationGroups({
 			</ReorderList>
 
 			<ProjectNavigationDialogs
-				archiveProjectTarget={state.archiveProjectTarget}
 				archiveWorkspaceTarget={state.archiveWorkspaceTarget}
 				browseArchiveProject={state.browseArchiveProject}
 				createSourceProject={state.createSourceProject}
@@ -237,12 +232,10 @@ export function ProjectNavigationGroups({
 				onOpenWorkspace={(project, workspaceId) => {
 					onWorkspaceSelect(project.id, workspaceId);
 				}}
-				onProjectArchived={handleProjectLifecycleAction}
-				onProjectDeleted={handleProjectLifecycleAction}
+				onProjectDeleted={handleProjectDeleted}
 				onWorkspaceArchived={handleWorkspaceLifecycleAction.archived}
 				onWorkspaceDeleted={handleWorkspaceLifecycleAction.deleted}
 				orderedProjects={orderedProjects}
-				setArchiveProjectTarget={setArchiveProjectTarget}
 				setArchiveWorkspaceTarget={setArchiveWorkspaceTarget}
 				setBrowseArchiveProject={setBrowseArchiveProject}
 				setCreateSourceProject={setCreateSourceProject}

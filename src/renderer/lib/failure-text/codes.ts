@@ -8,7 +8,6 @@ import type { InfisicalFailureCode } from '@/shared/ipc/contracts/infisical';
 import type { LinearAuthFailureCode } from '@/shared/ipc/contracts/linear';
 import type { QuickStartProjectDiagnosticCode } from '@/shared/ipc/contracts/quick-start';
 import type {
-	ArchiveRepositoryDiagnosticCode,
 	DeleteRepositoryDiagnosticCode,
 	RegisterLocalRepositoryDiagnosticCode,
 } from '@/shared/ipc/contracts/repository';
@@ -42,7 +41,6 @@ import type { WorkspaceGitFailureCode } from '@/shared/ipc/contracts/workspace-g
  * union, which is what keeps the same failure worded the same way everywhere.
  */
 export type AppFailureCode =
-	| ArchiveRepositoryDiagnosticCode
 	| ArchiveWorkspaceDiagnosticCode
 	| CheckpointFailureCode
 	| CloneGithubRepositoryDiagnosticCode
@@ -684,11 +682,6 @@ export const APP_FAILURE_TEXT: Record<
 			'errors:failure.repositories-path-missing',
 			'The managed root has no workspaces directory. Configure the root directory first.',
 		),
-	'repository-already-archived': (t) =>
-		t(
-			'errors:failure.repository-already-archived',
-			'That repository is already archived.',
-		),
 	'repository-already-registered': (t) =>
 		t(
 			'errors:failure.repository-already-registered',
@@ -757,11 +750,6 @@ export const APP_FAILURE_TEXT: Record<
 		t(
 			'errors:failure.repository-scan-failed',
 			'The repository could not be scanned.',
-		),
-	'repository-update-failed': (t) =>
-		t(
-			'errors:failure.repository-update-failed',
-			'The repository record could not be updated.',
 		),
 	'restore-failed': (t) =>
 		t('errors:failure.restore-failed', 'The restore failed.'),
@@ -833,11 +821,6 @@ export const APP_FAILURE_TEXT: Record<
 		t(
 			'errors:failure.workspace-already-archived',
 			'That workspace is already archived.',
-		),
-	'workspace-archive-failed': (t) =>
-		t(
-			'errors:failure.workspace-archive-failed',
-			'A workspace could not be archived.',
 		),
 	'workspace-branch-collision': (t) =>
 		t(

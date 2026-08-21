@@ -48,7 +48,12 @@ export function settingsResolutionQuery(
 	});
 }
 
-/** Query options for the repository's archive-after-merge policy settings. */
+/**
+ * Query options for the repository's resolved git lifecycle settings — the
+ * archive-after-merge policy, whether archiving drops the local branch, and
+ * whether a push sets upstream. Read by the merge flow and by the archive
+ * confirmation dialog, which resolves against the worktree being archived.
+ */
 export function reviewMergeSettingsQuery(
 	repository: { repositoryId: string; repositoryPath: string } | null,
 ) {
@@ -77,6 +82,7 @@ export function reviewMergeSettingsQuery(
 		},
 		queryKey: ensemblrQueryKeys.reviewMergeSettings(
 			repository?.repositoryId ?? '',
+			repository?.repositoryPath ?? '',
 		),
 		staleTime: 30_000,
 	});

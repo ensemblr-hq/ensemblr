@@ -923,6 +923,18 @@ CREATE TABLE linear_sync_state (
 ALTER TABLE linear_issues ADD COLUMN comments_synced_at TEXT;
 `,
 	},
+	{
+		id: '021_restore_archived_repositories',
+		version: 21,
+		// Archiving a repository was removed (ADR 0027 amendment): nothing writes
+		// `repositories.archived_at` any more, but the navigation snapshot still
+		// hides every row that carries one. Left alone, a repository archived by an
+		// earlier build is invisible with no surface left that could bring it back.
+		// The column stays for the `archive_records` history that references it.
+		sql: `
+UPDATE repositories SET archived_at = NULL WHERE archived_at IS NOT NULL;
+`,
+	},
 ];
 
 /** Highest declared migration version embedded in this build. */

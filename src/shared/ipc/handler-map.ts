@@ -135,8 +135,6 @@ import type {
 	QuickStartProjectResult,
 } from './contracts/quick-start';
 import type {
-	ArchiveRepositoryRequest,
-	ArchiveRepositoryResult,
 	DeleteRepositoryRequest,
 	DeleteRepositoryResult,
 	LocalRepositorySelectionResult,
@@ -262,10 +260,6 @@ interface IpcHandlerEntry<Req, Res> {
  * also use `void` for `req` and put the wire envelope in `res`.
  */
 export interface IpcHandlerMap {
-	[IPC_CHANNELS.archiveRepository]: IpcHandlerEntry<
-		ArchiveRepositoryRequest,
-		ArchiveRepositoryResult
-	>;
 	[IPC_CHANNELS.archiveWorkspace]: IpcHandlerEntry<
 		ArchiveWorkspaceRequest,
 		ArchiveWorkspaceResult

@@ -729,7 +729,6 @@ export default interface Resources {
 			'register-failed': 'The repository could not be registered.';
 			'remote-already-registered': 'This repository is already registered with Ensemblr.';
 			'repositories-path-missing': 'The managed root has no workspaces directory. Configure the root directory first.';
-			'repository-already-archived': 'That repository is already archived.';
 			'repository-already-registered': 'This repository is already registered with Ensemblr.';
 			'repository-copy-failed': 'The repository could not be copied.';
 			'repository-copy-target-inside-source': 'Choose a project outside the managed root — the destination would be inside the folder you picked.';
@@ -745,7 +744,6 @@ export default interface Resources {
 			'repository-permission-denied': 'Permission was denied for that repository.';
 			'repository-remote-already-registered': 'Another registered repository already tracks this remote. Remove it before re-adding.';
 			'repository-scan-failed': 'The repository could not be scanned.';
-			'repository-update-failed': 'The repository record could not be updated.';
 			'restore-failed': 'The restore failed.';
 			'root-create-failed': 'The root directory could not be created.';
 			'root-missing': 'The configured root directory does not exist.';
@@ -779,7 +777,6 @@ export default interface Resources {
 			'url-invalid': 'That repository URL is not valid.';
 			'url-required': 'Enter a repository URL.';
 			'workspace-already-archived': 'That workspace is already archived.';
-			'workspace-archive-failed': 'A workspace could not be archived.';
 			'workspace-branch-collision': 'Several workspaces in this repository share one branch.';
 			'workspace-cleanup-failed': 'The workspace could not be cleaned up.';
 			'workspace-delete-failed': 'The workspace could not be deleted.';
@@ -1777,7 +1774,7 @@ export default interface Resources {
 				none: 'None';
 			};
 			'delete-branch': {
-				description: 'Delete the local branch when archiving a workspace. To delete the remote branch, configure it on GitHub.';
+				description: 'Remove the worktree and delete the local branch whenever a workspace is archived, from the archive dialog and after a merge alike. To delete the remote branch, configure it on GitHub.';
 				label: 'Delete branch on archive';
 			};
 			description: 'Workspace branch defaults and lifecycle behavior. Repository-scope overrides win when set.';
@@ -2078,8 +2075,13 @@ export default interface Resources {
 				'repository-default': 'Repository default';
 				'search-placeholder': 'Search or enter a ref…';
 			};
+			delete: {
+				'row-description': 'Drops this repository from Ensemblr and deletes every workspace worktree. The repository folder stays on disk.';
+				'row-label': 'Delete repository';
+				trigger: 'Delete repository';
+			};
 			'delete-branch': {
-				description: 'Delete the local branch when archiving a workspace. Overrides your user-scope default for this repo.';
+				description: 'Remove the worktree and delete the local branch whenever a workspace is archived. Overrides your user-scope default for this repo.';
 				label: 'Delete branch on archive';
 			};
 			environment: {
@@ -2147,15 +2149,8 @@ export default interface Resources {
 				'name-placeholder': 'Name';
 				'template-aria-label': 'Preview URL template';
 			};
-			remove: {
-				description: 'Removes the repository from Ensemblr. The on-disk directory at<path>{{path}}</path>is not deleted; delete it manually if you want it gone.';
-				'row-description': 'Drops this repository from Ensemblr. Workspaces stop being tracked; nothing on disk is deleted.';
-				'row-label': 'Remove repository';
-				title: 'Remove this repository?';
-				trigger: 'Remove repository';
-			};
 			'root-path': {
-				description: 'Do not move or delete this directory. Instead, remove the repository in Ensemblr.';
+				description: 'Do not move or delete this directory. Instead, delete the repository in Ensemblr.';
 				label: 'Root path';
 			};
 			'run-mode': {
@@ -2341,20 +2336,10 @@ export default interface Resources {
 			placeholder: 'Search files';
 			title: 'Search files';
 		};
-		'archive-repository': {
-			cleanup: {
-				description: 'The per-workspace <0>.context/</0> handoff files are preserved; anything else not pushed will be lost.';
-				label: 'Also remove each worktree and drop its local branch';
-			};
-			description: "Marks the repository and {{workspaces}} as archived. Each workspace's <0>.context/</0> handoff files are preserved under <1>archived-contexts/</1>. Worktrees and the repository folder stay on disk.";
-			title: 'Archive repository?';
-		};
 		'archive-workspace': {
-			cleanup: {
-				description: 'The <0>.context/</0> handoff files are preserved; anything else not pushed to the remote will be lost.';
-				label: 'Also remove the worktree and drop the local branch';
-			};
-			description: 'Marks the workspace as archived and preserves its <0>.context/</0> handoff files under <1>archived-contexts/</1>. By default the worktree folder and local branch stay on disk; nothing is committed or pushed.';
+			'description-cleanup': 'Marks the workspace as archived and preserves its <0>.context/</0> handoff files under <1>archived-contexts/</1>. The worktree folder is removed and the local branch dropped, per your git settings; anything else not pushed to the remote will be lost.';
+			'description-keep': 'Marks the workspace as archived and preserves its <0>.context/</0> handoff files under <1>archived-contexts/</1>. The worktree folder and local branch stay on disk; nothing is committed or pushed.';
+			'settings-unavailable': 'Your git settings could not be read, so the worktree folder and local branch will be kept.';
 			title: 'Archive workspace?';
 		};
 		'attach-to-chat': {
@@ -3204,7 +3189,6 @@ export default interface Resources {
 			settings: 'Repository settings for {{repository}}';
 		};
 		'repository-menu': {
-			archive: 'Archive repository';
 			'aria-label': '{{repository}} repository actions';
 			'create-from': 'Create from…';
 			delete: 'Delete repository…';

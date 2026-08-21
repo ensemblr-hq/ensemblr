@@ -72,65 +72,6 @@ export interface LocalRepositorySelectionResult {
 }
 
 /**
- * Lifecycle archive of a repository. Sets `repositories.archived_at`, archives
- * every child workspace through the same hook pipeline as a standalone
- * workspace archive, and records the lifecycle decision so ENS-038 / ENS-060
- * subscribers can act on it later. Worktree folders and branches are preserved
- * unless the request opts into `branchCleanup` (and each workspace already
- * confirmed that choice upstream).
- */
-export type ArchiveRepositoryDiagnosticCode =
-	| 'archive-aborted-by-hook'
-	| 'database-unavailable'
-	| 'lifecycle-hook-failed'
-	| 'repository-already-archived'
-	| 'repository-id-required'
-	| 'repository-not-found'
-	| 'repository-update-failed'
-	| 'workspace-archive-failed';
-
-/** Severity level of a repository-archive diagnostic. */
-export type ArchiveRepositoryDiagnosticSeverity = 'error' | 'info' | 'warning';
-
-/** A single diagnostic emitted while archiving a repository. */
-export interface ArchiveRepositoryDiagnostic {
-	code: ArchiveRepositoryDiagnosticCode;
-	message: string;
-	path?: string;
-	severity: ArchiveRepositoryDiagnosticSeverity;
-	workspaceId?: string;
-}
-
-/** Request to archive a repository and its workspaces. */
-export interface ArchiveRepositoryRequest {
-	branchCleanup?: boolean;
-	reason?: string;
-	repositoryId: string;
-}
-
-/** Outcome status of a repository-archive attempt. */
-export type ArchiveRepositoryStatus = 'aborted' | 'failure' | 'success';
-
-/** Wire snapshot of a repository after it has been archived. */
-export interface ArchivedRepositorySnapshot {
-	archivedAt: string;
-	archivedWorkspaceIds: string[];
-	id: string;
-	name: string;
-	path: string;
-	slug: string;
-}
-
-/** Result of archiving a repository, with diagnostics and the count of archived workspaces. */
-export interface ArchiveRepositoryResult {
-	archiveRecordId: string | null;
-	diagnostics: ArchiveRepositoryDiagnostic[];
-	repository: ArchivedRepositorySnapshot | null;
-	status: ArchiveRepositoryStatus;
-	workspacesArchived: number;
-}
-
-/**
  * Destructive removal of a repository and all its workspaces. Wipes worktrees,
  * drops branches, deletes rows, and writes the `.ensemblr-archived` sentinel
  * so the shared-root reconciler skips the still-on-disk folder on next launch.

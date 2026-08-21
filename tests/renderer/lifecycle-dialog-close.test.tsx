@@ -5,7 +5,6 @@ import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { ArchiveRepositoryDialog } from '@/renderer/components/workbench-shell/archive-repository-dialog';
 import { ArchiveWorkspaceDialog } from '@/renderer/components/workbench-shell/archive-workspace-dialog';
 import { DeleteRepositoryDialog } from '@/renderer/components/workbench-shell/delete-repository-dialog';
 import { DeleteWorkspaceDialog } from '@/renderer/components/workbench-shell/delete-workspace-dialog';
@@ -58,7 +57,7 @@ function Host({
 	target,
 	targetId,
 }: {
-	// biome-ignore lint/suspicious/noExplicitAny: one host drives all four dialogs
+	// biome-ignore lint/suspicious/noExplicitAny: one host drives every dialog
 	Component: any;
 	onSucceeded: () => Promise<void> | void;
 	target: 'project' | 'workspace';
@@ -120,6 +119,44 @@ function never(): Promise<void> {
 }
 
 /**
+ * Installs the stub bridge with every channel the lifecycle dialogs reach,
+ * `resolveSettings` included — the archive dialog reads the repository's
+ * branch-cleanup policy before it will let the user archive.
+ */
+function installLifecycleApi(overrides: Record<string, unknown> = {}): void {
+	installEnsemblrApi({
+		archiveWorkspace: () =>
+			Promise.resolve({ diagnostics: [], status: 'success' }),
+		deleteRepository: () =>
+			Promise.resolve({ diagnostics: [], status: 'success' }),
+		deleteWorkspace: () =>
+			Promise.resolve({ diagnostics: [], status: 'success' }),
+		resolveSettings: () =>
+			Promise.resolve({
+				repository: {
+					settings: [
+						{
+							key: 'deleteLocalBranchOnArchive',
+							source: 'default',
+							value: false,
+						},
+					],
+				},
+			}),
+		...overrides,
+	});
+}
+
+/** Clicks a lifecycle dialog's action button once it is enabled. */
+async function clickAction(name: RegExp): Promise<void> {
+	const action = screen.getByRole('button', { name });
+	await waitFor(() => {
+		expect(action).not.toBeDisabled();
+	});
+	await userEvent.click(action);
+}
+
+/**
  * Finds a footer button by name. Scoped to the footer because `DialogContent`
  * renders its own corner dismiss with the screen-reader name "Close", which
  * would otherwise tie with the footer's own once the run is in flight.
@@ -142,16 +179,7 @@ function hasFooterButton(name: RegExp): boolean {
 
 describe('lifecycle dialogs close independently of post-removal navigation', () => {
 	beforeEach(() => {
-		installEnsemblrApi({
-			archiveRepository: () =>
-				Promise.resolve({ diagnostics: [], status: 'success' }),
-			archiveWorkspace: () =>
-				Promise.resolve({ diagnostics: [], status: 'success' }),
-			deleteRepository: () =>
-				Promise.resolve({ diagnostics: [], status: 'success' }),
-			deleteWorkspace: () =>
-				Promise.resolve({ diagnostics: [], status: 'success' }),
-		});
+		installLifecycleApi();
 	});
 
 	afterEach(() => {
@@ -168,7 +196,6 @@ describe('lifecycle dialogs close independently of post-removal navigation', () 
 		['delete workspace', DeleteWorkspaceDialog, 'workspace', /^delete$/i],
 		['archive workspace', ArchiveWorkspaceDialog, 'workspace', /^archive$/i],
 		['delete repository', DeleteRepositoryDialog, 'project', /^delete$/i],
-		['archive repository', ArchiveRepositoryDialog, 'project', /^archive$/i],
 	] as const)(
 		'removes the %s dialog from the DOM when the post-removal work never settles',
 		async (_name, Component, target, buttonName) => {
@@ -176,7 +203,7 @@ describe('lifecycle dialogs close independently of post-removal navigation', () 
 				<Host Component={Component} onSucceeded={never} target={target} />,
 			);
 
-			await userEvent.click(screen.getByRole('button', { name: buttonName }));
+			await clickAction(buttonName);
 
 			await waitFor(() => {
 				expect(screen.queryByRole('dialog')).toBeNull();
@@ -193,7 +220,6 @@ describe('lifecycle dialogs close independently of post-removal navigation', () 
 		['delete workspace', DeleteWorkspaceDialog, 'workspace', /^delete$/i],
 		['archive workspace', ArchiveWorkspaceDialog, 'workspace', /^archive$/i],
 		['delete repository', DeleteRepositoryDialog, 'project', /^delete$/i],
-		['archive repository', ArchiveRepositoryDialog, 'project', /^archive$/i],
 	] as const)(
 		'has the %s dialog off screen by the time the post-removal work starts',
 		async (_name, Component, target, buttonName) => {
@@ -209,7 +235,7 @@ describe('lifecycle dialogs close independently of post-removal navigation', () 
 				/>,
 			);
 
-			await userEvent.click(screen.getByRole('button', { name: buttonName }));
+			await clickAction(buttonName);
 
 			await waitFor(() => {
 				expect(dialogAtHandoff).not.toBe('not called');
@@ -246,19 +272,11 @@ describe('lifecycle dialogs close independently of post-removal navigation', () 
 			/^delete$/i,
 			'delete-repository-diagnostics',
 		],
-		[
-			'archive repository',
-			ArchiveRepositoryDialog,
-			'project',
-			'archiveRepository',
-			/^archive$/i,
-			'archive-repository-diagnostics',
-		],
 	] as const)(
 		'shows a diagnostic and stays usable when the %s call rejects',
 		async (_name, Component, target, channel, buttonName, diagnosticsTestId) => {
 			const onSettled = vi.fn();
-			installEnsemblrApi({
+			installLifecycleApi({
 				[channel]: () => Promise.reject(new Error('Permission denied')),
 			});
 
@@ -266,7 +284,7 @@ describe('lifecycle dialogs close independently of post-removal navigation', () 
 				<Host Component={Component} onSucceeded={onSettled} target={target} />,
 			);
 
-			await userEvent.click(screen.getByRole('button', { name: buttonName }));
+			await clickAction(buttonName);
 
 			expect(await screen.findByTestId(diagnosticsTestId)).toBeTruthy();
 			expect(screen.getByRole('dialog')).toBeTruthy();
@@ -292,18 +310,11 @@ describe('lifecycle dialogs close independently of post-removal navigation', () 
 			'archiveWorkspace',
 			'archive-workspace-diagnostics',
 		],
-		[
-			'repository',
-			ArchiveRepositoryDialog,
-			'project',
-			'archiveRepository',
-			'archive-repository-diagnostics',
-		],
 	] as const)(
 		'keeps the %s archive dialog open when a hook aborts the run',
 		async (_name, Component, target, channel, diagnosticsTestId) => {
 			const onSettled = vi.fn();
-			installEnsemblrApi({
+			installLifecycleApi({
 				[channel]: () =>
 					Promise.resolve({
 						diagnostics: [
@@ -321,7 +332,7 @@ describe('lifecycle dialogs close independently of post-removal navigation', () 
 				<Host Component={Component} onSucceeded={onSettled} target={target} />,
 			);
 
-			await userEvent.click(screen.getByRole('button', { name: /^archive$/i }));
+			await clickAction(/^archive$/i);
 
 			expect(await screen.findByTestId(diagnosticsTestId)).toBeTruthy();
 			expect(screen.getByRole('dialog')).toBeTruthy();
@@ -356,17 +367,10 @@ describe('lifecycle dialogs close independently of post-removal navigation', () 
 			'deleteRepository',
 			/^delete$/i,
 		],
-		[
-			'archive repository',
-			ArchiveRepositoryDialog,
-			'project',
-			'archiveRepository',
-			/^archive$/i,
-		],
 	] as const)(
 		'offers Close rather than Cancel while the %s run is in flight',
 		async (name, Component, target, channel, buttonName) => {
-			installEnsemblrApi({ [channel]: () => never() });
+			installLifecycleApi({ [channel]: () => never() });
 
 			renderWithProviders(
 				<Host
@@ -379,7 +383,7 @@ describe('lifecycle dialogs close independently of post-removal navigation', () 
 
 			expect(footerButton(/^cancel$/i)).toBeTruthy();
 
-			await userEvent.click(screen.getByRole('button', { name: buttonName }));
+			await clickAction(buttonName);
 
 			await waitFor(() => {
 				expect(hasFooterButton(/^close$/i)).toBe(true);
@@ -394,7 +398,7 @@ describe('lifecycle dialogs close independently of post-removal navigation', () 
 	// dialog happily fires a second destructive IPC over the first.
 	it('starts no second delete when the dialog is dismissed mid-run and reopened', async () => {
 		const deleteWorkspace = vi.fn(() => never());
-		installEnsemblrApi({ deleteWorkspace });
+		installLifecycleApi({ deleteWorkspace });
 
 		renderWithProviders(
 			<ReopenableHost onDeleted={vi.fn()} targetId='ws-reopened' />,
@@ -422,7 +426,7 @@ describe('lifecycle dialogs close independently of post-removal navigation', () 
 	// and will not say so is indistinguishable from a frozen app.
 	it('reports the blocked retry instead of leaving the button dead', async () => {
 		const deleteWorkspace = vi.fn(() => never());
-		installEnsemblrApi({ deleteWorkspace });
+		installLifecycleApi({ deleteWorkspace });
 
 		renderWithProviders(
 			<ReopenableHost onDeleted={vi.fn()} targetId='ws-latched' />,
@@ -456,7 +460,7 @@ describe('lifecycle dialogs close independently of post-removal navigation', () 
 		const deleteWorkspace = vi.fn(() =>
 			Promise.resolve({ diagnostics: [], status: 'success' }),
 		);
-		installEnsemblrApi({ deleteWorkspace });
+		installLifecycleApi({ deleteWorkspace });
 
 		renderWithProviders(
 			<Host
@@ -525,23 +529,16 @@ describe('lifecycle dialogs close independently of post-removal navigation', () 
 		},
 	);
 
-	it.each([
-		['delete', DeleteRepositoryDialog],
-		['archive', ArchiveRepositoryDialog],
-	])(
-		'renders no repository %s dialog when open with a null project',
-		(_name, Component) => {
-			renderWithProviders(
-				<Component
-					onArchived={vi.fn()}
-					onDeleted={vi.fn()}
-					onOpenChange={vi.fn()}
-					open={true}
-					project={null}
-				/>,
-			);
+	it('renders no repository delete dialog when open with a null project', () => {
+		renderWithProviders(
+			<DeleteRepositoryDialog
+				onDeleted={vi.fn()}
+				onOpenChange={vi.fn()}
+				open={true}
+				project={null}
+			/>,
+		);
 
-			expect(screen.queryByRole('dialog')).toBeNull();
-		},
-	);
+		expect(screen.queryByRole('dialog')).toBeNull();
+	});
 });

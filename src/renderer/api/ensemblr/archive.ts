@@ -2,10 +2,6 @@ import { queryOptions } from '@tanstack/react-query';
 
 import { profileElectronIpcCall } from '@/renderer/lib/instrumentation';
 import type {
-	ArchiveRepositoryRequest,
-	ArchiveRepositoryResult,
-} from '@/shared/ipc/contracts/repository';
-import type {
 	ArchiveWorkspaceRequest,
 	ArchiveWorkspaceResult,
 	DeleteArchivedWorkspaceRequest,
@@ -28,20 +24,6 @@ export function archiveWorkspace(
 	return profileElectronIpcCall(
 		{ channel: 'ensemblr:archive-workspace', usesDatabase: true },
 		() => getEnsemblrApi().archiveWorkspace(request),
-	);
-}
-
-/**
- * Lifecycle archive of a repository: cascades the workspace archive flow to
- * every child workspace, stamps `repositories.archived_at`, and records the
- * decision in `archive_records`.
- */
-export function archiveRepository(
-	request: ArchiveRepositoryRequest,
-): Promise<ArchiveRepositoryResult> {
-	return profileElectronIpcCall(
-		{ channel: 'ensemblr:archive-repository', usesDatabase: true },
-		() => getEnsemblrApi().archiveRepository(request),
 	);
 }
 

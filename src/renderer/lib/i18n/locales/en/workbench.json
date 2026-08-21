@@ -30,20 +30,10 @@
 		"placeholder": "Search files",
 		"title": "Search files"
 	},
-	"archive-repository": {
-		"cleanup": {
-			"description": "The per-workspace <0>.context/</0> handoff files are preserved; anything else not pushed will be lost.",
-			"label": "Also remove each worktree and drop its local branch"
-		},
-		"description": "Marks the repository and {{workspaces}} as archived. Each workspace's <0>.context/</0> handoff files are preserved under <1>archived-contexts/</1>. Worktrees and the repository folder stay on disk.",
-		"title": "Archive repository?"
-	},
 	"archive-workspace": {
-		"cleanup": {
-			"description": "The <0>.context/</0> handoff files are preserved; anything else not pushed to the remote will be lost.",
-			"label": "Also remove the worktree and drop the local branch"
-		},
-		"description": "Marks the workspace as archived and preserves its <0>.context/</0> handoff files under <1>archived-contexts/</1>. By default the worktree folder and local branch stay on disk; nothing is committed or pushed.",
+		"description-cleanup": "Marks the workspace as archived and preserves its <0>.context/</0> handoff files under <1>archived-contexts/</1>. The worktree folder is removed and the local branch dropped, per your git settings; anything else not pushed to the remote will be lost.",
+		"description-keep": "Marks the workspace as archived and preserves its <0>.context/</0> handoff files under <1>archived-contexts/</1>. The worktree folder and local branch stay on disk; nothing is committed or pushed.",
+		"settings-unavailable": "Your git settings could not be read, so the worktree folder and local branch will be kept.",
 		"title": "Archive workspace?"
 	},
 	"attach-to-chat": {
@@ -893,7 +883,6 @@
 		"settings": "Repository settings for {{repository}}"
 	},
 	"repository-menu": {
-		"archive": "Archive repository",
 		"aria-label": "{{repository}} repository actions",
 		"create-from": "Create from…",
 		"delete": "Delete repository…",

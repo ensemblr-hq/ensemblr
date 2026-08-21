@@ -33,15 +33,15 @@ vi.mock('@/renderer/api/ensemblr-queries', () => ({
 
 vi.mock('@/renderer/api/query-client', () => ({ queryClient }));
 
-import { useArchiveProjectAction } from '../../src/renderer/hooks/workbench-shell/navigation-sidebar/use-project-navigation-actions';
+import { useDeleteProjectAction } from '../../src/renderer/hooks/workbench-shell/navigation-sidebar/use-project-navigation-actions';
 
 beforeEach(() => {
 	vi.clearAllMocks();
 });
 
-test('redirects to Welcome when the archived project is the active one', async () => {
+test('redirects to Welcome when the deleted project is the active one', async () => {
 	const view = renderHook(() =>
-		useArchiveProjectAction({ activeProjectId: 'repo-1' }),
+		useDeleteProjectAction({ activeProjectId: 'repo-1' }),
 	);
 
 	await act(async () => {
@@ -53,9 +53,9 @@ test('redirects to Welcome when the archived project is the active one', async (
 	expect(routerInvalidate).toHaveBeenCalledTimes(1);
 });
 
-test('leaves navigation untouched when a background project is archived', async () => {
+test('leaves navigation untouched when a background project is deleted', async () => {
 	const view = renderHook(() =>
-		useArchiveProjectAction({ activeProjectId: 'repo-1' }),
+		useDeleteProjectAction({ activeProjectId: 'repo-1' }),
 	);
 
 	await act(async () => {
@@ -69,7 +69,7 @@ test('leaves navigation untouched when a background project is archived', async 
 
 test('still refreshes list views when there is no active project', async () => {
 	const view = renderHook(() =>
-		useArchiveProjectAction({ activeProjectId: null }),
+		useDeleteProjectAction({ activeProjectId: null }),
 	);
 
 	await act(async () => {

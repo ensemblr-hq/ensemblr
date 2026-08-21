@@ -3,10 +3,10 @@ import { useTranslation } from 'react-i18next';
 import { failureDetail, failureText } from '@/renderer/lib/failure-text';
 
 /**
- * Shared diagnostics list shown by both `ArchiveRepositoryDialog` and
- * `ArchiveWorkspaceDialog` on failure. Generic over the diagnostic shape so
- * neither caller needs to coerce; both archive diagnostic types satisfy the
- * `{ code, message, path? }` minimum.
+ * Shared diagnostics list every lifecycle surface shows on failure — the
+ * archive and delete dialogs, the browse-archive list, and a History row.
+ * Generic over the diagnostic shape so no caller needs to coerce; every
+ * lifecycle diagnostic type satisfies the `{ code, message, path? }` minimum.
  */
 interface ArchiveDiagnosticItem {
 	code: string;
@@ -14,7 +14,7 @@ interface ArchiveDiagnosticItem {
 	path?: string;
 }
 
-/** Renders the shared archive diagnostics list used by the repository and workspace archive dialogs on failure. */
+/** Renders the shared lifecycle diagnostics list used by the archive, delete, and browse-archive surfaces on failure. */
 export function ArchiveDiagnosticsList<T extends ArchiveDiagnosticItem>({
 	diagnostics,
 	testId,

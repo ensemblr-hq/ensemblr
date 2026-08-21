@@ -29,7 +29,6 @@ import type { OpenTargetService } from '../open-target';
 import type { PiExecutableService } from '../pi-runtime';
 import type { PlanModeRegistry } from '../plan-mode';
 import type {
-	ArchiveRepositoryService,
 	ArchiveWorkspaceService,
 	ContinueWorkspaceBranchService,
 	CreateWorkspaceService,
@@ -105,7 +104,6 @@ import {
 interface RegisterIpcHandlersOptions {
 	agentProviderService: AgentProviderService;
 	appSettingsService: AppSettingsService;
-	archiveRepositoryService: ArchiveRepositoryService;
 	archiveWorkspaceService: ArchiveWorkspaceService;
 	configService: EnsemblrConfigService;
 	continueWorkspaceBranchService: ContinueWorkspaceBranchService;
@@ -181,7 +179,6 @@ export interface IpcHandlersHandle {
 export function registerIpcHandlers({
 	agentProviderService,
 	appSettingsService,
-	archiveRepositoryService,
 	archiveWorkspaceService,
 	augmentHarnessCommand,
 	configService,
@@ -263,7 +260,6 @@ export function registerIpcHandlers({
 		repositoryConfigService,
 	});
 	registerRepositoryHandlers({
-		archiveRepositoryService,
 		archiveWorkspaceService,
 		continueWorkspaceBranchService,
 		createWorkspaceService,
