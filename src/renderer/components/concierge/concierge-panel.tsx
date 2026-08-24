@@ -1,6 +1,7 @@
 import { GripVertical, Maximize2, Minimize2, RotateCcw, X } from 'lucide-react';
 import type { CSSProperties } from 'react';
 import { useTranslation } from 'react-i18next';
+import { TextContextMenu } from '@/renderer/components/text-context-menu';
 import { Button } from '@/renderer/components/ui/button';
 import { SidebarTrigger, useSidebar } from '@/renderer/components/ui/sidebar';
 import { useConciergePanel } from '@/renderer/hooks/concierge/use-concierge-panel';
@@ -206,13 +207,18 @@ export function ConciergePanel() {
 					</div>
 				) : null}
 
+				{/* Wrapped like the transcript is: a failure sentence is the line most
+				    likely to end up pasted into a bug report, and Electron draws no
+				    right-click menu of its own. */}
 				{session.error ? (
-					<p
-						className='shrink-0 border-status-danger/30 border-b bg-status-danger/10 px-3 py-2 text-status-danger text-xs'
-						role='alert'
-					>
-						{session.error}
-					</p>
+					<TextContextMenu>
+						<p
+							className='shrink-0 border-status-danger/30 border-b bg-status-danger/10 px-3 py-2 text-status-danger text-xs'
+							role='alert'
+						>
+							{session.error}
+						</p>
+					</TextContextMenu>
 				) : null}
 
 				<ConciergeTimeline

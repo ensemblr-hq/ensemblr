@@ -9,6 +9,7 @@ import {
 	ConversationContent,
 	ConversationScrollButton,
 } from '@/renderer/components/conversation';
+import { TextContextMenu } from '@/renderer/components/text-context-menu';
 import {
 	FilePreviewOpenerProvider,
 	WorkspacePathResolverProvider,
@@ -115,6 +116,12 @@ const ConciergeTimelineMessage = memo(function ConciergeTimelineMessage({
  * The one workspace affordance it does mount is the file-preview pair every
  * attachment chip reads: the Concierge names files across every project, and a
  * chip it draws opens the file in the workspace that holds it.
+ *
+ * It also wraps the transcript in the app's own right-click menu, exactly as the
+ * workspace timeline does — Electron draws no menu of its own, so prose the
+ * Concierge writes would otherwise be the one text in the window a right-click
+ * could not copy. Only the transcript is wrapped: the empty state has no answer
+ * to act on, and its copy is a prompt rather than something the user keeps.
  */
 export function ConciergeTimeline({
 	centered,
@@ -174,29 +181,31 @@ export function ConciergeTimeline({
 	return (
 		<WorkspacePathResolverProvider value={resolveFilePath}>
 			<FilePreviewOpenerProvider value={openFilePreview}>
-				<Conversation className='flex-1'>
-					<ConversationContent
-						className={cn(
-							'gap-4 px-4 py-3',
-							// The same column the workspace transcript uses, so a maximized
-							// Concierge reads at the same measure rather than running the full
-							// width of a wide display.
-							centered && 'mx-auto w-full max-w-3xl gap-6 py-5',
-						)}
-					>
-						{messages.map((message, index) => (
-							<ConciergeTimelineMessage
-								isLiveTurn={isStreaming && index === messages.length - 1}
-								key={message.id}
-								message={message}
-							/>
-						))}
-						{pendingStartMs === null ? null : (
-							<ChatWorkingIndicator startMs={pendingStartMs} />
-						)}
-					</ConversationContent>
-					<ConversationScrollButton />
-				</Conversation>
+				<TextContextMenu>
+					<Conversation className='flex-1'>
+						<ConversationContent
+							className={cn(
+								'gap-4 px-4 py-3',
+								// The same column the workspace transcript uses, so a maximized
+								// Concierge reads at the same measure rather than running the full
+								// width of a wide display.
+								centered && 'mx-auto w-full max-w-3xl gap-6 py-5',
+							)}
+						>
+							{messages.map((message, index) => (
+								<ConciergeTimelineMessage
+									isLiveTurn={isStreaming && index === messages.length - 1}
+									key={message.id}
+									message={message}
+								/>
+							))}
+							{pendingStartMs === null ? null : (
+								<ChatWorkingIndicator startMs={pendingStartMs} />
+							)}
+						</ConversationContent>
+						<ConversationScrollButton />
+					</Conversation>
+				</TextContextMenu>
 			</FilePreviewOpenerProvider>
 		</WorkspacePathResolverProvider>
 	);
