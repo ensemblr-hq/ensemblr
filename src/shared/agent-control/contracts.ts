@@ -47,6 +47,7 @@ export const AGENT_CONTROL_OPS = [
 	'linearGetMetadata',
 	'linearCreateComment',
 	'linearUpdateIssue',
+	'listProjects',
 	'listWorkspaces',
 	'listTabs',
 	'listTerminals',
@@ -63,6 +64,22 @@ export const AGENT_CONTROL_OPS = [
 	'checkPlanModeTool',
 	'exitPlanMode',
 ] as const;
+
+/**
+ * One project — a git repository Ensemblr has opened — as `listProjects`
+ * reports it. `path` is the project's own clone rather than a worktree, so it is
+ * readable but never a place to put an agent: work happens in a workspace cut
+ * from it.
+ */
+export interface AgentControlProjectInfo {
+	defaultBranch: string | null;
+	name: string;
+	path: string;
+	projectId: string;
+	slug: string;
+	/** How many live workspaces are cut from the project right now. */
+	workspaceCount: number;
+}
 
 /** One workspace row, as `ensemblr_create_workspace` reports what it made. */
 export interface CreatedWorkspaceResult {
@@ -1398,9 +1415,9 @@ export interface AgentControlWorkspaceInfo {
 	name: string;
 	cwd: string;
 	/**
-	 * Repository the workspace was cut from. Carried because it is the id the
-	 * Concierge writes a project reference with, and a workspace listing is the
-	 * only place it is handed one — there is no project-listing op.
+	 * Repository the workspace was cut from, and the id the Concierge writes a
+	 * project reference with. `listProjects` carries the projects this listing
+	 * cannot reach — the ones with no live workspace to name them.
 	 */
 	projectId: string;
 	projectName: string;

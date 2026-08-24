@@ -2543,7 +2543,7 @@ export default interface Resources {
 				'expand-sidebar': 'Show the sidebar';
 				label: 'Concierge';
 				maximize: 'Maximize';
-				pressure: 'Context is filling up. Clearing now writes what was learned to memory first.';
+				pressure: 'Context is filling up. Clearing starts a fresh conversation right away; this one writes to memory in the background.';
 				'pressure-clear': 'Clear now';
 				'pressure-dismiss': 'Not yet';
 				resize: 'Resize the Concierge — drag any edge, or use the arrow keys';
@@ -2652,6 +2652,10 @@ export default interface Resources {
 			'list-models': {
 				done: 'Listed models';
 				running: 'Listing models';
+			};
+			'list-projects': {
+				done: 'Listed projects';
+				running: 'Listing projects';
 			};
 			'list-run-scripts': {
 				done: 'Listed run scripts';

@@ -99,4 +99,48 @@ describe('origin registry', () => {
 		expect(registry.resolveByToken(origin.token)).toBeNull();
 		expect(registry.resolveBySession('s1')).toBeNull();
 	});
+
+	// A retired Concierge child still has to reach the control server to have its
+	// memory writes cleared, so retirement flags the origin rather than dropping
+	// it — the token keeps resolving, to a narrower identity.
+	it('retires a session without invalidating its token', () => {
+		const registry = makeRegistry();
+		const origin = registry.register({
+			sessionId: 's1',
+			workspaceId: '',
+			concierge: true,
+			workspaceCwd: '/home',
+			species: 'pi',
+		});
+		expect(origin.retired).toBe(false);
+
+		registry.retire('s1');
+
+		expect(registry.resolveByToken(origin.token)?.retired).toBe(true);
+		expect(registry.resolveBySession('s1')?.retired).toBe(true);
+	});
+
+	it('ignores a retire for a session it does not hold', () => {
+		const registry = makeRegistry();
+		expect(() => registry.retire('never-registered')).not.toThrow();
+		expect(registry.resolveBySession('never-registered')).toBeNull();
+	});
+
+	// Read back through the registry rather than off the handle the caller kept:
+	// retiring replaces the record instead of mutating it, so a request already
+	// admitted keeps the identity it was gated on.
+	it('leaves the origin a caller already holds untouched', () => {
+		const registry = makeRegistry();
+		const origin = registry.register({
+			sessionId: 's1',
+			workspaceId: '',
+			concierge: true,
+			workspaceCwd: '/home',
+			species: 'pi',
+		});
+
+		registry.retire('s1');
+
+		expect(origin.retired).toBe(false);
+	});
 });

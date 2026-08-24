@@ -32,6 +32,7 @@ const stubService: AgentControlService = {
 	readLanguageDirective: () => null,
 	readTurnPreamble: async () => null,
 	releaseSession: () => {},
+	retireSession: () => undefined,
 };
 
 const post = (url: string, token: string | null, body: unknown) =>
@@ -188,6 +189,7 @@ describe('control server', () => {
 			readLanguageDirective: () => null,
 			readTurnPreamble: async () => null,
 			releaseSession: () => {},
+			retireSession: () => undefined,
 		};
 		server = await startControlServer(holdingService, {
 			requestTimeoutMs: 200,
@@ -256,6 +258,7 @@ describe('control server', () => {
 			readLanguageDirective: () => null,
 			readTurnPreamble: async () => null,
 			releaseSession: () => {},
+			retireSession: () => undefined,
 		};
 		server = await startControlServer(holdingService);
 		const aborter = new AbortController();

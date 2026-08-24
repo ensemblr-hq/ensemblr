@@ -245,6 +245,8 @@ is what it works in: it supervises, and the agents it puts to work do the work.
 
 Its **memory** is the other half of that. It writes what it learns as ordinary
 markdown files under `concierge/memory/`, indexed by `concierge/MEMORY.md`, so
-what it knows outlives the conversation that taught it.
+what it knows outlives the conversation that taught it. Only what it could not
+fetch again, though — a fact a tool call or a git command would return is left to
+the tool rather than copied into a file that then goes stale.
 
 _You'll see this in_ [`06-agents.md`](./06-agents.md#the-concierge).

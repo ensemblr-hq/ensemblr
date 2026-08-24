@@ -10,6 +10,7 @@ import { posix as posixPath } from 'node:path';
 
 import type {
 	AgentControlModelList,
+	AgentControlProjectInfo,
 	AgentControlTabInfo,
 	AgentControlTerminalInfo,
 	AgentControlWorkspaceInfo,
@@ -61,6 +62,7 @@ import {
 	getChatTabById,
 	setChatTabMetadata,
 } from '../storage/repositories/chat-tab-repository.ts';
+import { listProjectRows } from '../storage/repositories/repository-row-repository.ts';
 import { listAllWorkspaceRows } from '../storage/repositories/workspace-repository.ts';
 import { type TerminalService, toReadableScrollback } from '../terminal';
 import type { WorkspaceGitService } from '../workspace-git';
@@ -199,12 +201,27 @@ interface WorkspaceRow {
 }
 
 /**
- * Builds the workspace-listing port from the workspace repository.
+ * Builds the project- and workspace-listing port from the workspace repository.
  * @param deps - Adapter collaborators.
  * @returns The workspace port.
  */
 function makeWorkspacePort(deps: PortAdapterDeps): WorkspacePort {
 	return {
+		listProjects: async (): Promise<readonly AgentControlProjectInfo[]> => {
+			const database = deps.databaseService.getConnection()?.database;
+			if (!database) {
+				return [];
+			}
+			return listProjectRows({ database }).map((row) => ({
+				defaultBranch: row.defaultBranch,
+				name: row.name,
+				path: row.path,
+				projectId: row.id,
+				slug: row.slug,
+				workspaceCount: row.workspaceCount,
+			}));
+		},
+
 		listWorkspaces: async (): Promise<readonly AgentControlWorkspaceInfo[]> => {
 			const database = deps.databaseService.getConnection()?.database;
 			if (!database) {

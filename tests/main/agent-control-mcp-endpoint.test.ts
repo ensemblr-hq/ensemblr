@@ -48,6 +48,7 @@ const makeStubService = (
 	readLanguageDirective: () => languageDirective,
 	readTurnPreamble: async () => null,
 	releaseSession: () => {},
+	retireSession: () => undefined,
 });
 
 const stubService: AgentControlService = makeStubService();
@@ -510,6 +511,7 @@ const makeBlockingService = (audience: ControlAudience = HARNESS_ROOT) => {
 		readLanguageDirective: () => null,
 		readTurnPreamble: async () => null,
 		releaseSession: () => {},
+		retireSession: () => undefined,
 	};
 	return { release: () => release(), service, started };
 };

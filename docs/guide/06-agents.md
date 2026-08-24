@@ -210,16 +210,43 @@ so a fresh install has somewhere to write from the first turn.
 ### Memory outlives the conversation
 
 The Concierge's context does not survive a clear, so anything worth keeping is
-written to a file before that happens. It records what it would otherwise have to
-rediscover — what a project is for, what a decision was and why, where work
-stands — as one file per fact under `memory/`, with a line in `MEMORY.md`
-pointing at it. Next session it reads the index first and searches what it wrote
-when a question touches something it might already know.
+written to a file before that happens — one file per fact under `memory/`, with a
+line in `MEMORY.md` pointing at it. Next session it reads the index first and
+searches what it wrote when a question touches something it might already know.
 
-**Clearing runs a memory pass first.** `⌘⇧K`, or View ▸ Concierge ▸ **Clear
-Context…**, hands the agent one last turn to write the files, and only then
-replaces the session — so what the conversation established survives the clear
-even though the transcript does not.
+**It writes only what nothing can answer for it.** The test it applies is not
+whether a fact is useful but whether it could be fetched again: anything a tool
+call, a git command, or reading one file would return is left out. So no project
+rosters, workspace ids, or paths; no remotes, branch lists, or commit history; no
+file layouts or dependency versions; no counts and no "as of today" snapshots.
+What is left is the part that exists nowhere else — a decision and what it
+rejected, a constraint you told it, how you work and what you are after, and
+behaviour it had to discover by running something.
+
+That line matters more than it sounds. A memory that duplicates a tool is worse
+than no memory at all, because the Concierge will trust the file instead of making
+the call, and a `workspaceId` written down last week points at nothing this week.
+It prunes on the same rule: a memory that has gone stale, or that turns out to be
+something a tool answers, gets deleted.
+
+**Clearing gives you the fresh conversation immediately, and the memory pass runs
+behind it.** `⌘⇧K`, or View ▸ Concierge ▸ **Clear Context…**, replaces the
+session on the spot and leaves the conversation it retired running one last turn
+to write its files. You never wait on that turn and never see it — it writes into
+a transcript nothing will open again — so what the conversation established
+survives the clear even though the transcript does not.
+
+That last turn is best-effort by design. It has five minutes, and quitting the
+app closes it wherever it got to; what a cut-short pass costs is one
+conversation's notes, and the files it had already written stay written.
+
+It is also the one turn the Concierge cannot act on the app from. A retired
+conversation keeps only what writing its memories needs — clearing its own file
+writes, and searching its own memory index — and every other control tool is
+refused for as long as it runs. Nothing it did would be visible to you: you are
+in a fresh conversation, and that transcript is one nothing will open again, so
+a window that moved or a question that appeared would have no cause you could
+see.
 
 A long conversation raises a banner of its own once the context passes a
 threshold, offering **Clear now** or **Not yet**. It is an offer, not an

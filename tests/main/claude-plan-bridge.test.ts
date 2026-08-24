@@ -14,6 +14,7 @@ const TOKEN = 'tok-claude-1';
 const ORIGIN: AgentControlOrigin = {
 	delegation: 'ensemblr',
 	concierge: false,
+	retired: false,
 	depth: 0,
 	parentSessionId: null,
 	sessionId: 'sess-1',

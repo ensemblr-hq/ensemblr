@@ -32,7 +32,10 @@ const makePorts = (
 		language: AppLanguage;
 	}> = {},
 ): AgentControlPorts => ({
-	workspaces: { listWorkspaces: vi.fn().mockResolvedValue([]) },
+	workspaces: {
+		listProjects: vi.fn().mockResolvedValue([]),
+		listWorkspaces: vi.fn().mockResolvedValue([]),
+	},
 	tabs: {
 		spawnChatTab: vi.fn().mockResolvedValue({ chatTabId: 'new-tab' }),
 		closeTab: vi.fn().mockResolvedValue(undefined),
@@ -2446,7 +2449,20 @@ const setupConcierge = (
 	const conciergePorts: AgentControlPorts = {
 		...ports,
 		concierge: { homePath: () => '/root/concierge' },
-		workspaces: { listWorkspaces: vi.fn().mockResolvedValue(workspaces) },
+		memory: { recall: vi.fn().mockReturnValue({ memories: [] }) },
+		workspaces: {
+			listProjects: vi.fn().mockResolvedValue([
+				{
+					defaultBranch: 'main',
+					name: 'Bruckner',
+					path: '/repos/bruckner',
+					projectId: 'repo-1',
+					slug: 'bruckner',
+					workspaceCount: 1,
+				},
+			]),
+			listWorkspaces: vi.fn().mockResolvedValue(workspaces),
+		},
 	};
 	return {
 		...setup({ concierge: true, ports: conciergePorts }),
@@ -2459,6 +2475,41 @@ const setupConcierge = (
 // asks about on every write, and the `workspaceId` every acting op needs because
 // the caller's own is the empty string.
 describe('agent-control service: the Concierge boundary', () => {
+	it('hands the Concierge the project roster', async () => {
+		const { service } = setupConcierge();
+
+		const result = await service.invoke({
+			op: 'listProjects',
+			token: 'tok-caller',
+			rawArgs: {},
+		});
+
+		expect(result).toMatchObject({
+			data: {
+				projects: [
+					{
+						name: 'Bruckner',
+						projectId: 'repo-1',
+						workspaceCount: 1,
+					},
+				],
+			},
+			ok: true,
+		});
+	});
+
+	it('refuses the project roster to a workspace agent', async () => {
+		const { service } = setup({ ports: makePorts() });
+
+		const result = await service.invoke({
+			op: 'listProjects',
+			token: 'tok-caller',
+			rawArgs: {},
+		});
+
+		expect(result).toMatchObject({ code: 'denied-scope', ok: false });
+	});
+
 	it('admits a write into the Concierge home', async () => {
 		const { service } = setupConcierge();
 
@@ -2687,5 +2738,106 @@ describe('agent-control service: the Concierge boundary', () => {
 			expect(result.code).toBe('denied-scope');
 		}
 		expect(ports.review.addComments).not.toHaveBeenCalled();
+	});
+});
+
+// A clear hands the user a fresh conversation and leaves the child it replaced
+// running to write its memories, so that child keeps a live Concierge token
+// behind a transcript the renderer no longer draws anywhere. Anything it does to
+// the app from there happens with no visible cause, which is why the authority
+// narrows to the file-writing turn rather than being left to the prompt.
+describe('agent-control service: a retired Concierge child', () => {
+	it('can still have its writes cleared against the home', async () => {
+		const { service } = setupConcierge();
+		service.retireSession('caller');
+
+		const result = await service.invoke({
+			op: 'checkPlanModeTool',
+			token: 'tok-caller',
+			rawArgs: { path: '/root/concierge/memory/a-fact.md', tool: 'write' },
+		});
+
+		expect(result).toMatchObject({ data: { blocked: false }, ok: true });
+	});
+
+	it('can still search its own memory index', async () => {
+		const { service } = setupConcierge();
+		service.retireSession('caller');
+
+		const result = await service.invoke({
+			op: 'recallMemory',
+			token: 'tok-caller',
+			rawArgs: { query: 'what did we decide' },
+		});
+
+		expect(result.ok).toBe(true);
+	});
+
+	// The dialog would render nowhere — the panel keys pending questionnaires off
+	// its own session id — while still firing a desktop notification, and the
+	// coordinator has no timeout to unwedge the child afterwards.
+	it('may not raise a questionnaire', async () => {
+		const { ports, service } = setupConcierge();
+		service.retireSession('caller');
+
+		const result = await service.invoke({
+			op: 'askUserQuestion',
+			token: 'tok-caller',
+			rawArgs: {
+				questions: [
+					{
+						header: 'Pick',
+						options: [{ label: 'a' }, { label: 'b' }],
+						question: 'Which?',
+					},
+				],
+			},
+		});
+
+		expect(result).toMatchObject({ code: 'denied-scope', ok: false });
+		expect(ports.ask.ask).not.toHaveBeenCalled();
+	});
+
+	it('drops a questionnaire already open when it is retired', () => {
+		const { ports, service } = setupConcierge();
+
+		service.retireSession('caller');
+
+		expect(ports.ask.releaseSession).toHaveBeenCalledWith('caller');
+	});
+
+	it.each([
+		{ op: 'createWorkspace', rawArgs: { projectId: 'repo-1' } },
+		{ op: 'focusWorkspace', rawArgs: { workspaceId: 'ws-1' } },
+		{ op: 'listProjects', rawArgs: {} },
+		{
+			op: 'setWorkspaceStatus',
+			rawArgs: { status: 'in-review', workspaceId: 'ws-1' },
+		},
+		{
+			op: 'startConversation',
+			rawArgs: { prompt: 'do the thing', workspaceId: 'ws-1' },
+		},
+	] as const)('may not act on the app through $op', async ({ op, rawArgs }) => {
+		const { service } = setupConcierge();
+		service.retireSession('caller');
+
+		const result = await service.invoke({ op, rawArgs, token: 'tok-caller' });
+
+		expect(result).toMatchObject({ code: 'denied-scope', ok: false });
+	});
+
+	// Retirement is one-way and idempotent, but it must not leak onto a Concierge
+	// that has not been through a clear.
+	it('leaves a live Concierge holding everything it had', async () => {
+		const { service } = setupConcierge();
+
+		const result = await service.invoke({
+			op: 'listProjects',
+			token: 'tok-caller',
+			rawArgs: {},
+		});
+
+		expect(result.ok).toBe(true);
 	});
 });

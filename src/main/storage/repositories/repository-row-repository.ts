@@ -216,6 +216,97 @@ export function selectLiveRepositoryPaths({
 	);
 }
 
+/**
+ * How every listing of live repositories orders them.
+ *
+ * Shared rather than repeated because two queries have to agree on it: the
+ * sidebar's navigation snapshot and the project roster `ensemblr_list_projects`
+ * hands the Concierge. A roster ordered differently from the sidebar the user
+ * reads it against is a needless discrepancy, and one copied clause drifts the
+ * moment the other is edited.
+ * @param alias - Table alias to qualify the columns with, when the query joins.
+ * @returns The `ORDER BY` clause, keyword included.
+ */
+export function liveRepositoryOrderClause(alias = ''): string {
+	const column = (name: string): string => (alias ? `${alias}.${name}` : name);
+	return `ORDER BY lower(${column('name')}), lower(${column('slug')}), ${column('id')}`;
+}
+
+/** One project row, with the live workspaces cut from it already counted. */
+export interface ProjectListingRow {
+	defaultBranch: string | null;
+	id: string;
+	name: string;
+	path: string;
+	slug: string;
+	workspaceCount: number;
+}
+
+/**
+ * Lists every live repository with the number of live workspaces cut from it,
+ * in the sidebar's own order via {@link liveRepositoryOrderClause}. Counted in
+ * SQL rather than by the caller, because the only alternative is reading every
+ * workspace row to group it back down to one integer per project.
+ * @param options - Database handle.
+ * @returns One row per live repository, in name order.
+ */
+export function listProjectRows({
+	database,
+}: {
+	database: DatabaseSync;
+}): ProjectListingRow[] {
+	const rows = database
+		.prepare(
+			`SELECT
+				r.id AS id,
+				r.slug AS slug,
+				r.name AS name,
+				r.path AS path,
+				r.default_branch AS defaultBranch,
+				COUNT(w.id) AS workspaceCount
+			FROM repositories r
+			LEFT JOIN workspaces w
+				ON w.repository_id = r.id
+				AND w.archived_at IS NULL
+			WHERE r.archived_at IS NULL
+			GROUP BY r.id
+			${liveRepositoryOrderClause('r')}`,
+		)
+		.all();
+
+	return rows.flatMap((row) => {
+		const project = toProjectListingRow(row);
+		return project ? [project] : [];
+	});
+}
+
+/**
+ * Narrows one grouped project row, dropping any whose identity columns are not
+ * the strings the schema promises.
+ * @param row - Value returned from the listing query.
+ * @returns The typed row, or null when it is malformed.
+ */
+function toProjectListingRow(row: unknown): ProjectListingRow | null {
+	if (typeof row !== 'object' || row === null) {
+		return null;
+	}
+	const { defaultBranch, id, name, path, slug, workspaceCount } = row as Record<
+		string,
+		unknown
+	>;
+	if (typeof id !== 'string' || typeof path !== 'string') {
+		return null;
+	}
+	return {
+		defaultBranch: typeof defaultBranch === 'string' ? defaultBranch : null,
+		id,
+		name: typeof name === 'string' ? name : id,
+		path,
+		slug: typeof slug === 'string' ? slug : id,
+		workspaceCount: typeof workspaceCount === 'number' ? workspaceCount : 0,
+	};
+}
+
 /** Inputs for {@link selectRepositoryForDelete}. */
 export interface SelectRepositoryForDeleteOptions {
 	database: DatabaseSync;

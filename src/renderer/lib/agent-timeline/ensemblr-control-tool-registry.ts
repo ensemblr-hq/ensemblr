@@ -426,6 +426,18 @@ export const ENSEMBLR_TOOL_LABELS: Record<string, EnsemblrToolLabel> = {
 				),
 		],
 	},
+	ensemblr_list_projects: {
+		glyph: 'list',
+		title: [
+			() =>
+				i18n.t('workbench:control-tool.list-projects.done', 'Listed projects'),
+			() =>
+				i18n.t(
+					'workbench:control-tool.list-projects.running',
+					'Listing projects',
+				),
+		],
+	},
 	ensemblr_list_tabs: {
 		glyph: 'list',
 		title: [

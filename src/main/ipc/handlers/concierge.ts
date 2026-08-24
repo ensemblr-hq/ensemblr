@@ -106,7 +106,7 @@ export function registerConciergeHandlers({
 			} catch (cause) {
 				return {
 					error: toError(cause, 'Failed to clear the Concierge context.'),
-					memoryPassRan: false,
+					memoryPassStarted: false,
 				};
 			}
 		},

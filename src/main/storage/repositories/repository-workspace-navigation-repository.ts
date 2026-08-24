@@ -7,6 +7,7 @@ import type {
 	RepositoryWorkspaceNavigationSnapshot,
 	WorkspacePrPresentation,
 } from '../../../shared/ipc/contracts/repository-navigation';
+import { liveRepositoryOrderClause } from './repository-row-repository.ts';
 
 /** Internal: shape of a repository row read from SQLite. */
 interface RepositoryRow {
@@ -49,7 +50,7 @@ SELECT
 	metadata_json AS metadataJson
 FROM repositories
 WHERE archived_at IS NULL
-ORDER BY lower(name), lower(slug), id
+${liveRepositoryOrderClause()}
 `;
 
 const SELECT_WORKSPACES = `

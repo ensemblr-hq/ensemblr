@@ -225,7 +225,7 @@ harness.
 
 ## Tool reference
 
-Forty-two tools, enumerated from `TOOL_DEFS` in
+Forty-three tools, enumerated from `TOOL_DEFS` in
 `src/main/agent-control/mcp-endpoint.ts`. The argument names and types below are
 the authoritative Zod schemas in `src/shared/agent-control/schemas.ts` — every
 schema is a `strictObject`, so an argument not listed here is rejected as
@@ -310,6 +310,7 @@ fragment and a colour code cut before its `ESC` reads as ordinary text.
 | `ensemblr_create_workspace` | **`projectId: string`**, `name?: string`, `baseBranch?: string` | write, spawn | workspace agent |
 | `ensemblr_set_workspace_status` | **`status: 'backlog' \| 'in-progress' \| 'in-review' \| 'done' \| 'canceled'`**, `workspaceId?: string` | write | sub-agent |
 | `ensemblr_get_workspace_status` | `workspaceId?: string` | read | — |
+| `ensemblr_list_projects` | *(none)* | read | workspace agent |
 | `ensemblr_list_workspaces` | *(none)* | read | — |
 | `ensemblr_list_tabs` | `workspaceId?: string` | read | — |
 | `ensemblr_list_terminals` | `workspaceId?: string` | read | — |
@@ -431,10 +432,35 @@ route to an `assigneeId` is matching a display name against the users table.
 | --- | --- | --- | --- |
 | `ensemblr_recall_memory` | **`query: string`**, `limit?: number` | read | workspace agent |
 
+`ensemblr_list_projects` is documented with the other listings above, and is the
+Concierge's too: a workspace agent belongs to one project and cannot act on
+another, so the roster of the rest is noise in its tool list. It is also the only
+place a `projectId` for a project with **no live workspace** is handed out —
+`ensemblr_list_workspaces` names a project only through the workspaces cut from
+it, so an idle project is invisible there and `ensemblr_create_workspace` has
+nothing to be called with. Each row carries `workspaceCount`, which is how a
+project with no work in it is told from one that is busy.
+
 The Concierge writes a memory as an ordinary file under `<root>/concierge/memory/`
 — which its tool policy admits because that path is inside its own home — and a
 watcher reindexes it. There is therefore no write op here: one exists for search,
 because searching an FTS index is the thing a file read cannot do.
+
+**A retired Concierge child holds a third, narrower list.** Clearing the context
+hands the user a fresh conversation at once and leaves the child it replaced
+running one last turn to write those memory files, so for the length of that turn
+a live Concierge token sits behind a transcript the renderer no longer draws
+anywhere. `retiredControlOpDenial` narrows it to the three ops that turn actually
+needs — `checkPlanModeTool`, which is what clears each write against the home and
+which the Pi extension blocks every guarded call on when it does not answer;
+`getSessionBrief`; and `ensemblr_recall_memory` — and answers `denied-scope` to
+everything else. The axis is the origin's `retired` flag, set by
+`OriginRegistry.retire` when the clear detaches the child and cleared only when
+the pass ends and the origin is released outright. Without it the child keeps the
+whole Concierge surface: `ensemblr_ask_user_question` would broadcast under a
+session id no panel is watching, so the dialog renders nowhere while the desktop
+notification still fires and the child blocks on an ask that has no timeout, and
+a focus op would move the user's window with no cause they could see.
 
 **The tab bookkeeping every workspace agent owes does not apply to it.** The
 Concierge is a panel, not a chat tab, so `ensemblr_set_name` and

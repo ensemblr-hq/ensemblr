@@ -382,6 +382,13 @@ export const TOOL_DEFS: readonly McpToolDef[] = [
 		shape: {},
 	},
 	{
+		name: 'ensemblr_list_projects',
+		op: 'listProjects',
+		description:
+			"Concierge only. List every project Ensemblr has opened — a project is a git repository, and `projectId` is the id ensemblr_create_workspace cuts a workspace off. Call this rather than listing the Ensemblr root directory, and call it before ensemblr_create_workspace: ensemblr_list_workspaces names only the projects that already have a live workspace, so a project nobody is working in is invisible there. Each row carries the project's name, slug, default branch, the absolute path of its own clone, and workspaceCount — how many live workspaces are cut from it, so 0 means idle. That clone path is readable but is never where work goes: put an agent in a workspace, not in the project itself.",
+		shape: {},
+	},
+	{
 		name: 'ensemblr_list_workspaces',
 		op: 'listWorkspaces',
 		description: 'List all open workspaces (id, name, cwd).',

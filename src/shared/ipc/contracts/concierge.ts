@@ -110,18 +110,27 @@ export interface ListConciergeEventsResult {
  */
 export type ConciergeClearReason = 'manual' | 'threshold';
 
-/** Clear the Concierge context, writing memory first unless the caller opts out. */
+/**
+ * Clear the Concierge context. The replacement conversation comes back at once
+ * and the retired one writes its memories in the background, unless the caller
+ * opts out of that turn entirely.
+ */
 export interface ClearConciergeContextRequest {
 	reason: ConciergeClearReason;
-	/** Skips the memory-write turn; the transcript is dropped as-is. */
+	/** Skips the memory-write turn; the retired conversation is closed as-is. */
 	skipMemoryPass?: boolean;
 }
 
 /** Result of clearing the Concierge context. */
 export interface ClearConciergeContextResult {
 	error?: string;
-	/** True when the memory-write turn ran before the session was replaced. */
-	memoryPassRan: boolean;
+	/**
+	 * True when a background memory-write turn was started on the conversation
+	 * this clear retired. Nothing waits on it — the replacement session in
+	 * `session` is already live — so this reports that the turn began, never that
+	 * it finished or what it wrote.
+	 */
+	memoryPassStarted: boolean;
 	session?: ConciergeSessionSnapshotWire;
 }
 

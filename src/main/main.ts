@@ -999,6 +999,8 @@ const conciergeSessionService = createConciergeSessionService({
 			thinkingLevel: concierge.thinkingLevel,
 		};
 	},
+	retireControlOrigin: (sessionId) =>
+		agentControlService?.retireSession(sessionId),
 });
 let ipcHandlersHandle: IpcHandlersHandle | null = null;
 const workspaceFilesWatcher = createWorkspaceFilesWatcher({
