@@ -100,7 +100,12 @@ function MenuAction({
  * focus, because each acts on whatever is focused or selected once it is gone.
  * Radix would hand focus back to the trigger, which is a zero-size anchor, so
  * the menu takes that over: a command refocuses the field it targets, and a
- * dismissal puts focus back where the right-click found it.
+ * dismissal puts focus back where the right-click found it. A read-only surface
+ * has no field to return to, so a dismissal and `Copy` restore whatever held
+ * focus before the menu opened — leaving it on `document.body` would strand the
+ * keyboard outside the surface that hosts the menu, and a host binding its
+ * chords to its own subtree (the Concierge panel closing on ⎋) would stop
+ * hearing them.
  *
  * A read-only surface runs its own `Copy` and `Select all` rather than the
  * `WebContents` ones, which need a focused field. `Copy` reads the live DOM
@@ -114,6 +119,7 @@ export function TextContextMenu({ children }: { children: ReactNode }) {
 	const scopeRef = useRef<HTMLDivElement | null>(null);
 	const pendingActionRef = useRef<(() => void) | null>(null);
 	const editableRef = useRef<HTMLElement | null>(null);
+	const previousFocusRef = useRef<HTMLElement | null>(null);
 	const [target, setTarget] = useState<TextContextMenuTarget | null>(null);
 
 	useEffect(() => {
@@ -126,6 +132,10 @@ export function TextContextMenu({ children }: { children: ReactNode }) {
 			}
 
 			editableRef.current = payload.isEditable ? findEditableIn(hit) : null;
+			previousFocusRef.current =
+				document.activeElement instanceof HTMLElement
+					? document.activeElement
+					: null;
 			setTarget(payload);
 		});
 	}, []);
@@ -146,7 +156,7 @@ export function TextContextMenu({ children }: { children: ReactNode }) {
 			return;
 		}
 
-		editableRef.current?.focus();
+		(editableRef.current ?? previousFocusRef.current)?.focus();
 	}, []);
 
 	const runOnField = useCallback((run: () => void) => {
@@ -181,11 +191,15 @@ export function TextContextMenu({ children }: { children: ReactNode }) {
 	}, []);
 
 	const copySelection = useCallback(() => {
-		pendingActionRef.current = () =>
+		pendingActionRef.current = () => {
 			void copyText(window.getSelection()?.toString() ?? '');
+			previousFocusRef.current?.focus();
+		};
 	}, []);
 
 	const selectScopeContents = useCallback(() => {
+		// No focus restore here: what held focus is usually a composer, and focusing
+		// an editable collapses the selection this row just made.
 		pendingActionRef.current = () => {
 			if (scopeRef.current) {
 				selectContentsOf(scopeRef.current);
