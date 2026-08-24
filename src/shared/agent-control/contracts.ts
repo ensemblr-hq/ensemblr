@@ -1397,6 +1397,13 @@ export interface AgentControlWorkspaceInfo {
 	workspaceId: string;
 	name: string;
 	cwd: string;
+	/**
+	 * Repository the workspace was cut from. Carried because it is the id the
+	 * Concierge writes a project reference with, and a workspace listing is the
+	 * only place it is handed one — there is no project-listing op.
+	 */
+	projectId: string;
+	projectName: string;
 	/** Current kanban board status (defaults to `backlog` when unreported). */
 	boardStatus: WorkspaceBoardStatusValue;
 }

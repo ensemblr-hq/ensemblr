@@ -71,6 +71,13 @@ export interface SubmitConciergePromptRequest {
 export interface SubmitConciergePromptResult {
 	acceptedAt?: string;
 	error?: string;
+	/**
+	 * The session the prompt actually landed in, present whenever the one the
+	 * caller named could not take it and a live session had to be put back
+	 * underneath — the same conversation resumed, or a clean one where it could
+	 * not be. The panel adopts it so its transcript follows what is now live.
+	 */
+	session?: ConciergeSessionSnapshotWire;
 }
 
 /** Stop the Concierge's streaming turn. */

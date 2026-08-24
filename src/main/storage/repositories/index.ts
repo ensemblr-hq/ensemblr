@@ -55,6 +55,7 @@ export {
 	getChatTabByAgentSessionId,
 	getChatTabById,
 	getRuntimeState,
+	listChatTabsAcrossWorkspaces,
 	listClosedForWorkspace,
 	listOpenChatTabs,
 	listOpenForWorkspace,

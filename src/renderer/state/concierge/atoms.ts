@@ -123,3 +123,33 @@ export const conciergeAnchorAtom = atomWithStorage<ConciergePoint>(
 	'concierge_anchor',
 	CONCIERGE_UNPLACED,
 );
+
+/** How large a draggable Concierge surface is, in pixels. */
+export interface ConciergeSize {
+	height: number;
+	width: number;
+}
+
+/**
+ * The docked panel's size before the user resizes it, which is also the floor a
+ * resize cannot go below.
+ *
+ * One constant for both because the shipped size was chosen as the smallest the
+ * panel reads well at: a transcript column, a composer card, and a header row.
+ * Anything under it starts truncating the model name and wrapping the control
+ * row, so there is nothing to be gained by letting a drag get there.
+ */
+export const CONCIERGE_MIN_PANEL_SIZE: ConciergeSize = {
+	height: 512,
+	width: 416,
+};
+
+/**
+ * Persisted size of the docked Concierge panel. Sits beside the anchor rather
+ * than with it because the two are dragged by different handles and a resize
+ * must not move the corner the panel hangs from.
+ */
+export const conciergePanelSizeAtom = atomWithStorage<ConciergeSize>(
+	'concierge_panel_size',
+	CONCIERGE_MIN_PANEL_SIZE,
+);

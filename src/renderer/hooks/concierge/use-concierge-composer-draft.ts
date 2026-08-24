@@ -8,9 +8,14 @@ import {
 } from 'react';
 
 import type { ComposerEditorHandle } from '@/renderer/components/workbench-shell/conversation-panel/composer/editor';
+import { useConciergeReferenceMatches } from '@/renderer/hooks/concierge/use-concierge-reference-matches';
+import { detectAutocomplete } from '@/renderer/hooks/workbench-shell/composer/use-autocomplete';
 import { PASTE_ATTACHMENT_THRESHOLD } from '@/renderer/hooks/workbench-shell/composer/use-composer-attachments';
 import { useSlashCommands } from '@/renderer/hooks/workbench-shell/composer/use-slash-commands';
 import { useSlashMatches } from '@/renderer/hooks/workbench-shell/composer/use-slash-matches';
+import { conciergeReferenceAttachment } from '@/renderer/lib/concierge';
+import { joinDictatedText } from '@/renderer/lib/dictation';
+import { mentionReplacementRange } from '@/renderer/lib/workbench/composer';
 import {
 	attachPastedFiles,
 	attachPastedText,
@@ -21,16 +26,22 @@ import {
 	slashCommandUsageAtom,
 } from '@/renderer/state/slash-commands';
 import type {
+	AutocompleteKind,
+	AutocompleteState,
 	ComposerAttachment,
 	ComposerDraftSegment,
+	ConciergeReferenceMatch,
 	SlashCommandMatch,
 } from '@/renderer/types/workbench';
 import type { AgentProviderId } from '@/shared/agent-provider';
+import type { ConciergeReference } from '@/shared/concierge-references';
 
 /** What the Concierge composer's JSX layer needs from its draft state machine. */
 export interface ConciergeComposerDraft {
 	activeIndex: number;
 	attachmentError: string | null;
+	/** Which autocomplete list is open, if any. */
+	autocompleteKind: AutocompleteKind;
 	/** True when the draft has text or a chip to send. */
 	canSend: boolean;
 	clear: () => void;
@@ -38,6 +49,7 @@ export interface ConciergeComposerDraft {
 	consumePastedTransfer: (data: DataTransfer) => boolean;
 	editorRef: RefObject<ComposerEditorHandle | null>;
 	handleDraftChange: (change: {
+		caret: number;
 		segments: readonly ComposerDraftSegment[];
 		text: string;
 	}) => void;
@@ -47,35 +59,49 @@ export interface ConciergeComposerDraft {
 	handleFileInputChange: (event: {
 		target: { files: FileList | null; value: string };
 	}) => void;
+	/** True while the draft holds an attachment chip. */
+	hasChips: boolean;
+	/** Inserts a transcribed phrase at the caret, spaced to read as prose. */
+	insertDictatedText: (text: string) => void;
 	/** Opens the file picker the attachment menu drives. */
 	openFilePicker: () => void;
 	/** Surfaces a send-path failure on the composer's own error line. */
 	reportError: (message: string) => void;
+	/** Every project, workspace, and chat matching the open `@` token. */
+	referenceMatches: readonly ConciergeReferenceMatch[];
+	/** Opens the `@` menu from a control, for a user who has not met the key. */
+	startReference: () => void;
+	/** Writes the reference a popover row was clicked on into the draft as a chip. */
+	selectReference: (reference: ConciergeReference) => void;
 	/** Applies the command a popover row was clicked on. */
 	selectSlashCommand: (command: string, autoSubmit: boolean) => void;
 	/** Renders the draft — text and chips in document order — as one prompt. */
 	readPrompt: () => Promise<string>;
 	setActiveIndex: (index: number) => void;
-	/** Which autocomplete list is open, if any. */
-	slashOpen: boolean;
 	slashLoading: boolean;
 	slashMatches: readonly SlashCommandMatch[];
 	text: string;
 }
 
-/** Matches a `/command` token the caret is still inside. */
-const SLASH_TOKEN = /(?:^|\s)\/([\w:-]*)$/;
+/** Caret outside any `@` or `/` token. */
+const NO_AUTOCOMPLETE: AutocompleteState = {
+	kind: null,
+	query: '',
+	tokenStart: 0,
+	tokenEnd: 0,
+};
 
 /**
- * Owns the Concierge composer's draft: its segments, its attachments, and its
- * slash-command autocomplete.
+ * Owns the Concierge composer's draft: its segments, its attachments, and both
+ * of its autocomplete menus.
  *
  * Everything here is the workspace composer's own machinery pointed at the
  * Concierge home instead of a worktree — `attachPastedFiles` and
  * `serializeComposerDraft` both take a cwd rather than a workspace, and the
- * slash catalogue is resolved per runtime and cwd. What it does not carry is
- * `@` file mentions: those rank against a workspace's file list, and the
- * Concierge has no workspace whose files it would be naming.
+ * slash catalogue is resolved per runtime and cwd. `@` is the one place the two
+ * composers genuinely differ: a workspace composer ranks it against that
+ * workspace's file list, and the Concierge — which has no workspace and no file
+ * list — ranks it against every project, workspace, and chat in the app.
  * @param input - The Concierge home and the runtime the composer is on.
  * @returns The draft state machine.
  */
@@ -95,15 +121,33 @@ export function useConciergeComposerDraft({
 	const [segments, setSegments] = useState<readonly ComposerDraftSegment[]>([]);
 	const [text, setText] = useState('');
 	const [attachmentError, setAttachmentError] = useState<string | null>(null);
-	const [slashQuery, setSlashQuery] = useState<string | null>(null);
+	const [autocomplete, setAutocomplete] =
+		useState<AutocompleteState>(NO_AUTOCOMPLETE);
 	const [activeIndex, setActiveIndex] = useState(0);
 
-	const slashOpen = slashQuery !== null;
+	const slashOpen = autocomplete.kind === 'slash';
+	const referenceOpen = autocomplete.kind === 'mention';
 	const catalogue = useSlashCommands(provider, cwd, slashOpen);
 	const slashMatches = useSlashMatches(
 		catalogue.commands,
-		slashQuery ?? '',
+		slashOpen ? autocomplete.query : '',
 		slashOpen,
+	);
+	const referenceMatches = useConciergeReferenceMatches(
+		referenceOpen ? autocomplete.query : '',
+		referenceOpen,
+	);
+	const openMatchCount = referenceOpen
+		? referenceMatches.length
+		: slashMatches.length * Number(slashOpen);
+	// The reference list narrows under a stored index without the draft being
+	// touched — the app-wide tab listing refetches, a project leaves the shell —
+	// which would strand the highlight past the end and make Enter a silent
+	// no-op. Held here rather than reset, so the row the user arrowed to keeps
+	// its highlight for as long as the list still reaches it.
+	const safeActiveIndex = Math.min(
+		activeIndex,
+		Math.max(0, openMatchCount - 1),
 	);
 
 	const addAttachments = useCallback(
@@ -130,19 +174,35 @@ export function useConciergeComposerDraft({
 	);
 
 	const handleDraftChange = useCallback(
-		(change: { segments: readonly ComposerDraftSegment[]; text: string }) => {
+		(change: {
+			caret: number;
+			segments: readonly ComposerDraftSegment[];
+			text: string;
+		}) => {
 			setSegments(change.segments);
 			setText(change.text);
-			const token = SLASH_TOKEN.exec(change.text);
-			setSlashQuery(token ? (token[1] ?? '') : null);
+			setAutocomplete(detectAutocomplete(change.text, change.caret));
 			setActiveIndex(0);
 		},
 		[],
 	);
 
+	const selectReference = useCallback(
+		(reference: ConciergeReference) => {
+			const range = mentionReplacementRange(text, autocomplete);
+			setAutocomplete(NO_AUTOCOMPLETE);
+			editorRef.current?.replaceRangeWithAttachment(
+				range.start,
+				range.end,
+				conciergeReferenceAttachment(reference),
+			);
+		},
+		[autocomplete, text],
+	);
+
 	const selectSlashCommand = useCallback(
 		(command: string, autoSubmit: boolean) => {
-			setSlashQuery(null);
+			setAutocomplete(NO_AUTOCOMPLETE);
 			recordSlashUsage((usage) =>
 				recordSlashCommandUse(usage, command, Date.now()),
 			);
@@ -160,14 +220,27 @@ export function useConciergeComposerDraft({
 		[onSubmitSlashCommand, recordSlashUsage, text],
 	);
 
-	const applySlashMatch = useCallback(
+	const applyMatch = useCallback(
 		(index: number) => {
+			if (referenceOpen) {
+				const match = referenceMatches[index];
+				if (match) {
+					selectReference(match.reference);
+				}
+				return;
+			}
 			const match = slashMatches[index];
 			if (match) {
 				selectSlashCommand(match.item.command, match.item.autoSubmit);
 			}
 		},
-		[selectSlashCommand, slashMatches],
+		[
+			referenceMatches,
+			referenceOpen,
+			selectReference,
+			selectSlashCommand,
+			slashMatches,
+		],
 	);
 
 	const handleFileInputChange = useCallback(
@@ -184,33 +257,57 @@ export function useConciergeComposerDraft({
 
 	const handleKeyDown = useCallback(
 		(event: ReactKeyboardEvent<HTMLElement>) => {
-			if (!slashOpen || slashMatches.length === 0) {
+			// Ahead of the row count, because a menu reporting no matches still
+			// covers the composer and Escape is the only thing that dismisses it
+			// without editing the token that opened it.
+			if (autocomplete.kind !== null && event.key === 'Escape') {
+				event.preventDefault();
+				setAutocomplete(NO_AUTOCOMPLETE);
+				return;
+			}
+			if (openMatchCount === 0) {
 				return;
 			}
 			if (event.key === 'ArrowDown') {
 				event.preventDefault();
-				setActiveIndex((index) => (index + 1) % slashMatches.length);
+				setActiveIndex((safeActiveIndex + 1) % openMatchCount);
 				return;
 			}
 			if (event.key === 'ArrowUp') {
 				event.preventDefault();
-				setActiveIndex(
-					(index) => (index - 1 + slashMatches.length) % slashMatches.length,
-				);
-				return;
-			}
-			if (event.key === 'Escape') {
-				event.preventDefault();
-				setSlashQuery(null);
+				setActiveIndex((safeActiveIndex - 1 + openMatchCount) % openMatchCount);
 				return;
 			}
 			if (event.key === 'Enter' || event.key === 'Tab') {
 				event.preventDefault();
-				applySlashMatch(activeIndex);
+				applyMatch(safeActiveIndex);
 			}
 		},
-		[activeIndex, applySlashMatch, slashMatches.length, slashOpen],
+		[autocomplete.kind, applyMatch, openMatchCount, safeActiveIndex],
 	);
+
+	// The caret position is not mirrored here the way the workspace composer
+	// mirrors it, so the whole draft stands in for the text before it. Dictation
+	// runs against an unfocused editor, where Lexical inserts at the end anyway.
+	const insertDictatedText = useCallback(
+		(phrase: string) => {
+			const joined = joinDictatedText(text, phrase);
+			if (!joined) {
+				return;
+			}
+			editorRef.current?.insertText(joined);
+			editorRef.current?.focus();
+		},
+		[text],
+	);
+
+	// The token is written into the draft rather than the menu being opened
+	// directly, so the control and the key reach the same state — including the
+	// leading space `detectAutocomplete` needs to read an `@` as a token at all.
+	const startReference = useCallback(() => {
+		editorRef.current?.insertText(/\S$/.test(text) ? ' @' : '@');
+		editorRef.current?.focus();
+	}, [text]);
 
 	const consumePastedTransfer = useCallback(
 		(data: DataTransfer): boolean => {
@@ -247,16 +344,17 @@ export function useConciergeComposerDraft({
 	);
 
 	return {
-		activeIndex,
+		activeIndex: safeActiveIndex,
 		attachmentError,
 		canSend:
 			text.trim().length > 0 ||
 			segments.some((segment) => segment.kind === 'attachment'),
+		autocompleteKind: referenceOpen ? 'entity' : autocomplete.kind,
 		clear: () => {
 			editorRef.current?.clear();
 			setSegments([]);
 			setText('');
-			setSlashQuery(null);
+			setAutocomplete(NO_AUTOCOMPLETE);
 		},
 		consumeDroppedTransfer,
 		consumePastedTransfer,
@@ -265,14 +363,18 @@ export function useConciergeComposerDraft({
 		handleDraftChange,
 		handleFileInputChange,
 		handleKeyDown,
+		hasChips: segments.some((segment) => segment.kind === 'attachment'),
+		insertDictatedText,
 		openFilePicker: () => fileInputRef.current?.click(),
+		referenceMatches,
 		reportError: setAttachmentError,
+		selectReference,
 		selectSlashCommand,
 		readPrompt: () => serializeComposerDraft({ segments, workspaceCwd: cwd }),
 		setActiveIndex,
 		slashLoading: catalogue.loading,
 		slashMatches,
-		slashOpen,
+		startReference,
 		text,
 	};
 }

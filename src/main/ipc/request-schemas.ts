@@ -43,6 +43,7 @@ export {
 export {
 	bindAgentSessionToChatTabRequestSchema,
 	closeChatTabRequestSchema,
+	listAllChatTabsRequestSchema,
 	listChatTabsRequestSchema,
 	listClosedChatTabsWithSummaryRequestSchema,
 	openChatTabRequestSchema,

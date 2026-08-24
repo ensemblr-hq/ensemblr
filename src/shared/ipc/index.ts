@@ -78,6 +78,8 @@ export type {
 	CloseChatTabRequest,
 	CloseChatTabResult,
 	ClosedChatTabEntryWire,
+	ListAllChatTabsRequest,
+	ListAllChatTabsResult,
 	ListChatTabsRequest,
 	ListChatTabsResult,
 	ListClosedChatTabsWithSummaryRequest,

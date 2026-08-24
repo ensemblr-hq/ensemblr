@@ -115,6 +115,7 @@ export const IPC_CHANNELS = {
 	linearMetadata: 'ensemblr:linear-metadata',
 	linearStartLogin: 'ensemblr:linear-start-login',
 	linearUpdateIssue: 'ensemblr:linear-update-issue',
+	listAllChatTabs: 'ensemblr:list-all-chat-tabs',
 	listAllWorkspaces: 'ensemblr:list-all-workspaces',
 	listArchivedWorkspaces: 'ensemblr:list-archived-workspaces',
 	listChatTabs: 'ensemblr:list-chat-tabs',

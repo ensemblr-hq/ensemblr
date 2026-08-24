@@ -61,6 +61,8 @@ import type {
 	BindAgentSessionToTabResult,
 	CloseChatTabRequest,
 	CloseChatTabResult,
+	ListAllChatTabsRequest,
+	ListAllChatTabsResult,
 	ListChatTabsRequest,
 	ListChatTabsResult,
 	ListClosedChatTabsWithSummaryRequest,
@@ -428,6 +430,10 @@ export interface IpcHandlerMap {
 	[IPC_CHANNELS.listArchivedWorkspaces]: IpcHandlerEntry<
 		ListArchivedWorkspacesRequest,
 		ListArchivedWorkspacesResult
+	>;
+	[IPC_CHANNELS.listAllChatTabs]: IpcHandlerEntry<
+		ListAllChatTabsRequest,
+		ListAllChatTabsResult
 	>;
 	[IPC_CHANNELS.listChatTabs]: IpcHandlerEntry<
 		ListChatTabsRequest,

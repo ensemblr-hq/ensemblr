@@ -19,6 +19,10 @@ import type {
 	ParsedPromptPart,
 } from '@/renderer/types/agent-timeline';
 import {
+	conciergeReferenceBlockPattern,
+	parseConciergeReferenceBlock,
+} from '@/shared/concierge-references';
+import {
 	attachedFileBlockPattern,
 	linkedDirectoriesBlockPattern,
 	referencedFoldersBlockPattern,
@@ -27,9 +31,15 @@ import {
 
 /** One scaffolding block located in the prompt, with the span it occupies. */
 interface ScaffoldingBlock {
-	attachments: readonly ParsedPromptAttachment[];
 	end: number;
+	/** What the block renders as, which is nothing for the dropped ones. */
+	parts: readonly ParsedPromptPart[];
 	start: number;
+}
+
+/** Wraps a parsed file attachment as the part that renders it. */
+function attachmentPart(attachment: ParsedPromptAttachment): ParsedPromptPart {
+	return { attachment, kind: 'attachment' };
 }
 
 /**
@@ -39,15 +49,43 @@ interface ScaffoldingBlock {
  */
 function attachedFileBlocks(prompt: string): ScaffoldingBlock[] {
 	return [...prompt.matchAll(attachedFileBlockPattern())].map((match) => ({
-		attachments: [
-			{
+		end: match.index + match[0].length,
+		parts: [
+			attachmentPart({
 				content: match[2] ?? '',
 				path: (match[1] ?? '').replaceAll('&quot;', '"'),
-			},
+			}),
 		],
-		end: match.index + match[0].length,
 		start: match.index,
 	}));
+}
+
+/**
+ * Locates every Concierge reference block, each one a project, workspace, or
+ * chat the user pointed the Concierge at. A block missing the ids its chip would
+ * need is skipped rather than rendered, so a truncated prompt reads back as
+ * prose.
+ * @param prompt - The raw persisted prompt text
+ * @returns The blocks found, in order of appearance
+ */
+function conciergeReferenceBlocks(prompt: string): ScaffoldingBlock[] {
+	return [...prompt.matchAll(conciergeReferenceBlockPattern())].flatMap(
+		(match) => {
+			const reference = parseConciergeReferenceBlock(
+				match[1] ?? '',
+				match[2] ?? '',
+			);
+			return reference
+				? [
+						{
+							end: match.index + match[0].length,
+							parts: [{ kind: 'reference' as const, reference }],
+							start: match.index,
+						},
+					]
+				: [];
+		},
+	);
 }
 
 /**
@@ -58,12 +96,12 @@ function attachedFileBlocks(prompt: string): ScaffoldingBlock[] {
  */
 function referencedFolderBlocks(prompt: string): ScaffoldingBlock[] {
 	return [...prompt.matchAll(referencedFoldersBlockPattern())].map((match) => ({
-		attachments: (match[1] ?? '')
+		end: match.index + match[0].length,
+		parts: (match[1] ?? '')
 			.split('\n')
 			.map((line) => line.trim())
 			.filter((line) => line.startsWith('@'))
-			.map((line) => ({ content: '', path: line.slice(1) })),
-		end: match.index + match[0].length,
+			.map((line) => attachmentPart({ content: '', path: line.slice(1) })),
 		start: match.index,
 	}));
 }
@@ -81,8 +119,8 @@ function droppedBlocks(prompt: string): ScaffoldingBlock[] {
 		...prompt.matchAll(linkedDirectoriesBlockPattern()),
 		...prompt.matchAll(userPreferencesBlockPattern()),
 	].map((match) => ({
-		attachments: [],
 		end: match.index + match[0].length,
+		parts: [],
 		start: match.index,
 	}));
 }
@@ -101,15 +139,17 @@ function pushText(parts: ParsedPromptPart[], text: string): void {
 }
 
 /**
- * Splits a persisted prompt into the typed runs and the attachment blocks
- * (referenced workspace folders and `<attached_file>` markers), in the order they
- * appear — which is the order the composer laid them out.
+ * Splits a persisted prompt into the typed runs, the attachment blocks
+ * (referenced workspace folders and `<attached_file>` markers), and the
+ * Concierge reference blocks, in the order they appear — which is the order the
+ * composer laid them out.
  * @param prompt - The raw persisted prompt text
  * @returns The prompt's parts, ready to render
  */
 export function parsePromptAttachments(prompt: string): ParsedPrompt {
 	const blocks = [
 		...attachedFileBlocks(prompt),
+		...conciergeReferenceBlocks(prompt),
 		...referencedFolderBlocks(prompt),
 		...droppedBlocks(prompt),
 	].sort((left, right) => left.start - right.start);
@@ -123,9 +163,7 @@ export function parsePromptAttachments(prompt: string): ParsedPrompt {
 			continue;
 		}
 		pushText(parts, prompt.slice(cursor, block.start));
-		for (const attachment of block.attachments) {
-			parts.push({ attachment, kind: 'attachment' });
-		}
+		parts.push(...block.parts);
 		cursor = block.end;
 	}
 	pushText(parts, prompt.slice(cursor));

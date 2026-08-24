@@ -4,6 +4,7 @@ import { profileElectronIpcCall } from '@/renderer/lib/instrumentation';
 import type {
 	CloseChatTabRequest,
 	CloseChatTabResult,
+	ListAllChatTabsResult,
 	ListChatTabsResult,
 	ListClosedChatTabsWithSummaryResult,
 	OpenChatTabRequest,
@@ -35,6 +36,26 @@ export function listChatTabsQuery(workspaceId: string) {
 		staleTime: 2000,
 	});
 }
+
+/**
+ * Query options for every workspace's chat tabs at once — open tabs plus the
+ * newest closed ones — for a surface that addresses the whole app rather than
+ * one workspace.
+ *
+ * One query rather than a fan-out of {@link listChatTabsQuery} over every
+ * workspace: a mention menu ranks across all of them on every keystroke, and a
+ * per-workspace query apiece would be one cache entry and one IPC round trip per
+ * project the user has open.
+ */
+export const allChatTabsQuery = queryOptions({
+	queryFn: (): Promise<ListAllChatTabsResult> =>
+		profileElectronIpcCall(
+			{ channel: 'ensemblr:list-all-chat-tabs', usesDatabase: true },
+			() => getEnsemblrApi().listAllChatTabs({}),
+		),
+	queryKey: ensemblrQueryKeys.allChatTabs(),
+	staleTime: 2000,
+});
 
 /**
  * Query options for closed chat tabs joined with their persisted session

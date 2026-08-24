@@ -423,7 +423,26 @@
 	font-variant-ligatures: none;
 }
 
+/*
+ * One turn, spent by the two `--animate-concierge-*` tokens below at different
+ * speeds. Declared here rather than inside `@theme` because that block is
+ * `inline`, which substitutes a token's value at the use site and so never
+ * emits keyframes of its own.
+ */
+@keyframes concierge-spin {
+	to {
+		transform: rotate(1turn);
+	}
+}
+
 @theme inline {
+	/*
+	 * The Concierge mark's orbiting ring, and the sheen that rides over the
+	 * launcher bubble beneath it. The ring turns slower than the sheen so the two
+	 * never lock into one rotation and read as a single spinning disc.
+	 */
+	--animate-concierge-orbit: concierge-spin 5s linear infinite;
+	--animate-concierge-sheen: concierge-spin 3.2s linear infinite;
 	--font-heading:
 		-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", sans-serif;
 	--font-sans:
@@ -562,6 +581,27 @@
 @utility code-line-counter {
 	--tw-content: counter(line);
 	content: var(--tw-content);
+}
+
+/*
+ * The lit arc that sweeps the Concierge launcher bubble while it is hovered or
+ * focused. A utility rather than an inline `bg-[conic-gradient(…)]` because the
+ * stop list is unreadable spelled out in a class attribute, and because the
+ * accent is a `color-mix` the arbitrary-value syntax would need escaping for.
+ *
+ * Every stop is the one accent hue fading out, so the arc lights the bubble
+ * rather than tinting it: mixing a second colour in leaves most of the disc a
+ * muddy wash of it, since this paints as a child over the bubble's own fill.
+ */
+@utility concierge-sheen {
+	background-image: conic-gradient(
+		from 0deg,
+		transparent 0deg,
+		color-mix(in oklch, var(--color-accent-strong) 90%, transparent) 55deg,
+		color-mix(in oklch, var(--color-accent-strong) 22%, transparent) 130deg,
+		transparent 200deg,
+		transparent 360deg
+	);
 }
 
 @layer base {

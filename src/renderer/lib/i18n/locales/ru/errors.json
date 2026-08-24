@@ -124,6 +124,9 @@
 		},
 		"reorder-failed": {
 			"title": "Не удалось изменить порядок вкладок"
+		},
+		"restore-failed": {
+			"title": "Не удалось снова открыть диалог"
 		}
 	},
 	"checkpoint-restore": {

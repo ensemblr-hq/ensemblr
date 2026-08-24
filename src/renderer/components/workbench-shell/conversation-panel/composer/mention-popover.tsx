@@ -1,4 +1,5 @@
 import type { TFunction } from 'i18next';
+import { FolderGitIcon, GitBranchIcon, MessageSquareIcon } from 'lucide-react';
 import type { CSSProperties, ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -11,10 +12,15 @@ import { Skeleton } from '@/renderer/components/ui/skeleton';
 import { WorkspaceFileIcon } from '@/renderer/components/workbench-shell/review-files/workspace-file-icon';
 import type {
 	AutocompleteKind,
+	ConciergeReferenceMatch,
 	MentionMatch,
 	SlashCommandMatch,
 	WorkspaceFileSummary,
 } from '@/renderer/types/workbench';
+import {
+	type ConciergeReference,
+	conciergeReferenceId,
+} from '@/shared/concierge-references';
 import { getAutocompleteHeight } from './autocomplete-height';
 import { AutocompleteRow } from './autocomplete-list';
 import { MatchHighlight } from './match-highlight';
@@ -25,8 +31,11 @@ const LOADING_PLACEHOLDER_ROWS = 5;
 interface ComposerAutocompletePopoverProps {
 	activeIndex: number;
 	children: ReactNode;
+	/** Projects, workspaces, and chats for an `entity` menu; empty otherwise. */
+	entityMatches?: readonly ConciergeReferenceMatch[];
 	kind: AutocompleteKind;
 	mentionMatches: readonly MentionMatch[];
+	onEntitySelect?: (reference: ConciergeReference) => void;
 	onHover: (index: number) => void;
 	onMentionSelect: (entry: WorkspaceFileSummary) => void;
 	onOpenChange: (open: boolean) => void;
@@ -116,6 +125,89 @@ function renderMentionRows({
 	));
 }
 
+/** The glyph that says what an entity row stands for. */
+function EntityRowIcon({ reference }: { reference: ConciergeReference }) {
+	if (reference.kind === 'project') {
+		return <FolderGitIcon aria-hidden='true' className='size-3.5' />;
+	}
+	if (reference.kind === 'workspace') {
+		return <GitBranchIcon aria-hidden='true' className='size-3.5' />;
+	}
+	return <MessageSquareIcon aria-hidden='true' className='size-3.5' />;
+}
+
+/**
+ * What an entity row says under its name: which project a workspace belongs to,
+ * which workspace a chat lives in. Without it two same-named workspaces in
+ * different projects are one row typed twice.
+ * @param reference - The reference the row stands for.
+ * @param t - Translator for the closed-chat marker.
+ * @returns The secondary text, or undefined for a project, which owns nothing above it.
+ */
+function entityRowSecondary(
+	reference: ConciergeReference,
+	t: TFunction,
+): ReactNode {
+	if (reference.kind === 'project') {
+		return undefined;
+	}
+	if (reference.kind === 'workspace') {
+		return <span className='truncate'>{reference.project}</span>;
+	}
+	return (
+		<span className='truncate'>
+			{reference.state === 'closed'
+				? t('workbench:autocomplete.closed-chat-in', '{{workspace}} · closed', {
+						workspace: reference.workspace,
+					})
+				: reference.workspace}
+		</span>
+	);
+}
+
+/** Renders Concierge project, workspace, and chat autocomplete rows. */
+function renderEntityRows({
+	activeIndex,
+	matches,
+	onHover,
+	onSelect,
+	t,
+}: {
+	activeIndex: number;
+	matches: readonly ConciergeReferenceMatch[];
+	onHover: (index: number) => void;
+	onSelect: (reference: ConciergeReference) => void;
+	t: TFunction;
+}): ReactNode {
+	if (matches.length === 0) {
+		return (
+			<div className='px-2 py-1.5 text-muted-foreground text-xs'>
+				{t(
+					'workbench:autocomplete.no-references',
+					'No matching projects, workspaces, or chats',
+				)}
+			</div>
+		);
+	}
+
+	return matches.map((match, index) => (
+		<AutocompleteRow
+			active={index === activeIndex}
+			icon={<EntityRowIcon reference={match.reference} />}
+			key={`${match.reference.kind}:${conciergeReferenceId(match.reference)}`}
+			onHover={() => onHover(index)}
+			onSelect={() => onSelect(match.reference)}
+			primary={
+				<MatchHighlight
+					ranges={match.labelRanges}
+					text={match.reference.label}
+				/>
+			}
+			secondary={entityRowSecondary(match.reference, t)}
+		/>
+	));
+}
+
 /** Renders slash command autocomplete rows. */
 function renderSlashRows({
 	activeIndex,
@@ -177,7 +269,7 @@ function getRowCount(
 	slashCount: number,
 	slashLoading: boolean,
 ): number {
-	if (kind === 'mention') {
+	if (kind === 'entity' || kind === 'mention') {
 		return mentionCount;
 	}
 	if (slashCount === 0 && slashLoading) {
@@ -194,8 +286,10 @@ function getRowCount(
 export function ComposerAutocompletePopover({
 	activeIndex,
 	children,
+	entityMatches = [],
 	kind,
 	mentionMatches,
+	onEntitySelect,
 	onHover,
 	onMentionSelect,
 	onOpenChange,
@@ -204,30 +298,26 @@ export function ComposerAutocompletePopover({
 	slashMatches,
 }: ComposerAutocompletePopoverProps) {
 	const { t } = useTranslation();
-	const open = kind === 'mention' || kind === 'slash';
+	const open = kind !== null;
 	const rowCount = getRowCount(
 		kind,
-		mentionMatches.length,
+		kind === 'entity' ? entityMatches.length : mentionMatches.length,
 		slashMatches.length,
 		slashLoading,
 	);
-	const rows =
-		kind === 'mention'
-			? renderMentionRows({
-					activeIndex,
-					matches: mentionMatches,
-					onHover,
-					onSelect: onMentionSelect,
-					t,
-				})
-			: renderSlashRows({
-					activeIndex,
-					loading: slashLoading,
-					matches: slashMatches,
-					onHover,
-					onSelect: onSlashSelect,
-					t,
-				});
+	const rows = renderRows({
+		activeIndex,
+		entityMatches,
+		kind,
+		mentionMatches,
+		onEntitySelect,
+		onHover,
+		onMentionSelect,
+		onSlashSelect,
+		slashLoading,
+		slashMatches,
+		t,
+	});
 
 	return (
 		<Popover onOpenChange={onOpenChange} open={open}>
@@ -248,4 +338,68 @@ export function ComposerAutocompletePopover({
 			</PopoverContent>
 		</Popover>
 	);
+}
+
+/**
+ * Picks the row renderer for whichever menu is open, so the popover itself stays
+ * one anchored, scroll-sized shell rather than three.
+ * @param input - The open kind, every match list, and the sinks a pick writes to.
+ * @returns The rows to render.
+ */
+function renderRows({
+	activeIndex,
+	entityMatches,
+	kind,
+	mentionMatches,
+	onEntitySelect,
+	onHover,
+	onMentionSelect,
+	onSlashSelect,
+	slashLoading,
+	slashMatches,
+	t,
+}: {
+	activeIndex: number;
+	entityMatches: readonly ConciergeReferenceMatch[];
+	kind: AutocompleteKind;
+	mentionMatches: readonly MentionMatch[];
+	onEntitySelect?: (reference: ConciergeReference) => void;
+	onHover: (index: number) => void;
+	onMentionSelect: (entry: WorkspaceFileSummary) => void;
+	onSlashSelect: (command: string, autoSubmit: boolean) => void;
+	slashLoading: boolean;
+	slashMatches: readonly SlashCommandMatch[];
+	t: TFunction;
+}): ReactNode {
+	if (kind === 'entity') {
+		return renderEntityRows({
+			activeIndex,
+			matches: entityMatches,
+			onHover,
+			onSelect: onEntitySelect ?? noSelection,
+			t,
+		});
+	}
+	if (kind === 'mention') {
+		return renderMentionRows({
+			activeIndex,
+			matches: mentionMatches,
+			onHover,
+			onSelect: onMentionSelect,
+			t,
+		});
+	}
+	return renderSlashRows({
+		activeIndex,
+		loading: slashLoading,
+		matches: slashMatches,
+		onHover,
+		onSelect: onSlashSelect,
+		t,
+	});
+}
+
+/** Stands in for an entity sink a surface without entities never supplies. */
+function noSelection(): void {
+	return;
 }

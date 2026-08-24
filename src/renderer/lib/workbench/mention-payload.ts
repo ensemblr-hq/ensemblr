@@ -4,6 +4,7 @@ import type {
 	ComposerDraftSegment,
 	LinkedDirectory,
 } from '@/renderer/types/workbench';
+import { formatConciergeReferenceBlock } from '@/shared/concierge-references';
 import {
 	formatAttachedFileBlock,
 	LINKED_DIRECTORIES_HEADER,
@@ -225,6 +226,9 @@ function segmentBlock(
 	if (segment.kind === 'text') {
 		return segment.text.trim() || null;
 	}
+	if (isReferenceAttachment(segment.attachment)) {
+		return formatConciergeReferenceBlock(segment.attachment.reference);
+	}
 	return formatAttachedFileSection(
 		attachmentPromptPath(segment.attachment),
 		contentByAttachment.get(segment.attachment.id) ?? ATTACHMENT_PLACEHOLDER,
@@ -271,6 +275,9 @@ async function readAttachmentContent(
 	if (attachment.kind === 'external-file') {
 		return EXTERNAL_PLACEHOLDER;
 	}
+	if (isReferenceAttachment(attachment)) {
+		return null;
+	}
 	if (
 		attachment.kind === 'workspace-directory' ||
 		!shouldInlineAsText(attachment.path)
@@ -298,9 +305,27 @@ async function readAttachmentContent(
  * @returns The workspace-relative path, the absolute path, or the upload's name.
  */
 function attachmentPromptPath(attachment: ComposerAttachment): string {
-	return attachment.kind === 'external-file'
-		? attachment.absolutePath
-		: attachment.path;
+	if (attachment.kind === 'external-file') {
+		return attachment.absolutePath;
+	}
+	return isReferenceAttachment(attachment) ? attachment.label : attachment.path;
+}
+
+/**
+ * Whether a chip stands for a project, a workspace, or a chat rather than for a
+ * file. Such a chip has no path and no bytes to read: it serializes to a block
+ * of ids the agent addresses its own ops with.
+ * @param attachment - The attachment being walked.
+ * @returns True when the attachment carries a reference.
+ */
+function isReferenceAttachment(
+	attachment: ComposerAttachment,
+): attachment is Extract<ComposerAttachment, { reference: unknown }> {
+	return (
+		attachment.kind === 'chat-ref' ||
+		attachment.kind === 'project-ref' ||
+		attachment.kind === 'workspace-ref'
+	);
 }
 
 /** Returns true when a file's content should be inlined as text rather than referenced by path. */

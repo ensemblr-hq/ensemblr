@@ -47,17 +47,21 @@
 			{
 				// Sequential by intent, each for its own reason. summary-queue drains
 				// a `for(;;)` loop that serializes summary writes so an older LLM
-				// response cannot win the race. delete-repository runs `git worktree
-				// remove` per workspace, which would race on `.git/index.lock`. The
-				// Codex rollout walk (agent-conversation-title) recurses newest-first
-				// under a MAX_SESSION_CANDIDATES budget with early returns. The
-				// pasted-file save loop (composer-attachments) preserves paste order,
-				// stops on the first error, and avoids saveCopy filename-collision
-				// races. Promise.all would corrupt the index, overshoot the budget, or
-				// change error/collision semantics.
+				// response cannot win the race. The Codex rollout walk
+				// (agent-conversation-title) recurses newest-first under a
+				// MAX_SESSION_CANDIDATES budget with early returns. The pasted-file
+				// save loop (composer-attachments) preserves paste order, stops on the
+				// first error, and avoids saveCopy filename-collision races.
+				// Promise.all would overshoot the budget or change error/collision
+				// semantics.
+				//
+				// delete-repository is deliberately absent: its per-workspace `git
+				// worktree remove` loop is just as sequential-by-intent, but the rule
+				// no longer flags it, and an override that suppresses nothing is the
+				// blind spot this file's header warns about. Re-add it with this same
+				// justification if the finding comes back.
 				"files": [
 					"src/main/agent-runtime/session/summary-queue.ts",
-					"src/main/repository/delete-repository.ts",
 					"src/main/terminal/agent-conversation-title.ts",
 					"src/renderer/lib/workbench/composer-attachments.ts"
 				],

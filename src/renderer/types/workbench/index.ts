@@ -14,6 +14,7 @@ export type {
 	ComposerDraftSegment,
 	ComposerSendIntent,
 	ComposerTextSource,
+	ConciergeReferenceMatch,
 	FollowUpQueueHoldReason,
 	GroupedOptions,
 	LinkedDirectory,

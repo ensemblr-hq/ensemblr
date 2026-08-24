@@ -210,6 +210,7 @@ export function createEnsemblrApi(): EnsemblrApi {
 		listAllWorkspaces: () => invoke('listAllWorkspaces'),
 		listArchivedWorkspaces: (request) =>
 			invoke('listArchivedWorkspaces', request),
+		listAllChatTabs: (request) => invoke('listAllChatTabs', request),
 		listChatTabs: (request) => invoke('listChatTabs', request),
 		forgetLinkedDirectoryRecent: (request) =>
 			invoke('forgetLinkedDirectoryRecent', request),

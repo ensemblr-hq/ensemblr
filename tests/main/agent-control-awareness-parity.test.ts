@@ -21,6 +21,7 @@ import {
 	subAgentControlOpDenial,
 	withheldControlOps,
 } from '../../src/shared/agent-control.ts';
+import { formatConciergeReferenceHref } from '../../src/shared/concierge-references.ts';
 import {
 	CONCIERGE_GUARDED_TOOLS,
 	PLAN_MODE_GUARDED_TOOLS,
@@ -913,6 +914,18 @@ describe('Concierge role policy', () => {
 		expect(CONCIERGE_AWARENESS).toContain('ensemblr_set_name');
 		expect(CONCIERGE_AWARENESS).toContain('ensemblr_set_summary');
 		expect(CONCIERGE_AWARENESS).toContain('refused here');
+	});
+
+	// The syntax is only useful if the playbook spells the exact destination the
+	// renderer parses back, and says where the ids come from. A scheme typed
+	// differently here renders as prose in every answer, silently.
+	it('teaches the reference link syntax the renderer parses back', () => {
+		for (const kind of ['chat', 'project', 'workspace'] as const) {
+			const href = formatConciergeReferenceHref(kind, 'id');
+			expect(CONCIERGE_AWARENESS).toContain(href.slice(0, href.length - 2));
+		}
+		expect(CONCIERGE_AWARENESS).toContain('ensemblr_list_workspaces');
+		expect(CONCIERGE_AWARENESS).toContain('ensemblr_list_tabs');
 	});
 });
 

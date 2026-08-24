@@ -10,6 +10,11 @@ import {
 	optionalStringCoerceNullToUndefined,
 } from './primitives.ts';
 
+/** {@link import('../../../shared/ipc').ListAllChatTabsRequest}. */
+export const listAllChatTabsRequestSchema = z.object({
+	closedLimit: z.number().int().positive().max(500).optional(),
+});
+
 /** {@link import('../../../shared/ipc').ListChatTabsRequest}. */
 export const listChatTabsRequestSchema = z.object({
 	workspaceId: z.string().min(1),

@@ -1,6 +1,7 @@
 import type { EditorState } from 'lexical';
 
 import type { MatchRange } from '@/renderer/lib/workbench/fuzzy-score';
+import type { ConciergeReference } from '@/shared/concierge-references';
 import type {
 	AgentProviderSlashCommandScope,
 	AgentProviderSlashCommandSource,
@@ -54,6 +55,17 @@ export interface MentionMatch {
 	entry: WorkspaceFileSummary;
 	nameRanges: readonly MatchRange[];
 	pathRanges: readonly MatchRange[];
+}
+
+/**
+ * One ranked Concierge reference row plus the spans of its label that matched
+ * the query. Sits beside {@link MentionMatch} rather than in a concern of its
+ * own because it is the same row in the same menu, differing only in what the
+ * row stands for.
+ */
+export interface ConciergeReferenceMatch {
+	labelRanges: readonly MatchRange[];
+	reference: ConciergeReference;
 }
 
 /**
@@ -141,6 +153,18 @@ export type ComposerAttachment =
 			label: string;
 			/** Path of the markdown document the comment was written out to. */
 			path: string;
+	  }
+	| {
+			id: string;
+			kind: 'project-ref' | 'workspace-ref' | 'chat-ref';
+			label: string;
+			/**
+			 * What the chip stands for and the ids it serializes to. Carried whole
+			 * rather than flattened into fields because the same value crosses to the
+			 * agent as a prompt block and comes back out of a markdown link, and one
+			 * shape for all three passes is what keeps those two ends in step.
+			 */
+			reference: ConciergeReference;
 	  };
 
 /**

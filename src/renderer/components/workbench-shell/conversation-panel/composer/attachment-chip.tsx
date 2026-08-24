@@ -1,5 +1,11 @@
 import { Icon } from '@iconify/react';
-import { FileDiffIcon, XIcon } from 'lucide-react';
+import {
+	FileDiffIcon,
+	FolderGitIcon,
+	GitBranchIcon,
+	MessageSquareIcon,
+	XIcon,
+} from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { ProviderMark } from '@/renderer/components/workbench-shell/checks-panel/provider-mark';
 import {
@@ -9,14 +15,27 @@ import {
 import { getWorkspaceFileIconName } from '@/renderer/lib/workbench';
 import { formatCommentLocation } from '@/renderer/lib/workbench/comment-body';
 import type { ComposerAttachment } from '@/renderer/types/workbench';
+import type { ConciergeReference } from '@/shared/concierge-references';
 
 /**
  * The glyph that says where an attachment came from: a tracker issue or a review
- * comment wears its provider's brand mark, and a diff wears a compare mark, since
- * the markdown document each was written to would otherwise render as an
- * anonymous file icon.
+ * comment wears its provider's brand mark, a diff wears a compare mark, and a
+ * project, workspace, or chat wears the mark the sidebar gives it — since the
+ * markdown document or the id behind each would otherwise render as an anonymous
+ * file icon.
  */
 function AttachmentIcon({ attachment }: { attachment: ComposerAttachment }) {
+	if (attachment.kind === 'project-ref') {
+		return <FolderGitIcon aria-hidden='true' className='size-3.5 shrink-0' />;
+	}
+	if (attachment.kind === 'workspace-ref') {
+		return <GitBranchIcon aria-hidden='true' className='size-3.5 shrink-0' />;
+	}
+	if (attachment.kind === 'chat-ref') {
+		return (
+			<MessageSquareIcon aria-hidden='true' className='size-3.5 shrink-0' />
+		);
+	}
 	if (attachment.kind === 'review-comment') {
 		return <ProviderMark provider={attachment.comment.provider} />;
 	}
@@ -56,11 +75,32 @@ function attachmentTooltip(attachment: ComposerAttachment): string {
 	if (attachment.kind === 'file-diff') {
 		return attachment.filePath || attachment.label;
 	}
+	if (attachment.kind === 'workspace-ref' || attachment.kind === 'chat-ref') {
+		return referenceTooltip(attachment.reference) || attachment.label;
+	}
 	if (attachment.kind !== 'review-comment') {
 		return attachment.label;
 	}
 	const { line, path } = attachment.comment;
 	return formatCommentLocation(path, line) || attachment.label;
+}
+
+/**
+ * Where a reference sits, so two same-named workspaces in different projects — or
+ * two chats called the same thing — are told apart on hover.
+ * @param reference - The reference behind the chip.
+ * @returns The qualified name, or an empty string when the owner is unknown.
+ */
+function referenceTooltip(reference: ConciergeReference): string {
+	if (reference.kind === 'workspace') {
+		return reference.project ? `${reference.project} › ${reference.label}` : '';
+	}
+	if (reference.kind === 'chat') {
+		return reference.workspace
+			? `${reference.workspace} › ${reference.label}`
+			: '';
+	}
+	return reference.label;
 }
 
 /**

@@ -39,6 +39,22 @@ export interface ClosedChatTabEntryWire {
 	tab: ChatTabWire;
 }
 
+/**
+ * List chat tabs across every workspace at once, for a surface that addresses
+ * the whole app rather than one workspace — the Concierge's `@` menu, which has
+ * no workspace to scope itself to. `closedLimit` caps the recently-closed half,
+ * which is unbounded over a project's lifetime where the open half is not.
+ */
+export interface ListAllChatTabsRequest {
+	closedLimit?: number;
+}
+
+/** Result of listing every workspace's chat tabs: its open and closed tabs. */
+export interface ListAllChatTabsResult {
+	closed: readonly ChatTabWire[];
+	open: readonly ChatTabWire[];
+}
+
 /** List all chat tabs (open + closed) for a workspace. */
 export interface ListChatTabsRequest {
 	workspaceId: string;
@@ -187,6 +203,9 @@ export interface ChatTabApi {
 		request: BindAgentSessionToTabRequest,
 	) => Promise<BindAgentSessionToTabResult>;
 	closeChatTab: (request: CloseChatTabRequest) => Promise<CloseChatTabResult>;
+	listAllChatTabs: (
+		request: ListAllChatTabsRequest,
+	) => Promise<ListAllChatTabsResult>;
 	listChatTabs: (request: ListChatTabsRequest) => Promise<ListChatTabsResult>;
 	listClosedChatTabsWithSummary: (
 		request: ListClosedChatTabsWithSummaryRequest,

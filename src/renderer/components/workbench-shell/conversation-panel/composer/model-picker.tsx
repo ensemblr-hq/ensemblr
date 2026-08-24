@@ -296,9 +296,13 @@ export function ModelPicker({
 			<Tooltip onOpenChange={setTooltipOpen} open={open ? false : tooltipOpen}>
 				<TooltipTrigger asChild>
 					<PopoverTrigger asChild>
+						{/* Shrinkable, against the `shrink-0` every button carries: this
+						    row has to fit the Concierge's docked card as well as a
+						    full-width chat, and the model name is the one label in it that
+						    can afford to truncate. */}
 						<Button
 							aria-label={t('workbench:model-picker.aria-label', 'Model')}
-							className='h-7 rounded-md px-1.5'
+							className='h-7 min-w-0 shrink rounded-md px-1.5'
 							disabled={disabled}
 							size='sm'
 							type='button'
@@ -308,7 +312,7 @@ export function ModelPicker({
 								agentProvider={selected?.agentProvider ?? null}
 								vendor={selected?.vendor ?? ''}
 							/>
-							<span className='font-medium text-foreground'>
+							<span className='truncate font-medium text-foreground'>
 								{selected?.displayName ??
 									t('workbench:model-picker.unselected', 'Select model')}
 							</span>

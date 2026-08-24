@@ -4,6 +4,7 @@ import type {
 	BindAgentSessionToTabResult,
 	ChatTabWire,
 	CloseChatTabResult,
+	ListAllChatTabsResult,
 	ListChatTabsResult,
 	ListClosedChatTabsWithSummaryResult,
 	OpenChatTabResult,
@@ -17,6 +18,7 @@ import type { ChatTabRow } from '../../storage/repositories';
 import {
 	bindAgentSessionToChatTabRequestSchema,
 	closeChatTabRequestSchema,
+	listAllChatTabsRequestSchema,
 	listChatTabsRequestSchema,
 	listClosedChatTabsWithSummaryRequestSchema,
 	openChatTabRequestSchema,
@@ -24,6 +26,13 @@ import {
 	reorderChatTabsRequestSchema,
 	restoreChatTabRequestSchema,
 } from '../request-schemas.ts';
+
+/**
+ * How many recently-closed tabs an app-wide listing returns when the caller names
+ * no cap. Sized for a mention menu: enough that a chat closed earlier today is
+ * still reachable, few enough that the payload stays a menu rather than a history.
+ */
+const DEFAULT_CLOSED_TAB_LIMIT = 100;
 
 /**
  * Registers IPC handlers exposing chat-tab CRUD and closed-tab history to the
@@ -35,6 +44,17 @@ export function registerChatTabHandlers({
 }: {
 	chatTabService: ChatTabService;
 }): void {
+	ipcMain.handle(
+		IPC_CHANNELS.listAllChatTabs,
+		async (_event, raw: unknown): Promise<ListAllChatTabsResult> => {
+			const { closedLimit } = listAllChatTabsRequestSchema.parse(raw ?? {});
+			const { closed, open } = chatTabService.listAllTabs({
+				closedLimit: closedLimit ?? DEFAULT_CLOSED_TAB_LIMIT,
+			});
+			return { closed: closed.map(toWire), open: open.map(toWire) };
+		},
+	);
+
 	ipcMain.handle(
 		IPC_CHANNELS.listChatTabs,
 		async (_event, raw: unknown): Promise<ListChatTabsResult> => {

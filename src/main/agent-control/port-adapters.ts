@@ -194,6 +194,8 @@ interface WorkspaceRow {
 	name: string | null;
 	path: string;
 	archivedAt: string | null;
+	repositoryId: string;
+	repositoryName: string | null;
 }
 
 /**
@@ -215,6 +217,8 @@ function makeWorkspacePort(deps: PortAdapterDeps): WorkspacePort {
 					workspaceId: row.id,
 					name: row.name ?? row.id,
 					cwd: row.path,
+					projectId: row.repositoryId,
+					projectName: row.repositoryName ?? row.repositoryId,
 					boardStatus: deps.boardStatusStore.get(row.id),
 				}));
 		},

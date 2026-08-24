@@ -13,6 +13,19 @@ import {
 	resolveFixtureOpenTargets,
 } from './agent-provider-fixtures.ts';
 import { installPlaygroundBridge } from './bridge.ts';
+import {
+	registerFixtureConciergeEvents,
+	resolveFixtureAgentModels,
+	resolveFixtureAllChatTabs,
+	resolveFixtureAppSettings,
+	resolveFixtureConciergeClear,
+	resolveFixtureConciergeEvents,
+	resolveFixtureConciergePressure,
+	resolveFixtureConciergeSession,
+	resolveFixtureConciergeStop,
+	resolveFixtureConciergeSubmit,
+	resolveFixtureDictationKeyStatus,
+} from './concierge-fixtures.ts';
 import { resolveFixtureMergeConflicts } from './conflicts-fixtures.ts';
 import { resolveFixtureLinearMetadata } from './linear-issue-editor-fixtures.ts';
 import { Playground } from './playground.tsx';
@@ -32,17 +45,28 @@ if (!rootElement) {
 
 installPlaygroundBridge({
 	addWordToDictionary: recordFixtureDictionaryWord,
+	clearConciergeContext: resolveFixtureConciergeClear,
+	conciergeContextPressure: resolveFixtureConciergePressure,
+	dictationKeyStatus: resolveFixtureDictationKeyStatus,
 	getAgentProviderExecutablePath: resolveFixtureAgentProviderExecutablePath,
 	getAgentProviderReadiness: resolveFixtureAgentProviderReadiness,
+	getAppSettings: resolveFixtureAppSettings,
 	getWorkspaceGitStatus: resolveFixtureGitStatus,
 	getWorkspaceMergeConflicts: resolveFixtureMergeConflicts,
 	linearMetadata: resolveFixtureLinearMetadata,
+	listAgentModels: resolveFixtureAgentModels,
 	listAgentProviderMcpServers: resolveFixtureAgentProviderMcpServers,
+	listAllChatTabs: resolveFixtureAllChatTabs,
+	listConciergeEvents: resolveFixtureConciergeEvents,
 	listWorkspaceOpenTargets: resolveFixtureOpenTargets,
+	onConciergeSessionEvent: registerFixtureConciergeEvents,
 	onTextContextMenu: registerFixtureTextContextMenu,
 	openAgentProviderSettingsFile: resolveFixtureOpenProviderSettingsFile,
+	openConciergeSession: resolveFixtureConciergeSession,
 	replaceMisspelling: recordFixtureMisspellingReplacement,
 	runTextEditCommand: recordFixtureTextEditCommand,
+	stopConciergeSession: resolveFixtureConciergeStop,
+	submitConciergePrompt: resolveFixtureConciergeSubmit,
 });
 
 const queryClient = new QueryClient({

@@ -211,6 +211,53 @@ describe('the Concierge launcher', () => {
 		expect(panel.querySelector('header')).toHaveClass('h-12');
 	});
 
+	test('maximizes on a double-click of its docked title bar', async () => {
+		renderBare();
+
+		await userEvent.click(
+			screen.getByRole('button', { name: 'Open the Concierge' }),
+		);
+		const panel = await screen.findByRole('region', { name: 'Concierge' });
+		const header = panel.querySelector('header');
+		if (!header) {
+			throw new Error('the panel rendered no header');
+		}
+
+		await userEvent.dblClick(header);
+		expect(panel).toHaveAttribute('data-concierge-presentation', 'fullscreen');
+
+		// Maximized, the header spans the window's own title area, where macOS has
+		// already claimed the double-click for zoom — so it hands the gesture back
+		// and the button beside it is what restores the panel.
+		await userEvent.dblClick(header);
+		expect(panel).toHaveAttribute('data-concierge-presentation', 'fullscreen');
+
+		await userEvent.click(
+			screen.getByRole('button', { name: 'Restore panel' }),
+		);
+		expect(panel).toHaveAttribute('data-concierge-presentation', 'panel');
+	});
+
+	test('leaves the title bar alone when a header control is double-clicked', async () => {
+		renderBare();
+
+		await userEvent.click(
+			screen.getByRole('button', { name: 'Open the Concierge' }),
+		);
+		const panel = await screen.findByRole('region', { name: 'Concierge' });
+
+		// Every header control sits on the title bar, so a double-click of one
+		// would otherwise fire the control twice *and* the bar underneath it. The
+		// maximize button is what makes that visible: unguarded, its own two clicks
+		// plus the bar's would land the panel back where it started.
+		await userEvent.dblClick(screen.getByRole('button', { name: 'Maximize' }));
+
+		expect(panel).toHaveAttribute('data-concierge-presentation', 'panel');
+		expect(
+			screen.getByRole('button', { name: 'Maximize' }),
+		).toBeInTheDocument();
+	});
+
 	test('offers a way back to a collapsed sidebar once maximized', async () => {
 		renderBare({ sidebarOpen: false });
 
@@ -508,9 +555,11 @@ describe('the Concierge anchor', () => {
 		// The button's base style transitions every property, `left` and `top`
 		// among them — which had the bubble easing toward the cursor a transition
 		// duration behind it while the panel, a plain section, tracked it exactly.
+		// `transform` is on the named list because the hover lift is a scale, which
+		// the drag never writes.
 		expect(bubble).not.toHaveClass('transition-all');
 		expect(bubble).toHaveClass(
-			'transition-[background-color,border-color,box-shadow]',
+			'transition-[background-color,border-color,box-shadow,transform]',
 		);
 	});
 
