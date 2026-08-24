@@ -118,6 +118,9 @@
 		},
 		"reorder-failed": {
 			"title": "Could not reorder tabs"
+		},
+		"restore-failed": {
+			"title": "Could not reopen chat"
 		}
 	},
 	"checkpoint-restore": {

@@ -340,6 +340,40 @@ export function listOpenChatTabs({
 	return rows.map(mapTabRow);
 }
 
+/**
+ * Returns every workspace's open tabs, plus the most recently closed tabs across
+ * all of them under a cap.
+ *
+ * The two halves are ordered differently on purpose: open tabs read as each
+ * workspace's own strip, so they keep position order, while closed tabs have no
+ * strip left to belong to and are only ever wanted newest-first. The cap applies
+ * to the closed half alone — open tabs are bounded by what the user has on
+ * screen, where closed ones accumulate for the life of a project.
+ * @param database - The open SQLite connection.
+ * @param closedLimit - How many recently-closed tabs to return.
+ * @returns The open and closed tabs across every workspace.
+ */
+export function listChatTabsAcrossWorkspaces({
+	closedLimit,
+	database,
+}: {
+	closedLimit: number;
+	database: DatabaseSync;
+}): { closed: readonly ChatTabRow[]; open: readonly ChatTabRow[] } {
+	const open = database
+		.prepare(
+			`${SELECT_TAB} WHERE closed_at IS NULL ORDER BY workspace_id ASC, position ASC, opened_at ASC`,
+		)
+		.all() as unknown as ChatTabRowShape[];
+	const closed = database
+		.prepare(
+			`${SELECT_TAB} WHERE closed_at IS NOT NULL ORDER BY closed_at DESC LIMIT ?`,
+		)
+		.all(closedLimit) as unknown as ChatTabRowShape[];
+
+	return { closed: closed.map(mapTabRow), open: open.map(mapTabRow) };
+}
+
 /** Alias for {@link listOpenChatTabs} matching the wire-contract naming. */
 export function listOpenForWorkspace({
 	database,

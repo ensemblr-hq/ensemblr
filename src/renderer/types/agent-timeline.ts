@@ -7,6 +7,7 @@
  */
 
 import type { DynamicToolUIPart, UIMessage } from 'ai';
+import type { ConciergeReference } from '@/shared/concierge-references';
 
 import type { AgentWireError } from '@/shared/ipc/contracts/agent-session';
 
@@ -121,9 +122,13 @@ export interface ParsedPromptAttachment {
 	path: string;
 }
 
-/** One run of a parsed prompt: a stretch of the typed message, or an attachment. */
+/**
+ * One run of a parsed prompt: a stretch of the typed message, an attachment, or a
+ * project/workspace/chat the Concierge was pointed at.
+ */
 export type ParsedPromptPart =
 	| { attachment: ParsedPromptAttachment; kind: 'attachment' }
+	| { kind: 'reference'; reference: ConciergeReference }
 	| { kind: 'text'; text: string };
 
 /**

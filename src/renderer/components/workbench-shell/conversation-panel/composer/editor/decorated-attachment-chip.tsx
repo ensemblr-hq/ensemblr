@@ -2,6 +2,7 @@ import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext
 import { $getNodeByKey, type NodeKey } from 'lexical';
 import { useCallback } from 'react';
 
+import { useConciergeReferenceAccess } from '@/renderer/components/concierge/concierge-reference-context';
 import {
 	useCommentPreviewOpener,
 	useFilePreviewOpener,
@@ -27,6 +28,7 @@ export function DecoratedAttachmentChip({
 	const [editor] = useLexicalComposerContext();
 	const openFilePreview = useFilePreviewOpener();
 	const openCommentPreview = useCommentPreviewOpener();
+	const referenceAccess = useConciergeReferenceAccess();
 
 	const handleRemove = useCallback(() => {
 		editor.update(() => {
@@ -39,6 +41,7 @@ export function DecoratedAttachmentChip({
 		attachment,
 		openCommentPreview,
 		openFilePreview,
+		referenceAccess,
 	});
 
 	if (attachment.kind === 'pasted-text') {
@@ -64,22 +67,36 @@ export function DecoratedAttachmentChip({
 /**
  * What a click on the chip does: a review comment opens its own preview panel,
  * because the markdown document it was written to is a serialization detail the
- * user never asked to read; everything else opens in the file preview. Undefined
- * when the surrounding workspace offers no opener, which renders the chip inert.
+ * user never asked to read; a project, workspace, or chat focuses that surface;
+ * everything else opens in the file preview. Undefined when the surrounding
+ * workspace offers no opener, which renders the chip inert — as a project chip
+ * always is, having no surface of its own to focus.
  * @param attachment - The attachment behind the chip
  * @param openCommentPreview - Comment preview opener, or null outside a workspace
  * @param openFilePreview - File preview opener, or null outside a conversation
+ * @param referenceAccess - Reference opener, or null outside the Concierge
  * @returns The activation handler, or undefined when there is nothing to open
  */
 function resolveChipActivation({
 	attachment,
 	openCommentPreview,
 	openFilePreview,
+	referenceAccess,
 }: {
 	attachment: ComposerAttachment;
 	openCommentPreview: ReturnType<typeof useCommentPreviewOpener>;
 	openFilePreview: ReturnType<typeof useFilePreviewOpener>;
+	referenceAccess: ReturnType<typeof useConciergeReferenceAccess>;
 }): (() => void) | undefined {
+	if (attachment.kind === 'chat-ref' || attachment.kind === 'workspace-ref') {
+		const { reference } = attachment;
+		return referenceAccess
+			? () => referenceAccess.openReference(reference)
+			: undefined;
+	}
+	if (attachment.kind === 'project-ref') {
+		return undefined;
+	}
 	if (attachment.kind === 'review-comment') {
 		if (!openCommentPreview) {
 			return undefined;

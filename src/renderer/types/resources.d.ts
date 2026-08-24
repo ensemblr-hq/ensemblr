@@ -566,6 +566,9 @@ export default interface Resources {
 			'reorder-failed': {
 				title: 'Could not reorder tabs';
 			};
+			'restore-failed': {
+				title: 'Could not reopen chat';
+			};
 		};
 		'checkpoint-restore': {
 			failed: {
@@ -2367,11 +2370,14 @@ export default interface Resources {
 			'link-issue-soon': {
 				title: 'Linking issues is coming soon.';
 			};
+			mention: 'Mention…';
 			tooltip: 'Add attachments, link issues, and more';
 		};
 		autocomplete: {
+			'closed-chat-in': '{{workspace}} · closed';
 			'no-commands': 'No matching commands';
 			'no-files': 'No matching files';
+			'no-references': 'No matching projects, workspaces, or chats';
 		};
 		'board-status': {
 			backlog: 'Backlog';
@@ -2526,7 +2532,7 @@ export default interface Resources {
 				placeholder: 'Ask across every project…';
 				'prompt-failed': 'The message could not be prepared for sending.';
 				'send-tooltip': 'Send message';
-				'stop-tooltip': 'Stop the turn';
+				'upload-input': 'Upload attachment';
 			};
 			launcher: {
 				open: 'Open the Concierge';
@@ -2540,6 +2546,7 @@ export default interface Resources {
 				pressure: 'Context is filling up. Clearing now writes what was learned to memory first.';
 				'pressure-clear': 'Clear now';
 				'pressure-dismiss': 'Not yet';
+				resize: 'Resize the Concierge — drag any edge, or use the arrow keys';
 				restore: 'Restore panel';
 				title: 'Concierge';
 			};
@@ -2549,7 +2556,7 @@ export default interface Resources {
 				'unknown-failure': 'Something went wrong in the Concierge.';
 			};
 			timeline: {
-				empty: 'Ask about any project, and the Concierge can read it, spawn agents into it, and remember what came of that.';
+				empty: 'Ask about your current projects, assign some work, learn anything about Ensemblr — or just chat.';
 				starting: 'Waking the Concierge';
 			};
 		};

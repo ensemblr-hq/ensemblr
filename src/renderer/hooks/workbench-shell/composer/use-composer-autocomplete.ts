@@ -6,7 +6,10 @@ import { detectAutocomplete } from '@/renderer/hooks/workbench-shell/composer/us
 import { useMentionMatches } from '@/renderer/hooks/workbench-shell/composer/use-mention-matches';
 import { useSlashCommands } from '@/renderer/hooks/workbench-shell/composer/use-slash-commands';
 import { useSlashMatches } from '@/renderer/hooks/workbench-shell/composer/use-slash-matches';
-import { resolveComposerProvider } from '@/renderer/lib/workbench/composer';
+import {
+	mentionReplacementRange,
+	resolveComposerProvider,
+} from '@/renderer/lib/workbench/composer';
 import { workspaceFileAttachment } from '@/renderer/lib/workbench/composer-attachments';
 import {
 	recordSlashCommandUse,
@@ -37,27 +40,6 @@ const EMPTY_AUTOCOMPLETE: AutocompleteState = {
  */
 function stepActiveIndex(stored: number, delta: number, total: number): number {
 	return (Math.min(stored, Math.max(0, total - 1)) + delta + total) % total;
-}
-
-/**
- * The span a mention pick replaces. A chip already reads as one space in the
- * draft, so the spaces around the `@` token go with it — otherwise every pick
- * would leave a double space where the token used to be.
- * @param value - The whole draft
- * @param token - Where the detected token starts and ends
- * @returns The span the chip is written over
- */
-function mentionReplacementRange(
-	value: string,
-	token: { tokenEnd: number; tokenStart: number },
-): { end: number; start: number } {
-	return {
-		end: value[token.tokenEnd] === ' ' ? token.tokenEnd + 1 : token.tokenEnd,
-		start:
-			token.tokenStart > 0 && value[token.tokenStart - 1] === ' '
-				? token.tokenStart - 1
-				: token.tokenStart,
-	};
 }
 
 /**

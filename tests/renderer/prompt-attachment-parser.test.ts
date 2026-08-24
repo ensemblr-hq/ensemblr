@@ -15,6 +15,14 @@ function attachments(parts: readonly ParsedPromptPart[]) {
 	);
 }
 
+/** Reads a part back as the text or path it renders, whichever it carries. */
+function partLabel(part: ParsedPromptPart): string {
+	if (part.kind === 'attachment') {
+		return part.attachment.path;
+	}
+	return part.kind === 'text' ? part.text : part.reference.label;
+}
+
 describe('parsePromptAttachments', () => {
 	test('extracts a leading attachment block', () => {
 		const prompt =
@@ -41,15 +49,39 @@ describe('parsePromptAttachments', () => {
 		]);
 	});
 
+	test('reads a Concierge reference block back as a reference part', () => {
+		const prompt = [
+			'what changed in',
+			'<referenced_workspace name="khachaturian" workspaceId="ws-1" projectId="repo-1" project="ensemblr" cwd="/w/k" />',
+			'today?',
+		].join('\n\n');
+		const { parts } = parsePromptAttachments(prompt);
+
+		expect(parts.map(partLabel)).toEqual([
+			'what changed in',
+			'khachaturian',
+			'today?',
+		]);
+		expect(parts[1]).toMatchObject({
+			kind: 'reference',
+			reference: {
+				kind: 'workspace',
+				projectId: 'repo-1',
+				workspaceId: 'ws-1',
+			},
+		});
+	});
+
 	test('keeps the typed runs and the blocks in the order they were sent', () => {
 		const prompt =
 			'<attached_file path="a.ts">\nA\n</attached_file>\n\nMiddle text.\n\n<attached_file path="b.ts">\nB\n</attached_file>\n\nTrailing.';
 		const { parts } = parsePromptAttachments(prompt);
-		expect(
-			parts.map((part) =>
-				part.kind === 'text' ? part.text : part.attachment.path,
-			),
-		).toEqual(['a.ts', 'Middle text.', 'b.ts', 'Trailing.']);
+		expect(parts.map((part) => partLabel(part))).toEqual([
+			'a.ts',
+			'Middle text.',
+			'b.ts',
+			'Trailing.',
+		]);
 	});
 
 	test('strips the user_preferences block without a chip, keeping file chips', () => {
@@ -91,11 +123,12 @@ describe('parsePromptAttachments', () => {
 		const prompt =
 			'Compare\n\nReferenced workspace folders:\n@src/main\n\nagainst\n\nReferenced workspace folders:\n@src/renderer';
 		const { parts } = parsePromptAttachments(prompt);
-		expect(
-			parts.map((part) =>
-				part.kind === 'text' ? part.text : part.attachment.path,
-			),
-		).toEqual(['Compare', 'src/main', 'against', 'src/renderer']);
+		expect(parts.map((part) => partLabel(part))).toEqual([
+			'Compare',
+			'src/main',
+			'against',
+			'src/renderer',
+		]);
 	});
 
 	test('ignores a header that is only part of an inlined file body', () => {

@@ -7,6 +7,8 @@ export const ensemblrQueryKeys = {
 	/** Query key for a repository's archived workspaces. */
 	archivedWorkspaces: (repositoryId: string) =>
 		[...ensemblrQueryKeys.all, 'archived-workspaces', repositoryId] as const,
+	/** Query key for every workspace's chat tabs at once. */
+	allChatTabs: () => [...ensemblrQueryKeys.all, 'all-chat-tabs'] as const,
 	/** Query key for a workspace's open chat tabs. */
 	chatTabs: (workspaceId: string) =>
 		[...ensemblrQueryKeys.all, 'chat-tabs', workspaceId] as const,

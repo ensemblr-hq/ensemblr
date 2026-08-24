@@ -3,6 +3,7 @@ import { AnswerPreview } from './answer-preview.tsx';
 import { CommentPreviewScene } from './comment-preview.tsx';
 import { ComposerScene } from './composer-preview.tsx';
 import { ComposerQueueScene } from './composer-queue-preview.tsx';
+import { ConciergeScene } from './concierge-preview.tsx';
 import { ConflictsScene } from './conflicts-preview.tsx';
 import { ConversationScrollScene } from './conversation-scroll-preview.tsx';
 import { FailureBannerScene } from './failure-banner-preview.tsx';
@@ -85,6 +86,12 @@ export const SCENE_GROUPS = [
 				label: 'agent error',
 				render: () => <AgentErrorScene />,
 				source: 'playground/agent-error-preview.tsx',
+			},
+			{
+				id: 'concierge',
+				label: 'concierge',
+				render: () => <ConciergeScene />,
+				source: 'playground/concierge-preview.tsx',
 			},
 		],
 	},

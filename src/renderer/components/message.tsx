@@ -10,13 +10,17 @@ import type { ComponentProps, ReactNode } from 'react';
 import { Children, memo, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Streamdown } from 'streamdown';
+import { ConciergeReferenceChip } from '@/renderer/components/concierge/concierge-reference-chip';
 import {
 	attachmentPathFromInlineCode,
 	chipLabelForPath,
 	isOutsideWorkspacePath,
 } from '@/renderer/lib/agent-timeline';
 import { toBundledLanguage } from '@/renderer/lib/language-from-path';
-import { MARKDOWN_REHYPE_PLUGINS } from '@/renderer/lib/markdown-rehype-plugins';
+import {
+	CONCIERGE_REFERENCE_ELEMENT,
+	MARKDOWN_REHYPE_PLUGINS,
+} from '@/renderer/lib/markdown-rehype-plugins';
 import { cn } from '@/renderer/lib/utils';
 import {
 	markdownStyleAtom,
@@ -70,6 +74,7 @@ export const MessageResponse = memo(
 			() => ({
 				...components,
 				code: MessageCodeBlock,
+				[CONCIERGE_REFERENCE_ELEMENT]: ConciergeReferenceChip,
 				img: MessageImage,
 				inlineCode: MessageInlineCode,
 				table: AnswerTable,

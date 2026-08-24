@@ -7,7 +7,9 @@ import {
 } from '@/renderer/lib/agent-timeline';
 import { cn } from '@/renderer/lib/utils';
 import type { ParsedPromptPart } from '@/renderer/types/agent-timeline';
+import { conciergeReferenceId } from '@/shared/concierge-references';
 import { ChatAttachmentChip } from './chat-attachment-chip';
+import { useConciergeReferenceAccess } from './concierge/concierge-reference-context';
 import {
 	useFilePreviewOpener,
 	useWorkspacePathResolver,
@@ -28,14 +30,27 @@ function keyedParts(
 ): readonly { key: string; part: ParsedPromptPart }[] {
 	const occurrences = new Map<string, number>();
 	return parts.map((part) => {
-		const identity =
-			part.kind === 'text'
-				? `text:${part.text}`
-				: `file:${part.attachment.path}`;
+		const identity = partIdentity(part);
 		const seen = occurrences.get(identity) ?? 0;
 		occurrences.set(identity, seen + 1);
 		return { key: `${identity}#${seen}`, part };
 	});
+}
+
+/**
+ * What a part is, for keying: two identical parts differ only in how many came
+ * before them.
+ * @param part - The part being keyed
+ * @returns A stable identity string
+ */
+function partIdentity(part: ParsedPromptPart): string {
+	if (part.kind === 'text') {
+		return `text:${part.text}`;
+	}
+	if (part.kind === 'reference') {
+		return `ref:${part.reference.kind}:${conciergeReferenceId(part.reference)}`;
+	}
+	return `file:${part.attachment.path}`;
 }
 
 /**
@@ -53,6 +68,7 @@ function keyedParts(
 function PromptParts({ parts }: { parts: readonly ParsedPromptPart[] }) {
 	const openFilePreview = useFilePreviewOpener();
 	const resolveWorkspacePath = useWorkspacePathResolver();
+	const referenceAccess = useConciergeReferenceAccess();
 	return (
 		<>
 			{keyedParts(parts).map(({ key, part }) => {
@@ -64,6 +80,22 @@ function PromptParts({ parts }: { parts: readonly ParsedPromptPart[] }) {
 						>
 							{part.text}
 						</span>
+					);
+				}
+				if (part.kind === 'reference') {
+					const { reference } = part;
+					return (
+						<ChatAttachmentChip
+							key={key}
+							kind={reference.kind}
+							label={reference.label}
+							onActivate={
+								referenceAccess && reference.kind !== 'project'
+									? () => referenceAccess.openReference(reference)
+									: undefined
+							}
+							title={reference.label}
+						/>
 					);
 				}
 				const { attachment } = part;

@@ -25,6 +25,7 @@ import {
 } from '@/renderer/lib/workbench/timeline-timing';
 import type { AgentSessionEventWire } from '@/shared/ipc/contracts/agent-session';
 import type { ConciergeSessionEventWire } from '@/shared/ipc/contracts/concierge';
+import { ConciergeMark } from './concierge-mark';
 
 /**
  * One frame per source event, so the same event always maps to the same object.
@@ -139,13 +140,31 @@ export function ConciergeTimeline({
 
 	if (messages.length === 0) {
 		return (
-			<div className='flex flex-1 items-center justify-center px-6 text-center text-muted-foreground text-sm'>
-				<p className='max-w-md'>
+			<div className='flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center text-muted-foreground text-sm'>
+				{/* The launcher's own mark, so the surface the bubble opened onto is
+				    recognisably the thing that was clicked. Waking spins its orbit
+				    rather than swapping in a spinner, for the same reason. */}
+				<span
+					className={cn(
+						'flex size-10 items-center justify-center rounded-full transition-colors',
+						isStreaming
+							? 'bg-accent-strong/15 text-accent-strong'
+							: 'bg-muted/60 text-muted-foreground',
+					)}
+				>
+					<ConciergeMark
+						className='size-6'
+						orbitClassName={
+							isStreaming ? 'motion-safe:animate-concierge-orbit' : undefined
+						}
+					/>
+				</span>
+				<p className='max-w-md text-pretty'>
 					{isStreaming
 						? t('workbench:concierge.timeline.starting', 'Waking the Concierge')
 						: t(
 								'workbench:concierge.timeline.empty',
-								'Ask about any project, and the Concierge can read it, spawn agents into it, and remember what came of that.',
+								'Ask about your current projects, assign some work, learn anything about Ensemblr — or just chat.',
 							)}
 				</p>
 			</div>

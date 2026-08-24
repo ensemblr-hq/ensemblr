@@ -13,6 +13,7 @@ import {
 	type ChatTabRow,
 	deleteChatTab,
 	getChatTabById,
+	listChatTabsAcrossWorkspaces,
 	listClosedForWorkspace,
 	listOpenForWorkspace,
 	markClosed,
@@ -69,6 +70,11 @@ export interface ChatTabService {
 	listClosedWithSummary: (input: {
 		workspaceId: string;
 	}) => ClosedChatTabEntry[];
+	/** Every workspace's open tabs, plus the newest closed tabs under a cap. */
+	listAllTabs: (input: { closedLimit: number }) => {
+		closed: readonly ChatTabRow[];
+		open: readonly ChatTabRow[];
+	};
 	listTabs: (input: { workspaceId: string }) => {
 		closed: readonly ChatTabRow[];
 		open: readonly ChatTabRow[];
@@ -199,6 +205,11 @@ export function createChatTabService({
 				.map(toClosedEntry)
 				.filter((entry): entry is ClosedChatTabEntry => entry !== null);
 		},
+		listAllTabs: ({ closedLimit }) =>
+			listChatTabsAcrossWorkspaces({
+				closedLimit,
+				database: requireChatTabDatabase(),
+			}),
 		listTabs: ({ workspaceId }) => {
 			const database = requireChatTabDatabase();
 			return {

@@ -142,10 +142,15 @@ export function useConciergeSession(enabled: boolean): ConciergeSessionModel {
 				}
 				setError(failureMessage(cause, unknownFailure));
 			})
+			// Cleared unconditionally, unlike the result above: a cancelled attempt
+			// has still stopped opening, and gating this on `cancelled` latched the
+			// flag on forever whenever the open settled inside the same microtask
+			// flush that re-ran the effect — which is every open that does not go
+			// through a real IPC round trip, and left the composer disabled with
+			// nothing on screen to say why. Nothing is exposed early by clearing it:
+			// the composer stays disabled on the null session id until one lands.
 			.finally(() => {
-				if (!cancelled) {
-					setIsOpening(false);
-				}
+				setIsOpening(false);
 			});
 		return () => {
 			cancelled = true;
@@ -239,6 +244,12 @@ export function useConciergeSession(enabled: boolean): ConciergeSessionModel {
 			});
 			if (result.error) {
 				throw new Error(result.error);
+			}
+			// The prompt lands in a replacement whenever the session it named had
+			// died, so the panel follows the transcript that is now live rather than
+			// staying subscribed to one nothing will ever append to again.
+			if (result.session && result.session.id !== targetSessionId) {
+				adoptSession(identityOf(result.session), targetSessionId);
 			}
 		},
 		/**

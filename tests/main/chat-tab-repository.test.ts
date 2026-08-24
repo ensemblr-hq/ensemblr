@@ -15,6 +15,7 @@ import {
 	deleteChatTab,
 	getChatTabByAgentSessionId,
 	getRuntimeState,
+	listChatTabsAcrossWorkspaces,
 	listClosedForWorkspace,
 	listOpenChatTabs,
 	listOpenForWorkspace,
@@ -747,4 +748,45 @@ test('getChatTabByAgentSessionId prefers the open tab over a closed one', (t) =>
 	});
 
 	assert.equal(found?.id, live.id);
+});
+
+test('listChatTabsAcrossWorkspaces spans every workspace and caps closed tabs', (t) => {
+	const fixture = openFixture(t);
+	fixture.database.exec(`
+INSERT INTO workspaces (id, repository_id, slug, name, path)
+VALUES ('ws-other', 'repo-tab', 'other', 'Other', '/tmp/ensemblr/tab/other');
+`);
+
+	const openTab = (workspaceId: string, title: string) =>
+		openChatTab({
+			database: fixture.database,
+			input: { kind: 'chat', title, workspaceId },
+		});
+
+	const here = openTab(fixture.workspaceId, 'Here');
+	const elsewhere = openTab('ws-other', 'Elsewhere');
+	const first = openTab(fixture.workspaceId, 'First closed');
+	const second = openTab('ws-other', 'Second closed');
+	closeChatTab({ database: fixture.database, id: first.id });
+	closeChatTab({ database: fixture.database, id: second.id });
+
+	const all = listChatTabsAcrossWorkspaces({
+		closedLimit: 10,
+		database: fixture.database,
+	});
+	assert.deepEqual(
+		new Set(all.open.map((tab) => tab.id)),
+		new Set([here.id, elsewhere.id]),
+	);
+	assert.deepEqual(
+		new Set(all.closed.map((tab) => tab.id)),
+		new Set([first.id, second.id]),
+	);
+
+	const capped = listChatTabsAcrossWorkspaces({
+		closedLimit: 1,
+		database: fixture.database,
+	});
+	assert.equal(capped.closed.length, 1);
+	assert.equal(capped.open.length, 2);
 });

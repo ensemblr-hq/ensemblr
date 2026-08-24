@@ -119,32 +119,43 @@ function topLeftFor(
  * That direct write is why the placement is applied in a layout effect rather
  * than through `style`: the panel re-renders while the agent streams, and a
  * `left` React owned would snap back to the last committed anchor mid-drag.
+ * A surface that is also resizable hands in the ref it already owns and a
+ * `suspended` getter: a resize writes `left`/`top` of its own to hold the
+ * opposite corner still, and the placement below would otherwise overwrite them
+ * on the next render the streaming transcript causes.
  * @param size - The surface's width and height, for the anchor offset and the clamp.
  * @param enabled - False while the surface is positioned by something else, as the maximized panel is.
+ * @param externalRef - Node ref to place, when the caller already holds one; a ref of its own otherwise.
+ * @param suspended - Reports a gesture that owns the node's offsets right now.
  * @returns The node ref to attach, the drag handler, and the click-suppression getter.
  */
 export function useConciergeAnchor<T extends HTMLElement>({
 	enabled = true,
+	externalRef,
 	size,
+	suspended,
 }: {
 	enabled?: boolean;
+	externalRef?: RefObject<T | null>;
 	size: ConciergeSurfaceSize;
+	suspended?: () => boolean;
 }): ConciergeAnchoredSurface<T> {
 	const [anchor, setAnchor] = useAtom(conciergeAnchorAtom);
-	const ref = useRef<T | null>(null);
+	const ownRef = useRef<T | null>(null);
+	const ref = externalRef ?? ownRef;
 	const session = useRef<DragSession | null>(null);
 	const dragged = useRef(false);
 	const endDrag = useRef<(() => void) | null>(null);
 
 	const applyAnchoredPosition = useCallback(() => {
 		const node = ref.current;
-		if (!node || !enabled || session.current) {
+		if (!node || !enabled || session.current || suspended?.()) {
 			return;
 		}
 		const point = topLeftFor(anchor, size);
 		node.style.left = `${point.x}px`;
 		node.style.top = `${point.y}px`;
-	}, [anchor, enabled, size]);
+	}, [anchor, enabled, ref, size, suspended]);
 
 	useLayoutEffect(applyAnchoredPosition);
 
@@ -222,7 +233,7 @@ export function useConciergeAnchor<T extends HTMLElement>({
 			window.addEventListener('pointermove', handleMove);
 			window.addEventListener('pointerup', handleEnd);
 		},
-		[anchor, enabled, setAnchor, size],
+		[anchor, enabled, ref, setAnchor, size],
 	);
 
 	return {

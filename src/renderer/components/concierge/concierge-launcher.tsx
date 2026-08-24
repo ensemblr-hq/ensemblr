@@ -1,5 +1,4 @@
 import { useAtom, useSetAtom } from 'jotai';
-import { Sparkles } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/renderer/components/ui/button';
 import { TooltipProvider } from '@/renderer/components/ui/tooltip';
@@ -16,6 +15,7 @@ import {
 	useMenuCommand,
 	useMenuCommandChecked,
 } from '@/renderer/state/menu-commands';
+import { ConciergeMark } from './concierge-mark';
 import { ConciergePanel } from './concierge-panel';
 
 /** Launcher size in pixels, matching the `size-*` class below. */
@@ -92,8 +92,10 @@ export function ConciergeLauncher() {
 					// The button's own base style transitions *all* properties, which
 					// includes the `left`/`top` a drag writes every frame — so the bubble
 					// eased toward the cursor a transition-duration behind it. Naming the
-					// properties keeps the hover and focus polish without the position.
-					className='fixed z-40 size-11 cursor-grab rounded-full shadow-lg transition-[background-color,border-color,box-shadow] active:cursor-grabbing'
+					// properties keeps the hover and focus polish without the position;
+					// `transform` is safe to name because the drag moves the bubble with
+					// `left`/`top` rather than translating it.
+					className='motion-safe:fade-in motion-safe:zoom-in-50 fixed z-40 size-11 cursor-grab overflow-hidden rounded-full shadow-lg transition-[background-color,border-color,box-shadow,transform] duration-200 hover:scale-110 hover:shadow-accent-strong/25 focus-visible:scale-110 active:scale-95 active:cursor-grabbing motion-safe:animate-in'
 					onClick={() => {
 						if (!anchor.isDragging()) {
 							toggle();
@@ -103,7 +105,14 @@ export function ConciergeLauncher() {
 					ref={anchor.ref}
 					size='icon'
 				>
-					<Sparkles aria-hidden='true' className='size-5' />
+					<span
+						aria-hidden='true'
+						className='concierge-sheen pointer-events-none absolute inset-0 rounded-full opacity-0 transition-opacity duration-300 group-hover/button:opacity-70 group-focus-visible/button:opacity-70 motion-safe:animate-concierge-sheen'
+					/>
+					<ConciergeMark
+						className='relative size-7'
+						orbitClassName='motion-safe:group-hover/button:animate-concierge-orbit motion-safe:group-focus-visible/button:animate-concierge-orbit'
+					/>
 				</Button>
 			) : null}
 			<ConciergePanel />

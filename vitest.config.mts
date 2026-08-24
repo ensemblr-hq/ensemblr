@@ -43,6 +43,7 @@ export default defineConfig({
 			'tests/main/concierge-context-pressure.test.ts',
 			'tests/main/concierge-control-wiring.test.ts',
 			'tests/main/concierge-home.test.ts',
+			'tests/main/concierge-session-recovery.test.ts',
 			'tests/main/concierge-tool-policy.test.ts',
 			'tests/main/dictation-service.test.ts',
 			'tests/main/pi-wire-content-blocks.test.ts',

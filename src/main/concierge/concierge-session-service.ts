@@ -20,7 +20,11 @@ import type {
 	SubmitConciergePromptRequest,
 	SubmitConciergePromptResult,
 } from '../../shared/ipc/contracts/concierge.ts';
-import type { AgentClient, AgentSession } from '../agent-runtime';
+import {
+	type AgentClient,
+	AgentClientError,
+	type AgentSession,
+} from '../agent-runtime/agent-client.ts';
 import { eventPayload } from '../agent-runtime/agent-session-persistence.ts';
 import type {
 	AgentEvent,
@@ -121,6 +125,9 @@ export interface ConciergeSessionService {
 		request: SubmitConciergePromptRequest,
 	) => Promise<SubmitConciergePromptResult>;
 }
+
+/** What the service reports when it has no runtime child to hand a caller. */
+const SESSION_NOT_OPEN_MESSAGE = 'The Concierge session is not open.';
 
 /** The live runtime attachment for the one open Concierge session. */
 interface ActiveConciergeSession {
@@ -226,6 +233,16 @@ function toEventWire(row: ConciergeEventRow): ConciergeSessionEventWire {
  */
 function toMessage(error: unknown): string {
 	return error instanceof Error ? error.message : String(error);
+}
+
+/**
+ * Reports whether a failure means the runtime child behind the session is gone,
+ * as opposed to a turn the live child refused.
+ * @param error - Thrown value from a runtime call.
+ * @returns True when the session is closed and only a replacement can serve it.
+ */
+function isSessionClosedFailure(error: unknown): boolean {
+	return error instanceof AgentClientError && error.code === 'session-closed';
 }
 
 /**
@@ -490,6 +507,69 @@ export function createConciergeSessionService({
 	};
 
 	/**
+	 * The wire snapshot of the session that is live right now, for a caller whose
+	 * prompt landed somewhere other than the session it named.
+	 *
+	 * Best-effort: this adorns a submit the runtime has already accepted, so a
+	 * database that closed under it costs the caller the id it should adopt
+	 * rather than the acknowledgement it earned.
+	 * @param sessionId - The live session's id.
+	 * @returns The snapshot, or null when its row cannot be read.
+	 */
+	const liveSnapshot = (
+		sessionId: string,
+	): ConciergeSessionSnapshotWire | null => {
+		try {
+			const row = getConciergeSessionById({
+				database: requireDatabase(),
+				id: sessionId,
+			});
+			return row ? toSnapshot(row, true) : null;
+		} catch {
+			return null;
+		}
+	};
+
+	/**
+	 * Opens the Concierge session, handing a caller that arrives mid-open the
+	 * attempt already running rather than starting a second one beside it.
+	 * @param request - Whether to force a new session rather than resume.
+	 * @returns The opened session, or the failure that stopped it.
+	 */
+	const openSession = (
+		request: OpenConciergeSessionRequest,
+	): Promise<OpenConciergeSessionResult> => {
+		if (!openInFlight) {
+			openInFlight = openSessionOnce(request);
+		}
+		return openInFlight;
+	};
+
+	/**
+	 * Puts a live runtime child back under the Concierge after the previous one
+	 * died, resuming the conversation where the runtime can and starting a clean
+	 * session where it cannot.
+	 *
+	 * `detach` runs first because the replacement is unreachable while the corpse
+	 * is still in `active`: an open row whose id matches the attachment is handed
+	 * straight back, which for a dead child is the dead child again.
+	 * @returns The now-live attachment and its snapshot, or why none could open.
+	 */
+	const reviveSession = async (): Promise<
+		| { error: string }
+		| { live: ActiveConciergeSession; session: ConciergeSessionSnapshotWire }
+	> => {
+		await detach();
+		const resumed = await openSession({ fresh: false });
+		const reopened = resumed.session
+			? resumed
+			: await openSession({ fresh: true });
+		return reopened.session && active
+			? { live: active, session: reopened.session }
+			: { error: reopened.error ?? SESSION_NOT_OPEN_MESSAGE };
+	};
+
+	/**
 	 * Opens a fresh session row against the concierge home.
 	 * @returns The created row.
 	 */
@@ -565,12 +645,7 @@ export function createConciergeSessionService({
 			}).map(toEventWire),
 		}),
 
-		openSession: (request) => {
-			if (!openInFlight) {
-				openInFlight = openSessionOnce(request);
-			}
-			return openInFlight;
-		},
+		openSession,
 
 		shutdown: detach,
 
@@ -579,7 +654,7 @@ export function createConciergeSessionService({
 			sessionId,
 		}: StopConciergeSessionRequest): Promise<StopConciergeSessionResult> => {
 			if (active?.sessionId !== sessionId) {
-				return { error: 'The Concierge session is not open.', ok: false };
+				return { error: SESSION_NOT_OPEN_MESSAGE, ok: false };
 			}
 			try {
 				await active.runtimeSession.abort(reason);
@@ -589,22 +664,61 @@ export function createConciergeSessionService({
 			}
 		},
 
+		/**
+		 * Sends one prompt into whatever conversation is live, replacing the
+		 * session first only when its runtime child is gone. The panel holds one
+		 * conversation and no control that restarts it, so a child lost to a stop,
+		 * a crash, or a runtime that closed itself left every later prompt bouncing
+		 * off a dead session with nothing but an error line and a retype to show
+		 * for it.
+		 *
+		 * A caller naming a session that has since been replaced is served by the
+		 * live child rather than by a new one: the id it holds is stale — a submit
+		 * that raced a clear, a second window a turn behind — and tearing the live
+		 * child down to rebuild it would throw away a turn it may be streaming.
+		 * The snapshot comes back either way, so the panel adopts the conversation
+		 * its prompt actually landed in.
+		 */
 		submitPrompt: async ({
 			model,
 			prompt,
 			sessionId,
 			thinkingLevel,
 		}: SubmitConciergePromptRequest): Promise<SubmitConciergePromptResult> => {
-			if (active?.sessionId !== sessionId) {
-				return { error: 'The Concierge session is not open.' };
+			const request = {
+				prompt,
+				...(model ? { modelOverride: model } : {}),
+				...(thinkingLevel ? { thinkingLevel } : {}),
+			};
+
+			const live = active;
+			if (live) {
+				try {
+					const acknowledgement = await live.runtimeSession.submit(request);
+					const adopted =
+						live.sessionId === sessionId ? null : liveSnapshot(live.sessionId);
+					return {
+						acceptedAt: acknowledgement.acceptedAt,
+						...(adopted ? { session: adopted } : {}),
+					};
+				} catch (error) {
+					if (!isSessionClosedFailure(error)) {
+						return { error: toMessage(error) };
+					}
+				}
+			}
+
+			const revived = await reviveSession();
+			if ('error' in revived) {
+				return { error: revived.error };
 			}
 			try {
-				const acknowledgement = await active.runtimeSession.submit({
-					prompt,
-					...(model ? { modelOverride: model } : {}),
-					...(thinkingLevel ? { thinkingLevel } : {}),
-				});
-				return { acceptedAt: acknowledgement.acceptedAt };
+				const acknowledgement =
+					await revived.live.runtimeSession.submit(request);
+				return {
+					acceptedAt: acknowledgement.acceptedAt,
+					session: revived.session,
+				};
 			} catch (error) {
 				return { error: toMessage(error) };
 			}

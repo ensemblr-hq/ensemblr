@@ -1,21 +1,25 @@
 import { Trans } from 'react-i18next';
 
-import { formatShortcut } from '@/shared/keymap';
-
-const FOCUS_SHORTCUT_HINT = formatShortcut('composer.focus');
+import { formatShortcut, type ShortcutId } from '@/shared/keymap';
 
 /**
  * The "⌘L to focus" hint overlaid on the composer textarea. Shows only while
  * the composer is idle and holds nothing, so it never sits on top of the user's
  * own text or their attachment chips.
+ *
+ * The chord is a prop rather than a constant because the Concierge composer is
+ * focused by a chord of its own: a hint naming the workspace composer's would
+ * teach a shortcut that does not reach the surface it is drawn on.
  */
 export function ComposerFocusHint({
 	focused,
 	hasChips,
+	shortcutId = 'composer.focus',
 	value,
 }: {
 	focused: boolean;
 	hasChips: boolean;
+	shortcutId?: ShortcutId;
 	value: string;
 }) {
 	if (focused || value.length > 0 || hasChips) {
@@ -34,7 +38,7 @@ export function ComposerFocusHint({
 				}}
 				defaults='<key>{{shortcut}}</key><label>to focus</label>'
 				i18nKey='workbench:composer.focus-hint'
-				values={{ shortcut: FOCUS_SHORTCUT_HINT }}
+				values={{ shortcut: formatShortcut(shortcutId) }}
 			/>
 		</span>
 	);

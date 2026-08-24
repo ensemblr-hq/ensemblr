@@ -305,3 +305,24 @@ export function resolveSendIntent(
 	}
 	return behavior === 'block' ? 'hold' : 'queue';
 }
+
+/**
+ * The span a mention pick replaces. A chip already reads as one space in the
+ * draft, so the spaces around the `@` token go with it — otherwise every pick
+ * would leave a double space where the token used to be.
+ * @param value - The whole draft
+ * @param token - Where the detected token starts and ends
+ * @returns The span the chip is written over
+ */
+export function mentionReplacementRange(
+	value: string,
+	token: { tokenEnd: number; tokenStart: number },
+): { end: number; start: number } {
+	return {
+		end: value[token.tokenEnd] === ' ' ? token.tokenEnd + 1 : token.tokenEnd,
+		start:
+			token.tokenStart > 0 && value[token.tokenStart - 1] === ' '
+				? token.tokenStart - 1
+				: token.tokenStart,
+	};
+}

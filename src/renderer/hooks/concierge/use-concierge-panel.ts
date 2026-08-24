@@ -13,6 +13,10 @@ import {
 	useConciergeAnchor,
 } from '@/renderer/hooks/concierge/use-concierge-anchor';
 import {
+	type ConciergeResizableSurface,
+	useConciergeResize,
+} from '@/renderer/hooks/concierge/use-concierge-resize';
+import {
 	type ConciergeSessionModel,
 	useConciergeSession,
 } from '@/renderer/hooks/concierge/use-concierge-session';
@@ -29,9 +33,6 @@ import {
 import { useMenuCommand } from '@/renderer/state/menu-commands';
 import type { KeymapBinding } from '@/renderer/types/keymap';
 
-/** Docked panel size in pixels, matching the panel's `h-*`/`w-*` classes. */
-export const PANEL_SIZE = { height: 512, width: 416 };
-
 /** Everything the Concierge panel renders from, already resolved. */
 export interface ConciergePanelModel {
 	anchor: ConciergeAnchoredSurface<HTMLElement>;
@@ -43,6 +44,8 @@ export interface ConciergePanelModel {
 	insetRect: ShellInsetRect | null;
 	isFullscreen: boolean;
 	presentation: ConciergePresentation;
+	/** The docked panel's size, and the handles that change it. */
+	resize: ConciergeResizableSurface;
 	session: ConciergeSessionModel;
 	/** Whether the context is full enough to offer a clear the user did not ask for. */
 	showClearBanner: boolean;
@@ -78,9 +81,12 @@ export function useConciergePanel(): ConciergePanelModel {
 		enabled: isOpen,
 	});
 
+	const resize = useConciergeResize({ enabled: !isFullscreen });
 	const anchor = useConciergeAnchor<HTMLElement>({
 		enabled: !isFullscreen,
-		size: PANEL_SIZE,
+		externalRef: resize.ref,
+		size: resize.size,
+		suspended: resize.isResizing,
 	});
 
 	const clearContext = useCallback(() => {
@@ -149,6 +155,7 @@ export function useConciergePanel(): ConciergePanelModel {
 		insetRect,
 		isFullscreen,
 		presentation,
+		resize,
 		session,
 		showClearBanner:
 			!bannerDismissed && (pressure.data?.overThreshold ?? false),
