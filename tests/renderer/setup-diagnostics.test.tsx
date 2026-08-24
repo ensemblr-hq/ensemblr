@@ -361,6 +361,7 @@ function createRootDirectoryPreview(): RootDirectoryChangePreview {
 		],
 		newRoot: {
 			archivedContextsPath: '/Users/alice/SharedRoot/archived-contexts',
+			conciergePath: '/Users/alice/SharedRoot/concierge',
 			createdPaths: [],
 			diagnostics: [
 				{
@@ -397,6 +398,7 @@ function createRootDirectoryPreview(): RootDirectoryChangePreview {
 		},
 		oldRoot: {
 			archivedContextsPath: '/Users/alice/Ensemblr/archived-contexts',
+			conciergePath: '/Users/alice/Ensemblr/concierge',
 			createdPaths: [],
 			diagnostics: [],
 			managedPaths: [

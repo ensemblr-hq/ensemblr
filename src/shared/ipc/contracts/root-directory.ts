@@ -10,6 +10,7 @@ export type RootDirectoryDiagnosticSeverity = 'error' | 'info' | 'warning';
 /** Identifier for one of the subdirectories Ensemblr manages under the root. */
 export type RootDirectoryManagedPathKey =
 	| 'archived-contexts'
+	| 'concierge'
 	| 'repos'
 	| 'workspaces';
 /** On-disk state of a managed root subdirectory. */
@@ -63,6 +64,7 @@ export interface RootDirectoryManagedPathSnapshot {
 /** Snapshot of the resolved root directory, its managed paths, and diagnostics. */
 export interface RootDirectorySnapshot {
 	archivedContextsPath: string;
+	conciergePath: string;
 	createdPaths: string[];
 	diagnostics: RootDirectoryDiagnostic[];
 	managedPaths: RootDirectoryManagedPathSnapshot[];

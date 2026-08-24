@@ -39,6 +39,7 @@
 		"test:config": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/config-loader.test.ts tests/main/config-resolution.test.ts tests/main/repository-config.test.ts tests/main/repository-scripts-writer.test.ts tests/main/repository-scripts-migration.test.ts tests/main/repository-settings.test.ts tests/main/repository-config-file.test.ts tests/main/permissions.test.ts",
 		"test:checkpoints": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/checkpoint-capture.test.ts tests/main/checkpoint-restore.test.ts",
 		"test:db": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/database.test.ts",
+		"test:concierge": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/concierge-storage.test.ts",
 		"test:agent-storage": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/agent-session-repository.test.ts tests/main/agent-event-repository.test.ts tests/main/chat-tab-repository.test.ts tests/main/chat-tab-service.test.ts tests/main/chat-tab-preview-slot.test.ts tests/main/chat-tab-plumbing.test.ts",
 		"test:environment": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/environment-variables.test.ts",
 		"test:workspace-environment": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/workspace-environment.test.ts",

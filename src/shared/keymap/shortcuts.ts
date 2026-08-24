@@ -24,6 +24,7 @@ export type Modifier = 'mod' | 'ctrl' | 'alt' | 'shift';
 export type Scope =
 	| 'global'
 	| 'composer'
+	| 'concierge'
 	| 'autocomplete'
 	| 'dialog'
 	| 'modelPicker'
@@ -224,6 +225,32 @@ export const SHORTCUTS = {
 		scope: 'global',
 		bindings: [{ key: 'a', modifiers: ['mod', 'shift'] }],
 		accelerator: 'CommandOrControl+Shift+A',
+	},
+	'concierge.toggle': {
+		scope: 'global',
+		bindings: [{ key: 'c', modifiers: ['mod', 'shift'] }],
+		accelerator: 'CommandOrControl+Shift+C',
+	},
+	'concierge.focusComposer': {
+		scope: 'global',
+		bindings: [{ key: 'l', modifiers: ['mod', 'shift'] }],
+		accelerator: 'CommandOrControl+Shift+L',
+	},
+	'concierge.toggleFullscreen': {
+		scope: 'concierge',
+		bindings: [{ key: 'm', modifiers: ['mod', 'shift'] }],
+		accelerator: 'CommandOrControl+Shift+M',
+	},
+	// No accelerator, so the menu leaves the chord to the panel: an item that
+	// claimed it would take ⌘⇧K from every other surface in the window, and this
+	// one throws a conversation away.
+	'concierge.clear': {
+		scope: 'concierge',
+		bindings: [{ key: 'k', modifiers: ['mod', 'shift'] }],
+	},
+	'concierge.close': {
+		scope: 'concierge',
+		bindings: [{ key: 'Escape' }],
 	},
 } as const satisfies Record<string, ShortcutDef>;
 

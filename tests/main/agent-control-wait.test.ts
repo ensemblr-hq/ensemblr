@@ -91,7 +91,12 @@ const makePorts = (
 			.fn()
 			.mockResolvedValue({ chatTabId: 't', terminalId: 't' }),
 	},
-	focus: { focusTab: vi.fn(), focusDockTab: vi.fn(), focusPanel: vi.fn() },
+	focus: {
+		focusTab: vi.fn(),
+		focusDockTab: vi.fn(),
+		focusPanel: vi.fn(),
+		focusWorkspace: vi.fn(),
+	},
 	board: {
 		setWorkspaceStatus: vi.fn(),
 		getWorkspaceStatus: () => 'backlog',

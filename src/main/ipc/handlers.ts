@@ -8,6 +8,7 @@ import type { QueueProvisionalNamingPort } from '../agent-runtime/naming/provisi
 import type { HarnessDetectionService } from '../agents/index.ts';
 import { createChatTabService } from '../chat-tabs/index.ts';
 import type { LocalCommandService } from '../commands/local-command';
+import type { ConciergeSessionService } from '../concierge';
 import type {
 	AppSettingsService,
 	EnsemblrConfigResolutionService,
@@ -69,6 +70,7 @@ import { registerAppSettingsHandlers } from './handlers/app-settings';
 import { registerChatTabHandlers } from './handlers/chat-tab';
 import { registerCheckpointHandlers } from './handlers/checkpoint';
 import { registerCloneHandlers } from './handlers/clone';
+import { registerConciergeHandlers } from './handlers/concierge';
 import { registerDictationHandlers } from './handlers/dictation';
 import { registerEnvironmentHandlers } from './handlers/environment';
 import { registerGithubHandlers } from './handlers/github';
@@ -105,6 +107,7 @@ interface RegisterIpcHandlersOptions {
 	agentProviderService: AgentProviderService;
 	appSettingsService: AppSettingsService;
 	archiveWorkspaceService: ArchiveWorkspaceService;
+	conciergeSessionService: ConciergeSessionService;
 	configService: EnsemblrConfigService;
 	continueWorkspaceBranchService: ContinueWorkspaceBranchService;
 	createWorkspaceService: CreateWorkspaceService;
@@ -210,6 +213,7 @@ export function registerIpcHandlers({
 	piExecutableService,
 	agentModelCatalog,
 	agentSessionService,
+	conciergeSessionService,
 	planModeRegistry,
 	provisionalNamingQueue,
 	quickStartProjectService,
@@ -291,6 +295,7 @@ export function registerIpcHandlers({
 		provisionalNamingQueue,
 		withPermissionGate,
 	});
+	registerConciergeHandlers({ conciergeSessionService });
 	registerChatTabHandlers({
 		chatTabService: createChatTabService({
 			databaseService,

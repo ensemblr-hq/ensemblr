@@ -21,6 +21,7 @@ import type {
 import type { EnsemblrApi } from '../../shared/ipc/contracts/api';
 import type { AppSettingsChangedBroadcast } from '../../shared/ipc/contracts/app-settings';
 import type { CloneGithubRepositoryProgressEvent } from '../../shared/ipc/contracts/clone';
+import type { ConciergeEventBroadcastWire } from '../../shared/ipc/contracts/concierge';
 import type { ConfigChangedBroadcast } from '../../shared/ipc/contracts/health';
 import type {
 	ChatTurnFinishedBroadcast,
@@ -53,6 +54,7 @@ type InvokeKey = Exclude<
 	| 'onExitPlanMode'
 	| 'onPlanModeChanged'
 	| 'onAgentSessionEvent'
+	| 'onConciergeSessionEvent'
 	| 'onPiRawFrame'
 	| 'onTerminalLifecycle'
 	| 'onTerminalOutput'
@@ -134,7 +136,10 @@ export function createEnsemblrApi(): EnsemblrApi {
 		archiveWorkspace: (request) => invoke('archiveWorkspace', request),
 		bindAgentSessionToChatTab: (request) =>
 			invoke('bindAgentSessionToChatTab', request),
+		clearConciergeContext: (request) =>
+			invoke('clearConciergeContext', request),
 		closeChatTab: (request) => invoke('closeChatTab', request),
+		conciergeContextPressure: () => invoke('conciergeContextPressure'),
 		closeWindow: () => invoke('closeWindow'),
 		commitWorkspaceChanges: (request) =>
 			invoke('commitWorkspaceChanges', request),
@@ -218,6 +223,7 @@ export function createEnsemblrApi(): EnsemblrApi {
 		listAgentSessionEvents: (request) =>
 			invoke('listAgentSessionEvents', request),
 		listAgentSessions: (request) => invoke('listAgentSessions', request),
+		listConciergeEvents: (request) => invoke('listConciergeEvents', request),
 		listEnvFiles: (request) => invoke('listEnvFiles', request),
 		listRepositoryBranches: (request) =>
 			invoke('listRepositoryBranches', request),
@@ -323,6 +329,11 @@ export function createEnsemblrApi(): EnsemblrApi {
 				IPC_CHANNELS.agentSessionEvent,
 				listener,
 			),
+		onConciergeSessionEvent: (listener) =>
+			subscribe<ConciergeEventBroadcastWire>(
+				IPC_CHANNELS.conciergeSessionEvent,
+				listener,
+			),
 		onPiRawFrame: (listener) =>
 			subscribe<PiRawFrameBroadcast>(IPC_CHANNELS.piRawFrame, listener),
 		onTerminalLifecycle: (listener) =>
@@ -342,6 +353,7 @@ export function createEnsemblrApi(): EnsemblrApi {
 		openAppConfigFile: () => invoke('openAppConfigFile'),
 		openExternal: (url) => invoke('openExternal', url),
 		openAgentSession: (request) => invoke('openAgentSession', request),
+		openConciergeSession: (request) => invoke('openConciergeSession', request),
 		openChatTab: (request) => invoke('openChatTab', request),
 		openSettingsFileInTarget: (request) =>
 			invoke('openSettingsFileInTarget', request),
@@ -415,8 +427,11 @@ export function createEnsemblrApi(): EnsemblrApi {
 		startCloneGithubRepository: (request) =>
 			invoke('startCloneGithubRepository', request),
 		stopAgentSession: (request) => invoke('stopAgentSession', request),
+		stopConciergeSession: (request) => invoke('stopConciergeSession', request),
 		stopWorkspaceScript: (request) => invoke('stopWorkspaceScript', request),
 		submitAgentPrompt: (request) => invoke('submitAgentPrompt', request),
+		submitConciergePrompt: (request) =>
+			invoke('submitConciergePrompt', request),
 		terminalSnapshot: (request) => invoke('terminalSnapshot', request),
 		unarchiveWorkspace: (request) => invoke('unarchiveWorkspace', request),
 		unsetEnvironmentVariable: (request) =>

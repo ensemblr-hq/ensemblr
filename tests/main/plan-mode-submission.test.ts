@@ -5,6 +5,7 @@ import type { ExitPlanModeBroadcast } from '../../src/shared/agent-control.ts';
 
 const ORIGIN: AgentControlOrigin = {
 	delegation: 'ensemblr',
+	concierge: false,
 	depth: 0,
 	parentSessionId: null,
 	sessionId: 'sess-1',

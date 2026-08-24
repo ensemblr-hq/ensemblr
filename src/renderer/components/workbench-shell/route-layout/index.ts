@@ -1,3 +1,4 @@
+export { AgentControlWorkspaceFocusBridge } from './agent-control-workspace-focus-bridge';
 export { WorkbenchPlaceholderPage } from './workbench-placeholder-page';
 export { WorkbenchShellLayout } from './workbench-shell-layout';
 export { WorkspaceChatPage } from './workspace-chat-page';

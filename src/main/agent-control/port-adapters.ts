@@ -44,6 +44,7 @@ import {
 	applyBranchSlug,
 	BranchSlugRejected,
 } from '../agent-runtime/naming/apply-branch-slug.ts';
+import type { SessionBriefCaller } from '../agent-runtime/naming/session-brief-naming.ts';
 import { readSessionBriefNaming } from '../agent-runtime/naming/session-brief-naming.ts';
 import type { HarnessDetectionService } from '../agents/index.ts';
 import type { ChatTabService } from '../chat-tabs/chat-tab-service.ts';
@@ -66,19 +67,23 @@ import type { WorkspaceGitService } from '../workspace-git';
 import type { BoardStatusStore } from './board-status-store.ts';
 import { makeLinearPort } from './linear-ports.ts';
 import {
+	type AgentControlOrigin,
 	type AgentControlPorts,
 	type AskPort,
 	type BoardPort,
+	type ConciergePort,
 	type ConfirmPort,
 	type ConversationPort,
 	type FocusPort,
 	type HarnessPort,
+	type MemoryPort,
 	originHasChatTab,
 	type PlanModePort,
 	type SessionNamingPort,
 	type StartTerminalOutcome,
 	type TabPort,
 	type TerminalPort,
+	type WorkspaceCreationPort,
 	type WorkspacePort,
 } from './ports.ts';
 import { makeDiffPort, makeReviewPort } from './review-ports.ts';
@@ -130,6 +135,17 @@ export interface PortAdapterDeps {
 	listLinearAccounts: () => Promise<readonly LinearAccountRef[]>;
 	/** Names a workspace and its git branch together, for `setBranchName`. */
 	renameWorkspace: RenameWorkspaceService['rename'];
+	/**
+	 * The three Concierge-only ports, or null when the Concierge is not composed
+	 * in. Nullable rather than optional so the composition root has to state which
+	 * it is — the service refuses the ops either way, but silently omitting them
+	 * would read as a wiring bug rather than a decision.
+	 */
+	conciergePorts: {
+		concierge: ConciergePort;
+		memory: MemoryPort;
+		workspaceCreation: WorkspaceCreationPort;
+	} | null;
 	getPermissionMode: () => PermissionMode;
 	/** Reads the language the app renders in, for the playbooks' language directive. */
 	getLanguage: () => AppLanguage;
@@ -644,6 +660,33 @@ function readSubAgentMarker(
 }
 
 /**
+ * Describes a caller to the session-brief reader. A Concierge answers without
+ * touching the database: it holds no chat tab and can never carry a sub-agent
+ * marker, so both lookups would spend a query to learn what the origin already
+ * says — and reporting a tab it does not have is what asks it for the naming
+ * upkeep only a chat tab can do.
+ * @param deps - Adapter collaborators.
+ * @param origin - Resolved caller identity.
+ * @returns The caller fields the brief consults.
+ */
+function briefCallerFor(
+	deps: PortAdapterDeps,
+	origin: AgentControlOrigin,
+): SessionBriefCaller {
+	return {
+		hasChatTab: !origin.concierge && originHasChatTab(origin),
+		isSubAgent:
+			!origin.concierge &&
+			resolveAgentRole(
+				readSubAgentMarker(deps, origin.sessionId),
+				origin.depth,
+			) === 'subagent',
+		sessionId: origin.sessionId,
+		workspaceId: origin.workspaceId,
+	};
+}
+
+/**
  * Applies a display name to a conversation's tab via the Pi session service,
  * swallowing failures so naming never breaks a spawn or a control call. Always
  * claims `agent` provenance: every route here is an agent naming a tab, so a
@@ -995,6 +1038,8 @@ function makeFocusPort(deps: PortAdapterDeps): FocusPort {
 			deps.broadcastFocus({ workspaceId, target: { kind: 'dock', dock } }),
 		focusPanel: ({ workspaceId, panel }) =>
 			deps.broadcastFocus({ workspaceId, target: { kind: 'panel', panel } }),
+		focusWorkspace: ({ workspaceId }) =>
+			deps.broadcastFocus({ workspaceId, target: { kind: 'workspace' } }),
 	};
 }
 
@@ -1034,16 +1079,7 @@ function makeSessionNamingPort(deps: PortAdapterDeps): SessionNamingPort {
 	return {
 		readBrief: async (origin) =>
 			readSessionBriefNaming({
-				caller: {
-					hasChatTab: originHasChatTab(origin),
-					isSubAgent:
-						resolveAgentRole(
-							readSubAgentMarker(deps, origin.sessionId),
-							origin.depth,
-						) === 'subagent',
-					sessionId: origin.sessionId,
-					workspaceId: origin.workspaceId,
-				},
+				caller: briefCallerFor(deps, origin),
 				database: deps.databaseService.getConnection()?.database,
 				namingEnabled,
 			}),
@@ -1116,5 +1152,6 @@ export function createAgentControlPorts(
 		confirm: deps.confirm,
 		ask: deps.ask,
 		planMode: deps.planMode,
+		...(deps.conciergePorts ?? {}),
 	};
 }

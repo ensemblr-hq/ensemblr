@@ -10,7 +10,11 @@ import {
 	ipcMain,
 	shell,
 } from 'electron';
-import { parseAskUserQuestionReply } from '../shared/agent-control.ts';
+import {
+	awarenessForAudience,
+	buildLanguageDirective,
+	parseAskUserQuestionReply,
+} from '../shared/agent-control.ts';
 import type { AgentProviderId } from '../shared/agent-provider.ts';
 import {
 	type AppLanguage,
@@ -35,6 +39,8 @@ import { scrollbackMbToBytes } from '../shared/terminal.ts';
 import {
 	type AgentControlService,
 	type BoardStatusStore,
+	CONTROL_TOKEN_ENV_KEY,
+	CONTROL_URL_ENV_KEY,
 	type ControlServer,
 	createAgentControlIntegration,
 	createAgentControlPorts,
@@ -58,6 +64,7 @@ import {
 import {
 	type AgentExecutableSnapshot,
 	createAgentClient,
+	usesNativeControlMcp,
 	WORKSPACE_REMOVED_STOP_REASON,
 } from './agent-runtime';
 import { ActiveChatStore } from './agent-runtime/active-chat-store';
@@ -92,6 +99,12 @@ import {
 } from './claude-agent';
 import { installClaudeToolApproval } from './claude-agent/claude-tool-approval-ipc.ts';
 import { createLocalCommandService } from './commands';
+import {
+	createConciergeMemoryService,
+	createConciergeSessionService,
+	ensureConciergeHome,
+	resolveConciergeHome,
+} from './concierge';
 import {
 	createAppSettingsService,
 	createEnsemblrConfigResolutionService,
@@ -524,6 +537,9 @@ const {
 		const database = databaseService.getConnection()?.database;
 		return database ? getWorkspacePathById({ database, workspaceId }) : null;
 	},
+	/** Resolves the Concierge's home, or null before the root directory is known. */
+	resolveConciergeCwd: () =>
+		rootDirectoryService.getSnapshot()?.conciergePath ?? null,
 	/** Reads the control server's URL lazily, null until the server is listening. */
 	getServerUrl: () => agentControlServer?.url ?? null,
 	getLanguage: resolveAppLanguage,
@@ -570,6 +586,19 @@ const piAgentAdapter = createPiCliRpcAdapter({
 const claudeToolApproval = installClaudeToolApproval({ app, ipcMain });
 const claudeAgentAdapter = createClaudeAgentAdapter({
 	canUseTool: claudeToolApproval.gate,
+	/**
+	 * Names the Concierge home for the one session that runs in it, so the
+	 * adapter gates that session's tool calls on the shared containment
+	 * classifier. A session is the Concierge exactly when it opened in the home —
+	 * `createRow` is the only thing that sets that cwd, and a workspace chat
+	 * opens in its own checkout.
+	 */
+	resolveConciergeHome: ({ cwd }) => {
+		const conciergePath = rootDirectoryService.getSnapshot()?.conciergePath;
+		return conciergePath && path.resolve(cwd) === path.resolve(conciergePath)
+			? conciergePath
+			: null;
+	},
 	onPlanSubmitted: createClaudePlanBridge({
 		/** Resolves a Claude session's control token back to its trusted origin. */
 		resolveOrigin: (token) => agentControlOriginRegistry.resolveByToken(token),
@@ -858,6 +887,119 @@ const broadcastToAllWindows = (channel: string, payload: unknown): void => {
 		}
 	}
 };
+/**
+ * Hands back the open SQLite connection, throwing when there is none. The
+ * services below take it as a resolver rather than a handle so a root change
+ * that reopens the database does not leave them holding the old one.
+ * @returns The open database.
+ */
+const requireOpenDatabase = (): DatabaseSync => {
+	const connection = databaseService.getConnection();
+	if (!connection) {
+		throw new Error('The Ensemblr database is not open.');
+	}
+	return connection.database;
+};
+/**
+ * Resolves the Concierge home layout under the current root, creating the root
+ * record if it does not exist yet.
+ * @returns The home's root, memory, and artifacts paths.
+ */
+const resolveConciergeHomePaths = () =>
+	resolveConciergeHome(rootDirectoryService.ensure().conciergePath);
+const conciergeMemoryService = createConciergeMemoryService({
+	requireDatabase: requireOpenDatabase,
+	resolveHome: resolveConciergeHomePaths,
+});
+/**
+ * The Concierge: one agent above every project, running in its own corner of
+ * the Ensemblr root rather than in a workspace.
+ *
+ * It reads across every workspace by grant rather than by enumeration — the
+ * managed `workspaces/` and `repos/` roots cover every workspace that exists
+ * and every one created later in the session, which a snapshot list taken at
+ * open would not.
+ */
+const conciergeSessionService = createConciergeSessionService({
+	agentClient,
+	/** Forwards a Concierge transcript event to every window. */
+	eventSink: (broadcast) =>
+		broadcastToAllWindows(IPC_CHANNELS.conciergeSessionEvent, broadcast),
+	requireDatabase: requireOpenDatabase,
+	/** Drops the control origin a closed Concierge session held. */
+	releaseControlOrigin: (sessionId) =>
+		agentControlService?.releaseSession(sessionId),
+	/**
+	 * Everything the Concierge child needs to reach the control server: the env
+	 * overlay carrying its own token, the MCP endpoint for a runtime that brings
+	 * its own client, and the system prompt telling it what it is. The origin is
+	 * registered as the app-level Concierge, so the server serves it the
+	 * Concierge tool list — cross-workspace reads and none of the workspace
+	 * write channels — rather than a workspace agent's.
+	 *
+	 * Pi reads the same overlay through the shipped extension and takes no
+	 * endpoint; the playbook reaches it over `getSessionBrief` rather than in the
+	 * system prompt, which the Pi adapter does not carry.
+	 */
+	resolveControlWiring: async ({ provider, sessionId }) => {
+		const env = resolveAgentControlEnv({
+			concierge: true,
+			sessionId,
+			species: provider,
+			workspaceId: '',
+		});
+		const url = env[CONTROL_URL_ENV_KEY];
+		const token = env[CONTROL_TOKEN_ENV_KEY];
+		const reachesControl = Boolean(url && token);
+		return {
+			controlMcp:
+				usesNativeControlMcp(provider) && url && token ? { token, url } : null,
+			env,
+			// The playbook is withheld with the endpoint, for the same reason a
+			// workspace session withholds it: a Concierge that cannot reach the
+			// control server holds none of the tools the playbook spends its length
+			// describing, and an inventory of absent tools only sends a model hunting
+			// for them.
+			systemPromptAppend: [
+				reachesControl
+					? awarenessForAudience({
+							delegation: 'ensemblr',
+							hasChatTab: true,
+							role: 'concierge',
+						})
+					: null,
+				buildLanguageDirective(resolveAppLanguage()),
+			]
+				.filter((block) => block !== null)
+				.join('\n\n'),
+		};
+	},
+	/**
+	 * Pi's snapshot is resolved here rather than left to
+	 * `resolveProviderExecutable`, which answers only for Claude because a
+	 * workspace chat carries Pi's snapshot on its open request. The Concierge has
+	 * no such request, so without this a Pi Concierge opened with no executable
+	 * at all and failed as though Pi were missing.
+	 */
+	resolveExecutable: async (provider) =>
+		provider === 'pi'
+			? await piExecutableService.getSnapshot()
+			: await resolveProviderExecutable(provider),
+	resolveHome: resolveConciergeHomePaths,
+	resolveReadableDirectories: () => {
+		const root = rootDirectoryService.ensure();
+		return [root.workspacesPath, root.repositoriesPath].filter(Boolean);
+	},
+	resolveSettings: () => {
+		const concierge = appSettingsService.read().concierge;
+		return {
+			autoClearAtPercent: concierge.autoClearAtPercent,
+			model: concierge.model,
+			provider: concierge.provider,
+			thinkingLevel: concierge.thinkingLevel,
+		};
+	},
+});
 let ipcHandlersHandle: IpcHandlersHandle | null = null;
 const workspaceFilesWatcher = createWorkspaceFilesWatcher({
 	/** Broadcasts a workspace-files-changed event when the watcher fires. */
@@ -1000,11 +1142,68 @@ const linearService = createLinearService({
 	/** Lists every connected Linear account for merged reads. */
 	listAccounts: () => linearAuthService.listAccounts(),
 });
+/**
+ * The three ports only the Concierge holds. Built here rather than inside the
+ * adapters because each wraps a service the composition root already owns, and
+ * because the control layer adds no capability of its own — creating a workspace
+ * is the same `createWorkspaceService` the "+" button calls.
+ */
+const conciergePorts = {
+	concierge: {
+		/** Where the Concierge may write, which is what its tool policy checks against. */
+		homePath: () => rootDirectoryService.getSnapshot()?.conciergePath ?? null,
+	},
+	memory: {
+		/**
+		 * Searches the Concierge's own memory index, bringing it in line with the
+		 * files on disk first. The markdown is the source of truth and the
+		 * Concierge writes it mid-session, so a recall against a stale index would
+		 * miss whatever this conversation had already written down.
+		 */
+		recall: ({ limit, query }: { limit?: number; query: string }) => {
+			conciergeMemoryService.reconcile();
+			return conciergeMemoryService.recall({ limit, query });
+		},
+	},
+	workspaceCreation: {
+		/** Cuts a workspace off a project and reports the row it made. */
+		createWorkspace: async ({
+			baseBranch,
+			name,
+			projectId,
+		}: {
+			baseBranch?: string;
+			name?: string;
+			projectId: string;
+		}) => {
+			const result = await createWorkspaceServiceWithSetup.create({
+				...(baseBranch ? { baseBranch } : {}),
+				...(name ? { name } : {}),
+				repositoryId: projectId,
+			});
+			const workspace = result.workspace;
+			if (!workspace) {
+				throw new Error(
+					result.diagnostics.at(0)?.message ??
+						'The workspace could not be created.',
+				);
+			}
+			return {
+				branchName: workspace.branchName,
+				name: workspace.name,
+				path: workspace.path,
+				projectId,
+				workspaceId: workspace.id,
+			};
+		},
+	},
+};
 agentControlService = createAgentControlService({
 	guardrails: agentControlGuardrails,
 	originRegistry: agentControlOriginRegistry,
 	ports: createAgentControlPorts({
 		augmentHarnessCommand,
+		conciergePorts,
 		boardStatusStore,
 		/** Broadcasts an agent-reported board status update to all windows. */
 		broadcastBoardStatus: (payload) =>
@@ -1176,7 +1375,8 @@ app.whenReady().then(() => {
 	databaseService.open();
 	registerLinearAssetProtocol(linearAssetProxy);
 	moveRepositoryScriptsIntoCommittedConfig();
-	rootDirectoryService.ensure();
+	ensureConciergeHome(rootDirectoryService.ensure().conciergePath);
+	conciergeMemoryService.reconcile();
 	void sharedRootAdoptionService.reconcile();
 	const readAppSettings = () => appSettingsService.read();
 	const menuContextStore = new MenuContextStore();
@@ -1228,6 +1428,7 @@ app.whenReady().then(() => {
 		appSettingsService,
 		archiveWorkspaceService: archiveWorkspaceServiceWithScript,
 		augmentHarnessCommand,
+		conciergeSessionService,
 		configService,
 		continueWorkspaceBranchService,
 		createWorkspaceService: createWorkspaceServiceWithSetup,

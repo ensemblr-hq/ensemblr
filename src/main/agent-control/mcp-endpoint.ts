@@ -102,6 +102,7 @@ export const TOOL_DEFS: readonly McpToolDef[] = [
 			thinkingLevel: z.string().optional(),
 			title: z.string().optional(),
 			wait: z.boolean().optional(),
+			workspaceId: z.string().optional(),
 		},
 	},
 	{
@@ -210,41 +211,80 @@ export const TOOL_DEFS: readonly McpToolDef[] = [
 		shape: {
 			terminalId: z.string().optional(),
 			kind: startStop.optional(),
+			workspaceId: z.string().optional(),
 		},
 	},
 	{
 		name: 'ensemblr_focus_panel',
 		op: 'focusPanel',
 		description: 'Focus the Files, Changes, or Checks review panel.',
-		shape: { panel: z.enum(['files', 'changes', 'checks']) },
+		shape: {
+			panel: z.enum(['files', 'changes', 'checks']),
+			workspaceId: z.string().optional(),
+		},
+	},
+	{
+		name: 'ensemblr_focus_workspace',
+		op: 'focusWorkspace',
+		description:
+			'Navigate the app to a workspace. Concierge only — every other caller is already in the one workspace it can address.',
+		shape: { workspaceId: z.string() },
+	},
+	{
+		name: 'ensemblr_create_workspace',
+		op: 'createWorkspace',
+		description:
+			'Cut a new workspace (a git worktree on its own branch) off a project, then put an orchestrator in it with ensemblr_start_conversation. Concierge only.',
+		shape: {
+			baseBranch: z.string().optional(),
+			name: z.string().optional(),
+			projectId: z.string(),
+		},
+	},
+	{
+		name: 'ensemblr_recall_memory',
+		op: 'recallMemory',
+		description:
+			'Search your own memory of past work. Concierge only — nothing else has a memory index to search.',
+		shape: { limit: z.number().optional(), query: z.string() },
 	},
 	{
 		name: 'ensemblr_set_workspace_status',
 		op: 'setWorkspaceStatus',
 		description:
-			'Move your workspace across the kanban board by setting its status (backlog, in-progress, in-review, done, canceled). Acts on your own workspace.',
-		shape: { status: z.enum(WORKSPACE_BOARD_STATUSES) },
+			'Move a workspace across the kanban board by setting its status (backlog, in-progress, in-review, done, canceled). Acts on your own workspace. Concierge only: name the workspace with `workspaceId`; every other caller acts on its own and may not name another.',
+		shape: {
+			status: z.enum(WORKSPACE_BOARD_STATUSES),
+			workspaceId: z.string().optional(),
+		},
 	},
 	{
 		name: 'ensemblr_get_workspace_status',
 		op: 'getWorkspaceStatus',
 		description:
 			"Read your workspace's current kanban board status. Use ensemblr_list_workspaces to see every workspace's status.",
-		shape: {},
+		shape: { workspaceId: z.string().optional() },
 	},
 	{
 		name: 'ensemblr_get_workspace_diff',
 		op: 'getWorkspaceDiff',
 		description:
 			"Read this workspace's diff — every change on its branch, committed and uncommitted alike, the same set the Changes panel shows. Call it with stat=true FIRST: that returns the changed files with their +/- counts and no patch text, so you can see how big the diff is before you read it. Then read the whole diff, or pass filePath to read one file's patch on its own — filePath and stat are alternatives, not a pair. Every read is capped: a full read names what it dropped in omittedFiles for you to re-request by filePath, and a single file too large to carry is cut at a hunk boundary.",
-		shape: { filePath: z.string().optional(), stat: z.boolean().optional() },
+		shape: {
+			filePath: z.string().optional(),
+			stat: z.boolean().optional(),
+			workspaceId: z.string().optional(),
+		},
 	},
 	{
 		name: 'ensemblr_get_diff_comments',
 		op: 'getDiffComments',
 		description:
 			"Read the review comments on this workspace's diff — the ones the user left in the Changes panel and the ones agents filed there. Pass filePath to narrow it to one path. Comments synced from a GitHub pull request are not included.",
-		shape: { filePath: z.string().optional() },
+		shape: {
+			filePath: z.string().optional(),
+			workspaceId: z.string().optional(),
+		},
 	},
 	{
 		name: 'ensemblr_add_diff_comments',
@@ -259,6 +299,7 @@ export const TOOL_DEFS: readonly McpToolDef[] = [
 					body: z.string(),
 				}),
 			),
+			workspaceId: z.string().optional(),
 		},
 	},
 	{
@@ -266,7 +307,10 @@ export const TOOL_DEFS: readonly McpToolDef[] = [
 		op: 'resolveDiffComments',
 		description:
 			"Mark review comments on this workspace's diff as resolved, by the ids ensemblr_get_diff_comments and ensemblr_add_diff_comments hand back. Resolve a comment in the same turn you make the fix it asked for, and batch a whole review pass into one call. Resolve only what you actually fixed: a comment you deferred or disagree with stays open, and you say so in your reply. This only ever resolves — it cannot reopen a comment the user closed, and an id that matches no open comment here is reported back rather than failing the call.",
-		shape: { commentIds: z.array(z.string()) },
+		shape: {
+			commentIds: z.array(z.string()),
+			workspaceId: z.string().optional(),
+		},
 	},
 	{
 		name: 'ensemblr_linear_list_issues',

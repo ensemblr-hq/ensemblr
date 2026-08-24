@@ -7,6 +7,7 @@ const makeFocusPort = (): FocusPort => ({
 	focusTab: vi.fn(),
 	focusDockTab: vi.fn(),
 	focusPanel: vi.fn(),
+	focusWorkspace: vi.fn(),
 });
 
 /** Drives the coalescer against a clock the test moves by hand. */

@@ -37,6 +37,7 @@ const EXPECTED_MIGRATIONS = [
 	'019_linear_accounts',
 	'020_linear_comment_freshness',
 	'021_restore_archived_repositories',
+	'022_concierge',
 ];
 
 const AGENT_VOCABULARY_MIGRATION_VERSION = 14;
@@ -146,6 +147,32 @@ function seedDatabaseBeforeAgentVocabulary(databasePath: string): void {
 	connection.database.close();
 }
 
+const CONCIERGE_MIGRATION_ID = '022_concierge';
+const CONCIERGE_MIGRATION_VERSION = 22;
+
+/**
+ * Builds a database at the pre-022 schema the same way
+ * {@link openDatabaseBeforeAgentVocabulary} does: `022_concierge` is
+ * pre-recorded as applied so 001-021 run and it does not, leaving
+ * `root_directories` without its `concierge_path` column.
+ */
+function openDatabaseBeforeConcierge(databasePath: string) {
+	const markerConnection = new DatabaseSync(databasePath);
+	listAppliedMigrationIds(markerConnection);
+	markerConnection
+		.prepare(
+			'INSERT INTO schema_migrations (id, version, name) VALUES (?, ?, ?)',
+		)
+		.run(
+			CONCIERGE_MIGRATION_ID,
+			CONCIERGE_MIGRATION_VERSION,
+			CONCIERGE_MIGRATION_ID,
+		);
+	markerConnection.close();
+
+	return openEnsemblrDatabase({ databasePath });
+}
+
 function readRows(
 	database: DatabaseSync,
 	sql: string,
@@ -249,6 +276,15 @@ test('opens an isolated database and applies foundation migrations', (t) => {
 		'chat_tabs',
 		'checkpoints',
 		'comments',
+		'concierge_memories',
+		'concierge_memories_fts',
+		'concierge_memories_fts_config',
+		'concierge_memories_fts_content',
+		'concierge_memories_fts_data',
+		'concierge_memories_fts_docsize',
+		'concierge_memories_fts_idx',
+		'concierge_session_events',
+		'concierge_sessions',
 		'infisical_accounts',
 		'infisical_links',
 		'integration_metadata',
@@ -1374,4 +1410,60 @@ VALUES ('ws-stranded', 'repo-stranded', 'gone', 'Gone', '/tmp/ensemblr/workspace
 		).repositories.map((repository) => repository.id),
 		['repo-live', 'repo-stranded'],
 	);
+});
+
+test('migration 022 leaves an upgraded root with an empty concierge path', (t) => {
+	const fixture = createTestDatabasePath();
+	t.after(fixture.cleanup);
+
+	const seeded = openDatabaseBeforeConcierge(fixture.databasePath);
+	assert.equal(
+		readRows(
+			seeded.database,
+			"SELECT name FROM pragma_table_info('root_directories') WHERE name = 'concierge_path'",
+		).length,
+		0,
+	);
+	seeded.database.exec(`
+INSERT INTO root_directories (id, path, source, status, repositories_path, workspaces_path, archived_contexts_path)
+VALUES ('root-upgraded', '/tmp/ensemblr/root', 'sqlite', 'ok', '/tmp/ensemblr/root/repos', '/tmp/ensemblr/root/workspaces', '/tmp/ensemblr/root/archived');
+`);
+	seeded.database
+		.prepare('DELETE FROM schema_migrations WHERE id = ?')
+		.run(CONCIERGE_MIGRATION_ID);
+	seeded.database.close();
+
+	const connection = openEnsemblrDatabase({
+		databasePath: fixture.databasePath,
+	});
+	t.after(() => connection.database.close());
+
+	assert.deepEqual(
+		listAppliedMigrationIds(connection.database),
+		EXPECTED_MIGRATIONS,
+	);
+
+	// The backfill cannot know where the concierge home belongs, so every
+	// upgraded row lands on the empty string — the one value that makes
+	// `ports.concierge.homePath()` falsy and hard-blocks the Concierge until
+	// `root-persist` rewrites it. Asserting it keeps the self-heal honest: a
+	// change that stops rewriting the column would otherwise ship silently.
+	assert.deepEqual(
+		readRows(
+			connection.database,
+			'SELECT id, concierge_path FROM root_directories',
+		),
+		[{ concierge_path: '', id: 'root-upgraded' }],
+	);
+
+	for (const table of [
+		'concierge_memories',
+		'concierge_session_events',
+		'concierge_sessions',
+	]) {
+		assert.ok(
+			listTablesLike(connection.database, 'concierge\\_%').includes(table),
+			`migration 022 did not create ${table}`,
+		);
+	}
 });

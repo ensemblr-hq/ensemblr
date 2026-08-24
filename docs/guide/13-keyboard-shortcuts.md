@@ -1,6 +1,6 @@
 # 13. Keyboard shortcuts
 
-Ensemblr binds 35 shortcuts. This page lists all of them.
+Ensemblr binds 41 shortcuts. This page lists all of them.
 
 ![Settings → More → Shortcuts, listing the Global and Composer scope groups with a key binding beside each action.](./images/13-shortcuts.png)
 
@@ -46,6 +46,8 @@ Active anywhere in the workbench.
 | `⌘R` | Start or stop run script | `run.start` |
 | `⌃O` | Expand or collapse all tool calls | `toolCalls.toggleCollapse` |
 | `⌘⇧A` | Launch coding agent | `agents.open` |
+| `⌘⇧C` | Open or close the Concierge | `concierge.toggle` |
+| `⌘⇧L` | Focus the Concierge composer | `concierge.focusComposer` |
 | `⌘⌥U` | Show uncommitted changes | `changes.uncommitted` |
 | `⌘⇧↵` | Keep preview tab open | `tab.keepOpen` |
 | `⌘⇧]` | Next tab | `tab.next` |
@@ -88,6 +90,7 @@ Active when the message composer has focus.
 | `⌥P` | Toggle model picker | `composer.toggleModelPicker` |
 | `⌥T` | Cycle thinking level | `composer.cycleThinking` |
 | `⌥⇧P` | Toggle plan mode | `composer.togglePlanMode` |
+| `⌥D` | Start or stop dictation | `composer.toggleDictation` |
 | `⌘↵` | Submit diff comment | `diffComment.submit` |
 
 Two of these need a word.
@@ -103,6 +106,32 @@ steering the running turn.
 **`diffComment.submit` is composer-scoped, not dialog-scoped.** A review-comment
 box is a composer, so `⌘↵` submits the comment when one has focus. See
 [8. Reviewing changes](./08-reviewing-changes.md).
+
+## Concierge
+
+Active while the Concierge is open. `⌘⇧C` and `⌘⇧L` above open it from anywhere,
+so they are global rather than listed here.
+
+| Shortcut | Does | Id |
+| --- | --- | --- |
+| `⌘⇧M` | Maximize or restore the Concierge | `concierge.toggleFullscreen` |
+| `⌘⇧K` | Clear the Concierge's context | `concierge.clear` |
+| `⎋` | Close the Concierge | `concierge.close` |
+
+`⌘⇧M` works from closed too — it opens the Concierge straight into the maximized
+view rather than needing the panel up first.
+
+`⌘⇧K` and `⎋` both fire only while focus is **inside** the Concierge. Neither
+carries a menu accelerator: a menu item claiming a chord takes it app-wide, and
+neither belongs to every other surface — one throws a conversation away, and the
+other is what dialogs and popovers everywhere already close on. The
+View ▸ Concierge ▸ **Clear Context…** item runs the same clear, from anywhere.
+
+Clearing writes what the Concierge learned to its memory first — see
+[6. Agents](./06-agents.md#the-concierge).
+
+`⎋` also yields to whatever is nearer: an open slash-command list takes it
+first, and the panel closes only on the next press.
 
 ## Dialogs
 

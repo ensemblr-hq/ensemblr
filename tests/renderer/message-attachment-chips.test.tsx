@@ -42,6 +42,30 @@ describe('chat message attachment chips', () => {
 		expect(markup).not.toContain('<code>/tmp/scratch.md</code>');
 	});
 
+	// A real root can hold a space — `~/Library/Application Support/…`, or the
+	// Ensemblr dev root — and a chip is the only thing that says the span is a
+	// file rather than the sentence running on.
+	test('renders a rooted path containing spaces as a chip', () => {
+		const markup = renderToStaticMarkup(
+			<ChatMessageText
+				text={'Read `/Users/dev/Ensemblr (DEV)/repos/app/README.md`.'}
+			/>,
+		);
+
+		expect(markup).toContain(
+			'title="/Users/dev/Ensemblr (DEV)/repos/app/README.md"',
+		);
+	});
+
+	test('leaves a spaced span that is not rooted as ordinary inline code', () => {
+		const markup = renderToStaticMarkup(
+			<ChatMessageText text={'Run `npm run check` and `bun add left-pad`.'} />,
+		);
+
+		expect(markup).toContain('<code>npm run check</code>');
+		expect(markup).toContain('<code>bun add left-pad</code>');
+	});
+
 	test('leaves an absolute path with no file extension as prose', () => {
 		const markup = renderToStaticMarkup(
 			<ChatMessageText text={'Resolved via `/usr/bin/env` on PATH.'} />,

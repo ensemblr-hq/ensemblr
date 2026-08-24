@@ -134,6 +134,23 @@ it applies to chats you start afterwards. Pi has no sub-agent tool of its own,
 and a spawned child always delegates through chat tabs whatever the setting says
 — that is what keeps the depth cap meaningful.
 
+## The Concierge is a caller too
+
+The Concierge reaches the same control server through the same bridges, but it is
+not in a workspace, so the rules land differently:
+
+- **Reads span everything and writes stop at its own folder.** There is no
+  permission mode to relax — writing a file in any workspace, opening a terminal,
+  and launching a harness are refused outright, whatever the mode a repository is
+  set to.
+- **Every op that acts on a workspace has to name one.** A workspace agent gets
+  its own by default; the Concierge has none, so an op that names no workspace is
+  refused rather than guessed at.
+- **What it spawns is a root orchestrator, not a sub-agent.** The child owns the
+  task and fans out its own children under its own depth cap.
+
+[6. Agents](./06-agents.md#the-concierge) covers the Concierge itself.
+
 ## Full tool reference
 
 This page covers what you see. The complete tool list — every operation, its

@@ -2,6 +2,7 @@ import type { UIMessage } from 'ai';
 
 import { turnMetadataOf } from '@/renderer/lib/agent-timeline';
 import type { OptimisticPrompt } from '@/renderer/state/composer';
+import type { ChatAssistantTurnTiming } from '@/renderer/types/chat';
 
 /**
  * Resolves the submit instant (ms) that anchors the live "Working…" indicator
@@ -38,4 +39,30 @@ export function resolveLiveTurnStartMs(
 		}
 	}
 	return null;
+}
+
+/**
+ * Resolve the window the turn timer counts over. It starts at the prompt submit
+ * time so the timer covers the whole turn (reasoning + tool calls + final
+ * answer), falling back to the first assistant event when the prompt time is
+ * unknown (resumed or legacy sessions). A live turn has no end yet.
+ * @param isLiveTurn - Whether this turn is still streaming
+ * @param metadata - Turn metadata carried on the message, if any
+ * @returns The timing window handed to the assistant turn
+ */
+export function resolveTurnTiming({
+	isLiveTurn,
+	metadata,
+}: {
+	isLiveTurn: boolean;
+	metadata: ReturnType<typeof turnMetadataOf>;
+}): ChatAssistantTurnTiming {
+	const startMs = metadata
+		? Date.parse(metadata.promptAt ?? metadata.firstEventAt)
+		: Number.NaN;
+	const endMs = metadata ? Date.parse(metadata.lastEventAt) : Number.NaN;
+	return {
+		endMs: isLiveTurn || Number.isNaN(endMs) ? null : endMs,
+		startMs: Number.isNaN(startMs) ? Date.now() : startMs,
+	};
 }

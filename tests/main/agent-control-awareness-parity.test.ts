@@ -3,6 +3,10 @@ import { describe, expect, it } from 'vitest';
 import { TOOL_DEFS } from '../../src/main/agent-control/index.ts';
 import {
 	ASK_USER_QUESTION_LIMITS,
+	CONCIERGE_AWARENESS,
+	CONCIERGE_ONLY_OPS,
+	CONCIERGE_WITHHELD_OPS,
+	conciergeControlOpDenial,
 	HARNESS_AWARENESS,
 	NATIVE_ORCHESTRATOR_AWARENESS,
 	ORCHESTRATOR_AWARENESS,
@@ -18,6 +22,7 @@ import {
 	withheldControlOps,
 } from '../../src/shared/agent-control.ts';
 import {
+	CONCIERGE_GUARDED_TOOLS,
 	PLAN_MODE_GUARDED_TOOLS,
 	planModeControlOpDenial,
 	planModeFollowUpDenial,
@@ -46,7 +51,12 @@ const NATIVE_WITHHELD_TOOL_NAMES = ((): readonly string[] => {
 		hasChatTab: true,
 		role: 'orchestrator',
 	});
-	return TOOL_DEFS.filter((def) => ops.has(def.op)).map((def) => def.name);
+	// The delegation axis only: the same answer folds in the Concierge-only ops,
+	// which a native-delegating root is withheld for a different reason and which
+	// the native-absence paragraph has no business naming.
+	return TOOL_DEFS.filter(
+		(def) => ops.has(def.op) && !CONCIERGE_ONLY_OPS.has(def.op),
+	).map((def) => def.name);
 })();
 
 /**
@@ -550,10 +560,54 @@ describe('agent-control AWARENESS parity', () => {
 		).toEqual([...PLAN_MODE_GUARDED_TOOLS].sort());
 	});
 
+	it('embeds the same Concierge guarded-tool set the shared classifier uses', () => {
+		expect(
+			extractEmbeddedStringSet(
+				readExtensionSource(),
+				'CONCIERGE_GUARDED_TOOLS',
+			),
+		).toEqual([...CONCIERGE_GUARDED_TOOLS].sort());
+	});
+
+	// A Concierge runs on the same runtime a workspace agent does, so one hook
+	// serves both policies and the app picks which applies from the origin. Gating
+	// on either set alone would leave the other's extra members — `MultiEdit`, the
+	// capitalized spellings — classified by a policy no call ever reaches.
+	it('forwards the union of both guarded sets, not one role’s half', () => {
+		expect(readExtensionSource()).toMatch(
+			/const GUARDED_TOOLS = new Set\(\[\s*\.\.\.PLAN_MODE_GUARDED_TOOLS,\s*\.\.\.CONCIERGE_GUARDED_TOOLS,\s*\]\)/,
+		);
+		expect(readExtensionSource()).toMatch(
+			/if \(!GUARDED_TOOLS\.has\(event\.toolName\)\)/,
+		);
+	});
+
+	// The path is the whole question for a Concierge write: without it every one
+	// of them — including into the Concierge's own `memory/` — comes back blocked,
+	// and `pathStaysInConciergeHome` never runs outside a unit test. Pi has never
+	// published which key its edit tools use, so both are read.
+	it('sends the target path with every guarded tool call', () => {
+		const source = readExtensionSource();
+
+		expect(source).toMatch(/path: input\?\.path \?\? input\?\.file_path,/);
+		expect(source).toMatch(
+			/invoke\(\s*'checkPlanModeTool',\s*\{\s*command: input\?\.command,\s*path:/,
+		);
+	});
+
 	it('swaps the role playbook for the plan-mode one rather than stacking both', () => {
 		expect(readExtensionSource()).toMatch(
-			/planning\s*\?\s*PLAN_MODE_AWARENESS_FOR_ROLE\s*:\s*AWARENESS/,
+			/planning\s*\?\s*PLAN_MODE_AWARENESS_FOR_ROLE\s*:\s*\(?\s*rolePlaybook\s*\?\?\s*AWARENESS\s*\)?/,
 		);
+	});
+
+	// The extension holds no Concierge copy on purpose: that playbook has no
+	// counterpart here, so the app sends it down with the brief. Without this the
+	// Concierge would be served the orchestrator copy and told to work in a
+	// workspace it has none of.
+	it('prefers the playbook the app sends over its own copies', () => {
+		expect(readExtensionSource()).toMatch(/rolePlaybook\s*\?\?\s*AWARENESS/);
+		expect(readExtensionSource()).not.toContain('CONCIERGE_AWARENESS');
 	});
 
 	// The app renders every one of these blocks and the extension only appends
@@ -718,7 +772,7 @@ describe('sub-agent role policy', () => {
 	it('gates both registration paths on that set', () => {
 		const source = readExtensionSource();
 		expect(source).toMatch(
-			/const registersOp = \(op: string\): boolean =>\s*!IS_SUBAGENT \|\| !SUBAGENT_WITHHELD_OPS\.has\(op\);/,
+			/const registersOp = \(op: string\): boolean =>\s*IS_CONCIERGE\s*\? !CONCIERGE_WITHHELD_OPS\.has\(op\)\s*: !IS_SUBAGENT \|\| !SUBAGENT_WITHHELD_OPS\.has\(op\);/,
 		);
 		expect(source).toMatch(/if \(!registersOp\(op\)\) \{\s*return;/);
 		expect(source).toMatch(/if \(registersOp\('exitPlanMode'\)\) \{/);
@@ -811,6 +865,54 @@ describe('sub-agent role policy', () => {
 			expect(SUBAGENT_WITHHELD_OPS.has(op)).toBe(false);
 		}
 		expect(SUBAGENT_AWARENESS).toContain('ensemblr_notify_orchestrator');
+	});
+});
+
+describe('Concierge role policy', () => {
+	it('embeds the same withheld-op set the app enforces', () => {
+		expect(
+			extractEmbeddedStringSet(readExtensionSource(), 'CONCIERGE_WITHHELD_OPS'),
+		).toEqual([...CONCIERGE_WITHHELD_OPS].sort());
+	});
+
+	// Every Concierge op is refused outright — there is no unusable half here, as
+	// there is for a sub-agent — so a member with no reason would be withheld from
+	// the tool list and then met with an empty denial by a stale caller.
+	it('gives every withheld op a reason', () => {
+		for (const op of CONCIERGE_WITHHELD_OPS) {
+			expect(conciergeControlOpDenial(op), op).not.toBeNull();
+		}
+	});
+
+	// The rule the sub-agent playbooks follow, for the same reason: naming a tool
+	// the app refuses as though it were available is what teaches a model to keep
+	// reaching for it, and naming one in order to say it is refused is the
+	// opposite. The Concierge playbook does the latter for the chat-tab ops, which
+	// is the whole point of the line — the app cannot refuse them on the chat-tab
+	// axis, so the playbook has to say so.
+	it('names a withheld tool only to refuse it', () => {
+		const refusal = /refused|cannot|do not|Concierge only/;
+		for (const op of CONCIERGE_WITHHELD_OPS) {
+			const toolName = `ensemblr_${op.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`)}`;
+			for (const line of CONCIERGE_AWARENESS.split('\n')) {
+				if (!line.includes(toolName)) {
+					continue;
+				}
+				expect(
+					refusal.test(line),
+					`\`${toolName}\` is named without a refusal: ${line.slice(0, 120)}`,
+				).toBe(true);
+			}
+		}
+	});
+
+	// The upkeep block asks for these two by name and the Concierge never receives
+	// one, so the playbook is the only place it can learn they are not its job. It
+	// said the opposite until the Concierge spent two calls a turn on them.
+	it('tells the Concierge the tab bookkeeping is not its job', () => {
+		expect(CONCIERGE_AWARENESS).toContain('ensemblr_set_name');
+		expect(CONCIERGE_AWARENESS).toContain('ensemblr_set_summary');
+		expect(CONCIERGE_AWARENESS).toContain('refused here');
 	});
 });
 

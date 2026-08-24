@@ -100,6 +100,17 @@ const INLINE_ATTACHMENT_LIBRARY_NAMES = new Set([
 const INLINE_ATTACHMENT_SAFE_PATH_PATTERN =
 	/^(?:\/|~\/|\.{1,2}\/)?[A-Za-z0-9._@+:-]+(?:\/[A-Za-z0-9._@+:-]+)*$/;
 
+// A rooted path may hold spaces and parentheses, which real directories carry
+// (`~/Library/Application Support/…`) and the strict pattern above refuses. The
+// looser form is confined to absolute and home-relative candidates: a bare span
+// with a space in it reads as prose or a shell command far more often than as a
+// path, and only a rooted one says outright that it is neither.
+const INLINE_ATTACHMENT_ROOTED_SEGMENT =
+	'[A-Za-z0-9._@+:()-]+(?: [A-Za-z0-9._@+:()-]+)*';
+const INLINE_ATTACHMENT_ROOTED_PATH_PATTERN = new RegExp(
+	`^(?:/|~/)${INLINE_ATTACHMENT_ROOTED_SEGMENT}(?:/${INLINE_ATTACHMENT_ROOTED_SEGMENT})*$`,
+);
+
 /**
  * Returns a previewable path when an inline-code value looks like a file
  * reference, or null when it reads as ordinary prose or a library name.
@@ -111,8 +122,7 @@ export function attachmentPathFromInlineCode(text: string): string | null {
 	if (
 		candidate.length === 0 ||
 		candidate.length > 240 ||
-		/\s/.test(candidate) ||
-		!INLINE_ATTACHMENT_SAFE_PATH_PATTERN.test(candidate)
+		!matchesPathShape(candidate)
 	) {
 		return null;
 	}
@@ -130,6 +140,18 @@ export function attachmentPathFromInlineCode(text: string): string | null {
 		return pathWithoutLineSuffix;
 	}
 	return null;
+}
+
+/**
+ * Reports whether a candidate is shaped like a path at all, applying the looser
+ * rooted rule only to a candidate that opens with `/` or `~/`.
+ * @param candidate - Trimmed inline-code text.
+ * @returns True when the text could be a path.
+ */
+function matchesPathShape(candidate: string): boolean {
+	return candidate.startsWith('/') || candidate.startsWith('~/')
+		? INLINE_ATTACHMENT_ROOTED_PATH_PATTERN.test(candidate)
+		: INLINE_ATTACHMENT_SAFE_PATH_PATTERN.test(candidate);
 }
 
 /** Returns the final path segment from a slash-delimited path. */

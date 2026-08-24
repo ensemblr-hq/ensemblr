@@ -147,6 +147,51 @@ export const ENSEMBLR_TOOL_LABELS: Record<string, EnsemblrToolLabel> = {
 				),
 		],
 	},
+	ensemblr_focus_workspace: {
+		detailKeys: ['workspaceId'],
+		glyph: 'crosshair',
+		title: [
+			() =>
+				i18n.t(
+					'workbench:control-tool.focus-workspace.done',
+					'Opened a workspace',
+				),
+			() =>
+				i18n.t(
+					'workbench:control-tool.focus-workspace.running',
+					'Opening a workspace',
+				),
+		],
+	},
+	ensemblr_create_workspace: {
+		detailKeys: ['projectId', 'name'],
+		glyph: 'crosshair',
+		title: [
+			() =>
+				i18n.t(
+					'workbench:control-tool.create-workspace.done',
+					'Created a workspace',
+				),
+			() =>
+				i18n.t(
+					'workbench:control-tool.create-workspace.running',
+					'Creating a workspace',
+				),
+		],
+	},
+	ensemblr_recall_memory: {
+		detailKeys: ['query'],
+		glyph: 'search',
+		title: [
+			() =>
+				i18n.t('workbench:control-tool.recall-memory.done', 'Recalled memory'),
+			() =>
+				i18n.t(
+					'workbench:control-tool.recall-memory.running',
+					'Searching memory',
+				),
+		],
+	},
 	ensemblr_focus_tab: {
 		glyph: 'crosshair',
 		title: [

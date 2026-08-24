@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
-import { useAtom, useAtomValue } from 'jotai';
-import { useEffect, useMemo } from 'react';
+import { useAtomValue, useSetAtom } from 'jotai';
+import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { agentModelsQuery } from '@/renderer/api/ensemblr';
@@ -15,16 +15,20 @@ import {
 } from '@/renderer/components/settings/settings-async-state';
 import { SettingsSection } from '@/renderer/components/settings/settings-section';
 import {
+	type ModelSlot,
+	useModelSlot,
+} from '@/renderer/hooks/preferences/use-model-slot';
+import {
+	conciergeModelAtom,
+	conciergeProviderAtom,
+	conciergeThinkingLevelAtom,
 	defaultChatModelAtom,
 	defaultChatThinkingLevelAtom,
 	hiddenModelsAtom,
 	reviewModelAtom,
 	reviewThinkingLevelAtom,
 } from '@/renderer/state/preferences';
-import {
-	type AgentProviderId,
-	normalizeAgentProviderId,
-} from '@/shared/agent-provider';
+import type { AgentProviderId } from '@/shared/agent-provider';
 import type { AgentModelOption } from '@/shared/ipc/contracts/agent-models';
 
 /** Route for the Models settings section; renders the models panel populated from agent capability discovery. */
@@ -32,7 +36,61 @@ export const Route = createFileRoute('/_workbench/settings/models')({
 	component: ModelsSettings,
 });
 
-/** Models settings panel for choosing default chat and review models, their thinking levels, and which models are visible. */
+/** The copy one model-slot row needs, resolved by the pane so the row stays presentational. */
+interface ModelSlotRowLabels {
+	description: string;
+	label: string;
+	modelAriaLabel: string;
+	thinkingAriaLabel: string;
+}
+
+/**
+ * One model-slot row: a model select paired with its thinking-level select.
+ *
+ * The three slots differ only in their copy and which atoms they read, so they
+ * share a row rather than repeating the pairing three times — which is what let
+ * the Concierge slot ship without the visibility fallback its siblings had.
+ */
+function ModelSlotRow({
+	defaultThinkingLevel,
+	labels,
+	models,
+	placeholder,
+	slot,
+}: {
+	defaultThinkingLevel?: string | null;
+	labels: ModelSlotRowLabels;
+	models: readonly AgentModelOption[];
+	placeholder: string;
+	slot: ModelSlot;
+}) {
+	return (
+		<SettingRow
+			control={
+				<div className='flex items-center gap-2'>
+					<ModelSelect
+						ariaLabel={labels.modelAriaLabel}
+						models={models}
+						onChange={slot.choose}
+						placeholder={placeholder}
+						value={slot.modelId}
+					/>
+					<ThinkingLevelSelect
+						ariaLabel={labels.thinkingAriaLabel}
+						levels={slot.levels}
+						onChange={slot.setThinking}
+						provider={slot.provider}
+						value={slot.thinking ?? defaultThinkingLevel}
+					/>
+				</div>
+			}
+			description={labels.description}
+			label={labels.label}
+		/>
+	);
+}
+
+/** Models settings panel for choosing the default chat, review, and Concierge models, their thinking levels, and which models are visible. */
 function ModelsSettings() {
 	const { t } = useTranslation();
 	const {
@@ -40,62 +98,61 @@ function ModelsSettings() {
 		error: modelsError,
 		isLoading: modelsLoading,
 	} = useQuery(agentModelsQuery);
-	const [defaultModel, setDefaultModel] = useAtom(defaultChatModelAtom);
-	const [defaultThinking, setDefaultThinking] = useAtom(
-		defaultChatThinkingLevelAtom,
-	);
-	const [reviewModel, setReviewModel] = useAtom(reviewModelAtom);
-	const [reviewThinking, setReviewThinking] = useAtom(reviewThinkingLevelAtom);
-
+	const setConciergeProvider = useSetAtom(conciergeProviderAtom);
 	const hidden = useAtomValue(hiddenModelsAtom);
+
 	const hiddenSet = useMemo(() => new Set(hidden), [hidden]);
 	const allModels = useMemo(() => modelsData?.models ?? [], [modelsData]);
-	// Hidden models drop out of the default/review selects too, not just the
-	// composer picker.
+	// Hidden models drop out of the default/review/Concierge selects too, not
+	// just the composer picker.
 	const list = useMemo(
 		() => allModels.filter((model) => !hiddenSet.has(model.id)),
 		[allModels, hiddenSet],
 	);
-	const agentDefaultModelId = modelsData?.defaultModelId ?? null;
+	const catalogue = useMemo(
+		() => ({
+			agentDefaultModelId: modelsData?.defaultModelId ?? null,
+			hiddenSet,
+			list,
+		}),
+		[hiddenSet, list, modelsData],
+	);
 
-	// If the model selected for the default or review slot gets hidden, fall back
-	// to the first visible model so the select never points at a hidden id. The
-	// list always has ≥1 entry (the visibility editor blocks hiding the last).
-	useEffect(() => {
-		const firstVisibleId = list[0]?.id;
-		if (!firstVisibleId) {
-			return;
-		}
-		const effectiveDefault = defaultModel ?? agentDefaultModelId;
-		if (effectiveDefault && hiddenSet.has(effectiveDefault)) {
-			setDefaultModel(firstVisibleId);
-		}
-		const effectiveReview = reviewModel ?? agentDefaultModelId;
-		if (effectiveReview && hiddenSet.has(effectiveReview)) {
-			setReviewModel(firstVisibleId);
-		}
-	}, [
-		list,
-		hiddenSet,
-		defaultModel,
-		reviewModel,
-		agentDefaultModelId,
-		setDefaultModel,
-		setReviewModel,
-	]);
+	// The runtime rides along with the model rather than being a second setting
+	// to keep in step: a model belongs to exactly one runtime, and a pair that
+	// disagrees is refused when the Concierge session opens.
+	const persistConciergeProvider = useCallback(
+		(_modelId: string | null, provider: AgentProviderId) => {
+			setConciergeProvider(provider);
+		},
+		[setConciergeProvider],
+	);
 
-	const resolvedDefault = defaultModel ?? agentDefaultModelId;
-	const resolvedReview = reviewModel ?? agentDefaultModelId;
-	const defaultLevels = thinkingLevelsFor(list, resolvedDefault);
-	const reviewLevels = thinkingLevelsFor(list, resolvedReview);
-	const defaultProvider = providerFor(list, resolvedDefault);
-	const reviewProvider = providerFor(list, resolvedReview);
+	const defaultSlot = useModelSlot(
+		catalogue,
+		defaultChatModelAtom,
+		defaultChatThinkingLevelAtom,
+	);
+	const reviewSlot = useModelSlot(
+		catalogue,
+		reviewModelAtom,
+		reviewThinkingLevelAtom,
+	);
+	const conciergeSlot = useModelSlot(
+		catalogue,
+		conciergeModelAtom,
+		conciergeThinkingLevelAtom,
+		persistConciergeProvider,
+	);
+
+	const placeholder =
+		modelsData?.defaultModelId ?? t('settings:models.no-models', 'No models');
 
 	return (
 		<SettingsSection
 			description={t(
 				'settings:models.description',
-				"Agent models and thinking-level defaults for new chats and reviews. Sourced from each configured runtime's capability discovery.",
+				"Agent models and thinking-level defaults for new chats, reviews, and the Concierge. Sourced from each configured runtime's capability discovery.",
 			)}
 			title={t('settings:models.title', 'Models')}
 		>
@@ -115,74 +172,70 @@ function ModelsSettings() {
 				/>
 			) : null}
 
-			<SettingRow
-				control={
-					<div className='flex items-center gap-2'>
-						<ModelSelect
-							ariaLabel={t(
-								'settings:models.default-model.aria-label',
-								'Default chat model',
-							)}
-							models={list}
-							onChange={setDefaultModel}
-							placeholder={
-								modelsData?.defaultModelId ??
-								t('settings:models.no-models', 'No models')
-							}
-							value={resolvedDefault}
-						/>
-						<ThinkingLevelSelect
-							ariaLabel={t(
-								'settings:models.default-model.thinking-aria-label',
-								'Default thinking level',
-							)}
-							levels={defaultLevels}
-							onChange={setDefaultThinking}
-							provider={defaultProvider}
-							value={defaultThinking ?? modelsData?.defaultThinkingLevel}
-						/>
-					</div>
-				}
-				description={t(
-					'settings:models.default-model.description',
-					'Model used when you start a new chat. Falls back to the agent-reported default when unset.',
-				)}
-				label={t('settings:models.default-model.label', 'Default model')}
+			<ModelSlotRow
+				defaultThinkingLevel={modelsData?.defaultThinkingLevel}
+				labels={{
+					description: t(
+						'settings:models.default-model.description',
+						'Model used when you start a new chat. Falls back to the agent-reported default when unset.',
+					),
+					label: t('settings:models.default-model.label', 'Default model'),
+					modelAriaLabel: t(
+						'settings:models.default-model.aria-label',
+						'Default chat model',
+					),
+					thinkingAriaLabel: t(
+						'settings:models.default-model.thinking-aria-label',
+						'Default thinking level',
+					),
+				}}
+				models={list}
+				placeholder={placeholder}
+				slot={defaultSlot}
 			/>
 
-			<SettingRow
-				control={
-					<div className='flex items-center gap-2'>
-						<ModelSelect
-							ariaLabel={t(
-								'settings:models.review-model.aria-label',
-								'Review model',
-							)}
-							models={list}
-							onChange={setReviewModel}
-							placeholder={
-								modelsData?.defaultModelId ??
-								t('settings:models.no-models', 'No models')
-							}
-							value={resolvedReview}
-						/>
-						<ThinkingLevelSelect
-							ariaLabel={t(
-								'settings:models.review-model.thinking-aria-label',
-								'Review thinking level',
-							)}
-							levels={reviewLevels}
-							onChange={setReviewThinking}
-							provider={reviewProvider}
-							value={reviewThinking ?? modelsData?.defaultThinkingLevel}
-						/>
-					</div>
-				}
-				description={t(
-					'settings:models.review-model.description',
-					'Model used for the Review action on a workspace.',
-				)}
-				label={t('settings:models.review-model.label', 'Review model')}
+			<ModelSlotRow
+				defaultThinkingLevel={modelsData?.defaultThinkingLevel}
+				labels={{
+					description: t(
+						'settings:models.review-model.description',
+						'Model used for the Review action on a workspace.',
+					),
+					label: t('settings:models.review-model.label', 'Review model'),
+					modelAriaLabel: t(
+						'settings:models.review-model.aria-label',
+						'Review model',
+					),
+					thinkingAriaLabel: t(
+						'settings:models.review-model.thinking-aria-label',
+						'Review thinking level',
+					),
+				}}
+				models={list}
+				placeholder={placeholder}
+				slot={reviewSlot}
+			/>
+
+			<ModelSlotRow
+				defaultThinkingLevel={modelsData?.defaultThinkingLevel}
+				labels={{
+					description: t(
+						'settings:models.concierge-model.description',
+						'Model the Concierge runs on. It works above every project rather than inside one, so it can differ from the chat default. Changing it takes effect on the next turn.',
+					),
+					label: t('settings:models.concierge-model.label', 'Concierge model'),
+					modelAriaLabel: t(
+						'settings:models.concierge-model.aria-label',
+						'Concierge model',
+					),
+					thinkingAriaLabel: t(
+						'settings:models.concierge-model.thinking-aria-label',
+						'Concierge thinking level',
+					),
+				}}
+				models={list}
+				placeholder={placeholder}
+				slot={conciergeSlot}
 			/>
 
 			<SettingRow
@@ -196,35 +249,5 @@ function ModelsSettings() {
 				<ModelVisibilityList />
 			</SettingRow>
 		</SettingsSection>
-	);
-}
-
-/**
- * Resolve the thinking levels a given model supports.
- * @param list - Available agent model options
- * @param modelId - ID of the model to look up, or null
- * @returns The model's thinking levels, or an empty list when none match
- */
-function thinkingLevelsFor(
-	list: readonly AgentModelOption[],
-	modelId: string | null,
-): readonly string[] {
-	if (!modelId) return [];
-	return list.find((m) => m.id === modelId)?.thinkingLevels ?? [];
-}
-
-/**
- * Resolve which agent runtime drives a given model, so its thinking levels are
- * labelled in that runtime's vocabulary.
- * @param list - Available agent model options
- * @param modelId - ID of the model to look up, or null
- * @returns The model's runtime, defaulting to pi when no model matches
- */
-function providerFor(
-	list: readonly AgentModelOption[],
-	modelId: string | null,
-): AgentProviderId {
-	return normalizeAgentProviderId(
-		modelId ? list.find((m) => m.id === modelId)?.agentProvider : undefined,
 	);
 }

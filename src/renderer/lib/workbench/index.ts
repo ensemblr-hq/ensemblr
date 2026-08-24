@@ -8,6 +8,7 @@ export {
 	resolveSendIntent,
 	showContextIndicator,
 	showsComposer,
+	toComposerModelOptions,
 } from './composer';
 export { DEFAULT_DOCK_TAB, DEFAULT_REVIEW_TAB } from './constants';
 export {

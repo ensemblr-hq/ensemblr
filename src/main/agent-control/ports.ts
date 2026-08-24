@@ -15,6 +15,7 @@ import type {
 	AgentDiffComment,
 	AskUserQuestionItem,
 	AskUserQuestionResult,
+	CreatedWorkspaceResult,
 	ExitPlanModeArgs,
 	ExitPlanModeResult,
 	FocusPanelName,
@@ -33,6 +34,7 @@ import type {
 	OpenTabVariant,
 	ReadConversationArgs,
 	ReadConversationResult,
+	RecallMemoryResult,
 	ResolveDiffCommentsResult,
 	SessionBriefNaming,
 	SetBranchNameResult,
@@ -72,6 +74,12 @@ export interface AgentControlEnvIdentity {
 	parentSessionId?: string | null;
 	species?: AgentSpecies;
 	/**
+	 * Registers the app-level Concierge, which belongs to no workspace and works
+	 * out of its own home instead. Its `workspaceId` is empty, so the cwd every
+	 * other caller resolves from that id is resolved from the concierge home.
+	 */
+	concierge?: boolean;
+	/**
 	 * Which delegation mechanism the session is opening under. Resolved by the
 	 * caller and pinned here rather than read per request, so the tool list the
 	 * control server serves cannot drift from the deny list the runtime fixed at
@@ -97,7 +105,19 @@ export type AgentControlEnvResolver = (
 export interface AgentControlOrigin {
 	token: string;
 	sessionId: string;
+	/**
+	 * Workspace every write is scoped to — empty for the Concierge, which has
+	 * none. That is why every workspace-addressed op takes an optional
+	 * `workspaceId`: a Concierge naming none is refused rather than defaulted
+	 * into a workspace it does not have.
+	 */
 	workspaceId: string;
+	/**
+	 * True for the app-level Concierge, which reads and acts across every
+	 * workspace instead of being confined to one. It outranks lineage: a
+	 * Concierge is never an orchestrator or a sub-agent.
+	 */
+	concierge: boolean;
 	workspaceCwd: string;
 	parentSessionId: string | null;
 	depth: number;
@@ -360,6 +380,52 @@ export interface FocusPort {
 	focusTab: (input: { workspaceId: string; chatTabId: string }) => void;
 	focusDockTab: (input: { workspaceId: string; dock: string }) => void;
 	focusPanel: (input: { workspaceId: string; panel: FocusPanelName }) => void;
+	/**
+	 * Navigates the app to a workspace. The other three bring a surface forward
+	 * inside the workspace already on screen, which is enough for an agent that
+	 * has only one; the Concierge spans every workspace, so it needs the route to
+	 * move before any of them mean anything.
+	 */
+	focusWorkspace: (input: { workspaceId: string }) => void;
+}
+
+/**
+ * Cuts a new workspace off a project and reports what it made.
+ *
+ * Concierge-only, and deliberately narrow: an agent that can create a worktree
+ * and a branch is one that can spend disk and run a setup script, so the port
+ * takes the project, an optional name, and an optional base branch — nothing
+ * that reshapes the repository. Linking a Linear issue is deliberately absent:
+ * the link needs the issue's identifier, title, and URL rather than its id, so
+ * exposing it here would mean a Linear read inside the port for a field the
+ * agent can set afterwards with `ensemblr_linear_update_issue`.
+ */
+export interface WorkspaceCreationPort {
+	createWorkspace: (input: {
+		baseBranch?: string;
+		name?: string;
+		projectId: string;
+	}) => Promise<CreatedWorkspaceResult>;
+}
+
+/**
+ * Searches the Concierge's own memory index.
+ *
+ * Read-only by construction: memories are written as ordinary files under the
+ * Concierge home and indexed by a watcher, so there is no write op here to keep
+ * the file and the index in step.
+ */
+export interface MemoryPort {
+	recall: (input: { limit?: number; query: string }) => RecallMemoryResult;
+}
+
+/**
+ * Reads where the Concierge lives, which is the one input its tool policy needs:
+ * every file write it makes is admitted or refused by whether the path resolves
+ * inside that directory.
+ */
+export interface ConciergePort {
+	homePath: () => string | null;
 }
 
 /**
@@ -596,6 +662,12 @@ export interface AgentControlPorts {
 	harnesses: HarnessPort;
 	focus: FocusPort;
 	board: BoardPort;
+	/** Concierge-only; absent when the Concierge is not wired. */
+	workspaceCreation?: WorkspaceCreationPort;
+	/** Concierge-only; absent when the Concierge is not wired. */
+	memory?: MemoryPort;
+	/** Concierge-only; absent when the Concierge is not wired. */
+	concierge?: ConciergePort;
 	diff: DiffPort;
 	review: ReviewPort;
 	linear: LinearPort;

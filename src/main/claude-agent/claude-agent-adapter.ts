@@ -27,6 +27,7 @@ import type {
 	AgentSubmitRequest,
 } from '../agent-runtime/agent-types.ts';
 import { stripLaunchContextEnv } from '../environment/launch-env.ts';
+import { createConciergeSessionGate } from './claude-concierge-guard.ts';
 import { buildClaudeMcpServers } from './claude-mcp-config.ts';
 import {
 	buildCanUseTool,
@@ -94,6 +95,17 @@ export interface CreateClaudeAgentAdapterOptions {
 	pluginDirectory?: string | null;
 	/** Injection seam for tests; defaults to the SDK's own `query`. */
 	queryFn?: typeof query;
+	/**
+	 * Reports the Concierge home when the session being opened is the Concierge's,
+	 * and null for every workspace chat. A session it names runs behind the
+	 * containment gate in `claude-concierge-guard.ts` instead of the workspace
+	 * permission mapping, whatever mode the request carried — the Concierge is
+	 * read-only outside its own folder by construction, not by configuration.
+	 */
+	resolveConciergeHome?: (session: {
+		agentSessionId: string;
+		cwd: string;
+	}) => string | null;
 }
 
 /**
@@ -123,6 +135,7 @@ export function createClaudeAgentAdapter(
 	const onPlanSubmitted = options.onPlanSubmitted;
 	const canUseTool = options.canUseTool;
 	const pluginDirectory = options.pluginDirectory ?? null;
+	const resolveConciergeHome = options.resolveConciergeHome ?? (() => null);
 
 	const openSessions = new Set<AgentAdapterSession>();
 
@@ -132,6 +145,10 @@ export function createClaudeAgentAdapter(
 			const session = createClaudeSession({
 				baseEnv,
 				canUseTool,
+				conciergeHome: resolveConciergeHome({
+					agentSessionId: input.request.agentSessionId,
+					cwd: input.metadata.cwd,
+				}),
 				input,
 				now,
 				onClosed: (closed) => openSessions.delete(closed),
@@ -163,6 +180,7 @@ export function createClaudeAgentAdapter(
 function createClaudeSession({
 	baseEnv,
 	canUseTool,
+	conciergeHome,
 	input,
 	now,
 	onClosed,
@@ -173,6 +191,7 @@ function createClaudeSession({
 }: {
 	baseEnv: NodeJS.ProcessEnv;
 	canUseTool?: ClaudeApprovalGate;
+	conciergeHome: string | null;
 	input: AgentAdapterCreateSessionInput;
 	now: () => Date;
 	onClosed: (session: AgentAdapterSession) => void;
@@ -452,6 +471,7 @@ function createClaudeSession({
 			options: buildQueryOptions({
 				baseEnv,
 				canUseTool: approval?.canUseTool,
+				conciergeHome,
 				input,
 				onStderr: (chunk) => {
 					stderr = `${stderr}${chunk}`.slice(-STDERR_RING_BYTES);
@@ -690,22 +710,29 @@ async function applyTurnSelection({
 function buildQueryOptions({
 	baseEnv,
 	canUseTool,
+	conciergeHome,
 	input,
 	onStderr,
 	pluginDirectory,
 }: {
 	baseEnv: NodeJS.ProcessEnv;
 	canUseTool?: ClaudeCanUseTool;
+	conciergeHome: string | null;
 	input: AgentAdapterCreateSessionInput;
 	onStderr: (chunk: string) => void;
 	pluginDirectory: string | null;
 }): Options {
 	const { metadata, request } = input;
 	const mode = request.permissionMode ?? DEFAULT_PERMISSION_MODE;
-	const permission = resolvePermissionSettings({
-		mode,
-		planMode: request.planMode === true,
-	});
+	const concierge = conciergeHome
+		? createConciergeSessionGate(conciergeHome)
+		: null;
+	const permission =
+		concierge?.permission ??
+		resolvePermissionSettings({
+			mode,
+			planMode: request.planMode === true,
+		});
 	const effort = toClaudeEffortLevel(request.thinkingLevel);
 	const executablePath = request.executable?.command?.trim();
 	const mcpServers = buildClaudeMcpServers(request.controlMcp);
@@ -722,8 +749,9 @@ function buildQueryOptions({
 		...(linkedDirectories.length > 0
 			? { additionalDirectories: [...linkedDirectories] }
 			: {}),
-		canUseTool: buildCanUseTool({ canUseTool, mode }),
+		canUseTool: concierge?.canUseTool ?? buildCanUseTool({ canUseTool, mode }),
 		cwd: metadata.cwd,
+		...(concierge ? { hooks: concierge.hooks } : {}),
 		env: stripLaunchContextEnv({ ...baseEnv, ...metadata.env }),
 		// Without this the SDK forwards only a subagent's tool_use/tool_result
 		// blocks, so a `Task` card would nest tool rows with none of the prose that

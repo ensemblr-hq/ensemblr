@@ -45,6 +45,7 @@ export function buildRootDirectorySnapshot({
 
 	return {
 		archivedContextsPath: managedPathByKey.get('archived-contexts') ?? '',
+		conciergePath: managedPathByKey.get('concierge') ?? '',
 		createdPaths,
 		diagnostics,
 		managedPaths,
@@ -84,10 +85,11 @@ export function persistRootDirectorySnapshot(
 				repositories_path,
 				workspaces_path,
 				archived_contexts_path,
+				concierge_path,
 				last_seen_at,
 				metadata_json
 			)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 			ON CONFLICT(id) DO UPDATE SET
 				path = excluded.path,
 				source = excluded.source,
@@ -95,6 +97,7 @@ export function persistRootDirectorySnapshot(
 				repositories_path = excluded.repositories_path,
 				workspaces_path = excluded.workspaces_path,
 				archived_contexts_path = excluded.archived_contexts_path,
+				concierge_path = excluded.concierge_path,
 				last_seen_at = excluded.last_seen_at,
 				metadata_json = excluded.metadata_json`,
 		)
@@ -106,6 +109,7 @@ export function persistRootDirectorySnapshot(
 			snapshot.repositoriesPath,
 			snapshot.workspacesPath,
 			snapshot.archivedContextsPath,
+			snapshot.conciergePath,
 			timestamp,
 			JSON.stringify({
 				createdPaths: snapshot.createdPaths,

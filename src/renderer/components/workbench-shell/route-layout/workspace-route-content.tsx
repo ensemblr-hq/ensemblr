@@ -237,7 +237,12 @@ export function WorkspaceRouteContent({
 			}
 			return;
 		}
-		updateSearch({ review: target.panel });
+		// `workspace` crosses workspaces by definition, so the shell drains it —
+		// see `AgentControlWorkspaceFocusBridge`. Reaching it here would mean the
+		// route is already where it asked to be.
+		if (target.kind === 'panel') {
+			updateSearch({ review: target.panel });
+		}
 	}
 	useAgentControlFocus(applyFocus);
 

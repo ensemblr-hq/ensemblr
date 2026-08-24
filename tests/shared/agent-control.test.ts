@@ -425,12 +425,17 @@ describe('resolveDiffComments args', () => {
 		).toBe(false);
 	});
 
-	it('rejects a workspace the caller tried to name itself', () => {
+	// The Concierge reviews every workspace and holds none, so the arg has to
+	// reach the service. Scope moved with it: `resolveTargetWorkspace` refuses a
+	// workspace agent that names anything but its own, which the service test
+	// `refuses a workspace agent that names another workspace on a comment op`
+	// pins. Accepting it here is the schema deferring, not the check going away.
+	it('accepts a named workspace, leaving scope to the service', () => {
 		expect(
 			validateArgs('resolveDiffComments', {
 				commentIds: ['a'],
 				workspaceId: 'ws-other',
 			}).ok,
-		).toBe(false);
+		).toBe(true);
 	});
 });

@@ -15,6 +15,7 @@ import {
 	type AgentProviderId,
 	normalizeAgentProviderId,
 } from '@/shared/agent-provider';
+import type { AgentModelCatalog } from '@/shared/ipc/contracts/agent-models';
 import type { SetupDiagnosticsSnapshot } from '@/shared/ipc/contracts/setup';
 
 /**
@@ -76,6 +77,31 @@ export function showContextIndicator(
 		return alwaysShow;
 	}
 	return alwaysShow || (usage.usedTokens / usage.maxTokens) * 100 > 70;
+}
+
+/**
+ * Re-shapes the runtime catalogue as the options a model picker renders.
+ *
+ * Shared by the workspace composer and the Concierge's, which offer the same
+ * list off the same catalogue and differ only in how they resolve a selection
+ * out of it.
+ * @param catalogue - The merged catalogue, or undefined before it has loaded.
+ * @returns One option per model, empty until the catalogue arrives.
+ */
+export function toComposerModelOptions(
+	catalogue: AgentModelCatalog | undefined,
+): readonly ComposerModelOption[] {
+	if (!catalogue) {
+		return [];
+	}
+	return catalogue.models.map((model) => ({
+		agentProvider: normalizeAgentProviderId(model.agentProvider),
+		contextWindow: model.contextWindow,
+		displayName: model.displayName,
+		id: model.id,
+		isDefault: model.id === catalogue.defaultModelId,
+		vendor: model.vendor,
+	}));
 }
 
 /**

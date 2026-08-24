@@ -241,6 +241,14 @@ Produce nothing after it. Your report is persisted and survives your tab closing
 const IS_SUBAGENT = process.env.ENSEMBLR_CONTROL_ROLE === 'subagent';
 
 /**
+ * Whether this Pi child is the app-level Concierge, read from the same env var.
+ * It is not a point on the lineage axis — a Concierge is never a root that
+ * delegates nor a child that was delegated to — so it is asked separately and
+ * answers the tool list on its own.
+ */
+const IS_CONCIERGE = process.env.ENSEMBLR_CONTROL_ROLE === 'concierge';
+
+/**
  * The role playbook for this Pi child. Plan Mode replaces this playbook rather
  * than stacking on top of it.
  */
@@ -259,6 +267,36 @@ const PLAN_MODE_AWARENESS_FOR_ROLE = IS_SUBAGENT
  * never forwarded and bypasses Plan Mode silently.
  */
 const PLAN_MODE_GUARDED_TOOLS = new Set(['bash', 'edit', 'write']);
+
+/**
+ * Built-in tools the Concierge policy restricts. Wider than Plan Mode's: the
+ * policy answers for a Concierge on any first-class runtime, so it names both
+ * Pi's lower-cased built-ins and Claude Code's capitalized ones. MUST hold the
+ * same members as `CONCIERGE_GUARDED_TOOLS` in
+ * `src/shared/plan-mode/concierge-guard.ts` (this file cannot import from `src/`
+ * at runtime); a parity test enforces it.
+ */
+const CONCIERGE_GUARDED_TOOLS = new Set([
+	'Bash',
+	'Edit',
+	'MultiEdit',
+	'NotebookEdit',
+	'Write',
+	'bash',
+	'edit',
+	'write',
+]);
+
+/**
+ * Every tool call the app is asked about. Gating on the union rather than on the
+ * set for this session's role is what keeps the policed set and the forwarded
+ * set the same one: the app decides which policy applies from the caller's
+ * origin, and a tool this hook filters out is a call no policy ever sees.
+ */
+const GUARDED_TOOLS = new Set([
+	...PLAN_MODE_GUARDED_TOOLS,
+	...CONCIERGE_GUARDED_TOOLS,
+]);
 
 /**
  * Control ops left out of a spawned sub-agent's tool list. Most are refused by
@@ -292,13 +330,40 @@ const SUBAGENT_WITHHELD_OPS = new Set([
 ]);
 
 /**
+ * Control ops left out of the Concierge's tool list. Every one is refused by the
+ * app for a Concierge: the workspace write channels it deliberately cannot
+ * reach, and the chat-tab ops — naming a tab, summarizing one, submitting a plan
+ * — that act on a row a panel does not have. MUST hold the same members as
+ * `CONCIERGE_WITHHELD_OPS` in `src/shared/agent-control/subagent-policy.ts`
+ * (this file cannot import from `src/` at runtime); a parity test enforces it.
+ */
+const CONCIERGE_WITHHELD_OPS = new Set([
+	'exitPlanMode',
+	'launchHarness',
+	'listRunScripts',
+	'notifyOrchestrator',
+	'openTab',
+	'setBranchName',
+	'setName',
+	'setSummary',
+	'spawnChatTab',
+	'startTerminal',
+	'stopTerminal',
+	'writeTerminal',
+]);
+
+/**
  * Whether this session registers a tool for the given control op. A root keeps
- * the whole surface; a sub-agent keeps what {@link SUBAGENT_WITHHELD_OPS} leaves.
+ * the whole surface; a sub-agent keeps what {@link SUBAGENT_WITHHELD_OPS} leaves,
+ * and the Concierge what {@link CONCIERGE_WITHHELD_OPS} leaves — asked first,
+ * because a Concierge is on neither end of the lineage axis.
  * @param op - The control op the tool would dispatch.
  * @returns True when the tool belongs in this session's tool list.
  */
 const registersOp = (op: string): boolean =>
-	!IS_SUBAGENT || !SUBAGENT_WITHHELD_OPS.has(op);
+	IS_CONCIERGE
+		? !CONCIERGE_WITHHELD_OPS.has(op)
+		: !IS_SUBAGENT || !SUBAGENT_WITHHELD_OPS.has(op);
 
 interface ControlResult {
 	ok: boolean;
@@ -483,9 +548,10 @@ function callerModelId(ctx: { model?: { id?: string } } | undefined) {
  * Asks the app for this turn's brief: whether the conversation is in Plan Mode,
  * so the planning playbook stands in for the role one only while planning, the
  * upkeep block naming whatever the session still owes, the directive telling a
- * planning turn to resubmit a plan the user is already reading, and the one
- * putting user-facing prose in the app's language. The app renders every block,
- * so this file holds no second copy of their wording to drift.
+ * planning turn to resubmit a plan the user is already reading, the one putting
+ * user-facing prose in the app's language, and a role playbook to use in place
+ * of the copies below when the caller's role has none here. The app renders
+ * every block, so this file holds no second copy of their wording to drift.
  *
  * A transport failure reports "not planning, nothing to append": the prompt
  * text is cosmetic, and real Plan Mode enforcement lives in the `tool_call`
@@ -498,6 +564,7 @@ async function fetchSessionBrief(): Promise<{
 	planRefinement: string | null;
 	languageDirective: string | null;
 	issueDirective: string | null;
+	rolePlaybook: string | null;
 }> {
 	const result = await invoke('getSessionBrief', {}, undefined);
 	if (!result.ok) {
@@ -507,6 +574,7 @@ async function fetchSessionBrief(): Promise<{
 			nudge: null,
 			planning: false,
 			planRefinement: null,
+			rolePlaybook: null,
 		};
 	}
 	const brief = result.data as
@@ -516,9 +584,14 @@ async function fetchSessionBrief(): Promise<{
 				planRefinement?: string | null;
 				languageDirective?: string | null;
 				issueDirective?: string | null;
+				rolePlaybook?: string | null;
 		  }
 		| undefined;
 	return {
+		rolePlaybook:
+			typeof brief?.rolePlaybook === 'string' && brief.rolePlaybook.length > 0
+				? brief.rolePlaybook
+				: null,
 		issueDirective:
 			typeof brief?.issueDirective === 'string' ? brief.issueDirective : null,
 		languageDirective:
@@ -560,8 +633,11 @@ export default function ensemblrControl(pi: ExtensionAPI): void {
 			nudge,
 			planning,
 			planRefinement,
+			rolePlaybook,
 		} = await fetchSessionBrief();
-		const playbook = planning ? PLAN_MODE_AWARENESS_FOR_ROLE : AWARENESS;
+		const playbook = planning
+			? PLAN_MODE_AWARENESS_FOR_ROLE
+			: (rolePlaybook ?? AWARENESS);
 		const blocks = [
 			event.systemPrompt,
 			playbook,
@@ -577,13 +653,20 @@ export default function ensemblrControl(pi: ExtensionAPI): void {
 	// per-turn cache: the user can approve a plan mid-turn, and a stale "not
 	// planning" cache would silently let the agent edit files it was told not to.
 	pi.on('tool_call', async (event) => {
-		if (!PLAN_MODE_GUARDED_TOOLS.has(event.toolName)) {
+		if (!GUARDED_TOOLS.has(event.toolName)) {
 			return;
 		}
+		// Pi has never published the parameter name its edit tools use, so both
+		// spellings are read: the Concierge policy blocks a write it cannot see a
+		// path for, and reading only the wrong key would block every write it makes.
+		const input = event.input as
+			| { command?: string; file_path?: string; path?: string }
+			| undefined;
 		const result = await invoke(
 			'checkPlanModeTool',
 			{
-				command: (event.input as { command?: string } | undefined)?.command,
+				command: input?.command,
+				path: input?.path ?? input?.file_path,
 				tool: event.toolName,
 			},
 			undefined,
@@ -645,6 +728,7 @@ export default function ensemblrControl(pi: ExtensionAPI): void {
 			thinkingLevel: Type.Optional(Type.String()),
 			title: Type.Optional(Type.String()),
 			wait: Type.Optional(Type.Boolean()),
+			workspaceId: Type.Optional(Type.String()),
 		}),
 	);
 	tool(
@@ -768,6 +852,7 @@ export default function ensemblrControl(pi: ExtensionAPI): void {
 			kind: Type.Optional(
 				Type.Union([Type.Literal('setup'), Type.Literal('run')]),
 			),
+			workspaceId: Type.Optional(Type.String()),
 		}),
 	);
 	tool(
@@ -780,12 +865,38 @@ export default function ensemblrControl(pi: ExtensionAPI): void {
 				Type.Literal('changes'),
 				Type.Literal('checks'),
 			]),
+			workspaceId: Type.Optional(Type.String()),
+		}),
+	);
+	tool(
+		'ensemblr_focus_workspace',
+		'focusWorkspace',
+		'Navigate the app to a workspace. Concierge only — every other caller is already in the one workspace it can address.',
+		Type.Object({ workspaceId: Type.String() }),
+	);
+	tool(
+		'ensemblr_create_workspace',
+		'createWorkspace',
+		'Cut a new workspace (a git worktree on its own branch) off a project, then put an orchestrator in it with ensemblr_start_conversation. Concierge only.',
+		Type.Object({
+			baseBranch: Type.Optional(Type.String()),
+			name: Type.Optional(Type.String()),
+			projectId: Type.String(),
+		}),
+	);
+	tool(
+		'ensemblr_recall_memory',
+		'recallMemory',
+		'Search your own memory of past work. Concierge only — nothing else has a memory index to search.',
+		Type.Object({
+			limit: Type.Optional(Type.Number()),
+			query: Type.String(),
 		}),
 	);
 	tool(
 		'ensemblr_set_workspace_status',
 		'setWorkspaceStatus',
-		'Move your workspace across the kanban board by setting its status (backlog, in-progress, in-review, done, canceled). Acts on your own workspace.',
+		'Move a workspace across the kanban board by setting its status (backlog, in-progress, in-review, done, canceled). Acts on your own workspace. Concierge only: name the workspace with `workspaceId`; every other caller acts on its own and may not name another.',
 		Type.Object({
 			status: Type.Union([
 				Type.Literal('backlog'),
@@ -794,13 +905,14 @@ export default function ensemblrControl(pi: ExtensionAPI): void {
 				Type.Literal('done'),
 				Type.Literal('canceled'),
 			]),
+			workspaceId: Type.Optional(Type.String()),
 		}),
 	);
 	tool(
 		'ensemblr_get_workspace_status',
 		'getWorkspaceStatus',
 		"Read your workspace's current kanban board status. Use ensemblr_list_workspaces to see every workspace's status.",
-		empty,
+		Type.Object({ workspaceId: Type.Optional(Type.String()) }),
 	);
 	tool(
 		'ensemblr_list_models',
@@ -893,13 +1005,17 @@ export default function ensemblrControl(pi: ExtensionAPI): void {
 						'Return the changed-file rows and totals only, with no patch text. Call this first.',
 				}),
 			),
+			workspaceId: Type.Optional(Type.String()),
 		}),
 	);
 	tool(
 		'ensemblr_get_diff_comments',
 		'getDiffComments',
 		"Read the review comments on this workspace's diff — the ones the user left in the Changes panel and the ones agents filed there. Pass filePath to narrow it to one path. Comments synced from a GitHub pull request are not included.",
-		Type.Object({ filePath: Type.Optional(Type.String()) }),
+		Type.Object({
+			filePath: Type.Optional(Type.String()),
+			workspaceId: Type.Optional(Type.String()),
+		}),
 	);
 	tool(
 		'ensemblr_add_diff_comments',
@@ -922,6 +1038,7 @@ export default function ensemblrControl(pi: ExtensionAPI): void {
 				}),
 				{ maxItems: 50, minItems: 1 },
 			),
+			workspaceId: Type.Optional(Type.String()),
 		}),
 	);
 	tool(
@@ -930,6 +1047,7 @@ export default function ensemblrControl(pi: ExtensionAPI): void {
 		"Mark review comments on this workspace's diff as resolved, by the ids ensemblr_get_diff_comments and ensemblr_add_diff_comments hand back. Resolve a comment in the same turn you make the fix it asked for, and batch a whole review pass into one call. Resolve only what you actually fixed: a comment you deferred or disagree with stays open, and you say so in your reply. This only ever resolves — it cannot reopen a comment the user closed, and an id that matches no open comment here is reported back rather than failing the call.",
 		Type.Object({
 			commentIds: Type.Array(Type.String(), { maxItems: 50, minItems: 1 }),
+			workspaceId: Type.Optional(Type.String()),
 		}),
 	);
 	tool(

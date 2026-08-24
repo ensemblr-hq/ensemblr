@@ -15,6 +15,7 @@ export type {
 } from './agent-control/awareness.ts';
 export {
 	awarenessForAudience,
+	CONCIERGE_AWARENESS,
 	HARNESS_AWARENESS,
 	NATIVE_ORCHESTRATOR_AWARENESS,
 	ORCHESTRATOR_AWARENESS,
@@ -49,6 +50,9 @@ export {
 	SUBAGENT_MECHANISMS,
 } from './agent-control/subagent-mechanism.ts';
 export {
+	CONCIERGE_ONLY_OPS,
+	CONCIERGE_WITHHELD_OPS,
+	conciergeControlOpDenial,
 	SUBAGENT_UNUSABLE_OPS,
 	SUBAGENT_WITHHELD_OPS,
 	subAgentControlOpDenial,

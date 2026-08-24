@@ -24,10 +24,11 @@ export const Route = createFileRoute('/_workbench/settings/shortcuts')({
 const SCOPE_RANK: Record<Scope, number> = {
 	global: 0,
 	composer: 1,
-	autocomplete: 2,
-	modelPicker: 3,
-	dialog: 4,
-	menu: 5,
+	concierge: 2,
+	autocomplete: 3,
+	modelPicker: 4,
+	dialog: 5,
+	menu: 6,
 };
 
 /** Scope order the reference lists groups in, widest surface first. */
@@ -46,6 +47,7 @@ function scopeHeading(t: TFunction): Record<Scope, string> {
 	return {
 		autocomplete: t('settings:shortcuts.scope.autocomplete', 'Autocomplete'),
 		composer: t('settings:shortcuts.scope.composer', 'Composer'),
+		concierge: t('settings:shortcuts.scope.concierge', 'Concierge'),
 		dialog: t('settings:shortcuts.scope.dialog', 'Dialogs'),
 		global: t('settings:shortcuts.scope.global', 'Global'),
 		menu: t('settings:shortcuts.scope.menu', 'Menus'),
@@ -121,6 +123,26 @@ function shortcutName(t: TFunction): Record<ShortcutId, string> {
 		'composer.toggleModelPicker': t(
 			'settings:shortcuts.name.composer-toggle-model-picker',
 			'Toggle model picker',
+		),
+		'concierge.clear': t(
+			'settings:shortcuts.name.concierge-clear',
+			'Clear the Concierge’s context',
+		),
+		'concierge.close': t(
+			'settings:shortcuts.name.concierge-close',
+			'Close the Concierge',
+		),
+		'concierge.focusComposer': t(
+			'settings:shortcuts.name.concierge-focus-composer',
+			'Focus the Concierge composer',
+		),
+		'concierge.toggle': t(
+			'settings:shortcuts.name.concierge-toggle',
+			'Open or close the Concierge',
+		),
+		'concierge.toggleFullscreen': t(
+			'settings:shortcuts.name.concierge-toggle-fullscreen',
+			'Maximize or restore the Concierge',
 		),
 		'diffComment.submit': t(
 			'settings:shortcuts.name.diff-comment-submit',
@@ -203,6 +225,7 @@ function shortcutsByScope(): Record<Scope, ShortcutId[]> {
 	const grouped: Record<Scope, ShortcutId[]> = {
 		autocomplete: [],
 		composer: [],
+		concierge: [],
 		dialog: [],
 		global: [],
 		menu: [],

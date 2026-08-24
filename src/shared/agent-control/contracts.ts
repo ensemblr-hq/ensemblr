@@ -33,6 +33,9 @@ export const AGENT_CONTROL_OPS = [
 	'focusTab',
 	'focusDockTab',
 	'focusPanel',
+	'focusWorkspace',
+	'createWorkspace',
+	'recallMemory',
 	'setWorkspaceStatus',
 	'getWorkspaceStatus',
 	'getWorkspaceDiff',
@@ -60,6 +63,33 @@ export const AGENT_CONTROL_OPS = [
 	'checkPlanModeTool',
 	'exitPlanMode',
 ] as const;
+
+/** One workspace row, as `ensemblr_create_workspace` reports what it made. */
+export interface CreatedWorkspaceResult {
+	branchName: string | null;
+	name: string;
+	path: string;
+	projectId: string;
+	workspaceId: string;
+}
+
+/** One memory the Concierge recalled, with the snippet the match came from. */
+export interface RecalledMemory {
+	kind: string;
+	/** Path relative to the Concierge home, so the agent can open the file itself. */
+	relativePath: string;
+	slug: string;
+	snippet: string;
+	summary: string;
+	title: string;
+}
+
+/** What a memory search returns, plus what the payload budget cut. */
+export interface RecallMemoryResult {
+	memories: readonly RecalledMemory[];
+	/** Slugs a match produced but the payload budget dropped. */
+	omittedSlugs: readonly string[];
+}
 
 /**
  * The kanban board statuses an agent may set on its workspace, in column order.
@@ -107,6 +137,8 @@ const WRITE_OPS: ReadonlySet<AgentControlOp> = new Set([
 	'focusTab',
 	'focusDockTab',
 	'focusPanel',
+	'focusWorkspace',
+	'createWorkspace',
 	'setWorkspaceStatus',
 	'addDiffComments',
 	'resolveDiffComments',
@@ -124,6 +156,7 @@ const SPAWN_OPS: ReadonlySet<AgentControlOp> = new Set([
 	'launchHarness',
 	'startTerminal',
 	'openTab',
+	'createWorkspace',
 ]);
 
 /**
@@ -157,6 +190,12 @@ export interface SpawnChatTabArgs {
 export interface StartConversationArgs {
 	chatTabId?: string;
 	prompt: string;
+	/**
+	 * Workspace to open the conversation in. Concierge-only, and required of it —
+	 * delegating into a workspace is the Concierge's only way to change anything,
+	 * and it has none of its own to default to.
+	 */
+	workspaceId?: string;
 	model?: string;
 	thinkingLevel?: AgentControlThinkingLevel;
 	/** Short, descriptive name for the new conversation's tab (Pi `/name`). */
@@ -687,6 +726,12 @@ export interface CheckPlanModeToolArgs {
 	tool: string;
 	/** The command a `bash` call would run; absent for other tools. */
 	command?: string;
+	/**
+	 * The path a `write`/`edit` call would touch. Plan Mode ignores it — it blocks
+	 * every write whatever the target — but the Concierge policy is a containment
+	 * rule, so the path is the whole question there.
+	 */
+	path?: string;
 }
 
 /**
@@ -749,6 +794,14 @@ export interface GetSessionBriefResult {
 	 * tracker, or null when the workspace was not created from a Linear issue.
 	 */
 	issueDirective: string | null;
+	/**
+	 * The role playbook to use in place of the one the extension holds, or null
+	 * when the extension's own copy is the right one. The Concierge is the case
+	 * that needs it: its playbook has no counterpart in the extension, and a
+	 * Concierge served the orchestrator copy is told to do work in a workspace it
+	 * has none of and to name a chat tab it does not own.
+	 */
+	rolePlaybook: string | null;
 }
 
 /** Args for `focusTab`: bring a session tab (chat/terminal/diff/…) to the foreground. */
@@ -760,6 +813,8 @@ export interface FocusTabArgs {
 export interface FocusDockTabArgs {
 	terminalId?: string;
 	kind?: 'setup' | 'run';
+	/** Concierge-only; every other caller may name only its own workspace. */
+	workspaceId?: string;
 }
 
 /** Review-panel tabs an agent can focus. */
@@ -768,11 +823,39 @@ export type FocusPanelName = 'files' | 'changes' | 'checks';
 /** Args for `focusPanel`: focus the Files, Changes, or Checks review panel. */
 export interface FocusPanelArgs {
 	panel: FocusPanelName;
+	/** Concierge-only; every other caller may name only its own workspace. */
+	workspaceId?: string;
+}
+
+/** Args for `focusWorkspace`: move the app to a workspace. Concierge-only. */
+export interface FocusWorkspaceArgs {
+	workspaceId: string;
+}
+
+/** Args for `createWorkspace`: cut a new workspace off a project. Concierge-only. */
+export interface CreateWorkspaceArgs {
+	baseBranch?: string;
+	name?: string;
+	projectId: string;
+}
+
+/** Args for `recallMemory`: search the Concierge's own memory index. */
+export interface RecallMemoryArgs {
+	limit?: number;
+	query: string;
+}
+
+/** Args for `getWorkspaceStatus`: read a workspace's kanban status. */
+export interface GetWorkspaceStatusArgs {
+	/** Concierge-only; every other caller reads its own. */
+	workspaceId?: string;
 }
 
 /** Args for `setWorkspaceStatus`: move the caller's own workspace on the kanban board. */
 export interface SetWorkspaceStatusArgs {
 	status: WorkspaceBoardStatusValue;
+	/** Concierge-only; every other caller moves its own workspace. */
+	workspaceId?: string;
 }
 
 /**
@@ -790,6 +873,8 @@ export interface GetWorkspaceDiffArgs {
 	filePath?: string;
 	/** Return the changed-file rows and totals only, with no patch text. */
 	stat?: boolean;
+	/** Concierge-only; every other caller reads its own workspace. */
+	workspaceId?: string;
 }
 
 /**
@@ -816,6 +901,8 @@ export interface GetWorkspaceDiffResult {
  */
 export interface GetDiffCommentsArgs {
 	filePath?: string;
+	/** Concierge-only; every other caller reads its own workspace. */
+	workspaceId?: string;
 }
 
 /**
@@ -853,6 +940,8 @@ export interface AgentDiffComment {
 /** Args for `addDiffComments`: file review comments on the caller's own workspace. */
 export interface AddDiffCommentsArgs {
 	comments: readonly AgentDiffComment[];
+	/** Concierge-only; every other caller comments on its own workspace. */
+	workspaceId?: string;
 }
 
 /**
@@ -876,6 +965,8 @@ export interface AddDiffCommentsResult {
  */
 export interface ResolveDiffCommentsArgs {
 	commentIds: readonly string[];
+	/** Concierge-only; every other caller resolves on its own workspace. */
+	workspaceId?: string;
 }
 
 /**
@@ -1199,11 +1290,15 @@ export interface BoardStatusBroadcast {
 export type FocusTarget =
 	| { kind: 'tab'; chatTabId: string }
 	| { kind: 'dock'; dock: string }
-	| { kind: 'panel'; panel: FocusPanelName };
+	| { kind: 'panel'; panel: FocusPanelName }
+	| { kind: 'workspace' };
 
 /**
- * Main → renderer focus request. The renderer applies it only for the window
- * showing `workspaceId`, so a focus is naturally scoped to its workspace.
+ * Main → renderer focus request. Every target but `workspace` is applied only by
+ * the window already showing `workspaceId`, so a focus is naturally scoped to
+ * its workspace; `workspace` is the one that has to cross, because its whole job
+ * is to move the route to a workspace nobody is looking at. The Concierge is the
+ * only caller that holds it.
  */
 export interface FocusViewBroadcast {
 	workspaceId: string;

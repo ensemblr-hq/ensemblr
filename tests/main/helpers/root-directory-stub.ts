@@ -10,6 +10,7 @@ import type { RootDirectorySnapshot } from '../../../src/shared/ipc';
  */
 export interface RootDirectoryStubOptions {
 	archivedContextsPath?: string;
+	conciergePath?: string;
 	repositoriesPath?: string;
 	rootPath?: string;
 	workspacesPath?: string;
@@ -35,9 +36,12 @@ export function buildRootDirectoryStub(
 		options.workspacesPath ?? path.join(rootPath, 'workspaces');
 	const archivedContextsPath =
 		options.archivedContextsPath ?? path.join(rootPath, 'archived-contexts');
+	const conciergePath =
+		options.conciergePath ?? path.join(rootPath, 'concierge');
 
 	const snapshot: RootDirectorySnapshot = {
 		archivedContextsPath,
+		conciergePath,
 		createdPaths: [],
 		diagnostics: [],
 		managedPaths: [],

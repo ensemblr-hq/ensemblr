@@ -121,6 +121,26 @@ export type {
 	GithubRepositoryListStatus,
 } from './contracts/clone';
 export type {
+	ClearConciergeContextRequest,
+	ClearConciergeContextResult,
+	ConciergeApi,
+	ConciergeClearReason,
+	ConciergeContextPressureWire,
+	ConciergeEventBroadcastWire,
+	ConciergeEventStreamWire,
+	ConciergeSessionEventWire,
+	ConciergeSessionSnapshotWire,
+	ConciergeSessionStatusWire,
+	ListConciergeEventsRequest,
+	ListConciergeEventsResult,
+	OpenConciergeSessionRequest,
+	OpenConciergeSessionResult,
+	StopConciergeSessionRequest,
+	StopConciergeSessionResult,
+	SubmitConciergePromptRequest,
+	SubmitConciergePromptResult,
+} from './contracts/concierge';
+export type {
 	EnvironmentApi,
 	EnvironmentVariableCatalogEntrySnapshot,
 	EnvironmentVariableCategory,

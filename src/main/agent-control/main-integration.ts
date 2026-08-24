@@ -36,6 +36,12 @@ interface AgentControlIntegrationDeps {
 	originRegistry: OriginRegistry;
 	/** Absolute cwd of a workspace, or null when it has no resolvable path. */
 	resolveWorkspaceCwd: (workspaceId: string) => string | null;
+	/**
+	 * Absolute path of the Concierge's home, which is its cwd and the only tree
+	 * it may write to. Omitted, a Concierge registers no origin and opens without
+	 * control tools, exactly as a workspace agent does before the root is known.
+	 */
+	resolveConciergeCwd?: () => string | null;
 	/** Current control-server base URL, or null before the server is up. */
 	getServerUrl: () => string | null;
 	/** The language the app renders in, for the harness playbook's directive. */
@@ -220,23 +226,34 @@ export function createAgentControlIntegration(
 		if (!serverUrl) {
 			return {};
 		}
-		const cwd = deps.resolveWorkspaceCwd(identity.workspaceId);
+		const concierge = identity.concierge === true;
+		const cwd = concierge
+			? (deps.resolveConciergeCwd?.() ?? null)
+			: deps.resolveWorkspaceCwd(identity.workspaceId);
 		if (!cwd) {
 			return {};
 		}
 		const origin = deps.originRegistry.register({
 			sessionId: identity.sessionId,
 			workspaceId: identity.workspaceId,
+			concierge,
 			workspaceCwd: cwd,
 			species: identity.species ?? 'pi',
 			parentSessionId: identity.parentSessionId ?? null,
 			delegation: identity.delegation,
 		});
-		const marked = deps.isSpawnedSubAgent?.(identity.sessionId) === true;
+		// A Concierge can never carry the sub-agent marker, and reading it would
+		// query the database for a chat tab that does not exist.
+		const marked =
+			!concierge && deps.isSpawnedSubAgent?.(identity.sessionId) === true;
 		return {
 			[CONTROL_URL_ENV_KEY]: serverUrl,
 			[CONTROL_TOKEN_ENV_KEY]: origin.token,
-			[CONTROL_ROLE_ENV_KEY]: resolveAgentRole(marked, origin.depth),
+			[CONTROL_ROLE_ENV_KEY]: resolveAgentRole(
+				marked,
+				origin.depth,
+				origin.concierge,
+			),
 		};
 	};
 

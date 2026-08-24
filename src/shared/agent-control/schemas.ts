@@ -55,6 +55,7 @@ const startConversationSchema = z.strictObject({
 	thinkingLevel: nonEmpty.optional(),
 	title: nonEmpty.optional(),
 	wait: z.boolean().optional(),
+	workspaceId: nonEmpty.optional(),
 });
 
 const setNameSchema = z.strictObject({
@@ -168,20 +169,53 @@ const focusTabSchema = z.strictObject({
 	chatTabId: nonEmpty,
 });
 
-const focusDockTabSchema = terminalIdOrKindSchema;
+// Not `terminalIdOrKindSchema` itself: `stopTerminal` shares that object and is
+// refused to a Concierge outright, so the cross-workspace argument belongs to
+// this op alone rather than to both.
+const focusDockTabSchema = z
+	.strictObject({
+		terminalId: nonEmpty.optional(),
+		kind: z.enum(['setup', 'run']).optional(),
+		workspaceId: nonEmpty.optional(),
+	})
+	.refine((value) => Boolean(value.terminalId) !== Boolean(value.kind), {
+		message: 'Provide exactly one of terminalId or kind.',
+	});
 
 const focusPanelSchema = z.strictObject({
 	panel: z.enum(['files', 'changes', 'checks']),
+	workspaceId: nonEmpty.optional(),
+});
+
+const focusWorkspaceSchema = z.strictObject({
+	workspaceId: nonEmpty,
+});
+
+const createWorkspaceSchema = z.strictObject({
+	baseBranch: nonEmpty.optional(),
+	name: nonEmpty.optional(),
+	projectId: nonEmpty,
+});
+
+const recallMemorySchema = z.strictObject({
+	limit: z.number().int().min(1).max(25).optional(),
+	query: nonEmpty,
 });
 
 const setWorkspaceStatusSchema = z.strictObject({
 	status: z.enum(WORKSPACE_BOARD_STATUSES),
+	workspaceId: nonEmpty.optional(),
+});
+
+const getWorkspaceStatusSchema = z.strictObject({
+	workspaceId: nonEmpty.optional(),
 });
 
 const getWorkspaceDiffSchema = z
 	.strictObject({
 		filePath: workspaceRelativePath.optional(),
 		stat: z.boolean().optional(),
+		workspaceId: nonEmpty.optional(),
 	})
 	// Reading one file already knows which file it wants, so a stat alongside it
 	// is a contradiction rather than a refinement. Rejecting says which of the two
@@ -193,9 +227,11 @@ const getWorkspaceDiffSchema = z
 
 const getDiffCommentsSchema = z.strictObject({
 	filePath: workspaceRelativePath.optional(),
+	workspaceId: nonEmpty.optional(),
 });
 
 const addDiffCommentsSchema = z.strictObject({
+	workspaceId: nonEmpty.optional(),
 	comments: z
 		.array(
 			z.strictObject({
@@ -213,6 +249,7 @@ const addDiffCommentsSchema = z.strictObject({
 // does not offer. Rejecting says so in one round trip.
 const resolveDiffCommentsSchema = z.strictObject({
 	commentIds: z.array(nonEmpty).min(1).max(DIFF_COMMENT_LIMITS.maxComments),
+	workspaceId: nonEmpty.optional(),
 });
 
 // Several Linear accounts can be connected at once. `accountId` stays optional
@@ -340,6 +377,7 @@ const askUserQuestionSchema = z.strictObject({
 const checkPlanModeToolSchema = z.strictObject({
 	tool: nonEmpty,
 	command: z.string().optional(),
+	path: z.string().optional(),
 });
 
 const exitPlanModeSchema = z.strictObject({
@@ -366,8 +404,11 @@ const AGENT_CONTROL_ARG_SCHEMAS = {
 	focusTab: focusTabSchema,
 	focusDockTab: focusDockTabSchema,
 	focusPanel: focusPanelSchema,
+	focusWorkspace: focusWorkspaceSchema,
+	createWorkspace: createWorkspaceSchema,
+	recallMemory: recallMemorySchema,
 	setWorkspaceStatus: setWorkspaceStatusSchema,
-	getWorkspaceStatus: emptySchema,
+	getWorkspaceStatus: getWorkspaceStatusSchema,
 	getWorkspaceDiff: getWorkspaceDiffSchema,
 	getDiffComments: getDiffCommentsSchema,
 	addDiffComments: addDiffCommentsSchema,

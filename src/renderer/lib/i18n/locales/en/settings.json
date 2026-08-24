@@ -306,13 +306,19 @@
 		"title": "Integrations"
 	},
 	"models": {
+		"concierge-model": {
+			"aria-label": "Concierge model",
+			"description": "Model the Concierge runs on. It works above every project rather than inside one, so it can differ from the chat default. Changing it takes effect on the next turn.",
+			"label": "Concierge model",
+			"thinking-aria-label": "Concierge thinking level"
+		},
 		"default-model": {
 			"aria-label": "Default chat model",
 			"description": "Model used when you start a new chat. Falls back to the agent-reported default when unset.",
 			"label": "Default model",
 			"thinking-aria-label": "Default thinking level"
 		},
-		"description": "Agent models and thinking-level defaults for new chats and reviews. Sourced from each configured runtime's capability discovery.",
+		"description": "Agent models and thinking-level defaults for new chats, reviews, and the Concierge. Sourced from each configured runtime's capability discovery.",
 		"discovery-failed": "Model discovery failed: {{error}}.",
 		"loading": "Loading models…",
 		"no-models": "No models",
@@ -718,6 +724,11 @@
 			"composer-toggle-dictation": "Start or stop dictation",
 			"composer-toggle-model-picker": "Toggle model picker",
 			"composer-toggle-plan-mode": "Toggle plan mode",
+			"concierge-clear": "Clear the Concierge’s context",
+			"concierge-close": "Close the Concierge",
+			"concierge-focus-composer": "Focus the Concierge composer",
+			"concierge-toggle": "Open or close the Concierge",
+			"concierge-toggle-fullscreen": "Maximize or restore the Concierge",
 			"dialog-submit": "Submit dialog form",
 			"diff-comment-submit": "Submit diff comment",
 			"files-search": "Open file search",
@@ -743,6 +754,7 @@
 		"scope": {
 			"autocomplete": "Autocomplete",
 			"composer": "Composer",
+			"concierge": "Concierge",
 			"dialog": "Dialogs",
 			"global": "Global",
 			"menu": "Menus",

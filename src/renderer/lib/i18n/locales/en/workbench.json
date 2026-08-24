@@ -202,6 +202,39 @@
 			"aria-label": "Upload attachment"
 		}
 	},
+	"concierge": {
+		"composer": {
+			"label": "Message the Concierge",
+			"placeholder": "Ask across every project…",
+			"prompt-failed": "The message could not be prepared for sending.",
+			"send-tooltip": "Send message",
+			"stop-tooltip": "Stop the turn"
+		},
+		"launcher": {
+			"open": "Open the Concierge"
+		},
+		"panel": {
+			"clear": "Clear context and start over",
+			"collapse-sidebar": "Hide the sidebar",
+			"expand-sidebar": "Show the sidebar",
+			"label": "Concierge",
+			"maximize": "Maximize",
+			"pressure": "Context is filling up. Clearing now writes what was learned to memory first.",
+			"pressure-clear": "Clear now",
+			"pressure-dismiss": "Not yet",
+			"restore": "Restore panel",
+			"title": "Concierge"
+		},
+		"session": {
+			"not-open": "The Concierge session is not open.",
+			"reopen-failed": "The Concierge session could not be reopened.",
+			"unknown-failure": "Something went wrong in the Concierge."
+		},
+		"timeline": {
+			"empty": "Ask about any project, and the Concierge can read it, spawn agents into it, and remember what came of that.",
+			"starting": "Waking the Concierge"
+		}
+	},
 	"context-usage": {
 		"aria-label": "Context usage",
 		"aria-label-with-plan": "Context and plan usage",
@@ -223,6 +256,10 @@
 			"done": "Closed a tab",
 			"running": "Closing a tab"
 		},
+		"create-workspace": {
+			"done": "Created a workspace",
+			"running": "Creating a workspace"
+		},
 		"exit-plan-mode": {
 			"done": "Submitted a plan",
 			"running": "Submitting a plan"
@@ -238,6 +275,10 @@
 		"focus-tab": {
 			"done": "Focused a tab",
 			"running": "Focusing a tab"
+		},
+		"focus-workspace": {
+			"done": "Opened a workspace",
+			"running": "Opening a workspace"
 		},
 		"get-conversation-status": {
 			"done": "Checked a sub-agent",
@@ -318,6 +359,10 @@
 		"read-terminal-output": {
 			"done": "Read terminal output",
 			"running": "Reading terminal output"
+		},
+		"recall-memory": {
+			"done": "Recalled memory",
+			"running": "Searching memory"
 		},
 		"resolve-diff-comments": {
 			"done": "Resolved review comments",

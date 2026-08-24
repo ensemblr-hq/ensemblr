@@ -85,6 +85,23 @@ const dictationSettingsSchema = z.object({
 	language: z.enum(['en']).catch('en'),
 });
 
+/**
+ * The Concierge's own runtime, independent of the workspace default.
+ *
+ * It runs above every project rather than inside one, so the model that suits
+ * supervising a dozen workspaces is not the model that suits editing a file in
+ * one of them. `autoClearAtPercent` is the share of the context window that
+ * trips the automatic clear; it fires at a turn boundary and shows a dismissible
+ * banner first, so a high value is a nudge rather than an interruption. Zero
+ * disables the automatic trip and leaves clearing entirely manual.
+ */
+const conciergeSettingsSchema = z.object({
+	provider: z.enum(['pi', 'claude']).catch('pi'),
+	model: z.string().nullable().catch(null),
+	thinkingLevel: z.string().nullable().catch(null),
+	autoClearAtPercent: z.number().min(0).max(1).catch(0.8),
+});
+
 /** Experimental user defaults that can feed repository behavior. */
 const experimentalSettingsSchema = z.object({
 	autoRunAfterSetup: z.boolean().catch(false),
@@ -138,6 +155,7 @@ const appSettingsSchema = z.object({
 	git: gitSettingsSchema,
 	appearance: appearanceSettingsSchema,
 	dictation: dictationSettingsSchema,
+	concierge: conciergeSettingsSchema,
 	experimental: experimentalSettingsSchema,
 	onboarding: onboardingSettingsSchema,
 });
@@ -156,6 +174,8 @@ export type GitSettings = AppSettings['git'];
 export type AppearanceSettings = AppSettings['appearance'];
 /** The `dictation` section of App settings. */
 export type DictationSettings = AppSettings['dictation'];
+/** The `concierge` runtime section of App settings. */
+export type ConciergeSettings = AppSettings['concierge'];
 /** The `experimental` section of App settings. */
 export type ExperimentalSettings = AppSettings['experimental'];
 /** The `onboarding` first-run state section of App settings. */
@@ -169,6 +189,7 @@ export interface AppSettingsPatch {
 	git?: Partial<GitSettings>;
 	appearance?: Partial<AppearanceSettings>;
 	dictation?: Partial<DictationSettings>;
+	concierge?: Partial<ConciergeSettings>;
 	experimental?: Partial<ExperimentalSettings>;
 	onboarding?: Partial<OnboardingSettings>;
 }
@@ -181,6 +202,7 @@ export const appSettingsPatchSchema = z.object({
 	git: gitSettingsSchema.partial().optional(),
 	appearance: appearanceSettingsSchema.partial().optional(),
 	dictation: dictationSettingsSchema.partial().optional(),
+	concierge: conciergeSettingsSchema.partial().optional(),
 	experimental: experimentalSettingsSchema.partial().optional(),
 	onboarding: onboardingSettingsSchema.partial().optional(),
 });
@@ -193,6 +215,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = appSettingsSchema.parse({
 	git: {},
 	appearance: {},
 	dictation: {},
+	concierge: {},
 	experimental: {},
 	onboarding: {},
 });
@@ -218,6 +241,7 @@ export function parseAppSettings(raw: unknown): AppSettings {
 		git: asRecord(record.git),
 		appearance: asRecord(record.appearance),
 		dictation: asRecord(record.dictation),
+		concierge: asRecord(record.concierge),
 		experimental: asRecord(record.experimental),
 		onboarding: asRecord(record.onboarding),
 	});
@@ -236,6 +260,7 @@ export function mergeAppSettings(
 		git: { ...current.git, ...patch.git },
 		appearance: { ...current.appearance, ...patch.appearance },
 		dictation: { ...current.dictation, ...patch.dictation },
+		concierge: { ...current.concierge, ...patch.concierge },
 		experimental: { ...current.experimental, ...patch.experimental },
 		onboarding: { ...current.onboarding, ...patch.onboarding },
 	};

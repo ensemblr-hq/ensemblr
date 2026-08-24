@@ -124,6 +124,107 @@ export function subAgentControlOpDenial(op: AgentControlOp): string | null {
 }
 
 /**
+ * Ops the Concierge is denied, mapped to the reason handed back. Every one of
+ * them is a write channel into a workspace it deliberately cannot reach: a
+ * terminal is a shell the read-only command rules cannot see into, a harness is
+ * an unrestricted writer launched with approval prompts skipped, and a branch
+ * name describes a body of work the Concierge is supervising rather than doing.
+ *
+ * `spawnChatTab` is here for a different reason: it opens an empty tab in *the
+ * caller's own* workspace, and the Concierge has none. `startConversation` is
+ * the op it wants, and that one takes a `workspaceId`.
+ *
+ * `openTab` and `listRunScripts` are here for a fourth: each reads or writes a
+ * workspace surface through the caller's own workspace, which for a Concierge is
+ * the empty string. Without these entries `openTab` creates an orphan tab nobody
+ * can see and spends spawn quota doing it, and `listRunScripts` answers with an
+ * empty list \u2014 both reporting `ok`, which reads to a model as the app having
+ * done what it asked.
+ *
+ * `setName` and `setSummary` are here for a third: the Concierge is a panel, not
+ * a chat tab, so both act on a row that does not exist. The chat-tab axis cannot
+ * refuse them on its own — it reads the caller's species, and a Concierge runs
+ * on the same runtimes a chat tab does, so it reports a tab the Concierge has
+ * never had. Without this entry the calls reach the services and fail as
+ * `not-found` and `internal`, which read to a model as faults worth retrying.
+ */
+const CONCIERGE_BLOCKED_OPS: ReadonlyMap<AgentControlOp, string> = new Map([
+	[
+		'spawnChatTab',
+		'You have no workspace of your own to open a tab in. Use `ensemblr_start_conversation` with a `workspaceId` to put an orchestrator into a workspace instead.',
+	],
+	[
+		'launchHarness',
+		'A harness is an unrestricted writer on a worktree and launches with approval prompts skipped, which is exactly the access you do not have. Spawn an orchestrator into that workspace and let it decide what to run.',
+	],
+	[
+		'startTerminal',
+		'A terminal is a shell the read-only command rules cannot see into, so it would be a write channel around every limit you have. Say which script should run and let that workspace\u2019s own agent start it.',
+	],
+	[
+		'stopTerminal',
+		'The workspace terminals belong to the agents and the user working in them. Say in your answer which one should be stopped and why.',
+	],
+	[
+		'writeTerminal',
+		'Writing into a terminal drives a shell in a workspace you may not write to. Run your own read-only commands with `bash` instead.',
+	],
+	[
+		'setBranchName',
+		'The workspace name and its git branch describe a body of work you are supervising rather than doing. The orchestrator working there names it.',
+	],
+	[
+		'setName',
+		'You are a panel rather than a chat tab, so there is no tab title of yours to set. Name the conversations you open instead: `ensemblr_start_conversation` takes a `title`.',
+	],
+	[
+		'setSummary',
+		'You are a panel rather than a chat tab, so there is no tab record to summarize. What you would have put in one belongs in a memory file under `memory/`, which is the only thing that survives a context clear.',
+	],
+	[
+		'exitPlanMode',
+		'You do not plan on someone else\u2019s behalf: an orchestrator you spawn with `planMode: true` submits its own plan, in the workspace the plan is about.',
+	],
+	[
+		'notifyOrchestrator',
+		'You are the top of the tree \u2014 there is no orchestrator above you to signal. Put the decision to the user with `ensemblr_ask_user_question`.',
+	],
+	[
+		'openTab',
+		'A file, diff, or comment tab opens in a workspace\u2019s own tab strip and spends that workspace\u2019s spawn budget, and you have no workspace of your own to open one in. Write the path in your answer instead \u2014 Ensemblr renders it as a chip the user clicks \u2014 or brief an orchestrator with `ensemblr_start_conversation`.',
+	],
+	[
+		'listRunScripts',
+		'A run script exists to be started, and starting one is a shell in a workspace you may not write to. Read a script terminal that is already up with `ensemblr_read_terminal_output`, or ask the orchestrator working there what it runs.',
+	],
+]);
+
+/** Every op the Concierge's tool list omits. */
+export const CONCIERGE_WITHHELD_OPS: ReadonlySet<AgentControlOp> = new Set(
+	CONCIERGE_BLOCKED_OPS.keys(),
+);
+
+/**
+ * Reports why the Concierge may not dispatch a control op.
+ * @param op - The control op being dispatched.
+ * @returns The model-facing denial reason, or null when the op may proceed.
+ */
+export function conciergeControlOpDenial(op: AgentControlOp): string | null {
+	return CONCIERGE_BLOCKED_OPS.get(op) ?? null;
+}
+
+/**
+ * Ops only the Concierge holds, withheld from every workspace agent because
+ * each addresses the app above the workspace: navigating to another workspace,
+ * cutting a new one, and searching a memory index nothing else has.
+ */
+export const CONCIERGE_ONLY_OPS: ReadonlySet<AgentControlOp> = new Set([
+	'focusWorkspace',
+	'createWorkspace',
+	'recallMemory',
+]);
+
+/**
  * Ops that act on a native chat tab and that the service refuses to a caller
  * without one: naming the tab, recording its summary, hosting a questionnaire in
  * it, and posting a plan into it. The second withholding axis alongside the
@@ -163,15 +264,24 @@ const NATIVE_DELEGATION_WITHHELD_OPS: ReadonlySet<AgentControlOp> = new Set([
  * delegating through its own runtime does not hold. Listing a tool the service
  * would only refuse teaches the model to keep reaching for it, which is the same
  * argument on every axis.
+ *
+ * The Concierge answers on its own rather than through those axes, because it is
+ * not on the lineage one at all: it is neither a root that delegates nor a child
+ * that was delegated to, so folding it in would mean answering "is it a
+ * sub-agent?" about something that can never be one.
  * @param audience - Whether the caller has a chat tab, its lineage role, and its delegation mechanism.
  * @returns The ops to withhold from that caller's tool list.
  */
 export function withheldControlOps(
 	audience: ControlAudience,
 ): ReadonlySet<AgentControlOp> {
+	if (audience.role === 'concierge') {
+		return CONCIERGE_WITHHELD_OPS;
+	}
 	const delegatesNatively =
 		audience.role === 'orchestrator' && audience.delegation === 'native';
 	return new Set([
+		...CONCIERGE_ONLY_OPS,
 		...(audience.hasChatTab ? [] : CHAT_TAB_ONLY_OPS),
 		...(audience.role === 'subagent' ? SUBAGENT_WITHHELD_OPS : []),
 		...(delegatesNatively ? NATIVE_DELEGATION_WITHHELD_OPS : []),
