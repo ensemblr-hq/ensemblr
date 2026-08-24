@@ -214,13 +214,52 @@ export function conciergeControlOpDenial(op: AgentControlOp): string | null {
 }
 
 /**
+ * The only ops a retired Concierge child may still dispatch, and every one of
+ * them exists to let it finish writing its memory files:
+ * `checkPlanModeTool` is what clears each `write`/`edit` against the home — the
+ * Pi extension blocks a guarded call outright when that check does not answer —
+ * `getSessionBrief` carries the playbook the pass is told to apply, and
+ * `recallMemory` is how it avoids filing a memory it already holds.
+ */
+const RETIRED_ALLOWED_OPS: ReadonlySet<AgentControlOp> = new Set([
+	'checkPlanModeTool',
+	'getSessionBrief',
+	'recallMemory',
+]);
+
+/**
+ * Reports why a retired Concierge child may not dispatch a control op.
+ *
+ * A clear hands the user a fresh conversation and leaves the child it replaced
+ * running to write its memories, which puts a live Concierge token behind a
+ * transcript the app no longer renders anywhere. Anything that child does to the
+ * app would therefore happen with no visible cause and no way to trace it back —
+ * a questionnaire raised here reaches nobody but still fires a desktop
+ * notification, and a focus op moves the user's window for no reason they can
+ * see. So the authority narrows to the file-writing turn it was left alive for
+ * and everything else is refused, rather than being left to the prompt to
+ * discourage.
+ * @param op - The control op being dispatched.
+ * @returns The model-facing denial reason, or null when the op may proceed.
+ */
+export function retiredControlOpDenial(op: AgentControlOp): string | null {
+	return RETIRED_ALLOWED_OPS.has(op)
+		? null
+		: 'This conversation has been retired and is running only to write its memory files. The user is in a fresh conversation and sees nothing you do here, so acting on the app from this turn would be invisible to them. Write your memories and end the turn.';
+}
+
+/**
  * Ops only the Concierge holds, withheld from every workspace agent because
  * each addresses the app above the workspace: navigating to another workspace,
- * cutting a new one, and searching a memory index nothing else has.
+ * cutting a new one, listing the projects any of them could be cut from, and
+ * searching a memory index nothing else has. A workspace agent belongs to
+ * exactly one project and cannot act on another, so the roster of the rest is
+ * noise in its tool list.
  */
 export const CONCIERGE_ONLY_OPS: ReadonlySet<AgentControlOp> = new Set([
 	'focusWorkspace',
 	'createWorkspace',
+	'listProjects',
 	'recallMemory',
 ]);
 

@@ -418,6 +418,7 @@ const AGENT_CONTROL_ARG_SCHEMAS = {
 	linearGetMetadata: linearGetMetadataSchema,
 	linearCreateComment: linearCreateCommentSchema,
 	linearUpdateIssue: linearUpdateIssueSchema,
+	listProjects: emptySchema,
 	listWorkspaces: emptySchema,
 	listTabs: listTabsSchema,
 	listTerminals: listTerminalsSchema,

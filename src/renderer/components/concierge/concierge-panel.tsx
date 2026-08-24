@@ -183,7 +183,7 @@ export function ConciergePanel() {
 						<p className='min-w-0 flex-1'>
 							{t(
 								'workbench:concierge.panel.pressure',
-								'Context is filling up. Clearing now writes what was learned to memory first.',
+								'Context is filling up. Clearing starts a fresh conversation right away; this one writes to memory in the background.',
 							)}
 						</p>
 						<Button

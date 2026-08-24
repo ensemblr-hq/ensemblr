@@ -127,7 +127,8 @@ neither belongs to every other surface — one throws a conversation away, and t
 other is what dialogs and popovers everywhere already close on. The
 View ▸ Concierge ▸ **Clear Context…** item runs the same clear, from anywhere.
 
-Clearing writes what the Concierge learned to its memory first — see
+Clearing hands you the fresh conversation at once and leaves the one it retired
+writing to memory in the background — see
 [6. Agents](./06-agents.md#the-concierge).
 
 `⎋` also yields to whatever is nearer: an open slash-command list takes it

@@ -134,11 +134,12 @@ describe('withheldControlOps: the other half of the same choice', () => {
 
 		// Not a denial the agent could recover from by phrasing the call
 		// differently: it has a workspace, so navigating to another one, cutting a
-		// new one, and searching a memory index it does not have are all
-		// meaningless rather than merely forbidden.
+		// new one, listing the projects it could be cut from, and searching a memory
+		// index it does not have are all meaningless rather than merely forbidden.
 		expect([...withheld].toSorted()).toEqual([
 			'createWorkspace',
 			'focusWorkspace',
+			'listProjects',
 			'recallMemory',
 		]);
 	});

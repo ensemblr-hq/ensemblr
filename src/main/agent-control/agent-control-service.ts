@@ -73,6 +73,7 @@ import {
 	isWriteOp,
 	PLAN_REFINEMENT_DIRECTIVE,
 	resolveAgentRole,
+	retiredControlOpDenial,
 	SET_SUMMARY_LIMITS,
 	subAgentControlOpDenial,
 	validateArgs,
@@ -181,6 +182,13 @@ export interface AgentControlService {
 	 * maps bounded. Idempotent; safe to call for unknown sessions.
 	 */
 	releaseSession: (sessionId: string) => void;
+	/**
+	 * Narrows a Concierge session's origin to the memory-write turn a clear left
+	 * it running for, without dropping its token — the child still needs to reach
+	 * the control server to have its writes cleared. Idempotent; safe to call for
+	 * unknown sessions.
+	 */
+	retireSession: (sessionId: string) => void;
 }
 
 /**
@@ -624,6 +632,13 @@ export function createAgentControlService({
 		origin: AgentControlOrigin,
 	): Promise<AgentControlResult<never> | null> => {
 		if (origin.concierge) {
+			// Ahead of the Concierge list rather than folded into it: retirement is
+			// a state the same origin passes through, and it withdraws ops the
+			// Concierge otherwise holds for as long as it lasts.
+			const retiredDenial = origin.retired ? retiredControlOpDenial(op) : null;
+			if (retiredDenial !== null) {
+				return fail('denied-scope', retiredDenial);
+			}
 			const conciergeDenial = conciergeControlOpDenial(op);
 			return conciergeDenial === null
 				? null
@@ -1440,6 +1455,26 @@ export function createAgentControlService({
 	};
 
 	/**
+	 * Lists every project the app has opened. Concierge-only: a workspace agent
+	 * belongs to one project and cannot act on another, while the Concierge needs
+	 * the roster to reach a project no live workspace names — which is the only
+	 * place `ensemblr_create_workspace` can get its `projectId` from.
+	 * @param origin - Resolved caller identity.
+	 * @returns The project listing, or a scope failure.
+	 */
+	const handleListProjects = async (
+		origin: AgentControlOrigin,
+	): Promise<AgentControlResult<unknown>> => {
+		if (!origin.concierge) {
+			return fail(
+				'denied-scope',
+				'The project roster belongs to the Concierge, which works across every project. You are in one workspace and can act only there.',
+			);
+		}
+		return ok({ projects: await ports.workspaces.listProjects() });
+	};
+
+	/**
 	 * Searches the Concierge's own memory index.
 	 * @param origin - Resolved caller identity.
 	 * @param args - The search text and result cap.
@@ -1970,6 +2005,7 @@ export function createAgentControlService({
 			handleListTabs(origin, args as ListTabsArgs),
 		listTerminals: ({ args, origin }) =>
 			handleListTerminals(origin, args as ListTerminalsArgs),
+		listProjects: ({ origin }) => handleListProjects(origin),
 		listWorkspaces: () => ports.workspaces.listWorkspaces().then(ok),
 		notifyOrchestrator: ({ args, origin }) =>
 			handleNotifyOrchestrator(origin, args as NotifyOrchestratorArgs),
@@ -2116,6 +2152,13 @@ export function createAgentControlService({
 		originRegistry.release(sessionId);
 	};
 
+	const retireSession = (sessionId: string): void => {
+		// The pass may open a questionnaire before the retire lands, and that
+		// dialog is exactly what no longer has anywhere to render.
+		ports.ask.releaseSession(sessionId);
+		originRegistry.retire(sessionId);
+	};
+
 	return {
 		describeAudience,
 		invoke,
@@ -2123,5 +2166,6 @@ export function createAgentControlService({
 		readLanguageDirective,
 		readTurnPreamble,
 		releaseSession,
+		retireSession,
 	};
 }

@@ -276,7 +276,7 @@ export function resolveFixtureConciergeStop(): StopConciergeSessionResult {
 
 /** Accepts a clear and hands the same session back, as a real clear would. */
 export function resolveFixtureConciergeClear(): ClearConciergeContextResult {
-	return { memoryPassRan: true, session: SESSION };
+	return { memoryPassStarted: true, session: SESSION };
 }
 
 /**

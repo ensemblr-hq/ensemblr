@@ -148,6 +148,10 @@ not in a workspace, so the rules land differently:
   refused rather than guessed at.
 - **What it spawns is a root orchestrator, not a sub-agent.** The child owns the
   task and fans out its own children under its own depth cap.
+- **It holds four ops nothing else does.** Listing every project, navigating the
+  app to a workspace, cutting a new workspace off a project, and searching its own
+  memory. A workspace agent is withheld all four: it belongs to one project and
+  cannot act on another.
 
 [6. Agents](./06-agents.md#the-concierge) covers the Concierge itself.
 

@@ -8,6 +8,7 @@ import type {
 	AddDiffCommentsResult,
 	AgentControlConversationStatus,
 	AgentControlModelList,
+	AgentControlProjectInfo,
 	AgentControlRunScriptList,
 	AgentControlTabInfo,
 	AgentControlTerminalInfo,
@@ -118,6 +119,13 @@ export interface AgentControlOrigin {
 	 * Concierge is never an orchestrator or a sub-agent.
 	 */
 	concierge: boolean;
+	/**
+	 * True once a clear has replaced this Concierge conversation and left the
+	 * child running only to write its memories. The token stays live for that
+	 * turn, so the flag is what narrows it: nothing the child does from here
+	 * reaches a surface the user is looking at.
+	 */
+	retired: boolean;
 	workspaceCwd: string;
 	parentSessionId: string | null;
 	depth: number;
@@ -153,8 +161,9 @@ export function originRuntime(
 	return origin.species === 'harness' ? null : origin.species;
 }
 
-/** Lists workspaces for the cross-workspace read ops. */
+/** Lists the app's projects and workspaces for the cross-workspace read ops. */
 export interface WorkspacePort {
+	listProjects: () => Promise<readonly AgentControlProjectInfo[]>;
 	listWorkspaces: () => Promise<readonly AgentControlWorkspaceInfo[]>;
 }
 

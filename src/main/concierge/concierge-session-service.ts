@@ -9,7 +9,6 @@ import type {
 	ClearConciergeContextResult,
 	ConciergeContextPressureWire,
 	ConciergeEventBroadcastWire,
-	ConciergeSessionEventWire,
 	ConciergeSessionSnapshotWire,
 	ListConciergeEventsRequest,
 	ListConciergeEventsResult,
@@ -20,10 +19,9 @@ import type {
 	SubmitConciergePromptRequest,
 	SubmitConciergePromptResult,
 } from '../../shared/ipc/contracts/concierge.ts';
-import {
-	type AgentClient,
-	AgentClientError,
-	type AgentSession,
+import type {
+	AgentClient,
+	AgentSession,
 } from '../agent-runtime/agent-client.ts';
 import { eventPayload } from '../agent-runtime/agent-session-persistence.ts';
 import type {
@@ -33,7 +31,6 @@ import type {
 } from '../agent-runtime/agent-types.ts';
 import {
 	appendConciergeEvent,
-	type ConciergeEventRow,
 	type ConciergeSessionRow,
 	createConciergeSession,
 	getActiveConciergeSession,
@@ -43,6 +40,13 @@ import {
 } from '../storage/repositories/concierge-session-repository.ts';
 import type { ConciergeHome } from './concierge-home.ts';
 import { runConciergeMemoryPass } from './concierge-memory-pass.ts';
+import { createConciergeRetirement } from './concierge-retirement.ts';
+import {
+	isSessionClosedFailure,
+	toEventWire,
+	toMessage,
+	toSnapshot,
+} from './concierge-session-wire.ts';
 
 /** Runtime settings a Concierge session opens under, read fresh on every open. */
 export interface ConciergeRuntimeSettings {
@@ -85,6 +89,13 @@ export interface ConciergeSessionServiceOptions {
 	 * resolving. Absent in tests and whenever control is not wired.
 	 */
 	releaseControlOrigin?: (sessionId: string) => void;
+	/**
+	 * Narrows the control origin of a child a clear retired, so the memory-write
+	 * turn keeps the token its writes are cleared against while losing every op
+	 * that would act on an app the user is no longer watching this conversation
+	 * from. Absent in tests and whenever control is not wired.
+	 */
+	retireControlOrigin?: (sessionId: string) => void;
 	/** Resolves the binary a runtime should launch; absent lets the adapter pick. */
 	resolveExecutable?: (
 		provider: AgentProviderId,
@@ -98,9 +109,9 @@ export interface ConciergeSessionServiceOptions {
 	resolveSettings: () => ConciergeRuntimeSettings;
 	requireDatabase: () => DatabaseSync;
 	/**
-	 * Overrides the memory-write turn a clear runs first. Absent, the service
-	 * runs its own against the live runtime child, which is what production
-	 * wants; a test that opens no runtime supplies a stub instead.
+	 * Overrides the memory-write turn a clear starts in the background. Absent,
+	 * the service runs its own against the child it just retired, which is what
+	 * production wants; a test that opens no runtime supplies a stub instead.
 	 */
 	runMemoryPass?: (sessionId: string) => Promise<boolean>;
 }
@@ -184,68 +195,6 @@ export function conciergeContextPressure({
 }
 
 /**
- * Projects a session row onto its renderer-facing snapshot.
- * @param row - Persisted session row.
- * @param runtimeOpen - Whether a runtime child is currently attached.
- * @returns The wire snapshot.
- */
-function toSnapshot(
-	row: ConciergeSessionRow,
-	runtimeOpen: boolean,
-): ConciergeSessionSnapshotWire {
-	return {
-		closedAt: row.closedAt,
-		createdAt: row.createdAt,
-		cwd: row.cwd,
-		id: row.id,
-		lastError: row.lastError,
-		model: row.model,
-		provider: row.provider,
-		runtimeOpen,
-		status: row.status,
-		thinkingLevel: row.thinkingLevel,
-		title: row.title,
-		updatedAt: row.updatedAt,
-	};
-}
-
-/**
- * Projects a persisted event row onto its wire shape.
- * @param row - Persisted event row.
- * @returns The wire event.
- */
-function toEventWire(row: ConciergeEventRow): ConciergeSessionEventWire {
-	return {
-		createdAt: row.createdAt,
-		eventType: row.eventType,
-		id: row.id,
-		ordinal: row.ordinal,
-		payload: row.payload,
-		sessionId: row.sessionId,
-		stream: row.stream,
-	};
-}
-
-/**
- * Coerces a thrown value into a message safe to persist and show.
- * @param error - Thrown value.
- * @returns A human-readable message.
- */
-function toMessage(error: unknown): string {
-	return error instanceof Error ? error.message : String(error);
-}
-
-/**
- * Reports whether a failure means the runtime child behind the session is gone,
- * as opposed to a turn the live child refused.
- * @param error - Thrown value from a runtime call.
- * @returns True when the session is closed and only a replacement can serve it.
- */
-function isSessionClosedFailure(error: unknown): boolean {
-	return error instanceof AgentClientError && error.code === 'session-closed';
-}
-
-/**
  * Owns the one Concierge conversation: opening it against a runtime, persisting
  * its transcript, and replacing it when the context is cleared.
  *
@@ -269,6 +218,7 @@ export function createConciergeSessionService({
 	resolveHome,
 	resolveReadableDirectories,
 	resolveSettings,
+	retireControlOrigin,
 	runMemoryPass,
 }: ConciergeSessionServiceOptions): ConciergeSessionService {
 	let active: ActiveConciergeSession | null = null;
@@ -320,22 +270,52 @@ export function createConciergeSessionService({
 	};
 
 	/**
-	 * Detaches the live runtime child, leaving the row intact so the transcript
-	 * survives. Safe to call when nothing is attached.
+	 * Closes one runtime attachment and drops everything it held open — its event
+	 * subscription and its control origin — leaving the session row intact so the
+	 * transcript survives.
+	 * @param attachment - The attachment to close.
 	 */
-	const detach = async (): Promise<void> => {
-		if (!active) {
-			return;
-		}
-		const current = active;
-		active = null;
-		current.subscription.unsubscribe();
-		releaseControlOrigin?.(current.sessionId);
+	const closeAttachment = async (
+		attachment: ActiveConciergeSession,
+	): Promise<void> => {
+		attachment.subscription.unsubscribe();
+		releaseControlOrigin?.(attachment.sessionId);
 		try {
-			await current.runtimeSession.close();
+			await attachment.runtimeSession.close();
 		} catch {
 			return;
 		}
+	};
+
+	const retirement = createConciergeRetirement(closeAttachment);
+
+	/**
+	 * Detaches the live runtime child. Safe to call when nothing is attached.
+	 */
+	const detach = async (): Promise<void> => {
+		const current = active;
+		if (!current) {
+			return;
+		}
+		active = null;
+		await closeAttachment(current);
+	};
+
+	/**
+	 * Takes the live attachment out of `active` without closing its runtime child,
+	 * so a clear can hand the user a fresh conversation while the child it
+	 * replaced keeps running long enough to write its memories. Narrows the
+	 * child's control origin on the way out: it keeps the token its writes are
+	 * cleared against and loses every op that would act on the app.
+	 * @returns The attachment that was live, or null when there was none.
+	 */
+	const retireActive = (): ActiveConciergeSession | null => {
+		const live = active;
+		active = null;
+		if (live) {
+			retireControlOrigin?.(live.sessionId);
+		}
+		return live;
 	};
 
 	/**
@@ -489,21 +469,54 @@ export function createConciergeSessionService({
 	};
 
 	/**
-	 * Runs the memory-write turn a clear is about to discard the context of,
-	 * preferring an injected override and otherwise driving the live runtime
-	 * child. Reports false rather than throwing when there is no live session to
-	 * ask: the clear is what the user pressed, and it proceeds either way.
-	 * @param sessionId - Session the clear is about to close.
+	 * Runs the memory-write turn on the child a clear retired, preferring an
+	 * injected override and otherwise driving that child directly. Reports false
+	 * rather than throwing when there is no retired child to ask.
+	 * @param sessionId - Session the clear closed.
+	 * @param retired - The child it left running, or null when there was none.
 	 * @returns True when the runtime completed the turn.
 	 */
-	const runMemoryPassFor = async (sessionId: string): Promise<boolean> => {
+	const runMemoryPassFor = async (
+		sessionId: string,
+		retired: ActiveConciergeSession | null,
+	): Promise<boolean> => {
 		if (runMemoryPass) {
 			return await runMemoryPass(sessionId);
 		}
-		const live = active;
-		return live?.sessionId === sessionId
-			? await runConciergeMemoryPass({ session: live.runtimeSession })
+		return retired
+			? await runConciergeMemoryPass({ session: retired.runtimeSession })
 			: false;
+	};
+
+	/**
+	 * Retires the live child and starts the memory-write turn the clear no longer
+	 * waits for, keeping that child open until the turn lands.
+	 *
+	 * Deliberately not awaited. Waiting for it is what made the refresh control
+	 * feel broken: the user pressed it, watched the agent be handed a prompt they
+	 * had not written, and only got their fresh conversation a turn later. The
+	 * retired child keeps its subscription for the duration so its events still
+	 * land in its own transcript rows, which no longer have a reader.
+	 * @param sessionId - Session the clear closed, which the pass writes for.
+	 * @param skipMemoryPass - Whether the caller opted out of the turn entirely.
+	 * @returns True when a background pass was started.
+	 */
+	const retireAndWriteMemories = (
+		sessionId: string,
+		skipMemoryPass: boolean | undefined,
+	): boolean => {
+		if (skipMemoryPass) {
+			return false;
+		}
+		const retired = retireActive();
+		if (!retired && !runMemoryPass) {
+			return false;
+		}
+		const pass = runMemoryPassFor(sessionId, retired).catch(() => false);
+		if (retired) {
+			retirement.keepAlive(retired, pass);
+		}
+		return true;
 	};
 
 	/**
@@ -587,6 +600,13 @@ export function createConciergeSessionService({
 	};
 
 	return {
+		/**
+		 * Replaces the conversation with a fresh one and hands it back at once,
+		 * leaving the memory-write turn to run in the background on the child it
+		 * retired. The clear is the thing the user pressed, so nothing about it
+		 * waits on an agent turn — and a pass that fails, times out, or never
+		 * starts costs one conversation's notes rather than the panel.
+		 */
 		clearContext: async ({
 			reason,
 			skipMemoryPass,
@@ -596,15 +616,12 @@ export function createConciergeSessionService({
 				? getConciergeSessionById({ database, id: active.sessionId })
 				: getActiveConciergeSession({ database });
 
-			let memoryPassRan = false;
-			if (current && !skipMemoryPass) {
-				try {
-					memoryPassRan = await runMemoryPassFor(current.id);
-				} catch {
-					memoryPassRan = false;
-				}
-			}
+			const memoryPassStarted = current
+				? retireAndWriteMemories(current.id, skipMemoryPass)
+				: false;
 
+			// A no-op once the child has been retired; it still closes the live one
+			// when the caller skipped the pass, and when there was no row to write for.
 			await detach();
 			if (current) {
 				updateConciergeSession({
@@ -620,9 +637,9 @@ export function createConciergeSessionService({
 
 			try {
 				const row = await attachRuntime(createRow());
-				return { memoryPassRan, session: toSnapshot(row, true) };
+				return { memoryPassStarted, session: toSnapshot(row, true) };
 			} catch (error) {
-				return { error: toMessage(error), memoryPassRan };
+				return { error: toMessage(error), memoryPassStarted };
 			}
 		},
 
@@ -647,7 +664,16 @@ export function createConciergeSessionService({
 
 		openSession,
 
-		shutdown: detach,
+		/**
+		 * Closes every child this service holds open, retired ones included. A
+		 * memory pass still running is abandoned rather than waited on: the app is
+		 * going away, and an unbounded wait at quit is worse than losing one
+		 * conversation's notes.
+		 */
+		shutdown: async (): Promise<void> => {
+			await retirement.drain();
+			await detach();
+		},
 
 		stopSession: async ({
 			reason,

@@ -10,6 +10,7 @@ import {
 	getChatTabById,
 	setChatTabMetadata,
 } from '../../src/main/storage/repositories/chat-tab-repository.ts';
+import { listProjectRows } from '../../src/main/storage/repositories/repository-row-repository.ts';
 import {
 	listAllWorkspaceRows,
 	selectWorkspaceWithRepositoryById,
@@ -37,6 +38,13 @@ vi.mock('../../src/main/storage/repositories/chat-tab-repository.ts', () => ({
 	getChatTabByAgentSessionId: vi.fn(() => null),
 	setChatTabMetadata: vi.fn(),
 }));
+
+vi.mock(
+	'../../src/main/storage/repositories/repository-row-repository.ts',
+	() => ({
+		listProjectRows: vi.fn(() => []),
+	}),
+);
 
 vi.mock('../../src/main/storage/repositories/workspace-repository.ts', () => ({
 	listAllWorkspaceRows: vi.fn(() => []),
@@ -280,6 +288,58 @@ describe('agent-control port adapters: board status', () => {
 		const { deps } = makeDeps();
 		const ports = createAgentControlPorts(deps);
 		expect(ports.board.getWorkspaceStatus('unknown')).toBe('backlog');
+	});
+
+	it('listProjects reports every project with its live workspace count', async () => {
+		const { deps } = makeDeps();
+		vi.mocked(listProjectRows).mockReturnValue([
+			{
+				defaultBranch: 'main',
+				id: 'repo-1',
+				name: 'Ensemblr',
+				path: '/repos/ensemblr',
+				slug: 'ensemblr',
+				workspaceCount: 2,
+			},
+			{
+				defaultBranch: null,
+				id: 'repo-2',
+				name: 'Playground',
+				path: '/repos/playground',
+				slug: 'playground',
+				workspaceCount: 0,
+			},
+		]);
+		const ports = createAgentControlPorts(deps);
+		expect(await ports.workspaces.listProjects()).toEqual([
+			{
+				defaultBranch: 'main',
+				name: 'Ensemblr',
+				path: '/repos/ensemblr',
+				projectId: 'repo-1',
+				slug: 'ensemblr',
+				workspaceCount: 2,
+			},
+			{
+				defaultBranch: null,
+				name: 'Playground',
+				path: '/repos/playground',
+				projectId: 'repo-2',
+				slug: 'playground',
+				workspaceCount: 0,
+			},
+		]);
+	});
+
+	it('listProjects answers empty rather than throwing with no database', async () => {
+		const { deps } = makeDeps();
+		const ports = createAgentControlPorts({
+			...deps,
+			databaseService: {
+				getConnection: () => null,
+			} as PortAdapterDeps['databaseService'],
+		});
+		expect(await ports.workspaces.listProjects()).toEqual([]);
 	});
 
 	it('listWorkspaces carries each workspace board status from the mirror', async () => {
@@ -553,6 +613,7 @@ describe('agent-control port adapters: branch naming', () => {
 	const origin = {
 		delegation: 'ensemblr' as const,
 		concierge: false,
+		retired: false,
 		depth: 0,
 		parentSessionId: null,
 		sessionId: 'sess-1',

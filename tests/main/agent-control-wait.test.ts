@@ -34,7 +34,10 @@ const makePorts = (
 	statuses: Map<string, string>,
 	lastMessage: (agentSessionId: string) => string = (id) => `msg:${id}`,
 ): AgentControlPorts => ({
-	workspaces: { listWorkspaces: vi.fn().mockResolvedValue([]) },
+	workspaces: {
+		listProjects: vi.fn().mockResolvedValue([]),
+		listWorkspaces: vi.fn().mockResolvedValue([]),
+	},
 	tabs: {
 		spawnChatTab: vi.fn().mockResolvedValue({ chatTabId: 't' }),
 		closeTab: vi.fn().mockResolvedValue(undefined),

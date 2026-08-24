@@ -12,6 +12,7 @@ const originAt = (depth: number): AgentControlOrigin => ({
 	species: 'pi',
 	delegation: 'ensemblr',
 	concierge: false,
+	retired: false,
 });
 
 describe('guardrails: depth', () => {

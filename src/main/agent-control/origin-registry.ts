@@ -36,6 +36,12 @@ export interface OriginRegistry {
 	resolveByToken: (token: string) => AgentControlOrigin | null;
 	resolveBySession: (sessionId: string) => AgentControlOrigin | null;
 	release: (sessionId: string) => void;
+	/**
+	 * Narrows a Concierge origin to the memory-write turn a clear left it alive
+	 * for, without invalidating its token. Idempotent, and a no-op for a session
+	 * that is not registered.
+	 */
+	retire: (sessionId: string) => void;
 	/** Session ids from the given session up to the lineage root, exclusive of itself. */
 	ancestorsOf: (sessionId: string) => readonly string[];
 	/** Session ids of the registered origins spawned directly by the given session. */
@@ -85,6 +91,7 @@ export function createOriginRegistry(
 			sessionId: input.sessionId,
 			workspaceId: input.workspaceId,
 			concierge: input.concierge ?? false,
+			retired: false,
 			workspaceCwd: input.workspaceCwd,
 			parentSessionId,
 			depth: resolveDepth(parentSessionId),
@@ -109,6 +116,18 @@ export function createOriginRegistry(
 		}
 		bySession.delete(sessionId);
 		byToken.delete(origin.token);
+	};
+
+	// Replaced rather than mutated, so a request already resolved against the
+	// origin it was admitted under keeps the identity it was gated on.
+	const retire = (sessionId: string): void => {
+		const origin = bySession.get(sessionId);
+		if (!origin || origin.retired) {
+			return;
+		}
+		const narrowed: AgentControlOrigin = { ...origin, retired: true };
+		bySession.set(sessionId, narrowed);
+		byToken.set(narrowed.token, narrowed);
 	};
 
 	const ancestorsOf = (sessionId: string): readonly string[] => {
@@ -138,6 +157,7 @@ export function createOriginRegistry(
 		resolveByToken,
 		resolveBySession,
 		release,
+		retire,
 		ancestorsOf,
 		childrenOf,
 	};

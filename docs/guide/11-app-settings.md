@@ -190,8 +190,8 @@ It is a **fraction between 0 and 1**, not a percentage, despite the name: `0.8`
 means 80% of the window. Anything outside that range is rejected and the default
 is used instead. Crossing the threshold raises a dismissible banner inside the
 Concierge panel offering **Clear now** or **Not yet** — nothing is cleared until
-you press the button, and clearing runs a memory pass first so what the
-conversation established is written to disk before the transcript goes. Set it to
+you press the button, and clearing hands you the fresh conversation at once while
+the one it retired writes to memory in the background. Set it to
 `0` and the banner never appears; clearing stays entirely yours to trigger with
 `⌘⇧K` or View ▸ Concierge ▸ **Clear Context…**.
 

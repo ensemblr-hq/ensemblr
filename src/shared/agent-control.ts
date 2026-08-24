@@ -53,6 +53,7 @@ export {
 	CONCIERGE_ONLY_OPS,
 	CONCIERGE_WITHHELD_OPS,
 	conciergeControlOpDenial,
+	retiredControlOpDenial,
 	SUBAGENT_UNUSABLE_OPS,
 	SUBAGENT_WITHHELD_OPS,
 	subAgentControlOpDenial,

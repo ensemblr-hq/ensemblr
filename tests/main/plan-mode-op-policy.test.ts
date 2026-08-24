@@ -56,6 +56,7 @@ const EXPECTED_DENIALS: Record<
 	listRunScripts: [],
 	listTabs: [],
 	listTerminals: [],
+	listProjects: [],
 	listWorkspaces: [],
 	notifyOrchestrator: [],
 	openTab: [],
