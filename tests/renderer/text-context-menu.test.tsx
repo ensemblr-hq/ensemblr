@@ -309,6 +309,117 @@ test('dismissing without picking a row puts focus back in the field', async () =
 	expect(runTextEditCommand).not.toHaveBeenCalled();
 });
 
+test('dismissing on a read-only surface puts focus back where it was', async () => {
+	renderWithProviders(
+		<div>
+			<button data-testid='host' type='button'>
+				host
+			</button>
+			<TextContextMenu>
+				<p data-testid='transcript'>selected prose</p>
+			</TextContextMenu>
+		</div>,
+	);
+	const host = screen.getByTestId('host');
+	host.focus();
+	clickLandedOn(screen.getByTestId('transcript'));
+
+	await rightClick(target());
+	await findMenuItem('Copy');
+
+	await act(async () => {
+		fireEvent.keyDown(document, { key: 'Escape' });
+	});
+
+	await waitFor(() => {
+		expect(document.activeElement).toBe(host);
+	});
+});
+
+test('copying from a read-only surface puts focus back where it was', async () => {
+	renderWithProviders(
+		<div>
+			<button data-testid='host' type='button'>
+				host
+			</button>
+			<TextContextMenu>
+				<p data-testid='transcript'>selected prose</p>
+			</TextContextMenu>
+		</div>,
+	);
+	const host = screen.getByTestId('host');
+	host.focus();
+	clickLandedOn(screen.getByTestId('transcript'));
+
+	await rightClick(target({ selectionText: 'selected prose' }));
+	await act(async () => {
+		fireEvent.click(await findMenuItem('Copy'));
+	});
+
+	await waitFor(() => {
+		expect(document.activeElement).toBe(host);
+	});
+});
+
+test('select all leaves focus alone rather than collapsing its own selection', async () => {
+	renderWithProviders(
+		<div>
+			{/* biome-ignore lint/a11y/useSemanticElements: stands in for the composer, the field that usually holds focus when the transcript is right-clicked */}
+			<div
+				contentEditable
+				data-testid='composer'
+				role='textbox'
+				suppressContentEditableWarning
+				tabIndex={0}
+			>
+				draft
+			</div>
+			<TextContextMenu>
+				<p data-testid='transcript'>selected prose</p>
+			</TextContextMenu>
+		</div>,
+	);
+	const composer = screen.getByTestId('composer');
+	composer.focus();
+	clickLandedOn(screen.getByTestId('transcript'));
+
+	await rightClick(target());
+	await act(async () => {
+		fireEvent.click(await findMenuItem('Select all'));
+	});
+
+	await waitFor(() => {
+		expect(screen.queryByRole('menuitem')).toBeNull();
+	});
+	expect(document.activeElement).not.toBe(composer);
+});
+
+test('dismissing the menu marks the key handled before the host surface sees it', async () => {
+	const onKeyDown = vi.fn();
+	renderWithProviders(
+		// biome-ignore lint/a11y/noStaticElementInteractions: stands in for the Concierge panel, which closes on ⎋
+		<div onKeyDown={onKeyDown}>
+			<TextContextMenu>
+				<p data-testid='transcript'>selected prose</p>
+			</TextContextMenu>
+		</div>,
+	);
+	clickLandedOn(screen.getByTestId('transcript'));
+
+	await rightClick(target());
+	await findMenuItem('Copy');
+
+	await act(async () => {
+		fireEvent.keyDown(screen.getByRole('menu'), { key: 'Escape' });
+	});
+
+	await waitFor(() => {
+		expect(screen.queryByRole('menuitem')).toBeNull();
+	});
+	expect(onKeyDown).toHaveBeenCalledTimes(1);
+	expect(onKeyDown.mock.calls[0]?.[0].defaultPrevented).toBe(true);
+});
+
 test('select all on a read-only surface scopes the range to the surface', async () => {
 	const addRange = vi.fn();
 	vi.spyOn(window, 'getSelection').mockReturnValue({
