@@ -9,6 +9,10 @@ them as harnesses in terminal tabs. Those are covered in
 [`07-terminals-and-run-scripts.md`](./07-terminals-and-run-scripts.md) and
 [`../harnesses.md`](../harnesses.md).
 
+One agent is not in a workspace at all: the [**Concierge**](#the-concierge) works
+above every project, reads all of them, and hands the work to agents it puts into
+the workspace that needs it.
+
 ## Two runtimes, one chat surface
 
 Both runtimes drive the same chat: the same streaming timeline, the same tool
@@ -141,6 +145,97 @@ Like the runtime, the level pins to the session.
 
 The context gauge next to the picker shows how much of the model's window the
 conversation currently occupies.
+
+## The Concierge
+
+Every agent described so far lives *inside* a workspace. The **Concierge** does
+not. It sits above every project, in a folder of its own under the Ensemblr root,
+and it is the only agent that can see all your work at once — which workspaces
+have something waiting, what a running agent actually did, where a body of work
+stands.
+
+Open it with `⌘⇧C`, from View ▸ Concierge, or by clicking the round button
+floating over the window. It is a **panel** rather than a chat tab: drag it where
+you want it, maximize it with `⌘⇧M`, close it with `⎋`. It belongs to the app, so
+it is the same conversation whichever workspace you happen to be looking at.
+
+It runs on the same two runtimes as everything else — **Pi or Claude Code** — and
+carries the Ensemblr Control tools, on a playbook written for supervising rather
+than for doing the work.
+
+### It reads everywhere and writes in one place
+
+The Concierge can read every workspace's files, diff, and review comments; replay
+any conversation in any workspace, tool calls and results included; read every
+terminal's output, the board, and Linear. Acting is a narrower set:
+
+- **Put an agent to work.** Starting a conversation in a workspace opens a **root
+  orchestrator** there — a peer that owns the task and fans out its own
+  sub-agents, not a child of the Concierge. It briefs that agent, steers it with
+  follow-ups, and reads back what it ran.
+- **Create a workspace** when the work needs one that does not exist yet.
+- **Move the board and the tracker**, and leave or resolve review comments on any
+  workspace's diff.
+
+What it cannot do is deliberate, and enforced per tool call at the control
+channel rather than asked for in the prompt:
+
+- **It cannot write a file in any workspace.** Writes outside its own folder are
+  refused, and `bash` is held to read-only commands. When something needs
+  changing, it spawns an orchestrator into that workspace and briefs it — that
+  agent has the write access the Concierge deliberately does not.
+- **It cannot open terminals or launch harnesses.** A shell is a write channel
+  the read-only rules cannot see into. It says which script should run and lets
+  the workspace's own agent run it.
+- **Every op that acts on a workspace names one.** The Concierge has no workspace
+  of its own to default to, so an op that names none is refused rather than
+  guessed at.
+
+### Its own folder
+
+The Concierge works out of `concierge/` in the Ensemblr root, which is
+`~/Ensemblr/concierge` unless you moved the root. It is scratch space that
+belongs to the agent: not a git repository, not a project, and not something any
+request is about.
+
+| Path | Holds |
+| --- | --- |
+| `MEMORY.md` | the memory index — one line per memory, pointing at its file |
+| `memory/` | one markdown file per durable fact |
+| `artifacts/` | reports and notes it writes for you |
+
+Ensemblr creates all three on launch and seeds `MEMORY.md` with an empty index,
+so a fresh install has somewhere to write from the first turn.
+
+### Memory outlives the conversation
+
+The Concierge's context does not survive a clear, so anything worth keeping is
+written to a file before that happens. It records what it would otherwise have to
+rediscover — what a project is for, what a decision was and why, where work
+stands — as one file per fact under `memory/`, with a line in `MEMORY.md`
+pointing at it. Next session it reads the index first and searches what it wrote
+when a question touches something it might already know.
+
+**Clearing runs a memory pass first.** `⌘⇧K`, or View ▸ Concierge ▸ **Clear
+Context…**, hands the agent one last turn to write the files, and only then
+replaces the session — so what the conversation established survives the clear
+even though the transcript does not.
+
+A long conversation raises a banner of its own once the context passes a
+threshold, offering **Clear now** or **Not yet**. It is an offer, not an
+interruption: nothing is cleared until you press the button, and dismissing it
+leaves the conversation alone. The threshold is
+[`app.concierge.autoClearAtPercent`](./11-app-settings.md#concierge-settings),
+`0.8` by default.
+
+### Its model is its own setting
+
+The Concierge's runtime, model, and thinking level live under `app.concierge`
+rather than `app.models`, and are set in Settings → Models — the model that suits
+supervising a dozen workspaces is not the one that suits editing a file in any of
+them. Picking a model belonging to the other runtime reopens the Concierge on
+that runtime, because a model belongs to exactly one. See
+[11. App settings](./11-app-settings.md#models).
 
 ## Permission modes
 

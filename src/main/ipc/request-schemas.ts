@@ -64,6 +64,13 @@ export {
 	parseGithubRepositoryListRequest,
 } from './request-schemas/clone.ts';
 export {
+	clearConciergeContextRequestSchema,
+	listConciergeEventsRequestSchema,
+	openConciergeSessionRequestSchema,
+	stopConciergeSessionRequestSchema,
+	submitConciergePromptRequestSchema,
+} from './request-schemas/concierge.ts';
+export {
 	commitWorkspaceChangesRequestSchema,
 	createPullRequestRequestSchema,
 	getPullRequestSnapshotRequestSchema,

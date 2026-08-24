@@ -82,4 +82,22 @@ describe('directory attachment chips', () => {
 		fireEvent.click(screen.getByRole('button', { name: 'renderer' }));
 		expect(openPreview).toHaveBeenCalledWith('src/renderer');
 	});
+
+	// The surface that provides a resolver has the last word: a file attached and
+	// since deleted would otherwise offer a control that opens onto a read error.
+	test('leaves a prompt chip inert when the resolver cannot place its path', () => {
+		const openPreview = vi.fn();
+		renderWithProviders(
+			<WorkspacePathResolverProvider value={() => null}>
+				<FilePreviewOpenerProvider value={openPreview}>
+					<ChatUserPrompt
+						prompt={'Referenced workspace files:\n@notes.md\n\nRead it'}
+					/>
+				</FilePreviewOpenerProvider>
+			</WorkspacePathResolverProvider>,
+		);
+
+		expect(screen.queryByRole('button', { name: 'notes.md' })).toBeNull();
+		expect(openPreview).not.toHaveBeenCalled();
+	});
 });

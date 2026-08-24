@@ -935,6 +935,88 @@ ALTER TABLE linear_issues ADD COLUMN comments_synced_at TEXT;
 UPDATE repositories SET archived_at = NULL WHERE archived_at IS NOT NULL;
 `,
 	},
+	{
+		id: '022_concierge',
+		version: 22,
+		// The Concierge is the one agent with no workspace: it lives above every
+		// project, so `agent_sessions` and `chat_tabs` — both `NOT NULL` on
+		// `workspace_id` — have nowhere to put it. It gets its own session and
+		// event tables rather than a synthetic workspace row, because a fake
+		// workspace would leak into the board, the sidebar, and every listing that
+		// forgot to filter it.
+		//
+		// `concierge_memories` mirrors the markdown files under
+		// `<root>/concierge/memory/`, which stay the source of truth; the FTS5
+		// table is a derived index that reconciliation rebuilds from disk, so
+		// dropping it costs nothing. It is standalone rather than an external-content
+		// table: the row count is small and a rebuild on write is cheaper to keep
+		// correct than trigger drift.
+		sql: `
+ALTER TABLE root_directories ADD COLUMN concierge_path TEXT NOT NULL DEFAULT '';
+
+CREATE TABLE concierge_sessions (
+	id TEXT PRIMARY KEY,
+	provider TEXT NOT NULL DEFAULT 'pi',
+	runtime_session_id TEXT,
+	executable_id TEXT,
+	executable_path TEXT,
+	model TEXT,
+	thinking_level TEXT,
+	status TEXT NOT NULL DEFAULT 'idle' CHECK (status IN ('idle', 'starting', 'streaming', 'closed', 'errored')),
+	last_error TEXT,
+	cwd TEXT NOT NULL,
+	title TEXT NOT NULL DEFAULT '',
+	next_ordinal INTEGER NOT NULL DEFAULT 0,
+	created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+	updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+	closed_at TEXT,
+	metadata_json TEXT NOT NULL DEFAULT '{}'
+) STRICT;
+
+CREATE INDEX idx_concierge_sessions_status ON concierge_sessions(status);
+CREATE INDEX idx_concierge_sessions_created_at ON concierge_sessions(created_at);
+
+CREATE TABLE concierge_session_events (
+	id TEXT PRIMARY KEY,
+	session_id TEXT NOT NULL REFERENCES concierge_sessions(id) ON DELETE CASCADE,
+	ordinal INTEGER NOT NULL,
+	event_type TEXT NOT NULL,
+	stream TEXT NOT NULL DEFAULT 'protocol' CHECK (stream IN ('protocol', 'stderr')),
+	payload_json TEXT NOT NULL DEFAULT '{}',
+	created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+	UNIQUE(session_id, ordinal)
+) STRICT;
+
+CREATE INDEX idx_concierge_session_events_session_ordinal ON concierge_session_events(session_id, ordinal);
+CREATE INDEX idx_concierge_session_events_type ON concierge_session_events(event_type);
+
+CREATE TABLE concierge_memories (
+	id TEXT PRIMARY KEY,
+	slug TEXT NOT NULL UNIQUE,
+	relative_path TEXT NOT NULL,
+	kind TEXT NOT NULL DEFAULT 'note' CHECK (kind IN ('project', 'decision', 'person', 'reference', 'work-log', 'note')),
+	title TEXT NOT NULL DEFAULT '',
+	summary TEXT NOT NULL DEFAULT '',
+	body TEXT NOT NULL DEFAULT '',
+	projects_json TEXT NOT NULL DEFAULT '[]',
+	content_hash TEXT NOT NULL,
+	file_mtime_ms INTEGER NOT NULL DEFAULT 0,
+	created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+	updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+) STRICT;
+
+CREATE INDEX idx_concierge_memories_kind ON concierge_memories(kind);
+CREATE INDEX idx_concierge_memories_updated_at ON concierge_memories(updated_at);
+
+CREATE VIRTUAL TABLE concierge_memories_fts USING fts5(
+	slug UNINDEXED,
+	title,
+	summary,
+	body,
+	tokenize = 'unicode61 remove_diacritics 2'
+);
+`,
+	},
 ];
 
 /** Highest declared migration version embedded in this build. */

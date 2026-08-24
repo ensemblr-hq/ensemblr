@@ -552,6 +552,7 @@ describe('agent-control port adapters: conversation naming', () => {
 describe('agent-control port adapters: branch naming', () => {
 	const origin = {
 		delegation: 'ensemblr' as const,
+		concierge: false,
 		depth: 0,
 		parentSessionId: null,
 		sessionId: 'sess-1',

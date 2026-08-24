@@ -12,12 +12,18 @@ import {
 
 const WORKSPACE = 'ws-1';
 const CWD = '/tmp/ws-1';
+const CONCIERGE_CWD = '/tmp/root/concierge';
 
 /**
  * Builds the integration with a real origin registry, so depth comes from actual
  * lineage rather than a stub that could agree with the code by construction.
  */
-const setup = (options: { markedSubAgent?: readonly string[] } = {}) => {
+const setup = (
+	options: {
+		conciergeCwd?: string | null;
+		markedSubAgent?: readonly string[];
+	} = {},
+) => {
 	const marked = new Set(options.markedSubAgent ?? []);
 	let issued = 0;
 	const registry = createOriginRegistry({
@@ -33,13 +39,15 @@ const setup = (options: { markedSubAgent?: readonly string[] } = {}) => {
 			getPath: () => '/tmp/userData',
 		} as never,
 		originRegistry: registry,
+		resolveConciergeCwd: () =>
+			options.conciergeCwd === undefined ? CONCIERGE_CWD : options.conciergeCwd,
 		resolveWorkspaceCwd: (workspaceId) =>
 			workspaceId === WORKSPACE ? CWD : null,
 		getLanguage: () => 'en' as const,
 		getServerUrl: () => 'http://127.0.0.1:1234',
 		isSpawnedSubAgent: (agentSessionId) => marked.has(agentSessionId),
 	});
-	return { resolveAgentControlEnv };
+	return { registry, resolveAgentControlEnv };
 };
 
 describe('agent-control env: the role handed to a spawned agent', () => {
@@ -103,6 +111,54 @@ describe('agent-control env: the role handed to a spawned agent', () => {
 			workspaceId: WORKSPACE,
 		});
 		expect(env.ENSEMBLR_CONTROL_ROLE).toBe('orchestrator');
+	});
+});
+
+describe('agent-control env: the Concierge overlay', () => {
+	it('registers the Concierge under its own home with no workspace', () => {
+		const { registry, resolveAgentControlEnv } = setup();
+		const env = resolveAgentControlEnv({
+			concierge: true,
+			sessionId: 'concierge-1',
+			species: 'claude',
+			workspaceId: '',
+		});
+		expect(env.ENSEMBLR_CONTROL_ROLE).toBe('concierge');
+		expect(env.ENSEMBLR_CONTROL_URL).toBe('http://127.0.0.1:1234');
+		const origin = registry.resolveByToken(
+			env.ENSEMBLR_CONTROL_TOKEN as string,
+		);
+		expect(origin?.concierge).toBe(true);
+		expect(origin?.workspaceCwd).toBe(CONCIERGE_CWD);
+		expect(origin?.workspaceId).toBe('');
+		expect(origin?.species).toBe('claude');
+	});
+
+	// A Concierge is never on the lineage axis, so a stray marker under its
+	// session id must not demote it to a sub-agent playbook and tool list.
+	it('outranks a sub-agent marker carrying its session id', () => {
+		const { resolveAgentControlEnv } = setup({
+			markedSubAgent: ['concierge-1'],
+		});
+		expect(
+			resolveAgentControlEnv({
+				concierge: true,
+				sessionId: 'concierge-1',
+				species: 'pi',
+				workspaceId: '',
+			}).ENSEMBLR_CONTROL_ROLE,
+		).toBe('concierge');
+	});
+
+	it('returns no overlay before the root directory is known', () => {
+		const { resolveAgentControlEnv } = setup({ conciergeCwd: null });
+		expect(
+			resolveAgentControlEnv({
+				concierge: true,
+				sessionId: 'concierge-1',
+				workspaceId: '',
+			}),
+		).toEqual({});
 	});
 });
 

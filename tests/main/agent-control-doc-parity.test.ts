@@ -6,6 +6,8 @@ import {
 	AGENT_CONTROL_OPS,
 	type AgentControlOp,
 	argKeysForOp,
+	CONCIERGE_ONLY_OPS,
+	CONCIERGE_WITHHELD_OPS,
 	isSpawnOp,
 	isWriteOp,
 	SUBAGENT_UNUSABLE_OPS,
@@ -28,11 +30,18 @@ const PARAGRAPHS = paragraphsIn(DOC);
 const DOC_TOOLS = parseToolReference(DOC);
 const DOC_TOOLS_BY_NAME = new Map(DOC_TOOLS.map((tool) => [tool.name, tool]));
 
-const CHAT_TAB_ONLY_OPS = withheldControlOps({
-	delegation: 'ensemblr',
-	hasChatTab: false,
-	role: 'orchestrator',
-});
+// The chat-tab axis alone: `withheldControlOps` folds in the Concierge-only ops
+// as well, and those are withheld from every workspace agent whether or not it
+// has a tab, so counting them here would document them under the wrong reason.
+const CHAT_TAB_ONLY_OPS = new Set(
+	[
+		...withheldControlOps({
+			delegation: 'ensemblr',
+			hasChatTab: false,
+			role: 'orchestrator',
+		}),
+	].filter((op) => !CONCIERGE_ONLY_OPS.has(op)),
+);
 
 const DENIED_OPS = AGENT_CONTROL_OPS.filter(
 	(op) => subAgentControlOpDenial(op) !== null,
@@ -143,6 +152,8 @@ const gateFor = (op: AgentControlOp): readonly string[] =>
 const withheldFor = (op: AgentControlOp): readonly string[] =>
 	[
 		...(CHAT_TAB_ONLY_OPS.has(op) ? ['no chat tab'] : []),
+		...(CONCIERGE_ONLY_OPS.has(op) ? ['workspace agent'] : []),
+		...(CONCIERGE_WITHHELD_OPS.has(op) ? ['Concierge'] : []),
 		...(subAgentControlOpDenial(op) ? ['sub-agent'] : []),
 		...(SUBAGENT_UNUSABLE_OPS.has(op) ? ['sub-agent*'] : []),
 	].sort();

@@ -120,7 +120,27 @@ describe('withheldControlOps: the other half of the same choice', () => {
 			role: 'orchestrator',
 		});
 
-		expect(withheld.size).toBe(0);
+		for (const op of SPAWN_OPS) {
+			expect(withheld.has(op)).toBe(false);
+		}
+	});
+
+	it('withholds the Concierge-only ops from a workspace agent', () => {
+		const withheld = withheldControlOps({
+			delegation: 'ensemblr',
+			hasChatTab: true,
+			role: 'orchestrator',
+		});
+
+		// Not a denial the agent could recover from by phrasing the call
+		// differently: it has a workspace, so navigating to another one, cutting a
+		// new one, and searching a memory index it does not have are all
+		// meaningless rather than merely forbidden.
+		expect([...withheld].toSorted()).toEqual([
+			'createWorkspace',
+			'focusWorkspace',
+			'recallMemory',
+		]);
 	});
 });
 

@@ -192,7 +192,7 @@ export function DashboardBoard() {
 				/>
 			</header>
 			<BoardWorkspaceMenuProvider controller={workspaceMenu}>
-				<div className='min-h-0 flex-1 overflow-x-auto p-4'>
+				<div className='sleek-scrollbar min-h-0 flex-1 overflow-x-auto p-4'>
 					<div className='mx-auto flex h-full w-max gap-3'>
 						{columns.map((column) => (
 							<BoardColumn

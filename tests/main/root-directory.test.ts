@@ -139,17 +139,20 @@ test('creates the default temp-home root and managed directories', (t) => {
 		snapshot.archivedContextsPath,
 		path.join(expectedRoot, 'archived-contexts'),
 	);
+	assert.equal(snapshot.conciergePath, path.join(expectedRoot, 'concierge'));
 	assert.deepEqual(
 		snapshot.createdPaths.sort(),
 		[
 			expectedRoot,
 			path.join(expectedRoot, 'archived-contexts'),
+			path.join(expectedRoot, 'concierge'),
 			path.join(expectedRoot, 'repos'),
 			path.join(expectedRoot, 'workspaces'),
 		].sort(),
 	);
 	assert.deepEqual(readdirSync(expectedRoot).sort(), [
 		'archived-contexts',
+		'concierge',
 		'repos',
 		'workspaces',
 	]);
@@ -281,6 +284,7 @@ test('ignores harmless macOS root metadata when creating managed directories', (
 	assert.deepEqual(readdirSync(rootPath).sort(), [
 		'.DS_Store',
 		'archived-contexts',
+		'concierge',
 		'repos',
 		'workspaces',
 	]);
@@ -318,7 +322,7 @@ test('warns about existing managed content as a shared-looking root', (t) => {
 		).length,
 		2,
 	);
-	assert.deepEqual(snapshot.createdPaths, []);
+	assert.deepEqual(snapshot.createdPaths, [path.join(rootPath, 'concierge')]);
 });
 
 test('persists and upserts current root metadata in SQLite', (t) => {
@@ -451,7 +455,7 @@ test('previews a root switch without creating missing managed directories', (t) 
 		preview.diagnostics.filter(
 			(diagnostic) => diagnostic.code === 'managed-directory-missing',
 		).length,
-		3,
+		4,
 	);
 	assert.equal(
 		preview.diagnostics.every((diagnostic) => diagnostic.severity !== 'error'),
@@ -493,6 +497,7 @@ test('applies root switch, preserves old root contents, and reconciles new root'
 	assert.equal(existsSync(oldMarker), true);
 	assert.deepEqual(readdirSync(nextRoot).sort(), [
 		'archived-contexts',
+		'concierge',
 		'repos',
 		'workspaces',
 	]);

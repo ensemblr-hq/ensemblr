@@ -7,6 +7,7 @@ import type { ArchiveApi } from './archive-lifecycle';
 import type { ChatTabApi } from './chat-tab';
 import type { CheckpointApi } from './checkpoint';
 import type { CloneApi } from './clone';
+import type { ConciergeApi } from './concierge';
 import type { DictationApi } from './dictation';
 import type { EnvironmentApi } from './environment';
 import type { GithubApi } from './github';
@@ -50,6 +51,7 @@ export interface EnsemblrApi
 		AgentSessionApi,
 		ChatTabApi,
 		CloneApi,
+		ConciergeApi,
 		ArchiveApi,
 		RootDirectoryApi,
 		EnvironmentApi,

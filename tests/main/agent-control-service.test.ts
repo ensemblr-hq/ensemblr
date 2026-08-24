@@ -8,7 +8,10 @@ import {
 	createOriginRegistry,
 	type GuardrailConfig,
 } from '../../src/main/agent-control/index.ts';
-import { PLAN_REFINEMENT_DIRECTIVE } from '../../src/shared/agent-control.ts';
+import {
+	CONCIERGE_AWARENESS,
+	PLAN_REFINEMENT_DIRECTIVE,
+} from '../../src/shared/agent-control.ts';
 import type { AppLanguage } from '../../src/shared/i18n.ts';
 import type { PermissionMode } from '../../src/shared/permissions.ts';
 
@@ -115,6 +118,7 @@ const makePorts = (
 		focusTab: vi.fn(),
 		focusDockTab: vi.fn(),
 		focusPanel: vi.fn(),
+		focusWorkspace: vi.fn(),
 	},
 	board: {
 		setWorkspaceStatus: vi.fn(),
@@ -209,6 +213,7 @@ const makePorts = (
 
 const setup = (
 	options: {
+		concierge?: boolean;
 		ports?: AgentControlPorts;
 		guardrails?: Partial<GuardrailConfig>;
 		species?: AgentSpecies;
@@ -218,7 +223,8 @@ const setup = (
 	const registry = createOriginRegistry({ generateToken: () => 'tok-caller' });
 	registry.register({
 		sessionId: 'caller',
-		workspaceId: 'ws',
+		workspaceId: options.concierge ? '' : 'ws',
+		concierge: options.concierge ?? false,
 		workspaceCwd: '/ws',
 		species: options.species ?? 'pi',
 	});
@@ -435,6 +441,36 @@ describe('agent-control service: the deadline on a non-blocking op', () => {
 });
 
 describe('agent-control service: review comments', () => {
+	// Both ops gained `workspaceId` so the Concierge can review a workspace it
+	// does not live in, which retired the schema-level rejection that used to
+	// stop a workspace agent naming another one. This is where that check landed.
+	it.each(['addDiffComments', 'resolveDiffComments'] as const)(
+		'refuses a workspace agent that names another workspace on %s',
+		async (op) => {
+			const ports = makePorts();
+			const { service } = setup({ ports });
+
+			const result = await service.invoke({
+				op,
+				token: 'tok-caller',
+				rawArgs:
+					op === 'addDiffComments'
+						? {
+								comments: [{ body: 'nit', filePath: 'src/a.ts' }],
+								workspaceId: 'ws-other',
+							}
+						: { commentIds: ['c-1'], workspaceId: 'ws-other' },
+			});
+
+			expect(result.ok).toBe(false);
+			if (!result.ok) {
+				expect(result.code).toBe('denied-scope');
+			}
+			expect(ports.review.addComments).not.toHaveBeenCalled();
+			expect(ports.review.resolveComments).not.toHaveBeenCalled();
+		},
+	);
+
 	// The comment roll-up lives in Checks, so the port pulls the user there
 	// rather than leaving the behaviour to a model remembering to focus.
 	it('lands the user in Checks after filing comments', async () => {
@@ -1858,10 +1894,10 @@ describe('agent-control service: review', () => {
 		});
 	});
 
-	// The strict schema is what makes the workspace unspoofable. This is the
+	// `workspaceId` is the Concierge's argument, not everyone's. This is the
 	// assertion that would have caught the unscoped UPDATE the repository used to
 	// run: even a caller that names another workspace never reaches the port.
-	it('refuses a resolve that tries to name its own workspace', async () => {
+	it('refuses a resolve that names another workspace', async () => {
 		const ports = makePorts();
 		const { service } = setup({ ports });
 		const result = await service.invoke({
@@ -1871,7 +1907,7 @@ describe('agent-control service: review', () => {
 		});
 		expect(result.ok).toBe(false);
 		if (!result.ok) {
-			expect(result.code).toBe('invalid-args');
+			expect(result.code).toBe('denied-scope');
 		}
 		expect(ports.review.resolveComments).not.toHaveBeenCalled();
 	});
@@ -2192,6 +2228,31 @@ describe('agent-control service: chat-tab ops by species', () => {
 		}
 	});
 
+	// The Concierge runs on the same runtimes a chat tab does, so the species axis
+	// reports a tab it has never had. Left to that axis alone, both calls reached
+	// the services and came back `not-found` and `internal` — two errors in the
+	// timeline on a turn that owed no bookkeeping at all.
+	it.each(['setName', 'setSummary'] as const)(
+		'denies %s to the Concierge, which has no tab to act on',
+		async (op) => {
+			const ports = makePorts();
+			const { service } = setup({ concierge: true, ports });
+
+			const result = await service.invoke({
+				op,
+				token: 'tok-caller',
+				rawArgs: CHAT_TAB_CALLS[op],
+			});
+
+			expect(result.ok).toBe(false);
+			if (!result.ok) {
+				expect(result.code).toBe('denied-scope');
+			}
+			expect(ports.conversations.setName).not.toHaveBeenCalled();
+			expect(ports.sessionNaming.setSummary).not.toHaveBeenCalled();
+		},
+	);
+
 	it('drives the chat-tab ports for a Claude caller, not just the gate', async () => {
 		const ports = makePorts({ planning: true });
 		const { service } = setup({ ports, species: 'claude' });
@@ -2268,6 +2329,35 @@ describe('agent-control service: chat-tab ops by species', () => {
 		}
 	});
 
+	// Pi holds no Concierge playbook of its own, so the brief is the only way one
+	// reaches it — without this a Concierge runs on the orchestrator copy.
+	it('sends the Concierge its playbook with the brief', async () => {
+		const { service } = setup({ concierge: true, ports: makePorts() });
+
+		const result = await service.invoke({
+			op: 'getSessionBrief',
+			token: 'tok-caller',
+			rawArgs: {},
+		});
+
+		expect(result).toMatchObject({
+			data: { rolePlaybook: CONCIERGE_AWARENESS },
+			ok: true,
+		});
+	});
+
+	it('sends a workspace agent no playbook, leaving its own copy in place', async () => {
+		const { service } = setup({ ports: makePorts() });
+
+		const result = await service.invoke({
+			op: 'getSessionBrief',
+			token: 'tok-caller',
+			rawArgs: {},
+		});
+
+		expect(result).toMatchObject({ data: { rolePlaybook: null }, ok: true });
+	});
+
 	it('carries no refinement directive once the user turned Plan Mode off', async () => {
 		const ports = makePorts({ planning: false, planSubmitted: true });
 		const { service } = setup({ ports });
@@ -2339,5 +2429,263 @@ describe('agent-control service: audience resolution', () => {
 			hasChatTab: false,
 			role: 'orchestrator',
 		});
+	});
+});
+
+/**
+ * A Concierge origin plus the ports a supervising turn actually reaches: a home
+ * to check writes against, and a workspace list to resolve a named id in.
+ */
+const setupConcierge = (
+	workspaces: readonly { cwd: string; workspaceId: string }[] = [
+		{ cwd: '/repos/bruckner', workspaceId: 'ws-a' },
+		{ cwd: '/repos/other', workspaceId: 'ws' },
+	],
+) => {
+	const ports = makePorts();
+	const conciergePorts: AgentControlPorts = {
+		...ports,
+		concierge: { homePath: () => '/root/concierge' },
+		workspaces: { listWorkspaces: vi.fn().mockResolvedValue(workspaces) },
+	};
+	return {
+		...setup({ concierge: true, ports: conciergePorts }),
+		ports: conciergePorts,
+	};
+};
+
+// The Concierge is read-only in every workspace and delegates to change
+// anything, so these are the two halves of that: the tool policy the extension
+// asks about on every write, and the `workspaceId` every acting op needs because
+// the caller's own is the empty string.
+describe('agent-control service: the Concierge boundary', () => {
+	it('admits a write into the Concierge home', async () => {
+		const { service } = setupConcierge();
+
+		const result = await service.invoke({
+			op: 'checkPlanModeTool',
+			token: 'tok-caller',
+			rawArgs: { path: 'memory/a-fact.md', tool: 'write' },
+		});
+
+		expect(result).toMatchObject({ data: { blocked: false }, ok: true });
+	});
+
+	it.each([
+		['a workspace file', '/repos/bruckner/src/main/main.ts'],
+		['a home-relative escape', '~/.ssh/authorized_keys'],
+		['a variable the guard cannot resolve', '$HOME/notes.md'],
+	])('blocks a write to %s', async (_label, path) => {
+		const { service } = setupConcierge();
+
+		const result = await service.invoke({
+			op: 'checkPlanModeTool',
+			token: 'tok-caller',
+			rawArgs: { path, tool: 'write' },
+		});
+
+		expect(result).toMatchObject({ data: { blocked: true }, ok: true });
+	});
+
+	// The path is the whole question for a Concierge write, and the extension not
+	// sending it is what made every one of them — including into its own
+	// `memory/` — come back blocked.
+	it('blocks a write whose path never arrived', async () => {
+		const { service } = setupConcierge();
+
+		const result = await service.invoke({
+			op: 'checkPlanModeTool',
+			token: 'tok-caller',
+			rawArgs: { tool: 'write' },
+		});
+
+		expect(result).toMatchObject({ data: { blocked: true }, ok: true });
+	});
+
+	it('opens a delegated conversation in the workspace it names', async () => {
+		const { ports, service } = setupConcierge();
+
+		const result = await service.invoke({
+			op: 'startConversation',
+			token: 'tok-caller',
+			rawArgs: { prompt: 'Fix the composer.', workspaceId: 'ws-a' },
+		});
+
+		expect(result.ok).toBe(true);
+		expect(ports.conversations.startConversation).toHaveBeenCalledWith(
+			expect.objectContaining({
+				workspaceCwd: '/repos/bruckner',
+				workspaceId: 'ws-a',
+			}),
+		);
+	});
+
+	// Without the argument the spawn landed on workspace `''`, whose cwd resolves
+	// to nothing — so the child came up with no control token, no role, and no
+	// guard at all.
+	it('refuses to delegate without a workspace to delegate into', async () => {
+		const { ports, service } = setupConcierge();
+
+		const result = await service.invoke({
+			op: 'startConversation',
+			token: 'tok-caller',
+			rawArgs: { prompt: 'Fix the composer.' },
+		});
+
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.code).toBe('invalid-args');
+		}
+		expect(ports.conversations.startConversation).not.toHaveBeenCalled();
+	});
+
+	it.each([
+		['startConversation', { prompt: 'go', workspaceId: 'ws-gone' }],
+		['setWorkspaceStatus', { status: 'in-review', workspaceId: 'ws-gone' }],
+		['focusWorkspace', { workspaceId: 'ws-gone' }],
+		[
+			'addDiffComments',
+			{
+				comments: [{ body: 'look here', filePath: 'a.ts' }],
+				workspaceId: 'ws-gone',
+			},
+		],
+	] as const)(
+		'refuses %s against a workspace that does not exist',
+		async (op, rawArgs) => {
+			const { ports, service } = setupConcierge();
+
+			const result = await service.invoke({ op, rawArgs, token: 'tok-caller' });
+
+			expect(result.ok).toBe(false);
+			if (!result.ok) {
+				expect(result.code).toBe('not-found');
+			}
+			expect(ports.board.setWorkspaceStatus).not.toHaveBeenCalled();
+			expect(ports.review.addComments).not.toHaveBeenCalled();
+			expect(ports.focus.focusWorkspace).not.toHaveBeenCalled();
+		},
+	);
+
+	it.each(['addDiffComments', 'resolveDiffComments'] as const)(
+		'files %s against the workspace it names, not the empty one',
+		async (op) => {
+			const { ports, service } = setupConcierge();
+
+			const result = await service.invoke({
+				op,
+				token: 'tok-caller',
+				rawArgs:
+					op === 'addDiffComments'
+						? {
+								comments: [{ body: 'look here', filePath: 'a.ts' }],
+								workspaceId: 'ws-a',
+							}
+						: { commentIds: ['c-1'], workspaceId: 'ws-a' },
+			});
+
+			expect(result.ok).toBe(true);
+			const port =
+				op === 'addDiffComments'
+					? ports.review.addComments
+					: ports.review.resolveComments;
+			expect(port).toHaveBeenCalledWith(
+				expect.objectContaining({ workspaceId: 'ws-a' }),
+			);
+		},
+	);
+
+	it('focuses a tab in the workspace that owns it', async () => {
+		const { ports, service } = setupConcierge();
+
+		const result = await service.invoke({
+			op: 'focusTab',
+			token: 'tok-caller',
+			rawArgs: { chatTabId: 'tab-1' },
+		});
+
+		expect(result.ok).toBe(true);
+		expect(ports.focus.focusTab).toHaveBeenCalledWith({
+			chatTabId: 'tab-1',
+			workspaceId: 'ws',
+		});
+	});
+
+	it('focuses a script dock tab in the workspace it names', async () => {
+		const { ports, service } = setupConcierge();
+
+		const result = await service.invoke({
+			op: 'focusDockTab',
+			token: 'tok-caller',
+			rawArgs: { kind: 'run', workspaceId: 'ws-a' },
+		});
+
+		expect(result.ok).toBe(true);
+		expect(ports.focus.focusDockTab).toHaveBeenCalledWith({
+			dock: 'run',
+			workspaceId: 'ws-a',
+		});
+	});
+
+	// Answering with an empty list reads to the model as "that workspace has no
+	// tabs", which is a different claim from "you did not say which workspace".
+	it.each(['listTabs', 'listTerminals'] as const)(
+		'refuses %s rather than answering for the empty workspace',
+		async (op) => {
+			const { ports, service } = setupConcierge();
+
+			const result = await service.invoke({
+				op,
+				token: 'tok-caller',
+				rawArgs: {},
+			});
+
+			expect(result.ok).toBe(false);
+			if (!result.ok) {
+				expect(result.code).toBe('invalid-args');
+			}
+			expect(ports.tabs.listTabs).not.toHaveBeenCalled();
+			expect(ports.terminals.listTerminals).not.toHaveBeenCalled();
+		},
+	);
+
+	// Both used to act on workspace `''` and report `ok`: `openTab` created a tab
+	// nobody could see and spent spawn quota doing it, `listRunScripts` answered
+	// with an empty list.
+	it.each([
+		['openTab', { filePath: 'a.ts', variant: 'file' }],
+		['listRunScripts', {}],
+	] as const)('denies %s to the Concierge outright', async (op, rawArgs) => {
+		const { ports, service } = setupConcierge();
+
+		const result = await service.invoke({ op, rawArgs, token: 'tok-caller' });
+
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.code).toBe('denied-scope');
+		}
+		expect(ports.tabs.openNonChatTab).not.toHaveBeenCalled();
+		expect(ports.terminals.listRunScripts).not.toHaveBeenCalled();
+	});
+
+	// The exemption that lets a Concierge act across workspaces must not become a
+	// way for a workspace agent to name another one.
+	it('still refuses a workspace agent that names another workspace', async () => {
+		const { ports, service } = setup({ ports: makePorts() });
+
+		const result = await service.invoke({
+			op: 'addDiffComments',
+			token: 'tok-caller',
+			rawArgs: {
+				comments: [{ body: 'look here', filePath: 'a.ts' }],
+				workspaceId: 'ws-other',
+			},
+		});
+
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.code).toBe('denied-scope');
+		}
+		expect(ports.review.addComments).not.toHaveBeenCalled();
 	});
 });

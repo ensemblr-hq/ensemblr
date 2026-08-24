@@ -1849,13 +1849,19 @@ export default interface Resources {
 			title: 'Integrations';
 		};
 		models: {
+			'concierge-model': {
+				'aria-label': 'Concierge model';
+				description: 'Model the Concierge runs on. It works above every project rather than inside one, so it can differ from the chat default. Changing it takes effect on the next turn.';
+				label: 'Concierge model';
+				'thinking-aria-label': 'Concierge thinking level';
+			};
 			'default-model': {
 				'aria-label': 'Default chat model';
 				description: 'Model used when you start a new chat. Falls back to the agent-reported default when unset.';
 				label: 'Default model';
 				'thinking-aria-label': 'Default thinking level';
 			};
-			description: "Agent models and thinking-level defaults for new chats and reviews. Sourced from each configured runtime's capability discovery.";
+			description: "Agent models and thinking-level defaults for new chats, reviews, and the Concierge. Sourced from each configured runtime's capability discovery.";
 			'discovery-failed': 'Model discovery failed: {{error}}.';
 			loading: 'Loading models…';
 			'no-models': 'No models';
@@ -2261,6 +2267,11 @@ export default interface Resources {
 				'composer-toggle-dictation': 'Start or stop dictation';
 				'composer-toggle-model-picker': 'Toggle model picker';
 				'composer-toggle-plan-mode': 'Toggle plan mode';
+				'concierge-clear': 'Clear the Concierge’s context';
+				'concierge-close': 'Close the Concierge';
+				'concierge-focus-composer': 'Focus the Concierge composer';
+				'concierge-toggle': 'Open or close the Concierge';
+				'concierge-toggle-fullscreen': 'Maximize or restore the Concierge';
 				'dialog-submit': 'Submit dialog form';
 				'diff-comment-submit': 'Submit diff comment';
 				'files-search': 'Open file search';
@@ -2286,6 +2297,7 @@ export default interface Resources {
 			scope: {
 				autocomplete: 'Autocomplete';
 				composer: 'Composer';
+				concierge: 'Concierge';
 				dialog: 'Dialogs';
 				global: 'Global';
 				menu: 'Menus';
@@ -2508,6 +2520,39 @@ export default interface Resources {
 				'aria-label': 'Upload attachment';
 			};
 		};
+		concierge: {
+			composer: {
+				label: 'Message the Concierge';
+				placeholder: 'Ask across every project…';
+				'prompt-failed': 'The message could not be prepared for sending.';
+				'send-tooltip': 'Send message';
+				'stop-tooltip': 'Stop the turn';
+			};
+			launcher: {
+				open: 'Open the Concierge';
+			};
+			panel: {
+				clear: 'Clear context and start over';
+				'collapse-sidebar': 'Hide the sidebar';
+				'expand-sidebar': 'Show the sidebar';
+				label: 'Concierge';
+				maximize: 'Maximize';
+				pressure: 'Context is filling up. Clearing now writes what was learned to memory first.';
+				'pressure-clear': 'Clear now';
+				'pressure-dismiss': 'Not yet';
+				restore: 'Restore panel';
+				title: 'Concierge';
+			};
+			session: {
+				'not-open': 'The Concierge session is not open.';
+				'reopen-failed': 'The Concierge session could not be reopened.';
+				'unknown-failure': 'Something went wrong in the Concierge.';
+			};
+			timeline: {
+				empty: 'Ask about any project, and the Concierge can read it, spawn agents into it, and remember what came of that.';
+				starting: 'Waking the Concierge';
+			};
+		};
 		'context-usage': {
 			'aria-label': 'Context usage';
 			'aria-label-with-plan': 'Context and plan usage';
@@ -2529,6 +2574,10 @@ export default interface Resources {
 				done: 'Closed a tab';
 				running: 'Closing a tab';
 			};
+			'create-workspace': {
+				done: 'Created a workspace';
+				running: 'Creating a workspace';
+			};
 			'exit-plan-mode': {
 				done: 'Submitted a plan';
 				running: 'Submitting a plan';
@@ -2544,6 +2593,10 @@ export default interface Resources {
 			'focus-tab': {
 				done: 'Focused a tab';
 				running: 'Focusing a tab';
+			};
+			'focus-workspace': {
+				done: 'Opened a workspace';
+				running: 'Opening a workspace';
 			};
 			'get-conversation-status': {
 				done: 'Checked a sub-agent';
@@ -2624,6 +2677,10 @@ export default interface Resources {
 			'read-terminal-output': {
 				done: 'Read terminal output';
 				running: 'Reading terminal output';
+			};
+			'recall-memory': {
+				done: 'Recalled memory';
+				running: 'Searching memory';
 			};
 			'resolve-diff-comments': {
 				done: 'Resolved review comments';

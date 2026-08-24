@@ -23,7 +23,7 @@ Values sit under an `app` key, one object per pane:
 | Pane | Key in `config.json` |
 | --- | --- |
 | General | `app.general` |
-| Models | `app.models` |
+| Models | `app.models`, plus `app.concierge` for the Concierge's own runtime |
 | Git | `app.git` |
 | Appearance | `app.appearance` |
 | Experimental | `app.experimental` |
@@ -133,9 +133,10 @@ or `error` for the path you choose.
 
 ### Models
 
-Model and thinking-level defaults for new chats and for the Review action.
-Models come from each configured runtime's own capability discovery, so the list
-reflects what your Pi and Claude Code installations actually offer.
+Model and thinking-level defaults for new chats, for the Review action, and for
+the Concierge. Models come from each configured runtime's own capability
+discovery, so the list reflects what your Pi and Claude Code installations
+actually offer.
 
 | Setting | What it does | Default |
 | --- | --- | --- |
@@ -143,20 +144,67 @@ reflects what your Pi and Claude Code installations actually offer.
 | Default thinking level | Reasoning level paired with the default model. | Unset |
 | Review model | Model used by the Review action on a workspace. | Unset |
 | Review thinking level | Reasoning level paired with the review model. | Unset |
-| Model visibility | Hide models you don't use from the model picker and from the two selects above. | Nothing hidden |
+| Concierge model | Model the Concierge runs on. Stored under `app.concierge`, not `app.models`. | Unset |
+| Concierge thinking level | Reasoning level paired with the Concierge model. | Unset |
+| Model visibility | Hide models you don't use from the model picker and from the selects above. | Nothing hidden |
 
 Thinking levels are `No thinking`, `Minimal`, `Low`, `Medium`, `High`,
 `Extra high`, and `Max`. Which of them a given model offers depends on the
 runtime — Pi steers *thinking*, Claude Code steers *effort*.
 
+The Concierge works above every project rather than inside one, so its model is
+its own setting rather than the chat default — the model that suits supervising
+a dozen workspaces is not the one that suits editing a file in any of them. It
+takes effect on the next turn; picking a model from the other runtime reopens
+the Concierge on that runtime, because a model belongs to exactly one.
+
 Visibility notes:
 
-- Hiding the model currently selected as default or review switches that
-  selection to the first available model.
+- Hiding the model currently selected as default, review, or Concierge switches
+  that selection to the first available model.
 - At least one model must stay visible; the control locks when you reach one.
 - You can hide a whole provider's models in one action.
 
 See [6. Agents](./06-agents.md) for what the runtimes differ on.
+
+### Concierge settings
+
+The Concierge is an app-level agent that works above every project rather than
+inside one — [6. Agents](./06-agents.md#the-concierge) covers what it is and what
+it may do. Everything about the runtime it opens on is stored under
+`app.concierge`, a top-level sibling of `app.models` rather than a key inside it:
+
+| Key | What it does | Default |
+| --- | --- | --- |
+| `app.concierge.provider` | Which runtime backs it — `pi` or `claude`. Set for you when you pick the Concierge model, because a model belongs to exactly one runtime. | `pi` |
+| `app.concierge.model` | Model the Concierge runs on. Unset falls back to the runtime-reported default. | unset |
+| `app.concierge.thinkingLevel` | Reasoning level paired with that model. Unset falls back to the runtime-reported default. | unset |
+| `app.concierge.autoClearAtPercent` | Share of the context window at which the Concierge offers to clear itself. | `0.8` |
+
+The first three are what the two Concierge controls in the Models pane above
+write; `provider` follows from the model you pick rather than being chosen
+separately. **`autoClearAtPercent` has no control at all** — it is edited in
+`config.json` and picked up without a restart, like every other key in the file.
+
+It is a **fraction between 0 and 1**, not a percentage, despite the name: `0.8`
+means 80% of the window. Anything outside that range is rejected and the default
+is used instead. Crossing the threshold raises a dismissible banner inside the
+Concierge panel offering **Clear now** or **Not yet** — nothing is cleared until
+you press the button, and clearing runs a memory pass first so what the
+conversation established is written to disk before the transcript goes. Set it to
+`0` and the banner never appears; clearing stays entirely yours to trigger with
+`⌘⇧K` or View ▸ Concierge ▸ **Clear Context…**.
+
+```json
+{
+	"app": {
+		"concierge": {
+			"provider": "claude",
+			"autoClearAtPercent": 0.9
+		}
+	}
+}
+```
 
 ### Providers
 

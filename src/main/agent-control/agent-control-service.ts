@@ -16,14 +16,17 @@ import type {
 	CloseTabArgs,
 	ControlAudience,
 	ConversationRef,
+	CreateWorkspaceArgs,
 	ExitPlanModeArgs,
 	FocusDockTabArgs,
 	FocusPanelArgs,
 	FocusTabArgs,
+	FocusWorkspaceArgs,
 	GetDiffCommentsArgs,
 	GetLastMessageResult,
 	GetSessionBriefResult,
 	GetWorkspaceDiffArgs,
+	GetWorkspaceStatusArgs,
 	LaunchHarnessArgs,
 	LinearCreateCommentArgs,
 	LinearGetIssueArgs,
@@ -39,6 +42,7 @@ import type {
 	ReadConversationArgs,
 	ReadTerminalOutputArgs,
 	ReadTerminalOutputResult,
+	RecallMemoryArgs,
 	ResolveDiffCommentsArgs,
 	SendFollowUpArgs,
 	SetBranchNameArgs,
@@ -64,6 +68,8 @@ import {
 	buildLanguageDirective,
 	buildLinkedIssueDirective,
 	buildSessionBriefNudge,
+	CONCIERGE_AWARENESS,
+	conciergeControlOpDenial,
 	isWriteOp,
 	PLAN_REFINEMENT_DIRECTIVE,
 	resolveAgentRole,
@@ -73,6 +79,7 @@ import {
 } from '../../shared/agent-control.ts';
 import { classifyPermissionAction } from '../../shared/permissions.ts';
 import {
+	evaluateConciergeTool,
 	evaluatePlanModeTool,
 	planModeControlOpDenial,
 	planModeFollowUpDenial,
@@ -486,6 +493,13 @@ function outOfScope(
 	if (actualWorkspaceId === null) {
 		return fail('not-found', 'Target resource does not exist.');
 	}
+	// The Concierge is the deliberate exception to "writes act only on the
+	// caller's own workspace": it has no workspace, and supervising every project
+	// is what it is for. Its own boundary is elsewhere — the tool policy that
+	// keeps every file write inside the Concierge home.
+	if (origin.concierge) {
+		return null;
+	}
 	if (actualWorkspaceId !== origin.workspaceId) {
 		return fail(
 			'denied-scope',
@@ -556,11 +570,18 @@ export function createAgentControlService({
 	 */
 	const resolveRole = async (
 		origin: AgentControlOrigin,
-	): Promise<AgentControlRole> =>
-		resolveAgentRole(
+	): Promise<AgentControlRole> => {
+		// Asked before the marker read, which costs a database round trip: a
+		// Concierge can never carry a sub-agent marker, so resolving one would be
+		// spending a query to learn something the origin already said.
+		if (origin.concierge) {
+			return 'concierge';
+		}
+		return resolveAgentRole(
 			await ports.conversations.isSpawnedSubAgent(origin.sessionId),
 			origin.depth,
 		);
+	};
 
 	/**
 	 * This turn's linked-issue directive, cut to what the caller may actually do to
@@ -602,6 +623,12 @@ export function createAgentControlService({
 		op: AgentControlOp,
 		origin: AgentControlOrigin,
 	): Promise<AgentControlResult<never> | null> => {
+		if (origin.concierge) {
+			const conciergeDenial = conciergeControlOpDenial(op);
+			return conciergeDenial === null
+				? null
+				: fail('denied-scope', conciergeDenial);
+		}
 		const denial = subAgentControlOpDenial(op);
 		if (denial === null) {
 			return null;
@@ -692,6 +719,74 @@ export function createAgentControlService({
 		);
 	};
 
+	/**
+	 * Resolves the workspace an op should act on, and its working directory.
+	 *
+	 * A workspace agent has exactly one and may not name another, so an explicit
+	 * `workspaceId` from it is refused rather than honoured — otherwise the
+	 * optional argument the Concierge needs would become a way around the scope
+	 * rule for everyone. The Concierge has none of its own, so it must name one,
+	 * and an op that names none is refused rather than defaulted into the empty
+	 * string, which every downstream service reads as a workspace that exists and
+	 * holds nothing.
+	 *
+	 * A named target is looked up in the workspace list rather than trusted, so an
+	 * id that no longer exists fails as `not-found` instead of writing a board row
+	 * nothing renders or reaching git with an empty path.
+	 *
+	 * An op that also names a tab or terminal passes that resource's owning
+	 * workspace as `owner`, which stands in for an argument the caller left out.
+	 * The two disagreeing is refused rather than resolved by precedence: whichever
+	 * won, the caller asked for the other one.
+	 * @param origin - Resolved caller identity.
+	 * @param named - The `workspaceId` the op's args carried, if any.
+	 * @param owner - Workspace owning the resource the op names, if it names one.
+	 * @returns The workspace id and cwd, or a failure envelope.
+	 */
+	const resolveTargetWorkspace = async (
+		origin: AgentControlOrigin,
+		named: string | undefined,
+		owner: string | null = null,
+	): Promise<
+		| { cwd: string; workspaceId: string }
+		| { failure: AgentControlResult<never> }
+	> => {
+		if (named && owner && named !== owner) {
+			return {
+				failure: fail(
+					'denied-scope',
+					'The tab or terminal you named lives in a different workspace than `workspaceId` does. Drop `workspaceId` — the resource already says which workspace it is in.',
+				),
+			};
+		}
+		const target = named ?? owner ?? null;
+		if (!origin.concierge) {
+			if (target && target !== origin.workspaceId) {
+				return {
+					failure: fail(
+						'denied-scope',
+						'Access is limited to the agent’s own workspace, so `workspaceId` may not name another one.',
+					),
+				};
+			}
+			return { cwd: origin.workspaceCwd, workspaceId: origin.workspaceId };
+		}
+		if (!target) {
+			return {
+				failure: fail(
+					'invalid-args',
+					'You have no workspace of your own, so this op needs an explicit `workspaceId`. `ensemblr_list_workspaces` returns the ids.',
+				),
+			};
+		}
+		const match = (await ports.workspaces.listWorkspaces()).find(
+			(workspace) => workspace.workspaceId === target,
+		);
+		return match
+			? { cwd: match.cwd, workspaceId: match.workspaceId }
+			: { failure: fail('not-found', 'No such workspace.') };
+	};
+
 	const handleSpawnChatTab = async (
 		origin: AgentControlOrigin,
 		args: SpawnChatTabArgs,
@@ -713,8 +808,14 @@ export function createAgentControlService({
 	 * another agent runtime, or none inferable at all — comes back as an argument
 	 * failure naming the runtime, because the calling agent can fix that on its
 	 * next turn and an `internal` envelope reads as a fault to retry verbatim.
+	 *
+	 * A Concierge delegates through this op and through nothing else, so the
+	 * workspace is an argument here rather than the caller's own: it has none, and
+	 * spawning into the empty string would put an agent with no control token and
+	 * no guard in a directory nobody is watching.
 	 * @param origin - Resolved caller identity.
-	 * @param args - Prompt, optional tab, model, thinking level, title, and wait flag.
+	 * @param args - Prompt, optional tab, model, thinking level, title, wait flag,
+	 *   and the workspace for a Concierge.
 	 * @param callerModel - The Pi extension's live-model hint, absent for MCP callers.
 	 * @param signal - Aborts when the spawning turn ends, so a `wait: true` poll
 	 *   stops instead of watching a child for a caller that has gone.
@@ -726,20 +827,29 @@ export function createAgentControlService({
 		callerModel: string | undefined,
 		signal: AbortSignal | undefined,
 	): Promise<AgentControlResult<unknown>> => {
+		let owner: string | null = null;
 		if (args.chatTabId) {
-			const owner = await ports.tabs.resolveTabWorkspace(args.chatTabId);
+			owner = await ports.tabs.resolveTabWorkspace(args.chatTabId);
 			const scoped = outOfScope(owner, origin);
 			if (scoped) {
 				return scoped;
 			}
+		}
+		const target = await resolveTargetWorkspace(
+			origin,
+			args.workspaceId,
+			owner,
+		);
+		if ('failure' in target) {
+			return target.failure;
 		}
 		const spawnDenied = evaluateSpawnGuard(origin);
 		if (spawnDenied) {
 			return spawnDenied;
 		}
 		const started = await ports.conversations.startConversation({
-			workspaceId: origin.workspaceId,
-			workspaceCwd: origin.workspaceCwd,
+			workspaceId: target.workspaceId,
+			workspaceCwd: target.cwd,
 			chatTabId: args.chatTabId,
 			prompt: args.prompt,
 			model: args.model,
@@ -888,8 +998,9 @@ export function createAgentControlService({
 	/**
 	 * Reports everything the Pi extension needs to assemble a turn's system
 	 * prompt in one round trip: whether the session is planning, what naming
-	 * upkeep it still owes, the rendered upkeep block to append, and the language
-	 * directive to append with it.
+	 * upkeep it still owes, the rendered upkeep block to append, the language
+	 * directive to append with it, and the role playbook when the caller's is one
+	 * the extension does not hold.
 	 * @param origin - Resolved caller identity.
 	 * @returns The session brief.
 	 */
@@ -905,6 +1016,7 @@ export function createAgentControlService({
 			nudge: buildSessionBriefNudge(naming, planMode),
 			planMode,
 			planRefinement: readPlanRefinement(origin),
+			rolePlaybook: origin.concierge ? CONCIERGE_AWARENESS : null,
 		} satisfies GetSessionBriefResult);
 	};
 
@@ -1144,6 +1256,14 @@ export function createAgentControlService({
 		return ok(created);
 	};
 
+	/**
+	 * Brings a chat tab forward, in the workspace that owns it rather than in the
+	 * caller's — the two are the same for a workspace agent, and the Concierge has
+	 * no workspace of its own to focus into.
+	 * @param origin - Resolved caller identity.
+	 * @param args - The tab to focus.
+	 * @returns Acknowledgement, or a scope failure.
+	 */
 	const handleFocusTab = async (
 		origin: AgentControlOrigin,
 		args: FocusTabArgs,
@@ -1153,59 +1273,220 @@ export function createAgentControlService({
 		if (scoped) {
 			return scoped;
 		}
+		const target = await resolveTargetWorkspace(origin, undefined, owner);
+		if ('failure' in target) {
+			return target.failure;
+		}
 		ports.focus.focusTab({
-			workspaceId: origin.workspaceId,
+			workspaceId: target.workspaceId,
 			chatTabId: args.chatTabId,
 		});
 		return ok({ ok: true });
 	};
 
+	/**
+	 * Brings a dock terminal forward. A `terminalId` names its own workspace, so
+	 * only the `kind` selector leaves a Concierge with nothing to focus into —
+	 * which is what `workspaceId` supplies.
+	 * @param origin - Resolved caller identity.
+	 * @param args - The terminal or script kind to focus, and the workspace for a Concierge.
+	 * @returns Acknowledgement, or a scope failure.
+	 */
 	const handleFocusDockTab = async (
 		origin: AgentControlOrigin,
 		args: FocusDockTabArgs,
 	): Promise<AgentControlResult<unknown>> => {
+		let owner: string | null = null;
 		if (args.terminalId) {
-			const owner = await ports.terminals.resolveTerminalWorkspace(
-				args.terminalId,
-			);
+			owner = await ports.terminals.resolveTerminalWorkspace(args.terminalId);
 			const scoped = outOfScope(owner, origin);
 			if (scoped) {
 				return scoped;
 			}
 		}
+		const target = await resolveTargetWorkspace(
+			origin,
+			args.workspaceId,
+			owner,
+		);
+		if ('failure' in target) {
+			return target.failure;
+		}
 		const dock = args.terminalId
 			? `terminal:${args.terminalId}`
 			: (args.kind as string);
-		ports.focus.focusDockTab({ workspaceId: origin.workspaceId, dock });
+		ports.focus.focusDockTab({ workspaceId: target.workspaceId, dock });
 		return ok({ ok: true });
 	};
 
-	const handleFocusPanel = (
+	/**
+	 * Resolves the workspace a listing answers for. Reads are not scope-limited —
+	 * an agent may inspect any open workspace — so a named id is honoured whoever
+	 * asked. Only the Concierge goes through the acting resolver, because the
+	 * workspace it would otherwise default to is the empty string, which the
+	 * listing ports answer with an empty array rather than an error.
+	 * @param origin - Resolved caller identity.
+	 * @param named - The `workspaceId` the op's args carried, if any.
+	 * @returns The workspace id to list, or a failure envelope.
+	 */
+	const resolveListWorkspace = async (
+		origin: AgentControlOrigin,
+		named: string | undefined,
+	): Promise<
+		{ workspaceId: string } | { failure: AgentControlResult<never> }
+	> =>
+		origin.concierge
+			? resolveTargetWorkspace(origin, named)
+			: { workspaceId: named ?? origin.workspaceId };
+
+	/**
+	 * Lists the tabs of the workspace the caller named, or of its own.
+	 * @param origin - Resolved caller identity.
+	 * @param args - The workspace to list, required of a Concierge.
+	 * @returns The tab rows, or a failure envelope.
+	 */
+	const handleListTabs = async (
+		origin: AgentControlOrigin,
+		args: ListTabsArgs,
+	): Promise<AgentControlResult<unknown>> => {
+		const target = await resolveListWorkspace(origin, args.workspaceId);
+		if ('failure' in target) {
+			return target.failure;
+		}
+		return ok(await ports.tabs.listTabs({ workspaceId: target.workspaceId }));
+	};
+
+	/**
+	 * Lists the terminals of the workspace the caller named, or of its own.
+	 * @param origin - Resolved caller identity.
+	 * @param args - The workspace to list, required of a Concierge.
+	 * @returns The terminal rows, or a failure envelope.
+	 */
+	const handleListTerminals = async (
+		origin: AgentControlOrigin,
+		args: ListTerminalsArgs,
+	): Promise<AgentControlResult<unknown>> => {
+		const target = await resolveListWorkspace(origin, args.workspaceId);
+		if ('failure' in target) {
+			return target.failure;
+		}
+		return ok(
+			await ports.terminals.listTerminals({ workspaceId: target.workspaceId }),
+		);
+	};
+
+	const handleFocusPanel = async (
 		origin: AgentControlOrigin,
 		args: FocusPanelArgs,
-	): AgentControlResult<unknown> => {
+	): Promise<AgentControlResult<unknown>> => {
+		const target = await resolveTargetWorkspace(origin, args.workspaceId);
+		if ('failure' in target) {
+			return target.failure;
+		}
 		ports.focus.focusPanel({
-			workspaceId: origin.workspaceId,
+			workspaceId: target.workspaceId,
 			panel: args.panel,
 		});
 		return ok({ ok: true });
 	};
 
-	const handleSetWorkspaceStatus = (
+	/**
+	 * Moves the app to a workspace. Concierge-only, because every other caller is
+	 * already in the one workspace it can address.
+	 * @param origin - Resolved caller identity.
+	 * @param args - The workspace to navigate to.
+	 * @returns Acknowledgement, or a scope failure.
+	 */
+	const handleFocusWorkspace = async (
+		origin: AgentControlOrigin,
+		args: FocusWorkspaceArgs,
+	): Promise<AgentControlResult<unknown>> => {
+		const target = await resolveTargetWorkspace(origin, args.workspaceId);
+		if ('failure' in target) {
+			return target.failure;
+		}
+		ports.focus.focusWorkspace({ workspaceId: target.workspaceId });
+		return ok({ ok: true });
+	};
+
+	/**
+	 * Cuts a new workspace off a project, so the Concierge can start work that has
+	 * nowhere to live yet rather than asking the user to make the worktree by hand.
+	 * @param origin - Resolved caller identity.
+	 * @param args - Project to fork, and the optional name, base branch, and issue.
+	 * @returns The created workspace, or a failure envelope.
+	 */
+	const handleCreateWorkspace = async (
+		origin: AgentControlOrigin,
+		args: CreateWorkspaceArgs,
+	): Promise<AgentControlResult<unknown>> => {
+		if (!origin.concierge) {
+			return fail(
+				'denied-scope',
+				'Creating a workspace belongs to the Concierge, which works across every project. Ask the user to create one, or say in your report which project it should come off.',
+			);
+		}
+		const port = ports.workspaceCreation;
+		if (!port) {
+			return fail('internal', 'Workspace creation is unavailable.');
+		}
+		return ok(
+			await port.createWorkspace({
+				...(args.baseBranch ? { baseBranch: args.baseBranch } : {}),
+				...(args.name ? { name: args.name } : {}),
+				projectId: args.projectId,
+			}),
+		);
+	};
+
+	/**
+	 * Searches the Concierge's own memory index.
+	 * @param origin - Resolved caller identity.
+	 * @param args - The search text and result cap.
+	 * @returns The ranked memories, or a scope failure.
+	 */
+	const handleRecallMemory = (
+		origin: AgentControlOrigin,
+		args: RecallMemoryArgs,
+	): AgentControlResult<unknown> => {
+		if (!origin.concierge || !ports.memory) {
+			return fail(
+				'denied-scope',
+				'The memory index belongs to the Concierge. Nothing else has one to search.',
+			);
+		}
+		return ok(
+			ports.memory.recall({
+				...(args.limit === undefined ? {} : { limit: args.limit }),
+				query: args.query,
+			}),
+		);
+	};
+
+	const handleSetWorkspaceStatus = async (
 		origin: AgentControlOrigin,
 		args: SetWorkspaceStatusArgs,
-	): AgentControlResult<unknown> => {
+	): Promise<AgentControlResult<unknown>> => {
+		const target = await resolveTargetWorkspace(origin, args.workspaceId);
+		if ('failure' in target) {
+			return target.failure;
+		}
 		ports.board.setWorkspaceStatus({
-			workspaceId: origin.workspaceId,
+			workspaceId: target.workspaceId,
 			status: args.status,
 		});
 		return ok({ ok: true });
 	};
 
-	const handleGetWorkspaceStatus = (
+	const handleGetWorkspaceStatus = async (
 		origin: AgentControlOrigin,
-	): AgentControlResult<unknown> => {
-		return ok({ status: ports.board.getWorkspaceStatus(origin.workspaceId) });
+		args: GetWorkspaceStatusArgs,
+	): Promise<AgentControlResult<unknown>> => {
+		const target = await resolveTargetWorkspace(origin, args.workspaceId);
+		if ('failure' in target) {
+			return target.failure;
+		}
+		return ok({ status: ports.board.getWorkspaceStatus(target.workspaceId) });
 	};
 
 	/**
@@ -1435,6 +1716,18 @@ export function createAgentControlService({
 		origin: AgentControlOrigin,
 		args: CheckPlanModeToolArgs,
 	): AgentControlResult<unknown> => {
+		// The Concierge's policy is permanent rather than a mode it can leave, and
+		// it is stricter than Plan Mode on writes and identical on bash, so it
+		// answers alone rather than being layered under a planning check that would
+		// never be true for a Concierge anyway.
+		if (origin.concierge) {
+			const conciergeHome = ports.concierge?.homePath();
+			return ok(
+				conciergeHome
+					? evaluateConciergeTool({ ...args, conciergeHome })
+					: { blocked: true, reason: 'The Concierge home is unavailable.' },
+			);
+		}
 		if (!isPlanning(origin)) {
 			return ok({ blocked: false });
 		}
@@ -1489,22 +1782,72 @@ export function createAgentControlService({
 	};
 
 	/**
+	 * Reads the diff of the workspace the caller named, or of its own.
+	 * @param origin - Resolved caller identity.
+	 * @param args - File filter or stat flag, and the workspace for a Concierge.
+	 * @returns The diff payload, or a failure envelope.
+	 */
+	const handleGetWorkspaceDiff = async (
+		origin: AgentControlOrigin,
+		args: GetWorkspaceDiffArgs,
+	): Promise<AgentControlResult<unknown>> => {
+		const target = await resolveTargetWorkspace(origin, args.workspaceId);
+		if ('failure' in target) {
+			return target.failure;
+		}
+		return ok(
+			await ports.diff.readWorkspaceDiff({
+				file: args.filePath,
+				stat: args.stat,
+				workspaceCwd: target.cwd,
+				workspaceId: target.workspaceId,
+			}),
+		);
+	};
+
+	/**
+	 * Lists the review comments on the workspace the caller named, or on its own.
+	 * @param origin - Resolved caller identity.
+	 * @param args - Optional file filter, and the workspace for a Concierge.
+	 * @returns The comments, or a failure envelope.
+	 */
+	const handleGetDiffComments = async (
+		origin: AgentControlOrigin,
+		args: GetDiffCommentsArgs,
+	): Promise<AgentControlResult<unknown>> => {
+		const target = await resolveTargetWorkspace(origin, args.workspaceId);
+		if ('failure' in target) {
+			return target.failure;
+		}
+		return ok(
+			await ports.review.listComments({
+				file: args.filePath,
+				workspaceId: target.workspaceId,
+			}),
+		);
+	};
+
+	/**
 	 * Files the batch, then puts the user in front of it: the comment roll-up
 	 * lives in Checks, so a pass that leaves six findings lands them on the list
 	 * rather than in the file-by-file diff they would have to scroll to collect.
 	 * @param origin - Resolved caller identity.
-	 * @param args - The comments to file against this workspace's diff.
-	 * @returns How many were saved, and their new ids.
+	 * @param args - The comments to file, and the workspace for a Concierge.
+	 * @returns How many were saved, and their new ids, or a failure envelope.
 	 */
 	const handleAddDiffComments = async (
 		origin: AgentControlOrigin,
 		args: AddDiffCommentsArgs,
 	): Promise<AgentControlResult<unknown>> => {
+		const target = await resolveTargetWorkspace(origin, args.workspaceId);
+		if ('failure' in target) {
+			return target.failure;
+		}
 		const result = await ports.review.addComments({
 			comments: args.comments,
-			workspaceId: origin.workspaceId,
+			workspaceId: target.workspaceId,
 		});
-		reviewFocus.focusChecks(origin.workspaceId);
+		reviewFocus.focusChecks(target.workspaceId);
 		return ok(result);
 	};
 
@@ -1514,28 +1857,32 @@ export function createAgentControlService({
 	 * them would be a yank with no payload behind it. Same condition the port
 	 * broadcasts its cache invalidation on.
 	 * @param origin - Resolved caller identity.
-	 * @param args - The comment ids to close.
+	 * @param args - The comment ids to close, and the workspace for a Concierge.
 	 * @returns The batch partitioned into resolved, already-resolved, and unknown.
 	 */
 	const handleResolveDiffComments = async (
 		origin: AgentControlOrigin,
 		args: ResolveDiffCommentsArgs,
 	): Promise<AgentControlResult<unknown>> => {
+		const target = await resolveTargetWorkspace(origin, args.workspaceId);
+		if ('failure' in target) {
+			return target.failure;
+		}
 		const result = await ports.review.resolveComments({
 			commentIds: args.commentIds,
-			workspaceId: origin.workspaceId,
+			workspaceId: target.workspaceId,
 		});
 		if (result.resolved > 0) {
-			reviewFocus.focusChecks(origin.workspaceId);
+			reviewFocus.focusChecks(target.workspaceId);
 		}
 		return ok(result);
 	};
 
-	// getWorkspaceDiff / getDiffComments / addDiffComments / resolveDiffComments
-	// take their workspace from the origin rather than from an argument, so a
-	// cross-workspace read or write is unreachable by construction and there is
-	// nothing left to gate. The Linear ops take no workspace at all — the
-	// integration is bound to one account app-wide — so the same holds there.
+	// Every review op now takes an optional `workspaceId`, which only the
+	// Concierge may fill: `resolveTargetWorkspace` refuses a workspace agent that
+	// names another workspace, so the cross-workspace path is the supervisor's
+	// alone. The Linear ops take no workspace at all — the integration is bound to
+	// one account app-wide.
 	const opHandlers: Record<AgentControlOp, OpHandler> = {
 		addDiffComments: ({ args, origin }) =>
 			handleAddDiffComments(origin, args as AddDiffCommentsArgs),
@@ -1556,12 +1903,7 @@ export function createAgentControlService({
 		getConversationStatus: ({ args }) =>
 			readConversationStatus((args as ConversationRef).agentSessionId),
 		getDiffComments: ({ args, origin }) =>
-			ports.review
-				.listComments({
-					file: (args as GetDiffCommentsArgs).filePath,
-					workspaceId: origin.workspaceId,
-				})
-				.then(ok),
+			handleGetDiffComments(origin, args as GetDiffCommentsArgs),
 		getLastMessage: async ({ args }) =>
 			ok({
 				message: await ports.conversations.getLastMessage(
@@ -1570,15 +1912,15 @@ export function createAgentControlService({
 			} satisfies GetLastMessageResult),
 		getSessionBrief: ({ origin }) => handleGetSessionBrief(origin),
 		getWorkspaceDiff: ({ args, origin }) =>
-			ports.diff
-				.readWorkspaceDiff({
-					file: (args as GetWorkspaceDiffArgs).filePath,
-					stat: (args as GetWorkspaceDiffArgs).stat,
-					workspaceCwd: origin.workspaceCwd,
-					workspaceId: origin.workspaceId,
-				})
-				.then(ok),
-		getWorkspaceStatus: ({ origin }) => handleGetWorkspaceStatus(origin),
+			handleGetWorkspaceDiff(origin, args as GetWorkspaceDiffArgs),
+		focusWorkspace: ({ args, origin }) =>
+			handleFocusWorkspace(origin, args as FocusWorkspaceArgs),
+		createWorkspace: ({ args, origin }) =>
+			handleCreateWorkspace(origin, args as CreateWorkspaceArgs),
+		recallMemory: ({ args, origin }) =>
+			handleRecallMemory(origin, args as RecallMemoryArgs),
+		getWorkspaceStatus: ({ args, origin }) =>
+			handleGetWorkspaceStatus(origin, args as GetWorkspaceStatusArgs),
 		launchHarness: ({ args, origin }) =>
 			handleLaunchHarness(origin, args as LaunchHarnessArgs),
 		linearCreateComment: ({ args, origin }) =>
@@ -1625,18 +1967,9 @@ export function createAgentControlService({
 				.listRunScripts({ workspaceId: origin.workspaceId })
 				.then(ok),
 		listTabs: ({ args, origin }) =>
-			ports.tabs
-				.listTabs({
-					workspaceId: (args as ListTabsArgs).workspaceId ?? origin.workspaceId,
-				})
-				.then(ok),
+			handleListTabs(origin, args as ListTabsArgs),
 		listTerminals: ({ args, origin }) =>
-			ports.terminals
-				.listTerminals({
-					workspaceId:
-						(args as ListTerminalsArgs).workspaceId ?? origin.workspaceId,
-				})
-				.then(ok),
+			handleListTerminals(origin, args as ListTerminalsArgs),
 		listWorkspaces: () => ports.workspaces.listWorkspaces().then(ok),
 		notifyOrchestrator: ({ args, origin }) =>
 			handleNotifyOrchestrator(origin, args as NotifyOrchestratorArgs),

@@ -24,9 +24,36 @@ import { watchConfigFile } from './watch-config-file.ts';
 const WATCH_DEBOUNCE_MS = 120;
 
 /**
- * Owns the App-settings slice (`app.general`, `app.models`, `app.providers`,
- * `app.git`, `app.appearance`, `app.dictation`, `app.experimental`,
- * `app.onboarding`) of `~/.config/ensemblr/config.json` — the source of truth.
+ * Every section of `app` this service owns, derived from the defaults rather
+ * than hand-listed.
+ *
+ * It used to be written out three times — once to read, once to seed a new file,
+ * once to write back — and a section added to the schema but missed in any one
+ * of them is silently dropped on that path. That is what happened to
+ * `app.concierge`: it was written to disk and discarded on every read, so the
+ * model picker appeared to do nothing and the Concierge kept opening on the
+ * default runtime.
+ */
+const APP_SETTINGS_SECTIONS = Object.keys(
+	DEFAULT_APP_SETTINGS,
+) as (keyof AppSettings)[];
+
+/**
+ * Picks the sections this service owns out of a raw `app` object, leaving every
+ * other key for {@link parseAppSettings} to default.
+ * @param app - The raw `app` object read from disk.
+ * @returns One entry per owned section, unvalidated.
+ */
+function sectionsOf(app: Record<string, unknown>): Record<string, unknown> {
+	return Object.fromEntries(
+		APP_SETTINGS_SECTIONS.map((section) => [section, app[section]]),
+	);
+}
+
+/**
+ * Owns the App-settings slice of `~/.config/ensemblr/config.json` — the source
+ * of truth. The sections it covers are {@link APP_SETTINGS_SECTIONS}, derived
+ * from the schema's own defaults so adding one reaches every path at once.
  * Creates the file with defaults and a `$schema` pointer on first use, applies
  * section-scoped patches via an atomic temp-write+rename, and watches for
  * external edits (echo-suppressed against its own writes). Other config keys are
@@ -91,19 +118,8 @@ export function createAppSettingsService(
 		lastWritten = serialized;
 	};
 
-	const settingsFrom = (config: Record<string, unknown>): AppSettings => {
-		const app = asRecord(config.app);
-		return parseAppSettings({
-			general: app.general,
-			models: app.models,
-			providers: app.providers,
-			git: app.git,
-			appearance: app.appearance,
-			dictation: app.dictation,
-			experimental: app.experimental,
-			onboarding: app.onboarding,
-		});
-	};
+	const settingsFrom = (config: Record<string, unknown>): AppSettings =>
+		parseAppSettings(sectionsOf(asRecord(config.app)));
 
 	const ensureExists = (): void => {
 		if (existsSync(configPath)) {
@@ -112,16 +128,7 @@ export function createAppSettingsService(
 		writeRaw({
 			$schema: ENSEMBLR_CONFIG_SCHEMA_URL,
 			schemaVersion: 1,
-			app: {
-				general: DEFAULT_APP_SETTINGS.general,
-				models: DEFAULT_APP_SETTINGS.models,
-				providers: DEFAULT_APP_SETTINGS.providers,
-				git: DEFAULT_APP_SETTINGS.git,
-				appearance: DEFAULT_APP_SETTINGS.appearance,
-				dictation: DEFAULT_APP_SETTINGS.dictation,
-				experimental: DEFAULT_APP_SETTINGS.experimental,
-				onboarding: DEFAULT_APP_SETTINGS.onboarding,
-			},
+			app: sectionsOf(DEFAULT_APP_SETTINGS),
 		});
 	};
 
@@ -139,17 +146,7 @@ export function createAppSettingsService(
 			...config,
 			schemaVersion:
 				typeof config.schemaVersion === 'number' ? config.schemaVersion : 1,
-			app: {
-				...app,
-				general: next.general,
-				models: next.models,
-				providers: next.providers,
-				git: next.git,
-				appearance: next.appearance,
-				dictation: next.dictation,
-				experimental: next.experimental,
-				onboarding: next.onboarding,
-			},
+			app: { ...app, ...sectionsOf(next) },
 		});
 		return next;
 	};

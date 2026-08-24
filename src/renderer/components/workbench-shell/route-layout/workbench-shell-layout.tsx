@@ -1,5 +1,6 @@
 import { Outlet, useChildMatches } from '@tanstack/react-router';
 import { useAtom } from 'jotai';
+import { ConciergeLauncher } from '@/renderer/components/concierge';
 import { CloneGithubDialog } from '@/renderer/components/welcome/clone-github-dialog';
 import { LocalProjectImportDialog } from '@/renderer/components/welcome/local-project-import-dialog';
 import { QuickStartDialog } from '@/renderer/components/welcome/quick-start-dialog';
@@ -32,6 +33,7 @@ import type {
 	WorkbenchShellRouteState,
 } from '@/renderer/types/components';
 import { WorkbenchLayoutModelProvider } from '../shell-contexts';
+import { AgentControlWorkspaceFocusBridge } from './agent-control-workspace-focus-bridge';
 import { NotificationFocusBridge } from './notification-focus-bridge';
 
 /** Workbench shell layout — builds the layout model and renders the navigation frame. */
@@ -71,8 +73,14 @@ export function WorkbenchShellLayout() {
 					resolveWorkspaceRouteSearch={model.resolveWorkspaceRouteSearch}
 				>
 					<WorkbenchLayoutModelProvider value={model}>
+						<AgentControlWorkspaceFocusBridge />
 						<NotificationFocusBridge />
 						<Outlet />
+						{/* Inside the frame so the maximized panel — which covers the
+						    sidebar's own expand trigger — can offer one of its own, and
+						    inside the layout model so a file the Concierge names can be
+						    opened in the workspace that holds it. */}
+						<ConciergeLauncher />
 					</WorkbenchLayoutModelProvider>
 				</WorkbenchFrame>
 				<CloneGithubDialog onOpenChange={setCloneOpen} open={cloneOpen} />

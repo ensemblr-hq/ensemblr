@@ -38,7 +38,7 @@ _You'll see this in_ [`05-workspaces.md`](./05-workspaces.md).
 ## The Ensemblr root directory
 
 Ensemblr keeps everything it manages under one directory you can see and open —
-`~/Ensemblr` by default, changeable in settings. It has three managed
+`~/Ensemblr` by default, changeable in settings. It has four managed
 subdirectories:
 
 | Directory | Holds |
@@ -46,6 +46,7 @@ subdirectories:
 | `repos/` | one clone per project |
 | `workspaces/` | one folder per workspace, grouped by project |
 | `archived-contexts/` | preserved `.context/` folders from archived workspaces |
+| `concierge/` | the Concierge's own folder — its memory and the reports it writes |
 
 Open them in Finder whenever you like. Do not rearrange them by hand — Ensemblr
 treats the shape as managed, and moving things around out from under it is how
@@ -233,3 +234,17 @@ does the delegating, and a **sub-agent** is a spawned child. A sub-agent does it
 one unit of work itself and never delegates onward.
 
 _You'll see this in_ [`09-agent-control.md`](./09-agent-control.md).
+
+## Concierge
+
+The **Concierge** is the one agent that belongs to no workspace. It lives in
+`concierge/` under the Ensemblr root, reads every workspace at once, and writes
+files only in that folder of its own. To change anything in a project it starts
+an orchestrator in the workspace concerned and briefs it, so the vocabulary above
+is what it works in: it supervises, and the agents it puts to work do the work.
+
+Its **memory** is the other half of that. It writes what it learns as ordinary
+markdown files under `concierge/memory/`, indexed by `concierge/MEMORY.md`, so
+what it knows outlives the conversation that taught it.
+
+_You'll see this in_ [`06-agents.md`](./06-agents.md#the-concierge).

@@ -54,6 +54,7 @@ function createHarness(t: TestContext): Harness {
 
 	const rootSnapshot: RootDirectorySnapshot = {
 		archivedContextsPath,
+		conciergePath: path.join(rootPath, 'concierge'),
 		createdPaths: [],
 		diagnostics: [],
 		managedPaths: [],

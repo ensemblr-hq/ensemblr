@@ -19,7 +19,12 @@ export interface WorkbenchLayoutModel {
 	displaySelection: WorkspaceNavigationSelection | null;
 	health: WorkbenchHealth;
 	navigateToStaticRoute: (target: WorkbenchStaticNavigationTarget) => void;
-	navigateToWorkspace: (projectId: string, workspaceId: string) => void;
+	navigateToWorkspace: (
+		projectId: string,
+		workspaceId: string,
+		/** Chat tab to land on, instead of the workspace's remembered one. */
+		chatId?: string,
+	) => void;
 	onAddProject: (id: AddProjectActionId) => void;
 	resolveWorkspaceRouteSearch: (
 		workspace: WorkspaceShellModel,

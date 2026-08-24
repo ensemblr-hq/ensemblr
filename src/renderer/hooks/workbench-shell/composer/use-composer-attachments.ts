@@ -26,7 +26,7 @@ import type { ComposerAttachment } from '@/renderer/types/workbench';
  * Pasted text at or above this length is converted into a `.txt` attachment
  * instead of being inlined, so a wall of pasted output does not bury the draft.
  */
-const PASTE_ATTACHMENT_THRESHOLD = 5_000;
+export const PASTE_ATTACHMENT_THRESHOLD = 5_000;
 
 /**
  * The composer's attachment list and every way the user adds to or removes from

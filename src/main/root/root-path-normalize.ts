@@ -23,6 +23,7 @@ export const MANAGED_DIRECTORIES: readonly {
 		key: 'archived-contexts',
 		name: 'archived-contexts',
 	},
+	{ key: 'concierge', name: 'concierge' },
 ];
 
 /** Names of managed directories used to detect unmanaged root content. */

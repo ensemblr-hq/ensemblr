@@ -26,7 +26,7 @@ import {
 	noticeMetadataOf,
 	turnMetadataOf,
 } from '@/renderer/lib/agent-timeline';
-import type { ChatAssistantTurnTiming } from '@/renderer/types/chat';
+import { resolveTurnTiming } from '@/renderer/lib/workbench/timeline-timing';
 import type {
 	SessionTabModel,
 	WorkspaceShellModel,
@@ -348,32 +348,6 @@ function AssistantTimelineTurn({
 			timing={resolveTurnTiming({ isLiveTurn, metadata })}
 		/>
 	);
-}
-
-/**
- * Resolve the window the turn timer counts over. It starts at the prompt submit
- * time so the timer covers the whole turn (reasoning + tool calls + final
- * answer), falling back to the first assistant event when the prompt time is
- * unknown (resumed or legacy sessions). A live turn has no end yet.
- * @param isLiveTurn - Whether this turn is still streaming
- * @param metadata - Turn metadata carried on the message, if any
- * @returns The timing window handed to the assistant turn
- */
-function resolveTurnTiming({
-	isLiveTurn,
-	metadata,
-}: {
-	isLiveTurn: boolean;
-	metadata: ReturnType<typeof turnMetadataOf>;
-}): ChatAssistantTurnTiming {
-	const startMs = metadata
-		? Date.parse(metadata.promptAt ?? metadata.firstEventAt)
-		: Number.NaN;
-	const endMs = metadata ? Date.parse(metadata.lastEventAt) : Number.NaN;
-	return {
-		endMs: isLiveTurn || Number.isNaN(endMs) ? null : endMs,
-		startMs: Number.isNaN(startMs) ? Date.now() : startMs,
-	};
 }
 
 /**

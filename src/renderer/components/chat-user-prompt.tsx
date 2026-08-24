@@ -8,7 +8,10 @@ import {
 import { cn } from '@/renderer/lib/utils';
 import type { ParsedPromptPart } from '@/renderer/types/agent-timeline';
 import { ChatAttachmentChip } from './chat-attachment-chip';
-import { useFilePreviewOpener } from './workbench-shell/conversation-panel/file-preview-context';
+import {
+	useFilePreviewOpener,
+	useWorkspacePathResolver,
+} from './workbench-shell/conversation-panel/file-preview-context';
 
 /** Sub-pixel rounding leaves a clamped element a hair taller than its content. */
 const CLIP_TOLERANCE_PX = 1;
@@ -41,9 +44,15 @@ function keyedParts(
  * where a surface provides an opener and stay inert where none does, which is
  * how the replay timeline renders the same prompt without a workspace behind
  * it.
+ *
+ * A surface that also provides a resolver has the last word on which paths it
+ * can open, the way a tool badge does: a file attached and since deleted, or one
+ * the Concierge cannot place in any project, stays inert rather than offering a
+ * control that opens onto a read error.
  */
 function PromptParts({ parts }: { parts: readonly ParsedPromptPart[] }) {
 	const openFilePreview = useFilePreviewOpener();
+	const resolveWorkspacePath = useWorkspacePathResolver();
 	return (
 		<>
 			{keyedParts(parts).map(({ key, part }) => {
@@ -58,13 +67,16 @@ function PromptParts({ parts }: { parts: readonly ParsedPromptPart[] }) {
 					);
 				}
 				const { attachment } = part;
+				const isPlaceable =
+					resolveWorkspacePath === null ||
+					resolveWorkspacePath(attachment.path) !== null;
 				return (
 					<ChatAttachmentChip
 						key={key}
 						kind={attachment.content.length > 0 ? 'file' : 'folder'}
 						label={chipLabelForPath(attachment.path)}
 						onActivate={
-							openFilePreview
+							openFilePreview && isPlaceable
 								? () => openFilePreview(attachment.path)
 								: undefined
 						}

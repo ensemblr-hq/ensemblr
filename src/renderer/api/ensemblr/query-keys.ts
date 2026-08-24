@@ -13,6 +13,12 @@ export const ensemblrQueryKeys = {
 	/** Query key for an agent session's checkpoints. */
 	checkpointsForSession: (agentSessionId: string) =>
 		[...ensemblrQueryKeys.all, 'checkpoints', agentSessionId] as const,
+	/** Query key for how full the Concierge's context window is. */
+	conciergeContextPressure: () =>
+		[...ensemblrQueryKeys.all, 'concierge-context-pressure'] as const,
+	/** Query key for the Concierge transcript of one session. */
+	conciergeEvents: (sessionId: string) =>
+		[...ensemblrQueryKeys.all, 'concierge-events', sessionId] as const,
 	/** Query key for a workspace's closed chat tabs with their summaries. */
 	closedChatTabsWithSummary: (workspaceId: string) =>
 		[

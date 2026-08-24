@@ -310,6 +310,36 @@
 						}
 					}
 				},
+				"concierge": {
+					"type": "object",
+					"description": "The Concierge's own runtime, independent of the workspace default. It runs above every project rather than inside one, so the model that suits supervising a dozen workspaces need not be the model that suits editing a file in one of them.",
+					"additionalProperties": false,
+					"properties": {
+						"provider": {
+							"type": "string",
+							"enum": ["pi", "claude"],
+							"default": "pi",
+							"description": "Agent runtime the Concierge opens on."
+						},
+						"model": {
+							"type": ["string", "null"],
+							"default": null,
+							"description": "Model id the Concierge opens on. `null` uses the runtime's own default."
+						},
+						"thinkingLevel": {
+							"type": ["string", "null"],
+							"default": null,
+							"description": "Thinking level the Concierge opens on. `null` uses the runtime's own default."
+						},
+						"autoClearAtPercent": {
+							"type": "number",
+							"minimum": 0,
+							"maximum": 1,
+							"default": 0.8,
+							"description": "Share of the context window that trips the automatic clear. It fires at a turn boundary and shows a dismissible banner first. `0` disables the trip and leaves clearing entirely manual."
+						}
+					}
+				},
 				"experimental": {
 					"type": "object",
 					"description": "Settings → Experimental.",

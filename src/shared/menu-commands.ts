@@ -91,6 +91,16 @@ export const MENU_COMMANDS = {
 		ownsAccelerator: true,
 		shortcutId: 'toolCalls.toggleCollapse',
 	},
+	'concierge.toggle': { ownsAccelerator: true, shortcutId: 'concierge.toggle' },
+	'concierge.toggleFullscreen': {
+		ownsAccelerator: true,
+		shortcutId: 'concierge.toggleFullscreen',
+	},
+	'concierge.focusComposer': {
+		ownsAccelerator: true,
+		shortcutId: 'concierge.focusComposer',
+	},
+	'concierge.clear': { shortcutId: 'concierge.clear' },
 
 	'run.toggle': { ownsAccelerator: true, shortcutId: 'run.start' },
 	'run.script': { dynamic: true },

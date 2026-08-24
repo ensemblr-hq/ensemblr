@@ -57,6 +57,26 @@ function settingAtom<
 	);
 }
 
+// ─── Concierge ───────────────────────────────────────────────────────────────
+/**
+ * Agent runtime the Concierge opens on. Written alongside {@link conciergeModelAtom}
+ * rather than picked separately: a model belongs to exactly one runtime, and a
+ * pair that disagrees is refused at session open.
+ */
+export const conciergeProviderAtom = settingAtom('concierge', 'provider');
+/** Model the Concierge opens on; `null` takes the runtime's own default. */
+export const conciergeModelAtom = settingAtom('concierge', 'model');
+/** Thinking level the Concierge opens on; `null` takes the runtime's default. */
+export const conciergeThinkingLevelAtom = settingAtom(
+	'concierge',
+	'thinkingLevel',
+);
+/** Share of the context window that trips the Concierge's automatic clear. */
+export const conciergeAutoClearAtPercentAtom = settingAtom(
+	'concierge',
+	'autoClearAtPercent',
+);
+
 // ─── General ──────────────────────────────────────────────────────────────────
 export const sendShortcutAtom = settingAtom('general', 'sendShortcut');
 export const followUpBehaviorAtom = settingAtom('general', 'followUpBehavior');

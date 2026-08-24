@@ -31,6 +31,7 @@ function createFixtureDirectory(t: TestContext, prefix: string): string {
 function createRootSnapshot(rootPath: string): RootDirectorySnapshot {
 	return {
 		archivedContextsPath: path.join(rootPath, 'archived-contexts'),
+		conciergePath: path.join(rootPath, 'concierge'),
 		createdPaths: [],
 		diagnostics: [],
 		managedPaths: [],

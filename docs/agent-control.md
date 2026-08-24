@@ -37,9 +37,12 @@ is registered per session, so its origin carries real lineage (`parentSessionId`
 `depth`) and the guardrails below have something to count. A **terminal** —
 including a harness — shares one workspace-level origin (`ws:<workspaceId>`),
 because a PTY has no session the app mints a token for; that is also why a
-harness cannot be told which agent runtime it is. One service validates the
-request, resolves the origin from the token, enforces scope and permissions,
-applies guardrails, and delegates to the app's existing services through ports.
+harness cannot be told which agent runtime it is. The **Concierge** registers one
+more origin of its own: no workspace at all, its own home as the cwd, and a
+`concierge` flag that outranks lineage, so it is never resolved as an
+orchestrator or a sub-agent. One service validates the request, resolves the
+origin from the token, enforces scope and permissions, applies guardrails, and
+delegates to the app's existing services through ports.
 
 The architecture decision is [ADR 0040](./adr/0040-use-loopback-control-server-for-agent-app-control.md);
 the full design record is [`considerations/agent-control-layer.md`](./considerations/agent-control-layer.md).
@@ -222,7 +225,7 @@ harness.
 
 ## Tool reference
 
-Thirty-nine tools, enumerated from `TOOL_DEFS` in
+Forty-two tools, enumerated from `TOOL_DEFS` in
 `src/main/agent-control/mcp-endpoint.ts`. The argument names and types below are
 the authoritative Zod schemas in `src/shared/agent-control/schemas.ts` — every
 schema is a `strictObject`, so an argument not listed here is rejected as
@@ -241,17 +244,20 @@ the caller's own workspace; `read` is allowed in every mode and may span
 workspaces; `spawn` additionally spends depth, quota, and rate budget.
 **Withheld from** names the callers whose tool list omits it — `sub-agent`
 (denied by role, `denied-scope`), `sub-agent*` (withheld as unusable, still
-dispatchable), `no chat tab` (a terminal harness).
+dispatchable), `no chat tab` (a terminal harness), `workspace agent` (a
+Concierge-only op, meaningless to an agent that already has a workspace), and
+`Concierge` (denied to the Concierge, which has neither a workspace to act in
+nor a chat tab of its own).
 
 ### Conversations and delegation
 
 | Tool | Arguments | Gate | Withheld from |
 | --- | --- | --- | --- |
-| `ensemblr_spawn_chat_tab` | `title?: string` | write, spawn | sub-agent |
-| `ensemblr_start_conversation` | **`prompt: string`**, `chatTabId?: string`, `model?: string`, `thinkingLevel?: string`, `title?: string`, `wait?: boolean` | write, spawn | sub-agent |
+| `ensemblr_spawn_chat_tab` | `title?: string` | write, spawn | sub-agent, Concierge |
+| `ensemblr_start_conversation` | **`prompt: string`**, `chatTabId?: string`, `model?: string`, `thinkingLevel?: string`, `title?: string`, `wait?: boolean`, `workspaceId?: string` | write, spawn | sub-agent |
 | `ensemblr_send_follow_up` | **`agentSessionId: string`**, **`prompt: string`**, `wait?: boolean` | write | sub-agent |
 | `ensemblr_wait_for_agents` | `targets?: string[]`, `mode?: 'first' \| 'all'`, `reports?: 'full' \| 'brief'`, `timeoutMs?: number` | read | sub-agent\* |
-| `ensemblr_notify_orchestrator` | **`reason: 'need_decision' \| 'blocked' \| 'progress' \| 'done'`**, **`message: string`** | read | — |
+| `ensemblr_notify_orchestrator` | **`reason: 'need_decision' \| 'blocked' \| 'progress' \| 'done'`**, **`message: string`** | read | Concierge |
 | `ensemblr_list_models` | *(none)* | read | sub-agent\* |
 | `ensemblr_close_tab` | **`chatTabId: string`** | write | sub-agent |
 
@@ -263,11 +269,11 @@ refused.
 
 | Tool | Arguments | Gate | Withheld from |
 | --- | --- | --- | --- |
-| `ensemblr_launch_harness` | **`harnessId: string`** | write, spawn | sub-agent |
-| `ensemblr_start_terminal` | **`kind: 'setup' \| 'run' \| 'spawn'`**, `scriptName?: string`, `restart?: boolean` | write, spawn | sub-agent |
-| `ensemblr_list_run_scripts` | *(none)* | read | sub-agent\* |
-| `ensemblr_stop_terminal` | `terminalId?: string`, `kind?: 'setup' \| 'run'` — exactly one | write | sub-agent |
-| `ensemblr_write_terminal` | **`terminalId: string`**, **`input: string`** | write | sub-agent |
+| `ensemblr_launch_harness` | **`harnessId: string`** | write, spawn | sub-agent, Concierge |
+| `ensemblr_start_terminal` | **`kind: 'setup' \| 'run' \| 'spawn'`**, `scriptName?: string`, `restart?: boolean` | write, spawn | sub-agent, Concierge |
+| `ensemblr_list_run_scripts` | *(none)* | read | Concierge, sub-agent\* |
+| `ensemblr_stop_terminal` | `terminalId?: string`, `kind?: 'setup' \| 'run'` — exactly one | write | sub-agent, Concierge |
+| `ensemblr_write_terminal` | **`terminalId: string`**, **`input: string`** | write | sub-agent, Concierge |
 | `ensemblr_read_terminal_output` | `terminalId?: string`, `kind?: 'setup' \| 'run'` — exactly one, `ansi?: boolean` | read | — |
 
 `scriptName` is accepted only with `kind: 'run'`; any other pairing is rejected.
@@ -296,12 +302,14 @@ fragment and a colour code cut before its `ESC` reads as ordinary text.
 
 | Tool | Arguments | Gate | Withheld from |
 | --- | --- | --- | --- |
-| `ensemblr_open_tab` | **`variant: 'file' \| 'diff' \| 'comment'`**, `filePath?: string`, `turnId?: string`, `commentBody?: string`, `prNumber?: number` | write, spawn | sub-agent |
+| `ensemblr_open_tab` | **`variant: 'file' \| 'diff' \| 'comment'`**, `filePath?: string`, `turnId?: string`, `commentBody?: string`, `prNumber?: number` | write, spawn | Concierge, sub-agent |
 | `ensemblr_focus_tab` | **`chatTabId: string`** | write | — |
-| `ensemblr_focus_dock_tab` | `terminalId?: string`, `kind?: 'setup' \| 'run'` — exactly one | write | — |
-| `ensemblr_focus_panel` | **`panel: 'files' \| 'changes' \| 'checks'`** | write | — |
-| `ensemblr_set_workspace_status` | **`status: 'backlog' \| 'in-progress' \| 'in-review' \| 'done' \| 'canceled'`** | write | sub-agent |
-| `ensemblr_get_workspace_status` | *(none)* | read | — |
+| `ensemblr_focus_dock_tab` | `terminalId?: string`, `kind?: 'setup' \| 'run'` — exactly one — `workspaceId?: string` | write | — |
+| `ensemblr_focus_panel` | **`panel: 'files' \| 'changes' \| 'checks'`**, `workspaceId?: string` | write | — |
+| `ensemblr_focus_workspace` | **`workspaceId: string`** | write | workspace agent |
+| `ensemblr_create_workspace` | **`projectId: string`**, `name?: string`, `baseBranch?: string` | write, spawn | workspace agent |
+| `ensemblr_set_workspace_status` | **`status: 'backlog' \| 'in-progress' \| 'in-review' \| 'done' \| 'canceled'`**, `workspaceId?: string` | write | sub-agent |
+| `ensemblr_get_workspace_status` | `workspaceId?: string` | read | — |
 | `ensemblr_list_workspaces` | *(none)* | read | — |
 | `ensemblr_list_tabs` | `workspaceId?: string` | read | — |
 | `ensemblr_list_terminals` | `workspaceId?: string` | read | — |
@@ -318,9 +326,9 @@ for chat rows, so a file tab never reads as a conversation nobody named.
 
 | Tool | Arguments | Gate | Withheld from |
 | --- | --- | --- | --- |
-| `ensemblr_set_name` | **`title: string`** | write | no chat tab |
-| `ensemblr_set_branch_name` | **`name: string`** (≤ 120 chars), `userRequested?: boolean` | write | sub-agent |
-| `ensemblr_set_summary` | **`title: string`** (≤ 80), **`summary: string`** (≤ 4,000) | write | no chat tab |
+| `ensemblr_set_name` | **`title: string`** | write | no chat tab, Concierge |
+| `ensemblr_set_branch_name` | **`name: string`** (≤ 120 chars), `userRequested?: boolean` | write | sub-agent, Concierge |
+| `ensemblr_set_summary` | **`title: string`** (≤ 80), **`summary: string`** (≤ 4,000) | write | no chat tab, Concierge |
 
 `ensemblr_set_summary` enforces both limits by truncation, not rejection: an
 over-long field is stored cut to its cap and the result carries `truncated`, one
@@ -386,10 +394,10 @@ its tool calls with their arguments and results — rather than trusting the rep
 
 | Tool | Arguments | Gate | Withheld from |
 | --- | --- | --- | --- |
-| `ensemblr_get_workspace_diff` | `filePath?: string`, `stat?: boolean` — not both | read | — |
-| `ensemblr_get_diff_comments` | `filePath?: string` | read | — |
-| `ensemblr_add_diff_comments` | **`comments: { filePath: string; lineNumber?: number \| null; body: string }[]`** (1–50, body ≤ 4,000) | write | — |
-| `ensemblr_resolve_diff_comments` | **`commentIds: string[]`** (1–50) | write | — |
+| `ensemblr_get_workspace_diff` | `filePath?: string`, `stat?: boolean` — not both, `workspaceId?: string` | read | — |
+| `ensemblr_get_diff_comments` | `filePath?: string`, `workspaceId?: string` | read | — |
+| `ensemblr_add_diff_comments` | **`comments: { filePath: string; lineNumber?: number \| null; body: string }[]`** (1–50, body ≤ 4,000), `workspaceId?: string` | write | — |
+| `ensemblr_resolve_diff_comments` | **`commentIds: string[]`** (1–50), `workspaceId?: string` | write | — |
 
 All four act on the caller's own workspace and none takes a workspace argument.
 `resolveDiffComments` is refused in Plan Mode. Any `filePath` must be relative to
@@ -417,12 +425,34 @@ Linear `userId` that account is authorized as. An agent has no Linear identity o
 its own, so that id is what "assign this to me" resolves to; without it the only
 route to an `assigneeId` is matching a display name against the users table.
 
+### The Concierge's own surface
+
+| Tool | Arguments | Gate | Withheld from |
+| --- | --- | --- | --- |
+| `ensemblr_recall_memory` | **`query: string`**, `limit?: number` | read | workspace agent |
+
+The Concierge writes a memory as an ordinary file under `<root>/concierge/memory/`
+— which its tool policy admits because that path is inside its own home — and a
+watcher reindexes it. There is therefore no write op here: one exists for search,
+because searching an FTS index is the thing a file read cannot do.
+
+**The tab bookkeeping every workspace agent owes does not apply to it.** The
+Concierge is a panel, not a chat tab, so `ensemblr_set_name` and
+`ensemblr_set_summary` act on a row it has never had. The chat-tab axis cannot
+refuse them on its own — `originHasChatTab` reads the caller's species, and a
+Concierge runs on the same runtimes a chat tab does — so both are named in
+`CONCIERGE_WITHHELD_OPS` instead, which withholds them from the tool list and
+answers `denied-scope` to a stale caller that dispatches one anyway. Left out,
+they reach the services and fail as `not-found` and `internal`: two errors in the
+timeline, on a turn that owed no bookkeeping at all. A memory file is the
+Concierge's equivalent, and the only one that survives a context clear.
+
 ### Asking the user, and Plan Mode
 
 | Tool | Arguments | Gate | Withheld from |
 | --- | --- | --- | --- |
 | `ensemblr_ask_user_question` | **`questions: { question: string; header?: string; options: { label: string; description? }[]; multiSelect?: boolean }[]`** (1–4 questions, 2–6 options each) | read | no chat tab, sub-agent |
-| `ensemblr_exit_plan_mode` | **`title: string`** (≤ 80), **`plan: string`** (≤ 60,000) | read | no chat tab, sub-agent |
+| `ensemblr_exit_plan_mode` | **`title: string`** (≤ 80), **`plan: string`** (≤ 60,000) | read | no chat tab, sub-agent, Concierge |
 
 Both are reads rather than writes, so neither is blocked by `read-only` mode.
 Option labels must be distinct within a question and must not collide with the
@@ -445,6 +475,15 @@ changes arrive as an ordinary prompt, and without the block the agent answers in
 prose and leaves them a revision they cannot approve. It rides both channels the
 upkeep block does, so Pi and Claude Code are told the same thing — close this
 turn by submitting the whole revised plan again.
+
+It carries a third, `rolePlaybook`, which is the whole role playbook rather than
+a block appended after one. The extension holds byte-identical copies of the
+orchestrator and sub-agent playbooks and picks between them from
+`ENSEMBLR_CONTROL_ROLE`; the Concierge's has no copy there, so the app sends it
+down with the brief and the extension prefers whatever arrives over its own. It
+is null for every workspace agent, which leaves the local copies in place. A
+Concierge served the orchestrator playbook instead would be told to do the work
+itself in a workspace it has none of, and to name a chat tab it does not own.
 
 ### Choosing a model for a child
 

@@ -69,6 +69,7 @@ export type {
 	FakeAgentAdapterSessionController,
 } from './fake-agent-adapter';
 export { createFakeAgentAdapter } from './fake-agent-adapter';
+export { usesNativeControlMcp } from './session/agent-control-wiring';
 export type {
 	CreateSessionSummaryWriterOptions,
 	SessionSummaryWriter,

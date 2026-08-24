@@ -42,7 +42,12 @@ import type { SetupDiagnosticsSnapshot } from '@/shared/ipc/contracts/setup';
 interface WorkbenchNavigationResult {
 	addProjectMenu: AddProjectMenuModel;
 	navigateToStaticRoute: (target: WorkbenchStaticNavigationTarget) => void;
-	navigateToWorkspace: (projectId: string, workspaceId: string) => void;
+	navigateToWorkspace: (
+		projectId: string,
+		workspaceId: string,
+		/** Chat tab to land on, instead of the workspace's remembered one. */
+		chatId?: string,
+	) => void;
 	navigation: NavigationContextValue;
 	onAddProject: (id: AddProjectActionId) => void;
 	resolveWorkspaceRouteSearch: (
@@ -103,7 +108,7 @@ export function useWorkbenchNavigation({
 		[navigate],
 	);
 	const navigateToWorkspace = useCallback(
-		(nextProjectId: string, nextWorkspaceId: string) => {
+		(nextProjectId: string, nextWorkspaceId: string, nextChatId?: string) => {
 			const target = findWorkspaceNavigationSelection(
 				displayProjects,
 				nextProjectId,
@@ -116,7 +121,7 @@ export function useWorkbenchNavigation({
 
 			navigate({
 				params: {
-					chatId: resolveWorkspaceChatId(target.workspace),
+					chatId: nextChatId ?? resolveWorkspaceChatId(target.workspace),
 					projectId: target.project.id,
 					workspaceId: target.workspace.id,
 				},

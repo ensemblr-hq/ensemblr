@@ -16,7 +16,7 @@ The app itself ships in English, Russian, and Greek; this guide is English only.
 3. [**First run**](./03-first-run.md) — the setup wizard, choosing a root directory, adding a project, creating your first workspace.
 4. [**Concepts**](./04-concepts.md) — workspace, base branch, runtime versus harness, permission modes, the board. The vocabulary the rest of the guide uses.
 5. [**Workspaces**](./05-workspaces.md) — creating, adopting versus cutting a branch, branch names, setup scripts, the board and its issue backlog, archiving.
-6. [**Agents**](./06-agents.md) — Pi and Claude Code, models and reasoning levels, permission modes, plan mode, checkpoints, attachments.
+6. [**Agents**](./06-agents.md) — Pi and Claude Code, models and reasoning levels, the Concierge, permission modes, plan mode, checkpoints, attachments.
 7. [**Terminals and run scripts**](./07-terminals-and-run-scripts.md) — the dock, named run scripts, the ⌘R default, terminal harnesses.
 8. [**Reviewing changes**](./08-reviewing-changes.md) — Files, Changes, Checks; review comments; opening and merging a pull request.
 9. [**Agent control**](./09-agent-control.md) — what an agent can do to the app itself, and what it is refused.
@@ -36,6 +36,7 @@ The app itself ships in English, Russian, and Greek; this guide is English only.
 | Configure a repository for your team | [12](./12-repository-settings.md) |
 | Add a run script | [07](./07-terminals-and-run-scripts.md), syntax in [12](./12-repository-settings.md) |
 | Stop an agent doing something | [06](./06-agents.md) (permission modes, plan mode) |
+| Ask one agent about all your projects at once | [06](./06-agents.md#the-concierge) (the Concierge) |
 | Ship the work | [08](./08-reviewing-changes.md) |
 
 ## Elsewhere in the repository

@@ -4,9 +4,10 @@ import type { MenuItemFactory } from './menu-item';
 import type { MenuLabels } from './menu-strings';
 
 /**
- * Builds the View menu: the palette, the layout toggles, the panel and theme
- * radio groups, and page zoom. Reload and the developer tools sit one level
- * down under Developer, because they are browser plumbing rather than product.
+ * Builds the View menu: the palette, the layout toggles, the Concierge's own
+ * surface controls, the panel and theme radio groups, and page zoom. Reload and
+ * the developer tools sit one level down under Developer, because they are
+ * browser plumbing rather than product.
  * @param labels - Native menu labels for the active language
  * @param items - Factory for the command items in this menu
  * @returns The View menu
@@ -25,6 +26,25 @@ export function buildViewMenu(
 				checkbox: true,
 			}),
 			items.command('layout.toggleDock', labels.dock, { checkbox: true }),
+			{
+				label: labels.concierge,
+				submenu: [
+					items.command('concierge.toggle', labels.conciergeShow, {
+						checkbox: true,
+					}),
+					items.command(
+						'concierge.toggleFullscreen',
+						labels.conciergeMaximize,
+						{ checkbox: true },
+					),
+					{ type: 'separator' },
+					items.command(
+						'concierge.focusComposer',
+						labels.conciergeFocusComposer,
+					),
+					items.command('concierge.clear', labels.conciergeClear),
+				],
+			},
 			{ type: 'separator' },
 			items.command('changes.uncommitted', labels.uncommittedChanges),
 			{

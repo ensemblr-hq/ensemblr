@@ -10,6 +10,7 @@ export {
 export * from './chat-tabs';
 export * from './checkpoints';
 export * from './clone';
+export * from './concierge';
 export * from './dictation';
 export * from './environment';
 export * from './forget-workspace-in-list-views';

@@ -10,6 +10,7 @@ import path from 'node:path';
 import { afterEach, describe, expect, test } from 'vitest';
 
 import { createAppSettingsService } from '../../src/main/config/app-settings-service';
+import { DEFAULT_APP_SETTINGS } from '../../src/shared/config';
 
 const created: string[] = [];
 
@@ -31,6 +32,59 @@ afterEach(() => {
 });
 
 describe('createAppSettingsService', () => {
+	// The service used to name its sections three times over — once to read, once
+	// to seed a new file, once to write back — and `app.concierge` was missed on
+	// all three. It wrote to disk and vanished on every read, so the Concierge's
+	// model picker looked inert and its sessions kept opening on the default
+	// runtime. These three hold every section the schema declares.
+	test.each(Object.keys(DEFAULT_APP_SETTINGS))(
+		'seeds a new config.json with the %s section',
+		(section) => {
+			const configPath = tmpConfigPath();
+			createAppSettingsService({ configPath }).read();
+
+			expect(readJson(configPath).app).toHaveProperty(section);
+		},
+	);
+
+	test.each(Object.keys(DEFAULT_APP_SETTINGS))(
+		'reads the %s section back rather than dropping it',
+		(section) => {
+			const configPath = tmpConfigPath();
+			const service = createAppSettingsService({ configPath });
+
+			expect(service.read()).toHaveProperty(section);
+		},
+	);
+
+	test('round-trips the Concierge runtime a picker writes', () => {
+		const configPath = tmpConfigPath();
+		const service = createAppSettingsService({ configPath });
+
+		service.update({ concierge: { model: 'opus[1m]', provider: 'claude' } });
+
+		expect(service.read().concierge).toMatchObject({
+			model: 'opus[1m]',
+			provider: 'claude',
+		});
+		expect(
+			createAppSettingsService({ configPath }).read().concierge,
+		).toMatchObject({ model: 'opus[1m]', provider: 'claude' });
+	});
+
+	test.each(Object.keys(DEFAULT_APP_SETTINGS))(
+		'preserves the %s section across an unrelated write',
+		(section) => {
+			const configPath = tmpConfigPath();
+			const service = createAppSettingsService({ configPath });
+			service.read();
+
+			service.update({ general: { sendShortcut: 'mod+enter' } });
+
+			expect(readJson(configPath).app).toHaveProperty(section);
+		},
+	);
+
 	test('creates config.json with defaults on first read', () => {
 		const configPath = tmpConfigPath();
 		const service = createAppSettingsService({ configPath });

@@ -28,6 +28,7 @@ const QUESTIONS: readonly AskUserQuestionItem[] = [
 const origin = (overrides: Partial<AgentControlOrigin> = {}) =>
 	({
 		delegation: 'ensemblr',
+		concierge: false,
 		depth: 0,
 		parentSessionId: null,
 		sessionId: 'session-1',

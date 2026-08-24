@@ -140,6 +140,7 @@ function createRootDirectoryService(
 ): EnsemblrRootDirectoryService {
 	const rootSnapshot: RootDirectorySnapshot = {
 		archivedContextsPath: `${HOME}/Ensemblr/archived-contexts`,
+		conciergePath: `${HOME}/Ensemblr/concierge`,
 		createdPaths: [],
 		diagnostics: [],
 		managedPaths: [

@@ -348,12 +348,12 @@ The action buttons themselves: [8. Reviewing changes](./08-reviewing-changes.md)
 This is Ensemblr's own committed `.ensemblr/settings.toml`, verbatim:
 
 ```toml
+# Node 24 is pinned by scripts/require-node-version.mjs, so every command goes
+# through the wrapper — non-interactive shells never activate mise on their own.
 [scripts]
-setup = "npm ci"
+setup = "./scripts/with-pinned-node.sh npm ci"
 
-# Electron dev server. Node 24 is pinned by scripts/require-node-version.mjs, so
-# every command goes through the wrapper — non-interactive shells never activate
-# mise on their own.
+# Electron dev server.
 [scripts.run.dev]
 command = "./scripts/with-pinned-node.sh npm run dev"
 icon = "play"

@@ -75,6 +75,40 @@ export {
 	insertCheckpoint,
 	listCheckpointsForAgentSession,
 } from './checkpoint-repository.ts';
+export type {
+	ConciergeMemoryHit,
+	ConciergeMemoryKind,
+	ConciergeMemoryRow,
+	UpsertConciergeMemoryInput,
+} from './concierge-memory-repository.ts';
+export {
+	CONCIERGE_MEMORY_KINDS,
+	coerceConciergeMemoryKind,
+	deleteConciergeMemory,
+	getConciergeMemoryBySlug,
+	listConciergeMemories,
+	rebuildConciergeMemoryIndex,
+	searchConciergeMemories,
+	upsertConciergeMemory,
+} from './concierge-memory-repository.ts';
+export type {
+	AppendConciergeEventInput,
+	ConciergeEventRow,
+	ConciergeEventStream,
+	ConciergeSessionRow,
+	ConciergeSessionStatus,
+	CreateConciergeSessionInput,
+	UpdateConciergeSessionPatch,
+} from './concierge-session-repository.ts';
+export {
+	appendConciergeEvent,
+	createConciergeSession,
+	getActiveConciergeSession,
+	getConciergeSessionById,
+	listConciergeEvents,
+	listConciergeSessions,
+	updateConciergeSession,
+} from './concierge-session-repository.ts';
 export type { LinkedDirectoryRecentRow } from './linked-directory-repository.ts';
 export {
 	readLinkedDirectoryRecents,

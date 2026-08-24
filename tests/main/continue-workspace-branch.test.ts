@@ -119,6 +119,7 @@ function rootDirectoryStub({
 }): EnsemblrRootDirectoryService {
 	const snapshot: RootDirectorySnapshot = {
 		archivedContextsPath: path.join(rootPath, 'archived-contexts'),
+		conciergePath: path.join(rootPath, 'concierge'),
 		createdPaths: [],
 		diagnostics: [],
 		managedPaths: [],

@@ -13,7 +13,10 @@ import type { AgentControlOrigin, AgentSpecies } from './ports.ts';
 /** Details supplied when registering a freshly spawned agent session. */
 export interface RegisterOriginInput {
 	sessionId: string;
+	/** Empty for the Concierge, which belongs to no workspace. */
 	workspaceId: string;
+	/** Registers the caller as the app-level Concierge rather than a workspace agent. */
+	concierge?: boolean;
 	workspaceCwd: string;
 	species: AgentSpecies;
 	/** Session id of the agent that spawned this one, when any. */
@@ -56,12 +59,19 @@ export function createOriginRegistry(
 	const byToken = new Map<string, AgentControlOrigin>();
 	const bySession = new Map<string, AgentControlOrigin>();
 
+	// A Concierge parent does not spend depth: what it opens is a root
+	// orchestrator with its own delegation budget, not a sub-agent of the
+	// Concierge. Counting it as depth 1 would hand the child the sub-agent policy
+	// and strip the fan-out that is the whole point of putting it there.
 	const resolveDepth = (parentSessionId: string | null): number => {
 		if (!parentSessionId) {
 			return 0;
 		}
 		const parent = bySession.get(parentSessionId);
-		return parent ? parent.depth + 1 : 0;
+		if (!parent || parent.concierge) {
+			return 0;
+		}
+		return parent.depth + 1;
 	};
 
 	const register = (input: RegisterOriginInput): AgentControlOrigin => {
@@ -74,6 +84,7 @@ export function createOriginRegistry(
 			token: generateToken(),
 			sessionId: input.sessionId,
 			workspaceId: input.workspaceId,
+			concierge: input.concierge ?? false,
 			workspaceCwd: input.workspaceCwd,
 			parentSessionId,
 			depth: resolveDepth(parentSessionId),

@@ -198,12 +198,18 @@ function McpServerRow({
 export function McpServersPanel({
 	cwd,
 	disabled,
-	workspaceId,
+	workspaceId = null,
 }: {
-	/** Workspace directory the roster resolves project- and local-scope servers against. */
+	/** Directory the roster resolves project- and local-scope servers against. */
 	cwd: string;
 	disabled?: boolean;
-	workspaceId: string;
+	/**
+	 * Workspace whose dock hosts the terminal the `claude mcp` authorize flow runs
+	 * in. Null for the Concierge, which has no workspace and cannot open a
+	 * terminal — the roster still reads, and a server needing auth simply offers
+	 * no authorize control rather than one that would fail.
+	 */
+	workspaceId?: string | null;
 }) {
 	const { t } = useTranslation();
 	const [open, setOpen] = useState(false);
@@ -219,6 +225,9 @@ export function McpServersPanel({
 	const servers = data?.servers ?? [];
 
 	const authorize = useCallback(() => {
+		if (!workspaceId) {
+			return;
+		}
 		requestDockTerminal({
 			command: buildMcpCommand(executable?.resolvedPath ?? null),
 			title: `${CLAUDE_DESCRIPTOR.label} ${MCP_COMMAND}`,
@@ -290,7 +299,9 @@ export function McpServersPanel({
 								<McpServerRow
 									key={server.name}
 									onAuthorize={
-										server.status === 'needs-auth' ? authorize : null
+										server.status === 'needs-auth' && workspaceId
+											? authorize
+											: null
 									}
 									server={server}
 								/>

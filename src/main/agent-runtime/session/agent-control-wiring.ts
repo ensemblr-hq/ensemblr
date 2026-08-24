@@ -36,6 +36,18 @@ const SUBAGENT_ROLE: AgentControlRole = 'subagent';
 const NATIVE_MCP_PROVIDERS: ReadonlySet<AgentProviderId> = new Set(['claude']);
 
 /**
+ * Whether a runtime reaches the control server through its own MCP client, and
+ * so needs the loopback endpoint handed to it at session open. A runtime that
+ * does not — Pi, which loads the shipped extension — reads the same control
+ * server out of its env instead.
+ * @param provider - The runtime a session is pinned to.
+ * @returns True when the session needs the MCP endpoint on its open request.
+ */
+export function usesNativeControlMcp(provider: AgentProviderId): boolean {
+	return NATIVE_MCP_PROVIDERS.has(provider);
+}
+
+/**
  * Runtimes that ship a sub-agent tool of their own, and so have two delegation
  * mechanisms to choose between. A runtime absent from this set always resolves
  * to `ensemblr`: withholding the chat-tab spawn ops from a runtime with nothing

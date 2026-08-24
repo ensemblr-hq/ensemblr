@@ -64,6 +64,7 @@ export {
 export { readStoredWorkspaceSelection } from './selection-storage';
 export { resolveRunningCloseTarget } from './session-tab-close';
 export { shouldSelectOnTabClick } from './session-tab-select';
+export { basenameOf } from './session-tab-titles';
 export { useSessionTabState } from './session-tabs';
 export {
 	collapsedProjectIdsAtom,

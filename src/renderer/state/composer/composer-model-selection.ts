@@ -4,6 +4,7 @@ import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { agentModelsQuery } from '@/renderer/api/ensemblr-queries';
+import { toComposerModelOptions } from '@/renderer/lib/workbench';
 import { thinkingLevelLabel } from '@/renderer/lib/workbench/thinking-labels';
 import {
 	chatModelOverrideAtomFamily,
@@ -91,19 +92,10 @@ export function useComposerModelSelection({
 	const [defaultModelId] = useAtom(defaultChatModelAtom);
 	const [defaultThinkingLevel] = useAtom(defaultChatThinkingLevelAtom);
 
-	const availableModels = useMemo<readonly ComposerModelOption[]>(() => {
-		if (!models) {
-			return [];
-		}
-		return models.models.map((model) => ({
-			agentProvider: normalizeAgentProviderId(model.agentProvider),
-			contextWindow: model.contextWindow,
-			displayName: model.displayName,
-			id: model.id,
-			isDefault: model.id === models.defaultModelId,
-			vendor: model.vendor,
-		}));
-	}, [models]);
+	const availableModels = useMemo<readonly ComposerModelOption[]>(
+		() => toComposerModelOptions(models),
+		[models],
+	);
 
 	const modelId =
 		chatModelOverride ??
