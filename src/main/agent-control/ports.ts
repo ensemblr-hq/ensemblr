@@ -416,16 +416,22 @@ export interface FocusPort {
  *
  * Concierge-only, and deliberately narrow: an agent that can create a worktree
  * and a branch is one that can spend disk and run a setup script, so the port
- * takes the project, an optional name, and an optional base branch — nothing
- * that reshapes the repository. Linking a Linear issue is deliberately absent:
- * the link needs the issue's identifier, title, and URL rather than its id, so
+ * takes the project, the name, and an optional base branch — nothing that
+ * reshapes the repository. Linking a Linear issue is deliberately absent: the
+ * link needs the issue's identifier, title, and URL rather than its id, so
  * exposing it here would mean a Linear read inside the port for a field the
  * agent can set afterwards with `ensemblr_linear_update_issue`.
+ *
+ * The name is required here as well as at the boundary schema, because the
+ * create service falls back to the literal placeholder `workspace` when handed
+ * none — a worktree called "workspace" on `<prefix>/workspace` that the next one
+ * collides with. Leaving it optional on the port would keep that hole open to
+ * every future caller.
  */
 export interface WorkspaceCreationPort {
 	createWorkspace: (input: {
 		baseBranch?: string;
-		name?: string;
+		name: string;
 		projectId: string;
 	}) => Promise<CreatedWorkspaceResult>;
 }

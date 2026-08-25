@@ -2,6 +2,7 @@ export {
 	buildConciergeReferences,
 	conciergeReferenceAttachment,
 	conciergeReferenceChipKind,
+	conciergeReferenceTitle,
 	findConciergeReference,
 } from './reference-catalog';
 export { mergeConciergeEvents } from './transcript-merge';

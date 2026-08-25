@@ -1,5 +1,8 @@
 import { ChatAttachmentChip } from '@/renderer/components/chat-attachment-chip';
-import { conciergeReferenceChipKind } from '@/renderer/lib/concierge';
+import {
+	conciergeReferenceChipKind,
+	conciergeReferenceTitle,
+} from '@/renderer/lib/concierge';
 import {
 	CONCIERGE_REFERENCE_ID_ATTRIBUTE,
 	CONCIERGE_REFERENCE_KIND_ATTRIBUTE,
@@ -56,23 +59,9 @@ export function ConciergeReferenceChip({
 					? undefined
 					: () => access.openReference(reference)
 			}
-			title={referenceTitle(reference)}
+			title={conciergeReferenceTitle(reference)}
 		/>
 	);
-}
-
-/** What the chip's tooltip says, qualifying a name that repeats across the app. */
-function referenceTitle(reference: ConciergeReference): string {
-	if (reference.kind === 'artifact') {
-		return reference.path;
-	}
-	if (reference.kind === 'workspace') {
-		return `${reference.project} › ${reference.label}`;
-	}
-	if (reference.kind === 'chat') {
-		return `${reference.workspace} › ${reference.label}`;
-	}
-	return reference.label;
 }
 
 /** Narrows the rewritten element's kind attribute back to a reference kind. */

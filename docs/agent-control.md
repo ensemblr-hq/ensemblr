@@ -318,7 +318,7 @@ fragment and a colour code cut before its `ESC` reads as ordinary text.
 | `ensemblr_focus_dock_tab` | `terminalId?: string`, `kind?: 'setup' \| 'run'` — exactly one — `workspaceId?: string` | write | — |
 | `ensemblr_focus_panel` | **`panel: 'files' \| 'changes' \| 'checks'`**, `workspaceId?: string` | write | — |
 | `ensemblr_focus_workspace` | **`workspaceId: string`** | write | workspace agent |
-| `ensemblr_create_workspace` | **`projectId: string`**, `name?: string`, `baseBranch?: string` | write, spawn | workspace agent |
+| `ensemblr_create_workspace` | **`projectId: string`**, **`name: string`**, `baseBranch?: string` | write, spawn | workspace agent |
 | `ensemblr_set_workspace_status` | **`status: 'backlog' \| 'in-progress' \| 'in-review' \| 'done' \| 'canceled'`**, `workspaceId?: string` | write | sub-agent |
 | `ensemblr_get_workspace_status` | `workspaceId?: string` | read | — |
 | `ensemblr_list_projects` | *(none)* | read | workspace agent |
@@ -451,6 +451,17 @@ place a `projectId` for a project with **no live workspace** is handed out —
 it, so an idle project is invisible there and `ensemblr_create_workspace` has
 nothing to be called with. Each row carries `workspaceCount`, which is how a
 project with no work in it is told from one that is busy.
+
+`ensemblr_create_workspace` takes its `name` as a requirement rather than a
+courtesy, because that one string is two things: the workspace the user reads in
+the sidebar, and the git branch, which the create service slugs and joins to the
+repository's branch prefix. Omitting it is not neutral — the service falls back
+to the literal placeholder `workspace`, so the worktree lands as "workspace" on
+`<prefix>/workspace` and the next one collides with it. The boundary schema
+therefore rejects both an empty name and a list of placeholders (`workspace`,
+`task`, `temp`, `test`, and friends) with a message naming what a good one looks
+like. A successful create also moves the app's route to the new workspace, over
+the same `focusWorkspace` port `ensemblr_focus_workspace` uses.
 
 The Concierge writes a memory as an ordinary file under `<root>/concierge/memory/`
 — which its tool policy admits because that path is inside its own home — and a

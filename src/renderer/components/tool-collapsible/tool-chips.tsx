@@ -3,7 +3,7 @@ import { ChatAttachmentChip } from '@/renderer/components/chat-attachment-chip';
 import { chipLabelForPath } from '@/renderer/lib/agent-timeline';
 import { cn } from '@/renderer/lib/utils';
 import type {
-	ToolBadgeDescriptor,
+	ToolFileBadgeDescriptor,
 	ToolTone,
 } from '@/renderer/types/tool-presentation';
 
@@ -77,7 +77,7 @@ export function ToolFileBadge({
 	badge,
 	onActivate,
 }: {
-	badge: ToolBadgeDescriptor;
+	badge: ToolFileBadgeDescriptor;
 	onActivate?: () => void;
 }) {
 	const hasCounts = badge.additions !== null || badge.deletions !== null;

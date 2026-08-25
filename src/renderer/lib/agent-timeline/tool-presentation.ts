@@ -2,6 +2,7 @@ import type { DynamicToolUIPart } from 'ai';
 import { i18n } from '@/renderer/lib/i18n';
 import type { PiCustomMessageData } from '@/renderer/types/agent-timeline';
 import type {
+	TimelineSurface,
 	ToolGlyph,
 	ToolPresentation,
 } from '@/renderer/types/tool-presentation';
@@ -11,7 +12,7 @@ import {
 	ensemblrToolLabel,
 } from './ensemblr-tool-presentation';
 import { looksLikeStackTrace } from './tool-output-classifier';
-import { inputOf, outputOf } from './tool-part-fields';
+import { outputOf } from './tool-part-fields';
 import { presenterFor, restingGlyph } from './tool-presenters';
 
 /**
@@ -86,9 +87,14 @@ function failureTextOf(part: DynamicToolUIPart): string | null {
  * namespacing one runtime wraps it in, which identifies the server and not the
  * call that was refused.
  * @param part - The tool part to project
+ * @param surface - Which transcript the row is rendered in, which decides what
+ * the app's own control tools are called there
  * @returns The row's icon, title, badge, preview, and body
  */
-export function presentToolCall(part: DynamicToolUIPart): ToolPresentation {
+export function presentToolCall(
+	part: DynamicToolUIPart,
+	surface: TimelineSurface = 'workspace',
+): ToolPresentation {
 	const failureText = failureTextOf(part);
 	if (failureText !== null) {
 		return {
@@ -109,16 +115,15 @@ export function presentToolCall(part: DynamicToolUIPart): ToolPresentation {
 	const glyph = restingGlyph(part);
 	const isRunning = RUNNING_STATES.has(part.state);
 	const projected = presenterFor(part.toolName)(part);
-	const controlLabel = ensemblrToolLabel(
-		part.toolName,
-		inputOf(part),
-		isRunning,
-	);
+	const controlLabel = ensemblrToolLabel(part, isRunning, surface);
 	const presentation = {
 		...projected,
 		badge: controlLabel?.badge ?? projected.badge,
 		glyph: projected.glyph ?? glyph,
 		title: controlLabel?.title ?? projected.title,
+		...(controlLabel?.unpinnedTitle
+			? { unpinnedTitle: controlLabel.unpinnedTitle }
+			: {}),
 	};
 	if (isRunning) {
 		return { ...presentation, body: { kind: 'pending' } };

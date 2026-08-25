@@ -52,11 +52,32 @@ interface EnsemblrToolLabel {
 	/** The title as `[settled, in flight]`, each resolved in the active language. */
 	title: readonly [() => string, () => string];
 	/**
+	 * The same pair for the Concierge's own transcript, where a spawned
+	 * conversation is a root orchestrator in a workspace the user can talk to
+	 * rather than a sub-agent reporting back — the role `spawnedChildRole` in
+	 * `src/shared/agent-control/awareness.ts` hands a Concierge child. Absent
+	 * when the tool means the same thing on both surfaces.
+	 */
+	conciergeTitle?: readonly [() => string, () => string];
+	/**
 	 * Input paths whose value is appended to the title, first match winning. A
 	 * path may step across a batch with `*` — `comments.*.filePath` — so a call
 	 * that carries its subject inside an array still names it.
 	 */
 	detailKeys?: readonly string[];
+	/**
+	 * The same for the Concierge's transcript, where a chip resolves and can carry
+	 * the subject itself. An empty list is meaningful: it hands the detail to the
+	 * chip rather than falling back to {@link EnsemblrToolLabel.detailKeys}, so a
+	 * spawn row reads "Started a chat" beside a chip painting the chat's name
+	 * instead of "Started a chat: Smoke test" beside a chip painting it a second
+	 * time.
+	 *
+	 * Handed over, not thrown away: whether the chip resolves is only known once a
+	 * component has asked the catalogue, so the detail comes back as the
+	 * presentation's `unpinnedTitle` for the row that ends up pinning nothing.
+	 */
+	conciergeDetailKeys?: readonly string[];
 	/**
 	 * Input paths whose value is a workspace file, pinned as a clickable chip
 	 * rather than appended to the title — the same chip a `write` or an `edit`
@@ -66,6 +87,25 @@ interface EnsemblrToolLabel {
 	 * two in their own slots rather than spending the title on the path.
 	 */
 	pathKeys?: readonly string[];
+	/**
+	 * Paths whose value is a workspace id, pinned as a workspace chip carrying
+	 * that workspace's current name. Resolved against the call's arguments first
+	 * and its result second, so the one tool that is handed a workspace and the
+	 * one that produces a workspace are described by the same key.
+	 *
+	 * A raw id is the worst thing a row can spell out: it is unreadable, it fills
+	 * the title, and it names something the user cannot click. The chip is what
+	 * turns it back into a name and a destination.
+	 */
+	workspaceKeys?: readonly string[];
+	/**
+	 * The same, for a chat tab id. Outranks {@link EnsemblrToolLabel.workspaceKeys}
+	 * when a tool declares both: what a spawn produced is a conversation, and the
+	 * workspace holding it is where that conversation already lives. Declaring
+	 * both is how a spawn still says *something* while its tab is unnamed, which
+	 * is exactly the moment the row is written.
+	 */
+	chatKeys?: readonly string[];
 }
 
 /**
@@ -96,6 +136,7 @@ export const ENSEMBLR_TOOL_LABELS: Record<string, EnsemblrToolLabel> = {
 		],
 	},
 	ensemblr_close_tab: {
+		chatKeys: ['chatTabId'],
 		glyph: 'square-x',
 		title: [
 			() => i18n.t('workbench:control-tool.close-tab.done', 'Closed a tab'),
@@ -148,7 +189,6 @@ export const ENSEMBLR_TOOL_LABELS: Record<string, EnsemblrToolLabel> = {
 		],
 	},
 	ensemblr_focus_workspace: {
-		detailKeys: ['workspaceId'],
 		glyph: 'crosshair',
 		title: [
 			() =>
@@ -162,10 +202,10 @@ export const ENSEMBLR_TOOL_LABELS: Record<string, EnsemblrToolLabel> = {
 					'Opening a workspace',
 				),
 		],
+		workspaceKeys: ['workspaceId'],
 	},
 	ensemblr_create_workspace: {
-		detailKeys: ['projectId', 'name'],
-		glyph: 'crosshair',
+		glyph: 'git-branch-plus',
 		title: [
 			() =>
 				i18n.t(
@@ -178,6 +218,7 @@ export const ENSEMBLR_TOOL_LABELS: Record<string, EnsemblrToolLabel> = {
 					'Creating a workspace',
 				),
 		],
+		workspaceKeys: ['workspaceId'],
 	},
 	ensemblr_recall_memory: {
 		detailKeys: ['query'],
@@ -193,6 +234,7 @@ export const ENSEMBLR_TOOL_LABELS: Record<string, EnsemblrToolLabel> = {
 		],
 	},
 	ensemblr_focus_tab: {
+		chatKeys: ['chatTabId'],
 		glyph: 'crosshair',
 		title: [
 			() => i18n.t('workbench:control-tool.focus-tab.done', 'Focused a tab'),
@@ -232,6 +274,19 @@ export const ENSEMBLR_TOOL_LABELS: Record<string, EnsemblrToolLabel> = {
 		],
 	},
 	ensemblr_get_conversation_status: {
+		chatKeys: ['agentSessionId'],
+		conciergeTitle: [
+			() =>
+				i18n.t(
+					'workbench:control-tool.get-conversation-status.concierge.done',
+					'Checked a chat',
+				),
+			() =>
+				i18n.t(
+					'workbench:control-tool.get-conversation-status.concierge.running',
+					'Checking a chat',
+				),
+		],
 		glyph: 'bot',
 		title: [
 			() =>
@@ -263,6 +318,19 @@ export const ENSEMBLR_TOOL_LABELS: Record<string, EnsemblrToolLabel> = {
 		],
 	},
 	ensemblr_get_last_message: {
+		chatKeys: ['agentSessionId'],
+		conciergeTitle: [
+			() =>
+				i18n.t(
+					'workbench:control-tool.get-last-message.concierge.done',
+					"Read a chat's report",
+				),
+			() =>
+				i18n.t(
+					'workbench:control-tool.get-last-message.concierge.running',
+					"Reading a chat's report",
+				),
+		],
 		glyph: 'bot',
 		title: [
 			() =>
@@ -501,6 +569,19 @@ export const ENSEMBLR_TOOL_LABELS: Record<string, EnsemblrToolLabel> = {
 		],
 	},
 	ensemblr_read_conversation: {
+		chatKeys: ['agentSessionId'],
+		conciergeTitle: [
+			() =>
+				i18n.t(
+					'workbench:control-tool.read-conversation.concierge.done',
+					"Read a chat's transcript",
+				),
+			() =>
+				i18n.t(
+					'workbench:control-tool.read-conversation.concierge.running',
+					"Reading a chat's transcript",
+				),
+		],
 		glyph: 'bot',
 		title: [
 			() =>
@@ -531,6 +612,19 @@ export const ENSEMBLR_TOOL_LABELS: Record<string, EnsemblrToolLabel> = {
 		],
 	},
 	ensemblr_send_follow_up: {
+		chatKeys: ['agentSessionId'],
+		conciergeTitle: [
+			() =>
+				i18n.t(
+					'workbench:control-tool.send-follow-up.concierge.done',
+					'Steered a chat',
+				),
+			() =>
+				i18n.t(
+					'workbench:control-tool.send-follow-up.concierge.running',
+					'Steering a chat',
+				),
+		],
 		glyph: 'send',
 		title: [
 			() =>
@@ -578,6 +672,20 @@ export const ENSEMBLR_TOOL_LABELS: Record<string, EnsemblrToolLabel> = {
 		],
 	},
 	ensemblr_start_conversation: {
+		chatKeys: ['chatTabId'],
+		conciergeDetailKeys: [],
+		conciergeTitle: [
+			() =>
+				i18n.t(
+					'workbench:control-tool.start-conversation.concierge.done',
+					'Started a chat',
+				),
+			() =>
+				i18n.t(
+					'workbench:control-tool.start-conversation.concierge.running',
+					'Starting a chat',
+				),
+		],
 		detailKeys: ['title'],
 		glyph: 'bot',
 		title: [
@@ -592,6 +700,7 @@ export const ENSEMBLR_TOOL_LABELS: Record<string, EnsemblrToolLabel> = {
 					'Starting a sub-agent',
 				),
 		],
+		workspaceKeys: ['workspaceId'],
 	},
 	ensemblr_start_terminal: {
 		detailKeys: ['scriptName', 'kind'],
@@ -626,6 +735,18 @@ export const ENSEMBLR_TOOL_LABELS: Record<string, EnsemblrToolLabel> = {
 		],
 	},
 	ensemblr_wait_for_agents: {
+		conciergeTitle: [
+			() =>
+				i18n.t(
+					'workbench:control-tool.wait-for-agents.concierge.done',
+					'Waited for the chats',
+				),
+			() =>
+				i18n.t(
+					'workbench:control-tool.wait-for-agents.concierge.running',
+					'Waiting for the chats',
+				),
+		],
 		glyph: 'hourglass',
 		title: [
 			() =>

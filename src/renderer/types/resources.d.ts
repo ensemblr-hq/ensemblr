@@ -2621,6 +2621,10 @@ export default interface Resources {
 				running: 'Opening a workspace';
 			};
 			'get-conversation-status': {
+				concierge: {
+					done: 'Checked a chat';
+					running: 'Checking a chat';
+				};
 				done: 'Checked a sub-agent';
 				running: 'Checking a sub-agent';
 			};
@@ -2629,6 +2633,10 @@ export default interface Resources {
 				running: 'Reading review comments';
 			};
 			'get-last-message': {
+				concierge: {
+					done: "Read a chat's report";
+					running: "Reading a chat's report";
+				};
 				done: "Read a sub-agent's report";
 				running: "Reading a sub-agent's report";
 			};
@@ -2697,6 +2705,10 @@ export default interface Resources {
 				running: 'Opening a tab';
 			};
 			'read-conversation': {
+				concierge: {
+					done: "Read a chat's transcript";
+					running: "Reading a chat's transcript";
+				};
 				done: "Read a sub-agent's transcript";
 				running: "Reading a sub-agent's transcript";
 			};
@@ -2713,6 +2725,10 @@ export default interface Resources {
 				running: 'Resolving review comments';
 			};
 			'send-follow-up': {
+				concierge: {
+					done: 'Steered a chat';
+					running: 'Steering a chat';
+				};
 				done: 'Steered a sub-agent';
 				running: 'Steering a sub-agent';
 			};
@@ -2725,6 +2741,10 @@ export default interface Resources {
 				running: 'Opening a chat tab';
 			};
 			'start-conversation': {
+				concierge: {
+					done: 'Started a chat';
+					running: 'Starting a chat';
+				};
 				done: 'Started a sub-agent';
 				running: 'Starting a sub-agent';
 			};
@@ -2737,6 +2757,10 @@ export default interface Resources {
 				running: 'Stopping a terminal';
 			};
 			'wait-for-agents': {
+				concierge: {
+					done: 'Waited for the chats';
+					running: 'Waiting for the chats';
+				};
 				done: 'Waited for sub-agents';
 				running: 'Waiting for sub-agents';
 			};

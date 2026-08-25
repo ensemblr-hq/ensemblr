@@ -138,6 +138,29 @@ describe('the Concierge reference catalogue', () => {
 		expect(findConciergeReference(references, 'workspace', 'gone')).toBeNull();
 		expect(findConciergeReference(references, 'chat', 'ws-1')).toBeNull();
 	});
+
+	// The control surface names a conversation from the far end: every op that
+	// steers, checks, or reads one takes an `agentSessionId`, so a timeline row
+	// for one of them has no tab id to look a chip up by.
+	it('looks a chat up by its agent session as well as its tab', () => {
+		const references = buildConciergeReferences({
+			chatTabs: {
+				closed: [],
+				open: [
+					tab({ agentSessionId: 'session-1', id: 'tab-1', title: 'a chat' }),
+				],
+			},
+			projects: PROJECTS,
+		});
+
+		expect(findConciergeReference(references, 'chat', 'tab-1')).toMatchObject({
+			label: 'a chat',
+		});
+		expect(
+			findConciergeReference(references, 'chat', 'session-1'),
+		).toMatchObject({ label: 'a chat' });
+		expect(findConciergeReference(references, 'chat', 'session-9')).toBeNull();
+	});
 });
 
 describe('sending a reference chip', () => {

@@ -4,7 +4,7 @@
  * runs. Each schema is keyed by its {@link AgentControlOp} in {@link AGENT_CONTROL_ARG_SCHEMAS}.
  */
 import { z } from 'zod';
-
+import { toSlug } from '../slug.ts';
 import { canonicalizeArgs } from './arg-naming.ts';
 import type { AskUserQuestionReply } from './contracts.ts';
 import {
@@ -191,9 +191,71 @@ const focusWorkspaceSchema = z.strictObject({
 	workspaceId: nonEmpty,
 });
 
+/**
+ * Slugs a new workspace may not be given.
+ *
+ * `workspace` is the placeholder the create service falls back to when it is
+ * handed no name at all, so accepting it produces exactly the row this rule
+ * exists to prevent — a worktree called "workspace" on a branch called
+ * `<prefix>/workspace`, which says nothing and collides with the next one. The
+ * rest are the stand-ins a model reaches for instead of thinking of a name.
+ */
+const PLACEHOLDER_WORKSPACE_SLUGS: ReadonlySet<string> = new Set([
+	'agent',
+	'new',
+	'new-workspace',
+	'scratch',
+	'task',
+	'temp',
+	'test',
+	'tmp',
+	'untitled',
+	'work',
+	'workspace',
+]);
+
+/**
+ * Fewest letters and digits a workspace name may reduce to. Two characters
+ * cannot describe work, and the name becomes the branch, so the floor is the
+ * branch's too.
+ */
+const MIN_WORKSPACE_NAME_CHARACTERS = 3;
+
+/**
+ * Counts the letters and digits a name survives slugging as, which is what the
+ * floor is about: the dashes a slug joins words with describe nothing, so `a b`
+ * is two characters rather than three.
+ * @param value - The raw name the agent sent.
+ * @returns How many alphanumerics the slug holds.
+ */
+function slugCharacterCount(value: string): number {
+	return toSlug(value).replaceAll('-', '').length;
+}
+
+/**
+ * The name a new workspace is cut with, which is also its branch: the create
+ * service slugs it and joins it to the repository's branch prefix. Required
+ * rather than optional, and held to a real description, because the fallback is
+ * silent — an omitted name yields `workspace` and nobody finds out until they
+ * look at the sidebar.
+ */
+const workspaceName = nonEmpty
+	.max(SET_BRANCH_NAME_LIMITS.maxRawLength)
+	.refine(
+		(value) => slugCharacterCount(value) >= MIN_WORKSPACE_NAME_CHARACTERS,
+		{
+			message:
+				'Name the workspace for the work it will hold, as you would name a branch — e.g. "add dark mode" or "fix-linear-oauth-callback". It must contain at least three letters or digits.',
+		},
+	)
+	.refine((value) => !PLACEHOLDER_WORKSPACE_SLUGS.has(toSlug(value)), {
+		message:
+			'That is a placeholder, not a name. The workspace and its git branch both carry it, so name it for the work — e.g. "add dark mode" or "fix-linear-oauth-callback".',
+	});
+
 const createWorkspaceSchema = z.strictObject({
 	baseBranch: nonEmpty.optional(),
-	name: nonEmpty.optional(),
+	name: workspaceName,
 	projectId: nonEmpty,
 });
 

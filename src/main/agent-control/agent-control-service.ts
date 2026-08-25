@@ -1430,9 +1430,18 @@ export function createAgentControlService({
 
 	/**
 	 * Cuts a new workspace off a project, so the Concierge can start work that has
-	 * nowhere to live yet rather than asking the user to make the worktree by hand.
+	 * nowhere to live yet rather than asking the user to make the worktree by hand,
+	 * and moves the app to it.
+	 *
+	 * The route follows the worktree because a workspace nobody is looking at is
+	 * indistinguishable from one that was never made: the sidebar only refreshes
+	 * its tree on a poll, so without the focus the user watches the Concierge
+	 * report a workspace that is not on screen anywhere. It is the same op
+	 * `ensemblr_focus_workspace` runs, which already handles a workspace this
+	 * window has never opened.
 	 * @param origin - Resolved caller identity.
-	 * @param args - Project to fork, and the optional name, base branch, and issue.
+	 * @param args - Project to fork, the name the workspace and its branch are
+	 * cut with, and the optional base branch.
 	 * @returns The created workspace, or a failure envelope.
 	 */
 	const handleCreateWorkspace = async (
@@ -1449,13 +1458,13 @@ export function createAgentControlService({
 		if (!port) {
 			return fail('internal', 'Workspace creation is unavailable.');
 		}
-		return ok(
-			await port.createWorkspace({
-				...(args.baseBranch ? { baseBranch: args.baseBranch } : {}),
-				...(args.name ? { name: args.name } : {}),
-				projectId: args.projectId,
-			}),
-		);
+		const created = await port.createWorkspace({
+			...(args.baseBranch ? { baseBranch: args.baseBranch } : {}),
+			name: args.name,
+			projectId: args.projectId,
+		});
+		ports.focus.focusWorkspace({ workspaceId: created.workspaceId });
+		return ok(created);
 	};
 
 	/**
