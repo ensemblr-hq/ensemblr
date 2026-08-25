@@ -234,10 +234,10 @@ export const TOOL_DEFS: readonly McpToolDef[] = [
 		name: 'ensemblr_create_workspace',
 		op: 'createWorkspace',
 		description:
-			'Cut a new workspace (a git worktree on its own branch) off a project, then put an orchestrator in it with ensemblr_start_conversation. Concierge only.',
+			'Cut a new workspace (a git worktree on its own branch) off a project, then put an orchestrator in it with ensemblr_start_conversation. Concierge only. `name` is required and is what the user reads in the sidebar AND what the git branch is cut as — the app slugs it and joins it to the repository\'s branch prefix, so "Fix Linear OAuth callback" becomes the branch <prefix>/fix-linear-oauth-callback. Name it for the work the way you would name a branch, in 2-5 words. Placeholders such as "workspace", "task", "temp", or "test" are refused.',
 		shape: {
 			baseBranch: z.string().optional(),
-			name: z.string().optional(),
+			name: z.string(),
 			projectId: z.string(),
 		},
 	},

@@ -1199,12 +1199,12 @@ const conciergePorts = {
 			projectId,
 		}: {
 			baseBranch?: string;
-			name?: string;
+			name: string;
 			projectId: string;
 		}) => {
 			const result = await createWorkspaceServiceWithSetup.create({
 				...(baseBranch ? { baseBranch } : {}),
-				...(name ? { name } : {}),
+				name,
 				repositoryId: projectId,
 			});
 			const workspace = result.workspace;

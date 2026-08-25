@@ -2435,6 +2435,15 @@ describe('agent-control service: audience resolution', () => {
 	});
 });
 
+// The row `ensemblr_create_workspace` reports when the Concierge cuts one.
+const CREATED_WORKSPACE = {
+	branchName: 'psoldunov/beta-16',
+	name: 'beta-16',
+	path: '/repos/bruckner/beta-16',
+	projectId: 'repo-1',
+	workspaceId: 'ws-new',
+};
+
 /**
  * A Concierge origin plus the ports a supervising turn actually reaches: a home
  * to check writes against, and a workspace list to resolve a named id in.
@@ -2456,6 +2465,9 @@ const setupConcierge = (
 			homePath: () => '/root/concierge',
 		},
 		memory: { recall: vi.fn().mockReturnValue({ memories: [] }) },
+		workspaceCreation: {
+			createWorkspace: vi.fn().mockResolvedValue(CREATED_WORKSPACE),
+		},
 		workspaces: {
 			listProjects: vi.fn().mockResolvedValue([
 				{
@@ -2623,6 +2635,70 @@ describe('agent-control service: the Concierge boundary', () => {
 			expect(ports.focus.focusWorkspace).not.toHaveBeenCalled();
 		},
 	);
+
+	// A workspace nobody is looking at is indistinguishable from one that was
+	// never made: the shell's tree only refreshes on a poll, so without the focus
+	// the Concierge reports a workspace that is on screen nowhere.
+	it('moves the app to the workspace it just cut', async () => {
+		const { ports, service } = setupConcierge();
+
+		const result = await service.invoke({
+			op: 'createWorkspace',
+			rawArgs: { name: 'beta-16', projectId: 'repo-1' },
+			token: 'tok-caller',
+		});
+
+		expect(result).toMatchObject({ data: CREATED_WORKSPACE, ok: true });
+		expect(ports.focus.focusWorkspace).toHaveBeenCalledWith({
+			workspaceId: CREATED_WORKSPACE.workspaceId,
+		});
+	});
+
+	// The name is the git branch too, and omitting it is not neutral: the create
+	// service falls back to the literal placeholder `workspace`, so the worktree
+	// lands on `<prefix>/workspace` and the next one collides with it.
+	it.each([
+		['a missing name', { projectId: 'repo-1' }],
+		['a blank name', { name: '   ', projectId: 'repo-1' }],
+		['a name with no slug characters', { name: '///', projectId: 'repo-1' }],
+		['a name too short to describe work', { name: 'ab', projectId: 'repo-1' }],
+		// The slug of `a b` is `a-b` — three characters, but the dash describes
+		// nothing, so the floor counts the two letters it actually holds.
+		['two letters a separator pads out', { name: 'a b', projectId: 'repo-1' }],
+		['the placeholder itself', { name: 'workspace', projectId: 'repo-1' }],
+		[
+			'a placeholder in disguise',
+			{ name: 'New Workspace', projectId: 'repo-1' },
+		],
+		['a generic stand-in', { name: 'test', projectId: 'repo-1' }],
+	])('refuses to cut a workspace with %s', async (_case, rawArgs) => {
+		const { ports, service } = setupConcierge();
+
+		const result = await service.invoke({
+			op: 'createWorkspace',
+			rawArgs,
+			token: 'tok-caller',
+		});
+
+		expect(result).toMatchObject({ code: 'invalid-args', ok: false });
+		expect(ports.workspaceCreation?.createWorkspace).not.toHaveBeenCalled();
+	});
+
+	it('cuts a workspace whose name describes the work', async () => {
+		const { ports, service } = setupConcierge();
+
+		const result = await service.invoke({
+			op: 'createWorkspace',
+			rawArgs: { name: 'Fix Linear OAuth callback', projectId: 'repo-1' },
+			token: 'tok-caller',
+		});
+
+		expect(result).toMatchObject({ ok: true });
+		expect(ports.workspaceCreation?.createWorkspace).toHaveBeenCalledWith({
+			name: 'Fix Linear OAuth callback',
+			projectId: 'repo-1',
+		});
+	});
 
 	it.each(['addDiffComments', 'resolveDiffComments'] as const)(
 		'files %s against the workspace it names, not the empty one',
@@ -2813,7 +2889,10 @@ describe('agent-control service: a retired Concierge child', () => {
 	});
 
 	it.each([
-		{ op: 'createWorkspace', rawArgs: { projectId: 'repo-1' } },
+		{
+			op: 'createWorkspace',
+			rawArgs: { name: 'beta-16', projectId: 'repo-1' },
+		},
 		{ op: 'focusWorkspace', rawArgs: { workspaceId: 'ws-1' } },
 		{ op: 'listProjects', rawArgs: {} },
 		{

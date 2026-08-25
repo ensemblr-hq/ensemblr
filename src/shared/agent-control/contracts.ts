@@ -852,7 +852,13 @@ export interface FocusWorkspaceArgs {
 /** Args for `createWorkspace`: cut a new workspace off a project. Concierge-only. */
 export interface CreateWorkspaceArgs {
 	baseBranch?: string;
-	name?: string;
+	/**
+	 * What the workspace is for, which becomes its git branch: the create service
+	 * slugs it and joins it to the repository's branch prefix. Required, and
+	 * validated against a placeholder list, because omitting it used to yield a
+	 * worktree called `workspace` on a branch called `<prefix>/workspace`.
+	 */
+	name: string;
 	projectId: string;
 }
 
