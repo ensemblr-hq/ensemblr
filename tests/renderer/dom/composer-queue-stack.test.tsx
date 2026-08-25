@@ -1,7 +1,8 @@
 // @vitest-environment happy-dom
 
-import { screen } from '@testing-library/react';
+import { fireEvent, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { useState } from 'react';
 import { describe, expect, test, vi } from 'vitest';
 
 import { FollowUpQueueList } from '../../../src/renderer/components/workbench-shell/conversation-panel/composer/follow-up-queue-list';
@@ -208,6 +209,13 @@ describe('the queue list', () => {
 		).toBeInTheDocument();
 	});
 
+	test('drops the reorder handle when a lone entry has nowhere to move', () => {
+		renderList([entry('a', 'only')]);
+
+		expect(screen.queryByRole('button', { name: /Reorder/ })).toBeNull();
+		expect(screen.getByText('1')).toBeInTheDocument();
+	});
+
 	test('shows how many chips an entry carries', () => {
 		renderList([entry('a', 'with a file', { withAttachment: true })]);
 
@@ -323,5 +331,84 @@ describe('reordering from the keyboard', () => {
 		await userEvent.keyboard('{ArrowUp}');
 
 		expect(onMove).not.toHaveBeenCalled();
+	});
+});
+
+/**
+ * Renders the list over entries the test can shrink, so a queue draining to its
+ * last message goes through the same render the composer puts it through.
+ */
+function DrainableQueue({ initial }: { initial: readonly QueuedFollowUp[] }) {
+	const [entries, setEntries] = useState(initial);
+
+	return (
+		<>
+			<button
+				onClick={() => setEntries((current) => current.slice(1))}
+				type='button'
+			>
+				drain the head
+			</button>
+			<FollowUpQueueList
+				entries={entries}
+				onEdit={vi.fn()}
+				onMove={vi.fn()}
+				onRemove={vi.fn()}
+				onReorder={vi.fn()}
+				onSteer={vi.fn()}
+				streaming={true}
+			/>
+		</>
+	);
+}
+
+/** Renders a shrinkable queue and hands back the control that drains its head. */
+function renderDrainableQueue(entries: readonly QueuedFollowUp[]) {
+	renderWithProviders(<DrainableQueue initial={entries} />);
+	return screen.getByRole('button', { name: 'drain the head' });
+}
+
+describe('focus when a drain takes the handle away', () => {
+	test('the row catches the focus its handle was holding', () => {
+		const drain = renderDrainableQueue([
+			entry('a', 'first'),
+			entry('b', 'second'),
+		]);
+		screen.getByRole('button', { name: 'Reorder, position 2' }).focus();
+
+		fireEvent.click(drain);
+
+		expect(screen.queryByRole('button', { name: /Reorder/ })).toBeNull();
+		expect(document.activeElement).toBe(
+			screen.getByText('second').closest('li'),
+		);
+	});
+
+	test('a row action that survives the drain keeps its own focus', () => {
+		const drain = renderDrainableQueue([
+			entry('a', 'first'),
+			entry('b', 'second'),
+		]);
+		const tailRemove = screen.getAllByRole('button', {
+			name: 'Remove from queue',
+		})[1];
+		tailRemove?.focus();
+
+		fireEvent.click(drain);
+
+		expect(document.activeElement).toBe(
+			screen.getByRole('button', { name: 'Remove from queue' }),
+		);
+	});
+
+	test('a queue nobody was standing in does not pull focus in', () => {
+		const drain = renderDrainableQueue([
+			entry('a', 'first'),
+			entry('b', 'second'),
+		]);
+
+		fireEvent.click(drain);
+
+		expect(document.activeElement).toBe(document.body);
 	});
 });

@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { Reorder, useDragControls, useMotionValue } from 'motion/react';
 import type { KeyboardEvent, PointerEvent, ReactNode } from 'react';
-import { useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/renderer/components/ui/button';
@@ -19,6 +19,15 @@ import {
 import { useRaisedShadow } from '@/renderer/hooks/use-raised-shadow';
 import { cn } from '@/renderer/lib/utils';
 import type { QueuedFollowUp } from '@/renderer/types/workbench';
+
+/**
+ * The column a row's position sits in, shared by the drag handle and the static
+ * marker that stands in for it. A queue crosses depth 1 on every drain, so the
+ * two swap in place constantly and any drift between them reads as the row
+ * jumping rather than as the handle going away.
+ */
+const POSITION_SLOT =
+	'flex h-6 w-5 shrink-0 items-center justify-center font-medium text-xxs tabular-nums';
 
 /** Wiring for one row's drag handle, which doubles as its position marker. */
 interface DragHandleProps {
@@ -104,19 +113,87 @@ function DragHandle({
 				},
 			)}
 			className={cn(
-				'group/handle flex h-6 w-5 shrink-0 cursor-grab touch-none items-center justify-center rounded-sm focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50 active:cursor-grabbing',
+				'group/handle cursor-grab touch-none rounded-sm focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50 active:cursor-grabbing',
+				POSITION_SLOT,
 				isFirst ? 'text-accent-strong' : 'text-muted-foreground',
 			)}
 			onKeyDown={handleKeyDown}
 			onPointerDown={onPointerDown}
 			type='button'
 		>
-			<span className='font-medium text-xxs tabular-nums group-hover/row:hidden group-focus-visible/handle:hidden'>
+			<span className='group-hover/row:hidden group-focus-visible/handle:hidden'>
 				{position}
 			</span>
 			<GripVerticalIcon className='hidden size-3.5 group-hover/row:block group-focus-visible/handle:block' />
 		</button>
 	);
+}
+
+/**
+ * Where a row sits, for a queue that cannot be reordered.
+ *
+ * A lone entry has nowhere to move to, so it keeps the position number but
+ * neither the grip on hover nor a control that answers the arrow keys — a handle
+ * that reorders nothing reads as an action the row does not have.
+ */
+function QueuePositionMarker({
+	isFirst,
+	position,
+}: {
+	isFirst: boolean;
+	position: number;
+}) {
+	return (
+		<span
+			aria-hidden='true'
+			className={cn(
+				POSITION_SLOT,
+				isFirst ? 'text-accent-strong' : 'text-muted-foreground',
+			)}
+		>
+			{position}
+		</span>
+	);
+}
+
+/**
+ * Keeps a row's focus on the row when its drag handle is taken away.
+ *
+ * A queue draining to its last entry swaps that handle for a static marker,
+ * which unmounts the button a keyboard user may be standing on and drops focus
+ * to the document body — the tab order then restarts from the top of the app.
+ * Nothing else restores it, so the row catches the focus itself and holds the
+ * user on the message they were already reading.
+ *
+ * The row's action buttons survive the swap and keep their own focus, which is
+ * what the containment check reads: focus still inside the row never moved.
+ * @param reorderable - Whether the row still renders a drag handle
+ * @returns The row ref to attach, and the handlers that track focus ownership
+ */
+function useRetainedRowFocus(reorderable: boolean) {
+	const rowRef = useRef<HTMLLIElement>(null);
+	const heldFocus = useRef(false);
+
+	useLayoutEffect(() => {
+		const row = rowRef.current;
+		if (reorderable || !heldFocus.current || !row) {
+			return;
+		}
+		if (row.contains(document.activeElement)) {
+			return;
+		}
+		row.focus();
+	}, [reorderable]);
+
+	return {
+		onBlur: () => {
+			heldFocus.current = false;
+		},
+		onFocus: () => {
+			heldFocus.current = true;
+		},
+		rowRef,
+	};
 }
 
 /**
@@ -187,6 +264,8 @@ function FollowUpQueueRow({
 	const y = useMotionValue(0);
 	const boxShadow = useRaisedShadow(y);
 	const dragControls = useDragControls();
+	const reorderable = !(isFirst && isLast);
+	const { onBlur, onFocus, rowRef } = useRetainedRowFocus(reorderable);
 	const attachmentCount = entry.segments.filter(
 		(segment) => segment.kind === 'attachment',
 	).length;
@@ -210,7 +289,7 @@ function FollowUpQueueRow({
 	return (
 		<Reorder.Item
 			className={cn(
-				'group/row flex list-none items-center gap-1.5 rounded-md border px-1 py-1 transition-colors',
+				'group/row flex list-none items-center gap-1.5 rounded-md border px-1 py-1 transition-colors focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50',
 				isFirst
 					? 'border-accent-strong/25 bg-accent-strong/5'
 					: 'border-transparent hover:border-border/60 hover:bg-secondary/50',
@@ -219,18 +298,26 @@ function FollowUpQueueRow({
 			dragListener={false}
 			id={entry.id}
 			layout='position'
+			onBlur={onBlur}
 			onDragEnd={onDragEnd}
+			onFocus={onFocus}
+			ref={rowRef}
 			style={{ boxShadow, y }}
+			tabIndex={-1}
 			value={entry.id}
 		>
-			<DragHandle
-				entryId={entry.id}
-				isFirst={isFirst}
-				isLast={isLast}
-				onMove={actions.onMove}
-				onPointerDown={(event) => dragControls.start(event)}
-				position={position}
-			/>
+			{reorderable ? (
+				<DragHandle
+					entryId={entry.id}
+					isFirst={isFirst}
+					isLast={isLast}
+					onMove={actions.onMove}
+					onPointerDown={(event) => dragControls.start(event)}
+					position={position}
+				/>
+			) : (
+				<QueuePositionMarker isFirst={isFirst} position={position} />
+			)}
 			<div className='flex min-w-0 flex-1 flex-col gap-1'>
 				{isFirst ? (
 					<span className='sr-only'>
