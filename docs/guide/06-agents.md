@@ -191,6 +191,14 @@ channel rather than asked for in the prompt:
   of its own to default to, so an op that names none is refused rather than
   guessed at.
 
+### Everything it names, you can click
+
+A project, a workspace, or a chat the Concierge mentions in its answers renders as a chip, the same
+way a file path does. Clicking a workspace or a chat chip focuses it — a closed chat reopens first;
+a project chip has no surface of its own to jump to, so it resolves to the project's name rather
+than sitting there as dead text. Type `@` in its composer to open a menu ranked against every
+project, workspace, and chat in the app, not just the one you happen to be looking at.
+
 ### Its own folder
 
 The Concierge works out of `concierge/` in the Ensemblr root, which is
@@ -263,6 +271,19 @@ supervising a dozen workspaces is not the one that suits editing a file in any o
 them. Picking a model belonging to the other runtime reopens the Concierge on
 that runtime, because a model belongs to exactly one. See
 [11. App settings](./11-app-settings.md#models).
+
+### Telling you what happened while it was closed
+
+The launcher bubble carries a count of what the Concierge said while its panel was shut, plus a
+separate mark for a question it is still waiting on you to answer, so a turn that finishes behind a
+closed panel is not silent just because nobody was looking at it. Opening the panel is what clears
+the count — the transcript on screen is the report.
+
+A finished turn also raises a desktop notification under the Concierge's own name rather than a
+workspace's, and clicking it opens the panel rather than navigating anywhere, since a Concierge
+answer belongs to no workspace to open. It stays quiet only while the panel itself is open in a
+focused window — it has no chat of its own to compare itself against the way a workspace
+notification does.
 
 ## Permission modes
 
@@ -522,7 +543,9 @@ They are **per chat, not per app**: a chat that finishes a turn or stops to ask
 you something posts its own notification, titled with that chat's name and
 naming its workspace in the body, so a fan-out of agents produces one line per
 agent rather than one line for the window. Clicking a notification brings
-Ensemblr forward and opens the chat it came from.
+Ensemblr forward and opens the chat it came from. The Concierge is the one exception: it notifies
+under its own name and clicking it opens its panel rather than a chat — see
+[above](#the-concierge).
 
 A **notification sound** rides alongside, on by default and switchable
 separately — the chat can chime without the notification banner, or the other

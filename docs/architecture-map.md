@@ -44,6 +44,7 @@ each exposing its public surface through `index.ts`.
 | Chat tabs | `chat-tabs/` | Tab service, preview slot, terminal-session persistence |
 | Checkpoints | `checkpoints/` | Git-backed per-turn checkpoints (ADR&nbsp;0012) |
 | Process execution | `commands/` | Local process and shell execution |
+| Concierge | `concierge/` | App-level agent session service, its home-folder layout under the Ensemblr root, the memory index and background memory pass, and the wire that retires a session while it finishes writing memories |
 | Config | `config/` | Declarative config loading, settings resolution, repository config |
 | Environment | `environment/` | Environment-variable catalogue and layered assembly, Infisical joining as its own layer |
 | IPC | `ipc/` | Handler registration (`handlers/`, 33 modules), request validation (`request-schemas/`, 21 modules), permission gate |
@@ -83,13 +84,13 @@ A new feature is split across these buckets, not given a folder of its own.
 | Bucket | Holds | Concern folders inside |
 | --- | --- | --- |
 | `api/` | TanStack Query clients, query options, preload-backed access | `ensemblr/` |
-| `components/` | React components and UI composition | `workbench-shell/`, `conversation/`, `diff-viewer/`, `code-surface/`, `settings/`, `setup-diagnostics/`, `onboarding/`, `git/`, `linear/`, `command-palette/`, `ask-user-question/`, `tool-approval/`, `tool-collapsible/`, `pi-replay/`, `welcome/`, `ui/` (vendored shadcn) |
+| `components/` | React components and UI composition | `workbench-shell/`, `conversation/`, `diff-viewer/`, `code-surface/`, `settings/`, `setup-diagnostics/`, `onboarding/`, `git/`, `linear/`, `command-palette/`, `ask-user-question/`, `tool-approval/`, `tool-collapsible/`, `pi-replay/`, `welcome/`, `concierge/`, `ui/` (vendored shadcn) |
 | `config/` | Stable renderer constants (route stale times, knobs) | — |
-| `hooks/` | Renderer hooks that are not durable shared state | `workbench-shell/`, `workspace/`, `conversation/`, `code-surface/`, `setup-diagnostics/`, `preferences/`, `git/`, `linear/`, `ask-user-question/`, `welcome/` |
-| `lib/` | Runtime helpers grouped by concern | `workbench/`, `agent-timeline/`, `conversation/`, `diff/`, `code/`, `github/`, `linear/`, `pi/`, `pi-replay/`, `terminal/`, `dictation/`, `i18n/` (i18next instance + bundled `locales/`), `onboarding/`, `instrumentation/`, `ask-user-question/`, `welcome/`, `notification-sound/` (the bundled chime and its player), plus the code→`t()` mappers `failure-text/`, `setup-check-text/`, `provider-check-text/`, `plan-limit-text/` |
+| `hooks/` | Renderer hooks that are not durable shared state | `workbench-shell/`, `workspace/`, `conversation/`, `code-surface/`, `setup-diagnostics/`, `preferences/`, `git/`, `linear/`, `ask-user-question/`, `welcome/`, `concierge/` |
+| `lib/` | Runtime helpers grouped by concern | `workbench/`, `agent-timeline/`, `conversation/`, `diff/`, `code/`, `github/`, `linear/`, `pi/`, `pi-replay/`, `terminal/`, `dictation/`, `i18n/` (i18next instance + bundled `locales/`), `onboarding/`, `instrumentation/`, `ask-user-question/`, `welcome/`, `notification-sound/` (the bundled chime and its player), `concierge/`, plus the code→`t()` mappers `failure-text/`, `setup-check-text/`, `provider-check-text/`, `plan-limit-text/` |
 | `fixtures/` | Fixture/demo data production code may still consume | `workbench/` |
 | `routing/` | TanStack Router file routes + generated tree | `routes/` |
-| `state/` | Durable Jotai state | `workspace/`, `composer/`, `pi/`, `plan-mode/`, `preferences/`, `dialogs/`, `recents/`, `sidebar/`, `settings-ui/`, `slash-commands/`, `tool-approval/`, `ask-user-question/`, `conversation-scroll/`, `menu-commands/`, `linear/`, `unread/` |
+| `state/` | Durable Jotai state | `workspace/`, `composer/`, `pi/`, `plan-mode/`, `preferences/`, `dialogs/`, `recents/`, `sidebar/`, `settings-ui/`, `slash-commands/`, `tool-approval/`, `ask-user-question/`, `conversation-scroll/`, `menu-commands/`, `linear/`, `unread/`, `concierge/` |
 | `styles/` | CSS entrypoint (`index.css`) and font assets | — |
 | `types/` | Exported renderer types and ambient declarations | `workbench/`, `workbench-shell/`, `components/`, `onboarding/` |
 
@@ -116,8 +117,8 @@ atom.
 The only code both processes may import. Two shapes coexist:
 
 - **Single-file concerns** — plain root modules (`config.ts`, `permissions.ts`,
-  `github.ts`, `slug.ts`, `menu-commands.ts`, …); 27 `.ts` files sit at the
-  shared root in total.
+  `github.ts`, `slug.ts`, `menu-commands.ts`, `concierge-references.ts`, …); 27
+  `.ts` files sit at the shared root in total.
 - **Multi-file concerns** — an implementation directory behind a stable
   entrypoint, in one of two forms:
   - `<concern>/index.ts` — `ipc/` (38 contract modules under `ipc/contracts/`,
@@ -171,7 +172,7 @@ submits) carries no menu accelerator at all. See ADR&nbsp;0046.
 
 | Data | Location |
 | --- | --- |
-| Repositories, workspaces, sessions, events, chat tabs, settings, linked-directory recents | SQLite at `~/Library/Application Support/dev.ensemblr.app/ensemblr.db` |
+| Repositories, workspaces, sessions, events, chat tabs, settings, linked-directory recents, the Concierge's own sessions, events, and memory index | SQLite at `~/Library/Application Support/dev.ensemblr.app/ensemblr.db` |
 | App settings | `~/.config/ensemblr/config.json` (ADR&nbsp;0029) |
 | Per-repository config | Committed `.ensemblr/settings.toml` (ADR&nbsp;0030, ADR&nbsp;0041) |
 | Composer attachments | Content-addressed under the workspace's `.context/attachments/<digest>/` |
