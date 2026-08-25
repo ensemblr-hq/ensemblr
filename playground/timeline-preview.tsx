@@ -13,6 +13,24 @@ import {
 
 const SHORT_PROMPT = 'Swap the Read row for the line-numbered body.';
 
+const CHIPPED_PROMPT = `Okay I think we are ready to make a new beta release of
+
+Referenced workspace folders:
+@ensemblr
+
+. So update the docs there and cut the beta. Once that is done let's make sure
+
+Referenced workspace folders:
+@ensemblr-dev
+
+is updated with the new release, and check src/renderer/components/chat-user-prompt.tsx while you are in there. Everything under (
+
+Referenced workspace folders:
+@src/main
+@src/renderer
+
+) can wait for the next one.`;
+
 const PASTED_PROMPT = `We have merged some PR so db may be out of sync:
 
 ## Error Type
@@ -143,9 +161,12 @@ function toolPart(
  * Every tool row the app can render, built from realistic Pi payloads and
  * mounted through the real `ChatToolCall`, so a regression in the shipped
  * projection and body components shows up here rather than in hand-written
- * markup that can drift from them. The two user prompts leading the scene cover
- * the card at both ends of its range: one that fits, and a pasted stack trace
- * long enough to clamp and wide enough to test the unbreakable-run wrapping.
+ * markup that can drift from them. The three user prompts leading the scene
+ * cover the card across its range: one that fits, one whose attachment chips sit
+ * mid-sentence so the paragraph has to flow around them — through every case the
+ * reconstructed gap has to get right, a word either side, punctuation binding
+ * from either side, and two chips in a row — and a pasted stack trace long
+ * enough to clamp and wide enough to test the unbreakable-run wrapping.
  */
 export function TimelinePreview() {
 	return (
@@ -159,6 +180,8 @@ export function TimelinePreview() {
 			<FilePreviewOpenerProvider value={() => undefined}>
 				<div className='flex flex-col gap-1'>
 					<ChatUserPrompt prompt={SHORT_PROMPT} />
+
+					<ChatUserPrompt prompt={CHIPPED_PROMPT} />
 
 					<ChatUserPrompt prompt={PASTED_PROMPT} />
 
