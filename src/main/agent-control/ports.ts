@@ -225,6 +225,19 @@ export interface ConversationPort {
 		 * name, and the spawn fails unless it names a model outright.
 		 */
 		callerRuntime: AgentProviderId | null;
+		/**
+		 * Whether the app-level Concierge is the caller, carried across from its
+		 * control origin because nothing downstream can infer it. Two readers, one
+		 * fact: the child's lineage role comes from `spawnedChildRole`, so a
+		 * Concierge's child is a root orchestrator and carries no sub-agent marker;
+		 * and the caller's own model is read from the Concierge session service,
+		 * which is the only store that holds it.
+		 *
+		 * Required rather than optional for the reason `planMode` is: a second spawn
+		 * route that forgot it would silently produce sub-agents from a parent that
+		 * can never have one.
+		 */
+		callerConcierge: boolean;
 		/** Caller session id, threaded into the child's spawn env for lineage. */
 		parentSessionId: string;
 		/**
@@ -429,12 +442,23 @@ export interface MemoryPort {
 }
 
 /**
- * Reads where the Concierge lives, which is the one input its tool policy needs:
- * every file write it makes is admitted or refused by whether the path resolves
- * inside that directory.
+ * Reads the Concierge's own state: where it lives, which is what its tool policy
+ * admits or refuses every file write against, and what its open conversation is
+ * running on, which is what a child it spawns inherits.
  */
 export interface ConciergePort {
 	homePath: () => string | null;
+	/**
+	 * The model and thinking level the open Concierge conversation runs on, or
+	 * null when none is open. It exists because the Concierge keeps its own
+	 * session store: `agentSessionService` holds no row for it, so the spawn path
+	 * has nothing to inherit from without this and would fall through to the
+	 * catalog default.
+	 */
+	describeSession: () => {
+		model: string | null;
+		thinkingLevel: string | null;
+	} | null;
 }
 
 /**

@@ -10,6 +10,7 @@ import { cn } from '@/renderer/lib/utils';
 import type { ConciergeSize } from '@/renderer/state/concierge';
 import { ConciergeComposer } from './concierge-composer';
 import { ConciergeMark } from './concierge-mark';
+import { ConciergeQuestionSlot } from './concierge-question-slot';
 import { ConciergeReferenceProvider } from './concierge-reference-context';
 import { ConciergeResizeHandles } from './concierge-resize-handles';
 import { ConciergeTimeline } from './concierge-timeline';
@@ -249,6 +250,8 @@ export function ConciergePanel() {
 				) : (
 					<ConciergeResizeHandles resize={panel.resize} />
 				)}
+
+				<ConciergeQuestionSlot agentSessionId={session.sessionId} />
 
 				<ConciergeComposer
 					centered={isFullscreen}

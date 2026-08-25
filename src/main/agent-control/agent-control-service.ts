@@ -827,7 +827,10 @@ export function createAgentControlService({
 	 * A Concierge delegates through this op and through nothing else, so the
 	 * workspace is an argument here rather than the caller's own: it has none, and
 	 * spawning into the empty string would put an agent with no control token and
-	 * no guard in a directory nobody is watching.
+	 * no guard in a directory nobody is watching. Its own flag rides along because
+	 * the port cannot infer it and two things downstream turn on it: what it opens
+	 * is a root orchestrator rather than a sub-agent, and its model is read from
+	 * the Concierge session service rather than from a session row it has none of.
 	 * @param origin - Resolved caller identity.
 	 * @param args - Prompt, optional tab, model, thinking level, title, wait flag,
 	 *   and the workspace for a Concierge.
@@ -870,6 +873,7 @@ export function createAgentControlService({
 			model: args.model,
 			thinkingLevel: args.thinkingLevel,
 			title: args.title,
+			callerConcierge: origin.concierge,
 			callerModel,
 			callerRuntime: originRuntime(origin),
 			parentSessionId: origin.sessionId,

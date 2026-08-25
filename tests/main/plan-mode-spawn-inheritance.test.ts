@@ -73,6 +73,7 @@ const makeDeps = () => {
 
 const spawn = (deps: PortAdapterDeps, planMode: boolean, chatTabId?: string) =>
 	createAgentControlPorts(deps).conversations.startConversation({
+		callerConcierge: false,
 		callerRuntime: 'pi',
 		chatTabId,
 		parentSessionId: 'parent',

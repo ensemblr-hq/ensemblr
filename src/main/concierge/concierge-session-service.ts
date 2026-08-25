@@ -116,12 +116,24 @@ export interface ConciergeSessionServiceOptions {
 	runMemoryPass?: (sessionId: string) => Promise<boolean>;
 }
 
+/**
+ * What the open Concierge conversation is running on. Its own store rather than
+ * `agentSessionService` holds this, so a caller that needs to inherit the
+ * Concierge's model — the spawn path, which opens a child on its parent's
+ * runtime — has to ask here.
+ */
+export interface ConciergeSessionRuntimeChoice {
+	model: string | null;
+	thinkingLevel: string | null;
+}
+
 /** Public surface of the Concierge session service. */
 export interface ConciergeSessionService {
 	clearContext: (
 		request: ClearConciergeContextRequest,
 	) => Promise<ClearConciergeContextResult>;
 	contextPressure: () => ConciergeContextPressureWire;
+	describeActiveSession: () => ConciergeSessionRuntimeChoice | null;
 	listEvents: (
 		request: ListConciergeEventsRequest,
 	) => ListConciergeEventsResult;
@@ -266,6 +278,45 @@ export function createConciergeSessionService({
 			eventSink?.({ event: toEventWire(row), sessionId });
 		} catch {
 			return;
+		}
+	};
+
+	/**
+	 * Records what a submitted turn is running on, matching what
+	 * `agent-session-lifecycle` already does for a workspace chat's own row.
+	 * `modelOverride` rides one request and is gone, so without this the row keeps
+	 * the value the session opened with and a caller reading it back — the spawn
+	 * path, whose child inherits the Concierge's model — hands that child a model
+	 * its parent left turns ago.
+	 *
+	 * Best-effort, like every other write on the runtime path: a submit that the
+	 * runtime accepted must not come back an error because a bookkeeping write
+	 * failed.
+	 * @param sessionId - The conversation the turn landed in.
+	 * @param choice - The model and thinking level the turn named, if any.
+	 */
+	const recordRuntimeChoice = (
+		sessionId: string,
+		choice: { model?: string | null; thinkingLevel?: string | null },
+	): void => {
+		const patch = {
+			...(choice.model ? { model: choice.model } : {}),
+			...(choice.thinkingLevel ? { thinkingLevel: choice.thinkingLevel } : {}),
+		};
+		if (Object.keys(patch).length === 0) {
+			return;
+		}
+		try {
+			updateConciergeSession({
+				database: requireDatabase(),
+				id: sessionId,
+				patch,
+			});
+		} catch (cause) {
+			console.warn('[concierge] could not record a turn’s runtime choice.', {
+				cause: cause instanceof Error ? cause.message : String(cause),
+				sessionId,
+			});
 		}
 	};
 
@@ -643,6 +694,28 @@ export function createConciergeSessionService({
 			}
 		},
 
+		/**
+		 * The model and thinking level the live conversation is running on: what its
+		 * last turn named, which `recordRuntimeChoice` puts on the row, else what it
+		 * opened with, else the settings each is an override of — the row stores
+		 * null for "whatever the setting says". Null when nothing is attached, so a
+		 * caller refuses rather than inheriting a model no conversation is on.
+		 */
+		describeActiveSession: (): ConciergeSessionRuntimeChoice | null => {
+			if (!active) {
+				return null;
+			}
+			const row = getConciergeSessionById({
+				database: requireDatabase(),
+				id: active.sessionId,
+			});
+			const settings = resolveSettings();
+			return {
+				model: row?.model ?? settings.model,
+				thinkingLevel: row?.thinkingLevel ?? settings.thinkingLevel,
+			};
+		},
+
 		contextPressure: (): ConciergeContextPressureWire =>
 			conciergeContextPressure({
 				autoClearAtFraction: resolveSettings().autoClearAtPercent,
@@ -721,6 +794,7 @@ export function createConciergeSessionService({
 			if (live) {
 				try {
 					const acknowledgement = await live.runtimeSession.submit(request);
+					recordRuntimeChoice(live.sessionId, { model, thinkingLevel });
 					const adopted =
 						live.sessionId === sessionId ? null : liveSnapshot(live.sessionId);
 					return {
@@ -741,6 +815,7 @@ export function createConciergeSessionService({
 			try {
 				const acknowledgement =
 					await revived.live.runtimeSession.submit(request);
+				recordRuntimeChoice(revived.live.sessionId, { model, thinkingLevel });
 				return {
 					acceptedAt: acknowledgement.acceptedAt,
 					session: revived.session,

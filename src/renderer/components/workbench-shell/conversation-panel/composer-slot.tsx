@@ -13,10 +13,7 @@ import { useCallback } from 'react';
 import { AskUserQuestionCard } from '@/renderer/components/ask-user-question';
 import { ToolApprovalCard } from '@/renderer/components/tool-approval';
 import { usePlanReview } from '@/renderer/hooks/workbench-shell/conversation-panel/use-plan-review';
-import {
-	useAnswerUserQuestion,
-	usePendingAskUserQuestion,
-} from '@/renderer/state/ask-user-question';
+import { usePendingQuestionCard } from '@/renderer/state/ask-user-question';
 import {
 	useAnswerToolApproval,
 	usePendingToolApproval,
@@ -26,7 +23,6 @@ import type {
 	WorkspaceLinkedIssueSummary,
 	WorkspaceShellModel,
 } from '@/renderer/types/workbench';
-import type { AskUserQuestionAnswer } from '@/shared/agent-control';
 import type { ToolApprovalDecision } from '@/shared/agent-tool-approval';
 import { ComposerPanel } from './composer-panel';
 import { PlanReviewPanel } from './plan-review-panel';
@@ -46,20 +42,7 @@ export function ComposerSlot({
 	seedLinkedIssue?: WorkspaceLinkedIssueSummary;
 	workspace: WorkspaceShellModel;
 }) {
-	const pendingQuestion = usePendingAskUserQuestion(agentSessionId);
-	const answerUserQuestion = useAnswerUserQuestion();
-	const requestId = pendingQuestion?.requestId ?? null;
-	const finishQuestion = useCallback(
-		(input: {
-			answers: readonly AskUserQuestionAnswer[];
-			cancelled: boolean;
-		}) => {
-			if (requestId !== null) {
-				answerUserQuestion({ ...input, requestId });
-			}
-		},
-		[answerUserQuestion, requestId],
-	);
+	const questionCard = usePendingQuestionCard(agentSessionId);
 
 	const pendingApproval = usePendingToolApproval(agentSessionId);
 	const answerToolApproval = useAnswerToolApproval();
@@ -85,12 +68,12 @@ export function ComposerSlot({
 		workspace,
 	});
 
-	if (pendingQuestion) {
+	if (questionCard) {
 		return (
 			<AskUserQuestionCard
-				key={pendingQuestion.requestId}
-				onFinish={finishQuestion}
-				questions={pendingQuestion.questions}
+				key={questionCard.requestId}
+				onFinish={questionCard.onFinish}
+				questions={questionCard.questions}
 			/>
 		);
 	}

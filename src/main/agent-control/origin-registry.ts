@@ -8,6 +8,7 @@
 import { randomUUID } from 'node:crypto';
 
 import type { SubagentMechanism } from '../../shared/agent-control.ts';
+import { spawnedChildRole } from '../../shared/agent-control.ts';
 import type { AgentControlOrigin, AgentSpecies } from './ports.ts';
 
 /** Details supplied when registering a freshly spawned agent session. */
@@ -68,13 +69,15 @@ export function createOriginRegistry(
 	// A Concierge parent does not spend depth: what it opens is a root
 	// orchestrator with its own delegation budget, not a sub-agent of the
 	// Concierge. Counting it as depth 1 would hand the child the sub-agent policy
-	// and strip the fan-out that is the whole point of putting it there.
+	// and strip the fan-out that is the whole point of putting it there. The
+	// exemption is `spawnedChildRole`'s to grant rather than this function's, so
+	// the marker the spawn path writes cannot decide it differently.
 	const resolveDepth = (parentSessionId: string | null): number => {
 		if (!parentSessionId) {
 			return 0;
 		}
 		const parent = bySession.get(parentSessionId);
-		if (!parent || parent.concierge) {
+		if (!parent || spawnedChildRole(parent) === 'orchestrator') {
 			return 0;
 		}
 		return parent.depth + 1;

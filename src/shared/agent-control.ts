@@ -24,6 +24,7 @@ export {
 	resolveAgentRole,
 	roleForDepth,
 	SUBAGENT_AWARENESS,
+	spawnedChildRole,
 } from './agent-control/awareness.ts';
 export {
 	BRIEF_REPORT_CHARS,

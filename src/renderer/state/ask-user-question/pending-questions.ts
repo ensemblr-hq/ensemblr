@@ -9,6 +9,7 @@ import { useCallback, useEffect } from 'react';
 import type {
 	AskUserQuestionAnswer,
 	AskUserQuestionBroadcast,
+	AskUserQuestionItem,
 } from '@/shared/agent-control';
 import { pendingAskUserQuestionsAtom } from './atoms.ts';
 
@@ -69,6 +70,45 @@ export function usePendingAskUserQuestion(
 ): AskUserQuestionBroadcast | null {
 	const pending = useAtomValue(pendingAskUserQuestionsAtom);
 	return agentSessionId === null ? null : (pending[agentSessionId] ?? null);
+}
+
+/**
+ * Everything a surface needs to render the questionnaire a session is blocked
+ * on, or null when it has none.
+ *
+ * The two surfaces that host one — a chat tab's composer slot and the Concierge
+ * panel — differ only in where they put the card, so the wiring between the
+ * pending map and `AskUserQuestionCard` lives here rather than twice in their
+ * components. `requestId` is the card's key: remounting on a new request is what
+ * clears the previous questionnaire's half-typed answers.
+ * @param agentSessionId - Session backing the surface, or null when it has none.
+ * @returns The card's key, its questions, and the callback that answers it.
+ */
+export function usePendingQuestionCard(agentSessionId: string | null): {
+	onFinish: (input: {
+		answers: readonly AskUserQuestionAnswer[];
+		cancelled: boolean;
+	}) => void;
+	questions: readonly AskUserQuestionItem[];
+	requestId: string;
+} | null {
+	const pending = usePendingAskUserQuestion(agentSessionId);
+	const answerUserQuestion = useAnswerUserQuestion();
+	const requestId = pending?.requestId ?? null;
+	const onFinish = useCallback(
+		(input: {
+			answers: readonly AskUserQuestionAnswer[];
+			cancelled: boolean;
+		}) => {
+			if (requestId !== null) {
+				answerUserQuestion({ ...input, requestId });
+			}
+		},
+		[answerUserQuestion, requestId],
+	);
+	return pending === null
+		? null
+		: { onFinish, questions: pending.questions, requestId: pending.requestId };
 }
 
 /**

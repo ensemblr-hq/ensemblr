@@ -25,6 +25,7 @@ import {
 	buildConversationTranscript,
 	MAX_AGENT_PAYLOAD_CHARS,
 	resolveAgentRole,
+	spawnedChildRole,
 } from '../../shared/agent-control.ts';
 import type { AgentProviderId } from '../../shared/agent-provider.ts';
 import { findHarnessDefinition } from '../../shared/agents.ts';
@@ -89,7 +90,10 @@ import {
 	type WorkspacePort,
 } from './ports.ts';
 import { makeDiffPort, makeReviewPort } from './review-ports.ts';
-import { isSessionTabMarkedSubAgent } from './sub-agent-marker.ts';
+import {
+	isSessionTabMarkedSubAgent,
+	isTabMarkedSubAgent,
+} from './sub-agent-marker.ts';
 
 /**
  * What an untitled tab is called when an agent lists tabs. The stored title is
@@ -409,22 +413,56 @@ function makeConversationPort(deps: PortAdapterDeps): ConversationPort {
 	};
 
 	/**
-	 * The spawning agent's own identity: its persisted session row, plus the live
+	 * The spawning agent's own identity: its persisted session, plus the live
 	 * model its bridge forwarded. Neither comes from the agent's own arguments —
 	 * a terminal harness forwards no model and has no session row to read.
+	 *
+	 * The Concierge is read out of its own session service rather than out of
+	 * `agentSessionService`, which has no row for an agent that belongs to no
+	 * workspace. Without that branch a Concierge on Claude Code has neither
+	 * signal — MCP forwards no live model either — and every model-less spawn
+	 * fell through to the catalog default.
 	 */
 	const describeCaller = (input: {
+		callerConcierge: boolean;
 		callerModel: string | undefined;
 		callerRuntime: AgentProviderId | null;
 		parentSessionId: string;
 	}): SpawnCallerIdentity => {
-		const session = deps.agentSessionService.getSession(input.parentSessionId);
+		const session = input.callerConcierge
+			? (deps.conciergePorts?.concierge.describeSession() ?? null)
+			: deps.agentSessionService.getSession(input.parentSessionId);
 		return {
 			liveModelId: input.callerModel ?? null,
 			runtime: input.callerRuntime,
 			sessionModelId: session?.model ?? null,
 			thinkingLevel: session?.thinkingLevel ?? null,
 		};
+	};
+
+	/**
+	 * Refuses a Concierge spawn whose model can be neither named nor inherited,
+	 * rather than opening it on whatever the catalog calls default — silently
+	 * landing on that default is the bug this guards, and the Concierge is the one
+	 * caller with no session row to fall back on. Named as an argument failure so
+	 * the calling agent can fix it on its next turn.
+	 * @param input - Whether the caller is the Concierge, its resolved identity, and any model it named.
+	 * @returns The refusal prose, or null when the spawn may resolve a model.
+	 */
+	const modelUnresolvable = (input: {
+		caller: SpawnCallerIdentity;
+		callerConcierge: boolean;
+		requestedModelId: string | null;
+	}): string | null => {
+		if (
+			!input.callerConcierge ||
+			input.requestedModelId !== null ||
+			input.caller.liveModelId !== null ||
+			input.caller.sessionModelId !== null
+		) {
+			return null;
+		}
+		return 'This conversation has no model of its own for a child to inherit, and a spawn is not opened on a default nobody chose. Call ensemblr_list_models and pass an id from that list as "model".';
 	};
 
 	return {
@@ -449,17 +487,28 @@ function makeConversationPort(deps: PortAdapterDeps): ConversationPort {
 			model,
 			thinkingLevel,
 			title,
+			callerConcierge,
 			callerModel,
 			callerRuntime,
 			parentSessionId,
 			planMode,
 		}) => {
+			const caller = describeCaller({
+				callerConcierge,
+				callerModel,
+				callerRuntime,
+				parentSessionId,
+			});
+			const unresolvable = modelUnresolvable({
+				caller,
+				callerConcierge,
+				requestedModelId: model ?? null,
+			});
+			if (unresolvable) {
+				return { ok: false, reason: unresolvable };
+			}
 			const resolution = await deps.spawnModelResolver.resolveForSpawn({
-				caller: describeCaller({
-					callerModel,
-					callerRuntime,
-					parentSessionId,
-				}),
+				caller,
 				requestedModelId: model ?? null,
 				requestedThinkingLevel: thinkingLevel ?? null,
 			});
@@ -510,7 +559,13 @@ function makeConversationPort(deps: PortAdapterDeps): ConversationPort {
 			// `submitPrompt` captures a git checkpoint first, and the renderer resolves
 			// a tab's branch id out of the session list, so a binding announced after
 			// it leaves the tab a blank rectangle for that whole window.
-			const markerApplied = writeSubAgentMarker(deps, targetTabId, 'subagent');
+			const marker = writeSubAgentMarker(
+				deps,
+				targetTabId,
+				spawnedChildRole({ concierge: callerConcierge }) === 'subagent'
+					? 'subagent'
+					: null,
+			);
 			deps.broadcastTabsChanged({ workspaceId });
 			try {
 				await deps.agentSessionService.submitPrompt({
@@ -524,7 +579,9 @@ function makeConversationPort(deps: PortAdapterDeps): ConversationPort {
 				await rollbackConversation(deps, {
 					agentSessionId: snapshot.id,
 					openedTabId,
-					markedTabId: markerApplied ? targetTabId : null,
+					markerRestore: marker
+						? { chatTabId: targetTabId, role: marker.previousRole }
+						: null,
 					workspaceId,
 				});
 				throw error;
@@ -619,31 +676,37 @@ function makeConversationPort(deps: PortAdapterDeps): ConversationPort {
 /**
  * Stamps or clears the sub-agent marker on a chat tab. The renderer reads it to
  * tint the tab and to lock its composer, so it is written before the first prompt
- * is submitted and cleared again if that submit fails. Best-effort and idempotent:
+ * is submitted and put back if that submit fails. Best-effort and idempotent:
  * a missing database or tab is ignored.
  *
- * The return value is what makes the rollback safe. A caller may reuse a tab that
- * is already marked from an earlier spawn, in which case this writes nothing —
- * and a rollback that cleared the marker anyway would strip a live sub-agent of
+ * The reported previous role is what makes the rollback safe. A spawn writes
+ * either role — an orchestrator stamps the marker, the Concierge clears it,
+ * because what the Concierge opens is a root — so undoing the write means
+ * restoring what the tab carried rather than assuming which way it went. A
+ * rollback that always cleared would strip a live sub-agent reusing the tab of
  * its role, handing it back the whole control surface.
  * @param deps - Adapter collaborators.
  * @param chatTabId - The tab bound to the spawned conversation.
  * @param role - `'subagent'` to stamp the marker, `null` to clear it.
- * @returns True when this call changed the marker, false when it was already there.
+ * @returns The role the tab carried before this call, or null when the marker could not be touched at all.
  */
 function writeSubAgentMarker(
 	deps: PortAdapterDeps,
 	chatTabId: string,
 	role: 'subagent' | null,
-): boolean {
+): { previousRole: 'subagent' | null } | null {
 	const database = deps.databaseService.getConnection()?.database;
 	if (!database) {
-		return false;
+		return null;
 	}
 	try {
 		const tab = getChatTabById({ database, id: chatTabId });
-		if (!tab || (tab.metadata.agentRole ?? null) === role) {
-			return false;
+		if (!tab) {
+			return null;
+		}
+		const previousRole = isTabMarkedSubAgent(tab) ? 'subagent' : null;
+		if (previousRole === role) {
+			return { previousRole };
 		}
 		const withoutRole = Object.fromEntries(
 			Object.entries(tab.metadata).filter(([key]) => key !== 'agentRole'),
@@ -653,13 +716,13 @@ function writeSubAgentMarker(
 			id: chatTabId,
 			metadata: role ? { ...withoutRole, agentRole: role } : withoutRole,
 		});
-		return true;
+		return { previousRole };
 	} catch (cause) {
 		console.warn('[agent-control] could not tint a tab as a sub-agent.', {
 			cause: cause instanceof Error ? cause.message : String(cause),
 			chatTabId,
 		});
-		return false;
+		return null;
 	}
 }
 
@@ -743,20 +806,24 @@ async function applyConversationName(
  * session that never planned is a no-op, and the shutdown path cannot be relied
  * on here because this function swallows a failed `stopSession`.
  * @param deps - Adapter collaborators.
- * @param target - The session to stop, the tab this call opened, the tab this call marked, and its workspace.
+ * @param target - The session to stop, the tab this call opened, the marker this call is undoing, and its workspace.
  */
 async function rollbackConversation(
 	deps: PortAdapterDeps,
 	target: {
 		agentSessionId: string;
 		openedTabId: string | null;
-		markedTabId: string | null;
+		markerRestore: { chatTabId: string; role: 'subagent' | null } | null;
 		workspaceId: string;
 	},
 ): Promise<void> {
 	deps.planMode.releaseSession(target.agentSessionId);
-	if (target.markedTabId) {
-		writeSubAgentMarker(deps, target.markedTabId, null);
+	if (target.markerRestore) {
+		writeSubAgentMarker(
+			deps,
+			target.markerRestore.chatTabId,
+			target.markerRestore.role,
+		);
 	}
 	try {
 		await deps.agentSessionService.stopSession({
