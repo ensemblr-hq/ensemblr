@@ -206,6 +206,11 @@
 		}
 	},
 	"concierge": {
+		"clear-confirm": {
+			"confirm": "Clear anyway",
+			"description": "The Concierge is still answering. Clearing now stops this turn and starts a fresh conversation; what it has written so far is kept in its memory.",
+			"title": "Clear context while the Concierge is working?"
+		},
 		"composer": {
 			"label": "Message the Concierge",
 			"placeholder": "Ask across every project…",
@@ -231,6 +236,9 @@
 			"resize": "Resize the Concierge — drag any edge, or use the arrow keys",
 			"restore": "Restore panel",
 			"title": "Concierge"
+		},
+		"preview": {
+			"close": "Back to the conversation"
 		},
 		"session": {
 			"not-open": "The Concierge session is not open.",

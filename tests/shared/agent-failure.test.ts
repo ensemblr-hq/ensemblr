@@ -95,6 +95,33 @@ describe('classifyAgentFailure', () => {
 		},
 	);
 
+	// The trace behind this: a Concierge row pinned to a conversation Claude never
+	// wrote answered every prompt with this pair of lines, and read as an ordinary
+	// crash — which is retried rather than repaired.
+	test('reads a rejected resume as its own class, not as a crash', () => {
+		expect(
+			classifyAgentFailure({
+				code: 'adapter-failure',
+				detail:
+					'Claude Code returned an error result: No conversation found with session ID: 005b83a8-514d-4ede-9f44-708737a09504',
+				message: 'The Claude session ended unexpectedly.',
+			}),
+		).toBe('session-unresumable');
+	});
+
+	// Pi says this on every fresh session it is handed an unknown id for and then
+	// carries on. Classified as fatal it would rebuild a healthy conversation.
+	test('leaves Pi’s benign new-session warning unclassified', () => {
+		expect(
+			classifyAgentFailure({
+				code: 'adapter-failure',
+				detail:
+					"Warning: No project session found with id 'af60da6e'; creating a new session with that id.",
+				message: 'Pi RPC stderr',
+			}),
+		).not.toBe('session-unresumable');
+	});
+
 	test('lands an unrecognized failure in a real class rather than nothing', () => {
 		expect(
 			classifyAgentFailure({

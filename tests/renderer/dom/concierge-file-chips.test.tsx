@@ -13,7 +13,10 @@ vi.mock('@iconify/react', () => ({
 
 import { ConciergeTimeline } from '@/renderer/components/concierge/concierge-timeline';
 import { WorkbenchLayoutModelProvider } from '@/renderer/components/workbench-shell/shell-contexts';
-import { conciergePresentationAtom } from '@/renderer/state/concierge';
+import {
+	conciergePresentationAtom,
+	conciergePreviewAtom,
+} from '@/renderer/state/concierge';
 import type {
 	ProjectShellModel,
 	WorkspaceShellModel,
@@ -29,6 +32,7 @@ import {
 
 const ROOT = '/Users/dev/Ensemblr';
 const WORKTREE = `${ROOT}/workspaces/app/bruckner`;
+const CONCIERGE_HOME = `${ROOT}/concierge`;
 
 const PROJECTS = [
 	{
@@ -72,7 +76,11 @@ function answer(text: string): ConciergeSessionEventWire {
 }
 
 /** Mounts the transcript with the shell's projects behind it. */
-function renderTimeline(text: string, store = createStore()) {
+function renderTimeline(
+	text: string,
+	store = createStore(),
+	home: string | null = null,
+) {
 	return render(
 		<Provider store={store}>
 			<QueryClientProvider client={createTestQueryClient()}>
@@ -80,6 +88,7 @@ function renderTimeline(text: string, store = createStore()) {
 					<ConciergeTimeline
 						centered={false}
 						events={[answer(text)]}
+						home={home}
 						isStreaming={false}
 					/>
 				</WorkbenchLayoutModelProvider>
@@ -140,5 +149,47 @@ describe('file chips in the Concierge transcript', () => {
 
 		expect(screen.queryByRole('button', { name: /README\.md/ })).toBeNull();
 		expect(openChatTab).not.toHaveBeenCalled();
+	});
+});
+
+// A memory note and an artifact belong to no workspace, so before the panel grew
+// a viewer of its own they were the one kind of file the Concierge could write
+// and never show — the path rendered as prose and the click went nowhere.
+describe('files in the Concierge’s own home', () => {
+	test('opens a memory note in the panel rather than a workspace tab', async () => {
+		const store = createStore();
+		renderTimeline(
+			`Written to \`${CONCIERGE_HOME}/memory/release-cadence.md\`.`,
+			store,
+			CONCIERGE_HOME,
+		);
+
+		await userEvent.click(
+			screen.getByRole('button', { name: /release-cadence\.md/ }),
+		);
+
+		await waitFor(() => {
+			expect(store.get(conciergePreviewAtom)).toEqual({
+				path: 'memory/release-cadence.md',
+				title: 'release-cadence.md',
+			});
+		});
+		expect(openChatTab).not.toHaveBeenCalled();
+	});
+
+	test('still sends a workspace file to the workspace that holds it', async () => {
+		const store = createStore();
+		renderTimeline(
+			`Start at \`${WORKTREE}/src/main/main.ts\`.`,
+			store,
+			CONCIERGE_HOME,
+		);
+
+		await userEvent.click(screen.getByRole('button', { name: /main\.ts/ }));
+
+		await waitFor(() => {
+			expect(openChatTab).toHaveBeenCalled();
+		});
+		expect(store.get(conciergePreviewAtom)).toBeNull();
 	});
 });

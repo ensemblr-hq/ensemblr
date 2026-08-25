@@ -62,6 +62,7 @@ const makeDeps = (): {
 	broadcastBoardStatus: ReturnType<typeof vi.fn>;
 	boardStatusStore: ReturnType<typeof createBoardStatusStore>;
 	openTab: ReturnType<typeof vi.fn>;
+	claimIdleChatTab: ReturnType<typeof vi.fn>;
 } => {
 	const broadcastTabsChanged = vi.fn();
 	const broadcastBoardStatus = vi.fn();
@@ -70,9 +71,15 @@ const makeDeps = (): {
 		id: 'tab-1',
 		metadata: input.metadata ?? {},
 	}));
+	const claimIdleChatTab = vi.fn(() => null);
 	const deps = {
 		databaseService: { getConnection: () => ({ database: {} }) },
-		chatTabService: { openTab, closeTab: vi.fn(), listTabs: vi.fn() },
+		chatTabService: {
+			claimIdleChatTab,
+			openTab,
+			closeTab: vi.fn(),
+			listTabs: vi.fn(),
+		},
 		agentSessionService: {},
 		terminalService: {},
 		scriptLifecycleService: {},
@@ -102,6 +109,7 @@ const makeDeps = (): {
 		broadcastTabsChanged,
 		broadcastBoardStatus,
 		boardStatusStore,
+		claimIdleChatTab,
 		openTab,
 	};
 };
@@ -478,6 +486,76 @@ describe('agent-control port adapters: conversation naming', () => {
 			provenance: 'agent',
 			sessionId: 'sess-1',
 		});
+	});
+
+	// The renderer opens an empty chat tab for every workspace that has none, so a
+	// spawn that always opened its own left a freshly created workspace showing
+	// two tabs, one of them permanently blank.
+	it('startConversation claims the workspace’s idle chat tab', async () => {
+		const { claimIdleChatTab, deps, openTab } = makeDeps();
+		claimIdleChatTab.mockReturnValue({ id: 'tab-idle', kind: 'chat' });
+		(deps as { agentSessionService: unknown }).agentSessionService = {
+			openSession: vi.fn().mockResolvedValue({ id: 'sess-1' }),
+			submitPrompt: vi.fn().mockResolvedValue({}),
+			setSessionName: vi.fn().mockResolvedValue({ applied: true }),
+			getSession: vi.fn(),
+			listSessionsForWorkspace: () => [],
+		};
+		(deps as { piExecutableService: unknown }).piExecutableService = {
+			getSnapshot: vi
+				.fn()
+				.mockResolvedValue({ status: 'ready', command: 'pi' }),
+		};
+		const ports = createAgentControlPorts(deps);
+
+		const result = await ports.conversations.startConversation({
+			workspaceId: 'ws',
+			workspaceCwd: '/ws',
+			prompt: 'do it',
+			callerConcierge: false,
+			callerRuntime: 'pi',
+			parentSessionId: 'parent-1',
+			planMode: false,
+		});
+
+		expect(result).toMatchObject({ chatTabId: 'tab-idle', ok: true });
+		expect(openTab).not.toHaveBeenCalled();
+	});
+
+	// Rollback closes what the spawn created, and a tab that was already there is
+	// not that — closing it would take the user's own empty tab away with it.
+	it('startConversation leaves a claimed tab open when the submit fails', async () => {
+		const { claimIdleChatTab, deps } = makeDeps();
+		claimIdleChatTab.mockReturnValue({ id: 'tab-idle', kind: 'chat' });
+		const closeTab = vi.fn();
+		(deps.chatTabService as { closeTab: unknown }).closeTab = closeTab;
+		(deps as { agentSessionService: unknown }).agentSessionService = {
+			openSession: vi.fn().mockResolvedValue({ id: 'sess-1' }),
+			submitPrompt: vi.fn().mockRejectedValue(new Error('runtime refused')),
+			setSessionName: vi.fn().mockResolvedValue({ applied: true }),
+			getSession: vi.fn(),
+			listSessionsForWorkspace: () => [],
+			stopSession: vi.fn().mockResolvedValue(undefined),
+		};
+		(deps as { piExecutableService: unknown }).piExecutableService = {
+			getSnapshot: vi
+				.fn()
+				.mockResolvedValue({ status: 'ready', command: 'pi' }),
+		};
+		const ports = createAgentControlPorts(deps);
+
+		await expect(
+			ports.conversations.startConversation({
+				workspaceId: 'ws',
+				workspaceCwd: '/ws',
+				prompt: 'do it',
+				callerConcierge: false,
+				callerRuntime: 'pi',
+				parentSessionId: 'parent-1',
+				planMode: false,
+			}),
+		).rejects.toThrow('runtime refused');
+		expect(closeTab).not.toHaveBeenCalled();
 	});
 
 	// The renderer resolves a tab's branch id out of the session list, so until the

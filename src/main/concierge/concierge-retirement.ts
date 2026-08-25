@@ -25,6 +25,17 @@ export interface ConciergeRetirement<TChild> {
 }
 
 /**
+ * How many retired children may write their memories at once.
+ *
+ * Each one is a whole runtime process running an unattended turn, so the set is
+ * a fan-out the user never asked for and cannot see. Three covers clearing a few
+ * conversations in a row; past that the oldest is closed mid-pass, which costs
+ * that conversation's notes — the price the pass is already documented as being
+ * worth, and far below a machine carrying one agent per keystroke.
+ */
+const MAX_CONCURRENT_RETIREMENTS = 3;
+
+/**
  * Builds a {@link ConciergeRetirement} over the caller's close routine.
  * @param close - Closes one child and drops everything it held open.
  * @returns The tracker.
@@ -33,6 +44,20 @@ export function createConciergeRetirement<TChild>(
 	close: (child: TChild) => Promise<void>,
 ): ConciergeRetirement<TChild> {
 	const retiring = new Set<TChild>();
+
+	/**
+	 * Closes the children over the cap, oldest first — a `Set` iterates in
+	 * insertion order, so the one that has had the longest to finish goes first.
+	 */
+	const shedOverflow = (): void => {
+		for (const child of retiring) {
+			if (retiring.size <= MAX_CONCURRENT_RETIREMENTS) {
+				return;
+			}
+			retiring.delete(child);
+			void close(child);
+		}
+	};
 
 	return {
 		drain: async (): Promise<void> => {
@@ -50,6 +75,7 @@ export function createConciergeRetirement<TChild>(
 					await close(child);
 				}
 			});
+			shedOverflow();
 		},
 	};
 }

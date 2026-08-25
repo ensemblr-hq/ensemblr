@@ -1,14 +1,13 @@
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
+import {
+	CONCIERGE_ARTIFACTS_DIRECTORY,
+	CONCIERGE_MEMORY_DIRECTORY,
+} from '../../shared/concierge-references.ts';
+
 /** Filename of the memory index seeded into every Concierge session. */
 export const CONCIERGE_MEMORY_INDEX_FILE = 'MEMORY.md';
-
-/** Directory holding one markdown file per memory. */
-export const CONCIERGE_MEMORY_DIRECTORY = 'memory';
-
-/** Directory the Concierge writes reports and notes into. */
-export const CONCIERGE_ARTIFACTS_DIRECTORY = 'artifacts';
 
 /**
  * The Concierge's own corner of the Ensemblr root: its working directory, and

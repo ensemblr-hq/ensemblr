@@ -4,12 +4,14 @@ import { IPC_CHANNELS } from '../../../shared/ipc/channels';
 import type {
 	ClearConciergeContextResult,
 	ConciergeContextPressureWire,
+	ListConciergeArtifactsResult,
 	ListConciergeEventsResult,
 	OpenConciergeSessionResult,
 	StopConciergeSessionResult,
 	SubmitConciergePromptResult,
 } from '../../../shared/ipc/contracts/concierge';
-import type { ConciergeSessionService } from '../../concierge';
+import type { ConciergeHome, ConciergeSessionService } from '../../concierge';
+import { listConciergeArtifacts } from '../../concierge/concierge-artifacts.ts';
 import {
 	clearConciergeContextRequestSchema,
 	listConciergeEventsRequestSchema,
@@ -35,12 +37,14 @@ function toError(cause: unknown, fallback: string): string {
  * the workspace they act on, and the Concierge has no workspace — its own
  * boundary is the tool policy that keeps every file write inside the concierge
  * home, which sits behind the runtime rather than in front of this bridge.
- * @param options - The Concierge session service.
+ * @param options - The Concierge session service and the home its artifacts live in.
  */
 export function registerConciergeHandlers({
 	conciergeSessionService,
+	resolveConciergeHome,
 }: {
 	conciergeSessionService: ConciergeSessionService;
+	resolveConciergeHome: () => ConciergeHome;
 }): void {
 	ipcMain.handle(
 		IPC_CHANNELS.openConciergeSession,
@@ -116,5 +120,16 @@ export function registerConciergeHandlers({
 		IPC_CHANNELS.conciergeContextPressure,
 		(): ConciergeContextPressureWire =>
 			conciergeSessionService.contextPressure(),
+	);
+
+	// The home is re-read per call rather than captured, so a root the user moved
+	// lists the artifacts that are there now. An unreadable directory lists as
+	// empty: the `@` menu offering nothing reads as "no artifacts yet", which is
+	// the truth, where a rejected promise would take the menu down with it.
+	ipcMain.handle(
+		IPC_CHANNELS.listConciergeArtifacts,
+		async (): Promise<ListConciergeArtifactsResult> => ({
+			artifacts: await listConciergeArtifacts(resolveConciergeHome()),
+		}),
 	);
 }

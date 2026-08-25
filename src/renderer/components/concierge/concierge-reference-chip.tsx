@@ -1,4 +1,5 @@
 import { ChatAttachmentChip } from '@/renderer/components/chat-attachment-chip';
+import { conciergeReferenceChipKind } from '@/renderer/lib/concierge';
 import {
 	CONCIERGE_REFERENCE_ID_ATTRIBUTE,
 	CONCIERGE_REFERENCE_KIND_ATTRIBUTE,
@@ -15,8 +16,8 @@ interface ConciergeReferenceChipProps {
 }
 
 /**
- * A project, workspace, or chat the Concierge named in an answer, rendered as
- * the same chip its `@` menu produces.
+ * A project, workspace, chat, or artifact the Concierge named in an answer,
+ * rendered as the same chip its `@` menu produces.
  *
  * Reached through the `ensemblr-ref` element the rehype chain rewrites a
  * reference link into, so it never has to be threaded down through the markdown
@@ -48,7 +49,7 @@ export function ConciergeReferenceChip({
 	return (
 		<ChatAttachmentChip
 			className='ensemblr-answer-chip'
-			kind={reference.kind}
+			kind={conciergeReferenceChipKind(reference)}
 			label={reference.label}
 			onActivate={
 				reference.kind === 'project'
@@ -62,6 +63,9 @@ export function ConciergeReferenceChip({
 
 /** What the chip's tooltip says, qualifying a name that repeats across the app. */
 function referenceTitle(reference: ConciergeReference): string {
+	if (reference.kind === 'artifact') {
+		return reference.path;
+	}
 	if (reference.kind === 'workspace') {
 		return `${reference.project} › ${reference.label}`;
 	}
@@ -75,5 +79,10 @@ function referenceTitle(reference: ConciergeReference): string {
 function isReferenceKind(
 	value: string | undefined,
 ): value is ConciergeReference['kind'] {
-	return value === 'chat' || value === 'project' || value === 'workspace';
+	return (
+		value === 'artifact' ||
+		value === 'chat' ||
+		value === 'project' ||
+		value === 'workspace'
+	);
 }

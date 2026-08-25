@@ -115,7 +115,8 @@ const ConciergeTimelineMessage = memo(function ConciergeTimelineMessage({
  *
  * The one workspace affordance it does mount is the file-preview pair every
  * attachment chip reads: the Concierge names files across every project, and a
- * chip it draws opens the file in the workspace that holds it.
+ * chip it draws opens the file in the workspace that holds it — or, for a file
+ * in the Concierge's own home, in the panel's viewer.
  *
  * It also wraps the transcript in the app's own right-click menu, exactly as the
  * workspace timeline does — Electron draws no menu of its own, so prose the
@@ -126,16 +127,19 @@ const ConciergeTimelineMessage = memo(function ConciergeTimelineMessage({
 export function ConciergeTimeline({
 	centered,
 	events,
+	home,
 	isStreaming,
 }: {
 	/** Constrains the transcript to a readable column, as the maximized panel needs. */
 	centered: boolean;
 	events: readonly ConciergeSessionEventWire[];
+	/** The open session's Concierge home, whose own files preview in the panel. */
+	home: string | null;
 	isStreaming: boolean;
 }) {
 	const { t } = useTranslation();
 	const [projectEvents] = useState(createTimelineProjector);
-	const { openFilePreview, resolveFilePath } = useConciergeFilePreview();
+	const { openFilePreview, resolveFilePath } = useConciergeFilePreview(home);
 	const messages = useMemo<UIMessage[]>(
 		() => projectEvents(events.map(toTimelineFrame)),
 		[events, projectEvents],

@@ -90,7 +90,10 @@ const makeDeps = (input: {
 		broadcastFocus: vi.fn(),
 		broadcastPlanMode: vi.fn(),
 		broadcastTabsChanged: vi.fn(),
-		chatTabService: { openTab: vi.fn(() => ({ id: 'tab-1', metadata: {} })) },
+		chatTabService: {
+			claimIdleChatTab: vi.fn(() => null),
+			openTab: vi.fn(() => ({ id: 'tab-1', metadata: {} })),
+		},
 		confirm: { confirm: vi.fn() },
 		databaseService: { getConnection: () => ({ database: {} }) },
 		getPermissionMode: () => 'workspace-trusted',
@@ -493,7 +496,11 @@ describe('startConversation rollback on submit failure', () => {
 					throw new Error('submit failed');
 				}),
 			},
-			chatTabService: { closeTab, openTab },
+			chatTabService: {
+				claimIdleChatTab: vi.fn(() => null),
+				closeTab,
+				openTab,
+			},
 			planMode: {
 				activateForSpawn: vi.fn(),
 				exit: vi.fn(),

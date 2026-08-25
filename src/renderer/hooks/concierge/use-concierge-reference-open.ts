@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 
 import {
 	allChatTabsQuery,
+	conciergeArtifactsQuery,
 	ensemblrQueryKeys,
 	restoreChatTab,
 } from '@/renderer/api/ensemblr';
@@ -15,13 +16,20 @@ import {
 	buildConciergeReferences,
 	findConciergeReference,
 } from '@/renderer/lib/concierge';
-import { restoreConciergePanelAtom } from '@/renderer/state/concierge';
-import type { ConciergeReference } from '@/shared/concierge-references';
+import {
+	conciergePreviewAtom,
+	restoreConciergePanelAtom,
+} from '@/renderer/state/concierge';
+import {
+	CONCIERGE_ARTIFACTS_DIRECTORY,
+	type ConciergeReference,
+} from '@/shared/concierge-references';
 
 /**
- * Makes the projects, workspaces, and chats the Concierge names openable: a
- * click focuses the workspace, or the chat tab inside it, wherever in the app it
- * lives.
+ * Makes the projects, workspaces, chats, and artifacts the Concierge names
+ * openable: a click focuses the workspace, or the chat tab inside it, wherever in
+ * the app it lives — and an artifact opens in the panel's own viewer, since the
+ * Concierge home belongs to no workspace and has no tab strip to land in.
  *
  * The catalogue is the same one the `@` menu ranks against, so a chip and a menu
  * row can never disagree about what the app holds — a workspace archived since
@@ -43,17 +51,20 @@ export function useConciergeReferenceOpen(
 	const queryClient = useQueryClient();
 	const layoutModel = useWorkbenchLayoutRouteModelOptional();
 	const restorePanel = useSetAtom(restoreConciergePanelAtom);
+	const setPreview = useSetAtom(conciergePreviewAtom);
 	const projects = layoutModel?.displayProjects;
 	const navigateToWorkspace = layoutModel?.navigateToWorkspace;
 	const { data: chatTabs } = useQuery({ ...allChatTabsQuery, enabled });
+	const { data: artifacts } = useQuery({ ...conciergeArtifactsQuery, enabled });
 
 	const references = useMemo(
 		() =>
 			buildConciergeReferences({
+				artifacts: artifacts?.artifacts ?? [],
 				chatTabs: chatTabs ?? { closed: [], open: [] },
 				projects: projects ?? [],
 			}),
-		[chatTabs, projects],
+		[artifacts, chatTabs, projects],
 	);
 
 	const openChat = useCallback(
@@ -88,6 +99,13 @@ export function useConciergeReferenceOpen(
 			if (reference.kind === 'project') {
 				return;
 			}
+			if (reference.kind === 'artifact') {
+				setPreview({
+					path: `${CONCIERGE_ARTIFACTS_DIRECTORY}/${reference.path}`,
+					title: reference.label,
+				});
+				return;
+			}
 			if (reference.kind === 'workspace') {
 				restorePanel();
 				navigateToWorkspace?.(reference.projectId, reference.workspaceId);
@@ -100,14 +118,17 @@ export function useConciergeReferenceOpen(
 				);
 			});
 		},
-		[navigateToWorkspace, openChat, restorePanel, t],
+		[navigateToWorkspace, openChat, restorePanel, setPreview, t],
 	);
 
 	return useMemo(
 		() => ({
 			openReference,
+			// An artifact resolves without the shell: it opens in the panel's own
+			// viewer, so unlike the three surfaces below it there is no route to
+			// navigate and nothing to be missing.
 			resolveReference: (kind, id) =>
-				navigateToWorkspace
+				kind === 'artifact' || navigateToWorkspace
 					? findConciergeReference(references, kind, id)
 					: null,
 		}),

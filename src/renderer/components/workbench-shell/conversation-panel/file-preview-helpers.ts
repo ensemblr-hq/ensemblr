@@ -1,5 +1,10 @@
+import type { TFunction } from 'i18next';
+
 import { languageForFilePath } from '@/renderer/lib/language-from-path';
-import type { ReadWorkspaceFileResult } from '@/shared/ipc/contracts/workspace-files';
+import type {
+	ReadWorkspaceFileFailureCode,
+	ReadWorkspaceFileResult,
+} from '@/shared/ipc/contracts/workspace-files';
 import { PREVIEW_PDF_MIME_TYPE } from '@/shared/preview-media';
 
 /**
@@ -95,4 +100,57 @@ export function formatSizeBytes(sizeBytes: number): string {
 		return `${(sizeBytes / 1024).toFixed(1)} KB`;
 	}
 	return `${(sizeBytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+/**
+ * Build a human-readable message for a workspace file read failure.
+ * @param code - The read-failure code.
+ * @param filePath - The path that failed to read.
+ * @param t - Translator from the calling component, so the message follows the UI language.
+ * @returns A user-facing explanation of the failure.
+ */
+export function describeReadFailure(
+	code: ReadWorkspaceFileFailureCode,
+	filePath: string,
+	t: TFunction,
+): string {
+	switch (code) {
+		case 'not-found':
+			return t(
+				'workbench:file-preview.failure.not-found',
+				'{{filePath}} does not exist.',
+				{
+					filePath,
+				},
+			);
+		case 'not-file':
+			return t(
+				'workbench:file-preview.failure.not-file',
+				'{{filePath}} is a directory and cannot be previewed.',
+				{ filePath },
+			);
+		case 'too-large':
+			return t(
+				'workbench:file-preview.failure.too-large',
+				'{{filePath}} is too large to preview.',
+				{ filePath },
+			);
+		case 'invalid-path':
+			return t(
+				'workbench:file-preview.failure.invalid-path',
+				'{{filePath}} is not a path this preview can open.',
+				{ filePath },
+			);
+		case 'invalid-cwd':
+			return t(
+				'workbench:file-preview.failure.invalid-cwd',
+				'The workspace directory is unavailable.',
+			);
+		default:
+			return t(
+				'workbench:file-preview.failure.unreadable',
+				'Could not read {{filePath}}.',
+				{ filePath },
+			);
+	}
 }

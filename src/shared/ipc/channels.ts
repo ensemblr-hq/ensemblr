@@ -40,6 +40,7 @@ export const IPC_CHANNELS = {
 	clearConciergeContext: 'ensemblr:clear-concierge-context',
 	conciergeContextPressure: 'ensemblr:concierge-context-pressure',
 	conciergeSessionEvent: 'ensemblr:concierge-session-event',
+	listConciergeArtifacts: 'ensemblr:list-concierge-artifacts',
 	listConciergeEvents: 'ensemblr:list-concierge-events',
 	openConciergeSession: 'ensemblr:open-concierge-session',
 	reportConciergeVisibility: 'ensemblr:concierge-visibility',

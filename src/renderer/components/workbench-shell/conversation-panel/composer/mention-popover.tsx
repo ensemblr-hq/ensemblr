@@ -1,3 +1,4 @@
+import { Icon } from '@iconify/react';
 import type { TFunction } from 'i18next';
 import { FolderGitIcon, GitBranchIcon, MessageSquareIcon } from 'lucide-react';
 import type { CSSProperties, ReactNode } from 'react';
@@ -10,6 +11,7 @@ import {
 import { ScrollArea } from '@/renderer/components/ui/scroll-area';
 import { Skeleton } from '@/renderer/components/ui/skeleton';
 import { WorkspaceFileIcon } from '@/renderer/components/workbench-shell/review-files/workspace-file-icon';
+import { getWorkspaceFileIconNameForPath } from '@/renderer/lib/workbench';
 import type {
 	AutocompleteKind,
 	ConciergeReferenceMatch,
@@ -127,6 +129,18 @@ function renderMentionRows({
 
 /** The glyph that says what an entity row stands for. */
 function EntityRowIcon({ reference }: { reference: ConciergeReference }) {
+	// An artifact is a document on disk, so it wears the file tree's own icon set
+	// and is read by extension — a `.md` report looks like the markdown files
+	// listed two rows above it rather than like a generic page.
+	if (reference.kind === 'artifact') {
+		return (
+			<Icon
+				aria-hidden='true'
+				className='size-3.5 shrink-0'
+				icon={getWorkspaceFileIconNameForPath(reference.path)}
+			/>
+		);
+	}
 	if (reference.kind === 'project') {
 		return <FolderGitIcon aria-hidden='true' className='size-3.5' />;
 	}
@@ -150,6 +164,14 @@ function entityRowSecondary(
 ): ReactNode {
 	if (reference.kind === 'project') {
 		return undefined;
+	}
+	// The path is only worth a second line when it says something the name did
+	// not — an artifact in a subfolder. A file at the top of `artifacts/` repeats
+	// its own name there.
+	if (reference.kind === 'artifact') {
+		return reference.path === reference.label ? undefined : (
+			<span className='truncate'>{reference.path}</span>
+		);
 	}
 	if (reference.kind === 'workspace') {
 		return <span className='truncate'>{reference.project}</span>;

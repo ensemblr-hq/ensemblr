@@ -28,6 +28,7 @@ import type {
 } from '../agent-runtime/agent-types.ts';
 import { stripLaunchContextEnv } from '../environment/launch-env.ts';
 import { createConciergeSessionGate } from './claude-concierge-guard.ts';
+import { resolveSystemPromptAppend } from './claude-edit-tool-directive.ts';
 import { buildClaudeMcpServers } from './claude-mcp-config.ts';
 import {
 	buildCanUseTool,
@@ -742,6 +743,10 @@ function buildQueryOptions({
 	});
 
 	const linkedDirectories = request.linkedDirectories ?? [];
+	const systemPromptAppend = resolveSystemPromptAppend({
+		permissionMode: permission.permissionMode,
+		systemPromptAppend: request.systemPromptAppend,
+	});
 
 	return {
 		...permission,
@@ -783,9 +788,7 @@ function buildQueryOptions({
 		systemPrompt: {
 			preset: 'claude_code',
 			type: 'preset',
-			...(request.systemPromptAppend
-				? { append: request.systemPromptAppend }
-				: {}),
+			...(systemPromptAppend ? { append: systemPromptAppend } : {}),
 		},
 	};
 }

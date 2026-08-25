@@ -312,9 +312,10 @@ function attachmentPromptPath(attachment: ComposerAttachment): string {
 }
 
 /**
- * Whether a chip stands for a project, a workspace, or a chat rather than for a
- * file. Such a chip has no path and no bytes to read: it serializes to a block
- * of ids the agent addresses its own ops with.
+ * Whether a chip stands for one of the app's own surfaces — a project, a
+ * workspace, a chat, or a Concierge artifact — rather than for a file in a
+ * workspace. Such a chip has no workspace path and no bytes to inline: it
+ * serializes to a block of ids the agent addresses its own ops with.
  * @param attachment - The attachment being walked.
  * @returns True when the attachment carries a reference.
  */
@@ -322,6 +323,7 @@ function isReferenceAttachment(
 	attachment: ComposerAttachment,
 ): attachment is Extract<ComposerAttachment, { reference: unknown }> {
 	return (
+		attachment.kind === 'artifact-ref' ||
 		attachment.kind === 'chat-ref' ||
 		attachment.kind === 'project-ref' ||
 		attachment.kind === 'workspace-ref'

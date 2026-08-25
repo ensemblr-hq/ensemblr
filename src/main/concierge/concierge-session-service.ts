@@ -1,5 +1,6 @@
 import type { DatabaseSync } from 'node:sqlite';
 
+import { classifyAgentFailure } from '../../shared/agent-failure.ts';
 import {
 	type AgentProviderId,
 	DEFAULT_AGENT_PROVIDER,
@@ -180,7 +181,36 @@ interface ActiveConciergeSession {
 	servedMessage: boolean;
 	sessionId: string;
 	subscription: AgentSubscription;
+	/**
+	 * Whether the runtime has said outright that it cannot reload the conversation
+	 * this attach asked for. Recorded from the error event rather than inferred
+	 * from the shutdown that follows, because a runtime that refuses a resume dies
+	 * like any other crash and only the error names the reason.
+	 */
+	unresumable: boolean;
 }
+
+/**
+ * The turn the service is holding on the user's behalf, so a prompt the runtime
+ * took but never answered can be delivered again to the child that replaces it.
+ * Carries the per-turn selection too, because `recordRuntimeChoice` runs against
+ * whichever session finally serves it.
+ */
+interface PendingConciergePrompt {
+	choice: { model?: string | null; thinkingLevel?: string | null };
+	request: { modelOverride?: string; prompt: string; thinkingLevel?: string };
+	sessionId: string;
+}
+
+/**
+ * How many times a conversation may be rebuilt after the runtime refused to
+ * reload it before the failure is left on screen.
+ *
+ * One. A rebuild starts a child from nothing, so the second refusal is not the
+ * same fault recurring — it is a runtime that cannot open a session at all, and
+ * retrying that is how a panel nobody can use spawns a process per attempt.
+ */
+const MAX_HEAL_ATTEMPTS = 1;
 
 /**
  * Converts the stored 0-1 fraction to the 0-100 percentage the runtimes report.
@@ -253,6 +283,10 @@ export function createConciergeSessionService({
 }: ConciergeSessionServiceOptions): ConciergeSessionService {
 	let active: ActiveConciergeSession | null = null;
 	let openInFlight: Promise<OpenConciergeSessionResult> | null = null;
+	let clearInFlight: Promise<ClearConciergeContextResult> | null = null;
+	let pendingPrompt: PendingConciergePrompt | null = null;
+	let replayedPrompt: PendingConciergePrompt | null = null;
+	let healAttempts = 0;
 
 	/**
 	 * Records the runtime's own id for the live conversation, now that there is
@@ -290,6 +324,26 @@ export function createConciergeSessionService({
 	};
 
 	/**
+	 * Records that the runtime is answering under this attachment: the prompt the
+	 * service was holding has landed, and the conversation has earned its heal
+	 * budget back.
+	 * @param sessionId - Session the runtime answered under.
+	 */
+	const noteRuntimeAnswered = (sessionId: string): void => {
+		healAttempts = 0;
+		if (pendingPrompt?.sessionId === sessionId) {
+			pendingPrompt = null;
+		}
+		// Bounds the echo suppression to the replayed turn. A runtime that
+		// announces no prompt of its own leaves the guard armed otherwise, and the
+		// next time the user typed those same words the transcript would swallow
+		// them.
+		if (replayedPrompt?.sessionId === sessionId) {
+			replayedPrompt = null;
+		}
+	};
+
+	/**
 	 * Forgets a runtime session id the runtime has just proved it cannot reload.
 	 *
 	 * A resumed child that crashes without carrying anything is what a
@@ -298,6 +352,12 @@ export function createConciergeSessionService({
 	 * same doomed resume is what every later prompt would revive into, forever.
 	 * Cleared, the next attach opens the same row fresh and its transcript
 	 * survives.
+	 *
+	 * A child the runtime told us outright it could not reload is forgotten
+	 * whatever its shutdown reason. That inference is stronger than the one below
+	 * it, which reads a resume failure off a crash that carried nothing: sessions
+	 * in the field kept their runtime id through two rejected resumes in a row and
+	 * every prompt after that landed in a child already dying.
 	 * @param attachment - The attachment whose child shut down.
 	 * @param reason - What ended it.
 	 */
@@ -305,11 +365,9 @@ export function createConciergeSessionService({
 		attachment: ActiveConciergeSession,
 		reason: AgentShutdownReason,
 	): void => {
-		if (
-			reason !== 'crashed' ||
-			!attachment.resumed ||
-			attachment.servedMessage
-		) {
+		const crashedBeforeWriting =
+			reason === 'crashed' && attachment.resumed && !attachment.servedMessage;
+		if (!attachment.unresumable && !crashedBeforeWriting) {
 			return;
 		}
 		updateConciergeSession({
@@ -318,6 +376,29 @@ export function createConciergeSessionService({
 			patch: { runtimeSessionId: null },
 		});
 	};
+
+	/**
+	 * Whether this event is the runtime echoing back a prompt {@link
+	 * healUnresumableSession} re-sent, which the transcript already carries.
+	 *
+	 * A runtime announces every prompt it accepts as a `user` message, and the
+	 * child that died had already announced this one under this same row — the
+	 * heal reopens the row rather than replacing it, which is what keeps the panel
+	 * on the transcript it is reading. Persisting the echo would print the user's
+	 * words twice with the failure between them.
+	 * @param sessionId - Session the event belongs to.
+	 * @param event - The runtime event.
+	 * @returns Whether the event duplicates a prompt already in the transcript.
+	 */
+	const isReplayedPromptEcho = (
+		sessionId: string,
+		event: AgentEvent,
+	): boolean =>
+		replayedPrompt?.sessionId === sessionId &&
+		event.type === 'message' &&
+		event.role === 'user' &&
+		event.payload.kind === 'prompt' &&
+		event.payload.prompt === replayedPrompt.request.prompt;
 
 	/**
 	 * Persists one runtime event, keeps the row's runtime continuity honest, and
@@ -345,6 +426,13 @@ export function createConciergeSessionService({
 				},
 			};
 		}
+		if (
+			event.type === 'error' &&
+			active?.sessionId === sessionId &&
+			classifyAgentFailure(event.error) === 'session-unresumable'
+		) {
+			active = { ...active, unresumable: true };
+		}
 		const attachment = active?.sessionId === sessionId ? active : null;
 		const live = attachment !== null;
 		try {
@@ -356,16 +444,24 @@ export function createConciergeSessionService({
 						patch: { status: event.status },
 					});
 				}
-				if (
-					event.type === 'message' &&
-					event.role !== 'user' &&
-					!attachment.servedMessage
-				) {
-					rememberRuntimeConversation(attachment);
+				if (event.type === 'message' && event.role !== 'user') {
+					noteRuntimeAnswered(sessionId);
+					if (!attachment.servedMessage) {
+						rememberRuntimeConversation(attachment);
+					}
 				}
 				if (event.type === 'shutdown') {
 					forgetUnresumableConversation(attachment, event.reason);
+					// Dropped before anything downstream can reach for it: `wrapSession`
+					// has already flipped the child closed, so an attachment left here is
+					// a corpse every later submit would be aimed at.
+					active = null;
+					discardDeadAttachment(attachment);
 				}
+			}
+			if (isReplayedPromptEcho(sessionId, event)) {
+				replayedPrompt = null;
+				return;
 			}
 			const row = appendConciergeEvent({
 				database: requireDatabase(),
@@ -380,6 +476,72 @@ export function createConciergeSessionService({
 			eventSink?.({ event: toEventWire(row), live, sessionId });
 		} catch {
 			return;
+		}
+	};
+
+	/**
+	 * Lets go of a child that has shut down, and rebuilds the conversation when
+	 * the runtime refused to reload it.
+	 *
+	 * The close is unconditional and is why `active` may be dropped at all: the
+	 * attachment holds an event subscription and a control origin, and nothing
+	 * else would ever reach them once the service has stopped pointing at it. A
+	 * child that ended any other way is simply released.
+	 * @param attachment - The attachment whose child shut down.
+	 */
+	const discardDeadAttachment = (attachment: ActiveConciergeSession): void => {
+		void closeAttachment(attachment);
+		if (!attachment.unresumable || healAttempts >= MAX_HEAL_ATTEMPTS) {
+			return;
+		}
+		healAttempts += 1;
+		void healUnresumableSession(attachment.sessionId);
+	};
+
+	/**
+	 * Puts a live child back under a conversation the runtime refused to reload,
+	 * and re-sends the turn that died with the last one.
+	 *
+	 * {@link forgetUnresumableConversation} has already cleared the row's runtime
+	 * id by the time this runs, so reopening the same row attaches a fresh child
+	 * rather than asking for the missing conversation again — and because the row
+	 * id never changes, the panel stays on the transcript it is already reading.
+	 *
+	 * A reopen that lands somewhere other than the row being healed drops the held
+	 * prompt rather than delivering it: the panel is watching the old transcript,
+	 * so a turn answered in another row would stream where nobody is looking.
+	 *
+	 * A reopen that fails outright refunds the heal budget rather than spending
+	 * it. The cap exists to stop a panel nobody can use spawning a process per
+	 * attempt, and an open that never got a child past the runtime spawned
+	 * nothing — so charging for it would disarm the repair for the next refusal,
+	 * which is a real one.
+	 * @param sessionId - The conversation to rebuild.
+	 */
+	const healUnresumableSession = async (sessionId: string): Promise<void> => {
+		const reopened = await openSession({ fresh: false });
+		if (!reopened.session) {
+			healAttempts = Math.max(0, healAttempts - 1);
+			return;
+		}
+		const held = pendingPrompt;
+		pendingPrompt = null;
+		if (active?.sessionId !== sessionId) {
+			return;
+		}
+		if (!held || held.sessionId !== sessionId) {
+			return;
+		}
+		replayedPrompt = held;
+		try {
+			await active.runtimeSession.submit(held.request);
+			recordRuntimeChoice(sessionId, held.choice);
+		} catch (cause) {
+			replayedPrompt = null;
+			console.warn('[concierge] could not re-send the turn after a heal.', {
+				cause: cause instanceof Error ? cause.message : String(cause),
+				sessionId,
+			});
 		}
 	};
 
@@ -534,6 +696,7 @@ export function createConciergeSessionService({
 				servedMessage: false,
 				sessionId: row.id,
 				subscription,
+				unresumable: false,
 			};
 
 			return (
@@ -756,48 +919,71 @@ export function createConciergeSessionService({
 		});
 	};
 
+	/**
+	 * Replaces the conversation with a fresh one and hands it back at once,
+	 * leaving the memory-write turn to run in the background on the child it
+	 * retired. The clear is the thing the user pressed, so nothing about it waits
+	 * on an agent turn — and a pass that fails, times out, or never starts costs
+	 * one conversation's notes rather than the panel.
+	 * @param request - Why the context is being cleared, and whether to skip the pass.
+	 * @returns The replacement conversation, or the failure that stopped it.
+	 */
+	const runClearContext = async ({
+		reason,
+		skipMemoryPass,
+	}: ClearConciergeContextRequest): Promise<ClearConciergeContextResult> => {
+		const database = requireDatabase();
+		const current = active
+			? getConciergeSessionById({ database, id: active.sessionId })
+			: getActiveConciergeSession({ database });
+
+		const memoryPassStarted = current
+			? retireAndWriteMemories(current.id, skipMemoryPass)
+			: false;
+
+		// A no-op once the child has been retired; it still closes the live one
+		// when the caller skipped the pass, and when there was no row to write for.
+		await detach();
+		if (current) {
+			updateConciergeSession({
+				database,
+				id: current.id,
+				patch: {
+					closedAt: now().toISOString(),
+					metadata: { ...current.metadata, clearedBy: reason },
+					status: 'closed',
+				},
+			});
+		}
+
+		try {
+			const row = await attachRuntime(createRow());
+			return { memoryPassStarted, session: toSnapshot(row, true) };
+		} catch (error) {
+			return { error: toMessage(error), memoryPassStarted };
+		}
+	};
+
 	return {
 		/**
-		 * Replaces the conversation with a fresh one and hands it back at once,
-		 * leaving the memory-write turn to run in the background on the child it
-		 * retired. The clear is the thing the user pressed, so nothing about it
-		 * waits on an agent turn — and a pass that fails, times out, or never
-		 * starts costs one conversation's notes rather than the panel.
+		 * Clears the context, serving a caller that arrives mid-clear the clear
+		 * already running rather than starting a second one beside it.
+		 *
+		 * The control is one chord and one button away, and each clear spawns a
+		 * replacement child plus a retired one running a whole memory-write turn.
+		 * A panel that has stopped answering is exactly when the user presses it
+		 * repeatedly, and unserialised that turned eighteen keystrokes into
+		 * eighteen conversations and eighteen runtime children in six seconds.
 		 */
-		clearContext: async ({
-			reason,
-			skipMemoryPass,
-		}: ClearConciergeContextRequest): Promise<ClearConciergeContextResult> => {
-			const database = requireDatabase();
-			const current = active
-				? getConciergeSessionById({ database, id: active.sessionId })
-				: getActiveConciergeSession({ database });
-
-			const memoryPassStarted = current
-				? retireAndWriteMemories(current.id, skipMemoryPass)
-				: false;
-
-			// A no-op once the child has been retired; it still closes the live one
-			// when the caller skipped the pass, and when there was no row to write for.
-			await detach();
-			if (current) {
-				updateConciergeSession({
-					database,
-					id: current.id,
-					patch: {
-						closedAt: now().toISOString(),
-						metadata: { ...current.metadata, clearedBy: reason },
-						status: 'closed',
-					},
+		clearContext: (
+			request: ClearConciergeContextRequest,
+		): Promise<ClearConciergeContextResult> => {
+			if (!clearInFlight) {
+				clearInFlight = runClearContext(request).finally(() => {
+					clearInFlight = null;
 				});
 			}
-
-			try {
-				const row = await attachRuntime(createRow());
-				return { memoryPassStarted, session: toSnapshot(row, true) };
-			} catch (error) {
-				return { error: toMessage(error), memoryPassStarted };
-			}
+			return clearInFlight;
 		},
 
 		/**
@@ -884,6 +1070,12 @@ export function createConciergeSessionService({
 		 * child down to rebuild it would throw away a turn it may be streaming.
 		 * The snapshot comes back either way, so the panel adopts the conversation
 		 * its prompt actually landed in.
+		 *
+		 * The turn is held until the runtime answers under it. A child can accept a
+		 * prompt and only then discover it cannot reload its conversation, and the
+		 * acknowledgement has already been returned by the time it dies — so
+		 * without the hold the user's words survive as a prompt bubble in a
+		 * transcript nothing will ever answer.
 		 */
 		submitPrompt: async ({
 			model,
@@ -896,9 +1088,11 @@ export function createConciergeSessionService({
 				...(model ? { modelOverride: model } : {}),
 				...(thinkingLevel ? { thinkingLevel } : {}),
 			};
+			const choice = { model, thinkingLevel };
 
 			const live = active;
 			if (live) {
+				pendingPrompt = { choice, request, sessionId: live.sessionId };
 				try {
 					const acknowledgement = await live.runtimeSession.submit(request);
 					recordRuntimeChoice(live.sessionId, { model, thinkingLevel });
@@ -909,6 +1103,7 @@ export function createConciergeSessionService({
 						...(adopted ? { session: adopted } : {}),
 					};
 				} catch (error) {
+					pendingPrompt = null;
 					if (!isSessionClosedFailure(error)) {
 						return { error: toMessage(error) };
 					}
@@ -919,6 +1114,7 @@ export function createConciergeSessionService({
 			if ('error' in revived) {
 				return { error: revived.error };
 			}
+			pendingPrompt = { choice, request, sessionId: revived.live.sessionId };
 			try {
 				const acknowledgement =
 					await revived.live.runtimeSession.submit(request);
@@ -928,6 +1124,7 @@ export function createConciergeSessionService({
 					session: revived.session,
 				};
 			} catch (error) {
+				pendingPrompt = null;
 				return { error: toMessage(error) };
 			}
 		},

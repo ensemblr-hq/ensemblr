@@ -140,6 +140,7 @@ export function createEnsemblrApi(): EnsemblrApi {
 			invoke('clearConciergeContext', request),
 		closeChatTab: (request) => invoke('closeChatTab', request),
 		conciergeContextPressure: () => invoke('conciergeContextPressure'),
+		listConciergeArtifacts: () => invoke('listConciergeArtifacts'),
 		closeWindow: () => invoke('closeWindow'),
 		commitWorkspaceChanges: (request) =>
 			invoke('commitWorkspaceChanges', request),

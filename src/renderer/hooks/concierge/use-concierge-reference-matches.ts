@@ -1,7 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
 
-import { allChatTabsQuery } from '@/renderer/api/ensemblr';
+import {
+	allChatTabsQuery,
+	conciergeArtifactsQuery,
+} from '@/renderer/api/ensemblr';
 import { useWorkbenchLayoutRouteModelOptional } from '@/renderer/components/workbench-shell/shell-contexts';
 import { buildConciergeReferences } from '@/renderer/lib/concierge';
 import { fuzzyMatch } from '@/renderer/lib/workbench/fuzzy-score';
@@ -13,8 +16,9 @@ const REFERENCE_MATCH_LIMIT = 40;
 
 /** Order the kinds appear in at equal score, and how a tie between them breaks. */
 const KIND_ORDER: Record<ConciergeReference['kind'], number> = {
-	chat: 1,
-	project: 2,
+	artifact: 1,
+	chat: 2,
+	project: 3,
 	workspace: 0,
 };
 
@@ -26,7 +30,8 @@ interface ScoredReference {
 
 /**
  * The Concierge's `@` catalogue: every project, workspace, and chat the app
- * holds, ranked against what the user has typed.
+ * holds, plus the artifacts the Concierge has written, ranked against what the
+ * user has typed.
  *
  * Workspaces lead an unfiltered menu because they are what the Concierge is
  * usually asked to act on, and an open chat outranks a closed one at equal score
@@ -44,14 +49,16 @@ export function useConciergeReferenceMatches(
 	const layoutModel = useWorkbenchLayoutRouteModelOptional();
 	const projects = layoutModel?.displayProjects;
 	const { data: chatTabs } = useQuery({ ...allChatTabsQuery, enabled });
+	const { data: artifacts } = useQuery({ ...conciergeArtifactsQuery, enabled });
 
 	const references = useMemo(
 		() =>
 			buildConciergeReferences({
+				artifacts: artifacts?.artifacts ?? [],
 				chatTabs: chatTabs ?? { closed: [], open: [] },
 				projects: projects ?? [],
 			}),
-		[chatTabs, projects],
+		[artifacts, chatTabs, projects],
 	);
 
 	return useMemo(

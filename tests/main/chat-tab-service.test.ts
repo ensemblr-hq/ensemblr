@@ -737,3 +737,36 @@ test('service surfaces a clear error when the database is closed', (t) => {
 		/Database is not open/,
 	);
 });
+
+test('claimIdleChatTab offers a chat nobody has spent yet', (t) => {
+	const fixture = openFixture(t);
+
+	const idle = fixture.service.openTab({ workspaceId: fixture.workspaceId });
+
+	assert.equal(
+		fixture.service.claimIdleChatTab({ workspaceId: fixture.workspaceId })?.id,
+		idle.id,
+	);
+});
+
+test('claimIdleChatTab refuses a tab the user named or already used', (t) => {
+	const fixture = openFixture(t);
+
+	fixture.service.openTab({
+		title: 'Release notes',
+		workspaceId: fixture.workspaceId,
+	});
+	fixture.service.openTab({
+		agentSessionId: fixture.agentSessionId,
+		workspaceId: fixture.workspaceId,
+	});
+	fixture.service.openTab({
+		kind: 'terminal',
+		workspaceId: fixture.workspaceId,
+	});
+
+	assert.equal(
+		fixture.service.claimIdleChatTab({ workspaceId: fixture.workspaceId }),
+		null,
+	);
+});

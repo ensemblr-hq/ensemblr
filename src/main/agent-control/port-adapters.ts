@@ -517,13 +517,23 @@ function makeConversationPort(deps: PortAdapterDeps): ConversationPort {
 			}
 			const selection = resolution.selection;
 			const executable = await requireExecutableFor(selection.runtime);
-			const openedTabId = chatTabId
+			// A workspace the user has looked at already has an empty chat tab: the
+			// renderer opens one for every workspace with none, so a spawn that
+			// always opened its own left the freshly created workspace showing two,
+			// one of them permanently blank. Claimed rather than opened, the tab
+			// stays out of `openedTabId` — rollback closes what this spawn created,
+			// and a tab that was already there is not that.
+			const claimedTab = chatTabId
 				? null
-				: deps.chatTabService.openTab({ kind: 'chat', workspaceId }).id;
+				: deps.chatTabService.claimIdleChatTab({ workspaceId });
+			const openedTabId =
+				chatTabId || claimedTab
+					? null
+					: deps.chatTabService.openTab({ kind: 'chat', workspaceId }).id;
 			if (openedTabId) {
 				deps.broadcastTabsChanged({ workspaceId });
 			}
-			const targetTabId = chatTabId ?? openedTabId;
+			const targetTabId = chatTabId ?? claimedTab?.id ?? openedTabId;
 			if (!targetTabId) {
 				throw new Error('Failed to resolve a chat tab for the conversation.');
 			}

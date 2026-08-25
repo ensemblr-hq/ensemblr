@@ -3,8 +3,10 @@ import { describe, expect, it, vi } from 'vitest';
 import {
 	buildConciergeReferences,
 	conciergeReferenceAttachment,
+	conciergeReferenceChipKind,
 	findConciergeReference,
 } from '@/renderer/lib/concierge';
+import { getWorkspaceFileIconNameForPath } from '@/renderer/lib/workbench';
 import { serializeComposerDraft } from '@/renderer/lib/workbench/mention-payload';
 import type { ProjectShellModel } from '@/renderer/types/workbench';
 import type { ChatTabWire } from '@/shared/ipc/contracts/chat-tab';
@@ -167,6 +169,50 @@ describe('sending a reference chip', () => {
 				'today?',
 			].join('\n\n'),
 		);
+	});
+
+	it('offers the Concierge’s artifacts alongside the app’s own surfaces', () => {
+		const references = buildConciergeReferences({
+			artifacts: [
+				{
+					modifiedAt: '2026-08-25T10:00:00.000Z',
+					name: 'release-plan.md',
+					relativePath: 'releases/release-plan.md',
+					size: 120,
+				},
+			],
+			chatTabs: { closed: [], open: [] },
+			projects: [],
+		});
+
+		expect(references).toEqual([
+			{
+				kind: 'artifact',
+				label: 'release-plan.md',
+				path: 'releases/release-plan.md',
+			},
+		]);
+		expect(conciergeReferenceAttachment(references[0]!).kind).toBe(
+			'artifact-ref',
+		);
+	});
+
+	// An artifact is a document on disk, so it wears the file tree's own icon set
+	// and is read by extension rather than getting a generic page glyph.
+	it('draws an artifact with the file tree’s own icon', () => {
+		const chipKind = conciergeReferenceChipKind({
+			kind: 'artifact',
+			label: 'release-plan.md',
+			path: 'releases/release-plan.md',
+		});
+
+		expect(chipKind).toBe('file');
+		expect(getWorkspaceFileIconNameForPath('releases/release-plan.md')).toBe(
+			getWorkspaceFileIconNameForPath('any/other/note.md'),
+		);
+		expect(
+			getWorkspaceFileIconNameForPath('releases/release-plan.md'),
+		).not.toBe(getWorkspaceFileIconNameForPath('releases/release-plan.json'));
 	});
 
 	it('namespaces a chip id by kind, so a project and its workspace never collide', () => {

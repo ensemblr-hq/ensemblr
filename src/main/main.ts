@@ -1455,6 +1455,7 @@ app.whenReady().then(() => {
 		archiveWorkspaceService: archiveWorkspaceServiceWithScript,
 		augmentHarnessCommand,
 		conciergeSessionService,
+		resolveConciergeHome: resolveConciergeHomePaths,
 		configService,
 		continueWorkspaceBranchService,
 		createWorkspaceService: createWorkspaceServiceWithSetup,

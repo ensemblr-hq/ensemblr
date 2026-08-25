@@ -85,6 +85,19 @@ each tool's current docs (do not edit them from memory):
 Because these bypass the harness's own approval gates, run harnesses only in
 workspaces you trust — the isolation boundary is the workspace's git worktree.
 
+Claude Code's own system prompt reacts to that flag: once prompts cost nothing
+it tells the model to read and rewrite files through `Bash` — `cat`, `sed -i`, a
+heredoc — "rather than using the dedicated Read, Edit, or Write tools". A
+harness renders as a terminal, so that trade is harmless there and the launch
+flags stay as they are. It is not harmless on the **first-class Claude chat**,
+where every tool call becomes a timeline row and only `Edit`/`Write` carry the
+path and diff a user opens and comments on, so
+`src/main/claude-agent/claude-edit-tool-directive.ts` appends an override to the
+system prompt of any session opened in an unprompted permission mode. The
+override flips the preference rather than banning the shell: `sed`, a heredoc,
+or a short script stays available for the sweeps and inspections it is actually
+good at.
+
 ## Resume
 
 Ensemblr captures each harness's native session id from its on-disk logs so a

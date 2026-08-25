@@ -120,6 +120,14 @@ const FAILURE_PRESENTATION: Readonly<
 		icon: 'power-off',
 		severity: 'warning',
 	},
+	// No action: the Concierge repairs this class itself, and a workspace chat
+	// that hits it is told to start a fresh one rather than offered a retry that
+	// would ask the runtime to reload the same missing conversation.
+	'session-unresumable': {
+		actions: [],
+		icon: 'power-off',
+		severity: 'warning',
+	},
 	'tool-denied': {
 		actions: ['open-permissions', 'continue'],
 		icon: 'shield-alert',
@@ -179,6 +187,11 @@ const FAILURE_TITLE: Readonly<
 		),
 	'session-closed': (t) =>
 		t('errors:agent-failure.session-closed.title', 'This session has ended'),
+	'session-unresumable': (t) =>
+		t(
+			'errors:agent-failure.session-unresumable.title',
+			'The runtime lost this conversation',
+		),
 	'tool-denied': (t) =>
 		t('errors:agent-failure.tool-denied.title', 'A tool call was blocked'),
 	unknown: (t) =>
@@ -257,6 +270,11 @@ const FAILURE_BODY: Readonly<
 		t(
 			'errors:agent-failure.session-closed.body',
 			'The turn could not be delivered because the session is already closed. Start a new chat to keep going.',
+		),
+	'session-unresumable': (t) =>
+		t(
+			'errors:agent-failure.session-unresumable.body',
+			'The agent runtime no longer holds the conversation this chat was reloading, so its history could not be restored. A fresh conversation carries on from here.',
 		),
 	'tool-denied': (t) =>
 		t(

@@ -75,7 +75,11 @@ function attachmentTooltip(attachment: ComposerAttachment): string {
 	if (attachment.kind === 'file-diff') {
 		return attachment.filePath || attachment.label;
 	}
-	if (attachment.kind === 'workspace-ref' || attachment.kind === 'chat-ref') {
+	if (
+		attachment.kind === 'artifact-ref' ||
+		attachment.kind === 'workspace-ref' ||
+		attachment.kind === 'chat-ref'
+	) {
 		return referenceTooltip(attachment.reference) || attachment.label;
 	}
 	if (attachment.kind !== 'review-comment') {
@@ -86,12 +90,16 @@ function attachmentTooltip(attachment: ComposerAttachment): string {
 }
 
 /**
- * Where a reference sits, so two same-named workspaces in different projects — or
- * two chats called the same thing — are told apart on hover.
+ * Where a reference sits, so two same-named workspaces in different projects, two
+ * chats called the same thing, or two artifacts in different folders are told
+ * apart on hover.
  * @param reference - The reference behind the chip.
  * @returns The qualified name, or an empty string when the owner is unknown.
  */
 function referenceTooltip(reference: ConciergeReference): string {
+	if (reference.kind === 'artifact') {
+		return reference.path;
+	}
 	if (reference.kind === 'workspace') {
 		return reference.project ? `${reference.project} › ${reference.label}` : '';
 	}

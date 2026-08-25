@@ -193,6 +193,14 @@ async function openClaudeSession(input: {
 	return options;
 }
 
+/** Reads the append off the preset system prompt the adapter built. */
+function systemPromptAppendOf(options: Options): string | undefined {
+	const systemPrompt = options.systemPrompt;
+	return typeof systemPrompt === 'object' && !Array.isArray(systemPrompt)
+		? systemPrompt.append
+		: undefined;
+}
+
 describe('Claude session options: the workspace permission mode reaches the SDK', () => {
 	it('leaves a workspace-trusted workspace exactly as permissive as it is today', async () => {
 		const options = await openClaudeSession({ mode: 'workspace-trusted' });
@@ -201,6 +209,20 @@ describe('Claude session options: the workspace permission mode reaches the SDK'
 		expect(options.allowDangerouslySkipPermissions).toBe(true);
 		expect(options.disallowedTools).toEqual(NATIVE_SUBAGENT_TOOLS);
 		expect(options.canUseTool).toBeUndefined();
+	});
+
+	it('overrides the Bash-first instruction the unprompted mode earns it', async () => {
+		const options = await openClaudeSession({ mode: 'workspace-trusted' });
+
+		expect(systemPromptAppendOf(options)).toContain('Edit and Write');
+	});
+
+	it('leaves the system prompt alone in a mode that still prompts', async () => {
+		for (const mode of ['read-only', 'approval-required'] as const) {
+			const options = await openClaudeSession({ mode });
+
+			expect(systemPromptAppendOf(options)).toBeUndefined();
+		}
 	});
 
 	it('plans and withholds the mutating tools when the user picked read-only', async () => {
