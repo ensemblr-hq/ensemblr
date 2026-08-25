@@ -36,8 +36,22 @@ const DRAG_THRESHOLD = 4;
 /** Margin kept between a Concierge surface and the viewport edge, in pixels. */
 const EDGE_MARGIN = 8;
 
-/** Distance the anchor keeps from the viewport's bottom-right corner initially. */
-const DOCK_MARGIN = 16;
+/** Distance the anchor keeps from the viewport's right edge initially. */
+const DOCK_MARGIN_X = 16;
+
+/**
+ * Distance the anchor keeps from the viewport's bottom edge initially. Taller
+ * than the side margin because the bottom-right corner is already occupied:
+ * `src/renderer/components/ui/sonner.tsx` leaves sonner on its default
+ * bottom-right stack, which starts 24px up, and the Setup pane floats its rerun
+ * control in the same corner — both of which an undragged bubble would sit on
+ * top of.
+ *
+ * It lifts the panel by the same amount, because the two surfaces share one
+ * corner by design: the panel opens where the bubble was, so a launcher-only
+ * margin would make opening it jump.
+ */
+const DOCK_MARGIN_Y = 96;
 
 /** A drag in flight: where it started, and where it has reached. */
 interface DragSession {
@@ -53,8 +67,8 @@ interface DragSession {
  */
 function dockedAnchor(): ConciergePoint {
 	return {
-		x: window.innerWidth - DOCK_MARGIN,
-		y: window.innerHeight - DOCK_MARGIN,
+		x: window.innerWidth - DOCK_MARGIN_X,
+		y: window.innerHeight - DOCK_MARGIN_Y,
 	};
 }
 

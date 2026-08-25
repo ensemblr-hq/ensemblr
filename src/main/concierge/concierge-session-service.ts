@@ -27,6 +27,7 @@ import { eventPayload } from '../agent-runtime/agent-session-persistence.ts';
 import type {
 	AgentEvent,
 	AgentExecutableSnapshot,
+	AgentShutdownReason,
 	AgentSubscription,
 } from '../agent-runtime/agent-types.ts';
 import {
@@ -167,7 +168,16 @@ interface ActiveConciergeSession {
 		percent: number | null;
 		usedTokens: number | null;
 	} | null;
+	/** Whether this attach asked the runtime to reload an existing conversation. */
+	resumed: boolean;
 	runtimeSession: AgentSession;
+	/**
+	 * Whether the runtime itself has produced a message under this child, which
+	 * is what makes it resumable. The prompt echo an adapter emits from its own
+	 * `submit` does not count: it is raised before the runtime has seen the
+	 * prompt, so it proves nothing about a transcript existing.
+	 */
+	servedMessage: boolean;
 	sessionId: string;
 	subscription: AgentSubscription;
 }
@@ -245,12 +255,77 @@ export function createConciergeSessionService({
 	let openInFlight: Promise<OpenConciergeSessionResult> | null = null;
 
 	/**
-	 * Persists one runtime event and pushes it to open windows. Best-effort: a
-	 * write that fails must not tear down the stream, because the transcript
-	 * rehydrates from whatever did land. Every database call is inside the guard,
-	 * status included — at quit the connection closes under the trailing
-	 * `closed` event, and a throw out of this callback skips every later
-	 * subscriber on the same emit.
+	 * Records the runtime's own id for the live conversation, now that there is
+	 * one to reload.
+	 *
+	 * Deliberately not written when the child attaches, though its metadata
+	 * carries an id from that moment: `AgentClient` seeds that field with the id
+	 * Ensemblr just handed the runtime, so it states what was asked for rather
+	 * than what the runtime holds. Stored at attach, a session that opened and
+	 * closed without a turn came back as `resume: <id>` — which Claude Code
+	 * answers with `No conversation found with session ID`, as an event raised
+	 * long after `createSession` has already resolved. The panel kept feeding
+	 * prompts into a child that was busy dying, and only a context clear escaped.
+	 * The first message the runtime itself produced is the earliest point it has
+	 * written a transcript of its own.
+	 *
+	 * The row is written before the flag is flipped, so a write that fails — or a
+	 * child whose metadata has no id yet — is retried by the next message rather
+	 * than leaving the session unresumable for good.
+	 * @param attachment - The live attachment that just carried a message.
+	 */
+	const rememberRuntimeConversation = (
+		attachment: ActiveConciergeSession,
+	): void => {
+		const runtimeSessionId = attachment.runtimeSession.getMetadata().sessionId;
+		if (!runtimeSessionId) {
+			return;
+		}
+		updateConciergeSession({
+			database: requireDatabase(),
+			id: attachment.sessionId,
+			patch: { runtimeSessionId },
+		});
+		active = { ...attachment, servedMessage: true };
+	};
+
+	/**
+	 * Forgets a runtime session id the runtime has just proved it cannot reload.
+	 *
+	 * A resumed child that crashes without carrying anything is what a
+	 * conversation the runtime has since dropped looks like from here, and it
+	 * arrives as an event rather than as a rejected open — so left on the row the
+	 * same doomed resume is what every later prompt would revive into, forever.
+	 * Cleared, the next attach opens the same row fresh and its transcript
+	 * survives.
+	 * @param attachment - The attachment whose child shut down.
+	 * @param reason - What ended it.
+	 */
+	const forgetUnresumableConversation = (
+		attachment: ActiveConciergeSession,
+		reason: AgentShutdownReason,
+	): void => {
+		if (
+			reason !== 'crashed' ||
+			!attachment.resumed ||
+			attachment.servedMessage
+		) {
+			return;
+		}
+		updateConciergeSession({
+			database: requireDatabase(),
+			id: attachment.sessionId,
+			patch: { runtimeSessionId: null },
+		});
+	};
+
+	/**
+	 * Persists one runtime event, keeps the row's runtime continuity honest, and
+	 * pushes the event to open windows. Best-effort: a write that fails must not
+	 * tear down the stream, because the transcript rehydrates from whatever did
+	 * land. Every database call is inside the guard, status included — at quit the
+	 * connection closes under the trailing `closed` event, and a throw out of this
+	 * callback skips every later subscriber on the same emit.
 	 *
 	 * The broadcast carries whether the event's session is the live one, because
 	 * a child {@link retireAndWriteMemories} retired keeps its subscription and
@@ -270,14 +345,27 @@ export function createConciergeSessionService({
 				},
 			};
 		}
-		const live = active?.sessionId === sessionId;
+		const attachment = active?.sessionId === sessionId ? active : null;
+		const live = attachment !== null;
 		try {
-			if (event.type === 'status' && live) {
-				updateConciergeSession({
-					database: requireDatabase(),
-					id: sessionId,
-					patch: { status: event.status },
-				});
+			if (attachment) {
+				if (event.type === 'status') {
+					updateConciergeSession({
+						database: requireDatabase(),
+						id: sessionId,
+						patch: { status: event.status },
+					});
+				}
+				if (
+					event.type === 'message' &&
+					event.role !== 'user' &&
+					!attachment.servedMessage
+				) {
+					rememberRuntimeConversation(attachment);
+				}
+				if (event.type === 'shutdown') {
+					forgetUnresumableConversation(attachment, event.reason);
+				}
 			}
 			const row = appendConciergeEvent({
 				database: requireDatabase(),
@@ -388,6 +476,10 @@ export function createConciergeSessionService({
 	 * attached before rather than dropping it: `active` holds one session, so an
 	 * overwrite would strand the previous child, its subscription, and its
 	 * control origin with no handle left to reach any of them.
+	 *
+	 * A row carrying a runtime session id is one whose runtime has already served
+	 * a turn under it — {@link rememberRuntimeConversation} is the only writer —
+	 * so it is the one case where reloading that conversation is the right ask.
 	 * @param row - The session row to attach.
 	 * @returns The row as it stands after the attach, streaming status included.
 	 */
@@ -396,6 +488,7 @@ export function createConciergeSessionService({
 	): Promise<ConciergeSessionRow> => {
 		const database = requireDatabase();
 		const settings = resolveSettings();
+		const resumed = Boolean(row.runtimeSessionId);
 		const starting =
 			updateConciergeSession({
 				database,
@@ -423,7 +516,7 @@ export function createConciergeSessionService({
 				permissionMode: 'workspace-trusted',
 				provider: row.provider,
 				resolveTurnPreamble: control.resolveTurnPreamble ?? null,
-				resumeRuntimeSession: Boolean(row.runtimeSessionId),
+				resumeRuntimeSession: resumed,
 				runtimeSessionId: row.runtimeSessionId ?? row.id,
 				systemPromptAppend: control.systemPromptAppend ?? null,
 				thinkingLevel: row.thinkingLevel ?? settings.thinkingLevel,
@@ -436,7 +529,9 @@ export function createConciergeSessionService({
 			});
 			active = {
 				contextUsage: null,
+				resumed,
 				runtimeSession,
+				servedMessage: false,
 				sessionId: row.id,
 				subscription,
 			};
@@ -445,10 +540,7 @@ export function createConciergeSessionService({
 				updateConciergeSession({
 					database,
 					id: row.id,
-					patch: {
-						runtimeSessionId: runtimeSession.getMetadata().sessionId ?? null,
-						status: 'idle',
-					},
+					patch: { status: 'idle' },
 				}) ?? starting
 			);
 		} catch (error) {

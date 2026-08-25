@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
 	type AgentClient,
 	AgentClientError,
+	type AgentEventListener,
 	type AgentSession,
 	type AgentSessionRequest,
 } from '../../src/main/agent-runtime';
@@ -22,6 +23,8 @@ let directory: string;
 /** A runtime child the test can kill, to stand in for one that died. */
 interface FakeChild {
 	kill: () => void;
+	/** Carries one turn, which is what leaves the runtime a conversation to reload. */
+	serveTurn: () => void;
 	session: AgentSession;
 	submitted: string[];
 }
@@ -34,6 +37,7 @@ interface FakeChild {
  */
 const fakeChild = (runtimeSessionId: string): FakeChild => {
 	const submitted: string[] = [];
+	const listeners = new Set<AgentEventListener>();
 	let closed = false;
 	const session = {
 		abort: async () => {
@@ -47,7 +51,14 @@ const fakeChild = (runtimeSessionId: string): FakeChild => {
 		id: runtimeSessionId as never,
 		refreshPlanUsage: async () => false,
 		setSessionName: async () => undefined,
-		subscribe: () => ({ unsubscribe: () => undefined }),
+		subscribe: (listener: AgentEventListener) => {
+			listeners.add(listener);
+			return {
+				unsubscribe: () => {
+					listeners.delete(listener);
+				},
+			};
+		},
 		submit: async (request: { prompt: string }) => {
 			if (closed) {
 				throw new AgentClientError({
@@ -66,10 +77,21 @@ const fakeChild = (runtimeSessionId: string): FakeChild => {
 			submitted.push(request.prompt);
 			return { acceptedAt: '2026-08-24T00:00:00.000Z' } as never;
 		},
-	} as AgentSession;
+	} as unknown as AgentSession;
 	return {
 		kill: () => {
 			closed = true;
+		},
+		serveTurn: () => {
+			for (const listener of [...listeners]) {
+				listener({
+					at: '2026-08-24T00:00:00.000Z',
+					payload: { kind: 'text', text: 'served' },
+					role: 'agent',
+					turnId: null,
+					type: 'message',
+				});
+			}
 		},
 		session,
 		submitted,
@@ -157,6 +179,7 @@ describe('a Concierge prompt sent after its runtime child has died', () => {
 	it('resumes the conversation the dead child was serving', async () => {
 		const { children, requests, service } = setup();
 		const opened = await service.openSession({ fresh: true });
+		children[0]?.serveTurn();
 		children[0]?.kill();
 
 		const result = await service.submitPrompt({
@@ -193,6 +216,7 @@ describe('a Concierge prompt sent after its runtime child has died', () => {
 			refuseOpen: (request) => request.resumeRuntimeSession === true,
 		});
 		const opened = await service.openSession({ fresh: true });
+		children[0]?.serveTurn();
 		children[0]?.kill();
 
 		const result = await service.submitPrompt({
