@@ -21,6 +21,7 @@ export type ToolGlyph =
 	| 'file-plus'
 	| 'file-text'
 	| 'folder-tree'
+	| 'git-branch-plus'
 	| 'hourglass'
 	| 'image'
 	| 'kanban'
@@ -45,16 +46,57 @@ export type ToolGlyph =
 	| 'wrench';
 
 /**
- * Persistent chip pinned beside a tool title. Unlike a preview it survives
- * expansion, so the file under discussion stays on screen while its body reads.
+ * Which transcript a row is being rendered in. The app's own control tools mean
+ * different things on the two: what a workspace agent spawns is a sub-agent that
+ * reports back to it, while what the Concierge spawns is a chat in a workspace
+ * the user can talk to themselves.
  */
-export interface ToolBadgeDescriptor {
+export type TimelineSurface = 'concierge' | 'workspace';
+
+/** The file a row touched, pinned beside its title. */
+export interface ToolFileBadgeDescriptor {
 	/** Added-line count for an edit; null when the tool reports no diff. */
 	additions: number | null;
 	deletions: number | null;
 	kind: 'file' | 'folder';
 	path: string;
 }
+
+/**
+ * The workspace a control call acted on. Only the id travels: the name the chip
+ * paints is read from the app's live catalogue, so a workspace renamed since the
+ * row was written reads by its current name rather than by the one it had then.
+ */
+export interface ToolWorkspaceBadgeDescriptor {
+	kind: 'workspace';
+	workspaceId: string;
+}
+
+/**
+ * The chat a control call opened, steered, or closed. Carries the id for the
+ * same reason a workspace badge does — a chat is renamed by the agent working in
+ * it, often seconds after the row that started it was written.
+ */
+export interface ToolChatBadgeDescriptor {
+	chatTabId: string;
+	kind: 'chat';
+	/**
+	 * Workspace holding the chat, pinned instead when the chat itself cannot be
+	 * resolved. A tab nobody has named yet is deliberately absent from the
+	 * catalogue, and that is exactly the state a spawn row is written in — so
+	 * without this the row that just started a chat would carry no chip at all.
+	 */
+	workspaceId: string | null;
+}
+
+/**
+ * Persistent chip pinned beside a tool title. Unlike a preview it survives
+ * expansion, so what the row is about stays on screen while its body reads.
+ */
+export type ToolBadgeDescriptor =
+	| ToolChatBadgeDescriptor
+	| ToolFileBadgeDescriptor
+	| ToolWorkspaceBadgeDescriptor;
 
 /** Collapsed-only one-line summary of what a row's body will show. */
 export interface ToolPreviewDescriptor {
@@ -144,6 +186,16 @@ export interface ToolPresentation {
 	preview: ToolPreviewDescriptor | null;
 	title: string;
 	tone: ToolTone;
+	/**
+	 * Title to fall back to when the badge pins nothing on screen, which only a
+	 * chat or workspace badge can do — those resolve against a live catalogue and
+	 * come up empty for something archived, deleted, or not listed yet.
+	 *
+	 * A row that hands its subject to a chip keeps it out of the title so the two
+	 * do not say the same thing twice; this is that subject put back, so the
+	 * fallback is a plainer row rather than a row that names nothing.
+	 */
+	unpinnedTitle?: string;
 }
 
 /**

@@ -1,5 +1,6 @@
 import { createContext, use } from 'react';
 
+import type { TimelineSurface } from '@/renderer/types/tool-presentation';
 import type {
 	ConciergeReference,
 	ConciergeReferenceKind,
@@ -36,4 +37,16 @@ export const ConciergeReferenceProvider = ConciergeReferenceContext.Provider;
  */
 export function useConciergeReferenceAccess(): ConciergeReferenceAccess | null {
 	return use(ConciergeReferenceContext);
+}
+
+/**
+ * Which transcript the surface being rendered belongs to.
+ *
+ * Read off the reference provider rather than from a flag of its own: the panel
+ * mounts that provider around the Concierge's transcript and its composer and
+ * nothing else does, so the two can never disagree about where a row is.
+ * @returns `concierge` inside the panel, `workspace` everywhere else.
+ */
+export function useTimelineSurface(): TimelineSurface {
+	return use(ConciergeReferenceContext) === null ? 'workspace' : 'concierge';
 }

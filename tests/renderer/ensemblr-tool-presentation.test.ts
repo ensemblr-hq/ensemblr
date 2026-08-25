@@ -12,6 +12,7 @@ import {
 	glyphForToolCall,
 	presentToolCall,
 } from '../../src/renderer/lib/agent-timeline/tool-presentation';
+import type { TimelineSurface } from '../../src/renderer/types/tool-presentation';
 
 const toolCall = (
 	toolName: string,
@@ -167,8 +168,24 @@ describe('isHiddenEnsemblrToolCall', () => {
 });
 
 describe('ensemblrToolLabel', () => {
+	// Every case below goes through a recorded call rather than a bare argument
+	// bag, because a control label is read off both halves of one: the arguments
+	// the model sent and the payload the app handed back.
+	const labelFor = (
+		toolName: string,
+		input: Record<string, unknown> = {},
+		isRunning = false,
+		surface: TimelineSurface = 'workspace',
+	) => ensemblrToolLabel(toolCall(toolName, input), isRunning, surface);
+
+	/** Reads a badge's path, which only a file badge carries. */
+	const badgePathOf = (label: ReturnType<typeof labelFor>) =>
+		label?.badge?.kind === 'file' || label?.badge?.kind === 'folder'
+			? label.badge.path
+			: null;
+
 	test('names the action rather than the tool', () => {
-		expect(ensemblrToolLabel('ensemblr_wait_for_agents', {}, false)).toEqual({
+		expect(labelFor('ensemblr_wait_for_agents', {}, false)).toEqual({
 			badge: null,
 			glyph: 'hourglass',
 			title: 'Waited for sub-agents',
@@ -178,37 +195,40 @@ describe('ensemblrToolLabel', () => {
 	// A wait blocks for as long as its children run, so the settled past tense
 	// over a turn that is still working describes something yet to happen.
 	test('reads in the present participle while the call is in flight', () => {
-		expect(ensemblrToolLabel('ensemblr_wait_for_agents', {}, true)?.title).toBe(
+		expect(labelFor('ensemblr_wait_for_agents', {}, true)?.title).toBe(
 			'Waiting for sub-agents',
 		);
 	});
 
-	test('carries both tenses for every control tool', () => {
-		for (const toolName of ENSEMBLR_CONTROL_TOOL_NAMES) {
-			const settled = ensemblrToolLabel(toolName, {}, false)?.title;
-			const running = ensemblrToolLabel(toolName, {}, true)?.title;
+	test.each(['workspace', 'concierge'] as const)(
+		'carries both tenses for every control tool on the %s surface',
+		(surface) => {
+			for (const toolName of ENSEMBLR_CONTROL_TOOL_NAMES) {
+				const settled = labelFor(toolName, {}, false, surface)?.title;
+				const running = labelFor(toolName, {}, true, surface)?.title;
 
-			expect(settled).toBeTruthy();
-			expect(running).toBeTruthy();
-			expect(running).not.toBe(settled);
-			expect(running?.endsWith('ing') || running?.includes('ing ')).toBe(true);
-		}
-	});
+				expect(settled).toBeTruthy();
+				expect(running).toBeTruthy();
+				expect(running).not.toBe(settled);
+				expect(running?.endsWith('ing') || running?.includes('ing ')).toBe(
+					true,
+				);
+			}
+		},
+	);
 
 	test('reads the review tools as the review action taken', () => {
-		expect(ensemblrToolLabel('ensemblr_get_workspace_diff', {}, false)).toEqual(
-			{
-				badge: null,
-				glyph: 'file-diff',
-				title: 'Read the diff',
-			},
-		);
-		expect(ensemblrToolLabel('ensemblr_get_diff_comments', {}, false)).toEqual({
+		expect(labelFor('ensemblr_get_workspace_diff', {}, false)).toEqual({
+			badge: null,
+			glyph: 'file-diff',
+			title: 'Read the diff',
+		});
+		expect(labelFor('ensemblr_get_diff_comments', {}, false)).toEqual({
 			badge: null,
 			glyph: 'message-square-text',
 			title: 'Read review comments',
 		});
-		expect(ensemblrToolLabel('ensemblr_add_diff_comments', {}, true)).toEqual({
+		expect(labelFor('ensemblr_add_diff_comments', {}, true)).toEqual({
 			badge: null,
 			glyph: 'message-square-plus',
 			title: 'Leaving review comments',
@@ -220,7 +240,7 @@ describe('ensemblrToolLabel', () => {
 	// the ticket they can go and look at.
 	test('reads the Linear tools with the ticket they acted on', () => {
 		expect(
-			ensemblrToolLabel(
+			labelFor(
 				'ensemblr_linear_update_issue',
 				{ issueId: 'ENG-106', stateId: 's-review' },
 				false,
@@ -231,22 +251,17 @@ describe('ensemblrToolLabel', () => {
 			title: 'Updated a Linear issue: ENG-106',
 		});
 		expect(
-			ensemblrToolLabel(
+			labelFor(
 				'ensemblr_linear_create_comment',
 				{ commentBody: 'shipped', issueId: 'ENG-106' },
 				true,
 			)?.title,
 		).toBe('Commenting on a Linear issue: ENG-106');
 		expect(
-			ensemblrToolLabel(
-				'ensemblr_linear_list_issues',
-				{ query: 'composer' },
-				false,
-			)?.title,
+			labelFor('ensemblr_linear_list_issues', { query: 'composer' }, false)
+				?.title,
 		).toBe('Searched Linear issues: composer');
-		expect(
-			ensemblrToolLabel('ensemblr_linear_get_metadata', {}, false),
-		).toEqual({
+		expect(labelFor('ensemblr_linear_get_metadata', {}, false)).toEqual({
 			badge: null,
 			glyph: 'list',
 			title: 'Read Linear teams and states',
@@ -257,18 +272,11 @@ describe('ensemblrToolLabel', () => {
 	// rewrites, and the timeline records what the model sent, not the rewrite.
 	test('reads the forgiven spelling of a Linear argument', () => {
 		expect(
-			ensemblrToolLabel(
-				'ensemblr_linear_get_issue',
-				{ identifier: 'ENG-42' },
-				false,
-			)?.title,
+			labelFor('ensemblr_linear_get_issue', { identifier: 'ENG-42' }, false)
+				?.title,
 		).toBe('Read a Linear issue: ENG-42');
 		expect(
-			ensemblrToolLabel(
-				'ensemblr_linear_list_issues',
-				{ search: 'diff' },
-				false,
-			)?.title,
+			labelFor('ensemblr_linear_list_issues', { search: 'diff' }, false)?.title,
 		).toBe('Searched Linear issues: diff');
 	});
 
@@ -277,7 +285,7 @@ describe('ensemblrToolLabel', () => {
 	// carries, so the file reads and opens the same way whichever tool named it.
 	test('pins the file under review as a chip rather than title text', () => {
 		expect(
-			ensemblrToolLabel(
+			labelFor(
 				'ensemblr_get_workspace_diff',
 				{ filePath: 'src/main/main.ts' },
 				false,
@@ -297,13 +305,13 @@ describe('ensemblrToolLabel', () => {
 	// `file` and `path` are the near-misses the control boundary rewrites to
 	// `filePath`, and the timeline records what the model sent, not the rewrite.
 	test('reads the forgiven spelling of a path argument', () => {
-		const label = ensemblrToolLabel(
+		const label = labelFor(
 			'ensemblr_get_diff_comments',
 			{ file: 'src/main/main.ts' },
 			false,
 		);
 
-		expect(label?.badge?.path).toBe('src/main/main.ts');
+		expect(badgePathOf(label)).toBe('src/main/main.ts');
 		expect(label?.title).toBe('Read review comments');
 	});
 
@@ -312,18 +320,18 @@ describe('ensemblrToolLabel', () => {
 	// the title are separate slots — the variant does not have to yield the one to
 	// hold the other.
 	test('names the variant and the file it opened in their own slots', () => {
-		const withFile = ensemblrToolLabel(
+		const withFile = labelFor(
 			'ensemblr_open_tab',
 			{ filePath: 'src/main/main.ts', variant: 'diff' },
 			false,
 		);
-		const withoutFile = ensemblrToolLabel(
+		const withoutFile = labelFor(
 			'ensemblr_open_tab',
 			{ variant: 'comment' },
 			false,
 		);
 
-		expect(withFile?.badge?.path).toBe('src/main/main.ts');
+		expect(badgePathOf(withFile)).toBe('src/main/main.ts');
 		expect(withFile?.title).toBe('Opened a tab: diff');
 		expect(withoutFile?.badge).toBeNull();
 		expect(withoutFile?.title).toBe('Opened a tab: comment');
@@ -331,22 +339,17 @@ describe('ensemblrToolLabel', () => {
 
 	test('reads the arguments the control surface actually names', () => {
 		expect(
-			ensemblrToolLabel(
-				'ensemblr_launch_harness',
-				{ harnessId: 'claude' },
-				true,
-			)?.title,
+			labelFor('ensemblr_launch_harness', { harnessId: 'claude' }, true)?.title,
 		).toBe('Launching a harness: claude');
 		expect(
-			ensemblrToolLabel(
+			labelFor(
 				'ensemblr_write_terminal',
 				{ input: 'npm run check', terminalId: 't1' },
 				false,
 			)?.title,
 		).toBe('Typed into a terminal: npm run check');
 		expect(
-			ensemblrToolLabel('ensemblr_focus_panel', { panel: 'changes' }, false)
-				?.title,
+			labelFor('ensemblr_focus_panel', { panel: 'changes' }, false)?.title,
 		).toBe('Focused a panel: changes');
 	});
 
@@ -354,7 +357,7 @@ describe('ensemblrToolLabel', () => {
 	// naming the first one labels the row with a file the body below it mostly is
 	// not about.
 	test('names no file on a batch spanning several', () => {
-		const label = ensemblrToolLabel(
+		const label = labelFor(
 			'ensemblr_add_diff_comments',
 			{
 				comments: [
@@ -373,7 +376,7 @@ describe('ensemblrToolLabel', () => {
 	// in one file — the common one — names it, the same chip a single-path tool
 	// would have pinned.
 	test('pins the file a batch agreed on', () => {
-		const label = ensemblrToolLabel(
+		const label = labelFor(
 			'ensemblr_add_diff_comments',
 			{
 				comments: [
@@ -385,14 +388,14 @@ describe('ensemblrToolLabel', () => {
 		);
 
 		expect(label?.title).toBe('Left review comments');
-		expect(label?.badge?.path).toBe('src/main/main.ts');
+		expect(badgePathOf(label)).toBe('src/main/main.ts');
 	});
 
 	// A question is a sentence, and a sentence cut to the title's length reads as
 	// less than the bare action does, so the row deliberately quotes none of it.
 	test('leaves a question out of the row it titles', () => {
 		expect(
-			ensemblrToolLabel(
+			labelFor(
 				'ensemblr_ask_user_question',
 				{
 					questions: [
@@ -406,7 +409,7 @@ describe('ensemblrToolLabel', () => {
 
 	test('titles a call the MCP-namespaced name reaches it under', () => {
 		expect(
-			ensemblrToolLabel(
+			labelFor(
 				'mcp__ensemblr__ensemblr_start_conversation',
 				{ title: 'Astro config audit' },
 				false,
@@ -436,7 +439,7 @@ describe('ensemblrToolLabel', () => {
 
 	test('folds the spawned tab title into the label', () => {
 		expect(
-			ensemblrToolLabel(
+			labelFor(
 				'ensemblr_start_conversation',
 				{ title: 'Astro config audit' },
 				false,
@@ -450,7 +453,7 @@ describe('ensemblrToolLabel', () => {
 
 	test('keeps the detail when the call is still running', () => {
 		expect(
-			ensemblrToolLabel(
+			labelFor(
 				'ensemblr_start_conversation',
 				{ title: 'Astro config audit' },
 				true,
@@ -459,7 +462,7 @@ describe('ensemblrToolLabel', () => {
 	});
 
 	test('collapses whitespace and truncates an over-long detail', () => {
-		const label = ensemblrToolLabel(
+		const label = labelFor(
 			'ensemblr_start_conversation',
 			{
 				title: `Investigate  how\nthe renderer resolves workspace paths end to end`,
@@ -475,17 +478,202 @@ describe('ensemblrToolLabel', () => {
 	});
 
 	test('omits the detail when the named key is absent or blank', () => {
+		expect(labelFor('ensemblr_start_conversation', {}, false)?.title).toBe(
+			'Started a sub-agent',
+		);
 		expect(
-			ensemblrToolLabel('ensemblr_start_conversation', {}, false)?.title,
-		).toBe('Started a sub-agent');
-		expect(
-			ensemblrToolLabel('ensemblr_start_conversation', { title: '   ' }, false)
-				?.title,
+			labelFor('ensemblr_start_conversation', { title: '   ' }, false)?.title,
 		).toBe('Started a sub-agent');
 	});
 
+	// What the Concierge spawns is a root orchestrator in a workspace the user can
+	// talk to — `spawnedChildRole` hands it that role — so calling it a sub-agent
+	// on the one surface that never has any is wrong in both directions: it names
+	// the wrong thing and hides that the user can open it.
+	test.each([
+		['ensemblr_start_conversation', 'Started a chat', 'Started a sub-agent'],
+		['ensemblr_send_follow_up', 'Steered a chat', 'Steered a sub-agent'],
+		[
+			'ensemblr_get_conversation_status',
+			'Checked a chat',
+			'Checked a sub-agent',
+		],
+		[
+			'ensemblr_get_last_message',
+			"Read a chat's report",
+			"Read a sub-agent's report",
+		],
+		[
+			'ensemblr_read_conversation',
+			"Read a chat's transcript",
+			"Read a sub-agent's transcript",
+		],
+		[
+			'ensemblr_wait_for_agents',
+			'Waited for the chats',
+			'Waited for sub-agents',
+		],
+	])('calls %s a chat in the Concierge', (toolName, concierge, workspace) => {
+		expect(labelFor(toolName, {}, false, 'concierge')?.title).toBe(concierge);
+		expect(labelFor(toolName, {}, false, 'workspace')?.title).toBe(workspace);
+	});
+
+	// Every other tool means the same thing wherever it is called, and a surface
+	// that quietly reworded them all would be a second catalogue to keep in step.
+	test('leaves a tool with no Concierge reading alone', () => {
+		expect(labelFor('ensemblr_open_tab', {}, false, 'concierge')?.title).toBe(
+			'Opened a tab',
+		);
+	});
+
+	// A raw workspace id is unreadable, fills the title, and names something the
+	// user cannot click. The chip carries the workspace's current name instead,
+	// and the id is all the row has to record for it to be resolved.
+	test('pins the workspace an argument named as a chip', () => {
+		expect(
+			labelFor('ensemblr_focus_workspace', { workspaceId: 'ws-1' }, false),
+		).toEqual({
+			badge: { kind: 'workspace', workspaceId: 'ws-1' },
+			glyph: 'crosshair',
+			title: 'Opened a workspace',
+		});
+	});
+
+	// `create_workspace` is handed a project and produces a workspace, so the id
+	// its chip needs exists only on the way back.
+	test('pins the workspace a call produced, from the Pi envelope', () => {
+		const label = ensemblrToolLabel(
+			toolCall(
+				'ensemblr_create_workspace',
+				{ name: 'beta-16', projectId: 'repository-b03382ad' },
+				{
+					output: {
+						details: {
+							data: { name: 'beta-16', workspaceId: 'ws-9' },
+							ok: true,
+						},
+						text: '{"name":"beta-16","workspaceId":"ws-9"}',
+					},
+				} as Partial<DynamicToolUIPart>,
+			),
+			false,
+		);
+
+		expect(label).toEqual({
+			badge: { kind: 'workspace', workspaceId: 'ws-9' },
+			glyph: 'git-branch-plus',
+			title: 'Created a workspace',
+		});
+	});
+
+	// The MCP bridge sends no envelope at all — only the text it rendered, which
+	// for a control op is that same payload as JSON.
+	test('pins the workspace a call produced, from the MCP result text', () => {
+		const label = ensemblrToolLabel(
+			toolCall(
+				'mcp__ensemblr__ensemblr_create_workspace',
+				{ projectId: 'repository-b03382ad' },
+				{
+					output: {
+						details: null,
+						text: '{"branchName":"psoldunov/beta-16","name":"beta-16","workspaceId":"ws-9"}',
+					},
+				} as Partial<DynamicToolUIPart>,
+			),
+			false,
+		);
+
+		expect(label?.badge).toEqual({ kind: 'workspace', workspaceId: 'ws-9' });
+	});
+
+	// A call still in flight has no result to read, and a refused one reports a
+	// failure rather than a workspace. Neither may invent a chip.
+	test('pins no workspace before the call reports one', () => {
+		expect(
+			labelFor('ensemblr_create_workspace', { projectId: 'p-1' }, true)?.badge,
+		).toBeNull();
+		expect(
+			ensemblrToolLabel(deniedCall('ensemblr_create_workspace'), false)?.badge,
+		).toBeNull();
+	});
+
+	// A spawn's subject is the conversation it opened, not the workspace holding
+	// it — but it declares both, so a row written before the tab has a name still
+	// has a workspace to fall back on when the chat cannot be resolved.
+	test('pins the chat a spawn opened, with its workspace behind it', () => {
+		const label = ensemblrToolLabel(
+			toolCall(
+				'ensemblr_start_conversation',
+				{ prompt: 'go', title: 'Smoke test', workspaceId: 'ws-9' },
+				{
+					output: {
+						details: {
+							data: { agentSessionId: 'session-1', chatTabId: 'tab-1' },
+							ok: true,
+						},
+						text: '{"agentSessionId":"session-1","chatTabId":"tab-1"}',
+					},
+				} as Partial<DynamicToolUIPart>,
+			),
+			false,
+			'concierge',
+		);
+
+		expect(label).toEqual({
+			badge: { chatTabId: 'tab-1', kind: 'chat', workspaceId: 'ws-9' },
+			glyph: 'bot',
+			title: 'Started a chat',
+			unpinnedTitle: 'Started a chat: Smoke test',
+		});
+	});
+
+	// The chip paints the chat's name, so repeating it in the title says the same
+	// thing twice. Nothing resolves a chip outside the Concierge, so there the
+	// title is the only thing that can carry it.
+	test('keeps the spawned title in the row a workspace agent reads', () => {
+		expect(
+			labelFor(
+				'ensemblr_start_conversation',
+				{ prompt: 'go', title: 'Smoke test' },
+				false,
+				'workspace',
+			)?.title,
+		).toBe('Started a sub-agent: Smoke test');
+	});
+
+	// Whether the chip resolves is only known once a component has asked the
+	// catalogue, and it comes up empty for a chat and workspace that are both
+	// too new to be listed. The row still has to say what it spawned.
+	test('offers the dropped detail back for a row that pins nothing', () => {
+		const label = labelFor(
+			'ensemblr_start_conversation',
+			{ prompt: 'go', title: 'Smoke test' },
+			false,
+			'concierge',
+		);
+
+		expect(label?.title).toBe('Started a chat');
+		expect(label?.unpinnedTitle).toBe('Started a chat: Smoke test');
+	});
+
+	// A surface that never moved the detail to a chip has nothing to put back,
+	// and a second title would be the same string twice.
+	test.each([
+		['ensemblr_start_conversation', 'workspace'],
+		['ensemblr_focus_panel', 'concierge'],
+	] as const)('carries no fallback title for %s on %s', (toolName, surface) => {
+		expect(
+			labelFor(
+				toolName,
+				{ panel: 'changes', title: 'Smoke test' },
+				false,
+				surface,
+			)?.unpinnedTitle,
+		).toBeUndefined();
+	});
+
 	test('returns null for a tool that is not a control tool', () => {
-		expect(ensemblrToolLabel('bash', { command: 'ls' }, false)).toBeNull();
+		expect(labelFor('bash', { command: 'ls' }, false)).toBeNull();
 		expect(ensemblrToolGlyph('bash')).toBeNull();
 	});
 });

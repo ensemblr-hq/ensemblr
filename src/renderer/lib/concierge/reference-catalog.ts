@@ -81,6 +81,14 @@ export function buildConciergeReferences({
 
 /**
  * Looks a reference up by what a link addresses it with.
+ *
+ * A chat answers to its agent session id as well as its tab id. The two are the
+ * same conversation named from either end, and the control surface names it from
+ * the far end: `ensemblr_send_follow_up`, `ensemblr_get_conversation_status`,
+ * `ensemblr_get_last_message`, and `ensemblr_read_conversation` all take an
+ * `agentSessionId`, so a timeline row for one of them has no tab id to look up.
+ * The two id spaces never collide, so accepting both cannot resolve the wrong
+ * chat.
  * @param references - The catalogue.
  * @param kind - Kind parsed out of the link.
  * @param id - Id parsed out of the link.
@@ -94,7 +102,9 @@ export function findConciergeReference(
 	return (
 		references.find(
 			(reference) =>
-				reference.kind === kind && conciergeReferenceId(reference) === id,
+				reference.kind === kind &&
+				(conciergeReferenceId(reference) === id ||
+					(reference.kind === 'chat' && reference.agentSessionId === id)),
 		) ?? null
 	);
 }
@@ -134,6 +144,26 @@ export function conciergeReferenceChipKind(
 	reference: ConciergeReference,
 ): 'chat' | 'file' | 'project' | 'workspace' {
 	return reference.kind === 'artifact' ? 'file' : reference.kind;
+}
+
+/**
+ * What a reference chip's tooltip says, qualifying a name that repeats across
+ * the app — two projects each hold a `main` workspace, and two workspaces each
+ * hold an untitled chat.
+ * @param reference - The reference being rendered.
+ * @returns The tooltip text.
+ */
+export function conciergeReferenceTitle(reference: ConciergeReference): string {
+	if (reference.kind === 'artifact') {
+		return reference.path;
+	}
+	if (reference.kind === 'workspace') {
+		return `${reference.project} › ${reference.label}`;
+	}
+	if (reference.kind === 'chat') {
+		return `${reference.workspace} › ${reference.label}`;
+	}
+	return reference.label;
 }
 
 /**
