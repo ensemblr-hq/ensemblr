@@ -85,6 +85,13 @@ export interface ConciergeSessionServiceOptions {
 		sessionId: string;
 	}) => Promise<ConciergeControlWiring>;
 	/**
+	 * Records that the user stopped this session, so the `idle` its abort emits on
+	 * the way out is not mistaken for a turn that finished on its own and does not
+	 * raise a desktop notification. Mirrors the workspace session service's hook of
+	 * the same name; absent in tests.
+	 */
+	onSessionAborted?: (sessionId: string) => void;
+	/**
 	 * Drops the control origin a closed session held, so its token stops
 	 * resolving. Absent in tests and whenever control is not wired.
 	 */
@@ -223,6 +230,7 @@ export function createConciergeSessionService({
 	agentClient,
 	eventSink,
 	now = () => new Date(),
+	onSessionAborted,
 	releaseControlOrigin,
 	requireDatabase,
 	resolveControlWiring,
@@ -243,6 +251,11 @@ export function createConciergeSessionService({
 	 * status included — at quit the connection closes under the trailing
 	 * `closed` event, and a throw out of this callback skips every later
 	 * subscriber on the same emit.
+	 *
+	 * The broadcast carries whether the event's session is the live one, because
+	 * a child {@link retireAndWriteMemories} retired keeps its subscription and
+	 * runs a whole memory-write turn afterwards. Its rows still belong in its own
+	 * transcript, but nothing downstream may read that turn as the user's.
 	 * @param sessionId - Session the event belongs to.
 	 * @param event - The runtime event.
 	 */
@@ -257,8 +270,9 @@ export function createConciergeSessionService({
 				},
 			};
 		}
+		const live = active?.sessionId === sessionId;
 		try {
-			if (event.type === 'status' && active?.sessionId === sessionId) {
+			if (event.type === 'status' && live) {
 				updateConciergeSession({
 					database: requireDatabase(),
 					id: sessionId,
@@ -275,7 +289,7 @@ export function createConciergeSessionService({
 					stream: event.type === 'error' ? 'stderr' : 'protocol',
 				},
 			});
-			eventSink?.({ event: toEventWire(row), sessionId });
+			eventSink?.({ event: toEventWire(row), live, sessionId });
 		} catch {
 			return;
 		}
@@ -756,6 +770,7 @@ export function createConciergeSessionService({
 				return { error: SESSION_NOT_OPEN_MESSAGE, ok: false };
 			}
 			try {
+				onSessionAborted?.(sessionId);
 				await active.runtimeSession.abort(reason);
 				return { ok: true };
 			} catch (error) {

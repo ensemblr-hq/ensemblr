@@ -318,6 +318,10 @@ export function createEnsemblrApi(): EnsemblrApi {
 		reportActiveChat: (context) => invoke('reportActiveChat', context),
 		onFocusChatRequested: (listener) =>
 			subscribe<FocusChatBroadcast>(IPC_CHANNELS.focusChatRequested, listener),
+		reportConciergeVisibility: (report) =>
+			invoke('reportConciergeVisibility', report),
+		onFocusConciergeRequested: (listener) =>
+			subscribe<void>(IPC_CHANNELS.focusConciergeRequested, listener),
 		onChatTurnFinished: (listener) =>
 			subscribe<ChatTurnFinishedBroadcast>(
 				IPC_CHANNELS.chatTurnFinished,

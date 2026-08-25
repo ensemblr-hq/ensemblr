@@ -44,6 +44,14 @@ export interface ConciergeSessionEventWire {
 /** Broadcast wrapper for a Concierge event pushed to open windows. */
 export interface ConciergeEventBroadcastWire {
 	event: ConciergeSessionEventWire;
+	/**
+	 * Whether the event belongs to the conversation the user is having. False for
+	 * a child a context clear retired but left running to write its memories: its
+	 * turn is background work nobody asked for, so it must not notify, orbit the
+	 * launcher, or count toward the unread badge. Its rows are still broadcast,
+	 * because they still belong in that session's transcript.
+	 */
+	live: boolean;
 	sessionId: string;
 }
 

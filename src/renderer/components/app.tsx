@@ -3,44 +3,18 @@ import { useAtom } from 'jotai';
 import { useCallback } from 'react';
 
 import { useAppMenuCommands } from '@/renderer/hooks/use-app-menu-commands';
-import { useConfigReloadSync } from '@/renderer/hooks/use-config-reload-sync';
+import { useAppRootSyncs } from '@/renderer/hooks/use-app-root-syncs';
 import { useHotkey } from '@/renderer/hooks/use-hotkey';
-import { useModalInertBodyGuard } from '@/renderer/hooks/use-modal-inert-body-guard';
-import { useNotificationSoundSync } from '@/renderer/hooks/use-notification-sound-sync';
-import { useAskUserQuestionSync } from '@/renderer/state/ask-user-question';
 import {
 	useMenuCommand,
 	useMenuCommandBridge,
 	useMenuCommandChecked,
 } from '@/renderer/state/menu-commands';
-import { usePlanModeSync, usePlanReviewSync } from '@/renderer/state/plan-mode';
-import {
-	toolCallCollapseAtom,
-	useAppearanceEffect,
-	useAppSettingsSync,
-	useLanguageEffect,
-	useThemeEffect,
-} from '@/renderer/state/preferences';
-import { useToolApprovalSync } from '@/renderer/state/tool-approval';
-import { useNotificationFocusSync } from '@/renderer/state/unread';
-import { useUpdateSync } from '@/renderer/state/updates';
+import { toolCallCollapseAtom } from '@/renderer/state/preferences';
 
 /** Root app component — delegates rendering to the active TanStack Router outlet. */
 export function App() {
-	useThemeEffect();
-	useAppearanceEffect();
-	useLanguageEffect();
-	useAppSettingsSync();
-	useConfigReloadSync();
-	useNotificationSoundSync();
-	useNotificationFocusSync();
-	useAskUserQuestionSync();
-	useToolApprovalSync();
-	usePlanReviewSync();
-	usePlanModeSync();
-	useUpdateSync();
-	useModalInertBodyGuard();
-
+	useAppRootSyncs();
 	useMenuCommandBridge();
 	useAppMenuCommands();
 

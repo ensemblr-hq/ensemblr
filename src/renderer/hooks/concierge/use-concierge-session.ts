@@ -1,17 +1,15 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAtom, useSetAtom } from 'jotai';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
 	clearConciergeContext,
-	conciergeEventsQuery,
 	ensemblrQueryKeys,
 	openConciergeSession,
 	stopConciergeSession,
 	submitConciergePrompt,
-	subscribeToConciergeEvents,
 } from '@/renderer/api/ensemblr';
-import { mergeConciergeEvents } from '@/renderer/lib/concierge';
+import { useConciergeTranscript } from '@/renderer/hooks/concierge/use-concierge-transcript';
 import {
 	type ConciergeSessionIdentity,
 	conciergeClearBannerDismissedAtom,
@@ -46,30 +44,6 @@ export interface ConciergeSessionModel {
 			thinkingLevel?: string | null;
 		},
 	) => Promise<void>;
-}
-
-/** Stands in for the transcript before one is read, at a stable identity. */
-const NO_EVENTS: readonly ConciergeSessionEventWire[] = [];
-
-/**
- * Derives whether the Concierge is mid-turn from its own transcript.
- *
- * The status events are the only signal available — unlike a workspace chat
- * there is no session list to read a row's status from — so the last status
- * event wins, and an empty transcript reads as idle.
- * @param events - The transcript so far.
- * @returns True while the runtime reports a streaming turn.
- */
-function isStreamingFrom(
-	events: readonly ConciergeSessionEventWire[],
-): boolean {
-	for (let index = events.length - 1; index >= 0; index -= 1) {
-		const payload = events[index]?.payload;
-		if (payload?.kind === 'status') {
-			return payload.status === 'streaming';
-		}
-	}
-	return false;
 }
 
 /**
@@ -157,29 +131,7 @@ export function useConciergeSession(enabled: boolean): ConciergeSessionModel {
 		};
 	}, [enabled, session, setSession, unknownFailure]);
 
-	const eventsQuery = useQuery(conciergeEventsQuery(sessionId));
-	const events = eventsQuery.data?.events ?? NO_EVENTS;
-
-	useEffect(() => {
-		if (!sessionId) {
-			return;
-		}
-		return subscribeToConciergeEvents((broadcast) => {
-			if (broadcast.sessionId !== sessionId) {
-				return;
-			}
-			queryClient.setQueryData(
-				ensemblrQueryKeys.conciergeEvents(sessionId),
-				(
-					current: { events: readonly ConciergeSessionEventWire[] } | undefined,
-				) => ({
-					events: mergeConciergeEvents(current?.events ?? NO_EVENTS, [
-						broadcast.event,
-					]),
-				}),
-			);
-		});
-	}, [queryClient, sessionId]);
+	const { events, isStreaming } = useConciergeTranscript(sessionId);
 
 	const adoptSession = useCallback(
 		(next: ConciergeSessionIdentity | null, replaced: string | null) => {
@@ -338,7 +290,7 @@ export function useConciergeSession(enabled: boolean): ConciergeSessionModel {
 		events,
 		isClearing: clearMutation.isPending,
 		isOpening,
-		isStreaming: isStreamingFrom(events),
+		isStreaming,
 		sessionId,
 		sessionProvider: session?.provider ?? null,
 		stop,

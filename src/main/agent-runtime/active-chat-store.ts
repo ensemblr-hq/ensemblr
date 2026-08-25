@@ -24,12 +24,33 @@ export interface OnScreenChatRef {
 export class ActiveChatStore {
 	private context: ActiveChatContext | null = null;
 
+	private conciergeVisible = false;
+
 	/**
 	 * Records what the renderer just reported, or null when no chat is open.
 	 * @param next - The chat on screen, or null
 	 */
 	apply(next: ActiveChatContext | null): void {
 		this.context = next;
+	}
+
+	/**
+	 * Records whether the Concierge panel is on screen. Held beside the chat
+	 * rather than folded into it: the panel floats above whatever route is open,
+	 * so it is a second thing the user can be looking at, not a different value
+	 * of the first.
+	 * @param visible - True while the panel is open in any presentation
+	 */
+	applyConciergeVisibility(visible: boolean): void {
+		this.conciergeVisible = visible;
+	}
+
+	/**
+	 * Whether the Concierge panel is the surface in front of the user.
+	 * @returns True when the renderer last reported the panel as open
+	 */
+	isConciergeOnScreen(): boolean {
+		return this.conciergeVisible;
 	}
 
 	/**

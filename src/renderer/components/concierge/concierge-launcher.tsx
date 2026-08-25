@@ -1,12 +1,19 @@
-import { useAtom, useSetAtom } from 'jotai';
+import type { TFunction } from 'i18next';
+import { useAtom, useAtomValue, useSetAtom } from 'jotai';
+import { selectAtom } from 'jotai/utils';
+import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/renderer/components/ui/button';
 import { TooltipProvider } from '@/renderer/components/ui/tooltip';
 import { useConciergeAnchor } from '@/renderer/hooks/concierge/use-concierge-anchor';
 import { useConciergeFocusHandoff } from '@/renderer/hooks/concierge/use-concierge-focus-handoff';
 import { useHotkey } from '@/renderer/hooks/use-hotkey';
+import { cn } from '@/renderer/lib/utils';
 import {
+	conciergeActivityAtom,
+	conciergeBadgeCount,
 	conciergePresentationAtom,
+	conciergeStreamingAtom,
 	focusConciergeComposerAtom,
 	toggleConciergeAtom,
 	toggleConciergeFullscreenAtom,
@@ -17,6 +24,7 @@ import {
 } from '@/renderer/state/menu-commands';
 import { ConciergeMark } from './concierge-mark';
 import { ConciergePanel } from './concierge-panel';
+import { ConciergeUnreadBadge } from './concierge-unread-badge';
 
 /** Launcher size in pixels, matching the `size-*` class below. */
 const LAUNCHER_SIZE = { height: 44, width: 44 };
@@ -50,6 +58,12 @@ const LAUNCHER_SIZE = { height: 44, width: 44 };
  * shut — open, maximize, and focus the composer — as both a shortcut and a
  * native-menu item driven by the same callback, which is what lets the menu
  * claim their chords, plus the focus handoff into and back out of the panel.
+ *
+ * The bubble is also where a shut Concierge reports itself: a count of what it
+ * produced unseen, and its mark left orbiting while a turn is still streaming.
+ * Both come from `useConciergeActivityWatch`, which runs at the app root — the
+ * launcher unmounts on a settings route, and a count kept here would reset every
+ * time the user visited one.
  */
 export function ConciergeLauncher() {
 	const { t } = useTranslation();
@@ -57,6 +71,12 @@ export function ConciergeLauncher() {
 	const toggle = useSetAtom(toggleConciergeAtom);
 	const toggleFullscreen = useSetAtom(toggleConciergeFullscreenAtom);
 	const focusComposer = useSetAtom(focusConciergeComposerAtom);
+	const badgeCountAtom = useMemo(
+		() => selectAtom(conciergeActivityAtom, conciergeBadgeCount),
+		[],
+	);
+	const unreadCount = useAtomValue(badgeCountAtom);
+	const isWorking = useAtomValue(conciergeStreamingAtom);
 
 	// Registered here rather than in the panel because the launcher outlives it:
 	// a chord that only worked once the Concierge was already open could not be
@@ -85,17 +105,17 @@ export function ConciergeLauncher() {
 		<TooltipProvider>
 			{presentation === 'closed' ? (
 				<Button
-					aria-label={t(
-						'workbench:concierge.launcher.open',
-						'Open the Concierge',
-					)}
+					aria-label={launcherLabel({ isWorking, t, unreadCount })}
 					// The button's own base style transitions *all* properties, which
 					// includes the `left`/`top` a drag writes every frame — so the bubble
 					// eased toward the cursor a transition-duration behind it. Naming the
 					// properties keeps the hover and focus polish without the position;
 					// `transform` is safe to name because the drag moves the bubble with
 					// `left`/`top` rather than translating it.
-					className='motion-safe:fade-in motion-safe:zoom-in-50 fixed z-40 size-11 cursor-grab overflow-hidden rounded-full shadow-lg transition-[background-color,border-color,box-shadow,transform] duration-200 hover:scale-110 hover:shadow-accent-strong/25 focus-visible:scale-110 active:scale-95 active:cursor-grabbing motion-safe:animate-in'
+					// `overflow-hidden` is deliberately absent: the unread badge sits on the
+					// bubble's shoulder, outside the circle, and clipping to it would cut
+					// the badge in half. The sheen below rounds itself, so it needs none.
+					className='motion-safe:fade-in motion-safe:zoom-in-50 fixed z-40 size-11 cursor-grab rounded-full shadow-lg transition-[background-color,border-color,box-shadow,transform] duration-200 hover:scale-110 hover:shadow-accent-strong/25 focus-visible:scale-110 active:scale-95 active:cursor-grabbing motion-safe:animate-in'
 					onClick={() => {
 						if (!anchor.isDragging()) {
 							toggle();
@@ -111,11 +131,51 @@ export function ConciergeLauncher() {
 					/>
 					<ConciergeMark
 						className='relative size-7'
-						orbitClassName='motion-safe:group-hover/button:animate-concierge-orbit motion-safe:group-focus-visible/button:animate-concierge-orbit'
+						orbitClassName={cn(
+							'motion-safe:group-focus-visible/button:animate-concierge-orbit motion-safe:group-hover/button:animate-concierge-orbit',
+							isWorking && 'motion-safe:animate-concierge-orbit',
+						)}
 					/>
+					<ConciergeUnreadBadge count={unreadCount} />
 				</Button>
 			) : null}
 			<ConciergePanel />
 		</TooltipProvider>
 	);
+}
+
+/**
+ * Names what pressing the bubble does, in the one state that matters most.
+ *
+ * Three whole sentences rather than a stem plus a suffix: a count appended to a
+ * translated label reads as two fragments in Russian and Greek, and the i18n
+ * lint rejects a sentence assembled across catalogue entries.
+ * @param isWorking - Whether a Concierge turn is streaming right now.
+ * @param t - The translator to render with.
+ * @param unreadCount - How many unseen things the badge is reporting.
+ * @returns The launcher's accessible label.
+ */
+function launcherLabel({
+	isWorking,
+	t,
+	unreadCount,
+}: {
+	isWorking: boolean;
+	t: TFunction;
+	unreadCount: number;
+}): string {
+	if (unreadCount > 0) {
+		return t('workbench:concierge.launcher.open-with-unread', {
+			count: unreadCount,
+			defaultValue_one: 'Open the Concierge, {{count}} new message',
+			defaultValue_other: 'Open the Concierge, {{count}} new messages',
+		});
+	}
+	if (isWorking) {
+		return t(
+			'workbench:concierge.launcher.working',
+			'Open the Concierge, still working',
+		);
+	}
+	return t('workbench:concierge.launcher.open', 'Open the Concierge');
 }

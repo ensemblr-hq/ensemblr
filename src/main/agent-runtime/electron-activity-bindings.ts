@@ -7,6 +7,7 @@ import type {
 } from '../../shared/ipc/contracts/notifications.ts';
 import type {
 	AgentNotification,
+	NotificationFocusTarget,
 	PowerSaveControls,
 } from './agent-activity-monitor.ts';
 import { createNotificationRetainer } from './notification-retention.ts';
@@ -26,16 +27,16 @@ export const electronPowerControls: PowerSaveControls = {
 };
 
 /**
- * Raises the app from wherever it is and asks every window to open the chat the
- * notification was about.
+ * Raises the app from wherever it is and asks every window to open whatever the
+ * notification was about — a chat in some workspace, or the Concierge panel.
  *
  * `window.focus()` alone is not enough on macOS: it raises the window within
  * Ensemblr but leaves whichever app the user is actually in frontmost, so the
  * chat opens behind their editor. `app.focus({ steal: true })` is what brings
  * Ensemblr forward.
- * @param target - The chat the clicked notification described.
+ * @param target - The surface the clicked notification described.
  */
-function openChatFromNotification(target: FocusChatBroadcast): void {
+function openFromNotification(target: NotificationFocusTarget): void {
 	const windows = BrowserWindow.getAllWindows().filter(
 		(window) => !window.isDestroyed(),
 	);
@@ -49,8 +50,29 @@ function openChatFromNotification(target: FocusChatBroadcast): void {
 	}
 	app.focus({ steal: true });
 	for (const window of windows) {
-		window.webContents.send(IPC_CHANNELS.focusChatRequested, target);
+		if (target.kind === 'concierge') {
+			window.webContents.send(IPC_CHANNELS.focusConciergeRequested);
+		} else {
+			window.webContents.send(IPC_CHANNELS.focusChatRequested, chatOf(target));
+		}
 	}
+}
+
+/**
+ * Strips the discriminant back off a chat target, so the renderer receives the
+ * broadcast shape its contract describes rather than one carrying a tag that
+ * only mattered inside main.
+ * @param target - The clicked notification's chat target.
+ * @returns The focus broadcast for that chat.
+ */
+function chatOf(
+	target: { kind: 'chat' } & FocusChatBroadcast,
+): FocusChatBroadcast {
+	return {
+		agentSessionId: target.agentSessionId,
+		chatTabId: target.chatTabId,
+		workspaceId: target.workspaceId,
+	};
 }
 
 /**
@@ -69,7 +91,8 @@ function requestNotificationSound(): void {
 /**
  * Shows a desktop notification titled with the chat that produced it; clicking
  * it raises the app and opens that chat, crossing workspaces when it lives in
- * another one.
+ * another one. A Concierge notification is titled with the Concierge's own name
+ * and opens its panel instead.
  *
  * The shown notification is handed to the retainer before it is displayed:
  * Electron drops a collected notification out of Notification Center along with
@@ -91,7 +114,7 @@ export function electronNotify(notification: AgentNotification): void {
 		silent: true,
 		title: notification.title,
 	});
-	shown.on('click', () => openChatFromNotification(notification.target));
+	shown.on('click', () => openFromNotification(notification.target));
 	notificationRetainer.retain(shown);
 	shown.show();
 	if (notification.playSound) {

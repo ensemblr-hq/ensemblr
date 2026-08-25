@@ -48,8 +48,21 @@ const TARGET: NotificationTarget = {
 	workspaceName: 'vangelis',
 };
 
+function shutdownEvent(): AgentSessionEventWire {
+	return {
+		...statusEvent('streaming'),
+		eventType: 'shutdown',
+		payload: { kind: 'shutdown', reason: 'closed' } as never,
+	};
+}
+
 function statusFor(status: string, sessionId: string, workspaceId = 'w1') {
 	return { event: statusEvent(status), sessionId, workspaceId };
+}
+
+/** The Concierge's own feed, which names no workspace. */
+function conciergeStatus(status: string, sessionId = 'concierge-1') {
+	return { event: statusEvent(status), sessionId };
 }
 
 interface Harness {
@@ -394,6 +407,7 @@ describe('createAgentActivityMonitor — notifications', () => {
 		expect(h.notifications[0]?.target).toEqual({
 			agentSessionId: 's7',
 			chatTabId: 'tab-1',
+			kind: 'chat',
 			workspaceId: 'w9',
 		});
 	});
@@ -562,11 +576,7 @@ describe('createAgentActivityMonitor — listRunning', () => {
 		const h = makeMonitor({ readSettings: () => settings({}) });
 		h.monitor.handle(statusFor('streaming', 's1', 'w1'));
 		h.monitor.handle({
-			event: {
-				...statusEvent('streaming'),
-				eventType: 'shutdown',
-				payload: { kind: 'shutdown', reason: 'closed' } as never,
-			},
+			event: shutdownEvent(),
 			sessionId: 's1',
 			workspaceId: 'w1',
 		});
@@ -578,5 +588,130 @@ describe('createAgentActivityMonitor — listRunning', () => {
 		h.monitor.handle(statusFor('streaming', 's1', 'w1'));
 		h.monitor.dispose();
 		expect(h.monitor.listRunning()).toEqual([]);
+	});
+});
+
+describe('createAgentActivityMonitor — the Concierge', () => {
+	test('notifies under its own name when a turn finishes', () => {
+		const h = makeMonitor({
+			readSettings: () => settings({ desktopNotifications: true }),
+		});
+		h.monitor.handleConcierge(conciergeStatus('streaming'));
+		h.monitor.handleConcierge(conciergeStatus('idle'));
+
+		expect(h.notifications).toHaveLength(1);
+		expect(h.notifications[0].title).toBe('Concierge');
+		expect(h.notifications[0].target).toEqual({ kind: 'concierge' });
+	});
+
+	test('marks no chat unread — the badge is the renderer’s own', () => {
+		const h = makeMonitor({
+			readSettings: () => settings({ desktopNotifications: true }),
+		});
+		h.monitor.handleConcierge(conciergeStatus('streaming'));
+		h.monitor.handleConcierge(conciergeStatus('idle'));
+
+		expect(h.announcements).toEqual([]);
+	});
+
+	test('stays quiet while the panel is open in a focused window', () => {
+		const h = makeMonitor({
+			isAppFocused: () => true,
+			isConciergeOnScreen: () => true,
+			readSettings: () => settings({ desktopNotifications: true }),
+		});
+		h.monitor.handleConcierge(conciergeStatus('streaming'));
+		h.monitor.handleConcierge(conciergeStatus('idle'));
+
+		expect(h.notifications).toEqual([]);
+	});
+
+	test('notifies for an open panel the user is not looking at', () => {
+		const h = makeMonitor({
+			isAppFocused: () => false,
+			isConciergeOnScreen: () => true,
+			readSettings: () => settings({ desktopNotifications: true }),
+		});
+		h.monitor.handleConcierge(conciergeStatus('streaming'));
+		h.monitor.handleConcierge(conciergeStatus('idle'));
+
+		expect(h.notifications).toHaveLength(1);
+	});
+
+	test('stays quiet when desktop notifications are off', () => {
+		const h = makeMonitor({
+			readSettings: () => settings({ desktopNotifications: false }),
+		});
+		h.monitor.handleConcierge(conciergeStatus('streaming'));
+		h.monitor.handleConcierge(conciergeStatus('idle'));
+
+		expect(h.notifications).toEqual([]);
+	});
+
+	test('does not report a stop the user asked for as a finished turn', () => {
+		const h = makeMonitor({
+			readSettings: () => settings({ desktopNotifications: true }),
+		});
+		h.monitor.handleConcierge(conciergeStatus('streaming'));
+		h.monitor.noteUserStop('concierge-1');
+		h.monitor.handleConcierge(conciergeStatus('idle'));
+
+		expect(h.notifications).toEqual([]);
+	});
+
+	test('says nothing on an idle that follows no turn', () => {
+		const h = makeMonitor({
+			readSettings: () => settings({ desktopNotifications: true }),
+		});
+		h.monitor.handleConcierge(conciergeStatus('idle'));
+
+		expect(h.notifications).toEqual([]);
+	});
+
+	test('a blocked questionnaire notifies as the Concierge', () => {
+		const h = makeMonitor({
+			readSettings: () => settings({ desktopNotifications: true }),
+		});
+		h.monitor.notifyQuestionRaised({
+			agentSessionId: 'concierge-1',
+			workspaceId: '',
+		});
+
+		expect(h.notifications).toHaveLength(1);
+		expect(h.notifications[0].title).toBe('Concierge');
+		expect(h.notifications[0].target).toEqual({ kind: 'concierge' });
+	});
+
+	test('stays out of listRunning, which the quit guard names workspaces from', () => {
+		const h = makeMonitor({ readSettings: () => settings({}) });
+		h.monitor.handleConcierge(conciergeStatus('streaming'));
+
+		expect(h.monitor.listRunning()).toEqual([]);
+	});
+
+	test('holds the caffeinate blocker while it works', async () => {
+		const h = makeMonitor({
+			readSettings: () => settings({ caffeinateWhileRunning: true }),
+		});
+		h.monitor.handleConcierge(conciergeStatus('streaming'));
+		await flush();
+		expect(h.starts).toBe(1);
+
+		h.monitor.handleConcierge(conciergeStatus('idle'));
+		expect(h.stops).toBe(1);
+	});
+
+	test('releases the blocker when its runtime shuts down', async () => {
+		const h = makeMonitor({
+			readSettings: () => settings({ caffeinateWhileRunning: true }),
+		});
+		h.monitor.handleConcierge(conciergeStatus('streaming'));
+		await flush();
+		h.monitor.handleConcierge({
+			event: shutdownEvent(),
+			sessionId: 'concierge-1',
+		});
+
+		expect(h.stops).toBe(1);
 	});
 });

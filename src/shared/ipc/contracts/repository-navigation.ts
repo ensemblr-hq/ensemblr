@@ -13,6 +13,7 @@ import type { MenuCommandBroadcast, MenuContext } from '../../menu-commands.ts';
 import type {
 	ActiveChatContext,
 	ChatTurnFinishedBroadcast,
+	ConciergeVisibilityReport,
 	FocusChatBroadcast,
 } from './notifications.ts';
 
@@ -129,6 +130,20 @@ export interface ShellApi {
 	onFocusChatRequested: (
 		listener: (payload: FocusChatBroadcast) => void,
 	) => () => void;
+	/**
+	 * Reports whether the Concierge panel is on screen, so a desktop notification
+	 * for the Concierge is suppressed while the user is already reading it. Null
+	 * is not a case — the panel is open or it is not. Fire-and-forget.
+	 */
+	reportConciergeVisibility: (
+		report: ConciergeVisibilityReport,
+	) => Promise<void>;
+	/**
+	 * Subscribes to Concierge notification clicks. Returns an unsubscribe
+	 * function. There is one Concierge, so the request carries no payload — every
+	 * window opens its own panel.
+	 */
+	onFocusConciergeRequested: (listener: () => void) => () => void;
 	/**
 	 * Subscribes to finished top-level turns, which is what the renderer marks a
 	 * chat unread from. Returns an unsubscribe function. Every window receives it
