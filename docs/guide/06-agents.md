@@ -173,7 +173,10 @@ terminal's output, the board, and Linear. Acting is a narrower set:
   orchestrator** there — a peer that owns the task and fans out its own
   sub-agents, not a child of the Concierge. It briefs that agent, steers it with
   follow-ups, and reads back what it ran.
-- **Create a workspace** when the work needs one that does not exist yet.
+- **Create a workspace** when the work needs one that does not exist yet, under a
+  name it has to supply — the name is the sidebar label and the git branch both,
+  so it is refused rather than guessed at, and you land in the new workspace once
+  it appears.
 - **Move the board and the tracker**, and leave or resolve review comments on any
   workspace's diff.
 
@@ -193,11 +196,31 @@ channel rather than asked for in the prompt:
 
 ### Everything it names, you can click
 
-A project, a workspace, or a chat the Concierge mentions in its answers renders as a chip, the same
-way a file path does. Clicking a workspace or a chat chip focuses it — a closed chat reopens first;
-a project chip has no surface of its own to jump to, so it resolves to the project's name rather
-than sitting there as dead text. Type `@` in its composer to open a menu ranked against every
-project, workspace, and chat in the app, not just the one you happen to be looking at.
+A project, a workspace, a chat, or an artifact the Concierge mentions in its answers renders as a
+chip, the same way a file path does. Clicking a workspace or a chat chip focuses it — a closed chat
+reopens first; a project chip has no surface of its own to jump to, so it resolves to the project's
+name rather than sitting there as dead text. Type `@` in its composer to open a menu ranked against
+every project, workspace, chat, and artifact in the app, not just the one you happen to be looking
+at.
+
+Its own tool rows are written in the same vocabulary. A row that spawned an agent says it opened a
+**root orchestrator**, not a sub-agent — that is what a Concierge spawn actually is, and the panel
+never has any sub-agents to confuse it with — and a row that steered a chat or created a workspace
+pins that chat or workspace as a chip carrying its current name, rather than spelling a raw id into
+the title.
+
+### Reading what it wrote
+
+Clicking an artifact opens a reader over the transcript. It covers the conversation and nothing
+else: the header keeps its controls, and the composer stays live, so a question about what is on
+screen can be asked without dismissing it first. It reads through the same channel a workspace file
+preview does, so markdown renders, images render, and an oversized file is truncated the same way.
+Its own **Back to the conversation** control puts the transcript back; the header's controls keep
+meaning what they say while a file is up, so closing from there closes the panel rather than the
+reader.
+
+The memory notes under `memory/` open in it too — they are ordinary markdown in the same folder, and
+the Concierge writes path chips for them the same way.
 
 ### Its own folder
 
@@ -210,7 +233,7 @@ request is about.
 | --- | --- |
 | `MEMORY.md` | the memory index — one line per memory, pointing at its file |
 | `memory/` | one markdown file per durable fact |
-| `artifacts/` | reports and notes it writes for you |
+| `artifacts/` | reports and notes it writes for you, addressable as chips and opened in the panel's reader |
 
 Ensemblr creates all three on launch and seeds `MEMORY.md` with an empty index,
 so a fresh install has somewhere to write from the first turn.
