@@ -26,7 +26,7 @@ agent binary of its own — it drives the one you installed.
 
 *Ensemblr Control driving the app from inside a workspace: the agent names its own tab, moves the workspace to In progress, starts a run script, then delegates to two sub-agents in their own chat tabs and launches a Claude Code harness in a terminal.*
 
-- **Version:** [`0.1.0-beta.14`](https://github.com/ensemblr-hq/ensemblr/releases/tag/v0.1.0-beta.14) (pre-1.0, polish stage)
+- **Version:** [`0.1.0-beta.15`](https://github.com/ensemblr-hq/ensemblr/releases/tag/v0.1.0-beta.15) (pre-1.0, polish stage)
 - **Platform:** macOS on Apple silicon
 - **License:** Apache-2.0
 
@@ -45,7 +45,7 @@ changes before 1.0. See [`CHANGELOG.md`](./CHANGELOG.md) for recent changes.
 brew install --cask ensemblr-hq/tap/ensemblr
 ```
 
-Or **[download Ensemblr 0.1.0-beta.14 (.dmg, Apple silicon)](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.0-beta.14/Ensemblr-0.1.0-beta.14-arm64.dmg)** — open it and drag Ensemblr to Applications.
+Or **[download Ensemblr 0.1.0-beta.15 (.dmg, Apple silicon)](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.0-beta.15/Ensemblr-0.1.0-beta.15-arm64.dmg)** — open it and drag Ensemblr to Applications.
 
 The build is code-signed with a Developer ID certificate, hardened-runtime, notarized by Apple, and
 stapled, so it opens without a Gatekeeper prompt and validates offline. Every build is on the
