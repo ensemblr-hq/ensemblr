@@ -60,6 +60,12 @@ Its memory is a directory of markdown files it searches and writes between conve
 context does not survive a clear.
 _Avoid_: Assistant, app agent, root agent (that names a per-workspace orchestrator)
 
+**Artifact**:
+A report or note the Concierge writes for you, under `artifacts/` in its own folder. It belongs to no
+workspace and is not part of any repository, so it is addressed by its path relative to the Concierge
+home and read in the panel's own reader rather than opened as a file tab.
+_Avoid_: Output, document, deliverable, attachment (that names a file added to a prompt)
+
 **Orchestrator / Sub-agent**:
 Roles in multi-agent work. The orchestrator is the root agent (lineage depth 0) that may delegate; a sub-agent is a spawned child that does its delegated unit of work itself and never delegates onward.
 _Avoid_: Master/worker, parent/child thread

@@ -44,7 +44,7 @@ each exposing its public surface through `index.ts`.
 | Chat tabs | `chat-tabs/` | Tab service, preview slot, terminal-session persistence |
 | Checkpoints | `checkpoints/` | Git-backed per-turn checkpoints (ADR&nbsp;0012) |
 | Process execution | `commands/` | Local process and shell execution |
-| Concierge | `concierge/` | App-level agent session service, its home-folder layout under the Ensemblr root, the memory index and background memory pass, and the wire that retires a session while it finishes writing memories |
+| Concierge | `concierge/` | App-level agent session service, its home-folder layout under the Ensemblr root, the memory index and background memory pass, the artifact lister the panel's reader reads through, and the wire that retires a session while it finishes writing memories |
 | Config | `config/` | Declarative config loading, settings resolution, repository config |
 | Environment | `environment/` | Environment-variable catalogue and layered assembly, Infisical joining as its own layer |
 | IPC | `ipc/` | Handler registration (`handlers/`, 33 modules), request validation (`request-schemas/`, 21 modules), permission gate |

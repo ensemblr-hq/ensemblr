@@ -9,6 +9,73 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.0-beta.16] - 2026-08-25
+
+A report the Concierge writes is something you can open, and a workspace it cuts arrives with a name
+you chose. Signed, notarized, Apple silicon.
+[Release](https://github.com/ensemblr-hq/ensemblr/releases/tag/v0.1.0-beta.16) ·
+[`.dmg`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.0-beta.16/Ensemblr-0.1.0-beta.16-arm64.dmg)
+
+### Added
+
+- **The report the Concierge just wrote is a chip you can click.** It writes into `artifacts/`, and
+  that was the one kind of file it could produce and never show you: the directory belongs to no
+  workspace, so there was no file tree to open a tab in and no project to resolve a path chip
+  against. An artifact is now the fourth thing the Concierge can address, alongside a project, a
+  workspace, and a chat — it renders as a chip in its answers, and typing `@` in its composer lists
+  the artifacts it has written beside everything else you can reference.
+- **A reader for them, without losing the conversation.** Opening an artifact covers the transcript
+  and nothing else: the header keeps its controls and the composer stays live, so you can ask about
+  what is on screen without dismissing it first. Reading goes through the same channel a workspace
+  file preview uses, so markdown, images, and oversized files all behave the way they do there. The
+  memory notes under `memory/` open in it too, through the path chips the Concierge already wrote.
+- **A workspace the Concierge cuts has to be given a name.** The name is two things at once — what
+  you read in the sidebar, and the git branch, which the create service slugs and joins to the
+  repository's branch prefix. Omitting it was not neutral: the service fell back to the literal
+  placeholder `workspace`, so the worktree landed as "workspace" on `<prefix>/workspace` and the
+  next one collided with it. An empty name, a name too short to describe work, and a list of
+  placeholders are now refused at the control boundary, each with a message saying what a good one
+  looks like. A successful create also moves you to the new workspace, holding the request until it
+  appears in the tree — which polls every fifteen seconds — and dropping it after thirty so a
+  workspace that never arrives cannot navigate you long after you have moved on.
+
+### Changed
+
+- **The Concierge's tool rows read in its own vocabulary.** What a workspace agent spawns is a
+  sub-agent that reports back to it; what the Concierge spawns is a root orchestrator in a workspace
+  you can open and talk to. Calling both a sub-agent named the wrong thing on the one surface that
+  never has any, and hid that the row was something you could go look at. Six control tools now
+  carry a second reading, chosen from the surface the row is rendered in rather than from a flag
+  that could disagree with it.
+- **A control row names the thing it acted on, as a chip rather than an id.** A row that steered a
+  chat or created a workspace used to spell a raw id into its title — unreadable, filling the line,
+  and naming something you could not click. It now pins the chat or workspace as a chip resolved
+  against the app's live catalogue, so it carries the current name; a chat answers to its agent
+  session id as well as its tab id, since every op that steers or reads one names it from that end.
+  Where nothing resolves — outside the Concierge, or for something archived or not yet listed — the
+  row spells its subject back into the title as before.
+
+### Fixed
+
+- **A conversation the runtime refused to reload could swallow every prompt after it.** A runtime
+  that declines to resume now has a failure class of its own instead of reading as an ordinary
+  crash, and the Concierge repairs it: it holds the turn the doomed child accepted, forgets the
+  runtime id the row was pinned to, rebuilds the conversation once on the same row, and re-sends.
+  Traces showed rows pinned to a conversation Claude never wrote, two rejected resumes in a row, and
+  the prompt typed between them sitting in the transcript unanswered for good.
+- **Pressing Clear repeatedly spawned a Concierge per keystroke.** Clears are serialised now,
+  retired conversations still writing their memories are capped at three, and a clear pressed
+  mid-answer asks first. The control is one chord and one button away, and a panel that has stopped
+  answering is exactly when it gets pressed over and over.
+- **Claude Code rewrote files through the shell, so the change never reached the diff.** Its own
+  prompt tells the model to prefer `bash` for reading and rewriting files once permission prompts
+  stop costing anything — the wrong trade inside Ensemblr, where an Edit or Write call renders as a
+  file row carrying the diff you review, and a shell rewrite renders as a command line with no path
+  in it. Sessions in an unprompted permission mode get an override that flips the preference back
+  without banning the shell.
+- **A spawn into a workspace you had already opened stacked a second chat tab beside the empty
+  one.** It claims the empty tab instead.
+
 ## [0.1.0-beta.15] - 2026-08-25
 
 Ensemblr gains the Concierge, an app-level agent that sits above every workspace with its own
