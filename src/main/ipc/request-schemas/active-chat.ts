@@ -14,3 +14,12 @@ export const activeChatContextSchema = z.union([
 	}),
 	z.null(),
 ]);
+
+/**
+ * Validates the Concierge-panel visibility the renderer reports. Lenient for the
+ * same reason as {@link activeChatContextSchema}: a report nobody can read means
+ * the panel's state is unknown, and unknown has to notify.
+ */
+export const conciergeVisibilityReportSchema = z.object({
+	visible: z.boolean(),
+});

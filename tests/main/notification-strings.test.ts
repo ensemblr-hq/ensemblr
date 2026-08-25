@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import {
+	conciergeNotificationText,
 	type NotificationKind,
 	notificationText,
 } from '../../src/main/agent-runtime/notification-strings';
@@ -62,5 +63,50 @@ describe('notificationText', () => {
 			workspaceName: 'vangelis',
 		});
 		expect(blank.title).toBe('Untitled chat');
+	});
+});
+
+describe('conciergeNotificationText', () => {
+	test('every language renders every kind, none empty', () => {
+		for (const language of APP_LANGUAGES) {
+			for (const kind of KINDS) {
+				const { body, title } = conciergeNotificationText({ kind, language });
+				expect(body.length).toBeGreaterThan(0);
+				expect(title.length).toBeGreaterThan(0);
+			}
+		}
+	});
+
+	test('names no workspace, so no placeholder is left behind', () => {
+		for (const language of APP_LANGUAGES) {
+			for (const kind of KINDS) {
+				expect(
+					conciergeNotificationText({ kind, language }).body,
+				).not.toContain('{{');
+			}
+		}
+	});
+
+	test('titles itself with the Concierge rather than a chat name', () => {
+		expect(
+			conciergeNotificationText({ kind: 'finished', language: 'en' }).title,
+		).toBe('Concierge');
+		expect(
+			conciergeNotificationText({ kind: 'question', language: 'ru' }).title,
+		).toBe('Консьерж');
+	});
+
+	test('tells a finished turn apart from a blocked question', () => {
+		for (const language of APP_LANGUAGES) {
+			const finished = conciergeNotificationText({
+				kind: 'finished',
+				language,
+			});
+			const question = conciergeNotificationText({
+				kind: 'question',
+				language,
+			});
+			expect(finished.body).not.toBe(question.body);
+		}
 	});
 });

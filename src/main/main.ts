@@ -330,6 +330,8 @@ const agentActivityMonitor = createAgentActivityMonitor({
 	isAppFocused: electronIsAppFocused,
 	/** Reports whether the user is looking at exactly this chat right now. */
 	isChatOnScreen: (chat) => activeChatStore.isOnScreen(chat),
+	/** Reports whether the Concierge panel is the surface in front of the user. */
+	isConciergeOnScreen: () => activeChatStore.isConciergeOnScreen(),
 	notify: electronNotify,
 	powerControls: electronPowerControls,
 	readBattery: readMacosBattery,
@@ -922,9 +924,29 @@ const conciergeMemoryService = createConciergeMemoryService({
  */
 const conciergeSessionService = createConciergeSessionService({
 	agentClient,
-	/** Forwards a Concierge transcript event to every window. */
-	eventSink: (broadcast) =>
-		broadcastToAllWindows(IPC_CHANNELS.conciergeSessionEvent, broadcast),
+	/**
+	 * Forwards a Concierge transcript event to every window and to the activity
+	 * monitor, which is what turns a finished turn into a desktop notification.
+	 *
+	 * The monitor sees only the live session's events. A child a context clear
+	 * retired keeps its subscription while it writes its memories, and that pass
+	 * is a whole turn: fed through, it would notify "Finished" for background
+	 * work the user never asked for, and its trailing `idle` could clear the
+	 * streaming session out from under the fresh one and swallow the real
+	 * notification. Its rows are still broadcast — they belong in its transcript.
+	 */
+	eventSink: (broadcast) => {
+		broadcastToAllWindows(IPC_CHANNELS.conciergeSessionEvent, broadcast);
+		if (!broadcast.live) {
+			return;
+		}
+		agentActivityMonitor.handleConcierge({
+			event: broadcast.event,
+			sessionId: broadcast.sessionId,
+		});
+	},
+	/** Keeps the stop the user just asked for from notifying as a finished turn. */
+	onSessionAborted: (sessionId) => agentActivityMonitor.noteUserStop(sessionId),
 	requireDatabase: requireOpenDatabase,
 	/** Drops the control origin a closed Concierge session held. */
 	releaseControlOrigin: (sessionId) =>

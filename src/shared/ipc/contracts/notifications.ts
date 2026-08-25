@@ -28,6 +28,20 @@ export interface FocusChatBroadcast {
 }
 
 /**
+ * Renderer → main report of whether the Concierge panel is on screen, which is
+ * the Concierge's equivalent of {@link ActiveChatContext}: it is the one fact
+ * that decides whether a finished Concierge turn is worth an OS notification.
+ *
+ * A boolean rather than an identity, because there is one Concierge and it is
+ * either in front of the user or it is not. The panel floats above whatever
+ * route is open, so this is orthogonal to the active chat rather than part of
+ * it.
+ */
+export interface ConciergeVisibilityReport {
+	visible: boolean;
+}
+
+/**
  * Main → renderer signal that a chat finished a turn the user should know
  * about, broadcast to every window. The in-app unread mark hangs off this
  * rather than off the raw session-event stream, so the two surfaces that tell a

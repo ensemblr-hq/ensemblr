@@ -214,7 +214,10 @@
 			"upload-input": "Μεταφόρτωση συνημμένου"
 		},
 		"launcher": {
-			"open": "Άνοιγμα του Concierge"
+			"open": "Άνοιγμα του Concierge",
+			"open-with-unread_one": "Άνοιγμα του Concierge, {{count}} νέο μήνυμα",
+			"open-with-unread_other": "Άνοιγμα του Concierge, {{count}} νέα μηνύματα",
+			"working": "Άνοιγμα του Concierge, εργάζεται ακόμη"
 		},
 		"panel": {
 			"clear": "Εκκαθάριση περιβάλλοντος και νέα αρχή",

@@ -143,3 +143,27 @@ export function subscribeToConciergeEvents(
 		getEnsemblrApiOrNull()?.onConciergeSessionEvent(listener) ?? (() => {})
 	);
 }
+
+/**
+ * Tells the main process whether the Concierge panel is on screen, which is what
+ * keeps a desktop notification from interrupting a user who is already reading
+ * the answer. Fire-and-forget, like the active-chat report.
+ * @param visible - True while the panel is open in any presentation.
+ */
+export function reportConciergeVisibility(visible: boolean): void {
+	void getEnsemblrApiOrNull()?.reportConciergeVisibility({ visible });
+}
+
+/**
+ * Subscribes to Concierge notification clicks, so the renderer can open the
+ * panel the user clicked through to. Returns an unsubscribe fn.
+ * @param listener - Runs once per click on a Concierge notification.
+ * @returns The unsubscribe function.
+ */
+export function subscribeFocusConciergeRequests(
+	listener: () => void,
+): () => void {
+	return (
+		getEnsemblrApiOrNull()?.onFocusConciergeRequested(listener) ?? (() => {})
+	);
+}

@@ -13,6 +13,7 @@ import {
 } from '../../src/main/concierge';
 import { openEnsemblrDatabase } from '../../src/main/storage/database.ts';
 import { getConciergeSessionById } from '../../src/main/storage/repositories/concierge-session-repository.ts';
+import type { ConciergeEventBroadcastWire } from '../../src/shared/ipc/contracts/concierge.ts';
 
 const HOME = '/tmp/root/concierge';
 
@@ -90,6 +91,7 @@ const finishTurn = (child: FakeChild): void => {
  */
 const setup = (
 	options: {
+		eventSink?: (broadcast: ConciergeEventBroadcastWire) => void;
 		releaseControlOrigin?: (sessionId: string) => void;
 		retireControlOrigin?: (sessionId: string) => void;
 		runMemoryPass?: (sessionId: string) => Promise<boolean>;
@@ -107,6 +109,7 @@ const setup = (
 	};
 	const service = createConciergeSessionService({
 		agentClient,
+		eventSink: options.eventSink,
 		releaseControlOrigin: options.releaseControlOrigin,
 		requireDatabase: () => database,
 		retireControlOrigin: options.retireControlOrigin,
@@ -164,6 +167,54 @@ describe('clearing the Concierge context', () => {
 		expect(cleared.memoryPassStarted).toBe(true);
 		expect(cleared.session?.id).not.toBe(opened.session?.id);
 		expect(children).toHaveLength(2);
+	});
+
+	// The retired child keeps its subscription so its rows still reach its own
+	// transcript, but the turn it runs is background work nobody asked for. Fed
+	// to the activity monitor as the user's own it notified "Finished" on every
+	// clear, and its trailing `idle` could clear the streaming session out from
+	// under the replacement and swallow that turn's real notification.
+	it('marks the retired child’s memory-pass turn as not live', async () => {
+		const broadcasts: ConciergeEventBroadcastWire[] = [];
+		const { children, service } = setup({
+			eventSink: (broadcast) => broadcasts.push(broadcast),
+			runMemoryPass: () => new Promise<boolean>(() => undefined),
+		});
+		const opened = await service.openSession({ fresh: true });
+
+		const cleared = await service.clearContext({ reason: 'manual' });
+		broadcasts.length = 0;
+		finishTurn(children[0] as FakeChild);
+
+		expect(broadcasts).not.toHaveLength(0);
+		expect(broadcasts.every((broadcast) => !broadcast.live)).toBe(true);
+		expect(
+			broadcasts.every(
+				(broadcast) => broadcast.sessionId === opened.session?.id,
+			),
+		).toBe(true);
+		expect(cleared.session?.id).not.toBe(opened.session?.id);
+	});
+
+	it('marks the replacement’s own turn as live', async () => {
+		const broadcasts: ConciergeEventBroadcastWire[] = [];
+		const { children, service } = setup({
+			eventSink: (broadcast) => broadcasts.push(broadcast),
+			runMemoryPass: () => new Promise<boolean>(() => undefined),
+		});
+		await service.openSession({ fresh: true });
+		const cleared = await service.clearContext({ reason: 'manual' });
+		broadcasts.length = 0;
+
+		finishTurn(children[1] as FakeChild);
+
+		expect(broadcasts).not.toHaveLength(0);
+		expect(broadcasts.every((broadcast) => broadcast.live)).toBe(true);
+		expect(
+			broadcasts.every(
+				(broadcast) => broadcast.sessionId === cleared.session?.id,
+			),
+		).toBe(true);
 	});
 
 	it('submits the memory prompt to the retired child, not the replacement', async () => {

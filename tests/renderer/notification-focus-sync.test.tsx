@@ -5,11 +5,13 @@ import { createStore, Provider } from 'jotai';
 import { act } from 'react';
 import { beforeEach, expect, test, vi } from 'vitest';
 
-const { matches, navigate, onFocusChatRequested } = vi.hoisted(() => ({
-	matches: { current: [] as { routeId: string }[] },
-	navigate: vi.fn(),
-	onFocusChatRequested: vi.fn(),
-}));
+const { matches, navigate, onFocusChatRequested, onFocusConciergeRequested } =
+	vi.hoisted(() => ({
+		matches: { current: [] as { routeId: string }[] },
+		navigate: vi.fn(),
+		onFocusChatRequested: vi.fn(),
+		onFocusConciergeRequested: vi.fn(),
+	}));
 
 vi.mock('@tanstack/react-router', () => ({
 	useMatches: ({
@@ -20,6 +22,7 @@ vi.mock('@tanstack/react-router', () => ({
 	useNavigate: () => navigate,
 }));
 
+import { conciergePresentationAtom } from '../../src/renderer/state/concierge';
 import {
 	pendingNotificationFocusAtom,
 	useNotificationFocusSync,
@@ -44,6 +47,7 @@ function mountSync(store: ReturnType<typeof createStore>) {
 		click: onFocusChatRequested.mock.calls[0][0] as (
 			payload: FocusChatBroadcast,
 		) => void,
+		clickConcierge: onFocusConciergeRequested.mock.calls[0][0] as () => void,
 		rerender: () => view.rerender(tree()),
 		unmount: () => view.unmount(),
 	};
@@ -60,7 +64,12 @@ beforeEach(() => {
 	navigate.mockReset();
 	onFocusChatRequested.mockReset();
 	onFocusChatRequested.mockReturnValue(() => undefined);
-	window.ensemblr = { onFocusChatRequested } as never;
+	onFocusConciergeRequested.mockReset();
+	onFocusConciergeRequested.mockReturnValue(() => undefined);
+	window.ensemblr = {
+		onFocusChatRequested,
+		onFocusConciergeRequested,
+	} as never;
 });
 
 test('parks the chat a clicked notification names', async () => {
@@ -104,8 +113,55 @@ test('pushes back to the shell when the window leaves it still parked', async ()
 
 test('unsubscribes on unmount', () => {
 	const unsubscribe = vi.fn();
+	const unsubscribeConcierge = vi.fn();
 	onFocusChatRequested.mockReturnValue(unsubscribe);
+	onFocusConciergeRequested.mockReturnValue(unsubscribeConcierge);
 	mountSync(createStore()).unmount();
 
 	expect(unsubscribe).toHaveBeenCalled();
+	expect(unsubscribeConcierge).toHaveBeenCalled();
+});
+
+test('opens the panel a clicked Concierge notification is about', async () => {
+	const store = createStore();
+	const { clickConcierge } = mountSync(store);
+	await act(async () => {
+		clickConcierge();
+	});
+
+	expect(store.get(conciergePresentationAtom)).toBe('panel');
+	expect(navigate).not.toHaveBeenCalled();
+});
+
+test('returns to the shell when a Concierge click lands outside it', async () => {
+	matches.current = [{ routeId: '/_workbench/settings' }];
+	const store = createStore();
+	const { clickConcierge } = mountSync(store);
+	await act(async () => {
+		clickConcierge();
+	});
+
+	expect(navigate).toHaveBeenCalledWith({ to: '/' });
+	expect(store.get(conciergePresentationAtom)).toBe('panel');
+});
+
+test('stops asking to return once the shell is back', async () => {
+	matches.current = [{ routeId: '/_workbench/settings' }];
+	const store = createStore();
+	const { clickConcierge, rerender } = mountSync(store);
+	await act(async () => {
+		clickConcierge();
+	});
+	navigate.mockReset();
+
+	matches.current = [{ routeId: '/_workbench/_shell' }];
+	await act(async () => {
+		rerender();
+	});
+	matches.current = [{ routeId: '/_workbench/settings' }];
+	await act(async () => {
+		rerender();
+	});
+
+	expect(navigate).not.toHaveBeenCalled();
 });

@@ -1,8 +1,12 @@
 import { useMatches, useNavigate } from '@tanstack/react-router';
-import { atom, useAtom } from 'jotai';
+import { atom, useAtom, useSetAtom } from 'jotai';
 import { useEffect } from 'react';
 
-import { subscribeFocusChatRequests } from '@/renderer/api/ensemblr';
+import {
+	subscribeFocusChatRequests,
+	subscribeFocusConciergeRequests,
+} from '@/renderer/api/ensemblr';
+import { conciergePresentationAtom } from '@/renderer/state/concierge';
 
 import type { UnreadChatRef } from './entries';
 
@@ -15,6 +19,14 @@ const SHELL_ROUTE_ID = '/_workbench/_shell';
  * first is drained supersedes it, which is what the user meant by clicking it.
  */
 export const pendingNotificationFocusAtom = atom<UnreadChatRef | null>(null);
+
+/**
+ * Whether a clicked Concierge notification is still waiting for the shell to
+ * come back. The panel itself needs no request parked — opening it is one atom —
+ * but the launcher that renders it only exists under the shell route, so the trip
+ * back is derived from this exactly as the chat's is from its own request.
+ */
+const pendingConciergeFocusAtom = atom(false);
 
 /**
  * Takes notification clicks at the app root and parks the chat they name for the
@@ -32,20 +44,34 @@ export const pendingNotificationFocusAtom = atom<UnreadChatRef | null>(null);
  * shell as still mounted and skip the redirect — leaving the request parked with
  * nothing left to drain it. Deriving it also pushes back a request that is still
  * parked when the window leaves the shell later.
+ *
+ * A clicked Concierge notification takes the same trip for the same reason. What
+ * it does on arrival is simpler: the panel is one atom away, and every window
+ * opens its own rather than one being sent somewhere.
  */
 export function useNotificationFocusSync(): void {
 	const navigate = useNavigate();
 	const [pendingFocus, setPendingFocus] = useAtom(pendingNotificationFocusAtom);
+	const [pendingConciergeFocus, setPendingConciergeFocus] = useAtom(
+		pendingConciergeFocusAtom,
+	);
+	const setConciergePresentation = useSetAtom(conciergePresentationAtom);
 	const isShellMounted = useMatches({
 		select: (matches) =>
 			matches.some((match) => match.routeId === SHELL_ROUTE_ID),
 	});
 
 	useEffect(() => {
-		if (pendingFocus && !isShellMounted) {
+		if ((pendingFocus || pendingConciergeFocus) && !isShellMounted) {
 			void navigate({ to: '/' });
 		}
-	}, [isShellMounted, navigate, pendingFocus]);
+	}, [isShellMounted, navigate, pendingConciergeFocus, pendingFocus]);
+
+	useEffect(() => {
+		if (pendingConciergeFocus && isShellMounted) {
+			setPendingConciergeFocus(false);
+		}
+	}, [isShellMounted, pendingConciergeFocus, setPendingConciergeFocus]);
 
 	useEffect(
 		() =>
@@ -57,5 +83,14 @@ export function useNotificationFocusSync(): void {
 				});
 			}),
 		[setPendingFocus],
+	);
+
+	useEffect(
+		() =>
+			subscribeFocusConciergeRequests(() => {
+				setConciergePresentation('panel');
+				setPendingConciergeFocus(true);
+			}),
+		[setConciergePresentation, setPendingConciergeFocus],
 	);
 }

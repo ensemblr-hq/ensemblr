@@ -36,14 +36,16 @@ vi.mock('electron', () => {
 	};
 });
 
+import type { AgentNotification } from '../../src/main/agent-runtime/agent-activity-monitor.ts';
 import { electronNotify } from '../../src/main/agent-runtime/electron-activity-bindings.ts';
 
-const notification = {
+const notification: AgentNotification = {
 	body: 'Finished the refactor',
 	playSound: false,
 	target: {
 		agentSessionId: 'session-7',
 		chatTabId: 'tab-7',
+		kind: 'chat',
 		workspaceId: 'workspace-7',
 	},
 	title: 'Review: retention',

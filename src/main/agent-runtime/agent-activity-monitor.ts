@@ -7,17 +7,40 @@ import type {
 } from '../../shared/ipc/contracts/notifications.ts';
 import type { OnScreenChatRef } from './active-chat-store.ts';
 import {
+	conciergeNotificationText,
 	type NotificationKind,
 	notificationText,
 } from './notification-strings.ts';
 import type { NotificationTarget } from './notification-target.ts';
 
+/**
+ * The fields of a persisted event the monitor actually reads. Narrower than
+ * {@link AgentSessionEventWire} so a Concierge event fits without inventing the
+ * `branchId` and `turnId` a conversation that never forks does not have.
+ */
+type MonitoredAgentEvent = Pick<AgentSessionEventWire, 'createdAt' | 'payload'>;
+
 /** One persisted agent event plus the session and workspace it belongs to. */
 interface AgentActivityEvent {
-	event: AgentSessionEventWire;
+	event: MonitoredAgentEvent;
 	sessionId: string;
 	workspaceId: string;
 }
+
+/** One persisted Concierge event; it belongs to no workspace. */
+interface ConciergeActivityEvent {
+	event: MonitoredAgentEvent;
+	sessionId: string;
+}
+
+/**
+ * What clicking a notification should open. Tagged rather than nullable,
+ * because the Concierge names no chat at all: it is one panel every window can
+ * open for itself, not a tab in a workspace somebody has to be sent to.
+ */
+export type NotificationFocusTarget =
+	| ({ kind: 'chat' } & FocusChatBroadcast)
+	| { kind: 'concierge' };
 
 /**
  * A desktop notification, and the chat clicking it should open. `playSound`
@@ -27,7 +50,7 @@ interface AgentActivityEvent {
 export interface AgentNotification {
 	body: string;
 	playSound: boolean;
-	target: FocusChatBroadcast;
+	target: NotificationFocusTarget;
 	title: string;
 }
 
@@ -73,6 +96,13 @@ export interface AgentActivityMonitorOptions {
 	 * lag the one the runtime is running.
 	 */
 	isChatOnScreen?: (chat: OnScreenChatRef) => boolean;
+	/**
+	 * True when the renderer reports the Concierge panel as open. The Concierge's
+	 * equivalent of {@link AgentActivityMonitorOptions.isChatOnScreen}, asked with
+	 * nothing: there is one panel and it is either in front of the user or it is
+	 * not.
+	 */
+	isConciergeOnScreen?: () => boolean;
 	/** Reads the workspace name, tab title, and sub-agent marker behind a session. */
 	resolveTarget?: (
 		workspaceId: string,
@@ -96,6 +126,13 @@ export interface AgentActivityMonitorOptions {
 interface AgentActivityMonitor {
 	/** Feed every persisted agent session event here. */
 	handle: (input: AgentActivityEvent) => void;
+	/**
+	 * Feed every persisted Concierge event here. Kept apart from {@link handle}
+	 * rather than passed through it with an empty workspace id: the Concierge
+	 * notifies under its own name, and it is deliberately absent from
+	 * {@link listRunning}, so the two paths differ in more than attribution.
+	 */
+	handleConcierge: (input: ConciergeActivityEvent) => void;
 	/**
 	 * Records that the user stopped this session, so the `idle` its abort emits
 	 * on the way out does not read as a turn that finished on its own.
@@ -183,6 +220,7 @@ export function createAgentActivityMonitor(
 		options.announceTurnFinished ?? (() => undefined);
 	const isAppFocused = options.isAppFocused ?? (() => false);
 	const isChatOnScreen = options.isChatOnScreen ?? (() => false);
+	const isConciergeOnScreen = options.isConciergeOnScreen ?? (() => false);
 	const resolveTarget = options.resolveTarget ?? (() => null);
 	const readLanguage = options.readLanguage ?? ((): AppLanguage => 'en');
 	const readBattery = options.readBattery ?? (() => Promise.resolve(null));
@@ -190,6 +228,9 @@ export function createAgentActivityMonitor(
 	const now = options.now ?? Date.now;
 
 	const streamingSessions = new Map<string, string>();
+	// Held apart from `streamingSessions` so the Concierge stays out of
+	// `listRunning`, which the quit guard names workspaces from.
+	let conciergeStreamingSessionId: string | null = null;
 	const userStoppedSessions = new Set<string>();
 	let blockerId: number | null = null;
 	let cancelPoll: (() => void) | null = null;
@@ -231,7 +272,8 @@ export function createAgentActivityMonitor(
 	const reconcilePower = (): void => {
 		const settings = options.readSettings();
 		const wantBlock =
-			settings.general.caffeinateWhileRunning && streamingSessions.size > 0;
+			settings.general.caffeinateWhileRunning &&
+			(streamingSessions.size > 0 || conciergeStreamingSessionId !== null);
 		if (wantBlock && now() - batterySampledAt >= BATTERY_SAMPLE_TTL_MS) {
 			const firstSample = batterySampledAt === Number.NEGATIVE_INFINITY;
 			sampleBattery();
@@ -302,8 +344,27 @@ export function createAgentActivityMonitor(
 			target: {
 				agentSessionId,
 				chatTabId: target.chatTabId,
+				kind: 'chat',
 				workspaceId: target.workspaceId,
 			},
+		});
+	};
+
+	// The Concierge's own silence gate. It has no chat to compare against, so
+	// "the user is already looking at it" is the panel being open in a focused
+	// window and nothing else.
+	const shouldConciergeStaySilent = (): boolean =>
+		!options.readSettings().general.desktopNotifications ||
+		(isAppFocused() && isConciergeOnScreen());
+
+	const emitConciergeNotification = (kind: NotificationKind): void => {
+		if (shouldConciergeStaySilent()) {
+			return;
+		}
+		notify({
+			...conciergeNotificationText({ kind, language: readLanguage() }),
+			playSound: options.readSettings().general.notificationSound,
+			target: { kind: 'concierge' },
 		});
 	};
 
@@ -356,6 +417,34 @@ export function createAgentActivityMonitor(
 		}
 	};
 
+	const handleConcierge = ({ event, sessionId }: ConciergeActivityEvent) => {
+		const payload = event.payload;
+		if (!payload) {
+			return;
+		}
+		if (payload.kind === 'status') {
+			const active =
+				payload.status === 'streaming' || payload.status === 'starting';
+			if (active) {
+				conciergeStreamingSessionId = sessionId;
+			} else {
+				const wasActive = conciergeStreamingSessionId !== null;
+				conciergeStreamingSessionId = null;
+				const stoppedByUser = userStoppedSessions.delete(sessionId);
+				if (wasActive && !stoppedByUser && payload.status === 'idle') {
+					emitConciergeNotification('finished');
+				}
+			}
+			reconcilePower();
+			return;
+		}
+		if (payload.kind === 'shutdown') {
+			conciergeStreamingSessionId = null;
+			userStoppedSessions.delete(sessionId);
+			reconcilePower();
+		}
+	};
+
 	const listRunning = (): readonly RunningAgentSession[] =>
 		[...streamingSessions].map(([sessionId, workspaceId]) => ({
 			sessionId,
@@ -370,17 +459,25 @@ export function createAgentActivityMonitor(
 			blockerId = null;
 		}
 		streamingSessions.clear();
+		conciergeStreamingSessionId = null;
 		userStoppedSessions.clear();
 	};
 
 	return {
 		dispose,
 		handle,
+		handleConcierge,
 		listRunning,
 		noteUserStop: (sessionId) => {
 			userStoppedSessions.add(sessionId);
 		},
 		notifyQuestionRaised: ({ agentSessionId, workspaceId }) => {
+			// An empty workspace id is the Concierge — the one agent that belongs to
+			// no workspace. Every other caller names one.
+			if (!workspaceId) {
+				emitConciergeNotification('question');
+				return;
+			}
 			const target = resolveAttentionTarget(workspaceId, agentSessionId);
 			if (target) {
 				emitNotification('question', agentSessionId, target);
