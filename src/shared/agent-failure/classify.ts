@@ -30,7 +30,9 @@ interface FailureProbe {
  * off, resume it" is the reading the reader can act on.
  *
  * The crash probes sit above the HTTP-status ones so an exit code in the 500s
- * is not read as a gateway error.
+ * is not read as a gateway error, and `session-unresumable` sits above them in
+ * turn because a runtime that refuses to reload a conversation exits like any
+ * other crash.
  */
 const FAILURE_PROBES: readonly FailureProbe[] = [
 	{
@@ -62,6 +64,15 @@ const FAILURE_PROBES: readonly FailureProbe[] = [
 		failureClass: 'runtime-missing',
 		pattern:
 			/\bENOENT\b|command not found|no such file or directory|not (installed|runnable|executable)|is not available|not found in \$?PATH/i,
+	},
+	// Above the crash probes because a rejected resume arrives as a dead child and
+	// would otherwise read as an ordinary crash, which is retried rather than
+	// repaired. Deliberately narrow: Pi's `No project session found with id '…';
+	// creating a new session with that id.` is a benign stderr warning and must
+	// not match.
+	{
+		failureClass: 'session-unresumable',
+		pattern: /no conversation found with session id/i,
 	},
 	{
 		failureClass: 'runtime-crashed',

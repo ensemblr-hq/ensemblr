@@ -31,6 +31,8 @@ export type AgentFailureClass =
 	| 'runtime-missing'
 	/** The session was already closed when the turn was submitted. */
 	| 'session-closed'
+	/** The runtime no longer holds the conversation this session asked it to reload. */
+	| 'session-unresumable'
 	/** A tool call was blocked by the permission mode or a guard. */
 	| 'tool-denied'
 	/** Nothing in the taxonomy matched; the raw runtime text is all there is. */
@@ -57,6 +59,7 @@ const CLASS_ORDER: Readonly<Record<AgentFailureClass, null>> = {
 	'workspace-invalid': null,
 	'tool-denied': null,
 	'session-closed': null,
+	'session-unresumable': null,
 	unknown: null,
 };
 

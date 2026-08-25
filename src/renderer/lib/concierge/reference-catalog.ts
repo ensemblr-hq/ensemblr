@@ -5,25 +5,35 @@ import {
 	conciergeReferenceId,
 } from '@/shared/concierge-references';
 import type { ChatTabWire } from '@/shared/ipc/contracts/chat-tab';
+import type { ConciergeArtifactWire } from '@/shared/ipc/contracts/concierge';
 
 /**
  * Every project, workspace, and chat the Concierge can be pointed at, flattened
  * out of the shell's project tree and the app-wide chat-tab listing.
  *
- * Built as one list rather than three because both surfaces that read it want it
- * that way: the `@` menu ranks all three kinds against one query, and the
- * timeline resolves a link by kind and id without caring which shelf it came
- * off. Chats are limited to tabs of kind `chat` — a file or terminal tab is a
- * view of something, not a conversation to point at, and a file tab already has
- * the path chip.
+ * Built as one list rather than four because both surfaces that read it want it
+ * that way: the `@` menu ranks every kind against one query, and the timeline
+ * resolves a link by kind and id without caring which shelf it came off. Chats
+ * are limited to tabs of kind `chat` — a file or terminal tab is a view of
+ * something, not a conversation to point at, and a file tab already has the path
+ * chip.
+ *
+ * Artifacts are here; memory files are not. A memory is the Concierge's own note
+ * to itself, which it reads by name without being pointed at, so offering the
+ * whole `memory/` directory in the menu would bury the reports the user actually
+ * wants to hand back. A memory file stays previewable through the path chip in
+ * an answer.
+ * @param artifacts - Files under the Concierge's `artifacts/` directory.
  * @param projects - Every project the shell knows, with their workspaces.
  * @param chatTabs - Every workspace's chat tabs, open and recently closed.
  * @returns The references, in the order the menu prefers before ranking.
  */
 export function buildConciergeReferences({
+	artifacts = [],
 	chatTabs,
 	projects,
 }: {
+	artifacts?: readonly ConciergeArtifactWire[];
 	chatTabs: { closed: readonly ChatTabWire[]; open: readonly ChatTabWire[] };
 	projects: readonly ProjectShellModel[];
 }): readonly ConciergeReference[] {
@@ -58,7 +68,15 @@ export function buildConciergeReferences({
 		...chatReferences(chatTabs.closed, 'closed', workspaceNames),
 	];
 
-	return [...workspaces, ...chats, ...projectRefs];
+	const artifactRefs = artifacts.map(
+		(artifact): ConciergeReference => ({
+			kind: 'artifact',
+			label: artifact.name,
+			path: artifact.relativePath,
+		}),
+	);
+
+	return [...workspaces, ...artifactRefs, ...chats, ...projectRefs];
 }
 
 /**
@@ -90,7 +108,7 @@ export function findConciergeReference(
  */
 export function conciergeReferenceAttachment(reference: ConciergeReference): {
 	id: string;
-	kind: 'chat-ref' | 'project-ref' | 'workspace-ref';
+	kind: 'artifact-ref' | 'chat-ref' | 'project-ref' | 'workspace-ref';
 	label: string;
 	reference: ConciergeReference;
 } {
@@ -100,6 +118,22 @@ export function conciergeReferenceAttachment(reference: ConciergeReference): {
 		label: reference.label,
 		reference,
 	};
+}
+
+/**
+ * The chip glyph a reference wears, which is its own kind for the three app
+ * surfaces and a file for an artifact — a document on disk, so the file tree's
+ * own icon set reads it by extension and a `.md` report looks like one.
+ *
+ * Returned as a literal union rather than typed against `ChatAttachmentChipKind`
+ * so this module stays clear of the component tree it feeds.
+ * @param reference - The reference being rendered.
+ * @returns The chip kind.
+ */
+export function conciergeReferenceChipKind(
+	reference: ConciergeReference,
+): 'chat' | 'file' | 'project' | 'workspace' {
+	return reference.kind === 'artifact' ? 'file' : reference.kind;
 }
 
 /**

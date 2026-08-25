@@ -5,6 +5,7 @@ import {
 	chipLabelForPath,
 	parsePromptAttachments,
 } from '@/renderer/lib/agent-timeline';
+import { conciergeReferenceChipKind } from '@/renderer/lib/concierge';
 import { cn } from '@/renderer/lib/utils';
 import type { ParsedPromptPart } from '@/renderer/types/agent-timeline';
 import { conciergeReferenceId } from '@/shared/concierge-references';
@@ -154,7 +155,7 @@ function PromptParts({ parts }: { parts: readonly ParsedPromptPart[] }) {
 						<span className={hostClassName} key={key}>
 							<ChatAttachmentChip
 								className={INLINE_CHIP_CLASS}
-								kind={reference.kind}
+								kind={conciergeReferenceChipKind(reference)}
 								label={reference.label}
 								onActivate={
 									referenceAccess && reference.kind !== 'project'

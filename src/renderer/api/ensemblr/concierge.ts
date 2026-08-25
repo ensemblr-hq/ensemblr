@@ -6,6 +6,7 @@ import type {
 	ClearConciergeContextResult,
 	ConciergeContextPressureWire,
 	ConciergeEventBroadcastWire,
+	ListConciergeArtifactsResult,
 	ListConciergeEventsResult,
 	OpenConciergeSessionRequest,
 	OpenConciergeSessionResult,
@@ -102,6 +103,24 @@ export async function submitConciergePrompt(
 		() => getEnsemblrApi().submitConciergePrompt(request),
 	);
 }
+
+/**
+ * Query options for the Concierge's artifacts.
+ *
+ * Kept briefly stale rather than cached forever: the Concierge writes these
+ * itself mid-conversation, so an `@` menu opened right after it said "written to
+ * `artifacts/plan.md`" has to be able to offer the file it just named.
+ */
+export const conciergeArtifactsQuery = queryOptions({
+	/** Reads the Concierge's `artifacts/` listing over IPC. */
+	queryFn: (): Promise<ListConciergeArtifactsResult> =>
+		profileElectronIpcCall(
+			{ channel: 'ensemblr:list-concierge-artifacts', usesDatabase: false },
+			() => getEnsemblrApi().listConciergeArtifacts(),
+		),
+	queryKey: ensemblrQueryKeys.conciergeArtifacts(),
+	staleTime: 5_000,
+});
 
 /**
  * Stops the Concierge's streaming turn.

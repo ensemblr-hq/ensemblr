@@ -1,6 +1,7 @@
 export type {
 	ConciergePoint,
 	ConciergePresentation,
+	ConciergePreviewTarget,
 	ConciergeSessionIdentity,
 	ConciergeSize,
 } from './atoms';
@@ -12,6 +13,7 @@ export {
 	conciergeComposerFocusRequestAtom,
 	conciergePanelSizeAtom,
 	conciergePresentationAtom,
+	conciergePreviewAtom,
 	conciergeSessionAtom,
 	focusConciergeComposerAtom,
 	restoreConciergePanelAtom,

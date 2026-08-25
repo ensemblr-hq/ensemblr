@@ -8,7 +8,9 @@ import { useConciergePanel } from '@/renderer/hooks/concierge/use-concierge-pane
 import { useConciergeReferenceOpen } from '@/renderer/hooks/concierge/use-concierge-reference-open';
 import { cn } from '@/renderer/lib/utils';
 import type { ConciergeSize } from '@/renderer/state/concierge';
+import { ConciergeClearConfirmDialog } from './concierge-clear-confirm-dialog';
 import { ConciergeComposer } from './concierge-composer';
+import { ConciergeFilePreview } from './concierge-file-preview';
 import { ConciergeMark } from './concierge-mark';
 import { ConciergeQuestionSlot } from './concierge-question-slot';
 import { ConciergeReferenceProvider } from './concierge-reference-context';
@@ -170,7 +172,7 @@ export function ConciergePanel() {
 					</Button>
 					<Button
 						aria-label={t('common:actions.close', 'Close')}
-						onClick={panel.close}
+						onClick={panel.closePanel}
 						onDoubleClick={stopHeaderGesture}
 						onPointerDown={stopHeaderGesture}
 						size='icon-sm'
@@ -191,7 +193,7 @@ export function ConciergePanel() {
 						<Button
 							className='shrink-0'
 							disabled={session.isClearing}
-							onClick={() => void session.clear({ reason: 'threshold' })}
+							onClick={() => panel.requestClear({ reason: 'threshold' })}
 							size='xs'
 							variant='secondary'
 						>
@@ -222,11 +224,19 @@ export function ConciergePanel() {
 					</TextContextMenu>
 				) : null}
 
-				<ConciergeTimeline
-					centered={isFullscreen}
-					events={session.events}
-					isStreaming={session.isStreaming}
-				/>
+				{/* The preview covers the transcript and nothing else: the header keeps
+				    the close and maximize controls reachable, and the composer stays
+				    live so a question about what is on screen can be asked without
+				    dismissing it first. */}
+				<div className='relative flex min-h-0 flex-1 flex-col'>
+					<ConciergeTimeline
+						centered={isFullscreen}
+						events={session.events}
+						home={session.cwd}
+						isStreaming={session.isStreaming}
+					/>
+					<ConciergeFilePreview home={session.cwd} />
+				</div>
 
 				{/* Maximized, the panel covers the sidebar's rail — the strip every other
 			    screen lets you hover and click to open or close it — so it carries a
@@ -269,6 +279,11 @@ export function ConciergePanel() {
 					}
 				/>
 			</section>
+			<ConciergeClearConfirmDialog
+				onCancel={panel.clearConfirmation.cancel}
+				onConfirm={panel.clearConfirmation.confirm}
+				open={panel.clearConfirmation.open}
+			/>
 		</ConciergeReferenceProvider>
 	);
 }

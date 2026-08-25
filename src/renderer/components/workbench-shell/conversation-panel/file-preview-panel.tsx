@@ -1,5 +1,4 @@
 import { useQuery } from '@tanstack/react-query';
-import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
 
 import {
@@ -8,10 +7,10 @@ import {
 } from '@/renderer/api/ensemblr-queries';
 import { CodeViewerHeader } from '@/renderer/components/code-surface';
 import { Badge } from '@/renderer/components/ui/badge';
-import type { ReadWorkspaceFileFailureCode } from '@/shared/ipc/contracts/workspace-files';
 
 import { FilePreviewActions } from './file-preview-actions';
 import { FilePreviewBody } from './file-preview-body';
+import { describeReadFailure } from './file-preview-helpers';
 import { PanelMessage } from './panel-message';
 
 /**
@@ -113,57 +112,4 @@ export function FilePreviewPanel({
 			<FilePreviewBody filePath={filePath} result={result} />
 		</div>
 	);
-}
-
-/**
- * Build a human-readable message for a workspace file read failure.
- * @param code - The read-failure code.
- * @param filePath - The path that failed to read.
- * @param t - Translator from the calling component, so the message follows the UI language.
- * @returns A user-facing explanation of the failure.
- */
-function describeReadFailure(
-	code: ReadWorkspaceFileFailureCode,
-	filePath: string,
-	t: TFunction,
-): string {
-	switch (code) {
-		case 'not-found':
-			return t(
-				'workbench:file-preview.failure.not-found',
-				'{{filePath}} does not exist.',
-				{
-					filePath,
-				},
-			);
-		case 'not-file':
-			return t(
-				'workbench:file-preview.failure.not-file',
-				'{{filePath}} is a directory and cannot be previewed.',
-				{ filePath },
-			);
-		case 'too-large':
-			return t(
-				'workbench:file-preview.failure.too-large',
-				'{{filePath}} is too large to preview.',
-				{ filePath },
-			);
-		case 'invalid-path':
-			return t(
-				'workbench:file-preview.failure.invalid-path',
-				'{{filePath}} is not a path this preview can open.',
-				{ filePath },
-			);
-		case 'invalid-cwd':
-			return t(
-				'workbench:file-preview.failure.invalid-cwd',
-				'The workspace directory is unavailable.',
-			);
-		default:
-			return t(
-				'workbench:file-preview.failure.unreadable',
-				'Could not read {{filePath}}.',
-				{ filePath },
-			);
-	}
 }

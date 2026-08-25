@@ -164,12 +164,30 @@ export interface ConciergeContextPressureWire {
 	usedTokens: number | null;
 }
 
+/**
+ * One file under the Concierge's `artifacts/` directory, as the `@` menu ranks it
+ * and the panel previews it. `relativePath` is the address: it is what the
+ * reference link carries and what the preview reads against the Concierge home.
+ */
+export interface ConciergeArtifactWire {
+	modifiedAt: string;
+	name: string;
+	relativePath: string;
+	size: number;
+}
+
+/** The Concierge's artifacts, newest first. */
+export interface ListConciergeArtifactsResult {
+	artifacts: readonly ConciergeArtifactWire[];
+}
+
 /** Concierge IPC surface: session lifecycle, transcript, and context clearing. */
 export interface ConciergeApi {
 	clearConciergeContext: (
 		request: ClearConciergeContextRequest,
 	) => Promise<ClearConciergeContextResult>;
 	conciergeContextPressure: () => Promise<ConciergeContextPressureWire>;
+	listConciergeArtifacts: () => Promise<ListConciergeArtifactsResult>;
 	listConciergeEvents: (
 		request: ListConciergeEventsRequest,
 	) => Promise<ListConciergeEventsResult>;

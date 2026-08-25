@@ -493,6 +493,10 @@ export default interface Resources {
 				body: 'The turn could not be delivered because the session is already closed. Start a new chat to keep going.';
 				title: 'This session has ended';
 			};
+			'session-unresumable': {
+				body: 'The agent runtime no longer holds the conversation this chat was reloading, so its history could not be restored. A fresh conversation carries on from here.';
+				title: 'The runtime lost this conversation';
+			};
 			'tool-denied': {
 				body: 'The turn stopped because a tool was not allowed to run. Change the permission mode in this repository’s security settings, then continue.';
 				title: 'A tool call was blocked';
@@ -2527,6 +2531,11 @@ export default interface Resources {
 			};
 		};
 		concierge: {
+			'clear-confirm': {
+				confirm: 'Clear anyway';
+				description: 'The Concierge is still answering. Clearing now stops this turn and starts a fresh conversation; what it has written so far is kept in its memory.';
+				title: 'Clear context while the Concierge is working?';
+			};
 			composer: {
 				label: 'Message the Concierge';
 				placeholder: 'Ask across every project…';
@@ -2552,6 +2561,9 @@ export default interface Resources {
 				resize: 'Resize the Concierge — drag any edge, or use the arrow keys';
 				restore: 'Restore panel';
 				title: 'Concierge';
+			};
+			preview: {
+				close: 'Back to the conversation';
 			};
 			session: {
 				'not-open': 'The Concierge session is not open.';

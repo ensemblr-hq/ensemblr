@@ -35,6 +35,12 @@ const PROJECT: ConciergeReference = {
 	projectId: 'repo-1',
 };
 
+const ARTIFACT: ConciergeReference = {
+	kind: 'artifact',
+	label: 'release-plan.md',
+	path: 'releases/release-plan.md',
+};
+
 /** Runs the block pattern once and rebuilds whatever it matched. */
 function roundTripBlock(block: string): ConciergeReference | null {
 	const match = conciergeReferenceBlockPattern().exec(block);
@@ -45,7 +51,7 @@ function roundTripBlock(block: string): ConciergeReference | null {
 
 describe('concierge reference links', () => {
 	it('round-trips every kind', () => {
-		for (const reference of [WORKSPACE, CHAT, PROJECT]) {
+		for (const reference of [WORKSPACE, CHAT, PROJECT, ARTIFACT]) {
 			const href = formatConciergeReferenceHref(
 				reference.kind,
 				conciergeReferenceId(reference),
@@ -137,5 +143,62 @@ describe('concierge reference blocks', () => {
 	it('refuses a block whose ids were truncated away', () => {
 		expect(roundTripBlock('<referenced_workspace name="x" />')).toBeNull();
 		expect(roundTripBlock('<referenced_chat title="x" />')).toBeNull();
+		expect(roundTripBlock('<referenced_artifact name="x" />')).toBeNull();
+	});
+
+	// An artifact is the one kind addressed by a path, so it is the one kind whose
+	// id carries a separator — and the only one where a link the agent wrote could
+	// try to walk out of the directory the preview resolves it against.
+	it('refuses an artifact path that leaves the artifacts directory', () => {
+		for (const path of [
+			'../memory/secrets.md',
+			'nested/../../escape.md',
+			'/etc/passwd',
+			'./plan.md',
+		]) {
+			expect(
+				parseConciergeReferenceHref(
+					formatConciergeReferenceHref('artifact', path),
+				),
+			).toBeNull();
+			expect(
+				roundTripBlock(
+					formatConciergeReferenceBlock({
+						kind: 'artifact',
+						label: 'x',
+						path,
+					}),
+				),
+			).toBeNull();
+		}
+	});
+
+	// A markdown destination cannot carry a space, so an artifact whose name has
+	// one is linked percent-encoded and has to come back as the path on disk.
+	it('reads a percent-encoded artifact path back as it was written', () => {
+		expect(
+			parseConciergeReferenceHref('ensemblr:artifact/Q3%20report.md'),
+		).toEqual({ id: 'Q3 report.md', kind: 'artifact' });
+	});
+
+	// The block is the one form an agent reads back, and its working directory is
+	// the Concierge home rather than `artifacts/` — so a chip carrying the bare
+	// address would send it to a path where no artifact lives.
+	it('writes an artifact path the agent can open from its own directory', () => {
+		expect(formatConciergeReferenceBlock(ARTIFACT)).toContain(
+			'path="artifacts/releases/release-plan.md"',
+		);
+		expect(roundTripBlock(formatConciergeReferenceBlock(ARTIFACT))).toEqual(
+			ARTIFACT,
+		);
+	});
+
+	// Tolerated rather than refused: a block an agent hand-wrote in the shorter
+	// form still names one artifact, and the traversal rules above are what keep
+	// the value safe either way.
+	it('reads an artifact path written without the directory prefix', () => {
+		expect(
+			roundTripBlock('<referenced_artifact name="x" path="plan.md" />'),
+		).toEqual({ kind: 'artifact', label: 'x', path: 'plan.md' });
 	});
 });

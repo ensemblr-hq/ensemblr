@@ -8,7 +8,7 @@ import type { QueueProvisionalNamingPort } from '../agent-runtime/naming/provisi
 import type { HarnessDetectionService } from '../agents/index.ts';
 import { createChatTabService } from '../chat-tabs/index.ts';
 import type { LocalCommandService } from '../commands/local-command';
-import type { ConciergeSessionService } from '../concierge';
+import type { ConciergeHome, ConciergeSessionService } from '../concierge';
 import type {
 	AppSettingsService,
 	EnsemblrConfigResolutionService,
@@ -108,6 +108,8 @@ interface RegisterIpcHandlersOptions {
 	appSettingsService: AppSettingsService;
 	archiveWorkspaceService: ArchiveWorkspaceService;
 	conciergeSessionService: ConciergeSessionService;
+	/** Re-read per call, so a root the user moved resolves to the home that is there now. */
+	resolveConciergeHome: () => ConciergeHome;
 	configService: EnsemblrConfigService;
 	continueWorkspaceBranchService: ContinueWorkspaceBranchService;
 	createWorkspaceService: CreateWorkspaceService;
@@ -214,6 +216,7 @@ export function registerIpcHandlers({
 	agentModelCatalog,
 	agentSessionService,
 	conciergeSessionService,
+	resolveConciergeHome,
 	planModeRegistry,
 	provisionalNamingQueue,
 	quickStartProjectService,
@@ -295,7 +298,7 @@ export function registerIpcHandlers({
 		provisionalNamingQueue,
 		withPermissionGate,
 	});
-	registerConciergeHandlers({ conciergeSessionService });
+	registerConciergeHandlers({ conciergeSessionService, resolveConciergeHome });
 	registerChatTabHandlers({
 		chatTabService: createChatTabService({
 			databaseService,

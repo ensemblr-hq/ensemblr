@@ -5,6 +5,7 @@ import {
 	useCallback,
 	useEffect,
 	useMemo,
+	useState,
 } from 'react';
 
 import { conciergeContextPressureQuery } from '@/renderer/api/ensemblr';
@@ -29,21 +30,35 @@ import {
 	type ConciergePresentation,
 	conciergeClearBannerDismissedAtom,
 	conciergePresentationAtom,
+	conciergePreviewAtom,
 } from '@/renderer/state/concierge';
 import { useMenuCommand } from '@/renderer/state/menu-commands';
 import type { KeymapBinding } from '@/renderer/types/keymap';
+import type { ClearConciergeContextRequest } from '@/shared/ipc/contracts/concierge';
 
 /** Everything the Concierge panel renders from, already resolved. */
 export interface ConciergePanelModel {
 	anchor: ConciergeAnchoredSurface<HTMLElement>;
+	/** Clears the context, asking first when a turn is streaming. */
 	clearContext: () => void;
+	/** The confirmation a clear raised mid-turn, and the two ways out of it. */
+	clearConfirmation: {
+		cancel: () => void;
+		confirm: () => void;
+		open: boolean;
+	};
+	/** Dismisses a preview if one is up, and otherwise closes the panel. For ⎋. */
 	close: () => void;
+	/** Closes the panel outright, preview and all. For the header's Close button. */
+	closePanel: () => void;
 	dismissBanner: () => void;
 	handleKeyDown: (event: ReactKeyboardEvent<HTMLElement>) => void;
 	/** The shell's content area, or null while the panel is not maximized. */
 	insetRect: ShellInsetRect | null;
 	isFullscreen: boolean;
 	presentation: ConciergePresentation;
+	/** Clears the context for a stated reason, asking first when a turn is streaming. */
+	requestClear: (request: ClearConciergeContextRequest) => void;
 	/** The docked panel's size, and the handles that change it. */
 	resize: ConciergeResizableSurface;
 	session: ConciergeSessionModel;
@@ -72,6 +87,7 @@ export function useConciergePanel(): ConciergePanelModel {
 	const [bannerDismissed, setBannerDismissed] = useAtom(
 		conciergeClearBannerDismissedAtom,
 	);
+	const [preview, setPreview] = useAtom(conciergePreviewAtom);
 	const isOpen = presentation !== 'closed';
 	const isFullscreen = presentation === 'fullscreen';
 	const session = useConciergeSession(isOpen);
@@ -89,12 +105,57 @@ export function useConciergePanel(): ConciergePanelModel {
 		suspended: resize.isResizing,
 	});
 
-	const clearContext = useCallback(() => {
-		void session.clear({ reason: 'manual' });
-	}, [session.clear]);
+	// Held rather than acted on while a turn is streaming: a clear replaces the
+	// conversation, so mid-answer it throws away work the user is watching arrive.
+	// The reason rides along so the confirmed clear is still recorded as the one
+	// the user asked for.
+	const [pendingClear, setPendingClear] =
+		useState<ClearConciergeContextRequest | null>(null);
+
+	const requestClear = useCallback(
+		(request: ClearConciergeContextRequest) => {
+			if (session.isStreaming) {
+				setPendingClear(request);
+				return;
+			}
+			void session.clear(request);
+		},
+		[session.clear, session.isStreaming],
+	);
+
+	const clearContext = useCallback(
+		() => requestClear({ reason: 'manual' }),
+		[requestClear],
+	);
 	useMenuCommand('concierge.clear', clearContext, isOpen);
 
-	const close = useCallback(() => setPresentation('closed'), [setPresentation]);
+	const confirmClear = useCallback(() => {
+		const request = pendingClear;
+		setPendingClear(null);
+		if (request) {
+			void session.clear(request);
+		}
+	}, [pendingClear, session.clear]);
+	const cancelClear = useCallback(() => setPendingClear(null), []);
+
+	const closePanel = useCallback(() => {
+		setPreview(null);
+		setPresentation('closed');
+	}, [setPresentation, setPreview]);
+
+	// A preview is the innermost thing on screen, so ⎋ dismisses it before it
+	// reaches the panel — closing the whole Concierge to get back to a transcript
+	// the user never left is one keystroke doing two jobs. The header's button is
+	// not this: it is labelled Close, the preview carries its own dismiss two rows
+	// below it, and a button that needs pressing twice to do what it says is worse
+	// than a chord that does one thing at a time.
+	const close = useCallback(() => {
+		if (preview) {
+			setPreview(null);
+			return;
+		}
+		closePanel();
+	}, [closePanel, preview, setPreview]);
 	const toggleFullscreen = useCallback(
 		() => setPresentation(isFullscreen ? 'panel' : 'fullscreen'),
 		[isFullscreen, setPresentation],
@@ -148,13 +209,20 @@ export function useConciergePanel(): ConciergePanelModel {
 
 	return {
 		anchor,
+		clearConfirmation: {
+			cancel: cancelClear,
+			confirm: confirmClear,
+			open: pendingClear !== null,
+		},
 		clearContext,
 		close,
+		closePanel,
 		dismissBanner,
 		handleKeyDown,
 		insetRect,
 		isFullscreen,
 		presentation,
+		requestClear,
 		resize,
 		session,
 		showClearBanner:

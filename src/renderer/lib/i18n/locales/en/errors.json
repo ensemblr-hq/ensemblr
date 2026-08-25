@@ -46,6 +46,10 @@
 			"body": "The turn could not be delivered because the session is already closed. Start a new chat to keep going.",
 			"title": "This session has ended"
 		},
+		"session-unresumable": {
+			"body": "The agent runtime no longer holds the conversation this chat was reloading, so its history could not be restored. A fresh conversation carries on from here.",
+			"title": "The runtime lost this conversation"
+		},
 		"tool-denied": {
 			"body": "The turn stopped because a tool was not allowed to run. Change the permission mode in this repository’s security settings, then continue.",
 			"title": "A tool call was blocked"

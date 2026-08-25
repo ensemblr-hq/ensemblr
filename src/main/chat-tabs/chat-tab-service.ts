@@ -67,6 +67,12 @@ export interface ChatTabService {
 		metadataPatch?: Record<string, unknown>;
 		title?: string;
 	}) => { deleted: boolean };
+	/**
+	 * The workspace's first chat tab nobody has used yet, for a caller that would
+	 * otherwise open one beside it. Null when every open tab is named, carries a
+	 * conversation, or is not a chat.
+	 */
+	claimIdleChatTab: (input: { workspaceId: string }) => ChatTabRow | null;
 	listClosedWithSummary: (input: {
 		workspaceId: string;
 	}) => ClosedChatTabEntry[];
@@ -199,6 +205,13 @@ export function createChatTabService({
 			}
 			return { deleted: false };
 		},
+		claimIdleChatTab: ({ workspaceId }) => {
+			const database = requireChatTabDatabase();
+			return (
+				listOpenForWorkspace({ database, workspaceId }).find(isIdleChatTab) ??
+				null
+			);
+		},
 		listClosedWithSummary: ({ workspaceId }) => {
 			const database = requireChatTabDatabase();
 			return listClosedForWorkspace({ database, workspaceId })
@@ -279,6 +292,26 @@ export function createChatTabService({
 			return restoreClosedChatTab({ database, id: chatTabId });
 		},
 	};
+}
+
+/**
+ * Whether a tab is a chat nobody has spent yet: still the kind a conversation
+ * goes in, still unnamed, and with no session bound to it.
+ *
+ * All three conditions are load-bearing. The renderer opens one of these for
+ * every workspace that has none, so an orchestrator arriving afterwards should
+ * take it rather than stack a second beside it — but a tab the user titled is
+ * one they meant to keep, and a tab carrying a session already has a
+ * conversation in it.
+ * @param tab - An open tab in the workspace.
+ * @returns Whether a spawn may claim it.
+ */
+function isIdleChatTab(tab: ChatTabRow): boolean {
+	return (
+		tab.kind === 'chat' &&
+		tab.agentSessionId === null &&
+		tab.title === UNTITLED_TAB_TITLE
+	);
 }
 
 /**

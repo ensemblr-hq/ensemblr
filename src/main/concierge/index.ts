@@ -1,7 +1,5 @@
 export type { ConciergeHome } from './concierge-home.ts';
 export {
-	CONCIERGE_ARTIFACTS_DIRECTORY,
-	CONCIERGE_MEMORY_DIRECTORY,
 	CONCIERGE_MEMORY_INDEX_FILE,
 	conciergeMemoryPath,
 	ensureConciergeHome,

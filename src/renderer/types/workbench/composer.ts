@@ -156,13 +156,13 @@ export type ComposerAttachment =
 	  }
 	| {
 			id: string;
-			kind: 'project-ref' | 'workspace-ref' | 'chat-ref';
+			kind: 'artifact-ref' | 'project-ref' | 'workspace-ref' | 'chat-ref';
 			label: string;
 			/**
 			 * What the chip stands for and the ids it serializes to. Carried whole
 			 * rather than flattened into fields because the same value crosses to the
 			 * agent as a prompt block and comes back out of a markdown link, and one
-			 * shape for all three passes is what keeps those two ends in step.
+			 * shape for all four passes is what keeps those two ends in step.
 			 */
 			reference: ConciergeReference;
 	  };

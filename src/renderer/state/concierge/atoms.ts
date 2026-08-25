@@ -124,6 +124,24 @@ export const conciergeAnchorAtom = atomWithStorage<ConciergePoint>(
 	CONCIERGE_UNPLACED,
 );
 
+/** A file in the Concierge home the panel is showing instead of its transcript. */
+export interface ConciergePreviewTarget {
+	/** Path relative to the Concierge home, which is what the read resolves against. */
+	path: string;
+	/** What the preview header calls it, usually the basename. */
+	title: string;
+}
+
+/**
+ * The memory file or artifact the Concierge panel is previewing, or null when it
+ * is showing the conversation.
+ *
+ * The panel owns this rather than the workbench because the Concierge home
+ * belongs to no workspace: there is no file tree to open a tab in, and the panel
+ * is reachable from the dashboard where no workspace is focused at all.
+ */
+export const conciergePreviewAtom = atom<ConciergePreviewTarget | null>(null);
+
 /** How large a draggable Concierge surface is, in pixels. */
 export interface ConciergeSize {
 	height: number;
