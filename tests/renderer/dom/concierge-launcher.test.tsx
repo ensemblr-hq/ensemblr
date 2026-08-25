@@ -495,18 +495,18 @@ describe('the Concierge anchor', () => {
 	test('opens the panel on the corner the bubble was dragged to', async () => {
 		renderBare();
 		const bubble = screen.getByRole('button', { name: 'Open the Concierge' });
-		expect(bubble).toHaveStyle({ left: '964px', top: '708px' });
+		expect(bubble).toHaveStyle({ left: '964px', top: '628px' });
 
 		dragBy(bubble, { x: -300, y: -100 });
 
-		expect(bubble).toHaveStyle({ left: '664px', top: '608px' });
+		expect(bubble).toHaveStyle({ left: '664px', top: '528px' });
 		await userEvent.click(bubble);
 
 		// Both surfaces hang their bottom-right corner from one stored point, so
 		// the panel opens where the bubble was rather than back at its own dock:
-		// the bubble's corner is (708, 652), and the panel is 416×512.
+		// the bubble's corner is (708, 572), and the panel is 416×512.
 		const panel = await screen.findByRole('region', { name: 'Concierge' });
-		expect(panel).toHaveStyle({ left: '292px', top: '140px' });
+		expect(panel).toHaveStyle({ left: '292px', top: '60px' });
 	});
 
 	test('brings the bubble back on the corner the panel was dragged to', async () => {
@@ -521,13 +521,13 @@ describe('the Concierge anchor', () => {
 		}
 
 		dragBy(header, { x: -200, y: -100 });
-		expect(panel).toHaveStyle({ left: '392px', top: '140px' });
+		expect(panel).toHaveStyle({ left: '392px', top: '60px' });
 		await userEvent.click(screen.getByRole('button', { name: 'Close' }));
 
-		// The panel's corner is (808, 652), and the bubble is 44×44.
+		// The panel's corner is (808, 572), and the bubble is 44×44.
 		expect(
 			screen.getByRole('button', { name: 'Open the Concierge' }),
-		).toHaveStyle({ left: '764px', top: '608px' });
+		).toHaveStyle({ left: '764px', top: '528px' });
 	});
 
 	test('returns to its anchored corner after a trip through fullscreen', async () => {
@@ -545,7 +545,7 @@ describe('the Concierge anchor', () => {
 		// Maximized, the shell inset owns the panel's placement and the anchor
 		// stands down — so restoring has to re-apply it, or the panel comes back
 		// with the offsets React cleared on the way out and pins to the corner.
-		expect(panel).toHaveStyle({ left: '592px', top: '240px' });
+		expect(panel).toHaveStyle({ left: '592px', top: '160px' });
 	});
 
 	test('does not transition the offsets it is dragged by', () => {
@@ -592,7 +592,7 @@ describe('the Concierge anchor', () => {
 			// `left`/`top` straight onto it, so nothing waits on a React render.
 			expect(bubble).toHaveStyle({
 				left: `${964 - step}px`,
-				top: `${708 - step}px`,
+				top: `${628 - step}px`,
 			});
 		}
 		expect(anchorWrites(setItem)).toHaveLength(0);
@@ -601,7 +601,7 @@ describe('the Concierge anchor', () => {
 
 		// A write per move meant a synchronous `localStorage` round trip on every
 		// pointer event, which is what left the bubble trailing the cursor.
-		expect(anchorWrites(setItem)).toEqual(['{"x":808,"y":552}']);
+		expect(anchorWrites(setItem)).toEqual(['{"x":808,"y":472}']);
 	});
 });
 
