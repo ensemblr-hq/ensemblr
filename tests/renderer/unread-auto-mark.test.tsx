@@ -203,3 +203,23 @@ test('a mark keeps the tab main resolved, so it needs no lookup to jump to', () 
 	emit(finishedTurn('ws-2', 'session-2', 'tab-2'));
 	expect(view.result.current[0].chatTabId).toBe('tab-2');
 });
+
+// The Concierge belongs to no workspace, so its question carries an empty one
+// and there is no chat row to mark. An entry made for it could never be cleared
+// — clearing happens when the user views that chat — and would sit in the capped
+// list evicting real ones. The panel is where its question shows.
+test('a question from the Concierge marks nothing, having no chat to mark', () => {
+	const { store, view } = renderAutoMark(null);
+	act(() => {
+		store.set(pendingAskUserQuestionsAtom, {
+			'concierge-1': {
+				agentSessionId: 'concierge-1',
+				questions: [],
+				requestId: 'request-concierge',
+				workspaceId: '',
+			},
+		});
+	});
+
+	expect(view.result.current).toHaveLength(0);
+});

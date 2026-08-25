@@ -57,11 +57,25 @@ interface CallerSession {
 const makeDeps = (input: {
 	caller?: CallerSession;
 	catalogDefaultModelId?: string;
+	/**
+	 * The Concierge's own open conversation, which lives in its own session store
+	 * rather than in `agentSessionService`. `null` stands for a Concierge with no
+	 * session the app can read a model off.
+	 */
+	conciergeSession?: CallerSession | null;
 	models?: typeof CATALOG;
 	openSession?: ReturnType<typeof vi.fn>;
 	piReady?: boolean;
 }): PortAdapterDeps =>
 	({
+		conciergePorts: {
+			concierge: {
+				describeSession: () => input.conciergeSession ?? null,
+				homePath: () => '/root/concierge',
+			},
+			memory: { recall: vi.fn() },
+			workspaceCreation: { createWorkspace: vi.fn() },
+		},
 		agentSessionService: {
 			getSession: vi.fn((id: string) =>
 				id === 'parent' && input.caller ? input.caller : null,
@@ -106,8 +120,10 @@ const makeDeps = (input: {
 /** Spawns a child and hands back the open request the port built. */
 const spawn = async (input: {
 	caller?: CallerSession;
+	callerConcierge?: boolean;
 	callerModel?: string;
 	callerRuntime: 'pi' | 'claude' | null;
+	conciergeSession?: CallerSession | null;
 	catalogDefaultModelId?: string;
 	model?: string;
 	models?: typeof CATALOG;
@@ -120,6 +136,7 @@ const spawn = async (input: {
 	}));
 	const ports = createAgentControlPorts(makeDeps({ ...input, openSession }));
 	const outcome = await ports.conversations.startConversation({
+		callerConcierge: input.callerConcierge ?? false,
 		callerModel: input.callerModel,
 		callerRuntime: input.callerRuntime,
 		model: input.model,
@@ -147,6 +164,7 @@ const refusal = async (input: Parameters<typeof spawn>[0]): Promise<string> => {
 	}));
 	const ports = createAgentControlPorts(makeDeps({ ...input, openSession }));
 	const outcome = await ports.conversations.startConversation({
+		callerConcierge: input.callerConcierge ?? false,
 		callerModel: input.callerModel,
 		callerRuntime: input.callerRuntime,
 		model: input.model,
@@ -492,6 +510,7 @@ describe('startConversation rollback on submit failure', () => {
 		const ports = createAgentControlPorts(deps);
 		await expect(
 			ports.conversations.startConversation({
+				callerConcierge: false,
 				callerRuntime: 'pi',
 				parentSessionId: 'parent',
 				planMode: false,
@@ -511,6 +530,7 @@ describe('startConversation rollback on submit failure', () => {
 		const ports = createAgentControlPorts(deps);
 		await expect(
 			ports.conversations.startConversation({
+				callerConcierge: false,
 				callerRuntime: 'pi',
 				chatTabId: 'caller-tab',
 				parentSessionId: 'parent',
@@ -534,6 +554,7 @@ describe('startConversation rollback on submit failure', () => {
 			const ports = createAgentControlPorts(deps);
 			await expect(
 				ports.conversations.startConversation({
+					callerConcierge: false,
 					callerRuntime: 'pi',
 					parentSessionId: 'parent',
 					planMode,
@@ -544,5 +565,82 @@ describe('startConversation rollback on submit failure', () => {
 			).rejects.toThrow('submit failed');
 			expect(releasePlanMode).toHaveBeenCalledWith('pi-child');
 		}
+	});
+});
+
+/**
+ * The Concierge keeps its own session store, so `agentSessionService` has no row
+ * to read its model off. On Pi the extension forwards a live model and the spawn
+ * inherits it whatever the store says; on Claude Code the MCP transport carries
+ * no such hint, which left the Concierge with neither signal and every model-less
+ * spawn landing on the catalog default.
+ */
+describe('a conversation the Concierge opens inherits the Concierge’s model', () => {
+	it('reads the Concierge’s own session when MCP forwards no live model', async () => {
+		const request = await spawn({
+			callerConcierge: true,
+			callerRuntime: 'claude',
+			catalogDefaultModelId: CLAUDE_MODEL,
+			conciergeSession: {
+				model: CLAUDE_ANTHROPIC_MODEL,
+				thinkingLevel: 'high',
+			},
+		});
+
+		expect(request.model).toBe(CLAUDE_ANTHROPIC_MODEL);
+		expect(request.provider).toBe('claude');
+		expect(request.thinkingLevel).toBe('high');
+	});
+
+	it('honours an explicit model from the Concierge’s own runtime', async () => {
+		const request = await spawn({
+			callerConcierge: true,
+			callerRuntime: 'claude',
+			conciergeSession: { model: CLAUDE_ANTHROPIC_MODEL, thinkingLevel: null },
+			model: CLAUDE_MODEL,
+		});
+
+		expect(request.model).toBe(CLAUDE_MODEL);
+		expect(request.provider).toBe('claude');
+	});
+
+	// The Pi Concierge already worked, because the extension forwards its live
+	// model on every call. Pinned so a fix aimed at the MCP path cannot cost it.
+	it('still prefers the live model a Pi Concierge forwards', async () => {
+		const request = await spawn({
+			callerConcierge: true,
+			callerModel: PI_LOCAL_MODEL,
+			callerRuntime: 'pi',
+			conciergeSession: { model: PI_MODEL, thinkingLevel: null },
+		});
+
+		expect(request.model).toBe(PI_LOCAL_MODEL);
+		expect(request.provider).toBe('pi');
+	});
+
+	// Silently defaulting is the bug, so a Concierge whose own model the app
+	// cannot name is refused with something it can act on rather than opened on
+	// whatever the catalog calls default.
+	it('refuses rather than defaulting when it cannot name its own model', async () => {
+		const message = await refusal({
+			callerConcierge: true,
+			callerRuntime: 'claude',
+			catalogDefaultModelId: CLAUDE_MODEL,
+			conciergeSession: null,
+		});
+
+		expect(message).toContain('model');
+		expect(message).toContain('ensemblr_list_models');
+	});
+
+	it('opens on an explicit model even with no Concierge session to read', async () => {
+		const request = await spawn({
+			callerConcierge: true,
+			callerRuntime: 'claude',
+			conciergeSession: null,
+			model: CLAUDE_MODEL,
+		});
+
+		expect(request.model).toBe(CLAUDE_MODEL);
 	});
 });

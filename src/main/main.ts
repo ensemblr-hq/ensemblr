@@ -1152,6 +1152,8 @@ const linearService = createLinearService({
  */
 const conciergePorts = {
 	concierge: {
+		/** What the live Concierge conversation runs on, for a child to inherit. */
+		describeSession: () => conciergeSessionService.describeActiveSession(),
 		/** Where the Concierge may write, which is what its tool policy checks against. */
 		homePath: () => rootDirectoryService.getSnapshot()?.conciergePath ?? null,
 	},

@@ -47,17 +47,24 @@ function readWorkspaceName(
  * falls back to a closed tab when a session has no open one, but the renderer
  * only navigates to open tabs; null is what makes it resolve the tab itself and
  * land on the workspace when there is none.
+ *
+ * An empty `workspaceId` is unattributable and reports null for the same reason.
+ * The app-level Concierge belongs to no workspace and holds no chat tab, so a
+ * target built for it names neither: the notification would read "Untitled chat"
+ * over a body whose `{{workspace}}` substituted to nothing, and clicking it
+ * would ask the renderer to open a workspace that does not exist. Its
+ * questionnaire is shown in the Concierge panel instead.
  * @param database - Open database connection, or null before one is.
- * @param workspaceId - Workspace the session belongs to.
+ * @param workspaceId - Workspace the session belongs to; empty for the Concierge, which has none.
  * @param agentSessionId - The session that finished or blocked.
- * @returns The resolved target, or null when it cannot be read.
+ * @returns The resolved target, or null when it cannot be read or attributed.
  */
 export function resolveNotificationTarget(
 	database: DatabaseSync | null | undefined,
 	workspaceId: string,
 	agentSessionId: string,
 ): NotificationTarget | null {
-	if (!database) {
+	if (!database || !workspaceId) {
 		return null;
 	}
 	try {

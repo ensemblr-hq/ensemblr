@@ -132,6 +132,19 @@ test('reports null when the database is not open yet', () => {
 	expect(resolveNotificationTarget(null, 'ws-notify', 'session-1')).toBeNull();
 });
 
+// The Concierge belongs to no workspace and holds no chat tab, so its control
+// origin carries an empty workspace id. Resolving one anyway produced a target
+// with no tab title and no workspace name, which the notifier rendered as
+// "Untitled chat" over a body ending in nothing and clicked through to a
+// workspace that does not exist.
+test('reports null for the empty workspace id the Concierge carries', () => {
+	const fixture = openFixture();
+
+	expect(
+		resolveNotificationTarget(fixture.database, '', 'concierge-session-1'),
+	).toBeNull();
+});
+
 test('falls back to the workspace id when the row has no name', () => {
 	const fixture = openFixture();
 	fixture.database.exec(

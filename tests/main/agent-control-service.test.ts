@@ -2448,7 +2448,13 @@ const setupConcierge = (
 	const ports = makePorts();
 	const conciergePorts: AgentControlPorts = {
 		...ports,
-		concierge: { homePath: () => '/root/concierge' },
+		concierge: {
+			describeSession: () => ({
+				model: 'anthropic/sonnet',
+				thinkingLevel: null,
+			}),
+			homePath: () => '/root/concierge',
+		},
 		memory: { recall: vi.fn().mockReturnValue({ memories: [] }) },
 		workspaces: {
 			listProjects: vi.fn().mockResolvedValue([

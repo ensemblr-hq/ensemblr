@@ -149,6 +149,17 @@ root, and got the whole surface back — while `notifyOrchestrator`, its one
 sanctioned escape hatch, broke on the same missing lineage. `notifyOrchestrator`
 now keys off the marker too, so the two move together.
 
+**A conversation the Concierge opens is a root orchestrator, not a sub-agent of
+it.** The Concierge is on no lineage axis, so what it opens is a peer with its own
+delegation budget. Both axes have to say so, and the marker outranks depth, so a
+spawn that stamped it unconditionally defeated the depth exemption on its own and
+silently downgraded every Concierge delegation to a leaf worker. Both now read
+one function — `spawnedChildRole` in `src/shared/agent-control/awareness.ts` —
+which the registry spends depth on and which the spawn path stamps the marker
+from. A tab the Concierge reuses has any marker its last tenant left cleared,
+because the tab now hosts a root; a spawn that fails to submit puts back whatever
+the tab carried before rather than assuming which way the write went.
+
 `waitForAgents`, `listModels`, and `listRunScripts` are not denied — a sub-agent
 simply has no children to wait on, no spawn to pick a model for, and no
 `startTerminal` to pick a run script for. Those three (`SUBAGENT_UNUSABLE_OPS`)
@@ -528,11 +539,53 @@ harness it carries every runtime — the app cannot tell which one the caller is
 because a harness origin is minted per workspace — which is also why `model` is
 **mandatory** there and omitting it is refused rather than defaulted.
 
+Inheritance reads two signals: the live model the caller's runtime reports, which
+only the Pi extension forwards, and the model the app has on record for the
+caller. A runtime driven over MCP forwards nothing — the protocol carries no
+field for it and the app cannot ask — so on that path the second signal is the
+whole answer. It names the model the caller's last turn ran on, because every
+submit records what it carried on the session row, rather than one switched
+inside the runtime since.
+
+**The Concierge is read out of its own session store**
+(`ConciergePort.describeSession`), because it belongs to no workspace and
+`agentSessionService` holds no row for it. It was the one caller with neither
+signal, so every model-less spawn from a Claude Concierge landed on the catalog
+default — in practice the most expensive model in the list, with no error and no
+warning. A caller whose model can be neither named nor inherited is now refused
+with prose telling it to call `listModels`, rather than opened on a default
+nobody chose.
+
+That store now records a turn's model the way `agent-session-lifecycle` records a
+workspace chat's, because it is the same signal read back: `modelOverride` rides
+one request and is gone, so a row left at the value the session opened with would
+hand a child the model its parent left several turns ago — the user's own pick in
+the Concierge composer being invisible to the very spawn that inherits from it.
+
 ## How the questionnaire behaves
 
 The questionnaire renders in the chat tab that asked, in place of the composer,
 so the answer lands where the question came from. A caller with no chat tab is
 refused with `denied-scope`.
+
+The Concierge is the one asker that is not a chat tab, so its question renders in
+the Concierge panel instead — above its composer rather than in place of it,
+because a chat tab's draft lives in an atom and survives the swap while the
+Concierge composer holds its draft in the editor itself. The pending map is keyed
+by the asking session either way, and the Concierge's session id is a perfectly
+good key; what it lacked was a reader, so the question sat in the map with nothing
+rendering it while the agent blocked on an ask that has no timeout. Closing the
+panel takes the card off screen and leaves the question pending, so reopening
+brings it back.
+
+Neither of the two things a workspace agent's question also does happens for it,
+and for the one reason: there is no chat to attribute either to. It marks no chat
+unread — an entry naming a tab that does not exist could never be cleared, and
+would evict real marks from the capped list. And it posts no desktop
+notification: `resolveNotificationTarget` refuses an empty workspace id outright,
+because a target built from one carries no tab title and no workspace name, so
+the notification read "Untitled chat" over a body ending in nothing and clicked
+through to a workspace that does not exist.
 
 One questionnaire per session at a time: a second call while one is on screen
 comes straight back unanswered rather than replacing it.

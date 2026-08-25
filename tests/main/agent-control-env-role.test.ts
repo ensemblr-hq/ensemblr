@@ -150,6 +150,51 @@ describe('agent-control env: the Concierge overlay', () => {
 		).toBe('concierge');
 	});
 
+	// The Concierge is on no lineage axis, so what it opens is a peer rather than
+	// a child of it: a root orchestrator with its own delegation budget. The other
+	// half of the same contract — that the spawn writes no sub-agent marker, which
+	// would outrank this — lives in `concierge-spawn-role.test.ts`.
+	it('hands a conversation it opens the orchestrator role', () => {
+		const { resolveAgentControlEnv } = setup();
+		resolveAgentControlEnv({
+			concierge: true,
+			sessionId: 'concierge-1',
+			species: 'pi',
+			workspaceId: '',
+		});
+		expect(
+			resolveAgentControlEnv({
+				parentSessionId: 'concierge-1',
+				sessionId: 'child',
+				workspaceId: WORKSPACE,
+			}).ENSEMBLR_CONTROL_ROLE,
+		).toBe('orchestrator');
+	});
+
+	// The depth exemption stops at the Concierge's own child: that child is an
+	// ordinary orchestrator, and what it delegates to is a sub-agent.
+	it('does not exempt the grandchild an opened conversation spawns', () => {
+		const { resolveAgentControlEnv } = setup();
+		resolveAgentControlEnv({
+			concierge: true,
+			sessionId: 'concierge-1',
+			species: 'pi',
+			workspaceId: '',
+		});
+		resolveAgentControlEnv({
+			parentSessionId: 'concierge-1',
+			sessionId: 'child',
+			workspaceId: WORKSPACE,
+		});
+		expect(
+			resolveAgentControlEnv({
+				parentSessionId: 'child',
+				sessionId: 'grandchild',
+				workspaceId: WORKSPACE,
+			}).ENSEMBLR_CONTROL_ROLE,
+		).toBe('subagent');
+	});
+
 	it('returns no overlay before the root directory is known', () => {
 		const { resolveAgentControlEnv } = setup({ conciergeCwd: null });
 		expect(

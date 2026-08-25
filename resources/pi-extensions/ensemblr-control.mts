@@ -720,7 +720,7 @@ export default function ensemblrControl(pi: ExtensionAPI): void {
 	tool(
 		'ensemblr_start_conversation',
 		'startConversation',
-		"Open a fresh chat tab (or reuse one via chatTabId) and start a conversation. A chat tab spawns children on its own agent runtime and may omit `model` to inherit its own; a terminal harness has no runtime the app can name, so it must pass a `model` from ensemblr_list_models and is refused without one. Pass a short, descriptive title to name the sub-agent's tab. Brief it with what to deliver, not just what to look at: the question it answers, the defaults it should assume rather than come back and ask about, and whether it reports inline (the default) or writes a file at a path you name. Set wait=true to block until it finishes.",
+		'Open a fresh chat tab (or reuse one via chatTabId) and start a conversation. A chat tab spawns children on its own agent runtime and may omit `model` to inherit the model the app holds for it — on a runtime driven over MCP that is the model its last turn ran on, not one switched inside the runtime since. A caller with no runtime the app can name, and one whose own model it cannot name either, must pass a `model` from ensemblr_list_models: it is refused without one rather than opened on a default nobody chose. Pass a short, descriptive title to name the tab it opens. Brief it with what to deliver, not just what to look at: the question it answers, the defaults it should assume rather than come back and ask about, and whether it reports inline (the default) or writes a file at a path you name. Set wait=true to block until it finishes.',
 		Type.Object({
 			chatTabId: Type.Optional(Type.String()),
 			prompt: Type.String(),

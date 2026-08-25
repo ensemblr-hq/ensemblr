@@ -22,6 +22,7 @@ export {
 export type {
 	ConciergeControlWiring,
 	ConciergeRuntimeSettings,
+	ConciergeSessionRuntimeChoice,
 	ConciergeSessionService,
 	ConciergeSessionServiceOptions,
 } from './concierge-session-service.ts';

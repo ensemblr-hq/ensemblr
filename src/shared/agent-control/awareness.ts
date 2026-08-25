@@ -761,6 +761,33 @@ export function roleForDepth(depth: number): AgentControlRole {
 }
 
 /**
+ * The lineage role a conversation takes when this parent opens it.
+ *
+ * The single answer both axes that carry the role are derived from: the origin
+ * registry spends depth on it, and the spawn path stamps the durable chat-tab
+ * marker from it. They disagreed once — the marker was written unconditionally
+ * while depth exempted a Concierge parent — and because the marker outranks
+ * depth, that silently handed every Concierge delegation the sub-agent policy.
+ * Reading one function is what stops the pair drifting apart again.
+ *
+ * The Concierge is on no lineage axis, so what it opens is a root orchestrator
+ * with its own delegation budget rather than a child of the Concierge.
+ *
+ * A parent is required rather than nullable: absent lineage is depth 0, which
+ * `roleForDepth` already calls an orchestrator, so answering `'subagent'` for a
+ * missing parent here would put the two axes back in the disagreement above —
+ * and the marker, which outranks depth, would win. Resolve the parent before
+ * asking; a caller that cannot spends no depth and stamps no marker.
+ * @param parent - The spawning caller.
+ * @returns The role the spawned conversation holds.
+ */
+export function spawnedChildRole(parent: {
+	concierge: boolean;
+}): AgentControlRole {
+	return parent.concierge ? 'orchestrator' : 'subagent';
+}
+
+/**
  * Resolves a caller's role from both signals that carry it, so every gate that
  * asks the question spells the answer the same way. The durable sub-agent marker
  * its spawn persisted on the chat tab wins over lineage depth, because depth

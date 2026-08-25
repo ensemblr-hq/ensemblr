@@ -111,6 +111,13 @@ export function useAutoMarkUnread(activeWorkspaceId: string | null): void {
 			if (marked.has(question.requestId)) {
 				continue;
 			}
+			// The Concierge belongs to no workspace and holds no chat tab, so an
+			// entry made for its question names a chat that does not exist: nothing
+			// could ever clear it, and it would evict real marks from the capped
+			// list. Its panel is the surface that shows the question.
+			if (question.workspaceId === '') {
+				continue;
+			}
 			if (
 				isOnScreen(activeChat, question.workspaceId, question.agentSessionId)
 			) {
