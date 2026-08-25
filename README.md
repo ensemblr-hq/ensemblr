@@ -147,6 +147,13 @@ tree stays one level deep. Depth, spawn count, and spawn rate are capped. Linear
 sub-agents, and nothing at any depth can move an issue to a completed or canceled state: agent work stops
 at In Review, enforced in code rather than in a prompt.
 
+**The Concierge sits above every workspace.** One panel, opened from a floating launcher rather
+than a workspace's own chat strip, that reads across every project and workspace you have open —
+files, diffs, review comments, terminal output, the board, Linear — and remembers what it learns
+between conversations in a memory of its own. It never writes a file itself: real change is
+delegated to an orchestrator it spawns into the workspace that needs it, so the containment that
+keeps one workspace from touching another also keeps the Concierge from becoming a way around it.
+
 **Two agent runtimes, one chat surface.** Pi runs as a CLI in RPC mode; Claude Code is driven through the
 Agent SDK against *your own* `claude` binary — Ensemblr ships none. Both share the same timeline, tool
 cards, model and thinking pickers, tool-approval prompts, git-backed checkpoints, session branching, and

@@ -52,6 +52,14 @@ _Avoid_: Read-only mode, dry run
 The permission-gated control surface that lets an agent running inside a workspace drive Ensemblr itself — spawn conversations, launch harnesses, run terminals, focus panels, read the diff and leave or resolve review comments, ask the user a question, and move the workspace across the board — through the `ensemblr_*` tools.
 _Avoid_: Agent API, automation, remote control
 
+**Concierge**:
+The one agent that belongs to no workspace. It runs above every project, in a folder of its own
+under the Ensemblr root, and can read across every workspace at once — but writes only inside that
+folder, delegating any actual change to an orchestrator it spawns into the workspace that needs it.
+Its memory is a directory of markdown files it searches and writes between conversations, since its
+context does not survive a clear.
+_Avoid_: Assistant, app agent, root agent (that names a per-workspace orchestrator)
+
 **Orchestrator / Sub-agent**:
 Roles in multi-agent work. The orchestrator is the root agent (lineage depth 0) that may delegate; a sub-agent is a spawned child that does its delegated unit of work itself and never delegates onward.
 _Avoid_: Master/worker, parent/child thread

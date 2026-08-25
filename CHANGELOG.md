@@ -9,6 +9,79 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.0-beta.15] - 2026-08-25
+
+Ensemblr gains the Concierge, an app-level agent that sits above every workspace with its own
+memory, its own project roster, and clickable references into the rest of the app. Signed,
+notarized, Apple silicon.
+[Release](https://github.com/ensemblr-hq/ensemblr/releases/tag/v0.1.0-beta.15) ·
+[`.dmg`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.0-beta.15/Ensemblr-0.1.0-beta.15-arm64.dmg)
+
+### Added
+
+- **The Concierge, an app-level agent that sits above every workspace.** Opened from its own
+  launcher rather than a workspace's chat strip, it reads across every project and workspace the
+  app has open but writes only inside its own `<root>/concierge` folder — any actual change is
+  delegated to an orchestrator it spawns into the workspace that needs it, never made directly.
+  What it is allowed to call is enforced by one shared classifier reached by both agent runtimes,
+  so a Pi Concierge and a Claude Code Concierge are contained the same way. Its memory is a
+  directory of markdown files, one per durable fact, indexed for full-text recall and refreshed by
+  a background pass before every context clear, so what a conversation established survives the
+  clear. Provider, model, thinking level, and the auto-clear threshold live under `app.concierge`
+  in settings; five keyboard shortcuts and matching View-menu items open, focus, clear, and close
+  it.
+- **A project, workspace, or chat the Concierge names becomes something you can click.** A file
+  path it mentioned already turned into an openable chip; a workspace or a chat had no path to
+  write, so everything else it named in prose was dead text you had to go find yourself in the
+  sidebar. Its answers now carry that same addressing grammar, rendered as chips that open the
+  thing they name — clicking a closed chat's chip reopens the tab first. Typing `@` in the
+  Concierge composer opens a menu ranked against every project, workspace, and chat in the app, not
+  just the current one.
+- **A roster of every project, and a memory pass that no longer holds up the panel.**
+  `ensemblr_list_projects` lists every repository the app has open, including one with no workspace
+  currently cut from it — previously invisible to the Concierge, and nothing it could hand to
+  `ensemblr_create_workspace`. Each row carries the project's clone path, default branch, and how
+  many workspaces are live against it. Clearing the Concierge's context now hands back a fresh
+  conversation immediately, rather than leaving the panel on a blank turn until the outgoing
+  conversation finishes writing its memories in the background.
+- **Its own answers get a right-click menu.** Electron draws no context menu on its own, so a
+  Concierge answer was the one text in the window a right-click could not copy. It's wrapped in the
+  same menu the workspace timeline uses, including the panel's failure line — the sentence most
+  likely to end up pasted into a bug report.
+- **Tells you what it did while its panel was closed.** The launcher now carries a count of the
+  replies that arrived while the panel was shut, plus a mark for a question still waiting on you,
+  so a turn that finishes behind a closed panel is no longer silent. A finished turn also raises a
+  desktop notification under the Concierge's own name; clicking it opens the panel rather than a
+  workspace, since a Concierge answer belongs to no workspace to open.
+- **Closed four gaps that treated it like an ordinary chat.** The Concierge has no workspace and no
+  chat tab, and four places assumed it had both: a conversation it delegates to could silently
+  inherit the wrong sub-agent policy, a spawned session could land on the wrong model with no
+  warning, a question it asked could go unrendered, and a finished turn could try to mark a
+  nonexistent chat unread or open a notification with nothing to point at. All four now check for
+  the Concierge explicitly instead of assuming a workspace is always there.
+- **A prompt's sentence flows around its attachment chips instead of breaking around them.** Chips
+  in a user prompt — including the Concierge's own project, workspace, and chat references — used
+  to force a line break on both sides, so a message written as one paragraph read back as a column
+  of fragments. Text now wraps around a chip the way it was typed, gaps and all.
+
+### Fixed
+
+- **A dead Concierge session could be resumed forever.** The runtime session id was recorded at
+  attach, before any turn had actually run — a session that opened and closed without producing one
+  therefore came back on the next prompt as a resume of a conversation Claude Code had already
+  discarded, which it answers with `No conversation found with session ID` raised well after the
+  attempt looked like it had succeeded. The panel kept feeding prompts into a child that was busy
+  dying, and only a context clear escaped it. The id is now recorded from the runtime's first real
+  message instead, and cleared when a resumed child crashes without producing one.
+- **The undragged Concierge launcher covered the toast stack and the Setup pane's rerun button.**
+  All three claim the bottom-right corner; the launcher's dock margin now clears both, and the
+  panel still opens from the same spot the launcher sat so opening it doesn't jump.
+- **A follow-up queue holding a single message still showed a drag handle it couldn't use.** The
+  handle answered neither a drag nor an arrow key on a queue that short — an affordance for an
+  action the row doesn't have. It now shows its position number without the control, and catches
+  keyboard focus itself so a keyboard user standing on that button when the queue drains to its
+  last message isn't dropped back to the whole document.
+
 ## [0.1.0-beta.14] - 2026-08-21
 
 A file or diff tab an agent opens is named after the file it targets instead of sitting in the strip
