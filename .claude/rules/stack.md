@@ -17,10 +17,10 @@ asserting a version.
 | Package manager | npm 11.17.0 |
 
 `scripts/require-node-version.mjs` gates both `preinstall` and
-`build`/`package`/`make`. Do not route around it: under Node 26
-`electron-forge package` exits 0 with an empty `out/`, and installing under the
-wrong major compiles `macos-alias`/`fs-xattr` for that major so a later Node 24
-`make` dies on `NODE_MODULE_VERSION` mismatch.
+`build`/`package`/`make`. Do not route around it: installing under the wrong
+major compiles `macos-alias` (V8-ABI-bound, via `nan`) for that major, so a later
+Node 24 `make` dies on `NODE_MODULE_VERSION` mismatch. Node 24 is also the Active
+LTS line the Electron 43 runtime embeds.
 
 **`@types/node` stays on `^24`, tracking the runtime rather than the latest
 release.** Electron 43 embeds Node 24, so typing against a newer major makes the
@@ -32,6 +32,18 @@ decline it until the Electron major moves.
 `.npmrc` sets `legacy-peer-deps=true` because `@electron-forge/plugin-fuses@7`
 declares a stale peer range (`@electron/fuses@^1`) against the v2 this repo pins.
 Leave it.
+
+**`extract-zip` is aliased in `overrides` to
+`npm:@electron-internal/extract-zip`.** Forge 7 reaches `extract-zip@2.0.1`
+through `@electron/packager@18`, and that package is abandoned (last publish
+2023) with an unpatched symlink path-traversal advisory,
+[GHSA-jmr9-qjv8-65gv](https://github.com/advisories/GHSA-jmr9-qjv8-65gv) —
+`electron-forge package` unzips the downloaded Electron bundle with it. The alias
+is the same swap Electron made upstream in
+[packager#1917](https://github.com/electron/packager/pull/1917), shipping in
+Forge 8; it is a napi-rs module carrying prebuilds for every platform in the
+tarball, so nothing compiles at install time. Drop the alias once Forge 8 is
+stable.
 
 ## Language and build
 
