@@ -101,7 +101,7 @@ Read these in order:
    `tailwind.config.js`), and
    [`../.claude/rules/patterns.md`](../.claude/rules/patterns.md) for the
    structural rules a change has to respect.
-5. [`adr/`](./adr) — 52 Architecture Decision Records. When something looks odd,
+5. [`adr/`](./adr) — 54 Architecture Decision Records. When something looks odd,
    the ADR usually explains it. Start with
    [0042](./adr/0042-add-claude-code-as-a-second-first-class-agent-runtime.md) if
    you are touching the agent layer.
@@ -174,10 +174,15 @@ npm run i18n:status # if you touched a user-facing string — must stay at 100% 
 strip types without checking them. A `scripts/*.ts` type error only surfaces
 here.
 
-Run all four — CI does not. `.github/workflows/checks.yml` has exactly one job: a
-`react-doctor` scan diffed against `master`, failing on `error`, on pushes to
-`master` and PRs targeting it. Nothing in CI runs Biome, `tsc`, or the tests, so
-a red `npm run check` only surfaces on someone else's machine.
+Run them locally anyway — CI runs the same gates, but only once the branch is
+pushed. `.github/workflows/checks.yml` has two jobs on pushes to `master` and
+PRs targeting it: `verify` runs `npm run check`, `npm run typecheck` and
+`npm run test` on a macOS runner — macOS rather than Linux because `mod`
+resolves to ⌘ on darwin, so the keymap suites fail anywhere else — and `scan`
+runs a `react-doctor` scan diffed against `master`, failing on `error`. The
+release workflow calls `checks.yml` as a reusable workflow, passing
+`run_scan: false`, so a release tag runs the same verification a PR does without
+re-diffing against a branch it already is.
 
 For changed renderer code, also run the `react-doctor` skill and `fallow` on the
 changed set, per [`../.claude/rules/code-review.md`](../.claude/rules/code-review.md).
