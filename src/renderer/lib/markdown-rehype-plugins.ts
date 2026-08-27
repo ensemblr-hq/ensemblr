@@ -18,12 +18,13 @@ interface ProtocolSchema {
 	protocols?: Record<string, readonly string[]>;
 }
 
-/** As much of a hast node as the reference rewrite needs to walk and edit one. */
+/** As much of a hast node as the rewrites below need to walk and edit one. */
 interface HastNode {
 	children?: HastNode[];
 	properties?: Record<string, unknown>;
 	tagName?: string;
 	type: string;
+	value?: string;
 }
 
 /** Element name a Concierge reference link is rewritten to. */
@@ -34,6 +35,9 @@ export const CONCIERGE_REFERENCE_KIND_ATTRIBUTE = 'data-reference-kind';
 
 /** Attribute carrying the rewritten link's id. */
 export const CONCIERGE_REFERENCE_ID_ATTRIBUTE = 'data-reference-id';
+
+/** Table tags that hold cells rather than content of their own. */
+const TABLE_STRUCTURE_TAGS = new Set(['thead', 'tr', 'th', 'td']);
 
 /**
  * Add the Linear asset scheme to a sanitize step's `<img>` source allow-list.
@@ -124,6 +128,105 @@ function rewriteReferenceAnchors(node: HastNode): void {
 }
 
 /**
+ * Reports whether a table header subtree says anything at all.
+ *
+ * Only the structural tags are walked through: anything else the header holds —
+ * an image, a line break, an inline chip — is content even when it carries no
+ * text of its own.
+ * @param node - The header node, or one of its descendants.
+ * @returns True once a non-blank text node or a non-structural element is found.
+ */
+function hasHeaderContent(node: HastNode): boolean {
+	if (node.type === 'text') {
+		return (node.value ?? '').trim().length > 0;
+	}
+	if (node.type !== 'element') {
+		return false;
+	}
+	if (!TABLE_STRUCTURE_TAGS.has(node.tagName ?? '')) {
+		return true;
+	}
+	return (node.children ?? []).some(hasHeaderContent);
+}
+
+/**
+ * Drops every `<thead>` whose cells are all empty, along with any table left
+ * holding no rows once one goes.
+ *
+ * GFM has no headerless table: a pipe table only parses once a delimiter row
+ * follows a header row, so an agent that wants a bare grid writes `|  |  |`
+ * above the delimiter and the parser dutifully emits a header of empty cells.
+ * Rendered, that is a labelled band over columns it does not label. Taking the
+ * band away can empty the table outright — every headerless table passes through
+ * that state mid-stream, between its delimiter row parsing and its first body
+ * row arriving — and the answer's table frame would draw a border around
+ * nothing. A header that labels its columns still stands on its own, so a
+ * body-less `| Name | Age |` renders as it always has.
+ * @returns A rehype transform over the tree.
+ */
+function dropEmptyTableParts(): (tree: HastNode) => void {
+	return (tree) => pruneEmptyTableParts(tree);
+}
+
+/**
+ * Walks a hast subtree, removing content-free table nodes in place.
+ *
+ * Depth-first, so a table is weighed after its own empty header has gone rather
+ * than while it still counts as content.
+ * @param node - The node to walk.
+ */
+function pruneEmptyTableParts(node: HastNode): void {
+	if (!node.children) {
+		return;
+	}
+	for (const child of node.children) {
+		pruneEmptyTableParts(child);
+	}
+	node.children = node.children.filter(
+		(child) => !isEmptyTableHeader(child) && !isEmptyTable(child),
+	);
+}
+
+/**
+ * Reports whether a node is a table header carrying nothing to show.
+ * @param node - The candidate node.
+ * @returns True for a `<thead>` with no content in any of its cells.
+ */
+function isEmptyTableHeader(node: HastNode): boolean {
+	return (
+		node.type === 'element' &&
+		node.tagName === 'thead' &&
+		!hasHeaderContent(node)
+	);
+}
+
+/**
+ * Reports whether a node is a table with nothing left to draw.
+ * @param node - The candidate node.
+ * @returns True for a `<table>` holding no row at all.
+ */
+function isEmptyTable(node: HastNode): boolean {
+	return (
+		node.type === 'element' && node.tagName === 'table' && !hasTableRows(node)
+	);
+}
+
+/**
+ * Reports whether a table subtree still holds a row.
+ * @param node - The table node, or one of its descendants.
+ * @returns True once a `<tr>` is found.
+ */
+function hasTableRows(node: HastNode): boolean {
+	if (node.type !== 'element') {
+		return false;
+	}
+	if (node.tagName === 'tr') {
+		return true;
+	}
+	return (node.children ?? []).some(hasTableRows);
+}
+
+/**
  * Streamdown's own rehype chain, with `<img>` sources allowed to name the
  * `ensemblr-linear-asset:` scheme and `<a>` destinations the `ensemblr:` one.
  *
@@ -141,7 +244,10 @@ export const MARKDOWN_REHYPE_PLUGINS: RehypePlugins = [
 			? admitConciergeReferenceScheme(admitLinearAssetScheme(plugin))
 			: plugin,
 	),
-	// Last, so the element it mints is one sanitize has already run past: an
-	// unknown tag name would be stripped outright by the schema.
+	// After sanitize, so the element it mints is one the schema has already run
+	// past: an unknown tag name would be stripped outright.
 	rewriteConciergeReferences as RehypePlugin,
+	// After the raw step, so a table an agent wrote as literal HTML is weighed as
+	// elements rather than skipped as an unparsed string.
+	dropEmptyTableParts as RehypePlugin,
 ];

@@ -66,3 +66,37 @@ export function installLocalStorage(): void {
 		value: storage,
 	});
 }
+
+/**
+ * Replaces the clipboard with a recorder that accepts both the plain and the
+ * rich write paths, so a test can assert what a copy control actually offered.
+ */
+export function stubClipboard(): { html?: string; text: string }[] {
+	const written: { html?: string; text: string }[] = [];
+	class TestClipboardItem {
+		constructor(readonly items: Record<string, Blob>) {}
+	}
+	Object.defineProperty(globalThis, 'ClipboardItem', {
+		configurable: true,
+		value: TestClipboardItem,
+		writable: true,
+	});
+	Object.defineProperty(navigator, 'clipboard', {
+		configurable: true,
+		value: {
+			write: async (entries: TestClipboardItem[]) => {
+				for (const entry of entries) {
+					written.push({
+						html: await entry.items['text/html']?.text(),
+						text: (await entry.items['text/plain']?.text()) ?? '',
+					});
+				}
+			},
+			writeText: async (text: string) => {
+				written.push({ text });
+			},
+		},
+		writable: true,
+	});
+	return written;
+}

@@ -9,6 +9,29 @@ import { CopyResponseButton } from './copy-response-button';
 import { Dialog, DialogContent, DialogTitle } from './ui/dialog';
 
 /**
+ * Reads a rendered table back as Markdown, standing a blank header row back up
+ * for a table that has none.
+ *
+ * A GFM pipe table cannot be written without a header — `tableDataToMarkdown`
+ * returns the empty string rather than a headerless one — but the renderer drops
+ * a header whose cells are all empty. Restoring it at copy time reproduces what
+ * the agent wrote instead of copying nothing at all.
+ * @param table - The rendered table
+ * @returns The table as GFM Markdown
+ */
+function tableMarkdown(table: HTMLTableElement): string {
+	const { headers, rows } = extractTableDataFromElement(table);
+	if (headers.length > 0) {
+		return tableDataToMarkdown({ headers, rows });
+	}
+	const widest = rows.reduce(
+		(columns, row) => Math.max(columns, row.length),
+		0,
+	);
+	return tableDataToMarkdown({ headers: new Array(widest).fill(''), rows });
+}
+
+/**
  * Reads a rendered table back as clipboard content: Markdown for a plain-text
  * paste, and the table's own HTML so a paste into a document or a spreadsheet
  * lands as rows and columns rather than a wall of pipes.
@@ -21,7 +44,7 @@ function tableClipboardPayload(table: HTMLTableElement | null) {
 	}
 	return {
 		html: table.outerHTML,
-		text: tableDataToMarkdown(extractTableDataFromElement(table)),
+		text: tableMarkdown(table),
 	};
 }
 
