@@ -30,8 +30,11 @@ npm run dev:playground   # the component preview harness, Vite only
 
 ## The gates
 
-Run these before you push. **CI does not run them** — `.github/workflows/checks.yml` runs a `react-doctor`
-scan and a verification job; anything it misses surfaces on someone else's machine.
+Run these before you push. CI runs the same gates, but only once the branch is up:
+`.github/workflows/checks.yml` has two jobs on pushes to `master` and PRs targeting it — `verify` runs
+`npm run check`, `npm run typecheck` and `npm run test` on a macOS runner, and `scan` runs a `react-doctor`
+scan diffed against `master`, failing on `error`. Catching a break locally costs a minute; catching it in CI
+costs a round trip.
 
 ```bash
 npm run check       # Biome + Tailwind class check + i18n lint + hardcoded-string scan
@@ -41,8 +44,8 @@ npm run doctor      # react-doctor diagnostics
 ```
 
 The `electron --test` suites (`npm run test:db`, `test:workspace`, `test:github`, `test:linear`,
-`test:agent-runtime`, …) need the Electron runtime and are not part of `npm run test`. Run the ones your
-change touches. `package.json` has the full list.
+`test:agent-runtime`, …) need the Electron runtime and are not part of `npm run test` — so they are the one
+set CI does not run either. Run the ones your change touches. `package.json` has the full list.
 
 ## House rules
 

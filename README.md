@@ -122,7 +122,7 @@ documented in [`docs/guide/02-requirements.md`](./docs/guide/02-requirements.md)
 **Working on Ensemblr** — [`CONTRIBUTING.md`](./CONTRIBUTING.md) ·
 [`docs/onboarding.md`](./docs/onboarding.md) (clone → run → first change) ·
 [`docs/architecture-map.md`](./docs/architecture-map.md) (which directory owns which concern) ·
-[`docs/adr/`](./docs/adr) (52 Architecture Decision Records) ·
+[`docs/adr/`](./docs/adr) (54 Architecture Decision Records) ·
 [`docs/agent-control.md`](./docs/agent-control.md) ·
 [`docs/harnesses.md`](./docs/harnesses.md) ·
 [`docs/build-and-release.md`](./docs/build-and-release.md) ·
