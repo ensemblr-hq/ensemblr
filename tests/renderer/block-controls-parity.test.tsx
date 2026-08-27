@@ -5,7 +5,7 @@ import { afterEach, describe, expect, test, vi } from 'vitest';
 
 import { AnswerTable } from '../../src/renderer/components/answer-table';
 import { CodeSurface } from '../../src/renderer/components/code-surface';
-import { renderWithProviders } from './support/dom';
+import { renderWithProviders, stubClipboard } from './support/dom';
 
 const TABLE_ROWS = (
 	<>
@@ -24,39 +24,18 @@ const TABLE_ROWS = (
 	</>
 );
 
-/**
- * Replaces the clipboard with a recorder that accepts both the plain and the
- * rich write paths, so a test can assert what a copy control actually offered.
- */
-function stubClipboard() {
-	const written: { html?: string; text: string }[] = [];
-	class TestClipboardItem {
-		constructor(readonly items: Record<string, Blob>) {}
-	}
-	Object.defineProperty(globalThis, 'ClipboardItem', {
-		configurable: true,
-		value: TestClipboardItem,
-		writable: true,
-	});
-	Object.defineProperty(navigator, 'clipboard', {
-		configurable: true,
-		value: {
-			write: async (entries: TestClipboardItem[]) => {
-				for (const entry of entries) {
-					written.push({
-						html: await entry.items['text/html']?.text(),
-						text: (await entry.items['text/plain']?.text()) ?? '',
-					});
-				}
-			},
-			writeText: async (text: string) => {
-				written.push({ text });
-			},
-		},
-		writable: true,
-	});
-	return written;
-}
+const HEADERLESS_ROWS = (
+	<tbody>
+		<tr>
+			<td>Types</td>
+			<td>npm run typecheck</td>
+		</tr>
+		<tr>
+			<td>Lint</td>
+			<td>npm run check</td>
+		</tr>
+	</tbody>
+);
 
 afterEach(() => {
 	vi.restoreAllMocks();
@@ -85,6 +64,23 @@ describe('answer table controls', () => {
 			].join('\n'),
 		);
 		expect(written[0].html).toContain('<table');
+	});
+
+	test('copies a headerless table as a table, not as nothing', async () => {
+		const written = stubClipboard();
+		renderWithProviders(<AnswerTable>{HEADERLESS_ROWS}</AnswerTable>);
+
+		fireEvent.click(screen.getByLabelText('Copy table'));
+
+		await waitFor(() => expect(written).toHaveLength(1));
+		expect(written[0].text).toBe(
+			[
+				'|  |  |',
+				'| --- | --- |',
+				'| Types | npm run typecheck |',
+				'| Lint | npm run check |',
+			].join('\n'),
+		);
 	});
 
 	test('confirms a copy the way the code panel does', async () => {
