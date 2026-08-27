@@ -1,11 +1,5 @@
 import type { TFunction } from 'i18next';
-import {
-	CheckIcon,
-	ChevronsUpDownIcon,
-	FolderGit2Icon,
-	GitBranchIcon,
-	GitPullRequestIcon,
-} from 'lucide-react';
+import { GitBranchIcon, GitPullRequestIcon } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/renderer/components/ui/button';
@@ -19,11 +13,6 @@ import {
 	CommandList,
 	CommandSeparator,
 } from '@/renderer/components/ui/command';
-import {
-	Popover,
-	PopoverContent,
-	PopoverTrigger,
-} from '@/renderer/components/ui/popover';
 import {
 	ToggleGroup,
 	ToggleGroupItem,
@@ -45,7 +34,6 @@ import type {
 	WorkspaceSourceAction,
 	WorkspaceSourceKind,
 } from '@/renderer/types/workbench';
-import { ProjectAvatar } from './project-avatar';
 import { GithubLogo, LinearLogo } from './source-provider-logo';
 
 /**

@@ -11,11 +11,6 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from '@/renderer/components/ui/dialog';
-import {
-	Popover,
-	PopoverContent,
-	PopoverTrigger,
-} from '@/renderer/components/ui/popover';
 import { ProjectAvatar } from '@/renderer/components/workbench-shell/project-avatar';
 import { RepositoryPicker } from '@/renderer/components/workbench-shell/repository-picker';
 import {

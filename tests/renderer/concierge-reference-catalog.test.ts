@@ -215,9 +215,11 @@ describe('sending a reference chip', () => {
 				path: 'releases/release-plan.md',
 			},
 		]);
-		expect(conciergeReferenceAttachment(references[0]!).kind).toBe(
-			'artifact-ref',
-		);
+		expect(
+			references.map(
+				(reference) => conciergeReferenceAttachment(reference).kind,
+			),
+		).toEqual(['artifact-ref']);
 	});
 
 	// An artifact is a document on disk, so it wears the file tree's own icon set
