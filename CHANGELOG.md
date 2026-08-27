@@ -9,6 +9,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.0-beta.17] - 2026-08-27
+
+A skill you install while the app is open turns up in the slash menu when you come back to it, and
+the toolchain that packaged this build no longer unzips Electron with an abandoned extractor.
+Signed, notarized, Apple silicon.
+[Release](https://github.com/ensemblr-hq/ensemblr/releases/tag/v0.1.0-beta.17) ·
+[`.dmg`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.0-beta.17/Ensemblr-0.1.0-beta.17-arm64.dmg)
+
+### Fixed
+
+- **A skill installed after you opened a chat stayed invisible in its slash menu until you
+  relaunched the app.** A catalogue discovered once never refreshed for the life of the window:
+  `staleTime` only decides whether a *trigger* refetches, and this query had none — the composer's
+  observer stays mounted for the whole chat, and refetch-on-window-focus is off app-wide. A
+  workspace created after the install picked the skill up immediately, which is exactly what made
+  the older chat look like it had simply failed. The catalogue now revalidates on the two
+  deliberate triggers — the slash menu opening, and the app coming back from somewhere else —
+  behind gates sized for the fact that discovery spawns a child process: thirty seconds between
+  refreshes, so repeated opens inside one window cost nothing; five seconds away, so a native dialog
+  or a detour into DevTools is not mistaken for a trip to install something; and five minutes after
+  a discovery that failed, so a machine with no `claude` on it does not re-spawn a doomed child
+  every time its user turns back to the window. The refresh lands in the query and never under an
+  open menu — rows do not reorder beneath the keyboard highlight, so the next open paints the new
+  list.
+- **The toolchain that packages a release unzipped Electron with an abandoned extractor.**
+  `extract-zip@2.0.1` restores symlinks without validating their targets, so an archive holding
+  `../../../etc/passwd` writes outside the directory it is being extracted into
+  (CVE-2026-56876 / GHSA-jmr9-qjv8-65gv). `electron-forge package` unpacks the downloaded Electron
+  bundle with it, reached through `@electron-forge/cli` → `@electron/packager`; the package last
+  published in 2023 and has no patched version, which left it as this repository's only open
+  Dependabot alert, and `npm audit fix` offered nothing better than a semver-major downgrade of the
+  DMG maker. It is now aliased in `overrides` to `@electron-internal/extract-zip` — the same swap
+  Electron made upstream, shipping in Forge 8, brought forward until that is stable. The
+  replacement is a napi-rs module carrying prebuilds for every platform inside its tarball, so
+  nothing compiles at install time, and `yauzl` and its three siblings leave the dependency tree
+  with it. That also takes the mid-extraction hang that used to make `electron-forge package` exit
+  0 with an empty `out/` under a newer Node.
+
 ## [0.1.0-beta.16] - 2026-08-25
 
 A report the Concierge writes is something you can open, and a workspace it cuts arrives with a name
