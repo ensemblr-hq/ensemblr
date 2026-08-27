@@ -1,8 +1,3 @@
-import { addCollection } from '@iconify/react';
-import { icons as logosIcons } from '@iconify-json/logos';
-
-addCollection(logosIcons);
-
 /**
  * Iconify brand-logo names (from the offline `logos` collection) for the agent
  * harnesses that ship a recognizable logo. Harnesses absent here fall back to a

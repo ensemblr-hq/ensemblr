@@ -144,7 +144,7 @@ a primitive gets reformatted to house style.
 
 ## Tooling
 
-- **Biome 2.5.8** is the only linter and formatter — no ESLint, no Prettier.
+- **Biome 2.5.9** is the only linter and formatter — no ESLint, no Prettier.
   Tabs for indentation; single quotes for JS **and** JSX.
   Config uses `linter.rules.preset: "recommended"`; the older
   `linter.rules.recommended: true` was deprecated in Biome 2.5, so do not

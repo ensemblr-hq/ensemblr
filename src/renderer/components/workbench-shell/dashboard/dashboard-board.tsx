@@ -54,7 +54,7 @@ export function DashboardBoard() {
 	const statusByWorkspaceId = useWorkspaceBoardStatuses();
 	const order = useWorkspaceBoardOrder();
 	const { reorderBoard, setWorkspaceBoardStatus } = useWorkspaceBoardActions();
-	const { dismiss, dismissedKeys, restore } = useBoardIssueDismissals();
+	const { dismiss, restore } = useBoardIssueDismissals();
 	const boardFilters = useBoardFilters();
 	const { backlogIssues, dismissedIssues, errors, isLoading } = useBoardIssues(
 		model.displayProjects,

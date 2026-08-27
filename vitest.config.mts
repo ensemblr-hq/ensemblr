@@ -19,16 +19,38 @@ import { defineConfig } from 'vitest/config';
  * Outside an Electron process the real module downloads the packaged binary on
  * import, which made a hermetic unit test depend on a ~100 MB network fetch. A
  * suite that needs Electron behaviour still mocks the module itself.
+ *
+ * `@iconify/react` is aliased to its own `offline` build for the same reason:
+ * the default build answers an unregistered icon prefix with a live request to
+ * `https://api.iconify.design`, which outlived window teardown and surfaced as
+ * an unhandled `AbortError`. The offline build drops the API module entirely
+ * while still exporting `Icon` and `addCollection`, so a glyph whose collection
+ * a component forgot to register renders empty instead of reaching the network.
+ * Its entry is anchored with a regular expression because a string alias key is
+ * a prefix match: as a plain string it also swallows `@iconify/react/offline`,
+ * rewriting the subpath onto a path that does not exist.
  */
 export default defineConfig({
 	plugins: [react()],
 	resolve: {
-		alias: {
-			'@': fileURLToPath(new URL('./src', import.meta.url)),
-			electron: fileURLToPath(
-				new URL('./tests/main/support/electron-stub.ts', import.meta.url),
-			),
-		},
+		alias: [
+			{
+				find: '@',
+				replacement: fileURLToPath(new URL('./src', import.meta.url)),
+			},
+			{
+				find: /^@iconify\/react$/,
+				replacement: fileURLToPath(
+					import.meta.resolve('@iconify/react/offline'),
+				),
+			},
+			{
+				find: 'electron',
+				replacement: fileURLToPath(
+					new URL('./tests/main/support/electron-stub.ts', import.meta.url),
+				),
+			},
+		],
 	},
 	test: {
 		globals: true,

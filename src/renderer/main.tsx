@@ -5,6 +5,7 @@ import { createRoot } from 'react-dom/client';
 
 import { queryClient } from './api/query-client';
 import { Toaster } from './components/ui/sonner';
+import { registerIconCollections } from './lib/workbench/icon-collections';
 import { router } from './routing/router';
 import './styles/index.css';
 
@@ -23,6 +24,8 @@ if (!rootElement) {
 if (import.meta.env.DEV) {
 	document.documentElement.classList.add('env-dev');
 }
+
+registerIconCollections();
 
 createRoot(rootElement).render(
 	<StrictMode>
