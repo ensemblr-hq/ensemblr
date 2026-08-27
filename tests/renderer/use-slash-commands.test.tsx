@@ -6,7 +6,7 @@
  */
 
 import { QueryClientProvider } from '@tanstack/react-query';
-import { renderHook, waitFor } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { ensemblrQueryKeys } from '../../src/renderer/api/ensemblr';
@@ -83,15 +83,22 @@ function fakeStorage(): Storage {
 	} satisfies Storage;
 }
 
+/** Moves the clock the hook's age gates read, without touching real timers. */
+let nowOffsetMs = 0;
+
 beforeEach(() => {
 	Object.defineProperty(globalThis, 'localStorage', {
 		configurable: true,
 		value: fakeStorage(),
 		writable: true,
 	});
+	nowOffsetMs = 0;
+	const realNow = Date.now.bind(Date);
+	vi.spyOn(Date, 'now').mockImplementation(() => realNow() + nowOffsetMs);
 });
 
 afterEach(() => {
+	vi.restoreAllMocks();
 	clearEnsemblrApi();
 	// The slash cache reads ambient storage, and its module mirror outlives a
 	// single test, so both have to go or one case seeds the next.
@@ -117,6 +124,22 @@ function seedStaleCache(
 		'/workspaces/demo',
 		commands,
 		Date.now() - STALE_AGE_MS,
+	);
+}
+
+/** Past the hook's revalidation window, still inside the query's stale time. */
+const AGED_MS = 60_000;
+
+/**
+ * Seeds a catalogue a composer mount is entitled to trust but a deliberate look
+ * at the menu is not.
+ */
+function seedAgedCache(commands = CLAUDE_COMMANDS.commands) {
+	writeCachedSlashCommands(
+		'claude',
+		'/workspaces/demo',
+		commands,
+		Date.now() - AGED_MS,
 	);
 }
 
@@ -411,5 +434,197 @@ test('does not swap a discovered pi catalogue under an open menu', async () => {
 		expect(result.current.commands.map((entry) => entry.command)).toEqual([
 			'renamed-skill',
 		]),
+	);
+});
+
+// `staleTime` only decides whether a *trigger* refetches, and a mounted composer
+// has none: its observer lives for the whole chat and `refetchOnWindowFocus` is
+// off app-wide. A skill installed after the chat opened therefore stayed
+// invisible in that workspace until the app was relaunched, while a workspace
+// created afterwards picked it up straight away.
+test('re-discovers when the menu opens onto an aged catalogue', async () => {
+	seedAgedCache();
+	const { listAgentProviderSlashCommands, rerender } =
+		renderSlashCommandsClosed();
+
+	await waitFor(() =>
+		expect(listAgentProviderSlashCommands).not.toHaveBeenCalled(),
+	);
+
+	rerender({ menuOpen: true });
+
+	await waitFor(() =>
+		expect(listAgentProviderSlashCommands).toHaveBeenCalledTimes(1),
+	);
+});
+
+// Discovery spawns a child process, so repeated opens inside one window must
+// cost nothing once the catalogue has just been read.
+test('spawns nothing when the menu opens onto a catalogue just discovered', async () => {
+	seedFreshCache();
+	const { listAgentProviderSlashCommands, rerender, result } =
+		renderSlashCommandsClosed();
+
+	rerender({ menuOpen: true });
+	await waitFor(() => expect(result.current.commands).not.toEqual([]));
+
+	expect(listAgentProviderSlashCommands).not.toHaveBeenCalled();
+});
+
+// Skills are installed outside the composer, so coming back to the window is
+// the moment the cached catalogue is most likely to be wrong — and revalidating
+// there is what lets the next open paint an already-correct list.
+test('re-discovers when the app window regains focus', async () => {
+	seedAgedCache();
+	const { listAgentProviderSlashCommands } = renderSlashCommandsClosed();
+
+	await waitFor(() =>
+		expect(listAgentProviderSlashCommands).not.toHaveBeenCalled(),
+	);
+
+	act(() => {
+		window.dispatchEvent(new Event('focus'));
+	});
+
+	await waitFor(() =>
+		expect(listAgentProviderSlashCommands).toHaveBeenCalledTimes(1),
+	);
+});
+
+test('spawns nothing on focus while the catalogue is still fresh', async () => {
+	seedFreshCache();
+	const { listAgentProviderSlashCommands, result } =
+		renderSlashCommandsClosed();
+
+	await waitFor(() => expect(result.current.commands).not.toEqual([]));
+
+	act(() => {
+		window.dispatchEvent(new Event('focus'));
+	});
+
+	expect(listAgentProviderSlashCommands).not.toHaveBeenCalled();
+});
+
+// The reported symptom, end to end: a workspace opened before the skill was
+// installed kept serving the catalogue from before it.
+//
+// The open that triggers the refresh does not paint it. `useStableWhileOpen`
+// holds the list the menu is already showing rather than reordering rows under
+// the keyboard highlight, so the new catalogue lands in the query and the next
+// open renders it. Pinned in both directions here, because it is the difference
+// between "coming back to the app fixes this" and "opening the menu does".
+test('shows a skill installed since the last discovery, from the next open', async () => {
+	seedAgedCache();
+	const { client, rerender, result } = renderSlashCommandsClosed('claude', {
+		commands: [
+			...CLAUDE_COMMANDS.commands,
+			{ autoSubmit: false, command: 'new-skill', description: 'Fresh' },
+		],
+		error: null,
+		source: 'runtime',
+	});
+
+	rerender({ menuOpen: true });
+	await waitFor(() =>
+		expect(
+			client.getQueryData(
+				ensemblrQueryKeys.agentProviderSlashCommands(
+					'claude',
+					'/workspaces/demo',
+				),
+			),
+		).toMatchObject({
+			commands: expect.arrayContaining([
+				expect.objectContaining({ command: 'new-skill' }),
+			]),
+		}),
+	);
+	expect(result.current.commands.map((entry) => entry.command)).not.toContain(
+		'new-skill',
+	);
+
+	rerender({ menuOpen: false });
+	rerender({ menuOpen: true });
+
+	await waitFor(() =>
+		expect(result.current.commands.map((entry) => entry.command)).toContain(
+			'new-skill',
+		),
+	);
+});
+
+// `refetch` fires on a disabled query too, so the revalidation triggers carry
+// their own copy of the guard. Without it, coming back to the app would spawn
+// the very child that deferring discovery until the first open exists to avoid.
+test('spawns nothing on focus before the menu has ever been opened', async () => {
+	const { listAgentProviderSlashCommands } = renderSlashCommandsClosed();
+
+	act(() => {
+		window.dispatchEvent(new Event('focus'));
+	});
+
+	await waitFor(() =>
+		expect(listAgentProviderSlashCommands).not.toHaveBeenCalled(),
+	);
+});
+
+// `focus` fires on every return to the window — a native dialog closing, a
+// detour into DevTools. Those are not trips to install a skill, and paying a
+// discovery child for each one would cost an ordinary session two a minute.
+test('spawns nothing when the app was away only for a moment', async () => {
+	seedAgedCache();
+	const { listAgentProviderSlashCommands } = renderSlashCommandsClosed();
+
+	act(() => {
+		window.dispatchEvent(new Event('blur'));
+		nowOffsetMs = 1_000;
+		window.dispatchEvent(new Event('focus'));
+	});
+
+	await waitFor(() =>
+		expect(listAgentProviderSlashCommands).not.toHaveBeenCalled(),
+	);
+});
+
+test('re-discovers after a trip long enough to have installed something', async () => {
+	seedAgedCache();
+	const { listAgentProviderSlashCommands } = renderSlashCommandsClosed();
+
+	act(() => {
+		window.dispatchEvent(new Event('blur'));
+		nowOffsetMs = 30_000;
+		window.dispatchEvent(new Event('focus'));
+	});
+
+	await waitFor(() =>
+		expect(listAgentProviderSlashCommands).toHaveBeenCalledTimes(1),
+	);
+});
+
+// A failed discovery still resolves — the query falls back to the cache and
+// carries the error — so it refreshes the age clock like a good answer does. A
+// machine with no `claude` on it must not re-spawn a doomed child every time
+// its user comes back to the app.
+test('re-probes a runtime that could not answer on the long window', async () => {
+	seedAgedCache();
+	const { listAgentProviderSlashCommands } = renderSlashCommandsClosed(
+		'claude',
+		{ commands: [], error: 'claude could not be resolved', source: 'static' },
+	);
+
+	act(() => {
+		window.dispatchEvent(new Event('focus'));
+	});
+	await waitFor(() =>
+		expect(listAgentProviderSlashCommands).toHaveBeenCalledTimes(1),
+	);
+
+	nowOffsetMs = AGED_MS;
+	act(() => {
+		window.dispatchEvent(new Event('focus'));
+	});
+
+	await waitFor(() =>
+		expect(listAgentProviderSlashCommands).toHaveBeenCalledTimes(1),
 	);
 });
