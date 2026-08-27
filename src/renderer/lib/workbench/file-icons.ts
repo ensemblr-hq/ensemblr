@@ -1,9 +1,6 @@
-import { addCollection } from '@iconify/react';
 import { icons as vscodeIcons } from '@iconify-json/vscode-icons';
 
 import type { WorkspaceFileSummary } from '@/renderer/types/workbench';
-
-addCollection(vscodeIcons);
 
 const iconPrefix = 'vscode-icons';
 
