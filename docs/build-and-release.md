@@ -172,7 +172,7 @@ full `checks.yml` suite, builds, signs, notarizes, verifies, then attaches the
 from the tag (`-alpha` / `-beta` / `-rc` → prerelease, anything else → latest).
 
 **Pushing a bare `vX.Y.Z` tag does nothing on purpose** — there would be no notes
-to attach to, and the six existing releases are hand-written prose that
+to attach to, and every release so far is hand-written prose that
 `--generate-notes` would only degrade. If a tag exists but the build needs
 re-running, dispatch the workflow manually with that tag as its input.
 

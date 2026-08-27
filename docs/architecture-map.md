@@ -46,8 +46,9 @@ each exposing its public surface through `index.ts`.
 | Process execution | `commands/` | Local process and shell execution |
 | Concierge | `concierge/` | App-level agent session service, its home-folder layout under the Ensemblr root, the memory index and background memory pass, the artifact lister the panel's reader reads through, and the wire that retires a session while it finishes writing memories |
 | Config | `config/` | Declarative config loading, settings resolution, repository config |
+| Dictation | `dictation/` | The transcription service behind the composer's mic control, its endpoint policy, and the Keychain-held key it authenticates with |
 | Environment | `environment/` | Environment-variable catalogue and layered assembly, Infisical joining as its own layer |
-| IPC | `ipc/` | Handler registration (`handlers/`, 33 modules), request validation (`request-schemas/`, 21 modules), permission gate |
+| IPC | `ipc/` | Handler registration (`handlers/`, 36 modules), request validation (`request-schemas/`, 23 modules), permission gate |
 | Integrations | `github/`, `linear/`, `infisical/` | `gh` CLI wrapper, PR snapshots, cached issue backlog; Linear OAuth + client + per-account store; Infisical account store, REST boundary, token-caching client, per-scope cache, link store |
 | Linked directories | `linked-directories/` | Read grants for directories outside a workspace, plus the app-global recents list behind them |
 | Native menus | `menu/` | One builder per menu behind `createMenuItemFactory`, driven by the renderer's command report and the localized `menu-strings.ts` table |
@@ -84,13 +85,13 @@ A new feature is split across these buckets, not given a folder of its own.
 | Bucket | Holds | Concern folders inside |
 | --- | --- | --- |
 | `api/` | TanStack Query clients, query options, preload-backed access | `ensemblr/` |
-| `components/` | React components and UI composition | `workbench-shell/`, `conversation/`, `diff-viewer/`, `code-surface/`, `settings/`, `setup-diagnostics/`, `onboarding/`, `git/`, `linear/`, `command-palette/`, `ask-user-question/`, `tool-approval/`, `tool-collapsible/`, `pi-replay/`, `welcome/`, `concierge/`, `ui/` (vendored shadcn) |
+| `components/` | React components and UI composition | `workbench-shell/`, `conversation/`, `diff-viewer/`, `code-surface/`, `settings/`, `setup-diagnostics/`, `onboarding/`, `git/`, `linear/`, `command-palette/`, `ask-user-question/`, `tool-approval/`, `tool-collapsible/`, `pi-replay/`, `text-context-menu/`, `welcome/`, `concierge/`, `ui/` (vendored shadcn) |
 | `config/` | Stable renderer constants (route stale times, knobs) | — |
 | `hooks/` | Renderer hooks that are not durable shared state | `workbench-shell/`, `workspace/`, `conversation/`, `code-surface/`, `setup-diagnostics/`, `preferences/`, `git/`, `linear/`, `ask-user-question/`, `welcome/`, `concierge/` |
-| `lib/` | Runtime helpers grouped by concern | `workbench/`, `agent-timeline/`, `conversation/`, `diff/`, `code/`, `github/`, `linear/`, `pi/`, `pi-replay/`, `terminal/`, `dictation/`, `i18n/` (i18next instance + bundled `locales/`), `onboarding/`, `instrumentation/`, `ask-user-question/`, `welcome/`, `notification-sound/` (the bundled chime and its player), `concierge/`, plus the code→`t()` mappers `failure-text/`, `setup-check-text/`, `provider-check-text/`, `plan-limit-text/` |
+| `lib/` | Runtime helpers grouped by concern | `workbench/`, `agent-timeline/`, `conversation/`, `diff/`, `code/`, `github/`, `linear/`, `pi/`, `pi-replay/`, `terminal/`, `dictation/`, `i18n/` (i18next instance + bundled `locales/`), `onboarding/`, `instrumentation/`, `ask-user-question/`, `welcome/`, `notification-sound/` (the bundled chime and its player), `concierge/`, plus the code→`t()` mappers `failure-text/`, `agent-failure-text/`, `setup-check-text/`, `provider-check-text/`, `plan-limit-text/` |
 | `fixtures/` | Fixture/demo data production code may still consume | `workbench/` |
 | `routing/` | TanStack Router file routes + generated tree | `routes/` |
-| `state/` | Durable Jotai state | `workspace/`, `composer/`, `pi/`, `plan-mode/`, `preferences/`, `dialogs/`, `recents/`, `sidebar/`, `settings-ui/`, `slash-commands/`, `tool-approval/`, `ask-user-question/`, `conversation-scroll/`, `menu-commands/`, `linear/`, `unread/`, `concierge/` |
+| `state/` | Durable Jotai state | `workspace/`, `composer/`, `pi/`, `plan-mode/`, `preferences/`, `dialogs/`, `recents/`, `sidebar/`, `settings-ui/`, `slash-commands/`, `tool-approval/`, `ask-user-question/`, `conversation-scroll/`, `menu-commands/`, `linear/`, `unread/`, `updates/`, `concierge/` |
 | `styles/` | CSS entrypoint (`index.css`) and font assets | — |
 | `types/` | Exported renderer types and ambient declarations | `workbench/`, `workbench-shell/`, `components/`, `onboarding/` |
 
@@ -117,11 +118,11 @@ atom.
 The only code both processes may import. Two shapes coexist:
 
 - **Single-file concerns** — plain root modules (`config.ts`, `permissions.ts`,
-  `github.ts`, `slug.ts`, `menu-commands.ts`, `concierge-references.ts`, …); 27
+  `github.ts`, `slug.ts`, `menu-commands.ts`, `concierge-references.ts`, …); 32
   `.ts` files sit at the shared root in total.
 - **Multi-file concerns** — an implementation directory behind a stable
   entrypoint, in one of two forms:
-  - `<concern>/index.ts` — `ipc/` (38 contract modules under `ipc/contracts/`,
+  - `<concern>/index.ts` — `ipc/` (41 contract modules under `ipc/contracts/`,
     plus `channels.ts` and `handler-map.ts`), `pi-rpc/`, `keymap/`.
   - `<concern>.ts` + `<concern>/` — `agent-control`, `plan-mode`, `scripts`,
     `terminal`. This is the form `electron --test` can resolve, so prefer it for
@@ -148,9 +149,10 @@ extension `resources/pi-extensions/ensemblr-control.mts`) and MCP-capable
 harnesses via `POST /mcp`. One service resolves a per-workspace bearer token,
 enforces scope and the workspace permission mode, applies fork-bomb guardrails,
 then delegates through a **port** (`ports.ts`, `port-adapters.ts`,
-`review-ports.ts`) to an existing service. Control adds no capability code of its
-own — if an operation does not exist as a service, it does not exist as a control
-op. See [`agent-control.md`](./agent-control.md) and ADR&nbsp;0040.
+`review-ports.ts`, `linear-ports.ts`) to an existing service. Control adds no
+capability code of its own — if an operation does not exist as a service, it does
+not exist as a control op. See [`agent-control.md`](./agent-control.md) and
+ADR&nbsp;0040.
 
 **3. Native menu → renderer (menu command bus).** The macOS menu bar is built in
 main but its items are owned by the renderer. `src/renderer/state/menu-commands/`
@@ -189,9 +191,9 @@ migration ids, so a new migration must be added to both.
 
 | Suite | Runner | Count |
 | --- | --- | --- |
-| `tests/main/**` | `electron --test` (`ELECTRON_RUN_AS_NODE=1`), plus the pure-logic files listed one-by-one in `vitest.config.mts` — an explicit list, not a glob, so it never drags in the Electron-only suites | 171 files |
-| `tests/renderer/**` | Vitest (`node` env; DOM files opt in per file) | 274 files (26 under `dom/`) |
-| `tests/shared/**` | Vitest | 34 files |
+| `tests/main/**` | `electron --test` (`ELECTRON_RUN_AS_NODE=1`), plus the pure-logic files listed one-by-one in `vitest.config.mts` — an explicit list, not a glob, so it never drags in the Electron-only suites | 202 files |
+| `tests/renderer/**` | Vitest (`node` env; DOM files opt in per file) | 317 files (41 under `dom/`) |
+| `tests/shared/**` | Vitest | 38 files |
 
 See [`onboarding.md`](./onboarding.md#6-running-the-tests) for which runner a new
 test should use.
