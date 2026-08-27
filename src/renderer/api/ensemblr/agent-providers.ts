@@ -85,10 +85,31 @@ export function agentProviderMcpServersQuery(
 }
 
 /**
+ * Whether a slash catalogue can be resolved at all. Discovery runs inside a
+ * workspace directory, so without one there is nothing to ask.
+ *
+ * Exported because callers gate on it too — `useSlashCommands` needs the answer
+ * as a plain boolean to decide whether its own revalidation triggers may fire,
+ * and reading it off the query options would hand it TanStack's wider
+ * `QueryBooleanOption`. One predicate, two readers.
+ * @param cwd - Workspace directory the commands would resolve against.
+ * @returns Whether discovery has somewhere to run.
+ */
+export function canDiscoverSlashCommands(cwd: string): boolean {
+	return cwd.length > 0;
+}
+
+/**
  * Query options for one agent runtime's slash commands, resolved inside a
  * workspace so project-scoped skills, prompts, and commands are included.
- * Discovery starts a child process, so the catalogue is held fresh for five
- * minutes — long enough that opening the slash menu never pays for a probe.
+ * Discovery starts a child process, so `staleTime` is sized for the passive
+ * trigger it governs: mounting a composer in a workspace whose catalogue was
+ * read minutes ago must not spawn one.
+ *
+ * It is not the freshness the menu itself promises. `useSlashCommands` runs a
+ * much shorter revalidation window on the deliberate triggers — the menu
+ * opening, the window regaining focus — so a skill installed mid-session is
+ * picked up without a relaunch.
  *
  * Seeds from the localStorage cache so a workspace opened before paints its menu
  * instantly on launch, then revalidates only once the seed is genuinely older
@@ -104,7 +125,7 @@ export function agentProviderSlashCommandsQuery(
 	cwd: string,
 ) {
 	return queryOptions({
-		enabled: cwd.length > 0,
+		enabled: canDiscoverSlashCommands(cwd),
 		/**
 		 * Seeds the menu from the localStorage cache for an instant first paint.
 		 * Must stay a function: these options are rebuilt on every composer render,
