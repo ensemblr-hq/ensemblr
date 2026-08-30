@@ -6,6 +6,7 @@ import {
 	ResizablePanelGroup,
 } from '@/renderer/components/ui/resizable';
 import { SidebarInset } from '@/renderer/components/ui/sidebar';
+import { RIGHT_SIDEBAR_COLLAPSED_SIZE } from '@/renderer/hooks/workbench-shell/use-right-sidebar-controller';
 import { SHELL_INSET_CLASS } from '@/renderer/lib/workbench/shell-inset';
 import type {
 	DockTabId,
@@ -107,13 +108,9 @@ function ReviewDockPanel({
 	return (
 		<ResizablePanel
 			className='hidden min-w-0 lg:flex'
-			collapsedSize='0rem'
+			collapsedSize={RIGHT_SIDEBAR_COLLAPSED_SIZE}
 			collapsible
-			defaultSize={
-				state.isRightSidebarCollapsed
-					? '0rem'
-					: `${state.rightSidebarSizePercent}%`
-			}
+			defaultSize={state.initialRightSidebarSize}
 			maxSize='68%'
 			minSize='22rem'
 			onResize={actions.handleRightSidebarResize}

@@ -41,9 +41,9 @@ export function StubbedWorkbenchLayout({
 			},
 			meta: { dockPanelRef, rightSidebarPanelRef },
 			state: {
+				initialRightSidebarSize: '34%',
 				isDockCollapsed: false,
 				isRightSidebarCollapsed,
-				rightSidebarSizePercent: 34,
 			},
 		}),
 		[isRightSidebarCollapsed],

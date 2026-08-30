@@ -185,9 +185,9 @@ export function WorkspaceWorkbenchContent({
 		<WorkbenchLayoutProvider
 			value={{
 				state: {
+					initialRightSidebarSize: rightSidebar.initialRightSidebarSize,
 					isDockCollapsed: dock.isDockCollapsed,
 					isRightSidebarCollapsed: rightSidebar.isRightSidebarCollapsed,
-					rightSidebarSizePercent: rightSidebar.rightSidebarSizePercent,
 				},
 				actions: {
 					collapseRightSidebar: rightSidebar.collapseRightSidebar,
