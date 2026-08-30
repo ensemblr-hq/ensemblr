@@ -1,5 +1,5 @@
-import { useAtom } from 'jotai';
-import { useEffect, useRef, useState } from 'react';
+import { useAtom, useSetAtom, useStore } from 'jotai';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { PanelImperativeHandle, PanelSize } from 'react-resizable-panels';
 
 import {
@@ -11,6 +11,10 @@ const RIGHT_SIDEBAR_MIN_VIEWPORT_WIDTH = 1024;
 const RIGHT_SIDEBAR_DEFAULT_SIZE_PERCENT = 34;
 const RIGHT_SIDEBAR_MAX_SIZE_PERCENT = 68;
 const RIGHT_SIDEBAR_COLLAPSED_THRESHOLD_PERCENT = 1;
+const RIGHT_SIDEBAR_SIZE_COMMIT_DELAY_MS = 250;
+
+/** The width the right sidebar collapses to, shared with the panel that renders it. */
+export const RIGHT_SIDEBAR_COLLAPSED_SIZE = '0rem';
 
 /** Asks the main process to grow the window to fit the right sidebar minimum. */
 async function ensureWindowCanShowRightSidebar() {
@@ -50,9 +54,9 @@ interface RightSidebarController {
 	collapseRightSidebar: () => void;
 	expandRightSidebar: () => Promise<void>;
 	handleRightSidebarResize: (size: PanelSize) => void;
+	initialRightSidebarSize: string;
 	isRightSidebarCollapsed: boolean;
 	rightSidebarPanelRef: React.RefObject<PanelImperativeHandle | null>;
-	rightSidebarSizePercent: number;
 }
 
 /**
@@ -60,21 +64,36 @@ interface RightSidebarController {
  * and the imperative panel ref.
  */
 export function useRightSidebarController(): RightSidebarController {
+	const store = useStore();
 	const rightSidebarPanelRef = useRef<PanelImperativeHandle | null>(null);
 	const rightSidebarCollapsedByViewportRef = useRef(false);
 	const [storedRightSidebarCollapsed, setStoredRightSidebarCollapsed] = useAtom(
 		rightSidebarCollapsedAtom,
 	);
-	const [rightSidebarSizePercent, setRightSidebarSizePercent] = useAtom(
-		rightSidebarSizePercentAtom,
-	);
-	const preferredRightSidebarSizePercent = getClampedRightSidebarSizePercent(
-		rightSidebarSizePercent,
-	);
+	// react-resizable-panels re-registers a panel — tearing down and relaying out
+	// the whole group — whenever `defaultSize` changes, so the persisted layout is
+	// read once at mount rather than subscribed to and tracked through a drag.
+	const [initialRightSidebarLayout] = useState(() => {
+		const sizePercent = getClampedRightSidebarSizePercent(
+			store.get(rightSidebarSizePercentAtom),
+		);
+
+		return {
+			size: store.get(rightSidebarCollapsedAtom)
+				? RIGHT_SIDEBAR_COLLAPSED_SIZE
+				: `${sizePercent}%`,
+			sizePercent,
+		};
+	});
+	const setRightSidebarSizePercent = useSetAtom(rightSidebarSizePercentAtom);
 	const rightSidebarCollapsedPreferenceRef = useRef(
 		storedRightSidebarCollapsed,
 	);
-	const rightSidebarSizePercentRef = useRef(preferredRightSidebarSizePercent);
+	const rightSidebarSizePercentRef = useRef(
+		initialRightSidebarLayout.sizePercent,
+	);
+	const pendingRightSidebarSizePercentRef = useRef<number | null>(null);
+	const rightSidebarSizeCommitTimerRef = useRef<number | null>(null);
 	const [isRightSidebarCollapsed, setIsRightSidebarCollapsed] = useState(
 		storedRightSidebarCollapsed,
 	);
@@ -82,9 +101,6 @@ export function useRightSidebarController(): RightSidebarController {
 	useEffect(() => {
 		rightSidebarCollapsedPreferenceRef.current = storedRightSidebarCollapsed;
 	}, [storedRightSidebarCollapsed]);
-	useEffect(() => {
-		rightSidebarSizePercentRef.current = preferredRightSidebarSizePercent;
-	}, [preferredRightSidebarSizePercent]);
 
 	/** Collapses the right sidebar and persists the preference. */
 	const collapseRightSidebar = () => {
@@ -109,6 +125,35 @@ export function useRightSidebarController(): RightSidebarController {
 			setStoredRightSidebarCollapsed(false);
 		});
 	};
+	/** Writes whatever width the drag last reported and drops the queued commit. */
+	const flushRightSidebarSizePercent = useCallback(() => {
+		if (rightSidebarSizeCommitTimerRef.current !== null) {
+			window.clearTimeout(rightSidebarSizeCommitTimerRef.current);
+			rightSidebarSizeCommitTimerRef.current = null;
+		}
+
+		const pendingSizePercent = pendingRightSidebarSizePercentRef.current;
+
+		if (pendingSizePercent === null) {
+			return;
+		}
+
+		pendingRightSidebarSizePercentRef.current = null;
+		setRightSidebarSizePercent(pendingSizePercent);
+	}, [setRightSidebarSizePercent]);
+	/** Defers the storage write until the drag settles, keeping frames free. */
+	const scheduleRightSidebarSizePercentCommit = (sizePercent: number) => {
+		pendingRightSidebarSizePercentRef.current = sizePercent;
+
+		if (rightSidebarSizeCommitTimerRef.current !== null) {
+			window.clearTimeout(rightSidebarSizeCommitTimerRef.current);
+		}
+
+		rightSidebarSizeCommitTimerRef.current = window.setTimeout(
+			flushRightSidebarSizePercent,
+			RIGHT_SIDEBAR_SIZE_COMMIT_DELAY_MS,
+		);
+	};
 	/** Persists user-driven resizes and toggles the collapsed flag. */
 	const handleRightSidebarResize = (size: PanelSize) => {
 		const isCollapsed =
@@ -120,17 +165,37 @@ export function useRightSidebarController(): RightSidebarController {
 			return;
 		}
 
-		setStoredRightSidebarCollapsed(isCollapsed);
-		rightSidebarCollapsedPreferenceRef.current = isCollapsed;
-
-		if (!isCollapsed) {
-			const nextSizePercent = getClampedRightSidebarSizePercent(
-				size.asPercentage,
-			);
-			rightSidebarSizePercentRef.current = nextSizePercent;
-			setRightSidebarSizePercent(nextSizePercent);
+		if (rightSidebarCollapsedPreferenceRef.current !== isCollapsed) {
+			rightSidebarCollapsedPreferenceRef.current = isCollapsed;
+			setStoredRightSidebarCollapsed(isCollapsed);
 		}
+
+		if (isCollapsed) {
+			return;
+		}
+
+		const nextSizePercent = getClampedRightSidebarSizePercent(
+			size.asPercentage,
+		);
+
+		if (nextSizePercent === rightSidebarSizePercentRef.current) {
+			return;
+		}
+
+		rightSidebarSizePercentRef.current = nextSizePercent;
+		scheduleRightSidebarSizePercentCommit(nextSizePercent);
 	};
+
+	// Quitting tears the renderer down without unmounting React, so the unmount
+	// cleanup alone would drop a width the user dragged to moments before.
+	useEffect(() => {
+		window.addEventListener('pagehide', flushRightSidebarSizePercent);
+
+		return () => {
+			window.removeEventListener('pagehide', flushRightSidebarSizePercent);
+			flushRightSidebarSizePercent();
+		};
+	}, [flushRightSidebarSizePercent]);
 
 	useEffect(() => {
 		const narrowViewportQuery = window.matchMedia(
@@ -197,8 +262,8 @@ export function useRightSidebarController(): RightSidebarController {
 		collapseRightSidebar,
 		expandRightSidebar,
 		handleRightSidebarResize,
+		initialRightSidebarSize: initialRightSidebarLayout.size,
 		isRightSidebarCollapsed,
 		rightSidebarPanelRef,
-		rightSidebarSizePercent: preferredRightSidebarSizePercent,
 	};
 }

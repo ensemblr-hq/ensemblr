@@ -9,9 +9,9 @@ import type { SetupDiagnosticsSnapshot } from '@/shared/ipc/contracts/setup';
 
 export interface WorkbenchLayoutContextValue {
 	state: {
+		initialRightSidebarSize: string;
 		isDockCollapsed: boolean;
 		isRightSidebarCollapsed: boolean;
-		rightSidebarSizePercent: number;
 	};
 	actions: {
 		collapseRightSidebar: () => void;
