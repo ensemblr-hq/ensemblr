@@ -214,6 +214,21 @@ const MODIFIER_LABEL_OTHER: Record<Modifier, string> = {
 	shift: 'Shift',
 };
 
+/** macOS renders modifiers in the fixed order ⌃⌥⇧⌘, whatever the chord holds. */
+const MODIFIER_ORDER_MAC: readonly Modifier[] = ['ctrl', 'alt', 'shift', 'mod'];
+
+/**
+ * Windows and Linux put Ctrl first — `Ctrl+Shift+Z`, never `Shift+Ctrl+Z`. Both
+ * `mod` and `ctrl` label as `Ctrl` here, so a chord holding both collapses to
+ * one label rather than repeating it.
+ */
+const MODIFIER_ORDER_OTHER: readonly Modifier[] = [
+	'mod',
+	'ctrl',
+	'alt',
+	'shift',
+];
+
 /**
  * Named keys macOS writes as a glyph. Elsewhere the word is the convention, so
  * the table applies on darwin only.
@@ -259,37 +274,27 @@ export function formatChord(
 ): string {
 	const mac = isMac();
 	const labels = mac ? MODIFIER_LABEL_MAC : MODIFIER_LABEL_OTHER;
-	const separator = mac ? '' : '+';
-	const order: readonly Modifier[] = ['ctrl', 'alt', 'shift', 'mod'];
 	const held = new Set(modifiers);
-	const parts = order
-		.filter((modifier) => held.has(modifier))
-		.map((modifier) => labels[modifier]);
+	const ordered = (mac ? MODIFIER_ORDER_MAC : MODIFIER_ORDER_OTHER).filter(
+		(modifier) => held.has(modifier),
+	);
+	const parts = Array.from(
+		new Set(ordered.map((modifier) => labels[modifier])),
+	);
 	parts.push(formatKey(key));
-	return parts.join(separator);
+	return parts.join(mac ? '' : '+');
 }
 
 /**
  * Human-readable label for the first binding of a shortcut. Used in tooltips
  * and hint chips. Returns e.g. `⌘L` on macOS or `Ctrl+L` elsewhere.
+ * @param id - Identifier of the shortcut to label
+ * @returns The display-ready chord, or an empty string when it has no binding
  */
 export function formatShortcut(id: ShortcutId): string {
 	const binding = defOf(id).bindings[0];
 	if (!binding) {
 		return '';
 	}
-	const mac = isMac();
-	const labels = mac ? MODIFIER_LABEL_MAC : MODIFIER_LABEL_OTHER;
-	const separator = mac ? '' : '+';
-	const parts: string[] = [];
-	// Mac convention orders ⌃⌥⇧⌘; elsewhere Ctrl comes first.
-	const order: readonly Modifier[] = ['ctrl', 'alt', 'shift', 'mod'];
-	const modifierSet = new Set<Modifier>(binding.modifiers ?? []);
-	for (const mod of order) {
-		if (modifierSet.has(mod)) {
-			parts.push(labels[mod]);
-		}
-	}
-	parts.push(formatKey(binding.key));
-	return parts.join(separator);
+	return formatChord(binding.modifiers ?? [], binding.key);
 }

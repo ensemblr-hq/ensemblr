@@ -1,6 +1,8 @@
 import { describe, expect, test } from 'vitest';
 
 import {
+	formatChord,
+	formatShortcut,
 	type KeyboardEventLike,
 	matchesShortcut,
 } from '../../src/shared/keymap';
@@ -194,5 +196,54 @@ describe('matchesShortcut — composer submit', () => {
 		const e = modEvent({ key: 'Enter', code: 'Enter' });
 		expect(matchesShortcut('composer.submitWithMod', e)).toBe(true);
 		expect(matchesShortcut('composer.submit', e)).toBe(false);
+	});
+});
+
+/**
+ * Modifier order is a platform convention, not a preference: macOS renders the
+ * fixed run ⌃⌥⇧⌘, while Windows and Linux put Ctrl first. The suite runs on
+ * both CI legs, so each case states the expectation for the running platform.
+ */
+const IS_MAC = process.platform === 'darwin';
+
+describe('formatChord — modifier order per platform', () => {
+	test('mod alone', () => {
+		expect(formatChord(['mod'], 'O')).toBe(IS_MAC ? '⌘O' : 'Ctrl+O');
+	});
+
+	test('shift+mod puts Ctrl first off macOS', () => {
+		expect(formatChord(['shift', 'mod'], 'Z')).toBe(
+			IS_MAC ? '⇧⌘Z' : 'Ctrl+Shift+Z',
+		);
+	});
+
+	test('alt+mod puts Ctrl first off macOS', () => {
+		expect(formatChord(['alt', 'mod'], 'U')).toBe(
+			IS_MAC ? '⌥⌘U' : 'Ctrl+Alt+U',
+		);
+	});
+
+	test('the order the modifiers are passed in does not change the label', () => {
+		expect(formatChord(['mod', 'shift'], 'N')).toBe(
+			formatChord(['shift', 'mod'], 'N'),
+		);
+	});
+
+	test('every modifier at once', () => {
+		expect(formatChord(['mod', 'ctrl', 'alt', 'shift'], 'K')).toBe(
+			IS_MAC ? '⌃⌥⇧⌘K' : 'Ctrl+Alt+Shift+K',
+		);
+	});
+
+	test('mod and ctrl collapse to one Ctrl off macOS', () => {
+		expect(formatChord(['mod', 'ctrl'], 'K')).toBe(IS_MAC ? '⌃⌘K' : 'Ctrl+K');
+	});
+
+	test('named keys render as glyphs on macOS and words elsewhere', () => {
+		expect(formatChord(['mod'], 'Enter')).toBe(IS_MAC ? '⌘↵' : 'Ctrl+Enter');
+	});
+
+	test('formatShortcut labels a registered shortcut the same way', () => {
+		expect(formatShortcut('tab.next')).toBe(IS_MAC ? '⇧⌘]' : 'Ctrl+Shift+]');
 	});
 });
