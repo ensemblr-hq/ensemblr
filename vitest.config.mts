@@ -20,6 +20,13 @@ import { defineConfig } from 'vitest/config';
  * import, which made a hermetic unit test depend on a ~100 MB network fetch. A
  * suite that needs Electron behaviour still mocks the module itself.
  *
+ * `node-pty` is aliased for the same reason, and it is the Linux leg that made
+ * it necessary: the package ships prebuilds for darwin and win32 only, and
+ * `allowScripts` blocks building one, so on Linux there is no `pty.node` to
+ * load at all. The suites that reach it do so through the agent-control barrel;
+ * none spawns a terminal. The real module is still loaded by the
+ * `electron --test` scripts, which is where terminal behaviour is exercised.
+ *
  * `@iconify/react` is aliased to its own `offline` build for the same reason:
  * the default build answers an unregistered icon prefix with a live request to
  * `https://api.iconify.design`, which outlived window teardown and surfaced as
@@ -48,6 +55,12 @@ export default defineConfig({
 				find: 'electron',
 				replacement: fileURLToPath(
 					new URL('./tests/main/support/electron-stub.ts', import.meta.url),
+				),
+			},
+			{
+				find: 'node-pty',
+				replacement: fileURLToPath(
+					new URL('./tests/main/support/node-pty-stub.ts', import.meta.url),
 				),
 			},
 		],

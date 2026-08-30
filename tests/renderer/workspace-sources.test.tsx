@@ -54,8 +54,10 @@ test('provides row actions per source', () => {
 	expect(
 		getWorkspaceSourceActions(branchWithWorkspace).map((a) => a.label),
 	).toEqual(['Open', 'Duplicate branch']);
+	// The shortcut is formatted for the running platform, and this suite runs on
+	// both CI legs — a bare '⌘↵' asserts the macOS spelling against a Linux runner.
 	expect(getWorkspaceSourceActions(branchWithWorkspace)[1]?.shortcut).toBe(
-		'⌘↵',
+		process.platform === 'darwin' ? '⌘↵' : 'Ctrl+Enter',
 	);
 	expect(
 		getWorkspaceSourceActions(branchWithoutWorkspace).map((a) => a.label),
