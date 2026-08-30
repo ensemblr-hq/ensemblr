@@ -206,6 +206,32 @@ cause. If the runtime refuses to mount at all, `--appimage-extract-and-run`.
 | 15 | Settings → General → Check for updates | Reports a version with a link; never tries to install |
 | 16 | Unplug it, run a long agent turn | The power-save blocker releases at the low-battery threshold |
 | 17 | `--ozone-platform=x11` | Still starts (the documented XWayland escape hatch) |
+| 18 | Let a background chat finish a turn | A desktop notification appears, and the in-app chime plays |
+| 19 | Click that notification | The window raises and opens *that* chat, crossing workspaces if needed |
+
+Rows 18 and 19 are separate on purpose. Electron posts Linux notifications over
+`org.freedesktop.Notifications`, and every daemon implements the `Notify` call —
+so a notification appearing proves very little. The **click** is what varies:
+Electron only attaches its default action when the daemon advertises the
+`actions` capability, and a daemon that has it still has to bind a mouse button
+to invoking it. KDE's daemon, which is what the Deck runs, does both. A
+wlroots-compositor daemon like **mako** is the case worth checking separately —
+it supports actions, but whether a left click invokes the default one is
+configuration (`on-button-left=invoke-default-action`), not a given.
+
+Ask the daemon directly before blaming the app:
+
+```bash
+gdbus call --session \
+  --dest org.freedesktop.Notifications \
+  --object-path /org/freedesktop/Notifications \
+  --method org.freedesktop.Notifications.GetCapabilities
+```
+
+No `actions` in that list means clicking a notification cannot work, whatever
+Ensemblr does. The chime is unaffected either way: it is `new Audio()` in the
+renderer, and the notification itself is posted `silent` so no daemon ever
+plays a second tone over it.
 
 `npm run build` is an alias for `npm run package`. All three of `build`,
 `package`, and `make` run `scripts/require-node-version.mjs` first.
