@@ -9,7 +9,7 @@
 
 import { renderHook } from '@testing-library/react';
 import { getDefaultStore } from 'jotai';
-import { beforeEach, describe, expect, test } from 'vitest';
+import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 
 import { useConciergeAnchor } from '../../src/renderer/hooks/concierge/use-concierge-anchor';
 import {
@@ -17,6 +17,7 @@ import {
 	CONCIERGE_UNPLACED,
 	conciergeAnchorAtom,
 } from '../../src/renderer/state/concierge';
+import { resolveWindowChrome } from '../../src/shared/window-chrome';
 import { installLocalStorage } from './support/dom';
 
 const LAUNCHER_SIZE = { height: 44, width: 44 };
@@ -24,11 +25,14 @@ const LAUNCHER_SIZE = { height: 44, width: 44 };
 /** Bottom edge of the zone toasts and the rerun control occupy, in pixels. */
 const OCCUPIED_CORNER_HEIGHT = 76;
 
+/** Height of the title bar Ensemblr draws for itself, in pixels. */
+const APP_TITLE_BAR_HEIGHT = 36;
+
 /**
  * Mounts the anchor hook against a real node and reports where it placed it.
  * @param anchor - The persisted corner to place from.
  * @param size - The surface's own width and height.
- * @returns The node's offsets from the viewport's bottom and right edges.
+ * @returns The node's top edge, and its offsets from the bottom and right edges.
  */
 function placeSurface(anchor = CONCIERGE_UNPLACED, size = LAUNCHER_SIZE) {
 	getDefaultStore().set(conciergeAnchorAtom, anchor);
@@ -45,6 +49,19 @@ function placeSurface(anchor = CONCIERGE_UNPLACED, size = LAUNCHER_SIZE) {
 			window.innerHeight - Number.parseFloat(node.style.top) - size.height,
 		fromRight:
 			window.innerWidth - Number.parseFloat(node.style.left) - size.width,
+		top: Number.parseFloat(node.style.top),
+	};
+}
+
+/**
+ * Seeds the shell snapshot the renderer reads its window chrome from.
+ * @param platform - The platform to resolve the chrome for.
+ */
+function installWindowChrome(platform: 'darwin' | 'linux'): void {
+	(
+		window as unknown as { ensemblrInitialShellSnapshot?: unknown }
+	).ensemblrInitialShellSnapshot = {
+		windowChrome: resolveWindowChrome(platform, 'custom'),
 	};
 }
 
@@ -83,5 +100,36 @@ describe('the undragged Concierge surface', () => {
 		});
 
 		expect(fromBottom).toBe(16);
+	});
+});
+
+// The surface is placed against the viewport, so the title bar Ensemblr draws
+// over the window's top edge is not something the layout keeps it clear of.
+describe('a surface dragged to the top of the window', () => {
+	beforeEach(() => {
+		installLocalStorage();
+		document.body.replaceChildren();
+	});
+
+	afterEach(() => {
+		(
+			window as unknown as { ensemblrInitialShellSnapshot?: unknown }
+		).ensemblrInitialShellSnapshot = undefined;
+	});
+
+	test('stops below the title bar Ensemblr draws for itself', () => {
+		installWindowChrome('linux');
+
+		const { top } = placeSurface({ x: 200, y: 0 }, CONCIERGE_MIN_PANEL_SIZE);
+
+		expect(top).toBe(APP_TITLE_BAR_HEIGHT + 8);
+	});
+
+	test('reaches the window edge where the desktop draws the title bar', () => {
+		installWindowChrome('darwin');
+
+		const { top } = placeSurface({ x: 200, y: 0 }, CONCIERGE_MIN_PANEL_SIZE);
+
+		expect(top).toBe(8);
 	});
 });

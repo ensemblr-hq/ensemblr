@@ -14,6 +14,13 @@ const INSET_TOP_PROPERTY = '--ensemblr-window-chrome-inset-top';
 const OWN_CONTROLS_CLASS = 'app-window-controls';
 
 /**
+ * One CSS `rem` in pixels, for the surfaces that weigh the chrome insets — which
+ * are expressed in `rem` — against a measured rectangle. The app never overrides
+ * the root font size.
+ */
+const REM_IN_PX = 16;
+
+/**
  * Reads the chrome the main process actually constructed the window with. Falls
  * back to resolving it from the platform when the preload snapshot is missing —
  * a dev reload before the bridge is up, or a test harness — which errs toward
@@ -27,6 +34,18 @@ export function readWindowChrome(): WindowChromeSnapshot {
 			: window.ensemblrInitialShellSnapshot?.windowChrome;
 
 	return snapshot ?? resolveWindowChrome(detectPlatform(), 'system');
+}
+
+/**
+ * The same insets in pixels, for the floating surfaces that place themselves
+ * against the viewport rather than inside the flow: a panel clamping its own
+ * drag has a measured rectangle to compare against, not a CSS length.
+ * @returns The leading and top insets, in pixels.
+ */
+export function readWindowChromeInsetsPx(): { start: number; top: number } {
+	const { insets } = readWindowChrome();
+
+	return { start: insets.start * REM_IN_PX, top: insets.top * REM_IN_PX };
 }
 
 /**

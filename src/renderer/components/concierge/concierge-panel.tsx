@@ -7,7 +7,10 @@ import { SidebarTrigger, useSidebar } from '@/renderer/components/ui/sidebar';
 import { useConciergePanel } from '@/renderer/hooks/concierge/use-concierge-panel';
 import { useConciergeReferenceOpen } from '@/renderer/hooks/concierge/use-concierge-reference-open';
 import { cn } from '@/renderer/lib/utils';
-import { readWindowChrome } from '@/renderer/lib/window-chrome';
+import {
+	readWindowChrome,
+	readWindowChromeInsetsPx,
+} from '@/renderer/lib/window-chrome';
 import { TOOLBAR_HEIGHT_CLASS } from '@/renderer/lib/workbench/shell-inset';
 import type { ConciergeSize } from '@/renderer/state/concierge';
 import { ConciergeClearConfirmDialog } from './concierge-clear-confirm-dialog';
@@ -18,13 +21,6 @@ import { ConciergeQuestionSlot } from './concierge-question-slot';
 import { ConciergeReferenceProvider } from './concierge-reference-context';
 import { ConciergeResizeHandles } from './concierge-resize-handles';
 import { ConciergeTimeline } from './concierge-timeline';
-
-/**
- * One CSS `rem` in pixels, for comparing a measured rectangle against the
- * chrome insets, which are expressed in `rem`. The app never overrides the root
- * font size.
- */
-const REM_IN_PX = 16;
 
 /**
  * The Concierge conversation surface: a docked card the user can drag anywhere
@@ -71,8 +67,13 @@ export function ConciergePanel() {
 	const sidebarEdgeLabel = sidebarIsCollapsed
 		? expandSidebarLabel
 		: t('workbench:concierge.panel.collapse-sidebar', 'Hide the sidebar');
+	const windowChrome = readWindowChrome();
 	const clearsLeadingChrome =
-		(panel.insetRect?.left ?? 0) >= readWindowChrome().insets.start * REM_IN_PX;
+		(panel.insetRect?.left ?? 0) >= readWindowChromeInsetsPx().start;
+	// Where Ensemblr draws the title bar the nav sidebar has no header strip, so
+	// a maximized panel covers the only trigger there is — open or collapsed.
+	const showsSidebarTrigger =
+		sidebarIsCollapsed || windowChrome.drawsOwnControls;
 
 	return (
 		// Wraps the transcript *and* the composer: a chip in an answer and a chip in
@@ -129,9 +130,9 @@ export function ConciergePanel() {
 							className='size-4 shrink-0 text-muted-foreground/50'
 						/>
 					)}
-					{isFullscreen && sidebarIsCollapsed ? (
+					{isFullscreen && showsSidebarTrigger ? (
 						<SidebarTrigger
-							aria-label={expandSidebarLabel}
+							aria-label={sidebarEdgeLabel}
 							className='mr-1'
 							onDoubleClick={stopHeaderGesture}
 						/>

@@ -13,6 +13,8 @@ import {
 	conciergePanelSizeAtom,
 } from '@/renderer/state/concierge';
 
+import { conciergeTopBound } from './use-concierge-anchor';
+
 /** Which edges a resize gesture moves. */
 export type ConciergeResizeEdge =
 	| 'bottom'
@@ -100,7 +102,7 @@ function clampSize(size: ConciergeSize): ConciergeSize {
 		height: clampSpan(
 			size.height,
 			CONCIERGE_MIN_PANEL_SIZE.height,
-			window.innerHeight - EDGE_MARGIN * 2,
+			window.innerHeight - conciergeTopBound() - EDGE_MARGIN,
 		),
 		width: clampSpan(
 			size.width,
@@ -159,7 +161,7 @@ function resolveResize(
 		axes.y === 0 ? start.bottom - start.top : spanAlong(start, axes.y, dy, 'y'),
 		CONCIERGE_MIN_PANEL_SIZE.height,
 		axes.y === -1
-			? start.bottom - EDGE_MARGIN
+			? start.bottom - conciergeTopBound()
 			: window.innerHeight - EDGE_MARGIN - start.top,
 	);
 

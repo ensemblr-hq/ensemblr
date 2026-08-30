@@ -656,6 +656,18 @@
 		@apply bg-background text-foreground antialiased;
 	}
 
+	/* The document itself never scrolls: every shell surface sizes to
+	   `--ensemblr-shell-height` and scrolls inside itself. Pinned rather than
+	   left to add up, because the title bar is drawn over the viewport's top
+	   edge while `body` pads for it — so a document scrolled even a few pixels,
+	   by a focus move or a collapsible opening below the fold, slides the whole
+	   app up underneath the bar. */
+	html.app-window-controls,
+	html.app-window-controls body {
+		block-size: 100svh;
+		overflow: hidden;
+	}
+
 	button,
 	input,
 	textarea,
@@ -850,6 +862,15 @@
 	[data-slot="sidebar"][data-state="collapsed"]
 		~ [data-slot="sidebar-inset"]
 		.sidebar-collapsed-trigger {
+		display: inline-flex;
+	}
+
+	/* Where Ensemblr draws its own title bar the nav sidebar has no title-bar
+	   strip of its own — the wordmark is up in the title bar, which would leave
+	   that strip carrying nothing but this trigger. So the toolbar's copy is the
+	   only one, and it stays out whether the sidebar is open or shut rather than
+	   appearing only once there is no other way back. */
+	html.app-window-controls .sidebar-collapsed-trigger {
 		display: inline-flex;
 	}
 

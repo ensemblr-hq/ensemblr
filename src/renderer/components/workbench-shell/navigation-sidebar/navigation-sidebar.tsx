@@ -88,11 +88,11 @@ export function WorkspaceNavigationSidebar({
 
 	return (
 		<Sidebar className='border-sidebar-border' collapsible='offcanvas'>
-			<NavigationSidebarHeader
-				showsWordmark={
-					windowChrome.insets.start === 0 && !windowChrome.drawsOwnControls
-				}
-			/>
+			{windowChrome.drawsOwnControls ? null : (
+				<NavigationSidebarHeader
+					showsWordmark={windowChrome.insets.start === 0}
+				/>
+			)}
 
 			<SidebarContent className='overflow-visible'>
 				<SidebarPrimaryNavigation
