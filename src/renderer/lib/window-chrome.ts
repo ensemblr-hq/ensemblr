@@ -4,11 +4,12 @@ import {
 } from '@/shared/window-chrome';
 
 const INSET_START_PROPERTY = '--ensemblr-window-chrome-inset-start';
-const INSET_END_PROPERTY = '--ensemblr-window-chrome-inset-end';
+const INSET_TOP_PROPERTY = '--ensemblr-window-chrome-inset-top';
 
 /**
- * Marks the document while Ensemblr draws the window controls itself, so CSS
- * can reserve the trailing strip without every toolbar knowing about it.
+ * Marks the document while Ensemblr draws the window controls itself, so the
+ * surfaces that size themselves to the viewport give the title bar its strip
+ * back without every one of them knowing about it.
  */
 const OWN_CONTROLS_CLASS = 'app-window-controls';
 
@@ -41,7 +42,7 @@ export function applyWindowChrome(chrome: WindowChromeSnapshot): void {
 
 	const root = document.documentElement;
 	root.style.setProperty(INSET_START_PROPERTY, `${chrome.insets.start}rem`);
-	root.style.setProperty(INSET_END_PROPERTY, `${chrome.insets.end}rem`);
+	root.style.setProperty(INSET_TOP_PROPERTY, `${chrome.insets.top}rem`);
 	root.classList.toggle(OWN_CONTROLS_CLASS, chrome.drawsOwnControls);
 }
 

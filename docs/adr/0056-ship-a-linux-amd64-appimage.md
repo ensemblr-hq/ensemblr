@@ -122,10 +122,23 @@ top level readable.
 In `custom` mode the window is `titleBarStyle: 'hidden'` with **no**
 `titleBarOverlay`, so Chromium draws nothing and Ensemblr's three buttons —
 minimize, maximize/restore, close — are the only ones. They are drawn in the
-app's own visual language, top-right, with no attempt to mimic GNOME's or KDE's
-button sets or ordering: imitating one desktop is guaranteed to be wrong on the
-other, and a half-right imitation reads as a bug where an honestly different
-cluster reads as a choice.
+app's own visual language, with no attempt to mimic GNOME's or KDE's button sets
+or ordering: imitating one desktop is guaranteed to be wrong on the other, and a
+half-right imitation reads as a bug where an honestly different cluster reads as
+a choice.
+
+They live in a title bar of their own — a full-width strip above the app's
+content, carrying the wordmark and the cluster — rather than floating over the
+window's top-right corner. The overlay shipped first and was wrong twice. It
+crowded whichever toolbar reached the trailing edge, which on a review sidebar
+is the pull-request header, leaving a PR number, a status label and a primary
+action to share one row with three buttons. And it did not work at all:
+Chromium reports draggable regions in document order and Electron unions them in
+that order, so a `-webkit-app-region: drag` toolbar painted *after* the cluster
+re-covered the holes its buttons had punched, and every click on them dragged
+the window instead. A strip that no toolbar overlaps has neither problem, and
+`body` pads by the strip's own height so the shell is sized to what is left
+rather than covered at the top.
 
 Window Controls Overlay was the alternative. It would have let Chromium draw the
 buttons, at the cost of a safe area that changes per desktop and has to be read

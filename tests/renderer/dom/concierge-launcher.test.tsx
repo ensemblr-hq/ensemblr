@@ -208,12 +208,8 @@ describe('the Concierge launcher', () => {
 		expect(panel.querySelector('.max-w-3xl')).not.toBeNull();
 		expect(panel.querySelector('.max-w-4xl')).not.toBeNull();
 		// Maximized, the header sits beside the navigation sidebar's own, so it
-		// takes the shell toolbar's height rather than its own compact one, and
-		// reserves the trailing strip Ensemblr draws its window controls in.
+		// takes the shell toolbar's height rather than its own compact one.
 		expect(panel.querySelector('header')).toHaveClass(TOOLBAR_HEIGHT_CLASS);
-		expect(panel.querySelector('header')).toHaveClass(
-			'window-controls-safe-end',
-		);
 	});
 
 	test('maximizes on a double-click of its docked title bar', async () => {

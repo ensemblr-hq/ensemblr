@@ -85,7 +85,7 @@ function OnboardingRoute() {
 	};
 
 	return (
-		<div className='relative h-svh w-full'>
+		<div className='relative h-(--ensemblr-shell-height) w-full'>
 			<span
 				aria-hidden='true'
 				className='window-drag-region absolute inset-x-0 top-0 z-10 h-12'

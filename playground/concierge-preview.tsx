@@ -31,7 +31,7 @@ import {
 	SceneToggle,
 } from './scene-chrome.tsx';
 import {
-	SceneWindowControls,
+	SceneWindowTitleBar,
 	useSceneWindowChrome,
 } from './scene-window-chrome.tsx';
 
@@ -200,7 +200,7 @@ function ConciergeStage() {
 				</SceneSection>
 				<ConciergeLauncher />
 			</SidebarInset>
-			<SceneWindowControls isEnabled={drawsOwnControls} />
+			<SceneWindowTitleBar isEnabled={drawsOwnControls} />
 		</>
 	);
 }

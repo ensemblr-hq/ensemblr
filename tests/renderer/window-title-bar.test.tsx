@@ -2,7 +2,7 @@
 
 import { fireEvent, screen } from '@testing-library/react';
 import { afterEach, expect, test, vi } from 'vitest';
-import { WindowControls } from '../../src/renderer/components/workbench-shell/window-controls';
+import { WindowTitleBar } from '../../src/renderer/components/workbench-shell/window-controls';
 import type { WindowMaximizedBroadcast } from '../../src/shared/ipc/contracts/repository-navigation';
 import {
 	clearEnsemblrApi,
@@ -52,8 +52,8 @@ afterEach(() => {
 	document.body.style.removeProperty('pointer-events');
 });
 
-test('mounts the cluster ahead of the app so it outranks a body-portalled overlay', () => {
-	const { container } = renderWithProviders(<WindowControls />);
+test('mounts the strip ahead of the app so it outranks a body-portalled overlay', () => {
+	const { container } = renderWithProviders(<WindowTitleBar />);
 
 	const group = screen.getByRole('group', { name: 'Window controls' });
 
@@ -61,13 +61,25 @@ test('mounts the cluster ahead of the app so it outranks a body-portalled overla
 	expect(document.body.firstElementChild).toContainElement(group);
 });
 
+test('draws the strip as a drag region so no toolbar below reserves room for it', () => {
+	renderWithProviders(<WindowTitleBar />);
+
+	const strip = screen
+		.getByRole('group', { name: 'Window controls' })
+		.closest('.window-title-bar');
+
+	expect(strip).not.toBeNull();
+	expect(strip?.parentElement).toHaveClass('fixed');
+	expect(strip?.parentElement).toHaveClass('top-0');
+});
+
 test('stays clickable while a modal has nulled pointer events on the body', () => {
-	renderWithProviders(<WindowControls />);
+	renderWithProviders(<WindowTitleBar />);
 	document.body.style.pointerEvents = 'none';
 
-	const overlay = screen.getByRole('group', {
-		name: 'Window controls',
-	}).parentElement;
+	const overlay = screen
+		.getByRole('group', { name: 'Window controls' })
+		.closest('.window-title-bar')?.parentElement;
 
 	expect(overlay).toHaveClass('pointer-events-auto');
 	expect(overlay).toHaveClass('z-100');
@@ -76,14 +88,14 @@ test('stays clickable while a modal has nulled pointer events on the body', () =
 test('seeds the maximized state from the bootstrap snapshot', () => {
 	seedShellSnapshot(true);
 
-	renderWithProviders(<WindowControls />);
+	renderWithProviders(<WindowTitleBar />);
 
 	expect(screen.getByRole('button', { name: 'Restore' })).toBeInTheDocument();
 });
 
 test('leaves the label to the broadcast rather than to its own click', async () => {
 	const bridge = installWindowBridge();
-	renderWithProviders(<WindowControls />);
+	renderWithProviders(<WindowTitleBar />);
 
 	fireEvent.click(screen.getByRole('button', { name: 'Maximize' }));
 
@@ -98,11 +110,11 @@ test('leaves the label to the broadcast rather than to its own click', async () 
 });
 
 test('removes its host element from the body on unmount', () => {
-	const { unmount } = renderWithProviders(<WindowControls />);
+	const { unmount } = renderWithProviders(<WindowTitleBar />);
 
-	expect(document.querySelector('[data-window-controls]')).not.toBeNull();
+	expect(document.querySelector('[data-window-title-bar]')).not.toBeNull();
 
 	unmount();
 
-	expect(document.querySelector('[data-window-controls]')).toBeNull();
+	expect(document.querySelector('[data-window-title-bar]')).toBeNull();
 });

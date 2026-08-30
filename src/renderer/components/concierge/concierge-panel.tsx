@@ -71,7 +71,7 @@ export function ConciergePanel() {
 	const sidebarEdgeLabel = sidebarIsCollapsed
 		? expandSidebarLabel
 		: t('workbench:concierge.panel.collapse-sidebar', 'Hide the sidebar');
-	const clearsWindowControls =
+	const clearsLeadingChrome =
 		(panel.insetRect?.left ?? 0) >= readWindowChrome().insets.start * REM_IN_PX;
 
 	return (
@@ -107,16 +107,14 @@ export function ConciergePanel() {
 						// Maximized, this header sits beside the sidebar's own — so it takes
 						// the shell toolbar's height, padding, and full-strength border, or
 						// the two rules miss each other and the title crowds the divider.
-						// It also spans both of the window's top corners, and window
-						// controls draw above the web contents at either end: the macOS
-						// traffic lights on the left, and Ensemblr's own cluster on the
-						// right where it draws one. Both are cleared by the same insets the
-						// shell's own toolbars take.
+						// It also spans the window's leading top corner, where macOS draws
+						// the traffic lights over the web contents — cleared by the same
+						// inset the shell's own toolbars take.
 						isFullscreen
 							? cn(
-									'window-controls-safe-end border-border pr-2',
+									'border-border pr-2',
 									TOOLBAR_HEIGHT_CLASS,
-									clearsWindowControls
+									clearsLeadingChrome
 										? 'pl-3'
 										: 'pl-[var(--ensemblr-window-chrome-safe-start)]',
 								)

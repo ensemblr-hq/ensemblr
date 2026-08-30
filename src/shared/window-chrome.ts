@@ -4,21 +4,22 @@ import type { AppearanceSettings } from './config.ts';
 export type TitleBarPreference = AppearanceSettings['titleBar'];
 
 /**
- * How much room the app's own chrome must leave along the window's top edge, in
- * `rem`, so the toolbar clears whatever the platform draws there.
+ * How much room the app's own content must leave along the window's edges, in
+ * `rem`, so it clears whatever is drawn over or above it.
  */
 export interface WindowChromeInsets {
-	/** Trailing edge: Ensemblr's own window controls, when it draws them. */
-	end: number;
 	/** Leading edge: the macOS traffic lights. */
 	start: number;
+	/** Top edge: the title bar Ensemblr draws when it owns the controls. */
+	top: number;
 }
 
 /**
  * Who draws the window's minimize / maximize / close buttons, and where they
  * sit relative to the app's own content.
  *
- * - `app` — Ensemblr draws them itself, over a frameless window.
+ * - `app` — Ensemblr draws them itself, in its own title bar above the app's
+ *   content, over a frameless window.
  * - `system-inset` — the platform draws them *inside* the content area, as
  *   macOS does with the traffic lights, so the shell keeps the leading edge
  *   clear for them.
@@ -46,17 +47,25 @@ export interface WindowChromeSnapshot {
 	titleBar: TitleBarPreference;
 }
 
-/** Width the app's own three-button control cluster occupies, in `rem`. */
-const APP_WINDOW_CONTROLS_INSET_REM = 7;
+/**
+ * Height of the title bar Ensemblr draws above its own content, in `rem`.
+ *
+ * Deliberately shorter than `--ensemblr-toolbar-height`: it carries the
+ * wordmark and three buttons, and a strip as tall as the toolbars below it
+ * would read as a second one. It reaches CSS as
+ * `--ensemblr-window-chrome-inset-top`, which is both the strip's height and
+ * the padding the shell clears it with, so the two cannot drift apart.
+ */
+const APP_TITLE_BAR_HEIGHT_REM = 2.25;
 
 /** Width the macOS traffic lights occupy, in `rem`. */
 export const TRAFFIC_LIGHT_INSET_REM = 5.75;
 
 /** The room each control owner claims along the window's top edge, in `rem`. */
 const INSETS_BY_CONTROLS: Record<WindowControlsOwner, WindowChromeInsets> = {
-	app: { end: APP_WINDOW_CONTROLS_INSET_REM, start: 0 },
-	'system-frame': { end: 0, start: 0 },
-	'system-inset': { end: 0, start: TRAFFIC_LIGHT_INSET_REM },
+	app: { start: 0, top: APP_TITLE_BAR_HEIGHT_REM },
+	'system-frame': { start: 0, top: 0 },
+	'system-inset': { start: TRAFFIC_LIGHT_INSET_REM, top: 0 },
 };
 
 /**

@@ -5,7 +5,7 @@ import { createRoot } from 'react-dom/client';
 
 import { queryClient } from './api/query-client';
 import { Toaster } from './components/ui/sonner';
-import { WindowControls } from './components/workbench-shell/window-controls';
+import { WindowTitleBar } from './components/workbench-shell/window-controls';
 import { applyWindowChrome, readWindowChrome } from './lib/window-chrome';
 import { registerIconCollections } from './lib/workbench/icon-collections';
 import { router } from './routing/router';
@@ -37,7 +37,7 @@ applyWindowChrome(windowChrome);
 createRoot(rootElement).render(
 	<StrictMode>
 		<QueryClientProvider client={queryClient}>
-			{windowChrome.drawsOwnControls ? <WindowControls /> : null}
+			{windowChrome.drawsOwnControls ? <WindowTitleBar /> : null}
 			<RouterProvider router={router} />
 			<Toaster position='bottom-right' />
 		</QueryClientProvider>

@@ -9,13 +9,16 @@ import type { WorkbenchLayoutContextValue } from '@/renderer/types/contexts';
  * Supplies the two contexts `WorkbenchHeader` reads — the resizable-panel layout
  * and the navigation sidebar — so the shipped toolbar renders outside the
  * workbench route. The review sidebar defaults to collapsed because that is the
- * only configuration that mounts the inline review-header actions; the
- * window-controls scene drives it both ways, since the trailing inset the
- * toolbar reserves depends on it.
+ * only configuration that mounts the inline review-header actions; the window
+ * title-bar scene drives it both ways, since which header carries the
+ * pull-request controls depends on it.
  *
  * `SidebarProvider` is built to own the viewport, so its wrapper is flattened to
- * a plain block here: a scene stacks many toolbars, and each one claiming
- * `min-h-svh` would put a screen of empty space between them.
+ * a plain block here: a scene stacks many toolbars, and each one claiming the
+ * window's height would put a screen of empty space between them. The flattening
+ * is `!important` because the shipped rule that gives the wrapper its height back
+ * under Ensemblr's own title bar is a `[data-slot]` selector, which outranks a
+ * plain utility class.
  */
 export function StubbedWorkbenchLayout({
 	children,
@@ -47,7 +50,7 @@ export function StubbedWorkbenchLayout({
 	);
 
 	return (
-		<SidebarProvider className='block min-h-0'>
+		<SidebarProvider className='block min-h-0!'>
 			<WorkbenchLayoutProvider value={layout}>
 				{children}
 			</WorkbenchLayoutProvider>

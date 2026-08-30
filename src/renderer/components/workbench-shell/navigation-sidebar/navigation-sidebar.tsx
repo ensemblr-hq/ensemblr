@@ -75,7 +75,7 @@ export function WorkspaceNavigationSidebar({
 	const [renameWorkspaceTarget, setRenameWorkspaceTarget] =
 		useState<WorkspaceShellModel | null>(null);
 	const developerMode = useAtomValue(developerModeAtom);
-	const leadingChromeIsEmpty = readWindowChrome().insets.start === 0;
+	const windowChrome = readWindowChrome();
 	const queryClient = useQueryClient();
 	const prefetchIssues = useCallback(
 		() =>
@@ -88,7 +88,11 @@ export function WorkspaceNavigationSidebar({
 
 	return (
 		<Sidebar className='border-sidebar-border' collapsible='offcanvas'>
-			<NavigationSidebarHeader showsWordmark={leadingChromeIsEmpty} />
+			<NavigationSidebarHeader
+				showsWordmark={
+					windowChrome.insets.start === 0 && !windowChrome.drawsOwnControls
+				}
+			/>
 
 			<SidebarContent className='overflow-visible'>
 				<SidebarPrimaryNavigation

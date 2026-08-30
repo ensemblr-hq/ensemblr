@@ -11,7 +11,8 @@ import { TOOLBAR_HEIGHT_CLASS } from '@/renderer/lib/workbench/shell-inset';
  * leaves the window's leading corner to the app — the Ensemblr wordmark.
  *
  * macOS parks the traffic lights in that corner, so there the strip stays bare
- * rather than crowding them; everywhere else the corner is empty and the bar
+ * rather than crowding them, and where Ensemblr draws its own title bar the
+ * wordmark is already up there; everywhere else the corner is empty and the bar
  * reads as an unexplained gap above the navigation.
  */
 export function NavigationSidebarHeader({
