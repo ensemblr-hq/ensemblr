@@ -43,6 +43,9 @@ npm run verify:signing # assert what make just produced is signed and notarized
 
 npm run package:linux  # build an unpacked linux-x64 directory under out/
 npm run make:linux     # build the .AppImage under out/make/
+
+npm run diagnose:linux # report the Linux native-module toolchain and pty.node's linkage
+npm run rebuild:native # compile node-pty in a container, for hosts with no compiler
 ```
 
 The Linux artifact is never signed, notarized, or stapled — there is no
@@ -89,6 +92,78 @@ Three ways to get one:
    `.desktop` file, the icons — on a Mac. It must never ship: terminals in the
    result do not work.
 
+### Developing on Linux
+
+On a Linux desktop that already has a compiler, there is nothing to know: pin
+Node and run `npm run dev`. The rest of this section is for the hosts where that
+is not true, which on Linux is a larger share than it sounds — every immutable
+distribution (SteamOS, Silverblue, NixOS) ships without one.
+
+```bash
+npm run diagnose:linux   # compiler, make, python3, mksquashfs, pty.node + its linkage
+npm run rebuild:native   # compile node-pty in a throwaway Debian container
+```
+
+**Pin Node first.** `.nvmrc`, `mise.toml`, and `engines` all say 24, but nothing
+on PATH enforces it and distro packages are usually something else:
+
+```bash
+./scripts/with-pinned-node.sh npm run dev        # resolves via mise → nvm → brew node@24
+export PATH="$(brew --prefix node@24)/bin:$PATH" # or put it on PATH yourself
+```
+
+`dev` **warns** on the wrong major rather than refusing, because Forge rebuilds
+native modules against Electron's own ABI either way — the mismatch degrades the
+dev loop instead of corrupting an artifact. `package`/`make`/`install` still
+refuse outright.
+
+**`node-pty` is the only thing that compiles, and it bites twice.** It publishes
+prebuilds for darwin and win32 only, so on linux-x64 its `install` script falls
+straight through `scripts/prebuild.js` to `node-gyp rebuild` — that is failure
+one, during `npm ci`. Forge then rebuilds it again against Electron's ABI inside
+`start` and `package`, which is failure two, and it surfaces as nothing more
+useful than:
+
+```
+Error: node-gyp failed to rebuild '.../node_modules/node-pty'
+```
+
+`scripts/require-linux-toolchain.mjs` runs ahead of `dev`, `package:linux`, and
+`make:linux` and turns that into a message naming the missing tool. It also
+reads `pty.node`'s linkage back with `ldd` and refuses a binding whose libraries
+resolve outside `/usr` or `/lib` — see the Deck section below for why a
+Homebrew-linked one is worse than no binding at all.
+
+**Without a host compiler, compile in a container and run on the host.** The
+container needs to exist only for the compile:
+
+```bash
+# Install, when npm ci itself cannot get past node-pty's install script.
+podman run --rm -v "$PWD":/src -w /src node:24-bookworm npm ci
+
+# Then the binding, which is what npm run rebuild:native wraps.
+npm run rebuild:native
+```
+
+Both leave their output in the host's `node_modules`, where Forge finds the
+binding already built and skips its own rebuild. Rootless podman maps container
+root to you, so the files come back owned correctly; rootful docker does not,
+and `rebuild:native` says so with the `chown` to fix it.
+
+**Do not try to run the app in that container.** Electron needs the whole
+Chromium runtime — a bare `debian:bookworm` gets as far as
+`error while loading shared libraries: libnspr4.so` — plus the session's Wayland
+socket and GPU nodes. Installing that set into a container to reach a desktop
+you are already sitting in front of is work for no gain, and it puts a second
+glibc between the app and the compositor whose behavior you are trying to
+verify. The compile is the only part that wants isolation, and it is the only
+part that is host-independent.
+
+`debian:bookworm` is also not arbitrary: it links an older glibc than any
+desktop host, and old-built-runs-on-new is the safe direction for a binary that
+ends up inside a shipped AppImage. Override with
+`ENSEMBLR_NATIVE_REBUILD_IMAGE` only toward an *older* base, never a newer one.
+
 ### Building and verifying on a Steam Deck
 
 The Deck is the reference Linux host: Wayland, KDE Plasma, fractional scaling, a
@@ -96,13 +171,26 @@ battery, an immutable root, and no package manager to speak of. Everything below
 assumes **Desktop Mode**.
 
 **Toolchain.** Three things are needed, and they do not all come from the same
-place. Check what is already there:
+place. `npm run diagnose:linux` reports all of them, plus whether `pty.node` is
+built and what it links against:
 
-```bash
-for tool in node python3 g++ make mksquashfs brew distrobox; do
-  printf '%-12s %s\n' "$tool" "$(command -v $tool || echo MISSING)"
-done
 ```
+node         24.20.0 (electron rebuild target)
+compiler     MISSING
+make         MISSING
+python3      /home/linuxbrew/.linuxbrew/bin/python3
+mksquashfs   /home/linuxbrew/.linuxbrew/bin/mksquashfs
+pty.node     .../node_modules/node-pty/build/Release/pty.node
+
+linkage
+  libstdc++.so.6     /usr/lib/libstdc++.so.6
+  libc.so.6          /usr/lib/libc.so.6
+```
+
+That output is the steady state on a Deck set up the way this section
+describes, and it is worth reading twice: **`compiler MISSING` is fine** once
+`pty.node` exists and links under `/usr`. The compiler is needed to produce the
+binding, not to use it.
 
 **Node 24 and `mksquashfs`: Homebrew covers both.** Each has an `x86_64_linux`
 bottle, so nothing compiles and nothing touches the read-only root. `node@24` is
@@ -131,7 +219,17 @@ Pointing `CXX` at Homebrew's `g++-16` to force it is the bad one: the resulting
 other — the same shape of silent, ships-anyway breakage
 `require-linux-host.mjs` exists to prevent, just one layer down.
 
-So if `g++` is MISSING above, use the system package manager or a container:
+So if `g++` is MISSING above, the shortest way through is not to install one at
+all — `npm run rebuild:native` compiles the one module that needs it in a
+throwaway `node:24-bookworm` container and leaves the binding in
+`node_modules`, where Forge finds it already built. The Deck ships `podman`, so
+this needs no installation and no sudo password:
+
+```bash
+npm run rebuild:native   # ~1 GB image pull the first time, seconds after that
+```
+
+Reach for a real toolchain only if you want one on the host anyway:
 
 ```bash
 # Native. Needs a sudo password set (`passwd` — the Deck ships without one),
@@ -141,17 +239,23 @@ sudo pacman-key --init && sudo pacman-key --populate archlinux holo
 sudo pacman -S --needed base-devel python
 ```
 
+Or keep a persistent Debian shell, if you would rather have `npm ci` and the
+build tools in one place than reach for a one-shot container each time:
+
 ```bash
-# Or a container, which survives OS updates. Prefer Debian over Arch: it links
-# against an older glibc than the host, and old-built-runs-on-new is the safe
-# direction for anything that ends up inside the artifact.
 distrobox create --name ensemblr --image debian:bookworm
 distrobox enter ensemblr
 sudo apt-get update && sudo apt-get install -y git curl python3 build-essential squashfs-tools
 ```
 
-**Whichever route, check what `pty.node` actually linked** before trusting the
-build. The one line that matters:
+It shares `$HOME`, so the repo is the same tree from both sides — but note that
+it does **not** share `/home/linuxbrew`, so Homebrew's `node@24` is invisible
+inside it and Node has to be installed in the container too. Compile there, then
+leave: the app itself has to run on the host (see *Developing on Linux* above).
+
+**Whichever route, check what `pty.node` actually linked.** For the tree you are
+developing against, `npm run diagnose:linux` does it and the `dev`/`package:linux`
+guards do it automatically. After a build, check what actually got packaged:
 
 ```bash
 ldd out/Ensemblr-linux-x64/resources/app.asar.unpacked/node_modules/node-pty/build/Release/pty.node
@@ -165,7 +269,13 @@ anywhere.
 
 ```bash
 git clone https://github.com/ensemblr-hq/ensemblr.git && cd ensemblr
-npm ci
+export PATH="$(brew --prefix node@24)/bin:$PATH"
+
+npm ci                  # no compiler? podman run --rm -v "$PWD":/src -w /src node:24-bookworm npm ci
+npm run rebuild:native  # no compiler? this is what builds node-pty
+npm run diagnose:linux  # confirm pty.node exists and links under /usr
+
+npm run dev             # the dev loop, on the host
 npm run package:linux   # unpacked build — needs no mksquashfs
 ./out/Ensemblr-linux-x64/Ensemblr
 ```
@@ -584,6 +694,18 @@ Adding another unbundled or native dependency means updating **both**
   `--fix` to unregister dangling ones (live sibling builds are left alone).
 - **Node version error at build.** `require-node-version.mjs` refuses to build on
   a Node outside `>=24 <25`; switch with `nvm`/`mise` (`.nvmrc` / `mise.toml`).
+- **`node-gyp failed to rebuild '.../node-pty'` on Linux.** The host has no C++
+  compiler, and node-pty ships no linux-x64 prebuild. `npm run rebuild:native`
+  builds it in a container without installing anything;
+  `npm run diagnose:linux` reports what is missing. See *Developing on Linux*.
+- **Terminals dead in a Linux build that worked locally.** `pty.node` was
+  compiled against a private prefix — a Homebrew or Nix compiler — and carries
+  an rpath no other machine has. `npm run diagnose:linux` names the offending
+  libraries; `rm -rf node_modules/node-pty/build && npm run rebuild:native`
+  replaces it. The `dev`/`package:linux`/`make:linux` guards refuse it now.
+- **`libnspr4.so: cannot open shared object file`.** Electron is being launched
+  inside a container that has no Chromium runtime libraries. Compile in the
+  container; run the app on the host.
 - **Node version error at install.** Non-interactive shells (a workspace's
   `setup`/`run` scripts, CI, hooks) never source the mise/nvm hooks, so they run
   under whatever Node is on PATH. Prefix the command with

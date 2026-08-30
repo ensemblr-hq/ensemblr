@@ -5,9 +5,17 @@ overview; this is the runbook.
 
 ## 1. Prerequisites
 
-Ensemblr is **macOS-only** — it packages an arm64 `.app`, stores secrets in the
-Keychain, and reads battery state through macOS APIs. There is no Linux or
-Windows path.
+Ensemblr targets **macOS arm64** (a signed, notarized `.app`) and **Linux x86-64**
+(an unsigned `.AppImage`). There is no Windows path. What differs between the two
+is declared per platform rather than branched inline — the secret store, the
+"Open in…" registry, the battery reader, the window chrome, and updates — so
+developing on either is the same loop.
+
+Linux has one extra setup step, because `node-pty` publishes no linux-x64
+prebuild and has to be compiled: see
+[*Developing on Linux*](./build-and-release.md#developing-on-linux), which also
+covers hosts with no compiler at all. `npm run diagnose:linux` reports where you
+stand.
 
 | Requirement | Why | Check |
 | --- | --- | --- |

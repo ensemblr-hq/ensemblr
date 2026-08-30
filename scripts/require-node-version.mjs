@@ -15,9 +15,26 @@ const CONSEQUENCE = {
 		`electron-forge silently produces no artifacts under Node ${current}.`,
 	install: (current) =>
 		`native modules would be compiled for Node ${current} and fail to load when the build runs.`,
+	dev: (current) =>
+		`Node ${current} is not what the build, CI, or the packaged app run, so tooling that works here may not survive \`npm run make\`.`,
 };
 
-const stage = process.argv.includes('--stage=install') ? 'install' : 'build';
+// `dev` warns rather than exits: Forge rebuilds native modules against Electron's
+// own ABI either way, so the wrong major degrades the dev loop instead of
+// corrupting an artifact. Blocking it would be louder than the risk.
+const ADVISORY_STAGES = new Set(['dev']);
+
+/**
+ * Reads the requested stage off argv, defaulting to the strictest one.
+ * @returns The stage key naming what the caller is about to do.
+ */
+function readStage() {
+	const flag = process.argv.find((argument) => argument.startsWith('--stage='));
+	const stage = flag?.slice('--stage='.length);
+	return stage && stage in CONSEQUENCE ? stage : 'build';
+}
+
+const stage = readStage();
 const nvmrc = fileURLToPath(new URL('../.nvmrc', import.meta.url));
 const required = Number.parseInt(readFileSync(nvmrc, 'utf8').trim(), 10);
 const current = Number.parseInt(process.versions.node.split('.')[0], 10);
@@ -33,10 +50,15 @@ if (Number.isNaN(required)) {
 }
 
 if (current !== required) {
-	console.error(
+	const advisory = ADVISORY_STAGES.has(stage);
+	const report = advisory ? console.warn : console.error;
+
+	report(
 		[
 			'',
-			`✖ Node ${required} required to ${stage}, but running Node ${process.versions.node}.`,
+			advisory
+				? `⚠ Node ${required} expected to ${stage}, but running Node ${process.versions.node}.`
+				: `✖ Node ${required} required to ${stage}, but running Node ${process.versions.node}.`,
 			`  ${CONSEQUENCE[stage](current)}`,
 			'',
 			'  Fix (pick one):',
@@ -46,5 +68,8 @@ if (current !== required) {
 			'',
 		].join('\n'),
 	);
-	process.exit(1);
+
+	if (!advisory) {
+		process.exit(1);
+	}
 }
