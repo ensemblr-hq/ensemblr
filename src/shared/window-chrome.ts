@@ -15,6 +15,23 @@ export interface WindowChromeInsets {
 }
 
 /**
+ * Who draws the window's minimize / maximize / close buttons, and where they
+ * sit relative to the app's own content.
+ *
+ * - `app` — Ensemblr draws them itself, over a frameless window.
+ * - `system-inset` — the platform draws them *inside* the content area, as
+ *   macOS does with the traffic lights, so the shell keeps the leading edge
+ *   clear for them.
+ * - `system-frame` — the desktop draws a title bar outside the content area and
+ *   the app reserves nothing.
+ *
+ * This is the single decision the whole chrome follows from: the insets, the
+ * `BrowserWindow` constructor options, and whether the renderer mounts a control
+ * cluster are all derived from it rather than each re-testing the platform.
+ */
+export type WindowControlsOwner = 'app' | 'system-frame' | 'system-inset';
+
+/**
  * What the running window's chrome actually is. Main resolves this once, when
  * it constructs the window, and hands the renderer the same answer — rather
  * than letting the renderer re-derive it from a setting that may have changed
@@ -22,6 +39,7 @@ export interface WindowChromeInsets {
  * system-decorated window would stack two sets of buttons.
  */
 export interface WindowChromeSnapshot {
+	controls: WindowControlsOwner;
 	/** Whether Ensemblr draws minimize / maximize / close itself. */
 	drawsOwnControls: boolean;
 	insets: WindowChromeInsets;
@@ -29,10 +47,17 @@ export interface WindowChromeSnapshot {
 }
 
 /** Width the app's own three-button control cluster occupies, in `rem`. */
-export const APP_WINDOW_CONTROLS_INSET_REM = 7;
+const APP_WINDOW_CONTROLS_INSET_REM = 7;
 
 /** Width the macOS traffic lights occupy, in `rem`. */
 export const TRAFFIC_LIGHT_INSET_REM = 5.75;
+
+/** The room each control owner claims along the window's top edge, in `rem`. */
+const INSETS_BY_CONTROLS: Record<WindowControlsOwner, WindowChromeInsets> = {
+	app: { end: APP_WINDOW_CONTROLS_INSET_REM, start: 0 },
+	'system-frame': { end: 0, start: 0 },
+	'system-inset': { end: 0, start: TRAFFIC_LIGHT_INSET_REM },
+};
 
 /**
  * Resolves the window chrome for a platform and the user's title-bar
@@ -51,24 +76,31 @@ export function resolveWindowChrome(
 	titleBar: TitleBarPreference,
 ): WindowChromeSnapshot {
 	if (platform === 'darwin') {
-		return {
-			drawsOwnControls: false,
-			insets: { end: 0, start: TRAFFIC_LIGHT_INSET_REM },
-			titleBar,
-		};
+		return describeWindowChrome('system-inset', titleBar);
 	}
 
 	if (platform === 'linux' && titleBar === 'custom') {
-		return {
-			drawsOwnControls: true,
-			insets: { end: APP_WINDOW_CONTROLS_INSET_REM, start: 0 },
-			titleBar,
-		};
+		return describeWindowChrome('app', titleBar);
 	}
 
+	return describeWindowChrome('system-frame', titleBar);
+}
+
+/**
+ * Expands a control owner into the full snapshot, so `drawsOwnControls` and the
+ * insets are computed in one place and cannot drift apart.
+ * @param controls - Who draws the window controls.
+ * @param titleBar - The user's title-bar preference.
+ * @returns The snapshot both processes read.
+ */
+function describeWindowChrome(
+	controls: WindowControlsOwner,
+	titleBar: TitleBarPreference,
+): WindowChromeSnapshot {
 	return {
-		drawsOwnControls: false,
-		insets: { end: 0, start: 0 },
+		controls,
+		drawsOwnControls: controls === 'app',
+		insets: { ...INSETS_BY_CONTROLS[controls] },
 		titleBar,
 	};
 }

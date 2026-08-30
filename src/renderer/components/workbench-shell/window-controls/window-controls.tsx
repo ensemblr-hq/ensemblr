@@ -1,5 +1,6 @@
 import { Copy, Minus, Square, X } from 'lucide-react';
-import { useCallback } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 
 import { closeWindow, minimizeWindow } from '@/renderer/api/ensemblr';
@@ -19,29 +20,61 @@ import { useWindowMaximized } from './use-window-maximized';
  * own actions out from under it is a CSS rule keyed on the
  * `app-window-controls` class the chrome resolver sets.
  *
+ * Portalled to the very start of `document.body` rather than left inside
+ * `#root`: on Linux these three buttons are the window's only decoration, so
+ * they have to outrank a Radix overlay that portals to the body behind them, and
+ * they have to come before the app in tab and reading order rather than after
+ * the entire route tree.
+ *
  * Close goes through `closeWindow`, which fires the window's `close` event and
  * therefore the quit confirmation. Calling `app.quit()` here would kill running
  * agents without asking.
  */
 export function WindowControls() {
 	const { maximized, toggle } = useWindowMaximized();
+	const container = useWindowControlsContainer();
 
 	const toggleMaximize = useCallback(() => {
 		void toggle();
 	}, [toggle]);
 
-	useDragRegionDoubleClick(toggleMaximize, true);
+	useDragRegionDoubleClick(toggleMaximize);
 
-	return (
-		<div className='fixed top-0 right-0 z-50'>
+	return createPortal(
+		// `z-100` and `pointer-events-auto` are what survive an open modal: a
+		// Radix overlay is also `z-50`, and its modal layer nulls pointer events on
+		// the body, which would otherwise leave the window with no way to close.
+		<div className='pointer-events-auto fixed top-0 right-0 z-100'>
 			<WindowControlCluster
 				isMaximized={maximized}
 				onClose={() => void closeWindow()}
 				onMinimize={() => void minimizeWindow()}
 				onToggleMaximize={toggleMaximize}
 			/>
-		</div>
+		</div>,
+		container,
 	);
+}
+
+/**
+ * Creates the host element the cluster portals into and keeps it as the first
+ * child of `document.body`, which is what puts the window controls ahead of the
+ * app in tab order while still leaving them outside `#root`'s stacking context.
+ * @returns The host element, attached for as long as the component is mounted.
+ */
+function useWindowControlsContainer(): HTMLElement {
+	const [container] = useState(() => {
+		const element = document.createElement('div');
+		element.dataset.windowControls = '';
+		return element;
+	});
+
+	useEffect(() => {
+		document.body.prepend(container);
+		return () => container.remove();
+	}, [container]);
+
+	return container;
 }
 
 /**
@@ -52,6 +85,10 @@ export function WindowControls() {
  * toolbar, so it takes its height from the same custom property
  * `.native-toolbar` does — otherwise a toolbar that changed height would leave
  * the buttons sitting off-centre against it.
+ *
+ * It carries a group label because a screen reader meets three unrelated icon
+ * buttons at the top of the document otherwise, with nothing saying they are the
+ * window's own controls rather than the app's.
  */
 export function WindowControlCluster({
 	isMaximized,
@@ -68,7 +105,12 @@ export function WindowControlCluster({
 	const MaximizeIcon = isMaximized ? Copy : Square;
 
 	return (
-		<div className={cn('flex items-center gap-1 px-2', TOOLBAR_HEIGHT_CLASS)}>
+		// biome-ignore lint/a11y/useSemanticElements: the semantic equivalent is <fieldset>, which groups form controls; these are the window's.
+		<div
+			aria-label={t('workbench:window-controls.group', 'Window controls')}
+			className={cn('flex items-center gap-1 px-2', TOOLBAR_HEIGHT_CLASS)}
+			role='group'
+		>
 			<WindowControlButton
 				label={t('workbench:window-controls.minimize', 'Minimize')}
 				onClick={onMinimize}

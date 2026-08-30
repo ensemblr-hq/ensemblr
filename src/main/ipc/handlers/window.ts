@@ -60,24 +60,23 @@ export function registerWindowHandlers({
 		liveWindow(event.sender)?.minimize();
 	});
 
-	ipcMain.handle(
-		IPC_CHANNELS.toggleMaximizeWindow,
-		(event): WindowMaximizedBroadcast => {
-			const window = liveWindow(event.sender);
+	// Returns nothing on purpose. `maximize()` is a request to the window
+	// manager, so `isMaximized()` on the next line can still report the old value
+	// on X11 and Wayland; the `maximize`/`unmaximize` broadcast below is the only
+	// writer of the renderer's state.
+	ipcMain.handle(IPC_CHANNELS.toggleMaximizeWindow, (event) => {
+		const window = liveWindow(event.sender);
 
-			if (!window) {
-				return { maximized: false };
-			}
+		if (!window) {
+			return;
+		}
 
-			if (window.isMaximized()) {
-				window.unmaximize();
-			} else {
-				window.maximize();
-			}
-
-			return { maximized: window.isMaximized() };
-		},
-	);
+		if (window.isMaximized()) {
+			window.unmaximize();
+		} else {
+			window.maximize();
+		}
+	});
 
 	ipcMain.handle(IPC_CHANNELS.relaunchApp, () => {
 		requestRelaunch();

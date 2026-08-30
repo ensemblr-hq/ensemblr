@@ -37,8 +37,8 @@ applyWindowChrome(windowChrome);
 createRoot(rootElement).render(
 	<StrictMode>
 		<QueryClientProvider client={queryClient}>
-			<RouterProvider router={router} />
 			{windowChrome.drawsOwnControls ? <WindowControls /> : null}
+			<RouterProvider router={router} />
 			<Toaster position='bottom-right' />
 		</QueryClientProvider>
 	</StrictMode>,

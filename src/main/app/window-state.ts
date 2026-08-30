@@ -13,7 +13,10 @@ export interface MainWindowState {
 
 /** Persistence interface for the main window's last-known state. */
 export interface MainWindowStateStore {
-	load: (displays: readonly MainWindowDisplay[]) => MainWindowState | null;
+	load: (
+		displays: readonly MainWindowDisplay[],
+		ignorePosition?: boolean,
+	) => MainWindowState | null;
 	save: (state: MainWindowState) => void;
 }
 
@@ -24,6 +27,7 @@ interface MainWindowDisplay {
 
 const MAIN_WINDOW_STATE_KEY = 'mainWindow.state';
 const MAIN_WINDOW_STATE_SAVE_DELAY_MS = 500;
+const OZONE_PLATFORM_SWITCH = '--ozone-platform';
 
 export const DEFAULT_MAIN_WINDOW_HEIGHT = 820;
 export const DEFAULT_MAIN_WINDOW_WIDTH = 1280;
@@ -47,14 +51,14 @@ export function createMainWindowStateStore({
 	now?: () => Date;
 }): MainWindowStateStore {
 	return {
-		load(displays) {
+		load(displays, ignorePosition = forbidsWindowPositioning()) {
 			const database = databaseService.getConnection()?.database ?? null;
 
 			if (!database) {
 				return null;
 			}
 
-			return loadMainWindowState({ database, displays });
+			return loadMainWindowState({ database, displays, ignorePosition });
 		},
 		save(state) {
 			const database = databaseService.getConnection()?.database ?? null;
@@ -88,7 +92,7 @@ export function captureMainWindowState(
 	}
 
 	return {
-		bounds,
+		bounds: forbidsWindowPositioning() ? { ...bounds, x: 0, y: 0 } : bounds,
 		isFullScreen: mainWindow.isFullScreen(),
 		isMaximized: mainWindow.isMaximized(),
 	};
@@ -146,19 +150,75 @@ export function trackMainWindowState({
 }
 
 /**
- * Reports whether the session forbids a client from placing its own window.
- * Wayland gives a client no way to read or set its position, so Electron
- * reports a clamped-to-zero rectangle and honours no `x`/`y` we pass — restoring
- * one would overwrite good persisted state with `(0, 0)` on every launch.
- * @param platform - The running platform.
- * @param sessionType - The value of `XDG_SESSION_TYPE`.
+ * Reports whether the running client is forbidden from placing its own window.
+ * Wayland gives a client no way to read or set its position, so Electron reports
+ * a clamped-to-zero rectangle and honours no `x`/`y` we pass — restoring one
+ * would overwrite good persisted state with `(0, 0)` on every launch.
+ *
+ * What decides this is the Ozone platform Chromium is actually running on, not
+ * the session logind advertises: `--ozone-platform=x11` is the documented escape
+ * hatch, and that client can position itself inside a Wayland session. The
+ * environment is only the fallback for a launch that names no platform, where a
+ * compositor started straight from a TTY may leave `XDG_SESSION_TYPE` unset but
+ * still export `WAYLAND_DISPLAY`.
+ * @param inputs - The platform and the switches/environment that name the Ozone backend.
  * @returns True when only the size and state flags may be restored.
  */
-export function forbidsWindowPositioning(
-	platform: NodeJS.Platform = process.platform,
-	sessionType: string | undefined = process.env.XDG_SESSION_TYPE,
-): boolean {
-	return platform === 'linux' && sessionType?.toLowerCase() === 'wayland';
+export function forbidsWindowPositioning({
+	ozonePlatform = readOzonePlatformSwitch(),
+	platform = process.platform,
+	sessionType = process.env.XDG_SESSION_TYPE,
+	waylandDisplay = process.env.WAYLAND_DISPLAY,
+}: {
+	/** The value of Chromium's `--ozone-platform` switch, when the launch set one. */
+	ozonePlatform?: string | undefined;
+	platform?: NodeJS.Platform;
+	/** The value of `XDG_SESSION_TYPE`. */
+	sessionType?: string | undefined;
+	/** The value of `WAYLAND_DISPLAY`. */
+	waylandDisplay?: string | undefined;
+} = {}): boolean {
+	if (platform !== 'linux') {
+		return false;
+	}
+
+	if (ozonePlatform) {
+		return ozonePlatform.toLowerCase() === 'wayland';
+	}
+
+	return (
+		sessionType?.toLowerCase() === 'wayland' || (waylandDisplay ?? '') !== ''
+	);
+}
+
+/**
+ * Reads Chromium's `--ozone-platform` switch off the command line the app was
+ * launched with, accepting both the `=` and the separated form.
+ * @param argv - Process arguments to scan.
+ * @returns The named platform, or undefined when the launch set none.
+ */
+function readOzonePlatformSwitch(
+	argv: readonly string[] = process.argv,
+): string | undefined {
+	const index = argv.findIndex(
+		(argument) =>
+			argument === OZONE_PLATFORM_SWITCH ||
+			argument.startsWith(`${OZONE_PLATFORM_SWITCH}=`),
+	);
+
+	if (index < 0) {
+		return undefined;
+	}
+
+	const inlineValue = argv[index]?.slice(OZONE_PLATFORM_SWITCH.length + 1);
+
+	if (inlineValue) {
+		return inlineValue;
+	}
+
+	const separatedValue = argv[index + 1];
+
+	return separatedValue?.startsWith('--') ? undefined : separatedValue;
 }
 
 /**
@@ -171,6 +231,7 @@ export function forbidsWindowPositioning(
 export function normalizeMainWindowState(
 	value: unknown,
 	displays: readonly MainWindowDisplay[],
+	ignorePosition: boolean = forbidsWindowPositioning(),
 ): MainWindowState | null {
 	const state = normalizeStoredMainWindowState(value);
 
@@ -180,26 +241,36 @@ export function normalizeMainWindowState(
 
 	return {
 		...state,
-		bounds: clampMainWindowBounds(state.bounds, displays),
+		bounds: clampMainWindowBounds(state.bounds, displays, ignorePosition),
 	};
 }
 
 /**
  * Clamps a rectangle to fit inside the nearest display's work area, while
  * enforcing the configured minimum window size.
+ *
+ * Where the client may not place its own window, the persisted origin is the
+ * compositor's `(0, 0)` rather than the display the window was on, so picking
+ * the work area *by position* would size a window on a large secondary monitor
+ * down to the primary's — a little further on every launch. There the size is
+ * clamped against the roomiest display instead, and the origin is dropped.
  * @param bounds - Candidate window rectangle.
  * @param displays - Display layout to clamp against.
+ * @param ignorePosition - True when the persisted origin carries no information.
  * @returns A rectangle guaranteed to be visible and at-or-above the minimum size.
  */
 export function clampMainWindowBounds(
 	bounds: Rectangle,
 	displays: readonly MainWindowDisplay[],
+	ignorePosition: boolean = forbidsWindowPositioning(),
 ): Rectangle {
 	const workAreas = displays.flatMap((display) => {
 		const workArea = normalizeRectangle(display.workArea);
 		return workArea ? [workArea] : [];
 	});
-	const targetWorkArea = findTargetWorkArea(bounds, workAreas);
+	const targetWorkArea = ignorePosition
+		? findLargestWorkArea(workAreas)
+		: findTargetWorkArea(bounds, workAreas);
 
 	if (!targetWorkArea) {
 		return bounds;
@@ -215,6 +286,10 @@ export function clampMainWindowBounds(
 		MAIN_WINDOW_MIN_HEIGHT,
 		targetWorkArea.height,
 	);
+
+	if (ignorePosition) {
+		return { height, width, x: 0, y: 0 };
+	}
 
 	return {
 		height,
@@ -232,9 +307,11 @@ export function clampMainWindowBounds(
 function loadMainWindowState({
 	database,
 	displays,
+	ignorePosition,
 }: {
 	database: DatabaseSync;
 	displays: readonly MainWindowDisplay[];
+	ignorePosition: boolean;
 }): MainWindowState | null {
 	try {
 		const row = database
@@ -249,7 +326,11 @@ function loadMainWindowState({
 			return null;
 		}
 
-		return normalizeMainWindowState(JSON.parse(row.value_json), displays);
+		return normalizeMainWindowState(
+			JSON.parse(row.value_json),
+			displays,
+			ignorePosition,
+		);
 	} catch (error) {
 		console.warn(
 			'Failed to load persisted main window state; using defaults.',
@@ -392,6 +473,29 @@ function findTargetWorkArea(
 	}
 
 	return findNearestWorkArea(bounds, workAreas);
+}
+
+/**
+ * Picks the roomiest work area, used when the persisted origin says nothing
+ * about which display the window was on.
+ * @param workAreas - Available display work areas.
+ * @returns The work area with the largest surface, or `null` when the list is empty.
+ */
+function findLargestWorkArea(
+	workAreas: readonly Rectangle[],
+): Rectangle | null {
+	let largest: Rectangle | null = null;
+
+	for (const workArea of workAreas) {
+		if (
+			!largest ||
+			workArea.width * workArea.height > largest.width * largest.height
+		) {
+			largest = workArea;
+		}
+	}
+
+	return largest;
 }
 
 /**

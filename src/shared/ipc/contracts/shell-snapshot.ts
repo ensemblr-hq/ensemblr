@@ -14,6 +14,12 @@ export interface InitialShellSnapshot {
 	health: HealthSnapshot | null;
 	/** Language the main process resolved, so the first paint is never English by default. */
 	language: AppLanguage;
+	/**
+	 * Whether the window was maximized when the bridge captured this. The
+	 * app-drawn control seeds itself from this instead of guessing `false` and
+	 * waiting for the first broadcast, which a reload would otherwise have missed.
+	 */
+	maximized: boolean;
 	navigation: RepositoryWorkspaceNavigationSnapshot | null;
 	openTargets: WorkspaceOpenTargetSnapshot[] | null;
 	/**

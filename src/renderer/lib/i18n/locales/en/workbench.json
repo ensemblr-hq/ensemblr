@@ -1236,6 +1236,7 @@
 	},
 	"window-controls": {
 		"close": "Close window",
+		"group": "Window controls",
 		"maximize": "Maximize",
 		"minimize": "Minimize",
 		"restore": "Restore"

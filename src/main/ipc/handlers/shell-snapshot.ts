@@ -1,4 +1,4 @@
-import { app, ipcMain } from 'electron';
+import { app, BrowserWindow, ipcMain } from 'electron';
 
 import {
 	type AppLanguage,
@@ -41,12 +41,26 @@ export function registerShellSnapshotHandlers({
 			capturedAt: new Date().toISOString(),
 			health: safeBuildHealthSnapshot(configService, databaseService),
 			language: safeResolveLanguage(appSettingsService),
+			maximized: isSenderWindowMaximized(event.sender),
 			navigation: safeBuildNavigationSnapshot(databaseService),
 			openTargets: openTargetService.getCachedSnapshots(),
 			windowChrome: readWindowChrome(),
 		};
 		event.returnValue = snapshot;
 	});
+}
+
+/**
+ * Report whether the window behind the bootstrap request is maximized, so the
+ * app-drawn control starts from the truth rather than from `false`. A reload of
+ * an already-maximized window would otherwise show "Maximize" until the next
+ * state change produced a broadcast.
+ * @param sender - The web contents that issued the bootstrap request
+ * @returns True when the window is maximized; false when it is gone or torn down
+ */
+function isSenderWindowMaximized(sender: Electron.WebContents): boolean {
+	const window = BrowserWindow.fromWebContents(sender);
+	return window !== null && !window.isDestroyed() && window.isMaximized();
 }
 
 /**
