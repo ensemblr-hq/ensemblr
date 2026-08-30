@@ -26,3 +26,13 @@ export const menuContextSchema = z.object({
 	recentProjects: z.array(menuDynamicEntrySchema),
 	runScripts: z.array(menuDynamicEntrySchema),
 });
+
+/**
+ * Validates a row the app-drawn menu bar reports the user picked. The id is
+ * opaque — main resolves it against the revision that minted it — so nothing
+ * beyond its shape can be checked here.
+ */
+export const menuBarInvokeRequestSchema = z.object({
+	id: z.string(),
+	revision: z.number().int().nonnegative(),
+});

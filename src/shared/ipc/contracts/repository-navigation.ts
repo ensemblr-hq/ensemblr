@@ -9,6 +9,10 @@ import type {
 	ReviewCommentsChangedBroadcast,
 	TabsChangedBroadcast,
 } from '../../agent-control.ts';
+import type {
+	MenuBarDescriptor,
+	MenuBarInvokeRequest,
+} from '../../menu-bar.ts';
 import type { MenuCommandBroadcast, MenuContext } from '../../menu-commands.ts';
 import type {
 	ActiveChatContext,
@@ -135,6 +139,25 @@ export interface ShellApi {
 	 * difference.
 	 */
 	reportMenuContext: (context: MenuContext) => Promise<void>;
+	/**
+	 * Reads the menu bar as main last built it, so a renderer that draws the bar
+	 * itself has one to paint before the next rebuild broadcasts.
+	 */
+	getMenuBar: () => Promise<MenuBarDescriptor>;
+	/**
+	 * Subscribes to the menu bar, rebroadcast whenever main rebuilds the native
+	 * menu — a language change, or a renderer report that altered it. Returns an
+	 * unsubscribe function.
+	 */
+	onMenuBarChanged: (
+		listener: (payload: MenuBarDescriptor) => void,
+	) => () => void;
+	/**
+	 * Performs the row the user picked in the app-drawn menu bar: main dispatches
+	 * the command or carries out the Electron role behind it, exactly as a click
+	 * on the native menu would.
+	 */
+	invokeMenuBarItem: (request: MenuBarInvokeRequest) => Promise<void>;
 	/**
 	 * Subscribes to agent-control focus requests (an agent asked to bring a tab,
 	 * dock terminal, or review panel to the foreground). Returns an unsubscribe

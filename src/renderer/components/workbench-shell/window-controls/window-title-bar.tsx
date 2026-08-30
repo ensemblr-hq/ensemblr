@@ -1,10 +1,13 @@
+import type { ReactNode } from 'react';
 import { useCallback, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 
 import { closeWindow, minimizeWindow } from '@/renderer/api/ensemblr';
 import { EnsemblrWordmark } from '@/renderer/components/ensemblr-wordmark';
 
+import { AppMenuBar } from './app-menu-bar';
 import { useDragRegionDoubleClick } from './use-drag-region-double-click';
+import { useMenuBar } from './use-menu-bar';
 import { useWindowMaximized } from './use-window-maximized';
 import { WindowControlCluster } from './window-controls';
 
@@ -33,6 +36,7 @@ import { WindowControlCluster } from './window-controls';
  */
 export function WindowTitleBar() {
 	const { maximized, toggle } = useWindowMaximized();
+	const { menuBar, select } = useMenuBar();
 	const container = useTitleBarContainer();
 
 	const toggleMaximize = useCallback(() => {
@@ -48,6 +52,7 @@ export function WindowTitleBar() {
 		<div className='pointer-events-auto fixed inset-x-0 top-0 z-100'>
 			<WindowTitleBarSurface
 				isMaximized={maximized}
+				menu={<AppMenuBar menuBar={menuBar} onSelect={select} />}
 				onClose={() => void closeWindow()}
 				onMinimize={() => void minimizeWindow()}
 				onToggleMaximize={toggleMaximize}
@@ -55,6 +60,20 @@ export function WindowTitleBar() {
 		</div>,
 		container,
 	);
+}
+
+/** What the title-bar strip needs to draw itself, with no window plumbing. */
+interface WindowTitleBarSurfaceProps {
+	isMaximized: boolean;
+	/**
+	 * The application menu, drawn between the wordmark and the controls. A slot
+	 * rather than a descriptor so the strip stays presentational and the
+	 * playground can mount the bar without a preload bridge behind it.
+	 */
+	menu?: ReactNode;
+	onClose: () => void;
+	onMinimize: () => void;
+	onToggleMaximize: () => void;
 }
 
 /**
@@ -65,21 +84,25 @@ export function WindowTitleBar() {
  * strip wherever this one is drawn: two wordmarks a row apart read as a bug, and
  * an empty band across the window reads as one too. It takes the same `h-3.5`
  * that strip used, which is the smallest height the pixel grid survives.
+ *
+ * The menu slot fills the band between the wordmark and the controls, which is
+ * the room a desktop title bar spends on a window title Ensemblr has no use
+ * for. The slot keeps its width whether or not it holds a menu, so the drag
+ * region stays the same shape on a system-decorated window.
  */
 export function WindowTitleBarSurface({
 	isMaximized,
+	menu,
 	onClose,
 	onMinimize,
 	onToggleMaximize,
-}: {
-	isMaximized: boolean;
-	onClose: () => void;
-	onMinimize: () => void;
-	onToggleMaximize: () => void;
-}) {
+}: WindowTitleBarSurfaceProps) {
 	return (
-		<div className='window-title-bar flex items-center justify-between gap-2 border-border border-b pl-3'>
-			<EnsemblrWordmark className='h-3.5 text-muted-foreground' />
+		<div className='window-title-bar flex items-center gap-2 border-border border-b pl-3'>
+			<EnsemblrWordmark className='h-3.5 shrink-0 text-muted-foreground' />
+			<div className='flex min-w-0 flex-1 items-center self-stretch'>
+				{menu}
+			</div>
 			<WindowControlCluster
 				isMaximized={isMaximized}
 				onClose={onClose}

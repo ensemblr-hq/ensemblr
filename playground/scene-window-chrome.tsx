@@ -1,8 +1,13 @@
 import { useEffect } from 'react';
 
-import { WindowTitleBarSurface } from '@/renderer/components/workbench-shell/window-controls';
+import {
+	AppMenuBar,
+	WindowTitleBarSurface,
+} from '@/renderer/components/workbench-shell/window-controls';
 import { applyWindowChrome } from '@/renderer/lib/window-chrome';
 import { resolveWindowChrome } from '@/shared/window-chrome';
+
+import { MENU_BAR_FIXTURE } from './menu-bar-fixtures.ts';
 
 /** The chrome Linux gets with `titleBar = custom`: Ensemblr draws the buttons. */
 const LINUX_CUSTOM_CHROME = resolveWindowChrome('linux', 'custom');
@@ -42,6 +47,9 @@ export function SceneWindowTitleBar({ isEnabled }: { isEnabled: boolean }) {
 		<div className='pointer-events-none fixed inset-x-0 top-0 z-50'>
 			<WindowTitleBarSurface
 				isMaximized={false}
+				menu={
+					<AppMenuBar menuBar={MENU_BAR_FIXTURE} onSelect={() => undefined} />
+				}
 				onClose={() => undefined}
 				onMinimize={() => undefined}
 				onToggleMaximize={() => undefined}

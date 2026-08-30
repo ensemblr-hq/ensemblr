@@ -131,6 +131,8 @@ export default defineConfig({
 			'tests/main/linux-desktop-identity.test.ts',
 			'tests/main/user-data-location.test.ts',
 			'tests/main/about-panel.test.ts',
+			'tests/main/menu-bar-descriptor.test.ts',
+			'tests/main/menu-bar-store.test.ts',
 			'tests/main/menu-build.test.ts',
 			'tests/main/menu-strings.test.ts',
 			'tests/main/open-in-editor.test.ts',

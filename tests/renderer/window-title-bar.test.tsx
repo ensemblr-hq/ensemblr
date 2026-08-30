@@ -1,9 +1,11 @@
 // @vitest-environment happy-dom
 
 import { fireEvent, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { afterEach, expect, test, vi } from 'vitest';
 import { WindowTitleBar } from '../../src/renderer/components/workbench-shell/window-controls';
 import type { WindowMaximizedBroadcast } from '../../src/shared/ipc/contracts/repository-navigation';
+import type { MenuBarDescriptor } from '../../src/shared/menu-bar';
 import {
 	clearEnsemblrApi,
 	installEnsemblrApi,
@@ -11,15 +13,44 @@ import {
 } from './support/dom';
 
 type MaximizedListener = (payload: WindowMaximizedBroadcast) => void;
+type MenuBarListener = (payload: MenuBarDescriptor) => void;
 
-/** Installs a bridge whose broadcast can be fired by hand, plus the toggle spy. */
-function installWindowBridge() {
+/** One menu with one row, enough to prove the strip mounts the bar it is given. */
+const MENU_BAR: MenuBarDescriptor = {
+	menus: [
+		{
+			enabled: true,
+			id: '0',
+			items: [
+				{ enabled: true, id: '0.0', kind: 'action', label: 'New Workspace' },
+			],
+			kind: 'submenu',
+			label: 'File',
+		},
+	],
+	revision: 4,
+};
+
+/** Installs a bridge whose broadcasts can be fired by hand, plus the spies. */
+function installWindowBridge({
+	menuBar = { menus: [], revision: 0 },
+}: {
+	menuBar?: MenuBarDescriptor;
+} = {}) {
 	const listeners = new Set<MaximizedListener>();
+	const menuBarListeners = new Set<MenuBarListener>();
 	const toggleMaximizeWindow = vi.fn(async () => undefined);
+	const invokeMenuBarItem = vi.fn(async () => undefined);
 
 	installEnsemblrApi({
 		closeWindow: vi.fn(async () => undefined),
+		getMenuBar: vi.fn(async () => menuBar),
+		invokeMenuBarItem,
 		minimizeWindow: vi.fn(async () => undefined),
+		onMenuBarChanged: (listener: MenuBarListener) => {
+			menuBarListeners.add(listener);
+			return () => menuBarListeners.delete(listener);
+		},
 		onWindowMaximizedChanged: (listener: MaximizedListener) => {
 			listeners.add(listener);
 			return () => listeners.delete(listener);
@@ -33,6 +64,7 @@ function installWindowBridge() {
 				listener({ maximized });
 			}
 		},
+		invokeMenuBarItem,
 		toggleMaximizeWindow,
 	};
 }
@@ -107,6 +139,41 @@ test('leaves the label to the broadcast rather than to its own click', async () 
 	expect(
 		await screen.findByRole('button', { name: 'Restore' }),
 	).toBeInTheDocument();
+});
+
+test('mounts the menu bar main sent inside the strip', async () => {
+	installWindowBridge({ menuBar: MENU_BAR });
+	renderWithProviders(<WindowTitleBar />);
+
+	const bar = await screen.findByRole('menubar', { name: 'Application menu' });
+
+	expect(bar.closest('.window-title-bar')).not.toBeNull();
+	expect(screen.getByRole('menuitem', { name: 'File' })).toBeInTheDocument();
+});
+
+test('reports a picked row against the revision it was drawn from', async () => {
+	const bridge = installWindowBridge({ menuBar: MENU_BAR });
+	renderWithProviders(<WindowTitleBar />);
+
+	await userEvent.click(await screen.findByRole('menuitem', { name: 'File' }));
+	await userEvent.click(
+		await screen.findByRole('menuitem', { name: 'New Workspace' }),
+	);
+
+	expect(bridge.invokeMenuBarItem).toHaveBeenCalledWith({
+		id: '0.0',
+		revision: 4,
+	});
+});
+
+test('leaves the strip as it was when main has no menu to draw', async () => {
+	installWindowBridge();
+	renderWithProviders(<WindowTitleBar />);
+
+	expect(
+		await screen.findByRole('group', { name: 'Window controls' }),
+	).toBeInTheDocument();
+	expect(screen.queryByRole('menubar')).not.toBeInTheDocument();
 });
 
 test('removes its host element from the body on unmount', () => {

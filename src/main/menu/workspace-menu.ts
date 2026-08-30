@@ -1,7 +1,5 @@
-import type { MenuItemConstructorOptions } from 'electron';
-
 import type { MenuContext } from '../../shared/menu-commands';
-import type { MenuItemFactory } from './menu-item';
+import type { DescribedMenuItem, MenuItemFactory } from './menu-item';
 import type { MenuLabels } from './menu-strings';
 
 /**
@@ -16,7 +14,7 @@ export function buildWorkspaceMenu(
 	labels: MenuLabels,
 	items: MenuItemFactory,
 	context: MenuContext | null,
-): MenuItemConstructorOptions {
+): DescribedMenuItem {
 	return {
 		label: labels.workspace,
 		submenu: [

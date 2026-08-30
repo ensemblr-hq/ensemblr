@@ -12,6 +12,44 @@ import { sendMenuCommand } from './menu-command';
 /** Mark for an item whose state the renderer reports: a standalone toggle, or one option of a one-of-N group. */
 type MenuItemMark = { checkbox: true } | { radio: true };
 
+/** The command a menu item dispatches, and the dynamic entry it carries. */
+export interface MenuItemDispatch {
+	readonly command: MenuCommandId;
+	/** Identifier of the chosen entry, for the commands marked `dynamic`. */
+	readonly arg?: string;
+}
+
+/**
+ * A template item annotated with the command behind it.
+ *
+ * Electron only ever sees the `click` closure, which is opaque — so a menu bar
+ * the app draws for itself could not tell what a row would do. Recording the
+ * dispatch alongside the closure is what lets the drawn bar reproduce the
+ * native one instead of keeping a second copy of the structure.
+ * `toElectronTemplate` strips the annotation again before Electron is handed
+ * the tree.
+ */
+export interface DescribedMenuItem extends MenuItemConstructorOptions {
+	readonly dispatch?: MenuItemDispatch;
+	readonly submenu?: DescribedMenuItem[];
+}
+
+/**
+ * Drops the annotations from a described template, leaving the plain Electron
+ * one. Structural rather than in-place so the annotated tree survives for the
+ * drawn menu bar to read.
+ * @param nodes - The annotated template
+ * @returns The same tree as Electron accepts it
+ */
+export function toElectronTemplate(
+	nodes: readonly DescribedMenuItem[],
+): MenuItemConstructorOptions[] {
+	return nodes.map(({ dispatch: _dispatch, submenu, ...rest }) => ({
+		...rest,
+		...(submenu ? { submenu: toElectronTemplate(submenu) } : {}),
+	}));
+}
+
 /** Builds the menu items that dispatch commands, against one reported context. */
 export interface MenuItemFactory {
 	/**
@@ -23,7 +61,7 @@ export interface MenuItemFactory {
 		command: MenuCommandId,
 		label: string,
 		mark?: MenuItemMark,
-	) => MenuItemConstructorOptions;
+	) => DescribedMenuItem;
 	/**
 	 * A submenu whose entries the renderer supplied — run scripts, open-in
 	 * targets, recent repositories, open chats. Renders a single disabled row
@@ -34,7 +72,7 @@ export interface MenuItemFactory {
 		label: string,
 		entries: readonly MenuDynamicEntry[],
 		emptyLabel: string,
-	) => MenuItemConstructorOptions;
+	) => DescribedMenuItem;
 }
 
 /**
@@ -65,6 +103,7 @@ export function createMenuItemFactory(
 			accelerator: acceleratorFor(command),
 			checked: mark ? checked.has(command) : undefined,
 			click: () => sendMenuCommand(command),
+			dispatch: { command },
 			enabled: isEnabled(command),
 			label,
 			type: markType(mark),
@@ -75,8 +114,9 @@ export function createMenuItemFactory(
 			submenu:
 				entries.length > 0
 					? entries.map(
-							(entry): MenuItemConstructorOptions => ({
+							(entry): DescribedMenuItem => ({
 								click: () => sendMenuCommand(command, entry.id),
+								dispatch: { arg: entry.id, command },
 								label: entry.label,
 							}),
 						)

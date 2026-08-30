@@ -9,11 +9,19 @@ import {
 
 import { ReviewActionsContextProvider } from '@/renderer/components/workbench-shell/review-actions/review-actions-context';
 import { RightSidebarHeader } from '@/renderer/components/workbench-shell/right-sidebar-header/right-sidebar-header';
-import { WindowTitleBarSurface } from '@/renderer/components/workbench-shell/window-controls';
+import {
+	AppMenuBar,
+	WindowTitleBarSurface,
+} from '@/renderer/components/workbench-shell/window-controls';
 import { WorkbenchHeader } from '@/renderer/components/workbench-shell/workbench-header';
 import { getDefaultProject } from '@/renderer/fixtures/workbench';
 import type { ReviewActionsValue } from '@/renderer/types/workbench';
+import type { MenuBarDescriptor } from '@/shared/menu-bar';
 
+import {
+	EMPTY_MENU_BAR_FIXTURE,
+	MENU_BAR_FIXTURE,
+} from './menu-bar-fixtures.ts';
 import { createPlaygroundQueryClient } from './playground-query-client.ts';
 import { HEADER_STATE_FIXTURES } from './right-sidebar-header-fixtures.ts';
 import { SceneSection } from './scene-chrome.tsx';
@@ -63,6 +71,7 @@ export function WindowTitleBarScene() {
 			<ReviewActionsContextProvider value={IDLE_REVIEW_ACTIONS}>
 				<div className='flex flex-col gap-8'>
 					<TitleBarOverTheShell />
+					<MenuBarStates />
 					<AlignmentStates />
 				</div>
 			</ReviewActionsContextProvider>
@@ -135,11 +144,56 @@ function AlignmentStates() {
 	);
 }
 
-/** The shipped strip with its handlers stubbed out. */
-function InertTitleBar() {
+/**
+ * The menu bar in the two states main can hand it: the built bar, and the empty
+ * one a window paints before the first descriptor arrives.
+ *
+ * Open a menu here rather than reading the fixture — the branches worth seeing
+ * are the ones a flat list cannot show: a checkbox run against a radio run, a
+ * nested submenu, and the disabled placeholder standing in for an empty dynamic
+ * submenu.
+ */
+function MenuBarStates() {
+	return (
+		<SceneSection
+			label='application menu — AppMenuBar'
+			note='drawn from the same tree main builds the native menu from; every label, mark and chord arrives resolved'
+		>
+			<WindowMock
+				label='menu populated'
+				note='File, Edit, View, Workspace and Help — open one for the marks, submenus and disabled rows'
+			>
+				<div className='h-24 bg-background' />
+			</WindowMock>
+
+			<section className='flex flex-col gap-1.5'>
+				<RowCaption
+					label='menu empty'
+					note='before main sends its first bar the strip is wordmark and controls, exactly as it was'
+				/>
+				<div className='overflow-hidden rounded-md border border-border'>
+					<InertTitleBar menuBar={EMPTY_MENU_BAR_FIXTURE} />
+					<div className='h-24 bg-background' />
+				</div>
+			</section>
+		</SceneSection>
+	);
+}
+
+/**
+ * The shipped strip with its handlers stubbed out. The menu is live — Radix
+ * opens and keyboard-navigates it — but picking a row does nothing, since the
+ * commands behind one belong to main.
+ */
+function InertTitleBar({
+	menuBar = MENU_BAR_FIXTURE,
+}: {
+	menuBar?: MenuBarDescriptor;
+}) {
 	return (
 		<WindowTitleBarSurface
 			isMaximized={false}
+			menu={<AppMenuBar menuBar={menuBar} onSelect={() => undefined} />}
 			onClose={() => undefined}
 			onMinimize={() => undefined}
 			onToggleMaximize={() => undefined}

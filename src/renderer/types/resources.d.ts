@@ -3147,6 +3147,9 @@ export default interface Resources {
 				pending: 'Awaiting status';
 			};
 		};
+		'menu-bar': {
+			group: 'Application menu';
+		};
 		'model-picker': {
 			'all-hidden': 'All models hidden — manage in Settings → Models.';
 			'aria-label': 'Model';

@@ -145,7 +145,7 @@ import {
 	registerLinearAssetProtocol,
 	registerLinearAssetScheme,
 } from './linear';
-import { installApplicationMenu, MenuContextStore } from './menu';
+import { installApplicationMenu, MenuBarStore, MenuContextStore } from './menu';
 import { createOpenTargetService } from './open-target';
 import { createPiCliRpcAdapter, resolvePiSlashCommands } from './pi-agent';
 import {
@@ -1487,8 +1487,19 @@ app.whenReady().then(() => {
 	void sharedRootAdoptionService.reconcile();
 	const readAppSettings = () => appSettingsService.read();
 	const menuContextStore = new MenuContextStore();
+	const menuBarStore = new MenuBarStore();
+	// The bar is serialized on every platform, not just where it is drawn: the
+	// window's chrome is fixed at construction, so gating on the live setting
+	// would leave a window that predates a change without a bar to paint.
 	const rebuildMenu = () => {
-		installApplicationMenu(readAppSettings, menuContextStore.current);
+		const template = installApplicationMenu(
+			readAppSettings,
+			menuContextStore.current,
+		);
+		broadcastToAllWindows(
+			IPC_CHANNELS.menuBarChanged,
+			menuBarStore.apply(template),
+		);
 	};
 	rebuildMenu();
 	// config.json is the source of truth; live-reload the renderer when it's
@@ -1574,6 +1585,7 @@ app.whenReady().then(() => {
 			updateService.settingsChanged();
 			rebuildMenu();
 		},
+		menuBarStore,
 		menuContextStore,
 		rebuildMenu,
 		readWindowChrome: () => activeWindowChrome,

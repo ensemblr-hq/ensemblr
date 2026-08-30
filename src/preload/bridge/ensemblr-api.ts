@@ -35,6 +35,7 @@ import type {
 import type { TextContextMenuTarget } from '../../shared/ipc/contracts/text-editing';
 import type { UpdateStatusChangedBroadcast } from '../../shared/ipc/contracts/update';
 import type { WorkspaceFilesChangedBroadcast } from '../../shared/ipc/contracts/workspace-files';
+import type { MenuBarDescriptor } from '../../shared/menu-bar';
 import type { MenuCommandBroadcast } from '../../shared/menu-commands';
 
 /**
@@ -48,6 +49,7 @@ type InvokeKey = Exclude<
 	| 'onConfigChanged'
 	| 'onCloneGithubRepositoryProgress'
 	| 'onMenuCommand'
+	| 'onMenuBarChanged'
 	| 'onAskUserQuestion'
 	| 'onAskUserQuestionClosed'
 	| 'onAgentToolApprovalRequested'
@@ -270,6 +272,10 @@ export function createEnsemblrApi(): EnsemblrApi {
 			),
 		onMenuCommand: (listener) =>
 			subscribe<MenuCommandBroadcast>(IPC_CHANNELS.menuCommand, listener),
+		onMenuBarChanged: (listener) =>
+			subscribe<MenuBarDescriptor>(IPC_CHANNELS.menuBarChanged, listener),
+		getMenuBar: () => invoke('getMenuBar'),
+		invokeMenuBarItem: (request) => invoke('invokeMenuBarItem', request),
 		onAgentControlFocusView: (listener) =>
 			subscribe<FocusViewBroadcast>(
 				IPC_CHANNELS.agentControlFocusView,
