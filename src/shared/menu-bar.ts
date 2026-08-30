@@ -7,6 +7,12 @@
  * is the only place the drawn bar renders: macOS keeps its native menu, and the
  * roles exclusive to it (`services`, `hide`, `pasteAndMatchStyle`, the speech
  * pair, `front`) would be executors with no caller.
+ *
+ * `reload` is the one entry Electron never sees as a role: the template gives
+ * Reload a `click` closure so the item does not claim ⌘R, which the renderer
+ * spends on Run. It reaches the drawn bar through `drawnRole` instead, because
+ * a closure is opaque to the serializer and the row would otherwise be the only
+ * permanently dead one in the bar.
  */
 const DRAWN_MENU_ITEM_ROLES = [
 	'about',
@@ -18,6 +24,7 @@ const DRAWN_MENU_ITEM_ROLES = [
 	'paste',
 	'quit',
 	'redo',
+	'reload',
 	'resetZoom',
 	'selectAll',
 	'toggleDevTools',

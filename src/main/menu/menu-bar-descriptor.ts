@@ -117,6 +117,10 @@ function describeNode(
 
 /**
  * Resolves what a chooseable row does — dispatch a command, or perform a role.
+ *
+ * `drawnRole` is read ahead of `role` so a row Electron was handed a `click`
+ * for, to keep it from claiming the role's accelerator, still reaches the drawn
+ * bar as the role it is rather than as a dead row.
  * @param node - The template item to classify
  * @returns The invocation, or null for a row the drawn bar cannot perform
  */
@@ -124,8 +128,9 @@ function invocationOf(node: DescribedMenuItem): MenuBarInvocation | null {
 	if (node.dispatch) {
 		return { dispatch: node.dispatch, kind: 'command' };
 	}
-	if (isDrawnMenuItemRole(node.role)) {
-		return { kind: 'role', role: node.role };
+	const role = node.drawnRole ?? node.role;
+	if (isDrawnMenuItemRole(role)) {
+		return { kind: 'role', role };
 	}
 	return null;
 }

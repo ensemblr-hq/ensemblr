@@ -77,6 +77,25 @@ describe('toElectronTemplate', () => {
 		expect(typeof submenu[0]?.click).toBe('function');
 	});
 
+	// `MenuItemConstructorOptions` is not excess-property-checked through a
+	// spread, so nothing but this test stops the annotation reaching Electron.
+	test('strips the drawn-bar role Electron has no use for', () => {
+		const [menu] = toElectronTemplate(
+			oneMenu([
+				{
+					click: () => undefined,
+					drawnRole: 'reload',
+					label: 'Reload',
+				},
+			]),
+		);
+		const submenu = menu?.submenu as DescribedMenuItem[];
+
+		expect(submenu[0]).not.toHaveProperty('drawnRole');
+		expect(submenu[0]?.label).toBe('Reload');
+		expect(typeof submenu[0]?.click).toBe('function');
+	});
+
 	test('leaves the annotated tree intact for the drawn bar to read', () => {
 		const items = createMenuItemFactory(null);
 		const template = oneMenu([items.command('tab.close', 'Close Tab')]);
@@ -268,5 +287,117 @@ describe('describeMenuBar', () => {
 		);
 
 		expect(invocations.size).toBe(2);
+	});
+});
+
+const { menuLabels } = await import('../../src/main/menu/menu-strings');
+const { buildFileMenu } = await import('../../src/main/menu/file-menu');
+const { buildEditMenu } = await import('../../src/main/menu/edit-menu');
+const { buildViewMenu } = await import('../../src/main/menu/view-menu');
+const { buildWorkspaceMenu } = await import(
+	'../../src/main/menu/workspace-menu'
+);
+const { buildChatMenu } = await import('../../src/main/menu/chat-menu');
+const { buildChangesMenu } = await import('../../src/main/menu/changes-menu');
+const { buildWindowMenu } = await import('../../src/main/menu/window-menu');
+const { buildHelpMenu } = await import('../../src/main/menu/help-menu');
+const { MENU_COMMANDS } = await import('../../src/shared/menu-commands');
+
+/** Label the factory gives the single row inside a dynamic submenu with no entries. */
+const EMPTY_SUBMENU_LABELS = new Set([
+	'No Recent Repositories',
+	'No Run Scripts',
+	'No Open In Targets',
+	'No Open Chats',
+]);
+
+/**
+ * Builds the whole menu as the drawn bar sees it, which is the Linux shape:
+ * off darwin there is no application menu, and the platform branches inside the
+ * builders are read when they run.
+ */
+function drawnBarTemplate(context: MenuContext): DescribedMenuItem[] {
+	const original = process.platform;
+	Object.defineProperty(process, 'platform', {
+		configurable: true,
+		value: 'linux',
+	});
+	try {
+		const labels = menuLabels('en', 'Ensemblr');
+		const items = createMenuItemFactory(context);
+		return [
+			buildFileMenu(labels, items, context),
+			buildEditMenu(labels),
+			buildViewMenu(labels, items),
+			buildWorkspaceMenu(labels, items, context),
+			buildChatMenu(labels, items, context),
+			buildChangesMenu(labels, items),
+			buildWindowMenu(labels, items),
+			buildHelpMenu(labels, items),
+		];
+	} finally {
+		Object.defineProperty(process, 'platform', {
+			configurable: true,
+			value: original,
+		});
+	}
+}
+
+/** Every chooseable row of a serialized bar, paired with the trail that reaches it. */
+function everyRow(
+	nodes: readonly MenuBarNode[],
+	trail: readonly string[],
+): Array<{ path: string; row: MenuBarAction }> {
+	return nodes.flatMap((node) => {
+		if (node.kind === 'separator') {
+			return [];
+		}
+		if (node.kind === 'submenu') {
+			return everyRow(node.items, [...trail, node.label]);
+		}
+		return [{ path: [...trail, node.label].join(' > '), row: node }];
+	});
+}
+
+describe('the whole drawn bar', () => {
+	const fullContext = context({
+		chatTabs: [{ id: 'chat-1', label: 'First chat' }],
+		commands: Object.keys(MENU_COMMANDS) as MenuContext['commands'],
+		openTargets: [{ id: 'vscode', label: 'VS Code' }],
+		recentProjects: [{ id: 'proj-1', label: 'ensemblr' }],
+		runScripts: [{ id: 'dev', label: 'Dev Server' }],
+	});
+
+	// A row Electron performs through a `click` closure is opaque to the
+	// serializer, so it reaches the drawn bar disabled unless it says what it is.
+	test('every row resolves to something the drawn bar can perform', () => {
+		const { descriptor, invocations } = describeMenuBar(
+			drawnBarTemplate(fullContext),
+			1,
+		);
+
+		const dead = descriptor.menus
+			.flatMap((menu) => everyRow(menu.items, [menu.label]))
+			.filter(
+				({ row }) =>
+					!invocations.has(row.id) && !EMPTY_SUBMENU_LABELS.has(row.label),
+			)
+			.map(({ path }) => path);
+
+		expect(dead).toEqual([]);
+	});
+
+	test('every command the native menu can dispatch has a row in the drawn bar', () => {
+		const { invocations } = describeMenuBar(drawnBarTemplate(fullContext), 1);
+
+		const reached = new Set(
+			[...invocations.values()].flatMap((invocation) =>
+				invocation.kind === 'command' ? [invocation.dispatch.command] : [],
+			),
+		);
+
+		expect(
+			[...Object.keys(MENU_COMMANDS)].filter((id) => !reached.has(id as never)),
+		).toEqual([]);
 	});
 });

@@ -41,6 +41,9 @@ const ROLE_ACTIONS: Record<DrawnMenuItemRole, (window: BrowserWindow) => void> =
 		redo: (window) => {
 			window.webContents.redo();
 		},
+		reload: (window) => {
+			window.webContents.reload();
+		},
 		resetZoom: (window) => {
 			window.webContents.setZoomLevel(0);
 		},

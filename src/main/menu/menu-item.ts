@@ -1,6 +1,7 @@
 import type { MenuItemConstructorOptions } from 'electron';
 
 import { getAccelerator } from '../../shared/keymap/matcher';
+import type { DrawnMenuItemRole } from '../../shared/menu-bar';
 import type {
 	MenuCommandId,
 	MenuContext,
@@ -31,6 +32,12 @@ export interface MenuItemDispatch {
  */
 export interface DescribedMenuItem extends MenuItemConstructorOptions {
 	readonly dispatch?: MenuItemDispatch;
+	/**
+	 * Role the drawn bar performs for an item Electron is given a `click` for
+	 * rather than a `role`, which is how a row opts out of the accelerator
+	 * Electron would attach to the role.
+	 */
+	readonly drawnRole?: DrawnMenuItemRole;
 	readonly submenu?: DescribedMenuItem[];
 }
 
@@ -44,10 +51,12 @@ export interface DescribedMenuItem extends MenuItemConstructorOptions {
 export function toElectronTemplate(
 	nodes: readonly DescribedMenuItem[],
 ): MenuItemConstructorOptions[] {
-	return nodes.map(({ dispatch: _dispatch, submenu, ...rest }) => ({
-		...rest,
-		...(submenu ? { submenu: toElectronTemplate(submenu) } : {}),
-	}));
+	return nodes.map(
+		({ dispatch: _dispatch, drawnRole: _drawnRole, submenu, ...rest }) => ({
+			...rest,
+			...(submenu ? { submenu: toElectronTemplate(submenu) } : {}),
+		}),
+	);
 }
 
 /** Builds the menu items that dispatch commands, against one reported context. */
