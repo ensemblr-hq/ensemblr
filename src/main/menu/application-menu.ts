@@ -1,9 +1,9 @@
 import { app, Menu, type MenuItemConstructorOptions } from 'electron';
 
-import { author } from '../../../package.json';
 import type { AppSettings } from '../../shared/config';
 import { resolveLanguage } from '../../shared/i18n';
 import type { MenuContext } from '../../shared/menu-commands';
+import { aboutPanelOptions } from './about-panel';
 import { buildAppMenu } from './app-menu';
 import { buildChangesMenu } from './changes-menu';
 import { buildChatMenu } from './chat-menu';
@@ -15,15 +15,6 @@ import { menuLabels } from './menu-strings';
 import { buildViewMenu } from './view-menu';
 import { buildWindowMenu } from './window-menu';
 import { buildWorkspaceMenu } from './workspace-menu';
-
-/**
- * Builds the About-panel copyright line from the package author and the current
- * year, so the notice tracks the build date instead of a baked-in constant.
- * @returns Copyright string such as `© Philipp Soldunov 2026`.
- */
-function getCopyrightNotice(): string {
-	return `© ${author.name} ${new Date().getFullYear()}`;
-}
 
 /**
  * Builds and installs the Ensemblr application menu in the language the app
@@ -38,7 +29,7 @@ export function installApplicationMenu(
 	readSettings: () => AppSettings,
 	context: MenuContext | null = null,
 ): void {
-	app.setAboutPanelOptions({ copyright: getCopyrightNotice() });
+	app.setAboutPanelOptions(aboutPanelOptions());
 
 	const language = resolveLanguage(
 		readSettings().general.language,
