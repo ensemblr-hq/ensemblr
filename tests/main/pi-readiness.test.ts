@@ -567,6 +567,58 @@ anthropic  opus    200K
 	]);
 });
 
+test('stops at the footer pi prints below the table', () => {
+	const parsed = parsePiListModelsOutput(
+		`provider   model   context
+anthropic  opus    200K
+
+Use /login to log into another provider via OAuth or API key. See:
+  /usr/local/lib/pi/docs/providers.md
+`,
+	);
+
+	assert.deepEqual(parsed, {
+		modelCount: 1,
+		models: [
+			{
+				contextWindow: 200_000,
+				id: 'anthropic/opus',
+				model: 'opus',
+				provider: 'anthropic',
+			},
+		],
+		providerCount: 1,
+	});
+});
+
+test('stops at a footer printed straight under the last row', () => {
+	const parsed = parsePiListModelsOutput(
+		`provider   model   context
+anthropic  opus    200K
+Use /login to add more providers.
+`,
+	);
+
+	assert.deepEqual(
+		parsed.models.map((row) => row.id),
+		['anthropic/opus'],
+	);
+});
+
+test('reads a table ruled under its header', () => {
+	const parsed = parsePiListModelsOutput(
+		`provider   model   context
+---------  ------  -------
+anthropic  opus    200K
+`,
+	);
+
+	assert.deepEqual(
+		parsed.models.map((row) => row.id),
+		['anthropic/opus'],
+	);
+});
+
 test('fails provider readiness on the prose pi prints with no provider configured', async () => {
 	const snapshot = await resolvePiProviderModels({
 		executable: createPiExecutableSnapshot(),

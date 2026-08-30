@@ -42,14 +42,13 @@ function harness(overrides: Partial<UpdateServiceOptions> = {}) {
 	const service = createUpdateService({
 		armUpdater: (feedUrl) => armed.push(feedUrl),
 		broadcast: (snapshot) => broadcasts.push(snapshot),
-		capability: 'install',
 		channel: 'release',
 		getCurrentVersion: () => '0.1.0',
 		isEnabled: () => enabled,
 		onUpdaterEvent: (next) => {
 			handlers = next;
 		},
-		preconditionFailure: null,
+		preconditions: { capability: 'install', failure: null },
 		releaseFeed: offeringFeed(),
 		requestInstall: () => installs.push(1),
 		...overrides,
@@ -209,11 +208,13 @@ describe('createUpdateService — the automatic-updates setting', () => {
 
 	test('the setting cannot revive a build that can never update', () => {
 		const h = harness({
-			capability: 'none',
 			isEnabled: () => true,
-			preconditionFailure: {
-				code: 'update-not-in-applications',
-				message: 'Run it from /Applications.',
+			preconditions: {
+				capability: 'none',
+				failure: {
+					code: 'update-not-in-applications',
+					message: 'Run it from /Applications.',
+				},
 			},
 		});
 
@@ -225,7 +226,9 @@ describe('createUpdateService — the automatic-updates setting', () => {
 
 describe('createUpdateService — a build that may check but not install', () => {
 	test('reports the version and its release page instead of downloading', async () => {
-		const h = harness({ capability: 'check-only' });
+		const h = harness({
+			preconditions: { capability: 'check-only', failure: null },
+		});
 
 		const snapshot = await h.service.checkNow();
 
@@ -238,7 +241,9 @@ describe('createUpdateService — a build that may check but not install', () =>
 	});
 
 	test('install stays inert — nothing was ever staged', async () => {
-		const h = harness({ capability: 'check-only' });
+		const h = harness({
+			preconditions: { capability: 'check-only', failure: null },
+		});
 		await h.service.checkNow();
 
 		h.service.install();
@@ -247,7 +252,9 @@ describe('createUpdateService — a build that may check but not install', () =>
 	});
 
 	test('start schedules checks without registering Squirrel listeners', async () => {
-		const h = harness({ capability: 'check-only' });
+		const h = harness({
+			preconditions: { capability: 'check-only', failure: null },
+		});
 
 		h.service.start();
 		await vi.advanceTimersByTimeAsync(3 * 60 * 1000);
@@ -258,7 +265,9 @@ describe('createUpdateService — a build that may check but not install', () =>
 	});
 
 	test('a later check re-reports rather than sticking on the first answer', async () => {
-		const h = harness({ capability: 'check-only' });
+		const h = harness({
+			preconditions: { capability: 'check-only', failure: null },
+		});
 		await h.service.checkNow();
 
 		const second = await h.service.checkNow();

@@ -101,41 +101,86 @@ export function useUpdateSync(): void {
 }
 
 /**
- * Tells the user how a check they asked for went. The ready state stays silent
- * here because the restart prompt above already says it, with the action.
+ * Tells the user how a check they asked for went. Exhaustive over
+ * {@link UpdateStatusSnapshot.state} so a state added later is a compile error
+ * rather than a menu item that answers nothing; `ready` is the one deliberate
+ * silence, because the restart prompt above already says it, with the action.
  * @param snapshot - The state the check left the updater in
  * @param t - Translator bound to the active language
  */
 function reportCheck(snapshot: UpdateStatusSnapshot, t: TFunction): void {
-	if (snapshot.state === 'error' || snapshot.state === 'unsupported') {
-		toast.error(
-			failureText(t, snapshot.failure) ??
-				t('common:update.check-failed', 'The update check failed.'),
-		);
-		return;
+	switch (snapshot.state) {
+		case 'error':
+		case 'unsupported':
+			toast.error(
+				failureText(t, snapshot.failure) ??
+					t('common:update.check-failed', 'The update check failed.'),
+			);
+			return;
+		case 'disabled':
+			toast.info(
+				t(
+					'common:update.disabled',
+					'Automatic updates are off. Turn them on in Settings → General.',
+				),
+			);
+			return;
+		case 'available':
+			reportAvailable(snapshot, t);
+			return;
+		case 'downloading':
+			toast.info(
+				t('common:update.downloading', 'Downloading Ensemblr {{version}}…', {
+					version: snapshot.availableVersion ?? '',
+				}),
+			);
+			return;
+		case 'checking':
+			toast.info(t('common:update.checking', 'Checking for updates…'));
+			return;
+		case 'idle':
+			toast.success(
+				t('common:update.up-to-date', 'Ensemblr {{version}} is up to date.', {
+					version: snapshot.currentVersion,
+				}),
+			);
+			return;
+		case 'ready':
+			return;
+		default:
+			snapshot.state satisfies never;
 	}
-	if (snapshot.state === 'disabled') {
-		toast.info(
-			t(
-				'common:update.disabled',
-				'Automatic updates are off. Turn them on in Settings → General.',
+}
+
+/**
+ * Reports the version a build that may check but not install has found, and
+ * offers the release page it would be downloaded from — the only step this
+ * build can take towards it.
+ * @param snapshot - The state the check left the updater in
+ * @param t - Translator bound to the active language
+ */
+function reportAvailable(snapshot: UpdateStatusSnapshot, t: TFunction): void {
+	const releaseUrl = snapshot.releaseUrl;
+	toast.info(
+		t('common:update.available.title', 'Ensemblr {{version}} is available', {
+			version: snapshot.availableVersion ?? '',
+		}),
+		{
+			...(releaseUrl
+				? {
+						action: {
+							label: t(
+								'common:update.available.open-release',
+								'Open the release page',
+							),
+							onClick: () => void window.ensemblr?.openExternal(releaseUrl),
+						},
+					}
+				: {}),
+			description: t(
+				'common:update.available.description',
+				'Ensemblr does not install this one itself — download it from the release page.',
 			),
-		);
-		return;
-	}
-	if (snapshot.state === 'downloading') {
-		toast.info(
-			t('common:update.downloading', 'Downloading Ensemblr {{version}}…', {
-				version: snapshot.availableVersion ?? '',
-			}),
-		);
-		return;
-	}
-	if (snapshot.state === 'idle') {
-		toast.success(
-			t('common:update.up-to-date', 'Ensemblr {{version}} is up to date.', {
-				version: snapshot.currentVersion,
-			}),
-		);
-	}
+		},
+	);
 }

@@ -49,7 +49,6 @@ export function createAppUpdateService({
 			autoUpdater.checkForUpdates();
 		},
 		broadcast,
-		capability: preconditions.capability,
 		channel,
 		getCurrentVersion: () => app.getVersion(),
 		isEnabled,
@@ -58,7 +57,7 @@ export function createAppUpdateService({
 			autoUpdater.on('update-not-available', () => handlers.onNotAvailable());
 			autoUpdater.on('error', (error) => handlers.onError(error));
 		},
-		preconditionFailure: preconditions.failure,
+		preconditions,
 		releaseFeed: createReleaseFeed(),
 		requestInstall,
 	});

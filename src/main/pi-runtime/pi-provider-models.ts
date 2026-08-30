@@ -4,6 +4,7 @@ import {
 	asModelVendorId,
 	EMPTY_AGENT_MODEL_CATALOG,
 } from '../../shared/ipc/contracts/agent-models.ts';
+import type { SetupMessageParams } from '../../shared/ipc/contracts/setup';
 import type {
 	LocalCommandFailureCode,
 	LocalCommandResult,
@@ -61,6 +62,68 @@ export function presentPiModels(
 		defaultModelId: models[0]?.id ?? null,
 		defaultThinkingLevel: DEFAULT_THINKING_LEVEL,
 		models,
+	};
+}
+
+/**
+ * Codes the provider/model detail line reports. Each is a member of both the
+ * `SetupDetailCode` catalogue the diagnostics screen translates and the
+ * `AgentProviderDetailCode` one the provider readiness screen does.
+ */
+type PiProviderModelDetailCode =
+	| 'pi-models-none'
+	| 'pi-models-ready'
+	| 'pi-models-unverified';
+
+/**
+ * A provider/model detail line: the English the support bundle records, plus
+ * the code and values a renderer translates. A message that came out of pi
+ * itself carries no code — it is not ours to reword.
+ */
+export interface PiProviderModelDetail {
+	detail: string;
+	detailMessage?: {
+		code: PiProviderModelDetailCode;
+		params?: SetupMessageParams;
+	};
+}
+
+/**
+ * Describes what `pi --list-models` returned, for whichever surface is asking.
+ * The setup diagnostics check and the provider readiness probe both report this
+ * one line, so neither can describe an installation the other has already
+ * described differently.
+ * @param providerModels - The `pi --list-models` snapshot the check ran on.
+ * @returns The detail fields for the check result.
+ */
+export function describePiProviderModels(
+	providerModels: PiProviderModelSnapshot,
+): PiProviderModelDetail {
+	if (providerModels.status === 'success') {
+		return {
+			detail: `Pi listed ${providerModels.modelCount} models across ${providerModels.providerCount} providers.`,
+			detailMessage: {
+				code: 'pi-models-ready',
+				params: {
+					modelCount: providerModels.modelCount,
+					providerCount: providerModels.providerCount,
+				},
+			},
+		};
+	}
+	if (providerModels.failure?.code === 'no-models') {
+		return {
+			detail:
+				'Pi listed no usable models. Configure at least one provider in Pi, then retry.',
+			detailMessage: { code: 'pi-models-none' },
+		};
+	}
+	if (providerModels.failure?.message) {
+		return { detail: providerModels.failure.message };
+	}
+	return {
+		detail: 'Pi provider/model readiness could not be verified.',
+		detailMessage: { code: 'pi-models-unverified' },
 	};
 }
 
@@ -209,10 +272,58 @@ function parseContextWindowCell(cell: string | undefined): number | null {
  */
 const PI_MODEL_TABLE_HEADER = /^provider\s+model\b/i;
 
+/** Shape the first column must have to name a provider rather than open a sentence. */
+const PI_PROVIDER_CELL = /^[A-Za-z][\w-]*$/;
+
+/**
+ * Shape the second column must have to name a model. Anchored on an
+ * alphanumeric so the prose pi prints *below* its table — `Use /login to add
+ * more providers.` — cannot pass its second word off as a model id.
+ */
+const PI_MODEL_CELL = /^[A-Za-z0-9][\w./:-]*$/;
+
+/**
+ * A rule some builds draw under the header. Part of the table rather than a row,
+ * so it is skipped instead of being read as the table ending.
+ */
+const PI_TABLE_RULE = /^[-=+|_─━┈│┼]+$/;
+
+/**
+ * Reads one line of the table body as a row.
+ *
+ * A line that is not a row ends the table: pi prints its footer directly below
+ * the last row — `Use /login to add more providers.` — and skipping it instead
+ * would leave the table open for every line after it.
+ * @param trimmedLine - The line to read, already trimmed.
+ * @returns The row, or null when the line is not one.
+ */
+function readTableRow(trimmedLine: string): PiProviderModelRow | null {
+	// Pi table columns may be separated by tabs, multi-spaces, or single spaces
+	// — different distributions format differently.
+	const columns = trimmedLine.split(/\s+/).filter(Boolean);
+	const provider = columns[0];
+	const model = columns[1];
+
+	if (!provider || !model) {
+		return null;
+	}
+	if (!PI_PROVIDER_CELL.test(provider) || !PI_MODEL_CELL.test(model)) {
+		return null;
+	}
+
+	return {
+		contextWindow: parseContextWindowCell(columns[2]),
+		id: `${provider}/${model}`,
+		model,
+		provider,
+	};
+}
+
 /**
  * Parses the columnar `pi --list-models` output into provider/model rows plus
- * deduplicated counts. Anything printed before the table header is prose rather
- * than a row, and is skipped.
+ * deduplicated counts. The table runs from its header to the first line that is
+ * not a row: anything printed before the header is prose, and so is anything
+ * printed after the last row.
  * @param output - Raw stdout (or stderr) from `pi --list-models`.
  * @returns Parsed rows alongside distinct provider and model counts.
  */
@@ -234,41 +345,27 @@ export function parsePiListModelsOutput(output: string): {
 			continue;
 		}
 
-		if (!isInsideTable || !trimmedLine) {
+		if (!isInsideTable) {
 			continue;
 		}
 
-		// Pi table columns may be separated by tabs, multi-spaces, or single
-		// spaces — different distributions format differently. Split on any
-		// whitespace and accept the first column as the provider name.
-		const columns = trimmedLine.split(/\s+/).filter(Boolean);
-
-		if (columns.length < 2) {
+		if (PI_TABLE_RULE.test(trimmedLine.replace(/\s+/g, ''))) {
 			continue;
 		}
 
-		const provider = columns[0];
-		const model = columns[1];
-		if (!provider || !/^[A-Za-z][\w-]*$/.test(provider)) {
-			continue;
-		}
-		if (!model) {
+		const row = readTableRow(trimmedLine);
+		if (!row) {
+			isInsideTable = false;
 			continue;
 		}
 
-		providers.add(provider);
+		providers.add(row.provider);
 
-		const id = `${provider}/${model}`;
-		if (seenIds.has(id)) {
+		if (seenIds.has(row.id)) {
 			continue;
 		}
-		seenIds.add(id);
-		models.push({
-			contextWindow: parseContextWindowCell(columns[2]),
-			id,
-			model,
-			provider,
-		});
+		seenIds.add(row.id);
+		models.push(row);
 	}
 
 	return {

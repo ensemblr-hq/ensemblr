@@ -435,7 +435,13 @@
 		"workspace-count_other": "{{count}} workspaces"
 	},
 	"update": {
+		"available": {
+			"description": "Ensemblr does not install this one itself — download it from the release page.",
+			"open-release": "Open the release page",
+			"title": "Ensemblr {{version}} is available"
+		},
 		"check-failed": "The update check failed.",
+		"checking": "Checking for updates…",
 		"disabled": "Automatic updates are off. Turn them on in Settings → General.",
 		"downloading": "Downloading Ensemblr {{version}}…",
 		"ready": {
