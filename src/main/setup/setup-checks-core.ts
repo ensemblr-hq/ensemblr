@@ -4,7 +4,7 @@ import type { LocalCommandService } from '../commands/local-command';
 import type { EnsemblrConfigService } from '../config';
 import type { EnvironmentVariablesService } from '../environment';
 import type { EnsemblrRootDirectoryService } from '../root';
-import type { SafeStorageStatus } from '../secrets/safe-storage-health.ts';
+import type { SafeStorageStatus } from '../secrets/index.ts';
 import type { EnsemblrDatabaseService } from '../storage';
 import {
 	appendCommandStreamLogs,

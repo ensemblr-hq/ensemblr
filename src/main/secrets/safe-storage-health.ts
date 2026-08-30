@@ -20,11 +20,42 @@ export interface SafeStorageStatus {
 	protection: SafeStorageProtection;
 }
 
-const PLAINTEXT_BACKEND = 'basic_text';
+/**
+ * Grades one of Electron's storage-backend ids.
+ *
+ * `basic_text` obfuscates with a hardcoded key rather than encrypting, and
+ * `unknown` means Electron could not identify the password store — the check
+ * exists to warn, so an unidentified backend is graded down rather than
+ * assumed safe.
+ * @param backend - Backend id from `getSelectedStorageBackend()`.
+ * @returns How much protection that backend provides.
+ */
+function gradeBackend(
+	backend: ReturnType<Electron.SafeStorage['getSelectedStorageBackend']>,
+): SafeStorageProtection {
+	switch (backend) {
+		case 'gnome_libsecret':
+		case 'kwallet':
+		case 'kwallet5':
+		case 'kwallet6':
+			return 'encrypted';
+		case 'basic_text':
+		case 'unknown':
+			return 'obfuscated';
+		default: {
+			const exhaustive: never = backend;
+			return exhaustive;
+		}
+	}
+}
 
 /**
  * Probes Electron's `safeStorage` for the backend it selected and how much
  * protection that backend actually provides.
+ *
+ * Only Linux reports a backend id — `getSelectedStorageBackend()` is a Linux
+ * API. Callers gate this check to Linux declaratively via
+ * `PLATFORM_ONLY_CHECK_IDS`, so it never has a platform to branch on here.
  * @returns The keyring status behind the Linux secret store.
  */
 export function readSafeStorageStatus(): SafeStorageStatus {
@@ -34,13 +65,7 @@ export function readSafeStorageStatus(): SafeStorageStatus {
 		return { backend: 'unavailable', protection: 'unavailable' };
 	}
 
-	const backend =
-		process.platform === 'linux'
-			? safeStorage.getSelectedStorageBackend()
-			: process.platform;
+	const backend = safeStorage.getSelectedStorageBackend();
 
-	return {
-		backend,
-		protection: backend === PLAINTEXT_BACKEND ? 'obfuscated' : 'encrypted',
-	};
+	return { backend, protection: gradeBackend(backend) };
 }

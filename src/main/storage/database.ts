@@ -1090,6 +1090,20 @@ ALTER TABLE secret_metadata_new RENAME TO secret_metadata;
 CREATE INDEX idx_secret_metadata_scope ON secret_metadata(scope, scope_id);
 `,
 	},
+	{
+		id: '024_secret_keyring_backend',
+		version: 24,
+		// Which keyring encrypted the row, so a failed decrypt can say whether the
+		// session's backend changed since the value was written or the ciphertext
+		// is simply corrupt. `safeStorage` reports the backend it selected but no
+		// row remembered the one in force when it was saved, which left the two
+		// indistinguishable and ruled out the only recovery that works: prompting
+		// to re-enter the affected secrets. NULL for every Keychain-backed row and
+		// for rows written before this column existed.
+		sql: `
+ALTER TABLE secret_metadata ADD COLUMN secret_keyring_backend TEXT;
+`,
+	},
 ];
 
 /** Highest declared migration version embedded in this build. */

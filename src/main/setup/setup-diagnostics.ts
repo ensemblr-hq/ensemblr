@@ -21,7 +21,7 @@ import type { EnsemblrRootDirectoryService } from '../root';
 import {
 	readSafeStorageStatus,
 	type SafeStorageStatus,
-} from '../secrets/safe-storage-health.ts';
+} from '../secrets/index.ts';
 import type { EnsemblrDatabaseService } from '../storage';
 import type { SetupCheckProvider } from './setup-check-context.ts';
 import { getClaudeExecutableCheck } from './setup-checks-claude.ts';

@@ -75,11 +75,47 @@ runtime dependency the user has to install, one that exists only in the
 libsecret world and answers nothing on a KWallet session — precisely the Deck's
 configuration.
 
-**A missing keyring is a warning, not a crash.** With no daemon running,
+**A missing keyring is a warning, not a crash.** That fallback is opt-in:
+`safeStorage.setUsePlainTextEncryption(true)` is called on Linux before the
+first store, or `isEncryptionAvailable()` stays false on a session with no
+daemon and every read and write throws — taking Linear, Infisical, dictation
+and secret workspace environment variables down with it. With it,
 `getSelectedStorageBackend()` returns `basic_text` and values are obfuscated
 with a hardcoded key rather than encrypted. A Linux-only setup check reports
 that, so the user learns it from the diagnostics screen instead of from a
 breach.
+
+**A decrypt failure degrades per secret.** The row records which keyring
+encrypted it (migration `024_secret_keyring_backend`), so a value written under
+one backend and read under another says so by name instead of guessing, and the
+environment assembly reports it as one `secret-value-undecryptable` diagnostic
+rather than rejecting the whole layer and leaving the workspace with no
+terminal.
+
+### One `~/.config/ensemblr`, with Electron's state nested inside it
+
+Electron derives `userData` from the product name, so on Linux its default is
+`~/.config/Ensemblr` — sitting beside the `~/.config/ensemblr` that already
+holds `config.json` and `ensemblr.db`. Two directories one capital letter apart
+is indistinguishable from a bug, and neither name tells the user which one is
+theirs.
+
+`userData` therefore points at `~/.config/ensemblr/electron`. The user sees one
+directory whose top level is only the two files they ever open; everything
+Chromium generates — `sessionData` defaults to `userData`, so cookies, Local
+Storage and the disk cache come along — is one clearly-named subdirectory they
+can ignore. macOS is untouched: `~/Library/Application Support/Ensemblr` is not
+a directory anyone browses, and the release-channel pin there exists for a
+different reason (a packaged Canary must open the release's recents).
+
+The Linux path needs no such pin — it is derived from the config directory,
+which was already channel-independent, so every packaged channel shares one
+`userData` and one single-instance lock for free.
+
+Merging the two outright was the alternative: put Electron's `Cache/`,
+`GPUCache/` and `Local Storage/` directly beside a `config.json` the user is
+expected to hand-edit. One directory either way, but the nested form keeps the
+top level readable.
 
 ### Bespoke app-drawn window controls, not Window Controls Overlay
 
@@ -146,6 +182,8 @@ skipped there — size, maximized and full-screen still restore.
   assumption fail there rather than in a user's AppImage — the keymap suites now
   assert whichever mapping the runner has. `release.yml` and `nightly.yml` each
   grow a separate `build-linux` job that skips `verify:signing`.
+- Electron's `userData` is `~/.config/ensemblr/electron` on Linux, so the app
+  owns exactly one directory under `~/.config` rather than a case-differing pair.
 - Platform differences are declared, not branched inline. The "Open in…"
   registry carries a `platforms` map so adding an editor that exists on both is
   a single-entry edit; the window chrome is one resolver in `src/shared/` that

@@ -8,6 +8,7 @@ import {
 	BrowserWindow,
 	dialog,
 	ipcMain,
+	safeStorage,
 	shell,
 } from 'electron';
 import {
@@ -91,6 +92,7 @@ import { createMainWindow } from './app/main-window';
 import type { QuitExit } from './app/quit-coordinator';
 import { createQuitCoordinator } from './app/quit-coordinator';
 import { createQuitGuard } from './app/quit-guard';
+import { resolveUserDataDirectory } from './app/user-data-location';
 import { createMainWindowStateStore } from './app/window-state';
 import { createChatTabService } from './chat-tabs/chat-tab-service.ts';
 import { persistTerminalAgentSessionId } from './chat-tabs/persist-terminal-agent-session.ts';
@@ -225,9 +227,6 @@ const isDev = !app.isPackaged;
 // live in different namespaces (dotfile path segment, reverse-DNS service id)
 // and carry their own dev markers below.
 const DEV_SUFFIX = ' (DEV)';
-// Product name of the release channel, and therefore the directory Electron
-// derives userData from. Mirrors APP_NAMES.release in forge.config.ts.
-const RELEASE_PRODUCT_NAME = 'Ensemblr';
 // The unpackaged dev build (`electron-forge start`) gets the explicit (DEV)
 // suffix so it reads its isolated userData below. A *packaged* build keeps the
 // product name forge baked in from its build channel (Ensemblr / Ensemblr
@@ -258,14 +257,25 @@ applyLinuxDesktopIdentity();
 // once was never safe. This amends ADR 0032, whose bundle-id split stands.
 // `setPath` throws when the directory does not exist, which is the ordinary case
 // on a machine that installed a dogfood channel before ever installing a
-// release, so create it first.
-if (!isDev) {
-	const sharedUserData = path.join(
-		app.getPath('appData'),
-		RELEASE_PRODUCT_NAME,
-	);
-	mkdirSync(sharedUserData, { recursive: true });
-	app.setPath('userData', sharedUserData);
+// release, so create it first. It also has to run before `ready`: `sessionData`
+// defaults to `userData`, and Electron only reads it once.
+//
+// Resolved from the config path, which is why that pair is derived here rather
+// than beside the other dev paths further down.
+const prodConfigPath = resolveEnsemblrConfigPath();
+const devConfigPath = path.join(
+	`${path.dirname(prodConfigPath)}-dev`,
+	path.basename(prodConfigPath),
+);
+const userDataDirectory = resolveUserDataDirectory({
+	appDataPath: app.getPath('appData'),
+	configPath: isDev ? devConfigPath : prodConfigPath,
+	isDev,
+	platform: process.platform,
+});
+if (userDataDirectory) {
+	mkdirSync(userDataDirectory, { recursive: true });
+	app.setPath('userData', userDataDirectory);
 }
 
 // A second launch of the packaged app — most often a spawned login shell that
@@ -297,16 +307,12 @@ if (!hasSingleInstanceLock) {
 // the prod path changes. Each keeps its own dev marker in the namespace the
 // prod path uses: the DB data dir is suffixed ` (DEV)`, while the `.config`
 // dotfile dir takes an `ensemblr-dev` sibling (spaces/parens don't belong in a
-// dotfile path segment).
+// dotfile path segment) — that pair is derived above, because the Linux
+// userData directory hangs off it.
 const prodDatabasePath = resolveDefaultDatabasePath();
 const devDatabasePath = path.join(
 	path.dirname(prodDatabasePath) + DEV_SUFFIX,
 	path.basename(prodDatabasePath),
-);
-const prodConfigPath = resolveEnsemblrConfigPath();
-const devConfigPath = path.join(
-	`${path.dirname(prodConfigPath)}-dev`,
-	path.basename(prodConfigPath),
 );
 const devRootDirectory = path.join(os.homedir(), `Ensemblr${DEV_SUFFIX}`);
 const devKeychainService = 'dev.ensemblr.app.secret-store.dev';
@@ -1444,12 +1450,33 @@ function moveRepositoryScriptsIntoCommittedConfig(): void {
 	}
 }
 
+/**
+ * Lets `safeStorage` fall back to its hardcoded key when no keyring daemon
+ * answers, which is what makes ADR 0056's "a missing keyring is a warning, not
+ * a crash" true rather than aspirational.
+ *
+ * Without it `isEncryptionAvailable()` stays false on a KWallet-less session and
+ * every store and read throws, so Linear, Infisical, dictation and secret
+ * workspace environment variables all hard-fail on the ADR's own target host.
+ * The reduced protection is not silent: the `secret-storage` setup check reads
+ * the selected backend and reports `basic_text` as a warning.
+ */
+function allowPlainTextSecretFallback(): void {
+	if (process.platform !== 'linux') {
+		return;
+	}
+
+	safeStorage.setUsePlainTextEncryption(true);
+}
+
 app.whenReady().then(() => {
 	// The instance that lost the single-instance lock is already quitting; skip
 	// state loading and window creation so it never touches shared userData.
 	if (!hasSingleInstanceLock) {
 		return;
 	}
+
+	allowPlainTextSecretFallback();
 
 	configService.load();
 	databaseService.open();

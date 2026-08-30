@@ -14,6 +14,7 @@ import {
 } from './normalize.ts';
 import {
 	type NormalizedWriteInput,
+	type SafeStorageApi,
 	type SafeStorageSecretStoreOptions,
 	type SecretStore,
 	SecretStoreError,
@@ -21,6 +22,7 @@ import {
 import {
 	createSqliteSecretMetadataStore,
 	type MetadataStore,
+	type StoredCiphertext,
 } from './sqlite-metadata-store.ts';
 
 const DEFAULT_SAFE_STORAGE_SERVICE_NAME = 'dev.ensemblr.app.secret-store';
@@ -33,39 +35,48 @@ const DEFAULT_SAFE_STORAGE_SERVICE_NAME = 'dev.ensemblr.app.secret-store';
  * already wraps whatever keyring the session provides (gnome-libsecret,
  * KWallet) behind one API. It hands back opaque bytes with nowhere to store
  * them, which is why the row carries them.
- * @param options - Database handle plus optional clock, id factory and service name.
+ * @param options - Database handle plus optional clock, id factory, service name and `safeStorage`.
  * @returns A {@link SecretStore} whose values are encrypted by the OS keyring.
  */
 export function createSafeStorageSecretStore({
 	database,
 	idFactory = randomUUID,
 	now = () => new Date(),
+	safeStorage,
 	serviceName = DEFAULT_SAFE_STORAGE_SERVICE_NAME,
 }: SafeStorageSecretStoreOptions): SecretStore {
 	return buildSafeStorageSecretStore({
 		idFactory,
 		metadataStore: createSqliteSecretMetadataStore(database),
 		now,
+		resolveSafeStorage: safeStorage
+			? () => safeStorage
+			: resolveElectronSafeStorage,
 		serviceName,
 	});
 }
 
 /** Injected dependencies for {@link buildSafeStorageSecretStore}. */
-interface SafeStorageBackendDependencies {
+export interface SafeStorageBackendDependencies {
 	idFactory: () => string;
 	metadataStore: MetadataStore;
 	now: () => Date;
+	resolveSafeStorage: () => SafeStorageApi | undefined;
 	serviceName: string;
 }
 
 /**
- * Composes a {@link SecretStore} from an injected {@link MetadataStore}, so the
- * encryption plumbing stays separate from where the row is persisted.
+ * Composes a {@link SecretStore} from an injected {@link MetadataStore} and
+ * `safeStorage`, so the encryption plumbing stays separate from where the row is
+ * persisted — and so both can be driven from a test outside Electron.
+ * @param dependencies - Metadata store, keyring resolver, clock, id factory and service name.
+ * @returns A {@link SecretStore} over the injected pieces.
  */
-function buildSafeStorageSecretStore({
+export function buildSafeStorageSecretStore({
 	idFactory,
 	metadataStore,
 	now,
+	resolveSafeStorage,
 	serviceName,
 }: SafeStorageBackendDependencies): SecretStore {
 	/**
@@ -74,12 +85,15 @@ function buildSafeStorageSecretStore({
 	 * @returns The persist payload minus the fields only one caller supplies.
 	 */
 	function toPersistPayload(input: NormalizedWriteInput) {
+		const safeStorage = requireSafeStorage(resolveSafeStorage, 'store');
+
 		return {
 			...input,
 			backend: 'safe-storage' as const,
+			keyringBackend: readKeyringBackend(safeStorage),
 			maskedDisplay: maskSecret(input.value),
 			now: now().toISOString(),
-			secretValue: encryptSecret(input.value),
+			secretValue: encryptSecret(safeStorage, input.value),
 		};
 	}
 
@@ -115,13 +129,15 @@ function buildSafeStorageSecretStore({
 		maskSecret,
 		async read(lookup) {
 			const normalized = normalizeLookup(lookup);
-			const ciphertext = metadataStore.readSecretValue(normalized);
+			const stored = metadataStore.readSecretValue(normalized);
 
-			if (!ciphertext) {
+			if (!stored) {
 				return null;
 			}
 
-			return decryptSecret(ciphertext, normalized.key);
+			const safeStorage = requireSafeStorage(resolveSafeStorage, 'read');
+
+			return decryptSecret(safeStorage, stored, normalized.key);
 		},
 		async update(input) {
 			const normalized = normalizeWriteInput(input);
@@ -149,13 +165,25 @@ function buildSafeStorageSecretStore({
 }
 
 /**
- * Resolves Electron's `safeStorage`, refusing when the runtime does not offer
- * one — a plain Node process running the test suites, most often.
- * @param action - What the caller was about to do, named in the error.
- * @returns The `safeStorage` module.
+ * Reads Electron's own `safeStorage`, which is absent under
+ * `ELECTRON_RUN_AS_NODE` and in a plain Node process.
+ * @returns The `safeStorage` module, or undefined outside Electron.
  */
-function requireSafeStorage(action: 'read' | 'store'): Electron.SafeStorage {
-	const safeStorage = electron.safeStorage as Electron.SafeStorage | undefined;
+function resolveElectronSafeStorage(): SafeStorageApi | undefined {
+	return electron.safeStorage as SafeStorageApi | undefined;
+}
+
+/**
+ * Resolves the keyring, refusing when the runtime does not offer one.
+ * @param resolve - Supplies the keyring API.
+ * @param action - What the caller was about to do, named in the error.
+ * @returns The resolved keyring API.
+ */
+function requireSafeStorage(
+	resolve: () => SafeStorageApi | undefined,
+	action: 'read' | 'store',
+): SafeStorageApi {
+	const safeStorage = resolve();
 
 	if (!safeStorage?.isEncryptionAvailable()) {
 		throw new SecretStoreError(
@@ -168,13 +196,24 @@ function requireSafeStorage(action: 'read' | 'store'): Electron.SafeStorage {
 }
 
 /**
+ * Names the keyring that is about to encrypt a value, so a later decrypt
+ * failure can say whether the session's backend changed.
+ * @param safeStorage - Resolved keyring API.
+ * @returns The backend id, or `unknown` off Linux where Electron reports none.
+ */
+function readKeyringBackend(safeStorage: SafeStorageApi): string {
+	return process.platform === 'linux'
+		? safeStorage.getSelectedStorageBackend()
+		: 'unknown';
+}
+
+/**
  * Encrypts a secret value with the session's keyring.
+ * @param safeStorage - Resolved keyring API.
  * @param value - Plaintext secret value.
  * @returns The opaque ciphertext to persist.
  */
-function encryptSecret(value: string): Uint8Array {
-	const safeStorage = requireSafeStorage('store');
-
+function encryptSecret(safeStorage: SafeStorageApi, value: string): Uint8Array {
 	try {
 		return safeStorage.encryptString(value);
 	} catch (error) {
@@ -188,22 +227,47 @@ function encryptSecret(value: string): Uint8Array {
 
 /**
  * Decrypts a stored ciphertext back into its secret value.
- * @param ciphertext - Bytes previously produced by {@link encryptSecret}.
+ * @param safeStorage - Resolved keyring API.
+ * @param stored - Ciphertext plus the keyring backend that produced it.
  * @param key - Secret key, named in the error so a failure is traceable.
  * @returns The plaintext secret value.
  */
-function decryptSecret(ciphertext: Uint8Array, key: string): string {
-	const safeStorage = requireSafeStorage('read');
-
+function decryptSecret(
+	safeStorage: SafeStorageApi,
+	stored: StoredCiphertext,
+	key: string,
+): string {
 	try {
-		return safeStorage.decryptString(Buffer.from(ciphertext));
+		return safeStorage.decryptString(Buffer.from(stored.ciphertext));
 	} catch (error) {
 		throw new SecretStoreError(
 			'encryption-error',
-			`The stored value for ${key} could not be decrypted. The OS keyring backend may have changed since it was saved.`,
+			describeDecryptFailure(safeStorage, stored, key),
 			{ cause: error },
 		);
 	}
+}
+
+/**
+ * Explains a failed decrypt, naming the keyring change when the row records a
+ * different backend than the session now reports.
+ * @param safeStorage - Resolved keyring API.
+ * @param stored - Ciphertext plus the keyring backend that produced it.
+ * @param key - Secret key, named so a failure is traceable.
+ * @returns The message to surface.
+ */
+function describeDecryptFailure(
+	safeStorage: SafeStorageApi,
+	stored: StoredCiphertext,
+	key: string,
+): string {
+	const current = readKeyringBackend(safeStorage);
+
+	if (stored.keyringBackend && stored.keyringBackend !== current) {
+		return `The stored value for ${key} was encrypted by the ${stored.keyringBackend} keyring, but this session uses ${current}. Re-enter the secret to store it under the current keyring.`;
+	}
+
+	return `The stored value for ${key} could not be decrypted.`;
 }
 
 /**

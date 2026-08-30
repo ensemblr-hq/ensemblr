@@ -1128,6 +1128,40 @@ test('a session with no keyring daemon warns rather than blocking', async () => 
 	assert.equal(check.detailMessage?.code, 'secret-storage-plaintext');
 });
 
+test('a session with no usable keyring at all warns and offers a retry', async () => {
+	const service = createSetupDiagnosticsService({
+		checkProviders: createFutureProviders(),
+		claudeExecutableService: createClaudeExecutableService(),
+		configService: createConfigService(),
+		databaseService: createDatabaseService(),
+		environmentVariablesService: createEnvironmentVariablesService(),
+		homeDirectory: HOME,
+		linearAuthService: createLinearAuthService(),
+		localCommandService: createLocalCommandService(),
+		now: () => NOW,
+		piExecutableService: createPiExecutableService(),
+		piReadinessService: createPiReadinessService(),
+		platform: 'linux',
+		readSecretStorageStatus: () => ({
+			backend: 'unavailable',
+			protection: 'unavailable',
+		}),
+		rootDirectoryService: createRootDirectoryService(),
+	});
+
+	const check = getCheck(await service.getSnapshot(), 'secret-storage');
+
+	// Warning, never blocking: ADR 0056 is explicit that a missing keyring
+	// degrades the app rather than stopping it.
+	assert.equal(check.status, 'warning');
+	assert.equal(check.blocking, false);
+	assert.equal(check.detailMessage?.code, 'secret-storage-unavailable');
+	assert.deepEqual(
+		check.remediationActions?.map((action) => action.id),
+		['retry-secret-storage'],
+	);
+});
+
 test('omits the keyring check on macOS, where the Keychain reports its own failures', async () => {
 	const snapshot = await getSnapshot({ platform: 'darwin' });
 

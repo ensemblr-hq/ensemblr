@@ -78,6 +78,19 @@ export interface MacosKeychainSecretStoreOptions {
 }
 
 /**
+ * The slice of Electron's `safeStorage` the backend actually uses. Naming it
+ * lets a test supply a fake, which the module-scope `electron` namespace import
+ * otherwise makes impossible outside an Electron process.
+ */
+export type SafeStorageApi = Pick<
+	Electron.SafeStorage,
+	| 'decryptString'
+	| 'encryptString'
+	| 'getSelectedStorageBackend'
+	| 'isEncryptionAvailable'
+>;
+
+/**
  * Options for the `safeStorage` backend. `serviceName` names no external store
  * — the ciphertext lives in SQLite — but it still identifies the row's
  * `(service, account)` pair, so a dev build can hold its own entries.
@@ -86,6 +99,7 @@ export interface SafeStorageSecretStoreOptions {
 	database: DatabaseSync;
 	idFactory?: () => string;
 	now?: () => Date;
+	safeStorage?: SafeStorageApi;
 	serviceName?: string;
 }
 

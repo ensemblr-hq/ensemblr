@@ -194,7 +194,7 @@ Five locations, and nothing outside them:
 | --- | --- |
 | App settings | `~/.config/ensemblr/config.json` |
 | Projects, workspaces, agent sessions, board state | `~/Library/Application Support/dev.ensemblr.app/ensemblr.db` |
-| Window state, recents, per-repository overrides, Electron's own caches | `~/Library/Application Support/Ensemblr` |
+| Window state, recents, per-repository overrides, Electron's own caches | `~/Library/Application Support/Ensemblr` (macOS) · `~/.config/ensemblr/electron` (Linux) |
 | Secrets (Linear OAuth tokens, Infisical client secrets) | macOS Keychain, service `dev.ensemblr.app.secret-store` |
 | Your repositories, worktrees, and archived context | The root directory you pick during setup — `~/Ensemblr` unless you change it |
 
@@ -204,6 +204,14 @@ Electron's `userData`, which every packaged channel is deliberately pinned to so
 a canary build opens the release's recents rather than a blank window. The dev
 build — `electron-forge start`, not a packaged app — keeps both under a `(DEV)`
 suffix instead, so dogfooding never writes over an installed copy's state.
+
+On Linux there is no Application Support, and everything lands under
+`~/.config/ensemblr`: `config.json` and `ensemblr.db` at the top level, with
+Electron's own state in an `electron/` subdirectory. Left to itself Electron
+would have written to `~/.config/Ensemblr`, a capitalised sibling of the
+directory holding your settings — so it is pointed inside instead. Nothing in
+`electron/` is meant to be edited by hand; deleting it costs you window
+placement and recents, nothing more.
 
 The root directory is the only one that holds your own work. See
 [First run](./03-first-run.md) for what Ensemblr creates inside it.
@@ -238,6 +246,7 @@ rm -rf ~/Library/Application\ Support/dev.ensemblr.app
 
 # 4. Window state, recents, Electron's caches
 rm -rf ~/Library/Application\ Support/Ensemblr
+#    On Linux this one lives inside ~/.config/ensemblr, so step 2 already took it.
 
 # 5. Keychain secrets
 security delete-generic-password -s dev.ensemblr.app.secret-store
