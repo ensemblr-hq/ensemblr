@@ -9,6 +9,74 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.0-beta.20] - 2026-08-30
+
+The shell moves to Electron 44, which raises the macOS floor from Monterey to Ventura — macOS 12
+cannot run this build, and `0.1.0-beta.19` stays the last release that can. Linux is unaffected. The
+rest is interaction repair: the right sidebar no longer relays out the workspace while you drag it,
+the drawn menu bar's focus-moving rows work, and a Linux user with no `git` gets remediation that
+applies to their machine.
+[Release](https://github.com/ensemblr-hq/ensemblr/releases/tag/v0.1.0-beta.20) ·
+[`.dmg`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.0-beta.20/Ensemblr-0.1.0-beta.20-arm64.dmg) ·
+[`.AppImage`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.0-beta.20/Ensemblr-0.1.0-beta.20-x64.AppImage)
+
+### Changed
+
+- **Electron 43 → 44, and the macOS floor with it.** The embedded Node stays at 24.18.1, so
+  `engines`, `.nvmrc` and the `@types/node` `^24` pin are all still correct, but two constraints
+  move. The macOS floor rises from Monterey to Ventura, per the `44-x-y` branch README; it is
+  declared outside this repository, in the `ensemblr-hq/homebrew-tap` cask, so `brew` refuses on a
+  machine that cannot run the app rather than installing something that will not open. And the
+  `clipboard` module is rearchitected against the W3C Clipboard API — `writeText` returns a Promise
+  instead of writing synchronously, and the module is gone from the renderer, which already uses
+  `navigator.clipboard`. Both are recorded in `.claude/rules/stack.md` rather than left to be
+  rediscovered. Alongside it: Biome 2.5.10 with the matching `$schema` pin, Vite 8.2.2, Vitest
+  4.1.11, i18next-cli 1.71.3 — whose new `@swc/core` dependency is denied in `allowScripts`, its
+  postinstall only probing for a binding that is already installed — the Claude Agent SDK 0.3.251,
+  streamdown 2.6.0, lucide-react 1.34.0, motion 13.1.1 and shadcn 4.19.0.
+
+### Fixed
+
+- **Dragging the right sidebar relaid out the entire workspace on every frame.** The drag wrote
+  `rightSidebarSizePercentAtom` sixty times a second, and that atom feeds an unmemoized
+  `WorkbenchLayoutProvider` value, so each frame re-rendered the whole workspace subtree — while the
+  new width also reached `ResizablePanel` as a changed `defaultSize`, which react-resizable-panels
+  lists in its registration effect, so every frame unregistered the panel and relaid out the group as
+  well. The width commit is debounced to once per settled drag; the panel's `defaultSize` is frozen
+  at mount by the controller that already owns clamping and the collapsed flag; and the controller no
+  longer subscribes to the width atom at all, writing with `useSetAtom` and reading the persisted
+  value once through the store, so even the settled commit re-renders nothing. The pending width is
+  flushed on unmount *and* on `pagehide`, because quitting tears the renderer down without unmounting
+  React. The queued follow-up rows sliding to places they were never dragged to had the same cause: a
+  new `useResizingWidth` reports while the list's box is still moving, and each row takes a
+  zero-duration layout transition, landing in its reflowed place outright while `Reorder.Group` can
+  still measure it.
+- **The drawn menu bar's focus-moving rows did nothing, and Reload was permanently dead.** Invoking a
+  row is a renderer→main→renderer round trip, and `AppMenuBar` performed the focus restore from
+  `onSelect` while the menu still owned focus — Radix's `onCloseAutoFocus` then refocused the trigger
+  from a `setTimeout(0)` in FocusScope's unmount cleanup, so whichever resolved last won. The row is
+  now held from `onSelect` and reported from `onCloseAutoFocus`, with the trigger restore
+  `preventDefault()`ed and focus put back on the element the bar was opened over; focus already
+  inside the bar is never recorded as an origin, so a reopen after a dismissal does not hand the row
+  back the trigger. Reload was dead for a second reason: it carries a `click` closure rather than a
+  `role`, so it does not claim Ctrl+R, and a closure is opaque to the serializer that builds the
+  drawn bar. A new `drawnRole` says what such a row is without handing Electron the role's
+  accelerator.
+- **A Linux user with no `git` on PATH was given macOS-only advice.** The `git-executable` setup
+  check is blocking, and it built its whole failure output unconditionally: a detail sentence naming
+  the Xcode Command Line Tools, a button running `xcode-select --install`, and a git-scm macOS link.
+  `getGitExecutableCheck` now takes the platform the diagnostics service already resolves to gate
+  `secret-storage`, and both the actions and the message branch on it — darwin keeps
+  install-command-line-tools, the mac docs page and retry, while every other platform gets the docs
+  page and retry, pointed at git-scm/download/linux on Linux and git-scm/downloads when unmapped. The
+  new `git-not-found-macos` code inherits the existing sentence and its `ru`/`el` translations
+  verbatim; `git-not-found` keeps its name, becomes platform-neutral, and had its two translations
+  reworded.
+- **"Copy path" reported success before the clipboard had been written.** Electron 44's
+  `clipboard.writeText` returns a Promise, and the `copy-path` open target left it unawaited, so the
+  success toast raced the write and a failure surfaced as an unhandled rejection rather than as an
+  error anyone could see.
+
 ## [0.1.0-beta.19] - 2026-08-30
 
 Ensemblr runs on Linux. An x86-64 `.AppImage` is built beside the macOS `.dmg`, with parity on every
