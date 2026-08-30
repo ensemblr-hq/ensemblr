@@ -86,6 +86,7 @@ import { resolveNotificationTarget } from './agent-runtime/notification-target';
 import { createSessionSummaryWriter } from './agent-runtime/session-summary-writer';
 import { resolveAgentSkillBundle } from './agent-skills';
 import { createHarnessDetectionService } from './agents';
+import { applyLinuxDesktopIdentity } from './app/linux-desktop-identity';
 import { createMainWindow } from './app/main-window';
 import type { QuitExit } from './app/quit-coordinator';
 import { createQuitCoordinator } from './app/quit-coordinator';
@@ -238,6 +239,12 @@ const RELEASE_PRODUCT_NAME = 'Ensemblr';
 if (isDev) {
 	app.setName(`Ensemblr${DEV_SUFFIX}`);
 }
+
+// The Linux counterpart of the identity above: the product name drives the Dock
+// and Launch Services on macOS, the desktop-entry name drives the XDG app id and
+// `WM_CLASS` on Linux. Runs for dev too, so a dogfooding window is as
+// rule-addressable as a packaged one.
+applyLinuxDesktopIdentity();
 
 // A packaged dogfood channel is the same install wearing a different name, so
 // it opens the release's state rather than a blank one. The SQLite database and

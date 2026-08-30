@@ -1,6 +1,6 @@
 import 'dotenv/config';
 import { execFile } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, readdirSync } from 'node:fs';
 import { promisify } from 'node:util';
 import { FuseV1Options, FuseVersion } from '@electron/fuses';
 import { MakerDMG } from '@electron-forge/maker-dmg';
@@ -56,7 +56,54 @@ const PACKAGE_KEEP_PREFIXES = [
 	'/node_modules/@anthropic-ai/claude-agent-sdk/',
 ];
 
+// Where `npm run icon:generate` writes the Linux icon ladder: one
+// `icon-<size>.png` per freedesktop `hicolor` size. The AppImage installs them
+// under `usr/share/icons/hicolor/<size>x<size>/apps/`, and the packaged app
+// keeps the same directory as a resource so a window can carry its own icon
+// (`src/main/app/linux-desktop-identity.ts`) with no launcher integration at all.
+const LINUX_ICONS_DIR = './assets/icons';
+
+// The size that becomes the AppImage's `.DirIcon`. It has to be a raster:
+// `assets/icon.svg` clips its artwork with `clipPath`, which Qt's SVG renderer
+// does not implement, so a KDE desktop handed the scalable icon draws it
+// unclipped or drops it for a generic placeholder.
+const LINUX_DEFAULT_ICON_SIZE = 512;
+
 const execFileAsync = promisify(execFile);
+
+/**
+ * Builds the AppImage maker's icon set from the generated PNG ladder, keyed by
+ * the `hicolor` directory each size installs into. Reading the directory rather
+ * than repeating the generator's size list keeps the two from drifting, and an
+ * incomplete ladder throws — the maker would otherwise produce an AppImage
+ * whose icon no desktop can find, which reads as a successful build.
+ * @returns The icon set, with the default size marked for `.DirIcon`
+ */
+function linuxIconSet(): {
+	default: `${number}x${number}`;
+	[size: `${number}x${number}`]: string;
+} {
+	const sizes = readdirSync(LINUX_ICONS_DIR)
+		.map((file) => /^icon-(\d+)\.png$/.exec(file))
+		.filter((match) => match !== null)
+		.map((match) => Number(match[1]));
+
+	if (!sizes.includes(LINUX_DEFAULT_ICON_SIZE)) {
+		throw new Error(
+			`${LINUX_ICONS_DIR} is missing icon-${LINUX_DEFAULT_ICON_SIZE}.png. ` +
+				'Run `npm run icon:generate` to write the Linux icon ladder.',
+		);
+	}
+
+	const icons: {
+		default: `${number}x${number}`;
+		[size: `${number}x${number}`]: string;
+	} = { default: `${LINUX_DEFAULT_ICON_SIZE}x${LINUX_DEFAULT_ICON_SIZE}` };
+	for (const size of sizes) {
+		icons[`${size}x${size}`] = `${LINUX_ICONS_DIR}/icon-${size}.png`;
+	}
+	return icons;
+}
 
 const appleApiKey = process.env.APPLE_API_KEY_PATH;
 const appleApiKeyId = process.env.APPLE_API_KEY_ID;
@@ -209,7 +256,11 @@ const config: ForgeConfig = {
 			NSMicrophoneUsageDescription:
 				'Ensemblr uses the microphone to dictate prompts into the composer. Audio is sent to the transcription provider you configure and is never stored.',
 		},
-		extraResource: ['resources/pi-extensions', 'resources/agent-skills'],
+		extraResource: [
+			'resources/pi-extensions',
+			'resources/agent-skills',
+			LINUX_ICONS_DIR,
+		],
 		// Packager resolves the platform extension (`icon.icns` on macOS).
 		// Regenerate with `npm run icon:generate`.
 		icon: './assets/icon',
@@ -263,11 +314,16 @@ const config: ForgeConfig = {
 					bin: APP_NAMES[buildChannel],
 					categories: ['Development'],
 					compressor: 'zstd',
+					// The desktop entry's basename is the app's Linux identity: Electron
+					// turns it into the XDG application id on Wayland and `WM_CLASS` on
+					// X11, which is how a desktop pairs a window with its icon and how a
+					// window manager addresses the app in a rule. `src/main/main.ts`
+					// declares the same per-channel id through `app.setDesktopName`, and
+					// the two have to agree — the maker would otherwise name the file
+					// after the product name ("Ensemblr Canary.desktop", space and all).
+					desktopName: APP_LINUX_APP_IDS[buildChannel],
 					genericName: 'Multi-agent coding workbench',
-					icon: {
-						'1024x1024': './assets/icon.png',
-						scalable: './assets/icon.svg',
-					},
+					icon: linuxIconSet(),
 					// Writes `x-scheme-handler/ensemblr` into the generated `.desktop`
 					// file, registering the app as the scheme's handler with the
 					// desktop environment. `src/shared/deep-link.ts` has no consumer

@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs';
 import { describe, expect, test } from 'vitest';
 
 import config from '../../forge.config.ts';
@@ -6,6 +7,26 @@ import {
 	APP_NAMES,
 	KNOWN_CHANNELS,
 } from '../../src/shared/build-channel.ts';
+
+// Every size directory the freedesktop `hicolor` theme declares in its
+// `index.theme`. GTK and Qt only look inside the sizes the theme lists, so an
+// icon installed under any other one — `1024x1024`, the obvious choice for a
+// macOS master — is invisible and the launcher draws its generic placeholder.
+const HICOLOR_SIZES = [
+	'16x16',
+	'22x22',
+	'24x24',
+	'32x32',
+	'36x36',
+	'48x48',
+	'64x64',
+	'72x72',
+	'96x96',
+	'128x128',
+	'192x192',
+	'256x256',
+	'512x512',
+];
 
 /**
  * Finds the AppImage maker instance in the Forge config.
@@ -59,6 +80,65 @@ describe('the AppImage maker', () => {
 
 	test('registers the deep-link scheme so the desktop entry claims it', () => {
 		expect(appImageOptions()?.mimeType).toEqual(['x-scheme-handler/ensemblr']);
+	});
+
+	// Electron derives the XDG app id and `WM_CLASS` from the desktop entry's
+	// basename (`app.setDesktopName`, wired in src/main/app/linux-desktop-identity.ts).
+	// If the file the maker writes is named anything else, the desktop cannot pair
+	// the running window with its entry and falls back to a generic icon.
+	test('names the desktop entry after the launcher id, not the product name', () => {
+		expect(appImageOptions()?.desktopName).toBe(APP_LINUX_APP_IDS.release);
+	});
+});
+
+describe('the Linux icon set', () => {
+	/**
+	 * Reads the icon set the AppImage maker was configured with.
+	 * @returns The icon set keyed by `hicolor` size directory.
+	 */
+	function iconSet(): Record<string, string> {
+		return (appImageOptions()?.icon ?? {}) as Record<string, string>;
+	}
+
+	/**
+	 * Lists the `<size>x<size>` keys of the icon set, dropping `default`.
+	 * @returns Every size directory the maker will install an icon into.
+	 */
+	function iconSizes(): string[] {
+		return Object.keys(iconSet()).filter((key) => key !== 'default');
+	}
+
+	test('installs only into sizes the hicolor theme declares', () => {
+		const sizes = iconSizes();
+
+		expect(sizes.length).toBeGreaterThan(0);
+		for (const size of sizes) {
+			expect(HICOLOR_SIZES).toContain(size);
+		}
+	});
+
+	test('ships every icon the set points at', () => {
+		for (const size of iconSizes()) {
+			expect(existsSync(iconSet()[size] as string)).toBe(true);
+		}
+	});
+
+	// The maker symlinks the default as `.DirIcon`, and would pick `scalable`
+	// over any raster when one is offered. `assets/icon.svg` clips its artwork
+	// with `clipPath`, which Qt's SVG renderer does not implement, so a KDE
+	// desktop handed that file draws the icon unclipped or not at all.
+	test('defaults to a raster, and offers no scalable icon at all', () => {
+		const icons = iconSet();
+
+		expect(icons.scalable).toBeUndefined();
+		expect(icons.default).toBeDefined();
+		expect(icons[icons.default as string]).toMatch(/\.png$/);
+	});
+
+	// The window carries the same PNG as its own icon, which is the only icon an
+	// AppImage the user never integrated into a launcher can show at all.
+	test('packages the icons as a resource the main process can read', () => {
+		expect(config.packagerConfig?.extraResource).toContain('./assets/icons');
 	});
 });
 

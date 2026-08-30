@@ -2,6 +2,7 @@ import path from 'node:path';
 import { BrowserWindow, screen } from 'electron';
 import type { TitleBarPreference } from '../../shared/window-chrome.ts';
 import { routeExternalLinksToBrowser } from './external-links';
+import { linuxWindowIconPath } from './linux-desktop-identity';
 import { restrictMediaPermissions } from './media-permissions';
 import { forwardTextContextMenus } from './text-context-menu-forwarding';
 import { resolveWindowChromeOptions } from './window-chrome';
@@ -34,6 +35,9 @@ export function createMainWindow({
 		...resolveWindowChromeOptions(process.platform, titleBar),
 		backgroundColor: '#0b0808',
 		height: restoredState?.bounds.height ?? DEFAULT_MAIN_WINDOW_HEIGHT,
+		// Linux only: macOS reads the icon off the bundle. Undefined everywhere
+		// else, which BrowserWindow treats as "unset".
+		icon: linuxWindowIconPath(),
 		minHeight: MAIN_WINDOW_MIN_HEIGHT,
 		minWidth: MAIN_WINDOW_MIN_WIDTH,
 		show: false,

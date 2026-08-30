@@ -422,11 +422,11 @@ The **channel** (`ENSEMBLR_BUILD_CHANNEL`, default `release`) scopes both the
 bundle id and product name so dogfood builds never collide with the release's
 macOS Launch Services registration:
 
-| Channel | Bundle id | Product name |
-| --- | --- | --- |
-| `release` | `dev.ensemblr.app` | Ensemblr |
-| `canary` | `dev.ensemblr.app.canary` | Ensemblr Canary |
-| `dev` | `dev.ensemblr.app.dev` | Ensemblr Dev |
+| Channel | Bundle id | Product name | Linux launcher id |
+| --- | --- | --- | --- |
+| `release` | `dev.ensemblr.app` | Ensemblr | `ensemblr` |
+| `canary` | `dev.ensemblr.app.canary` | Ensemblr Canary | `ensemblr-canary` |
+| `dev` | `dev.ensemblr.app.dev` | Ensemblr Dev | `ensemblr-dev` |
 
 Only the shipped release claims the canonical id. Sharing one id across multiple
 installed builds is what caused a stray Dock tile to flash during workspace
@@ -446,6 +446,45 @@ the correct reading given they share a database file — launching Canary while
 Ensemblr is running folds into the running instance rather than opening a second
 writer. The unpackaged `electron-forge start` build is the exception and keeps
 its isolated `Ensemblr (DEV)` state.
+
+### The Linux launcher id is the window's identity
+
+The launcher id above is the basename of the `.desktop` file the AppImage
+installs, and Electron turns it into the **XDG application id** on Wayland and
+**`WM_CLASS`** on X11. Three places have to agree on it or the desktop cannot
+pair a running window with its entry, and draws a generic icon instead:
+
+- `APP_LINUX_APP_IDS` in `src/shared/build-channel.ts` — the table.
+- `desktopName` on the AppImage maker in `forge.config.ts` — names the file.
+- `app.setDesktopName` via `applyLinuxDesktopIdentity()` in
+  `src/main/app/linux-desktop-identity.ts` — claims it before `ready`.
+
+Without the third, Electron guesses a name off the executable —
+`Ensemblr Canary`, space and all — which matches no installed entry. It is also
+the handle a window manager keys its own rules on, so it stays stable and
+per-channel rather than following the product name.
+
+### The icon ladder
+
+`npm run icon:generate` writes `assets/icons/icon-<size>.png` for every size the
+freedesktop `hicolor` theme declares in its `index.theme`, and the AppImage
+installs each under `usr/share/icons/hicolor/<size>x<size>/apps/`. Two
+constraints are easy to get wrong and both end in a generic icon:
+
+- **The size directory has to be one `hicolor` declares.** GTK and Qt only look
+  inside the theme's listed sizes, so the obvious `1024x1024` — the macOS master
+  — is never read.
+- **`.DirIcon` has to be a raster.** `assets/icon.svg` clips its artwork with
+  `clipPath`, which Qt's SVG renderer does not implement, so KDE draws the
+  scalable icon unclipped or not at all. The maker prefers `scalable` when it is
+  offered, so the AppImage icon set deliberately omits it and marks `512x512`
+  as the default.
+
+The same directory ships as a packaged resource, and the main process hands the
+512px PNG to `BrowserWindow` as its `icon`. That is the only icon an AppImage
+the user never integrated into a launcher can show at all — there is no
+installed `.desktop` file to look one up in. `tests/main/forge-linux-maker.test.ts`
+holds the icon set to both constraints.
 
 ## Outputs
 

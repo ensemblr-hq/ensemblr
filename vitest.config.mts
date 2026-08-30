@@ -115,6 +115,7 @@ export default defineConfig({
 			'tests/main/app-settings-service.test.ts',
 			'tests/main/published-schemas.test.ts',
 			'tests/main/forge-linux-maker.test.ts',
+			'tests/main/linux-desktop-identity.test.ts',
 			'tests/main/menu-build.test.ts',
 			'tests/main/menu-strings.test.ts',
 			'tests/main/open-in-editor.test.ts',
