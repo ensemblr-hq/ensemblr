@@ -17,6 +17,7 @@ import {
 	TooltipTrigger,
 } from '@/renderer/components/ui/tooltip';
 import { useRaisedShadow } from '@/renderer/hooks/use-raised-shadow';
+import { useResizingWidth } from '@/renderer/hooks/workbench-shell/composer/use-resizing-width';
 import { cn } from '@/renderer/lib/utils';
 import type { QueuedFollowUp } from '@/renderer/types/workbench';
 
@@ -28,6 +29,14 @@ import type { QueuedFollowUp } from '@/renderer/types/workbench';
  */
 const POSITION_SLOT =
 	'flex h-6 w-5 shrink-0 items-center justify-center font-medium text-xxs tabular-nums';
+
+/**
+ * Puts a row in its reflowed place outright instead of sliding it there. Motion
+ * reads this off the row as its layout transition, and a zero duration is how it
+ * spells "no layout animation" while still measuring the box, which is what
+ * `Reorder.Group` needs to keep tracking where each row sits.
+ */
+const INSTANT_LAYOUT_TRANSITION = { layout: { duration: 0 } };
 
 /** Wiring for one row's drag handle, which doubles as its position marker. */
 interface DragHandleProps {
@@ -43,6 +52,8 @@ interface DragHandleProps {
 interface FollowUpQueueRowProps {
 	actions: QueueRowActions;
 	entry: QueuedFollowUp;
+	/** True while the list is mid-resize, which reflows rows rather than animating them. */
+	instantLayout: boolean;
 	isFirst: boolean;
 	isLast: boolean;
 	onDragEnd: () => void;
@@ -255,6 +266,7 @@ function QueueRowAction({
 function FollowUpQueueRow({
 	actions,
 	entry,
+	instantLayout,
 	isFirst,
 	isLast,
 	onDragEnd,
@@ -304,6 +316,7 @@ function FollowUpQueueRow({
 			ref={rowRef}
 			style={{ boxShadow, y }}
 			tabIndex={-1}
+			transition={instantLayout ? INSTANT_LAYOUT_TRANSITION : undefined}
 			value={entry.id}
 		>
 			{reorderable ? (
@@ -399,6 +412,7 @@ export function FollowUpQueueList({
 	// Motion settles a dropped row into its slot, so the dragged order has to hold
 	// until release; committing per crossing yanks the row out from under the cursor.
 	const [dragging, setDragging] = useState<readonly string[] | null>(null);
+	const { boxRef, resizing } = useResizingWidth();
 	const committedIds = entries.map((entry) => entry.id);
 	const orderedIds = dragging ?? committedIds;
 	const byId = new Map(entries.map((entry) => [entry.id, entry] as const));
@@ -418,7 +432,10 @@ export function FollowUpQueueList({
 	};
 
 	return (
-		<div className='sleek-scrollbar max-h-44 overflow-y-auto overscroll-contain'>
+		<div
+			className='sleek-scrollbar max-h-44 overflow-y-auto overscroll-contain'
+			ref={boxRef}
+		>
 			<Reorder.Group
 				axis='y'
 				className='m-0! flex list-none flex-col gap-0.5 p-0!'
@@ -431,6 +448,7 @@ export function FollowUpQueueList({
 						<FollowUpQueueRow
 							actions={actions}
 							entry={entry}
+							instantLayout={resizing}
 							isFirst={index === 0}
 							isLast={index === orderedIds.length - 1}
 							key={id}
