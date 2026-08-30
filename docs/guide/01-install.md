@@ -1,11 +1,17 @@
 # Installing Ensemblr
 
-Ensemblr runs on **macOS with Apple silicon only**. The app is packaged as an
-arm64 `.app`, keeps its secrets in the macOS Keychain, and reads battery state
-through macOS APIs. There is no Intel build, no Linux build, and no Windows
-build.
+Ensemblr runs on **macOS with Apple silicon** and on **Linux with x86-64**.
 
-## Homebrew
+| Platform | Artifact | Signed | Updates itself |
+| --- | --- | --- | --- |
+| macOS, Apple silicon | `.dmg` and `.zip` | Developer ID, notarized, stapled | Yes |
+| Linux, x86-64 | `.AppImage` | No — there is no equivalent | No; it tells you and links |
+
+Neither host cross-builds the other's artifact, so they are built by two separate
+CI jobs and attached to the same release. There is no Intel Mac build, no arm64
+Linux build, and no Windows build.
+
+## Homebrew (macOS)
 
 ```bash
 brew install --cask ensemblr-hq/tap/ensemblr
@@ -28,41 +34,65 @@ brew upgrade --cask --greedy ensemblr
 
 ## Download
 
-The current build is **`0.1.0-beta.16`**:
+The current build is **`0.1.0-beta.19`**:
 
-- [**`Ensemblr-0.1.0-beta.16-arm64.dmg`**](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.0-beta.16/Ensemblr-0.1.0-beta.16-arm64.dmg)
-  — the disk image. Open it and drag Ensemblr to `/Applications`.
-- [`Ensemblr-darwin-arm64-0.1.0-beta.16.zip`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.0-beta.16/Ensemblr-darwin-arm64-0.1.0-beta.16.zip)
+- [**`Ensemblr-0.1.0-beta.19-arm64.dmg`**](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.0-beta.19/Ensemblr-0.1.0-beta.19-arm64.dmg)
+  — the macOS disk image. Open it and drag Ensemblr to `/Applications`.
+- [`Ensemblr-darwin-arm64-0.1.0-beta.19.zip`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.0-beta.19/Ensemblr-darwin-arm64-0.1.0-beta.19.zip)
   — the same `.app`, zipped, if you would rather not mount an image.
+- [**`Ensemblr-0.1.0-beta.19-x64.AppImage`**](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.0-beta.19/Ensemblr-0.1.0-beta.19-x64.AppImage)
+  — the Linux build. One file, no installer:
+
+  ```bash
+  chmod +x Ensemblr-*.AppImage
+  ./Ensemblr-*.AppImage
+  ```
+
+  Its runtime is statically linked, so no libfuse2 is needed on the host. If it
+  refuses to mount anyway — a container, or a kernel with no FUSE at all — run it
+  with `--appimage-extract-and-run`. If it starts and dies immediately with a
+  sandbox error, the kernel is refusing unprivileged user namespaces; an AppImage
+  is a FUSE mount and cannot carry a setuid `chrome-sandbox`, so confirm with
+  `--no-sandbox`.
 
 There is also a **nightly** build of `master` under the rolling
 [`nightly`](https://github.com/ensemblr-hq/ensemblr/releases/tag/nightly) tag —
-[`Ensemblr-Canary-arm64.dmg`](https://github.com/ensemblr-hq/ensemblr/releases/download/nightly/Ensemblr-Canary-arm64.dmg).
-It is signed and notarized the same way, but it is untested: it installs as
-"Ensemblr Canary" **alongside** a release rather than replacing it, and its
-assets are overwritten each night.
+[`Ensemblr-Canary-arm64.dmg`](https://github.com/ensemblr-hq/ensemblr/releases/download/nightly/Ensemblr-Canary-arm64.dmg)
+and [`Ensemblr-Canary-x86_64.AppImage`](https://github.com/ensemblr-hq/ensemblr/releases/download/nightly/Ensemblr-Canary-x86_64.AppImage).
+The macOS one is signed and notarized the same way, but both are untested: they
+install as "Ensemblr Canary" **alongside** a release rather than replacing it,
+and their assets are overwritten each night.
 
 Every build is on the Releases page:
 
 <https://github.com/ensemblr-hq/ensemblr/releases>
 
-The released build is code-signed with a Developer ID certificate, runs under the
-hardened runtime, and is notarized by Apple and stapled — both the `.app` and the
-`.dmg` carry their own ticket, so Gatekeeper clears them on first open without a
-network round-trip and without the right-click dance below. It is a **beta**: pre-1.0,
-with breaking changes expected before 1.0.
+The released **macOS** build is code-signed with a Developer ID certificate, runs
+under the hardened runtime, and is notarized by Apple and stapled — both the
+`.app` and the `.dmg` carry their own ticket, so Gatekeeper clears them on first
+open without a network round-trip and without the right-click dance below. The
+**AppImage is unsigned**, because Linux has no equivalent to notarization: verify
+it against the checksum on the release page if you want a check. Either way it is
+a **beta**: pre-1.0, with breaking changes expected before 1.0.
 
-The app reports the full version, suffix included — `0.1.0-beta.16` in
-**Settings → General** and in the bundle's `CFBundleShortVersionString`. It
-matches the release tag, so a bug report only has to quote one string.
+The app reports the full version, suffix included — `0.1.0-beta.19` in
+**Settings → General**, and on macOS in the bundle's
+`CFBundleShortVersionString`. It matches the release tag, so a bug report only
+has to quote one string.
 
 ## Staying up to date
 
-**Ensemblr updates itself.** An installed copy checks GitHub a couple of minutes
-after launch and every four hours after that, downloads a newer build in the
-background, and then offers to restart into it — you choose when. **Settings →
+**On macOS, Ensemblr updates itself.** An installed copy checks GitHub a couple of
+minutes after launch and every four hours after that, downloads a newer build in
+the background, and then offers to restart into it — you choose when. **Settings →
 General** shows the running version and the updater's state, and
 **Ensemblr → Check for Updates…** runs a check on the spot.
+
+**On Linux it checks but never installs.** The same schedule runs and the same
+places report the result, but a newer version is reported with a link to the
+release page rather than downloaded — the AppImage is a file you placed yourself,
+often somewhere read-only, and replacing it is not Ensemblr's to do. Download the
+new one and swap it in.
 
 Restarting goes through the same confirmation that guards ⌘Q: if agents are still
 working, Ensemblr asks before interrupting them, and declining leaves the
@@ -76,6 +106,7 @@ Two things it deliberately will not do:
 - **Update from anywhere but `/Applications`.** Replacing the bundle in place
   needs a writable location, so a copy run straight from the mounted `.dmg`
   reports that rather than failing quietly. Drag it to `/Applications` first.
+  This one is macOS-specific: on Linux nothing is replaced in place at all.
 
 A build you compiled yourself does not update — rebuild it instead.
 
@@ -91,10 +122,12 @@ Building from source is the other path, and the rest of this page covers it.
 
 | Requirement | Version | Check |
 | --- | --- | --- |
-| macOS | Apple silicon (arm64) | `uname -m` reports `arm64` |
+| macOS on Apple silicon, or Linux on x86-64 | arm64 / x86-64 | `uname -sm` |
 | Node | **exactly 24.x** | `node -v` |
 | npm | 11.17.0 | `npm -v` |
 | git | any recent | `git --version` |
+| `mksquashfs` (Linux only) | any recent | `which mksquashfs` |
+| A C++ toolchain (Linux only) | any recent | `which g++ make python3` |
 
 The Node pin is enforced, not advisory. `package.json` declares
 `engines: ">=24 <25"`, and `.nvmrc` and `mise.toml` both pin 24. A version gate
@@ -106,6 +139,8 @@ Ignoring the pin fails in ways that do not look like a Node problem — see
 [Troubleshooting](./14-troubleshooting.md) for the two symptoms.
 
 ### Build
+
+On macOS:
 
 ```bash
 git clone https://github.com/ensemblr-hq/ensemblr.git
@@ -130,7 +165,35 @@ Drag the `.app` out of the `.dmg` into `/Applications` as usual.
 If you only want to run the app and not distribute it, `npm run package` writes
 an unpacked `.app` straight to `out/` and skips the disk-image step.
 
-### Signing, notarization, and Gatekeeper
+On Linux:
+
+```bash
+npm run make:linux
+chmod +x out/make/AppImage/x64/*.AppImage
+./out/make/AppImage/x64/*.AppImage
+```
+
+`npm run package:linux` is the faster loop: it produces the unpacked directory,
+needs no `mksquashfs`, and skips the SquashFS pass on every iteration.
+
+**`make:linux` refuses to run anywhere but Linux, and that refusal is the
+feature.** Forge cross-packages nearly everything from a Mac — it downloads the
+linux-x64 Electron, and the shell it produces really is an ELF binary — but it
+cannot build a *native module* for a foreign platform. `node-pty` publishes
+prebuilds for darwin and win32 only, so a cross-build silently packages the
+host's Mach-O `pty.node`: the AppImage builds, launches, and has a dead terminal
+in every tab.
+
+`node-pty` is also the only thing that compiles, which is why a Linux build wants
+a toolchain. If the host has none — every immutable distribution ships without
+one — `npm run rebuild:native` compiles that one module in a throwaway
+`node:24-bookworm` container and leaves the binding where Forge finds it already
+built, and `npm run diagnose:linux` reports the toolchain plus what `pty.node`
+actually linked against. A binding whose libraries resolve outside `/usr` or
+`/lib` runs on the machine that built it and nowhere else, so the guard refuses
+it.
+
+### Signing, notarization, and Gatekeeper (macOS)
 
 A build **of your own** is code-signed and notarized only when all three App
 Store Connect credentials are present in the environment (the published release
@@ -183,6 +246,12 @@ one macOS opens, and each keeps its own database, settings, and secrets. Two
 builds sharing one id is what previously made a stray Dock tile flash during
 workspace creation.
 
+On Linux the same separation runs through the **launcher id** instead — the
+basename of the generated `.desktop` entry, which Electron turns into the XDG
+application id on Wayland and `WM_CLASS` on X11. That is how a desktop pairs a
+window with its icon and how a window-manager rule addresses the app, so each
+channel declares its own and a canary cannot overwrite the release's entry.
+
 [`../build-and-release.md`](../build-and-release.md) has the full packaging
 matrix, the entitlements, and the notarization detail.
 
@@ -195,7 +264,7 @@ Five locations, and nothing outside them:
 | App settings | `~/.config/ensemblr/config.json` |
 | Projects, workspaces, agent sessions, board state | `~/Library/Application Support/dev.ensemblr.app/ensemblr.db` |
 | Window state, recents, per-repository overrides, Electron's own caches | `~/Library/Application Support/Ensemblr` (macOS) · `~/.config/ensemblr/electron` (Linux) |
-| Secrets (Linear OAuth tokens, Infisical client secrets) | macOS Keychain, service `dev.ensemblr.app.secret-store` |
+| Secrets (Linear OAuth tokens, Infisical client secrets) | macOS: the Keychain, service `dev.ensemblr.app.secret-store` · Linux: encrypted with Electron `safeStorage` and held as ciphertext in `ensemblr.db` |
 | Your repositories, worktrees, and archived context | The root directory you pick during setup — `~/Ensemblr` unless you change it |
 
 The two Application Support directories split along a real seam. The
@@ -218,8 +287,14 @@ The root directory is the only one that holds your own work. See
 
 ## Uninstalling
 
-If Homebrew installed it, Homebrew removes it — `--zap` takes the application
-data with it:
+**On Linux there is nothing to uninstall but the file.** Delete the `.AppImage`,
+then `rm -rf ~/.config/ensemblr` for settings, local state and Electron's own
+directory — secrets go with it, because they live as ciphertext inside
+`ensemblr.db` rather than in a keyring entry of their own. If you integrated the
+AppImage with your desktop, remove the `.desktop` entry it installed too.
+
+On macOS, if Homebrew installed it, Homebrew removes it — `--zap` takes the
+application data with it:
 
 ```bash
 brew uninstall --zap --cask ensemblr
@@ -231,8 +306,8 @@ all. It removes one entry at a time, so run it repeatedly if Ensemblr stored
 several; they are also findable in Keychain Access by searching for
 `dev.ensemblr.app.secret-store`.
 
-Otherwise there is no uninstaller, and removing it is five deletions in whatever
-order suits you:
+Otherwise there is no uninstaller, and removing it on macOS is five deletions in
+whatever order suits you:
 
 ```bash
 # 1. The app itself

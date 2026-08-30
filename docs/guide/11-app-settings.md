@@ -98,12 +98,12 @@ How chats behave day to day, plus where Ensemblr keeps its repositories.
 
 | Setting | What it does | Options | Default |
 | --- | --- | --- | --- |
-| Language | Interface language. `System` follows your macOS language order. Also governs the native menu bar and the prose agents write back. | System, English, Русский, Ελληνικά | System |
+| Language | Interface language. `System` follows the operating system's own language order. Also governs the native menu bar and the prose agents write back. | System, English, Русский, Ελληνικά | System |
 | Send messages with | Which key sends a composer message. The other one inserts a newline. | `↵`, `⌘↵` | `↵` |
 | Follow-up behavior | What happens to a message you send while the agent is still working. `Steer` interrupts mid-turn, `Queue` holds it until the turn ends, `Block` holds it until you send it yourself. A queued message stays editable. `⌘J` queues in any mode. | Steer, Queue, Block | Steer |
 | Desktop notifications | Notify you when a chat finishes a turn or stops to ask you something. One notification per chat, titled with the chat's own name; clicking it focuses that chat. | On / off | On |
 | Notification sound | Play a chime alongside the notification when a chat needs your attention. | On / off | On |
-| Caffeinate while agents are running | Keep your Mac awake while an agent is working. Shuts off below 10% battery. | On / off | Off |
+| Caffeinate while agents are running | Keep the machine awake while an agent is working. Shuts off below 10% battery — read from macOS power APIs, or from sysfs on Linux. | On / off | Off |
 | Always show context usage | Show the context meter at all times instead of only past 70% used. | On / off | On |
 | Auto-convert long text | Turn pasted text over 5,000 characters into a text attachment instead of inlining it. | On / off | On |
 | Don't collapse tool calls | Show tool calls expanded by default. Toggle per session with `⌃O`. | On / off | Off (collapsed) |
@@ -118,6 +118,11 @@ confirmation that guards ⌘Q, so agents mid-turn are never cut off without bein
 named — declining leaves the update staged. A release build only ever updates to
 another release and Ensemblr Canary only ever to a newer nightly; a copy running
 outside `/Applications` says so rather than failing quietly.
+
+**On Linux it checks but never installs.** The same schedule runs and this pane
+reports the same states, but a newer version is reported with a link to the
+release page instead of downloaded — the AppImage is a file you placed yourself,
+often somewhere read-only.
 
 **Turn `Update Ensemblr automatically` off when something else owns this copy** —
 a Homebrew cask, or any package manager you would rather do the upgrading. Off
@@ -312,8 +317,8 @@ debugging against a local service expects.
 **Secret values are masked.** A variable is treated as secret when the built-in
 catalogue says so, or — for a variable you invent — when its name looks
 sensitive (contains `TOKEN`, `KEY`, `SECRET`, and similar). Masked values render
-as dots with a show/hide toggle per row. Secret values are stored in the macOS
-Keychain, not in a file.
+as dots with a show/hide toggle per row. Secret values go to the OS secret store
+— the macOS Keychain, or `safeStorage` ciphertext on Linux — not to a file.
 
 Variable names may contain only letters, numbers, and underscores. An empty
 value is legal and sets the variable to the empty string, which is different
@@ -331,7 +336,7 @@ Each entry carries three statuses:
 | Status | Meaning |
 | --- | --- |
 | `required` | Ensemblr will not work without it. **No built-in entry is currently required** — every one is optional. |
-| `masked` | Value kind is `secret`: hidden by default, stored in the Keychain. |
+| `masked` | Value kind is `secret`: hidden by default, stored in the OS secret store. |
 | `reserved` | Ensemblr populates it per workspace at run time. Do not set it yourself. |
 
 | Variable | Category | Scope | Masked | Reserved | Purpose |
@@ -394,7 +399,8 @@ terminal, and how much scrollback each terminal pane holds.
 
 | Setting | What it does | Options | Default |
 | --- | --- | --- | --- |
-| Theme | App theme. `System` follows macOS. Also switchable from the app menu. | System, Light, Dark | System |
+| Theme | App theme. `System` follows the desktop's own light/dark preference. Also switchable from the app menu. | System, Light, Dark | System |
+| Title bar — **Linux only** | Whether Ensemblr draws its own title bar and window controls, or lets your desktop decorate the window. `titleBarStyle` is a window-construction option, so the row offers a **Relaunch** button that still drains running agents rather than leaving you to quit and reopen. The row is hidden on macOS, which ignores the preference. | Ensemblr, System | Ensemblr |
 | Accessible colors | Palette tuned for a colour vision difference. | Default, Protanopia, Deuteranopia, Tritanopia | Default |
 | Code theme | Syntax highlighting for code blocks and editors. Each entry is a theme *family*: Ensemblr uses its light cut in light mode and its dark cut in dark mode. | `catppuccin-mocha`, `catppuccin-latte`, `github-dark`, `github-light`, `one-dark-pro`, `solarized-dark` | `catppuccin-mocha` |
 | Code ligatures | Use font ligatures in file editors and diffs. | On / off | On |
@@ -428,7 +434,7 @@ automatically. Reconnecting is a full sign-in, in your browser.
 **Linear is a list, not a switch.** Connect as many organizations as you need;
 each is its own row with its own state, and a row that needs reconnecting says
 so without disturbing the others. Disconnecting one takes its cached issues and
-its Keychain entries with it and leaves the rest alone.
+its stored tokens with it and leaves the rest alone.
 
 **Infisical** lists the Machine Identity accounts on this machine, with add,
 re-check, and remove. An account is the credential half of a secrets link; the
@@ -489,7 +495,7 @@ your machine.
 
 | Pane | Writes to | Shared with your team? |
 | --- | --- | --- |
-| Environment | Local state, with secret values in the macOS Keychain | No |
+| Environment | Local state, with secret values in the OS secret store | No |
 | **Secrets** | **`.ensemblr/settings.toml`** `[infisical]` — the committed file | **Yes** |
 | Git | Local state | No |
 | **Scripts** | **`.ensemblr/settings.toml`** — the committed file | **Yes** |

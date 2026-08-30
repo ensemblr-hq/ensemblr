@@ -57,11 +57,11 @@ each exposing its public surface through `index.ts`.
 | Review | `review/` | Ensemblr-local review comments and todos |
 | Root directory | `root/` | Managed root resolution and reconciliation |
 | Scripts | `scripts/` | Named run-script lifecycle, setup/archive hooks, setup fingerprint and state file |
-| Secrets | `secrets/` | Keychain-backed storage and metadata (ADR&nbsp;0018) |
+| Secrets | `secrets/` | One store behind two backends — the macOS Keychain (ADR&nbsp;0018), or Electron `safeStorage` ciphertext in SQLite off darwin (ADR&nbsp;0056) — plus the metadata rows and the keyring-health probe the Linux setup check reads |
 | Setup | `setup/` | Setup diagnostics orchestration |
 | Storage | `storage/` | SQLite connection (`database.ts`), migrations, `repositories/`, `tx.ts` |
 | Terminal | `terminal/` | `node-pty` PTY sessions, plus the scrollback renderer that makes an agent's terminal read legible |
-| Updates | `updates/` | The in-app updater: GitHub release resolution per build channel (`release-feed.ts`), the can-this-build-update gate (`update-preconditions.ts`), and the Squirrel.Mac state machine (ADR&nbsp;0055) |
+| Updates | `updates/` | The in-app updater: GitHub release resolution per build channel (`release-feed.ts`), the can-this-build-update gate (`update-preconditions.ts`), and the Squirrel.Mac state machine (ADR&nbsp;0055). Installing is a per-platform capability — darwin installs, Linux reports and links (ADR&nbsp;0056) |
 | Workspace files / git | `workspace-files/`, `workspace-git/` | File watching and listing, the content-addressed composer attachment store (`context-attachments.ts`), path safety (`workspace-paths.ts`) and image-signature checks (`workspace-images.ts`); git status, commits, worktrees |
 
 Do not add root-level files under `src/main/` unless Electron Forge or Vite needs
@@ -118,8 +118,8 @@ atom.
 The only code both processes may import. Two shapes coexist:
 
 - **Single-file concerns** — plain root modules (`config.ts`, `permissions.ts`,
-  `github.ts`, `slug.ts`, `menu-commands.ts`, `concierge-references.ts`, …); 32
-  `.ts` files sit at the shared root in total.
+  `github.ts`, `slug.ts`, `menu-commands.ts`, `concierge-references.ts`,
+  `window-chrome.ts`, …); 34 `.ts` files sit at the shared root in total.
 - **Multi-file concerns** — an implementation directory behind a stable
   entrypoint, in one of two forms:
   - `<concern>/index.ts` — `ipc/` (41 contract modules under `ipc/contracts/`,
@@ -154,7 +154,7 @@ capability code of its own — if an operation does not exist as a service, it d
 not exist as a control op. See [`agent-control.md`](./agent-control.md) and
 ADR&nbsp;0040.
 
-**3. Native menu → renderer (menu command bus).** The macOS menu bar is built in
+**3. Native menu → renderer (menu command bus).** The native menu bar is built in
 main but its items are owned by the renderer. `src/renderer/state/menu-commands/`
 registers a handler per `MenuCommandId` as a stack — the innermost registration
 wins, so overlapping route transitions restore the right one — and reports the
@@ -174,11 +174,11 @@ submits) carries no menu accelerator at all. See ADR&nbsp;0046.
 
 | Data | Location |
 | --- | --- |
-| Repositories, workspaces, sessions, events, chat tabs, settings, linked-directory recents, the Concierge's own sessions, events, and memory index | SQLite at `~/Library/Application Support/dev.ensemblr.app/ensemblr.db` |
+| Repositories, workspaces, sessions, events, chat tabs, settings, linked-directory recents, the Concierge's own sessions, events, and memory index | SQLite at `~/Library/Application Support/dev.ensemblr.app/ensemblr.db` (macOS) · `~/.config/ensemblr/ensemblr.db` (Linux) |
 | App settings | `~/.config/ensemblr/config.json` (ADR&nbsp;0029) |
 | Per-repository config | Committed `.ensemblr/settings.toml` (ADR&nbsp;0030, ADR&nbsp;0041) |
 | Composer attachments | Content-addressed under the workspace's `.context/attachments/<digest>/` |
-| Secrets | macOS Keychain (ADR&nbsp;0018) |
+| Secrets | macOS Keychain (ADR&nbsp;0018); on Linux, `safeStorage` ciphertext in the `secret_metadata` row (ADR&nbsp;0056) |
 | Per-turn checkpoints | Git refs in the workspace (ADR&nbsp;0012) |
 | Managed repos, workspaces, archived context | The Ensemblr Root Directory (ADR&nbsp;0010) |
 | Unread chat marks, slash-command catalogue cache | Renderer `localStorage`, via persisted Jotai atoms |
@@ -191,8 +191,8 @@ migration ids, so a new migration must be added to both.
 
 | Suite | Runner | Count |
 | --- | --- | --- |
-| `tests/main/**` | `electron --test` (`ELECTRON_RUN_AS_NODE=1`), plus the pure-logic files listed one-by-one in `vitest.config.mts` — an explicit list, not a glob, so it never drags in the Electron-only suites | 202 files |
-| `tests/renderer/**` | Vitest (`node` env; DOM files opt in per file) | 317 files (41 under `dom/`) |
+| `tests/main/**` | `electron --test` (`ELECTRON_RUN_AS_NODE=1`), plus the pure-logic files listed one-by-one in `vitest.config.mts` — an explicit list, not a glob, so it never drags in the Electron-only suites | 212 files |
+| `tests/renderer/**` | Vitest (`node` env; DOM files opt in per file) | 327 files (42 under `dom/`) |
 | `tests/shared/**` | Vitest | 38 files |
 
 See [`onboarding.md`](./onboarding.md#6-running-the-tests) for which runner a new

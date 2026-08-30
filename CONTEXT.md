@@ -1,6 +1,6 @@
 # Ensemblr
 
-Ensemblr is a macOS orchestrator for multi-agent coding work, driving the Pi CLI or the Claude Code CLI — **Pi** and **Claude Code** are its two first-class agent runtimes, each driving native chat tabs behind one adapter contract, and third-party CLIs run alongside them as terminal harnesses. A permission-gated control surface — **Ensemblr Control** — lets an agent drive the app itself: spawn sub-agents, delegate, wait on them, and integrate what they report. Isolation is what makes that safe rather than reckless: every stream of work gets its own worktree, branch, and review path, so a fan-out of agents cannot collide.
+Ensemblr is a desktop orchestrator for multi-agent coding work, shipping on macOS (Apple silicon) and Linux (x86-64), driving the Pi CLI or the Claude Code CLI — **Pi** and **Claude Code** are its two first-class agent runtimes, each driving native chat tabs behind one adapter contract, and third-party CLIs run alongside them as terminal harnesses. A permission-gated control surface — **Ensemblr Control** — lets an agent drive the app itself: spawn sub-agents, delegate, wait on them, and integrate what they report. Isolation is what makes that safe rather than reckless: every stream of work gets its own worktree, branch, and review path, so a fan-out of agents cannot collide.
 
 ## Language
 

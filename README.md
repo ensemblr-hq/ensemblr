@@ -27,7 +27,7 @@ installed.
 
 *Ensemblr Control driving the app from inside a workspace: the agent names its own tab, moves the workspace to In progress, starts a run script, then delegates to two sub-agents in their own chat tabs and launches a Claude Code harness in a terminal.*
 
-- **Version:** [`0.1.0-beta.18`](https://github.com/ensemblr-hq/ensemblr/releases/tag/v0.1.0-beta.18) (pre-1.0, polish stage)
+- **Version:** [`0.1.0-beta.19`](https://github.com/ensemblr-hq/ensemblr/releases/tag/v0.1.0-beta.19) (pre-1.0, polish stage)
 - **License:** Apache-2.0
 
 | Platform | Artifact | Install |
@@ -52,7 +52,7 @@ changes before 1.0. See [`CHANGELOG.md`](./CHANGELOG.md) for recent changes.
 brew install --cask ensemblr-hq/tap/ensemblr
 ```
 
-Or **[Download Ensemblr 0.1.0-beta.18 (.dmg, Apple silicon)](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.0-beta.18/Ensemblr-0.1.0-beta.18-arm64.dmg)** — open it and drag Ensemblr to Applications.
+Or **[Download Ensemblr 0.1.0-beta.19 (.dmg, Apple silicon)](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.0-beta.19/Ensemblr-0.1.0-beta.19-arm64.dmg)** — open it and drag Ensemblr to Applications.
 
 The macOS build is code-signed with a Developer ID certificate, hardened-runtime, notarized by Apple, and
 stapled, so it opens without a Gatekeeper prompt and validates offline. Every build is on the
@@ -149,7 +149,7 @@ documented in [`docs/guide/02-requirements.md`](./docs/guide/02-requirements.md)
 **Working on Ensemblr** — [`CONTRIBUTING.md`](./CONTRIBUTING.md) ·
 [`docs/onboarding.md`](./docs/onboarding.md) (clone → run → first change) ·
 [`docs/architecture-map.md`](./docs/architecture-map.md) (which directory owns which concern) ·
-[`docs/adr/`](./docs/adr) (54 Architecture Decision Records) ·
+[`docs/adr/`](./docs/adr) (55 Architecture Decision Records) ·
 [`docs/agent-control.md`](./docs/agent-control.md) ·
 [`docs/harnesses.md`](./docs/harnesses.md) ·
 [`docs/build-and-release.md`](./docs/build-and-release.md) ·

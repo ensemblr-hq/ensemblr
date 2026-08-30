@@ -2,6 +2,11 @@
 
 Ensemblr binds 41 shortcuts. This page lists all of them.
 
+The tables are written with the macOS glyphs. **On Linux the app renders every
+one of them with the names that keyboard has** — `⌘` as `Ctrl`, `⌥` as `Alt` —
+so what you see in a menu, a tooltip, or the Shortcuts settings page always
+matches the keys in front of you.
+
 ![Settings → More → Shortcuts, listing the Global and Composer scope groups with a key binding beside each action.](./images/13-shortcuts.png)
 
 ## How to read these tables
@@ -10,10 +15,10 @@ Ensemblr binds 41 shortcuts. This page lists all of them.
 
 | Symbol | Key |
 | --- | --- |
-| `⌘` | Command |
-| `⌥` | Option |
+| `⌘` | Command — **`Ctrl` on Linux** |
+| `⌥` | Option — **`Alt` on Linux** |
 | `⇧` | Shift |
-| `⌃` | Control — the physical Control key, distinct from `⌘` |
+| `⌃` | Control — the physical Control key, distinct from `⌘`. On Linux, where `⌘` is already `Ctrl`, these two collapse into one |
 | `↵` | Return |
 | `⇥` | Tab |
 | `⎋` | Escape |
@@ -65,7 +70,10 @@ current conversation between expanded and collapsed; the starting state is the
 
 ## Menu
 
-Fired from the native macOS menu bar, and bound to the same chord.
+Fired from the native menu bar, and bound to the same chord. On macOS that bar
+lives in the system menu; on Linux it is the window's own, and it additionally
+carries Settings, Check for Updates and Quit under **File**, and About under
+**Help**, because there is no application menu to hold them.
 
 | Shortcut | Does | Id |
 | --- | --- | --- |

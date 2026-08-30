@@ -9,6 +9,107 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.0-beta.19] - 2026-08-30
+
+Ensemblr runs on Linux. An x86-64 `.AppImage` is built beside the macOS `.dmg`, with parity on every
+surface that used to branch on darwin, and the window it opens there is one Ensemblr draws itself.
+Signed, notarized, Apple silicon — and unsigned on Linux, because there is no equivalent to do.
+[Release](https://github.com/ensemblr-hq/ensemblr/releases/tag/v0.1.0-beta.19) ·
+[`.dmg`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.0-beta.19/Ensemblr-0.1.0-beta.19-arm64.dmg) ·
+[`.AppImage`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.0-beta.19/Ensemblr-0.1.0-beta.19-x64.AppImage)
+
+### Added
+
+- **Linux x86-64, as a first-class target rather than a port.** Ensemblr shipped macOS-arm64 only.
+  Nine main-process modules branched on `process.platform === 'darwin'` and three of them returned
+  nothing anywhere else, so a Linux build would have launched with no secret store, no "Open in…"
+  targets, and a bare OS titlebar. Each of those is now declared per platform instead of branched
+  inline. **Secrets** move to Electron `safeStorage`, with the ciphertext in the `secret_metadata`
+  row — migration 023 rebuilds the table to widen the backend `CHECK` — and a Linux-only setup check
+  warns when the keyring degrades to `basic_text` rather than failing silently. The **"Open in…"**
+  registry gains a per-platform behaviour map, so a cross-platform editor stays one entry while Linux
+  resolves a launcher command or a `.desktop` entry and spawns it detached. The **battery** reader
+  gains a sysfs implementation, so the power-save blocker still releases on a draining laptop.
+  **Updates** split into a capability: darwin installs one, Linux reports that a newer version exists
+  and links to it, because the file is one you placed yourself and often lives somewhere read-only.
+  Packaging is `@reforged/maker-appimage` scoped to linux, plus `APP_LINUX_APP_IDS` as the
+  launcher-id counterpart of `APP_BUNDLE_IDS`, so a canary build cannot overwrite the release's
+  desktop entry. `make:linux` refuses to run off Linux: `node-pty` publishes no linux-x64 prebuild,
+  so cross-building from macOS silently packages the host's Mach-O `pty.node` — Forge reports
+  `Preparing native dependencies: 1 / 1` and the AppImage launches with every terminal dead. CI now
+  runs `check`, `typecheck` and `test` on `ubuntu-latest` as well as `macos-latest`, which is what
+  makes a darwin-only assumption fail there rather than in a user's AppImage. Ships with `ru` and
+  `el` at 100%. See ADR 0056.
+- **A title-bar setting, and shortcut hints that match the keyboard in front of you.**
+  `appearance.titleBar` picks Ensemblr's own title bar or the desktop's, resolved once in
+  `src/shared/window-chrome.ts` and read by both processes so they cannot disagree; switching it
+  needs a relaunch, which the settings row offers through the quit coordinator. Window minimums drop
+  to 720×480 so a 1280×800 panel at 150% scaling still fits, and the x/y restore is skipped under
+  Wayland, which forbids a client reading its own position. A new `formatChord` replaces ~24 literal
+  ⌘ glyphs — four of them re-authored out of translated strings into interpolation — so a machine
+  with no Command key reads `Ctrl`. Off darwin the File menu gains Settings, Check for Updates and
+  Quit, and Help gains About.
+
+### Fixed
+
+- **On Linux, the window controls dragged the window instead of pressing.** They shipped as a fixed
+  overlay in the top-right corner, with a 7rem trailing inset every `.native-toolbar` reserved for
+  them, and that was wrong twice. It crowded whichever toolbar reached the trailing edge — on a
+  review sidebar that is the pull-request header, so a PR number, a preview pill, a status label and
+  a primary action shared one row with three buttons. And the buttons did not work at all: Chromium
+  reports draggable regions in document order and Electron unions them in that order, so a
+  `-webkit-app-region: drag` toolbar painted after the cluster re-covered the `no-drag` holes its own
+  buttons had punched. Every click on them dragged the window, which is exactly why those three
+  failed while the toolbar's own buttons — whose `no-drag` came *after* the toolbar's `drag` — kept
+  working. The overlay is now a real 2.25rem title bar across the window's top edge carrying the
+  wordmark and the cluster, with `body` padded by the same inset so the shell is sized to what is
+  left rather than covered at the top. No toolbar overlaps the buttons, so the region ordering cannot
+  bite, and none reserves trailing room any more.
+- **The Linux About panel was titled after the file you downloaded.** Electron's About panel there is
+  GTK's, and it reads nothing on its own. `installApplicationMenu` set only `copyright`, so the
+  dialog fell back to `g_get_application_name()` — under an AppImage, the executable's file name,
+  titling the panel `Ensemblr-0.1.0-beta.18-x64.AppImage` — and with no `iconPath` it looked the icon
+  up in the desktop's theme by a name an unintegrated AppImage never installs, drawing GTK's
+  broken-image glyph. It now receives the full option set, with the icon taken from the same PNG the
+  window already carries.
+
+## [0.1.0-beta.18] - 2026-08-30
+
+The Concierge delegates before it inventories, glyphs resolve from the bundle instead of the network,
+and a Markdown table with no header row stops rendering an empty band above it. Signed, notarized,
+Apple silicon.
+[Release](https://github.com/ensemblr-hq/ensemblr/releases/tag/v0.1.0-beta.18) ·
+[`.dmg`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.0-beta.18/Ensemblr-0.1.0-beta.18-arm64.dmg)
+
+### Changed
+
+- **The Concierge delegates as its first action, ahead of taking a tool inventory.** Investigating,
+  planning and implementing are named explicitly as the orchestrator's job, and a four-item brief
+  checklist replaces the open-ended read, with the tempting detours — picking the approach, drafting
+  the file list — ruled out by name. It answers questions about board state itself rather than
+  spawning an agent to go read the board. "Delegate one workspace at a time" becomes "one
+  orchestrator per workspace": the one-writer rule is a property of a worktree, not a cap on the
+  Concierge, so a task spanning projects gets a workspace and an orchestrator in each, spawned in the
+  same turn, with the coordination left where it belongs. Several orchestrators may work the same
+  task from separate workspaces, each on a different model or approach, so you can choose between
+  implementations rather than between drafts of one.
+
+### Fixed
+
+- **Some icons were fetched from the network at render time.** Iconify collections were registered as
+  a module-scope side effect, so glyphs resolved only if something else had already pulled the
+  workbench barrel in. `OpenTargetIcon` drew vscode-icons glyphs without importing them, which left
+  those icons on an HTTP request to `api.iconify.design` instead of the bundle. Registration now
+  happens once at renderer startup in `main.tsx`, before the first render. The renderer test suite
+  stops reaching the network with it: Vitest aliases `@iconify/react` to its own offline build, and a
+  new test guards both behaviours.
+- **A Markdown table with no header row rendered an empty band where the header would be.** A new
+  `dropEmptyTableParts` rehype plugin removes a `<thead>` whose cells are all empty, walking only
+  structural tags so an image, a line break or an inline chip still counts as content, and removes
+  the `<table>` outright when taking the band away leaves no rows. Copying one works properly too:
+  `tableDataToMarkdown` returns the empty string for a table with no headers, and `tableMarkdown`
+  rebuilds a blank header row as wide as the widest body row so the result round-trips.
+
 ## [0.1.0-beta.17] - 2026-08-27
 
 A skill you install while the app is open turns up in the slash menu when you come back to it, and

@@ -76,10 +76,10 @@ The welcome screen carries a language picker. Ensemblr ships in three languages:
 
 They are listed under their own names rather than translated, so someone who has
 landed in a language they cannot read can still find their own. The setting also
-accepts **system**, which follows your macOS language preference and is the
-default until you pick one.
+accepts **system**, which follows the operating system's own language preference
+and is the default until you pick one.
 
-The choice governs more than the window chrome. It sets the native macOS menu
+The choice governs more than the window chrome. It sets the native menu
 bar, and it sets the language agents answer in — replies, tab names, workspace
 summaries, and review comments all come back in the app's language, because
 every agent playbook carries a directive naming it. Switch to Greek and your

@@ -135,8 +135,8 @@ the repository is already pointed at the right secrets and only has to add a
 Machine Identity of their own.
 
 **No credential is ever written here.** The identity — instance URL, client id,
-client secret — is per-machine state, kept in SQLite with its secret in the
-macOS Keychain.
+client secret — is per-machine state, kept in SQLite with its secret in the OS
+secret store: the macOS Keychain, or `safeStorage` ciphertext on Linux.
 
 | Key | Type | What it does |
 | --- | --- | --- |

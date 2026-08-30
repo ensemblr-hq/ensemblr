@@ -241,9 +241,11 @@ A workspace is a normal directory on disk, and the workbench header has an
 "Open in…" menu for handing it to another app: Finder, your editor, a terminal,
 a source-control GUI.
 
-Only apps you actually have installed appear — Ensemblr detects them through
-macOS Launch Services and shows their real icons, so the menu never offers you
-something that would fail to open. ⌘O opens your primary editor, ⌘⇧C copies the
+Only apps you actually have installed appear, and each entry knows how to be
+launched on the platform you are on: macOS detects them through Launch Services,
+Linux resolves either a launcher command on `PATH` or a `.desktop` entry and
+spawns it detached. Either way the menu shows their real icons and never offers
+you something that would fail to open. ⌘O opens your primary editor, ⌘⇧C copies the
 path, and `1`–`9` pick entries while the menu is open. See
 [ADR 0028](../adr/0028-use-launch-services-for-open-workspace-in-app.md).
 

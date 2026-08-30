@@ -51,15 +51,15 @@ reads. Two panes printing the same bytes therefore stay two chips instead of
 collapsing into one. Attachments are covered in
 [`./06-agents.md`](./06-agents.md).
 
-One xterm behaviour is worth knowing: on macOS a right-click **outside** the
-current selection replaces it with the word under the cursor, so select first
-and right-click inside what you selected.
+One xterm behaviour is worth knowing: a right-click **outside** the current
+selection replaces it with the word under the cursor, so select first and
+right-click inside what you selected.
 
 ## The environment inside a workspace terminal
 
-An **interactive terminal** starts your login shell — read from your macOS user
-record, so it is the same `fish`, `zsh`, or `bash` you get from Terminal.app,
-with your own config and your own `PATH`.
+An **interactive terminal** starts your login shell — read from your user record,
+falling back to `$SHELL` — so it is the same `fish`, `zsh`, or `bash` you get
+from your own terminal emulator, with your own config and your own `PATH`.
 
 **Script commands do not.** Setup, run, and archive commands run under a POSIX
 shell (`/bin/zsh`, `/bin/bash`, or `/bin/sh`), because repository scripts

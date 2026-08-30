@@ -470,7 +470,7 @@ than scrolling focus into a strip you cannot see.
 ### Right-clicking text
 
 Right-clicking the composer or the transcript opens Ensemblr's own text menu,
-drawn in the app's chrome rather than by macOS.
+drawn in the app's chrome rather than by the operating system.
 
 In the **composer** it carries the full set: the spellchecker's suggestions for
 the word under the cursor and **Add to dictionary**, then Undo, Redo, Cut, Copy,

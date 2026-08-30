@@ -20,7 +20,7 @@ and no DCO sign-off.
 first PR, and which test runner a new test belongs to. [`docs/architecture-map.md`](./docs/architecture-map.md)
 is the directory-level index of which subtree owns which concern.
 
-The short version: macOS on Apple silicon, Node **exactly 24.x**, npm.
+The short version: macOS on Apple silicon or Linux on x86-64, Node **exactly 24.x**, npm.
 
 ```bash
 npm install          # postinstall fixes node-pty native-module permissions
@@ -31,9 +31,10 @@ npm run dev:playground   # the component preview harness, Vite only
 ## The gates
 
 Run these before you push. CI runs the same gates, but only once the branch is up:
-`.github/workflows/checks.yml` has two jobs on pushes to `master` and PRs targeting it — `verify` runs
-`npm run check`, `npm run typecheck` and `npm run test` on a macOS runner, and `scan` runs a `react-doctor`
-scan diffed against `master`, failing on `error`. Catching a break locally costs a minute; catching it in CI
+`.github/workflows/checks.yml` has two jobs on pushes to `master` and PRs targeting it — `verify-matrix` runs
+`npm run check`, `npm run typecheck` and `npm run test` on both `macos-latest` and `ubuntu-latest`, collapsed
+into one `verify` status check, and `scan` runs a `react-doctor` scan diffed against `master`, failing on
+`error`. Catching a break locally costs a minute; catching it in CI
 costs a round trip.
 
 ```bash

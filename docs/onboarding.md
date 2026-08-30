@@ -184,10 +184,12 @@ here.
 
 Run them locally anyway — CI runs the same gates, but only once the branch is
 pushed. `.github/workflows/checks.yml` has two jobs on pushes to `master` and
-PRs targeting it: `verify` runs `npm run check`, `npm run typecheck` and
-`npm run test` on a macOS runner — macOS rather than Linux because `mod`
-resolves to ⌘ on darwin, so the keymap suites fail anywhere else — and `scan`
-runs a `react-doctor` scan diffed against `master`, failing on `error`. The
+PRs targeting it: `verify-matrix` runs `npm run check`, `npm run typecheck` and
+`npm run test` on **both** `macos-latest` and `ubuntu-latest`, which is what
+makes a darwin-only assumption fail in CI rather than in a user's AppImage; a
+tiny `verify` job collapses the matrix into the single status check branch
+protection names. `scan` runs a `react-doctor` scan diffed against `master`,
+failing on `error`. The
 release workflow calls `checks.yml` as a reusable workflow, passing
 `run_scan: false`, so a release tag runs the same verification a PR does without
 re-diffing against a branch it already is.

@@ -2,8 +2,9 @@
 
 Ensemblr talks to five things outside itself: GitHub through the `gh` CLI,
 Linear over OAuth, Infisical over its API, git through the native binary, and
-macOS through Launch Services. The first three need a setup step; the other two
-need nothing.
+your desktop — Launch Services on macOS, `.desktop` entries on Linux — to find
+the apps an "Open in…" menu offers. The first three need a setup step; the other
+two need nothing.
 
 The connection state for each lives in **Settings → Integrations**, and the
 setup gate that checks them at first run is described in
@@ -74,8 +75,8 @@ ports registered as redirect URIs on that application — Linear matches redirec
 URIs exactly, so a random port could never match. The server takes one callback
 and shuts down.
 
-The access and refresh tokens go straight to the macOS Keychain, keyed per
-account; only non-secret connection metadata is kept locally. Disconnecting from
+The access and refresh tokens go straight to the OS secret store, keyed per
+account; only non-secret connection metadata is kept in the clear. Disconnecting from
 settings revokes the token with Linear rather than just forgetting it. Ensemblr
 requests the `read` and `write` scopes.
 
@@ -96,8 +97,8 @@ with the organization it came from.
   came from. When the target is genuinely ambiguous, the call is refused with
   the candidate accounts named rather than guessed at — an issue id from one
   organization is never valid in another.
-- **Disconnecting an account takes its cached issues with it**, and its Keychain
-  entries. The accounts you keep are untouched.
+- **Disconnecting an account takes its cached issues with it**, and its stored
+  tokens. The accounts you keep are untouched.
 
 A connection made before this landed is adopted automatically on first read.
 
@@ -245,11 +246,21 @@ install and uninstall apps.
 
 ## Where secrets live
 
-Every secret Ensemblr stores goes into the **macOS Keychain**, written through
-`/usr/bin/security` under the service name `dev.ensemblr.app.secret-store`
-([ADR 0018](../adr/0018-use-keychain-for-secrets.md)). Nothing secret is written
-to `~/.config/ensemblr/config.json`, to the local database, or to the committed
-`.ensemblr/settings.toml`.
+Every secret Ensemblr stores goes into the **OS secret store**, and which one
+that is depends on the platform:
+
+- **macOS** — the Keychain, written through `/usr/bin/security` under the service
+  name `dev.ensemblr.app.secret-store`
+  ([ADR 0018](../adr/0018-use-keychain-for-secrets.md)).
+- **Linux** — encrypted with Electron `safeStorage` and held as ciphertext in
+  `ensemblr.db`, because there is no one keyring API every desktop answers
+  ([ADR 0056](../adr/0056-ship-a-linux-amd64-appimage.md)). `safeStorage` still
+  takes its key from gnome-keyring or KWallet; if no daemon answers it degrades
+  to obfuscation rather than encryption, and the **Secret storage** setup check
+  says so instead of letting it pass silently.
+
+Nothing secret is written to `~/.config/ensemblr/config.json`, to the committed
+`.ensemblr/settings.toml`, or — on macOS — to the local database.
 
 A secret is bound to one of three scopes:
 
@@ -259,13 +270,13 @@ A secret is bound to one of three scopes:
 | `repository` | one project |
 | `workspace` | one workspace |
 
-Only the key name, its scope, and its masked display state are kept outside the
-Keychain, so the app can list your secrets without reading them.
+Only the key name, its scope, and its masked display state are kept in the
+clear, so the app can list your secrets without reading them.
 
 Two credentials are deliberately **not** Ensemblr's:
 
-- **GitHub tokens belong to `gh`.** They are never copied into Ensemblr's
-  Keychain entries.
+- **GitHub tokens belong to `gh`.** They are never copied into Ensemblr's own
+  secret store.
 - **Pi's provider credentials stay in the Pi user environment**, where Pi put
   them. Ensemblr duplicates none of it unless you explicitly configure an
   Ensemblr-owned secret of your own.

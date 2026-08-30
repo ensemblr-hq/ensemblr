@@ -4,10 +4,17 @@ How to install, set up, and use Ensemblr. If you want to *work on* Ensemblr
 rather than use it, start at [`../onboarding.md`](../onboarding.md) and
 [`../../CONTRIBUTING.md`](../../CONTRIBUTING.md) instead.
 
-Ensemblr runs on macOS, Apple silicon only. You bring your own agent CLI — Pi or
-Claude Code, one is enough — plus `git` and an authenticated `gh`. It is pre-1.0,
-and this guide describes version [`0.1.0-beta.16`](https://github.com/ensemblr-hq/ensemblr/releases/tag/v0.1.0-beta.16).
+Ensemblr runs on macOS with Apple silicon and on Linux with x86-64. You bring
+your own agent CLI — Pi or Claude Code, one is enough — plus `git` and an
+authenticated `gh`. It is pre-1.0, and this guide describes version
+[`0.1.0-beta.19`](https://github.com/ensemblr-hq/ensemblr/releases/tag/v0.1.0-beta.19).
 The app itself ships in English, Russian, and Greek; this guide is English only.
+
+Where the two platforms differ — the installer, the secret store, keyboard
+shortcuts, and whether the app updates itself — the difference is called out
+where it comes up rather than split into a second guide. Shortcuts are written
+with the macOS glyphs (`⌘`, `⌥`); on Linux read `⌘` as `Ctrl` and `⌥` as `Alt`,
+which is what the app itself displays there.
 
 ## Read in order
 
