@@ -127,3 +127,39 @@ test('registry ids are unique', () => {
 	const unique = new Set(ids);
 	assert.equal(ids.length, unique.size);
 });
+
+// A file manager handed a file as a bare argument opens it with its default
+// handler — a text editor — instead of revealing it, which is the opposite of
+// what the Finder row does on macOS.
+test('every Linux file manager reveals the file rather than opening it', () => {
+	const revealDeliveries = new Set(['parent-directory', 'select-in-parent']);
+	for (const definition of OPEN_TARGET_REGISTRY) {
+		const dispatch = resolvePlatformBehavior(definition, 'linux')?.dispatch;
+		if (definition.kind !== 'file-manager' || dispatch?.kind !== 'linux-app') {
+			continue;
+		}
+		assert.ok(
+			revealDeliveries.has(dispatch.pathDelivery),
+			`file manager "${definition.id}" delivers the path as ${dispatch.pathDelivery}`,
+		);
+	}
+});
+
+// `--select` is documented by Dolphin and Nautilus and by neither Thunar nor
+// Nemo, so the flag is declared per app rather than inferred from the kind.
+test('only the file managers documenting --select declare a preselect', () => {
+	const deliveryById = new Map(
+		OPEN_TARGET_REGISTRY.map((definition) => {
+			const dispatch = resolvePlatformBehavior(definition, 'linux')?.dispatch;
+			return [
+				definition.id,
+				dispatch?.kind === 'linux-app' ? dispatch.pathDelivery : null,
+			];
+		}),
+	);
+
+	assert.equal(deliveryById.get('dolphin'), 'select-in-parent');
+	assert.equal(deliveryById.get('nautilus'), 'select-in-parent');
+	assert.equal(deliveryById.get('thunar'), 'parent-directory');
+	assert.equal(deliveryById.get('nemo'), 'parent-directory');
+});

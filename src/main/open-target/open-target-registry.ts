@@ -1,4 +1,5 @@
 import type {
+	OpenTargetShortcutChord,
 	WorkspaceOpenTargetIconName,
 	WorkspaceOpenTargetKind,
 } from '@/shared/ipc/contracts/open-target';
@@ -51,12 +52,24 @@ type OpenTargetDetection =
 	| { kind: 'utility' };
 
 /**
- * Where a Linux target expects the workspace path.
- *  - `argument` — appended as the last argument, the editor and file-manager shape.
+ * Where a Linux target expects the workspace path. A file manager handed a file
+ * as a bare argument opens it with its *default handler* — a text editor —
+ * rather than revealing it, so the two reveal shapes are declared per app
+ * instead of inferred from the target's kind.
+ *  - `argument` — appended as the last argument, the editor shape.
+ *  - `parent-directory` — the containing directory is opened, for a file
+ *    manager with no way to preselect (Thunar, Nemo).
+ *  - `select-in-parent` — `--select <path>`, which opens the containing
+ *    directory with the entry highlighted (Dolphin, Nautilus). This is the
+ *    closest Linux gets to macOS `shell.showItemInFolder`.
  *  - `working-directory` — the process is spawned *in* the path and passed none,
  *    which is how a terminal emulator opens where you asked it to.
  */
-export type LinuxPathDelivery = 'argument' | 'working-directory';
+export type LinuxPathDelivery =
+	| 'argument'
+	| 'parent-directory'
+	| 'select-in-parent'
+	| 'working-directory';
 
 /**
  * How the service opens a workspace path with the target.
@@ -95,7 +108,7 @@ export interface OpenTargetDefinition {
 		Record<OpenTargetPlatform, OpenTargetPlatformBehavior>
 	>;
 	readonly isPrimary?: boolean;
-	readonly shortcutLabel?: string;
+	readonly shortcutChord?: OpenTargetShortcutChord;
 }
 
 /**
@@ -160,7 +173,7 @@ export const OPEN_TARGET_REGISTRY: readonly OpenTargetDefinition[] = [
 				entryIds: ['code', 'com.visualstudio.code', 'codium'],
 			}),
 		},
-		shortcutLabel: '⌘O',
+		shortcutChord: { key: 'O', modifiers: ['mod'] },
 	},
 	{
 		iconName: 'vscode-icons:file-type-vscode',
@@ -487,7 +500,10 @@ export const OPEN_TARGET_REGISTRY: readonly OpenTargetDefinition[] = [
 		kind: 'file-manager',
 		label: 'Dolphin',
 		platforms: {
-			linux: linuxApp({ commands: ['dolphin'], entryIds: ['org.kde.dolphin'] }),
+			linux: linuxApp(
+				{ commands: ['dolphin'], entryIds: ['org.kde.dolphin'] },
+				'select-in-parent',
+			),
 		},
 	},
 	{
@@ -496,10 +512,10 @@ export const OPEN_TARGET_REGISTRY: readonly OpenTargetDefinition[] = [
 		kind: 'file-manager',
 		label: 'Files',
 		platforms: {
-			linux: linuxApp({
-				commands: ['nautilus'],
-				entryIds: ['org.gnome.Nautilus'],
-			}),
+			linux: linuxApp(
+				{ commands: ['nautilus'], entryIds: ['org.gnome.Nautilus'] },
+				'select-in-parent',
+			),
 		},
 	},
 	{
@@ -508,7 +524,10 @@ export const OPEN_TARGET_REGISTRY: readonly OpenTargetDefinition[] = [
 		kind: 'file-manager',
 		label: 'Thunar',
 		platforms: {
-			linux: linuxApp({ commands: ['thunar'], entryIds: ['thunar'] }),
+			linux: linuxApp(
+				{ commands: ['thunar'], entryIds: ['thunar'] },
+				'parent-directory',
+			),
 		},
 	},
 	{
@@ -517,7 +536,10 @@ export const OPEN_TARGET_REGISTRY: readonly OpenTargetDefinition[] = [
 		kind: 'file-manager',
 		label: 'Nemo',
 		platforms: {
-			linux: linuxApp({ commands: ['nemo'], entryIds: ['nemo'] }),
+			linux: linuxApp(
+				{ commands: ['nemo'], entryIds: ['nemo'] },
+				'parent-directory',
+			),
 		},
 	},
 	{
@@ -599,7 +621,7 @@ export const OPEN_TARGET_REGISTRY: readonly OpenTargetDefinition[] = [
 		kind: 'utility',
 		label: 'Copy path',
 		platforms: { darwin: COPY_PATH_BEHAVIOR, linux: COPY_PATH_BEHAVIOR },
-		shortcutLabel: '⌘⇧C',
+		shortcutChord: { key: 'C', modifiers: ['mod', 'shift'] },
 	},
 ];
 

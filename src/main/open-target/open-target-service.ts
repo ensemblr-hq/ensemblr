@@ -19,6 +19,7 @@ import {
 	detectInstalledTargets,
 } from './detect-installed-targets';
 import { launchLinuxApp } from './linux-app-launch';
+import { toOpenTargetFailure } from './open-target-failure';
 import { resolveOpenTargetPath } from './open-target-paths';
 import {
 	findOpenTargetDefinition,
@@ -223,7 +224,8 @@ export function createOpenTargetService({
 		} catch (error) {
 			const message =
 				error instanceof Error ? error.message : 'Failed to open target.';
-			return { ok: false, error: message };
+			const failure = toOpenTargetFailure(error);
+			return { ok: false, error: message, ...(failure ? { failure } : {}) };
 		}
 	};
 
@@ -254,22 +256,24 @@ async function resolveTargets({
 }
 
 /**
- * Reports whether a snapshot list contains any Spotlight-detected app (an entry
- * whose registry definition resolves via bundle id). Builtins like Finder and
- * utilities like Copy-path are always present, so their presence alone does not
- * mean detection succeeded — only a bundle-id hit proves the mdfind probes ran.
+ * Reports whether a snapshot list contains any probed app — one whose registry
+ * definition resolves via a bundle id on macOS or a launcher sweep on Linux.
+ * Builtins like Finder and utilities like Copy-path are always present, so their
+ * presence alone does not mean detection succeeded; only a probed hit proves the
+ * mdfind calls or the PATH and `.desktop` sweeps actually found something.
+ * Snapshots only ever carry installed targets, so membership is the hit.
  * @param snapshots - The snapshot list to inspect.
- * @returns True when at least one bundle-id-detected app is present.
+ * @returns True when at least one probed app is present.
  */
 function hasDetectedApps(
 	snapshots: readonly WorkspaceOpenTargetSnapshot[],
 ): boolean {
 	return snapshots.some((snapshot) => {
 		const definition = findOpenTargetDefinition(snapshot.id);
-		return definition
-			? resolvePlatformBehavior(definition, process.platform)?.detection
-					.kind === 'bundleId'
-			: false;
+		const detectionKind = definition
+			? resolvePlatformBehavior(definition, process.platform)?.detection.kind
+			: undefined;
+		return detectionKind === 'bundleId' || detectionKind === 'linux-app';
 	});
 }
 
@@ -377,8 +381,8 @@ function toSnapshot({
 		kind: definition.kind,
 		label: definition.label,
 		numberShortcutLabel: visibleIndex <= 9 ? String(visibleIndex) : '',
-		...(definition.shortcutLabel
-			? { shortcutLabel: definition.shortcutLabel }
+		...(definition.shortcutChord
+			? { shortcutChord: definition.shortcutChord }
 			: {}),
 	};
 }

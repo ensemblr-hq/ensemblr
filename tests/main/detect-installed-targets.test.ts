@@ -1,7 +1,11 @@
 import assert from 'node:assert/strict';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import test from 'node:test';
 
 import type {
+	CommandEnvironmentSnapshot,
 	LocalCommandRequest,
 	LocalCommandResult,
 	LocalCommandService,
@@ -134,4 +138,94 @@ test('a successful probe marks the target installed', async (t) => {
 		result.detected[firstBundleTargetId]?.appPath,
 		'/Applications/Example.app',
 	);
+});
+
+/**
+ * Creates a fake command service whose environment probe returns a fixed
+ * snapshot, so a Linux sweep resolves against a temporary tree rather than the
+ * host's own PATH and XDG data dirs.
+ * @param overrides - Snapshot fields to override on top of a shell-sourced default.
+ * @returns A stubbed {@link LocalCommandService}.
+ */
+function fakeEnvironmentService(
+	overrides: Partial<CommandEnvironmentSnapshot>,
+): LocalCommandService {
+	const snapshot: CommandEnvironmentSnapshot = {
+		diagnostics: [],
+		env: {},
+		path: '',
+		resolvedAt: '1970-01-01T00:00:00.000Z',
+		shell: '/bin/sh',
+		source: 'shell',
+		...overrides,
+	};
+	return {
+		getEnvironment: async () => snapshot,
+		run: async (request) => fakeResult('success', '', request),
+	};
+}
+
+const linuxDesktopEntryTargetId = 'dolphin';
+const linuxDesktopEntryId = 'org.kde.dolphin';
+
+test('detection resolves .desktop entries against the shell XDG data dirs', async (t) => {
+	if (process.platform !== 'linux') {
+		t.skip('linux-app detection only runs on Linux');
+		return;
+	}
+
+	const root = await mkdtemp(path.join(tmpdir(), 'ensemblr-detect-'));
+	try {
+		const applications = path.join(root, 'share', 'applications');
+		await mkdir(applications, { recursive: true });
+		await writeFile(
+			path.join(applications, `${linuxDesktopEntryId}.desktop`),
+			'[Desktop Entry]\nType=Application\n',
+			'utf8',
+		);
+
+		const result = await detectInstalledTargets({
+			localCommandService: fakeEnvironmentService({
+				env: { XDG_DATA_DIRS: path.join(root, 'share') },
+				path: path.join(root, 'empty'),
+			}),
+		});
+
+		assert.equal(result.degraded, false);
+		assert.equal(result.detected[linuxDesktopEntryTargetId]?.installed, true);
+	} finally {
+		await rm(root, { recursive: true });
+	}
+});
+
+// Detection sweeping the launcher's own PATH instead of the login shell's would
+// otherwise cache a short list as authoritative, hiding every app under
+// `~/.local/bin` on every later boot.
+test('a login-shell probe that fell back marks the pass degraded', async (t) => {
+	if (process.platform !== 'linux') {
+		t.skip('linux-app detection only runs on Linux');
+		return;
+	}
+
+	const result = await detectInstalledTargets({
+		localCommandService: fakeEnvironmentService({
+			path: '/usr/bin',
+			source: 'fallback',
+		}),
+	});
+
+	assert.equal(result.degraded, true);
+});
+
+test('a healthy login-shell probe is not degraded', async (t) => {
+	if (process.platform !== 'linux') {
+		t.skip('linux-app detection only runs on Linux');
+		return;
+	}
+
+	const result = await detectInstalledTargets({
+		localCommandService: fakeEnvironmentService({ path: '/usr/bin' }),
+	});
+
+	assert.equal(result.degraded, false);
 });

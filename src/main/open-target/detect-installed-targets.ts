@@ -36,11 +36,12 @@ interface DetectedTarget {
 export type DetectedTargetsMap = Readonly<Record<string, DetectedTarget>>;
 
 /**
- * Outcome of a full detection pass. `degraded` is set when at least one
- * bundle-id target could not be resolved because its `mdfind` probe failed
- * (timeout, spawn error) rather than genuinely returning "not installed" — a
- * signal to callers that the result may be hiding installed apps and should not
- * be trusted as the authoritative installed set.
+ * Outcome of a full detection pass. `degraded` marks a result that may be
+ * hiding installed apps and must not be trusted as the authoritative installed
+ * set: on macOS a bundle-id target whose `mdfind` probe failed (timeout, spawn
+ * error) rather than genuinely returning "not installed"; on Linux a
+ * login-shell probe that fell back, leaving detection to sweep the launcher's
+ * own PATH and `XDG_DATA_DIRS` instead of the user's.
  */
 export interface DetectionResult {
 	degraded: boolean;
@@ -84,14 +85,16 @@ export async function detectInstalledTargets({
 		detected[definition.id] = { appPath: null, installed: false };
 	}
 
-	let degraded = false;
-	// A packaged app inherits the launcher's PATH, not the user's login shell
-	// PATH, so an editor installed under `~/.local/bin` is invisible without
-	// this. The lookup is already cached by the command service.
-	const pathValue =
+	// A packaged app inherits the launcher's PATH and XDG_DATA_DIRS, not the
+	// user's login-shell ones, so an editor under `~/.local/bin` or a data dir
+	// added by `/etc/profile.d` is invisible without this. Detection and dispatch
+	// read the same snapshot or they disagree about which apps exist. The lookup
+	// is already cached by the command service.
+	const shell =
 		process.platform === 'linux'
-			? await resolveShellPath(localCommandService)
-			: '';
+			? await resolveShellEnvironment(localCommandService)
+			: null;
+	let degraded = shell?.probeFailed ?? false;
 
 	await Promise.all(
 		OPEN_TARGET_REGISTRY.map(async (definition) => {
@@ -114,10 +117,14 @@ export async function detectInstalledTargets({
 					return;
 				}
 				case 'linux-app': {
+					await yieldToEventLoop();
 					detected[definition.id] = {
 						appPath: null,
 						installed:
-							resolveLinuxLauncher(behavior.detection, { pathValue }) !== null,
+							resolveLinuxLauncher(behavior.detection, {
+								env: shell?.env,
+								pathValue: shell?.path ?? '',
+							}) !== null,
 					};
 					return;
 				}
@@ -142,20 +149,63 @@ export async function detectInstalledTargets({
 }
 
 /**
- * Reads the shell-derived PATH, falling back to the process PATH when the shell
- * probe fails so detection degrades to fewer hits rather than none.
- * @param localCommandService - Service that resolves the login-shell environment.
- * @returns A PATH-style directory list.
+ * Yields to the event loop so each Linux target's synchronous filesystem sweep
+ * lands in its own turn. Twenty-one targets probed back to back is roughly two
+ * thousand blocking syscalls in one tick, right after `app.whenReady` — enough
+ * to stall first paint on a host with a slow `$HOME`.
+ * @returns A promise resolved on the next event-loop turn.
  */
-async function resolveShellPath(
+function yieldToEventLoop(): Promise<void> {
+	return new Promise((resolve) => {
+		setImmediate(resolve);
+	});
+}
+
+/** The login-shell environment detection resolved, and whether it is trustworthy. */
+interface ShellEnvironment {
+	env: Record<string, string>;
+	path: string;
+	probeFailed: boolean;
+}
+
+/**
+ * Reads the login-shell environment, falling back to the process environment
+ * when the probe fails or returns its own fallback, so detection degrades to
+ * fewer hits rather than none. A fallback is reported so the caller can mark the
+ * pass degraded instead of caching a short list as authoritative.
+ * @param localCommandService - Service that resolves the login-shell environment.
+ * @returns The environment to resolve launchers against, plus the probe's health.
+ */
+async function resolveShellEnvironment(
 	localCommandService: LocalCommandService,
-): Promise<string> {
+): Promise<ShellEnvironment> {
 	try {
 		const environment = await localCommandService.getEnvironment();
-		return environment.path || (process.env.PATH ?? '');
+		const probeFailed = environment.source !== 'shell' || !environment.path;
+		return {
+			env: probeFailed ? processEnvironment() : environment.env,
+			path: environment.path || (process.env.PATH ?? ''),
+			probeFailed,
+		};
 	} catch {
-		return process.env.PATH ?? '';
+		return {
+			env: processEnvironment(),
+			path: process.env.PATH ?? '',
+			probeFailed: true,
+		};
 	}
+}
+
+/**
+ * Narrows `process.env` to the defined entries a launcher resolution can read.
+ * @returns The process environment with no undefined values.
+ */
+function processEnvironment(): Record<string, string> {
+	return Object.fromEntries(
+		Object.entries(process.env).filter(
+			(entry): entry is [string, string] => entry[1] !== undefined,
+		),
+	);
 }
 
 /**

@@ -14,11 +14,14 @@ import {
 
 /**
  * How a resolved Linux app is launched: directly as a binary, or through the
- * `.desktop` entry a Flatpak install exports instead of a binary.
+ * `.desktop` entry a Flatpak install exports instead of a binary. The entry
+ * carries both its id and its path because the two launchers disagree about
+ * which one they take — `gio launch` wants the file, `gtk-launch` wants the
+ * name it resolves through the XDG data dirs itself.
  */
 export type LinuxLauncher =
 	| { kind: 'binary'; executablePath: string }
-	| { kind: 'desktop-entry'; desktopFilePath: string };
+	| { desktopFilePath: string; entryId: string; kind: 'desktop-entry' };
 
 /**
  * Directories a Flatpak install exports its `.desktop` files into. A session
@@ -98,7 +101,7 @@ export function resolveLinuxLauncher(
 		for (const directory of directories) {
 			const desktopFilePath = path.join(directory, `${entryId}.desktop`);
 			if (existsSync(desktopFilePath)) {
-				return { desktopFilePath, kind: 'desktop-entry' };
+				return { desktopFilePath, entryId, kind: 'desktop-entry' };
 			}
 		}
 	}

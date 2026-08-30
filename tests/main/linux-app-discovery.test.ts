@@ -146,6 +146,9 @@ describe('resolveLinuxLauncher', () => {
 		).toEqual({ executablePath, kind: 'binary' });
 	});
 
+	// The entry id travels alongside its path because `gtk-launch` takes the
+	// *name* and resolves it through the XDG data dirs itself, while `gio launch`
+	// takes the file.
 	test('falls back to a .desktop entry when no command resolves', async () => {
 		const root = await createRoot();
 		const desktopFilePath = await writeDesktopEntry(
@@ -162,7 +165,11 @@ describe('resolveLinuxLauncher', () => {
 					pathValue: path.join(root, 'empty'),
 				},
 			),
-		).toEqual({ desktopFilePath, kind: 'desktop-entry' });
+		).toEqual({
+			desktopFilePath,
+			entryId: 'dev.zed.Zed',
+			kind: 'desktop-entry',
+		});
 	});
 
 	test('reports an app that is installed neither way as absent', async () => {

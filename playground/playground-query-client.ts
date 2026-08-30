@@ -18,7 +18,7 @@ export const PLAYGROUND_OPEN_TARGETS: WorkspaceOpenTarget[] = [
 		kind: 'editor',
 		label: 'VS Code',
 		numberShortcutLabel: '1',
-		shortcutLabel: '⌘⇧E',
+		shortcutChord: { key: 'E', modifiers: ['mod', 'shift'] },
 	},
 	{
 		behavior: 'launch-app',

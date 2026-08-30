@@ -13,8 +13,8 @@ interface UseOpenTargetShortcutsOptions {
 
 /**
  * Registers the global keyboard shortcuts that drive the open-in menu:
- *  - `⌘O`        — invoke the current primary target.
- *  - `⌘⇧C`       — invoke the copy-path utility.
+ *  - `⌘O` / `Ctrl+O`   — invoke the current primary target.
+ *  - `⌘⇧C` / `Ctrl+Shift+C` — invoke the copy-path utility.
  *  - `1`..`9`    — invoke the Nth target while the dropdown is open.
  *
  * The handler is intentionally a `window` listener so shortcuts fire from
@@ -103,8 +103,8 @@ export function useOpenTargetShortcuts(
 
 /**
  * Skip the global open-in shortcuts when the user is typing in an editable
- * surface. ⌘O / ⌘⇧C are claimed for opening editors and copying the workspace
- * path; firing them inside an input would surprise users.
+ * surface. The open-in chords are claimed for opening editors and copying the
+ * workspace path; firing them inside an input would surprise users.
  */
 export function shouldIgnoreShortcut(event: KeyboardEvent): boolean {
 	const target = event.target;
