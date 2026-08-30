@@ -114,7 +114,9 @@ claude                                      # complete the login prompt, or /log
 pi --list-models                            # verifies your Pi providers resolve
 ```
 
-`git` comes with the Xcode command line tools — `xcode-select --install` if `git --version` fails.
+On macOS `git` comes with the Xcode command line tools — `xcode-select --install` if `git --version`
+fails. On Linux install it with your distribution's package manager, or see
+<https://git-scm.com/download/linux>.
 
 Claude Code also installs with the official script, which is what the app itself offers when that check
 fails: `curl -fsSL https://claude.ai/install.sh | bash`. Pi providers are configured in Pi, not in

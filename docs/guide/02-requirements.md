@@ -46,7 +46,7 @@ open a URL in your browser. Every check also offers a plain retry.
 | 5 | Shell and process launch | Ensemblr can run a command through your login shell | Retry only | yes |
 | 6 | Secret storage — **Linux only** | A keyring daemon (gnome-keyring or KWallet) answers, so `safeStorage` encrypts rather than obfuscates | Retry only | no |
 | 7 | Environment variables | Every variable you marked required is set | Open environment settings | only if you marked one required |
-| 8 | Git executable | `git --version` succeeds | copy `xcode-select --install`; open <https://git-scm.com/download/mac> | yes |
+| 8 | Git executable | `git --version` succeeds | macOS: copy `xcode-select --install`; open <https://git-scm.com/download/mac>. Linux: open <https://git-scm.com/download/linux> | yes |
 | 9 | GitHub CLI installed | `gh --version` succeeds | open <https://cli.github.com/> | yes |
 | 10 | GitHub CLI authenticated | `gh auth status --hostname github.com --active` succeeds | copy `gh auth login --hostname github.com` | yes |
 | 11 | Pi executable | A Pi-compatible binary resolves | Select Pi executable | gated |
@@ -76,9 +76,10 @@ A few details the table compresses:
   keyring daemon still runs, it just obfuscates stored secrets instead of
   encrypting them, and you are told rather than stopped. Start gnome-keyring or
   KWallet and restart Ensemblr to upgrade the backend.
-- **Git executable** offers macOS remediation on both platforms today —
-  `xcode-select --install` and the git-scm macOS download page. On Linux, install
-  git through your distribution's package manager instead.
+- **Git executable** offers remediation matched to the platform. macOS gets
+  `xcode-select --install` alongside the git-scm macOS download page; Linux gets
+  the git-scm Linux download page on its own, because no single package-manager
+  command is right across apt, dnf, pacman, and zypper. Both offer a retry.
 - **Environment variables** ships with no required variables, so it does not
   block by default. It becomes blocking the moment you mark one required.
 - **Pi RPC startup** runs in a managed throwaway workspace, not in one of your

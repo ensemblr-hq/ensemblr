@@ -148,7 +148,7 @@ export function createSetupDiagnosticsService({
 		'gh-auth': () => getGitHubAuthCheck({ context, localCommandService }),
 		'gh-cli': () => getGitHubCliCheck({ context, localCommandService }),
 		'git-executable': () =>
-			getGitExecutableCheck({ context, localCommandService }),
+			getGitExecutableCheck({ context, localCommandService, platform }),
 		'linear-oauth': () =>
 			getLinearConnectionCheck({ context, linearAuthService }),
 		'managed-directories': () =>
