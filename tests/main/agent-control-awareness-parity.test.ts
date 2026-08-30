@@ -916,6 +916,39 @@ describe('Concierge role policy', () => {
 		expect(CONCIERGE_AWARENESS).toContain('refused here');
 	});
 
+	// A model reads its playbook in order, and one told what it can read before it
+	// is told what it is for treats reading as the task: it arrives at the spawn
+	// having already spent the turn working out how, which is the orchestrator's
+	// job and the reason the Concierge holds no write access in the first place.
+	it('states the delegation directive ahead of the capability inventory', () => {
+		const delegation = CONCIERGE_AWARENESS.indexOf(
+			'## Your first move is to delegate',
+		);
+		const capabilities = CONCIERGE_AWARENESS.indexOf('## What you can do');
+		expect(delegation).toBeGreaterThan(-1);
+		expect(capabilities).toBeGreaterThan(delegation);
+		expect(CONCIERGE_AWARENESS).toContain('ensemblr_create_workspace');
+		expect(CONCIERGE_AWARENESS).toContain('ensemblr_send_follow_up');
+	});
+
+	// The one-writer rule is per worktree, and it read as a rule about the
+	// Concierge until a task spanning two repositories — a release cut in one
+	// while the other publishes its notes — was delegated one repository at a
+	// time, leaving half the work idle for the length of the other half.
+	it('caps orchestrators per workspace rather than per turn', () => {
+		expect(CONCIERGE_AWARENESS).toContain('One orchestrator per workspace');
+		expect(CONCIERGE_AWARENESS).not.toContain('one workspace at a time');
+	});
+
+	// Running the same task in several workspaces is the one fan-out that needs
+	// the model id, and `listModels` is served to the Concierge for exactly that.
+	// A playbook that never names it leaves every contender on the same model,
+	// which is the variation the bake-off existed to buy.
+	it('teaches the competing-implementation fan-out with a model id', () => {
+		expect(CONCIERGE_AWARENESS).toContain('ensemblr_list_models');
+		expect(CONCIERGE_WITHHELD_OPS.has('listModels')).toBe(false);
+	});
+
 	// The syntax is only useful if the playbook spells the exact destination the
 	// renderer parses back, and says where the ids come from. A scheme typed
 	// differently here renders as prose in every answer, silently.
