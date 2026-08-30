@@ -1,3 +1,16 @@
+import type { Modifier } from '@/shared/keymap';
+
+/**
+ * The keystroke that invokes a target, as parts rather than a rendered label.
+ * `src/main` cannot know which platform the renderer draws on, and `⌘O` reads
+ * as a lie on a machine with no Command key — so the chord crosses the boundary
+ * and `formatChord` spells it for the platform in front of the user.
+ */
+export interface OpenTargetShortcutChord {
+	key: string;
+	modifiers: readonly Modifier[];
+}
+
 /**
  * Classification of an "Open workspace in…" target. Kept in shared so both the
  * main-process registry and renderer UI can narrow on it.
@@ -52,7 +65,7 @@ export interface WorkspaceOpenTargetSnapshot {
 	kind: WorkspaceOpenTargetKind;
 	label: string;
 	numberShortcutLabel: string;
-	shortcutLabel?: string;
+	shortcutChord?: OpenTargetShortcutChord;
 }
 
 /** Result of listing the "Open in" targets installed for a workspace. */
@@ -91,8 +104,29 @@ export interface OpenSettingsFileInTargetRequest {
 	targetId: string;
 }
 
-/** Result of an open-in-target action: success, or a failure with an error message. */
-export type OpenTargetResult = { ok: true } | { error: string; ok: false };
+/**
+ * Machine-readable reasons a Linux dispatch could not reach the app. Main
+ * cannot phrase these for the reader — it has no i18n instance — so it returns
+ * the code and the renderer's failure-text table words it.
+ */
+export type OpenTargetFailureCode =
+	| 'open-target-app-not-installed'
+	| 'open-target-no-desktop-launcher';
+
+/** Typed failure envelope carried alongside an errored open-in-target result. */
+export interface OpenTargetFailure {
+	code: OpenTargetFailureCode;
+	message: string;
+}
+
+/**
+ * Result of an open-in-target action: success, or a failure with an error
+ * message. `failure` is set when main could classify the failure; `error` stays
+ * the English sentence for the support bundle and for the codes it cannot.
+ */
+export type OpenTargetResult =
+	| { ok: true }
+	| { error: string; failure?: OpenTargetFailure; ok: false };
 
 /** IPC surface for the open-in menu. */
 export interface OpenTargetApi {

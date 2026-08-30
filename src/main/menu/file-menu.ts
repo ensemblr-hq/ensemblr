@@ -11,6 +11,10 @@ import type { MenuLabels } from './menu-strings';
  * New Terminal is deliberately absent — it lives in the Workspace menu beside
  * the scripts it shares a dock with, and listing it twice would register its
  * accelerator twice.
+ *
+ * Off darwin there is no application menu to host Settings, Check for Updates
+ * and Quit, so they land here. Close Tab is not repeated: the Window menu
+ * already carries it off darwin.
  * @param labels - Native menu labels for the active language
  * @param items - Factory for the command items in this menu
  * @param context - The last context the renderer reported, or null
@@ -42,9 +46,14 @@ export function buildFileMenu(
 				labels.noRecentProjects,
 			),
 			{ type: 'separator' },
-			process.platform === 'darwin'
-				? items.command('tab.close', labels.closeTab)
-				: { label: labels.quit, role: 'quit' },
+			...(process.platform === 'darwin'
+				? [items.command('tab.close', labels.closeTab)]
+				: [
+						items.command('settings.open', labels.settings),
+						items.command('app.checkForUpdates', labels.checkForUpdates),
+						{ type: 'separator' as const },
+						{ label: labels.quit, role: 'quit' as const },
+					]),
 		],
 	};
 }

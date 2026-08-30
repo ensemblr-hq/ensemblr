@@ -143,6 +143,11 @@ const appearanceSettingsSchema = z.object({
 	monoFont: z.string().catch('JetBrainsMono Nerd Font Mono'),
 	codeLigatures: z.boolean().catch(true),
 	markdownStyle: z.enum(['default', 'compact', 'prose']).catch('default'),
+	// Read on Linux only. macOS is pinned to its inset chrome, where the traffic
+	// lights are the system's to draw and a frameless window would lose them.
+	// `system` is the escape hatch: a compositor that mishandles a frameless
+	// window is one setting and one relaunch away from an ordinary decorated one.
+	titleBar: z.enum(['custom', 'system']).catch('custom'),
 	terminalFont: z.string().catch('JetBrainsMono Nerd Font Mono'),
 	terminalFontSize: z.number().int().min(8).max(24).catch(12),
 	terminalScrollbackMb: z.number().int().min(1).max(200).catch(10),

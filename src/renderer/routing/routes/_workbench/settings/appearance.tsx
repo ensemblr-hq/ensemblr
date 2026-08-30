@@ -6,6 +6,7 @@ import { CodeBlock } from '@/renderer/components/code-block';
 import { SettingRow } from '@/renderer/components/settings/setting-row';
 import { SettingsSection } from '@/renderer/components/settings/settings-section';
 import { TerminalScrollbackRow } from '@/renderer/components/settings/terminal-scrollback-row';
+import { TitleBarRow } from '@/renderer/components/settings/title-bar-row';
 import { Input } from '@/renderer/components/ui/input';
 import {
 	Select,
@@ -28,6 +29,7 @@ import {
 	themeAtom,
 } from '@/renderer/state/preferences';
 import { DEFAULT_APP_SETTINGS } from '@/shared/config';
+import { formatChord } from '@/shared/keymap';
 
 /** Route for the Appearance settings section; renders the appearance-settings panel. */
 export const Route = createFileRoute('/_workbench/settings/appearance')({
@@ -92,12 +94,15 @@ function AppearanceSettings() {
 				}
 				description={t(
 					'settings:appearance.theme.description',
-					'Toggle with ⌘⌥T.',
+					'Toggle with {{chord}}.',
+					{ chord: formatChord(['mod', 'alt'], 'T') },
 				)}
 				label={t('settings:appearance.theme.label', 'Theme')}
 				modified={theme !== DEFAULTS.theme}
 				onReset={() => setTheme(DEFAULTS.theme)}
 			/>
+
+			<TitleBarRow />
 
 			<SettingRow
 				control={

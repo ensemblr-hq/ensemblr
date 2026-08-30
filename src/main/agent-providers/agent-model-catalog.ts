@@ -19,6 +19,53 @@ import {
  */
 const PROVIDER_INDEX_TTL_MS = 5 * 60 * 1000;
 
+/**
+ * Rung a Claude-defaulted catalog starts on. It is the middle of Claude's own
+ * effort ladder and of pi's thinking ladder both, so the same value is right
+ * whichever runtime supplies the default.
+ */
+const FALLBACK_THINKING_LEVEL = 'medium';
+
+/**
+ * The level a catalog defaulting to `model` should start on: the shared middle
+ * rung when that model publishes it, and its most capable rung otherwise, so a
+ * model with a narrower ladder still gets a level it accepts.
+ * @param model - The model the catalog defaults to.
+ * @returns The default level, or null when the model publishes no ladder.
+ */
+function pickDefaultThinkingLevel(model: AgentModelOption): string | null {
+	return model.thinkingLevels.includes(FALLBACK_THINKING_LEVEL)
+		? FALLBACK_THINKING_LEVEL
+		: (model.thinkingLevels.at(-1) ?? null);
+}
+
+/**
+ * Merges the two runtimes' catalogs into the one the picker reads.
+ *
+ * Pi leads and its defaults win while it has models of its own. A pi install
+ * with no configured provider contributes none — and the defaults then name the
+ * first Claude model rather than staying null, so a fresh chat opens on a model
+ * that can actually run instead of on nothing.
+ * @param piModels - Pi's catalog, empty when pi lists no usable model.
+ * @param claudeModels - Claude Code's models, most capable first.
+ * @returns The merged catalog.
+ */
+function mergeCatalogs(
+	piModels: AgentModelCatalog,
+	claudeModels: readonly AgentModelOption[],
+): AgentModelCatalog {
+	const models = [...piModels.models, ...claudeModels];
+	if (piModels.models.length > 0) {
+		return { ...piModels, models };
+	}
+	const fallback = claudeModels[0];
+	return {
+		defaultModelId: fallback?.id ?? null,
+		defaultThinkingLevel: fallback ? pickDefaultThinkingLevel(fallback) : null,
+		models,
+	};
+}
+
 /** Dependencies for {@link createAgentModelCatalog}. */
 export interface CreateAgentModelCatalogOptions {
 	/**
@@ -84,10 +131,7 @@ export function createAgentModelCatalog({
 				.then(() => listClaudeModels?.() ?? [])
 				.catch(() => []),
 		]);
-		const merged: AgentModelCatalog = {
-			...piModels,
-			models: [...piModels.models, ...claudeModels],
-		};
+		const merged = mergeCatalogs(piModels, claudeModels);
 		if (merged.models.length > 0) {
 			index = {
 				at: now(),

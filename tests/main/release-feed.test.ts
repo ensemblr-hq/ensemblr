@@ -13,11 +13,14 @@ const RELEASES_URL = `https://api.github.com/repos/${SLUG}/releases?per_page=30`
 function release(
 	tag: string,
 	options: {
+		appImage?: boolean;
+		appImageName?: string;
 		draft?: boolean;
 		feedUrl?: string | null;
 		prerelease?: boolean;
 	} = {},
 ) {
+	const appImageName = options.appImageName ?? 'Ensemblr-x86_64.AppImage';
 	const feedUrl =
 		options.feedUrl === undefined
 			? `https://github.com/${SLUG}/releases/download/${tag}/${UPDATE_FEED_ASSET_NAME}`
@@ -28,11 +31,20 @@ function release(
 				browser_download_url: `https://github.com/${SLUG}/releases/download/${tag}/Ensemblr.zip`,
 				name: 'Ensemblr.zip',
 			},
+			...(options.appImage
+				? [
+						{
+							browser_download_url: `https://github.com/${SLUG}/releases/download/${tag}/${appImageName}`,
+							name: appImageName,
+						},
+					]
+				: []),
 			...(feedUrl
 				? [{ browser_download_url: feedUrl, name: UPDATE_FEED_ASSET_NAME }]
 				: []),
 		],
 		draft: options.draft ?? false,
+		html_url: `https://github.com/${SLUG}/releases/tag/${tag}`,
 		prerelease: options.prerelease ?? true,
 		tag_name: tag,
 	};
@@ -96,7 +108,11 @@ describe('createReleaseFeed — channel selection', () => {
 			[`https://github.com/${SLUG}/releases/download/v0.1.0-beta.8/${UPDATE_FEED_ASSET_NAME}`]:
 				{ body: feedDocument('0.1.0-beta.8') },
 		});
-		const feed = createReleaseFeed({ fetchImpl, repositorySlug: SLUG });
+		const feed = createReleaseFeed({
+			fetchImpl,
+			platform: 'darwin',
+			repositorySlug: SLUG,
+		});
 
 		const result = await feed.resolve('release', '0.1.0-beta.7');
 
@@ -112,7 +128,11 @@ describe('createReleaseFeed — channel selection', () => {
 			[`https://github.com/${SLUG}/releases/download/nightly/${UPDATE_FEED_ASSET_NAME}`]:
 				{ body: feedDocument('0.1.0-beta.7-nightly.20260819.gabc1234') },
 		});
-		const feed = createReleaseFeed({ fetchImpl, repositorySlug: SLUG });
+		const feed = createReleaseFeed({
+			fetchImpl,
+			platform: 'darwin',
+			repositorySlug: SLUG,
+		});
 
 		const result = await feed.resolve(
 			'canary',
@@ -129,7 +149,11 @@ describe('createReleaseFeed — channel selection', () => {
 		const { fetchImpl } = stubFetch({
 			[RELEASES_URL]: { body: [release('nightly', { draft: true })] },
 		});
-		const feed = createReleaseFeed({ fetchImpl, repositorySlug: SLUG });
+		const feed = createReleaseFeed({
+			fetchImpl,
+			platform: 'darwin',
+			repositorySlug: SLUG,
+		});
 
 		expect(await feed.resolve('canary', '0.1.0')).toEqual({
 			candidate: null,
@@ -139,10 +163,156 @@ describe('createReleaseFeed — channel selection', () => {
 
 	test('a channel with no published release reports current rather than failing', async () => {
 		const { fetchImpl } = stubFetch({ [RELEASES_URL]: { body: [] } });
-		const feed = createReleaseFeed({ fetchImpl, repositorySlug: SLUG });
+		const feed = createReleaseFeed({
+			fetchImpl,
+			platform: 'darwin',
+			repositorySlug: SLUG,
+		});
 
 		expect(await feed.resolve('release', '0.1.0')).toEqual({
 			candidate: null,
+			status: 'ok',
+		});
+	});
+
+	test('the candidate names the release page a check-only build links to', async () => {
+		const { fetchImpl } = stubFetch({
+			[RELEASES_URL]: { body: [release('v0.2.0')] },
+			[`https://github.com/${SLUG}/releases/download/v0.2.0/${UPDATE_FEED_ASSET_NAME}`]:
+				{ body: feedDocument('0.2.0') },
+		});
+		const feed = createReleaseFeed({
+			fetchImpl,
+			platform: 'darwin',
+			repositorySlug: SLUG,
+		});
+
+		expect(await feed.resolve('release', '0.1.0')).toMatchObject({
+			candidate: {
+				releaseUrl: `https://github.com/${SLUG}/releases/tag/v0.2.0`,
+			},
+		});
+	});
+});
+
+describe('createReleaseFeed — platform artifacts', () => {
+	test('Linux ignores a release that shipped no AppImage', async () => {
+		const { fetchImpl } = stubFetch({
+			[RELEASES_URL]: { body: [release('v0.2.0')] },
+			[`https://github.com/${SLUG}/releases/download/v0.2.0/${UPDATE_FEED_ASSET_NAME}`]:
+				{ body: feedDocument('0.2.0') },
+		});
+		const feed = createReleaseFeed({
+			fetchImpl,
+			platform: 'linux',
+			repositorySlug: SLUG,
+		});
+
+		expect(await feed.resolve('release', '0.1.0')).toEqual({
+			candidate: null,
+			status: 'ok',
+		});
+	});
+
+	test('Linux takes a release that shipped an AppImage', async () => {
+		const { fetchImpl } = stubFetch({
+			[RELEASES_URL]: { body: [release('v0.2.0', { appImage: true })] },
+			[`https://github.com/${SLUG}/releases/download/v0.2.0/${UPDATE_FEED_ASSET_NAME}`]:
+				{ body: feedDocument('0.2.0') },
+		});
+		const feed = createReleaseFeed({
+			fetchImpl,
+			platform: 'linux',
+			repositorySlug: SLUG,
+		});
+
+		expect(await feed.resolve('release', '0.1.0')).toMatchObject({
+			candidate: {
+				releaseUrl: `https://github.com/${SLUG}/releases/tag/v0.2.0`,
+				version: '0.2.0',
+			},
+			status: 'ok',
+		});
+	});
+
+	test('Linux takes an AppImage however it is capitalised', async () => {
+		const { fetchImpl } = stubFetch({
+			[RELEASES_URL]: {
+				body: [
+					release('v0.2.0', {
+						appImage: true,
+						appImageName: 'Ensemblr-x86_64.appimage',
+					}),
+				],
+			},
+			[`https://github.com/${SLUG}/releases/download/v0.2.0/${UPDATE_FEED_ASSET_NAME}`]:
+				{ body: feedDocument('0.2.0') },
+		});
+		const feed = createReleaseFeed({
+			fetchImpl,
+			platform: 'linux',
+			repositorySlug: SLUG,
+		});
+
+		expect(await feed.resolve('release', '0.1.0')).toMatchObject({
+			candidate: { version: '0.2.0' },
+			status: 'ok',
+		});
+	});
+
+	test('Linux ignores a release that carries no assets at all', async () => {
+		const { fetchImpl } = stubFetch({
+			[RELEASES_URL]: {
+				body: [{ ...release('v0.2.0'), assets: [] }],
+			},
+		});
+		const feed = createReleaseFeed({
+			fetchImpl,
+			platform: 'linux',
+			repositorySlug: SLUG,
+		});
+
+		expect(await feed.resolve('release', '0.1.0')).toEqual({
+			candidate: null,
+			status: 'ok',
+		});
+	});
+
+	// The feed document is a macOS artifact, and `release.yml` can publish an
+	// AppImage without one. Reporting that to a Linux user as a broken feed would
+	// fail the one release they could actually have installed.
+	test('Linux reports no candidate when the release carries no feed document', async () => {
+		const { fetchImpl } = stubFetch({
+			[RELEASES_URL]: {
+				body: [release('v0.2.0', { appImage: true, feedUrl: null })],
+			},
+		});
+		const feed = createReleaseFeed({
+			fetchImpl,
+			platform: 'linux',
+			repositorySlug: SLUG,
+		});
+
+		expect(await feed.resolve('release', '0.1.0')).toEqual({
+			candidate: null,
+			status: 'ok',
+		});
+	});
+
+	test('macOS does not require an AppImage', async () => {
+		const { fetchImpl } = stubFetch({
+			[RELEASES_URL]: { body: [release('v0.2.0')] },
+			[`https://github.com/${SLUG}/releases/download/v0.2.0/${UPDATE_FEED_ASSET_NAME}`]:
+				{ body: feedDocument('0.2.0') },
+		});
+		const feed = createReleaseFeed({
+			fetchImpl,
+			platform: 'darwin',
+			repositorySlug: SLUG,
+		});
+
+		expect(await feed.resolve('release', '0.1.0')).toMatchObject({
+			candidate: { version: '0.2.0' },
 			status: 'ok',
 		});
 	});
@@ -155,7 +325,11 @@ describe('createReleaseFeed — version comparison', () => {
 			[`https://github.com/${SLUG}/releases/download/v0.1.0-beta.7/${UPDATE_FEED_ASSET_NAME}`]:
 				{ body: feedDocument('0.1.0-beta.7') },
 		});
-		const feed = createReleaseFeed({ fetchImpl, repositorySlug: SLUG });
+		const feed = createReleaseFeed({
+			fetchImpl,
+			platform: 'darwin',
+			repositorySlug: SLUG,
+		});
 
 		expect(await feed.resolve('release', '0.1.0-beta.7')).toEqual({
 			candidate: null,
@@ -169,7 +343,11 @@ describe('createReleaseFeed — version comparison', () => {
 			[`https://github.com/${SLUG}/releases/download/v0.1.0-beta.6/${UPDATE_FEED_ASSET_NAME}`]:
 				{ body: feedDocument('0.1.0-beta.6') },
 		});
-		const feed = createReleaseFeed({ fetchImpl, repositorySlug: SLUG });
+		const feed = createReleaseFeed({
+			fetchImpl,
+			platform: 'darwin',
+			repositorySlug: SLUG,
+		});
 
 		expect(await feed.resolve('release', '0.1.0-beta.7')).toEqual({
 			candidate: null,
@@ -183,7 +361,11 @@ describe('createReleaseFeed — version comparison', () => {
 			[`https://github.com/${SLUG}/releases/download/nightly/${UPDATE_FEED_ASSET_NAME}`]:
 				{ body: feedDocument('0.1.0-nightly.20260818.gabc1234') },
 		});
-		const feed = createReleaseFeed({ fetchImpl, repositorySlug: SLUG });
+		const feed = createReleaseFeed({
+			fetchImpl,
+			platform: 'darwin',
+			repositorySlug: SLUG,
+		});
 
 		const result = await feed.resolve('canary', '0.1.0-beta.7');
 
@@ -201,7 +383,11 @@ describe('createReleaseFeed — version comparison', () => {
 			[`https://github.com/${SLUG}/releases/download/nightly/${UPDATE_FEED_ASSET_NAME}`]:
 				{ body: feedDocument('0.1.0-nightly.20260902.gbbbbbbb') },
 		});
-		const feed = createReleaseFeed({ fetchImpl, repositorySlug: SLUG });
+		const feed = createReleaseFeed({
+			fetchImpl,
+			platform: 'darwin',
+			repositorySlug: SLUG,
+		});
 
 		const result = await feed.resolve(
 			'canary',
@@ -216,7 +402,11 @@ describe('createReleaseFeed — version comparison', () => {
 
 	test('a build whose own version is not semver refuses rather than guessing', async () => {
 		const { fetchImpl } = stubFetch({});
-		const feed = createReleaseFeed({ fetchImpl, repositorySlug: SLUG });
+		const feed = createReleaseFeed({
+			fetchImpl,
+			platform: 'darwin',
+			repositorySlug: SLUG,
+		});
 
 		expect(await feed.resolve('release', 'not-a-version')).toMatchObject({
 			failure: { code: 'update-unsupported-build' },
@@ -228,7 +418,11 @@ describe('createReleaseFeed — version comparison', () => {
 describe('createReleaseFeed — failures and caching', () => {
 	test('a rate-limited feed is reported as such, not as unreachable', async () => {
 		const { fetchImpl } = stubFetch({ [RELEASES_URL]: { status: 403 } });
-		const feed = createReleaseFeed({ fetchImpl, repositorySlug: SLUG });
+		const feed = createReleaseFeed({
+			fetchImpl,
+			platform: 'darwin',
+			repositorySlug: SLUG,
+		});
 
 		expect(await feed.resolve('release', '0.1.0')).toMatchObject({
 			failure: { code: 'update-feed-rate-limited' },
@@ -240,7 +434,11 @@ describe('createReleaseFeed — failures and caching', () => {
 		const fetchImpl = (async () => {
 			throw new Error('offline');
 		}) as unknown as typeof fetch;
-		const feed = createReleaseFeed({ fetchImpl, repositorySlug: SLUG });
+		const feed = createReleaseFeed({
+			fetchImpl,
+			platform: 'darwin',
+			repositorySlug: SLUG,
+		});
 
 		expect(await feed.resolve('release', '0.1.0')).toMatchObject({
 			failure: { code: 'update-feed-unreachable' },
@@ -252,7 +450,11 @@ describe('createReleaseFeed — failures and caching', () => {
 		const { fetchImpl } = stubFetch({
 			[RELEASES_URL]: { body: [release('v0.2.0', { feedUrl: null })] },
 		});
-		const feed = createReleaseFeed({ fetchImpl, repositorySlug: SLUG });
+		const feed = createReleaseFeed({
+			fetchImpl,
+			platform: 'darwin',
+			repositorySlug: SLUG,
+		});
 
 		expect(await feed.resolve('release', '0.1.0')).toMatchObject({
 			failure: { code: 'update-feed-malformed' },
@@ -266,7 +468,11 @@ describe('createReleaseFeed — failures and caching', () => {
 			[`https://github.com/${SLUG}/releases/download/v0.2.0/${UPDATE_FEED_ASSET_NAME}`]:
 				{ body: { name: 'latest', url: 'https://example.com/a.zip' } },
 		});
-		const feed = createReleaseFeed({ fetchImpl, repositorySlug: SLUG });
+		const feed = createReleaseFeed({
+			fetchImpl,
+			platform: 'darwin',
+			repositorySlug: SLUG,
+		});
 
 		expect(await feed.resolve('release', '0.1.0')).toMatchObject({
 			failure: { code: 'update-feed-malformed' },
@@ -280,7 +486,11 @@ describe('createReleaseFeed — failures and caching', () => {
 			String(url) === RELEASES_URL
 				? new Response(JSON.stringify([release('v0.2.0')]))
 				: new Response(oversized)) as unknown as typeof fetch;
-		const feed = createReleaseFeed({ fetchImpl, repositorySlug: SLUG });
+		const feed = createReleaseFeed({
+			fetchImpl,
+			platform: 'darwin',
+			repositorySlug: SLUG,
+		});
 
 		expect(await feed.resolve('release', '0.1.0')).toMatchObject({
 			failure: { code: 'update-feed-malformed' },
@@ -299,7 +509,11 @@ describe('createReleaseFeed — failures and caching', () => {
 			[documentUrl]: { body: feedDocument('0.2.0') },
 		};
 		const { calls, fetchImpl } = stubFetch(routes);
-		const feed = createReleaseFeed({ fetchImpl, repositorySlug: SLUG });
+		const feed = createReleaseFeed({
+			fetchImpl,
+			platform: 'darwin',
+			repositorySlug: SLUG,
+		});
 
 		await feed.resolve('release', '0.1.0');
 		routes[RELEASES_URL] = { status: 304 };

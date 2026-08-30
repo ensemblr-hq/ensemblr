@@ -304,6 +304,11 @@ export const SETUP_DETAIL_TEXT: Record<
 			'common:setup-check.detail.pi-executable-unknown-error',
 			'Unknown Pi executable check error.',
 		),
+	'pi-models-none': (t) =>
+		t(
+			'common:setup-check.detail.pi-models-none',
+			'Pi listed no usable models. Configure at least one provider in Pi, then retry.',
+		),
 	'pi-models-ready': (t, params) =>
 		t(
 			'common:setup-check.detail.pi-models-ready',
@@ -341,6 +346,27 @@ export const SETUP_DETAIL_TEXT: Record<
 			'common:setup-check.detail.root-directory-ready',
 			'Ensemblr root is ready at {{path}}.',
 			params,
+		),
+	'secret-storage-encrypted': (t, params) =>
+		t(
+			'common:setup-check.detail.secret-storage-encrypted',
+			'Secrets are encrypted by the {{backend}} keyring.',
+			params,
+		),
+	'secret-storage-plaintext': (t) =>
+		t(
+			'common:setup-check.detail.secret-storage-plaintext',
+			'No keyring daemon answered, so stored secrets are only obfuscated rather than encrypted. Start gnome-keyring or KWallet and restart Ensemblr.',
+		),
+	'secret-storage-unavailable': (t) =>
+		t(
+			'common:setup-check.detail.secret-storage-unavailable',
+			'No OS keyring is available, so secrets cannot be saved. Start a keyring daemon (gnome-keyring or KWallet) and retry.',
+		),
+	'secret-storage-unknown-error': (t) =>
+		t(
+			'common:setup-check.detail.secret-storage-unknown-error',
+			'Unknown secret storage check error.',
 		),
 	'shell-fallback-environment': (t) =>
 		t(

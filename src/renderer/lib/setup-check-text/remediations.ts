@@ -66,6 +66,11 @@ export const SETUP_REMEDIATION_LABEL: Record<string, (t: TFunction) => string> =
 				'Retry {{provider}} executable check',
 				{ provider: CLAUDE.label },
 			),
+		'retry-secret-storage': (t) =>
+			t(
+				'common:setup-check.action.retry-secret-storage',
+				'Retry secret storage check',
+			),
 		'retry-config': (t) =>
 			t('common:setup-check.action.retry-config', 'Retry config check'),
 		'retry-database': (t) =>

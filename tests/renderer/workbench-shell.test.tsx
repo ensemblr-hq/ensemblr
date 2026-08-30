@@ -58,6 +58,7 @@ const GROUPS: Record<SetupCheckId, SetupCheckGroupId> = {
 	'pi-provider-model': 'pi',
 	'pi-rpc': 'pi',
 	'root-directory': 'storage',
+	'secret-storage': 'core',
 	'shell-process-launch': 'core',
 	'sqlite-database': 'storage',
 };
@@ -100,7 +101,7 @@ const OPEN_TARGETS_FIXTURE = [
 		kind: 'editor',
 		label: 'VS Code',
 		numberShortcutLabel: '2',
-		shortcutLabel: '⌘O',
+		shortcutChord: { key: 'O', modifiers: ['mod'] },
 	},
 	{
 		behavior: 'copy-path',
@@ -110,7 +111,7 @@ const OPEN_TARGETS_FIXTURE = [
 		kind: 'utility',
 		label: 'Copy path',
 		numberShortcutLabel: '3',
-		shortcutLabel: '⌘⇧C',
+		shortcutChord: { key: 'C', modifiers: ['mod', 'shift'] },
 	},
 ] as const;
 

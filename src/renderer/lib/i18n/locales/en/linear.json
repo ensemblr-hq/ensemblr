@@ -100,7 +100,7 @@
 		"status-none": "No status",
 		"submit-create": "Create issue",
 		"submit-edit": "Save changes",
-		"submit-hint": "⌘↵ to save",
+		"submit-hint": "{{chord}} to save",
 		"team-first": "Choose a team to set status, assignee, project, cycle, and labels.",
 		"team-required": "Choose a team for the new issue.",
 		"teams-empty": "No teams have loaded from your connected Linear accounts yet.",

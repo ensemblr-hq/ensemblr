@@ -18,6 +18,7 @@ function offeringFeed(
 				candidate: {
 					feedUrl: 'https://example.invalid/update-darwin-arm64.json',
 					notes: null,
+					releaseUrl: 'https://example.invalid/releases/tag/v0.2.0',
 					version,
 				},
 				status: 'ok' as const,
@@ -47,7 +48,7 @@ function harness(overrides: Partial<UpdateServiceOptions> = {}) {
 		onUpdaterEvent: (next) => {
 			handlers = next;
 		},
-		preconditionFailure: null,
+		preconditions: { capability: 'install', failure: null },
 		releaseFeed: offeringFeed(),
 		requestInstall: () => installs.push(1),
 		...overrides,
@@ -208,14 +209,69 @@ describe('createUpdateService — the automatic-updates setting', () => {
 	test('the setting cannot revive a build that can never update', () => {
 		const h = harness({
 			isEnabled: () => true,
-			preconditionFailure: {
-				code: 'update-not-in-applications',
-				message: 'Run it from /Applications.',
+			preconditions: {
+				capability: 'none',
+				failure: {
+					code: 'update-not-in-applications',
+					message: 'Run it from /Applications.',
+				},
 			},
 		});
 
 		h.service.settingsChanged();
 
 		expect(h.service.snapshot().state).toBe('unsupported');
+	});
+});
+
+describe('createUpdateService — a build that may check but not install', () => {
+	test('reports the version and its release page instead of downloading', async () => {
+		const h = harness({
+			preconditions: { capability: 'check-only', failure: null },
+		});
+
+		const snapshot = await h.service.checkNow();
+
+		expect(snapshot).toMatchObject({
+			availableVersion: '0.2.0',
+			releaseUrl: 'https://example.invalid/releases/tag/v0.2.0',
+			state: 'available',
+		});
+		expect(h.armed).toEqual([]);
+	});
+
+	test('install stays inert — nothing was ever staged', async () => {
+		const h = harness({
+			preconditions: { capability: 'check-only', failure: null },
+		});
+		await h.service.checkNow();
+
+		h.service.install();
+
+		expect(h.installs).toEqual([]);
+	});
+
+	test('start schedules checks without registering Squirrel listeners', async () => {
+		const h = harness({
+			preconditions: { capability: 'check-only', failure: null },
+		});
+
+		h.service.start();
+		await vi.advanceTimersByTimeAsync(3 * 60 * 1000);
+
+		expect(h.service.snapshot().state).toBe('available');
+		expect(h.fireDownloaded()).toBeUndefined();
+		expect(h.service.snapshot().state).toBe('available');
+	});
+
+	test('a later check re-reports rather than sticking on the first answer', async () => {
+		const h = harness({
+			preconditions: { capability: 'check-only', failure: null },
+		});
+		await h.service.checkNow();
+
+		const second = await h.service.checkNow();
+
+		expect(second.state).toBe('available');
 	});
 });

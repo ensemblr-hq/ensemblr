@@ -16,7 +16,7 @@ const PRIMARY: WorkspaceOpenTarget = {
 	kind: 'editor',
 	label: 'VS Code',
 	numberShortcutLabel: '1',
-	shortcutLabel: '⌘O',
+	shortcutChord: { key: 'O', modifiers: ['mod'] },
 };
 
 const COPY: WorkspaceOpenTarget = {
@@ -27,7 +27,7 @@ const COPY: WorkspaceOpenTarget = {
 	kind: 'utility',
 	label: 'Copy path',
 	numberShortcutLabel: '2',
-	shortcutLabel: '⌘⇧C',
+	shortcutChord: { key: 'C', modifiers: ['mod', 'shift'] },
 };
 
 test('labelled split button invokes the primary target and shows its label', () => {

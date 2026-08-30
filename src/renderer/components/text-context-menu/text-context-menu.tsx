@@ -21,8 +21,8 @@ import {
 } from '@/renderer/components/ui/dropdown-menu';
 import { cn } from '@/renderer/lib/utils';
 import type { TextContextMenuTarget } from '@/shared/ipc/contracts/text-editing';
+import { formatChord } from '@/shared/keymap';
 import type { TextEditCommand } from '@/shared/text-edit-commands';
-
 import {
 	addWordToDictionary,
 	copyText,
@@ -271,13 +271,13 @@ export function TextContextMenu({ children }: { children: ReactNode }) {
 								icon={Undo2Icon}
 								label={t('common:actions.undo', 'Undo')}
 								onSelect={() => runCommand('undo')}
-								shortcut='⌘Z'
+								shortcut={formatChord(['mod'], 'Z')}
 							/>
 							<MenuAction
 								icon={Redo2Icon}
 								label={t('common:actions.redo', 'Redo')}
 								onSelect={() => runCommand('redo')}
-								shortcut='⇧⌘Z'
+								shortcut={formatChord(['shift', 'mod'], 'Z')}
 							/>
 							<DropdownMenuSeparator />
 							<MenuAction
@@ -285,7 +285,7 @@ export function TextContextMenu({ children }: { children: ReactNode }) {
 								icon={ScissorsIcon}
 								label={t('common:actions.cut', 'Cut')}
 								onSelect={() => runCommand('cut')}
-								shortcut='⌘X'
+								shortcut={formatChord(['mod'], 'X')}
 							/>
 						</>
 					) : null}
@@ -294,7 +294,7 @@ export function TextContextMenu({ children }: { children: ReactNode }) {
 						icon={CopyIcon}
 						label={t('common:actions.copy', 'Copy')}
 						onSelect={() => (isEditable ? runCommand('copy') : copySelection())}
-						shortcut='⌘C'
+						shortcut={formatChord(['mod'], 'C')}
 					/>
 					{isEditable ? (
 						<MenuAction
@@ -302,7 +302,7 @@ export function TextContextMenu({ children }: { children: ReactNode }) {
 							icon={ClipboardIcon}
 							label={t('common:actions.paste', 'Paste')}
 							onSelect={() => runCommand('paste')}
-							shortcut='⌘V'
+							shortcut={formatChord(['mod'], 'V')}
 						/>
 					) : null}
 					<DropdownMenuSeparator />
@@ -313,7 +313,7 @@ export function TextContextMenu({ children }: { children: ReactNode }) {
 						onSelect={() =>
 							isEditable ? runCommand('selectAll') : selectScopeContents()
 						}
-						shortcut={isEditable ? '⌘A' : undefined}
+						shortcut={isEditable ? formatChord(['mod'], 'A') : undefined}
 					/>
 				</DropdownMenuContent>
 			</DropdownMenu>

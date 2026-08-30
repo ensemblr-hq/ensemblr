@@ -30,6 +30,8 @@ export const SETUP_LOG_LABEL_TEXT: Record<
 		t('common:setup-check.log.executable-path', 'Executable path'),
 	'first-jsonl-frame': (t) =>
 		t('common:setup-check.log.first-jsonl-frame', 'First JSONL frame'),
+	'keyring-backend': (t) =>
+		t('common:setup-check.log.keyring-backend', 'Keyring backend'),
 	'masked-secrets': (t) =>
 		t('common:setup-check.log.masked-secrets', 'Masked secrets'),
 	'model-count': (t) => t('common:setup-check.log.model-count', 'Model count'),

@@ -197,6 +197,7 @@
 			"retry-pi-provider-model": "Retry provider/model check",
 			"retry-pi-rpc": "Retry Pi RPC check",
 			"retry-root-directory": "Retry root check",
+			"retry-secret-storage": "Retry secret storage check",
 			"run-claude-login": "Run {{command}}",
 			"run-gh-auth-login": "Run gh auth login",
 			"select-claude-executable": "Select {{provider}} executable",
@@ -256,6 +257,7 @@
 			"pi-executable-ready-no-probe": "Pi executable selected from {{source}}: {{path}}. No version/help probe ran.",
 			"pi-executable-ready-with-probe": "Pi executable selected from {{source}}: {{path}}. {{probeKind}} probe returned: {{probeDetail}}",
 			"pi-executable-unknown-error": "Unknown Pi executable check error.",
+			"pi-models-none": "Pi listed no usable models. Configure at least one provider in Pi, then retry.",
 			"pi-models-ready": "Pi listed {{modelCount}} models across {{providerCount}} providers.",
 			"pi-models-unknown-error": "Unknown Pi provider/model check error.",
 			"pi-models-unverified": "Pi provider/model readiness could not be verified.",
@@ -263,6 +265,10 @@
 			"pi-rpc-ready": "Pi RPC startup produced a valid {{frameType}} frame from {{cwd}}.",
 			"pi-rpc-unknown-error": "Unknown Pi RPC check error.",
 			"root-directory-ready": "Ensemblr root is ready at {{path}}.",
+			"secret-storage-encrypted": "Secrets are encrypted by the {{backend}} keyring.",
+			"secret-storage-plaintext": "No keyring daemon answered, so stored secrets are only obfuscated rather than encrypted. Start gnome-keyring or KWallet and restart Ensemblr.",
+			"secret-storage-unavailable": "No OS keyring is available, so secrets cannot be saved. Start a keyring daemon (gnome-keyring or KWallet) and retry.",
+			"secret-storage-unknown-error": "Unknown secret storage check error.",
 			"shell-fallback-environment": "Commands launch successfully, but shell environment resolution used a fallback.",
 			"shell-ready": "Commands launch successfully with the shell-derived environment.",
 			"shell-smoke-failed": "The process launch smoke check failed.",
@@ -279,6 +285,7 @@
 			"database-path": "Database path",
 			"executable-path": "Executable path",
 			"first-jsonl-frame": "First JSONL frame",
+			"keyring-backend": "Keyring backend",
 			"masked-secrets": "Masked secrets",
 			"model-count": "Model count",
 			"pi-probe": "{{kind}} probe",
@@ -322,6 +329,7 @@
 			"pi-provider-model": "Pi provider and model readiness",
 			"pi-rpc": "Pi RPC startup",
 			"root-directory": "Root directory",
+			"secret-storage": "Secret storage",
 			"shell-process-launch": "Shell and process launch",
 			"sqlite-database": "SQLite database"
 		}
@@ -427,7 +435,13 @@
 		"workspace-count_other": "{{count}} workspaces"
 	},
 	"update": {
+		"available": {
+			"description": "Ensemblr does not install this one itself — download it from the release page.",
+			"open-release": "Open the release page",
+			"title": "Ensemblr {{version}} is available"
+		},
 		"check-failed": "The update check failed.",
+		"checking": "Checking for updates…",
 		"disabled": "Automatic updates are off. Turn them on in Settings → General.",
 		"downloading": "Downloading Ensemblr {{version}}…",
 		"ready": {

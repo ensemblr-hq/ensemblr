@@ -3,6 +3,7 @@ import type {
 	SetupRemediationAction,
 } from '../../shared/ipc/contracts/setup';
 import type { PiExecutableService, PiExecutableSnapshot } from '../pi-runtime';
+import { describePiProviderModels } from '../pi-runtime/pi-provider-models.ts';
 import type {
 	PiAgentDirectorySnapshot,
 	PiAgentDirectorySource,
@@ -157,21 +158,7 @@ export function getPiProviderModelCheck({
 				providerModels.status === 'success' ? 'success' : 'failure';
 
 			return {
-				...(status === 'success'
-					? authoredDetail(
-							'pi-models-ready',
-							`Pi listed ${providerModels.modelCount} models across ${providerModels.providerCount} providers.`,
-							{
-								modelCount: providerModels.modelCount,
-								providerCount: providerModels.providerCount,
-							},
-						)
-					: providerModels.failure?.message
-						? { detail: providerModels.failure.message }
-						: authoredDetail(
-								'pi-models-unverified',
-								'Pi provider/model readiness could not be verified.',
-							)),
+				...describePiProviderModels(providerModels),
 				logs: createPiProviderModelLogs(providerModels),
 				remediationActions: [
 					{

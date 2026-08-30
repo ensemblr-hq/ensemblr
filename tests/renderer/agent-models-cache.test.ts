@@ -7,7 +7,7 @@ import {
 import type { AgentModelCatalog } from '../../src/shared/ipc/contracts/agent-models';
 import { asModelVendorId } from '../../src/shared/ipc/contracts/agent-models';
 
-const KEY = 'ensemblr_pref_pi_models_snapshot';
+const KEY = 'ensemblr_pref_pi_models_snapshot_v2';
 
 /** Minimal Map-backed Storage for deterministic, DOM-free tests. */
 function fakeStorage(initial: Record<string, string> = {}): Storage {

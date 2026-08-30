@@ -8,6 +8,7 @@ import {
 	BrowserWindow,
 	dialog,
 	ipcMain,
+	safeStorage,
 	shell,
 } from 'electron';
 import {
@@ -16,6 +17,7 @@ import {
 	parseAskUserQuestionReply,
 } from '../shared/agent-control.ts';
 import type { AgentProviderId } from '../shared/agent-provider.ts';
+import { DEFAULT_APP_SETTINGS } from '../shared/config.ts';
 import {
 	type AppLanguage,
 	FALLBACK_LANGUAGE,
@@ -36,6 +38,7 @@ import type {
 import type { UpdateStatusChangedBroadcast } from '../shared/ipc/contracts/update';
 import type { WorkspaceFilesChangedBroadcast } from '../shared/ipc/contracts/workspace-files';
 import { scrollbackMbToBytes } from '../shared/terminal.ts';
+import { resolveWindowChrome } from '../shared/window-chrome.ts';
 import {
 	type AgentControlService,
 	type BoardStatusStore,
@@ -76,6 +79,7 @@ import {
 	electronNotify,
 	electronPowerControls,
 } from './agent-runtime/electron-activity-bindings';
+import { readLinuxBattery } from './agent-runtime/linux-battery';
 import { readMacosBattery } from './agent-runtime/macos-battery';
 import { createProvisionalWorkspaceNaming } from './agent-runtime/naming/provisional-workspace-naming';
 import { createSessionNaming } from './agent-runtime/naming/session-naming';
@@ -83,10 +87,12 @@ import { resolveNotificationTarget } from './agent-runtime/notification-target';
 import { createSessionSummaryWriter } from './agent-runtime/session-summary-writer';
 import { resolveAgentSkillBundle } from './agent-skills';
 import { createHarnessDetectionService } from './agents';
+import { applyLinuxDesktopIdentity } from './app/linux-desktop-identity';
 import { createMainWindow } from './app/main-window';
 import type { QuitExit } from './app/quit-coordinator';
 import { createQuitCoordinator } from './app/quit-coordinator';
 import { createQuitGuard } from './app/quit-guard';
+import { resolveUserDataDirectory } from './app/user-data-location';
 import { createMainWindowStateStore } from './app/window-state';
 import { createChatTabService } from './chat-tabs/chat-tab-service.ts';
 import { persistTerminalAgentSessionId } from './chat-tabs/persist-terminal-agent-session.ts';
@@ -129,6 +135,7 @@ import {
 	type InfisicalService,
 } from './infisical';
 import { type IpcHandlersHandle, registerIpcHandlers } from './ipc';
+import { trackWindowMaximizedState } from './ipc/handlers/window.ts';
 import { readPermissionModeFromSnapshot } from './ipc/permission-gate.ts';
 import {
 	createLinearAssetProxy,
@@ -182,7 +189,10 @@ import {
 	withArchiveScriptBeforeArchive,
 	withSetupScriptOnCreate,
 } from './scripts';
-import { createMacosKeychainSecretStore } from './secrets';
+import {
+	createMacosKeychainSecretStore,
+	createSafeStorageSecretStore,
+} from './secrets';
 import { createSetupDiagnosticsService } from './setup';
 import {
 	createEnsemblrDatabaseService,
@@ -217,9 +227,6 @@ const isDev = !app.isPackaged;
 // live in different namespaces (dotfile path segment, reverse-DNS service id)
 // and carry their own dev markers below.
 const DEV_SUFFIX = ' (DEV)';
-// Product name of the release channel, and therefore the directory Electron
-// derives userData from. Mirrors APP_NAMES.release in forge.config.ts.
-const RELEASE_PRODUCT_NAME = 'Ensemblr';
 // The unpackaged dev build (`electron-forge start`) gets the explicit (DEV)
 // suffix so it reads its isolated userData below. A *packaged* build keeps the
 // product name forge baked in from its build channel (Ensemblr / Ensemblr
@@ -231,6 +238,12 @@ const RELEASE_PRODUCT_NAME = 'Ensemblr';
 if (isDev) {
 	app.setName(`Ensemblr${DEV_SUFFIX}`);
 }
+
+// The Linux counterpart of the identity above: the product name drives the Dock
+// and Launch Services on macOS, the desktop-entry name drives the XDG app id and
+// `WM_CLASS` on Linux. Runs for dev too, so a dogfooding window is as
+// rule-addressable as a packaged one.
+applyLinuxDesktopIdentity();
 
 // A packaged dogfood channel is the same install wearing a different name, so
 // it opens the release's state rather than a blank one. The SQLite database and
@@ -244,14 +257,25 @@ if (isDev) {
 // once was never safe. This amends ADR 0032, whose bundle-id split stands.
 // `setPath` throws when the directory does not exist, which is the ordinary case
 // on a machine that installed a dogfood channel before ever installing a
-// release, so create it first.
-if (!isDev) {
-	const sharedUserData = path.join(
-		app.getPath('appData'),
-		RELEASE_PRODUCT_NAME,
-	);
-	mkdirSync(sharedUserData, { recursive: true });
-	app.setPath('userData', sharedUserData);
+// release, so create it first. It also has to run before `ready`: `sessionData`
+// defaults to `userData`, and Electron only reads it once.
+//
+// Resolved from the config path, which is why that pair is derived here rather
+// than beside the other dev paths further down.
+const prodConfigPath = resolveEnsemblrConfigPath();
+const devConfigPath = path.join(
+	`${path.dirname(prodConfigPath)}-dev`,
+	path.basename(prodConfigPath),
+);
+const userDataDirectory = resolveUserDataDirectory({
+	appDataPath: app.getPath('appData'),
+	configPath: isDev ? devConfigPath : prodConfigPath,
+	isDev,
+	platform: process.platform,
+});
+if (userDataDirectory) {
+	mkdirSync(userDataDirectory, { recursive: true });
+	app.setPath('userData', userDataDirectory);
 }
 
 // A second launch of the packaged app — most often a spawned login shell that
@@ -283,33 +307,50 @@ if (!hasSingleInstanceLock) {
 // the prod path changes. Each keeps its own dev marker in the namespace the
 // prod path uses: the DB data dir is suffixed ` (DEV)`, while the `.config`
 // dotfile dir takes an `ensemblr-dev` sibling (spaces/parens don't belong in a
-// dotfile path segment).
+// dotfile path segment) — that pair is derived above, because the Linux
+// userData directory hangs off it.
 const prodDatabasePath = resolveDefaultDatabasePath();
 const devDatabasePath = path.join(
 	path.dirname(prodDatabasePath) + DEV_SUFFIX,
 	path.basename(prodDatabasePath),
 );
-const prodConfigPath = resolveEnsemblrConfigPath();
-const devConfigPath = path.join(
-	`${path.dirname(prodConfigPath)}-dev`,
-	path.basename(prodConfigPath),
-);
 const devRootDirectory = path.join(os.homedir(), `Ensemblr${DEV_SUFFIX}`);
 const devKeychainService = 'dev.ensemblr.app.secret-store.dev';
 
 /**
- * Builds the macOS Keychain secret store shared by every service, swapping in
- * the isolated dev keychain service name when running the unpackaged dev build.
+ * Builds the platform's secret store, shared by every service: the macOS
+ * Keychain on darwin, Electron's `safeStorage` on Linux. Both swap in the
+ * isolated dev service name when running the unpackaged dev build, so a dev
+ * build never reads or overwrites the release's entries.
  * @param database - Open SQLite handle the store persists its metadata into.
- * @returns The secret store, or `null` on non-darwin platforms.
+ * @returns The secret store, or `null` on a platform with neither backend.
  */
-const createSecretStore = (database: DatabaseSync) =>
-	process.platform === 'darwin'
-		? createMacosKeychainSecretStore({
-				database,
-				...(isDev ? { serviceName: devKeychainService } : {}),
-			})
-		: null;
+const createSecretStore = (database: DatabaseSync) => {
+	const serviceNameOverride = isDev ? { serviceName: devKeychainService } : {};
+
+	if (process.platform === 'darwin') {
+		return createMacosKeychainSecretStore({
+			database,
+			...serviceNameOverride,
+		});
+	}
+
+	if (process.platform === 'linux') {
+		return createSafeStorageSecretStore({ database, ...serviceNameOverride });
+	}
+
+	return null;
+};
+
+/**
+ * Reads the battery through whichever mechanism the platform offers, so the
+ * power-save blocker releases on a draining laptop everywhere rather than only
+ * on macOS. A platform with neither reader reports `null`, which the monitor
+ * treats as "no battery limit".
+ * @returns The current battery snapshot, or `null` when it cannot be read.
+ */
+const readPlatformBattery = () =>
+	process.platform === 'linux' ? readLinuxBattery() : readMacosBattery();
 
 const configService = createEnsemblrConfigService(
 	isDev ? { configPath: devConfigPath } : {},
@@ -334,7 +375,7 @@ const agentActivityMonitor = createAgentActivityMonitor({
 	isConciergeOnScreen: () => activeChatStore.isConciergeOnScreen(),
 	notify: electronNotify,
 	powerControls: electronPowerControls,
-	readBattery: readMacosBattery,
+	readBattery: readPlatformBattery,
 	/** Resolves the language notification copy is rendered in. */
 	readLanguage: () => resolveAppLanguage(),
 	/** Reads the latest app settings so the monitor can gate itself live. */
@@ -1328,6 +1369,17 @@ const mainWindowStateStore = createMainWindowStateStore({
 });
 
 /**
+ * The chrome the live window was constructed with. `titleBarStyle` is
+ * construct-time, so this is the only honest answer for the renderer: reading
+ * the setting again would report a preference the window predates, and the
+ * shell would inset for a title bar that is not there.
+ */
+let activeWindowChrome = resolveWindowChrome(
+	process.platform,
+	DEFAULT_APP_SETTINGS.appearance.titleBar,
+);
+
+/**
  * Opens the workbench window and re-announces any questionnaire still waiting on
  * the user. A renderer keeps its pending questions in memory only, and an
  * `askUserQuestion` call has no timeout to fall back on, so a window that
@@ -1338,7 +1390,15 @@ const mainWindowStateStore = createMainWindowStateStore({
  * fires the window is destroyed, and the dialog has nothing left to attach to.
  */
 function openMainWindow(): void {
-	const window = createMainWindow({ windowStateStore: mainWindowStateStore });
+	activeWindowChrome = resolveWindowChrome(
+		process.platform,
+		appSettingsService.read().appearance.titleBar,
+	);
+	const window = createMainWindow({
+		titleBar: activeWindowChrome.titleBar,
+		windowStateStore: mainWindowStateStore,
+	});
+	trackWindowMaximizedState(window);
 	window.webContents.on('did-finish-load', () => {
 		for (const payload of askUserQuestionCoordinator.openAsks()) {
 			window.webContents.send(
@@ -1390,12 +1450,33 @@ function moveRepositoryScriptsIntoCommittedConfig(): void {
 	}
 }
 
+/**
+ * Lets `safeStorage` fall back to its hardcoded key when no keyring daemon
+ * answers, which is what makes ADR 0056's "a missing keyring is a warning, not
+ * a crash" true rather than aspirational.
+ *
+ * Without it `isEncryptionAvailable()` stays false on a KWallet-less session and
+ * every store and read throws, so Linear, Infisical, dictation and secret
+ * workspace environment variables all hard-fail on the ADR's own target host.
+ * The reduced protection is not silent: the `secret-storage` setup check reads
+ * the selected backend and reports `basic_text` as a warning.
+ */
+function allowPlainTextSecretFallback(): void {
+	if (process.platform !== 'linux') {
+		return;
+	}
+
+	safeStorage.setUsePlainTextEncryption(true);
+}
+
 app.whenReady().then(() => {
 	// The instance that lost the single-instance lock is already quitting; skip
 	// state loading and window creation so it never touches shared userData.
 	if (!hasSingleInstanceLock) {
 		return;
 	}
+
+	allowPlainTextSecretFallback();
 
 	configService.load();
 	databaseService.open();
@@ -1495,7 +1576,9 @@ app.whenReady().then(() => {
 		},
 		menuContextStore,
 		rebuildMenu,
+		readWindowChrome: () => activeWindowChrome,
 		repositoryConfigService,
+		requestRelaunch: () => quitCoordinator.requestRelaunch(),
 		rootDirectoryService,
 		scriptLifecycleService,
 		setWorkspaceBaseBranchService,
@@ -1582,6 +1665,9 @@ function beginAgentShutdown(exit: QuitExit): void {
 		if (exit === 'install-update') {
 			autoUpdater.quitAndInstall();
 			return;
+		}
+		if (exit === 'relaunch') {
+			app.relaunch();
 		}
 		app.quit();
 	})();

@@ -36,14 +36,17 @@ export interface KeyboardEventLike {
 /**
  * Detect whether the current platform is macOS, preferring the browser
  * `navigator.platform` and falling back to `process.platform`.
+ *
+ * Matches `Darwin` as well as `Mac`: Electron's renderer reports `MacIntel`,
+ * but a DOM emulator reports `X11; Darwin arm64`, and reading that as "not a
+ * Mac" would render `Ctrl+…` in every component test on a Mac. An empty
+ * `navigator.platform` is treated as unknown rather than as a negative, so the
+ * `process.platform` fallback still gets its say.
  * @returns True when running on macOS
  */
 function detectIsMac(): boolean {
-	if (
-		typeof navigator !== 'undefined' &&
-		typeof navigator.platform === 'string'
-	) {
-		return /Mac/i.test(navigator.platform);
+	if (typeof navigator !== 'undefined' && navigator.platform) {
+		return /Mac|Darwin/i.test(navigator.platform);
 	}
 	if (typeof process !== 'undefined' && process.platform === 'darwin') {
 		return true;
@@ -211,9 +214,36 @@ const MODIFIER_LABEL_OTHER: Record<Modifier, string> = {
 	shift: 'Shift',
 };
 
+/** macOS renders modifiers in the fixed order ⌃⌥⇧⌘, whatever the chord holds. */
+const MODIFIER_ORDER_MAC: readonly Modifier[] = ['ctrl', 'alt', 'shift', 'mod'];
+
+/**
+ * Windows and Linux put Ctrl first — `Ctrl+Shift+Z`, never `Shift+Ctrl+Z`. Both
+ * `mod` and `ctrl` label as `Ctrl` here, so a chord holding both collapses to
+ * one label rather than repeating it.
+ */
+const MODIFIER_ORDER_OTHER: readonly Modifier[] = [
+	'mod',
+	'ctrl',
+	'alt',
+	'shift',
+];
+
+/**
+ * Named keys macOS writes as a glyph. Elsewhere the word is the convention, so
+ * the table applies on darwin only.
+ */
+const KEY_GLYPH_MAC: Record<string, string> = {
+	Backspace: '⌫',
+	Delete: '⌦',
+	Enter: '↵',
+	Escape: '⎋',
+	Tab: '⇥',
+};
+
 /**
  * Normalize a binding key for display, upper-casing single characters and
- * leaving named keys (`Enter`, `ArrowUp`) untouched.
+ * rendering the named keys macOS spells as glyphs.
  * @param key - The binding key to format
  * @returns The display-ready key label
  */
@@ -221,30 +251,50 @@ function formatKey(key: string): string {
 	if (key.length === 1) {
 		return key.toUpperCase();
 	}
+	if (isMac()) {
+		return KEY_GLYPH_MAC[key] ?? key;
+	}
 	return key;
+}
+
+/**
+ * Human-readable label for a chord that is not a registered shortcut — a hint
+ * chip beside a dialog's confirm button, a menu row's trailing accelerator.
+ *
+ * Every such label used to be a literal `⌘…`, which reads as a lie on a machine
+ * with no Command key. Routing them through here is what makes them say `Ctrl+…`
+ * off macOS. Registered shortcuts keep using {@link formatShortcut}.
+ * @param modifiers - Modifiers held, in any order
+ * @param key - The key pressed, e.g. `Enter`, `U`, `,`
+ * @returns The display-ready chord, e.g. `⌘↵` on macOS or `Ctrl+Enter` elsewhere
+ */
+export function formatChord(
+	modifiers: readonly Modifier[],
+	key: string,
+): string {
+	const mac = isMac();
+	const labels = mac ? MODIFIER_LABEL_MAC : MODIFIER_LABEL_OTHER;
+	const held = new Set(modifiers);
+	const ordered = (mac ? MODIFIER_ORDER_MAC : MODIFIER_ORDER_OTHER).filter(
+		(modifier) => held.has(modifier),
+	);
+	const parts = Array.from(
+		new Set(ordered.map((modifier) => labels[modifier])),
+	);
+	parts.push(formatKey(key));
+	return parts.join(mac ? '' : '+');
 }
 
 /**
  * Human-readable label for the first binding of a shortcut. Used in tooltips
  * and hint chips. Returns e.g. `⌘L` on macOS or `Ctrl+L` elsewhere.
+ * @param id - Identifier of the shortcut to label
+ * @returns The display-ready chord, or an empty string when it has no binding
  */
 export function formatShortcut(id: ShortcutId): string {
 	const binding = defOf(id).bindings[0];
 	if (!binding) {
 		return '';
 	}
-	const mac = isMac();
-	const labels = mac ? MODIFIER_LABEL_MAC : MODIFIER_LABEL_OTHER;
-	const separator = mac ? '' : '+';
-	const parts: string[] = [];
-	// Mac convention orders ⌃⌥⇧⌘; elsewhere Ctrl comes first.
-	const order: readonly Modifier[] = ['ctrl', 'alt', 'shift', 'mod'];
-	const modifierSet = new Set<Modifier>(binding.modifiers ?? []);
-	for (const mod of order) {
-		if (modifierSet.has(mod)) {
-			parts.push(labels[mod]);
-		}
-	}
-	parts.push(formatKey(binding.key));
-	return parts.join(separator);
+	return formatChord(binding.modifiers ?? [], binding.key);
 }

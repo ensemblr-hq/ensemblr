@@ -30,6 +30,10 @@ import {
 	SceneSection,
 	SceneToggle,
 } from './scene-chrome.tsx';
+import {
+	SceneWindowControls,
+	useSceneWindowChrome,
+} from './scene-window-chrome.tsx';
 
 /** The three presentations, in the order the panel's own controls cycle them. */
 const PRESENTATIONS: readonly ConciergePresentation[] = [
@@ -86,6 +90,9 @@ function ConciergeStage() {
 		useState<ConciergeFixtureTranscript>('conversation');
 	const [pressured, setPressured] = useState(false);
 	const [dictating, setDictating] = useState(false);
+	const [drawsOwnControls, setDrawsOwnControls] = useState(false);
+
+	useSceneWindowChrome(drawsOwnControls);
 
 	useEffect(() => {
 		setPresentation(presentation);
@@ -166,6 +173,12 @@ function ConciergeStage() {
 					<ControlGroup label='dictation configured'>
 						<SceneOnOff isOn={dictating} onChange={chooseDictation} />
 					</ControlGroup>
+					<ControlGroup label='Linux window controls'>
+						<SceneOnOff
+							isOn={drawsOwnControls}
+							onChange={setDrawsOwnControls}
+						/>
+					</ControlGroup>
 				</div>
 				<span className='font-mono text-muted-foreground text-xxs'>
 					drag the header to move it, any edge or corner to resize it — pick the
@@ -187,6 +200,7 @@ function ConciergeStage() {
 				</SceneSection>
 				<ConciergeLauncher />
 			</SidebarInset>
+			<SceneWindowControls isEnabled={drawsOwnControls} />
 		</>
 	);
 }

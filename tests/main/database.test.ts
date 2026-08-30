@@ -38,6 +38,8 @@ const EXPECTED_MIGRATIONS = [
 	'020_linear_comment_freshness',
 	'021_restore_archived_repositories',
 	'022_concierge',
+	'023_secret_value_blob',
+	'024_secret_keyring_backend',
 ];
 
 const AGENT_VOCABULARY_MIGRATION_VERSION = 14;
@@ -1149,7 +1151,18 @@ test('stores only secret metadata and keychain references in SQLite', (t) => {
 	);
 });
 
-test('schema does not define raw secret value columns', (t) => {
+// The one column allowed to hold secret material, and only because it holds
+// ciphertext: Linux has no Keychain, so `safeStorage` encrypts the value and
+// hands back opaque bytes with nowhere else to live (migration 023, ADR 0056).
+// `secret_keyring_backend` matches the pattern but holds a backend id such as
+// `kwallet6` (migration 024), which is metadata, not a secret. Every other match
+// is a plaintext column and a bug.
+const CIPHERTEXT_COLUMNS = [
+	{ column_name: 'secret_value', table_name: 'secret_metadata' },
+	{ column_name: 'secret_keyring_backend', table_name: 'secret_metadata' },
+];
+
+test('schema defines no secret value column but the encrypted one', (t) => {
 	const fixture = createTestDatabasePath();
 	t.after(fixture.cleanup);
 
@@ -1167,11 +1180,210 @@ test('schema does not define raw secret value columns', (t) => {
 		)
 		.all() as Array<{ column_name: string; table_name: string }>;
 
-	const sensitiveColumns = columns.filter(({ column_name }) =>
-		/secret|token|password|credential/i.test(column_name),
+	const sensitiveColumns = columns
+		.filter(({ column_name }) =>
+			/secret|token|password|credential/i.test(column_name),
+		)
+		.map(({ column_name, table_name }) => ({ column_name, table_name }));
+
+	assert.deepEqual(sensitiveColumns, CIPHERTEXT_COLUMNS);
+});
+
+test('the encrypted secret column is a nullable BLOB', (t) => {
+	const fixture = createTestDatabasePath();
+	t.after(fixture.cleanup);
+
+	const connection = openEnsemblrDatabase({
+		databasePath: fixture.databasePath,
+	});
+	t.after(() => connection.database.close());
+
+	const column = connection.database
+		.prepare(
+			`SELECT type, "notnull"
+			 FROM pragma_table_info('secret_metadata')
+			 WHERE name = 'secret_value'`,
+		)
+		.get() as { notnull: number; type: string } | undefined;
+
+	// BLOB, not TEXT: `safeStorage.encryptString` returns bytes that are not
+	// valid UTF-8. Nullable because a Keychain-backed row keeps its value outside
+	// the database entirely.
+	assert.equal(column?.type, 'BLOB');
+	assert.equal(column?.notnull, 0);
+});
+
+test('migration 023 carries every existing Keychain row through the rebuild', (t) => {
+	const fixture = createTestDatabasePath();
+	t.after(fixture.cleanup);
+
+	const seeded = openEnsemblrDatabase({ databasePath: fixture.databasePath });
+	seeded.database.exec(`
+DELETE FROM secret_metadata;
+
+INSERT INTO secret_metadata (
+	id, scope, scope_id, name, backend, service, account,
+	display_name, masked_display, character_count, metadata_json,
+	created_at, updated_at
+)
+VALUES (
+	'secret-kept', 'workspace', 'ws-1', 'ANTHROPIC_API_KEY', 'macos-keychain',
+	'dev.ensemblr.app.secret-store', 'workspace:ws-1:ANTHROPIC_API_KEY',
+	'Anthropic key', 'sk-…tail', 42, '{"origin":"settings"}',
+	'2026-01-01T00:00:00.000Z', '2026-02-02T00:00:00.000Z'
+);
+`);
+	seeded.database
+		.prepare('DELETE FROM schema_migrations WHERE id IN (?, ?)')
+		.run('023_secret_value_blob', '024_secret_keyring_backend');
+	seeded.database.close();
+
+	const connection = openEnsemblrDatabase({
+		databasePath: fixture.databasePath,
+	});
+	t.after(() => connection.database.close());
+
+	// Field for field, not just "a row survived": the rebuild's INSERT…SELECT
+	// lists thirteen columns, and two adjacent TEXT ones transposed would corrupt
+	// every upgraded row while leaving a schema-only assertion green.
+	assert.deepEqual(
+		readRows(
+			connection.database,
+			`SELECT id, scope, scope_id, name, backend, service, account,
+			        display_name, masked_display, character_count, metadata_json,
+			        secret_value, secret_keyring_backend, created_at, updated_at
+			 FROM secret_metadata`,
+		),
+		[
+			{
+				account: 'workspace:ws-1:ANTHROPIC_API_KEY',
+				backend: 'macos-keychain',
+				character_count: 42,
+				created_at: '2026-01-01T00:00:00.000Z',
+				display_name: 'Anthropic key',
+				id: 'secret-kept',
+				masked_display: 'sk-…tail',
+				metadata_json: '{"origin":"settings"}',
+				name: 'ANTHROPIC_API_KEY',
+				scope: 'workspace',
+				scope_id: 'ws-1',
+				secret_keyring_backend: null,
+				secret_value: null,
+				service: 'dev.ensemblr.app.secret-store',
+				updated_at: '2026-02-02T00:00:00.000Z',
+			},
+		],
 	);
 
-	assert.deepEqual(sensitiveColumns, []);
+	// The rebuild drops and recreates the table, so both UNIQUE constraints and
+	// the scope index have to come back with it.
+	assert.throws(() =>
+		connection.database
+			.prepare(
+				`INSERT INTO secret_metadata (id, scope, scope_id, name, backend, service, account, display_name, masked_display)
+				 VALUES ('dupe-lookup', 'workspace', 'ws-1', 'ANTHROPIC_API_KEY', 'macos-keychain', 'other.service', 'other-account', '', '')`,
+			)
+			.run(),
+	);
+	assert.throws(() =>
+		connection.database
+			.prepare(
+				`INSERT INTO secret_metadata (id, scope, scope_id, name, backend, service, account, display_name, masked_display)
+				 VALUES ('dupe-reference', 'app', '', 'OTHER_KEY', 'macos-keychain', 'dev.ensemblr.app.secret-store', 'workspace:ws-1:ANTHROPIC_API_KEY', '', '')`,
+			)
+			.run(),
+	);
+	assert.equal(
+		readRows(
+			connection.database,
+			"SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'idx_secret_metadata_scope'",
+		).length,
+		1,
+	);
+});
+
+test('migration 023 admits the safe-storage backend the CHECK previously rejected', (t) => {
+	const fixture = createTestDatabasePath();
+	t.after(fixture.cleanup);
+
+	const connection = openEnsemblrDatabase({
+		databasePath: fixture.databasePath,
+	});
+	t.after(() => connection.database.close());
+
+	connection.database
+		.prepare(
+			`INSERT INTO secret_metadata (id, scope, scope_id, name, backend, service, account, display_name, masked_display, secret_value, secret_keyring_backend)
+			 VALUES ('linux-row', 'app', '', 'LINEAR_TOKEN', 'safe-storage', 'svc', 'acct', 'Linear', '…', ?, 'kwallet6')`,
+		)
+		.run(new Uint8Array([0, 159, 146, 150]));
+
+	const row = connection.database
+		.prepare(
+			"SELECT secret_value, secret_keyring_backend FROM secret_metadata WHERE id = 'linux-row'",
+		)
+		.get() as { secret_keyring_backend: string; secret_value: Uint8Array };
+
+	// Round-trips as raw bytes: the fixture is deliberately invalid UTF-8, which
+	// is exactly what `safeStorage.encryptString` returns and what a TEXT column
+	// would have mangled.
+	assert.ok(row.secret_value instanceof Uint8Array);
+	assert.deepEqual(Array.from(row.secret_value), [0, 159, 146, 150]);
+	assert.equal(row.secret_keyring_backend, 'kwallet6');
+
+	assert.throws(() =>
+		connection.database
+			.prepare(
+				`INSERT INTO secret_metadata (id, scope, scope_id, name, backend, service, account, display_name, masked_display)
+				 VALUES ('bad-backend', 'app', '', 'X', 'mock', 'svc2', 'acct2', '', '')`,
+			)
+			.run(),
+	);
+});
+
+test('migration 024 adds the keyring column without disturbing existing rows', (t) => {
+	const fixture = createTestDatabasePath();
+	t.after(fixture.cleanup);
+
+	const seeded = openEnsemblrDatabase({ databasePath: fixture.databasePath });
+	seeded.database.exec(`
+DELETE FROM secret_metadata;
+
+INSERT INTO secret_metadata (
+	id, scope, scope_id, name, backend, service, account,
+	display_name, masked_display, character_count, metadata_json
+)
+VALUES (
+	'secret-pre-024', 'app', '', 'GH_TOKEN', 'macos-keychain', 'svc', 'acct',
+	'GitHub', 'gh…ail', 40, '{}'
+);
+`);
+	seeded.database.exec(
+		'ALTER TABLE secret_metadata DROP COLUMN secret_keyring_backend',
+	);
+	seeded.database
+		.prepare('DELETE FROM schema_migrations WHERE id = ?')
+		.run('024_secret_keyring_backend');
+	seeded.database.close();
+
+	const connection = openEnsemblrDatabase({
+		databasePath: fixture.databasePath,
+	});
+	t.after(() => connection.database.close());
+
+	assert.deepEqual(
+		readRows(
+			connection.database,
+			'SELECT id, display_name, secret_keyring_backend FROM secret_metadata',
+		),
+		[
+			{
+				display_name: 'GitHub',
+				id: 'secret-pre-024',
+				secret_keyring_backend: null,
+			},
+		],
+	);
 });
 
 test('database service reports health without throwing on open', (t) => {

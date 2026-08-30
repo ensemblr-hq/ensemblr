@@ -2,12 +2,19 @@ import type { DatabaseSync } from 'node:sqlite';
 
 /** Scope a secret is bound to: the whole app, a repository, or a workspace. */
 export type SecretScope = 'app' | 'repository' | 'workspace';
-/** Storage backend a secret lives in: the macOS Keychain or the in-memory mock. */
-export type SecretBackend = 'macos-keychain' | 'mock';
+/**
+ * Storage backend a secret lives in: the macOS Keychain, Electron's
+ * `safeStorage` (Linux), or the in-memory mock.
+ */
+export type SecretBackend = 'macos-keychain' | 'mock' | 'safe-storage';
+
+/** Every backend that persists a metadata row, i.e. all but the mock. */
+export type PersistedSecretBackend = Exclude<SecretBackend, 'mock'>;
 
 /** Machine-readable failure categories for secret-store operations. */
 export type SecretStoreErrorCode =
 	| 'already-exists'
+	| 'encryption-error'
 	| 'invalid-input'
 	| 'keychain-error'
 	| 'metadata-error'
@@ -70,6 +77,32 @@ export interface MacosKeychainSecretStoreOptions {
 	serviceName?: string;
 }
 
+/**
+ * The slice of Electron's `safeStorage` the backend actually uses. Naming it
+ * lets a test supply a fake, which the module-scope `electron` namespace import
+ * otherwise makes impossible outside an Electron process.
+ */
+export type SafeStorageApi = Pick<
+	Electron.SafeStorage,
+	| 'decryptString'
+	| 'encryptString'
+	| 'getSelectedStorageBackend'
+	| 'isEncryptionAvailable'
+>;
+
+/**
+ * Options for the `safeStorage` backend. `serviceName` names no external store
+ * — the ciphertext lives in SQLite — but it still identifies the row's
+ * `(service, account)` pair, so a dev build can hold its own entries.
+ */
+export interface SafeStorageSecretStoreOptions {
+	database: DatabaseSync;
+	idFactory?: () => string;
+	now?: () => Date;
+	safeStorage?: SafeStorageApi;
+	serviceName?: string;
+}
+
 /** Options for the mock backend. */
 export interface MockSecretStoreOptions {
 	idFactory?: () => string;
@@ -91,7 +124,7 @@ export interface NormalizedWriteInput extends NormalizedLookup {
 	value: string;
 }
 
-/** Internal: Keychain identity `(service, account)` pair. */
+/** Internal: backend identity `(service, account)` pair. */
 export interface KeychainReference {
 	account: string;
 	service: string;

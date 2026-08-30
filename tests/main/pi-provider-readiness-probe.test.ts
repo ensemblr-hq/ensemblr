@@ -234,3 +234,29 @@ test('no check offers a retry action, whatever the outcome', async () => {
 		),
 	).not.toContain('retry');
 });
+
+test('a pi with no configured provider reports a translatable no-models detail', async () => {
+	const readiness = await createProbe(
+		createSnapshot({
+			providerModels: {
+				command: 'pi',
+				failure: {
+					code: 'no-models',
+					message:
+						'Pi listed zero usable provider models. Configure at least one provider or model, then retry.',
+				},
+				modelCount: 0,
+				models: [],
+				providerCount: 0,
+				result: null,
+				status: 'failure',
+			},
+		}),
+	).probe();
+	const providerModels = readiness.checks.find(
+		(check) => check.id === 'provider-models',
+	);
+
+	expect(providerModels?.status).toBe('failure');
+	expect(providerModels?.detailMessage?.code).toBe('pi-models-none');
+});

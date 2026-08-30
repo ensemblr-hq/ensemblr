@@ -17,45 +17,83 @@ function inputs(
 }
 
 describe('checkUpdatePreconditions', () => {
-	test('a packaged release build in /Applications may update', () => {
-		expect(checkUpdatePreconditions(inputs())).toBeNull();
+	test('a packaged release build in /Applications may install', () => {
+		expect(checkUpdatePreconditions(inputs())).toEqual({
+			capability: 'install',
+			failure: null,
+		});
 	});
 
-	test('a packaged canary build in /Applications may update', () => {
-		expect(checkUpdatePreconditions(inputs({ channel: 'canary' }))).toBeNull();
+	test('a packaged canary build in /Applications may install', () => {
+		expect(checkUpdatePreconditions(inputs({ channel: 'canary' }))).toEqual({
+			capability: 'install',
+			failure: null,
+		});
+	});
+
+	test('a packaged Linux build may check but not install', () => {
+		expect(checkUpdatePreconditions(inputs({ platform: 'linux' }))).toEqual({
+			capability: 'check-only',
+			failure: null,
+		});
+	});
+
+	test('a Linux build is not held to the /Applications rule', () => {
+		expect(
+			checkUpdatePreconditions(
+				inputs({ inApplicationsFolder: false, platform: 'linux' }),
+			),
+		).toEqual({ capability: 'check-only', failure: null });
 	});
 
 	test('the dev channel refuses — it publishes no releases to read', () => {
 		expect(checkUpdatePreconditions(inputs({ channel: 'dev' }))).toMatchObject({
-			code: 'update-unsupported-build',
+			capability: 'none',
+			failure: { code: 'update-unsupported-build' },
 		});
 	});
 
 	test('an unpackaged build refuses', () => {
 		expect(checkUpdatePreconditions(inputs({ packaged: false }))).toMatchObject(
 			{
-				code: 'update-unsupported-build',
+				capability: 'none',
+				failure: { code: 'update-unsupported-build' },
 			},
 		);
 	});
 
-	test('a non-darwin build refuses before Squirrel.Mac is reached', () => {
+	test('an unpackaged Linux build refuses rather than checking', () => {
+		expect(
+			checkUpdatePreconditions(inputs({ packaged: false, platform: 'linux' })),
+		).toMatchObject({
+			capability: 'none',
+			failure: { code: 'update-unsupported-build' },
+		});
+	});
+
+	test('a platform with neither updater refuses', () => {
 		expect(
 			checkUpdatePreconditions(inputs({ platform: 'win32' })),
-		).toMatchObject({ code: 'update-unsupported-build' });
+		).toMatchObject({
+			capability: 'none',
+			failure: { code: 'update-unsupported-build' },
+		});
 	});
 
 	test('a build outside /Applications names the fix rather than failing later', () => {
 		expect(
 			checkUpdatePreconditions(inputs({ inApplicationsFolder: false })),
-		).toMatchObject({ code: 'update-not-in-applications' });
+		).toMatchObject({
+			capability: 'none',
+			failure: { code: 'update-not-in-applications' },
+		});
 	});
 
 	test('being unpackaged outranks being outside /Applications', () => {
-		const failure = checkUpdatePreconditions(
+		const result = checkUpdatePreconditions(
 			inputs({ inApplicationsFolder: false, packaged: false }),
 		);
 
-		expect(failure?.code).toBe('update-unsupported-build');
+		expect(result.failure?.code).toBe('update-unsupported-build');
 	});
 });

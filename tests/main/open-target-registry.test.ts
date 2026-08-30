@@ -6,7 +6,10 @@ import {
 	findOpenTargetDefinition,
 	isValidBundleId,
 	OPEN_TARGET_REGISTRY,
+	resolvePlatformBehavior,
 } from '../../src/main/open-target/open-target-registry.ts';
+
+const BAD_COMMAND = 'code --wait; whoami';
 
 test('every bundle id in the curated registry passes the reverse-DNS pattern', () => {
 	const errors = collectRegistryValidationErrors();
@@ -25,12 +28,16 @@ test('rejects bundle ids with shell metacharacters', () => {
 test('collectRegistryValidationErrors reports both detection and dispatch failures', () => {
 	const errors = collectRegistryValidationErrors([
 		{
-			detection: { bundleIds: ['bad id with spaces'], kind: 'bundleId' },
-			dispatch: { bundleId: 'bad id with spaces', kind: 'open-bundle' },
 			iconName: 'lucide:file-code',
 			id: 'broken',
 			kind: 'editor',
 			label: 'Broken',
+			platforms: {
+				darwin: {
+					detection: { bundleIds: ['bad id with spaces'], kind: 'bundleId' },
+					dispatch: { bundleId: 'bad id with spaces', kind: 'open-bundle' },
+				},
+			},
 		},
 	]);
 
@@ -40,6 +47,65 @@ test('collectRegistryValidationErrors reports both detection and dispatch failur
 		errors[1] ?? '',
 		/Invalid dispatch bundle id .* in target "broken"/,
 	);
+});
+
+test('collectRegistryValidationErrors rejects a Linux launcher that smuggles arguments', () => {
+	const errors = collectRegistryValidationErrors([
+		{
+			iconName: 'lucide:file-code',
+			id: 'broken-linux',
+			kind: 'editor',
+			label: 'Broken Linux',
+			platforms: {
+				linux: {
+					detection: {
+						commands: [BAD_COMMAND],
+						entryIds: ['bad entry'],
+						kind: 'linux-app',
+					},
+					dispatch: {
+						commands: [BAD_COMMAND],
+						entryIds: ['bad entry'],
+						kind: 'linux-app',
+						pathDelivery: 'argument',
+					},
+				},
+			},
+		},
+	]);
+
+	assert.equal(errors.length, 4);
+	assert.match(
+		errors[0] ?? '',
+		/Invalid detection command .* in target "broken-linux"/,
+	);
+	assert.match(
+		errors[3] ?? '',
+		/Invalid dispatch desktop entry id .* in target "broken-linux"/,
+	);
+});
+
+test('every registry entry declares behaviour for at least one platform', () => {
+	for (const definition of OPEN_TARGET_REGISTRY) {
+		assert.ok(
+			resolvePlatformBehavior(definition, 'darwin') ??
+				resolvePlatformBehavior(definition, 'linux'),
+			`target "${definition.id}" declares no platform behaviour`,
+		);
+	}
+});
+
+test('labels are unique per platform so the menu never shows the same app twice', () => {
+	for (const platform of ['darwin', 'linux'] as const) {
+		const labels = OPEN_TARGET_REGISTRY.filter((definition) =>
+			resolvePlatformBehavior(definition, platform),
+		).map((definition) => definition.label);
+		assert.equal(
+			labels.length,
+			new Set(labels).size,
+			`duplicate label on ${platform}`,
+		);
+	}
 });
 
 test('findOpenTargetDefinition returns null for unknown ids and the entry for known ids', () => {
@@ -60,4 +126,40 @@ test('registry ids are unique', () => {
 	const ids = OPEN_TARGET_REGISTRY.map((entry) => entry.id);
 	const unique = new Set(ids);
 	assert.equal(ids.length, unique.size);
+});
+
+// A file manager handed a file as a bare argument opens it with its default
+// handler — a text editor — instead of revealing it, which is the opposite of
+// what the Finder row does on macOS.
+test('every Linux file manager reveals the file rather than opening it', () => {
+	const revealDeliveries = new Set(['parent-directory', 'select-in-parent']);
+	for (const definition of OPEN_TARGET_REGISTRY) {
+		const dispatch = resolvePlatformBehavior(definition, 'linux')?.dispatch;
+		if (definition.kind !== 'file-manager' || dispatch?.kind !== 'linux-app') {
+			continue;
+		}
+		assert.ok(
+			revealDeliveries.has(dispatch.pathDelivery),
+			`file manager "${definition.id}" delivers the path as ${dispatch.pathDelivery}`,
+		);
+	}
+});
+
+// `--select` is documented by Dolphin and Nautilus and by neither Thunar nor
+// Nemo, so the flag is declared per app rather than inferred from the kind.
+test('only the file managers documenting --select declare a preselect', () => {
+	const deliveryById = new Map(
+		OPEN_TARGET_REGISTRY.map((definition) => {
+			const dispatch = resolvePlatformBehavior(definition, 'linux')?.dispatch;
+			return [
+				definition.id,
+				dispatch?.kind === 'linux-app' ? dispatch.pathDelivery : null,
+			];
+		}),
+	);
+
+	assert.equal(deliveryById.get('dolphin'), 'select-in-parent');
+	assert.equal(deliveryById.get('nautilus'), 'select-in-parent');
+	assert.equal(deliveryById.get('thunar'), 'parent-directory');
+	assert.equal(deliveryById.get('nemo'), 'parent-directory');
 });

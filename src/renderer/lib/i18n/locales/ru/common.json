@@ -205,6 +205,7 @@
 			"retry-pi-provider-model": "Повторить проверку провайдеров и моделей",
 			"retry-pi-rpc": "Повторить проверку Pi RPC",
 			"retry-root-directory": "Повторить проверку корневого каталога",
+			"retry-secret-storage": "Проверить хранилище секретов ещё раз",
 			"run-claude-login": "Выполнить {{command}}",
 			"run-gh-auth-login": "Выполнить gh auth login",
 			"select-claude-executable": "Выбрать исполняемый файл {{provider}}",
@@ -266,6 +267,7 @@
 			"pi-executable-ready-no-probe": "Исполняемый файл Pi выбран из {{source}}: {{path}}. Проверка версии или справки не выполнялась.",
 			"pi-executable-ready-with-probe": "Исполняемый файл Pi выбран из {{source}}: {{path}}. Проверка «{{probeKind}}» вернула: {{probeDetail}}",
 			"pi-executable-unknown-error": "Неизвестная ошибка проверки исполняемого файла Pi.",
+			"pi-models-none": "Pi не перечислил ни одной пригодной модели. Настройте хотя бы одного провайдера в Pi и повторите проверку.",
 			"pi-models-ready": "Pi перечислил {{modelCount}} моделей у {{providerCount}} провайдеров.",
 			"pi-models-unknown-error": "Неизвестная ошибка проверки провайдеров и моделей Pi.",
 			"pi-models-unverified": "Не удалось проверить готовность провайдеров и моделей Pi.",
@@ -273,6 +275,10 @@
 			"pi-rpc-ready": "Запуск Pi RPC выдал корректный кадр {{frameType}} из {{cwd}}.",
 			"pi-rpc-unknown-error": "Неизвестная ошибка проверки Pi RPC.",
 			"root-directory-ready": "Корневой каталог Ensemblr готов: {{path}}.",
+			"secret-storage-encrypted": "Секреты зашифрованы хранилищем ключей {{backend}}.",
+			"secret-storage-plaintext": "Ни одна служба хранения ключей не ответила, поэтому сохранённые секреты только замаскированы, а не зашифрованы. Запустите gnome-keyring или KWallet и перезапустите Ensemblr.",
+			"secret-storage-unavailable": "Хранилище ключей системы недоступно, поэтому секреты сохранить нельзя. Запустите службу хранения ключей (gnome-keyring или KWallet) и повторите проверку.",
+			"secret-storage-unknown-error": "Неизвестная ошибка проверки хранилища секретов.",
 			"shell-fallback-environment": "Команды запускаются, но при определении окружения оболочки использован резервный вариант.",
 			"shell-ready": "Команды успешно запускаются с окружением, полученным из оболочки.",
 			"shell-smoke-failed": "Проверка запуска процесса не удалась.",
@@ -289,6 +295,7 @@
 			"database-path": "Путь к базе данных",
 			"executable-path": "Путь к исполняемому файлу",
 			"first-jsonl-frame": "Первый кадр JSONL",
+			"keyring-backend": "Хранилище ключей",
 			"masked-secrets": "Скрытых секретов",
 			"model-count": "Количество моделей",
 			"pi-probe": "Проверка «{{kind}}»",
@@ -332,6 +339,7 @@
 			"pi-provider-model": "Готовность провайдеров и моделей Pi",
 			"pi-rpc": "Запуск Pi RPC",
 			"root-directory": "Корневой каталог",
+			"secret-storage": "Хранилище секретов",
 			"shell-process-launch": "Оболочка и запуск процессов",
 			"sqlite-database": "База данных SQLite"
 		}
@@ -459,7 +467,13 @@
 		"workspace-count_other": "{{count}} рабочего пространства"
 	},
 	"update": {
+		"available": {
+			"description": "Ensemblr не устанавливает это обновление сам — скачайте его со страницы релиза.",
+			"open-release": "Открыть страницу релиза",
+			"title": "Доступна версия Ensemblr {{version}}"
+		},
 		"check-failed": "Не удалось проверить обновления.",
+		"checking": "Проверка обновлений…",
 		"disabled": "Автоматическое обновление отключено. Включить можно в «Настройки → Основные».",
 		"downloading": "Загрузка Ensemblr {{version}}…",
 		"ready": {

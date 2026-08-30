@@ -56,7 +56,7 @@ export function LinearIssueDetailHeader({ issueId }: { issueId: string }) {
 	);
 
 	return (
-		<header className='native-toolbar flex h-12 shrink-0 items-center gap-2 border-border border-b px-3'>
+		<header className='native-toolbar flex shrink-0 items-center gap-2 border-border border-b px-3'>
 			<SidebarTrigger className='sidebar-collapsed-trigger' />
 			<Button asChild size='icon-sm' variant='ghost'>
 				<Link

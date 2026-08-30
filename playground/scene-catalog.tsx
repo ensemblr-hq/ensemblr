@@ -10,6 +10,7 @@ import { FailureBannerScene } from './failure-banner-preview.tsx';
 import { FilePreviewScene } from './file-preview.tsx';
 import { LinearIssueEditorScene } from './linear-issue-editor-preview.tsx';
 import { LinearIssuePropertiesScene } from './linear-issue-properties-preview.tsx';
+import { NavigationSidebarHeaderScene } from './navigation-sidebar-header-preview.tsx';
 import { OnboardingScene } from './onboarding-preview.tsx';
 import { PendingButtonsScene } from './pending-buttons-preview.tsx';
 import { ProvidersScene } from './providers-preview.tsx';
@@ -22,6 +23,7 @@ import { ToolApprovalScene } from './tool-approval-preview.tsx';
 import { TurnSummaryPreview } from './turn-summary-preview.tsx';
 import { UnreadScene } from './unread-preview.tsx';
 import { ViewersScene } from './viewers-preview.tsx';
+import { WindowControlsScene } from './window-controls-preview.tsx';
 
 /**
  * Each scene drives the shipped components with real tool payloads, so what the
@@ -162,6 +164,18 @@ export const SCENE_GROUPS = [
 				label: 'pending buttons',
 				render: () => <PendingButtonsScene />,
 				source: 'playground/pending-buttons-preview.tsx',
+			},
+			{
+				id: 'nav-header',
+				label: 'nav header',
+				render: () => <NavigationSidebarHeaderScene />,
+				source: 'playground/navigation-sidebar-header-preview.tsx',
+			},
+			{
+				id: 'window-controls',
+				label: 'window controls',
+				render: () => <WindowControlsScene />,
+				source: 'playground/window-controls-preview.tsx',
 			},
 		],
 	},

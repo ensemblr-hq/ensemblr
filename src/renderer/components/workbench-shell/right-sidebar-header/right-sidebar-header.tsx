@@ -60,7 +60,7 @@ export function RightSidebarHeader({
 
 	return (
 		<header
-			className='native-toolbar right-sidebar-header flex h-12 w-full shrink-0 items-center gap-3 border-border border-b px-3'
+			className='native-toolbar right-sidebar-header flex w-full shrink-0 items-center gap-3 border-border border-b px-3'
 			data-pr-tone={headerState.tone}
 		>
 			<div className='@container/pr-header flex min-w-0 flex-1 items-center gap-2.5'>

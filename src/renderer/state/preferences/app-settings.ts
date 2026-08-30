@@ -178,6 +178,12 @@ export const codeThemeAtom = settingAtom('appearance', 'codeTheme');
 export const monoFontAtom = settingAtom('appearance', 'monoFont');
 export const codeLigaturesAtom = settingAtom('appearance', 'codeLigatures');
 export const markdownStyleAtom = settingAtom('appearance', 'markdownStyle');
+/**
+ * Whether Ensemblr draws its own title bar or lets the desktop environment do
+ * it. Read on Linux only, and applied at window construction, so a change needs
+ * a relaunch to take effect.
+ */
+export const titleBarAtom = settingAtom('appearance', 'titleBar');
 export const terminalFontAtom = settingAtom('appearance', 'terminalFont');
 export const terminalFontSizeAtom = settingAtom(
 	'appearance',

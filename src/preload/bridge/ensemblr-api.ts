@@ -27,6 +27,7 @@ import type {
 	ChatTurnFinishedBroadcast,
 	FocusChatBroadcast,
 } from '../../shared/ipc/contracts/notifications';
+import type { WindowMaximizedBroadcast } from '../../shared/ipc/contracts/repository-navigation';
 import type {
 	TerminalLifecycleBroadcast,
 	TerminalOutputBroadcast,
@@ -60,6 +61,7 @@ type InvokeKey = Exclude<
 	| 'onTerminalOutput'
 	| 'onTextContextMenu'
 	| 'onUpdateStatusChanged'
+	| 'onWindowMaximizedChanged'
 	| 'onWorkspaceFilesChanged'
 >;
 
@@ -142,6 +144,14 @@ export function createEnsemblrApi(): EnsemblrApi {
 		conciergeContextPressure: () => invoke('conciergeContextPressure'),
 		listConciergeArtifacts: () => invoke('listConciergeArtifacts'),
 		closeWindow: () => invoke('closeWindow'),
+		minimizeWindow: () => invoke('minimizeWindow'),
+		toggleMaximizeWindow: () => invoke('toggleMaximizeWindow'),
+		relaunchApp: () => invoke('relaunchApp'),
+		onWindowMaximizedChanged: (listener) =>
+			subscribe<WindowMaximizedBroadcast>(
+				IPC_CHANNELS.windowMaximizedChanged,
+				listener,
+			),
 		commitWorkspaceChanges: (request) =>
 			invoke('commitWorkspaceChanges', request),
 		computeTurnDiff: (request) => invoke('computeTurnDiff', request),

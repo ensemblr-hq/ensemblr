@@ -25,6 +25,7 @@ import {
 	type AgentProviderId,
 	getAgentProviderLabel,
 } from '@/shared/agent-provider';
+import { formatChord } from '@/shared/keymap';
 import { ModelProviderIcon } from './model-provider-icon';
 
 const MAX_MENU_HEIGHT_REM = 24;
@@ -322,7 +323,9 @@ export function ModelPicker({
 				<TooltipContent sideOffset={4}>
 					{t('workbench:model-picker.tooltip', 'Change model')}
 					{/* i18next-instrument-ignore */}
-					<span className='ml-2 text-muted-foreground'>⌥P</span>
+					<span className='ml-2 text-muted-foreground'>
+						{formatChord(['alt'], 'P')}
+					</span>
 				</TooltipContent>
 			</Tooltip>
 			<PopoverContent align='start' className='w-80 overflow-hidden p-1.5'>

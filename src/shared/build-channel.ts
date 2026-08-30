@@ -40,6 +40,19 @@ export const APP_NAMES: Record<BuildChannel, string> = {
 };
 
 /**
+ * Freedesktop application id per channel, baked into the AppImage's generated
+ * `.desktop` file by `forge.config.ts`. It is the Linux counterpart of
+ * {@link APP_BUNDLE_IDS}: a launcher keys its entries by this id, so a canary
+ * sharing the release's would overwrite the release's launcher entry and its
+ * icon.
+ */
+export const APP_LINUX_APP_IDS: Record<BuildChannel, string> = {
+	release: 'ensemblr',
+	canary: 'ensemblr-canary',
+	dev: 'ensemblr-dev',
+};
+
+/**
  * Narrows an `ENSEMBLR_BUILD_CHANNEL` value to a channel, falling back to
  * release so a typo produces the store build rather than an unbuildable one.
  * @param value - The raw environment value, in any case, or undefined

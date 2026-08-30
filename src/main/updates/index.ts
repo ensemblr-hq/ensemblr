@@ -8,7 +8,11 @@ export {
 	resolveRepositorySlug,
 	UPDATE_FEED_ASSET_NAME,
 } from './release-feed';
-export type { UpdatePreconditionInputs } from './update-preconditions';
+export type {
+	UpdateCapability,
+	UpdatePreconditionInputs,
+	UpdatePreconditionResult,
+} from './update-preconditions';
 export { checkUpdatePreconditions } from './update-preconditions';
 export type { UpdaterEventHandlers, UpdateService } from './update-service';
 export { createUpdateService } from './update-service';

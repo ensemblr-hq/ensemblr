@@ -16,7 +16,7 @@ import { Textarea } from '@/renderer/components/ui/textarea';
 import { useIssueEditorForm } from '@/renderer/hooks/linear/use-issue-editor-form';
 import { buildTeamChangeFields } from '@/renderer/lib/linear';
 import type { LinearIssueWire } from '@/shared/ipc/contracts/linear';
-
+import { formatChord } from '@/shared/keymap';
 import {
 	IssueEditorMetaRow,
 	IssueEditorTeamPicker,
@@ -156,7 +156,9 @@ export function LinearIssueEditorDialog({
 						</p>
 					) : (
 						<span className='hidden text-muted-foreground text-xs sm:inline'>
-							{t('linear:issue-editor.submit-hint', '⌘↵ to save')}
+							{t('linear:issue-editor.submit-hint', '{{chord}} to save', {
+								chord: formatChord(['mod'], 'Enter'),
+							})}
 						</span>
 					)}
 					<span className='flex items-center gap-2'>

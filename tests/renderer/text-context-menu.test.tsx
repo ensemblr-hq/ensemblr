@@ -11,6 +11,18 @@ import {
 	renderWithProviders,
 } from './support/dom';
 
+/**
+ * The chord label the context menu renders on the running platform: the macOS
+ * glyph run, or the `Ctrl+…` spelling everywhere else. Written out rather than
+ * taken from `formatChord`, so the assertion states the expected mapping
+ * instead of restating the formatter's own output.
+ */
+function chord(key: string, shifted = false): string {
+	return process.platform === 'darwin'
+		? `${shifted ? '⇧' : ''}⌘${key}`
+		: `Ctrl+${shifted ? 'Shift+' : ''}${key}`;
+}
+
 const writeText = vi.fn(async () => {});
 const runTextEditCommand = vi.fn(async () => {});
 const replaceMisspelling = vi.fn(async () => {});
@@ -141,7 +153,7 @@ test('a read-only surface offers only the commands it can run', async () => {
 	await rightClick(target({ selectionText: 'selected prose' }));
 
 	await findMenuItem('Copy');
-	expect(menuRows()).toEqual(['Copy⌘C', 'Select all']);
+	expect(menuRows()).toEqual([`Copy${chord('C')}`, 'Select all']);
 });
 
 test('an editable surface offers the clipboard and history commands', async () => {
@@ -151,12 +163,12 @@ test('an editable surface offers the clipboard and history commands', async () =
 
 	await findMenuItem('Paste');
 	expect(menuRows()).toEqual([
-		'Undo⌘Z',
-		'Redo⇧⌘Z',
-		'Cut⌘X',
-		'Copy⌘C',
-		'Paste⌘V',
-		'Select all⌘A',
+		`Undo${chord('Z')}`,
+		`Redo${chord('Z', true)}`,
+		`Cut${chord('X')}`,
+		`Copy${chord('C')}`,
+		`Paste${chord('V')}`,
+		`Select all${chord('A')}`,
 	]);
 });
 

@@ -1,6 +1,7 @@
 import type { DatabaseSync } from 'node:sqlite';
 
 import type { EnvironmentVariableDiagnostic } from '../../shared/ipc/contracts/environment';
+import { type SecretScope, SecretStoreError } from '../secrets/index.ts';
 import { loadScopeEnvFiles } from './env-files-repository.ts';
 import {
 	isReservedEnvironmentVariableKey,
@@ -112,8 +113,41 @@ export function readPlainLayer(state: EnvironmentState): EnvironmentLayer {
 }
 
 /**
+ * Read one secret, turning a keyring failure into a reportable outcome rather
+ * than a rejection.
+ *
+ * A decrypt failure is recoverable per secret — the user re-enters that one —
+ * but it used to reject the whole `Promise.all` below and take every terminal
+ * and agent launch down with it. `undecryptable` stays distinct from a `null`
+ * value so "the keyring changed" never reads as "nothing was ever stored".
+ * @param secretStore - Store to read from
+ * @param key - Environment variable key the secret backs
+ * @param metadata - Metadata row identifying the secret
+ * @returns The value, or the message explaining why it could not be read
+ */
+async function readOneSecret(
+	secretStore: NonNullable<EnvironmentState['secretStore']>,
+	key: string,
+	metadata: { key: string; scope: SecretScope; scopeId: string },
+): Promise<{ key: string; undecryptable?: string; value: string | null }> {
+	try {
+		const value = await secretStore.read({
+			key: metadata.key,
+			scope: metadata.scope,
+			scopeId: metadata.scopeId || undefined,
+		});
+		return { key, value };
+	} catch (error) {
+		if (error instanceof SecretStoreError) {
+			return { key, undecryptable: error.message, value: null };
+		}
+		throw error;
+	}
+}
+
+/**
  * Resolve the highest-precedence layer by reading each secret out of the secret
- * store, reporting metadata whose value has gone missing.
+ * store, reporting metadata whose value has gone missing or cannot be decrypted.
  * @param state - Resolved environment state carrying the secret metadata and store
  * @returns The secret layer, with every resolved value marked for redaction
  */
@@ -143,12 +177,7 @@ export async function readSecretLayer(
 			if (isReservedEnvironmentVariableKey(key, state.catalogByKey)) {
 				return null;
 			}
-			const value = await secretStore.read({
-				key: metadata.key,
-				scope: metadata.scope,
-				scopeId: metadata.scopeId || undefined,
-			});
-			return { key, value };
+			return readOneSecret(secretStore, key, metadata);
 		}),
 	);
 
@@ -158,6 +187,15 @@ export async function readSecretLayer(
 
 	for (const entry of resolved) {
 		if (!entry) {
+			continue;
+		}
+		if (entry.undecryptable) {
+			diagnostics.push({
+				code: 'secret-value-undecryptable',
+				key: entry.key,
+				message: entry.undecryptable,
+				severity: 'error',
+			});
 			continue;
 		}
 		if (entry.value === null) {

@@ -197,6 +197,7 @@
 			"retry-pi-provider-model": "Επανάληψη ελέγχου παρόχων και μοντέλων",
 			"retry-pi-rpc": "Επανάληψη ελέγχου Pi RPC",
 			"retry-root-directory": "Επανάληψη ελέγχου ρίζας",
+			"retry-secret-storage": "Επανέλεγχος αποθήκευσης μυστικών",
 			"run-claude-login": "Εκτέλεση {{command}}",
 			"run-gh-auth-login": "Εκτέλεση gh auth login",
 			"select-claude-executable": "Επιλογή εκτελέσιμου {{provider}}",
@@ -256,6 +257,7 @@
 			"pi-executable-ready-no-probe": "Το εκτελέσιμο Pi επιλέχθηκε από {{source}}: {{path}}. Δεν εκτελέστηκε έλεγχος έκδοσης/βοήθειας.",
 			"pi-executable-ready-with-probe": "Το εκτελέσιμο Pi επιλέχθηκε από {{source}}: {{path}}. Ο έλεγχος «{{probeKind}}» επέστρεψε: {{probeDetail}}",
 			"pi-executable-unknown-error": "Άγνωστο σφάλμα ελέγχου εκτελέσιμου Pi.",
+			"pi-models-none": "Το Pi δεν κατέγραψε κανένα χρησιμοποιήσιμο μοντέλο. Ρυθμίστε τουλάχιστον έναν πάροχο στο Pi και δοκιμάστε ξανά.",
 			"pi-models-ready": "Το Pi κατέγραψε {{modelCount}} μοντέλα από {{providerCount}} παρόχους.",
 			"pi-models-unknown-error": "Άγνωστο σφάλμα ελέγχου παρόχων και μοντέλων Pi.",
 			"pi-models-unverified": "Η ετοιμότητα παρόχων και μοντέλων Pi δεν επαληθεύτηκε.",
@@ -263,6 +265,10 @@
 			"pi-rpc-ready": "Η εκκίνηση Pi RPC παρήγαγε έγκυρο πλαίσιο {{frameType}} από {{cwd}}.",
 			"pi-rpc-unknown-error": "Άγνωστο σφάλμα ελέγχου Pi RPC.",
 			"root-directory-ready": "Η ρίζα του Ensemblr είναι έτοιμη στο {{path}}.",
+			"secret-storage-encrypted": "Τα μυστικά κρυπτογραφούνται από το θησαυροφυλάκιο κλειδιών {{backend}}.",
+			"secret-storage-plaintext": "Καμία υπηρεσία θησαυροφυλακίου δεν απάντησε, οπότε τα αποθηκευμένα μυστικά είναι μόνο συγκαλυμμένα και όχι κρυπτογραφημένα. Ξεκινήστε το gnome-keyring ή το KWallet και επανεκκινήστε το Ensemblr.",
+			"secret-storage-unavailable": "Δεν υπάρχει διαθέσιμο θησαυροφυλάκιο κλειδιών, οπότε τα μυστικά δεν μπορούν να αποθηκευτούν. Ξεκινήστε μια υπηρεσία θησαυροφυλακίου (gnome-keyring ή KWallet) και δοκιμάστε ξανά.",
+			"secret-storage-unknown-error": "Άγνωστο σφάλμα ελέγχου αποθήκευσης μυστικών.",
 			"shell-fallback-environment": "Οι εντολές εκτελούνται, αλλά η ανάλυση του περιβάλλοντος κελύφους χρησιμοποίησε εναλλακτική λύση.",
 			"shell-ready": "Οι εντολές εκτελούνται κανονικά με το περιβάλλον που προήλθε από το κέλυφος.",
 			"shell-smoke-failed": "Ο έλεγχος εκκίνησης διεργασίας απέτυχε.",
@@ -279,6 +285,7 @@
 			"database-path": "Διαδρομή βάσης δεδομένων",
 			"executable-path": "Διαδρομή εκτελέσιμου",
 			"first-jsonl-frame": "Πρώτο πλαίσιο JSONL",
+			"keyring-backend": "Θησαυροφυλάκιο κλειδιών",
 			"masked-secrets": "Αποκρυμμένα μυστικά",
 			"model-count": "Πλήθος μοντέλων",
 			"pi-probe": "Έλεγχος «{{kind}}»",
@@ -322,6 +329,7 @@
 			"pi-provider-model": "Ετοιμότητα παρόχων και μοντέλων Pi",
 			"pi-rpc": "Εκκίνηση Pi RPC",
 			"root-directory": "Ριζικός κατάλογος",
+			"secret-storage": "Αποθήκευση μυστικών",
 			"shell-process-launch": "Κέλυφος και εκκίνηση διεργασιών",
 			"sqlite-database": "Βάση δεδομένων SQLite"
 		}
@@ -427,7 +435,13 @@
 		"workspace-count_other": "{{count}} χώροι εργασίας"
 	},
 	"update": {
+		"available": {
+			"description": "Το Ensemblr δεν εγκαθιστά μόνο του αυτή την ενημέρωση — κατεβάστε την από τη σελίδα έκδοσης.",
+			"open-release": "Άνοιγμα σελίδας έκδοσης",
+			"title": "Διαθέσιμη η έκδοση Ensemblr {{version}}"
+		},
 		"check-failed": "Ο έλεγχος ενημερώσεων απέτυχε.",
+		"checking": "Έλεγχος για ενημερώσεις…",
 		"disabled": "Οι αυτόματες ενημερώσεις είναι απενεργοποιημένες. Ενεργοποιήστε τις στις «Ρυθμίσεις → Γενικά».",
 		"downloading": "Λήψη του Ensemblr {{version}}…",
 		"ready": {

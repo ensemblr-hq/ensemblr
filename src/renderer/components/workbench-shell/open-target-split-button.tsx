@@ -10,6 +10,7 @@ import {
 } from '@/renderer/components/ui/dropdown-menu';
 import { cn } from '@/renderer/lib/utils';
 import type { WorkspaceOpenTarget } from '@/renderer/types/workbench';
+import { formatChord } from '@/shared/keymap';
 
 import { OpenTargetIcon } from './open-target-icon';
 
@@ -106,9 +107,12 @@ export function OpenTargetSplitButton({
 						>
 							<OpenTargetIcon className='size-4' target={target} />
 							<span className='min-w-0 flex-1 truncate'>{target.label}</span>
-							{target.shortcutLabel ? (
+							{target.shortcutChord ? (
 								<span className='shrink-0 text-muted-foreground text-xs'>
-									{target.shortcutLabel}
+									{formatChord(
+										target.shortcutChord.modifiers,
+										target.shortcutChord.key,
+									)}
 								</span>
 							) : null}
 							<span className='w-3.5 shrink-0 text-right text-muted-foreground text-xs tabular-nums'>

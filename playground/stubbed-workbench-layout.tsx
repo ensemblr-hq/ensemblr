@@ -8,8 +8,10 @@ import type { WorkbenchLayoutContextValue } from '@/renderer/types/contexts';
 /**
  * Supplies the two contexts `WorkbenchHeader` reads — the resizable-panel layout
  * and the navigation sidebar — so the shipped toolbar renders outside the
- * workbench route. The review sidebar is pinned collapsed because that is the
- * only configuration that mounts the inline review-header actions.
+ * workbench route. The review sidebar defaults to collapsed because that is the
+ * only configuration that mounts the inline review-header actions; the
+ * window-controls scene drives it both ways, since the trailing inset the
+ * toolbar reserves depends on it.
  *
  * `SidebarProvider` is built to own the viewport, so its wrapper is flattened to
  * a plain block here: a scene stacks many toolbars, and each one claiming
@@ -17,8 +19,10 @@ import type { WorkbenchLayoutContextValue } from '@/renderer/types/contexts';
  */
 export function StubbedWorkbenchLayout({
 	children,
+	isRightSidebarCollapsed = true,
 }: {
 	children: React.ReactNode;
+	isRightSidebarCollapsed?: boolean;
 }) {
 	const dockPanelRef = useRef<PanelImperativeHandle | null>(null);
 	const rightSidebarPanelRef = useRef<PanelImperativeHandle | null>(null);
@@ -35,11 +39,11 @@ export function StubbedWorkbenchLayout({
 			meta: { dockPanelRef, rightSidebarPanelRef },
 			state: {
 				isDockCollapsed: false,
-				isRightSidebarCollapsed: true,
+				isRightSidebarCollapsed,
 				rightSidebarSizePercent: 34,
 			},
 		}),
-		[],
+		[isRightSidebarCollapsed],
 	);
 
 	return (

@@ -50,6 +50,7 @@ export {
 	terminalFontSizeAtom,
 	terminalScrollbackMbAtom,
 	themeAtom,
+	titleBarAtom,
 	toolCallCollapseAtom,
 	useAppSettingsSync,
 } from './app-settings';

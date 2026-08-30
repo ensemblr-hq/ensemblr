@@ -11,6 +11,7 @@ import type {
 	PiReadinessSnapshot,
 	PiRpcSmokeSnapshot,
 } from '../pi-runtime';
+import { describePiProviderModels } from '../pi-runtime/pi-provider-models.ts';
 import { commandLog } from '../setup/index.ts';
 import type { AgentProviderReadinessProbe } from './agent-provider-types.ts';
 import {
@@ -218,20 +219,7 @@ function createProviderModelCheck(
 	const failed = providerModels.status !== 'success';
 
 	return {
-		...(failed
-			? (upstreamDetail(providerModels.failure?.message) ??
-				authoredDetail(
-					'pi-models-unverified',
-					'Provider and model readiness could not be verified.',
-				))
-			: authoredDetail(
-					'pi-models-ready',
-					`${providerModels.modelCount} models across ${providerModels.providerCount} providers.`,
-					{
-						modelCount: providerModels.modelCount,
-						providerCount: providerModels.providerCount,
-					},
-				)),
+		...describePiProviderModels(providerModels),
 		id: 'provider-models',
 		label: 'Providers and models',
 		logs: [

@@ -1,3 +1,4 @@
+import type { WindowChromeSnapshot } from '../../shared/window-chrome';
 import type {
 	AgentModelCatalogService,
 	AgentProviderService,
@@ -156,6 +157,10 @@ interface RegisterIpcHandlersOptions {
 	quickStartProjectService: QuickStartProjectService;
 	renameWorkspaceService: RenameWorkspaceService;
 	repositoryConfigService: RepositoryConfigService;
+	/** The chrome the running window was constructed with, not the current setting. */
+	readWindowChrome: () => WindowChromeSnapshot;
+	/** Quits and starts this build again, draining running agents on the way out. */
+	requestRelaunch: () => void;
 	rootDirectoryService: EnsemblrRootDirectoryService;
 	scriptLifecycleService: ScriptLifecycleService;
 	setWorkspaceBaseBranchService: SetWorkspaceBaseBranchService;
@@ -220,8 +225,10 @@ export function registerIpcHandlers({
 	planModeRegistry,
 	provisionalNamingQueue,
 	quickStartProjectService,
+	readWindowChrome,
 	renameWorkspaceService,
 	repositoryConfigService,
+	requestRelaunch,
 	rootDirectoryService,
 	scriptLifecycleService,
 	setWorkspaceBaseBranchService,
@@ -240,7 +247,7 @@ export function registerIpcHandlers({
 			readPermissionModeFromSnapshot(settingsResolutionService.resolve()),
 	});
 
-	registerWindowHandlers();
+	registerWindowHandlers({ requestRelaunch });
 	registerTextEditingHandlers();
 	registerMenuHandlers({ menuContextStore, rebuildMenu });
 	registerActiveChatHandlers({ activeChatStore });
@@ -254,6 +261,7 @@ export function registerIpcHandlers({
 		configService,
 		databaseService,
 		openTargetService,
+		readWindowChrome,
 	});
 	registerNavigationHandlers({ databaseService });
 	registerSettingsHandlers({ settingsResolutionService });

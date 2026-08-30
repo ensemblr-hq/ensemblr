@@ -35,7 +35,10 @@ export function WorkbenchHeader({
 		: PanelRightCloseIcon;
 
 	return (
-		<header className='native-toolbar flex h-12 shrink-0 items-center justify-between gap-3 border-border border-b px-3'>
+		<header
+			className='native-toolbar flex shrink-0 items-center justify-between gap-3 border-border border-b px-3'
+			data-review-sidebar={isRightSidebarCollapsed ? 'collapsed' : 'expanded'}
+		>
 			<div className='flex min-w-0 flex-1 items-center gap-2'>
 				<SidebarTrigger className='sidebar-collapsed-trigger' />
 				<div className='flex min-w-0 items-center gap-2'>

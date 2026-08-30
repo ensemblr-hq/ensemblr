@@ -45,12 +45,19 @@
 		},
 		"theme": {
 			"dark": "Dark",
-			"description": "Toggle with ⌘⌥T.",
+			"description": "Toggle with {{chord}}.",
 			"label": "Theme",
 			"light": "Light",
 			"system": "System"
 		},
-		"title": "Appearance"
+		"title": "Appearance",
+		"title-bar": {
+			"custom": "Ensemblr",
+			"description": "Whether Ensemblr draws its own title bar and window controls, or lets your desktop decorate the window. Takes effect after a relaunch.",
+			"label": "Title bar",
+			"relaunch": "Relaunch",
+			"system": "System"
+		}
 	},
 	"common": {
 		"source": "source: {{source}}"
@@ -206,8 +213,10 @@
 			},
 			"check": "Check for updates",
 			"label": "Ensemblr version",
+			"open-release": "Open the release page",
 			"restart": "Restart to update",
 			"status": {
+				"available": "{{version}} is available to download.",
 				"checking": "Checking…",
 				"disabled": "Ensemblr will not check for updates.",
 				"downloading": "Downloading {{version}}…",
@@ -322,6 +331,11 @@
 		"discovery-failed": "Model discovery failed: {{error}}.",
 		"loading": "Loading models…",
 		"no-models": "No models",
+		"none-available": {
+			"action": "Open Providers",
+			"description": "No agent runtime reported a model. Pi lists none until at least one provider is configured, and Claude Code has to be installed separately. Set one up, then reopen this page.",
+			"title": "No models available"
+		},
 		"review-model": {
 			"aria-label": "Review model",
 			"description": "Model used for the Review action on a workspace.",
@@ -428,6 +442,7 @@
 			"pi-agent-directory-unverified": "{{provider}}'s agent directory could not be verified.",
 			"pi-executable-resolved": "{{path}} ({{source}}).",
 			"pi-executable-undiscovered": "{{provider}} could not be discovered. Install it or select a compatible executable.",
+			"pi-models-none": "No usable models. Configure at least one provider in Pi, then retry.",
 			"pi-models-ready": "{{modelCount}} models across {{providerCount}} providers.",
 			"pi-models-unverified": "Provider and model readiness could not be verified.",
 			"pi-rpc-invalid": "{{provider}} RPC startup did not produce valid JSONL.",
@@ -683,7 +698,7 @@
 			"add-title": "Add run script",
 			"command": "Command",
 			"default": "Default",
-			"default-description": "Runs when you press ⌘R in a workspace that has no other pick.",
+			"default-description": "Runs when you press {{chord}} in a workspace that has no other pick.",
 			"description": "Shortcuts for quick actions, like running your dev server or test suite. Use <port>$ENSEMBLR_PORT</port> for this workspace's allocated port.",
 			"duplicate-name": "Another run script already uses this name.",
 			"edit-title": "Edit run script",
@@ -746,7 +761,7 @@
 			"tab-new": "New chat tab",
 			"tab-next": "Next tab",
 			"tab-prev": "Previous tab",
-			"tab-select-by-index": "Select tab by index (⌘1–8, ⌘9 last)",
+			"tab-select-by-index": "Select tab by index ({{first}}–8, {{last}} last)",
 			"terminal-new": "New terminal",
 			"tool-calls-toggle-collapse": "Expand or collapse all tool calls",
 			"workspace-new": "New workspace"

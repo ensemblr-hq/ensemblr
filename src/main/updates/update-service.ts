@@ -1,9 +1,7 @@
 import type { BuildChannel } from '../../shared/build-channel';
-import type {
-	UpdateFailure,
-	UpdateStatusSnapshot,
-} from '../../shared/ipc/contracts/update';
+import type { UpdateStatusSnapshot } from '../../shared/ipc/contracts/update';
 import type { ReleaseFeed } from './release-feed';
+import type { UpdatePreconditionResult } from './update-preconditions';
 
 /**
  * How long after launch the first check runs. Long enough to stay out of the
@@ -53,8 +51,14 @@ export interface UpdateServiceOptions {
 	isEnabled: () => boolean;
 	/** Registers the Squirrel listeners. Called once, from `start`. */
 	onUpdaterEvent: (handlers: UpdaterEventHandlers) => void;
-	/** Why this build can never update, or null when it can. */
-	preconditionFailure: UpdateFailure | null;
+	/**
+	 * How far this build may take an update, and why it may take none: `install`
+	 * arms Squirrel, `check-only` stops at reporting the version, `none` never
+	 * checks and carries the failure naming why. Taken whole rather than as a
+	 * capability beside a failure, so no caller can pair one with the other's
+	 * reason.
+	 */
+	preconditions: UpdatePreconditionResult;
 	releaseFeed: ReleaseFeed;
 	/**
 	 * Restarts into the staged update. Goes through the quit guard, so agents
@@ -106,7 +110,7 @@ export function createUpdateService(
 	 * @returns The resting state
 	 */
 	const restingState = (): UpdateStatusSnapshot['state'] => {
-		if (options.preconditionFailure) {
+		if (options.preconditions.capability === 'none') {
 			return 'unsupported';
 		}
 		return options.isEnabled() ? 'idle' : 'disabled';
@@ -116,8 +120,9 @@ export function createUpdateService(
 		availableVersion: null,
 		channel: options.channel,
 		currentVersion: options.getCurrentVersion(),
-		failure: options.preconditionFailure,
+		failure: options.preconditions.failure,
 		notes: null,
+		releaseUrl: null,
 		state: restingState(),
 	};
 	let initialTimer: NodeJS.Timeout | null = null;
@@ -185,6 +190,7 @@ export function createUpdateService(
 				availableVersion: null,
 				failure: null,
 				notes: null,
+				releaseUrl: null,
 				state: 'disabled',
 			});
 		}
@@ -210,7 +216,23 @@ export function createUpdateService(
 				availableVersion: null,
 				failure: null,
 				notes: null,
+				releaseUrl: null,
 				state: 'idle',
+			});
+		}
+
+		// A build that may not install stops here: it has named the newer version
+		// and where to get it, and downloading a bundle it may not install would
+		// only leave an unusable file on disk. Asked as "may it install" rather
+		// than "is it check-only", so a capability added later reports the version
+		// instead of arming Squirrel by default.
+		if (options.preconditions.capability !== 'install') {
+			return advance({
+				availableVersion: result.candidate.version,
+				failure: null,
+				notes: result.candidate.notes,
+				releaseUrl: result.candidate.releaseUrl,
+				state: 'available',
 			});
 		}
 
@@ -229,6 +251,7 @@ export function createUpdateService(
 			availableVersion: result.candidate.version,
 			failure: null,
 			notes: result.candidate.notes,
+			releaseUrl: result.candidate.releaseUrl,
 			state: 'downloading',
 		});
 	};
@@ -259,6 +282,16 @@ export function createUpdateService(
 			options.broadcast(snapshot);
 			return;
 		}
+		// A build that may not install never arms Squirrel, so there is nothing to
+		// listen to — registering the handlers would only wire callbacks that
+		// cannot fire.
+		if (options.preconditions.capability !== 'install') {
+			if (options.isEnabled()) {
+				startSchedule();
+			}
+			options.broadcast(snapshot);
+			return;
+		}
 		options.onUpdaterEvent({
 			onDownloaded: whileEnabled(() => {
 				stopSchedule();
@@ -274,7 +307,12 @@ export function createUpdateService(
 				});
 			}),
 			onNotAvailable: whileEnabled(() => {
-				advance({ availableVersion: null, notes: null, state: 'idle' });
+				advance({
+					availableVersion: null,
+					notes: null,
+					releaseUrl: null,
+					state: 'idle',
+				});
 			}),
 		});
 		if (options.isEnabled()) {
@@ -298,6 +336,7 @@ export function createUpdateService(
 					availableVersion: null,
 					failure: null,
 					notes: null,
+					releaseUrl: null,
 					state: 'disabled',
 				});
 			}
@@ -311,7 +350,9 @@ export function createUpdateService(
 	};
 
 	/**
-	 * Restarts into a staged update, through the quit guard.
+	 * Restarts into a staged update, through the quit guard. A check-only build
+	 * never reaches `ready`, so this is inert there and the surface links to
+	 * `releaseUrl` instead.
 	 * @returns The unchanged snapshot when nothing is staged, else the state the request left behind
 	 */
 	const install = (): UpdateStatusSnapshot => {

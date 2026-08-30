@@ -238,9 +238,15 @@ The path must be absolute or start with `~/`. A relative path is rejected.
 | What | Where |
 | --- | --- |
 | App settings | `~/.config/ensemblr/config.json` |
-| Projects, workspaces, sessions, board state | `~/Library/Application Support/dev.ensemblr.app/ensemblr.db` |
-| Secrets (Linear OAuth token) | macOS Keychain, service `dev.ensemblr.app.secret-store` |
+| Projects, workspaces, sessions, board state | `~/Library/Application Support/dev.ensemblr.app/ensemblr.db` (macOS) · `~/.config/ensemblr/ensemblr.db` (Linux) |
+| Window state, recents, Electron's caches | `~/Library/Application Support/Ensemblr` (macOS) · `~/.config/ensemblr/electron` (Linux) |
+| Secrets (Linear OAuth token) | macOS Keychain, service `dev.ensemblr.app.secret-store` · on Linux, `safeStorage` ciphertext inside `ensemblr.db` |
 | Your repositories and worktrees | The root directory — `~/Ensemblr` by default |
+
+On Linux everything but the root directory sits under one `~/.config/ensemblr`.
+That is deliberate: Electron would otherwise write its own state to
+`~/.config/Ensemblr`, a capitalised sibling of the directory holding your
+settings.
 
 **There is no app log file.** The diagnostics bundle from **Settings →
 Diagnostics** is the support artifact; it carries each check's collected command

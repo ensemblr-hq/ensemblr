@@ -7,6 +7,8 @@ import { SidebarTrigger, useSidebar } from '@/renderer/components/ui/sidebar';
 import { useConciergePanel } from '@/renderer/hooks/concierge/use-concierge-panel';
 import { useConciergeReferenceOpen } from '@/renderer/hooks/concierge/use-concierge-reference-open';
 import { cn } from '@/renderer/lib/utils';
+import { readWindowChrome } from '@/renderer/lib/window-chrome';
+import { TOOLBAR_HEIGHT_CLASS } from '@/renderer/lib/workbench/shell-inset';
 import type { ConciergeSize } from '@/renderer/state/concierge';
 import { ConciergeClearConfirmDialog } from './concierge-clear-confirm-dialog';
 import { ConciergeComposer } from './concierge-composer';
@@ -18,11 +20,11 @@ import { ConciergeResizeHandles } from './concierge-resize-handles';
 import { ConciergeTimeline } from './concierge-timeline';
 
 /**
- * Width in pixels the macOS window controls claim at the window's leading edge,
- * matching the `--ensemblr-traffic-light-safe-inline` token the shell toolbars
- * pad by. A maximized panel starting left of this sits under the controls.
+ * One CSS `rem` in pixels, for comparing a measured rectangle against the
+ * chrome insets, which are expressed in `rem`. The app never overrides the root
+ * font size.
  */
-const TRAFFIC_LIGHT_SAFE_INLINE = 92;
+const REM_IN_PX = 16;
 
 /**
  * The Concierge conversation surface: a docked card the user can drag anywhere
@@ -69,8 +71,8 @@ export function ConciergePanel() {
 	const sidebarEdgeLabel = sidebarIsCollapsed
 		? expandSidebarLabel
 		: t('workbench:concierge.panel.collapse-sidebar', 'Hide the sidebar');
-	const clearsTrafficLights =
-		(panel.insetRect?.left ?? 0) >= TRAFFIC_LIGHT_SAFE_INLINE;
+	const clearsWindowControls =
+		(panel.insetRect?.left ?? 0) >= readWindowChrome().insets.start * REM_IN_PX;
 
 	return (
 		// Wraps the transcript *and* the composer: a chip in an answer and a chip in
@@ -105,16 +107,18 @@ export function ConciergePanel() {
 						// Maximized, this header sits beside the sidebar's own — so it takes
 						// the shell toolbar's height, padding, and full-strength border, or
 						// the two rules miss each other and the title crowds the divider.
-						// With that sidebar collapsed there is no header beside it and the
-						// macOS window controls, which draw above the web contents, land on
-						// the title — so it pads by the same safe inset the shell's leading
-						// toolbar takes.
+						// It also spans both of the window's top corners, and window
+						// controls draw above the web contents at either end: the macOS
+						// traffic lights on the left, and Ensemblr's own cluster on the
+						// right where it draws one. Both are cleared by the same insets the
+						// shell's own toolbars take.
 						isFullscreen
 							? cn(
-									'h-12 border-border pr-2',
-									clearsTrafficLights
+									'window-controls-safe-end border-border pr-2',
+									TOOLBAR_HEIGHT_CLASS,
+									clearsWindowControls
 										? 'pl-3'
-										: 'pl-[var(--ensemblr-traffic-light-safe-inline)]',
+										: 'pl-[var(--ensemblr-window-chrome-safe-start)]',
 								)
 							: 'h-10 cursor-grab border-border/60 pr-1.5 pl-1 active:cursor-grabbing',
 					)}

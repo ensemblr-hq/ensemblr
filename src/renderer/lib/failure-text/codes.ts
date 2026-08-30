@@ -6,6 +6,7 @@ import type { DictationFailureCode } from '@/shared/ipc/contracts/dictation';
 import type { GithubFailureCode } from '@/shared/ipc/contracts/github';
 import type { InfisicalFailureCode } from '@/shared/ipc/contracts/infisical';
 import type { LinearAuthFailureCode } from '@/shared/ipc/contracts/linear';
+import type { OpenTargetFailureCode } from '@/shared/ipc/contracts/open-target';
 import type { QuickStartProjectDiagnosticCode } from '@/shared/ipc/contracts/quick-start';
 import type {
 	DeleteRepositoryDiagnosticCode,
@@ -55,6 +56,7 @@ export type AppFailureCode =
 	| InfisicalFailureCode
 	| LinearAuthFailureCode
 	| ListWorkspaceFilesFailureCode
+	| OpenTargetFailureCode
 	| QuickStartProjectDiagnosticCode
 	| ReadWorkspaceDirectoryFailureCode
 	| ReadWorkspaceFileFailureCode
@@ -239,6 +241,16 @@ export const APP_FAILURE_TEXT: Record<
 		t(
 			'errors:failure.state-mismatch',
 			'The Linear sign-in reply did not match this attempt, so it was rejected.',
+		),
+	'open-target-app-not-installed': (t) =>
+		t(
+			'errors:failure.open-target-app-not-installed',
+			'That app is not installed on this machine.',
+		),
+	'open-target-no-desktop-launcher': (t) =>
+		t(
+			'errors:failure.open-target-no-desktop-launcher',
+			'That app is only installed as a desktop entry, and neither gio nor gtk-launch is available to start it. Install glib or gtk3.',
 		),
 	auth: (t) =>
 		t(

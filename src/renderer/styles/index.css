@@ -273,7 +273,31 @@
 			oklch(0.41 0.085 73)
 		)
 		var(--ensemblr-if-dark, oklch(0.78 0.13 73));
-	--ensemblr-traffic-light-safe-inline: 5.75rem;
+	/* Leading and trailing room the window's own chrome claims along the top
+	   edge: the macOS traffic lights on the left, Ensemblr's own control cluster
+	   on the right when it draws one. `applyWindowChrome` overwrites both inline
+	   on <html> before the first paint, from the chrome main actually built the
+	   window with; the zeros here are the "no chrome" case a browser preview or a
+	   missing preload bridge falls back to. */
+	--ensemblr-window-chrome-inset-start: 0rem;
+	--ensemblr-window-chrome-inset-end: 0rem;
+
+	/* The leading inset as a *padding*, for the bars that pad by it instead of
+	   padding on top of their own. The inset is zero everywhere but macOS, so a
+	   bar that used it raw lost its gutter entirely on Linux and sat flush
+	   against the window edge; the floor is the 0.75rem those bars would have
+	   taken from `px-4`/`pl-3` had the inset never been involved. */
+	--ensemblr-window-chrome-safe-start: max(
+		0.75rem,
+		var(--ensemblr-window-chrome-inset-start)
+	);
+
+	/* Height of every top bar, and therefore of the window-control cluster that
+	   overlays them. The cluster is positioned against the window rather than
+	   against any one toolbar, so a toolbar that set its own height would put
+	   the buttons off-centre against it — one value, read by `.native-toolbar`
+	   and by the cluster. */
+	--ensemblr-toolbar-height: 3rem;
 
 	--background: var(--ensemblr-canvas);
 	--foreground: var(--ensemblr-ink);
@@ -634,19 +658,46 @@
 }
 
 @layer utilities {
-	.macos-traffic-light-spacer,
+	.window-chrome-spacer,
 	.native-toolbar,
 	.window-drag-region {
 		-webkit-app-region: drag;
 	}
 
+	/* Keeps a toolbar's own trailing actions out from under the fixed control
+	   cluster. Only set while Ensemblr draws the controls. */
+	html.app-window-controls .native-toolbar {
+		padding-inline-end: calc(0.75rem + var(--ensemblr-window-chrome-inset-end));
+	}
+
+	/* The workbench toolbar gives that room back only while the review sidebar
+	   is genuinely to its right, because then the sidebar's own header is the
+	   one under the cluster. Neither half of that can be read off the DOM: the
+	   sidebar panel stays mounted at zero width when collapsed, and it is
+	   display:none below `lg`, so a `:has(.right-sidebar-header)` test matches
+	   in both states and leaves the toolbar's own actions under the buttons. */
+	@media (width >= 64rem) {
+		html.app-window-controls .native-toolbar[data-review-sidebar="expanded"] {
+			padding-inline-end: 0.75rem;
+		}
+	}
+
+	/* The same reservation for a bar that reaches the window's trailing edge
+	   without being a `.native-toolbar` — the maximized Concierge header, which
+	   covers the shell inset rather than sitting inside it. Its own
+	   `padding-inline-end` is the no-chrome case; this replaces it. */
+	html.app-window-controls .window-controls-safe-end {
+		padding-inline-end: calc(0.5rem + var(--ensemblr-window-chrome-inset-end));
+	}
+
 	.native-toolbar {
 		background: var(--ensemblr-toolbar);
 		backdrop-filter: blur(18px) saturate(1.3);
+		block-size: var(--ensemblr-toolbar-height);
 	}
 
 	/* Dev only: tint the nav sidebar's bare title-bar strip to match the top bars. */
-	.env-dev .macos-traffic-light-spacer {
+	.env-dev .window-chrome-spacer {
 		background: var(--ensemblr-toolbar);
 	}
 
@@ -761,8 +812,11 @@
 		}
 	}
 
-	/* A collapsed nav sidebar leaves the traffic lights over the inset's leading
-	   toolbar, which is the one hosting the trigger that reopens it. Matching on
+	/* A collapsed nav sidebar leaves the window's leading chrome over the inset's
+	   leading toolbar, which is the one hosting the trigger that reopens it.
+	   These selectors outrank the toolbar's own `px-4`, so they *replace* its
+	   leading padding rather than adding to it — hence the floored token, which
+	   gives back the gutter on every platform that draws nothing there. Matching on
 	   that trigger rather than on `.native-toolbar` alone is what keeps the inset
 	   off the toolbars further right — the review sidebar's header sits nowhere
 	   near the window controls and needs no room for them.
@@ -772,7 +826,7 @@
 	   readability constraint rather than a cascade one. */
 	@media (width < 48rem) {
 		.native-toolbar:has(.sidebar-collapsed-trigger) {
-			padding-inline-start: var(--ensemblr-traffic-light-safe-inline);
+			padding-inline-start: var(--ensemblr-window-chrome-safe-start);
 		}
 
 		.sidebar-collapsed-trigger {
@@ -783,7 +837,7 @@
 	[data-slot="sidebar"][data-collapsible="offcanvas"]
 		~ [data-slot="sidebar-inset"]
 		.native-toolbar:has(.sidebar-collapsed-trigger) {
-		padding-inline-start: var(--ensemblr-traffic-light-safe-inline);
+		padding-inline-start: var(--ensemblr-window-chrome-safe-start);
 	}
 
 	[data-slot="sidebar"][data-state="collapsed"]

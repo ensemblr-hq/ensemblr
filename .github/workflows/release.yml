@@ -263,3 +263,75 @@ jobs:
           if [ -n "${APPLE_API_KEY_PATH:-}" ]; then
             rm -f "$APPLE_API_KEY_PATH"
           fi
+
+  # A separate job rather than a matrix leg on `build`: nothing here is signed,
+  # notarized or stapled, `verify:signing` only looks for `*-darwin-arm64`
+  # output, and the Apple signing action has no business running on a Linux
+  # runner. It attaches to the same release, and `release-feed.ts` requires the
+  # `.AppImage` to be present before it offers a Linux user the version.
+  #
+  # After `build`, not beside it. `release-feed.ts` offers a Linux user any
+  # release carrying an `.AppImage`, and looks the darwin feed document up before
+  # that gate — so a release that got the AppImage while notarization failed
+  # would push Linux users at a version macOS users cannot install, and hand them
+  # a hard error on the one release they could actually run. A failure here still
+  # leaves the macOS release whole; the reverse must not happen. It also inherits
+  # `build`'s "release exists and is published" guard this way, so it can no
+  # longer attach to a draft.
+  build-linux:
+    needs: [verify, build]
+    if: ${{ !startsWith(github.event.release.tag_name, 'nightly') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      TAG: ${{ github.event.release.tag_name || inputs.tag }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.release.tag_name || inputs.tag }}
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      # `@reforged/maker-appimage` declares mksquashfs as a required external
+      # binary and refuses to run without it; ubuntu-latest does not ship it.
+      - name: Install mksquashfs
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y squashfs-tools
+
+      - run: npm ci
+
+      - name: Check package.json matches the tag
+        run: |
+          set -euo pipefail
+          declared=$(node -p "require('./package.json').version")
+          if [ "$declared" != "${TAG#v}" ]; then
+            echo "::error::package.json version ($declared) does not match tag $TAG."
+            exit 1
+          fi
+
+      - name: Build the AppImage
+        run: npm run make:linux
+
+      - name: Attach the AppImage to the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          find out/make -type f -name '*.AppImage' > "$RUNNER_TEMP/linux-assets.txt"
+          if [ ! -s "$RUNNER_TEMP/linux-assets.txt" ]; then
+            echo "::error::make:linux produced no .AppImage."
+            exit 1
+          fi
+          tr '\n' '\0' < "$RUNNER_TEMP/linux-assets.txt" \
+            | xargs -0 gh release upload "$TAG" --clobber
+          {
+            echo "### Linux artifacts for \`$TAG\`"
+            echo
+            while IFS= read -r asset; do echo "- \`$(basename "$asset")\`"; done \
+              < "$RUNNER_TEMP/linux-assets.txt"
+          } >> "$GITHUB_STEP_SUMMARY"

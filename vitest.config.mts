@@ -20,6 +20,13 @@ import { defineConfig } from 'vitest/config';
  * import, which made a hermetic unit test depend on a ~100 MB network fetch. A
  * suite that needs Electron behaviour still mocks the module itself.
  *
+ * `node-pty` is aliased for the same reason, and it is the Linux leg that made
+ * it necessary: the package ships prebuilds for darwin and win32 only, and
+ * `allowScripts` blocks building one, so on Linux there is no `pty.node` to
+ * load at all. The suites that reach it do so through the agent-control barrel;
+ * none spawns a terminal. The real module is still loaded by the
+ * `electron --test` scripts, which is where terminal behaviour is exercised.
+ *
  * `@iconify/react` is aliased to its own `offline` build for the same reason:
  * the default build answers an unregistered icon prefix with a live request to
  * `https://api.iconify.design`, which outlived window teardown and surfaced as
@@ -48,6 +55,12 @@ export default defineConfig({
 				find: 'electron',
 				replacement: fileURLToPath(
 					new URL('./tests/main/support/electron-stub.ts', import.meta.url),
+				),
+			},
+			{
+				find: 'node-pty',
+				replacement: fileURLToPath(
+					new URL('./tests/main/support/node-pty-stub.ts', import.meta.url),
 				),
 			},
 		],
@@ -114,6 +127,9 @@ export default defineConfig({
 			'tests/main/media-permissions-policy.test.ts',
 			'tests/main/app-settings-service.test.ts',
 			'tests/main/published-schemas.test.ts',
+			'tests/main/forge-linux-maker.test.ts',
+			'tests/main/linux-desktop-identity.test.ts',
+			'tests/main/user-data-location.test.ts',
 			'tests/main/menu-build.test.ts',
 			'tests/main/menu-strings.test.ts',
 			'tests/main/open-in-editor.test.ts',
@@ -130,9 +146,12 @@ export default defineConfig({
 			'tests/main/linear-callback-page-strings.test.ts',
 			'tests/main/quit-coordinator.test.ts',
 			'tests/main/macos-battery.test.ts',
+			'tests/main/linux-battery.test.ts',
 			'tests/main/workspace-commits.test.ts',
 			'tests/main/list-workspace-files.test.ts',
 			'tests/main/open-target-paths.test.ts',
+			'tests/main/linux-app-discovery.test.ts',
+			'tests/main/linux-app-launch.test.ts',
 			'tests/main/workspace-pr-sweeper.test.ts',
 			'tests/main/sweepable-workspaces.test.ts',
 			'tests/main/terminal-scrollback-text.test.ts',
@@ -166,6 +185,7 @@ export default defineConfig({
 			'tests/main/plan-mode-spawn-inheritance.test.ts',
 			'tests/main/plan-mode-op-policy.test.ts',
 			'tests/main/agent-control-env-role.test.ts',
+			'tests/main/agent-model-catalog.test.ts',
 			'tests/main/agent-provider-handlers.test.ts',
 			'tests/main/pi-provider-readiness-probe.test.ts',
 			'tests/main/claude-readiness.test.ts',

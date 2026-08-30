@@ -1,4 +1,5 @@
 export {
+	formatChord,
 	formatShortcut,
 	getAccelerator,
 	type KeyboardEventLike,

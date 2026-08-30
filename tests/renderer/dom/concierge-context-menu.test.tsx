@@ -24,6 +24,18 @@ import {
 	installLocalStorage,
 } from '../support/dom';
 
+/**
+ * The chord label the context menu renders on the running platform: the macOS
+ * glyph run, or the `Ctrl+…` spelling everywhere else. Written out rather than
+ * taken from `formatChord`, so the assertion states the expected mapping
+ * instead of restating the formatter's own output.
+ */
+function chord(key: string, shifted = false): string {
+	return process.platform === 'darwin'
+		? `${shifted ? '⇧' : ''}⌘${key}`
+		: `Ctrl+${shifted ? 'Shift+' : ''}${key}`;
+}
+
 const ANSWER_TEXT = 'an answer worth keeping';
 
 /** One assistant answer, as the Concierge's transcript stores it. */
@@ -176,7 +188,7 @@ describe('the Concierge panel context menus', () => {
 
 		await rightClick(screen.getByText(ANSWER_TEXT), target());
 
-		expect(menuRows()).toEqual(['Copy⌘C', 'Select all']);
+		expect(menuRows()).toEqual([`Copy${chord('C')}`, 'Select all']);
 	});
 
 	test('each surface answers only for its own subtree', async () => {
@@ -189,19 +201,19 @@ describe('the Concierge panel context menus', () => {
 
 		expect(screen.getAllByRole('menu')).toHaveLength(1);
 		expect(menuRows()).toEqual([
-			'Undo⌘Z',
-			'Redo⇧⌘Z',
-			'Cut⌘X',
-			'Copy⌘C',
-			'Paste⌘V',
-			'Select all⌘A',
+			`Undo${chord('Z')}`,
+			`Redo${chord('Z', true)}`,
+			`Cut${chord('X')}`,
+			`Copy${chord('C')}`,
+			`Paste${chord('V')}`,
+			`Select all${chord('A')}`,
 		]);
 
 		await dismissMenu();
 		await rightClick(screen.getByText(ANSWER_TEXT), target());
 
 		expect(screen.getAllByRole('menu')).toHaveLength(1);
-		expect(menuRows()).toEqual(['Copy⌘C', 'Select all']);
+		expect(menuRows()).toEqual([`Copy${chord('C')}`, 'Select all']);
 	});
 
 	test('right-clicking the failure line offers the read-only commands', async () => {
@@ -216,7 +228,7 @@ describe('the Concierge panel context menus', () => {
 			target({ selectionText: SESSION_FAILURE }),
 		);
 
-		expect(menuRows()).toEqual(['Copy⌘C', 'Select all']);
+		expect(menuRows()).toEqual([`Copy${chord('C')}`, 'Select all']);
 	});
 
 	test('dismissing the transcript menu leaves the panel open and focused', async () => {

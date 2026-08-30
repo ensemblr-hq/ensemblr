@@ -48,6 +48,8 @@ export const SETUP_CHECK_TITLE: Record<SetupCheckId, (t: TFunction) => string> =
 		'pi-rpc': (t) => t('common:setup-check.title.pi-rpc', 'Pi RPC startup'),
 		'root-directory': (t) =>
 			t('common:setup-check.title.root-directory', 'Root directory'),
+		'secret-storage': (t) =>
+			t('common:setup-check.title.secret-storage', 'Secret storage'),
 		'shell-process-launch': (t) =>
 			t(
 				'common:setup-check.title.shell-process-launch',

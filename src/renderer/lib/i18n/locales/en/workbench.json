@@ -1234,6 +1234,13 @@
 		"file-count_one": "{{count}} file",
 		"file-count_other": "{{count}} files"
 	},
+	"window-controls": {
+		"close": "Close window",
+		"group": "Window controls",
+		"maximize": "Maximize",
+		"minimize": "Minimize",
+		"restore": "Restore"
+	},
 	"workspace-checks": {
 		"blocked": {
 			"detail": "Checks are failing.",

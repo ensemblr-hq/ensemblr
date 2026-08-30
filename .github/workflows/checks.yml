@@ -18,10 +18,22 @@ permissions:
   contents: read
 
 jobs:
-  # macOS, not ubuntu: `mod` resolves to ⌘ on darwin and Ctrl elsewhere, so the
-  # keymap suites fail on Linux against an app that only ships for macOS.
-  verify:
-    runs-on: macos-latest
+  # Both platforms Ensemblr ships for. The keymap suites resolve `mod` to ⌘ on
+  # darwin and Ctrl elsewhere and assert whichever the runner is, so the Linux
+  # leg is what proves a darwin-only assumption fails here rather than in a
+  # user's AppImage.
+  #
+  # Named `verify-matrix`, not `verify`: a matrix reports one status check per
+  # leg — `verify (macos-latest)` — so keeping the name here would retire the
+  # `verify` context that branch protection on master requires, and every PR
+  # would block on a check that is never reported again. The aggregate below
+  # keeps reporting it.
+  verify-matrix:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v7
 
@@ -40,6 +52,23 @@ jobs:
 
       - name: Vitest
         run: npm run test
+
+  # One status check named `verify`, whatever the matrix grows to. The branch
+  # ruleset lives in repository settings rather than in this tree, so a required
+  # context can only be kept by keeping the name.
+  verify:
+    needs: verify-matrix
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      # A job whose dependency failed is *skipped*, and a skipped required check
+      # reports neutral rather than failing — which would make this aggregate
+      # green on a red matrix. Read the result explicitly instead.
+      - name: Fail unless every matrix leg passed
+        if: needs.verify-matrix.result != 'success'
+        run: |
+          echo "::error::verify-matrix reported '${{ needs.verify-matrix.result }}'."
+          exit 1
 
   scan:
     # `inputs` is null on push/pull_request, so those keep running the scan; only

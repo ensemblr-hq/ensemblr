@@ -16,7 +16,7 @@ import {
 	useCloneDialogForm,
 } from '@/renderer/hooks/welcome/use-clone-dialog-form';
 import type { CloneStage } from '@/renderer/types/welcome';
-
+import { formatChord } from '@/shared/keymap';
 import { CloneGithubLocationField } from './clone-github-location-field.tsx';
 import { CloneGithubProgressLog } from './clone-github-progress-log.tsx';
 import { CloneGithubRecentRepos } from './clone-github-recent-repos.tsx';
@@ -173,7 +173,7 @@ function CloneGithubDialogForm({
 						aria-hidden='true'
 						className='ml-1 inline-flex items-center gap-0.5 text-xxs opacity-70'
 					>
-						⌘↵
+						{formatChord(['mod'], 'Enter')}
 					</span>
 				</Button>
 			</div>

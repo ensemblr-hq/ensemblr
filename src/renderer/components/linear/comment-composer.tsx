@@ -10,6 +10,7 @@ import {
 import { Button } from '@/renderer/components/ui/button';
 import { Textarea } from '@/renderer/components/ui/textarea';
 import { describeLinearFailure } from '@/renderer/lib/linear';
+import { formatChord } from '@/shared/keymap';
 
 /**
  * Inline composer that posts a comment to a Linear issue. ⌘↵ submits from inside
@@ -92,7 +93,9 @@ export function LinearCommentComposer({ issueId }: { issueId: string }) {
 						: t('linear:comment-composer.submit', 'Comment')}
 					{mutation.isPending ? null : (
 						// i18next-instrument-ignore
-						<kbd className='ml-1 font-sans text-primary-foreground/70'>⌘↵</kbd>
+						<kbd className='ml-1 font-sans text-primary-foreground/70'>
+							{formatChord(['mod'], 'Enter')}
+						</kbd>
 					)}
 				</Button>
 			</div>

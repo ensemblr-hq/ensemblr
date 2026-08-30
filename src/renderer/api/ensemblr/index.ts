@@ -35,6 +35,7 @@ export * from './repository-sources';
 export * from './settings';
 export * from './setup';
 export * from './updates';
+export * from './window-controls';
 export * from './workspace-files';
 export * from './workspace-git';
 export * from './workspace-scripts';

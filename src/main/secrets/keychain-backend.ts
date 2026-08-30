@@ -218,10 +218,12 @@ function buildKeychainSecretStore({
 			try {
 				return metadataStore.update({
 					...normalized,
-					...existing,
+					account: existing.account,
 					backend: 'macos-keychain',
+					id: existing.id,
 					maskedDisplay: maskSecret(normalized.value),
 					now: now().toISOString(),
+					service: existing.service,
 				});
 			} catch (error) {
 				throw toMetadataError(error);

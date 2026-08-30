@@ -4,7 +4,7 @@
 
 # Ensemblr™
 
-**A macOS orchestrator for multi-agent coding work, driving the Pi CLI or the Claude Code CLI — whichever
+**A desktop orchestrator for multi-agent coding work, driving the Pi CLI or the Claude Code CLI — whichever
 you already run.**
 
 The agent inside a workspace can drive the app itself: spawn sub-agents into their own chat tabs, delegate
@@ -13,12 +13,13 @@ permission-gated surface is **Ensemblr Control**, and the worktree manager under
 safe — every stream of work gets its own git worktree, branch, and review path, so a fan-out of agents
 cannot collide.
 
-**Apple silicon Macs only. Bring your own agent CLI — Pi or Claude Code, one is enough. `git` and an
-authenticated `gh` are required.**
+**macOS on Apple silicon, or Linux on x86-64. Bring your own agent CLI — Pi or Claude Code, one is enough.
+`git` and an authenticated `gh` are required.**
 
 No Ensemblr account, no sign-in, no cloud sync, no telemetry. State is a local SQLite database, secrets go
-to the macOS Keychain, GitHub tokens stay with `gh` and are never copied anywhere, and the app ships no
-agent binary of its own — it drives the one you installed.
+to the OS keyring — the macOS Keychain, or gnome-keyring / KWallet on Linux — GitHub tokens stay with `gh`
+and are never copied anywhere, and the app ships no agent binary of its own — it drives the one you
+installed.
 
 <video src="https://github.com/user-attachments/assets/c5db8e14-0a89-474d-ad6a-994769b3e71b" controls muted loop playsinline>
   <a href="https://github.com/user-attachments/assets/c5db8e14-0a89-474d-ad6a-994769b3e71b">Watch Ensemblr Control drive the app (60 seconds, no audio)</a>
@@ -27,8 +28,14 @@ agent binary of its own — it drives the one you installed.
 *Ensemblr Control driving the app from inside a workspace: the agent names its own tab, moves the workspace to In progress, starts a run script, then delegates to two sub-agents in their own chat tabs and launches a Claude Code harness in a terminal.*
 
 - **Version:** [`0.1.0-beta.18`](https://github.com/ensemblr-hq/ensemblr/releases/tag/v0.1.0-beta.18) (pre-1.0, polish stage)
-- **Platform:** macOS on Apple silicon
 - **License:** Apache-2.0
+
+| Platform | Artifact | Install |
+| --- | --- | --- |
+| macOS, Apple silicon | `.dmg` (signed, notarized, stapled) | `brew install --cask ensemblr-hq/tap/ensemblr` |
+| Linux, x86-64 | `.AppImage` | download, `chmod +x`, run |
+
+Intel Macs and arm64 Linux are not built. Windows is not supported.
 
 ---
 
@@ -47,16 +54,35 @@ brew install --cask ensemblr-hq/tap/ensemblr
 
 Or **[Download Ensemblr 0.1.0-beta.18 (.dmg, Apple silicon)](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.0-beta.18/Ensemblr-0.1.0-beta.18-arm64.dmg)** — open it and drag Ensemblr to Applications.
 
-The build is code-signed with a Developer ID certificate, hardened-runtime, notarized by Apple, and
+The macOS build is code-signed with a Developer ID certificate, hardened-runtime, notarized by Apple, and
 stapled, so it opens without a Gatekeeper prompt and validates offline. Every build is on the
 [Releases page](https://github.com/ensemblr-hq/ensemblr/releases).
 
-To build it yourself instead, on an Apple silicon Mac with Node 24.x:
+On **Linux**, take the `.AppImage` from the same Releases page:
+
+```bash
+chmod +x Ensemblr-*.AppImage
+./Ensemblr-*.AppImage
+```
+
+The AppImage runtime is statically linked and needs no libfuse2 on the host. If it still refuses to mount —
+a container, or a kernel with no FUSE at all — run it with `--appimage-extract-and-run`. Ensemblr does not
+update itself on Linux: it reports when a newer version is out and links to the release page, because the
+file is one you placed yourself and often lives somewhere read-only.
+
+To build it yourself instead, with Node 24.x:
 
 ```bash
 npm install
-npm run make          # .dmg + .zip under out/make/
+npm run make          # macOS: .dmg + .zip under out/make/
+npm run make:linux    # Linux: .AppImage under out/make/ (needs squashfs-tools)
 ```
+
+`make:linux` refuses to run anywhere but Linux. `node-pty` ships no linux-x64
+prebuild, so cross-building it from macOS silently packages the host's Mach-O
+binary and produces an AppImage whose terminals are all dead. Build it on Linux,
+in CI, or in a `linux/amd64` container —
+[`docs/build-and-release.md`](./docs/build-and-release.md) has the one-liner.
 
 A build of your own is signed and notarized only when Apple API credentials are present in the
 environment; without them you get an unsigned build that Gatekeeper will hold on first launch. The full
@@ -66,7 +92,8 @@ path — prerequisites, channels, unsigned builds, and where Ensemblr keeps its 
 ## Prerequisites
 
 Ensemblr drives CLIs you install and authenticate yourself — it ships no agent binary and holds no provider
-key. On a clean Apple silicon Mac:
+key. On a clean Apple silicon Mac — on Linux, install the same tools with your distribution's package
+manager or the upstream scripts below:
 
 ```bash
 # 1 — Homebrew
@@ -205,8 +232,10 @@ There is no Ensemblr account to create, nothing to sign in to, and nothing synce
   Ensemblr backend in the path and no telemetry.
 - **GitHub tokens stay with `gh`.** Ensemblr stores none — no token field in settings, no OAuth screen, no
   second place one can leak from. It shells out to the CLI you already authenticated.
-- **Secrets live in the macOS Keychain**, never a file and never an environment variable. Linear's OAuth
-  tokens go straight there; the app can list what it holds without reading it back.
+- **Secrets live in the OS keyring**, never a file and never an environment variable: the macOS Keychain,
+  or gnome-keyring / KWallet through Electron's `safeStorage` on Linux. Linear's OAuth tokens go straight
+  there; the app can list what it holds without reading it back. On a Linux session with no keyring daemon
+  running, a setup check warns that values are only obfuscated rather than encrypted.
 - **State is a local SQLite database** (Node 24's built-in `node:sqlite`), alongside worktrees under a root
   directory you choose.
 - **No agent binary ships in the app.** Your `pi` and `claude` installs, your credentials, your models,

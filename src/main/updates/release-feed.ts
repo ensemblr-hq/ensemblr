@@ -17,6 +17,15 @@ import type {
 export const UPDATE_FEED_ASSET_NAME = 'update-darwin-arm64.json';
 
 /**
+ * Suffix of the Linux artifact `release.yml` attaches, lowercased because the
+ * comparison is. Linux updates notify rather than install, so this asset is
+ * never downloaded by the app — its presence is what proves the release
+ * actually shipped something a Linux user can install before the app offers
+ * them the version.
+ */
+const APPIMAGE_ASSET_SUFFIX = '.appimage';
+
+/**
  * Tag the rolling nightly release always carries. Reserved by ADR 0054: a
  * `v<semver>` tag is a real release, the literal `nightly` is the nightly, and
  * nothing else publishes.
@@ -43,6 +52,7 @@ const releaseSchema = z.object({
 		})
 		.array(),
 	draft: z.boolean().optional(),
+	html_url: z.url(),
 	tag_name: z.string(),
 });
 
@@ -56,10 +66,13 @@ const feedDocumentSchema = z.object({
 /** One GitHub release, narrowed to the fields this resolver trusts. */
 type Release = z.infer<typeof releaseSchema>;
 
-/** A release newer than the running build, and the feed URL Squirrel should be pointed at. */
+/** A release newer than the running build, and where each platform goes next. */
 export interface UpdateCandidate {
+	/** Feed document URL Squirrel is pointed at on macOS. */
 	feedUrl: string;
 	notes: string | null;
+	/** The release's page, which a check-only build links to instead of installing. */
+	releaseUrl: string;
 	version: string;
 }
 
@@ -84,10 +97,34 @@ export interface ReleaseFeed {
 	) => Promise<ReleaseFeedResult>;
 }
 
+/**
+ * Reports whether a release carries an artifact the running platform could
+ * actually install, so a version is never offered against a release that
+ * published nothing for it. A release with no assets at all ships nothing for
+ * Linux either, and the suffix is matched case-insensitively because the
+ * capitalisation of `.AppImage` is a convention rather than a guarantee.
+ * @param release - The release to inspect
+ * @param platform - The running platform
+ * @returns True when the release ships something for that platform
+ */
+function carriesPlatformArtifact(
+	release: Release,
+	platform: NodeJS.Platform,
+): boolean {
+	if (platform !== 'linux') {
+		return true;
+	}
+	return release.assets.some((asset) =>
+		asset.name.toLowerCase().endsWith(APPIMAGE_ASSET_SUFFIX),
+	);
+}
+
 /** Options for {@link createReleaseFeed}. */
 export interface ReleaseFeedOptions {
 	/** Injected so tests resolve without a network and the app uses Node's global. */
 	fetchImpl?: typeof fetch;
+	/** The running platform, which decides which release artifact must be present. */
+	platform?: NodeJS.Platform;
 	/** `owner/repo` to read releases from; defaults to the one this build was cut from. */
 	repositorySlug?: string;
 }
@@ -214,6 +251,7 @@ async function readBoundedText(
  */
 export function createReleaseFeed({
 	fetchImpl = fetch,
+	platform = process.platform,
 	repositorySlug = resolveRepositorySlug(),
 }: ReleaseFeedOptions = {}): ReleaseFeed {
 	const releasesUrl = `https://api.github.com/repos/${repositorySlug}/releases?per_page=${RELEASES_PAGE_SIZE}`;
@@ -341,16 +379,18 @@ export function createReleaseFeed({
 		if (!release) {
 			return { candidate: null, status: 'ok' };
 		}
+		// Asked before the feed document, so a release that shipped nothing this
+		// platform can install is simply not an update for it — rather than a
+		// release whose missing macOS artifact is reported to a Linux user as a
+		// broken feed.
+		if (!carriesPlatformArtifact(release, platform)) {
+			return { candidate: null, status: 'ok' };
+		}
 		const asset = release.assets.find(
 			(entry) => entry.name === UPDATE_FEED_ASSET_NAME,
 		);
 		if (!asset) {
-			return errored(
-				fail(
-					'update-feed-malformed',
-					`Release ${release.tag_name} carries no ${UPDATE_FEED_ASSET_NAME}.`,
-				),
-			);
+			return missingFeedDocument(release, platform);
 		}
 
 		const read = await readFeedDocument(asset.browser_download_url);
@@ -364,6 +404,7 @@ export function createReleaseFeed({
 			candidate: {
 				feedUrl: asset.browser_download_url,
 				notes: read.value.notes ?? null,
+				releaseUrl: release.html_url,
 				version: read.value.name,
 			},
 			status: 'ok',
@@ -371,6 +412,31 @@ export function createReleaseFeed({
 	};
 
 	return { resolve };
+}
+
+/**
+ * Answers a release that carries no Squirrel feed document. The document is a
+ * macOS artifact and the only place the exact version is written, so darwin —
+ * which installs from it — reports a broken feed, while a platform that could
+ * only have linked to the release page has one release it cannot name and
+ * reports no candidate.
+ * @param release - The release the document is missing from
+ * @param platform - The running platform
+ * @returns The errored result on darwin, no candidate elsewhere
+ */
+function missingFeedDocument(
+	release: Release,
+	platform: NodeJS.Platform,
+): ReleaseFeedResult {
+	if (platform !== 'darwin') {
+		return { candidate: null, status: 'ok' };
+	}
+	return errored(
+		fail(
+			'update-feed-malformed',
+			`Release ${release.tag_name} carries no ${UPDATE_FEED_ASSET_NAME}.`,
+		),
+	);
 }
 
 /**

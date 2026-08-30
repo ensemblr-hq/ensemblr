@@ -179,7 +179,7 @@ export function DashboardBoard() {
 	}
 	return (
 		<ShellScreen>
-			<header className='native-toolbar flex h-12 shrink-0 items-center gap-2.5 overflow-hidden border-border border-b px-4 font-medium text-sm'>
+			<header className='native-toolbar flex shrink-0 items-center gap-2.5 overflow-hidden border-border border-b px-4 font-medium text-sm'>
 				<SidebarTrigger className='sidebar-collapsed-trigger' />
 				<span className='shrink-0'>
 					{t('workbench:dashboard.title', 'Dashboard')}
