@@ -1,3 +1,4 @@
+export { linuxWindowIconPath } from './linux-desktop-identity';
 export { createMainWindow } from './main-window';
 export type {
 	QuitCoordinator,

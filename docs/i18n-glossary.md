@@ -191,6 +191,7 @@ from **Core nouns** — the width budget there is generous.
 | Create PR | Создать PR… | Δημιουργία PR… | `PR` stays `PR` per the `Pull request` row above. `Создать pull request…` is 21 characters. |
 | Open Config File | Файл конфигурации | Αρχείο ρυθμίσεων | The English is already shortened from "Open Configuration File"; the verb is carried by the menu it sits in. |
 | Run *(script toggle)* | Запуск | Εκτέλεση | The menu item that starts or stops the active run script, checked while it runs. Distinct from the `Run script` row above, which names the configured script itself. |
+| Application menu | Меню приложения | Μενού εφαρμογής | Screen-reader name for the whole bar, not a visible label — the one string in the menu that reaches the renderer catalogue, because the bar Ensemblr draws for itself on Linux is a renderer surface. The item labels inside it still come from `src/main/menu/menu-strings.ts`, already resolved to the user's language. |
 
 ## Settings-page section names
 

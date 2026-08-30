@@ -1,6 +1,4 @@
-import type { MenuItemConstructorOptions } from 'electron';
-
-import type { MenuItemFactory } from './menu-item';
+import type { DescribedMenuItem, MenuItemFactory } from './menu-item';
 import type { MenuLabels } from './menu-strings';
 
 /**
@@ -13,8 +11,8 @@ import type { MenuLabels } from './menu-strings';
 export function buildWindowMenu(
 	labels: MenuLabels,
 	items: MenuItemFactory,
-): MenuItemConstructorOptions {
-	const macOnly: MenuItemConstructorOptions[] = [
+): DescribedMenuItem {
+	const macOnly: DescribedMenuItem[] = [
 		{ type: 'separator' },
 		{ label: labels.bringAllToFront, role: 'front' },
 	];

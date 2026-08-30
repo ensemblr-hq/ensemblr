@@ -1,44 +1,44 @@
-import { app, Menu, type MenuItemConstructorOptions } from 'electron';
+import { app, Menu } from 'electron';
 
-import { author } from '../../../package.json';
 import type { AppSettings } from '../../shared/config';
 import { resolveLanguage } from '../../shared/i18n';
 import type { MenuContext } from '../../shared/menu-commands';
+import { aboutPanelOptions } from './about-panel';
 import { buildAppMenu } from './app-menu';
 import { buildChangesMenu } from './changes-menu';
 import { buildChatMenu } from './chat-menu';
 import { buildEditMenu } from './edit-menu';
 import { buildFileMenu } from './file-menu';
 import { buildHelpMenu } from './help-menu';
-import { createMenuItemFactory } from './menu-item';
+import {
+	createMenuItemFactory,
+	type DescribedMenuItem,
+	toElectronTemplate,
+} from './menu-item';
 import { menuLabels } from './menu-strings';
 import { buildViewMenu } from './view-menu';
 import { buildWindowMenu } from './window-menu';
 import { buildWorkspaceMenu } from './workspace-menu';
 
 /**
- * Builds the About-panel copyright line from the package author and the current
- * year, so the notice tracks the build date instead of a baked-in constant.
- * @returns Copyright string such as `© Philipp Soldunov 2026`.
- */
-function getCopyrightNotice(): string {
-	return `© ${author.name} ${new Date().getFullYear()}`;
-}
-
-/**
  * Builds and installs the Ensemblr application menu in the language the app
  * setting resolves to, with the macOS app menu appearing only on darwin.
  * `Menu.setApplicationMenu` replaces the menu wholesale, so calling this again
  * after the language or the renderer's menu context changes *is* the rebuild.
+ *
+ * Returns the template it built, annotated with the command behind each item,
+ * so the menu bar the app draws for itself where the desktop draws none is
+ * serialized from this same tree rather than from a second declaration of it.
  * @param readSettings - Reads the current App settings; called on every rebuild
  * @param context - The menu context the renderer last reported, or null before
  * its first report, which leaves every item enabled
+ * @returns The annotated template the menu was built from
  */
 export function installApplicationMenu(
 	readSettings: () => AppSettings,
 	context: MenuContext | null = null,
-): void {
-	app.setAboutPanelOptions({ copyright: getCopyrightNotice() });
+): DescribedMenuItem[] {
+	app.setAboutPanelOptions(aboutPanelOptions());
 
 	const language = resolveLanguage(
 		readSettings().general.language,
@@ -47,7 +47,7 @@ export function installApplicationMenu(
 	const labels = menuLabels(language, app.name);
 	const items = createMenuItemFactory(context);
 
-	const template: MenuItemConstructorOptions[] = [
+	const template: DescribedMenuItem[] = [
 		...buildAppMenu(labels, items),
 		buildFileMenu(labels, items, context),
 		buildEditMenu(labels),
@@ -59,5 +59,7 @@ export function installApplicationMenu(
 		buildHelpMenu(labels, items),
 	];
 
-	Menu.setApplicationMenu(Menu.buildFromTemplate(template));
+	Menu.setApplicationMenu(Menu.buildFromTemplate(toElectronTemplate(template)));
+
+	return template;
 }

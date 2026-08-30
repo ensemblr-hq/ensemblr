@@ -15,6 +15,9 @@ export const IPC_CHANNELS = {
 	bindAgentSessionToChatTab: 'ensemblr:bind-agent-session-to-chat-tab',
 	menuCommand: 'ensemblr:menu-command',
 	menuContext: 'ensemblr:menu-context',
+	menuBarChanged: 'ensemblr:menu-bar-changed',
+	getMenuBar: 'ensemblr:get-menu-bar',
+	invokeMenuBarItem: 'ensemblr:invoke-menu-bar-item',
 	agentControlFocusView: 'ensemblr:agent-control-focus-view',
 	agentControlTabsChanged: 'ensemblr:agent-control-tabs-changed',
 	agentControlReviewCommentsChanged:

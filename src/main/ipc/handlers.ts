@@ -26,7 +26,7 @@ import {
 import type { InfisicalService } from '../infisical';
 import type { LinearAuthService, LinearService } from '../linear';
 import { createLinkedDirectoryService } from '../linked-directories/index.ts';
-import type { MenuContextStore } from '../menu';
+import type { MenuBarStore, MenuContextStore } from '../menu';
 import type { OpenTargetService } from '../open-target';
 import type { PiExecutableService } from '../pi-runtime';
 import type { PlanModeRegistry } from '../plan-mode';
@@ -142,6 +142,8 @@ interface RegisterIpcHandlersOptions {
 	activeChatStore: ActiveChatStore;
 	/** Holds the menu context the renderer reports, shared with the menu rebuild. */
 	menuContextStore: MenuContextStore;
+	/** Holds the serialized menu bar the renderer draws for itself. */
+	menuBarStore: MenuBarStore;
 	/** Reinstalls the native application menu from the current settings and menu context. */
 	rebuildMenu: () => void;
 	/** Fired after an in-app App-settings write so side-effects can re-read. */
@@ -212,6 +214,7 @@ export function registerIpcHandlers({
 	localCommandService,
 	localRepositoryImportService,
 	localRepositoryRegistrationService,
+	menuBarStore,
 	menuContextStore,
 	onAppSettingsUpdated,
 	activeChatStore,
@@ -249,7 +252,7 @@ export function registerIpcHandlers({
 
 	registerWindowHandlers({ requestRelaunch });
 	registerTextEditingHandlers();
-	registerMenuHandlers({ menuContextStore, rebuildMenu });
+	registerMenuHandlers({ menuBarStore, menuContextStore, rebuildMenu });
 	registerActiveChatHandlers({ activeChatStore });
 	registerAppSettingsHandlers({ appSettingsService, onAppSettingsUpdated });
 	registerDictationHandlers({ dictationService });

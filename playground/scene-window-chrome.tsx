@@ -1,8 +1,13 @@
 import { useEffect } from 'react';
 
-import { WindowControlCluster } from '@/renderer/components/workbench-shell/window-controls';
+import {
+	AppMenuBar,
+	WindowTitleBarSurface,
+} from '@/renderer/components/workbench-shell/window-controls';
 import { applyWindowChrome } from '@/renderer/lib/window-chrome';
 import { resolveWindowChrome } from '@/shared/window-chrome';
+
+import { MENU_BAR_FIXTURE } from './menu-bar-fixtures.ts';
 
 /** The chrome Linux gets with `titleBar = custom`: Ensemblr draws the buttons. */
 const LINUX_CUSTOM_CHROME = resolveWindowChrome('linux', 'custom');
@@ -29,19 +34,22 @@ export function useSceneWindowChrome(isEnabled: boolean): void {
 }
 
 /**
- * The cluster where the app mounts it — fixed to the window's top-right corner
- * — so a scene can check what its own surfaces do underneath it. Inert: the
- * buttons are the geometry under review, not working window controls.
+ * The title-bar strip where the app mounts it — fixed across the window's top
+ * edge — so a scene can check what its own surfaces do below it. Inert: the
+ * strip is the geometry under review, not working window controls.
  */
-export function SceneWindowControls({ isEnabled }: { isEnabled: boolean }) {
+export function SceneWindowTitleBar({ isEnabled }: { isEnabled: boolean }) {
 	if (!isEnabled) {
 		return null;
 	}
 
 	return (
-		<div className='pointer-events-none fixed top-0 right-0 z-50'>
-			<WindowControlCluster
+		<div className='pointer-events-none fixed inset-x-0 top-0 z-50'>
+			<WindowTitleBarSurface
 				isMaximized={false}
+				menu={
+					<AppMenuBar menuBar={MENU_BAR_FIXTURE} onSelect={() => undefined} />
+				}
 				onClose={() => undefined}
 				onMinimize={() => undefined}
 				onToggleMaximize={() => undefined}

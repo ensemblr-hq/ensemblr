@@ -273,14 +273,14 @@
 			oklch(0.41 0.085 73)
 		)
 		var(--ensemblr-if-dark, oklch(0.78 0.13 73));
-	/* Leading and trailing room the window's own chrome claims along the top
-	   edge: the macOS traffic lights on the left, Ensemblr's own control cluster
-	   on the right when it draws one. `applyWindowChrome` overwrites both inline
-	   on <html> before the first paint, from the chrome main actually built the
+	/* Room the window's own chrome claims: the macOS traffic lights along the
+	   leading edge, and the title bar Ensemblr draws above its content where it
+	   owns the window controls. `applyWindowChrome` overwrites both inline on
+	   <html> before the first paint, from the chrome main actually built the
 	   window with; the zeros here are the "no chrome" case a browser preview or a
 	   missing preload bridge falls back to. */
 	--ensemblr-window-chrome-inset-start: 0rem;
-	--ensemblr-window-chrome-inset-end: 0rem;
+	--ensemblr-window-chrome-inset-top: 0rem;
 
 	/* The leading inset as a *padding*, for the bars that pad by it instead of
 	   padding on top of their own. The inset is zero everywhere but macOS, so a
@@ -292,12 +292,20 @@
 		var(--ensemblr-window-chrome-inset-start)
 	);
 
-	/* Height of every top bar, and therefore of the window-control cluster that
-	   overlays them. The cluster is positioned against the window rather than
-	   against any one toolbar, so a toolbar that set its own height would put
-	   the buttons off-centre against it — one value, read by `.native-toolbar`
-	   and by the cluster. */
+	/* Height of every top bar. One value, read by `.native-toolbar` and by the
+	   strips that are not one — the sidebar's title bar, the maximized Concierge
+	   header — so a bar that set its own height cannot sit a pixel off the one
+	   beside it. */
 	--ensemblr-toolbar-height: 3rem;
+
+	/* The window's usable height: the viewport, less the title bar Ensemblr
+	   draws above its content. Every surface that would otherwise size itself to
+	   `100svh` reads this instead, so the title bar takes its strip out of the
+	   app rather than covering the top of it. */
+	--ensemblr-shell-height: calc(
+		100svh -
+		var(--ensemblr-window-chrome-inset-top)
+	);
 
 	--background: var(--ensemblr-canvas);
 	--foreground: var(--ensemblr-ink);
@@ -645,6 +653,31 @@
 		@apply bg-background text-foreground antialiased;
 	}
 
+	/* Clears the title bar Ensemblr draws over the window's top edge. Zero
+	   wherever the desktop decorates the window itself.
+
+	   On the app root rather than on `body`, where it belongs: Radix locks the
+	   page scroll through `react-remove-scroll-bar`, which reads `body`'s
+	   *margin* offsets and writes them back as *padding* — so every select,
+	   dialog and dropdown that opened restated `padding-top: 0` over this and
+	   dropped the whole app a title bar's height, underneath the bar. Its style
+	   is injected unlayered, so it outranks anything written here. */
+	#root {
+		padding-block-start: var(--ensemblr-window-chrome-inset-top);
+	}
+
+	/* The document itself never scrolls: every shell surface sizes to
+	   `--ensemblr-shell-height` and scrolls inside itself. Pinned rather than
+	   left to add up, because the title bar is drawn over the viewport's top
+	   edge while `body` pads for it — so a document scrolled even a few pixels,
+	   by a focus move or a collapsible opening below the fold, slides the whole
+	   app up underneath the bar. */
+	html.app-window-controls,
+	html.app-window-controls body {
+		block-size: 100svh;
+		overflow: hidden;
+	}
+
 	button,
 	input,
 	textarea,
@@ -660,40 +693,36 @@
 @layer utilities {
 	.window-chrome-spacer,
 	.native-toolbar,
-	.window-drag-region {
+	.window-drag-region,
+	.window-title-bar {
 		-webkit-app-region: drag;
 	}
 
-	/* Keeps a toolbar's own trailing actions out from under the fixed control
-	   cluster. Only set while Ensemblr draws the controls. */
-	html.app-window-controls .native-toolbar {
-		padding-inline-end: calc(0.75rem + var(--ensemblr-window-chrome-inset-end));
+	/* The shadcn sidebar positions itself against the viewport rather than
+	   against its parent, so it is the one surface that cannot read
+	   `--ensemblr-shell-height` from a class of ours. Both slots are quieted
+	   here instead of by editing the vendored primitive. */
+	html.app-window-controls [data-slot="sidebar-wrapper"] {
+		min-block-size: var(--ensemblr-shell-height);
 	}
 
-	/* The workbench toolbar gives that room back only while the review sidebar
-	   is genuinely to its right, because then the sidebar's own header is the
-	   one under the cluster. Neither half of that can be read off the DOM: the
-	   sidebar panel stays mounted at zero width when collapsed, and it is
-	   display:none below `lg`, so a `:has(.right-sidebar-header)` test matches
-	   in both states and leaves the toolbar's own actions under the buttons. */
-	@media (width >= 64rem) {
-		html.app-window-controls .native-toolbar[data-review-sidebar="expanded"] {
-			padding-inline-end: 0.75rem;
-		}
-	}
-
-	/* The same reservation for a bar that reaches the window's trailing edge
-	   without being a `.native-toolbar` — the maximized Concierge header, which
-	   covers the shell inset rather than sitting inside it. Its own
-	   `padding-inline-end` is the no-chrome case; this replaces it. */
-	html.app-window-controls .window-controls-safe-end {
-		padding-inline-end: calc(0.5rem + var(--ensemblr-window-chrome-inset-end));
+	html.app-window-controls [data-slot="sidebar-container"] {
+		block-size: var(--ensemblr-shell-height);
+		inset-block-start: var(--ensemblr-window-chrome-inset-top);
 	}
 
 	.native-toolbar {
 		background: var(--ensemblr-toolbar);
 		backdrop-filter: blur(18px) saturate(1.3);
 		block-size: var(--ensemblr-toolbar-height);
+	}
+
+	/* Ensemblr's own title bar, drawn only where it owns the window controls. It
+	   takes its height from the same inset `body` pads by, so the strip and the
+	   room reserved for it are one value. */
+	.window-title-bar {
+		background: var(--ensemblr-toolbar);
+		block-size: var(--ensemblr-window-chrome-inset-top);
 	}
 
 	/* Dev only: tint the nav sidebar's bare title-bar strip to match the top bars. */
@@ -846,6 +875,19 @@
 		display: inline-flex;
 	}
 
+	/* Where Ensemblr draws its own title bar the nav sidebar has no title-bar
+	   strip of its own — the wordmark is up in the title bar, which would leave
+	   that strip carrying nothing but this trigger. So the toolbar's copy is the
+	   only one, and it stays out whether the sidebar is open or shut rather than
+	   appearing only once there is no other way back. */
+	html.app-window-controls .sidebar-collapsed-trigger {
+		display: inline-flex;
+	}
+
+	/* The whole cluster, not just the three buttons: the gaps between them are
+	   under a finger's width, and a click that lands in one should not become a
+	   window drag. */
+	.window-control-cluster,
 	a,
 	button,
 	input,

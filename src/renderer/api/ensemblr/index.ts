@@ -21,6 +21,7 @@ export * from './infisical';
 export * from './invalidate-workspace-list-views';
 export * from './linear';
 export * from './linked-directories';
+export * from './menu-bar';
 export * from './navigation';
 export * from './notifications';
 export * from './open-targets';

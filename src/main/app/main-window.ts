@@ -1,6 +1,9 @@
 import path from 'node:path';
 import { BrowserWindow, screen } from 'electron';
-import type { TitleBarPreference } from '../../shared/window-chrome.ts';
+import {
+	resolveWindowChrome,
+	type TitleBarPreference,
+} from '../../shared/window-chrome.ts';
 import { routeExternalLinksToBrowser } from './external-links';
 import { linuxWindowIconPath } from './linux-desktop-identity';
 import { restrictMediaPermissions } from './media-permissions';
@@ -56,6 +59,14 @@ export function createMainWindow({
 			preload: path.join(__dirname, 'preload.js'),
 		},
 	});
+
+	// The renderer draws the menu itself wherever it draws the title bar, so
+	// Electron's own Windows/Linux menu bar has to stay down — two bars a row
+	// apart, one of them unstyled, is what a frameless window would otherwise
+	// risk on an Electron that starts drawing it.
+	if (resolveWindowChrome(process.platform, titleBar).drawsOwnControls) {
+		mainWindow.setMenuBarVisibility(false);
+	}
 
 	if (windowStateStore) {
 		trackMainWindowState({ mainWindow, store: windowStateStore });

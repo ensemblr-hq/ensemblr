@@ -9,7 +9,7 @@ import { useEffect } from 'react';
  * stylesheet itself.
  */
 export const DRAG_REGION_SELECTOR =
-	'.native-toolbar, .window-drag-region, .window-chrome-spacer';
+	'.native-toolbar, .window-drag-region, .window-chrome-spacer, .window-title-bar';
 
 /** Elements inside a drag strip whose own double-click is not a title-bar gesture. */
 const INTERACTIVE_SELECTOR =

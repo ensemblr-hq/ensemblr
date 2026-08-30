@@ -13,6 +13,12 @@ import { TOOLBAR_HEIGHT_CLASS } from '@/renderer/lib/workbench/shell-inset';
  * macOS parks the traffic lights in that corner, so there the strip stays bare
  * rather than crowding them; everywhere else the corner is empty and the bar
  * reads as an unexplained gap above the navigation.
+ *
+ * Not mounted at all where Ensemblr draws its own title bar: the wordmark is
+ * already up there, which leaves a strip carrying nothing but the collapse
+ * trigger — a second bare band directly under the first. The trigger moves to
+ * the content toolbar instead, which the `sidebar-collapsed-trigger` rule keeps
+ * visible there whether or not the sidebar is open.
  */
 export function NavigationSidebarHeader({
 	showsWordmark,

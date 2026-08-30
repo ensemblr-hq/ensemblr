@@ -23,7 +23,7 @@ import { ToolApprovalScene } from './tool-approval-preview.tsx';
 import { TurnSummaryPreview } from './turn-summary-preview.tsx';
 import { UnreadScene } from './unread-preview.tsx';
 import { ViewersScene } from './viewers-preview.tsx';
-import { WindowControlsScene } from './window-controls-preview.tsx';
+import { WindowTitleBarScene } from './window-title-bar-preview.tsx';
 
 /**
  * Each scene drives the shipped components with real tool payloads, so what the
@@ -172,10 +172,10 @@ export const SCENE_GROUPS = [
 				source: 'playground/navigation-sidebar-header-preview.tsx',
 			},
 			{
-				id: 'window-controls',
-				label: 'window controls',
-				render: () => <WindowControlsScene />,
-				source: 'playground/window-controls-preview.tsx',
+				id: 'window-title-bar',
+				label: 'window title bar',
+				render: () => <WindowTitleBarScene />,
+				source: 'playground/window-title-bar-preview.tsx',
 			},
 		],
 	},

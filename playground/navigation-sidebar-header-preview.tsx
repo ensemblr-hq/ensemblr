@@ -8,10 +8,14 @@ import { StubbedWorkbenchLayout } from './stubbed-workbench-layout.tsx';
 
 /** The heights the wordmark is legible at, bracketing the shipped `h-3.5`. */
 const WORDMARK_SIZES: readonly { className: string; label: string }[] = [
-	{ className: 'h-2.5', label: 'h-2.5 · 10px' },
-	{ className: 'h-3', label: 'h-3 · 12px' },
-	{ className: 'h-3.5', label: 'h-3.5 · 14px — shipped, and the site header' },
-	{ className: 'h-4', label: 'h-4 · 16px' },
+	{ className: 'h-2.5', label: 'h-2.5 · 10px — rows dropped' },
+	{ className: 'h-3', label: 'h-3 · 12px — rows dropped' },
+	{
+		className: 'h-3.5',
+		label:
+			'h-3.5 · 14px — shipped, the site header, and the smallest that divides by 7',
+	},
+	{ className: 'h-4', label: 'h-4 · 16px — rows dropped' },
 ];
 
 /**
@@ -70,7 +74,7 @@ function WordmarkSizes() {
 	return (
 		<SceneSection
 			label='wordmark — EnsemblrWordmark'
-			note='ensemblr.dev’s 47×7 pixel grid, sized by height alone'
+			note='ensemblr.dev’s 47×7 pixel grid: crispEdges snaps each cell to a device pixel, so only a whole multiple of 7px keeps every row of the letters'
 		>
 			{WORDMARK_SIZES.map(({ className, label }) => (
 				<MeasuredRow key={className} label={label}>

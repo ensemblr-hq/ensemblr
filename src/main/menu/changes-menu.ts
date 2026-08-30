@@ -1,6 +1,4 @@
-import type { MenuItemConstructorOptions } from 'electron';
-
-import type { MenuItemFactory } from './menu-item';
+import type { DescribedMenuItem, MenuItemFactory } from './menu-item';
 import type { MenuLabels } from './menu-strings';
 
 /**
@@ -17,7 +15,7 @@ import type { MenuLabels } from './menu-strings';
 export function buildChangesMenu(
 	labels: MenuLabels,
 	items: MenuItemFactory,
-): MenuItemConstructorOptions {
+): DescribedMenuItem {
 	return {
 		label: labels.changes,
 		submenu: [

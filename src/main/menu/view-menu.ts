@@ -1,6 +1,6 @@
-import { BrowserWindow, type MenuItemConstructorOptions } from 'electron';
+import { BrowserWindow } from 'electron';
 
-import type { MenuItemFactory } from './menu-item';
+import type { DescribedMenuItem, MenuItemFactory } from './menu-item';
 import type { MenuLabels } from './menu-strings';
 
 /**
@@ -15,7 +15,7 @@ import type { MenuLabels } from './menu-strings';
 export function buildViewMenu(
 	labels: MenuLabels,
 	items: MenuItemFactory,
-): MenuItemConstructorOptions {
+): DescribedMenuItem {
 	return {
 		label: labels.view,
 		submenu: [

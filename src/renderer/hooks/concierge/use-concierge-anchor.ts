@@ -6,6 +6,7 @@ import {
 	useLayoutEffect,
 	useRef,
 } from 'react';
+import { readWindowChromeInsetsPx } from '@/renderer/lib/window-chrome';
 import {
 	CONCIERGE_UNPLACED,
 	type ConciergePoint,
@@ -73,6 +74,17 @@ function dockedAnchor(): ConciergePoint {
 }
 
 /**
+ * The highest a Concierge surface may reach, in pixels. A dragged surface is
+ * positioned against the viewport rather than against the padded document, so
+ * where Ensemblr draws its own title bar the margin alone would let the panel's
+ * own header slide underneath it and out of reach.
+ * @returns The top edge the drag stops at.
+ */
+export function conciergeTopBound(): number {
+	return readWindowChromeInsetsPx().top + EDGE_MARGIN;
+}
+
+/**
  * Clamps a top-left point so the surface it positions stays reachable, which
  * also covers a window that has since been resized around a stored anchor.
  * @param point - The proposed top-left corner.
@@ -83,17 +95,15 @@ function clampToViewport(
 	point: ConciergePoint,
 	size: ConciergeSurfaceSize,
 ): ConciergePoint {
+	const minY = conciergeTopBound();
 	const maxX = Math.max(
 		EDGE_MARGIN,
 		window.innerWidth - size.width - EDGE_MARGIN,
 	);
-	const maxY = Math.max(
-		EDGE_MARGIN,
-		window.innerHeight - size.height - EDGE_MARGIN,
-	);
+	const maxY = Math.max(minY, window.innerHeight - size.height - EDGE_MARGIN);
 	return {
 		x: Math.min(Math.max(point.x, EDGE_MARGIN), maxX),
-		y: Math.min(Math.max(point.y, EDGE_MARGIN), maxY),
+		y: Math.min(Math.max(point.y, minY), maxY),
 	};
 }
 

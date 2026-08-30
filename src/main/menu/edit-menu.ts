@@ -1,4 +1,4 @@
-import type { MenuItemConstructorOptions } from 'electron';
+import type { DescribedMenuItem } from './menu-item';
 
 import type { MenuLabels } from './menu-strings';
 
@@ -9,8 +9,8 @@ import type { MenuLabels } from './menu-strings';
  * @param labels - Native menu labels for the active language
  * @returns The Edit menu
  */
-export function buildEditMenu(labels: MenuLabels): MenuItemConstructorOptions {
-	const macOnly: MenuItemConstructorOptions[] = [
+export function buildEditMenu(labels: MenuLabels): DescribedMenuItem {
+	const macOnly: DescribedMenuItem[] = [
 		{ label: labels.pasteAndMatchStyle, role: 'pasteAndMatchStyle' },
 		{ label: labels.delete, role: 'delete' },
 		{ label: labels.selectAll, role: 'selectAll' },
@@ -21,7 +21,7 @@ export function buildEditMenu(labels: MenuLabels): MenuItemConstructorOptions {
 		},
 	];
 
-	const otherPlatforms: MenuItemConstructorOptions[] = [
+	const otherPlatforms: DescribedMenuItem[] = [
 		{ label: labels.delete, role: 'delete' },
 		{ type: 'separator' },
 		{ label: labels.selectAll, role: 'selectAll' },
