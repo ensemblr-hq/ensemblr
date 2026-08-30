@@ -95,46 +95,71 @@ The Deck is the reference Linux host: Wayland, KDE Plasma, fractional scaling, a
 battery, an immutable root, and no package manager to speak of. Everything below
 assumes **Desktop Mode**.
 
-**Toolchain.** `npm ci` compiles `node-pty`, so a C++ toolchain is needed, and
-SteamOS ships none. Check what is already there:
+**Toolchain.** Three things are needed, and they do not all come from the same
+place. Check what is already there:
 
 ```bash
-for tool in node python3 gcc make mksquashfs distrobox; do
+for tool in node python3 g++ make mksquashfs brew distrobox; do
   printf '%-12s %s\n' "$tool" "$(command -v $tool || echo MISSING)"
 done
 ```
 
-`mksquashfs` is needed only by `make:linux`; everything else is needed by both.
-Two ways to fill the gaps:
-
-- **Distrobox (preferred).** Nothing touches the read-only root, and a SteamOS
-  update cannot wipe it. Prefer a Debian image over Arch: it links against an
-  older glibc than the host, and old-built-runs-on-new is the safe direction.
-
-  ```bash
-  distrobox create --name ensemblr --image debian:bookworm
-  distrobox enter ensemblr
-  sudo apt-get update && sudo apt-get install -y git curl python3 build-essential squashfs-tools
-  ```
-
-- **Native**, if you would rather not. It needs a sudo password set (`passwd`,
-  the Deck ships without one), survives only until the next SteamOS update, and
-  usually needs the keyring initialised first:
-
-  ```bash
-  sudo steamos-readonly disable
-  sudo pacman-key --init && sudo pacman-key --populate archlinux holo
-  sudo pacman -S --needed base-devel python squashfs-tools
-  ```
-
-**Node 24.** `scripts/require-node-version.mjs` enforces the major exactly.
-`nvm` installs entirely under `$HOME`, needs no root, and survives OS updates:
+**Node 24 and `mksquashfs`: Homebrew covers both.** Each has an `x86_64_linux`
+bottle, so nothing compiles and nothing touches the read-only root. `node@24` is
+keg-only, as every versioned formula is, so it has to be put on PATH by hand —
+plain `node` is far past 24 and `scripts/require-node-version.mjs` enforces the
+major exactly.
 
 ```bash
-curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash
-exec "$SHELL" -l
-nvm install 24 && nvm use 24
+brew install node@24 squashfs
+export PATH="$(brew --prefix node@24)/bin:$PATH"
+node -v   # must print v24.x
 ```
+
+`nvm` works just as well for the Node half if you would rather not go through
+Homebrew; it also installs entirely under `$HOME`.
+
+**A C++ compiler: Homebrew is the wrong tool.** `npm ci` compiles `node-pty` —
+it publishes no linux-x64 prebuild — and node-gyp looks for `g++`/`c++`/`cc` on
+PATH. Homebrew's `gcc` formula installs *versioned* binaries (`g++-16`), so
+node-gyp will not find it and will fall through to the system compiler, or fail
+loudly if there is none. That failure is the good outcome.
+
+Pointing `CXX` at Homebrew's `g++-16` to force it is the bad one: the resulting
+`pty.node` links Homebrew's libstdc++ and carries an rpath into
+`/home/linuxbrew/.linuxbrew/lib`. It runs on the machine that built it and on no
+other — the same shape of silent, ships-anyway breakage
+`require-linux-host.mjs` exists to prevent, just one layer down.
+
+So if `g++` is MISSING above, use the system package manager or a container:
+
+```bash
+# Native. Needs a sudo password set (`passwd` — the Deck ships without one),
+# and lasts only until the next SteamOS update, which restores the image.
+sudo steamos-readonly disable
+sudo pacman-key --init && sudo pacman-key --populate archlinux holo
+sudo pacman -S --needed base-devel python
+```
+
+```bash
+# Or a container, which survives OS updates. Prefer Debian over Arch: it links
+# against an older glibc than the host, and old-built-runs-on-new is the safe
+# direction for anything that ends up inside the artifact.
+distrobox create --name ensemblr --image debian:bookworm
+distrobox enter ensemblr
+sudo apt-get update && sudo apt-get install -y git curl python3 build-essential squashfs-tools
+```
+
+**Whichever route, check what `pty.node` actually linked** before trusting the
+build. The one line that matters:
+
+```bash
+ldd out/Ensemblr-linux-x64/resources/app.asar.unpacked/node_modules/node-pty/build/Release/pty.node
+```
+
+Every entry should resolve under `/usr/lib` or `/lib`. A `/home/linuxbrew` path
+means the artifact only runs on this Deck, and `not found` means it will not run
+anywhere.
 
 **Build.** Budget ~2 GB for `node_modules` plus the Electron download.
 
