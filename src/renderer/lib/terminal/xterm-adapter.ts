@@ -27,6 +27,19 @@ const DEFAULT_FONT_SIZE = 12;
 const DEFAULT_SCROLLBACK = 10_000;
 
 /**
+ * Style and weight prefixes for the four faces xterm rasterizes separately.
+ * `document.fonts` addresses one face per prefix, so bold and italic cells stay
+ * on the fallback font unless each is requested in its own right.
+ */
+const FONT_FACE_VARIANTS = ['', 'bold ', 'italic ', 'italic bold '];
+
+/**
+ * Stack the font family round-trips through to make xterm's option value change,
+ * which is the only thing that re-runs the cell measurement.
+ */
+const FONT_REMEASURE_SENTINEL = 'monospace';
+
+/**
  * Builds the xterm.js-backed terminal adapter with fit, clickable links, and
  * the workspace monospace font.
  * @param options - Typography, scrollback, and read-only overrides.
@@ -60,14 +73,37 @@ export function createXtermAdapter({
 	const themeObserver = observeDocumentTheme(() => {
 		terminal.options.theme = readThemeFromDocument();
 	});
+	let disposed = false;
+	let activeFont = { family: fontFamily, size: fontSize };
+	let fontReady: Promise<void> = Promise.resolve();
+
+	/**
+	 * Starts loading the faces the terminal draws with and, when any of them was
+	 * still missing, redraws the surface once they arrive. A stack the user has
+	 * since moved off is dropped rather than redrawn, so a slow load cannot
+	 * reinstate the font its request was made for.
+	 */
+	const requestFontFaces = (): void => {
+		const { family, size } = activeFont;
+		const loading = loadTerminalFontFaces(family, size);
+		fontReady = loading
+			? loading.then(() => {
+					if (!disposed && activeFont.family === family) {
+						redrawWithLoadedFont(terminal, family);
+					}
+				})
+			: Promise.resolve();
+	};
 
 	return {
 		attach: (element) => {
 			terminal.open(element);
 			loadWebglRenderer(terminal);
+			requestFontFaces();
 		},
 		clear: () => terminal.clear(),
 		dispose: () => {
+			disposed = true;
 			themeObserver?.disconnect();
 			terminal.dispose();
 		},
@@ -94,12 +130,86 @@ export function createXtermAdapter({
 			if (nextSize !== undefined) {
 				terminal.options.fontSize = nextSize;
 			}
+			activeFont = {
+				family: nextFamily ?? activeFont.family,
+				size: nextSize ?? activeFont.size,
+			};
+			requestFontFaces();
 		},
 		setScrollback: (lines) => {
 			terminal.options.scrollback = lines;
 		},
+		whenFontReady: () => fontReady,
 		write: (data) => terminal.write(data),
 	};
+}
+
+/**
+ * Requests every face of a font stack and resolves once they are rasterizable.
+ *
+ * Canvas text — both xterm's cell measurement and the WebGL glyph atlas —
+ * silently substitutes the fallback font for a `@font-face` that has not
+ * finished loading, and unlike DOM text it neither starts the fetch nor repaints
+ * when one lands. The bundled Nerd Font is a `url()` face, so a surface opened
+ * before some other part of the UI happened to request it would otherwise keep
+ * the fallback for its whole lifetime. `document.fonts.ready` cannot stand in
+ * for this: it settles the loads already in flight rather than starting any.
+ *
+ * `allSettled` rather than `all`, because `fonts.load` rejects when a face
+ * fails to fetch or decode: `all` would reject the whole batch on the first
+ * such face, dropping the redraw for the three that did land, and the rejection
+ * would escape the `try` below — which only covers `fonts.check` throwing on an
+ * unparseable shorthand — into the caller's un-caught `then` chain. The returned
+ * promise therefore never rejects.
+ * @param fontFamily - CSS font-family stack the terminal draws with.
+ * @param fontSize - Font size in pixels, needed to form a valid CSS shorthand.
+ * @returns A promise settling when the faces are usable, or null when they
+ * already are and nothing needs redrawing.
+ */
+function loadTerminalFontFaces(
+	fontFamily: string,
+	fontSize: number,
+): Promise<void> | null {
+	const fonts = typeof document === 'undefined' ? undefined : document.fonts;
+
+	if (!fonts) {
+		return null;
+	}
+
+	const faces = FONT_FACE_VARIANTS.map(
+		(variant) => `${variant}${fontSize}px ${fontFamily}`,
+	);
+
+	try {
+		if (faces.every((face) => fonts.check(face))) {
+			return null;
+		}
+
+		return Promise.allSettled(faces.map((face) => fonts.load(face))).then(
+			() => undefined,
+		);
+	} catch {
+		return null;
+	}
+}
+
+/**
+ * Re-measures the cell box and discards every cached glyph so an already-open
+ * surface picks up a font face that finished loading after it was built.
+ *
+ * Neither happens on its own. xterm ignores an option write that does not change
+ * the value, so the measurement only re-runs if the family string actually
+ * differs — hence the round trip through {@link FONT_REMEASURE_SENTINEL}. The
+ * WebGL atlas keys its glyph cache on that same string, so settling back on the
+ * original stack hands it the pages it rasterized with the fallback font;
+ * `clearTextureAtlas` is what throws those away.
+ * @param terminal - The opened terminal whose font has just become available.
+ * @param fontFamily - The stack to settle back on after the sentinel.
+ */
+function redrawWithLoadedFont(terminal: Terminal, fontFamily: string): void {
+	terminal.options.fontFamily = FONT_REMEASURE_SENTINEL;
+	terminal.options.fontFamily = fontFamily;
+	terminal.clearTextureAtlas();
 }
 
 /**

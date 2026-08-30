@@ -150,27 +150,12 @@ export function XtermTerminal({
 				replayed = true;
 			});
 
-		const syncDimensions = () => {
-			// Force-mounted hidden tabs have a zero-size container; fitting then
-			// would collapse the PTY to minimum dimensions and garble wrapping.
-			if (container.clientHeight === 0 || container.clientWidth === 0) {
-				return;
-			}
-
-			const dimensions = adapter.fit();
-
-			if (dimensions) {
-				void ensemblr.resizeTerminalSession({
-					cols: dimensions.cols,
-					rows: dimensions.rows,
-					terminalId,
-				});
-			}
-		};
+		const syncDimensions = () =>
+			syncTerminalDimensions(adapter, container, terminalId);
 
 		syncDimensions();
 
-		void document.fonts?.ready.then(() => {
+		void adapter.whenFontReady().then(() => {
 			if (!disposed) {
 				syncDimensions();
 			}
@@ -217,20 +202,15 @@ export function XtermTerminal({
 		appliedFontRef.current = { fontFamily, fontSize: terminalFontSize };
 
 		adapter.setFont({ fontFamily, fontSize: terminalFontSize });
+		syncTerminalDimensions(adapter, container, terminalId);
 
-		if (container.clientHeight === 0 || container.clientWidth === 0) {
-			return;
-		}
-
-		const dimensions = adapter.fit();
-
-		if (dimensions) {
-			void window.ensemblr.resizeTerminalSession({
-				cols: dimensions.cols,
-				rows: dimensions.rows,
-				terminalId,
-			});
-		}
+		// Not redundant: the fit above measured whatever faces were rasterizable
+		// then, and a face landing later moves the cell box and the column count.
+		void adapter.whenFontReady().then(() => {
+			if (adapterRef.current === adapter) {
+				syncTerminalDimensions(adapter, container, terminalId);
+			}
+		});
 	}, [fontFamily, terminalFontSize, terminalId]);
 
 	useEffect(() => {
@@ -265,6 +245,40 @@ export function XtermTerminal({
 			/>
 		</ContextMenu>
 	);
+}
+
+/**
+ * Fits the surface to its container and hands the resulting geometry to the
+ * PTY, so the shell wraps at the width the user actually sees.
+ *
+ * A force-mounted hidden tab has a zero-size container, and fitting against one
+ * collapses the session to minimum dimensions and garbles the wrapping of
+ * everything already on screen — so that case is left for the ResizeObserver to
+ * pick up once the pane has a size.
+ * @param adapter - The live terminal surface to fit.
+ * @param container - The element the surface fills.
+ * @param terminalId - Session whose PTY geometry follows the fit.
+ */
+function syncTerminalDimensions(
+	adapter: TerminalRendererAdapter,
+	container: HTMLElement,
+	terminalId: string,
+): void {
+	if (container.clientHeight === 0 || container.clientWidth === 0) {
+		return;
+	}
+
+	const dimensions = adapter.fit();
+
+	if (!dimensions) {
+		return;
+	}
+
+	void window.ensemblr?.resizeTerminalSession({
+		cols: dimensions.cols,
+		rows: dimensions.rows,
+		terminalId,
+	});
 }
 
 /**

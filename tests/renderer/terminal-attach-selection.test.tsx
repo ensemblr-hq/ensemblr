@@ -35,6 +35,7 @@ const { adapter, selection, toastError, toastSuccess } = vi.hoisted(() => ({
 		onData: vi.fn(() => () => undefined),
 		setFont: vi.fn(),
 		setScrollback: vi.fn(),
+		whenFontReady: vi.fn(() => Promise.resolve()),
 		write: vi.fn(),
 	} satisfies Record<keyof TerminalRendererAdapter, unknown>,
 	selection: { text: '' },

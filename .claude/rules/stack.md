@@ -141,6 +141,31 @@ falls back to the DOM renderer on a construction failure or a
 `onContextLoss`. Note `allowTransparency: true` is still set there and costs the
 WebGL renderer its fast blend path.
 
+**xterm never waits for a webfont, so the adapter has to.** Neither the core nor
+the WebGL addon references `document.fonts` anywhere, and both of the places they
+draw text are canvas: cell metrics come from an `OffscreenCanvas` in xterm 6's
+measure strategy, and glyphs are rasterized into the atlas, which caches them and
+re-keys only on the font-family *string*. Canvas silently substitutes the
+fallback for a `@font-face` that has not finished loading and — unlike DOM text —
+neither starts the fetch nor repaints when one lands, so a terminal opened before
+something else in the UI happened to request the bundled Nerd Font keeps the
+fallback for its whole lifetime. `createXtermAdapter` therefore calls
+`document.fonts.load` for all four style/weight faces itself and, if any was
+missing, round-trips `options.fontFamily` through a sentinel (the option setter
+ignores a write that does not change the value, so this is what re-runs the
+measurement) and calls `clearTextureAtlas()` to drop the stale glyphs.
+`document.fonts.ready` is not a substitute: it settles the loads already in
+flight rather than starting any. Anything else that draws terminal text to a
+canvas needs the same treatment.
+
+Re-measuring moves the cell box, so **every caller re-fits once
+`whenFontReady()` settles** — on mount and after a live Appearance change alike,
+or the PTY keeps wrapping at the column count the fallback font implied. That
+promise never rejects (the faces are awaited with `allSettled`, since
+`fonts.load` rejects on a face that cannot be fetched or decoded and one bad
+face must not cost the redraw for the three that landed), so the re-fit chains
+onto it without a catch.
+
 **Lexical is confined to the composer editor.** Everything that imports it lives
 under
 `src/renderer/components/workbench-shell/conversation-panel/composer/editor/`,
