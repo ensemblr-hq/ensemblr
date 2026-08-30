@@ -17,6 +17,7 @@ import {
 	type ConciergeResizableSurface,
 	useConciergeResize,
 } from '@/renderer/hooks/concierge/use-concierge-resize';
+import { useConciergeRestoreOnOutsidePress } from '@/renderer/hooks/concierge/use-concierge-restore-on-outside-press';
 import {
 	type ConciergeSessionModel,
 	useConciergeSession,
@@ -159,6 +160,15 @@ export function useConciergePanel(): ConciergePanelModel {
 	const toggleFullscreen = useCallback(
 		() => setPresentation(isFullscreen ? 'panel' : 'fullscreen'),
 		[isFullscreen, setPresentation],
+	);
+	const restoreFromFullscreen = useCallback(
+		() => setPresentation('panel'),
+		[setPresentation],
+	);
+	useConciergeRestoreOnOutsidePress(
+		isFullscreen,
+		anchor.ref,
+		restoreFromFullscreen,
 	);
 
 	const panelBindings = useMemo<readonly KeymapBinding<HTMLElement>[]>(
