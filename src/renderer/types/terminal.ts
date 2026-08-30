@@ -28,5 +28,14 @@ export interface TerminalRendererAdapter {
 	setFont: (options: { fontFamily?: string; fontSize?: number }) => void;
 	/** Live-updates the scrollback buffer line limit without recreating the surface. */
 	setScrollback: (lines: number) => void;
+	/**
+	 * Resolves once the surface's font faces have loaded and its glyphs have been
+	 * redrawn with them. Callers re-fit afterwards: the cell box is measured from
+	 * the font, so how many columns and rows fit can change when a face lands.
+	 * Never rejects — a face that fails to load settles like any other, so the
+	 * re-fit can be chained without a catch. Reflects the typography in force
+	 * when it was called, so read it again after {@link setFont}.
+	 */
+	whenFontReady: () => Promise<void>;
 	write: (data: string) => void;
 }
