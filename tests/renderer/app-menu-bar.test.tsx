@@ -9,6 +9,9 @@ import type { MenuBarAction, MenuBarDescriptor } from '@/shared/menu-bar';
 
 import { renderWithProviders } from './support/dom';
 
+/** The utility every disabled row carries, whatever kind of row it is. */
+const DISABLED_DIM_CLASS = 'data-disabled:opacity-50';
+
 /** A bar with one menu, whose rows each test supplies. */
 function barOf(
 	items: MenuBarDescriptor['menus'][number]['items'],
@@ -86,6 +89,42 @@ describe('AppMenuBar', () => {
 		);
 
 		expect(onSelect).not.toHaveBeenCalled();
+	});
+
+	// A dynamic submenu disables itself once it has no entries, so this is the
+	// state a workspace with no run scripts actually draws.
+	test('a disabled submenu row is dimmed the way a disabled row is', async () => {
+		await openMenu(
+			barOf([
+				{
+					enabled: false,
+					id: '0.0',
+					items: [
+						{
+							enabled: false,
+							id: '0.0.0',
+							kind: 'action',
+							label: 'No Run Scripts',
+						},
+					],
+					kind: 'submenu',
+					label: 'Run Script',
+				},
+				{
+					enabled: false,
+					id: '0.1',
+					kind: 'action',
+					label: 'Rename Workspace',
+				},
+			]),
+		);
+
+		const submenu = await screen.findByRole('menuitem', { name: /Run Script/ });
+		const row = screen.getByRole('menuitem', { name: /Rename Workspace/ });
+
+		expect(submenu).toHaveAttribute('data-disabled');
+		expect(submenu).toHaveClass(DISABLED_DIM_CLASS);
+		expect(row).toHaveClass(DISABLED_DIM_CLASS);
 	});
 
 	test('a chord is shown beside the row that claims one', async () => {

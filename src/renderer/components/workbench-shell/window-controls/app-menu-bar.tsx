@@ -23,6 +23,15 @@ import type {
 } from '@/shared/menu-bar';
 
 /**
+ * Dims a disabled row, for the two vendored primitives that miss it.
+ *
+ * A plain item and a radio item carry this themselves; a checkbox item and a
+ * submenu trigger do not, so a disabled dynamic submenu — "Run Script" with no
+ * scripts configured — would otherwise draw exactly like a live one.
+ */
+const DISABLED_DIM_CLASS = 'data-disabled:opacity-50';
+
+/**
  * The application menu, drawn inside Ensemblr's own title bar.
  *
  * Where the desktop draws no title bar there is nowhere for the platform to put
@@ -139,7 +148,11 @@ function MenuBarRow({
 	if (node.kind === 'submenu') {
 		return (
 			<MenubarSub>
-				<MenubarSubTrigger disabled={!node.enabled} inset={inset}>
+				<MenubarSubTrigger
+					className={DISABLED_DIM_CLASS}
+					disabled={!node.enabled}
+					inset={inset}
+				>
 					{node.label}
 				</MenubarSubTrigger>
 				<MenubarSubContent>
@@ -153,8 +166,7 @@ function MenuBarRow({
 		return (
 			<MenubarCheckboxItem
 				checked={node.checked}
-				// The vendored primitive dims a disabled item everywhere but here.
-				className='data-disabled:opacity-50'
+				className={DISABLED_DIM_CLASS}
 				disabled={!node.enabled}
 				onSelect={() => onSelect(node)}
 			>
