@@ -154,7 +154,11 @@ export function OnboardingWelcome({
 					</Button>
 				</motion.div>
 			</section>
-			<div className='flex shrink-0 justify-center pt-6'>
+			{/* Padded by more than the row needs: the language options float up out
+			    of the trigger rather than pushing the wizard, so the gap above it is
+			    what keeps them off the actions even on a window too short to centre
+			    anything. */}
+			<div className='flex shrink-0 justify-center pt-12'>
 				<OnboardingLanguagePicker />
 			</div>
 		</div>

@@ -41,17 +41,20 @@ export function OnboardingLanguagePicker() {
 
 	return (
 		<Collapsible
-			className='flex flex-col items-center gap-1.5'
+			className='relative flex flex-col items-center'
 			onOpenChange={setOpen}
 			open={isOpen}
 		>
-			<CollapsibleContent className='data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=open]:animate-in'>
+			{/* Floats above the trigger rather than sitting in the column with it:
+			    the picker is the last thing on a vertically centred screen, so a row
+			    that took height on open shifted the whole wizard up under it. */}
+			<CollapsibleContent className='data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 -translate-x-1/2 absolute bottom-full left-1/2 z-10 mb-1.5 data-[state=closed]:animate-out data-[state=open]:animate-in'>
 				<nav
 					aria-label={t(
 						'onboarding:welcome.language.label',
 						'Interface language',
 					)}
-					className='flex items-center gap-1 rounded-full border border-border bg-card p-1'
+					className='flex items-center gap-1 rounded-full border border-border bg-card p-1 shadow-md'
 				>
 					{APP_LANGUAGES.map((code) => (
 						<Button
