@@ -1,5 +1,6 @@
 import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
+import { WebglAddon } from '@xterm/addon-webgl';
 import { Terminal } from '@xterm/xterm';
 
 import '@xterm/xterm/css/xterm.css';
@@ -63,6 +64,7 @@ export function createXtermAdapter({
 	return {
 		attach: (element) => {
 			terminal.open(element);
+			loadWebglRenderer(terminal);
 		},
 		clear: () => terminal.clear(),
 		dispose: () => {
@@ -98,6 +100,41 @@ export function createXtermAdapter({
 		},
 		write: (data) => terminal.write(data),
 	};
+}
+
+/**
+ * Upgrades an opened terminal to the WebGL renderer, leaving xterm's DOM
+ * renderer in place wherever the GPU cannot serve one.
+ *
+ * The DOM renderer lays out a span per cell, so a streaming agent turn costs a
+ * relayout of the whole viewport per frame — on the renderer's main thread,
+ * where the rest of the UI also lives. WebGL draws the same cells from a glyph
+ * atlas and leaves that thread free.
+ *
+ * Must run after `terminal.open`: the addon takes over a canvas the terminal
+ * only creates once it has a container. Losing the GL context (a driver reset,
+ * a suspend, an out-of-memory GPU) disposes the addon, which is how xterm
+ * documents dropping back to the DOM renderer mid-session.
+ *
+ * Teardown is left to `terminal.dispose`, which disposes every addon it loaded.
+ * Disposing this one first instead would make it hand the render service a
+ * freshly built DOM renderer — rows and an injected stylesheet — microseconds
+ * before the terminal tears that renderer down again; the addon skips that
+ * restore only once the terminal's core is already disposed.
+ * @param terminal - An xterm terminal that has already been opened.
+ */
+function loadWebglRenderer(terminal: Terminal): void {
+	try {
+		const addon = new WebglAddon();
+		addon.onContextLoss(() => {
+			addon.dispose();
+		});
+		terminal.loadAddon(addon);
+	} catch {
+		// A GPU that cannot serve a context throws out of the addon's activate;
+		// xterm is left on the DOM renderer it already had, so there is no
+		// teardown to do here.
+	}
 }
 
 /**

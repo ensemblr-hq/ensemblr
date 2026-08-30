@@ -1,16 +1,21 @@
 import { watch } from 'node:fs';
 import path from 'node:path';
 
+import { startLinuxRecursiveWatch } from './linux-recursive-watch.ts';
+
 const WATCH_DEBOUNCE_MS = 250;
 
 /**
- * First path segments whose churn never changes `git ls-files` output but would
+ * Directories whose churn never changes `git ls-files` output but would
  * otherwise trigger refetch storms — `.git` rewrites itself on every git
- * command, and `node_modules` is gitignored in practice. Ignoring them keeps
- * the watcher quiet; the renderer's polling fallback still covers the rare repo
- * that tracks these paths.
+ * command, and `node_modules` is gitignored in practice. The renderer's polling
+ * fallback still covers the rare repo that tracks these paths.
+ *
+ * They carry the watch's whole cost, so on Linux — where a recursive watch is
+ * emulated one OS watch per entry — this set is what the walk never descends
+ * into, not just what its events are filtered against.
  */
-const IGNORED_TOP_SEGMENTS = new Set(['.git', 'node_modules']);
+const IGNORED_DIRECTORY_NAMES = new Set(['.git', 'node_modules']);
 
 /**
  * Filenames whose churn never changes the listed tree but recurs constantly —
@@ -193,12 +198,34 @@ export function createWorkspaceFilesWatcher({
 	};
 }
 
-/** Default {@link StartWatch}: a recursive `fs.watch` on the directory. */
+/**
+ * Default {@link StartWatch}: a recursive watch on the directory, taken the way
+ * the running platform can afford.
+ *
+ * macOS backs `{ recursive: true }` with one FSEvents subscription over the
+ * whole tree, so it costs the same whatever the tree holds. Linux has no such
+ * primitive and emulates it by registering an inotify watch per entry before
+ * the call returns, which blocks the main process for over a second on a
+ * workspace with `node_modules` installed — see {@link startLinuxRecursiveWatch}.
+ * @param directory - Absolute directory to watch recursively.
+ * @param onChange - Called with the changed path, relative to `directory`.
+ * @param onError - Called when the underlying watcher errors.
+ * @returns A handle whose `close` stops the watch.
+ */
 function defaultStartWatch(
 	directory: string,
 	onChange: (changed: string | null) => void,
 	onError: () => void,
 ): WatchHandle {
+	if (process.platform === 'linux') {
+		return startLinuxRecursiveWatch({
+			ignoredDirectoryNames: IGNORED_DIRECTORY_NAMES,
+			onChange,
+			onError,
+			root: directory,
+		});
+	}
+
 	const watcher = watch(directory, { recursive: true }, (_event, changed) => {
 		onChange(changed);
 	});
@@ -214,7 +241,7 @@ function isIgnoredChange(changed: string | null): boolean {
 	}
 
 	const topSegment = changed.split(/[/\\]/, 1)[0];
-	if (IGNORED_TOP_SEGMENTS.has(topSegment)) {
+	if (IGNORED_DIRECTORY_NAMES.has(topSegment)) {
 		return true;
 	}
 
