@@ -5,18 +5,23 @@ import {
 	type KeychainReference,
 	type NormalizedLookup,
 	type NormalizedWriteInput,
+	type PersistedSecretBackend,
 	SECRET_SCOPES,
-	type SecretBackend,
 	type SecretMetadata,
 	type SecretMetadataFilter,
 	type SecretScope,
 	SecretStoreError,
 } from './secret-store-types.ts';
 
+const PERSISTED_BACKENDS: readonly PersistedSecretBackend[] = [
+	'macos-keychain',
+	'safe-storage',
+];
+
 /** Internal: raw row shape stored in the `secret_metadata` table. */
 interface SecretMetadataRow {
 	account: string;
-	backend: SecretBackend;
+	backend: PersistedSecretBackend;
 	character_count: number;
 	created_at: string;
 	display_name: string;
@@ -30,24 +35,31 @@ interface SecretMetadataRow {
 	updated_at: string;
 }
 
-/** Payload used to persist a metadata row from a Keychain-backed entry. */
+/**
+ * Payload used to persist a metadata row. `secretValue` carries the backend's
+ * ciphertext when the backend has nowhere else to keep it (`safe-storage`); the
+ * Keychain backend leaves it undefined, so its row holds metadata only.
+ */
 export type MetadataPersistInput = NormalizedWriteInput &
 	KeychainReference & {
-		backend: 'macos-keychain';
+		backend: PersistedSecretBackend;
 		id: string;
 		maskedDisplay: string;
 		now: string;
+		secretValue?: Uint8Array;
 	};
 
 /**
- * Storage-agnostic metadata DAO. The Keychain backend composes this interface
- * to persist non-sensitive metadata alongside the encrypted Keychain payload.
+ * Storage-agnostic metadata DAO. Every persisted backend composes this
+ * interface: the Keychain backend for metadata alone, the `safeStorage` backend
+ * for metadata plus the ciphertext it has nowhere else to put.
  */
 export interface MetadataStore {
 	delete: (lookup: NormalizedLookup) => void;
 	get: (lookup: NormalizedLookup) => SecretMetadata | null;
 	insert: (input: MetadataPersistInput) => SecretMetadata;
 	list: (filter?: SecretMetadataFilter) => SecretMetadata[];
+	readSecretValue: (lookup: NormalizedLookup) => Uint8Array | null;
 	update: (input: MetadataPersistInput) => SecretMetadata;
 }
 
@@ -97,10 +109,11 @@ export function createSqliteSecretMetadataStore(
 						masked_display,
 						character_count,
 						metadata_json,
+						secret_value,
 						created_at,
 						updated_at
 					)
-					VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+					VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 				)
 				.run(
 					input.id,
@@ -114,6 +127,7 @@ export function createSqliteSecretMetadataStore(
 					input.maskedDisplay,
 					input.value.length,
 					JSON.stringify(input.metadata),
+					input.secretValue ?? null,
 					input.now,
 					input.now,
 				);
@@ -167,6 +181,22 @@ export function createSqliteSecretMetadataStore(
 
 			return rows.map(parseMetadataRow);
 		},
+		/** Reads the stored ciphertext for a lookup, or `null` when the row keeps none. */
+		readSecretValue(lookup) {
+			const row = database
+				.prepare(
+					`SELECT secret_value
+					 FROM secret_metadata
+					 WHERE scope = ? AND scope_id = ? AND name = ?`,
+				)
+				.get(lookup.scope, lookup.scopeId, lookup.key);
+
+			if (!isSecretValueRow(row) || row.secret_value === null) {
+				return null;
+			}
+
+			return row.secret_value;
+		},
 		/** Updates an existing metadata row, returning the persisted shape. */
 		update(input) {
 			database
@@ -180,6 +210,7 @@ export function createSqliteSecretMetadataStore(
 						masked_display = ?,
 						character_count = ?,
 						metadata_json = ?,
+						secret_value = ?,
 						updated_at = ?
 					 WHERE scope = ? AND scope_id = ? AND name = ?`,
 				)
@@ -191,6 +222,7 @@ export function createSqliteSecretMetadataStore(
 					input.maskedDisplay,
 					input.value.length,
 					JSON.stringify(input.metadata),
+					input.secretValue ?? null,
 					input.now,
 					input.scope,
 					input.scopeId,
@@ -257,7 +289,7 @@ function isSecretMetadataRow(row: unknown): row is SecretMetadataRow {
 
 	return (
 		typeof candidate.account === 'string' &&
-		(candidate.backend === 'macos-keychain' || candidate.backend === 'mock') &&
+		PERSISTED_BACKENDS.includes(candidate.backend as PersistedSecretBackend) &&
 		typeof candidate.character_count === 'number' &&
 		typeof candidate.created_at === 'string' &&
 		typeof candidate.display_name === 'string' &&
@@ -270,6 +302,22 @@ function isSecretMetadataRow(row: unknown): row is SecretMetadataRow {
 		typeof candidate.service === 'string' &&
 		typeof candidate.updated_at === 'string'
 	);
+}
+
+/**
+ * Type guard for a row projecting only the nullable `secret_value` column.
+ * @param row - Candidate row value.
+ * @returns True when the column is present as a BLOB or SQL NULL.
+ */
+function isSecretValueRow(
+	row: unknown,
+): row is { secret_value: Uint8Array | null } {
+	if (typeof row !== 'object' || row === null || !('secret_value' in row)) {
+		return false;
+	}
+
+	const value = (row as { secret_value: unknown }).secret_value;
+	return value === null || value instanceof Uint8Array;
 }
 
 /**

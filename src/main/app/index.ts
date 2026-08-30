@@ -6,5 +6,10 @@ export type {
 export { createQuitCoordinator } from './quit-coordinator';
 export type { QuitGuard, QuitGuardOptions } from './quit-guard';
 export { createQuitGuard } from './quit-guard';
+export type { WindowChromeOptions } from './window-chrome';
+export { resolveWindowChromeOptions } from './window-chrome';
 export type { MainWindowStateStore } from './window-state';
-export { createMainWindowStateStore } from './window-state';
+export {
+	createMainWindowStateStore,
+	forbidsWindowPositioning,
+} from './window-state';

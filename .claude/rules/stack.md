@@ -11,10 +11,29 @@ asserting a version.
 
 | | |
 | --- | --- |
-| Target | macOS only, arm64 |
+| Target | macOS arm64 (`.dmg`/`.zip`) and Linux x64 (`.AppImage`) |
 | Shell | Electron 43 (Node 24 runtime), Electron Forge 7 |
 | Node | **exactly 24.x** (`.nvmrc`, `mise.toml`, `engines: >=24 <25`) |
 | Package manager | npm 11.17.0 |
+
+**Linux is a first-class target, not a port.** `npm run make:linux` builds the
+AppImage through `@reforged/maker-appimage` (there is no
+`@electron-forge/maker-appimage`); it declares `mksquashfs` as a required
+external binary, so CI installs `squashfs-tools`. What differs from macOS is
+declared per platform rather than branched inline: the secret store
+(`safeStorage` ciphertext in SQLite, not the Keychain — ADR 0056), the
+"Open in…" registry (`src/main/open-target/open-target-registry.ts` carries a
+`platforms` map), the battery reader (`linux-battery.ts` reads sysfs), the
+window chrome (`src/shared/window-chrome.ts`), and updates (Linux checks and
+links, never installs).
+
+**Wayland needs no configuration.** Electron 38 removed
+`ELECTRON_OZONE_PLATFORM_HINT` and made native Wayland the default in a Wayland
+session, so a user on this Electron 43 gets it automatically;
+`--ozone-platform=x11` is the documented escape hatch. What Wayland *does*
+forbid is a client reading or setting its own position, which is why
+`forbidsWindowPositioning` in `src/main/app/window-state.ts` skips the `x`/`y`
+restore there.
 
 `scripts/require-node-version.mjs` gates both `preinstall` and
 `build`/`package`/`make`. Do not route around it: installing under the wrong

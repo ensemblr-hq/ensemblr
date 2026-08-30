@@ -8,7 +8,10 @@ import type {
 	LocalCommandStatus,
 } from '../../src/main/commands/index.ts';
 import { detectInstalledTargets } from '../../src/main/open-target/detect-installed-targets.ts';
-import { OPEN_TARGET_REGISTRY } from '../../src/main/open-target/open-target-registry.ts';
+import {
+	OPEN_TARGET_REGISTRY,
+	resolvePlatformBehavior,
+} from '../../src/main/open-target/open-target-registry.ts';
 
 /**
  * Builds a {@link LocalCommandResult} carrying just the fields detection reads,
@@ -76,7 +79,9 @@ function fakeCommandService(
 }
 
 const firstBundleTargetId = OPEN_TARGET_REGISTRY.find(
-	(definition) => definition.detection.kind === 'bundleId',
+	(definition) =>
+		resolvePlatformBehavior(definition, 'darwin')?.detection.kind ===
+		'bundleId',
 )?.id;
 
 test('a timed-out probe is reported as degraded, not as "app absent"', async (t) => {

@@ -1,9 +1,11 @@
 import { access, constants } from 'node:fs/promises';
 
 import type { LocalCommandService } from '../commands/index.ts';
+import { resolveLinuxLauncher } from './linux-app-discovery.ts';
 import {
 	isValidBundleId,
 	OPEN_TARGET_REGISTRY,
+	resolvePlatformBehavior,
 } from './open-target-registry.ts';
 
 // Cold-boot Spotlight under ~18 concurrent probes routinely blows past 3s, and a
@@ -57,12 +59,16 @@ type BundleProbeResult =
 	| { status: 'error' };
 
 /**
- * Probes which registered targets exist on this host. macOS-only — on other
- * platforms only utilities are returned as installed.
+ * Probes which registered targets exist on this host, using whichever mechanism
+ * the platform declares: Spotlight bundle ids on macOS, PATH lookups and
+ * `.desktop` scans on Linux. A target that declares no behaviour for the
+ * running platform is reported as absent rather than omitted, so callers can
+ * still look it up by id.
  *
- * One `mdfind` call per bundle id, parallelised. Builtins fall back to a small
- * list of known system paths since mdfind can omit Apple-shipped apps when the
- * Spotlight index has not been built for those system volumes.
+ * On macOS this is one `mdfind` call per bundle id, parallelised. Builtins fall
+ * back to a small list of known system paths since mdfind can omit
+ * Apple-shipped apps when the Spotlight index has not been built for those
+ * system volumes.
  * @param options - The command runner used to invoke `mdfind`.
  * @returns The per-target detection map plus a `degraded` flag when any probe
  * failed transiently.
@@ -78,20 +84,24 @@ export async function detectInstalledTargets({
 		detected[definition.id] = { appPath: null, installed: false };
 	}
 
-	if (process.platform !== 'darwin') {
-		for (const definition of OPEN_TARGET_REGISTRY) {
-			if (definition.detection.kind === 'utility') {
-				detected[definition.id] = { appPath: null, installed: true };
-			}
-		}
-		return { degraded: false, detected };
-	}
-
 	let degraded = false;
+	// A packaged app inherits the launcher's PATH, not the user's login shell
+	// PATH, so an editor installed under `~/.local/bin` is invisible without
+	// this. The lookup is already cached by the command service.
+	const pathValue =
+		process.platform === 'linux'
+			? await resolveShellPath(localCommandService)
+			: '';
 
 	await Promise.all(
 		OPEN_TARGET_REGISTRY.map(async (definition) => {
-			switch (definition.detection.kind) {
+			const behavior = resolvePlatformBehavior(definition, process.platform);
+
+			if (!behavior) {
+				return;
+			}
+
+			switch (behavior.detection.kind) {
 				case 'utility':
 					detected[definition.id] = { appPath: null, installed: true };
 					return;
@@ -103,9 +113,17 @@ export async function detectInstalledTargets({
 					};
 					return;
 				}
+				case 'linux-app': {
+					detected[definition.id] = {
+						appPath: null,
+						installed:
+							resolveLinuxLauncher(behavior.detection, { pathValue }) !== null,
+					};
+					return;
+				}
 				case 'bundleId': {
 					const resolution = await findFirstInstalledAppPath({
-						bundleIds: definition.detection.bundleIds,
+						bundleIds: behavior.detection.bundleIds,
 						localCommandService,
 					});
 					detected[definition.id] = {
@@ -121,6 +139,23 @@ export async function detectInstalledTargets({
 	);
 
 	return { degraded, detected };
+}
+
+/**
+ * Reads the shell-derived PATH, falling back to the process PATH when the shell
+ * probe fails so detection degrades to fewer hits rather than none.
+ * @param localCommandService - Service that resolves the login-shell environment.
+ * @returns A PATH-style directory list.
+ */
+async function resolveShellPath(
+	localCommandService: LocalCommandService,
+): Promise<string> {
+	try {
+		const environment = await localCommandService.getEnvironment();
+		return environment.path || (process.env.PATH ?? '');
+	} catch {
+		return process.env.PATH ?? '';
+	}
 }
 
 /**

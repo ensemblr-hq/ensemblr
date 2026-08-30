@@ -1017,6 +1017,79 @@ CREATE VIRTUAL TABLE concierge_memories_fts USING fts5(
 );
 `,
 	},
+	{
+		id: '023_secret_value_blob',
+		version: 23,
+		// Linux has no Keychain, so its backend encrypts with Electron's
+		// `safeStorage` and keeps the ciphertext here — the row stops being purely
+		// non-sensitive metadata on that platform, which is why the column is a
+		// BLOB rather than TEXT: `safeStorage.encryptString` returns raw bytes that
+		// are not valid UTF-8. It stays NULL for every Keychain-backed row, whose
+		// value still lives outside the database.
+		//
+		// `backend` also has to admit the new value, and a CHECK is schema SQLite
+		// cannot alter in place, so this is the copy-drop-rename rebuild 016 uses.
+		// `service`/`account` are kept for both backends: safeStorage has no
+		// namespace of its own, but the pair is what `UNIQUE(service, account)`
+		// guards and what makes a row identifiable in a support bundle.
+		sql: `
+CREATE TABLE secret_metadata_new (
+	id TEXT PRIMARY KEY,
+	scope TEXT NOT NULL CHECK (scope IN ('app', 'repository', 'workspace')),
+	scope_id TEXT NOT NULL DEFAULT '',
+	name TEXT NOT NULL,
+	backend TEXT NOT NULL DEFAULT 'macos-keychain' CHECK (backend IN ('macos-keychain', 'safe-storage')),
+	service TEXT NOT NULL,
+	account TEXT NOT NULL,
+	display_name TEXT NOT NULL,
+	masked_display TEXT NOT NULL,
+	character_count INTEGER NOT NULL DEFAULT 0 CHECK (character_count >= 0),
+	metadata_json TEXT NOT NULL DEFAULT '{}',
+	secret_value BLOB,
+	created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+	updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+	UNIQUE(scope, scope_id, name),
+	UNIQUE(service, account)
+) STRICT;
+
+INSERT INTO secret_metadata_new (
+	id,
+	scope,
+	scope_id,
+	name,
+	backend,
+	service,
+	account,
+	display_name,
+	masked_display,
+	character_count,
+	metadata_json,
+	created_at,
+	updated_at
+)
+SELECT
+	id,
+	scope,
+	scope_id,
+	name,
+	backend,
+	service,
+	account,
+	display_name,
+	masked_display,
+	character_count,
+	metadata_json,
+	created_at,
+	updated_at
+FROM secret_metadata;
+
+DROP INDEX idx_secret_metadata_scope;
+DROP TABLE secret_metadata;
+ALTER TABLE secret_metadata_new RENAME TO secret_metadata;
+
+CREATE INDEX idx_secret_metadata_scope ON secret_metadata(scope, scope_id);
+`,
+	},
 ];
 
 /** Highest declared migration version embedded in this build. */

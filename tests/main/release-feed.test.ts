@@ -13,6 +13,7 @@ const RELEASES_URL = `https://api.github.com/repos/${SLUG}/releases?per_page=30`
 function release(
 	tag: string,
 	options: {
+		appImage?: boolean;
 		draft?: boolean;
 		feedUrl?: string | null;
 		prerelease?: boolean;
@@ -28,11 +29,20 @@ function release(
 				browser_download_url: `https://github.com/${SLUG}/releases/download/${tag}/Ensemblr.zip`,
 				name: 'Ensemblr.zip',
 			},
+			...(options.appImage
+				? [
+						{
+							browser_download_url: `https://github.com/${SLUG}/releases/download/${tag}/Ensemblr-x86_64.AppImage`,
+							name: 'Ensemblr-x86_64.AppImage',
+						},
+					]
+				: []),
 			...(feedUrl
 				? [{ browser_download_url: feedUrl, name: UPDATE_FEED_ASSET_NAME }]
 				: []),
 		],
 		draft: options.draft ?? false,
+		html_url: `https://github.com/${SLUG}/releases/tag/${tag}`,
 		prerelease: options.prerelease ?? true,
 		tag_name: tag,
 	};
@@ -143,6 +153,80 @@ describe('createReleaseFeed — channel selection', () => {
 
 		expect(await feed.resolve('release', '0.1.0')).toEqual({
 			candidate: null,
+			status: 'ok',
+		});
+	});
+
+	test('the candidate names the release page a check-only build links to', async () => {
+		const { fetchImpl } = stubFetch({
+			[RELEASES_URL]: { body: [release('v0.2.0')] },
+			[`https://github.com/${SLUG}/releases/download/v0.2.0/${UPDATE_FEED_ASSET_NAME}`]:
+				{ body: feedDocument('0.2.0') },
+		});
+		const feed = createReleaseFeed({ fetchImpl, repositorySlug: SLUG });
+
+		expect(await feed.resolve('release', '0.1.0')).toMatchObject({
+			candidate: {
+				releaseUrl: `https://github.com/${SLUG}/releases/tag/v0.2.0`,
+			},
+		});
+	});
+});
+
+describe('createReleaseFeed — platform artifacts', () => {
+	test('Linux ignores a release that shipped no AppImage', async () => {
+		const { fetchImpl } = stubFetch({
+			[RELEASES_URL]: { body: [release('v0.2.0')] },
+			[`https://github.com/${SLUG}/releases/download/v0.2.0/${UPDATE_FEED_ASSET_NAME}`]:
+				{ body: feedDocument('0.2.0') },
+		});
+		const feed = createReleaseFeed({
+			fetchImpl,
+			platform: 'linux',
+			repositorySlug: SLUG,
+		});
+
+		expect(await feed.resolve('release', '0.1.0')).toEqual({
+			candidate: null,
+			status: 'ok',
+		});
+	});
+
+	test('Linux takes a release that shipped an AppImage', async () => {
+		const { fetchImpl } = stubFetch({
+			[RELEASES_URL]: { body: [release('v0.2.0', { appImage: true })] },
+			[`https://github.com/${SLUG}/releases/download/v0.2.0/${UPDATE_FEED_ASSET_NAME}`]:
+				{ body: feedDocument('0.2.0') },
+		});
+		const feed = createReleaseFeed({
+			fetchImpl,
+			platform: 'linux',
+			repositorySlug: SLUG,
+		});
+
+		expect(await feed.resolve('release', '0.1.0')).toMatchObject({
+			candidate: {
+				releaseUrl: `https://github.com/${SLUG}/releases/tag/v0.2.0`,
+				version: '0.2.0',
+			},
+			status: 'ok',
+		});
+	});
+
+	test('macOS does not require an AppImage', async () => {
+		const { fetchImpl } = stubFetch({
+			[RELEASES_URL]: { body: [release('v0.2.0')] },
+			[`https://github.com/${SLUG}/releases/download/v0.2.0/${UPDATE_FEED_ASSET_NAME}`]:
+				{ body: feedDocument('0.2.0') },
+		});
+		const feed = createReleaseFeed({
+			fetchImpl,
+			platform: 'darwin',
+			repositorySlug: SLUG,
+		});
+
+		expect(await feed.resolve('release', '0.1.0')).toMatchObject({
+			candidate: { version: '0.2.0' },
 			status: 'ok',
 		});
 	});

@@ -38,6 +38,7 @@ const EXPECTED_MIGRATIONS = [
 	'020_linear_comment_freshness',
 	'021_restore_archived_repositories',
 	'022_concierge',
+	'023_secret_value_blob',
 ];
 
 const AGENT_VOCABULARY_MIGRATION_VERSION = 14;
@@ -1149,7 +1150,15 @@ test('stores only secret metadata and keychain references in SQLite', (t) => {
 	);
 });
 
-test('schema does not define raw secret value columns', (t) => {
+// The one column allowed to hold secret material, and only because it holds
+// ciphertext: Linux has no Keychain, so `safeStorage` encrypts the value and
+// hands back opaque bytes with nowhere else to live (migration 023, ADR 0056).
+// Every other match on the pattern below is a plaintext column and a bug.
+const CIPHERTEXT_COLUMNS = [
+	{ column_name: 'secret_value', table_name: 'secret_metadata' },
+];
+
+test('schema defines no secret value column but the encrypted one', (t) => {
 	const fixture = createTestDatabasePath();
 	t.after(fixture.cleanup);
 
@@ -1167,11 +1176,37 @@ test('schema does not define raw secret value columns', (t) => {
 		)
 		.all() as Array<{ column_name: string; table_name: string }>;
 
-	const sensitiveColumns = columns.filter(({ column_name }) =>
-		/secret|token|password|credential/i.test(column_name),
-	);
+	const sensitiveColumns = columns
+		.filter(({ column_name }) =>
+			/secret|token|password|credential/i.test(column_name),
+		)
+		.map(({ column_name, table_name }) => ({ column_name, table_name }));
 
-	assert.deepEqual(sensitiveColumns, []);
+	assert.deepEqual(sensitiveColumns, CIPHERTEXT_COLUMNS);
+});
+
+test('the encrypted secret column is a nullable BLOB', (t) => {
+	const fixture = createTestDatabasePath();
+	t.after(fixture.cleanup);
+
+	const connection = openEnsemblrDatabase({
+		databasePath: fixture.databasePath,
+	});
+	t.after(() => connection.database.close());
+
+	const column = connection.database
+		.prepare(
+			`SELECT type, "notnull"
+			 FROM pragma_table_info('secret_metadata')
+			 WHERE name = 'secret_value'`,
+		)
+		.get() as { notnull: number; type: string } | undefined;
+
+	// BLOB, not TEXT: `safeStorage.encryptString` returns bytes that are not
+	// valid UTF-8. Nullable because a Keychain-backed row keeps its value outside
+	// the database entirely.
+	assert.equal(column?.type, 'BLOB');
+	assert.equal(column?.notnull, 0);
 });
 
 test('database service reports health without throwing on open', (t) => {

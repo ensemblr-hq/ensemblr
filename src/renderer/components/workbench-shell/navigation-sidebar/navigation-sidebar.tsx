@@ -88,7 +88,7 @@ export function WorkspaceNavigationSidebar({
 	return (
 		<Sidebar className='border-sidebar-border' collapsible='offcanvas'>
 			<SidebarHeader className='h-12 border-sidebar-border border-b p-0'>
-				<div className='macos-traffic-light-spacer flex h-full shrink-0 items-center justify-end px-2'>
+				<div className='window-chrome-spacer flex h-full shrink-0 items-center justify-end px-2'>
 					<SidebarTrigger />
 				</div>
 			</SidebarHeader>

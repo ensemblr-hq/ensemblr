@@ -10,8 +10,9 @@ export const SHELL_INSET_CLASS =
 /**
  * Tailwind classes for the collapsed-sidebar expand trigger when a shell screen
  * has no toolbar to anchor it inline. Floats it in the top-left safe area beside
- * the traffic-light controls; the `sidebar-collapsed-trigger` rule keeps it
- * hidden until the sidebar is collapsed.
+ * whatever the window's leading chrome claims — the macOS traffic lights, or
+ * nothing at all; the `sidebar-collapsed-trigger` rule keeps it hidden until the
+ * sidebar is collapsed.
  */
 export const SHELL_FLOATING_TRIGGER_CLASS =
-	'sidebar-collapsed-trigger absolute top-2.5 left-[var(--ensemblr-traffic-light-safe-inline)] z-20';
+	'sidebar-collapsed-trigger absolute top-2.5 left-[var(--ensemblr-window-chrome-inset-start)] z-20';

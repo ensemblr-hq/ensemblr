@@ -10,6 +10,7 @@ import {
 } from '@/renderer/components/ui/dialog';
 import { useKeymapHandler } from '@/renderer/hooks/use-keymap-handler';
 import type { KeymapBinding } from '@/renderer/types/keymap';
+import { formatChord } from '@/shared/keymap';
 
 /**
  * Confirmation shown before clearing the context out from under a turn the
@@ -99,7 +100,7 @@ export function ConciergeClearConfirmDialog({
 							aria-hidden='true'
 							className='ml-1 inline-flex items-center gap-0.5 text-[0.6875rem] opacity-70'
 						>
-							⌘↵
+							{formatChord(['mod'], 'Enter')}
 						</span>
 					</Button>
 				</div>

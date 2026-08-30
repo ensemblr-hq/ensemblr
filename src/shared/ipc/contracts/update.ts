@@ -30,8 +30,13 @@ export interface UpdateFailure {
  * `disabled` is the same shape but the user's own doing, and reversible: they
  * turned `app.general.automaticUpdates` off because something else owns the
  * install. It is not a failure and carries none.
+ *
+ * `available` is where a check-only build rests once it finds a newer version:
+ * the version is known and `releaseUrl` points at it, but the install belongs
+ * to whoever put the file on disk. Only `ready` means "restart and it is done".
  */
 export type UpdateState =
+	| 'available'
 	| 'checking'
 	| 'disabled'
 	| 'downloading'
@@ -51,6 +56,11 @@ export interface UpdateStatusSnapshot {
 	failure: UpdateFailure | null;
 	/** Release notes for `availableVersion`, when the feed carried any. */
 	notes: string | null;
+	/**
+	 * Page for `availableVersion`, which a build that may check but not install
+	 * links to instead of downloading. Null whenever no newer version is known.
+	 */
+	releaseUrl: string | null;
 	state: UpdateState;
 }
 
@@ -65,7 +75,9 @@ export interface UpdateApi {
 	checkForUpdates: () => Promise<UpdateStatusSnapshot>;
 	/**
 	 * Restarts into a staged update. Goes through the quit guard, so a run with
-	 * agents still working asks first and a refusal leaves the update staged.
+	 * agents still working asks first and a refusal leaves the update staged. On
+	 * a build that may only check, there is nothing staged and this is a no-op —
+	 * the surface links to `releaseUrl` instead.
 	 */
 	installUpdate: () => Promise<UpdateStatusSnapshot>;
 	onUpdateStatusChanged: (

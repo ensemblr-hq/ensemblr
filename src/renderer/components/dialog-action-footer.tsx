@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/renderer/components/ui/button';
+import { formatChord } from '@/shared/keymap';
 
 /** Props for the sticky footer shared by the create/rename dialogs. */
 interface DialogActionFooterProps {
@@ -50,7 +51,7 @@ export function DialogActionFooter({
 					aria-hidden='true'
 					className='ml-1 inline-flex items-center gap-0.5 text-[0.6875rem] opacity-70'
 				>
-					⌘↵
+					{formatChord(['mod'], 'Enter')}
 				</span>
 			</Button>
 		</div>

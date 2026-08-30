@@ -45,6 +45,7 @@ const CHECK_ORDER: readonly SetupCheckId[] = [
 	'root-directory',
 	'managed-directories',
 	'shell-process-launch',
+	'secret-storage',
 	'environment-variables',
 	'git-executable',
 	'gh-cli',
@@ -70,6 +71,7 @@ const GROUPS: Record<SetupCheckId, SetupCheckGroupId> = {
 	'pi-provider-model': 'pi',
 	'pi-rpc': 'pi',
 	'root-directory': 'storage',
+	'secret-storage': 'core',
 	'shell-process-launch': 'core',
 	'sqlite-database': 'storage',
 };
@@ -558,6 +560,7 @@ async function getSnapshot(
 		localCommandService?: LocalCommandService;
 		piExecutableService?: PiExecutableService;
 		piReadinessService?: PiReadinessService;
+		platform?: NodeJS.Platform;
 		rootDirectoryService?: EnsemblrRootDirectoryService;
 	} = {},
 ) {
@@ -579,6 +582,13 @@ async function getSnapshot(
 			options.piExecutableService ?? createPiExecutableService(),
 		piReadinessService:
 			options.piReadinessService ?? createPiReadinessService(),
+		// Linux by default so the full check list is exercised; `safeStorage` is
+		// stubbed because the real one needs a ready Electron app.
+		platform: options.platform ?? 'linux',
+		readSecretStorageStatus: () => ({
+			backend: 'kwallet6',
+			protection: 'encrypted',
+		}),
 		rootDirectoryService:
 			options.rootDirectoryService ?? createRootDirectoryService(),
 	});
@@ -612,7 +622,9 @@ test('reports ready when required checks pass and Linear is optional', async () 
 
 	assert.equal(snapshot.status, 'ready');
 	assert.equal(snapshot.blockedCount, 0);
-	assert.equal(snapshot.optionalCount, 3);
+	// Four on Linux: Linear, the two Pi optionals, and the keyring check, which
+	// warns rather than blocks so a session without a daemon still starts.
+	assert.equal(snapshot.optionalCount, 4);
 	assert.equal(snapshot.warningCount, 1);
 	assert.equal(environmentVariablesCheck.blocking, false);
 	assert.equal(environmentVariablesCheck.status, 'success');
@@ -1048,5 +1060,55 @@ test('keeps a stable setup check ordering', async () => {
 	assert.deepEqual(
 		snapshot.checks.map((check) => check.id),
 		CHECK_ORDER,
+	);
+});
+
+test('the keyring check reports the backend that encrypts secrets', async () => {
+	const snapshot = await getSnapshot();
+	const check = getCheck(snapshot, 'secret-storage');
+
+	assert.equal(check.status, 'success');
+	assert.equal(check.blocking, false);
+	assert.equal(check.detailMessage?.code, 'secret-storage-encrypted');
+	assert.deepEqual(
+		check.logs.map((log) => log.text),
+		['kwallet6'],
+	);
+});
+
+test('a session with no keyring daemon warns rather than blocking', async () => {
+	const service = createSetupDiagnosticsService({
+		checkProviders: createFutureProviders(),
+		claudeExecutableService: createClaudeExecutableService(),
+		configService: createConfigService(),
+		databaseService: createDatabaseService(),
+		environmentVariablesService: createEnvironmentVariablesService(),
+		homeDirectory: HOME,
+		linearAuthService: createLinearAuthService(),
+		localCommandService: createLocalCommandService(),
+		now: () => NOW,
+		piExecutableService: createPiExecutableService(),
+		piReadinessService: createPiReadinessService(),
+		platform: 'linux',
+		readSecretStorageStatus: () => ({
+			backend: 'basic_text',
+			protection: 'obfuscated',
+		}),
+		rootDirectoryService: createRootDirectoryService(),
+	});
+
+	const check = getCheck(await service.getSnapshot(), 'secret-storage');
+
+	assert.equal(check.status, 'warning');
+	assert.equal(check.blocking, false);
+	assert.equal(check.detailMessage?.code, 'secret-storage-plaintext');
+});
+
+test('omits the keyring check on macOS, where the Keychain reports its own failures', async () => {
+	const snapshot = await getSnapshot({ platform: 'darwin' });
+
+	assert.deepEqual(
+		snapshot.checks.map((check) => check.id),
+		CHECK_ORDER.filter((id) => id !== 'secret-storage'),
 	);
 });

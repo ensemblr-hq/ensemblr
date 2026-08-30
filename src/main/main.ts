@@ -16,6 +16,7 @@ import {
 	parseAskUserQuestionReply,
 } from '../shared/agent-control.ts';
 import type { AgentProviderId } from '../shared/agent-provider.ts';
+import { DEFAULT_APP_SETTINGS } from '../shared/config.ts';
 import {
 	type AppLanguage,
 	FALLBACK_LANGUAGE,
@@ -36,6 +37,7 @@ import type {
 import type { UpdateStatusChangedBroadcast } from '../shared/ipc/contracts/update';
 import type { WorkspaceFilesChangedBroadcast } from '../shared/ipc/contracts/workspace-files';
 import { scrollbackMbToBytes } from '../shared/terminal.ts';
+import { resolveWindowChrome } from '../shared/window-chrome.ts';
 import {
 	type AgentControlService,
 	type BoardStatusStore,
@@ -76,6 +78,7 @@ import {
 	electronNotify,
 	electronPowerControls,
 } from './agent-runtime/electron-activity-bindings';
+import { readLinuxBattery } from './agent-runtime/linux-battery';
 import { readMacosBattery } from './agent-runtime/macos-battery';
 import { createProvisionalWorkspaceNaming } from './agent-runtime/naming/provisional-workspace-naming';
 import { createSessionNaming } from './agent-runtime/naming/session-naming';
@@ -129,6 +132,7 @@ import {
 	type InfisicalService,
 } from './infisical';
 import { type IpcHandlersHandle, registerIpcHandlers } from './ipc';
+import { trackWindowMaximizedState } from './ipc/handlers/window.ts';
 import { readPermissionModeFromSnapshot } from './ipc/permission-gate.ts';
 import {
 	createLinearAssetProxy,
@@ -182,7 +186,10 @@ import {
 	withArchiveScriptBeforeArchive,
 	withSetupScriptOnCreate,
 } from './scripts';
-import { createMacosKeychainSecretStore } from './secrets';
+import {
+	createMacosKeychainSecretStore,
+	createSafeStorageSecretStore,
+} from './secrets';
 import { createSetupDiagnosticsService } from './setup';
 import {
 	createEnsemblrDatabaseService,
@@ -298,18 +305,39 @@ const devRootDirectory = path.join(os.homedir(), `Ensemblr${DEV_SUFFIX}`);
 const devKeychainService = 'dev.ensemblr.app.secret-store.dev';
 
 /**
- * Builds the macOS Keychain secret store shared by every service, swapping in
- * the isolated dev keychain service name when running the unpackaged dev build.
+ * Builds the platform's secret store, shared by every service: the macOS
+ * Keychain on darwin, Electron's `safeStorage` on Linux. Both swap in the
+ * isolated dev service name when running the unpackaged dev build, so a dev
+ * build never reads or overwrites the release's entries.
  * @param database - Open SQLite handle the store persists its metadata into.
- * @returns The secret store, or `null` on non-darwin platforms.
+ * @returns The secret store, or `null` on a platform with neither backend.
  */
-const createSecretStore = (database: DatabaseSync) =>
-	process.platform === 'darwin'
-		? createMacosKeychainSecretStore({
-				database,
-				...(isDev ? { serviceName: devKeychainService } : {}),
-			})
-		: null;
+const createSecretStore = (database: DatabaseSync) => {
+	const serviceNameOverride = isDev ? { serviceName: devKeychainService } : {};
+
+	if (process.platform === 'darwin') {
+		return createMacosKeychainSecretStore({
+			database,
+			...serviceNameOverride,
+		});
+	}
+
+	if (process.platform === 'linux') {
+		return createSafeStorageSecretStore({ database, ...serviceNameOverride });
+	}
+
+	return null;
+};
+
+/**
+ * Reads the battery through whichever mechanism the platform offers, so the
+ * power-save blocker releases on a draining laptop everywhere rather than only
+ * on macOS. A platform with neither reader reports `null`, which the monitor
+ * treats as "no battery limit".
+ * @returns The current battery snapshot, or `null` when it cannot be read.
+ */
+const readPlatformBattery = () =>
+	process.platform === 'linux' ? readLinuxBattery() : readMacosBattery();
 
 const configService = createEnsemblrConfigService(
 	isDev ? { configPath: devConfigPath } : {},
@@ -334,7 +362,7 @@ const agentActivityMonitor = createAgentActivityMonitor({
 	isConciergeOnScreen: () => activeChatStore.isConciergeOnScreen(),
 	notify: electronNotify,
 	powerControls: electronPowerControls,
-	readBattery: readMacosBattery,
+	readBattery: readPlatformBattery,
 	/** Resolves the language notification copy is rendered in. */
 	readLanguage: () => resolveAppLanguage(),
 	/** Reads the latest app settings so the monitor can gate itself live. */
@@ -1328,6 +1356,17 @@ const mainWindowStateStore = createMainWindowStateStore({
 });
 
 /**
+ * The chrome the live window was constructed with. `titleBarStyle` is
+ * construct-time, so this is the only honest answer for the renderer: reading
+ * the setting again would report a preference the window predates, and the
+ * shell would inset for a title bar that is not there.
+ */
+let activeWindowChrome = resolveWindowChrome(
+	process.platform,
+	DEFAULT_APP_SETTINGS.appearance.titleBar,
+);
+
+/**
  * Opens the workbench window and re-announces any questionnaire still waiting on
  * the user. A renderer keeps its pending questions in memory only, and an
  * `askUserQuestion` call has no timeout to fall back on, so a window that
@@ -1338,7 +1377,15 @@ const mainWindowStateStore = createMainWindowStateStore({
  * fires the window is destroyed, and the dialog has nothing left to attach to.
  */
 function openMainWindow(): void {
-	const window = createMainWindow({ windowStateStore: mainWindowStateStore });
+	activeWindowChrome = resolveWindowChrome(
+		process.platform,
+		appSettingsService.read().appearance.titleBar,
+	);
+	const window = createMainWindow({
+		titleBar: activeWindowChrome.titleBar,
+		windowStateStore: mainWindowStateStore,
+	});
+	trackWindowMaximizedState(window);
 	window.webContents.on('did-finish-load', () => {
 		for (const payload of askUserQuestionCoordinator.openAsks()) {
 			window.webContents.send(
@@ -1495,7 +1542,9 @@ app.whenReady().then(() => {
 		},
 		menuContextStore,
 		rebuildMenu,
+		readWindowChrome: () => activeWindowChrome,
 		repositoryConfigService,
+		requestRelaunch: () => quitCoordinator.requestRelaunch(),
 		rootDirectoryService,
 		scriptLifecycleService,
 		setWorkspaceBaseBranchService,
@@ -1582,6 +1631,9 @@ function beginAgentShutdown(exit: QuitExit): void {
 		if (exit === 'install-update') {
 			autoUpdater.quitAndInstall();
 			return;
+		}
+		if (exit === 'relaunch') {
+			app.relaunch();
 		}
 		app.quit();
 	})();

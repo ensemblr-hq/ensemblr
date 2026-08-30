@@ -1234,6 +1234,12 @@
 		"file-count_one": "{{count}} αρχείο",
 		"file-count_other": "{{count}} αρχεία"
 	},
+	"window-controls": {
+		"close": "Κλείσιμο παραθύρου",
+		"maximize": "Μεγιστοποίηση",
+		"minimize": "Ελαχιστοποίηση",
+		"restore": "Επαναφορά μεγέθους"
+	},
 	"workspace-checks": {
 		"blocked": {
 			"detail": "Οι έλεγχοι αποτυγχάνουν.",

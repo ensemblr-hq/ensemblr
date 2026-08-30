@@ -9,6 +9,7 @@ import { IPC_CHANNELS } from '../../../shared/ipc/channels';
 import type { HealthSnapshot } from '../../../shared/ipc/contracts/health';
 import type { RepositoryWorkspaceNavigationSnapshot } from '../../../shared/ipc/contracts/repository-navigation';
 import type { InitialShellSnapshot } from '../../../shared/ipc/contracts/shell-snapshot';
+import type { WindowChromeSnapshot } from '../../../shared/window-chrome';
 import type { AppSettingsService, EnsemblrConfigService } from '../../config';
 import type { OpenTargetService } from '../../open-target';
 import type { EnsemblrDatabaseService } from '../../storage';
@@ -26,11 +27,14 @@ export function registerShellSnapshotHandlers({
 	configService,
 	databaseService,
 	openTargetService,
+	readWindowChrome,
 }: {
 	appSettingsService: AppSettingsService;
 	configService: EnsemblrConfigService;
 	databaseService: EnsemblrDatabaseService;
 	openTargetService: OpenTargetService;
+	/** The chrome the running window was constructed with, not the current setting. */
+	readWindowChrome: () => WindowChromeSnapshot;
 }): void {
 	ipcMain.on(IPC_CHANNELS.initialShellSnapshot, (event) => {
 		const snapshot: InitialShellSnapshot = {
@@ -39,6 +43,7 @@ export function registerShellSnapshotHandlers({
 			language: safeResolveLanguage(appSettingsService),
 			navigation: safeBuildNavigationSnapshot(databaseService),
 			openTargets: openTargetService.getCachedSnapshots(),
+			windowChrome: readWindowChrome(),
 		};
 		event.returnValue = snapshot;
 	});

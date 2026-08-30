@@ -1,13 +1,21 @@
 # Build & Release
 
-Ensemblr packages as a **macOS, arm64** app through Electron Forge. A release
-build is code-signed with a hardened runtime and notarized, and ships as both a
-`.dmg` and a `.zip`. This guide covers the build matrix, signing, and the build
-channels. The packaging config lives in `forge.config.ts`.
+Ensemblr packages through Electron Forge for two targets: **macOS arm64**, where
+a release build is code-signed with a hardened runtime, notarized, and shipped as
+both a `.dmg` and a `.zip`; and **Linux x86-64**, shipped as an unsigned
+`.AppImage`. This guide covers the build matrix, signing, and the build channels.
+The packaging config lives in `forge.config.ts`. See
+[ADR 0056](./adr/0056-ship-a-linux-amd64-appimage.md) for why AppImage, and what
+changes off darwin.
 
 ## Prerequisites
 
-- **macOS on Apple silicon** (builds are arm64-only).
+- **macOS on Apple silicon** for the `.dmg`/`.zip`; **Linux x86-64** for the
+  `.AppImage`. Neither host cross-builds the other's artifact, which is why CI
+  runs them as separate jobs.
+- **`mksquashfs`** for the Linux build (`apt install squashfs-tools`). The
+  AppImage maker declares it as a required external binary and refuses to run
+  without it.
 - **Node `>=24 <25`** — enforced by `scripts/require-node-version.mjs`, which
   `package`/`make` run first.
 - **An authenticated `gh`** — the whole release ritual is `gh release create`,
@@ -32,7 +40,54 @@ npm run dev            # run the app in development (electron-forge start)
 npm run package        # build an unpacked .app under out/ (arm64)
 npm run make           # build distributables (.dmg + .zip) under out/make/
 npm run verify:signing # assert what make just produced is signed and notarized
+
+npm run package:linux  # build an unpacked linux-x64 directory under out/
+npm run make:linux     # build the .AppImage under out/make/
 ```
+
+The Linux artifact is never signed, notarized, or stapled — there is no
+equivalent to do — so `verify:signing` is not run against it. Its
+`scripts/verify-signed-artifacts.mjs` only looks for `*-darwin-arm64` output and
+would report the Linux build as missing.
+
+### The Linux build has to run on Linux
+
+Both Linux scripts refuse on any other host, through
+`scripts/require-linux-host.mjs`. The refusal is not conservatism: Forge
+cross-packages nearly everything from macOS — it downloads the linux-x64
+Electron, and the shell it produces really is an ELF binary — but it cannot
+build a **native module** for a foreign platform. `node-pty` publishes prebuilds
+for darwin and win32 only, so Linux compiles it from source, and
+`@electron/rebuild` on a Mac has no toolchain to do that with.
+
+It does not fail. It reports `Preparing native dependencies: 1 / 1` and packages
+the Mach-O `pty.node` already sitting in `node_modules`. The AppImage builds,
+launches, and has a dead terminal in every tab — the same shape of silent
+breakage `require-node-version.mjs` exists to prevent, discovered a release
+later.
+
+Three ways to get one:
+
+1. **CI.** Push the tag; `build-linux` in `release.yml` builds and attaches it.
+2. **A container**, to iterate locally. Under emulation on Apple silicon this is
+   slow but correct:
+
+   ```bash
+   docker run --rm -it --platform=linux/amd64 \
+     -v "$PWD":/src -w /src node:24-bookworm \
+     bash -c 'apt-get update && apt-get install -y squashfs-tools \
+       && npm ci && npm run make:linux'
+   ```
+
+   `npm ci` clears `node_modules` itself, and that is the point: the host tree
+   holds darwin binaries for every native module, and the reinstall inside the
+   container is what compiles the Linux ones. It also means the host repo comes
+   back with Linux binaries in `node_modules` — run `npm ci` again on the Mac
+   before building there.
+3. **`ENSEMBLR_ALLOW_CROSS_PLATFORM_LINUX_BUILD=1`**, which downgrades the
+   refusal to a warning. It exercises the packaging plumbing — the maker, the
+   `.desktop` file, the icons — on a Mac. It must never ship: terminals in the
+   result do not work.
 
 `npm run build` is an alias for `npm run package`. All three of `build`,
 `package`, and `make` run `scripts/require-node-version.mjs` first.
@@ -201,7 +256,8 @@ was worth. See the prompt in that repository's own docs.
 [`.github/workflows/nightly.yml`](../.github/workflows/nightly.yml) builds
 `master` on the **canary** channel and publishes it to a rolling `nightly`
 release whose assets are replaced each run (`Ensemblr-Canary-arm64.dmg`,
-`Ensemblr-Canary-darwin-arm64.zip`). It is change-gated: a cheap Linux job
+`Ensemblr-Canary-darwin-arm64.zip`, `Ensemblr-Canary-x86_64.AppImage`). It is
+change-gated: a cheap Linux job
 compares `master` against the commit the `nightly` tag already points at and
 skips the build entirely when they match, so a quiet week republishes nothing.
 The version is stamped as `<major>.<minor>.<patch>-nightly.<YYYYMMDD>.g<short-sha>`
@@ -403,6 +459,7 @@ Adding another unbundled or native dependency means updating **both**
 
 - [ADR 0054](./adr/0054-build-releases-in-ci-and-reserve-the-nightly-tag.md) — why releases build in CI, the reserved tag namespace, and the shared channel state.
 - [ADR 0055](./adr/0055-resolve-updates-in-app-against-the-github-releases-api.md) — why the in-app updater resolves its own feed, and why `update.electronjs.org` cannot serve either channel.
+- [ADR 0056](./adr/0056-ship-a-linux-amd64-appimage.md) — why the Linux artifact is an AppImage, why its window controls are app-drawn, and why it checks for updates but never installs one.
 - [ADR 0031](./adr/0031-strip-launch-context-env-and-single-instance-lock.md), [ADR 0032](./adr/0032-channel-scoped-bundle-identity.md) — the Dock-flash fixes.
 - [ADR 0042](./adr/0042-add-claude-code-as-a-second-first-class-agent-runtime.md) — why the Claude binary is not packaged.
 - [`../.claude/rules/stack.md`](../.claude/rules/stack.md) — the pinned versions, the two `external` packages, and the `legacy-peer-deps` constraint.

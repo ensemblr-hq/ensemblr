@@ -4,6 +4,7 @@ import type { LocalCommandService } from '../commands/local-command';
 import type { EnsemblrConfigService } from '../config';
 import type { EnvironmentVariablesService } from '../environment';
 import type { EnsemblrRootDirectoryService } from '../root';
+import type { SafeStorageStatus } from '../secrets/safe-storage-health.ts';
 import type { EnsemblrDatabaseService } from '../storage';
 import {
 	appendCommandStreamLogs,
@@ -414,6 +415,94 @@ export function getShellProcessCheck({
 			};
 		},
 		title: 'Shell and process launch',
+	});
+
+	return check(context);
+}
+
+/**
+ * Builds the snapshot for the OS-keyring check that backs the Linux secret
+ * store. It never fails the setup: a session with no keyring daemon still runs,
+ * it just stores secrets obfuscated rather than encrypted, and the user needs
+ * to be told rather than blocked.
+ */
+export function getSecretStorageCheck({
+	context,
+	readStatus,
+}: {
+	context: SetupCheckProviderContext;
+	readStatus: () => SafeStorageStatus;
+}) {
+	const check = defineCheck<SetupCheckProviderContext>({
+		blocking: false,
+		description:
+			'Reports which OS keyring backend encrypts stored secrets, and warns when the session offers none.',
+		group: 'core',
+		id: 'secret-storage',
+		onError: (error) => ({
+			...unexpectedErrorDetail(error, {
+				code: 'secret-storage-unknown-error',
+				text: 'Unknown secret storage check error.',
+			}),
+			status: 'warning',
+		}),
+		run: () => {
+			const status = readStatus();
+			const logs: SetupCheckLogSnapshot[] = [
+				{
+					label: 'Keyring backend',
+					labelMessage: { code: 'keyring-backend' as const },
+					text: status.backend,
+				},
+			];
+
+			if (status.protection === 'unavailable') {
+				return {
+					...authoredDetail(
+						'secret-storage-unavailable',
+						'No OS keyring is available, so secrets cannot be saved. Start a keyring daemon (gnome-keyring or KWallet) and retry.',
+					),
+					logs,
+					remediationActions: [
+						{
+							id: 'retry-secret-storage',
+							kind: 'retry',
+							label: 'Retry secret storage check',
+						},
+					],
+					status: 'warning',
+				};
+			}
+
+			if (status.protection === 'obfuscated') {
+				return {
+					...authoredDetail(
+						'secret-storage-plaintext',
+						'No keyring daemon answered, so stored secrets are only obfuscated rather than encrypted. Start gnome-keyring or KWallet and restart Ensemblr.',
+					),
+					logs,
+					remediationActions: [
+						{
+							id: 'retry-secret-storage',
+							kind: 'retry',
+							label: 'Retry secret storage check',
+						},
+					],
+					status: 'warning',
+				};
+			}
+
+			return {
+				...authoredDetail(
+					'secret-storage-encrypted',
+					'Secrets are encrypted by the {{backend}} keyring.',
+					{ backend: status.backend },
+				),
+				logs,
+				status: 'success',
+			};
+		},
+		title: 'Secret storage',
 	});
 
 	return check(context);

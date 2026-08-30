@@ -25,6 +25,12 @@ import type { UpdateStatusSnapshot } from '@/shared/ipc/contracts/update';
  */
 function statusLabel(snapshot: UpdateStatusSnapshot, t: TFunction): string {
 	switch (snapshot.state) {
+		case 'available':
+			return t(
+				'settings:general.updates.status.available',
+				'{{version}} is available to download.',
+				{ version: snapshot.availableVersion ?? '' },
+			);
 		case 'checking':
 			return t('settings:general.updates.status.checking', 'Checking…');
 		case 'downloading':
@@ -80,6 +86,11 @@ export function SoftwareUpdateRows() {
 
 	const ready = snapshot.state === 'ready';
 	const disabled = snapshot.state === 'disabled';
+	// A check-only build knows the version but may not install it, so its button
+	// leaves for the release page rather than promising a restart that never
+	// replaces anything.
+	const downloadUrl =
+		snapshot.state === 'available' ? snapshot.releaseUrl : null;
 	/**
 	 * Runs one updater action with the button disabled for its duration, so a
 	 * slow check cannot be started twice.
@@ -121,17 +132,28 @@ export function SoftwareUpdateRows() {
 
 			<SettingRow
 				control={
-					<Button
-						disabled={busy || disabled || snapshot.state === 'unsupported'}
-						onClick={() => void runAction(ready ? install : check)}
-						size='sm'
-						variant={ready ? 'default' : 'outline'}
-					>
-						{busy ? <Spinner className='size-3.5' /> : null}
-						{ready
-							? t('settings:general.updates.restart', 'Restart to update')
-							: t('settings:general.updates.check', 'Check for updates')}
-					</Button>
+					downloadUrl ? (
+						<Button asChild size='sm' variant='default'>
+							<a href={downloadUrl} rel='noreferrer' target='_blank'>
+								{t(
+									'settings:general.updates.open-release',
+									'Open the release page',
+								)}
+							</a>
+						</Button>
+					) : (
+						<Button
+							disabled={busy || disabled || snapshot.state === 'unsupported'}
+							onClick={() => void runAction(ready ? install : check)}
+							size='sm'
+							variant={ready ? 'default' : 'outline'}
+						>
+							{busy ? <Spinner className='size-3.5' /> : null}
+							{ready
+								? t('settings:general.updates.restart', 'Restart to update')
+								: t('settings:general.updates.check', 'Check for updates')}
+						</Button>
+					)
 				}
 				description={statusLabel(snapshot, t)}
 				label={

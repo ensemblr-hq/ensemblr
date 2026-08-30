@@ -58,6 +58,7 @@ const GROUPS: Record<SetupCheckId, SetupCheckGroupId> = {
 	'pi-provider-model': 'pi',
 	'pi-rpc': 'pi',
 	'root-directory': 'storage',
+	'secret-storage': 'core',
 	'shell-process-launch': 'core',
 	'sqlite-database': 'storage',
 };

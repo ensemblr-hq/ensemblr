@@ -37,12 +37,19 @@ export function createAppUpdateService({
 	requestInstall,
 }: AppUpdateServiceOptions): UpdateService {
 	const channel = resolveBuildChannel(__ENSEMBLR_BUILD_CHANNEL__);
+	const preconditions = checkUpdatePreconditions({
+		channel,
+		inApplicationsFolder: readIsInApplicationsFolder(),
+		packaged: app.isPackaged,
+		platform: process.platform,
+	});
 	return createUpdateService({
 		armUpdater: (feedUrl) => {
 			autoUpdater.setFeedURL({ serverType: 'json', url: feedUrl });
 			autoUpdater.checkForUpdates();
 		},
 		broadcast,
+		capability: preconditions.capability,
 		channel,
 		getCurrentVersion: () => app.getVersion(),
 		isEnabled,
@@ -51,12 +58,7 @@ export function createAppUpdateService({
 			autoUpdater.on('update-not-available', () => handlers.onNotAvailable());
 			autoUpdater.on('error', (error) => handlers.onError(error));
 		},
-		preconditionFailure: checkUpdatePreconditions({
-			channel,
-			inApplicationsFolder: readIsInApplicationsFolder(),
-			packaged: app.isPackaged,
-			platform: process.platform,
-		}),
+		preconditionFailure: preconditions.failure,
 		releaseFeed: createReleaseFeed(),
 		requestInstall,
 	});
@@ -66,6 +68,8 @@ export function createAppUpdateService({
  * Reads whether the bundle sits in an Applications folder, treating a throw as
  * "no" — the call is documented macOS-only and raises on a path Electron cannot
  * classify, and refusing to update is the safe reading of an unknown location.
+ * The preconditions ignore it off darwin, so the `false` a Linux build gets
+ * here never reaches a decision.
  * @returns True when the app can be replaced in place
  */
 function readIsInApplicationsFolder(): boolean {

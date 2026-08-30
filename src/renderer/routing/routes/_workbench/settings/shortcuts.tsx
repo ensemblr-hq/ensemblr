@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { SettingRow } from '@/renderer/components/settings/setting-row';
 import { SettingsSection } from '@/renderer/components/settings/settings-section';
 import {
+	formatChord,
 	formatShortcut,
 	type Scope,
 	SHORTCUTS,
@@ -202,7 +203,11 @@ function shortcutName(t: TFunction): Record<ShortcutId, string> {
 		'tab.prev': t('settings:shortcuts.name.tab-prev', 'Previous tab'),
 		'tab.selectByIndex': t(
 			'settings:shortcuts.name.tab-select-by-index',
-			'Select tab by index (⌘1–8, ⌘9 last)',
+			'Select tab by index ({{first}}–8, {{last}} last)',
+			{
+				first: formatChord(['mod'], '1'),
+				last: formatChord(['mod'], '9'),
+			},
 		),
 		'terminal.new': t('settings:shortcuts.name.terminal-new', 'New terminal'),
 		'toolCalls.toggleCollapse': t(

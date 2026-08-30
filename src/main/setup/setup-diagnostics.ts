@@ -18,6 +18,10 @@ import type { LinearAuthService } from '../linear';
 import type { PiExecutableService } from '../pi-runtime';
 import type { PiReadinessService } from '../pi-runtime/pi-readiness';
 import type { EnsemblrRootDirectoryService } from '../root';
+import {
+	readSafeStorageStatus,
+	type SafeStorageStatus,
+} from '../secrets/safe-storage-health.ts';
 import type { EnsemblrDatabaseService } from '../storage';
 import type { SetupCheckProvider } from './setup-check-context.ts';
 import { getClaudeExecutableCheck } from './setup-checks-claude.ts';
@@ -27,6 +31,7 @@ import {
 	getEnvironmentVariablesCheck,
 	getManagedDirectoriesCheck,
 	getRootDirectoryCheck,
+	getSecretStorageCheck,
 	getShellProcessCheck,
 } from './setup-checks-core.ts';
 import {
@@ -60,6 +65,8 @@ interface CreateSetupDiagnosticsServiceOptions {
 	now?: () => Date;
 	piExecutableService: PiExecutableService;
 	piReadinessService: PiReadinessService;
+	platform?: NodeJS.Platform;
+	readSecretStorageStatus?: () => SafeStorageStatus;
 	rootDirectoryService: EnsemblrRootDirectoryService;
 }
 
@@ -69,6 +76,7 @@ const SETUP_CHECK_ORDER: readonly SetupCheckId[] = [
 	'root-directory',
 	'managed-directories',
 	'shell-process-launch',
+	'secret-storage',
 	'environment-variables',
 	'git-executable',
 	'gh-cli',
@@ -83,6 +91,16 @@ const SETUP_CHECK_ORDER: readonly SetupCheckId[] = [
 
 const AGENT_RUNTIME_CHECK_IDS: readonly (readonly SetupCheckId[])[] =
 	Object.values(AGENT_RUNTIME_CHECK_GROUPS);
+
+/**
+ * Check ids that only mean something on one platform. macOS keeps its secrets
+ * in the Keychain, which the Keychain-backed store already reports on through
+ * its own failures, so the keyring row would be a permanently green no-op there.
+ */
+const PLATFORM_ONLY_CHECK_IDS: Partial<Record<SetupCheckId, NodeJS.Platform>> =
+	{
+		'secret-storage': 'linux',
+	};
 
 const SENSITIVE_ASSIGNMENT_PATTERN =
 	/\b([A-Z0-9_.-]*(?:ACCESS[_-]?TOKEN|API[_-]?KEY|CREDENTIAL|PASSWORD|PRIVATE[_-]?KEY|SECRET|TOKEN)[A-Z0-9_.-]*)(\s*[=:]\s*)(["']?)([^\s"',;]+)/gi;
@@ -109,9 +127,15 @@ export function createSetupDiagnosticsService({
 	now = () => new Date(),
 	piExecutableService,
 	piReadinessService,
+	platform = process.platform,
+	readSecretStorageStatus = readSafeStorageStatus,
 	rootDirectoryService,
 }: CreateSetupDiagnosticsServiceOptions): SetupDiagnosticsService {
 	const context = { homeDirectory, now };
+	const checkOrder = SETUP_CHECK_ORDER.filter((id) => {
+		const requiredPlatform = PLATFORM_ONLY_CHECK_IDS[id];
+		return !requiredPlatform || requiredPlatform === platform;
+	});
 	const builtInProviders: Record<SetupCheckId, SetupCheckProvider> = {
 		'claude-executable': () =>
 			getClaudeExecutableCheck({ claudeExecutableService, context }),
@@ -142,6 +166,8 @@ export function createSetupDiagnosticsService({
 		'pi-rpc': () => getPiRpcCheck({ context, piReadinessService }),
 		'root-directory': () =>
 			getRootDirectoryCheck({ context, formatSafeText, rootDirectoryService }),
+		'secret-storage': () =>
+			getSecretStorageCheck({ context, readStatus: readSecretStorageStatus }),
 		'shell-process-launch': () =>
 			getShellProcessCheck({ context, localCommandService }),
 		'sqlite-database': () =>
@@ -151,7 +177,7 @@ export function createSetupDiagnosticsService({
 	return {
 		getSnapshot: async () => {
 			const checks = await Promise.all(
-				SETUP_CHECK_ORDER.map(async (id) => {
+				checkOrder.map(async (id) => {
 					const provider = checkProviders[id] ?? builtInProviders[id];
 					const check = await provider(context);
 

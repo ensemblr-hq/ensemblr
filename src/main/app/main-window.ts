@@ -1,12 +1,14 @@
 import path from 'node:path';
 import { BrowserWindow, screen } from 'electron';
-
+import type { TitleBarPreference } from '../../shared/window-chrome.ts';
 import { routeExternalLinksToBrowser } from './external-links';
 import { restrictMediaPermissions } from './media-permissions';
 import { forwardTextContextMenus } from './text-context-menu-forwarding';
+import { resolveWindowChromeOptions } from './window-chrome';
 import {
 	DEFAULT_MAIN_WINDOW_HEIGHT,
 	DEFAULT_MAIN_WINDOW_WIDTH,
+	forbidsWindowPositioning,
 	MAIN_WINDOW_MIN_HEIGHT,
 	MAIN_WINDOW_MIN_WIDTH,
 	type MainWindowState,
@@ -14,28 +16,22 @@ import {
 	trackMainWindowState,
 } from './window-state';
 
-const macosChromeOptions =
-	process.platform === 'darwin'
-		? {
-				titleBarStyle: 'hiddenInset' as const,
-				trafficLightPosition: { x: 14, y: 14 },
-			}
-		: {};
-
 /**
  * Creates the Ensemblr main BrowserWindow, restoring persisted bounds and
  * wiring the Vite-served renderer (dev URL or built bundle).
- * @param options - Optional dependencies including the persisted window-state store.
+ * @param options - The persisted window-state store and the user's title-bar preference.
  * @returns The created {@link BrowserWindow}.
  */
 export function createMainWindow({
+	titleBar = 'custom',
 	windowStateStore,
 }: {
+	titleBar?: TitleBarPreference;
 	windowStateStore?: MainWindowStateStore;
 } = {}): BrowserWindow {
 	const restoredState = windowStateStore?.load(screen.getAllDisplays()) ?? null;
 	const mainWindow = new BrowserWindow({
-		...macosChromeOptions,
+		...resolveWindowChromeOptions(process.platform, titleBar),
 		backgroundColor: '#0b0808',
 		height: restoredState?.bounds.height ?? DEFAULT_MAIN_WINDOW_HEIGHT,
 		minHeight: MAIN_WINDOW_MIN_HEIGHT,
@@ -43,7 +39,7 @@ export function createMainWindow({
 		show: false,
 		title: 'Ensemblr',
 		width: restoredState?.bounds.width ?? DEFAULT_MAIN_WINDOW_WIDTH,
-		...(restoredState
+		...(restoredState && !forbidsWindowPositioning()
 			? { x: restoredState.bounds.x, y: restoredState.bounds.y }
 			: {}),
 		webPreferences: {

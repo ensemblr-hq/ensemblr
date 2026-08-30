@@ -1,4 +1,5 @@
 import type { AppLanguage } from '../../i18n';
+import type { WindowChromeSnapshot } from '../../window-chrome';
 import type { HealthSnapshot } from './health';
 import type { WorkspaceOpenTargetSnapshot } from './open-target';
 import type { RepositoryWorkspaceNavigationSnapshot } from './repository-navigation';
@@ -15,4 +16,10 @@ export interface InitialShellSnapshot {
 	language: AppLanguage;
 	navigation: RepositoryWorkspaceNavigationSnapshot | null;
 	openTargets: WorkspaceOpenTargetSnapshot[] | null;
+	/**
+	 * The chrome the running window was actually constructed with, so the shell
+	 * insets its toolbars and mounts its controls to match rather than
+	 * re-deriving a setting the window may predate.
+	 */
+	windowChrome: WindowChromeSnapshot;
 }

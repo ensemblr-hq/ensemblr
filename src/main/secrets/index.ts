@@ -1,9 +1,12 @@
 export { createMacosKeychainSecretStore } from './keychain-backend.ts';
 export { createMockSecretStore } from './mock-backend.ts';
 export { maskSecret } from './normalize.ts';
+export { createSafeStorageSecretStore } from './safe-storage-backend.ts';
 export {
 	type MacosKeychainSecretStoreOptions,
 	type MockSecretStoreOptions,
+	type PersistedSecretBackend,
+	type SafeStorageSecretStoreOptions,
 	type SecretBackend,
 	type SecretLookup,
 	type SecretMetadata,

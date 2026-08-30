@@ -18,11 +18,14 @@ import {
 	type DetectedTargetsMap,
 	detectInstalledTargets,
 } from './detect-installed-targets';
+import { launchLinuxApp } from './linux-app-launch';
 import { resolveOpenTargetPath } from './open-target-paths';
 import {
 	findOpenTargetDefinition,
 	OPEN_TARGET_REGISTRY,
 	type OpenTargetDefinition,
+	type OpenTargetPlatformBehavior,
+	resolvePlatformBehavior,
 } from './open-target-registry';
 
 const OPEN_BINARY_PATH = '/usr/bin/open';
@@ -196,9 +199,17 @@ export function createOpenTargetService({
 		if (!definition) {
 			return { ok: false, error: `Unknown open target: ${targetId}` };
 		}
+		const behavior = resolvePlatformBehavior(definition, process.platform);
+		if (!behavior) {
+			return {
+				ok: false,
+				error: `${definition.label} is not available on this platform.`,
+			};
+		}
 
 		try {
 			await dispatchOpen({
+				behavior,
 				definition,
 				localCommandService,
 				targetPath: resolveOpenTargetPath({
@@ -253,10 +264,13 @@ async function resolveTargets({
 function hasDetectedApps(
 	snapshots: readonly WorkspaceOpenTargetSnapshot[],
 ): boolean {
-	return snapshots.some(
-		(snapshot) =>
-			findOpenTargetDefinition(snapshot.id)?.detection.kind === 'bundleId',
-	);
+	return snapshots.some((snapshot) => {
+		const definition = findOpenTargetDefinition(snapshot.id);
+		return definition
+			? resolvePlatformBehavior(definition, process.platform)?.detection
+					.kind === 'bundleId'
+			: false;
+	});
 }
 
 /**
@@ -313,7 +327,8 @@ function buildSnapshots(
 	let visibleIndex = 0;
 	let appsAdded = 0;
 	for (const definition of OPEN_TARGET_REGISTRY) {
-		if (!resolved.detected[definition.id]?.installed) {
+		const behavior = resolvePlatformBehavior(definition, process.platform);
+		if (!behavior || !resolved.detected[definition.id]?.installed) {
 			continue;
 		}
 		const isUtility = definition.kind === 'utility';
@@ -326,6 +341,7 @@ function buildSnapshots(
 		}
 		snapshots.push(
 			toSnapshot({
+				behavior,
 				definition,
 				iconDataUrl: resolved.iconDataUrls[definition.id],
 				visibleIndex,
@@ -341,16 +357,18 @@ function buildSnapshots(
  * @returns The renderer-facing snapshot.
  */
 function toSnapshot({
+	behavior,
 	definition,
 	iconDataUrl,
 	visibleIndex,
 }: {
+	behavior: OpenTargetPlatformBehavior;
 	definition: OpenTargetDefinition;
 	iconDataUrl: string | undefined;
 	visibleIndex: number;
 }): WorkspaceOpenTargetSnapshot {
 	return {
-		behavior: behaviorForDispatch(definition.dispatch.kind),
+		behavior: behaviorForDispatch(behavior.dispatch.kind),
 		...(iconDataUrl ? { iconDataUrl } : {}),
 		iconName: definition.iconName,
 		id: definition.id,
@@ -371,13 +389,14 @@ function toSnapshot({
  * @returns The workspace open-target behavior.
  */
 function behaviorForDispatch(
-	kind: OpenTargetDefinition['dispatch']['kind'],
+	kind: OpenTargetPlatformBehavior['dispatch']['kind'],
 ): WorkspaceOpenTargetBehavior {
 	switch (kind) {
 		case 'copy-path':
 			return 'copy-path';
 		case 'reveal-in-finder':
 			return 'reveal-in-finder';
+		case 'linux-app':
 		case 'open-app-name':
 		case 'open-bundle':
 			return 'launch-app';
@@ -455,25 +474,37 @@ function writeSnapshotsToDisk(snapshots: WorkspaceOpenTargetSnapshot[]): void {
  * @param options - The definition, command runner, and resolved target path.
  */
 async function dispatchOpen({
+	behavior,
 	definition,
 	localCommandService,
 	targetPath,
 }: {
+	behavior: OpenTargetPlatformBehavior;
 	definition: OpenTargetDefinition;
 	localCommandService: LocalCommandService;
 	targetPath: string;
 }): Promise<void> {
-	switch (definition.dispatch.kind) {
+	const dispatch = behavior.dispatch;
+	switch (dispatch.kind) {
 		case 'reveal-in-finder':
 			shell.showItemInFolder(targetPath);
 			return;
 		case 'copy-path':
 			clipboard.writeText(targetPath);
 			return;
+		case 'linux-app': {
+			await launchLinuxApp({
+				dispatch,
+				label: definition.label,
+				localCommandService,
+				targetPath,
+			});
+			return;
+		}
 		case 'open-bundle': {
 			const result = await localCommandService.run(
 				{
-					args: ['-b', definition.dispatch.bundleId, targetPath],
+					args: ['-b', dispatch.bundleId, targetPath],
 					command: OPEN_BINARY_PATH,
 					timeoutMs: OPEN_TIMEOUT_MS,
 				},
@@ -489,7 +520,7 @@ async function dispatchOpen({
 		case 'open-app-name': {
 			const result = await localCommandService.run(
 				{
-					args: ['-a', definition.dispatch.appName, targetPath],
+					args: ['-a', dispatch.appName, targetPath],
 					command: OPEN_BINARY_PATH,
 					timeoutMs: OPEN_TIMEOUT_MS,
 				},

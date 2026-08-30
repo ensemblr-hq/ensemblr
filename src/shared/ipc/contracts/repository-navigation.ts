@@ -82,6 +82,11 @@ export interface RepositoryWorkspaceNavigationSnapshot {
 	repositories: RepositoryWorkspaceNavigationRepository[];
 }
 
+/** The window's maximized state, pushed on every change and returned by a toggle. */
+export interface WindowMaximizedBroadcast {
+	maximized: boolean;
+}
+
 /** Repository / workspace navigation tree IPC surface. */
 export interface NavigationApi {
 	repositoryWorkspaceNavigation: () => Promise<RepositoryWorkspaceNavigationSnapshot>;
@@ -89,9 +94,33 @@ export interface NavigationApi {
 
 /** Window/shell-level IPC surface (resize the BrowserWindow, etc). */
 export interface ShellApi {
-	/** Closes the BrowserWindow that issued the request. */
+	/**
+	 * Closes the BrowserWindow that issued the request. Goes through the window's
+	 * own `close` event, so the quit guard still asks about running agents.
+	 */
 	closeWindow: () => Promise<void>;
 	ensureWindowWidth: (minimumWidth: number) => Promise<void>;
+	/** Minimizes the BrowserWindow that issued the request. */
+	minimizeWindow: () => Promise<void>;
+	/**
+	 * Subscribes to the window's maximized state, so an app-drawn control shows
+	 * what the window actually is rather than what it was last clicked to be —
+	 * the compositor's own shortcuts change it too. Returns an unsubscribe function.
+	 */
+	onWindowMaximizedChanged: (
+		listener: (payload: WindowMaximizedBroadcast) => void,
+	) => () => void;
+	/**
+	 * Quits and starts this build again, draining running agents on the way out
+	 * exactly as an ordinary quit does. Backs the settings that only
+	 * `BrowserWindow`'s constructor reads.
+	 */
+	relaunchApp: () => Promise<void>;
+	/**
+	 * Maximizes the window, or restores it when it already is. Resolves with the
+	 * state it left the window in.
+	 */
+	toggleMaximizeWindow: () => Promise<WindowMaximizedBroadcast>;
 	/**
 	 * Subscribes to native application-menu commands, broadcast to the focused
 	 * window when the user picks an item. Returns an unsubscribe function.

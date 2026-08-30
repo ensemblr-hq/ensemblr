@@ -27,8 +27,12 @@ const MAIN_WINDOW_STATE_SAVE_DELAY_MS = 500;
 
 export const DEFAULT_MAIN_WINDOW_HEIGHT = 820;
 export const DEFAULT_MAIN_WINDOW_WIDTH = 1280;
-export const MAIN_WINDOW_MIN_HEIGHT = 640;
-export const MAIN_WINDOW_MIN_WIDTH = 960;
+// A 1280x800 panel at 150% fractional scaling reports a 853x533 logical
+// viewport, which is under the old 960x640 floor — the window then could not
+// fit its own minimum and the compositor sized it off-screen. The shell's
+// narrow-viewport rules already collapse the sidebar well above this.
+export const MAIN_WINDOW_MIN_HEIGHT = 480;
+export const MAIN_WINDOW_MIN_WIDTH = 720;
 
 /**
  * Builds a SQLite-backed store for the main window's persisted state.
@@ -139,6 +143,22 @@ export function trackMainWindowState({
 	mainWindow.on('leave-full-screen', schedulePersist);
 	mainWindow.on('close', persistNow);
 	mainWindow.on('closed', clearPendingSave);
+}
+
+/**
+ * Reports whether the session forbids a client from placing its own window.
+ * Wayland gives a client no way to read or set its position, so Electron
+ * reports a clamped-to-zero rectangle and honours no `x`/`y` we pass — restoring
+ * one would overwrite good persisted state with `(0, 0)` on every launch.
+ * @param platform - The running platform.
+ * @param sessionType - The value of `XDG_SESSION_TYPE`.
+ * @returns True when only the size and state flags may be restored.
+ */
+export function forbidsWindowPositioning(
+	platform: NodeJS.Platform = process.platform,
+	sessionType: string | undefined = process.env.XDG_SESSION_TYPE,
+): boolean {
+	return platform === 'linux' && sessionType?.toLowerCase() === 'wayland';
 }
 
 /**

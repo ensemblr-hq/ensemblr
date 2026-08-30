@@ -57,6 +57,7 @@ const PARAMS = {
 	hostname: 'github.com',
 	identity: 'ada@example.com',
 	keys: 'repos, workspaces',
+	backend: 'kwallet6',
 	kind: 'version',
 	masked: 1,
 	message: 'boom',

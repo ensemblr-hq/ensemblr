@@ -260,6 +260,12 @@
 							"default": "default",
 							"description": "Density of rendered markdown in the timeline."
 						},
+						"titleBar": {
+							"type": "string",
+							"enum": ["custom", "system"],
+							"default": "custom",
+							"description": "Linux only: whether Ensemblr draws its own title bar and window controls, or lets the desktop environment decorate the window. macOS always uses the inset chrome. Changing this takes effect after a relaunch."
+						},
 						"terminalFont": {
 							"type": "string",
 							"default": "JetBrainsMono Nerd Font Mono",

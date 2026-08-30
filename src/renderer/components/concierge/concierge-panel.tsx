@@ -19,7 +19,7 @@ import { ConciergeTimeline } from './concierge-timeline';
 
 /**
  * Width in pixels the macOS window controls claim at the window's leading edge,
- * matching the `--ensemblr-traffic-light-safe-inline` token the shell toolbars
+ * matching the `--ensemblr-window-chrome-inset-start` token the shell toolbars
  * pad by. A maximized panel starting left of this sits under the controls.
  */
 const TRAFFIC_LIGHT_SAFE_INLINE = 92;
@@ -114,7 +114,7 @@ export function ConciergePanel() {
 									'h-12 border-border pr-2',
 									clearsTrafficLights
 										? 'pl-3'
-										: 'pl-[var(--ensemblr-traffic-light-safe-inline)]',
+										: 'pl-[var(--ensemblr-window-chrome-inset-start)]',
 								)
 							: 'h-10 cursor-grab border-border/60 pr-1.5 pl-1 active:cursor-grabbing',
 					)}

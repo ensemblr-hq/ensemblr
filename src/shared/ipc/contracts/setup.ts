@@ -23,6 +23,7 @@ export type SetupCheckId =
 	| 'pi-provider-model'
 	| 'pi-rpc'
 	| 'root-directory'
+	| 'secret-storage'
 	| 'shell-process-launch'
 	| 'sqlite-database';
 /** Status of a single setup check. */
@@ -106,6 +107,10 @@ export type SetupDetailCode =
 	| 'pi-rpc-ready'
 	| 'pi-rpc-unknown-error'
 	| 'root-directory-ready'
+	| 'secret-storage-encrypted'
+	| 'secret-storage-plaintext'
+	| 'secret-storage-unavailable'
+	| 'secret-storage-unknown-error'
 	| 'shell-fallback-environment'
 	| 'shell-ready'
 	| 'shell-smoke-failed'
@@ -126,6 +131,7 @@ export type SetupLogLabelCode =
 	| 'database-path'
 	| 'executable-path'
 	| 'first-jsonl-frame'
+	| 'keyring-backend'
 	| 'masked-secrets'
 	| 'model-count'
 	| 'pi-probe'

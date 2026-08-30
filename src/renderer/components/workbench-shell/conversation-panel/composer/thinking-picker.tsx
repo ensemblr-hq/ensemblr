@@ -15,7 +15,7 @@ import {
 import type { ComposerThinkingOption } from '@/renderer/types/workbench';
 import type { AgentProviderId } from '@/shared/agent-provider';
 import { getThinkingAxis } from '@/shared/agent-thinking';
-
+import { formatChord } from '@/shared/keymap';
 import { ThinkingBarIcon } from './thinking-bar-icon';
 
 /**
@@ -115,7 +115,9 @@ export function ThinkingPicker({
 							'Adjust thinking level',
 						)}
 				{/* i18next-instrument-ignore */}
-				<span className='ml-2 text-muted-foreground'>⌥T</span>
+				<span className='ml-2 text-muted-foreground'>
+					{formatChord(['alt'], 'T')}
+				</span>
 			</TooltipContent>
 		</Tooltip>
 	);

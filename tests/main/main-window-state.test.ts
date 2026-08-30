@@ -4,6 +4,9 @@ import test, { type TestContext } from 'node:test';
 import {
 	clampMainWindowBounds,
 	createMainWindowStateStore,
+	forbidsWindowPositioning,
+	MAIN_WINDOW_MIN_HEIGHT,
+	MAIN_WINDOW_MIN_WIDTH,
 	normalizeMainWindowState,
 } from '../../src/main/app/window-state.ts';
 import {
@@ -113,14 +116,30 @@ test('enforces the existing minimum window size while normalizing state', () => 
 
 	assert.deepEqual(state, {
 		bounds: {
-			height: 640,
-			width: 960,
+			height: MAIN_WINDOW_MIN_HEIGHT,
+			width: MAIN_WINDOW_MIN_WIDTH,
 			x: 20,
 			y: 30,
 		},
 		isFullScreen: true,
 		isMaximized: true,
 	});
+});
+
+// A 1280x800 panel at 150% fractional scaling reports an 853x533 logical
+// viewport. The floor has to sit under that, or the window cannot fit its own
+// minimum and the compositor sizes it off-screen.
+test('the minimum window size fits a fractionally-scaled 1280x800 panel', () => {
+	assert.ok(MAIN_WINDOW_MIN_WIDTH <= 853);
+	assert.ok(MAIN_WINDOW_MIN_HEIGHT <= 533);
+});
+
+test('only a Wayland session forbids the app placing its own window', () => {
+	assert.equal(forbidsWindowPositioning('linux', 'wayland'), true);
+	assert.equal(forbidsWindowPositioning('linux', 'Wayland'), true);
+	assert.equal(forbidsWindowPositioning('linux', 'x11'), false);
+	assert.equal(forbidsWindowPositioning('linux', undefined), false);
+	assert.equal(forbidsWindowPositioning('darwin', 'wayland'), false);
 });
 
 test('rejects invalid stored window state', () => {

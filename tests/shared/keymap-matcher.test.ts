@@ -16,6 +16,21 @@ function event(overrides: Partial<KeyboardEventLike>): KeyboardEventLike {
 	};
 }
 
+/**
+ * The physical key `mod` resolves to on the running platform: Command on macOS,
+ * Control everywhere else. The suite runs on both CI legs now that Ensemblr
+ * ships a Linux build, so a `metaKey: true` literal would assert the macOS
+ * mapping against a Linux runner and fail for the right reason in the wrong
+ * place.
+ */
+const MOD_KEY: 'ctrlKey' | 'metaKey' =
+	process.platform === 'darwin' ? 'metaKey' : 'ctrlKey';
+
+/** Builds an event with the platform's `mod` key held, plus any other overrides. */
+function modEvent(overrides: Partial<KeyboardEventLike>): KeyboardEventLike {
+	return event({ ...overrides, [MOD_KEY]: true });
+}
+
 describe('matchesShortcut — alt+letter on macOS', () => {
 	test('⌥P matches the model-picker toggle via physical code (key is "π")', () => {
 		expect(
@@ -82,8 +97,9 @@ describe('matchesShortcut — ctrl is the physical Control key', () => {
 		).toBe(true);
 	});
 
-	test('on macOS, ⌘O does NOT match the ctrl-bound toggle', () => {
-		// The runner is darwin, so metaKey is ⌘ — a distinct key from Control.
+	test('⌘O does NOT match the ctrl-bound toggle', () => {
+		// Command is a distinct physical key from Control, and nothing binds it
+		// here — on Linux there is no Command key at all, so this holds either way.
 		expect(
 			matchesShortcut(
 				'toolCalls.toggleCollapse',
@@ -108,25 +124,24 @@ describe('matchesShortcut — non-alt bindings unaffected', () => {
 });
 
 describe('matchesShortcut — tab navigation', () => {
-	test('⌘⇧] matches next-tab via physical code (shifted key is "}")', () => {
+	test('mod+⇧] matches next-tab via physical code (shifted key is "}")', () => {
 		expect(
 			matchesShortcut(
 				'tab.next',
-				event({
+				modEvent({
 					key: '}',
 					code: 'BracketRight',
-					metaKey: true,
 					shiftKey: true,
 				}),
 			),
 		).toBe(true);
 	});
 
-	test('⌘⇧[ matches prev-tab via physical code (shifted key is "{")', () => {
+	test('mod+⇧[ matches prev-tab via physical code (shifted key is "{")', () => {
 		expect(
 			matchesShortcut(
 				'tab.prev',
-				event({ key: '{', code: 'BracketLeft', metaKey: true, shiftKey: true }),
+				modEvent({ key: '{', code: 'BracketLeft', shiftKey: true }),
 			),
 		).toBe(true);
 	});
@@ -135,34 +150,28 @@ describe('matchesShortcut — tab navigation', () => {
 		expect(
 			matchesShortcut(
 				'tab.next',
-				event({ key: '{', code: 'BracketLeft', metaKey: true, shiftKey: true }),
+				modEvent({ key: '{', code: 'BracketLeft', shiftKey: true }),
 			),
 		).toBe(false);
 	});
 
 	test('bracket without shift does not match the shifted binding', () => {
 		expect(
-			matchesShortcut(
-				'tab.next',
-				event({ key: ']', code: 'BracketRight', metaKey: true }),
-			),
+			matchesShortcut('tab.next', modEvent({ key: ']', code: 'BracketRight' })),
 		).toBe(false);
 	});
 
 	test('falls back to key when code is absent (synthetic events)', () => {
 		expect(
-			matchesShortcut(
-				'tab.next',
-				event({ key: ']', metaKey: true, shiftKey: true }),
-			),
+			matchesShortcut('tab.next', modEvent({ key: ']', shiftKey: true })),
 		).toBe(true);
 	});
 
-	test('⌘1 matches select-tab-by-index', () => {
+	test('mod+1 matches select-tab-by-index', () => {
 		expect(
 			matchesShortcut(
 				'tab.selectByIndex',
-				event({ key: '1', code: 'Digit1', metaKey: true }),
+				modEvent({ key: '1', code: 'Digit1' }),
 			),
 		).toBe(true);
 	});
@@ -182,8 +191,7 @@ describe('matchesShortcut — composer submit', () => {
 	});
 
 	test('mod+Enter matches composer.submitWithMod, not the plain variant', () => {
-		// `mod` resolves to ⌘ on macOS (the test runner is darwin).
-		const e = event({ key: 'Enter', code: 'Enter', metaKey: true });
+		const e = modEvent({ key: 'Enter', code: 'Enter' });
 		expect(matchesShortcut('composer.submitWithMod', e)).toBe(true);
 		expect(matchesShortcut('composer.submit', e)).toBe(false);
 	});

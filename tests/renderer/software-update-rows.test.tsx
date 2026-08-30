@@ -29,6 +29,7 @@ function snapshot(
 		currentVersion: '0.1.0-beta.7',
 		failure: null,
 		notes: null,
+		releaseUrl: null,
 		state: 'idle',
 		...overrides,
 	};

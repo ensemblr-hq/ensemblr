@@ -16,6 +16,7 @@ import {
 import { cn } from '@/renderer/lib/utils';
 import type { WorkspaceShellModel } from '@/renderer/types/workbench';
 import type { ChangesSource } from '@/renderer/types/workbench-shell';
+import { formatChord } from '@/shared/keymap';
 
 /**
  * Dismissable pill showing the active non-default change source. Clicking it
@@ -133,7 +134,9 @@ export function ChangesOverflowMenu({
 						{source.kind === 'uncommitted' ? (
 							<CheckIcon aria-hidden='true' className='size-4' />
 						) : (
-							<DropdownMenuShortcut>⌥⌘U</DropdownMenuShortcut>
+							<DropdownMenuShortcut>
+								{formatChord(['alt', 'mod'], 'U')}
+							</DropdownMenuShortcut>
 						)}
 					</DropdownMenuItem>
 				</div>

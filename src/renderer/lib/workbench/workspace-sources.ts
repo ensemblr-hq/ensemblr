@@ -5,6 +5,7 @@ import type {
 	WorkspaceSourceKind,
 	WorkspaceSourceProvider,
 } from '@/renderer/types/workbench';
+import { formatChord } from '@/shared/keymap';
 
 /** Source kinds in the order they appear in the create-from picker. */
 export const WORKSPACE_SOURCE_KINDS: readonly WorkspaceSourceKind[] = [
@@ -42,7 +43,7 @@ function existingWorkspaceActions(): WorkspaceSourceAction[] {
 		{
 			id: 'open',
 			label: i18n.t('common:actions.open', 'Open'),
-			shortcut: '↵',
+			shortcut: formatChord([], 'Enter'),
 			variant: 'secondary',
 		},
 		{
@@ -51,7 +52,7 @@ function existingWorkspaceActions(): WorkspaceSourceAction[] {
 				'workbench:workspace-source-picker.action.duplicate-branch',
 				'Duplicate branch',
 			),
-			shortcut: '⌘↵',
+			shortcut: formatChord(['mod'], 'Enter'),
 			variant: 'primary',
 		},
 	];

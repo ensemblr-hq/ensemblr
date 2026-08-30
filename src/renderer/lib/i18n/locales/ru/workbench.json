@@ -1278,6 +1278,12 @@
 		"file-count_many": "{{count}} файлов",
 		"file-count_other": "{{count}} файла"
 	},
+	"window-controls": {
+		"close": "Закрыть окно",
+		"maximize": "Развернуть",
+		"minimize": "Свернуть",
+		"restore": "Восстановить"
+	},
 	"workspace-checks": {
 		"blocked": {
 			"detail": "Проверки не проходят.",

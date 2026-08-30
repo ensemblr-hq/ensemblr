@@ -2,7 +2,7 @@
 	"name": "ensemblr",
 	"productName": "Ensemblr",
 	"version": "0.1.0-beta.18",
-	"description": "A macOS workbench for isolated, multi-agent coding workflows.",
+	"description": "A desktop workbench for isolated, multi-agent coding workflows.",
 	"homepage": "https://www.ensemblr.dev",
 	"repository": {
 		"type": "git",
@@ -96,6 +96,8 @@
 		"make:canary": "ENSEMBLR_BUILD_CHANNEL=canary npm run make",
 		"make:dev": "ENSEMBLR_BUILD_CHANNEL=dev npm run make",
 		"make:unsigned": "ENSEMBLR_SKIP_SIGN=1 npm run make",
+		"make:linux": "node scripts/require-node-version.mjs && node scripts/require-linux-host.mjs && electron-forge make --platform=linux --arch=x64",
+		"package:linux": "node scripts/require-node-version.mjs && node scripts/require-linux-host.mjs && electron-forge package --platform=linux --arch=x64",
 		"package:dev": "ENSEMBLR_BUILD_CHANNEL=dev npm run package",
 		"package:unsigned": "ENSEMBLR_SKIP_SIGN=1 npm run package",
 		"verify:signing": "node scripts/verify-signed-artifacts.mjs",
@@ -106,6 +108,8 @@
 	"keywords": [
 		"electron",
 		"ensemblr",
+		"linux",
+		"macos",
 		"pi"
 	],
 	"author": {
@@ -172,6 +176,7 @@
 		"@electron-forge/plugin-fuses": "^7.11.2",
 		"@electron-forge/plugin-vite": "^7.11.2",
 		"@electron/fuses": "^2.1.3",
+		"@reforged/maker-appimage": "^5.3.1",
 		"@tailwindcss/typography": "^0.5.20",
 		"@tailwindcss/vite": "^4.3.3",
 		"@tanstack/router-plugin": "^1.168.32",

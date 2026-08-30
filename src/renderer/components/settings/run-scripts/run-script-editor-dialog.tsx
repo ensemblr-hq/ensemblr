@@ -13,11 +13,11 @@ import {
 import { Input } from '@/renderer/components/ui/input';
 import { Switch } from '@/renderer/components/ui/switch';
 import { Textarea } from '@/renderer/components/ui/textarea';
+import { formatChord } from '@/shared/keymap';
 import {
 	DEFAULT_RUN_SCRIPT_ICON,
 	type RunScriptDefinition,
 } from '@/shared/scripts';
-
 import { RunScriptIconPicker } from './run-script-icon-picker';
 
 /** Form key used when adding, so an add never reuses a previous edit's draft. */
@@ -232,7 +232,8 @@ function RunScriptEditorFields({
 					<p className='text-muted-foreground text-xs'>
 						{t(
 							'settings:run-scripts.editor.default-description',
-							'Runs when you press ⌘R in a workspace that has no other pick.',
+							'Runs when you press {{chord}} in a workspace that has no other pick.',
+							{ chord: formatChord(['mod'], 'R') },
 						)}
 					</p>
 				</div>

@@ -23,6 +23,7 @@ import {
 	TooltipContent,
 	TooltipTrigger,
 } from '@/renderer/components/ui/tooltip';
+import { formatChord } from '@/shared/keymap';
 
 /**
  * Opens the composer attachment/link actions from the plus button.
@@ -131,7 +132,9 @@ export function AttachmentMenu({
 						<span className='flex-1'>
 							{t('workbench:attachment-menu.add-attachment', 'Add attachment')}
 						</span>
-						<DropdownMenuShortcut>⌘U</DropdownMenuShortcut>
+						<DropdownMenuShortcut>
+							{formatChord(['mod'], 'U')}
+						</DropdownMenuShortcut>
 					</DropdownMenuItem>
 					<DropdownMenuItem
 						className='gap-3 px-2 py-2 text-sm'
@@ -152,7 +155,9 @@ export function AttachmentMenu({
 						<span className='flex-1'>
 							{t('workbench:attachment-menu.link-issue', 'Link issue')}
 						</span>
-						<DropdownMenuShortcut>⌘I</DropdownMenuShortcut>
+						<DropdownMenuShortcut>
+							{formatChord(['mod'], 'I')}
+						</DropdownMenuShortcut>
 					</DropdownMenuItem>
 					<DropdownMenuItem
 						className='gap-3 px-2 py-2 text-sm'

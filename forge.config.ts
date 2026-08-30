@@ -9,9 +9,11 @@ import { AutoUnpackNativesPlugin } from '@electron-forge/plugin-auto-unpack-nati
 import { FusesPlugin } from '@electron-forge/plugin-fuses';
 import { VitePlugin } from '@electron-forge/plugin-vite';
 import type { ForgeConfig } from '@electron-forge/shared-types';
+import MakerAppImage from '@reforged/maker-appimage';
 
 import {
 	APP_BUNDLE_IDS,
+	APP_LINUX_APP_IDS,
 	APP_NAMES,
 	resolveBuildChannel,
 } from './src/shared/build-channel.ts';
@@ -251,6 +253,32 @@ const config: ForgeConfig = {
 	makers: [
 		new MakerDMG({ format: 'ULFO' }, ['darwin']),
 		new MakerZIP({}, ['darwin']),
+		new MakerAppImage(
+			{
+				options: {
+					// `bin` names the executable inside the packaged directory, and the
+					// maker throws when it is absent. Packager derives that name from
+					// `packagerConfig.name`, so it is the product name — not the
+					// launcher id — and the two deliberately differ here.
+					bin: APP_NAMES[buildChannel],
+					categories: ['Development'],
+					compressor: 'zstd',
+					genericName: 'Multi-agent coding workbench',
+					icon: {
+						'1024x1024': './assets/icon.png',
+						scalable: './assets/icon.svg',
+					},
+					// Writes `x-scheme-handler/ensemblr` into the generated `.desktop`
+					// file, registering the app as the scheme's handler with the
+					// desktop environment. `src/shared/deep-link.ts` has no consumer
+					// yet; this only prepares the ground.
+					mimeType: ['x-scheme-handler/ensemblr'],
+					name: APP_LINUX_APP_IDS[buildChannel],
+					productName: APP_NAMES[buildChannel],
+				},
+			},
+			['linux'],
+		),
 	],
 	plugins: [
 		new AutoUnpackNativesPlugin({}),

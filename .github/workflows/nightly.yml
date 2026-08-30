@@ -216,3 +216,66 @@ jobs:
           if [ -n "${APPLE_API_KEY_PATH:-}" ]; then
             rm -f "$APPLE_API_KEY_PATH"
           fi
+
+  # Runs after `build`, not beside it: that job is what creates the rolling
+  # release on a first run, and an upload into a tag that does not exist yet
+  # fails. Nothing here is signed — an AppImage carries no notarization ticket —
+  # so `verify:signing`, which only looks for `*-darwin-arm64` output, is not run.
+  build-linux:
+    needs: [gate, build]
+    if: >-
+      needs.gate.outputs.changed == 'true' &&
+      (github.event_name == 'schedule' || inputs.publish)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      NIGHTLY_SHA: ${{ needs.gate.outputs.sha }}
+      NIGHTLY_VERSION: ${{ needs.gate.outputs.version }}
+      APPIMAGE_NAME: Ensemblr-Canary-x86_64.AppImage
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.gate.outputs.sha }}
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      # `@reforged/maker-appimage` declares mksquashfs as a required external
+      # binary and refuses to run without it; ubuntu-latest does not ship it.
+      - name: Install mksquashfs
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y squashfs-tools
+
+      # Before the version stamp, for the same reason as the macOS job: `npm ci`
+      # requires package.json and the lockfile to agree.
+      - run: npm ci
+
+      - name: Stamp the nightly version
+        run: npm pkg set version="$NIGHTLY_VERSION"
+
+      - name: Build the canary AppImage
+        env:
+          ENSEMBLR_BUILD_CHANNEL: canary
+        run: npm run make:linux
+
+      # Fixed filename, matching the DMG and ZIP: the rolling tag is only worth
+      # having if `--clobber` fully replaces yesterday's asset and the download
+      # URL stays bookmarkable.
+      - name: Attach the AppImage to the rolling nightly
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          built=$(find out/make -type f -name '*.AppImage' | head -1)
+          if [ -z "$built" ]; then
+            echo "::error::make:linux produced no .AppImage."
+            exit 1
+          fi
+          cp "$built" "$RUNNER_TEMP/$APPIMAGE_NAME"
+          gh release upload nightly "$RUNNER_TEMP/$APPIMAGE_NAME" --clobber
+          echo "Attached \`$APPIMAGE_NAME\` to the rolling nightly." \
+            >> "$GITHUB_STEP_SUMMARY"

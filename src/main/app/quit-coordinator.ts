@@ -29,8 +29,13 @@
 /** How far along the quit is: nobody asked, asking, answered, tearing down. */
 type QuitPhase = 'confirmed' | 'confirming' | 'idle' | 'shutting-down';
 
-/** What the quit ends in once the agents are down: exiting, or relaunching into an update. */
-export type QuitExit = 'install-update' | 'quit';
+/**
+ * What the quit ends in once the agents are down: exiting, relaunching into an
+ * update, or relaunching this same build — which is how a setting that only
+ * `BrowserWindow`'s constructor reads takes effect without stranding the agents
+ * still working.
+ */
+export type QuitExit = 'install-update' | 'quit' | 'relaunch';
 
 /** Options for {@link createQuitCoordinator}. */
 export interface QuitCoordinatorOptions {
@@ -57,6 +62,12 @@ export interface QuitCoordinator {
 	 * ⌘Q the user has already been asked about.
 	 */
 	requestInstallUpdate: () => void;
+	/**
+	 * Starts a quit that ends by launching this build again. Ignored while
+	 * another quit gesture is in flight, for the same reason as
+	 * {@link QuitCoordinator.requestInstallUpdate}.
+	 */
+	requestRelaunch: () => void;
 }
 
 /**
@@ -118,13 +129,21 @@ export function createQuitCoordinator(
 		return true;
 	};
 
-	const requestInstallUpdate = (): void => {
+	/**
+	 * Starts a quit whose final re-issue does something other than exit.
+	 * @param mode - How the quit should end once the agents are down.
+	 */
+	const requestExit = (mode: QuitExit): void => {
 		if (phase !== 'idle') {
 			return;
 		}
-		exit = 'install-update';
+		exit = mode;
 		options.quit();
 	};
+
+	const requestInstallUpdate = (): void => requestExit('install-update');
+
+	const requestRelaunch = (): void => requestExit('relaunch');
 
 	const handleWindowClose = (replayClose: () => void): boolean => {
 		if (phase === 'confirmed' || phase === 'shutting-down') {
@@ -137,5 +156,10 @@ export function createQuitCoordinator(
 		return true;
 	};
 
-	return { handleBeforeQuit, handleWindowClose, requestInstallUpdate };
+	return {
+		handleBeforeQuit,
+		handleWindowClose,
+		requestInstallUpdate,
+		requestRelaunch,
+	};
 }

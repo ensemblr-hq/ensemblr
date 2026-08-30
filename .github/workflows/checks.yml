@@ -18,10 +18,16 @@ permissions:
   contents: read
 
 jobs:
-  # macOS, not ubuntu: `mod` resolves to ⌘ on darwin and Ctrl elsewhere, so the
-  # keymap suites fail on Linux against an app that only ships for macOS.
+  # Both platforms Ensemblr ships for. The keymap suites resolve `mod` to ⌘ on
+  # darwin and Ctrl elsewhere and assert whichever the runner is, so the Linux
+  # leg is what proves a darwin-only assumption fails here rather than in a
+  # user's AppImage.
   verify:
-    runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v7
 

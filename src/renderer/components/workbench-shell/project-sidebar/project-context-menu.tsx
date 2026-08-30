@@ -15,6 +15,7 @@ import {
 } from '@/renderer/components/ui/context-menu';
 import { SidebarContextMenuItem } from '@/renderer/components/workbench-shell/sidebar-context-menu-item';
 import type { ProjectShellModel } from '@/renderer/types/workbench';
+import { formatChord } from '@/shared/keymap';
 import {
 	classifyPermissionAction,
 	DEFAULT_PERMISSION_MODE,
@@ -60,7 +61,7 @@ export function ProjectContextMenuContent({
 					<span className='min-w-0 flex-1'>
 						{t('workbench:repository-menu.new-workspace', 'New workspace')}
 					</span>
-					<ContextMenuShortcut>⌘N</ContextMenuShortcut>
+					<ContextMenuShortcut>{formatChord(['mod'], 'N')}</ContextMenuShortcut>
 				</SidebarContextMenuItem>
 				<SidebarContextMenuItem
 					data-action-placeholder='create-workspace-from-source'
@@ -72,7 +73,9 @@ export function ProjectContextMenuContent({
 					<span className='min-w-0 flex-1'>
 						{t('workbench:repository-menu.create-from', 'Create from…')}
 					</span>
-					<ContextMenuShortcut>⌘⇧N</ContextMenuShortcut>
+					<ContextMenuShortcut>
+						{formatChord(['shift', 'mod'], 'N')}
+					</ContextMenuShortcut>
 				</SidebarContextMenuItem>
 				<SidebarContextMenuItem
 					data-action-placeholder='repository-browse-archive'
@@ -92,7 +95,7 @@ export function ProjectContextMenuContent({
 					<span className='min-w-0 flex-1'>
 						{t('workbench:repository-menu.settings', 'Repository settings')}
 					</span>
-					<ContextMenuShortcut>⌘,</ContextMenuShortcut>
+					<ContextMenuShortcut>{formatChord(['mod'], ',')}</ContextMenuShortcut>
 				</SidebarContextMenuItem>
 			</ContextMenuGroup>
 			<ContextMenuSeparator />

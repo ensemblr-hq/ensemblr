@@ -41,7 +41,7 @@ function getRepoSectionFromPath(pathname: string): RepoSectionId {
 	);
 }
 
-/** Top toolbar: macOS traffic-light spacing, back button, scope tabs, repo picker. */
+/** Top toolbar: leading window-chrome inset, back button, scope tabs, repo picker. */
 export function SettingsHeader({
 	activeRepoId,
 	projects,
@@ -91,7 +91,7 @@ export function SettingsHeader({
 	});
 
 	return (
-		<header className='native-toolbar macos-traffic-light-spacer flex h-11 shrink-0 items-center gap-3 border-b pr-3 pl-[var(--ensemblr-traffic-light-safe-inline)]'>
+		<header className='native-toolbar window-chrome-spacer flex h-11 shrink-0 items-center gap-3 border-b pr-3 pl-[var(--ensemblr-window-chrome-inset-start)]'>
 			<Button onClick={closeSettings} size='sm' variant='ghost'>
 				<ArrowLeftIcon aria-hidden='true' className='size-4' />
 				<span>{t('common:actions.back', 'Back')}</span>

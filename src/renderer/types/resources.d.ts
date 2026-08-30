@@ -199,6 +199,7 @@ export default interface Resources {
 				'retry-pi-provider-model': 'Retry provider/model check';
 				'retry-pi-rpc': 'Retry Pi RPC check';
 				'retry-root-directory': 'Retry root check';
+				'retry-secret-storage': 'Retry secret storage check';
 				'run-claude-login': 'Run {{command}}';
 				'run-gh-auth-login': 'Run gh auth login';
 				'select-claude-executable': 'Select {{provider}} executable';
@@ -265,6 +266,10 @@ export default interface Resources {
 				'pi-rpc-ready': 'Pi RPC startup produced a valid {{frameType}} frame from {{cwd}}.';
 				'pi-rpc-unknown-error': 'Unknown Pi RPC check error.';
 				'root-directory-ready': 'Ensemblr root is ready at {{path}}.';
+				'secret-storage-encrypted': 'Secrets are encrypted by the {{backend}} keyring.';
+				'secret-storage-plaintext': 'No keyring daemon answered, so stored secrets are only obfuscated rather than encrypted. Start gnome-keyring or KWallet and restart Ensemblr.';
+				'secret-storage-unavailable': 'No OS keyring is available, so secrets cannot be saved. Start a keyring daemon (gnome-keyring or KWallet) and retry.';
+				'secret-storage-unknown-error': 'Unknown secret storage check error.';
 				'shell-fallback-environment': 'Commands launch successfully, but shell environment resolution used a fallback.';
 				'shell-ready': 'Commands launch successfully with the shell-derived environment.';
 				'shell-smoke-failed': 'The process launch smoke check failed.';
@@ -281,6 +286,7 @@ export default interface Resources {
 				'database-path': 'Database path';
 				'executable-path': 'Executable path';
 				'first-jsonl-frame': 'First JSONL frame';
+				'keyring-backend': 'Keyring backend';
 				'masked-secrets': 'Masked secrets';
 				'model-count': 'Model count';
 				'pi-probe': '{{kind}} probe';
@@ -324,6 +330,7 @@ export default interface Resources {
 				'pi-provider-model': 'Pi provider and model readiness';
 				'pi-rpc': 'Pi RPC startup';
 				'root-directory': 'Root directory';
+				'secret-storage': 'Secret storage';
 				'shell-process-launch': 'Shell and process launch';
 				'sqlite-database': 'SQLite database';
 			};
@@ -1220,7 +1227,7 @@ export default interface Resources {
 			'status-none': 'No status';
 			'submit-create': 'Create issue';
 			'submit-edit': 'Save changes';
-			'submit-hint': '⌘↵ to save';
+			'submit-hint': '{{chord}} to save';
 			'team-first': 'Choose a team to set status, assignee, project, cycle, and labels.';
 			'team-required': 'Choose a team for the new issue.';
 			'teams-empty': 'No teams have loaded from your connected Linear accounts yet.';
@@ -1595,12 +1602,19 @@ export default interface Resources {
 			};
 			theme: {
 				dark: 'Dark';
-				description: 'Toggle with ⌘⌥T.';
+				description: 'Toggle with {{chord}}.';
 				label: 'Theme';
 				light: 'Light';
 				system: 'System';
 			};
 			title: 'Appearance';
+			'title-bar': {
+				custom: 'Ensemblr';
+				description: 'Whether Ensemblr draws its own title bar and window controls, or lets your desktop decorate the window. Takes effect after a relaunch.';
+				label: 'Title bar';
+				relaunch: 'Relaunch';
+				system: 'System';
+			};
 		};
 		common: {
 			source: 'source: {{source}}';
@@ -1756,8 +1770,10 @@ export default interface Resources {
 				};
 				check: 'Check for updates';
 				label: 'Ensemblr version';
+				'open-release': 'Open the release page';
 				restart: 'Restart to update';
 				status: {
+					available: '{{version}} is available to download.';
 					checking: 'Checking…';
 					disabled: 'Ensemblr will not check for updates.';
 					downloading: 'Downloading {{version}}…';
@@ -2233,7 +2249,7 @@ export default interface Resources {
 				'add-title': 'Add run script';
 				command: 'Command';
 				default: 'Default';
-				'default-description': 'Runs when you press ⌘R in a workspace that has no other pick.';
+				'default-description': 'Runs when you press {{chord}} in a workspace that has no other pick.';
 				description: "Shortcuts for quick actions, like running your dev server or test suite. Use <port>$ENSEMBLR_PORT</port> for this workspace's allocated port.";
 				'duplicate-name': 'Another run script already uses this name.';
 				'edit-title': 'Edit run script';
@@ -2296,7 +2312,7 @@ export default interface Resources {
 				'tab-new': 'New chat tab';
 				'tab-next': 'Next tab';
 				'tab-prev': 'Previous tab';
-				'tab-select-by-index': 'Select tab by index (⌘1–8, ⌘9 last)';
+				'tab-select-by-index': 'Select tab by index ({{first}}–8, {{last}} last)';
 				'terminal-new': 'New terminal';
 				'tool-calls-toggle-collapse': 'Expand or collapse all tool calls';
 				'workspace-new': 'New workspace';
@@ -3558,6 +3574,12 @@ export default interface Resources {
 			};
 			'file-count_one': '{{count}} file';
 			'file-count_other': '{{count}} files';
+		};
+		'window-controls': {
+			close: 'Close window';
+			maximize: 'Maximize';
+			minimize: 'Minimize';
+			restore: 'Restore';
 		};
 		'workspace-checks': {
 			blocked: {
