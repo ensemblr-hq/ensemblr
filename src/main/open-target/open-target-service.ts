@@ -494,7 +494,7 @@ async function dispatchOpen({
 			shell.showItemInFolder(targetPath);
 			return;
 		case 'copy-path':
-			clipboard.writeText(targetPath);
+			await clipboard.writeText(targetPath);
 			return;
 		case 'linux-app': {
 			await launchLinuxApp({
