@@ -74,11 +74,8 @@ export function OnboardingWelcome({
 	};
 
 	return (
-		<div className='relative flex size-full items-center justify-center overflow-y-auto bg-canvas px-8 py-14'>
-			<div className='absolute top-4 right-4 z-10'>
-				<OnboardingLanguagePicker />
-			</div>
-			<section className='flex w-full max-w-lg flex-col items-center gap-10 text-center'>
+		<div className='flex size-full flex-col overflow-y-auto bg-canvas px-8 py-8'>
+			<section className='m-auto flex w-full max-w-lg flex-col items-center gap-10 text-center'>
 				<motion.div
 					animate={{ opacity: 1, y: 0 }}
 					initial={{ opacity: 0, y: prefersReducedMotion ? 0 : 12 }}
@@ -157,6 +154,9 @@ export function OnboardingWelcome({
 					</Button>
 				</motion.div>
 			</section>
+			<div className='flex shrink-0 justify-center pt-6'>
+				<OnboardingLanguagePicker />
+			</div>
 		</div>
 	);
 }

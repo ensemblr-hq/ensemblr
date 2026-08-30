@@ -1375,6 +1375,7 @@ export default interface Resources {
 		};
 		welcome: {
 			language: {
+				change: 'Change interface language';
 				label: 'Interface language';
 			};
 			lead: 'Ensemblr runs coding agents and the GitHub CLI as local processes. A short check confirms they are there — it takes about a minute.';

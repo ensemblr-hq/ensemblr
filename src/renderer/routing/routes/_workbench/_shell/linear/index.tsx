@@ -20,7 +20,7 @@ function LinearBrowseRoute() {
 
 	return (
 		<ShellScreen>
-			<header className='native-toolbar flex h-12 shrink-0 items-center gap-2.5 border-border border-b px-4 font-medium text-sm'>
+			<header className='native-toolbar flex shrink-0 items-center gap-2.5 border-border border-b px-4 font-medium text-sm'>
 				<SidebarTrigger className='sidebar-collapsed-trigger' />
 				<span>{t('linear:browse.title', 'Linear issues')}</span>
 			</header>

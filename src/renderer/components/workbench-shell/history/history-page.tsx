@@ -96,7 +96,7 @@ function HistoryFilterBar({
 	const { t } = useTranslation();
 
 	return (
-		<header className='native-toolbar flex h-12 shrink-0 items-center gap-2.5 border-border border-b px-3'>
+		<header className='native-toolbar flex shrink-0 items-center gap-2.5 border-border border-b px-3'>
 			<SidebarTrigger className='sidebar-collapsed-trigger' />
 			<SearchIcon
 				aria-hidden='true'

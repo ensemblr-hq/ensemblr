@@ -10,11 +10,10 @@ import {
 	Sidebar,
 	SidebarContent,
 	SidebarFooter,
-	SidebarHeader,
 	SidebarRail,
-	SidebarTrigger,
 } from '@/renderer/components/ui/sidebar';
 import { useSetupDiagnosticsOptional } from '@/renderer/components/workbench-shell/shell-contexts';
+import { readWindowChrome } from '@/renderer/lib/window-chrome';
 import { healthTone } from '@/renderer/lib/workbench';
 import { developerModeAtom } from '@/renderer/state/preferences';
 import type {
@@ -34,6 +33,7 @@ import type {
 import type { SetupDiagnosticsSnapshot } from '@/shared/ipc/contracts/setup';
 import { RenameWorkspaceDialog } from '../rename-workspace-dialog';
 
+import { NavigationSidebarHeader } from './navigation-sidebar-header';
 import { PinnedWorkspaceGroup } from './pinned-workspace-group';
 import { ProjectNavigationGroups } from './project-navigation-groups';
 import { SidebarPrimaryNavigation } from './sidebar-primary-navigation';
@@ -75,6 +75,7 @@ export function WorkspaceNavigationSidebar({
 	const [renameWorkspaceTarget, setRenameWorkspaceTarget] =
 		useState<WorkspaceShellModel | null>(null);
 	const developerMode = useAtomValue(developerModeAtom);
+	const leadingChromeIsEmpty = readWindowChrome().insets.start === 0;
 	const queryClient = useQueryClient();
 	const prefetchIssues = useCallback(
 		() =>
@@ -87,11 +88,7 @@ export function WorkspaceNavigationSidebar({
 
 	return (
 		<Sidebar className='border-sidebar-border' collapsible='offcanvas'>
-			<SidebarHeader className='h-12 border-sidebar-border border-b p-0'>
-				<div className='window-chrome-spacer flex h-full shrink-0 items-center justify-end px-2'>
-					<SidebarTrigger />
-				</div>
-			</SidebarHeader>
+			<NavigationSidebarHeader showsWordmark={leadingChromeIsEmpty} />
 
 			<SidebarContent className='overflow-visible'>
 				<SidebarPrimaryNavigation

@@ -16,3 +16,12 @@ export const SHELL_INSET_CLASS =
  */
 export const SHELL_FLOATING_TRIGGER_CLASS =
 	'sidebar-collapsed-trigger absolute top-2.5 left-[var(--ensemblr-window-chrome-inset-start)] z-20';
+
+/**
+ * Tailwind class for the height every top bar shares, read from the same custom
+ * property `.native-toolbar` uses. For the strips that are not `.native-toolbar`
+ * — the sidebar's title bar, and the window-control cluster that floats over the
+ * window rather than over any one toolbar — this is what keeps them level with
+ * the bars beside them instead of two pixels off.
+ */
+export const TOOLBAR_HEIGHT_CLASS = 'h-(--ensemblr-toolbar-height)';

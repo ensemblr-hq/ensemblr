@@ -1,1 +1,1 @@
-export { WindowControls } from './window-controls';
+export { WindowControlCluster, WindowControls } from './window-controls';

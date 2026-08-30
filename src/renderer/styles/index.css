@@ -282,6 +282,13 @@
 	--ensemblr-window-chrome-inset-start: 0rem;
 	--ensemblr-window-chrome-inset-end: 0rem;
 
+	/* Height of every top bar, and therefore of the window-control cluster that
+	   overlays them. The cluster is positioned against the window rather than
+	   against any one toolbar, so a toolbar that set its own height would put
+	   the buttons off-centre against it — one value, read by `.native-toolbar`
+	   and by the cluster. */
+	--ensemblr-toolbar-height: 3rem;
+
 	--background: var(--ensemblr-canvas);
 	--foreground: var(--ensemblr-ink);
 	--card: var(--ensemblr-surface);
@@ -648,22 +655,35 @@
 	}
 
 	/* Keeps a toolbar's own trailing actions out from under the fixed control
-	   cluster. Only set while Ensemblr draws the controls, and cancelled on the
-	   toolbars the review sidebar sits to the right of — there the sidebar's own
-	   header is the one under the cluster. */
+	   cluster. Only set while Ensemblr draws the controls. */
 	html.app-window-controls .native-toolbar {
 		padding-inline-end: calc(0.75rem + var(--ensemblr-window-chrome-inset-end));
 	}
 
-	html.app-window-controls
-		[data-slot="sidebar-inset"]:has(.right-sidebar-header)
-		.native-toolbar:not(.right-sidebar-header) {
-		padding-inline-end: 0.75rem;
+	/* The workbench toolbar gives that room back only while the review sidebar
+	   is genuinely to its right, because then the sidebar's own header is the
+	   one under the cluster. Neither half of that can be read off the DOM: the
+	   sidebar panel stays mounted at zero width when collapsed, and it is
+	   display:none below `lg`, so a `:has(.right-sidebar-header)` test matches
+	   in both states and leaves the toolbar's own actions under the buttons. */
+	@media (width >= 64rem) {
+		html.app-window-controls .native-toolbar[data-review-sidebar="expanded"] {
+			padding-inline-end: 0.75rem;
+		}
+	}
+
+	/* The same reservation for a bar that reaches the window's trailing edge
+	   without being a `.native-toolbar` — the maximized Concierge header, which
+	   covers the shell inset rather than sitting inside it. Its own
+	   `padding-inline-end` is the no-chrome case; this replaces it. */
+	html.app-window-controls .window-controls-safe-end {
+		padding-inline-end: calc(0.5rem + var(--ensemblr-window-chrome-inset-end));
 	}
 
 	.native-toolbar {
 		background: var(--ensemblr-toolbar);
 		backdrop-filter: blur(18px) saturate(1.3);
+		block-size: var(--ensemblr-toolbar-height);
 	}
 
 	/* Dev only: tint the nav sidebar's bare title-bar strip to match the top bars. */

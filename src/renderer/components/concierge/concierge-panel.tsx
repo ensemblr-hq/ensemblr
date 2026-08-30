@@ -7,6 +7,7 @@ import { SidebarTrigger, useSidebar } from '@/renderer/components/ui/sidebar';
 import { useConciergePanel } from '@/renderer/hooks/concierge/use-concierge-panel';
 import { useConciergeReferenceOpen } from '@/renderer/hooks/concierge/use-concierge-reference-open';
 import { cn } from '@/renderer/lib/utils';
+import { TOOLBAR_HEIGHT_CLASS } from '@/renderer/lib/workbench/shell-inset';
 import type { ConciergeSize } from '@/renderer/state/concierge';
 import { ConciergeClearConfirmDialog } from './concierge-clear-confirm-dialog';
 import { ConciergeComposer } from './concierge-composer';
@@ -105,13 +106,15 @@ export function ConciergePanel() {
 						// Maximized, this header sits beside the sidebar's own — so it takes
 						// the shell toolbar's height, padding, and full-strength border, or
 						// the two rules miss each other and the title crowds the divider.
-						// With that sidebar collapsed there is no header beside it and the
-						// macOS window controls, which draw above the web contents, land on
-						// the title — so it pads by the same safe inset the shell's leading
-						// toolbar takes.
+						// It also spans both of the window's top corners, and window
+						// controls draw above the web contents at either end: the macOS
+						// traffic lights on the left, and Ensemblr's own cluster on the
+						// right where it draws one. Both are cleared by the same insets the
+						// shell's own toolbars take.
 						isFullscreen
 							? cn(
-									'h-12 border-border pr-2',
+									'window-controls-safe-end border-border pr-2',
+									TOOLBAR_HEIGHT_CLASS,
 									clearsTrafficLights
 										? 'pl-3'
 										: 'pl-[var(--ensemblr-window-chrome-inset-start)]',

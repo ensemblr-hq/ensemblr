@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { closeWindow, minimizeWindow } from '@/renderer/api/ensemblr';
 import { Button } from '@/renderer/components/ui/button';
 import { cn } from '@/renderer/lib/utils';
+import { TOOLBAR_HEIGHT_CLASS } from '@/renderer/lib/workbench/shell-inset';
 
 import { useDragRegionDoubleClick } from './use-drag-region-double-click';
 import { useWindowMaximized } from './use-window-maximized';
@@ -23,7 +24,6 @@ import { useWindowMaximized } from './use-window-maximized';
  * agents without asking.
  */
 export function WindowControls() {
-	const { t } = useTranslation();
 	const { maximized, toggle } = useWindowMaximized();
 
 	const toggleMaximize = useCallback(() => {
@@ -32,29 +32,62 @@ export function WindowControls() {
 
 	useDragRegionDoubleClick(toggleMaximize, true);
 
-	const MaximizeIcon = maximized ? Copy : Square;
+	return (
+		<div className='fixed top-0 right-0 z-50'>
+			<WindowControlCluster
+				isMaximized={maximized}
+				onClose={() => void closeWindow()}
+				onMinimize={() => void minimizeWindow()}
+				onToggleMaximize={toggleMaximize}
+			/>
+		</div>
+	);
+}
+
+/**
+ * The three buttons themselves, with no window plumbing, so the overlay above
+ * and the playground can each mount them.
+ *
+ * The cluster is positioned against the window rather than against any one
+ * toolbar, so it takes its height from the same custom property
+ * `.native-toolbar` does — otherwise a toolbar that changed height would leave
+ * the buttons sitting off-centre against it.
+ */
+export function WindowControlCluster({
+	isMaximized,
+	onClose,
+	onMinimize,
+	onToggleMaximize,
+}: {
+	isMaximized: boolean;
+	onClose: () => void;
+	onMinimize: () => void;
+	onToggleMaximize: () => void;
+}) {
+	const { t } = useTranslation();
+	const MaximizeIcon = isMaximized ? Copy : Square;
 
 	return (
-		<div className='fixed top-0 right-0 z-50 flex h-12 items-center gap-1 px-2'>
+		<div className={cn('flex items-center gap-1 px-2', TOOLBAR_HEIGHT_CLASS)}>
 			<WindowControlButton
 				label={t('workbench:window-controls.minimize', 'Minimize')}
-				onClick={() => void minimizeWindow()}
+				onClick={onMinimize}
 			>
 				<Minus aria-hidden='true' className='size-3.5' />
 			</WindowControlButton>
 			<WindowControlButton
 				label={
-					maximized
+					isMaximized
 						? t('workbench:window-controls.restore', 'Restore')
 						: t('workbench:window-controls.maximize', 'Maximize')
 				}
-				onClick={toggleMaximize}
+				onClick={onToggleMaximize}
 			>
 				<MaximizeIcon aria-hidden='true' className='size-3' />
 			</WindowControlButton>
 			<WindowControlButton
 				label={t('workbench:window-controls.close', 'Close window')}
-				onClick={() => void closeWindow()}
+				onClick={onClose}
 				tone='destructive'
 			>
 				<X aria-hidden='true' className='size-3.5' />
