@@ -89,6 +89,99 @@ Three ways to get one:
    `.desktop` file, the icons — on a Mac. It must never ship: terminals in the
    result do not work.
 
+### Building and verifying on a Steam Deck
+
+The Deck is the reference Linux host: Wayland, KDE Plasma, fractional scaling, a
+battery, an immutable root, and no package manager to speak of. Everything below
+assumes **Desktop Mode**.
+
+**Toolchain.** `npm ci` compiles `node-pty`, so a C++ toolchain is needed, and
+SteamOS ships none. Check what is already there:
+
+```bash
+for tool in node python3 gcc make mksquashfs distrobox; do
+  printf '%-12s %s\n' "$tool" "$(command -v $tool || echo MISSING)"
+done
+```
+
+`mksquashfs` is needed only by `make:linux`; everything else is needed by both.
+Two ways to fill the gaps:
+
+- **Distrobox (preferred).** Nothing touches the read-only root, and a SteamOS
+  update cannot wipe it. Prefer a Debian image over Arch: it links against an
+  older glibc than the host, and old-built-runs-on-new is the safe direction.
+
+  ```bash
+  distrobox create --name ensemblr --image debian:bookworm
+  distrobox enter ensemblr
+  sudo apt-get update && sudo apt-get install -y git curl python3 build-essential squashfs-tools
+  ```
+
+- **Native**, if you would rather not. It needs a sudo password set (`passwd`,
+  the Deck ships without one), survives only until the next SteamOS update, and
+  usually needs the keyring initialised first:
+
+  ```bash
+  sudo steamos-readonly disable
+  sudo pacman-key --init && sudo pacman-key --populate archlinux holo
+  sudo pacman -S --needed base-devel python squashfs-tools
+  ```
+
+**Node 24.** `scripts/require-node-version.mjs` enforces the major exactly.
+`nvm` installs entirely under `$HOME`, needs no root, and survives OS updates:
+
+```bash
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash
+exec "$SHELL" -l
+nvm install 24 && nvm use 24
+```
+
+**Build.** Budget ~2 GB for `node_modules` plus the Electron download.
+
+```bash
+git clone https://github.com/ensemblr-hq/ensemblr.git && cd ensemblr
+npm ci
+npm run package:linux   # unpacked build — needs no mksquashfs
+./out/Ensemblr-linux-x64/Ensemblr
+```
+
+Run `package:linux` before `make:linux`. It exercises everything in the
+checklist below except the AppImage wrapper itself, needs no `mksquashfs`, and
+skips the SquashFS pass on every iteration. Once it behaves:
+
+```bash
+npm run make:linux
+chmod +x out/make/AppImage/x64/*.AppImage
+./out/make/AppImage/x64/*.AppImage
+```
+
+If the app dies at startup with a sandbox error, the kernel is refusing
+unprivileged user namespaces — an AppImage is a FUSE mount and cannot carry a
+setuid `chrome-sandbox`. Re-run with `--no-sandbox` to confirm that is the
+cause. If the runtime refuses to mount at all, `--appimage-extract-and-run`.
+
+**What to check.** These are the things CI structurally cannot prove:
+
+| # | Check | Looking for |
+| --- | --- | --- |
+| 1 | `echo $XDG_SESSION_TYPE`, then `xlsclients` | `wayland`, and Ensemblr *absent* from the X client list |
+| 2 | The three window controls, top right | Minimize, maximize, restore and close each do what they say |
+| 3 | Close with an agent mid-turn | The quit confirmation still appears |
+| 4 | Drag the toolbar strip; double-click it | Moves the window; toggles maximize |
+| 5 | Resize from every edge and corner | If edges are dead, that is the finding — `system` mode is the answer |
+| 6 | Maximize from Plasma's own keyboard shortcut | Our icon flips — proves the broadcast, not just the click path |
+| 7 | Settings → Appearance → Title bar → System, then Relaunch | A normally decorated window, zero inset. Flip back |
+| 8 | Display scaling at 125% and 150% | Window still fits the 1280×800 panel; sidebar collapses; nothing clipped |
+| 9 | Save a dictation API key, reopen Settings | Round-trips. Setup check reports `kwallet5`/`kwallet6` |
+| 10 | Stop the wallet daemon, retry the check | Degrades to `basic_text` and **warns** rather than crashing |
+| 11 | Put `pi` or `claude` in `~/.local/bin` | Executable discovery finds it — the Deck is the sharpest test that discovery is not Homebrew-shaped |
+| 12 | Open a terminal tab; run a workspace script | node-pty actually loaded |
+| 13 | The "Open in…" menu | Lists only what is installed — Konsole, Dolphin, any editor — and launches it |
+| 14 | The menu bar | Carries Settings and Check for Updates, reachable from a frameless window; hints read `Ctrl+…`, never `⌘…` |
+| 15 | Settings → General → Check for updates | Reports a version with a link; never tries to install |
+| 16 | Unplug it, run a long agent turn | The power-save blocker releases at the low-battery threshold |
+| 17 | `--ozone-platform=x11` | Still starts (the documented XWayland escape hatch) |
+
 `npm run build` is an alias for `npm run package`. All three of `build`,
 `package`, and `make` run `scripts/require-node-version.mjs` first.
 
