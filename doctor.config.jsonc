@@ -102,7 +102,9 @@
 				// says to import from a concern entrypoint when you are outside that
 				// concern. main.ts and ipc/handlers.ts additionally re-export types
 				// from the setup-diagnostics barrel so IPC contracts have one import
-				// surface. The no-barrel-import perf rule targets renderer bundle
+				// surface. menu/about-panel.ts reaches the Linux window-icon path the
+				// same way, through the app barrel rather than app/linux-desktop-identity
+				// directly. The no-barrel-import perf rule targets renderer bundle
 				// tree-shaking; the Electron main process is not bundled that way, so
 				// the cost is moot here.
 				"files": [
@@ -114,7 +116,8 @@
 					"src/main/agent-runtime/session/chat-tab-plumbing.ts",
 					"src/main/agent-providers/claude-readiness-probe.ts",
 					"src/main/agent-providers/pi-readiness-probe.ts",
-					"src/main/agent-control/port-adapters.ts"
+					"src/main/agent-control/port-adapters.ts",
+					"src/main/menu/about-panel.ts"
 				],
 				"rules": ["react-doctor/no-barrel-import"]
 			},
