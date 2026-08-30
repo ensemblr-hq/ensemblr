@@ -83,7 +83,9 @@ interface WindowTitleBarSurfaceProps {
  * The wordmark sits here rather than in the navigation sidebar's own title-bar
  * strip wherever this one is drawn: two wordmarks a row apart read as a bug, and
  * an empty band across the window reads as one too. It takes the same `h-3.5`
- * that strip used, which is the smallest height the pixel grid survives.
+ * that strip used, which is the smallest height the pixel grid survives, and
+ * more room after it than the row's own gap — the menu's first trigger draws no
+ * edge until it is hovered, so at one gap the wordmark reads as its first word.
  *
  * The menu slot fills the band between the wordmark and the controls, which is
  * the room a desktop title bar spends on a window title Ensemblr has no use
@@ -99,7 +101,7 @@ export function WindowTitleBarSurface({
 }: WindowTitleBarSurfaceProps) {
 	return (
 		<div className='window-title-bar flex items-center gap-2 border-border border-b pl-3'>
-			<EnsemblrWordmark className='h-3.5 shrink-0 text-muted-foreground' />
+			<EnsemblrWordmark className='mr-2 h-3.5 shrink-0 text-muted-foreground' />
 			<div className='flex min-w-0 flex-1 items-center self-stretch'>
 				{menu}
 			</div>
