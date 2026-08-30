@@ -437,7 +437,13 @@ export default interface Resources {
 			'workspace-count_other': '{{count}} workspaces';
 		};
 		update: {
+			available: {
+				description: 'Ensemblr does not install this one itself — download it from the release page.';
+				'open-release': 'Open the release page';
+				title: 'Ensemblr {{version}} is available';
+			};
 			'check-failed': 'The update check failed.';
+			checking: 'Checking for updates…';
 			disabled: 'Automatic updates are off. Turn them on in Settings → General.';
 			downloading: 'Downloading Ensemblr {{version}}…';
 			ready: {
@@ -729,6 +735,8 @@ export default interface Resources {
 			'not-file': 'That path is not a file.';
 			'not-found': 'That path was not found.';
 			'nothing-to-commit': 'Nothing to commit — the working tree is clean.';
+			'open-target-app-not-installed': 'That app is not installed on this machine.';
+			'open-target-no-desktop-launcher': 'That app is only installed as a desktop entry, and neither gio nor gtk-launch is available to start it. Install glib or gtk3.';
 			'parse-failed': 'The command output could not be parsed.';
 			'path-not-a-git-repository': 'That path is not a git repository.';
 			'pattern-listing-failed': 'The files matching that pattern could not be listed.';
@@ -3585,6 +3593,7 @@ export default interface Resources {
 		};
 		'window-controls': {
 			close: 'Close window';
+			group: 'Window controls';
 			maximize: 'Maximize';
 			minimize: 'Minimize';
 			restore: 'Restore';
