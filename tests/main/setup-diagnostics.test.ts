@@ -609,6 +609,19 @@ function getCheck(
 	return check;
 }
 
+function createMissingGitCommandService(): LocalCommandService {
+	return createLocalCommandService({
+		commandResults: {
+			'git --version': {
+				exitCode: null,
+				failureCode: 'command-not-found',
+				failureMessage: 'Command not found: git.',
+				status: 'failure',
+			},
+		},
+	});
+}
+
 test('reports ready when required checks pass and Linear is optional', async () => {
 	const snapshot = await getSnapshot();
 	const gitCheck = getCheck(snapshot, 'git-executable');
@@ -766,16 +779,7 @@ test('does not offer Pi executable picker for locked managed config', async () =
 
 test('blocks readiness when git is missing', async () => {
 	const snapshot = await getSnapshot({
-		localCommandService: createLocalCommandService({
-			commandResults: {
-				'git --version': {
-					exitCode: null,
-					failureCode: 'command-not-found',
-					failureMessage: 'Command not found: git.',
-					status: 'failure',
-				},
-			},
-		}),
+		localCommandService: createMissingGitCommandService(),
 	});
 	const gitCheck = getCheck(snapshot, 'git-executable');
 
@@ -783,12 +787,56 @@ test('blocks readiness when git is missing', async () => {
 	assert.equal(snapshot.blockedCount, 1);
 	assert.equal(gitCheck.status, 'failure');
 	assert.match(gitCheck.detail, /Git was not found/);
-	assert.equal(
-		gitCheck.remediationActions.some(
-			(action) => action.command === 'xcode-select --install',
-		),
-		true,
+});
+
+test('offers only Linux-resolvable git remediation on Linux', async () => {
+	const snapshot = await getSnapshot({
+		localCommandService: createMissingGitCommandService(),
+		platform: 'linux',
+	});
+	const gitCheck = getCheck(snapshot, 'git-executable');
+
+	assert.equal(gitCheck.status, 'failure');
+	assert.deepEqual(
+		gitCheck.remediationActions.map((action) => action.id),
+		['open-git-install', 'retry-git-executable'],
 	);
+	assert.equal(
+		gitCheck.remediationActions.find(
+			(action) => action.id === 'open-git-install',
+		)?.target,
+		'https://git-scm.com/download/linux',
+	);
+	assert.equal(gitCheck.detailMessage?.code, 'git-not-found');
+	assert.doesNotMatch(gitCheck.detail, /Xcode/);
+});
+
+test('keeps the macOS git remediation on macOS', async () => {
+	const snapshot = await getSnapshot({
+		localCommandService: createMissingGitCommandService(),
+		platform: 'darwin',
+	});
+	const gitCheck = getCheck(snapshot, 'git-executable');
+
+	assert.equal(gitCheck.status, 'failure');
+	assert.deepEqual(
+		gitCheck.remediationActions.map((action) => action.id),
+		['install-command-line-tools', 'open-git-install', 'retry-git-executable'],
+	);
+	assert.equal(
+		gitCheck.remediationActions.find(
+			(action) => action.id === 'install-command-line-tools',
+		)?.command,
+		'xcode-select --install',
+	);
+	assert.equal(
+		gitCheck.remediationActions.find(
+			(action) => action.id === 'open-git-install',
+		)?.target,
+		'https://git-scm.com/download/mac',
+	);
+	assert.equal(gitCheck.detailMessage?.code, 'git-not-found-macos');
+	assert.match(gitCheck.detail, /Xcode Command Line Tools/);
 });
 
 test('blocks readiness when gh is missing', async () => {

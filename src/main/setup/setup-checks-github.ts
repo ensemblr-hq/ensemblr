@@ -1,4 +1,7 @@
-import type { SetupDetailMessage } from '../../shared/ipc/contracts/setup';
+import type {
+	SetupDetailMessage,
+	SetupRemediationAction,
+} from '../../shared/ipc/contracts/setup';
 import type {
 	LocalCommandResult,
 	LocalCommandService,
@@ -12,6 +15,11 @@ import {
 } from './setup-check-context.ts';
 
 const GITHUB_HOSTNAME = 'github.com';
+const GIT_INSTALL_DOCS_BY_PLATFORM: Partial<Record<NodeJS.Platform, string>> = {
+	darwin: 'https://git-scm.com/download/mac',
+	linux: 'https://git-scm.com/download/linux',
+};
+const GIT_INSTALL_DOCS_FALLBACK = 'https://git-scm.com/downloads';
 const GIT_VERSION_TIMEOUT_MS = 3000;
 const GITHUB_CLI_TIMEOUT_MS = 3000;
 const GITHUB_AUTH_TIMEOUT_MS = 5000;
@@ -22,11 +30,16 @@ interface GitHubCheckDeps {
 	localCommandService: LocalCommandService;
 }
 
+/** Dependencies for the git check, whose remediation varies by platform. */
+interface GitExecutableCheckDeps extends GitHubCheckDeps {
+	platform: NodeJS.Platform;
+}
+
 /** The detail fields a failure mapper returns. */
 type DetailResult = { detail: string; detailMessage?: SetupDetailMessage };
 
 /** Builds the snapshot for the `git --version` setup check. */
-export function getGitExecutableCheck(deps: GitHubCheckDeps) {
+export function getGitExecutableCheck(deps: GitExecutableCheckDeps) {
 	const check = defineCheck<SetupCheckProviderContext>({
 		blocking: true,
 		description:
@@ -72,27 +85,9 @@ export function getGitExecutableCheck(deps: GitHubCheckDeps) {
 			}
 
 			return {
-				...getGitFailureDetail(result),
+				...getGitFailureDetail(result, deps.platform),
 				logs,
-				remediationActions: [
-					{
-						command: 'xcode-select --install',
-						id: 'install-command-line-tools',
-						kind: 'run-command',
-						label: 'Install command-line tools',
-					},
-					{
-						id: 'open-git-install',
-						kind: 'open-external',
-						label: 'Open Git install docs',
-						target: 'https://git-scm.com/download/mac',
-					},
-					{
-						id: 'retry-git-executable',
-						kind: 'retry',
-						label: 'Retry git check',
-					},
-				],
+				remediationActions: getGitFailureRemediationActions(deps.platform),
 				status: 'failure',
 			};
 		},
@@ -260,14 +255,65 @@ function getFirstOutputLine(output: string): string | null {
 	return line ?? null;
 }
 
-/** Maps a `git --version` failure to a user-facing message. */
-function getGitFailureDetail(result: LocalCommandResult): DetailResult {
+/**
+ * Builds the remediation actions for a failing git check, keeping only the ones
+ * that can resolve it on the running platform.
+ * @param platform - Platform the app is running on.
+ * @returns The remediation actions to offer alongside the failure.
+ */
+function getGitFailureRemediationActions(
+	platform: NodeJS.Platform,
+): SetupRemediationAction[] {
+	const openInstallDocs: SetupRemediationAction = {
+		id: 'open-git-install',
+		kind: 'open-external',
+		label: 'Open Git install docs',
+		target: GIT_INSTALL_DOCS_BY_PLATFORM[platform] ?? GIT_INSTALL_DOCS_FALLBACK,
+	};
+	const retry: SetupRemediationAction = {
+		id: 'retry-git-executable',
+		kind: 'retry',
+		label: 'Retry git check',
+	};
+
+	if (platform === 'darwin') {
+		return [
+			{
+				command: 'xcode-select --install',
+				id: 'install-command-line-tools',
+				kind: 'run-command',
+				label: 'Install command-line tools',
+			},
+			openInstallDocs,
+			retry,
+		];
+	}
+
+	return [openInstallDocs, retry];
+}
+
+/**
+ * Maps a `git --version` failure to a user-facing message.
+ * @param result - Outcome of the `git --version` run.
+ * @param platform - Platform the app is running on, which decides whether the
+ * missing-git line may name the Xcode command-line tools.
+ * @returns The detail fields for the failing check.
+ */
+function getGitFailureDetail(
+	result: LocalCommandResult,
+	platform: NodeJS.Platform,
+): DetailResult {
 	switch (result.failure?.code) {
 		case 'command-not-found':
-			return authoredDetail(
-				'git-not-found',
-				'Git was not found in the shell-derived PATH. Install Git or Xcode Command Line Tools, then retry.',
-			);
+			return platform === 'darwin'
+				? authoredDetail(
+						'git-not-found-macos',
+						'Git was not found in the shell-derived PATH. Install Git or Xcode Command Line Tools, then retry.',
+					)
+				: authoredDetail(
+						'git-not-found',
+						'Git was not found in the shell-derived PATH. Install Git, then retry.',
+					);
 		case 'timeout':
 			return authoredDetail('git-timeout', 'Git version check timed out.');
 		case 'output-truncated':

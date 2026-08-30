@@ -187,6 +187,11 @@ export const SETUP_DETAIL_TEXT: Record<
 	'git-not-found': (t) =>
 		t(
 			'common:setup-check.detail.git-not-found',
+			'Git was not found in the shell-derived PATH. Install Git, then retry.',
+		),
+	'git-not-found-macos': (t) =>
+		t(
+			'common:setup-check.detail.git-not-found-macos',
 			'Git was not found in the shell-derived PATH. Install Git or Xcode Command Line Tools, then retry.',
 		),
 	'git-output-truncated': (t) =>
