@@ -117,7 +117,7 @@ export function ConciergePanel() {
 									TOOLBAR_HEIGHT_CLASS,
 									clearsLeadingChrome
 										? 'pl-3'
-										: 'pl-[var(--ensemblr-window-chrome-safe-start)]',
+										: 'pl-(--ensemblr-window-chrome-safe-start)',
 								)
 							: 'h-10 cursor-grab border-border/60 pr-1.5 pl-1 active:cursor-grabbing',
 					)}

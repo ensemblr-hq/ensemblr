@@ -18,7 +18,7 @@ export const SHELL_INSET_CLASS =
  * the sidebar's only trigger.
  */
 export const SHELL_FLOATING_TRIGGER_CLASS =
-	'sidebar-collapsed-trigger absolute top-2.5 left-[var(--ensemblr-window-chrome-safe-start)] z-20';
+	'sidebar-collapsed-trigger absolute top-2.5 left-(--ensemblr-window-chrome-safe-start) z-20';
 
 /**
  * Tailwind class for the height every top bar shares, read from the same custom
