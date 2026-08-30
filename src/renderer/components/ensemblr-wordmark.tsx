@@ -16,6 +16,12 @@ const WORDMARK_PATH =
  * colour from `currentColor`. Sized by height alone — the width follows the
  * 47:7 grid — so callers set `h-*` and leave the rest.
  *
+ * That height must be a whole multiple of 7 CSS pixels, and 14 (`h-3.5`) is the
+ * smallest that reads: `shapeRendering="crispEdges"` snaps every cell to a
+ * device pixel, so a height the seven grid rows do not divide drops rows out of
+ * the letters rather than antialiasing them. The `wordmark` section of the
+ * `nav header` playground scene renders the sizes either side of it.
+ *
  * Decorative everywhere it is drawn: it labels the app inside the app's own
  * chrome, which tells a screen reader nothing its window title has not.
  */

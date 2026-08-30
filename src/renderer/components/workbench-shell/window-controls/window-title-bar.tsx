@@ -63,7 +63,8 @@ export function WindowTitleBar() {
  *
  * The wordmark sits here rather than in the navigation sidebar's own title-bar
  * strip wherever this one is drawn: two wordmarks a row apart read as a bug, and
- * an empty band across the window reads as one too.
+ * an empty band across the window reads as one too. It takes the same `h-3.5`
+ * that strip used, which is the smallest height the pixel grid survives.
  */
 export function WindowTitleBarSurface({
 	isMaximized,
@@ -78,7 +79,7 @@ export function WindowTitleBarSurface({
 }) {
 	return (
 		<div className='window-title-bar flex items-center justify-between gap-2 border-border border-b pl-3'>
-			<EnsemblrWordmark className='h-3 text-muted-foreground' />
+			<EnsemblrWordmark className='h-3.5 text-muted-foreground' />
 			<WindowControlCluster
 				isMaximized={isMaximized}
 				onClose={onClose}
