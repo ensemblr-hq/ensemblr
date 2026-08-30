@@ -648,7 +648,7 @@ mistake to anyone who did not hit the underlying constraint:
 
 | Stanza | Why |
 | --- | --- |
-| `depends_on macos: :monterey` | Electron 43's floor, per the `43-x-y` branch README. `electron/electron@main` says Ventura — that is the current major, not the one this app pins. Homebrew deprecated the `">= :monterey"` string form; `brew style` rewrites it. |
+| `depends_on macos: :ventura` | Electron 44's floor, per the `44-x-y` branch README — Electron 44 removed macOS 12 support, so the `:monterey` this stanza carried under Electron 43 now offers the build to machines that cannot run it. Homebrew deprecated the `">= :ventura"` string form; `brew style` rewrites it. Re-read the branch README on every Electron major: the floor moves without a release note. |
 | `auto_updates true` | The in-app updater owns the bundle. `brew upgrade` therefore skips it, and only `--greedy` overrides that. Two updaters writing one bundle is how an install gets corrupted. |
 | a custom `:github_releases` livecheck | Every release is flagged `--prerelease`, so `:github_latest` finds nothing at all. The block accepts prereleases and keys off a leading `v`, which is also what excludes the rolling `nightly` tag. |
 | `zap trash:` without the root directory | The root (`~/Ensemblr` by default) holds cloned repositories and worktrees. A `zap` that took it would delete the user's work. |

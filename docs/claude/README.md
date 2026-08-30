@@ -185,7 +185,7 @@ external: [
 The reason, quoted from that file: the SDK "calls `createRequire(import.meta.url)`
 at module load. Rollup rewrites `import.meta.url` to `{}.url` for the CJS main
 bundle, so bundling it throws `ERR_INVALID_ARG_VALUE` before the app starts."
-Electron 43 runs Node 24, which can `require()` this ESM-only package, so
+Electron 44 runs Node 24, which can `require()` this ESM-only package, so
 leaving it external costs nothing.
 
 Because it is external, `sdk.mjs` has to exist on disk in the packaged app.

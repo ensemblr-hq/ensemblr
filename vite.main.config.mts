@@ -22,7 +22,7 @@ export default defineConfig({
 				// and calls `createRequire(import.meta.url)` at module load. Rollup
 				// rewrites `import.meta.url` to `{}.url` for the CJS main bundle, so
 				// bundling it throws `ERR_INVALID_ARG_VALUE` before the app starts.
-				// Electron 43 runs Node 24, which can `require()` this ESM-only package.
+				// Electron 44 runs Node 24, which can `require()` this ESM-only package.
 				'@anthropic-ai/claude-agent-sdk',
 			],
 		},

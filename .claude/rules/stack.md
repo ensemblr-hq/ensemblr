@@ -11,8 +11,8 @@ asserting a version.
 
 | | |
 | --- | --- |
-| Target | macOS arm64 (`.dmg`/`.zip`) and Linux x64 (`.AppImage`) |
-| Shell | Electron 43 (Node 24 runtime), Electron Forge 7 |
+| Target | macOS arm64 Ventura+ (`.dmg`/`.zip`) and Linux x64 (`.AppImage`) |
+| Shell | Electron 44 (Node 24 runtime), Electron Forge 7 |
 | Node | **exactly 24.x** (`.nvmrc`, `mise.toml`, `engines: >=24 <25`) |
 | Package manager | npm 11.17.0 |
 
@@ -29,7 +29,7 @@ links, never installs).
 
 **Wayland needs no configuration.** Electron 38 removed
 `ELECTRON_OZONE_PLATFORM_HINT` and made native Wayland the default in a Wayland
-session, so a user on this Electron 43 gets it automatically;
+session, so a user on this Electron 44 gets it automatically;
 `--ozone-platform=x11` is the documented escape hatch. What Wayland *does*
 forbid is a client reading or setting its own position, which is why
 `forbidsWindowPositioning` in `src/main/app/window-state.ts` skips the `x`/`y`
@@ -39,14 +39,25 @@ restore there.
 `build`/`package`/`make`. Do not route around it: installing under the wrong
 major compiles `macos-alias` (V8-ABI-bound, via `nan`) for that major, so a later
 Node 24 `make` dies on `NODE_MODULE_VERSION` mismatch. Node 24 is also the Active
-LTS line the Electron 43 runtime embeds.
+LTS line the Electron 44 runtime embeds.
 
 **`@types/node` stays on `^24`, tracking the runtime rather than the latest
-release.** Electron 43 embeds Node 24, so typing against a newer major makes the
-compiler accept APIs that do not exist at runtime — a green `npm run typecheck`
-then ships a `TypeError`. Dependabot proposes the bump anyway, because it reads
-`@types/node` as an ordinary devDependency rather than a mirror of `engines`;
-decline it until the Electron major moves.
+release.** Electron 44 embeds Node 24.18.1, so typing against a newer major makes
+the compiler accept APIs that do not exist at runtime — a green
+`npm run typecheck` then ships a `TypeError`. Dependabot proposes the bump anyway,
+because it reads `@types/node` as an ordinary devDependency rather than a mirror
+of `engines`; decline it until the embedded Node major moves. The Electron 43 →
+44 bump did not move it — check the release's `node` field before assuming a
+major bump carries one.
+
+**Electron 44 raised the macOS floor from Monterey to Ventura**, per the
+`44-x-y` branch README. That floor is declared outside this repo, in the
+`ensemblr-hq/homebrew-tap` cask (`Casks/ensemblr.rb`, `depends_on macos:`), so an
+Electron major that moves it needs a matching change there or `brew` offers the
+build to machines that cannot run it. Electron 44 also made the `clipboard`
+module async and removed it from the renderer — the renderer already uses
+`navigator.clipboard`, and the one main-process call site is in
+`src/main/open-target/open-target-service.ts`.
 
 `.npmrc` sets `legacy-peer-deps=true` because `@electron-forge/plugin-fuses@7`
 declares a stale peer range (`@electron/fuses@^1`) against the v2 this repo pins.
@@ -163,8 +174,10 @@ a primitive gets reformatted to house style.
 
 ## Tooling
 
-- **Biome 2.5.9** is the only linter and formatter — no ESLint, no Prettier.
-  Tabs for indentation; single quotes for JS **and** JSX.
+- **Biome 2.5.10** is the only linter and formatter — no ESLint, no Prettier.
+  Tabs for indentation; single quotes for JS **and** JSX. `biome.json` pins the
+  `$schema` URL to the installed version, so a Biome bump updates that line too
+  or `biome check` reports the config as stale.
   Config uses `linter.rules.preset: "recommended"`; the older
   `linter.rules.recommended: true` was deprecated in Biome 2.5, so do not
   "fix" it back. Import organization runs through `assist.actions.source.organizeImports`.

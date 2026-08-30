@@ -18,7 +18,7 @@ brew install --cask ensemblr-hq/tap/ensemblr
 ```
 
 The [tap](https://github.com/ensemblr-hq/homebrew-tap) carries the stable
-channel only. It declares Apple silicon and macOS Monterey as requirements, so
+channel only. It declares Apple silicon and macOS Ventura as requirements, so
 `brew` refuses on a machine that cannot run the app rather than installing
 something that will not open.
 

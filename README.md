@@ -268,7 +268,7 @@ Full glossary in [`CONTEXT.md`](./CONTEXT.md); the user-facing tour is
 
 | Area | Choice |
 | --- | --- |
-| Desktop shell | Electron 43, Electron Forge 7 (Vite plugin, Fuses hardening) |
+| Desktop shell | Electron 44, Electron Forge 7 (Vite plugin, Fuses hardening) |
 | UI | React 19, TypeScript 7 (strict) |
 | Styling | Tailwind CSS 4, shadcn/ui (`radix-nova`) + Radix UI, Lucide icons |
 | Routing | TanStack Router (file-based) |
