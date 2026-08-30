@@ -24,8 +24,20 @@ declared per platform rather than branched inline: the secret store
 (`safeStorage` ciphertext in SQLite, not the Keychain — ADR 0056), the
 "Open in…" registry (`src/main/open-target/open-target-registry.ts` carries a
 `platforms` map), the battery reader (`linux-battery.ts` reads sysfs), the
-window chrome (`src/shared/window-chrome.ts`), and updates (Linux checks and
-links, never installs).
+workspace file watcher (`linux-recursive-watch.ts`), the window chrome
+(`src/shared/window-chrome.ts`), and updates (Linux checks and links, never
+installs).
+
+**`fs.watch(dir, { recursive: true })` is not portable performance.** macOS backs
+it with one FSEvents subscription over the whole tree; Linux has no such
+primitive and emulates it by walking the tree and registering an inotify watch
+per *entry*, files included, before the call returns. On a workspace with
+`node_modules` installed that measured ~68,000 watches and ~1.9s of blocked main
+event loop per call — which stalls every pending IPC reply and reads as a frozen
+window. `src/main/workspace-files/linux-recursive-watch.ts` is the Linux leg:
+directories only, `node_modules` and `.git` never descended into, the walk off
+the synchronous path. Reach for it rather than a recursive `fs.watch` whenever a
+new watch could cover a repository-sized tree.
 
 **Wayland needs no configuration.** Electron 38 removed
 `ELECTRON_OZONE_PLATFORM_HINT` and made native Wayland the default in a Wayland
@@ -107,7 +119,7 @@ packaged app ships without them.
 | Routing | TanStack Router (file-based) |
 | Async data | TanStack Query, TanStack Virtual |
 | State | Jotai (+ `jotai-family` for parameterized atoms) |
-| Terminal | `@xterm/xterm` 6 |
+| Terminal | `@xterm/xterm` 6, rendered through `@xterm/addon-webgl` |
 | Composer editor | `lexical` + `@lexical/react` 0.49, plain-text mode only |
 | Markdown | `streamdown` + Shiki, with the `@streamdown/{cjk,code,math,mermaid}` plugins wired in `src/renderer/components/message.tsx` |
 | Diff rendering | `react-diff-view`, tokenized through Shiki |
@@ -115,6 +127,19 @@ packaged app ships without them.
 | Drag and drop | `@atlaskit/pragmatic-drag-and-drop` (+ `-hitbox`), used by the dashboard board |
 | Validation | Zod 4 |
 | i18n | `i18next` 26 + `react-i18next` 17; catalogues bundled as JSON under `src/renderer/lib/i18n/locales/` |
+
+**xterm addons are versioned independently of the core and declare no peer
+range**, so nothing but the publish date pairs them: `@xterm/addon-fit` 0.11,
+`@xterm/addon-web-links` 0.12 and `@xterm/addon-webgl` 0.19 all shipped in the
+same batch as `@xterm/xterm` 6.0.0. Move them together, and check the publish
+times rather than assuming a bump is compatible. `@xterm/addon-webgl` is not
+optional polish: xterm's default DOM renderer lays out a span per cell, so a
+streaming agent turn relayouts the viewport per frame on the renderer's main
+thread. `createXtermAdapter` loads it in `attach`, after `terminal.open` (the
+addon needs the canvas the terminal only creates once it has a container), and
+falls back to the DOM renderer on a construction failure or a
+`onContextLoss`. Note `allowTransparency: true` is still set there and costs the
+WebGL renderer its fast blend path.
 
 **Lexical is confined to the composer editor.** Everything that imports it lives
 under
