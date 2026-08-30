@@ -10,7 +10,8 @@
 // hour and a whole release earlier.
 //
 // Refuse instead, and name the two ways out.
-import { execFileSync } from 'node:child_process';
+import { accessSync, constants } from 'node:fs';
+import { delimiter, join } from 'node:path';
 
 const ESCAPE_HATCH = 'ENSEMBLR_ALLOW_CROSS_PLATFORM_LINUX_BUILD';
 
@@ -35,17 +36,26 @@ if (
 
 /**
  * Reports whether a command exists on PATH, so the suggested fix names a tool
- * the machine actually has rather than one more thing to install.
+ * the machine actually has rather than one more thing to install. Walks PATH
+ * directly rather than shelling out to `command -v`, which needs
+ * `execFileSync(…, { shell: true })` — deprecated as of Node 26, and the same
+ * walk `require-linux-toolchain.mjs` does. It is duplicated rather than shared
+ * because that script exits at module scope, so importing from it here would
+ * end this process before it could refuse.
  * @param command - Bare command name to probe.
  * @returns True when the command resolves.
  */
 function isInstalled(command) {
-	try {
-		execFileSync('command', ['-v', command], { shell: true, stdio: 'ignore' });
-		return true;
-	} catch {
-		return false;
+	for (const directory of (process.env.PATH ?? '').split(delimiter)) {
+		if (directory === '') {
+			continue;
+		}
+		try {
+			accessSync(join(directory, command), constants.X_OK);
+			return true;
+		} catch {}
 	}
+	return false;
 }
 
 const dockerHint = isInstalled('docker')

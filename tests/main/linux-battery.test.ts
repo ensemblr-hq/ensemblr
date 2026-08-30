@@ -127,6 +127,81 @@ describe('readLinuxBattery', () => {
 		});
 	});
 
+	// A pack the vendor did not name `BAT*` — `CMB0` on several ThinkPads, and
+	// `macsmc-battery` on Asahi — is still a battery, and the `type` attribute is
+	// where the kernel says so.
+	test('finds a battery whose directory is not named BAT*', async () => {
+		pretendPlatform('linux');
+		const root = await withRoot({
+			'macsmc-battery': {
+				capacity: '64',
+				status: 'Discharging',
+				type: 'Battery',
+			},
+		});
+		await expect(readLinuxBattery(root)).resolves.toEqual({
+			charging: false,
+			percent: 64,
+		});
+	});
+
+	test('ignores a supply whose type says it is not a battery', async () => {
+		pretendPlatform('linux');
+		const root = await withRoot({
+			BAT0: { capacity: '55', status: 'Discharging', type: 'Mains' },
+		});
+		await expect(readLinuxBattery(root)).resolves.toBeNull();
+	});
+
+	// A docked machine reporting `status=Unknown` is the case that used to read
+	// as draining at 100%, releasing the power-save blocker on a plugged-in host.
+	test('treats an Unknown status as on AC when a mains supply is online', async () => {
+		pretendPlatform('linux');
+		const root = await withRoot({
+			AC: { online: '1', type: 'Mains' },
+			BAT0: { capacity: '100', status: 'Unknown', type: 'Battery' },
+		});
+		await expect(readLinuxBattery(root)).resolves.toEqual({
+			charging: true,
+			percent: 100,
+		});
+	});
+
+	test('treats an Unknown status as discharging when mains is offline', async () => {
+		pretendPlatform('linux');
+		const root = await withRoot({
+			AC: { online: '0', type: 'Mains' },
+			BAT0: { capacity: '48', status: 'Unknown', type: 'Battery' },
+		});
+		await expect(readLinuxBattery(root)).resolves.toEqual({
+			charging: false,
+			percent: 48,
+		});
+	});
+
+	test('treats an Unknown status as discharging when there is no mains supply', async () => {
+		pretendPlatform('linux');
+		const root = await withRoot({
+			BAT0: { capacity: '48', status: 'Unknown', type: 'Battery' },
+		});
+		await expect(readLinuxBattery(root)).resolves.toEqual({
+			charging: false,
+			percent: 48,
+		});
+	});
+
+	test('falls back to the mains supply when the status attribute is missing', async () => {
+		pretendPlatform('linux');
+		const root = await withRoot({
+			ADP1: { online: '1', type: 'Mains' },
+			BAT0: { capacity: '90', type: 'Battery' },
+		});
+		await expect(readLinuxBattery(root)).resolves.toEqual({
+			charging: true,
+			percent: 90,
+		});
+	});
+
 	test('returns null for a desktop with no battery', async () => {
 		pretendPlatform('linux');
 		const root = await withRoot({ AC: { online: '1' } });

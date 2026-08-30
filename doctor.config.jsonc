@@ -177,6 +177,27 @@
 				// authenticated, not an unguarded sink.
 				"files": ["src/main/agent-control/mcp-endpoint.ts"],
 				"rules": ["react-doctor/mcp-tool-capability-risk"]
+			},
+			{
+				// Importing a main-process concern through its barrel is the repo's
+				// documented rule, not an oversight: `.claude/rules/patterns.md` says
+				// "import from the barrel outside the concern; import siblings directly
+				// inside it", and all 33 main concerns carry an `index.ts` for exactly
+				// that. These two reach `src/main/secrets` from outside it.
+				//
+				// The rule's usual cost — a barrel dragging unused modules into a
+				// download bundle — does not apply here. `src/main` is one Vite bundle
+				// loaded from disk by an already-running Electron process, and
+				// `src/main/main.ts` imports every concern anyway, so the barrel adds
+				// no module the process would not have loaded.
+				//
+				// Renderer barrels are deliberately NOT exempted: there the bundle is
+				// parsed at startup and the rule earns its keep.
+				"files": [
+					"src/main/environment/environment-assembly.ts",
+					"src/main/setup/setup-diagnostics.ts"
+				],
+				"rules": ["react-doctor/no-barrel-import"]
 			}
 		]
 	}

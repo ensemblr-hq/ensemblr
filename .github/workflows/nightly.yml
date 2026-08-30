@@ -1,7 +1,10 @@
 name: Nightly
 
 # A scheduled run always publishes; a manual one defaults `publish` to false, so
-# the whole signing path stays exercisable without touching the release list.
+# the whole build path — macOS signing and the Linux AppImage alike — stays
+# exercisable without touching the release list. Both build jobs are gated on
+# the change gate only; `publish` gates the upload steps and the final job, so a
+# dry run still proves that `make` and `make:linux` work.
 # Building is change-gated below, so a quiet night costs one Linux job.
 #
 # 04:00 UTC puts a finished build in the release list before the working day in
@@ -157,52 +160,40 @@ jobs:
             '{url: $url, name: $name, notes: $notes, pub_date: $pub_date}' \
             > "$RUNNER_TEMP/nightly/$FEED_NAME"
 
-      # The `nightly` tag is what the gate reads, so it moves last, only once the
-      # assets are actually up. Moving it first would mark this commit published
-      # after a failed upload, and the next run would report "no change" and skip
-      # it for good. A first run creates the release as a draft for the same
+      # Uploads only. Un-drafting the release and moving the `nightly` tag happen
+      # in the `publish` job, after the AppImage is up too — the tag is what the
+      # gate reads, so moving it here would mark this commit published while the
+      # Linux leg could still fail, and the next run would report "no change" and
+      # never retry. A first run creates the release as a draft for the same
       # reason: a draft holds its tag unpushed until it is published.
-      - name: Publish the rolling nightly
+      - name: Upload the macOS assets to the rolling nightly
         if: ${{ github.event_name == 'schedule' || inputs.publish }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          title="Ensemblr Nightly $NIGHTLY_VERSION"
-          notes=$(printf '%s\n' \
-            "Automated build of \`master\`. Not a release — see the \`v*\` tags for those." \
-            "" \
-            "- Version: \`$NIGHTLY_VERSION\`" \
-            "- Commit: $NIGHTLY_SHA" \
-            "- Channel: canary (installs as \"Ensemblr Canary\", alongside a release)")
-
           if ! gh release view nightly > /dev/null 2>&1; then
             gh release create nightly --draft --target "$NIGHTLY_SHA" \
-              --title "$title" --notes "$notes" --prerelease
+              --title "Ensemblr Nightly $NIGHTLY_VERSION" \
+              --notes "Build in progress." --prerelease
           fi
 
           gh release upload nightly \
             "$RUNNER_TEMP/nightly/$DMG_NAME" "$RUNNER_TEMP/nightly/$ZIP_NAME" \
             "$RUNNER_TEMP/nightly/$FEED_NAME" --clobber
 
-          gh release edit nightly --title "$title" --notes "$notes" \
-            --prerelease --latest=false --draft=false
-
-          git tag -f nightly "$NIGHTLY_SHA"
-          git push -f origin refs/tags/nightly
-
       - name: Summarise the run
         if: always()
         run: |
           set -uo pipefail
           {
-            echo "### Nightly \`$NIGHTLY_VERSION\`"
+            echo "### Nightly \`$NIGHTLY_VERSION\` (macOS)"
             echo
             echo "- Commit: \`$NIGHTLY_SHA\`"
             if [ "${{ github.event_name == 'schedule' || inputs.publish }}" = "true" ]; then
-              echo "- Published to the rolling \`nightly\` release."
+              echo "- Uploaded to the rolling \`nightly\` release."
             else
-              echo "- Built and verified only; nothing published (\`publish\` was off)."
+              echo "- Built and verified only; nothing uploaded (\`publish\` was off)."
             fi
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -221,11 +212,14 @@ jobs:
   # release on a first run, and an upload into a tag that does not exist yet
   # fails. Nothing here is signed — an AppImage carries no notarization ticket —
   # so `verify:signing`, which only looks for `*-darwin-arm64` output, is not run.
+  #
+  # Gated on the change gate alone, mirroring `build`: a `workflow_dispatch` with
+  # `publish` off has to exercise `make:linux` too, or a break in it — a missing
+  # icon size, a maker option, mksquashfs — passes every dry run and surfaces at
+  # 04:00 UTC. The publish condition sits on the upload step instead.
   build-linux:
     needs: [gate, build]
-    if: >-
-      needs.gate.outputs.changed == 'true' &&
-      (github.event_name == 'schedule' || inputs.publish)
+    if: needs.gate.outputs.changed == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
@@ -262,12 +256,9 @@ jobs:
           ENSEMBLR_BUILD_CHANNEL: canary
         run: npm run make:linux
 
-      # Fixed filename, matching the DMG and ZIP: the rolling tag is only worth
-      # having if `--clobber` fully replaces yesterday's asset and the download
-      # URL stays bookmarkable.
-      - name: Attach the AppImage to the rolling nightly
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # Runs on a dry run too, so `publish: false` still proves the maker
+      # produced something. Only the upload below is conditional.
+      - name: Check the AppImage was produced
         run: |
           set -euo pipefail
           built=$(find out/make -type f -name '*.AppImage' | head -1)
@@ -276,6 +267,66 @@ jobs:
             exit 1
           fi
           cp "$built" "$RUNNER_TEMP/$APPIMAGE_NAME"
+
+      # Fixed filename, matching the DMG and ZIP: the rolling tag is only worth
+      # having if `--clobber` fully replaces yesterday's asset and the download
+      # URL stays bookmarkable.
+      - name: Attach the AppImage to the rolling nightly
+        if: ${{ github.event_name == 'schedule' || inputs.publish }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
           gh release upload nightly "$RUNNER_TEMP/$APPIMAGE_NAME" --clobber
           echo "Attached \`$APPIMAGE_NAME\` to the rolling nightly." \
+            >> "$GITHUB_STEP_SUMMARY"
+
+  # The barrier both build jobs publish through. The `nightly` tag is what the
+  # gate reads, so it moves here and nowhere else: with it moving inside `build`,
+  # a macOS build that succeeded and a Linux build that then failed left a
+  # nightly with no AppImage, and the next run computed "no change" and never
+  # retried it. Un-drafting is held back to the same point, so a first run's
+  # release only becomes visible once every asset is attached.
+  #
+  # Residual, and deliberate: on a run after the first the release is already
+  # published, so `build`'s `--clobber` upload replaces yesterday's macOS assets
+  # before this job is reached. A failed Linux leg therefore leaves one nightly
+  # pairing today's DMG with yesterday's AppImage — but the tag has not moved, so
+  # the next run rebuilds and repairs it rather than skipping forever.
+  publish:
+    needs: [gate, build, build-linux]
+    if: >-
+      needs.gate.outputs.changed == 'true' &&
+      (github.event_name == 'schedule' || inputs.publish)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      NIGHTLY_SHA: ${{ needs.gate.outputs.sha }}
+      NIGHTLY_VERSION: ${{ needs.gate.outputs.version }}
+    steps:
+      # The tag is force-moved to this commit, so the commit has to be here.
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.gate.outputs.sha }}
+
+      - name: Publish the rolling nightly and move its tag
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          title="Ensemblr Nightly $NIGHTLY_VERSION"
+          notes=$(printf '%s\n' \
+            "Automated build of \`master\`. Not a release — see the \`v*\` tags for those." \
+            "" \
+            "- Version: \`$NIGHTLY_VERSION\`" \
+            "- Commit: $NIGHTLY_SHA" \
+            "- Channel: canary (installs as \"Ensemblr Canary\", alongside a release)")
+
+          gh release edit nightly --title "$title" --notes "$notes" \
+            --prerelease --latest=false --draft=false
+
+          git tag -f nightly "$NIGHTLY_SHA"
+          git push -f origin refs/tags/nightly
+
+          echo "Published the rolling nightly at \`$NIGHTLY_VERSION\`." \
             >> "$GITHUB_STEP_SUMMARY"

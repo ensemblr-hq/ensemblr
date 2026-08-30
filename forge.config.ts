@@ -77,12 +77,24 @@ const execFileAsync = promisify(execFile);
  * than repeating the generator's size list keeps the two from drifting, and an
  * incomplete ladder throws — the maker would otherwise produce an AppImage
  * whose icon no desktop can find, which reads as a successful build.
+ *
+ * This runs at module scope, so it runs on every Forge command and every test
+ * that imports this config, macOS `make` included. An absent directory has to
+ * name the generator: a bare `ENOENT … scandir './assets/icons'` out of a DMG
+ * build points at nothing a reader can act on.
  * @returns The icon set, with the default size marked for `.DirIcon`
  */
 function linuxIconSet(): {
 	default: `${number}x${number}`;
 	[size: `${number}x${number}`]: string;
 } {
+	if (!existsSync(LINUX_ICONS_DIR)) {
+		throw new Error(
+			`${LINUX_ICONS_DIR} does not exist. ` +
+				'Run `npm run icon:generate` to write the Linux icon ladder.',
+		);
+	}
+
 	const sizes = readdirSync(LINUX_ICONS_DIR)
 		.map((file) => /^icon-(\d+)\.png$/.exec(file))
 		.filter((match) => match !== null)
@@ -256,6 +268,10 @@ const config: ForgeConfig = {
 			NSMicrophoneUsageDescription:
 				'Ensemblr uses the microphone to dictate prompts into the composer. Audio is sent to the transcription provider you configure and is never stored.',
 		},
+		// Forge has no per-target `extraResource`, so the Linux PNG ladder (~100 KB)
+		// ships inside the macOS `.app` too. Paid deliberately: the alternative is
+		// branching this config on `process.platform`, which would make the macOS
+		// and Linux packages differ by something other than their maker.
 		extraResource: [
 			'resources/pi-extensions',
 			'resources/agent-skills',

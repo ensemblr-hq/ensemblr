@@ -14,6 +14,15 @@ const POWER_SUPPLY_ROOT = '/sys/class/power_supply';
 const NON_DISCHARGING_STATUSES = new Set(['charging', 'full', 'not charging']);
 
 /**
+ * One power supply as sysfs describes it: the directory name, and whatever its
+ * `type` attribute reports, lowercased.
+ */
+interface PowerSupply {
+	name: string;
+	type: string | null;
+}
+
+/**
  * Reads the battery through sysfs, which every Linux kernel exposes — no
  * `upower` daemon, no D-Bus round trip, and nothing to install on an immutable
  * distro. Resolves `null` off-Linux, on a machine with no battery, or on any
@@ -28,31 +37,102 @@ export async function readLinuxBattery(
 		return null;
 	}
 
+	let supplies: PowerSupply[];
 	try {
-		const entries = await readdir(root);
-		const batteries = entries.filter((entry) => entry.startsWith('BAT')).sort();
-
-		for (const battery of batteries) {
-			const snapshot = await readBatterySnapshot(path.join(root, battery));
-			if (snapshot) {
-				return snapshot;
-			}
-		}
+		supplies = await readPowerSupplies(root);
 	} catch {
 		return null;
+	}
+
+	for (const supply of supplies.filter(isBattery)) {
+		const reading = await readBatteryReading(path.join(root, supply.name));
+		if (reading === null) {
+			continue;
+		}
+		return {
+			charging: reading.charging ?? (await isAnyMainsOnline(root, supplies)),
+			percent: reading.percent,
+		};
 	}
 
 	return null;
 }
 
 /**
- * Reads one power-supply directory into a snapshot.
- * @param directory - Absolute path to a `BAT*` power-supply directory.
- * @returns The snapshot, or `null` when the capacity is missing or unparseable.
+ * Lists every power supply under the root with its declared `type`, in a stable
+ * order.
+ * @param root - Power-supply directory to enumerate.
+ * @returns One entry per supply, sorted by directory name.
  */
-async function readBatterySnapshot(
+async function readPowerSupplies(root: string): Promise<PowerSupply[]> {
+	const names = (await readdir(root)).sort();
+	return Promise.all(
+		names.map(async (name) => ({
+			name,
+			type:
+				(await readSysfsValue(path.join(root, name, 'type')))?.toLowerCase() ??
+				null,
+		})),
+	);
+}
+
+/**
+ * Reports whether a supply is a battery. The `type` attribute is authoritative
+ * — a laptop may name its pack `CMB0` or `macsmc-battery` rather than `BAT0` —
+ * and the name prefix is only the fallback for a kernel that does not expose it.
+ * @param supply - The supply to classify.
+ * @returns True when the supply holds charge.
+ */
+function isBattery(supply: PowerSupply): boolean {
+	return supply.type === null
+		? supply.name.startsWith('BAT')
+		: supply.type === 'battery';
+}
+
+/**
+ * Reports whether a supply is a wall adapter.
+ * @param supply - The supply to classify.
+ * @returns True when the supply is mains power.
+ */
+function isMains(supply: PowerSupply): boolean {
+	return supply.type === null
+		? supply.name.startsWith('AC')
+		: supply.type === 'mains';
+}
+
+/**
+ * Reports whether any wall adapter is plugged in, which is what settles a
+ * battery whose own `status` says `Unknown` — common on a desktop and on ACPI
+ * implementations that never populate it. Without it a docked machine reads as
+ * draining at 100%.
+ * @param root - Power-supply directory the supplies were read from.
+ * @param supplies - Every supply under that root.
+ * @returns True when at least one mains supply reports `online=1`.
+ */
+async function isAnyMainsOnline(
+	root: string,
+	supplies: PowerSupply[],
+): Promise<boolean> {
+	const states = await Promise.all(
+		supplies.flatMap((supply) =>
+			isMains(supply)
+				? [readSysfsValue(path.join(root, supply.name, 'online'))]
+				: [],
+		),
+	);
+	return states.includes('1');
+}
+
+/**
+ * Reads one battery directory. `charging` is `null` rather than `false` when
+ * the kernel reports `Unknown` or no status at all, so the caller can fall back
+ * to the mains supply instead of assuming the machine is draining.
+ * @param directory - Absolute path to a battery power-supply directory.
+ * @returns The reading, or `null` when the capacity is missing or unparseable.
+ */
+async function readBatteryReading(
 	directory: string,
-): Promise<BatterySnapshot | null> {
+): Promise<{ charging: boolean | null; percent: number } | null> {
 	const percent = parsePercent(
 		await readSysfsValue(path.join(directory, 'capacity')),
 	);
@@ -65,10 +145,11 @@ async function readBatterySnapshot(
 		await readSysfsValue(path.join(directory, 'status'))
 	)?.toLowerCase();
 
-	return {
-		charging: status ? NON_DISCHARGING_STATUSES.has(status) : false,
-		percent,
-	};
+	if (!status || status === 'unknown') {
+		return { charging: null, percent };
+	}
+
+	return { charging: NON_DISCHARGING_STATUSES.has(status), percent };
 }
 
 /**

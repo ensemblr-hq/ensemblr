@@ -93,8 +93,15 @@
 	// devDependencies is correct and the renderer bundle needs none at runtime.
 	// i18next-cli is invoked only through the `i18n:*` npm scripts, so there is
 	// no import edge for fallow to follow.
+	// node-abi is required at build time by scripts/require-linux-toolchain.mjs,
+	// which resolves the ABI @electron/rebuild stamps into node-pty's
+	// `.forge-meta` so the guard can tell an Electron-built binding from a
+	// Node-built one. Fallow reads `scripts/**` as production and wants it in
+	// `dependencies`, but nothing under `scripts/` is packaged — it runs from the
+	// repo checkout, before `electron-forge` does.
 	"ignoreDependencies": [
 		"@electron-forge/shared-types",
+		"node-abi",
 		"@tailwindcss/typography",
 		"i18next-cli",
 		"class-variance-authority",

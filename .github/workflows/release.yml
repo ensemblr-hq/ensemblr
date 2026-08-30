@@ -269,8 +269,17 @@ jobs:
   # output, and the Apple signing action has no business running on a Linux
   # runner. It attaches to the same release, and `release-feed.ts` requires the
   # `.AppImage` to be present before it offers a Linux user the version.
+  #
+  # After `build`, not beside it. `release-feed.ts` offers a Linux user any
+  # release carrying an `.AppImage`, and looks the darwin feed document up before
+  # that gate — so a release that got the AppImage while notarization failed
+  # would push Linux users at a version macOS users cannot install, and hand them
+  # a hard error on the one release they could actually run. A failure here still
+  # leaves the macOS release whole; the reverse must not happen. It also inherits
+  # `build`'s "release exists and is published" guard this way, so it can no
+  # longer attach to a draft.
   build-linux:
-    needs: verify
+    needs: [verify, build]
     if: ${{ !startsWith(github.event.release.tag_name, 'nightly') }}
     runs-on: ubuntu-latest
     timeout-minutes: 30

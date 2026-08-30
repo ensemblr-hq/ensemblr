@@ -438,10 +438,12 @@ the env-strip + single-instance lock that closed the other path).
 identity is per-channel; the *state* is not. All three read one SQLite database
 (`~/Library/Application Support/dev.ensemblr.app/ensemblr.db`, keyed on the
 bundle id constant rather than the product name) and one
-`~/.config/ensemblr/config.json`, and `src/main/main.ts` pins Electron's
-`userData` to the release's directory for every packaged build so the
-localStorage-backed recents, workspace selection and per-repo overrides come
-along too. That also puts the channels behind one single-instance lock, which is
+`~/.config/ensemblr/config.json`, and `resolveUserDataDirectory` in
+`src/main/app/user-data-location.ts` pins Electron's `userData` to the release's
+directory for every packaged build so the localStorage-backed recents, workspace
+selection and per-repo overrides come along too. On Linux that pin is implicit:
+`userData` is `~/.config/ensemblr/electron`, derived from a config directory
+that never carried the channel name in the first place. That also puts the channels behind one single-instance lock, which is
 the correct reading given they share a database file — launching Canary while
 Ensemblr is running folds into the running instance rather than opening a second
 writer. The unpackaged `electron-forge start` build is the exception and keeps

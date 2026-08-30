@@ -13,13 +13,32 @@
 // that prefix. It loads on the machine that built it and nowhere else, so it
 // survives local testing and breaks every terminal in the shipped AppImage.
 // Read the linkage back and refuse a binding that is not host-portable.
+//
+// The third is the one a bare `existsSync` misses. `npm ci` inside a Node
+// container compiles node-pty against *Node's* ABI and writes no `.forge-meta`,
+// so the file exists and links against nothing but `/lib`. Forge then finds no
+// meta it recognises, shells out to node-gyp on the host anyway, and dies with
+// the same bare error — on the one host that has no compiler. Compare the meta
+// against the ABI Electron actually wants before declaring the binding usable.
 import { execFileSync } from 'node:child_process';
-import { accessSync, constants, existsSync } from 'node:fs';
+import { accessSync, constants, existsSync, readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { delimiter, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const BINDING = fileURLToPath(
 	new URL('../node_modules/node-pty/build/Release/pty.node', import.meta.url),
+);
+
+// `@electron/rebuild` stamps `${arch}--${ABI}` here after a successful rebuild
+// and skips the module when it matches (`module-rebuilder.js`, `metaData`).
+// Reading it is the only way to tell a binding Forge will accept from one it
+// will silently try to recompile.
+const FORGE_META = fileURLToPath(
+	new URL(
+		'../node_modules/node-pty/build/Release/.forge-meta',
+		import.meta.url,
+	),
 );
 
 /** Compilers node-gyp probes for, in the order it probes for them. */
@@ -68,7 +87,41 @@ function findCompiler() {
 }
 
 /**
- * Reads back what the compiled binding links against.
+ * Resolves the ABI the packaged Electron loads native modules with, which is
+ * what `@electron/rebuild` stamps into `.forge-meta` — not the host Node's.
+ * Uses the same `node-abi` lookup that rebuild itself performs.
+ * @returns The Electron version and its ABI, or null when neither resolves.
+ */
+function resolveElectronAbi() {
+	try {
+		const require = createRequire(import.meta.url);
+		const { version } = require('electron/package.json');
+		return {
+			version,
+			abi: String(require('node-abi').getAbi(version, 'electron')),
+		};
+	} catch {
+		return null;
+	}
+}
+
+/**
+ * Reads the `${arch}--${ABI}` stamp `@electron/rebuild` leaves beside a binding
+ * it built.
+ * @returns The stamp, or null when the module was never rebuilt for Electron.
+ */
+function readForgeMeta() {
+	try {
+		return readFileSync(FORGE_META, 'utf8').trim();
+	} catch {
+		return null;
+	}
+}
+
+/**
+ * Reads back what the compiled binding links against. Entries whose target is
+ * empty are dropped: older glibc prints the vDSO as `linux-vdso.so.1 => (0x…)`,
+ * which resolves to nothing and is not a real dependency.
  * @param binding - Path to the `.node` file to inspect.
  * @returns One entry per dependency, or null when `ldd` cannot report.
  */
@@ -86,8 +139,9 @@ function readLinkage(binding) {
 		.filter((line) => line.includes('=>'))
 		.map((line) => {
 			const [name, target] = line.split('=>').map((part) => part.trim());
-			return { name, target: target.replace(/\s*\(0x[0-9a-f]+\)$/, '') };
-		});
+			return { name, target: target.replace(/\s*\(0x[0-9a-f]+\)$/, '').trim() };
+		})
+		.filter(({ target }) => target !== '');
 }
 
 /**
@@ -106,18 +160,27 @@ function findUnportableLinks(linkage) {
 }
 
 /**
- * Prints the toolchain state as a table, for `npm run diagnose:linux`.
+ * Prints the toolchain state as a table, for `npm run diagnose:linux`. The
+ * Electron row is the one that matters when a `NODE_MODULE_VERSION` mismatch is
+ * being chased: the rebuild targets Electron's ABI, never the host Node's.
  * @param compiler - The resolved compiler, or null.
  * @param linkage - Dependencies of the built binding, or null when unbuilt.
+ * @param electron - Electron's version and ABI, or null when unresolvable.
+ * @param meta - The binding's `.forge-meta` stamp, or null when it has none.
  */
-function printReport(compiler, linkage) {
+function printReport(compiler, linkage, electron, meta) {
 	const rows = [
-		['node', `${process.versions.node} (electron rebuild target)`],
+		['node', process.versions.node],
+		[
+			'electron',
+			electron ? `${electron.version} (ABI ${electron.abi})` : 'UNRESOLVABLE',
+		],
 		['compiler', compiler ? `${compiler.name} → ${compiler.path}` : 'MISSING'],
 		['make', resolveCommand('make') ?? 'MISSING'],
 		['python3', resolveCommand('python3') ?? 'MISSING'],
 		['mksquashfs', resolveCommand('mksquashfs') ?? 'MISSING (make:linux only)'],
 		['pty.node', existsSync(BINDING) ? BINDING : 'not built'],
+		['built for', meta ?? 'no .forge-meta (not built by electron-rebuild)'],
 	];
 
 	for (const [label, value] of rows) {
@@ -133,14 +196,15 @@ function printReport(compiler, linkage) {
 }
 
 /**
- * Reports that the binding is unbuilt and the host cannot build it.
+ * Reports that Forge will have to compile the binding and the host cannot.
+ * @param state - What is wrong with the binding today, as a sentence fragment.
  * @param missing - Names of the build tools that are absent.
  */
-function refuseWithoutToolchain(missing) {
+function refuseWithoutToolchain(state, missing) {
 	console.error(
 		[
 			'',
-			`✖ node-pty is not built and this host cannot build it: ${missing.join(', ')} missing.`,
+			`✖ node-pty is ${state}, and this host cannot build it: ${missing.join(', ')} missing.`,
 			'  node-pty ships no linux-x64 prebuild, so Forge compiles it from source —',
 			'  it will fail with a bare "node-gyp failed to rebuild".',
 			'',
@@ -198,12 +262,21 @@ if (process.platform !== 'linux') {
 const compiler = findCompiler();
 const isBuilt = existsSync(BINDING);
 const linkage = isBuilt ? readLinkage(BINDING) : null;
+const electron = resolveElectronAbi();
+const forgeMeta = isBuilt ? readForgeMeta() : null;
 
 if (reportOnly) {
-	printReport(compiler, linkage);
+	printReport(compiler, linkage, electron, forgeMeta);
 }
 
-if (!isBuilt) {
+// With no ABI to compare against, an existing binding is taken at face value
+// rather than refused: a false stop here would block `dev` on a host that is
+// perfectly able to build.
+const builtForElectron =
+	isBuilt &&
+	(electron === null || forgeMeta === `${process.arch}--${electron.abi}`);
+
+if (!builtForElectron) {
 	const missing = [
 		compiler ? null : 'a C++ compiler',
 		resolveCommand('make') ? null : 'make',
@@ -211,7 +284,12 @@ if (!isBuilt) {
 	].filter(Boolean);
 
 	if (missing.length > 0) {
-		refuseWithoutToolchain(missing);
+		refuseWithoutToolchain(
+			isBuilt
+				? `built for ${forgeMeta ?? 'an unrecorded runtime'} rather than Electron's ${process.arch}--${electron?.abi}`
+				: 'not built',
+			missing,
+		);
 	}
 	process.exit(0);
 }

@@ -1,12 +1,22 @@
 import { existsSync } from 'node:fs';
 import { describe, expect, test } from 'vitest';
 
-import config from '../../forge.config.ts';
 import {
 	APP_LINUX_APP_IDS,
 	APP_NAMES,
 	KNOWN_CHANNELS,
 } from '../../src/shared/build-channel.ts';
+
+// Pinned before the config is imported, because it reads both at module scope:
+// `ENSEMBLR_BUILD_CHANNEL=canary` in a contributor's `.env` would rename every
+// identity asserted below, and `ENSEMBLR_REQUIRE_SIGN=1` makes the config throw
+// an Apple-signing error during collection. Assigned rather than deleted —
+// `import 'dotenv/config'` fills in absent keys from `.env` but never overrides
+// a key that is already set, empty string included.
+process.env.ENSEMBLR_BUILD_CHANNEL = 'release';
+process.env.ENSEMBLR_REQUIRE_SIGN = '';
+
+const { default: config } = await import('../../forge.config.ts');
 
 // Every size directory the freedesktop `hicolor` theme declares in its
 // `index.theme`. GTK and Qt only look inside the sizes the theme lists, so an

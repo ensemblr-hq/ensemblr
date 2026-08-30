@@ -50,12 +50,13 @@ echo "Rebuilding node-pty in $IMAGE via $runtime…"
 "$runtime" run --rm \
 	--volume "$repo_root":/src \
 	--workdir /src \
+	--env MODULE="$MODULE" \
 	"$IMAGE" \
 	bash -euo pipefail -c '
 		command -v python3 >/dev/null 2>&1 || {
 			apt-get update -qq && apt-get install -y -qq python3
 		}
-		npx electron-rebuild --force --module-dir '"$MODULE"'
+		npx electron-rebuild --force --module-dir "$MODULE"
 	'
 
 binding="$repo_root/$MODULE/build/Release/pty.node"
@@ -66,14 +67,25 @@ if [ ! -f "$binding" ]; then
 fi
 
 # Rootless podman maps container root to the invoking user, so the output is
-# already owned correctly; rootful docker leaves it owned by root instead.
+# already owned correctly; rootful docker leaves it owned by root instead. That
+# is a failure, not a warning: the next `npm ci` on the host dies with EACCES on
+# a path nothing connects back to this step.
+#
+# Passing `--user` to the run would prevent it on rootful docker and break it
+# everywhere else — under a rootless runtime the flag maps the build output into
+# a subuid the invoking user does not own either. Refuse and name the one
+# command instead.
 owner=$(stat -c %u "$binding")
 if [ "$owner" != "$(id -u)" ]; then
 	echo "" >&2
-	echo "⚠ $MODULE/build is owned by uid $owner, not you ($(id -u))." >&2
-	echo "  Your container runtime runs as root. Fix with:" >&2
+	echo "✖ $MODULE/build is owned by uid $owner, not you ($(id -u))." >&2
+	echo "  Your container runtime runs as root, so the build output is unwritable" >&2
+	echo "  and the next npm ci will fail with EACCES. Fix with:" >&2
 	echo "    sudo chown -R $(id -u):$(id -g) $MODULE/build" >&2
 	echo "" >&2
+	echo "  Then re-run: npm run diagnose:linux" >&2
+	echo "" >&2
+	exit 1
 fi
 
 exec node "$repo_root/scripts/require-linux-toolchain.mjs" --report
