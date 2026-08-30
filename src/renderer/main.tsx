@@ -5,7 +5,7 @@ import { createRoot } from 'react-dom/client';
 
 import { queryClient } from './api/query-client';
 import { Toaster } from './components/ui/sonner';
-import { WindowTitleBar } from './components/workbench-shell/window-controls';
+import { WindowTitleBar } from './components/workbench-shell/window-controls/window-title-bar';
 import { applyWindowChrome, readWindowChrome } from './lib/window-chrome';
 import { registerIconCollections } from './lib/workbench/icon-collections';
 import { router } from './routing/router';
