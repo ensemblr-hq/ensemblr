@@ -79,7 +79,9 @@ A few details the table compresses:
 - **Git executable** offers remediation matched to the platform. macOS gets
   `xcode-select --install` alongside the git-scm macOS download page; Linux gets
   the git-scm Linux download page on its own, because no single package-manager
-  command is right across apt, dnf, pacman, and zypper. Both offer a retry.
+  command is right across apt, dnf, pacman, and zypper. Both offer a retry. The
+  message naming the Xcode command-line tools is macOS-only too — elsewhere the
+  check just tells you to install Git.
 - **Environment variables** ships with no required variables, so it does not
   block by default. It becomes blocking the moment you mark one required.
 - **Pi RPC startup** runs in a managed throwaway workspace, not in one of your

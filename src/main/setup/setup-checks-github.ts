@@ -85,7 +85,7 @@ export function getGitExecutableCheck(deps: GitExecutableCheckDeps) {
 			}
 
 			return {
-				...getGitFailureDetail(result),
+				...getGitFailureDetail(result, deps.platform),
 				logs,
 				remediationActions: getGitFailureRemediationActions(deps.platform),
 				status: 'failure',
@@ -292,14 +292,28 @@ function getGitFailureRemediationActions(
 	return [openInstallDocs, retry];
 }
 
-/** Maps a `git --version` failure to a user-facing message. */
-function getGitFailureDetail(result: LocalCommandResult): DetailResult {
+/**
+ * Maps a `git --version` failure to a user-facing message.
+ * @param result - Outcome of the `git --version` run.
+ * @param platform - Platform the app is running on, which decides whether the
+ * missing-git line may name the Xcode command-line tools.
+ * @returns The detail fields for the failing check.
+ */
+function getGitFailureDetail(
+	result: LocalCommandResult,
+	platform: NodeJS.Platform,
+): DetailResult {
 	switch (result.failure?.code) {
 		case 'command-not-found':
-			return authoredDetail(
-				'git-not-found',
-				'Git was not found in the shell-derived PATH. Install Git or Xcode Command Line Tools, then retry.',
-			);
+			return platform === 'darwin'
+				? authoredDetail(
+						'git-not-found-macos',
+						'Git was not found in the shell-derived PATH. Install Git or Xcode Command Line Tools, then retry.',
+					)
+				: authoredDetail(
+						'git-not-found',
+						'Git was not found in the shell-derived PATH. Install Git, then retry.',
+					);
 		case 'timeout':
 			return authoredDetail('git-timeout', 'Git version check timed out.');
 		case 'output-truncated':

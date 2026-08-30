@@ -237,7 +237,8 @@ export default interface Resources {
 				'git-available-unknown-version': 'Git is available.';
 				'git-failed': 'Git version check failed: {{message}}';
 				'git-failed-unknown': 'Git version check failed for an unknown reason.';
-				'git-not-found': 'Git was not found in the shell-derived PATH. Install Git or Xcode Command Line Tools, then retry.';
+				'git-not-found': 'Git was not found in the shell-derived PATH. Install Git, then retry.';
+				'git-not-found-macos': 'Git was not found in the shell-derived PATH. Install Git or Xcode Command Line Tools, then retry.';
 				'git-output-truncated': 'Git version check produced too much output.';
 				'git-timeout': 'Git version check timed out.';
 				'git-unknown-error': 'Unknown git check error.';

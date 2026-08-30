@@ -79,6 +79,7 @@ export type SetupDetailCode =
 	| 'git-failed'
 	| 'git-failed-unknown'
 	| 'git-not-found'
+	| 'git-not-found-macos'
 	| 'git-output-truncated'
 	| 'git-timeout'
 	| 'git-unknown-error'

@@ -807,6 +807,8 @@ test('offers only Linux-resolvable git remediation on Linux', async () => {
 		)?.target,
 		'https://git-scm.com/download/linux',
 	);
+	assert.equal(gitCheck.detailMessage?.code, 'git-not-found');
+	assert.doesNotMatch(gitCheck.detail, /Xcode/);
 });
 
 test('keeps the macOS git remediation on macOS', async () => {
@@ -833,6 +835,8 @@ test('keeps the macOS git remediation on macOS', async () => {
 		)?.target,
 		'https://git-scm.com/download/mac',
 	);
+	assert.equal(gitCheck.detailMessage?.code, 'git-not-found-macos');
+	assert.match(gitCheck.detail, /Xcode Command Line Tools/);
 });
 
 test('blocks readiness when gh is missing', async () => {
