@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 
-import { fireEvent, screen } from '@testing-library/react';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { expect, test } from 'vitest';
 
 import { OnboardingLanguagePicker } from '../../src/renderer/components/onboarding/onboarding-language-picker';
@@ -8,42 +8,76 @@ import { LANGUAGE_ENDONYMS } from '../../src/shared/i18n';
 import { renderWithProviders } from './support/dom';
 
 /**
- * Renders the picker and returns its collapsible root, whose `data-state` is
- * what "open" means here — Radix keeps closed content mounted and hidden.
- * @returns The collapsible root element.
+ * Renders the picker and returns its trigger, whose `aria-expanded` is what
+ * "open" means here — the popover portals its content and unmounts it closed.
+ * @returns The trigger button.
  */
 function renderPicker(): HTMLElement {
-	const { container } = renderWithProviders(<OnboardingLanguagePicker />);
-	return container.querySelector('[data-slot="collapsible"]') as HTMLElement;
+	renderWithProviders(<OnboardingLanguagePicker />);
+	return screen.getByRole('button', { name: /change interface language/i });
 }
 
 test('rests closed, naming the language on screen', () => {
-	const collapsible = renderPicker();
+	const trigger = renderPicker();
 
-	expect(collapsible).toHaveAttribute('data-state', 'closed');
-	expect(
-		screen.getByRole('button', { name: /interface language/i }),
-	).toHaveTextContent(LANGUAGE_ENDONYMS.en);
+	expect(trigger).toHaveAttribute('aria-expanded', 'false');
+	expect(screen.queryByRole('navigation')).not.toBeInTheDocument();
 });
 
-test('expanding offers every language by its own name', () => {
-	const collapsible = renderPicker();
+test('the trigger’s accessible name carries the endonym a user can see', () => {
+	const trigger = renderPicker();
 
-	fireEvent.click(screen.getByRole('button', { name: /interface language/i }));
+	expect(trigger).toHaveAccessibleName(
+		expect.stringContaining(LANGUAGE_ENDONYMS.en),
+	);
+});
 
-	expect(collapsible).toHaveAttribute('data-state', 'open');
+test('expanding offers every language by its own name', async () => {
+	const trigger = renderPicker();
+
+	fireEvent.click(trigger);
+
+	const options = await screen.findByRole('navigation');
+	expect(trigger).toHaveAttribute('aria-expanded', 'true');
 	for (const endonym of Object.values(LANGUAGE_ENDONYMS)) {
-		expect(screen.getByRole('navigation')).toHaveTextContent(endonym);
+		expect(options).toHaveTextContent(endonym);
 	}
 });
 
-test('picking a language closes the row and the trigger names the new one', () => {
-	const collapsible = renderPicker();
-	const trigger = screen.getByRole('button', { name: /interface language/i });
+test('picking a language closes the row and the trigger names the new one', async () => {
+	const trigger = renderPicker();
 	fireEvent.click(trigger);
+	await screen.findByRole('navigation');
 
 	fireEvent.click(screen.getByRole('button', { name: LANGUAGE_ENDONYMS.ru }));
 
-	expect(collapsible).toHaveAttribute('data-state', 'closed');
+	await waitFor(() => {
+		expect(screen.queryByRole('navigation')).not.toBeInTheDocument();
+	});
 	expect(trigger).toHaveTextContent(LANGUAGE_ENDONYMS.ru);
+});
+
+test('Escape dismisses the row and hands focus back to the trigger', async () => {
+	const trigger = renderPicker();
+	fireEvent.click(trigger);
+	const options = await screen.findByRole('navigation');
+
+	fireEvent.keyDown(options, { code: 'Escape', key: 'Escape' });
+
+	await waitFor(() => {
+		expect(screen.queryByRole('navigation')).not.toBeInTheDocument();
+	});
+	expect(trigger).toHaveFocus();
+});
+
+test('picking a language hands focus back to the trigger', async () => {
+	const trigger = renderPicker();
+	fireEvent.click(trigger);
+	await screen.findByRole('navigation');
+
+	fireEvent.click(screen.getByRole('button', { name: LANGUAGE_ENDONYMS.el }));
+
+	await waitFor(() => {
+		expect(trigger).toHaveFocus();
+	});
 });

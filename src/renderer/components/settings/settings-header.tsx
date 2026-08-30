@@ -91,7 +91,7 @@ export function SettingsHeader({
 	});
 
 	return (
-		<header className='native-toolbar window-chrome-spacer flex shrink-0 items-center gap-3 border-b pr-3 pl-[var(--ensemblr-window-chrome-inset-start)]'>
+		<header className='native-toolbar window-chrome-spacer flex shrink-0 items-center gap-3 border-b pr-3 pl-[var(--ensemblr-window-chrome-safe-start)]'>
 			<Button onClick={closeSettings} size='sm' variant='ghost'>
 				<ArrowLeftIcon aria-hidden='true' className='size-4' />
 				<span>{t('common:actions.back', 'Back')}</span>

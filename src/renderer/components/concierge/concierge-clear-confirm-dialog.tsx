@@ -98,7 +98,7 @@ export function ConciergeClearConfirmDialog({
 						{/* i18next-instrument-ignore */}
 						<span
 							aria-hidden='true'
-							className='ml-1 inline-flex items-center gap-0.5 text-[0.6875rem] opacity-70'
+							className='ml-1 inline-flex items-center gap-0.5 text-xxs opacity-70'
 						>
 							{formatChord(['mod'], 'Enter')}
 						</span>

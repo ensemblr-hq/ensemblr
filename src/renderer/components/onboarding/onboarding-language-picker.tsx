@@ -5,10 +5,10 @@ import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/renderer/components/ui/button';
 import {
-	Collapsible,
-	CollapsibleContent,
-	CollapsibleTrigger,
-} from '@/renderer/components/ui/collapsible';
+	Popover,
+	PopoverContent,
+	PopoverTrigger,
+} from '@/renderer/components/ui/popover';
 import { cn } from '@/renderer/lib/utils';
 import { languageAtom } from '@/renderer/state/preferences';
 import {
@@ -30,8 +30,16 @@ import {
  * controls on Linux, and one row of three buttons is louder than the choice
  * deserves for the users who are already in their own language.
  *
+ * A popover rather than a collapsible, because the row floats over the wizard
+ * and so has to behave like one: Escape and a press outside dismiss it, and
+ * picking a language hands focus back to the trigger instead of dropping it to
+ * the body when the row unmounts.
+ *
  * Endonyms rather than a translated list: someone stranded in a language they
- * cannot read still recognises their own.
+ * cannot read still recognises their own. The trigger's own endonym stays part
+ * of its accessible name — a voice-control user asks for what they can see —
+ * so the verb is a screen-reader span beside it rather than an `aria-label`
+ * that would replace it.
  */
 export function OnboardingLanguagePicker() {
 	const { i18n, t } = useTranslation();
@@ -40,15 +48,35 @@ export function OnboardingLanguagePicker() {
 	const activeLanguage = resolveActiveLanguage(preference, i18n.language);
 
 	return (
-		<Collapsible
-			className='relative flex flex-col items-center'
-			onOpenChange={setOpen}
-			open={isOpen}
-		>
+		<Popover onOpenChange={setOpen} open={isOpen}>
+			<PopoverTrigger asChild>
+				<Button className='text-muted-foreground' size='sm' variant='ghost'>
+					<LanguagesIcon aria-hidden='true' data-icon='inline-start' />
+					<span className='sr-only'>
+						{t(
+							'onboarding:welcome.language.change',
+							'Change interface language',
+						)}
+					</span>
+					{LANGUAGE_ENDONYMS[activeLanguage]}
+					<ChevronUpIcon
+						aria-hidden='true'
+						className={cn('transition-transform', isOpen && 'rotate-180')}
+						data-icon='inline-end'
+					/>
+				</Button>
+			</PopoverTrigger>
+
 			{/* Floats above the trigger rather than sitting in the column with it:
 			    the picker is the last thing on a vertically centred screen, so a row
-			    that took height on open shifted the whole wizard up under it. */}
-			<CollapsibleContent className='data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 -translate-x-1/2 absolute bottom-full left-1/2 z-10 mb-1.5 data-[state=closed]:animate-out data-[state=open]:animate-in'>
+			    that took height on open shifted the whole wizard up under it. The
+			    content wrapper is stripped back to nothing so the pill below is the
+			    only surface, rather than a pill inside a panel. */}
+			<PopoverContent
+				className='w-auto border-none bg-transparent p-0 shadow-none ring-0'
+				side='top'
+				sideOffset={6}
+			>
 				<nav
 					aria-label={t(
 						'onboarding:welcome.language.label',
@@ -76,29 +104,8 @@ export function OnboardingLanguagePicker() {
 						</Button>
 					))}
 				</nav>
-			</CollapsibleContent>
-
-			<CollapsibleTrigger asChild>
-				<Button
-					aria-label={t(
-						'onboarding:welcome.language.change',
-						'Change interface language',
-					)}
-					className='text-muted-foreground'
-					size='sm'
-					type='button'
-					variant='ghost'
-				>
-					<LanguagesIcon aria-hidden='true' data-icon='inline-start' />
-					{LANGUAGE_ENDONYMS[activeLanguage]}
-					<ChevronUpIcon
-						aria-hidden='true'
-						className={cn('transition-transform', isOpen && 'rotate-180')}
-						data-icon='inline-end'
-					/>
-				</Button>
-			</CollapsibleTrigger>
-		</Collapsible>
+			</PopoverContent>
+		</Popover>
 	);
 }
 
