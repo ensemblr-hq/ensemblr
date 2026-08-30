@@ -170,6 +170,7 @@ export default defineConfig({
 			'tests/main/plan-mode-spawn-inheritance.test.ts',
 			'tests/main/plan-mode-op-policy.test.ts',
 			'tests/main/agent-control-env-role.test.ts',
+			'tests/main/agent-model-catalog.test.ts',
 			'tests/main/agent-provider-handlers.test.ts',
 			'tests/main/pi-provider-readiness-probe.test.ts',
 			'tests/main/claude-readiness.test.ts',

@@ -536,6 +536,52 @@ anthropic claude-sonnet-4 200K 8.0K yes yes
 	);
 });
 
+test('reads no rows out of the prose pi prints when no provider is configured', () => {
+	assert.deepEqual(
+		parsePiListModelsOutput(
+			`No models available. Use /login to log into a provider via OAuth or API key. See:
+  /usr/local/lib/pi/docs/providers.md
+  /usr/local/lib/pi/docs/models.md
+`,
+		),
+		{ modelCount: 0, models: [], providerCount: 0 },
+	);
+});
+
+test('skips prose printed above the table and still reads the table', () => {
+	const parsed = parsePiListModelsOutput(
+		`Warning: errors loading models.json:
+lmstudio endpoint unreachable
+provider   model   context
+anthropic  opus    200K
+`,
+	);
+
+	assert.deepEqual(parsed.models, [
+		{
+			contextWindow: 200_000,
+			id: 'anthropic/opus',
+			model: 'opus',
+			provider: 'anthropic',
+		},
+	]);
+});
+
+test('fails provider readiness on the prose pi prints with no provider configured', async () => {
+	const snapshot = await resolvePiProviderModels({
+		executable: createPiExecutableSnapshot(),
+		localCommandService: createLocalCommandService({
+			stdout:
+				'No models available. Use /login to log into a provider via OAuth or API key. See:\n  /usr/local/lib/pi/docs/providers.md\n',
+		}),
+		timeoutMs: 1000,
+	});
+
+	assert.equal(snapshot.status, 'failure');
+	assert.equal(snapshot.failure?.code, 'no-models');
+	assert.deepEqual(snapshot.models, []);
+});
+
 test('falls back to stderr when pi --list-models prints the table there', async () => {
 	const requests: Array<{ args: string[]; command: string }> = [];
 	const snapshot = await resolvePiProviderModels({

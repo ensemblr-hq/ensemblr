@@ -257,6 +257,7 @@
 			"pi-executable-ready-no-probe": "Pi executable selected from {{source}}: {{path}}. No version/help probe ran.",
 			"pi-executable-ready-with-probe": "Pi executable selected from {{source}}: {{path}}. {{probeKind}} probe returned: {{probeDetail}}",
 			"pi-executable-unknown-error": "Unknown Pi executable check error.",
+			"pi-models-none": "Pi listed no usable models. Configure at least one provider in Pi, then retry.",
 			"pi-models-ready": "Pi listed {{modelCount}} models across {{providerCount}} providers.",
 			"pi-models-unknown-error": "Unknown Pi provider/model check error.",
 			"pi-models-unverified": "Pi provider/model readiness could not be verified.",

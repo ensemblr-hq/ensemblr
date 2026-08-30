@@ -58,6 +58,7 @@ export type AgentProviderDetailCode =
 	| 'pi-agent-directory-unverified'
 	| 'pi-executable-resolved'
 	| 'pi-executable-undiscovered'
+	| 'pi-models-none'
 	| 'pi-models-ready'
 	| 'pi-models-unverified'
 	| 'pi-rpc-invalid'

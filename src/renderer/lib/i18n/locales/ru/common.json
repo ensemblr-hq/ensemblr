@@ -267,6 +267,7 @@
 			"pi-executable-ready-no-probe": "Исполняемый файл Pi выбран из {{source}}: {{path}}. Проверка версии или справки не выполнялась.",
 			"pi-executable-ready-with-probe": "Исполняемый файл Pi выбран из {{source}}: {{path}}. Проверка «{{probeKind}}» вернула: {{probeDetail}}",
 			"pi-executable-unknown-error": "Неизвестная ошибка проверки исполняемого файла Pi.",
+			"pi-models-none": "Pi не перечислил ни одной пригодной модели. Настройте хотя бы одного провайдера в Pi и повторите проверку.",
 			"pi-models-ready": "Pi перечислил {{modelCount}} моделей у {{providerCount}} провайдеров.",
 			"pi-models-unknown-error": "Неизвестная ошибка проверки провайдеров и моделей Pi.",
 			"pi-models-unverified": "Не удалось проверить готовность провайдеров и моделей Pi.",

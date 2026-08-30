@@ -9,8 +9,15 @@ import { isMissingProviderSubset } from './agent-models-catalog';
  *
  * Only non-empty catalogs are stored: the IPC handler returns an empty result
  * when `pi` is unavailable, and overwriting with that would blank the cache.
+ *
+ * The key carries a version because the cache outlives a fix to what it holds.
+ * A `pi` with no configured provider used to be listed as one model named
+ * `No/models`, scraped out of the prose `pi --list-models` prints instead of a
+ * table; every read after the parser stopped producing it would still answer
+ * with the cached copy, since an empty live listing falls back to the cache by
+ * design. Bumping the version retires those snapshots instead.
  */
-const CACHE_KEY = 'ensemblr_pref_pi_models_snapshot';
+const CACHE_KEY = 'ensemblr_pref_pi_models_snapshot_v2';
 
 /**
  * Resolves the Storage to use, defaulting to `globalThis.localStorage` when

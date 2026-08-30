@@ -143,6 +143,11 @@ export const PROVIDER_DETAIL_TEXT: Record<
 			'{{provider}} could not be discovered. Install it or select a compatible executable.',
 			params,
 		),
+	'pi-models-none': (t) =>
+		t(
+			'settings:providers.detail.pi-models-none',
+			'No usable models. Configure at least one provider in Pi, then retry.',
+		),
 	'pi-models-ready': (t, params) =>
 		t(
 			'settings:providers.detail.pi-models-ready',

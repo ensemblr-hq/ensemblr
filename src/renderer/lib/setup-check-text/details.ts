@@ -304,6 +304,11 @@ export const SETUP_DETAIL_TEXT: Record<
 			'common:setup-check.detail.pi-executable-unknown-error',
 			'Unknown Pi executable check error.',
 		),
+	'pi-models-none': (t) =>
+		t(
+			'common:setup-check.detail.pi-models-none',
+			'Pi listed no usable models. Configure at least one provider in Pi, then retry.',
+		),
 	'pi-models-ready': (t, params) =>
 		t(
 			'common:setup-check.detail.pi-models-ready',

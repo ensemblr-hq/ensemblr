@@ -131,6 +131,39 @@ export function getPiRpcCheck({
 	return check(context);
 }
 
+/**
+ * The detail line the provider/model check reports. Every outcome the app knows
+ * how to name gets a code the renderer translates; only a message that came out
+ * of pi itself is passed through as the English it arrived in.
+ * @param providerModels - The `pi --list-models` snapshot the check ran on.
+ * @returns The detail fields for the check result.
+ */
+function describeProviderModels(providerModels: PiProviderModelSnapshot) {
+	if (providerModels.status === 'success') {
+		return authoredDetail(
+			'pi-models-ready',
+			`Pi listed ${providerModels.modelCount} models across ${providerModels.providerCount} providers.`,
+			{
+				modelCount: providerModels.modelCount,
+				providerCount: providerModels.providerCount,
+			},
+		);
+	}
+	if (providerModels.failure?.code === 'no-models') {
+		return authoredDetail(
+			'pi-models-none',
+			'Pi listed no usable models. Configure at least one provider in Pi, then retry.',
+		);
+	}
+	if (providerModels.failure?.message) {
+		return { detail: providerModels.failure.message };
+	}
+	return authoredDetail(
+		'pi-models-unverified',
+		'Pi provider/model readiness could not be verified.',
+	);
+}
+
 /** Builds the snapshot for the Pi provider/model readiness check. */
 export function getPiProviderModelCheck({
 	context,
@@ -157,21 +190,7 @@ export function getPiProviderModelCheck({
 				providerModels.status === 'success' ? 'success' : 'failure';
 
 			return {
-				...(status === 'success'
-					? authoredDetail(
-							'pi-models-ready',
-							`Pi listed ${providerModels.modelCount} models across ${providerModels.providerCount} providers.`,
-							{
-								modelCount: providerModels.modelCount,
-								providerCount: providerModels.providerCount,
-							},
-						)
-					: providerModels.failure?.message
-						? { detail: providerModels.failure.message }
-						: authoredDetail(
-								'pi-models-unverified',
-								'Pi provider/model readiness could not be verified.',
-							)),
+				...describeProviderModels(providerModels),
 				logs: createPiProviderModelLogs(providerModels),
 				remediationActions: [
 					{

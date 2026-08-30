@@ -259,6 +259,7 @@ export default interface Resources {
 				'pi-executable-ready-no-probe': 'Pi executable selected from {{source}}: {{path}}. No version/help probe ran.';
 				'pi-executable-ready-with-probe': 'Pi executable selected from {{source}}: {{path}}. {{probeKind}} probe returned: {{probeDetail}}';
 				'pi-executable-unknown-error': 'Unknown Pi executable check error.';
+				'pi-models-none': 'Pi listed no usable models. Configure at least one provider in Pi, then retry.';
 				'pi-models-ready': 'Pi listed {{modelCount}} models across {{providerCount}} providers.';
 				'pi-models-unknown-error': 'Unknown Pi provider/model check error.';
 				'pi-models-unverified': 'Pi provider/model readiness could not be verified.';
@@ -1889,6 +1890,11 @@ export default interface Resources {
 			'discovery-failed': 'Model discovery failed: {{error}}.';
 			loading: 'Loading models…';
 			'no-models': 'No models';
+			'none-available': {
+				action: 'Open Providers';
+				description: 'No agent runtime reported a model. Pi lists none until at least one provider is configured, and Claude Code has to be installed separately. Set one up, then reopen this page.';
+				title: 'No models available';
+			};
 			'review-model': {
 				'aria-label': 'Review model';
 				description: 'Model used for the Review action on a workspace.';
@@ -1995,6 +2001,7 @@ export default interface Resources {
 				'pi-agent-directory-unverified': "{{provider}}'s agent directory could not be verified.";
 				'pi-executable-resolved': '{{path}} ({{source}}).';
 				'pi-executable-undiscovered': '{{provider}} could not be discovered. Install it or select a compatible executable.';
+				'pi-models-none': 'No usable models. Configure at least one provider in Pi, then retry.';
 				'pi-models-ready': '{{modelCount}} models across {{providerCount}} providers.';
 				'pi-models-unverified': 'Provider and model readiness could not be verified.';
 				'pi-rpc-invalid': '{{provider}} RPC startup did not produce valid JSONL.';

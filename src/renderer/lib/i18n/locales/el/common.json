@@ -257,6 +257,7 @@
 			"pi-executable-ready-no-probe": "Το εκτελέσιμο Pi επιλέχθηκε από {{source}}: {{path}}. Δεν εκτελέστηκε έλεγχος έκδοσης/βοήθειας.",
 			"pi-executable-ready-with-probe": "Το εκτελέσιμο Pi επιλέχθηκε από {{source}}: {{path}}. Ο έλεγχος «{{probeKind}}» επέστρεψε: {{probeDetail}}",
 			"pi-executable-unknown-error": "Άγνωστο σφάλμα ελέγχου εκτελέσιμου Pi.",
+			"pi-models-none": "Το Pi δεν κατέγραψε κανένα χρησιμοποιήσιμο μοντέλο. Ρυθμίστε τουλάχιστον έναν πάροχο στο Pi και δοκιμάστε ξανά.",
 			"pi-models-ready": "Το Pi κατέγραψε {{modelCount}} μοντέλα από {{providerCount}} παρόχους.",
 			"pi-models-unknown-error": "Άγνωστο σφάλμα ελέγχου παρόχων και μοντέλων Pi.",
 			"pi-models-unverified": "Η ετοιμότητα παρόχων και μοντέλων Pi δεν επαληθεύτηκε.",

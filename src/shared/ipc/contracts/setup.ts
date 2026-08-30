@@ -100,6 +100,7 @@ export type SetupDetailCode =
 	| 'pi-executable-ready-no-probe'
 	| 'pi-executable-ready-with-probe'
 	| 'pi-executable-unknown-error'
+	| 'pi-models-none'
 	| 'pi-models-ready'
 	| 'pi-models-unknown-error'
 	| 'pi-models-unverified'

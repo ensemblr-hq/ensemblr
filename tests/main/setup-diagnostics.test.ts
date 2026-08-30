@@ -1024,6 +1024,30 @@ test('redacts sensitive log assignments and collapses home paths', async () => {
 	);
 });
 
+test('reports a translatable detail when Pi lists no usable model', async () => {
+	const snapshot = await getSnapshot({
+		piReadinessService: createPiReadinessService({
+			providerModels: {
+				command: `${HOME}/bin/pi`,
+				failure: {
+					code: 'no-models',
+					message:
+						'Pi listed zero usable provider models. Configure at least one provider or model, then retry.',
+				},
+				modelCount: 0,
+				models: [],
+				providerCount: 0,
+				result: null,
+				status: 'failure',
+			},
+		}),
+	});
+	const providerCheck = getCheck(snapshot, 'pi-provider-model');
+
+	assert.equal(providerCheck.status, 'failure');
+	assert.equal(providerCheck.detailMessage?.code, 'pi-models-none');
+});
+
 test('redacts sensitive Pi provider/model diagnostics', async () => {
 	const snapshot = await getSnapshot({
 		piReadinessService: createPiReadinessService({

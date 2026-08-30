@@ -201,8 +201,18 @@ function parseContextWindowCell(cell: string | undefined): number | null {
 }
 
 /**
+ * The `provider  model  context …` header pi prints above its table. Rows are
+ * read only after it, because pi answers a machine with no configured provider
+ * in prose on the same stream — `No models available. Use /login …` — whose
+ * first two words are as good a provider/model pair as any real row, and a
+ * model called `No/models` then reaches the picker as something selectable.
+ */
+const PI_MODEL_TABLE_HEADER = /^provider\s+model\b/i;
+
+/**
  * Parses the columnar `pi --list-models` output into provider/model rows plus
- * deduplicated counts.
+ * deduplicated counts. Anything printed before the table header is prose rather
+ * than a row, and is skipped.
  * @param output - Raw stdout (or stderr) from `pi --list-models`.
  * @returns Parsed rows alongside distinct provider and model counts.
  */
@@ -214,11 +224,17 @@ export function parsePiListModelsOutput(output: string): {
 	const providers = new Set<string>();
 	const models: PiProviderModelRow[] = [];
 	const seenIds = new Set<string>();
+	let isInsideTable = false;
 
 	for (const line of output.split(/\r?\n/)) {
 		const trimmedLine = line.trim();
 
-		if (!trimmedLine || /^provider\s+model\b/i.test(trimmedLine)) {
+		if (PI_MODEL_TABLE_HEADER.test(trimmedLine)) {
+			isInsideTable = true;
+			continue;
+		}
+
+		if (!isInsideTable || !trimmedLine) {
 			continue;
 		}
 

@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next';
 import { agentModelsQuery } from '@/renderer/api/ensemblr';
 import { ModelVisibilityList } from '@/renderer/components/settings/model-visibility-list';
 import { ModelSelect } from '@/renderer/components/settings/models/model-select';
+import { NoModelsNotice } from '@/renderer/components/settings/models/no-models-notice';
 import { ThinkingLevelSelect } from '@/renderer/components/settings/models/thinking-level-select';
 import { SettingRow } from '@/renderer/components/settings/setting-row';
 import {
@@ -170,6 +171,10 @@ function ModelsSettings() {
 						{ error: String(modelsError) },
 					)}
 				/>
+			) : null}
+
+			{!modelsError && modelsData?.models.length === 0 ? (
+				<NoModelsNotice />
 			) : null}
 
 			<ModelSlotRow
