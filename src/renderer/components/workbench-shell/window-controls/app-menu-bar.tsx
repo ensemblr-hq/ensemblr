@@ -1,3 +1,4 @@
+import { useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import {
@@ -31,6 +32,9 @@ import type {
  */
 const DISABLED_DIM_CLASS = 'data-disabled:opacity-50';
 
+/** Matches the bar's root, which is how a focused row or title is recognized. */
+const MENU_BAR_SELECTOR = '[data-slot="menubar"]';
+
 /**
  * The application menu, drawn inside Ensemblr's own title bar.
  *
@@ -40,6 +44,18 @@ const DISABLED_DIM_CLASS = 'data-disabled:opacity-50';
  * enabled state, checkmarks and chords all arrive resolved, which is what keeps
  * this bar and the native one the same menu rather than two that agree by
  * inspection.
+ *
+ * A chosen row is held from `onSelect` and reported from `onCloseAutoFocus`,
+ * after Radix has released focus, with the trigger restore taken over — the
+ * same shape the app's other menus use. Every row here is performed across a
+ * round trip through main, so the command's own focus move lands a tick or more
+ * after the menu closed; leaving Radix to focus the trigger on its own timer
+ * makes the two race, and whichever runs last wins. Restoring the element the
+ * menu opened over instead settles focus synchronously and leaves the command's
+ * move as the only later write. It is also what the row needs to act on: the
+ * Edit menu's roles reach `webContents.cut` and friends, which operate on
+ * whatever is focused when main handles them, and a focused menu trigger is
+ * nothing they can edit.
  */
 export function AppMenuBar({
 	className,
@@ -51,6 +67,75 @@ export function AppMenuBar({
 	onSelect: (item: MenuBarAction) => void;
 }) {
 	const { t } = useTranslation();
+	const openRef = useRef(false);
+	const originRef = useRef<HTMLElement | null>(null);
+	const pendingRef = useRef<(() => void) | null>(null);
+
+	/**
+	 * Records what held focus as the bar is entered, which is where the chosen
+	 * row's command will be put back. Runs on the capture phase because Radix
+	 * moves focus into the menu while handling the same event, and skips a
+	 * reach for a second title while a menu is already open — by then the answer
+	 * is the open menu's own panel.
+	 *
+	 * Focus already inside the bar is not an origin, and the one it found before
+	 * stands: a dismissal leaves the trigger focused, so a second open would
+	 * otherwise record the trigger and hand the row back the one element the
+	 * Edit menu's roles can do nothing with.
+	 */
+	const rememberOrigin = useCallback(() => {
+		if (openRef.current) {
+			return;
+		}
+		const active = document.activeElement;
+		const outsideBar =
+			active instanceof HTMLElement && !active.closest(MENU_BAR_SELECTOR);
+
+		if (outsideBar) {
+			originRef.current = active;
+		}
+	}, []);
+
+	/**
+	 * Tracks whether any menu is open, which is what tells {@link rememberOrigin}
+	 * a fresh entry from an in-menu one.
+	 * @param value - Id of the open menu, empty once the bar closes
+	 */
+	const trackOpen = useCallback((value: string) => {
+		openRef.current = value !== '';
+	}, []);
+
+	/**
+	 * Holds the chosen row until the menu releases focus, bound to the render
+	 * that drew it so the deferred report still quotes the revision the row was
+	 * addressed against rather than one that arrived while the menu was closing.
+	 * @param item - The row the user picked
+	 */
+	const holdChoice = useCallback(
+		(item: MenuBarAction) => {
+			pendingRef.current = () => onSelect(item);
+		},
+		[onSelect],
+	);
+
+	/**
+	 * Puts focus back where the menu found it and reports the held row, or hands
+	 * the trigger restore back to Radix when the menu was dismissed without a
+	 * choice — which is where returning to the trigger is the right answer.
+	 * @param event - Radix's close event, whose default is the trigger restore
+	 */
+	const reportChoice = useCallback((event: Event) => {
+		const report = pendingRef.current;
+		pendingRef.current = null;
+
+		if (!report) {
+			return;
+		}
+
+		event.preventDefault();
+		originRef.current?.focus();
+		report();
+	}, []);
 
 	if (menuBar.menus.length === 0) {
 		return null;
@@ -63,6 +148,9 @@ export function AppMenuBar({
 				'h-full gap-0 rounded-none border-0 bg-transparent p-0',
 				className,
 			)}
+			onKeyDownCapture={rememberOrigin}
+			onPointerDownCapture={rememberOrigin}
+			onValueChange={trackOpen}
 		>
 			{menuBar.menus.map((menu) => (
 				<MenubarMenu key={menu.id}>
@@ -72,8 +160,8 @@ export function AppMenuBar({
 					>
 						{menu.label}
 					</MenubarTrigger>
-					<MenubarContent>
-						<MenuBarNodes nodes={menu.items} onSelect={onSelect} />
+					<MenubarContent onCloseAutoFocus={reportChoice}>
+						<MenuBarNodes nodes={menu.items} onChoose={holdChoice} />
 					</MenubarContent>
 				</MenubarMenu>
 			))}
@@ -92,10 +180,10 @@ export function AppMenuBar({
  */
 function MenuBarNodes({
 	nodes,
-	onSelect,
+	onChoose,
 }: {
 	nodes: readonly MenuBarNode[];
-	onSelect: (item: MenuBarAction) => void;
+	onChoose: (item: MenuBarAction) => void;
 }) {
 	const hasMarks = nodes.some(
 		(node) => node.kind === 'action' && node.mark !== undefined,
@@ -111,7 +199,7 @@ function MenuBarNodes({
 					<MenubarRadioItem
 						disabled={!item.enabled}
 						key={item.id}
-						onSelect={() => onSelect(item)}
+						onSelect={() => onChoose(item)}
 						value={item.id}
 					>
 						{item.label}
@@ -124,7 +212,7 @@ function MenuBarNodes({
 				inset={hasMarks}
 				key={group.id}
 				node={group}
-				onSelect={onSelect}
+				onChoose={onChoose}
 			/>
 		),
 	);
@@ -134,12 +222,12 @@ function MenuBarNodes({
 function MenuBarRow({
 	inset,
 	node,
-	onSelect,
+	onChoose,
 }: {
 	/** Whether this level reserves a check column the row has to clear. */
 	inset: boolean;
 	node: MenuBarNode;
-	onSelect: (item: MenuBarAction) => void;
+	onChoose: (item: MenuBarAction) => void;
 }) {
 	if (node.kind === 'separator') {
 		return <MenubarSeparator />;
@@ -156,7 +244,7 @@ function MenuBarRow({
 					{node.label}
 				</MenubarSubTrigger>
 				<MenubarSubContent>
-					<MenuBarNodes nodes={node.items} onSelect={onSelect} />
+					<MenuBarNodes nodes={node.items} onChoose={onChoose} />
 				</MenubarSubContent>
 			</MenubarSub>
 		);
@@ -168,7 +256,7 @@ function MenuBarRow({
 				checked={node.checked}
 				className={DISABLED_DIM_CLASS}
 				disabled={!node.enabled}
-				onSelect={() => onSelect(node)}
+				onSelect={() => onChoose(node)}
 			>
 				{node.label}
 				<MenuBarChord accelerator={node.accelerator} />
@@ -180,7 +268,7 @@ function MenuBarRow({
 		<MenubarItem
 			disabled={!node.enabled}
 			inset={inset}
-			onSelect={() => onSelect(node)}
+			onSelect={() => onChoose(node)}
 		>
 			{node.label}
 			<MenuBarChord accelerator={node.accelerator} />

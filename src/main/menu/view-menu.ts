@@ -1,6 +1,7 @@
 import { BrowserWindow } from 'electron';
 
 import type { DescribedMenuItem, MenuItemFactory } from './menu-item';
+import { performMenuRole } from './menu-roles';
 import type { MenuLabels } from './menu-strings';
 
 /**
@@ -89,8 +90,12 @@ export function buildViewMenu(
 					// renderer. Force Reload (⌘⇧R) stays as the keyboard path to a reload.
 					{
 						click: () => {
-							BrowserWindow.getFocusedWindow()?.webContents.reload();
+							const focused = BrowserWindow.getFocusedWindow();
+							if (focused) {
+								performMenuRole('reload', focused);
+							}
 						},
+						drawnRole: 'reload',
 						label: labels.reload,
 					},
 					{ label: labels.forceReload, role: 'forceReload' },
