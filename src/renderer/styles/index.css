@@ -650,10 +650,20 @@
 	body {
 		min-width: 320px;
 		margin: 0;
-		/* Clears the title bar Ensemblr draws over the window's top edge. Zero
-		   wherever the desktop decorates the window itself. */
-		padding-block-start: var(--ensemblr-window-chrome-inset-top);
 		@apply bg-background text-foreground antialiased;
+	}
+
+	/* Clears the title bar Ensemblr draws over the window's top edge. Zero
+	   wherever the desktop decorates the window itself.
+
+	   On the app root rather than on `body`, where it belongs: Radix locks the
+	   page scroll through `react-remove-scroll-bar`, which reads `body`'s
+	   *margin* offsets and writes them back as *padding* — so every select,
+	   dialog and dropdown that opened restated `padding-top: 0` over this and
+	   dropped the whole app a title bar's height, underneath the bar. Its style
+	   is injected unlayered, so it outranks anything written here. */
+	#root {
+		padding-block-start: var(--ensemblr-window-chrome-inset-top);
 	}
 
 	/* The document itself never scrolls: every shell surface sizes to
