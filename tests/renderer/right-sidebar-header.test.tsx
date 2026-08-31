@@ -21,7 +21,15 @@ import { stubReviewActions } from './support/review-actions';
 
 const PR_HEADER_CONTAINER_SELECTOR = '[class~="@container/pr-header"]';
 
-/** A review-actions value with every action stubbed, plus the given overrides. */
+const { toastError, toastSuccess } = vi.hoisted(() => ({
+	toastError: vi.fn(),
+	toastSuccess: vi.fn(),
+}));
+
+vi.mock('sonner', () => ({
+	toast: { error: toastError, success: toastSuccess },
+}));
+
 /** An open PR carrying the given pull-request overrides. */
 function workspaceWithPr(
 	overrides: Partial<WorkspaceShellModel['pullRequest']>,
@@ -57,6 +65,16 @@ function workspaceWithoutPr(): WorkspaceShellModel {
 	return {
 		...base,
 		changeSummary: { ...base.changeSummary, files: 0 },
+		pullRequest: { ...base.pullRequest, number: undefined, status: 'idle' },
+	};
+}
+
+/** Branch changes worth publishing, with no pull request open for them yet. */
+function workspaceReadyForPr(): WorkspaceShellModel {
+	const base = getDefaultWorkspace();
+	return {
+		...base,
+		changeSummary: { ...base.changeSummary, files: 4 },
 		pullRequest: { ...base.pullRequest, number: undefined, status: 'idle' },
 	};
 }
@@ -100,6 +118,8 @@ function renderInlineActions(
 
 beforeEach(() => {
 	installLocalStorage();
+	toastError.mockClear();
+	toastSuccess.mockClear();
 });
 
 test('an agent turn replaces every action with a spinner', () => {
@@ -227,6 +247,41 @@ test('either post-merge action in flight disables both', () => {
 
 	expect(screen.getByRole('button', { name: /continue/i })).toBeDisabled();
 	expect(screen.getByRole('button', { name: /archive/i })).toBeDisabled();
+});
+
+// The draft path is the one that goes through `handOffToChat` rather than
+// `runAgentAction`, so it is the one that breaks silently if the menu stops
+// reaching the review-actions context.
+test('Create draft PR hands the prompt to the chat agent', async () => {
+	const handOffToChat = vi.fn<ReviewActionsValue['handOffToChat']>(() => true);
+	const user = userEvent.setup();
+	renderHeader(workspaceReadyForPr(), stubReviewActions({ handOffToChat }));
+
+	await user.click(
+		screen.getByRole('button', { name: 'Open create pull request options' }),
+	);
+	await user.click(screen.getByRole('menuitem', { name: 'Create draft PR' }));
+
+	expect(handOffToChat).toHaveBeenCalledOnce();
+	expect(handOffToChat).toHaveBeenCalledWith(expect.stringContaining('draft'));
+});
+
+test('a workspace with no chat ready says so instead of claiming the draft PR landed', async () => {
+	const user = userEvent.setup();
+	renderHeader(
+		workspaceReadyForPr(),
+		stubReviewActions({ handOffToChat: vi.fn(() => false) }),
+	);
+
+	await user.click(
+		screen.getByRole('button', { name: 'Open create pull request options' }),
+	);
+	await user.click(screen.getByRole('menuitem', { name: 'Create draft PR' }));
+
+	expect(toastError).toHaveBeenCalledWith(
+		'This workspace has no chat ready yet. Try again in a moment.',
+	);
+	expect(toastSuccess).not.toHaveBeenCalled();
 });
 
 test('the collapsed toolbar stays silent on an idle workspace with no PR', () => {

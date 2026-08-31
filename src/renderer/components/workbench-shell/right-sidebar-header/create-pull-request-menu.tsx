@@ -18,7 +18,6 @@ import {
 import { buildCreatePullRequestPrompt } from '@/renderer/lib/workbench/checks-pr-prompts';
 import { buildGithubCompareUrl } from '@/renderer/lib/workbench/github-compare-url';
 import { resolvePrDetails } from '@/renderer/lib/workbench/pr-details-draft';
-import { useComposerSubmit } from '@/renderer/state/composer';
 import {
 	prDetailsDraftAtomFamily,
 	prDetailsLiveDraftAtomFamily,
@@ -38,7 +37,6 @@ export function CreatePullRequestMenu({
 	workspace: WorkspaceShellModel;
 }) {
 	const { t } = useTranslation();
-	const submitToComposer = useComposerSubmit(workspace.id);
 	const reviewActions = useReviewActions();
 	// Hand the agent the live title/description from the Checks tab (including
 	// unsaved edits), falling back to the saved draft and then the open PR. Only
@@ -81,7 +79,7 @@ export function CreatePullRequestMenu({
 	};
 
 	const createDraftPullRequest = () => {
-		const queued = submitToComposer(
+		const queued = reviewActions?.handOffToChat(
 			buildCreatePullRequestPrompt({
 				description,
 				draft: true,
@@ -92,8 +90,8 @@ export function CreatePullRequestMenu({
 		if (!queued) {
 			toast.error(
 				t(
-					'errors:composer.no-chat-tab.title',
-					'Open a chat tab to hand this to the agent.',
+					'errors:composer.chat-tab-not-ready.title',
+					'This workspace has no chat ready yet. Try again in a moment.',
 				),
 			);
 			return;

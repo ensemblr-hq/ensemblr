@@ -12,10 +12,16 @@ import type {
 } from '../../src/renderer/types/workbench';
 import { installLocalStorage } from './support/dom';
 
-const { useQuery, writeWorkspaceActionPrompt } = vi.hoisted(() => ({
-	useQuery: vi.fn(() => ({ data: undefined })),
-	writeWorkspaceActionPrompt: vi.fn(),
-}));
+const { deliverToChat, useQuery, writeWorkspaceActionPrompt } = vi.hoisted(
+	() => ({
+		deliverToChat: vi.fn((deliver: (chatTabId: string) => void) => {
+			deliver('chat-1');
+			return true;
+		}),
+		useQuery: vi.fn(() => ({ data: undefined })),
+		writeWorkspaceActionPrompt: vi.fn(),
+	}),
+);
 
 vi.mock('@tanstack/react-query', () => ({ useQuery }));
 
@@ -26,6 +32,11 @@ vi.mock('@/renderer/api/ensemblr', () => ({
 vi.mock('@/renderer/api/ensemblr-queries', () => ({
 	writeWorkspaceActionPrompt,
 }));
+
+vi.mock(
+	'@/renderer/hooks/workbench-shell/review-actions/use-chat-tab-target',
+	() => ({ useChatTabTarget: () => deliverToChat }),
+);
 
 vi.mock('sonner', () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 

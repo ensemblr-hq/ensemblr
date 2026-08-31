@@ -1,7 +1,8 @@
 // Render harness for the review Checks panel. It needs a jotai store and the
 // review-actions context on top of what `renderWithProviders` supplies. The
 // `ReviewActionsValue` stub lives in `./review-actions` and is re-exported here
-// for the panel tests that already import it from this module.
+// for the panel tests that already import it from this module, so a new field on
+// that type breaks one file rather than every panel test.
 
 import { QueryClientProvider } from '@tanstack/react-query';
 import { render } from '@testing-library/react';

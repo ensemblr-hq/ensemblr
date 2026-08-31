@@ -10,7 +10,6 @@ import { useReviewMutations } from '@/renderer/hooks/workbench-shell/review-acti
 import { useWorkspaceBusy } from '@/renderer/hooks/workspace/use-workspace-busy';
 import { resolvePullRequestAction } from '@/renderer/lib/workbench/action-prompts';
 import { buildCommitAndPushPrompt } from '@/renderer/lib/workbench/checks-pr-prompts';
-import { useComposerSubmit } from '@/renderer/state/composer';
 import type {
 	AgentActionKind,
 	ProjectShellModel,
@@ -46,11 +45,13 @@ export function ReviewActionsProvider({
 	activeProject,
 	activeWorkspace,
 	children,
+	handOffToChat,
 	runAgentAction,
 }: {
 	activeProject: ProjectShellModel;
 	activeWorkspace: WorkspaceShellModel;
 	children: ReactNode;
+	handOffToChat: (text: string) => boolean;
 	runAgentAction: (action: AgentActionKind) => void;
 }) {
 	const { t } = useTranslation();
@@ -83,13 +84,12 @@ export function ReviewActionsProvider({
 	});
 	const isAgentWorking = useWorkspaceBusy(activeWorkspace.id);
 	const pullRequestAction = resolvePullRequestAction(activeWorkspace);
-	const submitToComposer = useComposerSubmit(activeWorkspace.id);
 	const commitAndPush = useCallback(() => {
-		if (!submitToComposer(buildCommitAndPushPrompt(activeWorkspace))) {
+		if (!handOffToChat(buildCommitAndPushPrompt(activeWorkspace))) {
 			toast.error(
 				t(
-					'errors:composer.no-chat-tab.title',
-					'Open a chat tab to hand this to the agent.',
+					'errors:composer.chat-tab-not-ready.title',
+					'This workspace has no chat ready yet. Try again in a moment.',
 				),
 			);
 			return;
@@ -100,13 +100,14 @@ export function ReviewActionsProvider({
 				'Asked the agent to commit and push.',
 			),
 		);
-	}, [activeWorkspace, submitToComposer, t]);
+	}, [activeWorkspace, handOffToChat, t]);
 
 	const value = useMemo<ReviewActionsValue>(
 		() => ({
 			archiveMergedWorkspace: () => archiveAfterMergeMutation.mutate(),
 			commitAndPush,
 			continueMergedWorkspace: () => continueMergedWorkspaceMutation.mutate(),
+			handOffToChat,
 			isAgentWorking,
 			isArchivingMergedWorkspace: archiveAfterMergeMutation.isPending,
 			isContinuingMergedWorkspace: continueMergedWorkspaceMutation.isPending,
@@ -122,6 +123,7 @@ export function ReviewActionsProvider({
 			archiveAfterMergeMutation,
 			commitAndPush,
 			continueMergedWorkspaceMutation,
+			handOffToChat,
 			isAgentWorking,
 			isRefreshingPullRequest,
 			pullRequestAction,

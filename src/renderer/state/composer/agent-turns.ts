@@ -9,6 +9,7 @@ import {
 	submitAgentPrompt,
 } from '@/renderer/api/ensemblr-queries';
 import { wrapWithMasterPrompt } from '@/renderer/lib/workbench/action-prompts';
+import { isPlaceholderChatTabId } from '@/renderer/lib/workbench/chat-tab-target';
 import { useInFlightTurns } from '@/renderer/state/composer/in-flight-turns';
 import { useOptimisticPrompts } from '@/renderer/state/composer/optimistic-prompts';
 import { chatAppliedLinkedDirectoriesAtomFamily } from '@/renderer/state/preferences';
@@ -169,7 +170,7 @@ export function useAgentTurns({
 		},
 	});
 
-	const isRealChatTabId = !chatTabId.endsWith(':overview');
+	const isRealChatTabId = !isPlaceholderChatTabId(chatTabId);
 
 	/**
 	 * Resolves the session a turn will run on, opening one when the chat has none

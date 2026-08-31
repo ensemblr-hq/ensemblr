@@ -102,6 +102,7 @@ export function RightSidebarHeaderScene() {
 			archiveMergedWorkspace: () => undefined,
 			commitAndPush: () => undefined,
 			continueMergedWorkspace: () => undefined,
+			handOffToChat: () => true,
 			isAgentWorking,
 			isArchivingMergedWorkspace: busyAction === 'archiving',
 			isContinuingMergedWorkspace: busyAction === 'continuing',

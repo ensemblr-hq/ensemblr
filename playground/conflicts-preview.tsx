@@ -62,6 +62,7 @@ export function ConflictsScene() {
 			archiveMergedWorkspace: () => undefined,
 			commitAndPush: () => undefined,
 			continueMergedWorkspace: () => undefined,
+			handOffToChat: () => true,
 			isAgentWorking,
 			isArchivingMergedWorkspace: false,
 			isContinuingMergedWorkspace: false,

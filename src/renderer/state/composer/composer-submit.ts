@@ -1,8 +1,6 @@
 import { atom, useAtom, useSetAtom, useStore } from 'jotai';
-import { useAtomCallback } from 'jotai/utils';
 import { useCallback, useEffect } from 'react';
 
-import { activeChatTabByWorkspaceAtom } from '@/renderer/state/workspace/selection-atoms';
 import type { QueuedFollowUpSource } from '@/renderer/types/workbench';
 
 /** One queued composer auto-submit (commit & push, create PR, a failed turn re-sent…). */
@@ -19,7 +17,7 @@ export interface ComposerSubmitRequest {
 }
 
 /**
- * Queue of prompts that should be sent to the active chat tab's agent without
+ * Queue of prompts that should be sent to a chat tab's agent without
  * passing through the textarea. Review surfaces (Checks panel) enqueue a fully
  * formed prompt; the mounted composer drains the queue straight into its submit
  * pipeline. Unlike {@link useComposerInsert}, these DO auto-submit — the Checks
@@ -36,33 +34,28 @@ export interface ComposerSubmitRequest {
 const composerSubmitQueueAtom = atom<ComposerSubmitRequest[]>([]);
 
 /**
- * Returns a stable callback that queues a prompt for the chat tab that is active
- * when the caller fires it. The callback reports whether the prompt was queued,
- * so a caller that announces the chore ("Asked the agent to…") can stay honest
- * when the workspace has no chat tab to hand it to.
- * @param workspaceId - Workspace whose active chat tab the prompt is aimed at
- * @returns Callback taking the prompt text and its source, returning whether it was queued
+ * Returns a stable callback that queues a prompt against a named chat tab.
+ *
+ * The target is the caller's to resolve, never inferred from whichever tab is in
+ * front: the tab strip carries file, diff, and terminal tabs alongside chats,
+ * and only a chat tab mounts a composer to drain the entry. Callers that fire
+ * from a review surface resolve theirs with `resolveTargetChatTabId`.
+ * @returns Callback taking the target tab, the prompt text, and its source
  */
-export function useComposerSubmit(
-	workspaceId: string,
-): (text: string, source?: QueuedFollowUpSource) => boolean {
+export function useComposerSubmit(): (input: {
+	chatTabId: string;
+	source?: QueuedFollowUpSource;
+	text: string;
+}) => void {
 	const setQueue = useSetAtom(composerSubmitQueueAtom);
-	const readActiveChatTabs = useAtomCallback(
-		useCallback((get) => get(activeChatTabByWorkspaceAtom), []),
-	);
 	return useCallback(
-		(text: string, source: QueuedFollowUpSource = 'chore') => {
-			const chatTabId = readActiveChatTabs()[workspaceId];
-			if (!chatTabId) {
-				return false;
-			}
+		({ chatTabId, source = 'chore', text }) => {
 			setQueue((queue) => [
 				...queue,
 				{ chatTabId, id: crypto.randomUUID(), source, text },
 			]);
-			return true;
 		},
-		[readActiveChatTabs, setQueue, workspaceId],
+		[setQueue],
 	);
 }
 
