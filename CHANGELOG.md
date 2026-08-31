@@ -9,6 +9,95 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.0-beta.21] - 2026-08-31
+
+The terminal stops being the slowest surface in the app. Its cells draw from a WebGL glyph atlas
+instead of a DOM span each, the bundled Nerd Font is loaded before they are measured and rasterized,
+and terminal text is back to full weight in light mode. Linux gets the rest of the release: watching
+a workspace with `node_modules` installed no longer blocks the main process for ~1.9s per switch,
+and a host with no compiler builds `node-pty` itself instead of printing an instruction to type
+back. Plus the dock's Start Run button starts the run script again, and a launch that fails now says
+why.
+[Release](https://github.com/ensemblr-hq/ensemblr/releases/tag/v0.1.0-beta.21) ·
+[`.dmg`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.0-beta.21/Ensemblr-0.1.0-beta.21-arm64.dmg) ·
+[`.AppImage`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.0-beta.21/Ensemblr-0.1.0-beta.21-x64.AppImage)
+
+### Changed
+
+- **Terminals render through `@xterm/addon-webgl`.** xterm's default DOM renderer lays out a span
+  per cell, so a streaming agent turn relaid out the whole viewport every frame, on the renderer's
+  main thread where the rest of the UI also lives. The addon draws the same cells from a glyph
+  atlas. It loads in `attach`, after `terminal.open` — it takes over a canvas the terminal only
+  creates once it has a container — and leaves the DOM renderer in place on a construction failure
+  or a lost GL context. Teardown stays with `terminal.dispose`, which disposes its own addons:
+  disposing the addon first instead hands the render service a freshly built DOM renderer
+  microseconds before the terminal tears that renderer down again.
+- **Linux watches a workspace by directory rather than by entry.** `fs.watch(dir, { recursive: true
+  })` is one FSEvents subscription over the whole tree on macOS; Linux has no such primitive and
+  emulates it by walking the tree and registering an inotify watch per *entry*, files included,
+  before the call returns. On a workspace with `node_modules` installed that measured ~68,000
+  watches and ~1.9s of blocked main event loop per call, which stalls every pending IPC reply and
+  reads as a frozen window. `linux-recursive-watch.ts` takes the Linux leg instead: one watch per
+  directory, `node_modules` and `.git` never descended into rather than only filtered out of the
+  events, the walk off the synchronous path, and a 4,096-directory ceiling past which a pathological
+  tree degrades to the renderer's 30s poll instead of to a stall. A `rename` naming a watched child
+  drops its branch before the re-read, so a directory removed and recreated inside one coalesce
+  window rebinds instead of going dark for the life of the watch, and closing a branch clears the
+  re-reads it still has queued.
+- **A Linux host with no compiler builds `node-pty` itself.** `node-pty` publishes prebuilds for
+  darwin and win32 only, so every Linux host compiles it — and the hosts most likely to run this app
+  (SteamOS, Silverblue, NixOS) ship no compiler at all. `require-linux-toolchain.mjs` already caught
+  that before Forge could die on it with a bare `node-gyp failed to rebuild`, but all it could do
+  was print `npm run rebuild:native` and exit, which on an immutable root is the only path forward
+  anyway — so the stop was ceremony, asking the contributor to type back what the script already
+  knew. It now shells out to `rebuild-native-linux.sh` whenever a container runtime is available,
+  and that script re-invokes the preflight to verify what it built. Three guards keep that from
+  misfiring: `--report` never builds, `ENSEMBLR_NATIVE_AUTOBUILD` guards the re-entry, and
+  `ENSEMBLR_SKIP_NATIVE_AUTOBUILD` is the opt-out for anywhere a silent image pull is unwelcome. A
+  host that has a compiler is still left to Forge, and an unportable binding — one linking a
+  Homebrew or Nix prefix — is still refused rather than repaired.
+
+### Fixed
+
+- **A terminal opened before the bundled font had loaded kept the fallback for its whole lifetime.**
+  xterm never waits for a webfont: neither the core nor the WebGL addon references `document.fonts`,
+  and both of the places they draw text are canvas — cell metrics come from an `OffscreenCanvas` in
+  xterm 6's measure strategy, and glyphs are rasterized into the atlas. Canvas silently substitutes
+  the fallback for a `@font-face` that has not finished loading and, unlike DOM text, neither starts
+  the fetch nor repaints when one lands. `createXtermAdapter` now requests all four style/weight
+  faces itself in `attach` and, when any was missing, redraws once they arrive — round-tripping
+  `fontFamily` through a sentinel, because the option setter ignores a write that does not change
+  the value, and calling `clearTextureAtlas()`, because the atlas keys its glyph cache on that same
+  string. `document.fonts.ready` cannot stand in for the load: it settles the loads already in
+  flight rather than starting any. Re-measuring moves the cell box, so both callers re-fit once
+  `whenFontReady()` settles — on mount and after a live Appearance font change alike — or the PTY
+  keeps wrapping at the column count the fallback implied.
+- **Terminal text lost a quarter of its stroke in light mode.** `allowTransparency` was inert under
+  the DOM renderer, which never reads it, and became load-bearing the moment the WebGL addon
+  arrived: `TextureAtlas` builds its rasterization canvas with `alpha: allowTransparency`, and Skia
+  stem-darkens and subpixel-antialiases text only on an opaque surface. Measured in Electron 44
+  against the same string, the transparent atlas inked 1,386 pixels where the DOM renderer inked
+  1,877. Light-on-dark absorbs that loss, so dark mode looked untouched and only light mode read as
+  washed out. With the option off the WebGL renderer matches the DOM renderer's coverage exactly and
+  regains the fast blend path as a side effect; nothing needs to show through, since
+  `readThemeFromDocument` already resolves every token to an opaque `#rrggbb`.
+- **The dock's Start Run button did nothing from the stopped empty state.** It handed React's click
+  event to the run-script action as the script name, which threw inside `atomWithStorage`'s
+  `JSON.stringify` before the launch was ever requested. `RunStoppedEmptyState` declared
+  `onRunScript: () => void` and wired it straight to `onClick`, while `DockPanel` passed an
+  `(scriptName?: string) => void` action — both assignments typecheck on their own, since a function
+  with only optional parameters is assignable to a zero-arg type, so nothing flagged the
+  composition. The empty state now takes the active script's name and calls the action with it, and
+  the widened prop makes `onClick={onRunScript}` a compile error in that file.
+- **A script that failed to launch reported nothing at all.** `runWorkspaceScript` and
+  `stopWorkspaceScript` resolve with a session-less result and diagnostics rather than rejecting, so
+  watching `.catch` alone caught only a broken IPC bridge; a failed spawn, an unresolvable workspace
+  environment or an unreadable workspace resolved successfully and was discarded, leaving the dock
+  looking like the button had not fired. `notifyScriptResult` now reports the first error-severity
+  diagnostic through the failure-text mapper — a code the table carries is translated, one it does
+  not falls back to the sentence main wrote — and all four handlers route through it, so the same
+  failure is no longer reported on the run pair and swallowed on the setup pair.
+
 ## [0.1.0-beta.20] - 2026-08-30
 
 The shell moves to Electron 44, which raises the macOS floor from Monterey to Ventura — macOS 12

@@ -27,7 +27,7 @@ installed.
 
 *Ensemblr Control driving the app from inside a workspace: the agent names its own tab, moves the workspace to In progress, starts a run script, then delegates to two sub-agents in their own chat tabs and launches a Claude Code harness in a terminal.*
 
-- **Version:** [`0.1.0-beta.20`](https://github.com/ensemblr-hq/ensemblr/releases/tag/v0.1.0-beta.20) (pre-1.0, polish stage)
+- **Version:** [`0.1.0-beta.21`](https://github.com/ensemblr-hq/ensemblr/releases/tag/v0.1.0-beta.21) (pre-1.0, polish stage)
 - **License:** Apache-2.0
 
 | Platform | Artifact | Install |
@@ -52,7 +52,7 @@ changes before 1.0. See [`CHANGELOG.md`](./CHANGELOG.md) for recent changes.
 brew install --cask ensemblr-hq/tap/ensemblr
 ```
 
-Or **[Download Ensemblr 0.1.0-beta.20 (.dmg, Apple silicon)](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.0-beta.20/Ensemblr-0.1.0-beta.20-arm64.dmg)** — open it and drag Ensemblr to Applications.
+Or **[Download Ensemblr 0.1.0-beta.21 (.dmg, Apple silicon)](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.0-beta.21/Ensemblr-0.1.0-beta.21-arm64.dmg)** — open it and drag Ensemblr to Applications.
 
 The macOS build is code-signed with a Developer ID certificate, hardened-runtime, notarized by Apple, and
 stapled, so it opens without a Gatekeeper prompt and validates offline. Every build is on the
@@ -276,7 +276,7 @@ Full glossary in [`CONTEXT.md`](./CONTEXT.md); the user-facing tour is
 | State | Jotai |
 | Composer editor | Lexical (`lexical` + `@lexical/react`), plain-text mode with decorator-node chips |
 | Localization | i18next 26 + react-i18next 17 — `en` / `ru` / `el`, catalogues bundled as JSON |
-| Terminal | xterm.js 6 + `node-pty` |
+| Terminal | xterm.js 6 (WebGL renderer) + `node-pty` |
 | Markdown | `streamdown` + Shiki |
 | Agent runtimes | Pi (CLI RPC) + Claude Code (`@anthropic-ai/claude-agent-sdk`); Codex / Vibe / `claude` TUI as terminal harnesses |
 | Agent control | Loopback HTTP + MCP (`@modelcontextprotocol/sdk`) |

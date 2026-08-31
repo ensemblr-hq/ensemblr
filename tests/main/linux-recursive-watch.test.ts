@@ -158,16 +158,22 @@ describe('startLinuxRecursiveWatch', () => {
 		expect(changes).toEqual([]);
 	});
 
-	test('reports the root disappearing as an error', async () => {
-		start();
-		await sleep(SETTLE_MS);
+	// Only inotify reports the watched directory's own removal. Darwin's
+	// FSEvents-backed `fs.watch` goes quiet instead, and this module never runs
+	// there, so the assertion is Linux's to make.
+	test.skipIf(process.platform !== 'linux')(
+		'reports the root disappearing as an error',
+		async () => {
+			start();
+			await sleep(SETTLE_MS);
 
-		rmSync(root, { force: true, recursive: true });
-		await waitFor(() => errors > 0);
+			rmSync(root, { force: true, recursive: true });
+			await waitFor(() => errors > 0);
 
-		expect(errors).toBeGreaterThan(0);
-		mkdirSync(root, { recursive: true });
-	});
+			expect(errors).toBeGreaterThan(0);
+			mkdirSync(root, { recursive: true });
+		},
+	);
 
 	test('stops adding watches once the cap is reached', async () => {
 		for (let index = 0; index < 6; index += 1) {

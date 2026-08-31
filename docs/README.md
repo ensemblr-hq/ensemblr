@@ -8,7 +8,7 @@ then dive in here.
 
 ## Using Ensemblr
 
-The current build is [`0.1.0-beta.20`](https://github.com/ensemblr-hq/ensemblr/releases/tag/v0.1.0-beta.20), for macOS on Apple silicon and Linux on x86-64. [Download the `.dmg`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.0-beta.20/Ensemblr-0.1.0-beta.20-arm64.dmg) — signed, notarized and stapled — or the [`.AppImage`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.0-beta.20/Ensemblr-0.1.0-beta.20-x64.AppImage), which is unsigned. You bring your own agent CLI — Pi or Claude Code, one is enough — plus `git` and an authenticated `gh`.
+The current build is [`0.1.0-beta.21`](https://github.com/ensemblr-hq/ensemblr/releases/tag/v0.1.0-beta.21), for macOS on Apple silicon and Linux on x86-64. [Download the `.dmg`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.0-beta.21/Ensemblr-0.1.0-beta.21-arm64.dmg) — signed, notarized and stapled — or the [`.AppImage`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.0-beta.21/Ensemblr-0.1.0-beta.21-x64.AppImage), which is unsigned. You bring your own agent CLI — Pi or Claude Code, one is enough — plus `git` and an authenticated `gh`.
 
 - [`guide/`](./guide) — the user guide: [install](./guide/01-install.md), [requirements](./guide/02-requirements.md), [first run](./guide/03-first-run.md), [concepts](./guide/04-concepts.md), and the day-to-day surfaces through to [troubleshooting](./guide/14-troubleshooting.md). Start at [`guide/README.md`](./guide/README.md).
 
