@@ -59,13 +59,22 @@ export function CreatePullRequestMenu({
 			})
 		: null;
 
+	// The header only mounts this menu when no live PR exists, but the runner
+	// reroutes an open one to `update-pr` regardless, so report what it did.
+	const isUpdate = reviewActions?.pullRequestAction === 'update-pr';
+
 	const createPullRequest = () => {
 		reviewActions?.runAgentAction('create-pr');
 		toast.success(
-			t(
-				'git:pull-request-create.asked.title',
-				'Asked the agent to open a pull request.',
-			),
+			isUpdate
+				? t(
+						'git:pull-request-update.asked.title',
+						'Asked the agent to update the pull request.',
+					)
+				: t(
+						'git:pull-request-create.asked.title',
+						'Asked the agent to open a pull request.',
+					),
 		);
 	};
 
@@ -110,7 +119,9 @@ export function CreatePullRequestMenu({
 				variant='ghost'
 			>
 				<GitPullRequestCreateIcon data-icon='inline-start' />
-				{t('git:pull-request.create-action', 'Create PR')}
+				{isUpdate
+					? t('git:pull-request.update-action', 'Update PR')
+					: t('git:pull-request.create-action', 'Create PR')}
 			</Button>
 			<span aria-hidden='true' className='h-4 w-px shrink-0 bg-border' />
 			<DropdownMenu>

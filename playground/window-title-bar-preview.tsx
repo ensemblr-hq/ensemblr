@@ -15,7 +15,6 @@ import {
 } from '@/renderer/components/workbench-shell/window-controls';
 import { WorkbenchHeader } from '@/renderer/components/workbench-shell/workbench-header';
 import { getDefaultProject } from '@/renderer/fixtures/workbench';
-import type { ReviewActionsValue } from '@/renderer/types/workbench';
 import type { MenuBarDescriptor } from '@/shared/menu-bar';
 
 import {
@@ -23,6 +22,7 @@ import {
 	MENU_BAR_FIXTURE,
 } from './menu-bar-fixtures.ts';
 import { createPlaygroundQueryClient } from './playground-query-client.ts';
+import { IDLE_REVIEW_ACTIONS } from './review-actions-fixtures.ts';
 import { HEADER_STATE_FIXTURES } from './right-sidebar-header-fixtures.ts';
 import { SceneSection } from './scene-chrome.tsx';
 import { useSceneWindowChrome } from './scene-window-chrome.tsx';
@@ -34,23 +34,6 @@ const CROWDED_HEADER_WORKSPACE = (
 		(fixture) => fixture.expectedKind === 'pr-uncommitted',
 	) ?? HEADER_STATE_FIXTURES[0]
 ).workspace;
-
-/** Every action the inline review header reads, stubbed to do nothing. */
-const IDLE_REVIEW_ACTIONS: ReviewActionsValue = {
-	archiveMergedWorkspace: () => undefined,
-	commitAndPush: () => undefined,
-	continueMergedWorkspace: () => undefined,
-	handOffToChat: () => true,
-	isAgentWorking: false,
-	isArchivingMergedWorkspace: false,
-	isContinuingMergedWorkspace: false,
-	isPushingBranch: false,
-	isRefreshingPullRequest: false,
-	openMergeConfirmation: () => undefined,
-	pushBranch: () => undefined,
-	refreshPullRequest: () => undefined,
-	runAgentAction: () => undefined,
-};
 
 /**
  * Ensemblr's own title bar over the toolbars it sits above — the Linux chrome,

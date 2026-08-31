@@ -8,6 +8,7 @@ import { usePullRequestRefresh } from '@/renderer/hooks/workbench-shell/review-a
 import { useReviewMenuCommands } from '@/renderer/hooks/workbench-shell/review-actions/use-review-menu-commands';
 import { useReviewMutations } from '@/renderer/hooks/workbench-shell/review-actions/use-review-mutations';
 import { useWorkspaceBusy } from '@/renderer/hooks/workspace/use-workspace-busy';
+import { resolvePullRequestAction } from '@/renderer/lib/workbench/action-prompts';
 import { buildCommitAndPushPrompt } from '@/renderer/lib/workbench/checks-pr-prompts';
 import type {
 	AgentActionKind,
@@ -82,6 +83,7 @@ export function ReviewActionsProvider({
 		onSettled: closeDialog,
 	});
 	const isAgentWorking = useWorkspaceBusy(activeWorkspace.id);
+	const pullRequestAction = resolvePullRequestAction(activeWorkspace);
 	const commitAndPush = useCallback(() => {
 		if (!handOffToChat(buildCommitAndPushPrompt(activeWorkspace))) {
 			toast.error(
@@ -112,6 +114,7 @@ export function ReviewActionsProvider({
 			isPushingBranch: pushBranchMutation.isPending,
 			isRefreshingPullRequest,
 			openMergeConfirmation: () => setActiveDialog({ kind: 'merge' }),
+			pullRequestAction,
 			pushBranch: () => pushBranchMutation.mutate(),
 			refreshPullRequest,
 			runAgentAction,
@@ -123,6 +126,7 @@ export function ReviewActionsProvider({
 			handOffToChat,
 			isAgentWorking,
 			isRefreshingPullRequest,
+			pullRequestAction,
 			pushBranchMutation,
 			refreshPullRequest,
 			runAgentAction,

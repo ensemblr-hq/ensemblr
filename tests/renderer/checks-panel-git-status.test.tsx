@@ -19,6 +19,7 @@ import {
 	createTestQueryClient,
 	installEnsemblrApi,
 } from './support/dom';
+import { stubReviewActions } from './support/review-actions';
 
 const UNCOMMITTED_GIT_STATUS: PullRequestGitStatusSummary = {
 	actionLabel: 'Commit and push',
@@ -46,27 +47,6 @@ const CLEAN_GIT_STATUS: PullRequestGitStatusSummary = {
 	label: 'Up to date with remote',
 	status: 'open',
 };
-
-function stubReviewActions(
-	overrides: Partial<ReviewActionsValue> = {},
-): ReviewActionsValue {
-	return {
-		archiveMergedWorkspace: vi.fn(),
-		commitAndPush: vi.fn(),
-		continueMergedWorkspace: vi.fn(),
-		handOffToChat: vi.fn(() => true),
-		isAgentWorking: false,
-		isArchivingMergedWorkspace: false,
-		isContinuingMergedWorkspace: false,
-		isPushingBranch: false,
-		isRefreshingPullRequest: false,
-		openMergeConfirmation: vi.fn(),
-		pushBranch: vi.fn(),
-		refreshPullRequest: vi.fn(),
-		runAgentAction: vi.fn(),
-		...overrides,
-	};
-}
 
 function createWorkspace({
 	gitStatus,

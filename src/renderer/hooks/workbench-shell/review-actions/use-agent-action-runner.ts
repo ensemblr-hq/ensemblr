@@ -14,6 +14,7 @@ import {
 	ACTION_KEY_BY_KIND,
 	ACTION_TRIGGER_MESSAGE,
 	composeActionPrompt,
+	resolvePullRequestAction,
 } from '@/renderer/lib/workbench/action-prompts';
 import { resolvePrDetails } from '@/renderer/lib/workbench/pr-details-draft';
 import {
@@ -77,6 +78,11 @@ function primeReviewTab({
  * resolves, and says so rather than opening one when there is none — a
  * workspace always keeps a chat tab open, so an empty strip means the tab rows
  * have not arrived yet and opening on that reading spawns a spurious "New chat".
+ *
+ * Every surface fires `create-pr` for its pull-request button, so the runner
+ * resolves that against the workspace's live PR: an open one turns it into
+ * `update-pr`, which is what keeps the "Update PR" button from asking for a
+ * second pull request.
  */
 export function useAgentActionRunner({
 	activeProject,
@@ -118,8 +124,12 @@ export function useAgentActionRunner({
 	const reviewThinkingLevel = useAtomValue(reviewThinkingLevelAtom);
 
 	return useCallback(
-		(action: AgentActionKind) => {
+		(requestedAction: AgentActionKind) => {
 			void (async () => {
+				const action =
+					requestedAction === 'create-pr'
+						? resolvePullRequestAction(activeWorkspace)
+						: requestedAction;
 				const prDetails = resolvePrDetails({
 					live: liveDraft,
 					saved: savedDraft,

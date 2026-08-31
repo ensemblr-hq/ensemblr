@@ -6,6 +6,7 @@ import { ChecksPanel } from '@/renderer/components/workbench-shell/checks-panel/
 import { ReviewActionsContextProvider } from '@/renderer/components/workbench-shell/review-actions/review-actions-context';
 import { ReviewFileList } from '@/renderer/components/workbench-shell/review-files/review-file-list';
 import { RightSidebarHeader } from '@/renderer/components/workbench-shell/right-sidebar-header/right-sidebar-header';
+import { resolvePullRequestAction } from '@/renderer/lib/workbench/action-prompts';
 import type { ReviewActionsValue } from '@/renderer/types/workbench';
 
 import {
@@ -68,11 +69,12 @@ export function ConflictsScene() {
 			isPushingBranch: false,
 			isRefreshingPullRequest: false,
 			openMergeConfirmation: () => undefined,
+			pullRequestAction: resolvePullRequestAction(workspace),
 			pushBranch: () => undefined,
 			refreshPullRequest: () => undefined,
 			runAgentAction: () => undefined,
 		}),
-		[isAgentWorking],
+		[isAgentWorking, workspace],
 	);
 
 	return (
