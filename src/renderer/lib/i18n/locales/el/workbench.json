@@ -612,8 +612,6 @@
 	"follow-up-queue": {
 		"aria-label_one": "{{count}} μήνυμα σε ουρά",
 		"aria-label_other": "{{count}} μηνύματα σε ουρά",
-		"attachments_one": "{{count}} συνημμένο",
-		"attachments_other": "{{count}} συνημμένα",
 		"clear": "Εκκαθάριση όλων",
 		"edit": "Επεξεργασία στο πεδίο",
 		"edit-blocked": "Στείλτε ή καθαρίστε πρώτα το τρέχον πρόχειρο",

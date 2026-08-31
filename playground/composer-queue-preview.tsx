@@ -16,6 +16,7 @@ import {
 	followUpBehaviorAtom,
 } from '@/renderer/state/preferences';
 import type {
+	ComposerDraftSegment,
 	FollowUpQueueHoldReason,
 	QueuedFollowUp,
 } from '@/renderer/types/workbench';
@@ -43,14 +44,69 @@ const SHORT_MESSAGES: readonly string[] = [
 	'Update the glossary row for “queue”.',
 ];
 
+/**
+ * A message written around its chips rather than beside them, which is the case
+ * the row's flat draft text cannot carry: every chip flattens to one space, so a
+ * preview built from that text reads as a sentence with holes in it.
+ */
+const MENTION_MESSAGE: readonly ComposerDraftSegment[] = [
+	{ kind: 'text', text: 'Check that ' },
+	{
+		attachment: {
+			id: 'playground-attachment-queue',
+			kind: 'workspace-file',
+			label: 'follow-up-queue.ts',
+			path: 'src/renderer/state/composer/follow-up-queue.ts',
+		},
+		kind: 'attachment',
+	},
+	{ kind: 'text', text: ' still drains once you have renamed ' },
+	{
+		attachment: {
+			id: 'playground-attachment-list',
+			kind: 'workspace-file',
+			label: 'follow-up-queue-list.tsx',
+			path: 'src/renderer/components/workbench-shell/conversation-panel/composer/follow-up-queue-list.tsx',
+		},
+		kind: 'attachment',
+	},
+	{ kind: 'text', text: '.' },
+];
+
+/**
+ * The flat draft text Lexical would have produced for a set of runs, each chip
+ * standing in as the single space that keeps caret offsets addressable.
+ * @param segments - The draft's runs and chips, in document order
+ * @returns The text the queue entry carries alongside its segments
+ */
+function flattenDraft(segments: readonly ComposerDraftSegment[]): string {
+	return segments
+		.map((segment) => (segment.kind === 'text' ? segment.text : ' '))
+		.join('');
+}
+
 const LONG_MESSAGE =
 	'When you get to the flush hook, remember the composer is not permanently mounted — the ask_user_question card replaces it and a tab switch unmounts it — so a turn can end with nothing there to notice. Read the standing state rather than the transition, and add the regression test alongside it.';
 
 /**
- * Builds a queue of the requested depth. The second entry carries an attachment
- * so the row's chip badge and the edit-restores-chips path are both visible, and
- * the third is a chore so its muted styling can be compared against a user
- * message queued right beside it.
+ * The chip-carrying message at the length the scene is showing, so the two-line
+ * clamp can be read against a row holding chips rather than only against prose.
+ * @param shape - Whether the scene's entries read short or long enough to clamp
+ * @returns The runs and chips to queue
+ */
+function mentionMessage(
+	shape: 'long' | 'short',
+): readonly ComposerDraftSegment[] {
+	return shape === 'short'
+		? MENTION_MESSAGE
+		: [...MENTION_MESSAGE, { kind: 'text', text: ` ${LONG_MESSAGE}` }];
+}
+
+/**
+ * Builds a queue of the requested depth. The second entry is written around two
+ * chips rather than beside them, so the row's inline rendering and the
+ * edit-restores-chips path are both visible, and the third is a chore so its
+ * muted styling can be compared against a user message queued right beside it.
  * @param count - How many entries to build
  * @param shape - Whether entries read short or long enough to clamp
  * @returns The entries to seed the queue atom with
@@ -64,27 +120,15 @@ function buildQueueEntries(
 			shape === 'long'
 				? LONG_MESSAGE
 				: SHORT_MESSAGES[index % SHORT_MESSAGES.length];
-		const carriesAttachment = index === 1;
+		const segments: readonly ComposerDraftSegment[] =
+			index === 1 ? mentionMessage(shape) : [{ kind: 'text', text }];
 		return {
 			id: `playground-queued-${index}`,
 			queuedAt: `2026-08-11T20:0${index % 10}:00.000Z`,
-			segments: carriesAttachment
-				? [
-						{ kind: 'text' as const, text },
-						{
-							attachment: {
-								id: `playground-attachment-${index}`,
-								kind: 'workspace-file' as const,
-								label: 'follow-up-queue.ts',
-								path: 'src/renderer/state/composer/follow-up-queue.ts',
-							},
-							kind: 'attachment' as const,
-						},
-					]
-				: [{ kind: 'text' as const, text }],
+			segments,
 			snapshot: null,
 			source: index === 2 ? ('chore' as const) : ('user' as const),
-			text,
+			text: flattenDraft(segments),
 		};
 	});
 }

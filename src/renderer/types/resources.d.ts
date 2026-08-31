@@ -2984,8 +2984,6 @@ export default interface Resources {
 		'follow-up-queue': {
 			'aria-label_one': '{{count}} message queued';
 			'aria-label_other': '{{count}} messages queued';
-			attachments_one: '{{count}} attachment';
-			attachments_other: '{{count}} attachments';
 			clear: 'Clear all';
 			edit: 'Edit in composer';
 			'edit-blocked': 'Send or clear the current draft first';

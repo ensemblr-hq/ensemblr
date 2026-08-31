@@ -1,6 +1,5 @@
 import {
 	GripVerticalIcon,
-	PaperclipIcon,
 	PencilIcon,
 	SendHorizontalIcon,
 	XIcon,
@@ -19,7 +18,13 @@ import {
 import { useRaisedShadow } from '@/renderer/hooks/use-raised-shadow';
 import { useResizingWidth } from '@/renderer/hooks/workbench-shell/composer/use-resizing-width';
 import { cn } from '@/renderer/lib/utils';
-import type { QueuedFollowUp } from '@/renderer/types/workbench';
+import type {
+	ComposerDraftSegment,
+	QueuedFollowUp,
+	QueuedFollowUpSource,
+} from '@/renderer/types/workbench';
+
+import { AttachmentIcon } from './attachment-chip';
 
 /**
  * The column a row's position sits in, shared by the drag handle and the static
@@ -37,6 +42,74 @@ const POSITION_SLOT =
  * `Reorder.Group` needs to keep tracking where each row sits.
  */
 const INSTANT_LAYOUT_TRANSITION = { layout: { duration: 0 } };
+
+/**
+ * Pairs each run of a queued draft with a key. A text run has nothing to be
+ * identified by and the same chip can be mentioned twice, so where a run sits is
+ * the only stable handle there is — and a queued entry never reorders its own
+ * runs, only its place in the list.
+ * @param segments - The queued draft, in document order
+ * @returns The same runs, each with a key unique among its siblings
+ */
+function keyDraftSegments(
+	segments: readonly ComposerDraftSegment[],
+): readonly { key: string; segment: ComposerDraftSegment }[] {
+	return segments.map((segment, index) => ({ key: `${index}`, segment }));
+}
+
+/**
+ * The queued draft as it was written, with each chip standing where the user put
+ * it.
+ *
+ * The entry's flat `text` drops every chip to a single space — that space is
+ * there to keep caret offsets addressable, not to be read — so a message whose
+ * subject is the file it mentions comes back as a sentence missing its subject:
+ * `@timeline.tsx is fixed?` reads as `is fixed?`, which says nothing about what
+ * is being asked. Walking the runs instead keeps the chip in the clause it
+ * belongs to, so the row reads as the message the user typed.
+ *
+ * Whitespace is the user's own: unlike a sent prompt, whose runs have been
+ * trimmed by serialization, a queued draft still holds the spaces typed either
+ * side of a chip, so there is no gap to reconstruct.
+ *
+ * The chip is filled rather than outlined and pinned to exactly one line box,
+ * read off the prose's own leading with `1lh` so it tracks a change to it. A
+ * chip is a flex box rather than a run of text, so left to its own size and
+ * baseline it makes the line it lands on taller than the line above — which
+ * reads as the two clamped lines of one row drifting apart from every other
+ * row's. The same trick the timeline plays on a sent prompt.
+ */
+function QueuedDraftPreview({
+	segments,
+	source,
+}: {
+	segments: readonly ComposerDraftSegment[];
+	source: QueuedFollowUpSource;
+}) {
+	return (
+		<p
+			className={cn(
+				'line-clamp-2 break-words text-xs leading-snug',
+				source === 'chore' ? 'text-muted-foreground italic' : 'text-foreground',
+			)}
+		>
+			{keyDraftSegments(segments).map(({ key, segment }) =>
+				segment.kind === 'text' ? (
+					<span key={key}>{segment.text}</span>
+				) : (
+					<span
+						className='mx-px inline-flex h-[1lh] max-w-40 items-center gap-1 rounded-sm bg-muted px-1 align-top font-medium text-foreground text-xxs not-italic'
+						key={key}
+						title={segment.attachment.label}
+					>
+						<AttachmentIcon attachment={segment.attachment} />
+						<span className='truncate'>{segment.attachment.label}</span>
+					</span>
+				),
+			)}
+		</p>
+	);
+}
 
 /** Wiring for one row's drag handle, which doubles as its position marker. */
 interface DragHandleProps {
@@ -278,9 +351,6 @@ function FollowUpQueueRow({
 	const dragControls = useDragControls();
 	const reorderable = !(isFirst && isLast);
 	const { onBlur, onFocus, rowRef } = useRetainedRowFocus(reorderable);
-	const attachmentCount = entry.segments.filter(
-		(segment) => segment.kind === 'attachment',
-	).length;
 	const steerLabel =
 		actions.onSteer === null
 			? t(
@@ -337,26 +407,7 @@ function FollowUpQueueRow({
 						{t('workbench:follow-up-queue.next', 'Next')}
 					</span>
 				) : null}
-				<p
-					className={cn(
-						'line-clamp-2 break-words text-xs leading-snug',
-						entry.source === 'chore'
-							? 'text-muted-foreground italic'
-							: 'text-foreground',
-					)}
-				>
-					{entry.text.trim()}
-				</p>
-				{attachmentCount > 0 ? (
-					<span className='inline-flex items-center gap-1 text-muted-foreground text-xxs leading-none'>
-						<PaperclipIcon className='size-3' />
-						{t('workbench:follow-up-queue.attachments', {
-							count: attachmentCount,
-							defaultValue_one: '{{count}} attachment',
-							defaultValue_other: '{{count}} attachments',
-						})}
-					</span>
-				) : null}
+				<QueuedDraftPreview segments={entry.segments} source={entry.source} />
 			</div>
 			<div className='flex shrink-0 items-center gap-0.5'>
 				<QueueRowAction
@@ -396,9 +447,9 @@ function FollowUpQueueRow({
  *
  * Scrolls natively under `sleek-scrollbar` rather than through Radix
  * `ScrollArea`, so the box hugs however tall the rows actually came out. Rows
- * vary — one line, two clamped lines, and an attachment row that carries a meta
- * line under them — so the definite height an overlay viewport needs could only
- * ever be an average, and it left short queues sitting in dead space.
+ * vary — one line, or two clamped lines, whether or not a chip sits in them — so
+ * the definite height an overlay viewport needs could only ever be an average,
+ * and it left short queues sitting in dead space.
  */
 export function FollowUpQueueList({
 	entries,
