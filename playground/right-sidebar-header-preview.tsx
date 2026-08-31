@@ -108,6 +108,7 @@ export function RightSidebarHeaderScene() {
 			isPushingBranch: isPushing,
 			isRefreshingPullRequest: isRefreshing,
 			openMergeConfirmation: () => undefined,
+			pullRequestAction: 'create-pr',
 			pushBranch: () => undefined,
 			refreshPullRequest: () => undefined,
 			runAgentAction: () => undefined,

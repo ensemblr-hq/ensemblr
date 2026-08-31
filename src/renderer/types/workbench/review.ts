@@ -35,6 +35,13 @@ export interface ReviewActionsValue {
 	isPushingBranch: boolean;
 	isRefreshingPullRequest: boolean;
 	openMergeConfirmation: () => void;
+	/**
+	 * What the pull-request button will actually do, so a surface labels itself
+	 * and reports what it asked for without re-deriving the answer. Every surface
+	 * fires `create-pr` and {@link runAgentAction} reroutes an open pull request
+	 * to `update-pr`; this is that same verdict, published.
+	 */
+	pullRequestAction: Extract<AgentActionKind, 'create-pr' | 'update-pr'>;
 	/** Pushes the branch with git, skipping the agent. */
 	pushBranch: () => void;
 	refreshPullRequest: () => void;

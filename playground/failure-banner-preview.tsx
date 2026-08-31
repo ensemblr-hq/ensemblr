@@ -8,7 +8,6 @@ import {
 	describeCommandFailure,
 	describeMergeConflictProbeFailure,
 } from '@/renderer/lib/workbench/git-failure-copy';
-import type { ReviewActionsValue } from '@/renderer/types/workbench';
 
 import {
 	MERGE_PROBE_FAILURE,
@@ -16,6 +15,7 @@ import {
 	unsyncedWorkspace,
 } from './failure-banner-fixtures.ts';
 import { createPlaygroundQueryClient } from './playground-query-client.ts';
+import { IDLE_REVIEW_ACTIONS } from './review-actions-fixtures.ts';
 import {
 	ControlGroup,
 	SceneControls,
@@ -89,22 +89,6 @@ export function FailureBannerScene() {
 		</QueryClientProvider>
 	);
 }
-
-/** Review actions the banner never calls, stubbed so the panel can mount. */
-const IDLE_REVIEW_ACTIONS: ReviewActionsValue = {
-	archiveMergedWorkspace: () => undefined,
-	commitAndPush: () => undefined,
-	continueMergedWorkspace: () => undefined,
-	isAgentWorking: false,
-	isArchivingMergedWorkspace: false,
-	isContinuingMergedWorkspace: false,
-	isPushingBranch: false,
-	isRefreshingPullRequest: false,
-	openMergeConfirmation: () => undefined,
-	pushBranch: () => undefined,
-	refreshPullRequest: () => undefined,
-	runAgentAction: () => undefined,
-};
 
 /** Picks which gh failure the scene's two sync surfaces are showing. */
 function FailureControls({

@@ -168,10 +168,11 @@ export function ChecksPanel({ workspace }: { workspace: WorkspaceShellModel }) {
 	const canCreatePullRequest = useReviewableChanges(workspace);
 	const conflicts = useWorkspaceConflicts(workspace);
 
+	const pullRequestAction = reviewActions?.pullRequestAction;
 	const sendCreatePullRequest = useCallback(() => {
 		reviewActions?.runAgentAction('create-pr');
 		toast.success(
-			workspace.pullRequest.number
+			pullRequestAction === 'update-pr'
 				? t(
 						'git:pull-request-update.asked.title',
 						'Asked the agent to update the pull request.',
@@ -181,7 +182,7 @@ export function ChecksPanel({ workspace }: { workspace: WorkspaceShellModel }) {
 						'Asked the agent to open a pull request.',
 					),
 		);
-	}, [reviewActions, t, workspace.pullRequest.number]);
+	}, [pullRequestAction, reviewActions, t]);
 
 	const sendResolveConflicts = useCallback(() => {
 		reviewActions?.runAgentAction('resolve-conflicts');

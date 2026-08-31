@@ -14,6 +14,7 @@ import {
 	ACTION_KEY_BY_KIND,
 	ACTION_TRIGGER_MESSAGE,
 	composeActionPrompt,
+	resolvePullRequestAction,
 } from '@/renderer/lib/workbench/action-prompts';
 import { resolvePrDetails } from '@/renderer/lib/workbench/pr-details-draft';
 import {
@@ -97,6 +98,11 @@ function resolveTargetChatTabId({
  * to `.context/attachments/`, and primes a chat tab to send a short trigger
  * message with that prompt inlined. Review opens a fresh tab on the configured
  * review model; the other actions target the active (or last-active) chat tab.
+ *
+ * Every surface fires `create-pr` for its pull-request button, so the runner
+ * resolves that against the workspace's live PR: an open one turns it into
+ * `update-pr`, which is what keeps the "Update PR" button from asking for a
+ * second pull request.
  */
 export function useAgentActionRunner({
 	activeProject,
@@ -132,8 +138,12 @@ export function useAgentActionRunner({
 	const reviewThinkingLevel = useAtomValue(reviewThinkingLevelAtom);
 
 	return useCallback(
-		(action: AgentActionKind) => {
+		(requestedAction: AgentActionKind) => {
 			void (async () => {
+				const action =
+					requestedAction === 'create-pr'
+						? resolvePullRequestAction(activeWorkspace)
+						: requestedAction;
 				const prDetails = resolvePrDetails({
 					live: liveDraft,
 					saved: savedDraft,

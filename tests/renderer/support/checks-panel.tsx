@@ -1,12 +1,11 @@
 // Render harness for the review Checks panel. It needs a jotai store and the
-// review-actions context on top of what `renderWithProviders` supplies, and the
-// twelve-key `ReviewActionsValue` stub is the part worth writing once — a new
-// field on that type should break one file, not every panel test.
+// review-actions context on top of what `renderWithProviders` supplies. The
+// `ReviewActionsValue` stub lives in `./review-actions` and is re-exported here
+// for the panel tests that already import it from this module.
 
 import { QueryClientProvider } from '@tanstack/react-query';
 import { render } from '@testing-library/react';
 import { createStore, Provider } from 'jotai';
-import { vi } from 'vitest';
 
 import { ChecksPanel } from '@/renderer/components/workbench-shell/checks-panel/checks-panel';
 import { ReviewActionsContextProvider } from '@/renderer/components/workbench-shell/review-actions/review-actions-context';
@@ -16,27 +15,9 @@ import type {
 } from '@/renderer/types/workbench';
 
 import { createTestQueryClient } from './dom';
+import { stubReviewActions } from './review-actions';
 
-/** Review actions that record calls and do nothing, overridable per test. */
-export function stubReviewActions(
-	overrides: Partial<ReviewActionsValue> = {},
-): ReviewActionsValue {
-	return {
-		archiveMergedWorkspace: vi.fn(),
-		commitAndPush: vi.fn(),
-		continueMergedWorkspace: vi.fn(),
-		isAgentWorking: false,
-		isArchivingMergedWorkspace: false,
-		isContinuingMergedWorkspace: false,
-		isPushingBranch: false,
-		isRefreshingPullRequest: false,
-		openMergeConfirmation: vi.fn(),
-		pushBranch: vi.fn(),
-		refreshPullRequest: vi.fn(),
-		runAgentAction: vi.fn(),
-		...overrides,
-	};
-}
+export { stubReviewActions };
 
 /**
  * Renders the Checks panel for a workspace. `switchTo` re-renders it for another

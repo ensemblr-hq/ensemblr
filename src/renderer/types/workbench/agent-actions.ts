@@ -5,4 +5,5 @@ export type AgentActionKind =
 	| 'fix-check-errors'
 	| 'general'
 	| 'resolve-conflicts'
-	| 'review';
+	| 'review'
+	| 'update-pr';

@@ -17,30 +17,11 @@ import type {
 } from '../../src/renderer/types/workbench';
 
 import { installLocalStorage, renderWithProviders } from './support/dom';
+import { stubReviewActions } from './support/review-actions';
 
 const PR_HEADER_CONTAINER_SELECTOR = '[class~="@container/pr-header"]';
 
 /** A review-actions value with every action stubbed, plus the given overrides. */
-function stubReviewActions(
-	overrides: Partial<ReviewActionsValue> = {},
-): ReviewActionsValue {
-	return {
-		archiveMergedWorkspace: vi.fn(),
-		commitAndPush: vi.fn(),
-		continueMergedWorkspace: vi.fn(),
-		isAgentWorking: false,
-		isArchivingMergedWorkspace: false,
-		isContinuingMergedWorkspace: false,
-		isPushingBranch: false,
-		isRefreshingPullRequest: false,
-		openMergeConfirmation: vi.fn(),
-		pushBranch: vi.fn(),
-		refreshPullRequest: vi.fn(),
-		runAgentAction: vi.fn(),
-		...overrides,
-	};
-}
-
 /** An open PR carrying the given pull-request overrides. */
 function workspaceWithPr(
 	overrides: Partial<WorkspaceShellModel['pullRequest']>,
