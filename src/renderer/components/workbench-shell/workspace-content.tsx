@@ -2,6 +2,7 @@ import { useSetAtom } from 'jotai';
 import { type ComponentType, useCallback, useRef } from 'react';
 import { useWorkspaceMenuCommands } from '@/renderer/components/workbench-shell/workspace-menu-commands';
 import { useAgentActionRunner } from '@/renderer/hooks/workbench-shell/review-actions/use-agent-action-runner';
+import { useChatPromptHandoff } from '@/renderer/hooks/workbench-shell/review-actions/use-chat-prompt-handoff';
 import { useDockController } from '@/renderer/hooks/workbench-shell/use-dock-controller';
 import { useLayoutMenuCommands } from '@/renderer/hooks/workbench-shell/use-layout-menu-commands';
 import { useRightSidebarController } from '@/renderer/hooks/workbench-shell/use-right-sidebar-controller';
@@ -163,6 +164,12 @@ export function WorkspaceWorkbenchContent({
 		selectChat: onSessionTabChange,
 		sessionTabs: sessionNavigation.sessionTabs,
 	});
+	const handOffToChat = useChatPromptHandoff({
+		activeSession: sessionNavigation.effectiveActiveSession,
+		selectChat: onSessionTabChange,
+		sessionTabs: sessionNavigation.sessionTabs,
+		workspaceId: activeWorkspace.id,
+	});
 	const mainContentState = {
 		activeSession: sessionNavigation.effectiveActiveSession,
 		activeWorkspace,
@@ -205,6 +212,7 @@ export function WorkspaceWorkbenchContent({
 			<ReviewActionsProvider
 				activeProject={activeProject}
 				activeWorkspace={activeWorkspace}
+				handOffToChat={handOffToChat}
 				runAgentAction={runAgentAction}
 			>
 				<WorkspaceFileDiffOpenerProvider value={openWorkspaceFileDiff}>

@@ -23,8 +23,16 @@ import type { ConciergeReference } from '@/shared/concierge-references';
  * project, workspace, or chat wears the mark the sidebar gives it — since the
  * markdown document or the id behind each would otherwise render as an anonymous
  * file icon.
+ *
+ * Exported for the follow-up queue's rows, which stand a read-only chip in the
+ * middle of a queued sentence and have to mark it the same way the composer
+ * marked it while the message was still being typed.
  */
-function AttachmentIcon({ attachment }: { attachment: ComposerAttachment }) {
+export function AttachmentIcon({
+	attachment,
+}: {
+	attachment: ComposerAttachment;
+}) {
 	if (attachment.kind === 'project-ref') {
 		return <FolderGitIcon aria-hidden='true' className='size-3.5 shrink-0' />;
 	}

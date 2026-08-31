@@ -13,35 +13,39 @@ import type {
 } from '../../../src/renderer/types/workbench';
 import { renderWithProviders } from '../support/dom';
 
-/** Builds a queued entry, optionally carrying one attachment chip. */
+/**
+ * Builds a queued entry. `leadingChip` puts a chip in front of the text the way
+ * an `@` mention opens a message, which is where the flat `text` loses it.
+ */
 function entry(
 	id: string,
 	text: string,
 	options: {
+		leadingChip?: string;
 		source?: QueuedFollowUp['source'];
-		withAttachment?: boolean;
 	} = {},
 ): QueuedFollowUp {
+	const chip = options.leadingChip;
 	return {
 		id,
 		queuedAt: '2026-08-11T20:00:00.000Z',
-		segments: options.withAttachment
+		segments: chip
 			? [
-					{ kind: 'text', text },
 					{
 						attachment: {
-							id: 'wsfile:notes.md',
-							kind: 'workspace-file',
-							label: 'notes.md',
-							path: 'notes.md',
+							id: `wsfile:${chip}`,
+							kind: 'workspace-file' as const,
+							label: chip,
+							path: chip,
 						},
-						kind: 'attachment',
+						kind: 'attachment' as const,
 					},
+					{ kind: 'text' as const, text },
 				]
-			: [{ kind: 'text', text }],
+			: [{ kind: 'text' as const, text }],
 		snapshot: null,
 		source: options.source ?? 'user',
-		text,
+		text: chip ? ` ${text}` : text,
 	};
 }
 
@@ -216,10 +220,13 @@ describe('the queue list', () => {
 		expect(screen.getByText('1')).toBeInTheDocument();
 	});
 
-	test('shows how many chips an entry carries', () => {
-		renderList([entry('a', 'with a file', { withAttachment: true })]);
+	test('keeps a chip where the message put it', () => {
+		renderList([entry('a', ' is fixed?', { leadingChip: 'timeline.tsx' })]);
 
-		expect(screen.getByText('1 attachment')).toBeInTheDocument();
+		expect(screen.getByText('timeline.tsx')).toBeInTheDocument();
+		expect(screen.getByText('timeline.tsx').closest('p')?.textContent).toBe(
+			'timeline.tsx is fixed?',
+		);
 	});
 
 	test('marks only the head as the one that goes next', () => {

@@ -36,13 +36,10 @@ import type {
 	WorkspaceShellModel,
 } from '@/renderer/types/workbench';
 
+import { useChatTabTarget } from './use-chat-tab-target';
+
 /** Jotai store slice used to prime a tab and set its overrides imperatively. */
 type ActionStore = ReturnType<typeof useStore>;
-
-/** True for chat tabs (placeholder sessions predate `kind` and count as chat). */
-function isChatTab(tab: SessionTabModel): boolean {
-	return tab.kind === undefined || tab.kind === 'chat';
-}
 
 /**
  * Primes a freshly-opened Review tab: pins it to the configured review model and
@@ -72,31 +69,14 @@ function primeReviewTab({
 }
 
 /**
- * Resolves the chat tab an action should target: the active tab when it is a
- * chat, otherwise the last-active chat tab (so an action fired while viewing a
- * file or diff routes to the most recent chat). Returns null when no chat tab is
- * open, letting the caller open a fresh one.
- */
-function resolveTargetChatTabId({
-	activeSession,
-	sessionTabs,
-}: {
-	activeSession: SessionTabModel;
-	sessionTabs: readonly SessionTabModel[];
-}): string | null {
-	if (isChatTab(activeSession)) {
-		return activeSession.chatTabId;
-	}
-	const chatTabs = sessionTabs.filter(isChatTab);
-	return chatTabs.at(-1)?.chatTabId ?? null;
-}
-
-/**
  * Builds the agent-action runner: composes the action's prompt (built-in base
  * prompt + workspace context + the user's per-action preferences), persists it
  * to `.context/attachments/`, and primes a chat tab to send a short trigger
  * message with that prompt inlined. Review opens a fresh tab on the configured
- * review model; the other actions target the active (or last-active) chat tab.
+ * review model; every other action goes to the chat {@link useChatTabTarget}
+ * resolves, and says so rather than opening one when there is none — a
+ * workspace always keeps a chat tab open, so an empty strip means the tab rows
+ * have not arrived yet and opening on that reading spawns a spurious "New chat".
  */
 export function useAgentActionRunner({
 	activeProject,
@@ -128,6 +108,12 @@ export function useAgentActionRunner({
 		prDetailsLiveDraftAtomFamily(activeWorkspace.id),
 	);
 	const savedDraft = useAtomValue(prDetailsDraftAtomFamily(activeWorkspace.id));
+	const deliverToChat = useChatTabTarget({
+		activeSession,
+		selectChat,
+		sessionTabs,
+		workspaceId: activeWorkspace.id,
+	});
 	const reviewModel = useAtomValue(reviewModelAtom);
 	const reviewThinkingLevel = useAtomValue(reviewThinkingLevelAtom);
 
@@ -187,22 +173,22 @@ export function useAgentActionRunner({
 					return;
 				}
 
-				const targetChatTabId =
-					resolveTargetChatTabId({ activeSession, sessionTabs }) ??
-					(await openSessionTab())?.chatTabId ??
-					null;
-				if (!targetChatTabId) {
-					return;
-				}
-				store.set(primedActionAtomFamily(targetChatTabId), primed);
-				if (targetChatTabId !== activeSession.chatTabId) {
-					selectChat(targetChatTabId);
+				const delivered = deliverToChat((chatTabId) => {
+					store.set(primedActionAtomFamily(chatTabId), primed);
+				});
+				if (!delivered) {
+					toast.error(
+						t(
+							'errors:composer.chat-tab-not-ready.title',
+							'This workspace has no chat ready yet. Try again in a moment.',
+						),
+					);
 				}
 			})();
 		},
 		[
-			activeSession,
 			activeWorkspace,
+			deliverToChat,
 			liveDraft,
 			openSessionTab,
 			overrides.actionPreferences,
@@ -211,7 +197,6 @@ export function useAgentActionRunner({
 			reviewThinkingLevel,
 			savedDraft,
 			selectChat,
-			sessionTabs,
 			store,
 			t,
 		],

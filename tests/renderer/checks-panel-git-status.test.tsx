@@ -54,6 +54,7 @@ function stubReviewActions(
 		archiveMergedWorkspace: vi.fn(),
 		commitAndPush: vi.fn(),
 		continueMergedWorkspace: vi.fn(),
+		handOffToChat: vi.fn(() => true),
 		isAgentWorking: false,
 		isArchivingMergedWorkspace: false,
 		isContinuingMergedWorkspace: false,

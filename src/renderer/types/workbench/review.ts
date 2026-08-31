@@ -16,6 +16,13 @@ export interface ReviewActionsValue {
 	/** Asks the chat agent to stage, commit, and push everything in the worktree. */
 	commitAndPush: () => void;
 	/**
+	 * Hands a ready-made prompt to the workspace's chat agent, bringing the target
+	 * chat tab forward when a file, diff, or terminal tab is in front. Returns
+	 * false when the workspace has no chat tab open, so the caller can say so
+	 * instead of claiming the chore was handed over.
+	 */
+	handOffToChat: (text: string) => boolean;
+	/**
 	 * Branches the workspace onto a `-v<n>` successor of its current branch from
 	 * the post-merge header action, so work continues without the merged pull
 	 * request trailing along.
