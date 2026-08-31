@@ -3,8 +3,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createXtermAdapter } from '@/renderer/lib/terminal/xterm-adapter';
 
-const { calls, webglState } = vi.hoisted(() => ({
+const { calls, terminalState, webglState } = vi.hoisted(() => ({
 	calls: [] as string[],
+	terminalState: { constructorOptions: [] as Array<Record<string, unknown>> },
 	webglState: {
 		contextLossHandlers: [] as Array<() => void>,
 		disposeCount: 0,
@@ -46,6 +47,9 @@ vi.mock('@xterm/xterm', () => ({
 		cols = 80;
 		rows = 24;
 		options: Record<string, unknown> = {};
+		constructor(options: Record<string, unknown>) {
+			terminalState.constructorOptions.push(options);
+		}
 		clear() {}
 		dispose() {
 			calls.push('terminal:dispose');
@@ -72,10 +76,23 @@ vi.mock('@xterm/xterm', () => ({
 describe('terminal WebGL renderer', () => {
 	beforeEach(() => {
 		calls.length = 0;
+		terminalState.constructorOptions.length = 0;
 		webglState.contextLossHandlers.length = 0;
 		webglState.disposeCount = 0;
 		webglState.throwOnConstruct = false;
 		webglState.throwOnLoad = false;
+	});
+
+	// The atlas canvas is built with `alpha: allowTransparency`, and Skia
+	// stem-darkens text only on an opaque one. Measured against the DOM renderer,
+	// transparency cost dark-on-light cells ~26% of their inked pixels, which read
+	// as washed-out text in light mode and was invisible in dark.
+	it('rasterizes the glyph atlas opaquely so light-mode text keeps its weight', () => {
+		createXtermAdapter();
+
+		expect(terminalState.constructorOptions[0]).toMatchObject({
+			allowTransparency: false,
+		});
 	});
 
 	// The addon takes over a canvas the terminal only creates once it has a

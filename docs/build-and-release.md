@@ -45,7 +45,7 @@ npm run package:linux  # build an unpacked linux-x64 directory under out/
 npm run make:linux     # build the .AppImage under out/make/
 
 npm run diagnose:linux # report the Linux native-module toolchain and pty.node's linkage
-npm run rebuild:native # compile node-pty in a container, for hosts with no compiler
+npm run rebuild:native # compile node-pty in a container by hand (dev/make:linux do it themselves)
 ```
 
 The Linux artifact is never signed, notarized, or stapled — there is no
@@ -95,14 +95,23 @@ Three ways to get one:
 ### Developing on Linux
 
 On a Linux desktop that already has a compiler, there is nothing to know: pin
-Node and run `npm run dev`. The rest of this section is for the hosts where that
-is not true, which on Linux is a larger share than it sounds — every immutable
-distribution (SteamOS, Silverblue, NixOS) ships without one.
+Node and run `npm run dev`. On one that has none — which on Linux is a larger
+share than it sounds, since every immutable distribution (SteamOS, Silverblue,
+NixOS) ships without one — there is still nothing to know, as long as `podman` or
+`docker` is installed. `dev`, `package:linux`, and `make:linux` all run
+`require-linux-toolchain.mjs` first, and it builds `node-pty` in a container
+itself rather than telling you to. The rest of this section is what it is doing
+on your behalf, and what to reach for when it cannot.
 
 ```bash
 npm run diagnose:linux   # compiler, make, python3, mksquashfs, pty.node + its linkage
-npm run rebuild:native   # compile node-pty in a throwaway Debian container
+npm run rebuild:native   # run that same container build by hand
 ```
+
+`diagnose:linux` is the read-only view of the same checks — it never builds, so
+it always describes the tree as it stands. `ENSEMBLR_SKIP_NATIVE_AUTOBUILD=1`
+turns the automatic build back into the old refusal-with-instructions, for an
+environment that would rather not have an image pulled on its behalf.
 
 **Pin Node first.** `.nvmrc`, `mise.toml`, and `engines` all say 24, but nothing
 on PATH enforces it and distro packages are usually something else:
@@ -220,10 +229,12 @@ other — the same shape of silent, ships-anyway breakage
 `require-linux-host.mjs` exists to prevent, just one layer down.
 
 So if `g++` is MISSING above, the shortest way through is not to install one at
-all — `npm run rebuild:native` compiles the one module that needs it in a
-throwaway `node:24-bookworm` container and leaves the binding in
-`node_modules`, where Forge finds it already built. The Deck ships `podman`, so
-this needs no installation and no sudo password:
+all — the one module that needs it compiles in a throwaway `node:24-bookworm`
+container, and the binding lands in `node_modules` where Forge finds it already
+built. The Deck ships `podman`, so this needs no installation and no sudo
+password, and `npm run dev` does it unprompted the first time it finds the
+binding missing or stamped for the wrong ABI. Run it by hand when you want to
+replace a binding without waiting for a preflight to notice:
 
 ```bash
 npm run rebuild:native   # ~1 GB image pull the first time, seconds after that
@@ -272,10 +283,10 @@ git clone https://github.com/ensemblr-hq/ensemblr.git && cd ensemblr
 export PATH="$(brew --prefix node@24)/bin:$PATH"
 
 npm ci                  # no compiler? podman run --rm -v "$PWD":/src -w /src node:24-bookworm npm ci
-npm run rebuild:native  # no compiler? this is what builds node-pty
-npm run diagnose:linux  # confirm pty.node exists and links under /usr
 
-npm run dev             # the dev loop, on the host
+npm run dev             # the dev loop — builds node-pty in a container first if it has to
+npm run diagnose:linux  # after that build: confirm pty.node exists and links under /usr
+
 npm run package:linux   # unpacked build — needs no mksquashfs
 ./out/Ensemblr-linux-x64/Ensemblr
 ```
@@ -736,9 +747,12 @@ Adding another unbundled or native dependency means updating **both**
 - **Node version error at build.** `require-node-version.mjs` refuses to build on
   a Node outside `>=24 <25`; switch with `nvm`/`mise` (`.nvmrc` / `mise.toml`).
 - **`node-gyp failed to rebuild '.../node-pty'` on Linux.** The host has no C++
-  compiler, and node-pty ships no linux-x64 prebuild. `npm run rebuild:native`
-  builds it in a container without installing anything;
-  `npm run diagnose:linux` reports what is missing. See *Developing on Linux*.
+  compiler, and node-pty ships no linux-x64 prebuild. Reaching Forge's error at
+  all means the preflight did not repair it, and there are two reasons it would
+  not: no `podman` or `docker` to build in — install one and re-run — or
+  `ENSEMBLR_SKIP_NATIVE_AUTOBUILD` is set, in which case `npm run rebuild:native`
+  does that same container build by hand. `npm run diagnose:linux` reports what
+  is missing and which of the two you are looking at. See *Developing on Linux*.
 - **Terminals dead in a Linux build that worked locally.** `pty.node` was
   compiled against a private prefix — a Homebrew or Nix compiler — and carries
   an rpath no other machine has. `npm run diagnose:linux` names the offending

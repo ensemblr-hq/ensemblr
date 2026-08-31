@@ -20,6 +20,13 @@
 // meta it recognises, shells out to node-gyp on the host anyway, and dies with
 // the same bare error — on the one host that has no compiler. Compare the meta
 // against the ABI Electron actually wants before declaring the binding usable.
+//
+// Where a container runtime is available this repairs rather than refuses. A
+// host with no compiler cannot act on any advice except "run the container
+// build", so printing that instruction and exiting only makes the contributor
+// type what this script already knows — and on an immutable root it is the
+// *only* path, which makes the stop pure ceremony. `rebuild-native-linux.sh` is
+// run directly instead, and it re-invokes this script to verify what it built.
 import { execFileSync } from 'node:child_process';
 import { accessSync, constants, existsSync, readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -41,8 +48,29 @@ const FORGE_META = fileURLToPath(
 	),
 );
 
+/** The container build this script delegates to when the host cannot compile. */
+const REBUILD_SCRIPT = fileURLToPath(
+	new URL('./rebuild-native-linux.sh', import.meta.url),
+);
+
 /** Compilers node-gyp probes for, in the order it probes for them. */
 const COMPILERS = ['c++', 'g++', 'cc', 'clang++'];
+
+/** Container runtimes that can host the build, in `rebuild-native-linux.sh`'s order. */
+const CONTAINER_RUNTIMES = ['podman', 'docker'];
+
+/**
+ * Set to opt out of the automatic container build — for an environment that
+ * would rather see the refusal than have a multi-hundred-megabyte image pulled
+ * on its behalf.
+ */
+const OPT_OUT = 'ENSEMBLR_SKIP_NATIVE_AUTOBUILD';
+
+/**
+ * Set on the child's environment so the verification pass at the end of
+ * `rebuild-native-linux.sh` reports rather than starting a second build.
+ */
+const REENTRY_GUARD = 'ENSEMBLR_NATIVE_AUTOBUILD';
 
 /** Prefixes a shared library may resolve under and still run on any host. */
 const SYSTEM_PREFIXES = ['/usr/', '/lib/', '/lib64/'];
@@ -196,11 +224,101 @@ function printReport(compiler, linkage, electron, meta) {
 }
 
 /**
+ * Finds the container runtime `rebuild-native-linux.sh` would pick, so this
+ * script only promises a build the shell script can actually perform.
+ * @returns The runtime's name, or null when neither is installed.
+ */
+function findContainerRuntime() {
+	return CONTAINER_RUNTIMES.find((runtime) => resolveCommand(runtime)) ?? null;
+}
+
+/**
+ * Builds the binding in a container and exits — successfully when the build
+ * verified, with the child's status when it did not.
+ *
+ * No fallthrough on success, because every fact this process gathered about the
+ * binding was read before the build and none of it survived: the script ends by
+ * re-running these same checks against what it produced, so returning here would
+ * re-test stale state and could only disagree with a verdict already reached.
+ * @param runtime - The container runtime that will host the build, for the notice.
+ * @param state - What is wrong with the binding today, as a sentence fragment.
+ * @param missing - Names of the build tools that are absent. A missing `make` or
+ * `python3` reaches here as readily as a missing compiler, so the notice names
+ * what it found rather than assuming which one it was.
+ */
+function rebuildInContainer(runtime, state, missing) {
+	console.error(
+		[
+			'',
+			`• node-pty is ${state}, and this host cannot build it: ${missing.join(', ')} missing.`,
+			`  Building it in a throwaway Debian container via ${runtime}; nothing is`,
+			'  installed on this machine. The first run pulls node:24-bookworm and takes',
+			`  a few minutes. Set ${OPT_OUT}=1 to refuse instead.`,
+			'',
+		].join('\n'),
+	);
+
+	try {
+		execFileSync(REBUILD_SCRIPT, {
+			env: { ...process.env, [REENTRY_GUARD]: '1' },
+			stdio: 'inherit',
+		});
+	} catch (error) {
+		console.error(
+			[
+				'',
+				'✖ The container build failed, so node-pty is still unusable and Forge',
+				'  would die on it. Install a toolchain and let Forge compile instead:',
+				'    • Debian/Ubuntu:  sudo apt-get install -y build-essential python3',
+				'    • Fedora:         sudo dnf install -y gcc-c++ make python3',
+				'    • Arch:           sudo pacman -S --needed base-devel python',
+				'',
+			].join('\n'),
+		);
+		process.exit(typeof error?.status === 'number' ? error.status : 1);
+	}
+
+	process.exit(0);
+}
+
+/**
+ * Words the container fix for how the caller reached the refusal. Reaching it
+ * with a runtime installed is the normal case for `--report` and for the
+ * opt-out, and telling either of those to install podman is advice they have
+ * already taken — the command they want is the one the autobuild would have
+ * run. On the verification pass there is no container fix left to offer: that
+ * build is what just failed.
+ * @param runtime - The container runtime on PATH, or null when there is none.
+ * @returns The fix bullets to splice into the list, empty when none applies.
+ */
+function containerFixLines(runtime) {
+	if (process.env[REENTRY_GUARD]) {
+		return [];
+	}
+
+	if (runtime) {
+		return [
+			'    • npm run rebuild:native   — build it in a throwaway Debian container',
+			`                                 via the ${runtime} already installed here`,
+		];
+	}
+
+	return [
+		'    • install podman or docker, then re-run — this builds node-pty in a',
+		'      throwaway Debian container on its own, installing nothing on the host',
+		'      (npm run rebuild:native does the same thing by hand)',
+	];
+}
+
+/**
  * Reports that Forge will have to compile the binding and the host cannot.
  * @param state - What is wrong with the binding today, as a sentence fragment.
  * @param missing - Names of the build tools that are absent.
+ * @param runtime - The container runtime on PATH, or null when there is none.
  */
-function refuseWithoutToolchain(state, missing) {
+function refuseWithoutToolchain(state, missing, runtime) {
+	const containerFix = containerFixLines(runtime);
+
 	console.error(
 		[
 			'',
@@ -209,15 +327,18 @@ function refuseWithoutToolchain(state, missing) {
 			'  it will fail with a bare "node-gyp failed to rebuild".',
 			'',
 			'  Fix (pick one):',
-			'    • npm run rebuild:native   — compile it in a throwaway Debian container',
-			'                                 (needs podman or docker; installs nothing here)',
+			...containerFix,
 			'    • Debian/Ubuntu:  sudo apt-get install -y build-essential python3',
 			'    • Fedora:         sudo dnf install -y gcc-c++ make python3',
 			'    • Arch:           sudo pacman -S --needed base-devel python',
 			'',
-			'  On an immutable root (SteamOS, Silverblue) prefer the container: it needs',
-			'  no sudo password and survives the next OS update.',
-			'',
+			...(containerFix.length > 0
+				? [
+						'  On an immutable root (SteamOS, Silverblue) prefer the container: it needs',
+						'  no sudo password and survives the next OS update.',
+						'',
+					]
+				: []),
 		].join('\n'),
 	);
 	process.exit(1);
@@ -284,12 +405,24 @@ if (!builtForElectron) {
 	].filter(Boolean);
 
 	if (missing.length > 0) {
-		refuseWithoutToolchain(
-			isBuilt
-				? `built for ${forgeMeta ?? 'an unrecorded runtime'} rather than Electron's ${process.arch}--${electron?.abi}`
-				: 'not built',
-			missing,
+		const state = isBuilt
+			? `built for ${forgeMeta ?? 'an unrecorded runtime'} rather than Electron's ${process.arch}--${electron?.abi}`
+			: 'not built';
+		const runtime = findContainerRuntime();
+		// `--report` diagnoses; it must not spend minutes changing what it was
+		// asked to describe, and it is also how the container build verifies
+		// itself, which is what would make this recurse.
+		const mayBuild = !(
+			reportOnly ||
+			process.env[OPT_OUT] ||
+			process.env[REENTRY_GUARD]
 		);
+
+		if (runtime && mayBuild) {
+			rebuildInContainer(runtime, state, missing);
+		}
+
+		refuseWithoutToolchain(state, missing, runtime);
 	}
 	process.exit(0);
 }

@@ -185,13 +185,26 @@ host's Mach-O `pty.node`: the AppImage builds, launches, and has a dead terminal
 in every tab.
 
 `node-pty` is also the only thing that compiles, which is why a Linux build wants
-a toolchain. If the host has none — every immutable distribution ships without
-one — `npm run rebuild:native` compiles that one module in a throwaway
-`node:24-bookworm` container and leaves the binding where Forge finds it already
-built, and `npm run diagnose:linux` reports the toolchain plus what `pty.node`
-actually linked against. A binding whose libraries resolve outside `/usr` or
-`/lib` runs on the machine that built it and nowhere else, so the guard refuses
-it.
+a toolchain. **If the host has none — every immutable distribution ships without
+one — nothing needs doing: `npm run dev`, `npm run make:linux`, and
+`npm run package:linux` build that one module themselves**, in a throwaway
+`node:24-bookworm` container, and leave the binding where Forge finds it already
+built. The first such run pulls the image and takes a few minutes; later ones
+find the binding stamped for Electron's ABI and skip straight through. It needs
+`podman` or `docker` and installs nothing on the host, which is what makes it
+safe on an immutable root — no sudo, and it survives the next OS update.
+
+`npm run rebuild:native` runs that same container build by hand, for a binding
+you want to replace without waiting for a preflight to notice. Set
+`ENSEMBLR_SKIP_NATIVE_AUTOBUILD=1` to be refused with instructions instead of
+having an image pulled on your behalf.
+
+`npm run diagnose:linux` reports the toolchain plus what `pty.node` actually
+linked against, and never builds anything. A binding whose libraries resolve
+outside `/usr` or `/lib` runs on the machine that built it and nowhere else, so
+the guard refuses it — that one is not repaired automatically, because a
+compiler pointed at a Homebrew or Nix prefix is a host misconfiguration rather
+than a missing tool.
 
 ### Signing, notarization, and Gatekeeper (macOS)
 
