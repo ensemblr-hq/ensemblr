@@ -1,8 +1,9 @@
 import { useAtomValue } from 'jotai';
+import { useMemo } from 'react';
+import { MarkdownDocumentScopeProvider } from '@/renderer/components/markdown';
 import { XtermTerminal } from '@/renderer/components/workbench-shell/dock-panel/xterm-terminal';
 import { useConversationOpeners } from '@/renderer/hooks/workbench-shell/conversation-panel/use-conversation-openers';
 import { useLinkedIssueComposerSeed } from '@/renderer/hooks/workspace/use-linked-issue-composer-seed';
-import type { createWorkspacePathResolver } from '@/renderer/lib/agent-timeline';
 import { showsComposer } from '@/renderer/lib/workbench';
 import { usePiRawFrameCapture } from '@/renderer/state/pi';
 import { developerModeAtom } from '@/renderer/state/preferences';
@@ -96,6 +97,13 @@ export function WorkspaceConversationContent({
 			onSessionTabChange,
 			onTurnDiffOpen,
 		});
+	const workspaceCwd = activeWorkspace.pathLabel ?? null;
+	// Chat sits at the workspace root: an agent writes the paths it reports
+	// relative to the repository, not to any document of its own.
+	const markdownDocumentScope = useMemo(
+		() => (workspaceCwd ? { baseDirectory: '', workspaceCwd } : null),
+		[workspaceCwd],
+	);
 
 	return (
 		<section className='relative flex min-h-0 flex-1 flex-col overflow-hidden'>
@@ -112,40 +120,35 @@ export function WorkspaceConversationContent({
 				sessions={sessionTabs}
 				unreadKeys={unreadKeys}
 			/>
-			{isChatTab ? (
-				<ChatTabBody
-					activeSession={activeSession}
-					activeWorkspace={activeWorkspace}
-					composer={composer}
-					openFilePreview={openFilePreview}
-					openTurnDiff={openTurnDiff}
-					resolveWorkspacePath={resolveWorkspacePath}
-				/>
-			) : (
-				<ActiveAuxiliaryPanel
-					activeSession={activeSession}
-					activeWorkspace={activeWorkspace}
-					onSessionTabChange={onSessionTabChange}
-				/>
-			)}
+			<WorkspacePathResolverProvider value={resolveWorkspacePath}>
+				<FilePreviewOpenerProvider value={openFilePreview}>
+					<MarkdownDocumentScopeProvider value={markdownDocumentScope}>
+						{isChatTab ? (
+							<ChatTabBody
+								activeSession={activeSession}
+								activeWorkspace={activeWorkspace}
+								composer={composer}
+								openTurnDiff={openTurnDiff}
+							/>
+						) : (
+							<ActiveAuxiliaryPanel
+								activeSession={activeSession}
+								activeWorkspace={activeWorkspace}
+								onSessionTabChange={onSessionTabChange}
+							/>
+						)}
+					</MarkdownDocumentScopeProvider>
+				</FilePreviewOpenerProvider>
+			</WorkspacePathResolverProvider>
 			{developerMode ? <PiRawFramePanel sessionId={debugSessionId} /> : null}
 		</section>
 	);
 }
 
-/** Options a chat tab's body needs to render its timeline and composer. */
-interface ChatTabBodyProps {
-	activeSession: SessionTabModel;
-	activeWorkspace: WorkspaceShellModel;
-	composer: ComposerShellState;
-	openFilePreview: (filePath: string) => void;
-	openTurnDiff: (input: { label: string; turnId: string }) => void;
-	resolveWorkspacePath: ReturnType<typeof createWorkspacePathResolver>;
-}
-
 /**
- * Renders a chat tab's timeline and composer under the path-resolution and
- * preview-opener context the conversation surface provides. A tab that gets no
+ * Renders a chat tab's timeline and composer under the turn-diff opener only
+ * chat rows reach for; path resolution and the preview opener come from the
+ * conversation surface, which shares them with the file tabs. A tab that gets no
  * composer is a spawned sub-agent's — the only case `showsComposer` refuses —
  * so its runtime readout takes the slot the composer would have occupied.
  */
@@ -153,33 +156,32 @@ function ChatTabBody({
 	activeSession,
 	activeWorkspace,
 	composer,
-	openFilePreview,
 	openTurnDiff,
-	resolveWorkspacePath,
-}: ChatTabBodyProps) {
+}: {
+	activeSession: SessionTabModel;
+	activeWorkspace: WorkspaceShellModel;
+	composer: ComposerShellState;
+	openTurnDiff: (input: { label: string; turnId: string }) => void;
+}) {
 	return (
-		<WorkspacePathResolverProvider value={resolveWorkspacePath}>
-			<FilePreviewOpenerProvider value={openFilePreview}>
-				<TurnDiffOpenerProvider value={openTurnDiff}>
-					<div className='flex min-h-0 flex-1 flex-col overflow-hidden'>
-						<WorkspaceTimeline
-							activeSession={activeSession}
-							composer={composer}
-							workspace={activeWorkspace}
-						/>
-					</div>
-					{showsComposer(activeSession) ? (
-						<LinkedIssueComposerSlot
-							activeSession={activeSession}
-							activeWorkspace={activeWorkspace}
-							composer={composer}
-						/>
-					) : (
-						<SubAgentStatusPanel composer={composer} />
-					)}
-				</TurnDiffOpenerProvider>
-			</FilePreviewOpenerProvider>
-		</WorkspacePathResolverProvider>
+		<TurnDiffOpenerProvider value={openTurnDiff}>
+			<div className='flex min-h-0 flex-1 flex-col overflow-hidden'>
+				<WorkspaceTimeline
+					activeSession={activeSession}
+					composer={composer}
+					workspace={activeWorkspace}
+				/>
+			</div>
+			{showsComposer(activeSession) ? (
+				<LinkedIssueComposerSlot
+					activeSession={activeSession}
+					activeWorkspace={activeWorkspace}
+					composer={composer}
+				/>
+			) : (
+				<SubAgentStatusPanel composer={composer} />
+			)}
+		</TurnDiffOpenerProvider>
 	);
 }
 

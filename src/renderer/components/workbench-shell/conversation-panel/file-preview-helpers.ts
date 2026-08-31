@@ -12,7 +12,9 @@ import { PREVIEW_PDF_MIME_TYPE } from '@/shared/preview-media';
  * @param result - File-read result from the workspace preview IPC.
  * @returns An image data URL, or null when the result contains text content.
  */
-function imageSourceForPreview(result: ReadWorkspaceFileResult): string | null {
+export function imageSourceForPreview(
+	result: ReadWorkspaceFileResult,
+): string | null {
 	if (
 		result.contentEncoding !== 'base64' ||
 		!result.mimeType?.startsWith('image/') ||
