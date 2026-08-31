@@ -9,6 +9,7 @@ import {
 	ConversationContent,
 	ConversationScrollButton,
 } from '@/renderer/components/conversation';
+import { MarkdownDocumentScopeProvider } from '@/renderer/components/markdown';
 import { TextContextMenu } from '@/renderer/components/text-context-menu';
 import {
 	FilePreviewOpenerProvider,
@@ -140,6 +141,12 @@ export function ConciergeTimeline({
 	const { t } = useTranslation();
 	const [projectEvents] = useState(createTimelineProjector);
 	const { openFilePreview, resolveFilePath } = useConciergeFilePreview(home);
+	// The Concierge's home is the root its own paths are relative to, exactly as
+	// a workspace root is in a chat tab, so its answers draw their images too.
+	const markdownDocumentScope = useMemo(
+		() => (home ? { baseDirectory: '', workspaceCwd: home } : null),
+		[home],
+	);
 	const messages = useMemo<UIMessage[]>(
 		() => projectEvents(events.map(toTimelineFrame)),
 		[events, projectEvents],
@@ -185,31 +192,33 @@ export function ConciergeTimeline({
 	return (
 		<WorkspacePathResolverProvider value={resolveFilePath}>
 			<FilePreviewOpenerProvider value={openFilePreview}>
-				<TextContextMenu>
-					<Conversation className='flex-1'>
-						<ConversationContent
-							className={cn(
-								'gap-4 px-4 py-3',
-								// The same column the workspace transcript uses, so a maximized
-								// Concierge reads at the same measure rather than running the full
-								// width of a wide display.
-								centered && 'mx-auto w-full max-w-3xl gap-6 py-5',
-							)}
-						>
-							{messages.map((message, index) => (
-								<ConciergeTimelineMessage
-									isLiveTurn={isStreaming && index === messages.length - 1}
-									key={message.id}
-									message={message}
-								/>
-							))}
-							{pendingStartMs === null ? null : (
-								<ChatWorkingIndicator startMs={pendingStartMs} />
-							)}
-						</ConversationContent>
-						<ConversationScrollButton />
-					</Conversation>
-				</TextContextMenu>
+				<MarkdownDocumentScopeProvider value={markdownDocumentScope}>
+					<TextContextMenu>
+						<Conversation className='flex-1'>
+							<ConversationContent
+								className={cn(
+									'gap-4 px-4 py-3',
+									// The same column the workspace transcript uses, so a maximized
+									// Concierge reads at the same measure rather than running the full
+									// width of a wide display.
+									centered && 'mx-auto w-full max-w-3xl gap-6 py-5',
+								)}
+							>
+								{messages.map((message, index) => (
+									<ConciergeTimelineMessage
+										isLiveTurn={isStreaming && index === messages.length - 1}
+										key={message.id}
+										message={message}
+									/>
+								))}
+								{pendingStartMs === null ? null : (
+									<ChatWorkingIndicator startMs={pendingStartMs} />
+								)}
+							</ConversationContent>
+							<ConversationScrollButton />
+						</Conversation>
+					</TextContextMenu>
+				</MarkdownDocumentScopeProvider>
 			</FilePreviewOpenerProvider>
 		</WorkspacePathResolverProvider>
 	);

@@ -66,6 +66,7 @@ export function ConciergeFilePreview({ home }: { home: string | null }) {
 				isError={isError}
 				isPending={isPending}
 				path={path}
+				workspaceCwd={home ?? ''}
 			/>
 		</div>
 	);
@@ -77,11 +78,13 @@ function PreviewContent({
 	isError,
 	isPending,
 	path,
+	workspaceCwd,
 }: {
 	data: Awaited<ReturnType<typeof readWorkspaceFile>> | undefined;
 	isError: boolean;
 	isPending: boolean;
 	path: string;
+	workspaceCwd: string;
 }) {
 	const { t } = useTranslation();
 
@@ -116,5 +119,11 @@ function PreviewContent({
 			/>
 		);
 	}
-	return <FilePreviewBody filePath={path} result={data} />;
+	return (
+		<FilePreviewBody
+			filePath={path}
+			result={data}
+			workspaceCwd={workspaceCwd}
+		/>
+	);
 }

@@ -7,6 +7,8 @@ import {
 } from '@/shared/concierge-references';
 import { LINEAR_ASSET_SCHEME } from '@/shared/linear-assets';
 
+import { isLocalFileReference } from './markdown-references';
+
 /** The rehype chain Streamdown accepts, and one link in it. */
 type RehypePlugins = NonNullable<
 	ComponentProps<typeof Streamdown>['rehypePlugins']
@@ -35,6 +37,18 @@ export const CONCIERGE_REFERENCE_KIND_ATTRIBUTE = 'data-reference-kind';
 
 /** Attribute carrying the rewritten link's id. */
 export const CONCIERGE_REFERENCE_ID_ATTRIBUTE = 'data-reference-id';
+
+/** Element name a link to a workspace file is rewritten to. */
+export const FILE_REFERENCE_ELEMENT = 'ensemblr-file-link';
+
+/** Attribute carrying the rewritten link's destination, as the document wrote it. */
+export const FILE_REFERENCE_HREF_ATTRIBUTE = 'data-file-href';
+
+/** Element name an image sourced from a workspace file is rewritten to. */
+export const FILE_IMAGE_ELEMENT = 'ensemblr-file-image';
+
+/** Attribute carrying the rewritten image's source, as the document wrote it. */
+export const FILE_IMAGE_SRC_ATTRIBUTE = 'data-file-src';
 
 /** Table tags that hold cells rather than content of their own. */
 const TABLE_STRUCTURE_TAGS = new Set(['thead', 'tr', 'th', 'td']);
@@ -125,6 +139,81 @@ function rewriteReferenceAnchors(node: HastNode): void {
 	for (const child of node.children ?? []) {
 		rewriteReferenceAnchors(child);
 	}
+}
+
+/**
+ * Rewrites every link and image whose destination is a path rather than a URL
+ * into an element only this app renders, carrying the destination as a data
+ * attribute.
+ *
+ * A markdown document in a repository points at its neighbours — an ADR at the
+ * ADR it supersedes, a guide page at the screenshot beside it — and those
+ * destinations are relative paths. `rehype-harden` reads them as web URLs and
+ * resolves them against an origin: `./images/a.png` comes out as
+ * `/images/a.png`, which has lost the directory it was relative to, and a bare
+ * `images/a.png` parses as nothing at all and is replaced by the blocked-image
+ * badge. Either way the one file the reference cannot reach is the one it names.
+ *
+ * Taking those off the `a` and `img` tags before harden runs is what preserves
+ * the path the author wrote. It costs nothing elsewhere: harden still weighs
+ * every http destination, and the `a` renderer is untouched, so an external link
+ * keeps Streamdown's own link-safety affordances.
+ * @returns A rehype transform over the tree.
+ */
+function captureLocalFileReferences(): (tree: HastNode) => void {
+	return (tree) => rewriteLocalReferences(tree);
+}
+
+/**
+ * Walks a hast subtree, replacing path-destined links and images in place.
+ * @param node - The node to walk.
+ */
+function rewriteLocalReferences(node: HastNode): void {
+	if (node.type === 'element') {
+		rewriteLocalAnchor(node);
+		rewriteLocalImage(node);
+	}
+	for (const child of node.children ?? []) {
+		rewriteLocalReferences(child);
+	}
+}
+
+/**
+ * Replaces an anchor pointing at a path with the app's own link element,
+ * keeping the title the author wrote for it.
+ * @param node - The element to weigh.
+ */
+function rewriteLocalAnchor(node: HastNode): void {
+	if (node.tagName !== 'a') {
+		return;
+	}
+	const href =
+		typeof node.properties?.href === 'string' ? node.properties.href : '';
+	if (!isLocalFileReference(href)) {
+		return;
+	}
+	const { href: _href, ...properties } = node.properties ?? {};
+	node.tagName = FILE_REFERENCE_ELEMENT;
+	node.properties = { ...properties, [FILE_REFERENCE_HREF_ATTRIBUTE]: href };
+}
+
+/**
+ * Replaces an image sourced from a path with the app's own image element,
+ * keeping the alt text the author wrote for it.
+ * @param node - The element to weigh.
+ */
+function rewriteLocalImage(node: HastNode): void {
+	if (node.tagName !== 'img') {
+		return;
+	}
+	const src =
+		typeof node.properties?.src === 'string' ? node.properties.src : '';
+	if (!isLocalFileReference(src)) {
+		return;
+	}
+	const { src: _src, ...properties } = node.properties ?? {};
+	node.tagName = FILE_IMAGE_ELEMENT;
+	node.properties = { ...properties, [FILE_IMAGE_SRC_ATTRIBUTE]: src };
 }
 
 /**
@@ -239,10 +328,16 @@ function hasTableRows(node: HastNode): boolean {
  * order and any later additions to it keep applying.
  */
 export const MARKDOWN_REHYPE_PLUGINS: RehypePlugins = [
-	...Object.entries(defaultRehypePlugins).map(([name, plugin]) =>
+	...Object.entries(defaultRehypePlugins).flatMap(([name, plugin]) =>
 		name === 'sanitize'
-			? admitConciergeReferenceScheme(admitLinearAssetScheme(plugin))
-			: plugin,
+			? [
+					admitConciergeReferenceScheme(admitLinearAssetScheme(plugin)),
+					// Between sanitize and harden: after the schema has run, so the
+					// elements it mints are not stripped as unknown tags, and before
+					// harden, which would have resolved every relative path away.
+					captureLocalFileReferences as RehypePlugin,
+				]
+			: [plugin],
 	),
 	// After sanitize, so the element it mints is one the schema has already run
 	// past: an unknown tag name would be stripped outright.

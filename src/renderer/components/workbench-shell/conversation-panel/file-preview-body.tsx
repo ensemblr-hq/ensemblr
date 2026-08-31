@@ -1,12 +1,15 @@
 import type { TFunction } from 'i18next';
 import { useAtomValue } from 'jotai';
+import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { CodeBlockContent } from '@/renderer/components/code-block';
+import { MarkdownDocumentScopeProvider } from '@/renderer/components/markdown';
 import { MessageResponse } from '@/renderer/components/message';
 import { usePdfObjectUrl } from '@/renderer/hooks/workbench-shell/conversation-panel/use-pdf-object-url';
 import { languageForFilePath } from '@/renderer/lib/language-from-path';
 import { splitMarkdownFrontmatter } from '@/renderer/lib/markdown-frontmatter';
+import { documentBaseDirectory } from '@/renderer/lib/markdown-references';
 import {
 	filePreviewMarkdownPreviewAtom,
 	filePreviewWordWrapAtom,
@@ -34,9 +37,11 @@ import { PanelMessage } from './panel-message';
 export function FilePreviewBody({
 	filePath,
 	result,
+	workspaceCwd,
 }: {
 	filePath: string;
 	result: ReadWorkspaceFileResult;
+	workspaceCwd: string;
 }) {
 	const { t } = useTranslation();
 	const wordWrap = useAtomValue(filePreviewWordWrapAtom);
@@ -101,16 +106,12 @@ export function FilePreviewBody({
 	}
 
 	if (showFormattedPreview) {
-		const { body, frontmatter } = splitMarkdownFrontmatter(content);
 		return (
-			<div className='sleek-scrollbar min-h-0 flex-1 overflow-auto'>
-				<div className={DOCUMENT_BODY_CLASSES}>
-					{frontmatter ? (
-						<FrontmatterHeader block={frontmatter} className='mb-5' />
-					) : null}
-					<MessageResponse>{body}</MessageResponse>
-				</div>
-			</div>
+			<MarkdownPreview
+				content={content}
+				documentPath={result.path || filePath}
+				workspaceCwd={workspaceCwd}
+			/>
 		);
 	}
 
@@ -122,6 +123,42 @@ export function FilePreviewBody({
 			showLineNumbers
 			wrapLines={wordWrap}
 		/>
+	);
+}
+
+/**
+ * Renders a markdown file as the formatted document it describes, with its own
+ * location published to the surface so the relative links and images it writes
+ * resolve against the directory it lives in rather than against the app.
+ */
+function MarkdownPreview({
+	content,
+	documentPath,
+	workspaceCwd,
+}: {
+	content: string;
+	documentPath: string;
+	workspaceCwd: string;
+}) {
+	const { body, frontmatter } = splitMarkdownFrontmatter(content);
+	const documentScope = useMemo(
+		() => ({
+			baseDirectory: documentBaseDirectory(documentPath),
+			workspaceCwd,
+		}),
+		[documentPath, workspaceCwd],
+	);
+	return (
+		<div className='sleek-scrollbar min-h-0 flex-1 overflow-auto'>
+			<div className={DOCUMENT_BODY_CLASSES}>
+				{frontmatter ? (
+					<FrontmatterHeader block={frontmatter} className='mb-5' />
+				) : null}
+				<MarkdownDocumentScopeProvider value={documentScope}>
+					<MessageResponse>{body}</MessageResponse>
+				</MarkdownDocumentScopeProvider>
+			</div>
+		</div>
 	);
 }
 

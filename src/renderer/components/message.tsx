@@ -5,20 +5,26 @@ import { createCodePlugin } from '@streamdown/code';
 import { math } from '@streamdown/math';
 import { mermaid } from '@streamdown/mermaid';
 import { useAtomValue } from 'jotai';
-import { ImageOffIcon } from 'lucide-react';
 import type { ComponentProps, ReactNode } from 'react';
-import { Children, memo, useMemo, useState } from 'react';
-import { useTranslation } from 'react-i18next';
+import { Children, memo, useMemo } from 'react';
 import { Streamdown } from 'streamdown';
 import { ConciergeReferenceChip } from '@/renderer/components/concierge/concierge-reference-chip';
+import {
+	MarkdownFileLink,
+	MarkdownImage,
+	useMarkdownDocumentScope,
+} from '@/renderer/components/markdown';
 import {
 	attachmentPathFromInlineCode,
 	chipLabelForPath,
 	isOutsideWorkspacePath,
 } from '@/renderer/lib/agent-timeline';
 import { toBundledLanguage } from '@/renderer/lib/language-from-path';
+import { documentReferenceLookupPath } from '@/renderer/lib/markdown-references';
 import {
 	CONCIERGE_REFERENCE_ELEMENT,
+	FILE_IMAGE_ELEMENT,
+	FILE_REFERENCE_ELEMENT,
 	MARKDOWN_REHYPE_PLUGINS,
 } from '@/renderer/lib/markdown-rehype-plugins';
 import { cn } from '@/renderer/lib/utils';
@@ -47,9 +53,6 @@ type InlineCodeProps = ComponentProps<'code'> & { node?: unknown };
 /** Props received by Streamdown's fenced code-block renderer. */
 type FencedCodeProps = ComponentProps<'code'> & { node?: unknown };
 
-/** Props received by Streamdown's image renderer. */
-type MessageImageProps = ComponentProps<'img'> & { node?: unknown };
-
 /** Renders assistant markdown through Streamdown, honoring the user's chosen code theme and markdown style. */
 export const MessageResponse = memo(
 	({ className, components, ...props }: MessageResponseProps) => {
@@ -75,7 +78,9 @@ export const MessageResponse = memo(
 				...components,
 				code: MessageCodeBlock,
 				[CONCIERGE_REFERENCE_ELEMENT]: ConciergeReferenceChip,
-				img: MessageImage,
+				[FILE_IMAGE_ELEMENT]: MarkdownImage,
+				[FILE_REFERENCE_ELEMENT]: MarkdownFileLink,
+				img: MarkdownImage,
 				inlineCode: MessageInlineCode,
 				table: AnswerTable,
 			}),
@@ -125,69 +130,6 @@ function MessageCodeBlock({ children, className }: FencedCodeProps) {
 }
 
 /**
- * Renders a markdown image as a plain image, inline with the text around it.
- *
- * Streamdown frames every image in a block media widget — a 1rem block margin
- * plus a hover overlay and download button — which suits a generated picture but
- * not the badges bots write. A PR comment's status dot and project favicon sit on
- * the line with the link beside them, and that margin drops the link onto a line
- * of its own. An image that stands alone still reads as a figure; Streamdown
- * unwraps its paragraph, so the stylesheet blocks it out from the answer root.
- *
- * A PR comment is third-party markdown and its images are fetched from whatever
- * host wrote them, so an image is a read receipt for whoever hosts it. Deferring
- * the fetch until the image scrolls into view keeps a thread nobody opened from
- * announcing itself, and dropping the referrer keeps the request from carrying
- * where in the app it came from.
- *
- * A host that refuses the fetch is the ordinary case rather than the exception —
- * an expired link, a private asset, an offline machine — and the platform's
- * answer to it is a broken-image glyph that reads as a rendering fault in the
- * app. A failed load falls back to a placeholder carrying the alt text instead,
- * which is the description the author wrote for exactly this.
- */
-function MessageImage({ className, node: _node, ...props }: MessageImageProps) {
-	const { t } = useTranslation();
-	const [failedSrc, setFailedSrc] = useState<string | null>(null);
-	if (!props.src) {
-		return null;
-	}
-	if (failedSrc === props.src) {
-		return (
-			<span
-				className={cn(
-					'inline-flex max-w-full items-center gap-1.5 rounded-md border border-border border-dashed bg-muted/40 px-2 py-1 align-middle text-muted-foreground text-xs',
-					className,
-				)}
-				data-streamdown='image-unavailable'
-			>
-				<ImageOffIcon aria-hidden='true' className='size-3.5 shrink-0' />
-				<span className='truncate'>
-					{props.alt
-						? t(
-								'common:message-image.unavailable-alt',
-								'{{description}} (image unavailable)',
-								{ description: props.alt },
-							)
-						: t('common:message-image.unavailable', 'Image unavailable')}
-				</span>
-			</span>
-		);
-	}
-	return (
-		<img
-			{...props}
-			alt={props.alt ?? ''}
-			className={cn('inline-block max-w-full align-middle', className)}
-			data-streamdown='image'
-			loading='lazy'
-			onError={() => setFailedSrc(props.src ?? null)}
-			referrerPolicy='no-referrer'
-		/>
-	);
-}
-
-/**
  * Renders file-like inline code as attachment chips while preserving ordinary
  * code snippets.
  *
@@ -205,10 +147,15 @@ function MessageInlineCode({
 }: InlineCodeProps) {
 	const openFilePreview = useFilePreviewOpener();
 	const resolveWorkspacePath = useWorkspacePathResolver();
+	const documentScope = useMarkdownDocumentScope();
 	const inlineText = textFromCodeChildren(children);
 	const attachmentPath = attachmentPathFromInlineCode(inlineText);
 	const resolvedPath = attachmentPath
-		? placeInlinePath(attachmentPath, resolveWorkspacePath)
+		? placeInlinePath({
+				attachmentPath,
+				baseDirectory: documentScope?.baseDirectory ?? '',
+				resolveWorkspacePath,
+			})
 		: null;
 	if (attachmentPath && resolvedPath) {
 		return (
@@ -235,14 +182,25 @@ function MessageInlineCode({
  * workspace conversation there is no tree and no resolver, and the path is taken
  * at face value — a chip there has no opener to bind to anyway, so the two null
  * cases must not collapse into one.
- * @param attachmentPath - Path the agent wrote, as it appeared in the prose.
- * @param resolveWorkspacePath - Resolver from context, null outside a workspace.
+ *
+ * A document previewed from the workspace is tried against its own directory
+ * first, because that is what a path in a markdown file means, and only then
+ * against the workspace root, which is how an agent writes one in chat. The two
+ * readings cannot be told apart from the text alone, so both are asked and the
+ * tree decides.
+ * @param params - The path as it appeared in the prose, the directory of the
+ *   document that wrote it (empty in chat), and the resolver from context.
  * @returns The entry to bind the chip to, or null when the tree lacks the path.
  */
-function placeInlinePath(
-	attachmentPath: string,
-	resolveWorkspacePath: WorkspacePathResolver | null,
-): WorkspacePathMatch | null {
+function placeInlinePath({
+	attachmentPath,
+	baseDirectory,
+	resolveWorkspacePath,
+}: {
+	attachmentPath: string;
+	baseDirectory: string;
+	resolveWorkspacePath: WorkspacePathResolver | null;
+}): WorkspacePathMatch | null {
 	if (!resolveWorkspacePath) {
 		return {
 			kind: 'file',
@@ -250,7 +208,14 @@ function placeInlinePath(
 			scope: isOutsideWorkspacePath(attachmentPath) ? 'external' : 'workspace',
 		};
 	}
-	return resolveWorkspacePath(attachmentPath);
+	if (!baseDirectory) {
+		return resolveWorkspacePath(attachmentPath);
+	}
+	const anchored = documentReferenceLookupPath(attachmentPath, baseDirectory);
+	return (
+		(anchored ? resolveWorkspacePath(anchored) : null) ??
+		resolveWorkspacePath(attachmentPath)
+	);
 }
 
 /** Extracts plain text from Streamdown's code children, inline or fenced. */

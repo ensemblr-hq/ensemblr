@@ -109,7 +109,11 @@ export function FilePreviewPanel({
 				}
 				title={filePath}
 			/>
-			<FilePreviewBody filePath={filePath} result={result} />
+			<FilePreviewBody
+				filePath={filePath}
+				result={result}
+				workspaceCwd={workspaceCwd}
+			/>
 		</div>
 	);
 }
