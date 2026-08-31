@@ -44,33 +44,33 @@ export interface RuntimeErrorRecovery {
  * linked-directory preamble, the Follow-up behavior mid-turn, and the composer's
  * error strip when the send does not land. A send the composer cannot take right
  * now stays queued and drains when it frees up rather than disappearing.
+ * @param chatTabId - Tab owning the transcript the failed turn belongs to
  * @param fork - Fork handlers for this conversation, or null when it cannot fork
  * @param projectId - Repository whose security settings hold the permission mode
- * @param workspaceId - Workspace whose active chat the recovered prompt is sent to
  * @returns Stable handlers for every recovery the row can render
  */
 export function useRuntimeErrorRecovery({
+	chatTabId,
 	fork,
 	projectId,
-	workspaceId,
 }: {
+	chatTabId: string;
 	fork: (() => void) | null;
 	projectId: string;
-	workspaceId: string;
 }): RuntimeErrorRecovery {
 	const navigate = useNavigate();
-	const submitToComposer = useComposerSubmit(workspaceId);
+	const submitToComposer = useComposerSubmit();
 	const insertIntoComposer = useComposerInsert();
 
 	const continueTurn = useCallback(() => {
-		submitToComposer(CONTINUE_PROMPT, 'user');
-	}, [submitToComposer]);
+		submitToComposer({ chatTabId, source: 'user', text: CONTINUE_PROMPT });
+	}, [chatTabId, submitToComposer]);
 
 	const retry = useCallback(
 		(prompt: string) => {
-			submitToComposer(prompt, 'user');
+			submitToComposer({ chatTabId, source: 'user', text: prompt });
 		},
-		[submitToComposer],
+		[chatTabId, submitToComposer],
 	);
 
 	const editPrompt = useCallback(

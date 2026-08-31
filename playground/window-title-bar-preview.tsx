@@ -40,6 +40,7 @@ const IDLE_REVIEW_ACTIONS: ReviewActionsValue = {
 	archiveMergedWorkspace: () => undefined,
 	commitAndPush: () => undefined,
 	continueMergedWorkspace: () => undefined,
+	handOffToChat: () => true,
 	isAgentWorking: false,
 	isArchivingMergedWorkspace: false,
 	isContinuingMergedWorkspace: false,

@@ -1,7 +1,7 @@
 // Render harness for the review Checks panel. It needs a jotai store and the
 // review-actions context on top of what `renderWithProviders` supplies, and the
-// twelve-key `ReviewActionsValue` stub is the part worth writing once — a new
-// field on that type should break one file, not every panel test.
+// `ReviewActionsValue` stub is the part worth writing once — a new field on that
+// type should break one file, not every panel test.
 
 import { QueryClientProvider } from '@tanstack/react-query';
 import { render } from '@testing-library/react';
@@ -25,6 +25,7 @@ export function stubReviewActions(
 		archiveMergedWorkspace: vi.fn(),
 		commitAndPush: vi.fn(),
 		continueMergedWorkspace: vi.fn(),
+		handOffToChat: vi.fn(() => true),
 		isAgentWorking: false,
 		isArchivingMergedWorkspace: false,
 		isContinuingMergedWorkspace: false,

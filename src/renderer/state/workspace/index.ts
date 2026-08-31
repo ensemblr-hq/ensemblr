@@ -60,6 +60,7 @@ export {
 	activeChatTabByWorkspaceAtom,
 	lastWorkspaceNavigationRenderStateAtom,
 	lastWorkspaceSelectionAtom,
+	sessionVisitOrderByWorkspaceAtom,
 } from './selection-atoms';
 export { readStoredWorkspaceSelection } from './selection-storage';
 export { resolveRunningCloseTarget } from './session-tab-close';

@@ -32,7 +32,13 @@ export const sessionVisitOrderByWorkspaceAtom = atom<Record<string, string[]>>(
 	{},
 );
 
-/** Persisted active chat-tab session id, keyed by workspace id. */
+/**
+ * Persisted id of the tab each workspace was last on, so re-entering it lands
+ * back there. Any kind qualifies — the strip carries file, diff, and terminal
+ * tabs on the same route — so this is a routing memory, never the answer to
+ * "which chat should this prompt go to". That target is
+ * `resolveTargetChatTabId`.
+ */
 export const activeChatTabByWorkspaceAtom = atomWithStorage<
 	Record<string, string>
 >(

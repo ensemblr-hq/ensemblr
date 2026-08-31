@@ -131,9 +131,9 @@ export function AgentSessionTimeline({
 		[canFork, fork.forkToNewTab],
 	);
 	const errorRecovery = useRuntimeErrorRecovery({
+		chatTabId: activeSession.chatTabId,
 		fork: forkFromEnd,
 		projectId: workspace.projectId,
-		workspaceId: workspace.id,
 	});
 	const retryPrompts = useMemo(
 		() => retryPromptsByMessageId(messages),

@@ -607,8 +607,8 @@ export default interface Resources {
 			};
 		};
 		composer: {
-			'no-chat-tab': {
-				title: 'Open a chat tab to hand this to the agent.';
+			'chat-tab-not-ready': {
+				title: 'This workspace has no chat ready yet. Try again in a moment.';
 			};
 		};
 		'continue-branch': {
