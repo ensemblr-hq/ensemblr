@@ -1,4 +1,5 @@
 import { useNavigate } from '@tanstack/react-router';
+import type { TFunction } from 'i18next';
 import { useSetAtom } from 'jotai';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -8,12 +9,14 @@ import {
 	runWorkspaceScript,
 	stopWorkspaceScript,
 } from '@/renderer/api/ensemblr/workspace-scripts';
+import { failureDetail, failureText } from '@/renderer/lib/failure-text';
 import { lastRunScriptAtomFamily } from '@/renderer/state/preferences';
 import { useProvideDockTerminal } from '@/renderer/state/workspace/terminal-requests';
 import type { WorkbenchRouteSearch } from '@/renderer/types/workbench';
 import type { WorkbenchDockActions } from '@/renderer/types/workbench-shell';
 import type {
 	CreateTerminalSessionResult,
+	TerminalDiagnostic,
 	TerminalSessionSnapshot,
 } from '@/shared/ipc/contracts/terminal';
 
@@ -152,25 +155,53 @@ export function useWorkspaceDockActions({
 					scriptName: scriptName ?? null,
 					workspaceId,
 				})
-					.then((result) => notifyScriptConflict(result.diagnostics))
-					.catch(() => undefined);
+					.then((result) => notifyScriptResult(t, result.diagnostics))
+					.catch(() =>
+						toast.error(
+							t(
+								'errors:run-script.start-failed.title',
+								'The run script could not start.',
+							),
+						),
+					);
 				updateSearchRef.current({ dock: 'run' });
 			},
 			onRunSetupScript: () => {
 				void runWorkspaceScript({ kind: 'setup', workspaceId })
-					.then((result) => notifyScriptConflict(result.diagnostics))
-					.catch(() => undefined);
+					.then((result) => notifyScriptResult(t, result.diagnostics))
+					.catch(() =>
+						toast.error(
+							t(
+								'errors:setup-script.start-failed.title',
+								'The setup script could not start.',
+							),
+						),
+					);
 				updateSearchRef.current({ dock: 'setup' });
 			},
 			onStopRunScript: () => {
-				void stopWorkspaceScript({ kind: 'run', workspaceId }).catch(
-					() => undefined,
-				);
+				void stopWorkspaceScript({ kind: 'run', workspaceId })
+					.then((result) => notifyScriptResult(t, result.diagnostics))
+					.catch(() =>
+						toast.error(
+							t(
+								'errors:run-script.stop-failed.title',
+								'The run script could not be stopped.',
+							),
+						),
+					);
 			},
 			onStopSetupScript: () => {
-				void stopWorkspaceScript({ kind: 'setup', workspaceId }).catch(
-					() => undefined,
-				);
+				void stopWorkspaceScript({ kind: 'setup', workspaceId })
+					.then((result) => notifyScriptResult(t, result.diagnostics))
+					.catch(() =>
+						toast.error(
+							t(
+								'errors:setup-script.stop-failed.title',
+								'The setup script could not be stopped.',
+							),
+						),
+					);
 			},
 		}),
 		[
@@ -179,9 +210,38 @@ export function useWorkspaceDockActions({
 			openTerminal,
 			repositoryId,
 			setLastRunScript,
+			t,
 			workspaceId,
 		],
 	);
+}
+
+/**
+ * Reports what a script launch or stop actually did. The script channels answer
+ * a refusal with a session-less result and diagnostics rather than a rejected
+ * promise, so a failed spawn or an unreadable workspace reaches the user only
+ * from here — a caller that watched `.catch` alone would show nothing and leave
+ * the dock looking like the button did not fire. Milder diagnostics fall
+ * through to {@link notifyScriptConflict}.
+ * @param t - Translator bound to the active language.
+ * @param diagnostics - Diagnostics the main process answered with.
+ */
+function notifyScriptResult(
+	t: TFunction,
+	diagnostics: readonly TerminalDiagnostic[],
+): void {
+	const failure = diagnostics.find(
+		(diagnostic) => diagnostic.severity === 'error',
+	);
+
+	if (!failure) {
+		notifyScriptConflict(diagnostics);
+		return;
+	}
+
+	toast.error(failureText(t, failure) ?? failure.message, {
+		description: failureDetail(t, failure) ?? undefined,
+	});
 }
 
 /** Surfaces script diagnostics (e.g. duplicate-run conflicts) to the user. */

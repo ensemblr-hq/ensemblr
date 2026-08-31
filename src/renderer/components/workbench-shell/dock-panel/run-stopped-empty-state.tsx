@@ -10,9 +10,12 @@ import { formatShortcut } from '@/shared/keymap';
  * caption pointing at where dev-server output will stream once it starts.
  */
 export function RunStoppedEmptyState({
+	activeRunScriptName,
 	onRunScript,
 }: {
-	onRunScript: () => void;
+	/** Script the action starts — the same one ⌘R and the header button target. */
+	activeRunScriptName: string | null;
+	onRunScript: (scriptName?: string) => void;
 }) {
 	const { t } = useTranslation();
 
@@ -27,7 +30,7 @@ export function RunStoppedEmptyState({
 				<div className='flex flex-col items-center gap-2'>
 					<Button
 						className='gap-2'
-						onClick={onRunScript}
+						onClick={() => onRunScript(activeRunScriptName ?? undefined)}
 						size='sm'
 						variant='outline'
 					>

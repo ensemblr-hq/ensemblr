@@ -927,6 +927,14 @@ export default interface Resources {
 			'health-label': 'Loading';
 			title: 'Loading repositories';
 		};
+		'run-script': {
+			'start-failed': {
+				title: 'The run script could not start.';
+			};
+			'stop-failed': {
+				title: 'The run script could not be stopped.';
+			};
+		};
 		'script-settings': {
 			'save-failed': {
 				title: 'Could not save script settings.';
@@ -954,6 +962,12 @@ export default interface Resources {
 			'chat-ready': {
 				description: 'Send the prompt to have the agent create .ensemblr/settings.toml — edit it first if needed.';
 				title: 'New chat ready for setup.';
+			};
+			'start-failed': {
+				title: 'The setup script could not start.';
+			};
+			'stop-failed': {
+				title: 'The setup script could not be stopped.';
 			};
 		};
 		'target-branch': {
