@@ -20,6 +20,7 @@ import {
 } from './support/dom';
 
 const workspace = {
+	changeSummary: { additions: 0, deletions: 0, files: 0 },
 	id: 'ws-1',
 	landingSummary: null,
 	name: 'nyman',

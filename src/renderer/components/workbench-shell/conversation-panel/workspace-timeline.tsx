@@ -1,6 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
 
-import { listClosedChatTabsWithSummaryQuery } from '@/renderer/api/ensemblr-queries';
+import {
+	agentSessionsForWorkspaceQuery,
+	listClosedChatTabsWithSummaryQuery,
+} from '@/renderer/api/ensemblr-queries';
 import { useHasPendingPrompts } from '@/renderer/state/composer';
 import type {
 	ComposerShellState,
@@ -18,10 +21,10 @@ import { WorkspaceLandingCard } from './workspace-landing-card';
  * Three mutually-exclusive states:
  *   1. Active agent session, or a prompt already submitted into one that is
  *      still opening — render `AgentSessionTimeline` with events.
- *   2. No session, transcripts exist — render `NewChatEmptyState` with chips
- *      for each `.context/sessions` transcript.
- *   3. No session, no transcripts — render `WorkspaceLandingCard` (fresh
- *      workspace summary) or a bare `NewChatEmptyState` as fallback.
+ *   2. No session, but the workspace has been worked in — render
+ *      `NewChatEmptyState`, with a chip for each `.context/sessions` transcript.
+ *   3. No session and an untouched workspace — render `WorkspaceLandingCard`
+ *      (fresh workspace summary), falling back to `NewChatEmptyState`.
  *
  * Setup / diagnostic / readiness UI lives in the sidebar footer and the
  * settings → diagnostics screen — it never appears inside the conversation
@@ -48,6 +51,9 @@ export function WorkspaceTimeline({
 	const { data: transcriptsData } = useQuery(
 		listClosedChatTabsWithSummaryQuery(workspace.id),
 	);
+	const { data: agentSessionsData } = useQuery(
+		agentSessionsForWorkspaceQuery(workspace.id),
+	);
 	// The closed-history query lists every restorable tab, including terminal and
 	// aborted-summary tabs with no attachable transcript. Only summary-bearing
 	// entries can become attachment chips here.
@@ -67,8 +73,18 @@ export function WorkspaceTimeline({
 		);
 	}
 
+	// The card claims nothing has happened in this workspace yet, so every trace
+	// of prior work has to count — a sibling chat tab's session, a closed tab's
+	// transcript, or edits made straight from a terminal. An unloaded session
+	// list counts as history too: guessing "untouched" before it lands is the one
+	// answer that can be wrong, and the neutral empty state is right either way.
+	const hasWorkspaceHistory =
+		agentSessionsData === undefined ||
+		agentSessionsData.sessions.length > 0 ||
+		transcripts.length > 0 ||
+		workspace.changeSummary.files > 0;
 	const showLandingCard =
-		transcripts.length === 0 && Boolean(workspace.landingSummary);
+		!hasWorkspaceHistory && Boolean(workspace.landingSummary);
 
 	return (
 		<div className='flex min-h-0 flex-1 flex-col'>
