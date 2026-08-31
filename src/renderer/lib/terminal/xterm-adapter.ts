@@ -52,7 +52,10 @@ export function createXtermAdapter({
 	scrollback = DEFAULT_SCROLLBACK,
 }: CreateXtermAdapterOptions = {}): TerminalRendererAdapter {
 	const terminal = new Terminal({
-		allowTransparency: true,
+		// The WebGL atlas rasterizes glyphs onto a canvas built with
+		// `alpha: allowTransparency`, and Skia stem-darkens text only on an opaque
+		// one — turning this on costs dark-on-light cells ~26% of their ink.
+		allowTransparency: false,
 		convertEol: false,
 		cursorBlink: !readOnly,
 		cursorInactiveStyle: readOnly ? 'none' : 'outline',
@@ -292,8 +295,10 @@ function observeDocumentTheme(
 /**
  * Derives the xterm theme from the app's CSS design tokens so the terminal
  * follows the active Ensemblr theme: the dock terminal surface shares the
- * sidebar background. Falls back to a transparent background with inherited
- * colors when tokens are unavailable (tests).
+ * sidebar background. Every color resolves opaque, which is what lets the
+ * surface run with `allowTransparency` off. Falls back to `#00000000` with
+ * inherited colors when there is no document (tests); a real window always
+ * resolves the tokens.
  */
 function readThemeFromDocument(): {
 	background: string;

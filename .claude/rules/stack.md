@@ -28,6 +28,23 @@ workspace file watcher (`linux-recursive-watch.ts`), the window chrome
 (`src/shared/window-chrome.ts`), and updates (Linux checks and links, never
 installs).
 
+**`node-pty` is the only thing that compiles, and the Linux preflight builds it
+rather than complaining about it.** It publishes prebuilds for darwin and win32
+only, so every Linux host compiles it — and the hosts most likely to run this app
+(SteamOS, Silverblue, NixOS) ship no compiler at all.
+`scripts/require-linux-toolchain.mjs` runs ahead of `dev`, `package:linux`, and
+`make:linux`; when the binding is missing or stamped for the wrong Electron ABI
+*and* the host cannot compile, it shells out to `scripts/rebuild-native-linux.sh`
+rather than printing an instruction the contributor would only have to retype.
+Three things keep that from misfiring, and all three are load-bearing: `--report`
+never builds (it is a diagnostic, and it is also how the shell script verifies
+itself, which is what would recurse), `ENSEMBLR_NATIVE_AUTOBUILD` guards the
+re-entry, and `ENSEMBLR_SKIP_NATIVE_AUTOBUILD` is the opt-out for anywhere a
+silent image pull is unwelcome. A host that *has* a compiler is left to Forge,
+and an unportable binding — one linking a Homebrew or Nix prefix — is still
+refused rather than repaired, because that is a misconfigured host rather than a
+missing tool.
+
 **`fs.watch(dir, { recursive: true })` is not portable performance.** macOS backs
 it with one FSEvents subscription over the whole tree; Linux has no such
 primitive and emulates it by walking the tree and registering an inotify watch
@@ -138,8 +155,23 @@ streaming agent turn relayouts the viewport per frame on the renderer's main
 thread. `createXtermAdapter` loads it in `attach`, after `terminal.open` (the
 addon needs the canvas the terminal only creates once it has a container), and
 falls back to the DOM renderer on a construction failure or a
-`onContextLoss`. Note `allowTransparency: true` is still set there and costs the
-WebGL renderer its fast blend path.
+`onContextLoss`.
+
+**`allowTransparency` must stay off, and that is a legibility constraint rather
+than a performance one.** The DOM renderer never reads the option — xterm core
+only stores it — so the `true` the adapter carried from the start was inert until
+`@xterm/addon-webgl` arrived and began reading it. `TextureAtlas` builds its
+rasterization canvas with `alpha: this._config.allowTransparency`, and Skia
+stem-darkens and subpixel-antialiases text only on an opaque surface; on a
+transparent one glyphs come back grayscale-antialiased and unweighted. Measured
+in Electron 44 against the same string, the transparent atlas inked 1,386 pixels
+where the DOM renderer inked 1,877 — a quarter of the stroke gone. Light-on-dark
+absorbs that loss, so dark mode looked untouched and only light mode read as
+washed out. With the option off the WebGL renderer matches the DOM renderer's
+coverage exactly (1,877), and it regains the fast blend path as a side effect.
+Nothing needs to show through: `readThemeFromDocument` already resolves every
+token to an opaque `#rrggbb`. `tests/renderer/terminal-webgl-renderer.test.ts`
+guards it.
 
 **xterm never waits for a webfont, so the adapter has to.** Neither the core nor
 the WebGL addon references `document.fonts` anywhere, and both of the places they

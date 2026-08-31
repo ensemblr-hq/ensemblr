@@ -1,4 +1,4 @@
-#:schema https://www.ensemblr.dev/schemas/settings.schema.json
+#:schema ../schemas/settings.schema.json
 
 # Node 24 is pinned by scripts/require-node-version.mjs, so every command goes
 # through the wrapper — non-interactive shells never activate mise on their own.
@@ -27,7 +27,30 @@ command = "./scripts/with-pinned-node.sh npm run dev:playground"
 icon = "play"
 available_in = ["local"]
 
+# macOS artifact. `make:unsigned` packages --arch=arm64 and `open` is macOS-only,
+# so this one does nothing useful on a Linux host — build `appimage` there.
 [scripts.run.unsigned]
 command = "./scripts/with-pinned-node.sh npm run make:unsigned && open out"
 icon = "package"
+available_in = ["local"]
+
+# Linux artifact. Needs mksquashfs; `diagnose` reports whether this host has it.
+[scripts.run.appimage]
+command = "./scripts/with-pinned-node.sh npm run make:linux"
+icon = "package"
+available_in = ["local"]
+
+# Read-only: compiler, make, python3, mksquashfs, and what pty.node linked
+# against. Never builds, so it always describes the tree as it stands.
+[scripts.run.diagnose]
+command = "./scripts/with-pinned-node.sh npm run diagnose:linux"
+icon = "microscope"
+available_in = ["local"]
+
+# Rebuilds node-pty in a throwaway Debian container. `dev` does this by itself
+# when the binding is missing or stamped for the wrong Electron ABI; this is for
+# replacing one without waiting for a preflight to notice.
+[scripts.run.rebuild-native]
+command = "./scripts/with-pinned-node.sh npm run rebuild:native"
+icon = "hammer"
 available_in = ["local"]
