@@ -205,6 +205,7 @@ export function DockPanel({
 				value='run'
 			>
 				<RunScriptOutputPanel
+					activeRunScriptName={activeRunScript?.name ?? null}
 					onOpenSetupScripts={actions.onOpenSetupScripts}
 					onRunScript={actions.onRunScript}
 					script={workspace.scripts.run}

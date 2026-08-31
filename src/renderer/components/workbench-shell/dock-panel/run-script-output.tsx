@@ -8,14 +8,17 @@ import { XtermTerminal } from './xterm-terminal';
 
 /** Renders the Run script output or the appropriate empty state. */
 export function RunScriptOutputPanel({
+	activeRunScriptName,
 	onOpenSetupScripts,
 	onRunScript,
 	script,
 	tabLabel,
 	workspaceCwd,
 }: {
+	/** Script the stopped empty state starts, or null when none is configured. */
+	activeRunScriptName: string | null;
 	onOpenSetupScripts: () => void;
-	onRunScript: () => void;
+	onRunScript: (scriptName?: string) => void;
 	script: WorkspaceScriptSummary;
 	/** The dock tab's own name, which names a selection attached from this pane. */
 	tabLabel: string;
@@ -44,7 +47,12 @@ export function RunScriptOutputPanel({
 	}
 
 	if (!script.terminalId) {
-		return <RunStoppedEmptyState onRunScript={onRunScript} />;
+		return (
+			<RunStoppedEmptyState
+				activeRunScriptName={activeRunScriptName}
+				onRunScript={onRunScript}
+			/>
+		);
 	}
 
 	return (
