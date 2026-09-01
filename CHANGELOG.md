@@ -9,6 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`./scripts/with-pinned-node.sh npm ci` died on the preinstall Node guard even with the pinned
+  Node installed.** The wrapper handed the command to `mise exec node@24`, which resolves the
+  *direct* command from its own tool bin but appends that directory to PATH *after* the inherited
+  entries rather than before them — so `/opt/homebrew/bin` still won for any child that re-resolves
+  `node`, and npm's lifecycle scripts do exactly that. `npm ci` therefore ran under mise's Node 24
+  while its own `preinstall` ran `node scripts/require-node-version.mjs` under Homebrew's Node 26,
+  which the guard correctly rejected. The wrapper now resolves the install directory itself with
+  `mise where` (installing the version first when it is absent) and prepends it to PATH, so every
+  descendant sees the same Node. Each strategy — mise, nvm, Homebrew — is verified before it is
+  taken: the candidate's own `node --version` has to report the major in `.nvmrc`, so a stale
+  `node@24` keg or an `nvm use` that silently selected something else falls through to the next one
+  instead of running the command under the wrong runtime, and `hash -r` after the PATH change stops
+  bash serving the previously-hashed binary.
+
 ## [0.1.0-beta.22] - 2026-09-01
 
 Archiving stops hoarding disk. A worktree folder is overwhelmingly gitignored dependencies the setup
