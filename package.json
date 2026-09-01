@@ -74,7 +74,7 @@
 		"test:repository": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/register-repository.test.ts tests/main/import-local-repository.test.ts tests/main/clone-repository.test.ts tests/main/list-github-repositories.test.ts tests/main/quick-start-project.test.ts",
 		"test:workspace": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/create-workspace.test.ts",
 		"test:workspace-rename": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/rename-workspace.test.ts",
-		"test:worktree-add": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/git-ops-worktree-add.test.ts",
+		"test:worktree-add": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/git-ops-worktree-add.test.ts tests/main/git-ops-worktree-remove.test.ts",
 		"test:workspace-base-branch": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/set-workspace-base-branch.test.ts",
 		"test:continue-branch": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/continue-workspace-branch.test.ts",
 		"test:ensure-base-ref": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/ensure-base-ref.test.ts",

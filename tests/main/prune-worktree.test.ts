@@ -19,6 +19,8 @@ import {
 	pruneWorktree,
 } from '../../src/main/repository/prune-worktree.ts';
 
+const BRANCH_NAME = 'octocat/eng-1';
+
 interface Harness {
 	archivedContextPath: string;
 	repositoryPath: string;
@@ -48,7 +50,7 @@ function createHarness(t: TestContext): Harness {
 		'worktree',
 		'add',
 		'-b',
-		'octocat/eng-1',
+		BRANCH_NAME,
 		workspacePath,
 		'main',
 	]);
@@ -63,6 +65,7 @@ function createHarness(t: TestContext): Harness {
 function prune(harness: Harness) {
 	return pruneWorktree({
 		archivedContextPath: harness.archivedContextPath,
+		branchName: BRANCH_NAME,
 		localCommandService: createLocalCommandService(),
 		repositoryPath: harness.repositoryPath,
 		workspaceId: 'ws-1',
@@ -166,6 +169,7 @@ test('a files-to-copy match with nowhere to go keeps the worktree', async (t) =>
 
 	const outcome = await pruneWorktree({
 		archivedContextPath: null,
+		branchName: BRANCH_NAME,
 		localCommandService: createLocalCommandService(),
 		repositoryPath: harness.repositoryPath,
 		workspaceId: 'ws-1',
@@ -188,6 +192,7 @@ test('no files-to-copy match means an absent archive directory is harmless', asy
 
 	const outcome = await pruneWorktree({
 		archivedContextPath: null,
+		branchName: BRANCH_NAME,
 		localCommandService: createLocalCommandService(),
 		repositoryPath: harness.repositoryPath,
 		workspaceId: 'ws-1',
@@ -223,6 +228,7 @@ test('a worktree that cannot be snapshotted is kept rather than reclaimed', asyn
 
 	const outcome = await pruneWorktree({
 		archivedContextPath: harness.archivedContextPath,
+		branchName: BRANCH_NAME,
 		localCommandService: createLocalCommandService(),
 		repositoryPath: harness.repositoryPath,
 		workspaceId: 'ws-detached',
@@ -231,4 +237,93 @@ test('a worktree that cannot be snapshotted is kept rather than reclaimed', asyn
 
 	assert.equal(outcome.status, 'failure');
 	assert.equal(existsSync(path.join(detached, 'keep.txt')), true);
+});
+
+test('a worktree git no longer knows about is reclaimed from its snapshot', async (t) => {
+	const harness = createHarness(t);
+	// What `git worktree remove` leaves behind when it unregisters the worktree
+	// and then fails to delete it: a directory git cannot read, repair, or
+	// re-register, holding the dependencies the archive was meant to reclaim.
+	const snapshot = await prune(harness);
+	assert.equal(snapshot.status, 'pruned');
+	mkdirSync(path.join(harness.workspacePath, 'node_modules'), {
+		recursive: true,
+	});
+	writeFileSync(path.join(harness.workspacePath, '.git'), 'gitdir: gone\n');
+
+	const outcome = await prune(harness);
+
+	assert.equal(outcome.status, 'pruned');
+	assert.equal(existsSync(harness.workspacePath), false);
+	assert.equal(outcome.wipCommit, snapshot.wipCommit);
+	assert.equal(outcome.headCommit, snapshot.headCommit);
+});
+
+// The archive ref outlives its own prune whenever the best-effort ref delete an
+// unarchive runs does not land. A snapshot from a cycle the branch has since
+// moved past is not this worktree's state, and reclaiming against it would
+// destroy the work in between while reporting the archive as recoverable.
+test('a snapshot the branch has moved past is refused', async (t) => {
+	const harness = createHarness(t);
+	const stale = await prune(harness);
+	assert.equal(stale.status, 'pruned');
+	runGit(harness.repositoryPath, [
+		'worktree',
+		'add',
+		harness.workspacePath,
+		BRANCH_NAME,
+	]);
+	writeFileSync(path.join(harness.workspacePath, 'later.txt'), 'later\n');
+	runGit(harness.workspacePath, ['add', '.']);
+	runGit(harness.workspacePath, [
+		'commit',
+		'-m',
+		'work done since the archive',
+	]);
+	writeFileSync(path.join(harness.workspacePath, 'unsaved.txt'), 'work\n');
+	writeFileSync(path.join(harness.workspacePath, '.git'), 'gitdir: gone\n');
+
+	const outcome = await prune(harness);
+
+	assert.equal(outcome.status, 'failure');
+	assert.equal(
+		existsSync(path.join(harness.workspacePath, 'unsaved.txt')),
+		true,
+	);
+});
+
+// A worktree that is intact but has no commit on HEAD yet reads as unreadable
+// to `rev-parse HEAD`, and its contents are still the only copy of themselves.
+test('a worktree on an unborn branch is not treated as unreadable', async (t) => {
+	const harness = createHarness(t);
+	const emptyRepository = path.join(harness.repositoryPath, '..', 'empty');
+	mkdirSync(emptyRepository, { recursive: true });
+	runGit(emptyRepository, ['init', '-b', 'main']);
+	writeFileSync(path.join(emptyRepository, 'unsaved.txt'), 'work\n');
+
+	const outcome = await pruneWorktree({
+		archivedContextPath: harness.archivedContextPath,
+		branchName: 'main',
+		localCommandService: createLocalCommandService(),
+		repositoryPath: emptyRepository,
+		workspaceId: 'ws-1',
+		workspacePath: emptyRepository,
+	});
+
+	assert.equal(outcome.status, 'failure');
+	assert.equal(existsSync(path.join(emptyRepository, 'unsaved.txt')), true);
+});
+
+test('an unreadable worktree with no snapshot to fall back on is kept', async (t) => {
+	const harness = createHarness(t);
+	writeFileSync(path.join(harness.workspacePath, '.git'), 'gitdir: gone\n');
+	writeFileSync(path.join(harness.workspacePath, 'unsaved.txt'), 'work\n');
+
+	const outcome = await prune(harness);
+
+	assert.equal(outcome.status, 'failure');
+	assert.equal(
+		existsSync(path.join(harness.workspacePath, 'unsaved.txt')),
+		true,
+	);
 });

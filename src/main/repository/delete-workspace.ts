@@ -12,7 +12,6 @@ import type { EnsemblrDatabaseService } from '../storage';
 import { selectDeleteWorkspaceWithRepositoryById } from '../storage/repositories/workspace-repository.ts';
 import { runBranchDelete, runRefDelete, runWorktreeRemove } from './git-ops.ts';
 import { archivedWorktreeRefFor } from './prune-worktree.ts';
-import { removeDirectoryTree } from './remove-directory.ts';
 import { deleteWorkspaceRow } from './workspace-row-ops.ts';
 import type { WorkspaceTeardownService } from './workspace-teardown.ts';
 
@@ -99,8 +98,12 @@ export function createDeleteWorkspaceService({
 				});
 			}
 
+			// Deleting a workspace is explicit intent for the directory too, so a
+			// `git worktree lock` is released rather than worked around, and the
+			// removal reports success only once the path is gone.
 			const worktreeOutcome = await runWorktreeRemove({
 				localCommandService,
+				deletingWorkspace: true,
 				repositoryPath: source.repositoryPath,
 				workspacePath: source.path,
 			});
@@ -112,11 +115,7 @@ export function createDeleteWorkspaceService({
 					severity: 'warning',
 				});
 			}
-
-			const pathRemoved = await removeWorkspaceDirectory({
-				diagnostics,
-				workspacePath: source.path,
-			});
+			const pathRemoved = worktreeOutcome.status === 'success';
 
 			// A workspace that was ever archived with disk reclaimed still carries the
 			// private ref that pinned its snapshot. It survives the branch on
@@ -204,32 +203,6 @@ function readWorkspace(
 		return null;
 	}
 	return row;
-}
-
-/**
- * Remove a workspace's worktree directory, recording a warning diagnostic on failure.
- * @param options - Diagnostics sink and the workspace path to remove
- * @returns True when the directory no longer exists afterward
- */
-async function removeWorkspaceDirectory({
-	diagnostics,
-	workspacePath,
-}: {
-	diagnostics: DeleteWorkspaceDiagnostic[];
-	workspacePath: string;
-}): Promise<boolean> {
-	const outcome = await removeDirectoryTree(workspacePath);
-
-	if (outcome.error !== null || !outcome.removed) {
-		diagnostics.push({
-			code: 'workspace-delete-failed',
-			message: outcome.error ?? 'Failed to remove the workspace directory.',
-			path: workspacePath,
-			severity: 'warning',
-		});
-	}
-
-	return outcome.removed;
 }
 
 /**

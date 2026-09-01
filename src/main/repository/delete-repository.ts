@@ -117,8 +117,11 @@ export function createDeleteRepositoryService({
 					});
 				}
 
+				// The whole repository is going, so a `git worktree lock` on one of its
+				// workspaces is unlocked rather than worked around.
 				const worktreeOutcome = await runWorktreeRemove({
 					localCommandService,
+					deletingWorkspace: true,
 					repositoryPath: source.path,
 					workspacePath: workspace.path,
 				});
@@ -131,8 +134,6 @@ export function createDeleteRepositoryService({
 						workspaceId: workspace.id,
 					});
 				}
-
-				await removeWorkspaceDirectory({ diagnostics, workspace });
 
 				if (workspace.branchName) {
 					const branchOutcome = await runBranchDelete({
@@ -233,30 +234,6 @@ function readRepository(
 		slug: repositoryRow.slug,
 		workspaces,
 	};
-}
-
-/**
- * Remove a workspace's worktree directory, recording a warning diagnostic when it cannot be deleted.
- * @param options - Diagnostics sink and the workspace whose directory is removed
- */
-async function removeWorkspaceDirectory({
-	diagnostics,
-	workspace,
-}: {
-	diagnostics: DeleteRepositoryDiagnostic[];
-	workspace: SourceWorkspace;
-}): Promise<void> {
-	const outcome = await removeDirectoryTree(workspace.path);
-
-	if (outcome.error !== null || !outcome.removed) {
-		diagnostics.push({
-			code: 'workspace-cleanup-failed',
-			message: outcome.error ?? 'Failed to remove the workspace directory.',
-			path: workspace.path,
-			severity: 'warning',
-			workspaceId: workspace.id,
-		});
-	}
 }
 
 /**

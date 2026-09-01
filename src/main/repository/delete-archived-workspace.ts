@@ -110,8 +110,11 @@ export function createDeleteArchivedWorkspaceService({
 
 			let pathRemoved = !existsSync(source.path);
 			if (!pathRemoved) {
+				// Purging the archive is explicit intent for the directory too, so a
+				// `git worktree lock` is released rather than worked around.
 				const worktreeOutcome = await runWorktreeRemove({
 					localCommandService,
+					deletingWorkspace: true,
 					repositoryPath: source.repositoryPath,
 					workspacePath: source.path,
 				});
@@ -123,10 +126,7 @@ export function createDeleteArchivedWorkspaceService({
 						severity: 'warning',
 					});
 				}
-				pathRemoved = await removeWorkspaceDirectory({
-					diagnostics,
-					workspacePath: source.path,
-				});
+				pathRemoved = worktreeOutcome.status === 'success';
 			}
 
 			let branchDeleted = false;
@@ -234,33 +234,6 @@ function readArchivedWorkspace(
 		path: candidate.path,
 		repositoryPath: candidate.repositoryPath,
 	};
-}
-
-/**
- * Removes the workspace worktree directory, recording a diagnostic on failure.
- * @param diagnostics - Diagnostics sink appended to on failure
- * @param workspacePath - Absolute path of the worktree directory
- * @returns True when the directory no longer exists afterwards
- */
-async function removeWorkspaceDirectory({
-	diagnostics,
-	workspacePath,
-}: {
-	diagnostics: DeleteArchivedWorkspaceDiagnostic[];
-	workspacePath: string;
-}): Promise<boolean> {
-	const outcome = await removeDirectoryTree(workspacePath);
-
-	if (outcome.error !== null || !outcome.removed) {
-		diagnostics.push({
-			code: 'worktree-cleanup-failed',
-			message: outcome.error ?? 'Failed to remove the workspace directory.',
-			path: workspacePath,
-			severity: 'warning',
-		});
-	}
-
-	return outcome.removed;
 }
 
 /**

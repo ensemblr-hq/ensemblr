@@ -1,8 +1,12 @@
+import { existsSync, realpathSync } from 'node:fs';
+import path from 'node:path';
+
 import type {
 	LocalCommandResult,
 	LocalCommandService,
 } from '../commands/local-command';
 import { firstLine } from './first-line.ts';
+import { removeDirectoryTree } from './remove-directory.ts';
 
 /** Outcome of a git operation that the caller maps to its own diagnostic code. */
 type GitOpOutcome =
@@ -786,8 +790,241 @@ async function runGitSucceeds({
 	}
 }
 
-/** Force-removes a worktree registration so a follow-up branch delete succeeds. */
+/**
+ * Removes a worktree's registration and its directory, reporting success only
+ * once the directory is actually gone.
+ *
+ * `git worktree remove` aborts its recursive delete on the first entry it
+ * cannot unlink — a `.DS_Store` Finder writes into a directory mid-walk makes
+ * the following `rmdir` return `ENOTEMPTY`, which is enough — and then drops
+ * `.git/worktrees/<id>` anyway before exiting non-zero. The tree is left whole
+ * on disk as a worktree git no longer knows about, so no later git command can
+ * remove it and the disk is never reclaimed. The directory is therefore
+ * unlinked directly when it survives an unregistration, which retries that
+ * race rather than abandoning the whole walk to it.
+ *
+ * Unregistration is the condition, not the surviving directory: git also
+ * refuses a *locked* worktree, and that refusal keeps both the registration and
+ * the tree intact. Unlinking there would destroy a worktree the user marked
+ * do-not-touch, leave `.git/worktrees/<id>` pointing at nothing — `git worktree
+ * prune` skips a locked entry, so permanently — and break the `git branch -D`
+ * this removal exists to enable, which still reports the branch as checked out.
+ * A caller deleting the workspace outright says so with `deletingWorkspace`.
+ * Git's refusal preserves nothing there, so the lock is released and the
+ * removal retried — keeping git's own bookkeeping consistent rather than
+ * stepping around it — and an unanswerable registration no longer holds the
+ * directory back either.
+ * @param options - Repository path, worktree path, delete intent, and the command runner.
+ * @returns Success once the directory is gone, or why it could not be removed.
+ */
 export async function runWorktreeRemove({
+	deletingWorkspace = false,
+	localCommandService,
+	repositoryPath,
+	workspacePath,
+}: {
+	/** True when the workspace itself is going, so git's refusal preserves nothing. */
+	deletingWorkspace?: boolean;
+	localCommandService: LocalCommandService;
+	repositoryPath: string;
+	workspacePath: string;
+}): Promise<GitOpOutcome> {
+	const attempt = await removeWorktreeUntilUnregistered({
+		deletingWorkspace,
+		localCommandService,
+		repositoryPath,
+		workspacePath,
+	});
+	if (attempt.state === 'gone') {
+		return { status: 'success' };
+	}
+	if (attempt.state === 'registered' && !deletingWorkspace) {
+		return { status: 'failure', message: attempt.message };
+	}
+
+	const removal = await removeDirectoryTree(workspacePath);
+	if (removal.removed) {
+		return { status: 'success' };
+	}
+
+	return { status: 'failure', message: removal.error ?? attempt.message };
+}
+
+/**
+ * Runs git's own removal, retrying once past a lock when the caller's intent
+ * allows it, and reports which of the three states the worktree ended in.
+ *
+ * `registered` is the state a prune must never unlink behind git's back:
+ * either git still owns the worktree, or it could not be asked and the answer
+ * is unknown.
+ * @param options - Repository path, worktree path, delete intent, and the command runner.
+ * @returns Whether the directory is gone, still registered, or an orphan on disk.
+ */
+async function removeWorktreeUntilUnregistered({
+	deletingWorkspace,
+	localCommandService,
+	repositoryPath,
+	workspacePath,
+}: {
+	deletingWorkspace: boolean;
+	localCommandService: LocalCommandService;
+	repositoryPath: string;
+	workspacePath: string;
+}): Promise<WorktreeRemovalState> {
+	const first = await attemptWorktreeRemoval({
+		localCommandService,
+		repositoryPath,
+		workspacePath,
+	});
+	if (first.state !== 'registered' || !deletingWorkspace) {
+		return first;
+	}
+
+	await runWorktreeUnlock({
+		localCommandService,
+		repositoryPath,
+		workspacePath,
+	});
+	return await attemptWorktreeRemoval({
+		localCommandService,
+		repositoryPath,
+		workspacePath,
+	});
+}
+
+/** Where a single `git worktree remove` left the worktree. */
+type WorktreeRemovalState =
+	| { state: 'gone' }
+	| { state: 'orphaned'; message: string }
+	| { state: 'registered'; message: string };
+
+/**
+ * Runs git's removal once and classifies what survived it.
+ * @param options - Repository path, worktree path, and the command runner.
+ * @returns Whether the directory is gone, still registered, or an orphan on disk.
+ */
+async function attemptWorktreeRemoval({
+	localCommandService,
+	repositoryPath,
+	workspacePath,
+}: {
+	localCommandService: LocalCommandService;
+	repositoryPath: string;
+	workspacePath: string;
+}): Promise<WorktreeRemovalState> {
+	const gitOutcome = await removeWorktreeWithGit({
+		localCommandService,
+		repositoryPath,
+		workspacePath,
+	});
+	if (!existsSync(workspacePath)) {
+		return { state: 'gone' };
+	}
+
+	const message =
+		gitOutcome.status === 'failure'
+			? gitOutcome.message
+			: `The worktree directory ${workspacePath} is still on disk.`;
+	const registered = await isWorktreeRegistered({
+		localCommandService,
+		repositoryPath,
+		workspacePath,
+	});
+	return registered === false
+		? { state: 'orphaned', message }
+		: { state: 'registered', message };
+}
+
+/**
+ * Releases a `git worktree lock` so a delete can proceed through git rather
+ * than around it. Best-effort: the retry that follows reports the real outcome.
+ * @param options - Repository path, worktree path, and the command runner.
+ */
+async function runWorktreeUnlock({
+	localCommandService,
+	repositoryPath,
+	workspacePath,
+}: {
+	localCommandService: LocalCommandService;
+	repositoryPath: string;
+	workspacePath: string;
+}): Promise<void> {
+	try {
+		await localCommandService.run({
+			args: ['worktree', 'unlock', workspacePath],
+			command: 'git',
+			cwd: repositoryPath,
+			maxOutputBytes: 4 * 1024,
+			timeoutMs: GIT_WORKTREE_TIMEOUT_MS,
+		});
+	} catch {
+		return;
+	}
+}
+
+/**
+ * Asks git whether it still knows the path as one of the repository's
+ * worktrees, which is what separates a removal that unregistered and then
+ * failed to delete from one git refused outright.
+ *
+ * A list that cannot be read or parsed answers null rather than false: the
+ * caller unlinks a directory on the strength of this answer, so "git did not
+ * say" must not read as "git dropped it".
+ * @param options - Repository path, worktree path, and the command runner.
+ * @returns Whether the path is registered, or null when git could not be asked.
+ */
+async function isWorktreeRegistered({
+	localCommandService,
+	repositoryPath,
+	workspacePath,
+}: {
+	localCommandService: LocalCommandService;
+	repositoryPath: string;
+	workspacePath: string;
+}): Promise<boolean | null> {
+	try {
+		const result = await localCommandService.run({
+			args: ['worktree', 'list', '--porcelain'],
+			command: 'git',
+			cwd: repositoryPath,
+			maxOutputBytes: 256 * 1024,
+			timeoutMs: GIT_WORKTREE_TIMEOUT_MS,
+		});
+		if (result.status !== 'success') {
+			return null;
+		}
+		const target = canonicalPath(workspacePath);
+		return result.stdout
+			.split(/\r?\n/)
+			.filter((line) => line.startsWith('worktree '))
+			.some((line) => canonicalPath(line.slice('worktree '.length)) === target);
+	} catch {
+		return null;
+	}
+}
+
+/**
+ * Resolves a path to the form git prints, so `/tmp` and `/private/tmp` compare
+ * equal on macOS. An unresolvable path falls back to its normalized form.
+ * @param candidate - Path to canonicalize.
+ * @returns The real path when it resolves, or the normalized path.
+ */
+function canonicalPath(candidate: string): string {
+	const normalized = path.resolve(candidate.trim());
+	try {
+		return realpathSync.native(normalized);
+	} catch {
+		return normalized;
+	}
+}
+
+/**
+ * Runs `git worktree remove --force`, which unregisters the worktree and tries
+ * to delete its directory.
+ * @param options - Repository path, worktree path, and the command runner.
+ * @returns What git reported, which says nothing about the directory itself.
+ */
+async function removeWorktreeWithGit({
 	localCommandService,
 	repositoryPath,
 	workspacePath,
