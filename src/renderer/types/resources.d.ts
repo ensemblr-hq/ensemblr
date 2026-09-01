@@ -3232,6 +3232,8 @@ export default interface Resources {
 		'new-chat': {
 			'aria-label': 'New chat empty state';
 			headline: 'New chat in <path>/{{workspaceName}}</path>.';
+			'transcript-unavailable': 'No transcript was saved for this chat, so it cannot be attached.';
+			'transcript-unavailable-aria': '{{title}} — no transcript was saved for this chat, so it cannot be attached.';
 			'transcripts-label': 'Add chat transcripts:';
 			'untitled-transcript': 'Untitled transcript';
 		};
