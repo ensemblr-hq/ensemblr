@@ -150,6 +150,10 @@ export const deleteBranchOnArchiveAtom = settingAtom(
 	'git',
 	'deleteLocalBranchOnArchive',
 );
+export const reclaimDiskOnArchiveAtom = settingAtom(
+	'git',
+	'reclaimDiskOnArchive',
+);
 export const archiveOnMergeAtom = settingAtom('git', 'archiveAfterMerge');
 export const setUpstreamOnPushAtom = settingAtom('git', 'setUpstreamOnPush');
 

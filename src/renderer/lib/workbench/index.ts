@@ -22,6 +22,7 @@ export {
 	getCompactFileDirectory,
 	listDirectoryPaths,
 } from './file-tree';
+export { formatBytes } from './format-bytes';
 export { harnessIconClassName, harnessIconName } from './harness-icons';
 export { healthTone } from './health-tone';
 export {

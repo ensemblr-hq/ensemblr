@@ -29,14 +29,16 @@ function workspace(): WorkspaceShellModel {
 }
 
 /**
- * Installs a bridge whose settings resolver reports the repository's
- * branch-cleanup policy, plus a spy standing in for the archive IPC.
+ * Installs a bridge whose settings resolver reports the repository's worktree
+ * disposal policy, plus a spy standing in for the archive IPC.
  */
 function installBridge({
 	deleteLocalBranchOnArchive,
+	reclaimDiskOnArchive,
 	resolveSettings,
 }: {
 	deleteLocalBranchOnArchive?: boolean;
+	reclaimDiskOnArchive?: boolean;
 	resolveSettings?: () => Promise<unknown>;
 }): ReturnType<typeof vi.fn> {
 	const archiveWorkspace = vi.fn(() =>
@@ -54,6 +56,11 @@ function installBridge({
 								key: 'deleteLocalBranchOnArchive',
 								source: 'default',
 								value: deleteLocalBranchOnArchive === true,
+							},
+							{
+								key: 'reclaimDiskOnArchive',
+								source: 'default',
+								value: reclaimDiskOnArchive === true,
 							},
 						],
 					},
@@ -95,6 +102,7 @@ describe('archive workspace dialog branch cleanup', () => {
 		await waitFor(() => {
 			expect(archiveWorkspace).toHaveBeenCalledWith({
 				branchCleanup: false,
+				reclaimDisk: false,
 				workspaceId: 'ws-doomed',
 			});
 		});
@@ -116,6 +124,7 @@ describe('archive workspace dialog branch cleanup', () => {
 		await waitFor(() => {
 			expect(archiveWorkspace).toHaveBeenCalledWith({
 				branchCleanup: true,
+				reclaimDisk: false,
 				workspaceId: 'ws-doomed',
 			});
 		});
@@ -158,6 +167,52 @@ describe('archive workspace dialog branch cleanup', () => {
 		});
 	});
 
+	it('archives with disk reclaim when only that git setting is on', async () => {
+		const archiveWorkspace = installBridge({ reclaimDiskOnArchive: true });
+
+		renderDialog();
+
+		const action = screen.getByRole('button', { name: /^archive$/i });
+		await waitFor(() => {
+			expect(action).not.toBeDisabled();
+		});
+		await userEvent.click(action);
+
+		await waitFor(() => {
+			expect(archiveWorkspace).toHaveBeenCalledWith({
+				branchCleanup: false,
+				reclaimDisk: true,
+				workspaceId: 'ws-doomed',
+			});
+		});
+	});
+
+	// Dropping the branch destroys the commits; reclaiming keeps them. Sending
+	// both would let the dialog promise a workspace that comes back while doing
+	// the archive that does not.
+	it('does not reclaim when branch cleanup already destroys the worktree', async () => {
+		const archiveWorkspace = installBridge({
+			deleteLocalBranchOnArchive: true,
+			reclaimDiskOnArchive: true,
+		});
+
+		renderDialog();
+
+		const action = screen.getByRole('button', { name: /^archive$/i });
+		await waitFor(() => {
+			expect(action).not.toBeDisabled();
+		});
+		await userEvent.click(action);
+
+		await waitFor(() => {
+			expect(archiveWorkspace).toHaveBeenCalledWith({
+				branchCleanup: true,
+				reclaimDisk: false,
+				workspaceId: 'ws-doomed',
+			});
+		});
+	});
+
 	// A failed resolver reads as `false` too, so without the notice the dialog
 	// would quietly do the opposite of a repository that opted into cleanup.
 	it('says the branch is kept when the settings resolver fails', async () => {
@@ -180,6 +235,7 @@ describe('archive workspace dialog branch cleanup', () => {
 		await waitFor(() => {
 			expect(archiveWorkspace).toHaveBeenCalledWith({
 				branchCleanup: false,
+				reclaimDisk: false,
 				workspaceId: 'ws-doomed',
 			});
 		});

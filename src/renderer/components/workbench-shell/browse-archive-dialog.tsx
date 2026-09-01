@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArchiveIcon, ArchiveRestoreIcon, Trash2Icon } from 'lucide-react';
+import { HardDriveDownloadIcon } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -19,17 +19,20 @@ import {
 	DialogTitle,
 } from '@/renderer/components/ui/dialog';
 import { ArchiveDiagnosticsList } from '@/renderer/components/workbench-shell/archive-diagnostics-list';
-import { canRestoreArchivedWorkspace } from '@/renderer/lib/archive-restore';
+import {
+	type ArchiveRowAction,
+	type ArchiveRowDiagnostic,
+	BrowseArchiveRow,
+} from '@/renderer/components/workbench-shell/browse-archive-row';
+import { useArchiveReclaim } from '@/renderer/hooks/workbench-shell/use-archive-reclaim';
+import { formatBytes } from '@/renderer/lib/workbench';
 import type { ProjectShellModel } from '@/renderer/types/workbench';
-import type {
-	ArchivedWorkspaceListEntry,
-	DeleteArchivedWorkspaceDiagnostic,
-	UnarchiveWorkspaceDiagnostic,
-} from '@/shared/ipc/contracts/workspace';
+import type { ArchivedWorkspaceListEntry } from '@/shared/ipc/contracts/workspace';
 
 /**
  * Repository-scoped browser for archived workspaces. Lets users unarchive
- * (restore worktree + .context/) or permanently purge each entry. Backed by
+ * (restore worktree + .context/), reclaim the disk a still-materialized
+ * worktree occupies, or permanently purge each entry. Backed by
  * `archivedWorkspacesQuery` so the list refreshes when archive lifecycle
  * mutations invalidate the cache.
  */
@@ -59,12 +62,13 @@ export function BrowseArchiveDialog({
 	);
 }
 
-/** Diagnostic surfaced against a single archived-workspace row from a delete or unarchive attempt. */
-type RowDiagnostic =
-	| DeleteArchivedWorkspaceDiagnostic
-	| UnarchiveWorkspaceDiagnostic;
+/** Which row is running which action, plus the diagnostics one of them produced. */
+interface RowActivity {
+	action: ArchiveRowAction;
+	workspaceId: string;
+}
 
-/** Inner body that lists a repository's archived workspaces with restore and purge actions. */
+/** Inner body that lists a repository's archived workspaces with its row actions. */
 function BrowseArchiveDialogBody({
 	onChange,
 	project,
@@ -72,7 +76,7 @@ function BrowseArchiveDialogBody({
 	onChange: (repositoryId: string) => Promise<void> | void;
 	project: ProjectShellModel;
 }) {
-	const { t } = useTranslation();
+	const { i18n, t } = useTranslation();
 	const queryClient = useQueryClient();
 	const apiAvailable = isEnsemblrApiAvailable();
 	const { data, isLoading, isError } = useQuery({
@@ -81,13 +85,14 @@ function BrowseArchiveDialogBody({
 	});
 
 	const entries = useMemo(() => data?.entries ?? [], [data]);
-	const [pendingId, setPendingId] = useState<string | null>(null);
-	const [pendingAction, setPendingAction] = useState<
-		'unarchive' | 'delete' | null
-	>(null);
-	const [diagnostics, setDiagnostics] = useState<{
+	const reclaimable = useMemo(
+		() => entries.filter((entry) => entry.pathExists),
+		[entries],
+	);
+	const [activity, setActivity] = useState<RowActivity | null>(null);
+	const [rowDiagnostics, setRowDiagnostics] = useState<{
 		workspaceId: string;
-		entries: RowDiagnostic[];
+		entries: ArchiveRowDiagnostic[];
 	} | null>(null);
 
 	const invalidate = useCallback(async () => {
@@ -100,6 +105,17 @@ function BrowseArchiveDialogBody({
 		await onChange(project.id);
 	}, [onChange, project.id, queryClient]);
 
+	const reclaim = useArchiveReclaim(invalidate);
+
+	// One busy flag for the whole dialog, not one per button. Every action here
+	// runs git against the same repository, and two `git worktree remove` runs
+	// contend on the worktree admin lock and fail rather than wait — so a reclaim
+	// in flight has to lock the bulk button and every other row, not just its own.
+	const isBusy =
+		activity !== null ||
+		reclaim.reclaimingId !== null ||
+		reclaim.isReclaimingAll;
+
 	const runRowAction = useCallback(
 		async ({
 			action,
@@ -110,43 +126,90 @@ function BrowseArchiveDialogBody({
 			entry: ArchivedWorkspaceListEntry;
 			request: (payload: {
 				workspaceId: string;
-			}) => Promise<{ diagnostics: RowDiagnostic[]; status: string }>;
+			}) => Promise<{ diagnostics: ArchiveRowDiagnostic[]; status: string }>;
 		}) => {
-			if (!apiAvailable) {
+			if (!apiAvailable || isBusy) {
 				return;
 			}
-			setPendingId(entry.id);
-			setPendingAction(action);
-			setDiagnostics(null);
+			setActivity({ action, workspaceId: entry.id });
+			setRowDiagnostics(null);
+			reclaim.clearReport();
 
-			const result = await request({ workspaceId: entry.id });
+			try {
+				const result = await request({ workspaceId: entry.id });
 
-			if (result.status === 'success') {
-				await invalidate();
-			} else {
-				setDiagnostics({ entries: result.diagnostics, workspaceId: entry.id });
+				if (result.status === 'success') {
+					await invalidate();
+				} else {
+					setRowDiagnostics({
+						entries: result.diagnostics,
+						workspaceId: entry.id,
+					});
+				}
+			} catch (cause) {
+				// The code carries the wording, translated; `message` is only the
+				// runtime specifics the shared list appends when there are any, so a
+				// throw with nothing to add leaves it empty rather than English.
+				setRowDiagnostics({
+					entries: [
+						{
+							code: 'workspace-update-failed',
+							message: cause instanceof Error ? cause.message : '',
+							severity: 'error',
+						},
+					],
+					workspaceId: entry.id,
+				});
+			} finally {
+				setActivity(null);
 			}
-			setPendingId(null);
-			setPendingAction(null);
 		},
-		[apiAvailable, invalidate],
+		[apiAvailable, invalidate, isBusy, reclaim.clearReport],
 	);
 
 	const handleUnarchive = useCallback(
-		(entry: ArchivedWorkspaceListEntry) =>
-			runRowAction({ action: 'unarchive', entry, request: unarchiveWorkspace }),
+		(entry: ArchivedWorkspaceListEntry) => {
+			void runRowAction({
+				action: 'unarchive',
+				entry,
+				request: unarchiveWorkspace,
+			});
+		},
 		[runRowAction],
 	);
 
 	const handleDelete = useCallback(
-		(entry: ArchivedWorkspaceListEntry) =>
-			runRowAction({
+		(entry: ArchivedWorkspaceListEntry) => {
+			void runRowAction({
 				action: 'delete',
 				entry,
 				request: deleteArchivedWorkspace,
-			}),
+			});
+		},
 		[runRowAction],
 	);
+
+	const handleReclaimOne = useCallback(
+		(entry: ArchivedWorkspaceListEntry) => {
+			if (isBusy) {
+				return;
+			}
+			setRowDiagnostics(null);
+			reclaim.reclaimOne(entry);
+		},
+		[isBusy, reclaim.reclaimOne],
+	);
+
+	const handleReclaimAll = useCallback(() => {
+		if (isBusy) {
+			return;
+		}
+		setRowDiagnostics(null);
+		reclaim.reclaimAll(reclaimable);
+	}, [isBusy, reclaim.reclaimAll, reclaimable]);
+
+	const diagnostics = rowDiagnostics ?? reclaim.diagnostics;
+	const freed = formatBytes(reclaim.reclaimedBytes, i18n.language);
 
 	return (
 		<>
@@ -161,10 +224,56 @@ function BrowseArchiveDialogBody({
 				<p className='text-muted-foreground text-xs'>
 					{t(
 						'workbench:browse-archive.description',
-						'Restore an archived workspace, or permanently purge it. Restoring rebuilds the worktree from the recorded base branch when branch cleanup ran at archive time.',
+						'Restore an archived workspace, reclaim the disk its worktree still occupies, or permanently purge it. Reclaiming keeps the branch and any uncommitted changes, so the workspace is rebuilt from git when you unarchive it.',
 					)}
 				</p>
 			</DialogHeader>
+
+			{reclaimable.length > 0 ? (
+				<div className='flex items-center justify-between gap-3'>
+					<p className='text-muted-foreground text-xs'>
+						{t(
+							'workbench:browse-archive.reclaimable',
+							'{{count}} archived workspace still has its worktree on disk.',
+							{ count: reclaimable.length },
+						)}
+					</p>
+					<Button
+						className='h-8 shrink-0'
+						data-testid='browse-archive-reclaim-all'
+						disabled={isBusy}
+						onClick={handleReclaimAll}
+						pending={reclaim.isReclaimingAll}
+						size='sm'
+						type='button'
+						variant='outline'
+					>
+						<HardDriveDownloadIcon
+							aria-hidden='true'
+							data-icon='inline-start'
+						/>
+						{t('workbench:browse-archive.reclaim-all', 'Reclaim all')}
+					</Button>
+				</div>
+			) : null}
+
+			{freed ? (
+				<p
+					className='text-muted-foreground text-xs'
+					data-testid='browse-archive-reclaimed'
+				>
+					{t('workbench:browse-archive.reclaimed', 'Reclaimed {{size}}.', {
+						size: freed,
+					})}
+				</p>
+			) : null}
+
+			{diagnostics && diagnostics.workspaceId === null ? (
+				<ArchiveDiagnosticsList
+					diagnostics={diagnostics.entries}
+					testId='browse-archive-diagnostics'
+				/>
+			) : null}
 
 			<div className='-mx-4 max-h-[60vh] overflow-y-auto border-border border-t border-b'>
 				{!apiAvailable ? (
@@ -197,99 +306,60 @@ function BrowseArchiveDialogBody({
 					/>
 				) : (
 					<ul className='divide-y divide-border'>
-						{entries.map((entry) => {
-							const isBusy = pendingId === entry.id;
-							const showDiagnostics =
-								diagnostics?.workspaceId === entry.id &&
-								diagnostics.entries.length > 0;
-							return (
-								<li
-									className='flex flex-col gap-2 px-4 py-3'
-									data-testid='browse-archive-row'
-									key={entry.id}
-								>
-									<div className='flex flex-col gap-0.5'>
-										<span className='flex items-center gap-1.5 font-medium text-[0.8125rem]'>
-											<ArchiveIcon
-												aria-hidden='true'
-												className='size-3.5 text-muted-foreground'
-											/>
-											{entry.name}
-										</span>
-										<span className='font-mono text-[0.6875rem] text-muted-foreground'>
-											{entry.branchName ??
-												t(
-													'workbench:browse-archive.row.no-branch',
-													'no branch',
-												)}
-										</span>
-										<span className='truncate font-mono text-[0.6875rem] text-muted-foreground'>
-											{entry.path}
-										</span>
-										<span className='text-[0.6875rem] text-muted-foreground'>
-											{entry.branchCleanup
-												? t(
-														'workbench:browse-archive.row.archived-destroyed',
-														'Archived {{date}} · worktree was destroyed (recreate from base branch on restore)',
-														{ date: formatArchivedAt(entry.archivedAt) },
-													)
-												: t(
-														'workbench:browse-archive.row.archived',
-														'Archived {{date}}',
-														{ date: formatArchivedAt(entry.archivedAt) },
-													)}
-										</span>
-									</div>
-									<div className='flex gap-2'>
-										<Button
-											className='h-8'
-											disabled={isBusy || !canRestoreArchivedWorkspace(entry)}
-											onClick={() => {
-												void handleUnarchive(entry);
-											}}
-											pending={isBusy && pendingAction === 'unarchive'}
-											size='sm'
-											type='button'
-											variant='default'
-										>
-											<ArchiveRestoreIcon
-												aria-hidden='true'
-												data-icon='inline-start'
-											/>
-											{t('common:actions.unarchive', 'Unarchive')}
-										</Button>
-										<Button
-											className='h-8'
-											disabled={isBusy}
-											onClick={() => {
-												void handleDelete(entry);
-											}}
-											pending={isBusy && pendingAction === 'delete'}
-											size='sm'
-											type='button'
-											variant='destructive'
-										>
-											<Trash2Icon aria-hidden='true' data-icon='inline-start' />
-											{t(
-												'workbench:browse-archive.row.delete-permanently',
-												'Delete permanently',
-											)}
-										</Button>
-									</div>
-									{showDiagnostics ? (
-										<ArchiveDiagnosticsList
-											diagnostics={diagnostics?.entries ?? []}
-											testId={`browse-archive-row-diagnostics-${entry.id}`}
-										/>
-									) : null}
-								</li>
-							);
-						})}
+						{entries.map((entry) => (
+							<BrowseArchiveRow
+								diagnostics={
+									diagnostics?.workspaceId === entry.id
+										? diagnostics.entries
+										: []
+								}
+								disabled={isBusy}
+								entry={entry}
+								key={entry.id}
+								onDelete={handleDelete}
+								onReclaim={handleReclaimOne}
+								onUnarchive={handleUnarchive}
+								pendingAction={rowPendingAction({
+									activity,
+									entry,
+									isReclaimingAll: reclaim.isReclaimingAll,
+									reclaimingId: reclaim.reclaimingId,
+								})}
+							/>
+						))}
 					</ul>
 				)}
 			</div>
 		</>
 	);
+}
+
+/**
+ * The action a row should show as running: its own, or the bulk reclaim, which
+ * every still-materialized row is part of at once. This drives the spinner
+ * only — whether a row's buttons are usable is the dialog-wide `isBusy`, since
+ * an action on one row locks every other.
+ * @param options - Current row activity, the row, and the reclaim hook's state.
+ * @returns The pending action, or null when the row is idle.
+ */
+function rowPendingAction({
+	activity,
+	entry,
+	isReclaimingAll,
+	reclaimingId,
+}: {
+	activity: RowActivity | null;
+	entry: ArchivedWorkspaceListEntry;
+	isReclaimingAll: boolean;
+	reclaimingId: string | null;
+}): ArchiveRowAction | null {
+	if (activity?.workspaceId === entry.id) {
+		return activity.action;
+	}
+	if (reclaimingId === entry.id) {
+		return 'reclaim';
+	}
+	return isReclaimingAll && entry.pathExists ? 'reclaim' : null;
 }
 
 /** Renders a centered muted message when the archive list is empty. */
@@ -299,17 +369,4 @@ function EmptyState({ message }: { message: string }) {
 			{message}
 		</div>
 	);
-}
-
-/**
- * Format an archived-at ISO timestamp as a locale string, falling back to the raw value.
- * @param iso - ISO timestamp string
- * @returns The localized date-time, or the original string when parsing fails.
- */
-function formatArchivedAt(iso: string): string {
-	try {
-		return new Date(iso).toLocaleString();
-	} catch {
-		return iso;
-	}
 }

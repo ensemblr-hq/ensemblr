@@ -107,6 +107,7 @@ export function useReviewMutations({
 			archiveWorkspace({
 				branchCleanup: mergeSettings.deleteLocalBranchOnArchive,
 				reason: 'archive-after-merge',
+				reclaimDisk: mergeSettings.reclaimDiskOnArchive,
 				workspaceId,
 			}),
 		onError: async (cause) => {

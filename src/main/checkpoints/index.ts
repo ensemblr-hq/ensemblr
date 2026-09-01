@@ -8,3 +8,8 @@ export {
 	readHiddenEventRanges,
 	restoreTurnCheckpoint,
 } from './checkpoint-service.ts';
+export {
+	captureWorkspaceCheckpoint,
+	restoreWorkspaceTo,
+	sanitizeRefSegment,
+} from './git-checkpoint.ts';

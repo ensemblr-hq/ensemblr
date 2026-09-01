@@ -1104,6 +1104,23 @@ CREATE INDEX idx_secret_metadata_scope ON secret_metadata(scope, scope_id);
 ALTER TABLE secret_metadata ADD COLUMN secret_keyring_backend TEXT;
 `,
 	},
+	{
+		id: '025_worktree_prune',
+		version: 25,
+		// State needed to re-derive a pruned workspace from git. Archiving used to
+		// leave the whole worktree on disk, which is ~97% gitignored build output
+		// and dependencies; pruning removes it and keeps the branch instead.
+		// `pruned_head_commit` is the branch tip at prune time, so a branch the
+		// user later deletes out of band can still be recreated at the right
+		// commit, and `pruned_wip_ref` pins both that commit and the captured
+		// working tree against `git gc`. NULL on every row archived before this.
+		sql: `
+ALTER TABLE archive_records ADD COLUMN worktree_pruned INTEGER NOT NULL DEFAULT 0 CHECK (worktree_pruned IN (0, 1));
+ALTER TABLE archive_records ADD COLUMN pruned_head_commit TEXT;
+ALTER TABLE archive_records ADD COLUMN pruned_wip_ref TEXT;
+ALTER TABLE archive_records ADD COLUMN pruned_wip_commit TEXT;
+`,
+	},
 ];
 
 /** Highest declared migration version embedded in this build. */

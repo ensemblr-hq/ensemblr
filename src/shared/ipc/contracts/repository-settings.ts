@@ -18,6 +18,7 @@ export interface RepositorySettingsPatch {
 	archiveAfterMerge?: boolean | null;
 	branchFrom?: string | null;
 	deleteLocalBranchOnArchive?: boolean | null;
+	reclaimDiskOnArchive?: boolean | null;
 	filesToCopy?: string[] | null;
 	/** Stored under the resolver's `security.permissionMode` key. */
 	permissionMode?: PermissionMode | null;

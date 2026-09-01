@@ -22,6 +22,7 @@ import type {
 	DeleteArchivedWorkspaceDiagnosticCode,
 	DeleteWorkspaceDiagnosticCode,
 	FilesToCopyDiagnosticCode,
+	ReclaimArchivedWorkspaceDiskDiagnosticCode,
 	RenameWorkspaceDiagnosticCode,
 	SetWorkspaceBaseBranchDiagnosticCode,
 	UnarchiveWorkspaceDiagnosticCode,
@@ -60,6 +61,7 @@ export type AppFailureCode =
 	| QuickStartProjectDiagnosticCode
 	| ReadWorkspaceDirectoryFailureCode
 	| ReadWorkspaceFileFailureCode
+	| ReclaimArchivedWorkspaceDiskDiagnosticCode
 	| RegisterLocalRepositoryDiagnosticCode
 	| RenameWorkspaceDiagnosticCode
 	| RootDirectoryDiagnosticCode
@@ -672,6 +674,21 @@ export const APP_FAILURE_TEXT: Record<
 		t('errors:failure.permission', 'Permission was denied for that location.'),
 	'permission-denied': (t) =>
 		t('errors:failure.permission-denied', 'Permission was denied.'),
+	'pruned-branch-missing': (t) =>
+		t(
+			'errors:failure.pruned-branch-missing',
+			'The branch this workspace was archived on no longer exists, so its files could not be restored.',
+		),
+	'pruned-snapshot-missing': (t) =>
+		t(
+			'errors:failure.pruned-snapshot-missing',
+			'The commit this workspace was archived at is no longer in the repository, so its files could not be restored.',
+		),
+	'pruned-snapshot-restore-failed': (t) =>
+		t(
+			'errors:failure.pruned-snapshot-restore-failed',
+			'The branch was checked out, but the uncommitted changes saved when the workspace was archived could not be restored.',
+		),
 	'publish-failed': (t) =>
 		t(
 			'errors:failure.publish-failed',
@@ -851,6 +868,11 @@ export const APP_FAILURE_TEXT: Record<
 		),
 	'workspace-id-required': (t) =>
 		t('errors:failure.workspace-id-required', 'A workspace is required.'),
+	'workspace-ids-required': (t) =>
+		t(
+			'errors:failure.workspace-ids-required',
+			'No workspace was selected, so nothing was changed.',
+		),
 	'workspace-insert-failed': (t) =>
 		t(
 			'errors:failure.workspace-insert-failed',
@@ -880,6 +902,11 @@ export const APP_FAILURE_TEXT: Record<
 			'errors:failure.workspace-update-failed',
 			'The workspace record could not be updated.',
 		),
+	'worktree-already-pruned': (t) =>
+		t(
+			'errors:failure.worktree-already-pruned',
+			'That workspace has no worktree folder on disk, so there was nothing to reclaim.',
+		),
 	'worktree-cleanup-failed': (t) =>
 		t(
 			'errors:failure.worktree-cleanup-failed',
@@ -889,6 +916,11 @@ export const APP_FAILURE_TEXT: Record<
 		t(
 			'errors:failure.worktree-move-failed',
 			'The worktree could not be moved.',
+		),
+	'worktree-prune-failed': (t) =>
+		t(
+			'errors:failure.worktree-prune-failed',
+			'The worktree folder could not be removed, so its disk was not reclaimed.',
 		),
 	'worktree-recreate-failed': (t) =>
 		t(

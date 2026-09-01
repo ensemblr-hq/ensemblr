@@ -827,6 +827,35 @@ export async function runWorktreeRemove({
 }
 
 /**
+ * Deletes a private ref, so purging an archive also drops the snapshot pinning
+ * its commits against `git gc`. Best-effort: a ref that was never written, or
+ * one already gone, is the expected case rather than a failure.
+ * @param options - Ref to delete plus git command dependencies.
+ */
+export async function runRefDelete({
+	localCommandService,
+	ref,
+	repositoryPath,
+}: {
+	localCommandService: LocalCommandService;
+	ref: string;
+	repositoryPath: string;
+}): Promise<void> {
+	try {
+		await localCommandService.run({
+			args: ['update-ref', '-d', ref],
+			command: 'git',
+			cwd: repositoryPath,
+			maxOutputBytes: 4 * 1024,
+			timeoutMs: GIT_BRANCH_TIMEOUT_MS,
+		});
+	} catch {
+		// Nothing downstream depends on the ref being gone; the objects it held
+		// become unreachable with the branch and are collected on the next gc.
+	}
+}
+
+/**
  * Drops a local branch. Returns `no-branch` when the branch was already missing
  * so callers can distinguish "expected absence" from real failures.
  */

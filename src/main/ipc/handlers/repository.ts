@@ -15,6 +15,7 @@ import type {
 	DeleteWorkspaceResult,
 	ListAllWorkspacesResult,
 	ListArchivedWorkspacesResult,
+	ReclaimArchivedWorkspaceDiskResult,
 	RenameWorkspaceResult,
 	SetWorkspaceBaseBranchResult,
 	UnarchiveWorkspaceResult,
@@ -31,6 +32,7 @@ import type {
 	LocalRepositoryImportService,
 	LocalRepositoryRegistrationService,
 	QuickStartProjectService,
+	ReclaimArchivedWorkspaceDiskService,
 	RenameWorkspaceService,
 	SetWorkspaceBaseBranchService,
 	SharedRootAdoptionService,
@@ -46,6 +48,7 @@ import {
 	parseDeleteWorkspaceRequest,
 	parseListArchivedWorkspacesRequest,
 	parseQuickStartProjectRequest,
+	parseReclaimArchivedWorkspaceDiskRequest,
 	parseRegisterLocalRepositoryRequest,
 	parseRenameWorkspaceRequest,
 	parseSetWorkspaceBaseBranchRequest,
@@ -63,6 +66,7 @@ interface RepositoryHandlersOptions {
 	deleteWorkspaceService: DeleteWorkspaceService;
 	listAllWorkspacesService: ListAllWorkspacesService;
 	listArchivedWorkspacesService: ListArchivedWorkspacesService;
+	reclaimArchivedWorkspaceDiskService: ReclaimArchivedWorkspaceDiskService;
 	localRepositoryImportService: LocalRepositoryImportService;
 	localRepositoryRegistrationService: LocalRepositoryRegistrationService;
 	quickStartProjectService: QuickStartProjectService;
@@ -87,6 +91,7 @@ export function registerRepositoryHandlers({
 	deleteWorkspaceService,
 	listAllWorkspacesService,
 	listArchivedWorkspacesService,
+	reclaimArchivedWorkspaceDiskService,
 	localRepositoryImportService,
 	localRepositoryRegistrationService,
 	quickStartProjectService,
@@ -200,6 +205,15 @@ export function registerRepositoryHandlers({
 		IPC_CHANNELS.unarchiveWorkspace,
 		(_event, raw: unknown): Promise<UnarchiveWorkspaceResult> =>
 			unarchiveWorkspaceService.unarchive(parseUnarchiveWorkspaceRequest(raw)),
+	);
+
+	withPermissionGate(
+		IPC_CHANNELS.reclaimArchivedWorkspaceDisk,
+		'workspace-archive-delete',
+		(_event, raw: unknown): Promise<ReclaimArchivedWorkspaceDiskResult> =>
+			reclaimArchivedWorkspaceDiskService.reclaim(
+				parseReclaimArchivedWorkspaceDiskRequest(raw),
+			),
 	);
 
 	withPermissionGate(

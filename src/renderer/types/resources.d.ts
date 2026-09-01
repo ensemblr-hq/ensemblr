@@ -743,6 +743,9 @@ export default interface Resources {
 			'pattern-listing-failed': 'The files matching that pattern could not be listed.';
 			permission: 'Permission was denied for that location.';
 			'permission-denied': 'Permission was denied.';
+			'pruned-branch-missing': 'The branch this workspace was archived on no longer exists, so its files could not be restored.';
+			'pruned-snapshot-missing': 'The commit this workspace was archived at is no longer in the repository, so its files could not be restored.';
+			'pruned-snapshot-restore-failed': 'The branch was checked out, but the uncommitted changes saved when the workspace was archived could not be restored.';
 			'publish-failed': 'The project was created locally, but publishing it to GitHub failed.';
 			'read-failed': 'That file could not be read.';
 			'reconcile-child-not-directory': 'An entry under the root is not a directory and was skipped.';
@@ -805,6 +808,7 @@ export default interface Resources {
 			'workspace-cleanup-failed': 'The workspace could not be cleaned up.';
 			'workspace-delete-failed': 'The workspace could not be deleted.';
 			'workspace-id-required': 'A workspace is required.';
+			'workspace-ids-required': 'No workspace was selected, so nothing was changed.';
 			'workspace-insert-failed': 'The workspace could not be saved.';
 			'workspace-missing': 'That workspace no longer exists.';
 			'workspace-not-archived': 'That workspace is not archived.';
@@ -812,8 +816,10 @@ export default interface Resources {
 			'workspace-orphaned': 'Workspaces exist for a repository Ensemblr does not know.';
 			'workspace-scan-failed': 'The workspace could not be scanned.';
 			'workspace-update-failed': 'The workspace record could not be updated.';
+			'worktree-already-pruned': 'That workspace has no worktree folder on disk, so there was nothing to reclaim.';
 			'worktree-cleanup-failed': 'The worktree could not be removed.';
 			'worktree-move-failed': 'The worktree could not be moved.';
+			'worktree-prune-failed': 'The worktree folder could not be removed, so its disk was not reclaimed.';
 			'worktree-recreate-failed': 'The worktree could not be recreated.';
 			'worktree-repository-mismatch': 'That worktree belongs to a different repository.';
 			'write-failed': 'That file could not be written.';
@@ -1827,6 +1833,10 @@ export default interface Resources {
 				label: 'Delete branch on archive';
 			};
 			description: 'Workspace branch defaults and lifecycle behavior. Repository-scope overrides win when set.';
+			'reclaim-disk': {
+				description: 'Delete the worktree folder when a workspace is archived, keeping its branch and a snapshot of any uncommitted changes. Unarchiving checks the branch out again and restores them; dependencies and build output are rebuilt by the setup script. Off keeps the folder, and its dependencies, on disk indefinitely.';
+				label: 'Reclaim disk on archive';
+			};
 			'rename-workspace': {
 				description: 'Ask the agent to rename a workspace from its placeholder composer name, and its git branch to match, once it knows what the work is. Off leaves the placeholder name in place.';
 				label: 'Let agents name the workspace and branch';
@@ -2210,6 +2220,10 @@ export default interface Resources {
 				'name-placeholder': 'Name';
 				'template-aria-label': 'Preview URL template';
 			};
+			'reclaim-disk': {
+				description: 'Delete the worktree folder when a workspace is archived, keeping its branch and a snapshot of any uncommitted changes. Overrides your user-scope default for this repo.';
+				label: 'Reclaim disk on archive';
+			};
 			'root-path': {
 				description: 'Do not move or delete this directory. Instead, delete the repository in Ensemblr.';
 				label: 'Root path';
@@ -2406,6 +2420,7 @@ export default interface Resources {
 		'archive-workspace': {
 			'description-cleanup': 'Marks the workspace as archived and preserves its <0>.context/</0> handoff files under <1>archived-contexts/</1>. The worktree folder is removed and the local branch dropped, per your git settings; anything else not pushed to the remote will be lost.';
 			'description-keep': 'Marks the workspace as archived and preserves its <0>.context/</0> handoff files under <1>archived-contexts/</1>. The worktree folder and local branch stay on disk; nothing is committed or pushed.';
+			'description-reclaim': 'Marks the workspace as archived and preserves its <0>.context/</0> handoff files under <1>archived-contexts/</1>. The worktree folder is removed to reclaim its disk, keeping the branch and a snapshot of any uncommitted changes; unarchiving restores both and rebuilds dependencies.';
 			'settings-unavailable': 'Your git settings could not be read, so the worktree folder and local branch will be kept.';
 			title: 'Archive workspace?';
 		};
@@ -2446,11 +2461,18 @@ export default interface Resources {
 				none: 'No archived workspaces for this repository.';
 				unavailable: 'The preload bridge is unavailable in this context.';
 			};
+			'reclaim-all': 'Reclaim all';
+			reclaimable_one: '{{count}} archived workspace still has its worktree on disk.';
+			reclaimable_other: '{{count}} archived workspace still has its worktree on disk.';
+			reclaimed: 'Reclaimed {{size}}.';
 			row: {
 				archived: 'Archived {{date}}';
 				'archived-destroyed': 'Archived {{date}} · worktree was destroyed (recreate from base branch on restore)';
+				'archived-on-disk': 'Archived {{date}} · worktree still on disk';
+				'archived-pruned': 'Archived {{date}} · disk reclaimed (restored from its branch on unarchive)';
 				'delete-permanently': 'Delete permanently';
 				'no-branch': 'no branch';
+				reclaim: 'Reclaim disk';
 			};
 			title: 'Workspace archive — {{repository}}';
 		};

@@ -40,6 +40,7 @@ const EXPECTED_MIGRATIONS = [
 	'022_concierge',
 	'023_secret_value_blob',
 	'024_secret_keyring_backend',
+	'025_worktree_prune',
 ];
 
 const AGENT_VOCABULARY_MIGRATION_VERSION = 14;
@@ -1381,6 +1382,67 @@ VALUES (
 				display_name: 'GitHub',
 				id: 'secret-pre-024',
 				secret_keyring_backend: null,
+			},
+		],
+	);
+});
+
+test('migration 025 adds the prune columns without disturbing existing rows', (t) => {
+	const fixture = createTestDatabasePath();
+	t.after(fixture.cleanup);
+
+	const seeded = openEnsemblrDatabase({ databasePath: fixture.databasePath });
+	seeded.database.exec(`
+INSERT INTO repositories (id, slug, name, path, default_branch)
+VALUES ('repo-pre-025', 'pre', 'Pre', '/tmp/ensemblr/pre', 'main');
+
+INSERT INTO workspaces (id, repository_id, slug, name, path, branch_name, base_branch, archived_at)
+VALUES ('ws-pre-025', 'repo-pre-025', 'eng-9', 'ENG-9', '/tmp/ensemblr/workspaces/eng-9', 'octocat/eng-9', 'main', '2026-01-01T00:00:00.000Z');
+
+INSERT INTO archive_records (
+	id, record_type, repository_id, workspace_id, repository_slug, workspace_slug,
+	branch_name, base_branch, source_path, archived_context_path, branch_cleanup, archived_at
+)
+VALUES (
+	'archive-pre-025', 'workspace', 'repo-pre-025', 'ws-pre-025', 'pre', 'eng-9',
+	'octocat/eng-9', 'main', '/tmp/ensemblr/workspaces/eng-9', NULL, 0, '2026-01-01T00:00:00.000Z'
+);
+`);
+	seeded.database.exec(
+		'ALTER TABLE archive_records DROP COLUMN pruned_wip_commit',
+	);
+	seeded.database.exec(
+		'ALTER TABLE archive_records DROP COLUMN pruned_wip_ref',
+	);
+	seeded.database.exec(
+		'ALTER TABLE archive_records DROP COLUMN pruned_head_commit',
+	);
+	seeded.database.exec(
+		'ALTER TABLE archive_records DROP COLUMN worktree_pruned',
+	);
+	seeded.database
+		.prepare('DELETE FROM schema_migrations WHERE id = ?')
+		.run('025_worktree_prune');
+	seeded.database.close();
+
+	const connection = openEnsemblrDatabase({
+		databasePath: fixture.databasePath,
+	});
+	t.after(() => connection.database.close());
+
+	assert.deepEqual(
+		readRows(
+			connection.database,
+			`SELECT id, worktree_pruned, pruned_head_commit, pruned_wip_ref, pruned_wip_commit
+			FROM archive_records`,
+		),
+		[
+			{
+				id: 'archive-pre-025',
+				pruned_head_commit: null,
+				pruned_wip_commit: null,
+				pruned_wip_ref: null,
+				worktree_pruned: 0,
 			},
 		],
 	);

@@ -90,5 +90,6 @@ function toEntry(row: unknown): WorkspaceHistoryEntry | null {
 		repositoryName: candidate.repositoryName,
 		slug: candidate.slug,
 		updatedAt: candidate.updatedAt,
+		worktreePruned: candidate.worktreePrunedRaw === 1,
 	};
 }
