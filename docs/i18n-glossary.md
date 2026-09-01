@@ -176,6 +176,7 @@ Rules of thumb:
 | Clone | Клонировать | Κλωνοποίηση | |
 | Push | Push | Push | Git; untranslated. |
 | Merge | Merge | Merge | Git; untranslated. |
+| Conflict *(merge)* | Конфликт | Σύγκρουση | A file that will not merge cleanly with the base branch, and the Checks section that lists them. The noun is localized even though `merge` beside it is not — hence `Конфликты merge`/`Συγκρούσεις merge` for the header badge, and a bare `Конфликты`/`Συγκρούσεις` where the context is already git. The adjectival form follows it (`конфликтующие файлы`/`αρχεία με συγκρούσεις`); never `коллизия`/`διένεξη`, which read as a hash collision and an interpersonal dispute. |
 | Quit anyway | Всё равно завершить | Τερματισμός ούτως ή άλλως | The button that lets a quit through while agents are still working (`src/main/app/quit-guard-strings.ts`). Takes the verb from the menu-bar `Quit` (`Завершить`/`Τερματισμός`) rather than coining a second one. **Flag for native review:** the Greek runs to 25 characters; a shorter idiom may exist. |
 | Show more / Show less | Развернуть / Свернуть | Ανάπτυξη / Σύμπτυξη | The control under a clipped block — a long user prompt in the timeline. Both languages say **expand**/**collapse** rather than translating "show more" literally (`Показать больше`/`Περισσότερα`): the app already fixed this pair on the answer-table and terminal-area controls, and the gesture is the same one. |
 

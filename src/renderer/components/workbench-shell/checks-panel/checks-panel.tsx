@@ -60,6 +60,7 @@ import { ChecksSectionHeader } from './pr-metadata';
 import {
 	PullRequestCheckRow,
 	PullRequestCommentRow,
+	PullRequestConflictProbeRow,
 	PullRequestConflictRow,
 	PullRequestStatusRow,
 	PullRequestTodoRow,
@@ -194,11 +195,16 @@ export function ChecksPanel({ workspace }: { workspace: WorkspaceShellModel }) {
 		);
 	}, [reviewActions, t]);
 
+	// GitHub's verdict arrives minutes before the trial merge can name the files,
+	// so it opens the section on its own and the probe fills it in.
+	const isProbingKnownConflict =
+		conflicts.isProbing && workspace.pullRequest.isConflicting === true;
 	const conflictsSection =
-		conflicts.paths.size || conflicts.error ? (
+		conflicts.paths.size || conflicts.error || isProbingKnownConflict ? (
 			<ConflictsSection
 				error={conflicts.error}
 				isAgentWorking={isAgentWorking}
+				isProbing={isProbingKnownConflict}
 				onResolve={sendResolveConflicts}
 				paths={[...conflicts.paths]}
 			/>
@@ -444,19 +450,27 @@ function ChecksPullRequestPanel({
 /**
  * "Conflicts" section naming every file that will not merge with the base, with
  * one action that hands the whole resolution to the agent. Rendered only when
- * there is something to say — a conflict, or the reason the check could not run
- * — so a clean branch never carries a dead section. A probe that failed offers
- * no Resolve action, because it never learned what there is to resolve.
+ * there is something to say — a conflict, the reason the check could not run, or
+ * a trial merge still working out which files GitHub means — so a clean branch
+ * never carries a dead section. A probe that failed offers no Resolve action,
+ * because it never learned what there is to resolve; one still running does,
+ * since the resolve prompt asks for a rebase rather than naming the files.
  */
 function ConflictsSection({
 	error,
 	isAgentWorking,
+	isProbing,
 	onResolve,
 	paths,
 }: {
 	/** Why the trial merge could not answer; replaces the rows when set. */
 	error?: WorkspaceGitFailure;
 	isAgentWorking: boolean;
+	/**
+	 * GitHub reports a conflict the trial merge has not yet turned into paths.
+	 * Never set alongside `error`, which is the probe having answered.
+	 */
+	isProbing: boolean;
 	onResolve: () => void;
 	paths: readonly string[];
 }) {
@@ -475,6 +489,7 @@ function ConflictsSection({
 			) : (
 				paths.map((path) => <PullRequestConflictRow key={path} path={path} />)
 			)}
+			{isProbing ? <PullRequestConflictProbeRow /> : null}
 		</section>
 	);
 }
