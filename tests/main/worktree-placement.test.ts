@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
 
-import { readWorktreePathForBranch } from '../../src/main/repository/worktree-placement';
+import { readWorktreeHolderForBranch } from '../../src/main/repository/worktree-placement';
 
 const PORCELAIN = [
 	'worktree /repos/app',
@@ -18,18 +18,22 @@ const PORCELAIN = [
 ].join('\n');
 
 test('finds the worktree holding a branch', () => {
-	expect(readWorktreePathForBranch(PORCELAIN, 'feature-x')).toBe(
-		'/repos/app-workspaces/app/bach',
-	);
-	expect(readWorktreePathForBranch(PORCELAIN, 'main')).toBe('/repos/app');
+	expect(readWorktreeHolderForBranch(PORCELAIN, 'feature-x')).toEqual({
+		path: '/repos/app-workspaces/app/bach',
+		prunable: false,
+	});
+	expect(readWorktreeHolderForBranch(PORCELAIN, 'main')).toEqual({
+		path: '/repos/app',
+		prunable: false,
+	});
 });
 
 test('returns null for a branch no worktree holds', () => {
-	expect(readWorktreePathForBranch(PORCELAIN, 'feature-y')).toBeNull();
+	expect(readWorktreeHolderForBranch(PORCELAIN, 'feature-y')).toBeNull();
 });
 
 test('does not match a branch whose name only prefixes a held one', () => {
-	expect(readWorktreePathForBranch(PORCELAIN, 'feature')).toBeNull();
+	expect(readWorktreeHolderForBranch(PORCELAIN, 'feature')).toBeNull();
 });
 
 test('matches nested branch names in full', () => {
@@ -39,15 +43,75 @@ test('matches nested branch names in full', () => {
 		'',
 	].join('\n');
 
-	expect(readWorktreePathForBranch(stdout, 'octocat/feat/nested')).toBe(
-		'/repos/app-workspaces/app/ravel',
-	);
-	expect(readWorktreePathForBranch(stdout, 'nested')).toBeNull();
+	expect(readWorktreeHolderForBranch(stdout, 'octocat/feat/nested')).toEqual({
+		path: '/repos/app-workspaces/app/ravel',
+		prunable: false,
+	});
+	expect(readWorktreeHolderForBranch(stdout, 'nested')).toBeNull();
 });
 
 test('ignores a detached worktree and empty output', () => {
-	expect(readWorktreePathForBranch('', 'main')).toBeNull();
+	expect(readWorktreeHolderForBranch('', 'main')).toBeNull();
 	expect(
-		readWorktreePathForBranch('worktree /repos/app\ndetached\n', 'main'),
+		readWorktreeHolderForBranch('worktree /repos/app\ndetached\n', 'main'),
 	).toBeNull();
+});
+
+test('reports a holder git marked prunable, which git writes after the branch', () => {
+	const stdout = [
+		'worktree /repos/app-workspaces/app/xarhakos',
+		'HEAD 4444444444444444444444444444444444444444',
+		'branch refs/heads/feature-gone',
+		'prunable gitdir file points to non-existent location',
+		'',
+	].join('\n');
+
+	expect(readWorktreeHolderForBranch(stdout, 'feature-gone')).toEqual({
+		path: '/repos/app-workspaces/app/xarhakos',
+		prunable: true,
+	});
+});
+
+test('reports a bare prunable annotation', () => {
+	const stdout = [
+		'worktree /repos/app-workspaces/app/xarhakos',
+		'branch refs/heads/feature-gone',
+		'prunable',
+		'',
+	].join('\n');
+
+	expect(readWorktreeHolderForBranch(stdout, 'feature-gone')?.prunable).toBe(
+		true,
+	);
+});
+
+test('does not leak a prunable annotation across record boundaries', () => {
+	const stdout = [
+		'worktree /repos/app-workspaces/app/xarhakos',
+		'branch refs/heads/feature-gone',
+		'prunable gitdir file points to non-existent location',
+		'',
+		'worktree /repos/app-workspaces/app/bach',
+		'branch refs/heads/feature-x',
+		'',
+	].join('\n');
+
+	expect(readWorktreeHolderForBranch(stdout, 'feature-x')).toEqual({
+		path: '/repos/app-workspaces/app/bach',
+		prunable: false,
+	});
+});
+
+test('treats a locked worktree as a live holder', () => {
+	const stdout = [
+		'worktree /repos/app-workspaces/app/bach',
+		'branch refs/heads/feature-x',
+		'locked on a removable drive',
+		'',
+	].join('\n');
+
+	expect(readWorktreeHolderForBranch(stdout, 'feature-x')).toEqual({
+		path: '/repos/app-workspaces/app/bach',
+		prunable: false,
+	});
 });

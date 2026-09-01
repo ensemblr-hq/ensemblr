@@ -11,6 +11,10 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test, { type TestContext } from 'node:test';
 
+import type {
+	LocalCommandRequest,
+	LocalCommandService,
+} from '../../src/main/commands/command-types.ts';
 import { createLocalCommandService } from '../../src/main/commands/local-command.ts';
 import { runWorktreeRemove } from '../../src/main/repository/git-ops.ts';
 
@@ -60,6 +64,34 @@ function remove(harness: Harness, deletingWorkspace?: boolean) {
 		repositoryPath: harness.repositoryPath,
 		workspacePath: harness.workspacePath,
 	});
+}
+
+const WORKTREE_REMOVE_REFUSAL = {
+	status: 'failure',
+	stderr: 'fatal: validation failed, cannot remove working tree',
+	stdout: '',
+	stdoutTruncated: false,
+} as Awaited<ReturnType<LocalCommandService['run']>>;
+
+function refuseWorktreeRemove(
+	delegate: LocalCommandService,
+): LocalCommandService {
+	const isWorktreeRemove = (request: LocalCommandRequest): boolean => {
+		const [subcommand, action] = request.args ?? [];
+		return (
+			request.command === 'git' &&
+			subcommand === 'worktree' &&
+			action === 'remove'
+		);
+	};
+
+	return {
+		getEnvironment: (cwd) => delegate.getEnvironment(cwd),
+		run: (request, options) =>
+			isWorktreeRemove(request)
+				? Promise.resolve(WORKTREE_REMOVE_REFUSAL)
+				: delegate.run(request, options),
+	};
 }
 
 function isRegistered(harness: Harness): boolean {
@@ -163,6 +195,26 @@ test('deleting the workspace unlocks a locked worktree and removes it through gi
 	runGit(harness.repositoryPath, ['worktree', 'lock', harness.workspacePath]);
 
 	const outcome = await remove(harness, true);
+
+	assert.equal(outcome.status, 'success');
+	assert.equal(existsSync(harness.workspacePath), false);
+	assert.equal(isRegistered(harness), false);
+	runGit(harness.repositoryPath, ['branch', '-D', BRANCH_NAME]);
+});
+
+// A removal git keeps refusing leaves the registration in place, and deleting
+// the workspace unlinks the directory under it anyway. Git then lists an entry
+// pointing at nothing and keeps reporting the branch as checked out — to the
+// `git branch -D` that follows, and to every later workspace creation.
+test('a registration that outlives its directory is pruned', async (t) => {
+	const harness = createHarness(t);
+
+	const outcome = await runWorktreeRemove({
+		deletingWorkspace: true,
+		localCommandService: refuseWorktreeRemove(createLocalCommandService()),
+		repositoryPath: harness.repositoryPath,
+		workspacePath: harness.workspacePath,
+	});
 
 	assert.equal(outcome.status, 'success');
 	assert.equal(existsSync(harness.workspacePath), false);

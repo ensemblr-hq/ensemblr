@@ -316,7 +316,7 @@ export async function runWorktreeAdd({
 
 		// Clear any half-written worktree admin entry the failed attempt left
 		// behind so the retry starts from a clean registry.
-		await pruneWorktreeAdmin({ localCommandService, repositoryPath });
+		await runWorktreePrune({ localCommandService, repositoryPath });
 		await delay(GIT_WORKTREE_ADD_RETRY_DELAY_MS * attempt);
 	}
 
@@ -429,12 +429,13 @@ function isGitProgressLine(line: string): boolean {
 }
 
 /**
- * Best-effort `git worktree prune` to drop stale worktree admin entries before
- * a retry. Failures are ignored — the retry's `git worktree add` reports the
- * real problem if pruning did not help.
+ * Best-effort `git worktree prune` to drop stale worktree admin entries — ones
+ * whose directory is gone while their registration survives. Failures are
+ * ignored: every caller has its own report for the problem pruning was meant to
+ * clear, and none of them can act on the prune itself failing.
  * @param options - Git command dependencies.
  */
-async function pruneWorktreeAdmin({
+export async function runWorktreePrune({
 	localCommandService,
 	repositoryPath,
 }: {
@@ -814,6 +815,13 @@ async function runGitSucceeds({
  * removal retried — keeping git's own bookkeeping consistent rather than
  * stepping around it — and an unanswerable registration no longer holds the
  * directory back either.
+ *
+ * Unlinking under a registration that survived all of that strands the
+ * registration: git keeps listing an entry pointing at nothing, and the branch
+ * keeps reading as checked out — to the `git branch -D` that follows, and to
+ * every later workspace creation. A `git worktree prune` therefore runs before
+ * this returns, which is exactly the case git's own pruning was written for
+ * now that the directory is gone.
  * @param options - Repository path, worktree path, delete intent, and the command runner.
  * @returns Success once the directory is gone, or why it could not be removed.
  */
@@ -843,11 +851,15 @@ export async function runWorktreeRemove({
 	}
 
 	const removal = await removeDirectoryTree(workspacePath);
-	if (removal.removed) {
-		return { status: 'success' };
+	if (!removal.removed) {
+		return { status: 'failure', message: removal.error ?? attempt.message };
 	}
 
-	return { status: 'failure', message: removal.error ?? attempt.message };
+	if (attempt.state === 'registered') {
+		await runWorktreePrune({ localCommandService, repositoryPath });
+	}
+
+	return { status: 'success' };
 }
 
 /**

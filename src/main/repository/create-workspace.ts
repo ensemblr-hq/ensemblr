@@ -28,9 +28,11 @@ import type {
 import { loadRepositoryConfig } from '../config/repository-config.ts';
 import type { EnsemblrRootDirectoryService } from '../root';
 import type { EnsemblrDatabaseService } from '../storage';
+import { parseMetadata } from '../storage/repositories/metadata-json.ts';
 import { selectRepositoryWithDefaultsById } from '../storage/repositories/repository-row-repository.ts';
 import {
 	insertWorkspaceRow as insertWorkspaceRowStorage,
+	listActiveWorkspaceSnapshotRowsByRepository,
 	listWorkspaceNameSlugRowsByRepository,
 	workspaceSlugExists as workspaceSlugExistsStorage,
 } from '../storage/repositories/workspace-repository.ts';
@@ -53,6 +55,7 @@ import { validateWorkspaceName } from './workspace-validation.ts';
 import {
 	cleanupWorkspaceDirectory,
 	createWorktree,
+	isSamePath,
 } from './worktree-placement.ts';
 
 /** Public surface of the workspace creation service. */
@@ -431,7 +434,20 @@ export function createWorkspaceService({
 			},
 		});
 		if ('diagnostic' in worktree) {
-			return failure(worktree.diagnostic);
+			const holder = readWorkspaceHoldingBranch({
+				database,
+				diagnostic: worktree.diagnostic,
+				repositoryId: repository.id,
+			});
+			return holder
+				? {
+						diagnostics: [],
+						filesToCopy: null,
+						reusedExisting: true,
+						status: 'success',
+						workspace: holder,
+					}
+				: failure(worktree.diagnostic);
 		}
 
 		// Best-effort: ensure `.context/` is git-ignored before anything can
@@ -516,6 +532,7 @@ export function createWorkspaceService({
 		return {
 			diagnostics: [],
 			filesToCopy: filesToCopySnapshot,
+			reusedExisting: false,
 			status: 'success',
 			workspace,
 		};
@@ -650,6 +667,57 @@ function parseNullSeparated(value: string): string[] {
 }
 
 /**
+ * Resolves the diagnostic that refused a branch as already checked out into the
+ * workspace that holds it, so the request can open that workspace instead of
+ * reporting an error the user can do nothing with.
+ *
+ * Only a `branch-already-checked-out` diagnostic can be answered this way, and
+ * only when its holder is an *active* workspace of this repository: an archived
+ * one has no route to navigate to, and the repository folder — which the
+ * refusal also covers — is not a workspace at all. Anything else stays a
+ * failure.
+ *
+ * Paths are compared by their real location rather than in SQL: git reports
+ * worktree paths with symlinks resolved, so a workspace under `/var/...` comes
+ * back from git as `/private/var/...` and a string compare would miss it.
+ * @param options - The refusal, the repository it came from, and the database.
+ * @returns The holding workspace's snapshot, or null when there is none.
+ */
+function readWorkspaceHoldingBranch({
+	database,
+	diagnostic,
+	repositoryId,
+}: {
+	database: DatabaseSync;
+	diagnostic: CreateWorkspaceDiagnostic;
+	repositoryId: string;
+}): CreatedWorkspaceSnapshot | null {
+	if (diagnostic.code !== 'branch-already-checked-out' || !diagnostic.path) {
+		return null;
+	}
+	const holderPath = diagnostic.path;
+	const row = listActiveWorkspaceSnapshotRowsByRepository({
+		database,
+		repositoryId,
+	}).find((candidate) => isSamePath(candidate.path, holderPath));
+	return row
+		? {
+				archivedAt: null,
+				baseBranch: row.baseBranch,
+				branchName: row.branchName,
+				createdAt: row.createdAt,
+				id: row.id,
+				metadata: parseMetadata(row.metadataJson),
+				name: row.name,
+				path: row.path,
+				repositoryId,
+				slug: row.slug,
+				updatedAt: row.updatedAt,
+			}
+		: null;
+}
+
+/**
  * Builds the standard failure shape for any rejected create request.
  * @param diagnostic - Diagnostic to surface as the single failure entry.
  */
@@ -657,6 +725,7 @@ function failure(diagnostic: CreateWorkspaceDiagnostic): CreateWorkspaceResult {
 	return {
 		diagnostics: [diagnostic],
 		filesToCopy: null,
+		reusedExisting: false,
 		status: 'failure',
 		workspace: null,
 	};

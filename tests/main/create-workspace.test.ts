@@ -157,6 +157,24 @@ function readGitExclude(workspacePath: string): string {
 	return existsSync(excludePath) ? readFileSync(excludePath, 'utf8') : '';
 }
 
+function countWorkspaceRows(databaseService: EnsemblrDatabaseService): number {
+	const database = databaseService.getConnection()?.database as DatabaseSync;
+	const row = database
+		.prepare('SELECT COUNT(*) AS total FROM workspaces')
+		.get() as { total: number } | undefined;
+	return row?.total ?? 0;
+}
+
+function archiveWorkspaceRow(
+	databaseService: EnsemblrDatabaseService,
+	workspaceId: string,
+): void {
+	const database = databaseService.getConnection()?.database as DatabaseSync;
+	database
+		.prepare('UPDATE workspaces SET archived_at = ? WHERE id = ?')
+		.run(fixedNow().toISOString(), workspaceId);
+}
+
 function workspaceRow(
 	databaseService: EnsemblrDatabaseService,
 	id: string,
@@ -1208,7 +1226,7 @@ test('adopting a branch that exists only on the remote tracks it', async (t) => 
 	assert.equal(existsSync(path.join(workspace.path, 'pr.txt')), true);
 });
 
-test('adopting a branch another worktree already holds is refused', async (t) => {
+test('adopting a branch another workspace already holds opens that workspace', async (t) => {
 	const harness = createHarness(t);
 	commitOnBranch(harness.repositoryPath, 'feature-x', 'feature.txt');
 
@@ -1232,9 +1250,17 @@ test('adopting a branch another worktree already holds is refused', async (t) =>
 		repositoryId: harness.repositoryId,
 	});
 
-	assert.equal(second.status, 'failure');
-	assert.equal(second.diagnostics[0]?.code, 'branch-already-checked-out');
-	assert.match(String(second.diagnostics[0]?.message), /already checked out/);
+	assert.equal(second.status, 'success');
+	assert.equal(second.reusedExisting, true);
+	assert.deepEqual(second.diagnostics, []);
+	assert.equal(second.workspace?.id, first.workspace?.id);
+	assert.equal(second.workspace?.path, first.workspace?.path);
+	assert.equal(second.workspace?.branchName, 'feature-x');
+	assert.equal(
+		countWorkspaceRows(harness.databaseService),
+		1,
+		'reusing must not insert a second row',
+	);
 	assert.equal(
 		runGit(first.workspace?.path ?? harness.repositoryPath, [
 			'rev-parse',
@@ -1242,6 +1268,109 @@ test('adopting a branch another worktree already holds is refused', async (t) =>
 			'HEAD',
 		]),
 		'feature-x',
+	);
+});
+
+test('adopting a branch an archived workspace holds is still refused', async (t) => {
+	const harness = createHarness(t);
+	commitOnBranch(harness.repositoryPath, 'feature-x', 'feature.txt');
+
+	const service = createWorkspaceService({
+		databaseService: harness.databaseService,
+		localCommandService: createLocalCommandService(),
+		now: fixedNow,
+		rootDirectoryService: rootDirectoryStub(harness),
+	});
+
+	const first = await service.create({
+		branchPlan: { branch: 'feature-x', kind: 'adopt' },
+		name: 'first',
+		repositoryId: harness.repositoryId,
+	});
+	assert.equal(first.status, 'success');
+	archiveWorkspaceRow(harness.databaseService, String(first.workspace?.id));
+
+	const second = await service.create({
+		branchPlan: { branch: 'feature-x', kind: 'adopt' },
+		name: 'second',
+		repositoryId: harness.repositoryId,
+	});
+
+	assert.equal(second.status, 'failure');
+	assert.equal(second.reusedExisting, false);
+	assert.equal(second.diagnostics[0]?.code, 'branch-already-checked-out');
+});
+
+test('adopting a branch the repository folder holds is still refused', async (t) => {
+	const harness = createHarness(t);
+	commitOnBranch(harness.repositoryPath, 'feature-x', 'feature.txt');
+	runGit(harness.repositoryPath, ['checkout', 'feature-x']);
+
+	const service = createWorkspaceService({
+		databaseService: harness.databaseService,
+		localCommandService: createLocalCommandService(),
+		now: fixedNow,
+		rootDirectoryService: rootDirectoryStub(harness),
+	});
+
+	const result = await service.create({
+		branchPlan: { branch: 'feature-x', kind: 'adopt' },
+		name: 'takeover',
+		repositoryId: harness.repositoryId,
+	});
+
+	assert.equal(result.status, 'failure');
+	assert.equal(result.diagnostics[0]?.code, 'branch-already-checked-out');
+	assert.match(
+		String(result.diagnostics[0]?.message),
+		/checked out in the repository folder/,
+	);
+});
+
+// The registration a delete or archive strands when `git worktree remove` fails
+// and the directory is unlinked anyway. Git still lists the branch as held, by a
+// worktree nobody can open.
+test('adopting a branch only a prunable registration holds succeeds', async (t) => {
+	const harness = createHarness(t);
+	commitOnBranch(harness.repositoryPath, 'feature-x', 'feature.txt');
+
+	const service = createWorkspaceService({
+		databaseService: harness.databaseService,
+		localCommandService: createLocalCommandService(),
+		now: fixedNow,
+		rootDirectoryService: rootDirectoryStub(harness),
+	});
+
+	const first = await service.create({
+		branchPlan: { branch: 'feature-x', kind: 'adopt' },
+		name: 'first',
+		repositoryId: harness.repositoryId,
+	});
+	assert.equal(first.status, 'success');
+	rmSync(String(first.workspace?.path), { force: true, recursive: true });
+	archiveWorkspaceRow(harness.databaseService, String(first.workspace?.id));
+
+	const second = await service.create({
+		branchPlan: { branch: 'feature-x', kind: 'adopt' },
+		name: 'second',
+		repositoryId: harness.repositoryId,
+	});
+
+	assert.equal(second.status, 'success');
+	assert.equal(second.reusedExisting, false);
+	assert.notEqual(second.workspace?.id, first.workspace?.id);
+	assert.equal(
+		runGit(String(second.workspace?.path), [
+			'rev-parse',
+			'--abbrev-ref',
+			'HEAD',
+		]),
+		'feature-x',
+	);
+	assert.doesNotMatch(
+		runGit(harness.repositoryPath, ['worktree', 'list', '--porcelain']),
+		/prunable/,
+		'the stale registration is pruned rather than left to block the next attempt',
 	);
 });
 

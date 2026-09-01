@@ -12,6 +12,7 @@ import {
 	readOriginTrackingRef,
 	refResolvesToCommit,
 	runWorktreeAdd as runWorktreeAddShared,
+	runWorktreePrune,
 	syncBaseRef,
 	type WorktreeBranchPlacement,
 } from './git-ops.ts';
@@ -20,6 +21,7 @@ import { validateGitRef } from './validate-git-ref.ts';
 
 const ORIGIN_REMOTE = 'origin';
 const GIT_WORKTREE_LIST_MAX_OUTPUT_BYTES = 256 * 1024;
+const WORKTREE_PATH_PREFIX = 'worktree ';
 
 /**
  * Everything the worktree needs to exist: where it goes, which branch it
@@ -213,6 +215,12 @@ async function prepareGitRefs({
  * Finds the worktree that already has `branchName` checked out. Git allows a
  * branch in only one worktree at a time, so adopting one it already holds must
  * fail with a diagnostic that names the holder rather than a raw git error.
+ *
+ * A prunable holder is not a holder. Its registration outlived the directory it
+ * points at — a delete or archive whose `git worktree remove` failed and which
+ * unlinked the folder anyway — so it blocks a branch nothing is actually using.
+ * Pruning is scoped to having found one for this branch rather than run on
+ * every creation, because `git worktree prune` has no per-entry granularity.
  * @param options - Branch to look for plus git command dependencies.
  * @returns The holding worktree's path, or null when the branch is free.
  */
@@ -236,36 +244,88 @@ async function findWorktreeHoldingBranch({
 		if (result.status !== 'success') {
 			return null;
 		}
-		return readWorktreePathForBranch(result.stdout, branchName);
+		const holder = readWorktreeHolderForBranch(result.stdout, branchName);
+		if (!holder) {
+			return null;
+		}
+		if (!holder.prunable) {
+			return holder.path;
+		}
+		await runWorktreePrune({ localCommandService, repositoryPath });
+		return null;
 	} catch {
 		return null;
 	}
 }
 
 /**
+ * The worktree holding a branch, as `git worktree list --porcelain` describes
+ * it. `prunable` marks a registration whose directory is gone: git still lists
+ * it, but it holds nothing that can be opened and a prune clears it.
+ */
+export interface WorktreeBranchHolder {
+	path: string;
+	prunable: boolean;
+}
+
+/**
  * Scans `git worktree list --porcelain` output for the worktree holding a
  * branch. Each record opens with a `worktree <path>` line and names its branch
  * on a later `branch refs/heads/<name>` line.
+ *
+ * The whole record is read before answering rather than returning at the branch
+ * line, because git emits `prunable` *after* `branch` — and that annotation is
+ * the difference between a branch another worktree is genuinely using and one
+ * whose worktree was deleted out from under its registration.
  * @param stdout - Raw porcelain output.
  * @param branchName - Branch to look for.
- * @returns The worktree path holding the branch, or null.
+ * @returns The worktree holding the branch, or null when no record names it.
  */
-export function readWorktreePathForBranch(
+export function readWorktreeHolderForBranch(
 	stdout: string,
 	branchName: string,
-): string | null {
-	const worktreePrefix = 'worktree ';
+): WorktreeBranchHolder | null {
 	const branchLine = `branch refs/heads/${branchName}`;
-	let currentPath: string | null = null;
-	for (const line of stdout.split('\n')) {
-		const entry = line.trim();
-		if (entry.startsWith(worktreePrefix)) {
-			currentPath = entry.slice(worktreePrefix.length);
-		} else if (entry === branchLine) {
-			return currentPath;
+	for (const record of readWorktreeRecords(stdout)) {
+		const pathLine = record.find((line) =>
+			line.startsWith(WORKTREE_PATH_PREFIX),
+		);
+		if (pathLine && record.includes(branchLine)) {
+			return {
+				path: pathLine.slice(WORKTREE_PATH_PREFIX.length),
+				prunable: record.some(isPrunableLine),
+			};
 		}
 	}
 	return null;
+}
+
+/**
+ * Splits porcelain output into one record per worktree. Git separates records
+ * with a blank line and terminates the last one with a newline.
+ * @param stdout - Raw porcelain output.
+ * @returns One array of non-empty trimmed lines per worktree record.
+ */
+function readWorktreeRecords(stdout: string): string[][] {
+	return stdout
+		.split(/\n\s*\n/)
+		.map((record) =>
+			record
+				.split('\n')
+				.map((line) => line.trim())
+				.filter((line) => line.length > 0),
+		)
+		.filter((record) => record.length > 0);
+}
+
+/**
+ * Reports whether a porcelain line is git's `prunable` annotation, which it
+ * writes bare or followed by the reason the entry became prunable.
+ * @param line - A trimmed porcelain line.
+ * @returns True when the line marks its record prunable.
+ */
+function isPrunableLine(line: string): boolean {
+	return line === 'prunable' || line.startsWith('prunable ');
 }
 
 /**
@@ -276,7 +336,7 @@ export function readWorktreePathForBranch(
  * @param right - Second path.
  * @returns True when both name the same directory.
  */
-function isSamePath(left: string, right: string): boolean {
+export function isSamePath(left: string, right: string): boolean {
 	try {
 		return realpathSync(left) === realpathSync(right);
 	} catch {

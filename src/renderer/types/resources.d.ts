@@ -2840,6 +2840,9 @@ export default interface Resources {
 				running: 'Typing into a terminal';
 			};
 		};
+		'create-workspace': {
+			'opened-existing': 'Opened the workspace that already has this branch checked out.';
+		};
 		'create-workspace-source': {
 			description: 'Choose a branch, pull request, or issue to start a workspace.';
 			loading: 'Loading {{sources}}…';
