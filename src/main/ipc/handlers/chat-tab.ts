@@ -41,8 +41,15 @@ const DEFAULT_CLOSED_TAB_LIMIT = 100;
  */
 export function registerChatTabHandlers({
 	chatTabService,
+	flushSummaryForChatTab,
 }: {
 	chatTabService: ChatTabService;
+	/**
+	 * Writes the summary a closing tab's live session still owes, before the row
+	 * is archived. Closing never stops the runtime, so this is the only flush the
+	 * final turn gets; the two services meet here rather than inside either one.
+	 */
+	flushSummaryForChatTab: (chatTabId: string) => Promise<void>;
 }): void {
 	ipcMain.handle(
 		IPC_CHANNELS.listAllChatTabs,
@@ -90,6 +97,17 @@ export function registerChatTabHandlers({
 		async (_event, raw: unknown): Promise<CloseChatTabResult> => {
 			const { chatTabId, fullTitle, metadataPatch, title } =
 				closeChatTabRequestSchema.parse(raw);
+			// Ahead of the archive, so the history entry this close produces carries
+			// this turn's summary rather than the previous turn's. A failed write is
+			// swallowed: archival work must not cost the user the close itself.
+			try {
+				await flushSummaryForChatTab(chatTabId);
+			} catch (cause) {
+				console.warn('[chat-tab] could not flush the closing tab’s summary.', {
+					cause: cause instanceof Error ? cause.message : String(cause),
+					chatTabId,
+				});
+			}
 			const { deleted } = chatTabService.closeTab({
 				chatTabId,
 				fullTitle,

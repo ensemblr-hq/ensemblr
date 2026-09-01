@@ -327,6 +327,7 @@ export function registerIpcHandlers({
 				},
 			},
 		}),
+		flushSummaryForChatTab: agentSessionService.flushSummaryForChatTab,
 	});
 	registerCheckpointHandlers({ databaseService });
 	registerReviewHandlers({

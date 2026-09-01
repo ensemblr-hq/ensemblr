@@ -54,10 +54,14 @@ export function WorkspaceTimeline({
 	const { data: agentSessionsData } = useQuery(
 		agentSessionsForWorkspaceQuery(workspace.id),
 	);
-	// The closed-history query lists every restorable tab, including terminal and
-	// aborted-summary tabs with no attachable transcript. Only summary-bearing
-	// entries can become attachment chips here.
+	// The closed-history query lists every restorable tab, including terminal
+	// tabs no transcript is ever written for. Chats are the ones this surface can
+	// speak to: one whose summary file is missing is shown disabled rather than
+	// dropped, so a gap reads as a gap instead of as a workspace with no history.
 	const transcripts = (transcriptsData?.entries ?? []).filter(
+		(entry) => entry.tab.kind === 'chat',
+	);
+	const hasAttachableTranscript = transcripts.some(
 		(entry) => entry.summaryPath.length > 0,
 	);
 
@@ -81,7 +85,7 @@ export function WorkspaceTimeline({
 	const hasWorkspaceHistory =
 		agentSessionsData === undefined ||
 		agentSessionsData.sessions.length > 0 ||
-		transcripts.length > 0 ||
+		hasAttachableTranscript ||
 		workspace.changeSummary.files > 0;
 	const showLandingCard =
 		!hasWorkspaceHistory && Boolean(workspace.landingSummary);
