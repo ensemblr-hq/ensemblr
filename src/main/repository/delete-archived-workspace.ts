@@ -10,7 +10,8 @@ import type {
 import type { LocalCommandService } from '../commands/local-command';
 import type { EnsemblrDatabaseService } from '../storage';
 import { selectDeleteArchivedWorkspaceJoinById } from '../storage/repositories/workspace-repository.ts';
-import { runBranchDelete, runWorktreeRemove } from './git-ops.ts';
+import { runBranchDelete, runRefDelete, runWorktreeRemove } from './git-ops.ts';
+import { archivedWorktreeRefFor } from './prune-worktree.ts';
 import { removeDirectoryTree } from './remove-directory.ts';
 import { deleteWorkspaceRow } from './workspace-row-ops.ts';
 import type { WorkspaceTeardownService } from './workspace-teardown.ts';
@@ -44,8 +45,9 @@ interface ArchivedWorkspace {
 /**
  * Builds the service that permanently purges an archived workspace: removes
  * the preserved `archived-contexts/.../` directory, the worktree folder
- * and registration if still present, the local branch if still present, and
- * the SQLite row (which cascades the `archive_records` rows via foreign key).
+ * and registration if still present, the local branch if still present, the
+ * private ref pinning a pruned workspace's snapshot, and the SQLite row (which
+ * cascades the `archive_records` rows via foreign key).
  */
 export function createDeleteArchivedWorkspaceService({
 	databaseService,
@@ -144,6 +146,14 @@ export function createDeleteArchivedWorkspaceService({
 					});
 				}
 			}
+
+			// The prune ref outlives the branch by design, so purging the archive is
+			// the only thing that can release the commits it pins.
+			await runRefDelete({
+				localCommandService,
+				ref: archivedWorktreeRefFor(source.id),
+				repositoryPath: source.repositoryPath,
+			});
 
 			const contextRemoved = await removeArchivedContextDirectory({
 				diagnostics,

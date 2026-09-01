@@ -443,3 +443,63 @@ test('archive validates the workspace id and rejects unknown ids', async (t) => 
 	assert.equal(notFound.status, 'failure');
 	assert.equal(notFound.diagnostics[0]?.code, 'workspace-not-found');
 });
+
+test('archiving with reclaimDisk removes the worktree and keeps the branch', async (t) => {
+	const harness = createHarness(t);
+	const workspace = await seedWorkspace(harness, 'reclaim-me');
+	const { service } = makeArchiveService(harness);
+
+	const result = await service.archive({
+		reclaimDisk: true,
+		workspaceId: workspace.id,
+	});
+
+	assert.equal(result.status, 'success');
+	assert.equal(result.workspace?.worktreePruned, true);
+	assert.equal(existsSync(workspace.path), false);
+	assert.ok(
+		listBranches(harness.repositoryPath).includes(workspace.branchName ?? ''),
+	);
+
+	const record = archiveRecord(
+		harness.databaseService,
+		result.archiveRecordId ?? '',
+	);
+	assert.equal(record?.worktree_pruned, 1);
+	assert.equal(typeof record?.pruned_head_commit, 'string');
+	assert.equal(typeof record?.pruned_wip_commit, 'string');
+});
+
+test('branch cleanup takes the discard path rather than pruning', async (t) => {
+	const harness = createHarness(t);
+	const workspace = await seedWorkspace(harness, 'discard-me');
+	const { service } = makeArchiveService(harness);
+
+	const result = await service.archive({
+		branchCleanup: true,
+		reclaimDisk: true,
+		workspaceId: workspace.id,
+	});
+
+	assert.equal(result.status, 'success');
+	// Dropping the branch destroys the commits deliberately, so it must not also
+	// leave a pin ref keeping them alive.
+	assert.equal(result.workspace?.worktreePruned, false);
+	assert.equal(result.workspace?.branchDeleted, true);
+	assert.equal(existsSync(workspace.path), false);
+	assert.ok(
+		!listBranches(harness.repositoryPath).includes(workspace.branchName ?? ''),
+	);
+});
+
+test('archiving without reclaimDisk leaves the worktree alone', async (t) => {
+	const harness = createHarness(t);
+	const workspace = await seedWorkspace(harness, 'keep-me');
+	const { service } = makeArchiveService(harness);
+
+	const result = await service.archive({ workspaceId: workspace.id });
+
+	assert.equal(result.status, 'success');
+	assert.equal(result.workspace?.worktreePruned, false);
+	assert.equal(existsSync(workspace.path), true);
+});

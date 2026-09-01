@@ -16,6 +16,7 @@ import {
 	diffTrees,
 	type GitDiffResult,
 	restoreWorkspaceTo,
+	sanitizeRefSegment,
 	snapshotWorkingTree,
 } from './git-checkpoint.ts';
 
@@ -98,11 +99,6 @@ export function createCheckpointCapture(): CheckpointCapturePort {
 			return null;
 		}
 	};
-}
-
-/** Keeps ids inside the ref namespace even if a slug-like id sneaks in. */
-function sanitizeRefSegment(segment: string): string {
-	return segment.replaceAll(/[^\w.-]/g, '-');
 }
 
 /** Typed error thrown by checkpoint service operations for IPC translation. */

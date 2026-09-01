@@ -202,6 +202,11 @@
 							"default": false,
 							"description": "Delete the local branch when a workspace is archived. The remote branch is untouched."
 						},
+						"reclaimDiskOnArchive": {
+							"type": "boolean",
+							"default": true,
+							"description": "Delete the worktree folder when a workspace is archived, keeping its branch and a snapshot of any uncommitted changes so unarchiving re-derives the workspace from git."
+						},
 						"archiveAfterMerge": {
 							"type": "boolean",
 							"default": false,
@@ -462,6 +467,11 @@
 					"type": "boolean",
 					"default": false,
 					"description": "Delete the local branch when a workspace is archived. The remote branch is untouched."
+				},
+				"reclaimDiskOnArchive": {
+					"type": "boolean",
+					"default": true,
+					"description": "Delete the worktree folder when a workspace is archived, keeping its branch and a snapshot of any uncommitted changes so unarchiving re-derives the workspace from git."
 				},
 				"setUpstreamOnPush": {
 					"type": "boolean",

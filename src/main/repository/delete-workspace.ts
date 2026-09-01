@@ -10,7 +10,8 @@ import type {
 import type { LocalCommandService } from '../commands/local-command';
 import type { EnsemblrDatabaseService } from '../storage';
 import { selectDeleteWorkspaceWithRepositoryById } from '../storage/repositories/workspace-repository.ts';
-import { runBranchDelete, runWorktreeRemove } from './git-ops.ts';
+import { runBranchDelete, runRefDelete, runWorktreeRemove } from './git-ops.ts';
+import { archivedWorktreeRefFor } from './prune-worktree.ts';
 import { removeDirectoryTree } from './remove-directory.ts';
 import { deleteWorkspaceRow } from './workspace-row-ops.ts';
 import type { WorkspaceTeardownService } from './workspace-teardown.ts';
@@ -115,6 +116,16 @@ export function createDeleteWorkspaceService({
 			const pathRemoved = await removeWorkspaceDirectory({
 				diagnostics,
 				workspacePath: source.path,
+			});
+
+			// A workspace that was ever archived with disk reclaimed still carries the
+			// private ref that pinned its snapshot. It survives the branch on
+			// purpose, so unless it goes here the commits stay reachable after the
+			// workspace it belonged to is gone.
+			await runRefDelete({
+				localCommandService,
+				ref: archivedWorktreeRefFor(source.id),
+				repositoryPath: source.repositoryPath,
 			});
 
 			let branchDeleted = false;

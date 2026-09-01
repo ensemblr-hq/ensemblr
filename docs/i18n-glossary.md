@@ -27,6 +27,9 @@ Rules of thumb:
 | Repository | Репозиторий | Αποθετήριο | |
 | Project | Проект | Έργο | The imported local repo, as distinct from a workspace. |
 | Worktree | Worktree | Worktree | Git term; untranslated. |
+| Reclaim disk *(the action)* | Освободить место | Ανάκτηση χώρου | Deleting an archived workspace's worktree folder while keeping its branch, so the disk comes back and the workspace does not have to. Russian takes `Освободить место` (free up space) over a literal `Вернуть диск`, which reads as reclaiming hardware; Greek `Ανάκτηση χώρου` is the noun form the button and the settings label share. Never `Очистить`/`Εκκαθάριση`, which the app already uses for clearing a chat. |
+| Pruned *(a worktree)* | Место освобождено | Ο χώρος ανακτήθηκε | The state of an archived workspace whose folder was removed and whose branch was kept. Stated as an outcome rather than an adjective in both languages: `обрезанный`/`κλαδεμένος` are the horticultural sense of `prune` and say nothing about disk. Distinct from *destroyed*, below. |
+| Destroyed *(a worktree)* | Worktree удалён | Το worktree διαγράφηκε | The state of an archived workspace whose folder **and** branch were both dropped, so its commits are gone. Kept plainly distinct from *pruned*: the two look identical in the archive list and only this wording tells the user which one comes back intact. |
 | Branch | Ветка | Κλάδος | |
 | Commit | Коммит | Commit | |
 | Pull request | Pull request | Pull request | Untranslated; `PR` stays `PR`. |

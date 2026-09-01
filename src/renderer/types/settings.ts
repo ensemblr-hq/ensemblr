@@ -32,5 +32,7 @@ export type RepoProject = ReturnType<typeof useRepoSettings>['project'];
 export interface ReviewMergeSettings {
 	archiveAfterMerge: boolean;
 	deleteLocalBranchOnArchive: boolean;
+	/** Remove the worktree on archive, keeping the branch so unarchive re-derives it. */
+	reclaimDiskOnArchive: boolean;
 	setUpstreamOnPush: boolean;
 }

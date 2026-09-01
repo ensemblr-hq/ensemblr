@@ -244,6 +244,10 @@
 			"label": "Delete branch on archive"
 		},
 		"description": "Workspace branch defaults and lifecycle behavior. Repository-scope overrides win when set.",
+		"reclaim-disk": {
+			"description": "Delete the worktree folder when a workspace is archived, keeping its branch and a snapshot of any uncommitted changes. Unarchiving checks the branch out again and restores them; dependencies and build output are rebuilt by the setup script. Off keeps the folder, and its dependencies, on disk indefinitely.",
+			"label": "Reclaim disk on archive"
+		},
 		"rename-workspace": {
 			"description": "Ask the agent to rename a workspace from its placeholder composer name, and its git branch to match, once it knows what the work is. Off leaves the placeholder name in place.",
 			"label": "Let agents name the workspace and branch"
@@ -626,6 +630,10 @@
 			"name-aria-label": "Preview URL name",
 			"name-placeholder": "Name",
 			"template-aria-label": "Preview URL template"
+		},
+		"reclaim-disk": {
+			"description": "Delete the worktree folder when a workspace is archived, keeping its branch and a snapshot of any uncommitted changes. Overrides your user-scope default for this repo.",
+			"label": "Reclaim disk on archive"
 		},
 		"root-path": {
 			"description": "Do not move or delete this directory. Instead, delete the repository in Ensemblr.",

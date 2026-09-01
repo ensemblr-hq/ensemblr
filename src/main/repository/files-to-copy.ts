@@ -55,120 +55,188 @@ export function createFilesToCopyService({
 }): FilesToCopyService {
 	return {
 		copy: async (input) => {
-			const resolved = resolvePatterns(input.config, input.personalPatterns);
+			const resolved = resolveFilesToCopyPatterns(
+				input.config,
+				input.personalPatterns,
+			);
 
 			if (resolved.patterns.length === 0) {
 				return emptySnapshot(resolved.source, resolved.patterns);
 			}
 
-			const tmpDirectory = mkdtempSync(
-				path.join(tmpdir(), 'ensemblr-files-to-copy-'),
-			);
-			const patternsPath = path.join(tmpDirectory, 'patterns');
+			const listed = await listFilesToCopyMatches({
+				cwd: input.repositoryPath,
+				localCommandService,
+				patterns: resolved.patterns,
+			});
 
-			try {
-				writeFileSync(
-					patternsPath,
-					`${resolved.patterns.join('\n')}\n`,
-					'utf8',
-				);
-
-				const result = await localCommandService.run({
-					args: [
-						'ls-files',
-						'-z',
-						'--others',
-						'--ignored',
-						`--exclude-from=${patternsPath}`,
-					],
-					command: 'git',
-					cwd: input.repositoryPath,
-					maxOutputBytes: LS_FILES_MAX_OUTPUT_BYTES,
-					timeoutMs: LS_FILES_TIMEOUT_MS,
-				});
-
-				if (result.status !== 'success') {
-					return {
-						copied: [],
-						diagnostics: [
-							{
-								code: 'pattern-listing-failed',
-								message:
-									firstLine(result.stderr) ||
-									'git ls-files failed to enumerate files-to-copy candidates.',
-								severity: 'warning',
-							},
-						],
-						patterns: resolved.patterns,
-						skipped: [],
-						source: resolved.source,
-					};
-				}
-
-				const relativePaths = parseNullSeparated(result.stdout);
-				const copied: FilesToCopyEntry[] = [];
-				const skipped: FilesToCopyDiagnostic[] = [];
-				const diagnostics: FilesToCopyDiagnostic[] = [];
-
-				for (const relativePath of relativePaths) {
-					const from = path.join(input.repositoryPath, relativePath);
-					const to = path.join(input.workspacePath, relativePath);
-
-					if (!existsSync(from)) {
-						skipped.push({
-							code: 'source-path-missing',
-							message: `Source path ${relativePath} no longer exists; skipped.`,
-							path: relativePath,
-							severity: 'info',
-						});
-						continue;
-					}
-
-					const stats = lstatSync(from);
-
-					if (!stats.isFile()) {
-						skipped.push({
-							code: 'source-path-missing',
-							message: `Source path ${relativePath} is not a regular file; skipped.`,
-							path: relativePath,
-							severity: 'info',
-						});
-						continue;
-					}
-
-					try {
-						mkdirSync(path.dirname(to), { recursive: true });
-						copyFileSync(from, to);
-						copied.push({ from, relativePath, to });
-					} catch (error) {
-						diagnostics.push({
-							code: 'copy-failed',
-							message:
-								error instanceof Error
-									? error.message
-									: `Failed to copy ${relativePath}.`,
-							path: relativePath,
-							severity: 'warning',
-						});
-					}
-				}
-
+			if (listed.error !== null) {
 				return {
-					copied,
-					diagnostics,
+					copied: [],
+					diagnostics: [
+						{
+							code: 'pattern-listing-failed',
+							message: listed.error,
+							severity: 'warning',
+						},
+					],
 					patterns: resolved.patterns,
-					skipped,
+					skipped: [],
 					source: resolved.source,
 				};
-			} finally {
-				try {
-					rmSync(tmpDirectory, { force: true, recursive: true });
-				} catch {
-					// Best effort: temp scratch left behind on next OS cleanup.
+			}
+
+			const copied: FilesToCopyEntry[] = [];
+			const skipped: FilesToCopyDiagnostic[] = [];
+			const diagnostics: FilesToCopyDiagnostic[] = [];
+
+			for (const relativePath of listed.relativePaths) {
+				const from = path.join(input.repositoryPath, relativePath);
+				const to = path.join(input.workspacePath, relativePath);
+
+				const outcome = copyOneFile(from, to);
+				if (outcome.status === 'copied') {
+					copied.push({ from, relativePath, to });
+				} else if (outcome.status === 'failed') {
+					diagnostics.push({
+						code: 'copy-failed',
+						message: outcome.message,
+						path: relativePath,
+						severity: 'warning',
+					});
+				} else {
+					skipped.push({
+						code: 'source-path-missing',
+						message:
+							outcome.status === 'missing'
+								? `Source path ${relativePath} no longer exists; skipped.`
+								: `Source path ${relativePath} is not a regular file; skipped.`,
+						path: relativePath,
+						severity: 'info',
+					});
 				}
 			}
+
+			return {
+				copied,
+				diagnostics,
+				patterns: resolved.patterns,
+				skipped,
+				source: resolved.source,
+			};
 		},
 	};
+}
+
+/** Outcome of enumerating files-to-copy candidates in one tree. */
+export interface FilesToCopyMatches {
+	/** Why the enumeration failed, or null when it succeeded. */
+	error: string | null;
+	/** Matching paths, relative to `cwd`. */
+	relativePaths: string[];
+}
+
+/**
+ * Asks git which gitignored files in `cwd` match the resolved patterns.
+ *
+ * Exported because the archive prune enumerates the same set in the *workspace*
+ * — to preserve a locally-edited `.env` before the worktree is removed — while
+ * workspace creation enumerates it in the repository root.
+ * @param cwd - Tree to enumerate.
+ * @param localCommandService - Command runner used for git.
+ * @param patterns - Resolved files-to-copy patterns.
+ * @returns The matching relative paths, or the failure that stopped the listing.
+ */
+export async function listFilesToCopyMatches({
+	cwd,
+	localCommandService,
+	patterns,
+}: {
+	cwd: string;
+	localCommandService: LocalCommandService;
+	patterns: readonly string[];
+}): Promise<FilesToCopyMatches> {
+	if (patterns.length === 0) {
+		return { error: null, relativePaths: [] };
+	}
+
+	const tmpDirectory = mkdtempSync(
+		path.join(tmpdir(), 'ensemblr-files-to-copy-'),
+	);
+	const patternsPath = path.join(tmpDirectory, 'patterns');
+
+	try {
+		writeFileSync(patternsPath, `${patterns.join('\n')}\n`, 'utf8');
+
+		const result = await localCommandService.run({
+			args: [
+				'ls-files',
+				'-z',
+				'--others',
+				'--ignored',
+				`--exclude-from=${patternsPath}`,
+			],
+			command: 'git',
+			cwd,
+			maxOutputBytes: LS_FILES_MAX_OUTPUT_BYTES,
+			timeoutMs: LS_FILES_TIMEOUT_MS,
+		});
+
+		if (result.status !== 'success') {
+			return {
+				error:
+					firstLine(result.stderr) ||
+					'git ls-files failed to enumerate files-to-copy candidates.',
+				relativePaths: [],
+			};
+		}
+
+		return { error: null, relativePaths: parseNullSeparated(result.stdout) };
+	} finally {
+		try {
+			rmSync(tmpDirectory, { force: true, recursive: true });
+		} catch {
+			// Best effort: temp scratch left behind on next OS cleanup.
+		}
+	}
+}
+
+/**
+ * What copying one candidate produced. `missing` and `not-a-file` are expected
+ * absences the caller reports as skips; `failed` carries the throw.
+ */
+export type CopyOneOutcome =
+	| { status: 'copied' }
+	| { status: 'missing' }
+	| { status: 'not-a-file' }
+	| { message: string; status: 'failed' };
+
+/**
+ * Copies one files-to-copy candidate, creating parent directories as needed.
+ * @param from - Absolute source path.
+ * @param to - Absolute destination path.
+ * @returns Whether the copy happened, and what stopped it when it did not.
+ */
+export function copyOneFile(from: string, to: string): CopyOneOutcome {
+	if (!existsSync(from)) {
+		return { status: 'missing' };
+	}
+
+	if (!lstatSync(from).isFile()) {
+		return { status: 'not-a-file' };
+	}
+
+	try {
+		mkdirSync(path.dirname(to), { recursive: true });
+		copyFileSync(from, to);
+		return { status: 'copied' };
+	} catch (error) {
+		return {
+			message:
+				error instanceof Error ? error.message : `Failed to copy ${from}.`,
+			status: 'failed',
+		};
+	}
 }
 
 /**
@@ -180,7 +248,7 @@ export function createFilesToCopyService({
  * @param personalPatterns - Personal (SQLite) patterns, when set.
  * @returns The chosen source plus its resolved pattern list.
  */
-function resolvePatterns(
+export function resolveFilesToCopyPatterns(
 	config: LoadedRepositoryConfig,
 	personalPatterns?: readonly string[],
 ): {

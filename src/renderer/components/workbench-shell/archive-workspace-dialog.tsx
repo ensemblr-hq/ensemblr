@@ -23,10 +23,11 @@ import type { ArchiveWorkspaceDiagnostic } from '@/shared/ipc/contracts/workspac
 
 /**
  * Lifecycle archive dialog: preserves the workspace `.context/` folder and
- * archives the workspace as a state. Whether the worktree and local branch go
- * with it is the repository's resolved `deleteLocalBranchOnArchive` setting,
- * the same one the merge-then-archive flow obeys. A setting that cannot be
- * resolved keeps both and says so rather than guessing.
+ * archives the workspace as a state. What happens to the worktree and local
+ * branch is the repository's resolved `deleteLocalBranchOnArchive` and
+ * `reclaimDiskOnArchive` settings, the same ones the merge-then-archive flow
+ * obeys. A setting that cannot be resolved keeps both and says so rather than
+ * guessing.
  */
 export function ArchiveWorkspaceDialog({
 	onArchived,
@@ -69,7 +70,56 @@ function archiveWorkspaceFailure(message: string): ArchiveWorkspaceDiagnostic {
 	return { code: 'workspace-update-failed', message, severity: 'error' };
 }
 
-/** Inner archive form for a workspace; owns the archiving state and reads the branch-cleanup policy. */
+/** The two `<0>`/`<1>` slots every archive description interpolates a path into. */
+const CONTEXT_PATH_COMPONENTS = [
+	<span className='font-mono' key='context-dir' />,
+	<span className='font-mono' key='archived-contexts-dir' />,
+];
+
+/**
+ * Says what this archive will actually do to the worktree, which is the one
+ * thing the user cannot tell by looking. The three states are genuinely
+ * different outcomes — the branch is dropped, the folder is reclaimed and the
+ * branch kept, or nothing on disk is touched — so each gets its own sentence
+ * rather than a hedged one covering all three.
+ */
+function ArchiveDescription({
+	branchCleanup,
+	reclaimDisk,
+}: {
+	branchCleanup: boolean;
+	reclaimDisk: boolean;
+}) {
+	if (branchCleanup) {
+		return (
+			<Trans
+				components={CONTEXT_PATH_COMPONENTS}
+				defaults='Marks the workspace as archived and preserves its <0>.context/</0> handoff files under <1>archived-contexts/</1>. The worktree folder is removed and the local branch dropped, per your git settings; anything else not pushed to the remote will be lost.'
+				i18nKey='workbench:archive-workspace.description-cleanup'
+			/>
+		);
+	}
+
+	if (reclaimDisk) {
+		return (
+			<Trans
+				components={CONTEXT_PATH_COMPONENTS}
+				defaults='Marks the workspace as archived and preserves its <0>.context/</0> handoff files under <1>archived-contexts/</1>. The worktree folder is removed to reclaim its disk, keeping the branch and a snapshot of any uncommitted changes; unarchiving restores both and rebuilds dependencies.'
+				i18nKey='workbench:archive-workspace.description-reclaim'
+			/>
+		);
+	}
+
+	return (
+		<Trans
+			components={CONTEXT_PATH_COMPONENTS}
+			defaults='Marks the workspace as archived and preserves its <0>.context/</0> handoff files under <1>archived-contexts/</1>. The worktree folder and local branch stay on disk; nothing is committed or pushed.'
+			i18nKey='workbench:archive-workspace.description-keep'
+		/>
+	);
+}
+
+/** Inner archive form for a workspace; owns the archiving state and reads the worktree-cleanup policy. */
 function ArchiveWorkspaceDialogForm({
 	onArchived,
 	onOpenChange,
@@ -96,6 +146,11 @@ function ArchiveWorkspaceDialogForm({
 	);
 	const branchCleanup =
 		hasBranch && gitSettings?.deleteLocalBranchOnArchive === true;
+	// Dropping the branch removes the worktree anyway, and destroys the commits
+	// with it, so the two never describe the same archive: the reclaim wording
+	// promises a workspace that comes back.
+	const reclaimDisk =
+		!branchCleanup && gitSettings?.reclaimDiskOnArchive === true;
 	const { diagnostics, isBusy, start } = useLifecycleDialogAction({
 		failure: archiveWorkspaceFailure,
 		onOpenChange,
@@ -104,6 +159,7 @@ function ArchiveWorkspaceDialogForm({
 		run: () =>
 			archiveWorkspace({
 				branchCleanup,
+				reclaimDisk,
 				workspaceId: workspace.id,
 			}),
 	});
@@ -126,25 +182,10 @@ function ArchiveWorkspaceDialogForm({
 					{t('workbench:archive-workspace.title', 'Archive workspace?')}
 				</DialogTitle>
 				<DialogDescription className='text-xs'>
-					{branchCleanup ? (
-						<Trans
-							components={[
-								<span className='font-mono' key='context-dir' />,
-								<span className='font-mono' key='archived-contexts-dir' />,
-							]}
-							defaults='Marks the workspace as archived and preserves its <0>.context/</0> handoff files under <1>archived-contexts/</1>. The worktree folder is removed and the local branch dropped, per your git settings; anything else not pushed to the remote will be lost.'
-							i18nKey='workbench:archive-workspace.description-cleanup'
-						/>
-					) : (
-						<Trans
-							components={[
-								<span className='font-mono' key='context-dir' />,
-								<span className='font-mono' key='archived-contexts-dir' />,
-							]}
-							defaults='Marks the workspace as archived and preserves its <0>.context/</0> handoff files under <1>archived-contexts/</1>. The worktree folder and local branch stay on disk; nothing is committed or pushed.'
-							i18nKey='workbench:archive-workspace.description-keep'
-						/>
-					)}
+					<ArchiveDescription
+						branchCleanup={branchCleanup}
+						reclaimDisk={reclaimDisk}
+					/>
 				</DialogDescription>
 			</DialogHeader>
 

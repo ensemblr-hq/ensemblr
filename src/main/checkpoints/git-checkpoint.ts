@@ -17,13 +17,15 @@ const execFileAsync = promisify(execFile);
 interface CaptureWorkspaceCheckpointInput {
 	cwd: string;
 	message: string;
-	/** Fully-qualified private ref, e.g. `refs/ensemblr/checkpoints/<ws>/<turn>`. */
+	/** Private ref under `refs/ensemblr/<namespace>/`, e.g. `refs/ensemblr/checkpoints/<ws>/<turn>`. */
 	ref: string;
 }
 
 /** Identifiers produced by a workspace checkpoint capture: the commit, its tree, and the ref it was written to. */
 interface CaptureWorkspaceCheckpointResult {
 	commitHash: string;
+	/** HEAD at capture time — the snapshot's parent — or null on an unborn branch. */
+	parentHash: string | null;
 	ref: string;
 	treeHash: string;
 }
@@ -39,7 +41,25 @@ export class GitCheckpointError extends Error {
 	}
 }
 
-const REF_PATTERN = /^refs\/ensemblr\/checkpoints\/[\w./-]+$/;
+/**
+ * Every ref this module may write, across the namespaces that use it: agent
+ * turn checkpoints under `refs/ensemblr/checkpoints/`, and the snapshot a
+ * pruned archive is re-derived from under `refs/ensemblr/archived/`. Anything
+ * outside `refs/ensemblr/<namespace>/` is refused, so a caller can never make
+ * `update-ref` move a branch or a tag.
+ */
+const REF_PATTERN = /^refs\/ensemblr\/[\w.-]+\/[\w./-]+$/;
+
+/**
+ * Keeps an id inside the ref namespace even if a slug-like id sneaks in. Lives
+ * beside {@link REF_PATTERN} so the sanitizer and the guard it has to satisfy
+ * cannot drift apart.
+ * @param segment - Raw id to place in a ref path.
+ * @returns The segment with every character the pattern rejects replaced.
+ */
+export function sanitizeRefSegment(segment: string): string {
+	return segment.replaceAll(/[^\w.-]/g, '-');
+}
 
 /** Fixed identity so capture never depends on the user's git config. */
 const GIT_IDENTITY_ENV = {
@@ -65,7 +85,7 @@ export async function captureWorkspaceCheckpoint({
 }: CaptureWorkspaceCheckpointInput): Promise<CaptureWorkspaceCheckpointResult> {
 	if (!REF_PATTERN.test(ref)) {
 		throw new GitCheckpointError({
-			message: `Refusing to write outside the ensemblr checkpoint namespace: ${ref}`,
+			message: `Refusing to write outside the ensemblr ref namespace: ${ref}`,
 			step: 'validate-ref',
 		});
 	}
@@ -95,7 +115,7 @@ export async function captureWorkspaceCheckpoint({
 			step: 'update-ref',
 		});
 
-		return { commitHash, ref, treeHash };
+		return { commitHash, parentHash, ref, treeHash };
 	});
 }
 

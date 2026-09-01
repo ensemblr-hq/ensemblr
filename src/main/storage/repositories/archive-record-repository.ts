@@ -94,3 +94,63 @@ export function insertArchiveRecordRow({
 			archivedAt,
 		);
 }
+
+/** Inputs for {@link updateArchiveRecordPruneState}. */
+export interface UpdateArchiveRecordPruneStateOptions {
+	database: DatabaseSync;
+	/** Branch tip at prune time, so a branch deleted out of band stays recreatable. */
+	prunedHeadCommit: string | null;
+	/** Snapshot commit holding the working tree the prune removed. */
+	prunedWipCommit: string | null;
+	/** Private ref pinning the snapshot (and through it the branch) against `git gc`. */
+	prunedWipRef: string | null;
+	recordId: string;
+}
+
+/**
+ * Stamps the prune columns onto an existing `archive_records` row. Pruning can
+ * happen either during the archive itself or long afterwards from the archive
+ * browser, so the state is written by UPDATE rather than folded into the INSERT.
+ */
+export function updateArchiveRecordPruneState({
+	database,
+	prunedHeadCommit,
+	prunedWipCommit,
+	prunedWipRef,
+	recordId,
+}: UpdateArchiveRecordPruneStateOptions): void {
+	database
+		.prepare(
+			`UPDATE archive_records
+			SET worktree_pruned = 1,
+				pruned_head_commit = ?,
+				pruned_wip_ref = ?,
+				pruned_wip_commit = ?
+			WHERE id = ?`,
+		)
+		.run(prunedHeadCommit, prunedWipRef, prunedWipCommit, recordId);
+}
+
+/**
+ * Clears the prune columns on an archive row once its worktree exists again, so
+ * a workspace that is unarchived and re-archived is not treated as pruned while
+ * its files are back on disk.
+ */
+export function clearArchiveRecordPruneState({
+	database,
+	recordId,
+}: {
+	database: DatabaseSync;
+	recordId: string;
+}): void {
+	database
+		.prepare(
+			`UPDATE archive_records
+			SET worktree_pruned = 0,
+				pruned_head_commit = NULL,
+				pruned_wip_ref = NULL,
+				pruned_wip_commit = NULL
+			WHERE id = ?`,
+		)
+		.run(recordId);
+}

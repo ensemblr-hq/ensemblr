@@ -6,6 +6,8 @@ import type {
 	ArchiveWorkspaceResult,
 	DeleteArchivedWorkspaceRequest,
 	DeleteArchivedWorkspaceResult,
+	ReclaimArchivedWorkspaceDiskRequest,
+	ReclaimArchivedWorkspaceDiskResult,
 	UnarchiveWorkspaceRequest,
 	UnarchiveWorkspaceResult,
 } from '@/shared/ipc/contracts/workspace';
@@ -15,8 +17,9 @@ import { ensemblrQueryKeys, getEnsemblrApi } from './query-keys';
 /**
  * Lifecycle archive: preserves the workspace `.context/` under
  * `<root>/archived-contexts/`, stamps `workspaces.archived_at`, and records a
- * row in `archive_records`. The worktree folder stays on disk; branch cleanup
- * is opt-in via `request.branchCleanup`.
+ * row in `archive_records`. What happens to the worktree is opt-in:
+ * `request.reclaimDisk` removes it and keeps the branch, `request.branchCleanup`
+ * removes it and drops the branch.
  */
 export function archiveWorkspace(
 	request: ArchiveWorkspaceRequest,
@@ -50,8 +53,9 @@ export function archivedWorkspacesQuery(repositoryId: string) {
 
 /**
  * Reverses a workspace lifecycle archive. Restores `.context/` from the
- * preserved snapshot; recreates the worktree from the recorded base branch
- * when the original archive ran with branch cleanup.
+ * preserved snapshot; re-derives a pruned worktree by checking its branch out
+ * again, or recreates one from the recorded base branch when the original
+ * archive dropped the branch.
  */
 export function unarchiveWorkspace(
 	request: UnarchiveWorkspaceRequest,
@@ -73,5 +77,19 @@ export function deleteArchivedWorkspace(
 	return profileElectronIpcCall(
 		{ channel: 'ensemblr:delete-archived-workspace', usesDatabase: true },
 		() => getEnsemblrApi().deleteArchivedWorkspace(request),
+	);
+}
+
+/**
+ * Reclaims the disk archived workspaces still occupy, removing each worktree
+ * while keeping its branch and a snapshot of any uncommitted changes. Takes a
+ * list so one call serves both a single row and the bulk action.
+ */
+export function reclaimArchivedWorkspaceDisk(
+	request: ReclaimArchivedWorkspaceDiskRequest,
+): Promise<ReclaimArchivedWorkspaceDiskResult> {
+	return profileElectronIpcCall(
+		{ channel: 'ensemblr:reclaim-archived-workspace-disk', usesDatabase: true },
+		() => getEnsemblrApi().reclaimArchivedWorkspaceDisk(request),
 	);
 }

@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs';
 import type { DatabaseSync } from 'node:sqlite';
 
 import type {
@@ -24,7 +25,8 @@ export interface CreateListArchivedWorkspacesServiceOptions {
 /**
  * Builds the service that returns every archived workspace under a repository,
  * joined with the most recent `archive_records` row so the renderer can show
- * branch cleanup status, preserved context path, and base branch.
+ * branch cleanup status, preserved context path, base branch, and whether the
+ * worktree still occupies disk.
  */
 export function createListArchivedWorkspacesService({
 	databaseService,
@@ -103,7 +105,12 @@ function toListEntry(row: unknown): ArchivedWorkspaceListEntry | null {
 		id: candidate.id,
 		name: candidate.name,
 		path: candidate.path,
+		// Probed rather than inferred from the prune flag: a worktree the user
+		// deleted by hand, or one from an archive made before pruning existed, is
+		// equally not there, and offering to reclaim it would be a dead button.
+		pathExists: existsSync(candidate.path),
 		repositoryId: candidate.repositoryId,
 		slug: candidate.slug,
+		worktreePruned: candidate.worktreePrunedRaw === 1,
 	};
 }

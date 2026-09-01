@@ -1,4 +1,4 @@
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
 import {
@@ -70,4 +70,27 @@ export function writeSetupStateFile(
 		mkdirSync(path.dirname(markerPath), { recursive: true });
 		writeFileSync(markerPath, `${JSON.stringify(state, null, 2)}\n`);
 	} catch {}
+}
+
+/**
+ * Removes both the current and the legacy setup markers from a worktree, so the
+ * next open re-runs setup.
+ *
+ * A pruned workspace is re-derived from git without its dependencies, yet its
+ * `.context/` — the marker included — is restored from the archive. Without this
+ * the marker would claim setup already ran while `node_modules` no longer
+ * exists, and the lifecycle service would skip the very run that rebuilds it.
+ * Best-effort, mirroring {@link writeSetupStateFile}: a failure only costs a
+ * skipped setup the user can trigger by hand.
+ * @param worktreePath - Absolute path to the workspace worktree root.
+ */
+export function clearSetupStateFile(worktreePath: string): void {
+	for (const markerPath of [
+		setupStatePath(worktreePath),
+		legacySetupStatePath(worktreePath),
+	]) {
+		try {
+			rmSync(markerPath, { force: true });
+		} catch {}
+	}
 }

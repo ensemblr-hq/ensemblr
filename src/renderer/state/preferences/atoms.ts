@@ -298,6 +298,7 @@ const REPO_SETTINGS_KEYS = [
 	'branchFrom',
 	'remoteOrigin',
 	'deleteLocalBranchOnArchive',
+	'reclaimDiskOnArchive',
 	'archiveAfterMerge',
 	'filesToCopy',
 	'previewUrls',

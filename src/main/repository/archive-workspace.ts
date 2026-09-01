@@ -14,6 +14,7 @@ import type {
 import type { LocalCommandService } from '../commands/local-command';
 import type { EnsemblrRootDirectoryService } from '../root';
 import type { EnsemblrDatabaseService } from '../storage';
+import { updateArchiveRecordPruneState } from '../storage/repositories/archive-record-repository.ts';
 import {
 	selectWorkspaceWithRepositoryById,
 	stampWorkspaceArchived,
@@ -29,6 +30,7 @@ import { insertArchiveRecord } from './archive-records.ts';
 import { readContinuedBranches } from './continued-branches.ts';
 import { copyDirectoryTree } from './copy-directory.ts';
 import { runBranchDelete, runWorktreeRemove } from './git-ops.ts';
+import { pruneWorktree } from './prune-worktree.ts';
 import { hasWorkspaceRepositoryIdentity, isRecord } from './row-guards.ts';
 import type { WorkspaceTeardownService } from './workspace-teardown.ts';
 
@@ -73,8 +75,12 @@ const ARCHIVE_METADATA_FILENAME = 'archive-metadata.json';
  * `workspaces.archived_at`, preserves the workspace `.context/` under
  * `<root>/archived-contexts/<repo-slug>/<workspace-slug>-<timestamp>/`, writes
  * an `archive-metadata.json` snapshot, and inserts a row into `archive_records`
- * so ENS-038 / ENS-060 subscribers have enough state to act on later. Branch
- * cleanup runs only when the request opts in.
+ * so ENS-038 / ENS-060 subscribers have enough state to act on later.
+ *
+ * What happens to the worktree is the request's choice. `reclaimDisk` removes
+ * the directory and keeps the branch, so the workspace is re-derived from git
+ * on unarchive; `branchCleanup` removes the directory and drops the branch,
+ * which is not reversible. Neither runs unless the request opts in.
  */
 export function createArchiveWorkspaceService({
 	archiveLifecycleService,
@@ -86,56 +92,21 @@ export function createArchiveWorkspaceService({
 }: CreateArchiveWorkspaceServiceOptions): ArchiveWorkspaceService {
 	return {
 		archive: async (request) => {
-			const database = databaseService.getConnection()?.database;
-			if (!database) {
-				return failure({
-					code: 'database-unavailable',
-					message: 'SQLite is unavailable; the workspace was not archived.',
-					severity: 'error',
-				});
+			const target = resolveArchiveTarget({
+				databaseService,
+				request,
+				rootDirectoryService,
+			});
+			if ('diagnostic' in target) {
+				return failure(target.diagnostic);
 			}
-
-			const workspaceId =
-				typeof request.workspaceId === 'string'
-					? request.workspaceId.trim()
-					: '';
-			if (!workspaceId) {
-				return failure({
-					code: 'workspace-id-required',
-					message: 'A workspace id is required to archive a workspace.',
-					severity: 'error',
-				});
-			}
-
-			const source = readWorkspace(database, workspaceId);
-			if (!source) {
-				return failure({
-					code: 'workspace-not-found',
-					message: `No workspace is registered with id ${workspaceId}.`,
-					severity: 'error',
-				});
-			}
-
-			if (source.archivedAt) {
-				return failure({
-					code: 'workspace-already-archived',
-					message: `Workspace "${source.name}" was already archived at ${source.archivedAt}.`,
-					severity: 'info',
-				});
-			}
-
-			const rootSnapshot =
-				rootDirectoryService.getSnapshot() ?? rootDirectoryService.ensure();
-			if (!rootSnapshot.archivedContextsPath) {
-				return failure({
-					code: 'archived-contexts-directory-missing',
-					message:
-						'The managed root has no archived-contexts path; configure the root directory first.',
-					severity: 'error',
-				});
-			}
+			const { archivedContextsRoot, database, source } = target;
 
 			const branchCleanup = request.branchCleanup === true;
+			// Deleting the branch already removes the worktree, and it deliberately
+			// destroys the commits with it — so it takes the discard path below
+			// rather than the prune path, which exists to keep them recoverable.
+			const reclaimDisk = !branchCleanup && request.reclaimDisk === true;
 			const reason =
 				typeof request.reason === 'string' && request.reason.trim()
 					? request.reason.trim()
@@ -145,7 +116,7 @@ export function createArchiveWorkspaceService({
 
 			const preserved = await preserveContextDirectory({
 				archivedAt,
-				archivedContextsRoot: rootSnapshot.archivedContextsPath,
+				archivedContextsRoot,
 				diagnostics,
 				source,
 			});
@@ -254,6 +225,17 @@ export function createArchiveWorkspaceService({
 				});
 			}
 
+			const reclaimed = reclaimDisk
+				? await reclaimWorktreeDisk({
+						archivedContextPath: preserved.archivedContextPath,
+						database,
+						diagnostics,
+						localCommandService,
+						recordId,
+						source,
+					})
+				: { bytesFreed: null, worktreePruned: false };
+
 			if (preserved.archivedContextPath) {
 				writeArchiveMetadata({
 					archiveRecordId: recordId,
@@ -264,6 +246,7 @@ export function createArchiveWorkspaceService({
 					preservedDirectory: preserved.archivedContextPath,
 					reason,
 					source,
+					worktreePruned: reclaimed.worktreePruned,
 				});
 			}
 
@@ -284,11 +267,13 @@ export function createArchiveWorkspaceService({
 				branchCleanup,
 				branchDeleted,
 				branchName: source.branchName,
+				bytesFreed: reclaimed.bytesFreed,
 				id: source.id,
 				name: source.name,
 				path: source.path,
 				repositoryId: source.repositoryId,
 				slug: source.slug,
+				worktreePruned: reclaimed.worktreePruned,
 			};
 
 			return {
@@ -298,6 +283,96 @@ export function createArchiveWorkspaceService({
 				workspace,
 			};
 		},
+	};
+}
+
+/** Everything an archive needs before it can touch anything, or why it cannot. */
+type ArchiveTarget =
+	| {
+			archivedContextsRoot: string;
+			database: DatabaseSync;
+			source: SourceWorkspace;
+	  }
+	| { diagnostic: ArchiveWorkspaceDiagnostic };
+
+/**
+ * Resolves the workspace an archive will act on, refusing up front anything the
+ * lifecycle cannot proceed without: an open database, a usable id, a workspace
+ * that exists and is not already archived, and a managed root to preserve its
+ * context under.
+ * @param options - Service dependencies and the incoming request.
+ * @returns The resolved target, or the diagnostic that blocks the archive.
+ */
+function resolveArchiveTarget({
+	databaseService,
+	request,
+	rootDirectoryService,
+}: {
+	databaseService: EnsemblrDatabaseService;
+	request: ArchiveWorkspaceRequest;
+	rootDirectoryService: EnsemblrRootDirectoryService;
+}): ArchiveTarget {
+	const database = databaseService.getConnection()?.database;
+	if (!database) {
+		return {
+			diagnostic: {
+				code: 'database-unavailable',
+				message: 'SQLite is unavailable; the workspace was not archived.',
+				severity: 'error',
+			},
+		};
+	}
+
+	const workspaceId =
+		typeof request.workspaceId === 'string' ? request.workspaceId.trim() : '';
+	if (!workspaceId) {
+		return {
+			diagnostic: {
+				code: 'workspace-id-required',
+				message: 'A workspace id is required to archive a workspace.',
+				severity: 'error',
+			},
+		};
+	}
+
+	const source = readWorkspace(database, workspaceId);
+	if (!source) {
+		return {
+			diagnostic: {
+				code: 'workspace-not-found',
+				message: `No workspace is registered with id ${workspaceId}.`,
+				severity: 'error',
+			},
+		};
+	}
+
+	if (source.archivedAt) {
+		return {
+			diagnostic: {
+				code: 'workspace-already-archived',
+				message: `Workspace "${source.name}" was already archived at ${source.archivedAt}.`,
+				severity: 'info',
+			},
+		};
+	}
+
+	const rootSnapshot =
+		rootDirectoryService.getSnapshot() ?? rootDirectoryService.ensure();
+	if (!rootSnapshot.archivedContextsPath) {
+		return {
+			diagnostic: {
+				code: 'archived-contexts-directory-missing',
+				message:
+					'The managed root has no archived-contexts path; configure the root directory first.',
+				severity: 'error',
+			},
+		};
+	}
+
+	return {
+		archivedContextsRoot: rootSnapshot.archivedContextsPath,
+		database,
+		source,
 	};
 }
 
@@ -365,6 +440,78 @@ async function deleteBranchChain({
 		}
 	}
 	return branchDeleted;
+}
+
+/**
+ * Removes the worktree directory while keeping the branch, and records what a
+ * later unarchive needs to re-derive it.
+ *
+ * A worktree is overwhelmingly gitignored dependencies and build output that
+ * the setup script rebuilds, so keeping it is a permanent disk cost for state
+ * nobody reads. A prune that fails is a warning rather than an error: the
+ * archive itself succeeded and the only consequence is disk still in use.
+ * @param options - Preserved context path, database, diagnostics sink, git
+ * dependencies, archive record id, and the workspace being archived.
+ * @returns Whether the worktree was pruned, and how much disk that reclaimed.
+ */
+async function reclaimWorktreeDisk({
+	archivedContextPath,
+	database,
+	diagnostics,
+	localCommandService,
+	recordId,
+	source,
+}: {
+	archivedContextPath: string | null;
+	database: DatabaseSync;
+	diagnostics: ArchiveWorkspaceDiagnostic[];
+	localCommandService: LocalCommandService;
+	recordId: string;
+	source: SourceWorkspace;
+}): Promise<{ bytesFreed: number | null; worktreePruned: boolean }> {
+	const pruned = await pruneWorktree({
+		archivedContextPath,
+		localCommandService,
+		repositoryPath: source.repositoryPath,
+		workspaceId: source.id,
+		workspacePath: source.path,
+	});
+
+	if (pruned.status === 'failure') {
+		diagnostics.push({
+			code: 'worktree-prune-failed',
+			message: pruned.message ?? 'The worktree could not be removed.',
+			path: source.path,
+			severity: 'warning',
+		});
+		return { bytesFreed: null, worktreePruned: false };
+	}
+
+	if (pruned.status === 'skipped') {
+		return { bytesFreed: null, worktreePruned: false };
+	}
+
+	try {
+		updateArchiveRecordPruneState({
+			database,
+			prunedHeadCommit: pruned.headCommit,
+			prunedWipCommit: pruned.wipCommit,
+			prunedWipRef: pruned.wipRef,
+			recordId,
+		});
+	} catch (error) {
+		diagnostics.push({
+			code: 'workspace-update-failed',
+			message:
+				error instanceof Error
+					? error.message
+					: 'Failed to record the prune state; unarchive will not find the worktree.',
+			severity: 'error',
+		});
+		return { bytesFreed: pruned.bytesFreed, worktreePruned: false };
+	}
+
+	return { bytesFreed: pruned.bytesFreed, worktreePruned: true };
 }
 
 /**
@@ -500,6 +647,7 @@ function writeArchiveMetadata({
 	preservedDirectory,
 	reason,
 	source,
+	worktreePruned,
 }: {
 	archiveRecordId: string;
 	archivedAt: string;
@@ -509,6 +657,7 @@ function writeArchiveMetadata({
 	preservedDirectory: string;
 	reason: string | null;
 	source: SourceWorkspace;
+	worktreePruned: boolean;
 }): void {
 	const payload = {
 		archiveRecordId,
@@ -516,6 +665,7 @@ function writeArchiveMetadata({
 		branchCleanup,
 		branchDeleted,
 		ensemblrSchema: 'archive-record/v1',
+		worktreePruned,
 		reason,
 		repository: {
 			id: source.repositoryId,

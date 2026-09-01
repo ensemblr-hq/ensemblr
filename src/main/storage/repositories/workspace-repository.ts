@@ -633,7 +633,8 @@ export interface SelectArchivedWorkspaceJoinByIdOptions {
  * Full `workspaces` + `repositories` + most-recent `archive_records` join
  * needed by the unarchive flow. The latest archive row is resolved with a
  * correlated subquery so the worktree can be recreated from the original
- * `base_branch` and `archived_context_path`.
+ * `base_branch` and `archived_context_path`, and the prune columns carry what a
+ * pruned workspace needs to be re-derived from git.
  */
 export function selectArchivedWorkspaceJoinById({
 	database,
@@ -655,7 +656,11 @@ export function selectArchivedWorkspaceJoinById({
 				a.id AS archiveRecordId,
 				a.base_branch AS baseBranch,
 				a.archived_context_path AS archivedContextPath,
-				a.branch_cleanup AS branchCleanupRaw
+				a.branch_cleanup AS branchCleanupRaw,
+				a.worktree_pruned AS worktreePrunedRaw,
+				a.pruned_head_commit AS prunedHeadCommit,
+				a.pruned_wip_ref AS prunedWipRef,
+				a.pruned_wip_commit AS prunedWipCommit
 			FROM workspaces w
 			INNER JOIN repositories r ON r.id = w.repository_id
 			LEFT JOIN archive_records a
@@ -682,7 +687,8 @@ export interface SelectDeleteArchivedWorkspaceJoinByIdOptions {
  * Narrow projection of the archived workspace join used by the
  * `delete-from-archive` service. Excludes columns the unarchive flow needs
  * (slug, repository id, repositoryName, repositorySlug) to keep the result
- * shape minimal for that consumer.
+ * shape minimal for that consumer. The prune columns are included so a
+ * permanent delete can drop the private ref pinning the pruned snapshot.
  */
 export function selectDeleteArchivedWorkspaceJoinById({
 	database,
@@ -698,7 +704,11 @@ export function selectDeleteArchivedWorkspaceJoinById({
 				w.archived_at AS archivedAt,
 				r.path AS repositoryPath,
 				a.archived_context_path AS archivedContextPath,
-				a.branch_cleanup AS branchCleanupRaw
+				a.branch_cleanup AS branchCleanupRaw,
+				a.worktree_pruned AS worktreePrunedRaw,
+				a.pruned_head_commit AS prunedHeadCommit,
+				a.pruned_wip_ref AS prunedWipRef,
+				a.pruned_wip_commit AS prunedWipCommit
 			FROM workspaces w
 			INNER JOIN repositories r ON r.id = w.repository_id
 			LEFT JOIN archive_records a
@@ -724,8 +734,8 @@ export interface ListArchivedWorkspaceRowsByRepositoryOptions {
 /**
  * Returns every archived workspace under `repositoryId`, joined with the most
  * recent matching `archive_records` row, ordered by archive timestamp desc.
- * The shape matches what the legacy domain query produced so the existing
- * `toListEntry` projector can stay unchanged.
+ * Carries the prune columns so the archive browser can tell an archive whose
+ * worktree still occupies disk from one already reclaimed.
  */
 export function listArchivedWorkspaceRowsByRepository({
 	database,
@@ -744,7 +754,11 @@ export function listArchivedWorkspaceRowsByRepository({
 				a.id AS archiveRecordId,
 				a.base_branch AS baseBranch,
 				a.archived_context_path AS archivedContextPath,
-				a.branch_cleanup AS branchCleanupRaw
+				a.branch_cleanup AS branchCleanupRaw,
+				a.worktree_pruned AS worktreePrunedRaw,
+				a.pruned_head_commit AS prunedHeadCommit,
+				a.pruned_wip_ref AS prunedWipRef,
+				a.pruned_wip_commit AS prunedWipCommit
 			FROM workspaces w
 			LEFT JOIN archive_records a
 				ON a.workspace_id = w.id
@@ -764,8 +778,8 @@ export function listArchivedWorkspaceRowsByRepository({
 /**
  * Returns every workspace across all repositories — active and archived —
  * joined with the parent repository (for the display name) and the most recent
- * matching `archive_records` row (for base branch + branch-cleanup state, used
- * to gate the Unarchive action). Ordered by last activity (with `id` as a
+ * matching `archive_records` row (for base branch, branch-cleanup, and prune
+ * state, used to gate the Unarchive action). Ordered by last activity (with `id` as a
  * stable tiebreaker so equal timestamps don't reshuffle between loads) so the
  * History screen can group newest-first. Mirrors the archive-record join in
  * {@link listArchivedWorkspaceRowsByRepository} but drops the archived filter
@@ -790,7 +804,8 @@ export function listAllWorkspaceRows({
 				w.archived_at AS archivedAt,
 				r.name AS repositoryName,
 				a.base_branch AS baseBranch,
-				a.branch_cleanup AS branchCleanupRaw
+				a.branch_cleanup AS branchCleanupRaw,
+				a.worktree_pruned AS worktreePrunedRaw
 			FROM workspaces w
 			INNER JOIN repositories r ON r.id = w.repository_id
 			LEFT JOIN archive_records a

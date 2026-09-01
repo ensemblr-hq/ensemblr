@@ -85,6 +85,29 @@ function RepoGitSettings() {
 			<SettingRow
 				control={
 					<Switch
+						checked={Boolean(resolved('reclaimDiskOnArchive')?.value)}
+						onCheckedChange={(checked) =>
+							save({ reclaimDiskOnArchive: checked })
+						}
+					/>
+				}
+				description={t(
+					'settings:repo.reclaim-disk.description',
+					'Delete the worktree folder when a workspace is archived, keeping its branch and a snapshot of any uncommitted changes. Overrides your user-scope default for this repo.',
+				)}
+				label={
+					<span className='flex items-center gap-2'>
+						{t('settings:repo.reclaim-disk.label', 'Reclaim disk on archive')}
+						<SourceBadge source={resolved('reclaimDiskOnArchive')?.source} />
+					</span>
+				}
+				modified={isPersonalOverride(resolved('reclaimDiskOnArchive'))}
+				onReset={() => save({ reclaimDiskOnArchive: null })}
+			/>
+
+			<SettingRow
+				control={
+					<Switch
 						checked={Boolean(resolved('archiveAfterMerge')?.value)}
 						onCheckedChange={(checked) => save({ archiveAfterMerge: checked })}
 					/>

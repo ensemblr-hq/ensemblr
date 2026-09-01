@@ -25,6 +25,7 @@ type ActiveReviewDialog = { kind: 'merge' } | null;
 const DEFAULT_MERGE_SETTINGS = {
 	archiveAfterMerge: false,
 	deleteLocalBranchOnArchive: false,
+	reclaimDiskOnArchive: true,
 	setUpstreamOnPush: true,
 } as const;
 

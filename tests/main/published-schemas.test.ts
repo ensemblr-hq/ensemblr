@@ -288,6 +288,7 @@ const settingsFixture = {
 		branch_from: 'develop',
 		branch_prefix: 'feat/',
 		delete_local_branch_on_archive: true,
+		reclaim_disk_on_archive: true,
 		remote_origin: 'origin',
 		set_upstream_on_push: true,
 	},

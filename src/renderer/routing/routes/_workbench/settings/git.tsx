@@ -15,6 +15,7 @@ import {
 	branchPrefixCustomAtom,
 	branchPrefixSourceAtom,
 	deleteBranchOnArchiveAtom,
+	reclaimDiskOnArchiveAtom,
 	renameWorkspaceOnBranchAtom,
 	setUpstreamOnPushAtom,
 } from '@/renderer/state/preferences';
@@ -37,6 +38,7 @@ function GitSettings() {
 		renameWorkspaceOnBranchAtom,
 	);
 	const [deleteBranch, setDeleteBranch] = useAtom(deleteBranchOnArchiveAtom);
+	const [reclaimDisk, setReclaimDisk] = useAtom(reclaimDiskOnArchiveAtom);
 	const [archiveOnMerge, setArchiveOnMerge] = useAtom(archiveOnMergeAtom);
 	const [setUpstream, setSetUpstream] = useAtom(setUpstreamOnPushAtom);
 
@@ -138,6 +140,19 @@ function GitSettings() {
 				)}
 				modified={deleteBranch !== DEFAULTS.deleteLocalBranchOnArchive}
 				onReset={() => setDeleteBranch(DEFAULTS.deleteLocalBranchOnArchive)}
+			/>
+
+			<SettingRow
+				control={
+					<Switch checked={reclaimDisk} onCheckedChange={setReclaimDisk} />
+				}
+				description={t(
+					'settings:git.reclaim-disk.description',
+					'Delete the worktree folder when a workspace is archived, keeping its branch and a snapshot of any uncommitted changes. Unarchiving checks the branch out again and restores them; dependencies and build output are rebuilt by the setup script. Off keeps the folder, and its dependencies, on disk indefinitely.',
+				)}
+				label={t('settings:git.reclaim-disk.label', 'Reclaim disk on archive')}
+				modified={reclaimDisk !== DEFAULTS.reclaimDiskOnArchive}
+				onReset={() => setReclaimDisk(DEFAULTS.reclaimDiskOnArchive)}
 			/>
 
 			<SettingRow

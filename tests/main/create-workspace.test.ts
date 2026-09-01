@@ -36,6 +36,7 @@ function gitDefaults(overrides: Partial<GitSettings> = {}): GitSettings {
 		branchPrefixCustom: '',
 		renameWorkspaceOnBranch: true,
 		deleteLocalBranchOnArchive: false,
+		reclaimDiskOnArchive: true,
 		archiveAfterMerge: false,
 		setUpstreamOnPush: true,
 		...overrides,

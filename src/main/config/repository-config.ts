@@ -86,6 +86,7 @@ const GIT_FIELD_MAP: ReadonlyMap<
 		'delete_local_branch_on_archive',
 		{ key: 'deleteLocalBranchOnArchive', type: 'boolean' },
 	],
+	['reclaim_disk_on_archive', { key: 'reclaimDiskOnArchive', type: 'boolean' }],
 	['archive_after_merge', { key: 'archiveAfterMerge', type: 'boolean' }],
 	['set_upstream_on_push', { key: 'setUpstreamOnPush', type: 'boolean' }],
 ]);

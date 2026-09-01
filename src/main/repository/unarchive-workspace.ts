@@ -12,6 +12,7 @@ import type {
 } from '../../shared/ipc/contracts/workspace';
 import type { LocalCommandService } from '../commands/local-command';
 import type { EnsemblrDatabaseService } from '../storage';
+import { clearArchiveRecordPruneState } from '../storage/repositories/archive-record-repository.ts';
 import {
 	clearWorkspaceArchived,
 	selectArchivedWorkspaceJoinById,
@@ -24,7 +25,16 @@ import {
 import type { ArchiveLifecycleService } from './archive-lifecycle.ts';
 import { toLifecycleTargets } from './archive-lifecycle-targets.ts';
 import { copyDirectoryTree } from './copy-directory.ts';
-import { runWorktreeAdd as runWorktreeAddShared } from './git-ops.ts';
+import {
+	refResolvesToCommit,
+	runRefDelete,
+	runWorktreeAdd as runWorktreeAddShared,
+} from './git-ops.ts';
+import { archivedWorktreeRefFor } from './prune-worktree.ts';
+import {
+	invalidateSetupMarker,
+	rehydrateWorktree,
+} from './rehydrate-worktree.ts';
 import {
 	hasWorkspaceRepositoryIdentity,
 	isNullableNumber,
@@ -58,11 +68,14 @@ interface ArchivedWorkspace {
 	id: string;
 	name: string;
 	path: string;
+	prunedHeadCommit: string | null;
+	prunedWipCommit: string | null;
 	repositoryId: string;
 	repositoryName: string;
 	repositoryPath: string;
 	repositorySlug: string;
 	slug: string;
+	worktreePruned: boolean;
 }
 
 const CONTEXT_DIRECTORY = '.context';
@@ -151,57 +164,19 @@ export function createUnarchiveWorkspaceService({
 				};
 			}
 
-			let branchRecreated = false;
-			if (source.branchCleanup) {
-				if (!source.archiveRecordId) {
-					return failure({
-						code: 'archive-record-missing',
-						message:
-							'No archive record was found for this workspace; the original worktree path cannot be recreated.',
-						severity: 'error',
-					});
-				}
-				if (!source.branchName) {
-					return failure({
-						code: 'base-branch-missing',
-						message:
-							'The archived branch name was not preserved; the worktree cannot be recreated.',
-						severity: 'error',
-					});
-				}
-				if (!source.baseBranch) {
-					return failure({
-						code: 'base-branch-missing',
-						message:
-							'The base branch was not preserved in the archive record; the worktree cannot be recreated.',
-						severity: 'error',
-					});
-				}
-
-				const recreateDiagnostic = await runWorktreeAdd({
-					baseBranch: source.baseBranch,
-					branchName: source.branchName,
-					localCommandService,
-					repositoryPath: source.repositoryPath,
-					workspacePath: source.path,
-				});
-				if (recreateDiagnostic) {
-					diagnostics.push(recreateDiagnostic);
-					return {
-						diagnostics,
-						status: 'failure',
-						workspace: null,
-					};
-				}
-				branchRecreated = true;
-			} else if (!existsSync(source.path)) {
-				return failure({
-					code: 'worktree-recreate-failed',
-					message: `Worktree path is missing on disk: ${source.path}. Run delete-from-archive to clean up the orphaned record.`,
-					path: source.path,
-					severity: 'error',
-				});
+			const materialized = await materializeWorktree({
+				diagnostics,
+				localCommandService,
+				source,
+			});
+			if ('diagnostic' in materialized) {
+				return {
+					diagnostics: [...diagnostics, materialized.diagnostic],
+					status: 'failure',
+					workspace: null,
+				};
 			}
+			const { branchRecreated, rehydrated } = materialized;
 
 			// Clear archived_at before restoring .context/ so a failed file copy
 			// leaves the row in the live state (with a warning), not in a
@@ -229,6 +204,29 @@ export function createUnarchiveWorkspaceService({
 				source,
 			});
 
+			if (rehydrated) {
+				// The restored `.context/` carries the setup marker from before the
+				// prune, but the dependencies it vouches for are gone with the
+				// directory. Clearing it is what makes the next open rebuild them.
+				invalidateSetupMarker(source.path);
+				// The snapshot is back in the worktree, so the ref that pinned it has
+				// nothing left to protect — and it outlives the branch by design, so
+				// leaving it here would keep the commits reachable forever, in the
+				// user's own repository, past every delete that could clean it up.
+				await runRefDelete({
+					localCommandService,
+					ref: archivedWorktreeRefFor(source.id),
+					repositoryPath: source.repositoryPath,
+				});
+				if (source.archiveRecordId) {
+					clearPruneState({
+						database,
+						recordId: source.archiveRecordId,
+						diagnostics,
+					});
+				}
+			}
+
 			const postHookOutcome = await archiveLifecycleService.invoke(
 				'post-unarchive-workspace',
 				{
@@ -245,6 +243,7 @@ export function createUnarchiveWorkspaceService({
 				branchRecreated,
 				contextRestored,
 				id: source.id,
+				rehydrated,
 				name: source.name,
 				path: source.path,
 				repositoryId: source.repositoryId,
@@ -287,12 +286,288 @@ function readArchivedWorkspace(
 		id: row.id,
 		name: row.name,
 		path: row.path,
+		prunedHeadCommit: row.prunedHeadCommit,
+		prunedWipCommit: row.prunedWipCommit,
 		repositoryId: row.repositoryId,
 		repositoryName: row.repositoryName,
 		repositoryPath: row.repositoryPath,
 		repositorySlug: row.repositorySlug,
 		slug: row.slug,
+		worktreePruned: row.worktreePrunedRaw === 1,
 	};
+}
+
+/** How the worktree came back, or the diagnostic that stopped it. */
+type MaterializeOutcome =
+	| { branchRecreated: boolean; rehydrated: boolean }
+	| { diagnostic: UnarchiveWorkspaceDiagnostic };
+
+/**
+ * Puts the workspace's worktree back, by whichever route its archive left open.
+ *
+ * A pruned archive kept its branch and a snapshot of the working tree, so it is
+ * re-derived from git and comes back byte for byte. An archive that deleted the
+ * branch has nothing left to check out, so it is recreated from the recorded
+ * base branch and its commits do not come with it. Anything else should still
+ * be on disk — and when it is not, the branch is tried before the row is
+ * written off, because a directory can go missing without the workspace being
+ * unrecoverable.
+ * @param options - Diagnostics sink, git dependencies, and the archived workspace.
+ * @returns How the worktree was materialized, or the diagnostic that blocked it.
+ */
+async function materializeWorktree({
+	diagnostics,
+	localCommandService,
+	source,
+}: {
+	diagnostics: UnarchiveWorkspaceDiagnostic[];
+	localCommandService: LocalCommandService;
+	source: ArchivedWorkspace;
+}): Promise<MaterializeOutcome> {
+	if (source.worktreePruned) {
+		return await rehydratePrunedWorktree({
+			diagnostics,
+			localCommandService,
+			source,
+		});
+	}
+
+	if (source.branchCleanup) {
+		return await recreateDiscardedWorktree({ localCommandService, source });
+	}
+
+	if (!existsSync(source.path)) {
+		return await recoverMissingWorktree({
+			diagnostics,
+			localCommandService,
+			source,
+		});
+	}
+
+	return { branchRecreated: false, rehydrated: false };
+}
+
+/**
+ * Last resort for an archive that says nothing was pruned yet has no directory:
+ * check the branch out again rather than write the row off.
+ *
+ * Two things land here. A prune whose record never got stamped — the removal
+ * succeeded and the SQLite write did not — and a worktree the user deleted by
+ * hand. Both leave the branch, and often the prune's private ref, perfectly
+ * intact, so telling the user to purge the archive would destroy a workspace
+ * git could have handed straight back.
+ *
+ * The snapshot ref is derived from the workspace id rather than read from the
+ * record, which is exactly the column that is missing in the first case; when
+ * no such ref exists the restore fails harmlessly and the branch checkout still
+ * stands.
+ * @param options - Diagnostics sink, git dependencies, and the archived workspace.
+ * @returns How the worktree was materialized, or the diagnostic that blocked it.
+ */
+async function recoverMissingWorktree({
+	diagnostics,
+	localCommandService,
+	source,
+}: {
+	diagnostics: UnarchiveWorkspaceDiagnostic[];
+	localCommandService: LocalCommandService;
+	source: ArchivedWorkspace;
+}): Promise<MaterializeOutcome> {
+	const orphaned: MaterializeOutcome = {
+		diagnostic: {
+			code: 'worktree-recreate-failed',
+			message: `Worktree path is missing on disk: ${source.path}. Run delete-from-archive to clean up the orphaned record.`,
+			path: source.path,
+			severity: 'error',
+		},
+	};
+
+	if (!source.branchName) {
+		return orphaned;
+	}
+
+	const branchExists = await refResolvesToCommit({
+		localCommandService,
+		ref: `refs/heads/${source.branchName}`,
+		repositoryPath: source.repositoryPath,
+	});
+	if (!branchExists) {
+		return orphaned;
+	}
+
+	const outcome = await rehydrateWorktree({
+		archivedContextPath: source.archivedContextPath,
+		branchName: source.branchName,
+		localCommandService,
+		prunedHeadCommit: null,
+		prunedWipCommit: archivedWorktreeRefFor(source.id),
+		repositoryPath: source.repositoryPath,
+		workspacePath: source.path,
+	});
+	if (outcome.status === 'failure') {
+		return orphaned;
+	}
+
+	diagnostics.push({
+		code: 'worktree-recreate-failed',
+		message: `The worktree folder was missing, so it was checked out again from branch "${source.branchName}". Dependencies and build output are rebuilt by the setup script.`,
+		path: source.path,
+		severity: 'warning',
+	});
+
+	return { branchRecreated: false, rehydrated: true };
+}
+
+/**
+ * Re-derives a pruned workspace: checks its branch out at the original path and
+ * restores the snapshotted working tree on top.
+ * @param options - Diagnostics sink, git dependencies, and the archived workspace.
+ * @returns How the worktree was materialized, or the diagnostic that blocked it.
+ */
+async function rehydratePrunedWorktree({
+	diagnostics,
+	localCommandService,
+	source,
+}: {
+	diagnostics: UnarchiveWorkspaceDiagnostic[];
+	localCommandService: LocalCommandService;
+	source: ArchivedWorkspace;
+}): Promise<MaterializeOutcome> {
+	if (!source.branchName) {
+		return {
+			diagnostic: {
+				code: 'pruned-branch-missing',
+				message:
+					'The pruned workspace recorded no branch, so its worktree cannot be re-derived.',
+				severity: 'error',
+			},
+		};
+	}
+
+	const outcome = await rehydrateWorktree({
+		archivedContextPath: source.archivedContextPath,
+		branchName: source.branchName,
+		localCommandService,
+		prunedHeadCommit: source.prunedHeadCommit,
+		prunedWipCommit: source.prunedWipCommit,
+		repositoryPath: source.repositoryPath,
+		workspacePath: source.path,
+	});
+
+	if (outcome.status === 'failure') {
+		return {
+			diagnostic: {
+				code:
+					outcome.reason === 'worktree-add-failed'
+						? 'worktree-recreate-failed'
+						: outcome.reason === 'branch-missing'
+							? 'pruned-branch-missing'
+							: 'pruned-snapshot-missing',
+				message: outcome.message,
+				path: source.path,
+				severity: 'error',
+			},
+		};
+	}
+
+	if (source.prunedWipCommit && !outcome.workingTreeRestored) {
+		diagnostics.push({
+			code: 'pruned-snapshot-restore-failed',
+			message: `The branch was checked out, but the uncommitted changes captured at ${source.prunedWipCommit} could not be restored.`,
+			path: source.path,
+			severity: 'warning',
+		});
+	}
+
+	return { branchRecreated: outcome.branchRecreated, rehydrated: true };
+}
+
+/**
+ * Recreates the worktree of an archive that deleted its branch, cutting a fresh
+ * branch from the recorded base. The original commits are gone by design — this
+ * is the reverse of a discard, not of a prune.
+ * @param options - Git dependencies and the archived workspace.
+ * @returns How the worktree was materialized, or the diagnostic that blocked it.
+ */
+async function recreateDiscardedWorktree({
+	localCommandService,
+	source,
+}: {
+	localCommandService: LocalCommandService;
+	source: ArchivedWorkspace;
+}): Promise<MaterializeOutcome> {
+	if (!source.archiveRecordId) {
+		return {
+			diagnostic: {
+				code: 'archive-record-missing',
+				message:
+					'No archive record was found for this workspace; the original worktree path cannot be recreated.',
+				severity: 'error',
+			},
+		};
+	}
+	if (!source.branchName) {
+		return {
+			diagnostic: {
+				code: 'base-branch-missing',
+				message:
+					'The archived branch name was not preserved; the worktree cannot be recreated.',
+				severity: 'error',
+			},
+		};
+	}
+	if (!source.baseBranch) {
+		return {
+			diagnostic: {
+				code: 'base-branch-missing',
+				message:
+					'The base branch was not preserved in the archive record; the worktree cannot be recreated.',
+				severity: 'error',
+			},
+		};
+	}
+
+	const recreateDiagnostic = await runWorktreeAdd({
+		baseBranch: source.baseBranch,
+		branchName: source.branchName,
+		localCommandService,
+		repositoryPath: source.repositoryPath,
+		workspacePath: source.path,
+	});
+	if (recreateDiagnostic) {
+		return { diagnostic: recreateDiagnostic };
+	}
+
+	return { branchRecreated: true, rehydrated: false };
+}
+
+/**
+ * Clears the archive row's prune columns now that the worktree is back on disk,
+ * so re-archiving does not read stale snapshot state. A failure only costs a
+ * misleading badge in the archive browser, so it degrades to a warning.
+ * @param options - Open database, archive record id, and the diagnostics sink.
+ */
+function clearPruneState({
+	database,
+	diagnostics,
+	recordId,
+}: {
+	database: DatabaseSync;
+	diagnostics: UnarchiveWorkspaceDiagnostic[];
+	recordId: string;
+}): void {
+	try {
+		clearArchiveRecordPruneState({ database, recordId });
+	} catch (error) {
+		diagnostics.push({
+			code: 'workspace-update-failed',
+			message:
+				error instanceof Error
+					? error.message
+					: 'Failed to clear the recorded prune state.',
+			severity: 'warning',
+		});
+	}
 }
 
 /**
@@ -451,11 +726,14 @@ interface WorkspaceRow {
 	id: string;
 	name: string;
 	path: string;
+	prunedHeadCommit: string | null;
+	prunedWipCommit: string | null;
 	repositoryId: string;
 	repositoryName: string;
 	repositoryPath: string;
 	repositorySlug: string;
 	slug: string;
+	worktreePrunedRaw: number | null;
 }
 
 /**
@@ -472,7 +750,10 @@ function isWorkspaceRow(row: unknown): row is WorkspaceRow {
 		isNullableString(row.archiveRecordId) &&
 		isNullableString(row.archivedContextPath) &&
 		isNullableString(row.baseBranch) &&
-		isNullableNumber(row.branchCleanupRaw)
+		isNullableString(row.prunedHeadCommit) &&
+		isNullableString(row.prunedWipCommit) &&
+		isNullableNumber(row.branchCleanupRaw) &&
+		isNullableNumber(row.worktreePrunedRaw)
 	);
 }
 

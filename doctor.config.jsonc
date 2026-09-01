@@ -96,15 +96,18 @@
 				"rules": ["react-doctor/async-defer-await"]
 			},
 			{
-				// Main-process modules import their storage/checkpoint/setup/terminal
-				// public surface through the concern barrels — the intended
+				// Main-process modules import their storage/checkpoint/scripts/setup/
+				// terminal public surface through the concern barrels — the intended
 				// entrypoints, required by src/main/AGENTS.md → Public Surfaces, which
 				// says to import from a concern entrypoint when you are outside that
 				// concern. main.ts and ipc/handlers.ts additionally re-export types
 				// from the setup-diagnostics barrel so IPC contracts have one import
 				// surface. menu/about-panel.ts reaches the Linux window-icon path the
 				// same way, through the app barrel rather than app/linux-desktop-identity
-				// directly. The no-barrel-import perf rule targets renderer bundle
+				// directly. The archive prune/rehydrate pair reaches the checkpoints
+				// barrel for the working-tree capture it re-derives a pruned worktree
+				// from, and the scripts barrel to invalidate the setup marker.
+				// The no-barrel-import perf rule targets renderer bundle
 				// tree-shaking; the Electron main process is not bundled that way, so
 				// the cost is moot here.
 				"files": [
@@ -113,11 +116,14 @@
 					"src/main/checkpoints/checkpoint-service.ts",
 					"src/main/ipc/handlers/checkpoint.ts",
 					"src/main/agent-runtime/agent-session-persistence.ts",
+					"src/main/agent-runtime/agent-session-service.ts",
 					"src/main/agent-runtime/session/chat-tab-plumbing.ts",
 					"src/main/agent-providers/claude-readiness-probe.ts",
 					"src/main/agent-providers/pi-readiness-probe.ts",
 					"src/main/agent-control/port-adapters.ts",
-					"src/main/menu/about-panel.ts"
+					"src/main/menu/about-panel.ts",
+					"src/main/repository/prune-worktree.ts",
+					"src/main/repository/rehydrate-worktree.ts"
 				],
 				"rules": ["react-doctor/no-barrel-import"]
 			},
