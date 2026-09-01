@@ -152,6 +152,18 @@ export interface FilesToCopySnapshot {
 export interface CreateWorkspaceResult {
 	diagnostics: CreateWorkspaceDiagnostic[];
 	filesToCopy: FilesToCopySnapshot | null;
+	/**
+	 * The request asked for a branch an existing workspace already has checked
+	 * out, so `workspace` is that workspace rather than a new one: nothing was
+	 * created, and the caller should open it instead of adding a row to its list.
+	 *
+	 * This is a flag on a `success` result rather than a `CreateWorkspaceStatus`
+	 * member on purpose. Callers gate on `status !== 'success'`, and for every one
+	 * of them "carry on with the workspace you were handed" is the correct
+	 * behaviour; a new status word would read as a failure to each of them
+	 * silently.
+	 */
+	reusedExisting: boolean;
 	status: CreateWorkspaceStatus;
 	workspace: CreatedWorkspaceSnapshot | null;
 }

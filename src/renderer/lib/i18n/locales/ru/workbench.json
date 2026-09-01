@@ -469,6 +469,9 @@
 			"running": "Вводит текст в терминал"
 		}
 	},
+	"create-workspace": {
+		"opened-existing": "Открыто рабочее пространство, которое уже использует эту ветку."
+	},
 	"create-workspace-source": {
 		"description": "Выберите ветку, pull request или задачу, чтобы создать рабочее пространство.",
 		"loading": "Загружаются {{sources}}…",

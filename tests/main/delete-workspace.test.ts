@@ -12,6 +12,10 @@ import path from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
 import test, { type TestContext } from 'node:test';
 
+import type {
+	LocalCommandRequest,
+	LocalCommandService,
+} from '../../src/main/commands/command-types.ts';
 import { createLocalCommandService } from '../../src/main/commands/local-command.ts';
 import { createWorkspaceService } from '../../src/main/repository/create-workspace.ts';
 import { createDeleteWorkspaceService } from '../../src/main/repository/delete-workspace.ts';
@@ -145,6 +149,34 @@ function listWorktreePaths(repositoryPath: string): string[] {
 		.map((line) => line.slice('worktree '.length));
 }
 
+function isWorktreeRemove(request: LocalCommandRequest): boolean {
+	const [subcommand, action] = request.args ?? [];
+	return (
+		request.command === 'git' &&
+		subcommand === 'worktree' &&
+		action === 'remove'
+	);
+}
+
+const WORKTREE_REMOVE_REFUSAL = {
+	status: 'failure',
+	stderr: 'fatal: validation failed, cannot remove working tree',
+	stdout: '',
+	stdoutTruncated: false,
+} as Awaited<ReturnType<LocalCommandService['run']>>;
+
+function refuseWorktreeRemove(
+	delegate: LocalCommandService,
+): LocalCommandService {
+	return {
+		getEnvironment: (cwd) => delegate.getEnvironment(cwd),
+		run: (request, options) =>
+			isWorktreeRemove(request)
+				? Promise.resolve(WORKTREE_REMOVE_REFUSAL)
+				: delegate.run(request, options),
+	};
+}
+
 async function seedWorkspace(harness: Harness, name: string) {
 	const service = createWorkspaceService({
 		databaseService: harness.databaseService,
@@ -208,6 +240,46 @@ test('delete succeeds even when the worktree directory was already removed', asy
 	assert.equal(result.status, 'success');
 	assert.equal(result.pathRemoved, true);
 	assert.equal(workspaceRow(harness.databaseService, workspace.id), undefined);
+	assert.equal(
+		listWorktreePaths(harness.repositoryPath).includes(workspace.path),
+		false,
+	);
+	assert.equal(
+		listBranches(harness.repositoryPath).includes('already-gone'),
+		false,
+	);
+});
+
+// A `git worktree remove` that fails — a lock, a permission, a tree big enough
+// to blow the timeout — is only a warning, and the directory is then unlinked
+// anyway. Nothing can remove the registration after that point, so it outlives
+// its directory and keeps the branch reading as checked out to every later
+// workspace creation. `git worktree prune` is what stops that.
+test('delete prunes the registration a failed worktree remove leaves behind', async (t) => {
+	const harness = createHarness(t);
+	const workspace = await seedWorkspace(harness, 'remove-refused');
+
+	const deleteService = createDeleteWorkspaceService({
+		databaseService: harness.databaseService,
+		localCommandService: refuseWorktreeRemove(createLocalCommandService()),
+		workspaceTeardownService: buildWorkspaceTeardownStub(),
+	});
+
+	const result = await deleteService.delete({ workspaceId: workspace.id });
+
+	assert.equal(result.status, 'success');
+	assert.equal(result.pathRemoved, true);
+	assert.equal(existsSync(workspace.path), false);
+	assert.equal(
+		listWorktreePaths(harness.repositoryPath).includes(workspace.path),
+		false,
+		'the registration is pruned rather than left to block its branch',
+	);
+	assert.equal(
+		listBranches(harness.repositoryPath).includes('remove-refused'),
+		false,
+		'and the branch it held can then be deleted',
+	);
 });
 
 test('delete winds the workspace down before the worktree is unlinked', async (t) => {

@@ -498,6 +498,60 @@ export interface ActiveWorkspacePathRow {
 	path: string;
 }
 
+/** Inputs for {@link listActiveWorkspaceSnapshotRowsByRepository}. */
+export interface ListActiveWorkspaceSnapshotRowsByRepositoryOptions {
+	database: DatabaseSync;
+	repositoryId: string;
+}
+
+/**
+ * Every column a `CreatedWorkspaceSnapshot` is built from, for one non-archived
+ * workspace. `metadataJson` is still encoded; callers parse it with
+ * `parseMetadata`.
+ */
+export interface ActiveWorkspaceSnapshotRow {
+	baseBranch: string | null;
+	branchName: string | null;
+	createdAt: string;
+	id: string;
+	metadataJson: string;
+	name: string;
+	path: string;
+	slug: string;
+	updatedAt: string;
+}
+
+/**
+ * Returns the full snapshot columns for every non-archived workspace in a
+ * repository. Create-workspace reads this to answer "which workspace already
+ * holds the worktree git says has this branch checked out", which it settles by
+ * comparing real paths rather than in SQL — git reports worktree paths with
+ * symlinks resolved while the `path` column stores them as the user gave them.
+ * @param options - The open database connection and the repository to scope to.
+ * @returns One row per active workspace in the repository.
+ */
+export function listActiveWorkspaceSnapshotRowsByRepository({
+	database,
+	repositoryId,
+}: ListActiveWorkspaceSnapshotRowsByRepositoryOptions): ActiveWorkspaceSnapshotRow[] {
+	return database
+		.prepare(
+			`SELECT
+				id AS id,
+				slug AS slug,
+				name AS name,
+				path AS path,
+				branch_name AS branchName,
+				base_branch AS baseBranch,
+				created_at AS createdAt,
+				updated_at AS updatedAt,
+				metadata_json AS metadataJson
+			FROM workspaces
+			WHERE repository_id = ? AND archived_at IS NULL`,
+		)
+		.all(repositoryId) as unknown as ActiveWorkspaceSnapshotRow[];
+}
+
 /**
  * Returns `id` + worktree `path` for every non-archived workspace. Used by the
  * PR-status sweeper to refresh each workspace's cached GitHub snapshot.

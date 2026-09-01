@@ -453,6 +453,9 @@
 			"running": "Πληκτρολογεί σε ένα τερματικό"
 		}
 	},
+	"create-workspace": {
+		"opened-existing": "Άνοιξε ο χώρος εργασίας που χρησιμοποιεί ήδη αυτόν τον κλάδο."
+	},
 	"create-workspace-source": {
 		"description": "Επιλέξτε κλάδο, pull request ή ζήτημα για να ξεκινήσετε χώρο εργασίας.",
 		"loading": "Φορτώνονται {{sources}}…",

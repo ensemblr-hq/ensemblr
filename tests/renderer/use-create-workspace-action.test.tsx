@@ -15,6 +15,7 @@ const {
 	queryClient,
 	routerInvalidate,
 	toastError,
+	toastInfo,
 } = vi.hoisted(() => ({
 	createWorkspace: vi.fn(),
 	invalidateWorkspaceListViews: vi.fn().mockResolvedValue(undefined),
@@ -24,6 +25,7 @@ const {
 	},
 	routerInvalidate: vi.fn().mockResolvedValue(undefined),
 	toastError: vi.fn(),
+	toastInfo: vi.fn(),
 }));
 
 vi.mock('@tanstack/react-router', () => ({
@@ -32,7 +34,7 @@ vi.mock('@tanstack/react-router', () => ({
 }));
 
 vi.mock('sonner', () => ({
-	toast: { error: toastError },
+	toast: { error: toastError, info: toastInfo },
 }));
 
 vi.mock('@/renderer/api/ensemblr-queries', () => ({
@@ -92,6 +94,7 @@ function createSuccessResult(): CreateWorkspaceResult {
 	return {
 		diagnostics: [],
 		filesToCopy: null,
+		reusedExisting: false,
 		status: 'success',
 		workspace: {
 			archivedAt: null,
@@ -181,4 +184,97 @@ test('adds a disabled pending workspace before create IPC resolves', async () =>
 	});
 	expect(routerInvalidate).toHaveBeenCalledTimes(1);
 	expect(view.result.current.creatingProjectIds.has('repo-1')).toBe(false);
+});
+
+test('opens the existing workspace when the branch is already checked out', async () => {
+	createWorkspace.mockResolvedValue({
+		diagnostics: [],
+		filesToCopy: null,
+		reusedExisting: true,
+		status: 'success',
+		workspace:
+			baseNavigationSnapshot.repositories[0]?.workspaces[0] ??
+			(() => {
+				throw new Error('fixture is missing its existing workspace');
+			})(),
+	} satisfies CreateWorkspaceResult);
+	const view = renderHook(() => useCreateWorkspaceFromProject());
+
+	await act(async () => {
+		await view.result.current.create(project, { name: 'Instant Workspace' });
+	});
+
+	expect(navigationSnapshot?.repositories[0]?.workspaces).toMatchObject([
+		{ id: 'workspace-existing', name: 'Existing Workspace' },
+	]);
+	expect(toastError).not.toHaveBeenCalled();
+	expect(toastInfo).toHaveBeenCalledTimes(1);
+	expect(navigate).toHaveBeenCalledWith({
+		params: { projectId: 'repo-1', workspaceId: 'workspace-existing' },
+		to: '/projects/$projectId/workspaces/$workspaceId',
+	});
+});
+
+test('reports a create failure with the translated text for its code', async () => {
+	createWorkspace.mockResolvedValue({
+		diagnostics: [
+			{
+				code: 'branch-already-checked-out',
+				message:
+					'Branch "feature-x" is already checked out at /tmp/gone. Open that workspace, or duplicate the branch to work on a copy.',
+				path: '/tmp/gone',
+				severity: 'error',
+			},
+		],
+		filesToCopy: null,
+		reusedExisting: false,
+		status: 'failure',
+		workspace: null,
+	} satisfies CreateWorkspaceResult);
+	const view = renderHook(() => useCreateWorkspaceFromProject());
+
+	await act(async () => {
+		await view.result.current.create(project, { name: 'Instant Workspace' });
+	});
+
+	expect(toastError).toHaveBeenCalledWith(
+		'That branch is already checked out in another worktree.',
+		{
+			description:
+				'Branch "feature-x" is already checked out at /tmp/gone. Open that workspace, or duplicate the branch to work on a copy.',
+		},
+	);
+	expect(navigationSnapshot?.repositories[0]?.workspaces).toMatchObject([
+		{ id: 'workspace-existing' },
+	]);
+});
+
+// Main's sentence is the support-bundle English and is never translated, so it
+// only belongs under the headline when it says something the code could not.
+// One that merely restates the headline would read as an untranslated second
+// line in every locale.
+test('drops a detail line that only restates the translated headline', async () => {
+	createWorkspace.mockResolvedValue({
+		diagnostics: [
+			{
+				code: 'database-unavailable',
+				message: 'SQLite is unavailable; the workspace was not created.',
+				severity: 'error',
+			},
+		],
+		filesToCopy: null,
+		reusedExisting: false,
+		status: 'failure',
+		workspace: null,
+	} satisfies CreateWorkspaceResult);
+	const view = renderHook(() => useCreateWorkspaceFromProject());
+
+	await act(async () => {
+		await view.result.current.create(project, { name: 'Instant Workspace' });
+	});
+
+	expect(toastError).toHaveBeenCalledWith(
+		'The local database is unavailable, so nothing was changed.',
+		{ description: undefined },
+	);
 });

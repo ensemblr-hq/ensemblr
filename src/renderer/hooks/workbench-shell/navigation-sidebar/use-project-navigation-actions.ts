@@ -9,6 +9,7 @@ import {
 	isEnsemblrApiAvailable,
 } from '@/renderer/api/ensemblr-queries';
 import { queryClient } from '@/renderer/api/query-client';
+import { failureDetail, failureText } from '@/renderer/lib/failure-text';
 import { i18n } from '@/renderer/lib/i18n';
 import {
 	addPendingWorkspaceToNavigationSnapshot,
@@ -189,20 +190,64 @@ function replacePendingWorkspaceInCache(
 	);
 }
 
-/** Returns the first user-facing create-workspace error from an IPC result. */
-function getCreateWorkspaceFailureMessage(
-	result: CreateWorkspaceResult,
-): string {
+/**
+ * Returns the first user-facing create-workspace error from an IPC result, as
+ * the translated sentence for its code plus the detail main built for it.
+ *
+ * Main cannot reach the renderer's i18n instance, so what it sends is a stable
+ * code alongside an English sentence. `failureText` turns the code into the
+ * app's language and falls back to that English only for a code this build's
+ * table does not carry, while `failureDetail` keeps main's sentence as a second
+ * line only when it carries specifics a code cannot — the occupied path, git's
+ * stderr — rather than restating the headline in a language the reader may not
+ * have.
+ * @param result - The create-workspace result to report.
+ * @returns The headline to show, plus the detail line when there is one.
+ */
+function getCreateWorkspaceFailure(result: CreateWorkspaceResult): {
+	detail: string | undefined;
+	title: string;
+} {
 	const firstError = result.diagnostics.find(
 		(diagnostic: CreateWorkspaceDiagnostic) => diagnostic.severity === 'error',
 	);
+	return {
+		detail: firstError
+			? (failureDetail(i18n.t, firstError) ?? undefined)
+			: undefined,
+		title:
+			failureText(i18n.t, firstError) ??
+			i18n.t(
+				'errors:workspace-create.failed.title',
+				'Failed to create workspace.',
+			),
+	};
+}
 
-	return (
-		firstError?.message ??
+/**
+ * Settles the optimistic sidebar row against what the service actually did.
+ *
+ * A reused workspace was never created: the list already holds it, so replacing
+ * the placeholder with it would show the same workspace twice. The placeholder
+ * is dropped instead, and the toast says why the request landed somewhere the
+ * user did not name.
+ * @param pendingWorkspaceId - Id of the optimistic row to settle.
+ * @param result - The successful create-workspace result.
+ */
+function settlePendingWorkspace(
+	pendingWorkspaceId: string,
+	result: CreateWorkspaceResult,
+): void {
+	if (!result.reusedExisting) {
+		replacePendingWorkspaceInCache(pendingWorkspaceId, result);
+		return;
+	}
+	removePendingWorkspaceFromCache(pendingWorkspaceId);
+	toast.info(
 		i18n.t(
-			'errors:workspace-create.failed.title',
-			'Failed to create workspace.',
-		)
+			'workbench:create-workspace.opened-existing',
+			'Opened the workspace that already has this branch checked out.',
+		),
 	);
 }
 
@@ -294,14 +339,14 @@ export function useCreateWorkspaceFromProject(): CreateWorkspaceActionResult {
 
 				if (result.status !== 'success' || !result.workspace) {
 					removePendingWorkspaceFromCache(pendingWorkspaceId);
-					const message = getCreateWorkspaceFailureMessage(result);
-					setError(message);
-					toast.error(message);
+					const { detail, title } = getCreateWorkspaceFailure(result);
+					setError(title);
+					toast.error(title, { description: detail });
 					return null;
 				}
 
 				const created = result.workspace;
-				replacePendingWorkspaceInCache(pendingWorkspaceId, result);
+				settlePendingWorkspace(pendingWorkspaceId, result);
 				void invalidateWorkspaceListViews(queryClient).catch(() => undefined);
 
 				if (options?.navigate === false) {
