@@ -37,7 +37,10 @@ import {
 	createSessionOpener,
 	type ProviderExecutablePort,
 } from './session/session-open.ts';
-import { createSummaryQueue } from './session/summary-queue.ts';
+import {
+	createSummaryQueue,
+	type SummaryPersistedListener,
+} from './session/summary-queue.ts';
 import type { SessionSummaryWriter } from './session-summary-writer.ts';
 
 export type { PersistRuntimeEventPort } from './session/handle-runtime-event.ts';
@@ -123,6 +126,13 @@ interface AgentSessionLifecycleOptions {
 	 * one that finished on its own.
 	 */
 	onSessionAborted?: (sessionId: string) => void;
+	/**
+	 * Announces a summary that has landed on disk. Summary writes are async and
+	 * finish after the close that triggered them has already answered the
+	 * renderer, so without this the surfaces reading closed-tab summaries keep a
+	 * result taken before the file existed.
+	 */
+	onSummaryPersisted?: SummaryPersistedListener;
 	persistRuntimeEvent: PersistRuntimeEventPort;
 	agentClient: AgentClient;
 	/** Derived tab titling, fired at open and every turn-idle. */
@@ -148,6 +158,12 @@ interface AgentSessionLifecycleOptions {
 
 /** Public surface of the agent session lifecycle: open, submit, stop, and shut down active sessions. */
 interface AgentSessionLifecycle {
+	/**
+	 * Writes the summary owed by whichever active session backs `chatTabId`, and
+	 * resolves once it is on disk. The close path awaits this so an archived tab
+	 * records the turn it was closed on rather than the one before it.
+	 */
+	flushSummaryForChatTab: (chatTabId: string) => Promise<void>;
 	getActiveSession: (sessionId: string) => ActiveSessionView | null;
 	openSession: (
 		request: AgentSessionOpenRequest,
@@ -191,6 +207,7 @@ export function createAgentSessionLifecycle({
 	isPlanModeActive,
 	now,
 	onSessionAborted,
+	onSummaryPersisted,
 	persistRuntimeEvent,
 	agentClient,
 	queueNaming,
@@ -208,6 +225,7 @@ export function createAgentSessionLifecycle({
 	const summaryQueue = createSummaryQueue({
 		activeSessions,
 		now,
+		onSummaryPersisted,
 		sessionSummaryWriter,
 	});
 
@@ -426,6 +444,11 @@ export function createAgentSessionLifecycle({
 		stopSessionTree(request, new Set());
 
 	return {
+		flushSummaryForChatTab: (chatTabId) =>
+			summaryQueue.flushSummaryForChatTab({
+				chatTabId,
+				database: requireDatabase(),
+			}),
 		getActiveSession: (sessionId) => {
 			const active = activeSessions.get(sessionId);
 			if (!active) {

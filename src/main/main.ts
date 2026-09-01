@@ -791,6 +791,15 @@ const agentSessionService = createAgentSessionService({
 	isPlanModeActive: (sessionId) => planModeRegistry.isActive(sessionId),
 	/** Keeps the stop the user just asked for from notifying as a finished turn. */
 	onSessionAborted: (sessionId) => agentActivityMonitor.noteUserStop(sessionId),
+	/**
+	 * Refreshes the chat-tab queries once a flushed summary file lands. The write
+	 * settles after the close that triggered it has already answered, so the
+	 * transcript list the renderer cached was taken while the file did not exist.
+	 */
+	onSummaryPersisted: ({ workspaceId }) =>
+		broadcastToAllWindows(IPC_CHANNELS.agentControlTabsChanged, {
+			workspaceId,
+		}),
 	queueNaming: sessionNamingQueue,
 	/** Reads the delegation mechanism each new Claude Code session opens under. */
 	readClaudeSubagentMode: () =>

@@ -23,6 +23,15 @@ export interface SummaryQueue {
 		sessionId: string;
 	}) => Promise<void>;
 	/**
+	 * The same flush addressed by chat tab rather than session, for the close
+	 * path — a tab is archived without its runtime being stopped, so the session
+	 * id is not what the caller holds. No-ops when no active session backs it.
+	 */
+	flushSummaryForChatTab: (input: {
+		chatTabId: string;
+		database: DatabaseSync;
+	}) => Promise<void>;
+	/**
 	 * Awaits every in-flight drain, including those for sessions already removed
 	 * from the active map (e.g. a `stopSession` that backgrounded its flush).
 	 * App shutdown calls this so a stopped session's final summary lands before
@@ -32,6 +41,18 @@ export interface SummaryQueue {
 }
 
 /**
+ * Told after a flushed summary file has landed on disk and its marker is on the
+ * tab, so the composition root can refresh the surfaces that read closed-tab
+ * summaries. Only the flush paths announce: a turn-idle write leaves the tab
+ * open and live, so nothing cached is stale and a broadcast per turn would cost
+ * every window a refetch of the closed-tab list for nothing.
+ */
+export type SummaryPersistedListener = (input: {
+	chatTabId: string;
+	workspaceId: string;
+}) => void;
+
+/**
  * Owns the queued/in-flight bookkeeping for summary writes. Serializes writes
  * per session so older LLM responses cannot overwrite newer ones, and only
  * starts a drain loop when no write is already in flight.
@@ -39,14 +60,23 @@ export interface SummaryQueue {
 export function createSummaryQueue({
 	activeSessions,
 	now,
+	onSummaryPersisted,
 	sessionSummaryWriter,
 }: {
 	activeSessions: ActiveSessionMap;
 	now: () => Date;
+	onSummaryPersisted?: SummaryPersistedListener;
 	sessionSummaryWriter: SessionSummaryWriter | undefined;
 }): SummaryQueue {
 	/** In-flight drain promise per session, so close paths can await it. */
 	const inFlightDrains = new Map<string, Promise<void>>();
+	/**
+	 * Sessions whose next summary write must announce itself. Set by the flush
+	 * paths only, and consumed by the write — a drain already running for a
+	 * turn-idle still announces once a flush joins it, which is what makes a stop
+	 * racing a turn boundary reach the renderer.
+	 */
+	const announceOnNextWrite = new Set<string>();
 
 	/**
 	 * Starts the drain loop for a session, or returns the already-running one.
@@ -158,6 +188,12 @@ export function createSummaryQueue({
 			result,
 			tabId: active.chatTabId,
 		});
+		if (announceOnNextWrite.delete(active.row.id)) {
+			onSummaryPersisted?.({
+				chatTabId: active.chatTabId,
+				workspaceId: active.row.workspaceId,
+			});
+		}
 	};
 
 	/**
@@ -186,7 +222,29 @@ export function createSummaryQueue({
 		} else if (!inFlightDrains.has(sessionId)) {
 			return;
 		}
+		announceOnNextWrite.add(sessionId);
 		await startDrain({ database, sessionId });
+	};
+
+	/**
+	 * Forces the owed summary for whichever active session backs `chatTabId`.
+	 * Closing a tab leaves its runtime registered, so without this the turn the
+	 * user just archived keeps whatever summary the previous turn boundary wrote.
+	 */
+	const flushSummaryForChatTab = async ({
+		chatTabId,
+		database,
+	}: {
+		chatTabId: string;
+		database: DatabaseSync;
+	}): Promise<void> => {
+		const owner = [...activeSessions.entries()].find(
+			([, session]) => session.chatTabId === chatTabId,
+		);
+		if (!owner) {
+			return;
+		}
+		await flushSummaryForSession({ database, sessionId: owner[0] });
 	};
 
 	/** Awaits all currently in-flight drains, looping until the map settles. */
@@ -198,6 +256,7 @@ export function createSummaryQueue({
 
 	return {
 		awaitInFlight,
+		flushSummaryForChatTab,
 		flushSummaryForSession,
 		queueSummaryAfterAgentResponse,
 	};

@@ -86,6 +86,7 @@ import type {
 	SubagentMechanismReader,
 	TurnPreambleResolver,
 } from './session/agent-control-wiring.ts';
+import type { SummaryPersistedListener } from './session/summary-queue.ts';
 import type { SessionSummaryWriter } from './session-summary-writer.ts';
 
 export type {
@@ -123,6 +124,13 @@ interface AgentSessionServiceOptions {
 	 * one that finished on its own.
 	 */
 	onSessionAborted?: (sessionId: string) => void;
+	/**
+	 * Announces a summary that has landed on disk, so the composition root can
+	 * refresh the closed-tab surfaces. The write is async and outlives the close
+	 * that triggered it, so a listener is the only way those surfaces learn the
+	 * result they cached was taken before the file existed.
+	 */
+	onSummaryPersisted?: SummaryPersistedListener;
 	/** Derived tab-titling queue, fired at open and each turn-idle. */
 	queueNaming: QueueNamingPort;
 	/**
@@ -158,6 +166,14 @@ interface AgentSessionServiceOptions {
 
 /** Public surface of the agent session service used by IPC handlers. */
 export interface AgentSessionService {
+	/**
+	 * Writes the summary owed by whichever live session backs `chatTabId` and
+	 * resolves once it is on disk. The chat-tab close path awaits it so an
+	 * archived tab records the turn it was closed on; closing never stops the
+	 * runtime, so no other flush covers that turn. A no-op when the tab has no
+	 * live session.
+	 */
+	flushSummaryForChatTab: (chatTabId: string) => Promise<void>;
 	getSession: (sessionId: string) => AgentSessionSnapshot | null;
 	listSessionsForWorkspace: (
 		workspaceId: string,
@@ -262,6 +278,7 @@ export function createAgentSessionService({
 	agentClient,
 	isPlanModeActive = () => false,
 	onSessionAborted,
+	onSummaryPersisted,
 	queueNaming,
 	readClaudeSubagentMode,
 	resolveAgentControlEnv,
@@ -288,6 +305,7 @@ export function createAgentSessionService({
 		isPlanModeActive,
 		now,
 		onSessionAborted,
+		onSummaryPersisted,
 		persistRuntimeEvent,
 		agentClient,
 		queueNaming,
@@ -331,6 +349,7 @@ export function createAgentSessionService({
 	};
 
 	return {
+		flushSummaryForChatTab: lifecycle.flushSummaryForChatTab,
 		getSession: (sessionId) => {
 			const database = requireSessionDatabase();
 			const active = lifecycle.getActiveSession(sessionId);

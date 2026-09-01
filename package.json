@@ -40,7 +40,7 @@
 		"test:checkpoints": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/checkpoint-capture.test.ts tests/main/checkpoint-restore.test.ts",
 		"test:db": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/database.test.ts",
 		"test:concierge": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/concierge-storage.test.ts",
-		"test:agent-storage": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/agent-session-repository.test.ts tests/main/agent-event-repository.test.ts tests/main/chat-tab-repository.test.ts tests/main/chat-tab-service.test.ts tests/main/chat-tab-preview-slot.test.ts tests/main/chat-tab-plumbing.test.ts",
+		"test:agent-storage": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/agent-session-repository.test.ts tests/main/agent-event-repository.test.ts tests/main/chat-tab-repository.test.ts tests/main/chat-tab-service.test.ts tests/main/closed-tab-summary.test.ts tests/main/chat-tab-preview-slot.test.ts tests/main/chat-tab-plumbing.test.ts",
 		"test:environment": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/environment-variables.test.ts",
 		"test:workspace-environment": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/workspace-environment.test.ts",
 		"test:terminal": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/terminal-service.test.ts tests/main/persist-terminal-agent-session.test.ts",
