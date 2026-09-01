@@ -37,6 +37,7 @@ interface ArchivedWorkspace {
 	archiveRecordId: string | null;
 	archivedAt: string | null;
 	archivedContextPath: string | null;
+	branchName: string | null;
 	id: string;
 	name: string;
 	path: string;
@@ -193,6 +194,7 @@ async function reclaimOne({
 
 	const pruned = await pruneWorktree({
 		archivedContextPath: source.archivedContextPath,
+		branchName: source.branchName,
 		localCommandService,
 		repositoryPath: source.repositoryPath,
 		workspaceId: source.id,
@@ -282,6 +284,7 @@ function readArchivedWorkspace(
 		archiveRecordId: row.archiveRecordId,
 		archivedAt: row.archivedAt,
 		archivedContextPath: row.archivedContextPath,
+		branchName: row.branchName,
 		id: row.id,
 		name: row.name,
 		path: row.path,
@@ -295,6 +298,7 @@ interface WorkspaceRow {
 	archiveRecordId: string | null;
 	archivedAt: string | null;
 	archivedContextPath: string | null;
+	branchName: string | null;
 	id: string;
 	name: string;
 	path: string;

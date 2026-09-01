@@ -21,6 +21,7 @@ import { runWorktreeRemove } from './git-ops.ts';
 export const ARCHIVED_FILES_TO_COPY_DIRECTORY = 'files-to-copy';
 
 const DISK_USAGE_TIMEOUT_MS = 60_000;
+const REV_PARSE_TIMEOUT_MS = 15_000;
 
 /**
  * What a prune left behind for the rehydrate to work from. `status` is
@@ -67,6 +68,7 @@ export function archivedWorktreeRefFor(workspaceId: string): string {
  */
 export async function pruneWorktree({
 	archivedContextPath,
+	branchName,
 	localCommandService,
 	repositoryPath,
 	workspaceId,
@@ -74,6 +76,8 @@ export async function pruneWorktree({
 }: {
 	/** Preserved archive directory the files-to-copy matches are copied under. */
 	archivedContextPath: string | null;
+	/** Workspace's branch, whose tip dates any snapshot a salvage falls back on. */
+	branchName: string | null;
 	localCommandService: LocalCommandService;
 	repositoryPath: string;
 	workspaceId: string;
@@ -89,7 +93,13 @@ export async function pruneWorktree({
 		};
 	}
 
-	const captured = await captureWorkingTree({ workspaceId, workspacePath });
+	const captured = await captureWorkingTree({
+		branchName,
+		localCommandService,
+		repositoryPath,
+		workspaceId,
+		workspacePath,
+	});
 	if ('message' in captured) {
 		return {
 			bytesFreed: null,
@@ -105,11 +115,19 @@ export async function pruneWorktree({
 	// Neither reads what the other writes, and both walk the tree the removal is
 	// about to unlink, so the user waits for one pass rather than two.
 	const [preserved, bytesFreed] = await Promise.all([
-		preserveFilesToCopy({
-			archivedContextPath,
-			localCommandService,
-			workspacePath,
-		}),
+		// A reused snapshot means git cannot read this directory at all, so
+		// `git ls-files` has nothing to enumerate. The matches are not lost with
+		// it: a failing `preserveFilesToCopy` returns before the removal that
+		// breaks the worktree, so the attempt that wrote the snapshot copied them
+		// first — into this same directory, because every retry replays the
+		// `archived_context_path` recorded on the archive record.
+		captured.reusedSnapshot
+			? null
+			: preserveFilesToCopy({
+					archivedContextPath,
+					localCommandService,
+					workspacePath,
+				}),
 		measureDirectoryBytes({
 			directoryPath: workspacePath,
 			localCommandService,
@@ -233,17 +251,37 @@ async function preserveFilesToCopy({
  * archive ref, translating a thrown {@link GitCheckpointError} into a message.
  * The parent it reports is HEAD at capture time — the branch tip a rehydrate
  * recreates the branch at, so nothing has to read it a second time.
- * @param options - Workspace id and path.
+ *
+ * A directory git can no longer read falls back to the snapshot an earlier
+ * attempt left behind, reported as `reusedSnapshot`. That state is one this
+ * lifecycle produces itself: `git worktree remove` drops the worktree's admin
+ * directory even when it fails to delete the tree, and what it leaves is a
+ * directory git cannot read, repair, or re-register — so refusing it outright
+ * would strand its disk permanently. The pre-existing snapshot is what makes
+ * removing it safe, and there is no other way to prove the work is preserved,
+ * so a workspace without one is still kept.
+ * @param options - Workspace id, path, and branch, repository path, and the command runner.
  * @returns The capture identifiers, or the message explaining the failure.
  */
 async function captureWorkingTree({
+	branchName,
+	localCommandService,
+	repositoryPath,
 	workspaceId,
 	workspacePath,
 }: {
+	branchName: string | null;
+	localCommandService: LocalCommandService;
+	repositoryPath: string;
 	workspaceId: string;
 	workspacePath: string;
 }): Promise<
-	| { commitHash: string; parentHash: string | null; ref: string }
+	| {
+			commitHash: string;
+			parentHash: string | null;
+			ref: string;
+			reusedSnapshot: boolean;
+	  }
 	| { message: string }
 > {
 	try {
@@ -256,14 +294,155 @@ async function captureWorkingTree({
 			commitHash: captured.commitHash,
 			parentHash: captured.parentHash,
 			ref: captured.ref,
+			reusedSnapshot: false,
 		};
 	} catch (error) {
+		const salvaged = await readUnregisteredWorktreeSnapshot({
+			branchName,
+			localCommandService,
+			repositoryPath,
+			workspaceId,
+			workspacePath,
+		});
+		if (salvaged) {
+			return { ...salvaged, reusedSnapshot: true };
+		}
 		return {
 			message:
 				error instanceof Error
 					? `The working tree could not be snapshotted, so the worktree was kept: ${error.message}`
 					: 'The working tree could not be snapshotted, so the worktree was kept.',
 		};
+	}
+}
+
+/**
+ * Reads the archive snapshot a previous prune wrote, but only for a directory
+ * git can no longer read as a worktree, and only while that snapshot still
+ * describes the branch as it stands now.
+ *
+ * The readability check is what keeps a snapshot from standing in for a capture
+ * that failed for any other reason — a full disk, a missing binary — where the
+ * worktree is intact and its current state is still the only copy. The
+ * freshness check is what keeps it from standing in for a *stale* one: the ref
+ * outlives its own prune whenever the best-effort `runRefDelete` an unarchive
+ * runs does not land, and a snapshot from a cycle the user has since worked
+ * past would be reclaimed as if it were current.
+ * @param options - Workspace id, path, and branch, repository path, and the command runner.
+ * @returns The earlier snapshot's identifiers, or null when it cannot stand in.
+ */
+async function readUnregisteredWorktreeSnapshot({
+	branchName,
+	localCommandService,
+	repositoryPath,
+	workspaceId,
+	workspacePath,
+}: {
+	branchName: string | null;
+	localCommandService: LocalCommandService;
+	repositoryPath: string;
+	workspaceId: string;
+	workspacePath: string;
+}): Promise<{
+	commitHash: string;
+	parentHash: string | null;
+	ref: string;
+} | null> {
+	if (!branchName) {
+		return null;
+	}
+	if (await isGitRepository({ cwd: workspacePath, localCommandService })) {
+		return null;
+	}
+
+	const ref = archivedWorktreeRefFor(workspaceId);
+	const commitHash = await readGitRevision({
+		localCommandService,
+		cwd: repositoryPath,
+		revision: ref,
+	});
+	if (commitHash === null) {
+		return null;
+	}
+
+	const parentHash = await readGitRevision({
+		localCommandService,
+		cwd: repositoryPath,
+		revision: `${ref}^1`,
+	});
+	const branchTip = await readGitRevision({
+		localCommandService,
+		cwd: repositoryPath,
+		revision: `refs/heads/${branchName}`,
+	});
+	if (branchTip !== null && branchTip !== parentHash) {
+		return null;
+	}
+	return { commitHash, parentHash, ref };
+}
+
+/**
+ * Asks whether the directory is still a git repository at all, which is the
+ * question the salvage gate is really asking.
+ *
+ * `rev-parse --git-dir` is what separates a worktree whose admin directory is
+ * gone from one that is intact but has no commit on HEAD yet — a distinction
+ * `rev-parse HEAD` collapses, because it answers "no" to both. The second is a
+ * live worktree whose contents are still the only copy.
+ * @param options - Directory to probe and the command runner.
+ * @returns True when git resolves a repository for the directory.
+ */
+async function isGitRepository({
+	cwd,
+	localCommandService,
+}: {
+	cwd: string;
+	localCommandService: LocalCommandService;
+}): Promise<boolean> {
+	try {
+		const result = await localCommandService.run({
+			args: ['rev-parse', '--git-dir'],
+			command: 'git',
+			cwd,
+			maxOutputBytes: 4 * 1024,
+			timeoutMs: REV_PARSE_TIMEOUT_MS,
+		});
+		return result.status === 'success';
+	} catch {
+		return false;
+	}
+}
+
+/**
+ * Resolves a revision to a commit hash, treating an unreadable repository the
+ * same as an unresolvable revision.
+ * @param options - Directory to run in, the revision, and the command runner.
+ * @returns The commit hash, or null when it does not resolve.
+ */
+async function readGitRevision({
+	cwd,
+	localCommandService,
+	revision,
+}: {
+	cwd: string;
+	localCommandService: LocalCommandService;
+	revision: string;
+}): Promise<string | null> {
+	try {
+		const result = await localCommandService.run({
+			args: ['rev-parse', '--verify', '--quiet', `${revision}^{commit}`],
+			command: 'git',
+			cwd,
+			maxOutputBytes: 4 * 1024,
+			timeoutMs: REV_PARSE_TIMEOUT_MS,
+		});
+		if (result.status !== 'success') {
+			return null;
+		}
+		const hash = result.stdout.trim();
+		return hash === '' ? null : hash;
+	} catch {
+		return null;
 	}
 }
 

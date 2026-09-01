@@ -471,6 +471,7 @@ async function reclaimWorktreeDisk({
 }): Promise<{ bytesFreed: number | null; worktreePruned: boolean }> {
 	const pruned = await pruneWorktree({
 		archivedContextPath,
+		branchName: source.branchName,
 		localCommandService,
 		repositoryPath: source.repositoryPath,
 		workspaceId: source.id,

@@ -68,6 +68,7 @@ function createHarness(t: TestContext): Harness {
 function prune(harness: Harness): Promise<PruneWorktreeOutcome> {
 	return pruneWorktree({
 		archivedContextPath: harness.archivedContextPath,
+		branchName: BRANCH,
 		localCommandService: createLocalCommandService(),
 		repositoryPath: harness.repositoryPath,
 		workspaceId: 'ws-1',
