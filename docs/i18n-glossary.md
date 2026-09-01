@@ -192,7 +192,7 @@ from **Core nouns** — the width budget there is generous.
 | English | Русский | Ελληνικά | Note |
 | --- | --- | --- | --- |
 | Workspace *(menu title)* | Пространство | Χώρος | Short form for the menu-bar title only; the full `Рабочее пространство`/`Χώρος εργασίας` is 20 and 14 characters and does not fit beside `Файл`/`Правка`/`Вид`. Submenu items keep the full term. **Flag for native review:** `Пространство` alone can read as "space", and only the neighbouring menu titles disambiguate it. |
-| Create PR | Создать PR… | Δημιουργία PR… | `PR` stays `PR` per the `Pull request` row above. `Создать pull request…` is 21 characters. |
+| Create or Update PR *(menu item)* | Создать или обновить PR… | Δημιουργία ή ενημέρωση PR… | `PR` stays `PR` per the `Pull request` row above. The item fires regardless of PR state and cannot relabel itself per state, so both verbs are named. `Создать pull request…` is 21 characters. |
 | Open Config File | Файл конфигурации | Αρχείο ρυθμίσεων | The English is already shortened from "Open Configuration File"; the verb is carried by the menu it sits in. |
 | Run *(script toggle)* | Запуск | Εκτέλεση | The menu item that starts or stops the active run script, checked while it runs. Distinct from the `Run script` row above, which names the configured script itself. |
 | Application menu | Меню приложения | Μενού εφαρμογής | Screen-reader name for the whole bar, not a visible label — the one string in the menu that reaches the renderer catalogue, because the bar Ensemblr draws for itself on Linux is a renderer surface. The item labels inside it still come from `src/main/menu/menu-strings.ts`, already resolved to the user's language. |

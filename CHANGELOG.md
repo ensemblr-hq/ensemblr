@@ -9,6 +9,208 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.0-beta.22] - 2026-09-01
+
+Archiving stops hoarding disk. A worktree folder is overwhelmingly gitignored dependencies the setup
+script rebuilds, so archiving now removes it and keeps the branch, capturing uncommitted work in a
+snapshot ref first and re-deriving the workspace from git on unarchive — with a retroactive
+**Reclaim disk** for archives made before the setting existed. Markdown documents become navigable:
+a relative link opens its neighbour's own tab and a relative image draws from the workspace, instead
+of resolving against an origin that was never there. The rest is correctness — agent chores reach a
+real chat tab rather than the viewer in front, Update PR updates the open pull request instead of
+asking for a second one, the conflict list stops disagreeing with the badge above it, and archiving
+a workspace no longer restamps its idle chats as interrupted.
+[Release](https://github.com/ensemblr-hq/ensemblr/releases/tag/v0.1.0-beta.22) ·
+[`.dmg`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.0-beta.22/Ensemblr-0.1.0-beta.22-arm64.dmg) ·
+[`.AppImage`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.0-beta.22/Ensemblr-0.1.0-beta.22-x64.AppImage)
+
+### Added
+
+- **Archiving reclaims the disk its worktree occupied.** That directory is overwhelmingly gitignored
+  dependencies and build output the setup script rebuilds, so a user who has been archiving for
+  months holds tens of gigabytes for workspaces they finished with. Archiving with `reclaimDisk` now
+  removes the directory and keeps the branch, so unarchiving re-derives the workspace from git rather
+  than finding it in place. What git cannot store is captured first: uncommitted and untracked work
+  goes into a snapshot commit under `refs/ensemblr/archived/<id>` whose parent is the branch tip, so
+  the single ref pins both the working tree and the branch history against `git gc` even if the
+  branch is later deleted outside the app. The files-to-copy matches are gitignored by definition and
+  therefore absent from that snapshot, so they are copied into the preserved archive directory
+  separately. Either capture failing aborts the prune: refusing to reclaim disk beats reclaiming
+  work. `branchCleanup` is unchanged and takes precedence — it removes the directory anyway and
+  destroys the commits deliberately, which is the opposite guarantee. Unarchive gains the reverse
+  path: the branch is checked out at the original path, the snapshot restored on top and unstaged,
+  the preserved files-to-copy matches copied back, and the setup marker inside the restored
+  `.context/` cleared so the next open rebuilds dependencies. A worktree that went missing without a
+  prune record — a stamp that failed, or a folder deleted by hand — is now recovered from its branch
+  instead of being reported as an orphaned row. Archives made before the setting existed get the same
+  treatment retroactively through a per-row and a bulk action in the archive browser, processed one
+  at a time because two `git worktree remove` runs in one repository contend on the worktree admin
+  lock. The ref is released on unarchive, on workspace delete, and on archive purge, so nothing keeps
+  commits reachable past the workspace that owned them. Adds migration 025 and the
+  `reclaimDiskOnArchive` setting at user and repository scope, defaulting on.
+- **A markdown document's relative links and images resolve against the document that wrote them.** A
+  document in a repository points at its neighbours — an ADR at the ADR it supersedes, a guide page
+  at the screenshot beside it — and those destinations are relative paths. `rehype-harden` read them
+  as web URLs and resolved them against an origin: `./images/a.png` came out as `/images/a.png`,
+  having lost the directory it was relative to, and a bare `images/a.png` parsed as nothing and was
+  replaced by the blocked-image badge. Either way the one file the reference could not reach was the
+  one it named. A rehype pass now takes path-destined `a` and `img` off those tags before harden
+  runs, rewriting them to `ensemblr-file-link` and `ensemblr-file-image` with the destination the
+  author wrote carried on a data attribute. It sits between sanitize and harden: after the schema, so
+  the elements it mints are not stripped as unknown tags, and before harden, which would have
+  resolved the paths away. Every `http` destination still goes through harden untouched. A link
+  renders as a button that opens the file's own tab, keeping the text the author wrote; an image is
+  read out of the workspace and drawn from its bytes, because the renderer's origin is the app bundle
+  and a relative source resolves against that rather than against the document. A destination the
+  workspace cannot place falls back to prose or to the alt-text placeholder, so nothing looks
+  openable that would open onto an error. An image read is refused when the destination leaves the
+  workspace — an image is fetched the instant it is drawn rather than on a click, and markdown is not
+  always the reader's own, since a pull-request comment renders through the same surface. A link is
+  left ungated, because following one is the reader's own decision and agents write `~/.claude/`
+  paths constantly. A chat answer has no document of its own and sits at `baseDirectory: ''`, which
+  makes the paths an agent writes workspace-relative.
+
+### Fixed
+
+- **"Commit and push" and "Create draft PR" queued their prompt against whatever tab was in front,
+  including a file or diff viewer.** Only a chat tab mounts a composer, so the entry sat in the queue
+  undelivered for the life of the window while the toast said the chore had been handed over. The
+  cause was `useComposerSubmit(workspaceId)` resolving its target from `activeChatTabByWorkspaceAtom`
+  — despite the name, `panel-tabs.ts` writes any tab kind into that atom; it is a routing memory,
+  not a chat target. `resolveTargetChatTabId` now picks the tab in front when it is a chat, else the
+  most recently visited open chat, else the last chat in the strip, refusing the
+  `<workspaceId>:overview` placeholder that reads as a chat but has no row behind it.
+  `useChatTabTarget` resolves the target and follows it, so the queued prompt and the primed agent
+  action cannot drift on which tab they pick — navigation is part of delivery. `useComposerSubmit()`
+  now takes an explicit `{ chatTabId, text, source }` and reads no workspace atom, which removes the
+  footgun at its source. Neither path opens a chat tab when none resolves: a workspace always keeps
+  one open, so an empty strip means the rows have not arrived yet, and opening on that reading spawns
+  a spurious "New chat".
+- **A queued message came back with a hole where its attachment chip had been.** The queued row
+  rendered `entry.text`, the linearizer's flat draft text, which replaces every chip with a single
+  space — that space exists to keep caret offsets addressable, not to be read, so
+  `@timeline.tsx is fixed?` rendered as `is fixed?`. `QueuedDraftPreview` now walks `entry.segments`,
+  rendering text runs as-is and each chip as a small filled inline pill wearing the same mark the
+  composer gave it while the message was being typed. The paperclip meta line and its
+  `follow-up-queue.attachments` keys are gone — the row renders the user's own words. The pill is
+  `h-[1lh]` and `align-top`: a chip is a flex box rather than a run of text, so left to its own size
+  and baseline it made the line it landed on taller than the line above.
+- **A new chat tab in an already-worked workspace greeted it with the fresh-workspace card.** "You're
+  in a new copy of ensemblr", "copied 2485 files" — even though a sibling tab had already written
+  hundreds of lines. The card was gated on `transcripts.length === 0`, where `transcripts` lists
+  closed chat tabs only, so an open sibling mid-work counted for nothing. `workspace.sessions` is not
+  usable instead: it holds a single `<workspaceId>:overview` placeholder the live model never
+  replaces. The gate now counts every trace of prior work — a persisted agent session (opened only on
+  first prompt submit, so a row means an agent really ran), a closed tab's transcript, or
+  working-tree changes, which catch work done from a terminal harness that never opened a session. An
+  unloaded session list counts as history too: guessing "untouched" before it lands is the one answer
+  that can be wrong, and the neutral empty state is right either way.
+- **The Checks panel's "Update PR" button asked for a second pull request onto the same branch.**
+  Every pull-request surface fires `create-pr`, and with a PR already open that prompt ran
+  `gh pr create`. `resolvePullRequestAction` now reroutes a `create-pr` trigger to a new `update-pr`
+  prompt whenever the branch's PR is live; a merged or closed PR is past the point where updating
+  means anything, so it still starts a fresh one — which matches `resolveGitStatusSection`, already
+  hiding the Update PR button in exactly that case. The update prompt edits the PR with `gh pr edit`,
+  never `gh pr create`. Its title and description are treated as authoritative only when the user
+  actually asked for them: `resolvePrDetails` seeds an untouched draft from the open PR, so fencing
+  that back as "use this exact title" would pin the PR to the very wording the update was meant to
+  refresh. Its push step names `--force-with-lease` for a branch that was rebased, since resolving
+  conflicts and then updating the PR is an ordinary sequence. The resolved action is published on
+  `ReviewActionsValue` so a surface labels itself and reports what it asked for rather than
+  re-deriving the answer, and the native menu item becomes "Create or Update PR…" in all three
+  languages: it fires regardless of PR state and cannot relabel per state.
+- **The sidebar header said "Merge conflicts" while the Changes list and Checks panel stayed empty.**
+  Two sources answer "does this branch merge?" on unrelated clocks: the pull-request snapshot polls
+  every ten seconds and returns a single boolean, while the trial merge that names the conflicting
+  files polls every two minutes, because each pass costs a `git fetch`. The reverse was just as
+  visible — a resolved branch kept listing files after the badge cleared. A flip of GitHub's verdict
+  is the one event that makes the cached probe result known-wrong, so it now invalidates immediately
+  rather than waiting for the timer. `unknown` already collapses into `isConflicting: false`, so
+  GitHub recomputing mergeability after a push does not churn, and `cancelRefetch` stays off because
+  all three consumers run the effect in the same commit and would otherwise abandon each other's
+  in-flight fetch. The window between the verdict and the file names gets its own row: the Conflicts
+  section opens on GitHub's word and says "Finding the conflicting files…" until the probe answers,
+  rather than rendering empty and reading as "no conflicts" at the exact moment the header says
+  otherwise. Resolve stays available throughout, since that prompt asks for a rebase rather than
+  naming the files. Two details keep the extra probing bounded, both by the same watermark: it is
+  keyed by workspace as well as verdict, because none of the three consumers remounts across a
+  workspace switch, and it is stamped at the flip, so the routine two-minute poll does not reopen the
+  section on every pass for as long as GitHub and the trial merge disagree.
+- **The archive reclaim unlinked a worktree directory git had refused to unregister.** The direct
+  unlink fired whenever the directory survived `git worktree remove`, regardless of why git refused.
+  A locked worktree is one of those reasons, and the only one where git's refusal carries explicit
+  user intent: `--force` declines it and keeps both the registration and the tree. The unlink then
+  destroyed a worktree the user marked do-not-touch and reported success, while
+  `.git/worktrees/<id>` stayed behind — `git worktree prune` skips a locked entry — so the
+  `git branch -D` the removal exists to enable failed with "cannot delete branch … used by worktree
+  at". The unlink is now gated on the state the fix was written for: git dropped the registration and
+  then failed to delete the tree. `git worktree list --porcelain` answers that, with paths compared
+  through realpath so `/tmp` and `/private/tmp` match, and a list that cannot be read answers
+  "unknown" rather than "unregistered" — the caller deletes a directory on the strength of this, so
+  git's silence must not read as its consent. Callers destroying the workspace outright say so with
+  `deletingWorkspace`: there git's refusal preserves nothing, so the lock is released and the removal
+  retried through git, which lets the three delete flows drop their own follow-up removal that only
+  reported the same failure to the user twice.
+- **An archive could be reclaimed against a snapshot the branch had long since moved past.** The
+  salvage path falls back to `refs/ensemblr/archived/<id>` when git can no longer read the worktree,
+  but trusted that ref on resolution alone. It outlives its own prune whenever the best-effort
+  `runRefDelete` an unarchive runs does not land — that helper never reads the command status, so an
+  ordinary failure is invisible. A worktree that later lost its admin directory for an unrelated
+  reason, such as the repository being moved, was then reclaimed against a snapshot from a cycle the
+  user had worked past: the directory deleted, the files-to-copy preservation skipped, and the
+  outcome reported as pruned with a weeks-old wip commit. The snapshot's parent must now still be the
+  workspace branch's tip; a branch that no longer resolves is accepted, since the snapshot is the only
+  record of it left and that is the recovery path it was written for. The readability gate also asked
+  the wrong question — `rev-parse --verify --quiet HEAD^{commit}` answers "no" both to a worktree
+  whose admin directory is gone and to a live one with no commit on HEAD yet, so an intact worktree
+  on an unborn branch read as a corpse. `rev-parse --git-dir` separates them.
+- **A stale worktree registration blocked its own branch from being adopted.** Git allows a branch in
+  one worktree at a time, so creating a workspace that adopts a branch git reports as checked out is
+  refused up front — and two of those refusals were wrong. A registration whose directory was
+  unlinked out from under it holds nothing: `git worktree list --porcelain` marks it `prunable`, but
+  it writes that annotation *after* `branch`, so a line-at-a-time scan that returned at the branch
+  line never saw it. Records are now read whole, and a prunable holder is pruned rather than reported
+  as an occupant the user cannot do anything about. Those registrations are stranded by
+  `runWorktreeRemove` itself, which unlinks the directory directly when git keeps refusing to
+  unregister a worktree on its way out; it now prunes there too, once the unlink has succeeded and
+  only for the state git was still holding the registration in. A holder that is a live workspace of
+  the same repository is not an error either — it is where the user was trying to get — so create
+  returns that workspace with `reusedExisting: true`, and the sidebar drops its optimistic row, says
+  what happened, and navigates there instead of adding a duplicate. An archived workspace and the
+  repository folder still refuse, since neither is somewhere to send anyone. Create failures render
+  through `failureDetail`, so main's English sentence only appears under the translated headline when
+  it carries specifics a code cannot.
+- **Closing a chat tab left it holding the summary from the previous turn boundary.** Closing never
+  stops the runtime, so no idle or shutdown event remained to drain the summary queue. The close path
+  now flushes the owed summary before the row is archived, addressed by chat tab rather than session
+  id since that is what the caller holds. A stop deliberately backgrounds its flush, so the write can
+  still settle after the close has answered the renderer; `onSummaryPersisted` reports the landed file
+  so the composition root can refresh the closed-tab queries, which would otherwise cache a result
+  taken before it existed. Only the flush paths announce — a turn-idle write leaves the tab open and
+  live, so nothing cached is stale, and broadcasting there would cost every window an unbounded query
+  plus a synchronous stat per closed tab on the main thread, once per turn.
+- **A chat whose transcript never reached disk vanished from the new-chat chip list.** The list
+  filtered on a non-empty summary path, so the workspace read as one that had never been chatted in.
+  It now lists every closed chat and refuses the ones with no transcript, so a gap reads as a gap.
+  The refusal uses `aria-disabled` rather than `disabled`: the button base class carries
+  `disabled:pointer-events-none`, which stops the hover that raises the title tooltip and drops the
+  chip out of the tab order, leaving the explanation reachable by nobody. The reason also rides an
+  `aria-label`, so it survives however the chip is read. The landing-card gate keeps its previous
+  meaning and still counts only transcripts that can actually be attached.
+- **Archiving or deleting a workspace restamped its idle chats as interrupted.** Teardown stops every
+  agent session the workspace holds, idle ones included, and every stop went through `abort()` —
+  `aborted` being the one shutdown reason the timeline projects into "You stopped this turn". A chat
+  that had been sitting finished therefore picked up an interruption marker for a turn nobody
+  stopped. The stop now branches on whether a turn is actually running, read from the persisted
+  session row: that row is the only provider-neutral answer, since `submitPrompt` stamps it
+  `streaming` before the runtime is reached and both adapters report `idle` at the turn boundary,
+  whereas `activeTurnId` keeps pointing at the last turn forever and adapter metadata tracks the
+  transition on Pi only. A session mid-turn still aborts; an idle one closes, which reports `manual`
+  and leaves no marker. An idle session's last turn settles `completed` rather than `aborted`, since
+  that is what it did before the stop arrived, and the stamp runs on both paths rather than being
+  left to the runtime's own `shutdown` event — Pi's `close` stops waiting on a wedged child once its
+  kill deadline passes, so that event can arrive after the session has left `activeSessions`.
+
 ## [0.1.0-beta.21] - 2026-08-31
 
 The terminal stops being the slowest surface in the app. Its cells draw from a WebGL glyph atlas

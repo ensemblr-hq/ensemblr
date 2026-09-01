@@ -94,6 +94,25 @@ metadata read wrong is worse than metadata read literally — so a document open
 with two thematic breaks, or with a block that repeats a key, renders verbatim
 rather than being reshaped into a header it does not have.
 
+**Relative links and images resolve against the document that wrote them.** A
+document in a repository points at its neighbours — an ADR at the ADR it
+supersedes, a guide page at the screenshot beside it — and those destinations are
+relative paths, not web URLs. A link like `../adr/0027-….md` renders as a button
+that opens that file's own tab, keeping the text the author wrote, and
+`./images/a.png` is read out of the workspace and drawn from its bytes. A
+destination the workspace cannot place falls back to plain prose, or to the
+alt-text placeholder for an image, so nothing looks openable that would open onto
+an error. An `http` destination is untouched and keeps its usual link-safety
+affordances.
+
+An image whose path leaves the workspace is refused, unlike a link. An image is
+fetched the instant it is drawn rather than on a click, and the markdown you are
+reading is not always your own — a pull-request comment renders through the same
+surface. Following a link stays your own decision, so links are left ungated;
+agents cite `~/.claude/` paths constantly. In a chat answer, which has no
+document of its own, relative paths are workspace-relative — which is how agents
+write them.
+
 ### Files outside the workspace
 
 Agents write to `/tmp`, to `~/.claude/`, and to sibling worktrees, and they cite
@@ -195,10 +214,23 @@ draft and manual variants behind the header button's dropdown:
 
 Once a pull request is open the same button becomes **Update PR**, which asks
 the agent to push the new work and bring the PR's title and description in line
-with what you have edited.
+with what you have edited — editing the open pull request with `gh pr edit`
+rather than opening a second one onto the same branch. It names
+`--force-with-lease` for a branch that was rebased, since resolving conflicts and
+then updating the PR is an ordinary sequence. A title and description you left
+untouched are seeded from the open PR and are not fenced back to the agent as
+authoritative, so an update does not pin the PR to the wording it was meant to
+refresh. A *merged or closed* PR is past the point where updating means anything,
+so the action opens a fresh one. The menu item covering both is **Create or
+Update PR…**, since it fires regardless of PR state and cannot relabel itself per
+state.
 
-The agent-driven actions hand their prompt to the workspace's active chat tab,
-and say so if there is no chat tab open to take it.
+The agent-driven actions hand their prompt to a real chat tab: the one in front
+when it is a chat, otherwise the most recently visited open chat, otherwise the
+last chat in the strip — and Ensemblr navigates there, because the queue only
+drains through a mounted composer. A file or diff viewer never takes the prompt.
+If the tab rows have not arrived yet, the action says so rather than opening a
+spurious new chat.
 
 The target branch — what the workspace diffs against and opens pull requests
 into — is set from the workbench header and can be changed without touching the

@@ -215,11 +215,45 @@ opened hundreds of workspaces is not carrying a remembered tab for every one of
 them. Each workspace's memory is its own: switching between two of them and back
 lands you on the chat you were reading, not on whichever one you looked at last.
 
-Two settings under `[git]` govern the git side:
+### The worktree folder is reclaimed
+
+A worktree directory is overwhelmingly gitignored dependencies and build output
+that the setup script rebuilds, so a user who has been archiving for months can
+be holding tens of gigabytes for workspaces they finished with. With **Reclaim
+disk on archive** on — the default — archiving removes the directory and keeps
+the branch, and unarchiving re-derives the workspace from git rather than finding
+it in place.
+
+What git cannot store is captured before anything is removed. Uncommitted and
+untracked work goes into a snapshot commit under `refs/ensemblr/archived/<id>`
+whose parent is the branch tip, so that one ref pins both the working tree and
+the branch history against `git gc` even if the branch is later deleted outside
+the app. The **Files to copy** matches are gitignored by definition and therefore
+absent from that snapshot, so they are preserved into the archive directory
+separately. **Either capture failing aborts the removal** — refusing to reclaim
+disk beats reclaiming work.
+
+Unarchiving reverses it: the branch is checked out at the original path, the
+snapshot is restored on top and left unstaged, the preserved **Files to copy**
+matches are copied back, and the setup marker is cleared so the next open
+rebuilds dependencies. A worktree that went missing without a record — a folder
+deleted by hand, or a stamp that failed — is recovered from its branch instead of
+being reported as an orphaned row.
+
+Archives made before the setting existed keep their folders, and the archive
+browser offers **Reclaim disk** per row and **Reclaim all** for the lot, telling
+you how much it freed. Workspaces are processed one at a time, because two
+`git worktree remove` runs in one repository contend on git's worktree admin
+lock.
+
+### The git side
+
+Three settings under `[git]` govern it:
 
 | Setting | Default | Effect |
 | --- | --- | --- |
 | `delete_local_branch_on_archive` | off | also delete the workspace's local branch when archiving |
+| `reclaim_disk_on_archive` | on | remove the worktree folder when archiving, keeping the branch and a snapshot of uncommitted work |
 | `archive_after_merge` | off | archive the workspace automatically once its pull request merges |
 
 `delete_local_branch_on_archive` is the **only** control over branch cleanup —
@@ -232,8 +266,12 @@ says the worktree and branch are being kept if the setting could not be read at
 all.
 
 A branch the workspace **adopted** is never deleted regardless — it was not the
-workspace's to destroy. See
-[ADR 0027](../adr/0027-use-workspace-archive-lifecycle.md).
+workspace's to destroy.
+
+Where the two archive settings overlap, `delete_local_branch_on_archive` takes
+precedence: it removes the directory anyway and destroys the commits
+deliberately, which is the opposite guarantee to the snapshot the reclaim keeps.
+See [ADR 0027](../adr/0027-use-workspace-archive-lifecycle.md).
 
 ## Opening a workspace elsewhere
 

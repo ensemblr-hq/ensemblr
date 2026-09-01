@@ -538,7 +538,10 @@ and a limit a sub-agent hit stays inside that sub-agent's own activity.
 
 Type while a turn is running and your message joins the **follow-up queue**
 instead of disappearing. Queued messages stay listed, and you can reorder, edit,
-or remove them right up until they drain.
+or remove them right up until they drain. A queued row renders your own words,
+attachment chips included, inline and in place — the same mark the composer gave
+each chip while you were typing it — so a message written around a chip reads as
+you wrote it rather than with a hole where the chip was.
 
 Two things stop a queue draining, and the strip says which: **stopping a turn**
 parks the messages that turn was holding, so resuming is your call rather than

@@ -191,8 +191,8 @@ migration ids, so a new migration must be added to both.
 
 | Suite | Runner | Count |
 | --- | --- | --- |
-| `tests/main/**` | `electron --test` (`ELECTRON_RUN_AS_NODE=1`), plus the pure-logic files listed one-by-one in `vitest.config.mts` — an explicit list, not a glob, so it never drags in the Electron-only suites | 213 files |
-| `tests/renderer/**` | Vitest (`node` env; DOM files opt in per file) | 333 files (42 under `dom/`) |
+| `tests/main/**` | `electron --test` (`ELECTRON_RUN_AS_NODE=1`), plus the pure-logic files listed one-by-one in `vitest.config.mts` — an explicit list, not a glob, so it never drags in the Electron-only suites | 217 files |
+| `tests/renderer/**` | Vitest (`node` env; DOM files opt in per file) | 340 files (44 under `dom/`) |
 | `tests/shared/**` | Vitest | 38 files |
 
 See [`onboarding.md`](./onboarding.md#6-running-the-tests) for which runner a new

@@ -176,12 +176,13 @@ setting for this repository.
 | `branch_prefix` | string | Prefix for new workspace branch names. |
 | `remote_origin` | string | The remote Ensemblr treats as origin. |
 | `delete_local_branch_on_archive` | boolean | Delete the local branch when a workspace is archived. The remote branch is untouched. |
+| `reclaim_disk_on_archive` | boolean | Remove the worktree folder when a workspace is archived, keeping its branch and a snapshot of any uncommitted work. Defaults to `true`. |
 | `archive_after_merge` | boolean | Archive a workspace automatically once its pull request merges. |
 | `set_upstream_on_push` | boolean | Configure new workspaces so a plain `git push` sets the branch upstream. |
 
 **Historical spelling.** `branchPrefix` in camelCase is still accepted as an
 alias for `branch_prefix`, so configs written before the snake_case convention
-keep resolving. It is the only camelCase `[git]` key accepted — the other five
+keep resolving. It is the only camelCase `[git]` key accepted — the other six
 must be snake_case.
 
 ```toml
