@@ -1444,6 +1444,7 @@ export default interface Resources {
 			checks: 'Checks';
 			comments: 'Comments';
 			conflicts: 'Conflicts';
+			'conflicts-probing': 'Finding the conflicting files…';
 			'git-status': 'Git status';
 			'no-checks': 'No checks reported';
 			'no-comments': 'No comments yet';

@@ -20,6 +20,7 @@
 		"checks": "Проверки",
 		"comments": "Комментарии",
 		"conflicts": "Конфликты",
+		"conflicts-probing": "Поиск конфликтующих файлов…",
 		"git-status": "Статус git",
 		"no-checks": "Проверок нет",
 		"no-comments": "Комментариев пока нет",

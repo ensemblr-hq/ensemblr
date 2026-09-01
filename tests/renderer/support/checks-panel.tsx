@@ -23,7 +23,9 @@ export { stubReviewActions };
 /**
  * Renders the Checks panel for a workspace. `switchTo` re-renders it for another
  * workspace against the same query cache and store, which is how a test asserts
- * that per-workspace state does not leak across a navigation.
+ * that per-workspace state does not leak across a navigation. `client` is the
+ * same cache, exposed so a test can drive a background refetch — the panel has
+ * behaviour that only differs between a poll and a fresh question.
  */
 export function renderChecksPanel(
 	workspace: WorkspaceShellModel,
@@ -43,6 +45,7 @@ export function renderChecksPanel(
 	const view = render(panel(workspace));
 	return {
 		...view,
+		client: queryClient,
 		switchTo: (next: WorkspaceShellModel) => view.rerender(panel(next)),
 	};
 }

@@ -85,6 +85,29 @@ export function PullRequestConflictRow({ path }: { path: string }) {
 	);
 }
 
+/**
+ * Placeholder row for the window where GitHub has already reported the branch
+ * as conflicting but the local trial merge has not yet named the files. Without
+ * it the section GitHub's verdict opens would render empty, reading as "no
+ * conflicts" at the exact moment the header says otherwise.
+ */
+export function PullRequestConflictProbeRow() {
+	const { t } = useTranslation();
+
+	return (
+		<div
+			className='flex min-h-7 min-w-0 items-center gap-2 px-1 text-muted-foreground text-xs'
+			data-conflict-probing='true'
+		>
+			<LoaderCircleIcon
+				aria-hidden='true'
+				className='size-3.5 shrink-0 motion-safe:animate-spin'
+			/>
+			{t('review:checks.conflicts-probing', 'Finding the conflicting files…')}
+		</div>
+	);
+}
+
 /** Renders the semantic icon for a GitHub check's current state. */
 function CheckStatusIcon({ status }: { status: PullRequestCheckStatus }) {
 	const { t } = useTranslation();
