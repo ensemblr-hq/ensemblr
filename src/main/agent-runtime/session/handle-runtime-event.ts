@@ -1,6 +1,7 @@
 import type { DatabaseSync } from 'node:sqlite';
 import type { AgentEventRow } from '../../storage/repositories';
 import {
+	type AgentTurnStatus,
 	getAgentSessionById,
 	updateAgentSession,
 	updateTurn,
@@ -12,7 +13,11 @@ import type {
 	AgentShutdownReason,
 } from '../agent-types.ts';
 import type { SessionNamingInput } from '../naming/session-naming.ts';
-import type { ActiveSession, ActiveSessionMap } from './active-session.ts';
+import {
+	type ActiveSession,
+	type ActiveSessionMap,
+	isTurnInFlight,
+} from './active-session.ts';
 import type { SummaryQueue } from './summary-queue.ts';
 
 /** Lifecycle calls this to mirror runtime events into `agent_session_events`. */
@@ -182,6 +187,10 @@ export function createRuntimeEventHandler({
 	/**
 	 * Closes out a session the runtime shut down: stamps the row closed, drains
 	 * the summary queue, settles the open turn, and drops the active entry.
+	 *
+	 * `activeTurnId` keeps pointing at the last turn once it has settled, so a
+	 * shutdown that interrupted nothing — the workspace teardown closing an idle
+	 * session — would otherwise restamp a finished turn as aborted.
 	 * @param active - The live session, when it is still in the active map
 	 * @param database - Open database handle
 	 * @param reason - Why the runtime shut the session down
@@ -198,6 +207,11 @@ export function createRuntimeEventHandler({
 		reason: AgentShutdownReason;
 		sessionId: string;
 	}): void => {
+		const settledStatus = resolveSettledTurnStatus({
+			database,
+			reason,
+			sessionId,
+		});
 		updateAgentSession({
 			database,
 			id: sessionId,
@@ -210,7 +224,7 @@ export function createRuntimeEventHandler({
 				id: active.activeTurnId,
 				patch: {
 					completedAt: now().toISOString(),
-					status: reason === 'completed' ? 'completed' : 'aborted',
+					status: settledStatus,
 				},
 			});
 		}
@@ -293,6 +307,30 @@ export function createRuntimeEventHandler({
 	};
 
 	return { handle };
+}
+
+/**
+ * Decides how a runtime shutdown settles the session's open turn. Only a
+ * shutdown that actually interrupted a running turn aborts it; one that reached
+ * an idle session — the workspace teardown closing a chat nobody was using —
+ * settles the turn it finds as completed, because that is what the turn did.
+ * @param database - Open database handle
+ * @param reason - Why the runtime shut the session down
+ * @param sessionId - Session the shutdown belongs to
+ * @returns The status to stamp on the turn
+ */
+function resolveSettledTurnStatus({
+	database,
+	reason,
+	sessionId,
+}: {
+	database: DatabaseSync;
+	reason: AgentShutdownReason;
+	sessionId: string;
+}): AgentTurnStatus {
+	const interruptedARunningTurn =
+		reason !== 'completed' && isTurnInFlight(database, sessionId);
+	return interruptedARunningTurn ? 'aborted' : 'completed';
 }
 
 /**
