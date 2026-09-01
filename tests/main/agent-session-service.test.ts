@@ -9,6 +9,7 @@ import test from 'node:test';
 import { setTimeout as delay } from 'node:timers/promises';
 import type { AgentAdapter } from '../../src/main/agent-runtime/agent-adapter.ts';
 import { createAgentClient } from '../../src/main/agent-runtime/agent-client.ts';
+import { WORKSPACE_REMOVED_STOP_REASON } from '../../src/main/agent-runtime/agent-session-lifecycle.ts';
 import {
 	type AgentSessionEventSink,
 	createAgentSessionService,
@@ -21,7 +22,10 @@ import type {
 import type { PiExecutableSnapshot } from '../../src/main/pi-runtime/pi-executable.ts';
 import { openEnsemblrDatabase } from '../../src/main/storage/database.ts';
 import { listEventsByBranch } from '../../src/main/storage/repositories/agent-event-repository.ts';
-import { getAgentSessionById } from '../../src/main/storage/repositories/agent-session-repository.ts';
+import {
+	getAgentSessionById,
+	listTurns,
+} from '../../src/main/storage/repositories/agent-session-repository.ts';
 import {
 	getChatTabById,
 	listOpenChatTabs,
@@ -63,11 +67,12 @@ function createReadyExecutable(): PiExecutableSnapshot {
 	};
 }
 
-// The CLI adapter's `abort()` only signals the child: the `shutdown` event
-// lands later, on process exit, once `stopSession` already dropped the session
-// from the active map. The fake emits it inline, so tests that care about that
-// tail opt into this wrapper.
-function deferAbortUntilExit(adapter: AgentAdapter): AgentAdapter {
+// Neither CLI teardown resolves with the `shutdown` event in hand: `abort()`
+// only signals the child, and `close()` stops waiting once its kill deadline
+// passes, so on a wedged child the event lands later — on process exit, after
+// `stopSession` already dropped the session from the active map. The fake emits
+// it inline, so tests that care about that tail opt into this wrapper.
+function deferShutdownUntilExit(adapter: AgentAdapter): AgentAdapter {
 	return {
 		createSession: async (input) => {
 			const session = await adapter.createSession(input);
@@ -76,6 +81,11 @@ function deferAbortUntilExit(adapter: AgentAdapter): AgentAdapter {
 				abort: async (reason) => {
 					setTimeout(() => {
 						void session.abort(reason);
+					}, 0);
+				},
+				close: async () => {
+					setTimeout(() => {
+						void session.close();
 					}, 0);
 				},
 			};
@@ -129,7 +139,7 @@ function answerPlanUsage(
 function resolveAdapter(
 	fake: ReturnType<typeof createFakeAgentAdapter>,
 	options: {
-		deferAbort?: boolean;
+		deferShutdown?: boolean;
 		refreshPlanUsage?: () => Promise<boolean>;
 		rejectAbortFor?: (index: number) => boolean;
 	},
@@ -140,13 +150,15 @@ function resolveAdapter(
 	if (options.rejectAbortFor) {
 		return rejectAbortForSession(fake.adapter, options.rejectAbortFor);
 	}
-	return options.deferAbort ? deferAbortUntilExit(fake.adapter) : fake.adapter;
+	return options.deferShutdown
+		? deferShutdownUntilExit(fake.adapter)
+		: fake.adapter;
 }
 
 function createService(
 	database: DatabaseSync,
 	options: {
-		deferAbort?: boolean;
+		deferShutdown?: boolean;
 		eventSink?: AgentSessionEventSink;
 		refreshPlanUsage?: () => Promise<boolean>;
 		rejectAbortFor?: (index: number) => boolean;
@@ -774,7 +786,7 @@ test('stopSession broadcasts the shutdown that lands after the session left the 
 	const fixture = openFixture(t);
 	const shutdowns: Array<{ reason: string; workspaceId: string }> = [];
 	const { service } = createService(fixture.database, {
-		deferAbort: true,
+		deferShutdown: true,
 		eventSink: ({ event, workspaceId }) => {
 			const envelope = event.payload;
 			if (envelope?.kind === 'shutdown') {
@@ -1231,4 +1243,92 @@ test('refreshPlanUsage answers false once no runtime is attached to the session'
 	assert.equal(service.getSession(snapshot.id)?.runtimeOpen, false);
 	assert.equal(await service.refreshPlanUsage(snapshot.id), false);
 	assert.equal(await service.refreshPlanUsage('no-such-session'), false);
+});
+
+// Archiving or deleting a workspace stops every session it holds, idle ones
+// included. An idle session has no turn to interrupt, so reporting the stop as
+// an abort writes "You stopped this turn" into a chat the user never ran, and
+// rewrites the last completed turn as aborted. The stop reason below is the one
+// the teardown records, but it is incidental: the branch is taken off the
+// session's own status, so a stop with any reason behaves the same way.
+test('stopSession closes an idle session instead of reporting a stopped turn', async (t) => {
+	const fixture = openFixture(t);
+	const shutdowns: string[] = [];
+	const { fake, service } = createService(fixture.database, {
+		deferShutdown: true,
+		eventSink: ({ event }) => {
+			const envelope = event.payload;
+			if (envelope?.kind === 'shutdown') {
+				shutdowns.push(envelope.reason);
+			}
+		},
+	});
+
+	const snapshot = await service.openSession({
+		executable: createReadyExecutable(),
+		workspaceCwd: '/tmp/ensemblr/svc/ws',
+		workspaceId: fixture.workspaceId,
+	});
+	await service.submitPrompt({ prompt: 'task', sessionId: snapshot.id });
+	const runtime = fake.getOpenSessions()[0];
+	assert.ok(runtime, 'expected one open runtime session');
+	runtime.setStatus('idle');
+	await delay(10);
+
+	await service.stopSession({
+		reason: WORKSPACE_REMOVED_STOP_REASON,
+		sessionId: snapshot.id,
+	});
+	await delay(20);
+
+	assert.deepEqual(
+		shutdowns,
+		['manual'],
+		'an idle session must not report an aborted turn',
+	);
+	const turns = listTurns({
+		branchId: snapshot.branchId,
+		database: fixture.database,
+	});
+	assert.equal(turns.length, 1, 'expected the submitted turn');
+	assert.equal(
+		turns[0]?.status,
+		'completed',
+		'a turn the runtime already finished settles as completed, not aborted',
+	);
+	assert.ok(
+		turns[0]?.completedAt,
+		'a settled turn carries the instant it settled',
+	);
+});
+
+test('stopSession still reports an aborted turn while one is streaming', async (t) => {
+	const fixture = openFixture(t);
+	const shutdowns: string[] = [];
+	const { service } = createService(fixture.database, {
+		deferShutdown: true,
+		eventSink: ({ event }) => {
+			const envelope = event.payload;
+			if (envelope?.kind === 'shutdown') {
+				shutdowns.push(envelope.reason);
+			}
+		},
+	});
+
+	const snapshot = await service.openSession({
+		executable: createReadyExecutable(),
+		workspaceCwd: '/tmp/ensemblr/svc/ws',
+		workspaceId: fixture.workspaceId,
+	});
+	await service.submitPrompt({ prompt: 'task', sessionId: snapshot.id });
+	await service.stopSession({ sessionId: snapshot.id });
+	await delay(20);
+
+	assert.deepEqual(shutdowns, ['aborted']);
+	const turns = listTurns({
+		branchId: snapshot.branchId,
+		database: fixture.database,
+	});
+	assert.equal(turns[0]?.status, 'aborted');
+	assert.ok(turns[0]?.completedAt, 'an aborted turn carries its end instant');
 });

@@ -23,7 +23,10 @@ import type {
 	AgentSessionSnapshot,
 } from './agent-session-types.ts';
 import type { SessionNamingInput } from './naming/session-naming.ts';
-import type { ActiveSessionMap } from './session/active-session.ts';
+import {
+	type ActiveSessionMap,
+	isTurnInFlight,
+} from './session/active-session.ts';
 import type {
 	SubagentMechanismReader,
 	TurnPreambleResolver,
@@ -343,6 +346,13 @@ export function createAgentSessionLifecycle({
 	 * Aborts one session's in-flight turn and closes it, leaving anything it
 	 * spawned untouched. A session that is not currently active is already
 	 * stopped, so this is a no-op for it.
+	 *
+	 * An idle session is wound down with `close` rather than `abort`, because a
+	 * stop that reaches every session of a workspace — the teardown archiving or
+	 * deleting one runs — otherwise writes the "you stopped this turn" marker
+	 * into chats that were running nothing, and restamps their last settled turn
+	 * as aborted. Its last turn settles `completed` instead, which is what that
+	 * turn did before the stop arrived.
 	 * @param request - The session to stop and the reason to record.
 	 */
 	const abortActiveSession = async (
@@ -353,10 +363,13 @@ export function createAgentSessionLifecycle({
 		if (!active) {
 			return;
 		}
+		const turnInFlight = isTurnInFlight(database, request.sessionId);
 		// Announce the stop before the abort, because aborting settles the turn to
 		// `idle` on its way out and a listener told only afterwards would already
 		// have read that as a turn finishing by itself.
-		onSessionAborted?.(request.sessionId);
+		if (turnInFlight) {
+			onSessionAborted?.(request.sessionId);
+		}
 		// Start the owed summary before aborting so it snapshots the active session,
 		// but never block the user's explicit stop on archival summary work. The
 		// flush reads the transcript synchronously before its first await, so the
@@ -370,14 +383,22 @@ export function createAgentSessionLifecycle({
 				sessionId: request.sessionId,
 			})
 			.catch(() => undefined);
-		await active.agentRuntimeSession.abort(request.reason);
+		if (turnInFlight) {
+			await active.agentRuntimeSession.abort(request.reason);
+		} else {
+			await active.agentRuntimeSession.close();
+		}
+		// The runtime's own `shutdown` event settles this turn too, but it is not
+		// guaranteed to land first: Pi's `close` gives up waiting on a wedged child
+		// after its kill deadline, so the event can arrive once this session is
+		// already out of `activeSessions` and no longer carries the turn to stamp.
 		if (active.activeTurnId) {
 			updateTurn({
 				database,
 				id: active.activeTurnId,
 				patch: {
 					completedAt: now().toISOString(),
-					status: 'aborted',
+					status: turnInFlight ? 'aborted' : 'completed',
 				},
 			});
 		}

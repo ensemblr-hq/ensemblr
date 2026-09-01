@@ -104,9 +104,11 @@ export function createWorkspaceTeardownService(
  * Stops every agent session of a workspace and releases its control origin.
  * Sessions are stopped concurrently — each `stopAgentSession` already cascades
  * to the sub-agents it spawned, and one wedged runtime must not delay the rest.
- * Each stop is deadlined: the Pi adapter signals and returns, but the Claude one
- * awaits the SDK's `interrupt()`, so an unbounded wait here would hang the whole
- * removal on a runtime that never answers.
+ * Each stop is deadlined, because none of them merely signals and returns: a
+ * session mid-turn aborts, which on Claude awaits the SDK's `interrupt()`, and
+ * an idle one — the common case in a workspace being archived — closes, which
+ * on Pi awaits the child's actual exit up to its kill deadline. An unbounded
+ * wait here would hang the whole removal on a runtime that never answers.
  * @param input - Diagnostics sink, the ports, and the workspace being removed
  * @returns How many sessions were stopped without error
  */
