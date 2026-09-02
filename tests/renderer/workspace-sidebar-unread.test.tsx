@@ -18,8 +18,8 @@ function renderRow(unreadCount: number) {
 		<WorkspaceSidebarItemContent
 			dockActivityState={null}
 			hasDiffStats={false}
-			isPendingCreation={false}
 			isUnread={unreadCount > 0}
+			pendingLifecycle={null}
 			sidebarState={getWorkspaceSidebarState(workspace, { agentBusy: false })}
 			unreadCount={unreadCount}
 			workspace={workspace}

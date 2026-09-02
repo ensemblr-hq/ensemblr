@@ -11,11 +11,29 @@ import {
 import type { WorkspaceSidebarState } from '@/renderer/types/components';
 import type { WorkspaceShellModel } from '@/renderer/types/workbench';
 
-/** Derives the icon and tone for a workspace sidebar row from its status. */
+/**
+ * Derives the icon and tone for a workspace sidebar row from its status.
+ *
+ * An archive that is running outranks everything else the row could say: the
+ * workspace is being torn down, so a pull-request verdict or an agent turn from
+ * a moment ago describes a state it is leaving.
+ * @param workspace - The workspace the row stands for
+ * @param options - Live state the cached workspace snapshot does not carry
+ * @returns The icon, tone, and state id the row renders from
+ */
 export function getWorkspaceSidebarState(
 	workspace: WorkspaceShellModel,
-	options: { agentBusy?: boolean } = {},
+	options: { agentBusy?: boolean; isArchiving?: boolean } = {},
 ): WorkspaceSidebarState {
+	if (options.isArchiving) {
+		return {
+			className: 'text-muted-foreground',
+			icon: LoaderCircleIcon,
+			isSpinning: true,
+			kind: 'workspace-archiving',
+		};
+	}
+
 	if (workspace.isPendingCreation) {
 		return {
 			className: 'text-muted-foreground',

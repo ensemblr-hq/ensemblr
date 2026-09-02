@@ -13,7 +13,10 @@ import { WorkspaceDiffStats } from '@/renderer/components/workbench-shell/worksp
 import { useWorkspaceBusy } from '@/renderer/hooks/workspace/use-workspace-busy';
 import { cn } from '@/renderer/lib/utils';
 import { getWorkspaceSidebarState } from '@/renderer/lib/workbench';
-import { useWorkspaceIsUnread } from '@/renderer/state/workspace';
+import {
+	useWorkspaceIsArchiving,
+	useWorkspaceIsUnread,
+} from '@/renderer/state/workspace';
 import type { WorkspaceSidebarStateKind } from '@/renderer/types/components';
 import type { WorkspaceShellModel } from '@/renderer/types/workbench';
 import { BoardDropIndicator } from './board-drop-indicator';
@@ -29,6 +32,12 @@ import { useCardDnd } from './use-card-dnd';
  *
  * Keeps its grab cursor under every sort: a non-manual sort only takes away
  * in-column reordering, and the card still drags between columns.
+ *
+ * A card whose archive is running dims and stops answering altogether — not
+ * openable, not draggable, not a drop target, and outside the context menu, the
+ * same way the sidebar row is. The workspace is leaving the board, so a status
+ * it is dragged into lands on nothing and every lifecycle action in the menu
+ * would fire a second run against it.
  */
 export function WorkspaceCard({
 	allowReorder,
@@ -44,62 +53,77 @@ export function WorkspaceCard({
 	const { t } = useTranslation();
 	const menu = useBoardWorkspaceMenuController();
 	const isUnread = useWorkspaceIsUnread(workspace.id);
+	const isArchiving = useWorkspaceIsArchiving(workspace.id);
 	const hasDiffStats =
 		workspace.changeSummary.additions > 0 ||
 		workspace.changeSummary.deletions > 0;
-	const { closestEdge, isDragging, ref } = useCardDnd(
-		workspace.id,
-		'workspace',
+	const { closestEdge, isDragging, ref } = useCardDnd({
 		allowReorder,
+		cardId: workspace.id,
+		cardKind: 'workspace',
+		disabled: isArchiving,
+	});
+	const openLabel = isArchiving
+		? t(
+				'workbench:workspace-item.archiving-aria',
+				'Workspace {{workspace}} is being archived',
+				{ workspace: workspace.name },
+			)
+		: t('workbench:workspace-item.open-aria', 'Open workspace {{workspace}}', {
+				workspace: workspace.name,
+			});
+
+	const card = (
+		<div
+			className={cn(
+				'relative transition-opacity',
+				isArchiving
+					? 'cursor-default opacity-60'
+					: 'cursor-grab active:cursor-grabbing',
+				isDragging && 'opacity-50',
+			)}
+			ref={ref}
+		>
+			<BoardDropIndicator edge={closestEdge} />
+			<Card className='gap-0 overflow-hidden border border-foreground/10 py-0 ring-0 transition-colors hover:border-foreground/20'>
+				<button
+					aria-label={openLabel}
+					className='flex w-full flex-col gap-2 px-3 py-2.5 text-left focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50'
+					disabled={isArchiving}
+					onClick={onOpen}
+					type='button'
+				>
+					<div className='flex min-w-0 items-center justify-between gap-2'>
+						<span
+							className={cn(
+								'min-w-0 flex-1 truncate text-[0.8125rem]',
+								isUnread ? 'font-semibold' : 'font-medium',
+							)}
+						>
+							{workspace.name}
+						</span>
+						{hasDiffStats ? <WorkspaceDiffStats workspace={workspace} /> : null}
+					</div>
+					<span className='truncate text-muted-foreground text-xxs'>
+						{projectName}
+					</span>
+					<div className='flex min-w-0 items-center gap-1.5 text-muted-foreground text-xxs'>
+						<GitBranchIcon aria-hidden='true' className='size-3 shrink-0' />
+						<span className='truncate'>{workspace.branchName}</span>
+					</div>
+					<WorkspaceCardFooter workspace={workspace} />
+				</button>
+			</Card>
+		</div>
 	);
+
+	if (isArchiving) {
+		return card;
+	}
 
 	return (
 		<ContextMenu>
-			<ContextMenuTrigger asChild>
-				<div
-					className={cn(
-						'relative cursor-grab transition-opacity active:cursor-grabbing',
-						isDragging && 'opacity-50',
-					)}
-					ref={ref}
-				>
-					<BoardDropIndicator edge={closestEdge} />
-					<Card className='gap-0 overflow-hidden border border-foreground/10 py-0 ring-0 transition-colors hover:border-foreground/20'>
-						<button
-							aria-label={t(
-								'workbench:workspace-item.open-aria',
-								'Open workspace {{workspace}}',
-								{ workspace: workspace.name },
-							)}
-							className='flex w-full flex-col gap-2 px-3 py-2.5 text-left focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50'
-							onClick={onOpen}
-							type='button'
-						>
-							<div className='flex min-w-0 items-center justify-between gap-2'>
-								<span
-									className={cn(
-										'min-w-0 flex-1 truncate text-[0.8125rem]',
-										isUnread ? 'font-semibold' : 'font-medium',
-									)}
-								>
-									{workspace.name}
-								</span>
-								{hasDiffStats ? (
-									<WorkspaceDiffStats workspace={workspace} />
-								) : null}
-							</div>
-							<span className='truncate text-muted-foreground text-xxs'>
-								{projectName}
-							</span>
-							<div className='flex min-w-0 items-center gap-1.5 text-muted-foreground text-xxs'>
-								<GitBranchIcon aria-hidden='true' className='size-3 shrink-0' />
-								<span className='truncate'>{workspace.branchName}</span>
-							</div>
-							<WorkspaceCardFooter workspace={workspace} />
-						</button>
-					</Card>
-				</div>
-			</ContextMenuTrigger>
+			<ContextMenuTrigger asChild>{card}</ContextMenuTrigger>
 			<WorkspaceContextMenuContent
 				onArchiveSelect={() => menu.archive(workspace)}
 				onDeleteSelect={() => menu.openDelete(workspace)}
@@ -151,6 +175,11 @@ function workspaceStateLabel(
 			return t('workbench:dashboard.card.state.pr-ready', 'ready to merge');
 		case 'pr-working':
 			return t('workbench:dashboard.card.state.pr-working', 'agent working');
+		case 'workspace-archiving':
+			return t(
+				'workbench:dashboard.card.state.workspace-archiving',
+				'archiving',
+			);
 		case 'workspace-blocked':
 			return t(
 				'workbench:dashboard.card.state.workspace-blocked',

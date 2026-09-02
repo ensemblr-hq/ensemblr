@@ -10,6 +10,7 @@ const {
 	archiveWorkspace,
 	getWorkspaceGitStatus,
 	invalidateWorkspaceListViews,
+	navigate,
 	removeWorkspace,
 	resolveSettings,
 	routerInvalidate,
@@ -19,6 +20,7 @@ const {
 	archiveWorkspace: vi.fn(),
 	getWorkspaceGitStatus: vi.fn(),
 	invalidateWorkspaceListViews: vi.fn().mockResolvedValue(undefined),
+	navigate: vi.fn().mockResolvedValue(undefined),
 	removeWorkspace: {
 		archived: vi.fn().mockResolvedValue(undefined),
 		deleted: vi.fn().mockResolvedValue(undefined),
@@ -29,8 +31,15 @@ const {
 	unarchiveWorkspace: vi.fn(),
 }));
 
+/** Where the shell stands when a case starts: the hop restores to this href. */
+const RETURN_HREF = '/projects/repo-doomed/workspaces/ws-active/chats/chat-1';
+
 vi.mock('@tanstack/react-router', () => ({
-	useRouter: () => ({ invalidate: routerInvalidate }),
+	useNavigate: () => navigate,
+	useRouter: () => ({
+		invalidate: routerInvalidate,
+		state: { location: { href: RETURN_HREF } },
+	}),
 }));
 
 vi.mock('sonner', () => ({ toast }));
@@ -39,8 +48,18 @@ vi.mock('@/renderer/hooks/workbench-shell/use-remove-workspace-action', () => ({
 	useRemoveWorkspaceAction: () => removeWorkspace,
 }));
 
+// The archive action reaches the archiving mark through the workspace-state
+// barrel, which pulls the shared query client in with it — so the mock has to
+// carry the key factory that module reads at import time.
 vi.mock('@/renderer/api/ensemblr-queries', () => ({
 	archiveWorkspace,
+	ensemblrQueryKeys: {
+		agentModels: () => ['agent-models'],
+		health: () => ['health'],
+		repositoryWorkspaceNavigation: () => ['repository-workspace-navigation'],
+		reviewComments: (workspaceId: string) => ['review-comments', workspaceId],
+		workspaceOpenTargets: () => ['workspace-open-targets'],
+	},
 	invalidateWorkspaceListViews,
 	reviewMergeSettingsQuery: () => ({
 		queryFn: resolveSettings,
@@ -58,6 +77,7 @@ import {
 	useArchiveWorkspaceAction,
 } from '../../src/renderer/hooks/workbench-shell/use-archive-workspace-action';
 import { workspaceLifecycleDialogAtom } from '../../src/renderer/state/dialogs';
+import { archivingWorkspaceIdsAtom } from '../../src/renderer/state/workspace/workspace-archiving';
 import type { WorkspaceShellModel } from '../../src/renderer/types/workbench';
 
 /** Minimal workspace shell model the archive action reads. */
@@ -328,8 +348,9 @@ test('starts one archive when the action is fired twice in one task', async () =
 	expect(archiveWorkspace).toHaveBeenCalledTimes(1);
 });
 
-// The action has no busy state of its own, so a silent second click leaves the
-// menu item looking dead.
+// The row goes non-interactive on the first click, but the Workspace menu and a
+// keyboard-repeated click can still land a second one, so it reports rather than
+// no-opping in silence.
 test('reports the second fire rather than no-opping in silence', async () => {
 	const { view } = mountAction();
 	const target = workspace('ws-double-report');
@@ -345,4 +366,151 @@ test('reports the second fire rather than no-opping in silence', async () => {
 	expect(toast.warning.mock.calls[0]?.[1]).toEqual({
 		id: 'archive-workspace:ws-double-report',
 	});
+});
+
+test('marks the workspace archiving for the whole run, and clears it after', async () => {
+	let finishArchive: () => void = () => undefined;
+	archiveWorkspace.mockReturnValue(
+		new Promise((resolve) => {
+			finishArchive = () =>
+				resolve({
+					archiveRecordId: 'record-1',
+					diagnostics: [],
+					status: 'success',
+					workspace: null,
+				});
+		}),
+	);
+	const { store, view } = mountAction();
+	const target = workspace('ws-marked');
+
+	let run: Promise<void> = Promise.resolve();
+	await act(async () => {
+		run = view.result.current(target);
+	});
+
+	expect(store.get(archivingWorkspaceIdsAtom).has('ws-marked')).toBe(true);
+
+	// The mark has to outlive the removal, or the row flashes back to normal for
+	// the frames between the IPC answering and the list dropping it.
+	removeWorkspace.archived.mockImplementationOnce(async () => {
+		expect(store.get(archivingWorkspaceIdsAtom).has('ws-marked')).toBe(true);
+	});
+
+	await act(async () => {
+		finishArchive();
+		await run;
+	});
+
+	expect(store.get(archivingWorkspaceIdsAtom).has('ws-marked')).toBe(false);
+});
+
+test('clears the mark when the run escalates to the dialog', async () => {
+	getWorkspaceGitStatus.mockResolvedValue(gitStatus(2));
+	const { store, view } = mountAction();
+
+	await act(async () => {
+		await view.result.current(workspace('ws-escalated'));
+	});
+
+	expect(store.get(archivingWorkspaceIdsAtom).has('ws-escalated')).toBe(false);
+});
+
+test('clears the mark when the archive fails', async () => {
+	archiveWorkspace.mockRejectedValue(new Error('main process is wedged'));
+	const { store, view } = mountAction();
+
+	await act(async () => {
+		await view.result.current(workspace('ws-failed'));
+	});
+
+	expect(store.get(archivingWorkspaceIdsAtom).has('ws-failed')).toBe(false);
+});
+
+// Archiving tears the worktree down under the user, so they leave before it
+// happens rather than after the IPC answers.
+test('leaves the active workspace before running the archive', async () => {
+	const { view } = mountAction('ws-active');
+
+	await act(async () => {
+		await view.result.current(workspace('ws-active'));
+	});
+
+	expect(navigate).toHaveBeenCalledWith({ replace: true, to: '/' });
+	expect(navigate.mock.invocationCallOrder[0]).toBeLessThan(
+		archiveWorkspace.mock.invocationCallOrder[0] as number,
+	);
+	// `useRemoveWorkspaceAction` skips its own invalidation for the active
+	// workspace, so the hop has to spend one itself.
+	expect(routerInvalidate).toHaveBeenCalledTimes(1);
+	// A successful archive removed the workspace, so there is nothing to go back to.
+	expect(navigate).toHaveBeenCalledTimes(1);
+});
+
+test('stays put when archiving a workspace the user is not in', async () => {
+	const { view } = mountAction('ws-elsewhere');
+
+	await act(async () => {
+		await view.result.current(workspace('ws-background'));
+	});
+
+	expect(navigate).not.toHaveBeenCalled();
+	expect(routerInvalidate).not.toHaveBeenCalled();
+});
+
+// Main refuses a vetoed archive before it tears anything down, so the workspace
+// the user was hopped out of is still whole. Leaving them in a sibling with only
+// a toast to explain it would cost them their place for nothing.
+test('returns the user to the workspace when a hook vetoes the archive', async () => {
+	archiveWorkspace.mockResolvedValue({
+		archiveRecordId: null,
+		diagnostics: [],
+		status: 'aborted',
+	});
+	const { view } = mountAction('ws-active');
+
+	await act(async () => {
+		await view.result.current(workspace('ws-active'));
+	});
+
+	expect(navigate).toHaveBeenNthCalledWith(1, { replace: true, to: '/' });
+	expect(navigate).toHaveBeenNthCalledWith(2, {
+		href: RETURN_HREF,
+		replace: true,
+	});
+	expect(removeWorkspace.archived).not.toHaveBeenCalled();
+	expect(toast.warning).toHaveBeenCalledTimes(1);
+});
+
+test('returns the user to the workspace when the archive fails outright', async () => {
+	archiveWorkspace.mockRejectedValue(new Error('main process is wedged'));
+	const { view } = mountAction('ws-active');
+
+	await act(async () => {
+		await view.result.current(workspace('ws-active'));
+	});
+
+	expect(navigate).toHaveBeenNthCalledWith(2, {
+		href: RETURN_HREF,
+		replace: true,
+	});
+	expect(toast.error).toHaveBeenCalledTimes(1);
+});
+
+// The user asked for the archive. Standing in the wrong place while it runs
+// beats the click doing nothing at all with nothing on screen to say why.
+test('archives anyway when the hop out cannot be made', async () => {
+	navigate.mockRejectedValueOnce(new Error('router is wedged'));
+	const logged = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+	const { view } = mountAction('ws-active');
+
+	await act(async () => {
+		await view.result.current(workspace('ws-active'));
+	});
+
+	expect(archiveWorkspace).toHaveBeenCalledTimes(1);
+	expect(removeWorkspace.archived).toHaveBeenCalledWith('ws-active');
+	// Nothing moved, so there is nothing to move back.
+	expect(navigate).toHaveBeenCalledTimes(1);
+	logged.mockRestore();
 });

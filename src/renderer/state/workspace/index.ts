@@ -92,6 +92,11 @@ export {
 	viewedChangesByWorkspaceAtom,
 } from './viewed-changes';
 export {
+	getArchivingWorkspaceIds,
+	useArchivingWorkspaceActions,
+	useWorkspaceIsArchiving,
+} from './workspace-archiving';
+export {
 	forgetWorkspaceStateAtom,
 	pruneWorkspaceStateAtom,
 } from './workspace-state-eviction';

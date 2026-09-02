@@ -535,6 +535,66 @@ test('falls back inside the stored project when its stored workspace is gone', (
 	});
 });
 
+// The archive action leaves the active workspace before the IPC answers, while
+// the stored pair still names it — so an unavailable id has to lose every
+// fallback or the hop redirects straight back into the workspace being torn down.
+test('refuses an unavailable workspace and falls back past it', () => {
+	const projects = mapNavigationSnapshotToProjects(
+		withRepositoryOneWorkspaces([
+			{
+				archivedAt: null,
+				baseBranch: 'master',
+				branchName: 'octocat/eng-120',
+				createdAt: '2026-06-06T00:00:00.000Z',
+				id: 'workspace-1',
+				metadata: {},
+				name: 'ENG-120 Archiving',
+				path: '/Users/alice/Ensemblr/workspaces/ensemblr/eng-120',
+				repositoryId: 'repo-1',
+				slug: 'eng-120',
+				updatedAt: '2026-06-06T00:00:00.000Z',
+			},
+			{
+				archivedAt: null,
+				baseBranch: 'master',
+				branchName: 'octocat/eng-121',
+				createdAt: '2026-06-06T00:00:00.000Z',
+				id: 'workspace-1b',
+				metadata: {},
+				name: 'ENG-121 Sibling',
+				path: '/Users/alice/Ensemblr/workspaces/ensemblr/eng-121',
+				repositoryId: 'repo-1',
+				slug: 'eng-121',
+				updatedAt: '2026-06-06T00:00:00.000Z',
+			},
+		]),
+	);
+	const storedSelection = { projectId: 'repo-1', workspaceId: 'workspace-1' };
+	const unavailableWorkspaceIds = new Set(['workspace-1']);
+
+	expect(
+		resolveWorkspaceNavigationSelection({
+			projects,
+			storedSelection,
+			unavailableWorkspaceIds,
+		}),
+	).toMatchObject({ source: 'first', workspace: { id: 'workspace-1b' } });
+	expect(
+		resolveWorkspaceNavigationSelection({
+			projects,
+			routeProjectId: 'repo-1',
+			routeWorkspaceId: 'workspace-1',
+			unavailableWorkspaceIds,
+		}),
+	).toBeNull();
+	expect(
+		resolveWorkspaceNavigationSelection({ projects, unavailableWorkspaceIds }),
+	).toMatchObject({ source: 'first', workspace: { id: 'workspace-1b' } });
+	expect(
+		resolveWorkspaceNavigationSelection({ projects, storedSelection }),
+	).toMatchObject({ source: 'stored', workspace: { id: 'workspace-1' } });
+});
+
 test('leaves the shell selectionless once a refresh drops the routed workspace', () => {
 	const projects = mapNavigationSnapshotToProjects(
 		withRepositoryOneWorkspaces([]),

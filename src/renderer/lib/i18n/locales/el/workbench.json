@@ -496,6 +496,7 @@
 				"pr-open": "ανοιχτό",
 				"pr-ready": "έτοιμο για merge",
 				"pr-working": "ο πράκτορας εργάζεται",
+				"workspace-archiving": "αρχειοθετείται",
 				"workspace-blocked": "ο χώρος εργασίας είναι αποκλεισμένος",
 				"workspace-checking": "εκτελούνται έλεγχοι χώρου εργασίας",
 				"workspace-working": "ο πράκτορας εργάζεται"
@@ -1285,6 +1286,9 @@
 	},
 	"workspace-item": {
 		"archive-aria": "Αρχειοθέτηση χώρου εργασίας {{workspace}}· {{boundary}}",
+		"archiving": "Αρχειοθέτηση…",
+		"archiving-aria": "Ο χώρος εργασίας {{workspace}} αρχειοθετείται",
+		"archiving-tooltip": "Ο {{workspace}} αρχειοθετείται",
 		"creating": "Δημιουργία χώρου εργασίας…",
 		"creating-aria": "Ο χώρος εργασίας {{workspace}} δημιουργείται",
 		"creating-tooltip": "Ο {{workspace}} δημιουργείται",

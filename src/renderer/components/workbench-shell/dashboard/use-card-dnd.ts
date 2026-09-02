@@ -33,23 +33,31 @@ export interface CardDndState {
  * change the sort has no say over — but it stops reporting an insertion edge,
  * because a line promising "it lands here" is a lie when the sort decides where
  * it lands.
- * @param cardId - Stable id of the card: a workspace id, or an issue key.
- * @param cardKind - Which card shape the id refers to.
- * @param allowReorder - Whether dropping between cards would be honoured.
+ *
+ * `disabled` is the stronger form, for a card whose subject is being torn down:
+ * it registers neither the drag source nor the drop target, so the card can be
+ * neither moved nor moved onto.
+ * @param options - Which card this is, whether reordering is honoured, and whether the card takes part in drag and drop at all.
  * @returns The drag state plus the ref to attach to the card's root element.
  */
-export function useCardDnd(
-	cardId: string,
-	cardKind: BoardCardKind,
-	allowReorder: boolean,
-): CardDndState {
+export function useCardDnd({
+	allowReorder,
+	cardId,
+	cardKind,
+	disabled = false,
+}: {
+	allowReorder: boolean;
+	cardId: string;
+	cardKind: BoardCardKind;
+	disabled?: boolean;
+}): CardDndState {
 	const ref = useRef<HTMLDivElement | null>(null);
 	const [isDragging, setIsDragging] = useState(false);
 	const [closestEdge, setClosestEdge] = useState<Edge | null>(null);
 
 	useEffect(() => {
 		const element = ref.current;
-		if (!element) {
+		if (!element || disabled) {
 			return undefined;
 		}
 		const data = { cardId, cardKind, type: BOARD_CARD_DRAG_TYPE };
@@ -78,7 +86,7 @@ export function useCardDnd(
 				onDrop: () => setClosestEdge(null),
 			}),
 		);
-	}, [allowReorder, cardId, cardKind]);
+	}, [allowReorder, cardId, cardKind, disabled]);
 
-	return { closestEdge, isDragging, ref };
+	return { closestEdge, isDragging: isDragging && !disabled, ref };
 }

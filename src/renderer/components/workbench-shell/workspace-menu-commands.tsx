@@ -8,6 +8,7 @@ import {
 import {
 	useWorkspaceBoardActions,
 	useWorkspaceBoardStatus,
+	useWorkspaceIsArchiving,
 } from '@/renderer/state/workspace';
 import type { WorkspaceShellModel } from '@/renderer/types/workbench';
 
@@ -20,6 +21,9 @@ import type { WorkspaceShellModel } from '@/renderer/types/workbench';
  * had mounted. They are raised through an atom for the same reason they cannot
  * be reused from the sidebar row — the menu acts on the *active* workspace,
  * whose row a collapsed sidebar or a filtered list may not render at all.
+ *
+ * Archive greys out while its own run is in flight, so the menu cannot start a
+ * second one against a workspace already being torn down.
  * @param workspace - The workspace currently on screen
  */
 export function useWorkspaceMenuCommands(workspace: WorkspaceShellModel): void {
@@ -29,13 +33,18 @@ export function useWorkspaceMenuCommands(workspace: WorkspaceShellModel): void {
 	const archiveWorkspace = useArchiveWorkspaceAction({
 		activeWorkspaceId: workspace.id,
 	});
+	const isArchiving = useWorkspaceIsArchiving(workspace.id);
 
 	useMenuCommand('workspace.rename', () =>
 		requestLifecycleDialog({ kind: 'rename', workspace }),
 	);
-	useMenuCommand('workspace.archive', () => {
-		void archiveWorkspace(workspace);
-	});
+	useMenuCommand(
+		'workspace.archive',
+		() => {
+			void archiveWorkspace(workspace);
+		},
+		!isArchiving,
+	);
 	useMenuCommand('workspace.delete', () =>
 		requestLifecycleDialog({ kind: 'delete', workspace }),
 	);

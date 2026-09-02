@@ -97,4 +97,28 @@ describe('getWorkspaceSidebarState (sidebar rows)', () => {
 		expect(state.kind).toBe('workspace-working');
 		expect(state.isSpinning).toBe(true);
 	});
+
+	test('a running archive outranks the PR verdict and the agent spinner', () => {
+		const state = getWorkspaceSidebarState(
+			workspaceModelWith({ number: 7, status: 'merged' }),
+			{ agentBusy: true, isArchiving: true },
+		);
+		expect(state.kind).toBe('workspace-archiving');
+		expect(state.isSpinning).toBe(true);
+	});
+
+	test('a running archive outranks a pending creation', () => {
+		const state = getWorkspaceSidebarState(
+			{ ...workspaceModelWith(null), isPendingCreation: true },
+			{ isArchiving: true },
+		);
+		expect(state.kind).toBe('workspace-archiving');
+	});
+
+	test('an idle workspace is unaffected by the archiving option', () => {
+		expect(
+			getWorkspaceSidebarState(workspaceModelWith(null), { isArchiving: false })
+				.kind,
+		).toBe('branch');
+	});
 });

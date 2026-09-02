@@ -514,6 +514,7 @@
 				"pr-open": "открыт",
 				"pr-ready": "готов к merge",
 				"pr-working": "агент работает",
+				"workspace-archiving": "архивируется",
 				"workspace-blocked": "рабочее пространство заблокировано",
 				"workspace-checking": "проверки рабочего пространства выполняются",
 				"workspace-working": "агент работает"
@@ -1331,6 +1332,9 @@
 	},
 	"workspace-item": {
 		"archive-aria": "Архивировать рабочее пространство {{workspace}}; {{boundary}}",
+		"archiving": "Архивирование…",
+		"archiving-aria": "Рабочее пространство {{workspace}} архивируется",
+		"archiving-tooltip": "{{workspace}} архивируется",
 		"creating": "Создание рабочего пространства…",
 		"creating-aria": "Рабочее пространство {{workspace}} создаётся",
 		"creating-tooltip": "{{workspace}} создаётся",

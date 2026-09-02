@@ -2895,6 +2895,7 @@ export default interface Resources {
 					'pr-open': 'open';
 					'pr-ready': 'ready to merge';
 					'pr-working': 'agent working';
+					'workspace-archiving': 'archiving';
 					'workspace-blocked': 'workspace blocked';
 					'workspace-checking': 'workspace checks running';
 					'workspace-working': 'agent working';
@@ -3684,6 +3685,9 @@ export default interface Resources {
 		};
 		'workspace-item': {
 			'archive-aria': 'Archive workspace {{workspace}}; {{boundary}}';
+			archiving: 'Archiving…';
+			'archiving-aria': 'Workspace {{workspace}} is being archived';
+			'archiving-tooltip': '{{workspace}} is being archived';
 			creating: 'Creating workspace…';
 			'creating-aria': 'Workspace {{workspace}} is being created';
 			'creating-tooltip': '{{workspace}} is being created';

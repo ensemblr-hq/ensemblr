@@ -54,11 +54,11 @@ export function IssueCard({
 	onRestore: () => void;
 }) {
 	const { t } = useTranslation();
-	const { closestEdge, isDragging, ref } = useCardDnd(
-		issue.key,
-		'issue',
+	const { closestEdge, isDragging, ref } = useCardDnd({
 		allowReorder,
-	);
+		cardId: issue.key,
+		cardKind: 'issue',
+	});
 
 	return (
 		<ContextMenu>

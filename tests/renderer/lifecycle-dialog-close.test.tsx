@@ -517,6 +517,7 @@ describe('lifecycle dialogs close independently of post-removal navigation', () 
 		(_name, Component) => {
 			renderWithProviders(
 				<Component
+					activeWorkspaceId={null}
 					onArchived={vi.fn()}
 					onDeleted={vi.fn()}
 					onOpenChange={vi.fn()}

@@ -102,8 +102,8 @@ export function UnreadScene() {
 											hasDiffStats={
 												rowCase.workspace.changeSummary.additions > 0
 											}
-											isPendingCreation={false}
 											isUnread={unreadCount > 0}
+											pendingLifecycle={null}
 											sidebarState={getWorkspaceSidebarState(
 												rowCase.workspace,
 												{
