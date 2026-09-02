@@ -101,7 +101,7 @@ describe('getWorkspaceSidebarState (sidebar rows)', () => {
 	test('a running archive outranks the PR verdict and the agent spinner', () => {
 		const state = getWorkspaceSidebarState(
 			workspaceModelWith({ number: 7, status: 'merged' }),
-			{ agentBusy: true, isArchiving: true },
+			{ agentBusy: true, lifecycleRun: 'archiving' },
 		);
 		expect(state.kind).toBe('workspace-archiving');
 		expect(state.isSpinning).toBe(true);
@@ -110,15 +110,24 @@ describe('getWorkspaceSidebarState (sidebar rows)', () => {
 	test('a running archive outranks a pending creation', () => {
 		const state = getWorkspaceSidebarState(
 			{ ...workspaceModelWith(null), isPendingCreation: true },
-			{ isArchiving: true },
+			{ lifecycleRun: 'archiving' },
 		);
 		expect(state.kind).toBe('workspace-archiving');
 	});
 
-	test('an idle workspace is unaffected by the archiving option', () => {
+	test('a running delete reports its own kind rather than the archive one', () => {
+		const state = getWorkspaceSidebarState(workspaceModelWith(null), {
+			lifecycleRun: 'deleting',
+		});
+		expect(state.kind).toBe('workspace-deleting');
+		expect(state.isSpinning).toBe(true);
+	});
+
+	test('an idle workspace is unaffected by the lifecycle-run option', () => {
 		expect(
-			getWorkspaceSidebarState(workspaceModelWith(null), { isArchiving: false })
-				.kind,
+			getWorkspaceSidebarState(workspaceModelWith(null), {
+				lifecycleRun: null,
+			}).kind,
 		).toBe('branch');
 	});
 });

@@ -97,6 +97,7 @@ export function useBoardWorkspaceMenu(): {
 	const dialogs = (
 		<>
 			<DeleteWorkspaceDialog
+				activeWorkspaceId={null}
 				onDeleted={handleWorkspaceLifecycleAction.deleted}
 				onOpenChange={(open) => {
 					if (!open) {

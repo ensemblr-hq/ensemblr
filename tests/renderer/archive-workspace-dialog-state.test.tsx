@@ -22,7 +22,7 @@ vi.mock('@tanstack/react-router', () => ({
 }));
 
 import { ArchiveWorkspaceDialog } from '@/renderer/components/workbench-shell/archive-workspace-dialog';
-import { archivingWorkspaceIdsAtom } from '@/renderer/state/workspace/workspace-archiving';
+import { workspaceLifecycleRunsAtom } from '@/renderer/state/workspace/workspace-lifecycle-runs';
 import type { WorkspaceShellModel } from '@/renderer/types/workbench';
 
 import {
@@ -104,7 +104,7 @@ beforeEach(() => {
 
 afterEach(() => {
 	clearEnsemblrApi();
-	store.set(archivingWorkspaceIdsAtom, new Set<string>());
+	store.set(workspaceLifecycleRunsAtom, new Map());
 });
 
 // A confirmed archive is the same run as an unconfirmed one, and it is the
@@ -127,7 +127,7 @@ describe('archive workspace dialog live state', () => {
 		);
 		installBridge(archiveWorkspace);
 		const onArchived = vi.fn(() => {
-			expect(store.get(archivingWorkspaceIdsAtom).has('ws-doomed')).toBe(true);
+			expect(store.get(workspaceLifecycleRunsAtom).has('ws-doomed')).toBe(true);
 		});
 		renderDialog(onArchived);
 
@@ -135,11 +135,13 @@ describe('archive workspace dialog live state', () => {
 		await waitFor(() => {
 			expect(archiveWorkspace).toHaveBeenCalledTimes(1);
 		});
-		expect(store.get(archivingWorkspaceIdsAtom).has('ws-doomed')).toBe(true);
+		expect(store.get(workspaceLifecycleRunsAtom).has('ws-doomed')).toBe(true);
 
 		finishArchive();
 		await waitFor(() => {
-			expect(store.get(archivingWorkspaceIdsAtom).has('ws-doomed')).toBe(false);
+			expect(store.get(workspaceLifecycleRunsAtom).has('ws-doomed')).toBe(
+				false,
+			);
 		});
 		expect(onArchived).toHaveBeenCalledTimes(1);
 	});
@@ -195,6 +197,6 @@ describe('archive workspace dialog live state', () => {
 			replace: true,
 		});
 		expect(onArchived).not.toHaveBeenCalled();
-		expect(store.get(archivingWorkspaceIdsAtom).has('ws-doomed')).toBe(false);
+		expect(store.get(workspaceLifecycleRunsAtom).has('ws-doomed')).toBe(false);
 	});
 });

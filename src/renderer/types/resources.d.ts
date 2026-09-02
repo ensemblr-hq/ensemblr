@@ -2898,6 +2898,7 @@ export default interface Resources {
 					'workspace-archiving': 'archiving';
 					'workspace-blocked': 'workspace blocked';
 					'workspace-checking': 'workspace checks running';
+					'workspace-deleting': 'deleting';
 					'workspace-working': 'agent working';
 				};
 			};
@@ -3691,6 +3692,9 @@ export default interface Resources {
 			creating: 'Creating workspace…';
 			'creating-aria': 'Workspace {{workspace}} is being created';
 			'creating-tooltip': '{{workspace}} is being created';
+			deleting: 'Deleting…';
+			'deleting-aria': 'Workspace {{workspace}} is being deleted';
+			'deleting-tooltip': '{{workspace}} is being deleted';
 			'dock-activity': 'Dock activity running';
 			'open-aria': 'Open workspace {{workspace}}';
 			'open-busy-aria': 'Open workspace {{workspace}}; dock activity running';

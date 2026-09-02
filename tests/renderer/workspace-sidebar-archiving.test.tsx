@@ -7,7 +7,7 @@ import { SidebarProvider } from '../../src/renderer/components/ui/sidebar';
 import { NavigationProvider } from '../../src/renderer/components/workbench-shell/shell-contexts';
 import { WorkspaceSidebarItem } from '../../src/renderer/components/workbench-shell/workspace-sidebar-item/workspace-sidebar-item';
 import { shellFixtureProjects } from '../../src/renderer/fixtures/workbench';
-import { archivingWorkspaceIdsAtom } from '../../src/renderer/state/workspace/workspace-archiving';
+import { workspaceLifecycleRunsAtom } from '../../src/renderer/state/workspace/workspace-lifecycle-runs';
 import type { WorkbenchRouteSearch } from '../../src/renderer/types/workbench';
 import { renderWithProviders } from './support/dom';
 
@@ -43,11 +43,14 @@ function renderRow() {
 
 /** Marks the fixture workspace as having an archive in flight. */
 function markArchiving(): void {
-	store.set(archivingWorkspaceIdsAtom, new Set([workspace.id]));
+	store.set(
+		workspaceLifecycleRunsAtom,
+		new Map([[workspace.id, 'archiving' as const]]),
+	);
 }
 
 afterEach(() => {
-	store.set(archivingWorkspaceIdsAtom, new Set<string>());
+	store.set(workspaceLifecycleRunsAtom, new Map());
 });
 
 describe('workspace sidebar row while archiving', () => {

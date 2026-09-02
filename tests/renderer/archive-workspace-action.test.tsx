@@ -44,7 +44,11 @@ vi.mock('@tanstack/react-router', () => ({
 
 vi.mock('sonner', () => ({ toast }));
 
+// The action takes the hop-aware removal, which is what adds back the one
+// `router.invalidate()` the hop's redirect spent — asserted directly in
+// `use-remove-workspace-action.test.tsx` rather than through this double.
 vi.mock('@/renderer/hooks/workbench-shell/use-remove-workspace-action', () => ({
+	useRemoveHoppedWorkspaceAction: () => removeWorkspace,
 	useRemoveWorkspaceAction: () => removeWorkspace,
 }));
 
@@ -77,7 +81,7 @@ import {
 	useArchiveWorkspaceAction,
 } from '../../src/renderer/hooks/workbench-shell/use-archive-workspace-action';
 import { workspaceLifecycleDialogAtom } from '../../src/renderer/state/dialogs';
-import { archivingWorkspaceIdsAtom } from '../../src/renderer/state/workspace/workspace-archiving';
+import { workspaceLifecycleRunsAtom } from '../../src/renderer/state/workspace/workspace-lifecycle-runs';
 import type { WorkspaceShellModel } from '../../src/renderer/types/workbench';
 
 /** Minimal workspace shell model the archive action reads. */
@@ -389,12 +393,12 @@ test('marks the workspace archiving for the whole run, and clears it after', asy
 		run = view.result.current(target);
 	});
 
-	expect(store.get(archivingWorkspaceIdsAtom).has('ws-marked')).toBe(true);
+	expect(store.get(workspaceLifecycleRunsAtom).has('ws-marked')).toBe(true);
 
 	// The mark has to outlive the removal, or the row flashes back to normal for
 	// the frames between the IPC answering and the list dropping it.
 	removeWorkspace.archived.mockImplementationOnce(async () => {
-		expect(store.get(archivingWorkspaceIdsAtom).has('ws-marked')).toBe(true);
+		expect(store.get(workspaceLifecycleRunsAtom).has('ws-marked')).toBe(true);
 	});
 
 	await act(async () => {
@@ -402,7 +406,7 @@ test('marks the workspace archiving for the whole run, and clears it after', asy
 		await run;
 	});
 
-	expect(store.get(archivingWorkspaceIdsAtom).has('ws-marked')).toBe(false);
+	expect(store.get(workspaceLifecycleRunsAtom).has('ws-marked')).toBe(false);
 });
 
 test('clears the mark when the run escalates to the dialog', async () => {
@@ -413,7 +417,7 @@ test('clears the mark when the run escalates to the dialog', async () => {
 		await view.result.current(workspace('ws-escalated'));
 	});
 
-	expect(store.get(archivingWorkspaceIdsAtom).has('ws-escalated')).toBe(false);
+	expect(store.get(workspaceLifecycleRunsAtom).has('ws-escalated')).toBe(false);
 });
 
 test('clears the mark when the archive fails', async () => {
@@ -424,7 +428,7 @@ test('clears the mark when the archive fails', async () => {
 		await view.result.current(workspace('ws-failed'));
 	});
 
-	expect(store.get(archivingWorkspaceIdsAtom).has('ws-failed')).toBe(false);
+	expect(store.get(workspaceLifecycleRunsAtom).has('ws-failed')).toBe(false);
 });
 
 // Archiving tears the worktree down under the user, so they leave before it
@@ -440,9 +444,6 @@ test('leaves the active workspace before running the archive', async () => {
 	expect(navigate.mock.invocationCallOrder[0]).toBeLessThan(
 		archiveWorkspace.mock.invocationCallOrder[0] as number,
 	);
-	// `useRemoveWorkspaceAction` skips its own invalidation for the active
-	// workspace, so the hop has to spend one itself.
-	expect(routerInvalidate).toHaveBeenCalledTimes(1);
 	// A successful archive removed the workspace, so there is nothing to go back to.
 	expect(navigate).toHaveBeenCalledTimes(1);
 });
@@ -455,7 +456,6 @@ test('stays put when archiving a workspace the user is not in', async () => {
 	});
 
 	expect(navigate).not.toHaveBeenCalled();
-	expect(routerInvalidate).not.toHaveBeenCalled();
 });
 
 // Main refuses a vetoed archive before it tears anything down, so the workspace

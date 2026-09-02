@@ -8,7 +8,7 @@ import {
 	resolveWorkspaceNavigationSelection,
 } from '@/renderer/lib/workbench';
 import {
-	getArchivingWorkspaceIds,
+	getUnavailableWorkspaceIds,
 	readStoredWorkspaceSelection,
 } from '@/renderer/state/workspace';
 import type {
@@ -409,16 +409,16 @@ export async function loadWorkspaceChatRoute({
  * Resolves the launch workspace selection from the persisted pair, falling back
  * to the first workspace anywhere only when nothing has been stored yet.
  *
- * A workspace whose archive is running is refused as a target. The archive
- * action leaves the active workspace the moment it starts the IPC rather than
- * once it answers, and the stored pair still names the workspace it left — so
+ * A workspace whose archive or delete is running is refused as a target. Both
+ * actions leave the active workspace the moment they start the IPC rather than
+ * once it answers, and the stored pair still names the workspace they left — so
  * without this the hop redirects straight back into the one being torn down.
  */
 function resolveFallbackWorkspaceSelection(projects: ProjectShellModel[]) {
 	return resolveWorkspaceNavigationSelection({
 		projects,
 		storedSelection: readStoredWorkspaceSelection(),
-		unavailableWorkspaceIds: getArchivingWorkspaceIds(),
+		unavailableWorkspaceIds: getUnavailableWorkspaceIds(),
 	});
 }
 

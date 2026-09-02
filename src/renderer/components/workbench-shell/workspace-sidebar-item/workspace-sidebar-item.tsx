@@ -11,6 +11,7 @@ import { SidebarMenuButton } from '@/renderer/components/ui/sidebar';
 import { useNavigation } from '@/renderer/components/workbench-shell/shell-contexts';
 import { useWorkspaceSidebarRow } from '@/renderer/hooks/workbench-shell/navigation-sidebar/use-workspace-sidebar-row';
 import { usePermissionBoundaryLabel } from '@/renderer/hooks/workbench-shell/use-permission-boundary-label';
+import type { WorkspaceLifecycleRun } from '@/renderer/types/components';
 import type {
 	WorkbenchRouteSearch,
 	WorkspaceShellModel,
@@ -29,19 +30,19 @@ const archiveBoundary = classifyPermissionAction({
 });
 
 /**
- * Which lifecycle run, if any, is holding a row non-interactive. An archive
+ * Which lifecycle run, if any, is holding a row non-interactive. A teardown
  * outranks a pending creation because only one of them can ever be true, and the
- * archive is the state the user just asked for.
+ * teardown is the state the user just asked for.
  * @param workspace - The workspace the row stands for
- * @param isArchiving - Whether this workspace's archive is running
+ * @param lifecycleRun - The destructive run against this workspace, when there is one
  * @returns The run holding the row, or null when the row is interactive
  */
 function resolvePendingLifecycle(
 	workspace: WorkspaceShellModel,
-	isArchiving: boolean,
+	lifecycleRun: WorkspaceLifecycleRun | null,
 ): WorkspacePendingLifecycle {
-	if (isArchiving) {
-		return 'archiving';
+	if (lifecycleRun) {
+		return lifecycleRun;
 	}
 	return workspace.isPendingCreation === true ? 'creating' : null;
 }
@@ -70,6 +71,21 @@ function pendingLifecycleLabels(
 			tooltip: t(
 				'workbench:workspace-item.archiving-tooltip',
 				'{{workspace}} is being archived',
+				{ workspace: workspaceName },
+			),
+		};
+	}
+
+	if (pendingLifecycle === 'deleting') {
+		return {
+			ariaLabel: t(
+				'workbench:workspace-item.deleting-aria',
+				'Workspace {{workspace}} is being deleted',
+				{ workspace: workspaceName },
+			),
+			tooltip: t(
+				'workbench:workspace-item.deleting-tooltip',
+				'{{workspace}} is being deleted',
 				{ workspace: workspaceName },
 			),
 		};
@@ -119,12 +135,12 @@ export function WorkspaceSidebarItem({
 	const {
 		dockActivityState,
 		hasDiffStats,
-		isArchiving,
 		isUnread,
+		lifecycleRun,
 		sidebarState,
 		unreadCount,
 	} = useWorkspaceSidebarRow({ isActive, workspace });
-	const pendingLifecycle = resolvePendingLifecycle(workspace, isArchiving);
+	const pendingLifecycle = resolvePendingLifecycle(workspace, lifecycleRun);
 
 	const buttonContent = (
 		<WorkspaceSidebarItemContent
@@ -140,7 +156,7 @@ export function WorkspaceSidebarItem({
 
 	// A row held by a lifecycle run renders outside the context menu on purpose:
 	// the workspace has no worktree to open, and every action the menu offers —
-	// archive most of all — would fire a second run against it.
+	// archive and delete most of all — would fire a second run against it.
 	if (pendingLifecycle) {
 		const { ariaLabel, tooltip } = pendingLifecycleLabels(
 			t,

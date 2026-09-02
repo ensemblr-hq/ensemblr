@@ -8,5 +8,5 @@ export interface WorkbenchShellRouteState {
 
 export interface WorkbenchChildMatch {
 	params: Record<string, unknown>;
-	view: unknown;
+	staticData: unknown;
 }

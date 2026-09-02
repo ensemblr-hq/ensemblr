@@ -8,7 +8,7 @@ import { afterEach, describe, expect, test, vi } from 'vitest';
 import { BoardWorkspaceMenuProvider } from '@/renderer/components/workbench-shell/dashboard/board-workspace-menu';
 import { WorkspaceCard } from '@/renderer/components/workbench-shell/dashboard/workspace-card';
 import { shellFixtureProjects } from '@/renderer/fixtures/workbench';
-import { archivingWorkspaceIdsAtom } from '@/renderer/state/workspace/workspace-archiving';
+import { workspaceLifecycleRunsAtom } from '@/renderer/state/workspace/workspace-lifecycle-runs';
 
 import { renderWithProviders } from './support/dom';
 
@@ -37,11 +37,14 @@ function renderCard(onOpen = vi.fn()) {
 
 /** Marks the fixture workspace as having an archive in flight. */
 function markArchiving(): void {
-	store.set(archivingWorkspaceIdsAtom, new Set([workspace.id]));
+	store.set(
+		workspaceLifecycleRunsAtom,
+		new Map([[workspace.id, 'archiving' as const]]),
+	);
 }
 
 afterEach(() => {
-	store.set(archivingWorkspaceIdsAtom, new Set<string>());
+	store.set(workspaceLifecycleRunsAtom, new Map());
 	vi.clearAllMocks();
 });
 

@@ -53,7 +53,10 @@ vi.mock('@/renderer/state/workspace/open-target-history', () => ({
 	deleteLastUsedOpenTarget,
 }));
 
-import { useRemoveWorkspaceAction } from '@/renderer/hooks/workbench-shell/use-remove-workspace-action';
+import {
+	useRemoveHoppedWorkspaceAction,
+	useRemoveWorkspaceAction,
+} from '@/renderer/hooks/workbench-shell/use-remove-workspace-action';
 import { lastWorkspaceSelectionAtom } from '@/renderer/state/workspace';
 import { activeChatTabByWorkspaceAtom } from '@/renderer/state/workspace/selection-atoms';
 import { pinnedWorkspaceIdsAtom } from '@/renderer/state/workspace/structure-atoms';
@@ -78,6 +81,7 @@ function renderRemoveWorkspaceAction(
 	return renderHook(
 		() => ({
 			remove: useRemoveWorkspaceAction({ activeWorkspaceId }),
+			removeAfterHop: useRemoveHoppedWorkspaceAction({ activeWorkspaceId }),
 			selection: useAtomValue(lastWorkspaceSelectionAtom),
 			store,
 		}),
@@ -233,4 +237,40 @@ test('still refreshes list views when there is no active workspace', async () =>
 
 	expect(navigate).not.toHaveBeenCalled();
 	expect(invalidateWorkspaceListViews).toHaveBeenCalledTimes(1);
+});
+
+// The teardown hop leaves the active workspace before the IPC, which spends the
+// layout's missing-selection redirect — so by the time the workspace is gone
+// nothing is left to re-run the loaders. The hop-aware action adds back exactly
+// the one invalidation that redirect used to cover.
+test('invalidates the router for the active workspace it was hopped off', async () => {
+	const view = renderRemoveWorkspaceAction('san-antonio');
+
+	await act(async () => {
+		await view.result.current.removeAfterHop.deleted('san-antonio');
+	});
+
+	expect(invalidate).toHaveBeenCalledTimes(1);
+});
+
+test('invalidates the router for an active workspace it archived', async () => {
+	const view = renderRemoveWorkspaceAction('san-antonio');
+
+	await act(async () => {
+		await view.result.current.removeAfterHop.archived('san-antonio');
+	});
+
+	expect(invalidate).toHaveBeenCalledTimes(1);
+});
+
+// A workspace the user is not standing in was never hopped off, so the plain
+// action already invalidated and a second one would run the index loader twice.
+test('leaves the invalidation alone for a workspace the user is not in', async () => {
+	const view = renderRemoveWorkspaceAction('san-antonio');
+
+	await act(async () => {
+		await view.result.current.removeAfterHop.deleted('el-paso');
+	});
+
+	expect(invalidate).toHaveBeenCalledTimes(1);
 });

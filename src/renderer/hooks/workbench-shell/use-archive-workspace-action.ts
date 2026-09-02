@@ -13,8 +13,8 @@ import {
 	unarchiveWorkspace,
 	workspaceGitStatusQuery,
 } from '@/renderer/api/ensemblr-queries';
-import { useArchiveWorkspaceHop } from '@/renderer/hooks/workbench-shell/use-archive-workspace-hop';
-import { useRemoveWorkspaceAction } from '@/renderer/hooks/workbench-shell/use-remove-workspace-action';
+import { useRemoveHoppedWorkspaceAction } from '@/renderer/hooks/workbench-shell/use-remove-workspace-action';
+import { useWorkspaceTeardownHop } from '@/renderer/hooks/workbench-shell/use-workspace-teardown-hop';
 import { getErrorMessage } from '@/renderer/lib/error';
 import { failureText } from '@/renderer/lib/failure-text';
 import {
@@ -27,7 +27,7 @@ import {
 	releaseLifecycleRun,
 } from '@/renderer/lib/workbench/lifecycle-run-latch';
 import { workspaceLifecycleDialogAtom } from '@/renderer/state/dialogs';
-import { useArchivingWorkspaceActions } from '@/renderer/state/workspace';
+import { useWorkspaceLifecycleRunActions } from '@/renderer/state/workspace';
 import type { WorkspaceShellModel } from '@/renderer/types/workbench';
 import type { ArchiveWorkspaceStatus } from '@/shared/ipc/contracts/workspace';
 
@@ -251,7 +251,7 @@ export function useArchivedWorkspaceToast(): (
  * the row has to keep saying so until it has actually left the list.
  *
  * Leaving the workspace before its teardown, and returning to it when the
- * archive did not happen, belongs to {@link useArchiveWorkspaceHop} — which the
+ * archive did not happen, belongs to {@link useWorkspaceTeardownHop} — which the
  * confirmation dialog wraps its own run in too, so both paths move the shell the
  * same way.
  * @param options - Active workspace identity, used to leave the workspace before it is torn down and to pick the post-removal route fallback
@@ -263,15 +263,15 @@ export function useArchiveWorkspaceAction({
 	activeWorkspaceId: string | null;
 }): (workspace: WorkspaceShellModel) => Promise<void> {
 	const queryClient = useQueryClient();
-	const router = useRouter();
 	const { t } = useTranslation();
 	const requestLifecycleDialog = useSetAtom(workspaceLifecycleDialogAtom);
-	const removeWorkspace = useRemoveWorkspaceAction({ activeWorkspaceId });
+	const removeWorkspace = useRemoveHoppedWorkspaceAction({ activeWorkspaceId });
 	const announceArchived = useArchivedWorkspaceToast();
-	const archiveAwayFromWorkspace = useArchiveWorkspaceHop({
+	const archiveAwayFromWorkspace = useWorkspaceTeardownHop({
 		activeWorkspaceId,
 	});
-	const { clearArchiving, markArchiving } = useArchivingWorkspaceActions();
+	const { clearLifecycleRun, markLifecycleRun } =
+		useWorkspaceLifecycleRunActions();
 
 	return useCallback(
 		async (workspace: WorkspaceShellModel) => {
@@ -289,8 +289,7 @@ export function useArchiveWorkspaceAction({
 				return;
 			}
 
-			const leavesActiveWorkspace = activeWorkspaceId === workspace.id;
-			markArchiving(workspace.id);
+			markLifecycleRun(workspace.id, 'archiving');
 
 			try {
 				let outcome: ArchiveOutcome;
@@ -315,12 +314,6 @@ export function useArchiveWorkspaceAction({
 
 				if (outcome.status === 'success') {
 					await removeWorkspace.archived(workspace.id);
-					// `removeWorkspace` skips its own invalidation for the active
-					// workspace, on the assumption the layout's redirect will re-run
-					// every loader — which the hop above has already spent.
-					if (leavesActiveWorkspace) {
-						await router.invalidate();
-					}
 					announceArchived({
 						branchCleanup: plan.branchCleanup,
 						workspaceId: workspace.id,
@@ -331,19 +324,17 @@ export function useArchiveWorkspaceAction({
 				reportUnarchivedOutcome(outcome, t);
 				await invalidateWorkspaceListViews(queryClient);
 			} finally {
-				clearArchiving(workspace.id);
+				clearLifecycleRun(workspace.id);
 			}
 		},
 		[
-			activeWorkspaceId,
 			announceArchived,
 			archiveAwayFromWorkspace,
-			clearArchiving,
-			markArchiving,
+			clearLifecycleRun,
+			markLifecycleRun,
 			queryClient,
 			removeWorkspace.archived,
 			requestLifecycleDialog,
-			router,
 			t,
 		],
 	);

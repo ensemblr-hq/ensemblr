@@ -14,7 +14,11 @@ import { WorkspaceUnreadDot } from './unread-dot';
  * The lifecycle run holding a workspace row non-interactive, or null when the
  * row is a workspace the user can actually open.
  */
-export type WorkspacePendingLifecycle = 'archiving' | 'creating' | null;
+export type WorkspacePendingLifecycle =
+	| 'archiving'
+	| 'creating'
+	| 'deleting'
+	| null;
 
 /** What a sidebar row renders inside its button, live state already resolved. */
 interface WorkspaceSidebarItemContentProps {
@@ -43,6 +47,9 @@ function workspaceSubtitle(
 ): string {
 	if (pendingLifecycle === 'archiving') {
 		return t('workbench:workspace-item.archiving', 'Archiving…');
+	}
+	if (pendingLifecycle === 'deleting') {
+		return t('workbench:workspace-item.deleting', 'Deleting…');
 	}
 	if (pendingLifecycle === 'creating') {
 		return t('workbench:workspace-item.creating', 'Creating workspace…');

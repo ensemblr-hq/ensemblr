@@ -75,6 +75,35 @@ describe('WorkspaceWorkbenchLayout missing-selection redirect', () => {
 		expect(navigateSpy).toHaveBeenCalledWith({ replace: true, to: '/' });
 	});
 
+	// The shell resolves `displaySelection` from its own router subscription, so
+	// while an archive tears this workspace down it can already name a sibling.
+	// Substituting it here rendered that sibling's whole workspace view under
+	// this URL — and `useActiveWorkspaceChatId` then refused the routed chat id
+	// as belonging to another workspace, which is the pairing that overwrites
+	// what the sibling remembered. A workspace the nav data no longer holds is
+	// gone, and the redirect is the answer to that.
+	it('redirects rather than rendering the shell selection under another URL', () => {
+		model.current = {
+			displayProjects: [
+				{
+					id: 'repo-1',
+					name: 'repo-1',
+					workspaces: [{ id: 'ws-b', name: 'ws-b' }],
+				},
+			] as unknown as WorkbenchLayoutModel['displayProjects'],
+			displaySelection: {
+				project: { id: 'repo-1', name: 'repo-1' },
+				source: 'route',
+				workspace: { id: 'ws-b', name: 'ws-b' },
+			} as unknown as WorkbenchLayoutModel['displaySelection'],
+		};
+
+		render(<WorkspaceWorkbenchLayout />);
+
+		expect(navigateSpy).toHaveBeenCalledWith({ replace: true, to: '/' });
+		expect(renderedChatId.current).toBeUndefined();
+	});
+
 	it('does not navigate when the selection resolves', () => {
 		const workspace = { id: 'ws-a', name: 'ws-a' };
 		model.current = {

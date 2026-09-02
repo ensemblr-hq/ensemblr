@@ -8,7 +8,7 @@ import {
 import {
 	useWorkspaceBoardActions,
 	useWorkspaceBoardStatus,
-	useWorkspaceIsArchiving,
+	useWorkspaceLifecycleRun,
 } from '@/renderer/state/workspace';
 import type { WorkspaceShellModel } from '@/renderer/types/workbench';
 
@@ -22,8 +22,9 @@ import type { WorkspaceShellModel } from '@/renderer/types/workbench';
  * be reused from the sidebar row — the menu acts on the *active* workspace,
  * whose row a collapsed sidebar or a filtered list may not render at all.
  *
- * Archive greys out while its own run is in flight, so the menu cannot start a
- * second one against a workspace already being torn down.
+ * Archive, delete and rename all grey out while an archive or a delete is in
+ * flight, so the menu cannot start a second run against a workspace already
+ * being torn down, or rename one that is about to stop existing.
  * @param workspace - The workspace currently on screen
  */
 export function useWorkspaceMenuCommands(workspace: WorkspaceShellModel): void {
@@ -33,20 +34,26 @@ export function useWorkspaceMenuCommands(workspace: WorkspaceShellModel): void {
 	const archiveWorkspace = useArchiveWorkspaceAction({
 		activeWorkspaceId: workspace.id,
 	});
-	const isArchiving = useWorkspaceIsArchiving(workspace.id);
+	const lifecycleRun = useWorkspaceLifecycleRun(workspace.id);
 
-	useMenuCommand('workspace.rename', () =>
-		requestLifecycleDialog({ kind: 'rename', workspace }),
+	const isTearingDown = lifecycleRun !== null;
+
+	useMenuCommand(
+		'workspace.rename',
+		() => requestLifecycleDialog({ kind: 'rename', workspace }),
+		!isTearingDown,
 	);
 	useMenuCommand(
 		'workspace.archive',
 		() => {
 			void archiveWorkspace(workspace);
 		},
-		!isArchiving,
+		!isTearingDown,
 	);
-	useMenuCommand('workspace.delete', () =>
-		requestLifecycleDialog({ kind: 'delete', workspace }),
+	useMenuCommand(
+		'workspace.delete',
+		() => requestLifecycleDialog({ kind: 'delete', workspace }),
+		!isTearingDown,
 	);
 
 	useMenuCommand('workspace.status.backlog', () =>

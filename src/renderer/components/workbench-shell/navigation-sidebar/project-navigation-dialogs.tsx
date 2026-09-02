@@ -82,6 +82,7 @@ export function useProjectNavigationDialogs(): {
 
 /** Mounts the sidebar lifecycle dialogs driven by the navigation actions hook. */
 export function ProjectNavigationDialogs({
+	activeWorkspaceId,
 	browseArchiveProject,
 	createSourceProject,
 	deleteProjectTarget,
@@ -97,6 +98,7 @@ export function ProjectNavigationDialogs({
 	setDeleteProjectTarget,
 	setDeleteWorkspaceTarget,
 }: {
+	activeWorkspaceId: string | null;
 	browseArchiveProject: ProjectShellModel | null;
 	createSourceProject: ProjectShellModel | null;
 	deleteProjectTarget: ProjectShellModel | null;
@@ -145,6 +147,7 @@ export function ProjectNavigationDialogs({
 			/>
 
 			<DeleteWorkspaceDialog
+				activeWorkspaceId={activeWorkspaceId}
 				onDeleted={onWorkspaceDeleted}
 				onOpenChange={(open) => {
 					if (!open) {

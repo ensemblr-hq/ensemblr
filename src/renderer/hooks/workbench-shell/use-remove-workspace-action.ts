@@ -105,3 +105,53 @@ export function useRemoveWorkspaceAction(options: {
 		[dropFromNavigation, forgetWorkspaceState],
 	);
 }
+
+/**
+ * The post-removal action for a surface that runs its teardown behind
+ * {@link useWorkspaceTeardownHop}, which leaves the active workspace *before*
+ * the IPC rather than after it.
+ *
+ * {@link useRemoveWorkspaceAction} skips its own `router.invalidate()` when the
+ * removed workspace is the active one, because losing the selection is what
+ * fires the layout's redirect and that redirect re-runs every loader. A hop
+ * spends that redirect up front, so by the time the workspace is actually gone
+ * there is nothing left to re-run the loaders — this adds back the one
+ * invalidation the redirect used to cover.
+ *
+ * Surfaces that tear down the active workspace *without* hopping first — the
+ * archive-after-merge mutation in `use-review-mutations.ts` — must keep using
+ * {@link useRemoveWorkspaceAction}: there the redirect still fires, and a second
+ * invalidation would race it into the index loader twice.
+ * @param options - Active workspace identity used to choose the route fallback.
+ * @returns One removal callback per lifecycle reason.
+ */
+export function useRemoveHoppedWorkspaceAction(options: {
+	activeWorkspaceId: string | null;
+}): WorkspaceRemovalActions {
+	const { activeWorkspaceId } = options;
+	const router = useRouter();
+	const removeWorkspace = useRemoveWorkspaceAction(options);
+
+	return useMemo(
+		() => ({
+			archived: async (archivedWorkspaceId: string) => {
+				await removeWorkspace.archived(archivedWorkspaceId);
+				if (activeWorkspaceId === archivedWorkspaceId) {
+					await router.invalidate();
+				}
+			},
+			deleted: async (deletedWorkspaceId: string) => {
+				await removeWorkspace.deleted(deletedWorkspaceId);
+				if (activeWorkspaceId === deletedWorkspaceId) {
+					await router.invalidate();
+				}
+			},
+		}),
+		[
+			activeWorkspaceId,
+			removeWorkspace.archived,
+			removeWorkspace.deleted,
+			router,
+		],
+	);
+}

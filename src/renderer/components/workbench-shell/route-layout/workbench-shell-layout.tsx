@@ -1,5 +1,6 @@
 import { Outlet, useChildMatches } from '@tanstack/react-router';
 import { useAtom } from 'jotai';
+import { useMemo } from 'react';
 import { ConciergeLauncher } from '@/renderer/components/concierge';
 import { CloneGithubDialog } from '@/renderer/components/welcome/clone-github-dialog';
 import { LocalProjectImportDialog } from '@/renderer/components/welcome/local-project-import-dialog';
@@ -19,19 +20,15 @@ import { useReconcileUnreadChats } from '@/renderer/hooks/workspace/use-reconcil
 import { useReconcileWorkspaceState } from '@/renderer/hooks/workspace/use-reconcile-workspace-state';
 import { useRouteProfilerMount } from '@/renderer/lib/instrumentation';
 import {
-	getStringRouteParam,
-	getWorkbenchStaticView,
-	isWorkbenchActiveView,
+	packWorkbenchShellRouteState,
+	unpackWorkbenchShellRouteState,
 } from '@/renderer/lib/workbench';
 import {
 	cloneDialogOpenAtom,
 	localProjectImportDialogOpenAtom,
 	quickStartDialogOpenAtom,
 } from '@/renderer/state/dialogs';
-import type {
-	WorkbenchChildMatch,
-	WorkbenchShellRouteState,
-} from '@/renderer/types/components';
+import type { WorkbenchShellRouteState } from '@/renderer/types/components';
 import { WorkbenchLayoutModelProvider } from '../shell-contexts';
 import { AgentControlWorkspaceFocusBridge } from './agent-control-workspace-focus-bridge';
 import { NotificationFocusBridge } from './notification-focus-bridge';
@@ -97,40 +94,31 @@ export function WorkbenchShellLayout() {
 	);
 }
 
-/** Derives the active workbench view + URL params from the current router match. */
+/**
+ * Derives the active workbench view + URL params from the current router match.
+ *
+ * The selector packs its answer into one string and this unpacks it, which is a
+ * render-count constraint rather than a style choice — see
+ * {@link packWorkbenchShellRouteState}. Selecting the matches themselves handed
+ * back a fresh array on every router-state notification, so the shell, its
+ * frame, its sidebar and every workspace row re-rendered for router activity
+ * that changed nothing, which is what made a burst of workspace switches during
+ * an archive read as the chrome coming apart.
+ * @returns The active view plus the routed project and workspace ids
+ */
 function useWorkbenchShellRouteState(): WorkbenchShellRouteState {
-	const childMatches = useChildMatches({
-		select: (matches): WorkbenchChildMatch[] =>
-			matches.map((match) => ({
-				params: match.params as unknown as Record<string, unknown>,
-				view: getWorkbenchStaticView(match.staticData),
-			})),
+	const packedRouteState = useChildMatches({
+		select: (matches) =>
+			packWorkbenchShellRouteState(
+				matches.map((match) => ({
+					params: match.params as unknown as Record<string, unknown>,
+					staticData: match.staticData,
+				})),
+			),
 	});
-	const viewMatch = [...childMatches]
-		.reverse()
-		.find((match) => isWorkbenchActiveView(match.view));
-	const view = isWorkbenchActiveView(viewMatch?.view)
-		? viewMatch.view
-		: 'welcome';
 
-	if (view !== 'workspace') {
-		return { view };
-	}
-
-	const workspaceMatch = [...childMatches]
-		.reverse()
-		.find(
-			(match) =>
-				getStringRouteParam(match.params, 'projectId') &&
-				getStringRouteParam(match.params, 'workspaceId'),
-		);
-
-	return {
-		routeProjectId: getStringRouteParam(workspaceMatch?.params, 'projectId'),
-		routeWorkspaceId: getStringRouteParam(
-			workspaceMatch?.params,
-			'workspaceId',
-		),
-		view,
-	};
+	return useMemo(
+		() => unpackWorkbenchShellRouteState(packedRouteState),
+		[packedRouteState],
+	);
 }

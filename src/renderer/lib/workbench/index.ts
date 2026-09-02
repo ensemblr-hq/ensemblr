@@ -47,6 +47,8 @@ export { normalizeWorkbenchSearch } from './route-search';
 export {
 	getStringRouteParam,
 	getWorkbenchStaticView,
+	packWorkbenchShellRouteState,
+	unpackWorkbenchShellRouteState,
 } from './route-utils';
 export { loadWorkbenchShellData } from './shell-data-loader';
 export { getWorkbenchStaticRoute } from './static-navigation';

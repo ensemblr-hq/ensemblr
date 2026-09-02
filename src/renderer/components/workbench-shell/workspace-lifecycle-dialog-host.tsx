@@ -1,9 +1,8 @@
-import { useRouter } from '@tanstack/react-router';
 import { useAtom } from 'jotai';
 import { useCallback, useEffect, useState } from 'react';
 
 import { useArchivedWorkspaceToast } from '@/renderer/hooks/workbench-shell/use-archive-workspace-action';
-import { useRemoveWorkspaceAction } from '@/renderer/hooks/workbench-shell/use-remove-workspace-action';
+import { useRemoveHoppedWorkspaceAction } from '@/renderer/hooks/workbench-shell/use-remove-workspace-action';
 import type { ArchivedWorkspace } from '@/renderer/lib/workbench/archive-worktree-plan';
 import {
 	type WorkspaceLifecycleDialogRequest,
@@ -31,8 +30,7 @@ export function WorkspaceLifecycleDialogHost({
 	activeWorkspaceId: string | null;
 }) {
 	const [request, setRequest] = useAtom(workspaceLifecycleDialogAtom);
-	const router = useRouter();
-	const handleWorkspaceRemoved = useRemoveWorkspaceAction({
+	const handleWorkspaceRemoved = useRemoveHoppedWorkspaceAction({
 		activeWorkspaceId,
 	});
 	const announceArchived = useArchivedWorkspaceToast();
@@ -66,20 +64,9 @@ export function WorkspaceLifecycleDialogHost({
 	const handleArchived = useCallback(
 		async (archived: ArchivedWorkspace) => {
 			await handleWorkspaceRemoved.archived(archived.workspaceId);
-			// `handleWorkspaceRemoved` skips its own invalidation for the active
-			// workspace, on the assumption the layout's redirect will re-run every
-			// loader — which the dialog's hop off the workspace already spent.
-			if (activeWorkspaceId === archived.workspaceId) {
-				await router.invalidate();
-			}
 			announceArchived(archived);
 		},
-		[
-			activeWorkspaceId,
-			announceArchived,
-			handleWorkspaceRemoved.archived,
-			router,
-		],
+		[announceArchived, handleWorkspaceRemoved.archived],
 	);
 
 	return (
@@ -92,6 +79,7 @@ export function WorkspaceLifecycleDialogHost({
 				workspace={workspace}
 			/>
 			<DeleteWorkspaceDialog
+				activeWorkspaceId={activeWorkspaceId}
 				onDeleted={handleWorkspaceRemoved.deleted}
 				onOpenChange={closeOnDismiss}
 				open={request?.kind === 'delete'}
