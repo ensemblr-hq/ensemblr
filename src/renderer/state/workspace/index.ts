@@ -92,10 +92,10 @@ export {
 	viewedChangesByWorkspaceAtom,
 } from './viewed-changes';
 export {
-	getArchivingWorkspaceIds,
-	useArchivingWorkspaceActions,
-	useWorkspaceIsArchiving,
-} from './workspace-archiving';
+	getUnavailableWorkspaceIds,
+	useWorkspaceLifecycleRun,
+	useWorkspaceLifecycleRunActions,
+} from './workspace-lifecycle-runs';
 export {
 	forgetWorkspaceStateAtom,
 	pruneWorkspaceStateAtom,

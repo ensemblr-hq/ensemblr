@@ -13,7 +13,7 @@ import {
 	useDeleteProjectAction,
 } from '@/renderer/hooks/workbench-shell/navigation-sidebar/use-project-navigation-actions';
 import { useArchiveWorkspaceAction } from '@/renderer/hooks/workbench-shell/use-archive-workspace-action';
-import { useRemoveWorkspaceAction } from '@/renderer/hooks/workbench-shell/use-remove-workspace-action';
+import { useRemoveHoppedWorkspaceAction } from '@/renderer/hooks/workbench-shell/use-remove-workspace-action';
 import {
 	useMenuCommand,
 	useMenuDynamicEntries,
@@ -84,7 +84,7 @@ export function ProjectNavigationGroups({
 
 	// The delete dialog decides which IPC ran; this callback only sees the
 	// workspace id that disappeared from the active surface.
-	const handleWorkspaceLifecycleAction = useRemoveWorkspaceAction({
+	const handleWorkspaceLifecycleAction = useRemoveHoppedWorkspaceAction({
 		activeWorkspaceId: activeWorkspace?.id ?? null,
 	});
 	const archiveWorkspace = useArchiveWorkspaceAction({
@@ -221,6 +221,7 @@ export function ProjectNavigationGroups({
 			</ReorderList>
 
 			<ProjectNavigationDialogs
+				activeWorkspaceId={activeWorkspace?.id ?? null}
 				browseArchiveProject={state.browseArchiveProject}
 				createSourceProject={state.createSourceProject}
 				deleteProjectTarget={state.deleteProjectTarget}

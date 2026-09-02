@@ -14,14 +14,53 @@ import { useWorkspaceBusy } from '@/renderer/hooks/workspace/use-workspace-busy'
 import { cn } from '@/renderer/lib/utils';
 import { getWorkspaceSidebarState } from '@/renderer/lib/workbench';
 import {
-	useWorkspaceIsArchiving,
 	useWorkspaceIsUnread,
+	useWorkspaceLifecycleRun,
 } from '@/renderer/state/workspace';
-import type { WorkspaceSidebarStateKind } from '@/renderer/types/components';
+import type {
+	WorkspaceLifecycleRun,
+	WorkspaceSidebarStateKind,
+} from '@/renderer/types/components';
 import type { WorkspaceShellModel } from '@/renderer/types/workbench';
 import { BoardDropIndicator } from './board-drop-indicator';
 import { useBoardWorkspaceMenuController } from './board-workspace-menu';
 import { useCardDnd } from './use-card-dnd';
+
+/**
+ * What a card announces while a teardown holds it: which run, or the ordinary
+ * open label when none does.
+ * @param t - Translation function from `useTranslation`
+ * @param lifecycleRun - The destructive run against this workspace, when there is one
+ * @param workspaceName - Name of the workspace the card stands for
+ * @returns The button's aria label
+ */
+function teardownCardLabel(
+	t: TFunction,
+	lifecycleRun: WorkspaceLifecycleRun | null,
+	workspaceName: string,
+): string {
+	if (lifecycleRun === 'archiving') {
+		return t(
+			'workbench:workspace-item.archiving-aria',
+			'Workspace {{workspace}} is being archived',
+			{ workspace: workspaceName },
+		);
+	}
+	if (lifecycleRun === 'deleting') {
+		return t(
+			'workbench:workspace-item.deleting-aria',
+			'Workspace {{workspace}} is being deleted',
+			{ workspace: workspaceName },
+		);
+	}
+	return t(
+		'workbench:workspace-item.open-aria',
+		'Open workspace {{workspace}}',
+		{
+			workspace: workspaceName,
+		},
+	);
+}
 
 /**
  * Draggable board card for a single workspace. Dragging it to another column
@@ -33,11 +72,11 @@ import { useCardDnd } from './use-card-dnd';
  * Keeps its grab cursor under every sort: a non-manual sort only takes away
  * in-column reordering, and the card still drags between columns.
  *
- * A card whose archive is running dims and stops answering altogether — not
- * openable, not draggable, not a drop target, and outside the context menu, the
- * same way the sidebar row is. The workspace is leaving the board, so a status
- * it is dragged into lands on nothing and every lifecycle action in the menu
- * would fire a second run against it.
+ * A card whose archive or delete is running dims and stops answering altogether
+ * — not openable, not draggable, not a drop target, and outside the context
+ * menu, the same way the sidebar row is. The workspace is leaving the board, so
+ * a status it is dragged into lands on nothing and every lifecycle action in the
+ * menu would fire a second run against it.
  */
 export function WorkspaceCard({
 	allowReorder,
@@ -53,7 +92,8 @@ export function WorkspaceCard({
 	const { t } = useTranslation();
 	const menu = useBoardWorkspaceMenuController();
 	const isUnread = useWorkspaceIsUnread(workspace.id);
-	const isArchiving = useWorkspaceIsArchiving(workspace.id);
+	const lifecycleRun = useWorkspaceLifecycleRun(workspace.id);
+	const isTearingDown = lifecycleRun !== null;
 	const hasDiffStats =
 		workspace.changeSummary.additions > 0 ||
 		workspace.changeSummary.deletions > 0;
@@ -61,23 +101,15 @@ export function WorkspaceCard({
 		allowReorder,
 		cardId: workspace.id,
 		cardKind: 'workspace',
-		disabled: isArchiving,
+		disabled: isTearingDown,
 	});
-	const openLabel = isArchiving
-		? t(
-				'workbench:workspace-item.archiving-aria',
-				'Workspace {{workspace}} is being archived',
-				{ workspace: workspace.name },
-			)
-		: t('workbench:workspace-item.open-aria', 'Open workspace {{workspace}}', {
-				workspace: workspace.name,
-			});
+	const openLabel = teardownCardLabel(t, lifecycleRun, workspace.name);
 
 	const card = (
 		<div
 			className={cn(
 				'relative transition-opacity',
-				isArchiving
+				isTearingDown
 					? 'cursor-default opacity-60'
 					: 'cursor-grab active:cursor-grabbing',
 				isDragging && 'opacity-50',
@@ -89,7 +121,7 @@ export function WorkspaceCard({
 				<button
 					aria-label={openLabel}
 					className='flex w-full flex-col gap-2 px-3 py-2.5 text-left focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50'
-					disabled={isArchiving}
+					disabled={isTearingDown}
 					onClick={onOpen}
 					type='button'
 				>
@@ -117,7 +149,7 @@ export function WorkspaceCard({
 		</div>
 	);
 
-	if (isArchiving) {
+	if (isTearingDown) {
 		return card;
 	}
 
@@ -180,6 +212,8 @@ function workspaceStateLabel(
 				'workbench:dashboard.card.state.workspace-archiving',
 				'archiving',
 			);
+		case 'workspace-deleting':
+			return t('workbench:dashboard.card.state.workspace-deleting', 'deleting');
 		case 'workspace-blocked':
 			return t(
 				'workbench:dashboard.card.state.workspace-blocked',

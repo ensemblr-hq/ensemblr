@@ -7,6 +7,8 @@ import {
 	claimLifecycleRun,
 	releaseLifecycleRun,
 } from '@/renderer/lib/workbench/lifecycle-run-latch';
+import { useWorkspaceLifecycleRunActions } from '@/renderer/state/workspace';
+import type { WorkspaceLifecycleRun } from '@/renderer/types/components';
 
 /**
  * The diagnostic shape every lifecycle result carries: a code the renderer
@@ -32,6 +34,12 @@ interface LifecycleResult<TDiagnostic extends LifecycleDiagnostic> {
 	status: LifecycleStatus;
 }
 
+/** Which destructive run to show against which workspace for the action's whole span. */
+interface LifecycleRunMark {
+	kind: WorkspaceLifecycleRun;
+	workspaceId: string;
+}
+
 /**
  * Drives one archive or delete confirmation dialog: runs the IPC, keeps the
  * failure diagnostics it reports, and takes the modal down before the caller's
@@ -40,19 +48,28 @@ interface LifecycleResult<TDiagnostic extends LifecycleDiagnostic> {
  * A rejected IPC — a denied permission gate, a wedged main process — is folded
  * into the same failure diagnostics as a reported one, so the dialog can never
  * sit on "Deleting…" with nothing to show and no way forward.
- * @param options - The IPC to run, how to word an unexpected error, the key that identifies this run, the dialog's open setter, and the post-removal work
+ *
+ * The visual run mark is set here rather than by the caller because it has to
+ * be paired with the re-entrancy claim below. Marking outside this hook meant a
+ * second confirm that the claim *refused* still ran its own `finally` and
+ * cleared the mark the first, still-running teardown owned — dropping the row's
+ * "Deleting…" and re-opening every action against a workspace whose worktree
+ * was still coming apart.
+ * @param options - The IPC to run, how to word an unexpected error, the key that identifies this run, the run to mark on the workspace, the dialog's open setter, and the post-removal work
  * @returns The diagnostics to render, whether the IPC is still in flight, and the action to fire
  */
 export function useLifecycleDialogAction<
 	TDiagnostic extends LifecycleDiagnostic,
 >({
 	failure,
+	lifecycleRun,
 	onOpenChange,
 	onSucceeded,
 	operationKey,
 	run,
 }: {
 	failure: (message: string) => TDiagnostic;
+	lifecycleRun?: LifecycleRunMark;
 	onOpenChange: (open: boolean) => void;
 	onSucceeded: () => Promise<void> | void;
 	operationKey: string;
@@ -64,6 +81,8 @@ export function useLifecycleDialogAction<
 } {
 	const [isBusy, setIsBusy] = useState(false);
 	const [diagnostics, setDiagnostics] = useState<TDiagnostic[]>([]);
+	const { clearLifecycleRun, markLifecycleRun } =
+		useWorkspaceLifecycleRunActions();
 
 	const start = async (): Promise<void> => {
 		if (!claimLifecycleRun(operationKey)) {
@@ -73,6 +92,9 @@ export function useLifecycleDialogAction<
 			// detail to add beyond the code the dialog already translates.
 			setDiagnostics([failure('')]);
 			return;
+		}
+		if (lifecycleRun) {
+			markLifecycleRun(lifecycleRun.workspaceId, lifecycleRun.kind);
 		}
 		setIsBusy(true);
 		setDiagnostics([]);
@@ -106,6 +128,13 @@ export function useLifecycleDialogAction<
 			);
 		} finally {
 			setIsBusy(false);
+			// Held until here rather than released with the latch above: the row has
+			// to keep saying "Archiving…" / "Deleting…" until the workspace has
+			// actually left the list, which is the post-removal work `onSucceeded`
+			// just did.
+			if (lifecycleRun) {
+				clearLifecycleRun(lifecycleRun.workspaceId);
+			}
 		}
 	};
 

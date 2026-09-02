@@ -104,6 +104,7 @@ function ReopenableHost({
 				reopen
 			</button>
 			<DeleteWorkspaceDialog
+				activeWorkspaceId={null}
 				onDeleted={onDeleted}
 				onOpenChange={setOpen}
 				open={open}

@@ -9,6 +9,7 @@ export type {
 } from './route-match';
 export type { WorkspaceMainContentState } from './workspace-main-content';
 export type {
+	WorkspaceLifecycleRun,
 	WorkspaceSidebarState,
 	WorkspaceSidebarStateKind,
 } from './workspace-sidebar';

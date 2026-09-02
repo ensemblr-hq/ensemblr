@@ -37,7 +37,7 @@ import { shellFixtureProjects } from '../../src/renderer/fixtures/workbench';
 import { useNavigateToLastUnread } from '../../src/renderer/hooks/workbench-shell/composer/use-navigate-to-last-unread';
 import type { UnreadChatEntry } from '../../src/renderer/state/unread';
 import { unreadChatEntriesAtom } from '../../src/renderer/state/unread/atoms';
-import { archivingWorkspaceIdsAtom } from '../../src/renderer/state/workspace/workspace-archiving';
+import { workspaceLifecycleRunsAtom } from '../../src/renderer/state/workspace/workspace-lifecycle-runs';
 import type { WorkbenchLayoutModel } from '../../src/renderer/types/workbench-shell';
 import { createTestQueryClient } from './support/dom';
 
@@ -180,7 +180,10 @@ test('does not navigate when no project holds the marked workspace', async () =>
 // mark survives because a vetoed archive leaves the workspace — and the unread
 // chat in it — whole.
 test('refuses a jump into a workspace being archived, keeping the mark', async () => {
-	getDefaultStore().set(archivingWorkspaceIdsAtom, new Set([workspace.id]));
+	getDefaultStore().set(
+		workspaceLifecycleRunsAtom,
+		new Map([[workspace.id, 'archiving' as const]]),
+	);
 	const mark = target('tab-7');
 	const { result, store } = renderNavigate([mark]);
 
@@ -195,5 +198,5 @@ test('refuses a jump into a workspace being archived, keeping the mark', async (
 });
 
 afterEach(() => {
-	getDefaultStore().set(archivingWorkspaceIdsAtom, new Set<string>());
+	getDefaultStore().set(workspaceLifecycleRunsAtom, new Map());
 });

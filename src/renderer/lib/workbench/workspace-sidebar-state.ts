@@ -8,13 +8,16 @@ import {
 	LoaderCircleIcon,
 } from 'lucide-react';
 
-import type { WorkspaceSidebarState } from '@/renderer/types/components';
+import type {
+	WorkspaceLifecycleRun,
+	WorkspaceSidebarState,
+} from '@/renderer/types/components';
 import type { WorkspaceShellModel } from '@/renderer/types/workbench';
 
 /**
  * Derives the icon and tone for a workspace sidebar row from its status.
  *
- * An archive that is running outranks everything else the row could say: the
+ * A destructive lifecycle run outranks everything else the row could say: the
  * workspace is being torn down, so a pull-request verdict or an agent turn from
  * a moment ago describes a state it is leaving.
  * @param workspace - The workspace the row stands for
@@ -23,14 +26,20 @@ import type { WorkspaceShellModel } from '@/renderer/types/workbench';
  */
 export function getWorkspaceSidebarState(
 	workspace: WorkspaceShellModel,
-	options: { agentBusy?: boolean; isArchiving?: boolean } = {},
+	options: {
+		agentBusy?: boolean;
+		lifecycleRun?: WorkspaceLifecycleRun | null;
+	} = {},
 ): WorkspaceSidebarState {
-	if (options.isArchiving) {
+	if (options.lifecycleRun) {
 		return {
 			className: 'text-muted-foreground',
 			icon: LoaderCircleIcon,
 			isSpinning: true,
-			kind: 'workspace-archiving',
+			kind:
+				options.lifecycleRun === 'deleting'
+					? 'workspace-deleting'
+					: 'workspace-archiving',
 		};
 	}
 

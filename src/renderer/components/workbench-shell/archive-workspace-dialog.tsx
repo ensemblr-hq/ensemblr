@@ -17,14 +17,13 @@ import {
 } from '@/renderer/components/ui/dialog';
 import { LifecycleDialogActions } from '@/renderer/components/workbench-shell/lifecycle-dialog-actions';
 import { LifecycleSummary } from '@/renderer/components/workbench-shell/lifecycle-summary';
-import { useArchiveWorkspaceHop } from '@/renderer/hooks/workbench-shell/use-archive-workspace-hop';
 import { useLifecycleDialogAction } from '@/renderer/hooks/workbench-shell/use-lifecycle-dialog-action';
+import { useWorkspaceTeardownHop } from '@/renderer/hooks/workbench-shell/use-workspace-teardown-hop';
 import {
 	type ArchivedWorkspace,
 	resolveArchiveWorktreePlan,
 } from '@/renderer/lib/workbench/archive-worktree-plan';
 import { workspaceSummaryRows } from '@/renderer/lib/workbench/lifecycle-summary-rows';
-import { useArchivingWorkspaceActions } from '@/renderer/state/workspace';
 import type { WorkspaceShellModel } from '@/renderer/types/workbench';
 import type { ArchiveWorkspaceDiagnostic } from '@/shared/ipc/contracts/workspace';
 
@@ -187,10 +186,9 @@ function ArchiveWorkspaceDialogForm({
 	workspace: WorkspaceShellModel;
 }) {
 	const { t } = useTranslation();
-	const archiveAwayFromWorkspace = useArchiveWorkspaceHop({
+	const archiveAwayFromWorkspace = useWorkspaceTeardownHop({
 		activeWorkspaceId,
 	});
-	const { clearArchiving, markArchiving } = useArchivingWorkspaceActions();
 	// The worktree being archived is the checkout whose committed
 	// `.ensemblr/settings.toml` applies to this branch, so resolve against it
 	// rather than the repository root.
@@ -210,6 +208,7 @@ function ArchiveWorkspaceDialogForm({
 	});
 	const { diagnostics, isBusy, start } = useLifecycleDialogAction({
 		failure: archiveWorkspaceFailure,
+		lifecycleRun: { kind: 'archiving', workspaceId: workspace.id },
 		onOpenChange,
 		onSucceeded: () =>
 			onArchived({
@@ -222,18 +221,6 @@ function ArchiveWorkspaceDialogForm({
 				archiveWorkspace({ ...plan, workspaceId: workspace.id }),
 			),
 	});
-
-	// `start` resolves only once the post-removal work has run, so marking around
-	// it is what keeps the row saying "Archiving…" until it has left the list —
-	// the same span the unconfirmed path marks.
-	const startArchive = useCallback(async () => {
-		markArchiving(workspace.id);
-		try {
-			await start();
-		} finally {
-			clearArchiving(workspace.id);
-		}
-	}, [clearArchiving, markArchiving, start, workspace.id]);
 
 	// Archiving before the resolver answers would silently skip the cleanup the
 	// setting asked for, because an unanswered query reads as `false`. A resolver
@@ -282,7 +269,7 @@ function ArchiveWorkspaceDialogForm({
 				diagnostics={diagnostics}
 				diagnosticsTestId='archive-workspace-diagnostics'
 				isBusy={isBusy}
-				onAct={startArchive}
+				onAct={start}
 				onClose={handleClose}
 			/>
 		</>

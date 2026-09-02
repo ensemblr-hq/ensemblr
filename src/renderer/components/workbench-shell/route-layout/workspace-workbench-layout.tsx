@@ -26,12 +26,19 @@ export function WorkspaceWorkbenchLayout() {
 	const params = workspaceRouteApi.useParams();
 	const search = workspaceRouteApi.useSearch();
 	const navigate = useNavigate();
-	const selection =
-		findWorkspaceNavigationSelection(
-			model.displayProjects,
-			params.projectId,
-			params.workspaceId,
-		) ?? model.displaySelection;
+	// Only the routed workspace, never the shell's held selection as a fallback.
+	// The shell resolves that from its own router subscription, so while an
+	// archive is tearing this workspace down it can already name a sibling — and
+	// substituting it rendered that sibling's whole workspace view under this
+	// URL, with a chat id `useActiveWorkspaceChatId` then refused as belonging to
+	// another workspace, which is the pairing that overwrites what the sibling
+	// remembered. A workspace the nav data no longer holds is gone; the redirect
+	// below is the answer to that, not a stand-in workspace.
+	const selection = findWorkspaceNavigationSelection(
+		model.displayProjects,
+		params.projectId,
+		params.workspaceId,
+	);
 	const chatId = useActiveWorkspaceChatId(selection?.workspace.id);
 	const isSelectionMissing = !selection;
 

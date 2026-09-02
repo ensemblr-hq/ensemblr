@@ -499,6 +499,7 @@
 				"workspace-archiving": "αρχειοθετείται",
 				"workspace-blocked": "ο χώρος εργασίας είναι αποκλεισμένος",
 				"workspace-checking": "εκτελούνται έλεγχοι χώρου εργασίας",
+				"workspace-deleting": "διαγράφεται",
 				"workspace-working": "ο πράκτορας εργάζεται"
 			}
 		},
@@ -1292,6 +1293,9 @@
 		"creating": "Δημιουργία χώρου εργασίας…",
 		"creating-aria": "Ο χώρος εργασίας {{workspace}} δημιουργείται",
 		"creating-tooltip": "Ο {{workspace}} δημιουργείται",
+		"deleting": "Διαγραφή…",
+		"deleting-aria": "Ο χώρος εργασίας {{workspace}} διαγράφεται",
+		"deleting-tooltip": "Ο {{workspace}} διαγράφεται",
 		"dock-activity": "Εκτελείται δραστηριότητα στο dock",
 		"open-aria": "Άνοιγμα χώρου εργασίας {{workspace}}",
 		"open-busy-aria": "Άνοιγμα χώρου εργασίας {{workspace}}· εκτελείται δραστηριότητα στο dock",

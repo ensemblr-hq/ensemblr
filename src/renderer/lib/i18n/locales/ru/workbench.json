@@ -517,6 +517,7 @@
 				"workspace-archiving": "архивируется",
 				"workspace-blocked": "рабочее пространство заблокировано",
 				"workspace-checking": "проверки рабочего пространства выполняются",
+				"workspace-deleting": "удаляется",
 				"workspace-working": "агент работает"
 			}
 		},
@@ -1338,6 +1339,9 @@
 		"creating": "Создание рабочего пространства…",
 		"creating-aria": "Рабочее пространство {{workspace}} создаётся",
 		"creating-tooltip": "{{workspace}} создаётся",
+		"deleting": "Удаление…",
+		"deleting-aria": "Рабочее пространство {{workspace}} удаляется",
+		"deleting-tooltip": "{{workspace}} удаляется",
 		"dock-activity": "В доке идёт активность",
 		"open-aria": "Открыть рабочее пространство {{workspace}}",
 		"open-busy-aria": "Открыть рабочее пространство {{workspace}}; в доке идёт активность",
