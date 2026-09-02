@@ -6,16 +6,16 @@ import {
 	useState,
 } from 'react';
 
+import { useArchiveWorkspaceAction } from '@/renderer/hooks/workbench-shell/use-archive-workspace-action';
 import { useRemoveWorkspaceAction } from '@/renderer/hooks/workbench-shell/use-remove-workspace-action';
 import type { WorkspaceShellModel } from '@/renderer/types/workbench';
 
-import { ArchiveWorkspaceDialog } from '../archive-workspace-dialog';
 import { DeleteWorkspaceDialog } from '../delete-workspace-dialog';
 import { RenameWorkspaceDialog } from '../rename-workspace-dialog';
 
-/** Per-workspace openers for the board card's archive, delete, and rename dialogs. */
+/** Per-workspace board card actions: archive outright, or open the delete and rename dialogs. */
 export interface BoardWorkspaceMenuController {
-	openArchive: (workspace: WorkspaceShellModel) => void;
+	archive: (workspace: WorkspaceShellModel) => void;
 	openDelete: (workspace: WorkspaceShellModel) => void;
 	openRename: (workspace: WorkspaceShellModel) => void;
 }
@@ -58,17 +58,17 @@ export function useBoardWorkspaceMenuController(): BoardWorkspaceMenuController 
 }
 
 /**
- * Owns the archive, delete, and rename dialog state for the dashboard board so
- * every card can trigger the same workspace lifecycle actions the sidebar uses,
- * without each card mounting its own dialogs.
+ * Owns the delete and rename dialog state for the dashboard board so every card
+ * can trigger the same workspace lifecycle actions the sidebar uses, without
+ * each card mounting its own dialogs. Archiving needs no dialog of its own — it
+ * runs straight from the card and escalates to the shell's archive dialog only
+ * for the archives that cannot be taken back.
  * @returns A controller the cards call plus the dialog node to mount once.
  */
 export function useBoardWorkspaceMenu(): {
 	controller: BoardWorkspaceMenuController;
 	dialogs: ReactNode;
 } {
-	const [archiveTarget, setArchiveTarget] =
-		useState<WorkspaceShellModel | null>(null);
 	const [deleteTarget, setDeleteTarget] = useState<WorkspaceShellModel | null>(
 		null,
 	);
@@ -79,28 +79,23 @@ export function useBoardWorkspaceMenu(): {
 	const handleWorkspaceLifecycleAction = useRemoveWorkspaceAction({
 		activeWorkspaceId: null,
 	});
+	const archiveWorkspace = useArchiveWorkspaceAction({
+		activeWorkspaceId: null,
+	});
 
 	const controller = useMemo<BoardWorkspaceMenuController>(
 		() => ({
-			openArchive: setArchiveTarget,
+			archive: (workspace) => {
+				void archiveWorkspace(workspace);
+			},
 			openDelete: setDeleteTarget,
 			openRename: setRenameTarget,
 		}),
-		[],
+		[archiveWorkspace],
 	);
 
 	const dialogs = (
 		<>
-			<ArchiveWorkspaceDialog
-				onArchived={handleWorkspaceLifecycleAction.archived}
-				onOpenChange={(open) => {
-					if (!open) {
-						setArchiveTarget(null);
-					}
-				}}
-				open={archiveTarget !== null}
-				workspace={archiveTarget}
-			/>
 			<DeleteWorkspaceDialog
 				onDeleted={handleWorkspaceLifecycleAction.deleted}
 				onOpenChange={(open) => {

@@ -35,7 +35,9 @@
 		"description-keep": "Marks the workspace as archived and preserves its <0>.context/</0> handoff files under <1>archived-contexts/</1>. The worktree folder and local branch stay on disk; nothing is committed or pushed.",
 		"description-reclaim": "Marks the workspace as archived and preserves its <0>.context/</0> handoff files under <1>archived-contexts/</1>. The worktree folder is removed to reclaim its disk, keeping the branch and a snapshot of any uncommitted changes; unarchiving restores both and rebuilds dependencies.",
 		"settings-unavailable": "Your git settings could not be read, so the worktree folder and local branch will be kept.",
-		"title": "Archive workspace?"
+		"title": "Archive workspace?",
+		"uncommitted_one": "This workspace has {{count}} uncommitted change that archiving will not commit or push.",
+		"uncommitted_other": "This workspace has {{count}} uncommitted changes that archiving will not commit or push."
 	},
 	"attach-to-chat": {
 		"attached": "{{label}} is attached to the chat.",

@@ -12,6 +12,7 @@ import {
 	useCreateWorkspaceFromProject,
 	useDeleteProjectAction,
 } from '@/renderer/hooks/workbench-shell/navigation-sidebar/use-project-navigation-actions';
+import { useArchiveWorkspaceAction } from '@/renderer/hooks/workbench-shell/use-archive-workspace-action';
 import { useRemoveWorkspaceAction } from '@/renderer/hooks/workbench-shell/use-remove-workspace-action';
 import {
 	useMenuCommand,
@@ -74,7 +75,6 @@ export function ProjectNavigationGroups({
 
 	const {
 		controller,
-		setArchiveWorkspaceTarget,
 		setBrowseArchiveProject,
 		setCreateSourceProject,
 		setDeleteProjectTarget,
@@ -82,11 +82,12 @@ export function ProjectNavigationGroups({
 		state,
 	} = useProjectNavigationDialogs();
 
-	// A workspace archive and a workspace delete share the same post-action cache
-	// invalidation + navigation fallback. The dialogs decide which IPC ran; the
-	// callback only sees the workspace id that disappeared from the active
-	// surface.
+	// The delete dialog decides which IPC ran; this callback only sees the
+	// workspace id that disappeared from the active surface.
 	const handleWorkspaceLifecycleAction = useRemoveWorkspaceAction({
+		activeWorkspaceId: activeWorkspace?.id ?? null,
+	});
+	const archiveWorkspace = useArchiveWorkspaceAction({
 		activeWorkspaceId: activeWorkspace?.id ?? null,
 	});
 
@@ -203,9 +204,9 @@ export function ProjectNavigationGroups({
 							onStaticNavigationSelect={onStaticNavigationSelect}
 							onWorkspacePinToggle={toggleWorkspacePinned}
 							onWorkspaceRenameSelect={onWorkspaceRenameSelect}
-							onWorkspaceArchiveSelect={(workspace) =>
-								controller.openArchiveWorkspace(workspace)
-							}
+							onWorkspaceArchiveSelect={(workspace) => {
+								void archiveWorkspace(workspace);
+							}}
 							onWorkspaceDeleteSelect={(workspace) =>
 								controller.openDeleteWorkspace(workspace)
 							}
@@ -220,7 +221,6 @@ export function ProjectNavigationGroups({
 			</ReorderList>
 
 			<ProjectNavigationDialogs
-				archiveWorkspaceTarget={state.archiveWorkspaceTarget}
 				browseArchiveProject={state.browseArchiveProject}
 				createSourceProject={state.createSourceProject}
 				deleteProjectTarget={state.deleteProjectTarget}
@@ -233,10 +233,8 @@ export function ProjectNavigationGroups({
 					onWorkspaceSelect(project.id, workspaceId);
 				}}
 				onProjectDeleted={handleProjectDeleted}
-				onWorkspaceArchived={handleWorkspaceLifecycleAction.archived}
 				onWorkspaceDeleted={handleWorkspaceLifecycleAction.deleted}
 				orderedProjects={orderedProjects}
-				setArchiveWorkspaceTarget={setArchiveWorkspaceTarget}
 				setBrowseArchiveProject={setBrowseArchiveProject}
 				setCreateSourceProject={setCreateSourceProject}
 				setDeleteProjectTarget={setDeleteProjectTarget}

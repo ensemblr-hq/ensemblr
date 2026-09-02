@@ -6,6 +6,7 @@ import {
 	archiveWorkspace,
 	isEnsemblrApiAvailable,
 	reviewMergeSettingsQuery,
+	workspaceGitStatusQuery,
 } from '@/renderer/api/ensemblr-queries';
 import {
 	Dialog,
@@ -17,6 +18,10 @@ import {
 import { LifecycleDialogActions } from '@/renderer/components/workbench-shell/lifecycle-dialog-actions';
 import { LifecycleSummary } from '@/renderer/components/workbench-shell/lifecycle-summary';
 import { useLifecycleDialogAction } from '@/renderer/hooks/workbench-shell/use-lifecycle-dialog-action';
+import {
+	type ArchivedWorkspace,
+	resolveArchiveWorktreePlan,
+} from '@/renderer/lib/workbench/archive-worktree-plan';
 import { workspaceSummaryRows } from '@/renderer/lib/workbench/lifecycle-summary-rows';
 import type { WorkspaceShellModel } from '@/renderer/types/workbench';
 import type { ArchiveWorkspaceDiagnostic } from '@/shared/ipc/contracts/workspace';
@@ -28,6 +33,12 @@ import type { ArchiveWorkspaceDiagnostic } from '@/shared/ipc/contracts/workspac
  * `reclaimDiskOnArchive` settings, the same ones the merge-then-archive flow
  * obeys. A setting that cannot be resolved keeps both and says so rather than
  * guessing.
+ *
+ * An archive is reversible, so it is not confirmed as a rule: this dialog is
+ * the escalation `useArchiveWorkspaceAction` raises for the archives that are
+ * not — a worktree carrying uncommitted changes, a plan that drops the local
+ * branch along with any unpushed commit on it, or a git read that could not say
+ * which of those applies.
  */
 export function ArchiveWorkspaceDialog({
 	onArchived,
@@ -35,7 +46,7 @@ export function ArchiveWorkspaceDialog({
 	open,
 	workspace,
 }: {
-	onArchived: (workspaceId: string) => Promise<void> | void;
+	onArchived: (archived: ArchivedWorkspace) => Promise<void> | void;
 	onOpenChange: (open: boolean) => void;
 	open: boolean;
 	workspace: WorkspaceShellModel | null;
@@ -119,18 +130,50 @@ function ArchiveDescription({
 	);
 }
 
+/**
+ * Names the uncommitted work an archive is about to leave behind. Renders
+ * nothing when the worktree is clean — a branch-dropping plan and an unreadable
+ * git status both reach this dialog with no count to report, and the
+ * description below already words those.
+ */
+function UncommittedChangesNotice({ workspaceCwd }: { workspaceCwd: string }) {
+	const { t } = useTranslation();
+	// Already fetched by the action that escalated here, so this reads the cache
+	// rather than the worktree.
+	const { data: gitStatus } = useQuery(workspaceGitStatusQuery(workspaceCwd));
+	const fileCount = gitStatus?.error ? 0 : (gitStatus?.summary.files ?? 0);
+
+	if (fileCount === 0) {
+		return null;
+	}
+
+	return (
+		<span
+			className='mb-2 block text-foreground'
+			data-testid='archive-workspace-uncommitted'
+		>
+			{t('workbench:archive-workspace.uncommitted', {
+				count: fileCount,
+				defaultValue_one:
+					'This workspace has {{count}} uncommitted change that archiving will not commit or push.',
+				defaultValue_other:
+					'This workspace has {{count}} uncommitted changes that archiving will not commit or push.',
+			})}
+		</span>
+	);
+}
+
 /** Inner archive form for a workspace; owns the archiving state and reads the worktree-cleanup policy. */
 function ArchiveWorkspaceDialogForm({
 	onArchived,
 	onOpenChange,
 	workspace,
 }: {
-	onArchived: (workspaceId: string) => Promise<void> | void;
+	onArchived: (archived: ArchivedWorkspace) => Promise<void> | void;
 	onOpenChange: (open: boolean) => void;
 	workspace: WorkspaceShellModel;
 }) {
 	const { t } = useTranslation();
-	const hasBranch = Boolean(workspace.branchName);
 	// The worktree being archived is the checkout whose committed
 	// `.ensemblr/settings.toml` applies to this branch, so resolve against it
 	// rather than the repository root.
@@ -144,24 +187,20 @@ function ArchiveWorkspaceDialogForm({
 			repositoryPath: workspace.pathLabel,
 		}),
 	);
-	const branchCleanup =
-		hasBranch && gitSettings?.deleteLocalBranchOnArchive === true;
-	// Dropping the branch removes the worktree anyway, and destroys the commits
-	// with it, so the two never describe the same archive: the reclaim wording
-	// promises a workspace that comes back.
-	const reclaimDisk =
-		!branchCleanup && gitSettings?.reclaimDiskOnArchive === true;
+	const plan = resolveArchiveWorktreePlan({
+		hasBranch: Boolean(workspace.branchName),
+		settings: gitSettings,
+	});
 	const { diagnostics, isBusy, start } = useLifecycleDialogAction({
 		failure: archiveWorkspaceFailure,
 		onOpenChange,
-		onSucceeded: () => onArchived(workspace.id),
-		operationKey: `archive-workspace:${workspace.id}`,
-		run: () =>
-			archiveWorkspace({
-				branchCleanup,
-				reclaimDisk,
+		onSucceeded: () =>
+			onArchived({
+				branchCleanup: plan.branchCleanup,
 				workspaceId: workspace.id,
 			}),
+		operationKey: `archive-workspace:${workspace.id}`,
+		run: () => archiveWorkspace({ ...plan, workspaceId: workspace.id }),
 	});
 
 	// Archiving before the resolver answers would silently skip the cleanup the
@@ -182,9 +221,10 @@ function ArchiveWorkspaceDialogForm({
 					{t('workbench:archive-workspace.title', 'Archive workspace?')}
 				</DialogTitle>
 				<DialogDescription className='text-xs'>
+					<UncommittedChangesNotice workspaceCwd={workspace.pathLabel} />
 					<ArchiveDescription
-						branchCleanup={branchCleanup}
-						reclaimDisk={reclaimDisk}
+						branchCleanup={plan.branchCleanup}
+						reclaimDisk={plan.reclaimDisk}
 					/>
 				</DialogDescription>
 			</DialogHeader>
@@ -205,7 +245,7 @@ function ArchiveWorkspaceDialogForm({
 
 			<LifecycleDialogActions
 				actionLabel={t('common:actions.archive', 'Archive')}
-				actionVariant={branchCleanup ? 'destructive' : 'default'}
+				actionVariant={plan.branchCleanup ? 'destructive' : 'default'}
 				canAct={canArchive}
 				diagnostics={diagnostics}
 				diagnosticsTestId='archive-workspace-diagnostics'

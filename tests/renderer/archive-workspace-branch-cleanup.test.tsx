@@ -36,16 +36,23 @@ function installBridge({
 	deleteLocalBranchOnArchive,
 	reclaimDiskOnArchive,
 	resolveSettings,
+	uncommittedFiles = 0,
 }: {
 	deleteLocalBranchOnArchive?: boolean;
 	reclaimDiskOnArchive?: boolean;
 	resolveSettings?: () => Promise<unknown>;
+	uncommittedFiles?: number;
 }): ReturnType<typeof vi.fn> {
 	const archiveWorkspace = vi.fn(() =>
 		Promise.resolve({ diagnostics: [], status: 'success' }),
 	);
 	installEnsemblrApi({
 		archiveWorkspace,
+		getWorkspaceGitStatus: () =>
+			Promise.resolve({
+				files: [],
+				summary: { additions: 0, deletions: 0, files: uncommittedFiles },
+			}),
 		resolveSettings:
 			resolveSettings ??
 			(() =>
@@ -128,6 +135,32 @@ describe('archive workspace dialog branch cleanup', () => {
 				workspaceId: 'ws-doomed',
 			});
 		});
+	});
+
+	// The dialog is now only reached when the worktree is dirty, so it has to say
+	// what the archive is about to leave behind.
+	it('counts the uncommitted changes that sent the archive here', async () => {
+		installBridge({ uncommittedFiles: 3 });
+
+		renderDialog();
+
+		const line = await screen.findByTestId('archive-workspace-uncommitted');
+		expect(line).toHaveTextContent(/3 uncommitted changes/i);
+	});
+
+	it('says nothing about uncommitted changes on a clean worktree', async () => {
+		installBridge({});
+
+		renderDialog();
+
+		await waitFor(() => {
+			expect(
+				screen.getByRole('button', { name: /^archive$/i }),
+			).not.toBeDisabled();
+		});
+		expect(
+			screen.queryByTestId('archive-workspace-uncommitted'),
+		).not.toBeInTheDocument();
 	});
 
 	// A pending resolver reads as `false`, so archiving before it answers would

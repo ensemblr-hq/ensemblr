@@ -4,15 +4,13 @@ import type {
 	WorkspaceCreationSeed,
 	WorkspaceShellModel,
 } from '@/renderer/types/workbench';
-import { ArchiveWorkspaceDialog } from '../archive-workspace-dialog';
 import { BrowseArchiveDialog } from '../browse-archive-dialog';
 import { CreateWorkspaceSourceDialog } from '../create-workspace-source-dialog';
 import { DeleteRepositoryDialog } from '../delete-repository-dialog';
 import { DeleteWorkspaceDialog } from '../delete-workspace-dialog';
 
-/** Openers for each sidebar lifecycle dialog (archive, delete, browse-archive, create-source). */
+/** Openers for each sidebar lifecycle dialog (delete, browse-archive, create-source). */
 interface ProjectNavigationDialogsController {
-	openArchiveWorkspace: (workspace: WorkspaceShellModel) => void;
 	openBrowseArchive: (project: ProjectShellModel) => void;
 	openCreateSource: (project: ProjectShellModel) => void;
 	openDeleteProject: (project: ProjectShellModel) => void;
@@ -21,7 +19,6 @@ interface ProjectNavigationDialogsController {
 
 /** Current target project or workspace for each sidebar lifecycle dialog. */
 interface ProjectNavigationDialogsState {
-	archiveWorkspaceTarget: WorkspaceShellModel | null;
 	browseArchiveProject: ProjectShellModel | null;
 	createSourceProject: ProjectShellModel | null;
 	deleteProjectTarget: ProjectShellModel | null;
@@ -29,13 +26,13 @@ interface ProjectNavigationDialogsState {
 }
 
 /**
- * Owns the open/close state for every sidebar lifecycle dialog (archive, delete,
- * create-source) and exposes setters the navigation tree can use to trigger them.
+ * Owns the open/close state for every sidebar lifecycle dialog (delete,
+ * browse-archive, create-source) and exposes setters the navigation tree can use
+ * to trigger them.
  */
 export function useProjectNavigationDialogs(): {
 	controller: ProjectNavigationDialogsController;
 	state: ProjectNavigationDialogsState;
-	setArchiveWorkspaceTarget: (workspace: WorkspaceShellModel | null) => void;
 	setBrowseArchiveProject: (project: ProjectShellModel | null) => void;
 	setCreateSourceProject: (project: ProjectShellModel | null) => void;
 	setDeleteProjectTarget: (project: ProjectShellModel | null) => void;
@@ -43,8 +40,6 @@ export function useProjectNavigationDialogs(): {
 } {
 	const [createSourceProject, setCreateSourceProject] =
 		useState<ProjectShellModel | null>(null);
-	const [archiveWorkspaceTarget, setArchiveWorkspaceTarget] =
-		useState<WorkspaceShellModel | null>(null);
 	const [browseArchiveProject, setBrowseArchiveProject] =
 		useState<ProjectShellModel | null>(null);
 	const [deleteWorkspaceTarget, setDeleteWorkspaceTarget] =
@@ -54,9 +49,6 @@ export function useProjectNavigationDialogs(): {
 
 	const openCreateSource = useCallback((project: ProjectShellModel) => {
 		setCreateSourceProject(project);
-	}, []);
-	const openArchiveWorkspace = useCallback((workspace: WorkspaceShellModel) => {
-		setArchiveWorkspaceTarget(workspace);
 	}, []);
 	const openBrowseArchive = useCallback((project: ProjectShellModel) => {
 		setBrowseArchiveProject(project);
@@ -70,19 +62,16 @@ export function useProjectNavigationDialogs(): {
 
 	return {
 		controller: {
-			openArchiveWorkspace,
 			openBrowseArchive,
 			openCreateSource,
 			openDeleteProject,
 			openDeleteWorkspace,
 		},
-		setArchiveWorkspaceTarget,
 		setBrowseArchiveProject,
 		setCreateSourceProject,
 		setDeleteProjectTarget,
 		setDeleteWorkspaceTarget,
 		state: {
-			archiveWorkspaceTarget,
 			browseArchiveProject,
 			createSourceProject,
 			deleteProjectTarget,
@@ -93,7 +82,6 @@ export function useProjectNavigationDialogs(): {
 
 /** Mounts the sidebar lifecycle dialogs driven by the navigation actions hook. */
 export function ProjectNavigationDialogs({
-	archiveWorkspaceTarget,
 	browseArchiveProject,
 	createSourceProject,
 	deleteProjectTarget,
@@ -102,16 +90,13 @@ export function ProjectNavigationDialogs({
 	onCreateWorkspaceFromSource,
 	onOpenWorkspace,
 	onProjectDeleted,
-	onWorkspaceArchived,
 	onWorkspaceDeleted,
 	orderedProjects,
-	setArchiveWorkspaceTarget,
 	setBrowseArchiveProject,
 	setCreateSourceProject,
 	setDeleteProjectTarget,
 	setDeleteWorkspaceTarget,
 }: {
-	archiveWorkspaceTarget: WorkspaceShellModel | null;
 	browseArchiveProject: ProjectShellModel | null;
 	createSourceProject: ProjectShellModel | null;
 	deleteProjectTarget: ProjectShellModel | null;
@@ -123,10 +108,8 @@ export function ProjectNavigationDialogs({
 	) => void;
 	onOpenWorkspace?: (project: ProjectShellModel, workspaceId: string) => void;
 	onProjectDeleted: (deletedProjectId: string) => Promise<void>;
-	onWorkspaceArchived: (archivedWorkspaceId: string) => Promise<void>;
 	onWorkspaceDeleted: (deletedWorkspaceId: string) => Promise<void>;
 	orderedProjects: ProjectShellModel[];
-	setArchiveWorkspaceTarget: (workspace: WorkspaceShellModel | null) => void;
 	setBrowseArchiveProject: (project: ProjectShellModel | null) => void;
 	setCreateSourceProject: (project: ProjectShellModel | null) => void;
 	setDeleteProjectTarget: (project: ProjectShellModel | null) => void;
@@ -159,17 +142,6 @@ export function ProjectNavigationDialogs({
 				open={createSourceProject !== null}
 				project={createSourceProject}
 				projects={orderedProjects}
-			/>
-
-			<ArchiveWorkspaceDialog
-				onArchived={onWorkspaceArchived}
-				onOpenChange={(open) => {
-					if (!open) {
-						setArchiveWorkspaceTarget(null);
-					}
-				}}
-				open={archiveWorkspaceTarget !== null}
-				workspace={archiveWorkspaceTarget}
 			/>
 
 			<DeleteWorkspaceDialog
