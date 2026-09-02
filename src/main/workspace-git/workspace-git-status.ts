@@ -16,7 +16,8 @@ import type {
 	WorkspaceGitDiffScope,
 	WorkspaceGitFailure,
 	WorkspaceGitFileWire,
-} from '../../shared/ipc/contracts/workspace-git';
+} from '../../shared/ipc/contracts/workspace-git.ts';
+import { summarizeWorkspaceGitFiles } from '../../shared/ipc/contracts/workspace-git.ts';
 import type { LocalCommandService } from '../commands/local-command';
 // react-doctor-disable-next-line -- Cross-concern imports use the stable public entrypoint.
 import { resolveWorkspaceCwd } from '../workspace-files/index.ts';
@@ -294,7 +295,7 @@ export function createWorkspaceGitService({
 			}),
 		);
 
-		return summarizeFiles(await withContentIds(cwd, files));
+		return summarizeWorkspaceGitFiles(await withContentIds(cwd, files));
 	}
 
 	/** The changes a single commit introduced (`<parent>..<hash>`). */
@@ -361,10 +362,10 @@ export function createWorkspaceGitService({
 		});
 
 		if (!newSideIsWorkingTree) {
-			return summarizeFiles(files);
+			return summarizeWorkspaceGitFiles(files);
 		}
 		files.push(...(await readUntrackedFiles(cwd)));
-		return summarizeFiles(await withContentIds(cwd, files));
+		return summarizeWorkspaceGitFiles(await withContentIds(cwd, files));
 	}
 
 	/**
@@ -787,19 +788,6 @@ function emptyStatusResult(
 		files: [],
 		summary: { additions: 0, deletions: 0, files: 0 },
 	};
-}
-
-/** Totals additions/deletions across the rows into a status result. */
-function summarizeFiles(
-	files: WorkspaceGitFileWire[],
-): GetWorkspaceGitStatusResult {
-	let additions = 0;
-	let deletions = 0;
-	for (const file of files) {
-		additions += file.additions ?? 0;
-		deletions += file.deletions ?? 0;
-	}
-	return { files, summary: { additions, deletions, files: files.length } };
 }
 
 /** Rejects absolute or workspace-escaping relative paths from the renderer. */

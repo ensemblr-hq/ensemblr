@@ -251,6 +251,9 @@ export const ensemblrQueryKeys = {
 			workspaceCwd,
 			scopeKey,
 		] as const,
+	/** Prefix matching a workspace's cached git status at every diff scope. */
+	workspaceGitStatusAll: (workspaceCwd: string) =>
+		[...ensemblrQueryKeys.all, 'workspace-git-status', workspaceCwd] as const,
 	/** Query key for the paths that conflict between a workspace and its base. */
 	workspaceMergeConflicts: (workspaceCwd: string, baseRef = '') =>
 		[

@@ -43,6 +43,7 @@ export function ReviewFileList({
 	files,
 	isLoading = false,
 	onDiscardFile,
+	pendingDiscardPaths,
 	viewMode,
 	workspaceCwd,
 	workspaceId,
@@ -63,6 +64,8 @@ export function ReviewFileList({
 	/** True while the source's status query is in flight with no rows yet. */
 	isLoading?: boolean;
 	onDiscardFile: (filePath: string) => void;
+	/** Paths a discard is currently running against; their rows mute until it settles. */
+	pendingDiscardPaths?: ReadonlySet<string>;
 	viewMode: ChangesViewMode;
 	/** Absolute workspace root an attached diff is written under. */
 	workspaceCwd: string;
@@ -79,6 +82,7 @@ export function ReviewFileList({
 		discardablePaths,
 		files: markedFiles,
 		onDiscardFile,
+		pendingDiscardPaths,
 		workspaceCwd,
 		workspaceId,
 	});

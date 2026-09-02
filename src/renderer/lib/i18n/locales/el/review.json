@@ -99,6 +99,8 @@
 	"discard-changes": {
 		"affected-file-count_one": "{{count}} αρχείο επηρεάζεται",
 		"affected-file-count_other": "{{count}} αρχεία επηρεάζονται",
+		"all-uncommitted-target_one": "η {{count}} αλλαγή χωρίς commit",
+		"all-uncommitted-target_other": "όλες οι {{count}} αλλαγές χωρίς commit",
 		"description": "Οι αλλαγές στο δέντρο εργασίας επαναφέρονται στο τελευταίο commit· ένα νέο αρχείο διαγράφεται. Αυτό δεν μπορεί να αναιρεθεί.",
 		"description-bulk": "Κάθε αλλαγή στο δέντρο εργασίας επαναφέρεται στο τελευταίο commit και τυχόν νέα αρχεία διαγράφονται. Αυτό δεν μπορεί να αναιρεθεί.",
 		"title": "Απόρριψη αλλαγών;",

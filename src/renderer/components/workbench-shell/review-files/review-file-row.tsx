@@ -42,7 +42,8 @@ const fileStatusLabel: Record<ReviewFileSummary['status'], string> = {
  * when the workspace still holds a previewable image. On hover — or while its
  * open-in menu is open — the trailing +/- stats swap for a Discard button and an
  * "Open in" dropdown. A row marked viewed in the diff toolbar dims until the file
- * changes again.
+ * changes again, and a row whose discard is still running dims and stops
+ * responding until git answers.
  */
 export function ReviewFileRow({
 	ariaLevel,
@@ -60,6 +61,7 @@ export function ReviewFileRow({
 		copyTarget,
 		invokeTarget,
 		isDiscardable,
+		isDiscarding,
 		isViewed,
 		onDiscardFile,
 		openFile,
@@ -71,6 +73,7 @@ export function ReviewFileRow({
 	const fileName = getReviewFileName(file.path);
 	const hasOpenInMenu = openInTargets.length > 0 || Boolean(copyTarget);
 	const canDiscard = isDiscardable(file.path);
+	const discarding = isDiscarding(file.path);
 	const viewed = isViewed(file);
 	const openThisFile = openFile ? () => openFile(file.path) : undefined;
 	const keepThisFileOpen = openFile
@@ -86,8 +89,14 @@ export function ReviewFileRow({
 				// mark recede with it, and lift it back on hover so a reviewer
 				// returning to a signed-off file can still read it.
 				viewed && 'opacity-50 hover:opacity-100',
+				// `pointer-events-none` covers the pointer, and stops the viewed lift
+				// above from firing besides, since a row that is not a hit-test target
+				// never matches `:hover`. It leaves the tab order untouched, so each
+				// control carries `disabled` for the keyboard as well.
+				discarding && 'pointer-events-none opacity-50',
 				fileTreeIndentClassName(level),
 			)}
+			aria-busy={discarding || undefined}
 			data-row-kind='file'
 			data-row-path={file.path}
 			// `aria-level` is only valid alongside a tree role: apply both together
@@ -101,6 +110,7 @@ export function ReviewFileRow({
 					path: file.path,
 				})}
 				className='flex h-full min-w-0 flex-1 items-center gap-2 self-stretch rounded-md px-2 text-left font-mono text-xs'
+				disabled={discarding}
 				onClick={openThisFile}
 				onDoubleClick={keepThisFileOpen}
 				type='button'
@@ -148,6 +158,7 @@ export function ReviewFileRow({
 									{ path: file.path },
 								)}
 								className='text-muted-foreground hover:text-foreground'
+								disabled={discarding}
 								onClick={() => onDiscardFile(file.path)}
 								size='icon-xs'
 								variant='ghost'
@@ -173,6 +184,7 @@ export function ReviewFileRow({
 								path: file.path,
 							})}
 							className='text-muted-foreground hover:text-foreground'
+							disabled={discarding}
 							size='icon-xs'
 							variant='ghost'
 						>

@@ -25,6 +25,7 @@ import { isPreviewableImagePath } from '@/shared/preview-media';
  * @param discardablePaths - Paths that can be discarded; others hide the discard action
  * @param files - The change set's file rows
  * @param onDiscardFile - Discards one uncommitted file
+ * @param pendingDiscardPaths - Paths a discard is currently running against
  * @param workspaceCwd - Absolute workspace root attached diffs are written under
  * @param workspaceId - Workspace the rows belong to
  * @returns The action bundle plus the viewed predicate the flat list sorts by
@@ -34,6 +35,7 @@ export function useBuildReviewFileActions({
 	discardablePaths,
 	files,
 	onDiscardFile,
+	pendingDiscardPaths,
 	workspaceCwd,
 	workspaceId,
 }: {
@@ -41,6 +43,7 @@ export function useBuildReviewFileActions({
 	discardablePaths: ReadonlySet<string> | undefined;
 	files: ReviewFileSummary[];
 	onDiscardFile: (filePath: string) => void;
+	pendingDiscardPaths: ReadonlySet<string> | undefined;
 	workspaceCwd: string;
 	workspaceId: string;
 }): {
@@ -76,6 +79,11 @@ export function useBuildReviewFileActions({
 			discardablePaths ? discardablePaths.has(filePath) : true,
 		[discardablePaths],
 	);
+	const isDiscarding = useMemo(
+		() => (filePath: string) =>
+			pendingDiscardPaths ? pendingDiscardPaths.has(filePath) : false,
+		[pendingDiscardPaths],
+	);
 
 	// Marks are stored against the revision they were set at, so a row the agent
 	// touched again reads as unviewed and climbs back out of the reviewed group.
@@ -94,6 +102,7 @@ export function useBuildReviewFileActions({
 			copyTarget,
 			invokeTarget,
 			isDiscardable,
+			isDiscarding,
 			isViewed,
 			onDiscardFile,
 			openFile,
@@ -104,6 +113,7 @@ export function useBuildReviewFileActions({
 			copyTarget,
 			invokeTarget,
 			isDiscardable,
+			isDiscarding,
 			isViewed,
 			onDiscardFile,
 			openFile,

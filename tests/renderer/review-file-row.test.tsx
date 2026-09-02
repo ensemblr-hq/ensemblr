@@ -38,6 +38,7 @@ function makeActions(
 		copyTarget: undefined,
 		invokeTarget: async () => {},
 		isDiscardable: () => true,
+		isDiscarding: () => false,
 		isViewed: () => false,
 		onDiscardFile: () => {},
 		openFile: () => {},
@@ -211,4 +212,77 @@ test('the open-in chevron only appears when targets are available', () => {
 	expect(withTargets).toContain(
 		'Open src/main/ipc/handlers/workspace-files.ts in…',
 	);
+});
+
+function rowClassNames(markup: string): string {
+	return /^<div class="([^"]*)"/.exec(markup)?.[1] ?? '';
+}
+
+test('a row whose discard is in flight mutes and stops responding', () => {
+	const markup = renderRow(
+		modifiedFile,
+		{ showPath: true },
+		makeActions({ isDiscarding: () => true }),
+	);
+
+	expect(markup).toContain('aria-busy="true"');
+	expect(rowClassNames(markup)).toContain('pointer-events-none');
+	expect(rowClassNames(markup)).toContain('opacity-50');
+});
+
+test('a row with no discard in flight is neither busy nor inert', () => {
+	const markup = renderRow(modifiedFile, { showPath: true });
+
+	expect(markup).not.toContain('aria-busy');
+	expect(rowClassNames(markup)).not.toContain('pointer-events-none');
+	expect(rowClassNames(markup)).not.toContain('opacity-50');
+});
+
+function buttonWithLabel(markup: string, label: string): string {
+	const anchor = markup.indexOf(`aria-label="${label}"`);
+	if (anchor < 0) {
+		return '';
+	}
+	return markup.slice(
+		markup.lastIndexOf('<', anchor),
+		markup.indexOf('>', anchor) + 1,
+	);
+}
+
+const DISCARDING_ROW_LABELS = [
+	'Open src/main/ipc/handlers/workspace-files.ts',
+	'Discard changes to src/main/ipc/handlers/workspace-files.ts',
+	'Open src/main/ipc/handlers/workspace-files.ts in…',
+];
+
+// `pointer-events-none` on the row covers the pointer and nothing else, so a
+// keyboard could still tab into a row mid-revert and act on it.
+test('a row whose discard is in flight refuses the keyboard, not just the pointer', () => {
+	const markup = renderRow(
+		modifiedFile,
+		{ showPath: true },
+		makeActions({
+			copyTarget,
+			isDiscarding: () => true,
+			openInTargets: [launchTarget],
+		}),
+	);
+
+	for (const label of DISCARDING_ROW_LABELS) {
+		expect(buttonWithLabel(markup, label)).toContain('disabled=""');
+	}
+});
+
+test('the same controls stay operable while no discard is running', () => {
+	const markup = renderRow(
+		modifiedFile,
+		{ showPath: true },
+		makeActions({ copyTarget, openInTargets: [launchTarget] }),
+	);
+
+	// The attribute, not the substring — the Button's own class list carries
+	// `disabled:pointer-events-none` whether or not it is disabled.
+	for (const label of DISCARDING_ROW_LABELS) {
+		expect(buttonWithLabel(markup, label)).not.toContain('disabled=""');
+	}
 });
