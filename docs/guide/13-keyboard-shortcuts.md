@@ -54,7 +54,7 @@ Active anywhere in the workbench.
 | `⌘⇧C` | Open or close the Concierge | `concierge.toggle` |
 | `⌘⇧L` | Focus the Concierge composer | `concierge.focusComposer` |
 | `⌘⌥U` | Show uncommitted changes | `changes.uncommitted` |
-| `⌘⇧↵` | Keep preview tab open | `tab.keepOpen` |
+| `⌘⇧O` | Keep preview tab open | `tab.keepOpen` |
 | `⌘⇧]` | Next tab | `tab.next` |
 | `⌘⇧[` | Previous tab | `tab.prev` |
 | `⌘1` … `⌘9` | Select tab by index — `⌘1`–`⌘8` pick that tab, `⌘9` picks the last | `tab.selectByIndex` |
@@ -95,13 +95,14 @@ Active when the message composer has focus.
 | `⌘↵` | Send message | `composer.submitWithMod` |
 | `⇧↵` | Insert newline in composer | `composer.newline` |
 | `⌘J` | Queue message as a follow-up | `composer.queue` |
+| `⌘⇧↵` | Send now, skipping the follow-up queue | `composer.sendNow` |
 | `⌥P` | Toggle model picker | `composer.toggleModelPicker` |
 | `⌥T` | Cycle thinking level | `composer.cycleThinking` |
 | `⌥⇧P` | Toggle plan mode | `composer.togglePlanMode` |
 | `⌥D` | Start or stop dictation | `composer.toggleDictation` |
 | `⌘↵` | Submit diff comment | `diffComment.submit` |
 
-Two of these need a word.
+Three of these need a word.
 
 **`↵` and `⌘↵` both send.** Which one is *your* send key is the **Send messages
 with** setting; the other inserts a newline. Both ids exist because the menu
@@ -110,6 +111,12 @@ item has to describe one of them, and because the app reports both as live.
 **`⌘J` queues in any mode**, regardless of what **Follow-up behavior** is set to
 — it is the escape hatch when you want this one message held rather than
 steering the running turn.
+
+**`⌘⇧↵` sends in any mode**, and is the mirror of `⌘J`. Mid-turn it goes as a
+steer frame whatever **Follow-up behavior** says, because that is the only
+delivery a running turn can receive; idle it is an ordinary send. It jumps this
+one message past the queue and leaves anything already parked exactly where it
+is.
 
 **`diffComment.submit` is composer-scoped, not dialog-scoped.** A review-comment
 box is a composer, so `⌘↵` submits the comment when one has focus. See

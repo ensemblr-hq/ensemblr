@@ -7,6 +7,7 @@ import {
 	mkdtempSync,
 	readdirSync,
 	readFileSync,
+	renameSync,
 	rmSync,
 	statSync,
 	symlinkSync,
@@ -183,6 +184,37 @@ describe('createListWorkspaceFilesService.list', () => {
 		expect(paths).not.toContain('._resource');
 		// A real file in the same folder as junk still lists.
 		expect(paths).toContain('src/app.ts');
+	});
+
+	test('drops a moved-away directory instead of listing it twice', async () => {
+		const dir = seedRepo();
+		renameSync(path.join(dir, 'src'), path.join(dir, 'lib'));
+
+		const result = await listFiles(dir);
+		const paths = result.files.map((entry) => entry.path);
+
+		// The index still carries the old paths until the move is staged; the
+		// listing must describe the worktree, not the index.
+		expect(paths).not.toContain('src');
+		expect(paths).not.toContain('src/app.ts');
+		expect(paths).toContain('lib');
+		expect(paths).toContain('lib/app.ts');
+	});
+
+	test('drops files and folders deleted from the worktree but still in the index', async () => {
+		const dir = seedRepo();
+		rmSync(path.join(dir, 'README.md'));
+		rmSync(path.join(dir, 'src'), { recursive: true });
+
+		const result = await listFiles(dir);
+		const paths = result.files.map((entry) => entry.path);
+
+		expect(paths).not.toContain('README.md');
+		expect(paths).not.toContain('src');
+		expect(paths).not.toContain('src/app.ts');
+		// Untracked and ignored siblings are untouched by the filter.
+		expect(paths).toContain('debug.log');
+		expect(paths).toContain('.context/sessions/tab.md');
 	});
 });
 

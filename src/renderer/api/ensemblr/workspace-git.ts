@@ -1,11 +1,15 @@
-import { queryOptions } from '@tanstack/react-query';
+import { type QueryClient, queryOptions } from '@tanstack/react-query';
 
 import { profileElectronIpcCall } from '@/renderer/lib/instrumentation';
 import type {
 	DiscardWorkspaceChangesRequest,
+	GetWorkspaceGitStatusResult,
 	WorkspaceGitDiffScope,
 } from '@/shared/ipc/contracts/workspace-git';
-import { serializeWorkspaceGitDiffScope } from '@/shared/ipc/contracts/workspace-git';
+import {
+	serializeWorkspaceGitDiffScope,
+	summarizeWorkspaceGitFiles,
+} from '@/shared/ipc/contracts/workspace-git';
 
 import { ensemblrQueryKeys, getEnsemblrApi } from './query-keys';
 
@@ -135,6 +139,66 @@ export function discardWorkspaceChanges(
 	return profileElectronIpcCall(
 		{ channel: 'ensemblr:discard-workspace-changes', usesDatabase: false },
 		() => getEnsemblrApi().discardWorkspaceChanges(request),
+	);
+}
+
+/**
+ * Refreshes a workspace's change set at *every* diff scope it is cached under.
+ * A scoped key alone is the wrong reach: the Changes tab defaults to the whole
+ * branch and the sidebar summaries are branch-scoped too, so invalidating only
+ * the working tree leaves both waiting out their poll after an edit lands.
+ * @param queryClient - The query client holding the cached statuses
+ * @param workspaceCwd - Absolute workspace root whose statuses to refresh
+ * @returns A promise settling once the refetches are dispatched
+ */
+export function invalidateWorkspaceGitStatus(
+	queryClient: QueryClient,
+	workspaceCwd: string,
+) {
+	return queryClient.invalidateQueries({
+		queryKey: ensemblrQueryKeys.workspaceGitStatusAll(workspaceCwd),
+	});
+}
+
+/**
+ * Drops the paths a discard reverted from the cached working-tree change set, so
+ * their rows leave the Changes panel without waiting on a git round-trip.
+ *
+ * Deliberately confined to the working-tree scope, which is the only one where
+ * the answer is certain: a discarded path has no uncommitted change left. A file
+ * with committed *and* uncommitted changes keeps its branch-scoped row with
+ * smaller counts, and only git can say what those are — those scopes settle on
+ * {@link invalidateWorkspaceGitStatus} instead.
+ * @param queryClient - The query client holding the cached status
+ * @param discarded - Paths git reported as reverted; a partial failure lists only its successes
+ * @param workspaceCwd - Absolute workspace root the paths belong to
+ */
+export function removeDiscardedPathsFromGitStatus(
+	queryClient: QueryClient,
+	{
+		discarded,
+		workspaceCwd,
+	}: { discarded: readonly string[]; workspaceCwd: string },
+) {
+	if (discarded.length === 0) {
+		return;
+	}
+	const discardedPaths = new Set(discarded);
+	queryClient.setQueryData<GetWorkspaceGitStatusResult>(
+		ensemblrQueryKeys.workspaceGitStatus(workspaceCwd),
+		(current) => {
+			if (!current || current.error) {
+				return current;
+			}
+			const remaining = current.files.filter(
+				(file) =>
+					!discardedPaths.has(file.path) &&
+					!(file.renamedFrom && discardedPaths.has(file.renamedFrom)),
+			);
+			return remaining.length === current.files.length
+				? current
+				: summarizeWorkspaceGitFiles(remaining);
+		},
 	);
 }
 

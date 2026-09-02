@@ -114,15 +114,17 @@ function keepOpenKeydown() {
 	const candidates = [
 		{
 			altKey: false,
+			code: 'KeyO',
 			ctrlKey: false,
-			key: 'Enter',
+			key: 'O',
 			metaKey: true,
 			shiftKey: true,
 		},
 		{
 			altKey: false,
+			code: 'KeyO',
 			ctrlKey: true,
-			key: 'Enter',
+			key: 'O',
 			metaKey: false,
 			shiftKey: true,
 		},

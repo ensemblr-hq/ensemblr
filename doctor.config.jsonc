@@ -55,13 +55,16 @@
 				// Promise.all would overshoot the budget or change error/collision
 				// semantics.
 				//
-				// delete-repository is deliberately absent: its per-workspace `git
-				// worktree remove` loop is just as sequential-by-intent, but the rule
-				// no longer flags it, and an override that suppresses nothing is the
-				// blind spot this file's header warns about. Re-add it with this same
-				// justification if the finding comes back.
+				// delete-repository tears each workspace down and then runs `git
+				// worktree remove` and `git branch -d` against the one repository the
+				// whole loop is deleting. Two `git worktree remove` runs contend on the
+				// worktree admin lock and fail rather than wait — the same constraint
+				// browse-archive-dialog.tsx locks its whole dialog for — and all three
+				// steps append to one shared `diagnostics` array, so Promise.all would
+				// both break the removals and interleave the report.
 				"files": [
 					"src/main/agent-runtime/session/summary-queue.ts",
+					"src/main/repository/delete-repository.ts",
 					"src/main/terminal/agent-conversation-title.ts",
 					"src/renderer/lib/workbench/composer-attachments.ts"
 				],

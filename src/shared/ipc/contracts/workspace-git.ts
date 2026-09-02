@@ -137,6 +137,26 @@ export interface GetWorkspaceGitStatusResult {
 	summary: WorkspaceGitChangeSummaryWire;
 }
 
+/**
+ * Pairs a set of changed-file rows with the totals derived from them. Shared so
+ * the renderer's optimistic recount after a discard cannot drift from the count
+ * the main process produces on the next read. Binary rows carry `null` counts
+ * and contribute nothing but their presence in `files`.
+ * @param files - The rows to summarize
+ * @returns The rows and their aggregate additions, deletions, and file count
+ */
+export function summarizeWorkspaceGitFiles(
+	files: readonly WorkspaceGitFileWire[],
+): GetWorkspaceGitStatusResult {
+	let additions = 0;
+	let deletions = 0;
+	for (const file of files) {
+		additions += file.additions ?? 0;
+		deletions += file.deletions ?? 0;
+	}
+	return { files, summary: { additions, deletions, files: files.length } };
+}
+
 /** Request for a single file's unified diff within a workspace. */
 export interface GetWorkspaceFileDiffRequest {
 	path: string;

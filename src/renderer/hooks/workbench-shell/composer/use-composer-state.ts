@@ -385,6 +385,7 @@ export function useComposerState({
 		queueCurrent,
 		queueStalled,
 		restoreQueued,
+		sendNow,
 		steerQueued,
 	} = useComposerSubmit({
 		chatTabId,
@@ -470,6 +471,7 @@ export function useComposerState({
 		onConfirmAutocomplete: confirmAutocomplete,
 		onDismissAutocomplete: dismissAutocomplete,
 		onQueue: queueCurrent,
+		onSendNow: sendNow,
 		onStepActiveIndex: stepActive,
 		onSubmit: () => {
 			void handleSubmit();

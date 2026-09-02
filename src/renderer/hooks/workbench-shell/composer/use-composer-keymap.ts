@@ -7,7 +7,7 @@ import type { AutocompleteKind } from '@/renderer/types/workbench';
 
 /**
  * Keyboard bindings for the composer editor: autocomplete navigation and
- * confirm, send, and explicit queue.
+ * confirm, send, explicit queue, and the send that bypasses the queue.
  *
  * Each binding returns `false` when it does not apply, which hands the key back
  * to the editor's own handling — that is how Enter still inserts a newline with
@@ -22,6 +22,7 @@ export function useComposerKeymap({
 	onConfirmAutocomplete,
 	onDismissAutocomplete,
 	onQueue,
+	onSendNow,
 	onStepActiveIndex,
 	onSubmit,
 	submitsOnBareEnter,
@@ -31,6 +32,7 @@ export function useComposerKeymap({
 	onConfirmAutocomplete: () => void;
 	onDismissAutocomplete: () => void;
 	onQueue: () => void;
+	onSendNow: () => void;
 	onStepActiveIndex: (delta: number) => void;
 	onSubmit: () => void;
 	submitsOnBareEnter: boolean;
@@ -97,6 +99,15 @@ export function useComposerKeymap({
 				},
 			],
 			[
+				'composer.sendNow',
+				(event) => {
+					if (event.nativeEvent.isComposing) {
+						return false;
+					}
+					onSendNow();
+				},
+			],
+			[
 				'composer.queue',
 				() => {
 					onQueue();
@@ -109,6 +120,7 @@ export function useComposerKeymap({
 			onConfirmAutocomplete,
 			onDismissAutocomplete,
 			onQueue,
+			onSendNow,
 			onStepActiveIndex,
 			onSubmit,
 			submitsOnBareEnter,

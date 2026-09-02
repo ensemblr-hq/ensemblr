@@ -90,6 +90,12 @@ export interface ReviewFileActions {
 	 */
 	isDiscardable: (filePath: string) => boolean;
 	/**
+	 * Whether a discard is in flight against this file. Its row mutes and stops
+	 * responding until git answers, rather than looking untouched while the
+	 * revert runs.
+	 */
+	isDiscarding: (filePath: string) => boolean;
+	/**
 	 * Whether the reviewer marked this row viewed at the state it currently shows.
 	 * Takes the whole row because the answer expires when the file changes again.
 	 */

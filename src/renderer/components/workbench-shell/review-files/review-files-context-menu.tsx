@@ -1,20 +1,14 @@
-import {
-	CopyIcon,
-	EyeIcon,
-	PaperclipIcon,
-	PinIcon,
-	Undo2Icon,
-} from 'lucide-react';
+import { CopyIcon, PaperclipIcon, Undo2Icon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import {
 	ContextMenuContent,
-	ContextMenuItem,
 	ContextMenuSeparator,
 } from '@/renderer/components/ui/context-menu';
 
 import type { ReviewFileMenuTarget } from '@/renderer/types/workbench';
 
+import { FileMenuItem, OpenFileMenuItems } from './file-menu-items';
 import { OpenInTargetsSubmenu } from './open-in-targets-submenu';
 import { useReviewFileActions } from './review-file-actions-context';
 
@@ -62,62 +56,29 @@ export function ReviewFilesContextMenuContent({
 			aria-label={t('review:file-menu.actions', '{{path}} actions', { path })}
 			className='w-48 bg-muted p-1'
 		>
-			{openFile ? (
-				<>
-					<ContextMenuItem
-						className='h-8 gap-2 px-2 text-[0.8125rem]'
-						onSelect={() => openFile(path)}
-					>
-						<EyeIcon aria-hidden='true' className='text-muted-foreground' />
-						<span className='min-w-0 flex-1'>
-							{t('common:actions.view', 'View')}
-						</span>
-					</ContextMenuItem>
-					<ContextMenuItem
-						className='h-8 gap-2 px-2 text-[0.8125rem]'
-						onSelect={() => openFile(path, { preview: false })}
-					>
-						<PinIcon aria-hidden='true' className='text-muted-foreground' />
-						<span className='min-w-0 flex-1'>
-							{t('common:actions.keep-open', 'Keep open')}
-						</span>
-					</ContextMenuItem>
-				</>
-			) : null}
-			<ContextMenuItem
-				className='h-8 gap-2 px-2 text-[0.8125rem]'
+			{openFile ? <OpenFileMenuItems openFile={openFile} path={path} /> : null}
+			<FileMenuItem
+				icon={PaperclipIcon}
+				label={t('review:file-menu.attach-diff-to-chat', 'Attach diff to chat')}
 				onSelect={() => attachDiff(path)}
-			>
-				<PaperclipIcon aria-hidden='true' className='text-muted-foreground' />
-				<span className='min-w-0 flex-1'>
-					{t('review:file-menu.attach-diff-to-chat', 'Attach diff to chat')}
-				</span>
-			</ContextMenuItem>
+			/>
 			{openInTargets.length || copyTarget ? <ContextMenuSeparator /> : null}
 			<OpenInTargetsSubmenu onSelect={invoke} openInTargets={openInTargets} />
 			{copyTarget ? (
-				<ContextMenuItem
-					className='h-8 gap-2 px-2 text-[0.8125rem]'
+				<FileMenuItem
+					icon={CopyIcon}
+					label={t('common:actions.copy-path', 'Copy path')}
 					onSelect={() => invoke(copyTarget)}
-				>
-					<CopyIcon aria-hidden='true' className='text-muted-foreground' />
-					<span className='min-w-0 flex-1'>
-						{t('common:actions.copy-path', 'Copy path')}
-					</span>
-				</ContextMenuItem>
+				/>
 			) : null}
 			{canDiscard ? (
 				<>
 					<ContextMenuSeparator />
-					<ContextMenuItem
-						className='h-8 gap-2 px-2 text-[0.8125rem]'
+					<FileMenuItem
+						icon={Undo2Icon}
+						label={t('common:actions.discard-changes', 'Discard changes')}
 						onSelect={() => onDiscardFile(path)}
-					>
-						<Undo2Icon aria-hidden='true' className='text-muted-foreground' />
-						<span className='min-w-0 flex-1'>
-							{t('common:actions.discard-changes', 'Discard changes')}
-						</span>
-					</ContextMenuItem>
+					/>
 				</>
 			) : null}
 		</ContextMenuContent>

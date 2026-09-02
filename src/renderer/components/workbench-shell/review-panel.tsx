@@ -118,10 +118,14 @@ export function ReviewPanel({
 	useMenuCommandChecked('panel.checks', activeTab === 'checks');
 
 	const {
+		discardErrorMessage,
 		discardTarget,
 		handleDiscardAll,
+		handleDiscardConfirm,
 		handleDiscardDialogChange,
 		handleDiscardFile,
+		isDiscarding,
+		pendingDiscardPaths,
 	} = useDiscardChanges({ sourceFiles, workspace });
 	useMenuCommand(
 		'review.discardChanges',
@@ -182,6 +186,7 @@ export function ReviewPanel({
 					files={sourceFiles}
 					isLoading={isCommitLoading}
 					onDiscardFile={handleDiscardFile}
+					pendingDiscardPaths={pendingDiscardPaths}
 					viewMode={changesViewMode}
 					workspaceCwd={workspace.pathLabel}
 					workspaceId={workspace.id}
@@ -196,10 +201,12 @@ export function ReviewPanel({
 				open={isFileSearchOpen}
 			/>
 			<DiscardChangesDialog
+				errorMessage={discardErrorMessage}
+				isPending={isDiscarding}
+				onConfirm={handleDiscardConfirm}
 				onOpenChange={handleDiscardDialogChange}
 				open={discardTarget !== null}
 				target={discardTarget}
-				workspaceCwd={workspace.pathLabel}
 			/>
 		</Tabs>
 	);

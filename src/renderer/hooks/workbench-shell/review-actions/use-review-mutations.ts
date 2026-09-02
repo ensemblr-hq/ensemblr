@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 import {
 	archiveWorkspace,
 	continueWorkspaceBranch,
-	ensemblrQueryKeys,
+	invalidateWorkspaceGitStatus,
 	invalidateWorkspaceListViews,
 	mergePullRequest,
 	pushWorkspaceBranch,
@@ -178,9 +178,7 @@ export function useReviewMutations({
 					workspaceCwd,
 					workspaceId,
 				}),
-				queryClient.invalidateQueries({
-					queryKey: ensemblrQueryKeys.workspaceGitStatus(workspaceCwd),
-				}),
+				invalidateWorkspaceGitStatus(queryClient, workspaceCwd),
 				invalidateWorkspaceListViews(queryClient),
 			]);
 		},
@@ -207,9 +205,7 @@ export function useReviewMutations({
 			}).catch((cause) => {
 				console.error('Failed to refresh PR snapshot after merge:', cause);
 			});
-			void queryClient.invalidateQueries({
-				queryKey: ensemblrQueryKeys.workspaceGitStatus(workspaceCwd),
-			});
+			void invalidateWorkspaceGitStatus(queryClient, workspaceCwd);
 			if (mergeSettings.archiveAfterMerge) {
 				archiveAfterMergeMutation.mutate();
 			}
@@ -235,9 +231,7 @@ export function useReviewMutations({
 			toast.success(t('errors:push.success.title', 'Branch pushed.'));
 			await Promise.all([
 				refreshPullRequestSnapshot({ queryClient, workspaceCwd, workspaceId }),
-				queryClient.invalidateQueries({
-					queryKey: ensemblrQueryKeys.workspaceGitStatus(workspaceCwd),
-				}),
+				invalidateWorkspaceGitStatus(queryClient, workspaceCwd),
 			]);
 		},
 	});

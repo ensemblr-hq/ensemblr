@@ -1,25 +1,19 @@
-import { GripVertical, Maximize2, Minimize2, RotateCcw, X } from 'lucide-react';
 import type { CSSProperties } from 'react';
 import { useTranslation } from 'react-i18next';
 import { TextContextMenu } from '@/renderer/components/text-context-menu';
 import { Button } from '@/renderer/components/ui/button';
-import { SidebarTrigger, useSidebar } from '@/renderer/components/ui/sidebar';
 import { useConciergePanel } from '@/renderer/hooks/concierge/use-concierge-panel';
 import { useConciergeReferenceOpen } from '@/renderer/hooks/concierge/use-concierge-reference-open';
 import { cn } from '@/renderer/lib/utils';
-import {
-	readWindowChrome,
-	readWindowChromeInsetsPx,
-} from '@/renderer/lib/window-chrome';
-import { TOOLBAR_HEIGHT_CLASS } from '@/renderer/lib/workbench/shell-inset';
 import type { ConciergeSize } from '@/renderer/state/concierge';
 import { ConciergeClearConfirmDialog } from './concierge-clear-confirm-dialog';
 import { ConciergeComposer } from './concierge-composer';
 import { ConciergeFilePreview } from './concierge-file-preview';
-import { ConciergeMark } from './concierge-mark';
+import { ConciergePanelHeader } from './concierge-panel-header';
 import { ConciergeQuestionSlot } from './concierge-question-slot';
 import { ConciergeReferenceProvider } from './concierge-reference-context';
 import { ConciergeResizeHandles } from './concierge-resize-handles';
+import { ConciergeSidebarRail } from './concierge-sidebar-rail';
 import { ConciergeTimeline } from './concierge-timeline';
 
 /**
@@ -38,17 +32,14 @@ import { ConciergeTimeline } from './concierge-timeline';
  * navigation sidebar stays reachable and the user can still switch projects with
  * the Concierge open. The rectangle is measured rather than derived from the
  * sidebar's width variable, which has three values and animates between them.
- * A collapsed sidebar leaves that inset spanning the whole window, which is why
- * the maximized header takes over both jobs its neighbour would have done: the
- * window controls' safe inset, and the trigger that brings the sidebar back.
- *
- * Only the docked title bar maximizes on a double-click. Maximized, the header
- * spans the window's own title area, where macOS has already claimed that
- * gesture for zoom — so restoring is left to the header's button and its chord.
+ * A collapsed sidebar leaves that inset spanning the whole window, so what the
+ * covered neighbour would have drawn is drawn here instead:
+ * {@link ConciergePanelHeader} takes the window controls' safe inset and the
+ * trigger that brings the sidebar back, and {@link ConciergeSidebarRail}
+ * replaces the hover strip along the same edge.
  */
 export function ConciergePanel() {
 	const { t } = useTranslation();
-	const { state: sidebarState, toggleSidebar } = useSidebar();
 	const panel = useConciergePanel();
 	const referenceAccess = useConciergeReferenceOpen(
 		panel.presentation !== 'closed',
@@ -59,21 +50,6 @@ export function ConciergePanel() {
 	}
 
 	const { isFullscreen, session } = panel;
-	const sidebarIsCollapsed = sidebarState === 'collapsed';
-	const expandSidebarLabel = t(
-		'workbench:concierge.panel.expand-sidebar',
-		'Show the sidebar',
-	);
-	const sidebarEdgeLabel = sidebarIsCollapsed
-		? expandSidebarLabel
-		: t('workbench:concierge.panel.collapse-sidebar', 'Hide the sidebar');
-	const windowChrome = readWindowChrome();
-	const clearsLeadingChrome =
-		(panel.insetRect?.left ?? 0) >= readWindowChromeInsetsPx().start;
-	// Where Ensemblr draws the title bar the nav sidebar has no header strip, so
-	// a maximized panel covers the only trigger there is — open or collapsed.
-	const showsSidebarTrigger =
-		sidebarIsCollapsed || windowChrome.drawsOwnControls;
 
 	return (
 		// Wraps the transcript *and* the composer: a chip in an answer and a chip in
@@ -101,89 +77,15 @@ export function ConciergePanel() {
 				})}
 				tabIndex={-1}
 			>
-				{/* biome-ignore lint/a11y/noStaticElementInteractions: a docked title bar that maximizes on double-click, as a window's own does; the labelled Maximize button beside it is the keyboard route */}
-				<header
-					className={cn(
-						'flex shrink-0 select-none items-center gap-0.5 border-b',
-						// Maximized, this header sits beside the sidebar's own — so it takes
-						// the shell toolbar's height, padding, and full-strength border, or
-						// the two rules miss each other and the title crowds the divider.
-						// It also spans the window's leading top corner, where macOS draws
-						// the traffic lights over the web contents — cleared by the same
-						// inset the shell's own toolbars take.
-						isFullscreen
-							? cn(
-									'border-border pr-2',
-									TOOLBAR_HEIGHT_CLASS,
-									clearsLeadingChrome
-										? 'pl-3'
-										: 'pl-(--ensemblr-window-chrome-safe-start)',
-								)
-							: 'h-10 cursor-grab border-border/60 pr-1.5 pl-1 active:cursor-grabbing',
-					)}
-					onDoubleClick={isFullscreen ? undefined : panel.toggleFullscreen}
+				<ConciergePanelHeader
+					insetLeft={panel.insetRect?.left ?? null}
+					isClearing={session.isClearing}
+					isFullscreen={isFullscreen}
+					onClear={panel.clearContext}
+					onClose={panel.closePanel}
 					onPointerDown={panel.anchor.onPointerDown}
-				>
-					{isFullscreen ? null : (
-						<GripVertical
-							aria-hidden='true'
-							className='size-4 shrink-0 text-muted-foreground/50'
-						/>
-					)}
-					{isFullscreen && showsSidebarTrigger ? (
-						<SidebarTrigger
-							aria-label={sidebarEdgeLabel}
-							className='mr-1'
-							onDoubleClick={stopHeaderGesture}
-						/>
-					) : null}
-					<ConciergeMark className='mx-1 size-4 shrink-0 text-muted-foreground' />
-					<h2 className='flex-1 truncate font-medium text-sm'>
-						{t('workbench:concierge.panel.title', 'Concierge')}
-					</h2>
-					<Button
-						aria-label={t(
-							'workbench:concierge.panel.clear',
-							'Clear context and start over',
-						)}
-						disabled={session.isClearing}
-						onClick={panel.clearContext}
-						onDoubleClick={stopHeaderGesture}
-						onPointerDown={stopHeaderGesture}
-						size='icon-sm'
-						variant='ghost'
-					>
-						<RotateCcw aria-hidden='true' className='size-4' />
-					</Button>
-					<Button
-						aria-label={
-							isFullscreen
-								? t('workbench:concierge.panel.restore', 'Restore panel')
-								: t('workbench:concierge.panel.maximize', 'Maximize')
-						}
-						onClick={panel.toggleFullscreen}
-						onDoubleClick={stopHeaderGesture}
-						onPointerDown={stopHeaderGesture}
-						size='icon-sm'
-						variant='ghost'
-					>
-						{isFullscreen ? (
-							<Minimize2 aria-hidden='true' className='size-4' />
-						) : (
-							<Maximize2 aria-hidden='true' className='size-4' />
-						)}
-					</Button>
-					<Button
-						aria-label={t('common:actions.close', 'Close')}
-						onClick={panel.closePanel}
-						onDoubleClick={stopHeaderGesture}
-						onPointerDown={stopHeaderGesture}
-						size='icon-sm'
-						variant='ghost'
-					>
-						<X aria-hidden='true' className='size-4' />
-					</Button>
-				</header>
+					onToggleFullscreen={panel.toggleFullscreen}
+				/>
 
 				{panel.showClearBanner ? (
 					<div className='flex shrink-0 items-center gap-2 border-status-warning/30 border-b bg-status-warning/10 px-3 py-2 text-status-warning text-xs'>
@@ -241,25 +143,8 @@ export function ConciergePanel() {
 					<ConciergeFilePreview home={session.cwd} />
 				</div>
 
-				{/* Maximized, the panel covers the sidebar's rail — the strip every other
-			    screen lets you hover and click to open or close it — so it carries a
-			    rail of its own along the same edge, lighting the same rule the shell's
-			    does: the sidebar's border while it is open, the panel's own edge once
-			    it is closed. */}
 				{isFullscreen ? (
-					<button
-						aria-label={sidebarEdgeLabel}
-						className={cn(
-							'absolute inset-y-0 left-0 z-10 hidden w-2 transition-all ease-linear after:absolute after:inset-y-0 after:w-0.5 hover:after:bg-sidebar-border sm:block',
-							sidebarIsCollapsed
-								? 'after:left-full after:-translate-x-px hover:bg-sidebar'
-								: 'after:-left-px',
-						)}
-						onClick={toggleSidebar}
-						tabIndex={-1}
-						title={sidebarEdgeLabel}
-						type='button'
-					/>
+					<ConciergeSidebarRail />
 				) : (
 					<ConciergeResizeHandles resize={panel.resize} />
 				)}
@@ -333,14 +218,4 @@ function panelStyle({
 		maxWidth: 'calc(100vw - 1rem)',
 		width: size.width,
 	};
-}
-
-/**
- * Keeps a header control's own press from reaching the title bar behind it,
- * which would otherwise start a drag of the whole panel or — on the second
- * click of a double — maximize it out from under the button being pressed.
- * @param event - The pointer-down or double-click on the control.
- */
-function stopHeaderGesture(event: { stopPropagation: () => void }): void {
-	event.stopPropagation();
 }

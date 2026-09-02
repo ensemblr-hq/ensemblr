@@ -1,20 +1,11 @@
-import { useQuery } from '@tanstack/react-query';
-import { useAtomValue } from 'jotai';
 import { type ReactNode, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { dictationKeyStatusQuery } from '@/renderer/api/ensemblr';
 import { TextContextMenu } from '@/renderer/components/text-context-menu';
-import { useHotkey } from '@/renderer/hooks/use-hotkey';
+import { useComposerDictation } from '@/renderer/hooks/workbench-shell/composer/use-composer-dictation';
+import { useComposerShortcuts } from '@/renderer/hooks/workbench-shell/composer/use-composer-shortcuts';
 import { useComposerState } from '@/renderer/hooks/workbench-shell/composer/use-composer-state';
-import { useDictation } from '@/renderer/hooks/workbench-shell/composer/use-dictation';
 import { cn } from '@/renderer/lib/utils';
-import { getNextThinkingId } from '@/renderer/lib/workbench/thinking-strength';
 import { useConsumeComposerFocusRequest } from '@/renderer/state/composer';
-import {
-	useMenuCommand,
-	useMenuCommandChecked,
-} from '@/renderer/state/menu-commands';
-import { dictationEnabledAtom } from '@/renderer/state/preferences';
 import type {
 	ComposerShellState,
 	WorkspaceLinkedIssueSummary,
@@ -86,75 +77,24 @@ function ComposerPanelBody({
 	const focusEditor = useCallback(() => {
 		state.editorRef.current?.focus();
 	}, [state.editorRef]);
-	useHotkey('composer.focus', focusEditor);
-	useMenuCommand('composer.focus', focusEditor);
 	useConsumeComposerFocusRequest(chatTabId, focusEditor);
 
 	const pickersDisabled = composer.disabled || state.isStreaming;
 	const toggleModelPicker = useCallback(() => {
 		setModelPickerOpen((current) => !current);
 	}, []);
-	const cycleThinking = useCallback(() => {
-		const nextId = getNextThinkingId(
-			composer.availableThinkingLevels,
-			composer.thinkingLevel,
-		);
-		if (nextId) {
-			composer.onThinkingChange(nextId);
-		}
-	}, [
-		composer.availableThinkingLevels,
-		composer.onThinkingChange,
-		composer.thinkingLevel,
-	]);
-	useHotkey('composer.toggleModelPicker', toggleModelPicker, {
-		enabled: !pickersDisabled && composer.availableModels.length > 0,
-	});
-	useHotkey('composer.cycleThinking', cycleThinking, {
-		enabled: !pickersDisabled && composer.availableThinkingLevels.length > 0,
-	});
-	const togglePlanMode = useCallback(() => {
-		composer.onPlanModeChange(!composer.planMode);
-	}, [composer.onPlanModeChange, composer.planMode]);
-	useHotkey('composer.togglePlanMode', togglePlanMode, {
-		enabled: !pickersDisabled,
-	});
-
-	useMenuCommand(
-		'composer.toggleModelPicker',
+	useComposerShortcuts({
+		composer,
+		focusEditor,
+		isStreaming: state.isStreaming,
+		pickersDisabled,
+		submit: () => void state.handleSubmit(),
 		toggleModelPicker,
-		!pickersDisabled && composer.availableModels.length > 0,
-	);
-	useMenuCommand(
-		'composer.cycleThinking',
-		cycleThinking,
-		!pickersDisabled && composer.availableThinkingLevels.length > 0,
-	);
-	// The mic is hidden rather than disabled when dictation is off or has no key:
-	// a permanently dead control in the row teaches nothing, while its absence
-	// sends the user to the settings row that can actually turn it on.
-	const dictationEnabled = useAtomValue(dictationEnabledAtom);
-	const { data: dictationKeyStatus } = useQuery({
-		...dictationKeyStatusQuery,
-		enabled: dictationEnabled,
 	});
-	const dictationVisible =
-		dictationEnabled && (dictationKeyStatus?.configured ?? false);
-	const dictation = useDictation({
-		enabled: dictationVisible && !composer.disabled,
+	const dictation = useComposerDictation({
+		disabled: composer.disabled,
 		onTranscript: state.insertDictatedText,
 	});
-	useHotkey('composer.toggleDictation', dictation.toggle, {
-		enabled: dictationVisible && !composer.disabled,
-	});
-
-	useMenuCommand('composer.togglePlanMode', togglePlanMode, !pickersDisabled);
-	useMenuCommandChecked('composer.togglePlanMode', composer.planMode);
-	useMenuCommand(
-		'composer.submit',
-		() => void state.handleSubmit(),
-		!composer.disabled && !state.isStreaming,
-	);
 
 	// Both queue controls hand an entry straight to the send pipeline, which
 	// refuses one outright while the composer cannot take a send. Offering them

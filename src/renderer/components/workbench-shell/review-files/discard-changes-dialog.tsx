@@ -1,11 +1,6 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { useCallback, useState } from 'react';
+import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import {
-	discardWorkspaceChanges,
-	ensemblrQueryKeys,
-} from '@/renderer/api/ensemblr';
 import { isEnsemblrApiAvailable } from '@/renderer/api/ensemblr-queries';
 import { Button } from '@/renderer/components/ui/button';
 import {
@@ -14,34 +9,39 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from '@/renderer/components/ui/dialog';
-import { failureText } from '@/renderer/lib/failure-text';
 import type { DiscardChangesTarget } from '@/renderer/types/workbench';
 
 /**
  * Destructive confirmation for discarding working-tree changes. Tracked files
  * revert to HEAD; new/untracked files are deleted — none of it is recoverable,
- * so the action is always gated behind this dialog.
+ * so the action is always gated behind this dialog. The git call itself belongs
+ * to `useDiscardChanges`, which owns how the change set settles afterwards.
  */
 export function DiscardChangesDialog({
+	errorMessage,
+	isPending,
+	onConfirm,
 	onOpenChange,
 	open,
 	target,
-	workspaceCwd,
 }: {
+	errorMessage: string | null;
+	isPending: boolean;
+	onConfirm: () => void;
 	onOpenChange: (open: boolean) => void;
 	open: boolean;
 	target: DiscardChangesTarget | null;
-	workspaceCwd: string;
 }) {
 	return (
 		<Dialog onOpenChange={onOpenChange} open={open}>
 			<DialogContent className='gap-4 sm:max-w-md'>
 				{target ? (
-					<DiscardChangesDialogForm
-						key={target.paths.join('\n')}
+					<DiscardChangesDialogBody
+						errorMessage={errorMessage}
+						isPending={isPending}
+						onConfirm={onConfirm}
 						onOpenChange={onOpenChange}
 						target={target}
-						workspaceCwd={workspaceCwd}
 					/>
 				) : null}
 			</DialogContent>
@@ -49,49 +49,22 @@ export function DiscardChangesDialog({
 	);
 }
 
-/** Inner form that discards a target's working-tree changes and surfaces any failure. */
-function DiscardChangesDialogForm({
+/** Copy, affected-file summary, and buttons for one pending discard target. */
+function DiscardChangesDialogBody({
+	errorMessage,
+	isPending,
+	onConfirm,
 	onOpenChange,
 	target,
-	workspaceCwd,
 }: {
+	errorMessage: string | null;
+	isPending: boolean;
+	onConfirm: () => void;
 	onOpenChange: (open: boolean) => void;
 	target: DiscardChangesTarget;
-	workspaceCwd: string;
 }) {
 	const { t } = useTranslation();
-	const queryClient = useQueryClient();
-	const [errorMessage, setErrorMessage] = useState<string | null>(null);
-
-	const mutation = useMutation({
-		mutationFn: () =>
-			discardWorkspaceChanges({ paths: target.paths, workspaceCwd }),
-		onError: (error) =>
-			setErrorMessage(
-				error instanceof Error
-					? error.message
-					: t('errors:discard-changes.failed', 'Could not discard changes.'),
-			),
-		onSettled: () => {
-			// Some files may have been discarded even on partial failure, so refresh
-			// both the change set and the lazy file tree regardless of outcome.
-			void queryClient.invalidateQueries({
-				queryKey: ensemblrQueryKeys.workspaceGitStatus(workspaceCwd),
-			});
-			void queryClient.invalidateQueries({
-				queryKey: ensemblrQueryKeys.workspaceFiles(workspaceCwd),
-			});
-		},
-		onSuccess: (result) => {
-			if (result.error) {
-				setErrorMessage(failureText(t, result.error));
-				return;
-			}
-			onOpenChange(false);
-		},
-	});
-
-	const canDiscard = !mutation.isPending && isEnsemblrApiAvailable();
+	const canDiscard = !isPending && isEnsemblrApiAvailable();
 	const isBulk = target.fileCount > 1;
 
 	const handleClose = useCallback(() => {
@@ -139,7 +112,7 @@ function DiscardChangesDialogForm({
 			<div className='-mx-4 -mb-4 flex justify-end gap-2 rounded-b-xl border-border border-t bg-muted/40 px-4 py-3'>
 				<Button
 					className='h-8'
-					disabled={mutation.isPending}
+					disabled={isPending}
 					onClick={handleClose}
 					type='button'
 					variant='outline'
@@ -149,8 +122,8 @@ function DiscardChangesDialogForm({
 				<Button
 					className='h-8'
 					disabled={!canDiscard}
-					onClick={() => mutation.mutate()}
-					pending={mutation.isPending}
+					onClick={onConfirm}
+					pending={isPending}
 					type='button'
 					variant='destructive'
 				>

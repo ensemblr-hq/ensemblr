@@ -1538,6 +1538,8 @@ export default interface Resources {
 		'discard-changes': {
 			'affected-file-count_one': '{{count}} file affected';
 			'affected-file-count_other': '{{count}} files affected';
+			'all-uncommitted-target_one': 'all {{count}} uncommitted change';
+			'all-uncommitted-target_other': 'all {{count}} uncommitted changes';
 			description: 'The working-tree changes are reverted to the last commit; a new file is deleted. This cannot be undone.';
 			'description-bulk': 'Every working-tree change is reverted to the last commit and any new files are deleted. This cannot be undone.';
 			title: 'Discard changes?';
@@ -2340,6 +2342,7 @@ export default interface Resources {
 				'composer-focus': 'Focus composer';
 				'composer-newline': 'Insert newline in composer';
 				'composer-queue': 'Queue message as a follow-up';
+				'composer-send-now': 'Send now, skipping the follow-up queue';
 				'composer-submit': 'Send message';
 				'composer-submit-with-mod': 'Send message';
 				'composer-toggle-dictation': 'Start or stop dictation';

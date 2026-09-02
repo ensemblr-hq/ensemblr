@@ -215,6 +215,18 @@ export const ensemblrQueryKeys = {
 			workspaceCwd,
 			baseRef,
 		] as const,
+	/**
+	 * Query key prefix covering every lazily enumerated directory in a workspace.
+	 * Invalidating this refreshes all expanded ignored folders at once.
+	 */
+	workspaceDirectories: (workspaceCwd: string) =>
+		[...ensemblrQueryKeys.all, 'workspace-directory', workspaceCwd] as const,
+	/** Query key for one lazily enumerated directory level within a workspace. */
+	workspaceDirectory: (workspaceCwd: string, directoryPath: string) =>
+		[
+			...ensemblrQueryKeys.workspaceDirectories(workspaceCwd),
+			directoryPath,
+		] as const,
 	/** Query key for a single file's diff within a workspace and scope. */
 	workspaceFileDiff: (
 		workspaceCwd: string,
@@ -239,6 +251,9 @@ export const ensemblrQueryKeys = {
 			workspaceCwd,
 			scopeKey,
 		] as const,
+	/** Prefix matching a workspace's cached git status at every diff scope. */
+	workspaceGitStatusAll: (workspaceCwd: string) =>
+		[...ensemblrQueryKeys.all, 'workspace-git-status', workspaceCwd] as const,
 	/** Query key for the paths that conflict between a workspace and its base. */
 	workspaceMergeConflicts: (workspaceCwd: string, baseRef = '') =>
 		[

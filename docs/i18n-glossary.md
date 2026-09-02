@@ -32,6 +32,7 @@ Rules of thumb:
 | Destroyed *(a worktree)* | Worktree удалён | Το worktree διαγράφηκε | The state of an archived workspace whose folder **and** branch were both dropped, so its commits are gone. Kept plainly distinct from *pruned*: the two look identical in the archive list and only this wording tells the user which one comes back intact. |
 | Branch | Ветка | Κλάδος | |
 | Commit | Коммит | Commit | |
+| Uncommitted change | Изменение без коммита | Αλλαγή χωρίς commit | The working-tree change set. Russian says *without a commit* rather than a participle; Greek keeps the porcelain `commit`. Already the shape every `git:` catalogue row uses — reuse it rather than coining `незакоммиченный`/`μη υποβεβλημένη`. |
 | Pull request | Pull request | Pull request | Untranslated; `PR` stays `PR`. |
 | Diff | Diff | Diff | Untranslated — "различия"/"διαφορές" reads as prose, not the view. |
 | Review comment | Комментарий к ревью | Σχόλιο αξιολόγησης | |

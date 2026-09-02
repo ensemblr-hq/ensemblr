@@ -93,42 +93,30 @@ function LinearLinkedIssueStatus({
 
 	if (gate.kind !== 'ready') {
 		return (
-			<span className='flex flex-wrap items-center gap-2'>
-				<LinkedIssueReference linkedIssue={linkedIssue} />
-				<Button asChild size='sm' variant='ghost'>
-					<Link to='/settings/integrations'>
-						{gate.kind === 'reconnect-required'
-							? t('linear:linked-issue.reconnect', 'Reconnect Linear')
-							: t('linear:linked-issue.connect', 'Connect Linear')}
-					</Link>
-				</Button>
-			</span>
+			<LinearConnectPrompt
+				linkedIssue={linkedIssue}
+				needsReconnect={gate.kind === 'reconnect-required'}
+			/>
 		);
 	}
 
-	if (!result || result.status === 'error') {
+	if (!result) {
 		return (
-			<span className='flex flex-wrap items-center gap-2'>
-				<LinkedIssueReference linkedIssue={linkedIssue} />
-				<Badge variant='outline'>
-					{result
-						? shortFailureLabel(result.failure.code, t)
-						: t('linear:linked-issue.status.unavailable', 'Status unavailable')}
-				</Badge>
-				{result?.failure.code === 'not-found' ? null : (
-					<Button
-						aria-label={t(
-							'linear:linked-issue.refresh',
-							'Refresh linked issue',
-						)}
-						onClick={refresh.start}
-						size='icon-sm'
-						variant='ghost'
-					>
-						<RefreshCwIcon />
-					</Button>
-				)}
-			</span>
+			<LinearStatusUnavailable
+				failureCode={null}
+				linkedIssue={linkedIssue}
+				onRefresh={refresh.start}
+			/>
+		);
+	}
+
+	if (result.status === 'error') {
+		return (
+			<LinearStatusUnavailable
+				failureCode={result.failure.code}
+				linkedIssue={linkedIssue}
+				onRefresh={refresh.start}
+			/>
 		);
 	}
 
@@ -148,22 +136,99 @@ function LinearLinkedIssueStatus({
 				<SetStatusMenu issue={result.issue} />
 			)}
 			{isLinearDataStale(result.issue.syncedAt, now) ? (
-				<Button
-					aria-label={t(
+				<RefreshIssueButton
+					busy={detailFetching}
+					label={t(
 						'linear:linked-issue.refresh-status',
 						'Refresh linked issue status',
 					)}
-					disabled={detailFetching}
-					onClick={refresh.start}
-					size='icon-sm'
-					variant='ghost'
-				>
-					<RefreshCwIcon
-						className={detailFetching ? 'animate-spin' : undefined}
-					/>
-				</Button>
+					onRefresh={refresh.start}
+				/>
 			) : null}
 		</span>
+	);
+}
+
+/** Reference plus the settings link that gets Linear connected or reconnected. */
+function LinearConnectPrompt({
+	linkedIssue,
+	needsReconnect,
+}: {
+	linkedIssue: WorkspaceLinkedIssueSummary;
+	needsReconnect: boolean;
+}) {
+	const { t } = useTranslation();
+
+	return (
+		<span className='flex flex-wrap items-center gap-2'>
+			<LinkedIssueReference linkedIssue={linkedIssue} />
+			<Button asChild size='sm' variant='ghost'>
+				<Link to='/settings/integrations'>
+					{needsReconnect
+						? t('linear:linked-issue.reconnect', 'Reconnect Linear')
+						: t('linear:linked-issue.connect', 'Connect Linear')}
+				</Link>
+			</Button>
+		</span>
+	);
+}
+
+/**
+ * Reference plus a badge saying why the live status is missing. A retry sits
+ * beside it except for `not-found`, where the issue is gone from Linear and no
+ * amount of refreshing brings it back.
+ * @param failureCode - The Linear failure code, or null when nothing came back at all.
+ */
+function LinearStatusUnavailable({
+	failureCode,
+	linkedIssue,
+	onRefresh,
+}: {
+	failureCode: string | null;
+	linkedIssue: WorkspaceLinkedIssueSummary;
+	onRefresh: () => void;
+}) {
+	const { t } = useTranslation();
+
+	return (
+		<span className='flex flex-wrap items-center gap-2'>
+			<LinkedIssueReference linkedIssue={linkedIssue} />
+			<Badge variant='outline'>
+				{failureCode === null
+					? t('linear:linked-issue.status.unavailable', 'Status unavailable')
+					: shortFailureLabel(failureCode, t)}
+			</Badge>
+			{failureCode === 'not-found' ? null : (
+				<RefreshIssueButton
+					busy={false}
+					label={t('linear:linked-issue.refresh', 'Refresh linked issue')}
+					onRefresh={onRefresh}
+				/>
+			)}
+		</span>
+	);
+}
+
+/** Icon button that re-fetches the linked issue, spinning while one is in flight. */
+function RefreshIssueButton({
+	busy,
+	label,
+	onRefresh,
+}: {
+	busy: boolean;
+	label: string;
+	onRefresh: () => void;
+}) {
+	return (
+		<Button
+			aria-label={label}
+			disabled={busy}
+			onClick={onRefresh}
+			size='icon-sm'
+			variant='ghost'
+		>
+			<RefreshCwIcon className={busy ? 'animate-spin' : undefined} />
+		</Button>
 	);
 }
 

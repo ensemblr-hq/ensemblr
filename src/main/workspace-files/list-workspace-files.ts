@@ -64,6 +64,12 @@ const GIT_IGNORED_ARGS = [
 	'--directory',
 	'-z',
 ] as const;
+// Lists index entries whose worktree file is gone. `--cached` above enumerates
+// the index, so a file deleted or moved without staging is still listed there;
+// subtracting this set is what keeps a `mv`d directory from showing at both its
+// old and new path until the move is committed. It must be its own invocation:
+// adding `--deleted` to the primary call would add a category, not filter one.
+const GIT_DELETED_ARGS = ['ls-files', '--deleted', '-z'] as const;
 const TIMEOUT_MS = 10_000;
 const MAX_OUTPUT_BYTES = 4 * 1024 * 1024;
 const MAX_ENTRIES = 5000;
@@ -110,6 +116,10 @@ export interface CreateListWorkspaceFilesServiceOptions {
  * workspace by shelling out to `git ls-files -z`, safely reads selected files,
  * and hands composer attachments to the content-addressed store in
  * `context-attachments.ts`. Caller-supplied cwd must be absolute.
+ *
+ * The listing describes the worktree rather than the index: entries `--cached`
+ * still carries for a file that was deleted or moved without staging are
+ * subtracted, so a `mv`d directory does not show at both its old and new path.
  */
 export function createListWorkspaceFilesService({
 	ignoredRootMaxEntries = IGNORED_ROOT_MAX_ENTRIES,
@@ -137,9 +147,10 @@ export function createListWorkspaceFilesService({
 					timeoutMs: TIMEOUT_MS,
 				});
 
-			const [tracked, ignored] = await Promise.all([
+			const [tracked, ignored, deleted] = await Promise.all([
 				runGit(GIT_ARGS),
 				runGit(GIT_IGNORED_ARGS),
+				runGit(GIT_DELETED_ARGS),
 			]);
 
 			if (tracked.status !== 'success') {
@@ -161,7 +172,13 @@ export function createListWorkspaceFilesService({
 				};
 			}
 
-			const trackedEntries = parseGitLsFiles(tracked.stdout);
+			// Best-effort like the ignored listing: a failure here must never drop
+			// the primary file list, so fall back to subtracting nothing.
+			const deletedPaths =
+				deleted.status === 'success'
+					? parseNulSeparatedPaths(deleted.stdout)
+					: new Set<string>();
+			const trackedEntries = parseGitLsFiles(tracked.stdout, deletedPaths);
 			// Ignored listing is best-effort: a failure there must never drop the
 			// primary file list, so fall back to no ignored entries.
 			const ignoredEntries =
@@ -317,13 +334,48 @@ export function createListWorkspaceFilesService({
 	};
 }
 
-/** Parses `git ls-files -z` output into directory rows followed by file rows. */
-function parseGitLsFiles(stdout: string): readonly WorkspaceFileEntryWire[] {
+/**
+ * Collects the paths in a `-z` git listing into a set, dropping blanks.
+ * @param stdout - Raw NUL-separated stdout.
+ * @returns Every non-empty path the listing named.
+ */
+function parseNulSeparatedPaths(stdout: string): ReadonlySet<string> {
+	const paths = new Set<string>();
+	for (const raw of stdout.split('\0')) {
+		const trimmed = raw.trim();
+		if (trimmed) {
+			paths.add(trimmed);
+		}
+	}
+	return paths;
+}
+
+/**
+ * Parses `git ls-files -z` output into directory rows followed by file rows.
+ *
+ * Index entries whose worktree file is gone are dropped before the directory
+ * rows are collected, so a deleted or moved-away folder disappears entirely
+ * rather than lingering as a row with no children. Applying the filter to the
+ * whole listing is safe: the `--others` half is on disk by definition and can
+ * never appear in `--deleted`.
+ * @param stdout - Raw NUL-separated `ls-files` stdout.
+ * @param deletedPaths - Index paths missing from the worktree.
+ * @returns Directory rows followed by file rows, outermost directories first.
+ */
+function parseGitLsFiles(
+	stdout: string,
+	deletedPaths: ReadonlySet<string>,
+): readonly WorkspaceFileEntryWire[] {
 	const filePaths: string[] = [];
 	const seenFiles = new Set<string>();
 	for (const raw of stdout.split('\0')) {
 		const trimmed = raw.trim();
-		if (!trimmed || seenFiles.has(trimmed) || isHiddenEntryPath(trimmed)) {
+		if (
+			!trimmed ||
+			seenFiles.has(trimmed) ||
+			deletedPaths.has(trimmed) ||
+			isHiddenEntryPath(trimmed)
+		) {
 			continue;
 		}
 		seenFiles.add(trimmed);

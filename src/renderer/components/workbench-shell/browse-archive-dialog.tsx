@@ -1,4 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import type { TFunction } from 'i18next';
 import { HardDriveDownloadIcon } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -66,6 +67,53 @@ export function BrowseArchiveDialog({
 interface RowActivity {
 	action: ArchiveRowAction;
 	workspaceId: string;
+}
+
+/**
+ * Picks the message that stands in for the archive list, in the order the
+ * states become knowable: no preload bridge, still loading, load failure, then
+ * a repository with nothing archived.
+ * @param options - Query state plus how many entries came back
+ * @returns The message to show instead of the list, or null once there are rows
+ */
+function resolveArchiveEmptyMessage({
+	apiAvailable,
+	entryCount,
+	isError,
+	isLoading,
+	t,
+}: {
+	apiAvailable: boolean;
+	entryCount: number;
+	isError: boolean;
+	isLoading: boolean;
+	t: TFunction;
+}): string | null {
+	if (!apiAvailable) {
+		return t(
+			'workbench:browse-archive.empty.unavailable',
+			'The preload bridge is unavailable in this context.',
+		);
+	}
+	if (isLoading) {
+		return t(
+			'workbench:browse-archive.empty.loading',
+			'Loading archived workspaces…',
+		);
+	}
+	if (isError) {
+		return t(
+			'workbench:browse-archive.empty.failed',
+			'Failed to load archived workspaces.',
+		);
+	}
+	if (entryCount === 0) {
+		return t(
+			'workbench:browse-archive.empty.none',
+			'No archived workspaces for this repository.',
+		);
+	}
+	return null;
 }
 
 /** Inner body that lists a repository's archived workspaces with its row actions. */
@@ -210,6 +258,13 @@ function BrowseArchiveDialogBody({
 
 	const diagnostics = rowDiagnostics ?? reclaim.diagnostics;
 	const freed = formatBytes(reclaim.reclaimedBytes, i18n.language);
+	const emptyMessage = resolveArchiveEmptyMessage({
+		apiAvailable,
+		entryCount: entries.length,
+		isError,
+		isLoading,
+		t,
+	});
 
 	return (
 		<>
@@ -276,34 +331,8 @@ function BrowseArchiveDialogBody({
 			) : null}
 
 			<div className='-mx-4 max-h-[60vh] overflow-y-auto border-border border-t border-b'>
-				{!apiAvailable ? (
-					<EmptyState
-						message={t(
-							'workbench:browse-archive.empty.unavailable',
-							'The preload bridge is unavailable in this context.',
-						)}
-					/>
-				) : isLoading ? (
-					<EmptyState
-						message={t(
-							'workbench:browse-archive.empty.loading',
-							'Loading archived workspaces…',
-						)}
-					/>
-				) : isError ? (
-					<EmptyState
-						message={t(
-							'workbench:browse-archive.empty.failed',
-							'Failed to load archived workspaces.',
-						)}
-					/>
-				) : entries.length === 0 ? (
-					<EmptyState
-						message={t(
-							'workbench:browse-archive.empty.none',
-							'No archived workspaces for this repository.',
-						)}
-					/>
+				{emptyMessage ? (
+					<EmptyState message={emptyMessage} />
 				) : (
 					<ul className='divide-y divide-border'>
 						{entries.map((entry) => (

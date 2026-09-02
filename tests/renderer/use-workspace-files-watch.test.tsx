@@ -68,3 +68,90 @@ test('invalidates files and workspace-scoped settings after a watched workspace 
 		queryKey: ensemblrQueryKeys.settingsResolution('repo-1', '/tmp/workspace'),
 	});
 });
+
+const WORKSPACE_CWD = '/tmp/workspace';
+
+/**
+ * Counts how many times the expanded-directory prefix was invalidated, which is
+ * the fan-out the throttle exists to bound.
+ */
+function directoryRefreshCount(calls: unknown[][]): number {
+	const wanted = JSON.stringify(
+		ensemblrQueryKeys.workspaceDirectories(WORKSPACE_CWD),
+	);
+	return calls.filter(
+		([argument]) =>
+			JSON.stringify(
+				(argument as { queryKey?: unknown } | undefined)?.queryKey,
+			) === wanted,
+	).length;
+}
+
+test('throttles the expanded-directory refresh a burst of broadcasts would fan out', () => {
+	vi.useFakeTimers();
+	try {
+		const client = createTestQueryClient();
+		const invalidateQueries = vi.spyOn(client, 'invalidateQueries');
+		let listener: ((event: WorkspaceFilesChangedBroadcast) => void) | null =
+			null;
+
+		installEnsemblrApi({
+			onWorkspaceFilesChanged: (
+				nextListener: (event: WorkspaceFilesChangedBroadcast) => void,
+			) => {
+				listener = nextListener;
+				return vi.fn();
+			},
+			unwatchWorkspaceFiles: vi.fn(),
+			watchWorkspaceFiles: vi.fn(),
+		});
+
+		const wrapper = ({ children }: { children: ReactNode }) => (
+			<QueryClientProvider client={client}>{children}</QueryClientProvider>
+		);
+
+		renderHook(
+			() =>
+				useWorkspaceFilesWatch({
+					repositoryId: null,
+					workspaceCwd: WORKSPACE_CWD,
+				}),
+			{ wrapper },
+		);
+
+		act(() => {
+			for (let index = 0; index < 5; index += 1) {
+				listener?.({ workspaceCwd: WORKSPACE_CWD });
+			}
+		});
+
+		// The file list refreshes once per broadcast because it is one query; the
+		// per-folder fan-out behind it is what must not.
+		expect(
+			invalidateQueries.mock.calls.filter(
+				([argument]) =>
+					JSON.stringify(argument?.queryKey) ===
+					JSON.stringify(ensemblrQueryKeys.workspaceFiles(WORKSPACE_CWD)),
+			),
+		).toHaveLength(5);
+
+		act(() => {
+			vi.advanceTimersByTime(1);
+		});
+		expect(directoryRefreshCount(invalidateQueries.mock.calls)).toBe(1);
+
+		act(() => {
+			listener?.({ workspaceCwd: WORKSPACE_CWD });
+			vi.advanceTimersByTime(1);
+		});
+		expect(directoryRefreshCount(invalidateQueries.mock.calls)).toBe(1);
+
+		// Deferred, not dropped: the tail of a burst still lands, one window later.
+		act(() => {
+			vi.advanceTimersByTime(5_000);
+		});
+		expect(directoryRefreshCount(invalidateQueries.mock.calls)).toBe(2);
+	} finally {
+		vi.useRealTimers();
+	}
+});

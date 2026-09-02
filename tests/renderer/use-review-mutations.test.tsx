@@ -7,12 +7,14 @@ import { beforeEach, expect, test, vi } from 'vitest';
 
 const {
 	archiveWorkspace,
+	invalidateWorkspaceGitStatus,
 	invalidateWorkspaceListViews,
 	mergePullRequest,
 	refreshPullRequestSnapshot,
 	removeWorkspace,
 } = vi.hoisted(() => ({
 	archiveWorkspace: vi.fn(),
+	invalidateWorkspaceGitStatus: vi.fn().mockResolvedValue(undefined),
 	invalidateWorkspaceListViews: vi.fn().mockResolvedValue(undefined),
 	mergePullRequest: vi.fn().mockResolvedValue({ merged: true }),
 	refreshPullRequestSnapshot: vi.fn().mockResolvedValue(undefined),
@@ -24,9 +26,7 @@ const {
 
 vi.mock('@/renderer/api/ensemblr-queries', () => ({
 	archiveWorkspace,
-	ensemblrQueryKeys: {
-		workspaceGitStatus: (cwd: string) => ['git-status', cwd],
-	},
+	invalidateWorkspaceGitStatus,
 	invalidateWorkspaceListViews,
 	mergePullRequest,
 	refreshPullRequestSnapshot,
@@ -132,4 +132,17 @@ test('refreshes list views but stays put when archiving throws', async () => {
 		expect(invalidateWorkspaceListViews).toHaveBeenCalledTimes(1);
 	});
 	expect(removeWorkspace.archived).not.toHaveBeenCalled();
+});
+
+test('refreshes the change set at every diff scope after a merge', async () => {
+	const { result } = renderReviewMutations(false);
+
+	await result.current.mergeMutation.mutateAsync();
+
+	await waitFor(() => {
+		expect(invalidateWorkspaceGitStatus).toHaveBeenCalledWith(
+			expect.anything(),
+			'/tmp/san-antonio',
+		);
+	});
 });

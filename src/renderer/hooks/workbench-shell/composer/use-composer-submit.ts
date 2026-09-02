@@ -510,6 +510,24 @@ export function useComposerSubmit({
 			void submitText(draft);
 		}, [composer.isStreaming, enqueueDraft, readDraft, submitText]),
 		/**
+		 * Sends the current draft this instant, whatever the Follow-up behavior says.
+		 * Mid-turn it goes as a steer frame, which is the only delivery that reaches
+		 * a turn already running; `queue` and `block` would both have parked it, and
+		 * bypassing them is the whole point. Idle it is an ordinary send, so the
+		 * shortcut never means something different from the send button.
+		 *
+		 * Deliberately leaves an existing queue alone: jumping one message past the
+		 * queue is a decision about that message, and draining the rest behind it
+		 * would send everything the user had parked.
+		 */
+		sendNow: useCallback(() => {
+			const draft = readDraft();
+			void submitText(draft, {
+				streamingBehavior:
+					composer.isStreaming && !isEmptyDraft(draft) ? 'steer' : undefined,
+			});
+		}, [composer.isStreaming, readDraft, submitText]),
+		/**
 		 * Takes a queued entry back out for editing, restoring the document so its
 		 * chips land where the user left them.
 		 */
