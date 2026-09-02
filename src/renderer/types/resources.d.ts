@@ -988,10 +988,14 @@ export default interface Resources {
 		};
 		'workspace-archive': {
 			archived: {
+				'branch-dropped': 'Its local branch was deleted, so restoring the workspace will not bring back commits you never pushed.';
 				title: 'Workspace archived.';
 			};
 			failed: {
 				title: 'Archiving the workspace failed.';
+			};
+			'in-flight': {
+				title: 'This workspace is already being archived.';
 			};
 			skipped: {
 				title: 'The workspace was not archived.';
@@ -1000,6 +1004,11 @@ export default interface Resources {
 		'workspace-create': {
 			failed: {
 				title: 'Failed to create workspace.';
+			};
+		};
+		'workspace-unarchive': {
+			failed: {
+				title: 'Restoring the workspace failed.';
 			};
 		};
 	};
@@ -2423,6 +2432,8 @@ export default interface Resources {
 			'description-reclaim': 'Marks the workspace as archived and preserves its <0>.context/</0> handoff files under <1>archived-contexts/</1>. The worktree folder is removed to reclaim its disk, keeping the branch and a snapshot of any uncommitted changes; unarchiving restores both and rebuilds dependencies.';
 			'settings-unavailable': 'Your git settings could not be read, so the worktree folder and local branch will be kept.';
 			title: 'Archive workspace?';
+			uncommitted_one: 'This workspace has {{count}} uncommitted change that archiving will not commit or push.';
+			uncommitted_other: 'This workspace has {{count}} uncommitted changes that archiving will not commit or push.';
 		};
 		'attach-to-chat': {
 			attached: '{{label}} is attached to the chat.';

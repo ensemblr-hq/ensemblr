@@ -1,7 +1,9 @@
 import { useAtom } from 'jotai';
 import { useCallback, useEffect, useState } from 'react';
 
+import { useArchivedWorkspaceToast } from '@/renderer/hooks/workbench-shell/use-archive-workspace-action';
 import { useRemoveWorkspaceAction } from '@/renderer/hooks/workbench-shell/use-remove-workspace-action';
+import type { ArchivedWorkspace } from '@/renderer/lib/workbench/archive-worktree-plan';
 import {
 	type WorkspaceLifecycleDialogRequest,
 	workspaceLifecycleDialogAtom,
@@ -31,6 +33,7 @@ export function WorkspaceLifecycleDialogHost({
 	const handleWorkspaceRemoved = useRemoveWorkspaceAction({
 		activeWorkspaceId,
 	});
+	const announceArchived = useArchivedWorkspaceToast();
 	// Radix keeps a closing dialog mounted for its exit animation. Dropping the
 	// workspace the instant the request clears would empty the panel for those
 	// frames, which is the "shell with no content" the removal used to leave on
@@ -55,10 +58,21 @@ export function WorkspaceLifecycleDialogHost({
 
 	const workspace = (request ?? closing)?.workspace ?? null;
 
+	// Only the archives the instant path refuses to run reach this dialog, so
+	// these are the ones most worth announcing. The toast reads the plan that ran
+	// to decide whether it may offer to take it back.
+	const handleArchived = useCallback(
+		async (archived: ArchivedWorkspace) => {
+			await handleWorkspaceRemoved.archived(archived.workspaceId);
+			announceArchived(archived);
+		},
+		[announceArchived, handleWorkspaceRemoved.archived],
+	);
+
 	return (
 		<>
 			<ArchiveWorkspaceDialog
-				onArchived={handleWorkspaceRemoved.archived}
+				onArchived={handleArchived}
 				onOpenChange={closeOnDismiss}
 				open={request?.kind === 'archive'}
 				workspace={workspace}

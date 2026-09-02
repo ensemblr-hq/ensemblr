@@ -101,7 +101,7 @@ export function WorkspaceCard({
 				</div>
 			</ContextMenuTrigger>
 			<WorkspaceContextMenuContent
-				onArchiveSelect={() => menu.openArchive(workspace)}
+				onArchiveSelect={() => menu.archive(workspace)}
 				onDeleteSelect={() => menu.openDelete(workspace)}
 				onRenameSelect={() => menu.openRename(workspace)}
 				workspace={workspace}

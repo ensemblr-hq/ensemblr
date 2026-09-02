@@ -526,10 +526,14 @@
 	},
 	"workspace-archive": {
 		"archived": {
+			"branch-dropped": "Its local branch was deleted, so restoring the workspace will not bring back commits you never pushed.",
 			"title": "Workspace archived."
 		},
 		"failed": {
 			"title": "Archiving the workspace failed."
+		},
+		"in-flight": {
+			"title": "This workspace is already being archived."
 		},
 		"skipped": {
 			"title": "The workspace was not archived."
@@ -538,6 +542,11 @@
 	"workspace-create": {
 		"failed": {
 			"title": "Failed to create workspace."
+		}
+	},
+	"workspace-unarchive": {
+		"failed": {
+			"title": "Restoring the workspace failed."
 		}
 	}
 }

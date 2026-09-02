@@ -3,6 +3,10 @@ import { useState } from 'react';
 import { flushSync } from 'react-dom';
 
 import { getErrorMessage } from '@/renderer/lib/error';
+import {
+	claimLifecycleRun,
+	releaseLifecycleRun,
+} from '@/renderer/lib/workbench/lifecycle-run-latch';
 
 /**
  * The diagnostic shape every lifecycle result carries: a code the renderer
@@ -27,20 +31,6 @@ interface LifecycleResult<TDiagnostic extends LifecycleDiagnostic> {
 	diagnostics: TDiagnostic[];
 	status: LifecycleStatus;
 }
-
-/**
- * Operation keys of the lifecycle runs currently in flight. Module-scoped
- * rather than a ref because the dialog form remounts on every open: dismissing
- * a dialog mid-delete and reopening it would otherwise hand back a fresh, idle
- * form and let a second destructive IPC start over the first.
- *
- * The latch covers the IPC and nothing after it: the key is released in a
- * `finally` the moment the call answers, so post-removal work that stalls never
- * strands the target behind a latch it can no longer clear. A second attempt
- * while the first is genuinely still in flight reports the failure rather than
- * no-opping, so the button is never dead without saying why.
- */
-const runsInFlight = new Set<string>();
 
 /**
  * Drives one archive or delete confirmation dialog: runs the IPC, keeps the
@@ -76,7 +66,7 @@ export function useLifecycleDialogAction<
 	const [diagnostics, setDiagnostics] = useState<TDiagnostic[]>([]);
 
 	const start = async (): Promise<void> => {
-		if (runsInFlight.has(operationKey)) {
+		if (!claimLifecycleRun(operationKey)) {
 			// An earlier run of this exact operation is still waiting on its IPC.
 			// Returning silently left the action button dead with nothing on screen
 			// to explain why, so render the failure headline instead — there is no
@@ -84,7 +74,6 @@ export function useLifecycleDialogAction<
 			setDiagnostics([failure('')]);
 			return;
 		}
-		runsInFlight.add(operationKey);
 		setIsBusy(true);
 		setDiagnostics([]);
 
@@ -92,7 +81,7 @@ export function useLifecycleDialogAction<
 		try {
 			result = await reportedOutcome(run, failure);
 		} finally {
-			runsInFlight.delete(operationKey);
+			releaseLifecycleRun(operationKey);
 		}
 
 		try {
