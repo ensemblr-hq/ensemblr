@@ -197,6 +197,32 @@ describe('matchesShortcut — composer submit', () => {
 		expect(matchesShortcut('composer.submitWithMod', e)).toBe(true);
 		expect(matchesShortcut('composer.submit', e)).toBe(false);
 	});
+
+	// Four shortcuts sit on Enter and are told apart by modifiers alone, so adding
+	// the queue-bypassing send is exactly the kind of change that silently steals
+	// a chord from one of the other three.
+	test('mod+shift+Enter matches composer.sendNow and none of the other Enter bindings', () => {
+		const e = modEvent({ key: 'Enter', code: 'Enter', shiftKey: true });
+		expect(matchesShortcut('composer.sendNow', e)).toBe(true);
+		expect(matchesShortcut('composer.submit', e)).toBe(false);
+		expect(matchesShortcut('composer.submitWithMod', e)).toBe(false);
+		expect(matchesShortcut('composer.newline', e)).toBe(false);
+	});
+
+	test('composer.sendNow does not fire on the plain or mod-only Enter', () => {
+		expect(
+			matchesShortcut(
+				'composer.sendNow',
+				event({ key: 'Enter', code: 'Enter' }),
+			),
+		).toBe(false);
+		expect(
+			matchesShortcut(
+				'composer.sendNow',
+				modEvent({ key: 'Enter', code: 'Enter' }),
+			),
+		).toBe(false);
+	});
 });
 
 /**

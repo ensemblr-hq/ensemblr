@@ -132,6 +132,10 @@ export const SHORTCUTS = {
 		scope: 'composer',
 		bindings: [{ key: 'Enter', modifiers: ['mod'] }],
 	},
+	'composer.sendNow': {
+		scope: 'composer',
+		bindings: [{ key: 'Enter', modifiers: ['mod', 'shift'] }],
+	},
 	'composer.newline': {
 		scope: 'composer',
 		bindings: [{ key: 'Enter', modifiers: ['shift'] }],
@@ -192,10 +196,15 @@ export const SHORTCUTS = {
 		bindings: [{ key: 't', modifiers: ['mod'] }],
 		accelerator: 'CommandOrControl+T',
 	},
+	// Not ⌘⇧↵ — that chord belongs to `composer.sendNow`, and an accelerator here
+	// would let AppKit claim it before the composer ever saw the keydown. Not
+	// ⌘⇧P either: ⌘P one entry up is `files.search`, so ⌘⇧P reads as its command
+	// palette everywhere else, and the accelerator would swallow it inside a
+	// terminal pane too.
 	'tab.keepOpen': {
 		scope: 'global',
-		bindings: [{ key: 'Enter', modifiers: ['mod', 'shift'] }],
-		accelerator: 'CommandOrControl+Shift+Return',
+		bindings: [{ key: 'o', modifiers: ['mod', 'shift'] }],
+		accelerator: 'CommandOrControl+Shift+O',
 	},
 	'tab.next': {
 		scope: 'global',

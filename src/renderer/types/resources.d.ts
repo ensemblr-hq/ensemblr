@@ -2340,6 +2340,7 @@ export default interface Resources {
 				'composer-focus': 'Focus composer';
 				'composer-newline': 'Insert newline in composer';
 				'composer-queue': 'Queue message as a follow-up';
+				'composer-send-now': 'Send now, skipping the follow-up queue';
 				'composer-submit': 'Send message';
 				'composer-submit-with-mod': 'Send message';
 				'composer-toggle-dictation': 'Start or stop dictation';

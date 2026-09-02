@@ -105,6 +105,10 @@ function shortcutName(t: TFunction): Record<ShortcutId, string> {
 			'settings:shortcuts.name.composer-queue',
 			'Queue message as a follow-up',
 		),
+		'composer.sendNow': t(
+			'settings:shortcuts.name.composer-send-now',
+			'Send now, skipping the follow-up queue',
+		),
 		'composer.submit': t(
 			'settings:shortcuts.name.composer-submit',
 			'Send message',
