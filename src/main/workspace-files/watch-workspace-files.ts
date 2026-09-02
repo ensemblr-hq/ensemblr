@@ -4,6 +4,13 @@ import path from 'node:path';
 import { startLinuxRecursiveWatch } from './linux-recursive-watch.ts';
 
 const WATCH_DEBOUNCE_MS = 250;
+/**
+ * Ceiling on how long a burst of events may defer the notification. The debounce
+ * alone is trailing-only, so sustained churn — an `npm install`, a build, moving
+ * a large directory — restarts it forever and the renderer never hears until the
+ * 30s poll (which pauses entirely while the window is blurred).
+ */
+const WATCH_MAX_WAIT_MS = 1_000;
 
 /**
  * Directories whose churn never changes `git ls-files` output but would
@@ -44,8 +51,12 @@ export type StartWatch = (
 	onError: () => void,
 ) => WatchHandle;
 
-/** Internal per-directory watch state: OS handle, debounce timer, and reference count. */
+/**
+ * Internal per-directory watch state: OS handle, debounce timer, the start of the
+ * current burst (for the max-wait clamp), and reference count.
+ */
 interface WatchEntry {
+	burstStartedAt: number | null;
 	debounce: ReturnType<typeof setTimeout> | null;
 	handle: WatchHandle;
 	refCount: number;
@@ -103,10 +114,18 @@ export function createWorkspaceFilesWatcher({
 			clearTimeout(entry.debounce);
 		}
 
+		entry.burstStartedAt ??= Date.now();
+		const elapsed = Date.now() - entry.burstStartedAt;
+		const delay = Math.max(
+			0,
+			Math.min(WATCH_DEBOUNCE_MS, WATCH_MAX_WAIT_MS - elapsed),
+		);
+
 		entry.debounce = setTimeout(() => {
 			entry.debounce = null;
+			entry.burstStartedAt = null;
 			onChange(workspaceCwd);
-		}, WATCH_DEBOUNCE_MS);
+		}, delay);
 	};
 
 	const closeEntry = (entry: WatchEntry): void => {
@@ -115,6 +134,7 @@ export function createWorkspaceFilesWatcher({
 			entry.debounce = null;
 		}
 
+		entry.burstStartedAt = null;
 		entry.handle.close();
 	};
 
@@ -170,7 +190,12 @@ export function createWorkspaceFilesWatcher({
 				return;
 			}
 
-			entries.set(workspaceCwd, { debounce: null, handle, refCount: 1 });
+			entries.set(workspaceCwd, {
+				burstStartedAt: null,
+				debounce: null,
+				handle,
+				refCount: 1,
+			});
 		},
 		unwatch(workspaceCwd) {
 			const entry = entries.get(workspaceCwd);

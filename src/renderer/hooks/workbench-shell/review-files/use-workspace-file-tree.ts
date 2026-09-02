@@ -102,7 +102,7 @@ function useDirectoryReveal({
 }: {
 	knownDirectoryPaths: string[];
 	knownDirectoryPathSet: ReadonlySet<string>;
-	loadIgnoredDirectory: (directoryPath: string) => Promise<void>;
+	loadIgnoredDirectory: (directoryPath: string) => void;
 	tree: FileTreeNode<WorkspaceFileSummary>;
 	workspaceCwd: string;
 	workspaceId: string;
@@ -139,7 +139,7 @@ function useDirectoryReveal({
 		pendingRevealPathRef.current = directoryPath;
 		const directoryNode = findDirectoryNode(tree, directoryPath);
 		if (directoryNode && needsLazyLoad(directoryNode)) {
-			void loadIgnoredDirectory(directoryPath);
+			loadIgnoredDirectory(directoryPath);
 		}
 	}, [
 		expandDirectories,
@@ -269,7 +269,7 @@ export function useWorkspaceFileTree({
 			// On first expand of an ignored directory left collapsed by the main
 			// process (no enumerated children), fetch its contents lazily.
 			if (willExpand && needsLazyLoad(node)) {
-				void loadIgnoredDirectory(node.path);
+				loadIgnoredDirectory(node.path);
 			}
 		},
 		[toggleDirectory, loadIgnoredDirectory],

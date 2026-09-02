@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'vitest';
+import { describe, expect, test, vi } from 'vitest';
 
 import {
 	createWorkspaceFilesWatcher,
@@ -55,6 +55,38 @@ describe('createWorkspaceFilesWatcher', () => {
 		expect(changes).toEqual([]);
 		await sleep(AFTER_DEBOUNCE_MS);
 		expect(changes).toEqual(['/abs/workspace']);
+	});
+
+	// Fake timers rather than `sleep`: the window between the max-wait firing at
+	// 1s and the following burst's trailing debounce at 1.35s is ~150ms of real
+	// clock, which a loaded parallel runner can drift straight through.
+	test('fires under sustained churn instead of starving the debounce', () => {
+		vi.useFakeTimers();
+		try {
+			const changes: string[] = [];
+			const { startWatch, watches } = fakeWatchFactory();
+			const watcher = createWorkspaceFilesWatcher({
+				onChange: (cwd) => changes.push(cwd),
+				startWatch,
+			});
+
+			watcher.watch('/abs/workspace');
+			// Events closer together than the 250ms debounce restart it every time,
+			// so without the 1s max-wait this burst would never notify.
+			for (let index = 0; index < 12; index += 1) {
+				watches[0].changed(`src/file-${index}.ts`);
+				vi.advanceTimersByTime(100);
+			}
+
+			expect(changes).toEqual(['/abs/workspace']);
+
+			// The max-wait ends the burst rather than the watch: events after it
+			// start a fresh one, which still owes its own trailing notification.
+			vi.advanceTimersByTime(AFTER_DEBOUNCE_MS);
+			expect(changes).toEqual(['/abs/workspace', '/abs/workspace']);
+		} finally {
+			vi.useRealTimers();
+		}
 	});
 
 	test('ignores .git and node_modules churn', async () => {

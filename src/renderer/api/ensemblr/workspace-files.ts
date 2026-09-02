@@ -51,8 +51,31 @@ export function readWorkspaceFile(
 	);
 }
 
-/** Lists an ignored directory's immediate children for lazy tree expansion. */
-export function readWorkspaceDirectory(
+/**
+ * Query options for one lazily expanded ignored directory. Carries no
+ * `refetchInterval` of its own: the fs watcher invalidates the whole
+ * `workspaceDirectories` prefix, which is what keeps an expanded folder's rows
+ * honest when its contents are deleted or moved.
+ */
+export function workspaceDirectoryQuery(
+	workspaceCwd: string,
+	directoryPath: string,
+) {
+	return queryOptions({
+		enabled: !!workspaceCwd && !!directoryPath,
+		queryFn: () =>
+			readWorkspaceDirectory({ path: directoryPath, workspaceCwd }),
+		queryKey: ensemblrQueryKeys.workspaceDirectory(workspaceCwd, directoryPath),
+		staleTime: 5_000,
+	});
+}
+
+/**
+ * Lists an ignored directory's immediate children for lazy tree expansion.
+ * Private to this module: callers go through {@link workspaceDirectoryQuery} so
+ * the fs watcher's invalidation reaches every expanded folder.
+ */
+function readWorkspaceDirectory(
 	request: ReadWorkspaceDirectoryRequest,
 ): Promise<ReadWorkspaceDirectoryResult> {
 	return profileElectronIpcCall(
