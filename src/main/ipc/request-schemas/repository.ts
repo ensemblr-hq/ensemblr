@@ -240,7 +240,6 @@ export function parseContinueWorkspaceBranchRequest(raw: unknown): {
 export const archiveWorkspaceRequestSchema = z.object({
 	branchCleanup: optionalBoolean,
 	reason: optionalTrimmedString,
-	reclaimDisk: optionalBoolean,
 	workspaceId: z.string(),
 });
 
@@ -253,18 +252,16 @@ export const archiveWorkspaceRequestSchema = z.object({
 export function parseArchiveWorkspaceRequest(raw: unknown): {
 	branchCleanup?: boolean;
 	reason?: string;
-	reclaimDisk?: boolean;
 	workspaceId: string;
 } {
 	const parsed = archiveWorkspaceRequestSchema.safeParse(raw);
 	if (!parsed.success) {
 		return { workspaceId: '' };
 	}
-	const { branchCleanup, reason, reclaimDisk, workspaceId } = parsed.data;
+	const { branchCleanup, reason, workspaceId } = parsed.data;
 	const result: {
 		branchCleanup?: boolean;
 		reason?: string;
-		reclaimDisk?: boolean;
 		workspaceId: string;
 	} = { workspaceId };
 	if (branchCleanup !== undefined) {
@@ -273,34 +270,7 @@ export function parseArchiveWorkspaceRequest(raw: unknown): {
 	if (reason !== undefined) {
 		result.reason = reason;
 	}
-	if (reclaimDisk !== undefined) {
-		result.reclaimDisk = reclaimDisk;
-	}
 	return result;
-}
-
-/** {@link import('../../../shared/ipc').ReclaimArchivedWorkspaceDiskRequest}. */
-export const reclaimArchivedWorkspaceDiskRequestSchema = z.object({
-	workspaceIds: z.array(z.string()),
-});
-
-/**
- * Parses a reclaim-disk payload, falling back to an empty id list on malformed
- * input. Lenient like its archive-lifecycle neighbours rather than throwing:
- * the service answers an empty list with a request-level
- * `workspace-ids-required` diagnostic, so a bad payload still reaches the user
- * as a refusal instead of an empty success.
- * @param raw - Raw IPC payload.
- * @returns The normalized reclaim-disk request.
- */
-export function parseReclaimArchivedWorkspaceDiskRequest(raw: unknown): {
-	workspaceIds: string[];
-} {
-	const parsed = reclaimArchivedWorkspaceDiskRequestSchema.safeParse(raw);
-	if (!parsed.success) {
-		return { workspaceIds: [] };
-	}
-	return { workspaceIds: parsed.data.workspaceIds };
 }
 
 /** {@link import('../../../shared/ipc').DeleteWorkspaceRequest}. */

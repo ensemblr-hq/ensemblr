@@ -172,7 +172,6 @@ import {
 	createLocalRepositoryImportService,
 	createLocalRepositoryRegistrationService,
 	createQuickStartProjectService,
-	createReclaimArchivedWorkspaceDiskService,
 	createRenameWorkspaceService,
 	createSetWorkspaceBaseBranchService,
 	createSharedRootAdoptionService,
@@ -913,11 +912,6 @@ const deleteArchivedWorkspaceService = createDeleteArchivedWorkspaceService({
 	localCommandService,
 	workspaceTeardownService,
 });
-const reclaimArchivedWorkspaceDiskService =
-	createReclaimArchivedWorkspaceDiskService({
-		databaseService,
-		localCommandService,
-	});
 const listAllWorkspacesService = createListAllWorkspacesService({
 	databaseService,
 });
@@ -1580,7 +1574,6 @@ app.whenReady().then(() => {
 		linearService,
 		listAllWorkspacesService,
 		listArchivedWorkspacesService,
-		reclaimArchivedWorkspaceDiskService,
 		listWorkspaceFilesService,
 		localCommandService,
 		localRepositoryImportService,

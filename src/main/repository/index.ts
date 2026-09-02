@@ -96,11 +96,6 @@ export {
 	getQuickStartNameRules,
 } from './quick-start-project.ts';
 export type {
-	CreateReclaimArchivedWorkspaceDiskServiceOptions,
-	ReclaimArchivedWorkspaceDiskService,
-} from './reclaim-archived-workspace-disk.ts';
-export { createReclaimArchivedWorkspaceDiskService } from './reclaim-archived-workspace-disk.ts';
-export type {
 	CreateLocalRepositoryRegistrationServiceOptions,
 	LocalRepositoryRegistrationService,
 } from './register-repository.ts';

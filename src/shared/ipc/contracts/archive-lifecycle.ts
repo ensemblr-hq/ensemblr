@@ -12,8 +12,6 @@ import type {
 	ListAllWorkspacesResult,
 	ListArchivedWorkspacesRequest,
 	ListArchivedWorkspacesResult,
-	ReclaimArchivedWorkspaceDiskRequest,
-	ReclaimArchivedWorkspaceDiskResult,
 	UnarchiveWorkspaceRequest,
 	UnarchiveWorkspaceResult,
 } from './workspace';
@@ -94,9 +92,6 @@ export interface ArchiveApi {
 	listArchivedWorkspaces: (
 		request: ListArchivedWorkspacesRequest,
 	) => Promise<ListArchivedWorkspacesResult>;
-	reclaimArchivedWorkspaceDisk: (
-		request: ReclaimArchivedWorkspaceDiskRequest,
-	) => Promise<ReclaimArchivedWorkspaceDiskResult>;
 	unarchiveWorkspace: (
 		request: UnarchiveWorkspaceRequest,
 	) => Promise<UnarchiveWorkspaceResult>;

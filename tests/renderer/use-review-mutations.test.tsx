@@ -75,7 +75,6 @@ function renderReviewMutations(archiveAfterMerge: boolean) {
 				mergeSettings: {
 					archiveAfterMerge,
 					deleteLocalBranchOnArchive: false,
-					reclaimDiskOnArchive: false,
 					setUpstreamOnPush: false,
 				},
 				onSettled: vi.fn(),

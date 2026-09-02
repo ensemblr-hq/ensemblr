@@ -1,9 +1,4 @@
-import {
-	ArchiveIcon,
-	ArchiveRestoreIcon,
-	HardDriveDownloadIcon,
-	Trash2Icon,
-} from 'lucide-react';
+import { ArchiveIcon, ArchiveRestoreIcon, Trash2Icon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/renderer/components/ui/button';
@@ -12,26 +7,23 @@ import { canRestoreArchivedWorkspace } from '@/renderer/lib/archive-restore';
 import type {
 	ArchivedWorkspaceListEntry,
 	DeleteArchivedWorkspaceDiagnostic,
-	ReclaimArchivedWorkspaceDiskDiagnostic,
 	UnarchiveWorkspaceDiagnostic,
 } from '@/shared/ipc/contracts/workspace';
 
 /** Diagnostic surfaced against a single archived-workspace row. */
 export type ArchiveRowDiagnostic =
 	| DeleteArchivedWorkspaceDiagnostic
-	| ReclaimArchivedWorkspaceDiskDiagnostic
 	| UnarchiveWorkspaceDiagnostic;
 
 /** Which per-row action is in flight, or null when the row is idle. */
-export type ArchiveRowAction = 'delete' | 'reclaim' | 'unarchive';
+export type ArchiveRowAction = 'delete' | 'unarchive';
 
-/** One archived workspace, with its restore, reclaim, and purge actions. */
+/** One archived workspace, with its restore and purge actions. */
 export function BrowseArchiveRow({
 	diagnostics,
 	disabled,
 	entry,
 	onDelete,
-	onReclaim,
 	onUnarchive,
 	pendingAction,
 }: {
@@ -44,7 +36,6 @@ export function BrowseArchiveRow({
 	disabled: boolean;
 	entry: ArchivedWorkspaceListEntry;
 	onDelete: (entry: ArchivedWorkspaceListEntry) => void;
-	onReclaim: (entry: ArchivedWorkspaceListEntry) => void;
 	onUnarchive: (entry: ArchivedWorkspaceListEntry) => void;
 	/** The action running on this row, or null when nothing is. */
 	pendingAction: ArchiveRowAction | null;
@@ -91,26 +82,6 @@ export function BrowseArchiveRow({
 					<ArchiveRestoreIcon aria-hidden='true' data-icon='inline-start' />
 					{t('common:actions.unarchive', 'Unarchive')}
 				</Button>
-				{entry.pathExists ? (
-					<Button
-						className='h-8'
-						data-testid='browse-archive-row-reclaim'
-						disabled={isBusy}
-						onClick={() => {
-							onReclaim(entry);
-						}}
-						pending={pendingAction === 'reclaim'}
-						size='sm'
-						type='button'
-						variant='outline'
-					>
-						<HardDriveDownloadIcon
-							aria-hidden='true'
-							data-icon='inline-start'
-						/>
-						{t('workbench:browse-archive.row.reclaim', 'Reclaim disk')}
-					</Button>
-				) : null}
 				<Button
 					className='h-8'
 					disabled={isBusy}
@@ -159,14 +130,6 @@ function ArchiveRowStatus({ entry }: { entry: ArchivedWorkspaceListEntry }) {
 		return t(
 			'workbench:browse-archive.row.archived-pruned',
 			'Archived {{date}} · disk reclaimed (restored from its branch on unarchive)',
-			{ date },
-		);
-	}
-
-	if (entry.pathExists) {
-		return t(
-			'workbench:browse-archive.row.archived-on-disk',
-			'Archived {{date}} · worktree still on disk',
 			{ date },
 		);
 	}

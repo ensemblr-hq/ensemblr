@@ -21,7 +21,6 @@ import { createDeleteArchivedWorkspaceService } from '../../src/main/repository/
 import { createDeleteRepositoryService } from '../../src/main/repository/delete-repository.ts';
 import { createListArchivedWorkspacesService } from '../../src/main/repository/list-archived-workspaces.ts';
 import { archivedWorktreeRefFor } from '../../src/main/repository/prune-worktree.ts';
-import { createReclaimArchivedWorkspaceDiskService } from '../../src/main/repository/reclaim-archived-workspace-disk.ts';
 import { createUnarchiveWorkspaceService } from '../../src/main/repository/unarchive-workspace.ts';
 import {
 	type EnsemblrDatabaseConnection,
@@ -206,11 +205,7 @@ function makeArchiveService(harness: Harness) {
 	const list = createListArchivedWorkspacesService({
 		databaseService: harness.databaseService,
 	});
-	const reclaim = createReclaimArchivedWorkspaceDiskService({
-		databaseService: harness.databaseService,
-		localCommandService: createLocalCommandService(),
-	});
-	return { archive, lifecycle, list, purge, reclaim, unarchive };
+	return { archive, lifecycle, list, purge, unarchive };
 }
 
 test('list returns archived workspaces ordered newest first with archive metadata', async (t) => {
@@ -420,86 +415,30 @@ test('destructive repository delete wipes the archived-contexts subtree for that
 	assert.equal(existsSync(repoArchiveRoot), false);
 });
 
-test('reclaim frees an already-archived worktree and the row survives it', async (t) => {
+test('archiving frees the worktree and the row survives it', async (t) => {
 	const harness = createHarness(t);
 	const workspace = await seedWorkspace(harness, 'legacy-archive');
-	const { archive, list, reclaim } = makeArchiveService(harness);
-	await archive.archive({ workspaceId: workspace.id });
+	const { archive, list } = makeArchiveService(harness);
 
-	const before = await list.list({ repositoryId: harness.repositoryId });
-	assert.equal(before.entries[0]?.pathExists, true);
-	assert.equal(before.entries[0]?.worktreePruned, false);
+	const result = await archive.archive({ workspaceId: workspace.id });
 
-	const result = await reclaim.reclaim({ workspaceIds: [workspace.id] });
-
-	assert.equal(result.reclaimedCount, 1);
-	assert.equal(result.entries[0]?.status, 'reclaimed');
+	assert.equal(result.status, 'success');
+	assert.equal(result.workspace?.worktreePruned, true);
 	assert.equal(existsSync(workspace.path), false);
 	assert.ok(
 		listBranches(harness.repositoryPath).includes(workspace.branchName ?? ''),
 	);
 
 	const after = await list.list({ repositoryId: harness.repositoryId });
-	assert.equal(after.entries[0]?.pathExists, false);
 	assert.equal(after.entries[0]?.worktreePruned, true);
 });
 
-test('reclaim skips a worktree that is already gone rather than failing', async (t) => {
-	const harness = createHarness(t);
-	const workspace = await seedWorkspace(harness, 'twice-reclaimed');
-	const { archive, reclaim } = makeArchiveService(harness);
-	await archive.archive({ workspaceId: workspace.id });
-	await reclaim.reclaim({ workspaceIds: [workspace.id] });
-
-	const result = await reclaim.reclaim({ workspaceIds: [workspace.id] });
-
-	assert.equal(result.reclaimedCount, 0);
-	assert.equal(result.entries[0]?.status, 'skipped');
-	assert.equal(
-		result.entries[0]?.diagnostics[0]?.code,
-		'worktree-already-pruned',
-	);
-});
-
-test('reclaim refuses a workspace that is not archived', async (t) => {
-	const harness = createHarness(t);
-	const workspace = await seedWorkspace(harness, 'still-live');
-	const { reclaim } = makeArchiveService(harness);
-
-	const result = await reclaim.reclaim({ workspaceIds: [workspace.id] });
-
-	assert.equal(result.entries[0]?.status, 'failure');
-	assert.equal(
-		result.entries[0]?.diagnostics[0]?.code,
-		'workspace-not-archived',
-	);
-	assert.equal(existsSync(workspace.path), true);
-});
-
-test('a bulk reclaim keeps going past one failure', async (t) => {
-	const harness = createHarness(t);
-	const archived = await seedWorkspace(harness, 'bulk-archived');
-	const live = await seedWorkspace(harness, 'bulk-live');
-	const { archive, reclaim } = makeArchiveService(harness);
-	await archive.archive({ workspaceId: archived.id });
-
-	const result = await reclaim.reclaim({
-		workspaceIds: [live.id, archived.id, 'nope'],
-	});
-
-	assert.equal(result.entries.length, 3);
-	assert.equal(result.reclaimedCount, 1);
-	assert.equal(existsSync(archived.path), false);
-	assert.equal(existsSync(live.path), true);
-});
-
-test('a reclaimed workspace unarchives back to its branch with its files', async (t) => {
+test('an archived workspace unarchives back to its branch with its files', async (t) => {
 	const harness = createHarness(t);
 	const workspace = await seedWorkspace(harness, 'round-trip');
 	writeFileSync(path.join(workspace.path, 'draft.txt'), 'in progress\n');
-	const { archive, reclaim, unarchive } = makeArchiveService(harness);
+	const { archive, unarchive } = makeArchiveService(harness);
 	await archive.archive({ workspaceId: workspace.id });
-	await reclaim.reclaim({ workspaceIds: [workspace.id] });
 
 	const result = await unarchive.unarchive({ workspaceId: workspace.id });
 
@@ -525,28 +464,14 @@ test('a reclaimed workspace unarchives back to its branch with its files', async
 	assert.equal(record?.pruned, 0);
 });
 
-// An empty list is what a malformed IPC payload degrades to, so answering it
-// with a clean zero-everything result would render as "nothing to reclaim".
-test('reclaim refuses an empty request instead of reporting success', async (t) => {
-	const harness = createHarness(t);
-	const { reclaim } = makeArchiveService(harness);
-
-	const result = await reclaim.reclaim({ workspaceIds: [] });
-
-	assert.equal(result.reclaimedCount, 0);
-	assert.equal(result.entries.length, 0);
-	assert.equal(result.diagnostics[0]?.code, 'workspace-ids-required');
-});
-
 // The ref outlives the branch by design, so nothing downstream of unarchive
 // could ever collect it: the workspace is live again and the archive-purge path
 // that drops it is no longer reachable.
-test('unarchiving a reclaimed workspace releases the ref pinning its commits', async (t) => {
+test('unarchiving a pruned workspace releases the ref pinning its commits', async (t) => {
 	const harness = createHarness(t);
 	const workspace = await seedWorkspace(harness, 'unarchive-releases');
-	const { archive, reclaim, unarchive } = makeArchiveService(harness);
+	const { archive, unarchive } = makeArchiveService(harness);
 	await archive.archive({ workspaceId: workspace.id });
-	await reclaim.reclaim({ workspaceIds: [workspace.id] });
 
 	const ref = archivedWorktreeRefFor(workspace.id);
 	assert.doesNotThrow(() =>
@@ -569,12 +494,12 @@ test('unarchiving recovers a worktree that went missing without a prune record',
 	const workspace = await seedWorkspace(harness, 'vanished-folder');
 	const { archive, unarchive } = makeArchiveService(harness);
 	await archive.archive({ workspaceId: workspace.id });
-	runGit(harness.repositoryPath, [
-		'worktree',
-		'remove',
-		'--force',
-		workspace.path,
-	]);
+	harness.databaseService
+		.getConnection()
+		?.database.prepare(
+			'UPDATE archive_records SET worktree_pruned = 0, pruned_head_commit = NULL, pruned_wip_ref = NULL, pruned_wip_commit = NULL WHERE workspace_id = ?',
+		)
+		.run(workspace.id);
 	assert.equal(existsSync(workspace.path), false);
 
 	const result = await unarchive.unarchive({ workspaceId: workspace.id });
@@ -608,12 +533,11 @@ test('unarchiving still reports an orphaned row when the branch is gone too', as
 	assert.equal(result.diagnostics[0]?.code, 'worktree-recreate-failed');
 });
 
-test('purging a reclaimed workspace drops the ref pinning its commits', async (t) => {
+test('purging a pruned workspace drops the ref pinning its commits', async (t) => {
 	const harness = createHarness(t);
 	const workspace = await seedWorkspace(harness, 'purge-reclaimed');
-	const { archive, purge, reclaim } = makeArchiveService(harness);
+	const { archive, purge } = makeArchiveService(harness);
 	await archive.archive({ workspaceId: workspace.id });
-	await reclaim.reclaim({ workspaceIds: [workspace.id] });
 
 	const ref = archivedWorktreeRefFor(workspace.id);
 	assert.doesNotThrow(() =>

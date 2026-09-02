@@ -34,6 +34,16 @@ interface LifecycleResult<TDiagnostic extends LifecycleDiagnostic> {
 	status: LifecycleStatus;
 }
 
+/**
+ * The envelope this hook synthesizes for a rejected IPC. Its `status` is the
+ * literal `'failure'` rather than the wider union, which is what lets the
+ * success guard below narrow the run's own richer result back out of it.
+ */
+interface LifecycleThrewResult<TDiagnostic extends LifecycleDiagnostic> {
+	diagnostics: TDiagnostic[];
+	status: 'failure';
+}
+
 /** Which destructive run to show against which workspace for the action's whole span. */
 interface LifecycleRunMark {
 	kind: WorkspaceLifecycleRun;
@@ -55,11 +65,12 @@ interface LifecycleRunMark {
  * cleared the mark the first, still-running teardown owned — dropping the row's
  * "Deleting…" and re-opening every action against a workspace whose worktree
  * was still coming apart.
- * @param options - The IPC to run, how to word an unexpected error, the key that identifies this run, the run to mark on the workspace, the dialog's open setter, and the post-removal work
+ * @param options - The IPC to run, how to word an unexpected error, the key that identifies this run, the run to mark on the workspace, the dialog's open setter, and the post-removal work, which receives the result the IPC answered with
  * @returns The diagnostics to render, whether the IPC is still in flight, and the action to fire
  */
 export function useLifecycleDialogAction<
 	TDiagnostic extends LifecycleDiagnostic,
+	TResult extends LifecycleResult<TDiagnostic> = LifecycleResult<TDiagnostic>,
 >({
 	failure,
 	lifecycleRun,
@@ -71,9 +82,9 @@ export function useLifecycleDialogAction<
 	failure: (message: string) => TDiagnostic;
 	lifecycleRun?: LifecycleRunMark;
 	onOpenChange: (open: boolean) => void;
-	onSucceeded: () => Promise<void> | void;
+	onSucceeded: (result: TResult) => Promise<void> | void;
 	operationKey: string;
-	run: () => Promise<LifecycleResult<TDiagnostic>>;
+	run: () => Promise<TResult>;
 }): {
 	diagnostics: TDiagnostic[];
 	isBusy: boolean;
@@ -99,7 +110,7 @@ export function useLifecycleDialogAction<
 		setIsBusy(true);
 		setDiagnostics([]);
 
-		let result: LifecycleResult<TDiagnostic>;
+		let result: LifecycleThrewResult<TDiagnostic> | TResult;
 		try {
 			result = await reportedOutcome(run, failure);
 		} finally {
@@ -120,7 +131,7 @@ export function useLifecycleDialogAction<
 			flushSync(() => {
 				onOpenChange(false);
 			});
-			await onSucceeded();
+			await onSucceeded(result);
 		} catch (error) {
 			console.error(
 				'Post-removal work failed after a lifecycle action:',
@@ -148,10 +159,13 @@ export function useLifecycleDialogAction<
  * @param failure - Builds the dialog's own diagnostic from an error message
  * @returns The reported result, or a failure carrying the thrown error
  */
-async function reportedOutcome<TDiagnostic extends LifecycleDiagnostic>(
-	run: () => Promise<LifecycleResult<TDiagnostic>>,
+async function reportedOutcome<
+	TDiagnostic extends LifecycleDiagnostic,
+	TResult extends LifecycleResult<TDiagnostic>,
+>(
+	run: () => Promise<TResult>,
 	failure: (message: string) => TDiagnostic,
-): Promise<LifecycleResult<TDiagnostic>> {
+): Promise<LifecycleThrewResult<TDiagnostic> | TResult> {
 	try {
 		return await run();
 	} catch (error) {

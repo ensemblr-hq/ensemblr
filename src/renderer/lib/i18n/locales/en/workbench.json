@@ -32,9 +32,8 @@
 	},
 	"archive-workspace": {
 		"description-cleanup": "Marks the workspace as archived and preserves its <0>.context/</0> handoff files under <1>archived-contexts/</1>. The worktree folder is removed and the local branch dropped, per your git settings; anything else not pushed to the remote will be lost.",
-		"description-keep": "Marks the workspace as archived and preserves its <0>.context/</0> handoff files under <1>archived-contexts/</1>. The worktree folder and local branch stay on disk; nothing is committed or pushed.",
 		"description-reclaim": "Marks the workspace as archived and preserves its <0>.context/</0> handoff files under <1>archived-contexts/</1>. The worktree folder is removed to reclaim its disk, keeping the branch and a snapshot of any uncommitted changes; unarchiving restores both and rebuilds dependencies.",
-		"settings-unavailable": "Your git settings could not be read, so the worktree folder and local branch will be kept.",
+		"settings-unavailable": "Your git settings could not be read, so the local branch will be kept.",
 		"title": "Archive workspace?",
 		"uncommitted_one": "This workspace has {{count}} uncommitted change that archiving will not commit or push.",
 		"uncommitted_other": "This workspace has {{count}} uncommitted changes that archiving will not commit or push."
@@ -76,18 +75,12 @@
 			"none": "No archived workspaces for this repository.",
 			"unavailable": "The preload bridge is unavailable in this context."
 		},
-		"reclaim-all": "Reclaim all",
-		"reclaimable_one": "{{count}} archived workspace still has its worktree on disk.",
-		"reclaimable_other": "{{count}} archived workspace still has its worktree on disk.",
-		"reclaimed": "Reclaimed {{size}}.",
 		"row": {
 			"archived": "Archived {{date}}",
 			"archived-destroyed": "Archived {{date}} · worktree was destroyed (recreate from base branch on restore)",
-			"archived-on-disk": "Archived {{date}} · worktree still on disk",
 			"archived-pruned": "Archived {{date}} · disk reclaimed (restored from its branch on unarchive)",
 			"delete-permanently": "Delete permanently",
-			"no-branch": "no branch",
-			"reclaim": "Reclaim disk"
+			"no-branch": "no branch"
 		},
 		"title": "Workspace archive — {{repository}}"
 	},

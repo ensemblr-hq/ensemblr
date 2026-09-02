@@ -9,6 +9,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Archiving always reclaims the worktree's disk, and says how much it gave back.** Removing the
+  folder was previously a setting (`reclaim_disk_on_archive`, on by default) with a retroactive
+  **Reclaim disk** / **Reclaim all** action in the archive browser for archives made before it
+  existed. Both are gone: reclaiming is what archiving *does*, so there is nothing left to opt into
+  and nothing left to catch up on. The archive success toast now reports the size freed, which is the
+  one thing the measurement was ever for — it was taken on every archive and displayed nowhere.
+
+### Removed
+
+- **The archive browser no longer claims an archived workspace is still occupying disk.** The row's
+  **Reclaim disk** button was drawn from `pathExists`, an `existsSync` probe taken once when the list
+  was built, so a folder that went away afterwards left the button behind — clicking it reported
+  "no worktree folder on disk, so there was nothing to reclaim" against a row that already read
+  "disk reclaimed". A listing cannot win that race, so the claim is gone rather than refreshed: rows
+  are worded from what the archive recorded, and **Delete permanently** clears out a folder an older
+  archive left on disk. The `reclaimDiskOnArchive` setting is dropped from both scopes and from
+  `schemas/config.schema.json` / `schemas/settings.schema.json`; a `reclaim_disk_on_archive` still
+  sitting in a committed `.ensemblr/settings.toml` is inert.
+
 ### Fixed
 
 - **`./scripts/with-pinned-node.sh npm ci` died on the preinstall Node guard even with the pinned

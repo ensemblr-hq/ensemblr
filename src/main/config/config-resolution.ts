@@ -101,7 +101,6 @@ const REPOSITORY_BUILT_IN_DEFAULTS: Readonly<Record<string, unknown>> =
 		autoRunAfterSetup: false,
 		branchFrom: null,
 		deleteLocalBranchOnArchive: false,
-		reclaimDiskOnArchive: true,
 		filesToCopy: Object.freeze(['.env*']),
 		'actionPreferences.branchRename': null,
 		'actionPreferences.codeReview': null,
@@ -768,7 +767,6 @@ function collectUserGitDefaultCandidates(
 	}
 
 	candidates.set('deleteLocalBranchOnArchive', git.deleteLocalBranchOnArchive);
-	candidates.set('reclaimDiskOnArchive', git.reclaimDiskOnArchive);
 	candidates.set('archiveAfterMerge', git.archiveAfterMerge);
 	candidates.set('setUpstreamOnPush', git.setUpstreamOnPush);
 

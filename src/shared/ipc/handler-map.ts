@@ -210,8 +210,6 @@ import type {
 	DeleteWorkspaceResult,
 	ListArchivedWorkspacesRequest,
 	ListArchivedWorkspacesResult,
-	ReclaimArchivedWorkspaceDiskRequest,
-	ReclaimArchivedWorkspaceDiskResult,
 	RenameWorkspaceRequest,
 	RenameWorkspaceResult,
 	SetWorkspaceBaseBranchRequest,
@@ -432,10 +430,6 @@ export interface IpcHandlerMap {
 	[IPC_CHANNELS.listArchivedWorkspaces]: IpcHandlerEntry<
 		ListArchivedWorkspacesRequest,
 		ListArchivedWorkspacesResult
-	>;
-	[IPC_CHANNELS.reclaimArchivedWorkspaceDisk]: IpcHandlerEntry<
-		ReclaimArchivedWorkspaceDiskRequest,
-		ReclaimArchivedWorkspaceDiskResult
 	>;
 	[IPC_CHANNELS.listAllChatTabs]: IpcHandlerEntry<
 		ListAllChatTabsRequest,

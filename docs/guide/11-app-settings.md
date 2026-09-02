@@ -385,7 +385,6 @@ See [12. Repository settings](./12-repository-settings.md).
 | Custom branch prefix | The literal prefix, used only when the source above is `Custom`. | Any string | Empty |
 | Let agents name the workspace and branch | Ask the agent to rename a workspace away from its placeholder composer name, and its git branch to match, once it knows what the work is. Off leaves the placeholder in place. | On / off | On |
 | Delete branch on archive | Delete the local branch when a workspace is archived. The remote branch is untouched — configure that on GitHub. | On / off | Off |
-| Reclaim disk on archive | Delete the worktree folder when a workspace is archived, keeping its branch and a snapshot of any uncommitted changes. Unarchiving checks the branch out again and restores them; dependencies and build output are rebuilt by the setup script. Off keeps the folder, and its dependencies, on disk indefinitely. | On / off | On |
 | Archive on merge | Archive a workspace automatically after its pull request merges. | On / off | Off |
 | Set upstream on plain `git push` | Configure new workspaces so a bare `git push` sets the branch upstream. Turning it off avoids writing git worktree config, at the cost of less reliable PR information until branches have an upstream. | On / off | On |
 

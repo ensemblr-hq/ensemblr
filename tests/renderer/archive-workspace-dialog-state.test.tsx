@@ -69,7 +69,6 @@ function installBridge(
 							source: 'default',
 							value: false,
 						},
-						{ key: 'reclaimDiskOnArchive', source: 'default', value: true },
 					],
 				},
 			}),
