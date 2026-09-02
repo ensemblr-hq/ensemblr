@@ -11,6 +11,26 @@ import type {
 import { createPlaceholderSession } from './navigation-model';
 
 /**
+ * Whether a workspace can be navigated to right now. A workspace still being
+ * created has no worktree yet, and one being archived is losing the one it had,
+ * so neither is a place to land — an id in `unavailableWorkspaceIds` is refused
+ * the same way, which is what stops a hop away from an archiving workspace from
+ * redirecting straight back into it.
+ * @param workspace - The candidate workspace
+ * @param unavailableWorkspaceIds - Ids the caller knows are mid-teardown
+ * @returns True when the workspace can be opened
+ */
+function isSelectableWorkspace(
+	workspace: WorkspaceShellModel,
+	unavailableWorkspaceIds: ReadonlySet<string> | undefined,
+): boolean {
+	return (
+		!workspace.isPendingCreation &&
+		unavailableWorkspaceIds?.has(workspace.id) !== true
+	);
+}
+
+/**
  * Picks the active workspace selection, preferring the URL route, then the
  * stored workspace, then the first workspace in the stored project.
  *
@@ -24,11 +44,14 @@ export function resolveWorkspaceNavigationSelection({
 	routeProjectId,
 	routeWorkspaceId,
 	storedSelection,
+	unavailableWorkspaceIds,
 }: {
 	projects: ProjectShellModel[];
 	routeProjectId?: string;
 	routeWorkspaceId?: string;
 	storedSelection?: StoredWorkspaceSelection | null;
+	/** Workspaces mid-teardown, refused as a target however they were reached. */
+	unavailableWorkspaceIds?: ReadonlySet<string>;
 }): WorkspaceNavigationSelection | null {
 	if (routeProjectId && routeWorkspaceId) {
 		return findWorkspaceNavigationSelection(
@@ -36,6 +59,7 @@ export function resolveWorkspaceNavigationSelection({
 			routeProjectId,
 			routeWorkspaceId,
 			'route',
+			unavailableWorkspaceIds,
 		);
 	}
 
@@ -46,12 +70,17 @@ export function resolveWorkspaceNavigationSelection({
 				storedSelection.projectId,
 				storedSelection.workspaceId,
 				'stored',
+				unavailableWorkspaceIds,
 			) ??
-			getFirstWorkspaceSelectionInProject(projects, storedSelection.projectId)
+			getFirstWorkspaceSelectionInProject(
+				projects,
+				storedSelection.projectId,
+				unavailableWorkspaceIds,
+			)
 		);
 	}
 
-	return getFirstWorkspaceSelection(projects);
+	return getFirstWorkspaceSelection(projects, unavailableWorkspaceIds);
 }
 
 /**
@@ -121,10 +150,13 @@ export function findWorkspaceNavigationSelection(
 	projectId: string,
 	workspaceId: string,
 	source: WorkspaceNavigationSelection['source'] = 'route',
+	unavailableWorkspaceIds?: ReadonlySet<string>,
 ): WorkspaceNavigationSelection | null {
 	const project = projects.find((candidate) => candidate.id === projectId);
 	const workspace = project?.workspaces.find(
-		(candidate) => candidate.id === workspaceId && !candidate.isPendingCreation,
+		(candidate) =>
+			candidate.id === workspaceId &&
+			isSelectableWorkspace(candidate, unavailableWorkspaceIds),
 	);
 
 	return project && workspace
@@ -140,6 +172,11 @@ export function findWorkspaceNavigationSelection(
  * Locates a workspace by its id alone, scanning every project. An unread mark
  * records the workspace an agent spoke in but never the project above it, so
  * jumping to one has to recover the pair before it can build a route.
+ *
+ * Answers whether the tree *holds* the workspace rather than whether it can be
+ * opened right now, because two of its callers ask only that — the jump
+ * button's label and the focus bridge's "is it listed yet" poll. The one that
+ * navigates, `useNavigateToLastUnread`, refuses an archiving workspace itself.
  * @param projects - Projects to search
  * @param workspaceId - Workspace to find
  * @returns The (project, workspace) pair, or null when no project holds it
@@ -211,10 +248,11 @@ export function resolveWorkspaceRouteParams(
 function getFirstWorkspaceSelectionInProject(
 	projects: ProjectShellModel[],
 	projectId: string,
+	unavailableWorkspaceIds?: ReadonlySet<string>,
 ): WorkspaceNavigationSelection | null {
 	const project = projects.find((candidate) => candidate.id === projectId);
-	const workspace = project?.workspaces.find(
-		(candidate) => !candidate.isPendingCreation,
+	const workspace = project?.workspaces.find((candidate) =>
+		isSelectableWorkspace(candidate, unavailableWorkspaceIds),
 	);
 
 	return project && workspace
@@ -229,10 +267,11 @@ function getFirstWorkspaceSelectionInProject(
 /** Returns the first available (project, workspace) pair as a selection. */
 function getFirstWorkspaceSelection(
 	projects: ProjectShellModel[],
+	unavailableWorkspaceIds?: ReadonlySet<string>,
 ): WorkspaceNavigationSelection | null {
 	for (const project of projects) {
-		const workspace = project.workspaces.find(
-			(candidate) => !candidate.isPendingCreation,
+		const workspace = project.workspaces.find((candidate) =>
+			isSelectableWorkspace(candidate, unavailableWorkspaceIds),
 		);
 
 		if (workspace) {

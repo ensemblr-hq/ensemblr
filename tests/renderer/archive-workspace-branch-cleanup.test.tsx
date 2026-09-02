@@ -80,6 +80,7 @@ function installBridge({
 function renderDialog(): void {
 	renderWithProviders(
 		<ArchiveWorkspaceDialog
+			activeWorkspaceId={null}
 			onArchived={vi.fn()}
 			onOpenChange={vi.fn()}
 			open={true}

@@ -17,12 +17,14 @@ import {
 } from '@/renderer/components/ui/dialog';
 import { LifecycleDialogActions } from '@/renderer/components/workbench-shell/lifecycle-dialog-actions';
 import { LifecycleSummary } from '@/renderer/components/workbench-shell/lifecycle-summary';
+import { useArchiveWorkspaceHop } from '@/renderer/hooks/workbench-shell/use-archive-workspace-hop';
 import { useLifecycleDialogAction } from '@/renderer/hooks/workbench-shell/use-lifecycle-dialog-action';
 import {
 	type ArchivedWorkspace,
 	resolveArchiveWorktreePlan,
 } from '@/renderer/lib/workbench/archive-worktree-plan';
 import { workspaceSummaryRows } from '@/renderer/lib/workbench/lifecycle-summary-rows';
+import { useArchivingWorkspaceActions } from '@/renderer/state/workspace';
 import type { WorkspaceShellModel } from '@/renderer/types/workbench';
 import type { ArchiveWorkspaceDiagnostic } from '@/shared/ipc/contracts/workspace';
 
@@ -39,13 +41,21 @@ import type { ArchiveWorkspaceDiagnostic } from '@/shared/ipc/contracts/workspac
  * not — a worktree carrying uncommitted changes, a plan that drops the local
  * branch along with any unpushed commit on it, or a git read that could not say
  * which of those applies.
+ *
+ * A confirmed archive is still the same run, so it carries the same live state
+ * as the unconfirmed one: the workspace is marked archiving for the whole of it,
+ * and the shell leaves the workspace before the teardown starts. Escalating is
+ * what makes that matter most — these are the slowest archives, against the
+ * worktrees with the most in them.
  */
 export function ArchiveWorkspaceDialog({
+	activeWorkspaceId,
 	onArchived,
 	onOpenChange,
 	open,
 	workspace,
 }: {
+	activeWorkspaceId: string | null;
 	onArchived: (archived: ArchivedWorkspace) => Promise<void> | void;
 	onOpenChange: (open: boolean) => void;
 	open: boolean;
@@ -60,6 +70,7 @@ export function ArchiveWorkspaceDialog({
 			<DialogContent className='sm:max-w-md'>
 				{workspace ? (
 					<ArchiveWorkspaceDialogForm
+						activeWorkspaceId={activeWorkspaceId}
 						key={`${workspace.id}:${open ? 'open' : 'closed'}`}
 						onArchived={onArchived}
 						onOpenChange={onOpenChange}
@@ -165,15 +176,21 @@ function UncommittedChangesNotice({ workspaceCwd }: { workspaceCwd: string }) {
 
 /** Inner archive form for a workspace; owns the archiving state and reads the worktree-cleanup policy. */
 function ArchiveWorkspaceDialogForm({
+	activeWorkspaceId,
 	onArchived,
 	onOpenChange,
 	workspace,
 }: {
+	activeWorkspaceId: string | null;
 	onArchived: (archived: ArchivedWorkspace) => Promise<void> | void;
 	onOpenChange: (open: boolean) => void;
 	workspace: WorkspaceShellModel;
 }) {
 	const { t } = useTranslation();
+	const archiveAwayFromWorkspace = useArchiveWorkspaceHop({
+		activeWorkspaceId,
+	});
+	const { clearArchiving, markArchiving } = useArchivingWorkspaceActions();
 	// The worktree being archived is the checkout whose committed
 	// `.ensemblr/settings.toml` applies to this branch, so resolve against it
 	// rather than the repository root.
@@ -200,8 +217,23 @@ function ArchiveWorkspaceDialogForm({
 				workspaceId: workspace.id,
 			}),
 		operationKey: `archive-workspace:${workspace.id}`,
-		run: () => archiveWorkspace({ ...plan, workspaceId: workspace.id }),
+		run: () =>
+			archiveAwayFromWorkspace(workspace.id, () =>
+				archiveWorkspace({ ...plan, workspaceId: workspace.id }),
+			),
 	});
+
+	// `start` resolves only once the post-removal work has run, so marking around
+	// it is what keeps the row saying "Archiving…" until it has left the list —
+	// the same span the unconfirmed path marks.
+	const startArchive = useCallback(async () => {
+		markArchiving(workspace.id);
+		try {
+			await start();
+		} finally {
+			clearArchiving(workspace.id);
+		}
+	}, [clearArchiving, markArchiving, start, workspace.id]);
 
 	// Archiving before the resolver answers would silently skip the cleanup the
 	// setting asked for, because an unanswered query reads as `false`. A resolver
@@ -250,7 +282,7 @@ function ArchiveWorkspaceDialogForm({
 				diagnostics={diagnostics}
 				diagnosticsTestId='archive-workspace-diagnostics'
 				isBusy={isBusy}
-				onAct={start}
+				onAct={startArchive}
 				onClose={handleClose}
 			/>
 		</>

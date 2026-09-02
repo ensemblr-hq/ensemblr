@@ -1,3 +1,4 @@
+import { useRouter } from '@tanstack/react-router';
 import { useAtom } from 'jotai';
 import { useCallback, useEffect, useState } from 'react';
 
@@ -30,6 +31,7 @@ export function WorkspaceLifecycleDialogHost({
 	activeWorkspaceId: string | null;
 }) {
 	const [request, setRequest] = useAtom(workspaceLifecycleDialogAtom);
+	const router = useRouter();
 	const handleWorkspaceRemoved = useRemoveWorkspaceAction({
 		activeWorkspaceId,
 	});
@@ -64,14 +66,26 @@ export function WorkspaceLifecycleDialogHost({
 	const handleArchived = useCallback(
 		async (archived: ArchivedWorkspace) => {
 			await handleWorkspaceRemoved.archived(archived.workspaceId);
+			// `handleWorkspaceRemoved` skips its own invalidation for the active
+			// workspace, on the assumption the layout's redirect will re-run every
+			// loader — which the dialog's hop off the workspace already spent.
+			if (activeWorkspaceId === archived.workspaceId) {
+				await router.invalidate();
+			}
 			announceArchived(archived);
 		},
-		[announceArchived, handleWorkspaceRemoved.archived],
+		[
+			activeWorkspaceId,
+			announceArchived,
+			handleWorkspaceRemoved.archived,
+			router,
+		],
 	);
 
 	return (
 		<>
 			<ArchiveWorkspaceDialog
+				activeWorkspaceId={activeWorkspaceId}
 				onArchived={handleArchived}
 				onOpenChange={closeOnDismiss}
 				open={request?.kind === 'archive'}

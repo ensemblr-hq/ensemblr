@@ -2,10 +2,10 @@
 
 import { QueryClientProvider } from '@tanstack/react-query';
 import { renderHook } from '@testing-library/react';
-import { createStore, Provider } from 'jotai';
+import { createStore, getDefaultStore, Provider } from 'jotai';
 import type { ReactNode } from 'react';
 import { act } from 'react';
-import { beforeEach, expect, test, vi } from 'vitest';
+import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 
 const { listChatTabs, navigate, navigateToWorkspace } = vi.hoisted(() => ({
 	listChatTabs: vi.fn(),
@@ -15,7 +15,17 @@ const { listChatTabs, navigate, navigateToWorkspace } = vi.hoisted(() => ({
 
 vi.mock('@tanstack/react-router', () => ({ useNavigate: () => navigate }));
 
+// The jump refuses an archiving workspace, which it reads through the
+// workspace-state barrel — and that pulls the shared query client in with it, so
+// the mock has to carry the key factory that module reads at import time.
 vi.mock('@/renderer/api/ensemblr-queries', () => ({
+	ensemblrQueryKeys: {
+		agentModels: () => ['agent-models'],
+		health: () => ['health'],
+		repositoryWorkspaceNavigation: () => ['repository-workspace-navigation'],
+		reviewComments: (workspaceId: string) => ['review-comments', workspaceId],
+		workspaceOpenTargets: () => ['workspace-open-targets'],
+	},
 	listChatTabsQuery: (workspaceId: string) => ({
 		queryFn: () => listChatTabs(workspaceId),
 		queryKey: ['chat-tabs', workspaceId],
@@ -27,6 +37,7 @@ import { shellFixtureProjects } from '../../src/renderer/fixtures/workbench';
 import { useNavigateToLastUnread } from '../../src/renderer/hooks/workbench-shell/composer/use-navigate-to-last-unread';
 import type { UnreadChatEntry } from '../../src/renderer/state/unread';
 import { unreadChatEntriesAtom } from '../../src/renderer/state/unread/atoms';
+import { archivingWorkspaceIdsAtom } from '../../src/renderer/state/workspace/workspace-archiving';
 import type { WorkbenchLayoutModel } from '../../src/renderer/types/workbench-shell';
 import { createTestQueryClient } from './support/dom';
 
@@ -163,4 +174,26 @@ test('does not navigate when no project holds the marked workspace', async () =>
 	expect(navigate).not.toHaveBeenCalled();
 	expect(navigateToWorkspace).not.toHaveBeenCalled();
 	expect(store.get(unreadChatEntriesAtom)).toEqual([]);
+});
+
+// A workspace mid-archive is losing the worktree the chat lives in, and the
+// mark survives because a vetoed archive leaves the workspace — and the unread
+// chat in it — whole.
+test('refuses a jump into a workspace being archived, keeping the mark', async () => {
+	getDefaultStore().set(archivingWorkspaceIdsAtom, new Set([workspace.id]));
+	const mark = target('tab-7');
+	const { result, store } = renderNavigate([mark]);
+
+	await act(async () => {
+		await result.current(mark);
+	});
+
+	expect(navigate).not.toHaveBeenCalled();
+	expect(navigateToWorkspace).not.toHaveBeenCalled();
+	expect(listChatTabs).not.toHaveBeenCalled();
+	expect(store.get(unreadChatEntriesAtom)).toEqual([mark]);
+});
+
+afterEach(() => {
+	getDefaultStore().set(archivingWorkspaceIdsAtom, new Set<string>());
 });

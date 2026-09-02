@@ -13,6 +13,7 @@ import {
 	unarchiveWorkspace,
 	workspaceGitStatusQuery,
 } from '@/renderer/api/ensemblr-queries';
+import { useArchiveWorkspaceHop } from '@/renderer/hooks/workbench-shell/use-archive-workspace-hop';
 import { useRemoveWorkspaceAction } from '@/renderer/hooks/workbench-shell/use-remove-workspace-action';
 import { getErrorMessage } from '@/renderer/lib/error';
 import { failureText } from '@/renderer/lib/failure-text';
@@ -26,6 +27,7 @@ import {
 	releaseLifecycleRun,
 } from '@/renderer/lib/workbench/lifecycle-run-latch';
 import { workspaceLifecycleDialogAtom } from '@/renderer/state/dialogs';
+import { useArchivingWorkspaceActions } from '@/renderer/state/workspace';
 import type { WorkspaceShellModel } from '@/renderer/types/workbench';
 import type { ArchiveWorkspaceStatus } from '@/shared/ipc/contracts/workspace';
 
@@ -108,6 +110,34 @@ async function runArchive(
 			status: 'failure',
 		};
 	}
+}
+
+/**
+ * Reports an archive that did not remove the workspace. A lifecycle hook that
+ * vetoed the run is a decision rather than a fault, so it warns where a genuine
+ * failure errors.
+ * @param outcome - The archive that ran, and what it reported
+ * @param t - Translator used to word the headline
+ */
+function reportUnarchivedOutcome(outcome: ArchiveOutcome, t: TFunction): void {
+	if (outcome.status === 'aborted') {
+		toast.warning(
+			t(
+				'errors:workspace-archive.skipped.title',
+				'The workspace was not archived.',
+			),
+			{ description: outcome.description },
+		);
+		return;
+	}
+
+	toast.error(
+		t(
+			'errors:workspace-archive.failed.title',
+			'Archiving the workspace failed.',
+		),
+		{ description: outcome.description },
+	);
 }
 
 /**
@@ -213,7 +243,18 @@ export function useArchivedWorkspaceToast(): (
  * asking first. It defers to the archive dialog behind
  * {@link workspaceLifecycleDialogAtom} for the archives that are not reversible
  * — see {@link resolveUnconfirmedArchivePlan} for which those are.
- * @param options - Active workspace identity, used to pick the post-removal route fallback
+ *
+ * The run is marked in `archivingWorkspaceIdsAtom` for as long as it lasts, which
+ * is what puts the sidebar row and the board card into their archiving state and
+ * takes the action out of reach while it runs. That mark deliberately outlives
+ * the `lifecycle-run-latch` claim, which is released the moment the IPC answers:
+ * the row has to keep saying so until it has actually left the list.
+ *
+ * Leaving the workspace before its teardown, and returning to it when the
+ * archive did not happen, belongs to {@link useArchiveWorkspaceHop} — which the
+ * confirmation dialog wraps its own run in too, so both paths move the shell the
+ * same way.
+ * @param options - Active workspace identity, used to leave the workspace before it is torn down and to pick the post-removal route fallback
  * @returns A callback that archives the workspace it is given
  */
 export function useArchiveWorkspaceAction({
@@ -222,18 +263,22 @@ export function useArchiveWorkspaceAction({
 	activeWorkspaceId: string | null;
 }): (workspace: WorkspaceShellModel) => Promise<void> {
 	const queryClient = useQueryClient();
+	const router = useRouter();
 	const { t } = useTranslation();
 	const requestLifecycleDialog = useSetAtom(workspaceLifecycleDialogAtom);
 	const removeWorkspace = useRemoveWorkspaceAction({ activeWorkspaceId });
 	const announceArchived = useArchivedWorkspaceToast();
+	const archiveAwayFromWorkspace = useArchiveWorkspaceHop({
+		activeWorkspaceId,
+	});
+	const { clearArchiving, markArchiving } = useArchivingWorkspaceActions();
 
 	return useCallback(
 		async (workspace: WorkspaceShellModel) => {
 			const operationKey = `archive-workspace:${workspace.id}`;
 			if (!claimLifecycleRun(operationKey)) {
-				// This action has no busy state of its own, so returning silently
-				// leaves the menu item looking dead. Keyed by the operation so a burst
-				// of clicks reports once rather than stacking a toast per click.
+				// Keyed by the operation so a burst of clicks reports once rather than
+				// stacking a toast per click.
 				toast.warning(
 					t(
 						'errors:workspace-archive.in-flight.title',
@@ -244,56 +289,61 @@ export function useArchiveWorkspaceAction({
 				return;
 			}
 
-			let outcome: ArchiveOutcome;
-			let plan: ArchiveWorktreePlan;
+			const leavesActiveWorkspace = activeWorkspaceId === workspace.id;
+			markArchiving(workspace.id);
+
 			try {
-				const resolved = await resolveUnconfirmedArchivePlan(
-					queryClient,
-					workspace,
-				);
-				if (!resolved) {
-					requestLifecycleDialog({ kind: 'archive', workspace });
+				let outcome: ArchiveOutcome;
+				let plan: ArchiveWorktreePlan;
+				try {
+					const resolved = await resolveUnconfirmedArchivePlan(
+						queryClient,
+						workspace,
+					);
+					if (!resolved) {
+						requestLifecycleDialog({ kind: 'archive', workspace });
+						return;
+					}
+
+					plan = resolved;
+					outcome = await archiveAwayFromWorkspace(workspace.id, () =>
+						runArchive(resolved, workspace.id, t),
+					);
+				} finally {
+					releaseLifecycleRun(operationKey);
+				}
+
+				if (outcome.status === 'success') {
+					await removeWorkspace.archived(workspace.id);
+					// `removeWorkspace` skips its own invalidation for the active
+					// workspace, on the assumption the layout's redirect will re-run
+					// every loader — which the hop above has already spent.
+					if (leavesActiveWorkspace) {
+						await router.invalidate();
+					}
+					announceArchived({
+						branchCleanup: plan.branchCleanup,
+						workspaceId: workspace.id,
+					});
 					return;
 				}
-				plan = resolved;
-				outcome = await runArchive(plan, workspace.id, t);
+
+				reportUnarchivedOutcome(outcome, t);
+				await invalidateWorkspaceListViews(queryClient);
 			} finally {
-				releaseLifecycleRun(operationKey);
+				clearArchiving(workspace.id);
 			}
-
-			if (outcome.status === 'success') {
-				await removeWorkspace.archived(workspace.id);
-				announceArchived({
-					branchCleanup: plan.branchCleanup,
-					workspaceId: workspace.id,
-				});
-				return;
-			}
-
-			if (outcome.status === 'aborted') {
-				toast.warning(
-					t(
-						'errors:workspace-archive.skipped.title',
-						'The workspace was not archived.',
-					),
-					{ description: outcome.description },
-				);
-			} else {
-				toast.error(
-					t(
-						'errors:workspace-archive.failed.title',
-						'Archiving the workspace failed.',
-					),
-					{ description: outcome.description },
-				);
-			}
-			await invalidateWorkspaceListViews(queryClient);
 		},
 		[
+			activeWorkspaceId,
 			announceArchived,
+			archiveAwayFromWorkspace,
+			clearArchiving,
+			markArchiving,
 			queryClient,
 			removeWorkspace.archived,
 			requestLifecycleDialog,
+			router,
 			t,
 		],
 	);

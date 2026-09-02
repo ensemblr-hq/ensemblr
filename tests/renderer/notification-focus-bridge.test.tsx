@@ -15,7 +15,17 @@ const { listChatTabs, navigate, navigateToWorkspace } = vi.hoisted(() => ({
 
 vi.mock('@tanstack/react-router', () => ({ useNavigate: () => navigate }));
 
+// The jump the bridge reuses refuses an archiving workspace, which it reads
+// through the workspace-state barrel — and that pulls the shared query client in
+// with it, so the mock has to carry the key factory it reads at import time.
 vi.mock('@/renderer/api/ensemblr-queries', () => ({
+	ensemblrQueryKeys: {
+		agentModels: () => ['agent-models'],
+		health: () => ['health'],
+		repositoryWorkspaceNavigation: () => ['repository-workspace-navigation'],
+		reviewComments: (workspaceId: string) => ['review-comments', workspaceId],
+		workspaceOpenTargets: () => ['workspace-open-targets'],
+	},
 	listChatTabsQuery: (workspaceId: string) => ({
 		queryFn: () => listChatTabs(workspaceId),
 		queryKey: ['chat-tabs', workspaceId],

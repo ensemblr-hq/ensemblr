@@ -10,6 +10,7 @@ import {
 	type UnreadChatRef,
 	useUnreadChatActions,
 } from '@/renderer/state/unread';
+import { getArchivingWorkspaceIds } from '@/renderer/state/workspace';
 
 /**
  * Finds which tab a session sits in for a workspace the renderer has not opened,
@@ -69,6 +70,13 @@ export function useNavigateToLastUnread(): (
 	return useCallback(
 		async (target: UnreadChatRef) => {
 			if (!layoutModel) {
+				return;
+			}
+			// A workspace mid-archive is losing the worktree this chat lives in, so
+			// the jump has nowhere to land. The mark is left alone rather than
+			// cleared: an archive a lifecycle hook vetoes leaves the workspace whole,
+			// and the unread chat with it.
+			if (getArchivingWorkspaceIds().has(target.workspaceId)) {
 				return;
 			}
 			const selection = findWorkspaceSelectionById(

@@ -8,6 +8,7 @@ export type WorkspaceSidebarStateKind =
 	| 'pr-open'
 	| 'pr-ready'
 	| 'pr-working'
+	| 'workspace-archiving'
 	| 'workspace-blocked'
 	| 'workspace-checking'
 	| 'workspace-working';

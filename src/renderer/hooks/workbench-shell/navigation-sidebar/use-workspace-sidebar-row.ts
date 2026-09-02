@@ -7,6 +7,7 @@ import { useWorkspaceBusy } from '@/renderer/hooks/workspace/use-workspace-busy'
 import { getWorkspaceSidebarState } from '@/renderer/lib/workbench';
 import { useWorkspaceUnreadCount } from '@/renderer/state/unread';
 import {
+	useWorkspaceIsArchiving,
 	useWorkspaceIsUnread,
 	type WorkspaceDockActivityState,
 	workspaceDockActivityByWorkspaceAtom,
@@ -32,6 +33,10 @@ import type { WorkspaceShellModel } from '@/renderer/types/workbench';
  * `isUnread` comes from `useWorkspaceIsUnread`, which folds the manual flag and
  * the per-chat marks; the bold label answers either, while only the chat count
  * draws the dot.
+ *
+ * `isArchiving` is the one piece of row state the cached workspace cannot carry:
+ * the archive is a renderer-side run against a workspace the list still holds.
+ * It takes the icon outright and the row renders itself non-interactive from it.
  * @param isActive - Whether this row is the workspace currently open
  * @param workspace - The workspace the row stands for
  * @returns The derived state the row renders from
@@ -46,6 +51,7 @@ export function useWorkspaceSidebarRow({
 	const isUnread = useWorkspaceIsUnread(workspace.id);
 	const unreadCount = useWorkspaceUnreadCount(workspace.id);
 	const agentBusy = useWorkspaceBusy(workspace.id);
+	const isArchiving = useWorkspaceIsArchiving(workspace.id);
 	const livePullRequest = useLivePullRequestModel({
 		changeSummary: workspace.changeSummary,
 		enabled: isActive,
@@ -74,8 +80,12 @@ export function useWorkspaceSidebarRow({
 		hasDiffStats:
 			workspace.changeSummary.additions > 0 ||
 			workspace.changeSummary.deletions > 0,
+		isArchiving,
 		isUnread,
-		sidebarState: getWorkspaceSidebarState(liveWorkspace, { agentBusy }),
+		sidebarState: getWorkspaceSidebarState(liveWorkspace, {
+			agentBusy,
+			isArchiving,
+		}),
 		unreadCount,
 	};
 }
