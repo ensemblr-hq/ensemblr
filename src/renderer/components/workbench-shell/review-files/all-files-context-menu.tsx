@@ -1,9 +1,8 @@
-import { CopyIcon, EyeIcon, PaperclipIcon, PinIcon } from 'lucide-react';
+import { CopyIcon, PaperclipIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import {
 	ContextMenuContent,
-	ContextMenuItem,
 	ContextMenuSeparator,
 } from '@/renderer/components/ui/context-menu';
 import type {
@@ -13,6 +12,7 @@ import type {
 	WorkspaceOpenTarget,
 } from '@/renderer/types/workbench';
 
+import { FileMenuItem, OpenFileMenuItems } from './file-menu-items';
 import { OpenInTargetsSubmenu } from './open-in-targets-submenu';
 
 /**
@@ -69,48 +69,21 @@ export function AllFilesContextMenuContent({
 			className='w-44 bg-muted p-1'
 		>
 			{canOpen ? (
-				<>
-					<ContextMenuItem
-						className='h-8 gap-2 px-2 text-[0.8125rem]'
-						onSelect={() => openFilePreview(path)}
-					>
-						<EyeIcon aria-hidden='true' className='text-muted-foreground' />
-						<span className='min-w-0 flex-1'>
-							{t('common:actions.view', 'View')}
-						</span>
-					</ContextMenuItem>
-					<ContextMenuItem
-						className='h-8 gap-2 px-2 text-[0.8125rem]'
-						onSelect={() => openFilePreview(path, { preview: false })}
-					>
-						<PinIcon aria-hidden='true' className='text-muted-foreground' />
-						<span className='min-w-0 flex-1'>
-							{t('common:actions.keep-open', 'Keep open')}
-						</span>
-					</ContextMenuItem>
-				</>
+				<OpenFileMenuItems openFile={openFilePreview} path={path} />
 			) : null}
-			<ContextMenuItem
-				className='h-8 gap-2 px-2 text-[0.8125rem]'
+			<FileMenuItem
+				icon={PaperclipIcon}
+				label={t('common:actions.attach-to-chat', 'Attach to chat')}
 				onSelect={() => onAttachToChat(target)}
-			>
-				<PaperclipIcon aria-hidden='true' className='text-muted-foreground' />
-				<span className='min-w-0 flex-1'>
-					{t('common:actions.attach-to-chat', 'Attach to chat')}
-				</span>
-			</ContextMenuItem>
+			/>
 			{openInTargets.length || copyTarget ? <ContextMenuSeparator /> : null}
 			<OpenInTargetsSubmenu onSelect={invoke} openInTargets={openInTargets} />
 			{copyTarget ? (
-				<ContextMenuItem
-					className='h-8 gap-2 px-2 text-[0.8125rem]'
+				<FileMenuItem
+					icon={CopyIcon}
+					label={t('common:actions.copy-path', 'Copy path')}
 					onSelect={() => invoke(copyTarget)}
-				>
-					<CopyIcon aria-hidden='true' className='text-muted-foreground' />
-					<span className='min-w-0 flex-1'>
-						{t('common:actions.copy-path', 'Copy path')}
-					</span>
-				</ContextMenuItem>
+				/>
 			) : null}
 		</ContextMenuContent>
 	);

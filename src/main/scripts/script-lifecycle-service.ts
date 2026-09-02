@@ -409,15 +409,18 @@ export function createScriptLifecycleService({
 			);
 		};
 
-		return terminalService
-			.listByKind('run-script')
-			.filter(
-				(session) =>
-					session.workspaceId !== launch.workspaceId &&
-					session.status === 'running' &&
-					sharesRepository(session.workspaceId),
-			)
-			.map((session) => session.id);
+		const siblingSessionIds: string[] = [];
+		for (const session of terminalService.listByKind('run-script')) {
+			if (
+				session.workspaceId !== launch.workspaceId &&
+				session.status === 'running' &&
+				sharesRepository(session.workspaceId)
+			) {
+				siblingSessionIds.push(session.id);
+			}
+		}
+
+		return siblingSessionIds;
 	}
 
 	/**

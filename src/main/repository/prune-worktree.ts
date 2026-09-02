@@ -365,16 +365,18 @@ async function readUnregisteredWorktreeSnapshot({
 		return null;
 	}
 
-	const parentHash = await readGitRevision({
-		localCommandService,
-		cwd: repositoryPath,
-		revision: `${ref}^1`,
-	});
-	const branchTip = await readGitRevision({
-		localCommandService,
-		cwd: repositoryPath,
-		revision: `refs/heads/${branchName}`,
-	});
+	const [parentHash, branchTip] = await Promise.all([
+		readGitRevision({
+			localCommandService,
+			cwd: repositoryPath,
+			revision: `${ref}^1`,
+		}),
+		readGitRevision({
+			localCommandService,
+			cwd: repositoryPath,
+			revision: `refs/heads/${branchName}`,
+		}),
+	]);
 	if (branchTip !== null && branchTip !== parentHash) {
 		return null;
 	}

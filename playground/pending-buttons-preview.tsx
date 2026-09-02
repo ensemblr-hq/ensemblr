@@ -93,16 +93,36 @@ export function PendingButtonsScene() {
 				note='An icon-only button has nothing to fall back to, so the spinner takes the icon’s place rather than sitting beside it.'
 			>
 				<div className='flex items-center gap-3'>
-					<Button pending={pending} size='icon' variant='destructive'>
+					<Button
+						aria-label='Delete · pending'
+						pending={pending}
+						size='icon'
+						variant='destructive'
+					>
 						<Trash2Icon aria-hidden='true' />
 					</Button>
-					<Button pending={false} size='icon' variant='destructive'>
+					<Button
+						aria-label='Delete · idle'
+						pending={false}
+						size='icon'
+						variant='destructive'
+					>
 						<Trash2Icon aria-hidden='true' />
 					</Button>
-					<Button pending={pending} size='icon-sm' variant='outline'>
+					<Button
+						aria-label='Merge · pending'
+						pending={pending}
+						size='icon-sm'
+						variant='outline'
+					>
 						<GitMergeIcon aria-hidden='true' />
 					</Button>
-					<Button pending={false} size='icon-sm' variant='outline'>
+					<Button
+						aria-label='Merge · idle'
+						pending={false}
+						size='icon-sm'
+						variant='outline'
+					>
 						<GitMergeIcon aria-hidden='true' />
 					</Button>
 				</div>

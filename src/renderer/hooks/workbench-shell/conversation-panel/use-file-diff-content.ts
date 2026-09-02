@@ -67,6 +67,28 @@ function resolveDiffPlaceholder({
 }
 
 /**
+ * The source the viewer shows beside the patch once diff-only mode is off, or
+ * null when the read failed or returned something that is not source.
+ *
+ * Only a utf8 read has source to show: base64 is an image or a PDF and would
+ * fill the code surface with megabytes of noise, and binary carries no content
+ * at all.
+ * @param fileData - The workspace file read, or undefined while it is in flight
+ * @returns The file's text, or null when there is none to show
+ */
+function resolveFullFileText(
+	fileData: Awaited<ReturnType<typeof readWorkspaceFile>> | undefined,
+): string | null {
+	if (!fileData || fileData.error) {
+		return null;
+	}
+	if (fileData.contentEncoding !== 'utf8') {
+		return null;
+	}
+	return fileData.content ?? null;
+}
+
+/**
  * Loads one file's unified patch alongside the full working-tree file the
  * viewer reveals when the user turns off diff-only mode, and resolves the
  * placeholder to show while no patch is renderable.
@@ -88,8 +110,9 @@ export function useFileDiffContent({
 	const diff = useQuery(
 		workspaceFileDiffQuery({ filePath, scope, workspaceCwd }),
 	);
-	const loaded = diff.data && !diff.data.error ? diff.data : null;
-	const resolvedPath = loaded ? loaded.path : (filePath ?? '');
+	const diffError = diff.data?.error ?? null;
+	const loaded = diffError ? null : (diff.data ?? null);
+	const resolvedPath = loaded?.path ?? filePath ?? '';
 	const patch = loaded?.patch ?? '';
 
 	const fullFileEnabled =
@@ -104,23 +127,13 @@ export function useFileDiffContent({
 		queryKey: ensemblrQueryKeys.filePreview(workspaceCwd ?? '', resolvedPath),
 		staleTime: 10_000,
 	});
-	const fileData = fullFile.data;
-
-	// Only a utf8 read has source to show beside the patch: base64 is an image or
-	// a PDF and would fill the code surface with megabytes of noise, and binary
-	// carries no content at all.
-	const fullFileIsText = fileData?.contentEncoding === 'utf8';
-
 	return {
-		fullFileContent:
-			fileData && !fileData.error && fullFileIsText
-				? (fileData.content ?? null)
-				: null,
+		fullFileContent: resolveFullFileText(fullFile.data),
 		fullFileContentPending: fullFileEnabled && !fullFile.isFetched,
 		isTruncated: loaded?.isTruncated ?? false,
 		patch,
 		placeholder: resolveDiffPlaceholder({
-			errorMessage: diff.data?.error?.message ?? null,
+			errorMessage: diffError?.message ?? null,
 			hasFilePath: Boolean(filePath),
 			hasPatch: Boolean(patch),
 			isError: diff.isError,
