@@ -1,5 +1,8 @@
 // @vitest-environment happy-dom
 
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
 import { act, fireEvent, screen } from '@testing-library/react';
 import { createStore, Provider } from 'jotai';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
@@ -35,6 +38,20 @@ const workspaceCwd = '/workspace/ensemblr';
 const previewFilePath = 'assets/logo.png';
 const previewImageContent = 'iVBORw0KGgo=';
 
+const LANGUAGE_FROM_PATH = join(
+	process.cwd(),
+	'src/renderer/lib/language-from-path.ts',
+);
+
+function listHighlightedExtensions(): string[] {
+	const source = readFileSync(LANGUAGE_FROM_PATH, 'utf8');
+	const table = source.slice(
+		source.indexOf('const EXTENSION_LANGUAGE'),
+		source.indexOf('const BASENAME_LANGUAGE'),
+	);
+	return [...table.matchAll(/^\t([a-z0-9]+):/gm)].map((match) => match[1]);
+}
+
 const previewSession: SessionTabModel = {
 	chatTabId: 'preview-tab',
 	filePath: previewFilePath,
@@ -60,6 +77,46 @@ describe('file preview tabs', () => {
 		);
 		expect(getWorkspaceFileIconNameForPath('packages/app/.nvmrc')).toBe(
 			'vscode-icons:file-type-node',
+		);
+	});
+
+	test('maps Swift sources to the Swift icon', () => {
+		expect(getWorkspaceFileIconNameForPath('Sources/App/Main.swift')).toBe(
+			'vscode-icons:file-type-swift',
+		);
+		expect(getWorkspaceFileIconNameForPath('Package.swift')).toBe(
+			'vscode-icons:file-type-swift',
+		);
+	});
+
+	test('gives every syntax-highlighted extension an icon of its own', () => {
+		const unmapped = listHighlightedExtensions().filter(
+			(extension) =>
+				getWorkspaceFileIconNameForPath(`sample.${extension}`) ===
+				'vscode-icons:default-file',
+		);
+
+		expect(unmapped).toEqual([]);
+	});
+
+	test('maps Apple toolchain resources alongside their Swift sources', () => {
+		expect(getWorkspaceFileIconNameForPath('App/Info.plist')).toBe(
+			'vscode-icons:file-type-xml',
+		);
+		expect(getWorkspaceFileIconNameForPath('App/App.entitlements')).toBe(
+			'vscode-icons:file-type-xml',
+		);
+		expect(getWorkspaceFileIconNameForPath('App/Main.storyboard')).toBe(
+			'vscode-icons:file-type-storyboard',
+		);
+		expect(getWorkspaceFileIconNameForPath('App/LaunchScreen.xib')).toBe(
+			'vscode-icons:file-type-xib',
+		);
+		expect(getWorkspaceFileIconNameForPath('Legacy/AppDelegate.m')).toBe(
+			'vscode-icons:file-type-objectivec',
+		);
+		expect(getWorkspaceFileIconNameForPath('Legacy/Bridge.mm')).toBe(
+			'vscode-icons:file-type-objectivecpp',
 		);
 	});
 
