@@ -9,7 +9,115 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.0-beta.23] - 2026-09-03
+
+Archiving becomes an ordinary action. It no longer asks before doing something it can take back —
+the confirmation survives only for the archives that destroy work — it shows the row leaving while
+the worktree comes apart, and it actually reclaims the disk it recorded reclaiming, with a
+launch-time pass that sweeps up the folders earlier versions left behind (those workspaces could not
+be unarchived at all). The review header stops answering for the wrong workspace: merge, push,
+archive and continue each carry the workspace they were started on, so a merge no longer archives a
+sibling. The Changes panel drops discarded rows before git answers and stops showing a moved
+directory at both paths, `⌘⇧↵` sends past the follow-up queue, a still-open chat can be attached to
+a new one, and 26 more file extensions draw their own icon.
+[Release](https://github.com/ensemblr-hq/ensemblr/releases/tag/v0.1.0-beta.23) ·
+[`.dmg`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.0-beta.23/Ensemblr-0.1.0-beta.23-arm64.dmg) ·
+[`.AppImage`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.0-beta.23/Ensemblr-0.1.0-beta.23-x64.AppImage)
+
+### Added
+
+- **A workspace archives without confirming, unless the archive destroys something.** Archiving
+  preserves `.context/` and is reversible from History and the archive browser, so the dialog was
+  asking about an action the user could already take back. The Workspace menu, the sidebar row and
+  the dashboard card now archive straight away and report with a success toast carrying **Undo**.
+  The dialog survives as an *escalation*, raised only where the archive is genuinely not reversible:
+  a worktree with uncommitted changes, a plan that would drop the local branch (`git branch -D`
+  takes the predecessor chain with it, and unarchive cuts a fresh branch from base rather than
+  bringing those commits back), or a git status that errored — an unknown worktree confirms rather
+  than assuming it is clean. The Undo tells the truth about which of those it was: a branch-cleanup
+  archive offers no Undo at all, because nothing can perform that restore, and says the local branch
+  was deleted instead. One rule in `archive-worktree-plan.ts` maps the repository's git settings onto
+  the three outcomes and both paths read it, so the dialog cannot describe an archive different from
+  the one that runs.
+- **An archive shows itself running, and the shell leaves the workspace before its teardown.**
+  Archiving had no state of its own: the sidebar row kept its branch line and stayed clickable while
+  the worktree behind it was taken apart, and a second archive could be fired at a workspace already
+  leaving. The row now says `Archiving…` and spins, the board card dims and registers neither drag
+  source nor drop target, the native **Archive** menu item greys out, and both the index-route loader
+  and jump-to-last-unread refuse the workspace as a navigation target so nothing redirects back into
+  it. The shell hops away *before* the teardown starts, so the user watches the row go from a sibling
+  rather than watching their own come apart — and an archive that a `pre-archive-workspace` hook
+  vetoes puts them back where they were, sub-route included, because that workspace is still whole.
+- **A still-open chat can be attached to a new one.** The new-chat empty state only listed *closed*
+  tabs as attach chips, so a workspace whose chats were all still open showed an empty row — even
+  though a chat is summarized to `.context/sessions` at every turn boundary and has had a transcript
+  to attach the whole time. Open tabs are listed alongside closed ones, ranked by transcript
+  freshness, with the active tab filtered out (attaching a chat's own transcript to itself says
+  nothing). The history dropdown keeps its own ordering by close time, since it restores rather than
+  attaches and a terminal tab never has a transcript.
+- **`⌘⇧↵` sends the draft past the follow-up queue.** `composer.sendNow` is the mirror of
+  `composer.queue`: it sends this instant whatever **Follow-up behavior** says — mid-turn as a steer
+  frame, the only delivery a running turn can receive — so `queue` and `block` no longer park a
+  message the user wants delivered now. Idle it is an ordinary send, and an existing queue is left
+  alone: jumping one message past the queue is a decision about that message, not licence to drain
+  everything behind it. `tab.keepOpen` moves to `⌘⇧O`, because its menu accelerator would otherwise
+  swallow the composer chord outright.
+- **Swift and 25 other extensions draw their own file icons.** `.swift` fell back to the generic
+  glyph everywhere the workbench resolves an icon — the Files panel, the Checks diff rows, preview
+  tabs, composer mention chips. Fixing it exposed 20 more extensions the diff viewer already
+  syntax-highlights with no icon at all (`bash` `c` `cpp` `cs` `fish` `graphql` `h` `hpp` `java`
+  `jsonc` `kt` `mdx` `php` `prisma` `rb` `scss` `sql` `svelte` `vue` `zsh`), plus the Apple-toolchain
+  resources beside Swift sources. No dependency was added — the whole `vscode-icons` set was already
+  registered at renderer startup and only the mapping was missing. A drift guard now fails CI when a
+  highlighter language is added without an icon.
+
+### Changed
+
+- **Archiving always reclaims the worktree's disk, and says how much it gave back.** Removing the
+  folder was previously a setting (`reclaim_disk_on_archive`, on by default) with a retroactive
+  **Reclaim disk** / **Reclaim all** action in the archive browser for archives made before it
+  existed. Both are gone: reclaiming is what archiving *does*, so there is nothing left to opt into
+  and nothing left to catch up on. The archive success toast now reports the size freed, which is the
+  one thing the measurement was ever for — it was taken on every archive and displayed nowhere.
+
+### Removed
+
+- **The archive browser no longer claims an archived workspace is still occupying disk.** The row's
+  **Reclaim disk** button was drawn from `pathExists`, an `existsSync` probe taken once when the list
+  was built, so a folder that went away afterwards left the button behind — clicking it reported
+  "no worktree folder on disk, so there was nothing to reclaim" against a row that already read
+  "disk reclaimed". A listing cannot win that race, so the claim is gone rather than refreshed: rows
+  are worded from what the archive recorded, and **Delete permanently** clears out a folder an older
+  archive left on disk. The `reclaimDiskOnArchive` setting is dropped from both scopes and from
+  `schemas/config.schema.json` / `schemas/settings.schema.json`; a `reclaim_disk_on_archive` still
+  sitting in a committed `.ensemblr/settings.toml` is inert.
+
 ### Fixed
+
+- **Every review action is scoped to the workspace it was raised on.** Merge, push,
+  archive-after-merge and continue each read their workspace off the render that *settled* them
+  rather than the one they were *started* on: the workbench route component is reused across
+  workspace params, so the provider and its mutations outlive a workspace switch. Merge archived the
+  **wrong workspace**; clicking **Archive** in a merged PR header left Archive/Continue disabled and
+  spinning on *other* merged workspaces. Each run now carries its target in the mutation's variables,
+  and each busy flag is read from a record that outlives the shell — continue moves to the mutation
+  cache, which holds every pending run rather than only the newest and survives navigating to Welcome
+  and back mid-run. The stale merge dialog is dropped during render rather than from an effect, which
+  would have shown one frame naming the wrong pull request.
+- **Discarded rows leave the Changes panel immediately.** A discard held its dialog open through a
+  full git round-trip and only then re-read the change set, so reverted rows sat there looking
+  untouched. `useDiscardChanges` owns the lifecycle: targeted paths mute while the call is in flight
+  and leave the cached change set on success. The optimistic removal is confined to the working-tree
+  scope, the only one where the answer is certain; every scope still settles on a real invalidation
+  behind it. Invalidation was also under-reaching — the scoped status key alone left the
+  branch-scoped Changes tab and the sidebar summaries waiting out their poll.
+- **The file tree keeps up with the worktree.** A directory moved without staging showed at both
+  paths, because `git ls-files --cached` enumerates the index; the index entries whose worktree file
+  is gone are now subtracted. Sustained churn — an `npm install`, a build, a large move — restarted a
+  trailing-only debounce forever and went unreported until the 30s poll, which pauses while the
+  window is blurred; a 1s max-wait clamps a burst to one broadcast. And that broadcast fanned out one
+  IPC round-trip per expanded ignored folder every second, for contents ignored by definition, now
+  throttled to one enumeration per 5s.
 
 - **Archiving no longer leaves the worktree folder on disk, and a launch-time pass reclaims the ones
   it already left.** Every archive recorded `worktree_pruned`, and the folders were still there —
@@ -39,29 +147,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   terminals had already ended — one archive here kept zero logs for six terminals. Archiving reads
   each dock terminal's buffer out of memory after the teardown instead, and writes it into the
   preserved context. Agent and run-script output stays out, as it does on disk today.
-
-### Changed
-
-- **Archiving always reclaims the worktree's disk, and says how much it gave back.** Removing the
-  folder was previously a setting (`reclaim_disk_on_archive`, on by default) with a retroactive
-  **Reclaim disk** / **Reclaim all** action in the archive browser for archives made before it
-  existed. Both are gone: reclaiming is what archiving *does*, so there is nothing left to opt into
-  and nothing left to catch up on. The archive success toast now reports the size freed, which is the
-  one thing the measurement was ever for — it was taken on every archive and displayed nowhere.
-
-### Removed
-
-- **The archive browser no longer claims an archived workspace is still occupying disk.** The row's
-  **Reclaim disk** button was drawn from `pathExists`, an `existsSync` probe taken once when the list
-  was built, so a folder that went away afterwards left the button behind — clicking it reported
-  "no worktree folder on disk, so there was nothing to reclaim" against a row that already read
-  "disk reclaimed". A listing cannot win that race, so the claim is gone rather than refreshed: rows
-  are worded from what the archive recorded, and **Delete permanently** clears out a folder an older
-  archive left on disk. The `reclaimDiskOnArchive` setting is dropped from both scopes and from
-  `schemas/config.schema.json` / `schemas/settings.schema.json`; a `reclaim_disk_on_archive` still
-  sitting in a committed `.ensemblr/settings.toml` is inert.
-
-### Fixed
 
 - **`./scripts/with-pinned-node.sh npm ci` died on the preinstall Node guard even with the pinned
   Node installed.** The wrapper handed the command to `mise exec node@24`, which resolves the
