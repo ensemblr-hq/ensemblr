@@ -523,7 +523,7 @@ you need to bisect a packaging break.
 **Write the notes and create the release. That is the whole ritual.**
 
 ```bash
-gh release create v0.1.0-beta.23 --notes-file NOTES.md --prerelease
+gh release create v0.1.0-beta.24 --notes-file NOTES.md --prerelease
 ```
 
 That creates the tag and fires `release: published`, which triggers
@@ -540,8 +540,20 @@ re-running, dispatch the workflow manually with that tag as its input.
 The workflow refuses to build when `package.json`'s `version` does not match the
 tag with `v` stripped, or when the release is still a draft.
 
-The README's version line and `.dmg` download URL stay hand-edited; the job
-prints the exact two replacement lines to its run summary.
+The README's version line and `.dmg` download URL stay hand-edited. The job's
+run summary is not a readable surface for an agent or for anyone without an
+authenticated browser session — `$GITHUB_STEP_SUMMARY` has no API surface,
+`gh api` on the check run returns `output.summary: null`, and the raw logs show
+only the unexpanded script. Reconstruct both lines instead from the release's
+own assets, whose `name` field is the single fact both lines depend on:
+
+```bash
+gh release view v0.1.0-beta.24 --json assets -q '.assets[].name'
+```
+
+The `.dmg` name (`Ensemblr-<version>-arm64.dmg`) gives the download URL; the
+version line is just the tag. Verify the reconstruction against the real asset
+name before editing the README — never present a guess as a copy.
 
 **The Homebrew cask bumps itself.** The same job's `Bump the Homebrew cask` step
 rewrites `Casks/ensemblr.rb` in `ensemblr-hq/homebrew-tap` to the new version and
