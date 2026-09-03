@@ -75,8 +75,8 @@ function savedLink(
 		accountLabel: 'Work',
 		enabled: true,
 		environmentSlug: 'dev',
-		fromRepositoryConfig: false,
 		lastSyncedAt: null,
+		origin: 'local',
 		projectId: 'proj-1',
 		projectName: 'Backend',
 		recursive: false,
@@ -166,7 +166,7 @@ test('a committed link with no local account resolves against the aggregated lis
 		link: savedLink({
 			accountId: null,
 			accountLabel: null,
-			fromRepositoryConfig: true,
+			origin: 'repository-config',
 		}),
 		projects: [backend, frontend],
 		projectsLoaded: true,

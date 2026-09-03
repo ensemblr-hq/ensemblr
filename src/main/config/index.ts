@@ -66,6 +66,7 @@ export type {
 export { writeRepositoryScripts } from './repository-scripts-writer.ts';
 export type { WriteRepositorySettingsResult } from './repository-settings-writer.ts';
 export {
+	hasRepositorySettingsFile,
 	readRepositorySettings,
 	rewriteRepositorySettings,
 } from './repository-settings-writer.ts';

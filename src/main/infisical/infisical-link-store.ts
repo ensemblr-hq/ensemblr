@@ -34,12 +34,30 @@ export interface WriteInfisicalLinkInput {
 /** SQLite persistence for the per-machine half of every Infisical link. */
 export interface InfisicalLinkStore {
 	clear: (input: { scope: InfisicalLinkScope; scopeId: string }) => void;
+	/**
+	 * Records that the user unlinked a scope, so a project Ensemblr can still
+	 * rediscover from the CLI's `.infisical.json` stays unlinked.
+	 */
+	dismissDiscovery: (input: {
+		scope: InfisicalLinkScope;
+		scopeId: string;
+	}) => void;
+	/** Reports whether the user has unlinked this scope since last linking it. */
+	isDiscoveryDismissed: (input: {
+		scope: InfisicalLinkScope;
+		scopeId: string;
+	}) => boolean;
 	/** Resolves a repository's absolute path, used to reach its committed config. */
 	readRepositoryPath: (repositoryId: string) => string | null;
 	recordSync: (input: {
 		scope: InfisicalLinkScope;
 		scopeId: string;
 		syncedAt: string;
+	}) => void;
+	/** Drops a dismissal, so discovery applies to this scope again. */
+	restoreDiscovery: (input: {
+		scope: InfisicalLinkScope;
+		scopeId: string;
 	}) => void;
 	rows: (input: {
 		scope: InfisicalLinkScope;
@@ -72,6 +90,27 @@ export function createInfisicalLinkStore({
 				.run(scope, scopeId);
 		},
 
+		dismissDiscovery: ({ scope, scopeId }) => {
+			database
+				.prepare(
+					`INSERT INTO infisical_discovery_dismissals (scope, scope_id, dismissed_at)
+					 VALUES (?, ?, ?)
+					 ON CONFLICT(scope, scope_id) DO UPDATE SET
+						dismissed_at = excluded.dismissed_at`,
+				)
+				.run(scope, scopeId, now().toISOString());
+		},
+
+		isDiscoveryDismissed: ({ scope, scopeId }) => {
+			const row = database
+				.prepare(
+					'SELECT 1 FROM infisical_discovery_dismissals WHERE scope = ? AND scope_id = ?',
+				)
+				.get(scope, scopeId);
+
+			return Boolean(row);
+		},
+
 		readRepositoryPath: (repositoryId) => {
 			const row = database
 				.prepare('SELECT path FROM repositories WHERE id = ?')
@@ -88,6 +127,14 @@ export function createInfisicalLinkStore({
 					 WHERE scope = ? AND scope_id = ?`,
 				)
 				.run(syncedAt, now().toISOString(), scope, scopeId);
+		},
+
+		restoreDiscovery: ({ scope, scopeId }) => {
+			database
+				.prepare(
+					'DELETE FROM infisical_discovery_dismissals WHERE scope = ? AND scope_id = ?',
+				)
+				.run(scope, scopeId);
 		},
 
 		rows: ({ scope, scopeId }) => {

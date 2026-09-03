@@ -205,6 +205,7 @@ export type {
 	InfisicalEnvironmentSnapshot,
 	InfisicalFailure,
 	InfisicalFailureCode,
+	InfisicalLinkOrigin,
 	InfisicalLinkResult,
 	InfisicalLinkScope,
 	InfisicalLinkScopeRequest,

@@ -4,6 +4,7 @@ import type {
 	InfisicalAccountSnapshot,
 	InfisicalAccountsResult,
 	InfisicalFailure,
+	InfisicalLinkOrigin,
 	InfisicalLinkResult,
 	InfisicalLinkScope,
 	InfisicalLinkSnapshot,
@@ -12,12 +13,18 @@ import type {
 	InfisicalSyncResult,
 	SetInfisicalLinkRequest,
 } from '../../shared/ipc/contracts/infisical';
+import { hasRepositorySettingsFile } from '../config';
+import { createInfisicalAccountMatcher } from './infisical-account-match.ts';
 import type {
 	InfisicalAccountRecord,
 	InfisicalAccountStore,
 } from './infisical-account-store.ts';
 import { InfisicalApiError } from './infisical-api.ts';
 import type { InfisicalCache } from './infisical-cache.ts';
+import {
+	type InfisicalCliConfig,
+	readInfisicalCliConfig,
+} from './infisical-cli-config.ts';
 import type { InfisicalClient } from './infisical-client.ts';
 import type { InfisicalLinkStore } from './infisical-link-store.ts';
 import {
@@ -99,6 +106,10 @@ export function createInfisicalService({
 	now = () => new Date(),
 }: CreateInfisicalServiceOptions): InfisicalService {
 	const inFlightResolutions = new Map<string, Promise<InfisicalResolution>>();
+	const accountMatcher = createInfisicalAccountMatcher({
+		accountStore,
+		client,
+	});
 
 	/**
 	 * Builds the IPC-safe view of an account, including the mask of its stored
@@ -116,41 +127,26 @@ export function createInfisicalService({
 	}
 
 	/**
-	 * Reads the committed `[infisical]` block behind a scope. Only a repository
-	 * commits one; a workspace link is an explicit per-machine override.
+	 * Reads the two repository-side sources of a link: the `[infisical]` block
+	 * Ensemblr commits, and the `.infisical.json` the Infisical CLI writes.
+	 * Only a repository has either; a workspace link is an explicit per-machine
+	 * override with nothing on disk behind it.
 	 * @param scope - Link scope.
 	 * @param scopeId - Repository or workspace id.
-	 * @returns The committed block, or null.
+	 * @returns Both sources, each null when the repository declares none.
 	 */
-	function readCommittedBlock(scope: InfisicalLinkScope, scopeId: string) {
-		if (scope !== 'repository') {
-			return null;
+	function readRepositorySources(scope: InfisicalLinkScope, scopeId: string) {
+		const repositoryPath =
+			scope === 'repository' ? linkStore.readRepositoryPath(scopeId) : null;
+
+		if (!repositoryPath) {
+			return { committed: null, discovered: null };
 		}
 
-		const repositoryPath = linkStore.readRepositoryPath(scopeId);
-
-		return repositoryPath
-			? readInfisicalRepositoryConfig(repositoryPath)
-			: null;
-	}
-
-	/**
-	 * Picks the local account that resolves a committed link, by matching its
-	 * instance URL. An ambiguous match is left unresolved so the user chooses
-	 * rather than Ensemblr guessing which org's credentials to spend.
-	 * @param siteUrl - Instance URL named by the committed block.
-	 * @returns The account id, or null when there is no unambiguous match.
-	 */
-	function matchAccountBySiteUrl(siteUrl: string | null): string | null {
-		if (!siteUrl) {
-			return null;
-		}
-
-		const matches = accountStore
-			.list()
-			.filter((account) => account.siteUrl === siteUrl);
-
-		return matches.length === 1 ? (matches.at(0)?.id ?? null) : null;
+		return {
+			committed: readInfisicalRepositoryConfig(repositoryPath),
+			discovered: readInfisicalCliConfig(repositoryPath),
+		};
 	}
 
 	/**
@@ -165,19 +161,20 @@ export function createInfisicalService({
 		scopeId: string,
 	): InfisicalLinkSnapshot | null {
 		const row = linkStore.rows({ scope, scopeId });
-		const committed = readCommittedBlock(scope, scopeId);
-
-		if (!row && !committed) {
-			return null;
-		}
-
-		const projectId = row?.projectId || committed?.projectId || '';
-		const siteUrl = row?.siteUrl ?? committed?.siteUrl ?? null;
-		const accountId = row?.accountId ?? matchAccountBySiteUrl(siteUrl);
+		const { committed, discovered } = readRepositorySources(scope, scopeId);
+		const ensemblrProjectId = row?.projectId || committed?.projectId || '';
+		const fallback = ensemblrProjectId
+			? null
+			: discoveryFallback({ discovered, scope, scopeId });
+		const projectId = ensemblrProjectId || fallback?.projectId || '';
 
 		if (!projectId) {
 			return null;
 		}
+
+		const siteUrl =
+			row?.siteUrl ?? committed?.siteUrl ?? fallback?.siteUrl ?? null;
+		const accountId = row?.accountId ?? accountMatcher.matchBySiteUrl(siteUrl);
 
 		return {
 			accountId,
@@ -185,9 +182,13 @@ export function createInfisicalService({
 				? (accountStore.get(accountId)?.label ?? null)
 				: null,
 			enabled: row?.enabled ?? true,
-			environmentSlug: row?.environmentSlug || committed?.environmentSlug || '',
-			fromRepositoryConfig: !row && Boolean(committed),
+			environmentSlug:
+				row?.environmentSlug ||
+				committed?.environmentSlug ||
+				fallback?.environmentSlug ||
+				'',
 			lastSyncedAt: row?.lastSyncedAt ?? null,
+			origin: resolveOrigin({ committed, hasRow: Boolean(row) }),
 			projectId,
 			projectName: row?.projectName ?? committed?.projectName ?? null,
 			recursive: row?.recursive ?? committed?.recursive ?? false,
@@ -196,6 +197,27 @@ export function createInfisicalService({
 			secretPath: row?.secretPath || committed?.secretPath || '/',
 			siteUrl,
 		};
+	}
+
+	/**
+	 * Decides whether the CLI's `.infisical.json` gets to supply this link. A
+	 * scope the user has unlinked forfeits it, or unlinking a repository that ran
+	 * `infisical init` would never take.
+	 * @param input - The discovered config and the scope it was read for.
+	 * @returns The discovered config, or null when the scope has refused it.
+	 */
+	function discoveryFallback({
+		discovered,
+		scope,
+		scopeId,
+	}: {
+		discovered: InfisicalCliConfig | null;
+		scope: InfisicalLinkScope;
+		scopeId: string;
+	}): InfisicalCliConfig | null {
+		return linkStore.isDiscoveryDismissed({ scope, scopeId })
+			? null
+			: discovered;
 	}
 
 	/**
@@ -219,6 +241,39 @@ export function createInfisicalService({
 		return Object.fromEntries(
 			secrets.map((secret) => [secret.key, secret.value]),
 		);
+	}
+
+	/**
+	 * Fills in the account half of a link no instance URL resolved on its own, by
+	 * asking which of the accounts on that instance reach the project. This is
+	 * what lets a link discovered in a `.infisical.json` resolve without the user
+	 * opening Settings, and it is the same check that confirms the identity has
+	 * access. Reached whenever the link carries no account — including a
+	 * committed link whose instance hosts none or several of them.
+	 * @param link - The link whose account half may be missing.
+	 * @returns The link, with its account filled in when one unambiguously matches.
+	 */
+	async function withMatchedAccount(
+		link: InfisicalLinkSnapshot,
+	): Promise<InfisicalLinkSnapshot> {
+		if (link.accountId) {
+			return link;
+		}
+
+		const accountId = await accountMatcher.matchByProjectId({
+			projectId: link.projectId,
+			siteUrl: link.siteUrl,
+		});
+
+		if (!accountId) {
+			return link;
+		}
+
+		return {
+			...link,
+			accountId,
+			accountLabel: accountStore.get(accountId)?.label ?? null,
+		};
 	}
 
 	/**
@@ -265,7 +320,10 @@ export function createInfisicalService({
 	 * Rewrites the repository's committed `[infisical]` block, reporting a
 	 * failure rather than swallowing it: a config that could not be written is a
 	 * link nobody who clones the repository will inherit, and the local half has
-	 * already saved by the time this runs.
+	 * already saved by the time this runs. Clearing is skipped only when the
+	 * repository has no settings file at all — unlinking a project discovered in
+	 * a `.infisical.json` must not create one. A file that exists but does not
+	 * parse still goes through the writer, so the failure is reported.
 	 * @param repositoryId - Repository whose committed config is rewritten.
 	 * @param block - The block to commit, or null to clear it.
 	 * @returns The failure that stopped the write, or null.
@@ -277,6 +335,10 @@ export function createInfisicalService({
 		const repositoryPath = linkStore.readRepositoryPath(repositoryId);
 
 		if (!repositoryPath) {
+			return null;
+		}
+
+		if (!block && !hasRepositorySettingsFile(repositoryPath)) {
 			return null;
 		}
 
@@ -351,6 +413,8 @@ export function createInfisicalService({
 			try {
 				const account = await accountStore.create(request);
 
+				accountMatcher.invalidate();
+
 				try {
 					await client.verify(account.id);
 					recordAccountOutcome(account.id, null);
@@ -369,6 +433,7 @@ export function createInfisicalService({
 		clearLink: async ({ scope, scopeId }) => {
 			try {
 				linkStore.clear({ scope, scopeId });
+				linkStore.dismissDiscovery({ scope, scopeId });
 				await cache.clear({ scope, scopeId });
 
 				return {
@@ -436,6 +501,7 @@ export function createInfisicalService({
 			try {
 				client.invalidate(accountId);
 				await accountStore.delete(accountId);
+				accountMatcher.invalidate();
 
 				return { account: null, failure: null };
 			} catch (error) {
@@ -464,9 +530,11 @@ export function createInfisicalService({
 				return pending;
 			}
 
-			const resolution = fetchWithCacheFallback(link).finally(() => {
-				inFlightResolutions.delete(inFlightKey);
-			});
+			const resolution = withMatchedAccount(link)
+				.then(fetchWithCacheFallback)
+				.finally(() => {
+					inFlightResolutions.delete(inFlightKey);
+				});
 
 			inFlightResolutions.set(inFlightKey, resolution);
 
@@ -494,6 +562,10 @@ export function createInfisicalService({
 				const secretPath = request.secretPath?.trim() || '/';
 				const recursive = request.recursive ?? false;
 
+				linkStore.restoreDiscovery({
+					scope: request.scope,
+					scopeId: request.scopeId,
+				});
 				linkStore.write({
 					accountId: request.accountId,
 					enabled: request.enabled ?? true,
@@ -583,6 +655,7 @@ export function createInfisicalService({
 			try {
 				await client.verify(accountId);
 				recordAccountOutcome(accountId, null);
+				accountMatcher.invalidate();
 
 				const account = accountStore.get(accountId);
 
@@ -602,6 +675,27 @@ export function createInfisicalService({
 			}
 		},
 	};
+}
+
+/**
+ * Names where a link's project half came from. A saved row outranks the
+ * committed block, which outranks the CLI's `.infisical.json` — the same order
+ * the fields themselves resolve in.
+ * @param sources - Whether a row was saved, and the committed block behind the link.
+ * @returns The origin to report across the bridge.
+ */
+function resolveOrigin({
+	committed,
+	hasRow,
+}: {
+	committed: InfisicalRepositoryConfigBlock | null;
+	hasRow: boolean;
+}): InfisicalLinkOrigin {
+	if (hasRow) {
+		return 'local';
+	}
+
+	return committed ? 'repository-config' : 'infisical-cli';
 }
 
 /**

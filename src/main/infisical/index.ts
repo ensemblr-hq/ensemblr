@@ -1,4 +1,9 @@
 export {
+	type CreateInfisicalAccountMatcherOptions,
+	createInfisicalAccountMatcher,
+	type InfisicalAccountMatcher,
+} from './infisical-account-match.ts';
+export {
 	type CreateInfisicalAccountInput,
 	type CreateInfisicalAccountStoreOptions,
 	createInfisicalAccountStore,
@@ -24,6 +29,11 @@ export {
 	type InfisicalCache,
 	type InfisicalCacheEntry,
 } from './infisical-cache.ts';
+export {
+	INFISICAL_CLI_CONFIG_FILENAME,
+	type InfisicalCliConfig,
+	readInfisicalCliConfig,
+} from './infisical-cli-config.ts';
 export {
 	type CreateInfisicalClientOptions,
 	createInfisicalClient,

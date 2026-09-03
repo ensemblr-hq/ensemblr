@@ -32,6 +32,10 @@ export function InfisicalLinkSummary({
 }: InfisicalLinkSummaryProps) {
 	const { t } = useTranslation();
 	const canOperate = Boolean(link?.accountId);
+	/* A discovered link has no saved account to spend, so syncing it would only
+	   fail. Unlinking stays: it is the one way to tell Ensemblr to stop reading
+	   a `.infisical.json` it found, and it writes nothing into the repository. */
+	const showsSync = Boolean(link) && link?.origin !== 'infisical-cli';
 
 	return (
 		<div className='flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-border bg-card/40 px-4 py-3'>
@@ -63,22 +67,24 @@ export function InfisicalLinkSummary({
 			</div>
 			{link ? (
 				<div className='flex shrink-0 items-center gap-1.5'>
-					<Button
-						disabled={!canOperate || syncing}
-						onClick={onSync}
-						size='sm'
-						type='button'
-						variant='outline'
-					>
-						<RefreshCwIcon
-							aria-hidden='true'
-							className={cn(syncing && 'animate-spin')}
-							data-icon='inline-start'
-						/>
-						{syncing
-							? t('settings:repo.infisical.syncing', 'Syncing…')
-							: t('settings:repo.infisical.sync', 'Sync now')}
-					</Button>
+					{showsSync ? (
+						<Button
+							disabled={!canOperate || syncing}
+							onClick={onSync}
+							size='sm'
+							type='button'
+							variant='outline'
+						>
+							<RefreshCwIcon
+								aria-hidden='true'
+								className={cn(syncing && 'animate-spin')}
+								data-icon='inline-start'
+							/>
+							{syncing
+								? t('settings:repo.infisical.syncing', 'Syncing…')
+								: t('settings:repo.infisical.sync', 'Sync now')}
+						</Button>
+					) : null}
 					{/* Unlinking rewrites the committed `.ensemblr/settings.toml` for
 					    everyone who clones the repository, which is too much to hang off
 					    one stray click. */}
@@ -131,7 +137,7 @@ function displaySecretPath(secretPath: string, recursive: boolean): string {
 	return secretPath === '/' ? '/**' : `${secretPath}/**`;
 }
 
-/** Reports how complete the link is: resolvable, missing its account half, or absent. */
+/** Reports how complete the link is: resolvable, discovered, missing its account half, or absent. */
 function LinkStateBadge({ link }: { link: InfisicalLinkSnapshot | null }) {
 	const { t } = useTranslation();
 
@@ -139,6 +145,14 @@ function LinkStateBadge({ link }: { link: InfisicalLinkSnapshot | null }) {
 		return (
 			<StatusBadge tone='muted'>
 				{t('settings:repo.infisical.summary.state-none', 'Not linked')}
+			</StatusBadge>
+		);
+	}
+
+	if (link.origin === 'infisical-cli') {
+		return (
+			<StatusBadge tone='info'>
+				{t('settings:repo.infisical.summary.state-detected', 'Detected')}
 			</StatusBadge>
 		);
 	}

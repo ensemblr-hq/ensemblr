@@ -5,7 +5,13 @@
  * does not parse is left untouched rather than clobbered, and the replacement
  * is atomic so a crash mid-write cannot leave a half-written config behind.
  */
-import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import {
+	existsSync,
+	mkdirSync,
+	readFileSync,
+	renameSync,
+	writeFileSync,
+} from 'node:fs';
 import path from 'node:path';
 
 import { dump } from 'js-toml';
@@ -36,6 +42,19 @@ function repositorySettingsPath(repositoryPath: string): string {
 		ENSEMBLR_DIRECTORY,
 		ENSEMBLR_SETTINGS_FILENAME,
 	);
+}
+
+/**
+ * Reports whether a repository has a committed settings file at all, without
+ * caring whether it parses. A caller that clears a section checks this to tell
+ * "nothing was ever committed here" — where a rewrite would *create* the file —
+ * apart from "the file exists but is broken", which must still be written
+ * through so the failure is reported rather than swallowed.
+ * @param repositoryPath - Absolute path of the repository.
+ * @returns True when `.ensemblr/settings.toml` exists.
+ */
+export function hasRepositorySettingsFile(repositoryPath: string): boolean {
+	return existsSync(repositorySettingsPath(repositoryPath));
 }
 
 /**

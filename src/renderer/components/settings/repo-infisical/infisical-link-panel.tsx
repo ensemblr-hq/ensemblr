@@ -20,6 +20,7 @@ import { buttonVariants } from '@/renderer/components/ui/button';
 import { Switch } from '@/renderer/components/ui/switch';
 import type { InfisicalFailure } from '@/shared/ipc/contracts/infisical';
 
+import { InfisicalDiscoveredNotice } from './infisical-discovered-notice';
 import { InfisicalFailureText } from './infisical-failure-text';
 import {
 	InfisicalEnvironmentSelect,
@@ -140,6 +141,8 @@ export function InfisicalLinkPanel({ repoId }: { repoId: string }) {
 				syncing={sync.isPending}
 				unlinking={clear.isPending}
 			/>
+
+			<InfisicalDiscoveredNotice link={link} />
 
 			<div className='divide-y divide-border border-border border-t'>
 				<div>
