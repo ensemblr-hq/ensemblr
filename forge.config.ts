@@ -261,6 +261,10 @@ const config: ForgeConfig = {
 		// Per-channel bundle id so dogfood builds never share the release's
 		// LaunchServices registration (the Dock-flash root cause). See ADR 0032.
 		appBundleId: APP_BUNDLE_IDS[buildChannel],
+		// Fills NSHumanReadableCopyright, the attribution line the macOS "Get Info"
+		// panel reads. Holder tracks NOTICE, which credits the author rather than the
+		// product name — leave it as the author.
+		appCopyright: 'Copyright © 2026 Philipp Soldunov',
 		// macOS kills a process that touches the microphone without a usage
 		// description rather than prompting, so composer dictation needs this key
 		// alongside the `com.apple.security.device.audio-input` entitlement.
