@@ -4,11 +4,13 @@ import { linearInitials } from '@/renderer/lib/linear';
 import { cn } from '@/renderer/lib/utils';
 
 /**
- * A Linear person as an initials disc. Linear's API hands the app a display name
+ * A Linear person as an initials tile. Linear's API hands the app a display name
  * and no avatar URL, so every surface that shows who is involved — a browse row,
- * a comment, the assignee property — draws the same disc rather than repeating a
+ * a comment, the assignee property — draws the same tile rather than repeating a
  * full name that is usually the same one down the whole screen. An absent person
- * keeps the disc's footprint as a dashed outline, so a list stays aligned.
+ * keeps the tile's footprint as a dashed outline, so a list stays aligned. The
+ * rounded-square shape is the app's one avatar shape, shared with
+ * `ProjectAvatar` and `OwnerAvatar`.
  */
 export function LinearAvatar({
 	className,
@@ -23,7 +25,7 @@ export function LinearAvatar({
 	return (
 		<span
 			className={cn(
-				'flex size-5 shrink-0 items-center justify-center rounded-full font-medium text-[0.625rem] leading-none tracking-tight',
+				'flex size-5 shrink-0 items-center justify-center rounded-sm font-medium text-[0.625rem] leading-none tracking-tight',
 				name
 					? 'bg-accent text-accent-foreground'
 					: 'border border-border border-dashed text-muted-foreground',
