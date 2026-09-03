@@ -148,6 +148,8 @@ export default defineConfig({
 			'tests/main/notification-retention.test.ts',
 			'tests/main/electron-notify.test.ts',
 			'tests/main/quit-guard.test.ts',
+			'tests/main/about-panel-strings.test.ts',
+			'tests/main/credits-manifest.test.ts',
 			'tests/main/quit-guard-strings.test.ts',
 			'tests/main/linear-callback-page-strings.test.ts',
 			'tests/main/quit-coordinator.test.ts',

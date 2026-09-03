@@ -224,6 +224,19 @@ from **Core nouns** — the width budget there is generous.
 **Shortcuts** plus rows folded into General and Appearance; it has no page and
 no row of its own any more.
 
+## About panel
+
+The native About panel's credit headings, from
+`src/main/menu/about-panel-strings.ts`. The package names, SPDX license
+identifiers, and URLs listed beneath them are proper nouns and generated data —
+never translated.
+
+| English | Русский | Ελληνικά | Note |
+| --- | --- | --- | --- |
+| Core open-source projects | Основные проекты с открытым исходным кодом | Βασικά έργα ανοιχτού κώδικα | Heading over the app's **direct** runtime dependencies. "Core"/"Основные"/"Βασικά" rather than "Bundled"/"Встроенные"/"Ενσωματωμένα": the list is 49 packages where the production tree resolves to ~537, so a word claiming everything bundled would be false. All three read as "the main ones", which is what the list is. |
+| Development tools | Инструменты разработки | Εργαλεία ανάπτυξης | Heading over the dev dependencies — used to build and test the app, not shipped in it. |
+| Inspired by {{name}} | Вдохновлено проектом {{name}} | Με έμπνευση από το {{name}} | Credits the project Ensemblr takes design inspiration from. Russian adds `проектом` because a bare `Вдохновлено Conductor` cannot take a case ending on a Latin proper noun. |
+
 ## Language names
 
 Shown **untranslated** wherever the user picks a language — an endonym reads
