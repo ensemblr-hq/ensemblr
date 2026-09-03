@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 
 import {
 	agentSessionsForWorkspaceQuery,
-	listClosedChatTabsWithSummaryQuery,
+	listChatTabSummariesQuery,
 } from '@/renderer/api/ensemblr-queries';
 import { useHasPendingPrompts } from '@/renderer/state/composer';
 import type {
@@ -22,7 +22,8 @@ import { WorkspaceLandingCard } from './workspace-landing-card';
  *   1. Active agent session, or a prompt already submitted into one that is
  *      still opening — render `AgentSessionTimeline` with events.
  *   2. No session, but the workspace has been worked in — render
- *      `NewChatEmptyState`, with a chip for each `.context/sessions` transcript.
+ *      `NewChatEmptyState`, with a chip for each sibling chat's
+ *      `.context/sessions` transcript, open chats included.
  *   3. No session and an untouched workspace — render `WorkspaceLandingCard`
  *      (fresh workspace summary), falling back to `NewChatEmptyState`.
  *
@@ -49,17 +50,20 @@ export function WorkspaceTimeline({
 	// timeline that still has something to render.
 	const hasPendingPrompt = useHasPendingPrompts(activeSession.chatTabId);
 	const { data: transcriptsData } = useQuery(
-		listClosedChatTabsWithSummaryQuery(workspace.id),
+		listChatTabSummariesQuery(workspace.id),
 	);
 	const { data: agentSessionsData } = useQuery(
 		agentSessionsForWorkspaceQuery(workspace.id),
 	);
-	// The closed-history query lists every restorable tab, including terminal
-	// tabs no transcript is ever written for. Chats are the ones this surface can
-	// speak to: one whose summary file is missing is shown disabled rather than
-	// dropped, so a gap reads as a gap instead of as a workspace with no history.
+	// The summary query lists every restorable tab, including terminal tabs no
+	// transcript is ever written for. Chats are the ones this surface can speak
+	// to, minus this tab itself — attaching a chat's own transcript to itself says
+	// nothing. A closed chat whose summary file is missing is shown disabled
+	// rather than dropped, so a gap reads as a gap instead of as a workspace with
+	// no history.
 	const transcripts = (transcriptsData?.entries ?? []).filter(
-		(entry) => entry.tab.kind === 'chat',
+		(entry) =>
+			entry.tab.kind === 'chat' && entry.tab.id !== activeSession.chatTabId,
 	);
 	const hasAttachableTranscript = transcripts.some(
 		(entry) => entry.summaryPath.length > 0,

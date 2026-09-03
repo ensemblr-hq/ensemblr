@@ -5,8 +5,8 @@ import type {
 	CloseChatTabRequest,
 	CloseChatTabResult,
 	ListAllChatTabsResult,
+	ListChatTabSummariesResult,
 	ListChatTabsResult,
-	ListClosedChatTabsWithSummaryResult,
 	OpenChatTabRequest,
 	OpenChatTabResult,
 	PinChatTabRequest,
@@ -58,21 +58,24 @@ export const allChatTabsQuery = queryOptions({
 });
 
 /**
- * Query options for closed chat tabs joined with their persisted session
- * summary files (path + title), used by the history dropdown.
+ * Query options for a workspace's chat tabs joined with their persisted session
+ * summary files (path + title), newest summary first. Open tabs are included —
+ * a live chat's summary is rewritten at every turn boundary — so the new-chat
+ * chips can offer them; the history dropdown narrows the same result to the
+ * closed entries.
  */
-export function listClosedChatTabsWithSummaryQuery(workspaceId: string) {
+export function listChatTabSummariesQuery(workspaceId: string) {
 	return queryOptions({
 		enabled: workspaceId.length > 0,
-		queryFn: (): Promise<ListClosedChatTabsWithSummaryResult> =>
+		queryFn: (): Promise<ListChatTabSummariesResult> =>
 			profileElectronIpcCall(
 				{
-					channel: 'ensemblr:list-closed-chat-tabs-with-summary',
+					channel: 'ensemblr:list-chat-tab-summaries',
 					usesDatabase: true,
 				},
-				() => getEnsemblrApi().listClosedChatTabsWithSummary({ workspaceId }),
+				() => getEnsemblrApi().listChatTabSummaries({ workspaceId }),
 			),
-		queryKey: ensemblrQueryKeys.closedChatTabsWithSummary(workspaceId),
+		queryKey: ensemblrQueryKeys.chatTabSummaries(workspaceId),
 		staleTime: 2000,
 	});
 }

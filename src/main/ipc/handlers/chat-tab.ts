@@ -5,8 +5,8 @@ import type {
 	ChatTabWire,
 	CloseChatTabResult,
 	ListAllChatTabsResult,
+	ListChatTabSummariesResult,
 	ListChatTabsResult,
-	ListClosedChatTabsWithSummaryResult,
 	OpenChatTabResult,
 	PinChatTabResult,
 	ReorderChatTabsResult,
@@ -19,8 +19,8 @@ import {
 	bindAgentSessionToChatTabRequestSchema,
 	closeChatTabRequestSchema,
 	listAllChatTabsRequestSchema,
+	listChatTabSummariesRequestSchema,
 	listChatTabsRequestSchema,
-	listClosedChatTabsWithSummaryRequestSchema,
 	openChatTabRequestSchema,
 	pinChatTabRequestSchema,
 	reorderChatTabsRequestSchema,
@@ -146,18 +146,16 @@ export function registerChatTabHandlers({
 	);
 
 	ipcMain.handle(
-		IPC_CHANNELS.listClosedChatTabsWithSummary,
-		async (
-			_event,
-			raw: unknown,
-		): Promise<ListClosedChatTabsWithSummaryResult> => {
-			const request = listClosedChatTabsWithSummaryRequestSchema.parse(raw);
-			const entries = chatTabService.listClosedWithSummary(request);
+		IPC_CHANNELS.listChatTabSummaries,
+		async (_event, raw: unknown): Promise<ListChatTabSummariesResult> => {
+			const request = listChatTabSummariesRequestSchema.parse(raw);
+			const entries = chatTabService.listChatTabSummaries(request);
 			return {
 				entries: entries.map((entry) => ({
 					closedAt: entry.closedAt,
 					summaryPath: entry.summaryPath,
 					summaryTitle: entry.summaryTitle,
+					summaryUpdatedAt: entry.summaryUpdatedAt,
 					tab: toWire(entry.tab),
 				})),
 			};

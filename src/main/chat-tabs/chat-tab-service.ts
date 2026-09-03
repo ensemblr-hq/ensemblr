@@ -1,4 +1,4 @@
-import { existsSync } from 'node:fs';
+import { statSync } from 'node:fs';
 import type { DatabaseSync } from 'node:sqlite';
 
 import {
@@ -43,15 +43,18 @@ interface ChatTabLookups {
 }
 
 /**
- * A closed tab plus its session-summary location and title. `summaryPath` is
- * empty (and `summaryTitle` null) when the tab has no attachable on-disk
- * summary — the tab is still listed so it can be restored, just without a
- * transcript to attach.
+ * A chat tab plus its session-summary location and title. `closedAt` is null
+ * while the tab is still open — a live chat has a summary too, rewritten at
+ * every turn boundary. `summaryPath` is empty (and `summaryTitle` /
+ * `summaryUpdatedAt` null) when the tab has no attachable on-disk summary: a
+ * closed tab is still listed so it can be restored, just without a transcript
+ * to attach.
  */
-interface ClosedChatTabEntry {
-	closedAt: string;
+interface ChatTabSummaryEntry {
+	closedAt: string | null;
 	summaryPath: string;
 	summaryTitle: string | null;
+	summaryUpdatedAt: string | null;
 	tab: ChatTabRow;
 }
 
@@ -73,9 +76,23 @@ export interface ChatTabService {
 	 * conversation, or is not a chat.
 	 */
 	claimIdleChatTab: (input: { workspaceId: string }) => ChatTabRow | null;
-	listClosedWithSummary: (input: {
+	/**
+	 * Every tab of a workspace that has something to offer, newest summary first.
+	 * Open tabs are included, since a live chat's summary is rewritten at each turn
+	 * boundary. Closed tabs are listed whether or not a summary survives — they
+	 * remain restorable, and that includes the terminal tabs the history dropdown
+	 * reattaches — while an open tab with nothing recorded is dropped, being
+	 * already visible in the tab strip.
+	 *
+	 * The ordering answers to the attach chips, which rank by transcript freshness.
+	 * The history dropdown restores rather than attaches, so it re-ranks the closed
+	 * entries by `closedAt` itself (`byCloseRecency` in the renderer's
+	 * `session-tab-models`) rather than inheriting an order a transcript-less
+	 * terminal tab cannot place in.
+	 */
+	listChatTabSummaries: (input: {
 		workspaceId: string;
-	}) => ClosedChatTabEntry[];
+	}) => ChatTabSummaryEntry[];
 	/** Every workspace's open tabs, plus the newest closed tabs under a cap. */
 	listAllTabs: (input: { closedLimit: number }) => {
 		closed: readonly ChatTabRow[];
@@ -212,11 +229,16 @@ export function createChatTabService({
 				null
 			);
 		},
-		listClosedWithSummary: ({ workspaceId }) => {
+		listChatTabSummaries: ({ workspaceId }) => {
 			const database = requireChatTabDatabase();
-			return listClosedForWorkspace({ database, workspaceId })
-				.map(toClosedEntry)
-				.filter((entry): entry is ClosedChatTabEntry => entry !== null);
+			const rows = [
+				...listOpenForWorkspace({ database, workspaceId }),
+				...listClosedForWorkspace({ database, workspaceId }),
+			];
+			return rows
+				.map(toChatTabSummaryEntry)
+				.filter((entry): entry is ChatTabSummaryEntry => entry !== null)
+				.sort(bySummaryRecency);
 		},
 		listAllTabs: ({ closedLimit }) =>
 			listChatTabsAcrossWorkspaces({
@@ -561,32 +583,81 @@ function readNonEmptyString(value: unknown): string | null {
 }
 
 /**
- * Build a closed-history entry for a closed tab, or null when the row is not
- * actually closed. Every closed tab enters history so it can be restored —
- * including terminal/harness tabs and chat sessions whose summary write never
- * landed. The summary path/title are populated only when the metadata carries
- * the summary marker (persisted after a successful summary write) *and* the
- * recorded file is still on disk; otherwise they are left empty, marking the
- * entry as restorable-but-not-attachable so a transcript attach can never fail
- * with ENOENT. The on-disk check uses the path the writer persisted
- * (`summary.path`), not a path recomputed from the workspace root, because a
- * session's cwd can differ from the workspace root (e.g. a worktree) and only
- * the persisted path is authoritative.
- * @param tab - The closed chat-tab row
- * @returns The history entry, or null when the row is not closed
+ * Build a summary entry for a tab, or null when the tab has nothing to offer
+ * this surface. A closed tab earns its place by being restorable — every kind
+ * the close path archives, terminal tabs included, so the history dropdown keeps
+ * seeing them. An open one earns it only by being a chat with a transcript to
+ * attach; otherwise it is just a tab already sitting in the strip.
+ *
+ * The summary path/title are populated only when the metadata carries the
+ * summary marker (persisted after a successful summary write) *and* the recorded
+ * file is still on disk; otherwise they are left empty, marking a closed entry
+ * restorable-but-not-attachable so a transcript attach can never fail with
+ * ENOENT. The on-disk check uses the path the writer persisted (`summary.path`),
+ * not a path recomputed from the workspace root, because a session's cwd can
+ * differ from the workspace root (e.g. a worktree) and only the persisted path
+ * is authoritative.
+ * @param tab - The chat-tab row
+ * @returns The summary entry, or null when an open tab has nothing to attach
  */
-function toClosedEntry(tab: ChatTabRow): ClosedChatTabEntry | null {
-	if (tab.closedAt === null) {
+function toChatTabSummaryEntry(tab: ChatTabRow): ChatTabSummaryEntry | null {
+	const summary = readSummaryFromMetadata(tab.metadata);
+	const summaryUpdatedAt = summary ? readSummaryMtime(summary.path) : null;
+	const attachable = summary !== null && summaryUpdatedAt !== null;
+	if (tab.closedAt === null && !(attachable && tab.kind === 'chat')) {
 		return null;
 	}
-	const summary = readSummaryFromMetadata(tab.metadata);
-	const attachable = summary !== null && existsSync(summary.path);
 	return {
 		closedAt: tab.closedAt,
 		summaryPath: attachable ? summary.path : '',
 		summaryTitle: attachable ? summary.title : null,
+		summaryUpdatedAt,
 		tab,
 	};
+}
+
+/**
+ * The summary file's last-write time, which doubles as the existence check the
+ * entry needs: one `statSync` answers both "is it still there" and "how recently
+ * was this chat worked in", and the latter is the only ordering key that ranks a
+ * live chat against a closed one.
+ * @param summaryPath - Absolute path the summary writer persisted
+ * @returns The mtime as an ISO timestamp, or null when the file is gone or unreadable
+ */
+function readSummaryMtime(summaryPath: string): string | null {
+	try {
+		return statSync(summaryPath).mtime.toISOString();
+	} catch {
+		return null;
+	}
+}
+
+/**
+ * Orders summary entries most-recently-written first, sinking the entries with
+ * no file at all to the end — they cannot be attached, so they are the least
+ * useful rows on the attach-chip surface this ranking answers to.
+ *
+ * It is not an ordering the history dropdown can use: a terminal tab never has a
+ * transcript, so ranking by one would file every terminal below every summarized
+ * chat however recently it closed. That consumer re-sorts by `closedAt`.
+ * @param left - First entry to compare
+ * @param right - Second entry to compare
+ * @returns Negative when `left` sorts first, positive when `right` does
+ */
+function bySummaryRecency(
+	left: ChatTabSummaryEntry,
+	right: ChatTabSummaryEntry,
+): number {
+	if (left.summaryUpdatedAt === right.summaryUpdatedAt) {
+		return 0;
+	}
+	if (left.summaryUpdatedAt === null) {
+		return 1;
+	}
+	if (right.summaryUpdatedAt === null) {
+		return -1;
+	}
+	return right.summaryUpdatedAt.localeCompare(left.summaryUpdatedAt);
 }
 
 /**

@@ -4,12 +4,14 @@ import { Trans, useTranslation } from 'react-i18next';
 import { Button } from '@/renderer/components/ui/button';
 import { cn } from '@/renderer/lib/utils';
 import { useComposerAttachmentDispatcher } from '@/renderer/state/composer';
-import type { ClosedChatTabEntryWire } from '@/shared/ipc/contracts/chat-tab';
+import type { ChatTabSummaryEntryWire } from '@/shared/ipc/contracts/chat-tab';
 
 /**
  * Empty-state shown above the composer when a workspace has prior chats /
  * transcripts in `.context/` but no active agent session in the current tab.
- * Lists each transcript as a chip the user can attach to the new chat.
+ * Lists each transcript as a chip the user can attach to the new chat — a
+ * sibling chat still open counts, since its summary is rewritten at every turn
+ * boundary.
  */
 export function NewChatEmptyState({
 	activeChatTabId,
@@ -18,7 +20,7 @@ export function NewChatEmptyState({
 	workspaceName,
 }: {
 	activeChatTabId: string;
-	transcripts: readonly ClosedChatTabEntryWire[];
+	transcripts: readonly ChatTabSummaryEntryWire[];
 	workspaceCwd: string;
 	workspaceName: string;
 }) {
@@ -60,14 +62,14 @@ export function NewChatEmptyState({
 	);
 }
 
-/** Renders a closed-chat transcript as a chip that can be attached to the composer. */
+/** Renders a chat's transcript as a chip that can be attached to the composer. */
 function TranscriptChip({
 	activeChatTabId,
 	entry,
 	workspaceCwd,
 }: {
 	activeChatTabId: string;
-	entry: ClosedChatTabEntryWire;
+	entry: ChatTabSummaryEntryWire;
 	workspaceCwd: string;
 }) {
 	const { t } = useTranslation();
@@ -81,7 +83,8 @@ function TranscriptChip({
 	const dispatch = useComposerAttachmentDispatcher();
 	// A chat closed before its summary reached disk, or whose file has since
 	// gone, is listed but cannot be attached. Dropping it instead would read as
-	// a workspace that never had the chat.
+	// a workspace that never had the chat. An open tab in that state is not
+	// listed at all — it is already in the tab strip, so there is no gap to explain.
 	const isAttachable = entry.summaryPath.length > 0;
 
 	const handleAttach = () => {

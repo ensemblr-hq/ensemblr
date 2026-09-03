@@ -57,7 +57,7 @@ function setup(chatTabId: string) {
 	const render = () => {
 		installEnsemblrApi({
 			listAgentSessions: async () => ({ sessions: [] }),
-			listClosedChatTabsWithSummary: async () => ({ entries: [] }),
+			listChatTabSummaries: async () => ({ entries: [] }),
 		});
 		return renderWithProviders(
 			<Provider store={store}>

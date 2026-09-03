@@ -113,10 +113,9 @@ describe('per-workspace active chat memory', () => {
 			closed: [],
 			open: [chatTabRow('tab-1', 0), chatTabRow('tab-2', 1)],
 		});
-		client.setQueryData(
-			ensemblrQueryKeys.closedChatTabsWithSummary(WORKSPACE_ID),
-			{ entries: [] },
-		);
+		client.setQueryData(ensemblrQueryKeys.chatTabSummaries(WORKSPACE_ID), {
+			entries: [],
+		});
 		client.setQueryData(
 			ensemblrQueryKeys.agentSessionsForWorkspace(WORKSPACE_ID),
 			{

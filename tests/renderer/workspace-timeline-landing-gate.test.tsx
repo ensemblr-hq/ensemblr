@@ -12,6 +12,7 @@ import type {
 	WorkspaceShellModel,
 } from '@/renderer/types/workbench';
 import type { AgentSessionSnapshotWire } from '@/shared/ipc/contracts/agent-session';
+import type { ChatTabSummaryEntryWire } from '@/shared/ipc/contracts/chat-tab';
 
 import {
 	clearEnsemblrApi,
@@ -66,30 +67,55 @@ function agentSession(id: string): AgentSessionSnapshotWire {
 	return { id } as unknown as AgentSessionSnapshotWire;
 }
 
+/** An open chat's summary entry, as the main process now reports one. */
+function openChatEntry(id: string, title: string): ChatTabSummaryEntryWire {
+	return {
+		closedAt: null,
+		summaryPath: `${composer.workspaceCwd}/.context/sessions/${id}.md`,
+		summaryTitle: null,
+		summaryUpdatedAt: '2026-09-03T00:00:00.000Z',
+		tab: {
+			agentSessionId: null,
+			closedAt: null,
+			fullTitle: title,
+			id,
+			isPreview: false,
+			kind: 'chat',
+			metadata: {},
+			openedAt: '2026-09-03T00:00:00.000Z',
+			position: 0,
+			title,
+			workspaceId: WORKSPACE_ID,
+		},
+	};
+}
+
 function seed(
 	client: QueryClient,
 	sessions: readonly AgentSessionSnapshotWire[],
+	entries: readonly ChatTabSummaryEntryWire[],
 ): void {
 	client.setQueryData(
 		ensemblrQueryKeys.agentSessionsForWorkspace(WORKSPACE_ID),
 		{ sessions },
 	);
-	client.setQueryData(
-		ensemblrQueryKeys.closedChatTabsWithSummary(WORKSPACE_ID),
-		{ entries: [] },
-	);
+	client.setQueryData(ensemblrQueryKeys.chatTabSummaries(WORKSPACE_ID), {
+		entries,
+	});
 }
 
 function renderTimeline(input: {
 	changedFiles?: number;
+	entries?: readonly ChatTabSummaryEntryWire[];
 	sessions?: readonly AgentSessionSnapshotWire[];
 }) {
+	const entries = input.entries ?? [];
 	installEnsemblrApi({
 		listAgentSessions: async () => ({ sessions: input.sessions ?? [] }),
-		listClosedChatTabsWithSummary: async () => ({ entries: [] }),
+		listChatTabSummaries: async () => ({ entries }),
 	});
 	const client = createTestQueryClient();
-	seed(client, input.sessions ?? []);
+	seed(client, input.sessions ?? [], entries);
 	return renderWithProviders(
 		<WorkspaceTimeline
 			activeSession={activeSession}
@@ -128,7 +154,7 @@ test('uncommitted work retires the landing card even with no agent session', () 
 test('the landing card stays hidden until the session list has loaded', () => {
 	installEnsemblrApi({
 		listAgentSessions: () => new Promise(() => undefined),
-		listClosedChatTabsWithSummary: async () => ({ entries: [] }),
+		listChatTabSummaries: async () => ({ entries: [] }),
 	});
 	const container = renderWithProviders(
 		<WorkspaceTimeline
@@ -140,4 +166,35 @@ test('the landing card stays hidden until the session list has loaded', () => {
 
 	expect(container.querySelector(LANDING_CARD)).toBeNull();
 	expect(container.querySelector(EMPTY_STATE)).not.toBeNull();
+});
+
+test('a sibling chat still open is offered as a chip', () => {
+	// What the surface was reported broken for: the chips only ever listed closed
+	// tabs, so a workspace whose chats were all open showed an empty row.
+	const container = renderTimeline({
+		entries: [openChatEntry('chat-sibling', 'Retire reclaim disk')],
+	});
+
+	expect(container.querySelector(LANDING_CARD)).toBeNull();
+	expect(
+		container.querySelector('[data-transcript-id="chat-sibling"]'),
+	).not.toBeNull();
+});
+
+test('the chat being typed in is not offered as a chip against itself', () => {
+	const container = renderTimeline({
+		entries: [
+			openChatEntry(activeSession.chatTabId, 'This chat'),
+			openChatEntry('chat-sibling', 'Retire reclaim disk'),
+		],
+	});
+
+	expect(
+		container.querySelector(
+			`[data-transcript-id="${activeSession.chatTabId}"]`,
+		),
+	).toBeNull();
+	expect(
+		container.querySelector('[data-transcript-id="chat-sibling"]'),
+	).not.toBeNull();
 });

@@ -63,10 +63,10 @@ import type {
 	CloseChatTabResult,
 	ListAllChatTabsRequest,
 	ListAllChatTabsResult,
+	ListChatTabSummariesRequest,
+	ListChatTabSummariesResult,
 	ListChatTabsRequest,
 	ListChatTabsResult,
-	ListClosedChatTabsWithSummaryRequest,
-	ListClosedChatTabsWithSummaryResult,
 	OpenChatTabRequest,
 	OpenChatTabResult,
 	PinChatTabRequest,
@@ -439,9 +439,9 @@ export interface IpcHandlerMap {
 		ListChatTabsRequest,
 		ListChatTabsResult
 	>;
-	[IPC_CHANNELS.listClosedChatTabsWithSummary]: IpcHandlerEntry<
-		ListClosedChatTabsWithSummaryRequest,
-		ListClosedChatTabsWithSummaryResult
+	[IPC_CHANNELS.listChatTabSummaries]: IpcHandlerEntry<
+		ListChatTabSummariesRequest,
+		ListChatTabSummariesResult
 	>;
 	[IPC_CHANNELS.listAgentModels]: IpcHandlerEntry<void, AgentModelCatalog>;
 	[IPC_CHANNELS.listAgentSessionEvents]: IpcHandlerEntry<

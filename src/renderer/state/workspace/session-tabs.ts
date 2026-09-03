@@ -54,7 +54,7 @@ export interface OpenSessionTabHandlerResult {
 
 /**
  * React hook exposing chat-tab state for a workspace, backed by SQLite via the
- * `listChatTabs` and `listClosedChatTabsWithSummary` IPC queries. Open tabs
+ * `listChatTabs` and `listChatTabSummaries` IPC queries. Open tabs
  * project into `SessionTabModel`s; closed tabs feed the history dropdown.
  * Mutations call the corresponding open/close IPCs and invalidate both caches.
  */
@@ -225,7 +225,7 @@ export function useSessionTabState({
 				queryKey: ensemblrQueryKeys.chatTabs(workspaceId),
 			});
 			void queryClient.invalidateQueries({
-				queryKey: ensemblrQueryKeys.closedChatTabsWithSummary(workspaceId),
+				queryKey: ensemblrQueryKeys.chatTabSummaries(workspaceId),
 			});
 		},
 	});
