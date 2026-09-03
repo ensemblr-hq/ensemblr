@@ -1,6 +1,6 @@
 # 13. Keyboard shortcuts
 
-Ensemblr binds 41 shortcuts. This page lists all of them.
+Ensemblr binds 42 shortcuts. This page lists all of them.
 
 The tables are written with the macOS glyphs. **On Linux the app renders every
 one of them with the names that keyboard has** — `⌘` as `Ctrl`, `⌥` as `Alt` —
