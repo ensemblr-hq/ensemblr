@@ -219,6 +219,20 @@ open, not only on children. `NATIVE_ORCHESTRATOR_AWARENESS` is the matching
 playbook, which names the runtime's own tool and says once that the spawn ops are
 absent rather than leaving it to be discovered.
 
+**Denying the tool is not enough on a planning turn.** Claude Code's own prompt
+carries a standing *"Do not call the AgentTool unless the user requested it"*
+line — shipped with the model's prompt bundle, not derived from `disallowedTools`
+— and `permissionMode: 'plan'` adds a plan workflow ordering a fan-out through
+that same tool. Read together with the deny above, an agent holds three
+instructions and nothing saying which governs, and it picks by guess.
+`buildPlanModeDelegationDirective` answers all three on every planning turn, in
+the harness's own vocabulary, and inverts across the mechanism: the `ensemblr`
+root is told which ops replaced its denied tool, the `native` root is told its
+workflow's fan-out is the right one here, and an investigator is told it holds
+neither. It rides `readTurnPreamble`, so Pi never sees it — Pi gets
+`PLAN_MODE_ORCHESTRATOR_AWARENESS` instead. See
+[ADR 0057](./adr/0057-answer-the-harness-plan-workflow-in-the-per-turn-preamble.md).
+
 **The mechanism is pinned at session open**, on `AgentControlOrigin.delegation`.
 The SDK fixes `disallowedTools` when `query()` opens, so a live-read tool list
 would let the user flip the setting mid-session and leave that session holding
@@ -229,7 +243,18 @@ Pi is unaffected: it has no sub-agent tool of its own, so
 regardless of the setting. So is every spawned child, whatever its runtime — the
 setting picks how a *root* delegates. Nested delegation is blocked on the other
 axes already, so a child opened under `native` would keep its own sub-agent tool
-live and fan out around the depth cap. Terminal harnesses are unaffected too — their control
+live and fan out around the depth cap.
+
+**A child is recognised by its marker, not only by its lineage.**
+`parentSessionId` rides the open request and a *resume* carries none, so a child
+reopened after a restart reads as a root — and would take the user's `native`
+setting, which is exactly the escape above. `resolveDelegation` therefore reads
+the durable sub-agent marker off the chat tab as well, the same column the
+control layer's role resolution prefers over lineage for the same reason. The
+sub-agent variant of the plan-mode delegation directive states outright that the
+runtime's tool is denied; this pin is what makes that true.
+
+Terminal harnesses are unaffected too — their control
 token is minted per workspace and shared by every terminal in it, so the app
 cannot tell a Claude Code CLI from a Codex one and cannot vary the tool list per
 harness.

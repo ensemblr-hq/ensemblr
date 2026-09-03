@@ -8,10 +8,13 @@ import {
 } from '../../src/main/agent-control/index.ts';
 import type { AgentSpecies } from '../../src/main/agent-control/ports.ts';
 import { BranchSlugRejected } from '../../src/main/agent-runtime/naming/apply-branch-slug.ts';
+import type { SubagentMechanism } from '../../src/shared/agent-control.ts';
 import {
 	buildLanguageDirective,
 	buildLinkedIssueDirective,
+	buildPlanModeDelegationDirective,
 	LINKED_ISSUE_DIRECTIVE_HEADER,
+	PLAN_MODE_DELEGATION_HEADER,
 	PLAN_REFINEMENT_DIRECTIVE,
 	PLAN_REFINEMENT_HEADER,
 	SESSION_BRIEF_NUDGE_HEADER,
@@ -47,10 +50,12 @@ function setup(
 		language?: AppLanguage;
 		linkedIssue?: WorkspaceLinkedIssue;
 		subAgent?: boolean;
+		delegation?: SubagentMechanism;
 	} = {},
 ) {
 	const registry = createOriginRegistry({ generateToken: () => 'tok' });
 	registry.register({
+		delegation: overrides.delegation ?? 'ensemblr',
 		sessionId: CALLER,
 		species: overrides.species ?? 'pi',
 		workspaceCwd: '/ws',
@@ -399,15 +404,99 @@ describe('readTurnPreamble', () => {
 	it('tells a refinement turn to close on another plan submission', async () => {
 		const { service } = setup({ planMode: true, planSubmitted: true });
 
-		expect(await service.readTurnPreamble(CALLER)).toBe(
+		expect(await service.readTurnPreamble(CALLER)).toContain(
 			PLAN_REFINEMENT_DIRECTIVE,
 		);
 	});
 
-	it('leaves the directive off a planning turn with no plan under review', async () => {
+	it('leaves the refinement directive off a planning turn with no plan under review', async () => {
 		const { service } = setup({ planMode: true });
 
-		expect(await service.readTurnPreamble(CALLER)).toBeNull();
+		expect(await service.readTurnPreamble(CALLER)).not.toContain(
+			PLAN_REFINEMENT_HEADER,
+		);
+	});
+
+	it('answers the harness plan workflow on every planning turn', async () => {
+		const { service } = setup({ planMode: true });
+
+		expect(await service.readTurnPreamble(CALLER)).toBe(
+			buildPlanModeDelegationDirective({
+				delegation: 'ensemblr',
+				role: 'orchestrator',
+			}),
+		);
+	});
+
+	it('leaves the delegation directive off a turn that is not planning', async () => {
+		const { service } = setup({ language: 'ru' });
+
+		expect(await service.readTurnPreamble(CALLER)).not.toContain(
+			PLAN_MODE_DELEGATION_HEADER,
+		);
+	});
+
+	it('renders the native variant for a session pinned to the runtime tool', async () => {
+		const { service } = setup({ delegation: 'native', planMode: true });
+
+		expect(await service.readTurnPreamble(CALLER)).toBe(
+			buildPlanModeDelegationDirective({
+				delegation: 'native',
+				role: 'orchestrator',
+			}),
+		);
+	});
+
+	it('renders the investigator variant for a planning sub-agent', async () => {
+		const { service } = setup({ planMode: true, subAgent: true });
+
+		expect(await service.readTurnPreamble(CALLER)).toBe(
+			buildPlanModeDelegationDirective({
+				delegation: 'ensemblr',
+				role: 'subagent',
+			}),
+		);
+	});
+
+	it('orders the delegation directive after the upkeep block and before the refinement one', async () => {
+		const { service } = setup({
+			planMode: true,
+			planSubmitted: true,
+			readBrief: vi.fn().mockResolvedValue({
+				branch: { current: null, eligible: false },
+				summaryStale: true,
+				titleNeeded: false,
+			}),
+		});
+
+		const preamble = (await service.readTurnPreamble(CALLER)) ?? '';
+
+		expect(preamble.indexOf(SESSION_BRIEF_NUDGE_HEADER)).toBeLessThan(
+			preamble.indexOf(PLAN_MODE_DELEGATION_HEADER),
+		);
+		expect(preamble.indexOf(PLAN_MODE_DELEGATION_HEADER)).toBeLessThan(
+			preamble.indexOf(PLAN_REFINEMENT_HEADER),
+		);
+	});
+
+	// Two blocks are cut from the same role, and resolving one reads the tab
+	// marker out of the database. A preamble that resolved it per block would pay
+	// that query twice on every turn of every Claude session.
+	it('resolves the caller’s role once, however many blocks are cut from it', async () => {
+		const { ports, service } = setup({
+			linkedIssue: {
+				accountId: null,
+				identifier: 'ENS-1',
+				provider: 'linear',
+				title: 'Ship it',
+				url: null,
+			},
+			planMode: true,
+		});
+
+		await service.readTurnPreamble(CALLER);
+
+		expect(ports.conversations.isSpawnedSubAgent).toHaveBeenCalledTimes(1);
 	});
 
 	it('orders the refinement directive after the upkeep block and before the language one', async () => {

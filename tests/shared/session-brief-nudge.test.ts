@@ -2,7 +2,9 @@ import { describe, expect, test } from 'vitest';
 
 import type { SessionBriefNaming } from '../../src/shared/agent-control/contracts';
 import {
+	buildPlanModeDelegationDirective,
 	buildSessionBriefNudge,
+	PLAN_MODE_DELEGATION_HEADER,
 	SESSION_BRIEF_NUDGE_HEADER,
 } from '../../src/shared/agent-control/session-brief';
 
@@ -266,5 +268,105 @@ describe('buildSessionBriefNudge in Plan Mode', () => {
 		expect(nudge).not.toContain('You are planning');
 		expect(nudge).toContain('BEFORE you write your closing answer');
 		expect(nudge).toContain('Do it now and only once;');
+	});
+});
+
+describe('buildPlanModeDelegationDirective', () => {
+	const root =
+		buildPlanModeDelegationDirective({
+			delegation: 'ensemblr',
+			role: 'orchestrator',
+		}) ?? '';
+	const native =
+		buildPlanModeDelegationDirective({
+			delegation: 'native',
+			role: 'orchestrator',
+		}) ?? '';
+	const child =
+		buildPlanModeDelegationDirective({
+			delegation: 'ensemblr',
+			role: 'subagent',
+		}) ?? '';
+
+	test('opens every variant with the header a preamble can be searched for', () => {
+		for (const directive of [root, native, child]) {
+			expect(directive.startsWith(PLAN_MODE_DELEGATION_HEADER)).toBe(true);
+		}
+	});
+
+	// The Concierge holds no `ensemblr_exit_plan_mode` and fans out from a panel
+	// rather than a plan, so the root block would point it at an op it is denied.
+	// Refused on the role, not left to the caller's plan-mode gate.
+	test('gives a Concierge nothing, whatever mechanism it opened under', () => {
+		for (const delegation of ['ensemblr', 'native'] as const) {
+			expect(
+				buildPlanModeDelegationDirective({ delegation, role: 'concierge' }),
+			).toBeNull();
+		}
+	});
+
+	test('names both pieces of harness text it is answering', () => {
+		for (const directive of [root, native, child]) {
+			expect(directive).toContain('Explore');
+			expect(directive).toContain('AgentTool');
+		}
+	});
+
+	test('tells the agent not to narrate the conflict', () => {
+		expect(root).toContain('do not spend the turn narrating the conflict');
+	});
+
+	test('points a default root at the mechanism that replaced its own tool', () => {
+		expect(root).toContain('ensemblr_start_conversation');
+		expect(root).toContain('ensemblr_wait_for_agents');
+		expect(root).toContain('is denied in this session');
+	});
+
+	test('says the standing line is not a ban on delegating', () => {
+		expect(root).toContain('It is not a ban on delegating');
+	});
+
+	test('holds a default root to a fan-out it actually needs', () => {
+		expect(root).toContain('two or more genuinely independent areas');
+	});
+
+	test('tells a native root its own workflow fan-out is the right one', () => {
+		expect(native).toContain('does not govern it');
+		expect(native).toContain('absent rather than discouraged');
+	});
+
+	test('withholds the chat-tab mechanism from a native root', () => {
+		expect(native).not.toContain('is denied in this session');
+	});
+
+	test('blocks an investigator from fanning out at all', () => {
+		expect(child).toContain('nested delegation is blocked on every axis');
+		expect(child).not.toContain('ensemblr_start_conversation');
+	});
+
+	test('blocks an investigator from submitting a plan', () => {
+		expect(child).toContain('ExitPlanMode');
+		expect(child).toContain('ensemblr_exit_plan_mode');
+		expect(child).toContain('belong to the orchestrator that spawned you');
+	});
+
+	test('closes every variant on the plan file the harness names', () => {
+		for (const directive of [root, native, child]) {
+			expect(directive).toContain('~/.claude/plans/');
+			expect(directive).toContain(
+				'Do not write the plan file your workflow names',
+			);
+		}
+	});
+
+	test('names where a root plan actually lands', () => {
+		for (const directive of [root, native]) {
+			expect(directive).toContain('.context/plans/');
+		}
+	});
+
+	test('tells an investigator its report is the whole output', () => {
+		expect(child).toContain('Your report is your whole output');
+		expect(child).not.toContain('.context/plans/');
 	});
 });

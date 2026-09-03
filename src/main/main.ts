@@ -15,6 +15,7 @@ import {
 	awarenessForAudience,
 	buildLanguageDirective,
 	parseAskUserQuestionReply,
+	resolveAgentRole,
 } from '../shared/agent-control.ts';
 import type { AgentProviderId } from '../shared/agent-provider.ts';
 import { DEFAULT_APP_SETTINGS } from '../shared/config.ts';
@@ -563,6 +564,20 @@ let agentControlService: AgentControlService | null = null;
 // directly, both Claude paths load the plugin root it sits inside.
 const agentSkillBundle = resolveAgentSkillBundle(app);
 
+/**
+ * Reads the durable sub-agent marker off the chat tab bound to a session. The
+ * one place that knows how to reach the database for it: the env overlay's
+ * playbook, the mechanism a session opens under, and the native plan bridge all
+ * ask the same question and must not disagree about the answer.
+ * @param agentSessionId - The session whose tab to inspect.
+ * @returns True when the session's tab is stamped as hosting a spawned sub-agent.
+ */
+const readSubAgentMarker = (agentSessionId: string): boolean =>
+	isSessionTabMarkedSubAgent(
+		databaseService.getConnection()?.database,
+		agentSessionId,
+	);
+
 // The env resolver, harness-command augmenter, native confirm dialog, and
 // resolved Pi extension path all live behind one integration factory; main.ts
 // keeps only the composition. `getServerUrl` reads the mutable server ref
@@ -591,11 +606,7 @@ const {
 	readLinkedIssue: (workspaceId) =>
 		readWorkspaceLinkedIssue({ databaseService, workspaceId }),
 	/** Reads the durable sub-agent marker so a resumed child keeps its playbook. */
-	isSpawnedSubAgent: (agentSessionId) =>
-		isSessionTabMarkedSubAgent(
-			databaseService.getConnection()?.database,
-			agentSessionId,
-		),
+	isSpawnedSubAgent: readSubAgentMarker,
 });
 
 /**
@@ -644,6 +655,13 @@ const claudeAgentAdapter = createClaudeAgentAdapter({
 			: null;
 	},
 	onPlanSubmitted: createClaudePlanBridge({
+		/** Refuses a native plan submission from a child, as the control op does. */
+		isSubAgent: (origin) =>
+			resolveAgentRole(
+				readSubAgentMarker(origin.sessionId),
+				origin.depth,
+				origin.concierge,
+			) === 'subagent',
 		/** Resolves a Claude session's control token back to its trusted origin. */
 		resolveOrigin: (token) => agentControlOriginRegistry.resolveByToken(token),
 		/** Saves the plan, posts it into the chat, and raises the review panel. */
@@ -800,6 +818,8 @@ const agentSessionService = createAgentSessionService({
 		broadcastToAllWindows(IPC_CHANNELS.agentControlTabsChanged, {
 			workspaceId,
 		}),
+	/** Keeps a resumed child on `ensemblr`, whose lineage a restart forgot. */
+	isSpawnedSubAgent: readSubAgentMarker,
 	queueNaming: sessionNamingQueue,
 	/** Reads the delegation mechanism each new Claude Code session opens under. */
 	readClaudeSubagentMode: () =>

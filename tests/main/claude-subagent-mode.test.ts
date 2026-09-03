@@ -333,6 +333,7 @@ describe('a spawned child never opens under the native mechanism', () => {
 	// defaults to `ensemblr` and so keeps the spawn ops.
 	it('pins a Claude child to ensemblr however the setting is set', () => {
 		const wiring = resolveAgentControlWiring({
+			isSpawnedSubAgent: undefined,
 			parentSessionId: 'sess-root',
 			provider: 'claude',
 			readClaudeSubagentMode: () => 'native',
@@ -354,11 +355,46 @@ describe('a spawned child never opens under the native mechanism', () => {
 
 		expect(options?.disallowedTools).toEqual(NATIVE_SUBAGENT_TOOLS);
 	});
+
+	// `parentSessionId` rides the open request and a resume carries none, so
+	// lineage alone would let a child reopened after a restart read as a root and
+	// pick up the user's `native` setting — the escape this whole block rules out.
+	// The chat tab's marker is a column, so it is what still answers.
+	it('pins a resumed child to ensemblr on its marker, with no lineage left', () => {
+		const wiring = resolveAgentControlWiring({
+			isSpawnedSubAgent: (sessionId) => sessionId === 'sess-child',
+			parentSessionId: null,
+			provider: 'claude',
+			readClaudeSubagentMode: () => 'native',
+			resolveAgentControlEnv: undefined,
+			resolveTurnPreamble: undefined,
+			sessionId: 'sess-child',
+			workspaceId: WORKSPACE_ID,
+		});
+
+		expect(wiring.delegation).toBe('ensemblr');
+	});
+
+	it('leaves an unmarked root on the setting, so the marker is not a blanket pin', () => {
+		const wiring = resolveAgentControlWiring({
+			isSpawnedSubAgent: () => false,
+			parentSessionId: null,
+			provider: 'claude',
+			readClaudeSubagentMode: () => 'native',
+			resolveAgentControlEnv: undefined,
+			resolveTurnPreamble: undefined,
+			sessionId: 'sess-root',
+			workspaceId: WORKSPACE_ID,
+		});
+
+		expect(wiring.delegation).toBe('native');
+	});
 });
 
 describe('the setting never reaches a runtime with no sub-agent tool of its own', () => {
 	it('pins a Pi session to ensemblr however the Claude setting is set', () => {
 		const wiring = resolveAgentControlWiring({
+			isSpawnedSubAgent: undefined,
 			parentSessionId: null,
 			provider: 'pi',
 			readClaudeSubagentMode: () => 'native',
@@ -373,6 +409,7 @@ describe('the setting never reaches a runtime with no sub-agent tool of its own'
 
 	it('pins a Claude session to what the setting says', () => {
 		const wiring = resolveAgentControlWiring({
+			isSpawnedSubAgent: undefined,
 			parentSessionId: null,
 			provider: 'claude',
 			readClaudeSubagentMode: () => 'native',

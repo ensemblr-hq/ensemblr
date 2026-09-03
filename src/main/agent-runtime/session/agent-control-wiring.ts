@@ -60,6 +60,9 @@ const NATIVE_SUBAGENT_PROVIDERS: ReadonlySet<AgentProviderId> = new Set([
 /** Reads the user's chosen delegation mechanism for the Claude Code runtime. */
 export type SubagentMechanismReader = () => SubagentMechanism;
 
+/** Reads the durable sub-agent marker off the chat tab bound to a session. */
+export type SubAgentMarkerReader = (sessionId: string) => boolean;
+
 /**
  * Resolves the mechanism a session opens under from its lineage, the runtime it
  * is pinned to, and the user's setting.
@@ -70,21 +73,34 @@ export type SubagentMechanismReader = () => SubagentMechanism;
  * child never fans out — so letting a child open under `native` would leave the
  * runtime's own sub-agent tool live and route an unbounded fan-out around the
  * depth cap.
+ *
+ * Lineage alone cannot say whether a session is a child. `parentSessionId` rides
+ * the open request, and a resume carries none, so a child reopened after a
+ * restart would read as a root and pick up the user's `native` setting — the
+ * exact escape the paragraph above rules out. The durable marker is checked
+ * alongside it for the same reason the control layer's role resolution prefers
+ * it: it is a column on the chat tab rather than a process fact.
+ * @param isSpawnedSubAgent - Reads the durable sub-agent marker, when available.
  * @param parentSessionId - The session that spawned this one, when any.
  * @param provider - The runtime the session runs on.
  * @param readClaudeSubagentMode - Reads the persisted Claude Code preference.
+ * @param sessionId - The session being opened, whose marker to read.
  * @returns The mechanism to pin on this session.
  */
 function resolveDelegation({
+	isSpawnedSubAgent,
 	parentSessionId,
 	provider,
 	readClaudeSubagentMode,
+	sessionId,
 }: {
+	isSpawnedSubAgent: SubAgentMarkerReader | undefined;
 	parentSessionId: string | null;
 	provider: AgentProviderId;
 	readClaudeSubagentMode: SubagentMechanismReader | undefined;
+	sessionId: string;
 }): SubagentMechanism {
-	if (parentSessionId) {
+	if (parentSessionId || isSpawnedSubAgent?.(sessionId) === true) {
 		return 'ensemblr';
 	}
 	if (!NATIVE_SUBAGENT_PROVIDERS.has(provider) || !readClaudeSubagentMode) {
@@ -167,10 +183,11 @@ function readControlMcp(
  * every turn, while a runtime the app drives over MCP has its system prompt
  * fixed at session open and would otherwise never hear about naming the session
  * still owes, nor about a language switched since it opened.
- * @param input - Session identity, its runtime, the env resolver, the delegation-mode reader, and the turn-preamble resolver.
+ * @param input - Session identity, its runtime, the env resolver, the delegation-mode and sub-agent-marker readers, and the turn-preamble resolver.
  * @returns The env overlay plus the MCP endpoint, playbook, delegation mechanism, and turn preamble, where they apply.
  */
 export function resolveAgentControlWiring({
+	isSpawnedSubAgent,
 	parentSessionId,
 	provider,
 	readClaudeSubagentMode,
@@ -179,6 +196,7 @@ export function resolveAgentControlWiring({
 	sessionId,
 	workspaceId,
 }: {
+	isSpawnedSubAgent: SubAgentMarkerReader | undefined;
 	parentSessionId: string | null;
 	provider: AgentProviderId;
 	readClaudeSubagentMode: SubagentMechanismReader | undefined;
@@ -188,9 +206,11 @@ export function resolveAgentControlWiring({
 	workspaceId: string;
 }): AgentControlWiring {
 	const delegation = resolveDelegation({
+		isSpawnedSubAgent,
 		parentSessionId,
 		provider,
 		readClaudeSubagentMode,
+		sessionId,
 	});
 	const env = resolveAgentControlEnv?.({
 		delegation,

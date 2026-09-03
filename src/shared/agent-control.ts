@@ -40,7 +40,9 @@ export {
 export { buildPlanSubmittedResult } from './agent-control/plan-mode.ts';
 export * from './agent-control/schemas.ts';
 export {
+	buildPlanModeDelegationDirective,
 	buildSessionBriefNudge,
+	PLAN_MODE_DELEGATION_HEADER,
 	PLAN_REFINEMENT_DIRECTIVE,
 	PLAN_REFINEMENT_HEADER,
 	SESSION_BRIEF_NUDGE_HEADER,

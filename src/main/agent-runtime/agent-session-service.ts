@@ -83,6 +83,7 @@ import {
 	readTitleProvenance,
 } from './naming/title-provenance.ts';
 import type {
+	SubAgentMarkerReader,
 	SubagentMechanismReader,
 	TurnPreambleResolver,
 } from './session/agent-control-wiring.ts';
@@ -139,6 +140,8 @@ interface AgentSessionServiceOptions {
 	 * tools were built for.
 	 */
 	readClaudeSubagentMode?: SubagentMechanismReader;
+	/** Reads the durable sub-agent marker, so a resumed child stays on `ensemblr`. */
+	isSpawnedSubAgent?: SubAgentMarkerReader;
 	/** Injects the agent-control env (control URL + token) into each agent child. */
 	resolveAgentControlEnv?: AgentControlEnvResolver;
 	/** Renders the per-turn upkeep block for runtimes whose system prompt is fixed at open. */
@@ -279,6 +282,7 @@ export function createAgentSessionService({
 	isPlanModeActive = () => false,
 	onSessionAborted,
 	onSummaryPersisted,
+	isSpawnedSubAgent,
 	queueNaming,
 	readClaudeSubagentMode,
 	resolveAgentControlEnv,
@@ -308,6 +312,7 @@ export function createAgentSessionService({
 		onSummaryPersisted,
 		persistRuntimeEvent,
 		agentClient,
+		isSpawnedSubAgent,
 		queueNaming,
 		readClaudeSubagentMode,
 		requireDatabase: requireSessionDatabase,

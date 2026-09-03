@@ -154,6 +154,18 @@ to fold the user's changes in and end the turn on another `ExitPlanMode` rather
 than in prose. Approve and Hand off turn the toggle off, which clears the mark;
 the `planMode: true` the renderer re-sends on every submit does not.
 
+The delegation directive rides it too, on every planning turn rather than only
+after a submission. Plan Mode reaches Claude as `permissionMode: 'plan'`, which
+injects Claude Code's own plan workflow — a fan-out through the `Explore` and
+`Plan` sub-agent types, and a plan file under `~/.claude/plans/` — while the
+model's prompt bundle separately carries a standing "do not call the AgentTool"
+line, and Ensemblr denies that tool outright under the default mechanism.
+`buildPlanModeDelegationDirective` says which of the three governs, names the ops
+that replaced the denied tool, and points the plan at `ExitPlanMode` rather than
+at a file nothing here reads. Three variants, because the answer inverts across
+mechanism and role. Pi needs none of it: its plan-mode playbooks already say all
+of this, and a parity test asserts the shipped extension carries no copy.
+
 Each of those two answers states the new toggle to main itself. Approve's prompt
 would carry it anyway, but Hand off submits nothing to the session it leaves
 behind, so it calls `setAgentPlanMode` — the one write of that flag which does
