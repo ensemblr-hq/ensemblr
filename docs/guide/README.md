@@ -18,7 +18,7 @@ which is what the app itself displays there.
 
 ## Read in order
 
-1. [**Install**](./01-install.md) — downloading the signed build, building it yourself, build channels, and where Ensemblr keeps its data.
+1. [**Install**](./01-install.md) — the Homebrew cask, the Linux install script, downloading the signed build, building it yourself, build channels, and where Ensemblr keeps its data.
 2. [**Requirements**](./02-requirements.md) — every setup check the app runs, what each one needs, and why you need only *one* agent runtime.
 3. [**First run**](./03-first-run.md) — the setup wizard, choosing a root directory, adding a project, creating your first workspace.
 4. [**Concepts**](./04-concepts.md) — workspace, base branch, runtime versus harness, permission modes, the board. The vocabulary the rest of the guide uses.
@@ -37,7 +37,7 @@ which is what the app itself displays there.
 
 | You want to | Go to |
 | --- | --- |
-| Get it running on your Mac | [01](./01-install.md), then [02](./02-requirements.md) |
+| Get it running on your Mac or your Linux box | [01](./01-install.md), then [02](./02-requirements.md) |
 | Work out why the app will not let you in | [02](./02-requirements.md) and [14](./14-troubleshooting.md) |
 | Understand what "workspace" means here | [04](./04-concepts.md) |
 | Configure a repository for your team | [12](./12-repository-settings.md) |

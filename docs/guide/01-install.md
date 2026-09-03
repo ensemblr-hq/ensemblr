@@ -32,6 +32,57 @@ automatically** off and upgrade explicitly:
 brew upgrade --cask --greedy ensemblr
 ```
 
+## Install script (Linux)
+
+```bash
+curl -fsSL https://www.ensemblr.dev/install.sh | sh
+```
+
+The AppImage on its own is one file and nothing else — no launcher entry, no
+icon, and no update path. The script is the missing half. It resolves the newest
+release, **verifies the download against the digest GitHub publishes for it**
+before writing anything, extracts the `.desktop` entry and the icon ladder the
+AppImage already carries, and records a manifest so `--uninstall` removes exactly
+what it added.
+
+Nothing needs root and nothing is written outside `$HOME`:
+
+| Path | What |
+| --- | --- |
+| `~/.local/share/ensemblr/Ensemblr-<version>-x64.AppImage` | the app |
+| `~/.local/share/ensemblr/.version` | the installed tag |
+| `~/.local/bin/ensemblr` | symlink, so `ensemblr` runs from a shell |
+| `~/.local/share/applications/ensemblr.desktop` | launcher entry |
+| `~/.local/share/icons/hicolor/<N>x<N>/apps/ensemblr.png` | icons |
+
+`XDG_DATA_HOME` and `XDG_BIN_HOME` move the first two if you set them.
+
+| Option | Does |
+| --- | --- |
+| `--version <tag>` | install a specific release, e.g. `--version v0.1.0` |
+| `--nightly` | install the rolling canary build, **alongside** a release |
+| `--dir <path>` | where the AppImage goes |
+| `--no-desktop` | skip the launcher entry and the icons |
+| `--uninstall` | remove everything a previous run installed |
+| `--print-latest` | print `tag⇥sha256⇥url` and install nothing |
+
+It refuses rather than guesses: a non-Linux kernel, a machine that is not
+x86-64, no `curl`, or no SHA-256 tool (`sha256sum`, `shasum`, or `openssl`) each
+stop it with a message naming what was missing. An unverified install is not
+offered as a cheaper fallback.
+
+Re-running it is an update, and there is a thinner entry point for exactly that:
+
+```bash
+curl -fsSL https://www.ensemblr.dev/update.sh | sh          # update if behind
+curl -fsSL https://www.ensemblr.dev/update.sh | sh -s -- --check   # report only
+```
+
+`update.sh` holds no second copy of the "which release is newest" rule — it asks
+`install.sh --print-latest`, compares against `.version` on disk, and re-runs the
+same file. `--check` exits `10` when there is something to install, distinct from
+`1` for a failed lookup, so a shell alias or a cron entry can tell the two apart.
+
 ## Download
 
 The current build is **`0.1.0-beta.24`**:
@@ -41,14 +92,16 @@ The current build is **`0.1.0-beta.24`**:
 - [`Ensemblr-darwin-arm64-0.1.0-beta.24.zip`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.0-beta.24/Ensemblr-darwin-arm64-0.1.0-beta.24.zip)
   — the same `.app`, zipped, if you would rather not mount an image.
 - [**`Ensemblr-0.1.0-beta.24-x64.AppImage`**](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.0-beta.24/Ensemblr-0.1.0-beta.24-x64.AppImage)
-  — the Linux build. One file, no installer:
+  — the Linux build, if you would rather place it yourself than run the
+  [install script](#install-script-linux). One file, no installer:
 
   ```bash
   chmod +x Ensemblr-*.AppImage
   ./Ensemblr-*.AppImage
   ```
 
-  Its runtime is statically linked, so no libfuse2 is needed on the host. If it
+  You get no launcher entry, no icon, and no update path this way — that is what
+  the script adds. Its runtime is statically linked, so no libfuse2 is needed on the host. If it
   refuses to mount anyway — a container, or a kernel with no FUSE at all — run it
   with `--appimage-extract-and-run`. If it starts and dies immediately with a
   sandbox error, the kernel is refusing unprivileged user namespaces; an AppImage
@@ -72,8 +125,9 @@ under the hardened runtime, and is notarized by Apple and stapled — both the
 `.app` and the `.dmg` carry their own ticket, so Gatekeeper clears them on first
 open without a network round-trip and without the right-click dance below. The
 **AppImage is unsigned**, because Linux has no equivalent to notarization: verify
-it against the checksum on the release page if you want a check. Either way it is
-a **beta**: pre-1.0, with breaking changes expected before 1.0.
+it against the checksum on the release page if you want a check, or let the
+[install script](#install-script-linux) do it for you. Either way this is
+**pre-1.0** software, with breaking changes expected before 1.0.
 
 The app reports the full version, suffix included — `0.1.0-beta.24` in
 **Settings → General**, and on macOS in the bundle's
@@ -91,8 +145,11 @@ General** shows the running version and the updater's state, and
 **On Linux it checks but never installs.** The same schedule runs and the same
 places report the result, but a newer version is reported with a link to the
 release page rather than downloaded — the AppImage is a file you placed yourself,
-often somewhere read-only, and replacing it is not Ensemblr's to do. Download the
-new one and swap it in.
+often somewhere read-only, and replacing it is not Ensemblr's to do. The
+[install script](#install-script-linux) is the other end of that pointer:
+`curl -fsSL https://www.ensemblr.dev/update.sh | sh` swaps the file and its
+launcher entry in place. Otherwise download the new AppImage and swap it in
+yourself.
 
 Restarting goes through the same confirmation that guards ⌘Q: if agents are still
 working, Ensemblr asks before interrupting them, and declining leaves the
@@ -300,11 +357,20 @@ The root directory is the only one that holds your own work. See
 
 ## Uninstalling
 
-**On Linux there is nothing to uninstall but the file.** Delete the `.AppImage`,
-then `rm -rf ~/.config/ensemblr` for settings, local state and Electron's own
-directory — secrets go with it, because they live as ciphertext inside
-`ensemblr.db` rather than in a keyring entry of their own. If you integrated the
-AppImage with your desktop, remove the `.desktop` entry it installed too.
+**On Linux there is nothing to uninstall but the file.** If the install script
+put it there, it removes exactly what it added — the AppImage, the symlink, the
+`.desktop` entry and the icons — and leaves your settings alone:
+
+```bash
+curl -fsSL https://www.ensemblr.dev/install.sh | sh -s -- --uninstall
+rm -rf ~/.config/ensemblr   # settings, local state, Electron's own directory
+```
+
+Otherwise delete the `.AppImage`, then `rm -rf ~/.config/ensemblr` for settings,
+local state and Electron's own directory — secrets go with it, because they live
+as ciphertext inside `ensemblr.db` rather than in a keyring entry of their own.
+If you integrated the AppImage with your desktop, remove the `.desktop` entry it
+installed too.
 
 On macOS, if Homebrew installed it, Homebrew removes it — `--zap` takes the
 application data with it:
