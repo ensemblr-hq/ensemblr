@@ -65,7 +65,7 @@ export const reorderChatTabsRequestSchema = z.object({
 	workspaceId: z.string().min(1),
 });
 
-/** {@link import('../../../shared/ipc').ListClosedChatTabsWithSummaryRequest}. */
-export const listClosedChatTabsWithSummaryRequestSchema = z.object({
+/** {@link import('../../../shared/ipc').ListChatTabSummariesRequest}. */
+export const listChatTabSummariesRequestSchema = z.object({
 	workspaceId: z.string().min(1),
 });

@@ -5,8 +5,8 @@ import {
 	toSessionTabModel,
 } from '../../src/renderer/state/workspace/session-tab-model-mappers';
 import type {
+	ChatTabSummaryEntryWire,
 	ChatTabWire,
-	ClosedChatTabEntryWire,
 } from '../../src/shared/ipc/contracts/chat-tab';
 
 /**
@@ -33,11 +33,12 @@ function untitledTab(): ChatTabWire {
  * Wraps an untitled tab as a closed-tab history entry with no summary title.
  * @returns A closed entry whose only label source is the placeholder.
  */
-function untitledClosedEntry(): ClosedChatTabEntryWire {
+function untitledClosedEntry(): ChatTabSummaryEntryWire {
 	return {
 		closedAt: '2026-07-20T11:00:00.000Z',
 		summaryPath: '/tmp/summary.md',
 		summaryTitle: '',
+		summaryUpdatedAt: '2026-07-20T11:00:00.000Z',
 		tab: { ...untitledTab(), closedAt: '2026-07-20T11:00:00.000Z' },
 	};
 }

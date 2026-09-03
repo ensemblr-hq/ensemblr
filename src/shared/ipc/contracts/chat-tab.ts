@@ -29,13 +29,19 @@ export interface ChatTabWire {
 }
 
 /**
- * Renderer-facing description of a closed tab plus the path to its persisted
- * session summary. The summary file lives under `<workspaceCwd>/.context/sessions`.
+ * Renderer-facing description of a chat tab plus the path to its persisted
+ * session summary. The summary file lives under `<workspaceCwd>/.context/sessions`
+ * and is rewritten at every turn boundary, so an open tab has one too —
+ * `closedAt` is null for those. `summaryPath` is empty (and `summaryTitle` /
+ * `summaryUpdatedAt` null) when no summary file is on disk, which only ever
+ * happens for a closed tab: it stays listed so it can still be restored.
  */
-export interface ClosedChatTabEntryWire {
-	closedAt: string;
+export interface ChatTabSummaryEntryWire {
+	closedAt: string | null;
 	summaryPath: string;
 	summaryTitle: string | null;
+	/** The summary file's last-write time, and the key the entries are ordered by. */
+	summaryUpdatedAt: string | null;
 	tab: ChatTabWire;
 }
 
@@ -183,14 +189,14 @@ export interface BindAgentSessionToTabResult {
 	ok: true;
 }
 
-/** List closed chat tabs for a workspace alongside their persisted summary files. */
-export interface ListClosedChatTabsWithSummaryRequest {
+/** List a workspace's chat tabs alongside their persisted summary files. */
+export interface ListChatTabSummariesRequest {
 	workspaceId: string;
 }
 
-/** Result of listing a workspace's closed chat tabs with their persisted session summaries. */
-export interface ListClosedChatTabsWithSummaryResult {
-	entries: readonly ClosedChatTabEntryWire[];
+/** Result of listing a workspace's chat tabs with their persisted session summaries, newest summary first. */
+export interface ListChatTabSummariesResult {
+	entries: readonly ChatTabSummaryEntryWire[];
 }
 
 /**
@@ -207,9 +213,9 @@ export interface ChatTabApi {
 		request: ListAllChatTabsRequest,
 	) => Promise<ListAllChatTabsResult>;
 	listChatTabs: (request: ListChatTabsRequest) => Promise<ListChatTabsResult>;
-	listClosedChatTabsWithSummary: (
-		request: ListClosedChatTabsWithSummaryRequest,
-	) => Promise<ListClosedChatTabsWithSummaryResult>;
+	listChatTabSummaries: (
+		request: ListChatTabSummariesRequest,
+	) => Promise<ListChatTabSummariesResult>;
 	openChatTab: (request: OpenChatTabRequest) => Promise<OpenChatTabResult>;
 	pinChatTab: (request: PinChatTabRequest) => Promise<PinChatTabResult>;
 	reorderChatTabs: (

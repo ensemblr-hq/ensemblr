@@ -133,7 +133,7 @@ export const IPC_CHANNELS = {
 	listLinkedDirectoryRecents: 'ensemblr:list-linked-directory-recents',
 	recordLinkedDirectoryRecent: 'ensemblr:record-linked-directory-recent',
 	selectLinkedDirectory: 'ensemblr:select-linked-directory',
-	listClosedChatTabsWithSummary: 'ensemblr:list-closed-chat-tabs-with-summary',
+	listChatTabSummaries: 'ensemblr:list-chat-tab-summaries',
 	listAgentModels: 'ensemblr:list-agent-models',
 	listAgentSessionEvents: 'ensemblr:list-agent-session-events',
 	listAgentSessions: 'ensemblr:list-agent-sessions',

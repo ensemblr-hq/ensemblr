@@ -24,13 +24,9 @@ export const ensemblrQueryKeys = {
 	/** Query key for the Concierge transcript of one session. */
 	conciergeEvents: (sessionId: string) =>
 		[...ensemblrQueryKeys.all, 'concierge-events', sessionId] as const,
-	/** Query key for a workspace's closed chat tabs with their summaries. */
-	closedChatTabsWithSummary: (workspaceId: string) =>
-		[
-			...ensemblrQueryKeys.all,
-			'closed-chat-tabs-with-summary',
-			workspaceId,
-		] as const,
+	/** Query key for a workspace's chat tabs with their persisted summaries. */
+	chatTabSummaries: (workspaceId: string) =>
+		[...ensemblrQueryKeys.all, 'chat-tab-summaries', workspaceId] as const,
 	/** Query key for the environment files in a given scope. */
 	environmentFiles: (scope: string, scopeId?: string) =>
 		[

@@ -165,7 +165,7 @@ function summaryPathFor(
 	chatTabId: string,
 ): string | null {
 	const entry = chatTabService
-		.listClosedWithSummary({ workspaceId })
+		.listChatTabSummaries({ workspaceId })
 		.find((row) => row.tab.id === chatTabId);
 	return entry ? entry.summaryPath : null;
 }

@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, test } from 'vitest';
 
 import { NewChatEmptyState } from '../../../src/renderer/components/workbench-shell/conversation-panel/new-chat-empty-state';
 import { useComposerAttachmentInbox } from '../../../src/renderer/state/composer';
-import type { ClosedChatTabEntryWire } from '../../../src/shared/ipc/contracts/chat-tab';
+import type { ChatTabSummaryEntryWire } from '../../../src/shared/ipc/contracts/chat-tab';
 import { installLocalStorage, renderWithProviders } from '../support/dom';
 
 const WORKSPACE_CWD = '/tmp/ws';
@@ -19,11 +19,12 @@ function closedChat(
 	id: string,
 	title: string,
 	summaryPath: string,
-): ClosedChatTabEntryWire {
+): ChatTabSummaryEntryWire {
 	return {
 		closedAt: '2026-06-08T00:00:00.000Z',
 		summaryPath,
 		summaryTitle: null,
+		summaryUpdatedAt: summaryPath ? '2026-06-08T00:00:00.000Z' : null,
 		tab: {
 			agentSessionId: `session-${id}`,
 			closedAt: '2026-06-08T00:00:00.000Z',
@@ -37,6 +38,18 @@ function closedChat(
 			title,
 			workspaceId: 'ws-1',
 		},
+	};
+}
+
+/**
+ * Builds a still-open chat's entry. Main only lists an open tab once its summary
+ * is on disk, so these always carry a path.
+ */
+function openChat(id: string, title: string): ChatTabSummaryEntryWire {
+	return {
+		...closedChat(id, title, `${WORKSPACE_CWD}/.context/sessions/${id}.md`),
+		closedAt: null,
+		tab: { ...closedChat(id, title, '').tab, closedAt: null },
 	};
 }
 
@@ -67,8 +80,8 @@ function queuedEntries(): string[] {
 	);
 }
 
-/** Mounts the empty state over the given closed-chat history. */
-function renderChips(transcripts: readonly ClosedChatTabEntryWire[]): void {
+/** Mounts the empty state over the given chat-summary entries. */
+function renderChips(transcripts: readonly ChatTabSummaryEntryWire[]): void {
 	renderWithProviders(
 		<>
 			<NewChatEmptyState
@@ -152,5 +165,20 @@ describe('the new-chat transcript chips', () => {
 		expect(queuedEntries()).toEqual([
 			'transcript:tab-5|.context/sessions/tab-5.md',
 		]);
+	});
+
+	test('offers a chat that is still open', () => {
+		// The regression the surface exists for: a chat is summarized at every turn
+		// boundary, so the tabs beside this one are attachable without closing them.
+		renderChips([openChat('tab-live', 'Retire reclaim disk')]);
+
+		const chip = screen.getByRole('button', { name: /Retire reclaim disk/ });
+		expect(chip).not.toHaveAttribute('aria-disabled');
+
+		fireEvent.click(chip);
+
+		expect(queuedEntries()).toContain(
+			'transcript:tab-live|.context/sessions/tab-live.md',
+		);
 	});
 });

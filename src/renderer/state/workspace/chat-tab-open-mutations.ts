@@ -41,7 +41,7 @@ export function useChatTabOpenMutations({
 			queryKey: ensemblrQueryKeys.chatTabs(workspaceId),
 		});
 		void queryClient.invalidateQueries({
-			queryKey: ensemblrQueryKeys.closedChatTabsWithSummary(workspaceId),
+			queryKey: ensemblrQueryKeys.chatTabSummaries(workspaceId),
 		});
 		// The timeline resolves a tab's branch id out of the session list, so a tab
 		// that just gained an agent session has no branch to query until this
@@ -92,7 +92,7 @@ export function useChatTabOpenMutations({
 				queryKey: ensemblrQueryKeys.chatTabs(workspaceId),
 			});
 			void queryClient.invalidateQueries({
-				queryKey: ensemblrQueryKeys.closedChatTabsWithSummary(workspaceId),
+				queryKey: ensemblrQueryKeys.chatTabSummaries(workspaceId),
 			});
 		},
 		onSuccess: (result) => {

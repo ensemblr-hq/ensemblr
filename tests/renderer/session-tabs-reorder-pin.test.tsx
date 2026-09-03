@@ -72,7 +72,7 @@ function renderTabState() {
 	const reorderChatTabs = vi.fn(async () => ({ open: OPEN_TABS }));
 	installEnsemblrApi({
 		listChatTabs: async () => ({ closed: [], open: OPEN_TABS }),
-		listClosedChatTabsWithSummary: async () => ({ closed: [] }),
+		listChatTabSummaries: async () => ({ entries: [] }),
 		listAgentSessions: async () => ({ sessions: [] }),
 		onAgentControlTabsChanged: vi.fn(() => () => undefined),
 		onAgentSessionEvent: vi.fn(() => () => undefined),

@@ -1,9 +1,9 @@
 /// <reference types="node" />
 
 import assert from 'node:assert/strict';
-import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
-import test from 'node:test';
+import test, { type TestContext } from 'node:test';
 
 import {
 	createChatTabService,
@@ -18,6 +18,24 @@ import {
 	openChatTabServiceFixture as openFixture,
 	CHAT_TAB_FIXTURE_WORKSPACE_CWD as WORKSPACE_CWD,
 } from './helpers/chat-tab-service-fixture.ts';
+
+/** Where the summary writer would put a tab's transcript in the fixture workspace. */
+function summaryPathFor(chatTabId: string): string {
+	return path.join(WORKSPACE_CWD, '.context', 'sessions', `${chatTabId}.md`);
+}
+
+/** Writes a stand-in transcript for a tab and removes it when the test ends. */
+function writeSummaryFile(t: TestContext, chatTabId: string): void {
+	const summaryPath = summaryPathFor(chatTabId);
+	mkdirSync(path.dirname(summaryPath), { recursive: true });
+	writeFileSync(summaryPath, `# Transcript for ${chatTabId}\n`);
+	t.after(() => {
+		rmSync(path.join(WORKSPACE_CWD, '.context'), {
+			force: true,
+			recursive: true,
+		});
+	});
+}
 
 test('openTab defaults blank titles and lists the tab as open', (t) => {
 	const fixture = openFixture(t);
@@ -167,7 +185,7 @@ test('bindAgentSession validates tab and session existence', (t) => {
 	);
 });
 
-test('listClosedWithSummary lists closed tabs without a summary as restorable', (t) => {
+test('listChatTabSummaries lists closed tabs without a summary as restorable', (t) => {
 	const fixture = openFixture(t);
 
 	fixture.service.openTab({ workspaceId: fixture.workspaceId });
@@ -177,7 +195,7 @@ test('listClosedWithSummary lists closed tabs without a summary as restorable', 
 	});
 	fixture.service.closeTab({ chatTabId: bound.id });
 
-	const entries = fixture.service.listClosedWithSummary({
+	const entries = fixture.service.listChatTabSummaries({
 		workspaceId: fixture.workspaceId,
 	});
 	// The tab still enters history so it can be restored; it just carries no
@@ -188,7 +206,7 @@ test('listClosedWithSummary lists closed tabs without a summary as restorable', 
 	assert.equal(entries[0]?.summaryTitle, null);
 });
 
-test('listClosedWithSummary leaves the summary empty when the file is gone', (t) => {
+test('listChatTabSummaries leaves the summary empty when the file is gone', (t) => {
 	const fixture = openFixture(t);
 
 	fixture.service.openTab({ workspaceId: fixture.workspaceId });
@@ -209,7 +227,7 @@ test('listClosedWithSummary leaves the summary empty when the file is gone', (t)
 		},
 	});
 
-	const entries = fixture.service.listClosedWithSummary({
+	const entries = fixture.service.listChatTabSummaries({
 		workspaceId: fixture.workspaceId,
 	});
 	// The tab is still restorable; the stale summary marker must not surface a
@@ -220,7 +238,7 @@ test('listClosedWithSummary leaves the summary empty when the file is gone', (t)
 	assert.equal(entries[0]?.summaryTitle, null);
 });
 
-test('listClosedWithSummary lists a closed tab whose summary file exists', (t) => {
+test('listChatTabSummaries lists a closed tab whose summary file exists', (t) => {
 	const fixture = openFixture(t);
 
 	fixture.service.openTab({ workspaceId: fixture.workspaceId });
@@ -252,7 +270,7 @@ test('listClosedWithSummary lists a closed tab whose summary file exists', (t) =
 		},
 	});
 
-	const entries = fixture.service.listClosedWithSummary({
+	const entries = fixture.service.listChatTabSummaries({
 		workspaceId: fixture.workspaceId,
 	});
 	assert.equal(entries.length, 1);
@@ -262,7 +280,7 @@ test('listClosedWithSummary lists a closed tab whose summary file exists', (t) =
 	assert.equal(entries[0]?.summaryPath, summaryPath);
 });
 
-test('listClosedWithSummary trusts the persisted summary path outside the workspace root', (t) => {
+test('listChatTabSummaries trusts the persisted summary path outside the workspace root', (t) => {
 	const fixture = openFixture(t);
 
 	fixture.service.openTab({ workspaceId: fixture.workspaceId });
@@ -292,7 +310,7 @@ test('listClosedWithSummary trusts the persisted summary path outside the worksp
 		},
 	});
 
-	const entries = fixture.service.listClosedWithSummary({
+	const entries = fixture.service.listChatTabSummaries({
 		workspaceId: fixture.workspaceId,
 	});
 	assert.equal(entries.length, 1);
@@ -768,5 +786,162 @@ test('claimIdleChatTab refuses a tab the user named or already used', (t) => {
 	assert.equal(
 		fixture.service.claimIdleChatTab({ workspaceId: fixture.workspaceId }),
 		null,
+	);
+});
+
+test('listChatTabSummaries offers an open chat whose summary file exists', (t) => {
+	const fixture = openFixture(t);
+
+	const live = fixture.service.openTab({
+		agentSessionId: fixture.agentSessionId,
+		title: 'Retire reclaim disk',
+		workspaceId: fixture.workspaceId,
+	});
+	writeSummaryFile(t, live.id);
+	setChatTabMetadata({
+		database: fixture.connection.database,
+		id: live.id,
+		metadata: {
+			summary: { path: summaryPathFor(live.id), title: 'Retired reclaim disk' },
+		},
+	});
+
+	const entries = fixture.service.listChatTabSummaries({
+		workspaceId: fixture.workspaceId,
+	});
+	// The regression this listing exists for: a chat is summarized at every turn
+	// boundary, so a tab the user never closed still has a transcript to attach.
+	assert.equal(entries.length, 1);
+	assert.equal(entries[0]?.tab.id, live.id);
+	assert.equal(entries[0]?.closedAt, null);
+	assert.equal(entries[0]?.summaryPath, summaryPathFor(live.id));
+	assert.equal(entries[0]?.summaryTitle, 'Retired reclaim disk');
+	assert.ok(entries[0]?.summaryUpdatedAt);
+});
+
+test('listChatTabSummaries omits an open chat with nothing recorded yet', (t) => {
+	const fixture = openFixture(t);
+
+	fixture.service.openTab({ workspaceId: fixture.workspaceId });
+	const stale = fixture.service.openTab({
+		agentSessionId: fixture.agentSessionId,
+		workspaceId: fixture.workspaceId,
+	});
+	// A marker whose file has since gone is as unattachable as no marker at all.
+	setChatTabMetadata({
+		database: fixture.connection.database,
+		id: stale.id,
+		metadata: {
+			summary: {
+				path: path.join(WORKSPACE_CWD, '.context', 'sessions', 'missing.md'),
+				title: 'Written but deleted',
+			},
+		},
+	});
+
+	// An unused open tab is already in the tab strip, so listing it disabled
+	// would be noise rather than the gap a closed tab's absence would read as.
+	assert.deepEqual(
+		fixture.service.listChatTabSummaries({ workspaceId: fixture.workspaceId }),
+		[],
+	);
+});
+
+test('listChatTabSummaries orders entries by summary recency, unattachable last', (t) => {
+	const fixture = openFixture(t);
+
+	const older = fixture.service.openTab({
+		agentSessionId: fixture.agentSessionId,
+		title: 'Older',
+		workspaceId: fixture.workspaceId,
+	});
+	const newer = fixture.service.openTab({
+		title: 'Newer',
+		workspaceId: fixture.workspaceId,
+	});
+	// Bound to a session, or `closeTab` hard-deletes it as an unspent tab rather
+	// than archiving it into restorable history.
+	const restorable = fixture.service.openTab({
+		agentSessionId: fixture.agentSessionId,
+		title: 'Restorable',
+		workspaceId: fixture.workspaceId,
+	});
+	fixture.service.closeTab({ chatTabId: restorable.id });
+
+	for (const [tabId, mtime] of [
+		[older.id, new Date('2026-09-01T00:00:00.000Z')],
+		[newer.id, new Date('2026-09-02T00:00:00.000Z')],
+	] as const) {
+		writeSummaryFile(t, tabId);
+		utimesSync(summaryPathFor(tabId), mtime, mtime);
+		setChatTabMetadata({
+			database: fixture.connection.database,
+			id: tabId,
+			metadata: { summary: { path: summaryPathFor(tabId), title: null } },
+		});
+	}
+
+	const entries = fixture.service.listChatTabSummaries({
+		workspaceId: fixture.workspaceId,
+	});
+	assert.deepEqual(
+		entries.map((entry) => entry.tab.id),
+		[newer.id, older.id, restorable.id],
+	);
+	assert.equal(entries[2]?.summaryUpdatedAt, null);
+});
+
+test('listChatTabSummaries keeps closed terminal tabs the history dropdown restores', (t) => {
+	const fixture = openFixture(t);
+
+	fixture.service.openTab({
+		agentSessionId: fixture.agentSessionId,
+		workspaceId: fixture.workspaceId,
+	});
+	const terminalTab = fixture.service.openTab({
+		kind: 'terminal',
+		metadata: { harnessId: 'claude', harnessSessionId: 'native-1' },
+		title: 'Claude Code',
+		workspaceId: fixture.workspaceId,
+	});
+	fixture.service.closeTab({ chatTabId: terminalTab.id });
+
+	// No transcript is ever written for a harness tab, but it is archived rather
+	// than deleted so a restore can reattach the conversation — the listing must
+	// carry it or the history dropdown loses every terminal it could reopen.
+	const entries = fixture.service.listChatTabSummaries({
+		workspaceId: fixture.workspaceId,
+	});
+	assert.deepEqual(
+		entries.map((entry) => entry.tab.id),
+		[terminalTab.id],
+	);
+	assert.equal(entries[0]?.tab.kind, 'terminal');
+	assert.equal(entries[0]?.summaryPath, '');
+});
+
+test('listChatTabSummaries omits open tabs that are not chats', (t) => {
+	const fixture = openFixture(t);
+
+	fixture.service.openTab({
+		agentSessionId: fixture.agentSessionId,
+		workspaceId: fixture.workspaceId,
+	});
+	fixture.service.openTab({
+		kind: 'terminal',
+		metadata: { harnessId: 'claude' },
+		title: 'Claude Code',
+		workspaceId: fixture.workspaceId,
+	});
+	fixture.service.openTab({
+		kind: 'file',
+		metadata: { filePath: 'src/main/main.ts' },
+		title: 'main.ts',
+		workspaceId: fixture.workspaceId,
+	});
+
+	assert.deepEqual(
+		fixture.service.listChatTabSummaries({ workspaceId: fixture.workspaceId }),
+		[],
 	);
 });

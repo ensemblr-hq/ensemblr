@@ -4,20 +4,36 @@ import { useTranslation } from 'react-i18next';
 
 import {
 	agentSessionsForWorkspaceQuery,
+	listChatTabSummariesQuery,
 	listChatTabsQuery,
-	listClosedChatTabsWithSummaryQuery,
 } from '@/renderer/api/ensemblr-queries';
 import type {
 	SessionTabModel,
 	WorkspaceShellModel,
 } from '@/renderer/types/workbench';
 import type { AgentSessionSnapshotWire } from '@/shared/ipc/contracts/agent-session';
+import type { ChatTabSummaryEntryWire } from '@/shared/ipc/contracts/chat-tab';
 
 import {
 	toClosedSessionTabModel,
 	toSessionTabModel,
 } from './session-tab-model-mappers';
 import type { LiveTerminalTitle } from './terminal-tab-title';
+
+/**
+ * Orders closed summary entries most-recently-closed first — the order the
+ * history dropdown restores from, and the one main's summary-recency ranking
+ * discards on its way to serving the attach chips.
+ * @param left - First entry to compare
+ * @param right - Second entry to compare
+ * @returns Negative when `left` sorts first, positive when `right` does
+ */
+function byCloseRecency(
+	left: ChatTabSummaryEntryWire,
+	right: ChatTabSummaryEntryWire,
+): number {
+	return (right.closedAt ?? '').localeCompare(left.closedAt ?? '');
+}
 
 /**
  * Derives the workspace's open and closed tab models from the persisted rows,
@@ -53,15 +69,30 @@ export function useSessionTabModels({
 		isFetching: isFetchingChatTabs,
 		isSuccess: hasLoadedChatTabs,
 	} = useQuery(listChatTabsQuery(workspaceId));
-	const { data: closedChatTabsData } = useQuery(
-		listClosedChatTabsWithSummaryQuery(workspaceId),
+	const { data: chatTabSummariesData } = useQuery(
+		listChatTabSummariesQuery(workspaceId),
 	);
 	const { data: agentSessionsData } = useQuery(
 		agentSessionsForWorkspaceQuery(workspaceId),
 	);
 
 	const openTabs = chatTabsData?.open ?? null;
-	const closedEntries = closedChatTabsData?.entries ?? null;
+	const summaryEntries = chatTabSummariesData?.entries;
+	// The summary query lists open tabs too, ranked by summary recency so the
+	// new-chat attach chips lead with the freshest transcript. The history
+	// dropdown restores tabs rather than attaching them, so it speaks only for
+	// the closed ones and re-ranks them by close time: a terminal tab never has a
+	// transcript, and inheriting a transcript-based order buries the one closed a
+	// minute ago under every chat that happens to carry a summary file.
+	// Memoized because it feeds a dependency array: a fresh array per render
+	// would rebuild every closed-tab model on every render.
+	const closedEntries = useMemo(
+		() =>
+			summaryEntries
+				?.filter((entry) => entry.closedAt !== null)
+				.sort(byCloseRecency) ?? null,
+		[summaryEntries],
+	);
 	const agentSessions = agentSessionsData?.sessions;
 
 	const agentStatusByAgentSessionId = useMemo(() => {

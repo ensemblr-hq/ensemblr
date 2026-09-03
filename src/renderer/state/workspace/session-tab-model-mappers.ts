@@ -3,8 +3,8 @@ import { formatRelativeTimestamp } from '@/renderer/lib/workbench/relative-time'
 import type { SessionTabModel } from '@/renderer/types/workbench';
 import type { AgentSessionSnapshotWire } from '@/shared/ipc/contracts/agent-session';
 import type {
+	ChatTabSummaryEntryWire,
 	ChatTabWire,
-	ClosedChatTabEntryWire,
 } from '@/shared/ipc/contracts/chat-tab';
 import { parseWorkspaceGitDiffScope } from '@/shared/ipc/contracts/workspace-git';
 
@@ -155,9 +155,13 @@ function deriveTabStatus(
 	return 'idle';
 }
 
-/** Maps a closed-tab + summary entry into a `SessionTabModel`. */
+/**
+ * Maps a closed-tab + summary entry into a `SessionTabModel`. Callers narrow the
+ * summary listing to closed entries first, so `closedAt` is a real timestamp
+ * here rather than the null an open tab carries.
+ */
 export function toClosedSessionTabModel(
-	entry: ClosedChatTabEntryWire,
+	entry: ChatTabSummaryEntryWire,
 ): SessionTabModel {
 	const base: SessionTabBaseFields = {
 		agentSessionId: entry.tab.agentSessionId,
@@ -176,7 +180,7 @@ export function toClosedSessionTabModel(
 		label: entry.tab.title || entry.summaryTitle || untitledClosedTabLabel(),
 		status: 'idle',
 		summary: entry.summaryPath,
-		updatedLabel: formatRelativeTimestamp(entry.closedAt),
+		updatedLabel: formatRelativeTimestamp(entry.closedAt ?? entry.tab.openedAt),
 	};
 	// Terminal (harness) tabs keep their harness identity so the history row shows
 	// the harness icon and a restore can reattach the exact conversation. The
