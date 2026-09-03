@@ -82,10 +82,12 @@ export interface ComposerTextSource {
 
 /**
  * Everything the composer can carry alongside the typed message, in one ordered
- * list. `id` is what dedupes an add and targets a remove; `label` is what the
- * chip reads. The variants differ only in where their content lives — a
- * repo-relative path, an absolute path outside the tree, or an in-memory file
- * awaiting its first write.
+ * list. `id` dedupes an add for the kinds whose content is inlined, and targets
+ * the first chip carrying it on a remove; a reference chip may repeat within one
+ * draft, so its id is not unique there. `label` is what the chip reads. The
+ * variants differ only in where their content lives — a repo-relative path, an
+ * absolute path outside the tree, an in-memory file awaiting its first write, or
+ * a surface of the app's own that has no content at all.
  */
 export type ComposerAttachment =
 	| {
