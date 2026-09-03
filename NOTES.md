@@ -1,35 +1,45 @@
-## Ensemblr v0.1.0
+## Ensemblr v0.1.1
 
-**The first stable release.** Ensemblr leaves the beta series after twenty-four prereleases and three weeks. The version that ships is the one the betas converged on rather than a twenty-fifth with the suffix filed off: `0.1.0` carries no `-beta` suffix, so GitHub marks it **Latest**, the Homebrew cask bumps to it, and the Linux install script selects it over every `v0.1.0-beta.*` before it.
+**Fable 5.1 is selectable in a Claude Code chat.** Claude Code advertises only its moving aliases (`opus`, `sonnet`, …) from `supportedModels()`, so a named model has to be pinned into Ensemblr's catalog to appear in the picker at all. `claude-fable-5-1` is now pinned, and because the `fable` family already led the family order it sorts to the top of the list rather than trailing the other pinned rows.
 
-**macOS and Linux are both public, supported targets.** The `.dmg` is signed with a Developer ID certificate, hardened-runtime, notarized by Apple and stapled, so it opens without a Gatekeeper prompt and validates offline. The `.AppImage` is built on Linux in CI beside it. Linux users now have a one-line installer:
+Selecting it needs a **Claude Code binary at 2.1.251 or newer**. On an older binary the model id is rejected by the CLI when the chat starts rather than when the picker is opened — the same way a model the signed-in account is not entitled to fails.
 
 ```sh
-curl -fsSL https://www.ensemblr.dev/install.sh | sh
+claude --version   # must be >= 2.1.251
 ```
 
-It needs no root and writes nothing outside `$HOME`. It resolves the newest release, verifies the download against the digest GitHub publishes, places the AppImage under `~/.local/share/ensemblr`, symlinks it to `~/.local/bin/ensemblr`, and extracts the desktop entry and icon ladder the AppImage already carries so the app appears in the launcher. A manifest records exactly what it added, so `--uninstall` removes that and nothing else. Re-running it is an update.
+The rest of the release is the Linux window-drag fix and a dependency bump within every pinned major.
 
-On macOS:
+### Install
+
+macOS:
 
 ```sh
 brew install --cask ensemblr-hq/tap/ensemblr
 ```
 
-### What stabilised
+Linux:
 
-What the beta series converged on is the model underneath the app. Every stream of work gets its own git worktree, branch and review path, so a fan-out of agents cannot collide. **Ensemblr Control** lets the agent inside a workspace drive the app through a permission gate — naming its own tab, moving itself across the board, starting run scripts, spawning sub-agents into their own chat tabs and reading their reports. The runtime layer is provider-neutral, with Pi and Claude Code as sibling adapters rather than one routed through the other's vocabulary. The app ships in English, Russian and Greek, holds no account and no telemetry, keeps its state in a local SQLite database and its secrets in the OS keyring, and ships no agent binary of its own — it drives the CLI you installed and authenticated yourself.
+```sh
+curl -fsSL https://www.ensemblr.dev/install.sh | sh
+```
 
-Stability from here is ordinary semver. `0.1.0` is a stable release, not a promise that the surface is frozen; breaking changes remain possible before `1.0` and are recorded in the changelog when they land.
+The `.dmg` is signed with a Developer ID certificate, hardened-runtime, notarized by Apple and stapled, so it opens without a Gatekeeper prompt and validates offline. The Linux installer needs no root, writes nothing outside `$HOME`, verifies the download against the digest GitHub publishes, and keeps a manifest so `--uninstall` removes exactly what it added. Re-running it is an update.
 
-### What's Changed since v0.1.0-beta.24
+### What's Changed since v0.1.0
 
 #### Added
 
-* **The native About panel credits every direct dependency**: the panel named its author and nothing else, leaving the 82 open-source projects Ensemblr is built out of uncredited. Each is now listed with its license and project page, under headings that read in all three of the app's languages. The metadata lives in each dependency's own `package.json`, which the packaged app does not ship — Vite bundles the code and Forge drops `node_modules` apart from the `PACKAGE_KEEP_*` entries — so `scripts/generate-credits.mjs` captures it at authoring time into a committed `credits-manifest.gen.ts`, and a drift test recomputes the manifest from `node_modules` on every run, making a dependency change that skips `npm run credits:generate` a red test rather than a stale panel. Electron splits the credits across two platform-exclusive fields that render text differently enough to need separate treatment: GTK turns an angle-bracketed URL into a link, while the macOS panel shows the brackets verbatim and buries 82 names under unclickable URLs — so `authors` carries the links and `credits` drops them, out of one document builder rather than two. (#421)
+* **Fable 5.1 in the Claude Code model picker**: `claude-fable-5-1` joins `PINNED_MODELS` in `src/main/claude-agent/claude-model-catalog.ts`. Pinning is what makes a named model selectable — `supportedModels()` returns only the aliases that track the newest release, so a model whose behaviour you want fixed has to be listed explicitly. Requires the user's own Claude Code binary at 2.1.251 or newer; an older binary, or an account without the entitlement, fails when the model is actually selected rather than when the picker is opened. (#423)
 
-* **A repository that has already run `infisical init` is linked from its own `.infisical.json`**: the file names the project, so asking the user to pick that same project a second time is work Ensemblr can do for them. It is read as a whole-link fallback behind the saved row and the committed `[infisical]` block, and is never written back — it belongs to the CLI. Its `domain` is read as the link's instance, and only `workspaceId` and `defaultEnvironment` besides; `gitBranchToEnvironmentMapping` has no one branch to resolve against, because a repository-scope link is shared by every workspace of that repository and each sits on a different branch. `fromRepositoryConfig: boolean` becomes an `InfisicalLinkOrigin` union of local, repository-config and infisical-cli. The summary badges a discovered link as **Detected** rather than as unsaved, with a notice explaining what is already resolving, what is still missing, and what saving would add — nothing is committed on the user's behalf. Unlinking is a decision that persists: `clearLink` records a dismissal in the new `infisical_discovery_dismissals` table and the fallback honours it, so unlinking a repository whose `.infisical.json` still names the project takes rather than resurrecting on the next read with secrets flowing. Account matching never crosses instances. (#420)
+* **A copyright line on the macOS "Get Info" panel**: `appCopyright` in the Forge config fills `NSHumanReadableCopyright`, which the panel had been leaving blank. The holder tracks `NOTICE`, which credits the author rather than the product name. (#423)
+
+#### Changed
+
+* **Linux windows are dragged by the title bar, not by the toolbars**: the app's toolbars carried `-webkit-app-region: drag` on every platform. That is correct only where the platform insets its own window controls into the content — on macOS the traffic lights sit in the toolbar, which makes the toolbar the window's drag surface. Linux draws either the title bar Ensemblr renders itself or a compositor frame, and the toolbar there is plain content that should not move the window. The drag rule is now keyed on an `inset-window-controls` class that `applyWindowChrome` toggles from `chrome.controls === 'system-inset'`, and `DRAG_REGION_SELECTOR` narrows to the title bar. The stylesheet-parity test was hardened to guard that the toolbars stay gated. (#423)
+
+* **Dependencies bumped within their pinned majors**: Electron 44.1.1, `@anthropic-ai/claude-agent-sdk` 0.3.259, Zod 4.5.4, `lucide-react` 1.40, TanStack Query/Router/Virtual, i18next and `react-i18next`, Jotai, Motion, `shadcn`, `i18next-cli`, `tsx`, and the Testing Library packages. `@types/node` stays on `^24` deliberately — it mirrors the Node major the Electron runtime embeds rather than the latest release, so typing against a newer one would let a green typecheck ship a runtime `TypeError`. The xterm core and its addons are untouched, since they are versioned independently and are only paired by publish date. The credits manifest is regenerated for the resulting metadata. (#423)
 
 ---
 
-*Full changelog*: https://github.com/ensemblr-hq/ensemblr/compare/v0.1.0-beta.24...v0.1.0
+*Full changelog*: https://github.com/ensemblr-hq/ensemblr/compare/v0.1.0...v0.1.1

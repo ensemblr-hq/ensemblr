@@ -9,6 +9,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-09-03
+
+**Fable 5.1 is selectable in a Claude Code chat.** The model is pinned into the catalog rather than
+waiting on `supportedModels()`, which advertises only the moving aliases, so it appears in the picker
+as soon as the signed-in account is entitled to it. Alongside it, Linux windows stop being draggable
+by their toolbars — a rule that only ever made sense where the platform insets its own window
+controls into the content, as macOS does with the traffic lights — and the dependency floor moves up
+within every pinned major.
+[Release](https://github.com/ensemblr-hq/ensemblr/releases/tag/v0.1.1) ·
+[`.dmg`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.1/Ensemblr-0.1.1-arm64.dmg) ·
+[`.AppImage`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.1/Ensemblr-0.1.1-x64.AppImage)
+
+### Added
+
+- **Fable 5.1 in the Claude Code model picker.** `claude-fable-5-1` joins `PINNED_MODELS`, and the
+  `fable` family already led `FAMILY_ORDER`, so it sorts to the top of the list rather than trailing
+  the pinned rows. Claude Code advertises only its moving aliases from `supportedModels()`, which is
+  why a named model has to be pinned to be selectable at all. Selecting it needs a Claude Code binary
+  at **2.1.251 or newer**; on an older one the model id is rejected by the CLI when the chat starts,
+  not when the picker is opened. An account without the entitlement fails the same way. (#423)
+
+- **macOS "Get Info" shows a copyright line.** `appCopyright` in the Forge config fills
+  `NSHumanReadableCopyright`, which the panel had been leaving blank. The holder tracks `NOTICE` and
+  credits the author rather than the product. (#423)
+
+### Changed
+
+- **Linux windows are dragged by the title bar, not the toolbars.** The toolbars carried
+  `-webkit-app-region: drag` on every platform, which is right only where the window controls are
+  inset into the content — macOS traffic lights sit in the toolbar, so the toolbar is the drag
+  surface. Linux draws either its own title bar or a compositor frame, and the toolbar there is plain
+  content that should not move the window. The rule is now keyed on a new `inset-window-controls`
+  class that `applyWindowChrome` toggles from `chrome.controls === 'system-inset'`, and
+  `DRAG_REGION_SELECTOR` narrows to the title bar. The stylesheet-parity test asserts the toolbars
+  stay gated. (#423)
+
+- **Dependencies bumped within their pinned majors.** Electron 44.1.1, the Claude Agent SDK 0.3.259,
+  Zod 4.5.4, `lucide-react` 1.40, TanStack Query/Router/Virtual, i18next and `react-i18next`, Jotai,
+  Motion, `shadcn`, `i18next-cli`, and the Testing Library packages. `@types/node` stays on `^24` to
+  track the Node the Electron runtime embeds, and the xterm core and addons are untouched. The
+  credits manifest is regenerated for the resulting metadata. (#423)
+
 ## [0.1.0] - 2026-09-03
 
 **The first stable release.** Ensemblr leaves the beta series after twenty-four prereleases and
