@@ -512,6 +512,16 @@ A third artifact exists only on the release, not in `out/`: both workflows write
 **`update-darwin-arm64.json`** and attach it beside the `.zip`. See
 [The update feed document](#the-update-feed-document) below.
 
+**An empty `out/` has two unrelated causes and they look alike.** The Node-major
+one is silent — exit 0, no error. The other is the Electron download: Forge
+reaches `@electron/get` **v3** through `@electron/packager`, which fetches
+`SHASUMS256.txt` over `got@11` before the zip, and a network that resets that
+request stops the build there. `electron`'s own postinstall is not affected — it
+uses `@electron/get` **v5**, which downloads over native `fetch` — so `npm
+install` can succeed on a network where `npm run make` does not. It is transient
+and the download is cached, so retrying usually clears it. See
+[Troubleshooting](./guide/14-troubleshooting.md#make-dies-fetching-shasums256txt).
+
 ## Releasing
 
 Releases are built by GitHub Actions on a `macos-15` runner, not on a laptop.

@@ -61,6 +61,49 @@ Ensemblr pins Node 24 in `.nvmrc`, `mise.toml`, and `package.json` (`engines:
 gate did not fire, something is invoking Forge directly rather than through the
 npm script.
 
+**If `node -v` already reports v24.x, this is not your problem** — read the next
+entry, which produces the same empty `out/` for a different reason.
+
+### `make` dies fetching `SHASUMS256.txt`
+
+**Cause.** The Electron download, not Node. Before Forge can package anything it
+downloads the Electron build for the target platform, and `@electron/get` fetches
+`SHASUMS256.txt` as its own request first, to verify the zip against. That
+request is the one that fails, and on a network that resets it the build stops
+there with nothing in `out/` — which reads exactly like the Node-major symptom
+above.
+
+The reason it is specific to `make` and `package` is a version split in one
+dependency. Two copies of `@electron/get` are installed: `electron`'s own
+postinstall uses **v5**, which downloads over native `fetch`, while Forge reaches
+**v3** through `@electron/packager`, and v3 downloads over `got@11`. So
+`npm install` fetching Electron succeeds on the same network where `npm run make`
+fetching Electron does not.
+
+**Fix.** It is transient, so retry first:
+
+```bash
+npm run make
+```
+
+A successful download is cached and reused, so the second attempt usually gets
+past it — and once the artifacts are in the cache the request is skipped
+entirely. The cache is keyed by download URL under:
+
+```
+~/Library/Caches/electron     # macOS
+~/.cache/electron             # Linux
+```
+
+Deleting it forces the fetch again, so keep it if you are debugging something
+else. If your network fails this consistently rather than intermittently, point
+`@electron/get` elsewhere — it reads `ELECTRON_MIRROR` for the download host and
+`ELECTRON_GET_USE_PROXY` to route through the standard proxy variables.
+
+**How to tell the two apart.** The Node-major failure is silent: exit 0, no
+error, empty `out/`. This one names the artifact it could not fetch. If you see
+`SHASUMS256.txt` in the output, switching Node majors will not help.
+
 ### `NODE_MODULE_VERSION` mismatch during `make`
 
 **Cause.** You ran `npm install` under a different Node major than the one you
