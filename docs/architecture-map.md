@@ -85,9 +85,9 @@ A new feature is split across these buckets, not given a folder of its own.
 | Bucket | Holds | Concern folders inside |
 | --- | --- | --- |
 | `api/` | TanStack Query clients, query options, preload-backed access | `ensemblr/` |
-| `components/` | React components and UI composition | `workbench-shell/`, `conversation/`, `diff-viewer/`, `code-surface/`, `settings/`, `setup-diagnostics/`, `onboarding/`, `git/`, `linear/`, `command-palette/`, `ask-user-question/`, `tool-approval/`, `tool-collapsible/`, `pi-replay/`, `text-context-menu/`, `welcome/`, `concierge/`, `ui/` (vendored shadcn) |
+| `components/` | React components and UI composition | `workbench-shell/`, `conversation/`, `diff-viewer/`, `code-surface/`, `settings/`, `setup-diagnostics/`, `onboarding/`, `git/`, `linear/`, `command-palette/`, `ask-user-question/`, `tool-approval/`, `tool-collapsible/`, `pi-replay/`, `text-context-menu/`, `welcome/`, `concierge/`, `markdown/` (the file-link and image renderers streamdown is handed), `ui/` (vendored shadcn) |
 | `config/` | Stable renderer constants (route stale times, knobs) | — |
-| `hooks/` | Renderer hooks that are not durable shared state | `workbench-shell/`, `workspace/`, `conversation/`, `code-surface/`, `setup-diagnostics/`, `preferences/`, `git/`, `linear/`, `ask-user-question/`, `welcome/`, `concierge/` |
+| `hooks/` | Renderer hooks that are not durable shared state | `workbench-shell/`, `workspace/`, `conversation/`, `code-surface/`, `setup-diagnostics/`, `preferences/`, `git/`, `linear/`, `ask-user-question/`, `welcome/`, `concierge/`, `markdown/` |
 | `lib/` | Runtime helpers grouped by concern | `workbench/`, `agent-timeline/`, `conversation/`, `diff/`, `code/`, `github/`, `linear/`, `pi/`, `pi-replay/`, `terminal/`, `dictation/`, `i18n/` (i18next instance + bundled `locales/`), `onboarding/`, `instrumentation/`, `ask-user-question/`, `welcome/`, `notification-sound/` (the bundled chime and its player), `concierge/`, plus the code→`t()` mappers `failure-text/`, `agent-failure-text/`, `setup-check-text/`, `provider-check-text/`, `plan-limit-text/` |
 | `fixtures/` | Fixture/demo data production code may still consume | `workbench/` |
 | `routing/` | TanStack Router file routes + generated tree | `routes/` |
@@ -124,9 +124,9 @@ The only code both processes may import. Two shapes coexist:
   entrypoint, in one of two forms:
   - `<concern>/index.ts` — `ipc/` (41 contract modules under `ipc/contracts/`,
     plus `channels.ts` and `handler-map.ts`), `pi-rpc/`, `keymap/`.
-  - `<concern>.ts` + `<concern>/` — `agent-control`, `plan-mode`, `scripts`,
-    `terminal`. This is the form `electron --test` can resolve, so prefer it for
-    anything the main-process suites import.
+  - `<concern>.ts` + `<concern>/` — `agent-control`, `agent-failure`,
+    `plan-mode`, `scripts`, `terminal`. This is the form `electron --test` can
+    resolve, so prefer it for anything the main-process suites import.
 
 Never import renderer UI, main-process services, Electron, or `node:fs` from
 here.
@@ -191,8 +191,8 @@ migration ids, so a new migration must be added to both.
 
 | Suite | Runner | Count |
 | --- | --- | --- |
-| `tests/main/**` | `electron --test` (`ELECTRON_RUN_AS_NODE=1`), plus the pure-logic files listed one-by-one in `vitest.config.mts` — an explicit list, not a glob, so it never drags in the Electron-only suites | 218 files |
-| `tests/renderer/**` | Vitest (`node` env; DOM files opt in per file) | 352 files (44 under `dom/`) |
+| `tests/main/**` | `electron --test` (`ELECTRON_RUN_AS_NODE=1`), plus the pure-logic files listed one-by-one in `vitest.config.mts` — an explicit list, not a glob, so it never drags in the Electron-only suites | 232 files |
+| `tests/renderer/**` | Vitest (`node` env; DOM files opt in per file) | 360 files (44 under `dom/`) |
 | `tests/shared/**` | Vitest | 39 files |
 
 See [`onboarding.md`](./onboarding.md#6-running-the-tests) for which runner a new

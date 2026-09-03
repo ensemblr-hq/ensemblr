@@ -182,6 +182,36 @@ account that reached it, so picking the project settles the account. An account
 that cannot be listed drops out of the list by name rather than failing the
 whole screen.
 
+### A repository that already ran `infisical init`
+
+If the Infisical CLI has been run in the repository, its `.infisical.json`
+already names the project — so Ensemblr reads it rather than asking you to pick
+the same project twice. The project half resolves in this order:
+
+1. the link you saved on this machine,
+2. the committed `[infisical]` block in `.ensemblr/settings.toml`,
+3. the repository's `.infisical.json`.
+
+Only the third is a *discovery*, and the Secrets screen badges it **Detected**
+rather than as an unsaved edit: it tells you what is already resolving, what is
+still missing, and what saving would add. Nothing is committed on your behalf,
+and **`.infisical.json` is never written to** — it belongs to the CLI.
+
+Three fields are read from it and no others: the project id, `defaultEnvironment`
+as the environment, and `domain` as the instance URL (absent means Infisical
+Cloud). `defaultSecretPath` is skipped so the link reads the environment root,
+matching `infisical run --path`'s own default.
+`gitBranchToEnvironmentMapping` is skipped because it resolves against the
+working tree's current branch, and a repository-scope link is shared by every
+workspace of that repository — each sitting on a different branch, so there is
+no one branch to resolve it against. A repository that maps environments per
+branch gets `defaultEnvironment` everywhere; save an explicit link when that is
+wrong.
+
+Unlinking sticks. Removing a discovered link records a dismissal, so it stays
+unlinked rather than reappearing — with secrets flowing again — the next time
+the file is read.
+
 Three properties worth knowing:
 
 - **Pull only.** Ensemblr never writes a secret back to Infisical.

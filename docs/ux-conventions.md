@@ -200,17 +200,26 @@ Ensemblr equivalent:
   shared with another workspace manager (ADR 0011) — and the variables Ensemblr exports into a
   workspace are natively named `ENSEMBLR_*`.
 
-## Prioritized Implementation Checklist
+## Implementation Checklist
 
-1. Maintain the implemented app shell contract: sidebar projects/workspaces, center tabbed workspace, right panel tabs, terminal dock, file-based route state (path-based workspace/chat selection plus `dock`/`review` search params), and Query-backed setup/health snapshots.
-2. Build settings shell: app settings sections plus repository settings from the screenshot inventory.
-3. Implement setup gate: git, `gh`, Pi executable/RPC/provider, root directory, SQLite, and process environment checks.
-4. Implement repository add/open/clone: add menu, clone modal, clone progress log, post-clone workspace landing.
-5. Implement workspace core: worktree creation, default branch/remote, copied files, setup script, placeholder naming, context folder.
-6. **Complete.** Implement Pi timeline: session creation, event rendering, tool calls, runtime errors, retry/fork actions, composer controls.
-7. **Complete.** Wire terminal dock: replace dock placeholder logs with setup/run output, named terminals, rerun/stop/run controls, PTY lifecycle.
-8. **Complete.** Wire file/diff panel: all-files tree, changes tree, diff body, source filtering, discard controls, and search are live. Inline local line comments shipped with the rich diff viewer (#151, `diff-viewer/diff-comment-thread.tsx`); #211 unified the file preview, turn diff, and workspace file diff behind one code surface.
-9. **Complete.** Wire PR/checks panel: no-PR state, uncommitted state, PR metadata, CI/deployments, comments, todos, ready-to-merge state, and merge confirmation are live. PR comment bodies are readable in-app (#209) and open as their own tab (#207, #208); the deployed-build preview link is wired (#196, #197); merge conflicts surface in the panel with a "Resolve" action that hands the conflict to the agent (#215); resolved review comments render struck through and bulk-add sends only the unresolved ones (#234).
-10. Implement repository action preferences: review, create PR, fix errors, resolve conflicts, branch rename, and general agent instructions.
-11. Complete the polish/settings surface: appearance previews, keyboard shortcuts, command palette, diagnostics, and source-status polish. Voice remains post-core deferred.
-12. Revisit advanced integrations: Graphite stack support and cloud/remote workspace SSH behavior. Linear issue workflows are v1 scope, and GitHub workflows stay on `gh`/`gh api`.
+This began as a build order and is now a record of what shipped. Everything
+below landed by `0.1.0`; each line stays because it names the surface a change
+has to keep working, not because the work is outstanding.
+
+1. **Shipped.** The app shell contract: sidebar projects/workspaces, center tabbed workspace, right panel tabs, terminal dock, file-based route state (path-based workspace/chat selection plus `dock`/`review` search params), and Query-backed setup/health snapshots.
+2. **Shipped.** The settings shell: ten app panes and seven repository panes, documented in [`guide/11-app-settings.md`](./guide/11-app-settings.md).
+3. **Shipped.** The setup gate: sixteen checks in `SETUP_CHECK_ORDER`, from declarative config through Linear, documented in [`guide/02-requirements.md`](./guide/02-requirements.md).
+4. **Shipped.** Repository add/open/clone: add menu, clone dialog, clone progress log, post-clone workspace landing.
+5. **Shipped.** Workspace core: worktree creation, default branch/remote, copied files, setup script, placeholder naming, context folder. Adopting an existing branch instead of always forking landed with ADR 0043.
+6. **Shipped.** The agent timeline: session creation, event rendering, tool calls, runtime errors, retry/fork actions, composer controls. Provider-neutral since ADR 0042 — Pi and Claude Code are sibling adapters.
+7. **Shipped.** The terminal dock: setup/run output, named terminals, rerun/stop/run controls, PTY lifecycle.
+8. **Shipped.** The file/diff panel: all-files tree, changes tree, diff body, source filtering, discard controls, and search. Inline local line comments shipped with the rich diff viewer (#151, `diff-viewer/diff-comment-thread.tsx`); #211 unified the file preview, turn diff, and workspace file diff behind one code surface (ADR 0045).
+9. **Shipped.** The PR/checks panel: no-PR state, uncommitted state, PR metadata, CI/deployments, comments, todos, ready-to-merge state, and merge confirmation. PR comment bodies are readable in-app (#209) and open as their own tab (#207, #208); the deployed-build preview link is wired (#196, #197); merge conflicts surface with a "Resolve" action that hands the conflict to the agent (#215); resolved review comments render struck through and bulk-add sends only the unresolved ones (#234).
+10. **Shipped.** Repository action preferences: `code_review`, `create_pr`, `fix_errors`, `resolve_conflicts`, `branch_rename`, and `general`, layered under the committed `[prompts]` block.
+11. **Shipped.** The polish/settings surface: appearance previews, keyboard shortcuts, command palette, diagnostics, and source-status polish. Dictation shipped too — `⌥D` toggles it, over `src/renderer/lib/dictation/`.
+
+**Still deferred**, and deliberately so: Graphite stack support and cloud/remote
+workspace SSH behaviour ([ADR 0020](./adr/0020-defer-voice-graphite-and-cloud-ssh.md)).
+Linear issue workflows shipped and now span several accounts at once
+([ADR 0052](./adr/0052-support-multiple-linear-accounts.md)); GitHub workflows
+stay on `gh`/`gh api` ([ADR 0013](./adr/0013-use-gh-cli-for-v1-github-integration.md)).

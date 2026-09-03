@@ -109,7 +109,7 @@ Read these in order:
    `tailwind.config.js`), and
    [`../.claude/rules/patterns.md`](../.claude/rules/patterns.md) for the
    structural rules a change has to respect.
-5. [`adr/`](./adr) — 55 Architecture Decision Records. When something looks odd,
+5. [`adr/`](./adr) — 56 Architecture Decision Records. When something looks odd,
    the ADR usually explains it. Start with
    [0042](./adr/0042-add-claude-code-as-a-second-first-class-agent-runtime.md) if
    you are touching the agent layer.
@@ -223,4 +223,5 @@ changed set, per [`../.claude/rules/code-review.md`](../.claude/rules/code-revie
 | New setup check | `src/shared/ipc/contracts/setup.ts` → `SETUP_CHECK_ORDER` in `src/main/setup/setup-diagnostics.ts` → the implementation under `src/main/setup/` → the check table in `docs/guide/02-requirements.md` |
 | New `.ensemblr/settings.toml` key | The field map in `src/main/config/repository-config.ts` → the reference table in `docs/guide/12-repository-settings.md` |
 | New keyboard shortcut | `SHORTCUTS` in `src/shared/keymap/shortcuts.ts` → the scope table in `docs/guide/13-keyboard-shortcuts.md` |
+| A dependency added, removed, or renamed | `npm run credits:generate`, which rewrites `src/main/menu/credits-manifest.gen.ts` for the native About panel. The packaged app ships no `node_modules` to read a license out of, so the manifest is captured at authoring time; `tests/main/credits-manifest.test.ts` recomputes it and fails on drift |
 | A decision worth recording | The next numbered ADR in `docs/adr/`, and bump the count in all three places it appears: `docs/README.md`, the documentation list in `README.md`, and §4 of this file |

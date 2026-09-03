@@ -159,8 +159,12 @@ project_name = "ensemblr"
 
 Values resolve live at every launch, so a rotated secret takes effect on the
 next terminal, script, or agent you start. Keys the app does not model survive a
-rewrite untouched. The rest of the integration — accounts, the resolution order,
-what happens when Infisical is unreachable — is in
+rewrite untouched.
+
+A repository with no `[infisical]` block is not necessarily unlinked: Ensemblr
+falls back to the `.infisical.json` the Infisical CLI writes, reading it but
+never writing to it. The rest of the integration — accounts, that resolution
+order, what happens when Infisical is unreachable — is in
 [10. Integrations](./10-integrations.md).
 
 ---

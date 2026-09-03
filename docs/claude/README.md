@@ -375,12 +375,21 @@ the presentation work:
   `Sonnet`), which reads as ambiguous, so `claude-opus-5[1m]` renders as
   `Opus 5`.
 - Appends `PINNED_MODELS` — releases Claude Code accepts as an explicit `--model`
-  id but does not advertise (Opus 4.8, Opus 4.7, Sonnet 4.6) — deduped by
-  release key against any alias that already covers them.
+  id but does not advertise (Fable 5.1, Opus 4.8, Opus 4.7, Sonnet 4.6) — deduped
+  by release key against any alias that already covers them. Fable is pinned
+  rather than advertised because `supportedModels()` lists only the moving
+  aliases, and the newest line is exactly the one a chat most often wants to
+  name outright.
 - Orders by `FAMILY_ORDER = ['fable', 'opus', 'sonnet', 'haiku']`, then newest
   version first.
 - Stamps every row with vendor `claude-code` and `agentProvider: 'claude'`;
   Claude Code model ids carry no vendor segment to parse.
+
+A pinned id is only as good as the binary it is handed to. `claude-fable-5-1`
+needs **Claude Code 2.1.251 or newer**; an older binary rejects the id when the
+model is actually selected rather than when the catalog is built, which is the
+same failure shape as an entitlement the signed-in account does not hold.
+`claude --version` is the check.
 
 `src/main/agent-providers/agent-model-catalog.ts` merges this with Pi's and
 builds the model-id → runtime index (also 5 min TTL) that both spawn routes
