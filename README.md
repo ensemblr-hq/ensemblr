@@ -27,13 +27,13 @@ installed.
 
 *Ensemblr Control driving the app from inside a workspace: the agent names its own tab, moves the workspace to In progress, starts a run script, then delegates to two sub-agents in their own chat tabs and launches a Claude Code harness in a terminal.*
 
-- **Version:** [`0.1.0-beta.24`](https://github.com/ensemblr-hq/ensemblr/releases/tag/v0.1.0-beta.24) (pre-1.0, polish stage)
+- **Version:** [`0.1.0`](https://github.com/ensemblr-hq/ensemblr/releases/tag/v0.1.0) (first stable release)
 - **License:** Apache-2.0
 
 | Platform | Artifact | Install |
 | --- | --- | --- |
 | macOS, Apple silicon | `.dmg` (signed, notarized, stapled) | `brew install --cask ensemblr-hq/tap/ensemblr` |
-| Linux, x86-64 | `.AppImage` | download, `chmod +x`, run |
+| Linux, x86-64 | `.AppImage` | `curl -fsSL https://www.ensemblr.dev/install.sh \| sh` |
 
 Intel Macs and arm64 Linux are not built. Windows is not supported.
 
@@ -41,10 +41,11 @@ Intel Macs and arm64 Linux are not built. Windows is not supported.
 
 ## Status
 
-Ensemblr is **pre-1.0, in the polish stage**. The core workflows — isolated workspaces, Pi and Claude Code
-agent sessions, the review and PR flow, and the GitHub / Linear / git integrations — are implemented and
-wired to real services. The first public build is out as a **beta**; expect rough edges and breaking
-changes before 1.0. See [`CHANGELOG.md`](./CHANGELOG.md) for recent changes.
+Ensemblr is **stable at 0.1.0**, released 2026-09-03 after twenty-four betas. The core workflows —
+isolated workspaces, Pi and Claude Code agent sessions, the review and PR flow, and the GitHub / Linear /
+git integrations — are implemented and wired to real services, on both macOS and Linux. Stable means
+ordinary semver rather than a frozen surface: breaking changes remain possible before 1.0 and are recorded
+in [`CHANGELOG.md`](./CHANGELOG.md) when they land.
 
 ## Install
 
@@ -52,13 +53,27 @@ changes before 1.0. See [`CHANGELOG.md`](./CHANGELOG.md) for recent changes.
 brew install --cask ensemblr-hq/tap/ensemblr
 ```
 
-Or **[Download Ensemblr 0.1.0-beta.24 (.dmg, Apple silicon)](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.0-beta.24/Ensemblr-0.1.0-beta.24-arm64.dmg)** — open it and drag Ensemblr to Applications.
+Or **[Download Ensemblr 0.1.0 (.dmg, Apple silicon)](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.0/Ensemblr-0.1.0-arm64.dmg)** — open it and drag Ensemblr to Applications.
 
 The macOS build is code-signed with a Developer ID certificate, hardened-runtime, notarized by Apple, and
 stapled, so it opens without a Gatekeeper prompt and validates offline. Every build is on the
 [Releases page](https://github.com/ensemblr-hq/ensemblr/releases).
 
-On **Linux**, take the `.AppImage` from the same Releases page:
+On **Linux**, one line installs it:
+
+```bash
+curl -fsSL https://www.ensemblr.dev/install.sh | sh
+```
+
+The script needs no root and writes nothing outside `$HOME`. It resolves the newest release, verifies the
+download against the digest GitHub publishes, puts the AppImage in `~/.local/share/ensemblr`, symlinks it
+to `~/.local/bin/ensemblr`, and extracts the desktop entry and icon ladder the AppImage already carries so
+the app appears in your launcher. A manifest records exactly what it added, and `--uninstall` removes that
+and nothing else. Re-running it is an update. Useful flags: `--version <tag>` pins a release, `--nightly`
+takes the rolling canary alongside it, `--dir <path>` moves the install, `--no-desktop` skips the launcher
+entry. Pipe to `sh -s -- --flag` to pass one.
+
+Or take the `.AppImage` from the [Releases page](https://github.com/ensemblr-hq/ensemblr/releases) by hand:
 
 ```bash
 chmod +x Ensemblr-*.AppImage
