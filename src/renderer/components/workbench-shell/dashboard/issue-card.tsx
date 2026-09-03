@@ -9,7 +9,6 @@ import { Button } from '@/renderer/components/ui/button';
 import { Card } from '@/renderer/components/ui/card';
 import {
 	ContextMenu,
-	ContextMenuContent,
 	ContextMenuGroup,
 	ContextMenuTrigger,
 } from '@/renderer/components/ui/context-menu';
@@ -18,6 +17,7 @@ import {
 	GithubLogo,
 	LinearLogo,
 } from '@/renderer/components/workbench-shell/source-provider-logo';
+import { WorkbenchContextMenuContent } from '@/renderer/components/workbench-shell/workbench-context-menu-content';
 import { cn } from '@/renderer/lib/utils';
 import type { BoardIssueCard } from '@/renderer/types/workbench-shell';
 
@@ -111,13 +111,13 @@ export function IssueCard({
 					</Button>
 				</div>
 			</ContextMenuTrigger>
-			<ContextMenuContent
+			<WorkbenchContextMenuContent
 				aria-label={t(
 					'workbench:dashboard.issue-card.menu-aria',
 					'{{issue}} issue actions',
 					{ issue: issue.reference },
 				)}
-				className='w-56 bg-muted p-1'
+				className='min-w-56'
 			>
 				<ContextMenuGroup>
 					<SidebarContextMenuItem onSelect={onAssign}>
@@ -151,7 +151,7 @@ export function IssueCard({
 						</SidebarContextMenuItem>
 					)}
 				</ContextMenuGroup>
-			</ContextMenuContent>
+			</WorkbenchContextMenuContent>
 		</ContextMenu>
 	);
 }

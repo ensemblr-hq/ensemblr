@@ -1,10 +1,8 @@
 import { CopyIcon, PaperclipIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
-import {
-	ContextMenuContent,
-	ContextMenuSeparator,
-} from '@/renderer/components/ui/context-menu';
+import { ContextMenuSeparator } from '@/renderer/components/ui/context-menu';
+import { WorkbenchContextMenuContent } from '@/renderer/components/workbench-shell/workbench-context-menu-content';
 import type {
 	FileTreeMenuTarget,
 	OpenTargetsState,
@@ -62,11 +60,11 @@ export function AllFilesContextMenuContent({
 		});
 
 	return (
-		<ContextMenuContent
+		<WorkbenchContextMenuContent
 			aria-label={t('workbench:file-tree-menu.actions', '{{path}} actions', {
 				path,
 			})}
-			className='w-44 bg-muted p-1'
+			className='min-w-44'
 		>
 			{canOpen ? (
 				<OpenFileMenuItems openFile={openFilePreview} path={path} />
@@ -85,6 +83,6 @@ export function AllFilesContextMenuContent({
 					onSelect={() => invoke(copyTarget)}
 				/>
 			) : null}
-		</ContextMenuContent>
+		</WorkbenchContextMenuContent>
 	);
 }

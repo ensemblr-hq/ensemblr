@@ -8,12 +8,12 @@ import {
 import { useTranslation } from 'react-i18next';
 
 import {
-	ContextMenuContent,
 	ContextMenuGroup,
 	ContextMenuSeparator,
 	ContextMenuShortcut,
 } from '@/renderer/components/ui/context-menu';
 import { SidebarContextMenuItem } from '@/renderer/components/workbench-shell/sidebar-context-menu-item';
+import { WorkbenchContextMenuContent } from '@/renderer/components/workbench-shell/workbench-context-menu-content';
 import type { ProjectShellModel } from '@/renderer/types/workbench';
 import { formatChord } from '@/shared/keymap';
 import {
@@ -28,14 +28,18 @@ const repositoryRemovalBoundary = classifyPermissionAction({
 
 /** Right-click context menu surfacing project workspace/settings actions. */
 export function ProjectContextMenuContent({
+	isCreatingWorkspace = false,
 	onBrowseArchiveSelect,
 	onCreateFromSourceSelect,
+	onCreateWorkspaceSelect,
 	onDeleteSelect,
 	onRepositorySettingsSelect,
 	project,
 }: {
+	isCreatingWorkspace?: boolean;
 	onBrowseArchiveSelect?: () => void;
 	onCreateFromSourceSelect?: () => void;
+	onCreateWorkspaceSelect?: () => void;
 	onDeleteSelect?: () => void;
 	onRepositorySettingsSelect: () => void;
 	project: ProjectShellModel;
@@ -47,16 +51,19 @@ export function ProjectContextMenuContent({
 	const deleteWired = Boolean(onDeleteSelect);
 
 	return (
-		<ContextMenuContent
+		<WorkbenchContextMenuContent
 			aria-label={t(
 				'workbench:repository-menu.aria-label',
 				'{{repository}} repository actions',
 				{ repository: project.name },
 			)}
-			className='w-56 bg-muted p-1'
+			className='min-w-56'
 		>
 			<ContextMenuGroup>
-				<SidebarContextMenuItem>
+				<SidebarContextMenuItem
+					disabled={!onCreateWorkspaceSelect || isCreatingWorkspace}
+					onSelect={onCreateWorkspaceSelect}
+				>
 					<PlusIcon aria-hidden='true' />
 					<span className='min-w-0 flex-1'>
 						{t('workbench:repository-menu.new-workspace', 'New workspace')}
@@ -113,6 +120,6 @@ export function ProjectContextMenuContent({
 					</span>
 				</SidebarContextMenuItem>
 			</ContextMenuGroup>
-		</ContextMenuContent>
+		</WorkbenchContextMenuContent>
 	);
 }

@@ -164,8 +164,10 @@ export function ProjectSidebarHeader({
 				</SidebarGroupLabel>
 			</ContextMenuTrigger>
 			<ProjectContextMenuContent
+				isCreatingWorkspace={isCreatingWorkspace}
 				onBrowseArchiveSelect={onBrowseArchiveSelect}
 				onCreateFromSourceSelect={onCreateFromSourceSelect}
+				onCreateWorkspaceSelect={onCreateWorkspaceSelect}
 				onDeleteSelect={onDeleteSelect}
 				onRepositorySettingsSelect={onRepositorySettingsSelect}
 				project={project}

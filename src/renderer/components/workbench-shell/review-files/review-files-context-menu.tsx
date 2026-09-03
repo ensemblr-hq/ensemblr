@@ -1,10 +1,8 @@
 import { CopyIcon, PaperclipIcon, Undo2Icon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
-import {
-	ContextMenuContent,
-	ContextMenuSeparator,
-} from '@/renderer/components/ui/context-menu';
+import { ContextMenuSeparator } from '@/renderer/components/ui/context-menu';
+import { WorkbenchContextMenuContent } from '@/renderer/components/workbench-shell/workbench-context-menu-content';
 
 import type { ReviewFileMenuTarget } from '@/renderer/types/workbench';
 
@@ -52,9 +50,9 @@ export function ReviewFilesContextMenuContent({
 		});
 
 	return (
-		<ContextMenuContent
+		<WorkbenchContextMenuContent
 			aria-label={t('review:file-menu.actions', '{{path}} actions', { path })}
-			className='w-48 bg-muted p-1'
+			className='min-w-48'
 		>
 			{openFile ? <OpenFileMenuItems openFile={openFile} path={path} /> : null}
 			<FileMenuItem
@@ -81,6 +79,6 @@ export function ReviewFilesContextMenuContent({
 					/>
 				</>
 			) : null}
-		</ContextMenuContent>
+		</WorkbenchContextMenuContent>
 	);
 }
