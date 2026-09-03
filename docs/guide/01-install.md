@@ -59,7 +59,7 @@ Nothing needs root and nothing is written outside `$HOME`:
 
 | Option | Does |
 | --- | --- |
-| `--version <tag>` | install a specific release, e.g. `--version v0.1.1` |
+| `--version <tag>` | install a specific release, e.g. `--version v0.1.2` |
 | `--nightly` | install the rolling canary build, **alongside** a release |
 | `--dir <path>` | where the AppImage goes |
 | `--no-desktop` | skip the launcher entry and the icons |
@@ -85,13 +85,13 @@ same file. `--check` exits `10` when there is something to install, distinct fro
 
 ## Download
 
-The current build is **`0.1.1`**:
+The current build is **`0.1.2`**:
 
-- [**`Ensemblr-0.1.1-arm64.dmg`**](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.1/Ensemblr-0.1.1-arm64.dmg)
+- [**`Ensemblr-0.1.2-arm64.dmg`**](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.2/Ensemblr-0.1.2-arm64.dmg)
   — the macOS disk image. Open it and drag Ensemblr to `/Applications`.
-- [`Ensemblr-darwin-arm64-0.1.1.zip`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.1/Ensemblr-darwin-arm64-0.1.1.zip)
+- [`Ensemblr-darwin-arm64-0.1.2.zip`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.2/Ensemblr-darwin-arm64-0.1.2.zip)
   — the same `.app`, zipped, if you would rather not mount an image.
-- [**`Ensemblr-0.1.1-x64.AppImage`**](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.1/Ensemblr-0.1.1-x64.AppImage)
+- [**`Ensemblr-0.1.2-x64.AppImage`**](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.2/Ensemblr-0.1.2-x64.AppImage)
   — the Linux build, if you would rather place it yourself than run the
   [install script](#install-script-linux). One file, no installer:
 
@@ -129,7 +129,7 @@ it against the checksum on the release page if you want a check, or let the
 [install script](#install-script-linux) do it for you. Either way this is
 **pre-1.0** software, with breaking changes expected before 1.0.
 
-The app reports the full version, any prerelease suffix included — `0.1.1` in
+The app reports the full version, any prerelease suffix included — `0.1.2` in
 **Settings → General**, and on macOS in the bundle's
 `CFBundleShortVersionString`. It matches the release tag, so a bug report only
 has to quote one string.
