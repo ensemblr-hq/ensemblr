@@ -118,7 +118,7 @@ function runningPart(
 
 function renderRow(ui: ReactElement) {
 	const store = createStore();
-	return renderWithProviders(
+	const withRowProviders = (node: ReactElement) => (
 		<Provider store={store}>
 			<WorkspacePathResolverProvider
 				value={(filePath: string) => ({
@@ -128,11 +128,18 @@ function renderRow(ui: ReactElement) {
 				})}
 			>
 				<FilePreviewOpenerProvider value={() => undefined}>
-					{ui}
+					{node}
 				</FilePreviewOpenerProvider>
 			</WorkspacePathResolverProvider>
-		</Provider>,
+		</Provider>
 	);
+	const result = renderWithProviders(withRowProviders(ui));
+	return {
+		...result,
+		rerender: (next: ReactElement) => {
+			result.rerender(withRowProviders(next));
+		},
+	};
 }
 
 function disclosureFor(title: string): HTMLElement {
@@ -363,16 +370,42 @@ describe('tool call bodies', () => {
 		expect(screen.queryByRole('button')).toBeNull();
 	});
 
-	test('paints a call still in flight as a running placeholder', () => {
-		renderRow(
+	test('leaves a call still in flight inert until it settles', () => {
+		const { rerender } = renderRow(
 			<ChatToolCall
 				part={runningPart('bash', { command: 'npx tsc --noEmit' })}
 			/>,
 		);
 
-		const body = openRow('Type-checking');
+		const toggle = disclosureFor('Type-checking');
 
-		expect(within(body).getByText('Running…')).toBeInTheDocument();
+		expect(toggle).toBeDisabled();
+		expect(toggle).toHaveAttribute('aria-expanded', 'false');
+		expect(toggle).not.toHaveAttribute('aria-controls');
+
+		fireEvent.click(toggle);
+
+		expect(toggle).toHaveAttribute('aria-expanded', 'false');
+		expect(bodyOf(toggle)).toBeNull();
+		expect(screen.getByText('npx tsc --noEmit')).toBeInTheDocument();
+
+		rerender(
+			<ChatToolCall
+				part={toolPart(
+					'bash',
+					{ command: 'npx tsc --noEmit' },
+					'Found 0 errors.',
+				)}
+			/>,
+		);
+
+		const settled = disclosureFor('Type-checking');
+
+		expect(settled).toBeEnabled();
+		expect(settled).toHaveAttribute('aria-expanded', 'false');
+		expect(
+			within(openRow('Type-checking')).getByText('Found 0 errors.'),
+		).toBeInTheDocument();
 	});
 });
 
@@ -410,15 +443,22 @@ describe('tool row disclosure', () => {
 	test('swaps the collapsed preview for the body once opened', () => {
 		renderRow(
 			<ChatToolCall
-				part={runningPart('bash', { command: 'npx tsc --noEmit' })}
+				part={toolPart(
+					'glob',
+					{ pattern: 'components/**/*.tsx' },
+					'src/renderer/components/tool-collapsible.tsx',
+				)}
 			/>,
 		);
 
-		expect(screen.getByText('npx tsc --noEmit')).toBeInTheDocument();
+		expect(screen.getByText('components/**/*.tsx')).toBeInTheDocument();
 
-		openRow('Type-checking');
+		const body = openRow('Glob');
 
-		expect(screen.queryByText('npx tsc --noEmit')).toBeNull();
+		expect(screen.queryByText('components/**/*.tsx')).toBeNull();
+		expect(
+			within(body).getByText('src/renderer/components/tool-collapsible.tsx'),
+		).toBeInTheDocument();
 	});
 
 	test('leaves a row with an empty body disabled and inert', () => {

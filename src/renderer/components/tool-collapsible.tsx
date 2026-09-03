@@ -9,7 +9,7 @@ import { GLYPH_ICONS } from './tool-collapsible/glyph-icons';
 /** Shape of a {@link ToolCollapsible} row. */
 interface ToolCollapsibleProps {
 	children: ReactNode;
-	/** Suppresses the disclosure control for a row whose body is empty. */
+	/** Suppresses the disclosure control for a row with nothing to disclose. */
 	disabled?: boolean;
 	glyph: ToolGlyph;
 	/** Pulses the row while the call is still in flight. */
@@ -35,6 +35,10 @@ interface ToolCollapsibleProps {
  *
  * Opening a row keeps the row itself still: the body unfolds beneath the
  * heading instead of the transcript sliding down to its newest message.
+ *
+ * A disabled row drops `aria-controls` rather than pointing at the body id: the
+ * body element exists only while the row is open, so naming it there would leave
+ * an idref that never resolves.
  */
 export function ToolCollapsible({
 	children,
@@ -61,7 +65,7 @@ export function ToolCollapsible({
 			<div className='wrap-break-word flex w-full max-w-xl flex-col space-y-1 lg:max-w-3xl'>
 				<div className='group/collapsible flex max-w-full items-center gap-2'>
 					<button
-						aria-controls={bodyId}
+						aria-controls={disabled ? undefined : bodyId}
 						aria-expanded={isOpen}
 						className={cn(
 							'group/disclosure -ml-1.5 flex shrink-0 items-center gap-2 rounded-sm px-1.5 py-1 text-left',

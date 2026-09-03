@@ -417,9 +417,6 @@
 		"show-all_one": "Εμφάνιση {{count}} γραμμής",
 		"show-all_other": "Εμφάνιση όλων των {{count}} γραμμών"
 	},
-	"tool-row": {
-		"running": "Εκτελείται…"
-	},
 	"turn-footer": {
 		"actions": "Ενέργειες γύρου",
 		"fork-tab": "Fork σε νέα καρτέλα",

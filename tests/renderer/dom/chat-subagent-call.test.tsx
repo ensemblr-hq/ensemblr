@@ -264,6 +264,32 @@ describe('ChatSubagentCall', () => {
 		expect(screen.getByText('partial thoughts')).toBeInTheDocument();
 	});
 
+	test('adds nothing of its own to a delegation still in flight', () => {
+		renderTurn(
+			[
+				taskPart({ input: { subagent_type: 'Explore' }, toolCallId: 'task-1' }),
+				childToolPart('call-1', 'Grep', 'task-1', { pattern: 'authGuard' }),
+			],
+			true,
+		);
+
+		const card = screen.getByRole('button', { name: 'Sub-agent: Explore' });
+
+		expect(card).toBeEnabled();
+
+		expandAll();
+
+		const body = document.getElementById(
+			card.getAttribute('aria-controls') ?? '',
+		);
+		const nested = body?.querySelector('[data-role="subagent-children"]');
+
+		expect(
+			within(nested as HTMLElement).getByText('Search'),
+		).toBeInTheDocument();
+		expect(body?.textContent).toBe(nested?.textContent);
+	});
+
 	test('renders an unlinked tool call flat, as before subagents nested', () => {
 		renderTurn([
 			{

@@ -443,9 +443,6 @@
 		"show-all_many": "Показать все {{count}} строк",
 		"show-all_other": "Показать все {{count}} строки"
 	},
-	"tool-row": {
-		"running": "Выполняется…"
-	},
 	"turn-footer": {
 		"actions": "Действия хода",
 		"fork-tab": "Форк в новую вкладку",

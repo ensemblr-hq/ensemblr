@@ -5,7 +5,7 @@
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { type RenderResult, render } from '@testing-library/react';
-import type { ReactElement } from 'react';
+import type { ReactElement, ReactNode } from 'react';
 import { TooltipProvider } from '@/renderer/components/ui/tooltip';
 
 /** A QueryClient tuned for tests: no retries, no background refetch churn. */
@@ -17,18 +17,30 @@ export function createTestQueryClient(): QueryClient {
 	});
 }
 
-/** Renders `ui` inside a fresh QueryClientProvider; returns the client too for seeding. */
+/**
+ * Renders `ui` inside a fresh QueryClientProvider; returns the client too for
+ * seeding. The returned `rerender` re-applies the same providers, so a test
+ * driving a prop change keeps the tree it started with rather than remounting
+ * under a bare root.
+ */
 export function renderWithProviders(
 	ui: ReactElement,
 	options: { client?: QueryClient } = {},
 ): RenderResult & { client: QueryClient } {
 	const client = options.client ?? createTestQueryClient();
-	const result = render(
+	const withProviders = (node: ReactNode) => (
 		<QueryClientProvider client={client}>
-			<TooltipProvider>{ui}</TooltipProvider>
-		</QueryClientProvider>,
+			<TooltipProvider>{node}</TooltipProvider>
+		</QueryClientProvider>
 	);
-	return { ...result, client };
+	const result = render(withProviders(ui));
+	return {
+		...result,
+		client,
+		rerender: (next: ReactNode) => {
+			result.rerender(withProviders(next));
+		},
+	};
 }
 
 /** Installs a stub `window.ensemblr` bridge so isEnsemblrApiAvailable() is true. */
