@@ -9,6 +9,101 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-09-04
+
+**Quick Start can publish into an organization, and a sent prompt keeps the chips the composer
+showed.** Both are places where the app knew more than it was passing on: "Create project" could only
+ever create a repository under the signed-in user, and the sent bubble rebuilt its attachment chips
+from the file path alone, so a chat transcript or a tracker issue arrived as a bare `<uuid>.md` behind
+a generic file icon. Alongside them, three fixes to surfaces that were quietly lying about their own
+state — a context menu whose Russian and Greek labels overflowed their row, a Concierge reference chip
+that could not be named twice in one draft, and a running tool row that opened onto a placeholder
+repeating what its own pulse already said.
+[Release](https://github.com/ensemblr-hq/ensemblr/releases/tag/v0.1.2) ·
+[`.dmg`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.2/Ensemblr-0.1.2-arm64.dmg) ·
+[`.AppImage`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.2/Ensemblr-0.1.2-x64.AppImage)
+
+### Added
+
+- **Quick Start publishes into a GitHub organization.** "Create project" now offers a picker of every
+  account the user can publish into and prefixes `gh repo create` with `OWNER/` when one is chosen.
+  With no owner picked the argv is byte-identical to before, and visibility stays `--private` either
+  way. Two `gh` calls back the list, issued concurrently because neither feeds the other: REST
+  `user/orgs` enumerates memberships including concealed ones but carries no permission data, while
+  GraphQL `viewer.organizations` carries `viewerCanCreateRepositories` but silently omits any org the
+  token cannot reach. The difference between the two answers is the set of orgs the user belongs to
+  but cannot publish into — present in REST and absent from GraphQL is `owner-access-restricted`
+  (SAML SSO, an enterprise 2FA policy), present with `false` is `owner-create-restricted` — and both
+  are listed disabled behind a short badge rather than hidden, so an unavailable org explains itself
+  instead of vanishing. The last organization published into is remembered in
+  `lastQuickStartOwnerAtom`, honoured only while it is still listed and still creatable, so revoked
+  access falls back to the personal account rather than failing at publish. A user who has never
+  published into an org is never made to wait on `gh` and never sees the placeholder row, and any
+  failure yields an empty list, hides the picker entirely, and leaves quick-start exactly as it was.
+  (#429)
+
+- **Attachment chips carry their glyph and title into the sent prompt.** A chat transcript, a tracker
+  issue, a patch and a review comment are all `.context/` documents addressed by a generated
+  filename, so rebuilding their chips from the path lost everything the composer had shown.
+  `AttachmentMark` is the flat glyph token that crosses the prompt and `AttachmentGlyph` the single
+  resolver both the composer chip and the sent-message chip delegate to, so the two can no longer
+  diverge. `<attached_file>` widens with optional `label` and `mark` attributes — backward-compatible,
+  written only where the path does not name itself, so an ordinary `@src/foo.ts` mention's prompt
+  bytes are unchanged and the path keeps its quote-only escape. A new `chat-transcript` composer
+  attachment carries `isSubAgent`, so a transcript a sub-agent left behind wears a robot and an
+  ordinary one a sparkle; `isSubAgentTab` is extracted so the tab strip, the transcript chips and the
+  Concierge `@` menu read that marker from one place. `src/shared/block-attributes.ts` gives the
+  Concierge reference blocks and the `<attached_file>` envelope one escaping and one parse rather than
+  two copies that can drift. (#428)
+
+### Changed
+
+- **The Linear person avatar is drawn as a rounded square.** Every account avatar in the app chrome —
+  the workbench header, the repository picker, the project sidebar header, the settings header — goes
+  through `ProjectAvatar` and is a rounded square. `LinearAvatar` was the one that stayed a circle, so
+  an issue row's assignee did not match the project avatar a few pixels above it. `OwnerAvatar` is
+  lifted out of `clone-github-recent-repos.tsx` for the same reason, which also changes the clone
+  list's owner avatars from circles. (#429)
+
+- **`docs/` is audited against the code for 0.1.1.** Every countable and structural claim was verified
+  rather than tidied: the ADR count and range, the `tests/main` and `tests/renderer` file counts, the
+  missing `src/shared/agent-failure` pair and the missing renderer `markdown/` subdirectories, and a
+  `PINNED_MODELS` table that enumerated three entries where the catalog carries four. Two gaps where a
+  shipped feature contradicted a doc claiming completeness are filled — the Linux install script had
+  no mention in the install guide, and Infisical setup was still described as "two halves" after
+  `.infisical.json` became a third, discovered source. (#425)
+
+### Fixed
+
+- **Context menus grow to fit a long label, and "New workspace" works.** Menu rows were a fixed `h-8`
+  inside fixed-width panels, so a label that wrapped in Russian or Greek overflowed its 32px box and
+  drew on top of the row beneath it. Rows take a `min-h-8` floor and panels size to their content
+  (`w-max`) under a `max-w-80` cap, with the metrics owned by `WorkbenchContextMenuContent` rather than
+  repeated at each call site — every menu still passes its own `min-w-*`, which is a genuine per-menu
+  judgement. Separately, the repository menu's "New workspace" item was rendered with no props at all:
+  no `onSelect` and no `disabled`, so it highlighted on hover and did nothing on click. The handler was
+  already plumbed as far as `ProjectSidebarHeader` for the "+" button but never forwarded to the menu,
+  which is why the ⌘N accelerator worked while the item did not. (#426)
+
+- **A Concierge reference chip can repeat within one draft.** The composer allowed only one chip per
+  workspace, repo or chat tab, so naming the same surface twice in one prompt was impossible. The
+  dedupe lived in the shared Lexical editor rather than in the Concierge, which is right for a file
+  chip — whose bytes are inlined into the prompt, so a repeat only spends budget — and wrong for a
+  reference chip, which carries no content and stands where the user put it in the sentence. Dedupe is
+  now conditional on the attachment kind: `$isDuplicateChip` pairs the existing lookup with
+  `isReferenceAttachment`, which moves out of `mention-payload.ts` into `composer-attachments.ts` so
+  the editor and the serializer share one definition. The guard tests for the reference payload rather
+  than listing the kinds that carry it, so a fifth reference kind is covered the day it is declared.
+  (#427)
+
+- **A running tool row no longer opens onto a bare placeholder.** A tool call still in flight projected
+  a `pending` body whose only content was a "Running…" line — exactly what the row's own pulse already
+  says. Both callers of `ToolCollapsible` now keep it out of the disclosure: a plain tool row disables
+  the control outright, and a subagent card contributes no body while staying expandable, because its
+  nested rows arrive while the delegation runs and are worth opening onto. A disabled row also stops
+  advertising `aria-controls`, which had been naming an idref that never resolved. `ToolPendingOutput`
+  and the `common:tool-row.running` key are removed from all three catalogues. (#430)
+
 ## [0.1.1] - 2026-09-03
 
 **Fable 5.1 is selectable in a Claude Code chat.** The model is pinned into the catalog rather than
