@@ -144,6 +144,13 @@ export default interface Resources {
 			creates: 'Creates folder and repo <name>{{projectName}}</name>';
 			description: 'Create a local folder and initialize a new git repository.';
 			'name-label': 'Project name';
+			'owner-label': 'GitHub owner';
+			'owner-loading': 'Reading GitHub accounts…';
+			'owner-placeholder': 'Choose an account';
+			'owner-restriction': {
+				access: 'No access';
+				create: 'Owners only';
+			};
 			'parent-label': 'Parent folder';
 			'parent-placeholder': 'Managed repos directory';
 			title: 'Create project';
@@ -741,6 +748,7 @@ export default interface Resources {
 			'nothing-to-commit': 'Nothing to commit — the working tree is clean.';
 			'open-target-app-not-installed': 'That app is not installed on this machine.';
 			'open-target-no-desktop-launcher': 'That app is only installed as a desktop entry, and neither gio nor gtk-launch is available to start it. Install glib or gtk3.';
+			'owner-invalid': 'That GitHub owner is not a valid login.';
 			'parse-failed': 'The command output could not be parsed.';
 			'path-not-a-git-repository': 'That path is not a git repository.';
 			'pattern-listing-failed': 'The files matching that pattern could not be listed.';

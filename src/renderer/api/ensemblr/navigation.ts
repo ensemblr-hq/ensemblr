@@ -4,6 +4,26 @@ import { profileElectronIpcCall } from '@/renderer/lib/instrumentation';
 
 import { ensemblrQueryKeys, getEnsemblrApi } from './query-keys';
 
+/**
+ * Query options for the GitHub accounts a quick-start project can be published
+ * under. Organization membership barely moves, so this is cached generously;
+ * a failure yields an empty list and the owner picker hides itself.
+ */
+export const githubOwnerListQuery = queryOptions({
+	/** Fetches the publishable GitHub owner list over IPC with call profiling. */
+	queryFn: () =>
+		profileElectronIpcCall(
+			{ channel: 'ensemblr:github-owner-list', usesDatabase: false },
+			() => getEnsemblrApi().githubOwnerList(),
+		),
+	queryKey: ensemblrQueryKeys.githubOwnerList(),
+	// Held well past `staleTime` so moving between the welcome screen and the
+	// workbench does not throw the answer away and make the next dialog wait on
+	// `gh` again.
+	gcTime: 1_800_000,
+	staleTime: 300_000,
+});
+
 /** Query options for the gh-backed GitHub repository list (8 most recent). */
 export const githubRepositoryListQuery = queryOptions({
 	/** Fetches the recent GitHub repository list over IPC with call profiling. */

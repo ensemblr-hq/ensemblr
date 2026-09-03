@@ -1,6 +1,9 @@
 import { ipcMain } from 'electron';
 import { IPC_CHANNELS } from '../../../shared/ipc/channels';
-import type { QuickStartProjectResult } from '../../../shared/ipc/contracts/quick-start';
+import type {
+	GithubOwnerListResult,
+	QuickStartProjectResult,
+} from '../../../shared/ipc/contracts/quick-start';
 import type {
 	DeleteRepositoryResult,
 	LocalRepositorySelectionResult,
@@ -26,6 +29,7 @@ import type {
 	DeleteArchivedWorkspaceService,
 	DeleteRepositoryService,
 	DeleteWorkspaceService,
+	GithubOwnerListService,
 	ListAllWorkspacesService,
 	ListArchivedWorkspacesService,
 	LocalRepositoryImportService,
@@ -61,6 +65,7 @@ interface RepositoryHandlersOptions {
 	deleteArchivedWorkspaceService: DeleteArchivedWorkspaceService;
 	deleteRepositoryService: DeleteRepositoryService;
 	deleteWorkspaceService: DeleteWorkspaceService;
+	githubOwnerListService: GithubOwnerListService;
 	listAllWorkspacesService: ListAllWorkspacesService;
 	listArchivedWorkspacesService: ListArchivedWorkspacesService;
 	localRepositoryImportService: LocalRepositoryImportService;
@@ -85,6 +90,7 @@ export function registerRepositoryHandlers({
 	deleteArchivedWorkspaceService,
 	deleteRepositoryService,
 	deleteWorkspaceService,
+	githubOwnerListService,
 	listAllWorkspacesService,
 	listArchivedWorkspacesService,
 	localRepositoryImportService,
@@ -127,6 +133,11 @@ export function registerRepositoryHandlers({
 		IPC_CHANNELS.quickStartProject,
 		(_event, raw: unknown): Promise<QuickStartProjectResult> =>
 			quickStartProjectService.create(parseQuickStartProjectRequest(raw)),
+	);
+
+	ipcMain.handle(
+		IPC_CHANNELS.githubOwnerList,
+		(): Promise<GithubOwnerListResult> => githubOwnerListService.list(),
 	);
 
 	ipcMain.handle(

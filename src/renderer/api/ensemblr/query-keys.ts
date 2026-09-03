@@ -44,6 +44,9 @@ export const ensemblrQueryKeys = {
 	/** Query key for a not-yet-cloned repository's remote branches, keyed by URL. */
 	githubRemoteBranches: (url: string) =>
 		[...ensemblrQueryKeys.all, 'github-remote-branches', url] as const,
+	/** Query key for the GitHub accounts a new project can be published under. */
+	githubOwnerList: () =>
+		[...ensemblrQueryKeys.all, 'github-owner-list'] as const,
 	/** Query key for the GitHub repository list, scoped to full or recent. */
 	githubRepositoryList: (scope: 'full' | 'recent' = 'recent') =>
 		[...ensemblrQueryKeys.all, 'github-repository-list', scope] as const,

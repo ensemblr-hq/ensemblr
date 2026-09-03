@@ -142,6 +142,13 @@
 		"creates": "Creates folder and repo <name>{{projectName}}</name>",
 		"description": "Create a local folder and initialize a new git repository.",
 		"name-label": "Project name",
+		"owner-label": "GitHub owner",
+		"owner-loading": "Reading GitHub accounts…",
+		"owner-placeholder": "Choose an account",
+		"owner-restriction": {
+			"access": "No access",
+			"create": "Owners only"
+		},
 		"parent-label": "Parent folder",
 		"parent-placeholder": "Managed repos directory",
 		"title": "Create project"

@@ -144,6 +144,13 @@
 		"creates": "Создаст папку и репозиторий <name>{{projectName}}</name>",
 		"description": "Создайте локальную папку и инициализируйте новый git-репозиторий.",
 		"name-label": "Название проекта",
+		"owner-label": "Владелец на GitHub",
+		"owner-loading": "Читаем аккаунты GitHub…",
+		"owner-placeholder": "Выберите аккаунт",
+		"owner-restriction": {
+			"access": "Нет доступа",
+			"create": "Только владельцы"
+		},
 		"parent-label": "Родительская папка",
 		"parent-placeholder": "Папка управляемых репозиториев",
 		"title": "Создать проект"

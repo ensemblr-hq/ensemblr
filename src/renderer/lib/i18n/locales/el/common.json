@@ -142,6 +142,13 @@
 		"creates": "Δημιουργεί φάκελο και αποθετήριο <name>{{projectName}}</name>",
 		"description": "Δημιουργήστε έναν τοπικό φάκελο και αρχικοποιήστε ένα νέο αποθετήριο git.",
 		"name-label": "Όνομα έργου",
+		"owner-label": "Κάτοχος στο GitHub",
+		"owner-loading": "Ανάγνωση λογαριασμών GitHub…",
+		"owner-placeholder": "Επιλέξτε λογαριασμό",
+		"owner-restriction": {
+			"access": "Χωρίς πρόσβαση",
+			"create": "Μόνο κάτοχοι"
+		},
 		"parent-label": "Γονικός φάκελος",
 		"parent-placeholder": "Κατάλογος διαχειριζόμενων αποθετηρίων",
 		"title": "Δημιουργία έργου"

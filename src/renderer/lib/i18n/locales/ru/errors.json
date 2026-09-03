@@ -282,6 +282,7 @@
 		"nothing-to-commit": "Коммитить нечего — рабочее дерево чистое.",
 		"open-target-app-not-installed": "Это приложение не установлено на этом компьютере.",
 		"open-target-no-desktop-launcher": "Это приложение установлено только как desktop-запись, а запустить её нечем: нет ни gio, ни gtk-launch. Установите glib или gtk3.",
+		"owner-invalid": "Недопустимое имя владельца на GitHub.",
 		"parse-failed": "Не удалось разобрать вывод команды.",
 		"path-not-a-git-repository": "Этот путь не является репозиторием git.",
 		"pattern-listing-failed": "Не удалось получить список файлов по этому шаблону.",

@@ -40,6 +40,7 @@ export function parseRegisterLocalRepositoryRequest(raw: unknown): {
 /** {@link import('../../../shared/ipc').QuickStartProjectRequest}. */
 export const quickStartProjectRequestSchema = z.object({
 	name: z.string(),
+	owner: optionalTrimmedString,
 	parentPath: optionalTrimmedString,
 });
 
@@ -51,14 +52,19 @@ export const quickStartProjectRequestSchema = z.object({
  */
 export function parseQuickStartProjectRequest(raw: unknown): {
 	name: string;
+	owner?: string;
 	parentPath?: string;
 } {
 	const parsed = quickStartProjectRequestSchema.safeParse(raw);
 	if (!parsed.success) {
 		return { name: '' };
 	}
-	const { name, parentPath } = parsed.data;
-	return parentPath !== undefined ? { name, parentPath } : { name };
+	const { name, owner, parentPath } = parsed.data;
+	return {
+		name,
+		...(owner !== undefined ? { owner } : {}),
+		...(parentPath !== undefined ? { parentPath } : {}),
+	};
 }
 
 /** Issue tracker reference a workspace can be created against. */

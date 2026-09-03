@@ -1,8 +1,8 @@
-import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/renderer/components/ui/button';
 import { ScrollArea } from '@/renderer/components/ui/scroll-area';
+import { OwnerAvatar } from '@/renderer/components/welcome/owner-avatar';
 import { cn } from '@/renderer/lib/utils';
 import type { GithubRepositoryEntry } from '@/shared/ipc/contracts/clone';
 
@@ -98,58 +98,4 @@ export function CloneGithubRecentRepos({
 			) : null}
 		</div>
 	);
-}
-
-/** Avatar bubble for a repo owner, with an image fallback to a tinted swatch. */
-function OwnerAvatar({
-	avatarUrl,
-	ownerLogin,
-}: {
-	avatarUrl: string | null;
-	ownerLogin: string;
-}) {
-	const [failed, setFailed] = useState(false);
-
-	if (avatarUrl && !failed) {
-		return (
-			<img
-				alt=''
-				className='size-5 shrink-0 rounded-full bg-background object-cover ring-1 ring-foreground/10'
-				draggable={false}
-				loading='lazy'
-				onError={() => setFailed(true)}
-				referrerPolicy='no-referrer'
-				src={withAvatarSize(avatarUrl, 40)}
-			/>
-		);
-	}
-
-	return (
-		<span
-			aria-hidden='true'
-			className='size-5 shrink-0 rounded-full ring-1 ring-foreground/10'
-			style={{ backgroundColor: ownerAvatarColor(ownerLogin) }}
-		/>
-	);
-}
-
-/** Appends `?s=<size>` to a GitHub avatar URL so we fetch a small thumbnail. */
-function withAvatarSize(url: string, size: number): string {
-	if (url.includes('?')) {
-		return `${url}&s=${size}`;
-	}
-	return `${url}?s=${size}`;
-}
-
-/** Stable color swatch per owner login, derived without external assets. */
-function ownerAvatarColor(login: string): string {
-	if (!login) {
-		return 'oklch(0.5 0.04 260)';
-	}
-	let hash = 0;
-	for (let index = 0; index < login.length; index += 1) {
-		hash = (hash * 31 + login.charCodeAt(index)) >>> 0;
-	}
-	const hue = hash % 360;
-	return `oklch(0.62 0.13 ${hue})`;
 }
