@@ -7,7 +7,10 @@ import {
 	buildActionAttachmentBlock,
 	wrapWithMasterPrompt,
 } from '../../src/renderer/lib/workbench/action-prompts';
-import { REFERENCED_FOLDERS_HEADER } from '../../src/shared/prompt-scaffolding';
+import {
+	formatAttachedFileBlock,
+	REFERENCED_FOLDERS_HEADER,
+} from '../../src/shared/prompt-scaffolding';
 
 describe('stripPromptScaffolding', () => {
 	test('returns plain typed text untouched', () => {
@@ -20,6 +23,23 @@ describe('stripPromptScaffolding', () => {
 		const wrapped =
 			'<user_preferences>\nBe concise.\n</user_preferences>\n\nAdd a dark mode toggle';
 		expect(stripPromptScaffolding(wrapped)).toBe('Add a dark mode toggle');
+	});
+
+	test('strips an attached_file block that carries a descriptor', () => {
+		const prompt = `${formatAttachedFileBlock(
+			'.context/sessions/b4d21395.md',
+			'# Session summary',
+			{ label: 'Concierge: allow duplicate chips', mark: 'chat-transcript' },
+		)}\nCarry on from here`;
+		expect(stripPromptScaffolding(prompt)).toBe('Carry on from here');
+	});
+
+	test('strips an attached_file block whose path came out empty', () => {
+		const prompt = `${formatAttachedFileBlock('', '# Session summary', {
+			label: 'Nameless',
+			mark: 'chat-transcript',
+		})}\nCarry on from here`;
+		expect(stripPromptScaffolding(prompt)).toBe('Carry on from here');
 	});
 
 	test('strips attached_file blocks', () => {

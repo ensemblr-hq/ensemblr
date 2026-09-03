@@ -3,13 +3,17 @@ import { FolderGitIcon, GitBranchIcon, MessageSquareIcon } from 'lucide-react';
 import type { ComponentProps, ReactNode } from 'react';
 import { cn } from '@/renderer/lib/utils';
 import { getWorkspaceFileIconName } from '@/renderer/lib/workbench';
+import type { AttachmentMark } from '@/renderer/types/components';
+import { AttachmentGlyph } from './attachment-glyph';
 
 /**
  * What a chip stands for. The first two are read off a path and wear the file
- * tree's own icon set; the last three are the app's own surfaces and wear the
- * mark the sidebar gives them.
+ * tree's own icon set, the next three are the app's own surfaces and wear the
+ * mark the sidebar gives them, and an {@link AttachmentMark} covers everything
+ * whose path is a generated `.context/` filename that names nothing.
  */
 export type ChatAttachmentChipKind =
+	| AttachmentMark
 	| 'chat'
 	| 'file'
 	| 'folder'
@@ -18,7 +22,8 @@ export type ChatAttachmentChipKind =
 
 /**
  * The glyph a chip leads with: a VSCode-style file icon for anything read off a
- * path, and the sidebar's own mark for a project, workspace, or chat.
+ * path, the sidebar's own mark for a project, workspace, or chat, and the shared
+ * attachment glyph for everything carrying a mark.
  * @param kind - What the chip stands for.
  * @param label - Chip text, which a file icon is chosen by extension from.
  * @returns The icon element.
@@ -34,6 +39,9 @@ function chipIcon(kind: ChatAttachmentChipKind, label: string): ReactNode {
 		return (
 			<MessageSquareIcon aria-hidden='true' className='size-3.5 shrink-0' />
 		);
+	}
+	if (kind !== 'file' && kind !== 'folder') {
+		return <AttachmentGlyph mark={kind} />;
 	}
 	return (
 		<Icon

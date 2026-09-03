@@ -7,6 +7,11 @@
  * the process boundary instead of silently leaking scaffolding into titles.
  */
 
+import {
+	formatBlockAttributes,
+	readBlockAttributes,
+} from './block-attributes.ts';
+
 /** Header line the composer prepends before a list of `@folder` references. */
 export const REFERENCED_FOLDERS_HEADER = 'Referenced workspace folders:';
 
@@ -25,29 +30,112 @@ export const USER_PREFERENCES_TAG = 'user_preferences';
 const ATTACHED_FILE_TAG = 'attached_file';
 
 /**
- * Wraps a file's content in the shared `<attached_file>` envelope, escaping
- * double quotes in the path so the marker stays parseable. Callers pass content
- * already truncated to their own budget.
- * @param path - Workspace-relative path the content came from.
- * @param content - The (already size-bounded) content to embed.
- * @returns The `<attached_file>` block for the given path and content.
+ * What a chip stood for when the message was sent, beyond the path it was read
+ * from. A `.context/` document is addressed by a generated filename, so a
+ * transcript, a tracker issue, a patch, and a review comment all read back as an
+ * anonymous `<uuid>.md` unless the block carries what the user actually saw.
+ *
+ * Both fields are optional and omitted when they add nothing: an ordinary
+ * `@src/foo.ts` mention is already named by its own basename, and spending
+ * prompt bytes to repeat it would change what every agent sees for no gain.
  */
-export function formatAttachedFileBlock(path: string, content: string): string {
-	const safePath = path.replaceAll('"', '&quot;');
-	return `<${ATTACHED_FILE_TAG} path="${safePath}">\n${content}\n</${ATTACHED_FILE_TAG}>`;
+export interface AttachedFileDescriptor {
+	/** Human-readable name the chip showed, when it is not the path's basename. */
+	label?: string;
+	/** Opaque glyph token the renderer maps back to a mark; see `AttachmentMark`. */
+	mark?: string;
 }
 
 /**
- * Fresh global regex matching every `<attached_file>` block; capture group 1 is
- * the raw path attribute and group 2 the block content. Returned fresh per call
- * so callers never share a stateful `lastIndex`.
+ * Escapes the one character that could end the `path` attribute early.
+ *
+ * The path is deliberately *not* run through the shared `escapeBlockAttribute`:
+ * it is captured as `([^"]*)`, which already tolerates `&`, `<`, and `>`, and
+ * entity-escaping those would hand the agent a filename that does not exist.
+ * The whole point of the block is to name a file the agent can go and read, so
+ * `docs/Q&A.md` has to reach it spelled that way.
+ * @param path - The raw path.
+ * @returns The path with its quotes entity-escaped.
+ */
+function escapeAttachedFilePath(path: string): string {
+	return path.replaceAll('"', '&quot;');
+}
+
+/**
+ * Reads a path back, undoing {@link escapeAttachedFilePath}. Narrow by design:
+ * a block persisted before descriptors existed escaped its path the same way, so
+ * one grammar covers both.
+ * @param rawPath - The escaped path attribute.
+ * @returns The original path.
+ */
+function unescapeAttachedFilePath(rawPath: string): string {
+	return rawPath.replaceAll('&quot;', '"');
+}
+
+/**
+ * Wraps a file's content in the shared `<attached_file>` envelope, escaping each
+ * attribute for the grammar it sits in so the marker stays parseable. Callers
+ * pass content already truncated to their own budget.
+ *
+ * `path` is always written, even when empty: {@link attachedFileBlockPattern}
+ * requires it, so omitting it would emit a block nothing can match — and an
+ * unmatched block is one the title deriver cannot strip.
+ * @param path - Workspace-relative path the content came from.
+ * @param content - The (already size-bounded) content to embed.
+ * @param descriptor - What the chip showed, for a path that does not name itself.
+ * @returns The `<attached_file>` block for the given path and content.
+ */
+export function formatAttachedFileBlock(
+	path: string,
+	content: string,
+	descriptor: AttachedFileDescriptor = {},
+): string {
+	const descriptorRun = formatBlockAttributes([
+		['label', descriptor.label ?? ''],
+		['mark', descriptor.mark ?? ''],
+	]);
+	const attributes = `path="${escapeAttachedFilePath(path)}"${
+		descriptorRun ? ` ${descriptorRun}` : ''
+	}`;
+	return `<${ATTACHED_FILE_TAG} ${attributes}>\n${content}\n</${ATTACHED_FILE_TAG}>`;
+}
+
+/**
+ * Fresh global regex matching every `<attached_file>` block: capture group 1 is
+ * the raw path, group 2 the rest of the attribute run, and group 3 the block
+ * content. Returned fresh per call so callers never share a stateful
+ * `lastIndex`.
+ *
+ * The trailing run is optional, so a block persisted before descriptors existed
+ * still matches and still yields its path and content.
  * @returns A new `RegExp` for `<attached_file>` blocks.
  */
 export function attachedFileBlockPattern(): RegExp {
 	return new RegExp(
-		`<${ATTACHED_FILE_TAG} path="([^"]*)">\\n([\\s\\S]*?)\\n</${ATTACHED_FILE_TAG}>`,
+		`<${ATTACHED_FILE_TAG} path="([^"]*)"([^>]*)>\\n([\\s\\S]*?)\\n</${ATTACHED_FILE_TAG}>`,
 		'g',
 	);
+}
+
+/**
+ * Reads an `<attached_file>` block's path and descriptor back out of the two
+ * attribute capture groups {@link attachedFileBlockPattern} produces.
+ * @param rawPath - Capture group 1, the escaped path.
+ * @param rawAttributes - Capture group 2, the rest of the attribute run.
+ * @returns The path plus whatever descriptor fields the block carried.
+ */
+export function parseAttachedFileAttributes(
+	rawPath: string,
+	rawAttributes: string,
+): AttachedFileDescriptor & { path: string } {
+	const values = readBlockAttributes(rawAttributes);
+	const label = values.get('label');
+	const mark = values.get('mark');
+	return {
+		...(label ? { label } : {}),
+		...(mark ? { mark } : {}),
+		path: unescapeAttachedFilePath(rawPath),
+	};
 }
 
 /**

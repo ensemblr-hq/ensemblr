@@ -1,8 +1,10 @@
-import { SparklesIcon } from 'lucide-react';
+import type { TFunction } from 'i18next';
 import { Trans, useTranslation } from 'react-i18next';
 
+import { AttachmentGlyph } from '@/renderer/components/attachment-glyph';
 import { Button } from '@/renderer/components/ui/button';
 import { cn } from '@/renderer/lib/utils';
+import { isSubAgentTab } from '@/renderer/lib/workbench/sub-agent-tab';
 import { useComposerAttachmentDispatcher } from '@/renderer/state/composer';
 import type { ChatTabSummaryEntryWire } from '@/shared/ipc/contracts/chat-tab';
 
@@ -81,6 +83,7 @@ function TranscriptChip({
 		entry.summaryTitle ||
 		t('workbench:new-chat.untitled-transcript', 'Untitled transcript');
 	const dispatch = useComposerAttachmentDispatcher();
+	const isSubAgent = isSubAgentTab(entry.tab);
 	// A chat closed before its summary reached disk, or whose file has since
 	// gone, is listed but cannot be attached. Dropping it instead would read as
 	// a workspace that never had the chat. An open tab in that state is not
@@ -100,7 +103,8 @@ function TranscriptChip({
 			{ chatTabId: activeChatTabId },
 			{
 				id: `transcript:${entry.tab.id}`,
-				kind: 'workspace-file',
+				isSubAgent,
+				kind: 'chat-transcript',
 				label,
 				path: relativePath,
 			},
@@ -114,15 +118,7 @@ function TranscriptChip({
 		// surface explaining why it cannot be attached would reach nobody.
 		<Button
 			aria-disabled={isAttachable ? undefined : true}
-			aria-label={
-				isAttachable
-					? undefined
-					: t(
-							'workbench:new-chat.transcript-unavailable-aria',
-							'{{title}} — no transcript was saved for this chat, so it cannot be attached.',
-							{ title: label },
-						)
-			}
+			aria-label={transcriptChipLabel({ isAttachable, isSubAgent, label, t })}
 			className={cn(
 				'h-auto gap-1.5 rounded-md bg-pane px-2.5 py-1 text-xs',
 				isAttachable
@@ -143,13 +139,48 @@ function TranscriptChip({
 			type='button'
 			variant='outline'
 		>
-			<SparklesIcon
-				aria-hidden='true'
-				className='size-3.5 text-muted-foreground'
-			/>
+			<span className='text-muted-foreground'>
+				<AttachmentGlyph
+					mark={isSubAgent ? 'subagent-transcript' : 'chat-transcript'}
+				/>
+			</span>
 			<span className='truncate'>{label}</span>
 		</Button>
 	);
+}
+
+/**
+ * The accessible name for one transcript chip, which the visible label alone
+ * cannot carry: both the robot glyph and the disabled state are silent to a
+ * screen reader, so each earns a sentence here or reaches nobody.
+ * @param input - The chip's state, its visible label, and the translator.
+ * @returns The `aria-label`, or undefined when the label already says it all.
+ */
+function transcriptChipLabel({
+	isAttachable,
+	isSubAgent,
+	label,
+	t,
+}: {
+	isAttachable: boolean;
+	isSubAgent: boolean;
+	label: string;
+	t: TFunction;
+}): string | undefined {
+	if (!isAttachable) {
+		return t(
+			'workbench:new-chat.transcript-unavailable-aria',
+			'{{title}} — no transcript was saved for this chat, so it cannot be attached.',
+			{ title: label },
+		);
+	}
+	return isSubAgent
+		? t(
+				'workbench:new-chat.subagent-transcript-aria',
+				'{{title}} — transcript of a sub-agent chat',
+				{ title: label },
+			)
+		: undefined;
 }
 
 /** Strips the workspace cwd prefix from an absolute path. */

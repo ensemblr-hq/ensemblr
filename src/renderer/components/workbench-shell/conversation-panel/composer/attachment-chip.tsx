@@ -1,17 +1,14 @@
 import { Icon } from '@iconify/react';
 import {
-	FileDiffIcon,
+	BotIcon,
 	FolderGitIcon,
 	GitBranchIcon,
 	MessageSquareIcon,
 	XIcon,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { ProviderMark } from '@/renderer/components/workbench-shell/checks-panel/provider-mark';
-import {
-	GithubLogo,
-	LinearLogo,
-} from '@/renderer/components/workbench-shell/source-provider-logo';
+import { AttachmentGlyph } from '@/renderer/components/attachment-glyph';
+import { attachmentMark } from '@/renderer/lib/attachment-mark';
 import { getWorkspaceFileIconName } from '@/renderer/lib/workbench';
 import { formatCommentLocation } from '@/renderer/lib/workbench/comment-body';
 import type { ComposerAttachment } from '@/renderer/types/workbench';
@@ -19,8 +16,9 @@ import type { ConciergeReference } from '@/shared/concierge-references';
 
 /**
  * The glyph that says where an attachment came from: a tracker issue or a review
- * comment wears its provider's brand mark, a diff wears a compare mark, and a
- * project, workspace, or chat wears the mark the sidebar gives it — since the
+ * comment wears its provider's brand mark, a diff wears a compare mark, a chat's
+ * transcript wears a sparkle — or a robot when a sub-agent wrote it — and a
+ * project, workspace, or chat wears the mark the sidebar gives it, since the
  * markdown document or the id behind each would otherwise render as an anonymous
  * file icon.
  *
@@ -40,24 +38,16 @@ export function AttachmentIcon({
 		return <GitBranchIcon aria-hidden='true' className='size-3.5 shrink-0' />;
 	}
 	if (attachment.kind === 'chat-ref') {
-		return (
-			<MessageSquareIcon aria-hidden='true' className='size-3.5 shrink-0' />
-		);
+		const ChatIcon =
+			attachment.reference.kind === 'chat' &&
+			attachment.reference.role === 'subagent'
+				? BotIcon
+				: MessageSquareIcon;
+		return <ChatIcon aria-hidden='true' className='size-3.5 shrink-0' />;
 	}
-	if (attachment.kind === 'review-comment') {
-		return <ProviderMark provider={attachment.comment.provider} />;
-	}
-	if (attachment.kind === 'issue') {
-		const Logo = attachment.provider === 'linear' ? LinearLogo : GithubLogo;
-		return <Logo className='size-3.5 shrink-0' />;
-	}
-	if (attachment.kind === 'file-diff') {
-		return (
-			<FileDiffIcon
-				aria-hidden='true'
-				className='size-3.5 shrink-0 text-muted-foreground'
-			/>
-		);
+	const mark = attachmentMark(attachment);
+	if (mark) {
+		return <AttachmentGlyph mark={mark} />;
 	}
 	return (
 		<Icon
@@ -72,16 +62,20 @@ export function AttachmentIcon({
 }
 
 /**
- * What the chip's tooltip says, which is the label unless the label is an
- * abbreviation of something longer: a review comment and a diff are both labelled
- * by their file's basename, so two of them on same-named files in different
- * directories read identically until the tooltip names the full path.
+ * What the chip's tooltip says, which is the label unless the label leaves the
+ * chip ambiguous: a review comment and a diff are both labelled by their file's
+ * basename, so two of them on same-named files in different directories read
+ * identically until the tooltip names the full path, and a transcript is
+ * labelled by its chat's title, which says nothing about which file was read.
  * @param attachment - The attachment behind the chip
  * @returns The hover text; never empty
  */
 function attachmentTooltip(attachment: ComposerAttachment): string {
 	if (attachment.kind === 'file-diff') {
 		return attachment.filePath || attachment.label;
+	}
+	if (attachment.kind === 'chat-transcript') {
+		return attachment.path || attachment.label;
 	}
 	if (
 		attachment.kind === 'artifact-ref' ||
