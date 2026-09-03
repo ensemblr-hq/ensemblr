@@ -31,6 +31,27 @@ export function getWorkspacePathById({
 	return row?.path ?? null;
 }
 
+/** Inputs for {@link selectWorkspaceBaseBranchById}. */
+export interface SelectWorkspaceBaseBranchByIdOptions {
+	database: DatabaseSync;
+	workspaceId: string;
+}
+
+/**
+ * Returns the merge target a workspace was opened against, or `null` when the
+ * row does not exist or carries no base. Stored either bare (`staging`) or
+ * remote-qualified (`origin/staging`), so callers normalize before comparing.
+ */
+export function selectWorkspaceBaseBranchById({
+	database,
+	workspaceId,
+}: SelectWorkspaceBaseBranchByIdOptions): string | null {
+	const row = database
+		.prepare(`SELECT base_branch AS baseBranch FROM workspaces WHERE id = ?`)
+		.get(workspaceId) as { baseBranch: string | null } | undefined;
+	return row?.baseBranch ?? null;
+}
+
 /** Inputs for {@link selectWorkspaceIdByPath}. */
 export interface SelectWorkspaceIdByPathOptions {
 	database: DatabaseSync;

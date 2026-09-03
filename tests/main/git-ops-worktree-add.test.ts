@@ -234,8 +234,28 @@ test('reports git-missing without retrying', async () => {
 test('builds one argv per branch placement', async () => {
 	const placements = [
 		{
-			expected: ['worktree', 'add', '-b', 'x', '/repo/ws', 'main'],
+			expected: [
+				'worktree',
+				'add',
+				'--no-track',
+				'-b',
+				'x',
+				'/repo/ws',
+				'main',
+			],
 			placement: { forkRef: 'main', kind: 'create' } as const,
+		},
+		{
+			expected: [
+				'worktree',
+				'add',
+				'--no-track',
+				'-b',
+				'x',
+				'/repo/ws',
+				'origin/staging',
+			],
+			placement: { forkRef: 'origin/staging', kind: 'create' } as const,
 		},
 		{
 			expected: ['worktree', 'add', '/repo/ws', 'x'],

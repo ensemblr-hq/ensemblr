@@ -498,7 +498,7 @@ test('continue reports a diagnostic when the checkout fails', async (t) => {
 
 	const result = await createService(harness, {
 		localCommandService: gitServiceFailing(
-			(args) => args[0] === 'checkout' && args[1] === '-b',
+			(args) => args[0] === 'checkout' && args.includes('-b'),
 		),
 	}).continueBranch({ workspaceId: workspace.id });
 
@@ -531,7 +531,7 @@ test('continue warns when the rollback itself cannot restore the worktree', asyn
 	const result = await createService(harness, {
 		databaseService: databaseServiceRejectingWorkspaceUpdate(harness),
 		localCommandService: gitServiceFailing(
-			(args) => args[0] === 'checkout' && args[1] !== '-b',
+			(args) => args[0] === 'checkout' && !args.includes('-b'),
 		),
 	}).continueBranch({ workspaceId: workspace.id });
 
