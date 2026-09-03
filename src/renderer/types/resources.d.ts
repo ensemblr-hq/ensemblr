@@ -412,9 +412,6 @@ export default interface Resources {
 			'show-all_one': 'Show all {{count}} line';
 			'show-all_other': 'Show all {{count}} lines';
 		};
-		'tool-row': {
-			running: 'Running…';
-		};
 		'turn-footer': {
 			actions: 'Turn actions';
 			'fork-tab': 'Fork to new tab';

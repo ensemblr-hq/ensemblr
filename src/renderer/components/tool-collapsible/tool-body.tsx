@@ -1,4 +1,3 @@
-import { useTranslation } from 'react-i18next';
 import { CodePanel } from '@/renderer/components/code-surface';
 import { MessageResponse } from '@/renderer/components/message';
 import { StackTraceDiagnostic } from '@/renderer/components/stack-trace-diagnostic';
@@ -39,20 +38,15 @@ function ToolMarkdownOutput({ children }: { children: string }) {
 	);
 }
 
-/** Placeholder shown while a tool call is still running and has no result yet. */
-function ToolPendingOutput() {
-	const { t } = useTranslation();
-	return (
-		<p className='px-1 text-muted-foreground text-xs italic'>
-			{t('common:tool-row.running', 'Running…')}
-		</p>
-	);
-}
-
 /**
  * Renders the body a presentation asked for. This is the one place a body kind
  * turns into a component, so adding a tool means picking a kind rather than
  * touching the row.
+ *
+ * `empty` and `pending` both render nothing: a row whose call produced no output
+ * and a row whose call has not finished have nothing to show that the row's own
+ * title and pulse do not already say. Callers keep them out of the disclosure
+ * rather than opening onto a blank panel.
  */
 export function ToolBody({ body }: { body: ToolBodyDescriptor }) {
 	switch (body.kind) {
@@ -79,7 +73,7 @@ export function ToolBody({ body }: { body: ToolBodyDescriptor }) {
 		case 'markdown':
 			return <ToolMarkdownOutput>{body.text}</ToolMarkdownOutput>;
 		case 'pending':
-			return <ToolPendingOutput />;
+			return null;
 		case 'stack-trace':
 			return (
 				<StackTraceDiagnostic

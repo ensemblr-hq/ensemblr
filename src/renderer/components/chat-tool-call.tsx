@@ -128,7 +128,10 @@ export function ChatSkillInvocation({ name }: { name: string }) {
  * nothing must both skip the badge slot and put the subject back in its title.
  *
  * A body of kind `empty` disables the disclosure rather than offering a control
- * that opens onto nothing — a clean diagnostics run is the common case.
+ * that opens onto nothing — a clean diagnostics run is the common case. A body
+ * of kind `pending` disables it for the same reason: the call has produced no
+ * result yet, so the only thing behind the control is a placeholder repeating
+ * what the row's own pulse already says.
  */
 function ToolRow({ presentation }: { presentation: ToolPresentation }) {
 	const { badge, body, glyph, preview, title, tone, unpinnedTitle } =
@@ -137,7 +140,7 @@ function ToolRow({ presentation }: { presentation: ToolPresentation }) {
 
 	return (
 		<ToolCollapsible
-			disabled={body.kind === 'empty'}
+			disabled={body.kind === 'empty' || body.kind === 'pending'}
 			glyph={glyph}
 			pending={body.kind === 'pending'}
 			title={subject ? title : (unpinnedTitle ?? title)}

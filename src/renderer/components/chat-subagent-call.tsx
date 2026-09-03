@@ -18,6 +18,11 @@ import { ToolCommandChip } from './tool-collapsible/tool-chips';
  *
  * The timeline renders this only for a delegation that produced rows; one that
  * produced none is a plain tool row and never reaches here.
+ *
+ * Unlike a plain tool row, a delegation still in flight stays open for business:
+ * its nested rows arrive while it runs, so the disclosure has real work behind
+ * it long before the closing report lands. Only the report itself waits, which
+ * is why a `pending` body contributes nothing rather than disabling the row.
  */
 export function ChatSubagentCall({
 	children,
@@ -36,7 +41,7 @@ export function ChatSubagentCall({
 		[part, i18n.language],
 	);
 	const { body, glyph, preview, title, tone } = presentation;
-	const hasBody = body.kind !== 'empty';
+	const hasBody = body.kind !== 'empty' && body.kind !== 'pending';
 
 	return (
 		<ToolCollapsible
