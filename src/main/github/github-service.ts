@@ -1,5 +1,6 @@
 import path from 'node:path';
 
+import { bareBranchName } from '../../shared/branch-ref.ts';
 import {
 	extractPullRequestNumber,
 	extractPullRequestUrl,
@@ -24,6 +25,7 @@ import type {
 	LocalCommandService,
 } from '../commands/local-command';
 import type { EnsemblrDatabaseService } from '../storage';
+import { selectWorkspaceBaseBranchById } from '../storage/repositories/workspace-repository.ts';
 import { classifyCommandFailure } from './gh-failures.ts';
 import {
 	readCachedPullRequestSnapshot,
@@ -80,6 +82,17 @@ const REVIEW_THREADS_QUERY = `query($owner: String!, $name: String!, $number: In
   }
 }`;
 
+/**
+ * The workspace branch's sync state and the remote branch `gh` should be asked
+ * about. Resolved together because rejecting an inherited base upstream has to
+ * suppress both at once: the head ref `gh` is given, and the claim that the
+ * branch has been pushed at all.
+ */
+interface WorkspaceBranchState {
+	branchSync: GitBranchSyncWire | null;
+	remoteHeadRef: string | null;
+}
+
 /** Public surface for git review-flow operations and all `gh`-backed GitHub calls. */
 export interface GithubService {
 	commitWorkspaceChanges: (
@@ -135,19 +148,67 @@ export function createGithubService({
 		});
 	}
 
-	/** Reads ahead/behind state for the workspace branch versus its upstream. */
-	async function readBranchSync(
+	/**
+	 * Reads the workspace branch's sync state and the remote branch `gh` should
+	 * be asked about, rejecting an upstream that merely names the workspace's own
+	 * base branch.
+	 *
+	 * A branch cut from `origin/<base>` without `--no-track` inherits the base as
+	 * its upstream even though it was never pushed there. Trusting that ref makes
+	 * `gh pr view` answer with the *base branch's* pull request — a merged one
+	 * reads as "this brand-new branch is already merged" — and makes an unpushed
+	 * branch claim it is up to date with the remote. A workspace's own pull
+	 * request merges *into* its base, so the base can never be its head ref.
+	 *
+	 * A worktree parked *on* the base branch is the one case where that upstream
+	 * is real — `master` genuinely tracks `origin/master` — so it keeps its sync
+	 * counts instead of reporting itself unpushed.
+	 * @param cwd - Workspace working directory.
+	 * @param baseBranch - The workspace's merge target, bare or `origin/`-qualified.
+	 * @returns The branch sync wire plus the remote head ref, if any.
+	 */
+	async function readWorkspaceBranchState(
 		cwd: string,
-	): Promise<GitBranchSyncWire | null> {
+		baseBranch: string | null,
+	): Promise<WorkspaceBranchState> {
 		const branchResult = await run('git', cwd, [
 			'rev-parse',
 			'--abbrev-ref',
 			'HEAD',
 		]);
 		if (branchResult.status !== 'success') {
-			return null;
+			return { branchSync: null, remoteHeadRef: null };
 		}
 		const branchName = branchResult.stdout.trim();
+		const bareBase = bareBranchName(baseBranch);
+		const upstreamBranch = await resolveUpstreamBranch(cwd, branchName);
+		const inheritedBaseUpstream =
+			upstreamBranch !== null &&
+			upstreamBranch === bareBase &&
+			branchName !== bareBase;
+		if (inheritedBaseUpstream) {
+			return {
+				branchSync: { ahead: 0, behind: 0, branchName, hasUpstream: false },
+				remoteHeadRef: null,
+			};
+		}
+		return {
+			branchSync: await readBranchSync(cwd, branchName),
+			remoteHeadRef: upstreamBranch,
+		};
+	}
+
+	/**
+	 * Reads ahead/behind state for the workspace branch versus its upstream.
+	 * @param cwd - Workspace working directory.
+	 * @param branchName - Current local branch name.
+	 * @returns The branch's sync counts, reporting no upstream when the rev-list
+	 * against `@{upstream}` cannot run.
+	 */
+	async function readBranchSync(
+		cwd: string,
+		branchName: string,
+	): Promise<GitBranchSyncWire> {
 		const countResult = await run('git', cwd, [
 			'rev-list',
 			'--left-right',
@@ -176,7 +237,7 @@ export function createGithubService({
 	 * @param branchName - Current local branch name.
 	 * @returns The remote head branch name, or null when there is no upstream.
 	 */
-	async function resolveRemoteHeadRef(
+	async function resolveUpstreamBranch(
 		cwd: string,
 		branchName: string,
 	): Promise<string | null> {
@@ -190,7 +251,20 @@ export function createGithubService({
 		}
 		const mergeRef = result.stdout.trim();
 		return mergeRef.startsWith('refs/heads/')
-			? mergeRef.slice('refs/heads/'.length)
+			? mergeRef.slice('refs/heads/'.length) || null
+			: null;
+	}
+
+	/**
+	 * Reads the merge target a workspace was opened against, which is what tells
+	 * an inherited fork upstream apart from a branch's own remote counterpart.
+	 * @param workspaceId - The workspace whose base branch to read.
+	 * @returns The stored base branch, or null when unknown.
+	 */
+	function readWorkspaceBaseBranch(workspaceId: string): string | null {
+		const database = databaseService.getConnection()?.database ?? null;
+		return database
+			? selectWorkspaceBaseBranchById({ database, workspaceId })
 			: null;
 	}
 
@@ -252,14 +326,13 @@ export function createGithubService({
 	/** Fetches the live PR snapshot from `gh`, enriching with deployments/threads. */
 	async function fetchSnapshot(
 		cwd: string,
+		baseBranch: string | null,
 	): Promise<
 		| { ok: true; snapshot: GithubPullRequestSnapshotWire }
 		| { error: GithubFailure; noPullRequest: boolean; ok: false }
 	> {
-		const branchSync = await readBranchSync(cwd);
-		const headRef = branchSync?.branchName
-			? await resolveRemoteHeadRef(cwd, branchSync.branchName)
-			: null;
+		const { branchSync, remoteHeadRef: headRef } =
+			await readWorkspaceBranchState(cwd, baseBranch);
 		const viewArgs = headRef
 			? ['pr', 'view', headRef, '--json', PR_VIEW_JSON_FIELDS]
 			: ['pr', 'view', '--json', PR_VIEW_JSON_FIELDS];
@@ -588,7 +661,10 @@ export function createGithubService({
 				return { fromCache: true, snapshot: cached };
 			}
 
-			const fetched = await fetchSnapshot(cwd.cwd);
+			const fetched = await fetchSnapshot(
+				cwd.cwd,
+				readWorkspaceBaseBranch(request.workspaceId),
+			);
 			if (!fetched.ok) {
 				// gh failed: keep the panel alive with the last known snapshot, but
 				// surface the refresh error instead of hiding it (ENS-055).
@@ -616,10 +692,11 @@ export function createGithubService({
 				return { error: cwd.error, merged: false };
 			}
 			const method = request.method ?? 'squash';
-			const branchSync = await readBranchSync(cwd.cwd);
-			const headRef = branchSync?.branchName
-				? await resolveRemoteHeadRef(cwd.cwd, branchSync.branchName)
-				: null;
+			const baseBranch = readWorkspaceBaseBranch(request.workspaceId);
+			const { remoteHeadRef: headRef } = await readWorkspaceBranchState(
+				cwd.cwd,
+				baseBranch,
+			);
 			const mergeResult = await run('gh', cwd.cwd, [
 				'pr',
 				'merge',
@@ -635,7 +712,7 @@ export function createGithubService({
 			// Refresh the cache so the workspace immediately reflects merged state.
 			const database = databaseService.getConnection()?.database ?? null;
 			if (database) {
-				const refreshed = await fetchSnapshot(cwd.cwd);
+				const refreshed = await fetchSnapshot(cwd.cwd, baseBranch);
 				if (refreshed.ok) {
 					writeCachedPullRequestSnapshot({
 						database,

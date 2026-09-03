@@ -81,6 +81,21 @@ function createTestDatabase(): DatabaseSync {
 		metadata_json TEXT NOT NULL DEFAULT '{}',
 		UNIQUE(provider, resource_type, resource_id, external_id)
 	) STRICT;`);
+	database.exec(`CREATE TABLE workspaces (
+		id TEXT PRIMARY KEY,
+		base_branch TEXT
+	) STRICT;`);
+	return database;
+}
+
+function withWorkspaceBase(
+	database: DatabaseSync,
+	workspaceId: string,
+	baseBranch: string,
+): DatabaseSync {
+	database
+		.prepare('INSERT INTO workspaces (id, base_branch) VALUES (?, ?)')
+		.run(workspaceId, baseBranch);
 	return database;
 }
 
@@ -532,6 +547,211 @@ test('getPullRequestSnapshot queries gh by the remote head branch, not the local
 		'view',
 		'remote/pr-branch',
 	]);
+});
+
+test('getPullRequestSnapshot ignores an upstream that names the workspace base branch', async () => {
+	const { calls, service } = createService(
+		(request) => {
+			if (request.command === 'git') {
+				if (request.args?.[0] === 'rev-parse') {
+					return buildResult({ stdout: 'psoldunov/csv-export\n' });
+				}
+				if (request.args?.[0] === 'config') {
+					return buildResult({ stdout: 'refs/heads/staging\n' });
+				}
+				return buildResult({ stdout: '0\t0\n' });
+			}
+			if (request.args?.[0] === 'pr' && request.args?.[1] === 'view') {
+				return buildResult({
+					exitCode: 1,
+					status: 'failure',
+					stderr: 'no pull requests found for branch "psoldunov/csv-export"',
+				});
+			}
+			return buildResult({
+				exitCode: 1,
+				status: 'failure',
+				stderr: 'HTTP 404',
+			});
+		},
+		withWorkspaceBase(createTestDatabase(), 'ws-1', 'origin/staging'),
+	);
+
+	const result = await service.getPullRequestSnapshot({
+		refresh: true,
+		workspaceCwd: '/tmp/ws',
+		workspaceId: 'ws-1',
+	});
+
+	assert.equal(result.error, undefined);
+	assert.equal(result.snapshot?.pullRequest, null);
+	const viewCall = calls.find(
+		(call) => call.command === 'gh' && call.args?.[1] === 'view',
+	);
+	assert.equal(viewCall?.args?.[2], '--json');
+});
+
+test('a branch inheriting the base branch as upstream reports itself unpushed', async () => {
+	const { calls, service } = createService(
+		(request) => {
+			if (request.command === 'git') {
+				if (request.args?.[0] === 'rev-parse') {
+					return buildResult({ stdout: 'psoldunov/csv-export\n' });
+				}
+				if (request.args?.[0] === 'config') {
+					return buildResult({ stdout: 'refs/heads/staging\n' });
+				}
+				return buildResult({ stdout: '0\t0\n' });
+			}
+			if (request.args?.[0] === 'pr' && request.args?.[1] === 'view') {
+				return buildResult({
+					exitCode: 1,
+					status: 'failure',
+					stderr: 'no pull requests found',
+				});
+			}
+			return buildResult({
+				exitCode: 1,
+				status: 'failure',
+				stderr: 'HTTP 404',
+			});
+		},
+		withWorkspaceBase(createTestDatabase(), 'ws-1', 'origin/staging'),
+	);
+
+	const result = await service.getPullRequestSnapshot({
+		refresh: true,
+		workspaceCwd: '/tmp/ws',
+		workspaceId: 'ws-1',
+	});
+
+	assert.equal(result.snapshot?.branchSync?.hasUpstream, false);
+	assert.equal(result.snapshot?.branchSync?.ahead, 0);
+	assert.equal(result.snapshot?.branchSync?.branchName, 'psoldunov/csv-export');
+	assert.equal(
+		calls.some((call) => call.args?.[0] === 'rev-list'),
+		false,
+	);
+});
+
+test('a worktree parked on the base branch keeps its real sync counts', async () => {
+	const { calls, service } = createService(
+		(request) => {
+			if (request.command === 'git') {
+				if (request.args?.[0] === 'rev-parse') {
+					return buildResult({ stdout: 'staging\n' });
+				}
+				if (request.args?.[0] === 'config') {
+					return buildResult({ stdout: 'refs/heads/staging\n' });
+				}
+				return buildResult({ stdout: '2\t3\n' });
+			}
+			if (request.args?.[0] === 'pr' && request.args?.[1] === 'view') {
+				return buildResult({
+					exitCode: 1,
+					status: 'failure',
+					stderr: 'no pull requests found',
+				});
+			}
+			return buildResult({
+				exitCode: 1,
+				status: 'failure',
+				stderr: 'HTTP 404',
+			});
+		},
+		withWorkspaceBase(createTestDatabase(), 'ws-1', 'origin/staging'),
+	);
+
+	const result = await service.getPullRequestSnapshot({
+		refresh: true,
+		workspaceCwd: '/tmp/ws',
+		workspaceId: 'ws-1',
+	});
+
+	assert.equal(result.snapshot?.branchSync?.hasUpstream, true);
+	assert.equal(result.snapshot?.branchSync?.ahead, 3);
+	assert.equal(result.snapshot?.branchSync?.behind, 2);
+	const viewCall = calls.find(
+		(call) => call.command === 'gh' && call.args?.[1] === 'view',
+	);
+	assert.equal(viewCall?.args?.[2], 'staging');
+});
+
+test('getPullRequestSnapshot still forwards an upstream that is not the base branch', async () => {
+	const { calls, service } = createService(
+		(request) => {
+			if (request.command === 'git') {
+				if (request.args?.[0] === 'rev-parse') {
+					return buildResult({ stdout: 'local/worktree-name\n' });
+				}
+				if (request.args?.[0] === 'config') {
+					return buildResult({ stdout: 'refs/heads/remote/pr-branch\n' });
+				}
+				return buildResult({ stdout: '0\t0\n' });
+			}
+			if (request.args?.[0] === 'pr' && request.args?.[1] === 'view') {
+				return buildResult({ stdout: PR_VIEW_JSON });
+			}
+			return buildResult({
+				exitCode: 1,
+				status: 'failure',
+				stderr: 'HTTP 404',
+			});
+		},
+		withWorkspaceBase(createTestDatabase(), 'ws-1', 'origin/staging'),
+	);
+
+	const result = await service.getPullRequestSnapshot({
+		refresh: true,
+		workspaceCwd: '/tmp/ws',
+		workspaceId: 'ws-1',
+	});
+
+	assert.equal(result.snapshot?.pullRequest?.number, 7);
+	const viewCall = calls.find(
+		(call) => call.command === 'gh' && call.args?.[1] === 'view',
+	);
+	assert.deepEqual(viewCall?.args?.slice(0, 3), [
+		'pr',
+		'view',
+		'remote/pr-branch',
+	]);
+});
+
+test('mergePullRequest never passes the workspace base branch to gh pr merge', async () => {
+	const { calls, service } = createService(
+		(request) => {
+			if (request.command === 'git') {
+				if (request.args?.[0] === 'rev-parse') {
+					return buildResult({ stdout: 'psoldunov/csv-export\n' });
+				}
+				if (request.args?.[0] === 'config') {
+					return buildResult({ stdout: 'refs/heads/staging\n' });
+				}
+				return buildResult({ stdout: '0\t0\n' });
+			}
+			if (request.args?.[0] === 'pr' && request.args?.[1] === 'merge') {
+				return buildResult({ stdout: 'merged\n' });
+			}
+			return buildResult({
+				exitCode: 1,
+				status: 'failure',
+				stderr: 'HTTP 404',
+			});
+		},
+		withWorkspaceBase(createTestDatabase(), 'ws-1', 'origin/staging'),
+	);
+
+	const result = await service.mergePullRequest({
+		workspaceCwd: '/tmp/ws',
+		workspaceId: 'ws-1',
+	});
+
+	assert.equal(result.merged, true);
+	const mergeCall = calls.find(
+		(call) => call.command === 'gh' && call.args?.[1] === 'merge',
+	);
+	assert.deepEqual(mergeCall?.args, ['pr', 'merge', '--squash']);
 });
 
 test('getPullRequestSnapshot falls back to the no-arg gh query when no upstream is set', async () => {

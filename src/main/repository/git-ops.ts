@@ -239,6 +239,13 @@ export type WorktreeBranchPlacement =
 
 /**
  * Builds the `git worktree add` argv for a branch placement.
+ *
+ * A `create` placement passes `--no-track` because its fork point is usually a
+ * remote-tracking ref (`origin/<base>`), and git's default
+ * `branch.autoSetupMerge=true` would make the new branch adopt the *base*
+ * branch as its upstream. That upstream is a lie — the branch has no remote
+ * counterpart until it is pushed — and it makes `gh pr view` resolve the base
+ * branch's own pull request instead of reporting none.
  * @param options - Branch name, placement, and destination path.
  * @returns The argument list to pass after `git`.
  */
@@ -258,6 +265,7 @@ function worktreeAddArgs({
 			return [
 				'worktree',
 				'add',
+				'--no-track',
 				'-b',
 				branchName,
 				workspacePath,

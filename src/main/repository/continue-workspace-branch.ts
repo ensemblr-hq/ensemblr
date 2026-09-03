@@ -266,6 +266,10 @@ export function createContinueWorkspaceBranchService({
 	 * Creates the successor branch, checks it out, and records the move. Rolls
 	 * the worktree back when the SQLite write fails, reporting a warning when
 	 * that rollback cannot complete rather than leaving the mismatch unsaid.
+	 *
+	 * `--no-track` keeps the successor from adopting an upstream it has no
+	 * remote counterpart for, which would make `gh pr view` resolve that
+	 * branch's pull request as if it were the successor's.
 	 * @param position - Position captured before the switch.
 	 * @param database - Open SQLite connection.
 	 * @param source - Workspace being continued.
@@ -287,6 +291,7 @@ export function createContinueWorkspaceBranchService({
 		const startPoint = await resolveStartPoint(source);
 		const checkout = await runGit(source.path, [
 			'checkout',
+			'--no-track',
 			'-b',
 			nextBranch,
 			...(startPoint.commit ? [startPoint.commit] : []),
