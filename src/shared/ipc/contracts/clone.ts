@@ -1,4 +1,6 @@
+import type { GithubFailure } from './github';
 import type { RegisteredRepositorySnapshot } from './repository';
+import type { RepositoryBranchWire } from './workspace-sources';
 
 /** Stable diagnostic code for GitHub clone preparation and execution failures. */
 export type CloneGithubRepositoryDiagnosticCode =
@@ -36,12 +38,26 @@ export interface CloneGithubRepositoryDiagnostic {
 
 /** Request to prepare a GitHub repository clone from a URL. */
 export interface CloneGithubRepositoryRequest {
+	/**
+	 * Bare branch name to check out, handed to `git clone --branch`. Absent for
+	 * the remote's own default, and for a ref `gh` does not list — a tag or
+	 * another remote's branch is not a valid `--branch` argument.
+	 */
+	branch?: string;
+	/**
+	 * Ref persisted as the cloned repository's `branchFrom` setting, so new
+	 * workspaces fork from it. Absent leaves the setting unwritten, which keeps
+	 * the repository tracking whatever GitHub's default branch is.
+	 */
+	branchFrom?: string;
 	destinationPath?: string;
 	url: string;
 }
 
 /** Validated clone plan produced by the prepare step, resolved before the clone runs. */
 export interface CloneGithubRepositoryPreparation {
+	branch?: string;
+	branchFrom?: string;
 	defaultParentPath: string;
 	jobId: string;
 	repositoryName: string;
@@ -108,6 +124,21 @@ export interface GithubRepositoryEntry {
 	updatedAt: string;
 }
 
+/** Request for a not-yet-cloned repository's remote branches, keyed by its URL. */
+export interface GithubRemoteBranchListRequest {
+	url: string;
+}
+
+/**
+ * A repository's remote branches read before it is cloned. Shaped like
+ * `ListRepositoryBranchesResult` so the shared branch picker renders either
+ * source unchanged; there is no local checkout yet, so every row reports
+ * `hasWorkspace: false`.
+ */
+export type GithubRemoteBranchListResult =
+	| { branches: RepositoryBranchWire[]; status: 'ok' }
+	| { branches: RepositoryBranchWire[]; error: GithubFailure; status: 'error' };
+
 /** How much of the repository list to fetch: recently updated or the full set. */
 export type GithubRepositoryListScope = 'full' | 'recent';
 
@@ -129,6 +160,9 @@ export interface GithubRepositoryListResult {
 
 /** GitHub clone / discovery IPC surface, including the live progress channel. */
 export interface CloneApi {
+	githubRemoteBranchList: (
+		request: GithubRemoteBranchListRequest,
+	) => Promise<GithubRemoteBranchListResult>;
 	githubRepositoryList: (
 		request?: GithubRepositoryListRequest,
 	) => Promise<GithubRepositoryListResult>;

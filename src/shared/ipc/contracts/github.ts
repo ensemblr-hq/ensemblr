@@ -18,7 +18,9 @@ export type GithubFailureCode =
 	| 'no-remote'
 	| 'nothing-to-commit'
 	| 'parse-failed'
-	| 'permission-denied';
+	| 'permission-denied'
+	| 'url-invalid'
+	| 'url-required';
 
 /** A failed git/gh operation, with its code, message, and optional remediation hint. */
 export interface GithubFailure {

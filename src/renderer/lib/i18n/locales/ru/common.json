@@ -79,6 +79,9 @@
 		"workspace-path-copied": "Путь рабочего пространства скопирован."
 	},
 	"clone-dialog": {
+		"branch-label": "Создавать новые рабочие пространства от",
+		"branch-repository-default": "По умолчанию для репозитория",
+		"branch-search-placeholder": "Найдите или введите ref…",
 		"loading-repos": "Загрузка репозиториев с GitHub…",
 		"location-label": "Расположение",
 		"matching-repos": "Подходящие репозитории",

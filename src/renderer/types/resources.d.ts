@@ -81,6 +81,9 @@ export default interface Resources {
 			'workspace-path-copied': 'Workspace path copied.';
 		};
 		'clone-dialog': {
+			'branch-label': 'Branch new workspaces from';
+			'branch-repository-default': 'Repository default';
+			'branch-search-placeholder': 'Search or enter a ref…';
 			'loading-repos': 'Loading repos from GitHub…';
 			'location-label': 'Location';
 			'matching-repos': 'Matching repos';

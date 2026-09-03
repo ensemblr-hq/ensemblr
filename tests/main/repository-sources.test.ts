@@ -6,9 +6,9 @@ import type {
 	LocalCommandResult,
 	LocalCommandService,
 } from '../../src/main/commands/local-command';
+import { parseBranches } from '../../src/main/repository/github-branches.ts';
 import {
 	createRepositorySourcesService,
-	parseBranches,
 	parseIssues,
 	parsePullRequests,
 } from '../../src/main/repository/repository-sources-service.ts';
@@ -275,6 +275,14 @@ test('listBranches pins the default branch first and marks hasWorkspace', async 
 	// Sourced live from GitHub via gh GraphQL, not local refs.
 	assert.equal(calls[0]?.command, 'gh');
 	assert.deepEqual(calls[0]?.args?.slice(0, 2), ['api', 'graphql']);
+	// The checkout leg leans on gh's placeholders, which only expand under `-F`.
+	assert.equal(calls[0]?.cwd, '/repo');
+	assert.deepEqual(calls[0]?.args?.slice(2, 6), [
+		'-F',
+		'owner={owner}',
+		'-F',
+		'name={repo}',
+	]);
 });
 
 test('listPullRequests calls gh in the repo path and maps rows', async () => {

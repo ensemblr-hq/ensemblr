@@ -11,6 +11,7 @@ import type {
 	CloneGithubRepositoryStartRequest,
 	CloneGithubRepositoryStartResult,
 } from '../../shared/ipc/contracts/clone';
+import { upsertRepositorySettings } from '../environment/repository-settings.ts';
 import type { EnsemblrRootDirectoryService } from '../root';
 import type { EnsemblrDatabaseService } from '../storage';
 import { classifyCloneFailure } from './clone-classifier.ts';
@@ -144,7 +145,11 @@ export function createGithubCloneService({
 			return { diagnostics, ok: false };
 		}
 
+		const branch = trimmedOption(request.branch);
+		const branchFrom = trimmedOption(request.branchFrom);
 		const preparation: CloneGithubRepositoryPreparation = {
+			...(branch ? { branch } : {}),
+			...(branchFrom ? { branchFrom } : {}),
 			defaultParentPath,
 			jobId: `clone-${randomUUID()}`,
 			repositoryName: parsedUrl.repositoryName,
@@ -302,6 +307,12 @@ export function createGithubCloneService({
 			`Registered ${registration.repository.name} (${registration.repository.path}).`,
 		);
 
+		applyBranchFrom({
+			branchFrom: preparation.branchFrom,
+			emit,
+			repositoryId: registration.repository.id,
+		});
+
 		return {
 			diagnostics: [],
 			jobId: preparation.jobId,
@@ -311,4 +322,54 @@ export function createGithubCloneService({
 			targetPath: preparation.targetPath,
 		};
 	}
+
+	/**
+	 * Persists the picked base branch as the new repository's `branchFrom`, so
+	 * the first workspace the renderer seeds right after this — and every later
+	 * one — forks from it. The clone itself has already succeeded by this point,
+	 * so a failed write is reported and swallowed rather than losing the
+	 * repository over a preference the user can set again from its Git settings.
+	 */
+	function applyBranchFrom({
+		branchFrom,
+		emit,
+		repositoryId,
+	}: {
+		branchFrom: string | undefined;
+		emit: (kind: 'status', text: string) => void;
+		repositoryId: string;
+	}): void {
+		if (!branchFrom) {
+			return;
+		}
+		const database = databaseService.getConnection()?.database;
+		if (!database) {
+			emit(
+				'status',
+				`SQLite is unavailable; new workspaces will not default to ${branchFrom}.`,
+			);
+			return;
+		}
+		try {
+			upsertRepositorySettings({
+				database,
+				repositoryId,
+				settings: { branchFrom },
+			});
+			emit('status', `New workspaces will branch from ${branchFrom}.`);
+		} catch (error) {
+			emit(
+				'status',
+				`Could not record ${branchFrom} as the branch new workspaces fork from: ${
+					error instanceof Error ? error.message : 'unknown error'
+				}`,
+			);
+		}
+	}
+}
+
+/** Trims an optional request string, treating a blank value as absent. */
+function trimmedOption(value: string | undefined): string | undefined {
+	const trimmed = value?.trim();
+	return trimmed ? trimmed : undefined;
 }

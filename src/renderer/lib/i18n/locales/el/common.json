@@ -79,6 +79,9 @@
 		"workspace-path-copied": "Η διαδρομή του χώρου εργασίας αντιγράφηκε."
 	},
 	"clone-dialog": {
+		"branch-label": "Διακλάδωση νέων χώρων εργασίας από",
+		"branch-repository-default": "Προεπιλογή αποθετηρίου",
+		"branch-search-placeholder": "Αναζητήστε ή εισαγάγετε ref…",
 		"loading-repos": "Φόρτωση αποθετηρίων από το GitHub…",
 		"location-label": "Τοποθεσία",
 		"matching-repos": "Αποθετήρια που ταιριάζουν",

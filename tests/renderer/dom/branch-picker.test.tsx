@@ -40,12 +40,66 @@ function renderPicker(
 			onSelect={overrides.onSelect ?? vi.fn()}
 			onSelectCustomRef={overrides.onSelectCustomRef}
 			placeholder='Set target branch'
-			repositoryId='repo-1'
 			searchPlaceholder='Search or enter a branch…'
+			source={{ kind: 'repository', repositoryId: 'repo-1' }}
 			value={overrides.value === undefined ? 'origin/master' : overrides.value}
 		/>,
 	);
 }
+
+test('reads a not-yet-cloned repository from its URL instead of an id', async () => {
+	const githubRemoteBranchList = vi.fn(async () => ({
+		branches: [branch('main', true), branch('develop')],
+		status: 'ok' as const,
+	}));
+	const listRepositoryBranches = vi.fn();
+	installEnsemblrApi({ githubRemoteBranchList, listRepositoryBranches });
+	const onSelect = vi.fn();
+	renderWithProviders(
+		<BranchPicker
+			onSelect={onSelect}
+			placeholder='Repository default'
+			searchPlaceholder='Search or enter a ref…'
+			source={{
+				kind: 'remote-url',
+				url: 'https://github.com/ensemblr-hq/ensemblr.git',
+			}}
+			value={null}
+		/>,
+	);
+
+	await userEvent.click(
+		screen.getByRole('button', { name: /Repository default/ }),
+	);
+	await userEvent.click(await screen.findByText('develop'));
+
+	expect(githubRemoteBranchList).toHaveBeenCalledWith({
+		url: 'https://github.com/ensemblr-hq/ensemblr.git',
+	});
+	expect(listRepositoryBranches).not.toHaveBeenCalled();
+	expect(onSelect).toHaveBeenCalledWith('develop');
+});
+
+test('puts an id on the trigger so a sibling label binds to it', () => {
+	installBranches({ branches: [], status: 'ok' });
+	renderWithProviders(
+		<>
+			<label htmlFor='picked-branch'>Branch new workspaces from</label>
+			<BranchPicker
+				id='picked-branch'
+				onSelect={vi.fn()}
+				placeholder='Repository default'
+				searchPlaceholder='Search or enter a ref…'
+				source={{ kind: 'repository', repositoryId: 'repo-1' }}
+				value={null}
+			/>
+		</>,
+	);
+
+	expect(
+		screen.getByRole('button', { name: 'Branch new workspaces from' }),
+	).toHaveTextContent('Repository default');
+});
 
 test('shows the bare branch name on the trigger', () => {
 	installBranches({ branches: [], status: 'ok' });

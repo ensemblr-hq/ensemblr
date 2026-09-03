@@ -26,6 +26,8 @@ interface UseCloneFlowResult {
 	retry: () => void;
 	stage: CloneStage;
 	startClone: (input: {
+		branch?: string;
+		branchFrom?: string;
 		destinationPath?: string;
 		url: string;
 	}) => Promise<void>;
@@ -34,7 +36,9 @@ interface UseCloneFlowResult {
 
 /**
  * Owns the clone-flow state machine: stages, diagnostics, progress events,
- * IPC prepare/start, and the post-success cache invalidation.
+ * IPC prepare/start, and the post-success cache invalidation. Main persists the
+ * requested `branchFrom` before it reports success, so the first workspace
+ * seeded below already forks from the picked branch.
  * @returns Flow state plus `startClone` / `retry` handlers.
  */
 export function useCloneFlow(): UseCloneFlowResult {
@@ -68,9 +72,13 @@ export function useCloneFlow(): UseCloneFlowResult {
 
 	const startClone = useCallback(
 		async ({
+			branch,
+			branchFrom,
 			destinationPath,
 			url,
 		}: {
+			branch?: string;
+			branchFrom?: string;
 			destinationPath?: string;
 			url: string;
 		}) => {
@@ -80,9 +88,12 @@ export function useCloneFlow(): UseCloneFlowResult {
 			setSuccessResult(null);
 			setActiveJobId(null);
 
-			const preparation = await prepareCloneGithubRepository(
-				destinationPath !== undefined ? { destinationPath, url } : { url },
-			);
+			const preparation = await prepareCloneGithubRepository({
+				...(branch !== undefined ? { branch } : {}),
+				...(branchFrom !== undefined ? { branchFrom } : {}),
+				...(destinationPath !== undefined ? { destinationPath } : {}),
+				url,
+			});
 
 			if (!preparation.ok) {
 				setStage('failure');

@@ -17,6 +17,7 @@ import {
 } from '@/renderer/hooks/welcome/use-clone-dialog-form';
 import type { CloneStage } from '@/renderer/types/welcome';
 import { formatChord } from '@/shared/keymap';
+import { CloneGithubBranchField } from './clone-github-branch-field.tsx';
 import { CloneGithubLocationField } from './clone-github-location-field.tsx';
 import { CloneGithubProgressLog } from './clone-github-progress-log.tsx';
 import { CloneGithubRecentRepos } from './clone-github-recent-repos.tsx';
@@ -55,6 +56,8 @@ function CloneGithubDialogForm({
 	const { t } = useTranslation();
 	const {
 		activeDescendantId,
+		branchDisabled,
+		branchSelection,
 		browseDisabled,
 		canClone,
 		canResetLocation,
@@ -69,6 +72,7 @@ function CloneGithubDialogForm({
 		resetLocation,
 		retry,
 		search,
+		setBranchSelection,
 		setLocation,
 		stage,
 		url,
@@ -126,6 +130,13 @@ function CloneGithubDialogForm({
 						<p className='text-muted-foreground text-xxs'>{search.liveError}</p>
 					) : null}
 				</div>
+
+				<CloneGithubBranchField
+					disabled={branchDisabled}
+					onChange={setBranchSelection}
+					selection={branchSelection}
+					url={url.trim()}
+				/>
 
 				<CloneGithubLocationField
 					browseDisabled={browseDisabled}

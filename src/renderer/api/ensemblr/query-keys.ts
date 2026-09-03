@@ -41,6 +41,9 @@ export const ensemblrQueryKeys = {
 	/** Query key for a file's preview within a workspace. */
 	filePreview: (workspaceCwd: string, filePath: string) =>
 		[...ensemblrQueryKeys.all, 'file-preview', workspaceCwd, filePath] as const,
+	/** Query key for a not-yet-cloned repository's remote branches, keyed by URL. */
+	githubRemoteBranches: (url: string) =>
+		[...ensemblrQueryKeys.all, 'github-remote-branches', url] as const,
 	/** Query key for the GitHub repository list, scoped to full or recent. */
 	githubRepositoryList: (scope: 'full' | 'recent' = 'recent') =>
 		[...ensemblrQueryKeys.all, 'github-repository-list', scope] as const,
