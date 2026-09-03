@@ -509,13 +509,17 @@ account at once and each row carries the account that reached it, so picking the
 project settles the account. Save stays hidden until something actually changed.
 What is committed is the project, environment, and path — never a credential.
 
-Only the Scripts pane writes the committed file. Saving there rewrites
-`.ensemblr/settings.toml` — every other section of the file survives by value,
-the write is atomic, and a file that does not parse is never overwritten. It
-does lose hand-written comments and blank-line grouping, which is the accepted
-cost of not shipping a comment-preserving TOML editor.
+Two panes write the committed file — **Scripts** and **Secrets** — and they
+share one writer. Saving in either rewrites `.ensemblr/settings.toml`: every
+other section of the file survives by value, the write is atomic, and a file
+that does not parse is never overwritten. Scripts rewrites `[scripts]`, Secrets
+rewrites `[infisical]`, and neither touches the other's block. The rewrite does
+lose hand-written comments and blank-line grouping — the accepted cost of not
+shipping a comment-preserving TOML editor — with one exception: a leading
+`#:schema` directive is read back and restored above the document, because
+losing it would unhook every editor pointed at the published schema.
 
-The other panes write personal rows that never touch the repository. Where a
+The other five panes write personal rows that never touch the repository. Where a
 committed key and a personal row define the same setting, **the committed value
 wins** and your personal edit is stored but shadowed. Several panes say so
 inline.
