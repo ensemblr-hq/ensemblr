@@ -131,10 +131,26 @@ Past the wizard, the workbench opens on the welcome screen with three ways in:
 | --- | --- |
 | **Open GitHub project** | Clone a repo from GitHub. Lists your repositories via `gh`, or takes a URL you paste. |
 | **Open project** | Point at a git repository already on your disk. Ensemblr clones its tracked files into the managed `repos/` folder — your original is left alone. |
-| **Quick start** | Create a new folder and initialize a fresh git repository in it. |
+| **Quick start** | Create a new folder, initialize a fresh git repository in it, and publish it to GitHub as a **private** repository via `gh`. |
 
 All three land the project under `repos/` in your root directory and open its
 first workspace.
+
+**Quick start can publish into an organization, not just your own account.** The
+dialog offers a **GitHub owner** picker listing every account you can create a
+repository under; leave it on your personal account or choose an organization,
+and the repository is created there. An organization you belong to but cannot
+publish into is listed disabled with a short reason — *No access* when your
+token cannot reach it at all (SAML SSO, or an enterprise 2FA policy), *Owners
+only* when the organization restricts repository creation — so an unavailable
+org is visible rather than missing. Ensemblr remembers the last organization you
+published into and preselects it, falling back to your personal account if that
+access has since been revoked.
+
+The picker hides itself entirely when there is no choice to make — `gh` missing,
+unauthenticated, or an account with no organizations — so a solo user's dialog
+looks exactly as it did before. Publishing is best-effort: if `gh` fails, you
+are warned and the local project still survives.
 
 ![The create-workspace dialog, with Pull requests, Branches, and Issues source tabs above a searchable list and a repository picker.](./images/03-create-workspace.png)
 

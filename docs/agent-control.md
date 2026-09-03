@@ -652,8 +652,8 @@ other two blocking ops a harness *does* hold: `waitForAgents`, capped at five
 minutes by its own guardrail, and a `wait: true` spawn.
 
 **Raising it per server means the app owes a bound per op.** A day is the right
-answer for the three ops that block by design and the wrong one for the other
-thirty-seven: before, a wedged port surfaced to the agent as its client's
+answer for the four ops that block by design and the wrong one for the other
+forty-one: before, a wedged port surfaced to the agent as its client's
 60-second timeout and the turn carried on; after, the same wedge would hold the
 agent for a day while the heartbeat reported it healthy. Port coverage does not
 close that on its own — `linear-client.ts` and `workspace-git-status.ts` bound
