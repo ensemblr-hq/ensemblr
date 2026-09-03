@@ -523,8 +523,11 @@ you need to bisect a packaging break.
 **Write the notes and create the release. That is the whole ritual.**
 
 ```bash
-gh release create v0.1.0-beta.24 --notes-file NOTES.md --prerelease
+gh release create v0.1.1 --notes-file NOTES.md
 ```
+
+Add `--prerelease` for an `-alpha` / `-beta` / `-rc` tag; the workflow corrects
+the flag from the tag either way.
 
 That creates the tag and fires `release: published`, which triggers
 [`.github/workflows/release.yml`](../.github/workflows/release.yml): it runs the
@@ -540,20 +543,45 @@ re-running, dispatch the workflow manually with that tag as its input.
 The workflow refuses to build when `package.json`'s `version` does not match the
 tag with `v` stripped, or when the release is still a draft.
 
-The README's version line and `.dmg` download URL stay hand-edited. The job's
-run summary is not a readable surface for an agent or for anyone without an
-authenticated browser session — `$GITHUB_STEP_SUMMARY` has no API surface,
-`gh api` on the check run returns `output.summary: null`, and the raw logs show
-only the unexpanded script. Reconstruct both lines instead from the release's
-own assets, whose `name` field is the single fact both lines depend on:
+**Five version-pinned lines stay hand-edited, and the release commit touches
+none of them.** The README's version line and `.dmg` download URL are the two
+that get remembered; the other three live under `docs/` and quietly point at the
+previous release until someone edits them:
+
+| File | What is pinned |
+| --- | --- |
+| `README.md` | version line, `.dmg` URL |
+| `docs/README.md` | version link, `.dmg` and `.AppImage` URLs |
+| `docs/guide/README.md` | the version this guide describes |
+| `docs/guide/01-install.md` | version string ×2, all three asset URLs |
+| `docs/build-and-release.md` | the `update-darwin-arm64.json` example |
+
+**Never string-replace the old version into the new one.** Asset filenames
+change shape between releases — `0.1.0` dropped the `-beta.N` segment, so
+`Ensemblr-0.1.0-beta.24-arm64.dmg` became `Ensemblr-0.1.0-arm64.dmg` — and a
+substitution produces URLs that 404 while looking right.
+
+Read the real names off the release instead. The job's run summary is not a
+readable surface for an agent or for anyone without an authenticated browser
+session — `$GITHUB_STEP_SUMMARY` has no API surface, `gh api` on the check run
+returns `output.summary: null`, and the raw logs show only the unexpanded
+script. Every pinned line above derives from one fact, each asset's `name`:
 
 ```bash
-gh release view v0.1.0-beta.24 --json assets -q '.assets[].name'
+gh release view v0.1.1 --json assets -q '.assets[].name'
 ```
 
-The `.dmg` name (`Ensemblr-<version>-arm64.dmg`) gives the download URL; the
-version line is just the tag. Verify the reconstruction against the real asset
-name before editing the README — never present a guess as a copy.
+The version string is the tag with `v` stripped; each URL is
+`.../releases/download/<tag>/<asset name>`. **The tag lands roughly fifteen
+minutes before the artifacts do**, and the Linux `.AppImage` trails the macOS
+pair by several minutes more, so a `gh release view` showing the tag with an
+empty or partial asset list is not the signal to start editing — poll until all
+four are there. Then check the URLs actually resolve before opening the PR:
+
+```bash
+gh api repos/ensemblr-hq/ensemblr/releases/tags/v0.1.1 \
+  --jq '.assets[] | "\(.name)\t\(.digest)"'
+```
 
 **The Homebrew cask bumps itself.** The same job's `Bump the Homebrew cask` step
 rewrites `Casks/ensemblr.rb` in `ensemblr-hq/homebrew-tap` to the new version and
@@ -618,10 +646,10 @@ Squirrel.Mac feed the in-app updater reads:
 
 ```json
 {
-  "url": "https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.0-beta.23/Ensemblr-darwin-arm64-0.1.0-beta.23.zip",
-  "name": "0.1.0-beta.23",
+  "url": "https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.1/Ensemblr-darwin-arm64-0.1.1.zip",
+  "name": "0.1.1",
   "notes": "…the release body…",
-  "pub_date": "2026-08-18T04:00:00Z"
+  "pub_date": "2026-09-03T16:25:43Z"
 }
 ```
 
