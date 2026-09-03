@@ -63,7 +63,9 @@ describe('the Claude catalog names alias rows after what they resolve to', () =>
 			modelInfo({ displayName: 'Fable', value: 'claude-fable-5[1m]' }),
 		]);
 
-		expect(models[0]?.displayName).toBe('Fable 5');
+		expect(
+			models.find((model) => model.id === 'claude-fable-5[1m]')?.displayName,
+		).toBe('Fable 5');
 	});
 
 	it('falls back to the reported name when no id parses', () => {
@@ -188,6 +190,7 @@ describe('the Claude catalog appends the pinned releases', () => {
 		]);
 
 		expect(models.map((model) => model.id)).toEqual([
+			'claude-fable-5-1',
 			'opus[1m]',
 			'claude-opus-4-7',
 			'sonnet',
@@ -207,6 +210,7 @@ describe('the Claude catalog orders models by family, then by version', () => {
 		]);
 
 		expect(models.map((model) => model.displayName)).toEqual([
+			'Fable 5.1',
 			'Fable 5',
 			'Opus 5',
 			'Opus 4.8',

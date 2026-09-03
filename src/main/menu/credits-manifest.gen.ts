@@ -454,7 +454,7 @@ export const CREDITS_PACKAGES = [
 	{
 		name: 'shadcn',
 		license: 'MIT',
-		url: 'https://github.com/shadcn-ui/ui',
+		url: 'https://ui.shadcn.com',
 		kind: 'development',
 	},
 	{

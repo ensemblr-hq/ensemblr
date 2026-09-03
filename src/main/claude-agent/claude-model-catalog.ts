@@ -34,6 +34,7 @@ const DEFAULT_MODEL_ALIAS = 'default';
  * is not entitled to fails only when it is actually selected.
  */
 const PINNED_MODELS = [
+	{ displayName: 'Fable 5.1', id: 'claude-fable-5-1' },
 	{ displayName: 'Opus 4.8', id: 'claude-opus-4-8' },
 	{ displayName: 'Opus 4.7', id: 'claude-opus-4-7' },
 	{ displayName: 'Sonnet 4.6', id: 'claude-sonnet-4-6' },

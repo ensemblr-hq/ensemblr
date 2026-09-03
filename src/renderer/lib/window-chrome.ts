@@ -14,6 +14,14 @@ const INSET_TOP_PROPERTY = '--ensemblr-window-chrome-inset-top';
 const OWN_CONTROLS_CLASS = 'app-window-controls';
 
 /**
+ * Marks the document while the platform insets its own window controls into the
+ * content, as macOS does with the traffic lights. There the app's toolbars are
+ * the window's drag surface, so the `-webkit-app-region: drag` rule keyed on
+ * this class turns them into one — a surface Linux keeps as plain content.
+ */
+const INSET_CONTROLS_CLASS = 'inset-window-controls';
+
+/**
  * One CSS `rem` in pixels, for the surfaces that weigh the chrome insets — which
  * are expressed in `rem` — against a measured rectangle. The app never overrides
  * the root font size.
@@ -63,6 +71,10 @@ export function applyWindowChrome(chrome: WindowChromeSnapshot): void {
 	root.style.setProperty(INSET_START_PROPERTY, `${chrome.insets.start}rem`);
 	root.style.setProperty(INSET_TOP_PROPERTY, `${chrome.insets.top}rem`);
 	root.classList.toggle(OWN_CONTROLS_CLASS, chrome.drawsOwnControls);
+	root.classList.toggle(
+		INSET_CONTROLS_CLASS,
+		chrome.controls === 'system-inset',
+	);
 }
 
 /**
