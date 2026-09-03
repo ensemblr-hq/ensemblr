@@ -1019,9 +1019,9 @@
 		"aria-label": "Действия с репозиторием {{repository}}",
 		"create-from": "Создать из…",
 		"delete": "Удалить репозиторий…",
-		"new-workspace": "Новое рабочее пространство",
-		"settings": "Настройки репозитория",
-		"workspace-archive": "Архив рабочих пространств"
+		"new-workspace": "Новое пространство",
+		"settings": "Настройки",
+		"workspace-archive": "Архив"
 	},
 	"restore-checkpoint": {
 		"confirm": "Восстановить рабочее пространство",

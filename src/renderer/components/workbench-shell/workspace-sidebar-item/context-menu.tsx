@@ -10,15 +10,17 @@ import {
 import { useTranslation } from 'react-i18next';
 
 import {
-	ContextMenuContent,
 	ContextMenuGroup,
 	ContextMenuSeparator,
 	ContextMenuShortcut,
 	ContextMenuSub,
-	ContextMenuSubContent,
 	ContextMenuSubTrigger,
 } from '@/renderer/components/ui/context-menu';
 import { SidebarContextMenuItem } from '@/renderer/components/workbench-shell/sidebar-context-menu-item';
+import {
+	WorkbenchContextMenuContent,
+	WorkbenchContextMenuSubContent,
+} from '@/renderer/components/workbench-shell/workbench-context-menu-content';
 import {
 	BOARD_STATUS_PRESENTATION,
 	boardStatusLabel,
@@ -82,13 +84,13 @@ export function WorkspaceContextMenuContent({
 	}
 
 	return (
-		<ContextMenuContent
+		<WorkbenchContextMenuContent
 			aria-label={t(
 				'workbench:workspace-menu.aria-label',
 				'{{workspace}} workspace actions',
 				{ workspace: workspace.name },
 			)}
-			className='w-56 bg-muted p-1'
+			className='min-w-56'
 		>
 			<ContextMenuGroup>
 				<SidebarContextMenuItem onSelect={toggleUnread}>
@@ -112,7 +114,7 @@ export function WorkspaceContextMenuContent({
 					</SidebarContextMenuItem>
 				) : null}
 				<ContextMenuSub>
-					<ContextMenuSubTrigger className='h-8 gap-2 px-2 text-[0.8125rem]'>
+					<ContextMenuSubTrigger className='min-h-8 gap-2 px-2 text-[0.8125rem]'>
 						<CurrentStatusIcon
 							aria-hidden='true'
 							className={currentStatusPresentation.iconClassName}
@@ -121,7 +123,7 @@ export function WorkspaceContextMenuContent({
 							{t('workbench:workspace-menu.set-status', 'Set status')}
 						</span>
 					</ContextMenuSubTrigger>
-					<ContextMenuSubContent className='w-48 bg-muted p-1'>
+					<WorkbenchContextMenuSubContent className='min-w-48'>
 						<ContextMenuGroup>
 							{WORKSPACE_BOARD_STATUSES_ASSIGNABLE.map((status) => {
 								const presentation = BOARD_STATUS_PRESENTATION[status];
@@ -139,7 +141,7 @@ export function WorkspaceContextMenuContent({
 								);
 							})}
 						</ContextMenuGroup>
-					</ContextMenuSubContent>
+					</WorkbenchContextMenuSubContent>
 				</ContextMenuSub>
 				<SidebarContextMenuItem
 					disabled={!onRenameSelect}
@@ -175,7 +177,7 @@ export function WorkspaceContextMenuContent({
 					</span>
 				</SidebarContextMenuItem>
 			</ContextMenuGroup>
-		</ContextMenuContent>
+		</WorkbenchContextMenuContent>
 	);
 }
 

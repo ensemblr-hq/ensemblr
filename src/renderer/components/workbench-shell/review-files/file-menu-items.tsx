@@ -7,7 +7,9 @@ import type { ReviewFilePreviewOpener } from '@/renderer/types/workbench';
 /**
  * One row of a file context menu: a muted leading icon beside its label. Owns
  * the row metrics the all-files tree and the changes list both draw, so the two
- * menus cannot drift apart a padding step at a time.
+ * menus cannot drift apart a padding step at a time. The height is a floor
+ * rather than a fixed box so a label that still wraps in a longer locale grows
+ * its row instead of overlapping the next one.
  */
 export function FileMenuItem({
 	icon: Icon,
@@ -20,7 +22,7 @@ export function FileMenuItem({
 }) {
 	return (
 		<ContextMenuItem
-			className='h-8 gap-2 px-2 text-[0.8125rem]'
+			className='min-h-8 gap-2 px-2 text-[0.8125rem]'
 			onSelect={onSelect}
 		>
 			<Icon aria-hidden='true' className='text-muted-foreground' />

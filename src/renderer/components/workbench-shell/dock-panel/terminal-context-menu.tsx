@@ -1,10 +1,8 @@
 import { PaperclipIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
-import {
-	ContextMenuContent,
-	ContextMenuItem,
-} from '@/renderer/components/ui/context-menu';
+import { ContextMenuItem } from '@/renderer/components/ui/context-menu';
+import { WorkbenchContextMenuContent } from '@/renderer/components/workbench-shell/workbench-context-menu-content';
 import { useAttachToChat } from '@/renderer/hooks/workbench-shell/composer/use-attach-to-chat';
 
 /**
@@ -34,13 +32,13 @@ export function TerminalContextMenuContent({
 	const { attachSelection } = useAttachToChat({ workspaceCwd });
 
 	return (
-		<ContextMenuContent
+		<WorkbenchContextMenuContent
 			aria-label={t('workbench:terminal.menu.actions', 'Terminal actions')}
-			className='w-56 bg-muted p-1'
+			className='min-w-56'
 			onCloseAutoFocus={onCloseAutoFocus}
 		>
 			<ContextMenuItem
-				className='h-8 gap-2 px-2 text-[0.8125rem]'
+				className='min-h-8 gap-2 px-2 text-[0.8125rem]'
 				disabled={selection.length === 0}
 				onSelect={() => attachSelection(terminalLabel, selection)}
 			>
@@ -52,6 +50,6 @@ export function TerminalContextMenuContent({
 					)}
 				</span>
 			</ContextMenuItem>
-		</ContextMenuContent>
+		</WorkbenchContextMenuContent>
 	);
 }

@@ -58,7 +58,7 @@ export function OpenInFileMenu({
 			<DropdownMenuContent align='end' className='w-56 bg-muted p-1'>
 				{openInTargets.map((openTarget) => (
 					<DropdownMenuItem
-						className='h-8 gap-2.5 px-2 text-[0.8125rem]'
+						className='min-h-8 gap-2.5 px-2 text-[0.8125rem]'
 						key={openTarget.id}
 						onSelect={() => invoke(openTarget)}
 					>
@@ -75,7 +75,7 @@ export function OpenInFileMenu({
 							<DropdownMenuSeparator className='my-1' />
 						) : null}
 						<DropdownMenuItem
-							className='h-8 gap-2.5 px-2 text-[0.8125rem]'
+							className='min-h-8 gap-2.5 px-2 text-[0.8125rem]'
 							onSelect={() => invoke(copyTarget)}
 						>
 							<CopyIcon

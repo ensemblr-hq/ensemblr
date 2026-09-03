@@ -31,7 +31,7 @@ export function OpenInTargetsSubmenu({
 
 	return (
 		<ContextMenuSub>
-			<ContextMenuSubTrigger className='h-8 gap-2 px-2 text-[0.8125rem]'>
+			<ContextMenuSubTrigger className='min-h-8 gap-2 px-2 text-[0.8125rem]'>
 				<ArrowUpRightIcon
 					aria-hidden='true'
 					className='text-muted-foreground'
@@ -43,7 +43,7 @@ export function OpenInTargetsSubmenu({
 			<ContextMenuSubContent className='w-60 bg-muted p-1'>
 				{openInTargets.map((openTarget) => (
 					<ContextMenuItem
-						className='h-8 gap-2.5 px-2 text-[0.8125rem]'
+						className='min-h-8 gap-2.5 px-2 text-[0.8125rem]'
 						key={openTarget.id}
 						onSelect={() => onSelect(openTarget)}
 					>
