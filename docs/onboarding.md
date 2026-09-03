@@ -109,7 +109,7 @@ Read these in order:
    `tailwind.config.js`), and
    [`../.claude/rules/patterns.md`](../.claude/rules/patterns.md) for the
    structural rules a change has to respect.
-5. [`adr/`](./adr) — 54 Architecture Decision Records. When something looks odd,
+5. [`adr/`](./adr) — 55 Architecture Decision Records. When something looks odd,
    the ADR usually explains it. Start with
    [0042](./adr/0042-add-claude-code-as-a-second-first-class-agent-runtime.md) if
    you are touching the agent layer.
@@ -183,7 +183,7 @@ strip types without checking them. A `scripts/*.ts` type error only surfaces
 here.
 
 Run them locally anyway — CI runs the same gates, but only once the branch is
-pushed. `.github/workflows/checks.yml` has two jobs on pushes to `master` and
+pushed. `.github/workflows/checks.yml` has three jobs on pushes to `master` and
 PRs targeting it: `verify-matrix` runs `npm run check`, `npm run typecheck` and
 `npm run test` on **both** `macos-latest` and `ubuntu-latest`, which is what
 makes a darwin-only assumption fail in CI rather than in a user's AppImage; a
