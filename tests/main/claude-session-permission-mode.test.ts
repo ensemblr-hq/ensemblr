@@ -196,9 +196,15 @@ async function openClaudeSession(input: {
 /** Reads the append off the preset system prompt the adapter built. */
 function systemPromptAppendOf(options: Options): string | undefined {
 	const systemPrompt = options.systemPrompt;
-	return typeof systemPrompt === 'object' && !Array.isArray(systemPrompt)
-		? systemPrompt.append
-		: undefined;
+	if (
+		typeof systemPrompt !== 'object' ||
+		systemPrompt === null ||
+		Array.isArray(systemPrompt) ||
+		systemPrompt.type !== 'preset'
+	) {
+		return undefined;
+	}
+	return systemPrompt.append;
 }
 
 describe('Claude session options: the workspace permission mode reaches the SDK', () => {
