@@ -57,7 +57,9 @@ A workspace that **cuts** a branch does not get its final name at creation. It
 starts on a placeholder, and after your first agent turn the branch is renamed
 from what you actually asked for: a kebab-case slug, lower-cased, capped at 40
 characters at a word boundary. "Add a dark mode toggle to the settings page"
-becomes `add-dark-mode-toggle-to-the-settings`.
+becomes `add-a-dark-mode-toggle-to-the-settings`. Nothing is dropped for being a
+short word — the slug is the sentence kebab-cased and then cut, so the trailing
+`page` is what the 40-character cap loses.
 
 A prefix is prepended when one is configured:
 
@@ -182,9 +184,11 @@ Resolving them is part of the review flow —
 
 When a workspace's pull request has merged and you want to keep going in the same
 place, **continue** it. Ensemblr branches onto a numbered successor — `bach`
-becomes `bach-v2`, `bach-v2` becomes `bach-v3` — forking from the base branch and
-checking the new branch out. A name already taken is skipped, so a repeat
-continue never collides with a branch an earlier one left behind.
+becomes `bach-v1`, `bach-v1` becomes `bach-v2` — forking from the base branch and
+checking the new branch out. An existing `-v<n>` marker is bumped rather than
+stacked, so you never end up on `bach-v1-v1`. A name already taken is skipped,
+so continuing `bach` a second time while `bach-v1` still exists lands on
+`bach-v2` rather than colliding.
 
 Three things to expect:
 
