@@ -19,8 +19,12 @@ import type {
 import { MergeConfirmationDialog } from './merge-confirmation-dialog';
 import { ReviewActionsContextProvider } from './review-actions-context';
 
-/** Which review dialog is currently open, or null when none is. */
-type ActiveReviewDialog = { kind: 'merge' } | null;
+/**
+ * Which review dialog is currently open and the workspace it was opened for, or
+ * null when none is. The workspace is part of the state because the provider
+ * outlives a switch and the dialog must not follow the shell onto the next one.
+ */
+type ActiveReviewDialog = { kind: 'merge'; workspaceId: string } | null;
 
 const DEFAULT_MERGE_SETTINGS = {
 	archiveAfterMerge: false,
@@ -36,6 +40,13 @@ const DEFAULT_MERGE_SETTINGS = {
  *
  * Merge never happens on the first click — the confirmation dialog is the only
  * path to `gh pr merge` (ADR 0023).
+ *
+ * A dialog is abandoned when the shell leaves the workspace it was opened for.
+ * The route component is reused across workspace params, so this state survives
+ * a switch the same way the review mutations do, and a confirmation raised for
+ * one workspace would otherwise re-render against — and merge — the next one.
+ * Dropped during render rather than from an effect: an effect runs after paint,
+ * which is one frame of a dialog naming the wrong pull request.
  *
  * Agent activity is read once here and published as `isAgentWorking`: every
  * review surface — both header variants and the Checks panel — sits under this
@@ -58,6 +69,13 @@ export function ReviewActionsProvider({
 	const [activeDialog, setActiveDialog] = useState<ActiveReviewDialog>(null);
 	const closeDialog = useCallback(() => setActiveDialog(null), []);
 
+	if (
+		activeDialog !== null &&
+		activeDialog.workspaceId !== activeWorkspace.id
+	) {
+		setActiveDialog(null);
+	}
+
 	const { data: mergeSettingsData } = useQuery(
 		reviewMergeSettingsQuery({
 			repositoryId: activeProject.id,
@@ -73,10 +91,14 @@ export function ReviewActionsProvider({
 		},
 	);
 	const {
-		archiveAfterMergeMutation,
-		continueMergedWorkspaceMutation,
-		mergeMutation,
-		pushBranchMutation,
+		archiveMergedWorkspace,
+		continueMergedWorkspace,
+		isArchivingMergedWorkspace,
+		isContinuingMergedWorkspace,
+		isMerging,
+		isPushingBranch,
+		merge,
+		pushBranch,
 	} = useReviewMutations({
 		activeWorkspace,
 		mergeSettings,
@@ -104,30 +126,35 @@ export function ReviewActionsProvider({
 
 	const value = useMemo<ReviewActionsValue>(
 		() => ({
-			archiveMergedWorkspace: () => archiveAfterMergeMutation.mutate(),
+			archiveMergedWorkspace,
 			commitAndPush,
-			continueMergedWorkspace: () => continueMergedWorkspaceMutation.mutate(),
+			continueMergedWorkspace,
 			handOffToChat,
 			isAgentWorking,
-			isArchivingMergedWorkspace: archiveAfterMergeMutation.isPending,
-			isContinuingMergedWorkspace: continueMergedWorkspaceMutation.isPending,
-			isPushingBranch: pushBranchMutation.isPending,
+			isArchivingMergedWorkspace,
+			isContinuingMergedWorkspace,
+			isPushingBranch,
 			isRefreshingPullRequest,
-			openMergeConfirmation: () => setActiveDialog({ kind: 'merge' }),
+			openMergeConfirmation: () =>
+				setActiveDialog({ kind: 'merge', workspaceId: activeWorkspace.id }),
 			pullRequestAction,
-			pushBranch: () => pushBranchMutation.mutate(),
+			pushBranch,
 			refreshPullRequest,
 			runAgentAction,
 		}),
 		[
-			archiveAfterMergeMutation,
+			activeWorkspace.id,
+			archiveMergedWorkspace,
 			commitAndPush,
-			continueMergedWorkspaceMutation,
+			continueMergedWorkspace,
 			handOffToChat,
 			isAgentWorking,
+			isArchivingMergedWorkspace,
+			isContinuingMergedWorkspace,
+			isPushingBranch,
 			isRefreshingPullRequest,
 			pullRequestAction,
-			pushBranchMutation,
+			pushBranch,
 			refreshPullRequest,
 			runAgentAction,
 		],
@@ -141,8 +168,8 @@ export function ReviewActionsProvider({
 			<MergeConfirmationDialog
 				archiveAfterMerge={mergeSettings.archiveAfterMerge}
 				deleteLocalBranchOnArchive={mergeSettings.deleteLocalBranchOnArchive}
-				isSubmitting={mergeMutation.isPending}
-				onConfirm={() => mergeMutation.mutate()}
+				isSubmitting={isMerging}
+				onConfirm={merge}
 				onOpenChange={(open) => {
 					if (!open) {
 						closeDialog();

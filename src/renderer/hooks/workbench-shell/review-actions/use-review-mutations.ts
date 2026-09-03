@@ -1,5 +1,11 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import type { Mutation } from '@tanstack/react-query';
+import {
+	useMutation,
+	useMutationState,
+	useQueryClient,
+} from '@tanstack/react-query';
 import { useSetAtom } from 'jotai';
+import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 
@@ -20,10 +26,86 @@ import {
 	ReviewActionError,
 	showReviewActionError,
 } from '@/renderer/lib/workbench/review-action-error';
-import { continuedMergedPullRequestByWorkspaceAtom } from '@/renderer/state/workspace';
+import {
+	continuedMergedPullRequestByWorkspaceAtom,
+	useWorkspaceLifecycleRun,
+	useWorkspaceLifecycleRunActions,
+} from '@/renderer/state/workspace';
 import type { ReviewMergeSettings } from '@/renderer/types/settings';
 import type { WorkspaceShellModel } from '@/renderer/types/workbench';
 import type { ContinueWorkspaceBranchResult } from '@/shared/ipc/contracts/workspace';
+
+/**
+ * The workspace a review run acts on. Passed as the mutation's variables rather
+ * than read off the render that settles it: TanStack hands an in-flight mutation
+ * the latest render's callbacks, so a workspace switch mid run would otherwise
+ * point the follow-up refreshes at whichever workspace the shell had moved on
+ * to.
+ */
+interface ReviewRunTarget {
+	workspaceCwd: string;
+	workspaceId: string;
+}
+
+/** The merged workspace a continue run targets, and the PR it moves past. */
+interface ContinueMergedWorkspaceTarget extends ReviewRunTarget {
+	pullRequestNumber: number | undefined;
+}
+
+/**
+ * Tags a review run in the shared mutation cache so its busy state can be read
+ * back per workspace instead of off this hook's own observer.
+ *
+ * The observer is the wrong source twice over: it is discarded when the shell
+ * unmounts — which is what navigating to Welcome and back mid-run does — and
+ * `MutationObserver.mutate` rebuilds it, so a second run started on another
+ * workspace leaves the first reading idle while its git work is still going.
+ * Either one re-enables the header's buttons over a live run, and a second click
+ * forks the branch or pushes again. The cache outlives the shell and holds every
+ * pending run rather than only the newest.
+ */
+const CONTINUE_MERGED_WORKSPACE_MUTATION_KEY = ['continue-merged-workspace'];
+
+/** @see CONTINUE_MERGED_WORKSPACE_MUTATION_KEY */
+const PUSH_BRANCH_MUTATION_KEY = ['push-workspace-branch'];
+
+/**
+ * Reads the workspace a cached review run targets.
+ *
+ * The cache is typed loosely because it holds every mutation in the app; the key
+ * filter is what narrows this to one kind of run, and a pending one always
+ * carries the variables `mutate` was called with.
+ * @param mutation - A pending mutation matched by a review run's mutation key.
+ * @returns The workspace id the run targets, or null when it carries none.
+ */
+function runTargetWorkspaceIdOf(mutation: Mutation): string | null {
+	const target = mutation.state.variables as ReviewRunTarget | undefined;
+	return target?.workspaceId ?? null;
+}
+
+/**
+ * Whether a review run of one kind is still in flight against a workspace,
+ * counting runs this hook instance never started.
+ *
+ * The filter is deliberately free of any workspace: `useMutationState` keeps its
+ * options in a ref it refreshes in an effect, so a filter closing over the
+ * rendered workspace would answer for whichever workspace was rendered when the
+ * cache last changed. Reading every pending run and comparing in render has no
+ * such window.
+ * @param mutationKey - Identifies the kind of run, and must be a stable value.
+ * @param workspaceId - The workspace to report on.
+ * @returns Whether a run of that kind is pending against it.
+ */
+function useWorkspaceRunIsPending(
+	mutationKey: string[],
+	workspaceId: string,
+): boolean {
+	const targetedWorkspaceIds = useMutationState({
+		filters: { mutationKey, status: 'pending' },
+		select: runTargetWorkspaceIdOf,
+	});
+	return targetedWorkspaceIds.includes(workspaceId);
+}
 
 /**
  * Announces a completed continue, downgrading to a warning toast when the
@@ -65,6 +147,23 @@ function announceContinueSuccess(
  * every success so the review panel reflects the new state immediately. When the
  * archive succeeds it redirects to Welcome, since the just archived workspace can
  * no longer render a shell.
+ *
+ * Both merged-header runs carry their workspace in the mutation's variables and
+ * report busy against that workspace rather than against `isPending` alone. The
+ * hook outlives a workspace switch — the route component is reused across
+ * workspace params, and the archive's own redirect lands the shell on a sibling
+ * while the run is still settling — so a provider-wide pending flag showed the
+ * next merged workspace's header as busy for the length of the list refetch.
+ * Neither flag comes off this hook's observers, which do not survive the shell
+ * unmounting: the archive reads `workspaceLifecycleRunsAtom` (the same record
+ * the sidebar row and the Workspace menu read) and the continue reads the
+ * mutation cache under {@link CONTINUE_MERGED_WORKSPACE_MUTATION_KEY}.
+ *
+ * Every action is published as a stable callback rather than as its mutation.
+ * Handing the mutation out would put `isPending` — the provider-wide flag the
+ * two booleans above exist to replace — back within reach of the next caller,
+ * and would churn the provider's context value on every render, since
+ * `useMutation` returns a fresh object each time.
  */
 export function useReviewMutations({
 	activeWorkspace,
@@ -85,30 +184,33 @@ export function useReviewMutations({
 	const removeWorkspace = useRemoveWorkspaceAction({
 		activeWorkspaceId: workspaceId,
 	});
+	const { clearLifecycleRun, markLifecycleRun } =
+		useWorkspaceLifecycleRunActions();
 
 	/**
 	 * Records a merged PR as locally dismissed so the merged header stops
-	 * rendering for this workspace. No-ops when no PR number is known.
-	 * @param pullRequestNumber - The merged PR the user moved past.
+	 * rendering for that workspace. No-ops when no PR number is known.
+	 * @param target - The workspace the continue ran against, and the merged PR the user moved past.
 	 */
 	const dismissMergedPullRequest = (
-		pullRequestNumber: number | undefined,
+		target: ContinueMergedWorkspaceTarget,
 	): void => {
+		const { pullRequestNumber, workspaceId: continuedWorkspaceId } = target;
 		if (pullRequestNumber === undefined) {
 			return;
 		}
 		setContinuedMergedPullRequests((current) => ({
 			...current,
-			[workspaceId]: pullRequestNumber,
+			[continuedWorkspaceId]: pullRequestNumber,
 		}));
 	};
 
 	const archiveAfterMergeMutation = useMutation({
-		mutationFn: () =>
+		mutationFn: (archivedWorkspaceId: string) =>
 			archiveWorkspace({
 				branchCleanup: mergeSettings.deleteLocalBranchOnArchive,
 				reason: 'archive-after-merge',
-				workspaceId,
+				workspaceId: archivedWorkspaceId,
 			}),
 		onError: async (cause) => {
 			toast.warning(
@@ -120,16 +222,22 @@ export function useReviewMutations({
 			);
 			await invalidateWorkspaceListViews(queryClient);
 		},
-		onSuccess: async (result) => {
+		onMutate: (archivedWorkspaceId: string) => {
+			markLifecycleRun(archivedWorkspaceId, 'archiving');
+		},
+		onSettled: (_result, _cause, archivedWorkspaceId: string) => {
+			clearLifecycleRun(archivedWorkspaceId);
+		},
+		onSuccess: async (result, archivedWorkspaceId) => {
 			if (result.status === 'success') {
 				setContinuedMergedPullRequests((current) => {
-					if (!(workspaceId in current)) {
+					if (!(archivedWorkspaceId in current)) {
 						return current;
 					}
-					const { [workspaceId]: _removed, ...rest } = current;
+					const { [archivedWorkspaceId]: _removed, ...rest } = current;
 					return rest;
 				});
-				await removeWorkspace.archived(workspaceId);
+				await removeWorkspace.archived(archivedWorkspaceId);
 				toast.success(
 					t('errors:workspace-archive.archived.title', 'Workspace archived.'),
 					{
@@ -154,7 +262,9 @@ export function useReviewMutations({
 	});
 
 	const continueMergedWorkspaceMutation = useMutation({
-		mutationFn: () => continueWorkspaceBranch({ workspaceId }),
+		mutationFn: (target: ContinueMergedWorkspaceTarget) =>
+			continueWorkspaceBranch({ workspaceId: target.workspaceId }),
+		mutationKey: CONTINUE_MERGED_WORKSPACE_MUTATION_KEY,
 		onError: (cause) => {
 			toast.error(
 				t(
@@ -164,7 +274,7 @@ export function useReviewMutations({
 				{ description: cause instanceof Error ? cause.message : undefined },
 			);
 		},
-		onSuccess: async (result) => {
+		onSuccess: async (result, target) => {
 			if (result.status !== 'success' || result.branchName === null) {
 				toast.error(
 					t(
@@ -177,23 +287,26 @@ export function useReviewMutations({
 			}
 			// The snapshot refresh below is what actually retires the merged
 			// header; dismissing locally first keeps it from flashing meanwhile.
-			dismissMergedPullRequest(activeWorkspace.pullRequest.number);
+			dismissMergedPullRequest(target);
 			announceContinueSuccess(result.branchName, result.diagnostics);
 			await Promise.all([
 				refreshPullRequestSnapshot({
 					queryClient,
-					workspaceCwd,
-					workspaceId,
+					workspaceCwd: target.workspaceCwd,
+					workspaceId: target.workspaceId,
 				}),
-				invalidateWorkspaceGitStatus(queryClient, workspaceCwd),
+				invalidateWorkspaceGitStatus(queryClient, target.workspaceCwd),
 				invalidateWorkspaceListViews(queryClient),
 			]);
 		},
 	});
 
 	const mergeMutation = useMutation({
-		mutationFn: async () => {
-			const result = await mergePullRequest({ workspaceCwd, workspaceId });
+		mutationFn: async (target: ReviewRunTarget) => {
+			const result = await mergePullRequest({
+				workspaceCwd: target.workspaceCwd,
+				workspaceId: target.workspaceId,
+			});
 			if (!result.merged) {
 				throw new ReviewActionError(result.error);
 			}
@@ -203,50 +316,103 @@ export function useReviewMutations({
 				t('errors:merge.failed.title', 'Merge failed'),
 				error,
 			),
-		onSuccess: () => {
+		onSuccess: (_result, target) => {
 			onSettled();
 			void refreshPullRequestSnapshot({
 				queryClient,
-				workspaceCwd,
-				workspaceId,
+				workspaceCwd: target.workspaceCwd,
+				workspaceId: target.workspaceId,
 			}).catch((cause) => {
 				console.error('Failed to refresh PR snapshot after merge:', cause);
 			});
-			void invalidateWorkspaceGitStatus(queryClient, workspaceCwd);
+			void invalidateWorkspaceGitStatus(queryClient, target.workspaceCwd);
 			if (mergeSettings.archiveAfterMerge) {
-				archiveAfterMergeMutation.mutate();
+				archiveAfterMergeMutation.mutate(target.workspaceId);
 			}
 		},
 	});
 
 	const pushBranchMutation = useMutation({
-		mutationFn: async () => {
+		mutationFn: async (target: ReviewRunTarget) => {
 			const result = await pushWorkspaceBranch({
 				setUpstream: mergeSettings.setUpstreamOnPush,
-				workspaceCwd,
+				workspaceCwd: target.workspaceCwd,
 			});
 			if (!result.ok) {
 				throw new ReviewActionError(result.error);
 			}
 		},
+		mutationKey: PUSH_BRANCH_MUTATION_KEY,
 		onError: (error) =>
 			showReviewActionError(
 				t('errors:push.failed.title', 'Push failed'),
 				error,
 			),
-		onSuccess: async () => {
+		onSuccess: async (_result, target) => {
 			toast.success(t('errors:push.success.title', 'Branch pushed.'));
 			await Promise.all([
-				refreshPullRequestSnapshot({ queryClient, workspaceCwd, workspaceId }),
-				invalidateWorkspaceGitStatus(queryClient, workspaceCwd),
+				refreshPullRequestSnapshot({
+					queryClient,
+					workspaceCwd: target.workspaceCwd,
+					workspaceId: target.workspaceId,
+				}),
+				invalidateWorkspaceGitStatus(queryClient, target.workspaceCwd),
 			]);
 		},
 	});
 
+	const { mutate: startArchive } = archiveAfterMergeMutation;
+	const { mutate: startContinue } = continueMergedWorkspaceMutation;
+	const { mutate: startMerge } = mergeMutation;
+	const { mutate: startPush } = pushBranchMutation;
+
+	/** Archives the workspace whose merged header is on screen. */
+	const archiveMergedWorkspace = useCallback(() => {
+		startArchive(workspaceId);
+	}, [startArchive, workspaceId]);
+
+	/** Branches the workspace on screen onto a successor of its merged branch. */
+	const continueMergedWorkspace = useCallback(() => {
+		startContinue({
+			pullRequestNumber: activeWorkspace.pullRequest.number,
+			workspaceCwd,
+			workspaceId,
+		});
+	}, [
+		activeWorkspace.pullRequest.number,
+		startContinue,
+		workspaceCwd,
+		workspaceId,
+	]);
+
+	/** Merges the workspace's pull request, from the confirmation dialog only. */
+	const merge = useCallback(() => {
+		startMerge({ workspaceCwd, workspaceId });
+	}, [startMerge, workspaceCwd, workspaceId]);
+
+	/** Pushes the workspace's branch with git, skipping the agent. */
+	const pushBranch = useCallback(() => {
+		startPush({ workspaceCwd, workspaceId });
+	}, [startPush, workspaceCwd, workspaceId]);
+
+	const lifecycleRun = useWorkspaceLifecycleRun(workspaceId);
+	const isContinuingMergedWorkspace = useWorkspaceRunIsPending(
+		CONTINUE_MERGED_WORKSPACE_MUTATION_KEY,
+		workspaceId,
+	);
+	const isPushingBranch = useWorkspaceRunIsPending(
+		PUSH_BRANCH_MUTATION_KEY,
+		workspaceId,
+	);
+
 	return {
-		archiveAfterMergeMutation,
-		continueMergedWorkspaceMutation,
-		mergeMutation,
-		pushBranchMutation,
+		archiveMergedWorkspace,
+		continueMergedWorkspace,
+		isArchivingMergedWorkspace: lifecycleRun === 'archiving',
+		isContinuingMergedWorkspace,
+		isMerging: mergeMutation.isPending,
+		isPushingBranch,
+		merge,
+		pushBranch,
 	};
 }
