@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import {
+	chmodSync,
 	existsSync,
 	mkdirSync,
 	mkdtempSync,
@@ -326,4 +327,80 @@ test('an unreadable worktree with no snapshot to fall back on is kept', async (t
 		existsSync(path.join(harness.workspacePath, 'unsaved.txt')),
 		true,
 	);
+});
+
+// A build that outlived the archive's teardown keeps writing to absolute paths
+// and puts its output directory straight back, seconds after git deleted it.
+function localCommandServiceThatRecreates(
+	workspacePath: string,
+	onRecreate?: () => void,
+) {
+	const real = createLocalCommandService();
+
+	return {
+		...real,
+		run: async (options: Parameters<typeof real.run>[0]) => {
+			const result = await real.run(options);
+			if (
+				options.command === 'git' &&
+				options.args?.[0] === 'worktree' &&
+				options.args[1] === 'remove'
+			) {
+				mkdirSync(path.join(workspacePath, '.build'), { recursive: true });
+				writeFileSync(path.join(workspacePath, '.build', 'out.o'), 'object\n');
+				onRecreate?.();
+			}
+			return result;
+		},
+	};
+}
+
+test('a straggling build that recreates the worktree is swept before the prune returns', async (t) => {
+	const harness = createHarness(t);
+
+	const outcome = await pruneWorktree({
+		archivedContextPath: harness.archivedContextPath,
+		branchName: BRANCH_NAME,
+		localCommandService: localCommandServiceThatRecreates(
+			harness.workspacePath,
+		),
+		repositoryPath: harness.repositoryPath,
+		workspaceId: 'ws-1',
+		workspacePath: harness.workspacePath,
+	});
+
+	assert.equal(outcome.status, 'pruned');
+	assert.equal(outcome.message, undefined);
+	assert.equal(existsSync(harness.workspacePath), false);
+});
+
+// Reporting `pruned` is deliberate even here: the checkout really is gone, and
+// unarchive branches on that flag to choose rehydrate-from-ref over reusing a
+// directory that no longer holds a worktree.
+test('residue that cannot be cleared is reported without failing the prune', async (t) => {
+	const harness = createHarness(t);
+	const workspacesParent = path.dirname(harness.workspacePath);
+
+	try {
+		const outcome = await pruneWorktree({
+			archivedContextPath: harness.archivedContextPath,
+			branchName: BRANCH_NAME,
+			localCommandService: localCommandServiceThatRecreates(
+				harness.workspacePath,
+				() => chmodSync(workspacesParent, 0o500),
+			),
+			repositoryPath: harness.repositoryPath,
+			workspaceId: 'ws-1',
+			workspacePath: harness.workspacePath,
+		});
+
+		assert.equal(outcome.status, 'pruned');
+		assert.match(
+			String(outcome.message),
+			/The worktree was removed, but .+ could not be cleared/,
+		);
+		assert.equal(existsSync(harness.workspacePath), true);
+	} finally {
+		chmodSync(workspacesParent, 0o700);
+	}
 });

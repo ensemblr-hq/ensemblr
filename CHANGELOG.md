@@ -9,6 +9,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Archiving no longer leaves the worktree folder on disk, and a launch-time pass reclaims the ones
+  it already left.** Every archive recorded `worktree_pruned`, and the folders were still there —
+  180 MB across five of them on one machine. Two causes, neither visible: a `swift build` that
+  outlived the workspace's teardown kept writing to absolute paths and recreated its 90 MB `.build`
+  over the thirty seconds *after* `git worktree remove` had deleted the tree; and quit flushed every
+  terminal it had ever tracked, including sessions whose workspace was archived hours earlier, with
+  a writer that `mkdir -p`s its way back through a pruned worktree's `.context`. The residue was not
+  only wasted disk — `git worktree add` refuses a non-empty directory, so **those workspaces could
+  not be unarchived at all**.
+
+  The prune now verifies its own removal and sweeps what came back; quit no longer rewrites the log
+  of a session that already exited (`finalizeSession` deletes it on purpose, so the rewrite was
+  restoring a secret-bearing orphan); a workspace's terminals are dropped from the tracking map when
+  it is torn down, rather than living for the whole process; nothing that writes into `.context` can
+  materialize a worktree root that is gone; and restoring clears residue at the path before checking
+  the branch out. A silent pass at launch reclaims what earlier versions left: archived workspaces
+  whose folder survived an archive that removed the worktree — whether it recorded a prune or
+  dropped the branch outright — folders under `workspaces/` that no workspace points at, and
+  repository folders left empty. It stays inside the Ensemblr root's `workspaces/`, resolves
+  symlinks before deciding, and skips anything still holding a `.git`. Because it runs while the
+  window is opening, every candidate is re-checked against the database and the disk in the instant
+  before it is unlinked, so a workspace you restore mid-pass is left alone.
+
+- **Archived contexts now hold the workspace's terminal scrollback.** A terminal's `.context` log is
+  deleted the moment it exits, so copying the folder preserved nothing for a workspace whose
+  terminals had already ended — one archive here kept zero logs for six terminals. Archiving reads
+  each dock terminal's buffer out of memory after the teardown instead, and writes it into the
+  preserved context. Agent and run-script output stays out, as it does on disk today.
+
 ### Changed
 
 - **Archiving always reclaims the worktree's disk, and says how much it gave back.** Removing the

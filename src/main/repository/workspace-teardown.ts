@@ -1,3 +1,5 @@
+import type { TerminalScrollbackCapture } from '../terminal/terminal-output-file.ts';
+
 /** How long one PTY is given to exit after being killed before teardown moves on. */
 const TERMINAL_EXIT_TIMEOUT_MS = 5_000;
 
@@ -20,6 +22,12 @@ interface DeadlineOutcome {
 export interface WorkspaceTeardownReport {
 	agentSessionsStopped: number;
 	failures: string[];
+	/**
+	 * Every torn-down terminal's scrollback, read from memory. The caller decides
+	 * where it belongs — an archive writes it into the preserved context, a
+	 * delete drops it.
+	 */
+	scrollbacks: readonly TerminalScrollbackCapture[];
 	terminalsKilled: number;
 }
 
@@ -28,9 +36,17 @@ export interface WorkspaceTeardownReport {
  * the services under test pass fakes.
  */
 export interface WorkspaceTeardownPorts {
+	/**
+	 * Drops the workspace's finished terminal sessions from the terminal
+	 * service's tracking map.
+	 */
+	forgetTerminals: (workspaceId: string) => void;
 	killTerminal: (terminalId: string) => void;
 	listAgentSessionIds: (workspaceId: string) => readonly string[];
 	listTerminalIds: (workspaceId: string) => readonly string[];
+	readTerminalScrollbacks: (
+		workspaceId: string,
+	) => readonly TerminalScrollbackCapture[];
 	releaseAgentControl: (sessionId: string) => void;
 	stopAgentSession: (sessionId: string) => Promise<void>;
 	stopWatchingFiles: (workspaceCwd: string) => void;
@@ -87,6 +103,12 @@ export function createWorkspaceTeardownService(
 				workspaceId,
 			});
 
+			// Read after the kills, so the capture includes each child's final
+			// output, and before the forget below, which is what drops the buffers.
+			// Memory is the only copy left: a terminal that ended earlier in the run
+			// had its `.context` log deleted at finalization.
+			const scrollbacks = readScrollbacks({ failures, ports, workspaceId });
+
 			try {
 				ports.stopWatchingFiles(workspacePath);
 			} catch (error) {
@@ -95,7 +117,15 @@ export function createWorkspaceTeardownService(
 				);
 			}
 
-			return { agentSessionsStopped, failures, terminalsKilled };
+			try {
+				ports.forgetTerminals(workspaceId);
+			} catch (error) {
+				failures.push(
+					`Could not forget the workspace's terminals: ${errorMessage(error)}`,
+				);
+			}
+
+			return { agentSessionsStopped, failures, scrollbacks, terminalsKilled };
 		},
 	};
 }
@@ -203,6 +233,31 @@ async function killTerminals({
 	);
 
 	return outcomes.filter(Boolean).length;
+}
+
+/**
+ * Reads a workspace's terminal scrollback, treating a read failure as nothing
+ * to preserve so the removal is never blocked by it.
+ * @param input - Diagnostics sink, the ports, and the workspace being removed
+ * @returns The captures, or an empty list when the read failed
+ */
+function readScrollbacks({
+	failures,
+	ports,
+	workspaceId,
+}: {
+	failures: string[];
+	ports: WorkspaceTeardownPorts;
+	workspaceId: string;
+}): readonly TerminalScrollbackCapture[] {
+	try {
+		return ports.readTerminalScrollbacks(workspaceId);
+	} catch (error) {
+		failures.push(
+			`Could not read the workspace's terminal output: ${errorMessage(error)}`,
+		);
+		return [];
+	}
 }
 
 /**

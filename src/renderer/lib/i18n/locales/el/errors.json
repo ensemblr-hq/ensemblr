@@ -358,6 +358,7 @@
 		"worktree-prune-failed": "Ο φάκελος worktree δεν ήταν δυνατό να αφαιρεθεί, οπότε ο χώρος του δεν ανακτήθηκε.",
 		"worktree-recreate-failed": "Δεν ήταν δυνατή η αναδημιουργία του worktree.",
 		"worktree-repository-mismatch": "Αυτό το worktree ανήκει σε άλλο αποθετήριο.",
+		"worktree-residue-swept": "Το worktree αφαιρέθηκε, αλλά κάτι έγραψε ξανά αρχεία στον φάκελό του. Το Ensemblr θα ανακτήσει τον χώρο στην επόμενη εκκίνηση.",
 		"write-failed": "Δεν ήταν δυνατή η εγγραφή του αρχείου."
 	},
 	"fork": {

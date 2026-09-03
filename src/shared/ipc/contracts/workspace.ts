@@ -341,7 +341,8 @@ export type ArchiveWorkspaceDiagnosticCode =
 	| 'workspace-id-required'
 	| 'workspace-not-found'
 	| 'workspace-update-failed'
-	| 'worktree-prune-failed';
+	| 'worktree-prune-failed'
+	| 'worktree-residue-swept';
 
 /** Severity level attached to an archive-workspace diagnostic. */
 export type ArchiveWorkspaceDiagnosticSeverity = 'error' | 'info' | 'warning';

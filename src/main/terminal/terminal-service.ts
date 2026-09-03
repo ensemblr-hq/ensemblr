@@ -43,6 +43,7 @@ import {
 	type PtyProcess,
 	type PtySpawnOptions,
 } from './pty-backend.ts';
+import type { TerminalScrollbackCapture } from './terminal-output-file.ts';
 import {
 	deleteTerminalOutput,
 	readTerminalOutput,
@@ -159,6 +160,14 @@ export interface TerminalService {
 	create: (
 		options: CreateTerminalSessionOptions,
 	) => Promise<CreateTerminalSessionResult>;
+	/**
+	 * Drops a workspace's finished sessions from the tracking map. Called once a
+	 * workspace is being torn down for archive or delete, so nothing later in the
+	 * run — quit included — writes into a worktree that is about to be removed.
+	 * Sessions whose PTY child is still alive are kept, since quit must still
+	 * wait for them.
+	 */
+	forgetWorkspaceSessions: (workspaceId: string) => number;
 	getSnapshot: (terminalId: string) => TerminalSnapshotResult;
 	kill: (terminalId: string) => TerminalSessionSnapshot | null;
 	/**
@@ -178,6 +187,15 @@ export interface TerminalService {
 	 * set is consumed on read so a remount does not re-offer them.
 	 */
 	listRestorable: (workspaceId: string) => RestorableTerminal[];
+	/**
+	 * Every tracked dock terminal's scrollback for one workspace, read from
+	 * memory. Exited sessions are included — their on-disk logs are deleted at
+	 * finalization, so this is the only copy an archive can preserve. Agent and
+	 * run-script sessions are excluded, matching what is allowed on disk at all.
+	 */
+	readWorkspaceScrollbacks: (
+		workspaceId: string,
+	) => TerminalScrollbackCapture[];
 	recoverStaleSessions: () => void;
 	resize: (terminalId: string, cols: number, rows: number) => void;
 	/**
@@ -409,6 +427,22 @@ const BRAILLE_BLOCK_START = 0x2800;
 const BRAILLE_BLOCK_END = 0x28ff;
 
 /**
+ * Reports whether a session's PTY child is gone, so nothing is left to signal
+ * or wait on. `ptyExited` is checked alongside the row status because an agent
+ * session finalizes asynchronously and its row reads 'running' for a while
+ * after the child has actually exited.
+ * @param session - Tracked session to test.
+ * @returns True when the child has exited.
+ */
+function isSessionOver(session: TrackedSession): boolean {
+	return (
+		session.pty === null ||
+		session.ptyExited ||
+		session.snapshot.status !== 'running'
+	);
+}
+
+/**
  * Reports whether a PTY output chunk contains a braille spinner glyph, the signal
  * that a `pty-spinner` harness (Vibe) is animating its "working" indicator.
  * @param data - A raw PTY output chunk.
@@ -606,16 +640,6 @@ export function createTerminalService({
 			session.snapshot.id,
 			session.scrollback.read(),
 		);
-	}
-
-	/**
-	 * Flushes a session's scrollback to disk immediately and cancels any pending
-	 * debounced flush. Used on quit and before an active session is torn down.
-	 * @param session - Tracked session whose scrollback to persist.
-	 */
-	function flushSessionOutput(session: TrackedSession): void {
-		clearOutputFlushTimer(session);
-		persistSessionOutput(session);
 	}
 
 	/**
@@ -848,16 +872,11 @@ export function createTerminalService({
 	}
 
 	/**
-	 * Tears down a session's PTY subscriptions, records its terminal status and
-	 * exit code, persists the outcome when a database is available, and wakes any
-	 * exit waiters and lifecycle listeners.
-	 * @param session - Tracked session that has exited
-	 * @param exitCode - Process exit code, or null when unknown
+	 * Cancels every timer a session can have armed, so nothing it scheduled
+	 * outlives it.
+	 * @param session - Tracked session whose timers to cancel
 	 */
-	function finalizeSession(
-		session: TrackedSession,
-		exitCode: number | null,
-	): void {
+	function clearSessionTimers(session: TrackedSession): void {
 		if (session.killTimer) {
 			clearTimeout(session.killTimer);
 			session.killTimer = null;
@@ -870,6 +889,89 @@ export function createTerminalService({
 			clearTimeout(session.agentBusyIdleTimer);
 			session.agentBusyIdleTimer = null;
 		}
+		clearOutputFlushTimer(session);
+	}
+
+	/**
+	 * Reads a workspace's dock-terminal scrollback straight from memory, so a
+	 * caller can preserve it before the worktree that would have held it is
+	 * removed.
+	 *
+	 * Sessions that already exited are included, and they are the point: their
+	 * on-disk logs were deleted at finalization, so memory is the only copy left
+	 * of a terminal the user ran earlier in the session. Non-restorable kinds are
+	 * excluded on the same grounds {@link persistSessionOutput} excludes them: an
+	 * agent harness's and a run script's output are never written to disk at all,
+	 * and an archive is more durable than the `.context` log they are kept out
+	 * of, not less.
+	 * @param workspaceId - Workspace whose scrollback to read
+	 * @returns One entry per tracked dock terminal, oldest first
+	 */
+	function readWorkspaceScrollbacks(
+		workspaceId: string,
+	): TerminalScrollbackCapture[] {
+		return Array.from(sessions.values()).flatMap((session) =>
+			session.snapshot.workspaceId === workspaceId &&
+			isRestorableTerminalKind(session.snapshot.kind)
+				? [
+						{
+							id: session.snapshot.id,
+							text: session.scrollback.read(),
+							title: session.snapshot.title,
+						},
+					]
+				: [],
+		);
+	}
+
+	/**
+	 * Drops a workspace's finished sessions from the tracking map, so nothing
+	 * later in the app's run can reach them.
+	 *
+	 * The map is otherwise append-only for the whole process lifetime, which is
+	 * what let quit flush a session whose workspace had been archived hours
+	 * earlier — recreating the pruned worktree's `.context` tree on disk. A
+	 * session whose PTY has not exited is deliberately kept: quit still has to
+	 * wait for that child, and node-pty reporting an exit onto a torn-down
+	 * environment aborts the process.
+	 * @param workspaceId - Workspace whose sessions to forget
+	 * @returns How many sessions were dropped
+	 */
+	function forgetWorkspaceSessions(workspaceId: string): number {
+		let forgotten = 0;
+
+		for (const [terminalId, session] of sessions) {
+			if (
+				session.snapshot.workspaceId !== workspaceId ||
+				!isSessionOver(session)
+			) {
+				continue;
+			}
+
+			clearSessionTimers(session);
+			session.dataSubscription?.dispose();
+			session.exitSubscription?.dispose();
+			session.dataSubscription = null;
+			session.exitSubscription = null;
+			sessions.delete(terminalId);
+			forgotten += 1;
+		}
+
+		return forgotten;
+	}
+
+	/**
+	 * Tears down a session's PTY subscriptions, records its terminal status and
+	 * exit code, persists the outcome when a database is available, and wakes any
+	 * exit waiters and lifecycle listeners.
+	 * @param session - Tracked session that has exited
+	 * @param exitCode - Process exit code, or null when unknown
+	 */
+	function finalizeSession(
+		session: TrackedSession,
+		exitCode: number | null,
+	): void {
+		clearSessionTimers(session);
 
 		// A terminated session's row is no longer restorable, so drop its persisted
 		// log rather than leaving a secret-bearing orphan. Quit is the exception:
@@ -1330,11 +1432,17 @@ export function createTerminalService({
 	 * session finalizes asynchronously, so its row still reads 'running' for up
 	 * to {@link FINAL_CONVERSATION_READ_TIMEOUT_MS} after the child is gone, and
 	 * a listener subscribed to an already-exited PTY would never fire.
+	 *
+	 * Only a live session is flushed, and that ordering is load-bearing: a
+	 * session that already exited had its log deleted by `finalizeSession` on
+	 * purpose, so writing it back here would restore a secret-bearing orphan —
+	 * and for a workspace archived earlier in the run, restore it inside a
+	 * worktree the prune removed.
 	 * @param session - Session to wind down
 	 * @returns Resolves once the child exits, immediately when it is already gone
 	 */
 	function beginSessionShutdown(session: TrackedSession): Promise<void> {
-		flushSessionOutput(session);
+		clearOutputFlushTimer(session);
 		session.dataSubscription?.dispose();
 		session.dataSubscription = null;
 		session.exitSubscription?.dispose();
@@ -1345,6 +1453,8 @@ export function createTerminalService({
 		if (!pty || session.ptyExited || session.snapshot.status !== 'running') {
 			return Promise.resolve();
 		}
+
+		persistSessionOutput(session);
 
 		const exited = new Promise<void>((resolve) => {
 			session.exitSubscription = pty.onExit(() => {
@@ -1441,6 +1551,7 @@ export function createTerminalService({
 				session: { ...session.snapshot },
 			};
 		},
+		forgetWorkspaceSessions,
 		kill,
 		list: (workspaceId) =>
 			Array.from(sessions.values()).flatMap((session) =>
@@ -1473,6 +1584,7 @@ export function createTerminalService({
 				return output ? [{ id: row.id, output, title: row.title }] : [];
 			});
 		},
+		readWorkspaceScrollbacks,
 		recoverStaleSessions: () => {
 			const database = getDatabase();
 

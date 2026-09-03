@@ -21,6 +21,10 @@ import {
 } from '../storage/repositories/workspace-repository.ts';
 import { withTransaction } from '../storage/tx.ts';
 import {
+	type TerminalScrollbackCapture,
+	writeArchivedTerminalOutput,
+} from '../terminal/terminal-output-file.ts';
+import {
 	failureResult,
 	pushLifecycleDiagnostics,
 } from './archive-diagnostics.ts';
@@ -165,6 +169,12 @@ export function createArchiveWorkspaceService({
 				});
 			}
 
+			preserveTerminalScrollback({
+				archivedContextPath: preserved.archivedContextPath,
+				diagnostics,
+				scrollbacks: teardown.scrollbacks,
+			});
+
 			const recordId = `archive-${randomUUID()}`;
 
 			// Stamp the database before touching the filesystem so a crash in
@@ -208,12 +218,13 @@ export function createArchiveWorkspaceService({
 					repositoryPath: source.repositoryPath,
 					workspacePath: source.path,
 				});
-				if (worktreeOutcome.status === 'failure') {
+				if (worktreeOutcome.status !== 'success') {
+					const residue = worktreeOutcome.status === 'residue';
 					diagnostics.push({
-						code: 'branch-cleanup-failed',
+						code: residue ? 'worktree-residue-swept' : 'branch-cleanup-failed',
 						message: worktreeOutcome.message,
 						path: source.path,
-						severity: 'warning',
+						severity: residue ? 'info' : 'warning',
 					});
 				}
 
@@ -493,6 +504,20 @@ async function reclaimWorktreeDisk({
 		return { bytesFreed: null, worktreePruned: false };
 	}
 
+	// Residue is not a failed prune: the checkout is gone and unarchive still has
+	// to rehydrate from the ref, so `worktreePruned` stays true and only the
+	// leftover disk is reported. The startup sweep clears it on the next launch,
+	// which is why this is informational rather than a warning — and why it must
+	// not borrow `worktree-prune-failed`, whose sentence says the opposite.
+	if (pruned.message) {
+		diagnostics.push({
+			code: 'worktree-residue-swept',
+			message: pruned.message,
+			path: source.path,
+			severity: 'info',
+		});
+	}
+
 	try {
 		updateArchiveRecordPruneState({
 			database,
@@ -514,6 +539,43 @@ async function reclaimWorktreeDisk({
 	}
 
 	return { bytesFreed: pruned.bytesFreed, worktreePruned: true };
+}
+
+/**
+ * Writes every torn-down terminal's scrollback into the preserved context,
+ * beside the `.context/` copy taken before the teardown.
+ *
+ * The copy alone preserves almost nothing: a terminal's `.context` log is
+ * deleted the moment it exits, so a workspace whose terminals ended earlier in
+ * the run archives an empty `terminals/` directory. Teardown reads the buffers
+ * out of memory instead, and this is where they land.
+ * @param options - Preserved context path, diagnostics sink, and the captures.
+ */
+function preserveTerminalScrollback({
+	archivedContextPath,
+	diagnostics,
+	scrollbacks,
+}: {
+	archivedContextPath: string | null;
+	diagnostics: ArchiveWorkspaceDiagnostic[];
+	scrollbacks: readonly TerminalScrollbackCapture[];
+}): void {
+	if (!archivedContextPath) {
+		return;
+	}
+
+	const contextDirectory = path.join(archivedContextPath, CONTEXT_DIRECTORY);
+	for (const capture of scrollbacks) {
+		const failure = writeArchivedTerminalOutput(contextDirectory, capture);
+		if (failure !== null) {
+			diagnostics.push({
+				code: 'archived-context-copy-failed',
+				message: `Terminal "${capture.title}" output could not be preserved: ${failure}`,
+				path: contextDirectory,
+				severity: 'warning',
+			});
+		}
+	}
 }
 
 /**
@@ -575,7 +637,9 @@ async function preserveContextDirectory({
 	// The terminals writing into this tree are torn down after the archive is
 	// certain to proceed, which is after this copy — so the retries inside
 	// `copyDirectoryTree` are what stop a scrollback flush rotating a file
-	// mid-walk from costing the user the whole preserved context.
+	// mid-walk from costing the user the whole preserved context. The scrollback
+	// itself does not depend on winning that race: `preserveTerminalScrollback`
+	// rewrites `terminals/` from memory once the teardown is done.
 	const copied = await copyDirectoryTree(
 		sourceContextDir,
 		path.join(archivedContextPath, CONTEXT_DIRECTORY),

@@ -121,6 +121,7 @@ export default defineConfig({
 			'tests/main/remove-directory.test.ts',
 			'tests/main/copy-directory.test.ts',
 			'tests/main/workspace-teardown.test.ts',
+			'tests/main/sweep-workspace-disk.test.ts',
 			'tests/main/external-links-policy.test.ts',
 			'tests/main/linear-asset-proxy.test.ts',
 			'tests/main/linear-asset-cache.test.ts',

@@ -195,6 +195,7 @@ function createTerminalServiceFake({
 
 			return { diagnostics: [], session };
 		},
+		forgetWorkspaceSessions: () => 0,
 		getSnapshot: (terminalId) => ({
 			lastSeq: 0,
 			scrollback: '',
@@ -220,6 +221,7 @@ function createTerminalServiceFake({
 		listByKind: (kind) =>
 			Array.from(sessions.values()).filter((session) => session.kind === kind),
 		listRestorable: () => [],
+		readWorkspaceScrollbacks: () => [],
 		recoverStaleSessions: () => undefined,
 		resize: () => undefined,
 		shutdown: () => Promise.resolve(),

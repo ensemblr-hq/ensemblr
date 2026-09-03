@@ -820,6 +820,7 @@ export default interface Resources {
 			'worktree-prune-failed': 'The worktree folder could not be removed, so its disk was not reclaimed.';
 			'worktree-recreate-failed': 'The worktree could not be recreated.';
 			'worktree-repository-mismatch': 'That worktree belongs to a different repository.';
+			'worktree-residue-swept': 'The worktree was removed, but something wrote files back into its folder. Ensemblr reclaims them on the next launch.';
 			'write-failed': 'That file could not be written.';
 		};
 		fork: {

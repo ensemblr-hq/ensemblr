@@ -364,6 +364,7 @@
 		"worktree-prune-failed": "Не удалось удалить папку worktree, поэтому место на диске не освобождено.",
 		"worktree-recreate-failed": "Не удалось воссоздать worktree.",
 		"worktree-repository-mismatch": "Этот worktree принадлежит другому репозиторию.",
+		"worktree-residue-swept": "Worktree удалён, но что-то записало файлы обратно в его папку. Ensemblr освободит место при следующем запуске.",
 		"write-failed": "Не удалось записать файл."
 	},
 	"fork": {

@@ -32,6 +32,16 @@ type GitWorktreeAddOutcome =
  */
 type GitBaseRefSyncOutcome = { status: 'synced' } | { status: 'skipped' };
 
+/**
+ * What a `git worktree remove` left behind. `residue` is the state that is
+ * neither: git dropped the worktree, so the checkout is gone, but something
+ * recreated part of the directory before it could be unlinked.
+ */
+export type WorktreeRemoveOutcome =
+	| { status: 'success' }
+	| { status: 'residue'; message: string }
+	| { status: 'failure'; message: string };
+
 /** Parsed reference to a branch hosted by a configured Git remote. */
 interface RemoteBranchRef {
 	branch: string;
@@ -823,7 +833,8 @@ async function runGitSucceeds({
  * this returns, which is exactly the case git's own pruning was written for
  * now that the directory is gone.
  * @param options - Repository path, worktree path, delete intent, and the command runner.
- * @returns Success once the directory is gone, or why it could not be removed.
+ * @returns Success once the directory is gone, `residue` when git dropped the
+ * worktree but the directory did not go with it, or why it could not be removed.
  */
 export async function runWorktreeRemove({
 	deletingWorkspace = false,
@@ -836,7 +847,7 @@ export async function runWorktreeRemove({
 	localCommandService: LocalCommandService;
 	repositoryPath: string;
 	workspacePath: string;
-}): Promise<GitOpOutcome> {
+}): Promise<WorktreeRemoveOutcome> {
 	const attempt = await removeWorktreeUntilUnregistered({
 		deletingWorkspace,
 		localCommandService,
@@ -852,7 +863,20 @@ export async function runWorktreeRemove({
 
 	const removal = await removeDirectoryTree(workspacePath);
 	if (!removal.removed) {
-		return { status: 'failure', message: removal.error ?? attempt.message };
+		const message = removal.error ?? attempt.message;
+
+		// An orphan is a worktree git has already dropped, so the checkout is gone
+		// whatever is left at the path — a build that outlived the caller's
+		// teardown recreating its output directory, most often. That is residue
+		// rather than a refusal, and the two must not read the same: a caller that
+		// treats it as a failed removal records the workspace as still having a
+		// worktree, and later looks for a checkout that no longer exists.
+		return attempt.state === 'orphaned'
+			? {
+					status: 'residue',
+					message: `The worktree was removed, but ${workspacePath} is still on disk and could not be cleared: ${message}`,
+				}
+			: { status: 'failure', message };
 	}
 
 	if (attempt.state === 'registered') {
