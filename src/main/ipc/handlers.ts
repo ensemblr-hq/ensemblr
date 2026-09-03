@@ -38,6 +38,7 @@ import type {
 	DeleteRepositoryService,
 	DeleteWorkspaceService,
 	GithubCloneService,
+	GithubRemoteBranchListService,
 	GithubRepositoryListService,
 	ListAllWorkspacesService,
 	ListArchivedWorkspacesService,
@@ -129,6 +130,7 @@ interface RegisterIpcHandlersOptions {
 	getInfisicalService: () => InfisicalService | null;
 	githubCloneService: GithubCloneService;
 	harnessDetectionService: HarnessDetectionService;
+	githubRemoteBranchListService: GithubRemoteBranchListService;
 	githubRepositoryListService: GithubRepositoryListService;
 	linearAuthService: LinearAuthService;
 	linearService: LinearService;
@@ -204,6 +206,7 @@ export function registerIpcHandlers({
 	environmentVariablesService,
 	getInfisicalService,
 	githubCloneService,
+	githubRemoteBranchListService,
 	githubRepositoryListService,
 	harnessDetectionService,
 	linearAuthService,
@@ -297,6 +300,7 @@ export function registerIpcHandlers({
 	});
 	registerCloneHandlers({
 		githubCloneService,
+		githubRemoteBranchListService,
 		githubRepositoryListService,
 		withPermissionGate,
 	});

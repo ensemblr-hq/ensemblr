@@ -118,6 +118,8 @@ export type {
 	CloneGithubRepositoryStartRequest,
 	CloneGithubRepositoryStartResult,
 	CloneGithubRepositoryStartStatus,
+	GithubRemoteBranchListRequest,
+	GithubRemoteBranchListResult,
 	GithubRepositoryEntry,
 	GithubRepositoryListResult,
 	GithubRepositoryListStatus,

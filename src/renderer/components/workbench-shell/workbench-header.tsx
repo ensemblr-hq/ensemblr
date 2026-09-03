@@ -117,11 +117,11 @@ function WorkspaceTargetBranch({
 							'workbench:header.target-branch.placeholder',
 							'Set target branch',
 						)}
-						repositoryId={repositoryId}
 						searchPlaceholder={t(
 							'workbench:header.target-branch.search',
 							'Search or enter a branch…',
 						)}
+						source={{ kind: 'repository', repositoryId }}
 						value={activeWorkspace.landingSummary?.branchSource.baseBranch}
 					/>
 				</span>

@@ -1,6 +1,7 @@
 import { type QueryClient, queryOptions } from '@tanstack/react-query';
 
 import { profileElectronIpcCall } from '@/renderer/lib/instrumentation';
+import type { GithubRemoteBranchListResult } from '@/shared/ipc/contracts/clone';
 import type {
 	ListRepositoryBranchesResult,
 	ListRepositoryIssuesResult,
@@ -33,6 +34,24 @@ export function repositoryBranchesQuery(repositoryId: string) {
 			),
 		queryKey: ensemblrQueryKeys.repositoryBranches(repositoryId),
 		refetchInterval: BRANCHES_REFETCH_MS,
+		staleTime: SOURCES_STALE_MS,
+	});
+}
+
+/**
+ * Query options for the remote branches of a repository that has not been cloned
+ * yet, read straight from its URL. Unlike {@link repositoryBranchesQuery} this
+ * does not poll: the clone dialog is open for a moment, not for the length of a
+ * work session, so there is nothing to keep fresh.
+ */
+export function githubRemoteBranchesQuery(url: string) {
+	return queryOptions({
+		queryFn: (): Promise<GithubRemoteBranchListResult> =>
+			profileElectronIpcCall(
+				{ channel: 'ensemblr:github-remote-branch-list', usesDatabase: false },
+				() => getEnsemblrApi().githubRemoteBranchList({ url }),
+			),
+		queryKey: ensemblrQueryKeys.githubRemoteBranches(url),
 		staleTime: SOURCES_STALE_MS,
 	});
 }

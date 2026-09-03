@@ -166,6 +166,7 @@ import {
 	createDeleteRepositoryService,
 	createDeleteWorkspaceService,
 	createGithubCloneService,
+	createGithubRemoteBranchListService,
 	createGithubRepositoryListService,
 	createGithubUsernameResolver,
 	createListAllWorkspacesService,
@@ -850,6 +851,9 @@ const githubCloneService = createGithubCloneService({
 	databaseService,
 	registrationService: localRepositoryRegistrationService,
 	rootDirectoryService,
+});
+const githubRemoteBranchListService = createGithubRemoteBranchListService({
+	localCommandService,
 });
 const githubRepositoryListService = createGithubRepositoryListService({
 	localCommandService,
@@ -1626,6 +1630,7 @@ app.whenReady().then(() => {
 		environmentVariablesService,
 		getInfisicalService,
 		githubCloneService,
+		githubRemoteBranchListService,
 		githubRepositoryListService,
 		harnessDetectionService,
 		linearAuthService,

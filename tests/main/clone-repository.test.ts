@@ -473,3 +473,189 @@ test('start surfaces register-failed when registration rejects the cloned repo',
 	assert.equal(result.status, 'failure');
 	assert.equal(result.diagnostics[0]?.code, 'register-failed');
 });
+
+test('start passes the picked branch to gh and to the git fallback', async (t) => {
+	const { repositoriesPath } = createWorkspace(t);
+	const target = path.join(repositoriesPath, 'ensemblr');
+	const attempts: { args: string[]; command: string }[] = [];
+
+	const runner: CloneCommandRunner = async ({ args, command }) => {
+		attempts.push({ args, command });
+		if (command === 'gh') {
+			return {
+				exitCode: null,
+				failure: 'command-not-found',
+				failureMessage: 'gh not found',
+				signal: null,
+			};
+		}
+		mkdirSync(target, { recursive: true });
+		return { exitCode: 0, signal: null };
+	};
+
+	const service = createGithubCloneService({
+		commandRunner: runner,
+		databaseService: databaseServiceStub(),
+		now: fixedNow,
+		registrationService: registrationStub(target).service,
+		rootDirectoryService: rootDirectoryStub(repositoriesPath),
+	});
+
+	const preparation = await service.prepare({
+		branch: 'develop',
+		branchFrom: 'origin/develop',
+		url: 'https://github.com/ensemblr-hq/ensemblr.git',
+	});
+	assert.equal(preparation.ok, true);
+	if (!preparation.ok) {
+		throw new Error('expected ok preparation');
+	}
+	assert.equal(preparation.preparation.branch, 'develop');
+	assert.equal(preparation.preparation.branchFrom, 'origin/develop');
+
+	await service.start({ jobId: preparation.preparation.jobId });
+
+	const gh = attempts.find((attempt) => attempt.command === 'gh');
+	const git = attempts.find((attempt) => attempt.command === 'git');
+	assert.deepEqual(gh?.args.slice(-2), ['--branch', 'develop']);
+	assert.ok(git?.args.includes('--branch'));
+	assert.equal(git?.args[git.args.indexOf('--branch') + 1], 'develop');
+});
+
+test('start omits --branch when no branch was picked', async (t) => {
+	const { repositoriesPath } = createWorkspace(t);
+	const target = path.join(repositoriesPath, 'ensemblr');
+	const attempts: string[][] = [];
+
+	const runner: CloneCommandRunner = async ({ args }) => {
+		attempts.push(args);
+		mkdirSync(target, { recursive: true });
+		return { exitCode: 0, signal: null };
+	};
+
+	const service = createGithubCloneService({
+		commandRunner: runner,
+		databaseService: databaseServiceStub(),
+		now: fixedNow,
+		registrationService: registrationStub(target).service,
+		rootDirectoryService: rootDirectoryStub(repositoriesPath),
+	});
+
+	const preparation = await service.prepare({
+		url: 'https://github.com/ensemblr-hq/ensemblr.git',
+	});
+	if (!preparation.ok) {
+		throw new Error('expected ok preparation');
+	}
+	await service.start({ jobId: preparation.preparation.jobId });
+
+	assert.equal(preparation.preparation.branch, undefined);
+	assert.ok(attempts.every((args) => !args.includes('--branch')));
+});
+
+test('start records branchFrom as the new repository personal setting', async (t) => {
+	const { repositoriesPath } = createWorkspace(t);
+	const target = path.join(repositoriesPath, 'ensemblr');
+	const { openEnsemblrDatabase } = await import(
+		'../../src/main/storage/database.ts'
+	);
+	const connection = openEnsemblrDatabase({ databasePath: ':memory:' });
+	t.after(() => connection.database.close());
+
+	const databaseService: EnsemblrDatabaseService = {
+		close: () => connection.database.close(),
+		getConnection: () => connection,
+		getHealth: () => ({
+			path: connection.path,
+			schemaVersion: connection.schemaVersion,
+			status: 'ok',
+		}),
+		open: () => ({
+			path: connection.path,
+			schemaVersion: connection.schemaVersion,
+			status: 'ok',
+		}),
+	};
+
+	const service = createGithubCloneService({
+		commandRunner: async () => {
+			mkdirSync(target, { recursive: true });
+			return { exitCode: 0, signal: null };
+		},
+		databaseService,
+		now: fixedNow,
+		registrationService: registrationStub(target).service,
+		rootDirectoryService: rootDirectoryStub(repositoriesPath),
+	});
+
+	const preparation = await service.prepare({
+		branch: 'develop',
+		branchFrom: 'origin/develop',
+		url: 'https://github.com/ensemblr-hq/ensemblr.git',
+	});
+	if (!preparation.ok) {
+		throw new Error('expected ok preparation');
+	}
+	const result = await service.start({ jobId: preparation.preparation.jobId });
+
+	assert.equal(result.status, 'success');
+	const row = connection.database
+		.prepare(
+			`SELECT value_json FROM settings
+			 WHERE scope = 'repository' AND scope_id = ? AND key = 'branchFrom'`,
+		)
+		.get('repository-test') as { value_json: string } | undefined;
+	assert.equal(row?.value_json, JSON.stringify('origin/develop'));
+});
+
+test('start writes no branchFrom row when the picker was left alone', async (t) => {
+	const { repositoriesPath } = createWorkspace(t);
+	const target = path.join(repositoriesPath, 'ensemblr');
+	const { openEnsemblrDatabase } = await import(
+		'../../src/main/storage/database.ts'
+	);
+	const connection = openEnsemblrDatabase({ databasePath: ':memory:' });
+	t.after(() => connection.database.close());
+
+	const databaseService: EnsemblrDatabaseService = {
+		close: () => connection.database.close(),
+		getConnection: () => connection,
+		getHealth: () => ({
+			path: connection.path,
+			schemaVersion: connection.schemaVersion,
+			status: 'ok',
+		}),
+		open: () => ({
+			path: connection.path,
+			schemaVersion: connection.schemaVersion,
+			status: 'ok',
+		}),
+	};
+
+	const service = createGithubCloneService({
+		commandRunner: async () => {
+			mkdirSync(target, { recursive: true });
+			return { exitCode: 0, signal: null };
+		},
+		databaseService,
+		now: fixedNow,
+		registrationService: registrationStub(target).service,
+		rootDirectoryService: rootDirectoryStub(repositoriesPath),
+	});
+
+	const preparation = await service.prepare({
+		url: 'https://github.com/ensemblr-hq/ensemblr.git',
+	});
+	if (!preparation.ok) {
+		throw new Error('expected ok preparation');
+	}
+	await service.start({ jobId: preparation.preparation.jobId });
+
+	const row = connection.database
+		.prepare(
+			`SELECT value_json FROM settings
+			 WHERE scope = 'repository' AND key = 'branchFrom'`,
+		)
+		.get() as { value_json: string } | undefined;
+	assert.equal(row, undefined);
+});

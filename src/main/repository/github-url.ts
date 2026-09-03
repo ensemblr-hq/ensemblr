@@ -10,6 +10,7 @@
 
 /** Parsed components of an accepted GitHub URL. */
 interface ParsedGithubUrl {
+	owner: string;
 	repositoryName: string;
 	sanitizedUrl: string;
 	validatedUrl: string;
@@ -55,6 +56,7 @@ export function parseGithubUrl(url: unknown): ParsedGithubUrl | null {
 	}
 
 	return {
+		owner,
 		repositoryName,
 		sanitizedUrl: `https://github.com/${owner}/${repositoryName}.git`,
 		validatedUrl: `${owner}/${repositoryName}`,

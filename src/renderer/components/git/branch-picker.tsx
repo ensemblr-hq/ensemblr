@@ -16,7 +16,10 @@ import {
 	PopoverContent,
 	PopoverTrigger,
 } from '@/renderer/components/ui/popover';
-import { useBranchOptions } from '@/renderer/hooks/git/use-branch-options';
+import {
+	type BranchOptionsSource,
+	useBranchOptions,
+} from '@/renderer/hooks/git/use-branch-options';
 import { failureText } from '@/renderer/lib/failure-text';
 import { cn } from '@/renderer/lib/utils';
 import { bareBranchName } from '@/shared/branch-ref';
@@ -34,6 +37,8 @@ interface BranchPickerProps {
 	 * selected branch and cannot be told apart from a pinned one.
 	 */
 	fallbackOption?: { isActive: boolean; label: string; onSelect: () => void };
+	/** Lands on the trigger button, so a sibling `<Label htmlFor>` can bind to it. */
+	id?: string;
 	/** Called with the bare branch name; the caller qualifies it with a remote. */
 	onSelect: (branchName: string) => void;
 	/**
@@ -44,8 +49,9 @@ interface BranchPickerProps {
 	 */
 	onSelectCustomRef?: (ref: string) => void;
 	placeholder: string;
-	repositoryId: string;
 	searchPlaceholder: string;
+	/** Repository whose branches to offer, by id once cloned or by URL before. */
+	source: BranchOptionsSource;
 	/** Current branch ref, remote-qualified or bare. */
 	value: string | null | undefined;
 }
@@ -60,17 +66,18 @@ export function BranchPicker({
 	className,
 	disabled,
 	fallbackOption,
+	id,
 	onSelect,
 	onSelectCustomRef,
 	placeholder,
-	repositoryId,
 	searchPlaceholder,
+	source,
 	value,
 }: BranchPickerProps) {
 	const { t } = useTranslation();
 	const [open, setOpen] = useState(false);
 	const [search, setSearch] = useState('');
-	const { branches, error, isLoading } = useBranchOptions(repositoryId, open);
+	const { branches, error, isLoading } = useBranchOptions(source, open);
 	const selected = bareBranchName(value);
 
 	const close = () => {
@@ -93,6 +100,7 @@ export function BranchPicker({
 				<Button
 					className={cn('h-7 gap-1.5 px-1.5 font-medium text-xs', className)}
 					disabled={disabled}
+					id={id}
 					size='sm'
 					variant='ghost'
 				>

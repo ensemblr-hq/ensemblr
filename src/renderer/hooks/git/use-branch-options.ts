@@ -1,8 +1,20 @@
 import { useQuery } from '@tanstack/react-query';
 
-import { repositoryBranchesQuery } from '@/renderer/api/ensemblr/repository-sources';
+import {
+	githubRemoteBranchesQuery,
+	repositoryBranchesQuery,
+} from '@/renderer/api/ensemblr/repository-sources';
 import type { GithubFailure } from '@/shared/ipc/contracts/github';
 import type { RepositoryBranchWire } from '@/shared/ipc/contracts/workspace-sources';
+
+/**
+ * Which repository a branch picker lists. A registered repository is read
+ * through its checkout; one that has not been cloned yet — the clone dialog's
+ * case — is read straight from its GitHub URL.
+ */
+export type BranchOptionsSource =
+	| { kind: 'remote-url'; url: string }
+	| { kind: 'repository'; repositoryId: string };
 
 /** Branch rows for a picker, plus the states it has to render instead of a list. */
 export interface BranchOptionsState {
@@ -16,18 +28,28 @@ export interface BranchOptionsState {
  * picker is open so the query's poll does not run behind a closed popover.
  * A `gh` failure surfaces as a typed error rather than an empty list, since the
  * two are indistinguishable to the user otherwise.
- * @param repositoryId - Repository whose branches to list.
+ * @param source - The repository to list branches for, by id or by URL.
  * @param open - Whether the picker is currently open.
  * @returns The branch rows plus loading and error state.
  */
 export function useBranchOptions(
-	repositoryId: string,
+	source: BranchOptionsSource,
 	open: boolean,
 ): BranchOptionsState {
-	const query = useQuery({
+	const repositoryId = source.kind === 'repository' ? source.repositoryId : '';
+	const url = source.kind === 'remote-url' ? source.url : '';
+	// The two lists carry different query keys, so they cannot share one
+	// `useQuery`. Both are declared and only the one matching `source` is
+	// enabled, which keeps the hook order fixed without fetching twice.
+	const byRepository = useQuery({
 		...repositoryBranchesQuery(repositoryId),
 		enabled: open && repositoryId.length > 0,
 	});
+	const byUrl = useQuery({
+		...githubRemoteBranchesQuery(url),
+		enabled: open && url.length > 0,
+	});
+	const query = source.kind === 'repository' ? byRepository : byUrl;
 
 	return {
 		branches: query.data?.branches ?? [],

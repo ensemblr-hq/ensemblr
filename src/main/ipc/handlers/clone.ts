@@ -4,16 +4,19 @@ import type {
 	CloneDestinationSelectionResult,
 	CloneGithubRepositoryPrepareResult,
 	CloneGithubRepositoryStartResult,
+	GithubRemoteBranchListResult,
 	GithubRepositoryListResult,
 } from '../../../shared/ipc/contracts/clone';
 import type {
 	GithubCloneService,
+	GithubRemoteBranchListService,
 	GithubRepositoryListService,
 } from '../../repository';
 import type { WithPermissionGate } from '../permission-gate.ts';
 import {
 	parseCloneGithubRepositoryRequest,
 	parseCloneGithubRepositoryStartRequest,
+	parseGithubRemoteBranchListRequest,
 	parseGithubRepositoryListRequest,
 } from '../request-schemas.ts';
 import { showDirectorySelectionDialog } from './dialog-helpers.ts';
@@ -25,10 +28,12 @@ import { showDirectorySelectionDialog } from './dialog-helpers.ts';
  */
 export function registerCloneHandlers({
 	githubCloneService,
+	githubRemoteBranchListService,
 	githubRepositoryListService,
 	withPermissionGate,
 }: {
 	githubCloneService: GithubCloneService;
+	githubRemoteBranchListService: GithubRemoteBranchListService;
 	githubRepositoryListService: GithubRepositoryListService;
 	withPermissionGate: WithPermissionGate;
 }): void {
@@ -37,6 +42,15 @@ export function registerCloneHandlers({
 		(_event, request: unknown): Promise<GithubRepositoryListResult> => {
 			return githubRepositoryListService.list(
 				parseGithubRepositoryListRequest(request),
+			);
+		},
+	);
+
+	ipcMain.handle(
+		IPC_CHANNELS.githubRemoteBranchList,
+		(_event, request: unknown): Promise<GithubRemoteBranchListResult> => {
+			return githubRemoteBranchListService.list(
+				parseGithubRemoteBranchListRequest(request),
 			);
 		},
 	);

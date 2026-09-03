@@ -152,11 +152,11 @@ function BranchFromSetting({
 					}
 					onSelectCustomRef={(ref) => save({ branchFrom: ref })}
 					placeholder={repositoryDefault}
-					repositoryId={repoId}
 					searchPlaceholder={t(
 						'settings:repo.branch-from.search-placeholder',
 						'Search or enter a ref…',
 					)}
+					source={{ kind: 'repository', repositoryId: repoId }}
 					value={stringValue(resolved)}
 				/>
 			}

@@ -8,7 +8,6 @@ import type {
 	ListRepositoryIssuesResult,
 	ListRepositoryPullRequestsRequest,
 	ListRepositoryPullRequestsResult,
-	RepositoryBranchWire,
 	RepositoryIssueWire,
 	RepositoryPullRequestWire,
 } from '../../shared/ipc/contracts/workspace-sources';
@@ -17,6 +16,7 @@ import { classifyCommandFailure } from '../github/gh-failures.ts';
 import type { EnsemblrDatabaseService } from '../storage';
 import { selectRepositoryPathById } from '../storage/repositories/repository-row-repository.ts';
 import { listActiveWorkspaceBranchRowsByRepository } from '../storage/repositories/workspace-repository.ts';
+import { fetchRemoteBranches, toBranchWires } from './github-branches.ts';
 import {
 	type CachedRepositoryIssues,
 	readCachedRepositoryIssues,
@@ -26,7 +26,6 @@ import {
 const GH_TIMEOUT_MS = 45_000;
 const GH_MAX_OUTPUT_BYTES = 4 * 1024 * 1024;
 const LIST_LIMIT = 50;
-const BRANCH_LIST_LIMIT = 100;
 const PR_JSON_FIELDS =
 	'number,title,headRefName,baseRefName,author,isDraft,state,updatedAt,url,isCrossRepository';
 const ISSUE_JSON_FIELDS =
@@ -43,25 +42,6 @@ const UNASSIGNED_SEARCH = 'no:assignee';
 // long keeps the board's first paint off that path; a triage backlog does not
 // need second-level freshness, and `refresh` bypasses it when a caller does.
 const ISSUE_CACHE_TTL_MS = 5 * 60_000;
-
-/**
- * Branches that live on the GitHub remote, plus the default branch name so the
- * caller can pin it to the top. Sourced from GitHub (not local refs) so branches
- * deleted/merged on GitHub are excluded automatically. `RefOrder` cannot sort by
- * a branch's commit date (only ALPHABETICAL / TAG_COMMIT_DATE), so each ref's
- * `committedDate` is fetched and {@link parseBranches} sorts newest-first.
- */
-const BRANCHES_QUERY = `query($owner: String!, $name: String!) {
-  repository(owner: $owner, name: $name) {
-    defaultBranchRef { name }
-    refs(refPrefix: "refs/heads/", first: ${BRANCH_LIST_LIMIT}) {
-      nodes {
-        name
-        target { ... on Commit { committedDate } }
-      }
-    }
-  }
-}`;
 
 /**
  * Whether a cached issue list is old enough to be worth re-running `gh` for. An
@@ -265,46 +245,25 @@ export function createRepositorySourcesService({
 				return { branches: [], error: repositoryMissing(), status: 'error' };
 			}
 
-			const result = await runGh(repositoryPath, [
-				'api',
-				'graphql',
-				'-F',
-				'owner={owner}',
-				'-F',
-				'name={repo}',
-				'-f',
-				`query=${BRANCHES_QUERY}`,
-			]);
+			const result = await fetchRemoteBranches({
+				localCommandService,
+				target: { checkoutPath: repositoryPath, kind: 'checkout' },
+			});
 			if (!result.ok) {
 				return { branches: [], error: result.error, status: 'error' };
-			}
-
-			const parsed = parseBranches(result.stdout);
-			if (!parsed) {
-				return {
-					branches: [],
-					error: parseFailure('gh api graphql (branches)'),
-					status: 'error',
-				};
 			}
 
 			const activeBranches = readWorkspaceBranchMap(
 				request.repositoryId,
 				listActiveWorkspaceBranchRowsByRepository,
 			);
-			const branches: RepositoryBranchWire[] = parsed.names.map((name) => {
-				const workspaceId = activeBranches.get(name) ?? null;
-				return {
-					hasWorkspace: workspaceId !== null,
-					isDefault: name === parsed.defaultBranch,
-					name,
-					workspaceId,
-				};
-			});
-			// Pin the default branch (e.g. master/main) to the top; the rest keep
-			// GitHub's newest-commit-first order.
-			branches.sort((a, b) => Number(b.isDefault) - Number(a.isDefault));
-			return { branches, status: 'ok' };
+			return {
+				branches: toBranchWires(
+					result.branches,
+					(name) => activeBranches.get(name) ?? null,
+				),
+				status: 'ok',
+			};
 		},
 
 		async listPullRequests(request) {
@@ -402,59 +361,6 @@ export function createRepositorySourcesService({
 			return recordListedIssues(request.repositoryId, issues, unassignedOnly);
 		},
 	};
-}
-
-/**
- * Parses the branches GraphQL payload into the default branch name plus the
- * branch names (newest commit first); null when the shape is unusable.
- */
-export function parseBranches(
-	stdout: string,
-): { defaultBranch: string | null; names: string[] } | null {
-	let parsed: unknown;
-	try {
-		parsed = JSON.parse(stdout);
-	} catch {
-		return null;
-	}
-	const repository = readRecord(readRecord(parsed)?.data)?.repository;
-	const repositoryRecord = readRecord(repository);
-	if (!repositoryRecord) {
-		return null;
-	}
-	const nodes = readRecord(repositoryRecord.refs)?.nodes;
-	if (!Array.isArray(nodes)) {
-		return null;
-	}
-	const entries: Array<{ committedDate: string; name: string }> = [];
-	for (const node of nodes) {
-		const record = readRecord(node);
-		const name = record?.name;
-		if (typeof name !== 'string' || !name) {
-			continue;
-		}
-		const committedDate = readRecord(record?.target)?.committedDate;
-		entries.push({
-			committedDate: typeof committedDate === 'string' ? committedDate : '',
-			name,
-		});
-	}
-	// Newest commit first; ISO-8601 dates compare lexically. Refs without a date
-	// sort last, and the order is stable for equal keys.
-	entries.sort((a, b) => b.committedDate.localeCompare(a.committedDate));
-
-	const defaultName = readRecord(repositoryRecord.defaultBranchRef)?.name;
-	return {
-		defaultBranch: typeof defaultName === 'string' ? defaultName : null,
-		names: entries.map((entry) => entry.name),
-	};
-}
-
-/** Narrows an unknown value to a plain record, else null. */
-function readRecord(value: unknown): Record<string, unknown> | null {
-	return value && typeof value === 'object'
-		? (value as Record<string, unknown>)
-		: null;
 }
 
 /**

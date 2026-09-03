@@ -188,6 +188,8 @@ export function createEnsemblrApi(): EnsemblrApi {
 			invoke('getWorkspaceGitStatus', request),
 		getWorkspaceMergeConflicts: (request) =>
 			invoke('getWorkspaceMergeConflicts', request),
+		githubRemoteBranchList: (request) =>
+			invoke('githubRemoteBranchList', request),
 		githubRepositoryList: (request) => invoke('githubRepositoryList', request),
 		health: () => invoke('health'),
 		updateStatus: () => invoke('updateStatus'),

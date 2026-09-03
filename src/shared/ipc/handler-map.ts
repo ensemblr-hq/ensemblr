@@ -83,6 +83,8 @@ import type {
 	CloneGithubRepositoryRequest,
 	CloneGithubRepositoryStartRequest,
 	CloneGithubRepositoryStartResult,
+	GithubRemoteBranchListRequest,
+	GithubRemoteBranchListResult,
 	GithubRepositoryListRequest,
 	GithubRepositoryListResult,
 } from './contracts/clone';
@@ -375,6 +377,10 @@ export interface IpcHandlerMap {
 	[IPC_CHANNELS.getWorkspaceMergeConflicts]: IpcHandlerEntry<
 		GetWorkspaceMergeConflictsRequest,
 		GetWorkspaceMergeConflictsResult
+	>;
+	[IPC_CHANNELS.githubRemoteBranchList]: IpcHandlerEntry<
+		GithubRemoteBranchListRequest,
+		GithubRemoteBranchListResult
 	>;
 	[IPC_CHANNELS.githubRepositoryList]: IpcHandlerEntry<
 		GithubRepositoryListRequest | undefined,

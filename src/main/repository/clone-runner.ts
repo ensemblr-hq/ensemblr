@@ -121,7 +121,8 @@ type CloneFallbackOutcome =
 /**
  * Runs `gh repo clone` first; if the binary is missing, falls back to
  * `git clone`. Surfaces a `both-missing` signal when neither command is
- * available so callers can emit the appropriate diagnostic.
+ * available so callers can emit the appropriate diagnostic. A prepared
+ * `branch` is passed through to git on either leg.
  */
 export async function runCloneWithFallback({
 	cwd,
@@ -134,6 +135,8 @@ export async function runCloneWithFallback({
 	preparation: CloneGithubRepositoryPreparation;
 	runner: CloneCommandRunner;
 }): Promise<CloneFallbackOutcome> {
+	const branchArgs = preparation.branch ? ['--branch', preparation.branch] : [];
+
 	const ghAttempt = await runAttempt({
 		command: 'gh',
 		args: [
@@ -143,6 +146,7 @@ export async function runCloneWithFallback({
 			preparation.targetPath,
 			'--',
 			...CLONE_PROGRESS_GIT_ARGS,
+			...branchArgs,
 		],
 		cwd,
 		emit,
@@ -159,6 +163,7 @@ export async function runCloneWithFallback({
 		args: [
 			'clone',
 			...CLONE_PROGRESS_GIT_ARGS,
+			...branchArgs,
 			preparation.sanitizedUrl,
 			preparation.targetPath,
 		],
