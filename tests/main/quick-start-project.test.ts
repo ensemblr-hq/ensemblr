@@ -357,3 +357,92 @@ test('create rolls back the directory when registration fails', async (t) => {
 	assert.equal(result.diagnostics[0]?.code, 'register-failed');
 	assert.equal(existsSync(path.join(repositoriesPath, 'my-app')), false);
 });
+
+test('create publishes under the requested owner', async (t) => {
+	const { repositoriesPath } = createWorkspace(t);
+	const calls: LocalCommandRequest[] = [];
+	const service = createQuickStartProjectService({
+		localCommandService: commandServiceStub({ calls, onRun: gitInitSuccess }),
+		registrationService: registrationStub(path.join(repositoriesPath, 'my-app'))
+			.service,
+		rootDirectoryService: rootDirectoryStub(repositoriesPath),
+	});
+
+	const result = await service.create({ name: 'my-app', owner: 'ensemblr-hq' });
+
+	assert.equal(result.status, 'success');
+	assert.equal(calls[3]?.command, 'gh');
+	assert.deepEqual(Array.from(calls[3]?.args ?? []).slice(0, 3), [
+		'repo',
+		'create',
+		'ensemblr-hq/my-app',
+	]);
+});
+
+test('create leaves the repo name unprefixed when no owner is given', async (t) => {
+	const { repositoriesPath } = createWorkspace(t);
+	const calls: LocalCommandRequest[] = [];
+	const service = createQuickStartProjectService({
+		localCommandService: commandServiceStub({ calls, onRun: gitInitSuccess }),
+		registrationService: registrationStub(path.join(repositoriesPath, 'my-app'))
+			.service,
+		rootDirectoryService: rootDirectoryStub(repositoriesPath),
+	});
+
+	const result = await service.create({ name: 'my-app', owner: '   ' });
+
+	assert.equal(result.status, 'success');
+	assert.deepEqual(Array.from(calls[3]?.args ?? []).slice(0, 3), [
+		'repo',
+		'create',
+		'my-app',
+	]);
+});
+
+test('create rejects an invalid owner before touching the filesystem', async (t) => {
+	const { repositoriesPath } = createWorkspace(t);
+	const calls: LocalCommandRequest[] = [];
+	const service = createQuickStartProjectService({
+		localCommandService: commandServiceStub({ calls, onRun: gitInitSuccess }),
+		registrationService: registrationStub(path.join(repositoriesPath, 'my-app'))
+			.service,
+		rootDirectoryService: rootDirectoryStub(repositoriesPath),
+	});
+
+	const result = await service.create({ name: 'my-app', owner: 'bad owner/x' });
+
+	assert.equal(result.status, 'failure');
+	assert.equal(result.diagnostics[0]?.code, 'owner-invalid');
+	assert.equal(calls.length, 0);
+	assert.equal(existsSync(path.join(repositoriesPath, 'my-app')), false);
+});
+
+test('create applies GitHub own login rule to the owner', async (t) => {
+	const { repositoriesPath } = createWorkspace(t);
+	const service = createQuickStartProjectService({
+		localCommandService: commandServiceStub({
+			calls: [],
+			onRun: gitInitSuccess,
+		}),
+		registrationService: registrationStub(path.join(repositoriesPath, 'my-app'))
+			.service,
+		rootDirectoryService: rootDirectoryStub(repositoriesPath),
+	});
+
+	const rejected = ['acme-', '-acme', 'a--b', 'ac_me', 'a'.repeat(40)];
+	for (const owner of rejected) {
+		const result = await service.create({ name: 'my-app', owner });
+		assert.equal(result.status, 'failure', `${owner} should be rejected`);
+		assert.equal(result.diagnostics[0]?.code, 'owner-invalid');
+	}
+
+	const accepted = ['a', 'ensemblr-hq', 'a-b-c', 'a'.repeat(39)];
+	for (const [index, owner] of accepted.entries()) {
+		const result = await service.create({ name: `app-${index}`, owner });
+		assert.notEqual(
+			result.diagnostics[0]?.code,
+			'owner-invalid',
+			`${owner} should be accepted`,
+		);
+	}
+});

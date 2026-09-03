@@ -35,6 +35,12 @@ export interface CreateQuickStartProjectServiceOptions {
 
 const PROJECT_NAME_PATTERN = /^[A-Za-z0-9._-]+$/;
 const PROJECT_NAME_MAX_LENGTH = 100;
+// GitHub's own login rule: alphanumerics or *single* hyphens, never leading or
+// trailing, 39 characters at most. The lookahead is what forbids `a--b` and
+// `acme-` while keeping every repetition exactly one character wide, so the
+// `{0,38}` bound stays a character count rather than a hyphen-pair count.
+const GITHUB_OWNER_PATTERN =
+	/^[A-Za-z0-9](?:[A-Za-z0-9]|-(?=[A-Za-z0-9])){0,38}$/;
 const GIT_INIT_TIMEOUT_MS = 5000;
 const GIT_ADD_TIMEOUT_MS = 5000;
 const GIT_COMMIT_TIMEOUT_MS = 5000;
@@ -72,6 +78,12 @@ export function createQuickStartProjectService({
 			return failureResult({ diagnostic: nameDiagnostic, targetPath: '' });
 		}
 		const name = request.name.trim();
+
+		const ownerDiagnostic = validateOwner(request.owner);
+		if (ownerDiagnostic) {
+			return failureResult({ diagnostic: ownerDiagnostic, targetPath: '' });
+		}
+		const owner = request.owner?.trim() || null;
 
 		const rootSnapshot =
 			rootDirectoryService.getSnapshot() ?? rootDirectoryService.ensure();
@@ -158,6 +170,7 @@ export function createQuickStartProjectService({
 			cwd: targetPath,
 			localCommandService,
 			name: projectName,
+			owner,
 		});
 		if (publishWarning) {
 			warnings.push(publishWarning);
@@ -222,6 +235,39 @@ function validateName(name: unknown): QuickStartProjectDiagnostic | null {
 			code: 'name-invalid',
 			message:
 				'Project names may only contain letters, numbers, dots, dashes, or underscores.',
+			severity: 'error',
+		};
+	}
+	return null;
+}
+
+/**
+ * Rejects owner logins GitHub itself would reject, so a typo fails before the
+ * project directory is created rather than as a publish warning afterwards. An
+ * absent or empty owner is valid and means "publish under the signed-in user".
+ * @param owner - Raw owner login from the request, if any.
+ * @returns A diagnostic when the login is unusable, otherwise `null`.
+ */
+function validateOwner(owner: unknown): QuickStartProjectDiagnostic | null {
+	if (owner === undefined || owner === null) {
+		return null;
+	}
+	if (typeof owner !== 'string') {
+		return {
+			code: 'owner-invalid',
+			message: 'The GitHub owner must be a login string.',
+			severity: 'error',
+		};
+	}
+	const trimmed = owner.trim();
+	if (trimmed.length === 0) {
+		return null;
+	}
+	if (!GITHUB_OWNER_PATTERN.test(trimmed)) {
+		return {
+			code: 'owner-invalid',
+			message:
+				'GitHub owner logins may only contain letters, numbers, and single dashes, and cannot start or end with a dash.',
 			severity: 'error',
 		};
 	}
@@ -492,21 +538,26 @@ async function runStageGitkeep({
  * `--source` makes `gh` create the remote and push from the local repo;
  * `--remote origin` fixes the remote name the workspace GitHub panel expects;
  * `--private` keeps new projects out of public view by default.
+ *
+ * A `null` owner leaves the name unprefixed, which is how `gh` decides to
+ * create under the signed-in user; an owner publishes into that organization.
  */
 async function runPublishToGithub({
 	cwd,
 	localCommandService,
 	name,
+	owner,
 }: {
 	cwd: string;
 	localCommandService: LocalCommandService;
 	name: string;
+	owner: string | null;
 }): Promise<QuickStartProjectDiagnostic | null> {
 	const result = await localCommandService.run({
 		args: [
 			'repo',
 			'create',
-			name,
+			owner ? `${owner}/${name}` : name,
 			'--private',
 			'--source',
 			cwd,

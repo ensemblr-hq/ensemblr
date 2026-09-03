@@ -95,6 +95,7 @@ export const IPC_CHANNELS = {
 	mergePullRequest: 'ensemblr:merge-pull-request',
 	pushWorkspaceBranch: 'ensemblr:push-workspace-branch',
 	githubRemoteBranchList: 'ensemblr:github-remote-branch-list',
+	githubOwnerList: 'ensemblr:github-owner-list',
 	githubRepositoryList: 'ensemblr:github-repository-list',
 	listRepositoryBranches: 'ensemblr:list-repository-branches',
 	listRepositoryPullRequests: 'ensemblr:list-repository-pull-requests',

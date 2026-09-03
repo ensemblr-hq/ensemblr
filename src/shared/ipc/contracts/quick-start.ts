@@ -12,6 +12,7 @@ export type QuickStartProjectDiagnosticCode =
 	| 'name-already-in-use'
 	| 'name-invalid'
 	| 'name-required'
+	| 'owner-invalid'
 	| 'publish-failed'
 	| 'register-failed';
 
@@ -29,6 +30,7 @@ export interface QuickStartProjectDiagnostic {
 /** Request to scaffold a new quick-start project. */
 export interface QuickStartProjectRequest {
 	name: string;
+	owner?: string;
 	parentPath?: string;
 }
 
@@ -43,8 +45,43 @@ export interface QuickStartProjectResult {
 	targetPath: string;
 }
 
+/**
+ * Why a GitHub owner cannot receive a new repository.
+ * `owner-access-restricted` covers an organization the token cannot reach at
+ * all (SAML SSO, an enterprise 2FA policy); `owner-create-restricted` covers a
+ * reachable organization that reserves repository creation for its owners.
+ */
+export type GithubOwnerRestrictionCode =
+	| 'owner-access-restricted'
+	| 'owner-create-restricted';
+
+/** Why an owner is unpickable, as a translatable code plus main's own wording. */
+export interface GithubOwnerRestriction {
+	code: GithubOwnerRestrictionCode;
+	message: string;
+}
+
+/** One selectable GitHub account a quick-start project can be published under. */
+export interface GithubOwnerEntry {
+	avatarUrl: string | null;
+	canCreate: boolean;
+	displayName: string | null;
+	kind: 'organization' | 'user';
+	login: string;
+	restriction: GithubOwnerRestriction | null;
+}
+
+/** Result of enumerating the GitHub accounts the signed-in user belongs to. */
+export interface GithubOwnerListResult {
+	error?: string;
+	generatedAt: string;
+	owners: GithubOwnerEntry[];
+	status: 'failure' | 'success';
+}
+
 /** Quick-start project scaffolding IPC surface. */
 export interface QuickStartApi {
+	githubOwnerList: () => Promise<GithubOwnerListResult>;
 	quickStartProject: (
 		request: QuickStartProjectRequest,
 	) => Promise<QuickStartProjectResult>;

@@ -83,6 +83,11 @@ export type {
 } from './list-archived-workspaces.ts';
 export { createListArchivedWorkspacesService } from './list-archived-workspaces.ts';
 export type {
+	CreateGithubOwnerListServiceOptions,
+	GithubOwnerListService,
+} from './list-github-owners.ts';
+export { createGithubOwnerListService } from './list-github-owners.ts';
+export type {
 	CreateGithubRemoteBranchListServiceOptions,
 	GithubRemoteBranchListService,
 } from './list-github-remote-branches.ts';

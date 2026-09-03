@@ -38,6 +38,7 @@ import type {
 	DeleteRepositoryService,
 	DeleteWorkspaceService,
 	GithubCloneService,
+	GithubOwnerListService,
 	GithubRemoteBranchListService,
 	GithubRepositoryListService,
 	ListAllWorkspacesService,
@@ -129,9 +130,10 @@ interface RegisterIpcHandlersOptions {
 	/** Resolves the Infisical service, which is rebuilt when the database connection changes. */
 	getInfisicalService: () => InfisicalService | null;
 	githubCloneService: GithubCloneService;
-	harnessDetectionService: HarnessDetectionService;
+	githubOwnerListService: GithubOwnerListService;
 	githubRemoteBranchListService: GithubRemoteBranchListService;
 	githubRepositoryListService: GithubRepositoryListService;
+	harnessDetectionService: HarnessDetectionService;
 	linearAuthService: LinearAuthService;
 	linearService: LinearService;
 	listAllWorkspacesService: ListAllWorkspacesService;
@@ -206,6 +208,7 @@ export function registerIpcHandlers({
 	environmentVariablesService,
 	getInfisicalService,
 	githubCloneService,
+	githubOwnerListService,
 	githubRemoteBranchListService,
 	githubRepositoryListService,
 	harnessDetectionService,
@@ -287,6 +290,7 @@ export function registerIpcHandlers({
 		deleteArchivedWorkspaceService,
 		deleteRepositoryService,
 		deleteWorkspaceService,
+		githubOwnerListService,
 		listAllWorkspacesService,
 		listArchivedWorkspacesService,
 		localRepositoryImportService,

@@ -135,6 +135,7 @@ import type {
 	OpenWorkspaceInTargetRequest,
 } from './contracts/open-target';
 import type {
+	GithubOwnerListResult,
 	QuickStartProjectRequest,
 	QuickStartProjectResult,
 } from './contracts/quick-start';
@@ -382,6 +383,7 @@ export interface IpcHandlerMap {
 		GithubRemoteBranchListRequest,
 		GithubRemoteBranchListResult
 	>;
+	[IPC_CHANNELS.githubOwnerList]: IpcHandlerEntry<void, GithubOwnerListResult>;
 	[IPC_CHANNELS.githubRepositoryList]: IpcHandlerEntry<
 		GithubRepositoryListRequest | undefined,
 		GithubRepositoryListResult

@@ -221,6 +221,25 @@ function storedLastRunScriptWorkspaceIds(): string[] {
 // localStorage-only with no consumers; they now back the `app.git` section and
 // feed the repository settings resolver as the `user-default` source.
 
+// ─── Quick start (user) ───────────────────────────────────────────────────────
+
+/**
+ * Organization the last quick-start project was published under, so a user who
+ * works out of an organization is not sent back to their personal account on
+ * every new project. `null` means the signed-in user, and is written back
+ * whenever the personal account is picked, so the atom answers "does this user
+ * publish into an organization?" rather than just naming the last owner. The
+ * quick-start flow reads it that way twice: to preselect the organization, and
+ * to decide whether Create is worth holding while `gh` answers. The stored
+ * login is only honoured when it still appears in the owner list and can still
+ * receive repositories, so revoked access falls back rather than failing at
+ * publish.
+ */
+export const lastQuickStartOwnerAtom = atomWithStorage<string | null>(
+	KEY('last_quick_start_owner'),
+	null,
+);
+
 // ─── Diff viewer (user) ────────────────────────────────────────────────────────
 
 /** Column layout of the diff viewer: one unified column or side-by-side split. */

@@ -78,6 +78,7 @@ export {
 	filePreviewWordWrapAtom,
 	forgetChatOverrides,
 	forgetLastRunScript,
+	lastQuickStartOwnerAtom,
 	lastRunScriptAtomFamily,
 	prDetailsDraftAtomFamily,
 	prDetailsLiveDraftAtomFamily,

@@ -1,6 +1,11 @@
+import { useQuery } from '@tanstack/react-query';
 import { Outlet, useChildMatches } from '@tanstack/react-router';
 import { useAtom } from 'jotai';
 import { useMemo } from 'react';
+import {
+	githubOwnerListQuery,
+	isEnsemblrApiAvailable,
+} from '@/renderer/api/ensemblr-queries';
 import { ConciergeLauncher } from '@/renderer/components/concierge';
 import { CloneGithubDialog } from '@/renderer/components/welcome/clone-github-dialog';
 import { LocalProjectImportDialog } from '@/renderer/components/welcome/local-project-import-dialog';
@@ -53,6 +58,13 @@ export function WorkbenchShellLayout() {
 	const [cloneOpen, setCloneOpen] = useAtom(cloneDialogOpenAtom);
 	const [localProjectImportOpen] = useAtom(localProjectImportDialogOpenAtom);
 	const [quickStartOpen, setQuickStartOpen] = useAtom(quickStartDialogOpenAtom);
+	// Warm the GitHub owner cache for QuickStartDialog, which is hosted here and
+	// blocks Create until the list lands. Two `gh` round trips, once per session
+	// — the result is read from the React Query cache, never from here.
+	useQuery({
+		...githubOwnerListQuery,
+		enabled: isEnsemblrApiAvailable(),
+	});
 
 	return (
 		<NavigationProvider value={navigation}>

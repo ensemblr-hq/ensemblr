@@ -13,6 +13,7 @@ import {
 } from '@/renderer/components/ui/dialog';
 import { Input } from '@/renderer/components/ui/input';
 import { Label } from '@/renderer/components/ui/label';
+import { QuickStartOwnerField } from '@/renderer/components/welcome/quick-start-owner-field';
 import { useKeymapHandler } from '@/renderer/hooks/use-keymap-handler';
 import { useQuickStartFlow } from '@/renderer/hooks/welcome/use-quick-start-flow';
 import {
@@ -54,11 +55,15 @@ function QuickStartDialogForm({
 		defaultParentPath,
 		diagnostics,
 		isBusy,
+		owner,
+		owners,
+		ownersLoading,
 		parentPath,
 		parentPathOverride,
 		pickParentPath,
 		resetParentPath,
 		retry,
+		setOwner,
 		setParentPathOverride,
 		stage,
 		startQuickStart,
@@ -77,6 +82,7 @@ function QuickStartDialogForm({
 	});
 	const canCreate =
 		!isBusy &&
+		!ownersLoading &&
 		trimmedName.length > 0 &&
 		nameIssue === null &&
 		isEnsemblrApiAvailable();
@@ -152,6 +158,14 @@ function QuickStartDialogForm({
 					</p>
 				) : null}
 			</div>
+
+			<QuickStartOwnerField
+				disabled={isBusy}
+				loading={ownersLoading}
+				onSelect={setOwner}
+				owners={owners}
+				value={owner}
+			/>
 
 			<div className='flex flex-col gap-1.5'>
 				<Label className='text-xs' htmlFor='quick-start-parent'>

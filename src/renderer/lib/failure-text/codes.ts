@@ -687,6 +687,11 @@ export const APP_FAILURE_TEXT: Record<
 			'errors:failure.pruned-snapshot-restore-failed',
 			'The branch was checked out, but the uncommitted changes saved when the workspace was archived could not be restored.',
 		),
+	'owner-invalid': (t) =>
+		t(
+			'errors:failure.owner-invalid',
+			'That GitHub owner is not a valid login.',
+		),
 	'publish-failed': (t) =>
 		t(
 			'errors:failure.publish-failed',
