@@ -101,6 +101,7 @@ Rules of thumb:
 | Token | Токен | Διακριτικό | Model context unit. Localized in both — it is not git porcelain and not a proper noun. |
 | Dictation | Диктовка | Υπαγόρευση | Speaking a prompt into the composer. The feature, and the verb on its control (`Продиктовать`/`Υπαγόρευση`). |
 | Transcription | Транскрибация | Μεταγραφή | Turning the recorded clip into text. Russian takes `транскрибация` over `расшифровка`, which also reads as *decryption*; Greek takes `μεταγραφή` over the much longer `απομαγνητοφώνηση`. |
+| Transcript | Транскрипт | Μεταγραφή | The `.context/sessions` summary a chat leaves behind, offered back to a new chat as a chip — a *thing on disk*, as against `Transcription`, which is the dictation act. Russian separates the two (`транскрипт` / `транскрибация`); **Greek deliberately does not** — `μεταγραφή` covers both, and the alternatives (`απομαγνητοφώνηση`, `απόγραφο`) are either far longer or read as a legal copy. The surrounding noun disambiguates: `μεταγραφή συνομιλίας` is this row, a bare `μεταγραφή` on a dictation control is the other. Russian names the chat it came from with `диалог` per the `Chat` row, since a transcript only exists for a thread that is over. |
 | Microphone | Микрофон | Μικρόφωνο | |
 | API key | Ключ API | Κλειδί API | `API` stays Latin in both — it is an initialism, not a translatable noun. |
 | Remote | Удалённый | Απομακρυσμένο | The adjective is localized; the remote's *name* (`origin`) is not. |

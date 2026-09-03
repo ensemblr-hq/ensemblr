@@ -124,6 +124,7 @@ export function attachmentPreviewPath(
 	attachment: ComposerAttachment,
 ): string | null {
 	switch (attachment.kind) {
+		case 'chat-transcript':
 		case 'file-diff':
 		case 'issue':
 		case 'pasted-text':

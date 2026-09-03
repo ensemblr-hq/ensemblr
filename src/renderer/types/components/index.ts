@@ -1,3 +1,4 @@
+export type { AttachmentMark } from './attachment-mark';
 export type {
 	ChecksGitStatusSection,
 	ChecksPanelState,

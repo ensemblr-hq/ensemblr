@@ -29,6 +29,7 @@ const CHAT: ConciergeReference = {
 	chatTabId: 'tab-1',
 	kind: 'chat',
 	label: 'Smoke test',
+	role: 'orchestrator',
 	state: 'open',
 	workspace: 'beta-16',
 	workspaceId: 'ws-new',

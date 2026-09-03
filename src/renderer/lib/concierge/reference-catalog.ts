@@ -1,3 +1,4 @@
+import { isSubAgentTab } from '@/renderer/lib/workbench/sub-agent-tab';
 import type { ProjectShellModel } from '@/renderer/types/workbench';
 import {
 	type ConciergeReference,
@@ -133,7 +134,9 @@ export function conciergeReferenceAttachment(reference: ConciergeReference): {
 /**
  * The chip glyph a reference wears, which is its own kind for the three app
  * surfaces and a file for an artifact — a document on disk, so the file tree's
- * own icon set reads it by extension and a `.md` report looks like one.
+ * own icon set reads it by extension and a `.md` report looks like one. A chat
+ * hosting a spawned sub-agent is told apart from a root one, since which of the
+ * two a name points at is the whole reason to point at it.
  *
  * Returned as a literal union rather than typed against `ChatAttachmentChipKind`
  * so this module stays clear of the component tree it feeds.
@@ -142,8 +145,13 @@ export function conciergeReferenceAttachment(reference: ConciergeReference): {
  */
 export function conciergeReferenceChipKind(
 	reference: ConciergeReference,
-): 'chat' | 'file' | 'project' | 'workspace' {
-	return reference.kind === 'artifact' ? 'file' : reference.kind;
+): 'chat' | 'file' | 'project' | 'subagent-chat' | 'workspace' {
+	if (reference.kind === 'artifact') {
+		return 'file';
+	}
+	return reference.kind === 'chat' && reference.role === 'subagent'
+		? 'subagent-chat'
+		: reference.kind;
 }
 
 /**
@@ -197,6 +205,9 @@ function chatReferences(
 						chatTabId: tab.id,
 						kind: 'chat' as const,
 						label,
+						role: isSubAgentTab(tab)
+							? ('subagent' as const)
+							: ('orchestrator' as const),
 						state,
 						workspace,
 						workspaceId: tab.workspaceId,

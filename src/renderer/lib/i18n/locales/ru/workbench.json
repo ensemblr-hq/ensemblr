@@ -879,6 +879,7 @@
 	"new-chat": {
 		"aria-label": "Пустое состояние нового чата",
 		"headline": "Новый чат в <path>/{{workspaceName}}</path>.",
+		"subagent-transcript-aria": "{{title}} — транскрипт диалога суб-агента",
 		"transcript-unavailable": "Для этого диалога не сохранён транскрипт, поэтому его нельзя прикрепить.",
 		"transcript-unavailable-aria": "{{title}} — для этого диалога не сохранён транскрипт, поэтому его нельзя прикрепить.",
 		"transcripts-label": "Добавить транскрипты чатов:",

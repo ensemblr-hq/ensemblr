@@ -175,8 +175,11 @@ function PromptParts({ parts }: { parts: readonly ParsedPromptPart[] }) {
 					<span className={hostClassName} key={key}>
 						<ChatAttachmentChip
 							className={INLINE_CHIP_CLASS}
-							kind={attachment.content.length > 0 ? 'file' : 'folder'}
-							label={chipLabelForPath(attachment.path)}
+							kind={
+								attachment.mark ??
+								(attachment.content.length > 0 ? 'file' : 'folder')
+							}
+							label={attachment.label ?? chipLabelForPath(attachment.path)}
 							onActivate={
 								openFilePreview && isPlaceable
 									? () => openFilePreview(attachment.path)

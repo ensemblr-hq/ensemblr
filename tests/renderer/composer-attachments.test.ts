@@ -287,6 +287,20 @@ describe('attachTerminalSelection', () => {
 		expect(storedFilename()).toBe('terminal-2-selection.txt');
 	});
 
+	// A transcript is a real file under `.context/sessions`, so the chip has to
+	// keep opening it — the kind of its own says nothing about that.
+	test('leaves a chat transcript previewable at its summary file', () => {
+		expect(
+			attachmentPreviewPath({
+				id: 'transcript:tab-1',
+				isSubAgent: true,
+				kind: 'chat-transcript',
+				label: 'Concierge: allow duplicate chips',
+				path: '.context/sessions/b4d21395.md',
+			}),
+		).toBe('.context/sessions/b4d21395.md');
+	});
+
 	test('propagates a write failure so the caller can surface it', async () => {
 		writeWorkspaceFileAttachment.mockResolvedValueOnce({
 			error: { code: 'write-failed', message: 'disk full' },

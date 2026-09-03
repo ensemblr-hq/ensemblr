@@ -7,6 +7,7 @@
  */
 
 import type { DynamicToolUIPart, UIMessage } from 'ai';
+import type { AttachmentMark } from '@/renderer/types/components';
 import type { ConciergeReference } from '@/shared/concierge-references';
 
 import type { AgentWireError } from '@/shared/ipc/contracts/agent-session';
@@ -116,9 +117,19 @@ export interface AgentFailureMetadata {
 	failure: AgentWireError;
 }
 
-/** One file attachment parsed from a persisted user prompt (path + inlined content). */
+/**
+ * One file attachment parsed from a persisted user prompt: the path it was read
+ * from, its inlined content, and — when the composer wrote them — the name and
+ * glyph the chip carried at send time. A `.context/` document is addressed by a
+ * generated filename, so without those the sent bubble can only show a bare
+ * `<uuid>.md` where the composer showed a chat title or an issue.
+ */
 export interface ParsedPromptAttachment {
 	content: string;
+	/** Human-readable name the chip showed; absent when the path names itself. */
+	label?: string;
+	/** Glyph the chip wore; absent for a plain file or folder. */
+	mark?: AttachmentMark;
 	path: string;
 }
 

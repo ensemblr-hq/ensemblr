@@ -1,5 +1,6 @@
 import { i18n } from '@/renderer/lib/i18n';
 import { formatRelativeTimestamp } from '@/renderer/lib/workbench/relative-time';
+import { isSubAgentTab } from '@/renderer/lib/workbench/sub-agent-tab';
 import type { SessionTabModel } from '@/renderer/types/workbench';
 import type { AgentSessionSnapshotWire } from '@/shared/ipc/contracts/agent-session';
 import type {
@@ -115,7 +116,7 @@ export function toSessionTabModel(
 		fullLabel: tab.fullTitle || tab.title || untitledOpenTabLabel(tab),
 		id: tab.id,
 		isPreview: tab.isPreview,
-		isSubAgent: tab.metadata.agentRole === 'subagent',
+		isSubAgent: isSubAgentTab(tab),
 		label: tab.title || untitledOpenTabLabel(tab),
 		status: deriveTabStatus(agentSession),
 		summary: '',
@@ -173,7 +174,7 @@ export function toClosedSessionTabModel(
 			untitledClosedTabLabel(),
 		id: entry.tab.id,
 		isPreview: false,
-		isSubAgent: entry.tab.metadata.agentRole === 'subagent',
+		isSubAgent: isSubAgentTab(entry.tab),
 		// Prefer the short chat-title that was visible on the open tab. The
 		// LLM-derived summary title is verbose and often diverges from what
 		// the user saw, so it is only used when no tab title exists.

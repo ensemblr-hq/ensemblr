@@ -1,4 +1,5 @@
 import { readWorkspaceFile } from '@/renderer/api/ensemblr-queries';
+import { attachmentMark } from '@/renderer/lib/attachment-mark';
 import { isReferenceAttachment } from '@/renderer/lib/workbench/composer-attachments';
 import type {
 	ComposerAttachment,
@@ -75,9 +76,30 @@ const ATTACHMENT_PLACEHOLDER =
 	'[attachment saved in the workspace — inspect this file directly if needed]';
 const EXTERNAL_PLACEHOLDER = '[external file — inspect this path directly]';
 
-/** Wraps one workspace file's content in the shared attachment marker, truncated to budget. */
-function formatAttachedFileSection(pathValue: string, content: string): string {
-	return formatAttachedFileBlock(pathValue, truncateAttachmentContent(content));
+/**
+ * Wraps one attachment's content in the shared marker, truncated to budget and
+ * carrying what the chip showed.
+ *
+ * The descriptor is what lets the sent message render the chip the user
+ * arranged rather than the file it happened to be written to: a transcript, an
+ * issue, a patch, and a review comment are all `.context/` documents named by a
+ * generated id, so the path alone reads back as an anonymous `.md`.
+ * @param attachment - The attachment being serialized.
+ * @param content - The inlined body, before truncation.
+ * @returns The `<attached_file>` block.
+ */
+function formatAttachedFileSection(
+	attachment: ComposerAttachment,
+	content: string,
+): string {
+	const mark = attachmentMark(attachment);
+	return formatAttachedFileBlock(
+		attachmentPromptPath(attachment),
+		truncateAttachmentContent(content),
+		{
+			...(mark ? { label: attachment.label, mark } : {}),
+		},
+	);
 }
 
 /**
@@ -231,7 +253,7 @@ function segmentBlock(
 		return formatConciergeReferenceBlock(segment.attachment.reference);
 	}
 	return formatAttachedFileSection(
-		attachmentPromptPath(segment.attachment),
+		segment.attachment,
 		contentByAttachment.get(segment.attachment.id) ?? ATTACHMENT_PLACEHOLDER,
 	);
 }

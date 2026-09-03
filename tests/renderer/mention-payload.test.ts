@@ -271,7 +271,7 @@ describe('serializeComposerDraft with a review comment', () => {
 			[
 				'address',
 				'',
-				'<attached_file path=".context/attachments/ab12cd/review-comment-github-page-tsx-57.md">',
+				'<attached_file path=".context/attachments/ab12cd/review-comment-github-page-tsx-57.md" label="page.tsx:57" mark="review-comment-github">',
 				'# Review comment on page.tsx:57',
 				'</attached_file>',
 				'',

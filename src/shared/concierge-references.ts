@@ -19,6 +19,11 @@
  * nothing but a reference this app minted can reach the chip renderer.
  */
 
+import {
+	escapeBlockAttribute,
+	readBlockAttributes,
+} from './block-attributes.ts';
+
 /** What a reference points at. A project has no focusable surface; the others do. */
 export type ConciergeReferenceKind =
 	| 'artifact'
@@ -41,6 +46,13 @@ export const CONCIERGE_MEMORY_DIRECTORY = 'memory';
 
 /** Whether a chat tab is still open, which decides whether a click restores it first. */
 export type ConciergeChatReferenceState = 'closed' | 'open';
+
+/**
+ * Whether a chat tab hosts a spawned sub-agent, which is what its chip wears a
+ * robot for. Read off the tab's durable marker rather than from lineage, so a
+ * child that has already finished still reads as one.
+ */
+export type ConciergeChatReferenceRole = 'orchestrator' | 'subagent';
 
 /**
  * One reference, in the form both the prompt block and the chip read it. The
@@ -81,6 +93,7 @@ export type ConciergeReference =
 			chatTabId: string;
 			kind: 'chat';
 			label: string;
+			role: ConciergeChatReferenceRole;
 			state: ConciergeChatReferenceState;
 			/** Name of the workspace holding the tab, for the chip's tooltip. */
 			workspace: string;
@@ -185,9 +198,6 @@ function decodeReferenceId(
 	}
 }
 
-/** One `name="value"` pair inside a reference block. */
-const BLOCK_ATTRIBUTE = /([a-z][a-zA-Z]*)="([^"]*)"/g;
-
 /**
  * The link destination a reference is written as, which the Concierge puts in an
  * ordinary markdown link so the label stays readable if the id no longer
@@ -253,7 +263,7 @@ export function formatConciergeReferenceBlock(
 	reference: ConciergeReference,
 ): string {
 	const attributes = referenceAttributes(reference)
-		.map(([name, value]) => `${name}="${escapeAttribute(value)}"`)
+		.map(([name, value]) => `${name}="${escapeBlockAttribute(value)}"`)
 		.join(' ');
 	return `<${BLOCK_TAG_PREFIX}${reference.kind} ${attributes} />`;
 }
@@ -286,7 +296,7 @@ export function parseConciergeReferenceBlock(
 	if (!isReferenceKind(kind)) {
 		return null;
 	}
-	const values = blockAttributes(rawAttributes);
+	const values = readBlockAttributes(rawAttributes);
 	const label = values.get(labelAttribute(kind)) ?? '';
 	if (kind === 'artifact') {
 		const written = values.get('path');
@@ -321,6 +331,7 @@ export function parseConciergeReferenceBlock(
 				chatTabId,
 				kind,
 				label,
+				role: values.get('role') === 'subagent' ? 'subagent' : 'orchestrator',
 				state: values.get('state') === 'closed' ? 'closed' : 'open',
 				workspace: values.get('workspace') ?? '',
 				workspaceId,
@@ -407,52 +418,8 @@ function referenceAttributes(
 		['workspace', reference.workspace],
 		['agentSessionId', reference.agentSessionId ?? ''],
 		['state', reference.state],
+		['role', reference.role],
 	];
-}
-
-/**
- * Reads a block's `name="value"` run back into a lookup, unescaping the quotes
- * {@link escapeAttribute} put in.
- * @param rawAttributes - The block's attribute run.
- * @returns Attribute name to value.
- */
-function blockAttributes(rawAttributes: string): ReadonlyMap<string, string> {
-	const values = new Map<string, string>();
-	for (const match of rawAttributes.matchAll(BLOCK_ATTRIBUTE)) {
-		values.set(match[1] ?? '', unescapeAttribute(match[2] ?? ''));
-	}
-	return values;
-}
-
-/**
- * Escapes every character that could end an attribute — or the whole block —
- * early. `>` matters as much as `"`: {@link conciergeReferenceBlockPattern}
- * scans the attribute run as `[^>]*?`, so one in an agent-written chat title
- * leaves the block unmatched and the prompt renders its own markup as prose.
- * @param value - The raw attribute value.
- * @returns The value with its structural characters entity-escaped.
- */
-function escapeAttribute(value: string): string {
-	return value
-		.replaceAll('&', '&amp;')
-		.replaceAll('"', '&quot;')
-		.replaceAll('<', '&lt;')
-		.replaceAll('>', '&gt;');
-}
-
-/**
- * Reads an attribute value back, undoing {@link escapeAttribute}. `&amp;` is
- * undone last so a value that spelled out `&quot;` comes back as those six
- * characters rather than as a quote.
- * @param value - The escaped attribute value.
- * @returns The original text.
- */
-function unescapeAttribute(value: string): string {
-	return value
-		.replaceAll('&quot;', '"')
-		.replaceAll('&lt;', '<')
-		.replaceAll('&gt;', '>')
-		.replaceAll('&amp;', '&');
 }
 
 /** Narrows a raw string to a reference kind. */

@@ -24,6 +24,7 @@ const CHAT: ConciergeReference = {
 	chatTabId: 'tab-1',
 	kind: 'chat',
 	label: 'Concierge "@" chips',
+	role: 'orchestrator',
 	state: 'closed',
 	workspace: 'khachaturian',
 	workspaceId: 'ws-1',

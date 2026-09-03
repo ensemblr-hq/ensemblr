@@ -63,8 +63,8 @@ function AttachmentProbe() {
 		<ul data-testid='queued'>
 			{pending.map((attachment) => (
 				<li key={attachment.id}>
-					{attachment.kind === 'workspace-file'
-						? `${attachment.id}|${attachment.path}`
+					{attachment.kind === 'chat-transcript'
+						? `${attachment.id}|${attachment.path}|${attachment.isSubAgent}`
 						: `${attachment.id}|${attachment.kind}`}
 				</li>
 			))}
@@ -163,7 +163,7 @@ describe('the new-chat transcript chips', () => {
 		fireEvent.click(screen.getByRole('button', { name: /Trim the bundle/ }));
 
 		expect(queuedEntries()).toEqual([
-			'transcript:tab-5|.context/sessions/tab-5.md',
+			'transcript:tab-5|.context/sessions/tab-5.md|false',
 		]);
 	});
 
@@ -178,7 +178,7 @@ describe('the new-chat transcript chips', () => {
 		fireEvent.click(chip);
 
 		expect(queuedEntries()).toContain(
-			'transcript:tab-live|.context/sessions/tab-live.md',
+			'transcript:tab-live|.context/sessions/tab-live.md|false',
 		);
 	});
 });

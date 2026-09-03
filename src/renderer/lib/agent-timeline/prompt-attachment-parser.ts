@@ -13,6 +13,7 @@
  * raw prompt).
  */
 
+import { parseAttachmentMark } from '@/renderer/lib/attachment-mark';
 import type {
 	ParsedPrompt,
 	ParsedPromptAttachment,
@@ -25,6 +26,7 @@ import {
 import {
 	attachedFileBlockPattern,
 	linkedDirectoriesBlockPattern,
+	parseAttachedFileAttributes,
 	referencedFoldersBlockPattern,
 	userPreferencesBlockPattern,
 } from '@/shared/prompt-scaffolding';
@@ -48,16 +50,25 @@ function attachmentPart(attachment: ParsedPromptAttachment): ParsedPromptPart {
  * @returns The blocks found, in order of appearance
  */
 function attachedFileBlocks(prompt: string): ScaffoldingBlock[] {
-	return [...prompt.matchAll(attachedFileBlockPattern())].map((match) => ({
-		end: match.index + match[0].length,
-		parts: [
-			attachmentPart({
-				content: match[2] ?? '',
-				path: (match[1] ?? '').replaceAll('&quot;', '"'),
-			}),
-		],
-		start: match.index,
-	}));
+	return [...prompt.matchAll(attachedFileBlockPattern())].map((match) => {
+		const { label, mark, path } = parseAttachedFileAttributes(
+			match[1] ?? '',
+			match[2] ?? '',
+		);
+		const parsedMark = parseAttachmentMark(mark);
+		return {
+			end: match.index + match[0].length,
+			parts: [
+				attachmentPart({
+					content: match[3] ?? '',
+					...(label ? { label } : {}),
+					...(parsedMark ? { mark: parsedMark } : {}),
+					path,
+				}),
+			],
+			start: match.index,
+		};
+	});
 }
 
 /**

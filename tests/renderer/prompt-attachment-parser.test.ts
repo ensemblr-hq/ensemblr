@@ -2,6 +2,7 @@ import { describe, expect, test } from 'vitest';
 
 import { parsePromptAttachments } from '../../src/renderer/lib/agent-timeline/prompt-attachment-parser';
 import type { ParsedPromptPart } from '../../src/renderer/types/agent-timeline';
+import { formatAttachedFileBlock } from '../../src/shared/prompt-scaffolding';
 
 /** The typed runs, in order. */
 function texts(parts: readonly ParsedPromptPart[]): string[] {
@@ -145,5 +146,92 @@ describe('parsePromptAttachments', () => {
 				'<user_preferences>\nBe concise.\n</user_preferences>',
 			).parts,
 		).toEqual([]);
+	});
+
+	test('carries a descriptor back out of a block that wrote one', () => {
+		const prompt = formatAttachedFileBlock(
+			'.context/sessions/b4d21395.md',
+			'# Concierge run',
+			{
+				label: 'Concierge: allow duplicate chips',
+				mark: 'subagent-transcript',
+			},
+		);
+		expect(attachments(parsePromptAttachments(prompt).parts)).toEqual([
+			{
+				content: '# Concierge run',
+				label: 'Concierge: allow duplicate chips',
+				mark: 'subagent-transcript',
+				path: '.context/sessions/b4d21395.md',
+			},
+		]);
+	});
+
+	test('leaves a block without a descriptor exactly as it was', () => {
+		const prompt = formatAttachedFileBlock('src/a.ts', 'const a = 1;');
+		expect(attachments(parsePromptAttachments(prompt).parts)).toEqual([
+			{ content: 'const a = 1;', path: 'src/a.ts' },
+		]);
+	});
+
+	test('survives a label carrying the characters that would end the block', () => {
+		const label = 'Fix <Chip /> & "quoting" > everything';
+		const prompt = formatAttachedFileBlock('.context/sessions/x.md', 'body', {
+			label,
+			mark: 'chat-transcript',
+		});
+		expect(attachments(parsePromptAttachments(prompt).parts)).toEqual([
+			{
+				content: 'body',
+				label,
+				mark: 'chat-transcript',
+				path: '.context/sessions/x.md',
+			},
+		]);
+	});
+
+	test('drops a mark this build does not know rather than rendering it', () => {
+		const prompt = formatAttachedFileBlock('.context/sessions/x.md', 'body', {
+			label: 'From the future',
+			mark: 'holographic-transcript',
+		});
+		expect(attachments(parsePromptAttachments(prompt).parts)).toEqual([
+			{
+				content: 'body',
+				label: 'From the future',
+				path: '.context/sessions/x.md',
+			},
+		]);
+	});
+
+	// The agent reads this attribute to go and open the file, so an entity in it
+	// is a path that does not exist. `&` is ordinary in a filename in a way `"`
+	// is not, which is why only the quote is escaped.
+	test('spells an ampersand in the path the way the filesystem does', () => {
+		const prompt = formatAttachedFileBlock('docs/Q&A.md', 'body');
+		expect(prompt).toContain('path="docs/Q&A.md"');
+		expect(attachments(parsePromptAttachments(prompt).parts)).toEqual([
+			{ content: 'body', path: 'docs/Q&A.md' },
+		]);
+	});
+
+	test('round-trips a path carrying a quote', () => {
+		const path = 'docs/say "hi".md';
+		const prompt = formatAttachedFileBlock(path, 'body');
+		expect(attachments(parsePromptAttachments(prompt).parts)).toEqual([
+			{ content: 'body', path },
+		]);
+	});
+
+	// An omitted `path` is a block the pattern cannot match, and an unmatched
+	// block is one the title deriver leaves in the prompt as prose.
+	test('still writes a matchable block when the path is empty', () => {
+		const prompt = formatAttachedFileBlock('', 'body', {
+			label: 'Nameless',
+			mark: 'chat-transcript',
+		});
+		expect(attachments(parsePromptAttachments(prompt).parts)).toEqual([
+			{ content: 'body', label: 'Nameless', mark: 'chat-transcript', path: '' },
+		]);
 	});
 });

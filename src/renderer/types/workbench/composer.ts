@@ -128,6 +128,19 @@ export type ComposerAttachment =
 	  }
 	| {
 			id: string;
+			/**
+			 * True when the chat was spawned as somebody's sub-agent, which is what
+			 * its chip wears a robot for instead of the sparkle an ordinary chat gets.
+			 */
+			isSubAgent: boolean;
+			kind: 'chat-transcript';
+			/** The chat's own title, since the summary file is named by a bare id. */
+			label: string;
+			/** Repo-relative path of the `.context/sessions` summary the agent reads. */
+			path: string;
+	  }
+	| {
+			id: string;
 			kind: 'issue';
 			label: string;
 			/** Path of the markdown document the issue was written out to. */
