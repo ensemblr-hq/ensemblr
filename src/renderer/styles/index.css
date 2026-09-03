@@ -691,10 +691,20 @@
 }
 
 @layer utilities {
-	.window-chrome-spacer,
-	.native-toolbar,
-	.window-drag-region,
+	/* The title bar Ensemblr draws itself (Linux, custom title bar) is a drag
+	   handle wherever it appears. */
 	.window-title-bar {
+		-webkit-app-region: drag;
+	}
+
+	/* macOS insets its window controls into the content, so the app's own
+	   toolbars double as the title bar's drag surface. Linux keeps them as plain
+	   content — only the title bar Ensemblr draws or the compositor's frame moves
+	   the window — so the drag affordance is gated to the inset-controls (macOS)
+	   case rather than applied on every platform. */
+	:where(html.inset-window-controls) .window-chrome-spacer,
+	:where(html.inset-window-controls) .native-toolbar,
+	:where(html.inset-window-controls) .window-drag-region {
 		-webkit-app-region: drag;
 	}
 

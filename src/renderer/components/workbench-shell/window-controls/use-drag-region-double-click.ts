@@ -1,15 +1,16 @@
 import { useEffect } from 'react';
 
 /**
- * Selectors for the strips declared as window drag regions in
- * `src/renderer/styles/index.css`. Kept in step with the `-webkit-app-region:
- * drag` rule there — a strip that drags the window but is missing here simply
- * will not toggle on a double-click, which is what
+ * Selector for the strip declared a window drag region on the platform this hook
+ * runs on. The hook is mounted only inside `WindowTitleBar`, which renders only
+ * where Ensemblr draws its own controls (Linux, custom title bar) — and there
+ * the title bar is the one draggable strip, since `src/renderer/styles/index.css`
+ * gates the toolbar drag regions behind the macOS `inset-window-controls` case.
+ * Kept in step with the ungated `-webkit-app-region: drag` rule there, which
  * `tests/renderer/drag-region-double-click.test.tsx` asserts against the
  * stylesheet itself.
  */
-export const DRAG_REGION_SELECTOR =
-	'.native-toolbar, .window-drag-region, .window-chrome-spacer, .window-title-bar';
+export const DRAG_REGION_SELECTOR = '.window-title-bar';
 
 /** Elements inside a drag strip whose own double-click is not a title-bar gesture. */
 const INTERACTIVE_SELECTOR =
