@@ -9,6 +9,55 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.0-beta.24] - 2026-09-03
+
+Cloning a repository now offers the same branch picker create-from-source already has, so a
+repository whose work happens off GitHub's default branch checks out where it should from the
+first workspace onward. A Claude Code chat planning inside Ensemblr no longer has to guess between
+three disagreeing instructions about delegation — the per-turn preamble now says which one governs,
+closing two related holes where a sub-agent could raise a review panel nobody is watching or inherit
+the root's own delegation rights across a resume. And a branch cut from a base whose own pull
+request is already merged stops reporting itself as merged: the upstream Git silently inherits from
+an unpushed branch no longer gets handed to `gh` as the head ref.
+[Release](https://github.com/ensemblr-hq/ensemblr/releases/tag/v0.1.0-beta.24) ·
+[`.dmg`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.0-beta.24/Ensemblr-0.1.0-beta.24-arm64.dmg) ·
+[`.AppImage`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.0-beta.24/Ensemblr-0.1.0-beta.24-x64.AppImage)
+
+### Added
+
+- **The clone dialog offers a branch picker, not just a URL field.** A repository whose work
+  happens on anything but GitHub's default branch was cloned onto the wrong branch and seeded its
+  first workspace off it. `cloneBranch` now reaches `git clone --branch` on both the `gh` and `git`
+  leg, and the picked branch is persisted as the repository's `branchFrom` setting before the clone
+  reports success, so every later workspace forks from it too. A new IPC surface,
+  `ensemblr:github-remote-branch-list`, reads branches for a not-yet-cloned repository straight from
+  its URL. (#418)
+
+- **A Claude Code chat in Plan Mode is told which of its three delegation instructions governs.**
+  The SDK's own Plan Workflow, a standing "don't call AgentTool" line in the model's prompt bundle,
+  and Ensemblr's own tool-deny list disagreed with no way for the agent to know which one to follow —
+  one turn was observed reasoning through the conflict out loud and guessing. `buildPlanModeDelegationDirective`
+  now names the runtime's actual delegation tool and the correct replacement literally, in a
+  per-turn preamble block, with a variant each for the root agent on `ensemblr`, the root agent on
+  `native`, and an investigator sub-agent. Fixed alongside it: a sub-agent could still raise a review
+  panel through Claude Code's native `ExitPlanMode` tool, bypassing the deny list built for exactly
+  that; and a resumed child session could inherit the root's own delegation rights because the
+  lineage field a resume carries none of was the only thing pinning it. (#417)
+
+### Fixed
+
+- **A branch forked from a base whose own pull request is merged no longer reports itself as
+  merged.** `git worktree add` without `--no-track` inherits the base as its upstream whenever the
+  fork point is a remote-tracking ref, which is every Ensemblr workspace — so `gh pr view` was
+  handed the base branch as the head ref and answered with the base's own (merged) pull request, and
+  an unpushed branch claimed to be up to date with the remote. Branches are now cut with
+  `--no-track`, and a runtime guard rejects an upstream that merely names the workspace's stored base
+  branch — except where the worktree is genuinely parked on that base, which keeps its real
+  ahead/behind counts. (#416)
+
+- **Dependency Bumps** (#404, #407, #410, #411): `@xmldom/xmldom` 0.9.10 → 0.9.12, `fast-uri` 3.1.5 →
+  3.1.7, `qs` 6.15.2 → 6.16.0, `browserslist` (dev) 4.28.2 → 4.28.8.
+
 ## [0.1.0-beta.23] - 2026-09-03
 
 Archiving becomes an ordinary action. It no longer asks before doing something it can take back —
