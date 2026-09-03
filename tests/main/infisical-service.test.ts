@@ -1,4 +1,5 @@
 import {
+	existsSync,
 	mkdirSync,
 	mkdtempSync,
 	readFileSync,
@@ -79,6 +80,15 @@ async function buildService(
 	});
 
 	return { accountId: added.account?.id ?? '', secretStore, service: built };
+}
+
+/** Writes the `.infisical.json` the Infisical CLI leaves at a repository root. */
+function writeCliConfig(config: Record<string, unknown>): void {
+	writeFileSync(
+		path.join(repositoryPath, '.infisical.json'),
+		JSON.stringify(config),
+		'utf8',
+	);
 }
 
 /** Inserts the repository row the link's committed half is written next to. */
@@ -536,5 +546,300 @@ describe('createInfisicalService.clearLink', () => {
 				'utf8',
 			),
 		).not.toContain('proj_1');
+	});
+});
+
+describe('createInfisicalService discovery from .infisical.json', () => {
+	test('resolves an otherwise-unlinked repository from the CLI config', async () => {
+		writeCliConfig({ defaultEnvironment: 'dev', workspaceId: 'proj_1' });
+
+		const { link } = service.getLink({
+			scope: 'repository',
+			scopeId: 'repo-1',
+		});
+
+		expect(link).toMatchObject({
+			environmentSlug: 'dev',
+			origin: 'infisical-cli',
+			projectId: 'proj_1',
+			secretPath: '/',
+			siteUrl: null,
+		});
+	});
+
+	test('reads the secrets that link points at, matching the account by project', async () => {
+		writeCliConfig({ defaultEnvironment: 'dev', workspaceId: 'proj_1' });
+
+		const resolution = await service.resolveForScope({
+			scope: 'repository',
+			scopeId: 'repo-1',
+		});
+
+		expect(resolution.degradedReason).toBeNull();
+		expect(resolution.values).toEqual({ DATABASE_URL: 'postgres://x' });
+	});
+
+	test('resolves to nothing when the CLI config names no environment', async () => {
+		writeCliConfig({ defaultEnvironment: '', workspaceId: 'proj_1' });
+
+		const { link } = service.getLink({
+			scope: 'repository',
+			scopeId: 'repo-1',
+		});
+		const resolution = await service.resolveForScope({
+			scope: 'repository',
+			scopeId: 'repo-1',
+		});
+
+		expect(link).toMatchObject({ environmentSlug: '', projectId: 'proj_1' });
+		expect(resolution.values).toEqual({});
+	});
+
+	test('writes nothing into the repository while resolving', async () => {
+		writeCliConfig({ defaultEnvironment: 'dev', workspaceId: 'proj_1' });
+
+		await service.resolveForScope({ scope: 'repository', scopeId: 'repo-1' });
+
+		expect(
+			existsSync(path.join(repositoryPath, '.ensemblr', 'settings.toml')),
+		).toBe(false);
+	});
+
+	test('leaves the account unresolved when two accounts reach the same project', async () => {
+		writeCliConfig({ defaultEnvironment: 'dev', workspaceId: 'proj_1' });
+		const built = await buildService();
+		await built.service.addAccount({
+			clientId: 'client-rival',
+			clientSecret: 'secret',
+			label: 'Rival',
+			siteUrl: 'https://eu.infisical.com',
+		});
+
+		const resolution = await built.service.resolveForScope({
+			scope: 'repository',
+			scopeId: 'repo-1',
+		});
+
+		expect(resolution.degradedReason).toBe('no-account');
+		expect(resolution.values).toEqual({});
+	});
+
+	test('degrades rather than resolving when no account reaches the project', async () => {
+		writeCliConfig({ defaultEnvironment: 'dev', workspaceId: 'proj_unknown' });
+
+		const resolution = await service.resolveForScope({
+			scope: 'repository',
+			scopeId: 'repo-1',
+		});
+
+		expect(resolution.degradedReason).toBe('no-account');
+	});
+
+	test('re-scans after an account is added rather than serving a stale miss', async () => {
+		writeCliConfig({ defaultEnvironment: 'dev', workspaceId: 'proj_2' });
+		const built = await buildService(
+			fakeApi({
+				listProjects: vi.fn(async ({ siteUrl }: { siteUrl: string }) =>
+					siteUrl === 'https://self.infisical.test'
+						? [
+								{
+									environments: [{ name: 'Development', slug: 'dev' }],
+									id: 'proj_2',
+									name: 'Frontend',
+									slug: 'frontend',
+								},
+							]
+						: [
+								{
+									environments: [{ name: 'Development', slug: 'dev' }],
+									id: 'proj_1',
+									name: 'Backend',
+									slug: 'backend',
+								},
+							],
+				),
+			}),
+		);
+
+		const before = await built.service.resolveForScope({
+			scope: 'repository',
+			scopeId: 'repo-1',
+		});
+
+		await built.service.addAccount({
+			clientId: 'client-late',
+			clientSecret: 'secret',
+			label: 'Late',
+			siteUrl: 'https://self.infisical.test',
+		});
+
+		const after = await built.service.resolveForScope({
+			scope: 'repository',
+			scopeId: 'repo-1',
+		});
+
+		expect(before.degradedReason).toBe('no-account');
+		expect(after.degradedReason).toBeNull();
+		expect(after.values).toEqual({ DATABASE_URL: 'postgres://x' });
+	});
+
+	test('a saved link outranks the CLI config entirely', async () => {
+		writeCliConfig({
+			defaultEnvironment: 'staging',
+			workspaceId: 'proj_other',
+		});
+		await service.setLink({
+			accountId,
+			environmentSlug: 'dev',
+			projectId: 'proj_1',
+			scope: 'repository',
+			scopeId: 'repo-1',
+		});
+
+		expect(
+			service.getLink({ scope: 'repository', scopeId: 'repo-1' }).link,
+		).toMatchObject({
+			environmentSlug: 'dev',
+			origin: 'local',
+			projectId: 'proj_1',
+		});
+	});
+
+	test('a committed block outranks the CLI config on a machine with no saved row', async () => {
+		writeCliConfig({
+			defaultEnvironment: 'staging',
+			workspaceId: 'proj_other',
+		});
+		mkdirSync(path.join(repositoryPath, '.ensemblr'), { recursive: true });
+		writeFileSync(
+			path.join(repositoryPath, '.ensemblr', 'settings.toml'),
+			'[infisical]\nproject_id = "proj_1"\nenvironment = "dev"\n',
+			'utf8',
+		);
+
+		expect(
+			service.getLink({ scope: 'repository', scopeId: 'repo-1' }).link,
+		).toMatchObject({
+			environmentSlug: 'dev',
+			origin: 'repository-config',
+			projectId: 'proj_1',
+		});
+	});
+
+	test('ignores a CLI config sitting beside a workspace scope', async () => {
+		writeCliConfig({ defaultEnvironment: 'dev', workspaceId: 'proj_1' });
+
+		expect(
+			service.getLink({ scope: 'workspace', scopeId: 'repo-1' }).link,
+		).toBeNull();
+	});
+});
+
+describe('createInfisicalService unlinking a discoverable repository', () => {
+	test('unlinking sticks even though the CLI config still names the project', async () => {
+		writeCliConfig({ defaultEnvironment: 'dev', workspaceId: 'proj_1' });
+		await service.setLink({
+			accountId,
+			environmentSlug: 'dev',
+			projectId: 'proj_1',
+			scope: 'repository',
+			scopeId: 'repo-1',
+		});
+
+		await service.clearLink({ scope: 'repository', scopeId: 'repo-1' });
+
+		expect(
+			service.getLink({ scope: 'repository', scopeId: 'repo-1' }).link,
+		).toBeNull();
+	});
+
+	test('stops resolving secrets once the discovered link is unlinked', async () => {
+		writeCliConfig({ defaultEnvironment: 'dev', workspaceId: 'proj_1' });
+
+		await service.clearLink({ scope: 'repository', scopeId: 'repo-1' });
+		const resolution = await service.resolveForScope({
+			scope: 'repository',
+			scopeId: 'repo-1',
+		});
+
+		expect(resolution.values).toEqual({});
+	});
+
+	test('unlinking a discovered link writes no settings file into the repository', async () => {
+		writeCliConfig({ defaultEnvironment: 'dev', workspaceId: 'proj_1' });
+
+		const result = await service.clearLink({
+			scope: 'repository',
+			scopeId: 'repo-1',
+		});
+
+		expect(result.failure).toBeNull();
+		expect(
+			existsSync(path.join(repositoryPath, '.ensemblr', 'settings.toml')),
+		).toBe(false);
+	});
+
+	test('linking again after an unlink restores discovery for a later unlink', async () => {
+		writeCliConfig({ defaultEnvironment: 'dev', workspaceId: 'proj_1' });
+		await service.clearLink({ scope: 'repository', scopeId: 'repo-1' });
+
+		await service.setLink({
+			accountId,
+			environmentSlug: 'dev',
+			projectId: 'proj_1',
+			scope: 'repository',
+			scopeId: 'repo-1',
+		});
+		await service.clearLink({ scope: 'repository', scopeId: 'repo-1' });
+
+		expect(
+			service.getLink({ scope: 'repository', scopeId: 'repo-1' }).link,
+		).toBeNull();
+	});
+});
+
+describe('createInfisicalService instance-scoped account matching', () => {
+	test('refuses an account on another instance for a link that names one', async () => {
+		mkdirSync(path.join(repositoryPath, '.ensemblr'), { recursive: true });
+		writeFileSync(
+			path.join(repositoryPath, '.ensemblr', 'settings.toml'),
+			'[infisical]\nproject_id = "proj_1"\nenvironment = "dev"\nsite_url = "https://infisical.acme.internal"\n',
+			'utf8',
+		);
+
+		const resolution = await service.resolveForScope({
+			scope: 'repository',
+			scopeId: 'repo-1',
+		});
+
+		expect(resolution.degradedReason).toBe('no-account');
+		expect(resolution.values).toEqual({});
+	});
+
+	test('matches a discovered link whose domain differs from the account only by the CLI api suffix', async () => {
+		writeCliConfig({
+			defaultEnvironment: 'dev',
+			domain: 'https://app.infisical.com/api',
+			workspaceId: 'proj_1',
+		});
+
+		const resolution = await service.resolveForScope({
+			scope: 'repository',
+			scopeId: 'repo-1',
+		});
+
+		expect(resolution.degradedReason).toBeNull();
+		expect(resolution.values).toEqual({ DATABASE_URL: 'postgres://x' });
+	});
+
+	test('still matches across every account when the link names no instance', async () => {
+		writeCliConfig({ defaultEnvironment: 'dev', workspaceId: 'proj_1' });
+
+		const resolution = await service.resolveForScope({
+			scope: 'repository',
+			scopeId: 'repo-1',
+		});
+
+		expect(resolution.values).toEqual({ DATABASE_URL: 'postgres://x' });
 	});
 });

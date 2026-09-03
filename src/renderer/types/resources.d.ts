@@ -2180,6 +2180,11 @@ export default interface Resources {
 			};
 			infisical: {
 				'account-unavailable': 'Projects from {{account}} are missing from this list: that account could not be reached.';
+				discovered: {
+					'needs-environment': 'That file names a project but no environment, so nothing resolves yet. Pick one below, then save to commit the link to .ensemblr/settings.toml.';
+					resolving: 'Ensemblr reads this project through whichever of your accounts can reach it. Nothing has been written to .ensemblr/settings.toml — save below to commit the link so everyone who clones this repository inherits it.';
+					title: 'Found in this repository’s .infisical.json';
+				};
 				environment: 'Environment';
 				'environment-description': 'Which Infisical environment this repository resolves against.';
 				'environment-placeholder': 'Pick an environment';
@@ -2203,6 +2208,7 @@ export default interface Resources {
 					'never-synced': 'never synced';
 					none: 'No project linked';
 					'none-detail': 'Pick a project below to resolve its secrets into every workspace, terminal, and agent.';
+					'state-detected': 'Detected';
 					'state-linked': 'Linked';
 					'state-none': 'Not linked';
 					'state-pending': 'Not saved yet';

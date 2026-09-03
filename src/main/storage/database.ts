@@ -1121,6 +1121,25 @@ ALTER TABLE archive_records ADD COLUMN pruned_wip_ref TEXT;
 ALTER TABLE archive_records ADD COLUMN pruned_wip_commit TEXT;
 `,
 	},
+	{
+		id: '026_infisical_discovery_dismissals',
+		version: 26,
+		// Records that the user unlinked a scope whose project Ensemblr can still
+		// rediscover from the Infisical CLI's own `.infisical.json`. Without it,
+		// `clearLink` deletes the row and the committed block and the very next
+		// read finds the CLI file again, so unlinking never takes and secrets keep
+		// resolving. This is not a link — it is the absence of one, held against
+		// the same key — so it stays out of `infisical_links` rather than becoming
+		// a row with no project.
+		sql: `
+CREATE TABLE infisical_discovery_dismissals (
+	scope TEXT NOT NULL CHECK (scope IN ('repository', 'workspace')),
+	scope_id TEXT NOT NULL,
+	dismissed_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+	PRIMARY KEY(scope, scope_id)
+) STRICT;
+`,
+	},
 ];
 
 /** Highest declared migration version embedded in this build. */

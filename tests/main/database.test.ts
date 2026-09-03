@@ -41,6 +41,7 @@ const EXPECTED_MIGRATIONS = [
 	'023_secret_value_blob',
 	'024_secret_keyring_backend',
 	'025_worktree_prune',
+	'026_infisical_discovery_dismissals',
 ];
 
 const AGENT_VOCABULARY_MIGRATION_VERSION = 14;
@@ -289,6 +290,7 @@ test('opens an isolated database and applies foundation migrations', (t) => {
 		'concierge_session_events',
 		'concierge_sessions',
 		'infisical_accounts',
+		'infisical_discovery_dismissals',
 		'infisical_links',
 		'integration_metadata',
 		'linear_accounts',

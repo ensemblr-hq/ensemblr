@@ -107,6 +107,7 @@ export default defineConfig({
 			'tests/main/update-preconditions.test.ts',
 			'tests/main/update-service.test.ts',
 			'tests/main/infisical-api.test.ts',
+			'tests/main/infisical-cli-config.test.ts',
 			'tests/main/infisical-service.test.ts',
 			'tests/main/infisical-cache.test.ts',
 			'tests/main/environment-infisical-layer.test.ts',

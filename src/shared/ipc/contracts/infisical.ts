@@ -65,17 +65,27 @@ export interface InfisicalProjectSnapshot {
 }
 
 /**
- * A resolved link between an Ensemblr scope and an Infisical project.
- * `fromRepositoryConfig` marks the project half as coming from the committed
- * `.ensemblr/settings.toml` rather than from local state.
+ * Where a link's project half came from: a local choice saved on this machine,
+ * the committed `.ensemblr/settings.toml`, or a `.infisical.json` the Infisical
+ * CLI wrote, which Ensemblr reads but never writes.
+ */
+export type InfisicalLinkOrigin =
+	| 'infisical-cli'
+	| 'local'
+	| 'repository-config';
+
+/**
+ * A resolved link between an Ensemblr scope and an Infisical project. `origin`
+ * marks where the project half came from, which decides whether saving the
+ * link still has anything to commit.
  */
 export interface InfisicalLinkSnapshot {
 	accountId: string | null;
 	accountLabel: string | null;
 	enabled: boolean;
 	environmentSlug: string;
-	fromRepositoryConfig: boolean;
 	lastSyncedAt: string | null;
+	origin: InfisicalLinkOrigin;
 	projectId: string;
 	projectName: string | null;
 	recursive: boolean;
