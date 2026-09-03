@@ -29,11 +29,11 @@ import type { ArchiveWorkspaceDiagnostic } from '@/shared/ipc/contracts/workspac
 
 /**
  * Lifecycle archive dialog: preserves the workspace `.context/` folder and
- * archives the workspace as a state. What happens to the worktree and local
- * branch is the repository's resolved `deleteLocalBranchOnArchive` and
- * `reclaimDiskOnArchive` settings, the same ones the merge-then-archive flow
- * obeys. A setting that cannot be resolved keeps both and says so rather than
- * guessing.
+ * archives the workspace as a state. The worktree folder always goes; whether
+ * the local branch goes with it is the repository's resolved
+ * `deleteLocalBranchOnArchive` setting, the same one the merge-then-archive flow
+ * obeys. A setting that cannot be resolved keeps the branch and says so rather
+ * than guessing.
  *
  * An archive is reversible, so it is not confirmed as a rule: this dialog is
  * the escalation `useArchiveWorkspaceAction` raises for the archives that are
@@ -98,19 +98,12 @@ const CONTEXT_PATH_COMPONENTS = [
 ];
 
 /**
- * Says what this archive will actually do to the worktree, which is the one
- * thing the user cannot tell by looking. The three states are genuinely
- * different outcomes — the branch is dropped, the folder is reclaimed and the
- * branch kept, or nothing on disk is touched — so each gets its own sentence
- * rather than a hedged one covering all three.
+ * Says what this archive will actually do, which is the one thing the user
+ * cannot tell by looking. The folder always goes; whether the branch goes with
+ * it is a genuinely different outcome, so each gets its own sentence rather
+ * than a hedged one covering both.
  */
-function ArchiveDescription({
-	branchCleanup,
-	reclaimDisk,
-}: {
-	branchCleanup: boolean;
-	reclaimDisk: boolean;
-}) {
+function ArchiveDescription({ branchCleanup }: { branchCleanup: boolean }) {
 	if (branchCleanup) {
 		return (
 			<Trans
@@ -121,21 +114,11 @@ function ArchiveDescription({
 		);
 	}
 
-	if (reclaimDisk) {
-		return (
-			<Trans
-				components={CONTEXT_PATH_COMPONENTS}
-				defaults='Marks the workspace as archived and preserves its <0>.context/</0> handoff files under <1>archived-contexts/</1>. The worktree folder is removed to reclaim its disk, keeping the branch and a snapshot of any uncommitted changes; unarchiving restores both and rebuilds dependencies.'
-				i18nKey='workbench:archive-workspace.description-reclaim'
-			/>
-		);
-	}
-
 	return (
 		<Trans
 			components={CONTEXT_PATH_COMPONENTS}
-			defaults='Marks the workspace as archived and preserves its <0>.context/</0> handoff files under <1>archived-contexts/</1>. The worktree folder and local branch stay on disk; nothing is committed or pushed.'
-			i18nKey='workbench:archive-workspace.description-keep'
+			defaults='Marks the workspace as archived and preserves its <0>.context/</0> handoff files under <1>archived-contexts/</1>. The worktree folder is removed to reclaim its disk, keeping the branch and a snapshot of any uncommitted changes; unarchiving restores both and rebuilds dependencies.'
+			i18nKey='workbench:archive-workspace.description-reclaim'
 		/>
 	);
 }
@@ -210,9 +193,10 @@ function ArchiveWorkspaceDialogForm({
 		failure: archiveWorkspaceFailure,
 		lifecycleRun: { kind: 'archiving', workspaceId: workspace.id },
 		onOpenChange,
-		onSucceeded: () =>
+		onSucceeded: (result) =>
 			onArchived({
 				branchCleanup: plan.branchCleanup,
+				bytesFreed: result.workspace?.bytesFreed ?? null,
 				workspaceId: workspace.id,
 			}),
 		operationKey: `archive-workspace:${workspace.id}`,
@@ -241,10 +225,7 @@ function ArchiveWorkspaceDialogForm({
 				</DialogTitle>
 				<DialogDescription className='text-xs'>
 					<UncommittedChangesNotice workspaceCwd={workspace.pathLabel} />
-					<ArchiveDescription
-						branchCleanup={plan.branchCleanup}
-						reclaimDisk={plan.reclaimDisk}
-					/>
+					<ArchiveDescription branchCleanup={plan.branchCleanup} />
 				</DialogDescription>
 			</DialogHeader>
 
@@ -257,7 +238,7 @@ function ArchiveWorkspaceDialogForm({
 				>
 					{t(
 						'workbench:archive-workspace.settings-unavailable',
-						'Your git settings could not be read, so the worktree folder and local branch will be kept.',
+						'Your git settings could not be read, so the local branch will be kept.',
 					)}
 				</p>
 			) : null}

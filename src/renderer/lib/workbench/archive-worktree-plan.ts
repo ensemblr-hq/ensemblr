@@ -3,7 +3,6 @@ import type { ReviewMergeSettings } from '@/renderer/types/settings';
 /** What an archive asks the main process to do to the workspace's worktree. */
 export interface ArchiveWorktreePlan {
 	branchCleanup: boolean;
-	reclaimDisk: boolean;
 }
 
 /** A completed archive, reduced to what its announcement needs to word itself. */
@@ -14,16 +13,18 @@ export interface ArchivedWorkspace {
 	 * it back.
 	 */
 	branchCleanup: boolean;
+	/** Disk the worktree removal freed, or null when it could not be measured. */
+	bytesFreed: number | null;
 	workspaceId: string;
 }
 
 /**
  * Resolves what the repository's git settings make this archive do to the
- * worktree. Settings that have not resolved — still pending, or a read that
- * failed — keep both the folder and the branch, the one outcome that loses
- * nothing.
+ * branch. The worktree folder always goes; the only question is whether the
+ * branch goes with it. Settings that have not resolved — still pending, or a
+ * read that failed — keep the branch, the outcome that loses nothing.
  *
- * The instant archive and the confirmation dialog both read this, so the three
+ * The instant archive and the confirmation dialog both read this, so the two
  * outcomes stay one rule: the dialog's wording cannot describe an archive
  * different from the one that runs.
  * @param options - Whether the workspace has a branch, and the resolved git settings
@@ -36,13 +37,7 @@ export function resolveArchiveWorktreePlan({
 	hasBranch: boolean;
 	settings: ReviewMergeSettings | undefined;
 }): ArchiveWorktreePlan {
-	const branchCleanup =
-		hasBranch && settings?.deleteLocalBranchOnArchive === true;
-	// Dropping the branch removes the worktree anyway, and destroys the commits
-	// with it, so the two never describe the same archive: the reclaim wording
-	// promises a workspace that comes back.
 	return {
-		branchCleanup,
-		reclaimDisk: !branchCleanup && settings?.reclaimDiskOnArchive === true,
+		branchCleanup: hasBranch && settings?.deleteLocalBranchOnArchive === true,
 	};
 }

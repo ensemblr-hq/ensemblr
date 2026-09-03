@@ -218,11 +218,12 @@ lands you on the chat you were reading, not on whichever one you looked at last.
 ### The worktree folder is reclaimed
 
 A worktree directory is overwhelmingly gitignored dependencies and build output
-that the setup script rebuilds, so a user who has been archiving for months can
-be holding tens of gigabytes for workspaces they finished with. With **Reclaim
-disk on archive** on — the default — archiving removes the directory and keeps
-the branch, and unarchiving re-derives the workspace from git rather than finding
-it in place.
+that the setup script rebuilds, so a user who has been archiving for months would
+otherwise be holding tens of gigabytes for workspaces they finished with.
+Archiving therefore removes the directory and keeps the branch, and unarchiving
+re-derives the workspace from git rather than finding it in place. There is no
+setting and no separate action: it is what archiving does. The success toast
+reports how much disk it gave back.
 
 What git cannot store is captured before anything is removed. Uncommitted and
 untracked work goes into a snapshot commit under `refs/ensemblr/archived/<id>`
@@ -240,20 +241,17 @@ rebuilds dependencies. A worktree that went missing without a record — a folde
 deleted by hand, or a stamp that failed — is recovered from its branch instead of
 being reported as an orphaned row.
 
-Archives made before the setting existed keep their folders, and the archive
-browser offers **Reclaim disk** per row and **Reclaim all** for the lot, telling
-you how much it freed. Workspaces are processed one at a time, because two
-`git worktree remove` runs in one repository contend on git's worktree admin
-lock.
+An archive made before this was unconditional may still have its folder on disk.
+Nothing reclaims it retroactively — **Delete permanently** in the archive browser
+is what clears one out.
 
 ### The git side
 
-Three settings under `[git]` govern it:
+Two settings under `[git]` govern it:
 
 | Setting | Default | Effect |
 | --- | --- | --- |
 | `delete_local_branch_on_archive` | off | also delete the workspace's local branch when archiving |
-| `reclaim_disk_on_archive` | on | remove the worktree folder when archiving, keeping the branch and a snapshot of uncommitted work |
 | `archive_after_merge` | off | archive the workspace automatically once its pull request merges |
 
 `delete_local_branch_on_archive` is the **only** control over branch cleanup —
@@ -262,15 +260,15 @@ what merging then archiving does. It is resolved against the worktree being
 archived rather than the repository root, so two workspaces of one repository
 can answer differently if their committed `.ensemblr/settings.toml` differ. The
 dialog says which of the two it is about to do before you press Archive, and
-says the worktree and branch are being kept if the setting could not be read at
-all.
+says the branch is being kept if the setting could not be read at all.
 
 A branch the workspace **adopted** is never deleted regardless — it was not the
 workspace's to destroy.
 
-Where the two archive settings overlap, `delete_local_branch_on_archive` takes
-precedence: it removes the directory anyway and destroys the commits
-deliberately, which is the opposite guarantee to the snapshot the reclaim keeps.
+`delete_local_branch_on_archive` takes the directory with it either way, but by
+a different route: it destroys the commits deliberately, which is the opposite
+guarantee to the snapshot an ordinary archive keeps — so it skips the snapshot
+rather than writing one nothing would ever restore.
 See [ADR 0027](../adr/0027-use-workspace-archive-lifecycle.md).
 
 ## Opening a workspace elsewhere

@@ -17,6 +17,7 @@ import { useRemoveHoppedWorkspaceAction } from '@/renderer/hooks/workbench-shell
 import { useWorkspaceTeardownHop } from '@/renderer/hooks/workbench-shell/use-workspace-teardown-hop';
 import { getErrorMessage } from '@/renderer/lib/error';
 import { failureText } from '@/renderer/lib/failure-text';
+import { reclaimedDiskDescription } from '@/renderer/lib/workbench';
 import {
 	type ArchivedWorkspace,
 	type ArchiveWorktreePlan,
@@ -33,6 +34,8 @@ import type { ArchiveWorkspaceStatus } from '@/shared/ipc/contracts/workspace';
 
 /** An archive that ran, reduced to the one status and sentence a toast needs. */
 interface ArchiveOutcome {
+	/** Disk the worktree removal freed, or null when it could not be measured. */
+	bytesFreed: number | null;
 	description: string | undefined;
 	status: ArchiveWorkspaceStatus;
 }
@@ -101,11 +104,13 @@ async function runArchive(
 	try {
 		const result = await archiveWorkspace({ ...plan, workspaceId });
 		return {
+			bytesFreed: result.workspace?.bytesFreed ?? null,
 			description: failureText(t, result.diagnostics[0]) ?? undefined,
 			status: result.status,
 		};
 	} catch (error) {
 		return {
+			bytesFreed: null,
 			description: getErrorMessage(error) ?? undefined,
 			status: 'failure',
 		};
@@ -184,7 +189,8 @@ async function undoWorkspaceArchive({
 
 /**
  * Returns the announcement for a completed archive: a success toast carrying the
- * Undo that stands in for the confirmation the archive no longer asks for.
+ * Undo that stands in for the confirmation the archive no longer asks for, and
+ * the disk the removed worktree gave back.
  *
  * An archive that dropped the local branch gets no Undo. Unarchiving that one
  * cuts a fresh branch from the recorded base, so the workspace comes back
@@ -197,10 +203,10 @@ export function useArchivedWorkspaceToast(): (
 ) => void {
 	const queryClient = useQueryClient();
 	const router = useRouter();
-	const { t } = useTranslation();
+	const { i18n: i18nInstance, t } = useTranslation();
 
 	return useCallback(
-		({ branchCleanup, workspaceId }: ArchivedWorkspace) => {
+		({ branchCleanup, bytesFreed, workspaceId }: ArchivedWorkspace) => {
 			const title = t(
 				'errors:workspace-archive.archived.title',
 				'Workspace archived.',
@@ -228,9 +234,14 @@ export function useArchivedWorkspaceToast(): (
 						});
 					},
 				},
+				description: reclaimedDiskDescription({
+					bytesFreed,
+					language: i18nInstance.language,
+					t,
+				}),
 			});
 		},
-		[queryClient, router, t],
+		[i18nInstance.language, queryClient, router, t],
 	);
 }
 
@@ -316,6 +327,7 @@ export function useArchiveWorkspaceAction({
 					await removeWorkspace.archived(workspace.id);
 					announceArchived({
 						branchCleanup: plan.branchCleanup,
+						bytesFreed: outcome.bytesFreed,
 						workspaceId: workspace.id,
 					});
 					return;

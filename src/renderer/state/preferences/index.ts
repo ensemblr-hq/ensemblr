@@ -41,7 +41,6 @@ export {
 	markdownStyleAtom,
 	monoFontAtom,
 	notificationSoundAtom,
-	reclaimDiskOnArchiveAtom,
 	renameWorkspaceOnBranchAtom,
 	reviewModelAtom,
 	reviewThinkingLevelAtom,

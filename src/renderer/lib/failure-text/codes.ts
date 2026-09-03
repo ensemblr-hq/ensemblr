@@ -22,7 +22,6 @@ import type {
 	DeleteArchivedWorkspaceDiagnosticCode,
 	DeleteWorkspaceDiagnosticCode,
 	FilesToCopyDiagnosticCode,
-	ReclaimArchivedWorkspaceDiskDiagnosticCode,
 	RenameWorkspaceDiagnosticCode,
 	SetWorkspaceBaseBranchDiagnosticCode,
 	UnarchiveWorkspaceDiagnosticCode,
@@ -61,7 +60,6 @@ export type AppFailureCode =
 	| QuickStartProjectDiagnosticCode
 	| ReadWorkspaceDirectoryFailureCode
 	| ReadWorkspaceFileFailureCode
-	| ReclaimArchivedWorkspaceDiskDiagnosticCode
 	| RegisterLocalRepositoryDiagnosticCode
 	| RenameWorkspaceDiagnosticCode
 	| RootDirectoryDiagnosticCode
@@ -868,11 +866,6 @@ export const APP_FAILURE_TEXT: Record<
 		),
 	'workspace-id-required': (t) =>
 		t('errors:failure.workspace-id-required', 'A workspace is required.'),
-	'workspace-ids-required': (t) =>
-		t(
-			'errors:failure.workspace-ids-required',
-			'No workspace was selected, so nothing was changed.',
-		),
 	'workspace-insert-failed': (t) =>
 		t(
 			'errors:failure.workspace-insert-failed',
@@ -901,11 +894,6 @@ export const APP_FAILURE_TEXT: Record<
 		t(
 			'errors:failure.workspace-update-failed',
 			'The workspace record could not be updated.',
-		),
-	'worktree-already-pruned': (t) =>
-		t(
-			'errors:failure.worktree-already-pruned',
-			'That workspace has no worktree folder on disk, so there was nothing to reclaim.',
 		),
 	'worktree-cleanup-failed': (t) =>
 		t(

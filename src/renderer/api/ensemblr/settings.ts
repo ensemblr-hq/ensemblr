@@ -77,7 +77,6 @@ export function reviewMergeSettingsQuery(
 			return {
 				archiveAfterMerge: readBoolean('archiveAfterMerge'),
 				deleteLocalBranchOnArchive: readBoolean('deleteLocalBranchOnArchive'),
-				reclaimDiskOnArchive: readBooleanOr('reclaimDiskOnArchive', true),
 				setUpstreamOnPush: readBooleanOr('setUpstreamOnPush', true),
 			};
 		},

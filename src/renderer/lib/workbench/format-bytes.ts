@@ -1,3 +1,5 @@
+import type { TFunction } from 'i18next';
+
 /**
  * Decimal, not binary: `Intl` knows `kilobyte` but has no unit for `kibibyte`,
  * so a 1024 step would print SI prefixes over binary maths. This also matches
@@ -20,10 +22,7 @@ const UNITS = ['byte', 'kilobyte', 'megabyte', 'gigabyte', 'terabyte'] as const;
  * @param language - Active i18next language tag.
  * @returns The formatted size, or null when there is no number to show.
  */
-export function formatBytes(
-	bytes: number | null,
-	language: string,
-): string | null {
+function formatBytes(bytes: number | null, language: string): string | null {
 	if (bytes === null || !Number.isFinite(bytes) || bytes < 0) {
 		return null;
 	}
@@ -47,4 +46,32 @@ export function formatBytes(
 		// A language tag Intl rejects must not cost the user the number itself.
 		return `${Math.round(value)} ${unit}`;
 	}
+}
+
+/**
+ * Words the disk an archive gave back, for the sentence under "Workspace
+ * archived." A measurement that did not complete returns undefined rather than
+ * a zero, so the toast simply says nothing about size — `du` failing is not
+ * news the user can act on.
+ * @param options - Bytes freed, the active language tag, and the translator.
+ * @returns The description, or undefined when there is no size to report.
+ */
+export function reclaimedDiskDescription({
+	bytesFreed,
+	language,
+	t,
+}: {
+	bytesFreed: number | null;
+	language: string;
+	t: TFunction;
+}): string | undefined {
+	const size = formatBytes(bytesFreed, language);
+	if (!size) {
+		return undefined;
+	}
+	return t(
+		'errors:workspace-archive.archived.reclaimed',
+		'Reclaimed {{size}} of disk.',
+		{ size },
+	);
 }

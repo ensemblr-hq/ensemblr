@@ -15,6 +15,7 @@ import {
 import { useRemoveWorkspaceAction } from '@/renderer/hooks/workbench-shell/use-remove-workspace-action';
 import { failureText } from '@/renderer/lib/failure-text';
 import { i18n } from '@/renderer/lib/i18n';
+import { reclaimedDiskDescription } from '@/renderer/lib/workbench';
 import {
 	ReviewActionError,
 	showReviewActionError,
@@ -107,7 +108,6 @@ export function useReviewMutations({
 			archiveWorkspace({
 				branchCleanup: mergeSettings.deleteLocalBranchOnArchive,
 				reason: 'archive-after-merge',
-				reclaimDisk: mergeSettings.reclaimDiskOnArchive,
 				workspaceId,
 			}),
 		onError: async (cause) => {
@@ -132,6 +132,13 @@ export function useReviewMutations({
 				await removeWorkspace.archived(workspaceId);
 				toast.success(
 					t('errors:workspace-archive.archived.title', 'Workspace archived.'),
+					{
+						description: reclaimedDiskDescription({
+							bytesFreed: result.workspace?.bytesFreed ?? null,
+							language: i18n.language,
+							t,
+						}),
+					},
 				);
 				return;
 			}

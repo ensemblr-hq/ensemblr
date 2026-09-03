@@ -65,7 +65,6 @@ const gitSettingsSchema = z.object({
 	branchPrefixCustom: z.string().catch(''),
 	renameWorkspaceOnBranch: z.boolean().catch(true),
 	deleteLocalBranchOnArchive: z.boolean().catch(false),
-	reclaimDiskOnArchive: z.boolean().catch(true),
 	archiveAfterMerge: z.boolean().catch(false),
 	setUpstreamOnPush: z.boolean().catch(true),
 });

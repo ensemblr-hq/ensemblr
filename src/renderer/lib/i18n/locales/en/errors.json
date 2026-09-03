@@ -346,7 +346,6 @@
 		"workspace-cleanup-failed": "The workspace could not be cleaned up.",
 		"workspace-delete-failed": "The workspace could not be deleted.",
 		"workspace-id-required": "A workspace is required.",
-		"workspace-ids-required": "No workspace was selected, so nothing was changed.",
 		"workspace-insert-failed": "The workspace could not be saved.",
 		"workspace-missing": "That workspace no longer exists.",
 		"workspace-not-archived": "That workspace is not archived.",
@@ -354,7 +353,6 @@
 		"workspace-orphaned": "Workspaces exist for a repository Ensemblr does not know.",
 		"workspace-scan-failed": "The workspace could not be scanned.",
 		"workspace-update-failed": "The workspace record could not be updated.",
-		"worktree-already-pruned": "That workspace has no worktree folder on disk, so there was nothing to reclaim.",
 		"worktree-cleanup-failed": "The worktree could not be removed.",
 		"worktree-move-failed": "The worktree could not be moved.",
 		"worktree-prune-failed": "The worktree folder could not be removed, so its disk was not reclaimed.",
@@ -527,6 +525,7 @@
 	"workspace-archive": {
 		"archived": {
 			"branch-dropped": "Its local branch was deleted, so restoring the workspace will not bring back commits you never pushed.",
+			"reclaimed": "Reclaimed {{size}} of disk.",
 			"title": "Workspace archived."
 		},
 		"failed": {

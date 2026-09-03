@@ -323,11 +323,11 @@ export interface ContinueWorkspaceBranchResult {
  * hooks (ENS-038) and after-merge cleanup (ENS-060), and stamps
  * `workspaces.archived_at`.
  *
- * What happens to the worktree is the caller's choice. By default it stays on
- * disk. `reclaimDisk` removes the directory but keeps the branch, snapshotting
- * uncommitted work into a private ref so unarchive can re-derive the whole
- * workspace from git; `branchCleanup` goes further and drops the branch too,
- * which is not reversible. Both are opt-in and surface explicit diagnostics.
+ * The worktree directory always goes: it is removed while the branch is kept,
+ * with uncommitted work snapshotted into a private ref so unarchive can
+ * re-derive the whole workspace from git. `branchCleanup` goes further and
+ * drops the branch too, which is not reversible; it is the one opt-in, and it
+ * surfaces explicit diagnostics.
  */
 export type ArchiveWorkspaceDiagnosticCode =
 	| 'archive-aborted-by-hook'
@@ -354,17 +354,11 @@ export interface ArchiveWorkspaceDiagnostic {
 	severity: ArchiveWorkspaceDiagnosticSeverity;
 }
 
-/** Request payload for archiving a workspace, optionally reclaiming its disk. */
+/** Request payload for archiving a workspace. */
 export interface ArchiveWorkspaceRequest {
 	/** Also delete the local branch. Removes the worktree, and is not reversible. */
 	branchCleanup?: boolean;
 	reason?: string;
-	/**
-	 * Remove the worktree directory but keep the branch, so unarchive re-derives
-	 * the workspace from git. Implied by `branchCleanup`, which removes the
-	 * directory anyway.
-	 */
-	reclaimDisk?: boolean;
 	workspaceId: string;
 }
 
@@ -591,84 +585,10 @@ export interface ArchivedWorkspaceListEntry {
 	id: string;
 	name: string;
 	path: string;
-	/**
-	 * True when the worktree directory is still on disk, so the row can offer to
-	 * reclaim it. Probed per listing rather than inferred from `worktreePruned`,
-	 * which says only what Ensemblr did, not what is there now.
-	 */
-	pathExists: boolean;
 	repositoryId: string;
 	slug: string;
 	/** True when Ensemblr removed the worktree and keeps the branch for re-derivation. */
 	worktreePruned: boolean;
-}
-
-/**
- * Reclaims the disk an already-archived workspace still occupies: removes its
- * worktree directory while keeping the branch, after snapshotting the working
- * tree into a private ref. The retroactive counterpart of archiving with
- * `reclaimDisk: true`, for archives made before the setting existed.
- */
-export type ReclaimArchivedWorkspaceDiskDiagnosticCode =
-	| 'database-unavailable'
-	| 'archive-record-missing'
-	| 'workspace-ids-required'
-	| 'workspace-not-archived'
-	| 'workspace-not-found'
-	| 'workspace-update-failed'
-	| 'worktree-already-pruned'
-	| 'worktree-prune-failed';
-
-/** Severity level attached to a reclaim-disk diagnostic. */
-export type ReclaimArchivedWorkspaceDiskDiagnosticSeverity =
-	| 'error'
-	| 'info'
-	| 'warning';
-
-/** A single problem reported while reclaiming an archived workspace's disk. */
-export interface ReclaimArchivedWorkspaceDiskDiagnostic {
-	code: ReclaimArchivedWorkspaceDiskDiagnosticCode;
-	message: string;
-	path?: string;
-	severity: ReclaimArchivedWorkspaceDiskDiagnosticSeverity;
-}
-
-/**
- * Request payload for reclaiming archived workspaces' disk. Takes a list so one
- * call serves both a single row's button and the archive browser's bulk action.
- */
-export interface ReclaimArchivedWorkspaceDiskRequest {
-	workspaceIds: string[];
-}
-
-/** Outcome for one workspace in a reclaim-disk request. */
-export type ReclaimArchivedWorkspaceDiskStatus =
-	| 'failure'
-	| 'reclaimed'
-	| 'skipped';
-
-/** What reclaiming one archived workspace's disk produced. */
-export interface ReclaimArchivedWorkspaceDiskEntry {
-	/** Bytes reclaimed, or null when the removal did not run or could not be measured. */
-	bytesFreed: number | null;
-	diagnostics: ReclaimArchivedWorkspaceDiskDiagnostic[];
-	status: ReclaimArchivedWorkspaceDiskStatus;
-	workspaceId: string;
-}
-
-/** Result of a reclaim-disk request, one entry per requested workspace. */
-export interface ReclaimArchivedWorkspaceDiskResult {
-	/** Sum of every entry's `bytesFreed`, ignoring the ones that could not be measured. */
-	bytesFreed: number;
-	/**
-	 * Problems with the request itself rather than with any one workspace — an
-	 * unopenable database, an id list that arrived empty. They live here because
-	 * such a request has no entries to hang them off, and a result that is empty
-	 * in every field is indistinguishable from "there was nothing to reclaim".
-	 */
-	diagnostics: ReclaimArchivedWorkspaceDiskDiagnostic[];
-	entries: ReclaimArchivedWorkspaceDiskEntry[];
-	reclaimedCount: number;
 }
 
 /** Request payload for listing a repository's archived workspaces. */

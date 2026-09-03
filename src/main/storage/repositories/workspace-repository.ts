@@ -788,8 +788,8 @@ export interface ListArchivedWorkspaceRowsByRepositoryOptions {
 /**
  * Returns every archived workspace under `repositoryId`, joined with the most
  * recent matching `archive_records` row, ordered by archive timestamp desc.
- * Carries the prune columns so the archive browser can tell an archive whose
- * worktree still occupies disk from one already reclaimed.
+ * Carries the prune columns so the archive browser can say how each archive
+ * disposed of its worktree, and so a rehydrate knows what to restore from.
  */
 export function listArchivedWorkspaceRowsByRepository({
 	database,

@@ -77,10 +77,11 @@ const ARCHIVE_METADATA_FILENAME = 'archive-metadata.json';
  * an `archive-metadata.json` snapshot, and inserts a row into `archive_records`
  * so ENS-038 / ENS-060 subscribers have enough state to act on later.
  *
- * What happens to the worktree is the request's choice. `reclaimDisk` removes
- * the directory and keeps the branch, so the workspace is re-derived from git
- * on unarchive; `branchCleanup` removes the directory and drops the branch,
- * which is not reversible. Neither runs unless the request opts in.
+ * The worktree directory always goes: it is overwhelmingly gitignored
+ * dependencies the setup script rebuilds, so archiving prunes it and keeps the
+ * branch, and unarchive re-derives the workspace from git. `branchCleanup` is
+ * the one variant that differs — it drops the branch along with the directory,
+ * which is not reversible, and is the only part the request opts into.
  */
 export function createArchiveWorkspaceService({
 	archiveLifecycleService,
@@ -106,7 +107,7 @@ export function createArchiveWorkspaceService({
 			// Deleting the branch already removes the worktree, and it deliberately
 			// destroys the commits with it — so it takes the discard path below
 			// rather than the prune path, which exists to keep them recoverable.
-			const reclaimDisk = !branchCleanup && request.reclaimDisk === true;
+			const prunesWorktree = !branchCleanup;
 			const reason =
 				typeof request.reason === 'string' && request.reason.trim()
 					? request.reason.trim()
@@ -225,7 +226,7 @@ export function createArchiveWorkspaceService({
 				});
 			}
 
-			const reclaimed = reclaimDisk
+			const reclaimed = prunesWorktree
 				? await reclaimWorktreeDisk({
 						archivedContextPath: preserved.archivedContextPath,
 						database,

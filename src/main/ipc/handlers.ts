@@ -44,7 +44,6 @@ import type {
 	LocalRepositoryImportService,
 	LocalRepositoryRegistrationService,
 	QuickStartProjectService,
-	ReclaimArchivedWorkspaceDiskService,
 	RenameWorkspaceService,
 	SetWorkspaceBaseBranchService,
 	SharedRootAdoptionService,
@@ -135,7 +134,6 @@ interface RegisterIpcHandlersOptions {
 	linearService: LinearService;
 	listAllWorkspacesService: ListAllWorkspacesService;
 	listArchivedWorkspacesService: ListArchivedWorkspacesService;
-	reclaimArchivedWorkspaceDiskService: ReclaimArchivedWorkspaceDiskService;
 	listWorkspaceFilesService: ListWorkspaceFilesService;
 	localCommandService: LocalCommandService;
 	localRepositoryImportService: LocalRepositoryImportService;
@@ -212,7 +210,6 @@ export function registerIpcHandlers({
 	linearService,
 	listAllWorkspacesService,
 	listArchivedWorkspacesService,
-	reclaimArchivedWorkspaceDiskService,
 	listWorkspaceFilesService,
 	localCommandService,
 	localRepositoryImportService,
@@ -289,7 +286,6 @@ export function registerIpcHandlers({
 		deleteWorkspaceService,
 		listAllWorkspacesService,
 		listArchivedWorkspacesService,
-		reclaimArchivedWorkspaceDiskService,
 		localRepositoryImportService,
 		localRepositoryRegistrationService,
 		quickStartProjectService,

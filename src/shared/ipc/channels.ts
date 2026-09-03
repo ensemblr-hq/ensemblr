@@ -128,7 +128,6 @@ export const IPC_CHANNELS = {
 	listAllChatTabs: 'ensemblr:list-all-chat-tabs',
 	listAllWorkspaces: 'ensemblr:list-all-workspaces',
 	listArchivedWorkspaces: 'ensemblr:list-archived-workspaces',
-	reclaimArchivedWorkspaceDisk: 'ensemblr:reclaim-archived-workspace-disk',
 	listChatTabs: 'ensemblr:list-chat-tabs',
 	forgetLinkedDirectoryRecent: 'ensemblr:forget-linked-directory-recent',
 	listLinkedDirectoryRecents: 'ensemblr:list-linked-directory-recents',

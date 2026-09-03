@@ -103,12 +103,10 @@ function gitStatus(files: number, error?: unknown) {
 /** Repository git settings, in the resolver's raw `resolveSettings` shape. */
 function gitSettings({
 	deleteLocalBranchOnArchive = false,
-	reclaimDiskOnArchive = true,
 }: {
 	deleteLocalBranchOnArchive?: boolean;
-	reclaimDiskOnArchive?: boolean;
 } = {}) {
-	return { deleteLocalBranchOnArchive, reclaimDiskOnArchive };
+	return { deleteLocalBranchOnArchive };
 }
 
 /** Mounts a hook against a fresh query cache and jotai store the test can read back. */
@@ -158,7 +156,6 @@ test('archives a clean workspace without raising the dialog', async () => {
 
 	expect(archiveWorkspace).toHaveBeenCalledWith({
 		branchCleanup: false,
-		reclaimDisk: true,
 		workspaceId: 'ws-clean',
 	});
 	expect(removeWorkspace.archived).toHaveBeenCalledWith('ws-clean');
@@ -187,7 +184,7 @@ test('raises the archive dialog when the plan would drop the local branch', asyn
 	});
 });
 
-test('keeps the branch and reclaims the disk on the unconfirmed path', async () => {
+test('keeps the branch on the unconfirmed path', async () => {
 	const { view } = mountAction();
 
 	await act(async () => {
@@ -196,26 +193,44 @@ test('keeps the branch and reclaims the disk on the unconfirmed path', async () 
 
 	expect(archiveWorkspace).toHaveBeenCalledWith({
 		branchCleanup: false,
-		reclaimDisk: true,
 		workspaceId: 'ws-reclaim',
 	});
 });
 
-test('archives without reclaiming when the repository turns that off', async () => {
-	resolveSettings.mockResolvedValue(
-		gitSettings({ reclaimDiskOnArchive: false }),
-	);
+// The measurement is the only report the user gets that archiving gave the disk
+// back, so it has to survive the trip from the IPC result into the toast.
+test('reports the disk the archive freed in the success toast', async () => {
+	archiveWorkspace.mockResolvedValue({
+		archiveRecordId: 'record-1',
+		diagnostics: [],
+		status: 'success',
+		workspace: { bytesFreed: 1_200_000_000 },
+	});
 	const { view } = mountAction();
 
 	await act(async () => {
-		await view.result.current(workspace('ws-keep'));
+		await view.result.current(workspace('ws-freed'));
 	});
 
-	expect(archiveWorkspace).toHaveBeenCalledWith({
-		branchCleanup: false,
-		reclaimDisk: false,
-		workspaceId: 'ws-keep',
+	expect(toast.success).toHaveBeenCalledWith(
+		expect.any(String),
+		expect.objectContaining({ description: expect.stringContaining('1.2') }),
+	);
+});
+
+// `du` is best-effort, and a measurement that did not complete is not news the
+// user can act on — the toast says nothing about size rather than "0 bytes".
+test('omits the size when the archive could not measure it', async () => {
+	const { view } = mountAction();
+
+	await act(async () => {
+		await view.result.current(workspace('ws-unmeasured'));
 	});
+
+	expect(toast.success).toHaveBeenCalledWith(
+		expect.any(String),
+		expect.objectContaining({ description: undefined }),
+	);
 });
 
 test('raises the archive dialog when the worktree has uncommitted changes', async () => {
@@ -289,7 +304,11 @@ test('offers no undo for an archive that dropped the local branch', () => {
 	const { view } = mountHook(() => useArchivedWorkspaceToast());
 
 	act(() => {
-		view.result.current({ branchCleanup: true, workspaceId: 'ws-dropped' });
+		view.result.current({
+			branchCleanup: true,
+			bytesFreed: null,
+			workspaceId: 'ws-dropped',
+		});
 	});
 
 	const [, options] = toast.success.mock.calls[0] as [

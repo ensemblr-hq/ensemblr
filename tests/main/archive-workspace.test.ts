@@ -251,7 +251,7 @@ test('archive reports what refused to wind down as a warning', async (t) => {
 	assert.equal(warning?.severity, 'warning');
 });
 
-test('lifecycle archive preserves .context/, stamps archived_at, leaves worktree + branch alone', async (t) => {
+test('lifecycle archive preserves .context/, stamps archived_at, keeps the branch', async (t) => {
 	const harness = createHarness(t);
 	const workspace = await seedWorkspace(harness, 'handoff');
 
@@ -292,7 +292,7 @@ test('lifecycle archive preserves .context/, stamps archived_at, leaves worktree
 
 	const row = workspaceRow(harness.databaseService, workspace.id);
 	assert.equal(row?.archived_at, fixedNow().toISOString());
-	assert.equal(existsSync(workspace.path), true);
+	assert.equal(existsSync(workspace.path), false);
 
 	assert.equal(
 		listBranches(harness.repositoryPath).includes(workspace.branchName ?? ''),
@@ -444,15 +444,12 @@ test('archive validates the workspace id and rejects unknown ids', async (t) => 
 	assert.equal(notFound.diagnostics[0]?.code, 'workspace-not-found');
 });
 
-test('archiving with reclaimDisk removes the worktree and keeps the branch', async (t) => {
+test('archiving removes the worktree and keeps the branch', async (t) => {
 	const harness = createHarness(t);
 	const workspace = await seedWorkspace(harness, 'reclaim-me');
 	const { service } = makeArchiveService(harness);
 
-	const result = await service.archive({
-		reclaimDisk: true,
-		workspaceId: workspace.id,
-	});
+	const result = await service.archive({ workspaceId: workspace.id });
 
 	assert.equal(result.status, 'success');
 	assert.equal(result.workspace?.worktreePruned, true);
@@ -477,7 +474,6 @@ test('branch cleanup takes the discard path rather than pruning', async (t) => {
 
 	const result = await service.archive({
 		branchCleanup: true,
-		reclaimDisk: true,
 		workspaceId: workspace.id,
 	});
 
@@ -492,14 +488,15 @@ test('branch cleanup takes the discard path rather than pruning', async (t) => {
 	);
 });
 
-test('archiving without reclaimDisk leaves the worktree alone', async (t) => {
+test('archiving reports the disk its worktree removal freed', async (t) => {
 	const harness = createHarness(t);
-	const workspace = await seedWorkspace(harness, 'keep-me');
+	const workspace = await seedWorkspace(harness, 'measure-me');
 	const { service } = makeArchiveService(harness);
 
 	const result = await service.archive({ workspaceId: workspace.id });
 
 	assert.equal(result.status, 'success');
-	assert.equal(result.workspace?.worktreePruned, false);
-	assert.equal(existsSync(workspace.path), true);
+	assert.equal(result.workspace?.worktreePruned, true);
+	assert.equal(typeof result.workspace?.bytesFreed, 'number');
+	assert.ok((result.workspace?.bytesFreed ?? 0) > 0);
 });

@@ -91,10 +91,6 @@
 					"type": "boolean",
 					"description": "Delete the local branch when a workspace is archived. The remote branch is untouched."
 				},
-				"reclaim_disk_on_archive": {
-					"type": "boolean",
-					"description": "Delete the worktree folder when a workspace is archived, keeping its branch and a snapshot of any uncommitted changes so unarchiving re-derives the workspace from git."
-				},
 				"archive_after_merge": {
 					"type": "boolean",
 					"description": "Archive a workspace automatically once its pull request merges."
