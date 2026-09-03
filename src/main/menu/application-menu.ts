@@ -38,12 +38,13 @@ export function installApplicationMenu(
 	readSettings: () => AppSettings,
 	context: MenuContext | null = null,
 ): DescribedMenuItem[] {
-	app.setAboutPanelOptions(aboutPanelOptions());
-
 	const language = resolveLanguage(
 		readSettings().general.language,
 		app.getPreferredSystemLanguages(),
 	);
+
+	app.setAboutPanelOptions(aboutPanelOptions(language));
+
 	const labels = menuLabels(language, app.name);
 	const items = createMenuItemFactory(context);
 

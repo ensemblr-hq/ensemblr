@@ -24,6 +24,7 @@
 		"start": "npm run dev",
 		"check": "biome check . && npm run check:tailwind && npm run check:strings && npm run i18n:lint",
 		"check:strings": "node scripts/check-hardcoded-strings.mjs",
+		"credits:generate": "node scripts/generate-credits.mjs && biome check --write src/main/menu/credits-manifest.gen.ts",
 		"check:tailwind": "node scripts/check-tailwind-classes.mjs",
 		"check:fix": "biome check --write .",
 		"i18n:extract": "i18next-cli extract && biome check --write src/renderer/lib/i18n/locales",

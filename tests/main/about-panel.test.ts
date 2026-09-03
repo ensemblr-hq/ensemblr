@@ -2,6 +2,7 @@ import path from 'node:path';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 
 import { author, homepage, version } from '../../package.json';
+import { CREDITS_PACKAGES } from '../../src/main/menu/credits-manifest.gen';
 
 const REAL_PLATFORM = process.platform;
 const REPO_ROOT = path.resolve(import.meta.dirname, '../..');
@@ -58,7 +59,7 @@ afterEach(() => {
 test('names the app and its version rather than leaving GTK to guess', () => {
 	pretendPlatform('linux');
 
-	const options = aboutPanelOptions();
+	const options = aboutPanelOptions('en');
 
 	expect(options.applicationName).toBe('Ensemblr');
 	expect(options.applicationVersion).toBe(version);
@@ -71,7 +72,7 @@ test('names the app and its version rather than leaving GTK to guess', () => {
 test('points the panel at a real icon file on Linux', () => {
 	pretendPlatform('linux');
 
-	const options = aboutPanelOptions();
+	const options = aboutPanelOptions('en');
 
 	expect(options.iconPath).toBe(
 		path.join(REPO_ROOT, 'assets', 'icons', 'icon-512.png'),
@@ -83,5 +84,45 @@ test('points the panel at a real icon file on Linux', () => {
 test('omits the icon path off Linux, where the platform owns it', () => {
 	pretendPlatform('darwin');
 
-	expect(aboutPanelOptions().iconPath).toBeUndefined();
+	expect(aboutPanelOptions('en').iconPath).toBeUndefined();
+});
+
+// Electron splits the credits by platform — `authors` reaches only GTK's
+// credits page and `credits` only the macOS panel — so a field left unset is a
+// platform with no attribution at all.
+test('credits every direct dependency on both platforms', () => {
+	const options = aboutPanelOptions('en');
+	const authors = options.authors ?? [];
+
+	for (const entry of CREDITS_PACKAGES) {
+		expect(authors).toContain(
+			`${entry.name} — ${entry.license} <${entry.url}>`,
+		);
+		expect(options.credits).toContain(`${entry.name} — ${entry.license}`);
+	}
+});
+
+// macOS hands `credits` to a plain NSAttributedString in a narrow column, so a
+// URL it cannot linkify is three wrapped lines of noise per package.
+test('linkifies project URLs for GTK and omits them on macOS', () => {
+	const options = aboutPanelOptions('en');
+
+	expect(options.authors?.join('\n')).toContain('<https://react.dev/>');
+	expect(options.credits).not.toContain('https://react.dev/');
+});
+
+test('credits the author first and the inspiration last', () => {
+	const options = aboutPanelOptions('en');
+	const authors = options.authors ?? [];
+
+	expect(authors[0]).toBe(author.name);
+	expect(authors.at(-1)).toBe(
+		'Inspired by Conductor <https://conductor.build>',
+	);
+	expect(options.credits?.trimEnd().endsWith('(conductor.build)')).toBe(true);
+});
+
+test('renders the credit headings in the requested language', () => {
+	expect(aboutPanelOptions('ru').authors).toContain('Инструменты разработки');
+	expect(aboutPanelOptions('el').authors).toContain('Εργαλεία ανάπτυξης');
 });
