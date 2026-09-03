@@ -1,3 +1,5 @@
+import assert from 'node:assert/strict';
+
 import { afterEach, expect, test, vi } from 'vitest';
 
 import {
@@ -21,9 +23,11 @@ function buildPorts(
 	overrides: Partial<WorkspaceTeardownPorts> = {},
 ): WorkspaceTeardownPorts {
 	return {
+		forgetTerminals: vi.fn(),
 		killTerminal: vi.fn(),
 		listAgentSessionIds: () => [],
 		listTerminalIds: () => [],
+		readTerminalScrollbacks: () => [],
 		releaseAgentControl: vi.fn(),
 		stopAgentSession: vi.fn(async () => {}),
 		stopWatchingFiles: vi.fn(),
@@ -48,6 +52,7 @@ test('stops every session, kills every terminal, and drops the watcher', async (
 	expect(report).toEqual({
 		agentSessionsStopped: 2,
 		failures: [],
+		scrollbacks: [],
 		terminalsKilled: 1,
 	});
 	expect(ports.stopAgentSession).toHaveBeenCalledWith('session-a');
@@ -227,5 +232,63 @@ test('reports a non-Error throw rather than swallowing it', async () => {
 
 	expect(report.failures).toEqual([
 		'Could not stop agent session session-a: an unexpected error',
+	]);
+});
+
+// Memory is the only copy: a terminal that ended earlier in the run had its
+// `.context` log deleted at finalization, so the archive has nothing to copy.
+test('reads scrollback after the kills and forgets the sessions after reading', async () => {
+	const order: string[] = [];
+	const captures = [{ id: 'term-a', text: 'output', title: 'Dev' }];
+	const ports = buildPorts({
+		forgetTerminals: vi.fn(() => {
+			order.push('forget');
+		}),
+		killTerminal: vi.fn(() => {
+			order.push('kill');
+		}),
+		listTerminalIds: () => ['term-a'],
+		readTerminalScrollbacks: vi.fn(() => {
+			order.push('read');
+			return captures;
+		}),
+	});
+
+	const report =
+		await createWorkspaceTeardownService(ports).teardown(WORKSPACE);
+
+	assert.deepEqual(report.scrollbacks, captures);
+	assert.deepEqual(order, ['kill', 'read', 'forget']);
+	expect(ports.forgetTerminals).toHaveBeenCalledWith(WORKSPACE.workspaceId);
+});
+
+test('a scrollback read that throws costs a warning, not the teardown', async () => {
+	const ports = buildPorts({
+		readTerminalScrollbacks: () => {
+			throw new Error('buffer gone');
+		},
+	});
+
+	const report =
+		await createWorkspaceTeardownService(ports).teardown(WORKSPACE);
+
+	assert.deepEqual(report.scrollbacks, []);
+	assert.deepEqual(report.failures, [
+		"Could not read the workspace's terminal output: buffer gone",
+	]);
+});
+
+test('a forget that throws costs a warning, not the teardown', async () => {
+	const ports = buildPorts({
+		forgetTerminals: () => {
+			throw new Error('map locked');
+		},
+	});
+
+	const report =
+		await createWorkspaceTeardownService(ports).teardown(WORKSPACE);
+
+	assert.deepEqual(report.failures, [
+		"Could not forget the workspace's terminals: map locked",
 	]);
 });

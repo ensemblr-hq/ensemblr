@@ -107,7 +107,7 @@ export function createDeleteWorkspaceService({
 				repositoryPath: source.repositoryPath,
 				workspacePath: source.path,
 			});
-			if (worktreeOutcome.status === 'failure') {
+			if (worktreeOutcome.status !== 'success') {
 				diagnostics.push({
 					code: 'workspace-delete-failed',
 					message: worktreeOutcome.message,

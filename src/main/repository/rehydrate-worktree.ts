@@ -14,6 +14,7 @@ import {
 	runWorktreeAdd,
 } from './git-ops.ts';
 import { ARCHIVED_FILES_TO_COPY_DIRECTORY } from './prune-worktree.ts';
+import { removeDirectoryTree } from './remove-directory.ts';
 
 const execFileAsync = promisify(execFile);
 
@@ -68,6 +69,13 @@ export async function rehydrateWorktree({
 	// A prune removes the admin entry with the directory, but an interrupted one
 	// can leave it behind and `git worktree add` refuses a registered path.
 	await pruneWorktreeAdmin({ localCommandService, repositoryPath });
+
+	// `git worktree add` also refuses a non-empty directory, and a pruned path
+	// does not stay empty: a build that outlived the archive's teardown, or a
+	// background write into `.context`, puts one back. This path only runs for a
+	// worktree the prune already removed, so whatever is there is residue the
+	// checkout below would have overwritten anyway.
+	await removeDirectoryTree(workspacePath);
 
 	const placement = await resolvePlacement({
 		branchName,

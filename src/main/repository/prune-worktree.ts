@@ -7,6 +7,7 @@ import {
 } from '../checkpoints/index.ts';
 import type { LocalCommandService } from '../commands/local-command';
 import { loadRepositoryConfig } from '../config/index.ts';
+import { measureDirectoryBytes } from './directory-bytes.ts';
 import {
 	copyOneFile,
 	listFilesToCopyMatches,
@@ -20,7 +21,6 @@ import { runWorktreeRemove } from './git-ops.ts';
  */
 export const ARCHIVED_FILES_TO_COPY_DIRECTORY = 'files-to-copy';
 
-const DISK_USAGE_TIMEOUT_MS = 60_000;
 const REV_PARSE_TIMEOUT_MS = 15_000;
 
 /**
@@ -33,7 +33,10 @@ export interface PruneWorktreeOutcome {
 	bytesFreed: number | null;
 	/** Branch tip at prune time, so a branch deleted out of band stays recreatable. */
 	headCommit: string | null;
-	/** Present only on `failure`. */
+	/**
+	 * Why the prune failed, or — on `pruned` — what a straggling writer put back
+	 * at the path after git had removed the checkout.
+	 */
 	message?: string;
 	status: 'failure' | 'pruned' | 'skipped';
 	/** Snapshot commit holding the removed working tree. */
@@ -168,6 +171,12 @@ export async function pruneWorktree({
 	return {
 		bytesFreed,
 		headCommit,
+		// `residue` is not a failed prune: git dropped the worktree, so the
+		// checkout is gone and unarchive still has to rehydrate from the ref. What
+		// is left at the path is a straggling writer's output — measured here as a
+		// `swift build` that recreated a 90 MB `.build` over the thirty seconds
+		// after an archive — and the startup sweep clears it on the next launch.
+		message: removal.status === 'residue' ? removal.message : undefined,
 		status: 'pruned',
 		wipCommit: captured.commitHash,
 		wipRef: captured.ref,
@@ -443,41 +452,6 @@ async function readGitRevision({
 		}
 		const hash = result.stdout.trim();
 		return hash === '' ? null : hash;
-	} catch {
-		return null;
-	}
-}
-
-/**
- * Measures a directory with `du -sk` so the caller can report bytes reclaimed.
- *
- * The walk is the same one the removal is about to do, and it is the only way
- * to report a real number rather than an estimate. Best-effort: an unavailable
- * or slow `du` reports null and the caller says nothing about size, which is
- * never a reason to skip the removal itself.
- * @param options - Directory to measure and the command runner.
- * @returns Size in bytes, or null when the measurement did not complete.
- */
-async function measureDirectoryBytes({
-	directoryPath,
-	localCommandService,
-}: {
-	directoryPath: string;
-	localCommandService: LocalCommandService;
-}): Promise<number | null> {
-	try {
-		const result = await localCommandService.run({
-			args: ['-sk', directoryPath],
-			command: 'du',
-			cwd: directoryPath,
-			maxOutputBytes: 4 * 1024,
-			timeoutMs: DISK_USAGE_TIMEOUT_MS,
-		});
-		if (result.status !== 'success') {
-			return null;
-		}
-		const kilobytes = Number.parseInt(result.stdout.trim().split(/\s+/)[0], 10);
-		return Number.isFinite(kilobytes) ? kilobytes * 1024 : null;
 	} catch {
 		return null;
 	}

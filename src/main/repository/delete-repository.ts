@@ -125,7 +125,7 @@ export function createDeleteRepositoryService({
 					repositoryPath: source.path,
 					workspacePath: workspace.path,
 				});
-				if (worktreeOutcome.status === 'failure') {
+				if (worktreeOutcome.status !== 'success') {
 					diagnostics.push({
 						code: 'workspace-cleanup-failed',
 						message: worktreeOutcome.message,

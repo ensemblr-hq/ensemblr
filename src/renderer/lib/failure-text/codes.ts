@@ -920,6 +920,11 @@ export const APP_FAILURE_TEXT: Record<
 			'errors:failure.worktree-repository-mismatch',
 			'That worktree belongs to a different repository.',
 		),
+	'worktree-residue-swept': (t) =>
+		t(
+			'errors:failure.worktree-residue-swept',
+			'The worktree was removed, but something wrote files back into its folder. Ensemblr reclaims them on the next launch.',
+		),
 	'write-failed': (t) =>
 		t('errors:failure.write-failed', 'That file could not be written.'),
 };

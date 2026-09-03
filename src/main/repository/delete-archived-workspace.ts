@@ -118,7 +118,7 @@ export function createDeleteArchivedWorkspaceService({
 					repositoryPath: source.repositoryPath,
 					workspacePath: source.path,
 				});
-				if (worktreeOutcome.status === 'failure') {
+				if (worktreeOutcome.status !== 'success') {
 					diagnostics.push({
 						code: 'worktree-cleanup-failed',
 						message: worktreeOutcome.message,

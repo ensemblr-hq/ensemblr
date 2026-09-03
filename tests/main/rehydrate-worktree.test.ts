@@ -261,3 +261,31 @@ test('rehydrating clears the setup marker the restored context carries', async (
 
 	assert.equal(existsSync(markerPath), false);
 });
+
+// `git worktree add` refuses a non-empty directory, so residue a straggling
+// build left at the path is what made an archived workspace unrecoverable.
+test('rehydrating clears residue a straggler left at the worktree path', async (t) => {
+	const harness = createHarness(t);
+	writeFileSync(path.join(harness.workspacePath, 'feature.txt'), 'shipped\n');
+	runGit(harness.workspacePath, ['add', '.']);
+	runGit(harness.workspacePath, ['commit', '-m', 'feature']);
+
+	const pruned = await prune(harness);
+	mkdirSync(path.join(harness.workspacePath, '.build'), { recursive: true });
+	writeFileSync(
+		path.join(harness.workspacePath, '.build', 'out.o'),
+		'stale object\n',
+	);
+
+	const outcome = await rehydrate(harness, pruned);
+
+	assert.equal(outcome.status, 'success');
+	assert.equal(
+		existsSync(path.join(harness.workspacePath, '.build', 'out.o')),
+		false,
+	);
+	assert.equal(
+		readFileSync(path.join(harness.workspacePath, 'feature.txt'), 'utf8'),
+		'shipped\n',
+	);
+});

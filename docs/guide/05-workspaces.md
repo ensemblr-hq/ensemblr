@@ -202,6 +202,14 @@ into the Ensemblr root's `archived-contexts/` directory alongside a metadata
 record. The directory is stamped with the workspace and a timestamp and is never
 reused; archiving the same workspace twice is refused rather than overwriting.
 
+Terminal scrollback is preserved with it. A terminal's on-disk log is deleted as
+soon as it exits, so copying the folder alone would archive nothing for a
+workspace whose terminals ended earlier in the session. Archiving therefore reads
+each dock terminal's buffer out of memory once they are stopped, and writes it to
+`archived-contexts/<repo>/<workspace>/.context/terminals/<id>.log`. Agent and
+run-script sessions are left out, on the same grounds their output is never
+written into `.context` in the first place.
+
 From the History screen you can browse everything archived for a project,
 **restore** one (which brings back its `.context/`, recreating the worktree first
 if the archive removed it), or **permanently delete** it — which purges the
@@ -241,9 +249,28 @@ rebuilds dependencies. A worktree that went missing without a record — a folde
 deleted by hand, or a stamp that failed — is recovered from its branch instead of
 being reported as an orphaned row.
 
-An archive made before this was unconditional may still have its folder on disk.
-Nothing reclaims it retroactively — **Delete permanently** in the archive browser
-is what clears one out.
+The removal is verified rather than assumed. `git worktree remove` deletes the
+tree in one pass, but a build that outlived the workspace's teardown keeps
+writing to absolute paths and can put its output directory straight back — the
+checkout is gone, and what is left is a stale `.build` or `node_modules` nothing
+would ever notice. Archiving sweeps that residue before it returns, and a
+launch-time pass catches whatever came back afterwards: any archived workspace
+whose folder is on disk although its archive removed the worktree — a recorded
+prune, or a branch cleanup that dropped the branch with it — any folder under
+`workspaces/` that no workspace points at (what a *delete* losing the same race
+leaves behind), and any repository folder left empty once its workspaces are
+gone. It runs silently and only ever touches directories inside the Ensemblr
+root's `workspaces/`, never one that still holds a `.git`, and never one whose
+archive left the worktree in place.
+
+The pass runs while the window is opening, so every candidate is re-checked
+against the database and the disk in the instant before it is unlinked. A
+workspace you restore while it is still running stops being a candidate the
+moment the checkout lands, and is left alone.
+
+That pass is also what makes a stale folder restorable: `git worktree add`
+refuses a directory that is not empty, so residue at the path would otherwise
+block unarchiving. Restoring clears the path itself for the same reason.
 
 ### The git side
 

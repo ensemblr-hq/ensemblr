@@ -115,6 +115,12 @@ export type {
 } from './set-workspace-base-branch.ts';
 export { createSetWorkspaceBaseBranchService } from './set-workspace-base-branch.ts';
 export type {
+	CreateWorkspaceDiskSweepServiceOptions,
+	WorkspaceDiskSweepReport,
+	WorkspaceDiskSweepService,
+} from './sweep-workspace-disk.ts';
+export { createWorkspaceDiskSweepService } from './sweep-workspace-disk.ts';
+export type {
 	CreateUnarchiveWorkspaceServiceOptions,
 	UnarchiveWorkspaceService,
 } from './unarchive-workspace.ts';

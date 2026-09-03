@@ -1178,3 +1178,103 @@ async function waitFor(
 		await new Promise((resolve) => setTimeout(resolve, 25));
 	}
 }
+
+// The log was deleted at finalization on purpose, so quit writing it back would
+// restore a secret-bearing orphan — and, for a workspace archived earlier in the
+// run, restore it inside a worktree the prune removed.
+test('shutdown does not rewrite the log of a session that already exited', async (t) => {
+	const cwd = createWorktreeCwd(t);
+	const fake = createFakePty();
+	const backend: PtyBackend = { spawn: () => fake.pty };
+	const { service } = createServiceFixture(t, { backend, cwd });
+
+	const result = await service.create({ workspaceId: WORKSPACE_ID });
+	const terminalId = result.session?.id ?? '';
+	fake.emitData('mid-session output');
+	fake.emitExit(0);
+	assert.equal(readTerminalOutput(cwd, terminalId), null);
+
+	await service.shutdown();
+
+	assert.equal(readTerminalOutput(cwd, terminalId), null);
+});
+
+// The map is otherwise append-only for the process lifetime, which is what let
+// quit reach a workspace archived hours earlier.
+test('forgetWorkspaceSessions drops finished sessions and keeps live ones', async (t) => {
+	const fakes = [createFakePty(), createFakePty()];
+	let spawnCount = 0;
+	const backend: PtyBackend = {
+		spawn: () => {
+			const fake = fakes[spawnCount];
+			spawnCount += 1;
+			return fake.pty;
+		},
+	};
+	const { service } = createServiceFixture(t, { backend });
+
+	const finished = await service.create({ workspaceId: WORKSPACE_ID });
+	const live = await service.create({ workspaceId: WORKSPACE_ID });
+	fakes[0].emitExit(0);
+
+	assert.equal(service.forgetWorkspaceSessions(WORKSPACE_ID), 1);
+	assert.equal(
+		service
+			.list(WORKSPACE_ID)
+			.map((session) => session.id)
+			.join(),
+		live.session?.id,
+	);
+	assert.equal(service.getSnapshot(finished.session?.id ?? '').session, null);
+});
+
+// An archive outlives the `.context` log, so the capture it reads has to obey
+// the same kind gate `persistSessionOutput` does — otherwise harness output that
+// is never allowed on disk lands in `archived-contexts/` forever.
+test('readWorkspaceScrollbacks carries dock terminals only', async (t) => {
+	const fakes = [createFakePty(), createFakePty(), createFakePty()];
+	let spawnCount = 0;
+	const backend: PtyBackend = {
+		spawn: () => {
+			const fake = fakes[spawnCount];
+			spawnCount += 1;
+			return fake.pty;
+		},
+	};
+	const { service } = createServiceFixture(t, { backend });
+
+	const dock = await service.create({ workspaceId: WORKSPACE_ID });
+	await service.create({
+		harnessId: 'claude',
+		kind: 'agent',
+		workspaceId: WORKSPACE_ID,
+	});
+	await service.create({
+		command: 'npm run dev',
+		kind: 'run-script',
+		workspaceId: WORKSPACE_ID,
+	});
+	fakes[0].emitData('git status\r\n');
+	fakes[1].emitData('sk-ant-secret\r\n');
+	fakes[2].emitData('listening on http://localhost:3000\r\n');
+
+	const captured = service.readWorkspaceScrollbacks(WORKSPACE_ID);
+
+	assert.deepEqual(
+		captured.map((capture) => capture.id),
+		[dock.session?.id],
+	);
+	assert.equal(captured[0].text.includes('git status'), true);
+});
+
+test('forgetWorkspaceSessions leaves another workspace alone', async (t) => {
+	const fake = createFakePty();
+	const backend: PtyBackend = { spawn: () => fake.pty };
+	const { service } = createServiceFixture(t, { backend });
+
+	const result = await service.create({ workspaceId: WORKSPACE_ID });
+	fake.emitExit(0);
+
+	assert.equal(service.forgetWorkspaceSessions('workspace-other'), 0);
+	assert.notEqual(service.getSnapshot(result.session?.id ?? '').session, null);
+});

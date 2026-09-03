@@ -176,6 +176,7 @@ import {
 	createSetWorkspaceBaseBranchService,
 	createSharedRootAdoptionService,
 	createUnarchiveWorkspaceService,
+	createWorkspaceDiskSweepService,
 	createWorkspaceService,
 	createWorkspaceTeardownService,
 } from './repository';
@@ -861,6 +862,9 @@ const archiveLifecycleService = createArchiveLifecycleService();
 // constructed further down this module, so each port resolves its dependency
 // when a teardown actually runs rather than when this service is built.
 const workspaceTeardownService = createWorkspaceTeardownService({
+	forgetTerminals: (workspaceId) => {
+		terminalService.forgetWorkspaceSessions(workspaceId);
+	},
 	killTerminal: (terminalId) => {
 		terminalService.kill(terminalId);
 	},
@@ -870,6 +874,8 @@ const workspaceTeardownService = createWorkspaceTeardownService({
 			.map((session) => session.id),
 	listTerminalIds: (workspaceId) =>
 		terminalService.list(workspaceId).map((session) => session.id),
+	readTerminalScrollbacks: (workspaceId) =>
+		terminalService.readWorkspaceScrollbacks(workspaceId),
 	releaseAgentControl: (sessionId) => {
 		agentControlService?.releaseSession(sessionId);
 	},
@@ -890,6 +896,11 @@ const archiveWorkspaceService = createArchiveWorkspaceService({
 	localCommandService,
 	rootDirectoryService,
 	workspaceTeardownService,
+});
+const workspaceDiskSweepService = createWorkspaceDiskSweepService({
+	databaseService,
+	localCommandService,
+	rootDirectoryService,
 });
 const deleteWorkspaceService = createDeleteWorkspaceService({
 	databaseService,
@@ -1429,6 +1440,32 @@ function openMainWindow(): void {
 }
 
 /**
+ * Reclaims workspace directories a prune or a delete believed it had removed,
+ * and which a straggling writer put back afterwards.
+ *
+ * Fired at launch rather than awaited: the sweep walks the workspaces root and
+ * unlinks whole dependency trees, and nothing about opening a window depends on
+ * it. Startup is also the only moment when nothing in the app is writing into a
+ * workspace, which is what makes the removal stick. Silent by design — the user
+ * was already told archiving reclaims the disk — so only what it could *not*
+ * sweep is worth a line in the log.
+ */
+async function reclaimSweptWorkspaceDisk(): Promise<void> {
+	try {
+		const report = await workspaceDiskSweepService.sweep();
+
+		for (const failure of report.failures) {
+			console.warn('[workspace-sweep]', failure);
+		}
+	} catch (error) {
+		console.error(
+			'[workspace-sweep] pass failed; retrying on next launch',
+			error,
+		);
+	}
+}
+
+/**
  * Moves personal script settings into each repository's committed
  * `.ensemblr/settings.toml` (ADR 0041). Runs before any window opens so the
  * Scripts screen never reads a half-migrated repository. Fails open: the pass
@@ -1494,6 +1531,7 @@ app.whenReady().then(() => {
 	ensureConciergeHome(rootDirectoryService.ensure().conciergePath);
 	conciergeMemoryService.reconcile();
 	void sharedRootAdoptionService.reconcile();
+	void reclaimSweptWorkspaceDisk();
 	const readAppSettings = () => appSettingsService.read();
 	const menuContextStore = new MenuContextStore();
 	const menuBarStore = new MenuBarStore();

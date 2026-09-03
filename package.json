@@ -43,7 +43,7 @@
 		"test:agent-storage": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/agent-session-repository.test.ts tests/main/agent-event-repository.test.ts tests/main/chat-tab-repository.test.ts tests/main/chat-tab-service.test.ts tests/main/closed-tab-summary.test.ts tests/main/chat-tab-preview-slot.test.ts tests/main/chat-tab-plumbing.test.ts",
 		"test:environment": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/environment-variables.test.ts",
 		"test:workspace-environment": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/workspace-environment.test.ts",
-		"test:terminal": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/terminal-service.test.ts tests/main/persist-terminal-agent-session.test.ts",
+		"test:terminal": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/terminal-service.test.ts tests/main/terminal-output-file.test.ts tests/main/persist-terminal-agent-session.test.ts",
 		"test:open-targets": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/open-target-registry.test.ts tests/main/detect-installed-targets.test.ts",
 		"test:scripts": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/script-lifecycle.test.ts",
 		"test:app": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/main-window-state.test.ts",

@@ -5,6 +5,8 @@ export type {
 } from './pty-backend';
 export { createNodePtyBackend } from './pty-backend';
 export { toReadableScrollback } from './scrollback-text';
+export type { TerminalScrollbackCapture } from './terminal-output-file';
+export { writeArchivedTerminalOutput } from './terminal-output-file';
 export type { ScrollbackBuffer } from './terminal-scrollback';
 export {
 	createScrollbackBuffer,

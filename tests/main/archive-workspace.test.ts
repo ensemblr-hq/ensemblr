@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import {
+	chmodSync,
 	existsSync,
 	mkdirSync,
 	mkdtempSync,
@@ -179,6 +180,7 @@ function makeArchiveService(
 	harness: Harness,
 	lifecycle = createArchiveLifecycleService(),
 	teardown = buildWorkspaceTeardownStub(),
+	localCommandService = createLocalCommandService(),
 ) {
 	return {
 		lifecycle,
@@ -186,7 +188,7 @@ function makeArchiveService(
 		service: createArchiveWorkspaceService({
 			archiveLifecycleService: lifecycle,
 			databaseService: harness.databaseService,
-			localCommandService: createLocalCommandService(),
+			localCommandService,
 			now: fixedNow,
 			rootDirectoryService: rootDirectoryStub(harness),
 			workspaceTeardownService: teardown,
@@ -499,4 +501,135 @@ test('archiving reports the disk its worktree removal freed', async (t) => {
 	assert.equal(result.workspace?.worktreePruned, true);
 	assert.equal(typeof result.workspace?.bytesFreed, 'number');
 	assert.ok((result.workspace?.bytesFreed ?? 0) > 0);
+});
+
+// A terminal's `.context` log is deleted the moment it exits, so the `.context`
+// copy alone preserves nothing for a workspace whose terminals ended earlier in
+// the run. Teardown reads the buffers out of memory instead.
+test('archive preserves every terminal scrollback into the archived context', async (t) => {
+	const harness = createHarness(t);
+	const workspace = await seedWorkspace(harness, 'chatty');
+	const teardown = buildWorkspaceTeardownStub(
+		[],
+		[
+			{ id: 'term-a', text: 'npm run dev\r\nready\r\n', title: 'Dev server' },
+			{ id: 'term-b', text: 'swift build\r\n', title: 'Build' },
+		],
+	);
+	const { service } = makeArchiveService(
+		harness,
+		createArchiveLifecycleService(),
+		teardown,
+	);
+
+	const result = await service.archive({ workspaceId: workspace.id });
+
+	assert.equal(result.status, 'success');
+	const terminalsDirectory = path.join(
+		String(result.workspace?.archivedContextPath),
+		'.context',
+		'terminals',
+	);
+	assert.equal(
+		readFileSync(path.join(terminalsDirectory, 'term-a.log'), 'utf8'),
+		'npm run dev\r\nready\r\n',
+	);
+	assert.equal(
+		readFileSync(path.join(terminalsDirectory, 'term-b.log'), 'utf8'),
+		'swift build\r\n',
+	);
+});
+
+test('a scrollback that cannot be written is a warning, not a failed archive', async (t) => {
+	const harness = createHarness(t);
+	const workspace = await seedWorkspace(harness, 'unwritable');
+	const teardown = buildWorkspaceTeardownStub(
+		[],
+		[{ id: '../escape', text: 'nope', title: 'Escapee' }],
+	);
+	const { service } = makeArchiveService(
+		harness,
+		createArchiveLifecycleService(),
+		teardown,
+	);
+
+	const result = await service.archive({ workspaceId: workspace.id });
+
+	assert.equal(result.status, 'success');
+	assert.equal(
+		result.diagnostics.some(
+			(diagnostic) =>
+				diagnostic.code === 'archived-context-copy-failed' &&
+				diagnostic.message.includes('Escapee'),
+		),
+		true,
+	);
+	assert.equal(
+		existsSync(
+			path.join(String(result.workspace?.archivedContextPath), 'escape.log'),
+		),
+		false,
+	);
+});
+
+// A straggling build recreates its output directory seconds after git deleted
+// the tree, and the parent being unwritable is what keeps the sweep from
+// clearing it inside the archive.
+function commandServiceThatRecreates(workspacePath: string, after: () => void) {
+	const real = createLocalCommandService();
+
+	return {
+		...real,
+		run: async (options: Parameters<typeof real.run>[0]) => {
+			const result = await real.run(options);
+			if (
+				options.command === 'git' &&
+				options.args?.[0] === 'worktree' &&
+				options.args[1] === 'remove'
+			) {
+				mkdirSync(path.join(workspacePath, '.build'), { recursive: true });
+				writeFileSync(path.join(workspacePath, '.build', 'out.o'), 'object\n');
+				after();
+			}
+			return result;
+		},
+	};
+}
+
+// The checkout is gone and the launch sweep clears what came back, so this must
+// not borrow `worktree-prune-failed` — whose sentence tells the user the folder
+// could not be removed and no disk was reclaimed.
+test('residue left at the path is reported as swept, not as a failed prune', async (t) => {
+	const harness = createHarness(t);
+	const workspace = await seedWorkspace(harness, 'straggler');
+	const workspacesParent = path.dirname(workspace.path);
+
+	try {
+		const { service } = makeArchiveService(
+			harness,
+			createArchiveLifecycleService(),
+			buildWorkspaceTeardownStub(),
+			commandServiceThatRecreates(workspace.path, () =>
+				chmodSync(workspacesParent, 0o500),
+			),
+		);
+
+		const result = await service.archive({ workspaceId: workspace.id });
+
+		assert.equal(result.status, 'success');
+		assert.equal(result.workspace?.worktreePruned, true);
+		const residue = result.diagnostics.find(
+			(diagnostic) => diagnostic.code === 'worktree-residue-swept',
+		);
+		assert.equal(residue?.severity, 'info');
+		assert.match(String(residue?.message), /The worktree was removed, but /);
+		assert.equal(
+			result.diagnostics.some(
+				(diagnostic) => diagnostic.code === 'worktree-prune-failed',
+			),
+			false,
+		);
+	} finally {
+		chmodSync(workspacesParent, 0o700);
+	}
 });

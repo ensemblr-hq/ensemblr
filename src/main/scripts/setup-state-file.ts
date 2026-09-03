@@ -1,11 +1,14 @@
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { readFileSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
 import {
 	parseSetupState,
 	type WorkspaceSetupState,
 } from '../../shared/scripts.ts';
-import { resolveContextPath } from '../config/context-directory.ts';
+import {
+	ensureContextPath,
+	resolveContextPath,
+} from '../config/context-directory.ts';
 import { ENSEMBLR_DIRECTORY } from '../config/repository-config.ts';
 
 /**
@@ -57,7 +60,8 @@ export function readSetupStateFile(
 /**
  * Writes the setup marker into a worktree's `.context` directory. Best-effort: a
  * filesystem error only costs one redundant setup run on the next open, so it is
- * swallowed rather than surfaced.
+ * swallowed rather than surfaced. A worktree that is no longer on disk is
+ * skipped rather than recreated — see {@link ensureContextPath}.
  * @param worktreePath - Absolute path to the workspace worktree root.
  * @param state - Setup state to persist.
  */
@@ -66,8 +70,10 @@ export function writeSetupStateFile(
 	state: WorkspaceSetupState,
 ): void {
 	try {
-		const markerPath = setupStatePath(worktreePath);
-		mkdirSync(path.dirname(markerPath), { recursive: true });
+		const markerPath = ensureContextPath(worktreePath, SETUP_STATE_FILENAME);
+		if (markerPath === null) {
+			return;
+		}
 		writeFileSync(markerPath, `${JSON.stringify(state, null, 2)}\n`);
 	} catch {}
 }
