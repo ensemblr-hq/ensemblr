@@ -134,6 +134,26 @@ export function attachmentPreviewPath(
 	}
 }
 
+/**
+ * Whether a chip stands for one of the app's own surfaces — a project, a
+ * workspace, a chat, or a Concierge artifact — rather than for a file in a
+ * workspace. Such a chip has no workspace path and no bytes to inline: it
+ * serializes to a block of ids the agent addresses its own ops with, and it may
+ * repeat within one draft, standing wherever the sentence names its surface.
+ *
+ * Tests for the payload rather than listing the kinds that carry it, so a fifth
+ * reference kind is covered the day it is declared. A hand-listed kind missed
+ * here reads as a file chip at every call site: deduped away on insert, and
+ * serialized as an `<attached_file>` whose path is its label.
+ * @param attachment - The attachment being walked.
+ * @returns True when the attachment carries a reference.
+ */
+export function isReferenceAttachment(
+	attachment: ComposerAttachment,
+): attachment is Extract<ComposerAttachment, { reference: unknown }> {
+	return 'reference' in attachment;
+}
+
 /** Extracts every file from a browser clipboard or drag payload. */
 export function getTransferFiles(data: DataTransfer): readonly File[] {
 	const files: File[] = [];

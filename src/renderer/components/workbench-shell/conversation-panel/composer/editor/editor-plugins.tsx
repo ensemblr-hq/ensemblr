@@ -13,6 +13,7 @@ import {
 } from 'lexical';
 import { type RefObject, useEffect } from 'react';
 
+import { isReferenceAttachment } from '@/renderer/lib/workbench/composer-attachments';
 import type { ComposerAttachment } from '@/renderer/types/workbench';
 
 import { $createAttachmentNode } from './attachment-node';
@@ -22,6 +23,22 @@ import {
 	$selectDraftRange,
 } from './draft-linearizer';
 import type { ComposerDraftChange, ComposerEditorHandle } from './types';
+
+/**
+ * Whether the draft already holds this attachment and should refuse a second
+ * chip for it. A file chip is inlined into the prompt, so a repeat only spends
+ * budget on bytes the agent already has; a reference chip carries no content and
+ * stands where the user put it, so naming one workspace twice in a sentence is
+ * the sentence rather than a mistake. Must run inside an editor read or update.
+ * @param attachment - The attachment about to be inserted.
+ * @returns True when the insert should be dropped.
+ */
+function $isDuplicateChip(attachment: ComposerAttachment): boolean {
+	return (
+		!isReferenceAttachment(attachment) &&
+		$findAttachmentNode(attachment.id) !== null
+	);
+}
 
 /**
  * Publishes the draft on mount and on every real update: the linearized text and
@@ -178,7 +195,7 @@ export function EditorHandlePlugin({
 			},
 			insertAttachment(attachment: ComposerAttachment) {
 				insertAtSelection(() => {
-					if ($findAttachmentNode(attachment.id)) {
+					if ($isDuplicateChip(attachment)) {
 						return;
 					}
 					const selection = $getSelection();
@@ -213,7 +230,7 @@ export function EditorHandlePlugin({
 					if (!$isRangeSelection(selection)) {
 						return;
 					}
-					if ($findAttachmentNode(attachment.id)) {
+					if ($isDuplicateChip(attachment)) {
 						selection.insertText('');
 						return;
 					}

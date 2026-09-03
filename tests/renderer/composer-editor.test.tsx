@@ -25,6 +25,20 @@ const README: ComposerAttachment = {
 	path: 'README.md',
 };
 
+const WORKSPACE_REF: ComposerAttachment = {
+	id: 'workspace-ref:ws-1',
+	kind: 'workspace-ref',
+	label: 'khachaturian',
+	reference: {
+		cwd: '/workspaces/ensemblr/khachaturian',
+		kind: 'workspace',
+		label: 'khachaturian',
+		project: 'ensemblr',
+		projectId: 'repo-1',
+		workspaceId: 'ws-1',
+	},
+};
+
 const TERMINAL_OUTPUT: ComposerAttachment = {
 	id: 'wsfile:.context/attachments/aa44bb/terminal-selection.txt',
 	kind: 'pasted-text',
@@ -202,6 +216,53 @@ describe('composer editor', () => {
 		await waitFor(() => {
 			expect(latest()?.attachments).toEqual([APP_FILE]);
 		});
+	});
+
+	// The @ menu is how a user re-picks a file already attached, and the refusal
+	// there still has to swallow the token it was typed as.
+	it('swallows the token when the @ menu picks a file the draft holds', async () => {
+		const { handleRef, latest } = mountEditor();
+
+		await write(() => handleRef.current?.insertAttachment(APP_FILE));
+		await write(() => handleRef.current?.appendText('and @app'));
+		await write(() =>
+			handleRef.current?.replaceRangeWithAttachment(5, 9, APP_FILE),
+		);
+
+		await waitFor(() => {
+			expect(latest()?.text).not.toContain('@app');
+		});
+		expect(latest()?.attachments).toEqual([APP_FILE]);
+	});
+
+	// A reference carries no content to inline, so a repeat costs nothing and is
+	// how a sentence names the same workspace in two places.
+	it('lets a reference chip repeat within one draft', async () => {
+		const { handleRef, latest } = mountEditor();
+
+		await write(() => handleRef.current?.appendText('compare'));
+		await write(() => handleRef.current?.insertAttachment(WORKSPACE_REF));
+		await write(() => handleRef.current?.appendText('then update'));
+		await write(() => handleRef.current?.insertAttachment(WORKSPACE_REF));
+
+		await waitFor(() => {
+			expect(latest()?.attachments).toEqual([WORKSPACE_REF, WORKSPACE_REF]);
+		});
+	});
+
+	it('replaces a token with a repeat of a reference already in the draft', async () => {
+		const { handleRef, latest } = mountEditor();
+
+		await write(() => handleRef.current?.insertAttachment(WORKSPACE_REF));
+		await write(() => handleRef.current?.appendText('and @kha'));
+		await write(() =>
+			handleRef.current?.replaceRangeWithAttachment(5, 9, WORKSPACE_REF),
+		);
+
+		await waitFor(() => {
+			expect(latest()?.attachments).toEqual([WORKSPACE_REF, WORKSPACE_REF]);
+		});
+		expect(latest()?.text).not.toContain('@kha');
 	});
 
 	it('removes a chip by attachment id', async () => {
