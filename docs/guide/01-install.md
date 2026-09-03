@@ -34,13 +34,13 @@ brew upgrade --cask --greedy ensemblr
 
 ## Download
 
-The current build is **`0.1.0-beta.22`**:
+The current build is **`0.1.0-beta.23`**:
 
-- [**`Ensemblr-0.1.0-beta.22-arm64.dmg`**](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.0-beta.22/Ensemblr-0.1.0-beta.22-arm64.dmg)
+- [**`Ensemblr-0.1.0-beta.23-arm64.dmg`**](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.0-beta.23/Ensemblr-0.1.0-beta.23-arm64.dmg)
   — the macOS disk image. Open it and drag Ensemblr to `/Applications`.
-- [`Ensemblr-darwin-arm64-0.1.0-beta.22.zip`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.0-beta.22/Ensemblr-darwin-arm64-0.1.0-beta.22.zip)
+- [`Ensemblr-darwin-arm64-0.1.0-beta.23.zip`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.0-beta.23/Ensemblr-darwin-arm64-0.1.0-beta.23.zip)
   — the same `.app`, zipped, if you would rather not mount an image.
-- [**`Ensemblr-0.1.0-beta.22-x64.AppImage`**](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.0-beta.22/Ensemblr-0.1.0-beta.22-x64.AppImage)
+- [**`Ensemblr-0.1.0-beta.23-x64.AppImage`**](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.0-beta.23/Ensemblr-0.1.0-beta.23-x64.AppImage)
   — the Linux build. One file, no installer:
 
   ```bash
@@ -75,7 +75,7 @@ open without a network round-trip and without the right-click dance below. The
 it against the checksum on the release page if you want a check. Either way it is
 a **beta**: pre-1.0, with breaking changes expected before 1.0.
 
-The app reports the full version, suffix included — `0.1.0-beta.22` in
+The app reports the full version, suffix included — `0.1.0-beta.23` in
 **Settings → General**, and on macOS in the bundle's
 `CFBundleShortVersionString`. It matches the release tag, so a bug report only
 has to quote one string.
