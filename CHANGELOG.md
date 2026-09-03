@@ -9,6 +9,64 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-09-03
+
+**The first stable release.** Ensemblr leaves the beta series after twenty-four prereleases and
+three weeks, and the version that ships is the one the betas converged on rather than a twenty-fifth
+with the suffix filed off. macOS on Apple silicon and Linux on x86-64 are both public, supported
+targets: the `.dmg` is signed, notarized and stapled, the `.AppImage` is built on Linux in CI beside
+it, and Linux users now have a one-line installer at
+<https://www.ensemblr.dev/install.sh> that places the AppImage, extracts the launcher entry and icon
+ladder it already carries, and keeps a manifest so `--uninstall` removes exactly what it added.
+
+What stabilised over the beta series is the model underneath the app. Every stream of work gets its
+own git worktree, branch and review path, so a fan-out of agents cannot collide; **Ensemblr Control**
+lets the agent inside a workspace drive the app through a permission gate — naming its own tab,
+moving itself across the board, running scripts, spawning sub-agents into their own chat tabs and
+reading their reports; and the runtime layer is provider-neutral, with Pi and Claude Code as sibling
+adapters rather than one routed through the other's vocabulary. The app ships in English, Russian and
+Greek, holds no account and no telemetry, keeps its state in a local SQLite database and its secrets
+in the OS keyring, and ships no agent binary of its own — it drives the CLI you installed and
+authenticated yourself.
+
+Stability from here is ordinary semver: `0.1.0` is a stable release, not a promise that the surface
+is frozen. Breaking changes remain possible before `1.0` and are recorded here when they land.
+[Release](https://github.com/ensemblr-hq/ensemblr/releases/tag/v0.1.0) ·
+[`.dmg`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.0/Ensemblr-0.1.0-arm64.dmg) ·
+[`.AppImage`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.0/Ensemblr-0.1.0-x64.AppImage)
+
+### Added
+
+- **The native About panel credits every direct dependency.** The panel named its author and nothing
+  else, leaving the 82 open-source projects Ensemblr is built out of uncredited. Each is now listed
+  with its license and project page, under headings that read in all three of the app's languages.
+  The metadata lives in each dependency's own `package.json`, which the packaged app does not ship —
+  Vite bundles the code and Forge drops `node_modules` apart from the `PACKAGE_KEEP_*` entries — so
+  `scripts/generate-credits.mjs` captures it at authoring time into a committed
+  `credits-manifest.gen.ts`, and a drift test recomputes the manifest from `node_modules` on every
+  run, making a dependency change that skips `npm run credits:generate` a red test rather than a
+  stale panel. Electron splits credits across two platform-exclusive fields that render text
+  differently, so `authors` carries the links and `credits` drops them, out of one document builder
+  rather than two. (#421)
+
+- **A repository that has already run `infisical init` is linked from its own `.infisical.json`.**
+  The file names the project, so asking the user to pick it a second time is work Ensemblr can do for
+  them. It is read as a whole-link fallback behind the saved row and the committed `[infisical]`
+  block, and is never written back — it belongs to the CLI. Its `domain` is read as the link's
+  instance, and only `workspaceId` and `defaultEnvironment` besides. The summary badges a discovered
+  link as **Detected** rather than as unsaved, with a notice explaining what is already resolving and
+  what saving would add, so nothing is committed on the user's behalf. Unlinking persists: `clearLink`
+  records a dismissal in a new `infisical_discovery_dismissals` table and the fallback honours it, so
+  unlinking a repository whose `.infisical.json` still names the project takes rather than
+  resurrecting on the next read. Account matching never crosses instances. (#420)
+
+### Changed
+
+- **The version leaves the prerelease channel.** `0.1.0` carries no `-beta` suffix, so the release is
+  published as a stable release rather than a prerelease: GitHub marks it **Latest**, the Homebrew
+  cask bumps to it, and the Linux install script — which ranks an absent prerelease above any present
+  one — selects it over every `v0.1.0-beta.*` before it.
+
 ## [0.1.0-beta.24] - 2026-09-03
 
 Cloning a repository now offers the same branch picker create-from-source already has, so a

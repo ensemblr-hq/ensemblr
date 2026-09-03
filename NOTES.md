@@ -1,21 +1,35 @@
-## Ensemblr v0.1.0-beta.24
+## Ensemblr v0.1.0
 
-**Cloning offers a branch picker, and Plan Mode stops guessing about delegation.** Cloning a repository now offers the same branch picker create-from-source already has, so a repository whose work happens off GitHub's default branch checks out where it should from the first workspace onward. A Claude Code chat planning inside Ensemblr no longer has to guess between three disagreeing instructions about delegation — the per-turn preamble now says which one governs, closing two related holes where a sub-agent could raise a review panel nobody is watching or inherit the root's own delegation rights across a resume. And a branch cut from a base whose own pull request is already merged stops reporting itself as merged.
+**The first stable release.** Ensemblr leaves the beta series after twenty-four prereleases and three weeks. The version that ships is the one the betas converged on rather than a twenty-fifth with the suffix filed off: `0.1.0` carries no `-beta` suffix, so GitHub marks it **Latest**, the Homebrew cask bumps to it, and the Linux install script selects it over every `v0.1.0-beta.*` before it.
 
-### What's Changed
+**macOS and Linux are both public, supported targets.** The `.dmg` is signed with a Developer ID certificate, hardened-runtime, notarized by Apple and stapled, so it opens without a Gatekeeper prompt and validates offline. The `.AppImage` is built on Linux in CI beside it. Linux users now have a one-line installer:
+
+```sh
+curl -fsSL https://www.ensemblr.dev/install.sh | sh
+```
+
+It needs no root and writes nothing outside `$HOME`. It resolves the newest release, verifies the download against the digest GitHub publishes, places the AppImage under `~/.local/share/ensemblr`, symlinks it to `~/.local/bin/ensemblr`, and extracts the desktop entry and icon ladder the AppImage already carries so the app appears in the launcher. A manifest records exactly what it added, so `--uninstall` removes that and nothing else. Re-running it is an update.
+
+On macOS:
+
+```sh
+brew install --cask ensemblr-hq/tap/ensemblr
+```
+
+### What stabilised
+
+What the beta series converged on is the model underneath the app. Every stream of work gets its own git worktree, branch and review path, so a fan-out of agents cannot collide. **Ensemblr Control** lets the agent inside a workspace drive the app through a permission gate — naming its own tab, moving itself across the board, starting run scripts, spawning sub-agents into their own chat tabs and reading their reports. The runtime layer is provider-neutral, with Pi and Claude Code as sibling adapters rather than one routed through the other's vocabulary. The app ships in English, Russian and Greek, holds no account and no telemetry, keeps its state in a local SQLite database and its secrets in the OS keyring, and ships no agent binary of its own — it drives the CLI you installed and authenticated yourself.
+
+Stability from here is ordinary semver. `0.1.0` is a stable release, not a promise that the surface is frozen; breaking changes remain possible before `1.0` and are recorded in the changelog when they land.
+
+### What's Changed since v0.1.0-beta.24
 
 #### Added
 
-* **The clone dialog offers a branch picker, not just a URL field**: a repository whose work happens on anything but GitHub's default branch was cloned onto the wrong branch and seeded its first workspace off it. `cloneBranch` now reaches `git clone --branch` on both the `gh` and `git` leg, and the picked branch is persisted as the repository's `branchFrom` setting before the clone reports success, so every later workspace forks from it too. A new IPC surface, `ensemblr:github-remote-branch-list`, reads branches for a not-yet-cloned repository straight from its URL, keyed by URL since no repository row or checkout exists yet. `github-branches.ts` owns the GraphQL query, its parser, and the default-pin ordering for both the picker and the existing Git settings page, so the two surfaces cannot drift. (#418)
+* **The native About panel credits every direct dependency**: the panel named its author and nothing else, leaving the 82 open-source projects Ensemblr is built out of uncredited. Each is now listed with its license and project page, under headings that read in all three of the app's languages. The metadata lives in each dependency's own `package.json`, which the packaged app does not ship — Vite bundles the code and Forge drops `node_modules` apart from the `PACKAGE_KEEP_*` entries — so `scripts/generate-credits.mjs` captures it at authoring time into a committed `credits-manifest.gen.ts`, and a drift test recomputes the manifest from `node_modules` on every run, making a dependency change that skips `npm run credits:generate` a red test rather than a stale panel. Electron splits the credits across two platform-exclusive fields that render text differently enough to need separate treatment: GTK turns an angle-bracketed URL into a link, while the macOS panel shows the brackets verbatim and buries 82 names under unclickable URLs — so `authors` carries the links and `credits` drops them, out of one document builder rather than two. (#421)
 
-* **A Claude Code chat in Plan Mode is told which of its three delegation instructions governs**: the SDK's own Plan Workflow ("Launch up to 3 Explore agents IN PARALLEL"), a standing "don't call AgentTool unless requested" line baked into the model's prompt bundle, and Ensemblr's own denial of `Agent`/`Task` on the `ensemblr` mechanism disagreed with no signal for which one to follow — one turn was observed reasoning through the conflict out loud and picking the safer-sounding one by guess. `buildPlanModeDelegationDirective` now renders a block naming the runtime's actual delegation tool and its correct replacement literally, appended to the per-turn preamble, with three variants: the root agent on `ensemblr` (told `ensemblr_start_conversation` replaces its denied tool), the root agent on `native` (told the SDK's own fan-out is exactly right here), and an investigator sub-agent (told the fan-out step isn't its to run and where `ExitPlanMode` belongs instead). Two related holes were found and fixed alongside it: a sub-agent could still raise a review panel through Claude Code's native `ExitPlanMode` tool, which the deny list built for exactly that case never covered; and a resumed child session could inherit the root's own delegation rights, because the lineage field pinning it to a mechanism carries nothing across a resume. (#417)
-
-#### Fixed
-
-* **A branch forked from a base whose own pull request is merged no longer reports itself as merged**: `git worktree add` without `--no-track` inherits the base as its upstream whenever the fork point is a remote-tracking ref — which is every Ensemblr workspace — so `gh pr view` was handed the base branch as the head ref and answered with the base's own, already-merged, pull request; an unpushed branch also claimed to be up to date with the remote off the same inherited upstream. Branches are now cut with `--no-track` at both sites that create them, and a runtime guard rejects an upstream that merely names the workspace's stored base branch for branches already on disk — except where the worktree is genuinely parked on that base, which keeps its real ahead/behind counts rather than reading as unpushed. (#416)
-
-* **Dependency Bumps** (#404, #407, #410, #411): `@xmldom/xmldom` 0.9.10 → 0.9.12, `fast-uri` 3.1.5 → 3.1.7, `qs` 6.15.2 → 6.16.0, and `browserslist` (dev) 4.28.2 → 4.28.8.
+* **A repository that has already run `infisical init` is linked from its own `.infisical.json`**: the file names the project, so asking the user to pick that same project a second time is work Ensemblr can do for them. It is read as a whole-link fallback behind the saved row and the committed `[infisical]` block, and is never written back — it belongs to the CLI. Its `domain` is read as the link's instance, and only `workspaceId` and `defaultEnvironment` besides; `gitBranchToEnvironmentMapping` has no one branch to resolve against, because a repository-scope link is shared by every workspace of that repository and each sits on a different branch. `fromRepositoryConfig: boolean` becomes an `InfisicalLinkOrigin` union of local, repository-config and infisical-cli. The summary badges a discovered link as **Detected** rather than as unsaved, with a notice explaining what is already resolving, what is still missing, and what saving would add — nothing is committed on the user's behalf. Unlinking is a decision that persists: `clearLink` records a dismissal in the new `infisical_discovery_dismissals` table and the fallback honours it, so unlinking a repository whose `.infisical.json` still names the project takes rather than resurrecting on the next read with secrets flowing. Account matching never crosses instances. (#420)
 
 ---
 
-*Full changelog*: https://github.com/ensemblr-hq/ensemblr/compare/v0.1.0-beta.23...v0.1.0-beta.24
+*Full changelog*: https://github.com/ensemblr-hq/ensemblr/compare/v0.1.0-beta.24...v0.1.0
