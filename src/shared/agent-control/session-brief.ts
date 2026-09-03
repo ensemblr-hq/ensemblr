@@ -1,7 +1,9 @@
 /**
  * Renders the per-turn blocks appended to an agent's system prompt: the upkeep
- * block naming what the session still owes, and the directive a turn carries
- * when a plan it submitted is already in front of the user.
+ * block naming what the session still owes, the directive a turn carries when a
+ * plan it submitted is already in front of the user, and the directive that
+ * answers the harness's own plan-mode instructions for a runtime the app prompts
+ * directly.
  *
  * The three naming tools are also described in the role playbooks, but a
  * playbook is static: a long skill invocation, or Plan Mode's instruction that
@@ -33,7 +35,9 @@
  * string in the brief payload and the extension appends text it never authors.
  */
 
+import type { AgentControlRole } from './awareness.ts';
 import type { SessionBriefNaming } from './contracts.ts';
+import type { SubagentMechanism } from './subagent-mechanism.ts';
 
 /** Opening line of the upkeep block, and the marker tests assert on. */
 export const SESSION_BRIEF_NUDGE_HEADER = 'ENSEMBLR SESSION UPKEEP';
@@ -199,3 +203,107 @@ export const PLAN_REFINEMENT_DIRECTIVE = `${PLAN_REFINEMENT_HEADER} — you alre
 End this turn the way you ended the last one. Fold what they asked for into the plan and submit the WHOLE revised plan through the same plan-exit tool you used before — \`ensemblr_exit_plan_mode\`, or your runtime's own \`ExitPlanMode\`. Pass the full plan rather than a note of what changed: the app posts what you pass and that is what they read and approve, so a submission naming only the edits replaces their plan with a fragment.
 
 Stopping at prose is the one outcome this turn must not have — it leaves them a revision with nothing to approve it from. If the message is a question rather than a change, answer it and submit anyway: \`ensemblr_ask_user_question\` returns inside this turn, so a clarification you need costs you nothing, and a plan that needed no edit is resubmitted unchanged.`;
+
+/**
+ * Opening line of the delegation directive. Exported so a test can locate the
+ * block inside a preamble it was joined into, and so the parity test can assert
+ * the shipped Pi extension never grows a copy of it.
+ */
+export const PLAN_MODE_DELEGATION_HEADER = 'PLAN MODE DELEGATION';
+
+/**
+ * How every variant opens. It names the two pieces of harness text it exists to
+ * answer, in the harness's own vocabulary, because a model that has to infer
+ * which instruction is being overridden is doing the guessing this block was
+ * added to remove.
+ */
+const PLAN_MODE_DELEGATION_PREAMBLE = `${PLAN_MODE_DELEGATION_HEADER} — your harness gave you a plan workflow that fans out with its \`Explore\` and \`Plan\` sub-agent types, and a standing line telling you not to call the \`AgentTool\` unless the user requested it. Both are generic Claude Code text written without knowledge of this app, and they contradict each other. This block is the live answer for this turn: resolve them against it, act on it, and do not spend the turn narrating the conflict.`;
+
+/**
+ * The answer for a planning root whose session runs Ensemblr's own mechanism —
+ * the default. It says what the standing line actually refers to, because read
+ * alone that line suppresses `ensemblr_start_conversation` too, and an agent
+ * that reads it as a blanket ban does the whole investigation by hand.
+ */
+const ENSEMBLR_DELEGATION_BODY = `Your runtime's own sub-agent tool — \`Agent\` and \`Task\`, and the \`Explore\` and \`Plan\` types that run through it — is denied in this session, because the user chose Ensemblr's delegation mechanism instead. The standing line is about that denied tool. It is not a ban on delegating, and it is not a reason to run a fan-out by hand: your fan-out is \`ensemblr_start_conversation\`, one investigator per question and each in its own tab the user can watch, followed by \`ensemblr_wait_for_agents\`. Your playbook writes that loop out in full. Reach for it when the plan hinges on two or more genuinely independent areas of the codebase, and read the repository yourself for anything smaller — a fan-out you did not need costs the user a tab and costs you a wait.`;
+
+/**
+ * The answer for a planning root whose user picked the runtime's own tool. The
+ * plan workflow is then correct as written, and the standing line is the thing
+ * that has to be set aside — the mirror image of the default, so it has to be
+ * said rather than left to the absence of the other variant.
+ */
+const NATIVE_DELEGATION_BODY = `The user chose your runtime's own sub-agent tool as this session's delegation mechanism, so the \`Explore\` and \`Plan\` fan-out your plan workflow describes is exactly right here and the standing line about the \`AgentTool\` does not govern it. Ensemblr's chat-tab spawn ops are withheld from your tool list by that same choice — \`ensemblr_start_conversation\` and \`ensemblr_wait_for_agents\` are absent rather than discouraged, so do not go hunting for them.`;
+
+/**
+ * The answer for a planning investigator, which holds neither mechanism: the
+ * runtime's tool is denied and the spawn ops are withheld, so the workflow's
+ * fan-out step describes nothing it can do.
+ *
+ * "Denied" is a claim about the deny list, and `resolveDelegation` is what makes
+ * it true: a session carrying the sub-agent marker pins to `ensemblr` whatever
+ * the user's setting says, which is what puts `Agent` and `Task` on the list.
+ * A change that lets a marked session open under `native` makes this sentence a
+ * lie and hands a child a live fan-out around the depth cap.
+ */
+const SUBAGENT_DELEGATION_BODY = `You were spawned to answer one question, and nested delegation is blocked on every axis: your runtime's sub-agent tool is denied and Ensemblr's spawn ops are withheld. The fan-out step in your plan workflow is not yours to run — do the reading yourself and leave your findings as your last message, which is what the orchestrator waiting on you reads. Submitting a plan is not yours either: \`ExitPlanMode\` and \`ensemblr_exit_plan_mode\` both belong to the orchestrator that spawned you, and a plan posted from here would raise a review panel in a tab nobody is watching.`;
+
+/**
+ * Closes the block for a root. The workflow names a plan file under the user's
+ * home that nothing in Ensemblr reads, and in a read-only workspace `Write` is
+ * on the SDK deny list, so the instruction is unfollowable there and duplicated
+ * work everywhere else.
+ */
+const PLAN_FILE_CLAUSE = `Do not write the plan file your workflow names. Ensemblr owns the plan: pass it whole to \`ExitPlanMode\` or to \`ensemblr_exit_plan_mode\`, and the app saves it under \`.context/plans/\`, posts it into the chat, and raises the review panel the user approves from. A file under \`~/.claude/plans/\` is read by nothing here — in a read-only workspace \`Write\` is denied outright, so that instruction cannot be followed at all, and everywhere else it authors the plan a second time for no reader.`;
+
+/** The same clause for an investigator, which is not submitting a plan at all. */
+const SUBAGENT_PLAN_FILE_CLAUSE = `Do not write the plan file your workflow names either. You are not submitting a plan, nothing in Ensemblr reads \`~/.claude/plans/\`, and in a read-only workspace \`Write\` is denied outright. Your report is your whole output.`;
+
+/**
+ * Builds the delegation directive for one planning turn.
+ *
+ * Appended to every turn a directly-prompted runtime spends in Plan Mode, and
+ * to no other. Claude Code learns of Plan Mode only as the SDK's
+ * `permissionMode: 'plan'`, which injects a plan workflow ordering a fan-out
+ * through the runtime's own sub-agent tool — a tool Ensemblr denies whenever the
+ * user picked the chat-tab mechanism. Alongside it sits a standing
+ * "do not call the AgentTool" line that ships with the model's prompt bundle
+ * rather than with any Ensemblr setting, and reads as a ban on delegating at
+ * all. The agent holds three instructions, two of them upstream text this app
+ * cannot edit, and nothing saying which governs; it picks one by guess, and a
+ * different turn guesses differently.
+ *
+ * `PLAN_MODE_ORCHESTRATOR_AWARENESS` already answers all of this, but it is
+ * Pi-only: the playbook is selected once at session open and the SDK fixes
+ * `systemPrompt` there, while the plan-mode toggle moves per turn. So the answer
+ * rides the per-turn channel instead — the same resolution ADR 0050 reached for
+ * the upkeep block, for the same reason.
+ *
+ * A Concierge gets nothing. It is a panel rather than a chat tab, so the
+ * plan-mode registry the caller gates on never holds its session — but that is a
+ * fact about a registry rather than about this function, and `originHasChatTab`
+ * does *not* rule it out: that predicate reads the session's species, which a
+ * Concierge shares with the chat it spawns. Refusing the role here is what keeps
+ * a Concierge from being handed the root block, which points at
+ * `ensemblr_exit_plan_mode` — an op the Concierge is denied.
+ * @param delegation - The mechanism this session was pinned to at open.
+ * @param role - The caller's control-layer role.
+ * @returns The block to append to this turn's prompt, or null for a Concierge.
+ */
+export function buildPlanModeDelegationDirective({
+	delegation,
+	role,
+}: {
+	delegation: SubagentMechanism;
+	role: AgentControlRole;
+}): string | null {
+	if (role === 'concierge') {
+		return null;
+	}
+	if (role === 'subagent') {
+		return `${PLAN_MODE_DELEGATION_PREAMBLE}\n\n${SUBAGENT_DELEGATION_BODY}\n\n${SUBAGENT_PLAN_FILE_CLAUSE}`;
+	}
+	const body =
+		delegation === 'native' ? NATIVE_DELEGATION_BODY : ENSEMBLR_DELEGATION_BODY;
+	return `${PLAN_MODE_DELEGATION_PREAMBLE}\n\n${body}\n\n${PLAN_FILE_CLAUSE}`;
+}

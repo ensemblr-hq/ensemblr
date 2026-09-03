@@ -33,6 +33,7 @@ import type { ActiveSession, ActiveSessionMap } from './active-session.ts';
 import {
 	type AgentControlWiring,
 	resolveAgentControlWiring,
+	type SubAgentMarkerReader,
 	type SubagentMechanismReader,
 	type TurnPreambleResolver,
 } from './agent-control-wiring.ts';
@@ -99,6 +100,12 @@ interface SessionOpenerOptions {
 	 */
 	readClaudeSubagentMode?: SubagentMechanismReader;
 	/**
+	 * Reads the durable sub-agent marker off a session's chat tab, so a child
+	 * resumed after a restart is still pinned to `ensemblr` rather than picking
+	 * up the user's root-level setting. Absent in tests.
+	 */
+	isSpawnedSubAgent?: SubAgentMarkerReader;
+	/**
 	 * Resolves the agent-control environment (control-server URL + per-session
 	 * token) injected into the agent child so it can call back into the app.
 	 * Absent in tests and when the control layer is disabled.
@@ -148,6 +155,7 @@ export function createSessionOpener({
 	isPlanModeActive,
 	now,
 	agentClient,
+	isSpawnedSubAgent,
 	queueNaming,
 	readClaudeSubagentMode,
 	resolveAgentControlEnv,
@@ -244,6 +252,7 @@ export function createSessionOpener({
 
 		const runtimeSession = await createRuntimeSessionOrFail({
 			control: resolveAgentControlWiring({
+				isSpawnedSubAgent,
 				parentSessionId: request.parentSessionId ?? null,
 				provider: row.provider,
 				readClaudeSubagentMode,
@@ -349,6 +358,7 @@ export function createSessionOpener({
 
 		const runtimeSession = await createRuntimeSessionOrFail({
 			control: resolveAgentControlWiring({
+				isSpawnedSubAgent,
 				parentSessionId: request.parentSessionId ?? null,
 				provider,
 				readClaudeSubagentMode,

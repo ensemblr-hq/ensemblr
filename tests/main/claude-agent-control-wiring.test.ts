@@ -59,6 +59,7 @@ const setup = (
 		sessionId: string;
 	}) =>
 		resolveAgentControlWiring({
+			isSpawnedSubAgent: (sessionId) => marked.has(sessionId),
 			parentSessionId: input.parentSessionId ?? null,
 			provider: input.provider,
 			readClaudeSubagentMode: undefined,
@@ -157,6 +158,7 @@ describe('agent-control wiring: the control MCP endpoint', () => {
 
 	it('resolves to nothing at all when the control layer is disabled', () => {
 		const wiring = resolveAgentControlWiring({
+			isSpawnedSubAgent: undefined,
 			parentSessionId: null,
 			provider: 'claude',
 			readClaudeSubagentMode: undefined,
@@ -199,6 +201,7 @@ describe('agent-control wiring: the per-turn upkeep block', () => {
 			asked,
 			wire: (provider: 'claude' | 'pi', sessionId: string) =>
 				resolveAgentControlWiring({
+					isSpawnedSubAgent: undefined,
 					parentSessionId: null,
 					provider,
 					readClaudeSubagentMode: undefined,

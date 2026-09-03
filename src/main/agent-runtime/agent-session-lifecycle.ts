@@ -28,6 +28,7 @@ import {
 	isTurnInFlight,
 } from './session/active-session.ts';
 import type {
+	SubAgentMarkerReader,
 	SubagentMechanismReader,
 	TurnPreambleResolver,
 } from './session/agent-control-wiring.ts';
@@ -143,6 +144,8 @@ interface AgentSessionLifecycleOptions {
 	requireDatabase: () => DatabaseSync;
 	/** Reads the delegation mechanism a Claude Code session must open under. */
 	readClaudeSubagentMode?: SubagentMechanismReader;
+	/** Reads the durable sub-agent marker, so a resumed child stays on `ensemblr`. */
+	isSpawnedSubAgent?: SubAgentMarkerReader;
 	/** Injects the agent-control env (control URL + token) into each agent child. */
 	resolveAgentControlEnv?: AgentControlEnvResolver;
 	/** Renders the per-turn upkeep block for runtimes whose system prompt is fixed at open. */
@@ -213,6 +216,7 @@ export function createAgentSessionLifecycle({
 	onSummaryPersisted,
 	persistRuntimeEvent,
 	agentClient,
+	isSpawnedSubAgent,
 	queueNaming,
 	readClaudeSubagentMode,
 	requireDatabase,
@@ -247,6 +251,7 @@ export function createAgentSessionLifecycle({
 		isPlanModeActive,
 		now,
 		agentClient,
+		isSpawnedSubAgent,
 		queueNaming,
 		readClaudeSubagentMode,
 		resolveAgentControlEnv,

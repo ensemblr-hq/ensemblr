@@ -67,6 +67,7 @@ import {
 	briefReport,
 	buildLanguageDirective,
 	buildLinkedIssueDirective,
+	buildPlanModeDelegationDirective,
 	buildSessionBriefNudge,
 	CONCIERGE_AWARENESS,
 	conciergeControlOpDenial,
@@ -558,6 +559,33 @@ export function createAgentControlService({
 			: null;
 
 	/**
+	 * The delegation directive for a planning caller, which answers the harness's
+	 * own plan-mode instructions in the vocabulary they use.
+	 *
+	 * Rendered from the mechanism the session was pinned to at open and the
+	 * caller's role, because the answer inverts across both: a root on `native`
+	 * is told its workflow's fan-out is correct, a root on `ensemblr` is told
+	 * which tool replaced it, and an investigator holds neither.
+	 *
+	 * Takes the role rather than resolving it, because the preamble it belongs to
+	 * builds a second block off the same answer and resolving one costs a database
+	 * read.
+	 * @param origin - Resolved caller identity.
+	 * @param role - The caller's already-resolved control-layer role.
+	 * @returns The directive to append, or null when the caller is not planning.
+	 */
+	const planDelegationFor = (
+		origin: AgentControlOrigin,
+		role: AgentControlRole,
+	): string | null =>
+		isPlanning(origin)
+			? buildPlanModeDelegationDirective({
+					delegation: origin.delegation,
+					role,
+				})
+			: null;
+
+	/**
 	 * This turn's language directive, read from the setting rather than captured
 	 * so a language switched mid-session reaches the next turn.
 	 * @returns The directive to append, or null when the app is in English.
@@ -597,16 +625,29 @@ export function createAgentControlService({
 	 * Plan Mode toggles mid-session, and a sub-agent marker is written when a child
 	 * is spawned.
 	 * @param origin - Resolved caller identity.
+	 * @param role - The caller's already-resolved control-layer role.
+	 * @returns The directive to append, or null when the workspace has no Linear issue.
+	 */
+	const issueDirectiveFor = (
+		origin: AgentControlOrigin,
+		role: AgentControlRole,
+	): string | null =>
+		buildLinkedIssueDirective(
+			ports.linear.readLinkedIssue(origin.workspaceId),
+			role,
+			isPlanning(origin),
+		);
+
+	/**
+	 * The linked-issue directive for a caller reached by token, which has no other
+	 * reason to have resolved a role and so pays for one here.
+	 * @param origin - Resolved caller identity.
 	 * @returns The directive to append, or null when the workspace has no Linear issue.
 	 */
 	const readIssueDirectiveForOrigin = async (
 		origin: AgentControlOrigin,
 	): Promise<string | null> =>
-		buildLinkedIssueDirective(
-			ports.linear.readLinkedIssue(origin.workspaceId),
-			await resolveRole(origin),
-			isPlanning(origin),
-		);
+		issueDirectiveFor(origin, await resolveRole(origin));
 
 	/**
 	 * Blocks the ops that belong to the orchestrator rather than to the one unit of
@@ -2140,14 +2181,16 @@ export function createAgentControlService({
 		if (!origin) {
 			return null;
 		}
+		const role = await resolveRole(origin);
 		const blocks = [
 			buildSessionBriefNudge(
 				await ports.sessionNaming.readBrief(origin),
 				isPlanning(origin),
 			),
+			planDelegationFor(origin, role),
 			readPlanRefinement(origin),
 			readLanguageDirective(),
-			await readIssueDirectiveForOrigin(origin),
+			issueDirectiveFor(origin, role),
 		].filter((block) => block !== null);
 		return blocks.length > 0 ? blocks.join('\n\n') : null;
 	};

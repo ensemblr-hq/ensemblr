@@ -31,13 +31,14 @@ const SUBMISSION = {
 };
 
 /** Builds the bridge over a registry that knows exactly one token. */
-const setup = (options: { submitFails?: boolean } = {}) => {
+const setup = (options: { subAgent?: boolean; submitFails?: boolean } = {}) => {
 	const submitPlan = vi.fn(
 		options.submitFails
 			? () => Promise.reject(new Error('disk full'))
 			: () => Promise.resolve({ planPath: null, summary: 'saved' }),
 	);
 	const bridge = createClaudePlanBridge({
+		isSubAgent: () => options.subAgent === true,
 		resolveOrigin: (token) => (token === TOKEN ? ORIGIN : null),
 		submitPlan,
 	});
@@ -86,6 +87,32 @@ describe('the Claude plan bridge', () => {
 		});
 
 		expect(submitPlan).not.toHaveBeenCalled();
+	});
+
+	it('refuses a spawned sub-agent, whose orchestrator owns the plan', () => {
+		const { bridge, submitPlan } = setup({ subAgent: true });
+
+		bridge({
+			agentSessionId: 'agent-session-1',
+			controlToken: TOKEN,
+			submission: SUBMISSION,
+		});
+
+		expect(submitPlan).not.toHaveBeenCalled();
+	});
+
+	it('says why a sub-agent submission was dropped', () => {
+		const { bridge } = setup({ subAgent: true });
+
+		bridge({
+			agentSessionId: 'agent-session-1',
+			controlToken: TOKEN,
+			submission: SUBMISSION,
+		});
+
+		expect(console.warn).toHaveBeenCalledWith(
+			expect.stringContaining('spawned sub-agent'),
+		);
 	});
 
 	it('survives a failed submission instead of rejecting into the event pump', async () => {
@@ -195,6 +222,7 @@ const runAdapter = async (
 	);
 	const adapter = createClaudeAgentAdapter({
 		onPlanSubmitted: createClaudePlanBridge({
+			isSubAgent: () => false,
 			resolveOrigin: (candidate) => (candidate === TOKEN ? ORIGIN : null),
 			submitPlan,
 		}),

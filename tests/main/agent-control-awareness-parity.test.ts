@@ -10,6 +10,7 @@ import {
 	HARNESS_AWARENESS,
 	NATIVE_ORCHESTRATOR_AWARENESS,
 	ORCHESTRATOR_AWARENESS,
+	PLAN_MODE_DELEGATION_HEADER,
 	PLAN_MODE_ORCHESTRATOR_AWARENESS,
 	PLAN_MODE_SUBAGENT_AWARENESS,
 	PLAN_REFINEMENT_HEADER,
@@ -643,6 +644,13 @@ describe('agent-control AWARENESS parity', () => {
 			/planRefinement:\s*\n?\s*typeof brief\?\.planRefinement === 'string'/,
 		);
 		expect(source).not.toContain(PLAN_REFINEMENT_HEADER);
+	});
+
+	// The delegation directive answers instructions only Claude Code carries, and
+	// it rides `readTurnPreamble`, which Pi never reaches. A copy in the extension
+	// would put a block about the `AgentTool` in front of a runtime that has none.
+	it('carries no copy of the plan-mode delegation directive', () => {
+		expect(readExtensionSource()).not.toContain(PLAN_MODE_DELEGATION_HEADER);
 	});
 
 	// One read of the role env var feeds both the role playbook and the plan-mode
