@@ -24,6 +24,8 @@ export const AGENT_CONTROL_OPS = [
 	'setName',
 	'setBranchName',
 	'setSummary',
+	'getArchitectureDiagram',
+	'updateArchitectureDiagram',
 	'closeTab',
 	'launchHarness',
 	'startTerminal',
@@ -145,6 +147,7 @@ const WRITE_OPS: ReadonlySet<AgentControlOp> = new Set([
 	'setName',
 	'setBranchName',
 	'setSummary',
+	'updateArchitectureDiagram',
 	'closeTab',
 	'launchHarness',
 	'startTerminal',
@@ -320,6 +323,62 @@ export interface SetSummaryTruncation {
 	field: 'summary' | 'title';
 	limit: number;
 	submittedLength: number;
+}
+
+/**
+ * Upper bound on an architecture-diagram submission. The document is a whole
+ * layout rather than a message, so the ceiling is generous — but it is a
+ * ceiling, because an agent that pastes a repository's every file into one
+ * would produce a diagram nobody can read and a payload that crowds its own
+ * context.
+ */
+export const ARCHITECTURE_DIAGRAM_LIMITS = {
+	maxBoundaries: 24,
+	maxComponents: 64,
+	maxConnections: 160,
+} as const;
+
+/**
+ * Result of `getArchitectureDiagram`.
+ *
+ * `diagram` is never null: a workspace whose diagram has never been built gets
+ * one scanned on the spot, because "there is no diagram" is a state the caller
+ * would have to invent a recovery for, and the recovery is the same scan the
+ * app runs anyway.
+ */
+export interface GetArchitectureDiagramResult {
+	componentCount: number;
+	connectionCount: number;
+	/** The full architecture IR, ready to edit and submit back. */
+	diagram: unknown;
+	message: string;
+	/** `scan` for the deterministic seed, `agent` once one has been refined. */
+	source: ArchitectureDiagramSource;
+}
+
+/** Where the diagram a read returned came from. */
+export type ArchitectureDiagramSource = 'agent' | 'scan';
+
+/**
+ * Args for `updateArchitectureDiagram`: replace the workspace's stored diagram
+ * with a refined one. The whole document is submitted rather than a patch,
+ * because a partial edit against a document the next scan may have already
+ * replaced is a merge nobody can adjudicate.
+ */
+export interface UpdateArchitectureDiagramArgs {
+	/**
+	 * The full architecture IR. Normally an object; a JSON string is decoded
+	 * rather than refused, since that encoding is a bridge's doing rather than
+	 * the caller's.
+	 */
+	diagram: unknown;
+}
+
+/** Result of `updateArchitectureDiagram`. */
+export interface UpdateArchitectureDiagramResult {
+	componentCount: number;
+	connectionCount: number;
+	message: string;
 }
 
 /** Args for `sendFollowUp`: submit a follow-up prompt into an existing conversation. */

@@ -30,6 +30,32 @@
 		"placeholder": "Search files",
 		"title": "Search files"
 	},
+	"architecture-diagram": {
+		"canvas": {
+			"label": "Architecture diagram of {{title}}"
+		},
+		"captured-at": "scanned {{when}}",
+		"legend": {
+			"backend": "Backend",
+			"cloud": "Infrastructure",
+			"database": "Data",
+			"external": "External",
+			"frontend": "Interface",
+			"messagebus": "Messaging",
+			"security": "Security"
+		},
+		"loading": "Reading the workspace architecture…",
+		"node": {
+			"open-title": "{{name}} — open {{path}}"
+		},
+		"open": "Workspace architecture",
+		"problems_one": "{{count}} placement problem in this diagram.",
+		"problems_other": "{{count}} placement problems in this diagram.",
+		"tab-title": "Architecture",
+		"title": "Architecture",
+		"zoom-in": "Zoom in",
+		"zoom-out": "Zoom out"
+	},
 	"archive-workspace": {
 		"description-cleanup": "Marks the workspace as archived and preserves its <0>.context/</0> handoff files under <1>archived-contexts/</1>. The worktree folder is removed and the local branch dropped, per your git settings; anything else not pushed to the remote will be lost.",
 		"description-reclaim": "Marks the workspace as archived and preserves its <0>.context/</0> handoff files under <1>archived-contexts/</1>. The worktree folder is removed to reclaim its disk, keeping the branch and a snapshot of any uncommitted changes; unarchiving restores both and rebuilds dependencies.",
@@ -298,6 +324,10 @@
 			"done": "Opened a workspace",
 			"running": "Opening a workspace"
 		},
+		"get-architecture-diagram": {
+			"done": "Read the architecture diagram",
+			"running": "Reading the architecture diagram"
+		},
 		"get-conversation-status": {
 			"concierge": {
 				"done": "Checked a chat",
@@ -433,6 +463,10 @@
 		"stop-terminal": {
 			"done": "Stopped a terminal",
 			"running": "Stopping a terminal"
+		},
+		"update-architecture-diagram": {
+			"done": "Redrew the architecture diagram",
+			"running": "Redrawing the architecture diagram"
 		},
 		"wait-for-agents": {
 			"concierge": {

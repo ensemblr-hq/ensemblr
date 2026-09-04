@@ -56,6 +56,7 @@ import type {
 	StartConversationArgs,
 	StartTerminalArgs,
 	StopTerminalArgs,
+	UpdateArchitectureDiagramArgs,
 	WaitedAgent,
 	WaitForAgentsArgs,
 	WaitForAgentsResult,
@@ -1053,6 +1054,64 @@ export function createAgentControlService({
 			message: `${recorded.message} ${describeSummaryTruncations(truncated)}`,
 			truncated,
 		} satisfies SetSummaryResult);
+	};
+
+	/**
+	 * Reads the caller's workspace architecture diagram, building one when the
+	 * workspace has never had a diagram drawn. Returning a scanned document
+	 * rather than an absence is the whole point: an agent told "there is none"
+	 * goes looking for the scanner, which is not a surface it holds.
+	 * @param origin - Resolved caller identity.
+	 * @returns The diagram and where it came from, or a failure.
+	 */
+	const handleGetArchitectureDiagram = async (
+		origin: AgentControlOrigin,
+	): Promise<AgentControlResult<unknown>> => {
+		if (!ports.architecture) {
+			return fail(
+				'denied-scope',
+				'This build keeps no architecture diagram, so there is none to read.',
+			);
+		}
+		try {
+			return ok(await ports.architecture.readDiagram({ origin }));
+		} catch (error) {
+			return fail(
+				'internal',
+				error instanceof Error ? error.message : String(error),
+			);
+		}
+	};
+
+	/**
+	 * Replaces the caller's workspace architecture diagram with a refined one.
+	 * @param origin - Resolved caller identity.
+	 * @param args - The submitted diagram document.
+	 * @returns What was stored, or a failure the agent can correct.
+	 */
+	const handleUpdateArchitectureDiagram = async (
+		origin: AgentControlOrigin,
+		args: UpdateArchitectureDiagramArgs,
+	): Promise<AgentControlResult<unknown>> => {
+		if (!ports.architecture) {
+			return fail(
+				'denied-scope',
+				'This build keeps no architecture diagram, so there is nothing to update.',
+			);
+		}
+		try {
+			return ok(
+				await ports.architecture.updateDiagram({
+					diagram: args.diagram,
+					origin,
+				}),
+			);
+		} catch (error) {
+			return fail(
+				'invalid-args',
+				error instanceof Error ? error.message : String(error),
+			);
+		}
 	};
 
 	/**
@@ -2079,6 +2138,13 @@ export function createAgentControlService({
 			handleSetSummary(origin, args as SetSummaryArgs),
 		setWorkspaceStatus: ({ args, origin }) =>
 			handleSetWorkspaceStatus(origin, args as SetWorkspaceStatusArgs),
+		getArchitectureDiagram: ({ origin }) =>
+			handleGetArchitectureDiagram(origin),
+		updateArchitectureDiagram: ({ args, origin }) =>
+			handleUpdateArchitectureDiagram(
+				origin,
+				args as UpdateArchitectureDiagramArgs,
+			),
 		spawnChatTab: ({ args, origin }) =>
 			handleSpawnChatTab(origin, args as SpawnChatTabArgs),
 		startConversation: ({ args, callerModel, origin, signal }) =>

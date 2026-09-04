@@ -669,6 +669,7 @@ export default interface Resources {
 			'destination-path-relative': 'The destination path must be absolute.';
 			'destination-required': 'No destination was provided and the managed root has none to fall back on.';
 			'detached-head': 'This workspace is not on a branch, so GitHub has nothing to match it against. Check out a branch, then retry.';
+			'diagram-unreadable': 'The stored architecture diagram cannot be read. Repair or delete the file, and a new one will be drawn.';
 			'dictation-disabled': 'Dictation is turned off in Settings.';
 			'dictation-empty-transcript': 'No speech was detected in the recording.';
 			'dictation-invalid-endpoint': 'The transcription endpoint must be a full http:// or https:// address.';
@@ -792,6 +793,7 @@ export default interface Resources {
 			'root-stat-failed': 'The root directory could not be inspected.';
 			'root-unavailable': 'The managed root is unavailable, so the operation was skipped.';
 			'root-unwritable': 'The root directory is not writable.';
+			'scan-failed': 'The workspace could not be scanned.';
 			'secret-store-error': 'The macOS Keychain is unavailable, so the Linear token could not be read.';
 			'shared-root-content': 'The root directory holds files Ensemblr does not manage.';
 			'source-path-missing': 'A source path no longer exists, so it was skipped.';
@@ -2435,6 +2437,32 @@ export default interface Resources {
 			placeholder: 'Search files';
 			title: 'Search files';
 		};
+		'architecture-diagram': {
+			canvas: {
+				label: 'Architecture diagram of {{title}}';
+			};
+			'captured-at': 'scanned {{when}}';
+			legend: {
+				backend: 'Backend';
+				cloud: 'Infrastructure';
+				database: 'Data';
+				external: 'External';
+				frontend: 'Interface';
+				messagebus: 'Messaging';
+				security: 'Security';
+			};
+			loading: 'Reading the workspace architecture…';
+			node: {
+				'open-title': '{{name}} — open {{path}}';
+			};
+			open: 'Workspace architecture';
+			problems_one: '{{count}} placement problem in this diagram.';
+			problems_other: '{{count}} placement problems in this diagram.';
+			'tab-title': 'Architecture';
+			title: 'Architecture';
+			'zoom-in': 'Zoom in';
+			'zoom-out': 'Zoom out';
+		};
 		'archive-workspace': {
 			'description-cleanup': 'Marks the workspace as archived and preserves its <0>.context/</0> handoff files under <1>archived-contexts/</1>. The worktree folder is removed and the local branch dropped, per your git settings; anything else not pushed to the remote will be lost.';
 			'description-reclaim': 'Marks the workspace as archived and preserves its <0>.context/</0> handoff files under <1>archived-contexts/</1>. The worktree folder is removed to reclaim its disk, keeping the branch and a snapshot of any uncommitted changes; unarchiving restores both and rebuilds dependencies.';
@@ -2703,6 +2731,10 @@ export default interface Resources {
 				done: 'Opened a workspace';
 				running: 'Opening a workspace';
 			};
+			'get-architecture-diagram': {
+				done: 'Read the architecture diagram';
+				running: 'Reading the architecture diagram';
+			};
 			'get-conversation-status': {
 				concierge: {
 					done: 'Checked a chat';
@@ -2838,6 +2870,10 @@ export default interface Resources {
 			'stop-terminal': {
 				done: 'Stopped a terminal';
 				running: 'Stopping a terminal';
+			};
+			'update-architecture-diagram': {
+				done: 'Redrew the architecture diagram';
+				running: 'Redrawing the architecture diagram';
 			};
 			'wait-for-agents': {
 				concierge: {

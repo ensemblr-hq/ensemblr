@@ -20,6 +20,8 @@ export type WorkspaceMainContentState = Pick<
 		harnessId: string;
 		harnessLabel: string;
 	}) => Promise<{ chatTabId: string } | null>;
+	/** Opens the workspace's architecture diagram tab. */
+	onOpenArchitectureDiagram: () => Promise<{ chatTabId: string } | null>;
 	onSessionTabClose: (sessionId: string) => void;
 	/** Promotes an ephemeral preview tab to a permanent one. */
 	onSessionTabPin: (sessionId: string) => void;

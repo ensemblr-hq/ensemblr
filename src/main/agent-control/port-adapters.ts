@@ -22,6 +22,7 @@ import type {
 	TabsChangedBroadcast,
 } from '../../shared/agent-control.ts';
 import {
+	ARCHITECTURE_DIAGRAM_LIMITS,
 	buildConversationTranscript,
 	MAX_AGENT_PAYLOAD_CHARS,
 	resolveAgentRole,
@@ -29,6 +30,7 @@ import {
 } from '../../shared/agent-control.ts';
 import type { AgentProviderId } from '../../shared/agent-provider.ts';
 import { findHarnessDefinition } from '../../shared/agents.ts';
+import { parseArchitectureIrResult } from '../../shared/architecture-diagram.ts';
 import type { AppLanguage } from '../../shared/i18n.ts';
 import type {
 	AgentPersistedEnvelope,
@@ -49,6 +51,7 @@ import {
 import type { SessionBriefCaller } from '../agent-runtime/naming/session-brief-naming.ts';
 import { readSessionBriefNaming } from '../agent-runtime/naming/session-brief-naming.ts';
 import type { HarnessDetectionService } from '../agents/index.ts';
+import type { ArchitectureService } from '../architecture/index.ts';
 import type { ChatTabService } from '../chat-tabs/chat-tab-service.ts';
 import type { AppSettingsService } from '../config';
 import type { LinearService } from '../linear';
@@ -72,6 +75,7 @@ import { makeLinearPort } from './linear-ports.ts';
 import {
 	type AgentControlOrigin,
 	type AgentControlPorts,
+	type ArchitecturePort,
 	type AskPort,
 	type BoardPort,
 	type ConciergePort,
@@ -129,6 +133,12 @@ export interface PortAdapterDeps {
 	workspaceGitService: WorkspaceGitService;
 	reviewService: ReviewService;
 	/**
+	 * The workspace architecture service, or null when none is composed in.
+	 * Nullable rather than optional so the composition root has to state which it
+	 * is; the port answers with a refusal either way.
+	 */
+	architectureService: ArchitectureService | null;
+	/**
 	 * The app's Linear data service, or null when the integration is not composed.
 	 * Nullable rather than optional so the composition root has to state which it
 	 * is; the port answers `not-connected` either way.
@@ -172,6 +182,8 @@ export interface PortAdapterDeps {
 	broadcastReviewCommentsChanged: (
 		payload: ReviewCommentsChangedBroadcast,
 	) => void;
+	/** Broadcasts a stored diagram so an open architecture tab refreshes. */
+	broadcastArchitectureChanged: (payload: { workspaceId: string }) => void;
 	/**
 	 * Broadcasts a chat tab's Plan Mode state so the renderer's per-chat toggle
 	 * matches a spawn the renderer never made. Best-effort mirror only —
@@ -1226,6 +1238,114 @@ function makeSessionNamingPort(deps: PortAdapterDeps): SessionNamingPort {
 }
 
 /**
+ * Reads a submitted diagram, accepting the JSON string a client that could not
+ * see the argument's shape may have sent instead of an object.
+ *
+ * Tolerated here rather than refused because the encoding is the bridge's
+ * mistake, not the model's: the document itself is right, and answering
+ * "invalid diagram" for a well-formed one sends the caller rewriting content
+ * that was never the problem.
+ * @param diagram - The submitted value, as an object or as JSON text
+ * @returns The value to validate
+ */
+function decodeSubmittedDiagram(diagram: unknown): unknown {
+	if (typeof diagram !== 'string') {
+		return diagram;
+	}
+	try {
+		return JSON.parse(diagram);
+	} catch {
+		return diagram;
+	}
+}
+
+/**
+ * Builds the architecture port: validate the submitted document, refuse one
+ * that is too large to read, and store it against the caller's workspace.
+ * @param deps - Adapter collaborators
+ * @returns The architecture port, or undefined when no service is wired
+ */
+function makeArchitecturePort(
+	deps: PortAdapterDeps,
+): ArchitecturePort | undefined {
+	const architectureService = deps.architectureService;
+	if (!architectureService) {
+		return undefined;
+	}
+	return {
+		readDiagram: async ({ origin }) => {
+			const read = await architectureService.readDiagram({
+				workspaceId: origin.workspaceId,
+			});
+			// A stored document this build cannot parse is never scanned over: the
+			// file is tracked, so replacing it would delete a refinement out of the
+			// user's working tree without either of you noticing.
+			if (read.error) {
+				throw new Error(
+					`${read.error.message} Repair or delete that file — it is tracked, so nothing here will overwrite it for you.`,
+				);
+			}
+			const snapshot =
+				read.current ??
+				(await (async () => {
+					const outcome = await architectureService.scanIfMissing({
+						workspaceId: origin.workspaceId,
+					});
+					return outcome.rebuilt ? outcome.diagram : null;
+				})());
+			if (!snapshot) {
+				throw new Error(
+					'This workspace has no architecture diagram and one could not be scanned. Check that the workspace directory is readable.',
+				);
+			}
+			const connectionCount = snapshot.ir.connections?.length ?? 0;
+			return {
+				componentCount: snapshot.ir.components.length,
+				connectionCount,
+				diagram: snapshot.ir,
+				message:
+					snapshot.source === 'agent'
+						? `Read from ${snapshot.relativePath}, refined by an agent. Edit it rather than replacing it wholesale.`
+						: `Read from ${snapshot.relativePath} \u2014 the scanner\u2019s own seed, correct but named after directories rather than concerns. Rename the boundaries, drop the noise, and submit it back.`,
+				source: snapshot.source,
+			};
+		},
+		updateDiagram: async ({ diagram, origin }) => {
+			const parsed = parseArchitectureIrResult(decodeSubmittedDiagram(diagram));
+			if (!parsed.ok) {
+				throw new Error(
+					`That document is not a valid architecture diagram. ${parsed.problems.join('; ')}. Fix those fields and resubmit the whole document.`,
+				);
+			}
+			const ir = parsed.ir;
+			const componentCount = ir.components.length;
+			const connectionCount = ir.connections?.length ?? 0;
+			const boundaryCount = ir.boundaries?.length ?? 0;
+			if (
+				componentCount > ARCHITECTURE_DIAGRAM_LIMITS.maxComponents ||
+				connectionCount > ARCHITECTURE_DIAGRAM_LIMITS.maxConnections ||
+				boundaryCount > ARCHITECTURE_DIAGRAM_LIMITS.maxBoundaries
+			) {
+				throw new Error(
+					`That diagram is too large to read: at most ${ARCHITECTURE_DIAGRAM_LIMITS.maxComponents} components, ${ARCHITECTURE_DIAGRAM_LIMITS.maxConnections} connections, and ${ARCHITECTURE_DIAGRAM_LIMITS.maxBoundaries} boundaries. Group the detail into fewer nodes rather than drawing every folder.`,
+				);
+			}
+			await architectureService.storeRefinedIr({
+				ir,
+				workspaceId: origin.workspaceId,
+			});
+			deps.broadcastArchitectureChanged({ workspaceId: origin.workspaceId });
+			return {
+				componentCount,
+				connectionCount,
+				message:
+					'Stored in .ensemblr/architecture.json \u2014 a tracked file, so it is part of your diff. It is the diagram from now on: nothing re-scans over it, so the next refinement starts from what you just wrote.',
+			};
+		},
+	};
+}
+
+/**
  * Assembles the full {@link AgentControlPorts} surface from real services.
  * @param deps - Adapter collaborators.
  * @returns Ports ready to pass to {@link createAgentControlService}.
@@ -1233,7 +1353,9 @@ function makeSessionNamingPort(deps: PortAdapterDeps): SessionNamingPort {
 export function createAgentControlPorts(
 	deps: PortAdapterDeps,
 ): AgentControlPorts {
+	const architecture = makeArchitecturePort(deps);
 	return {
+		...(architecture ? { architecture } : {}),
 		workspaces: makeWorkspacePort(deps),
 		tabs: makeTabPort(deps),
 		conversations: makeConversationPort(deps),

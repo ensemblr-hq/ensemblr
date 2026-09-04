@@ -3,6 +3,7 @@ import type { AgentSessionApi } from './agent-session';
 import type { AgentToolApprovalApi } from './agent-tool-approval';
 import type { AgentsApi } from './agents';
 import type { AppSettingsApi } from './app-settings';
+import type { ArchitectureApi } from './architecture';
 import type { ArchiveApi } from './archive-lifecycle';
 import type { ChatTabApi } from './chat-tab';
 import type { CheckpointApi } from './checkpoint';
@@ -46,6 +47,7 @@ import type { RepositorySourcesApi } from './workspace-sources';
 export interface EnsemblrApi
 	extends AgentsApi,
 		AppSettingsApi,
+		ArchitectureApi,
 		WorkspaceApi,
 		RepositoryApi,
 		AgentSessionApi,

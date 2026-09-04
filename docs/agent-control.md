@@ -261,7 +261,7 @@ harness.
 
 ## Tool reference
 
-Forty-three tools, enumerated from `TOOL_DEFS` in
+Forty-five tools, enumerated from `TOOL_DEFS` in
 `src/main/agent-control/mcp-endpoint.ts`. The argument names and types below are
 the authoritative Zod schemas in `src/shared/agent-control/schemas.ts` — every
 schema is a `strictObject`, so an argument not listed here is rejected as
@@ -366,6 +366,64 @@ for chat rows, so a file tab never reads as a conversation nobody named.
 | `ensemblr_set_name` | **`title: string`** | write | no chat tab, Concierge |
 | `ensemblr_set_branch_name` | **`name: string`** (≤ 120 chars), `userRequested?: boolean` | write | sub-agent, Concierge |
 | `ensemblr_set_summary` | **`title: string`** (≤ 80), **`summary: string`** (≤ 4,000) | write | no chat tab, Concierge |
+
+### Architecture diagram
+
+| Tool | Arguments | Gate | Withheld from |
+| --- | --- | --- | --- |
+| `ensemblr_get_architecture_diagram` | *(none)* | read | Concierge |
+| `ensemblr_update_architecture_diagram` | **`diagram: unknown`** | write | Concierge |
+
+**The diagram is a committed file**, `.ensemblr/architecture.json`, beside
+`settings.toml` in the repository it describes — so it travels with the code, a
+clone arrives with the architecture already drawn, and a refinement shows up in
+a pull request instead of hiding in application state. Nothing about it lives in
+SQLite.
+
+**The diagram is a drawing for the user, not a source of truth for an agent.**
+It is lossy by construction — nodes dropped as noise, edges omitted, labels
+renamed to concepts that appear nowhere in the source — and it is only as
+current as the last agent that refined it. An agent curates it and never
+consults it: no question about the codebase is answered from it, no edit is
+decided by it, and its contents are never reported as fact. The bundled
+`architecture-diagram` skill says the same thing at greater length, and the read
+tool's own description carries it, because a document handed to a model reads as
+evidence unless it is told otherwise.
+
+**The read never answers "there is none."** A repository without the file yet
+gets one scanned on the spot, written, and returned, because an agent told the
+diagram is missing goes looking for the scanner — the app's database, an
+`archify` binary — none of which is a surface it holds. The first read is
+therefore also the first build.
+
+Ensemblr scans the diagram from the source tree — directories as nodes,
+cross-module imports as edges, top-level directories as boundary frames — **once,
+when the workspace is created**. Nothing re-scans after that, and there is no
+rescan control in the UI: the file is tracked, so a scan running over a stored
+document would delete a refinement out of the user’s working tree. Keeping the
+diagram true to the code is therefore agent work, through this op, which
+*replaces* the stored document with a refined version — what the bundled
+`architecture-diagram` skill teaches an agent to produce. The whole document is
+submitted rather than a patch, because a partial edit against a document another
+agent may have refined in the meantime is a merge nobody can adjudicate.
+
+**A stored file that cannot be parsed is refused, not replaced.** The read
+reports what is wrong with it and the seed scan declines to run, because a
+document this build cannot read is still somebody’s work — a hand edit, a merge
+conflict, a refinement with one bad field. Repairing or deleting it is the
+user’s call.
+
+The submitted document is validated against the shared IR schema, which strips
+unknown keys rather than rejecting them, and refused when it exceeds 64
+components, 160 connections, or 24 boundaries. A rejection names the field paths
+that failed rather than saying only that the document is invalid. `diagram` is
+declared as a typed object in both bridges: left untyped it serializes to an
+empty JSON Schema, and a client with nothing to aim at sends the whole document
+as a JSON string — which is decoded rather than blamed on the caller, since the
+encoding is the bridge’s doing.
+
+Withheld from the Concierge for the reason `ensemblr_open_tab` is: the diagram
+belongs to a workspace and the Concierge has none of its own.
 
 `ensemblr_set_summary` enforces both limits by truncation, not rejection: an
 over-long field is stored cut to its cap and the result carries `truncated`, one

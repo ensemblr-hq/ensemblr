@@ -41,6 +41,7 @@ const EXPECTED_DENIALS: Record<
 	focusPanel: [],
 	focusTab: [],
 	focusWorkspace: [],
+	getArchitectureDiagram: [],
 	getConversationStatus: [],
 	getLastMessage: [],
 	getSessionBrief: [],
@@ -72,6 +73,10 @@ const EXPECTED_DENIALS: Record<
 	startConversation: 'conditional',
 	startTerminal: ['orchestrator', 'subagent'],
 	stopTerminal: [],
+	// Allowed in Plan Mode for both roles: the diagram describes the code that is
+	// already there rather than claiming a change landed, so redrawing it is
+	// planning output — the same call `linearCreateComment` gets.
+	updateArchitectureDiagram: [],
 	waitForAgents: [],
 	writeTerminal: ['orchestrator', 'subagent'],
 };

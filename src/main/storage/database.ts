@@ -1140,6 +1140,61 @@ CREATE TABLE infisical_discovery_dismissals (
 ) STRICT;
 `,
 	},
+	{
+		id: '027_architecture_diagram',
+		version: 27,
+		// Adds the 'diagram' tab kind, for the workspace architecture diagram. The
+		// diagram itself is NOT stored here: it is a committed file at
+		// `.ensemblr/architecture.json`, so it travels with the code it describes
+		// and shows up in a pull request. Only the tab kind is schema.
+		//
+		// SQLite cannot alter a CHECK in place, so
+		// chat_tabs and its dependent agent_runtime_state are rebuilt exactly as
+		// migration 010 did: agent_runtime_state_new temporarily references
+		// chat_tabs_new so the DROP TABLE chat_tabs cannot fire ON DELETE SET NULL
+		// against the copied rows; the RENAME rewrites the reference back. The
+		// rebuild also folds in the two ALTERs the table has taken since 010
+		// (full_title from 011, the agent_session_id rename from 014), so a
+		// database migrated from 026 and one created from scratch agree byte for
+		// byte in sqlite_master.
+		sql: `
+CREATE TABLE chat_tabs_new (
+	id TEXT PRIMARY KEY,
+	workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+	agent_session_id TEXT REFERENCES agent_sessions(id) ON DELETE SET NULL,
+	kind TEXT NOT NULL CHECK (kind IN ('chat', 'diagram', 'file', 'diff', 'document', 'preview', 'terminal')),
+	title TEXT NOT NULL,
+	position INTEGER NOT NULL DEFAULT 0,
+	opened_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+	closed_at TEXT,
+	metadata_json TEXT NOT NULL DEFAULT '{}',
+	full_title TEXT NOT NULL DEFAULT ''
+) STRICT;
+
+INSERT INTO chat_tabs_new (id, workspace_id, agent_session_id, kind, title, position, opened_at, closed_at, metadata_json, full_title)
+SELECT id, workspace_id, agent_session_id, kind, title, position, opened_at, closed_at, metadata_json, full_title FROM chat_tabs;
+
+CREATE TABLE agent_runtime_state_new (
+	workspace_id TEXT PRIMARY KEY REFERENCES workspaces(id) ON DELETE CASCADE,
+	active_tab_id TEXT REFERENCES chat_tabs_new(id) ON DELETE SET NULL,
+	last_active_session_id TEXT REFERENCES agent_sessions(id) ON DELETE SET NULL,
+	updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+) STRICT;
+
+INSERT INTO agent_runtime_state_new (workspace_id, active_tab_id, last_active_session_id, updated_at)
+SELECT workspace_id, active_tab_id, last_active_session_id, updated_at FROM agent_runtime_state;
+
+DROP TABLE agent_runtime_state;
+DROP TABLE chat_tabs;
+
+ALTER TABLE chat_tabs_new RENAME TO chat_tabs;
+ALTER TABLE agent_runtime_state_new RENAME TO agent_runtime_state;
+
+CREATE INDEX idx_chat_tabs_workspace_id ON chat_tabs(workspace_id);
+CREATE INDEX idx_chat_tabs_session_id ON chat_tabs(agent_session_id);
+CREATE INDEX idx_chat_tabs_open ON chat_tabs(workspace_id, closed_at);
+`,
+	},
 ];
 
 /** Highest declared migration version embedded in this build. */

@@ -31,6 +31,7 @@ import type {
 	PiRawFrameKind,
 } from '../shared/ipc/contracts/agent-session';
 import type { AppSettingsChangedBroadcast } from '../shared/ipc/contracts/app-settings';
+import type { ArchitectureSnapshotChangedBroadcast } from '../shared/ipc/contracts/architecture';
 import type { ConfigChangedBroadcast } from '../shared/ipc/contracts/health';
 import type {
 	TerminalLifecycleBroadcast,
@@ -95,6 +96,11 @@ import { createQuitCoordinator } from './app/quit-coordinator';
 import { createQuitGuard } from './app/quit-guard';
 import { resolveUserDataDirectory } from './app/user-data-location';
 import { createMainWindowStateStore } from './app/window-state';
+import {
+	createArchitectureScanQueue,
+	createArchitectureService,
+	withArchitectureScanOnCreate,
+} from './architecture';
 import { createChatTabService } from './chat-tabs/chat-tab-service.ts';
 import { persistTerminalAgentSessionId } from './chat-tabs/persist-terminal-agent-session.ts';
 import {
@@ -626,9 +632,10 @@ const piAgentAdapter = createPiCliRpcAdapter({
 		'--mode',
 		'rpc',
 		...(piControlExtensionPath ? ['-e', piControlExtensionPath] : []),
-		...(agentSkillBundle.skillDirectory
-			? ['--skill', agentSkillBundle.skillDirectory]
-			: []),
+		...agentSkillBundle.skillDirectories.flatMap((directory) => [
+			'--skill',
+			directory,
+		]),
 	],
 	onRawFrame: broadcastRawFrame,
 	resolveBaseEnv: resolveAgentSpawnEnv,
@@ -746,7 +753,7 @@ const agentProviderService = createAgentProviderService({
 			resolvePiSlashCommands(
 				await piExecutableService.getSnapshot(),
 				cwd,
-				agentSkillBundle.skillDirectory,
+				agentSkillBundle.skillDirectories,
 			),
 	},
 });
@@ -774,6 +781,24 @@ const sessionNamingQueue = createSessionNaming();
 // because the session service reads it at open time to decide the permission
 // mode a Claude child starts under.
 const planModeRegistry = createPlanModeRegistry();
+/**
+ * Owns the workspace architecture diagram: the one-time seed scan, the stored
+ * document, and the refinements an agent writes over it.
+ */
+const architectureService = createArchitectureService({
+	requireDatabase: () => requireOpenDatabase(),
+});
+const architectureScanQueue = createArchitectureScanQueue({
+	architectureService,
+	/** Refreshes an open diagram tab once the seed scan has stored one. */
+	onScan: ({ outcome, workspaceId }) => {
+		if (outcome.rebuilt) {
+			broadcastToAllWindows(IPC_CHANNELS.architectureSnapshotChanged, {
+				workspaceId,
+			} satisfies ArchitectureSnapshotChangedBroadcast);
+		}
+	},
+});
 const agentSessionService = createAgentSessionService({
 	databaseService,
 	/** Forwards an agent session event to every window and the activity monitor. */
@@ -1291,7 +1316,7 @@ const conciergePorts = {
 			name: string;
 			projectId: string;
 		}) => {
-			const result = await createWorkspaceServiceWithSetup.create({
+			const result = await createWorkspaceServiceWithHooks.create({
 				...(baseBranch ? { baseBranch } : {}),
 				name,
 				repositoryId: projectId,
@@ -1317,9 +1342,16 @@ agentControlService = createAgentControlService({
 	guardrails: agentControlGuardrails,
 	originRegistry: agentControlOriginRegistry,
 	ports: createAgentControlPorts({
+		architectureService,
 		augmentHarnessCommand,
 		conciergePorts,
 		boardStatusStore,
+		/** Broadcasts an agent-refined diagram so an open diagram tab refreshes. */
+		broadcastArchitectureChanged: (payload) =>
+			broadcastToAllWindows(
+				IPC_CHANNELS.architectureSnapshotChanged,
+				payload satisfies ArchitectureSnapshotChangedBroadcast,
+			),
 		/** Broadcasts an agent-reported board status update to all windows. */
 		broadcastBoardStatus: (payload) =>
 			broadcastToAllWindows(IPC_CHANNELS.agentControlBoardStatus, payload),
@@ -1390,9 +1422,17 @@ startControlServer(agentControlService)
 	.catch((error: unknown) => {
 		console.error('[agent-control] failed to start control server', error);
 	});
-const createWorkspaceServiceWithSetup = withSetupScriptOnCreate({
-	createWorkspaceService: createWorkspaceServiceInstance,
-	scriptLifecycleService,
+/**
+ * Workspace creation as every caller gets it: the setup script runs, and the
+ * architecture diagram is seeded. Both hooks are fire-and-forget, so neither
+ * can fail a create.
+ */
+const createWorkspaceServiceWithHooks = withArchitectureScanOnCreate({
+	createWorkspaceService: withSetupScriptOnCreate({
+		createWorkspaceService: createWorkspaceServiceInstance,
+		scriptLifecycleService,
+	}),
+	queueScan: architectureScanQueue.queueScan,
 });
 const archiveWorkspaceServiceWithScript = withArchiveScriptBeforeArchive({
 	archiveWorkspaceService,
@@ -1619,13 +1659,14 @@ app.whenReady().then(() => {
 		activeChatStore,
 		agentProviderService,
 		appSettingsService,
+		architectureService,
 		archiveWorkspaceService: archiveWorkspaceServiceWithScript,
 		augmentHarnessCommand,
 		conciergeSessionService,
 		resolveConciergeHome: resolveConciergeHomePaths,
 		configService,
 		continueWorkspaceBranchService,
-		createWorkspaceService: createWorkspaceServiceWithSetup,
+		createWorkspaceService: createWorkspaceServiceWithHooks,
 		databaseService,
 		deleteArchivedWorkspaceService,
 		deleteRepositoryService,

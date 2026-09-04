@@ -178,6 +178,7 @@ export function WorkspaceWorkbenchContent({
 		onDirectoryReveal: revealWorkspaceDirectory,
 		onFilePreviewOpen: sessionNavigation.openFilePreviewTab,
 		onLaunchHarness: sessionNavigation.openTerminalTab,
+		onOpenArchitectureDiagram: sessionNavigation.openArchitectureDiagramTab,
 		onSessionTabChange,
 		onSessionTabClose: sessionNavigation.closeSessionTab,
 		onSessionTabOpen: sessionNavigation.openSessionTab,

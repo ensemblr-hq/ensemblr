@@ -32,6 +32,7 @@ import { type ZodRawShape, z } from 'zod';
 import {
 	type AgentControlOp,
 	type AgentControlResult,
+	ARCHITECTURE_DIAGRAM_LIMITS,
 	ASK_USER_QUESTION_LIMITS,
 	awarenessForAudience,
 	type ControlAudience,
@@ -41,6 +42,10 @@ import {
 	WORKSPACE_BOARD_STATUSES,
 	withheldControlOps,
 } from '../../shared/agent-control.ts';
+import {
+	ARCHITECTURE_LAYOUT_MAX_COLS,
+	MAX_COMPONENT_SOURCES,
+} from '../../shared/architecture-diagram.ts';
 import type { AgentControlService } from './agent-control-service.ts';
 import { withProgressHeartbeat } from './mcp-progress.ts';
 
@@ -69,6 +74,83 @@ const askQuestion = z.object({
 		.min(ASK_USER_QUESTION_LIMITS.minOptions)
 		.max(ASK_USER_QUESTION_LIMITS.maxOptions),
 	multiSelect: z.boolean().optional(),
+});
+
+/**
+ * The architecture IR as the tool *advertises* it.
+ *
+ * It has to be spelled out rather than left as `z.unknown()`: an untyped
+ * property serializes to an empty JSON Schema, and a client with nothing to aim
+ * at sends the document as a JSON string — which then fails validation on the
+ * far side, every time, with no hint that the encoding was the problem.
+ *
+ * Every object here is loose, so an archify document carrying brand marks or
+ * guided views survives the trip intact rather than being stripped down to what
+ * this shape happens to name. `architectureIrSchema` in `shared/` stays the
+ * authority: this one only has to make the argument's *shape* legible.
+ */
+const architectureDiagram = z.looseObject({
+	meta: z.looseObject({ title: z.string(), subtitle: z.string().optional() }),
+	components: z
+		.array(
+			z.looseObject({
+				id: z.string(),
+				type: z.enum([
+					'frontend',
+					'backend',
+					'database',
+					'cloud',
+					'security',
+					'messagebus',
+					'external',
+				]),
+				label: z.string(),
+				sublabel: z.string().optional(),
+				row: z.number().int().optional(),
+				col: z.number().int().optional(),
+				sources: z
+					.array(z.looseObject({ path: z.string() }))
+					.max(MAX_COMPONENT_SOURCES)
+					.optional(),
+			}),
+		)
+		.max(ARCHITECTURE_DIAGRAM_LIMITS.maxComponents),
+	connections: z
+		.array(
+			z.looseObject({
+				id: z.string().optional(),
+				from: z.string(),
+				to: z.string(),
+				label: z.string().optional(),
+				variant: z
+					.enum(['default', 'emphasis', 'security', 'dashed'])
+					.optional(),
+			}),
+		)
+		.max(ARCHITECTURE_DIAGRAM_LIMITS.maxConnections)
+		.optional(),
+	boundaries: z
+		.array(
+			z.looseObject({
+				kind: z.enum(['region', 'security-group']),
+				label: z.string(),
+				wraps: z.array(z.string()),
+			}),
+		)
+		.max(ARCHITECTURE_DIAGRAM_LIMITS.maxBoundaries)
+		.optional(),
+	layout: z
+		.looseObject({
+			mode: z.literal('grid'),
+			cols: z
+				.number()
+				.int()
+				.min(1)
+				.max(ARCHITECTURE_LAYOUT_MAX_COLS)
+				.optional(),
+		})
+		.optional(),
+	schemaVersion: z.number().int().optional(),
 });
 
 /**
@@ -137,6 +219,19 @@ export const TOOL_DEFS: readonly McpToolDef[] = [
 		// client that validates its own inputs would reject an over-long summary
 		// locally, which is exactly the lost record the truncation exists to prevent.
 		shape: { title: z.string(), summary: z.string() },
+	},
+	{
+		name: 'ensemblr_get_architecture_diagram',
+		op: 'getArchitectureDiagram',
+		description:
+			"Read this workspace's architecture diagram — directories as nodes, cross-module imports as edges, top-level directories as boundary frames. Call this FIRST, before ensemblr_update_architecture_diagram: the diagram is what you edit, not something you author from nothing. A workspace that has never shown one still answers with a document — the seed scan runs on the spot — so an empty result is not a state you have to handle, and there is nothing to look for on disk or in the app's database. `source` says where it came from: `scan` is the deterministic seed, correct but named after directories rather than concerns, and `agent` is one a previous refinement already improved. A workspace whose stored file cannot be parsed is refused rather than scanned over, and the refusal names what is wrong with it: that file is tracked, so repair or delete it rather than working around it. The diagram is a drawing for the user to look at, not a source of truth for you: it is lossy by design and only as current as the last agent who updated it, so never answer a question about the codebase from it, never decide what to edit because a node says so, and never report its contents as fact. Read the code. Where the two disagree the diagram is wrong, and fixing it is the only thing that licenses.",
+		shape: {},
+	},
+	{
+		name: 'ensemblr_update_architecture_diagram',
+		op: 'updateArchitectureDiagram',
+		description: `Replace this workspace's architecture diagram with a refined one, passed whole as \`diagram\` — as a JSON object, never as a string containing JSON. Ensemblr already keeps a scanned diagram of every workspace — directories as nodes, cross-module imports as edges — so this op is for *editing* that document, not authoring one from nothing: read the current diagram first, then rename the boundaries to what the concerns are actually called, drop the nodes that are noise, and put the row/col ordering in an order a reader would draw it in. The shape is archify's architecture IR: \`meta.title\`, \`components\` (each with \`id\`, \`type\` of frontend|backend|database|cloud|security|messagebus|external, \`label\`, optional \`sublabel\`/\`sources\`/\`row\`/\`col\`), \`connections\` (each with \`id\`, \`from\`, \`to\`, optional \`label\`/\`variant\`), and \`boundaries\` (each with \`kind\`, \`label\`, \`wraps\`). A component's \`sources\` is a list of \`{ "path": "…" }\` objects, at most ${MAX_COMPONENT_SOURCES} of them — a node needing more is a node that should have been several — and \`layout.cols\` is at most ${ARCHITECTURE_LAYOUT_MAX_COLS}. At most ${ARCHITECTURE_DIAGRAM_LIMITS.maxComponents} components, ${ARCHITECTURE_DIAGRAM_LIMITS.maxConnections} connections, and ${ARCHITECTURE_DIAGRAM_LIMITS.maxBoundaries} boundaries. A rejection names the fields that failed, so fix those rather than resubmitting a guess. What you store is the diagram from then on: nothing re-scans over it.`,
+		shape: { diagram: architectureDiagram },
 	},
 	{
 		name: 'ensemblr_close_tab',

@@ -194,6 +194,14 @@ const CONCIERGE_BLOCKED_OPS: ReadonlyMap<AgentControlOp, string> = new Map([
 		'A file, diff, or comment tab opens in a workspace\u2019s own tab strip and spends that workspace\u2019s spawn budget, and you have no workspace of your own to open one in. Write the path in your answer instead \u2014 Ensemblr renders it as a chip the user clicks \u2014 or brief an orchestrator with `ensemblr_start_conversation`.',
 	],
 	[
+		'getArchitectureDiagram',
+		'The architecture diagram belongs to a workspace, and you have none of your own to read. Ask the orchestrator working there, or spawn one with `ensemblr_start_conversation`.',
+	],
+	[
+		'updateArchitectureDiagram',
+		'The architecture diagram belongs to a workspace, and you have none of your own to redraw. Brief the orchestrator working there with `ensemblr_start_conversation` if the diagram needs correcting.',
+	],
+	[
 		'listRunScripts',
 		'A run script exists to be started, and starting one is a shell in a workspace you may not write to. Read a script terminal that is already up with `ensemblr_read_terminal_output`, or ask the orchestrator working there what it runs.',
 	],

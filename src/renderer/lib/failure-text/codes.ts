@@ -1,5 +1,6 @@
 import type { TFunction } from 'i18next';
 
+import type { ArchitectureFailureCode } from '@/shared/ipc/contracts/architecture';
 import type { CheckpointFailureCode } from '@/shared/ipc/contracts/checkpoint';
 import type { CloneGithubRepositoryDiagnosticCode } from '@/shared/ipc/contracts/clone';
 import type { DictationFailureCode } from '@/shared/ipc/contracts/dictation';
@@ -42,6 +43,7 @@ import type { WorkspaceGitFailureCode } from '@/shared/ipc/contracts/workspace-g
  * union, which is what keeps the same failure worded the same way everywhere.
  */
 export type AppFailureCode =
+	| ArchitectureFailureCode
 	| ArchiveWorkspaceDiagnosticCode
 	| CheckpointFailureCode
 	| CloneGithubRepositoryDiagnosticCode
@@ -355,6 +357,11 @@ export const APP_FAILURE_TEXT: Record<
 			'errors:failure.detached-head',
 			'This workspace is not on a branch, so GitHub has nothing to match it against. Check out a branch, then retry.',
 		),
+	'diagram-unreadable': (t) =>
+		t(
+			'errors:failure.diagram-unreadable',
+			'The stored architecture diagram cannot be read. Repair or delete the file, and a new one will be drawn.',
+		),
 	'dictation-disabled': (t) =>
 		t(
 			'errors:failure.dictation-disabled',
@@ -609,6 +616,8 @@ export const APP_FAILURE_TEXT: Record<
 		),
 	'root-unwritable': (t) =>
 		t('errors:failure.root-unwritable', 'The root directory is not writable.'),
+	'scan-failed': (t) =>
+		t('errors:failure.scan-failed', 'The workspace could not be scanned.'),
 	'shared-root-content': (t) =>
 		t(
 			'errors:failure.shared-root-content',

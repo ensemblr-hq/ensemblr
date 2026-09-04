@@ -11,6 +11,11 @@ import { AGENT_CONTROL_OPS } from '../../src/shared/agent-control.ts';
 const REPO_ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const PLUGIN_ROOT = path.join(REPO_ROOT, 'resources', 'agent-skills');
 const SKILL_ROOT = path.join(PLUGIN_ROOT, 'skills', 'ensemblr');
+const ARCHITECTURE_SKILL_ROOT = path.join(
+	PLUGIN_ROOT,
+	'skills',
+	'architecture-diagram',
+);
 const SETTINGS_SCHEMA_PATH = path.join(
 	REPO_ROOT,
 	'schemas',
@@ -139,7 +144,7 @@ describe('resolveAgentSkillBundle', () => {
 	it('finds the bundle shipped in the repository', () => {
 		expect(resolveAgentSkillBundle(fakeApp(REPO_ROOT))).toEqual({
 			pluginDirectory: PLUGIN_ROOT,
-			skillDirectory: SKILL_ROOT,
+			skillDirectories: [SKILL_ROOT, ARCHITECTURE_SKILL_ROOT],
 		});
 	});
 
@@ -150,7 +155,7 @@ describe('resolveAgentSkillBundle', () => {
 		try {
 			expect(
 				resolveAgentSkillBundle(fakeApp(path.join(REPO_ROOT, 'schemas'))),
-			).toEqual({ pluginDirectory: null, skillDirectory: null });
+			).toEqual({ pluginDirectory: null, skillDirectories: [] });
 		} finally {
 			cwd.mockRestore();
 		}

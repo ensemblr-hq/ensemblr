@@ -52,6 +52,7 @@ function StripHarness({ onSwap }: { onSwap: (swap: () => void) => void }) {
 			activeSession={sessions[0]}
 			closedSessions={[]}
 			onLaunchHarness={() => Promise.resolve(null)}
+			onOpenArchitectureDiagram={async () => null}
 			onSessionTabChange={() => undefined}
 			onSessionTabClose={() => undefined}
 			onSessionTabOpen={() => Promise.resolve(null)}
@@ -90,6 +91,7 @@ test('asks for append placement from the strip new-tab button', async () => {
 			activeSession={sessions[0]}
 			closedSessions={[]}
 			onLaunchHarness={() => Promise.resolve(null)}
+			onOpenArchitectureDiagram={async () => null}
 			onSessionTabChange={() => undefined}
 			onSessionTabClose={() => undefined}
 			onSessionTabOpen={(options) => {

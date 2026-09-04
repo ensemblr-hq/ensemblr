@@ -1,6 +1,6 @@
 {
 	"name": "ensemblr",
-	"description": "Working inside the Ensemblr desktop coding workspace: control tools, repository settings, and the workspace/worktree model.",
+	"description": "Working inside the Ensemblr desktop coding workspace: control tools, repository settings, the workspace/worktree model, and the committed architecture diagram.",
 	"version": "0.1.0",
-	"skills": ["./skills/ensemblr"]
+	"skills": ["./skills/ensemblr", "./skills/architecture-diagram"]
 }

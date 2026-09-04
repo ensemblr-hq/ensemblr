@@ -20,6 +20,7 @@ import type {
 	ExitPlanModeArgs,
 	ExitPlanModeResult,
 	FocusPanelName,
+	GetArchitectureDiagramResult,
 	GetDiffCommentsResult,
 	GetWorkspaceDiffResult,
 	LinearCreateCommentArgs,
@@ -42,6 +43,7 @@ import type {
 	SetSummaryResult,
 	StartTerminalKind,
 	SubagentMechanism,
+	UpdateArchitectureDiagramResult,
 	WorkspaceBoardStatusValue,
 	WorkspaceLinkedIssue,
 } from '../../shared/agent-control.ts';
@@ -689,6 +691,30 @@ export interface SessionNamingPort {
 	}) => Promise<SetSummaryResult>;
 }
 
+/**
+ * Stores an agent-refined architecture diagram for the caller's workspace.
+ *
+ * The port is where the policy lives, not the handler: it validates the
+ * submitted document against the shared IR schema, refuses one that exceeds
+ * {@link ARCHITECTURE_DIAGRAM_LIMITS}, and answers with one `status` word rather
+ * than throwing across the boundary. Control adds no capability of its own — the
+ * scan, the storage, and the gates are the architecture service's, and this only
+ * reaches them.
+ */
+export interface ArchitecturePort {
+	/**
+	 * Reads the workspace's diagram, scanning one when nothing is stored yet, so
+	 * a caller never has to decide what "no diagram" means.
+	 */
+	readDiagram: (input: {
+		origin: AgentControlOrigin;
+	}) => Promise<GetArchitectureDiagramResult>;
+	updateDiagram: (input: {
+		diagram: unknown;
+		origin: AgentControlOrigin;
+	}) => Promise<UpdateArchitectureDiagramResult>;
+}
+
 /** All collaborators the agent-control service composes. */
 export interface AgentControlPorts {
 	ask: AskPort;
@@ -707,6 +733,8 @@ export interface AgentControlPorts {
 	memory?: MemoryPort;
 	/** Concierge-only; absent when the Concierge is not wired. */
 	concierge?: ConciergePort;
+	/** Absent when no architecture service is wired; the op is then refused. */
+	architecture?: ArchitecturePort;
 	diff: DiffPort;
 	review: ReviewPort;
 	linear: LinearPort;

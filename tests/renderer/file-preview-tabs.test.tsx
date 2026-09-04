@@ -126,6 +126,7 @@ describe('file preview tabs', () => {
 				activeSession={previewSession}
 				closedSessions={[]}
 				onLaunchHarness={async () => null}
+				onOpenArchitectureDiagram={async () => null}
 				onSessionTabChange={() => undefined}
 				onSessionTabClose={() => undefined}
 				onSessionTabOpen={async () => null}
@@ -157,6 +158,7 @@ describe('file preview tabs', () => {
 					activeSession={previewSession}
 					closedSessions={[]}
 					onLaunchHarness={async () => null}
+					onOpenArchitectureDiagram={async () => null}
 					onSessionTabChange={() => undefined}
 					onSessionTabClose={() => undefined}
 					onSessionTabOpen={async () => null}
@@ -428,6 +430,7 @@ describe('session tab close controls', () => {
 				activeSession={chatA}
 				closedSessions={[]}
 				onLaunchHarness={async () => null}
+				onOpenArchitectureDiagram={async () => null}
 				onSessionTabChange={() => undefined}
 				onSessionTabClose={onSessionTabClose}
 				onSessionTabOpen={async () => null}
@@ -463,6 +466,7 @@ describe('session tab close controls', () => {
 				activeSession={chatA}
 				closedSessions={[]}
 				onLaunchHarness={async () => null}
+				onOpenArchitectureDiagram={async () => null}
 				onSessionTabChange={() => undefined}
 				onSessionTabClose={() => undefined}
 				onSessionTabOpen={async () => null}
@@ -483,6 +487,7 @@ describe('session tab close controls', () => {
 				activeSession={previewSession}
 				closedSessions={[]}
 				onLaunchHarness={async () => null}
+				onOpenArchitectureDiagram={async () => null}
 				onSessionTabChange={() => undefined}
 				onSessionTabClose={() => undefined}
 				onSessionTabOpen={async () => null}

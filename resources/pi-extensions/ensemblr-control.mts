@@ -348,7 +348,9 @@ const CONCIERGE_WITHHELD_OPS = new Set([
 	'setSummary',
 	'spawnChatTab',
 	'startTerminal',
+	'getArchitectureDiagram',
 	'stopTerminal',
+	'updateArchitectureDiagram',
 	'writeTerminal',
 ]);
 
@@ -761,6 +763,18 @@ export default function ensemblrControl(pi: ExtensionAPI): void {
 		'setSummary',
 		"Record the session summary the app keeps for this chat tab, replacing whatever is on file. Call it once the turn's work is done: `title` is a short topic line of at most 80 characters and `summary` is markdown of at most 4000, covering the decisions made, the files touched, and what is still open. Either one over its limit is stored truncated rather than rejected, and the result says what was cut — so a long summary costs you the tail of it, never the whole call. Writing it yourself is what keeps the record useful — the app's fallback only dumps the raw transcript. This does NOT rename the tab.",
 		Type.Object({ title: Type.String(), summary: Type.String() }),
+	);
+	tool(
+		'ensemblr_get_architecture_diagram',
+		'getArchitectureDiagram',
+		"Read this workspace's architecture diagram — directories as nodes, cross-module imports as edges, top-level directories as boundary frames. Call this FIRST, before ensemblr_update_architecture_diagram: the diagram is what you edit, not something you author from nothing. A workspace that has never shown one still answers with a document — the seed scan runs on the spot — so an empty result is not a state you have to handle, and there is nothing to look for on disk or in the app's database. `source` says where it came from: `scan` is the deterministic seed, correct but named after directories rather than concerns, and `agent` is one a previous refinement already improved. A workspace whose stored file cannot be parsed is refused rather than scanned over, and the refusal names what is wrong with it: that file is tracked, so repair or delete it rather than working around it. The diagram is a drawing for the user to look at, not a source of truth for you: it is lossy by design and only as current as the last agent who updated it, so never answer a question about the codebase from it, never decide what to edit because a node says so, and never report its contents as fact. Read the code. Where the two disagree the diagram is wrong, and fixing it is the only thing that licenses.",
+		Type.Object({}),
+	);
+	tool(
+		'ensemblr_update_architecture_diagram',
+		'updateArchitectureDiagram',
+		'Replace this workspace\'s architecture diagram with a refined one, passed whole as `diagram` — as a JSON object, never as a string containing JSON. Ensemblr already keeps a scanned diagram of every workspace — directories as nodes, cross-module imports as edges — so this op is for *editing* that document, not authoring one from nothing: read the current diagram first, then rename the boundaries to what the concerns are actually called, drop the nodes that are noise, and put the row/col ordering in an order a reader would draw it in. The shape is archify\'s architecture IR: `meta.title`, `components` (each with `id`, `type` of frontend|backend|database|cloud|security|messagebus|external, `label`, optional `sublabel`/`sources`/`row`/`col`), `connections` (each with `id`, `from`, `to`, optional `label`/`variant`), and `boundaries` (each with `kind`, `label`, `wraps`). A component\'s `sources` is a list of `{ "path": "…" }` objects, at most 3 of them — a node needing more is a node that should have been several — and `layout.cols` is at most 12. At most 64 components, 160 connections, and 24 boundaries. A rejection names the fields that failed, so fix those rather than resubmitting a guess. What you store is the diagram from then on: nothing re-scans over it.',
+		Type.Object({ diagram: Type.Unknown() }),
 	);
 	tool(
 		'ensemblr_close_tab',

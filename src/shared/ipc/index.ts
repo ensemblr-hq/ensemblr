@@ -60,6 +60,16 @@ export type {
 export type { AgentToolApprovalApi } from './contracts/agent-tool-approval';
 export type { EnsemblrApi } from './contracts/api';
 export type {
+	ArchitectureApi,
+	ArchitectureDiagramWire,
+	ArchitectureFailureCode,
+	ArchitectureSnapshotChangedBroadcast,
+	GetArchitectureSnapshotRequest,
+	GetArchitectureSnapshotResult,
+	ScanArchitectureSnapshotRequest,
+	ScanArchitectureSnapshotResult,
+} from './contracts/architecture';
+export type {
 	ArchiveApi,
 	ArchiveLifecycleAbort,
 	ArchiveLifecycleContext,

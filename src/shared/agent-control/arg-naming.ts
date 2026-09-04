@@ -31,6 +31,8 @@ export const CANONICAL_ARG_KEYS = {
 	commentIds: 'Ids of review comments an op acts on.',
 	comments: 'Batch of review comments to file against the diff.',
 	description: 'Markdown body of a tracker issue.',
+	diagram:
+		"A whole architecture diagram document, in the app's own IR. Submitted entire rather than as a patch — see the `architecture-diagram` skill.",
 	filePath:
 		'Workspace-relative path of a file, e.g. src/main/main.ts. Never `file` or `path`.',
 	fromOrdinal: 'Inclusive lower bound when paging a transcript.',

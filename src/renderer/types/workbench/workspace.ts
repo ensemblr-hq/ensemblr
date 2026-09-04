@@ -301,6 +301,12 @@ export type SessionTabModel =
 			turnId?: null;
 	  })
 	| (SessionTabBase & {
+			filePath?: null;
+			/** Live architecture diagram of the workspace this tab belongs to. */
+			kind: 'diagram';
+			turnId?: null;
+	  })
+	| (SessionTabBase & {
 			/** Main-process terminal session id backing the embedded xterm. */
 			terminalId: string;
 			/** Registry id of the launched agent harness. */
