@@ -1,6 +1,12 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { MinusIcon, NetworkIcon, PlusIcon } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+	MaximizeIcon,
+	MinusIcon,
+	NetworkIcon,
+	PlusIcon,
+	RotateCcwIcon,
+} from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import {
@@ -9,10 +15,15 @@ import {
 	scanArchitectureSnapshot,
 } from '@/renderer/api/ensemblr-queries';
 import { Button } from '@/renderer/components/ui/button';
+import { ScrollArea, ScrollBar } from '@/renderer/components/ui/scroll-area';
+import { useDiagramViewport } from '@/renderer/hooks/workbench-shell/architecture-diagram/use-diagram-viewport';
+import { compileArchitectureLayout } from '@/renderer/lib/architecture-diagram';
+import { ZOOM } from '@/renderer/lib/architecture-diagram/viewport';
 import { failureText } from '@/renderer/lib/failure-text';
 import { formatRelativeTimestamp } from '@/renderer/lib/workbench/relative-time';
 import {
 	ARCHITECTURE_COMPONENT_TYPES,
+	type ArchitectureIR,
 	diffArchitectureIr,
 } from '@/shared/architecture-diagram';
 
@@ -20,23 +31,7 @@ import { useFilePreviewOpener } from '../file-preview-context';
 import { PanelMessage } from '../panel-message';
 import { DiagramCanvas } from './diagram-canvas';
 import { COMPONENT_TONE } from './diagram-tokens';
-
-/** Zoom bounds and step for the panel's own zoom control. */
-const ZOOM = { max: 2.5, min: 0.4, step: 0.2 } as const;
-
-/**
- * True when a source path names a file rather than a folder.
- *
- * Decided from the path rather than from the file tree because the tree only
- * knows the entries it has loaded, and a diagram node may point at a directory
- * nobody has expanded. A leading dot does not count — `.github` is a folder.
- * @param sourcePath - Workspace-relative path from a component's `sources`
- * @returns True when the path should open in the file preview
- */
-function namesAFile(sourcePath: string): boolean {
-	const basename = sourcePath.split('/').at(-1) ?? '';
-	return basename.slice(1).includes('.');
-}
+import { namesAFile } from './source-path';
 
 /**
  * Keeps the panel's query in step with the main process, which broadcasts every
@@ -100,13 +95,13 @@ function useSeedScan({
 }
 
 /**
- * Resolves what a click on a node should open.
+ * Resolves what the open control on a node should do.
  *
  * Every node the scanner emits stands for a *directory*, which the file preview
  * cannot render — it answers "is a directory and cannot be previewed". A refined
  * diagram may name a real file, so the path decides.
  * @param onDirectoryReveal - Selects All files and expands a directory
- * @returns The click handler for a node's first source
+ * @returns The open handler for a node's first source
  */
 function useSourceOpener(
 	onDirectoryReveal: (directoryPath: string) => void,
@@ -140,7 +135,6 @@ export function ArchitectureDiagramPanel({
 	workspaceId: string;
 }) {
 	const { t } = useTranslation();
-	const [zoom, setZoom] = useState(1);
 	const { data } = useQuery(architectureSnapshotQuery(workspaceId));
 	const openSource = useSourceOpener(onDirectoryReveal);
 	useSnapshotBroadcast(workspaceId);
@@ -160,26 +154,9 @@ export function ArchitectureDiagramPanel({
 		[data],
 	);
 
-	return (
-		<div className='flex min-h-0 flex-1 flex-col overflow-hidden'>
-			<DiagramToolbar
-				capturedAt={current?.generatedAt ?? null}
-				onZoom={setZoom}
-				zoom={zoom}
-			/>
-			{current && delta ? (
-				<>
-					<div className='min-h-0 flex-1 overflow-auto p-4'>
-						<DiagramCanvas
-							delta={delta}
-							ir={current.ir}
-							onOpenSource={openSource}
-							zoom={zoom}
-						/>
-					</div>
-					<DiagramLegend />
-				</>
-			) : (
+	if (!current || !delta) {
+		return (
+			<div className='flex min-h-0 flex-1 flex-col overflow-hidden'>
 				<PanelMessage
 					message={
 						failure ??
@@ -190,18 +167,89 @@ export function ArchitectureDiagramPanel({
 					}
 					tone={failure ? 'error' : 'muted'}
 				/>
-			)}
+			</div>
+		);
+	}
+
+	return (
+		<DiagramSurface
+			capturedAt={current.generatedAt}
+			delta={delta}
+			ir={current.ir}
+			onOpenSource={openSource}
+		/>
+	);
+}
+
+/**
+ * The diagram once a snapshot exists: the compiled layout, the viewport that
+ * frames it, and the chrome around both.
+ *
+ * Split from the panel so the viewport's hooks only ever run against a real
+ * layout — a compile cannot be conditional, and framing an empty canvas would
+ * fight the first real one for the initial fit.
+ */
+function DiagramSurface({
+	capturedAt,
+	delta,
+	ir,
+	onOpenSource,
+}: {
+	capturedAt: string;
+	delta: ReturnType<typeof diffArchitectureIr>;
+	ir: ArchitectureIR;
+	onOpenSource: (path: string) => void;
+}) {
+	const { t } = useTranslation();
+	const layout = useMemo(() => compileArchitectureLayout(ir), [ir]);
+	const viewport = useDiagramViewport(layout.viewBox);
+
+	return (
+		<div className='flex min-h-0 flex-1 flex-col overflow-hidden'>
+			<DiagramToolbar
+				capturedAt={capturedAt}
+				onFit={viewport.fitToView}
+				onReset={viewport.reset}
+				onZoom={viewport.setZoom}
+				zoom={viewport.view.zoom}
+			/>
+			{layout.problems.length > 0 ? (
+				<p className='shrink-0 border-border border-b px-3 py-1.5 text-amber-600 text-xs dark:text-amber-400'>
+					{t('workbench:architecture-diagram.problems', {
+						count: layout.problems.length,
+						defaultValue_one: '{{count}} placement problem in this diagram.',
+						defaultValue_other: '{{count}} placement problems in this diagram.',
+					})}
+				</p>
+			) : null}
+			<div
+				className='relative min-h-0 flex-1 overflow-hidden'
+				ref={viewport.paneRef}
+			>
+				<DiagramCanvas
+					delta={delta}
+					layout={layout}
+					onOpenSource={onOpenSource}
+					title={ir.meta.title}
+					viewport={viewport}
+				/>
+			</div>
+			<DiagramLegend />
 		</div>
 	);
 }
 
-/** Header strip: title, capture time, and zoom. */
+/** Header strip: title, capture time, and the viewport controls. */
 function DiagramToolbar({
 	capturedAt,
+	onFit,
+	onReset,
 	onZoom,
 	zoom,
 }: {
 	capturedAt: string | null;
+	onFit: () => void;
+	onReset: () => void;
 	onZoom: (zoom: number) => void;
 	zoom: number;
 }) {
@@ -230,9 +278,31 @@ function DiagramToolbar({
 			</div>
 			<div className='flex shrink-0 items-center gap-1'>
 				<Button
+					aria-label={t(
+						'workbench:architecture-diagram.fit-to-view',
+						'Fit to view',
+					)}
+					onClick={onFit}
+					size='icon-sm'
+					variant='ghost'
+				>
+					<MaximizeIcon />
+				</Button>
+				<Button
+					aria-label={t(
+						'workbench:architecture-diagram.reset-view',
+						'Reset to actual size',
+					)}
+					onClick={onReset}
+					size='icon-sm'
+					variant='ghost'
+				>
+					<RotateCcwIcon />
+				</Button>
+				<Button
 					aria-label={t('workbench:architecture-diagram.zoom-out', 'Zoom out')}
 					disabled={zoom <= ZOOM.min}
-					onClick={() => onZoom(Math.max(ZOOM.min, zoom - ZOOM.step))}
+					onClick={() => onZoom(zoom - ZOOM.step)}
 					size='icon-sm'
 					variant='ghost'
 				>
@@ -244,7 +314,7 @@ function DiagramToolbar({
 				<Button
 					aria-label={t('workbench:architecture-diagram.zoom-in', 'Zoom in')}
 					disabled={zoom >= ZOOM.max}
-					onClick={() => onZoom(Math.min(ZOOM.max, zoom + ZOOM.step))}
+					onClick={() => onZoom(zoom + ZOOM.step)}
 					size='icon-sm'
 					variant='ghost'
 				>
@@ -272,27 +342,34 @@ function useComponentTypeLabels(): Record<string, string> {
 	};
 }
 
-/** Footer legend naming what each node colour means. */
+/**
+ * Footer legend naming what each node colour means. Scrolls sideways rather
+ * than wrapping, so a narrow panel keeps the canvas its height instead of
+ * spending it on a second legend row.
+ */
 function DiagramLegend() {
 	const labels = useComponentTypeLabels();
 	return (
-		<div className='flex shrink-0 flex-wrap items-center gap-x-4 gap-y-1 border-border border-t px-3 py-2'>
-			{ARCHITECTURE_COMPONENT_TYPES.map((type) => (
-				<span
-					className='flex items-center gap-1.5 text-muted-foreground text-xs'
-					key={type}
-				>
-					<svg aria-hidden='true' height={8} width={8}>
-						<rect
-							className={`${COMPONENT_TONE[type].fill} ${COMPONENT_TONE[type].stroke}`}
-							height={8}
-							rx={2}
-							width={8}
-						/>
-					</svg>
-					{labels[type]}
-				</span>
-			))}
-		</div>
+		<ScrollArea className='w-full shrink-0 border-border border-t'>
+			<div className='flex items-center gap-x-4 px-3 py-2'>
+				{ARCHITECTURE_COMPONENT_TYPES.map((type) => (
+					<span
+						className='flex shrink-0 items-center gap-1.5 whitespace-nowrap text-muted-foreground text-xs'
+						key={type}
+					>
+						<svg aria-hidden='true' height={8} width={8}>
+							<rect
+								className={`${COMPONENT_TONE[type].fill} ${COMPONENT_TONE[type].stroke}`}
+								height={8}
+								rx={2}
+								width={8}
+							/>
+						</svg>
+						{labels[type]}
+					</span>
+				))}
+			</div>
+			<ScrollBar orientation='horizontal' />
+		</ScrollArea>
 	);
 }

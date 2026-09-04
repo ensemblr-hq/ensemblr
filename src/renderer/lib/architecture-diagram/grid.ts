@@ -4,56 +4,22 @@
  * Ported from archify's `renderers/architecture/grid.mjs`.
  * Copyright (c) archify contributors. Licensed under the MIT License.
  *
- * Not auto-layout — fixed cell math only. A component names a `row`/`col` and
- * the grid turns that into a point; nothing here moves a node to avoid another.
+ * Not auto-layout — a component names a `row`/`col` and this turns that into a
+ * point; nothing here moves a node to avoid another. What the port does not
+ * keep is the uniform cell: the offsets come from {@link resolveGridTracks},
+ * which sizes each track from the content sitting on it.
  */
 import type {
 	ArchitectureComponent,
 	ArchitectureIR,
-	ArchitectureLayout,
 	DiagramPoint,
 } from '@/shared/architecture-diagram';
 
-/** Every grid dimension, with the defaults an IR inherits when it omits them. */
-export interface ResolvedGrid {
-	cellH: number;
-	cellW: number;
-	cols: number;
-	gapX: number;
-	gapY: number;
-	mode: 'grid';
-	origin: DiagramPoint;
-}
-
-/** The cell geometry an IR inherits when `layout` names only `mode`. */
-export const DEFAULT_GRID: ResolvedGrid = {
-	cellH: 64,
-	cellW: 130,
-	cols: 4,
-	gapX: 30,
-	gapY: 40,
-	mode: 'grid',
-	origin: [40, 80],
-};
-
-/**
- * Resolves the document's grid, filling each omitted dimension from the
- * defaults.
- * @param layout - The IR's `layout` block, if it has one
- * @returns The resolved grid, or null for a free-placement document
- */
-export function gridLayout(
-	layout: ArchitectureLayout | undefined,
-): ResolvedGrid | null {
-	if (layout?.mode !== 'grid') {
-		return null;
-	}
-	return { ...DEFAULT_GRID, ...layout };
-}
+import type { ResolvedGrid } from './tracks';
 
 /**
  * Resolves a component's top-left corner. An explicit `pos` always wins;
- * otherwise `row`/`col` are stepped out from the grid origin.
+ * otherwise `row`/`col` select a track offset.
  * @param component - The component to place
  * @param grid - The document's resolved grid, or null under free placement
  * @returns The corner, or `[NaN, NaN]` when the component names no placement
@@ -76,11 +42,9 @@ export function resolveComponentPos(
 	) {
 		return [Number.NaN, Number.NaN];
 	}
-	const [originX, originY] = grid.origin;
-	return [
-		originX + component.col * (grid.cellW + grid.gapX),
-		originY + component.row * (grid.cellH + grid.gapY),
-	];
+	const x = grid.colX[component.col];
+	const y = grid.rowY[component.row];
+	return x === undefined || y === undefined ? [Number.NaN, Number.NaN] : [x, y];
 }
 
 /**

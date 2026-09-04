@@ -5,7 +5,7 @@ export type {
 	DiagramNode,
 } from './compile';
 export { compileArchitectureLayout } from './compile';
-export { DEFAULT_GRID, gridLayout, resolveComponentPos } from './grid';
+export { resolveComponentPos } from './grid';
 export type { MeasuredRect } from './routing';
 export {
 	anchor,
@@ -21,3 +21,11 @@ export {
 	minimumNodeTextWidth,
 	textUnits,
 } from './text-fit';
+export type { ResolvedGrid } from './tracks';
+export {
+	DEFAULT_GRID,
+	FRAME_METRICS,
+	PINNED_NODE_SIZE,
+	resolveGridTracks,
+	SOLVED_NODE_SIZE,
+} from './tracks';

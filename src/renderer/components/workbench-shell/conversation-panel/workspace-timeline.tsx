@@ -21,11 +21,11 @@ import { WorkspaceLandingCard } from './workspace-landing-card';
  * Three mutually-exclusive states:
  *   1. Active agent session, or a prompt already submitted into one that is
  *      still opening — render `AgentSessionTimeline` with events.
- *   2. No session, but the workspace has been worked in — render
+ *   2. No session, but the workspace has been chatted in before — render
  *      `NewChatEmptyState`, with a chip for each sibling chat's
  *      `.context/sessions` transcript, open chats included.
- *   3. No session and an untouched workspace — render `WorkspaceLandingCard`
- *      (fresh workspace summary), falling back to `NewChatEmptyState`.
+ *   3. No session and no prior chat — render `WorkspaceLandingCard` (fresh
+ *      workspace summary), falling back to `NewChatEmptyState`.
  *
  * Setup / diagnostic / readiness UI lives in the sidebar footer and the
  * settings → diagnostics screen — it never appears inside the conversation
@@ -81,16 +81,17 @@ export function WorkspaceTimeline({
 		);
 	}
 
-	// The card claims nothing has happened in this workspace yet, so every trace
-	// of prior work has to count — a sibling chat tab's session, a closed tab's
-	// transcript, or edits made straight from a terminal. An unloaded session
-	// list counts as history too: guessing "untouched" before it lands is the one
-	// answer that can be wrong, and the neutral empty state is right either way.
+	// Only Ensemblr's own record of work counts — a sibling chat tab's session or
+	// a closed tab's transcript. A dirty worktree does not: the app writes into a
+	// workspace it has just cut (the seed architecture scan, the setup script), so
+	// change counts report the app's own bookkeeping as if it were the user's
+	// work. An unloaded session list counts as history too: guessing "untouched"
+	// before it lands is the one answer that can be wrong, and the neutral empty
+	// state is right either way.
 	const hasWorkspaceHistory =
 		agentSessionsData === undefined ||
 		agentSessionsData.sessions.length > 0 ||
-		hasAttachableTranscript ||
-		workspace.changeSummary.files > 0;
+		hasAttachableTranscript;
 	const showLandingCard =
 		!hasWorkspaceHistory && Boolean(workspace.landingSummary);
 

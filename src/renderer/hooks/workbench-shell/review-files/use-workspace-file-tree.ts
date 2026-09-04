@@ -83,9 +83,13 @@ function needsLazyLoad(node: FileTreeNode<WorkspaceFileSummary>): boolean {
 
 /**
  * Folder expansion state, plus the pending "reveal this directory" request that
- * drives it: the target and its ancestors are expanded, an ignored folder's
- * children are lazily loaded when the target has none, and the path is recorded
- * for the scroll pass that follows.
+ * drives it: the target and its ancestors are expanded and *everything else is
+ * closed*, an ignored folder's children are lazily loaded when the target has
+ * none, and the path is recorded for the scroll pass that follows.
+ *
+ * The reveal is exclusive because a diagram node pointing at one directory in a
+ * tree of hundreds is only useful if that directory is the one thing the user
+ * can see when they arrive.
  *
  * Expansion is owned here rather than passed in so the reveal effect drives its
  * own state instead of calling back out to its caller's.
@@ -109,8 +113,10 @@ function useDirectoryReveal({
 }) {
 	// Folders start collapsed: the full repo tree would be overwhelming if every
 	// directory rendered open.
-	const { expandDirectories, isExpanded, toggleDirectory } =
-		useFileTreeExpansion(false, knownDirectoryPaths);
+	const { isExpanded, revealOnly, toggleDirectory } = useFileTreeExpansion(
+		false,
+		knownDirectoryPaths,
+	);
 	const revealRequest = useAtomValue(workspaceDirectoryRevealRequestAtom);
 	const handledRevealRequestIdRef = useRef<number | null>(null);
 	const pendingRevealPathRef = useRef<string | null>(null);
@@ -131,7 +137,7 @@ function useDirectoryReveal({
 			return;
 		}
 		handledRevealRequestIdRef.current = revealRequest.id;
-		expandDirectories(
+		revealOnly(
 			directoryPathAndAncestors(directoryPath).filter((path) =>
 				knownDirectoryPathSet.has(path),
 			),
@@ -142,9 +148,9 @@ function useDirectoryReveal({
 			loadIgnoredDirectory(directoryPath);
 		}
 	}, [
-		expandDirectories,
 		knownDirectoryPathSet,
 		loadIgnoredDirectory,
+		revealOnly,
 		revealRequest,
 		tree,
 		workspaceCwd,

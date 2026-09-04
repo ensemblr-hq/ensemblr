@@ -15,6 +15,7 @@
 import path from 'node:path';
 
 import {
+	ARCHITECTURE_COMPONENT_TYPES,
 	ARCHITECTURE_IR_SCHEMA_VERSION,
 	type ArchitectureBoundary,
 	type ArchitectureComponent,
@@ -25,8 +26,28 @@ import {
 
 import type { ModuleGraph, ModuleGraphNode } from './module-graph.ts';
 
-/** Columns the seeded grid fills before wrapping to the next row. */
-const GRID_COLUMNS = 4;
+/** Most boundaries drawn, well under the ceiling the agent skill documents. */
+const MAX_BOUNDARIES = 20;
+
+/** Most cross-cutting role sets drawn; more than two lenses is a hairball. */
+const MAX_ROLE_LENSES = 2;
+
+/**
+ * Most members a role lens may hold. A lens is read by seeing what falls inside
+ * it, and an outline stretched around a dozen boxes scattered over two regions
+ * has to swallow everything between them — which the renderer refuses to draw.
+ */
+const MAX_LENS_MEMBERS = 6;
+
+/** Regions a role has to fall across before it reads as crossing the structure. */
+const MIN_REGIONS_CROSSED = 2;
+
+/**
+ * Type a directory falls back to when no vocabulary in its path matched, which
+ * means "unclassified" rather than "backend" — so it is never a set worth
+ * drawing a curve around.
+ */
+const UNCLASSIFIED_TYPE: ArchitectureComponentType = 'backend';
 
 /** Most edges drawn; the heaviest survive so the diagram stays readable. */
 const MAX_EDGES = 120;
@@ -150,92 +171,39 @@ export function componentTypeForModule(
 	const matched = TYPE_HEURISTICS.find((rule) =>
 		rule.fragments.some((fragment) => haystack.includes(fragment)),
 	);
-	return matched?.type ?? 'backend';
+	return matched?.type ?? UNCLASSIFIED_TYPE;
 }
 
 /**
- * The top-level directory a node belongs to, which is the grouping its
- * boundary frame is built from.
+ * Every directory path that encloses a node, itself included — the prefixes a
+ * region can be drawn around.
  * @param moduleId - Workspace-relative directory path
- * @returns The first path segment, or `.` for a root-level node
+ * @returns Each enclosing path, shallowest first
  */
-function groupOf(moduleId: string): string {
-	return moduleId === '.' ? '.' : (moduleId.split('/')[0] ?? '.');
-}
-
-/**
- * Orders groups by how much of the graph's traffic runs through them, so the
- * busiest part of the repository lands at the top of the diagram.
- * @param nodes - Every node in the graph
- * @returns Group names, heaviest first, ties broken by name
- */
-function orderedGroups(nodes: readonly ModuleGraphNode[]): readonly string[] {
-	const weight = new Map<string, number>();
-	for (const node of nodes) {
-		const group = groupOf(node.id);
-		weight.set(group, (weight.get(group) ?? 0) + node.fanIn + node.fanOut);
+function enclosingPaths(moduleId: string): readonly string[] {
+	if (moduleId === '.') {
+		return [];
 	}
-	return [...weight.keys()].sort((left, right) => {
-		const byWeight = (weight.get(right) ?? 0) - (weight.get(left) ?? 0);
-		return byWeight !== 0 ? byWeight : left.localeCompare(right);
-	});
-}
-
-/**
- * Assigns each node a grid cell. Every group starts on a fresh row and fills
- * rows left to right, which is what keeps boundary frames non-overlapping
- * horizontal bands rather than interleaved rectangles.
- * @param nodes - Every node in the graph
- * @returns Node id → its cell
- */
-function assignCells(
-	nodes: readonly ModuleGraphNode[],
-): ReadonlyMap<string, { col: number; row: number }> {
-	const byGroup = new Map<string, ModuleGraphNode[]>();
-	for (const node of nodes) {
-		const group = groupOf(node.id);
-		byGroup.set(group, [...(byGroup.get(group) ?? []), node]);
-	}
-	const cells = new Map<string, { col: number; row: number }>();
-	let row = 0;
-	for (const group of orderedGroups(nodes)) {
-		const members = [...(byGroup.get(group) ?? [])].sort((left, right) => {
-			const byFanIn = right.fanIn - left.fanIn;
-			if (byFanIn !== 0) {
-				return byFanIn;
-			}
-			const byDepth = left.depth - right.depth;
-			return byDepth !== 0 ? byDepth : left.id.localeCompare(right.id);
-		});
-		for (const [index, member] of members.entries()) {
-			cells.set(member.id, {
-				col: index % GRID_COLUMNS,
-				row: row + Math.floor(index / GRID_COLUMNS),
-			});
-		}
-		row += Math.max(1, Math.ceil(members.length / GRID_COLUMNS));
-	}
-	return cells;
+	const segments = moduleId.split('/');
+	return segments.map((_, index) => segments.slice(0, index + 1).join('/'));
 }
 
 /**
  * Builds one component from a graph node.
+ *
+ * It names no placement at all: under the organic layout a component is placed
+ * by the regions that enclose it, so a seeded `row`/`col` would be a coordinate
+ * nothing reads.
  * @param node - The scanned directory
- * @param cell - Its assigned grid cell
  * @returns The component to draw
  */
-function toComponent(
-	node: ModuleGraphNode,
-	cell: { col: number; row: number },
-): ArchitectureComponent {
+function toComponent(node: ModuleGraphNode): ArchitectureComponent {
 	const segments = node.id === '.' ? [] : node.id.split('/');
 	const leaf = segments.at(-1);
 	const parent = segments.slice(0, -1).join('/');
 	return {
-		col: cell.col,
 		id: componentIdForModule(node.id),
 		label: leaf ?? ROOT_NODE_LABEL,
-		row: cell.row,
 		// The root node stands for whatever files sit loose at the top of the
 		// repository rather than for one directory, so it gets no source: a click
 		// target of `.` resolves to nothing openable and reads as a broken link.
@@ -246,29 +214,121 @@ function toComponent(
 }
 
 /**
- * Builds the boundary frames, one per top-level directory that holds more than
- * a single node.
+ * Builds the nested regions: one per directory path that encloses more than a
+ * single node, so `src`, `src/main`, and `src/main/agent-runtime` each get a
+ * curve and the deeper ones are drawn inside the shallower.
+ *
+ * A path whose members are exactly its parent's members is dropped. Two regions
+ * enclosing the same nodes draw as two curves with nothing between them, and
+ * the deeper label is the more specific true statement about that group.
  * @param nodes - Every node in the graph
- * @returns The frames, in group order
+ * @returns The regions, shallowest first
  */
-function toBoundaries(
+function toRegions(
 	nodes: readonly ModuleGraphNode[],
 ): readonly ArchitectureBoundary[] {
-	const byGroup = new Map<string, string[]>();
+	const byPath = new Map<string, string[]>();
 	for (const node of nodes) {
-		const group = groupOf(node.id);
-		byGroup.set(group, [
-			...(byGroup.get(group) ?? []),
+		for (const enclosing of enclosingPaths(node.id)) {
+			byPath.set(enclosing, [
+				...(byPath.get(enclosing) ?? []),
+				componentIdForModule(node.id),
+			]);
+		}
+	}
+	const candidates = [...byPath.entries()].filter(
+		([, wraps]) => wraps.length >= MIN_BOUNDARY_MEMBERS,
+	);
+	const distinct = candidates.filter(([candidatePath, wraps]) =>
+		candidates.every(
+			([otherPath, otherWraps]) =>
+				otherPath === candidatePath ||
+				otherWraps.length !== wraps.length ||
+				!otherPath.startsWith(`${candidatePath}/`),
+		),
+	);
+	return distinct
+		.sort(([leftPath, leftWraps], [rightPath, rightWraps]) => {
+			const byDepth = leftPath.split('/').length - rightPath.split('/').length;
+			if (byDepth !== 0) {
+				return byDepth;
+			}
+			const bySize = rightWraps.length - leftWraps.length;
+			return bySize !== 0 ? bySize : leftPath.localeCompare(rightPath);
+		})
+		.slice(0, MAX_BOUNDARIES - MAX_ROLE_LENSES)
+		.map(([label, wraps]) => ({ kind: 'region' as const, label, wraps }));
+}
+
+/**
+ * The innermost region holding a component, which is the one that places it.
+ * @param componentId - The component to locate
+ * @param regions - Every region the document declares
+ * @returns The smallest region's label, or null when no region holds it
+ */
+function deepestRegionOf(
+	componentId: string,
+	regions: readonly ArchitectureBoundary[],
+): string | null {
+	const holders = regions.filter((region) =>
+		region.wraps.includes(componentId),
+	);
+	return holders.length === 0
+		? null
+		: (holders.reduce((smallest, region) =>
+				region.wraps.length < smallest.wraps.length ? region : smallest,
+			).label ?? null);
+}
+
+/**
+ * Builds the cross-cutting lenses: a role whose members are placed by more than
+ * one region, which is the one thing about a repository the directory tree
+ * cannot say — `ipc` living in both the main process and the shared contracts
+ * is a concern that crosses the structure rather than sitting inside it.
+ *
+ * The label is the role's own id rather than a sentence, for the same reason
+ * every other string here is a path: main cannot reach the renderer's
+ * translations, so authored English would be English in every language.
+ * @param nodes - Every node in the graph
+ * @param regions - The regions already emitted, which a lens has to cross
+ * @returns The lenses, tightest first
+ */
+function toRoleLenses(
+	nodes: readonly ModuleGraphNode[],
+	regions: readonly ArchitectureBoundary[],
+): readonly ArchitectureBoundary[] {
+	const byRole = new Map<ArchitectureComponentType, string[]>();
+	for (const node of nodes) {
+		const role = componentTypeForModule(node.id);
+		byRole.set(role, [
+			...(byRole.get(role) ?? []),
 			componentIdForModule(node.id),
 		]);
 	}
-	return orderedGroups(nodes).flatMap((group) => {
-		const wraps = byGroup.get(group) ?? [];
-		if (wraps.length < MIN_BOUNDARY_MEMBERS || group === '.') {
+	return ARCHITECTURE_COMPONENT_TYPES.flatMap((role) => {
+		const wraps = byRole.get(role) ?? [];
+		const homes = new Set(wraps.map((id) => deepestRegionOf(id, regions)));
+		if (
+			role === UNCLASSIFIED_TYPE ||
+			homes.size < MIN_REGIONS_CROSSED ||
+			wraps.length < MIN_BOUNDARY_MEMBERS ||
+			wraps.length > MAX_LENS_MEMBERS
+		) {
 			return [];
 		}
-		return [{ kind: 'region' as const, label: group, wraps }];
-	});
+		return [
+			{
+				kind:
+					role === 'security'
+						? ('security-group' as const)
+						: ('region' as const),
+				label: role,
+				wraps,
+			},
+		];
+	})
+		.sort((left, right) => left.wraps.length - right.wraps.length)
+		.slice(0, MAX_ROLE_LENSES);
 }
 
 /**
@@ -299,6 +359,19 @@ function toConnections(graph: ModuleGraph): readonly ArchitectureConnection[] {
 }
 
 /**
+ * The document's boundaries: the nested regions, plus the role lenses that cross
+ * them.
+ * @param nodes - Every node in the graph
+ * @returns The boundaries, regions first
+ */
+function withRoleLenses(
+	nodes: readonly ModuleGraphNode[],
+): readonly ArchitectureBoundary[] {
+	const regions = toRegions(nodes);
+	return [...regions, ...toRoleLenses(nodes, regions)];
+}
+
+/**
  * Seeds a diagram from a scanned graph.
  * @param graph - The scanned module graph
  * @param workspaceCwd - Absolute workspace path, whose basename titles the diagram
@@ -308,14 +381,11 @@ export function irFromModuleGraph(
 	graph: ModuleGraph,
 	workspaceCwd: string,
 ): ArchitectureIR {
-	const cells = assignCells(graph.nodes);
 	return {
-		boundaries: toBoundaries(graph.nodes),
-		components: graph.nodes.map((node) =>
-			toComponent(node, cells.get(node.id) ?? { col: 0, row: 0 }),
-		),
+		boundaries: withRoleLenses(graph.nodes),
+		components: graph.nodes.map(toComponent),
 		connections: toConnections(graph),
-		layout: { cols: GRID_COLUMNS, mode: 'grid' },
+		layout: { mode: 'organic' },
 		meta: { title: path.basename(workspaceCwd) || workspaceCwd || '/' },
 		schemaVersion: ARCHITECTURE_IR_SCHEMA_VERSION,
 	};

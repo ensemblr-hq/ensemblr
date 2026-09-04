@@ -118,7 +118,7 @@ const layoutSchema = z.object({
 	cols: z.number().int().min(1).max(ARCHITECTURE_LAYOUT_MAX_COLS).optional(),
 	gapX: z.number().min(0).optional(),
 	gapY: z.number().min(0).optional(),
-	mode: z.literal('grid'),
+	mode: z.enum(['grid', 'organic']),
 	origin: pointSchema.optional(),
 });
 

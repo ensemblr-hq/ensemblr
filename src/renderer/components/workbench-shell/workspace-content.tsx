@@ -112,32 +112,6 @@ export function WorkspaceWorkbenchContent({
 			requestDiffLineReveal,
 		],
 	);
-	const openReviewFilePreview = useCallback(
-		(filePath: string, options?: FileOpenOptions) => {
-			void openFilePreviewTab({ filePath, preview: options?.preview }).then(
-				(result) => {
-					if (result) {
-						onSessionTabChange(result.chatTabId);
-					}
-				},
-			);
-		},
-		[onSessionTabChange, openFilePreviewTab],
-	);
-	const openCommentPreview = useCallback(
-		(input: {
-			comment: PullRequestCommentSummary;
-			preview?: boolean;
-			prNumber?: number;
-		}) => {
-			void openCommentPreviewTab(input).then((result) => {
-				if (result) {
-					onSessionTabChange(result.chatTabId);
-				}
-			});
-		},
-		[onSessionTabChange, openCommentPreviewTab],
-	);
 	const revealWorkspaceDirectory = useCallback(
 		(directoryPath: string) => {
 			directoryRevealRequestIdRef.current += 1;
@@ -155,6 +129,48 @@ export function WorkspaceWorkbenchContent({
 			rightSidebar.expandRightSidebar,
 			setDirectoryRevealRequest,
 		],
+	);
+	// Opening a file also says where it lives: the tree jumps to its folder with
+	// the rest of the repository closed, so the preview arrives with its context
+	// beside it rather than as a path in a tab title. Every preview goes through
+	// here — the review panel's opener and the conversation's alike — because two
+	// openers meant the diagram and the timeline silently skipped the reveal.
+	const openFilePreviewAndReveal = useCallback(
+		(input: { filePath: string; preview?: boolean }) => {
+			const parentDirectory = input.filePath.split('/').slice(0, -1).join('/');
+			if (parentDirectory) {
+				revealWorkspaceDirectory(parentDirectory);
+			}
+			return openFilePreviewTab(input);
+		},
+		[openFilePreviewTab, revealWorkspaceDirectory],
+	);
+	const openReviewFilePreview = useCallback(
+		(filePath: string, options?: FileOpenOptions) => {
+			void openFilePreviewAndReveal({
+				filePath,
+				preview: options?.preview,
+			}).then((result) => {
+				if (result) {
+					onSessionTabChange(result.chatTabId);
+				}
+			});
+		},
+		[onSessionTabChange, openFilePreviewAndReveal],
+	);
+	const openCommentPreview = useCallback(
+		(input: {
+			comment: PullRequestCommentSummary;
+			preview?: boolean;
+			prNumber?: number;
+		}) => {
+			void openCommentPreviewTab(input).then((result) => {
+				if (result) {
+					onSessionTabChange(result.chatTabId);
+				}
+			});
+		},
+		[onSessionTabChange, openCommentPreviewTab],
 	);
 	const runAgentAction = useAgentActionRunner({
 		activeProject,
@@ -176,7 +192,7 @@ export function WorkspaceWorkbenchContent({
 		closedSessions: sessionNavigation.closedSessions,
 		composer,
 		onDirectoryReveal: revealWorkspaceDirectory,
-		onFilePreviewOpen: sessionNavigation.openFilePreviewTab,
+		onFilePreviewOpen: openFilePreviewAndReveal,
 		onLaunchHarness: sessionNavigation.openTerminalTab,
 		onOpenArchitectureDiagram: sessionNavigation.openArchitectureDiagramTab,
 		onSessionTabChange,

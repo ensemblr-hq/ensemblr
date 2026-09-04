@@ -5,6 +5,11 @@ import { useCallback, useEffect, useState } from 'react';
  * "default open" (changes panel) vs "default closed" (all-files panel)
  * convention so both trees share one mental model.
  *
+ * Two writers, deliberately different: `expandDirectories` only ever opens, for
+ * a reveal that should leave the user's own expansion alone; `revealOnly`
+ * replaces the whole set, for a reveal whose point is that the target is the
+ * only thing left open.
+ *
  * State stores only the paths *toggled away from* `defaultExpanded` rather than
  * the literal expanded/collapsed set. That keeps the default stable when the
  * underlying file list swaps (e.g. placeholder fixture → live git data) without
@@ -22,6 +27,7 @@ export function useFileTreeExpansion(
 ): {
 	expandDirectories: (paths: readonly string[]) => void;
 	isExpanded: (path: string) => boolean;
+	revealOnly: (paths: readonly string[]) => void;
 	toggleDirectory: (path: string) => void;
 } {
 	const [toggledPaths, setToggledPaths] = useState<Set<string>>(
@@ -75,11 +81,23 @@ export function useFileTreeExpansion(
 		[defaultExpanded],
 	);
 
+	const revealOnly = useCallback(
+		(paths: readonly string[]) => {
+			const open = new Set(paths);
+			setToggledPaths(
+				defaultExpanded
+					? new Set(knownDirectoryPaths.filter((path) => !open.has(path)))
+					: open,
+			);
+		},
+		[defaultExpanded, knownDirectoryPaths],
+	);
+
 	const isExpanded = useCallback(
 		(path: string) =>
 			defaultExpanded ? !toggledPaths.has(path) : toggledPaths.has(path),
 		[defaultExpanded, toggledPaths],
 	);
 
-	return { expandDirectories, isExpanded, toggleDirectory };
+	return { expandDirectories, isExpanded, revealOnly, toggleDirectory };
 }

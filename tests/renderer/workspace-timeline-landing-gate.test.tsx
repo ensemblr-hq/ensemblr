@@ -144,11 +144,11 @@ test('a sibling chat tab that already ran an agent retires the landing card', ()
 	expect(container.querySelector(EMPTY_STATE)).not.toBeNull();
 });
 
-test('uncommitted work retires the landing card even with no agent session', () => {
+test('a worktree the app dirtied on create keeps the landing card', () => {
 	const container = renderTimeline({ changedFiles: 18 });
 
-	expect(container.querySelector(LANDING_CARD)).toBeNull();
-	expect(container.querySelector(EMPTY_STATE)).not.toBeNull();
+	expect(container.querySelector(LANDING_CARD)).not.toBeNull();
+	expect(container.textContent).toContain('new copy of');
 });
 
 test('the landing card stays hidden until the session list has loaded', () => {

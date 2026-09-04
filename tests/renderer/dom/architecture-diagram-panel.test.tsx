@@ -82,16 +82,75 @@ describe('ArchitectureDiagramPanel', () => {
 		);
 
 		expect(
-			await screen.findByRole('img', {
+			await screen.findByRole('application', {
 				name: /Architecture diagram of uematsu/,
 			}),
 		).toBeInTheDocument();
-		// A node with a source is interactive whatever the file-preview context:
-		// a directory reveal is always available, so the click has somewhere to go.
+		// Every node is selectable, which is what the body click now does; a node
+		// with a source carries a second control that leaves the diagram.
 		expect(
-			screen.getByRole('button', { name: /storage — src\/main/ }),
+			screen.getByRole('button', {
+				name: /storage — src\/main — show what it connects to/,
+			}),
 		).toBeInTheDocument();
 		expect(screen.getByText('Main process')).toBeInTheDocument();
+	});
+
+	it('draws a grid document’s boundary as a rectangle', async () => {
+		installBridge({ current: snapshot(), previous: null });
+		const { container } = renderWithProviders(
+			<ArchitectureDiagramPanel
+				onDirectoryReveal={revealDirectory}
+				workspaceId='ws-1'
+			/>,
+		);
+
+		await screen.findByText('Main process');
+		expect(
+			container.querySelectorAll('svg rect[stroke-dasharray]'),
+		).not.toHaveLength(0);
+	});
+
+	it('draws an organic document’s boundary as a closed curve', async () => {
+		installBridge({
+			current: snapshot({
+				ir: ir({
+					boundaries: [
+						{
+							kind: 'region',
+							label: 'Main process',
+							wraps: ['storage', 'ipc'],
+						},
+					],
+					components: [
+						{
+							id: 'storage',
+							label: 'storage',
+							sublabel: 'src/main',
+							type: 'database',
+						},
+						{
+							id: 'ipc',
+							label: 'ipc',
+							sublabel: 'src/main',
+							type: 'messagebus',
+						},
+					],
+					layout: { mode: 'organic' },
+				}),
+			}),
+			previous: null,
+		});
+		const { container } = renderWithProviders(
+			<ArchitectureDiagramPanel
+				onDirectoryReveal={revealDirectory}
+				workspaceId='ws-1'
+			/>,
+		);
+
+		await screen.findByText('Main process');
+		const outline = container.querySelector('svg path[stroke-dasharray]');
+		expect(outline?.getAttribute('d')).toMatch(/^M .* Z$/);
 	});
 
 	// A workspace created before the seed scan moved onto the creation path
@@ -180,8 +239,9 @@ describe('ArchitectureDiagramPanel', () => {
 	});
 
 	// A node stands for a directory, and the file preview answers "is a directory
-	// and cannot be previewed" for one — so a click reveals it in the file tree.
-	it('reveals a node’s directory in the file tree when it is clicked', async () => {
+	// and cannot be previewed" for one — so the open control reveals it in the
+	// file tree instead.
+	it('reveals a node’s directory from its open control', async () => {
 		installBridge({ current: snapshot(), previous: null });
 		const openFilePreview = vi.fn();
 		renderWithProviders(
@@ -194,10 +254,50 @@ describe('ArchitectureDiagramPanel', () => {
 		);
 
 		await userEvent.click(
-			await screen.findByRole('button', { name: /storage — src\/main/ }),
+			await screen.findByRole('button', { name: 'Open src/main/storage' }),
 		);
 		expect(revealDirectory).toHaveBeenCalledWith('src/main/storage');
 		expect(openFilePreview).not.toHaveBeenCalled();
+	});
+
+	// The whole point of the body click: a diagram of fifty boxes is unreadable
+	// until one of them can say what it talks to, so selecting dims the rest.
+	it('dims everything outside a selected node’s neighbourhood', async () => {
+		installBridge({
+			current: snapshot({
+				ir: ir({
+					boundaries: [],
+					components: [
+						...ir().components,
+						{
+							col: 2,
+							id: 'unrelated',
+							label: 'unrelated',
+							row: 0,
+							sublabel: 'src/other',
+							type: 'frontend',
+						},
+					],
+				}),
+			}),
+			previous: null,
+		});
+		const { container } = renderWithProviders(
+			<ArchitectureDiagramPanel
+				onDirectoryReveal={revealDirectory}
+				workspaceId='ws-1'
+			/>,
+		);
+
+		expect(container.querySelectorAll('.opacity-15')).toHaveLength(0);
+		await userEvent.click(
+			await screen.findByRole('button', {
+				name: /storage — src\/main — show what it connects to/,
+			}),
+		);
+
+		expect(container.querySelectorAll('.opacity-15').length).toBeGreaterThan(0);
+		expect(revealDirectory).not.toHaveBeenCalled();
 	});
 
 	it('opens a node’s source in the file preview when it names a file', async () => {
@@ -232,7 +332,9 @@ describe('ArchitectureDiagramPanel', () => {
 		);
 
 		await userEvent.click(
-			await screen.findByRole('button', { name: /database\.ts/ }),
+			await screen.findByRole('button', {
+				name: 'Open src/main/storage/database.ts',
+			}),
 		);
 		expect(openFilePreview).toHaveBeenCalledWith(
 			'src/main/storage/database.ts',
@@ -240,7 +342,7 @@ describe('ArchitectureDiagramPanel', () => {
 		expect(revealDirectory).not.toHaveBeenCalled();
 	});
 
-	it('leaves a node with no source non-interactive', async () => {
+	it('gives a node with no source no open control', async () => {
 		installBridge({ current: snapshot(), previous: null });
 		renderWithProviders(
 			<ArchitectureDiagramPanel
@@ -250,8 +352,13 @@ describe('ArchitectureDiagramPanel', () => {
 		);
 
 		expect(
-			await screen.findByRole('img', { name: /^ipc — src\/main$/ }),
+			await screen.findByRole('button', {
+				name: /^ipc — src\/main — show what it connects to$/,
+			}),
 		).toBeInTheDocument();
+		expect(
+			screen.queryByRole('button', { name: /^Open src\/main$/ }),
+		).not.toBeInTheDocument();
 	});
 
 	// The scan is not a thing the user runs: the seed happens once at creation
@@ -266,7 +373,7 @@ describe('ArchitectureDiagramPanel', () => {
 			/>,
 		);
 
-		await screen.findByRole('img', { name: /Architecture diagram/ });
+		await screen.findByRole('application', { name: /Architecture diagram/ });
 		expect(
 			screen.queryByRole('button', { name: /Rescan/i }),
 		).not.toBeInTheDocument();
@@ -286,7 +393,7 @@ describe('ArchitectureDiagramPanel', () => {
 			/>,
 		);
 
-		await screen.findByRole('img', { name: /Architecture diagram/ });
+		await screen.findByRole('application', { name: /Architecture diagram/ });
 		expect(container.querySelector('.stroke-emerald-500')).not.toBeNull();
 	});
 });

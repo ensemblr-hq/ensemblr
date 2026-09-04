@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { Outlet, useNavigate } from '@tanstack/react-router';
 import { useAtomValue } from 'jotai';
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useRef } from 'react';
 import { settingsResolutionQuery } from '@/renderer/api/ensemblr';
 import { CloseRunningChatDialog } from '@/renderer/components/workbench-shell/conversation-panel/close-running-chat-dialog';
 import { useSetupDiagnostics } from '@/renderer/components/workbench-shell/shell-contexts';
@@ -178,6 +178,17 @@ export function WorkspaceRouteContent({
 		workspaceId: activeWorkspace.id,
 	});
 
+	// Every navigation rebuilds the whole search object, so the panel tabs it
+	// carries have to be the latest ones rather than the ones this render closed
+	// over. Two updates in one tick are routine — revealing a file's directory
+	// switches to All files and then selects the preview's tab — and reading the
+	// render-time value in the second one silently reverts the first.
+	const latestPanelTabs = useRef({
+		dock: activeDockTab,
+		review: activeReviewTab,
+	});
+	latestPanelTabs.current = { dock: activeDockTab, review: activeReviewTab };
+
 	/** Navigates to the canonical chat route, preserving existing search state. */
 	function navigateToWorkspaceChat({
 		nextChatId,
@@ -193,8 +204,8 @@ export function WorkspaceRouteContent({
 				workspaceId: activeWorkspace.id,
 			},
 			search: {
-				dock: activeDockTab,
-				review: activeReviewTab,
+				dock: latestPanelTabs.current.dock,
+				review: latestPanelTabs.current.review,
 				...nextSearch,
 			},
 			to: '/projects/$projectId/workspaces/$workspaceId/chats/$chatId',
@@ -203,6 +214,10 @@ export function WorkspaceRouteContent({
 
 	/** Persists tab changes to local prefs and forwards them to the URL. */
 	function updateSearch(nextSearch: WorkbenchRouteSearch) {
+		latestPanelTabs.current = {
+			dock: nextSearch.dock ?? latestPanelTabs.current.dock,
+			review: nextSearch.review ?? latestPanelTabs.current.review,
+		};
 		if (nextSearch.review) {
 			panelTabs.setWorkspaceReviewTab(activeWorkspace.id, nextSearch.review);
 		}

@@ -155,11 +155,12 @@ export function useSessionTabOpeners({
 	return {
 		/**
 		 * Opens the workspace's architecture diagram, or returns the tab already
-		 * showing it. Ephemeral like the other subject tabs when it has to be
-		 * opened, so browsing to it does not grow the strip.
+		 * showing it. Pinned rather than ephemeral: a workspace has exactly one
+		 * architecture and it is a place you work from, so the next file opened
+		 * must not evict it out from under you.
 		 */
 		openArchitectureDiagramTab: useCallback(
-			async ({ preview = true }: { preview?: boolean } = {}) => {
+			async ({ preview = false }: { preview?: boolean } = {}) => {
 				// A workspace has exactly one architecture, so a second tab for it
 				// would be a duplicate of the first rather than a different subject.
 				// The preview slot only retargets an *ephemeral* tab, so once the user

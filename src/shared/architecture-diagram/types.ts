@@ -119,14 +119,22 @@ export interface ArchitectureConnection {
 	variant?: ArchitectureConnectionVariant;
 }
 
-/** Fixed-cell grid the components' `row`/`col` resolve against. */
+/**
+ * How the document is placed.
+ *
+ * `grid` resolves each component's `row`/`col` against a fixed-cell grid, and
+ * every other field here configures it. `organic` places nothing by hand: the
+ * renderer packs the components inside the boundaries that enclose them and
+ * draws each boundary as a closed curve, so a component needs no `row`, no
+ * `col`, and no `pos` — its membership is its placement.
+ */
 export interface ArchitectureLayout {
 	cellH?: number;
 	cellW?: number;
 	cols?: number;
 	gapX?: number;
 	gapY?: number;
-	mode: 'grid';
+	mode: 'grid' | 'organic';
 	origin?: DiagramPoint;
 }
 

@@ -9,8 +9,9 @@ Ensemblr keeps an architecture diagram of every workspace at
 **`.ensemblr/architecture.json`**, committed alongside the code it describes. It
 is **already built** before you arrive: when the workspace was created, a scanner
 walked the source tree, aggregated it to directory-level nodes, derived
-cross-module import edges, and laid them out on a grid. The user opens it from
-the tab strip.
+cross-module import edges, and laid them out as an Euler drawing — nested
+regions per directory, with a curve around each. The user opens it from the tab
+strip.
 
 That scan runs **once**. Nothing re-derives the diagram afterwards, so keeping it
 true to the code is agent work — yours — and what you store is what the user
@@ -78,15 +79,17 @@ Do not spend a turn redoing any of this:
 
 - **Which directories exist**, and how many source files each holds.
 - **Which directories import from which**, and how heavily.
-- **Grid placement that does not collide** — every node has a `row` and `col`,
-  and each top-level group starts on its own row.
+- **Placement.** Under `organic` there is none to get wrong: a node is placed by
+  the regions that enclose it, and the renderer packs and outlines them.
+- **Nested regions per directory** — `src`, `src/main`, `src/main/storage`, each
+  wrapping everything beneath it, so the curves nest the way the tree does.
 - **`sources`** — every node points at the directory it stands for, so a click
   opens it.
 
 ## What only you can fix
 
-- **Boundary labels.** The scanner names a boundary after its top-level
-  directory: `src`, `tests`. You know the concern — *Main process*, *Renderer*,
+- **Boundary labels.** The scanner names a region after its directory path:
+  `src`, `src/main`. You know the concern — *Main process*, *Renderer*,
   *Cross-process contracts*. Rename them.
 - **Node types.** The scanner guesses from path vocabulary and gets the obvious
   ones (`storage` → database, `renderer` → frontend). It cannot tell that a
@@ -95,9 +98,12 @@ Do not spend a turn redoing any of this:
   fixtures, generated output, a one-file shim. Drop the nodes that do not help a
   reader, and drop the edges that only exist because everything imports the
   types module.
-- **Reading order.** Re-assign `row`/`col` so the diagram reads the way the
-  system works: entry points at the top, storage at the bottom, the data path
-  left to right.
+- **Membership.** Which nodes belong in which region is the whole layout under
+  `organic`. Move a node into the region that owns it conceptually rather than
+  the directory it happens to sit in, and add a **cross-cutting set** — a
+  boundary wrapping nodes from more than one region — where one genuinely exists.
+  That is what draws as an overlapping lens, and it is the one thing a folder
+  tree cannot say.
 - **Edge labels.** An unlabelled arrow says "imports". A labelled one can say
   what actually crosses — `IPC`, `reads`, `spawns`. Label the few that carry
   meaning and leave the rest bare.
@@ -108,7 +114,7 @@ Do not spend a turn redoing any of this:
 {
   "schemaVersion": 1,
   "meta": { "title": "my-repo" },
-  "layout": { "mode": "grid", "cols": 4 },
+  "layout": { "mode": "organic" },        // or "grid" with "cols"; see Placement
   "components": [
     {
       "id": "src-main-storage",          // ^[a-zA-Z][a-zA-Z0-9_-]*$, unique
@@ -116,12 +122,16 @@ Do not spend a turn redoing any of this:
                                          // security|messagebus|external
       "label": "storage",                // the box's first line
       "sublabel": "src/main",            // optional second line
-      "row": 2, "col": 0,                // grid cell; col < layout.cols
+                                         // no placement under "organic";
+                                         // "row"/"col" only under "grid"
       "sources": [{ "path": "src/main/storage" }]   // at most 3 entries
     }
   ],
   "boundaries": [
-    { "kind": "region", "label": "Main process", "wraps": ["src-main-storage"] }
+    { "kind": "region", "label": "Main process", "wraps": ["src-main-storage"] },
+    // wraps members of more than one region → drawn as an overlapping lens
+    { "kind": "security-group", "label": "Permission gate",
+      "wraps": ["src-main-storage", "src-renderer-auth"] }
   ],
   "connections": [
     {
@@ -147,6 +157,34 @@ on the panel rather than drawn.
 
 ## Placement
 
+Two modes. The scanner seeds `organic`; a document archify authored, or one you
+place by hand, uses `grid`.
+
+### `organic` — the Euler drawing
+
+Components carry **no placement at all**. The renderer reads `boundaries` as
+*sets* and derives the whole layout from how they relate:
+
+| Two boundaries | Relation | Drawn as |
+| --- | --- | --- |
+| one `wraps` a subset of the other | nesting | the smaller curve inside the larger |
+| they share members, neither contains the other | crossing | two curves overlapping in a lens |
+| no shared members | siblings | two curves side by side |
+
+So membership *is* placement. Three things follow:
+
+1. **Nest a region by wrapping a subset.** `src/main` wrapping some of what `src`
+   wraps draws inside it. Nothing else declares the nesting.
+2. **A lens has to be small and local.** A crossing set is only drawn when its
+   outline encloses at most one node it does not wrap; otherwise the renderer
+   reports it as a problem and draws nothing. A role scattered over the whole
+   repository is not a lens — that information is already in the node colours.
+3. **Of a crossing pair, the larger set becomes the region and the smaller the
+   lens**, ties going to whichever is declared first. If you want a particular
+   one drawn as the region, make it the larger.
+
+### `grid` — fixed cells
+
 `layout.mode: "grid"` resolves `row`/`col` into coordinates. Two rules:
 
 1. `col` must be less than `layout.cols`, and no two components may share a
@@ -155,8 +193,10 @@ on the panel rather than drawn.
    boundary its own rows** — a group that ends mid-row leaves its frame
    overlapping the next one.
 
-Free placement (`pos: [x, y]` per component, no `layout`) exists, but the grid
-is what keeps a re-layout from turning into pixel-pushing. Prefer it.
+Free placement (`pos: [x, y]` per component, no `layout`) exists too, and is
+what an archify-authored document uses. Do not convert a document from one mode
+to the other unless the user asked for it: `row`/`col` is dead weight under
+`organic`, and `organic` throws away a hand-placed grid.
 
 ## Storing it
 

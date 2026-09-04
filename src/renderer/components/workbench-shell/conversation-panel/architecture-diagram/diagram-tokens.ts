@@ -54,16 +54,29 @@ export const COMPONENT_TONE: Record<
 	},
 };
 
-/** Stroke class and dash pattern for each connection variant. */
+/**
+ * Stroke class, dash pattern, and width for each connection variant.
+ *
+ * Weighted well above archify's hairlines: at 1.25px in `stroke-border` an edge
+ * is within a shade of the panel background, which is what made the scanned
+ * diagram read as boxes with nothing between them.
+ */
 export const CONNECTION_TONE: Record<
 	ArchitectureConnectionVariant,
-	{ dashArray?: string; stroke: string }
+	{ dashArray?: string; stroke: string; width: number }
 > = {
-	dashed: { dashArray: '4 3', stroke: 'stroke-muted-foreground/60' },
-	default: { stroke: 'stroke-border' },
-	emphasis: { stroke: 'stroke-sky-500/70' },
-	security: { stroke: 'stroke-rose-500/70' },
+	dashed: {
+		dashArray: '5 4',
+		stroke: 'stroke-muted-foreground/70',
+		width: 1.5,
+	},
+	default: { stroke: 'stroke-muted-foreground/50', width: 1.5 },
+	emphasis: { stroke: 'stroke-sky-500/80', width: 1.75 },
+	security: { stroke: 'stroke-rose-500/80', width: 1.75 },
 };
+
+/** Width of the invisible band that makes a hairline edge hoverable. */
+export const EDGE_HIT_WIDTH = 14;
 
 /**
  * Outline colour for a node or edge the last rebuild changed. `null` means the
@@ -80,10 +93,17 @@ export const DELTA_TONE: Record<ArchitectureDeltaStatus, string> = {
 	rerouted: 'stroke-sky-500/60',
 };
 
-/** Font sizes the node text shrinks between, matching archify's architecture renderer. */
+/**
+ * Font sizes the node text shrinks between.
+ *
+ * Raised over archify's because the scanner writes real paths into `sublabel`:
+ * `src/renderer/components` at archify's preferred 9 inside a 120px box fits
+ * only by dropping to the 6px floor, which is the unreadable grey line the
+ * scanned diagram was covered in. The larger solved node earns the extra size.
+ */
 export const NODE_TEXT_SIZES = {
-	labelMinimum: 7,
-	labelPreferred: 11,
-	sublabelMinimum: 6,
-	sublabelPreferred: 9,
+	labelMinimum: 8,
+	labelPreferred: 12.5,
+	sublabelMinimum: 7,
+	sublabelPreferred: 10,
 } as const;

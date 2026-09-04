@@ -192,19 +192,50 @@ describe('irFromModuleGraph', () => {
 		expect(parseArchitectureIr(ir)).not.toBeNull();
 	});
 
-	it('gives every component a cell and every connection an id', async () => {
+	it('names no placement and gives every connection an id', async () => {
 		const root = writeRepository(BASE_REPOSITORY);
 		const ir = irFromModuleGraph(await scanModuleGraph(root), root);
+		expect(ir.layout).toEqual({ mode: 'organic' });
 		for (const component of ir.components) {
-			expect(Number.isInteger(component.row)).toBe(true);
-			expect(Number.isInteger(component.col)).toBe(true);
+			expect(component.row).toBeUndefined();
+			expect(component.col).toBeUndefined();
+			expect(component.pos).toBeUndefined();
 		}
 		for (const connection of ir.connections ?? []) {
 			expect(connection.id.length).toBeGreaterThan(0);
 		}
 	});
 
-	it('gives each top-level group its own rows so frames do not interleave', async () => {
+	it('nests a region inside the directory that encloses it', async () => {
+		const root = writeRepository(BASE_REPOSITORY);
+		const ir = irFromModuleGraph(await scanModuleGraph(root), root);
+		const byLabel = new Map(
+			(ir.boundaries ?? []).map((boundary) => [
+				boundary.label,
+				new Set(boundary.wraps),
+			]),
+		);
+		const outer = byLabel.get('src');
+		const inner = byLabel.get('src/main');
+		expect(outer).toBeDefined();
+		expect(inner).toBeDefined();
+		for (const member of inner as ReadonlySet<string>) {
+			expect((outer as ReadonlySet<string>).has(member)).toBe(true);
+		}
+		expect((outer as ReadonlySet<string>).size).toBeGreaterThan(
+			(inner as ReadonlySet<string>).size,
+		);
+	});
+
+	it('draws no region around a directory holding a single node', async () => {
+		const root = writeRepository(BASE_REPOSITORY);
+		const ir = irFromModuleGraph(await scanModuleGraph(root), root);
+		for (const boundary of ir.boundaries ?? []) {
+			expect(boundary.wraps.length).toBeGreaterThan(1);
+		}
+	});
+
+	it('lets the renderer resolve every boundary member', async () => {
 		const root = writeRepository({
 			...BASE_REPOSITORY,
 			'tests/renderer/a.test.ts':
@@ -212,18 +243,12 @@ describe('irFromModuleGraph', () => {
 			'tests/shared/b.test.ts': "import '../../src/main/storage/rows.ts';\n",
 		});
 		const ir = irFromModuleGraph(await scanModuleGraph(root), root);
-		const rowsByGroup = new Map<string, Set<number>>();
-		for (const component of ir.components) {
-			const group = (component.sublabel ?? component.label).split('/')[0] ?? '';
-			rowsByGroup.set(
-				group,
-				(rowsByGroup.get(group) ?? new Set()).add(component.row ?? 0),
-			);
-		}
-		const groups = [...rowsByGroup.values()];
-		for (const [index, rows] of groups.entries()) {
-			for (const other of groups.slice(index + 1)) {
-				expect([...rows].some((row) => other.has(row))).toBe(false);
+		const ids = new Set(ir.components.map((component) => component.id));
+		for (const boundary of ir.boundaries ?? []) {
+			for (const wrapped of boundary.wraps) {
+				expect(ids.has(wrapped), `${boundary.label} wraps ${wrapped}`).toBe(
+					true,
+				);
 			}
 		}
 	});

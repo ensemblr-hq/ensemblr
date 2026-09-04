@@ -32,9 +32,11 @@
 	},
 	"architecture-diagram": {
 		"canvas": {
+			"hint": "Drag to pan. Pinch, or hold Command and scroll, to zoom. Select a node to see what it connects to.",
 			"label": "Architecture diagram of {{title}}"
 		},
 		"captured-at": "scanned {{when}}",
+		"fit-to-view": "Fit to view",
 		"legend": {
 			"backend": "Backend",
 			"cloud": "Infrastructure",
@@ -46,11 +48,13 @@
 		},
 		"loading": "Reading the workspace architecture…",
 		"node": {
-			"open-title": "{{name}} — open {{path}}"
+			"open-source": "Open {{path}}",
+			"select-label": "{{name}} — show what it connects to"
 		},
 		"open": "Workspace architecture",
 		"problems_one": "{{count}} placement problem in this diagram.",
 		"problems_other": "{{count}} placement problems in this diagram.",
+		"reset-view": "Reset to actual size",
 		"tab-title": "Architecture",
 		"title": "Architecture",
 		"zoom-in": "Zoom in",

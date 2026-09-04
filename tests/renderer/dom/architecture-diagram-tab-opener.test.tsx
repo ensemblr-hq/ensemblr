@@ -23,14 +23,14 @@ const openers = (findOpenDiagramTabId: () => string | null) => {
 // duplicate rather than a different subject. The preview slot only retargets an
 // *ephemeral* tab, which is why a pinned diagram tab used to get a twin.
 describe('openArchitectureDiagramTab', () => {
-	it('opens a diagram tab when the workspace has none', async () => {
+	it('opens a pinned diagram tab when the workspace has none', async () => {
 		const { openAuxiliaryTab, result } = openers(() => null);
 
 		expect(await result.current.openArchitectureDiagramTab()).toEqual({
 			chatTabId: 'new-tab',
 		});
 		expect(openAuxiliaryTab).toHaveBeenCalledWith(
-			expect.objectContaining({ kind: 'diagram', preview: true }),
+			expect.objectContaining({ kind: 'diagram', preview: false }),
 		);
 	});
 

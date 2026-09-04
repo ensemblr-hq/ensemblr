@@ -1,6 +1,6 @@
 {
-	"generatedAt": "2026-09-04T17:26:38.546Z",
-	"graphFingerprint": "c28624f9d30fb5383165a0497a5f751f96c0581a271744b10deee258d9c272aa",
+	"generatedAt": "2026-09-04T20:00:12.324Z",
+	"graphFingerprint": "729fcac418074e31c5ad8f859a279de515898835e2d849ed5a01448d6a009f5c",
 	"ir": {
 		"boundaries": [
 			{
@@ -12,6 +12,7 @@
 					"src-main-agent-providers",
 					"src-main-agent-runtime",
 					"src-main-app",
+					"src-main-architecture",
 					"src-main-chat-tabs",
 					"src-main-claude-agent",
 					"src-main-commands",
@@ -32,7 +33,6 @@
 					"src-main-setup",
 					"src-main-storage",
 					"src-main-terminal",
-					"src-main-updates",
 					"src-renderer-api",
 					"src-renderer-components",
 					"src-renderer-fixtures",
@@ -67,14 +67,93 @@
 					"demo-fixtures",
 					"demo-scenarios"
 				]
+			},
+			{
+				"kind": "region",
+				"label": "src/main",
+				"wraps": [
+					"src-main",
+					"src-main-agent-control",
+					"src-main-agent-providers",
+					"src-main-agent-runtime",
+					"src-main-app",
+					"src-main-architecture",
+					"src-main-chat-tabs",
+					"src-main-claude-agent",
+					"src-main-commands",
+					"src-main-concierge",
+					"src-main-config",
+					"src-main-environment",
+					"src-main-github",
+					"src-main-infisical",
+					"src-main-ipc",
+					"src-main-linear",
+					"src-main-menu",
+					"src-main-open-target",
+					"src-main-pi-agent",
+					"src-main-pi-runtime",
+					"src-main-repository",
+					"src-main-scripts",
+					"src-main-secrets",
+					"src-main-setup",
+					"src-main-storage",
+					"src-main-terminal"
+				]
+			},
+			{
+				"kind": "region",
+				"label": "src/renderer",
+				"wraps": [
+					"src-renderer-api",
+					"src-renderer-components",
+					"src-renderer-fixtures",
+					"src-renderer-hooks",
+					"src-renderer-lib",
+					"src-renderer-routing",
+					"src-renderer-state",
+					"src-renderer-types"
+				]
+			},
+			{
+				"kind": "region",
+				"label": "src/shared",
+				"wraps": [
+					"src-shared",
+					"src-shared-agent-control",
+					"src-shared-ipc"
+				]
+			},
+			{
+				"kind": "region",
+				"label": "tests/main",
+				"wraps": [
+					"tests-main",
+					"tests-main-helpers",
+					"tests-main-support"
+				]
+			},
+			{
+				"kind": "region",
+				"label": "tests/renderer",
+				"wraps": [
+					"tests-renderer",
+					"tests-renderer-dom",
+					"tests-renderer-support"
+				]
+			},
+			{
+				"kind": "region",
+				"label": "messagebus",
+				"wraps": [
+					"src-main-ipc",
+					"src-shared-ipc"
+				]
 			}
 		],
 		"components": [
 			{
-				"col": 0,
 				"id": "demo",
 				"label": "demo",
-				"row": 12,
 				"sources": [
 					{
 						"path": "demo"
@@ -83,10 +162,8 @@
 				"type": "backend"
 			},
 			{
-				"col": 1,
 				"id": "demo-fixtures",
 				"label": "fixtures",
-				"row": 12,
 				"sources": [
 					{
 						"path": "demo/fixtures"
@@ -96,10 +173,8 @@
 				"type": "backend"
 			},
 			{
-				"col": 2,
 				"id": "demo-scenarios",
 				"label": "scenarios",
-				"row": 12,
 				"sources": [
 					{
 						"path": "demo/scenarios"
@@ -109,10 +184,8 @@
 				"type": "backend"
 			},
 			{
-				"col": 0,
 				"id": "playground",
 				"label": "playground",
-				"row": 13,
 				"sources": [
 					{
 						"path": "playground"
@@ -121,10 +194,8 @@
 				"type": "backend"
 			},
 			{
-				"col": 2,
 				"id": "src-main",
 				"label": "main",
-				"row": 0,
 				"sources": [
 					{
 						"path": "src/main"
@@ -134,10 +205,8 @@
 				"type": "backend"
 			},
 			{
-				"col": 2,
 				"id": "src-main-agent-control",
 				"label": "agent-control",
-				"row": 4,
 				"sources": [
 					{
 						"path": "src/main/agent-control"
@@ -147,10 +216,8 @@
 				"type": "backend"
 			},
 			{
-				"col": 2,
 				"id": "src-main-agent-providers",
 				"label": "agent-providers",
-				"row": 6,
 				"sources": [
 					{
 						"path": "src/main/agent-providers"
@@ -160,10 +227,8 @@
 				"type": "backend"
 			},
 			{
-				"col": 3,
 				"id": "src-main-agent-runtime",
 				"label": "agent-runtime",
-				"row": 1,
 				"sources": [
 					{
 						"path": "src/main/agent-runtime"
@@ -173,10 +238,8 @@
 				"type": "backend"
 			},
 			{
-				"col": 0,
 				"id": "src-main-app",
 				"label": "app",
-				"row": 4,
 				"sources": [
 					{
 						"path": "src/main/app"
@@ -186,10 +249,19 @@
 				"type": "backend"
 			},
 			{
-				"col": 1,
+				"id": "src-main-architecture",
+				"label": "architecture",
+				"sources": [
+					{
+						"path": "src/main/architecture"
+					}
+				],
+				"sublabel": "src/main",
+				"type": "backend"
+			},
+			{
 				"id": "src-main-chat-tabs",
 				"label": "chat-tabs",
-				"row": 4,
 				"sources": [
 					{
 						"path": "src/main/chat-tabs"
@@ -199,10 +271,8 @@
 				"type": "backend"
 			},
 			{
-				"col": 2,
 				"id": "src-main-claude-agent",
 				"label": "claude-agent",
-				"row": 5,
 				"sources": [
 					{
 						"path": "src/main/claude-agent"
@@ -212,10 +282,8 @@
 				"type": "backend"
 			},
 			{
-				"col": 0,
 				"id": "src-main-commands",
 				"label": "commands",
-				"row": 2,
 				"sources": [
 					{
 						"path": "src/main/commands"
@@ -225,10 +293,8 @@
 				"type": "backend"
 			},
 			{
-				"col": 3,
 				"id": "src-main-concierge",
 				"label": "concierge",
-				"row": 6,
 				"sources": [
 					{
 						"path": "src/main/concierge"
@@ -238,10 +304,8 @@
 				"type": "cloud"
 			},
 			{
-				"col": 2,
 				"id": "src-main-config",
 				"label": "config",
-				"row": 3,
 				"sources": [
 					{
 						"path": "src/main/config"
@@ -251,10 +315,8 @@
 				"type": "backend"
 			},
 			{
-				"col": 1,
 				"id": "src-main-environment",
 				"label": "environment",
-				"row": 1,
 				"sources": [
 					{
 						"path": "src/main/environment"
@@ -264,10 +326,8 @@
 				"type": "backend"
 			},
 			{
-				"col": 3,
 				"id": "src-main-github",
 				"label": "github",
-				"row": 5,
 				"sources": [
 					{
 						"path": "src/main/github"
@@ -277,10 +337,8 @@
 				"type": "backend"
 			},
 			{
-				"col": 0,
 				"id": "src-main-infisical",
 				"label": "infisical",
-				"row": 8,
 				"sources": [
 					{
 						"path": "src/main/infisical"
@@ -290,10 +348,8 @@
 				"type": "backend"
 			},
 			{
-				"col": 0,
 				"id": "src-main-ipc",
 				"label": "ipc",
-				"row": 7,
 				"sources": [
 					{
 						"path": "src/main/ipc"
@@ -303,10 +359,8 @@
 				"type": "messagebus"
 			},
 			{
-				"col": 1,
 				"id": "src-main-linear",
 				"label": "linear",
-				"row": 8,
 				"sources": [
 					{
 						"path": "src/main/linear"
@@ -316,10 +370,8 @@
 				"type": "backend"
 			},
 			{
-				"col": 2,
 				"id": "src-main-menu",
 				"label": "menu",
-				"row": 8,
 				"sources": [
 					{
 						"path": "src/main/menu"
@@ -329,10 +381,8 @@
 				"type": "backend"
 			},
 			{
-				"col": 1,
 				"id": "src-main-open-target",
 				"label": "open-target",
-				"row": 7,
 				"sources": [
 					{
 						"path": "src/main/open-target"
@@ -342,10 +392,8 @@
 				"type": "backend"
 			},
 			{
-				"col": 3,
 				"id": "src-main-pi-agent",
 				"label": "pi-agent",
-				"row": 8,
 				"sources": [
 					{
 						"path": "src/main/pi-agent"
@@ -355,10 +403,8 @@
 				"type": "backend"
 			},
 			{
-				"col": 3,
 				"id": "src-main-pi-runtime",
 				"label": "pi-runtime",
-				"row": 2,
 				"sources": [
 					{
 						"path": "src/main/pi-runtime"
@@ -368,10 +414,8 @@
 				"type": "backend"
 			},
 			{
-				"col": 2,
 				"id": "src-main-repository",
 				"label": "repository",
-				"row": 2,
 				"sources": [
 					{
 						"path": "src/main/repository"
@@ -381,10 +425,8 @@
 				"type": "database"
 			},
 			{
-				"col": 0,
 				"id": "src-main-scripts",
 				"label": "scripts",
-				"row": 6,
 				"sources": [
 					{
 						"path": "src/main/scripts"
@@ -394,10 +436,8 @@
 				"type": "backend"
 			},
 			{
-				"col": 3,
 				"id": "src-main-secrets",
 				"label": "secrets",
-				"row": 4,
 				"sources": [
 					{
 						"path": "src/main/secrets"
@@ -407,10 +447,8 @@
 				"type": "security"
 			},
 			{
-				"col": 2,
 				"id": "src-main-setup",
 				"label": "setup",
-				"row": 7,
 				"sources": [
 					{
 						"path": "src/main/setup"
@@ -420,10 +458,8 @@
 				"type": "backend"
 			},
 			{
-				"col": 3,
 				"id": "src-main-storage",
 				"label": "storage",
-				"row": 0,
 				"sources": [
 					{
 						"path": "src/main/storage"
@@ -433,10 +469,8 @@
 				"type": "database"
 			},
 			{
-				"col": 0,
 				"id": "src-main-terminal",
 				"label": "terminal",
-				"row": 5,
 				"sources": [
 					{
 						"path": "src/main/terminal"
@@ -446,23 +480,8 @@
 				"type": "backend"
 			},
 			{
-				"col": 0,
-				"id": "src-main-updates",
-				"label": "updates",
-				"row": 9,
-				"sources": [
-					{
-						"path": "src/main/updates"
-					}
-				],
-				"sublabel": "src/main",
-				"type": "backend"
-			},
-			{
-				"col": 1,
 				"id": "src-renderer-api",
 				"label": "api",
-				"row": 2,
 				"sources": [
 					{
 						"path": "src/renderer/api"
@@ -472,10 +491,8 @@
 				"type": "frontend"
 			},
 			{
-				"col": 0,
 				"id": "src-renderer-components",
 				"label": "components",
-				"row": 3,
 				"sources": [
 					{
 						"path": "src/renderer/components"
@@ -485,10 +502,8 @@
 				"type": "frontend"
 			},
 			{
-				"col": 1,
 				"id": "src-renderer-fixtures",
 				"label": "fixtures",
-				"row": 6,
 				"sources": [
 					{
 						"path": "src/renderer/fixtures"
@@ -498,10 +513,8 @@
 				"type": "frontend"
 			},
 			{
-				"col": 3,
 				"id": "src-renderer-hooks",
 				"label": "hooks",
-				"row": 3,
 				"sources": [
 					{
 						"path": "src/renderer/hooks"
@@ -511,10 +524,8 @@
 				"type": "frontend"
 			},
 			{
-				"col": 0,
 				"id": "src-renderer-lib",
 				"label": "lib",
-				"row": 1,
 				"sources": [
 					{
 						"path": "src/renderer/lib"
@@ -524,10 +535,8 @@
 				"type": "frontend"
 			},
 			{
-				"col": 3,
 				"id": "src-renderer-routing",
 				"label": "routing",
-				"row": 7,
 				"sources": [
 					{
 						"path": "src/renderer/routing"
@@ -537,10 +546,8 @@
 				"type": "frontend"
 			},
 			{
-				"col": 1,
 				"id": "src-renderer-state",
 				"label": "state",
-				"row": 3,
 				"sources": [
 					{
 						"path": "src/renderer/state"
@@ -550,10 +557,8 @@
 				"type": "frontend"
 			},
 			{
-				"col": 2,
 				"id": "src-renderer-types",
 				"label": "types",
-				"row": 1,
 				"sources": [
 					{
 						"path": "src/renderer/types"
@@ -563,10 +568,8 @@
 				"type": "frontend"
 			},
 			{
-				"col": 1,
 				"id": "src-shared",
 				"label": "shared",
-				"row": 0,
 				"sources": [
 					{
 						"path": "src/shared"
@@ -576,10 +579,8 @@
 				"type": "backend"
 			},
 			{
-				"col": 1,
 				"id": "src-shared-agent-control",
 				"label": "agent-control",
-				"row": 5,
 				"sources": [
 					{
 						"path": "src/shared/agent-control"
@@ -589,10 +590,8 @@
 				"type": "backend"
 			},
 			{
-				"col": 0,
 				"id": "src-shared-ipc",
 				"label": "ipc",
-				"row": 0,
 				"sources": [
 					{
 						"path": "src/shared/ipc"
@@ -602,10 +601,8 @@
 				"type": "messagebus"
 			},
 			{
-				"col": 3,
 				"id": "tests-main",
 				"label": "main",
-				"row": 10,
 				"sources": [
 					{
 						"path": "tests/main"
@@ -615,10 +612,8 @@
 				"type": "backend"
 			},
 			{
-				"col": 1,
 				"id": "tests-main-helpers",
 				"label": "helpers",
-				"row": 10,
 				"sources": [
 					{
 						"path": "tests/main/helpers"
@@ -628,10 +623,8 @@
 				"type": "backend"
 			},
 			{
-				"col": 2,
 				"id": "tests-main-support",
 				"label": "support",
-				"row": 10,
 				"sources": [
 					{
 						"path": "tests/main/support"
@@ -641,10 +634,8 @@
 				"type": "backend"
 			},
 			{
-				"col": 0,
 				"id": "tests-renderer",
 				"label": "renderer",
-				"row": 11,
 				"sources": [
 					{
 						"path": "tests/renderer"
@@ -654,10 +645,8 @@
 				"type": "frontend"
 			},
 			{
-				"col": 2,
 				"id": "tests-renderer-dom",
 				"label": "dom",
-				"row": 11,
 				"sources": [
 					{
 						"path": "tests/renderer/dom"
@@ -667,10 +656,8 @@
 				"type": "frontend"
 			},
 			{
-				"col": 0,
 				"id": "tests-renderer-support",
 				"label": "support",
-				"row": 10,
 				"sources": [
 					{
 						"path": "tests/renderer/support"
@@ -680,10 +667,8 @@
 				"type": "frontend"
 			},
 			{
-				"col": 1,
 				"id": "tests-shared",
 				"label": "shared",
-				"row": 11,
 				"sources": [
 					{
 						"path": "tests/shared"
@@ -720,14 +705,14 @@
 			},
 			{
 				"from": "tests-renderer",
-				"id": "e-tests-renderer-to-src-renderer-components",
-				"to": "src-renderer-components",
+				"id": "e-tests-renderer-to-src-renderer-lib",
+				"to": "src-renderer-lib",
 				"variant": "default"
 			},
 			{
 				"from": "tests-renderer",
-				"id": "e-tests-renderer-to-src-renderer-lib",
-				"to": "src-renderer-lib",
+				"id": "e-tests-renderer-to-src-renderer-components",
+				"to": "src-renderer-components",
 				"variant": "default"
 			},
 			{
@@ -785,6 +770,12 @@
 				"variant": "default"
 			},
 			{
+				"from": "src-renderer-hooks",
+				"id": "e-src-renderer-hooks-to-src-renderer-lib",
+				"to": "src-renderer-lib",
+				"variant": "default"
+			},
+			{
 				"from": "tests-main",
 				"id": "e-tests-main-to-src-main-storage",
 				"to": "src-main-storage",
@@ -794,12 +785,6 @@
 				"from": "src-renderer-components",
 				"id": "e-src-renderer-components-to-src-renderer-state",
 				"to": "src-renderer-state",
-				"variant": "default"
-			},
-			{
-				"from": "src-renderer-hooks",
-				"id": "e-src-renderer-hooks-to-src-renderer-lib",
-				"to": "src-renderer-lib",
 				"variant": "default"
 			},
 			{
@@ -830,6 +815,12 @@
 				"from": "src-renderer-lib",
 				"id": "e-src-renderer-lib-to-src-shared-ipc",
 				"to": "src-shared-ipc",
+				"variant": "default"
+			},
+			{
+				"from": "src-renderer-lib",
+				"id": "e-src-renderer-lib-to-src-shared",
+				"to": "src-shared",
 				"variant": "default"
 			},
 			{
@@ -875,12 +866,6 @@
 				"variant": "default"
 			},
 			{
-				"from": "src-renderer-lib",
-				"id": "e-src-renderer-lib-to-src-shared",
-				"to": "src-shared",
-				"variant": "default"
-			},
-			{
 				"from": "src-renderer-state",
 				"id": "e-src-renderer-state-to-src-renderer-types",
 				"to": "src-renderer-types",
@@ -905,15 +890,15 @@
 				"variant": "default"
 			},
 			{
-				"from": "src-main-ipc",
-				"id": "e-src-main-ipc-to-src-main",
-				"to": "src-main",
-				"variant": "default"
-			},
-			{
 				"from": "tests-main",
 				"id": "e-tests-main-to-src-main-agent-control",
 				"to": "src-main-agent-control",
+				"variant": "default"
+			},
+			{
+				"from": "src-main-ipc",
+				"id": "e-src-main-ipc-to-src-main",
+				"to": "src-main",
 				"variant": "default"
 			},
 			{
@@ -923,15 +908,15 @@
 				"variant": "default"
 			},
 			{
-				"from": "playground",
-				"id": "e-playground-to-src-renderer-components",
-				"to": "src-renderer-components",
-				"variant": "default"
-			},
-			{
 				"from": "src-renderer-hooks",
 				"id": "e-src-renderer-hooks-to-src-shared",
 				"to": "src-shared",
+				"variant": "default"
+			},
+			{
+				"from": "playground",
+				"id": "e-playground-to-src-renderer-components",
+				"to": "src-renderer-components",
 				"variant": "default"
 			},
 			{
@@ -1020,14 +1005,14 @@
 			},
 			{
 				"from": "tests-main",
-				"id": "e-tests-main-to-src-main-config",
-				"to": "src-main-config",
+				"id": "e-tests-main-to-src-main",
+				"to": "src-main",
 				"variant": "default"
 			},
 			{
 				"from": "tests-main",
-				"id": "e-tests-main-to-src-main",
-				"to": "src-main",
+				"id": "e-tests-main-to-src-main-config",
+				"to": "src-main-config",
 				"variant": "default"
 			},
 			{
@@ -1229,6 +1214,12 @@
 				"variant": "default"
 			},
 			{
+				"from": "tests-renderer-dom",
+				"id": "e-tests-renderer-dom-to-src-renderer-hooks",
+				"to": "src-renderer-hooks",
+				"variant": "default"
+			},
+			{
 				"from": "src-main-agent-providers",
 				"id": "e-src-main-agent-providers-to-src-shared",
 				"to": "src-shared",
@@ -1292,12 +1283,6 @@
 				"from": "tests-main",
 				"id": "e-tests-main-to-src-main-menu",
 				"to": "src-main-menu",
-				"variant": "default"
-			},
-			{
-				"from": "tests-renderer-dom",
-				"id": "e-tests-renderer-dom-to-src-renderer-hooks",
-				"to": "src-renderer-hooks",
 				"variant": "default"
 			},
 			{
@@ -1416,11 +1401,10 @@
 			}
 		],
 		"layout": {
-			"cols": 4,
-			"mode": "grid"
+			"mode": "organic"
 		},
 		"meta": {
-			"title": "uematsu"
+			"title": "psoldunov-architecture-diagram-pane"
 		},
 		"schemaVersion": 1
 	},
