@@ -11,6 +11,14 @@
 	// to it, so every entry point has to be listed here or the rest of the tree
 	// reports as dead. This list mirrors `entry` in `.fallowrc.jsonc` — keep the
 	// two in sync when adding an entry point.
+	//
+	// Demo mode is the one place the two lists diverge on purpose: `demo/**` is
+	// ignored outright in `doctor.config.jsonc` and `.fallowrc.jsonc` rather than
+	// entried, because it is a screenshot harness the packaged app never carries
+	// (ADR 0058). Its two Vite configs sit at the repo root, outside that ignore,
+	// so they are still listed below — the same treatment
+	// `vite.playground.config.mts` gets, and for the same reason: nothing imports
+	// a Vite config, so without an entry it reads as dead.
 	"entry": [
 		"src/main/main.ts",
 		"src/preload/preload.ts",
@@ -22,6 +30,8 @@
 		"vite.renderer.config.mts",
 		"vite.playground.config.mts",
 		"playground/main.tsx",
+		"vite.demo.config.mts",
+		"vite.demo-main.config.mts",
 		"tests/**/*.test.{ts,tsx}",
 		"scripts/**/*.{mjs,ts}",
 		"resources/pi-extensions/*.mts",
