@@ -21,11 +21,9 @@ to the OS keyring — the macOS Keychain, or gnome-keyring / KWallet on Linux �
 and are never copied anywhere, and the app ships no agent binary of its own — it drives the one you
 installed.
 
-<video src="https://github.com/user-attachments/assets/c5db8e14-0a89-474d-ad6a-994769b3e71b" controls muted loop playsinline>
-  <a href="https://github.com/user-attachments/assets/c5db8e14-0a89-474d-ad6a-994769b3e71b">Watch Ensemblr Control drive the app (60 seconds, no audio)</a>
-</video>
+![The Ensemblr workbench: an orchestrator's timeline in the middle with two delegates beside it in the tab strip, the five-file diff the turn produced in the Changes panel, and the dev server it started still streaming in the dock.](./docs/guide/images/00-hero-orchestrator.png)
 
-*Ensemblr Control driving the app from inside a workspace: the agent names its own tab, moves the workspace to In progress, starts a run script, then delegates to two sub-agents in their own chat tabs and launches a Claude Code harness in a terminal.*
+*Ensemblr Control driving the app from inside a workspace: the agent moved the workspace to In progress, started a run script, delegated to two sub-agents in their own chat tabs, and launched a Claude Code harness in a terminal — all of it visible on one screen.*
 
 - **Version:** [`0.1.2`](https://github.com/ensemblr-hq/ensemblr/releases/tag/v0.1.2) (stable)
 - **License:** Apache-2.0
@@ -198,6 +196,8 @@ between conversations in a memory of its own. It never writes a file itself: rea
 delegated to an orchestrator it spawns into the workspace that needs it, so the containment that
 keeps one workspace from touching another also keeps the Concierge from becoming a way around it.
 
+![The Concierge panel floating over the dashboard board, answering a question about where every workspace stands.](./docs/guide/images/06-concierge.png)
+
 **Two agent runtimes, one chat surface.** Pi runs as a CLI in RPC mode; Claude Code is driven through the
 Agent SDK against *your own* `claude` binary — Ensemblr ships none. Both share the same timeline, tool
 cards, model and thinking pickers, tool-approval prompts, git-backed checkpoints, session branching, and
@@ -216,6 +216,8 @@ the workspace from it. Nothing is ever written back to the tracker: dismissing a
 and its own status stays yours to change. GitHub issues are cached locally so the board paints at app
 start rather than waiting on a `gh` call per repository, and says so when it is showing cached rows.
 
+![The dashboard board with workspace cards spread across Backlog, In progress, In review, and Done, each showing its repository, branch, and diff size.](./docs/guide/images/00-hero-dashboard.png)
+
 **Integrations that account for more than one account.** Connect any number of Linear organizations at
 once — every one syncs, and browse, search, and the issue pickers show them all with the organization on
 each row. Link a repository to an Infisical project and its secrets resolve live into every workspace,
@@ -227,10 +229,14 @@ per-file discard, a live file tree, and review comments anchored to specific lin
 answer, and resolve. Then an inline PR editor, commit and push, per-check status through `gh`, and a
 two-step merge — or archive the workspace instead.
 
+![The diff viewer open on a changed file, with a review comment thread anchored to the line it is about.](./docs/guide/images/08-changes.png)
+
 **Terminals and run scripts.** An xterm.js dock over real PTYs, restored across restart. A repository
 declares any number of named run scripts in its committed `.ensemblr/settings.toml`, each with a command
 and an icon, one of them the ⌘R default; single-command setup and archive scripts run on the same
 lifecycle, with setup fingerprinted so an unchanged workspace skips it.
+
+![The dock with a dev server streaming into a run-script terminal, and the picker open beside it listing the repository's named scripts.](./docs/guide/images/07-dock-run-scripts.png)
 
 **Three languages.** The app ships in English, Russian, and Greek — window, native menu bar, and the prose
 agents write back. A user-facing string a change adds ships translated in the same change.

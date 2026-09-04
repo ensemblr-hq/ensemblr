@@ -19,6 +19,15 @@
 		// named directly the same way src/renderer/main.tsx is above.
 		"vite.playground.config.mts",
 		"playground/main.tsx",
+		// Demo mode: a second Electron entrypoint, launched by
+		// `npm run dev:demo` rather than by Forge, so none of its three roots is
+		// reachable from src. The renderer root is reached through a
+		// `/demo/` redirect string, which is not a resolvable import edge.
+		"vite.demo.config.mts",
+		"vite.demo-main.config.mts",
+		"demo/main.tsx",
+		"demo/demo-main.ts",
+		"demo/demo-preload.ts",
 		// Vitest runs renderer tests directly; treat each file as an entry so
 		// fallow doesn't flag them as unused.
 		"tests/**/*.test.{ts,tsx}",

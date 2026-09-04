@@ -80,6 +80,8 @@ account; only non-secret connection metadata is kept in the clear. Disconnecting
 settings revokes the token with Linear rather than just forgetting it. Ensemblr
 requests the `read` and `write` scopes.
 
+![The Linear view listing synced issues grouped by state, each row carrying its identifier, priority, workflow state, and assignee.](./images/10-linear.png)
+
 ### More than one account
 
 A Linear OAuth application installs into one organization at a time, so an

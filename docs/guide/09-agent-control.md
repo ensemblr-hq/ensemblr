@@ -119,6 +119,8 @@ never a black box. That tab has no composer — the orchestrator owns the child,
 not you — but in its place is a read-only readout of the model, reasoning level,
 and context the child is running with.
 
+![An orchestrator's timeline listing four delegated reviews, with each sub-agent open as its own tab in the strip above and two of the four already reported back.](./images/09-subagents.png)
+
 A sub-agent that hits a genuine blocker escalates to its orchestrator rather than
 stopping silently. Decisions that are yours to make are collected by the
 orchestrator and put to you in one questionnaire, instead of four children

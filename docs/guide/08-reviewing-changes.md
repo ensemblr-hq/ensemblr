@@ -6,7 +6,7 @@ is where that happens. It has three tabs — **All files**, **Changes**, and
 **Checks** — and Ensemblr remembers which one you were on for each workspace
 separately, so switching workspaces does not reset you to the top.
 
-<!-- screenshot: 08-changes.png — the diff viewer with an inline review comment open -->
+![The diff viewer open on a changed file, with a review comment thread anchored to the line it is about and the Changes list beside it.](./images/08-changes.png)
 
 ## All files
 
@@ -193,7 +193,7 @@ when GitHub last actually computed the answer rather than repeated indefinitely.
 
 ## Opening a pull request
 
-![The Checks tab for a merged pull request, showing the title and description editor, the check runs, and the review comments.](./images/08-pr.png)
+![The Checks tab for an open pull request, showing the title and description editor above its check runs and the review comments below.](./images/08-pr.png)
 
 The Checks tab carries an inline **PR title** and **PR description** editor.
 What you type is held per workspace and re-seeded whenever the pull request

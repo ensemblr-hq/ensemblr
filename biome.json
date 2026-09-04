@@ -12,6 +12,7 @@
 			"**",
 			"!.agents/skills/ai-elements/scripts",
 			"!.claude",
+			"!.demo",
 			"!src/components/ui",
 			"!src/hooks/ui",
 			"!src/renderer/fixtures/pi-captures",

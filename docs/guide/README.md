@@ -57,6 +57,15 @@ which is what the app itself displays there.
 
 ## A note on screenshots
 
-Screenshots are captured against a finished build. Where a page carries an
-`<!-- screenshot: … -->` marker, the image is not in place yet. A UI change that
-invalidates a screenshot invalidates the page it sits on — update both.
+Screenshots are captured from **demo mode** — a second Electron entrypoint that
+renders the real app against scripted fixtures, so a shot is a file in
+`demo/scenarios/` rather than a state somebody reproduced by hand. Retaking the
+whole set after a UI change is a loop, and no image carries anyone's real
+repositories, issues, or paths. Where a page carries an
+`<!-- screenshot: … -->` marker, the image is not in place yet.
+
+A UI change that invalidates a screenshot invalidates the page it sits on —
+update both, and update the scenario that produced the image rather than
+shooting a replacement by hand.
+[`images/CAPTURE.md`](./images/CAPTURE.md) is the shot list, with the scenario id
+behind each one.

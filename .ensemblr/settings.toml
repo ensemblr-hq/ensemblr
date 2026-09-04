@@ -27,6 +27,13 @@ command = "./scripts/with-pinned-node.sh npm run dev:playground"
 icon = "play"
 available_in = ["local"]
 
+# Screenshot host: a second Electron entrypoint rendering the real UI over
+# scripted fixtures. See demo/README.md. Never touches the app's own state.
+[scripts.run.demo]
+command = "./scripts/with-pinned-node.sh npm run dev:demo"
+icon = "monitor"
+available_in = ["local"]
+
 # macOS artifact. `make:unsigned` packages --arch=arm64 and `open` is macOS-only,
 # so this one does nothing useful on a Linux host — build `appimage` there.
 [scripts.run.unsigned]
