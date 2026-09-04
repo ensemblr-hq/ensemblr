@@ -17,7 +17,24 @@
 		// shows which rules are off by default (`no-multi-comp` and
 		// `no-cascading-set-state` are), and an override for a rule that fires
 		// nothing is a blind spot for the next regression in that file.
-		"files": [".vite/**", "out/**", "dist/**", "coverage/**", ".context/**"],
+		//
+		// `demo/**` and its `.demo/` build output are a screenshot harness rather
+		// than product code — a separate Electron entrypoint rendering the shipped
+		// renderer against scripted fixtures, launched by `npm run dev:demo` and
+		// absent from the packaged app (ADR 0058, guarded by
+		// tests/renderer/demo-isolation.test.ts). It is ignored here rather than
+		// declared in knip.jsonc: an entry there would only buy dead-code
+		// reachability, and every other rule would still score a fixture tree
+		// against product thresholds it was never written to meet.
+		"files": [
+			".vite/**",
+			"out/**",
+			"dist/**",
+			"coverage/**",
+			".context/**",
+			".demo/**",
+			"demo/**"
+		],
 		"overrides": [
 			{
 				// shadcn primitives co-locate `cva` variant tables with their

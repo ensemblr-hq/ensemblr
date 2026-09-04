@@ -8,7 +8,7 @@ check fails.
 
 You can see the same list at any time in **Settings → Diagnostics**.
 
-![Settings → Diagnostics, with the core-runtime and storage checks listed under a green rollup and the root directory reporting a warning.](./images/02-settings-diagnostics.png)
+![Settings → Diagnostics, with the core-runtime and storage checks listed under a green rollup and shell environment resolution reporting a warning with its retry action.](./images/02-settings-diagnostics.png)
 
 ## Short answer
 

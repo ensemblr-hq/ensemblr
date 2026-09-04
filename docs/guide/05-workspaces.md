@@ -131,7 +131,7 @@ Every workspace is a card in one of five columns: **Backlog**, **In Progress**,
 to reorder within one — the order you set is kept. Each card has an action menu
 for the things you do to a whole workspace without opening it.
 
-![The dashboard board, with workspace cards spread across the Backlog, In progress, In review, and Done columns, each showing its branch and its diff size.](./images/00-hero-dashboard.png)
+![The dashboard board with workspace cards across its columns and one card's action menu open, listing what can be done to a whole workspace without opening it.](./images/05-board.png)
 
 Agents can move their own workspace across the board too, which is how a
 delegated run reports itself finished without interrupting you. Note that what an

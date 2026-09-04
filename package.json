@@ -20,6 +20,7 @@
 	"scripts": {
 		"preinstall": "node scripts/require-node-version.mjs --stage=install",
 		"dev": "node scripts/require-node-version.mjs --stage=dev && node scripts/require-linux-toolchain.mjs && electron-forge start",
+		"dev:demo": "node scripts/require-node-version.mjs --stage=dev && node scripts/run-demo.mjs",
 		"dev:playground": "vite --config vite.playground.config.mts",
 		"start": "npm run dev",
 		"check": "biome check . && npm run check:tailwind && npm run check:strings && npm run i18n:lint",
@@ -90,7 +91,7 @@
 		"test:setup": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/setup-diagnostics.test.ts tests/main/setup-state-file.test.ts",
 		"test:linear": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/linear-oauth.test.ts tests/main/linear-oauth-callback-server.test.ts tests/main/linear-auth-service.test.ts tests/main/linear-client.test.ts tests/main/linear-store.test.ts tests/main/linear-service.test.ts tests/main/workspace-create-linked-issue.test.ts",
 		"test:linear-renderer": "vitest run tests/renderer/linear-issue-view.test.ts tests/renderer/linear-issue-editor.test.ts tests/renderer/workspace-linked-issue-landing.test.ts",
-		"typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.scripts.json && tsc --noEmit -p tsconfig.tests.json",
+		"typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.scripts.json && tsc --noEmit -p tsconfig.tests.json && tsc --noEmit -p tsconfig.demo.json",
 		"build": "node scripts/require-node-version.mjs && electron-forge package --arch=arm64",
 		"package": "node scripts/require-node-version.mjs && electron-forge package --arch=arm64",
 		"make": "node scripts/require-node-version.mjs && electron-forge make --arch=arm64",

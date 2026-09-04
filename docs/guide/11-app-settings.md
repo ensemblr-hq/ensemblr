@@ -413,6 +413,12 @@ terminal, and how much scrollback each terminal pane holds.
 **Terminal scrollback is here**, in Appearance — not in a separate terminal or
 advanced pane.
 
+The theme reaches everything the window draws, the integrated terminal and the
+diff gutters included — this is the same workspace and the same turn as
+[`06-chat.png`](./images/06-chat.png), on Light:
+
+![The workbench in the light theme: an agent mid-turn, the Changes panel beside it, and a dev server streaming in the dock, all rendered on the light palette.](./images/06-chat-light.png)
+
 ### Integrations
 
 Third-party services Ensemblr signs in to on your behalf. Each is optional and

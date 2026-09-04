@@ -1,0 +1,13 @@
+{
+	// Demo mode is a separate Electron entrypoint that imports the app read-only.
+	// It is typechecked in its own project so `tsconfig.json` — the shipped app's
+	// project — stays exactly as it is and cannot pick demo sources up in a build.
+	"extends": "./tsconfig.json",
+	"include": [
+		"demo",
+		"forge.env.d.ts",
+		"src",
+		"vite.demo.config.mts",
+		"vite.demo-main.config.mts"
+	]
+}

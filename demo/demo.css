@@ -1,0 +1,57 @@
+/*
+ * Motion and caret suppression for capture. Applied on the root element for the
+ * whole session: two shots of the same scenario have to be byte-identical, and a
+ * blinking caret or a mid-sweep spinner is the one thing that makes them differ.
+ *
+ * Scoped to `.demo-frozen` rather than written globally so the demo window can
+ * be watched with motion running while a scenario is being composed.
+ *
+ * Pausing alone is not enough, and the difference is the whole shot rather than
+ * a detail: paused with the default delay holds an animation at its *first*
+ * frame, and every Radix overlay enters through `animate-in fade-in-0
+ * zoom-in-95`, so a dialog, dropdown, or context menu a scenario opens mounts
+ * at `opacity: 0` and photographs as if it never opened. The negative delay
+ * starts each animation ten seconds in instead: a finite enter animation is
+ * therefore over, and a looping one — the spinners — lands on a fixed phase,
+ * which is what determinism actually needs.
+ */
+
+.demo-frozen *,
+.demo-frozen *::before,
+.demo-frozen *::after {
+	/* biome-ignore-start lint/complexity/noImportantStyles: two captures of one
+	   scenario have to be byte-identical, so this has to beat every component's
+	   own animation, transition and caret rule rather than compete with it. */
+	animation-delay: -10s !important;
+	animation-play-state: paused !important;
+	caret-color: transparent !important;
+	pointer-events: none !important;
+	transition: none !important;
+	/* biome-ignore-end lint/complexity/noImportantStyles: see above. */
+}
+
+/*
+ * `pointer-events` above is the third kind of determinism, and the least
+ * obvious: the capture leaves the real mouse wherever it happens to be, and
+ * anything under it renders hovered. That is how a create-from row showed its
+ * action buttons in one shot and not the next from the same scenario. Taking
+ * the window out of hit-testing settles it — a scenario's own gestures are
+ * dispatched directly onto their targets and never hit-tested, so nothing a
+ * scenario does depends on this.
+ */
+
+.demo-toolbar,
+.demo-toolbar * {
+	/* biome-ignore-start lint/complexity/noImportantStyles: has to beat the
+	   blanket suppression above, which is itself `!important`. */
+	pointer-events: auto !important;
+	/* biome-ignore-end lint/complexity/noImportantStyles: see above. */
+}
+
+/*
+ * The demo toolbar sits above every app surface, including the dialogs the app
+ * renders into its own portal layer.
+ */
+.demo-toolbar {
+	z-index: 2147483647;
+}

@@ -19,6 +19,12 @@
 		// named directly the same way src/renderer/main.tsx is above.
 		"vite.playground.config.mts",
 		"playground/main.tsx",
+		// Demo mode's two Vite configs. `scripts/run-demo.mjs` reaches each by
+		// path string rather than by import, so neither is a resolvable edge —
+		// name them the way the playground config above is named. The tree they
+		// build is ignored outright; see `demo/**` in ignorePatterns.
+		"vite.demo.config.mts",
+		"vite.demo-main.config.mts",
 		// Vitest runs renderer tests directly; treat each file as an entry so
 		// fallow doesn't flag them as unused.
 		"tests/**/*.test.{ts,tsx}",
@@ -58,7 +64,18 @@
 		// Build / cache output
 		".vite/**",
 		"out/**",
-		".fallow/**"
+		".fallow/**",
+		".demo/**",
+		// Demo mode is a screenshot harness, not part of the product: a separate
+		// Electron entrypoint that renders the shipped renderer against scripted
+		// fixtures, launched by `npm run dev:demo` rather than by Forge. Nothing
+		// under src/ imports it and the packaged app carries none of it, which
+		// `tests/renderer/demo-isolation.test.ts` enforces in both directions.
+		// Analysing it as first-party is therefore all noise: a scenario is a
+		// fixture whose only consumer is the scenario registry, and its shape is
+		// dictated by the bridge calls a route happens to make rather than by
+		// anything fallow can reason about. See ADR 0058.
+		"demo/**"
 		// NOTE: vendored shadcn `ui/**` is intentionally NOT ignored here. A
 		// primitive that was installed but has no consumers should surface as an
 		// unused file. Per-rule style noise on the used primitives (unused
