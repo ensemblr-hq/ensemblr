@@ -173,7 +173,7 @@
 		"zod": "^4.5.4"
 	},
 	"devDependencies": {
-		"@biomejs/biome": "^2.5.10",
+		"@biomejs/biome": "^2.5.11",
 		"@electron-forge/cli": "^7.11.2",
 		"@electron-forge/maker-dmg": "^7.11.2",
 		"@electron-forge/maker-zip": "^7.11.2",
@@ -193,11 +193,11 @@
 		"@types/react": "^19.2.18",
 		"@types/react-dom": "^19.2.7",
 		"@types/semver": "^7.8.0",
-		"@vitejs/plugin-react": "6.1.0",
+		"@vitejs/plugin-react": "6.1.1",
 		"@vitest/coverage-istanbul": "^4.1.11",
 		"dotenv": "^17.4.2",
 		"electron": "^44.1.1",
-		"happy-dom": "^20.11.10",
+		"happy-dom": "^20.12.0",
 		"i18next-cli": "^1.72.4",
 		"node-abi": "^4.35.0",
 		"shadcn": "^4.20.1",
