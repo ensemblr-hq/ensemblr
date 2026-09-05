@@ -106,6 +106,17 @@ loop applies only to a turn that changes code, and one block would put "open a
 pull request" in front of an agent that was asked to explain a function. The gate
 is the first thing the block says.
 
+There are two gates, and the second one exists because of this change's own op.
+A review opened by `startReview` inherits the caller's AFK mode, as does a peer
+opened by `startConversation`, so both read the block on every turn — and the
+turn where one is asked to fix what it found *is* a change to the codebase by the
+first gate's definition. Left there, that turn ends in a commit and a pull
+request from an agent whose opening brief forbids both, racing the orchestrator
+that owns them. So the block also excludes a conversation whose opening brief
+named another orchestrator as the committer. It is scope prose rather than a role
+check because a harness launched into the same checkout is in the same position
+and carries no role the app can read.
+
 The five steps and why each is there:
 
 1. **Plan first, in writing, with an alternative weighed.** The only place a
@@ -113,10 +124,12 @@ The five steps and why each is there:
 2. **Build it, and revise the plan out loud when it stops being right.**
 3. **Have it reviewed by an agent that did not write it**, via the op above.
 4. **Send the findings back to the reviewer**, judging rather than accepting each
-   one, for at most **three** rounds. A loop with no exit is how an unattended
-   run spends a night on the same three findings; a fourth round still finding
-   the same class of problem means the approach is wrong rather than the code,
-   which is a thing to report.
+   one, for at most **three** rounds — every round in that same conversation,
+   because the open review holds a co-tenancy slot and a second `startReview`
+   would be refused rather than opening a fresh reader. A loop with no exit is
+   how an unattended run spends a night on the same three findings; a fourth
+   round still finding the same class of problem means the approach is wrong
+   rather than the code, which is a thing to report.
 5. **Open the pull request, and never merge it.**
 
 Step 5 resolves a standing conflict rather than ignoring one. This repository's

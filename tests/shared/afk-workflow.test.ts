@@ -23,6 +23,17 @@ describe('afk delivery loop', () => {
 		expect(directive).toContain('skip the rest of this block');
 	});
 
+	// A review and a peer both inherit the opener's AFK mode, so both read this
+	// block — and the turn where one is asked to fix what it found is a change to
+	// the codebase by the first gate's own definition. Without this second gate
+	// that turn ends in a commit and a pull request the agent's opening brief
+	// forbids, racing the orchestrator that owns them.
+	it('excludes an agent whose brief named somebody else as the committer', () => {
+		expect(directive).toContain('as the committer');
+		expect(directive).toContain('leave it in the working tree');
+		expect(directive).toContain('follow-up asking you to fix what you found');
+	});
+
 	// The five steps in order. Asserted by their leading numbers rather than by
 	// prose so a rewording does not silently drop one.
 	it('runs plan, build, review, fix, and ship in that order', () => {
@@ -53,6 +64,15 @@ describe('afk delivery loop', () => {
 	// three findings.
 	it('bounds the review rounds', () => {
 		expect(directive).toContain('three');
+	});
+
+	// The open review holds a co-tenancy slot, so re-reviewing by calling
+	// `ensemblr_start_review` again is a guaranteed `denied-quota` — a turn of an
+	// unattended run spent on a refusal the block itself walked the agent into.
+	it('re-reviews in the same conversation rather than opening a second', () => {
+		expect(directive).toContain('ask that same conversation to re-review');
+		expect(directive).toContain('co-tenancy slot');
+		expect(directive).not.toContain('repeat step 3');
 	});
 
 	it('opens a pull request and forbids merging it', () => {

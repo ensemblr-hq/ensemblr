@@ -1390,15 +1390,18 @@ export function createAgentControlService({
 		if (typeof reserved !== 'function') {
 			return reserved;
 		}
-		const brief = await ports.reviewLaunch.composeBrief({
-			workspaceCwd: origin.workspaceCwd,
-			workspaceId: origin.workspaceId,
-		});
-		const pinned = await spawnableReviewModel(origin, brief.model);
 		// Held until the review is open, because that is when it registers an origin
-		// of its own and starts being counted by the reservation above.
-		const started = await ports.conversations
-			.startConversation({
+		// of its own and starts being counted by the reservation above — and
+		// released on every path out, including a throwing compose, because
+		// `peerSpawnsOpening` has no other decrement and a slot lost here is lost
+		// for the life of the process.
+		try {
+			const brief = await ports.reviewLaunch.composeBrief({
+				workspaceCwd: origin.workspaceCwd,
+				workspaceId: origin.workspaceId,
+			});
+			const pinned = await spawnableReviewModel(origin, brief.model);
+			const started = await ports.conversations.startConversation({
 				afkMode: isUnattended(origin),
 				asPeer: true,
 				callerConcierge: false,
@@ -1408,25 +1411,30 @@ export function createAgentControlService({
 				parentSessionId: origin.sessionId,
 				planMode: false,
 				prompt: `${buildReviewPeerDirective(origin.sessionId)}\n\n---\n\n${brief.prompt}`,
-				thinkingLevel: pinned ? (brief.thinkingLevel ?? undefined) : undefined,
+				// Forwarded whichever way the model resolved: the level is the user's
+				// own review preference and is set independently of the model pin, and
+				// `resolveForSpawn` already drops one the resolved model cannot take.
+				thinkingLevel: brief.thinkingLevel ?? undefined,
 				title: args.title ?? DEFAULT_REVIEW_TAB_TITLE,
 				workspaceCwd: origin.workspaceCwd,
 				workspaceId: origin.workspaceId,
-			})
-			.finally(() => reserved());
-		if (!started.ok) {
-			return fail('invalid-args', started.reason);
-		}
-		guardrails.recordSpawn(origin.sessionId);
-		return ok({
-			agentSessionId: started.agentSessionId,
-			chatTabId: started.chatTabId,
-			message: startedReviewMessage({
+			});
+			if (!started.ok) {
+				return fail('invalid-args', started.reason);
+			}
+			guardrails.recordSpawn(origin.sessionId);
+			return ok({
 				agentSessionId: started.agentSessionId,
-				droppedModel: brief.model !== null && pinned === null,
-				source: brief.source,
-			}),
-		} satisfies StartReviewResult);
+				chatTabId: started.chatTabId,
+				message: startedReviewMessage({
+					agentSessionId: started.agentSessionId,
+					droppedModel: brief.model !== null && pinned === null,
+					source: brief.source,
+				}),
+			} satisfies StartReviewResult);
+		} finally {
+			reserved();
+		}
 	};
 
 	/**

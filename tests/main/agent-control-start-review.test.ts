@@ -20,6 +20,7 @@ interface PortOptions {
 		source: 'renderer' | 'fallback';
 		thinkingLevel: string | null;
 	};
+	composeBrief?: ReturnType<typeof vi.fn>;
 	confirm: ReturnType<typeof vi.fn>;
 	planning?: boolean;
 	runtimeModels?: { id: string }[];
@@ -88,14 +89,16 @@ const makePorts = (options: PortOptions): AgentControlPorts =>
 			resolveComments: vi.fn(),
 		},
 		reviewLaunch: {
-			composeBrief: vi.fn().mockResolvedValue(
-				options.brief ?? {
-					model: 'claude-opus-5',
-					prompt: 'THE REVIEW PROMPT',
-					source: 'renderer',
-					thinkingLevel: 'high',
-				},
-			),
+			composeBrief:
+				options.composeBrief ??
+				vi.fn().mockResolvedValue(
+					options.brief ?? {
+						model: 'claude-opus-5',
+						prompt: 'THE REVIEW PROMPT',
+						source: 'renderer',
+						thinkingLevel: 'high',
+					},
+				),
 		},
 		sessionNaming: {
 			readBrief: vi.fn().mockResolvedValue({
@@ -263,12 +266,38 @@ describe('agent-control startReview', () => {
 
 		const { message } = succeeded(await startReview(service));
 
-		expect(startConversation.mock.calls[0][0]).toMatchObject({
-			model: undefined,
-			thinkingLevel: undefined,
-		});
+		expect(startConversation.mock.calls[0][0].model).toBeUndefined();
 		expect(message).toContain('the other agent runtime');
 		expect(message).toContain('Say so in your report');
+	});
+
+	// The two are independent settings and the Review button applies each behind
+	// its own check, so coupling the level to the model pin loses it for a user
+	// who set only the level. `resolveForSpawn` drops a level the resolved model
+	// cannot take, so forwarding it whichever way the model resolved is safe.
+	it('keeps the pinned thinking level when the user pinned no review model', async () => {
+		const { service, startConversation } = setup({
+			brief: {
+				model: null,
+				prompt: 'THE REVIEW PROMPT',
+				source: 'renderer',
+				thinkingLevel: 'high',
+			},
+		});
+
+		await startReview(service);
+
+		expect(startConversation.mock.calls[0][0].thinkingLevel).toBe('high');
+	});
+
+	it('keeps the pinned thinking level when the model pin is dropped', async () => {
+		const { service, startConversation } = setup({
+			runtimeModels: [{ id: 'anthropic/sonnet' }],
+		});
+
+		await startReview(service);
+
+		expect(startConversation.mock.calls[0][0].thinkingLevel).toBe('high');
 	});
 
 	it('says nothing about the model when the pin was honoured', async () => {
@@ -375,6 +404,29 @@ describe('agent-control startReview', () => {
 		const retried = await startReview(service);
 
 		expect(refused.ok).toBe(false);
+		expect(retried.ok).toBe(true);
+	});
+
+	// The compose reads the workspace row, the git status, and the repository's
+	// settings, none of which is enveloped. A slot lost to one of them throwing is
+	// lost for the life of the process, and one leak is enough to refuse every
+	// later review and peer spawn in a workspace whose only occupant is the caller.
+	it('frees the co-tenancy slot when composing the brief throws', async () => {
+		const composeBrief = vi
+			.fn()
+			.mockRejectedValueOnce(new Error('git status failed'))
+			.mockResolvedValue({
+				model: null,
+				prompt: 'FALLBACK PROMPT',
+				source: 'fallback',
+				thinkingLevel: null,
+			});
+		const { service } = setup({ composeBrief });
+
+		const failed = await startReview(service);
+		const retried = await startReview(service);
+
+		expect(refused(failed).code).toBe('internal');
 		expect(retried.ok).toBe(true);
 	});
 

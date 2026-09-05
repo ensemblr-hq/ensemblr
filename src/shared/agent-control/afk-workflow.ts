@@ -34,8 +34,21 @@ export const AFK_WORKFLOW_HEADER = 'UNATTENDED DELIVERY LOOP';
  *
  * Stated before the steps rather than after them because a model that has read
  * five numbered steps has already started step one.
+ *
+ * The second gate covers the agents this block reaches by inheritance rather
+ * than by being asked for. A review opened by `startReview` and a peer opened by
+ * `startConversation` both inherit the caller's AFK mode, so both read this
+ * block on every turn — and the turn where one is asked to fix what it found is
+ * a change to the codebase by the first gate's own definition. Without the
+ * second gate that turn ends in a commit and a pull request from an agent whose
+ * opening brief forbids both, racing the orchestrator that owns them. Written as
+ * scope prose rather than enforced by role because a harness launched into the
+ * same checkout is in exactly the same position and holds no role the app can
+ * read.
  */
-const SCOPE = `This applies when the task in front of you is a **change to this codebase** that this workspace's branch would carry — a feature, a fix, a refactor, a migration. It does not apply to a question, an investigation, a review of somebody else's work, or a one-line correction the user asked for by name. Answer those directly, and skip the rest of this block; opening a pull request for work nobody asked to have shipped is worse than not doing it.`;
+const SCOPE = `This applies when the task in front of you is a **change to this codebase** that this workspace's branch would carry — a feature, a fix, a refactor, a migration. It does not apply to a question, an investigation, a review of somebody else's work, or a one-line correction the user asked for by name. Answer those directly, and skip the rest of this block; opening a pull request for work nobody asked to have shipped is worse than not doing it.
+
+It also does not apply when this conversation's own opening brief named another orchestrator in this workspace as the committer — as it does for a reviewer, and for a peer opened to take half the work. That brief wins outright over every step below, including on a follow-up asking you to fix what you found: make the change, leave it in the working tree, and say what you touched. Committing, pushing, or opening a pull request from there would move HEAD underneath the agent already doing those things for both of you.`;
 
 /** Step one, and the one the length of the run is decided by. */
 const PLAN = `**1. Plan before you write anything.** Read the code the change touches, the tests around it, and whatever the repository says about how it wants to be worked on — its agent instructions, its architecture notes, its decision records. Then decide the approach and write it down, in this conversation, before the first edit. Weigh at least one alternative and say why you rejected it. Nobody is going to stop you at message three, so the plan is the only place a wrong approach gets caught.
@@ -59,7 +72,7 @@ const FIX = `**4. Send the findings back to the same conversation.** When the re
 
 Judge each finding rather than accepting the whole list. A finding you disagree with is one you say you disagree with — in the follow-up, so the reviewer can answer, and in your final report, so the user can. Where it is right, the fix is the fix, not a comment explaining the problem.
 
-Then have it re-reviewed: repeat step 3 and step 4 until a review comes back with nothing that needs fixing, or until you have run **three** review rounds. Three is the stop, not a target — a fourth round that is still finding the same class of problem means the approach is wrong rather than the code, and that is a thing to report rather than to keep grinding at.`;
+Then ask that same conversation to re-review what it changed, and repeat this step until a round comes back with nothing that needs fixing, or until you have run **three** rounds. Keep every round in the one conversation: it holds a co-tenancy slot for as long as it is open, so a second \`ensemblr_start_review\` is refused rather than opening a fresh reviewer. Three is the stop, not a target — a fourth round that is still finding the same class of problem means the approach is wrong rather than the code, and that is a thing to report rather than to keep grinding at.`;
 
 /** Step five, and the two hard limits on it. */
 const SHIP = `**5. Open the pull request — and never merge it.** Once the review is clean, commit the work following this repository's commit conventions, push the branch, and open the pull request. Turning AFK on for a change *is* the request for one, so this is the one outward-facing step the block above has already asked for and it needs no further permission — but it is the end of your authority. Never merge, never force-push over somebody else's work, never close or reopen anything. A branch that already has an open pull request gets that one updated rather than a second one opened.
