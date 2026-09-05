@@ -33,7 +33,7 @@ npm run dev:playground   # the component preview harness, Vite only
 Run these before you push. CI runs the same gates, but only once the branch is up:
 `.github/workflows/checks.yml` runs `lint`, `typecheck` and `test` as separate jobs on pushes to `master` and
 PRs targeting it, so the wall clock is the slowest one rather than their sum. `test` is a matrix — both
-`macos-latest` and `ubuntu-latest`, each split into two shards — and `lint` and `typecheck` run on Linux only,
+`macos-latest` and `ubuntu-latest`, each split into three shards — and `lint` and `typecheck` run on Linux only,
 because neither Biome nor tsc can disagree across platforms. All three collapse into one `verify` status
 check. `scan` runs a `react-doctor` scan diffed against `master`, failing on `error`. Catching a break locally
 costs a minute; catching it in CI costs a round trip.

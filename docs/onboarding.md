@@ -152,14 +152,21 @@ npm run test:db           # a main-process suite (electron --test)
 **Which runner does my new test use?**
 
 - Testing pure logic (a formatter, a reducer, a slug function)? **Vitest.** If it
-  lives under `tests/main/`, add its path to the `include` array in
-  `vitest.config.mts` — that list is explicit, not a `tests/main/**` glob, because
-  a glob would drag in the Electron-only suites.
+  lives under `tests/main/`, add its path to the `include` array of the **`node`
+  project** in `vitest.config.mts` — that list is explicit, not a
+  `tests/main/**` glob, because a glob would drag in the Electron-only suites.
 - Testing a React component or hook? **Vitest**, under `tests/renderer/`, with a
   `// @vitest-environment happy-dom` docblock at the top of the file. Use
   `renderWithProviders` / `createTestQueryClient` from
   `tests/renderer/support/dom.tsx`. jest-dom matchers are already registered
   globally.
+
+`vitest.config.mts` defines two projects, and which one a file lands in decides
+what it costs. The `renderer` project globs `tests/renderer/**` whole and loads
+the setup file — jest-dom plus the i18next singleton, which pulls in all 24
+catalogues. The `node` project loads neither, which is why the main-process and
+shared suites are listed there. A test that needs to translate or assert with
+jest-dom therefore belongs under `tests/renderer/`, not in the `node` list.
 - Needs Electron or Node runtime APIs (SQLite, PTY, `app.getPath`)? **`electron --test`.**
   Add a `test:<name>` script to `package.json` following the existing
   `ELECTRON_RUN_AS_NODE=1 electron --test …` pattern.
@@ -188,7 +195,7 @@ Run them locally anyway — CI runs the same gates, but only once the branch is
 pushed. `.github/workflows/checks.yml` runs `lint`, `typecheck` and `test` as
 separate jobs on pushes to `master` and PRs targeting it, so the wall clock is
 the slowest of the three rather than their sum. `test` is a matrix over **both**
-`macos-latest` and `ubuntu-latest`, each split into two shards — running on both
+`macos-latest` and `ubuntu-latest`, each split into three shards — running on both
 platforms is what makes a darwin-only assumption fail in CI rather than in a
 user's AppImage. `lint` and `typecheck` run on Linux alone, because neither
 Biome nor tsc can reach a different verdict on macOS. A tiny `verify` job

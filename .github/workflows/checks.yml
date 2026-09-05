@@ -59,23 +59,31 @@ jobs:
   # leg is what proves a darwin-only assumption fails here rather than in a
   # user's AppImage.
   #
-  # Sharded in two because the suite is ~570 files whose cost is dominated by
-  # per-file module import rather than by the assertions, which halves cleanly
-  # across runners. Raising the shard count further hits diminishing returns:
-  # `npm ci` is a fixed ~25s (~40s on macOS) that every shard pays.
+  # Sharded because the suite is ~570 files whose cost is dominated by per-file
+  # module import rather than by the assertions, so it divides across runners
+  # almost linearly. Three rather than two: `--shard` splits by file count, not
+  # by duration, and at two the halves came in at 126s and 81s on macOS because
+  # one of them drew the handful of filesystem-watcher suites that take seconds
+  # apiece. A third shard costs nothing extra on the clock and spreads that tail.
+  #
+  # Not four or more, for two reasons. `npm ci` is a fixed ~26s (~40s on macOS)
+  # that every shard pays, so the marginal gain shrinks fast; and GitHub caps
+  # concurrent macOS runners far lower than Linux ones, so a wide macOS fan-out
+  # starts queueing against any second run in flight — which costs more wall
+  # clock than it saves.
   test:
     strategy:
       fail-fast: false
       matrix:
         os: [macos-latest, ubuntu-latest]
-        shard: [1, 2]
+        shard: [1, 2, 3]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/install-dependencies
-      - name: Vitest (shard ${{ matrix.shard }} of 2)
-        run: npm run test -- --shard=${{ matrix.shard }}/2
+      - name: Vitest (shard ${{ matrix.shard }} of 3)
+        run: npm run test -- --shard=${{ matrix.shard }}/3
 
   scan:
     # `inputs` is null on push/pull_request, so those keep running the scan; only
