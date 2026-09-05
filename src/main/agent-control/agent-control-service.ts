@@ -15,6 +15,7 @@ import type {
 	AskUserQuestionArgs,
 	CheckPlanModeToolArgs,
 	CloseTabArgs,
+	ConciergeMessageSender,
 	ControlAudience,
 	ConversationRef,
 	CreateWorkspaceArgs,
@@ -30,12 +31,15 @@ import type {
 	GetWorkspaceStatusArgs,
 	LaunchHarnessArgs,
 	LinearCreateCommentArgs,
+	LinearCreateIssueArgs,
 	LinearGetIssueArgs,
 	LinearGetMetadataArgs,
 	LinearListIssuesArgs,
 	LinearUpdateIssueArgs,
 	ListTabsArgs,
 	ListTerminalsArgs,
+	MessageConciergeArgs,
+	MessageConciergeResult,
 	NotifyOrchestratorArgs,
 	OpenTabArgs,
 	OrchestratorSignal,
@@ -68,13 +72,16 @@ import type {
 import {
 	briefReport,
 	buildCoAuthorDirective,
+	buildConciergeMessage,
 	buildLanguageDirective,
 	buildLinkedIssueDirective,
+	buildPeerBriefDirective,
 	buildPlanModeDelegationDirective,
 	buildSessionBriefNudge,
 	CONCIERGE_AWARENESS,
 	conciergeControlOpDenial,
 	isWriteOp,
+	PEER_ORCHESTRATOR_LIMITS,
 	PLAN_REFINEMENT_DIRECTIVE,
 	resolveAgentRole,
 	retiredControlOpDenial,
@@ -289,6 +296,12 @@ function ok<T>(data: T): AgentControlResult<T> {
  */
 const ABANDONED_CONFIRMATION =
 	'The call was abandoned before the user answered the approval prompt, so the op did not run. Nothing was changed — ask again if you still need it.';
+
+/** Terminal kind a third-party CLI harness runs in, as `listTerminals` reports it. */
+const HARNESS_TERMINAL_KIND = 'agent';
+
+/** Terminal status of a session whose process is still alive. */
+const RUNNING_TERMINAL_STATUS = 'running';
 
 /**
  * Builds a failure envelope.
@@ -569,6 +582,22 @@ export function createAgentControlService({
 }: AgentControlServiceOptions): AgentControlService {
 	/** Latest pending signal per child session id, set by `notifyOrchestrator`. */
 	const signalsByChild = new Map<string, OrchestratorSignal>();
+
+	/**
+	 * Sessions that have searched Linear at least once, which is the precondition
+	 * on filing an issue. Session state rather than port state on purpose: the
+	 * Linear port is stateless and knows nothing of who is calling it, and this is
+	 * a fact about the caller's own turn rather than about the tracker.
+	 */
+	const linearSearchesBySession = new Set<string>();
+
+	/**
+	 * Peer spawns per workspace that have cleared the cap and are still opening,
+	 * which is the window in which the workspace looks emptier than it is. Held
+	 * here rather than derived, because the thing being counted is a spawn in
+	 * flight and nothing else in the app records one.
+	 */
+	const peerSpawnsOpening = new Map<string, number>();
 
 	/** Pulls the review panel to Checks after a comment op, once per burst. */
 	const reviewFocus = createReviewFocus(ports.focus, scheduler.now);
@@ -905,6 +934,190 @@ export function createAgentControlService({
 	};
 
 	/**
+	 * Names the root orchestrators already working a workspace, which is what the
+	 * peer cap is really about — concurrent agents on one checkout, not
+	 * conversations that once existed.
+	 *
+	 * Two exclusions, and both are the difference between a live writer and a row
+	 * in a map. Only a chat-tab species is a conversation at all: a terminal
+	 * launch registers one workspace-scoped `harness` origin so a CLI the user
+	 * starts by hand can reach the control server, and that one is minted by the
+	 * first terminal of any kind — a dev server included — and never released, so
+	 * counting it would spend the workspace's whole allowance on a run script.
+	 * {@link liveHarnessTerminals} counts the harnesses that are actually running
+	 * instead. And the durable marker separates a root from a sub-agent exactly as
+	 * {@link resolveRole} does it, because a resumed sub-agent re-registers at
+	 * depth 0 and would otherwise refuse a peer the workspace has room for.
+	 * @param workspaceId - Workspace to count in.
+	 * @returns The session ids of the root orchestrators live there now.
+	 */
+	const rootsInWorkspace = async (
+		workspaceId: string,
+	): Promise<readonly string[]> => {
+		const sessions = originRegistry
+			.originsInWorkspace(workspaceId)
+			.flatMap((origin) =>
+				originHasChatTab(origin) ? [origin.sessionId] : [],
+			);
+		const marks = await Promise.all(
+			sessions.map((sessionId) =>
+				ports.conversations.isSpawnedSubAgent(sessionId),
+			),
+		);
+		return sessions.filter((_, index) => !marks[index]);
+	};
+
+	/**
+	 * Names the harness terminals running in a workspace right now.
+	 *
+	 * A harness is an unrestricted writer on the same checkout, so it counts
+	 * against the peer cap for the reason the cap exists. It is counted from the
+	 * live terminal list rather than from its control origin because that origin
+	 * is one per workspace and permanent, which answers "a terminal was opened
+	 * here once" — a question the cap does not ask.
+	 * @param workspaceId - Workspace to count in.
+	 * @returns The terminal ids of the harnesses running there now.
+	 */
+	const liveHarnessTerminals = async (
+		workspaceId: string,
+	): Promise<readonly string[]> => {
+		const terminals = await ports.terminals
+			.listTerminals({ workspaceId })
+			.catch(() => []);
+		return terminals.flatMap((terminal) =>
+			terminal.kind === HARNESS_TERMINAL_KIND &&
+			terminal.status === RUNNING_TERMINAL_STATUS
+				? [terminal.terminalId]
+				: [],
+		);
+	};
+
+	/**
+	 * Takes a slot in the workspace's peer allowance for a spawn that has cleared
+	 * the cap but not yet opened.
+	 *
+	 * The cap is read before a confirmation prompt that blocks with no time limit,
+	 * and the peer registers an origin of its own only once it is open, so between
+	 * those two moments the workspace looks emptier than it is. Two spawns issued
+	 * in one parallel tool block would both read the same count, both raise a
+	 * prompt, and both pass. The reservation is what they contend on instead.
+	 * @param workspaceId - Workspace the spawn is opening into.
+	 * @returns The release, which is idempotent so a `finally` may call it freely.
+	 */
+	const reservePeerSlot = (workspaceId: string): (() => void) => {
+		const held = peerSpawnsOpening.get(workspaceId) ?? 0;
+		peerSpawnsOpening.set(workspaceId, held + 1);
+		let released = false;
+		return () => {
+			if (released) {
+				return;
+			}
+			released = true;
+			const remaining = (peerSpawnsOpening.get(workspaceId) ?? 1) - 1;
+			if (remaining > 0) {
+				peerSpawnsOpening.set(workspaceId, remaining);
+			} else {
+				peerSpawnsOpening.delete(workspaceId);
+			}
+		};
+	};
+
+	/**
+	 * Renders the refusal a full workspace answers a peer spawn with, naming what
+	 * is in it and what to do about each.
+	 *
+	 * The two kinds of occupant take different answers, so listing them together
+	 * would send an agent to steer a terminal id `ensemblr_send_follow_up` cannot
+	 * reach. A conversation is steerable; a harness is the user's to close.
+	 * @param roots - Session ids of the orchestrators already in the workspace.
+	 * @param harnesses - Terminal ids of the harnesses running there.
+	 * @returns The model-facing denial message.
+	 */
+	const workspaceFullRefusal = (
+		roots: readonly string[],
+		harnesses: readonly string[],
+	): string => {
+		const occupants = [
+			roots.length > 0
+				? `${roots.length} orchestrator${roots.length > 1 ? 's' : ''} (${roots.join(', ')}), which you can steer with \`ensemblr_send_follow_up\``
+				: '',
+			harnesses.length > 0
+				? `${harnesses.length} running harness terminal${harnesses.length > 1 ? 's' : ''} (${harnesses.join(', ')}), which only the user can close`
+				: '',
+		].filter(Boolean);
+		return `This workspace already holds its limit of ${PEER_ORCHESTRATOR_LIMITS.maxPerWorkspace} agents writing to one checkout: ${occupants.join(' and ')}. They share one worktree and one git index, and nothing arbitrates a further writer. Work with what is there, or do the work in this conversation.`;
+	};
+
+	/**
+	 * Decides whether a peer orchestrator may be opened, and asks the user.
+	 *
+	 * "The user explicitly asked for this" cannot be a judgement the spawning agent
+	 * makes about its own prompt, so it is not asked to make it: passing `peer`
+	 * states an intent, and the confirmation is what turns that into authority. The
+	 * prompt is raised whatever the permission mode, unlike
+	 * {@link gatePermission}'s — `workspace-trusted` is the user trusting an agent
+	 * with its own workspace, which is not the same as trusting it to put a second
+	 * writer in there.
+	 *
+	 * The cap is what bounds the recursion. A peer is a root and looks like one to
+	 * every other gate, so "peers may not open peers" is not a rule the app could
+	 * check; a second peer is refused because the workspace already holds its
+	 * allowance, which is the same answer for a better reason.
+	 * @param origin - Resolved caller identity.
+	 * @param signal - Aborts when the spawning turn ends, withdrawing the prompt.
+	 * @returns The reservation to release once the peer is open, or the denial.
+	 */
+	const gatePeerSpawn = async (
+		origin: AgentControlOrigin,
+		signal: AbortSignal | undefined,
+	): Promise<AgentControlResult<never> | (() => void)> => {
+		if (origin.concierge) {
+			return fail(
+				'invalid-args',
+				'Drop `peer`: what `ensemblr_start_conversation` opens for you is already a root orchestrator with its own delegation budget, in the workspace you name. `peer` is for an orchestrator opening a second one alongside itself.',
+			);
+		}
+		if (isPlanning(origin)) {
+			return fail(
+				'denied-scope',
+				'A peer orchestrator is a second writer on this worktree, and you are planning — there is nothing yet for two agents to write. Say in the plan that the work splits in two, and open the peer once the plan is approved.',
+			);
+		}
+		const [roots, harnesses] = await Promise.all([
+			rootsInWorkspace(origin.workspaceId),
+			liveHarnessTerminals(origin.workspaceId),
+		]);
+		const opening = peerSpawnsOpening.get(origin.workspaceId) ?? 0;
+		if (
+			roots.length + harnesses.length + opening >=
+			PEER_ORCHESTRATOR_LIMITS.maxPerWorkspace
+		) {
+			return fail('denied-quota', workspaceFullRefusal(roots, harnesses));
+		}
+		const release = reservePeerSlot(origin.workspaceId);
+		const approved = await ports.confirm
+			.confirm({
+				origin,
+				signal,
+				summary:
+					'Open a second orchestrator in this workspace? It shares the worktree and git index with this conversation.',
+			})
+			.catch(() => false);
+		if (signal?.aborted) {
+			release();
+			return fail('timeout', ABANDONED_CONFIRMATION);
+		}
+		if (!approved) {
+			release();
+			return fail(
+				'denied-permission',
+				'The user declined to open a peer orchestrator. Do the work in this conversation instead, and do not ask again unless they raise it.',
+			);
+		}
+		return release;
+	};
+
+	/**
 	 * Opens a delegated conversation. A model the spawn cannot honour — one from
 	 * another agent runtime, or none inferable at all — comes back as an argument
 	 * failure naming the runtime, because the calling agent can fix that on its
@@ -951,20 +1164,36 @@ export function createAgentControlService({
 		if (spawnDenied) {
 			return spawnDenied;
 		}
-		const started = await ports.conversations.startConversation({
-			workspaceId: target.workspaceId,
-			workspaceCwd: target.cwd,
-			chatTabId: args.chatTabId,
-			prompt: args.prompt,
-			model: args.model,
-			thinkingLevel: args.thinkingLevel,
-			title: args.title,
-			callerConcierge: origin.concierge,
-			callerModel,
-			callerRuntime: originRuntime(origin),
-			parentSessionId: origin.sessionId,
-			planMode: isPlanning(origin),
-		});
+		const asPeer = args.peer === true;
+		let releasePeerSlot: (() => void) | null = null;
+		if (asPeer) {
+			const gated = await gatePeerSpawn(origin, signal);
+			if (typeof gated !== 'function') {
+				return gated;
+			}
+			releasePeerSlot = gated;
+		}
+		// Held until the child is open, because that is when it registers an origin
+		// of its own and starts being counted by the gate above.
+		const started = await ports.conversations
+			.startConversation({
+				workspaceId: target.workspaceId,
+				workspaceCwd: target.cwd,
+				asPeer,
+				chatTabId: args.chatTabId,
+				prompt: asPeer
+					? `${buildPeerBriefDirective(origin.sessionId)}\n\n---\n\n${args.prompt}`
+					: args.prompt,
+				model: args.model,
+				thinkingLevel: args.thinkingLevel,
+				title: args.title,
+				callerConcierge: origin.concierge,
+				callerModel,
+				callerRuntime: originRuntime(origin),
+				parentSessionId: origin.sessionId,
+				planMode: isPlanning(origin),
+			})
+			.finally(() => releasePeerSlot?.());
 		if (!started.ok) {
 			return fail('invalid-args', started.reason);
 		}
@@ -1672,6 +1901,116 @@ export function createAgentControlService({
 	};
 
 	/**
+	 * Files a Linear issue, behind a search-for-duplicates precondition.
+	 *
+	 * The precondition is enforced rather than asked for. Every other guard on
+	 * this op is about the ticket's shape — the right team, a state an unread
+	 * ticket belongs in — and none of them can tell that the issue already exists
+	 * under someone else's wording. Only a search can, and "search first" left to
+	 * the prompt is the instruction a model skips exactly when a backlog is large
+	 * enough for the duplicate to be likely. One search per session clears it: the
+	 * point is that the agent has looked, not that it looks once per filing.
+	 * @param origin - Resolved caller identity.
+	 * @param args - The issue to file.
+	 * @returns The filed issue, or the reason it was refused.
+	 */
+	const handleLinearCreateIssue = async (
+		origin: AgentControlOrigin,
+		args: LinearCreateIssueArgs,
+	): Promise<AgentControlResult<unknown>> => {
+		if (!linearSearchesBySession.has(origin.sessionId)) {
+			return fail(
+				'denied-scope',
+				'Search Linear before filing: call `ensemblr_linear_list_issues` with a query describing this problem, and file only if nothing there already covers it. A duplicate cannot be deleted from here, and the team reads both. One search in this conversation is enough — this is refused only because none has happened yet.',
+			);
+		}
+		return ports.linear
+			.createIssue({ ...args, workspaceId: origin.workspaceId })
+			.then(ok);
+	};
+
+	/**
+	 * Resolves who a message to the Concierge is from, off the caller's own
+	 * control token rather than anything it passed.
+	 *
+	 * Both lookups degrade to null rather than failing the send: a workspace the
+	 * listing cannot name and a session with no tab are cosmetic losses in the
+	 * header, and refusing the message over either would drop the one channel a
+	 * blocked agent has.
+	 * @param origin - Resolved caller identity.
+	 * @returns The sender as the Concierge will read it.
+	 */
+	const resolveMessageSender = async (
+		origin: AgentControlOrigin,
+	): Promise<ConciergeMessageSender> => {
+		const [workspaces, tabs] = await Promise.all([
+			ports.workspaces.listWorkspaces().catch(() => []),
+			ports.tabs.listTabs({ workspaceId: origin.workspaceId }).catch(() => []),
+		]);
+		const workspace = workspaces.find(
+			(row) => row.workspaceId === origin.workspaceId,
+		);
+		const tab = tabs.find((row) => row.agentSessionId === origin.sessionId);
+		return {
+			agentSessionId: origin.sessionId,
+			tabTitle: tab?.title ?? null,
+			workspaceId: origin.workspaceId,
+			workspaceName: workspace?.name ?? null,
+		};
+	};
+
+	/**
+	 * Delivers a workspace agent's message to the live Concierge conversation.
+	 *
+	 * Nothing here takes a session id, and that is the feature: the Concierge is
+	 * cleared and restarted routinely, so the only id that is ever right is the one
+	 * resolved at this moment. An absent conversation is refused rather than
+	 * opened — a message that booted the Concierge would start a turn nobody is
+	 * watching — and the refusal names what to do instead, because the failure this
+	 * op exists to prevent is a discovery that never reaches anybody.
+	 * @param origin - Resolved caller identity.
+	 * @param args - The reason and the agent's own prose.
+	 * @returns Which conversation took the message, or why none did.
+	 */
+	const handleMessageConcierge = async (
+		origin: AgentControlOrigin,
+		args: MessageConciergeArgs,
+	): Promise<AgentControlResult<unknown>> => {
+		const concierge = ports.concierge;
+		if (!concierge) {
+			return fail(
+				'not-found',
+				'This build has no Concierge, so there is nothing above you to message. Say it in your last message instead.',
+			);
+		}
+		const budget = guardrails.evaluateConciergeMessage(origin.sessionId);
+		if (!budget.ok) {
+			return fail(budget.code, budget.reason);
+		}
+		const delivery = await concierge.deliverMessage({
+			prompt: buildConciergeMessage({
+				message: args.message,
+				reason: args.reason,
+				sender: await resolveMessageSender(origin),
+			}),
+		});
+		if (!delivery.delivered) {
+			return fail(
+				delivery.cause === 'no-session' ? 'not-found' : 'internal',
+				delivery.cause === 'no-session'
+					? 'No Concierge conversation is open, so there is nobody up there to read this. It is not queued — a message delivered hours later, into a conversation that has since been cleared, is worse than none. Put what you were going to say in your last message, which is what the Concierge reads when it next looks at this workspace.'
+					: `The Concierge conversation refused the message: ${delivery.detail} Say it in your last message instead rather than retrying in a loop.`,
+			);
+		}
+		guardrails.recordConciergeMessage(origin.sessionId);
+		return ok({
+			conciergeSessionId: delivery.conciergeSessionId,
+			message:
+				'Delivered to the Concierge conversation that is live right now. It arrives as a turn the user can see, marked as coming from an agent rather than from them. Carry on with your work — nothing here waits for a reply, and a reply, if one comes, arrives as a follow-up in this conversation.',
+		} satisfies MessageConciergeResult);
+	};
+
+	/**
 	 * Parks a child's signal for the orchestrator's next wait tick. Gated on the
 	 * durable role rather than on live lineage: `origin.parentSessionId` lives in
 	 * the in-memory registry, so a session resumed after a restart would lose its
@@ -2126,13 +2465,23 @@ export function createAgentControlService({
 					workspaceId: origin.workspaceId,
 				})
 				.then(ok),
+		linearCreateIssue: ({ args, origin }) =>
+			handleLinearCreateIssue(origin, args as LinearCreateIssueArgs),
+		// Recorded on the answer rather than on the attempt: a search that came
+		// back `not-connected` never read the backlog, so counting it would let
+		// the duplicate guard be cleared by a call that looked at nothing.
 		linearListIssues: ({ args, origin }) =>
 			ports.linear
 				.listIssues({
 					...(args as LinearListIssuesArgs),
 					workspaceId: origin.workspaceId,
 				})
-				.then(ok),
+				.then((result) => {
+					if (result.status === 'ok') {
+						linearSearchesBySession.add(origin.sessionId);
+					}
+					return ok(result);
+				}),
 		linearUpdateIssue: ({ args, origin }) =>
 			ports.linear
 				.updateIssue({
@@ -2154,6 +2503,8 @@ export function createAgentControlService({
 			handleListTerminals(origin, args as ListTerminalsArgs),
 		listProjects: ({ origin }) => handleListProjects(origin),
 		listWorkspaces: () => ports.workspaces.listWorkspaces().then(ok),
+		messageConcierge: ({ args, origin }) =>
+			handleMessageConcierge(origin, args as MessageConciergeArgs),
 		notifyOrchestrator: ({ args, origin }) =>
 			handleNotifyOrchestrator(origin, args as NotifyOrchestratorArgs),
 		openTab: ({ args, origin }) => handleOpenTab(origin, args as OpenTabArgs),
@@ -2308,6 +2659,7 @@ export function createAgentControlService({
 		ports.ask.releaseSession(sessionId);
 		ports.planMode.releaseSession(sessionId);
 		signalsByChild.delete(sessionId);
+		linearSearchesBySession.delete(sessionId);
 		guardrails.release(sessionId);
 		originRegistry.release(sessionId);
 	};

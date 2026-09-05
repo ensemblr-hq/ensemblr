@@ -44,6 +44,7 @@ export type ToolGlyph =
 	| 'terminal'
 	| 'ticket'
 	| 'ticket-check'
+	| 'ticket-plus'
 	| 'wrench';
 
 /**

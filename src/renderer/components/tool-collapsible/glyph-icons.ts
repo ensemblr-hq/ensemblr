@@ -36,6 +36,7 @@ import {
 	TerminalIcon,
 	TicketCheckIcon,
 	TicketIcon,
+	TicketPlusIcon,
 	WrenchIcon,
 } from 'lucide-react';
 import type { ToolGlyph } from '@/renderer/types/tool-presentation';
@@ -81,5 +82,6 @@ export const GLYPH_ICONS: Record<ToolGlyph, LucideIcon> = {
 	terminal: TerminalIcon,
 	ticket: TicketIcon,
 	'ticket-check': TicketCheckIcon,
+	'ticket-plus': TicketPlusIcon,
 	wrench: WrenchIcon,
 };

@@ -116,6 +116,7 @@ const makePorts = (
 		getIssue: vi.fn(),
 		getMetadata: vi.fn(),
 		createComment: vi.fn(),
+		createIssue: vi.fn(),
 		updateIssue: vi.fn(),
 	},
 	permissions: { getMode: () => 'workspace-trusted' },

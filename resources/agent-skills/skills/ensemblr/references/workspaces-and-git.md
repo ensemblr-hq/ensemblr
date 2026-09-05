@@ -135,6 +135,14 @@ the tracker lying to the whole team.
 `completed` or `canceled` is refused whatever you pass — you take work as far as
 In Review and the user decides whether it is finished.
 
+**Filing one** is `ensemblr_linear_create_issue`, for the follow-up you found and
+were told not to fix rather than for the work you are already doing. `teamId` is
+required and read from `ensemblr_linear_get_metadata`; omit `stateId` and the
+team's own default applies, which is where an unread ticket belongs. The first
+create in a conversation is refused until `ensemblr_linear_list_issues` has run at
+least once — nothing here can delete a filed issue, so the duplicate check is a
+precondition rather than advice.
+
 ## Pull requests
 
 **Never create a pull request unless the user explicitly asks for one in the

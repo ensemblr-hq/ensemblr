@@ -35,6 +35,8 @@ import {
 	ARCHITECTURE_DIAGRAM_LIMITS,
 	ASK_USER_QUESTION_LIMITS,
 	awarenessForAudience,
+	CONCIERGE_MESSAGE_LIMITS,
+	CONCIERGE_MESSAGE_REASONS,
 	type ControlAudience,
 	EXIT_PLAN_MODE_LIMITS,
 	LINEAR_AGENT_LIMITS,
@@ -191,9 +193,10 @@ export const TOOL_DEFS: readonly McpToolDef[] = [
 		name: 'ensemblr_start_conversation',
 		op: 'startConversation',
 		description:
-			'Open a fresh chat tab (or reuse one via chatTabId) and start a conversation. A chat tab spawns children on its own agent runtime and may omit `model` to inherit the model the app holds for it — on a runtime driven over MCP that is the model its last turn ran on, not one switched inside the runtime since. A caller with no runtime the app can name, and one whose own model it cannot name either, must pass a `model` from ensemblr_list_models: it is refused without one rather than opened on a default nobody chose. Pass a short, descriptive title to name the tab it opens. Brief it with what to deliver, not just what to look at: the question it answers, the defaults it should assume rather than come back and ask about, and whether it reports inline (the default) or writes a file at a path you name. Set wait=true to block until it finishes.',
+			'Open a fresh chat tab (or reuse one via chatTabId) and start a conversation. A chat tab spawns children on its own agent runtime and may omit `model` to inherit the model the app holds for it — on a runtime driven over MCP that is the model its last turn ran on, not one switched inside the runtime since. A caller with no runtime the app can name, and one whose own model it cannot name either, must pass a `model` from ensemblr_list_models: it is refused without one rather than opened on a default nobody chose. Pass a short, descriptive title to name the tab it opens. Brief it with what to deliver, not just what to look at: the question it answers, the defaults it should assume rather than come back and ask about, and whether it reports inline (the default) or writes a file at a path you name. Set wait=true to block until it finishes. Set peer=true ONLY when the user asked in so many words for a second orchestrator in this workspace: it opens a full root orchestrator alongside you rather than a sub-agent, with its own delegation budget, and the app asks the user to confirm it whatever the permission mode — passing it is stating an intent, not establishing authority. A peer needs a `title` and refuses `wait`: it is not a child to wait on, it outlives your turn, and you do not close its tab. Two orchestrators per workspace is the limit, because they share one worktree and one git index and nothing arbitrates a third writer; you remain the committer for both, and the app tells the peer so.',
 		shape: {
 			chatTabId: z.string().optional(),
+			peer: z.boolean().optional(),
 			prompt: z.string(),
 			model: z.string().optional(),
 			thinkingLevel: z.string().optional(),
@@ -467,6 +470,29 @@ export const TOOL_DEFS: readonly McpToolDef[] = [
 		},
 	},
 	{
+		name: 'ensemblr_linear_create_issue',
+		op: 'linearCreateIssue',
+		description:
+			'File a new Linear issue. Call `ensemblr_linear_list_issues` first — a search is REQUIRED before the first create in a conversation, and this is refused until one has happened, because the duplicate you cannot see is the one a search would have found and nothing here can delete a filed issue. `teamId` is required and never guessed: read it from `ensemblr_linear_get_metadata`, and pass its own `accountId` or none at all — an accountId naming a different account than the team is refused rather than reconciled. Omit `stateId` and Linear opens the issue in the team default, which is where a ticket nobody has read belongs; a state whose type is `started`, `completed`, or `canceled` is refused. Write the issue as a teammate would file it: a title that names the problem, and a description carrying the evidence, the file paths, and what you already ruled out. File the follow-up you found and were told not to fix; do not file the work you are already doing.',
+		shape: {
+			accountId: z.string().optional(),
+			assigneeId: z.string().optional(),
+			description: z
+				.string()
+				.max(LINEAR_AGENT_LIMITS.maxDescriptionLength)
+				.optional(),
+			labelIds: z
+				.array(z.string())
+				.max(LINEAR_AGENT_LIMITS.maxLabelIds)
+				.optional(),
+			priority: z.number().int().min(0).max(4).optional(),
+			projectId: z.string().optional(),
+			stateId: z.string().optional(),
+			teamId: z.string(),
+			title: z.string().max(LINEAR_AGENT_LIMITS.maxTitleLength),
+		},
+	},
+	{
 		name: 'ensemblr_linear_update_issue',
 		op: 'linearUpdateIssue',
 		description:
@@ -562,6 +588,16 @@ export const TOOL_DEFS: readonly McpToolDef[] = [
 			mode: z.enum(['first', 'all']).optional(),
 			timeoutMs: z.number().optional(),
 			reports: z.enum(['full', 'brief']).optional(),
+		},
+	},
+	{
+		name: 'ensemblr_message_concierge',
+		op: 'messageConcierge',
+		description:
+			'Message the Concierge — the app-level agent that briefs workspace agents and supervises every workspace at once. For the things it has to know and cannot see from where it sits: you are blocked on something outside this workspace, the brief it gave you is wrong, the work belongs in a different repository, or you have finished. It NEVER reads your workspace on its own initiative, so a discovery you leave only in your own tab reaches nobody. You pass no session id and hold none: the Concierge conversation is cleared and restarted routinely, so the app resolves whichever one is live at the moment you send. The message arrives as a visible turn in the Concierge panel, marked as coming from an agent rather than from the user, and it does NOT block — carry on working, and a reply, if one comes, arrives as a follow-up here. Refused when no Concierge conversation is open (it is not queued), and capped per conversation, because the loop Concierge → you → Concierge has no natural end. Say it once, in full, rather than in installments.',
+		shape: {
+			message: z.string().max(CONCIERGE_MESSAGE_LIMITS.maxMessageLength),
+			reason: z.enum(CONCIERGE_MESSAGE_REASONS),
 		},
 	},
 	{

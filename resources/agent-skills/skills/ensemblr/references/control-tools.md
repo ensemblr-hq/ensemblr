@@ -33,10 +33,29 @@ Control adds no capability of its own — it is a gate, not a feature.
 
 **Linear** — `ensemblr_linear_list_issues`, `ensemblr_linear_get_issue`,
 `ensemblr_linear_get_metadata`, `ensemblr_linear_create_comment`,
-`ensemblr_linear_update_issue`.
+`ensemblr_linear_create_issue`, `ensemblr_linear_update_issue`.
 
 **The user, and planning** — `ensemblr_ask_user_question`,
 `ensemblr_exit_plan_mode`.
+
+**A peer, not a child** — `ensemblr_start_conversation` with `peer: true` opens a
+second *orchestrator* in your own workspace rather than a sub-agent: its own tab,
+its own delegation budget, its own conversation with the user. Only when the user
+asks for one — the app confirms the spawn with them whatever the permission mode,
+so the flag states an intent rather than settling it. It needs a `title`, refuses
+`wait`, is not among the children `ensemblr_wait_for_agents` returns, and outlives
+your turn. Two orchestrators per workspace is the limit. You stay the committer:
+you share one worktree and one git index, nothing arbitrates that, and the app
+tells the peer to leave committing to you.
+
+**Upward** — `ensemblr_message_concierge` reaches the app-level agent that briefs
+workspace agents, for the things it cannot see from where it sits: you are
+blocked on something outside this workspace, the brief it gave you is wrong, the
+work belongs in another repository, or you have finished. You pass no session id
+— its conversation is cleared and restarted routinely, so the app resolves the
+live one at send time. Refused outright when none is open (it is not queued), and
+capped per conversation. `ensemblr_notify_orchestrator` is the sub-agent's
+equivalent one level down.
 
 Not every caller holds every tool. A spawned sub-agent may not delegate onward
 and may not write to Linear; a terminal harness holds no chat-tab tools; Plan

@@ -6,6 +6,10 @@
 import { z } from 'zod';
 import { toSlug } from '../slug.ts';
 import { canonicalizeArgs } from './arg-naming.ts';
+import {
+	CONCIERGE_MESSAGE_LIMITS,
+	CONCIERGE_MESSAGE_REASONS,
+} from './concierge-message.ts';
 import type { AskUserQuestionReply } from './contracts.ts';
 import {
 	type AgentControlOp,
@@ -48,15 +52,30 @@ const spawnChatTabSchema = z.strictObject({
 	title: nonEmpty.optional(),
 });
 
-const startConversationSchema = z.strictObject({
-	chatTabId: nonEmpty.optional(),
-	prompt: nonEmpty,
-	model: nonEmpty.optional(),
-	thinkingLevel: nonEmpty.optional(),
-	title: nonEmpty.optional(),
-	wait: z.boolean().optional(),
-	workspaceId: nonEmpty.optional(),
-});
+// The two peer refinements are rejections rather than silent corrections
+// because both would otherwise produce something the caller did not ask for: an
+// unnamed second orchestrator tab is indistinguishable from the first on the tab
+// strip, and a blocking wait on a peer would hold the spawner's turn open for
+// work that is deliberately not its own.
+const startConversationSchema = z
+	.strictObject({
+		chatTabId: nonEmpty.optional(),
+		peer: z.boolean().optional(),
+		prompt: nonEmpty,
+		model: nonEmpty.optional(),
+		thinkingLevel: nonEmpty.optional(),
+		title: nonEmpty.optional(),
+		wait: z.boolean().optional(),
+		workspaceId: nonEmpty.optional(),
+	})
+	.refine((args) => !args.peer || Boolean(args.title), {
+		message:
+			'A peer orchestrator needs a `title`: it shares the tab strip with the conversation that opened it, and two unnamed orchestrator tabs cannot be told apart.',
+	})
+	.refine((args) => !args.peer || !args.wait, {
+		message:
+			'A peer is not a child to wait on — it is a root orchestrator with its own turn and its own user. Drop `wait`, and read its tab when it has something to say.',
+	});
 
 const setNameSchema = z.strictObject({
 	title: nonEmpty,
@@ -364,6 +383,21 @@ const LINEAR_UPDATE_FIELDS = [
 // 2 high, 3 medium, 4 low. Anything outside it is silently ignored by the API.
 const linearPriority = z.number().int().min(0).max(4);
 
+const linearCreateIssueSchema = z.strictObject({
+	accountId: nonEmpty.optional(),
+	assigneeId: nonEmpty.optional(),
+	description: z
+		.string()
+		.max(LINEAR_AGENT_LIMITS.maxDescriptionLength)
+		.optional(),
+	labelIds: z.array(nonEmpty).max(LINEAR_AGENT_LIMITS.maxLabelIds).optional(),
+	priority: linearPriority.optional(),
+	projectId: nonEmpty.optional(),
+	stateId: nonEmpty.optional(),
+	teamId: nonEmpty,
+	title: nonEmpty.max(LINEAR_AGENT_LIMITS.maxTitleLength),
+});
+
 const linearUpdateIssueSchema = z
 	.strictObject({
 		accountId: nonEmpty.optional(),
@@ -394,6 +428,15 @@ const waitForAgentsSchema = z.strictObject({
 const notifyOrchestratorSchema = z.strictObject({
 	reason: z.enum(['need_decision', 'blocked', 'progress', 'done']),
 	message: nonEmpty,
+});
+
+// No session id: the Concierge conversation is cleared and restarted routinely,
+// so an id the agent captured at spawn time names a session that is gone. The
+// app resolves the live one at delivery instead, which is why there is nothing
+// here for a caller to get wrong.
+const messageConciergeSchema = z.strictObject({
+	message: nonEmpty.max(CONCIERGE_MESSAGE_LIMITS.maxMessageLength),
+	reason: z.enum(CONCIERGE_MESSAGE_REASONS),
 });
 
 const reservedLabels: ReadonlySet<string> = new Set(
@@ -491,6 +534,7 @@ const AGENT_CONTROL_ARG_SCHEMAS = {
 	linearGetIssue: linearGetIssueSchema,
 	linearGetMetadata: linearGetMetadataSchema,
 	linearCreateComment: linearCreateCommentSchema,
+	linearCreateIssue: linearCreateIssueSchema,
 	linearUpdateIssue: linearUpdateIssueSchema,
 	listProjects: emptySchema,
 	listWorkspaces: emptySchema,
@@ -504,6 +548,7 @@ const AGENT_CONTROL_ARG_SCHEMAS = {
 	listRunScripts: emptySchema,
 	waitForAgents: waitForAgentsSchema,
 	notifyOrchestrator: notifyOrchestratorSchema,
+	messageConcierge: messageConciergeSchema,
 	askUserQuestion: askUserQuestionSchema,
 	getSessionBrief: emptySchema,
 	checkPlanModeTool: checkPlanModeToolSchema,

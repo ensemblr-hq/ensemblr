@@ -142,7 +142,7 @@ describe('agent-control MCP endpoint', () => {
 		expect(names).not.toContain('ensemblr_set_summary');
 		expect(names).not.toContain('ensemblr_ask_user_question');
 		expect(names).not.toContain('ensemblr_exit_plan_mode');
-		expect(tools).toHaveLength(37);
+		expect(tools).toHaveLength(39);
 		await client.close();
 	});
 

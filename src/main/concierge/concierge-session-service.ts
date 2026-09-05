@@ -136,8 +136,33 @@ export interface ConciergeSessionRuntimeChoice {
 	thinkingLevel: string | null;
 }
 
+/**
+ * How a workspace agent's message to the Concierge ended. `no-session` and
+ * `failed` are separated because only the first is the ordinary case — the
+ * Concierge is simply not open — and the agent is told something different
+ * about each.
+ */
+export type DeliverConciergeMessageResult =
+	| { conciergeSessionId: string; delivered: true }
+	| { cause: 'no-session' | 'failed'; delivered: false; detail: string };
+
 /** Public surface of the Concierge session service. */
 export interface ConciergeSessionService {
+	/**
+	 * Submits a workspace agent's message into whichever conversation is attached
+	 * right now, and never opens one.
+	 *
+	 * The session is resolved here rather than passed in because a clear replaces
+	 * the conversation without warning, so any id a caller could hold is stale by
+	 * the time it sends. Reviving is deliberately not on this path either, unlike
+	 * {@link ConciergeSessionService.submitPrompt}: a message that raised a
+	 * Concierge child would spend tokens and act on the app with no human in the
+	 * loop, and a prompt held for a conversation that does not exist yet would
+	 * land hours later in one that has since been cleared.
+	 */
+	deliverAgentMessage: (input: {
+		prompt: string;
+	}) => Promise<DeliverConciergeMessageResult>;
 	clearContext: (
 		request: ClearConciergeContextRequest,
 	) => Promise<ClearConciergeContextResult>;
@@ -903,6 +928,36 @@ export function createConciergeSessionService({
 	};
 
 	/**
+	 * Hands a request to the child that is attached right now, without deciding
+	 * what to do when there is no longer one.
+	 *
+	 * `closed` is reported rather than acted on because the two callers answer it
+	 * differently: a user prompt revives, and an agent message must not. Keeping
+	 * that fork at the call sites is what makes "an agent never opens a Concierge
+	 * conversation" a property of one branch instead of a flag threaded through
+	 * here.
+	 * @param live - The attachment to submit into.
+	 * @param request - Prompt and any per-turn runtime overrides.
+	 * @param choice - The model and thinking level to record against the session.
+	 * @returns The acknowledgement, the failure it refused with, or `closed`.
+	 */
+	const submitToLiveSession = async (
+		live: ActiveConciergeSession,
+		request: { modelOverride?: string; prompt: string; thinkingLevel?: string },
+		choice: { model?: string | null; thinkingLevel?: string | null },
+	): Promise<{ acceptedAt: string } | { error: string } | { closed: true }> => {
+		try {
+			const acknowledgement = await live.runtimeSession.submit(request);
+			recordRuntimeChoice(live.sessionId, choice);
+			return { acceptedAt: acknowledgement.acceptedAt };
+		} catch (error) {
+			return isSessionClosedFailure(error)
+				? { closed: true }
+				: { error: toMessage(error) };
+		}
+	};
+
+	/**
 	 * Opens a fresh session row against the concierge home.
 	 * @returns The created row.
 	 */
@@ -984,6 +1039,30 @@ export function createConciergeSessionService({
 				});
 			}
 			return clearInFlight;
+		},
+
+		deliverAgentMessage: async ({
+			prompt,
+		}): Promise<DeliverConciergeMessageResult> => {
+			const live = active;
+			if (!live) {
+				return {
+					cause: 'no-session',
+					delivered: false,
+					detail: SESSION_NOT_OPEN_MESSAGE,
+				};
+			}
+			const served = await submitToLiveSession(live, { prompt }, {});
+			if ('acceptedAt' in served) {
+				return { conciergeSessionId: live.sessionId, delivered: true };
+			}
+			return 'closed' in served
+				? {
+						cause: 'no-session',
+						delivered: false,
+						detail: SESSION_NOT_OPEN_MESSAGE,
+					}
+				: { cause: 'failed', delivered: false, detail: served.error };
 		},
 
 		/**
@@ -1093,20 +1172,18 @@ export function createConciergeSessionService({
 			const live = active;
 			if (live) {
 				pendingPrompt = { choice, request, sessionId: live.sessionId };
-				try {
-					const acknowledgement = await live.runtimeSession.submit(request);
-					recordRuntimeChoice(live.sessionId, { model, thinkingLevel });
+				const served = await submitToLiveSession(live, request, choice);
+				if ('acceptedAt' in served) {
 					const adopted =
 						live.sessionId === sessionId ? null : liveSnapshot(live.sessionId);
 					return {
-						acceptedAt: acknowledgement.acceptedAt,
+						acceptedAt: served.acceptedAt,
 						...(adopted ? { session: adopted } : {}),
 					};
-				} catch (error) {
-					pendingPrompt = null;
-					if (!isSessionClosedFailure(error)) {
-						return { error: toMessage(error) };
-					}
+				}
+				pendingPrompt = null;
+				if ('error' in served) {
+					return { error: served.error };
 				}
 			}
 

@@ -34,6 +34,12 @@ export {
 	buildCoAuthorDirective,
 	CO_AUTHOR_DIRECTIVE_HEADER,
 } from './agent-control/co-author-directive.ts';
+export type { ConciergeMessageSender } from './agent-control/concierge-message.ts';
+export {
+	buildConciergeMessage,
+	CONCIERGE_MESSAGE_LIMITS,
+	CONCIERGE_MESSAGE_REASONS,
+} from './agent-control/concierge-message.ts';
 export * from './agent-control/contracts.ts';
 export { buildConversationTranscript } from './agent-control/conversation-transcript.ts';
 export { buildLanguageDirective } from './agent-control/language-directive.ts';
@@ -41,6 +47,10 @@ export {
 	buildLinkedIssueDirective,
 	LINKED_ISSUE_DIRECTIVE_HEADER,
 } from './agent-control/linked-issue-directive.ts';
+export {
+	buildPeerBriefDirective,
+	PEER_BRIEF_HEADER,
+} from './agent-control/peer-brief.ts';
 export { buildPlanSubmittedResult } from './agent-control/plan-mode.ts';
 export * from './agent-control/schemas.ts';
 export {

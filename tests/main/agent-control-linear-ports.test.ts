@@ -89,9 +89,25 @@ const failure = (
 	...overrides,
 });
 
+const teamWire = (
+	overrides: Partial<LinearResourceWire> = {},
+): LinearResourceWire => ({
+	accountId: 'acct-1',
+	color: null,
+	id: 't-1',
+	key: 'THE',
+	kind: 'team',
+	name: 'Example Team',
+	organizationName: 'Example Org',
+	teamId: null,
+	type: null,
+	...overrides,
+});
+
 const metadataOk = (
 	states: readonly LinearResourceWire[] = [stateWire()],
 	overrides: Partial<GetLinearMetadataResult & { status: 'ok' }> = {},
+	teams: readonly LinearResourceWire[] = [teamWire()],
 ): GetLinearMetadataResult => ({
 	accountFailures: [],
 	metadata: {
@@ -100,7 +116,7 @@ const metadataOk = (
 		projects: [],
 		states: [...states],
 		syncedAt: '2026-08-08T00:00:00.000Z',
-		teams: [],
+		teams: [...teams],
 		users: [],
 	},
 	status: 'ok',
@@ -118,6 +134,7 @@ const makeDeps = (
 		getIssue?: GetLinearIssueResult;
 		getMetadata?: GetLinearMetadataResult;
 		createComment?: CreateLinearCommentResult;
+		createIssue?: MutateLinearIssueResult;
 		updateIssue?: MutateLinearIssueResult;
 	} = {},
 ) => {
@@ -128,7 +145,11 @@ const makeDeps = (
 				status: 'ok',
 			},
 		),
-		createIssue: vi.fn(),
+		createIssue: vi
+			.fn()
+			.mockResolvedValue(
+				overrides.createIssue ?? { issue: issueWire(), status: 'ok' },
+			),
 		getIssue: vi.fn().mockResolvedValue(
 			overrides.getIssue ?? {
 				comments: [commentWire()],
@@ -200,6 +221,9 @@ const portFor = (deps: LinearPortDeps) => {
 		createComment: (
 			args: Omit<Parameters<typeof port.createComment>[0], 'workspaceId'>,
 		) => port.createComment({ ...args, workspaceId: WORKSPACE_ID }),
+		createIssue: (
+			args: Omit<Parameters<typeof port.createIssue>[0], 'workspaceId'>,
+		) => port.createIssue({ ...args, workspaceId: WORKSPACE_ID }),
 		getIssue: (
 			args: Omit<Parameters<typeof port.getIssue>[0], 'workspaceId'>,
 		) => port.getIssue({ ...args, workspaceId: WORKSPACE_ID }),
@@ -677,6 +701,170 @@ describe('linear port: writes', () => {
 			body: 'Verified on the branch.',
 			issueId: 'ENG-106',
 		});
+	});
+});
+
+// Nothing on this surface deletes a Linear issue, so every one of these refusals
+// is the last chance to stop a row the team reads from being wrong. Each has to
+// land before the service is reached, and each has to say that nothing was
+// filed — an agent that reads "refused" and assumes a half-made issue exists
+// goes looking for an identifier that was never minted.
+describe('linear port: filing an issue', () => {
+	it('files with the fields the agent set and reports the identifier back', async () => {
+		const { deps, service } = makeDeps();
+
+		const result = await portFor(deps).createIssue({
+			description: 'Repro in src/main/main.ts.',
+			labelIds: ['l-1'],
+			priority: 3,
+			teamId: 't-1',
+			title: 'Terminal drops the last line',
+		});
+
+		expect(result.status).toBe('ok');
+		expect(result.issue?.identifier).toBe('ENG-106');
+		expect(result.message).toContain('ENG-106');
+		expect(service.createIssue).toHaveBeenCalledWith({
+			description: 'Repro in src/main/main.ts.',
+			labelIds: ['l-1'],
+			priority: 3,
+			teamId: 't-1',
+			title: 'Terminal drops the last line',
+		});
+	});
+
+	it('omits an unset state so the team default applies', async () => {
+		const { deps, service } = makeDeps();
+
+		await portFor(deps).createIssue({ teamId: 't-1', title: 'A follow-up' });
+
+		expect(service.createIssue).toHaveBeenCalledWith({
+			teamId: 't-1',
+			title: 'A follow-up',
+		});
+	});
+
+	it('refuses a team the cache does not know and never reaches Linear', async () => {
+		const { deps, service } = makeDeps();
+
+		const result = await portFor(deps).createIssue({
+			teamId: 't-missing',
+			title: 'A follow-up',
+		});
+
+		expect(result.status).toBe('refused');
+		expect(result.issue).toBeNull();
+		expect(result.message).toContain('t-missing');
+		expect(result.message).toContain('refresh: true');
+		expect(result.message).toContain('Nothing was filed');
+		expect(service.createIssue).not.toHaveBeenCalled();
+	});
+
+	it('refuses an accountId that names a different account than the team', async () => {
+		const { deps, service } = makeDeps();
+
+		const result = await portFor(deps).createIssue({
+			accountId: 'acct-2',
+			teamId: 't-1',
+			title: 'A follow-up',
+		});
+
+		expect(result.status).toBe('refused');
+		expect(result.message).toContain('acct-1');
+		expect(result.message).toContain('acct-2');
+		expect(service.createIssue).not.toHaveBeenCalled();
+	});
+
+	it('refuses a started state and names the ones it may open in', async () => {
+		const { deps, service } = makeDeps({
+			getMetadata: metadataOk([
+				stateWire(),
+				stateWire({ id: 's-backlog', name: 'Backlog', type: 'backlog' }),
+			]),
+		});
+
+		const result = await portFor(deps).createIssue({
+			stateId: 's-started',
+			teamId: 't-1',
+			title: 'A follow-up',
+		});
+
+		expect(result.status).toBe('refused');
+		expect(result.message).toContain('started state');
+		expect(result.message).toContain('"Backlog" (s-backlog)');
+		expect(service.createIssue).not.toHaveBeenCalled();
+	});
+
+	it('refuses a completed state on the same grounds', async () => {
+		const { deps, service } = makeDeps({
+			getMetadata: metadataOk([
+				stateWire({ id: 's-done', name: 'Done', type: 'completed' }),
+			]),
+		});
+
+		const result = await portFor(deps).createIssue({
+			stateId: 's-done',
+			teamId: 't-1',
+			title: 'A follow-up',
+		});
+
+		expect(result.status).toBe('refused');
+		expect(service.createIssue).not.toHaveBeenCalled();
+	});
+
+	it('refuses a state belonging to another team', async () => {
+		const { deps, service } = makeDeps({
+			getMetadata: metadataOk([
+				stateWire({
+					id: 's-other',
+					name: 'Backlog',
+					teamId: 't-2',
+					type: 'backlog',
+				}),
+			]),
+		});
+
+		const result = await portFor(deps).createIssue({
+			stateId: 's-other',
+			teamId: 't-1',
+			title: 'A follow-up',
+		});
+
+		expect(result.status).toBe('refused');
+		expect(result.message).toContain('another team');
+		expect(service.createIssue).not.toHaveBeenCalled();
+	});
+
+	it('opens in a backlog state the cache classifies', async () => {
+		const { deps, service } = makeDeps({
+			getMetadata: metadataOk([
+				stateWire({ id: 's-backlog', name: 'Backlog', type: 'backlog' }),
+			]),
+		});
+
+		const result = await portFor(deps).createIssue({
+			stateId: 's-backlog',
+			teamId: 't-1',
+			title: 'A follow-up',
+		});
+
+		expect(result.status).toBe('ok');
+		expect(service.createIssue).toHaveBeenCalledWith({
+			stateId: 's-backlog',
+			teamId: 't-1',
+			title: 'A follow-up',
+		});
+	});
+
+	it('answers not-connected when Linear is not composed at all', async () => {
+		const result = await makeLinearPort(nullDeps()).createIssue({
+			teamId: 't-1',
+			title: 'A follow-up',
+			workspaceId: WORKSPACE_ID,
+		});
+
+		expect(result.status).toBe('not-connected');
+		expect(result.issue).toBeNull();
 	});
 });
 

@@ -15,6 +15,7 @@ import type {
 	WorkspaceGitChangeSummaryWire,
 	WorkspaceGitFileWire,
 } from '../ipc/contracts/workspace-git.ts';
+import type { ConciergeMessageReason } from './concierge-message.ts';
 import { MAX_AGENT_PAYLOAD_CHARS } from './workspace-diff.ts';
 
 /** Every control operation an agent may request, read and write alike. */
@@ -49,6 +50,7 @@ export const AGENT_CONTROL_OPS = [
 	'linearGetIssue',
 	'linearGetMetadata',
 	'linearCreateComment',
+	'linearCreateIssue',
 	'linearUpdateIssue',
 	'listProjects',
 	'listWorkspaces',
@@ -62,6 +64,7 @@ export const AGENT_CONTROL_OPS = [
 	'listRunScripts',
 	'waitForAgents',
 	'notifyOrchestrator',
+	'messageConcierge',
 	'askUserQuestion',
 	'getSessionBrief',
 	'checkPlanModeTool',
@@ -164,7 +167,9 @@ const WRITE_OPS: ReadonlySet<AgentControlOp> = new Set([
 	'addDiffComments',
 	'resolveDiffComments',
 	'linearCreateComment',
+	'linearCreateIssue',
 	'linearUpdateIssue',
+	'messageConcierge',
 ]);
 
 /**
@@ -223,7 +228,30 @@ export interface StartConversationArgs {
 	title?: string;
 	/** Block until the child conversation completes, subject to the wait timeout. */
 	wait?: boolean;
+	/**
+	 * Open a second root orchestrator in the caller's own workspace instead of a
+	 * sub-agent. Only when the user asked for one in so many words — the app puts
+	 * the spawn to them for confirmation rather than taking the agent's word for
+	 * it, because "the user asked" is not something a model can establish about
+	 * its own prompt.
+	 */
+	peer?: boolean;
 }
+
+/**
+ * How many agents may write one workspace's checkout at once, the caller
+ * included. Two, because they share one worktree and one git index and nothing
+ * arbitrates that: the hazard grows with every additional writer, and the user
+ * asked for *a* peer. It is also what bounds the recursion — a peer opening a
+ * peer is refused by this cap rather than by a rule about who may open what.
+ *
+ * Root orchestrators are not the only thing counted against it. A harness
+ * terminal that is still running is an unrestricted writer on the same files, so
+ * it takes one of the two.
+ */
+export const PEER_ORCHESTRATOR_LIMITS = {
+	maxPerWorkspace: 2,
+} as const;
 
 /** Args for `setName`: set the display title of the caller's own conversation tab. */
 export interface SetNameArgs {
@@ -643,6 +671,30 @@ export interface WaitForAgentsResult {
  */
 export interface NotifyOrchestratorArgs {
 	reason: OrchestratorSignalReason;
+	message: string;
+}
+
+/**
+ * Args for `messageConcierge`: a workspace agent addresses the Concierge above
+ * it. Deliberately carries no session id. The Concierge conversation is cleared
+ * and restarted routinely, so any id an agent could hold is one it captured at
+ * spawn time and is wrong by the time it sends — the app resolves the live
+ * session at delivery instead, which is the only moment the answer is true.
+ */
+export interface MessageConciergeArgs {
+	message: string;
+	reason: ConciergeMessageReason;
+}
+
+/**
+ * Result of `messageConcierge`. Says which Concierge conversation took the
+ * message, because that is the fact the agent could not have known: a send that
+ * reports `ok` against an id the agent has never seen is the whole point of
+ * resolving late.
+ */
+export interface MessageConciergeResult {
+	/** Session the message landed in, as resolved at send time. */
+	conciergeSessionId: string;
 	message: string;
 }
 
@@ -1115,6 +1167,8 @@ export interface ResolveDiffCommentsResult {
 export const LINEAR_AGENT_LIMITS = {
 	maxCommentLength: 8_000,
 	maxDescriptionLength: 32_000,
+	/** Labels a filed issue may carry; a runaway guard, not a Linear limit. */
+	maxLabelIds: 10,
 	maxTitleLength: 255,
 	/** Comments returned alongside one issue, newest last. */
 	maxReturnedComments: 40,
@@ -1130,6 +1184,20 @@ export const LINEAR_AGENT_LIMITS = {
  * as In Review and a human decides whether it is finished.
  */
 export const LINEAR_TERMINAL_STATE_TYPES = ['canceled', 'completed'] as const;
+
+/**
+ * Workflow-state categories a newly filed issue may open in. Linear's own `type`
+ * values again: `triage` for a team that runs one, `backlog` and `unstarted` for
+ * a team that does not. `started` is absent for the same reason the terminal
+ * types are — a ticket an agent filed and nobody has read yet is not in
+ * progress, and a board that says otherwise is the tracker lying about who is
+ * working on what.
+ */
+export const LINEAR_INITIAL_STATE_TYPES = [
+	'backlog',
+	'triage',
+	'unstarted',
+] as const;
 
 /**
  * How a Linear op ended, in the vocabulary an agent acts on. Linear is often not
@@ -1368,6 +1436,41 @@ export interface LinearCreateCommentArgs {
  */
 export interface LinearCreateCommentResult extends LinearAgentOutcome {
 	commentId: string | null;
+}
+
+/**
+ * Args for `linearCreateIssue`. `teamId` is required and never inferred: several
+ * Linear accounts can be connected and one account spans teams, so a guessed team
+ * files the ticket on a board nobody who needs it is watching. Everything else is
+ * optional, and an omitted `stateId` leaves the team's own default — Linear picks
+ * triage or backlog, which is where an agent-filed ticket belongs.
+ *
+ * `labelIds`, `projectId`, and `assigneeId` are here where `linearUpdateIssue`
+ * omits the first two: on a ticket that already exists they are planning
+ * decisions a human is making, but on one the agent is filing they are the only
+ * chance to put it in front of the right people at all.
+ */
+export interface LinearCreateIssueArgs {
+	/** Account owning the team; refused rather than guessed when it disagrees. */
+	accountId?: string;
+	assigneeId?: string;
+	description?: string;
+	labelIds?: readonly string[];
+	/** Linear's own scale: 0 none, 1 urgent, 2 high, 3 medium, 4 low. */
+	priority?: number;
+	projectId?: string;
+	/** Workflow state to open in; a started, Done, or Canceled state is refused. */
+	stateId?: string;
+	teamId: string;
+	title: string;
+}
+
+/**
+ * Result of `linearCreateIssue`: the issue as Linear reports it after the write,
+ * so the agent reads back the `identifier` a branch and a commit have to cite.
+ */
+export interface LinearCreateIssueResult extends LinearAgentOutcome {
+	issue: AgentLinearIssue | null;
 }
 
 /**

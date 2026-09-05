@@ -134,12 +134,13 @@ Delegation is bounded so a runaway agent cannot fork-bomb the app
 
 Guardrails count spawns; they do not decide who may do what. That is the role
 policy in `src/shared/agent-control/subagent-policy.ts`, which refuses a spawned
-sub-agent fifteen ops with `denied-scope` **whatever mode it is in**:
+sub-agent seventeen ops with `denied-scope` **whatever mode it is in**:
 
 `spawnChatTab`, `startConversation`, `sendFollowUp`, `launchHarness`,
 `startTerminal`, `stopTerminal`, `writeTerminal`, `openTab`, `closeTab`,
 `setBranchName`, `setWorkspaceStatus`, `askUserQuestion`, `exitPlanMode`,
-`linearCreateComment`, `linearUpdateIssue`.
+`linearCreateComment`, `linearCreateIssue`, `linearUpdateIssue`,
+`messageConcierge`.
 
 Two things run together and are easy to confuse. The spawn guardrail reads
 `origin.depth`, which lives in the in-memory origin registry; the role policy
@@ -163,23 +164,27 @@ the tab carried before rather than assuming which way the write went.
 `waitForAgents`, `listModels`, and `listRunScripts` are not denied — a sub-agent
 simply has no children to wait on, no spawn to pick a model for, and no
 `startTerminal` to pick a run script for. Those three (`SUBAGENT_UNUSABLE_OPS`)
-are withheld from its tool list along with the fifteen above, because listing a
+are withheld from its tool list along with the seventeen above, because listing a
 tool the service would only refuse teaches the model to keep reaching for it. The
-Pi extension registers the complement of `SUBAGENT_WITHHELD_OPS` — eighteen ops in
+Pi extension registers the complement of `SUBAGENT_WITHHELD_OPS` — twenty ops in
 all — for a child, and a parity test compares its copy of that set against the
 shared one.
 
 What a sub-agent keeps: every read, `focusTab`/`focusDockTab`/`focusPanel`,
-`setName`, `setSummary`, and `notifyOrchestrator`.
+`setName`, `setSummary`, and `notifyOrchestrator` — which is also why
+`messageConcierge` is denied it: the Concierge briefed its orchestrator, not it,
+and `notifyOrchestrator` reaches the agent that is actually waiting on it.
 
-The two Linear writes are the newest members and are there for a different reason
+The three Linear writes are the newest members and are there for a different reason
 from the rest. They are not scoped to a workspace at all — a Linear issue is read
 by the whole team — so the usual "acts on someone else's workspace" argument does
 not apply. What does is duplication and authority: three children each posting
 their own comment on the ticket they are all working produces noise the
-orchestrator cannot retract, and an issue's state, assignee, and title describe
-the whole body of work rather than the one unit a child was handed. The
-orchestrator writes to Linear once, for all of them. The three Linear reads stay
+orchestrator cannot retract, an issue's state, assignee, and title describe
+the whole body of work rather than the one unit a child was handed, and several
+children each filing the follow-up they found is how a backlog fills with
+duplicates nothing here can delete. The orchestrator writes to Linear once, for
+all of them. The three Linear reads stay
 available, because a child that cannot read the ticket it was briefed from is
 working blind.
 
@@ -261,7 +266,7 @@ harness.
 
 ## Tool reference
 
-Forty-five tools, enumerated from `TOOL_DEFS` in
+Forty-seven tools, enumerated from `TOOL_DEFS` in
 `src/main/agent-control/mcp-endpoint.ts`. The argument names and types below are
 the authoritative Zod schemas in `src/shared/agent-control/schemas.ts` — every
 schema is a `strictObject`, so an argument not listed here is rejected as
@@ -290,16 +295,101 @@ nor a chat tab of its own).
 | Tool | Arguments | Gate | Withheld from |
 | --- | --- | --- | --- |
 | `ensemblr_spawn_chat_tab` | `title?: string` | write, spawn | sub-agent, Concierge |
-| `ensemblr_start_conversation` | **`prompt: string`**, `chatTabId?: string`, `model?: string`, `thinkingLevel?: string`, `title?: string`, `wait?: boolean`, `workspaceId?: string` | write, spawn | sub-agent |
+| `ensemblr_start_conversation` | **`prompt: string`**, `chatTabId?: string`, `model?: string`, `peer?: boolean`, `thinkingLevel?: string`, `title?: string`, `wait?: boolean`, `workspaceId?: string` | write, spawn | sub-agent |
 | `ensemblr_send_follow_up` | **`agentSessionId: string`**, **`prompt: string`**, `wait?: boolean` | write | sub-agent |
 | `ensemblr_wait_for_agents` | `targets?: string[]`, `mode?: 'first' \| 'all'`, `reports?: 'full' \| 'brief'`, `timeoutMs?: number` | read | sub-agent\* |
 | `ensemblr_notify_orchestrator` | **`reason: 'need_decision' \| 'blocked' \| 'progress' \| 'done'`**, **`message: string`** | read | Concierge |
+| `ensemblr_message_concierge` | **`reason: 'need_decision' \| 'blocked' \| 'brief_wrong' \| 'progress' \| 'done'`**, **`message: string`** (≤ 4,000) | write | sub-agent, Concierge |
 | `ensemblr_list_models` | *(none)* | read | sub-agent\* |
 | `ensemblr_close_tab` | **`chatTabId: string`** | write | sub-agent |
 
 `waitForAgents` and `notifyOrchestrator` are reads, so they survive `read-only`
 mode — a blocked child can still reach its orchestrator when every write is
 refused.
+
+### Peer orchestrators
+
+The decision, with the alternatives it ruled out, is
+[ADR 0059](./adr/0059-let-agents-reach-sideways-and-upwards.md).
+
+`startConversation` with `peer: true` opens a **second root orchestrator** in the
+caller's own workspace rather than a sub-agent: a full orchestrator with its own
+delegation budget, its own tab, and its own user. It records no
+`parentSessionId`, which is what makes it a root on every axis rather than only
+in the spawn path — the origin registry resolves depth from lineage, and
+`resolveDelegation` reads any parent at all as proof of a spawned child. It is
+therefore not among the children `waitForAgents` defaults to, and it outlives the
+turn that opened it.
+
+Four gates, in order:
+
+1. **The Concierge is refused** — what `startConversation` opens for it is already
+   a root, so `peer` there is a misunderstanding rather than a request.
+2. **Plan Mode is refused.** A peer is a second writer, and a planning agent has
+   nothing yet for two agents to write.
+3. **Two agents writing one checkout**, the caller included. Counted from two
+   places, because the two kinds of writer are recorded in different ones:
+   - **Conversations** — control origins in the workspace whose species drives a
+     chat tab, minus the ones carrying the durable sub-agent marker.
+   - **Harness terminals** — sessions of kind `agent` that are still `running`,
+     read from the live terminal list. A harness is an unrestricted writer on the
+     same checkout, so it counts for the reason the cap exists. It is *not*
+     counted from its control origin: a terminal launch of any kind mints one
+     workspace-scoped `harness` origin so a CLI the user starts by hand can reach
+     the control server, and that origin is never released — counting it would
+     spend the whole allowance on a `npm run dev` somebody opened once, and would
+     go on doing so after the terminal exited.
+
+   A spawn that has cleared the cap but has not opened yet holds a reservation,
+   because the count is read before a confirmation prompt that blocks with no
+   time limit and the peer registers nothing until it is running. This is also
+   what bounds the recursion: a peer is a root and looks like one to every gate,
+   so "peers may not open peers" is not a rule the app could check — a second
+   peer is refused because the workspace is full.
+4. **The user confirms it**, through `ConfirmPort`, whatever the permission mode.
+   "The user explicitly asked for this" is not something a model can establish
+   about its own prompt, so passing `peer` states an intent and the confirmation
+   is what turns it into authority. `workspace-trusted` is the user trusting an
+   agent with its own workspace, which is not the same as trusting it to add a
+   second writer to it.
+
+The schema refuses a peer with no `title` (two unnamed orchestrator tabs cannot
+be told apart) and a peer with `wait` (it is not a child to wait on).
+
+**Nothing arbitrates the shared checkout**, and the app does not pretend
+otherwise: file writes go through each agent's own runtime and neither process
+can see the other's uncommitted edits. What the app does instead is prepend
+`buildPeerBriefDirective` (`src/shared/agent-control/peer-brief.ts`) to the peer's
+first prompt — the spawner is the designated committer, the peer stays inside the
+files its brief names, it checks `getWorkspaceDiff` before assuming a file is
+free, and it raises a collision with `sendFollowUp` against the spawner's session
+id rather than resolving it itself. That is a contract, not a lock, and it is
+written down as one.
+
+The Concierge needs nothing new to see a peer: `listTabs` lists every chat tab in
+a workspace with its `agentSessionId`, and `outOfScope` already exempts the
+Concierge from the own-workspace rule, so it can address either orchestrator.
+
+`messageConcierge` is the same act one level up, and is a **write** rather than a
+read for a reason the two do not share: `notifyOrchestrator` sets a flag its
+orchestrator polls, while this one submits a prompt that starts a Concierge turn.
+Starting another agent's turn is acting, so `read-only` refuses it.
+
+It takes **no session id**, and that is the design rather than an omission. The
+Concierge conversation is cleared and restarted routinely, so any id an agent
+could hold was captured at spawn time and names a session that is gone; the port
+resolves the live one at delivery, which is the only moment the answer is true.
+An absent conversation is refused with `not-found` rather than queued or opened:
+queueing delivers stale context into a conversation that has since been cleared,
+and opening one would start a turn nobody is watching. The refusal says to put it
+in the agent's last message instead.
+
+The message arrives as an ordinary turn in the Concierge panel, so the user reads
+it, prefixed by a header naming the sending workspace, tab, and session id —
+every field resolved from the caller's control token rather than from anything it
+passed, because the Concierge acts on other workspaces on the strength of it.
+Guardrails cap it at **10 per session** and **3/min**: the loop
+Concierge → orchestrator → Concierge has no natural end.
 
 ### Harnesses, terminals, and run scripts
 
@@ -590,11 +680,22 @@ a `..` segment comes back as `invalid-args` rather than reaching git.
 | `ensemblr_linear_get_issue` | `accountId?: string`, **`issueId: string`**, `refresh?: boolean` | read | — |
 | `ensemblr_linear_get_metadata` | `accountId?: string`, `refresh?: boolean` | read | — |
 | `ensemblr_linear_create_comment` | `accountId?: string`, **`issueId: string`**, **`commentBody: string`** (≤ 8,000) | write | sub-agent |
+| `ensemblr_linear_create_issue` | `accountId?: string`, `assigneeId?: string`, `description?: string` (≤ 32,000), `labelIds?: string[]` (≤ 10), `priority?: number` (0–4), `projectId?: string`, `stateId?: string`, **`teamId: string`**, **`title: string`** (≤ 255) | write | sub-agent |
 | `ensemblr_linear_update_issue` | `accountId?: string`, **`issueId: string`**, `stateId?: string`, `assigneeId?: string`, `priority?: number` (0–4), `title?: string` (≤ 255), `description?: string` (≤ 32,000) | write | sub-agent |
 
 `linearUpdateIssue` needs at least one field beyond `issueId`, and a `stateId`
 whose workflow type is `completed` or `canceled` is refused. `linearUpdateIssue`
-is also refused in Plan Mode. Several Linear accounts can be connected at once,
+is also refused in Plan Mode, as is `linearCreateIssue`.
+
+`linearCreateIssue` carries three refusals of its own, all decided before Linear
+is called and all reporting that nothing was filed. `teamId` must name a cached
+team, and an `accountId` that names a different account than that team's is a
+mismatch rather than something to reconcile. A `stateId` must belong to that team
+and must be a `backlog`, `triage`, or `unstarted` state — `started` claims work is
+underway on a ticket nobody has read, and the terminal types close it before
+anybody has. And the caller's session must have run `linearListIssues` at least
+once: a duplicate cannot be deleted from here, so the search that would have found
+it is a precondition rather than an instruction. Several Linear accounts can be connected at once,
 so `accountId` is optional on every one of these and resolved from what the call
 already names. See [Talking to Linear](#talking-to-linear).
 

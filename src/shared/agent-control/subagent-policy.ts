@@ -88,6 +88,14 @@ const SUBAGENT_BLOCKED_OPS: ReadonlyMap<AgentControlOp, string> = new Map([
 		'You were spawned as a sub-agent, and a Linear issue is read by the whole team rather than by your orchestrator. Several children working the same ticket each posting their own comment is noise the orchestrator cannot retract, so it writes to Linear once, for all of you. Put what you would have commented in your report.',
 	],
 	[
+		'messageConcierge',
+		'You were spawned as a sub-agent, and the Concierge is two levels above you: it briefed your orchestrator, not you, and it has no context for a message from a unit of work it never handed out. `ensemblr_notify_orchestrator` is your channel — reason `blocked` or `need_decision` wakes the orchestrator that is waiting on you, and it decides whether the Concierge needs to hear about it.',
+	],
+	[
+		'linearCreateIssue',
+		'You were spawned as a sub-agent, and a filed issue is a row on the team\'s board that nothing here can delete. Several children each filing the follow-up they found is exactly how a backlog fills with duplicates, so the orchestrator files once, for all of you. Put what you would have filed under the "Follow-ups" heading of your report.',
+	],
+	[
 		'linearUpdateIssue',
 		"You were spawned as a sub-agent, and an issue's state, assignee, and title describe the whole body of work rather than the one unit you were handed, so moving the ticket belongs to the orchestrator that spawned you. Say in your report where you think it now stands and let the orchestrator move it.",
 	],
@@ -188,6 +196,10 @@ const CONCIERGE_BLOCKED_OPS: ReadonlyMap<AgentControlOp, string> = new Map([
 	[
 		'notifyOrchestrator',
 		'You are the top of the tree \u2014 there is no orchestrator above you to signal. Put the decision to the user with `ensemblr_ask_user_question`.',
+	],
+	[
+		'messageConcierge',
+		'You are the Concierge \u2014 a message here would be addressed to yourself. Put the decision to the user with `ensemblr_ask_user_question`, or steer the agent you are thinking of with `ensemblr_send_follow_up`.',
 	],
 	[
 		'openTab',

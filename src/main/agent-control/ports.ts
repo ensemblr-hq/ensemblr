@@ -24,6 +24,8 @@ import type {
 	GetWorkspaceDiffResult,
 	LinearCreateCommentArgs,
 	LinearCreateCommentResult,
+	LinearCreateIssueArgs,
+	LinearCreateIssueResult,
 	LinearGetIssueArgs,
 	LinearGetIssueResult,
 	LinearGetMetadataArgs,
@@ -240,6 +242,18 @@ export interface ConversationPort {
 		 * can never have one.
 		 */
 		callerConcierge: boolean;
+		/**
+		 * Whether this spawn opens a peer orchestrator rather than a sub-agent.
+		 * Required rather than optional for the same reason `callerConcierge` and
+		 * `planMode` are: a second spawn route that forgot it would open a peer with
+		 * the sub-agent policy, which is the one thing a peer must not have.
+		 *
+		 * It also drops the lineage. A peer is nobody's child — it records no
+		 * parent, so it registers at depth 0 with its own delegation budget, it is
+		 * not among the children `waitForAgents` defaults to, and it outlives the
+		 * turn that opened it.
+		 */
+		asPeer: boolean;
 		/** Caller session id, threaded into the child's spawn env for lineage. */
 		parentSessionId: string;
 		/**
@@ -450,12 +464,39 @@ export interface MemoryPort {
 }
 
 /**
- * Reads the Concierge's own state: where it lives, which is what its tool policy
- * admits or refuses every file write against, and what its open conversation is
- * running on, which is what a child it spawns inherits.
+ * Fronts the Concierge conversation for the rest of the app: where it lives,
+ * which is what its tool policy admits or refuses every file write against, what
+ * its open conversation is running on, which is what a child it spawns inherits,
+ * and how a workspace agent one level down addresses it.
+ *
+ * That last member is the one thing here a Concierge never calls itself. It is on
+ * this port anyway because this is the seam that fronts the Concierge session
+ * service, and a second port over the same service would be two answers to "which
+ * conversation is live" — which is exactly the question the back-channel exists
+ * to answer only once, at send time.
  */
 export interface ConciergePort {
 	homePath: () => string | null;
+	/**
+	 * Submits a message into whichever Concierge conversation is live right now,
+	 * as a turn the user sees in the panel. Resolves the session itself rather
+	 * than taking one: a clear replaces the conversation without warning, so any
+	 * id a caller could hold is stale by the time it sends.
+	 *
+	 * Never opens a conversation that is not already there. A message that started
+	 * a Concierge turn nobody was watching would spend tokens and act on the app
+	 * with no human in the loop, so an absent conversation is reported rather than
+	 * created — and that has to hold through a child that has died but whose
+	 * shutdown has not landed yet, which is why the adapter behind this reaches
+	 * for the session service's non-reviving path rather than guarding the
+	 * reviving one.
+	 */
+	deliverMessage: (input: {
+		prompt: string;
+	}) => Promise<
+		| { delivered: true; conciergeSessionId: string }
+		| { delivered: false; cause: 'no-session' | 'failed'; detail: string }
+	>;
 	/**
 	 * The model and thinking level the open Concierge conversation runs on, or
 	 * null when none is open. It exists because the Concierge keeps its own
@@ -561,6 +602,9 @@ export interface LinearPort {
 	createComment: (
 		input: LinearPortInput<LinearCreateCommentArgs>,
 	) => Promise<LinearCreateCommentResult>;
+	createIssue: (
+		input: LinearPortInput<LinearCreateIssueArgs>,
+	) => Promise<LinearCreateIssueResult>;
 	updateIssue: (
 		input: LinearPortInput<LinearUpdateIssueArgs>,
 	) => Promise<LinearUpdateIssueResult>;

@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
 	type AgentControlPorts,
 	type AgentSpecies,
+	type ConciergePort,
 	createAgentControlService,
 	createGuardrails,
 	createOriginRegistry,
@@ -30,6 +31,7 @@ const makePorts = (
 		planSubmitted: boolean;
 		spawnedSubAgent: boolean;
 		language: AppLanguage;
+		deliverMessage: ConciergePort['deliverMessage'];
 	}> = {},
 ): AgentControlPorts => ({
 	workspaces: {
@@ -186,11 +188,29 @@ const makePorts = (
 			message: 'Comment posted.',
 			status: 'ok',
 		}),
+		createIssue: vi.fn().mockResolvedValue({
+			issue: null,
+			message: 'Filed ENG-2.',
+			status: 'ok',
+		}),
 		updateIssue: vi.fn().mockResolvedValue({
 			issue: null,
 			message: 'ENG-1 updated.',
 			status: 'ok',
 		}),
+	},
+	// Present on the default ports, not only on the Concierge variant below: a
+	// workspace agent messaging upward reaches this port, and a build without one
+	// is a different answer ("no Concierge in this build") from an empty panel.
+	concierge: {
+		deliverMessage:
+			overrides.deliverMessage ??
+			vi.fn().mockResolvedValue({
+				conciergeSessionId: 'concierge-1',
+				delivered: true,
+			}),
+		describeSession: () => null,
+		homePath: () => null,
 	},
 	permissions: { getMode: () => overrides.mode ?? 'workspace-trusted' },
 	commitCredit: { isCoAuthorEnabled: () => false },
@@ -226,7 +246,14 @@ const setup = (
 		architectureDiagram?: boolean;
 	} = {},
 ) => {
-	const registry = createOriginRegistry({ generateToken: () => 'tok-caller' });
+	// The caller keeps `tok-caller`; anything a test registers afterwards gets its
+	// own token. One fixed token for every registration silently re-pointed
+	// `tok-caller` at the last session registered, so a test that added a second
+	// agent to the workspace was quietly testing that agent instead of the caller.
+	let minted = 0;
+	const registry = createOriginRegistry({
+		generateToken: () => (minted++ === 0 ? 'tok-caller' : `tok-${minted}`),
+	});
 	registry.register({
 		sessionId: 'caller',
 		workspaceId: options.concierge ? '' : 'ws',
@@ -1981,6 +2008,483 @@ describe('agent-control service: review', () => {
 	});
 });
 
+// Two orchestrators in one workspace are two writers on one git checkout, and the
+// app cannot arbitrate that. So every gate here is about the two things it CAN
+// do: make the user authorize the second writer rather than take the agent's word
+// that they asked, and bound how many there can be.
+describe('agent-control service: peer orchestrators', () => {
+	const PEER = {
+		peer: true,
+		prompt: 'Take the renderer half.',
+		title: 'Renderer half',
+	};
+
+	it('opens a peer as a root, with no parent and the co-tenancy contract in its prompt', async () => {
+		const ports = makePorts();
+		const { service } = setup({ ports });
+
+		const result = await service.invoke({
+			op: 'startConversation',
+			token: 'tok-caller',
+			rawArgs: PEER,
+		});
+
+		expect(result.ok).toBe(true);
+		const call = vi
+			.mocked(ports.conversations.startConversation)
+			.mock.calls.at(0)?.[0];
+		expect(call?.asPeer).toBe(true);
+		expect(call?.prompt).toContain('YOU ARE A PEER ORCHESTRATOR');
+		expect(call?.prompt).toContain('caller');
+		expect(call?.prompt).toContain('Take the renderer half.');
+	});
+
+	// "The user explicitly asked for this" is not something a model can establish
+	// about its own prompt, so the flag states an intent and the confirmation is
+	// what turns it into authority.
+	it('asks the user even in a mode that confirms nothing else', async () => {
+		const ports = makePorts({ mode: 'workspace-trusted' });
+		const { service } = setup({ ports });
+
+		await service.invoke({
+			op: 'startConversation',
+			token: 'tok-caller',
+			rawArgs: PEER,
+		});
+		const ordinary = makePorts({ mode: 'workspace-trusted' });
+		await setup({ ports: ordinary }).service.invoke({
+			op: 'startConversation',
+			token: 'tok-caller',
+			rawArgs: { prompt: 'go' },
+		});
+
+		expect(ports.confirm.confirm).toHaveBeenCalledTimes(1);
+		expect(ordinary.confirm.confirm).not.toHaveBeenCalled();
+	});
+
+	it('opens nothing when the user declines', async () => {
+		const ports = makePorts({ confirm: false });
+		const { service } = setup({ ports });
+
+		const result = await service.invoke({
+			op: 'startConversation',
+			token: 'tok-caller',
+			rawArgs: PEER,
+		});
+
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.code).toBe('denied-permission');
+			expect(result.error).toContain('do not ask again');
+		}
+		expect(ports.conversations.startConversation).not.toHaveBeenCalled();
+	});
+
+	// The cap is what bounds the recursion: a peer is a root and looks like one to
+	// every gate, so a peer opening a peer is refused because the workspace is
+	// full rather than by a rule about who may open what.
+	it('refuses a third orchestrator in one workspace and names the two already there', async () => {
+		const ports = makePorts();
+		const { registry, service } = setup({ ports });
+		registry.register({
+			sessionId: 'peer',
+			species: 'pi',
+			workspaceCwd: '/ws',
+			workspaceId: 'ws',
+		});
+
+		const result = await service.invoke({
+			op: 'startConversation',
+			token: 'tok-caller',
+			rawArgs: PEER,
+		});
+
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.code).toBe('denied-quota');
+			expect(result.error).toContain('caller');
+			expect(result.error).toContain('peer');
+		}
+		expect(ports.conversations.startConversation).not.toHaveBeenCalled();
+	});
+
+	// A resumed sub-agent re-registers at depth 0 and would otherwise be counted
+	// as a second orchestrator, refusing a peer the workspace has room for.
+	it('does not count a spawned sub-agent towards the cap', async () => {
+		const ports = makePorts();
+		vi.mocked(ports.conversations.isSpawnedSubAgent).mockImplementation(
+			async (sessionId) => sessionId === 'child',
+		);
+		const { registry, service } = setup({ ports });
+		registry.register({
+			sessionId: 'child',
+			species: 'pi',
+			workspaceCwd: '/ws',
+			workspaceId: 'ws',
+		});
+
+		const result = await service.invoke({
+			op: 'startConversation',
+			token: 'tok-caller',
+			rawArgs: PEER,
+		});
+
+		expect(result.ok).toBe(true);
+	});
+
+	// Every terminal — a dev server included — mints one workspace-scoped
+	// `harness` origin so a CLI the user starts by hand can reach the control
+	// server, and nothing releases it. Counting that as an orchestrator spent the
+	// workspace's whole allowance on a run script somebody opened once.
+	it('does not count the origin a terminal launch registers', async () => {
+		const ports = makePorts();
+		const { registry, service } = setup({ ports });
+		registry.register({
+			sessionId: 'ws:ws',
+			species: 'harness',
+			workspaceCwd: '/ws',
+			workspaceId: 'ws',
+		});
+
+		const result = await service.invoke({
+			op: 'startConversation',
+			token: 'tok-caller',
+			rawArgs: PEER,
+		});
+
+		expect(result.ok).toBe(true);
+	});
+
+	// A harness is an unrestricted writer on the same checkout, so it counts for
+	// the reason the cap exists — but it is counted live, from the terminal list,
+	// rather than from an origin that only says one was opened here once.
+	it('counts a running harness terminal, and says only the user can close it', async () => {
+		const ports = makePorts();
+		vi.mocked(ports.terminals.listTerminals).mockResolvedValue([
+			{
+				kind: 'agent',
+				scriptName: null,
+				status: 'running',
+				terminalId: 'term-claude',
+				workspaceId: 'ws',
+			},
+		]);
+		const { service } = setup({ ports });
+
+		const result = await service.invoke({
+			op: 'startConversation',
+			token: 'tok-caller',
+			rawArgs: PEER,
+		});
+
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.code).toBe('denied-quota');
+			expect(result.error).toContain('term-claude');
+			expect(result.error).toContain('only the user can close');
+		}
+		expect(ports.confirm.confirm).not.toHaveBeenCalled();
+	});
+
+	it('ignores a harness that has exited and a run script that is still going', async () => {
+		const ports = makePorts();
+		vi.mocked(ports.terminals.listTerminals).mockResolvedValue([
+			{
+				kind: 'agent',
+				scriptName: null,
+				status: 'exited',
+				terminalId: 'term-dead',
+				workspaceId: 'ws',
+			},
+			{
+				kind: 'run-script',
+				scriptName: 'dev',
+				status: 'running',
+				terminalId: 'term-dev',
+				workspaceId: 'ws',
+			},
+		]);
+		const { service } = setup({ ports });
+
+		const result = await service.invoke({
+			op: 'startConversation',
+			token: 'tok-caller',
+			rawArgs: PEER,
+		});
+
+		expect(result.ok).toBe(true);
+	});
+
+	// The cap is read before a prompt that blocks with no time limit, and the peer
+	// registers an origin only once it is open, so without a reservation two
+	// spawns issued in one parallel block both read the same count and both pass.
+	it('refuses a second peer issued while the first is still opening', async () => {
+		const ports = makePorts();
+		let releaseFirstSpawn = (): void => {};
+		const firstSpawnOpening = new Promise<void>((resolve) => {
+			releaseFirstSpawn = resolve;
+		});
+		vi.mocked(ports.conversations.startConversation).mockImplementation(
+			async () => {
+				await firstSpawnOpening;
+				return { agentSessionId: 'pi-peer', chatTabId: 't', ok: true };
+			},
+		);
+		const { service } = setup({ ports });
+
+		const first = service.invoke({
+			op: 'startConversation',
+			token: 'tok-caller',
+			rawArgs: PEER,
+		});
+		const second = await service.invoke({
+			op: 'startConversation',
+			token: 'tok-caller',
+			rawArgs: { ...PEER, title: 'Third half' },
+		});
+
+		expect(second.ok).toBe(false);
+		if (!second.ok) {
+			expect(second.code).toBe('denied-quota');
+		}
+		releaseFirstSpawn();
+		expect((await first).ok).toBe(true);
+	});
+
+	it('gives the slot back when the user declines, so the next ask still works', async () => {
+		const ports = makePorts({ confirm: false });
+		const { service } = setup({ ports });
+
+		const declined = await service.invoke({
+			op: 'startConversation',
+			token: 'tok-caller',
+			rawArgs: PEER,
+		});
+		vi.mocked(ports.confirm.confirm).mockResolvedValue(true);
+		const retried = await service.invoke({
+			op: 'startConversation',
+			token: 'tok-caller',
+			rawArgs: PEER,
+		});
+
+		expect(declined.ok).toBe(false);
+		expect(retried.ok).toBe(true);
+	});
+
+	it('refuses a peer while planning', async () => {
+		const ports = makePorts({ planning: true });
+		const { service } = setup({ ports });
+
+		const result = await service.invoke({
+			op: 'startConversation',
+			token: 'tok-caller',
+			rawArgs: PEER,
+		});
+
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.code).toBe('denied-scope');
+		}
+		expect(ports.confirm.confirm).not.toHaveBeenCalled();
+	});
+
+	it('tells the Concierge that what it opens is already a root', async () => {
+		const ports = makePorts();
+		ports.workspaces.listWorkspaces = vi
+			.fn()
+			.mockResolvedValue([{ cwd: '/ws', name: 'ws', workspaceId: 'ws' }]);
+		const { service } = setup({ concierge: true, ports });
+
+		const result = await service.invoke({
+			op: 'startConversation',
+			token: 'tok-caller',
+			rawArgs: { ...PEER, workspaceId: 'ws' },
+		});
+
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.code).toBe('invalid-args');
+		}
+	});
+
+	it('rejects a peer with no title, and a peer asked to be waited on', async () => {
+		const ports = makePorts();
+		const { service } = setup({ ports });
+
+		const untitled = await service.invoke({
+			op: 'startConversation',
+			token: 'tok-caller',
+			rawArgs: { peer: true, prompt: 'go' },
+		});
+		const waited = await service.invoke({
+			op: 'startConversation',
+			token: 'tok-caller',
+			rawArgs: { ...PEER, wait: true },
+		});
+
+		expect(untitled.ok).toBe(false);
+		expect(waited.ok).toBe(false);
+		if (!waited.ok) {
+			expect(waited.error).toContain('not a child to wait on');
+		}
+		expect(ports.conversations.startConversation).not.toHaveBeenCalled();
+	});
+
+	it('leaves an ordinary spawn a sub-agent, with its lineage intact', async () => {
+		const ports = makePorts();
+		const { service } = setup({ ports });
+
+		await service.invoke({
+			op: 'startConversation',
+			token: 'tok-caller',
+			rawArgs: { prompt: 'go' },
+		});
+
+		const call = vi
+			.mocked(ports.conversations.startConversation)
+			.mock.calls.at(0)?.[0];
+		expect(call?.asPeer).toBe(false);
+		expect(call?.parentSessionId).toBe('caller');
+		expect(call?.prompt).toBe('go');
+	});
+});
+
+// The Concierge never reads a workspace on its own initiative, so this is the one
+// channel by which anything an orchestrator finds reaches it at all. Every failure
+// mode here is the same failure — a discovery that reaches nobody — so what
+// matters is that a refusal says where to put it instead, and that the header
+// says who is speaking: the Concierge acts on other workspaces on the strength of
+// it, and cannot otherwise tell an agent's message from the user's.
+describe('agent-control service: messaging the Concierge', () => {
+	it('delivers the message with the sender the app resolved, not one it was told', async () => {
+		const deliverMessage = vi.fn().mockResolvedValue({
+			conciergeSessionId: 'concierge-1',
+			delivered: true,
+		});
+		const { service } = setup({ ports: makePorts({ deliverMessage }) });
+
+		const result = await service.invoke({
+			op: 'messageConcierge',
+			token: 'tok-caller',
+			rawArgs: {
+				message: 'The brief names a file that does not exist.',
+				reason: 'brief_wrong',
+			},
+		});
+
+		expect(result.ok).toBe(true);
+		const prompt = deliverMessage.mock.calls.at(0)?.[0].prompt ?? '';
+		expect(prompt).toContain('MESSAGE FROM AN AGENT');
+		expect(prompt).toContain('brief it was given is wrong');
+		expect(prompt).toContain('caller');
+		expect(prompt).toContain('The brief names a file that does not exist.');
+	});
+
+	it('reports which Concierge conversation took it, which the agent could not know', async () => {
+		const ports = makePorts();
+		const { service } = setup({ ports });
+
+		const result = await service.invoke({
+			op: 'messageConcierge',
+			token: 'tok-caller',
+			rawArgs: { message: 'Finished.', reason: 'done' },
+		});
+
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			expect(result.data).toMatchObject({ conciergeSessionId: 'concierge-1' });
+		}
+	});
+
+	// Queueing was the alternative and is worse: delivered hours later, into a
+	// conversation that has since been cleared, it is context nobody can place.
+	it('refuses when no Concierge conversation is open and names what to do instead', async () => {
+		const deliverMessage = vi.fn().mockResolvedValue({
+			cause: 'no-session',
+			delivered: false,
+			detail: '',
+		});
+		const { service } = setup({ ports: makePorts({ deliverMessage }) });
+
+		const result = await service.invoke({
+			op: 'messageConcierge',
+			token: 'tok-caller',
+			rawArgs: { message: 'Blocked on the API key.', reason: 'blocked' },
+		});
+
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.code).toBe('not-found');
+			expect(result.error).toContain('not queued');
+			expect(result.error).toContain('last message');
+		}
+	});
+
+	// Concierge → orchestrator → Concierge has no natural end, so the cap is what
+	// stops one workspace's agent from driving the supervisor in a circle.
+	it('caps how many messages one conversation may send', async () => {
+		const deliverMessage = vi.fn().mockResolvedValue({
+			conciergeSessionId: 'concierge-1',
+			delivered: true,
+		});
+		const { service } = setup({
+			guardrails: { maxConciergeMessagesPerSession: 2 },
+			ports: makePorts({ deliverMessage }),
+		});
+		const send = () =>
+			service.invoke({
+				op: 'messageConcierge',
+				token: 'tok-caller',
+				rawArgs: { message: 'Still going.', reason: 'progress' },
+			});
+
+		expect((await send()).ok).toBe(true);
+		expect((await send()).ok).toBe(true);
+		const third = await send();
+
+		expect(third.ok).toBe(false);
+		if (!third.ok) {
+			expect(third.code).toBe('denied-quota');
+		}
+		expect(deliverMessage).toHaveBeenCalledTimes(2);
+	});
+
+	// A refused delivery must not spend the allowance: an agent that could not
+	// reach the Concierge has said nothing, and burning its budget on the attempt
+	// would silence it for the rest of the run.
+	it('does not spend the allowance on a message that was never delivered', async () => {
+		const deliverMessage = vi
+			.fn()
+			.mockResolvedValueOnce({
+				cause: 'no-session',
+				delivered: false,
+				detail: '',
+			})
+			.mockResolvedValue({
+				conciergeSessionId: 'concierge-1',
+				delivered: true,
+			});
+		const { service } = setup({
+			guardrails: { maxConciergeMessagesPerSession: 1 },
+			ports: makePorts({ deliverMessage }),
+		});
+
+		const refused = await service.invoke({
+			op: 'messageConcierge',
+			token: 'tok-caller',
+			rawArgs: { message: 'Blocked.', reason: 'blocked' },
+		});
+		const later = await service.invoke({
+			op: 'messageConcierge',
+			token: 'tok-caller',
+			rawArgs: { message: 'Blocked.', reason: 'blocked' },
+		});
+
+		expect(refused.ok).toBe(false);
+		expect(later.ok).toBe(true);
+	});
+});
+
 // Linear is an app-level integration bound to one account, so unlike the review
 // ops none of these carries a workspace at all — which makes the permission mode
 // and the sub-agent role the only two gates left to get right.
@@ -2064,6 +2568,121 @@ describe('agent-control service: linear', () => {
 			issueId: 'ENG-106',
 			workspaceId: 'ws',
 		});
+	});
+
+	// Every other guard on a filing is about the ticket's shape; only a search can
+	// see that the issue already exists under somebody else's wording, and a
+	// duplicate cannot be deleted from here. So the search is a precondition the
+	// service enforces rather than a line in the tool description.
+	it('refuses the first filing until the session has searched Linear', async () => {
+		const ports = makePorts();
+		const { service } = setup({ ports });
+
+		const refused = await service.invoke({
+			op: 'linearCreateIssue',
+			token: 'tok-caller',
+			rawArgs: { teamId: 't-1', title: 'A follow-up' },
+		});
+
+		expect(refused.ok).toBe(false);
+		if (!refused.ok) {
+			expect(refused.code).toBe('denied-scope');
+			expect(refused.error).toContain('ensemblr_linear_list_issues');
+		}
+		expect(ports.linear.createIssue).not.toHaveBeenCalled();
+	});
+
+	it('files once the session has searched, and stays open after that', async () => {
+		const ports = makePorts();
+		const { service } = setup({ ports });
+
+		await service.invoke({
+			op: 'linearListIssues',
+			token: 'tok-caller',
+			rawArgs: { query: 'terminal drops a line' },
+		});
+		const first = await service.invoke({
+			op: 'linearCreateIssue',
+			token: 'tok-caller',
+			rawArgs: { teamId: 't-1', title: 'A follow-up' },
+		});
+		const second = await service.invoke({
+			op: 'linearCreateIssue',
+			token: 'tok-caller',
+			rawArgs: { teamId: 't-1', title: 'Another follow-up' },
+		});
+
+		expect(first.ok).toBe(true);
+		expect(second.ok).toBe(true);
+		expect(ports.linear.createIssue).toHaveBeenNthCalledWith(1, {
+			teamId: 't-1',
+			title: 'A follow-up',
+			workspaceId: 'ws',
+		});
+	});
+
+	// A search that came back `not-connected` never read the backlog, so it is not
+	// the looking the precondition is about — clearing the gate on the attempt
+	// would let the duplicate guard be satisfied by a call that saw nothing.
+	it('does not let a search that failed clear the first filing', async () => {
+		const ports = makePorts();
+		vi.mocked(ports.linear.listIssues).mockResolvedValue({
+			issues: [],
+			message: 'Linear is not connected.',
+			omittedIssues: 0,
+			source: null,
+			status: 'not-connected',
+			truncated: false,
+		});
+		const { service } = setup({ ports });
+
+		const searched = await service.invoke({
+			op: 'linearListIssues',
+			token: 'tok-caller',
+			rawArgs: { query: 'terminal drops a line' },
+		});
+		const filed = await service.invoke({
+			op: 'linearCreateIssue',
+			token: 'tok-caller',
+			rawArgs: { teamId: 't-1', title: 'A follow-up' },
+		});
+
+		expect(searched.ok).toBe(true);
+		expect(filed.ok).toBe(false);
+		if (!filed.ok) {
+			expect(filed.code).toBe('denied-scope');
+		}
+		expect(ports.linear.createIssue).not.toHaveBeenCalled();
+	});
+
+	// The gate is per session, not per app: one agent searching cannot clear the
+	// precondition for a different conversation that never looked.
+	it("does not let one session's search clear another session's first filing", async () => {
+		const ports = makePorts();
+		const { registry, service } = setup({ ports });
+
+		await service.invoke({
+			op: 'linearListIssues',
+			token: 'tok-caller',
+			rawArgs: { query: 'terminal' },
+		});
+		const other = registry.register({
+			sessionId: 'other',
+			species: 'pi',
+			workspaceCwd: '/ws',
+			workspaceId: 'ws',
+		});
+		const result = await service.invoke({
+			op: 'linearCreateIssue',
+			token: other.token,
+			rawArgs: { teamId: 't-1', title: 'A follow-up' },
+		});
+
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.code).toBe('denied-scope');
+		}
+		expect(ports.linear.createIssue).not.toHaveBeenCalled();
 	});
 
 	// An update carrying nothing but an id is a wasted round trip, and the reply
@@ -2467,6 +3086,10 @@ const setupConcierge = (
 	const conciergePorts: AgentControlPorts = {
 		...ports,
 		concierge: {
+			deliverMessage: vi.fn().mockResolvedValue({
+				conciergeSessionId: 'concierge-1',
+				delivered: true,
+			}),
 			describeSession: () => ({
 				model: 'anthropic/sonnet',
 				thinkingLevel: null,

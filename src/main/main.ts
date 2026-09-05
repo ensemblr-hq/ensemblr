@@ -1311,6 +1311,15 @@ const linearService = createLinearService({
  */
 const conciergePorts = {
 	concierge: {
+		/**
+		 * Hands a workspace agent's message to whichever Concierge conversation is
+		 * live, as an ordinary turn so the user reads it in the panel like any
+		 * other. Passed straight through rather than assembled here: resolving the
+		 * session and refusing to open one are the same decision, and the service
+		 * that owns the attachment is the only place both can be made at once.
+		 */
+		deliverMessage: (input: { prompt: string }) =>
+			conciergeSessionService.deliverAgentMessage(input),
 		/** What the live Concierge conversation runs on, for a child to inherit. */
 		describeSession: () => conciergeSessionService.describeActiveSession(),
 		/** Where the Concierge may write, which is what its tool policy checks against. */

@@ -47,6 +47,19 @@ export interface OriginRegistry {
 	ancestorsOf: (sessionId: string) => readonly string[];
 	/** Session ids of the registered origins spawned directly by the given session. */
 	childrenOf: (sessionId: string) => readonly string[];
+	/**
+	 * Every origin registered against a workspace, the Concierge excluded — it
+	 * belongs to none.
+	 *
+	 * Whole origins rather than session ids because not everything here is a
+	 * conversation: a terminal launch registers one workspace-scoped origin with
+	 * `species: 'harness'` so a CLI the user starts by hand can reach the control
+	 * server, and that one is registered on the first terminal of any kind and
+	 * never released. A caller deciding who is *working* in a workspace has to
+	 * read `species` to tell the two apart, so this hands it the field rather
+	 * than an id it would have to resolve again.
+	 */
+	originsInWorkspace: (workspaceId: string) => readonly AgentControlOrigin[];
 }
 
 /** Options for {@link createOriginRegistry}; overrides exist for tests. */
@@ -155,6 +168,18 @@ export function createOriginRegistry(
 		return children;
 	};
 
+	const originsInWorkspace = (
+		workspaceId: string,
+	): readonly AgentControlOrigin[] => {
+		const origins: AgentControlOrigin[] = [];
+		for (const origin of bySession.values()) {
+			if (!origin.concierge && origin.workspaceId === workspaceId) {
+				origins.push(origin);
+			}
+		}
+		return origins;
+	};
+
 	return {
 		register,
 		resolveByToken,
@@ -163,5 +188,6 @@ export function createOriginRegistry(
 		retire,
 		ancestorsOf,
 		childrenOf,
+		originsInWorkspace,
 	};
 }

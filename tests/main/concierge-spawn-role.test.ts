@@ -154,6 +154,7 @@ describe('a conversation the Concierge opens is a root orchestrator', () => {
 		const ports = createAgentControlPorts(makeDeps(tabs));
 
 		const outcome = await ports.conversations.startConversation({
+			asPeer: false,
 			callerConcierge: true,
 			callerRuntime: 'pi',
 			parentSessionId: 'concierge-1',
@@ -184,6 +185,45 @@ describe('a conversation the Concierge opens is a root orchestrator', () => {
 		).toBe('orchestrator');
 	});
 
+	// A peer reaches the same answer by the other route: an ordinary orchestrator
+	// opened it, but the user asked for a second orchestrator rather than a helper.
+	// Both axes have to agree, and the lineage has to be absent rather than
+	// exempted — depth is resolved from a parent this spawn deliberately does not
+	// record, and `resolveDelegation` reads any parent at all as proof of a child.
+	it('opens a peer as a root, recording no parent at all', async () => {
+		const tabs = createTabStore();
+		const deps = makeDeps(tabs);
+		const ports = createAgentControlPorts(deps);
+
+		const outcome = await ports.conversations.startConversation({
+			asPeer: true,
+			callerConcierge: false,
+			callerRuntime: 'pi',
+			parentSessionId: 'orchestrator-1',
+			planMode: false,
+			prompt: 'take the renderer half',
+			title: 'Renderer half',
+			workspaceCwd: CWD,
+			workspaceId: WORKSPACE,
+		});
+
+		expect(outcome.ok).toBe(true);
+		expect(tabs.roleOf('tab-opened')).toBeNull();
+		expect(
+			vi.mocked(deps.agentSessionService.openSession).mock.calls.at(0)?.[0],
+		).not.toHaveProperty('parentSessionId');
+
+		const { resolveAgentControlEnv } = makeOverlay(
+			() => tabs.roleOf('tab-opened') === 'subagent',
+		);
+		expect(
+			resolveAgentControlEnv({
+				sessionId: 'child-session',
+				workspaceId: WORKSPACE,
+			}).ENSEMBLR_CONTROL_ROLE,
+		).toBe('orchestrator');
+	});
+
 	// The regression that must survive the fix: an ordinary orchestrator still
 	// produces a sub-agent, on both axes.
 	it('still marks and demotes a child an orchestrator opens', async () => {
@@ -191,6 +231,7 @@ describe('a conversation the Concierge opens is a root orchestrator', () => {
 		const ports = createAgentControlPorts(makeDeps(tabs));
 
 		await ports.conversations.startConversation({
+			asPeer: false,
 			callerConcierge: false,
 			callerRuntime: 'pi',
 			parentSessionId: 'root-1',
@@ -227,6 +268,7 @@ describe('a conversation the Concierge opens is a root orchestrator', () => {
 		const ports = createAgentControlPorts(makeDeps(tabs));
 
 		await ports.conversations.startConversation({
+			asPeer: false,
 			callerConcierge: true,
 			callerRuntime: 'pi',
 			chatTabId: 'tab-reused',
@@ -258,6 +300,7 @@ describe('a conversation the Concierge opens is a root orchestrator', () => {
 
 		await expect(
 			ports.conversations.startConversation({
+				asPeer: false,
 				callerConcierge: true,
 				callerRuntime: 'pi',
 				chatTabId: 'tab-reused',

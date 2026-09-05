@@ -374,6 +374,10 @@
 			"done": "Σχολίασε ένα ζήτημα Linear",
 			"running": "Σχολιάζει ένα ζήτημα Linear"
 		},
+		"linear-create-issue": {
+			"done": "Δημιούργησε ένα ζήτημα Linear",
+			"running": "Δημιουργεί ένα ζήτημα Linear"
+		},
 		"linear-get-issue": {
 			"done": "Διάβασε ένα ζήτημα Linear",
 			"running": "Διαβάζει ένα ζήτημα Linear"
@@ -413,6 +417,10 @@
 		"list-workspaces": {
 			"done": "Παρέθεσε τους χώρους εργασίας",
 			"running": "Παραθέτει τους χώρους εργασίας"
+		},
+		"message-concierge": {
+			"done": "Έστειλε μήνυμα στον Concierge",
+			"running": "Στέλνει μήνυμα στον Concierge"
 		},
 		"notify-orchestrator": {
 			"done": "Ειδοποίησε τον ενορχηστρωτή",

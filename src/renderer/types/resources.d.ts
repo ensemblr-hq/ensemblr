@@ -2798,6 +2798,10 @@ export default interface Resources {
 				done: 'Commented on a Linear issue';
 				running: 'Commenting on a Linear issue';
 			};
+			'linear-create-issue': {
+				done: 'Filed a Linear issue';
+				running: 'Filing a Linear issue';
+			};
 			'linear-get-issue': {
 				done: 'Read a Linear issue';
 				running: 'Reading a Linear issue';

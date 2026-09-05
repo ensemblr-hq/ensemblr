@@ -49,6 +49,8 @@ const EXPECTED_DENIALS: Record<
 	getWorkspaceStatus: [],
 	launchHarness: ['orchestrator', 'subagent'],
 	linearCreateComment: [],
+	messageConcierge: [],
+	linearCreateIssue: ['orchestrator', 'subagent'],
 	linearGetIssue: [],
 	linearGetMetadata: [],
 	linearListIssues: [],

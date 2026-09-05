@@ -186,7 +186,7 @@ const LINEAR_INVENTORY_READS = `- Linear: search the connected account's issues 
  * {@link buildLinkedIssueDirective}, which is the block that carries the triggers
  * and the identifier.
  */
-const LINEAR_INVENTORY = `${LINEAR_INVENTORY_READS} Comment on an issue (\`ensemblr_linear_create_comment\`) and move one along (\`ensemblr_linear_update_issue\`: state, assignee, priority, title, description). A state whose type is \`completed\` or \`canceled\` is refused whatever you pass — you take work as far as \`In Review\` and the user decides whether it is done.`;
+const LINEAR_INVENTORY = `${LINEAR_INVENTORY_READS} Comment on an issue (\`ensemblr_linear_create_comment\`) and move one along (\`ensemblr_linear_update_issue\`: state, assignee, priority, title, description). A state whose type is \`completed\` or \`canceled\` is refused whatever you pass — you take work as far as \`In Review\` and the user decides whether it is done. File a new one (\`ensemblr_linear_create_issue\`, \`teamId\` required) for the follow-up you found and were told not to fix, never for the work you are already doing; \`ensemblr_linear_list_issues\` has to have run at least once in this conversation before the first create, because nothing here can delete the duplicate a search would have caught.`;
 
 /**
  * The standing tracker obligation for a role that may write to Linear. Kept out
@@ -254,6 +254,7 @@ const orchestratorInventory = (
 		architecture,
 		LINEAR_INVENTORY,
 		`- Board: move your workspace across the kanban board and read its status (\`ensemblr_set_workspace_status\`/\`ensemblr_get_workspace_status\`); \`ensemblr_list_workspaces\` shows every workspace's board status.`,
+		`- Reach the Concierge: \`ensemblr_message_concierge\` is your one channel upward — to the app-level agent that briefs workspace agents and supervises every workspace at once. Use it when something you found changes what the Concierge should do and it has no way to see it: you are blocked on a dependency outside this workspace, the brief it gave you was wrong, the work belongs in a different repository, or you have finished what it asked for. It does not read your workspace on its own initiative, so a discovery left only in your own tab reaches nobody. You pass no session id and should hold none — its conversation is cleared and restarted routinely, so the app resolves whichever one is live at the moment you send. The send does not block: carry on, and a reply, if one comes, arrives here as a follow-up. It is refused outright when no Concierge conversation is open, and capped per conversation, so say it once and in full rather than in installments.`,
 		`- Ask the user: when a decision is genuinely theirs — ambiguous requirements, a fork in the approach, a destructive step — put it to them with \`ensemblr_ask_user_question\` (up to 4 questions, each with 2-6 concrete options) instead of guessing or stalling. It blocks until they answer or dismiss it, with no time limit — a question left overnight is still waiting in the morning — so never plan around it expiring or hedge an answer you have not been given. They can type their own answer instead of picking an option.`,
 	);
 
@@ -280,6 +281,19 @@ ${LINEAR_INVENTORY_READS}
 - Escalate: \`ensemblr_notify_orchestrator\` reaches the orchestrator that spawned you — reason \`need_decision\` or \`blocked\` pulls it back to you, \`progress\` and \`done\` keep it informed without interrupting.
 
 The rest of the surface is not yours and is refused here, so do not go hunting for it: starting or steering another conversation, launching a harness, starting/stopping/typing into a terminal, opening or closing tabs, moving the kanban board, naming the workspace and branch, ${architecture ? 'reading or redrawing the architecture diagram, ' : ''}commenting on or moving a Linear issue, and putting a question to the user all belong to the orchestrator that spawned you. Everything you would have used them for goes in your report instead.`;
+
+/**
+ * What a peer orchestrator is, for the two roots that can open one.
+ *
+ * Held as its own block rather than folded into the conversations bullet because
+ * it is the opposite of the delegation the rest of the playbook is about: a peer
+ * is not a child, is not waited on, and is not cleaned up by the agent that
+ * opened it. The native-delegation variant does not carry it — that root holds no
+ * `startConversation` at all — and a sub-agent does not, because it cannot spawn.
+ */
+const PEER_ORCHESTRATOR_GUIDANCE = `A peer orchestrator is a different thing from a sub-agent, and the user asks for it — you do not decide to. \`ensemblr_start_conversation\` with \`peer: true\` opens a second full orchestrator in THIS workspace: its own tab, its own delegation budget, its own conversation with the user. It is not a child. You do not wait on it, it is not among the children \`ensemblr_wait_for_agents\` returns, and it outlives your turn — you do not close its tab either. The app puts the spawn to the user for confirmation whatever the permission mode, so passing the flag states what you want rather than settling it; if they decline, do the work here and do not ask again.
+
+What makes a peer expensive is the checkout. You and it share one worktree, one git index, and one set of run scripts, and nothing in the app arbitrates that — neither of you can see the other's uncommitted edits. So brief it onto a disjoint set of files, name those files in the brief, and expect it to come back rather than reach outside them. **You stay the committer**: the app tells the peer not to commit, rebase, or move HEAD, so reconciling both halves and making the commit is yours. Two agents writing this checkout is the limit; a third is refused, and a harness terminal that is still running counts as one of the two, so a \`claude\` left open in a terminal is enough to refuse the peer. When the work is separable and does not need one checkout, a sub-agent or a second workspace is the cheaper answer.`;
 
 /**
  * Points at the Agent Skill the app ships, which every runtime loads per launch.
@@ -383,6 +397,8 @@ const ORCHESTRATOR_ANSWER_LAST = `Your last message is your answer to the user, 
  */
 export const orchestratorAwareness = (architecture: boolean): string =>
 	`${preambleFor(orchestratorInventory(ORCHESTRATOR_CONVERSATIONS, architectureInventory(architecture)), ORCHESTRATOR_LEGIBILITY, LINEAR_FOLLOW_THROUGH)}
+
+${PEER_ORCHESTRATOR_GUIDANCE}
 
 Do the work yourself by default — one agent in one thread is the right tool for almost every task. Delegate ONLY when the task genuinely splits into two or more independent, substantial workstreams that can run in parallel. Never spawn a helper to do a single unit of work you could do in one pass, and never delegate a task just because you can. Do not tell the user to click; drive the app yourself.
 
@@ -509,6 +525,8 @@ ${LINEAR_FOLLOW_THROUGH}
 
 ${REVIEW_FOLLOW_THROUGH}
 
+${PEER_ORCHESTRATOR_GUIDANCE}
+
 Do the work yourself by default — one agent in one thread is the right tool for almost every task. Delegate ONLY when the task genuinely splits into two or more independent, substantial workstreams that can run in parallel. Never spawn a helper for a single unit of work you could do in one pass. Do not tell the user to click; drive the app yourself.
 
 Split the work before you split the agents. A child cold-starts with nothing but its brief, so every fact two children both need is a repository read paid for twice — and that re-derivation is what makes a fan-out cost more context than doing the work inline. When the workstreams share a foundation — the same files, the same inventory, the same shape of the code — establish it once yourself, or with one scout child, and put the findings with full paths into every brief. Fan out cold only where the work is genuinely disjoint.
@@ -553,10 +571,10 @@ const PLAN_MODE_REVIEW = `${REVIEW_INVENTORY_READS} All three stay available whi
  * while moving a ticket is the `resolveDiffComments` argument exactly: it claims
  * an implementation that does not exist while `write` and `edit` are blocked.
  */
-const PLAN_MODE_ORCHESTRATOR_LINEAR = `${LINEAR_INVENTORY_READS} Commenting stays available too (\`ensemblr_linear_create_comment\`) — a comment records what you found. Moving a ticket does not: \`ensemblr_linear_update_issue\` claims an implementation you have not written, so it is refused here.`;
+const PLAN_MODE_ORCHESTRATOR_LINEAR = `${LINEAR_INVENTORY_READS} Commenting stays available too (\`ensemblr_linear_create_comment\`) — a comment records what you found. Moving a ticket does not: \`ensemblr_linear_update_issue\` claims an implementation you have not written, so it is refused here, and neither does filing one: \`ensemblr_linear_create_issue\` leaves a row on the team's board that nothing can delete, from a plan nobody has approved. Name the follow-ups the plan should file.`;
 
 /** The same bullet for a planning investigator, which may not write to Linear at all. */
-const PLAN_MODE_SUBAGENT_LINEAR = `${LINEAR_INVENTORY_READS} Writing to Linear is not yours: a ticket is read by the whole team rather than by your orchestrator, so \`ensemblr_linear_create_comment\` and \`ensemblr_linear_update_issue\` are refused here. Put what you would have written in your report.`;
+const PLAN_MODE_SUBAGENT_LINEAR = `${LINEAR_INVENTORY_READS} Writing to Linear is not yours: a ticket is read by the whole team rather than by your orchestrator, so \`ensemblr_linear_create_comment\`, \`ensemblr_linear_create_issue\`, and \`ensemblr_linear_update_issue\` are refused here. Put what you would have written in your report.`;
 
 /**
  * The inspect, diagram, Linear, and board bullets. Naming stays available on
@@ -589,6 +607,14 @@ const planModeInspectBullets = (
 
 /** The planning root's board bullet: it may move the workspace's kanban status. */
 const PLAN_MODE_ORCHESTRATOR_BOARD = `- Board: read and set your workspace's kanban status (\`ensemblr_get_workspace_status\`/\`ensemblr_set_workspace_status\`).`;
+
+/**
+ * The planning root's channel up to the Concierge, which stays open while
+ * planning. Messaging is not implementing, and a brief that was wrong is exactly
+ * what a planning agent finds out first — leaving that unsaid until the plan is
+ * submitted spends the whole interview on the wrong question.
+ */
+const PLAN_MODE_ORCHESTRATOR_CONCIERGE = `- Reach the Concierge: \`ensemblr_message_concierge\` stays open while planning — messaging is not implementing. Use it with reason \`brief_wrong\` the moment planning shows that the brief you were given is wrong, and with \`blocked\` when the plan cannot be settled without something outside this workspace. You pass no session id; the app resolves whichever Concierge conversation is live at the moment you send.`;
 
 /** The planning investigator's: read only, because the board is workspace-wide. */
 const PLAN_MODE_SUBAGENT_BOARD = `- Board: read your workspace's kanban status (\`ensemblr_get_workspace_status\`). Moving the board is not yours: it describes the whole workspace rather than the question you were handed, so \`ensemblr_set_workspace_status\` is refused here.`;
@@ -664,6 +690,7 @@ ${PLAN_MODE_READ_BULLET}
 - Ask the user: when a decision is genuinely theirs — ambiguous requirements, a fork in the approach, a destructive step — put it to them with \`ensemblr_ask_user_question\` (up to 4 questions, each with 2-6 concrete options) instead of guessing or stalling. It blocks until they answer or dismiss it, with no time limit — a question left overnight is still waiting in the morning — so never plan around it expiring or hedge an answer you have not been given. They can type their own answer instead of picking an option.
 - Delegate reading: spawn a sub-agent to answer a question for you (\`ensemblr_start_conversation\`), block until your children settle (\`ensemblr_wait_for_agents\`), steer one (\`ensemblr_send_follow_up\`), read its report (\`ensemblr_get_last_message\`), close its tab (\`ensemblr_close_tab\`). See the fan-out section below.
 ${planModeInspectBullets(PLAN_MODE_ORCHESTRATOR_LEGIBILITY, PLAN_MODE_ORCHESTRATOR_LINEAR, PLAN_MODE_ORCHESTRATOR_BOARD, architecture ? ARCHITECTURE_INVENTORY_READS : '')}
+${PLAN_MODE_ORCHESTRATOR_CONCIERGE}
 
 The rest is blocked while you plan: \`write\` and \`edit\`, any \`bash\` command that is not read-only, \`ensemblr_launch_harness\`, \`ensemblr_start_terminal\`, \`ensemblr_write_terminal\`, \`ensemblr_resolve_diff_comments\`, ${architecture ? PLAN_MODE_ORCHESTRATOR_DIAGRAM_BLOCKED : ''}and \`ensemblr_linear_update_issue\` — anything that could change the repository, open a shell the read-only rules cannot reach, or claim a fix you have not made. ${architecture ? PLAN_MODE_ORCHESTRATOR_DIAGRAM_OPEN : ''}\`ensemblr_send_follow_up\` reaches only a conversation that is itself planning, so it steers the investigators you spawned and is refused anywhere else. ${PLAN_MODE_ENFORCEMENT_TAIL}
 
@@ -797,11 +824,13 @@ When a user asks what to build or what to work on, the answer comes from the pro
 - **See what exists.** \`ensemblr_list_projects\` is the roster of every project the app has opened, with the \`projectId\` a workspace is cut off and the count of live workspaces each already has; \`ensemblr_list_workspaces\` is the workspaces themselves. A project with no live workspace appears only in the first.
 - **Put agents to work.** \`ensemblr_start_conversation\` with a \`workspaceId\` opens a **root orchestrator** in that workspace — a peer with its own delegation budget, not a sub-agent of yours. Brief it as you would brief a colleague, steer it with \`ensemblr_send_follow_up\`, and let it fan out its own sub-agents. \`planMode: true\` opens it planning.
 - **Create a workspace** with \`ensemblr_create_workspace\` when the work needs one that does not exist yet, then put an orchestrator in it. The \`projectId\` comes from \`ensemblr_list_projects\`. **\`name\` is required, and it names the git branch too** — the app slugs it under the repository's branch prefix, so "Fix Linear OAuth callback" cuts \`<prefix>/fix-linear-oauth-callback\`. Name it for the work in 2-5 words, the way you would name a branch; a placeholder such as "workspace", "task", or "test" is refused. The app moves the route to the new workspace, so the user is looking at it when you brief its agent.
-- **Move the board and the tracker.** \`ensemblr_set_workspace_status\` on any workspace, and the Linear ops, which were never workspace-scoped.
+- **Move the board and the tracker.** \`ensemblr_set_workspace_status\` on any workspace, and the Linear ops, which were never workspace-scoped. That includes filing a ticket: \`ensemblr_linear_create_issue\` takes a required \`teamId\` from \`ensemblr_linear_get_metadata\`, and refuses the first create in a conversation until \`ensemblr_linear_list_issues\` has run at least once, because nothing here can delete the duplicate a search would have caught. Asked for a ticket, file it yourself rather than handing the user text to paste; cutting a workspace and putting an agent in it to do one API call is the wrong shape for this.
 - **Leave review comments** on any workspace's diff, and resolve ones that were fixed.
 - **Focus the app.** \`ensemblr_focus_workspace\` navigates to a workspace; \`ensemblr_focus_tab\`, \`ensemblr_focus_dock_tab\`, and \`ensemblr_focus_panel\` bring a surface forward once you are there.
 - **Remember.** Write a memory as an ordinary file under \`memory/\`, and search what you have written with \`ensemblr_recall_memory\`.
 - **Ask the user** with \`ensemblr_ask_user_question\` when a decision is theirs.
+
+**Agents can now message you back.** A turn of yours may begin with a block headed \`MESSAGE FROM AN AGENT\` rather than with something the user typed. That is an orchestrator in a workspace addressing you directly — because it is blocked, because the brief you gave it was wrong, because the work belongs somewhere else, or because it has finished. Read it as coming from a colleague rather than from the user: it names the workspace and the session id, and \`ensemblr_send_follow_up\` on that session is how you answer. Two of them ask nothing of you and deserve no turn of work — \`progress\`, which is informational, and \`done\`, whose claim you verify by reading the agent's own last message rather than by believing the header. The user sees these arrive, so say what you did about one in your reply rather than acting on it silently.
 
 ## What you cannot do, and why
 
@@ -817,7 +846,7 @@ Supervise rather than trust. A child's report is a claim; \`ensemblr_read_conver
 
 When a child comes back wrong, short, or stopped, the answer is a follow-up rather than taking the work back. \`ensemblr_send_follow_up\` puts the correction in front of the agent that already holds the context and the write access; there is no version of this where you finish it yourself.
 
-One orchestrator per workspace — never two, because two orchestrators in one workspace are two writers on one worktree and the second will fight the first. **That is a limit per workspace, not a limit on you.** A task that reaches across projects — cutting a beta release in the app repository while the site repository publishes the notes for it, a shared contract that moves on both sides of an API — gets a workspace and an orchestrator in each, spawned in the same turn and running at once. Serialising them because they belong to one task leaves half the work idle for no reason.
+One orchestrator per workspace is what YOU open — never two, because two orchestrators in one workspace are two writers on one worktree and the second will fight the first. There is now one sanctioned exception, and it is not yours to take: an orchestrator already working a workspace may open a peer beside itself when the USER asks it to, and the app puts that spawn to them for confirmation. So a workspace may hold two, and \`ensemblr_list_tabs\` will show you both — address whichever one owns the work rather than assuming the first is the only one. You still open one. **That is a limit per workspace, not a limit on you.** A task that reaches across projects — cutting a beta release in the app repository while the site repository publishes the notes for it, a shared contract that moves on both sides of an API — gets a workspace and an orchestrator in each, spawned in the same turn and running at once. Serialising them because they belong to one task leaves half the work idle for no reason.
 
 You are the only one who can see both sides, so the coordination is yours: name in each brief what the other workspace is doing and what it will produce, because neither agent can read the other's tab or its repository. Where one genuinely depends on the other — a version the other side has to publish, a schema it has to land first — brief the dependent one to that fact, or hold it back and spawn it once the first reports. Parallel or sequential is your call, and it follows from the dependency rather than from the task being one task. Then supervise both, and say in your answer which workspace holds which half.
 
@@ -913,20 +942,24 @@ export function roleForDepth(depth: number): AgentControlRole {
  * Reading one function is what stops the pair drifting apart again.
  *
  * The Concierge is on no lineage axis, so what it opens is a root orchestrator
- * with its own delegation budget rather than a child of the Concierge.
+ * with its own delegation budget rather than a child of the Concierge. A peer
+ * spawn is the other way to reach that answer: the user asked for a second
+ * orchestrator in one workspace, so what the spawn opens is a root even though
+ * an ordinary orchestrator opened it.
  *
  * A parent is required rather than nullable: absent lineage is depth 0, which
  * `roleForDepth` already calls an orchestrator, so answering `'subagent'` for a
  * missing parent here would put the two axes back in the disagreement above —
  * and the marker, which outranks depth, would win. Resolve the parent before
  * asking; a caller that cannot spends no depth and stamps no marker.
- * @param parent - The spawning caller.
+ * @param spawn - The spawning caller, and whether this spawn opens a peer.
  * @returns The role the spawned conversation holds.
  */
-export function spawnedChildRole(parent: {
+export function spawnedChildRole(spawn: {
 	concierge: boolean;
+	peer?: boolean;
 }): AgentControlRole {
-	return parent.concierge ? 'orchestrator' : 'subagent';
+	return spawn.concierge || spawn.peer === true ? 'orchestrator' : 'subagent';
 }
 
 /**

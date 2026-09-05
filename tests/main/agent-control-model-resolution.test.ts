@@ -139,6 +139,7 @@ const spawn = async (input: {
 	}));
 	const ports = createAgentControlPorts(makeDeps({ ...input, openSession }));
 	const outcome = await ports.conversations.startConversation({
+		asPeer: false,
 		callerConcierge: input.callerConcierge ?? false,
 		callerModel: input.callerModel,
 		callerRuntime: input.callerRuntime,
@@ -167,6 +168,7 @@ const refusal = async (input: Parameters<typeof spawn>[0]): Promise<string> => {
 	}));
 	const ports = createAgentControlPorts(makeDeps({ ...input, openSession }));
 	const outcome = await ports.conversations.startConversation({
+		asPeer: false,
 		callerConcierge: input.callerConcierge ?? false,
 		callerModel: input.callerModel,
 		callerRuntime: input.callerRuntime,
@@ -517,6 +519,7 @@ describe('startConversation rollback on submit failure', () => {
 		const ports = createAgentControlPorts(deps);
 		await expect(
 			ports.conversations.startConversation({
+				asPeer: false,
 				callerConcierge: false,
 				callerRuntime: 'pi',
 				parentSessionId: 'parent',
@@ -537,6 +540,7 @@ describe('startConversation rollback on submit failure', () => {
 		const ports = createAgentControlPorts(deps);
 		await expect(
 			ports.conversations.startConversation({
+				asPeer: false,
 				callerConcierge: false,
 				callerRuntime: 'pi',
 				chatTabId: 'caller-tab',
@@ -561,6 +565,7 @@ describe('startConversation rollback on submit failure', () => {
 			const ports = createAgentControlPorts(deps);
 			await expect(
 				ports.conversations.startConversation({
+					asPeer: false,
 					callerConcierge: false,
 					callerRuntime: 'pi',
 					parentSessionId: 'parent',
