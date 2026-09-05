@@ -387,6 +387,7 @@ See [12. Repository settings](./12-repository-settings.md).
 | Delete branch on archive | Delete the local branch when a workspace is archived. The remote branch is untouched — configure that on GitHub. | On / off | Off |
 | Archive on merge | Archive a workspace automatically after its pull request merges. | On / off | Off |
 | Set upstream on plain `git push` | Configure new workspaces so a bare `git push` sets the branch upstream. Turning it off avoids writing git worktree config, at the cost of less reliable PR information until branches have an upstream. | On / off | On |
+| Credit Ensemblr as a commit co-author | Ask agents to end every commit they make with a `Co-authored-by:` trailer for the Ensemblr account. GitHub credits the trailer, so Ensemblr appears alongside you in the repository's contributors. Off leaves your commits with you as the sole author. | On / off | On |
 
 Workspace and branch mechanics are covered in
 [5. Workspaces](./05-workspaces.md); the merge and archive path in
@@ -487,6 +488,7 @@ Developer-only controls and early automation defaults.
 
 | Setting | What it does | Default |
 | --- | --- | --- |
+| Architecture diagram | Show the workspace architecture diagram and let agents read and redraw it. The diagram is a committed `.ensemblr/architecture.json` an agent authors — nothing derives one, so a workspace nobody has drawn simply has none. New sessions pick the switch up; the ones already running keep the surface they started with. | Off |
 | Auto-run after setup | Start a repository's run script automatically after setup, when no repository-specific setting overrides it. | Off |
 | Developer Mode | Show developer-only diagnostics and Pi debug controls. | Off |
 
