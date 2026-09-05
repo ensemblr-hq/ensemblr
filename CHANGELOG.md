@@ -9,6 +9,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Agents can reach sideways and upwards, not only down.** Three new control ops
+  that close the loops the topology left open, decided in
+  [ADR 0059](./docs/adr/0059-let-agents-reach-sideways-and-upwards.md).
+  `ensemblr_start_conversation` with `peer: true` opens a **second root
+  orchestrator** in the caller's own workspace — its own tab, its own delegation
+  budget, its own conversation with the user — capped at two per workspace and
+  confirmed with the user whatever the permission mode, because "the user asked
+  for this" is not something a model can establish about its own prompt. The two
+  share one worktree, so the app hands the peer a written contract: the spawner
+  commits, the peer stays inside the files its brief names.
+  `ensemblr_message_concierge` gives a workspace agent a channel back to the
+  Concierge for the things it cannot see from where it sits — a blocked
+  dependency, a wrong brief, work that belongs in another repository — resolving
+  the live Concierge session at send time rather than trusting an id captured at
+  spawn, and landing as a visible turn in the Concierge panel marked as coming
+  from an agent. `ensemblr_linear_create_issue` files a ticket, with `teamId`
+  required, a started or terminal opening state refused, and a
+  `ensemblr_linear_list_issues` search enforced as a precondition on the first
+  create in a conversation, because nothing here can delete a duplicate.
+
 ## [0.1.3] - 2026-09-05
 
 **Every workspace can carry an architecture diagram, and the guide finally shows the app at its own

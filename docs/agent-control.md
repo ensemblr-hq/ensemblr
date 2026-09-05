@@ -309,6 +309,9 @@ refused.
 
 ### Peer orchestrators
 
+The decision, with the alternatives it ruled out, is
+[ADR 0059](./adr/0059-let-agents-reach-sideways-and-upwards.md).
+
 `startConversation` with `peer: true` opens a **second root orchestrator** in the
 caller's own workspace rather than a sub-agent: a full orchestrator with its own
 delegation budget, its own tab, and its own user. It records no

@@ -43,6 +43,7 @@ import type {
 	LinearMetadataWire,
 	LinearResourceWire,
 	LinearServiceFailure,
+	MutateLinearIssueResult,
 } from '../../shared/ipc/contracts/linear.ts';
 import type { LinearService } from '../linear';
 import type { EnsemblrDatabaseService } from '../storage';
@@ -534,6 +535,33 @@ async function createIssueRefusal(
 }
 
 /**
+ * Reports how a Linear issue mutation went, in the one shape both mutations
+ * answer in. The two differ only in the sentence they describe success with, and
+ * every part they share is load-bearing: a failure carries the account list an
+ * agent needs to correct itself, and a success is flattened to the few fields it
+ * acts on.
+ * @param deps - Port collaborators, for the account list a failure carries.
+ * @param result - The service's mutation envelope.
+ * @param describe - Renders the success message from the issue as written.
+ * @returns The agent-facing result for either mutation.
+ */
+async function issueMutationOutcome(
+	deps: LinearPortDeps,
+	result: MutateLinearIssueResult,
+	describe: (issue: AgentLinearIssue) => string,
+): Promise<LinearUpdateIssueResult> {
+	if (result.status === 'error') {
+		return {
+			...failed(result.failure),
+			...accountChoice(await listAccountsSafely(deps)),
+			issue: null,
+		};
+	}
+	const issue = toAgentIssue(result.issue);
+	return { issue, message: describe(issue), status: 'ok' };
+}
+
+/**
  * Reads the Linear account a workspace was created against, so an agent working
  * a ticket does not have to name the organization it already came from.
  * @param deps - Port collaborators holding the database service.
@@ -883,19 +911,12 @@ export function makeLinearPort(deps: LinearPortDeps): LinearPort {
 				teamId,
 				title,
 			});
-			if (result.status === 'error') {
-				return {
-					...failed(result.failure),
-					...accountChoice(await listAccountsSafely(deps)),
-					issue: null,
-				};
-			}
-			const issue = toAgentIssue(result.issue);
-			return {
-				issue,
-				message: `Filed ${issue.identifier} "${issue.title}" on ${issue.team ?? 'the team you named'}, in ${issue.state ?? 'the team default state'}. The whole team sees it and nothing here can delete it, so cite ${issue.identifier} rather than filing it again. Its accountId is "${issue.accountId}" — pass that on any further write.`,
-				status: 'ok',
-			} satisfies LinearCreateIssueResult;
+			return issueMutationOutcome(
+				deps,
+				result,
+				(issue) =>
+					`Filed ${issue.identifier} "${issue.title}" on ${issue.team ?? 'the team you named'}, in ${issue.state ?? 'the team default state'}. The whole team sees it and nothing here can delete it, so cite ${issue.identifier} rather than filing it again. Its accountId is "${issue.accountId}" — pass that on any further write.`,
+			) satisfies Promise<LinearCreateIssueResult>;
 		},
 
 		updateIssue: async ({
@@ -927,19 +948,12 @@ export function makeLinearPort(deps: LinearPortDeps): LinearPort {
 				id: issueId,
 				input: { assigneeId, description, priority, stateId, title },
 			});
-			if (result.status === 'error') {
-				return {
-					...failed(result.failure),
-					...accountChoice(await listAccountsSafely(deps)),
-					issue: null,
-				};
-			}
-			const issue = toAgentIssue(result.issue);
-			return {
-				issue,
-				message: `${issue.identifier} updated; it is now in ${issue.state ?? 'no state'}.`,
-				status: 'ok',
-			} satisfies LinearUpdateIssueResult;
+			return issueMutationOutcome(
+				deps,
+				result,
+				(issue) =>
+					`${issue.identifier} updated; it is now in ${issue.state ?? 'no state'}.`,
+			);
 		},
 	};
 }

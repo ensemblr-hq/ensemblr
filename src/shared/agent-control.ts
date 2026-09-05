@@ -34,10 +34,7 @@ export {
 	buildCoAuthorDirective,
 	CO_AUTHOR_DIRECTIVE_HEADER,
 } from './agent-control/co-author-directive.ts';
-export type {
-	ConciergeMessageReason,
-	ConciergeMessageSender,
-} from './agent-control/concierge-message.ts';
+export type { ConciergeMessageSender } from './agent-control/concierge-message.ts';
 export {
 	buildConciergeMessage,
 	CONCIERGE_MESSAGE_LIMITS,
