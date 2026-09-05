@@ -133,6 +133,7 @@ export function UnreadScene() {
 						activeSession={activeSession}
 						closedSessions={[]}
 						onLaunchHarness={async () => null}
+						onOpenArchitectureDiagram={async () => null}
 						onSessionTabChange={setActiveTabId}
 						onSessionTabClose={() => undefined}
 						onSessionTabOpen={async () => null}

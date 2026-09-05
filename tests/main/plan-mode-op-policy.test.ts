@@ -41,6 +41,7 @@ const EXPECTED_DENIALS: Record<
 	focusPanel: [],
 	focusTab: [],
 	focusWorkspace: [],
+	getArchitectureDiagram: [],
 	getConversationStatus: [],
 	getLastMessage: [],
 	getSessionBrief: [],
@@ -72,6 +73,12 @@ const EXPECTED_DENIALS: Record<
 	startConversation: 'conditional',
 	startTerminal: ['orchestrator', 'subagent'],
 	stopTerminal: [],
+	// Denied in Plan Mode for both roles: it is the only permitted write that
+	// touches the git working tree. `.ensemblr/architecture.json` is tracked, so a
+	// planning agent redrawing it dirties the user's `git status` and the Changes
+	// panel — the invariant planning sells. `linearCreateComment` is not the
+	// precedent, because that writes to a remote tracker; `resolveDiffComments` is.
+	updateArchitectureDiagram: ['orchestrator', 'subagent'],
 	waitForAgents: [],
 	writeTerminal: ['orchestrator', 'subagent'],
 };

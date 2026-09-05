@@ -4,6 +4,9 @@ import type { EnsemblrApi } from '@/shared/ipc/contracts/api';
 /** Hierarchical TanStack Query keys for every Ensemblr IPC-backed query. */
 export const ensemblrQueryKeys = {
 	all: ['ensemblr'] as const,
+	/** Query key for a workspace's stored architecture snapshots. */
+	architectureSnapshot: (workspaceId: string) =>
+		[...ensemblrQueryKeys.all, 'architecture-snapshot', workspaceId] as const,
 	/** Query key for a repository's archived workspaces. */
 	archivedWorkspaces: (repositoryId: string) =>
 		[...ensemblrQueryKeys.all, 'archived-workspaces', repositoryId] as const,

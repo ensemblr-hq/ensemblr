@@ -208,16 +208,18 @@ describe('the Concierge withholding axis', () => {
 		// sub-agent?" about something that can never be one.
 		expect(
 			withheldControlOps({
+				architectureDiagram: true,
 				delegation: 'native',
 				hasChatTab: false,
 				role: 'concierge',
 			}),
-		).toBe(CONCIERGE_WITHHELD_OPS);
+		).toStrictEqual(CONCIERGE_WITHHELD_OPS);
 	});
 
 	test('withholds the Concierge-only ops from every workspace agent', () => {
 		for (const role of ['orchestrator', 'subagent'] as const) {
 			const withheld = withheldControlOps({
+				architectureDiagram: true,
 				delegation: 'ensemblr',
 				hasChatTab: true,
 				role,

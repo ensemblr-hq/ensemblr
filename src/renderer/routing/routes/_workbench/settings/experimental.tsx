@@ -6,6 +6,7 @@ import { SettingRow } from '@/renderer/components/settings/setting-row';
 import { SettingsSection } from '@/renderer/components/settings/settings-section';
 import { Switch } from '@/renderer/components/ui/switch';
 import {
+	architectureDiagramAtom,
 	autoRunAfterSetupAtom,
 	developerModeAtom,
 } from '@/renderer/state/preferences';
@@ -24,6 +25,9 @@ function ExperimentalSettings() {
 	const { t } = useTranslation();
 	const [developerMode, setDeveloperMode] = useAtom(developerModeAtom);
 	const [autoRun, setAutoRun] = useAtom(autoRunAfterSetupAtom);
+	const [architectureDiagram, setArchitectureDiagram] = useAtom(
+		architectureDiagramAtom,
+	);
 
 	return (
 		<SettingsSection
@@ -47,6 +51,25 @@ function ExperimentalSettings() {
 				)}
 				modified={developerMode !== DEFAULTS.developerMode}
 				onReset={() => setDeveloperMode(DEFAULTS.developerMode)}
+			/>
+
+			<SettingRow
+				control={
+					<Switch
+						checked={architectureDiagram}
+						onCheckedChange={setArchitectureDiagram}
+					/>
+				}
+				description={t(
+					'settings:experimental.architecture-diagram.description',
+					'Show the workspace architecture diagram and let agents read and redraw it. New sessions pick this up; the ones already running keep the surface they started with.',
+				)}
+				label={t(
+					'settings:experimental.architecture-diagram.label',
+					'Architecture diagram',
+				)}
+				modified={architectureDiagram !== DEFAULTS.architectureDiagram}
+				onReset={() => setArchitectureDiagram(DEFAULTS.architectureDiagram)}
 			/>
 
 			<SettingRow

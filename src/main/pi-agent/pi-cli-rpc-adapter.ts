@@ -99,10 +99,12 @@ export interface CreatePiCliRpcAdapterOptions {
 	onRawFrame?: (frame: PiRawFrameSample) => void;
 	/**
 	 * Argv every session starts from, before the per-session selection flags.
-	 * Production appends `-e <control-extension>` here; the default is the bare
-	 * RPC mode switch.
+	 * Production appends `-e <control-extension>` and one `--skill` per shipped
+	 * skill here; the default is the bare RPC mode switch. Resolved per session
+	 * rather than once, because the skills a session is entitled to follow a
+	 * setting the user can flip while the app runs.
 	 */
-	baseArgs?: readonly string[];
+	baseArgs?: () => readonly string[];
 }
 
 /**
@@ -131,7 +133,7 @@ export function createPiCliRpcAdapter(
 	const killGraceMs = options.killGraceMs ?? DEFAULT_KILL_GRACE_MS;
 	const onRawFrame = options.onRawFrame;
 	const resolveBaseEnv = options.resolveBaseEnv ?? (() => process.env);
-	const baseArgs = options.baseArgs ?? DEFAULT_PI_RPC_ARGS;
+	const readBaseArgs = options.baseArgs ?? (() => DEFAULT_PI_RPC_ARGS);
 
 	const openSessions = new Set<CliRpcSession>();
 
@@ -147,7 +149,7 @@ export function createPiCliRpcAdapter(
 					metadata: {
 						...input.metadata,
 						args: buildPiSessionArgs({
-							baseArgs,
+							baseArgs: readBaseArgs(),
 							modelOverride: input.request.modelOverride,
 							runtimeSessionId: input.metadata.sessionId,
 							thinkingLevel: input.request.thinkingLevel,

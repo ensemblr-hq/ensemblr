@@ -19,6 +19,7 @@ import type {
 	LinearAccountRef,
 	PlanModeChangedBroadcast,
 	ReviewCommentsChangedBroadcast,
+	SessionBriefNaming,
 	TabsChangedBroadcast,
 } from '../../shared/agent-control.ts';
 import {
@@ -49,6 +50,8 @@ import {
 import type { SessionBriefCaller } from '../agent-runtime/naming/session-brief-naming.ts';
 import { readSessionBriefNaming } from '../agent-runtime/naming/session-brief-naming.ts';
 import type { HarnessDetectionService } from '../agents/index.ts';
+import type { ArchitectureService } from '../architecture/index.ts';
+import { readDiagramUpkeep } from '../architecture/index.ts';
 import type { ChatTabService } from '../chat-tabs/chat-tab-service.ts';
 import type { AppSettingsService } from '../config';
 import type { LinearService } from '../linear';
@@ -64,9 +67,13 @@ import {
 	setChatTabMetadata,
 } from '../storage/repositories/chat-tab-repository.ts';
 import { listProjectRows } from '../storage/repositories/repository-row-repository.ts';
-import { listAllWorkspaceRows } from '../storage/repositories/workspace-repository.ts';
+import {
+	listAllWorkspaceRows,
+	selectWorkspaceWithRepositoryById,
+} from '../storage/repositories/workspace-repository.ts';
 import { type TerminalService, toReadableScrollback } from '../terminal';
 import type { WorkspaceGitService } from '../workspace-git';
+import { makeArchitecturePort } from './architecture-ports.ts';
 import type { BoardStatusStore } from './board-status-store.ts';
 import { makeLinearPort } from './linear-ports.ts';
 import {
@@ -129,6 +136,12 @@ export interface PortAdapterDeps {
 	workspaceGitService: WorkspaceGitService;
 	reviewService: ReviewService;
 	/**
+	 * The workspace architecture service, or null when none is composed in.
+	 * Nullable rather than optional so the composition root has to state which it
+	 * is; the port answers with a refusal either way.
+	 */
+	architectureService: ArchitectureService | null;
+	/**
 	 * The app's Linear data service, or null when the integration is not composed.
 	 * Nullable rather than optional so the composition root has to state which it
 	 * is; the port answers `not-connected` either way.
@@ -172,6 +185,8 @@ export interface PortAdapterDeps {
 	broadcastReviewCommentsChanged: (
 		payload: ReviewCommentsChangedBroadcast,
 	) => void;
+	/** Broadcasts a stored diagram so an open architecture tab refreshes. */
+	broadcastArchitectureChanged: (payload: { workspaceId: string }) => void;
 	/**
 	 * Broadcasts a chat tab's Plan Mode state so the renderer's per-chat toggle
 	 * matches a spawn the renderer never made. Best-effort mirror only —
@@ -1165,6 +1180,37 @@ function makeBoardPort(deps: PortAdapterDeps): BoardPort {
  * @param deps - Adapter collaborators.
  * @returns The session-naming port.
  */
+/**
+ * Resolves a workspace's absolute directory, which the diagram upkeep read needs
+ * to reach both the stored document and the repository's change set.
+ *
+ * Swallows a storage failure rather than propagating it: this feeds a turn's
+ * system prompt, and a workspace row that cannot be read is a reason to say
+ * nothing about the diagram, never a reason to fail the brief.
+ * @param deps - Adapter collaborators.
+ * @param workspaceId - Workspace to resolve.
+ * @returns The absolute workspace path, or null when it cannot be read.
+ */
+function workspaceCwdFor(
+	deps: PortAdapterDeps,
+	workspaceId: string,
+): string | null {
+	try {
+		const database = deps.databaseService.getConnection()?.database;
+		if (!database) {
+			return null;
+		}
+		const row = selectWorkspaceWithRepositoryById({ database, workspaceId }) as
+			| { path?: unknown }
+			| undefined;
+		return typeof row?.path === 'string' && row.path.length > 0
+			? row.path
+			: null;
+	} catch {
+		return null;
+	}
+}
+
 function makeSessionNamingPort(deps: PortAdapterDeps): SessionNamingPort {
 	/**
 	 * Reads the user's "Let agents name the workspace and branch" setting, which
@@ -1174,13 +1220,56 @@ function makeSessionNamingPort(deps: PortAdapterDeps): SessionNamingPort {
 	const namingEnabled = (): boolean =>
 		deps.appSettingsService.read().git.renameWorkspaceOnBranch;
 
+	/**
+	 * Reads whether the workspace's diagram has fallen behind the code, for a
+	 * caller that could actually do something about it.
+	 *
+	 * Withheld from a spawned child and from the Concierge because both diagram
+	 * ops are refused for those roles: a bullet asking either for a redraw would
+	 * only spend a turn discovering the denial. Withheld from everyone while the
+	 * feature is off, for the same reason and one more: nothing would even read
+	 * the bullet's answer. The read itself is silent on a workspace nobody has
+	 * drawn, so this costs one failed `stat` in the common case.
+	 * @param origin - Resolved caller identity.
+	 * @param caller - The brief fields already derived for that caller.
+	 * @returns The diagram slice of the caller's upkeep.
+	 */
+	const readDiagramUpkeepFor = async (
+		origin: AgentControlOrigin,
+		caller: SessionBriefCaller,
+	): Promise<SessionBriefNaming['diagram']> => {
+		const nothingStale = { components: [], stale: false };
+		if (
+			!deps.appSettingsService.read().experimental.architectureDiagram ||
+			origin.concierge ||
+			caller.isSubAgent
+		) {
+			return nothingStale;
+		}
+		const workspaceCwd = workspaceCwdFor(deps, caller.workspaceId);
+		if (!workspaceCwd) {
+			return nothingStale;
+		}
+		return readDiagramUpkeep({
+			changedPaths: () =>
+				deps.workspaceGitService.listChangedPaths(workspaceCwd),
+			workspaceCwd,
+		});
+	};
+
 	return {
-		readBrief: async (origin) =>
-			readSessionBriefNaming({
-				caller: briefCallerFor(deps, origin),
+		readBrief: async (origin) => {
+			const caller = briefCallerFor(deps, origin);
+			const naming = readSessionBriefNaming({
+				caller,
 				database: deps.databaseService.getConnection()?.database,
 				namingEnabled,
-			}),
+			});
+			return {
+				...naming,
+				diagram: await readDiagramUpkeepFor(origin, caller),
+			};
+		},
 		setBranchName: async ({ origin, slug, userRequested }) => {
 			const database = deps.databaseService.getConnection()?.database;
 			if (!database) {
@@ -1233,7 +1322,9 @@ function makeSessionNamingPort(deps: PortAdapterDeps): SessionNamingPort {
 export function createAgentControlPorts(
 	deps: PortAdapterDeps,
 ): AgentControlPorts {
+	const architecture = makeArchitecturePort(deps);
 	return {
+		...(architecture ? { architecture } : {}),
 		workspaces: makeWorkspacePort(deps),
 		tabs: makeTabPort(deps),
 		conversations: makeConversationPort(deps),

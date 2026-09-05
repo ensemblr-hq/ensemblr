@@ -19,7 +19,7 @@ interface OpenedTabResult {
 
 /** Opens a non-chat tab; resolves without a `tab` when the row was not written. */
 type OpenAuxiliaryTab = (input: {
-	kind: 'diff' | 'document' | 'file' | 'terminal';
+	kind: 'diagram' | 'diff' | 'document' | 'file' | 'terminal';
 	metadata: Record<string, unknown>;
 	preview?: boolean;
 	title: string;
@@ -44,11 +44,14 @@ type OpenChatTab = (input?: {
  * @returns The opener callbacks the session-tab contract exposes
  */
 export function useSessionTabOpeners({
+	findOpenDiagramTabId,
 	insertAnchorTabId,
 	openAuxiliaryTab,
 	openChatTab,
 	workspaceId,
 }: {
+	/** The workspace's open diagram tab, if it already has one. */
+	findOpenDiagramTabId: () => string | null;
 	insertAnchorTabId: string | null;
 	openAuxiliaryTab: OpenAuxiliaryTab;
 	openChatTab: OpenChatTab;
@@ -150,6 +153,29 @@ export function useSessionTabOpeners({
 	);
 
 	return {
+		/**
+		 * Opens the workspace's architecture diagram, or returns the tab already
+		 * showing it. Pinned rather than ephemeral: a workspace has exactly one
+		 * architecture and it is a place you work from, so the next file opened
+		 * must not evict it out from under you.
+		 */
+		openArchitectureDiagramTab: useCallback(
+			async ({ preview = false }: { preview?: boolean } = {}) => {
+				// The preview slot only retargets an *ephemeral* tab, so once the user
+				// pins theirs the toggle has to find it rather than open beside it.
+				const openTabId = findOpenDiagramTabId();
+				if (openTabId) {
+					return { chatTabId: openTabId };
+				}
+				return openAuxiliary({
+					kind: 'diagram',
+					metadata: {},
+					preview,
+					title: t('workbench:architecture-diagram.tab-title', 'Architecture'),
+				});
+			},
+			[findOpenDiagramTabId, openAuxiliary, t],
+		),
 		/**
 		 * Opens (or re-focuses) a read-only preview tab for a PR comment. The comment
 		 * rides in `metadata` as a `document` tab so the body survives reloads without

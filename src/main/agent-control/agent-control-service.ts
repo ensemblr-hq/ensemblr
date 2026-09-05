@@ -11,6 +11,7 @@ import type {
 	AgentControlOp,
 	AgentControlResult,
 	AgentControlRole,
+	ArchitectureFailureReason,
 	AskUserQuestionArgs,
 	CheckPlanModeToolArgs,
 	CloseTabArgs,
@@ -56,6 +57,7 @@ import type {
 	StartConversationArgs,
 	StartTerminalArgs,
 	StopTerminalArgs,
+	UpdateArchitectureDiagramArgs,
 	WaitedAgent,
 	WaitForAgentsArgs,
 	WaitForAgentsResult,
@@ -206,6 +208,13 @@ interface AgentControlServiceOptions {
 	ports: AgentControlPorts;
 	originRegistry: OriginRegistry;
 	guardrails: Guardrails;
+	/**
+	 * Whether the architecture diagram feature is on, read live rather than
+	 * captured: it is a user setting the app watches, and the answer gates both
+	 * the two diagram ops and the playbook that describes them. Defaults to off,
+	 * so a build that never wires it keeps the feature absent.
+	 */
+	readArchitectureDiagramEnabled?: () => boolean;
 	/**
 	 * Overrides the service clock and sleep; defaults to the real scheduler. Its
 	 * `now` drives both the wait-loop deadline and the review-focus coalescing
@@ -373,6 +382,24 @@ function startTerminalErrorCode(code: string): AgentControlErrorCode {
 }
 
 /**
+ * Maps an architecture refusal onto the code an agent branches on. Only
+ * `invalid` is the caller's own doing, so only it may report `invalid-args` —
+ * that code precedes an instruction to fix the fields and resubmit, which for a
+ * failed write sends the agent to rewrite a document that was already correct,
+ * forever. `unreadable` is `conflict` rather than `internal` because nothing is
+ * broken in the app: a tracked file is in a state that blocks the read, and only
+ * the user can clear it.
+ */
+const ARCHITECTURE_FAILURE_CODES: Readonly<
+	Record<ArchitectureFailureReason, AgentControlErrorCode>
+> = {
+	invalid: 'invalid-args',
+	'store-failed': 'internal',
+	unavailable: 'internal',
+	unreadable: 'conflict',
+};
+
+/**
  * Closes a refused launch with the id of the terminal it collided with. The
  * lifecycle service knows exactly which session is holding the slot, and an
  * agent that cannot see the dock has no other way to reach it — withholding it
@@ -527,6 +554,7 @@ export function createAgentControlService({
 	ports,
 	originRegistry,
 	guardrails,
+	readArchitectureDiagramEnabled = () => false,
 	scheduler = REAL_SCHEDULER,
 	dispatchTimeoutMs = DISPATCH_TIMEOUT_MS,
 }: AgentControlServiceOptions): AgentControlService {
@@ -1053,6 +1081,54 @@ export function createAgentControlService({
 			message: `${recorded.message} ${describeSummaryTruncations(truncated)}`,
 			truncated,
 		} satisfies SetSummaryResult);
+	};
+
+	/**
+	 * Reads the caller's workspace architecture diagram, answering with a null
+	 * document for a workspace nobody has drawn. Nothing derives one, so the
+	 * message that comes back with the absence tells the agent to author it
+	 * rather than to go looking for a scanner it does not hold.
+	 * @param origin - Resolved caller identity.
+	 * @returns The diagram, or a failure.
+	 */
+	const handleGetArchitectureDiagram = async (
+		origin: AgentControlOrigin,
+	): Promise<AgentControlResult<unknown>> => {
+		if (!(readArchitectureDiagramEnabled() && ports.architecture)) {
+			return fail(
+				'denied-scope',
+				'This build keeps no architecture diagram, so there is none to read.',
+			);
+		}
+		const outcome = await ports.architecture.readDiagram({ origin });
+		return outcome.ok
+			? ok(outcome.result)
+			: fail(ARCHITECTURE_FAILURE_CODES[outcome.reason], outcome.message);
+	};
+
+	/**
+	 * Replaces the caller's workspace architecture diagram with a refined one.
+	 * @param origin - Resolved caller identity.
+	 * @param args - The submitted diagram document.
+	 * @returns What was stored, or a failure the agent can correct.
+	 */
+	const handleUpdateArchitectureDiagram = async (
+		origin: AgentControlOrigin,
+		args: UpdateArchitectureDiagramArgs,
+	): Promise<AgentControlResult<unknown>> => {
+		if (!(readArchitectureDiagramEnabled() && ports.architecture)) {
+			return fail(
+				'denied-scope',
+				'This build keeps no architecture diagram, so there is nothing to update.',
+			);
+		}
+		const outcome = await ports.architecture.updateDiagram({
+			diagram: args.diagram,
+			origin,
+		});
+		return outcome.ok
+			? ok(outcome.result)
+			: fail(ARCHITECTURE_FAILURE_CODES[outcome.reason], outcome.message);
 	};
 
 	/**
@@ -2079,6 +2155,13 @@ export function createAgentControlService({
 			handleSetSummary(origin, args as SetSummaryArgs),
 		setWorkspaceStatus: ({ args, origin }) =>
 			handleSetWorkspaceStatus(origin, args as SetWorkspaceStatusArgs),
+		getArchitectureDiagram: ({ origin }) =>
+			handleGetArchitectureDiagram(origin),
+		updateArchitectureDiagram: ({ args, origin }) =>
+			handleUpdateArchitectureDiagram(
+				origin,
+				args as UpdateArchitectureDiagramArgs,
+			),
 		spawnChatTab: ({ args, origin }) =>
 			handleSpawnChatTab(origin, args as SpawnChatTabArgs),
 		startConversation: ({ args, callerModel, origin, signal }) =>
@@ -2159,15 +2242,18 @@ export function createAgentControlService({
 	};
 
 	const describeAudience = async (token: string): Promise<ControlAudience> => {
+		const architectureDiagram = readArchitectureDiagramEnabled();
 		const origin = originRegistry.resolveByToken(token);
 		if (!origin) {
 			return {
+				architectureDiagram,
 				delegation: 'ensemblr',
 				hasChatTab: false,
 				role: 'orchestrator',
 			};
 		}
 		return {
+			architectureDiagram,
 			delegation: origin.delegation,
 			hasChatTab: originHasChatTab(origin),
 			role: await resolveRole(origin),

@@ -23,6 +23,7 @@ export type {
 /** Kind of chat tab surfaced to the renderer. */
 export type ChatTabKindWire =
 	| 'chat'
+	| 'diagram'
 	| 'diff'
 	| 'document'
 	| 'file'

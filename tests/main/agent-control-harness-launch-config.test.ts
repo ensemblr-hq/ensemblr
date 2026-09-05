@@ -44,12 +44,9 @@ describe('buildHarnessLaunchDecoration', () => {
 	});
 
 	it('loads the shipped skill into Claude Code as a session-only plugin', () => {
-		const joined = buildHarnessLaunchDecoration(
-			'claude',
-			URL,
-			INSTRUCTIONS,
+		const joined = buildHarnessLaunchDecoration('claude', URL, INSTRUCTIONS, [
 			SKILL_PLUGIN,
-		).flags.join(' ');
+		]).flags.join(' ');
 		expect(joined).toContain(`--plugin-dir '${SKILL_PLUGIN}'`);
 	});
 
@@ -58,9 +55,22 @@ describe('buildHarnessLaunchDecoration', () => {
 			'claude',
 			URL,
 			INSTRUCTIONS,
-			null,
+			[],
 		).flags.join(' ');
 		expect(joined).not.toContain('--plugin-dir');
+	});
+
+	// Two roots ship: the always-on `ensemblr` skill, and the architecture
+	// diagram one the Experimental switch adds. Claude takes one flag per root.
+	it('repeats --plugin-dir once per shipped plugin root', () => {
+		const joined = buildHarnessLaunchDecoration('claude', URL, INSTRUCTIONS, [
+			SKILL_PLUGIN,
+			'/opt/ensemblr/agent-skills-architecture',
+		]).flags.join(' ');
+		expect(joined).toContain(`--plugin-dir '${SKILL_PLUGIN}'`);
+		expect(joined).toContain(
+			`--plugin-dir '/opt/ensemblr/agent-skills-architecture'`,
+		);
 	});
 
 	// Codex plugins use their own manifest format and Vibe exposes no skill
@@ -71,7 +81,7 @@ describe('buildHarnessLaunchDecoration', () => {
 				harnessId,
 				URL,
 				INSTRUCTIONS,
-				SKILL_PLUGIN,
+				[SKILL_PLUGIN],
 			);
 			expect([...env, ...flags].join(' ')).not.toContain(SKILL_PLUGIN);
 		}
@@ -181,7 +191,7 @@ describe('decorateHarnessCommand', () => {
 	it('carries the skill plugin root through from the launch context', () => {
 		const out = decorateHarnessCommand(
 			'claude --skip',
-			context({ skillPluginDirectory: SKILL_PLUGIN }),
+			context({ skillPluginDirectories: [SKILL_PLUGIN] }),
 		);
 		expect(out).toContain(`--plugin-dir '${SKILL_PLUGIN}'`);
 	});

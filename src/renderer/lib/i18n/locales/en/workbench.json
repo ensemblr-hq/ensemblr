@@ -30,6 +30,42 @@
 		"placeholder": "Search files",
 		"title": "Search files"
 	},
+	"architecture-diagram": {
+		"canvas": {
+			"hint": "Drag or press the arrow keys to pan. Pinch, hold Command and scroll, or press plus and minus to zoom. Press 0 to fit the whole diagram. Press N and P to step between modules, Enter to see what one connects to, and Escape to clear that again.",
+			"label": "Architecture diagram of {{title}}"
+		},
+		"captured-at": "drawn {{when}}",
+		"fit-to-view": "Fit to view",
+		"legend": {
+			"backend": "Backend",
+			"cloud": "Infrastructure",
+			"database": "Data",
+			"external": "External",
+			"frontend": "Interface",
+			"messagebus": "Messaging",
+			"security": "Security"
+		},
+		"loading": "Reading the workspace architecture…",
+		"node": {
+			"name-with-sublabel": "{{label}} — {{sublabel}}",
+			"open-source": "Open {{path}}",
+			"select-label": "{{name}} — show what it connects to"
+		},
+		"open": "Workspace architecture",
+		"problems_one": "{{count}} placement problem in this diagram.",
+		"problems_other": "{{count}} placement problems in this diagram.",
+		"reset-view": "Reset to actual size",
+		"tab-title": "Architecture",
+		"title": "Architecture",
+		"undrawn": {
+			"body": "An agent reads the codebase and draws it. The diagram is stored at {{path}} and travels with your commits.",
+			"draw": "Draw it with an agent",
+			"title": "No architecture diagram yet"
+		},
+		"zoom-in": "Zoom in",
+		"zoom-out": "Zoom out"
+	},
 	"archive-workspace": {
 		"description-cleanup": "Marks the workspace as archived and preserves its <0>.context/</0> handoff files under <1>archived-contexts/</1>. The worktree folder is removed and the local branch dropped, per your git settings; anything else not pushed to the remote will be lost.",
 		"description-reclaim": "Marks the workspace as archived and preserves its <0>.context/</0> handoff files under <1>archived-contexts/</1>. The worktree folder is removed to reclaim its disk, keeping the branch and a snapshot of any uncommitted changes; unarchiving restores both and rebuilds dependencies.",
@@ -298,6 +334,10 @@
 			"done": "Opened a workspace",
 			"running": "Opening a workspace"
 		},
+		"get-architecture-diagram": {
+			"done": "Read the architecture diagram",
+			"running": "Reading the architecture diagram"
+		},
 		"get-conversation-status": {
 			"concierge": {
 				"done": "Checked a chat",
@@ -433,6 +473,10 @@
 		"stop-terminal": {
 			"done": "Stopped a terminal",
 			"running": "Stopping a terminal"
+		},
+		"update-architecture-diagram": {
+			"done": "Redrew the architecture diagram",
+			"running": "Redrawing the architecture diagram"
 		},
 		"wait-for-agents": {
 			"concierge": {

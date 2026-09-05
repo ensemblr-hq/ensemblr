@@ -32,6 +32,7 @@ import { type ZodRawShape, z } from 'zod';
 import {
 	type AgentControlOp,
 	type AgentControlResult,
+	ARCHITECTURE_DIAGRAM_LIMITS,
 	ASK_USER_QUESTION_LIMITS,
 	awarenessForAudience,
 	type ControlAudience,
@@ -41,6 +42,10 @@ import {
 	WORKSPACE_BOARD_STATUSES,
 	withheldControlOps,
 } from '../../shared/agent-control.ts';
+import {
+	ARCHITECTURE_LAYOUT_MAX_COLS,
+	MAX_COMPONENT_SOURCES,
+} from '../../shared/architecture-diagram.ts';
 import type { AgentControlService } from './agent-control-service.ts';
 import { withProgressHeartbeat } from './mcp-progress.ts';
 
@@ -70,6 +75,98 @@ const askQuestion = z.object({
 		.max(ASK_USER_QUESTION_LIMITS.maxOptions),
 	multiSelect: z.boolean().optional(),
 });
+
+/**
+ * The architecture IR as the tool *advertises* it.
+ *
+ * It has to be spelled out rather than left as `z.unknown()`: an untyped
+ * property serializes to an empty JSON Schema, and a client with nothing to aim
+ * at sends the document as a JSON string — which then fails validation on the
+ * far side, every time, with no hint that the encoding was the problem.
+ *
+ * Every object here is loose, so an archify document carrying brand marks or
+ * guided views survives the trip intact rather than being stripped down to what
+ * this shape happens to name. `architectureIrSchema` in `shared/` stays the
+ * authority: this one only has to make the argument's *shape* legible.
+ */
+const architectureDiagram = z.looseObject({
+	meta: z.looseObject({ title: z.string(), subtitle: z.string().optional() }),
+	components: z
+		.array(
+			z.looseObject({
+				id: z.string(),
+				type: z.enum([
+					'frontend',
+					'backend',
+					'database',
+					'cloud',
+					'security',
+					'messagebus',
+					'external',
+				]),
+				label: z.string(),
+				sublabel: z.string().optional(),
+				row: z.number().int().optional(),
+				col: z.number().int().optional(),
+				sources: z
+					.array(z.looseObject({ path: z.string() }))
+					.max(MAX_COMPONENT_SOURCES)
+					.optional(),
+			}),
+		)
+		.max(ARCHITECTURE_DIAGRAM_LIMITS.maxComponents),
+	connections: z
+		.array(
+			z.looseObject({
+				id: z.string().optional(),
+				from: z.string(),
+				to: z.string(),
+				label: z.string().optional(),
+				variant: z
+					.enum(['default', 'emphasis', 'security', 'dashed'])
+					.optional(),
+			}),
+		)
+		.max(ARCHITECTURE_DIAGRAM_LIMITS.maxConnections)
+		.optional(),
+	boundaries: z
+		.array(
+			z.looseObject({
+				kind: z.enum(['region', 'security-group']),
+				label: z.string(),
+				wraps: z.array(z.string()),
+			}),
+		)
+		.max(ARCHITECTURE_DIAGRAM_LIMITS.maxBoundaries)
+		.optional(),
+	layout: z
+		.looseObject({
+			mode: z.enum(['grid', 'organic']),
+			cols: z
+				.number()
+				.int()
+				.min(1)
+				.max(ARCHITECTURE_LAYOUT_MAX_COLS)
+				.optional(),
+		})
+		.optional(),
+	schemaVersion: z.number().int().optional(),
+});
+
+/**
+ * What the tool actually accepts: the advertised object, or the JSON string a
+ * client that could not read the advertisement sent instead.
+ *
+ * The string arm is what makes the two bridges answer the same way. The Pi
+ * extension declares this argument `Type.Unknown()`, so a stringified document
+ * reaches `decodeSubmittedDiagram` and is decoded; without the union the SDK
+ * rejects the identical call here with a raw Zod error before the port is ever
+ * entered — and this is the bridge whose clients are likeliest to stringify.
+ * The tolerance is kept rather than dropped because the encoding is the bridge's
+ * mistake and the document is right: refusing it sends a model rewriting content
+ * that was never the problem.
+ */
+const submittedArchitectureDiagram = z.union([architectureDiagram, z.string()]);
 
 /**
  * Every tool this endpoint knows how to serve, in the whole control vocabulary
@@ -137,6 +234,19 @@ export const TOOL_DEFS: readonly McpToolDef[] = [
 		// client that validates its own inputs would reject an over-long summary
 		// locally, which is exactly the lost record the truncation exists to prevent.
 		shape: { title: z.string(), summary: z.string() },
+	},
+	{
+		name: 'ensemblr_get_architecture_diagram',
+		op: 'getArchitectureDiagram',
+		description:
+			"Read this workspace's architecture diagram — directories as nodes, cross-module imports as edges, top-level directories as boundary frames. Call this FIRST, before ensemblr_update_architecture_diagram, so you edit the stored document rather than replacing it blind. `diagram` comes back null when nobody has drawn this workspace yet: that is an ordinary answer rather than a failure, and it is not something to retry. Nothing in Ensemblr derives a diagram — there is no scanner to invoke and nothing to look for on disk or in the app's database — so a null answer means you read the codebase and author one yourself, then store it with ensemblr_update_architecture_diagram. A workspace whose stored file cannot be parsed is refused rather than written over, and the refusal names what is wrong with it: that file is tracked, so repair or delete it rather than working around it. The diagram is a drawing for the user to look at, not a source of truth for you: it is lossy by design and only as current as the last agent who updated it, so never answer a question about the codebase from it, never decide what to edit because a node says so, and never report its contents as fact. Read the code. Where the two disagree the diagram is wrong, and fixing it is the only thing that licenses.",
+		shape: {},
+	},
+	{
+		name: 'ensemblr_update_architecture_diagram',
+		op: 'updateArchitectureDiagram',
+		description: `Store this workspace's architecture diagram, passed whole as \`diagram\` — as a JSON object, never as a string containing JSON. This op is the only way a diagram comes to exist or changes: Ensemblr derives nothing. Read the current one first with ensemblr_get_architecture_diagram; if it answers null, derive the document from the codebase — directories as nodes, cross-module imports as edges — naming each boundary for the concern it holds rather than its directory path and leaving out the nodes that are noise. If one already exists, edit it rather than replacing it wholesale. Placement follows \`layout.mode\`: under \`organic\` (prefer it) a component names no position at all and the boundaries *are* the layout — a boundary wrapping a subset of another's members draws nested inside it, and one sharing members with another without nesting draws as an overlapping lens; under \`grid\` a component names \`row\`/\`col\` instead. The shape is archify's architecture IR: \`meta.title\`, \`components\` (each with \`id\`, \`type\` of frontend|backend|database|cloud|security|messagebus|external, \`label\`, optional \`sublabel\`/\`sources\`, plus \`row\`/\`col\` under grid placement only), \`connections\` (each with \`id\`, \`from\`, \`to\`, optional \`label\`/\`variant\`), and \`boundaries\` (each with \`kind\`, \`label\`, \`wraps\`). A component's \`sources\` is a list of \`{ "path": "…" }\` objects, at most ${MAX_COMPONENT_SOURCES} of them — a node needing more is a node that should have been several — and \`layout.cols\` — grid mode only — is at most ${ARCHITECTURE_LAYOUT_MAX_COLS}. At most ${ARCHITECTURE_DIAGRAM_LIMITS.maxComponents} components, ${ARCHITECTURE_DIAGRAM_LIMITS.maxConnections} connections, and ${ARCHITECTURE_DIAGRAM_LIMITS.maxBoundaries} boundaries. A rejection names the fields that failed, so fix those rather than resubmitting a guess. What you store is the diagram from then on: nothing in the app regenerates it.`,
+		shape: { diagram: submittedArchitectureDiagram },
 	},
 	{
 		name: 'ensemblr_close_tab',

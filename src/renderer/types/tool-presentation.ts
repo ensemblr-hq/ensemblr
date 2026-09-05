@@ -31,6 +31,7 @@ export type ToolGlyph =
 	| 'message-square-check'
 	| 'message-square-plus'
 	| 'message-square-text'
+	| 'network'
 	| 'panels-top-left'
 	| 'play'
 	| 'puzzle'

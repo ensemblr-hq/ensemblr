@@ -195,6 +195,40 @@ test('getStatus merges porcelain entries with numstat counts', async (t) => {
 	assert.deepEqual(result.summary, { additions: 7, deletions: 2, files: 2 });
 });
 
+test('listChangedPaths returns paths alone, with no numstat round trip', async (t) => {
+	const workspaceDir = await mkdtemp(path.join(tmpdir(), 'ensemblr-git-'));
+	t.after(() => rm(workspaceDir, { force: true, recursive: true }));
+	const { calls, service } = stubCommandService(() =>
+		buildResult({ stdout: ' M src/app.ts\0?? notes.md\0' }),
+	);
+	const git = createWorkspaceGitService({ localCommandService: service });
+
+	const paths = await git.listChangedPaths(workspaceDir);
+
+	assert.deepEqual(paths, ['src/app.ts', 'notes.md']);
+	// One porcelain read and nothing else: this runs on every agent turn, so the
+	// line counts and content stamps `getStatus` builds must stay out of it.
+	assert.deepEqual(
+		calls.map((call) => call.args?.[0]),
+		['status'],
+	);
+});
+
+test('listChangedPaths reports an empty change set when git fails', async (t) => {
+	const workspaceDir = await mkdtemp(path.join(tmpdir(), 'ensemblr-git-'));
+	t.after(() => rm(workspaceDir, { force: true, recursive: true }));
+	const { service } = stubCommandService(() =>
+		buildResult({
+			exitCode: 128,
+			status: 'failure',
+			stderr: 'not a git repository',
+		}),
+	);
+	const git = createWorkspaceGitService({ localCommandService: service });
+
+	assert.deepEqual(await git.listChangedPaths(workspaceDir), []);
+});
+
 test('getStatus expands untracked directories with --untracked-files=all', async (t) => {
 	const workspaceDir = await mkdtemp(path.join(tmpdir(), 'ensemblr-git-'));
 	t.after(() => rm(workspaceDir, { force: true, recursive: true }));

@@ -8,12 +8,13 @@ import { showsComposer } from '@/renderer/lib/workbench';
 import { usePiRawFrameCapture } from '@/renderer/state/pi';
 import { developerModeAtom } from '@/renderer/state/preferences';
 import { useWorkspaceUnreadKeys } from '@/renderer/state/unread';
+import type { WorkspaceMainContentState } from '@/renderer/types/components/workspace-main-content';
 import type {
 	ComposerShellState,
 	SessionTabModel,
 	WorkspaceShellModel,
 } from '@/renderer/types/workbench';
-import type { SessionTabPlacement } from '@/renderer/types/workbench-shell';
+import { ArchitectureDiagramPanel } from './architecture-diagram/architecture-diagram-panel';
 import { CommentPreviewPanel } from './comment-preview-panel';
 import { ComposerSlot } from './composer-slot';
 import {
@@ -42,8 +43,10 @@ export function WorkspaceConversationContent({
 	closedSessions,
 	composer,
 	onDirectoryReveal,
+	onDrawArchitectureDiagram,
 	onFilePreviewOpen,
 	onLaunchHarness,
+	onOpenArchitectureDiagram,
 	onSessionTabChange,
 	onSessionTabClose,
 	onSessionTabOpen,
@@ -52,36 +55,7 @@ export function WorkspaceConversationContent({
 	onSessionTabsReorder,
 	onTurnDiffOpen,
 	sessionTabs,
-}: {
-	activeSession: SessionTabModel;
-	activeWorkspace: WorkspaceShellModel;
-	closedSessions: SessionTabModel[];
-	composer: ComposerShellState;
-	onDirectoryReveal: (directoryPath: string) => void;
-	onFilePreviewOpen: (input: {
-		filePath: string;
-	}) => Promise<{ chatTabId: string } | null>;
-	onLaunchHarness: (input: {
-		harnessId: string;
-		harnessLabel: string;
-	}) => Promise<{ chatTabId: string } | null>;
-	onTurnDiffOpen: (input: {
-		label: string;
-		turnId: string;
-	}) => Promise<{ chatTabId: string } | null>;
-	onSessionTabChange: (sessionId: string) => void;
-	onSessionTabClose: (sessionId: string) => void;
-	onSessionTabOpen: (options?: {
-		placement?: SessionTabPlacement;
-	}) => Promise<{ chatTabId: string } | null>;
-	onSessionTabPin: (sessionId: string) => void;
-	onSessionTabRestore: (sessionId: string) => void;
-	onSessionTabsReorder: (
-		sessionIds: string[],
-		draggedSessionId: string,
-	) => void;
-	sessionTabs: SessionTabModel[];
-}) {
+}: WorkspaceMainContentState) {
 	const developerMode = useAtomValue(developerModeAtom);
 	usePiRawFrameCapture(developerMode);
 	const debugSessionId =
@@ -111,6 +85,7 @@ export function WorkspaceConversationContent({
 				activeSession={activeSession}
 				closedSessions={closedSessions}
 				onLaunchHarness={onLaunchHarness}
+				onOpenArchitectureDiagram={onOpenArchitectureDiagram}
 				onSessionTabClose={onSessionTabClose}
 				onSessionTabChange={onSessionTabChange}
 				onSessionTabOpen={onSessionTabOpen}
@@ -134,6 +109,8 @@ export function WorkspaceConversationContent({
 							<ActiveAuxiliaryPanel
 								activeSession={activeSession}
 								activeWorkspace={activeWorkspace}
+								onDirectoryReveal={onDirectoryReveal}
+								onDrawArchitectureDiagram={onDrawArchitectureDiagram}
 								onSessionTabChange={onSessionTabChange}
 							/>
 						)}
@@ -186,19 +163,33 @@ function ChatTabBody({
 }
 
 /**
- * Renders the panel for a non-chat session tab (terminal, diff, document, or
- * file). Split out of `WorkspaceConversationContent` so the per-kind branching
- * lives in one focused component instead of inflating the parent's complexity.
+ * Renders the panel for a non-chat session tab (diagram, terminal, diff,
+ * document, or file). Split out of `WorkspaceConversationContent` so the
+ * per-kind branching lives in one focused component instead of inflating the
+ * parent's complexity.
  */
 function ActiveAuxiliaryPanel({
 	activeSession,
 	activeWorkspace,
+	onDirectoryReveal,
+	onDrawArchitectureDiagram,
 	onSessionTabChange,
 }: {
 	activeSession: SessionTabModel;
 	activeWorkspace: WorkspaceShellModel;
+	onDirectoryReveal: (directoryPath: string) => void;
+	onDrawArchitectureDiagram: () => void;
 	onSessionTabChange: (sessionId: string) => void;
 }) {
+	if (activeSession.kind === 'diagram') {
+		return (
+			<ArchitectureDiagramPanel
+				onDirectoryReveal={onDirectoryReveal}
+				onDraw={onDrawArchitectureDiagram}
+				workspaceId={activeWorkspace.id}
+			/>
+		);
+	}
 	if (activeSession.kind === 'terminal') {
 		return (
 			<div className='flex min-h-0 flex-1'>

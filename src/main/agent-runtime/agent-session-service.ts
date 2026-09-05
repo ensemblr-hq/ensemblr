@@ -139,6 +139,8 @@ interface AgentSessionServiceOptions {
 	 * Omitted, every session opens under `ensemblr` — the mechanism the control
 	 * tools were built for.
 	 */
+	/** Whether the architecture diagram feature is on, for the playbook a session receives. */
+	readArchitectureDiagramEnabled?: () => boolean;
 	readClaudeSubagentMode?: SubagentMechanismReader;
 	/** Reads the durable sub-agent marker, so a resumed child stays on `ensemblr`. */
 	isSpawnedSubAgent?: SubAgentMarkerReader;
@@ -284,6 +286,7 @@ export function createAgentSessionService({
 	onSummaryPersisted,
 	isSpawnedSubAgent,
 	queueNaming,
+	readArchitectureDiagramEnabled,
 	readClaudeSubagentMode,
 	resolveAgentControlEnv,
 	resolvePermissionMode = () => DEFAULT_PERMISSION_MODE,
@@ -314,6 +317,7 @@ export function createAgentSessionService({
 		agentClient,
 		isSpawnedSubAgent,
 		queueNaming,
+		readArchitectureDiagramEnabled,
 		readClaudeSubagentMode,
 		requireDatabase: requireSessionDatabase,
 		resolveAgentControlEnv,

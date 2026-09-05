@@ -309,6 +309,7 @@ describe('readSessionBriefNaming: callers without a chat tab', () => {
 				namesWorkspace: true,
 				provisional: false,
 			},
+			diagram: { components: [], stale: false },
 			summaryStale: false,
 			titleNeeded: false,
 		});
@@ -325,6 +326,7 @@ describe('readSessionBriefNaming: callers without a chat tab', () => {
 				namesWorkspace: true,
 				provisional: false,
 			},
+			diagram: { components: [], stale: false },
 			summaryStale: false,
 			titleNeeded: false,
 		});
@@ -346,6 +348,7 @@ describe('readSessionBriefNaming: degradation', () => {
 				namesWorkspace: false,
 				provisional: false,
 			},
+			diagram: { components: [], stale: false },
 			summaryStale: false,
 			titleNeeded: false,
 		});
@@ -365,6 +368,7 @@ describe('readSessionBriefNaming: degradation', () => {
 				namesWorkspace: false,
 				provisional: false,
 			},
+			diagram: { components: [], stale: false },
 			summaryStale: false,
 			titleNeeded: false,
 		});

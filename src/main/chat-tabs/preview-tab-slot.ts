@@ -17,6 +17,7 @@ const PREVIEW_METADATA_KEY = 'preview';
  * cannot get back.
  */
 const PREVIEWABLE_KINDS: ReadonlySet<ChatTabKind> = new Set([
+	'diagram',
 	'diff',
 	'document',
 	'file',

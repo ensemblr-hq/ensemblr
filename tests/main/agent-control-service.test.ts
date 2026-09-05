@@ -206,6 +206,7 @@ const makePorts = (
 	sessionNaming: {
 		readBrief: vi.fn().mockResolvedValue({
 			branch: { current: null, eligible: false },
+			diagram: { components: [], stale: false },
 			summaryStale: false,
 			titleNeeded: false,
 		}),
@@ -221,6 +222,7 @@ const setup = (
 		guardrails?: Partial<GuardrailConfig>;
 		species?: AgentSpecies;
 		dispatchTimeoutMs?: number;
+		architectureDiagram?: boolean;
 	} = {},
 ) => {
 	const registry = createOriginRegistry({ generateToken: () => 'tok-caller' });
@@ -237,6 +239,7 @@ const setup = (
 		ports,
 		originRegistry: registry,
 		guardrails: createGuardrails(options.guardrails),
+		readArchitectureDiagramEnabled: () => options.architectureDiagram ?? true,
 	});
 	return { service, ports, registry };
 };
@@ -2383,6 +2386,7 @@ describe('agent-control service: audience resolution', () => {
 		const { service } = setup({ ports: makePorts() });
 
 		expect(await service.describeAudience('tok-caller')).toEqual({
+			architectureDiagram: true,
 			delegation: 'ensemblr',
 			hasChatTab: true,
 			role: 'orchestrator',
@@ -2393,6 +2397,7 @@ describe('agent-control service: audience resolution', () => {
 		const { service } = setup({ ports: makePorts(), species: 'claude' });
 
 		expect(await service.describeAudience('tok-caller')).toEqual({
+			architectureDiagram: true,
 			delegation: 'ensemblr',
 			hasChatTab: true,
 			role: 'orchestrator',
@@ -2403,6 +2408,7 @@ describe('agent-control service: audience resolution', () => {
 		const { service } = setup({ ports: makePorts(), species: 'harness' });
 
 		expect(await service.describeAudience('tok-caller')).toEqual({
+			architectureDiagram: true,
 			delegation: 'ensemblr',
 			hasChatTab: false,
 			role: 'orchestrator',
@@ -2416,6 +2422,7 @@ describe('agent-control service: audience resolution', () => {
 		});
 
 		expect(await service.describeAudience('tok-caller')).toEqual({
+			architectureDiagram: true,
 			delegation: 'ensemblr',
 			hasChatTab: true,
 			role: 'subagent',
@@ -2428,6 +2435,7 @@ describe('agent-control service: audience resolution', () => {
 		const { service } = setup({ ports: makePorts() });
 
 		expect(await service.describeAudience('bogus')).toEqual({
+			architectureDiagram: true,
 			delegation: 'ensemblr',
 			hasChatTab: false,
 			role: 'orchestrator',

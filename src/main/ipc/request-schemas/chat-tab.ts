@@ -24,7 +24,15 @@ export const listChatTabsRequestSchema = z.object({
 export const openChatTabRequestSchema = z.object({
 	insertAfterChatTabId: optionalNullableString,
 	kind: z
-		.enum(['chat', 'diff', 'document', 'file', 'preview', 'terminal'])
+		.enum([
+			'chat',
+			'diagram',
+			'diff',
+			'document',
+			'file',
+			'preview',
+			'terminal',
+		])
 		.optional(),
 	metadata: z.record(z.string(), z.unknown()).optional(),
 	agentSessionId: optionalNullableString,

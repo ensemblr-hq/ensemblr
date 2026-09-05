@@ -33,6 +33,7 @@ import type {
 	LinearUpdateIssueArgs,
 	LinearUpdateIssueResult,
 	OpenTabVariant,
+	ReadArchitectureDiagramOutcome,
 	ReadConversationArgs,
 	ReadConversationResult,
 	RecallMemoryResult,
@@ -42,6 +43,7 @@ import type {
 	SetSummaryResult,
 	StartTerminalKind,
 	SubagentMechanism,
+	UpdateArchitectureDiagramOutcome,
 	WorkspaceBoardStatusValue,
 	WorkspaceLinkedIssue,
 } from '../../shared/agent-control.ts';
@@ -689,6 +691,32 @@ export interface SessionNamingPort {
 	}) => Promise<SetSummaryResult>;
 }
 
+/**
+ * Stores an agent-refined architecture diagram for the caller's workspace.
+ *
+ * The port is where the policy lives, not the handler: it validates the
+ * submitted document against the shared IR schema, refuses one that exceeds
+ * {@link ARCHITECTURE_DIAGRAM_LIMITS}, fits a read to
+ * {@link MAX_AGENT_PAYLOAD_CHARS} and says what it cut, and answers with one
+ * `reason` word rather than throwing across the boundary. Control adds no
+ * capability of its own — the storage and the gates are the architecture
+ * service's, and this only reaches them.
+ */
+export interface ArchitecturePort {
+	/**
+	 * Reads the workspace's stored diagram, answering with a null document for a
+	 * workspace nobody has drawn. Nothing derives one, so that absence is an
+	 * ordinary result rather than a failure.
+	 */
+	readDiagram: (input: {
+		origin: AgentControlOrigin;
+	}) => Promise<ReadArchitectureDiagramOutcome>;
+	updateDiagram: (input: {
+		diagram: unknown;
+		origin: AgentControlOrigin;
+	}) => Promise<UpdateArchitectureDiagramOutcome>;
+}
+
 /** All collaborators the agent-control service composes. */
 export interface AgentControlPorts {
 	ask: AskPort;
@@ -707,6 +735,8 @@ export interface AgentControlPorts {
 	memory?: MemoryPort;
 	/** Concierge-only; absent when the Concierge is not wired. */
 	concierge?: ConciergePort;
+	/** Absent when no architecture service is wired; the op is then refused. */
+	architecture?: ArchitecturePort;
 	diff: DiffPort;
 	review: ReviewPort;
 	linear: LinearPort;

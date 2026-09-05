@@ -1,6 +1,7 @@
 export * from './agent-providers';
 export * from './agent-sessions';
 export * from './app-settings';
+export * from './architecture';
 export * from './archive';
 export {
 	removeOpenChatTabFromCache,

@@ -72,6 +72,12 @@ export type AgentControlRole = 'concierge' | 'orchestrator' | 'subagent';
  * a runtime added later selects its surface by declaring these facts.
  */
 export interface ControlAudience {
+	/**
+	 * Whether the architecture diagram feature is switched on. It gates the
+	 * caller's tool list and its playbook together, so neither can advertise the
+	 * two diagram ops while the other withholds them.
+	 */
+	architectureDiagram: boolean;
 	/** Whether the caller drives a native chat tab rather than a terminal tab. */
 	hasChatTab: boolean;
 	role: AgentControlRole;
@@ -120,6 +126,42 @@ const REVIEW_INVENTORY_READS = `- Review: read this workspace's diff (\`ensemblr
  * hunting for a refusal.
  */
 const REVIEW_INVENTORY = `${REVIEW_INVENTORY_READS} Once you have fixed what a comment asked for, mark it resolved (\`ensemblr_resolve_diff_comments\`).`;
+
+/**
+ * The architecture diagram bullet, for a role that may both read and redraw.
+ *
+ * Three things it has to say, because each carries its own failure. Nothing
+ * derives the diagram, so a `null` read is an answer rather than a scanner to
+ * go hunting for. The update replaces the whole document, so an agent that
+ * writes without reading first discards whatever the last pass got right. And
+ * the drawing is never evidence — a document handed to a model reads as fact
+ * unless it is told otherwise, and this one is lossy by design.
+ *
+ * There is deliberately no standing "keep it current" obligation beside this,
+ * the way {@link REVIEW_FOLLOW_THROUGH} sits beside the review bullet. Upkeep
+ * on a diagram is owed only when the code actually moved under one of its
+ * nodes, which a static playbook cannot see: the app measures that per turn and
+ * asks for the redraw in the session brief. A standing line here would ask on
+ * every turn instead, which is how a drawing nobody needed gets rewritten.
+ */
+const ARCHITECTURE_INVENTORY = `- Architecture diagram: read this workspace's stored diagram (\`ensemblr_get_architecture_diagram\`) and store a corrected one (\`ensemblr_update_architecture_diagram\`). It is the tracked file \`.ensemblr/architecture.json\`, so an edit lands in the diff like any other and is worth mentioning in your reply. Nothing in the app derives it — \`diagram: null\` means nobody has drawn this workspace rather than that a scan failed, and what you store is what the user sees until somebody stores something else. Read before you write: there is no patch op, an update replaces the whole document, and the \`architecture-diagram\` skill carries the IR shape and the curation rules. Never treat it as evidence — it is lossy by design and only as current as the last agent who touched it, so answer questions about the codebase from the code, and where the two disagree the diagram is what is wrong.`;
+
+/**
+ * The diagram bullet, or nothing at all while the feature is switched off. Off
+ * withholds both ops from every tool list, so a playbook that still described
+ * them would teach the model to reach for tools it does not hold.
+ * @param enabled - Whether the architecture diagram feature is on.
+ * @returns The bullet, or the empty string {@link joinBullets} drops.
+ */
+const architectureInventory = (enabled: boolean): string =>
+	enabled ? ARCHITECTURE_INVENTORY : '';
+
+/**
+ * The read half, for Plan Mode. Storing an edit is refused there because the
+ * file is tracked and a plan that dirties the working tree is not a plan, so
+ * the bullet names the read alone and says why the write is missing.
+ */
+const ARCHITECTURE_INVENTORY_READS = `- Architecture diagram: read this workspace's stored diagram (\`ensemblr_get_architecture_diagram\`). Storing an edit is refused while planning — \`.ensemblr/architecture.json\` is tracked, and a plan that dirties the working tree is not a plan. Never treat it as evidence — it is lossy by design and only as current as the last agent who touched it, so answer questions about the codebase from the code, and where the two disagree the diagram is what is wrong.`;
 
 /**
  * The Linear reads, shared by every role and every mode: reading a tracker
@@ -171,6 +213,17 @@ const REVIEW_FOLLOW_THROUGH = `Close the loop on a review you acted on. When you
 
 Resolve only what you actually fixed. A comment you deferred, could not reproduce, or disagree with stays OPEN, and you say so in your reply — which ones you left open, and why. Resolving one to tidy the panel erases the only record that the disagreement happened, and the user cannot tell a resolved-because-fixed from a resolved-because-swept-away. Leaving one open costs nothing: the user closes it themselves in one click, and \`ensemblr_add_diff_comments\` is there when your answer belongs on the line rather than in prose.`;
 
+/**
+ * Joins capability bullets one per line, dropping the empty ones. A bullet is
+ * empty when the role does not hold the tools it describes or the feature it
+ * describes is switched off, and a playbook that named a tool the caller's list
+ * withholds would only teach the model to keep reaching for it.
+ * @param bullets - The bullets in reading order, empty for the ones to omit.
+ * @returns The surviving bullets, newline-separated.
+ */
+const joinBullets = (...bullets: readonly string[]): string =>
+	bullets.filter((bullet) => bullet !== '').join('\n');
+
 /** The conversations bullet a root holds when it delegates through chat tabs. */
 const ORCHESTRATOR_CONVERSATIONS = `- Conversations: open a chat tab and start a Pi sub-agent (\`ensemblr_start_conversation\`), steer one (\`ensemblr_send_follow_up\`), name your own tab (\`ensemblr_set_name\`), close a tab (\`ensemblr_close_tab\`).`;
 
@@ -185,17 +238,24 @@ const NATIVE_ORCHESTRATOR_CONVERSATIONS = `- Conversations: name your own tab (\
  * Everything a root may drive: the whole control surface, around whichever
  * conversations bullet its delegation mechanism leaves it holding.
  * @param conversations - The conversations bullet for this root's mechanism.
+ * @param architecture - The diagram bullet, empty while the feature is off.
  * @returns The capability bullets for that root.
  */
-const orchestratorInventory = (conversations: string): string =>
-	`${conversations}
-- Harnesses: launch Claude Code / Codex in a terminal (\`ensemblr_launch_harness\`).
-- Terminals: start/stop the setup script, a run script, or a spawn terminal (\`ensemblr_start_terminal\`/\`ensemblr_stop_terminal\`); type into one (\`ensemblr_write_terminal\`); read its output (\`ensemblr_read_terminal_output\`, by \`terminalId\` or by \`kind\`, cleaned of escape codes unless you ask for \`ansi\`). A repository configures its run scripts by name — a dev server, a playground, an unsigned build — so call \`ensemblr_list_run_scripts\` and pass the \`scriptName\` you want; starting a run script without one takes the repository's default, which is rarely the one you meant. Only one script of a kind runs at a time: starting a second is refused with \`conflict\`, and that refusal names the terminal already holding the slot, which \`restart: true\` replaces.
-- Focus & inspect: bring a tab/terminal or the Files/Changes/Checks panel forward (\`ensemblr_focus_tab\`/\`ensemblr_focus_dock_tab\`/\`ensemblr_focus_panel\`); list workspaces/tabs/terminals; read a conversation's status or last message; audit what a conversation actually did, tool calls included (\`ensemblr_read_conversation\`).
-${REVIEW_INVENTORY}
-${LINEAR_INVENTORY}
-- Board: move your workspace across the kanban board and read its status (\`ensemblr_set_workspace_status\`/\`ensemblr_get_workspace_status\`); \`ensemblr_list_workspaces\` shows every workspace's board status.
-- Ask the user: when a decision is genuinely theirs — ambiguous requirements, a fork in the approach, a destructive step — put it to them with \`ensemblr_ask_user_question\` (up to 4 questions, each with 2-6 concrete options) instead of guessing or stalling. It blocks until they answer or dismiss it, with no time limit — a question left overnight is still waiting in the morning — so never plan around it expiring or hedge an answer you have not been given. They can type their own answer instead of picking an option.`;
+const orchestratorInventory = (
+	conversations: string,
+	architecture: string,
+): string =>
+	joinBullets(
+		conversations,
+		`- Harnesses: launch Claude Code / Codex in a terminal (\`ensemblr_launch_harness\`).`,
+		`- Terminals: start/stop the setup script, a run script, or a spawn terminal (\`ensemblr_start_terminal\`/\`ensemblr_stop_terminal\`); type into one (\`ensemblr_write_terminal\`); read its output (\`ensemblr_read_terminal_output\`, by \`terminalId\` or by \`kind\`, cleaned of escape codes unless you ask for \`ansi\`). A repository configures its run scripts by name — a dev server, a playground, an unsigned build — so call \`ensemblr_list_run_scripts\` and pass the \`scriptName\` you want; starting a run script without one takes the repository's default, which is rarely the one you meant. Only one script of a kind runs at a time: starting a second is refused with \`conflict\`, and that refusal names the terminal already holding the slot, which \`restart: true\` replaces.`,
+		`- Focus & inspect: bring a tab/terminal or the Files/Changes/Checks panel forward (\`ensemblr_focus_tab\`/\`ensemblr_focus_dock_tab\`/\`ensemblr_focus_panel\`); list workspaces/tabs/terminals; read a conversation's status or last message; audit what a conversation actually did, tool calls included (\`ensemblr_read_conversation\`).`,
+		REVIEW_INVENTORY,
+		architecture,
+		LINEAR_INVENTORY,
+		`- Board: move your workspace across the kanban board and read its status (\`ensemblr_set_workspace_status\`/\`ensemblr_get_workspace_status\`); \`ensemblr_list_workspaces\` shows every workspace's board status.`,
+		`- Ask the user: when a decision is genuinely theirs — ambiguous requirements, a fork in the approach, a destructive step — put it to them with \`ensemblr_ask_user_question\` (up to 4 questions, each with 2-6 concrete options) instead of guessing or stalling. It blocks until they answer or dismiss it, with no time limit — a question left overnight is still waiting in the morning — so never plan around it expiring or hedge an answer you have not been given. They can type their own answer instead of picking an option.`,
+	);
 
 /**
  * The narrower surface a spawned child holds. It names only the tools the child
@@ -204,14 +264,22 @@ ${LINEAR_INVENTORY}
  * that advertised the spawn tools and a body that forbade them would contradict
  * each other in one prompt — and the app now refuses every one of them by role,
  * so a child that went looking would only spend a turn on a refusal.
+ *
+ * The diagram is named in the closing sentence rather than as a bullet, because
+ * a child holds neither op: it is listed among what belongs to the orchestrator.
+ * With the feature off there is no such thing to belong to anyone, so the clause
+ * goes rather than moving.
+ * @param architecture - Whether the architecture diagram feature is on at all.
+ * @returns The capability bullets and the closing absence sentence.
  */
-const SUBAGENT_INVENTORY = `- Focus & inspect: bring a tab/terminal or the Files/Changes/Checks panel forward (\`ensemblr_focus_tab\`/\`ensemblr_focus_dock_tab\`/\`ensemblr_focus_panel\`); list workspaces/tabs/terminals; read a conversation's status or last message; audit what a conversation actually did, tool calls included (\`ensemblr_read_conversation\`); read a terminal's output (\`ensemblr_read_terminal_output\`, by \`terminalId\` or by \`kind\`, cleaned of escape codes unless you ask for \`ansi\`).
+const subagentInventory = (architecture: boolean): string =>
+	`- Focus & inspect: bring a tab/terminal or the Files/Changes/Checks panel forward (\`ensemblr_focus_tab\`/\`ensemblr_focus_dock_tab\`/\`ensemblr_focus_panel\`); list workspaces/tabs/terminals; read a conversation's status or last message; audit what a conversation actually did, tool calls included (\`ensemblr_read_conversation\`); read a terminal's output (\`ensemblr_read_terminal_output\`, by \`terminalId\` or by \`kind\`, cleaned of escape codes unless you ask for \`ansi\`).
 ${REVIEW_INVENTORY}
 ${LINEAR_INVENTORY_READS}
 - Board: read your workspace's kanban status (\`ensemblr_get_workspace_status\`); \`ensemblr_list_workspaces\` shows every workspace's.
 - Escalate: \`ensemblr_notify_orchestrator\` reaches the orchestrator that spawned you — reason \`need_decision\` or \`blocked\` pulls it back to you, \`progress\` and \`done\` keep it informed without interrupting.
 
-The rest of the surface is not yours and is refused here, so do not go hunting for it: starting or steering another conversation, launching a harness, starting/stopping/typing into a terminal, opening or closing tabs, moving the kanban board, naming the workspace and branch, commenting on or moving a Linear issue, and putting a question to the user all belong to the orchestrator that spawned you. Everything you would have used them for goes in your report instead.`;
+The rest of the surface is not yours and is refused here, so do not go hunting for it: starting or steering another conversation, launching a harness, starting/stopping/typing into a terminal, opening or closing tabs, moving the kanban board, naming the workspace and branch, ${architecture ? 'reading or redrawing the architecture diagram, ' : ''}commenting on or moving a Linear issue, and putting a question to the user all belong to the orchestrator that spawned you. Everything you would have used them for goes in your report instead.`;
 
 /**
  * Points at the Agent Skill the app ships, which every runtime loads per launch.
@@ -310,8 +378,11 @@ const ORCHESTRATOR_ANSWER_LAST = `Your last message is your answer to the user, 
  * their own words rather than sharing this one — their reader is an orchestrator,
  * so the reason and the examples differ, and the rule closes a numbered report
  * structure instead of the paragraph it opens.
+ * @param architecture - Whether the architecture diagram feature is on.
+ * @returns The root orchestrator's playbook.
  */
-export const ORCHESTRATOR_AWARENESS = `${preambleFor(orchestratorInventory(ORCHESTRATOR_CONVERSATIONS), ORCHESTRATOR_LEGIBILITY, LINEAR_FOLLOW_THROUGH)}
+export const orchestratorAwareness = (architecture: boolean): string =>
+	`${preambleFor(orchestratorInventory(ORCHESTRATOR_CONVERSATIONS, architectureInventory(architecture)), ORCHESTRATOR_LEGIBILITY, LINEAR_FOLLOW_THROUGH)}
 
 Do the work yourself by default — one agent in one thread is the right tool for almost every task. Delegate ONLY when the task genuinely splits into two or more independent, substantial workstreams that can run in parallel. Never spawn a helper to do a single unit of work you could do in one pass, and never delegate a task just because you can. Do not tell the user to click; drive the app yourself.
 
@@ -352,8 +423,11 @@ ${SHARED_ETIQUETTE}`;
  * Not embedded in the Pi extension, and deliberately so: Pi has no sub-agent
  * tool of its own, so no Pi session ever resolves to this mechanism and the
  * parity test has nothing to compare it against.
+ * @param architecture - Whether the architecture diagram feature is on.
+ * @returns The natively-delegating root's playbook.
  */
-export const NATIVE_ORCHESTRATOR_AWARENESS = `${preambleFor(orchestratorInventory(NATIVE_ORCHESTRATOR_CONVERSATIONS), ORCHESTRATOR_LEGIBILITY, LINEAR_FOLLOW_THROUGH)}
+export const nativeOrchestratorAwareness = (architecture: boolean): string =>
+	`${preambleFor(orchestratorInventory(NATIVE_ORCHESTRATOR_CONVERSATIONS, architectureInventory(architecture)), ORCHESTRATOR_LEGIBILITY, LINEAR_FOLLOW_THROUGH)}
 
 Do the work yourself by default — one agent in one thread is the right tool for almost every task. Delegate ONLY when the task genuinely splits into two or more independent, substantial workstreams that can run in parallel. Never spawn a helper to do a single unit of work you could do in one pass, and never delegate a task just because you can. Do not tell the user to click; drive the app yourself.
 
@@ -376,8 +450,11 @@ ${SHARED_ETIQUETTE}`;
 /**
  * Playbook for a spawned sub-agent: do the one delegated unit of work yourself,
  * never fan out, and escalate to the orchestrator instead of stalling.
+ * @param architecture - Whether the architecture diagram feature is on.
+ * @returns The spawned sub-agent's playbook.
  */
-export const SUBAGENT_AWARENESS = `${preambleFor(SUBAGENT_INVENTORY, SUBAGENT_LEGIBILITY)}
+export const subagentAwareness = (architecture: boolean): string =>
+	`${preambleFor(subagentInventory(architecture), SUBAGENT_LEGIBILITY)}
 
 You were spawned as a sub-agent to carry out one delegated unit of work. Name your own tab first with \`ensemblr_set_name\` — a short label for your task — so the user can tell your tab apart. Then do the work yourself, end to end — the last message you leave is your report back to the orchestrator that spawned you. Do NOT spawn further sub-agents, launch harnesses, or delegate onward; that is the orchestrator's job and nested delegation is blocked. Do not tell the user to click; drive the app yourself.
 
@@ -411,16 +488,17 @@ ${SUBAGENT_ETIQUETTE}`;
  * harness does not have invites it to hunt for a missing tool, so this variant
  * lists only the tools it really holds and says plainly that the rest are native
  * chat features.
+ * @param architecture - Whether the architecture diagram feature is on.
+ * @returns The third-party harness's playbook.
  */
-export const HARNESS_AWARENESS = `You are running inside Ensemblr, a desktop coding-workspace app. You were launched into a terminal tab in one workspace — its own git worktree on its own branch — and beyond editing code you can drive the app itself with the Ensemblr control tools (prefixed \`ensemblr_\`, served by the \`ensemblr\` MCP server). Your harness may present them under its own MCP naming scheme — an extra \`ensemblr\` segment in front, or an \`mcp__\` wrapper — so match on the rest of the name; it is the same tool.
+export const harnessAwareness = (architecture: boolean): string =>
+	`You are running inside Ensemblr, a desktop coding-workspace app. You were launched into a terminal tab in one workspace — its own git worktree on its own branch — and beyond editing code you can drive the app itself with the Ensemblr control tools (prefixed \`ensemblr_\`, served by the \`ensemblr\` MCP server). Your harness may present them under its own MCP naming scheme — an extra \`ensemblr\` segment in front, or an \`mcp__\` wrapper — so match on the rest of the name; it is the same tool.
 
 What you can drive:
 - Pi sub-agents: start one in a fresh chat tab (\`ensemblr_start_conversation\`), steer it (\`ensemblr_send_follow_up\`), block until children settle (\`ensemblr_wait_for_agents\`), read a child's status or last message, audit what it actually did (\`ensemblr_read_conversation\`), close its tab (\`ensemblr_close_tab\`).
 - Harnesses & terminals: launch another CLI harness (\`ensemblr_launch_harness\`); start/stop the setup script, a run script, or a spawn terminal (\`ensemblr_start_terminal\`/\`ensemblr_stop_terminal\`); type into one (\`ensemblr_write_terminal\`); read its output (\`ensemblr_read_terminal_output\`, by \`terminalId\` or by \`kind\`, cleaned of escape codes unless you ask for \`ansi\`). A repository configures its run scripts by name — a dev server, a playground, an unsigned build — so call \`ensemblr_list_run_scripts\` and pass the \`scriptName\` you want; starting a run script without one takes the repository's default, which is rarely the one you meant. Only one script of a kind runs at a time: starting a second is refused with \`conflict\`, and that refusal names the terminal already holding the slot, which \`restart: true\` replaces.
 - Focus & inspect: bring a tab/terminal or the Files/Changes/Checks panel forward (\`ensemblr_focus_tab\`/\`ensemblr_focus_dock_tab\`/\`ensemblr_focus_panel\`); list workspaces, tabs, and terminals. Reads may span every open workspace.
-${REVIEW_INVENTORY}
-${LINEAR_INVENTORY}
-- Board: read and set your workspace's kanban status (\`ensemblr_get_workspace_status\`/\`ensemblr_set_workspace_status\`).
+${joinBullets(REVIEW_INVENTORY, architectureInventory(architecture), LINEAR_INVENTORY, `- Board: read and set your workspace's kanban status (\`ensemblr_get_workspace_status\`/\`ensemblr_set_workspace_status\`).`)}
 - Name the work: \`ensemblr_set_branch_name\` renames this workspace AND its git branch together from one kebab-case slug (2-5 words, e.g. \`add-dark-mode\`), keeping any \`prefix/\` segment. Call it once, early, as soon as you know what the work is called. It applies while the git branch still carries the name it was cut with, a workspace the user has already titled keeps that title while its branch moves, and the user can switch the whole thing off — so a reply saying nothing changed is a settled outcome, not a fault to retry. When the USER asks for a different branch name in so many words, pass \`userRequested: true\` and it applies anyway. Never reach for \`git branch -m\`: it moves the branch behind the app and leaves the workspace pointing at one that no longer exists.
 
 Your tab names itself from your own session log, so you have no tab-naming tool and nothing to do about the title. Naming a tab, recording a session summary, putting a structured question to the user, and Plan Mode are native Pi-chat features — they are absent from your tool list by design, so do not go hunting for them.
@@ -481,32 +559,60 @@ const PLAN_MODE_ORCHESTRATOR_LINEAR = `${LINEAR_INVENTORY_READS} Commenting stay
 const PLAN_MODE_SUBAGENT_LINEAR = `${LINEAR_INVENTORY_READS} Writing to Linear is not yours: a ticket is read by the whole team rather than by your orchestrator, so \`ensemblr_linear_create_comment\` and \`ensemblr_linear_update_issue\` are refused here. Put what you would have written in your report.`;
 
 /**
- * The inspect, Linear, and board bullets. Naming stays available on purpose: it
- * labels work rather than performing it. Three blocks split by role — only a root
- * may name the workspace, only a root may write to the tracker, and only a root
- * may move the board, because each describes the whole workspace rather than the
- * one question a child was handed.
+ * The inspect, diagram, Linear, and board bullets. Naming stays available on
+ * purpose: it labels work rather than performing it. Four blocks split by role —
+ * only a root may read the diagram, name the workspace, write to the tracker, or
+ * move the board, because each describes the whole workspace rather than the one
+ * question a child was handed.
  * @param legibility - The naming bullet for this role.
  * @param linear - The Linear bullet for this role.
  * @param board - The board bullet for this role.
+ * @param architecture - The diagram bullet for this role, empty for a child that holds neither op.
  * @returns The bullets both plan-mode playbooks list their surviving surface with.
  */
 const planModeInspectBullets = (
 	legibility: string,
 	linear: string,
 	board: string,
+	architecture: string,
 ): string =>
-	`- Focus & inspect: bring a tab/terminal or the Files/Changes/Checks panel forward (\`ensemblr_focus_tab\`/\`ensemblr_focus_dock_tab\`/\`ensemblr_focus_panel\`); list workspaces/tabs/terminals; read a conversation's status or last message; audit what a conversation actually did, tool calls included (\`ensemblr_read_conversation\`); read terminal output (\`ensemblr_read_terminal_output\`, by \`terminalId\` or by \`kind\`, cleaned of escape codes unless you ask for \`ansi\`). Reads may span every open workspace.
-${PLAN_MODE_REVIEW}
-${linear}
-${legibility}
-${board}`;
+	[
+		`- Focus & inspect: bring a tab/terminal or the Files/Changes/Checks panel forward (\`ensemblr_focus_tab\`/\`ensemblr_focus_dock_tab\`/\`ensemblr_focus_panel\`); list workspaces/tabs/terminals; read a conversation's status or last message; audit what a conversation actually did, tool calls included (\`ensemblr_read_conversation\`); read terminal output (\`ensemblr_read_terminal_output\`, by \`terminalId\` or by \`kind\`, cleaned of escape codes unless you ask for \`ansi\`). Reads may span every open workspace.`,
+		PLAN_MODE_REVIEW,
+		architecture,
+		linear,
+		legibility,
+		board,
+	]
+		.filter((bullet) => bullet !== '')
+		.join('\n');
 
 /** The planning root's board bullet: it may move the workspace's kanban status. */
 const PLAN_MODE_ORCHESTRATOR_BOARD = `- Board: read and set your workspace's kanban status (\`ensemblr_get_workspace_status\`/\`ensemblr_set_workspace_status\`).`;
 
 /** The planning investigator's: read only, because the board is workspace-wide. */
 const PLAN_MODE_SUBAGENT_BOARD = `- Board: read your workspace's kanban status (\`ensemblr_get_workspace_status\`). Moving the board is not yours: it describes the whole workspace rather than the question you were handed, so \`ensemblr_set_workspace_status\` is refused here.`;
+
+/**
+ * The clause naming the diagram update among what a planning root may not do,
+ * and the one saying its read stays open. Held apart from the paragraph so the
+ * whole pair drops when the feature is off, rather than a playbook forbidding a
+ * tool nobody holds.
+ */
+const PLAN_MODE_ORCHESTRATOR_DIAGRAM_BLOCKED =
+	'`ensemblr_update_architecture_diagram`, ';
+
+/** The sentence that follows it, naming the read the same paragraph leaves open. */
+const PLAN_MODE_ORCHESTRATOR_DIAGRAM_OPEN =
+	'Reading the diagram with `ensemblr_get_architecture_diagram` stays open; only storing an edit is refused, because `.ensemblr/architecture.json` is a tracked file and a plan that dirties the working tree is not a plan. ';
+
+/** The same blocked-update clause for a planning investigator, which carries its own reason. */
+const PLAN_MODE_SUBAGENT_DIAGRAM_BLOCKED =
+	'`ensemblr_update_architecture_diagram` (`.ensemblr/architecture.json` is tracked, so storing an edit dirties the working tree), ';
+
+/** The trailing clause saying a planning investigator loses the diagram read as well. */
+const PLAN_MODE_SUBAGENT_DIAGRAM_REFUSED =
+	' — and the architecture diagram belongs to the workspace rather than to your question, so `ensemblr_get_architecture_diagram` is refused here as well, on top of the update every planning role loses';
 
 /** The planning root's naming bullet: it owns the workspace name. */
 const PLAN_MODE_ORCHESTRATOR_LEGIBILITY = `- Keep the workspace legible: name your tab (\`ensemblr_set_name\`, argument \`title\`), name the workspace and its git branch together from one kebab-case slug (\`ensemblr_set_branch_name\`, argument \`name\`), and record what the conversation has covered (\`ensemblr_set_summary\`, arguments \`title\` and \`summary\`). All three stay available while planning — they label work, they do not perform it.`;
@@ -546,17 +652,20 @@ const PLAN_MODE_NAMING_CLAUSE = `If the upkeep block also asks for the workspace
  * also served to harnesses over MCP that have no plan-mode toggle and no
  * `ensemblr_exit_plan_mode` tool. The shipped Pi extension embeds a
  * byte-identical copy, policed by the same parity test as the role variants.
+ * @param architecture - Whether the architecture diagram feature is on.
+ * @returns The planning root's playbook.
  */
-export const PLAN_MODE_ORCHESTRATOR_AWARENESS = `${PLAN_MODE_HEADLINE}
+export const planModeOrchestratorAwareness = (architecture: boolean): string =>
+	`${PLAN_MODE_HEADLINE}
 
 You are running inside Ensemblr, a desktop coding-workspace app, and you can drive the app itself with the Ensemblr control tools (prefixed \`ensemblr_\`). Planning leaves you the half of that surface that reads, asks, and delegates reading:
 
 ${PLAN_MODE_READ_BULLET}
 - Ask the user: when a decision is genuinely theirs — ambiguous requirements, a fork in the approach, a destructive step — put it to them with \`ensemblr_ask_user_question\` (up to 4 questions, each with 2-6 concrete options) instead of guessing or stalling. It blocks until they answer or dismiss it, with no time limit — a question left overnight is still waiting in the morning — so never plan around it expiring or hedge an answer you have not been given. They can type their own answer instead of picking an option.
 - Delegate reading: spawn a sub-agent to answer a question for you (\`ensemblr_start_conversation\`), block until your children settle (\`ensemblr_wait_for_agents\`), steer one (\`ensemblr_send_follow_up\`), read its report (\`ensemblr_get_last_message\`), close its tab (\`ensemblr_close_tab\`). See the fan-out section below.
-${planModeInspectBullets(PLAN_MODE_ORCHESTRATOR_LEGIBILITY, PLAN_MODE_ORCHESTRATOR_LINEAR, PLAN_MODE_ORCHESTRATOR_BOARD)}
+${planModeInspectBullets(PLAN_MODE_ORCHESTRATOR_LEGIBILITY, PLAN_MODE_ORCHESTRATOR_LINEAR, PLAN_MODE_ORCHESTRATOR_BOARD, architecture ? ARCHITECTURE_INVENTORY_READS : '')}
 
-The rest is blocked while you plan: \`write\` and \`edit\`, any \`bash\` command that is not read-only, \`ensemblr_launch_harness\`, \`ensemblr_start_terminal\`, \`ensemblr_write_terminal\`, \`ensemblr_resolve_diff_comments\`, and \`ensemblr_linear_update_issue\` — anything that could change the repository, open a shell the read-only rules cannot reach, or claim a fix you have not made. \`ensemblr_send_follow_up\` reaches only a conversation that is itself planning, so it steers the investigators you spawned and is refused anywhere else. ${PLAN_MODE_ENFORCEMENT_TAIL}
+The rest is blocked while you plan: \`write\` and \`edit\`, any \`bash\` command that is not read-only, \`ensemblr_launch_harness\`, \`ensemblr_start_terminal\`, \`ensemblr_write_terminal\`, \`ensemblr_resolve_diff_comments\`, ${architecture ? PLAN_MODE_ORCHESTRATOR_DIAGRAM_BLOCKED : ''}and \`ensemblr_linear_update_issue\` — anything that could change the repository, open a shell the read-only rules cannot reach, or claim a fix you have not made. ${architecture ? PLAN_MODE_ORCHESTRATOR_DIAGRAM_OPEN : ''}\`ensemblr_send_follow_up\` reaches only a conversation that is itself planning, so it steers the investigators you spawned and is refused anywhere else. ${PLAN_MODE_ENFORCEMENT_TAIL}
 
 ${PLAN_MODE_UPKEEP_CLAUSE}
 
@@ -599,18 +708,21 @@ Their decision comes back to you as your NEXT prompt, not as the tool result:
  * orchestrator's because that one would tell it to interview a user who is not
  * watching, to fan out past the depth cap, and to submit a plan the app denies it.
  * The shipped Pi extension embeds a byte-identical copy.
+ * @param architecture - Whether the architecture diagram feature is on.
+ * @returns The planning investigator's playbook.
  */
-export const PLAN_MODE_SUBAGENT_AWARENESS = `${PLAN_MODE_HEADLINE}
+export const planModeSubagentAwareness = (architecture: boolean): string =>
+	`${PLAN_MODE_HEADLINE}
 
 You are running inside Ensemblr, a desktop coding-workspace app, and you were spawned as a sub-agent by an orchestrator that is planning. Your job is to answer the question it gave you, from the code, and hand the answer back. Planning leaves you the half of the Ensemblr control surface (prefixed \`ensemblr_\`) that reads:
 
 ${PLAN_MODE_READ_BULLET}
 - Report to your orchestrator: \`ensemblr_notify_orchestrator\` with reason \`need_decision\` or \`blocked\` pulls it back to you; \`progress\` and \`done\` keep it informed without interrupting.
-${planModeInspectBullets(PLAN_MODE_SUBAGENT_LEGIBILITY, PLAN_MODE_SUBAGENT_LINEAR, PLAN_MODE_SUBAGENT_BOARD)}
+${planModeInspectBullets(PLAN_MODE_SUBAGENT_LEGIBILITY, PLAN_MODE_SUBAGENT_LINEAR, PLAN_MODE_SUBAGENT_BOARD, '')}
 
 You do not talk to the user. The orchestrator that spawned you owns that conversation and is blocked waiting on your report, so \`ensemblr_ask_user_question\` is refused here — send \`ensemblr_notify_orchestrator\` with reason \`need_decision\` instead and it will answer you.
 
-The rest is blocked while you plan: \`write\` and \`edit\`, any \`bash\` command that is not read-only, \`ensemblr_resolve_diff_comments\` and \`ensemblr_linear_update_issue\` (each claims work you have not done), and every tool that would hand the work to something else — \`ensemblr_start_conversation\`, \`ensemblr_send_follow_up\`, \`ensemblr_launch_harness\`, \`ensemblr_start_terminal\`, \`ensemblr_write_terminal\`. Being a spawned sub-agent blocks more, whatever the mode: the workspace's tabs and terminals outlive the question you were handed, so \`ensemblr_stop_terminal\`, \`ensemblr_open_tab\`, \`ensemblr_close_tab\`, and \`ensemblr_linear_create_comment\` are refused here too. \`ensemblr_exit_plan_mode\` is not yours to call either: submitting the plan belongs to the orchestrator, and a plan posted from here would put a review panel in a tab nobody is watching. ${PLAN_MODE_ENFORCEMENT_TAIL}
+The rest is blocked while you plan: \`write\` and \`edit\`, any \`bash\` command that is not read-only, \`ensemblr_resolve_diff_comments\` and \`ensemblr_linear_update_issue\` (each claims work you have not done), ${architecture ? PLAN_MODE_SUBAGENT_DIAGRAM_BLOCKED : ''}and every tool that would hand the work to something else — \`ensemblr_start_conversation\`, \`ensemblr_send_follow_up\`, \`ensemblr_launch_harness\`, \`ensemblr_start_terminal\`, \`ensemblr_write_terminal\`. Being a spawned sub-agent blocks more, whatever the mode: the workspace's tabs and terminals outlive the question you were handed, so \`ensemblr_stop_terminal\`, \`ensemblr_open_tab\`, \`ensemblr_close_tab\`, and \`ensemblr_linear_create_comment\` are refused here too${architecture ? PLAN_MODE_SUBAGENT_DIAGRAM_REFUSED : ''}. \`ensemblr_exit_plan_mode\` is not yours to call either: submitting the plan belongs to the orchestrator, and a plan posted from here would put a review panel in a tab nobody is watching. ${PLAN_MODE_ENFORCEMENT_TAIL}
 
 ${PLAN_MODE_UPKEEP_CLAUSE}
 
@@ -766,15 +878,16 @@ export function awarenessForAudience(audience: ControlAudience): string {
 	if (audience.role === 'concierge') {
 		return CONCIERGE_AWARENESS;
 	}
+	const architecture = audience.architectureDiagram;
 	if (!audience.hasChatTab) {
-		return HARNESS_AWARENESS;
+		return harnessAwareness(architecture);
 	}
 	if (audience.role === 'subagent') {
-		return SUBAGENT_AWARENESS;
+		return subagentAwareness(architecture);
 	}
 	return audience.delegation === 'native'
-		? NATIVE_ORCHESTRATOR_AWARENESS
-		: ORCHESTRATOR_AWARENESS;
+		? nativeOrchestratorAwareness(architecture)
+		: orchestratorAwareness(architecture);
 }
 
 /**

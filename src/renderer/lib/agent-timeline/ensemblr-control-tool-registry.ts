@@ -135,6 +135,36 @@ export const ENSEMBLR_TOOL_LABELS: Record<string, EnsemblrToolLabel> = {
 				),
 		],
 	},
+	ensemblr_get_architecture_diagram: {
+		glyph: 'network',
+		title: [
+			() =>
+				i18n.t(
+					'workbench:control-tool.get-architecture-diagram.done',
+					'Read the architecture diagram',
+				),
+			() =>
+				i18n.t(
+					'workbench:control-tool.get-architecture-diagram.running',
+					'Reading the architecture diagram',
+				),
+		],
+	},
+	ensemblr_update_architecture_diagram: {
+		glyph: 'network',
+		title: [
+			() =>
+				i18n.t(
+					'workbench:control-tool.update-architecture-diagram.done',
+					'Redrew the architecture diagram',
+				),
+			() =>
+				i18n.t(
+					'workbench:control-tool.update-architecture-diagram.running',
+					'Redrawing the architecture diagram',
+				),
+		],
+	},
 	ensemblr_close_tab: {
 		chatKeys: ['chatTabId'],
 		glyph: 'square-x',

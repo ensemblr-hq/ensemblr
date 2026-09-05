@@ -52,6 +52,7 @@ function makeUserExperimental(
 	overrides: Partial<ExperimentalSettings> = {},
 ): ExperimentalSettings {
 	return {
+		architectureDiagram: false,
 		autoRunAfterSetup: false,
 		developerMode: false,
 		...overrides,

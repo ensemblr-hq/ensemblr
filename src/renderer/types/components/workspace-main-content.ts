@@ -12,6 +12,8 @@ export type WorkspaceMainContentState = Pick<
 	closedSessions: WorkbenchShellProps['activeWorkspace']['sessions'];
 	/** Selects All files and expands a workspace-relative directory. */
 	onDirectoryReveal: (directoryPath: string) => void;
+	/** Opens a fresh chat and asks its agent to draw the architecture diagram. */
+	onDrawArchitectureDiagram: () => void;
 	onFilePreviewOpen: (input: {
 		filePath: string;
 	}) => Promise<{ chatTabId: string } | null>;
@@ -20,6 +22,8 @@ export type WorkspaceMainContentState = Pick<
 		harnessId: string;
 		harnessLabel: string;
 	}) => Promise<{ chatTabId: string } | null>;
+	/** Opens the workspace's architecture diagram tab. */
+	onOpenArchitectureDiagram: () => Promise<{ chatTabId: string } | null>;
 	onSessionTabClose: (sessionId: string) => void;
 	/** Promotes an ephemeral preview tab to a permanent one. */
 	onSessionTabPin: (sessionId: string) => void;

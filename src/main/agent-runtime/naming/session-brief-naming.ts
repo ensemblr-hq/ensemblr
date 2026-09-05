@@ -57,6 +57,7 @@ function nothingOutstanding(): SessionBriefNaming {
 			namesWorkspace: false,
 			provisional: false,
 		},
+		diagram: { components: [], stale: false },
 		summaryStale: false,
 		titleNeeded: false,
 	};
@@ -67,8 +68,12 @@ function nothingOutstanding(): SessionBriefNaming {
  * brief runs on every agent start, so a caller whose tab, branch, workspace, or
  * settings file cannot be read reports nothing outstanding rather than failing
  * the turn's system prompt.
+ *
+ * The `diagram` slice always comes back empty here. It is the one item in the
+ * bag that no database read answers — it needs the repository's own files and
+ * its git change set — so the control adapter fills it in around this result.
  * @param input - The open database (null when storage is down), the caller's identity, and a reader for the workspace-naming setting.
- * @returns The caller's outstanding naming upkeep.
+ * @returns The caller's outstanding naming upkeep, with the diagram slice left empty.
  */
 export function readSessionBriefNaming({
 	caller,
@@ -109,6 +114,7 @@ export function readSessionBriefNaming({
 		}
 		return {
 			branch,
+			diagram: { components: [], stale: false },
 			summaryStale: isSummaryStale({
 				branchId: sessionBranch.id,
 				database,

@@ -18,6 +18,17 @@ export const CONTROL_TOKEN_ENV_KEY = 'ENSEMBLR_CONTROL_TOKEN';
 export const CONTROL_ROLE_ENV_KEY = 'ENSEMBLR_CONTROL_ROLE';
 
 /**
+ * Env var telling the Pi extension whether the architecture diagram feature is
+ * on. The extension registers its own tools and injects its own playbook, so it
+ * has to be told: the MCP endpoint's tool list and the playbooks the app serves
+ * never reach it. Set to `1` when on, absent otherwise.
+ */
+export const CONTROL_ARCHITECTURE_ENV_KEY = 'ENSEMBLR_CONTROL_ARCHITECTURE';
+
+/** The value {@link CONTROL_ARCHITECTURE_ENV_KEY} carries when the feature is on. */
+export const CONTROL_ARCHITECTURE_ENABLED = '1';
+
+/**
  * Renders a shell-style reference to an env var, for configs the agent's own
  * CLI expands at launch. Passing the reference instead of the value keeps the
  * secret out of the child's argv, where any process on the machine can read it.

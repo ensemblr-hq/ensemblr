@@ -42,6 +42,7 @@ const EXPECTED_MIGRATIONS = [
 	'024_secret_keyring_backend',
 	'025_worktree_prune',
 	'026_infisical_discovery_dismissals',
+	'027_architecture_diagram',
 ];
 
 const AGENT_VOCABULARY_MIGRATION_VERSION = 14;
@@ -1742,4 +1743,160 @@ VALUES ('root-upgraded', '/tmp/ensemblr/root', 'sqlite', 'ok', '/tmp/ensemblr/ro
 			`migration 022 did not create ${table}`,
 		);
 	}
+});
+
+const ARCHITECTURE_MIGRATION_ID = '027_architecture_diagram';
+const ARCHITECTURE_MIGRATION_VERSION = 27;
+
+/**
+ * Every chat-tab kind the pre-027 CHECK accepts. Migration 027 rebuilds
+ * `chat_tabs` by copying rows through the widened CHECK, so a kind dropped from
+ * that list on a later edit fails the copy at startup for any user holding one.
+ * Seeding all six is what turns that into a red test rather than a database the
+ * app cannot open.
+ */
+const CHAT_TAB_KINDS_BEFORE_ARCHITECTURE = [
+	'chat',
+	'diff',
+	'document',
+	'file',
+	'preview',
+	'terminal',
+] as const;
+
+/**
+ * Builds a database at the pre-027 schema the same way
+ * {@link openDatabaseBeforeConcierge} does: `027_architecture_diagram` is
+ * pre-recorded as applied so 001-026 run and it does not, leaving `chat_tabs`
+ * with the narrower kind CHECK that does not yet accept `diagram`.
+ */
+function openDatabaseBeforeArchitecture(databasePath: string) {
+	const markerConnection = new DatabaseSync(databasePath);
+	listAppliedMigrationIds(markerConnection);
+	markerConnection
+		.prepare(
+			'INSERT INTO schema_migrations (id, version, name) VALUES (?, ?, ?)',
+		)
+		.run(
+			ARCHITECTURE_MIGRATION_ID,
+			ARCHITECTURE_MIGRATION_VERSION,
+			ARCHITECTURE_MIGRATION_ID,
+		);
+	markerConnection.close();
+
+	return openEnsemblrDatabase({ databasePath });
+}
+
+test('widens the chat-tab kinds to diagram without losing tabs or their runtime links', (t) => {
+	const fixture = createTestDatabasePath();
+	t.after(fixture.cleanup);
+
+	const seeded = openDatabaseBeforeArchitecture(fixture.databasePath);
+	seeded.database.exec(`
+		INSERT INTO repositories (id, slug, name, path)
+		VALUES ('repo-arch', 'arch', 'Arch', '/tmp/ensemblr/arch');
+
+		INSERT INTO workspaces (id, repository_id, slug, name, path)
+		VALUES ('ws-arch', 'repo-arch', 'ws', 'WS', '/tmp/ensemblr/workspaces/ws');
+
+		INSERT INTO agent_sessions (id, workspace_id, cwd, status)
+		VALUES ('sess-arch', 'ws-arch', '/tmp/ensemblr/workspaces/ws', 'idle');
+
+		INSERT INTO chat_tabs (id, workspace_id, agent_session_id, kind, title, position, metadata_json, full_title)
+		VALUES
+			('tab-chat', 'ws-arch', 'sess-arch', 'chat', 'Chat', 0, '{"tab":"chat"}', 'Chat with the agent'),
+			('tab-file', 'ws-arch', NULL, 'file', 'file.ts', 1, '{"filePath":"src/file.ts"}', 'src/file.ts');
+
+		INSERT INTO agent_runtime_state (workspace_id, active_tab_id, last_active_session_id)
+		VALUES ('ws-arch', 'tab-chat', 'sess-arch');
+	`);
+	for (const [index, kind] of CHAT_TAB_KINDS_BEFORE_ARCHITECTURE.entries()) {
+		seeded.database
+			.prepare(
+				'INSERT INTO chat_tabs (id, workspace_id, kind, title, position) VALUES (?, ?, ?, ?, ?)',
+			)
+			.run(`tab-kind-${kind}`, 'ws-arch', kind, kind, 10 + index);
+	}
+	assert.throws(
+		() =>
+			seeded.database.exec(`
+				INSERT INTO chat_tabs (id, workspace_id, kind, title, position)
+				VALUES ('tab-early', 'ws-arch', 'diagram', 'Architecture', 2);
+			`),
+		/CHECK/,
+		'migration 026 should not already accept a diagram tab',
+	);
+	seeded.database
+		.prepare('DELETE FROM schema_migrations WHERE id = ?')
+		.run(ARCHITECTURE_MIGRATION_ID);
+	seeded.database.close();
+
+	const connection = openEnsemblrDatabase({
+		databasePath: fixture.databasePath,
+	});
+	t.after(() => connection.database.close());
+
+	assert.deepEqual(
+		listAppliedMigrationIds(connection.database),
+		EXPECTED_MIGRATIONS,
+	);
+
+	// The rebuild copies rows and rewrites the foreign key, so both the tabs and
+	// the runtime state pointing at one have to survive it. This is the whole
+	// reason the migration copies `agent_runtime_state` too: a plain DROP TABLE
+	// chat_tabs would fire ON DELETE SET NULL and blank `active_tab_id`.
+	assert.deepEqual(
+		readRows(
+			connection.database,
+			"SELECT id, kind, agent_session_id, full_title FROM chat_tabs WHERE id IN ('tab-chat', 'tab-file') ORDER BY position",
+		),
+		[
+			{
+				agent_session_id: 'sess-arch',
+				full_title: 'Chat with the agent',
+				id: 'tab-chat',
+				kind: 'chat',
+			},
+			{
+				agent_session_id: null,
+				full_title: 'src/file.ts',
+				id: 'tab-file',
+				kind: 'file',
+			},
+		],
+	);
+
+	assert.deepEqual(
+		readRows(
+			connection.database,
+			"SELECT kind FROM chat_tabs WHERE id LIKE 'tab-kind-%' ORDER BY kind",
+		),
+		CHAT_TAB_KINDS_BEFORE_ARCHITECTURE.map((kind) => ({ kind })),
+		'migration 027 must copy every kind the pre-027 CHECK accepted',
+	);
+	assert.deepEqual(
+		readRows(
+			connection.database,
+			'SELECT workspace_id, active_tab_id, last_active_session_id FROM agent_runtime_state',
+		),
+		[
+			{
+				active_tab_id: 'tab-chat',
+				last_active_session_id: 'sess-arch',
+				workspace_id: 'ws-arch',
+			},
+		],
+	);
+
+	connection.database.exec(`
+		INSERT INTO chat_tabs (id, workspace_id, kind, title, position)
+		VALUES ('tab-diagram', 'ws-arch', 'diagram', 'Architecture', 2);
+	`);
+	assert.deepEqual(
+		readRows(
+			connection.database,
+			"SELECT id FROM chat_tabs WHERE kind = 'diagram'",
+		),
+		[{ id: 'tab-diagram' }],
+	);
 });

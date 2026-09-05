@@ -87,6 +87,12 @@ function needsLazyLoad(node: FileTreeNode<WorkspaceFileSummary>): boolean {
  * children are lazily loaded when the target has none, and the path is recorded
  * for the scroll pass that follows.
  *
+ * A request marked `exclusive` closes everything else — the architecture
+ * diagram asks for that, because a node pointing at one directory in a tree of
+ * hundreds is only useful if that directory is the one thing the user can see
+ * when they arrive. Every other reveal only opens, so clicking a file path in a
+ * tool result does not collapse the folders the user opened themselves.
+ *
  * Expansion is owned here rather than passed in so the reveal effect drives its
  * own state instead of calling back out to its caller's.
  * @param input - The tree, its known directory paths, and the lazy loader
@@ -109,7 +115,7 @@ function useDirectoryReveal({
 }) {
 	// Folders start collapsed: the full repo tree would be overwhelming if every
 	// directory rendered open.
-	const { expandDirectories, isExpanded, toggleDirectory } =
+	const { expandDirectories, isExpanded, revealOnly, toggleDirectory } =
 		useFileTreeExpansion(false, knownDirectoryPaths);
 	const revealRequest = useAtomValue(workspaceDirectoryRevealRequestAtom);
 	const handledRevealRequestIdRef = useRef<number | null>(null);
@@ -131,11 +137,14 @@ function useDirectoryReveal({
 			return;
 		}
 		handledRevealRequestIdRef.current = revealRequest.id;
-		expandDirectories(
-			directoryPathAndAncestors(directoryPath).filter((path) =>
-				knownDirectoryPathSet.has(path),
-			),
+		const chain = directoryPathAndAncestors(directoryPath).filter((path) =>
+			knownDirectoryPathSet.has(path),
 		);
+		if (revealRequest.exclusive) {
+			revealOnly(chain);
+		} else {
+			expandDirectories(chain);
+		}
 		pendingRevealPathRef.current = directoryPath;
 		const directoryNode = findDirectoryNode(tree, directoryPath);
 		if (directoryNode && needsLazyLoad(directoryNode)) {
@@ -145,6 +154,7 @@ function useDirectoryReveal({
 		expandDirectories,
 		knownDirectoryPathSet,
 		loadIgnoredDirectory,
+		revealOnly,
 		revealRequest,
 		tree,
 		workspaceCwd,

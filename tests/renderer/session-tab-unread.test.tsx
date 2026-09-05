@@ -31,6 +31,7 @@ function renderStrip(unreadKeys: ReadonlySet<string>) {
 			activeSession={activeTab}
 			closedSessions={[]}
 			onLaunchHarness={async () => null}
+			onOpenArchitectureDiagram={async () => null}
 			onSessionTabChange={() => undefined}
 			onSessionTabClose={() => undefined}
 			onSessionTabOpen={async () => null}

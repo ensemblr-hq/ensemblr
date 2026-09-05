@@ -31,6 +31,7 @@ import type {
 	PiRawFrameKind,
 } from '../shared/ipc/contracts/agent-session';
 import type { AppSettingsChangedBroadcast } from '../shared/ipc/contracts/app-settings';
+import type { ArchitectureSnapshotChangedBroadcast } from '../shared/ipc/contracts/architecture';
 import type { ConfigChangedBroadcast } from '../shared/ipc/contracts/health';
 import type {
 	TerminalLifecycleBroadcast,
@@ -95,6 +96,7 @@ import { createQuitCoordinator } from './app/quit-coordinator';
 import { createQuitGuard } from './app/quit-guard';
 import { resolveUserDataDirectory } from './app/user-data-location';
 import { createMainWindowStateStore } from './app/window-state';
+import { createArchitectureService } from './architecture';
 import { createChatTabService } from './chat-tabs/chat-tab-service.ts';
 import { persistTerminalAgentSessionId } from './chat-tabs/persist-terminal-agent-session.ts';
 import {
@@ -365,6 +367,17 @@ const appSettingsService = createAppSettingsService(
 const databaseService = createEnsemblrDatabaseService(
 	isDev ? { databasePath: devDatabasePath } : {},
 );
+
+/**
+ * Whether the experimental architecture diagram feature is on. Read live rather
+ * than captured at launch: it gates the diagram pane, the two control ops, the
+ * shipped skill, and the playbooks that describe them, and the settings file is
+ * watched, so a session opened after the switch flips gets the surface the user
+ * just asked for.
+ * @returns True when the user has enabled the architecture diagram.
+ */
+const readArchitectureDiagramEnabled = (): boolean =>
+	appSettingsService.read().experimental.architectureDiagram;
 // The chat the renderer last reported as on screen, so a desktop notification is
 // suppressed for that chat alone rather than for the whole app.
 const activeChatStore = new ActiveChatStore();
@@ -562,9 +575,17 @@ let agentControlServer: ControlServer | null = null;
 // control state on shutdown.
 let agentControlService: AgentControlService | null = null;
 
-// The shipped Agent Skill bundle, resolved once: Pi loads the skill directory
-// directly, both Claude paths load the plugin root it sits inside.
-const agentSkillBundle = resolveAgentSkillBundle(app);
+/**
+ * The shipped Agent Skills this launch should load: Pi loads a skill directory
+ * directly, both Claude paths load the plugin root it sits inside. Resolved per
+ * read rather than once, because the architecture-diagram bundle follows a
+ * setting the user can flip while the app runs.
+ * @returns The plugin roots and skill directories for the current settings.
+ */
+const readAgentSkillBundle = () =>
+	resolveAgentSkillBundle(app, {
+		architectureDiagram: readArchitectureDiagramEnabled(),
+	});
 
 /**
  * Reads the durable sub-agent marker off the chat tab bound to a session. The
@@ -592,7 +613,8 @@ const {
 } = createAgentControlIntegration({
 	app,
 	originRegistry: agentControlOriginRegistry,
-	skillPluginDirectory: agentSkillBundle.pluginDirectory,
+	readArchitectureDiagramEnabled,
+	readSkillPluginDirectories: () => readAgentSkillBundle().pluginDirectories,
 	/** Resolves a workspace's checkout path, or null before the database is open. */
 	resolveWorkspaceCwd: (workspaceId) => {
 		const database = databaseService.getConnection()?.database;
@@ -622,13 +644,15 @@ const {
 const resolveAgentSpawnEnv = async (): Promise<NodeJS.ProcessEnv> =>
 	(await localCommandService.getEnvironment()).env;
 const piAgentAdapter = createPiCliRpcAdapter({
-	baseArgs: [
+	/** Re-resolved per session, so a skill switched on mid-run reaches the next one. */
+	baseArgs: () => [
 		'--mode',
 		'rpc',
 		...(piControlExtensionPath ? ['-e', piControlExtensionPath] : []),
-		...(agentSkillBundle.skillDirectory
-			? ['--skill', agentSkillBundle.skillDirectory]
-			: []),
+		...readAgentSkillBundle().skillDirectories.flatMap((directory) => [
+			'--skill',
+			directory,
+		]),
 	],
 	onRawFrame: broadcastRawFrame,
 	resolveBaseEnv: resolveAgentSpawnEnv,
@@ -669,7 +693,7 @@ const claudeAgentAdapter = createClaudeAgentAdapter({
 		/** Saves the plan, posts it into the chat, and raises the review panel. */
 		submitPlan: (input) => planSubmission.submit(input),
 	}),
-	pluginDirectory: agentSkillBundle.pluginDirectory,
+	readPluginDirectories: () => readAgentSkillBundle().pluginDirectories,
 	resolveBaseEnv: resolveAgentSpawnEnv,
 });
 /**
@@ -738,7 +762,7 @@ const agentProviderService = createAgentProviderService({
 	},
 	slashCommandCatalogs: {
 		claude: createClaudeSlashCommands({
-			pluginDirectory: agentSkillBundle.pluginDirectory,
+			pluginDirectories: readAgentSkillBundle().pluginDirectories,
 			resolveBaseEnv: resolveAgentSpawnEnv,
 			resolveExecutablePath: resolveClaudeExecutablePath,
 		}),
@@ -746,7 +770,7 @@ const agentProviderService = createAgentProviderService({
 			resolvePiSlashCommands(
 				await piExecutableService.getSnapshot(),
 				cwd,
-				agentSkillBundle.skillDirectory,
+				readAgentSkillBundle().skillDirectories,
 			),
 	},
 });
@@ -774,6 +798,14 @@ const sessionNamingQueue = createSessionNaming();
 // because the session service reads it at open time to decide the permission
 // mode a Claude child starts under.
 const planModeRegistry = createPlanModeRegistry();
+/**
+ * Owns the workspace architecture diagram: the stored document and the updates
+ * an agent writes over it. Nothing derives one — a workspace nobody has drawn
+ * has no diagram.
+ */
+const architectureService = createArchitectureService({
+	requireDatabase: () => requireOpenDatabase(),
+});
 const agentSessionService = createAgentSessionService({
 	databaseService,
 	/** Forwards an agent session event to every window and the activity monitor. */
@@ -823,6 +855,7 @@ const agentSessionService = createAgentSessionService({
 	/** Keeps a resumed child on `ensemblr`, whose lineage a restart forgot. */
 	isSpawnedSubAgent: readSubAgentMarker,
 	queueNaming: sessionNamingQueue,
+	readArchitectureDiagramEnabled,
 	/** Reads the delegation mechanism each new Claude Code session opens under. */
 	readClaudeSubagentMode: () =>
 		appSettingsService.read().providers.claudeSubagentMode,
@@ -1074,6 +1107,7 @@ const conciergeSessionService = createConciergeSessionService({
 			systemPromptAppend: [
 				reachesControl
 					? awarenessForAudience({
+							architectureDiagram: readArchitectureDiagramEnabled(),
 							delegation: 'ensemblr',
 							hasChatTab: true,
 							role: 'concierge',
@@ -1291,7 +1325,7 @@ const conciergePorts = {
 			name: string;
 			projectId: string;
 		}) => {
-			const result = await createWorkspaceServiceWithSetup.create({
+			const result = await createWorkspaceServiceWithHooks.create({
 				...(baseBranch ? { baseBranch } : {}),
 				name,
 				repositoryId: projectId,
@@ -1316,10 +1350,18 @@ const conciergePorts = {
 agentControlService = createAgentControlService({
 	guardrails: agentControlGuardrails,
 	originRegistry: agentControlOriginRegistry,
+	readArchitectureDiagramEnabled,
 	ports: createAgentControlPorts({
+		architectureService,
 		augmentHarnessCommand,
 		conciergePorts,
 		boardStatusStore,
+		/** Broadcasts an agent-refined diagram so an open diagram tab refreshes. */
+		broadcastArchitectureChanged: (payload) =>
+			broadcastToAllWindows(
+				IPC_CHANNELS.architectureSnapshotChanged,
+				payload satisfies ArchitectureSnapshotChangedBroadcast,
+			),
 		/** Broadcasts an agent-reported board status update to all windows. */
 		broadcastBoardStatus: (payload) =>
 			broadcastToAllWindows(IPC_CHANNELS.agentControlBoardStatus, payload),
@@ -1390,7 +1432,11 @@ startControlServer(agentControlService)
 	.catch((error: unknown) => {
 		console.error('[agent-control] failed to start control server', error);
 	});
-const createWorkspaceServiceWithSetup = withSetupScriptOnCreate({
+/**
+ * Workspace creation as every caller gets it: the setup script runs. The hook
+ * is fire-and-forget, so it cannot fail a create.
+ */
+const createWorkspaceServiceWithHooks = withSetupScriptOnCreate({
 	createWorkspaceService: createWorkspaceServiceInstance,
 	scriptLifecycleService,
 });
@@ -1619,13 +1665,14 @@ app.whenReady().then(() => {
 		activeChatStore,
 		agentProviderService,
 		appSettingsService,
+		architectureService,
 		archiveWorkspaceService: archiveWorkspaceServiceWithScript,
 		augmentHarnessCommand,
 		conciergeSessionService,
 		resolveConciergeHome: resolveConciergeHomePaths,
 		configService,
 		continueWorkspaceBranchService,
-		createWorkspaceService: createWorkspaceServiceWithSetup,
+		createWorkspaceService: createWorkspaceServiceWithHooks,
 		databaseService,
 		deleteArchivedWorkspaceService,
 		deleteRepositoryService,

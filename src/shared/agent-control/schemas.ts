@@ -76,6 +76,16 @@ const setSummarySchema = z.strictObject({
 	summary: nonEmpty,
 });
 
+// The diagram itself is validated by `architectureIrSchema` in the service,
+// which strips unknown keys rather than rejecting them. Validating it twice —
+// once loosely here and once strictly there — would let the two drift, so this
+// boundary only asserts that something was submitted. Deliberately wide enough
+// to admit a JSON string as well as an object: the port decodes one rather than
+// blaming the model for a bridge's encoding.
+const updateArchitectureDiagramSchema = z.strictObject({
+	diagram: z.unknown(),
+});
+
 const sendFollowUpSchema = z.strictObject({
 	agentSessionId: nonEmpty,
 	prompt: nonEmpty,
@@ -457,6 +467,8 @@ const AGENT_CONTROL_ARG_SCHEMAS = {
 	setName: setNameSchema,
 	setBranchName: setBranchNameSchema,
 	setSummary: setSummarySchema,
+	getArchitectureDiagram: emptySchema,
+	updateArchitectureDiagram: updateArchitectureDiagramSchema,
 	closeTab: closeTabSchema,
 	launchHarness: launchHarnessSchema,
 	startTerminal: startTerminalSchema,

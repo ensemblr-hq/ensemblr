@@ -101,6 +101,7 @@ describe('All files directory reveal', () => {
 
 		act(() => {
 			store.set(workspaceDirectoryRevealRequestAtom, {
+				exclusive: false,
 				id: 1,
 				path: 'src/renderer',
 				workspaceId: 'workspace-1',
@@ -113,4 +114,100 @@ describe('All files directory reveal', () => {
 			).not.toBeNull();
 		});
 	});
+
+	// Every file preview reveals its folder, so an additive reveal is the common
+	// case: clicking a path in a tool result must not close what the user opened.
+	test('an additive reveal leaves other folders open', async () => {
+		const store = renderAllFiles();
+
+		act(() => {
+			store.set(workspaceDirectoryRevealRequestAtom, {
+				exclusive: false,
+				id: 1,
+				path: 'src/main',
+				workspaceId: 'workspace-1',
+			});
+		});
+		await waitFor(() => {
+			expect(
+				screen.getByRole('treeitem', { name: 'Collapse src/main' }),
+			).not.toBeNull();
+		});
+
+		act(() => {
+			store.set(workspaceDirectoryRevealRequestAtom, {
+				exclusive: false,
+				id: 2,
+				path: 'src/renderer',
+				workspaceId: 'workspace-1',
+			});
+		});
+		await waitFor(() => {
+			expect(
+				screen.getByRole('treeitem', { name: 'Collapse src/renderer' }),
+			).not.toBeNull();
+		});
+		expect(
+			screen.getByRole('treeitem', { name: 'Collapse src/main' }),
+		).not.toBeNull();
+	});
+
+	// Only the architecture diagram asks for this: a node pointing at one folder
+	// in a tree of hundreds is useful only if that folder is what you land on.
+	test('an exclusive reveal closes every other folder', async () => {
+		const store = renderAllFiles();
+
+		act(() => {
+			store.set(workspaceDirectoryRevealRequestAtom, {
+				exclusive: false,
+				id: 1,
+				path: 'src/main',
+				workspaceId: 'workspace-1',
+			});
+		});
+		await waitFor(() => {
+			expect(
+				screen.getByRole('treeitem', { name: 'Collapse src/main' }),
+			).not.toBeNull();
+		});
+
+		act(() => {
+			store.set(workspaceDirectoryRevealRequestAtom, {
+				exclusive: true,
+				id: 2,
+				path: 'src/renderer',
+				workspaceId: 'workspace-1',
+			});
+		});
+		await waitFor(() => {
+			expect(
+				screen.getByRole('treeitem', { name: 'Collapse src/renderer' }),
+			).not.toBeNull();
+		});
+		expect(
+			screen.queryByRole('treeitem', { name: 'Collapse src/main' }),
+		).toBeNull();
+	});
 });
+
+/** Renders the All files tree over a fresh Jotai store and returns that store. */
+function renderAllFiles() {
+	const client = createTestQueryClient();
+	client.setQueryData(ensemblrQueryKeys.workspaceOpenTargets(), {
+		targets: [],
+	});
+	const store = createStore();
+	renderWithProviders(
+		<Provider store={store}>
+			<ReviewFilePreviewOpenerProvider value={vi.fn()}>
+				<AllFilesList
+					files={files}
+					workspaceCwd='/repo'
+					workspaceId='workspace-1'
+				/>
+			</ReviewFilePreviewOpenerProvider>
+		</Provider>,
+		{ client },
+	);
+	return store;
+}

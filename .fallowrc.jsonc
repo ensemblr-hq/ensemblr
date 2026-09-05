@@ -51,6 +51,7 @@
 		// are plain modules reached through normal imports, so a real unused
 		// export in one should still surface.
 		"src/shared/agent-failure.ts",
+		"src/shared/architecture-diagram.ts",
 		"src/shared/plan-mode.ts",
 		"src/shared/scripts.ts",
 		"src/shared/terminal.ts",

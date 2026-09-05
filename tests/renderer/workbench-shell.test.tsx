@@ -125,6 +125,7 @@ function stubSessionNavigation(
 		closeSessionTab: () => undefined,
 		closeSessionTabAsync: () => Promise.resolve({ replacementChatTabId: null }),
 		effectiveActiveSession: activeSession,
+		openArchitectureDiagramTab: () => Promise.resolve(null),
 		openCommentPreviewTab: () => Promise.resolve(null),
 		openFilePreviewTab: () => Promise.resolve(null),
 		openSessionTab: () => Promise.resolve(null),

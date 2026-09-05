@@ -1,6 +1,7 @@
 import { useSetAtom } from 'jotai';
 import { type ComponentType, useCallback, useRef } from 'react';
 import { useWorkspaceMenuCommands } from '@/renderer/components/workbench-shell/workspace-menu-commands';
+import { useDrawArchitectureDiagram } from '@/renderer/hooks/workbench-shell/architecture-diagram/use-draw-architecture-diagram';
 import { useAgentActionRunner } from '@/renderer/hooks/workbench-shell/review-actions/use-agent-action-runner';
 import { useChatPromptHandoff } from '@/renderer/hooks/workbench-shell/review-actions/use-chat-prompt-handoff';
 import { useDockController } from '@/renderer/hooks/workbench-shell/use-dock-controller';
@@ -112,17 +113,64 @@ export function WorkspaceWorkbenchContent({
 			requestDiffLineReveal,
 		],
 	);
+	/**
+	 * Selects All files and expands a workspace-relative directory. `exclusive`
+	 * closes every other folder, which only the architecture diagram asks for.
+	 */
+	const revealWorkspaceDirectory = useCallback(
+		(directoryPath: string, options?: { exclusive?: boolean }) => {
+			directoryRevealRequestIdRef.current += 1;
+			setDirectoryRevealRequest({
+				exclusive: options?.exclusive ?? false,
+				id: directoryRevealRequestIdRef.current,
+				path: directoryPath,
+				workspaceId: activeWorkspace.id,
+			});
+			onReviewTabChange('files');
+			void rightSidebar.expandRightSidebar();
+		},
+		[
+			activeWorkspace.id,
+			onReviewTabChange,
+			rightSidebar.expandRightSidebar,
+			setDirectoryRevealRequest,
+		],
+	);
+	/**
+	 * Opens a file preview and says where it lives, by expanding its folder in the
+	 * tree. Every preview in the app goes through here — the review panel's opener
+	 * and the conversation's alike — because two openers meant the diagram and the
+	 * timeline silently skipped the reveal.
+	 */
+	const openFilePreviewAndReveal = useCallback(
+		(input: { filePath: string; preview?: boolean }) => {
+			const parentDirectory = input.filePath.split('/').slice(0, -1).join('/');
+			if (parentDirectory) {
+				revealWorkspaceDirectory(parentDirectory);
+			}
+			return openFilePreviewTab(input);
+		},
+		[openFilePreviewTab, revealWorkspaceDirectory],
+	);
+	/** Reveals a diagram node's directory, and only it, in the All files tree. */
+	const revealDiagramDirectory = useCallback(
+		(directoryPath: string) => {
+			revealWorkspaceDirectory(directoryPath, { exclusive: true });
+		},
+		[revealWorkspaceDirectory],
+	);
 	const openReviewFilePreview = useCallback(
 		(filePath: string, options?: FileOpenOptions) => {
-			void openFilePreviewTab({ filePath, preview: options?.preview }).then(
-				(result) => {
-					if (result) {
-						onSessionTabChange(result.chatTabId);
-					}
-				},
-			);
+			void openFilePreviewAndReveal({
+				filePath,
+				preview: options?.preview,
+			}).then((result) => {
+				if (result) {
+					onSessionTabChange(result.chatTabId);
+				}
+			});
 		},
-		[onSessionTabChange, openFilePreviewTab],
+		[onSessionTabChange, openFilePreviewAndReveal],
 	);
 	const openCommentPreview = useCallback(
 		(input: {
@@ -138,24 +186,6 @@ export function WorkspaceWorkbenchContent({
 		},
 		[onSessionTabChange, openCommentPreviewTab],
 	);
-	const revealWorkspaceDirectory = useCallback(
-		(directoryPath: string) => {
-			directoryRevealRequestIdRef.current += 1;
-			setDirectoryRevealRequest({
-				id: directoryRevealRequestIdRef.current,
-				path: directoryPath,
-				workspaceId: activeWorkspace.id,
-			});
-			onReviewTabChange('files');
-			void rightSidebar.expandRightSidebar();
-		},
-		[
-			activeWorkspace.id,
-			onReviewTabChange,
-			rightSidebar.expandRightSidebar,
-			setDirectoryRevealRequest,
-		],
-	);
 	const runAgentAction = useAgentActionRunner({
 		activeProject,
 		activeSession: sessionNavigation.effectiveActiveSession,
@@ -163,6 +193,10 @@ export function WorkspaceWorkbenchContent({
 		openSessionTab: sessionNavigation.openSessionTab,
 		selectChat: onSessionTabChange,
 		sessionTabs: sessionNavigation.sessionTabs,
+	});
+	const drawArchitectureDiagram = useDrawArchitectureDiagram({
+		openSessionTab: sessionNavigation.openSessionTab,
+		selectChat: onSessionTabChange,
 	});
 	const handOffToChat = useChatPromptHandoff({
 		activeSession: sessionNavigation.effectiveActiveSession,
@@ -175,9 +209,11 @@ export function WorkspaceWorkbenchContent({
 		activeWorkspace,
 		closedSessions: sessionNavigation.closedSessions,
 		composer,
-		onDirectoryReveal: revealWorkspaceDirectory,
-		onFilePreviewOpen: sessionNavigation.openFilePreviewTab,
+		onDirectoryReveal: revealDiagramDirectory,
+		onDrawArchitectureDiagram: drawArchitectureDiagram,
+		onFilePreviewOpen: openFilePreviewAndReveal,
 		onLaunchHarness: sessionNavigation.openTerminalTab,
+		onOpenArchitectureDiagram: sessionNavigation.openArchitectureDiagramTab,
 		onSessionTabChange,
 		onSessionTabClose: sessionNavigation.closeSessionTab,
 		onSessionTabOpen: sessionNavigation.openSessionTab,

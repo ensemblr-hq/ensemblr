@@ -1,0 +1,195 @@
+{
+	"viewBox": [
+		1064,
+		356
+	],
+	"components": [
+		{
+			"id": "user",
+			"x": 40,
+			"y": 208,
+			"width": 120,
+			"height": 60
+		},
+		{
+			"id": "agents",
+			"x": 184,
+			"y": 208,
+			"width": 120,
+			"height": 60
+		},
+		{
+			"id": "skill",
+			"x": 184,
+			"y": 100,
+			"width": 120,
+			"height": 60
+		},
+		{
+			"id": "ir",
+			"x": 328,
+			"y": 208,
+			"width": 120,
+			"height": 60
+		},
+		{
+			"id": "schemas",
+			"x": 328,
+			"y": 100,
+			"width": 120,
+			"height": 60
+		},
+		{
+			"id": "renderers",
+			"x": 472,
+			"y": 208,
+			"width": 120,
+			"height": 60
+		},
+		{
+			"id": "template",
+			"x": 616,
+			"y": 208,
+			"width": 120,
+			"height": 60
+		},
+		{
+			"id": "checker",
+			"x": 760,
+			"y": 208,
+			"width": 120,
+			"height": 60
+		},
+		{
+			"id": "html",
+			"x": 904,
+			"y": 208,
+			"width": 120,
+			"height": 60
+		}
+	],
+	"boundaries": [
+		{
+			"kind": "region",
+			"label": "archify/ skill package",
+			"x": 298,
+			"y": 70,
+			"width": 612,
+			"height": 218
+		}
+	],
+	"connections": [
+		{
+			"from": "user",
+			"to": "agents",
+			"points": [
+				[
+					160,
+					238
+				],
+				[
+					184,
+					238
+				]
+			]
+		},
+		{
+			"from": "agents",
+			"to": "skill",
+			"points": [
+				[
+					244,
+					208
+				],
+				[
+					244,
+					160
+				]
+			]
+		},
+		{
+			"from": "agents",
+			"to": "ir",
+			"points": [
+				[
+					304,
+					238
+				],
+				[
+					328,
+					238
+				]
+			]
+		},
+		{
+			"from": "ir",
+			"to": "schemas",
+			"points": [
+				[
+					388,
+					208
+				],
+				[
+					388,
+					160
+				]
+			]
+		},
+		{
+			"from": "ir",
+			"to": "renderers",
+			"points": [
+				[
+					448,
+					238
+				],
+				[
+					472,
+					238
+				]
+			]
+		},
+		{
+			"from": "renderers",
+			"to": "template",
+			"points": [
+				[
+					592,
+					238
+				],
+				[
+					616,
+					238
+				]
+			]
+		},
+		{
+			"from": "template",
+			"to": "checker",
+			"points": [
+				[
+					736,
+					238
+				],
+				[
+					760,
+					238
+				]
+			]
+		},
+		{
+			"from": "checker",
+			"to": "html",
+			"points": [
+				[
+					880,
+					238
+				],
+				[
+					904,
+					238
+				]
+			]
+		}
+	]
+}

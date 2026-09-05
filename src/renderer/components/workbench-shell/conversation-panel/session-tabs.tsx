@@ -12,10 +12,7 @@ import {
 } from 'lucide-react';
 import { Reorder } from 'motion/react';
 import {
-	type ComponentPropsWithoutRef,
-	forwardRef,
 	type KeyboardEvent,
-	type ReactNode,
 	useEffect,
 	useMemo,
 	useRef,
@@ -54,6 +51,8 @@ import type { SessionTabModel } from '@/renderer/types/workbench';
 import type { SessionTabPlacement } from '@/renderer/types/workbench-shell';
 import { formatShortcut } from '@/shared/keymap';
 
+import { ArchitectureDiagramButton } from './architecture-diagram/architecture-diagram-button';
+import { GhostIconButton } from './ghost-icon-button';
 import { SessionTab } from './session-tab';
 
 /** Display label for the coding-agent launcher shortcut, e.g. `⌘⇧A`. */
@@ -61,21 +60,6 @@ const AGENTS_SHORTCUT_HINT = formatShortcut('agents.open');
 
 /** Display label for the new-chat-tab shortcut, e.g. `⌘T`. */
 const NEW_TAB_SHORTCUT_HINT = formatShortcut('tab.new');
-
-/**
- * Ghost `icon-sm` button carrying a screen-reader-only label. Forwards its ref
- * and props so it can back a Radix `asChild` trigger (tooltip, dropdown).
- */
-const GhostIconButton = forwardRef<
-	HTMLButtonElement,
-	{ icon: ReactNode; label: string } & ComponentPropsWithoutRef<typeof Button>
->(({ icon, label, ...props }, ref) => (
-	<Button ref={ref} size='icon-sm' variant='ghost' {...props}>
-		{icon}
-		<span className='sr-only'>{label}</span>
-	</Button>
-));
-GhostIconButton.displayName = 'GhostIconButton';
 
 /** Tooltip body pairing a label with an optional keyboard-shortcut chip. */
 function ShortcutTooltipContent({
@@ -98,6 +82,7 @@ export function SessionTabs({
 	activeSession,
 	closedSessions,
 	onLaunchHarness,
+	onOpenArchitectureDiagram,
 	onSessionTabClose,
 	onSessionTabChange,
 	onSessionTabOpen,
@@ -113,6 +98,8 @@ export function SessionTabs({
 		harnessId: string;
 		harnessLabel: string;
 	}) => Promise<{ chatTabId: string } | null>;
+	/** Opens the workspace's architecture diagram tab. */
+	onOpenArchitectureDiagram: () => Promise<{ chatTabId: string } | null>;
 	onSessionTabClose: (sessionId: string) => void;
 	onSessionTabChange: (sessionId: string) => void;
 	onSessionTabOpen: (options?: {
@@ -289,6 +276,10 @@ export function SessionTabs({
 						</span>
 					</Button>
 				) : null}
+				<ArchitectureDiagramButton
+					onOpenArchitectureDiagram={onOpenArchitectureDiagram}
+					onSessionTabChange={onSessionTabChange}
+				/>
 				<HarnessLauncherMenu
 					onLaunchHarness={onLaunchHarness}
 					onSessionTabChange={onSessionTabChange}

@@ -1,5 +1,6 @@
 import type { TFunction } from 'i18next';
 
+import type { ArchitectureFailureCode } from '@/shared/ipc/contracts/architecture';
 import type { CheckpointFailureCode } from '@/shared/ipc/contracts/checkpoint';
 import type { CloneGithubRepositoryDiagnosticCode } from '@/shared/ipc/contracts/clone';
 import type { DictationFailureCode } from '@/shared/ipc/contracts/dictation';
@@ -42,6 +43,7 @@ import type { WorkspaceGitFailureCode } from '@/shared/ipc/contracts/workspace-g
  * union, which is what keeps the same failure worded the same way everywhere.
  */
 export type AppFailureCode =
+	| ArchitectureFailureCode
 	| ArchiveWorkspaceDiagnosticCode
 	| CheckpointFailureCode
 	| CloneGithubRepositoryDiagnosticCode
@@ -354,6 +356,11 @@ export const APP_FAILURE_TEXT: Record<
 		t(
 			'errors:failure.detached-head',
 			'This workspace is not on a branch, so GitHub has nothing to match it against. Check out a branch, then retry.',
+		),
+	'diagram-unreadable': (t) =>
+		t(
+			'errors:failure.diagram-unreadable',
+			'The stored architecture diagram cannot be read. Repair or delete the file, then ask an agent to draw a new one.',
 		),
 	'dictation-disabled': (t) =>
 		t(

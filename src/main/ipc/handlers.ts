@@ -7,6 +7,7 @@ import type { AgentSessionService } from '../agent-runtime';
 import type { ActiveChatStore } from '../agent-runtime/active-chat-store.ts';
 import type { QueueProvisionalNamingPort } from '../agent-runtime/naming/provisional-workspace-naming';
 import type { HarnessDetectionService } from '../agents/index.ts';
+import type { ArchitectureService } from '../architecture/index.ts';
 import { createChatTabService } from '../chat-tabs/index.ts';
 import type { LocalCommandService } from '../commands/local-command';
 import type { ConciergeHome, ConciergeSessionService } from '../concierge';
@@ -70,6 +71,7 @@ import { registerAgentProviderHandlers } from './handlers/agent-provider';
 import { registerAgentSessionHandlers } from './handlers/agent-session';
 import { registerAgentHandlers } from './handlers/agents';
 import { registerAppSettingsHandlers } from './handlers/app-settings';
+import { registerArchitectureHandlers } from './handlers/architecture';
 import { registerChatTabHandlers } from './handlers/chat-tab';
 import { registerCheckpointHandlers } from './handlers/checkpoint';
 import { registerCloneHandlers } from './handlers/clone';
@@ -109,6 +111,7 @@ import {
 interface RegisterIpcHandlersOptions {
 	agentProviderService: AgentProviderService;
 	appSettingsService: AppSettingsService;
+	architectureService: ArchitectureService;
 	archiveWorkspaceService: ArchiveWorkspaceService;
 	conciergeSessionService: ConciergeSessionService;
 	/** Re-read per call, so a root the user moved resolves to the home that is there now. */
@@ -195,6 +198,7 @@ export interface IpcHandlersHandle {
 export function registerIpcHandlers({
 	agentProviderService,
 	appSettingsService,
+	architectureService,
 	archiveWorkspaceService,
 	augmentHarnessCommand,
 	configService,
@@ -333,6 +337,7 @@ export function registerIpcHandlers({
 		}),
 		flushSummaryForChatTab: agentSessionService.flushSummaryForChatTab,
 	});
+	registerArchitectureHandlers({ architectureService });
 	registerCheckpointHandlers({ databaseService });
 	registerReviewHandlers({
 		reviewService: createReviewService({ databaseService }),

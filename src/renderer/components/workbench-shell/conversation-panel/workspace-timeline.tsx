@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import {
 	agentSessionsForWorkspaceQuery,
 	listChatTabSummariesQuery,
+	workspaceGitStatusQuery,
 } from '@/renderer/api/ensemblr-queries';
 import { useHasPendingPrompts } from '@/renderer/state/composer';
 import type {
@@ -16,16 +17,42 @@ import { AgentSessionTimeline } from './timeline/timeline';
 import { WorkspaceLandingCard } from './workspace-landing-card';
 
 /**
+ * Directories Ensemblr writes into a workspace itself: the seed architecture
+ * scan and the committed repository settings under one, the agent's plans,
+ * transcripts, and prompt attachments under the other. A change under either is
+ * the app's own bookkeeping rather than work the user did.
+ */
+const APP_OWNED_PREFIXES = ['.ensemblr/', '.context/'] as const;
+
+/**
+ * How many changed files the *user* is responsible for.
+ * @param paths - Every changed path git reports, or null before the read lands
+ * @param fallbackCount - The workspace model's own count, used until it does
+ * @returns The count the landing-card gate reads
+ */
+function countUserChangedFiles(
+	paths: readonly string[] | null,
+	fallbackCount: number,
+): number {
+	if (!paths) {
+		return fallbackCount;
+	}
+	return paths.filter(
+		(path) => !APP_OWNED_PREFIXES.some((prefix) => path.startsWith(prefix)),
+	).length;
+}
+
+/**
  * Scrollable timeline content shown above the composer.
  *
  * Three mutually-exclusive states:
  *   1. Active agent session, or a prompt already submitted into one that is
  *      still opening — render `AgentSessionTimeline` with events.
- *   2. No session, but the workspace has been worked in — render
+ *   2. No session, but the workspace has been chatted in before — render
  *      `NewChatEmptyState`, with a chip for each sibling chat's
  *      `.context/sessions` transcript, open chats included.
- *   3. No session and an untouched workspace — render `WorkspaceLandingCard`
- *      (fresh workspace summary), falling back to `NewChatEmptyState`.
+ *   3. No session and no prior chat — render `WorkspaceLandingCard` (fresh
+ *      workspace summary), falling back to `NewChatEmptyState`.
  *
  * Setup / diagnostic / readiness UI lives in the sidebar footer and the
  * settings → diagnostics screen — it never appears inside the conversation
@@ -55,6 +82,11 @@ export function WorkspaceTimeline({
 	const { data: agentSessionsData } = useQuery(
 		agentSessionsForWorkspaceQuery(workspace.id),
 	);
+	// The same query the workspace model derives `changeSummary` from, so reading
+	// it here costs a cache hit rather than a second poll.
+	const { data: gitStatusData } = useQuery(
+		workspaceGitStatusQuery(composer.workspaceCwd || null),
+	);
 	// The summary query lists every restorable tab, including terminal tabs no
 	// transcript is ever written for. Chats are the ones this surface can speak
 	// to, minus this tab itself — attaching a chat's own transcript to itself says
@@ -81,16 +113,23 @@ export function WorkspaceTimeline({
 		);
 	}
 
-	// The card claims nothing has happened in this workspace yet, so every trace
-	// of prior work has to count — a sibling chat tab's session, a closed tab's
-	// transcript, or edits made straight from a terminal. An unloaded session
-	// list counts as history too: guessing "untouched" before it lands is the one
-	// answer that can be wrong, and the neutral empty state is right either way.
+	// A workspace the app has just cut is already dirty — it writes the seed
+	// architecture scan into it — so the dirty-worktree signal counts only the
+	// files outside the directories the app writes.
+	const userChangedFiles = countUserChangedFiles(
+		gitStatusData && !gitStatusData.error
+			? gitStatusData.files.map((file) => file.path)
+			: null,
+		workspace.changeSummary.files,
+	);
+	// An unloaded session list counts as history: guessing "untouched" before it
+	// lands is the one answer that can be wrong, and the neutral empty state is
+	// right either way.
 	const hasWorkspaceHistory =
 		agentSessionsData === undefined ||
 		agentSessionsData.sessions.length > 0 ||
 		hasAttachableTranscript ||
-		workspace.changeSummary.files > 0;
+		userChangedFiles > 0;
 	const showLandingCard =
 		!hasWorkspaceHistory && Boolean(workspace.landingSummary);
 

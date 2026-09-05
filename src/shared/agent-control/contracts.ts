@@ -9,6 +9,7 @@
  * defines the bare op identifiers and their argument/result shapes.
  */
 import type { AgentProviderId } from '../agent-provider.ts';
+import { ARCHITECTURE_DIAGRAM_LIMITS } from '../architecture-diagram/schema.ts';
 import type { ReviewCommentWire } from '../ipc/contracts/review-comments.ts';
 import type {
 	WorkspaceGitChangeSummaryWire,
@@ -24,6 +25,8 @@ export const AGENT_CONTROL_OPS = [
 	'setName',
 	'setBranchName',
 	'setSummary',
+	'getArchitectureDiagram',
+	'updateArchitectureDiagram',
 	'closeTab',
 	'launchHarness',
 	'startTerminal',
@@ -145,6 +148,7 @@ const WRITE_OPS: ReadonlySet<AgentControlOp> = new Set([
 	'setName',
 	'setBranchName',
 	'setSummary',
+	'updateArchitectureDiagram',
 	'closeTab',
 	'launchHarness',
 	'startTerminal',
@@ -321,6 +325,90 @@ export interface SetSummaryTruncation {
 	limit: number;
 	submittedLength: number;
 }
+
+/**
+ * Upper bound on an architecture-diagram submission, re-exported from the IR
+ * schema that also enforces it.
+ *
+ * One number rather than two: the op refuses an oversized submission so the
+ * agent is told which bound it crossed, and the schema refuses an oversized
+ * *document* so a hand-edited or cloned `.ensemblr/architecture.json` cannot
+ * reach the compiler by a path the op never sees.
+ */
+export { ARCHITECTURE_DIAGRAM_LIMITS };
+
+/**
+ * Result of `getArchitectureDiagram`.
+ *
+ * `diagram` is null for a workspace nobody has drawn yet, which is an ordinary
+ * answer rather than a failure: nothing derives a diagram, so the recovery is
+ * for the caller to author one and submit it.
+ */
+export interface GetArchitectureDiagramResult {
+	componentCount: number;
+	connectionCount: number;
+	/** The full architecture IR, ready to edit and submit back, or null. */
+	diagram: unknown;
+	message: string;
+}
+
+/**
+ * Args for `updateArchitectureDiagram`: replace the workspace's stored diagram
+ * with a new one. The whole document is submitted rather than a patch, because
+ * a partial edit against a document another agent may have already replaced is
+ * a merge nobody can adjudicate.
+ */
+export interface UpdateArchitectureDiagramArgs {
+	/**
+	 * The full architecture IR. Normally an object; a JSON string is decoded
+	 * rather than refused, since that encoding is a bridge's doing rather than
+	 * the caller's.
+	 */
+	diagram: unknown;
+}
+
+/** Result of `updateArchitectureDiagram`. */
+export interface UpdateArchitectureDiagramResult {
+	componentCount: number;
+	connectionCount: number;
+	message: string;
+}
+
+/**
+ * Why an architecture op could not be served, as one word the dispatcher maps
+ * onto a failure code. Four rather than one because the recoveries have nothing
+ * in common: `invalid` is the caller's own document and is fixed by resubmitting
+ * a corrected one, `unreadable` is a tracked file only the user can repair,
+ * `store-failed` is a write that did not land, and `unavailable` is a read that
+ * could not run at all. Collapsing them is what sends an agent to rewrite a
+ * document that was already valid.
+ */
+export type ArchitectureFailureReason =
+	| 'invalid'
+	| 'store-failed'
+	| 'unavailable'
+	| 'unreadable';
+
+/** A refused architecture op: the reason word and the message the agent reads. */
+export interface ArchitectureFailure {
+	message: string;
+	ok: false;
+	reason: ArchitectureFailureReason;
+}
+
+/**
+ * What `readDiagram` answers with. The payload is wrapped rather than widened
+ * with an `ok` field of its own, so a success hands the agent exactly
+ * {@link GetArchitectureDiagramResult} and nothing about the port's plumbing.
+ */
+export type ReadArchitectureDiagramOutcome =
+	| ArchitectureFailure
+	| { ok: true; result: GetArchitectureDiagramResult };
+
+/** What `updateDiagram` answers with, shaped like {@link ReadArchitectureDiagramOutcome}. */
+export type UpdateArchitectureDiagramOutcome =
+	| ArchitectureFailure
+	| { ok: true; result: UpdateArchitectureDiagramResult };
 
 /** Args for `sendFollowUp`: submit a follow-up prompt into an existing conversation. */
 export interface SendFollowUpArgs {
@@ -775,6 +863,17 @@ export interface SessionBriefNaming {
 		 * The agent is asked to improve it rather than to supply a first name.
 		 */
 		provisional: boolean;
+	};
+	/**
+	 * Whether the workspace's stored architecture diagram has fallen behind the
+	 * code it draws. Absent from a workspace nobody has drawn: there is nothing
+	 * to keep current there, and the drawing is the user's to ask for.
+	 */
+	diagram: {
+		/** Labels of the diagram's components the change set landed in. */
+		components: readonly string[];
+		/** A component's `sources` cover a file changed since the diagram was drawn. */
+		stale: boolean;
 	};
 	/** Turns have landed since the recorded summary was written. */
 	summaryStale: boolean;

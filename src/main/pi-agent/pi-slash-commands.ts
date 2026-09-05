@@ -90,13 +90,13 @@ const AUTO_SUBMIT_NAMES = new Set([
  * commands are used only as a static fallback when the SDK cannot be loaded.
  * @param executable - Resolved Pi executable snapshot.
  * @param cwd - Workspace directory whose project-local resources should load.
- * @param shippedSkillPath - Ensemblr's own skill directory, which sits outside every location the SDK discovers, or null.
+ * @param shippedSkillPaths - Ensemblr's own skill directories, which sit outside every location the SDK discovers.
  * @returns Slash commands plus provenance and fallback errors.
  */
 export async function resolvePiSlashCommands(
 	executable: PiExecutableSnapshot,
 	cwd?: string,
-	shippedSkillPath?: string | null,
+	shippedSkillPaths: readonly string[] = [],
 ): Promise<ListAgentProviderSlashCommandsResult> {
 	if (!isExecutableReady(executable)) {
 		return {
@@ -120,7 +120,7 @@ export async function resolvePiSlashCommands(
 			commands: await resolveLivePiSlashCommands(
 				packageRoot,
 				normalizeWorkspaceCwd(cwd),
-				shippedSkillPath ?? null,
+				shippedSkillPaths,
 			),
 			error: null,
 			source: 'runtime',
@@ -141,13 +141,13 @@ export async function resolvePiSlashCommands(
  * Resolves live extension, prompt-template, and skill commands through the SDK.
  * @param packageRoot - Installed Pi package root.
  * @param workspaceCwd - Workspace directory for project resources.
- * @param shippedSkillPath - Ensemblr's own skill directory, or null.
+ * @param shippedSkillPaths - Ensemblr's own skill directories.
  * @returns Prompt-invokable slash commands.
  */
 async function resolveLivePiSlashCommands(
 	packageRoot: string,
 	workspaceCwd: string,
-	shippedSkillPath: string | null,
+	shippedSkillPaths: readonly string[],
 ): Promise<AgentProviderSlashCommandWire[]> {
 	const sdk = (await import(
 		pathToFileURL(path.join(packageRoot, 'dist', 'index.js')).href
@@ -162,7 +162,7 @@ async function resolveLivePiSlashCommands(
 		workspaceCwd,
 		settingsManager,
 		packageRoot,
-		shippedSkillPath,
+		shippedSkillPaths,
 	);
 	await resourceLoader.reload?.();
 	const sessionManager = createSessionManager(sdk, workspaceCwd);
@@ -226,7 +226,7 @@ function createSettingsManager(
  * @param workspaceCwd - Workspace directory for project resources.
  * @param settingsManager - Settings manager shared with the loader.
  * @param packageRoot - Installed Pi package root for error messages.
- * @param shippedSkillPath - Ensemblr's own skill directory, or null.
+ * @param shippedSkillPaths - Ensemblr's own skill directories.
  * @returns SDK resource loader instance.
  */
 function createResourceLoader(
@@ -234,7 +234,7 @@ function createResourceLoader(
 	workspaceCwd: string,
 	settingsManager: unknown,
 	packageRoot: string,
-	shippedSkillPath: string | null,
+	shippedSkillPaths: readonly string[],
 ): SdkResourceLoader {
 	const Loader = sdk.DefaultResourceLoader;
 	if (!Loader) {
@@ -246,7 +246,9 @@ function createResourceLoader(
 		agentDir: getAgentDir(sdk),
 		cwd: workspaceCwd,
 		settingsManager,
-		...(shippedSkillPath ? { additionalSkillPaths: [shippedSkillPath] } : {}),
+		...(shippedSkillPaths.length > 0
+			? { additionalSkillPaths: [...shippedSkillPaths] }
+			: {}),
 	});
 }
 

@@ -12,4 +12,5 @@ export {
 	captureWorkspaceCheckpoint,
 	restoreWorkspaceTo,
 	sanitizeRefSegment,
+	snapshotWorkingTree,
 } from './git-checkpoint.ts';

@@ -16,15 +16,15 @@ export type {
 export {
 	awarenessForAudience,
 	CONCIERGE_AWARENESS,
-	HARNESS_AWARENESS,
-	NATIVE_ORCHESTRATOR_AWARENESS,
-	ORCHESTRATOR_AWARENESS,
-	PLAN_MODE_ORCHESTRATOR_AWARENESS,
-	PLAN_MODE_SUBAGENT_AWARENESS,
+	harnessAwareness,
+	nativeOrchestratorAwareness,
+	orchestratorAwareness,
+	planModeOrchestratorAwareness,
+	planModeSubagentAwareness,
 	resolveAgentRole,
 	roleForDepth,
-	SUBAGENT_AWARENESS,
 	spawnedChildRole,
+	subagentAwareness,
 } from './agent-control/awareness.ts';
 export {
 	BRIEF_REPORT_CHARS,
@@ -53,6 +53,7 @@ export {
 	SUBAGENT_MECHANISMS,
 } from './agent-control/subagent-mechanism.ts';
 export {
+	ARCHITECTURE_DIAGRAM_OPS,
 	CONCIERGE_ONLY_OPS,
 	CONCIERGE_WITHHELD_OPS,
 	conciergeControlOpDenial,

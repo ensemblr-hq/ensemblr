@@ -125,6 +125,8 @@ export function toSessionTabModel(
 	switch (tab.kind) {
 		case 'chat':
 			return { ...base, kind: 'chat' };
+		case 'diagram':
+			return { ...base, kind: 'diagram' };
 		case 'diff':
 			return toDiffSessionTab(base, tab);
 		case 'terminal':

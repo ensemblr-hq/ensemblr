@@ -544,6 +544,16 @@ export default interface Resources {
 				title: 'Could not restore agent';
 			};
 		};
+		'architecture-diagram': {
+			'chat-failed': {
+				description: 'Try the "Draw it with an agent" action again from the diagram tab.';
+				title: 'Could not open a new chat.';
+			};
+			'open-failed': {
+				description: 'The tab could not be opened. Try again.';
+				title: 'Could not open the architecture diagram';
+			};
+		};
 		attachment: {
 			'file-diff-empty': {
 				message: '{{label}} has no diff to attach.';
@@ -669,6 +679,7 @@ export default interface Resources {
 			'destination-path-relative': 'The destination path must be absolute.';
 			'destination-required': 'No destination was provided and the managed root has none to fall back on.';
 			'detached-head': 'This workspace is not on a branch, so GitHub has nothing to match it against. Check out a branch, then retry.';
+			'diagram-unreadable': 'The stored architecture diagram cannot be read. Repair or delete the file, then ask an agent to draw a new one.';
 			'dictation-disabled': 'Dictation is turned off in Settings.';
 			'dictation-empty-transcript': 'No speech was detected in the recording.';
 			'dictation-invalid-endpoint': 'The transcription endpoint must be a full http:// or https:// address.';
@@ -1745,6 +1756,10 @@ export default interface Resources {
 			title: 'Environment';
 		};
 		experimental: {
+			'architecture-diagram': {
+				description: 'Show the workspace architecture diagram and let agents read and redraw it. New sessions pick this up; the ones already running keep the surface they started with.';
+				label: 'Architecture diagram';
+			};
 			'auto-run': {
 				description: "Start a repository's run script automatically after setup when no repository-specific setting overrides it.";
 				label: 'Auto-run after setup';
@@ -2435,6 +2450,42 @@ export default interface Resources {
 			placeholder: 'Search files';
 			title: 'Search files';
 		};
+		'architecture-diagram': {
+			canvas: {
+				hint: 'Drag or press the arrow keys to pan. Pinch, hold Command and scroll, or press plus and minus to zoom. Press 0 to fit the whole diagram. Press N and P to step between modules, Enter to see what one connects to, and Escape to clear that again.';
+				label: 'Architecture diagram of {{title}}';
+			};
+			'captured-at': 'drawn {{when}}';
+			'fit-to-view': 'Fit to view';
+			legend: {
+				backend: 'Backend';
+				cloud: 'Infrastructure';
+				database: 'Data';
+				external: 'External';
+				frontend: 'Interface';
+				messagebus: 'Messaging';
+				security: 'Security';
+			};
+			loading: 'Reading the workspace architecture…';
+			node: {
+				'name-with-sublabel': '{{label}} — {{sublabel}}';
+				'open-source': 'Open {{path}}';
+				'select-label': '{{name}} — show what it connects to';
+			};
+			open: 'Workspace architecture';
+			problems_one: '{{count}} placement problem in this diagram.';
+			problems_other: '{{count}} placement problems in this diagram.';
+			'reset-view': 'Reset to actual size';
+			'tab-title': 'Architecture';
+			title: 'Architecture';
+			undrawn: {
+				body: 'An agent reads the codebase and draws it. The diagram is stored at {{path}} and travels with your commits.';
+				draw: 'Draw it with an agent';
+				title: 'No architecture diagram yet';
+			};
+			'zoom-in': 'Zoom in';
+			'zoom-out': 'Zoom out';
+		};
 		'archive-workspace': {
 			'description-cleanup': 'Marks the workspace as archived and preserves its <0>.context/</0> handoff files under <1>archived-contexts/</1>. The worktree folder is removed and the local branch dropped, per your git settings; anything else not pushed to the remote will be lost.';
 			'description-reclaim': 'Marks the workspace as archived and preserves its <0>.context/</0> handoff files under <1>archived-contexts/</1>. The worktree folder is removed to reclaim its disk, keeping the branch and a snapshot of any uncommitted changes; unarchiving restores both and rebuilds dependencies.';
@@ -2703,6 +2754,10 @@ export default interface Resources {
 				done: 'Opened a workspace';
 				running: 'Opening a workspace';
 			};
+			'get-architecture-diagram': {
+				done: 'Read the architecture diagram';
+				running: 'Reading the architecture diagram';
+			};
 			'get-conversation-status': {
 				concierge: {
 					done: 'Checked a chat';
@@ -2838,6 +2893,10 @@ export default interface Resources {
 			'stop-terminal': {
 				done: 'Stopped a terminal';
 				running: 'Stopping a terminal';
+			};
+			'update-architecture-diagram': {
+				done: 'Redrew the architecture diagram';
+				running: 'Redrawing the architecture diagram';
 			};
 			'wait-for-agents': {
 				concierge: {

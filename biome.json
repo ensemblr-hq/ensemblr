@@ -16,7 +16,9 @@
 			"!src/components/ui",
 			"!src/hooks/ui",
 			"!src/renderer/fixtures/pi-captures",
-			"!src/renderer/routing/routeTree.gen.ts"
+			"!tests/fixtures/architecture",
+			"!src/renderer/routing/routeTree.gen.ts",
+			"!.ensemblr/architecture.json"
 		]
 	},
 	"formatter": {

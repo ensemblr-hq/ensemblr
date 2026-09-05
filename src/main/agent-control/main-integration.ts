@@ -13,12 +13,14 @@ import { type App, BrowserWindow, dialog } from 'electron';
 import {
 	buildLanguageDirective,
 	buildLinkedIssueDirective,
-	HARNESS_AWARENESS,
+	harnessAwareness,
 	resolveAgentRole,
 	type WorkspaceLinkedIssue,
 } from '../../shared/agent-control.ts';
 import type { AppLanguage } from '../../shared/i18n.ts';
 import {
+	CONTROL_ARCHITECTURE_ENABLED,
+	CONTROL_ARCHITECTURE_ENV_KEY,
 	CONTROL_ROLE_ENV_KEY,
 	CONTROL_TOKEN_ENV_KEY,
 	CONTROL_URL_ENV_KEY,
@@ -47,6 +49,12 @@ interface AgentControlIntegrationDeps {
 	/** The language the app renders in, for the harness playbook's directive. */
 	getLanguage: () => AppLanguage;
 	/**
+	 * Whether the architecture diagram feature is on. Off, the harness playbook
+	 * never mentions the diagram, matching the tool list the MCP endpoint serves
+	 * it. Omitted, the feature reads as off.
+	 */
+	readArchitectureDiagramEnabled?: () => boolean;
+	/**
 	 * Reads the issue a workspace was created from, for the linked-issue block in
 	 * the harness playbook. Omitted, a harness launches with no prose about the
 	 * ticket and moves it only when asked.
@@ -59,11 +67,12 @@ interface AgentControlIntegrationDeps {
 	 */
 	isSpawnedSubAgent?: (agentSessionId: string) => boolean;
 	/**
-	 * Root of the shipped Agent Skill plugin, which the Claude harness loads with
-	 * `--plugin-dir`. Omitted, a harness launches with the playbook but without
-	 * the deeper reference behind it.
+	 * Roots of the shipped Agent Skill plugins, which the Claude harness loads
+	 * with one `--plugin-dir` each. Read per launch, because the architecture
+	 * bundle follows a setting the user can flip. Omitted, a harness launches with
+	 * the playbook but without the deeper reference behind it.
 	 */
-	skillPluginDirectory?: string | null;
+	readSkillPluginDirectories?: () => readonly string[];
 }
 
 /** The main-process primitives the agent-control layer contributes. */
@@ -134,6 +143,7 @@ function resolvePiControlExtensionPath(app: App): string | null {
  * @param language - The language the app is rendering in.
  * @param workspaceId - Workspace the harness is launching into, keying its directory.
  * @param issueDirective - The workspace's linked-issue block, or null when it has none.
+ * @param architectureDiagram - Whether the architecture diagram feature is on.
  * @returns Absolute path to the directory holding the playbook, or null.
  */
 function writeHarnessInstructions(
@@ -141,6 +151,7 @@ function writeHarnessInstructions(
 	language: AppLanguage,
 	workspaceId: string,
 	issueDirective: string | null,
+	architectureDiagram: boolean,
 ): string | null {
 	const directory = path.join(
 		app.getPath('userData'),
@@ -150,7 +161,7 @@ function writeHarnessInstructions(
 	const playbook = path.join(directory, HARNESS_INSTRUCTIONS_FILENAME);
 	const staging = `${playbook}.tmp`;
 	const blocks = [
-		HARNESS_AWARENESS,
+		harnessAwareness(architectureDiagram),
 		buildLanguageDirective(language),
 		issueDirective,
 	].filter((block) => block !== null);
@@ -254,6 +265,9 @@ export function createAgentControlIntegration(
 				origin.depth,
 				origin.concierge,
 			),
+			...(deps.readArchitectureDiagramEnabled?.()
+				? { [CONTROL_ARCHITECTURE_ENV_KEY]: CONTROL_ARCHITECTURE_ENABLED }
+				: {}),
 		};
 	};
 
@@ -270,8 +284,9 @@ export function createAgentControlIntegration(
 				deps.getLanguage(),
 				workspaceId,
 				buildLinkedIssueDirective(deps.readLinkedIssue?.(workspaceId) ?? null),
+				deps.readArchitectureDiagramEnabled?.() ?? false,
 			),
-			skillPluginDirectory: deps.skillPluginDirectory ?? null,
+			skillPluginDirectories: deps.readSkillPluginDirectories?.() ?? [],
 			token:
 				resolveAgentControlEnv({
 					workspaceId,

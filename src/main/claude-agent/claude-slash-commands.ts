@@ -21,7 +21,7 @@ export interface CreateClaudeSlashCommandsOptions {
 	 * open — discovery reads its own `plugins`, so a skill the app loads per
 	 * session would otherwise be missing from the composer's catalogue.
 	 */
-	pluginDirectory?: string | null;
+	pluginDirectories?: readonly string[];
 	/** Injection seam for tests; defaults to the SDK's own `query`. */
 	queryFn?: typeof query;
 	/** Resolves the login-shell env, so a Finder-launched app still finds `claude`. */
@@ -59,7 +59,7 @@ function toWire(command: SlashCommand): AgentProviderSlashCommandWire {
  * @returns A function returning the commands for one workspace directory.
  */
 export function createClaudeSlashCommands({
-	pluginDirectory = null,
+	pluginDirectories = [],
 	queryFn = query,
 	resolveBaseEnv = () => process.env,
 	resolveExecutablePath = () => null,
@@ -87,8 +87,13 @@ export function createClaudeSlashCommands({
 				env: stripLaunchContextEnv({ ...baseEnv }),
 				pathToClaudeCodeExecutable: executablePath,
 				permissionMode: DISCOVERY_PERMISSION_MODE,
-				...(pluginDirectory
-					? { plugins: [{ path: pluginDirectory, type: 'local' as const }] }
+				...(pluginDirectories.length > 0
+					? {
+							plugins: pluginDirectories.map((pluginRoot) => ({
+								path: pluginRoot,
+								type: 'local' as const,
+							})),
+						}
 					: {}),
 			},
 			prompt: promptQueue.stream,

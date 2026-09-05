@@ -20,6 +20,7 @@ import type {
 } from '../../shared/ipc/contracts/agent-session';
 import type { EnsemblrApi } from '../../shared/ipc/contracts/api';
 import type { AppSettingsChangedBroadcast } from '../../shared/ipc/contracts/app-settings';
+import type { ArchitectureSnapshotChangedBroadcast } from '../../shared/ipc/contracts/architecture';
 import type { CloneGithubRepositoryProgressEvent } from '../../shared/ipc/contracts/clone';
 import type { ConciergeEventBroadcastWire } from '../../shared/ipc/contracts/concierge';
 import type { ConfigChangedBroadcast } from '../../shared/ipc/contracts/health';
@@ -46,6 +47,7 @@ type InvokeKey = Exclude<
 	keyof EnsemblrApi,
 	| 'getPathForFile'
 	| 'onAppSettingsChanged'
+	| 'onArchitectureSnapshotChanged'
 	| 'onConfigChanged'
 	| 'onCloneGithubRepositoryProgress'
 	| 'onMenuCommand'
@@ -134,6 +136,8 @@ function subscribe<E>(
 export function createEnsemblrApi(): EnsemblrApi {
 	return {
 		addEnvFile: (request) => invoke('addEnvFile', request),
+		getArchitectureSnapshot: (request) =>
+			invoke('getArchitectureSnapshot', request),
 		launchAgentHarness: (request) => invoke('launchAgentHarness', request),
 		resumeAgentHarness: (request) => invoke('resumeAgentHarness', request),
 		listAgentHarnesses: () => invoke('listAgentHarnesses'),
@@ -369,6 +373,11 @@ export function createEnsemblrApi(): EnsemblrApi {
 			subscribe<TerminalOutputBroadcast>(IPC_CHANNELS.terminalOutput, listener),
 		onTextContextMenu: (listener) =>
 			subscribe<TextContextMenuTarget>(IPC_CHANNELS.textContextMenu, listener),
+		onArchitectureSnapshotChanged: (listener) =>
+			subscribe<ArchitectureSnapshotChangedBroadcast>(
+				IPC_CHANNELS.architectureSnapshotChanged,
+				listener,
+			),
 		onWorkspaceFilesChanged: (listener) =>
 			subscribe<WorkspaceFilesChangedBroadcast>(
 				IPC_CHANNELS.workspaceFilesChanged,

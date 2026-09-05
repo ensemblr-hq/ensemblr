@@ -98,6 +98,8 @@ interface SessionOpenerOptions {
 	 * runtime fixes its own deny list at session open. Absent in tests, where
 	 * every session opens under `ensemblr`.
 	 */
+	/** Whether the architecture diagram feature is on, for the playbook a session receives. */
+	readArchitectureDiagramEnabled?: () => boolean;
 	readClaudeSubagentMode?: SubagentMechanismReader;
 	/**
 	 * Reads the durable sub-agent marker off a session's chat tab, so a child
@@ -157,6 +159,7 @@ export function createSessionOpener({
 	agentClient,
 	isSpawnedSubAgent,
 	queueNaming,
+	readArchitectureDiagramEnabled,
 	readClaudeSubagentMode,
 	resolveAgentControlEnv,
 	resolvePermissionMode,
@@ -255,6 +258,7 @@ export function createSessionOpener({
 				isSpawnedSubAgent,
 				parentSessionId: request.parentSessionId ?? null,
 				provider: row.provider,
+				readArchitectureDiagramEnabled,
 				readClaudeSubagentMode,
 				resolveAgentControlEnv,
 				resolveTurnPreamble,
@@ -361,6 +365,7 @@ export function createSessionOpener({
 				isSpawnedSubAgent,
 				parentSessionId: request.parentSessionId ?? null,
 				provider,
+				readArchitectureDiagramEnabled,
 				readClaudeSubagentMode,
 				resolveAgentControlEnv,
 				resolveTurnPreamble,

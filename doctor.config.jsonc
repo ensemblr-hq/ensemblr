@@ -212,7 +212,8 @@
 				// documented rule, not an oversight: `.claude/rules/patterns.md` says
 				// "import from the barrel outside the concern; import siblings directly
 				// inside it", and all 33 main concerns carry an `index.ts` for exactly
-				// that. These two reach `src/main/secrets` from outside it.
+				// that. The first two reach `src/main/secrets` from outside it, and the
+				// last two reach `src/main/architecture` the same way.
 				//
 				// The rule's usual cost — a barrel dragging unused modules into a
 				// download bundle — does not apply here. `src/main` is one Vite bundle
@@ -224,7 +225,9 @@
 				// parsed at startup and the rule earns its keep.
 				"files": [
 					"src/main/environment/environment-assembly.ts",
-					"src/main/setup/setup-diagnostics.ts"
+					"src/main/setup/setup-diagnostics.ts",
+					"src/main/agent-control/architecture-ports.ts",
+					"src/main/ipc/handlers/architecture.ts"
 				],
 				"rules": ["react-doctor/no-barrel-import"]
 			}

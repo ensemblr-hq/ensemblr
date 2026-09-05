@@ -143,6 +143,8 @@ interface AgentSessionLifecycleOptions {
 	queueNaming: QueueNamingPort;
 	requireDatabase: () => DatabaseSync;
 	/** Reads the delegation mechanism a Claude Code session must open under. */
+	/** Whether the architecture diagram feature is on, for the playbook a session receives. */
+	readArchitectureDiagramEnabled?: () => boolean;
 	readClaudeSubagentMode?: SubagentMechanismReader;
 	/** Reads the durable sub-agent marker, so a resumed child stays on `ensemblr`. */
 	isSpawnedSubAgent?: SubAgentMarkerReader;
@@ -218,6 +220,7 @@ export function createAgentSessionLifecycle({
 	agentClient,
 	isSpawnedSubAgent,
 	queueNaming,
+	readArchitectureDiagramEnabled,
 	readClaudeSubagentMode,
 	requireDatabase,
 	resolveAgentControlEnv,
@@ -253,6 +256,7 @@ export function createAgentSessionLifecycle({
 		agentClient,
 		isSpawnedSubAgent,
 		queueNaming,
+		readArchitectureDiagramEnabled,
 		readClaudeSubagentMode,
 		resolveAgentControlEnv,
 		resolvePermissionMode,

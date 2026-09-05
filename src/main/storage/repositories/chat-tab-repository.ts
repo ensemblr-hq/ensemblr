@@ -2,9 +2,10 @@ import { randomUUID } from 'node:crypto';
 import type { DatabaseSync } from 'node:sqlite';
 import { parseMetadata, serializeMetadata } from './metadata-json.ts';
 
-/** Kind of content a chat tab hosts: a chat, diff, document, file, or preview. */
+/** Kind of content a chat tab hosts: a chat, diagram, diff, document, file, or preview. */
 export type ChatTabKind =
 	| 'chat'
+	| 'diagram'
 	| 'diff'
 	| 'document'
 	| 'file'

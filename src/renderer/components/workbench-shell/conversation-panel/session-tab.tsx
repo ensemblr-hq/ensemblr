@@ -6,6 +6,7 @@ import {
 	FileTextIcon,
 	LoaderCircleIcon,
 	MessageSquareIcon,
+	NetworkIcon,
 	XIcon,
 } from 'lucide-react';
 import { Reorder } from 'motion/react';
@@ -324,6 +325,8 @@ function iconNameForFilePreviewTab(session: SessionTabModel): string | null {
 /** Returns the generic icon component for non-file-backed tab kinds. */
 function iconForTabKind(kind: NonNullable<SessionTabModel['kind']>) {
 	switch (kind) {
+		case 'diagram':
+			return NetworkIcon;
 		case 'diff':
 			return FileDiffIcon;
 		case 'document':

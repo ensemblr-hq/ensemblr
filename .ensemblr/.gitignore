@@ -1,1 +1,5 @@
 *.local.*
+# Temporary half-written files from an atomic write that was interrupted. The
+# rename that finishes one is what makes the real file appear, so a `.tmp` left
+# here is debris from a crash and never belongs in a commit.
+*.tmp

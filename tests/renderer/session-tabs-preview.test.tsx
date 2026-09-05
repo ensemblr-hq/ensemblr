@@ -62,6 +62,7 @@ function renderStrip(isPreview: boolean) {
 			activeSession={sessions[1]}
 			closedSessions={[]}
 			onLaunchHarness={() => Promise.resolve(null)}
+			onOpenArchitectureDiagram={async () => null}
 			onSessionTabChange={() => undefined}
 			onSessionTabClose={() => undefined}
 			onSessionTabOpen={() => Promise.resolve(null)}

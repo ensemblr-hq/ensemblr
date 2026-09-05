@@ -1,4 +1,8 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
 	createAgentControlPorts,
@@ -718,7 +722,10 @@ describe('agent-control port adapters: branch naming', () => {
 		});
 		Object.assign(deps, {
 			appSettingsService: {
-				read: () => ({ git: { renameWorkspaceOnBranch } }),
+				read: () => ({
+					experimental: { architectureDiagram: true },
+					git: { renameWorkspaceOnBranch },
+				}),
 			},
 			agentSessionService: { appendWorkspaceRenamed: vi.fn() },
 			renameWorkspace,
@@ -766,6 +773,151 @@ describe('agent-control port adapters: branch naming', () => {
 		expect(result).toMatchObject({ applied: false, name: 'bach' });
 		expect(result.message).toContain('do not call this tool again');
 		expect(broadcastTabsChanged).not.toHaveBeenCalled();
+	});
+});
+
+describe('agent-control port adapters: diagram upkeep', () => {
+	const origin = {
+		delegation: 'ensemblr' as const,
+		concierge: false,
+		retired: false,
+		depth: 0,
+		parentSessionId: null,
+		sessionId: 'sess-1',
+		species: 'pi' as const,
+		token: 'tok',
+		workspaceCwd: '/ws',
+		workspaceId: 'ws',
+	};
+
+	let workspaceCwd: string;
+
+	beforeEach(async () => {
+		workspaceCwd = await mkdtemp(path.join(tmpdir(), 'diagram-port-'));
+	});
+
+	afterEach(async () => {
+		await rm(workspaceCwd, { force: true, recursive: true });
+	});
+
+	/** Stores a diagram in the temp workspace, so the first gate lets a read past. */
+	async function storeDiagram(): Promise<void> {
+		await mkdir(path.join(workspaceCwd, '.ensemblr'), { recursive: true });
+		await writeFile(
+			path.join(workspaceCwd, '.ensemblr', 'architecture.json'),
+			JSON.stringify({
+				generatedAt: '2026-09-01T12:00:00.000Z',
+				ir: {
+					boundaries: [],
+					components: [
+						{
+							id: 'storage',
+							label: 'storage',
+							sources: [{ path: 'src' }],
+							type: 'database',
+						},
+					],
+					connections: [],
+					meta: { title: 'repo' },
+					schemaVersion: 1,
+				},
+			}),
+			'utf8',
+		);
+	}
+
+	const withCaller = (
+		overrides: Partial<typeof origin> & { depth?: number } = {},
+	) => {
+		const { deps } = makeDeps();
+		const listChangedPaths = vi.fn().mockResolvedValue([]);
+		Object.assign(deps, {
+			appSettingsService: {
+				read: () => ({
+					experimental: { architectureDiagram: true },
+					git: { renameWorkspaceOnBranch: true },
+				}),
+			},
+			workspaceGitService: { listChangedPaths },
+		});
+		vi.mocked(selectWorkspaceWithRepositoryById).mockReturnValue({
+			branchName: 'octocat/bach',
+			metadataJson: '{}',
+			name: 'bach',
+			path: workspaceCwd,
+		} as ReturnType<typeof selectWorkspaceWithRepositoryById>);
+		return {
+			listChangedPaths,
+			ports: createAgentControlPorts(deps),
+			origin: { ...origin, ...overrides },
+		};
+	};
+
+	it('reads the change set for a root that may redraw', async () => {
+		await storeDiagram();
+		const { listChangedPaths, ports, origin: caller } = withCaller();
+
+		await ports.sessionNaming.readBrief(caller);
+
+		expect(listChangedPaths).toHaveBeenCalledWith(workspaceCwd);
+	});
+
+	// The whole point of the first gate: a workspace nobody has drawn must not be
+	// nudged into having a diagram, and must not pay for a git read to find out.
+	it('never reads the change set for a workspace with no diagram', async () => {
+		const { listChangedPaths, ports, origin: caller } = withCaller();
+
+		const brief = await ports.sessionNaming.readBrief(caller);
+
+		expect(listChangedPaths).not.toHaveBeenCalled();
+		expect(brief.diagram).toEqual({ components: [], stale: false });
+	});
+
+	// Both diagram ops are refused for the Concierge, so a bullet asking it to
+	// redraw would only spend a turn discovering the denial.
+	it('never reads the change set for the Concierge', async () => {
+		await storeDiagram();
+		const {
+			listChangedPaths,
+			ports,
+			origin: caller,
+		} = withCaller({
+			concierge: true,
+		});
+
+		const brief = await ports.sessionNaming.readBrief(caller);
+
+		expect(listChangedPaths).not.toHaveBeenCalled();
+		expect(brief.diagram).toEqual({ components: [], stale: false });
+	});
+
+	it('never reads the change set for a spawned child', async () => {
+		await storeDiagram();
+		const {
+			listChangedPaths,
+			ports,
+			origin: caller,
+		} = withCaller({ depth: 1 });
+
+		const brief = await ports.sessionNaming.readBrief(caller);
+
+		expect(listChangedPaths).not.toHaveBeenCalled();
+		expect(brief.diagram).toEqual({ components: [], stale: false });
+	});
+
+	// The brief builds a turn's system prompt, so an unreadable workspace row is
+	// a reason to say nothing about the diagram rather than to fail the turn.
+	it('reports nothing outstanding when the workspace row cannot be read', async () => {
+		await storeDiagram();
+		const { listChangedPaths, ports, origin: caller } = withCaller();
+		vi.mocked(selectWorkspaceWithRepositoryById).mockImplementation(() => {
+			throw new Error('storage is down');
+		});
+
+		const brief = await ports.sessionNaming.readBrief(caller);
+
+		expect(listChangedPaths).not.toHaveBeenCalled();
+		expect(brief.diagram).toEqual({ components: [], stale: false });
 	});
 });
 

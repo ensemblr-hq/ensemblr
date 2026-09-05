@@ -132,6 +132,7 @@ const makePorts = (
 	sessionNaming: {
 		readBrief: vi.fn().mockResolvedValue({
 			branch: { current: null, eligible: false },
+			diagram: { components: [], stale: false },
 			summaryStale: false,
 			titleNeeded: false,
 		}),

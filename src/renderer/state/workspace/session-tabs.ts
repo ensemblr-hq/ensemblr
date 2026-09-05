@@ -77,6 +77,9 @@ export function useSessionTabState({
 	openSessionTab: (options?: {
 		placement?: SessionTabPlacement;
 	}) => Promise<OpenSessionTabHandlerResult | null>;
+	openArchitectureDiagramTab: (input?: {
+		preview?: boolean;
+	}) => Promise<OpenSessionTabHandlerResult | null>;
 	openCommentPreviewTab: (input: {
 		comment: PullRequestCommentSummary;
 		preview?: boolean;
@@ -237,6 +240,7 @@ export function useSessionTabState({
 	});
 
 	const {
+		openArchitectureDiagramTab,
 		openCommentPreviewTab,
 		openFilePreviewTab,
 		openSessionTab,
@@ -244,6 +248,11 @@ export function useSessionTabState({
 		openTurnDiffTab,
 		openWorkspaceFileDiffTab,
 	} = useSessionTabOpeners({
+		/** The workspace's open diagram tab, so the toggle focuses rather than duplicates. */
+		findOpenDiagramTabId: useCallback(
+			() => sessionTabs.find((tab) => tab.kind === 'diagram')?.id ?? null,
+			[sessionTabs],
+		),
 		insertAnchorTabId,
 		openAuxiliaryTab: openAuxiliaryTabMutation.mutateAsync,
 		openChatTab: openChatTabMutation.mutateAsync,
@@ -357,6 +366,7 @@ export function useSessionTabState({
 		closeSessionTabAsync,
 		effectiveActiveSession,
 		isResolvingActiveSession,
+		openArchitectureDiagramTab,
 		openCommentPreviewTab,
 		openFilePreviewTab,
 		openSessionTab,

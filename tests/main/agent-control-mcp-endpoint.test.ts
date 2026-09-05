@@ -14,17 +14,24 @@ import {
 } from '../../src/main/agent-control/index.ts';
 import type { ControlAudience } from '../../src/shared/agent-control.ts';
 import {
-	HARNESS_AWARENESS,
-	NATIVE_ORCHESTRATOR_AWARENESS,
-	ORCHESTRATOR_AWARENESS,
-	SUBAGENT_AWARENESS,
+	harnessAwareness,
+	nativeOrchestratorAwareness,
+	orchestratorAwareness,
+	subagentAwareness,
 	withheldControlOps,
 } from '../../src/shared/agent-control.ts';
+
+/** Each playbook with the architecture diagram on, the variant these tests use. */
+const HARNESS_AWARENESS = harnessAwareness(true);
+const NATIVE_ORCHESTRATOR_AWARENESS = nativeOrchestratorAwareness(true);
+const ORCHESTRATOR_AWARENESS = orchestratorAwareness(true);
+const SUBAGENT_AWARENESS = subagentAwareness(true);
 
 const calls: AgentControlCommand[] = [];
 let server: ControlServer | null = null;
 
 const HARNESS_ROOT: ControlAudience = {
+	architectureDiagram: true,
 	delegation: 'ensemblr',
 	hasChatTab: false,
 	role: 'orchestrator',
@@ -134,7 +141,7 @@ describe('agent-control MCP endpoint', () => {
 		expect(names).not.toContain('ensemblr_set_summary');
 		expect(names).not.toContain('ensemblr_ask_user_question');
 		expect(names).not.toContain('ensemblr_exit_plan_mode');
-		expect(tools).toHaveLength(35);
+		expect(tools).toHaveLength(37);
 		await client.close();
 	});
 
@@ -269,6 +276,7 @@ describe('agent-control MCP endpoint, per-origin surface', () => {
 
 	it('serves the chat-tab tools to a first-class root', async () => {
 		const names = await toolNamesFor({
+			architectureDiagram: true,
 			delegation: 'ensemblr',
 			hasChatTab: true,
 			role: 'orchestrator',
@@ -285,6 +293,7 @@ describe('agent-control MCP endpoint, per-origin surface', () => {
 	// whichever its training favours, which is the whole reason for the axis.
 	it('withholds the spawn tools from a root delegating through its own runtime', async () => {
 		const names = await toolNamesFor({
+			architectureDiagram: true,
 			delegation: 'native',
 			hasChatTab: true,
 			role: 'orchestrator',
@@ -322,6 +331,7 @@ describe('agent-control MCP endpoint, per-origin surface', () => {
 	// its list advertises a delegation surface the service refuses it.
 	it('withholds the delegation surface from a first-class sub-agent', async () => {
 		const names = await toolNamesFor({
+			architectureDiagram: true,
 			delegation: 'ensemblr',
 			hasChatTab: true,
 			role: 'subagent',
@@ -353,6 +363,7 @@ describe('agent-control MCP endpoint, per-origin surface', () => {
 
 	it('serves the orchestrator playbook to a first-class root', async () => {
 		const client = await connectAs({
+			architectureDiagram: true,
 			delegation: 'ensemblr',
 			hasChatTab: true,
 			role: 'orchestrator',
@@ -365,6 +376,7 @@ describe('agent-control MCP endpoint, per-origin surface', () => {
 
 	it('serves the sub-agent playbook to a first-class sub-agent', async () => {
 		const client = await connectAs({
+			architectureDiagram: true,
 			delegation: 'ensemblr',
 			hasChatTab: true,
 			role: 'subagent',
@@ -403,7 +415,12 @@ describe('agent-control MCP endpoint, per-origin surface', () => {
 	// directive there; repeating it here would state it twice in one prompt.
 	it('leaves the directive off a caller the app prompts per turn', async () => {
 		const client = await connectAs(
-			{ delegation: 'ensemblr', hasChatTab: true, role: 'orchestrator' },
+			{
+				architectureDiagram: true,
+				delegation: 'ensemblr',
+				hasChatTab: true,
+				role: 'orchestrator',
+			},
 			'LANGUAGE: reply in Русский.',
 		);
 
@@ -437,7 +454,12 @@ describe('agent-control MCP endpoint, per-origin surface', () => {
 
 	it('leaves the linked-issue directive off a caller prompted per turn', async () => {
 		const client = await connectAs(
-			{ delegation: 'ensemblr', hasChatTab: true, role: 'orchestrator' },
+			{
+				architectureDiagram: true,
+				delegation: 'ensemblr',
+				hasChatTab: true,
+				role: 'orchestrator',
+			},
 			null,
 			'LINKED ISSUE: this workspace was created from ENG-106.',
 		);
@@ -450,6 +472,7 @@ describe('agent-control MCP endpoint, per-origin surface', () => {
 	it('names only tools a first-class root is actually served', async () => {
 		const served = new Set(
 			await toolNamesFor({
+				architectureDiagram: true,
 				delegation: 'ensemblr',
 				hasChatTab: true,
 				role: 'orchestrator',
@@ -469,6 +492,7 @@ describe('agent-control MCP endpoint, per-origin surface', () => {
 	// absent.
 	it('names only served tools in the native playbook, bar the absent ones', async () => {
 		const audience: ControlAudience = {
+			architectureDiagram: true,
 			delegation: 'native',
 			hasChatTab: true,
 			role: 'orchestrator',
@@ -517,6 +541,7 @@ const makeBlockingService = (audience: ControlAudience = HARNESS_ROOT) => {
 };
 
 const CHAT_TAB_ROOT: ControlAudience = {
+	architectureDiagram: true,
 	delegation: 'ensemblr',
 	hasChatTab: true,
 	role: 'orchestrator',
