@@ -160,8 +160,9 @@ test('a sibling chat tab that already ran an agent retires the landing card', ()
 	expect(container.querySelector(EMPTY_STATE)).not.toBeNull();
 });
 
-// The app writes into a workspace it has just cut — the seed architecture scan
-// lands in `.ensemblr/` — so those files are not a sign anyone has worked here.
+// `.ensemblr/` and `.context/` are the app's own scratch, written without the
+// user having done anything, so a worktree holding only those is still one
+// nobody has worked in.
 test('a worktree only the app dirtied keeps the landing card', async () => {
 	const container = renderTimeline({
 		changedFiles: 2,

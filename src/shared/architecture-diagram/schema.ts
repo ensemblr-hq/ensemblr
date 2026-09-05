@@ -57,6 +57,44 @@ export const ARCHITECTURE_LAYOUT_MAX_COLS = 12;
  */
 export const ARCHITECTURE_LAYOUT_MAX_ROWS = 256;
 
+/**
+ * How many nodes, edges, and frames one document may hold.
+ *
+ * The ceiling is the renderer's rather than the author's. The geometry compiler
+ * routes every edge against every box, so its cost climbs with the product of
+ * the two: 64 components and 128 connections compile in about 20ms, while 2,000
+ * of each take over two minutes on the same machine. That compile is
+ * synchronous inside the diagram pane's render, so an oversized document is a
+ * frozen window rather than a slow drawing — and `.ensemblr/architecture.json`
+ * is a tracked file, so one arrives with a clone rather than only from the
+ * control op that could enforce its own bound.
+ *
+ * Exported because the agent-facing tool descriptions state these numbers, and
+ * re-exported from `shared/agent-control` so the op and the file agree on one.
+ */
+export const ARCHITECTURE_DIAGRAM_LIMITS = {
+	maxBoundaries: 24,
+	maxComponents: 64,
+	maxConnections: 160,
+} as const;
+
+/**
+ * What an over-sized collection says, spelled out rather than left to Zod's
+ * "expected array to have <=64 items".
+ *
+ * An agent reading a bare count resubmits the same document with an arbitrary
+ * tail removed; told what the cap is *for*, it groups the detail instead. These
+ * are the sentences the control op used to add on top of its own duplicate
+ * check, kept here so the file path and the op path answer alike.
+ */
+const TOO_MANY_COMPONENTS = `That diagram is too large to read: at most ${ARCHITECTURE_DIAGRAM_LIMITS.maxComponents} components. Group the detail into fewer, larger nodes rather than drawing every folder.`;
+
+/** The connection cap's message, for the reason {@link TOO_MANY_COMPONENTS} carries one. */
+const TOO_MANY_CONNECTIONS = `That diagram is too large to read: at most ${ARCHITECTURE_DIAGRAM_LIMITS.maxConnections} connections. Draw the edges that carry meaning rather than every import.`;
+
+/** The boundary cap's message, for the reason {@link TOO_MANY_COMPONENTS} carries one. */
+const TOO_MANY_BOUNDARIES = `That diagram is too large to read: at most ${ARCHITECTURE_DIAGRAM_LIMITS.maxBoundaries} boundaries. Name each frame for the concern it holds rather than framing every directory.`;
+
 /** Longest single-line name: a component, connection, boundary, or card title. */
 const MAX_LABEL_CHARS = 120;
 
@@ -384,10 +422,18 @@ function checkIrIntegrity(
  */
 export const architectureIrSchema = z
 	.object({
-		boundaries: z.array(boundarySchema).optional(),
+		boundaries: z
+			.array(boundarySchema)
+			.max(ARCHITECTURE_DIAGRAM_LIMITS.maxBoundaries, TOO_MANY_BOUNDARIES)
+			.optional(),
 		cards: z.array(cardSchema).max(MAX_CARDS).optional(),
-		components: z.array(componentSchema),
-		connections: z.array(connectionSchema).optional(),
+		components: z
+			.array(componentSchema)
+			.max(ARCHITECTURE_DIAGRAM_LIMITS.maxComponents, TOO_MANY_COMPONENTS),
+		connections: z
+			.array(connectionSchema)
+			.max(ARCHITECTURE_DIAGRAM_LIMITS.maxConnections, TOO_MANY_CONNECTIONS)
+			.optional(),
 		layout: layoutSchema.optional(),
 		meta: metaSchema,
 		schema_version: z.number().int().optional(),

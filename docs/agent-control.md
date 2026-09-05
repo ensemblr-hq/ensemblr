@@ -374,6 +374,19 @@ for chat rows, so a file tab never reads as a conversation nobody named.
 | `ensemblr_get_architecture_diagram` | *(none)* | read | Concierge |
 | `ensemblr_update_architecture_diagram` | **`diagram: unknown`** | write | Concierge |
 
+**The whole feature is off by default**, behind Settings → Experimental →
+*Architecture diagram* (`app.experimental.architectureDiagram`). Off, it is
+absent rather than refused: both ops leave every tool list, every playbook stops
+describing them, the per-turn upkeep bullet is never measured, the tab strip
+grows no button, and the `architecture-diagram` skill is not loaded — which is
+why it ships as a plugin root of its own (`resources/agent-skills-architecture/`)
+rather than as a second skill inside `resources/agent-skills/`, since a skill
+listed in a manifest loads whenever that manifest does. One axis carries all of
+it: `architectureDiagram` on `ControlAudience`, which `withheldControlOps` and
+`awarenessForAudience` read together. The Pi extension registers its own tools
+and injects its own playbook, so the app tells it separately over
+`ENSEMBLR_CONTROL_ARCHITECTURE`.
+
 **The diagram is a committed file**, `.ensemblr/architecture.json`, beside
 `settings.toml` in the repository it describes — so it travels with the code, a
 clone arrives with the architecture already drawn, and a refinement shows up in
@@ -390,28 +403,27 @@ decided by it, and its contents are never reported as fact. The bundled
 tool's own description carries it, because a document handed to a model reads as
 evidence unless it is told otherwise.
 
-**The read never answers "there is none."** A repository without the file yet
-gets one scanned on the spot, written, and returned, because an agent told the
-diagram is missing goes looking for the scanner — the app's database, an
-`archify` binary — none of which is a surface it holds. The first read is
-therefore also the first build.
+**Ensemblr derives no diagram at all.** There is no scanner and no build step:
+a workspace nobody has drawn has no `.ensemblr/architecture.json`, its pane shows
+an empty state whose button opens a fresh chat and sends the drawing prompt to
+it, and the read answers `diagram: null`. The app once seeded one by walking the source tree at workspace
+creation; that was removed, because the seed was named after directories rather
+than concepts and had to be rewritten by an agent before it was worth reading —
+so it bought a diff full of folder names and no time saved.
 
-Ensemblr scans the diagram from the source tree — directories as nodes,
-cross-module imports as edges, top-level directories as boundary frames — **once,
-when the workspace is created**. Nothing re-scans after that, and there is no
-rescan control in the UI: the file is tracked, so a scan running over a stored
-document would delete a refinement out of the user’s working tree. Keeping the
-diagram true to the code is therefore agent work, through this op, which
-*replaces* the stored document with a refined version — what the bundled
-`architecture-diagram` skill teaches an agent to produce. The whole document is
-submitted rather than a patch, because a partial edit against a document another
-agent may have refined in the meantime is a merge nobody can adjudicate.
+The null answer is therefore an ordinary result rather than a failure, and the
+message that comes back with it says so: read the codebase, author a document,
+and store it with this op. Drawing one and keeping it true to the code are the
+same op and the same work — what the bundled `architecture-diagram` skill
+teaches an agent to produce. The whole document is submitted rather than a
+patch, because a partial edit against a document another agent may have changed
+in the meantime is a merge nobody can adjudicate.
 
 **A stored file that cannot be parsed is refused, not replaced.** The read
-reports what is wrong with it and the seed scan declines to run, because a
+reports what is wrong with it and the update op declines to write, because a
 document this build cannot read is still somebody’s work — a hand edit, a merge
-conflict, a refinement with one bad field. Repairing or deleting it is the
-user’s call.
+conflict, an update with one bad field. Repairing or deleting it is the user’s
+call.
 
 **A read is fitted to the payload budget rather than dumped whole.** The file is
 hand-editable and tracked, so its size has no ceiling the way a submission does,
@@ -459,6 +471,42 @@ that one writes to a remote tracker, not to the repository.
 
 Withheld from the Concierge for the reason `ensemblr_open_tab` is: the diagram
 belongs to a workspace and the Concierge has none of its own.
+
+**The playbooks name both ops, and the upkeep block asks for the redraw.** These
+are two different jobs and they are deliberately not merged. The role playbooks
+carry an inventory bullet, the way they do for the diff and the tracker, so an
+agent learns the ops exist from the same list it learns everything else from
+rather than from a tool schema alone. What the playbooks do *not* carry is a
+standing "keep it current" obligation beside that bullet — the review and Linear
+bullets each have one, and this one must not, because a static playbook cannot
+see whether the code actually moved under a node and a standing line would ask on
+every turn.
+
+Measuring that is `readDiagramUpkeep` in `src/main/architecture/diagram-upkeep.ts`,
+which the session-naming port folds into `SessionBriefNaming.diagram` so the
+answer rides the same per-turn upkeep block as the tab title and the branch. It
+gates in three steps, cheapest first:
+
+1. **A stored diagram, or nothing.** A workspace nobody has drawn is never
+   nudged into having one — the drawing is the user's to ask for, and the empty
+   state's button is how they ask. This costs one failed `stat` and short-circuits
+   the rest, which is what keeps the check off the critical path of every turn in
+   every workspace that has no diagram.
+2. **A change set landing inside a component's `sources`**, compared on segment
+   boundaries by `coverChangedPaths` in `src/shared/architecture-diagram/coverage.ts`
+   so `src/main/storage` never claims `src/main/storage-legacy`. The paths come
+   from `WorkspaceGitService.listChangedPaths`, a porcelain read with none of the
+   line counts or content stamps `getStatus` builds.
+3. **A covered file modified after the document's `generatedAt`.** Measured
+   against the stored timestamp rather than the file's mtime because that is what
+   makes the bullet self-clearing: an agent that stores an update stamps the
+   document with the current time, every changed file is then older than it, and
+   the bullet disappears with nothing having to remember it was shown.
+
+The bullet is withheld from a spawned child and from the Concierge, both of which
+have the ops refused, and Plan Mode **drops** it rather than retiming it the way
+it retimes the naming bullets — the update is refused while planning, so asking
+would only spend a turn on a denial.
 
 `ensemblr_set_summary` enforces both limits by truncation, not rejection: an
 over-long field is stored cut to its cap and the result carries `truncated`, one

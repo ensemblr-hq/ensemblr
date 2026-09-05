@@ -209,6 +209,13 @@ interface AgentControlServiceOptions {
 	originRegistry: OriginRegistry;
 	guardrails: Guardrails;
 	/**
+	 * Whether the architecture diagram feature is on, read live rather than
+	 * captured: it is a user setting the app watches, and the answer gates both
+	 * the two diagram ops and the playbook that describes them. Defaults to off,
+	 * so a build that never wires it keeps the feature absent.
+	 */
+	readArchitectureDiagramEnabled?: () => boolean;
+	/**
 	 * Overrides the service clock and sleep; defaults to the real scheduler. Its
 	 * `now` drives both the wait-loop deadline and the review-focus coalescing
 	 * window, so a test can hold either still.
@@ -547,6 +554,7 @@ export function createAgentControlService({
 	ports,
 	originRegistry,
 	guardrails,
+	readArchitectureDiagramEnabled = () => false,
 	scheduler = REAL_SCHEDULER,
 	dispatchTimeoutMs = DISPATCH_TIMEOUT_MS,
 }: AgentControlServiceOptions): AgentControlService {
@@ -1076,17 +1084,17 @@ export function createAgentControlService({
 	};
 
 	/**
-	 * Reads the caller's workspace architecture diagram, building one when the
-	 * workspace has never had a diagram drawn. Returning a scanned document
-	 * rather than an absence is the whole point: an agent told "there is none"
-	 * goes looking for the scanner, which is not a surface it holds.
+	 * Reads the caller's workspace architecture diagram, answering with a null
+	 * document for a workspace nobody has drawn. Nothing derives one, so the
+	 * message that comes back with the absence tells the agent to author it
+	 * rather than to go looking for a scanner it does not hold.
 	 * @param origin - Resolved caller identity.
-	 * @returns The diagram and where it came from, or a failure.
+	 * @returns The diagram, or a failure.
 	 */
 	const handleGetArchitectureDiagram = async (
 		origin: AgentControlOrigin,
 	): Promise<AgentControlResult<unknown>> => {
-		if (!ports.architecture) {
+		if (!(readArchitectureDiagramEnabled() && ports.architecture)) {
 			return fail(
 				'denied-scope',
 				'This build keeps no architecture diagram, so there is none to read.',
@@ -1108,7 +1116,7 @@ export function createAgentControlService({
 		origin: AgentControlOrigin,
 		args: UpdateArchitectureDiagramArgs,
 	): Promise<AgentControlResult<unknown>> => {
-		if (!ports.architecture) {
+		if (!(readArchitectureDiagramEnabled() && ports.architecture)) {
 			return fail(
 				'denied-scope',
 				'This build keeps no architecture diagram, so there is nothing to update.',
@@ -2234,15 +2242,18 @@ export function createAgentControlService({
 	};
 
 	const describeAudience = async (token: string): Promise<ControlAudience> => {
+		const architectureDiagram = readArchitectureDiagramEnabled();
 		const origin = originRegistry.resolveByToken(token);
 		if (!origin) {
 			return {
+				architectureDiagram,
 				delegation: 'ensemblr',
 				hasChatTab: false,
 				role: 'orchestrator',
 			};
 		}
 		return {
+			architectureDiagram,
 			delegation: origin.delegation,
 			hasChatTab: originHasChatTab(origin),
 			role: await resolveRole(origin),

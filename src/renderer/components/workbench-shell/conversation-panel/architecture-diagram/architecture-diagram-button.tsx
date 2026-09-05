@@ -1,3 +1,4 @@
+import { useAtomValue } from 'jotai';
 import { NetworkIcon } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -8,12 +9,14 @@ import {
 	TooltipContent,
 	TooltipTrigger,
 } from '@/renderer/components/ui/tooltip';
+import { architectureDiagramAtom } from '@/renderer/state/preferences';
 
 import { GhostIconButton } from '../ghost-icon-button';
 
 /**
  * Tab-strip control that opens the workspace's architecture diagram and
- * focuses it.
+ * focuses it. Renders nothing while the Experimental architecture-diagram
+ * setting is off, which is the tab strip's whole surface for the feature.
  */
 export function ArchitectureDiagramButton({
 	onOpenArchitectureDiagram,
@@ -23,6 +26,7 @@ export function ArchitectureDiagramButton({
 	onSessionTabChange: (sessionId: string) => void;
 }) {
 	const { t } = useTranslation();
+	const enabled = useAtomValue(architectureDiagramAtom);
 	const [isOpening, setIsOpening] = useState(false);
 	const label = t(
 		'workbench:architecture-diagram.open',
@@ -61,6 +65,10 @@ export function ArchitectureDiagramButton({
 				);
 			})
 			.finally(() => setIsOpening(false));
+	}
+
+	if (!enabled) {
+		return null;
 	}
 
 	return (

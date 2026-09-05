@@ -1,25 +1,30 @@
 import { describe, expect, it } from 'vitest';
 
-import { TOOL_DEFS } from '../../src/main/agent-control/index.ts';
 import {
+	CONTROL_ARCHITECTURE_ENABLED,
+	CONTROL_ARCHITECTURE_ENV_KEY,
+	TOOL_DEFS,
+} from '../../src/main/agent-control/index.ts';
+import {
+	ARCHITECTURE_DIAGRAM_OPS,
 	ASK_USER_QUESTION_LIMITS,
 	CONCIERGE_AWARENESS,
 	CONCIERGE_ONLY_OPS,
 	CONCIERGE_WITHHELD_OPS,
 	conciergeControlOpDenial,
-	HARNESS_AWARENESS,
-	NATIVE_ORCHESTRATOR_AWARENESS,
-	ORCHESTRATOR_AWARENESS,
+	harnessAwareness,
+	nativeOrchestratorAwareness,
+	orchestratorAwareness,
 	PLAN_MODE_DELEGATION_HEADER,
-	PLAN_MODE_ORCHESTRATOR_AWARENESS,
-	PLAN_MODE_SUBAGENT_AWARENESS,
 	PLAN_REFINEMENT_HEADER,
+	planModeOrchestratorAwareness,
+	planModeSubagentAwareness,
 	roleForDepth,
 	SESSION_BRIEF_NUDGE_HEADER,
-	SUBAGENT_AWARENESS,
 	SUBAGENT_UNUSABLE_OPS,
 	SUBAGENT_WITHHELD_OPS,
 	subAgentControlOpDenial,
+	subagentAwareness,
 	withheldControlOps,
 } from '../../src/shared/agent-control.ts';
 import { formatConciergeReferenceHref } from '../../src/shared/concierge-references.ts';
@@ -36,6 +41,28 @@ import {
 	readSessionBriefDirectiveFields,
 } from './support/pi-extension-source.ts';
 
+/**
+ * Each playbook composed with the architecture diagram switched ON, which is the
+ * variant every assertion below describes: they are about the whole surface, and
+ * the feature-off cuts get their own tests at the end of the file.
+ */
+const ORCHESTRATOR_AWARENESS = orchestratorAwareness(true);
+const NATIVE_ORCHESTRATOR_AWARENESS = nativeOrchestratorAwareness(true);
+const SUBAGENT_AWARENESS = subagentAwareness(true);
+const HARNESS_AWARENESS = harnessAwareness(true);
+const PLAN_MODE_ORCHESTRATOR_AWARENESS = planModeOrchestratorAwareness(true);
+const PLAN_MODE_SUBAGENT_AWARENESS = planModeSubagentAwareness(true);
+
+/** The same six with the feature off, for the assertions that it leaves no trace. */
+const AWARENESS_WITHOUT_DIAGRAM = [
+	orchestratorAwareness(false),
+	nativeOrchestratorAwareness(false),
+	subagentAwareness(false),
+	harnessAwareness(false),
+	planModeOrchestratorAwareness(false),
+	planModeSubagentAwareness(false),
+] as const;
+
 /** Both plan-mode playbooks, for the assertions that hold whatever the role. */
 const PLAN_MODE_PLAYBOOKS = [
 	PLAN_MODE_ORCHESTRATOR_AWARENESS,
@@ -49,6 +76,10 @@ const PLAN_MODE_PLAYBOOKS = [
  */
 const NATIVE_WITHHELD_TOOL_NAMES = ((): readonly string[] => {
 	const ops = withheldControlOps({
+		// The delegation axis is what this list is about, so the feature axis is
+		// held open: an op withheld because the diagram is off is not one the
+		// native-absence paragraph has any business naming.
+		architectureDiagram: true,
 		delegation: 'native',
 		hasChatTab: true,
 		role: 'orchestrator',
@@ -62,17 +93,72 @@ const NATIVE_WITHHELD_TOOL_NAMES = ((): readonly string[] => {
 })();
 
 /**
- * Extracts the value of a named `const <name> = \`...\`` template literal from the
- * extension source and unescapes its backticks back to their runtime form.
+ * Reads a named single- or backtick-quoted literal out of the extension source
+ * and unescapes it back to its runtime form. The fragments the playbooks
+ * interpolate are declared this way, so resolving a substitution means looking
+ * one of these up rather than evaluating a file that imports Pi's runtime.
  */
-const extractEmbeddedAwareness = (source: string, name: string): string => {
+const extractEmbeddedLiteral = (source: string, name: string): string => {
+	const backticked = source.match(
+		new RegExp(`const ${name} =\\s*\`((?:\\\\.|[^\`\\\\])*)\`;`, 's'),
+	);
+	if (backticked) {
+		return backticked[1]
+			.replace(/\\`/g, '`')
+			.replace(/\\n/g, '\n')
+			.replace(/\\\\/g, '\\');
+	}
+	const quoted = source.match(
+		new RegExp(`const ${name} =\\s*'((?:\\\\.|[^'\\\\])*)';`, 's'),
+	);
+	if (!quoted) {
+		throw new Error(`Could not find the ${name} literal.`);
+	}
+	return quoted[1].replace(/\\'/g, "'").replace(/\\\\/g, '\\');
+};
+
+/**
+ * Extracts one of the extension's playbook builders and composes it for a given
+ * feature state, so the embedded copy can be compared against the shared one in
+ * both. The builders are template literals over exactly two substitution forms —
+ * an `architecture ? … : ''` guard around a quoted clause, and the same guard
+ * around a named fragment — and resolving those textually is what keeps the
+ * comparison a source read.
+ * @param source - The extension's raw source.
+ * @param name - The builder's declared name.
+ * @param architecture - Which feature state to compose.
+ * @returns The composed playbook, byte-for-byte as the extension would build it.
+ */
+const extractEmbeddedAwareness = (
+	source: string,
+	name: string,
+	architecture: boolean,
+): string => {
 	const match = source.match(
-		new RegExp(`const ${name} = \`((?:\\\\.|[^\`\\\\])*)\`;`, 's'),
+		new RegExp(
+			`const ${name} = \\(architecture: boolean\\): string =>\\s*\`((?:\\\\.|[^\`\\\\])*)\`;`,
+			's',
+		),
 	);
 	if (!match) {
-		throw new Error(`Could not find the ${name} template literal.`);
+		throw new Error(`Could not find the ${name} playbook builder.`);
 	}
-	return match[1].replace(/\\`/g, '`').replace(/\\\\/g, '\\');
+	const body = match[1]
+		.replace(/\\`/g, '`')
+		.replace(/\\\\/g, '\\')
+		.replace(
+			/\$\{architecture \? '((?:\\.|[^'\\])*)' : ''\}/g,
+			(_whole, clause: string) => (architecture ? clause : ''),
+		)
+		.replace(
+			/\$\{architecture \? ([A-Z_]+) : ''\}/g,
+			(_whole, fragment: string) =>
+				architecture ? extractEmbeddedLiteral(source, fragment) : '',
+		);
+	if (body.includes('${')) {
+		throw new Error(`Unresolved substitution left in ${name}.`);
+	}
+	return body;
 };
 
 /**
@@ -125,15 +211,23 @@ const SPECIES_SPECIFIC_DESCRIPTIONS: ReadonlySet<string> = new Set([
 
 describe('agent-control AWARENESS parity', () => {
 	it('embeds the orchestrator variant byte-for-byte in the Pi extension', () => {
+		const source = readExtensionSource();
 		expect(
-			extractEmbeddedAwareness(readExtensionSource(), 'ORCHESTRATOR_AWARENESS'),
-		).toBe(ORCHESTRATOR_AWARENESS);
+			extractEmbeddedAwareness(source, 'ORCHESTRATOR_AWARENESS', true),
+		).toBe(orchestratorAwareness(true));
+		expect(
+			extractEmbeddedAwareness(source, 'ORCHESTRATOR_AWARENESS', false),
+		).toBe(orchestratorAwareness(false));
 	});
 
 	it('embeds the sub-agent variant byte-for-byte in the Pi extension', () => {
-		expect(
-			extractEmbeddedAwareness(readExtensionSource(), 'SUBAGENT_AWARENESS'),
-		).toBe(SUBAGENT_AWARENESS);
+		const source = readExtensionSource();
+		expect(extractEmbeddedAwareness(source, 'SUBAGENT_AWARENESS', true)).toBe(
+			subagentAwareness(true),
+		);
+		expect(extractEmbeddedAwareness(source, 'SUBAGENT_AWARENESS', false)).toBe(
+			subagentAwareness(false),
+		);
 	});
 
 	// The native variant is the playbook for a root whose runtime delegates
@@ -348,11 +442,25 @@ describe('agent-control AWARENESS parity', () => {
 	it('embeds both plan-mode playbooks byte-for-byte in the Pi extension', () => {
 		const source = readExtensionSource();
 		expect(
-			extractEmbeddedAwareness(source, 'PLAN_MODE_ORCHESTRATOR_AWARENESS'),
-		).toBe(PLAN_MODE_ORCHESTRATOR_AWARENESS);
+			extractEmbeddedAwareness(
+				source,
+				'PLAN_MODE_ORCHESTRATOR_AWARENESS',
+				true,
+			),
+		).toBe(planModeOrchestratorAwareness(true));
 		expect(
-			extractEmbeddedAwareness(source, 'PLAN_MODE_SUBAGENT_AWARENESS'),
-		).toBe(PLAN_MODE_SUBAGENT_AWARENESS);
+			extractEmbeddedAwareness(
+				source,
+				'PLAN_MODE_ORCHESTRATOR_AWARENESS',
+				false,
+			),
+		).toBe(planModeOrchestratorAwareness(false));
+		expect(
+			extractEmbeddedAwareness(source, 'PLAN_MODE_SUBAGENT_AWARENESS', true),
+		).toBe(planModeSubagentAwareness(true));
+		expect(
+			extractEmbeddedAwareness(source, 'PLAN_MODE_SUBAGENT_AWARENESS', false),
+		).toBe(planModeSubagentAwareness(false));
 	});
 
 	// The two variants share their headline, upkeep clause, stale-context tail, and
@@ -781,7 +889,7 @@ describe('sub-agent role policy', () => {
 	it('gates both registration paths on that set', () => {
 		const source = readExtensionSource();
 		expect(source).toMatch(
-			/const registersOp = \(op: string\): boolean =>\s*IS_CONCIERGE\s*\? !CONCIERGE_WITHHELD_OPS\.has\(op\)\s*: !IS_SUBAGENT \|\| !SUBAGENT_WITHHELD_OPS\.has\(op\);/,
+			/return IS_CONCIERGE\s*\? !CONCIERGE_WITHHELD_OPS\.has\(op\)\s*: !IS_SUBAGENT \|\| !SUBAGENT_WITHHELD_OPS\.has\(op\);/,
 		);
 		expect(source).toMatch(/if \(!registersOp\(op\)\) \{\s*return;/);
 		expect(source).toMatch(/if \(registersOp\('exitPlanMode'\)\) \{/);
@@ -1092,5 +1200,89 @@ describe('control transport', () => {
 
 	it('measures the request body in bytes, so wide characters survive it', () => {
 		expect(readExtensionSource()).toContain('Buffer.byteLength(payload)');
+	});
+});
+
+// The architecture diagram is a whole feature behind an Experimental switch, and
+// off it is *absent* rather than refused: the two ops leave every tool list, so a
+// playbook still describing them would send the model hunting for tools it does
+// not hold. These assert the whole vocabulary goes, not just the bullet.
+describe('the architecture diagram feature switch', () => {
+	it('withholds both diagram ops from every role while it is off', () => {
+		for (const role of ['orchestrator', 'subagent', 'concierge'] as const) {
+			const withheld = withheldControlOps({
+				architectureDiagram: false,
+				delegation: 'ensemblr',
+				hasChatTab: true,
+				role,
+			});
+			for (const op of ARCHITECTURE_DIAGRAM_OPS) {
+				expect(withheld.has(op), `${role} should not hold \`${op}\``).toBe(
+					true,
+				);
+			}
+		}
+	});
+
+	it('leaves both diagram ops in place for a root while it is on', () => {
+		const withheld = withheldControlOps({
+			architectureDiagram: true,
+			delegation: 'ensemblr',
+			hasChatTab: true,
+			role: 'orchestrator',
+		});
+		for (const op of ARCHITECTURE_DIAGRAM_OPS) {
+			expect(withheld.has(op)).toBe(false);
+		}
+	});
+
+	it('names neither diagram tool in any playbook while it is off', () => {
+		for (const playbook of AWARENESS_WITHOUT_DIAGRAM) {
+			expect(playbook).not.toContain('ensemblr_get_architecture_diagram');
+			expect(playbook).not.toContain('ensemblr_update_architecture_diagram');
+		}
+	});
+
+	// The prose around the tool names goes too: a playbook that still discussed
+	// "the architecture diagram" would have the model looking for a surface the
+	// app does not draw and a skill it was never handed.
+	it('mentions the diagram nowhere in any playbook while it is off', () => {
+		for (const playbook of AWARENESS_WITHOUT_DIAGRAM) {
+			expect(playbook.toLowerCase()).not.toContain('architecture diagram');
+			expect(playbook).not.toContain('.ensemblr/architecture.json');
+			expect(playbook).not.toContain('architecture-diagram');
+		}
+	});
+
+	// Off must cut only the diagram: a slot that swallowed its neighbours would
+	// pass every assertion above and quietly delete half a playbook.
+	it('leaves every playbook otherwise intact', () => {
+		const on = [
+			orchestratorAwareness(true),
+			nativeOrchestratorAwareness(true),
+			subagentAwareness(true),
+			harnessAwareness(true),
+			planModeOrchestratorAwareness(true),
+			planModeSubagentAwareness(true),
+		];
+		AWARENESS_WITHOUT_DIAGRAM.forEach((off, index) => {
+			expect(off.length).toBeGreaterThan(on[index].length * 0.85);
+			expect(off).not.toBe(on[index]);
+		});
+	});
+
+	// The extension reads the switch off an env var the app sets, because neither
+	// the MCP tool list nor the playbooks the app serves ever reach it.
+	it('reads the switch from the env var the app writes', () => {
+		const source = readExtensionSource();
+		expect(source).toContain(
+			`process.env.${CONTROL_ARCHITECTURE_ENV_KEY} === '${CONTROL_ARCHITECTURE_ENABLED}'`,
+		);
+		expect(
+			extractEmbeddedStringSet(source, 'ARCHITECTURE_DIAGRAM_OPS'),
+		).toEqual([...ARCHITECTURE_DIAGRAM_OPS].sort());
+		expect(source).toMatch(
+			/if \(!ARCHITECTURE_DIAGRAM_ON && ARCHITECTURE_DIAGRAM_OPS\.has\(op\)\) \{\s*return false;/,
+		);
 	});
 });

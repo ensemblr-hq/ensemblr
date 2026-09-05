@@ -12,6 +12,8 @@ export {
 	createBoardStatusStore,
 } from './board-status-store.ts';
 export {
+	CONTROL_ARCHITECTURE_ENABLED,
+	CONTROL_ARCHITECTURE_ENV_KEY,
 	CONTROL_ROLE_ENV_KEY,
 	CONTROL_TOKEN_ENV_KEY,
 	CONTROL_URL_ENV_KEY,

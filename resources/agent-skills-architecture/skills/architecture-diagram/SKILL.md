@@ -1,29 +1,28 @@
 ---
 name: architecture-diagram
-description: How to read and refine the architecture diagram Ensemblr keeps for a workspace — ensemblr_get_architecture_diagram to fetch it (it scans one on the spot when the workspace has never shown one, so there is never nothing to read), the IR shape, what the scanner already got right, what only you can fix, and ensemblr_update_architecture_diagram to store the edit. Read this when asked to improve, correct, annotate, generate, or explain the workspace architecture diagram.
+description: How to draw and maintain the architecture diagram Ensemblr keeps for a workspace — ensemblr_get_architecture_diagram to fetch the stored one (it answers with null when nobody has drawn this workspace yet), the IR shape, how to derive it from the codebase, and ensemblr_update_architecture_diagram to store it. Read this when asked to draw, generate, improve, correct, annotate, or explain the workspace architecture diagram.
 ---
 
-# Refining the architecture diagram
+# Drawing the architecture diagram
 
 Ensemblr keeps an architecture diagram of every workspace at
-**`.ensemblr/architecture.json`**, committed alongside the code it describes. It
-is **already built** before you arrive: when the workspace was created, a scanner
-walked the source tree, aggregated it to directory-level nodes, derived
-cross-module import edges, and laid them out as an Euler drawing — nested
-regions per directory, with a curve around each. The user opens it from the tab
-strip.
+**`.ensemblr/architecture.json`**, committed alongside the code it describes. The
+user opens it from the tab strip.
 
-That scan runs **once**. Nothing re-derives the diagram afterwards, so keeping it
-true to the code is agent work — yours — and what you store is what the user
-sees until somebody stores something else.
+**Nothing derives it.** The app ships no scanner: a workspace nobody has drawn
+has no diagram at all, and its pane shows an empty state whose button opens a
+fresh chat and asks for one — which may well be how you got here. Producing it is
+entirely your work, and what you store is what the user sees until somebody
+stores something else.
 
 Read and write it through the two ops below rather than by editing the file
 directly — they validate the document, and the update op refreshes any diagram
 tab the user has open.
 
-Your job is never to author one from nothing. It is to **edit the one that
-exists** so it reads like a drawing a maintainer would make rather than a dump
-of the folder tree.
+So the job is one of two, depending on what the read answers: **draw one from
+the codebase** when there is none, or **edit the one that exists** when there
+is. Either way the target is a drawing a maintainer would make, not a dump of
+the folder tree.
 
 ## It is a drawing for people, not a map for you
 
@@ -53,51 +52,52 @@ Read first, change what is wrong, store the whole document back. There is no
 patch operation: a partial edit against a document another agent may have
 refined in the meantime is a merge nobody can adjudicate.
 
-**The read always answers with a diagram.** A repository with no
-`.ensemblr/architecture.json` yet is not an empty case — the seed scan runs on
-the spot, writes the file, and returns it, marked `source: "scan"`. So there is
-nothing to go hunting for and no scanner to invoke yourself.
+**The read answers `diagram: null` when nobody has drawn this workspace.** That
+is an ordinary answer, not a failure and not something to retry: there is no
+scanner to invoke and nothing to go hunting for. Read the codebase and author
+the document yourself.
 
 The one thing the read *can* refuse is a stored file it cannot parse — a hand
 edit, a merge conflict, a document with one bad field. It says so and names the
-problem rather than scanning a replacement over the top, because that file is
+problem rather than inviting a replacement over the top, because that file is
 tracked and overwriting it would delete work out of the user's diff. Repair or
 delete it; do not work around it.
 
-What comes back is a document to **edit**, not evidence to reason from — see
-*It is a drawing for people* above. `source` tells you what you are holding:
+A document that *does* come back is a thing to **edit**, not evidence to reason
+from — see *It is a drawing for people* above. Edit it rather than replacing it
+wholesale, or you discard whatever the last pass got right.
 
-- `scan` — the deterministic seed. Correct, but named after directories rather
-  than concerns. This is the interesting case: everything under *What only you
-  can fix* is still undone.
-- `agent` — a previous refinement. Edit it; do not replace it wholesale, or you
-  discard whatever the last pass got right.
+## Drawing one from nothing
 
-## What the scanner already gets right
+Read the repository first. Its own documentation is the fastest route to the
+concepts: a `README`, an `AGENTS.md` or `CLAUDE.md`, an architecture map under
+`docs/`, and the top-level directory listing. Then:
 
-Do not spend a turn redoing any of this:
+1. **Pick the nodes.** One per directory that a maintainer would name out loud,
+   at whatever depth that lands — usually two or three levels, not every folder.
+   A directory nobody would mention is not a node.
+2. **Give each one `sources`**, pointing at the directory it stands for, so a
+   click in the pane opens it.
+3. **Derive the edges** from what actually imports what. Sample the imports
+   rather than exhaustively parsing the tree; the drawing wants the edges that
+   carry meaning, not every one that exists.
+4. **Group them into regions** by concern, and use `organic` unless the user
+   asked otherwise.
 
-- **Which directories exist**, and how many source files each holds.
-- **Which directories import from which**, and how heavily.
-- **Placement.** Under `organic` there is none to get wrong: a node is placed by
-  the regions that enclose it, and the renderer packs and outlines them.
-- **Nested regions per directory** — `src`, `src/main`, `src/main/storage`, each
-  wrapping everything beneath it, so the curves nest the way the tree does.
-- **`sources`** — every node points at the directory it stands for, so a click
-  opens it.
+Then apply everything below — it is the difference between a folder tree and a
+drawing.
 
-## What only you can fix
+## What only you can do
 
-- **Boundary labels.** The scanner names a region after its directory path:
-  `src`, `src/main`. You know the concern — *Main process*, *Renderer*,
-  *Cross-process contracts*. Rename them.
-- **Node types.** The scanner guesses from path vocabulary and gets the obvious
-  ones (`storage` → database, `renderer` → frontend). It cannot tell that a
-  directory called `lib` is really the permission gate. Fix the wrong ones.
+- **Boundary labels.** Name a region for its concern — *Main process*,
+  *Renderer*, *Cross-process contracts* — rather than for its directory path.
+- **Node types.** `storage` is a database, `renderer` a frontend; but a
+  directory called `lib` may really be the permission gate. Only reading the
+  code settles it.
 - **Noise.** A repository has directories that are true but not interesting —
-  fixtures, generated output, a one-file shim. Drop the nodes that do not help a
-  reader, and drop the edges that only exist because everything imports the
-  types module.
+  fixtures, generated output, a one-file shim. Leave out the nodes that do not
+  help a reader, and leave out the edges that only exist because everything
+  imports the types module.
 - **Membership.** Which nodes belong in which region is the whole layout under
   `organic`. Move a node into the region that owns it conceptually rather than
   the directory it happens to sit in, and add a **cross-cutting set** — a
@@ -157,8 +157,8 @@ on the panel rather than drawn.
 
 ## Placement
 
-Two modes. The scanner seeds `organic`; a document archify authored, or one you
-place by hand, uses `grid`.
+Two modes. Prefer `organic`, which needs no coordinates; `grid` is for a
+document that was hand-placed, or one archify authored.
 
 ### `organic` — the Euler drawing
 
@@ -206,9 +206,9 @@ tracked file, so it lands in the diff like any other edit and is worth
 mentioning in your answer. Pass `diagram` as an **object**, not as a string
 containing JSON.
 
-What you store is the diagram from then on. Nothing re-scans over it, so a
-refinement is never undone by the app — and equally, a diagram left stale after
-a refactor stays stale until somebody fixes it.
+What you store is the diagram from then on. Nothing in the app derives or
+regenerates one, so your work is never undone by it — and equally, a diagram
+left stale after a refactor stays stale until somebody fixes it.
 
 The op answers with the component and connection counts it stored. A document
 that does not validate comes back with the **field paths** that failed
@@ -220,9 +220,18 @@ different shape.
 
 - The user asked about something else. A diagram that is roughly right is not
   worth a turn of its own; it is not upkeep you owe on every task.
+
+  The exception is when the app says otherwise. Ensemblr checks each turn
+  whether your change set landed inside a component's `sources` and whether
+  those files moved after the document was drawn; when both hold it adds a
+  diagram line to the session upkeep block naming the nodes involved. That line
+  is the app telling you this drawing is now wrong about code you touched, so
+  act on it rather than reading this bullet as a reason not to. It appears only
+  where a diagram already exists — a workspace nobody has drawn is never nudged
+  into having one.
 - You have not called `ensemblr_get_architecture_diagram`. Guessing at a
-  replacement discards whatever the last refinement got right, and re-deriving
-  the module graph by hand is work the scanner already did.
+  replacement discards whatever the last pass got right — and the read is one
+  call, so there is no reason to skip it.
 - The repository is mid-refactor and the shape is about to move again.
 - You wanted to *look something up*. The diagram is not a lookup surface; read
   the code.

@@ -360,7 +360,7 @@ export const APP_FAILURE_TEXT: Record<
 	'diagram-unreadable': (t) =>
 		t(
 			'errors:failure.diagram-unreadable',
-			'The stored architecture diagram cannot be read. Repair or delete the file, and a new one will be drawn.',
+			'The stored architecture diagram cannot be read. Repair or delete the file, then ask an agent to draw a new one.',
 		),
 	'dictation-disabled': (t) =>
 		t(
@@ -616,8 +616,6 @@ export const APP_FAILURE_TEXT: Record<
 		),
 	'root-unwritable': (t) =>
 		t('errors:failure.root-unwritable', 'The root directory is not writable.'),
-	'scan-failed': (t) =>
-		t('errors:failure.scan-failed', 'The workspace could not be scanned.'),
 	'shared-root-content': (t) =>
 		t(
 			'errors:failure.shared-root-content',

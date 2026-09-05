@@ -82,6 +82,14 @@ export interface WorkspaceGitService {
 	getMergeConflicts: (
 		request: GetWorkspaceMergeConflictsRequest,
 	) => Promise<GetWorkspaceMergeConflictsResult>;
+	/**
+	 * Working-tree paths only, with none of the line counts, content stamps, or
+	 * summaries {@link WorkspaceGitService.getStatus} builds. It backs decisions
+	 * about *which* files moved rather than a view of them, so it stays cheap
+	 * enough to run on every agent turn. Best-effort: an unreadable workspace
+	 * reports an empty change set rather than failing its caller.
+	 */
+	listChangedPaths: (workspaceCwd: string) => Promise<readonly string[]>;
 }
 
 /**
@@ -184,6 +192,23 @@ export function createWorkspaceGitService({
 				};
 			}
 			return readMergeConflicts(runGit, cwd.cwd, request.baseRef);
+		},
+
+		async listChangedPaths(workspaceCwd) {
+			const cwd = resolveWorkspaceCwd(workspaceCwd);
+			if (!cwd.ok) {
+				return [];
+			}
+			const result = await runGit(cwd.cwd, [
+				'status',
+				'--porcelain',
+				'-z',
+				'--untracked-files=all',
+			]);
+			if (result.status !== 'success') {
+				return [];
+			}
+			return parsePorcelainStatus(result.stdout).map((entry) => entry.path);
 		},
 
 		async discardChanges(request) {

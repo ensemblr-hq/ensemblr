@@ -144,10 +144,10 @@ export const DELTA_TONE: Record<ArchitectureDeltaStatus, string> = {
 /**
  * Font sizes the node text shrinks between.
  *
- * Raised over archify's because the scanner writes real paths into `sublabel`:
+ * Raised over archify's because a `sublabel` often carries a real path:
  * `src/renderer/components` at archify's preferred 9 inside a 120px box fits
- * only by dropping to the 6px floor, which is the unreadable grey line the
- * scanned diagram was covered in. The larger solved node earns the extra size.
+ * only by dropping to the 6px floor, which is an unreadable grey line. The
+ * larger solved node earns the extra size.
  */
 export const NODE_TEXT_SIZES = {
 	labelMinimum: 8,

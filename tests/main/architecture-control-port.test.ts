@@ -6,9 +6,9 @@ import {
 } from '../../src/main/agent-control/index.ts';
 import type {
 	ArchitectureReadResult,
-	ArchitectureScanOutcome,
 	ArchitectureService,
 } from '../../src/main/architecture/index.ts';
+import { ArchitectureServiceError } from '../../src/main/architecture/index.ts';
 import { MAX_AGENT_PAYLOAD_CHARS } from '../../src/shared/agent-control.ts';
 import type {
 	ArchitectureComponent,
@@ -45,17 +45,8 @@ function makePort(service: Partial<ArchitectureService>) {
 		service.storeRefinedIr ??
 			(async () => ({
 				generatedAt: '',
-				graphFingerprint: '',
 				ir: diagram,
 				relativePath: '.ensemblr/architecture.json',
-				source: 'agent' as const,
-			})),
-	);
-	const scanIfMissing = vi.fn(
-		service.scanIfMissing ??
-			(async (): Promise<ArchitectureScanOutcome> => ({
-				reason: 'already-stored',
-				rebuilt: false,
 			})),
 	);
 	const readDiagram = vi.fn(
@@ -68,7 +59,6 @@ function makePort(service: Partial<ArchitectureService>) {
 	const broadcastArchitectureChanged = vi.fn();
 	const architectureService = {
 		readDiagram,
-		scanIfMissing,
 		storeRefinedIr,
 	} as unknown as ArchitectureService;
 	const ports = createAgentControlPorts({
@@ -92,7 +82,7 @@ function makePort(service: Partial<ArchitectureService>) {
 	return {
 		broadcastArchitectureChanged,
 		port: ports.architecture,
-		scanIfMissing,
+		readDiagram,
 		storeRefinedIr,
 	};
 }
@@ -101,10 +91,8 @@ function makePort(service: Partial<ArchitectureService>) {
 const stored = (ir: ArchitectureIR = diagram): ArchitectureReadResult => ({
 	current: {
 		generatedAt: '2026-09-04T00:00:00.000Z',
-		graphFingerprint: 'abc',
 		ir,
 		relativePath: '.ensemblr/architecture.json',
-		source: 'scan',
 	},
 	previous: null,
 });
@@ -172,27 +160,35 @@ async function readOk(port: ReturnType<typeof makePort>['port']) {
 }
 
 describe('architecture control port: reading', () => {
-	it('seeds a workspace that has none rather than reporting one missing', async () => {
-		const { port, scanIfMissing } = makePort({
+	// Nothing derives a diagram, so "there is none" is an ordinary answer the
+	// agent acts on by authoring one — not a failure it should retry.
+	it('answers that a workspace nobody has drawn has no diagram', async () => {
+		const { port } = makePort({
 			readDiagram: async () => ({ current: null, previous: null }),
-			scanIfMissing: async () => ({
-				diagram: stored().current as never,
-				rebuilt: true,
-			}),
 		});
 
 		const result = await readOk(port);
 
-		expect(scanIfMissing).toHaveBeenCalledWith({ workspaceId: 'ws-1' });
-		expect(result.source).toBe('scan');
-		expect(result.componentCount).toBe(2);
+		expect(result.diagram).toBeNull();
+		expect(result.componentCount).toBe(0);
+		expect(result.connectionCount).toBe(0);
+		expect(result.message).toMatch(/does not exist/);
+	});
+
+	it('names the file the diagram would live at, so the agent can find it', async () => {
+		const { port } = makePort({
+			readDiagram: async () => ({ current: null, previous: null }),
+		});
+
+		expect((await readOk(port)).message).toContain(
+			'.ensemblr/architecture.json',
+		);
 	});
 
 	// The file is tracked, so a document this build cannot parse is somebody's
-	// work. Scanning a replacement over it is what used to make a refinement
-	// disappear with the read still answering `source: "scan"`.
-	it('refuses an unreadable document instead of scanning over it', async () => {
-		const { port, scanIfMissing } = makePort({
+	// work. Writing a replacement over it is what would make an update disappear.
+	it('refuses an unreadable document instead of writing over it', async () => {
+		const { port } = makePort({
 			readDiagram: async () => ({
 				current: null,
 				error: {
@@ -209,18 +205,6 @@ describe('architecture control port: reading', () => {
 		expect(outcome?.ok === false && outcome.message).toMatch(
 			/could not be read/,
 		);
-		expect(scanIfMissing).not.toHaveBeenCalled();
-	});
-
-	it('reports a workspace whose diagram could not be scanned as unavailable', async () => {
-		const { port } = makePort({
-			readDiagram: async () => ({ current: null, previous: null }),
-			scanIfMissing: async () => ({ reason: 'already-stored', rebuilt: false }),
-		});
-
-		const outcome = await port?.readDiagram({ origin });
-
-		expect(outcome).toMatchObject({ ok: false, reason: 'unavailable' });
 	});
 
 	it('answers rather than throwing when the service itself throws', async () => {
@@ -530,5 +514,45 @@ describe('architecture control port: writing', () => {
 		expect(message).toContain('EACCES');
 		expect(message).not.toContain('/Users/p');
 		expect(message).toMatch(/valid and nothing is wrong with it/);
+	});
+
+	// `store-failed` says "your document was fine, the directory refused it, do
+	// not retry". Answering a conflicted file with that sends the agent to report
+	// a full disk instead of the conflict markers in the user's working tree.
+	it('names the stored document rather than the write when the service refuses to start one', async () => {
+		const { port } = makePort({
+			readDiagram: async () => stored(),
+			storeRefinedIr: async () => {
+				throw new ArchitectureServiceError({
+					code: 'diagram-unreadable',
+					message:
+						'.ensemblr/architecture.json could not be read: Unexpected token <',
+				});
+			},
+		});
+
+		const outcome = await port?.updateDiagram({ diagram, origin });
+
+		expect(outcome).toMatchObject({ ok: false, reason: 'unreadable' });
+		const message = outcome?.ok === false ? outcome.message : '';
+		expect(message).toMatch(/Repair or delete that file/);
+		expect(message).not.toMatch(/valid and nothing is wrong with it/);
+	});
+
+	it('reports a workspace that has gone as unavailable rather than a failed write', async () => {
+		const { port } = makePort({
+			readDiagram: async () => stored(),
+			storeRefinedIr: async () => {
+				throw new ArchitectureServiceError({
+					code: 'workspace-missing',
+					message: 'Workspace ws-1 is no longer on disk at /Users/p/ws.',
+				});
+			},
+		});
+
+		const outcome = await port?.updateDiagram({ diagram, origin });
+
+		expect(outcome).toMatchObject({ ok: false, reason: 'unavailable' });
+		expect(outcome?.ok === false && outcome.message).not.toContain('/Users/p');
 	});
 });

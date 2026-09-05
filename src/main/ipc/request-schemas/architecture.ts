@@ -11,8 +11,3 @@ import { z } from 'zod';
 export const getArchitectureSnapshotRequestSchema = z.object({
 	workspaceId: z.string().min(1),
 });
-
-/** {@link import('../../../shared/ipc').ScanArchitectureSnapshotRequest}. */
-export const scanArchitectureSnapshotRequestSchema = z.object({
-	workspaceId: z.string().min(1),
-});

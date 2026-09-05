@@ -75,6 +75,40 @@ const SUMMARY_BULLET =
 const PLAN_MODE_SUMMARY_BULLET =
 	'- Session summary: the summary on file for this tab is older than the conversation. Call `ensemblr_set_summary` as the last thing you do before `ensemblr_exit_plan_mode` — that tool ends your turn, so there is no slot after it — or before your closing message on a turn where you are not submitting a plan. Pass a short `title` and a markdown `summary` covering the decisions made, what the plan settles, and what is still open. It replaces the record the app keeps for this tab; it does NOT rename the tab.';
 
+/**
+ * Names the diagram nodes the turn's changes landed in, so the bullet points at
+ * the part of the drawing that moved rather than at the drawing as a whole.
+ * @param components - Labels the app matched, already capped to a readable few.
+ * @returns The clause naming them, or one naming none when the labels are gone.
+ */
+function diagramSubject(components: readonly string[]): string {
+	if (components.length === 0) {
+		return 'covers files this branch has changed';
+	}
+	const quoted = components.map((label) => `\`${label}\``);
+	const named =
+		quoted.length === 1
+			? quoted[0]
+			: `${quoted.slice(0, -1).join(', ')} and ${quoted.at(-1)}`;
+	return `draws ${named} over files this branch has changed`;
+}
+
+/**
+ * Builds the bullet asking the agent to bring a stale diagram back in line with
+ * the code.
+ *
+ * Shown only where there is already a diagram *and* the change set landed
+ * inside one of its components, so it asks for a correction rather than for the
+ * drawing itself — a workspace nobody has drawn is not nagged into having one.
+ * The read is named as a required first step because the update op replaces the
+ * whole document and there is no patch.
+ * @param components - The diagram nodes the change set landed in.
+ * @returns The diagram upkeep bullet.
+ */
+function diagramBullet(components: readonly string[]): string {
+	return `- Architecture diagram: this workspace's stored diagram ${diagramSubject(components)}, so it is drawing something the code no longer does. Once the change you are making has settled, read it with \`ensemblr_get_architecture_diagram\`, correct what moved, and store the whole document back with \`ensemblr_update_architecture_diagram\` — there is no patch op, and nothing in the app redraws it. Keep it a correction: edit the nodes, edges, and boundaries that are now wrong and leave the rest of the drawing alone. If the shape did not actually change — a rename inside one module, a file split that no node draws — say so in your reply and store nothing.`;
+}
+
 /** How a planning turn must not put the branch off until the plan lands. */
 const PLAN_MODE_BRANCH_TIMING =
 	'Do it now, in the same breath as the tab title, rather than once the plan is approved — and only once;';
@@ -141,7 +175,12 @@ function branchBullet(
 }
 
 /**
- * Renders the upkeep block for a session's outstanding naming work.
+ * Renders the upkeep block for a session's outstanding work.
+ *
+ * The diagram bullet is the one item Plan Mode drops rather than retimes:
+ * `updateArchitectureDiagram` is refused while planning, because the diagram is
+ * a tracked file and a plan that dirties the working tree is not a plan. Asking
+ * for it anyway would send a planning agent after a denial.
  * @param naming - The upkeep the session still owes, from `getSessionBrief`.
  * @param planMode - Whether the calling session is planning, which changes both the framing and the timing of every bullet.
  * @returns The block to append to the system prompt, or null when nothing is outstanding.
@@ -157,6 +196,9 @@ export function buildSessionBriefNudge(
 				: TITLE_BULLET
 			: null,
 		naming.branch.eligible ? branchBullet(naming.branch, planMode) : null,
+		naming.diagram.stale && !planMode
+			? diagramBullet(naming.diagram.components)
+			: null,
 		naming.summaryStale
 			? planMode
 				? PLAN_MODE_SUMMARY_BULLET

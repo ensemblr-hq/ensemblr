@@ -138,8 +138,6 @@ export function createEnsemblrApi(): EnsemblrApi {
 		addEnvFile: (request) => invoke('addEnvFile', request),
 		getArchitectureSnapshot: (request) =>
 			invoke('getArchitectureSnapshot', request),
-		scanArchitectureSnapshot: (request) =>
-			invoke('scanArchitectureSnapshot', request),
 		launchAgentHarness: (request) => invoke('launchAgentHarness', request),
 		resumeAgentHarness: (request) => invoke('resumeAgentHarness', request),
 		listAgentHarnesses: () => invoke('listAgentHarnesses'),

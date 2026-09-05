@@ -6,13 +6,12 @@ import {
 	PlusIcon,
 	RotateCcwIcon,
 } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import {
 	architectureSnapshotQuery,
 	ensemblrQueryKeys,
-	scanArchitectureSnapshot,
 } from '@/renderer/api/ensemblr-queries';
 import { Button } from '@/renderer/components/ui/button';
 import { ScrollArea, ScrollBar } from '@/renderer/components/ui/scroll-area';
@@ -23,6 +22,7 @@ import { failureText } from '@/renderer/lib/failure-text';
 import { formatRelativeTimestamp } from '@/renderer/lib/workbench/relative-time';
 import {
 	ARCHITECTURE_COMPONENT_TYPES,
+	ARCHITECTURE_FILE_RELATIVE_PATH,
 	type ArchitectureComponentType,
 	type ArchitectureIR,
 	diffArchitectureIr,
@@ -57,50 +57,11 @@ function useSnapshotBroadcast(workspaceId: string): void {
 }
 
 /**
- * Seeds a workspace that arrives with no diagram, which is how a workspace
- * created before the scan moved onto the creation path gets one. There is no
- * manual rescan: the seed is scanned once and everything after it is an agent's
- * refinement, so a control that re-ran the scanner would overwrite that work.
- *
- * Attempted once per workspace, tracked by ref rather than by state: a
- * repository the scan finds no modules in still stores no snapshot, so a re-run
- * on every settle would be an unbounded scan loop.
- *
- * The outcome is not inspected, only re-read: main reports a failed scan in the
- * snapshot it hands back, which is the surface already showing it.
- * @param needsSeed - True when the read settled with nothing and no error
- * @param workspaceId - Workspace being shown
- */
-function useSeedScan({
-	needsSeed,
-	workspaceId,
-}: {
-	needsSeed: boolean;
-	workspaceId: string;
-}): void {
-	const queryClient = useQueryClient();
-	const attemptedFor = useRef<string | null>(null);
-	useEffect(() => {
-		if (!needsSeed || attemptedFor.current === workspaceId) {
-			return;
-		}
-		attemptedFor.current = workspaceId;
-		void scanArchitectureSnapshot({ workspaceId })
-			.catch(() => undefined)
-			.then(() =>
-				queryClient.invalidateQueries({
-					queryKey: ensemblrQueryKeys.architectureSnapshot(workspaceId),
-				}),
-			);
-	}, [needsSeed, queryClient, workspaceId]);
-}
-
-/**
  * Resolves what the open control on a node should do.
  *
- * Every node the scanner emits stands for a *directory*, which the file preview
- * cannot render — it answers "is a directory and cannot be previewed". A refined
- * diagram may name a real file, so the path decides.
+ * A node usually stands for a *directory*, which the file preview cannot render
+ * — it answers "is a directory and cannot be previewed" — but a diagram may
+ * name a real file instead, so the path decides.
  * @param onDirectoryReveal - Selects All files and expands a directory
  * @returns The open handler for a node's first source
  */
@@ -124,15 +85,18 @@ function useSourceOpener(
  * The workspace's architecture diagram: modules as nodes, cross-module imports
  * as edges, top-level directories as boundaries.
  *
- * The snapshot is read, never computed here — main owns the scan, and the panel
- * only asks for one when the workspace has none yet.
+ * The snapshot is read, never computed — nothing in the app derives a diagram,
+ * so a workspace nobody has drawn gets the empty state rather than a wait.
  */
 export function ArchitectureDiagramPanel({
 	onDirectoryReveal,
+	onDraw,
 	workspaceId,
 }: {
 	/** Selects All files and expands a workspace-relative directory. */
 	onDirectoryReveal: (directoryPath: string) => void;
+	/** Opens a fresh chat and asks its agent to draw the diagram. */
+	onDraw?: () => void;
 	workspaceId: string;
 }) {
 	const { t } = useTranslation();
@@ -142,10 +106,6 @@ export function ArchitectureDiagramPanel({
 
 	const failure = failureText(t, data?.error ?? null);
 	const current = data?.current ?? null;
-	useSeedScan({
-		needsSeed: Boolean(data) && !current && !data?.error,
-		workspaceId,
-	});
 
 	const delta = useMemo(
 		() =>
@@ -155,21 +115,30 @@ export function ArchitectureDiagramPanel({
 		[data],
 	);
 
-	if (!current || !delta) {
+	if (failure) {
+		return (
+			<div className='flex min-h-0 flex-1 flex-col overflow-hidden'>
+				<PanelMessage message={failure} tone='error' />
+			</div>
+		);
+	}
+
+	if (!data) {
 		return (
 			<div className='flex min-h-0 flex-1 flex-col overflow-hidden'>
 				<PanelMessage
-					message={
-						failure ??
-						t(
-							'workbench:architecture-diagram.loading',
-							'Reading the workspace architecture…',
-						)
-					}
-					tone={failure ? 'error' : 'muted'}
+					message={t(
+						'workbench:architecture-diagram.loading',
+						'Reading the workspace architecture…',
+					)}
+					tone='muted'
 				/>
 			</div>
 		);
+	}
+
+	if (!current || !delta) {
+		return <UndrawnDiagram onDraw={onDraw} />;
 	}
 
 	return (
@@ -179,6 +148,49 @@ export function ArchitectureDiagramPanel({
 			ir={current.ir}
 			onOpenSource={openSource}
 		/>
+	);
+}
+
+/**
+ * What the pane shows for a workspace no agent has drawn yet. Nothing derives a
+ * diagram, so this is a durable state rather than a wait: it says who has to act
+ * and hands the work over on one click.
+ */
+function UndrawnDiagram({ onDraw }: { onDraw?: () => void }) {
+	const { t } = useTranslation();
+
+	return (
+		<div className='flex min-h-0 flex-1 flex-col items-center justify-center gap-4 overflow-y-auto p-8 text-center'>
+			<div className='flex size-12 items-center justify-center rounded-full bg-muted'>
+				<NetworkIcon
+					aria-hidden='true'
+					className='size-6 text-muted-foreground'
+				/>
+			</div>
+			<div className='flex max-w-md flex-col gap-1.5'>
+				<h2 className='font-medium text-sm'>
+					{t(
+						'workbench:architecture-diagram.undrawn.title',
+						'No architecture diagram yet',
+					)}
+				</h2>
+				<p className='text-muted-foreground text-sm'>
+					{t(
+						'workbench:architecture-diagram.undrawn.body',
+						'An agent reads the codebase and draws it. The diagram is stored at {{path}} and travels with your commits.',
+						{ path: ARCHITECTURE_FILE_RELATIVE_PATH },
+					)}
+				</p>
+			</div>
+			{onDraw ? (
+				<Button onClick={onDraw} size='sm' type='button'>
+					{t(
+						'workbench:architecture-diagram.undrawn.draw',
+						'Draw it with an agent',
+					)}
+				</Button>
+			) : null}
+		</div>
 	);
 }
 
@@ -270,13 +282,9 @@ function DiagramToolbar({
 				</span>
 				{capturedAt ? (
 					<span className='truncate text-muted-foreground text-xs'>
-						{t(
-							'workbench:architecture-diagram.captured-at',
-							'scanned {{when}}',
-							{
-								when: formatRelativeTimestamp(capturedAt),
-							},
-						)}
+						{t('workbench:architecture-diagram.captured-at', 'drawn {{when}}', {
+							when: formatRelativeTimestamp(capturedAt),
+						})}
 					</span>
 				) : null}
 			</div>

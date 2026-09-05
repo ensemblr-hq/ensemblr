@@ -1,6 +1,7 @@
 import { useSetAtom } from 'jotai';
 import { type ComponentType, useCallback, useRef } from 'react';
 import { useWorkspaceMenuCommands } from '@/renderer/components/workbench-shell/workspace-menu-commands';
+import { useDrawArchitectureDiagram } from '@/renderer/hooks/workbench-shell/architecture-diagram/use-draw-architecture-diagram';
 import { useAgentActionRunner } from '@/renderer/hooks/workbench-shell/review-actions/use-agent-action-runner';
 import { useChatPromptHandoff } from '@/renderer/hooks/workbench-shell/review-actions/use-chat-prompt-handoff';
 import { useDockController } from '@/renderer/hooks/workbench-shell/use-dock-controller';
@@ -193,6 +194,10 @@ export function WorkspaceWorkbenchContent({
 		selectChat: onSessionTabChange,
 		sessionTabs: sessionNavigation.sessionTabs,
 	});
+	const drawArchitectureDiagram = useDrawArchitectureDiagram({
+		openSessionTab: sessionNavigation.openSessionTab,
+		selectChat: onSessionTabChange,
+	});
 	const handOffToChat = useChatPromptHandoff({
 		activeSession: sessionNavigation.effectiveActiveSession,
 		selectChat: onSessionTabChange,
@@ -205,6 +210,7 @@ export function WorkspaceWorkbenchContent({
 		closedSessions: sessionNavigation.closedSessions,
 		composer,
 		onDirectoryReveal: revealDiagramDirectory,
+		onDrawArchitectureDiagram: drawArchitectureDiagram,
 		onFilePreviewOpen: openFilePreviewAndReveal,
 		onLaunchHarness: sessionNavigation.openTerminalTab,
 		onOpenArchitectureDiagram: sessionNavigation.openArchitectureDiagramTab,

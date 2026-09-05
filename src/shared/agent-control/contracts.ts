@@ -9,6 +9,7 @@
  * defines the bare op identifiers and their argument/result shapes.
  */
 import type { AgentProviderId } from '../agent-provider.ts';
+import { ARCHITECTURE_DIAGRAM_LIMITS } from '../architecture-diagram/schema.ts';
 import type { ReviewCommentWire } from '../ipc/contracts/review-comments.ts';
 import type {
 	WorkspaceGitChangeSummaryWire,
@@ -326,44 +327,36 @@ export interface SetSummaryTruncation {
 }
 
 /**
- * Upper bound on an architecture-diagram submission. The document is a whole
- * layout rather than a message, so the ceiling is generous — but it is a
- * ceiling, because an agent that pastes a repository's every file into one
- * would produce a diagram nobody can read and a payload that crowds its own
- * context.
+ * Upper bound on an architecture-diagram submission, re-exported from the IR
+ * schema that also enforces it.
+ *
+ * One number rather than two: the op refuses an oversized submission so the
+ * agent is told which bound it crossed, and the schema refuses an oversized
+ * *document* so a hand-edited or cloned `.ensemblr/architecture.json` cannot
+ * reach the compiler by a path the op never sees.
  */
-export const ARCHITECTURE_DIAGRAM_LIMITS = {
-	maxBoundaries: 24,
-	maxComponents: 64,
-	maxConnections: 160,
-} as const;
+export { ARCHITECTURE_DIAGRAM_LIMITS };
 
 /**
  * Result of `getArchitectureDiagram`.
  *
- * `diagram` is never null: a workspace whose diagram has never been built gets
- * one scanned on the spot, because "there is no diagram" is a state the caller
- * would have to invent a recovery for, and the recovery is the same scan the
- * app runs anyway.
+ * `diagram` is null for a workspace nobody has drawn yet, which is an ordinary
+ * answer rather than a failure: nothing derives a diagram, so the recovery is
+ * for the caller to author one and submit it.
  */
 export interface GetArchitectureDiagramResult {
 	componentCount: number;
 	connectionCount: number;
-	/** The full architecture IR, ready to edit and submit back. */
+	/** The full architecture IR, ready to edit and submit back, or null. */
 	diagram: unknown;
 	message: string;
-	/** `scan` for the deterministic seed, `agent` once one has been refined. */
-	source: ArchitectureDiagramSource;
 }
-
-/** Where the diagram a read returned came from. */
-export type ArchitectureDiagramSource = 'agent' | 'scan';
 
 /**
  * Args for `updateArchitectureDiagram`: replace the workspace's stored diagram
- * with a refined one. The whole document is submitted rather than a patch,
- * because a partial edit against a document the next scan may have already
- * replaced is a merge nobody can adjudicate.
+ * with a new one. The whole document is submitted rather than a patch, because
+ * a partial edit against a document another agent may have already replaced is
+ * a merge nobody can adjudicate.
  */
 export interface UpdateArchitectureDiagramArgs {
 	/**
@@ -386,9 +379,9 @@ export interface UpdateArchitectureDiagramResult {
  * onto a failure code. Four rather than one because the recoveries have nothing
  * in common: `invalid` is the caller's own document and is fixed by resubmitting
  * a corrected one, `unreadable` is a tracked file only the user can repair,
- * `store-failed` is a write that did not land, and `unavailable` is a diagram
- * that could not be produced at all. Collapsing them is what sends an agent to
- * rewrite a document that was already valid.
+ * `store-failed` is a write that did not land, and `unavailable` is a read that
+ * could not run at all. Collapsing them is what sends an agent to rewrite a
+ * document that was already valid.
  */
 export type ArchitectureFailureReason =
 	| 'invalid'
@@ -870,6 +863,17 @@ export interface SessionBriefNaming {
 		 * The agent is asked to improve it rather than to supply a first name.
 		 */
 		provisional: boolean;
+	};
+	/**
+	 * Whether the workspace's stored architecture diagram has fallen behind the
+	 * code it draws. Absent from a workspace nobody has drawn: there is nothing
+	 * to keep current there, and the drawing is the user's to ask for.
+	 */
+	diagram: {
+		/** Labels of the diagram's components the change set landed in. */
+		components: readonly string[];
+		/** A component's `sources` cover a file changed since the diagram was drawn. */
+		stale: boolean;
 	};
 	/** Turns have landed since the recorded summary was written. */
 	summaryStale: boolean;

@@ -699,13 +699,14 @@ export interface SessionNamingPort {
  * {@link ARCHITECTURE_DIAGRAM_LIMITS}, fits a read to
  * {@link MAX_AGENT_PAYLOAD_CHARS} and says what it cut, and answers with one
  * `reason` word rather than throwing across the boundary. Control adds no
- * capability of its own — the scan, the storage, and the gates are the
- * architecture service's, and this only reaches them.
+ * capability of its own — the storage and the gates are the architecture
+ * service's, and this only reaches them.
  */
 export interface ArchitecturePort {
 	/**
-	 * Reads the workspace's diagram, scanning one when nothing is stored yet, so
-	 * a caller never has to decide what "no diagram" means.
+	 * Reads the workspace's stored diagram, answering with a null document for a
+	 * workspace nobody has drawn. Nothing derives one, so that absence is an
+	 * ordinary result rather than a failure.
 	 */
 	readDiagram: (input: {
 		origin: AgentControlOrigin;

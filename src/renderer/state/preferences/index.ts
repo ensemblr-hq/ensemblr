@@ -13,6 +13,7 @@ export {
 	accessibleColorsAtom,
 	alwaysShowContextUsageAtom,
 	appSettingsAtom,
+	architectureDiagramAtom,
 	archiveOnMergeAtom,
 	autoConvertLongTextAtom,
 	automaticUpdatesAtom,

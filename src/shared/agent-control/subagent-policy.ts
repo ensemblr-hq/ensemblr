@@ -257,6 +257,18 @@ export function retiredControlOpDenial(op: AgentControlOp): string | null {
 }
 
 /**
+ * The two ops the architecture diagram feature owns, withheld from every caller
+ * while the feature is off. This axis is a feature switch rather than a role
+ * boundary, so it cuts across all the others: with the diagram off the ops are
+ * absent from every list, the playbooks stop describing them, and the app ships
+ * no skill for them.
+ */
+export const ARCHITECTURE_DIAGRAM_OPS: readonly AgentControlOp[] = [
+	'getArchitectureDiagram',
+	'updateArchitectureDiagram',
+];
+
+/**
  * Ops only the Concierge holds, withheld from every workspace agent because
  * each addresses the app above the workspace: navigating to another workspace,
  * cutting a new one, listing the projects any of them could be cut from, and
@@ -315,20 +327,26 @@ const NATIVE_DELEGATION_WITHHELD_OPS: ReadonlySet<AgentControlOp> = new Set([
  * The Concierge answers on its own rather than through those axes, because it is
  * not on the lineage one at all: it is neither a root that delegates nor a child
  * that was delegated to, so folding it in would mean answering "is it a
- * sub-agent?" about something that can never be one.
- * @param audience - Whether the caller has a chat tab, its lineage role, and its delegation mechanism.
+ * sub-agent?" about something that can never be one — but the feature axis still
+ * applies to it, because a Concierge with the diagram switched on would otherwise
+ * be handed ops the rest of the app does not serve.
+ * @param audience - Whether the caller has a chat tab, its lineage role, its delegation mechanism, and which optional features are on.
  * @returns The ops to withhold from that caller's tool list.
  */
 export function withheldControlOps(
 	audience: ControlAudience,
 ): ReadonlySet<AgentControlOp> {
+	const featureWithheld = audience.architectureDiagram
+		? []
+		: ARCHITECTURE_DIAGRAM_OPS;
 	if (audience.role === 'concierge') {
-		return CONCIERGE_WITHHELD_OPS;
+		return new Set([...CONCIERGE_WITHHELD_OPS, ...featureWithheld]);
 	}
 	const delegatesNatively =
 		audience.role === 'orchestrator' && audience.delegation === 'native';
 	return new Set([
 		...CONCIERGE_ONLY_OPS,
+		...featureWithheld,
 		...(audience.hasChatTab ? [] : CHAT_TAB_ONLY_OPS),
 		...(audience.role === 'subagent' ? SUBAGENT_WITHHELD_OPS : []),
 		...(delegatesNatively ? NATIVE_DELEGATION_WITHHELD_OPS : []),

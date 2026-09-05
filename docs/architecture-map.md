@@ -38,7 +38,7 @@ each exposing its public surface through `index.ts`.
 | Provider catalogue | `agent-providers/` | Model catalogue, executable overrides, readiness probes across runtimes |
 | Harness detection | `agents/` | Which spawnable harnesses are installed on PATH, and their trusted launch commands |
 | Agent → app control | `agent-control/` | Loopback control server, MCP endpoint, ports/adapters, guardrails, origin registry |
-| Shipped Agent Skill | `agent-skills/` | Where the bundled `ensemblr` skill lives on disk, addressed as a Pi skill directory and as a Claude plugin root |
+| Shipped Agent Skills | `agent-skills/` | Where the bundled skills live on disk, each addressed as a Pi skill directory and as a Claude plugin root. Two roots ship: `resources/agent-skills/` always, and `resources/agent-skills-architecture/` only while the Experimental architecture-diagram switch is on |
 | Plan mode | `plan-mode/` | Per-session plan registry, plan-file writing, plan submission — the enforcement classifiers live in `src/shared/plan-mode/` |
 | App lifecycle | `app/` | `BrowserWindow` creation, window state, and the quit guard + coordinator that confirm a quit while agents are still running |
 | Chat tabs | `chat-tabs/` | Tab service, preview slot, terminal-session persistence |

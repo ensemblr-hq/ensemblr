@@ -279,6 +279,7 @@ const config: ForgeConfig = {
 		extraResource: [
 			'resources/pi-extensions',
 			'resources/agent-skills',
+			'resources/agent-skills-architecture',
 			LINUX_ICONS_DIR,
 		],
 		// Packager resolves the platform extension (`icon.icns` on macOS).

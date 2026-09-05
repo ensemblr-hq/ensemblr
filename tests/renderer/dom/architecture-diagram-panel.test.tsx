@@ -1,10 +1,10 @@
 // @vitest-environment happy-dom
 
-import { act, fireEvent, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { ArchitectureDiagramPanel } from '@/renderer/components/workbench-shell/conversation-panel/architecture-diagram';
+import { ArchitectureDiagramPanel } from '@/renderer/components/workbench-shell/conversation-panel/architecture-diagram/architecture-diagram-panel';
 import { FilePreviewOpenerProvider } from '@/renderer/components/workbench-shell/conversation-panel/file-preview-context';
 import type { ArchitectureIR } from '@/shared/architecture-diagram';
 import type { ArchitectureDiagramWire } from '@/shared/ipc/contracts/architecture';
@@ -47,23 +47,20 @@ const snapshot = (
 	patch: Partial<ArchitectureDiagramWire> = {},
 ): ArchitectureDiagramWire => ({
 	generatedAt: new Date(Date.now() - 60_000).toISOString(),
-	graphFingerprint: 'abc',
 	ir: ir(),
 	relativePath: '.ensemblr/architecture.json',
-	source: 'scan',
 	...patch,
 });
 
 const revealDirectory = vi.fn();
 
 const installBridge = (result: unknown) => {
-	const scanArchitectureSnapshot = vi.fn(async () => result);
+	const getArchitectureSnapshot = vi.fn(async () => result);
 	installEnsemblrApi({
-		getArchitectureSnapshot: vi.fn(async () => result),
+		getArchitectureSnapshot,
 		onArchitectureSnapshotChanged: vi.fn(() => () => undefined),
-		scanArchitectureSnapshot,
 	});
-	return { scanArchitectureSnapshot };
+	return { getArchitectureSnapshot };
 };
 
 afterEach(() => {
@@ -153,14 +150,10 @@ describe('ArchitectureDiagramPanel', () => {
 		expect(outline?.getAttribute('d')).toMatch(/^M .* Z$/);
 	});
 
-	// A workspace created before the seed scan moved onto the creation path
-	// arrives here with nothing stored. There is no button to offer — the scan is
-	// not a thing the user runs — so the panel asks for the seed itself.
-	it('seeds a workspace that arrives with no diagram', async () => {
-		const { scanArchitectureSnapshot } = installBridge({
-			current: null,
-			previous: null,
-		});
+	// Nothing derives a diagram, so an undrawn workspace is a durable state
+	// rather than a wait. The pane says who has to act instead of spinning.
+	it('shows the undrawn empty state when there is no diagram', async () => {
+		installBridge({ current: null, previous: null });
 		renderWithProviders(
 			<ArchitectureDiagramPanel
 				onDirectoryReveal={revealDirectory}
@@ -168,15 +161,50 @@ describe('ArchitectureDiagramPanel', () => {
 			/>,
 		);
 
-		await waitFor(() => {
-			expect(scanArchitectureSnapshot).toHaveBeenCalledWith({
-				workspaceId: 'ws-1',
-			});
-		});
+		await screen.findByText('No architecture diagram yet');
+		expect(
+			screen.getByText(/An agent reads the codebase and draws it/),
+		).toBeInTheDocument();
 	});
 
-	it('attempts the seed once, so a repository with no modules cannot loop', async () => {
-		const { scanArchitectureSnapshot } = installBridge({
+	// One click hands the work over: the pane opens a fresh chat and sends the
+	// prompt itself rather than making the user copy one.
+	it('hands the work to an agent from its own button', async () => {
+		installBridge({ current: null, previous: null });
+		const onDraw = vi.fn();
+		renderWithProviders(
+			<ArchitectureDiagramPanel
+				onDirectoryReveal={revealDirectory}
+				onDraw={onDraw}
+				workspaceId='ws-1'
+			/>,
+		);
+
+		fireEvent.click(
+			await screen.findByRole('button', { name: 'Draw it with an agent' }),
+		);
+		expect(onDraw).toHaveBeenCalledOnce();
+	});
+
+	// The pane is rendered without the handler in a few harnesses; a button that
+	// did nothing on click would be worse than none.
+	it('omits the button when no handler is wired', async () => {
+		installBridge({ current: null, previous: null });
+		renderWithProviders(
+			<ArchitectureDiagramPanel
+				onDirectoryReveal={revealDirectory}
+				workspaceId='ws-1'
+			/>,
+		);
+
+		await screen.findByText('No architecture diagram yet');
+		expect(
+			screen.queryByRole('button', { name: 'Draw it with an agent' }),
+		).not.toBeInTheDocument();
+	});
+
+	it('never asks main to read twice for one undrawn workspace', async () => {
+		const { getArchitectureSnapshot } = installBridge({
 			current: null,
 			previous: null,
 		});
@@ -187,11 +215,9 @@ describe('ArchitectureDiagramPanel', () => {
 			/>,
 		);
 
-		await waitFor(() => {
-			expect(scanArchitectureSnapshot).toHaveBeenCalledTimes(1);
-		});
-		// A slow retry loop is still a retry loop: advance far past anything a
-		// re-render or a refetch interval could schedule.
+		await screen.findByText('No architecture diagram yet');
+		// A pane that answered "there is none" by asking again would be a retry
+		// loop; advance far past anything a re-render could schedule.
 		vi.useFakeTimers();
 		try {
 			await act(async () => {
@@ -200,11 +226,11 @@ describe('ArchitectureDiagramPanel', () => {
 		} finally {
 			vi.useRealTimers();
 		}
-		expect(scanArchitectureSnapshot).toHaveBeenCalledTimes(1);
+		expect(getArchitectureSnapshot).toHaveBeenCalledTimes(1);
 	});
 
-	it('does not scan when the read already failed', async () => {
-		const { scanArchitectureSnapshot } = installBridge({
+	it('reports a failed read rather than the empty state', async () => {
+		installBridge({
 			current: null,
 			error: { code: 'workspace-missing', message: 'gone' },
 			previous: null,
@@ -219,14 +245,15 @@ describe('ArchitectureDiagramPanel', () => {
 		// `workspace-missing` is one of the codes `failure-text` authors, so the
 		// panel shows the translated headline rather than main's own message.
 		await screen.findByText('That workspace no longer exists.');
-		expect(scanArchitectureSnapshot).not.toHaveBeenCalled();
+		expect(
+			screen.queryByText('No architecture diagram yet'),
+		).not.toBeInTheDocument();
 	});
 
 	// A stored document this build cannot parse is somebody's work, so the panel
-	// says so and stops. Scanning a replacement over it is what used to make a
-	// refinement disappear without a word.
-	it('reports an unreadable stored diagram instead of scanning over it', async () => {
-		const { scanArchitectureSnapshot } = installBridge({
+	// says so and stops rather than inviting a replacement over the top of it.
+	it('reports an unreadable stored diagram', async () => {
+		installBridge({
 			current: null,
 			error: {
 				code: 'diagram-unreadable',
@@ -242,9 +269,11 @@ describe('ArchitectureDiagramPanel', () => {
 		);
 
 		await screen.findByText(
-			'The stored architecture diagram cannot be read. Repair or delete the file, and a new one will be drawn.',
+			'The stored architecture diagram cannot be read. Repair or delete the file, then ask an agent to draw a new one.',
 		);
-		expect(scanArchitectureSnapshot).not.toHaveBeenCalled();
+		expect(
+			screen.queryByText('No architecture diagram yet'),
+		).not.toBeInTheDocument();
 	});
 
 	// A node stands for a directory, and the file preview answers "is a directory
@@ -372,9 +401,8 @@ describe('ArchitectureDiagramPanel', () => {
 		).not.toBeInTheDocument();
 	});
 
-	// The scan is not a thing the user runs: the seed happens once at creation
-	// and everything after it is an agent's refinement, so a control that re-ran
-	// the scanner would overwrite that work on a click.
+	// There is no scanner to re-run, and a control that regenerated the document
+	// would overwrite an agent's work on a click.
 	it('offers no rescan control', async () => {
 		installBridge({ current: snapshot(), previous: null });
 		renderWithProviders(

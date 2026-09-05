@@ -102,8 +102,13 @@ const conciergeSettingsSchema = z.object({
 	autoClearAtPercent: z.number().min(0).max(1).catch(0.8),
 });
 
+// `architectureDiagram` gates a whole feature rather than tuning one: off, the
+// diagram pane, its two control ops, the `architecture-diagram` skill, and every
+// mention of it in an agent playbook are absent rather than disabled, so nothing
+// advertises a surface the app will not serve.
 /** Experimental user defaults that can feed repository behavior. */
 const experimentalSettingsSchema = z.object({
+	architectureDiagram: z.boolean().catch(false),
 	autoRunAfterSetup: z.boolean().catch(false),
 	developerMode: z.boolean().catch(false),
 });

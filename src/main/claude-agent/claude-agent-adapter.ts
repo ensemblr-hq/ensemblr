@@ -88,12 +88,13 @@ export interface CreateClaudeAgentAdapterOptions {
 	/** Called when Claude submits a plan through its native `ExitPlanMode` tool. */
 	onPlanSubmitted?: (event: ClaudePlanSubmittedEvent) => void;
 	/**
-	 * Root of the local plugin carrying Ensemblr's shipped Agent Skill, loaded
-	 * per session so the skill never has to be installed into the user's
-	 * `~/.claude` or repository. Null when the bundle is missing, which drops the
-	 * option and leaves the session otherwise unchanged.
+	 * Roots of the local plugins carrying Ensemblr's shipped Agent Skills, loaded
+	 * per session so a skill never has to be installed into the user's
+	 * `~/.claude` or repository. Read per session rather than captured, because
+	 * one of the roots follows a setting the user can flip while the app runs;
+	 * an empty list drops the option and leaves the session otherwise unchanged.
 	 */
-	pluginDirectory?: string | null;
+	readPluginDirectories?: () => readonly string[];
 	/** Injection seam for tests; defaults to the SDK's own `query`. */
 	queryFn?: typeof query;
 	/**
@@ -135,7 +136,7 @@ export function createClaudeAgentAdapter(
 	const queryFn = options.queryFn ?? query;
 	const onPlanSubmitted = options.onPlanSubmitted;
 	const canUseTool = options.canUseTool;
-	const pluginDirectory = options.pluginDirectory ?? null;
+	const readPluginDirectories = options.readPluginDirectories ?? (() => []);
 	const resolveConciergeHome = options.resolveConciergeHome ?? (() => null);
 
 	const openSessions = new Set<AgentAdapterSession>();
@@ -154,7 +155,7 @@ export function createClaudeAgentAdapter(
 				now,
 				onClosed: (closed) => openSessions.delete(closed),
 				onPlanSubmitted,
-				pluginDirectory,
+				pluginDirectories: readPluginDirectories(),
 				queryFn,
 				turnIdFactory,
 			});
@@ -186,7 +187,7 @@ function createClaudeSession({
 	now,
 	onClosed,
 	onPlanSubmitted,
-	pluginDirectory,
+	pluginDirectories,
 	queryFn,
 	turnIdFactory,
 }: {
@@ -197,7 +198,7 @@ function createClaudeSession({
 	now: () => Date;
 	onClosed: (session: AgentAdapterSession) => void;
 	onPlanSubmitted?: CreateClaudeAgentAdapterOptions['onPlanSubmitted'];
-	pluginDirectory: string | null;
+	pluginDirectories: readonly string[];
 	queryFn: typeof query;
 	turnIdFactory: () => string;
 }): AgentAdapterSession {
@@ -477,7 +478,7 @@ function createClaudeSession({
 				onStderr: (chunk) => {
 					stderr = `${stderr}${chunk}`.slice(-STDERR_RING_BYTES);
 				},
-				pluginDirectory,
+				pluginDirectories,
 			}),
 			prompt: promptQueue.stream,
 		});
@@ -714,14 +715,14 @@ function buildQueryOptions({
 	conciergeHome,
 	input,
 	onStderr,
-	pluginDirectory,
+	pluginDirectories,
 }: {
 	baseEnv: NodeJS.ProcessEnv;
 	canUseTool?: ClaudeCanUseTool;
 	conciergeHome: string | null;
 	input: AgentAdapterCreateSessionInput;
 	onStderr: (chunk: string) => void;
-	pluginDirectory: string | null;
+	pluginDirectories: readonly string[];
 }): Options {
 	const { metadata, request } = input;
 	const mode = request.permissionMode ?? DEFAULT_PERMISSION_MODE;
@@ -773,8 +774,13 @@ function buildQueryOptions({
 		// The SDK's sibling `skills` option is a context *filter*, not a switch:
 		// naming ours there would hide every skill the user already has. Omitting
 		// it leaves the CLI's own defaults in place, which is what we want.
-		...(pluginDirectory
-			? { plugins: [{ path: pluginDirectory, type: 'local' as const }] }
+		...(pluginDirectories.length > 0
+			? {
+					plugins: pluginDirectories.map((pluginRoot) => ({
+						path: pluginRoot,
+						type: 'local' as const,
+					})),
+				}
 			: {}),
 		...resolveSdkSessionIdentity({
 			resumeRuntimeSession: request.resumeRuntimeSession === true,

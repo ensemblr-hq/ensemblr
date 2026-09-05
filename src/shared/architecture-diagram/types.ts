@@ -153,6 +153,13 @@ export interface ArchitectureCard {
 	title: string;
 }
 
+/**
+ * Workspace-relative path the diagram is stored at. Shared because both ends
+ * name it: main reads and writes the file, and the renderer's empty state tells
+ * the user where a drawn diagram will land.
+ */
+export const ARCHITECTURE_FILE_RELATIVE_PATH = '.ensemblr/architecture.json';
+
 /** Schema version every IR this build writes carries. */
 export const ARCHITECTURE_IR_SCHEMA_VERSION = 1;
 

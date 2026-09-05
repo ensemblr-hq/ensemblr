@@ -1,0 +1,6 @@
+{
+	"name": "ensemblr-architecture",
+	"description": "Drawing and maintaining the architecture diagram Ensemblr keeps for a workspace: the IR shape, how to derive it from the codebase, and the two control tools that read and store it.",
+	"version": "0.1.0",
+	"skills": ["./skills/architecture-diagram"]
+}

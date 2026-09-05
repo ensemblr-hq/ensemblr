@@ -43,10 +43,7 @@ export {
 	launchAgentHarnessRequestSchema,
 	resumeAgentHarnessRequestSchema,
 } from './request-schemas/agents.ts';
-export {
-	getArchitectureSnapshotRequestSchema,
-	scanArchitectureSnapshotRequestSchema,
-} from './request-schemas/architecture.ts';
+export { getArchitectureSnapshotRequestSchema } from './request-schemas/architecture.ts';
 export {
 	bindAgentSessionToChatTabRequestSchema,
 	closeChatTabRequestSchema,

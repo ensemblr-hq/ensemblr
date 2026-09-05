@@ -5,9 +5,10 @@
  * `review-ports.ts` are: this is not thin delegation. A stored diagram has no
  * natural ceiling — the file is hand-editable and tracked — so a read fits the
  * document to the agent payload budget by shedding detail in a fixed order and
- * saying what it shed, and a write validates the submission, refuses one past
- * {@link ARCHITECTURE_DIAGRAM_LIMITS}, and reports a write that did not land
- * without repeating the host path the error text carries.
+ * saying what it shed, and a write validates the submission and reports a write
+ * that did not land without repeating the host path the error text carries. The
+ * size caps live in the IR schema rather than here, so the tracked file and this
+ * op refuse the same document.
  *
  * Nothing here throws. Every failure comes back as one `reason` word the
  * dispatcher maps onto a failure code, so a full disk and a malformed document
@@ -19,17 +20,17 @@ import type {
 	ReadArchitectureDiagramOutcome,
 	UpdateArchitectureDiagramOutcome,
 } from '../../shared/agent-control.ts';
-import {
-	ARCHITECTURE_DIAGRAM_LIMITS,
-	MAX_AGENT_PAYLOAD_CHARS,
-} from '../../shared/agent-control.ts';
+import { MAX_AGENT_PAYLOAD_CHARS } from '../../shared/agent-control.ts';
 import type { ArchitectureIR } from '../../shared/architecture-diagram.ts';
 import { parseArchitectureIrResult } from '../../shared/architecture-diagram.ts';
 import type {
 	ArchitectureFileContents,
 	ArchitectureService,
 } from '../architecture/index.ts';
-import { ARCHITECTURE_FILE_RELATIVE_PATH } from '../architecture/index.ts';
+import {
+	ARCHITECTURE_FILE_RELATIVE_PATH,
+	ArchitectureServiceError,
+} from '../architecture/index.ts';
 import { fitRows } from './payload-fit.ts';
 import type { ArchitecturePort } from './ports.ts';
 
@@ -236,15 +237,13 @@ function fitDiagramToBudget(ir: ArchitectureIR): ShedResult {
 }
 
 /**
- * Describes where a diagram came from, which is what tells an agent whether it is
- * looking at the scanner's seed or at somebody's refinement.
- * @param snapshot - The stored document and its provenance.
+ * Opens a read by naming the file the document came from, so an agent edits
+ * that document rather than composing a replacement for it.
+ * @param snapshot - The stored document.
  * @returns The sentence the read opens with.
  */
 function provenanceMessage(snapshot: ArchitectureFileContents): string {
-	return snapshot.source === 'agent'
-		? `Read from ${snapshot.relativePath}, refined by an agent. Edit it rather than replacing it wholesale.`
-		: `Read from ${snapshot.relativePath} — the scanner’s own seed, correct but named after directories rather than concerns. Rename the boundaries, drop the noise, and submit it back.`;
+	return `Read from ${snapshot.relativePath}. Edit it rather than replacing it wholesale.`;
 }
 
 /**
@@ -296,11 +295,6 @@ function storeFailureMessage(error: unknown): string {
 	return `${ARCHITECTURE_FILE_RELATIVE_PATH} could not be written${cause}. The document you submitted was valid and nothing is wrong with it — the workspace directory would not take the write, which resubmitting cannot change. Say so in your reply rather than trying again.`;
 }
 
-const UNREADABLE_RACE_MESSAGE = `${ARCHITECTURE_FILE_RELATIVE_PATH} cannot be parsed, so no diagram was scanned over it. That file is tracked and it is somebody’s work — the user repairs or deletes it, and nothing you pass here will.`;
-
-const NOTHING_TO_SCAN_MESSAGE =
-	'This workspace has no architecture diagram and one could not be scanned. Nothing you pass will change that; report it rather than retrying.';
-
 /**
  * Names a read that could not run at all — a workspace the database no longer
  * knows, or a directory that would not open. Reported without the error text for
@@ -315,25 +309,44 @@ function readFailureMessage(error: unknown): string {
 }
 
 /**
- * Seeds a workspace that has no diagram yet, which is what keeps "there is none"
- * off this surface entirely.
- * @param architectureService - The service that owns the scan.
- * @param workspaceId - Workspace to seed.
- * @returns The scanned document, or a refusal naming why none could be produced.
+ * The refusal both ops answer with over a stored document this build cannot
+ * parse. The file is tracked, so the recovery belongs to the user — repairing
+ * the hand edit or resolving the merge conflict — and is never an overwrite
+ * from here.
+ * @param message - What the service said stopped it reading the file.
+ * @returns The refusal.
  */
-async function seedDiagram(
-	architectureService: ArchitectureService,
-	workspaceId: string,
-): Promise<ArchitectureFileContents | ArchitectureFailure> {
-	const outcome = await architectureService.scanIfMissing({ workspaceId });
-	if (outcome.rebuilt) {
-		return outcome.diagram;
-	}
-	if (outcome.reason === 'diagram-unreadable') {
-		return refuse('unreadable', UNREADABLE_RACE_MESSAGE);
-	}
-	return refuse('unavailable', NOTHING_TO_SCAN_MESSAGE);
+function refuseUnreadable(message: string): ArchitectureFailure {
+	return refuse(
+		'unreadable',
+		`${message} Repair or delete that file — it is tracked, so nothing here will overwrite it for you.`,
+	);
 }
+
+/**
+ * Maps a throw out of {@link ArchitectureService.storeRefinedIr} onto the
+ * refusal that names its actual cause.
+ *
+ * Only a genuine filesystem rejection is `store-failed`, because that refusal
+ * tells the agent its document was fine and retrying cannot help. The service
+ * also refuses to *start* the write over a stored document it cannot parse or a
+ * workspace that has gone — told "the directory would not take the write" an
+ * agent reports a full disk to the user and never mentions the conflict marker
+ * that is actually sitting in their working tree.
+ * @param error - Whatever the store threw.
+ * @returns The refusal the agent reads.
+ */
+function refuseFailedStore(error: unknown): ArchitectureFailure {
+	if (!(error instanceof ArchitectureServiceError)) {
+		return refuse('store-failed', storeFailureMessage(error));
+	}
+	return error.code === 'diagram-unreadable'
+		? refuseUnreadable(error.message)
+		: refuse('unavailable', readFailureMessage(error));
+}
+
+/** What a read answers for a workspace no agent has drawn yet. */
+const NO_DIAGRAM_MESSAGE = `This workspace has no architecture diagram: ${ARCHITECTURE_FILE_RELATIVE_PATH} does not exist. Nothing derives one, so there is nothing to fetch and nothing to retry — read the codebase, author a diagram, and submit it with the update op.`;
 
 /**
  * Builds the architecture port: fit a stored diagram to what an agent can read,
@@ -360,22 +373,23 @@ export function makeArchitecturePort(
 			if ('ok' in read) {
 				return read;
 			}
-			// A stored document this build cannot parse is never scanned over: the
-			// file is tracked, so replacing it would delete a refinement out of the
-			// user's working tree without either of you noticing.
+			// A stored document this build cannot parse is never written over: the
+			// file is tracked, so replacing it would delete work out of the user's
+			// working tree without either of you noticing.
 			if (read.error) {
-				return refuse(
-					'unreadable',
-					`${read.error.message} Repair or delete that file — it is tracked, so nothing here will overwrite it for you.`,
-				);
+				return refuseUnreadable(read.error.message);
 			}
-			const snapshot =
-				read.current ??
-				(await seedDiagram(architectureService, origin.workspaceId).catch(
-					(error: unknown) => refuse('unavailable', readFailureMessage(error)),
-				));
-			if ('ok' in snapshot) {
-				return snapshot;
+			const snapshot = read.current;
+			if (!snapshot) {
+				return {
+					ok: true,
+					result: {
+						componentCount: 0,
+						connectionCount: 0,
+						diagram: null,
+						message: NO_DIAGRAM_MESSAGE,
+					},
+				};
 			}
 			const fitted = fitDiagramToBudget(snapshot.ir);
 			return {
@@ -385,7 +399,6 @@ export function makeArchitecturePort(
 					connectionCount: fitted.ir.connections?.length ?? 0,
 					diagram: fitted.ir,
 					message: `${provenanceMessage(snapshot)}${fitted.note}`,
-					source: snapshot.source,
 				},
 			};
 		},
@@ -400,27 +413,19 @@ export function makeArchitecturePort(
 					`That document is not a valid architecture diagram. ${parsed.problems.join('; ')}. Fix those fields and resubmit the whole document.`,
 				);
 			}
+			// The size caps are the schema's, not this port's: `.ensemblr/architecture.json`
+			// is tracked, so a document also reaches the compiler straight off disk,
+			// and a bound only this op enforced would be one the file path skips.
 			const ir = parsed.ir;
 			const componentCount = ir.components.length;
 			const connectionCount = ir.connections?.length ?? 0;
-			const boundaryCount = ir.boundaries?.length ?? 0;
-			if (
-				componentCount > ARCHITECTURE_DIAGRAM_LIMITS.maxComponents ||
-				connectionCount > ARCHITECTURE_DIAGRAM_LIMITS.maxConnections ||
-				boundaryCount > ARCHITECTURE_DIAGRAM_LIMITS.maxBoundaries
-			) {
-				return refuse(
-					'invalid',
-					`That diagram is too large to read: at most ${ARCHITECTURE_DIAGRAM_LIMITS.maxComponents} components, ${ARCHITECTURE_DIAGRAM_LIMITS.maxConnections} connections, and ${ARCHITECTURE_DIAGRAM_LIMITS.maxBoundaries} boundaries. Group the detail into fewer nodes rather than drawing every folder.`,
-				);
-			}
 			try {
 				await architectureService.storeRefinedIr({
 					ir,
 					workspaceId: origin.workspaceId,
 				});
 			} catch (error) {
-				return refuse('store-failed', storeFailureMessage(error));
+				return refuseFailedStore(error);
 			}
 			deps.broadcastArchitectureChanged({ workspaceId: origin.workspaceId });
 			return {
@@ -428,7 +433,7 @@ export function makeArchitecturePort(
 				result: {
 					componentCount,
 					connectionCount,
-					message: `Stored in ${ARCHITECTURE_FILE_RELATIVE_PATH} — a tracked file, so it is part of your diff. It is the diagram from now on: nothing re-scans over it, so the next refinement starts from what you just wrote.`,
+					message: `Stored in ${ARCHITECTURE_FILE_RELATIVE_PATH} — a tracked file, so it is part of your diff. It is the diagram from now on: nothing in the app regenerates it, so the next pass starts from what you just wrote.`,
 				},
 			};
 		},

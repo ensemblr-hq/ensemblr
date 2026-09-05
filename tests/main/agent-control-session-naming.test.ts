@@ -26,6 +26,7 @@ const CALLER = 'caller';
 
 const idleBrief = {
 	branch: { current: null, eligible: false },
+	diagram: { components: [], stale: false },
 	summaryStale: false,
 	titleNeeded: false,
 };
@@ -264,6 +265,7 @@ describe('getSessionBrief', () => {
 		const { invoke } = setup({
 			readBrief: vi.fn().mockResolvedValue({
 				branch: { current: 'octocat/bach', eligible: true },
+				diagram: { components: [], stale: false },
 				summaryStale: true,
 				titleNeeded: true,
 			}),
@@ -370,6 +372,7 @@ describe('readTurnPreamble', () => {
 			language: 'el',
 			readBrief: vi.fn().mockResolvedValue({
 				branch: { current: null, eligible: false },
+				diagram: { components: [], stale: false },
 				summaryStale: true,
 				titleNeeded: false,
 			}),
@@ -464,6 +467,7 @@ describe('readTurnPreamble', () => {
 			planSubmitted: true,
 			readBrief: vi.fn().mockResolvedValue({
 				branch: { current: null, eligible: false },
+				diagram: { components: [], stale: false },
 				summaryStale: true,
 				titleNeeded: false,
 			}),
@@ -506,6 +510,7 @@ describe('readTurnPreamble', () => {
 			planSubmitted: true,
 			readBrief: vi.fn().mockResolvedValue({
 				branch: { current: null, eligible: false },
+				diagram: { components: [], stale: false },
 				summaryStale: true,
 				titleNeeded: false,
 			}),
@@ -564,6 +569,7 @@ describe('readTurnPreamble', () => {
 			planMode: true,
 			readBrief: vi.fn().mockResolvedValue({
 				branch: { current: 'octocat/bach', eligible: true },
+				diagram: { components: [], stale: false },
 				summaryStale: true,
 				titleNeeded: true,
 			}),
@@ -582,6 +588,7 @@ describe('readTurnPreamble', () => {
 		const { service } = setup({
 			readBrief: vi.fn().mockResolvedValue({
 				branch: { current: 'octocat/bach', eligible: true },
+				diagram: { components: [], stale: false },
 				summaryStale: true,
 				titleNeeded: true,
 			}),

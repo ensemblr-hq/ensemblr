@@ -76,6 +76,10 @@
 		}
 	},
 	"architecture-diagram": {
+		"chat-failed": {
+			"description": "Try the \"Draw it with an agent\" action again from the diagram tab.",
+			"title": "Could not open a new chat."
+		},
 		"open-failed": {
 			"description": "The tab could not be opened. Try again.",
 			"title": "Could not open the architecture diagram"
@@ -206,7 +210,7 @@
 		"destination-path-relative": "The destination path must be absolute.",
 		"destination-required": "No destination was provided and the managed root has none to fall back on.",
 		"detached-head": "This workspace is not on a branch, so GitHub has nothing to match it against. Check out a branch, then retry.",
-		"diagram-unreadable": "The stored architecture diagram cannot be read. Repair or delete the file, and a new one will be drawn.",
+		"diagram-unreadable": "The stored architecture diagram cannot be read. Repair or delete the file, then ask an agent to draw a new one.",
 		"dictation-disabled": "Dictation is turned off in Settings.",
 		"dictation-empty-transcript": "No speech was detected in the recording.",
 		"dictation-invalid-endpoint": "The transcription endpoint must be a full http:// or https:// address.",
@@ -330,7 +334,6 @@
 		"root-stat-failed": "The root directory could not be inspected.",
 		"root-unavailable": "The managed root is unavailable, so the operation was skipped.",
 		"root-unwritable": "The root directory is not writable.",
-		"scan-failed": "The workspace could not be scanned.",
 		"secret-store-error": "The macOS Keychain is unavailable, so the Linear token could not be read.",
 		"shared-root-content": "The root directory holds files Ensemblr does not manage.",
 		"source-path-missing": "A source path no longer exists, so it was skipped.",

@@ -545,6 +545,10 @@ export default interface Resources {
 			};
 		};
 		'architecture-diagram': {
+			'chat-failed': {
+				description: 'Try the "Draw it with an agent" action again from the diagram tab.';
+				title: 'Could not open a new chat.';
+			};
 			'open-failed': {
 				description: 'The tab could not be opened. Try again.';
 				title: 'Could not open the architecture diagram';
@@ -675,7 +679,7 @@ export default interface Resources {
 			'destination-path-relative': 'The destination path must be absolute.';
 			'destination-required': 'No destination was provided and the managed root has none to fall back on.';
 			'detached-head': 'This workspace is not on a branch, so GitHub has nothing to match it against. Check out a branch, then retry.';
-			'diagram-unreadable': 'The stored architecture diagram cannot be read. Repair or delete the file, and a new one will be drawn.';
+			'diagram-unreadable': 'The stored architecture diagram cannot be read. Repair or delete the file, then ask an agent to draw a new one.';
 			'dictation-disabled': 'Dictation is turned off in Settings.';
 			'dictation-empty-transcript': 'No speech was detected in the recording.';
 			'dictation-invalid-endpoint': 'The transcription endpoint must be a full http:// or https:// address.';
@@ -799,7 +803,6 @@ export default interface Resources {
 			'root-stat-failed': 'The root directory could not be inspected.';
 			'root-unavailable': 'The managed root is unavailable, so the operation was skipped.';
 			'root-unwritable': 'The root directory is not writable.';
-			'scan-failed': 'The workspace could not be scanned.';
 			'secret-store-error': 'The macOS Keychain is unavailable, so the Linear token could not be read.';
 			'shared-root-content': 'The root directory holds files Ensemblr does not manage.';
 			'source-path-missing': 'A source path no longer exists, so it was skipped.';
@@ -1753,6 +1756,10 @@ export default interface Resources {
 			title: 'Environment';
 		};
 		experimental: {
+			'architecture-diagram': {
+				description: 'Show the workspace architecture diagram and let agents read and redraw it. New sessions pick this up; the ones already running keep the surface they started with.';
+				label: 'Architecture diagram';
+			};
 			'auto-run': {
 				description: "Start a repository's run script automatically after setup when no repository-specific setting overrides it.";
 				label: 'Auto-run after setup';
@@ -2448,7 +2455,7 @@ export default interface Resources {
 				hint: 'Drag or press the arrow keys to pan. Pinch, hold Command and scroll, or press plus and minus to zoom. Press 0 to fit the whole diagram. Press N and P to step between modules, Enter to see what one connects to, and Escape to clear that again.';
 				label: 'Architecture diagram of {{title}}';
 			};
-			'captured-at': 'scanned {{when}}';
+			'captured-at': 'drawn {{when}}';
 			'fit-to-view': 'Fit to view';
 			legend: {
 				backend: 'Backend';
@@ -2471,6 +2478,11 @@ export default interface Resources {
 			'reset-view': 'Reset to actual size';
 			'tab-title': 'Architecture';
 			title: 'Architecture';
+			undrawn: {
+				body: 'An agent reads the codebase and draws it. The diagram is stored at {{path}} and travels with your commits.';
+				draw: 'Draw it with an agent';
+				title: 'No architecture diagram yet';
+			};
 			'zoom-in': 'Zoom in';
 			'zoom-out': 'Zoom out';
 		};

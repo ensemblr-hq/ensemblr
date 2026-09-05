@@ -6,7 +6,6 @@
 export const IPC_CHANNELS = {
 	architectureSnapshotChanged: 'ensemblr:architecture-snapshot-changed',
 	getArchitectureSnapshot: 'ensemblr:get-architecture-snapshot',
-	scanArchitectureSnapshot: 'ensemblr:scan-architecture-snapshot',
 	archiveWorkspace: 'ensemblr:archive-workspace',
 	appSettingsChanged: 'ensemblr:app-settings-changed',
 	configChanged: 'ensemblr:config-changed',

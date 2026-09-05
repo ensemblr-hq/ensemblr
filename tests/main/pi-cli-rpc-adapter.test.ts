@@ -298,7 +298,7 @@ test('omits model and thinking flags when the request leaves them blank', async 
 test('prepends caller-supplied base args, such as the control extension', async () => {
 	const recorder = createSpawnRecorder();
 	const adapter = createPiCliRpcAdapter({
-		baseArgs: ['--mode', 'rpc', '-e', '/opt/ensemblr-control.mts'],
+		baseArgs: () => ['--mode', 'rpc', '-e', '/opt/ensemblr-control.mts'],
 		spawn: recorder.spawn,
 	});
 	await adapter.createSession(

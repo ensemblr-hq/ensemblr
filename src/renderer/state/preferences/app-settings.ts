@@ -155,6 +155,16 @@ export const setUpstreamOnPushAtom = settingAtom('git', 'setUpstreamOnPush');
 
 // ─── Experimental ────────────────────────────────────────────────────────────────
 /**
+ * Whether the workspace architecture diagram exists at all: its pane and the
+ * button that opens it, the two agent-control ops, the shipped skill, and every
+ * mention of it in an agent playbook. Off, the feature is absent rather than
+ * disabled, so nothing offers the user or an agent a surface that will refuse.
+ */
+export const architectureDiagramAtom = settingAtom(
+	'experimental',
+	'architectureDiagram',
+);
+/**
  * Whether a repository's run script auto-starts after setup when no repository
  * override exists.
  */

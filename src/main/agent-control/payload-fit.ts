@@ -14,8 +14,8 @@
  *
  * Greedy from the front rather than proportional: every caller hands rows in an
  * order where the head is the half worth keeping — Linear's most recently
- * updated issues first, the scanner's own traversal order for a diagram — so a
- * contiguous head stays coherent in a way an arbitrary subset would not.
+ * updated issues first, a diagram's own component order — so a contiguous head
+ * stays coherent in a way an arbitrary subset would not.
  * @param rows - Rows in the order they should survive.
  * @param budget - Characters the kept rows may occupy in total.
  * @returns The rows that fit, how many were dropped, and the characters spent.

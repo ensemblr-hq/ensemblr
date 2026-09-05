@@ -137,6 +137,10 @@
 		"title": "Environment"
 	},
 	"experimental": {
+		"architecture-diagram": {
+			"description": "Show the workspace architecture diagram and let agents read and redraw it. New sessions pick this up; the ones already running keep the surface they started with.",
+			"label": "Architecture diagram"
+		},
 		"auto-run": {
 			"description": "Start a repository's run script automatically after setup when no repository-specific setting overrides it.",
 			"label": "Auto-run after setup"

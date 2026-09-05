@@ -30,6 +30,16 @@ const document = (patch: Partial<ArchitectureIR> = {}): ArchitectureIR => ({
 	...patch,
 });
 
+// Indexing the compiled arrays yields `T | undefined`, and a `?? 0` fallback
+// turns a layout that produced nothing into assertions that compare zero
+// against zero and pass. Fail on the absence instead.
+const required = <T>(value: T | undefined, what: string): T => {
+	if (value === undefined) {
+		throw new Error(`the layout produced no ${what}`);
+	}
+	return value;
+};
+
 describe('compileArchitectureLayout: boundaries', () => {
 	it('wraps every member inside the frame it draws', () => {
 		const layout = compileArchitectureLayout(
@@ -39,17 +49,12 @@ describe('compileArchitectureLayout: boundaries', () => {
 				],
 			}),
 		);
-		const frame = layout.frames[0];
-		expect(frame).toBeDefined();
+		const frame = required(layout.frames[0], 'boundary frame');
 		for (const node of layout.nodes) {
-			expect(node.x).toBeGreaterThanOrEqual(frame?.x ?? 0);
-			expect(node.y).toBeGreaterThanOrEqual(frame?.y ?? 0);
-			expect(node.x + node.width).toBeLessThanOrEqual(
-				(frame?.x ?? 0) + (frame?.width ?? 0),
-			);
-			expect(node.y + node.height).toBeLessThanOrEqual(
-				(frame?.y ?? 0) + (frame?.height ?? 0),
-			);
+			expect(node.x).toBeGreaterThanOrEqual(frame.x);
+			expect(node.y).toBeGreaterThanOrEqual(frame.y);
+			expect(node.x + node.width).toBeLessThanOrEqual(frame.x + frame.width);
+			expect(node.y + node.height).toBeLessThanOrEqual(frame.y + frame.height);
 		}
 	});
 
@@ -103,16 +108,11 @@ describe('compileArchitectureLayout: connections', () => {
 				],
 			}),
 		);
-		const edge = layout.edges[0];
-		const [alpha, beta] = layout.nodes;
-		expect(edge?.points[0]).toEqual([
-			alpha?.cx,
-			(alpha?.y ?? 0) + (alpha?.height ?? 0),
-		]);
-		expect(edge?.points.at(-1)).toEqual([
-			beta?.cx,
-			(beta?.y ?? 0) + (beta?.height ?? 0),
-		]);
+		const edge = required(layout.edges[0], 'edge');
+		const alpha = required(layout.nodes[0], 'node for alpha');
+		const beta = required(layout.nodes[1], 'node for beta');
+		expect(edge.points[0]).toEqual([alpha.cx, alpha.y + alpha.height]);
+		expect(edge.points.at(-1)).toEqual([beta.cx, beta.y + beta.height]);
 	});
 
 	it('reports a connection naming a component that does not exist', () => {

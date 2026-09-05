@@ -14,10 +14,15 @@ import {
 import { resolveAgentControlWiring } from '../../src/main/agent-runtime/session/agent-control-wiring.ts';
 import { buildClaudeMcpServers } from '../../src/main/claude-agent/claude-mcp-config.ts';
 import {
-	HARNESS_AWARENESS,
-	ORCHESTRATOR_AWARENESS,
-	SUBAGENT_AWARENESS,
+	harnessAwareness,
+	orchestratorAwareness,
+	subagentAwareness,
 } from '../../src/shared/agent-control.ts';
+
+/** Each playbook with the architecture diagram on, as these tests wire it. */
+const HARNESS_AWARENESS = harnessAwareness(true);
+const ORCHESTRATOR_AWARENESS = orchestratorAwareness(true);
+const SUBAGENT_AWARENESS = subagentAwareness(true);
 
 const WORKSPACE = 'ws-1';
 const CWD = '/tmp/ws-1';
@@ -62,6 +67,7 @@ const setup = (
 			isSpawnedSubAgent: (sessionId) => marked.has(sessionId),
 			parentSessionId: input.parentSessionId ?? null,
 			provider: input.provider,
+			readArchitectureDiagramEnabled: () => true,
 			readClaudeSubagentMode: undefined,
 			resolveAgentControlEnv,
 			resolveTurnPreamble: undefined,
@@ -161,6 +167,7 @@ describe('agent-control wiring: the control MCP endpoint', () => {
 			isSpawnedSubAgent: undefined,
 			parentSessionId: null,
 			provider: 'claude',
+			readArchitectureDiagramEnabled: () => true,
 			readClaudeSubagentMode: undefined,
 			resolveAgentControlEnv: undefined,
 			resolveTurnPreamble: undefined,
@@ -204,6 +211,7 @@ describe('agent-control wiring: the per-turn upkeep block', () => {
 					isSpawnedSubAgent: undefined,
 					parentSessionId: null,
 					provider,
+					readArchitectureDiagramEnabled: () => true,
 					readClaudeSubagentMode: undefined,
 					resolveAgentControlEnv,
 					resolveTurnPreamble: async (id) => {

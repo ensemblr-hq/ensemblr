@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+	ARCHITECTURE_DIAGRAM_LIMITS,
 	ARCHITECTURE_LAYOUT_MAX_COLS,
+	ARCHITECTURE_LAYOUT_MAX_ROWS,
 	parseArchitectureIr,
 	parseArchitectureIrResult,
 } from '../../src/shared/architecture-diagram';
-import { ARCHITECTURE_LAYOUT_MAX_ROWS } from '../../src/shared/architecture-diagram/schema.ts';
 
 const minimal = () => ({
 	components: [{ id: 'alpha', label: 'Alpha', type: 'backend' }],
@@ -198,6 +199,75 @@ describe('grid placement bounds', () => {
 			col: ARCHITECTURE_LAYOUT_MAX_COLS - 1,
 			row: ARCHITECTURE_LAYOUT_MAX_ROWS - 1,
 		});
+	});
+});
+
+// The control op enforces the same numbers, but `.ensemblr/architecture.json`
+// is tracked, so a document also reaches the compiler straight off disk. The
+// compiler routes every edge against every box, so an uncapped document is the
+// renderer frozen for minutes rather than a diagram nobody can read.
+describe('document size bounds', () => {
+	const componentsNumbering = (count: number) =>
+		Array.from({ length: count }, (_, index) => ({
+			id: `c${index}`,
+			label: `Node ${index}`,
+			type: 'backend' as const,
+		}));
+
+	it('rejects more components than the compiler can route in a frame', () => {
+		expect(
+			problemsFor({
+				...minimal(),
+				components: componentsNumbering(
+					ARCHITECTURE_DIAGRAM_LIMITS.maxComponents + 1,
+				),
+			}),
+		).toContainEqual(expect.stringContaining('components'));
+	});
+
+	it('rejects more connections than the compiler can route in a frame', () => {
+		expect(
+			problemsFor({
+				...minimal(),
+				components: componentsNumbering(2),
+				connections: Array.from(
+					{ length: ARCHITECTURE_DIAGRAM_LIMITS.maxConnections + 1 },
+					(_, index) => ({ from: 'c0', id: `e${index}`, to: 'c1' }),
+				),
+			}),
+		).toContainEqual(expect.stringContaining('connections'));
+	});
+
+	it('rejects more boundaries than the document may frame', () => {
+		expect(
+			problemsFor({
+				...minimal(),
+				boundaries: Array.from(
+					{ length: ARCHITECTURE_DIAGRAM_LIMITS.maxBoundaries + 1 },
+					(_, index) => ({
+						kind: 'region' as const,
+						label: `r${index}`,
+						wraps: ['alpha'],
+					}),
+				),
+			}),
+		).toContainEqual(expect.stringContaining('boundaries'));
+	});
+
+	it('accepts a document sitting exactly on every bound', () => {
+		const parsed = parseArchitectureIr({
+			...minimal(),
+			components: componentsNumbering(
+				ARCHITECTURE_DIAGRAM_LIMITS.maxComponents,
+			),
+			connections: Array.from(
+				{ length: ARCHITECTURE_DIAGRAM_LIMITS.maxConnections },
+				(_, index) => ({ from: 'c0', id: `e${index}`, to: 'c1' }),
+			),
+		});
+		expect(parsed?.components).toHaveLength(
+			ARCHITECTURE_DIAGRAM_LIMITS.maxComponents,
+		);
 	});
 });
 

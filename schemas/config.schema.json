@@ -351,6 +351,11 @@
 					"description": "Settings → Experimental.",
 					"additionalProperties": false,
 					"properties": {
+						"architectureDiagram": {
+							"type": "boolean",
+							"default": false,
+							"description": "Enable the workspace architecture diagram: its pane, its two agent-control ops, and the `architecture-diagram` skill."
+						},
 						"autoRunAfterSetup": {
 							"type": "boolean",
 							"default": false,

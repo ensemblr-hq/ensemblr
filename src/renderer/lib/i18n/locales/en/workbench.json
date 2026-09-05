@@ -35,7 +35,7 @@
 			"hint": "Drag or press the arrow keys to pan. Pinch, hold Command and scroll, or press plus and minus to zoom. Press 0 to fit the whole diagram. Press N and P to step between modules, Enter to see what one connects to, and Escape to clear that again.",
 			"label": "Architecture diagram of {{title}}"
 		},
-		"captured-at": "scanned {{when}}",
+		"captured-at": "drawn {{when}}",
 		"fit-to-view": "Fit to view",
 		"legend": {
 			"backend": "Backend",
@@ -58,6 +58,11 @@
 		"reset-view": "Reset to actual size",
 		"tab-title": "Architecture",
 		"title": "Architecture",
+		"undrawn": {
+			"body": "An agent reads the codebase and draws it. The diagram is stored at {{path}} and travels with your commits.",
+			"draw": "Draw it with an agent",
+			"title": "No architecture diagram yet"
+		},
 		"zoom-in": "Zoom in",
 		"zoom-out": "Zoom out"
 	},

@@ -17,11 +17,11 @@ import { afterEach, describe, expect, it } from 'vitest';
 import {
 	type ArchitectureService,
 	architectureFilePath,
-	createArchitectureScanQueue,
 	createArchitectureService,
 	readArchitectureFile,
 } from '../../src/main/architecture/index.ts';
 import { openEnsemblrDatabase } from '../../src/main/storage/database.ts';
+import type { ArchitectureIR } from '../../src/shared/architecture-diagram.ts';
 
 const execFileAsync = promisify(execFile);
 const cleanups: (() => void)[] = [];
@@ -33,29 +33,33 @@ afterEach(() => {
 });
 
 /**
- * Materializes a git repository with two module directories, registered as a
- * workspace in a fresh in-memory database.
+ * A minimal valid document, as an agent would submit one.
+ * @param title - The diagram's title, for telling two writes apart
+ * @returns The IR
+ */
+function irNamed(title: string): ArchitectureIR {
+	return {
+		components: [
+			{ col: 0, id: 'alpha', label: 'Alpha', row: 0, type: 'backend' },
+		],
+		meta: { title },
+		schemaVersion: 1,
+	};
+}
+
+/**
+ * Materializes a git repository registered as a workspace in a fresh in-memory
+ * database.
  * @returns The workspace id, its path, and the service under test
  */
 async function createFixture(): Promise<{
 	architectureService: ArchitectureService;
 	cwd: string;
 	database: DatabaseSync;
-	writeFile: (relative: string, contents: string) => void;
 	workspaceId: string;
 }> {
 	const cwd = mkdtempSync(path.join(tmpdir(), 'ensemblr-architecture-'));
 	cleanups.push(() => rmSync(cwd, { force: true, recursive: true }));
-	const writeFile = (relative: string, contents: string) => {
-		const absolute = path.join(cwd, relative);
-		mkdirSync(path.dirname(absolute), { recursive: true });
-		writeFileSync(absolute, contents, 'utf8');
-	};
-	writeFile(
-		'src/main/ipc/handlers.ts',
-		"import { readRow } from '../storage/rows.ts';\nexport const handle = () => readRow();\n",
-	);
-	writeFile('src/main/storage/rows.ts', 'export const readRow = () => 1;\n');
 	await execFileAsync('git', ['init', '--quiet'], { cwd });
 
 	const connection = openEnsemblrDatabase({ databasePath: ':memory:' });
@@ -69,7 +73,6 @@ async function createFixture(): Promise<{
 		cwd,
 		database: connection.database,
 		workspaceId: 'ws-1',
-		writeFile,
 	};
 }
 
@@ -86,145 +89,128 @@ function seedWorkspace(database: DatabaseSync, cwd: string): void {
 	`);
 }
 
-describe('architecture service: the seed scan', () => {
-	it('builds a snapshot the first time it is asked', async () => {
-		const { architectureService, workspaceId } = await createFixture();
-		const outcome = await architectureService.scanIfMissing({ workspaceId });
-		expect(outcome.rebuilt).toBe(true);
+// Nothing derives a diagram. A workspace nobody has drawn has none, and that is
+// an ordinary answer rather than a prompt to go and build one.
+describe('architecture service: a workspace nobody has drawn', () => {
+	it('answers that there is none, without error', async () => {
+		const { architectureService, cwd, workspaceId } = await createFixture();
+
+		const read = await architectureService.readDiagram({ workspaceId });
+		expect(read.current).toBeNull();
+		expect(read.error).toBeUndefined();
+		expect(read.previous).toBeNull();
+		expect(existsSync(architectureFilePath(cwd))).toBe(false);
+	});
+
+	it('still answers that there is none after a repeat read', async () => {
+		const { architectureService, cwd, workspaceId } = await createFixture();
+		await architectureService.readDiagram({ workspaceId });
+
 		expect(
 			(await architectureService.readDiagram({ workspaceId })).current,
-		).not.toBeNull();
-	});
-
-	// The seed is scanned once, at workspace creation. Everything after it is an
-	// agent's refinement, so a second scan has nothing to add and everything to
-	// overwrite.
-	it('leaves a workspace that already has a diagram alone', async () => {
-		const { architectureService, workspaceId } = await createFixture();
-		await architectureService.scanIfMissing({ workspaceId });
-		expect(await architectureService.scanIfMissing({ workspaceId })).toEqual({
-			reason: 'already-stored',
-			rebuilt: false,
-		});
-	});
-
-	it('leaves it alone even after the module graph moves', async () => {
-		const { architectureService, workspaceId, writeFile } =
-			await createFixture();
-		await architectureService.scanIfMissing({ workspaceId });
-		writeFile('src/shared/ipc/channels.ts', 'export const channel = "x";\n');
-		expect(await architectureService.scanIfMissing({ workspaceId })).toEqual({
-			reason: 'already-stored',
-			rebuilt: false,
-		});
+		).toBeNull();
+		expect(existsSync(architectureFilePath(cwd))).toBe(false);
 	});
 
 	it('refuses a workspace the database does not know', async () => {
 		const { architectureService } = await createFixture();
 		await expect(
-			architectureService.scanIfMissing({ workspaceId: 'ws-missing' }),
+			architectureService.readDiagram({ workspaceId: 'ws-missing' }),
 		).rejects.toThrow(/No workspace with id/);
 	});
 });
 
-describe('architecture service: agent refinements', () => {
-	it('stores a refined document as the current snapshot', async () => {
+describe('architecture service: an agent-authored diagram', () => {
+	it('stores it and reads it back', async () => {
 		const { architectureService, workspaceId } = await createFixture();
-		await architectureService.scanIfMissing({ workspaceId });
-		const refined = {
-			components: [
-				{
-					col: 0,
-					id: 'alpha',
-					label: 'Alpha',
-					row: 0,
-					type: 'backend' as const,
-				},
-			],
-			meta: { title: 'refined' },
-			schemaVersion: 1,
-		};
-		await architectureService.storeRefinedIr({ ir: refined, workspaceId });
-		const { current, previous } = await architectureService.readDiagram({
+		await architectureService.storeRefinedIr({
+			ir: irNamed('drawn'),
 			workspaceId,
 		});
-		expect(current?.source).toBe('agent');
-		expect(current?.ir.meta.title).toBe('refined');
-		// `previous` is the document this write replaced, which is how the panel
-		// badges what moved.
-		expect(previous?.meta.title).not.toBe('refined');
+
+		const read = await architectureService.readDiagram({ workspaceId });
+		expect(read.current?.ir.meta.title).toBe('drawn');
+		expect(read.current?.relativePath).toBe('.ensemblr/architecture.json');
 	});
 
-	it('keeps the refinement rather than scanning over it', async () => {
-		const { architectureService, workspaceId, writeFile } =
-			await createFixture();
-		await architectureService.scanIfMissing({ workspaceId });
+	it('reports what a write replaced, which is what the delta badges read', async () => {
+		const { architectureService, workspaceId } = await createFixture();
 		await architectureService.storeRefinedIr({
-			ir: {
-				components: [
-					{
-						col: 0,
-						id: 'alpha',
-						label: 'Alpha',
-						row: 0,
-						type: 'backend' as const,
-					},
-				],
-				meta: { title: 'refined' },
-				schemaVersion: 1,
-			},
+			ir: irNamed('first'),
 			workspaceId,
 		});
-		writeFile('src/renderer/state/atoms.ts', 'export const atom = 1;\n');
-		expect(await architectureService.scanIfMissing({ workspaceId })).toEqual({
-			reason: 'already-stored',
-			rebuilt: false,
+		await architectureService.storeRefinedIr({
+			ir: irNamed('second'),
+			workspaceId,
 		});
+
+		const read = await architectureService.readDiagram({ workspaceId });
+		expect(read.current?.ir.meta.title).toBe('second');
+		expect(read.previous?.meta.title).toBe('first');
+	});
+
+	it('badges nothing for the first write, which replaced nothing', async () => {
+		const { architectureService, workspaceId } = await createFixture();
+		await architectureService.storeRefinedIr({
+			ir: irNamed('first'),
+			workspaceId,
+		});
+
 		expect(
-			(await architectureService.readDiagram({ workspaceId })).current?.ir.meta
-				.title,
-		).toBe('refined');
+			(await architectureService.readDiagram({ workspaceId })).previous,
+		).toBeNull();
 	});
 
-	it('keeps the fingerprint the seed recorded, as provenance', async () => {
+	// A write that replaced nothing has to clear what an earlier one left behind,
+	// or the badges compare the new document against a snapshot two writes old.
+	it('forgets what it replaced once the user deletes the diagram', async () => {
 		const { architectureService, cwd, workspaceId } = await createFixture();
-		await architectureService.scanIfMissing({ workspaceId });
-		const seeded = JSON.parse(readFileSync(architectureFilePath(cwd), 'utf8'));
 		await architectureService.storeRefinedIr({
-			ir: {
-				components: [
-					{ col: 0, id: 'alpha', label: 'Alpha', row: 0, type: 'backend' },
-				],
-				meta: { title: 'refined' },
-				schemaVersion: 1,
-			},
+			ir: irNamed('first'),
 			workspaceId,
 		});
-		const refined = JSON.parse(readFileSync(architectureFilePath(cwd), 'utf8'));
-		expect(refined.graphFingerprint).toBe(seeded.graphFingerprint);
+		await architectureService.storeRefinedIr({
+			ir: irNamed('second'),
+			workspaceId,
+		});
+		rmSync(architectureFilePath(cwd));
+		await architectureService.storeRefinedIr({
+			ir: irNamed('third'),
+			workspaceId,
+		});
+
+		const read = await architectureService.readDiagram({ workspaceId });
+		expect(read.current?.ir.meta.title).toBe('third');
+		expect(read.previous).toBeNull();
 	});
 });
 
 describe('architecture service: the committed file', () => {
 	it('writes the diagram to .ensemblr/architecture.json', async () => {
 		const { architectureService, cwd, workspaceId } = await createFixture();
-		await architectureService.scanIfMissing({ workspaceId });
+		await architectureService.storeRefinedIr({
+			ir: irNamed('drawn'),
+			workspaceId,
+		});
 
 		const filePath = architectureFilePath(cwd);
 		expect(filePath).toBe(path.join(cwd, '.ensemblr', 'architecture.json'));
 		const stored = JSON.parse(readFileSync(filePath, 'utf8'));
-		expect(stored.source).toBe('scan');
 		expect(stored.ir.components.length).toBeGreaterThan(0);
-		expect(typeof stored.graphFingerprint).toBe('string');
-		// The working-tree hash is a machine-local cache key and must never reach
-		// the committed file: it would churn every diff, and writing the file moves
-		// the tree it describes.
+		expect(typeof stored.generatedAt).toBe('string');
+		// Provenance the scan used to record. Nothing derives a diagram now, so a
+		// document carrying either field is a stale writer rather than history.
+		expect(stored).not.toHaveProperty('source');
+		expect(stored).not.toHaveProperty('graphFingerprint');
 		expect(stored).not.toHaveProperty('treeHash');
 	});
 
 	it('writes readable, newline-terminated JSON, for reading in a diff', async () => {
 		const { architectureService, cwd, workspaceId } = await createFixture();
-		await architectureService.scanIfMissing({ workspaceId });
+		await architectureService.storeRefinedIr({
+			ir: irNamed('drawn'),
+			workspaceId,
+		});
 
 		const raw = readFileSync(architectureFilePath(cwd), 'utf8');
 		expect(raw.endsWith('\n')).toBe(true);
@@ -233,14 +219,12 @@ describe('architecture service: the committed file', () => {
 });
 
 // The file is tracked, so a document this build cannot parse is somebody's
-// work — a hand edit, a merge conflict, a refinement with one bad field. Every
-// path stops on it rather than quietly scanning a replacement over the top,
-// which is how a refinement used to disappear with the read still reporting
-// `source: "scan"` as though nothing had happened.
+// work — a hand edit, a merge conflict, an update with one bad field. Every
+// path stops on it rather than quietly writing a replacement over the top.
 describe('architecture service: a document it cannot read', () => {
 	it('reports the problem rather than answering "there is none"', async () => {
 		const { architectureService, cwd, workspaceId } = await createFixture();
-		await architectureService.scanIfMissing({ workspaceId });
+		mkdirSync(path.dirname(architectureFilePath(cwd)), { recursive: true });
 		writeFileSync(architectureFilePath(cwd), '{ not json', 'utf8');
 
 		const read = await architectureService.readDiagram({ workspaceId });
@@ -251,7 +235,10 @@ describe('architecture service: a document it cannot read', () => {
 
 	it('names the field that failed when the IR is the problem', async () => {
 		const { architectureService, cwd, workspaceId } = await createFixture();
-		await architectureService.scanIfMissing({ workspaceId });
+		await architectureService.storeRefinedIr({
+			ir: irNamed('drawn'),
+			workspaceId,
+		});
 		const stored = JSON.parse(readFileSync(architectureFilePath(cwd), 'utf8'));
 		stored.ir.components[0].type = 'not-a-type';
 		writeFileSync(
@@ -264,137 +251,18 @@ describe('architecture service: a document it cannot read', () => {
 		expect(read.error?.message).toContain('components.0.type');
 	});
 
-	it('refuses to scan over it, and leaves the bytes untouched', async () => {
+	it('refuses an update over it, and leaves the bytes untouched', async () => {
 		const { architectureService, cwd, workspaceId } = await createFixture();
-		await architectureService.scanIfMissing({ workspaceId });
-		writeFileSync(architectureFilePath(cwd), '{ not json', 'utf8');
-
-		expect(await architectureService.scanIfMissing({ workspaceId })).toEqual({
-			reason: 'diagram-unreadable',
-			rebuilt: false,
-		});
-		expect(readFileSync(architectureFilePath(cwd), 'utf8')).toBe('{ not json');
-	});
-});
-
-describe('architecture service: the first read', () => {
-	// The agent-control read port seeds when nothing is stored, so an agent is
-	// never told the diagram is missing and sent hunting for the scanner.
-	it('produces a snapshot for a workspace that has never had one', async () => {
-		const { architectureService, workspaceId } = await createFixture();
-		const first = await architectureService.readDiagram({ workspaceId });
-		expect(first.current).toBeNull();
-		expect(first.error).toBeUndefined();
-
-		const outcome = await architectureService.scanIfMissing({ workspaceId });
-		expect(outcome.rebuilt).toBe(true);
-		expect(
-			(await architectureService.readDiagram({ workspaceId })).current?.source,
-		).toBe('scan');
-	});
-});
-
-describe('architecture scan queue', () => {
-	it('collapses a burst of asks into one scan per workspace', async () => {
-		const calls: string[] = [];
-		const queue = createArchitectureScanQueue({
-			architectureService: {
-				readDiagram: async () => ({ current: null, previous: null }),
-				scanIfMissing: async ({ workspaceId }: { workspaceId: string }) => {
-					calls.push(workspaceId);
-					await new Promise((resolve) => setTimeout(resolve, 5));
-					return { reason: 'already-stored', rebuilt: false };
-				},
-				storeRefinedIr: () => {
-					throw new Error('not used');
-				},
-			} as unknown as ArchitectureService,
-		});
-		queue.queueScan({ workspaceId: 'ws-1' });
-		queue.queueScan({ workspaceId: 'ws-1' });
-		queue.queueScan({ workspaceId: 'ws-1' });
-		await queue.awaitInFlight();
-		expect(calls).toEqual(['ws-1', 'ws-1']);
-	});
-
-	it('keeps a failed scan off the caller’s path', async () => {
-		const queue = createArchitectureScanQueue({
-			architectureService: {
-				scanIfMissing: async () => {
-					throw new Error('scan exploded');
-				},
-			} as unknown as ArchitectureService,
-		});
-		expect(() => queue.queueScan({ workspaceId: 'ws-1' })).not.toThrow();
-		await expect(queue.awaitInFlight()).resolves.toBeUndefined();
-	});
-});
-
-describe('architecture service: scanIfMissingAndRead', () => {
-	it('seeds and returns the diagram it wrote, in one call', async () => {
-		const { architectureService, workspaceId } = await createFixture();
-		const result = await architectureService.scanIfMissingAndRead({
+		await architectureService.storeRefinedIr({
+			ir: irNamed('drawn'),
 			workspaceId,
 		});
-		expect(result.rebuilt).toBe(true);
-		expect(result.current?.source).toBe('scan');
-		expect(result.error).toBeUndefined();
-		expect(result.previous).toBeNull();
-	});
-
-	it('returns the stored diagram without rebuilding it', async () => {
-		const { architectureService, workspaceId } = await createFixture();
-		await architectureService.scanIfMissing({ workspaceId });
-		const result = await architectureService.scanIfMissingAndRead({
-			workspaceId,
-		});
-		expect(result.rebuilt).toBe(false);
-		expect(result.current?.source).toBe('scan');
-	});
-
-	it('reports an unreadable document rather than scanning over it', async () => {
-		const { architectureService, cwd, workspaceId } = await createFixture();
-		await architectureService.scanIfMissing({ workspaceId });
-		writeFileSync(architectureFilePath(cwd), '{ not json', 'utf8');
-
-		const result = await architectureService.scanIfMissingAndRead({
-			workspaceId,
-		});
-		expect(result).toMatchObject({ current: null, rebuilt: false });
-		expect(result.error?.code).toBe('diagram-unreadable');
-		expect(readFileSync(architectureFilePath(cwd), 'utf8')).toBe('{ not json');
-	});
-
-	// Two panels opening on one fresh workspace used to interleave between the
-	// scan and the read, so the first reported `rebuilt` against a document its
-	// own scan had not written.
-	it('lets only one of two concurrent asks claim the rebuild', async () => {
-		const { architectureService, workspaceId } = await createFixture();
-		const [first, second] = await Promise.all([
-			architectureService.scanIfMissingAndRead({ workspaceId }),
-			architectureService.scanIfMissingAndRead({ workspaceId }),
-		]);
-		expect([first.rebuilt, second.rebuilt].filter(Boolean)).toHaveLength(1);
-		expect(first.current?.generatedAt).toBe(second.current?.generatedAt);
-	});
-});
-
-describe('architecture service: an agent refinement over a document it cannot read', () => {
-	it('refuses rather than overwriting somebody’s hand edit', async () => {
-		const { architectureService, cwd, workspaceId } = await createFixture();
-		await architectureService.scanIfMissing({ workspaceId });
 		const handEdited = '{ "ir": { "components": [] } }';
 		writeFileSync(architectureFilePath(cwd), handEdited, 'utf8');
 
 		await expect(
 			architectureService.storeRefinedIr({
-				ir: {
-					components: [
-						{ id: 'alpha', label: 'Alpha', type: 'backend' as const },
-					],
-					meta: { title: 'refined' },
-					schemaVersion: 1,
-				},
+				ir: irNamed('replacement'),
 				workspaceId,
 			}),
 		).rejects.toThrow(/could not be read/);
@@ -402,17 +270,19 @@ describe('architecture service: an agent refinement over a document it cannot re
 	});
 });
 
-// A scan started at workspace creation outlives a workspace deleted a second
-// later. The writer creates the directories it needs, so without a re-check the
-// finished walk recreates `.ensemblr/` inside a removed worktree and the next
+// The writer creates the directories it needs, so without a re-check a write
+// racing a delete recreates `.ensemblr/` inside a removed worktree and the next
 // `git worktree add` at that path fails.
-describe('architecture service: a workspace that goes away mid-scan', () => {
+describe('architecture service: a workspace that goes away mid-write', () => {
 	it('drops the write when the directory is gone', async () => {
 		const { architectureService, cwd, workspaceId } = await createFixture();
 		rmSync(cwd, { force: true, recursive: true });
 
 		await expect(
-			architectureService.scanIfMissing({ workspaceId }),
+			architectureService.storeRefinedIr({
+				ir: irNamed('drawn'),
+				workspaceId,
+			}),
 		).rejects.toThrow(/no longer on disk/);
 		expect(existsSync(cwd)).toBe(false);
 	});
@@ -420,10 +290,14 @@ describe('architecture service: a workspace that goes away mid-scan', () => {
 	it('drops the write when the row is gone', async () => {
 		const { architectureService, database, cwd, workspaceId } =
 			await createFixture();
-		const scan = architectureService.scanIfMissing({ workspaceId });
 		database.exec(`DELETE FROM workspaces WHERE id = '${workspaceId}'`);
 
-		await expect(scan).rejects.toThrow(/No workspace with id/);
+		await expect(
+			architectureService.storeRefinedIr({
+				ir: irNamed('drawn'),
+				workspaceId,
+			}),
+		).rejects.toThrow(/No workspace with id/);
 		expect(existsSync(architectureFilePath(cwd))).toBe(false);
 	});
 });
@@ -448,8 +322,8 @@ describe('readArchitectureFile', () => {
 		expect(await readArchitectureFile(cwd)).toEqual({ status: 'absent' });
 	});
 
-	// Only ENOENT means "there is nothing to lose". Every other rejection is a
-	// document that exists and that the seed scan must not write over.
+	// Only ENOENT means "there is nothing there". Every other rejection is a
+	// document that exists and that an update must not write over.
 	it('reports a directory in the file’s place as unreadable', async () => {
 		const cwd = mkdtempSync(path.join(tmpdir(), 'ensemblr-diagram-'));
 		cleanups.push(() => rmSync(cwd, { force: true, recursive: true }));
@@ -504,7 +378,10 @@ describe('writeArchitectureFile', () => {
 
 	it('leaves no temporary file beside a diagram it did write', async () => {
 		const { architectureService, cwd, workspaceId } = await createFixture();
-		await architectureService.scanIfMissing({ workspaceId });
+		await architectureService.storeRefinedIr({
+			ir: irNamed('drawn'),
+			workspaceId,
+		});
 		expect(existsSync(`${architectureFilePath(cwd)}.tmp`)).toBe(false);
 	});
 });

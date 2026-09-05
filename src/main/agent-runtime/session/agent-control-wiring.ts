@@ -190,6 +190,7 @@ export function resolveAgentControlWiring({
 	isSpawnedSubAgent,
 	parentSessionId,
 	provider,
+	readArchitectureDiagramEnabled,
 	readClaudeSubagentMode,
 	resolveAgentControlEnv,
 	resolveTurnPreamble,
@@ -199,6 +200,8 @@ export function resolveAgentControlWiring({
 	isSpawnedSubAgent: SubAgentMarkerReader | undefined;
 	parentSessionId: string | null;
 	provider: AgentProviderId;
+	/** Whether the architecture diagram feature is on, for the playbook this session receives. */
+	readArchitectureDiagramEnabled: (() => boolean) | undefined;
 	readClaudeSubagentMode: SubagentMechanismReader | undefined;
 	resolveAgentControlEnv: AgentControlEnvResolver | undefined;
 	resolveTurnPreamble: TurnPreambleResolver | undefined;
@@ -241,6 +244,7 @@ export function resolveAgentControlWiring({
 			? () => resolveTurnPreamble(sessionId)
 			: null,
 		systemPromptAppend: awarenessForAudience({
+			architectureDiagram: readArchitectureDiagramEnabled?.() ?? false,
 			delegation,
 			hasChatTab: true,
 			role: readControlRole(env),

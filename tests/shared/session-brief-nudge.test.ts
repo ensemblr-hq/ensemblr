@@ -20,11 +20,18 @@ function branch(
 	};
 }
 
+function diagram(
+	overrides: Partial<SessionBriefNaming['diagram']> = {},
+): SessionBriefNaming['diagram'] {
+	return { components: [], stale: false, ...overrides };
+}
+
 function naming(
 	overrides: Partial<SessionBriefNaming> = {},
 ): SessionBriefNaming {
 	return {
 		branch: branch(),
+		diagram: diagram(),
 		summaryStale: false,
 		titleNeeded: false,
 		...overrides,
@@ -133,6 +140,58 @@ describe('buildSessionBriefNudge', () => {
 		expect(nudge).not.toContain("Once this turn's work is done");
 	});
 
+	test('says nothing about the diagram when it is not stale', () => {
+		const nudge = buildSessionBriefNudge(naming({ summaryStale: true })) ?? '';
+
+		expect(nudge).not.toContain('ensemblr_update_architecture_diagram');
+	});
+
+	test('asks for a redraw when the diagram has fallen behind the code', () => {
+		const nudge = buildSessionBriefNudge(
+			naming({ diagram: diagram({ stale: true }) }),
+		);
+
+		expect(nudge).toContain('ensemblr_get_architecture_diagram');
+		expect(nudge).toContain('ensemblr_update_architecture_diagram');
+	});
+
+	test('names the components the change set landed in', () => {
+		const nudge =
+			buildSessionBriefNudge(
+				naming({
+					diagram: diagram({
+						components: ['storage', 'IPC'],
+						stale: true,
+					}),
+				}),
+			) ?? '';
+
+		expect(nudge).toContain('`storage` and `IPC`');
+	});
+
+	// The read is what stops an update replacing a document another pass refined:
+	// there is no patch op, so a write without a read discards the whole drawing.
+	test('orders the diagram read before the diagram write', () => {
+		const nudge =
+			buildSessionBriefNudge(naming({ diagram: diagram({ stale: true }) })) ??
+			'';
+
+		expect(nudge.indexOf('ensemblr_get_architecture_diagram')).toBeLessThan(
+			nudge.indexOf('ensemblr_update_architecture_diagram'),
+		);
+	});
+
+	// A shape that did not move is the common case for a diagram-adjacent edit,
+	// and storing an identical document is a diff the user has to read for
+	// nothing.
+	test('lets the agent store nothing when the shape did not move', () => {
+		const nudge =
+			buildSessionBriefNudge(naming({ diagram: diagram({ stale: true }) })) ??
+			'';
+
+		expect(nudge).toContain('store nothing');
+	});
+
 	test('orders the outstanding items title, branch, then summary', () => {
 		const nudge =
 			buildSessionBriefNudge(
@@ -180,6 +239,17 @@ describe('buildSessionBriefNudge in Plan Mode', () => {
 
 	test('still renders nothing when no upkeep is outstanding', () => {
 		expect(buildSessionBriefNudge(naming(), true)).toBeNull();
+	});
+
+	// `updateArchitectureDiagram` is refused while planning, so asking for a
+	// redraw would only send the agent after a denial.
+	test('drops the diagram bullet rather than retiming it', () => {
+		const stale = naming({ diagram: diagram({ stale: true }) });
+
+		expect(buildSessionBriefNudge(stale, true)).toBeNull();
+		expect(buildSessionBriefNudge(stale, false)).toContain(
+			'ensemblr_update_architecture_diagram',
+		);
 	});
 
 	test('states that every item stays allowed while planning', () => {

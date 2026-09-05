@@ -10,9 +10,15 @@ import { AGENT_CONTROL_OPS } from '../../src/shared/agent-control.ts';
 
 const REPO_ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const PLUGIN_ROOT = path.join(REPO_ROOT, 'resources', 'agent-skills');
+const ARCHITECTURE_PLUGIN_ROOT = path.join(
+	REPO_ROOT,
+	'resources',
+	'agent-skills-architecture',
+);
+const PLUGIN_ROOTS = [PLUGIN_ROOT, ARCHITECTURE_PLUGIN_ROOT];
 const SKILL_ROOT = path.join(PLUGIN_ROOT, 'skills', 'ensemblr');
 const ARCHITECTURE_SKILL_ROOT = path.join(
-	PLUGIN_ROOT,
+	ARCHITECTURE_PLUGIN_ROOT,
 	'skills',
 	'architecture-diagram',
 );
@@ -50,12 +56,9 @@ const shippedSkill = (root: string) => {
 const SHIPPED_SKILLS = [SKILL_ROOT, ARCHITECTURE_SKILL_ROOT].map(shippedSkill);
 const EVERY_DOC = SHIPPED_SKILLS.map((skill) => skill.everyDoc).join('\n');
 
-const manifest = (): { name: string; skills: string[] } =>
+const manifest = (root: string): { name: string; skills: string[] } =>
 	JSON.parse(
-		readFileSync(
-			path.join(PLUGIN_ROOT, '.claude-plugin', 'plugin.json'),
-			'utf8',
-		),
+		readFileSync(path.join(root, '.claude-plugin', 'plugin.json'), 'utf8'),
 	);
 
 const frontmatter = (source: string): Record<string, string> => {
@@ -76,16 +79,16 @@ const frontmatter = (source: string): Record<string, string> => {
 const fakeApp = (appPath: string): App =>
 	({ getAppPath: () => appPath, isPackaged: false }) as unknown as App;
 
-describe('the shipped Claude plugin manifest', () => {
+describe.each(PLUGIN_ROOTS)('the shipped Claude plugin manifest', (root) => {
 	it('names every skill directory it bundles, and each one exists', () => {
-		for (const entry of manifest().skills) {
-			const directory = path.resolve(PLUGIN_ROOT, entry);
+		for (const entry of manifest(root).skills) {
+			const directory = path.resolve(root, entry);
 			expect(existsSync(path.join(directory, 'SKILL.md'))).toBe(true);
 		}
 	});
 
 	it('keeps components out of .claude-plugin/, which holds the manifest alone', () => {
-		expect(readdirSync(path.join(PLUGIN_ROOT, '.claude-plugin'))).toEqual([
+		expect(readdirSync(path.join(root, '.claude-plugin'))).toEqual([
 			'plugin.json',
 		]);
 	});
@@ -116,19 +119,33 @@ describe.each(SHIPPED_SKILLS)('the $name SKILL.md', (skill) => {
 });
 
 describe('the shipped skills as a set', () => {
-	it('ships exactly the skills the manifest names', () => {
-		const listed = manifest()
-			.skills.map((entry) => path.basename(path.resolve(PLUGIN_ROOT, entry)))
-			.sort();
-		expect(readdirSync(path.join(PLUGIN_ROOT, 'skills')).sort()).toEqual(
-			listed,
+	it('ships exactly the skills each manifest names', () => {
+		for (const root of PLUGIN_ROOTS) {
+			const listed = manifest(root)
+				.skills.map((entry) => path.basename(path.resolve(root, entry)))
+				.sort();
+			expect(readdirSync(path.join(root, 'skills')).sort()).toEqual(listed);
+		}
+	});
+
+	it('validates every skill the plugins bundle, not just the first', () => {
+		expect(SHIPPED_SKILLS.map((skill) => skill.name).sort()).toEqual(
+			PLUGIN_ROOTS.flatMap((root) =>
+				readdirSync(path.join(root, 'skills')),
+			).sort(),
 		);
 	});
 
-	it('validates every skill the plugin bundles, not just the first', () => {
-		expect(SHIPPED_SKILLS.map((skill) => skill.name).sort()).toEqual(
-			readdirSync(path.join(PLUGIN_ROOT, 'skills')).sort(),
+	// The architecture diagram is a whole feature behind an Experimental switch,
+	// and a skill listed in a manifest loads whenever that manifest does. Keeping
+	// it in a root of its own is the only way the app can withhold it.
+	it('keeps the architecture-diagram skill in a root the core manifest does not name', () => {
+		expect(manifest(PLUGIN_ROOT).skills).not.toContain(
+			'./skills/architecture-diagram',
 		);
+		expect(manifest(ARCHITECTURE_PLUGIN_ROOT).skills).toEqual([
+			'./skills/architecture-diagram',
+		]);
 	});
 
 	it('keeps at least one reference link across the bundle, so the link check cannot pass vacuously', () => {
@@ -182,9 +199,20 @@ describe('the skill against the surfaces it documents', () => {
 
 describe('resolveAgentSkillBundle', () => {
 	it('finds the bundle shipped in the repository', () => {
-		expect(resolveAgentSkillBundle(fakeApp(REPO_ROOT))).toEqual({
-			pluginDirectory: PLUGIN_ROOT,
+		expect(
+			resolveAgentSkillBundle(fakeApp(REPO_ROOT), {
+				architectureDiagram: true,
+			}),
+		).toEqual({
+			pluginDirectories: PLUGIN_ROOTS,
 			skillDirectories: [SKILL_ROOT, ARCHITECTURE_SKILL_ROOT],
+		});
+	});
+
+	it('withholds the architecture bundle by default', () => {
+		expect(resolveAgentSkillBundle(fakeApp(REPO_ROOT))).toEqual({
+			pluginDirectories: [PLUGIN_ROOT],
+			skillDirectories: [SKILL_ROOT],
 		});
 	});
 
@@ -195,7 +223,7 @@ describe('resolveAgentSkillBundle', () => {
 		try {
 			expect(
 				resolveAgentSkillBundle(fakeApp(path.join(REPO_ROOT, 'schemas'))),
-			).toEqual({ pluginDirectory: null, skillDirectories: [] });
+			).toEqual({ pluginDirectories: [], skillDirectories: [] });
 		} finally {
 			cwd.mockRestore();
 		}

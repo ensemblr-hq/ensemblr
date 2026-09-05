@@ -8,22 +8,19 @@
  * agent made is reviewable rather than hidden in application state. The cost is
  * that parallel workspaces cut from one repository can conflict on it, the same
  * way they conflict on any committed file — resolve it by taking either side
- * and letting the next scan settle it.
+ * and letting the next agent update settle it.
  */
 import { mkdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
 
 import {
+	ARCHITECTURE_FILE_RELATIVE_PATH,
 	type ArchitectureIR,
 	parseArchitectureIrResult,
 } from '../../shared/architecture-diagram.ts';
 
-/** Directory in a repository that holds Ensemblr's committed files. */
-const ENSEMBLR_DIRECTORY = '.ensemblr';
-
-/** Filename the diagram is stored under, inside {@link ENSEMBLR_DIRECTORY}. */
-const DIAGRAM_FILENAME = 'architecture.json';
+export { ARCHITECTURE_FILE_RELATIVE_PATH };
 
 /**
  * Largest stored document read at all. A diagram is bounded — at most a few
@@ -33,24 +30,12 @@ const DIAGRAM_FILENAME = 'architecture.json';
  */
 const MAX_DIAGRAM_BYTES = 4 * 1024 * 1024;
 
-/**
- * How the stored document wraps the IR with the provenance a rebuild needs.
- *
- * Deliberately does NOT carry the working-tree hash the rebuild gate compares
- * against. That hash is a machine-local cache key: committing it would put a
- * line of churn in every diff, and — because writing this file changes the
- * working tree — a hash taken before the write is stale the moment it lands, so
- * the gate would re-scan forever. It lives in memory in the service instead.
- */
+/** How the stored document wraps the IR with the time it was authored. */
 interface StoredDiagram {
 	/** ISO timestamp of the write. */
 	generatedAt: string;
-	/** Hash of the module graph's topology when this was written. */
-	graphFingerprint: string;
 	/** The diagram itself. */
 	ir: ArchitectureIR;
-	/** `scan` for the deterministic seed, `agent` once one has refined it. */
-	source: 'agent' | 'scan';
 }
 
 /** A diagram read back off disk. */
@@ -65,20 +50,18 @@ export interface ArchitectureFileContents extends StoredDiagram {
  * @returns Absolute path of the diagram file
  */
 export function architectureFilePath(workspaceCwd: string): string {
-	return path.join(workspaceCwd, ENSEMBLR_DIRECTORY, DIAGRAM_FILENAME);
+	return path.join(workspaceCwd, ...ARCHITECTURE_FILE_RELATIVE_PATH.split('/'));
 }
-
-/** Workspace-relative path of the diagram file, for display and for `sources`. */
-export const ARCHITECTURE_FILE_RELATIVE_PATH = `${ENSEMBLR_DIRECTORY}/${DIAGRAM_FILENAME}`;
 
 /**
  * What a read of the stored file found.
  *
  * `absent` and `unreadable` are deliberately different answers. Absent means
- * scan one. Unreadable means a document *is* there and this build cannot make
- * sense of it — a hand edit, a merge conflict, a refinement with one bad field
- * — and the file is tracked, so overwriting it would silently destroy work the
- * user can see in their diff. Every caller stops on it instead.
+ * nobody has drawn this workspace yet. Unreadable means a document *is* there
+ * and this build cannot make sense of it — a hand edit, a merge conflict, an
+ * update with one bad field — and the file is tracked, so overwriting it would
+ * silently destroy work the user can see in their diff. Every caller stops on
+ * it instead.
  */
 export type ArchitectureFileRead =
 	| { contents: ArchitectureFileContents; status: 'stored' }
@@ -105,8 +88,8 @@ function errorCodeOf(error: unknown): string | null {
  *
  * Only `ENOENT` means absent. A permission denial, a directory where the file
  * should be, an exhausted descriptor table — each of those is a document that
- * exists and that a caller must not scan over, so they answer `unreadable` with
- * the code that stopped them.
+ * exists and that a caller must not write over, so they answer `unreadable`
+ * with the code that stopped them.
  * @param filePath - Absolute path of the diagram file
  * @returns The file's text, or why it could not be had
  */
@@ -171,13 +154,8 @@ export async function readArchitectureFile(
 		contents: {
 			generatedAt:
 				typeof document.generatedAt === 'string' ? document.generatedAt : '',
-			graphFingerprint:
-				typeof document.graphFingerprint === 'string'
-					? document.graphFingerprint
-					: '',
 			ir: result.ir,
 			relativePath: ARCHITECTURE_FILE_RELATIVE_PATH,
-			source: document.source === 'agent' ? 'agent' : 'scan',
 		},
 		status: 'stored',
 	};
@@ -193,10 +171,10 @@ export async function readArchitectureFile(
  *
  * The IR is validated against the schema that reads it back first. A producer
  * emitting a document this build then refuses leaves the workspace with a
- * diagram every path reports as unreadable and none will scan over, which the
+ * diagram every path reports as unreadable and none will write over, which the
  * user can only escape by deleting the file outside the app — so a bad document
  * fails its own write instead.
- * @param contents - The diagram and its provenance
+ * @param contents - The diagram and the time it was authored
  * @param workspaceCwd - Absolute path of the workspace root
  */
 export function writeArchitectureFile({

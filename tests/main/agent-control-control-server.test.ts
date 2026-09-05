@@ -17,6 +17,7 @@ let server: ControlServer | null = null;
 
 const stubService: AgentControlService = {
 	describeAudience: async () => ({
+		architectureDiagram: true,
 		delegation: 'ensemblr',
 		hasChatTab: false,
 		role: 'orchestrator',
@@ -181,6 +182,7 @@ describe('control server', () => {
 				return { ok: true, data: { echoed: command.op } };
 			},
 			describeAudience: async () => ({
+				architectureDiagram: true,
 				delegation: 'ensemblr',
 				hasChatTab: false,
 				role: 'orchestrator',
@@ -250,6 +252,7 @@ describe('control server', () => {
 				return { ok: true, data: { echoed: command.op } };
 			},
 			describeAudience: async () => ({
+				architectureDiagram: true,
 				delegation: 'ensemblr',
 				hasChatTab: false,
 				role: 'orchestrator',

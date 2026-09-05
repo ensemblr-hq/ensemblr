@@ -66,8 +66,6 @@ export type {
 	ArchitectureSnapshotChangedBroadcast,
 	GetArchitectureSnapshotRequest,
 	GetArchitectureSnapshotResult,
-	ScanArchitectureSnapshotRequest,
-	ScanArchitectureSnapshotResult,
 } from './contracts/architecture';
 export type {
 	ArchiveApi,
