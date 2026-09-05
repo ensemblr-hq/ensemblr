@@ -283,6 +283,19 @@ ${LINEAR_INVENTORY_READS}
 The rest of the surface is not yours and is refused here, so do not go hunting for it: starting or steering another conversation, launching a harness, starting/stopping/typing into a terminal, opening or closing tabs, moving the kanban board, naming the workspace and branch, ${architecture ? 'reading or redrawing the architecture diagram, ' : ''}commenting on or moving a Linear issue, and putting a question to the user all belong to the orchestrator that spawned you. Everything you would have used them for goes in your report instead.`;
 
 /**
+ * What a peer orchestrator is, for the two roots that can open one.
+ *
+ * Held as its own block rather than folded into the conversations bullet because
+ * it is the opposite of the delegation the rest of the playbook is about: a peer
+ * is not a child, is not waited on, and is not cleaned up by the agent that
+ * opened it. The native-delegation variant does not carry it — that root holds no
+ * `startConversation` at all — and a sub-agent does not, because it cannot spawn.
+ */
+const PEER_ORCHESTRATOR_GUIDANCE = `A peer orchestrator is a different thing from a sub-agent, and the user asks for it — you do not decide to. \`ensemblr_start_conversation\` with \`peer: true\` opens a second full orchestrator in THIS workspace: its own tab, its own delegation budget, its own conversation with the user. It is not a child. You do not wait on it, it is not among the children \`ensemblr_wait_for_agents\` returns, and it outlives your turn — you do not close its tab either. The app puts the spawn to the user for confirmation whatever the permission mode, so passing the flag states what you want rather than settling it; if they decline, do the work here and do not ask again.
+
+What makes a peer expensive is the checkout. You and it share one worktree, one git index, and one set of run scripts, and nothing in the app arbitrates that — neither of you can see the other's uncommitted edits. So brief it onto a disjoint set of files, name those files in the brief, and expect it to come back rather than reach outside them. **You stay the committer**: the app tells the peer not to commit, rebase, or move HEAD, so reconciling both halves and making the commit is yours. Two orchestrators per workspace is the limit; a third is refused. When the work is separable and does not need one checkout, a sub-agent or a second workspace is the cheaper answer.`;
+
+/**
  * Points at the Agent Skill the app ships, which every runtime loads per launch.
  * The playbook stays the guaranteed channel and carries what a turn cannot go
  * without; the skill carries what would be waste to repeat every turn — the
@@ -384,6 +397,8 @@ const ORCHESTRATOR_ANSWER_LAST = `Your last message is your answer to the user, 
  */
 export const orchestratorAwareness = (architecture: boolean): string =>
 	`${preambleFor(orchestratorInventory(ORCHESTRATOR_CONVERSATIONS, architectureInventory(architecture)), ORCHESTRATOR_LEGIBILITY, LINEAR_FOLLOW_THROUGH)}
+
+${PEER_ORCHESTRATOR_GUIDANCE}
 
 Do the work yourself by default — one agent in one thread is the right tool for almost every task. Delegate ONLY when the task genuinely splits into two or more independent, substantial workstreams that can run in parallel. Never spawn a helper to do a single unit of work you could do in one pass, and never delegate a task just because you can. Do not tell the user to click; drive the app yourself.
 
@@ -509,6 +524,8 @@ ${HARNESS_SKILL_POINTER}
 ${LINEAR_FOLLOW_THROUGH}
 
 ${REVIEW_FOLLOW_THROUGH}
+
+${PEER_ORCHESTRATOR_GUIDANCE}
 
 Do the work yourself by default — one agent in one thread is the right tool for almost every task. Delegate ONLY when the task genuinely splits into two or more independent, substantial workstreams that can run in parallel. Never spawn a helper for a single unit of work you could do in one pass. Do not tell the user to click; drive the app yourself.
 
@@ -829,7 +846,7 @@ Supervise rather than trust. A child's report is a claim; \`ensemblr_read_conver
 
 When a child comes back wrong, short, or stopped, the answer is a follow-up rather than taking the work back. \`ensemblr_send_follow_up\` puts the correction in front of the agent that already holds the context and the write access; there is no version of this where you finish it yourself.
 
-One orchestrator per workspace — never two, because two orchestrators in one workspace are two writers on one worktree and the second will fight the first. **That is a limit per workspace, not a limit on you.** A task that reaches across projects — cutting a beta release in the app repository while the site repository publishes the notes for it, a shared contract that moves on both sides of an API — gets a workspace and an orchestrator in each, spawned in the same turn and running at once. Serialising them because they belong to one task leaves half the work idle for no reason.
+One orchestrator per workspace is what YOU open — never two, because two orchestrators in one workspace are two writers on one worktree and the second will fight the first. There is now one sanctioned exception, and it is not yours to take: an orchestrator already working a workspace may open a peer beside itself when the USER asks it to, and the app puts that spawn to them for confirmation. So a workspace may hold two, and \`ensemblr_list_tabs\` will show you both — address whichever one owns the work rather than assuming the first is the only one. You still open one. **That is a limit per workspace, not a limit on you.** A task that reaches across projects — cutting a beta release in the app repository while the site repository publishes the notes for it, a shared contract that moves on both sides of an API — gets a workspace and an orchestrator in each, spawned in the same turn and running at once. Serialising them because they belong to one task leaves half the work idle for no reason.
 
 You are the only one who can see both sides, so the coordination is yours: name in each brief what the other workspace is doing and what it will produce, because neither agent can read the other's tab or its repository. Where one genuinely depends on the other — a version the other side has to publish, a schema it has to land first — brief the dependent one to that fact, or hold it back and spawn it once the first reports. Parallel or sequential is your call, and it follows from the dependency rather than from the task being one task. Then supervise both, and say in your answer which workspace holds which half.
 
@@ -925,20 +942,24 @@ export function roleForDepth(depth: number): AgentControlRole {
  * Reading one function is what stops the pair drifting apart again.
  *
  * The Concierge is on no lineage axis, so what it opens is a root orchestrator
- * with its own delegation budget rather than a child of the Concierge.
+ * with its own delegation budget rather than a child of the Concierge. A peer
+ * spawn is the other way to reach that answer: the user asked for a second
+ * orchestrator in one workspace, so what the spawn opens is a root even though
+ * an ordinary orchestrator opened it.
  *
  * A parent is required rather than nullable: absent lineage is depth 0, which
  * `roleForDepth` already calls an orchestrator, so answering `'subagent'` for a
  * missing parent here would put the two axes back in the disagreement above —
  * and the marker, which outranks depth, would win. Resolve the parent before
  * asking; a caller that cannot spends no depth and stamps no marker.
- * @param parent - The spawning caller.
+ * @param spawn - The spawning caller, and whether this spawn opens a peer.
  * @returns The role the spawned conversation holds.
  */
-export function spawnedChildRole(parent: {
+export function spawnedChildRole(spawn: {
 	concierge: boolean;
+	peer?: boolean;
 }): AgentControlRole {
-	return parent.concierge ? 'orchestrator' : 'subagent';
+	return spawn.concierge || spawn.peer === true ? 'orchestrator' : 'subagent';
 }
 
 /**

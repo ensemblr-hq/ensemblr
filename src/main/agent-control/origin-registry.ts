@@ -47,6 +47,13 @@ export interface OriginRegistry {
 	ancestorsOf: (sessionId: string) => readonly string[];
 	/** Session ids of the registered origins spawned directly by the given session. */
 	childrenOf: (sessionId: string) => readonly string[];
+	/**
+	 * Session ids of every live origin registered against a workspace, the
+	 * Concierge excluded — it belongs to none. Live rather than historical: an
+	 * origin is released when its session ends, so this answers "who is working
+	 * here right now", which is the question the peer cap asks.
+	 */
+	sessionsInWorkspace: (workspaceId: string) => readonly string[];
 }
 
 /** Options for {@link createOriginRegistry}; overrides exist for tests. */
@@ -155,6 +162,16 @@ export function createOriginRegistry(
 		return children;
 	};
 
+	const sessionsInWorkspace = (workspaceId: string): readonly string[] => {
+		const sessions: string[] = [];
+		for (const origin of bySession.values()) {
+			if (!origin.concierge && origin.workspaceId === workspaceId) {
+				sessions.push(origin.sessionId);
+			}
+		}
+		return sessions;
+	};
+
 	return {
 		register,
 		resolveByToken,
@@ -163,5 +180,6 @@ export function createOriginRegistry(
 		retire,
 		ancestorsOf,
 		childrenOf,
+		sessionsInWorkspace,
 	};
 }

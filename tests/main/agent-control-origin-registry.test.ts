@@ -144,3 +144,62 @@ describe('origin registry', () => {
 		expect(origin.retired).toBe(false);
 	});
 });
+
+// The peer cap counts concurrent writers on a workspace's one checkout, so it
+// asks the registry who is live there — not who ever was, and not the Concierge,
+// which belongs to no workspace and writes to none.
+describe('origin registry: who is live in a workspace', () => {
+	it('lists the sessions registered against that workspace only', () => {
+		const registry = createOriginRegistry();
+		registry.register({
+			sessionId: 'a',
+			species: 'pi',
+			workspaceCwd: '/a',
+			workspaceId: 'ws-a',
+		});
+		registry.register({
+			sessionId: 'b',
+			species: 'pi',
+			workspaceCwd: '/a',
+			workspaceId: 'ws-a',
+		});
+		registry.register({
+			sessionId: 'c',
+			species: 'pi',
+			workspaceCwd: '/b',
+			workspaceId: 'ws-b',
+		});
+
+		expect([...registry.sessionsInWorkspace('ws-a')].sort()).toEqual([
+			'a',
+			'b',
+		]);
+		expect(registry.sessionsInWorkspace('ws-b')).toEqual(['c']);
+	});
+
+	it('leaves out the Concierge, which belongs to no workspace', () => {
+		const registry = createOriginRegistry();
+		registry.register({
+			concierge: true,
+			sessionId: 'concierge',
+			species: 'pi',
+			workspaceCwd: '/home',
+			workspaceId: '',
+		});
+
+		expect(registry.sessionsInWorkspace('')).toEqual([]);
+	});
+
+	it('drops a session as soon as it is released', () => {
+		const registry = createOriginRegistry();
+		registry.register({
+			sessionId: 'a',
+			species: 'pi',
+			workspaceCwd: '/a',
+			workspaceId: 'ws-a',
+		});
+		registry.release('a');
+
+		expect(registry.sessionsInWorkspace('ws-a')).toEqual([]);
+	});
+});

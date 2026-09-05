@@ -497,6 +497,7 @@ function makeConversationPort(deps: PortAdapterDeps): ConversationPort {
 		startConversation: async ({
 			workspaceId,
 			workspaceCwd,
+			asPeer,
 			chatTabId,
 			prompt,
 			model,
@@ -564,7 +565,11 @@ function makeConversationPort(deps: PortAdapterDeps): ConversationPort {
 				thinkingLevel: selection.thinkingLevel,
 				initialPrompt: prompt,
 				executable,
-				parentSessionId,
+				// A peer records no parent, and that is what makes it a root on every
+				// axis rather than only in this module: the control registry reads
+				// lineage to resolve depth, and `resolveDelegation` treats any parent
+				// at all as proof of a spawned child and pins it to `ensemblr`.
+				...(asPeer ? {} : { parentSessionId }),
 				// The registry below cannot be seeded until the session has an id, so
 				// a runtime that gates on its starting permission mode would miss the
 				// spawn entirely without the flag riding the open itself.
@@ -587,7 +592,8 @@ function makeConversationPort(deps: PortAdapterDeps): ConversationPort {
 			const marker = writeSubAgentMarker(
 				deps,
 				targetTabId,
-				spawnedChildRole({ concierge: callerConcierge }) === 'subagent'
+				spawnedChildRole({ concierge: callerConcierge, peer: asPeer }) ===
+					'subagent'
 					? 'subagent'
 					: null,
 			);

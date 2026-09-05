@@ -49,6 +49,7 @@ export const CANONICAL_ARG_KEYS = {
 	name: 'Identity of a durable, addressable thing — the workspace and its git branch, a run script. Never the label of a tab or an artifact; that is `title`.',
 	ordinal: 'Position of a single transcript entry.',
 	panel: 'Which review panel to bring forward.',
+	peer: 'Open a second root orchestrator in this workspace rather than a sub-agent.',
 	path: 'Filesystem path a guarded tool call is about to write.',
 	plan: 'Markdown plan handed to the user.',
 	prNumber: 'Number of the pull request a tab is opened on.',

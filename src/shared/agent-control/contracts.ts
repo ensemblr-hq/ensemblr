@@ -228,7 +228,26 @@ export interface StartConversationArgs {
 	title?: string;
 	/** Block until the child conversation completes, subject to the wait timeout. */
 	wait?: boolean;
+	/**
+	 * Open a second root orchestrator in the caller's own workspace instead of a
+	 * sub-agent. Only when the user asked for one in so many words — the app puts
+	 * the spawn to them for confirmation rather than taking the agent's word for
+	 * it, because "the user asked" is not something a model can establish about
+	 * its own prompt.
+	 */
+	peer?: boolean;
 }
+
+/**
+ * How many root orchestrators may work one workspace at once, the caller
+ * included. Two, because they share one worktree and one git index and nothing
+ * arbitrates that: the hazard grows with every additional writer, and the user
+ * asked for *a* peer. It is also what bounds the recursion — a peer opening a
+ * peer is refused by this cap rather than by a rule about who may open what.
+ */
+export const PEER_ORCHESTRATOR_LIMITS = {
+	maxPerWorkspace: 2,
+} as const;
 
 /** Args for `setName`: set the display title of the caller's own conversation tab. */
 export interface SetNameArgs {

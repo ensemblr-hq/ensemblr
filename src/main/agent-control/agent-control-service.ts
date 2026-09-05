@@ -75,11 +75,13 @@ import {
 	buildConciergeMessage,
 	buildLanguageDirective,
 	buildLinkedIssueDirective,
+	buildPeerBriefDirective,
 	buildPlanModeDelegationDirective,
 	buildSessionBriefNudge,
 	CONCIERGE_AWARENESS,
 	conciergeControlOpDenial,
 	isWriteOp,
+	PEER_ORCHESTRATOR_LIMITS,
 	PLAN_REFINEMENT_DIRECTIVE,
 	resolveAgentRole,
 	retiredControlOpDenial,
@@ -938,6 +940,89 @@ export function createAgentControlService({
 	 *   stops instead of watching a child for a caller that has gone.
 	 * @returns The spawned conversation, or the reason it was refused.
 	 */
+	/**
+	 * Counts the root orchestrators already working a workspace, which is what the
+	 * peer cap is really about — concurrent writers on one checkout, not
+	 * conversations that once existed.
+	 *
+	 * Registered origins are the live set (one is released when its session ends),
+	 * and the durable marker is what separates a root from a sub-agent, exactly as
+	 * {@link resolveRole} does it — a resumed sub-agent re-registers at depth 0 and
+	 * would otherwise be counted as a second orchestrator and refuse a legitimate
+	 * peer.
+	 * @param workspaceId - Workspace to count in.
+	 * @returns The session ids of the root orchestrators live there now.
+	 */
+	const rootsInWorkspace = async (
+		workspaceId: string,
+	): Promise<readonly string[]> => {
+		const sessions = originRegistry.sessionsInWorkspace(workspaceId);
+		const marks = await Promise.all(
+			sessions.map((sessionId) =>
+				ports.conversations.isSpawnedSubAgent(sessionId),
+			),
+		);
+		return sessions.filter((_, index) => !marks[index]);
+	};
+
+	/**
+	 * Decides whether a peer orchestrator may be opened, and asks the user.
+	 *
+	 * "The user explicitly asked for this" cannot be a judgement the spawning agent
+	 * makes about its own prompt, so it is not asked to make it: passing `peer`
+	 * states an intent, and the confirmation is what turns that into authority. The
+	 * prompt is raised whatever the permission mode, unlike
+	 * {@link gatePermission}'s — `workspace-trusted` is the user trusting an agent
+	 * with its own workspace, which is not the same as trusting it to put a second
+	 * writer in there.
+	 *
+	 * The cap is what bounds the recursion. A peer is a root and looks like one to
+	 * every other gate, so "peers may not open peers" is not a rule the app could
+	 * check; a second peer is refused because the workspace already holds its
+	 * allowance, which is the same answer for a better reason.
+	 * @param origin - Resolved caller identity.
+	 * @param signal - Aborts when the spawning turn ends, withdrawing the prompt.
+	 * @returns A denial envelope, or null when the peer may be opened.
+	 */
+	const gatePeerSpawn = async (
+		origin: AgentControlOrigin,
+		signal: AbortSignal | undefined,
+	): Promise<AgentControlResult<never> | null> => {
+		if (origin.concierge) {
+			return fail(
+				'invalid-args',
+				'Drop `peer`: what `ensemblr_start_conversation` opens for you is already a root orchestrator with its own delegation budget, in the workspace you name. `peer` is for an orchestrator opening a second one alongside itself.',
+			);
+		}
+		if (isPlanning(origin)) {
+			return fail(
+				'denied-scope',
+				'A peer orchestrator is a second writer on this worktree, and you are planning — there is nothing yet for two agents to write. Say in the plan that the work splits in two, and open the peer once the plan is approved.',
+			);
+		}
+		const roots = await rootsInWorkspace(origin.workspaceId);
+		if (roots.length >= PEER_ORCHESTRATOR_LIMITS.maxPerWorkspace) {
+			return fail(
+				'denied-quota',
+				`This workspace already has ${roots.length} orchestrators working in it (${roots.join(', ')}), which is the limit — they share one worktree and one git index, and nothing arbitrates a third writer. Steer one of them with \`ensemblr_send_follow_up\`, or do the work here.`,
+			);
+		}
+		const approved = await ports.confirm.confirm({
+			origin,
+			signal,
+			summary: `Open a second orchestrator in this workspace? It shares the worktree and git index with this conversation.`,
+		});
+		if (signal?.aborted) {
+			return fail('timeout', ABANDONED_CONFIRMATION);
+		}
+		return approved
+			? null
+			: fail(
+					'denied-permission',
+					'The user declined to open a peer orchestrator. Do the work in this conversation instead, and do not ask again unless they raise it.',
+				);
+	};
+
 	const handleStartConversation = async (
 		origin: AgentControlOrigin,
 		args: StartConversationArgs,
@@ -964,11 +1049,21 @@ export function createAgentControlService({
 		if (spawnDenied) {
 			return spawnDenied;
 		}
+		const asPeer = args.peer === true;
+		if (asPeer) {
+			const peerDenied = await gatePeerSpawn(origin, signal);
+			if (peerDenied) {
+				return peerDenied;
+			}
+		}
 		const started = await ports.conversations.startConversation({
 			workspaceId: target.workspaceId,
 			workspaceCwd: target.cwd,
+			asPeer,
 			chatTabId: args.chatTabId,
-			prompt: args.prompt,
+			prompt: asPeer
+				? `${buildPeerBriefDirective(origin.sessionId)}\n\n---\n\n${args.prompt}`
+				: args.prompt,
 			model: args.model,
 			thinkingLevel: args.thinkingLevel,
 			title: args.title,

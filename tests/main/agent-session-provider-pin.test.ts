@@ -418,6 +418,7 @@ describe('a spawned sub-agent starts in Plan Mode rather than joining it late', 
 		} as never);
 
 		await ports.conversations.startConversation({
+			asPeer: false,
 			callerConcierge: false,
 			callerRuntime: 'pi',
 			parentSessionId: 'ws:ws',

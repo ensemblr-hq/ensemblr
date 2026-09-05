@@ -52,15 +52,30 @@ const spawnChatTabSchema = z.strictObject({
 	title: nonEmpty.optional(),
 });
 
-const startConversationSchema = z.strictObject({
-	chatTabId: nonEmpty.optional(),
-	prompt: nonEmpty,
-	model: nonEmpty.optional(),
-	thinkingLevel: nonEmpty.optional(),
-	title: nonEmpty.optional(),
-	wait: z.boolean().optional(),
-	workspaceId: nonEmpty.optional(),
-});
+// The two peer refinements are rejections rather than silent corrections
+// because both would otherwise produce something the caller did not ask for: an
+// unnamed second orchestrator tab is indistinguishable from the first on the tab
+// strip, and a blocking wait on a peer would hold the spawner's turn open for
+// work that is deliberately not its own.
+const startConversationSchema = z
+	.strictObject({
+		chatTabId: nonEmpty.optional(),
+		peer: z.boolean().optional(),
+		prompt: nonEmpty,
+		model: nonEmpty.optional(),
+		thinkingLevel: nonEmpty.optional(),
+		title: nonEmpty.optional(),
+		wait: z.boolean().optional(),
+		workspaceId: nonEmpty.optional(),
+	})
+	.refine((args) => !args.peer || Boolean(args.title), {
+		message:
+			'A peer orchestrator needs a `title`: it shares the tab strip with the conversation that opened it, and two unnamed orchestrator tabs cannot be told apart.',
+	})
+	.refine((args) => !args.peer || !args.wait, {
+		message:
+			'A peer is not a child to wait on — it is a root orchestrator with its own turn and its own user. Drop `wait`, and read its tab when it has something to say.',
+	});
 
 const setNameSchema = z.strictObject({
 	title: nonEmpty,

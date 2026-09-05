@@ -246,7 +246,14 @@ const setup = (
 		architectureDiagram?: boolean;
 	} = {},
 ) => {
-	const registry = createOriginRegistry({ generateToken: () => 'tok-caller' });
+	// The caller keeps `tok-caller`; anything a test registers afterwards gets its
+	// own token. One fixed token for every registration silently re-pointed
+	// `tok-caller` at the last session registered, so a test that added a second
+	// agent to the workspace was quietly testing that agent instead of the caller.
+	let minted = 0;
+	const registry = createOriginRegistry({
+		generateToken: () => (minted++ === 0 ? 'tok-caller' : `tok-${minted}`),
+	});
 	registry.register({
 		sessionId: 'caller',
 		workspaceId: options.concierge ? '' : 'ws',
@@ -2001,6 +2008,208 @@ describe('agent-control service: review', () => {
 	});
 });
 
+// Two orchestrators in one workspace are two writers on one git checkout, and the
+// app cannot arbitrate that. So every gate here is about the two things it CAN
+// do: make the user authorize the second writer rather than take the agent's word
+// that they asked, and bound how many there can be.
+describe('agent-control service: peer orchestrators', () => {
+	const PEER = {
+		peer: true,
+		prompt: 'Take the renderer half.',
+		title: 'Renderer half',
+	};
+
+	it('opens a peer as a root, with no parent and the co-tenancy contract in its prompt', async () => {
+		const ports = makePorts();
+		const { service } = setup({ ports });
+
+		const result = await service.invoke({
+			op: 'startConversation',
+			token: 'tok-caller',
+			rawArgs: PEER,
+		});
+
+		expect(result.ok).toBe(true);
+		const call = vi
+			.mocked(ports.conversations.startConversation)
+			.mock.calls.at(0)?.[0];
+		expect(call?.asPeer).toBe(true);
+		expect(call?.prompt).toContain('YOU ARE A PEER ORCHESTRATOR');
+		expect(call?.prompt).toContain('caller');
+		expect(call?.prompt).toContain('Take the renderer half.');
+	});
+
+	// "The user explicitly asked for this" is not something a model can establish
+	// about its own prompt, so the flag states an intent and the confirmation is
+	// what turns it into authority.
+	it('asks the user even in a mode that confirms nothing else', async () => {
+		const ports = makePorts({ mode: 'workspace-trusted' });
+		const { service } = setup({ ports });
+
+		await service.invoke({
+			op: 'startConversation',
+			token: 'tok-caller',
+			rawArgs: PEER,
+		});
+		const ordinary = makePorts({ mode: 'workspace-trusted' });
+		await setup({ ports: ordinary }).service.invoke({
+			op: 'startConversation',
+			token: 'tok-caller',
+			rawArgs: { prompt: 'go' },
+		});
+
+		expect(ports.confirm.confirm).toHaveBeenCalledTimes(1);
+		expect(ordinary.confirm.confirm).not.toHaveBeenCalled();
+	});
+
+	it('opens nothing when the user declines', async () => {
+		const ports = makePorts({ confirm: false });
+		const { service } = setup({ ports });
+
+		const result = await service.invoke({
+			op: 'startConversation',
+			token: 'tok-caller',
+			rawArgs: PEER,
+		});
+
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.code).toBe('denied-permission');
+			expect(result.error).toContain('do not ask again');
+		}
+		expect(ports.conversations.startConversation).not.toHaveBeenCalled();
+	});
+
+	// The cap is what bounds the recursion: a peer is a root and looks like one to
+	// every gate, so a peer opening a peer is refused because the workspace is
+	// full rather than by a rule about who may open what.
+	it('refuses a third orchestrator in one workspace and names the two already there', async () => {
+		const ports = makePorts();
+		const { registry, service } = setup({ ports });
+		registry.register({
+			sessionId: 'peer',
+			species: 'pi',
+			workspaceCwd: '/ws',
+			workspaceId: 'ws',
+		});
+
+		const result = await service.invoke({
+			op: 'startConversation',
+			token: 'tok-caller',
+			rawArgs: PEER,
+		});
+
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.code).toBe('denied-quota');
+			expect(result.error).toContain('caller');
+			expect(result.error).toContain('peer');
+		}
+		expect(ports.conversations.startConversation).not.toHaveBeenCalled();
+	});
+
+	// A resumed sub-agent re-registers at depth 0 and would otherwise be counted
+	// as a second orchestrator, refusing a peer the workspace has room for.
+	it('does not count a spawned sub-agent towards the cap', async () => {
+		const ports = makePorts();
+		vi.mocked(ports.conversations.isSpawnedSubAgent).mockImplementation(
+			async (sessionId) => sessionId === 'child',
+		);
+		const { registry, service } = setup({ ports });
+		registry.register({
+			sessionId: 'child',
+			species: 'pi',
+			workspaceCwd: '/ws',
+			workspaceId: 'ws',
+		});
+
+		const result = await service.invoke({
+			op: 'startConversation',
+			token: 'tok-caller',
+			rawArgs: PEER,
+		});
+
+		expect(result.ok).toBe(true);
+	});
+
+	it('refuses a peer while planning', async () => {
+		const ports = makePorts({ planning: true });
+		const { service } = setup({ ports });
+
+		const result = await service.invoke({
+			op: 'startConversation',
+			token: 'tok-caller',
+			rawArgs: PEER,
+		});
+
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.code).toBe('denied-scope');
+		}
+		expect(ports.confirm.confirm).not.toHaveBeenCalled();
+	});
+
+	it('tells the Concierge that what it opens is already a root', async () => {
+		const ports = makePorts();
+		ports.workspaces.listWorkspaces = vi
+			.fn()
+			.mockResolvedValue([{ cwd: '/ws', name: 'ws', workspaceId: 'ws' }]);
+		const { service } = setup({ concierge: true, ports });
+
+		const result = await service.invoke({
+			op: 'startConversation',
+			token: 'tok-caller',
+			rawArgs: { ...PEER, workspaceId: 'ws' },
+		});
+
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.code).toBe('invalid-args');
+		}
+	});
+
+	it('rejects a peer with no title, and a peer asked to be waited on', async () => {
+		const ports = makePorts();
+		const { service } = setup({ ports });
+
+		const untitled = await service.invoke({
+			op: 'startConversation',
+			token: 'tok-caller',
+			rawArgs: { peer: true, prompt: 'go' },
+		});
+		const waited = await service.invoke({
+			op: 'startConversation',
+			token: 'tok-caller',
+			rawArgs: { ...PEER, wait: true },
+		});
+
+		expect(untitled.ok).toBe(false);
+		expect(waited.ok).toBe(false);
+		if (!waited.ok) {
+			expect(waited.error).toContain('not a child to wait on');
+		}
+		expect(ports.conversations.startConversation).not.toHaveBeenCalled();
+	});
+
+	it('leaves an ordinary spawn a sub-agent, with its lineage intact', async () => {
+		const ports = makePorts();
+		const { service } = setup({ ports });
+
+		await service.invoke({
+			op: 'startConversation',
+			token: 'tok-caller',
+			rawArgs: { prompt: 'go' },
+		});
+
+		const call = vi
+			.mocked(ports.conversations.startConversation)
+			.mock.calls.at(0)?.[0];
+		expect(call?.asPeer).toBe(false);
+		expect(call?.parentSessionId).toBe('caller');
+		expect(call?.prompt).toBe('go');
+	});
+});
+
 // The Concierge never reads a workspace on its own initiative, so this is the one
 // channel by which anything an orchestrator finds reaches it at all. Every failure
 // mode here is the same failure — a discovery that reaches nobody — so what
@@ -2284,7 +2493,7 @@ describe('agent-control service: linear', () => {
 			token: 'tok-caller',
 			rawArgs: { query: 'terminal' },
 		});
-		registry.register({
+		const other = registry.register({
 			sessionId: 'other',
 			species: 'pi',
 			workspaceCwd: '/ws',
@@ -2292,7 +2501,7 @@ describe('agent-control service: linear', () => {
 		});
 		const result = await service.invoke({
 			op: 'linearCreateIssue',
-			token: 'tok-caller',
+			token: other.token,
 			rawArgs: { teamId: 't-1', title: 'A follow-up' },
 		});
 

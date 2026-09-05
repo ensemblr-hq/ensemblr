@@ -50,6 +50,10 @@ export {
 	buildLinkedIssueDirective,
 	LINKED_ISSUE_DIRECTIVE_HEADER,
 } from './agent-control/linked-issue-directive.ts';
+export {
+	buildPeerBriefDirective,
+	PEER_BRIEF_HEADER,
+} from './agent-control/peer-brief.ts';
 export { buildPlanSubmittedResult } from './agent-control/plan-mode.ts';
 export * from './agent-control/schemas.ts';
 export {

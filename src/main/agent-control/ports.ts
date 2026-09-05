@@ -242,6 +242,18 @@ export interface ConversationPort {
 		 * can never have one.
 		 */
 		callerConcierge: boolean;
+		/**
+		 * Whether this spawn opens a peer orchestrator rather than a sub-agent.
+		 * Required rather than optional for the same reason `callerConcierge` and
+		 * `planMode` are: a second spawn route that forgot it would open a peer with
+		 * the sub-agent policy, which is the one thing a peer must not have.
+		 *
+		 * It also drops the lineage. A peer is nobody's child — it records no
+		 * parent, so it registers at depth 0 with its own delegation budget, it is
+		 * not among the children `waitForAgents` defaults to, and it outlives the
+		 * turn that opened it.
+		 */
+		asPeer: boolean;
 		/** Caller session id, threaded into the child's spawn env for lineage. */
 		parentSessionId: string;
 		/**

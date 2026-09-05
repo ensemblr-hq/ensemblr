@@ -295,7 +295,7 @@ nor a chat tab of its own).
 | Tool | Arguments | Gate | Withheld from |
 | --- | --- | --- | --- |
 | `ensemblr_spawn_chat_tab` | `title?: string` | write, spawn | sub-agent, Concierge |
-| `ensemblr_start_conversation` | **`prompt: string`**, `chatTabId?: string`, `model?: string`, `thinkingLevel?: string`, `title?: string`, `wait?: boolean`, `workspaceId?: string` | write, spawn | sub-agent |
+| `ensemblr_start_conversation` | **`prompt: string`**, `chatTabId?: string`, `model?: string`, `peer?: boolean`, `thinkingLevel?: string`, `title?: string`, `wait?: boolean`, `workspaceId?: string` | write, spawn | sub-agent |
 | `ensemblr_send_follow_up` | **`agentSessionId: string`**, **`prompt: string`**, `wait?: boolean` | write | sub-agent |
 | `ensemblr_wait_for_agents` | `targets?: string[]`, `mode?: 'first' \| 'all'`, `reports?: 'full' \| 'brief'`, `timeoutMs?: number` | read | sub-agent\* |
 | `ensemblr_notify_orchestrator` | **`reason: 'need_decision' \| 'blocked' \| 'progress' \| 'done'`**, **`message: string`** | read | Concierge |
@@ -306,6 +306,52 @@ nor a chat tab of its own).
 `waitForAgents` and `notifyOrchestrator` are reads, so they survive `read-only`
 mode — a blocked child can still reach its orchestrator when every write is
 refused.
+
+### Peer orchestrators
+
+`startConversation` with `peer: true` opens a **second root orchestrator** in the
+caller's own workspace rather than a sub-agent: a full orchestrator with its own
+delegation budget, its own tab, and its own user. It records no
+`parentSessionId`, which is what makes it a root on every axis rather than only
+in the spawn path — the origin registry resolves depth from lineage, and
+`resolveDelegation` reads any parent at all as proof of a spawned child. It is
+therefore not among the children `waitForAgents` defaults to, and it outlives the
+turn that opened it.
+
+Four gates, in order:
+
+1. **The Concierge is refused** — what `startConversation` opens for it is already
+   a root, so `peer` there is a misunderstanding rather than a request.
+2. **Plan Mode is refused.** A peer is a second writer, and a planning agent has
+   nothing yet for two agents to write.
+3. **Two orchestrators per workspace**, the caller included, counted as live
+   control origins in the workspace minus the ones carrying the durable
+   sub-agent marker. This is also what bounds the recursion: a peer is a root and
+   looks like one to every gate, so "peers may not open peers" is not a rule the
+   app could check — a second peer is refused because the workspace is full.
+4. **The user confirms it**, through `ConfirmPort`, whatever the permission mode.
+   "The user explicitly asked for this" is not something a model can establish
+   about its own prompt, so passing `peer` states an intent and the confirmation
+   is what turns it into authority. `workspace-trusted` is the user trusting an
+   agent with its own workspace, which is not the same as trusting it to add a
+   second writer to it.
+
+The schema refuses a peer with no `title` (two unnamed orchestrator tabs cannot
+be told apart) and a peer with `wait` (it is not a child to wait on).
+
+**Nothing arbitrates the shared checkout**, and the app does not pretend
+otherwise: file writes go through each agent's own runtime and neither process
+can see the other's uncommitted edits. What the app does instead is prepend
+`buildPeerBriefDirective` (`src/shared/agent-control/peer-brief.ts`) to the peer's
+first prompt — the spawner is the designated committer, the peer stays inside the
+files its brief names, it checks `getWorkspaceDiff` before assuming a file is
+free, and it raises a collision with `sendFollowUp` against the spawner's session
+id rather than resolving it itself. That is a contract, not a lock, and it is
+written down as one.
+
+The Concierge needs nothing new to see a peer: `listTabs` lists every chat tab in
+a workspace with its `agentSessionId`, and `outOfScope` already exempts the
+Concierge from the own-workspace rule, so it can address either orchestrator.
 
 `messageConcierge` is the same act one level up, and is a **write** rather than a
 read for a reason the two do not share: `notifyOrchestrator` sets a flag its
