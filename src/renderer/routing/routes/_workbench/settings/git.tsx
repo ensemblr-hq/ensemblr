@@ -14,10 +14,12 @@ import {
 	archiveOnMergeAtom,
 	branchPrefixCustomAtom,
 	branchPrefixSourceAtom,
+	coAuthorEnsemblrAtom,
 	deleteBranchOnArchiveAtom,
 	renameWorkspaceOnBranchAtom,
 	setUpstreamOnPushAtom,
 } from '@/renderer/state/preferences';
+import { ENSEMBLR_CO_AUTHOR_TRAILER } from '@/shared/co-author';
 import { DEFAULT_APP_SETTINGS } from '@/shared/config';
 
 /** Route for the Git settings section; renders the git-settings panel. */
@@ -39,6 +41,7 @@ function GitSettings() {
 	const [deleteBranch, setDeleteBranch] = useAtom(deleteBranchOnArchiveAtom);
 	const [archiveOnMerge, setArchiveOnMerge] = useAtom(archiveOnMergeAtom);
 	const [setUpstream, setSetUpstream] = useAtom(setUpstreamOnPushAtom);
+	const [coAuthor, setCoAuthor] = useAtom(coAuthorEnsemblrAtom);
 
 	const branchPrefixModified =
 		prefixSource !== DEFAULTS.branchPrefixSource ||
@@ -170,6 +173,21 @@ function GitSettings() {
 				)}
 				modified={setUpstream !== DEFAULTS.setUpstreamOnPush}
 				onReset={() => setSetUpstream(DEFAULTS.setUpstreamOnPush)}
+			/>
+
+			<SettingRow
+				control={<Switch checked={coAuthor} onCheckedChange={setCoAuthor} />}
+				description={t(
+					'settings:git.co-author.description',
+					"Ask agents to end every commit they make with `{{trailer}}`. GitHub credits the trailer to the Ensemblr account, so it appears alongside you in the repository's contributors.",
+					{ trailer: ENSEMBLR_CO_AUTHOR_TRAILER },
+				)}
+				label={t(
+					'settings:git.co-author.label',
+					'Credit Ensemblr as a commit co-author',
+				)}
+				modified={coAuthor !== DEFAULTS.coAuthorEnsemblr}
+				onReset={() => setCoAuthor(DEFAULTS.coAuthorEnsemblr)}
 			/>
 		</SettingsSection>
 	);

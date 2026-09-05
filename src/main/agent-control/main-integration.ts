@@ -11,6 +11,7 @@ import path from 'node:path';
 import { type App, BrowserWindow, dialog } from 'electron';
 
 import {
+	buildCoAuthorDirective,
 	buildLanguageDirective,
 	buildLinkedIssueDirective,
 	harnessAwareness,
@@ -54,6 +55,12 @@ interface AgentControlIntegrationDeps {
 	 * it. Omitted, the feature reads as off.
 	 */
 	readArchitectureDiagramEnabled?: () => boolean;
+	/**
+	 * Whether the user opted into crediting Ensemblr as a commit co-author. Off,
+	 * the harness playbook never mentions the trailer. Omitted, the credit reads
+	 * as off, which is also its shipped default.
+	 */
+	readCoAuthorEnabled?: () => boolean;
 	/**
 	 * Reads the issue a workspace was created from, for the linked-issue block in
 	 * the harness playbook. Omitted, a harness launches with no prose about the
@@ -136,34 +143,33 @@ function resolvePiControlExtensionPath(app: App): string | null {
  * file left behind by a failed write is inert — a harness reads only `AGENTS.md`
  * — and the next write reuses and consumes it.
  *
- * Writing per launch also re-resolves both directives per launch, which is the
+ * Writing per launch also re-resolves every directive per launch, which is the
  * only reliable channel a harness has for them: it reads this file once at
  * startup and the app never prompts it again.
- * @param app - The Electron app, for the `userData` path.
- * @param language - The language the app is rendering in.
- * @param workspaceId - Workspace the harness is launching into, keying its directory.
- * @param issueDirective - The workspace's linked-issue block, or null when it has none.
- * @param architectureDiagram - Whether the architecture diagram feature is on.
+ * @param input - The app and workspace the playbook is written for, plus the
+ *   directive blocks to append after the awareness and language ones. Named
+ *   rather than positional because the blocks are interchangeable `string | null`
+ *   values that a positional list would let a caller silently transpose.
  * @returns Absolute path to the directory holding the playbook, or null.
  */
-function writeHarnessInstructions(
-	app: App,
-	language: AppLanguage,
-	workspaceId: string,
-	issueDirective: string | null,
-	architectureDiagram: boolean,
-): string | null {
+function writeHarnessInstructions(input: {
+	app: App;
+	architectureDiagram: boolean;
+	directives: readonly (string | null)[];
+	language: AppLanguage;
+	workspaceId: string;
+}): string | null {
 	const directory = path.join(
-		app.getPath('userData'),
+		input.app.getPath('userData'),
 		'harness-instructions',
-		workspaceId,
+		input.workspaceId,
 	);
 	const playbook = path.join(directory, HARNESS_INSTRUCTIONS_FILENAME);
 	const staging = `${playbook}.tmp`;
 	const blocks = [
-		harnessAwareness(architectureDiagram),
-		buildLanguageDirective(language),
-		issueDirective,
+		harnessAwareness(input.architectureDiagram),
+		buildLanguageDirective(input.language),
+		...input.directives,
 	].filter((block) => block !== null);
 	try {
 		mkdirSync(directory, { recursive: true });
@@ -222,29 +228,41 @@ async function confirmAgentControlAction({
 
 /**
  * Builds the agent-control main-process integration primitives.
- * @param deps - The Electron app, origin registry, workspace-cwd lookup, and
- *   a live control-server URL getter.
+ * @param deps - The Electron app, origin registry, workspace-cwd lookup, and a
+ *   live control-server URL getter. Every optional collaborator takes its
+ *   documented default here rather than at each read, so the primitives below
+ *   call a plain function and a new one cannot be read with the wrong fallback.
  * @returns The env resolver, harness-command augmenter, confirm dialog, and
  *   resolved extension path.
  */
-export function createAgentControlIntegration(
-	deps: AgentControlIntegrationDeps,
-): AgentControlIntegration {
+export function createAgentControlIntegration({
+	app,
+	getLanguage,
+	getServerUrl,
+	isSpawnedSubAgent = () => false,
+	originRegistry,
+	readArchitectureDiagramEnabled = () => false,
+	readCoAuthorEnabled = () => false,
+	readLinkedIssue = () => null,
+	readSkillPluginDirectories = () => [],
+	resolveConciergeCwd = () => null,
+	resolveWorkspaceCwd,
+}: AgentControlIntegrationDeps): AgentControlIntegration {
 	const resolveAgentControlEnv: AgentControlEnvResolver = (
 		identity,
 	): Record<string, string> => {
-		const serverUrl = deps.getServerUrl();
+		const serverUrl = getServerUrl();
 		if (!serverUrl) {
 			return {};
 		}
 		const concierge = identity.concierge === true;
 		const cwd = concierge
-			? (deps.resolveConciergeCwd?.() ?? null)
-			: deps.resolveWorkspaceCwd(identity.workspaceId);
+			? resolveConciergeCwd()
+			: resolveWorkspaceCwd(identity.workspaceId);
 		if (!cwd) {
 			return {};
 		}
-		const origin = deps.originRegistry.register({
+		const origin = originRegistry.register({
 			sessionId: identity.sessionId,
 			workspaceId: identity.workspaceId,
 			concierge,
@@ -255,8 +273,7 @@ export function createAgentControlIntegration(
 		});
 		// A Concierge can never carry the sub-agent marker, and reading it would
 		// query the database for a chat tab that does not exist.
-		const marked =
-			!concierge && deps.isSpawnedSubAgent?.(identity.sessionId) === true;
+		const marked = !concierge && isSpawnedSubAgent(identity.sessionId);
 		return {
 			[CONTROL_URL_ENV_KEY]: serverUrl,
 			[CONTROL_TOKEN_ENV_KEY]: origin.token,
@@ -265,7 +282,7 @@ export function createAgentControlIntegration(
 				origin.depth,
 				origin.concierge,
 			),
-			...(deps.readArchitectureDiagramEnabled?.()
+			...(readArchitectureDiagramEnabled()
 				? { [CONTROL_ARCHITECTURE_ENV_KEY]: CONTROL_ARCHITECTURE_ENABLED }
 				: {}),
 		};
@@ -277,16 +294,19 @@ export function createAgentControlIntegration(
 		workspaceId: string,
 	): string =>
 		decorateHarnessCommand(command, {
-			baseUrl: deps.getServerUrl(),
+			baseUrl: getServerUrl(),
 			harnessId,
-			instructionsDirectory: writeHarnessInstructions(
-				deps.app,
-				deps.getLanguage(),
+			instructionsDirectory: writeHarnessInstructions({
+				app,
+				architectureDiagram: readArchitectureDiagramEnabled(),
+				directives: [
+					buildLinkedIssueDirective(readLinkedIssue(workspaceId)),
+					buildCoAuthorDirective(readCoAuthorEnabled()),
+				],
+				language: getLanguage(),
 				workspaceId,
-				buildLinkedIssueDirective(deps.readLinkedIssue?.(workspaceId) ?? null),
-				deps.readArchitectureDiagramEnabled?.() ?? false,
-			),
-			skillPluginDirectories: deps.readSkillPluginDirectories?.() ?? [],
+			}),
+			skillPluginDirectories: readSkillPluginDirectories(),
 			token:
 				resolveAgentControlEnv({
 					workspaceId,
@@ -299,6 +319,6 @@ export function createAgentControlIntegration(
 		resolveAgentControlEnv,
 		augmentHarnessCommand,
 		confirmAgentControlAction,
-		piControlExtensionPath: resolvePiControlExtensionPath(deps.app),
+		piControlExtensionPath: resolvePiControlExtensionPath(app),
 	};
 }

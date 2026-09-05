@@ -15,8 +15,10 @@ import {
 	createOriginRegistry,
 } from '../../src/main/agent-control/index.ts';
 import {
+	buildCoAuthorDirective,
 	buildLanguageDirective,
 	buildLinkedIssueDirective,
+	CO_AUTHOR_DIRECTIVE_HEADER,
 	harnessAwareness,
 	LINKED_ISSUE_DIRECTIVE_HEADER,
 	type WorkspaceLinkedIssue,
@@ -50,6 +52,7 @@ const userDataDirectories: string[] = [];
 const launchHarness = (
 	language: AppLanguage,
 	linkedIssue: WorkspaceLinkedIssue | null = null,
+	coAuthor = false,
 ) => {
 	const userData = mkdtempSync(path.join(tmpdir(), 'ensemblr-harness-'));
 	userDataDirectories.push(userData);
@@ -63,6 +66,7 @@ const launchHarness = (
 		readArchitectureDiagramEnabled: () => true,
 		getServerUrl: () => SERVER_URL,
 		originRegistry: createOriginRegistry({ generateToken: () => 'tok' }),
+		readCoAuthorEnabled: () => coAuthor,
 		readLinkedIssue: () => linkedIssue,
 		resolveWorkspaceCwd: () => '/tmp/ws-1',
 	});
@@ -136,6 +140,21 @@ describe('the harness playbook file', () => {
 	it('leaves the issue block out for a workspace with no linked issue', () => {
 		expect(launchHarness('en').playbook).not.toContain(
 			LINKED_ISSUE_DIRECTIVE_HEADER,
+		);
+	});
+
+	it('names the commit trailer once the user opts into the credit', () => {
+		const { playbook } = launchHarness('en', null, true);
+
+		expect(playbook).toBe(
+			`${HARNESS_AWARENESS}\n\n${buildCoAuthorDirective(true)}\n`,
+		);
+		expect(playbook).toContain('Co-authored-by: Ensemblr <howdy@ensemblr.dev>');
+	});
+
+	it('leaves the co-author block out while the credit is off', () => {
+		expect(launchHarness('en').playbook).not.toContain(
+			CO_AUTHOR_DIRECTIVE_HEADER,
 		);
 	});
 

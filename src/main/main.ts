@@ -13,6 +13,7 @@ import {
 } from 'electron';
 import {
 	awarenessForAudience,
+	buildCoAuthorDirective,
 	buildLanguageDirective,
 	parseAskUserQuestionReply,
 	resolveAgentRole,
@@ -378,6 +379,15 @@ const databaseService = createEnsemblrDatabaseService(
  */
 const readArchitectureDiagramEnabled = (): boolean =>
 	appSettingsService.read().experimental.architectureDiagram;
+/**
+ * Reads the user's "Credit Ensemblr as a commit co-author" setting, which puts
+ * the trailer block into the playbooks an agent receives. Read per call rather
+ * than captured, and for the same reason the diagram flag is: the settings file
+ * is watched, so a session opened after the switch flips gets the block.
+ * @returns True when the user has opted into the credit.
+ */
+const readCoAuthorEnabled = (): boolean =>
+	appSettingsService.read().git.coAuthorEnsemblr;
 // The chat the renderer last reported as on screen, so a desktop notification is
 // suppressed for that chat alone rather than for the whole app.
 const activeChatStore = new ActiveChatStore();
@@ -614,6 +624,7 @@ const {
 	app,
 	originRegistry: agentControlOriginRegistry,
 	readArchitectureDiagramEnabled,
+	readCoAuthorEnabled,
 	readSkillPluginDirectories: () => readAgentSkillBundle().pluginDirectories,
 	/** Resolves a workspace's checkout path, or null before the database is open. */
 	resolveWorkspaceCwd: (workspaceId) => {
@@ -1114,6 +1125,9 @@ const conciergeSessionService = createConciergeSessionService({
 						})
 					: null,
 				buildLanguageDirective(resolveAppLanguage()),
+				// Unlike a workspace chat the Concierge gets no per-turn preamble, so
+				// its credit is fixed at open: a toggle reaches the next session.
+				buildCoAuthorDirective(readCoAuthorEnabled()),
 			]
 				.filter((block) => block !== null)
 				.join('\n\n'),

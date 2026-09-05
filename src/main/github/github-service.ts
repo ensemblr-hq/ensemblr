@@ -1,6 +1,7 @@
 import path from 'node:path';
 
 import { bareBranchName } from '../../shared/branch-ref.ts';
+import { buildCoAuthorTrailers } from '../../shared/co-author.ts';
 import {
 	extractPullRequestNumber,
 	extractPullRequestUrl,
@@ -121,10 +122,17 @@ export function createGithubService({
 	databaseService,
 	localCommandService,
 	now = () => new Date(),
+	readCoAuthorEnabled = () => false,
 }: {
 	databaseService: EnsemblrDatabaseService;
 	localCommandService: LocalCommandService;
 	now?: () => Date;
+	/**
+	 * Whether to credit Ensemblr as a co-author on commits this service makes.
+	 * Read here rather than taken from the request so no caller can forget it,
+	 * and read per commit so a toggle lands on the next one.
+	 */
+	readCoAuthorEnabled?: () => boolean;
 }): GithubService {
 	/**
 	 * Run a `gh` or `git` command through the local command service, applying the
@@ -553,7 +561,11 @@ export function createGithubService({
 				};
 			}
 
-			const commitResult = await run('git', cwd.cwd, ['commit', '-m', message]);
+			const commitResult = await run(
+				'git',
+				cwd.cwd,
+				buildCommitArgs(message, buildCoAuthorTrailers(readCoAuthorEnabled())),
+			);
 			if (commitResult.status !== 'success') {
 				const stdout = commitResult.stdout.toLowerCase();
 				if (stdout.includes('nothing to commit')) {
@@ -737,6 +749,27 @@ export function createGithubService({
 			Number.isFinite(parsed) && current.getTime() - parsed < SNAPSHOT_TTL_MS
 		);
 	}
+}
+
+/**
+ * Builds the `git commit` argv, appending each requested trailer through
+ * `--trailer` rather than into the message text so git owns the placement: it
+ * inserts the blank line, keeps the block last, and skips a trailer identical to
+ * the one already beneath it.
+ * @param message - The commit message the caller supplied.
+ * @param trailers - Trailer lines to append, empty when the credit is off.
+ * @returns The argv to hand `git`.
+ */
+function buildCommitArgs(
+	message: string,
+	trailers: readonly string[],
+): string[] {
+	return [
+		'commit',
+		'-m',
+		message,
+		...trailers.flatMap((trailer) => ['--trailer', trailer]),
+	];
 }
 
 /** Validates the renderer-supplied workspace cwd. */

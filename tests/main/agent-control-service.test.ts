@@ -193,6 +193,7 @@ const makePorts = (
 		}),
 	},
 	permissions: { getMode: () => overrides.mode ?? 'workspace-trusted' },
+	commitCredit: { isCoAuthorEnabled: () => false },
 	language: { getLanguage: () => overrides.language ?? 'en' },
 	confirm: { confirm: vi.fn().mockResolvedValue(overrides.confirm ?? true) },
 	ask: { ask: vi.fn(), releaseSession: vi.fn() },

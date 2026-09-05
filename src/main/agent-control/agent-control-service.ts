@@ -67,6 +67,7 @@ import type {
 } from '../../shared/agent-control.ts';
 import {
 	briefReport,
+	buildCoAuthorDirective,
 	buildLanguageDirective,
 	buildLinkedIssueDirective,
 	buildPlanModeDelegationDirective,
@@ -169,6 +170,14 @@ export interface AgentControlService {
 	 * @returns The directive to append, or null when the app is in English.
 	 */
 	readLanguageDirective: () => string | null;
+	/**
+	 * Renders the commit co-author directive on its own, for the same
+	 * inject-once surfaces {@link readLanguageDirective} serves. Takes no caller
+	 * argument because the credit is a global app setting rather than a property
+	 * of the workspace or the session.
+	 * @returns The directive to append, or null when the credit is off.
+	 */
+	readCoAuthorDirective: () => string | null;
 	/**
 	 * Renders the linked-issue directive for one caller, for the MCP server's
 	 * `instructions` field — the only per-workspace channel a caller whose whole
@@ -620,6 +629,14 @@ export function createAgentControlService({
 	 */
 	const readLanguageDirective = (): string | null =>
 		buildLanguageDirective(ports.language.getLanguage());
+
+	/**
+	 * This turn's commit co-author block, read from the setting rather than
+	 * captured so a credit toggled mid-session reaches the next turn.
+	 * @returns The directive to append, or null when the credit is off.
+	 */
+	const readCoAuthorDirective = (): string | null =>
+		buildCoAuthorDirective(ports.commitCredit.isCoAuthorEnabled());
 
 	/**
 	 * The caller's control-layer role. Prefers the sub-agent marker its spawn
@@ -2277,6 +2294,7 @@ export function createAgentControlService({
 			readPlanRefinement(origin),
 			readLanguageDirective(),
 			issueDirectiveFor(origin, role),
+			readCoAuthorDirective(),
 		].filter((block) => block !== null);
 		return blocks.length > 0 ? blocks.join('\n\n') : null;
 	};
@@ -2304,6 +2322,7 @@ export function createAgentControlService({
 	return {
 		describeAudience,
 		invoke,
+		readCoAuthorDirective,
 		readIssueDirective,
 		readLanguageDirective,
 		readTurnPreamble,

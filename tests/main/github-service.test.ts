@@ -111,6 +111,7 @@ function stubDatabaseService(database: DatabaseSync): EnsemblrDatabaseService {
 function createService(
 	respond: (request: LocalCommandRequest) => LocalCommandResult,
 	database = createTestDatabase(),
+	coAuthorEnabled = false,
 ): { calls: LocalCommandRequest[]; service: GithubService } {
 	const { calls, service } = stubCommandService(respond);
 	return {
@@ -119,6 +120,7 @@ function createService(
 			databaseService: stubDatabaseService(database),
 			localCommandService: service,
 			now: fixedNow,
+			readCoAuthorEnabled: () => coAuthorEnabled,
 		}),
 	};
 }
@@ -386,6 +388,38 @@ test('commitWorkspaceChanges stages, commits, and reports the hash', async () =>
 	assert.equal(result.commitHash, 'abc123');
 	assert.deepEqual(calls[0]?.args, ['add', '--all']);
 	assert.deepEqual(calls[1]?.args, ['commit', '-m', 'feat: change']);
+});
+
+test('commitWorkspaceChanges appends the co-author trailer once the credit is on', async () => {
+	const { calls, service } = createService(
+		() => buildResult(),
+		createTestDatabase(),
+		true,
+	);
+
+	await service.commitWorkspaceChanges({
+		message: 'feat: credited',
+		workspaceCwd: '/tmp/ws',
+	});
+
+	assert.deepEqual(calls[1]?.args, [
+		'commit',
+		'-m',
+		'feat: credited',
+		'--trailer',
+		'Co-authored-by: Ensemblr <howdy@ensemblr.dev>',
+	]);
+});
+
+test('commitWorkspaceChanges passes no trailer when the credit is off', async () => {
+	const { calls, service } = createService(() => buildResult());
+
+	await service.commitWorkspaceChanges({
+		message: 'feat: uncredited',
+		workspaceCwd: '/tmp/ws',
+	});
+
+	assert.deepEqual(calls[1]?.args, ['commit', '-m', 'feat: uncredited']);
 });
 
 test('commitWorkspaceChanges stages only requested paths', async () => {

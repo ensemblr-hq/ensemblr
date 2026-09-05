@@ -1338,6 +1338,10 @@ export function createAgentControlPorts(
 		sessionNaming: makeSessionNamingPort(deps),
 		permissions: { getMode: () => deps.getPermissionMode() },
 		language: { getLanguage: () => deps.getLanguage() },
+		commitCredit: {
+			isCoAuthorEnabled: () =>
+				deps.appSettingsService.read().git.coAuthorEnsemblr,
+		},
 		confirm: deps.confirm,
 		ask: deps.ask,
 		planMode: deps.planMode,

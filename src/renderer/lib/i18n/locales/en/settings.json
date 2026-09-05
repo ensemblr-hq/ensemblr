@@ -243,6 +243,10 @@
 			"label": "Branch name prefix",
 			"none": "None"
 		},
+		"co-author": {
+			"description": "Ask agents to end every commit they make with `{{trailer}}`. GitHub credits the trailer to the Ensemblr account, so it appears alongside you in the repository's contributors.",
+			"label": "Credit Ensemblr as a commit co-author"
+		},
 		"delete-branch": {
 			"description": "Remove the worktree and delete the local branch whenever a workspace is archived, from the archive dialog and after a merge alike. To delete the remote branch, configure it on GitHub.",
 			"label": "Delete branch on archive"

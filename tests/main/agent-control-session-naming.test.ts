@@ -13,6 +13,7 @@ import {
 	buildLanguageDirective,
 	buildLinkedIssueDirective,
 	buildPlanModeDelegationDirective,
+	CO_AUTHOR_DIRECTIVE_HEADER,
 	LINKED_ISSUE_DIRECTIVE_HEADER,
 	PLAN_MODE_DELEGATION_HEADER,
 	PLAN_REFINEMENT_DIRECTIVE,
@@ -50,6 +51,7 @@ function setup(
 		species?: AgentSpecies;
 		language?: AppLanguage;
 		linkedIssue?: WorkspaceLinkedIssue;
+		coAuthor?: boolean;
 		subAgent?: boolean;
 		delegation?: SubagentMechanism;
 	} = {},
@@ -82,6 +84,7 @@ function setup(
 		focus: { focusDockTab: vi.fn(), focusPanel: vi.fn(), focusTab: vi.fn() },
 		harnesses: { launchHarness: vi.fn() },
 		language: { getLanguage: () => overrides.language ?? 'en' },
+		commitCredit: { isCoAuthorEnabled: () => overrides.coAuthor ?? false },
 		linear: {
 			readLinkedIssue: vi.fn().mockReturnValue(overrides.linkedIssue ?? null),
 		},
@@ -544,6 +547,17 @@ describe('readTurnPreamble', () => {
 		const { service } = setup();
 
 		expect(await service.readTurnPreamble(CALLER)).toBeNull();
+	});
+
+	// The setting can be flipped while sessions are live, so the block is read per
+	// turn rather than captured when the session opened.
+	it('names the commit trailer on every turn once the credit is on', async () => {
+		const { service } = setup({ coAuthor: true });
+
+		const preamble = (await service.readTurnPreamble(CALLER)) ?? '';
+
+		expect(preamble).toContain(CO_AUTHOR_DIRECTIVE_HEADER);
+		expect(preamble).toContain('Co-authored-by: Ensemblr <howdy@ensemblr.dev>');
 	});
 
 	// `linearUpdateIssue` is denied while planning, so the block a planning turn

@@ -22,6 +22,7 @@ export {
 	branchPrefixSourceAtom,
 	caffeinateWhileRunningAtom,
 	claudeSubagentModeAtom,
+	coAuthorEnsemblrAtom,
 	codeLigaturesAtom,
 	codeThemeAtom,
 	conciergeAutoClearAtPercentAtom,

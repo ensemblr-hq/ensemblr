@@ -211,6 +211,11 @@
 							"type": "boolean",
 							"default": true,
 							"description": "Configure new workspaces so a plain `git push` sets the branch upstream."
+						},
+						"coAuthorEnsemblr": {
+							"type": "boolean",
+							"default": false,
+							"description": "Ask agents to end every commit they make with a `Co-authored-by: Ensemblr <howdy@ensemblr.dev>` trailer, and append it to any commit the app makes itself, so Ensemblr is credited as a GitHub contributor."
 						}
 					}
 				},

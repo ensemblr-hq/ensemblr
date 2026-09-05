@@ -43,6 +43,7 @@ function makeUserGit(overrides: Partial<GitSettings> = {}): GitSettings {
 		renameWorkspaceOnBranch: true,
 		deleteLocalBranchOnArchive: false,
 		archiveAfterMerge: false,
+		coAuthorEnsemblr: false,
 		setUpstreamOnPush: true,
 		...overrides,
 	};
