@@ -138,6 +138,13 @@ export interface ConciergeSessionRuntimeChoice {
 
 /** Public surface of the Concierge session service. */
 export interface ConciergeSessionService {
+	/**
+	 * Id of the conversation currently attached to a runtime, or null when none
+	 * is. Resolved per call rather than handed out to be kept: a clear replaces
+	 * the conversation without warning, so an id captured earlier names a session
+	 * that no longer exists.
+	 */
+	activeSessionId: () => string | null;
 	clearContext: (
 		request: ClearConciergeContextRequest,
 	) => Promise<ClearConciergeContextResult>;
@@ -985,6 +992,8 @@ export function createConciergeSessionService({
 			}
 			return clearInFlight;
 		},
+
+		activeSessionId: (): string | null => active?.sessionId ?? null,
 
 		/**
 		 * The model and thinking level the live conversation is running on: what its

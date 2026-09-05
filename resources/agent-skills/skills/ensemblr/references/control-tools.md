@@ -38,6 +38,15 @@ Control adds no capability of its own — it is a gate, not a feature.
 **The user, and planning** — `ensemblr_ask_user_question`,
 `ensemblr_exit_plan_mode`.
 
+**Upward** — `ensemblr_message_concierge` reaches the app-level agent that briefs
+workspace agents, for the things it cannot see from where it sits: you are
+blocked on something outside this workspace, the brief it gave you is wrong, the
+work belongs in another repository, or you have finished. You pass no session id
+— its conversation is cleared and restarted routinely, so the app resolves the
+live one at send time. Refused outright when none is open (it is not queued), and
+capped per conversation. `ensemblr_notify_orchestrator` is the sub-agent's
+equivalent one level down.
+
 Not every caller holds every tool. A spawned sub-agent may not delegate onward
 and may not write to Linear; a terminal harness holds no chat-tab tools; Plan
 Mode withholds anything that would perform the work rather than plan it. What

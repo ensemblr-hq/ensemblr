@@ -134,12 +134,13 @@ Delegation is bounded so a runaway agent cannot fork-bomb the app
 
 Guardrails count spawns; they do not decide who may do what. That is the role
 policy in `src/shared/agent-control/subagent-policy.ts`, which refuses a spawned
-sub-agent sixteen ops with `denied-scope` **whatever mode it is in**:
+sub-agent seventeen ops with `denied-scope` **whatever mode it is in**:
 
 `spawnChatTab`, `startConversation`, `sendFollowUp`, `launchHarness`,
 `startTerminal`, `stopTerminal`, `writeTerminal`, `openTab`, `closeTab`,
 `setBranchName`, `setWorkspaceStatus`, `askUserQuestion`, `exitPlanMode`,
-`linearCreateComment`, `linearCreateIssue`, `linearUpdateIssue`.
+`linearCreateComment`, `linearCreateIssue`, `linearUpdateIssue`,
+`messageConcierge`.
 
 Two things run together and are easy to confuse. The spawn guardrail reads
 `origin.depth`, which lives in the in-memory origin registry; the role policy
@@ -163,14 +164,16 @@ the tab carried before rather than assuming which way the write went.
 `waitForAgents`, `listModels`, and `listRunScripts` are not denied — a sub-agent
 simply has no children to wait on, no spawn to pick a model for, and no
 `startTerminal` to pick a run script for. Those three (`SUBAGENT_UNUSABLE_OPS`)
-are withheld from its tool list along with the sixteen above, because listing a
+are withheld from its tool list along with the seventeen above, because listing a
 tool the service would only refuse teaches the model to keep reaching for it. The
-Pi extension registers the complement of `SUBAGENT_WITHHELD_OPS` — nineteen ops in
+Pi extension registers the complement of `SUBAGENT_WITHHELD_OPS` — twenty ops in
 all — for a child, and a parity test compares its copy of that set against the
 shared one.
 
 What a sub-agent keeps: every read, `focusTab`/`focusDockTab`/`focusPanel`,
-`setName`, `setSummary`, and `notifyOrchestrator`.
+`setName`, `setSummary`, and `notifyOrchestrator` — which is also why
+`messageConcierge` is denied it: the Concierge briefed its orchestrator, not it,
+and `notifyOrchestrator` reaches the agent that is actually waiting on it.
 
 The three Linear writes are the newest members and are there for a different reason
 from the rest. They are not scoped to a workspace at all — a Linear issue is read
@@ -263,7 +266,7 @@ harness.
 
 ## Tool reference
 
-Forty-six tools, enumerated from `TOOL_DEFS` in
+Forty-seven tools, enumerated from `TOOL_DEFS` in
 `src/main/agent-control/mcp-endpoint.ts`. The argument names and types below are
 the authoritative Zod schemas in `src/shared/agent-control/schemas.ts` — every
 schema is a `strictObject`, so an argument not listed here is rejected as
@@ -296,12 +299,34 @@ nor a chat tab of its own).
 | `ensemblr_send_follow_up` | **`agentSessionId: string`**, **`prompt: string`**, `wait?: boolean` | write | sub-agent |
 | `ensemblr_wait_for_agents` | `targets?: string[]`, `mode?: 'first' \| 'all'`, `reports?: 'full' \| 'brief'`, `timeoutMs?: number` | read | sub-agent\* |
 | `ensemblr_notify_orchestrator` | **`reason: 'need_decision' \| 'blocked' \| 'progress' \| 'done'`**, **`message: string`** | read | Concierge |
+| `ensemblr_message_concierge` | **`reason: 'need_decision' \| 'blocked' \| 'brief_wrong' \| 'progress' \| 'done'`**, **`message: string`** (≤ 4,000) | write | sub-agent, Concierge |
 | `ensemblr_list_models` | *(none)* | read | sub-agent\* |
 | `ensemblr_close_tab` | **`chatTabId: string`** | write | sub-agent |
 
 `waitForAgents` and `notifyOrchestrator` are reads, so they survive `read-only`
 mode — a blocked child can still reach its orchestrator when every write is
 refused.
+
+`messageConcierge` is the same act one level up, and is a **write** rather than a
+read for a reason the two do not share: `notifyOrchestrator` sets a flag its
+orchestrator polls, while this one submits a prompt that starts a Concierge turn.
+Starting another agent's turn is acting, so `read-only` refuses it.
+
+It takes **no session id**, and that is the design rather than an omission. The
+Concierge conversation is cleared and restarted routinely, so any id an agent
+could hold was captured at spawn time and names a session that is gone; the port
+resolves the live one at delivery, which is the only moment the answer is true.
+An absent conversation is refused with `not-found` rather than queued or opened:
+queueing delivers stale context into a conversation that has since been cleared,
+and opening one would start a turn nobody is watching. The refusal says to put it
+in the agent's last message instead.
+
+The message arrives as an ordinary turn in the Concierge panel, so the user reads
+it, prefixed by a header naming the sending workspace, tab, and session id —
+every field resolved from the caller's control token rather than from anything it
+passed, because the Concierge acts on other workspaces on the strength of it.
+Guardrails cap it at **10 per session** and **3/min**: the loop
+Concierge → orchestrator → Concierge has no natural end.
 
 ### Harnesses, terminals, and run scripts
 

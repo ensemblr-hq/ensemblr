@@ -69,6 +69,7 @@ export {
 	type AgentControlOrigin,
 	type AgentControlPorts,
 	type AgentSpecies,
+	type ConciergePort,
 	type ConfirmPort,
 	type ConversationPort,
 	type HarnessPort,

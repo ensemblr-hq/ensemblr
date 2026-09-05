@@ -6,6 +6,10 @@
 import { z } from 'zod';
 import { toSlug } from '../slug.ts';
 import { canonicalizeArgs } from './arg-naming.ts';
+import {
+	CONCIERGE_MESSAGE_LIMITS,
+	CONCIERGE_MESSAGE_REASONS,
+} from './concierge-message.ts';
 import type { AskUserQuestionReply } from './contracts.ts';
 import {
 	type AgentControlOp,
@@ -411,6 +415,15 @@ const notifyOrchestratorSchema = z.strictObject({
 	message: nonEmpty,
 });
 
+// No session id: the Concierge conversation is cleared and restarted routinely,
+// so an id the agent captured at spawn time names a session that is gone. The
+// app resolves the live one at delivery instead, which is why there is nothing
+// here for a caller to get wrong.
+const messageConciergeSchema = z.strictObject({
+	message: nonEmpty.max(CONCIERGE_MESSAGE_LIMITS.maxMessageLength),
+	reason: z.enum(CONCIERGE_MESSAGE_REASONS),
+});
+
 const reservedLabels: ReadonlySet<string> = new Set(
 	ASK_USER_QUESTION_RESERVED_LABELS,
 );
@@ -520,6 +533,7 @@ const AGENT_CONTROL_ARG_SCHEMAS = {
 	listRunScripts: emptySchema,
 	waitForAgents: waitForAgentsSchema,
 	notifyOrchestrator: notifyOrchestratorSchema,
+	messageConcierge: messageConciergeSchema,
 	askUserQuestion: askUserQuestionSchema,
 	getSessionBrief: emptySchema,
 	checkPlanModeTool: checkPlanModeToolSchema,

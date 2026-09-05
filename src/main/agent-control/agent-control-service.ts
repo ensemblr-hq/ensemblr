@@ -15,6 +15,7 @@ import type {
 	AskUserQuestionArgs,
 	CheckPlanModeToolArgs,
 	CloseTabArgs,
+	ConciergeMessageSender,
 	ControlAudience,
 	ConversationRef,
 	CreateWorkspaceArgs,
@@ -37,6 +38,8 @@ import type {
 	LinearUpdateIssueArgs,
 	ListTabsArgs,
 	ListTerminalsArgs,
+	MessageConciergeArgs,
+	MessageConciergeResult,
 	NotifyOrchestratorArgs,
 	OpenTabArgs,
 	OrchestratorSignal,
@@ -69,6 +72,7 @@ import type {
 import {
 	briefReport,
 	buildCoAuthorDirective,
+	buildConciergeMessage,
 	buildLanguageDirective,
 	buildLinkedIssueDirective,
 	buildPlanModeDelegationDirective,
@@ -1725,6 +1729,87 @@ export function createAgentControlService({
 			.then(ok);
 	};
 
+	/**
+	 * Resolves who a message to the Concierge is from, off the caller's own
+	 * control token rather than anything it passed.
+	 *
+	 * Both lookups degrade to null rather than failing the send: a workspace the
+	 * listing cannot name and a session with no tab are cosmetic losses in the
+	 * header, and refusing the message over either would drop the one channel a
+	 * blocked agent has.
+	 * @param origin - Resolved caller identity.
+	 * @returns The sender as the Concierge will read it.
+	 */
+	const resolveMessageSender = async (
+		origin: AgentControlOrigin,
+	): Promise<ConciergeMessageSender> => {
+		const [workspaces, tabs] = await Promise.all([
+			ports.workspaces.listWorkspaces().catch(() => []),
+			ports.tabs.listTabs({ workspaceId: origin.workspaceId }).catch(() => []),
+		]);
+		const workspace = workspaces.find(
+			(row) => row.workspaceId === origin.workspaceId,
+		);
+		const tab = tabs.find((row) => row.agentSessionId === origin.sessionId);
+		return {
+			agentSessionId: origin.sessionId,
+			tabTitle: tab?.title ?? null,
+			workspaceId: origin.workspaceId,
+			workspaceName: workspace?.name ?? null,
+		};
+	};
+
+	/**
+	 * Delivers a workspace agent's message to the live Concierge conversation.
+	 *
+	 * Nothing here takes a session id, and that is the feature: the Concierge is
+	 * cleared and restarted routinely, so the only id that is ever right is the one
+	 * resolved at this moment. An absent conversation is refused rather than
+	 * opened — a message that booted the Concierge would start a turn nobody is
+	 * watching — and the refusal names what to do instead, because the failure this
+	 * op exists to prevent is a discovery that never reaches anybody.
+	 * @param origin - Resolved caller identity.
+	 * @param args - The reason and the agent's own prose.
+	 * @returns Which conversation took the message, or why none did.
+	 */
+	const handleMessageConcierge = async (
+		origin: AgentControlOrigin,
+		args: MessageConciergeArgs,
+	): Promise<AgentControlResult<unknown>> => {
+		const concierge = ports.concierge;
+		if (!concierge) {
+			return fail(
+				'not-found',
+				'This build has no Concierge, so there is nothing above you to message. Say it in your last message instead.',
+			);
+		}
+		const budget = guardrails.evaluateConciergeMessage(origin.sessionId);
+		if (!budget.ok) {
+			return fail(budget.code, budget.reason);
+		}
+		const delivery = await concierge.deliverMessage({
+			prompt: buildConciergeMessage({
+				message: args.message,
+				reason: args.reason,
+				sender: await resolveMessageSender(origin),
+			}),
+		});
+		if (!delivery.delivered) {
+			return fail(
+				delivery.cause === 'no-session' ? 'not-found' : 'internal',
+				delivery.cause === 'no-session'
+					? 'No Concierge conversation is open, so there is nobody up there to read this. It is not queued — a message delivered hours later, into a conversation that has since been cleared, is worse than none. Put what you were going to say in your last message, which is what the Concierge reads when it next looks at this workspace.'
+					: `The Concierge conversation refused the message: ${delivery.detail} Say it in your last message instead rather than retrying in a loop.`,
+			);
+		}
+		guardrails.recordConciergeMessage(origin.sessionId);
+		return ok({
+			conciergeSessionId: delivery.conciergeSessionId,
+			message:
+				'Delivered to the Concierge conversation that is live right now. It arrives as a turn the user can see, marked as coming from an agent rather than from them. Carry on with your work — nothing here waits for a reply, and a reply, if one comes, arrives as a follow-up in this conversation.',
+		} satisfies MessageConciergeResult);
+	};
+
 	const handleNotifyOrchestrator = async (
 		origin: AgentControlOrigin,
 		args: NotifyOrchestratorArgs,
@@ -2196,6 +2281,8 @@ export function createAgentControlService({
 			handleListTerminals(origin, args as ListTerminalsArgs),
 		listProjects: ({ origin }) => handleListProjects(origin),
 		listWorkspaces: () => ports.workspaces.listWorkspaces().then(ok),
+		messageConcierge: ({ args, origin }) =>
+			handleMessageConcierge(origin, args as MessageConciergeArgs),
 		notifyOrchestrator: ({ args, origin }) =>
 			handleNotifyOrchestrator(origin, args as NotifyOrchestratorArgs),
 		openTab: ({ args, origin }) => handleOpenTab(origin, args as OpenTabArgs),

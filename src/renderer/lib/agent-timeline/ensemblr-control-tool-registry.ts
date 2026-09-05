@@ -589,6 +589,22 @@ export const ENSEMBLR_TOOL_LABELS: Record<string, EnsemblrToolLabel> = {
 				),
 		],
 	},
+	ensemblr_message_concierge: {
+		detailKeys: ['reason'],
+		glyph: 'send',
+		title: [
+			() =>
+				i18n.t(
+					'workbench:control-tool.message-concierge.done',
+					'Messaged the Concierge',
+				),
+			() =>
+				i18n.t(
+					'workbench:control-tool.message-concierge.running',
+					'Messaging the Concierge',
+				),
+		],
+	},
 	ensemblr_notify_orchestrator: {
 		detailKeys: ['reason'],
 		glyph: 'bell',

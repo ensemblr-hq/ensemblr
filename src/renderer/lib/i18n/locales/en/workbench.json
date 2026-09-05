@@ -418,6 +418,10 @@
 			"done": "Listed workspaces",
 			"running": "Listing workspaces"
 		},
+		"message-concierge": {
+			"done": "Messaged the Concierge",
+			"running": "Messaging the Concierge"
+		},
 		"notify-orchestrator": {
 			"done": "Notified the orchestrator",
 			"running": "Notifying the orchestrator"

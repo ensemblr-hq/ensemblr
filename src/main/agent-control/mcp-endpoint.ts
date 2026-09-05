@@ -35,6 +35,8 @@ import {
 	ARCHITECTURE_DIAGRAM_LIMITS,
 	ASK_USER_QUESTION_LIMITS,
 	awarenessForAudience,
+	CONCIERGE_MESSAGE_LIMITS,
+	CONCIERGE_MESSAGE_REASONS,
 	type ControlAudience,
 	EXIT_PLAN_MODE_LIMITS,
 	LINEAR_AGENT_LIMITS,
@@ -585,6 +587,16 @@ export const TOOL_DEFS: readonly McpToolDef[] = [
 			mode: z.enum(['first', 'all']).optional(),
 			timeoutMs: z.number().optional(),
 			reports: z.enum(['full', 'brief']).optional(),
+		},
+	},
+	{
+		name: 'ensemblr_message_concierge',
+		op: 'messageConcierge',
+		description:
+			'Message the Concierge — the app-level agent that briefs workspace agents and supervises every workspace at once. For the things it has to know and cannot see from where it sits: you are blocked on something outside this workspace, the brief it gave you is wrong, the work belongs in a different repository, or you have finished. It NEVER reads your workspace on its own initiative, so a discovery you leave only in your own tab reaches nobody. You pass no session id and hold none: the Concierge conversation is cleared and restarted routinely, so the app resolves whichever one is live at the moment you send. The message arrives as a visible turn in the Concierge panel, marked as coming from an agent rather than from the user, and it does NOT block — carry on working, and a reply, if one comes, arrives as a follow-up here. Refused when no Concierge conversation is open (it is not queued), and capped per conversation, because the loop Concierge → you → Concierge has no natural end. Say it once, in full, rather than in installments.',
+		shape: {
+			message: z.string().max(CONCIERGE_MESSAGE_LIMITS.maxMessageLength),
+			reason: z.enum(CONCIERGE_MESSAGE_REASONS),
 		},
 	},
 	{

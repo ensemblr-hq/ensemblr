@@ -15,6 +15,7 @@ import type {
 	WorkspaceGitChangeSummaryWire,
 	WorkspaceGitFileWire,
 } from '../ipc/contracts/workspace-git.ts';
+import type { ConciergeMessageReason } from './concierge-message.ts';
 import { MAX_AGENT_PAYLOAD_CHARS } from './workspace-diff.ts';
 
 /** Every control operation an agent may request, read and write alike. */
@@ -63,6 +64,7 @@ export const AGENT_CONTROL_OPS = [
 	'listRunScripts',
 	'waitForAgents',
 	'notifyOrchestrator',
+	'messageConcierge',
 	'askUserQuestion',
 	'getSessionBrief',
 	'checkPlanModeTool',
@@ -167,6 +169,7 @@ const WRITE_OPS: ReadonlySet<AgentControlOp> = new Set([
 	'linearCreateComment',
 	'linearCreateIssue',
 	'linearUpdateIssue',
+	'messageConcierge',
 ]);
 
 /**
@@ -645,6 +648,30 @@ export interface WaitForAgentsResult {
  */
 export interface NotifyOrchestratorArgs {
 	reason: OrchestratorSignalReason;
+	message: string;
+}
+
+/**
+ * Args for `messageConcierge`: a workspace agent addresses the Concierge above
+ * it. Deliberately carries no session id. The Concierge conversation is cleared
+ * and restarted routinely, so any id an agent could hold is one it captured at
+ * spawn time and is wrong by the time it sends — the app resolves the live
+ * session at delivery instead, which is the only moment the answer is true.
+ */
+export interface MessageConciergeArgs {
+	message: string;
+	reason: ConciergeMessageReason;
+}
+
+/**
+ * Result of `messageConcierge`. Says which Concierge conversation took the
+ * message, because that is the fact the agent could not have known: a send that
+ * reports `ok` against an id the agent has never seen is the whole point of
+ * resolving late.
+ */
+export interface MessageConciergeResult {
+	/** Session the message landed in, as resolved at send time. */
+	conciergeSessionId: string;
 	message: string;
 }
 

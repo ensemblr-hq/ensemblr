@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
 	type AgentControlPorts,
 	type AgentSpecies,
+	type ConciergePort,
 	createAgentControlService,
 	createGuardrails,
 	createOriginRegistry,
@@ -30,6 +31,7 @@ const makePorts = (
 		planSubmitted: boolean;
 		spawnedSubAgent: boolean;
 		language: AppLanguage;
+		deliverMessage: ConciergePort['deliverMessage'];
 	}> = {},
 ): AgentControlPorts => ({
 	workspaces: {
@@ -196,6 +198,19 @@ const makePorts = (
 			message: 'ENG-1 updated.',
 			status: 'ok',
 		}),
+	},
+	// Present on the default ports, not only on the Concierge variant below: a
+	// workspace agent messaging upward reaches this port, and a build without one
+	// is a different answer ("no Concierge in this build") from an empty panel.
+	concierge: {
+		deliverMessage:
+			overrides.deliverMessage ??
+			vi.fn().mockResolvedValue({
+				conciergeSessionId: 'concierge-1',
+				delivered: true,
+			}),
+		describeSession: () => null,
+		homePath: () => null,
 	},
 	permissions: { getMode: () => overrides.mode ?? 'workspace-trusted' },
 	commitCredit: { isCoAuthorEnabled: () => false },
@@ -1986,6 +2001,142 @@ describe('agent-control service: review', () => {
 	});
 });
 
+// The Concierge never reads a workspace on its own initiative, so this is the one
+// channel by which anything an orchestrator finds reaches it at all. Every failure
+// mode here is the same failure — a discovery that reaches nobody — so what
+// matters is that a refusal says where to put it instead, and that the header
+// says who is speaking: the Concierge acts on other workspaces on the strength of
+// it, and cannot otherwise tell an agent's message from the user's.
+describe('agent-control service: messaging the Concierge', () => {
+	it('delivers the message with the sender the app resolved, not one it was told', async () => {
+		const deliverMessage = vi.fn().mockResolvedValue({
+			conciergeSessionId: 'concierge-1',
+			delivered: true,
+		});
+		const { service } = setup({ ports: makePorts({ deliverMessage }) });
+
+		const result = await service.invoke({
+			op: 'messageConcierge',
+			token: 'tok-caller',
+			rawArgs: {
+				message: 'The brief names a file that does not exist.',
+				reason: 'brief_wrong',
+			},
+		});
+
+		expect(result.ok).toBe(true);
+		const prompt = deliverMessage.mock.calls.at(0)?.[0].prompt ?? '';
+		expect(prompt).toContain('MESSAGE FROM AN AGENT');
+		expect(prompt).toContain('brief it was given is wrong');
+		expect(prompt).toContain('caller');
+		expect(prompt).toContain('The brief names a file that does not exist.');
+	});
+
+	it('reports which Concierge conversation took it, which the agent could not know', async () => {
+		const ports = makePorts();
+		const { service } = setup({ ports });
+
+		const result = await service.invoke({
+			op: 'messageConcierge',
+			token: 'tok-caller',
+			rawArgs: { message: 'Finished.', reason: 'done' },
+		});
+
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			expect(result.data).toMatchObject({ conciergeSessionId: 'concierge-1' });
+		}
+	});
+
+	// Queueing was the alternative and is worse: delivered hours later, into a
+	// conversation that has since been cleared, it is context nobody can place.
+	it('refuses when no Concierge conversation is open and names what to do instead', async () => {
+		const deliverMessage = vi.fn().mockResolvedValue({
+			cause: 'no-session',
+			delivered: false,
+			detail: '',
+		});
+		const { service } = setup({ ports: makePorts({ deliverMessage }) });
+
+		const result = await service.invoke({
+			op: 'messageConcierge',
+			token: 'tok-caller',
+			rawArgs: { message: 'Blocked on the API key.', reason: 'blocked' },
+		});
+
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.code).toBe('not-found');
+			expect(result.error).toContain('not queued');
+			expect(result.error).toContain('last message');
+		}
+	});
+
+	// Concierge → orchestrator → Concierge has no natural end, so the cap is what
+	// stops one workspace's agent from driving the supervisor in a circle.
+	it('caps how many messages one conversation may send', async () => {
+		const deliverMessage = vi.fn().mockResolvedValue({
+			conciergeSessionId: 'concierge-1',
+			delivered: true,
+		});
+		const { service } = setup({
+			guardrails: { maxConciergeMessagesPerSession: 2 },
+			ports: makePorts({ deliverMessage }),
+		});
+		const send = () =>
+			service.invoke({
+				op: 'messageConcierge',
+				token: 'tok-caller',
+				rawArgs: { message: 'Still going.', reason: 'progress' },
+			});
+
+		expect((await send()).ok).toBe(true);
+		expect((await send()).ok).toBe(true);
+		const third = await send();
+
+		expect(third.ok).toBe(false);
+		if (!third.ok) {
+			expect(third.code).toBe('denied-quota');
+		}
+		expect(deliverMessage).toHaveBeenCalledTimes(2);
+	});
+
+	// A refused delivery must not spend the allowance: an agent that could not
+	// reach the Concierge has said nothing, and burning its budget on the attempt
+	// would silence it for the rest of the run.
+	it('does not spend the allowance on a message that was never delivered', async () => {
+		const deliverMessage = vi
+			.fn()
+			.mockResolvedValueOnce({
+				cause: 'no-session',
+				delivered: false,
+				detail: '',
+			})
+			.mockResolvedValue({
+				conciergeSessionId: 'concierge-1',
+				delivered: true,
+			});
+		const { service } = setup({
+			guardrails: { maxConciergeMessagesPerSession: 1 },
+			ports: makePorts({ deliverMessage }),
+		});
+
+		const refused = await service.invoke({
+			op: 'messageConcierge',
+			token: 'tok-caller',
+			rawArgs: { message: 'Blocked.', reason: 'blocked' },
+		});
+		const later = await service.invoke({
+			op: 'messageConcierge',
+			token: 'tok-caller',
+			rawArgs: { message: 'Blocked.', reason: 'blocked' },
+		});
+
+		expect(refused.ok).toBe(false);
+		expect(later.ok).toBe(true);
+	});
+});
+
 // Linear is an app-level integration bound to one account, so unlike the review
 // ops none of these carries a workspace at all — which makes the permission mode
 // and the sub-agent role the only two gates left to get right.
@@ -2553,6 +2704,10 @@ const setupConcierge = (
 	const conciergePorts: AgentControlPorts = {
 		...ports,
 		concierge: {
+			deliverMessage: vi.fn().mockResolvedValue({
+				conciergeSessionId: 'concierge-1',
+				delivered: true,
+			}),
 			describeSession: () => ({
 				model: 'anthropic/sonnet',
 				thinkingLevel: null,

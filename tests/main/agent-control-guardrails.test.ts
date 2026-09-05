@@ -125,3 +125,63 @@ describe('guardrails: deadlock', () => {
 		expect(guardrails.evaluateWaitTarget('sibling', ['parent']).ok).toBe(true);
 	});
 });
+
+// The loop this bounds is Concierge → orchestrator → Concierge: each message can
+// start a Concierge turn, and each of those can brief the orchestrator again.
+// Nothing in that cycle ends on its own.
+describe('guardrails: messaging the Concierge', () => {
+	it('denies a message once the session has spent its lifetime allowance', () => {
+		const guardrails = createGuardrails({
+			maxConciergeMessagesPerSession: 2,
+		});
+
+		guardrails.recordConciergeMessage('sess');
+		guardrails.recordConciergeMessage('sess');
+		const result = guardrails.evaluateConciergeMessage('sess');
+
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.code).toBe('denied-quota');
+		}
+	});
+
+	it('denies a burst inside the rolling minute and allows one after it', () => {
+		let now = 0;
+		const guardrails = createGuardrails(
+			{ maxConciergeMessagesPerMinute: 2, maxConciergeMessagesPerSession: 99 },
+			() => now,
+		);
+
+		guardrails.recordConciergeMessage('sess');
+		guardrails.recordConciergeMessage('sess');
+		const burst = guardrails.evaluateConciergeMessage('sess');
+		now += 61_000;
+		const later = guardrails.evaluateConciergeMessage('sess');
+
+		expect(burst.ok).toBe(false);
+		if (!burst.ok) {
+			expect(burst.code).toBe('denied-rate');
+		}
+		expect(later.ok).toBe(true);
+	});
+
+	// The two budgets are separate: an orchestrator that fanned out sub-agents has
+	// not thereby used up its right to tell the Concierge it is blocked.
+	it('counts messages apart from spawns', () => {
+		const guardrails = createGuardrails({ maxConciergeMessagesPerSession: 1 });
+
+		guardrails.recordSpawn('sess');
+		guardrails.recordSpawn('sess');
+
+		expect(guardrails.evaluateConciergeMessage('sess').ok).toBe(true);
+	});
+
+	it('drops a session’s message counters when it ends', () => {
+		const guardrails = createGuardrails({ maxConciergeMessagesPerSession: 1 });
+
+		guardrails.recordConciergeMessage('sess');
+		guardrails.release('sess');
+
+		expect(guardrails.evaluateConciergeMessage('sess').ok).toBe(true);
+	});
+});

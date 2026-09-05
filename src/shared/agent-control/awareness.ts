@@ -254,6 +254,7 @@ const orchestratorInventory = (
 		architecture,
 		LINEAR_INVENTORY,
 		`- Board: move your workspace across the kanban board and read its status (\`ensemblr_set_workspace_status\`/\`ensemblr_get_workspace_status\`); \`ensemblr_list_workspaces\` shows every workspace's board status.`,
+		`- Reach the Concierge: \`ensemblr_message_concierge\` is your one channel upward — to the app-level agent that briefs workspace agents and supervises every workspace at once. Use it when something you found changes what the Concierge should do and it has no way to see it: you are blocked on a dependency outside this workspace, the brief it gave you was wrong, the work belongs in a different repository, or you have finished what it asked for. It does not read your workspace on its own initiative, so a discovery left only in your own tab reaches nobody. You pass no session id and should hold none — its conversation is cleared and restarted routinely, so the app resolves whichever one is live at the moment you send. The send does not block: carry on, and a reply, if one comes, arrives here as a follow-up. It is refused outright when no Concierge conversation is open, and capped per conversation, so say it once and in full rather than in installments.`,
 		`- Ask the user: when a decision is genuinely theirs — ambiguous requirements, a fork in the approach, a destructive step — put it to them with \`ensemblr_ask_user_question\` (up to 4 questions, each with 2-6 concrete options) instead of guessing or stalling. It blocks until they answer or dismiss it, with no time limit — a question left overnight is still waiting in the morning — so never plan around it expiring or hedge an answer you have not been given. They can type their own answer instead of picking an option.`,
 	);
 
@@ -590,6 +591,14 @@ const planModeInspectBullets = (
 /** The planning root's board bullet: it may move the workspace's kanban status. */
 const PLAN_MODE_ORCHESTRATOR_BOARD = `- Board: read and set your workspace's kanban status (\`ensemblr_get_workspace_status\`/\`ensemblr_set_workspace_status\`).`;
 
+/**
+ * The planning root's channel up to the Concierge, which stays open while
+ * planning. Messaging is not implementing, and a brief that was wrong is exactly
+ * what a planning agent finds out first — leaving that unsaid until the plan is
+ * submitted spends the whole interview on the wrong question.
+ */
+const PLAN_MODE_ORCHESTRATOR_CONCIERGE = `- Reach the Concierge: \`ensemblr_message_concierge\` stays open while planning — messaging is not implementing. Use it with reason \`brief_wrong\` the moment planning shows that the brief you were given is wrong, and with \`blocked\` when the plan cannot be settled without something outside this workspace. You pass no session id; the app resolves whichever Concierge conversation is live at the moment you send.`;
+
 /** The planning investigator's: read only, because the board is workspace-wide. */
 const PLAN_MODE_SUBAGENT_BOARD = `- Board: read your workspace's kanban status (\`ensemblr_get_workspace_status\`). Moving the board is not yours: it describes the whole workspace rather than the question you were handed, so \`ensemblr_set_workspace_status\` is refused here.`;
 
@@ -664,6 +673,7 @@ ${PLAN_MODE_READ_BULLET}
 - Ask the user: when a decision is genuinely theirs — ambiguous requirements, a fork in the approach, a destructive step — put it to them with \`ensemblr_ask_user_question\` (up to 4 questions, each with 2-6 concrete options) instead of guessing or stalling. It blocks until they answer or dismiss it, with no time limit — a question left overnight is still waiting in the morning — so never plan around it expiring or hedge an answer you have not been given. They can type their own answer instead of picking an option.
 - Delegate reading: spawn a sub-agent to answer a question for you (\`ensemblr_start_conversation\`), block until your children settle (\`ensemblr_wait_for_agents\`), steer one (\`ensemblr_send_follow_up\`), read its report (\`ensemblr_get_last_message\`), close its tab (\`ensemblr_close_tab\`). See the fan-out section below.
 ${planModeInspectBullets(PLAN_MODE_ORCHESTRATOR_LEGIBILITY, PLAN_MODE_ORCHESTRATOR_LINEAR, PLAN_MODE_ORCHESTRATOR_BOARD, architecture ? ARCHITECTURE_INVENTORY_READS : '')}
+${PLAN_MODE_ORCHESTRATOR_CONCIERGE}
 
 The rest is blocked while you plan: \`write\` and \`edit\`, any \`bash\` command that is not read-only, \`ensemblr_launch_harness\`, \`ensemblr_start_terminal\`, \`ensemblr_write_terminal\`, \`ensemblr_resolve_diff_comments\`, ${architecture ? PLAN_MODE_ORCHESTRATOR_DIAGRAM_BLOCKED : ''}and \`ensemblr_linear_update_issue\` — anything that could change the repository, open a shell the read-only rules cannot reach, or claim a fix you have not made. ${architecture ? PLAN_MODE_ORCHESTRATOR_DIAGRAM_OPEN : ''}\`ensemblr_send_follow_up\` reaches only a conversation that is itself planning, so it steers the investigators you spawned and is refused anywhere else. ${PLAN_MODE_ENFORCEMENT_TAIL}
 
@@ -802,6 +812,8 @@ When a user asks what to build or what to work on, the answer comes from the pro
 - **Focus the app.** \`ensemblr_focus_workspace\` navigates to a workspace; \`ensemblr_focus_tab\`, \`ensemblr_focus_dock_tab\`, and \`ensemblr_focus_panel\` bring a surface forward once you are there.
 - **Remember.** Write a memory as an ordinary file under \`memory/\`, and search what you have written with \`ensemblr_recall_memory\`.
 - **Ask the user** with \`ensemblr_ask_user_question\` when a decision is theirs.
+
+**Agents can now message you back.** A turn of yours may begin with a block headed \`MESSAGE FROM AN AGENT\` rather than with something the user typed. That is an orchestrator in a workspace addressing you directly — because it is blocked, because the brief you gave it was wrong, because the work belongs somewhere else, or because it has finished. Read it as coming from a colleague rather than from the user: it names the workspace and the session id, and \`ensemblr_send_follow_up\` on that session is how you answer. Two of them ask nothing of you and deserve no turn of work — \`progress\`, which is informational, and \`done\`, whose claim you verify by reading the agent's own last message rather than by believing the header. The user sees these arrive, so say what you did about one in your reply rather than acting on it silently.
 
 ## What you cannot do, and why
 

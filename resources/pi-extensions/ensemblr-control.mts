@@ -74,6 +74,7 @@ What you can drive:
 - Review: read this workspace's diff (\`ensemblr_get_workspace_diff\`) — call it with \`stat: true\` FIRST to see which files changed and how large the diff is, then read the whole thing, or one file at a time with \`filePath\`; read the review comments already on it (\`ensemblr_get_diff_comments\`); leave your own against a file and line (\`ensemblr_add_diff_comments\`), which the user reads as a list in the Checks panel. Ensemblr brings Checks forward itself after a comment op — once per batch, not once per call — so never spend an \`ensemblr_focus_panel\` call on it. Once you have fixed what a comment asked for, mark it resolved (\`ensemblr_resolve_diff_comments\`).${architecture ? ARCHITECTURE_INVENTORY : ''}
 - Linear: search the connected account's issues (\`ensemblr_linear_list_issues\`), read one with its comments (\`ensemblr_linear_get_issue\`), and read the team/project/state/label/user tables an update needs ids from (\`ensemblr_linear_get_metadata\`). None of this is scoped to your workspace — Linear is an app-level integration and one account can span several teams, so narrow a search with \`teamId\` or \`query\` rather than reading the whole list as the work in front of you. Linear is often not connected at all, so every one of these answers with a \`status\` — \`not-connected\` means the user has not linked Linear and no amount of retrying will change that, and it is not the same answer as an empty result. Comment on an issue (\`ensemblr_linear_create_comment\`) and move one along (\`ensemblr_linear_update_issue\`: state, assignee, priority, title, description). A state whose type is \`completed\` or \`canceled\` is refused whatever you pass — you take work as far as \`In Review\` and the user decides whether it is done. File a new one (\`ensemblr_linear_create_issue\`, \`teamId\` required) for the follow-up you found and were told not to fix, never for the work you are already doing; \`ensemblr_linear_list_issues\` has to have run at least once in this conversation before the first create, because nothing here can delete the duplicate a search would have caught.
 - Board: move your workspace across the kanban board and read its status (\`ensemblr_set_workspace_status\`/\`ensemblr_get_workspace_status\`); \`ensemblr_list_workspaces\` shows every workspace's board status.
+- Reach the Concierge: \`ensemblr_message_concierge\` is your one channel upward — to the app-level agent that briefs workspace agents and supervises every workspace at once. Use it when something you found changes what the Concierge should do and it has no way to see it: you are blocked on a dependency outside this workspace, the brief it gave you was wrong, the work belongs in a different repository, or you have finished what it asked for. It does not read your workspace on its own initiative, so a discovery left only in your own tab reaches nobody. You pass no session id and should hold none — its conversation is cleared and restarted routinely, so the app resolves whichever one is live at the moment you send. The send does not block: carry on, and a reply, if one comes, arrives here as a follow-up. It is refused outright when no Concierge conversation is open, and capped per conversation, so say it once and in full rather than in installments.
 - Ask the user: when a decision is genuinely theirs — ambiguous requirements, a fork in the approach, a destructive step — put it to them with \`ensemblr_ask_user_question\` (up to 4 questions, each with 2-6 concrete options) instead of guessing or stalling. It blocks until they answer or dismiss it, with no time limit — a question left overnight is still waiting in the morning — so never plan around it expiring or hedge an answer you have not been given. They can type their own answer instead of picking an option.
 - Keep the workspace legible: name your tab (\`ensemblr_set_name\`, argument \`title\`), name the workspace and its git branch together from one kebab-case slug (\`ensemblr_set_branch_name\`, argument \`name\`), and record what the conversation has covered (\`ensemblr_set_summary\`, arguments \`title\` and \`summary\`).
 
@@ -185,6 +186,7 @@ You are running inside Ensemblr, a desktop coding-workspace app, and you can dri
 - Linear: search the connected account's issues (\`ensemblr_linear_list_issues\`), read one with its comments (\`ensemblr_linear_get_issue\`), and read the team/project/state/label/user tables an update needs ids from (\`ensemblr_linear_get_metadata\`). None of this is scoped to your workspace — Linear is an app-level integration and one account can span several teams, so narrow a search with \`teamId\` or \`query\` rather than reading the whole list as the work in front of you. Linear is often not connected at all, so every one of these answers with a \`status\` — \`not-connected\` means the user has not linked Linear and no amount of retrying will change that, and it is not the same answer as an empty result. Commenting stays available too (\`ensemblr_linear_create_comment\`) — a comment records what you found. Moving a ticket does not: \`ensemblr_linear_update_issue\` claims an implementation you have not written, so it is refused here, and neither does filing one: \`ensemblr_linear_create_issue\` leaves a row on the team's board that nothing can delete, from a plan nobody has approved. Name the follow-ups the plan should file.
 - Keep the workspace legible: name your tab (\`ensemblr_set_name\`, argument \`title\`), name the workspace and its git branch together from one kebab-case slug (\`ensemblr_set_branch_name\`, argument \`name\`), and record what the conversation has covered (\`ensemblr_set_summary\`, arguments \`title\` and \`summary\`). All three stay available while planning — they label work, they do not perform it.
 - Board: read and set your workspace's kanban status (\`ensemblr_get_workspace_status\`/\`ensemblr_set_workspace_status\`).
+- Reach the Concierge: \`ensemblr_message_concierge\` stays open while planning — messaging is not implementing. Use it with reason \`brief_wrong\` the moment planning shows that the brief you were given is wrong, and with \`blocked\` when the plan cannot be settled without something outside this workspace. You pass no session id; the app resolves whichever Concierge conversation is live at the moment you send.
 
 The rest is blocked while you plan: \`write\` and \`edit\`, any \`bash\` command that is not read-only, \`ensemblr_launch_harness\`, \`ensemblr_start_terminal\`, \`ensemblr_write_terminal\`, \`ensemblr_resolve_diff_comments\`, ${architecture ? PLAN_MODE_ORCHESTRATOR_DIAGRAM_BLOCKED : ''}and \`ensemblr_linear_update_issue\` — anything that could change the repository, open a shell the read-only rules cannot reach, or claim a fix you have not made. ${architecture ? PLAN_MODE_ORCHESTRATOR_DIAGRAM_OPEN : ''}\`ensemblr_send_follow_up\` reaches only a conversation that is itself planning, so it steers the investigators you spawned and is refused anywhere else. That enforcement is deliberate — do not look for a way around it. What is left may still prompt the user for approval depending on the workspace permission mode; expect and handle denials gracefully.
 
@@ -366,6 +368,7 @@ const SUBAGENT_WITHHELD_OPS = new Set([
 	'linearUpdateIssue',
 	'listModels',
 	'listRunScripts',
+	'messageConcierge',
 	'openTab',
 	'sendFollowUp',
 	'setBranchName',
@@ -390,6 +393,7 @@ const CONCIERGE_WITHHELD_OPS = new Set([
 	'exitPlanMode',
 	'launchHarness',
 	'listRunScripts',
+	'messageConcierge',
 	'notifyOrchestrator',
 	'openTab',
 	'setBranchName',
@@ -1314,6 +1318,21 @@ export default function ensemblrControl(pi: ExtensionAPI): void {
 				}),
 			),
 			timeoutMs: Type.Optional(Type.Number()),
+		}),
+	);
+	tool(
+		'ensemblr_message_concierge',
+		'messageConcierge',
+		'Message the Concierge — the app-level agent that briefs workspace agents and supervises every workspace at once. For the things it has to know and cannot see from where it sits: you are blocked on something outside this workspace, the brief it gave you is wrong, the work belongs in a different repository, or you have finished. It NEVER reads your workspace on its own initiative, so a discovery you leave only in your own tab reaches nobody. You pass no session id and hold none: the Concierge conversation is cleared and restarted routinely, so the app resolves whichever one is live at the moment you send. The message arrives as a visible turn in the Concierge panel, marked as coming from an agent rather than from the user, and it does NOT block — carry on working, and a reply, if one comes, arrives as a follow-up here. Refused when no Concierge conversation is open (it is not queued), and capped per conversation, because the loop Concierge → you → Concierge has no natural end. Say it once, in full, rather than in installments.',
+		Type.Object({
+			message: Type.String({ maxLength: 4000 }),
+			reason: Type.Union([
+				Type.Literal('need_decision'),
+				Type.Literal('blocked'),
+				Type.Literal('brief_wrong'),
+				Type.Literal('progress'),
+				Type.Literal('done'),
+			]),
 		}),
 	);
 	tool(

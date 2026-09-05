@@ -13,6 +13,13 @@ export interface GuardrailConfig {
 	maxSpawnDepth: number;
 	maxSpawnsPerSession: number;
 	maxSpawnsPerMinute: number;
+	/**
+	 * Messages one session may send up to the Concierge, ever. The loop this
+	 * bounds is Concierge → orchestrator → Concierge: each message can start a
+	 * Concierge turn, and each of those can brief the orchestrator again.
+	 */
+	maxConciergeMessagesPerSession: number;
+	maxConciergeMessagesPerMinute: number;
 	waitTimeoutMs: number;
 }
 
@@ -21,6 +28,8 @@ export const DEFAULT_GUARDRAIL_CONFIG: GuardrailConfig = {
 	maxSpawnDepth: 1,
 	maxSpawnsPerSession: 20,
 	maxSpawnsPerMinute: 10,
+	maxConciergeMessagesPerSession: 10,
+	maxConciergeMessagesPerMinute: 3,
 	waitTimeoutMs: 300_000,
 };
 
@@ -38,6 +47,10 @@ export interface Guardrails {
 	evaluateSpawn: (origin: AgentControlOrigin) => GuardrailResult;
 	/** Record a spawn against the caller's counters after it is cleared to run. */
 	recordSpawn: (sessionId: string) => void;
+	/** Quota + rate check for a message to the Concierge; does not mutate counters. */
+	evaluateConciergeMessage: (sessionId: string) => GuardrailResult;
+	/** Record a message to the Concierge once it has actually been delivered. */
+	recordConciergeMessage: (sessionId: string) => void;
 	/** Drop a session's spawn counters when it ends, so the maps stay bounded. */
 	release: (sessionId: string) => void;
 	/** Refuse a blocking wait whose target is an ancestor of the caller. */
@@ -60,15 +73,31 @@ export function createGuardrails(
 	const limits: GuardrailConfig = { ...DEFAULT_GUARDRAIL_CONFIG, ...config };
 	const spawnTimestamps = new Map<string, readonly number[]>();
 	const lifetimeSpawns = new Map<string, number>();
+	const messageTimestamps = new Map<string, readonly number[]>();
+	const lifetimeMessages = new Map<string, number>();
 
-	const recentSpawns = (sessionId: string): readonly number[] => {
+	/**
+	 * Drops the timestamps that have aged out of the rolling window and reports
+	 * what is left, so a rate check reads the window rather than the whole log.
+	 * @param log - The per-session timestamp map to prune.
+	 * @param sessionId - The session whose log to prune.
+	 * @returns The timestamps still inside the window.
+	 */
+	const withinWindow = (
+		log: Map<string, readonly number[]>,
+		sessionId: string,
+	): readonly number[] => {
 		const cutoff = now() - RATE_WINDOW_MS;
-		const kept = (spawnTimestamps.get(sessionId) ?? []).filter(
-			(at) => at >= cutoff,
-		);
-		spawnTimestamps.set(sessionId, kept);
+		const kept = (log.get(sessionId) ?? []).filter((at) => at >= cutoff);
+		log.set(sessionId, kept);
 		return kept;
 	};
+
+	const recentSpawns = (sessionId: string): readonly number[] =>
+		withinWindow(spawnTimestamps, sessionId);
+
+	const recentMessages = (sessionId: string): readonly number[] =>
+		withinWindow(messageTimestamps, sessionId);
 
 	const totalSpawns = (sessionId: string): number =>
 		lifetimeSpawns.get(sessionId) ?? 0;
@@ -104,9 +133,40 @@ export function createGuardrails(
 		lifetimeSpawns.set(sessionId, (lifetimeSpawns.get(sessionId) ?? 0) + 1);
 	};
 
+	const evaluateConciergeMessage = (sessionId: string): GuardrailResult => {
+		if (
+			(lifetimeMessages.get(sessionId) ?? 0) >=
+			limits.maxConciergeMessagesPerSession
+		) {
+			return {
+				code: 'denied-quota',
+				ok: false,
+				reason: `This conversation has already sent the Concierge ${limits.maxConciergeMessagesPerSession} messages, which is its lifetime allowance. Anything further belongs in your last message, which the Concierge can read with \`ensemblr_get_last_message\`.`,
+			};
+		}
+		if (
+			recentMessages(sessionId).length >= limits.maxConciergeMessagesPerMinute
+		) {
+			return {
+				code: 'denied-rate',
+				ok: false,
+				reason: `Message rate limit of ${limits.maxConciergeMessagesPerMinute}/min to the Concierge exceeded. It is one conversation supervising several workspaces, and a burst from one of them crowds out the rest — get on with the work and say the rest in one message later.`,
+			};
+		}
+		return { ok: true };
+	};
+
+	const recordConciergeMessage = (sessionId: string): void => {
+		const log = messageTimestamps.get(sessionId) ?? [];
+		messageTimestamps.set(sessionId, [...log, now()]);
+		lifetimeMessages.set(sessionId, (lifetimeMessages.get(sessionId) ?? 0) + 1);
+	};
+
 	const release = (sessionId: string): void => {
 		spawnTimestamps.delete(sessionId);
 		lifetimeSpawns.delete(sessionId);
+		messageTimestamps.delete(sessionId);
+		lifetimeMessages.delete(sessionId);
 	};
 
 	const evaluateWaitTarget = (
@@ -127,6 +187,8 @@ export function createGuardrails(
 		waitTimeoutMs: limits.waitTimeoutMs,
 		evaluateSpawn,
 		recordSpawn,
+		evaluateConciergeMessage,
+		recordConciergeMessage,
 		release,
 		evaluateWaitTarget,
 	};
