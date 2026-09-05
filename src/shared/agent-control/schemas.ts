@@ -364,6 +364,21 @@ const LINEAR_UPDATE_FIELDS = [
 // 2 high, 3 medium, 4 low. Anything outside it is silently ignored by the API.
 const linearPriority = z.number().int().min(0).max(4);
 
+const linearCreateIssueSchema = z.strictObject({
+	accountId: nonEmpty.optional(),
+	assigneeId: nonEmpty.optional(),
+	description: z
+		.string()
+		.max(LINEAR_AGENT_LIMITS.maxDescriptionLength)
+		.optional(),
+	labelIds: z.array(nonEmpty).max(LINEAR_AGENT_LIMITS.maxLabelIds).optional(),
+	priority: linearPriority.optional(),
+	projectId: nonEmpty.optional(),
+	stateId: nonEmpty.optional(),
+	teamId: nonEmpty,
+	title: nonEmpty.max(LINEAR_AGENT_LIMITS.maxTitleLength),
+});
+
 const linearUpdateIssueSchema = z
 	.strictObject({
 		accountId: nonEmpty.optional(),
@@ -491,6 +506,7 @@ const AGENT_CONTROL_ARG_SCHEMAS = {
 	linearGetIssue: linearGetIssueSchema,
 	linearGetMetadata: linearGetMetadataSchema,
 	linearCreateComment: linearCreateCommentSchema,
+	linearCreateIssue: linearCreateIssueSchema,
 	linearUpdateIssue: linearUpdateIssueSchema,
 	listProjects: emptySchema,
 	listWorkspaces: emptySchema,

@@ -23,6 +23,7 @@ import type {
 	LinearAccountRef,
 	LinearAgentStatus,
 	LinearCreateCommentResult,
+	LinearCreateIssueResult,
 	LinearGetIssueResult,
 	LinearGetMetadataResult,
 	LinearListIssuesResult,
@@ -30,6 +31,7 @@ import type {
 } from '../../shared/agent-control.ts';
 import {
 	LINEAR_AGENT_LIMITS,
+	LINEAR_INITIAL_STATE_TYPES,
 	LINEAR_TERMINAL_STATE_TYPES,
 	MAX_AGENT_PAYLOAD_CHARS,
 } from '../../shared/agent-control.ts';
@@ -69,6 +71,11 @@ export interface LinearPortDeps {
 /** State types an agent may never move an issue into, for a fast membership test. */
 const TERMINAL_STATE_TYPES: ReadonlySet<string> = new Set(
 	LINEAR_TERMINAL_STATE_TYPES,
+);
+
+/** State types a filed issue may open in, for a fast membership test. */
+const INITIAL_STATE_TYPES: ReadonlySet<string> = new Set(
+	LINEAR_INITIAL_STATE_TYPES,
 );
 
 // The refusal message is assembled after `fitMetadata` has spent the payload
@@ -438,6 +445,95 @@ async function terminalStateRefusal(
 }
 
 /**
+ * Says that a refused create filed nothing at all, so an agent does not go
+ * looking for a half-made issue or, worse, assume one exists and cite it.
+ */
+const NOTHING_CREATED =
+	'Nothing was filed — there is no issue to find, edit, or delete, so fix the argument this names and call again.';
+
+/**
+ * States a refused create could have opened in, drawn from the target team. Same
+ * argument as {@link nonTerminalStatesNote}: the classification already read
+ * every state on that team, so making the agent call `get_metadata` again to
+ * learn what it just looked at costs a round trip and buys nothing.
+ * @param states - Every cached workflow state the lookup covered.
+ * @param teamId - The team the issue is being filed on.
+ * @returns The clause naming the states it may open in, or an empty string when none qualify.
+ */
+function initialStatesNote(
+	states: readonly LinearResourceWire[],
+	teamId: string,
+): string {
+	const allowed = states.flatMap((row) =>
+		row.teamId === teamId &&
+		row.type !== null &&
+		INITIAL_STATE_TYPES.has(row.type)
+			? [`"${row.name}" (${row.id})`]
+			: [],
+	);
+	if (allowed.length === 0) {
+		return ' That team exposes no backlog or triage state at all, so omit `stateId` and let Linear apply the team default.';
+	}
+	return ` The states you may open it in on that team are ${allowed
+		.slice(0, MAX_LISTED_STATES)
+		.join(
+			', ',
+		)} — or omit \`stateId\` entirely and let Linear apply the team default.`;
+}
+
+/**
+ * Reports why an agent may not file this issue, or null when it may.
+ *
+ * Two refusals, both fail-closed, both checked against one metadata read. The
+ * team must exist and must belong to the account the agent named, because a
+ * ticket filed on the wrong board is invisible to the people who needed it and
+ * cannot be moved from here. And an opening state must be one an unread ticket
+ * belongs in: `started` claims someone is working on it, `completed` and
+ * `canceled` close it before anyone has read it, and a state the cache cannot
+ * classify might be any of the three.
+ *
+ * The metadata read is deliberately unscoped even when the agent named an
+ * account: a team id is a UUID that identifies its own account, so reading only
+ * the named account's tables would turn a mismatch into "no such team" and hide
+ * the very thing the agent got wrong.
+ * @param service - The Linear service the tables are read from.
+ * @param args - The team, the account the agent named, and any opening state.
+ * @returns The model-facing refusal, or null when the create may proceed.
+ */
+async function createIssueRefusal(
+	service: LinearService,
+	args: { accountId?: string; stateId?: string; teamId: string },
+): Promise<string | null> {
+	const metadata = await service.getMetadata();
+	const team = metadata.metadata.teams.find((row) => row.id === args.teamId);
+	if (!team) {
+		return `Refused: no cached Linear team has the id "${args.teamId}"${
+			metadata.status === 'error'
+				? `, and Linear could not be reached to check for a newer one (${metadata.failure.message})`
+				: ''
+		}. Call ensemblr_linear_get_metadata with refresh: true and pass a teamId from the list it returns. ${NOTHING_CREATED}`;
+	}
+	if (args.accountId && team.accountId !== args.accountId) {
+		return `Refused: team "${team.name}" belongs to Linear account "${team.accountId}", not to the "${args.accountId}" you passed. An id from one account is never valid in another, so this is a mismatch rather than something to retry — pass the team's own accountId, or drop accountId and let the team resolve it. ${NOTHING_CREATED}`;
+	}
+	if (!args.stateId) {
+		return null;
+	}
+	const states = metadata.metadata.states;
+	const state = states.find((row) => row.id === args.stateId);
+	if (!state || state.type === null) {
+		return `Refused: this app will not open an issue in a state it cannot classify, and ${unclassifiableCause(metadata, state)}. ${NOTHING_CREATED}${initialStatesNote(states, args.teamId)}`;
+	}
+	if (state.teamId !== null && state.teamId !== args.teamId) {
+		return `Refused: "${state.name}" is a workflow state of another team, and a state is only valid on the team that owns it. ${NOTHING_CREATED}${initialStatesNote(states, args.teamId)}`;
+	}
+	if (!INITIAL_STATE_TYPES.has(state.type)) {
+		return `Refused: "${state.name}" is a ${state.type} state, and a ticket you have just filed is not one anybody has read yet — opening it there tells the team work is underway, or finished, when neither is true. ${NOTHING_CREATED}${initialStatesNote(states, args.teamId)}`;
+	}
+	return null;
+}
+
+/**
  * Reads the Linear account a workspace was created against, so an agent working
  * a ticket does not have to name the organization it already came from.
  * @param deps - Port collaborators holding the database service.
@@ -750,6 +846,56 @@ export function makeLinearPort(deps: LinearPortDeps): LinearPort {
 				message: `Comment posted on ${issueId}. It is visible to the whole team in Linear and cannot be edited or deleted from here.`,
 				status: 'ok',
 			} satisfies LinearCreateCommentResult;
+		},
+
+		createIssue: async ({
+			accountId,
+			assigneeId,
+			description,
+			labelIds,
+			priority,
+			projectId,
+			stateId,
+			teamId,
+			title,
+			workspaceId,
+		}) => {
+			if (!linearService) {
+				return { ...unavailable(), issue: null };
+			}
+			const refusal = await createIssueRefusal(linearService, {
+				...(accountId ? { accountId } : {}),
+				...(stateId ? { stateId } : {}),
+				teamId,
+			});
+			if (refusal) {
+				return { issue: null, message: refusal, status: 'refused' };
+			}
+			const result = await linearService.createIssue({
+				...(accountId ? { accountId } : {}),
+				...withFallback(fallbackAccount(workspaceId)),
+				...(assigneeId ? { assigneeId } : {}),
+				...(description ? { description } : {}),
+				...(labelIds ? { labelIds: [...labelIds] } : {}),
+				...(priority === undefined ? {} : { priority }),
+				...(projectId ? { projectId } : {}),
+				...(stateId ? { stateId } : {}),
+				teamId,
+				title,
+			});
+			if (result.status === 'error') {
+				return {
+					...failed(result.failure),
+					...accountChoice(await listAccountsSafely(deps)),
+					issue: null,
+				};
+			}
+			const issue = toAgentIssue(result.issue);
+			return {
+				issue,
+				message: `Filed ${issue.identifier} "${issue.title}" on ${issue.team ?? 'the team you named'}, in ${issue.state ?? 'the team default state'}. The whole team sees it and nothing here can delete it, so cite ${issue.identifier} rather than filing it again. Its accountId is "${issue.accountId}" — pass that on any further write.`,
+				status: 'ok',
+			} satisfies LinearCreateIssueResult;
 		},
 
 		updateIssue: async ({

@@ -49,6 +49,7 @@ export const AGENT_CONTROL_OPS = [
 	'linearGetIssue',
 	'linearGetMetadata',
 	'linearCreateComment',
+	'linearCreateIssue',
 	'linearUpdateIssue',
 	'listProjects',
 	'listWorkspaces',
@@ -164,6 +165,7 @@ const WRITE_OPS: ReadonlySet<AgentControlOp> = new Set([
 	'addDiffComments',
 	'resolveDiffComments',
 	'linearCreateComment',
+	'linearCreateIssue',
 	'linearUpdateIssue',
 ]);
 
@@ -1115,6 +1117,8 @@ export interface ResolveDiffCommentsResult {
 export const LINEAR_AGENT_LIMITS = {
 	maxCommentLength: 8_000,
 	maxDescriptionLength: 32_000,
+	/** Labels a filed issue may carry; a runaway guard, not a Linear limit. */
+	maxLabelIds: 10,
 	maxTitleLength: 255,
 	/** Comments returned alongside one issue, newest last. */
 	maxReturnedComments: 40,
@@ -1130,6 +1134,20 @@ export const LINEAR_AGENT_LIMITS = {
  * as In Review and a human decides whether it is finished.
  */
 export const LINEAR_TERMINAL_STATE_TYPES = ['canceled', 'completed'] as const;
+
+/**
+ * Workflow-state categories a newly filed issue may open in. Linear's own `type`
+ * values again: `triage` for a team that runs one, `backlog` and `unstarted` for
+ * a team that does not. `started` is absent for the same reason the terminal
+ * types are — a ticket an agent filed and nobody has read yet is not in
+ * progress, and a board that says otherwise is the tracker lying about who is
+ * working on what.
+ */
+export const LINEAR_INITIAL_STATE_TYPES = [
+	'backlog',
+	'triage',
+	'unstarted',
+] as const;
 
 /**
  * How a Linear op ended, in the vocabulary an agent acts on. Linear is often not
@@ -1368,6 +1386,41 @@ export interface LinearCreateCommentArgs {
  */
 export interface LinearCreateCommentResult extends LinearAgentOutcome {
 	commentId: string | null;
+}
+
+/**
+ * Args for `linearCreateIssue`. `teamId` is required and never inferred: several
+ * Linear accounts can be connected and one account spans teams, so a guessed team
+ * files the ticket on a board nobody who needs it is watching. Everything else is
+ * optional, and an omitted `stateId` leaves the team's own default — Linear picks
+ * triage or backlog, which is where an agent-filed ticket belongs.
+ *
+ * `labelIds`, `projectId`, and `assigneeId` are here where `linearUpdateIssue`
+ * omits the first two: on a ticket that already exists they are planning
+ * decisions a human is making, but on one the agent is filing they are the only
+ * chance to put it in front of the right people at all.
+ */
+export interface LinearCreateIssueArgs {
+	/** Account owning the team; refused rather than guessed when it disagrees. */
+	accountId?: string;
+	assigneeId?: string;
+	description?: string;
+	labelIds?: readonly string[];
+	/** Linear's own scale: 0 none, 1 urgent, 2 high, 3 medium, 4 low. */
+	priority?: number;
+	projectId?: string;
+	/** Workflow state to open in; a started, Done, or Canceled state is refused. */
+	stateId?: string;
+	teamId: string;
+	title: string;
+}
+
+/**
+ * Result of `linearCreateIssue`: the issue as Linear reports it after the write,
+ * so the agent reads back the `identifier` a branch and a commit have to cite.
+ */
+export interface LinearCreateIssueResult extends LinearAgentOutcome {
+	issue: AgentLinearIssue | null;
 }
 
 /**

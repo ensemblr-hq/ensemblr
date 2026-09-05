@@ -30,6 +30,7 @@ import type {
 	GetWorkspaceStatusArgs,
 	LaunchHarnessArgs,
 	LinearCreateCommentArgs,
+	LinearCreateIssueArgs,
 	LinearGetIssueArgs,
 	LinearGetMetadataArgs,
 	LinearListIssuesArgs,
@@ -569,6 +570,14 @@ export function createAgentControlService({
 }: AgentControlServiceOptions): AgentControlService {
 	/** Latest pending signal per child session id, set by `notifyOrchestrator`. */
 	const signalsByChild = new Map<string, OrchestratorSignal>();
+
+	/**
+	 * Sessions that have searched Linear at least once, which is the precondition
+	 * on filing an issue. Session state rather than port state on purpose: the
+	 * Linear port is stateless and knows nothing of who is calling it, and this is
+	 * a fact about the caller's own turn rather than about the tracker.
+	 */
+	const linearSearchesBySession = new Set<string>();
 
 	/** Pulls the review panel to Checks after a comment op, once per burst. */
 	const reviewFocus = createReviewFocus(ports.focus, scheduler.now);
@@ -1687,6 +1696,35 @@ export function createAgentControlService({
 	 * @param args - The signal reason and its message.
 	 * @returns An acknowledgement, or a `not-found` failure for a root caller.
 	 */
+	/**
+	 * Files a Linear issue, behind a search-for-duplicates precondition.
+	 *
+	 * The precondition is enforced rather than asked for. Every other guard on
+	 * this op is about the ticket's shape — the right team, a state an unread
+	 * ticket belongs in — and none of them can tell that the issue already exists
+	 * under someone else's wording. Only a search can, and "search first" left to
+	 * the prompt is the instruction a model skips exactly when a backlog is large
+	 * enough for the duplicate to be likely. One search per session clears it: the
+	 * point is that the agent has looked, not that it looks once per filing.
+	 * @param origin - Resolved caller identity.
+	 * @param args - The issue to file.
+	 * @returns The filed issue, or the reason it was refused.
+	 */
+	const handleLinearCreateIssue = async (
+		origin: AgentControlOrigin,
+		args: LinearCreateIssueArgs,
+	): Promise<AgentControlResult<unknown>> => {
+		if (!linearSearchesBySession.has(origin.sessionId)) {
+			return fail(
+				'denied-scope',
+				'Search Linear before filing: call `ensemblr_linear_list_issues` with a query describing this problem, and file only if nothing there already covers it. A duplicate cannot be deleted from here, and the team reads both. One search in this conversation is enough — this is refused only because none has happened yet.',
+			);
+		}
+		return ports.linear
+			.createIssue({ ...args, workspaceId: origin.workspaceId })
+			.then(ok);
+	};
+
 	const handleNotifyOrchestrator = async (
 		origin: AgentControlOrigin,
 		args: NotifyOrchestratorArgs,
@@ -2126,13 +2164,17 @@ export function createAgentControlService({
 					workspaceId: origin.workspaceId,
 				})
 				.then(ok),
-		linearListIssues: ({ args, origin }) =>
-			ports.linear
+		linearCreateIssue: ({ args, origin }) =>
+			handleLinearCreateIssue(origin, args as LinearCreateIssueArgs),
+		linearListIssues: ({ args, origin }) => {
+			linearSearchesBySession.add(origin.sessionId);
+			return ports.linear
 				.listIssues({
 					...(args as LinearListIssuesArgs),
 					workspaceId: origin.workspaceId,
 				})
-				.then(ok),
+				.then(ok);
+		},
 		linearUpdateIssue: ({ args, origin }) =>
 			ports.linear
 				.updateIssue({
@@ -2308,6 +2350,7 @@ export function createAgentControlService({
 		ports.ask.releaseSession(sessionId);
 		ports.planMode.releaseSession(sessionId);
 		signalsByChild.delete(sessionId);
+		linearSearchesBySession.delete(sessionId);
 		guardrails.release(sessionId);
 		originRegistry.release(sessionId);
 	};

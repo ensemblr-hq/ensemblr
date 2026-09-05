@@ -467,6 +467,29 @@ export const TOOL_DEFS: readonly McpToolDef[] = [
 		},
 	},
 	{
+		name: 'ensemblr_linear_create_issue',
+		op: 'linearCreateIssue',
+		description:
+			'File a new Linear issue. Call `ensemblr_linear_list_issues` first — a search is REQUIRED before the first create in a conversation, and this is refused until one has happened, because the duplicate you cannot see is the one a search would have found and nothing here can delete a filed issue. `teamId` is required and never guessed: read it from `ensemblr_linear_get_metadata`, and pass its own `accountId` or none at all — an accountId naming a different account than the team is refused rather than reconciled. Omit `stateId` and Linear opens the issue in the team default, which is where a ticket nobody has read belongs; a state whose type is `started`, `completed`, or `canceled` is refused. Write the issue as a teammate would file it: a title that names the problem, and a description carrying the evidence, the file paths, and what you already ruled out. File the follow-up you found and were told not to fix; do not file the work you are already doing.',
+		shape: {
+			accountId: z.string().optional(),
+			assigneeId: z.string().optional(),
+			description: z
+				.string()
+				.max(LINEAR_AGENT_LIMITS.maxDescriptionLength)
+				.optional(),
+			labelIds: z
+				.array(z.string())
+				.max(LINEAR_AGENT_LIMITS.maxLabelIds)
+				.optional(),
+			priority: z.number().int().min(0).max(4).optional(),
+			projectId: z.string().optional(),
+			stateId: z.string().optional(),
+			teamId: z.string(),
+			title: z.string().max(LINEAR_AGENT_LIMITS.maxTitleLength),
+		},
+	},
+	{
 		name: 'ensemblr_linear_update_issue',
 		op: 'linearUpdateIssue',
 		description:

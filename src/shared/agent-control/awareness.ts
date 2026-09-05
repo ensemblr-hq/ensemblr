@@ -186,7 +186,7 @@ const LINEAR_INVENTORY_READS = `- Linear: search the connected account's issues 
  * {@link buildLinkedIssueDirective}, which is the block that carries the triggers
  * and the identifier.
  */
-const LINEAR_INVENTORY = `${LINEAR_INVENTORY_READS} Comment on an issue (\`ensemblr_linear_create_comment\`) and move one along (\`ensemblr_linear_update_issue\`: state, assignee, priority, title, description). A state whose type is \`completed\` or \`canceled\` is refused whatever you pass — you take work as far as \`In Review\` and the user decides whether it is done.`;
+const LINEAR_INVENTORY = `${LINEAR_INVENTORY_READS} Comment on an issue (\`ensemblr_linear_create_comment\`) and move one along (\`ensemblr_linear_update_issue\`: state, assignee, priority, title, description). A state whose type is \`completed\` or \`canceled\` is refused whatever you pass — you take work as far as \`In Review\` and the user decides whether it is done. File a new one (\`ensemblr_linear_create_issue\`, \`teamId\` required) for the follow-up you found and were told not to fix, never for the work you are already doing; \`ensemblr_linear_list_issues\` has to have run at least once in this conversation before the first create, because nothing here can delete the duplicate a search would have caught.`;
 
 /**
  * The standing tracker obligation for a role that may write to Linear. Kept out
@@ -553,10 +553,10 @@ const PLAN_MODE_REVIEW = `${REVIEW_INVENTORY_READS} All three stay available whi
  * while moving a ticket is the `resolveDiffComments` argument exactly: it claims
  * an implementation that does not exist while `write` and `edit` are blocked.
  */
-const PLAN_MODE_ORCHESTRATOR_LINEAR = `${LINEAR_INVENTORY_READS} Commenting stays available too (\`ensemblr_linear_create_comment\`) — a comment records what you found. Moving a ticket does not: \`ensemblr_linear_update_issue\` claims an implementation you have not written, so it is refused here.`;
+const PLAN_MODE_ORCHESTRATOR_LINEAR = `${LINEAR_INVENTORY_READS} Commenting stays available too (\`ensemblr_linear_create_comment\`) — a comment records what you found. Moving a ticket does not: \`ensemblr_linear_update_issue\` claims an implementation you have not written, so it is refused here, and neither does filing one: \`ensemblr_linear_create_issue\` leaves a row on the team's board that nothing can delete, from a plan nobody has approved. Name the follow-ups the plan should file.`;
 
 /** The same bullet for a planning investigator, which may not write to Linear at all. */
-const PLAN_MODE_SUBAGENT_LINEAR = `${LINEAR_INVENTORY_READS} Writing to Linear is not yours: a ticket is read by the whole team rather than by your orchestrator, so \`ensemblr_linear_create_comment\` and \`ensemblr_linear_update_issue\` are refused here. Put what you would have written in your report.`;
+const PLAN_MODE_SUBAGENT_LINEAR = `${LINEAR_INVENTORY_READS} Writing to Linear is not yours: a ticket is read by the whole team rather than by your orchestrator, so \`ensemblr_linear_create_comment\`, \`ensemblr_linear_create_issue\`, and \`ensemblr_linear_update_issue\` are refused here. Put what you would have written in your report.`;
 
 /**
  * The inspect, diagram, Linear, and board bullets. Naming stays available on
@@ -797,7 +797,7 @@ When a user asks what to build or what to work on, the answer comes from the pro
 - **See what exists.** \`ensemblr_list_projects\` is the roster of every project the app has opened, with the \`projectId\` a workspace is cut off and the count of live workspaces each already has; \`ensemblr_list_workspaces\` is the workspaces themselves. A project with no live workspace appears only in the first.
 - **Put agents to work.** \`ensemblr_start_conversation\` with a \`workspaceId\` opens a **root orchestrator** in that workspace — a peer with its own delegation budget, not a sub-agent of yours. Brief it as you would brief a colleague, steer it with \`ensemblr_send_follow_up\`, and let it fan out its own sub-agents. \`planMode: true\` opens it planning.
 - **Create a workspace** with \`ensemblr_create_workspace\` when the work needs one that does not exist yet, then put an orchestrator in it. The \`projectId\` comes from \`ensemblr_list_projects\`. **\`name\` is required, and it names the git branch too** — the app slugs it under the repository's branch prefix, so "Fix Linear OAuth callback" cuts \`<prefix>/fix-linear-oauth-callback\`. Name it for the work in 2-5 words, the way you would name a branch; a placeholder such as "workspace", "task", or "test" is refused. The app moves the route to the new workspace, so the user is looking at it when you brief its agent.
-- **Move the board and the tracker.** \`ensemblr_set_workspace_status\` on any workspace, and the Linear ops, which were never workspace-scoped.
+- **Move the board and the tracker.** \`ensemblr_set_workspace_status\` on any workspace, and the Linear ops, which were never workspace-scoped. That includes filing a ticket: \`ensemblr_linear_create_issue\` takes a required \`teamId\` from \`ensemblr_linear_get_metadata\`, and refuses the first create in a conversation until \`ensemblr_linear_list_issues\` has run at least once, because nothing here can delete the duplicate a search would have caught. Asked for a ticket, file it yourself rather than handing the user text to paste; cutting a workspace and putting an agent in it to do one API call is the wrong shape for this.
 - **Leave review comments** on any workspace's diff, and resolve ones that were fixed.
 - **Focus the app.** \`ensemblr_focus_workspace\` navigates to a workspace; \`ensemblr_focus_tab\`, \`ensemblr_focus_dock_tab\`, and \`ensemblr_focus_panel\` bring a surface forward once you are there.
 - **Remember.** Write a memory as an ordinary file under \`memory/\`, and search what you have written with \`ensemblr_recall_memory\`.

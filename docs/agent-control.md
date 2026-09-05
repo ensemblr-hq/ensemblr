@@ -134,12 +134,12 @@ Delegation is bounded so a runaway agent cannot fork-bomb the app
 
 Guardrails count spawns; they do not decide who may do what. That is the role
 policy in `src/shared/agent-control/subagent-policy.ts`, which refuses a spawned
-sub-agent fifteen ops with `denied-scope` **whatever mode it is in**:
+sub-agent sixteen ops with `denied-scope` **whatever mode it is in**:
 
 `spawnChatTab`, `startConversation`, `sendFollowUp`, `launchHarness`,
 `startTerminal`, `stopTerminal`, `writeTerminal`, `openTab`, `closeTab`,
 `setBranchName`, `setWorkspaceStatus`, `askUserQuestion`, `exitPlanMode`,
-`linearCreateComment`, `linearUpdateIssue`.
+`linearCreateComment`, `linearCreateIssue`, `linearUpdateIssue`.
 
 Two things run together and are easy to confuse. The spawn guardrail reads
 `origin.depth`, which lives in the in-memory origin registry; the role policy
@@ -163,23 +163,25 @@ the tab carried before rather than assuming which way the write went.
 `waitForAgents`, `listModels`, and `listRunScripts` are not denied — a sub-agent
 simply has no children to wait on, no spawn to pick a model for, and no
 `startTerminal` to pick a run script for. Those three (`SUBAGENT_UNUSABLE_OPS`)
-are withheld from its tool list along with the fifteen above, because listing a
+are withheld from its tool list along with the sixteen above, because listing a
 tool the service would only refuse teaches the model to keep reaching for it. The
-Pi extension registers the complement of `SUBAGENT_WITHHELD_OPS` — eighteen ops in
+Pi extension registers the complement of `SUBAGENT_WITHHELD_OPS` — nineteen ops in
 all — for a child, and a parity test compares its copy of that set against the
 shared one.
 
 What a sub-agent keeps: every read, `focusTab`/`focusDockTab`/`focusPanel`,
 `setName`, `setSummary`, and `notifyOrchestrator`.
 
-The two Linear writes are the newest members and are there for a different reason
+The three Linear writes are the newest members and are there for a different reason
 from the rest. They are not scoped to a workspace at all — a Linear issue is read
 by the whole team — so the usual "acts on someone else's workspace" argument does
 not apply. What does is duplication and authority: three children each posting
 their own comment on the ticket they are all working produces noise the
-orchestrator cannot retract, and an issue's state, assignee, and title describe
-the whole body of work rather than the one unit a child was handed. The
-orchestrator writes to Linear once, for all of them. The three Linear reads stay
+orchestrator cannot retract, an issue's state, assignee, and title describe
+the whole body of work rather than the one unit a child was handed, and several
+children each filing the follow-up they found is how a backlog fills with
+duplicates nothing here can delete. The orchestrator writes to Linear once, for
+all of them. The three Linear reads stay
 available, because a child that cannot read the ticket it was briefed from is
 working blind.
 
@@ -261,7 +263,7 @@ harness.
 
 ## Tool reference
 
-Forty-five tools, enumerated from `TOOL_DEFS` in
+Forty-six tools, enumerated from `TOOL_DEFS` in
 `src/main/agent-control/mcp-endpoint.ts`. The argument names and types below are
 the authoritative Zod schemas in `src/shared/agent-control/schemas.ts` — every
 schema is a `strictObject`, so an argument not listed here is rejected as
@@ -590,11 +592,22 @@ a `..` segment comes back as `invalid-args` rather than reaching git.
 | `ensemblr_linear_get_issue` | `accountId?: string`, **`issueId: string`**, `refresh?: boolean` | read | — |
 | `ensemblr_linear_get_metadata` | `accountId?: string`, `refresh?: boolean` | read | — |
 | `ensemblr_linear_create_comment` | `accountId?: string`, **`issueId: string`**, **`commentBody: string`** (≤ 8,000) | write | sub-agent |
+| `ensemblr_linear_create_issue` | `accountId?: string`, `assigneeId?: string`, `description?: string` (≤ 32,000), `labelIds?: string[]` (≤ 10), `priority?: number` (0–4), `projectId?: string`, `stateId?: string`, **`teamId: string`**, **`title: string`** (≤ 255) | write | sub-agent |
 | `ensemblr_linear_update_issue` | `accountId?: string`, **`issueId: string`**, `stateId?: string`, `assigneeId?: string`, `priority?: number` (0–4), `title?: string` (≤ 255), `description?: string` (≤ 32,000) | write | sub-agent |
 
 `linearUpdateIssue` needs at least one field beyond `issueId`, and a `stateId`
 whose workflow type is `completed` or `canceled` is refused. `linearUpdateIssue`
-is also refused in Plan Mode. Several Linear accounts can be connected at once,
+is also refused in Plan Mode, as is `linearCreateIssue`.
+
+`linearCreateIssue` carries three refusals of its own, all decided before Linear
+is called and all reporting that nothing was filed. `teamId` must name a cached
+team, and an `accountId` that names a different account than that team's is a
+mismatch rather than something to reconcile. A `stateId` must belong to that team
+and must be a `backlog`, `triage`, or `unstarted` state — `started` claims work is
+underway on a ticket nobody has read, and the terminal types close it before
+anybody has. And the caller's session must have run `linearListIssues` at least
+once: a duplicate cannot be deleted from here, so the search that would have found
+it is a precondition rather than an instruction. Several Linear accounts can be connected at once,
 so `accountId` is optional on every one of these and resolved from what the call
 already names. See [Talking to Linear](#talking-to-linear).
 

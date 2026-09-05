@@ -51,6 +51,10 @@ const PLAN_MODE_BLOCKED_OPS: ReadonlyMap<AgentControlOp, string> = new Map([
 		'`ensemblr_update_architecture_diagram` writes `.ensemblr/architecture.json`, which is a tracked file — a redraw from here lands in the user’s `git status` and in the Changes panel, and a working tree left untouched is the one thing planning promises. Reading it is not blocked: `ensemblr_get_architecture_diagram` is how you describe the architecture in the plan, and redrawing it is work the approved plan can carry',
 	],
 	[
+		'linearCreateIssue',
+		'`ensemblr_linear_create_issue` files a ticket the whole team reads, and nothing on this surface can delete one afterwards — a plan the user has not approved yet should not have left rows on their board. Name the follow-ups the plan should file, and file them once the plan is approved. Commenting on an issue that already exists is not blocked: `ensemblr_linear_create_comment` records what you found, which is planning output',
+	],
+	[
 		'linearUpdateIssue',
 		'`ensemblr_linear_update_issue` moves a ticket the whole team reads, and an issue pushed to In Review from here claims an implementation that does not exist while `write` and `edit` are blocked — the same reason `ensemblr_resolve_diff_comments` is blocked. Commenting on the issue is not: `ensemblr_linear_create_comment` records what you found, which is planning output',
 	],

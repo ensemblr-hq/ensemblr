@@ -392,6 +392,10 @@
 			"done": "Прокомментировал задачу в Linear",
 			"running": "Комментирует задачу в Linear"
 		},
+		"linear-create-issue": {
+			"done": "Создал задачу в Linear",
+			"running": "Создаёт задачу в Linear"
+		},
 		"linear-get-issue": {
 			"done": "Прочитал задачу в Linear",
 			"running": "Читает задачу в Linear"

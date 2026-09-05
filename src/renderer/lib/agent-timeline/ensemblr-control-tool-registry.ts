@@ -438,6 +438,22 @@ export const ENSEMBLR_TOOL_LABELS: Record<string, EnsemblrToolLabel> = {
 				),
 		],
 	},
+	ensemblr_linear_create_issue: {
+		detailKeys: ['title', 'name'],
+		glyph: 'ticket-plus',
+		title: [
+			() =>
+				i18n.t(
+					'workbench:control-tool.linear-create-issue.done',
+					'Filed a Linear issue',
+				),
+			() =>
+				i18n.t(
+					'workbench:control-tool.linear-create-issue.running',
+					'Filing a Linear issue',
+				),
+		],
+	},
 	ensemblr_linear_get_issue: {
 		detailKeys: ['issueId', 'id', 'identifier'],
 		glyph: 'ticket',

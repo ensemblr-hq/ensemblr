@@ -24,6 +24,8 @@ import type {
 	GetWorkspaceDiffResult,
 	LinearCreateCommentArgs,
 	LinearCreateCommentResult,
+	LinearCreateIssueArgs,
+	LinearCreateIssueResult,
 	LinearGetIssueArgs,
 	LinearGetIssueResult,
 	LinearGetMetadataArgs,
@@ -561,6 +563,9 @@ export interface LinearPort {
 	createComment: (
 		input: LinearPortInput<LinearCreateCommentArgs>,
 	) => Promise<LinearCreateCommentResult>;
+	createIssue: (
+		input: LinearPortInput<LinearCreateIssueArgs>,
+	) => Promise<LinearCreateIssueResult>;
 	updateIssue: (
 		input: LinearPortInput<LinearUpdateIssueArgs>,
 	) => Promise<LinearUpdateIssueResult>;

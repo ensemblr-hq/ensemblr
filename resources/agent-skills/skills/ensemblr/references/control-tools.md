@@ -33,7 +33,7 @@ Control adds no capability of its own — it is a gate, not a feature.
 
 **Linear** — `ensemblr_linear_list_issues`, `ensemblr_linear_get_issue`,
 `ensemblr_linear_get_metadata`, `ensemblr_linear_create_comment`,
-`ensemblr_linear_update_issue`.
+`ensemblr_linear_create_issue`, `ensemblr_linear_update_issue`.
 
 **The user, and planning** — `ensemblr_ask_user_question`,
 `ensemblr_exit_plan_mode`.

@@ -186,6 +186,11 @@ const makePorts = (
 			message: 'Comment posted.',
 			status: 'ok',
 		}),
+		createIssue: vi.fn().mockResolvedValue({
+			issue: null,
+			message: 'Filed ENG-2.',
+			status: 'ok',
+		}),
 		updateIssue: vi.fn().mockResolvedValue({
 			issue: null,
 			message: 'ENG-1 updated.',
@@ -2064,6 +2069,87 @@ describe('agent-control service: linear', () => {
 			issueId: 'ENG-106',
 			workspaceId: 'ws',
 		});
+	});
+
+	// Every other guard on a filing is about the ticket's shape; only a search can
+	// see that the issue already exists under somebody else's wording, and a
+	// duplicate cannot be deleted from here. So the search is a precondition the
+	// service enforces rather than a line in the tool description.
+	it('refuses the first filing until the session has searched Linear', async () => {
+		const ports = makePorts();
+		const { service } = setup({ ports });
+
+		const refused = await service.invoke({
+			op: 'linearCreateIssue',
+			token: 'tok-caller',
+			rawArgs: { teamId: 't-1', title: 'A follow-up' },
+		});
+
+		expect(refused.ok).toBe(false);
+		if (!refused.ok) {
+			expect(refused.code).toBe('denied-scope');
+			expect(refused.error).toContain('ensemblr_linear_list_issues');
+		}
+		expect(ports.linear.createIssue).not.toHaveBeenCalled();
+	});
+
+	it('files once the session has searched, and stays open after that', async () => {
+		const ports = makePorts();
+		const { service } = setup({ ports });
+
+		await service.invoke({
+			op: 'linearListIssues',
+			token: 'tok-caller',
+			rawArgs: { query: 'terminal drops a line' },
+		});
+		const first = await service.invoke({
+			op: 'linearCreateIssue',
+			token: 'tok-caller',
+			rawArgs: { teamId: 't-1', title: 'A follow-up' },
+		});
+		const second = await service.invoke({
+			op: 'linearCreateIssue',
+			token: 'tok-caller',
+			rawArgs: { teamId: 't-1', title: 'Another follow-up' },
+		});
+
+		expect(first.ok).toBe(true);
+		expect(second.ok).toBe(true);
+		expect(ports.linear.createIssue).toHaveBeenNthCalledWith(1, {
+			teamId: 't-1',
+			title: 'A follow-up',
+			workspaceId: 'ws',
+		});
+	});
+
+	// The gate is per session, not per app: one agent searching cannot clear the
+	// precondition for a different conversation that never looked.
+	it("does not let one session's search clear another session's first filing", async () => {
+		const ports = makePorts();
+		const { registry, service } = setup({ ports });
+
+		await service.invoke({
+			op: 'linearListIssues',
+			token: 'tok-caller',
+			rawArgs: { query: 'terminal' },
+		});
+		registry.register({
+			sessionId: 'other',
+			species: 'pi',
+			workspaceCwd: '/ws',
+			workspaceId: 'ws',
+		});
+		const result = await service.invoke({
+			op: 'linearCreateIssue',
+			token: 'tok-caller',
+			rawArgs: { teamId: 't-1', title: 'A follow-up' },
+		});
+
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.code).toBe('denied-scope');
+		}
+		expect(ports.linear.createIssue).not.toHaveBeenCalled();
 	});
 
 	// An update carrying nothing but an id is a wasted round trip, and the reply
