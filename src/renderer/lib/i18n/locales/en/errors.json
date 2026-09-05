@@ -310,6 +310,8 @@
 		"repository-copy-failed": "The repository could not be copied.",
 		"repository-copy-target-inside-source": "Choose a project outside the managed root — the destination would be inside the folder you picked.",
 		"repository-delete-failed": "The repository could not be deleted.",
+		"repository-folder-delete-failed": "The repository folder could not be removed from disk.",
+		"repository-folder-external": "The repository folder was left on disk because it lives outside the folder Ensemblr manages.",
 		"repository-id-required": "A repository is required.",
 		"repository-insert-failed": "The repository could not be saved.",
 		"repository-not-found": "That repository was not found.",

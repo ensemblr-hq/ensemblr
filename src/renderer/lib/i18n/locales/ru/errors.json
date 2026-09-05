@@ -316,6 +316,8 @@
 		"repository-copy-failed": "Не удалось скопировать репозиторий.",
 		"repository-copy-target-inside-source": "Выберите проект вне управляемого корневого каталога — иначе место назначения окажется внутри выбранной папки.",
 		"repository-delete-failed": "Не удалось удалить репозиторий.",
+		"repository-folder-delete-failed": "Не удалось удалить папку репозитория с диска.",
+		"repository-folder-external": "Папка репозитория осталась на диске, потому что находится вне каталога, которым управляет Ensemblr.",
 		"repository-id-required": "Нужен репозиторий.",
 		"repository-insert-failed": "Не удалось сохранить репозиторий.",
 		"repository-not-found": "Такой репозиторий не найден.",

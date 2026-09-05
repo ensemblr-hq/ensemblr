@@ -9,7 +9,9 @@ import type {
 	DeleteRepositoryRequest,
 	DeleteRepositoryResult,
 } from '../../shared/ipc/contracts/repository';
+import { MANAGED_CHILD_DEPTH } from '../../shared/managed-path.ts';
 import type { LocalCommandService } from '../commands/local-command';
+import { deleteRepositoryInfisicalLinks } from '../infisical/infisical-link-store.ts';
 import type { EnsemblrRootDirectoryService } from '../root';
 import type { EnsemblrDatabaseService } from '../storage';
 import {
@@ -22,8 +24,13 @@ import {
 } from '../storage/repositories/workspace-repository.ts';
 import { withTransaction } from '../storage/tx.ts';
 import { ARCHIVED_REPOSITORY_MARKER } from './archived-marker.ts';
-import { runBranchDelete, runWorktreeRemove } from './git-ops.ts';
+import {
+	runBranchDelete,
+	runEnsemblrRefPurge,
+	runWorktreeRemove,
+} from './git-ops.ts';
 import { deleteCachedRepositoryIssues } from './issue-cache.ts';
+import { containmentRefusal } from './managed-path.ts';
 import { removeDirectoryTree } from './remove-directory.ts';
 import type { WorkspaceTeardownService } from './workspace-teardown.ts';
 
@@ -59,9 +66,14 @@ interface SourceWorkspace {
 
 /**
  * Builds the service that destructively removes a repository and every child
- * workspace from Ensemblr. Worktrees are wiped, branches are dropped, and the
- * SQLite rows are deleted. The repository folder itself is left in place and
- * tagged with a sentinel so the shared-root reconciler does not resurrect it.
+ * workspace from Ensemblr. Worktrees are wiped, branches are dropped, the
+ * SQLite rows are deleted, and the repository's leftover workspace directory is
+ * cleared.
+ *
+ * The repository folder itself is removed only when the request asks for it and
+ * the folder lives inside the managed `repos/` root; otherwise it is left in
+ * place and tagged with a sentinel so the shared-root reconciler does not
+ * resurrect it.
  */
 export function createDeleteRepositoryService({
 	databaseService,
@@ -171,7 +183,30 @@ export function createDeleteRepositoryService({
 				};
 			}
 
-			writeArchivedMarker({ diagnostics, repositoryPath: source.path });
+			await removeWorkspacesDirectory({
+				diagnostics,
+				repositorySlug: source.slug,
+				rootDirectoryService,
+			});
+
+			const folderDeleted =
+				request.deleteFolder === true &&
+				(await removeRepositoryFolder({
+					diagnostics,
+					repositoryPath: source.path,
+					rootDirectoryService,
+				}));
+
+			if (!folderDeleted) {
+				// The refs only need purging while a `.git` survives to hold them, and
+				// only then is the sentinel what stops the next launch re-adopting the
+				// folder as a brand-new repository.
+				await runEnsemblrRefPurge({
+					localCommandService,
+					repositoryPath: source.path,
+				});
+				writeArchivedMarker({ diagnostics, repositoryPath: source.path });
+			}
 
 			await removeArchivedContextsForRepository({
 				diagnostics,
@@ -181,6 +216,7 @@ export function createDeleteRepositoryService({
 
 			const repository: DeletedRepositorySnapshot = {
 				deletedWorkspaceIds: source.workspaces.map((w) => w.id),
+				folderDeleted,
 				id: source.id,
 				name: source.name,
 				path: source.path,
@@ -237,10 +273,10 @@ function readRepository(
 }
 
 /**
- * Delete a repository's workspace rows, its cached issue lists, and its own row
- * within one transaction. `integration_metadata` has no foreign key back to
- * `repositories`, so the cached issue bodies outlive the repository unless they
- * are dropped here.
+ * Delete a repository's workspace rows, its cached issue lists, its Infisical
+ * link, and its own row within one transaction. Neither `integration_metadata`
+ * nor `infisical_links` has a foreign key back to `repositories`, so both
+ * outlive the repository unless they are dropped here.
  * @param options - Open database and the repository id whose rows are removed
  */
 function deleteRepositoryRows({
@@ -253,8 +289,129 @@ function deleteRepositoryRows({
 	withTransaction(database, () => {
 		deleteWorkspaceRowsByRepository({ database, repositoryId });
 		deleteCachedRepositoryIssues({ database, repositoryId });
+		deleteRepositoryInfisicalLinks({ database, repositoryId });
 		deleteRepositoryRowById({ database, id: repositoryId });
 	});
+}
+
+/**
+ * Removes the repository's folder under the managed workspaces root, which
+ * holds whatever the per-workspace worktree removals left behind.
+ *
+ * Wholesale rather than per-directory, and that is the point: the startup sweep
+ * refuses any leftover holding a `.git` — permanently — so a workspace whose
+ * `git worktree remove` failed is residue nothing else can ever reclaim. Every
+ * row under this slug has just been deleted, so there is nothing left here to
+ * protect. Slugs are unique across live rows, so the path is unambiguous now
+ * and would not stay so if this were deferred.
+ * @param options - Diagnostics sink, the repository slug, and the root service
+ */
+async function removeWorkspacesDirectory({
+	diagnostics,
+	repositorySlug,
+	rootDirectoryService,
+}: {
+	diagnostics: DeleteRepositoryDiagnostic[];
+	repositorySlug: string;
+	rootDirectoryService: EnsemblrRootDirectoryService;
+}): Promise<void> {
+	const snapshot = rootDirectoryService.getSnapshot();
+	if (!snapshot?.workspacesPath) {
+		return;
+	}
+
+	const directoryPath = path.join(snapshot.workspacesPath, repositorySlug);
+	if (!existsSync(directoryPath)) {
+		return;
+	}
+
+	const refusal = containmentRefusal({
+		candidatePath: directoryPath,
+		expectedDepth: MANAGED_CHILD_DEPTH,
+		root: snapshot.workspacesPath,
+	});
+	if (refusal !== null) {
+		diagnostics.push({
+			code: 'workspace-cleanup-failed',
+			message: refusal,
+			path: directoryPath,
+			severity: 'warning',
+		});
+		return;
+	}
+
+	const outcome = await removeDirectoryTree(directoryPath);
+	if (!outcome.removed) {
+		diagnostics.push({
+			code: 'workspace-cleanup-failed',
+			message:
+				outcome.error ??
+				'Failed to remove the workspaces directory for the repository.',
+			path: directoryPath,
+			severity: 'warning',
+		});
+	}
+}
+
+/**
+ * Removes the repository folder itself, but only when it lives inside the
+ * managed `repos/` root.
+ *
+ * Nothing recorded on the row distinguishes a repository Ensemblr cloned from
+ * one the user registered in place, so realpath containment is the only test
+ * that separates a folder Ensemblr owns from the user's own checkout. It
+ * resolves both sides, so neither a row pointing through a symlink nor a
+ * symlink planted in `repos/` can walk the removal out of the managed tree. A
+ * refusal is reported and the caller falls back to the sentinel.
+ * @param options - Diagnostics sink, the repository path, and the root service
+ * @returns True when the folder is gone
+ */
+async function removeRepositoryFolder({
+	diagnostics,
+	repositoryPath,
+	rootDirectoryService,
+}: {
+	diagnostics: DeleteRepositoryDiagnostic[];
+	repositoryPath: string;
+	rootDirectoryService: EnsemblrRootDirectoryService;
+}): Promise<boolean> {
+	const snapshot = rootDirectoryService.getSnapshot();
+	const repositoriesPath = snapshot?.repositoriesPath;
+
+	const refusal = repositoriesPath
+		? containmentRefusal({
+				candidatePath: repositoryPath,
+				expectedDepth: MANAGED_CHILD_DEPTH,
+				root: repositoriesPath,
+			})
+		: 'The managed repositories directory is unavailable, so the repository folder was left on disk.';
+
+	if (refusal !== null) {
+		diagnostics.push({
+			code: 'repository-folder-external',
+			message: refusal,
+			path: repositoryPath,
+			severity: 'warning',
+		});
+		return false;
+	}
+
+	if (!existsSync(repositoryPath)) {
+		return true;
+	}
+
+	const outcome = await removeDirectoryTree(repositoryPath);
+	if (!outcome.removed) {
+		diagnostics.push({
+			code: 'repository-folder-delete-failed',
+			message:
+				outcome.error ?? 'Failed to remove the repository folder from disk.',
+			path: repositoryPath,
+			severity: 'warning',
+		});
+	}
+
+	return outcome.removed;
 }
 
 /**

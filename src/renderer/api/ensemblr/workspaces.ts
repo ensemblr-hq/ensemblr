@@ -113,8 +113,10 @@ export function deleteWorkspace(
 
 /**
  * Permanently deletes a repository and its workspaces from Ensemblr. Wipes
- * each worktree + branch and writes the `.ensemblr-archived` sentinel so the
- * shared-root reconciler does not re-adopt the still-on-disk folder.
+ * each worktree + branch and clears the repository's leftover workspace
+ * folder. When `deleteFolder` is set the repository folder is removed too;
+ * otherwise it keeps the `.ensemblr-archived` sentinel so the shared-root
+ * reconciler does not re-adopt it.
  */
 export function deleteRepository(
 	request: DeleteRepositoryRequest,

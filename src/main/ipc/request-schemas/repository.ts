@@ -302,23 +302,30 @@ export function parseDeleteWorkspaceRequest(raw: unknown): {
 
 /** {@link import('../../../shared/ipc').DeleteRepositoryRequest}. */
 export const deleteRepositoryRequestSchema = z.object({
+	deleteFolder: optionalBoolean,
 	repositoryId: z.string(),
 });
 
 /**
  * Parses a delete-repository payload, falling back to `{ repositoryId: '' }`
  * on malformed input. The service emits a `repository-id-required` diagnostic.
+ * A malformed payload also drops `deleteFolder`, so the destructive half can
+ * never be inferred from input the schema could not read.
  * @param raw - Raw IPC payload.
  * @returns The normalized delete-repository request.
  */
 export function parseDeleteRepositoryRequest(raw: unknown): {
+	deleteFolder?: boolean;
 	repositoryId: string;
 } {
 	const parsed = deleteRepositoryRequestSchema.safeParse(raw);
 	if (!parsed.success) {
 		return { repositoryId: '' };
 	}
-	return parsed.data;
+	const { deleteFolder, repositoryId } = parsed.data;
+	return deleteFolder !== undefined
+		? { deleteFolder, repositoryId }
+		: { repositoryId };
 }
 
 /** {@link import('../../../shared/ipc').ListArchivedWorkspacesRequest}. */

@@ -1,11 +1,11 @@
-import { existsSync, realpathSync } from 'node:fs';
-import path from 'node:path';
+import { existsSync } from 'node:fs';
 
 import type {
 	LocalCommandResult,
 	LocalCommandService,
 } from '../commands/local-command';
 import { firstLine } from './first-line.ts';
+import { canonicalPath } from './managed-path.ts';
 import { removeDirectoryTree } from './remove-directory.ts';
 
 /** Outcome of a git operation that the caller maps to its own diagnostic code. */
@@ -52,6 +52,9 @@ interface RemoteBranchRef {
 export const DEFAULT_FALLBACK_BRANCH = 'main';
 
 const GIT_BRANCH_TIMEOUT_MS = 5_000;
+
+/** Namespace holding every ref Ensemblr writes into a user's repository. */
+const ENSEMBLR_REF_NAMESPACE = 'refs/ensemblr/';
 const GIT_FETCH_TIMEOUT_MS = 30_000;
 export const GIT_WORKTREE_TIMEOUT_MS = 15_000;
 
@@ -1041,24 +1044,12 @@ async function isWorktreeRegistered({
 		return result.stdout
 			.split(/\r?\n/)
 			.filter((line) => line.startsWith('worktree '))
-			.some((line) => canonicalPath(line.slice('worktree '.length)) === target);
+			.some(
+				(line) =>
+					canonicalPath(line.slice('worktree '.length).trim()) === target,
+			);
 	} catch {
 		return null;
-	}
-}
-
-/**
- * Resolves a path to the form git prints, so `/tmp` and `/private/tmp` compare
- * equal on macOS. An unresolvable path falls back to its normalized form.
- * @param candidate - Path to canonicalize.
- * @returns The real path when it resolves, or the normalized path.
- */
-function canonicalPath(candidate: string): string {
-	const normalized = path.resolve(candidate.trim());
-	try {
-		return realpathSync.native(normalized);
-	} catch {
-		return normalized;
 	}
 }
 
@@ -1104,6 +1095,45 @@ async function removeWorktreeWithGit({
 					? error.message
 					: 'git worktree remove --force threw unexpectedly.',
 		};
+	}
+}
+
+/**
+ * Deletes every private `refs/ensemblr/**` ref in a repository, so removing the
+ * repository does not leave archive snapshots and turn checkpoints pinning
+ * commits against `git gc` in a `.git` nobody owns any more.
+ *
+ * Enumerated once for the whole repository rather than reconstructed per
+ * workspace: the repository is going, so every ref under that namespace is dead
+ * whether or not a row still names the workspace it belonged to. Best-effort
+ * throughout, like {@link runRefDelete}: nothing downstream depends on a
+ * particular ref being gone, so there is no count worth reporting back.
+ * @param options - Git command dependencies and the repository to purge.
+ */
+export async function runEnsemblrRefPurge({
+	localCommandService,
+	repositoryPath,
+}: {
+	localCommandService: LocalCommandService;
+	repositoryPath: string;
+}): Promise<void> {
+	const stdout = await runGitText({
+		args: ['for-each-ref', '--format=%(refname)', ENSEMBLR_REF_NAMESPACE],
+		localCommandService,
+		maxOutputBytes: 1024 * 1024,
+		repositoryPath,
+	});
+
+	const refs = stdout
+		.split('\n')
+		.map((line) => line.trim())
+		.filter((line) => line.startsWith(ENSEMBLR_REF_NAMESPACE));
+
+	for (const ref of refs) {
+		// Sequential on purpose: `update-ref -d` takes the ref lock, and running
+		// these together only makes them queue on it while spawning a git per ref.
+		// oxlint-disable-next-line react-doctor/async-await-in-loop
+		await runRefDelete({ localCommandService, ref, repositoryPath });
 	}
 }
 

@@ -604,7 +604,9 @@
 		}
 	},
 	"delete-repository": {
-		"description": "Permanently removes the repository and {{workspaces}} from Ensemblr. Each workspace's worktree folder is deleted and its local branch is dropped. The repository folder stays on disk so you can re-register it later. This cannot be undone.",
+		"delete-folder": "Also delete the repository folder from disk",
+		"delete-folder-warning": "The folder and everything in it is removed, including uncommitted work and any branch that was never pushed.",
+		"description": "Permanently removes the repository and {{workspaces}} from Ensemblr. Each workspace's worktree folder is deleted and its local branch is dropped. This cannot be undone.",
 		"title": "Delete repository?"
 	},
 	"delete-workspace": {

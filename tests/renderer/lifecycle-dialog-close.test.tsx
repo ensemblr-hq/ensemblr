@@ -19,6 +19,11 @@ import {
 	renderWithProviders,
 } from './support/dom';
 
+const toastWarning = vi.hoisted(() => vi.fn());
+vi.mock('sonner', () => ({
+	toast: { error: vi.fn(), success: vi.fn(), warning: toastWarning },
+}));
+
 /**
  * Minimal workspace shell model the lifecycle dialogs read. The id is a
  * parameter because the hook latches a run in flight by target id, so a test
@@ -37,11 +42,22 @@ function workspace(id = 'ws-doomed'): WorkspaceShellModel {
 	} as unknown as WorkspaceShellModel;
 }
 
-/** Minimal project shell model the repository lifecycle dialogs read. */
-function project(id = 'repo-doomed'): ProjectShellModel {
+/** Path of the managed repositories root the stubbed root snapshot reports. */
+const MANAGED_REPOSITORIES_PATH = '/tmp/ensemblr/repos';
+
+/**
+ * Minimal project shell model the repository lifecycle dialogs read. The path
+ * defaults to one inside the managed root, which is what makes the delete
+ * dialog offer to remove the folder.
+ */
+function project(
+	id = 'repo-doomed',
+	pathLabel = `${MANAGED_REPOSITORIES_PATH}/${id}`,
+): ProjectShellModel {
 	return {
 		id,
 		name: 'doomed',
+		pathLabel,
 		workspaces: [],
 	} as unknown as ProjectShellModel;
 }
@@ -56,16 +72,18 @@ function Host({
 	onSucceeded,
 	target,
 	targetId,
+	targetPath,
 }: {
 	// biome-ignore lint/suspicious/noExplicitAny: one host drives every dialog
 	Component: any;
 	onSucceeded: () => Promise<void> | void;
 	target: 'project' | 'workspace';
 	targetId?: string;
+	targetPath?: string;
 }) {
 	const [openTarget, setOpenTarget] = useState<
 		ProjectShellModel | WorkspaceShellModel | null
-	>(target === 'project' ? project(targetId) : workspace(targetId));
+	>(target === 'project' ? project(targetId, targetPath) : workspace(targetId));
 	const targetProps =
 		target === 'project' ? { project: openTarget } : { workspace: openTarget };
 
@@ -132,6 +150,11 @@ function installLifecycleApi(overrides: Record<string, unknown> = {}): void {
 			Promise.resolve({ diagnostics: [], status: 'success' }),
 		deleteWorkspace: () =>
 			Promise.resolve({ diagnostics: [], status: 'success' }),
+		rootDirectory: () =>
+			Promise.resolve({
+				repositoriesPath: MANAGED_REPOSITORIES_PATH,
+				status: 'ok',
+			}),
 		resolveSettings: () =>
 			Promise.resolve({
 				repository: {
@@ -542,5 +565,175 @@ describe('lifecycle dialogs close independently of post-removal navigation', () 
 		);
 
 		expect(screen.queryByRole('dialog')).toBeNull();
+	});
+});
+
+describe('delete repository folder checkbox', () => {
+	beforeEach(() => {
+		toastWarning.mockClear();
+	});
+
+	afterEach(() => {
+		clearEnsemblrApi();
+	});
+
+	it('sends the folder flag when the checkbox is ticked', async () => {
+		const deleteRepository = vi.fn(() =>
+			Promise.resolve({ diagnostics: [], status: 'success' }),
+		);
+		installLifecycleApi({ deleteRepository });
+
+		renderWithProviders(
+			<Host
+				Component={DeleteRepositoryDialog}
+				onSucceeded={vi.fn()}
+				target='project'
+				targetId='repo-folder-on'
+			/>,
+		);
+
+		const checkbox = await screen.findByRole('checkbox');
+		await userEvent.click(checkbox);
+		await clickAction(/^delete$/i);
+
+		expect(deleteRepository).toHaveBeenCalledWith({
+			deleteFolder: true,
+			repositoryId: 'repo-folder-on',
+		});
+	});
+
+	it('leaves the folder alone when the checkbox is untouched', async () => {
+		const deleteRepository = vi.fn(() =>
+			Promise.resolve({ diagnostics: [], status: 'success' }),
+		);
+		installLifecycleApi({ deleteRepository });
+
+		renderWithProviders(
+			<Host
+				Component={DeleteRepositoryDialog}
+				onSucceeded={vi.fn()}
+				target='project'
+				targetId='repo-folder-off'
+			/>,
+		);
+
+		await screen.findByRole('checkbox');
+		await clickAction(/^delete$/i);
+
+		expect(deleteRepository).toHaveBeenCalledWith({
+			deleteFolder: false,
+			repositoryId: 'repo-folder-off',
+		});
+	});
+
+	it('does not offer the checkbox for a repository outside the managed root', async () => {
+		installLifecycleApi();
+
+		renderWithProviders(
+			<Host
+				Component={DeleteRepositoryDialog}
+				onSucceeded={vi.fn()}
+				target='project'
+				targetId='repo-external'
+				targetPath='/Users/someone/dev/my-project'
+			/>,
+		);
+
+		await screen.findByRole('dialog');
+		await waitFor(() => {
+			expect(
+				screen.getByRole('button', { name: /^delete$/i }),
+			).not.toBeDisabled();
+		});
+		expect(screen.queryByRole('checkbox')).toBeNull();
+	});
+
+	it('describes the checkbox by its warning once it is ticked', async () => {
+		installLifecycleApi();
+
+		renderWithProviders(
+			<Host
+				Component={DeleteRepositoryDialog}
+				onSucceeded={vi.fn()}
+				target='project'
+				targetId='repo-folder-a11y'
+			/>,
+		);
+
+		const checkbox = await screen.findByRole('checkbox');
+		expect(checkbox).not.toHaveAttribute('aria-describedby');
+
+		await userEvent.click(checkbox);
+
+		const describedBy = checkbox.getAttribute('aria-describedby');
+		expect(describedBy).toBeTruthy();
+		expect(document.getElementById(describedBy ?? '')?.textContent).toMatch(
+			/uncommitted work/i,
+		);
+	});
+
+	it('warns when the folder survives a delete the user asked for', async () => {
+		const deleteRepository = vi.fn(() =>
+			Promise.resolve({
+				diagnostics: [
+					{
+						code: 'repository-folder-external',
+						message: 'Refused to remove /tmp/ensemblr/repos/repo-survivor.',
+						path: '/tmp/ensemblr/repos/repo-survivor',
+						severity: 'warning',
+					},
+				],
+				repository: { folderDeleted: false, id: 'repo-survivor' },
+				status: 'success',
+			}),
+		);
+		installLifecycleApi({ deleteRepository });
+
+		renderWithProviders(
+			<Host
+				Component={DeleteRepositoryDialog}
+				onSucceeded={vi.fn()}
+				target='project'
+				targetId='repo-survivor'
+			/>,
+		);
+
+		await userEvent.click(await screen.findByRole('checkbox'));
+		await clickAction(/^delete$/i);
+
+		await waitFor(() => {
+			expect(toastWarning).toHaveBeenCalledWith(
+				expect.stringContaining('outside the folder Ensemblr manages'),
+				{ description: '/tmp/ensemblr/repos/repo-survivor' },
+			);
+		});
+	});
+
+	it('stays quiet when the folder really was removed', async () => {
+		const deleteRepository = vi.fn(() =>
+			Promise.resolve({
+				diagnostics: [],
+				repository: { folderDeleted: true, id: 'repo-gone' },
+				status: 'success',
+			}),
+		);
+		installLifecycleApi({ deleteRepository });
+
+		renderWithProviders(
+			<Host
+				Component={DeleteRepositoryDialog}
+				onSucceeded={vi.fn()}
+				target='project'
+				targetId='repo-gone'
+			/>,
+		);
+
+		await userEvent.click(await screen.findByRole('checkbox'));
+		await clickAction(/^delete$/i);
+
+		await waitFor(() => {
+			expect(deleteRepository).toHaveBeenCalled();
+		});
+		expect(toastWarning).not.toHaveBeenCalled();
 	});
 });

@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, realpathSync } from 'node:fs';
+import { existsSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 
 import type { LocalCommandService } from '../commands/local-command';
@@ -6,6 +6,7 @@ import type { EnsemblrRootDirectoryService } from '../root';
 import type { EnsemblrDatabaseService } from '../storage';
 import { listAllWorkspaceRows } from '../storage/repositories/workspace-repository.ts';
 import { measureDirectoryBytes } from './directory-bytes.ts';
+import { canonicalPath, containmentRefusal } from './managed-path.ts';
 import { removeDirectoryTree } from './remove-directory.ts';
 import { isRecord } from './row-guards.ts';
 
@@ -300,16 +301,13 @@ function sweepRefusal({
 	candidatePath: string;
 	workspacesRoot: string;
 }): string | null {
-	const resolved = canonicalPath(candidatePath);
-	const relative = path.relative(workspacesRoot, resolved);
-	const segments = relative.split(path.sep);
-
-	if (relative === '' || segments[0] === '..' || path.isAbsolute(relative)) {
-		return `Refused to sweep ${candidatePath}: it resolves outside ${workspacesRoot}.`;
-	}
-
-	if (segments.length !== WORKTREE_DEPTH) {
-		return `Refused to sweep ${candidatePath}: it is not a workspace directory under ${workspacesRoot}.`;
+	const refusal = containmentRefusal({
+		candidatePath,
+		expectedDepth: WORKTREE_DEPTH,
+		root: workspacesRoot,
+	});
+	if (refusal !== null) {
+		return refusal;
 	}
 
 	if (isGitWorktreeDirectory(candidatePath)) {
@@ -535,21 +533,6 @@ function isEffectivelyEmpty({
 	} catch (error) {
 		failures.push(`Could not read ${directoryPath}: ${errorMessage(error)}`);
 		return false;
-	}
-}
-
-/**
- * Resolves a path through symlinks, falling back to its normalized form when it
- * cannot be resolved.
- * @param candidate - Path to canonicalize.
- * @returns The real path when it resolves, or the normalized path.
- */
-function canonicalPath(candidate: string): string {
-	const normalized = path.resolve(candidate);
-	try {
-		return realpathSync.native(normalized);
-	} catch {
-		return normalized;
 	}
 }
 
