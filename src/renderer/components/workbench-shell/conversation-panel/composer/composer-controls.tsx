@@ -25,6 +25,7 @@ import type {
 	ComposerShellState,
 } from '@/renderer/types/workbench';
 import { formatShortcut } from '@/shared/keymap';
+import { AfkModeToggle } from './afk-mode-toggle';
 import { AttachmentMenu } from './attachment-menu';
 import { ContextIndicator } from './context-indicator';
 import { DictationButton } from './dictation-button';
@@ -49,8 +50,8 @@ interface ComposerControlsProps {
 }
 
 /**
- * The composer's bottom control row: model, thinking, and plan-mode chips on
- * the left; context gauge, attachment menu, and the send/stop control on the
+ * The composer's bottom control row: model, thinking, plan-mode, and AFK chips
+ * on the left; context gauge, attachment menu, and the send/stop control on the
  * right. Split out of `ComposerPanel` so the panel stays a layout shell and the
  * row's send/stop and tooltip branching lives with the controls it describes.
  */
@@ -95,6 +96,11 @@ export function ComposerControls({
 					disabled={pickersDisabled}
 					onChange={composer.onPlanModeChange}
 					value={composer.planMode}
+				/>
+				<AfkModeToggle
+					disabled={pickersDisabled}
+					onChange={composer.onAfkModeChange}
+					value={composer.afkMode}
 				/>
 			</div>
 			<div className='-mr-1.5 flex items-center gap-1'>

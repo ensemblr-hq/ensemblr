@@ -7,6 +7,7 @@ import { useAgentTurns } from '@/renderer/state/composer/agent-turns';
 import { useComposerModelSelection } from '@/renderer/state/composer/composer-model-selection';
 import { useLiveSessionUsage } from '@/renderer/state/composer/session-usage';
 import {
+	chatAfkModeAtomFamily,
 	chatLinkedDirectoriesAtomFamily,
 	chatPlanModeAtomFamily,
 } from '@/renderer/state/preferences';
@@ -44,6 +45,8 @@ export interface AgentComposerControllerState {
 	modelId: string | null;
 	onModelChange: (modelId: string) => void;
 	onPlanModeChange: (planMode: boolean) => void;
+	/** Switching AFK on switches Plan Mode off; the two are mutually exclusive. */
+	onAfkModeChange: (afkMode: boolean) => void;
 	onStop: () => Promise<void>;
 	onSubmit: (
 		prompt: string,
@@ -51,6 +54,12 @@ export interface AgentComposerControllerState {
 	) => Promise<ComposerSubmitOutcome>;
 	onThinkingChange: (thinkingLevel: string) => void;
 	planMode: boolean;
+	/**
+	 * Whether the user has stepped away from this chat: the agent decides for
+	 * itself rather than asking, and the confirmations it would otherwise raise
+	 * are approved on their behalf.
+	 */
+	afkMode: boolean;
 	/** Plan windows and running cost this chat's session has reported. */
 	planUsage: ComposerPlanUsage | null;
 	thinkingLevel: string | null;
@@ -90,6 +99,7 @@ export function useAgentComposerController({
 	);
 
 	const [planMode, setPlanMode] = useAtom(chatPlanModeAtomFamily(chatTabId));
+	const [afkMode, setAfkMode] = useAtom(chatAfkModeAtomFamily(chatTabId));
 	const store = useStore();
 	/**
 	 * Builds the Plan Mode half of a turn snapshot, reading the store at call time.
@@ -105,6 +115,19 @@ export function useAgentComposerController({
 	const planModeRequest = useCallback((): { planMode?: boolean } => {
 		const decided = store.get(chatPlanModeAtomFamily(chatTabId));
 		return decided === null ? {} : { planMode: decided };
+	}, [chatTabId, store]);
+
+	/**
+	 * Builds the AFK half of a turn snapshot, reading the store at call time and
+	 * omitting the field when the user has never decided, for both the reasons
+	 * {@link planModeRequest} does. Switching the chip submits in the same tick,
+	 * and a child that inherited AFK from an unattended parent must not be
+	 * cleared by a request that states no opinion.
+	 * @returns The `afkMode` field to spread into the request, or nothing.
+	 */
+	const afkModeRequest = useCallback((): { afkMode?: boolean } => {
+		const decided = store.get(chatAfkModeAtomFamily(chatTabId));
+		return decided === null ? {} : { afkMode: decided };
 	}, [chatTabId, store]);
 
 	/**
@@ -143,6 +166,7 @@ export function useAgentComposerController({
 			modelId,
 			persistedActiveSession,
 			planModeRequest,
+			afkModeRequest,
 			thinkingLevel,
 			workspaceCwd,
 			workspaceId,
@@ -187,8 +211,21 @@ export function useAgentComposerController({
 	const onPlanModeChange = useCallback(
 		(nextPlanMode: boolean) => {
 			setPlanMode(nextPlanMode);
+			if (nextPlanMode) {
+				setAfkMode(false);
+			}
 		},
-		[setPlanMode],
+		[setAfkMode, setPlanMode],
+	);
+
+	const onAfkModeChange = useCallback(
+		(nextAfkMode: boolean) => {
+			setAfkMode(nextAfkMode);
+			if (nextAfkMode) {
+				setPlanMode(false);
+			}
+		},
+		[setAfkMode, setPlanMode],
 	);
 
 	return {
@@ -201,11 +238,13 @@ export function useAgentComposerController({
 		liveSessionId: isRuntimeOpen ? activeSessionId : null,
 		lockedProvider,
 		modelId,
+		onAfkModeChange,
 		onModelChange,
 		onPlanModeChange,
 		onStop,
 		onSubmit,
 		onThinkingChange,
+		afkMode: afkMode === true,
 		planMode: planMode === true,
 		planUsage,
 		thinkingLevel,

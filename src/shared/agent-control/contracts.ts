@@ -878,6 +878,20 @@ export interface PlanModeChangedBroadcast {
 	planMode: boolean;
 }
 
+/**
+ * Main → renderer notice that a chat tab's AFK state changed underneath the
+ * renderer. The mirror of {@link PlanModeChangedBroadcast}, for the same reason
+ * and along the same path: a conversation spawned by an unattended agent
+ * inherits AFK through the control layer, which bypasses the IPC handlers the
+ * composer's own toggle rides.
+ */
+export interface AfkModeChangedBroadcast {
+	workspaceId: string;
+	chatTabId: string;
+	agentSessionId: string;
+	afkMode: boolean;
+}
+
 /** Args for `checkPlanModeTool`: ask whether a tool call is allowed while planning. */
 export interface CheckPlanModeToolArgs {
 	tool: string;
@@ -933,14 +947,21 @@ export interface SessionBriefNaming {
 
 /**
  * Result of `getSessionBrief`: everything the Pi extension needs to assemble
- * this turn's system prompt in one round trip. `nudge`, `planRefinement`, and
- * `languageDirective` are all rendered by the app rather than the extension so
+ * this turn's system prompt in one round trip. `nudge`, `planRefinement`,
+ * `languageDirective`, and `afkDirective` are all rendered by the app rather
+ * than the extension so
  * there is no second copy of the wording to drift — the extension appends
  * strings it never authors.
  */
 export interface GetSessionBriefResult {
 	/** Whether the calling session is currently planning. */
 	planMode: boolean;
+	/**
+	 * Whether the user has told the app they are away from this conversation.
+	 * Mutually exclusive with {@link GetSessionBriefResult.planMode}: planning
+	 * exists to stop and ask, which is the one thing AFK rules out.
+	 */
+	afkMode: boolean;
 	naming: SessionBriefNaming;
 	/** Ready-to-append upkeep block, or null when nothing is outstanding. */
 	nudge: string | null;
@@ -956,6 +977,13 @@ export interface GetSessionBriefResult {
 	 * language-mirroring should stand.
 	 */
 	languageDirective: string | null;
+	/**
+	 * Ready-to-append instruction telling an unattended session to decide for
+	 * itself and record what it assumed, or null when the user is present. The
+	 * refusal it describes is enforced by `afkModeControlOpDenial` rather than by
+	 * this block; the block is what tells the agent to keep going instead.
+	 */
+	afkDirective: string | null;
 	/**
 	 * Ready-to-append instruction to keep the workspace's linked Linear issue
 	 * current, cut to what this caller's role and mode may actually do to a

@@ -12,6 +12,7 @@ import type {
 	SubmitAgentPromptResult,
 	WriteForkSummaryResult,
 } from '../../../shared/ipc/contracts/agent-session';
+import type { AfkModeRegistry } from '../../afk-mode';
 import type { AgentModelCatalogService } from '../../agent-providers';
 import {
 	type AgentSessionService,
@@ -34,10 +35,53 @@ import {
 } from '../request-schemas.ts';
 
 /**
+ * Mirrors the chat's two mutually exclusive turn modes into their registries.
+ *
+ * Both flags are optional on the wire and `undefined` means "the user has no
+ * opinion about this tab", so an absent flag clears nothing — a spawned child
+ * inherits either mode through the control layer, and a request that never
+ * mentioned one must not unblock a conversation nobody asked to unblock.
+ *
+ * Exclusivity resolves in favour of the flag the request actually states, so a
+ * mode left in the registry by an earlier turn cannot veto the one the user just
+ * switched on. When a request states both — which only a stale window can do —
+ * Plan Mode wins: it is the more restrictive of the two, and AFK's whole promise
+ * is that the agent keeps working, which is the opposite of what a planning turn
+ * is for.
+ * @param input - The request's flags, the session they apply to, and the two registries.
+ */
+function applyTurnModes({
+	afkMode,
+	afkModeRegistry,
+	planMode,
+	planModeRegistry,
+	sessionId,
+}: {
+	afkMode: boolean | undefined;
+	afkModeRegistry: AfkModeRegistry;
+	planMode: boolean | undefined;
+	planModeRegistry: PlanModeRegistry;
+	sessionId: string;
+}): void {
+	if (planMode !== undefined) {
+		planModeRegistry.setActive(sessionId, planMode);
+	}
+	if (afkMode !== undefined) {
+		afkModeRegistry.setActive(sessionId, afkMode);
+	}
+	if (planMode === true) {
+		afkModeRegistry.setActive(sessionId, false);
+	} else if (afkMode === true) {
+		planModeRegistry.setActive(sessionId, false);
+	}
+}
+
+/**
  * Registers IPC handlers that expose the agent session service to the renderer.
  * @param options - Required services.
  */
 export function registerAgentSessionHandlers({
+	afkModeRegistry,
 	agentModelCatalog,
 	agentSessionService,
 	piExecutableService,
@@ -45,6 +89,16 @@ export function registerAgentSessionHandlers({
 	provisionalNamingQueue,
 	withPermissionGate,
 }: {
+	/**
+	 * Mirror of the renderer's per-chat AFK toggle, written here for the reason
+	 * `planModeRegistry` is: the renderer's setting is the durable record and
+	 * rides every open and submit, so the runtime never needs to persist it.
+	 *
+	 * There is no `setAgentAfkMode` counterpart. Plan Mode needs one because
+	 * handing a plan off turns the toggle off while submitting no prompt to carry
+	 * the new value; nothing turns AFK off without a prompt behind it.
+	 */
+	afkModeRegistry: AfkModeRegistry;
 	/**
 	 * Every runtime's models plus the model→runtime lookup. Shared with the
 	 * agent-control spawn path so a delegated child and a user-opened chat resolve
@@ -97,6 +151,7 @@ export function registerAgentSessionHandlers({
 					return { error: 'workspaceCwd is required.' };
 				}
 				const snapshot = await agentSessionService.openSession({
+					afkMode: request.afkMode,
 					chatTabId: request.chatTabId ?? null,
 					executable,
 					initialPrompt: request.initialPrompt ?? null,
@@ -109,9 +164,13 @@ export function registerAgentSessionHandlers({
 					workspaceCwd: request.workspaceCwd,
 					workspaceId: request.workspaceId,
 				});
-				if (request.planMode !== undefined) {
-					planModeRegistry.setActive(snapshot.id, request.planMode);
-				}
+				applyTurnModes({
+					afkMode: request.afkMode,
+					afkModeRegistry,
+					planMode: request.planMode,
+					planModeRegistry,
+					sessionId: snapshot.id,
+				});
 				if (request.planMode === true && request.initialPrompt) {
 					provisionalNamingQueue({
 						prompt: request.initialPrompt,
@@ -139,9 +198,13 @@ export function registerAgentSessionHandlers({
 				const provider = await agentModelCatalog.resolveAgentProvider(
 					request.model,
 				);
-				if (request.planMode !== undefined) {
-					planModeRegistry.setActive(request.sessionId, request.planMode);
-				}
+				applyTurnModes({
+					afkMode: request.afkMode,
+					afkModeRegistry,
+					planMode: request.planMode,
+					planModeRegistry,
+					sessionId: request.sessionId,
+				});
 				if (planModeRegistry.isActive(request.sessionId)) {
 					provisionalNamingQueue({
 						prompt: request.prompt,
@@ -150,6 +213,7 @@ export function registerAgentSessionHandlers({
 					});
 				}
 				const acknowledgement = await agentSessionService.submitPrompt({
+					afkMode: request.afkMode,
 					model: request.model ?? null,
 					planMode: request.planMode,
 					prompt: request.prompt,
@@ -171,7 +235,13 @@ export function registerAgentSessionHandlers({
 		IPC_CHANNELS.setAgentPlanMode,
 		(_event, raw: unknown): void => {
 			const request = setAgentPlanModeRequestSchema.parse(raw);
-			planModeRegistry.setActive(request.sessionId, request.planMode);
+			applyTurnModes({
+				afkMode: undefined,
+				afkModeRegistry,
+				planMode: request.planMode,
+				planModeRegistry,
+				sessionId: request.sessionId,
+			});
 		},
 	);
 

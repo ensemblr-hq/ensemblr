@@ -722,12 +722,12 @@ describe('agent-control AWARENESS parity', () => {
 
 	// The app renders every one of these blocks and the extension only appends
 	// them, so a field added to `GetSessionBriefResult` that nobody splices in
-	// here reaches Pi as nothing at all. `readTurnPreamble` joins the same three
+	// here reaches Pi as nothing at all. `readTurnPreamble` joins the same blocks
 	// in the same order for the runtimes the app prompts directly; asserting the
 	// order pins the two hand-maintained copies of that sequence together.
 	it('appends every rendered brief block, in the order the app joins them', () => {
 		expect(readExtensionSource()).toMatch(
-			/event\.systemPrompt,\s*playbook,\s*nudge,\s*planRefinement,\s*languageDirective,\s*issueDirective,/,
+			/event\.systemPrompt,\s*playbook,\s*nudge,\s*planRefinement,\s*afkDirective,\s*languageDirective,\s*issueDirective,/,
 		);
 	});
 

@@ -67,6 +67,8 @@ export function createComposerShellState(
 		lockedProvider: overrides.lockedProvider ?? null,
 		modelId: overrides.modelId ?? null,
 		onModelChange: () => undefined,
+		afkMode: false,
+		onAfkModeChange: () => undefined,
 		onPlanModeChange: () => undefined,
 		onStop: () => undefined,
 		onSubmit: () => Promise.resolve({}),

@@ -395,6 +395,40 @@ A plan-mode workspace is also named from your opening prompt before the agent
 gets there, and marked provisional so the agent's own naming call still replaces
 it ([ADR 0050](../adr/0050-name-a-planning-workspace-before-the-agent-does.md)).
 
+## AFK mode
+
+Plan mode's opposite number. Toggle AFK (⌥⇧A) and the agent is told you are away
+from the machine: finish the task, or take it as far as it honestly goes, without
+stopping to ask.
+
+Three things change while the chip is on:
+
+- **The question tool is refused.** `ensemblr_ask_user_question` has no time
+  limit by design, which is right while you are watching and is exactly what
+  strands an overnight run when you are not. Instead of asking, the agent is told
+  to take the most defensible reading, act on it, and put every assumption it
+  made on your behalf in its final message under its own heading. Claude Code's
+  own `AskUserQuestion` is withheld the same way.
+- **Approval prompts are answered for you.** In an `approval-required` workspace
+  both prompts resolve approved without being raised: the confirmation an agent's
+  app-control write asks for, and the per-tool card Claude raises before an edit
+  or a command. This does not widen the workspace's permission mode: a
+  `read-only` workspace still blocks every write, because AFK answers a question
+  the mode already permits rather than granting a new one. The agent is told in
+  the same breath that your judgement is no longer in the loop, so nothing hard to
+  reverse or outward-facing happens unless the task asked for it.
+- **A second orchestrator is refused rather than approved.** Opening a peer
+  writer on the worktree only ever happens because you asked for one, so with you
+  away it fails fast and the agent does the work in the conversation it has.
+
+AFK and plan mode are mutually exclusive — planning exists to stop and ask —
+so switching one on switches the other off. A conversation an AFK agent spawns
+inherits AFK, the same way a planning agent's investigators inherit plan mode.
+
+Read the session summary first when you come back: it is written for exactly this
+case, and it carries what the agent did, what it assumed, and what it left. See
+[ADR 0060](../adr/0060-let-a-chat-run-unattended.md).
+
 ## Checkpoints and session branching
 
 Before each of your prompts runs, Ensemblr captures the workspace's file state

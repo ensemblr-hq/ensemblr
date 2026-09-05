@@ -412,6 +412,8 @@ export interface ComposerShellState {
 	modelLabel: string;
 	onModelChange: (modelId: string) => void;
 	onPlanModeChange: (planMode: boolean) => void;
+	/** Switching AFK on switches Plan Mode off; the two are mutually exclusive. */
+	onAfkModeChange: (afkMode: boolean) => void;
 	onStop: () => Promise<void> | void;
 	onSubmit: (
 		prompt: string,
@@ -421,6 +423,11 @@ export interface ComposerShellState {
 	placeholder: string;
 	/** Whether this chat is planning: mutating tools are blocked until a plan is approved. */
 	planMode: boolean;
+	/**
+	 * Whether the user is away from this chat: the agent decides for itself
+	 * instead of asking, and the confirmations it would raise are approved for it.
+	 */
+	afkMode: boolean;
 	/** Plan windows and running cost for this chat; null when none reported yet. */
 	planUsage: ComposerPlanUsage | null;
 	thinkingLabel: string;

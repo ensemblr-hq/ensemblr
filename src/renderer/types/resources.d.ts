@@ -2370,6 +2370,7 @@ export default interface Resources {
 				'composer-send-now': 'Send now, skipping the follow-up queue';
 				'composer-submit': 'Send message';
 				'composer-submit-with-mod': 'Send message';
+				'composer-toggle-afk-mode': 'Toggle AFK mode';
 				'composer-toggle-dictation': 'Start or stop dictation';
 				'composer-toggle-model-picker': 'Toggle model picker';
 				'composer-toggle-plan-mode': 'Toggle plan mode';
@@ -2439,6 +2440,12 @@ export default interface Resources {
 				label: 'Quick start';
 				unavailable: 'Set a writable Ensemblr root directory before starting a new project.';
 			};
+		};
+		'afk-mode': {
+			'aria-label-off': 'AFK mode: off. Click to toggle.';
+			'aria-label-on': 'AFK mode: on. Click to toggle.';
+			'tooltip-off': 'Work without asking me';
+			'tooltip-on': 'Stop working unattended';
 		};
 		'all-files': {
 			empty: {
@@ -2841,6 +2848,10 @@ export default interface Resources {
 			'list-workspaces': {
 				done: 'Listed workspaces';
 				running: 'Listing workspaces';
+			};
+			'message-concierge': {
+				done: 'Messaged the Concierge';
+				running: 'Messaging the Concierge';
 			};
 			'notify-orchestrator': {
 				done: 'Notified the orchestrator';

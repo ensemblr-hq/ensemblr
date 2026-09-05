@@ -120,6 +120,12 @@ interface AgentSessionServiceOptions {
 	 */
 	isPlanModeActive?: (agentSessionId: string) => boolean;
 	/**
+	 * Reads a session's AFK state off the AFK registry, so a runtime that gates on
+	 * a starting tool set (Claude, which deny-lists its own question tool) opens
+	 * in it. Omitted, no session starts unattended.
+	 */
+	isAfkModeActive?: (agentSessionId: string) => boolean;
+	/**
 	 * Announces a stop the user asked for, before the abort settles the turn to
 	 * `idle`. The desktop notifier listens so a cancelled turn is not announced as
 	 * one that finished on its own.
@@ -282,6 +288,7 @@ export function createAgentSessionService({
 	eventSink,
 	agentClient,
 	isPlanModeActive = () => false,
+	isAfkModeActive = () => false,
 	onSessionAborted,
 	onSummaryPersisted,
 	isSpawnedSubAgent,
@@ -310,6 +317,7 @@ export function createAgentSessionService({
 		captureCheckpoint,
 		eventSink,
 		isPlanModeActive,
+		isAfkModeActive,
 		now,
 		onSessionAborted,
 		onSummaryPersisted,

@@ -27,6 +27,9 @@ export function buildChatMenu(
 			items.command('composer.togglePlanMode', labels.planMode, {
 				checkbox: true,
 			}),
+			items.command('composer.toggleAfkMode', labels.afkMode, {
+				checkbox: true,
+			}),
 			items.command('composer.cycleThinking', labels.cycleThinking),
 			items.command('composer.toggleModelPicker', labels.chooseModel),
 			{ type: 'separator' },

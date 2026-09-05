@@ -18,6 +18,7 @@ import type { AppLanguage } from '../../shared/i18n';
  */
 const MENU_LABELS = {
 	en: {
+		afkMode: 'AFK',
 		about: 'About {{app}}',
 		addFromGithub: 'From GitHub…',
 		addFromLocal: 'From Local Folder…',
@@ -125,6 +126,7 @@ const MENU_LABELS = {
 		zoomOut: 'Zoom Out',
 	},
 	ru: {
+		afkMode: 'AFK',
 		about: 'О программе {{app}}',
 		addFromGithub: 'Из GitHub…',
 		addFromLocal: 'Из локальной папки…',
@@ -232,6 +234,7 @@ const MENU_LABELS = {
 		zoomOut: 'Уменьшить',
 	},
 	el: {
+		afkMode: 'AFK',
 		about: 'Σχετικά με το {{app}}',
 		addFromGithub: 'Από το GitHub…',
 		addFromLocal: 'Από τοπικό φάκελο…',

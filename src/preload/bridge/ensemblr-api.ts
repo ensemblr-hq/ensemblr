@@ -1,5 +1,6 @@
 import { type IpcRendererEvent, ipcRenderer, webUtils } from 'electron';
 import type {
+	AfkModeChangedBroadcast,
 	AskUserQuestionBroadcast,
 	AskUserQuestionClosedBroadcast,
 	BoardStatusBroadcast,
@@ -58,6 +59,7 @@ type InvokeKey = Exclude<
 	| 'onAgentToolApprovalClosed'
 	| 'onExitPlanMode'
 	| 'onPlanModeChanged'
+	| 'onAfkModeChanged'
 	| 'onAgentSessionEvent'
 	| 'onConciergeSessionEvent'
 	| 'onPiRawFrame'
@@ -333,6 +335,11 @@ export function createEnsemblrApi(): EnsemblrApi {
 		onPlanModeChanged: (listener) =>
 			subscribe<PlanModeChangedBroadcast>(
 				IPC_CHANNELS.agentControlPlanModeChanged,
+				listener,
+			),
+		onAfkModeChanged: (listener) =>
+			subscribe<AfkModeChangedBroadcast>(
+				IPC_CHANNELS.agentControlAfkModeChanged,
 				listener,
 			),
 		reportBoardStatus: (statusByWorkspaceId) =>

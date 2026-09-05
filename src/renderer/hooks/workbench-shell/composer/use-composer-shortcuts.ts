@@ -47,6 +47,9 @@ export function useComposerShortcuts({
 	const togglePlanMode = useCallback(() => {
 		composer.onPlanModeChange(!composer.planMode);
 	}, [composer.onPlanModeChange, composer.planMode]);
+	const toggleAfkMode = useCallback(() => {
+		composer.onAfkModeChange(!composer.afkMode);
+	}, [composer.afkMode, composer.onAfkModeChange]);
 
 	const canPickModel = !pickersDisabled && composer.availableModels.length > 0;
 	const canCycleThinking =
@@ -63,11 +66,16 @@ export function useComposerShortcuts({
 	useHotkey('composer.togglePlanMode', togglePlanMode, {
 		enabled: !pickersDisabled,
 	});
+	useHotkey('composer.toggleAfkMode', toggleAfkMode, {
+		enabled: !pickersDisabled,
+	});
 
 	useMenuCommand('composer.focus', focusEditor);
 	useMenuCommand('composer.toggleModelPicker', toggleModelPicker, canPickModel);
 	useMenuCommand('composer.cycleThinking', cycleThinking, canCycleThinking);
 	useMenuCommand('composer.togglePlanMode', togglePlanMode, !pickersDisabled);
 	useMenuCommandChecked('composer.togglePlanMode', composer.planMode);
+	useMenuCommand('composer.toggleAfkMode', toggleAfkMode, !pickersDisabled);
+	useMenuCommandChecked('composer.toggleAfkMode', composer.afkMode);
 	useMenuCommand('composer.submit', submit, canSubmit);
 }

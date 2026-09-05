@@ -99,6 +99,7 @@ Active when the message composer has focus.
 | `⌥P` | Toggle model picker | `composer.toggleModelPicker` |
 | `⌥T` | Cycle thinking level | `composer.cycleThinking` |
 | `⌥⇧P` | Toggle plan mode | `composer.togglePlanMode` |
+| `⌥⇧A` | Toggle AFK mode | `composer.toggleAfkMode` |
 | `⌥D` | Start or stop dictation | `composer.toggleDictation` |
 | `⌘↵` | Submit diff comment | `diffComment.submit` |
 

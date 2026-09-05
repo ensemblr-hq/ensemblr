@@ -263,6 +263,13 @@ export interface ConversationPort {
 		 * unrestricted child from a planning parent.
 		 */
 		planMode: boolean;
+		/**
+		 * Whether the child starts unattended, snapshotted from the spawning agent
+		 * at spawn time. Required rather than optional for the reason `planMode` is:
+		 * a second spawn route that forgot it would open a child free to raise a
+		 * questionnaire in a tab nobody is watching.
+		 */
+		afkMode: boolean;
 	}) => Promise<StartConversationOutcome>;
 	/**
 	 * Lists the models the caller may spawn a child on — its own runtime's, or
@@ -717,6 +724,24 @@ export interface PlanModePort {
 }
 
 /**
+ * Reads whether the user has stepped away from a session. Read-only apart from
+ * the spawn hook, for the reason {@link PlanModePort} is one-way: this port is
+ * reachable from every control handler, and a member that could turn AFK *off*
+ * would let an op re-open the questionnaire route its own session was told is
+ * closed.
+ */
+export interface AfkModePort {
+	isActive: (sessionId: string) => boolean;
+	/**
+	 * Puts a freshly spawned child into AFK, so an unattended agent's delegation
+	 * does not raise a dialog in a tab nobody is watching.
+	 */
+	activateForSpawn: (sessionId: string) => void;
+	/** Forgets a session's AFK state once it ends. */
+	releaseSession: (sessionId: string) => void;
+}
+
+/**
  * Reads and writes the caller's own session identity: the per-turn upkeep
  * brief, the one-shot workspace/branch naming, and the tab's session summary.
  * Separate from {@link TabPort} (id plumbing for scope checks) and
@@ -776,6 +801,7 @@ export interface ArchitecturePort {
 export interface AgentControlPorts {
 	ask: AskPort;
 	planMode: PlanModePort;
+	afkMode: AfkModePort;
 	sessionNaming: SessionNamingPort;
 	workspaces: WorkspacePort;
 	tabs: TabPort;

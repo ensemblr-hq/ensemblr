@@ -1,4 +1,5 @@
 import type {
+	AfkModeChangedBroadcast,
 	AskUserQuestionBroadcast,
 	AskUserQuestionClosedBroadcast,
 	AskUserQuestionReply,
@@ -280,6 +281,15 @@ export interface ShellApi {
 	 */
 	onPlanModeChanged: (
 		listener: (payload: PlanModeChangedBroadcast) => void,
+	) => () => void;
+	/**
+	 * Subscribes to AFK changes main made on the renderer's behalf, which today
+	 * means a spawned conversation inheriting its parent's AFK state through the
+	 * control layer. Returns an unsubscribe function. Mirrored into the per-chat
+	 * toggle for the same reason {@link EnsemblrApi.onPlanModeChanged} is.
+	 */
+	onAfkModeChanged: (
+		listener: (payload: AfkModeChangedBroadcast) => void,
 	) => () => void;
 	/** Opens an http/https URL in the user's default browser. */
 	openExternal: (url: string) => Promise<void>;

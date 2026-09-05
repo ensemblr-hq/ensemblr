@@ -4,6 +4,7 @@ import path from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { createAfkModeRegistry } from '../../src/main/afk-mode/afk-mode-registry.ts';
 import type { AgentSessionService } from '../../src/main/agent-runtime/agent-session-service.ts';
 import type { PiExecutableSnapshot } from '../../src/main/pi-runtime/pi-executable.ts';
 import { IPC_CHANNELS } from '../../src/shared/ipc/channels.ts';
@@ -182,6 +183,7 @@ function registerHandlers({
 			release: () => undefined,
 			setActive,
 		},
+		afkModeRegistry: createAfkModeRegistry(),
 		provisionalNamingQueue: () => undefined,
 		withPermissionGate: () => undefined,
 	});
@@ -390,6 +392,7 @@ describe('a spawned sub-agent starts in Plan Mode rather than joining it late', 
 			ask: { ask: vi.fn(), releaseSession: vi.fn() },
 			augmentHarnessCommand: (command: string) => command,
 			broadcastFocus: vi.fn(),
+			broadcastAfkMode: vi.fn(),
 			broadcastPlanMode: vi.fn(),
 			broadcastTabsChanged: vi.fn(),
 			chatTabService: {
@@ -413,6 +416,11 @@ describe('a spawned sub-agent starts in Plan Mode rather than joining it late', 
 				isActive: vi.fn(() => false),
 				releaseSession: vi.fn(),
 			},
+			afkMode: {
+				activateForSpawn: vi.fn(),
+				isActive: vi.fn(() => false),
+				releaseSession: vi.fn(),
+			},
 			scriptLifecycleService: {},
 			terminalService: {},
 		} as never);
@@ -423,6 +431,7 @@ describe('a spawned sub-agent starts in Plan Mode rather than joining it late', 
 			callerRuntime: 'pi',
 			parentSessionId: 'ws:ws',
 			planMode,
+			afkMode: false,
 			prompt: 'go',
 			workspaceCwd: '/ws',
 			workspaceId: 'ws',

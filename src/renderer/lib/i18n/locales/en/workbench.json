@@ -16,6 +16,12 @@
 			"unavailable": "Set a writable Ensemblr root directory before starting a new project."
 		}
 	},
+	"afk-mode": {
+		"aria-label-off": "AFK mode: off. Click to toggle.",
+		"aria-label-on": "AFK mode: on. Click to toggle.",
+		"tooltip-off": "Work without asking me",
+		"tooltip-on": "Stop working unattended"
+	},
 	"all-files": {
 		"empty": {
 			"message": "Files appear here as soon as they are created.",

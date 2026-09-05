@@ -162,6 +162,12 @@ export interface AgentSessionRequest {
 	permissionMode?: PermissionMode;
 	/** Opens the session in the runtime's plan mode, where writes wait on an approved plan. */
 	planMode?: boolean;
+	/**
+	 * Opens the session unattended: the user is away, so a runtime that ships its
+	 * own question tool has it withheld. Mutually exclusive with
+	 * {@link AgentCreateSessionInput.planMode}, which exists to stop and ask.
+	 */
+	afkMode?: boolean;
 	/** Ensemblr Control MCP endpoint, for runtimes that speak MCP natively. */
 	controlMcp?: AgentControlMcpConfig | null;
 	/**
@@ -247,6 +253,12 @@ export interface AgentSubmitRequest {
 	 * ignore it.
 	 */
 	planMode?: boolean;
+	/**
+	 * Whether the chat's AFK toggle is on for this turn. Re-sent every turn for
+	 * the reason {@link AgentSubmitInput.planMode} is: the flag decides the tool
+	 * set a runtime opens its turn with, and the toggle can move between turns.
+	 */
+	afkMode?: boolean;
 	prompt: string;
 	/**
 	 * Mid-turn delivery mode. When set, the adapter uses its runtime's steer or

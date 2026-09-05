@@ -42,6 +42,7 @@ import type { UpdateStatusChangedBroadcast } from '../shared/ipc/contracts/updat
 import type { WorkspaceFilesChangedBroadcast } from '../shared/ipc/contracts/workspace-files';
 import { scrollbackMbToBytes } from '../shared/terminal.ts';
 import { resolveWindowChrome } from '../shared/window-chrome.ts';
+import { createAfkModeRegistry } from './afk-mode';
 import {
 	type AgentControlService,
 	type BoardStatusStore,
@@ -809,6 +810,11 @@ const sessionNamingQueue = createSessionNaming();
 // because the session service reads it at open time to decide the permission
 // mode a Claude child starts under.
 const planModeRegistry = createPlanModeRegistry();
+// Beside its Plan Mode counterpart and read at the same moment: a Claude child
+// resolves the tool set it opens with from this, and the two toggles are
+// mutually exclusive, so keeping the pair together is what stops one moving
+// without the other.
+const afkModeRegistry = createAfkModeRegistry();
 /**
  * Owns the workspace architecture diagram: the stored document and the updates
  * an agent writes over it. Nothing derives one — a workspace nobody has drawn
@@ -852,6 +858,7 @@ const agentSessionService = createAgentSessionService({
 	agentClient,
 	/** Reports whether the chat behind this session has Plan Mode switched on. */
 	isPlanModeActive: (sessionId) => planModeRegistry.isActive(sessionId),
+	isAfkModeActive: (sessionId) => afkModeRegistry.isActive(sessionId),
 	/** Keeps the stop the user just asked for from notifying as a finished turn. */
 	onSessionAborted: (sessionId) => agentActivityMonitor.noteUserStop(sessionId),
 	/**
@@ -1403,6 +1410,8 @@ agentControlService = createAgentControlService({
 		/** Broadcasts an inherited Plan Mode state so the owning chat tab shows it. */
 		broadcastPlanMode: (payload) =>
 			broadcastToAllWindows(IPC_CHANNELS.agentControlPlanModeChanged, payload),
+		broadcastAfkMode: (payload) =>
+			broadcastToAllWindows(IPC_CHANNELS.agentControlAfkModeChanged, payload),
 		appSettingsService,
 		ask: askUserQuestionCoordinator.port,
 		chatTabService: agentControlChatTabService,
@@ -1443,6 +1452,14 @@ agentControlService = createAgentControlService({
 				planModeRegistry.setActive(sessionId, true),
 			/** Forgets the session's Plan Mode state once it ends. */
 			releaseSession: planModeRegistry.release,
+		},
+		afkMode: {
+			/** Reports whether the user has stepped away from the calling session. */
+			isActive: afkModeRegistry.isActive,
+			/** Starts a spawned child unattended; narrowed to on-only on purpose. */
+			activateForSpawn: afkModeRegistry.activateForSpawn,
+			/** Forgets the session's AFK state once it ends. */
+			releaseSession: afkModeRegistry.release,
 		},
 		scriptLifecycleService,
 		terminalService,
@@ -1720,6 +1737,7 @@ app.whenReady().then(() => {
 		piExecutableService,
 		agentModelCatalog,
 		agentSessionService,
+		afkModeRegistry,
 		planModeRegistry,
 		provisionalNamingQueue,
 		quickStartProjectService,

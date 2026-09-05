@@ -120,6 +120,10 @@ export const SHORTCUTS = {
 		scope: 'composer',
 		bindings: [{ key: 'p', modifiers: ['alt', 'shift'] }],
 	},
+	'composer.toggleAfkMode': {
+		scope: 'composer',
+		bindings: [{ key: 'a', modifiers: ['alt', 'shift'] }],
+	},
 	'composer.toggleDictation': {
 		scope: 'composer',
 		bindings: [{ key: 'd', modifiers: ['alt'] }],

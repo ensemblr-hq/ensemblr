@@ -3,6 +3,11 @@
  * argument/result types, and the argument validators from here rather than the
  * `agent-control/` implementation files.
  */
+
+export {
+	AFK_DIRECTIVE_HEADER,
+	buildAfkDirective,
+} from './agent-control/afk-directive.ts';
 export {
 	AGENT_CONTROL_ARG_ALIASES,
 	CANONICAL_ARG_KEYS,

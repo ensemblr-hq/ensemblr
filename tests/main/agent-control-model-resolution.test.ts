@@ -88,6 +88,7 @@ const makeDeps = (input: {
 		ask: { ask: vi.fn(), releaseSession: vi.fn() },
 		augmentHarnessCommand: (command: string) => command,
 		broadcastFocus: vi.fn(),
+		broadcastAfkMode: vi.fn(),
 		broadcastPlanMode: vi.fn(),
 		broadcastTabsChanged: vi.fn(),
 		chatTabService: {
@@ -109,6 +110,11 @@ const makeDeps = (input: {
 			activateForSpawn: vi.fn(),
 			exit: vi.fn(),
 			hasSubmittedPlan: vi.fn(() => false),
+			isActive: vi.fn(() => false),
+			releaseSession: vi.fn(),
+		},
+		afkMode: {
+			activateForSpawn: vi.fn(),
 			isActive: vi.fn(() => false),
 			releaseSession: vi.fn(),
 		},
@@ -146,6 +152,7 @@ const spawn = async (input: {
 		model: input.model,
 		parentSessionId: 'parent',
 		planMode: false,
+		afkMode: false,
 		prompt: 'go',
 		thinkingLevel: input.thinkingLevel,
 		workspaceCwd: '/ws',
@@ -175,6 +182,7 @@ const refusal = async (input: Parameters<typeof spawn>[0]): Promise<string> => {
 		model: input.model,
 		parentSessionId: 'parent',
 		planMode: false,
+		afkMode: false,
 		prompt: 'go',
 		thinkingLevel: input.thinkingLevel,
 		workspaceCwd: '/ws',
@@ -510,6 +518,11 @@ describe('startConversation rollback on submit failure', () => {
 				isActive: vi.fn(() => false),
 				releaseSession: releasePlanMode,
 			},
+			afkMode: {
+				activateForSpawn: vi.fn(),
+				isActive: vi.fn(() => false),
+				releaseSession: vi.fn(),
+			},
 		} as unknown as PortAdapterDeps;
 		return { closeTab, deps, openTab, releasePlanMode, stopSession };
 	};
@@ -524,6 +537,7 @@ describe('startConversation rollback on submit failure', () => {
 				callerRuntime: 'pi',
 				parentSessionId: 'parent',
 				planMode: false,
+				afkMode: false,
 				prompt: 'go',
 				workspaceCwd: '/ws',
 				workspaceId: 'ws',
@@ -546,6 +560,7 @@ describe('startConversation rollback on submit failure', () => {
 				chatTabId: 'caller-tab',
 				parentSessionId: 'parent',
 				planMode: false,
+				afkMode: false,
 				prompt: 'go',
 				workspaceCwd: '/ws',
 				workspaceId: 'ws',
@@ -570,6 +585,7 @@ describe('startConversation rollback on submit failure', () => {
 					callerRuntime: 'pi',
 					parentSessionId: 'parent',
 					planMode,
+					afkMode: false,
 					prompt: 'go',
 					workspaceCwd: '/ws',
 					workspaceId: 'ws',

@@ -27,6 +27,7 @@ import type {
 	AgentSubmitRequest,
 } from '../agent-runtime/agent-types.ts';
 import { stripLaunchContextEnv } from '../environment/launch-env.ts';
+import { withAfkAutoApproval, withAfkHooks } from './claude-afk-mode.ts';
 import { createConciergeSessionGate } from './claude-concierge-guard.ts';
 import { resolveSystemPromptAppend } from './claude-edit-tool-directive.ts';
 import { buildClaudeMcpServers } from './claude-mcp-config.ts';
@@ -218,6 +219,9 @@ function createClaudeSession({
 	// Null means "the SDK moved the permission mode behind our back", which makes
 	// the next turn re-assert whichever way the toggle is pointing.
 	let appliedPlanMode: boolean | null = input.request.planMode === true;
+	// Read by the AFK PreToolUse hook at tool-call time rather than captured into
+	// the SDK options, so the composer's chip reaches a session already running.
+	let unattended = input.request.afkMode === true;
 	let currentTurnId: string | null = null;
 	let planUsageReadAt: number | null = null;
 	let planUsageRead: Promise<boolean> | null = null;
@@ -475,6 +479,7 @@ function createClaudeSession({
 				canUseTool: approval?.canUseTool,
 				conciergeHome,
 				input,
+				isUnattended: () => unattended,
 				onStderr: (chunk) => {
 					stderr = `${stderr}${chunk}`.slice(-STDERR_RING_BYTES);
 				},
@@ -605,6 +610,13 @@ function createClaudeSession({
 			if (request.planMode !== undefined && !request.streamingBehavior) {
 				appliedPlanMode = request.planMode;
 			}
+			// Applied on a steer and a follow-up too, unlike the plan mode above:
+			// that one feeds the SDK's permission mode, which cannot move mid-turn,
+			// while this is read by the hook and the approval wrapper at call time.
+			// A chip switched on during a running turn has to reach that turn.
+			if (request.afkMode !== undefined) {
+				unattended = request.afkMode;
+			}
 
 			if (!continuesTurn) {
 				currentTurnId = turnId;
@@ -714,6 +726,7 @@ function buildQueryOptions({
 	canUseTool,
 	conciergeHome,
 	input,
+	isUnattended,
 	onStderr,
 	pluginDirectories,
 }: {
@@ -721,6 +734,8 @@ function buildQueryOptions({
 	canUseTool?: ClaudeCanUseTool;
 	conciergeHome: string | null;
 	input: AgentAdapterCreateSessionInput;
+	/** Reads the session's live AFK flag, for the hook that withholds `AskUserQuestion`. */
+	isUnattended: () => boolean;
 	onStderr: (chunk: string) => void;
 	pluginDirectories: readonly string[];
 }): Options {
@@ -755,9 +770,14 @@ function buildQueryOptions({
 		...(linkedDirectories.length > 0
 			? { additionalDirectories: [...linkedDirectories] }
 			: {}),
-		canUseTool: concierge?.canUseTool ?? buildCanUseTool({ canUseTool, mode }),
+		// AFK wraps only the mode's own confirmation gate. The Concierge's is
+		// containment — it refuses writes outside its home outright — and answering
+		// that on the user's behalf would widen the mode rather than answer it.
+		canUseTool:
+			concierge?.canUseTool ??
+			withAfkAutoApproval(buildCanUseTool({ canUseTool, mode }), isUnattended),
 		cwd: metadata.cwd,
-		...(concierge ? { hooks: concierge.hooks } : {}),
+		hooks: withAfkHooks(concierge?.hooks, isUnattended),
 		env: stripLaunchContextEnv({ ...baseEnv, ...metadata.env }),
 		// Without this the SDK forwards only a subagent's tool_use/tool_result
 		// blocks, so a `Task` card would nest tool rows with none of the prose that

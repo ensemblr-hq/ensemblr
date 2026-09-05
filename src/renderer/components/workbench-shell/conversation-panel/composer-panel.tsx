@@ -164,7 +164,9 @@ function ComposerPanelBody({
 						'relative flex w-full flex-col overflow-hidden rounded-xl border border-border bg-pane/80 shadow-panel transition-shadow',
 						composer.planMode
 							? 'border-accent-strong/50 border-dashed'
-							: focused && 'ring-1 ring-ring/40',
+							: composer.afkMode
+								? 'border-status-away/50 border-dashed'
+								: focused && 'ring-1 ring-ring/40',
 					)}
 					onDragOver={state.handleDragOver}
 					onDrop={state.handleDrop}

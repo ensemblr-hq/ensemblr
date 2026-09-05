@@ -119,6 +119,12 @@ export interface OpenAgentSessionRequest {
 	 * main-process registry is a derived, in-memory mirror.
 	 */
 	planMode?: boolean;
+	/**
+	 * Whether the chat's AFK toggle is on, carried the same way and for the same
+	 * reason as {@link OpenAgentSessionRequest.planMode}. The two are mutually
+	 * exclusive, and an explicit `true` here clears the other in the registry.
+	 */
+	afkMode?: boolean;
 	/** Existing Ensemblr agent session id to reopen with native runtime history. */
 	resumeSessionId?: string | null;
 	model?: string | null;
@@ -146,6 +152,8 @@ export interface SubmitAgentPromptRequest {
 	model?: string | null;
 	/** Whether the chat's Plan Mode toggle is on for this turn. */
 	planMode?: boolean;
+	/** Whether the chat's AFK toggle is on for this turn. */
+	afkMode?: boolean;
 	prompt: string;
 	sessionId: string;
 	/** Mid-turn delivery mode; omit for a normal (idle) submit. */

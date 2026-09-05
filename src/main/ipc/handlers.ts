@@ -1,4 +1,5 @@
 import type { WindowChromeSnapshot } from '../../shared/window-chrome';
+import type { AfkModeRegistry } from '../afk-mode';
 import type {
 	AgentModelCatalogService,
 	AgentProviderService,
@@ -161,6 +162,8 @@ interface RegisterIpcHandlersOptions {
 	agentModelCatalog: AgentModelCatalogService;
 	agentSessionService: AgentSessionService;
 	planModeRegistry: PlanModeRegistry;
+	/** Mirror of the composer's per-chat AFK toggle, Plan Mode's opposite number. */
+	afkModeRegistry: AfkModeRegistry;
 	/** Names a planning workspace from its first prompt, ahead of the agent. */
 	provisionalNamingQueue: QueueProvisionalNamingPort;
 	quickStartProjectService: QuickStartProjectService;
@@ -235,6 +238,7 @@ export function registerIpcHandlers({
 	agentSessionService,
 	conciergeSessionService,
 	resolveConciergeHome,
+	afkModeRegistry,
 	planModeRegistry,
 	provisionalNamingQueue,
 	quickStartProjectService,
@@ -317,6 +321,7 @@ export function registerIpcHandlers({
 		agentModelCatalog,
 		agentSessionService,
 		piExecutableService,
+		afkModeRegistry,
 		planModeRegistry,
 		provisionalNamingQueue,
 		withPermissionGate,
