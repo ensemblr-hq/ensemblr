@@ -24,7 +24,8 @@ export const ENSEMBLR_CO_AUTHOR_TRAILER = `Co-authored-by: ${ENSEMBLR_CO_AUTHOR_
 /**
  * The trailers a commit should carry, as a list so a caller can spread it into a
  * git argv without branching on whether the setting is on.
- * @param enabled - Whether the user opted into crediting Ensemblr.
+ * @param enabled - Whether the credit is on, which it is until the user turns
+ *   it off in Settings → Git.
  * @returns The trailer lines to append, empty when the setting is off.
  */
 export function buildCoAuthorTrailers(enabled: boolean): string[] {

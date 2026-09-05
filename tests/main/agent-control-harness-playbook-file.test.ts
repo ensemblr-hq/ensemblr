@@ -46,13 +46,15 @@ const userDataDirectories: string[] = [];
  * Wires the real integration against a throwaway `userData` directory and
  * returns the playbook file it writes, so the assertions read the bytes a
  * harness actually loads rather than the flag that points at them.
- * @param language - The language the app reports while the harness launches.
+ *
+ * Every optional collaborator is wired here rather than in {@link launchHarness}
+ * so a test can leave one out and exercise the integration's own default, which
+ * is the only way a default the app relies on is held to anything.
+ * @param overrides - Dependencies to wire over the ones these tests share.
  * @returns The launch command's decoration and the playbook file's contents.
  */
-const launchHarness = (
-	language: AppLanguage,
-	linkedIssue: WorkspaceLinkedIssue | null = null,
-	coAuthor = false,
+const launchWith = (
+	overrides: Partial<Parameters<typeof createAgentControlIntegration>[0]>,
 ) => {
 	const userData = mkdtempSync(path.join(tmpdir(), 'ensemblr-harness-'));
 	userDataDirectories.push(userData);
@@ -62,13 +64,13 @@ const launchHarness = (
 			getAppPath: () => process.cwd(),
 			getPath: () => userData,
 		} as never,
-		getLanguage: () => language,
+		getLanguage: () => 'en',
 		readArchitectureDiagramEnabled: () => true,
 		getServerUrl: () => SERVER_URL,
 		originRegistry: createOriginRegistry({ generateToken: () => 'tok' }),
-		readCoAuthorEnabled: () => coAuthor,
-		readLinkedIssue: () => linkedIssue,
+		readLinkedIssue: () => null,
 		resolveWorkspaceCwd: () => '/tmp/ws-1',
+		...overrides,
 	});
 
 	const command = augmentHarnessCommand('claude', 'claude', WORKSPACE);
@@ -80,6 +82,25 @@ const launchHarness = (
 		),
 	};
 };
+
+/**
+ * Launches a harness with every collaborator wired, for the assertions that care
+ * about one directive and need the others held still.
+ * @param language - The language the app reports while the harness launches.
+ * @param linkedIssue - The ticket the workspace came from, if any.
+ * @param coAuthor - Whether the commit credit is on.
+ * @returns The launch command's decoration and the playbook file's contents.
+ */
+const launchHarness = (
+	language: AppLanguage,
+	linkedIssue: WorkspaceLinkedIssue | null = null,
+	coAuthor = false,
+) =>
+	launchWith({
+		getLanguage: () => language,
+		readCoAuthorEnabled: () => coAuthor,
+		readLinkedIssue: () => linkedIssue,
+	});
 
 afterEach(() => {
 	for (const directory of userDataDirectories.splice(0)) {
@@ -143,7 +164,7 @@ describe('the harness playbook file', () => {
 		);
 	});
 
-	it('names the commit trailer once the user opts into the credit', () => {
+	it('names the commit trailer while the credit is on', () => {
 		const { playbook } = launchHarness('en', null, true);
 
 		expect(playbook).toBe(
@@ -155,6 +176,17 @@ describe('the harness playbook file', () => {
 	it('leaves the co-author block out while the credit is off', () => {
 		expect(launchHarness('en').playbook).not.toContain(
 			CO_AUTHOR_DIRECTIVE_HEADER,
+		);
+	});
+
+	// The credit ships on, so the reader's own default is what a caller that never
+	// wires one falls back to. Asserted here because the app reads the setting
+	// through this integration and nothing else would catch the default flipping.
+	it('names the commit trailer when no reader is wired', () => {
+		const { playbook } = launchWith({});
+
+		expect(playbook).toBe(
+			`${HARNESS_AWARENESS}\n\n${buildCoAuthorDirective(true)}\n`,
 		);
 	});
 

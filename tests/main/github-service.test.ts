@@ -422,6 +422,30 @@ test('commitWorkspaceChanges passes no trailer when the credit is off', async ()
 	assert.deepEqual(calls[1]?.args, ['commit', '-m', 'feat: uncredited']);
 });
 
+test('commitWorkspaceChanges credits Ensemblr when no reader is wired', async () => {
+	const { calls, service: localCommandService } = stubCommandService(() =>
+		buildResult(),
+	);
+	const service = createGithubService({
+		databaseService: stubDatabaseService(createTestDatabase()),
+		localCommandService,
+		now: fixedNow,
+	});
+
+	await service.commitWorkspaceChanges({
+		message: 'feat: default credit',
+		workspaceCwd: '/tmp/ws',
+	});
+
+	assert.deepEqual(calls[1]?.args, [
+		'commit',
+		'-m',
+		'feat: default credit',
+		'--trailer',
+		'Co-authored-by: Ensemblr <howdy@ensemblr.dev>',
+	]);
+});
+
 test('commitWorkspaceChanges stages only requested paths', async () => {
 	const { calls, service } = createService(() => buildResult());
 

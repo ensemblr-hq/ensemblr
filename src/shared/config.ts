@@ -67,7 +67,7 @@ const gitSettingsSchema = z.object({
 	deleteLocalBranchOnArchive: z.boolean().catch(false),
 	archiveAfterMerge: z.boolean().catch(false),
 	setUpstreamOnPush: z.boolean().catch(true),
-	coAuthorEnsemblr: z.boolean().catch(false),
+	coAuthorEnsemblr: z.boolean().catch(true),
 });
 
 /**

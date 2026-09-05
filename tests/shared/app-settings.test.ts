@@ -78,7 +78,7 @@ describe('parseAppSettings', () => {
 		expect(parsed.git.deleteLocalBranchOnArchive).toBe(false); // default
 		expect(parsed.git.setUpstreamOnPush).toBe(true); // default
 		expect(parsed.git.renameWorkspaceOnBranch).toBe(true); // default
-		expect(parsed.git.coAuthorEnsemblr).toBe(false); // default
+		expect(parsed.git.coAuthorEnsemblr).toBe(true); // default
 	});
 
 	test('parses the experimental auto-run default', () => {

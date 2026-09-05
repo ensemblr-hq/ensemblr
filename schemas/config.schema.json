@@ -214,8 +214,8 @@
 						},
 						"coAuthorEnsemblr": {
 							"type": "boolean",
-							"default": false,
-							"description": "Ask agents to end every commit they make with a `Co-authored-by: Ensemblr <howdy@ensemblr.dev>` trailer, and append it to any commit the app makes itself, so Ensemblr is credited as a GitHub contributor."
+							"default": true,
+							"description": "Ask agents to end every commit they make with a `Co-authored-by: Ensemblr <howdy@ensemblr.dev>` trailer, and append it to any commit the app makes itself, so Ensemblr is credited as a GitHub contributor. On by default; set to false to leave the trailer off."
 						}
 					}
 				},

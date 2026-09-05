@@ -384,7 +384,7 @@ const readArchitectureDiagramEnabled = (): boolean =>
  * the trailer block into the playbooks an agent receives. Read per call rather
  * than captured, and for the same reason the diagram flag is: the settings file
  * is watched, so a session opened after the switch flips gets the block.
- * @returns True when the user has opted into the credit.
+ * @returns True unless the user has switched the credit off.
  */
 const readCoAuthorEnabled = (): boolean =>
 	appSettingsService.read().git.coAuthorEnsemblr;
