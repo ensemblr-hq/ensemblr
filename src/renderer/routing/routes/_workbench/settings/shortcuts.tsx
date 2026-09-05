@@ -125,6 +125,10 @@ function shortcutName(t: TFunction): Record<ShortcutId, string> {
 			'settings:shortcuts.name.composer-toggle-plan-mode',
 			'Toggle plan mode',
 		),
+		'composer.toggleAfkMode': t(
+			'settings:shortcuts.name.composer-toggle-afk-mode',
+			'Toggle AFK mode',
+		),
 		'composer.toggleModelPicker': t(
 			'settings:shortcuts.name.composer-toggle-model-picker',
 			'Toggle model picker',

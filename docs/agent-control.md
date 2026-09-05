@@ -774,6 +774,30 @@ Option labels must be distinct within a question and must not collide with the
 labels the dialog reserves for its own rows (`other`, `next`, `type something`);
 questions must be distinct within a call.
 
+`ensemblr_ask_user_question` is also refused while the chat's **AFK** chip is on
+— Plan Mode's opposite number, and the reason it exists. The dialog has no time
+limit by design, which is right while somebody is watching and is exactly what
+strands an overnight run when nobody is. `afkModeControlOpDenial` in
+`src/shared/afk-mode/` refuses the op with a reason that names what to do
+instead — take the most defensible reading, act on it, record the assumption —
+and `buildAfkDirective` puts the same instruction in the turn's preamble so the
+agent is not left discovering the refusal by trial. Claude Code ships its own
+`AskUserQuestion`, which never touches this server; `buildAfkHooks` withholds it
+with a `PreToolUse` hook rather than a `disallowedTools` entry, because the SDK
+fixes that list when `query()` opens and the chip moves per turn.
+
+Two more surfaces park a turn on a human, and AFK answers them differently.
+The `approval-required` confirmation `gatePermission` raises is **auto-approved**
+while AFK, as is the per-tool card Claude raises through `canUseTool` in that
+same mode (`withAfkAutoApproval`, beside the hook). Both reach only the
+`confirmation-required` boundary, so a `blocked` one stays blocked, the
+Concierge's containment gate is never wrapped, and the mode is answered rather
+than widened. The peer-orchestrator confirmation is **refused** instead — a peer
+is only ever opened because the user asked for one, a premise that cannot hold
+while they are away, so it fails fast rather than putting two unsupervised
+writers on one worktree. See
+[ADR 0060](./adr/0060-let-a-chat-run-unattended.md).
+
 ### Not served over MCP
 
 `getSessionBrief` and `checkPlanModeTool` are control ops with no entry in
@@ -791,7 +815,11 @@ prose and leaves them a revision they cannot approve. It rides both channels the
 upkeep block does, so Pi and Claude Code are told the same thing — close this
 turn by submitting the whole revised plan again.
 
-It carries a third, `rolePlaybook`, which is the whole role playbook rather than
+It carries `afkDirective` on the same terms, for a session the user has stepped
+away from, and for the same reason: the toggle moves per turn while a playbook is
+selected once at session open.
+
+It carries a fourth, `rolePlaybook`, which is the whole role playbook rather than
 a block appended after one. The extension holds byte-identical copies of the
 orchestrator and sub-agent playbooks and picks between them from
 `ENSEMBLR_CONTROL_ROLE`; the Concierge's has no copy there, so the app sends it

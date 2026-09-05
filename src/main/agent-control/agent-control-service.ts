@@ -4,6 +4,8 @@
  * call is validated, its origin resolved from an injected token, permission- and
  * scope-checked, guardrailed, then delegated to an existing service via a port.
  */
+
+import { afkModeControlOpDenial } from '../../shared/afk-mode.ts';
 import type {
 	AddDiffCommentsArgs,
 	AgentControlConversationStatus,
@@ -71,6 +73,7 @@ import type {
 } from '../../shared/agent-control.ts';
 import {
 	briefReport,
+	buildAfkDirective,
 	buildCoAuthorDirective,
 	buildConciergeMessage,
 	buildLanguageDirective,
@@ -613,6 +616,17 @@ export function createAgentControlService({
 		originHasChatTab(origin) && ports.planMode.isActive(origin.sessionId);
 
 	/**
+	 * Whether the user has stepped away from the caller's conversation. Gated on
+	 * the chat tab for the reason {@link isPlanning} is: AFK is a composer toggle,
+	 * so a caller without a composer is never unattended however its session id
+	 * happens to resolve.
+	 * @param origin - Resolved caller identity.
+	 * @returns True when AFK governs this caller's turn.
+	 */
+	const isUnattended = (origin: AgentControlOrigin): boolean =>
+		originHasChatTab(origin) && ports.afkMode.isActive(origin.sessionId);
+
+	/**
 	 * The refinement directive for a planning caller whose plan is already in
 	 * front of the user, so the turn carrying their answer is told to end in
 	 * another submission rather than in prose.
@@ -794,6 +808,17 @@ export function createAgentControlService({
 		return denial === null ? null : fail('denied-scope', denial);
 	};
 
+	const gateAfkMode = (
+		op: AgentControlOp,
+		origin: AgentControlOrigin,
+	): AgentControlResult<never> | null => {
+		if (!isUnattended(origin)) {
+			return null;
+		}
+		const denial = afkModeControlOpDenial(op);
+		return denial === null ? null : fail('denied-scope', denial);
+	};
+
 	const gatePermission = async (
 		op: AgentControlOp,
 		origin: AgentControlOrigin,
@@ -806,6 +831,13 @@ export function createAgentControlService({
 			return fail('denied-permission', `Blocked by ${mode} permission mode.`);
 		}
 		if (boundary !== 'confirmation-required') {
+			return null;
+		}
+		// The user is away, so the dialog this would raise has nobody to answer it
+		// and the op would hang until they came back. Deliberately reaches only the
+		// `confirmation-required` boundary: a `blocked` one is still blocked above,
+		// so AFK answers a question the mode already allows rather than widening it.
+		if (isUnattended(origin)) {
 			return null;
 		}
 		const approved = await ports.confirm.confirm({
@@ -1095,6 +1127,18 @@ export function createAgentControlService({
 			return fail('denied-quota', workspaceFullRefusal(roots, harnesses));
 		}
 		const release = reservePeerSlot(origin.workspaceId);
+		// Not auto-approved the way `gatePermission`'s confirmation is. A peer is
+		// only ever opened because the USER asked for one, and that premise cannot
+		// hold while they are away — so this refuses rather than waiting on a dialog
+		// nobody will answer, and two unsupervised writers never land on one
+		// worktree.
+		if (isUnattended(origin)) {
+			release();
+			return fail(
+				'denied-permission',
+				'A peer orchestrator is a second writer on this worktree and is only ever opened because the user asked for one — and they are away, so nobody can be asked. Do the work in this conversation, and say in your final message that you wanted a peer and why.',
+			);
+		}
 		const approved = await ports.confirm
 			.confirm({
 				origin,
@@ -1192,6 +1236,7 @@ export function createAgentControlService({
 				callerRuntime: originRuntime(origin),
 				parentSessionId: origin.sessionId,
 				planMode: isPlanning(origin),
+				afkMode: isUnattended(origin),
 			})
 			.finally(() => releasePeerSlot?.());
 		if (!started.ok) {
@@ -1391,7 +1436,10 @@ export function createAgentControlService({
 	): Promise<AgentControlResult<unknown>> => {
 		const naming = await ports.sessionNaming.readBrief(origin);
 		const planMode = isPlanning(origin);
+		const afkMode = isUnattended(origin);
 		return ok({
+			afkDirective: buildAfkDirective(afkMode),
+			afkMode,
 			issueDirective: await readIssueDirectiveForOrigin(origin),
 			languageDirective: readLanguageDirective(),
 			naming,
@@ -2582,6 +2630,10 @@ export function createAgentControlService({
 		if (planModeDenied) {
 			return planModeDenied;
 		}
+		const afkDenied = gateAfkMode(command.op, origin);
+		if (afkDenied) {
+			return afkDenied;
+		}
 		const permissionDenied = await gatePermission(
 			command.op,
 			origin,
@@ -2643,6 +2695,7 @@ export function createAgentControlService({
 			),
 			planDelegationFor(origin, role),
 			readPlanRefinement(origin),
+			buildAfkDirective(isUnattended(origin)),
 			readLanguageDirective(),
 			issueDirectiveFor(origin, role),
 			readCoAuthorDirective(),
@@ -2658,6 +2711,7 @@ export function createAgentControlService({
 	const releaseSession = (sessionId: string): void => {
 		ports.ask.releaseSession(sessionId);
 		ports.planMode.releaseSession(sessionId);
+		ports.afkMode.releaseSession(sessionId);
 		signalsByChild.delete(sessionId);
 		linearSearchesBySession.delete(sessionId);
 		guardrails.release(sessionId);

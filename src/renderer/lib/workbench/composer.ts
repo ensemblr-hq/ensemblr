@@ -165,11 +165,13 @@ export function getComposerState({
 	liveAgentSessionId,
 	lockedProvider,
 	modelId,
+	onAfkModeChange,
 	onModelChange,
 	onPlanModeChange,
 	onStop,
 	onSubmit,
 	onThinkingChange,
+	afkMode,
 	planMode,
 	planUsage,
 	setupDiagnostics,
@@ -187,6 +189,7 @@ export function getComposerState({
 	liveAgentSessionId?: string | null;
 	lockedProvider: AgentProviderId | null;
 	modelId: string | null;
+	onAfkModeChange: (afkMode: boolean) => void;
 	onModelChange: (modelId: string) => void;
 	onPlanModeChange: (planMode: boolean) => void;
 	onStop: () => Promise<void> | void;
@@ -195,6 +198,7 @@ export function getComposerState({
 		options?: { streamingBehavior?: 'steer' | 'followUp' },
 	) => Promise<ComposerSubmitOutcome>;
 	onThinkingChange: (thinkingLevel: string) => void;
+	afkMode: boolean;
 	planMode: boolean;
 	planUsage?: ComposerPlanUsage | null;
 	setupDiagnostics: SetupDiagnosticsSnapshot | null;
@@ -221,11 +225,13 @@ export function getComposerState({
 		lockedProvider,
 		modelId,
 		modelLabel,
+		onAfkModeChange,
 		onModelChange,
 		onPlanModeChange,
 		onStop,
 		onSubmit,
 		onThinkingChange,
+		afkMode,
 		planMode,
 		planUsage: planUsage ?? null,
 		workspaceCwd: workspaceCwd ?? '',

@@ -9,6 +9,7 @@
 import { posix as posixPath } from 'node:path';
 
 import type {
+	AfkModeChangedBroadcast,
 	AgentControlModelList,
 	AgentControlProjectInfo,
 	AgentControlTabInfo,
@@ -77,6 +78,7 @@ import { makeArchitecturePort } from './architecture-ports.ts';
 import type { BoardStatusStore } from './board-status-store.ts';
 import { makeLinearPort } from './linear-ports.ts';
 import {
+	type AfkModePort,
 	type AgentControlOrigin,
 	type AgentControlPorts,
 	type AskPort,
@@ -193,6 +195,12 @@ export interface PortAdapterDeps {
 	 * enforcement reads the main-process registry, never this.
 	 */
 	broadcastPlanMode: (payload: PlanModeChangedBroadcast) => void;
+	/**
+	 * Broadcasts a chat tab's AFK state so the renderer's per-chat toggle matches
+	 * a spawn the renderer never made. Best-effort mirror only, exactly as
+	 * {@link PortAdapterDeps.broadcastPlanMode} is.
+	 */
+	broadcastAfkMode: (payload: AfkModeChangedBroadcast) => void;
 	/** Broadcasts a board-status change so the renderer updates its board atom. */
 	broadcastBoardStatus: (payload: BoardStatusBroadcast) => void;
 	/** Main-side mirror of the renderer's board-status map. */
@@ -200,6 +208,7 @@ export interface PortAdapterDeps {
 	confirm: ConfirmPort;
 	ask: AskPort;
 	planMode: PlanModePort;
+	afkMode: AfkModePort;
 }
 
 const IDLE_STATUSES: ReadonlySet<string> = new Set([
@@ -508,6 +517,7 @@ function makeConversationPort(deps: PortAdapterDeps): ConversationPort {
 			callerRuntime,
 			parentSessionId,
 			planMode,
+			afkMode,
 		}) => {
 			const caller = describeCaller({
 				callerConcierge,
@@ -574,6 +584,7 @@ function makeConversationPort(deps: PortAdapterDeps): ConversationPort {
 				// a runtime that gates on its starting permission mode would miss the
 				// spawn entirely without the flag riding the open itself.
 				planMode,
+				afkMode,
 			});
 			// Registered before `submitPrompt` because the child can reach
 			// `before_agent_start` first.
@@ -583,6 +594,15 @@ function makeConversationPort(deps: PortAdapterDeps): ConversationPort {
 					chatTabId: targetTabId,
 					agentSessionId: snapshot.id,
 					planMode: true,
+					workspaceId,
+				});
+			}
+			if (afkMode) {
+				deps.afkMode.activateForSpawn(snapshot.id);
+				deps.broadcastAfkMode({
+					chatTabId: targetTabId,
+					afkMode: true,
+					agentSessionId: snapshot.id,
 					workspaceId,
 				});
 			}
@@ -849,6 +869,7 @@ async function rollbackConversation(
 	},
 ): Promise<void> {
 	deps.planMode.releaseSession(target.agentSessionId);
+	deps.afkMode.releaseSession(target.agentSessionId);
 	if (target.markerRestore) {
 		writeSubAgentMarker(
 			deps,
@@ -1351,6 +1372,7 @@ export function createAgentControlPorts(
 		confirm: deps.confirm,
 		ask: deps.ask,
 		planMode: deps.planMode,
+		afkMode: deps.afkMode,
 		...(deps.conciergePorts ?? {}),
 	};
 }

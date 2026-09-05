@@ -224,6 +224,11 @@ const makePorts = (
 		isActive: vi.fn().mockReturnValue(overrides.planning ?? false),
 		releaseSession: vi.fn(),
 	},
+	afkMode: {
+		activateForSpawn: vi.fn(),
+		isActive: vi.fn(() => false),
+		releaseSession: vi.fn(),
+	},
 	sessionNaming: {
 		readBrief: vi.fn().mockResolvedValue({
 			branch: { current: null, eligible: false },

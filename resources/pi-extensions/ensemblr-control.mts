@@ -640,11 +640,13 @@ async function fetchSessionBrief(): Promise<{
 	planRefinement: string | null;
 	languageDirective: string | null;
 	issueDirective: string | null;
+	afkDirective: string | null;
 	rolePlaybook: string | null;
 }> {
 	const result = await invoke('getSessionBrief', {}, undefined);
 	if (!result.ok) {
 		return {
+			afkDirective: null,
 			issueDirective: null,
 			languageDirective: null,
 			nudge: null,
@@ -660,6 +662,7 @@ async function fetchSessionBrief(): Promise<{
 				planRefinement?: string | null;
 				languageDirective?: string | null;
 				issueDirective?: string | null;
+				afkDirective?: string | null;
 				rolePlaybook?: string | null;
 		  }
 		| undefined;
@@ -668,6 +671,8 @@ async function fetchSessionBrief(): Promise<{
 			typeof brief?.rolePlaybook === 'string' && brief.rolePlaybook.length > 0
 				? brief.rolePlaybook
 				: null,
+		afkDirective:
+			typeof brief?.afkDirective === 'string' ? brief.afkDirective : null,
 		issueDirective:
 			typeof brief?.issueDirective === 'string' ? brief.issueDirective : null,
 		languageDirective:
@@ -704,6 +709,7 @@ export default function ensemblrControl(pi: ExtensionAPI): void {
 
 	pi.on('before_agent_start', async (event) => {
 		const {
+			afkDirective,
 			issueDirective,
 			languageDirective,
 			nudge,
@@ -719,6 +725,7 @@ export default function ensemblrControl(pi: ExtensionAPI): void {
 			playbook,
 			nudge,
 			planRefinement,
+			afkDirective,
 			languageDirective,
 			issueDirective,
 		].filter((block) => typeof block === 'string' && block.length > 0);

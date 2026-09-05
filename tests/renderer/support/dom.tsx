@@ -54,8 +54,14 @@ export function clearEnsemblrApi(): void {
 }
 
 /**
- * Installs a fresh Map-backed `window.localStorage`; happy-dom here ships none,
- * so tests that touch storage must stub it. Reinstalling resets the store.
+ * Installs a fresh Map-backed `window.localStorage`, so a test that asserts on
+ * stored values owns the whole store. Reinstalling resets it.
+ *
+ * happy-dom ships no `localStorage` of its own; what a test sees without this is
+ * whatever the host Node exposes as a process global, which is a real store on
+ * Node 24 and nothing at all on some later versions. The shared setup empties
+ * that before every test, so this is for tests that want their own object rather
+ * than for isolation.
  */
 export function installLocalStorage(): void {
 	const items = new Map<string, string>();

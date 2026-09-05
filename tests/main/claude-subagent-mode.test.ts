@@ -267,6 +267,7 @@ async function openClaudeSessions({
 		agentClient,
 		eventSink: undefined,
 		isPlanModeActive: () => false,
+		isAfkModeActive: () => false,
 		now: () => new Date('2026-08-07T00:00:00.000Z'),
 		queueNaming: () => undefined,
 		readArchitectureDiagramEnabled: () => true,

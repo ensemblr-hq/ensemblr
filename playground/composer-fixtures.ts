@@ -78,22 +78,26 @@ const WORKSPACE_FILES: readonly WorkspaceFileSummary[] = [
 
 /**
  * Builds the `ComposerShellState` the panel reads. Every callback is inert
- * except plan mode, which a scene owns so the chip and the dashed border stay in
- * step with whatever drives them. Shared by both composer scenes so the surface
- * under review is identical in each.
- * @param input - The inputs a scene varies, plus the plan-mode setter.
- * @returns A composer state fixture wired to the scene's plan-mode toggle.
+ * except the two turn modes, which a scene owns so the chips and the dashed
+ * border stay in step with whatever drives them. Shared by both composer scenes
+ * so the surface under review is identical in each.
+ * @param input - The inputs a scene varies, plus the two mode setters.
+ * @returns A composer state fixture wired to the scene's mode toggles.
  */
 export function useComposerStub({
 	disabled = false,
 	isStreaming,
 	lockedProvider,
+	afkMode = false,
+	onAfkModeChange,
 	onPlanModeChange,
 	planMode,
 }: {
+	afkMode?: boolean;
 	disabled?: boolean;
 	isStreaming: boolean;
 	lockedProvider: AgentProviderId | null;
+	onAfkModeChange?: (afkMode: boolean) => void;
 	onPlanModeChange?: (planMode: boolean) => void;
 	planMode: boolean;
 }): ComposerShellState {
@@ -110,12 +114,14 @@ export function useComposerStub({
 			lockedProvider,
 			modelId: MODELS[0].id,
 			modelLabel: MODELS[0].displayName,
+			onAfkModeChange: (next: boolean) => onAfkModeChange?.(next),
 			onModelChange: () => undefined,
 			onPlanModeChange: (next: boolean) => onPlanModeChange?.(next),
 			onStop: () => undefined,
 			onSubmit: () => Promise.resolve({}),
 			onThinkingChange: () => undefined,
 			placeholder: '',
+			afkMode,
 			planMode,
 			planUsage: {
 				limits: [
@@ -140,6 +146,14 @@ export function useComposerStub({
 			workspaceCwd: WORKSPACE_CWD,
 			workspaceFiles: WORKSPACE_FILES,
 		}),
-		[disabled, isStreaming, lockedProvider, onPlanModeChange, planMode],
+		[
+			afkMode,
+			disabled,
+			isStreaming,
+			lockedProvider,
+			onAfkModeChange,
+			onPlanModeChange,
+			planMode,
+		],
 	);
 }

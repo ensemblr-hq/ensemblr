@@ -96,6 +96,7 @@ const makeDeps = (): {
 		broadcastFocus: vi.fn(),
 		broadcastTabsChanged,
 		broadcastBoardStatus,
+		broadcastAfkMode: vi.fn(),
 		broadcastPlanMode: vi.fn(),
 		boardStatusStore,
 		ask: { ask: vi.fn(), releaseSession: vi.fn() },
@@ -104,6 +105,11 @@ const makeDeps = (): {
 			activateForSpawn: vi.fn(),
 			exit: vi.fn(),
 			hasSubmittedPlan: vi.fn(() => false),
+			isActive: vi.fn(() => false),
+			releaseSession: vi.fn(),
+		},
+		afkMode: {
+			activateForSpawn: vi.fn(),
 			isActive: vi.fn(() => false),
 			releaseSession: vi.fn(),
 		},
@@ -474,6 +480,7 @@ describe('agent-control port adapters: conversation naming', () => {
 			callerRuntime: 'pi',
 			parentSessionId: 'parent-1',
 			planMode: false,
+			afkMode: false,
 		});
 		expect(result).toEqual({
 			ok: true,
@@ -522,6 +529,7 @@ describe('agent-control port adapters: conversation naming', () => {
 			callerRuntime: 'pi',
 			parentSessionId: 'parent-1',
 			planMode: false,
+			afkMode: false,
 		});
 
 		expect(result).toMatchObject({ chatTabId: 'tab-idle', ok: true });
@@ -560,6 +568,7 @@ describe('agent-control port adapters: conversation naming', () => {
 				callerRuntime: 'pi',
 				parentSessionId: 'parent-1',
 				planMode: false,
+				afkMode: false,
 			}),
 		).rejects.toThrow('runtime refused');
 		expect(closeTab).not.toHaveBeenCalled();
@@ -595,6 +604,7 @@ describe('agent-control port adapters: conversation naming', () => {
 			callerRuntime: 'pi',
 			parentSessionId: 'parent-1',
 			planMode: false,
+			afkMode: false,
 		});
 
 		const markedAt = vi.mocked(setChatTabMetadata).mock.invocationCallOrder[0];
@@ -647,6 +657,7 @@ describe('agent-control port adapters: conversation naming', () => {
 				callerRuntime: 'pi',
 				parentSessionId: 'parent-1',
 				planMode: false,
+				afkMode: false,
 			}),
 		).rejects.toThrow('pi is not ready');
 
@@ -694,6 +705,7 @@ describe('agent-control port adapters: conversation naming', () => {
 				callerRuntime: 'pi',
 				parentSessionId: 'parent-1',
 				planMode: false,
+				afkMode: false,
 			}),
 		).rejects.toThrow('pi is not ready');
 

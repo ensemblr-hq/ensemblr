@@ -67,6 +67,7 @@ export type {
 	ToolCallCollapseMode,
 } from './atoms';
 export {
+	chatAfkModeAtomFamily,
 	chatAppliedLinkedDirectoriesAtomFamily,
 	chatLinkedDirectoriesAtomFamily,
 	chatModelOverrideAtomFamily,

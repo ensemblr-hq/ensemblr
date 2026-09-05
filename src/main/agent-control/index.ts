@@ -64,6 +64,7 @@ export {
 	type PortAdapterDeps,
 } from './port-adapters.ts';
 export {
+	type AfkModePort,
 	type AgentControlEnvIdentity,
 	type AgentControlEnvResolver,
 	type AgentControlOrigin,

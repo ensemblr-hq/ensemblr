@@ -106,6 +106,13 @@ function createPendingQuery(): Query {
 
 const noSubscription: AgentSubscription = { unsubscribe: () => undefined };
 
+/** The per-call arguments the SDK's dispatcher hands `canUseTool`. */
+const toolCallOptions = () => ({
+	requestId: 'sdk-req',
+	signal: new AbortController().signal,
+	toolUseID: 'tool-use-1',
+});
+
 /**
  * Opens a Claude session through the production opener — real database, real
  * AgentClient, real Claude adapter — and returns the `Options` the adapter
@@ -145,6 +152,7 @@ async function openClaudeSessions({
 		agentClient,
 		eventSink: undefined,
 		isPlanModeActive: planMode,
+		isAfkModeActive: () => false,
 		now: () => new Date('2026-08-07T00:00:00.000Z'),
 		queueNaming: () => undefined,
 		resolvePermissionMode: mode,
@@ -275,18 +283,23 @@ describe('Claude session options: the workspace permission mode reaches the SDK'
 });
 
 describe('Claude session options: the approval seam', () => {
-	it('hands approval-required the injected handler, untouched', async () => {
-		const approve: ClaudeCanUseTool = async (_toolName, input) => ({
-			behavior: 'allow',
-			updatedInput: input,
-		});
+	// Behaviour rather than identity: the gate is wrapped so an unattended chat
+	// answers its own card (`withAfkAutoApproval`), and a session that is not
+	// unattended must still reach the injected handler for every call.
+	it('routes every approval-required call to the injected handler', async () => {
+		const asked: string[] = [];
+		const approve: ClaudeCanUseTool = async (toolName, input) => {
+			asked.push(toolName);
+			return { behavior: 'allow', updatedInput: input };
+		};
 
 		const options = await openClaudeSession({
 			canUseTool: () => ({ canUseTool: approve, release: () => undefined }),
 			mode: 'approval-required',
 		});
+		await options.canUseTool?.('Bash', { command: 'ls' }, toolCallOptions());
 
-		expect(options.canUseTool).toBe(approve);
+		expect(asked).toEqual(['Bash']);
 	});
 
 	it('opens the gate with the agent_sessions.id the renderer keys the card by', async () => {
@@ -417,6 +430,7 @@ async function openPiSessionArgs(input: {
 		agentClient,
 		eventSink: undefined,
 		isPlanModeActive: () => input.planMode,
+		isAfkModeActive: () => false,
 		now: () => new Date('2026-08-07T00:00:00.000Z'),
 		queueNaming: () => undefined,
 		resolvePermissionMode: () => input.mode,
