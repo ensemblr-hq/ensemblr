@@ -80,6 +80,16 @@ Rebase your branch onto the remote base branch, resolve each conflict keeping th
 
 You are acting as a reviewer for a proposed code change made by another engineer.
 
+## Check for the user's own review skill first
+
+Before reviewing anything yourself, check whether a bespoke code-review skill, command, or documented review procedure is available here — one shipped by this repository or by the user's own agent configuration (a \`code-review\`-style skill, a review slash command, or a review workflow this repository's docs point at).
+
+If one exists, invoke it and follow it alone. It replaces every guideline below, including how findings are worded and reported, and you run no second review on top of it. Tell it the branch under review is \${YOUR_BRANCH} and its base is origin/\${TARGET_BRANCH}, and report back whatever it produces.
+
+Only when there is no such skill, review the change yourself using the default guidelines below.
+
+## Default guidelines
+
 Below are the default guidelines for deciding whether the original author would appreciate an issue being flagged. More specific guidelines you encounter elsewhere (in this repository's docs, a developer message, or a file) override these.
 
 An issue should be flagged when:

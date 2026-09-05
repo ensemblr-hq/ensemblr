@@ -45,6 +45,24 @@ describe('composeActionPrompt', () => {
 		expect(result).toContain('src/a.ts (modified, +3/-1)');
 	});
 
+	test('sends the review to a bespoke review skill before the defaults', () => {
+		const result = composeActionPrompt({
+			action: 'review',
+			preferences: '',
+			workspace: makeWorkspace(),
+		});
+		const skillSection = result.indexOf(
+			"## Check for the user's own review skill first",
+		);
+		expect(skillSection).toBeGreaterThan(-1);
+		expect(result.indexOf('## Default guidelines')).toBeGreaterThan(
+			skillSection,
+		);
+		expect(result).toContain(
+			'the branch under review is feature/widget and its base is origin/main',
+		);
+	});
+
 	test('omits the preferences addon when preferences are empty', () => {
 		const result = composeActionPrompt({
 			action: 'review',
