@@ -759,6 +759,16 @@ runs the same verification a PR does rather than a copy of it. Callers pass
 `run_scan: false`: react-doctor diffs against `master`, which a release tag
 already is.
 
+An `already-verified` job runs ahead of it and checks whether the commit the tag
+points at has a green `Checks` run of its own. A tag cut from `master` normally
+does — that run was the merge — and re-running the identical suite over the
+identical tree proves nothing, so `verify` is skipped and the build starts
+several minutes earlier. It fails closed: a lookup that errors, finds nothing,
+or finds only failed runs leaves the flag false and the full suite runs, which
+is exactly what a tag cut from a commit that never reached `master` gets.
+`build` and `build-linux` therefore gate on `always()` plus explicit job
+results, because a *skipped* dependency would otherwise skip them too.
+
 ## What ships inside the `.app`
 
 The packager's `ignore` filter keeps the Vite output plus an explicit allow-list

@@ -152,14 +152,21 @@ npm run test:db           # a main-process suite (electron --test)
 **Which runner does my new test use?**
 
 - Testing pure logic (a formatter, a reducer, a slug function)? **Vitest.** If it
-  lives under `tests/main/`, add its path to the `include` array in
-  `vitest.config.mts` — that list is explicit, not a `tests/main/**` glob, because
-  a glob would drag in the Electron-only suites.
+  lives under `tests/main/`, add its path to the `include` array of the **`node`
+  project** in `vitest.config.mts` — that list is explicit, not a
+  `tests/main/**` glob, because a glob would drag in the Electron-only suites.
 - Testing a React component or hook? **Vitest**, under `tests/renderer/`, with a
   `// @vitest-environment happy-dom` docblock at the top of the file. Use
   `renderWithProviders` / `createTestQueryClient` from
   `tests/renderer/support/dom.tsx`. jest-dom matchers are already registered
   globally.
+
+`vitest.config.mts` defines two projects, and which one a file lands in decides
+what it costs. The `renderer` project globs `tests/renderer/**` whole and loads
+the setup file — jest-dom plus the i18next singleton, which pulls in all 24
+catalogues. The `node` project loads neither, which is why the main-process and
+shared suites are listed there. A test that needs to translate or assert with
+jest-dom therefore belongs under `tests/renderer/`, not in the `node` list.
 - Needs Electron or Node runtime APIs (SQLite, PTY, `app.getPath`)? **`electron --test`.**
   Add a `test:<name>` script to `package.json` following the existing
   `ELECTRON_RUN_AS_NODE=1 electron --test …` pattern.
@@ -172,27 +179,37 @@ from `bun:test` — Bun is not the runner and the enforcement hook blocks the CL
 ```bash
 npm run check       # Biome + the Tailwind class check + i18n lint + hardcoded-string scan
 npm run check:fix   # apply safe fixes (format + import organization)
-npm run typecheck   # tsc --noEmit across app, scripts/, and tests/
+npm run typecheck   # every tsconfig project, concurrently
 npm run test
 npm run i18n:status # if you touched a user-facing string — must stay at 100% ru/el
 ```
 
-`npm run typecheck` covers **three** projects — `tsconfig.json`,
-`tsconfig.scripts.json`, `tsconfig.tests.json` — because `npx tsx` and Vitest
-strip types without checking them. A `scripts/*.ts` type error only surfaces
-here.
+`npm run typecheck` covers **four** projects — `tsconfig.json`,
+`tsconfig.scripts.json`, `tsconfig.tests.json`, `tsconfig.demo.json` — because
+`npx tsx` and Vitest strip types without checking them. A `scripts/*.ts` type
+error only surfaces here. `scripts/typecheck.mjs` runs them at once rather than
+chaining them with `&&`: they each `include` `src`, so the serial form
+type-checked the bulk of the program four times in a row.
 
 Run them locally anyway — CI runs the same gates, but only once the branch is
-pushed. `.github/workflows/checks.yml` has three jobs on pushes to `master` and
-PRs targeting it: `verify-matrix` runs `npm run check`, `npm run typecheck` and
-`npm run test` on **both** `macos-latest` and `ubuntu-latest`, which is what
-makes a darwin-only assumption fail in CI rather than in a user's AppImage; a
-tiny `verify` job collapses the matrix into the single status check branch
-protection names. `scan` runs a `react-doctor` scan diffed against `master`,
-failing on `error`. The
-release workflow calls `checks.yml` as a reusable workflow, passing
+pushed. `.github/workflows/checks.yml` runs `lint`, `typecheck` and `test` as
+separate jobs on pushes to `master` and PRs targeting it, so the wall clock is
+the slowest of the three rather than their sum. `test` is a matrix over **both**
+`macos-latest` and `ubuntu-latest`, each split into three shards — running on both
+platforms is what makes a darwin-only assumption fail in CI rather than in a
+user's AppImage. `lint` and `typecheck` run on Linux alone, because neither
+Biome nor tsc can reach a different verdict on macOS. A tiny `verify` job
+collapses all of them into the single status check branch protection names.
+`scan` runs a `react-doctor` scan diffed against `master`, failing on `error`.
+
+A second push to a PR cancels the run it superseded, so pushing three fixups in
+a minute costs one run rather than three racing for the same runners.
+
+The release workflow calls `checks.yml` as a reusable workflow, passing
 `run_scan: false`, so a release tag runs the same verification a PR does without
-re-diffing against a branch it already is.
+re-diffing against a branch it already is — and skips even that when the tagged
+commit already has a green `Checks` run, which a tag cut from `master` normally
+does.
 
 For changed renderer code, also run the `react-doctor` skill and `fallow` on the
 changed set, per [`../.claude/rules/code-review.md`](../.claude/rules/code-review.md).

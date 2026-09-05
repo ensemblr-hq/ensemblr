@@ -22,6 +22,57 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # Has the exact tree this release builds already been through Checks? A tag is
+  # normally cut from a master commit that checks.yml has already run over in
+  # full — and with the scan, which `verify` below skips — so re-running the same
+  # suite over the same commit costs several minutes and proves nothing the first
+  # run did not. This resolves the commit the way `build` does, by checking the
+  # ref out, so a dispatch that rebuilds a branch is judged on that branch's head
+  # rather than on whatever `github.sha` happens to be.
+  #
+  # It fails closed: a lookup that errors, finds nothing, or finds only failed
+  # runs leaves `verified` false and the full suite runs. A tag cut from a commit
+  # that never reached master is exactly that case.
+  already-verified:
+    if: ${{ !startsWith(github.event.release.tag_name, 'nightly') }}
+    runs-on: ubuntu-latest
+    # `actions: read` is what reads the run history, and it has to be asked for
+    # by name: declaring any `permissions:` block at workflow level sets every
+    # scope it does not list to none, so the workflow-level `contents: write`
+    # leaves this job unable to list its own workflow's runs. Without it the
+    # lookup 403s, falls back to `verified=false`, and quietly re-runs the suite
+    # every time — the safe answer, but never the fast one.
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      verified: ${{ steps.lookup.outputs.verified }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.release.tag_name || inputs.tag }}
+
+      - id: lookup
+        name: Look for a green Checks run on this commit
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -uo pipefail
+          sha=$(git rev-parse HEAD)
+          green=$(gh api \
+            "repos/${GITHUB_REPOSITORY}/actions/workflows/checks.yml/runs?head_sha=${sha}&per_page=100" \
+            --jq '[.workflow_runs[] | select(.conclusion == "success")] | length' 2>/dev/null || echo 0)
+          case "$green" in
+            ''|*[!0-9]*) green=0 ;;
+          esac
+          if [ "$green" -gt 0 ]; then
+            echo "verified=true" >> "$GITHUB_OUTPUT"
+            echo "\`$sha\` already passed Checks ($green green run(s)); skipping re-verification." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "verified=false" >> "$GITHUB_OUTPUT"
+            echo "No green Checks run for \`$sha\`; running the full suite." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
   # On `release: published` this checks out the tag, because that event sets
   # github.ref to it. A manual dispatch checks out the branch it was dispatched
   # from instead — the escape-hatch path verifies the branch, not the tag.
@@ -32,7 +83,10 @@ jobs:
   # the package.json-matches-the-tag step. `github.event.release` is null on a
   # dispatch, so the escape hatch is unaffected.
   verify:
-    if: ${{ !startsWith(github.event.release.tag_name, 'nightly') }}
+    needs: already-verified
+    if: >-
+      ${{ !startsWith(github.event.release.tag_name, 'nightly')
+      && needs.already-verified.outputs.verified != 'true' }}
     # Mirrors what checks.yml's `scan` job declares, because a called workflow's
     # job permissions are validated statically — a job skipped by `if:` is
     # validated too, so `run_scan: false` does not excuse the scope. Granted
@@ -47,7 +101,19 @@ jobs:
       run_scan: false
 
   build:
-    needs: verify
+    # `verify` is now legitimately skipped when the commit was already checked,
+    # and a skipped dependency skips the job that needs it — hence `always()`
+    # plus explicit results. `skipped` and `success` both let the build through;
+    # `failure` and `cancelled` do not. The nightly guard has to be repeated
+    # here, because `always()` would otherwise run this on the one event the
+    # whole workflow is meant to ignore.
+    needs: [already-verified, verify]
+    if: >-
+      ${{ always()
+      && !startsWith(github.event.release.tag_name, 'nightly')
+      && needs.already-verified.result == 'success'
+      && needs.verify.result != 'failure'
+      && needs.verify.result != 'cancelled' }}
     # Pinned rather than macos-latest: an image bump must not silently change the
     # signing and notarization toolchain under a release.
     runs-on: macos-15
@@ -81,12 +147,7 @@ jobs:
               exit 1 ;;
           esac
 
-      - uses: actions/setup-node@v7
-        with:
-          node-version-file: .nvmrc
-          cache: npm
-
-      - run: npm ci
+      - uses: ./.github/actions/install-dependencies
 
       - name: Check package.json matches the tag
         run: |
@@ -279,8 +340,14 @@ jobs:
   # `build`'s "release exists and is published" guard this way, so it can no
   # longer attach to a draft.
   build-linux:
-    needs: [verify, build]
-    if: ${{ !startsWith(github.event.release.tag_name, 'nightly') }}
+    # Same `always()` shape as `build`, for the same reason — `verify` is
+    # skipped on an already-checked commit. Gating on `build` having actually
+    # succeeded is what preserves the ordering the comment above describes.
+    needs: [already-verified, verify, build]
+    if: >-
+      ${{ always()
+      && !startsWith(github.event.release.tag_name, 'nightly')
+      && needs.build.result == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
@@ -290,11 +357,6 @@ jobs:
         with:
           ref: ${{ github.event.release.tag_name || inputs.tag }}
 
-      - uses: actions/setup-node@v7
-        with:
-          node-version-file: .nvmrc
-          cache: npm
-
       # `@reforged/maker-appimage` declares mksquashfs as a required external
       # binary and refuses to run without it; ubuntu-latest does not ship it.
       - name: Install mksquashfs
@@ -303,7 +365,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install --no-install-recommends -y squashfs-tools
 
-      - run: npm ci
+      - uses: ./.github/actions/install-dependencies
 
       - name: Check package.json matches the tag
         run: |
