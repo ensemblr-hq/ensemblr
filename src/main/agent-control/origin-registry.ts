@@ -48,12 +48,18 @@ export interface OriginRegistry {
 	/** Session ids of the registered origins spawned directly by the given session. */
 	childrenOf: (sessionId: string) => readonly string[];
 	/**
-	 * Session ids of every live origin registered against a workspace, the
-	 * Concierge excluded — it belongs to none. Live rather than historical: an
-	 * origin is released when its session ends, so this answers "who is working
-	 * here right now", which is the question the peer cap asks.
+	 * Every origin registered against a workspace, the Concierge excluded — it
+	 * belongs to none.
+	 *
+	 * Whole origins rather than session ids because not everything here is a
+	 * conversation: a terminal launch registers one workspace-scoped origin with
+	 * `species: 'harness'` so a CLI the user starts by hand can reach the control
+	 * server, and that one is registered on the first terminal of any kind and
+	 * never released. A caller deciding who is *working* in a workspace has to
+	 * read `species` to tell the two apart, so this hands it the field rather
+	 * than an id it would have to resolve again.
 	 */
-	sessionsInWorkspace: (workspaceId: string) => readonly string[];
+	originsInWorkspace: (workspaceId: string) => readonly AgentControlOrigin[];
 }
 
 /** Options for {@link createOriginRegistry}; overrides exist for tests. */
@@ -162,14 +168,16 @@ export function createOriginRegistry(
 		return children;
 	};
 
-	const sessionsInWorkspace = (workspaceId: string): readonly string[] => {
-		const sessions: string[] = [];
+	const originsInWorkspace = (
+		workspaceId: string,
+	): readonly AgentControlOrigin[] => {
+		const origins: AgentControlOrigin[] = [];
 		for (const origin of bySession.values()) {
 			if (!origin.concierge && origin.workspaceId === workspaceId) {
-				sessions.push(origin.sessionId);
+				origins.push(origin);
 			}
 		}
-		return sessions;
+		return origins;
 	};
 
 	return {
@@ -180,6 +188,6 @@ export function createOriginRegistry(
 		retire,
 		ancestorsOf,
 		childrenOf,
-		sessionsInWorkspace,
+		originsInWorkspace,
 	};
 }

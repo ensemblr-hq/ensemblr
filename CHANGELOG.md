@@ -16,8 +16,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   [ADR 0059](./docs/adr/0059-let-agents-reach-sideways-and-upwards.md).
   `ensemblr_start_conversation` with `peer: true` opens a **second root
   orchestrator** in the caller's own workspace — its own tab, its own delegation
-  budget, its own conversation with the user — capped at two per workspace and
-  confirmed with the user whatever the permission mode, because "the user asked
+  budget, its own conversation with the user — capped at two agents writing one
+  checkout (a running harness terminal counts as one of the two) and confirmed
+  with the user whatever the permission mode, because "the user asked
   for this" is not something a model can establish about its own prompt. The two
   share one worktree, so the app hands the peer a written contract: the spawner
   commits, the peer stays inside the files its brief names.

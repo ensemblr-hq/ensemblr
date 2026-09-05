@@ -57,12 +57,27 @@ confirmation on this surface — `workspace-trusted` is the user trusting an age
 with its own workspace, which is not the same as trusting it to add a second
 writer to it.
 
-**Two orchestrators per workspace, and that is what bounds the recursion.** A
+**Two agents writing one checkout, and that is what bounds the recursion.** A
 peer is a root and looks like one to every gate, so "peers may not open peers" is
 not a rule the app could check; a second peer is refused because the workspace
-already holds its allowance. The count is live control origins in the workspace
-minus the ones carrying the durable sub-agent marker, so a child resumed after a
-restart — which re-registers at depth 0 — is not miscounted as a root.
+already holds its allowance.
+
+The count comes from two places, because the two kinds of writer are recorded in
+different ones. Conversations are control origins in the workspace whose species
+drives a chat tab, minus the ones carrying the durable sub-agent marker — so a
+child resumed after a restart, which re-registers at depth 0, is not miscounted
+as a root. Harness terminals are counted from the live terminal list instead, as
+sessions of kind `agent` that are still running. Their control origin is no use
+for this: a terminal launch of *any* kind mints one workspace-scoped `harness`
+origin so a CLI the user starts by hand can reach the control server, it is
+minted once per workspace, and nothing releases it — counting that would spend
+the allowance on a `npm run dev` opened an hour ago and go on doing so after the
+terminal exited.
+
+A spawn that has cleared the cap and has not opened yet holds a reservation. The
+count is read before a confirmation prompt that blocks with no time limit, and a
+peer registers nothing until it is running, so without one two spawns issued in
+a single parallel tool block would both read the same count and both pass.
 
 **The shared checkout is a contract, not a lock.** Nothing in the app arbitrates
 two agents writing one worktree: writes go through each agent's own runtime and
@@ -95,6 +110,15 @@ delivered hours later into a conversation that has since been cleared is context
 nobody can place; and not a revive, because that starts a Concierge turn nobody
 is watching. The refusal names the agent's own last message as where to put it
 instead.
+
+That refusal is a separate path through the session service rather than a check
+in front of the ordinary one. `submitPrompt` revives on purpose — a user whose
+Concierge child died still gets an answer — so a guard that only asked "is one
+attached?" would still fall through to a revive whenever the child had died but
+its shutdown event had not landed yet. `deliverAgentMessage` takes the other
+branch at the same fork: it reports `no-session` where `submitPrompt` would
+reopen, and it never holds the prompt for replay into a conversation that does
+not exist yet.
 
 **The user sees every one.** It arrives as an ordinary turn in the Concierge
 panel, headed `MESSAGE FROM AN AGENT` and naming the sending workspace, tab, and

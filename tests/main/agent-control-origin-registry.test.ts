@@ -146,10 +146,11 @@ describe('origin registry', () => {
 });
 
 // The peer cap counts concurrent writers on a workspace's one checkout, so it
-// asks the registry who is live there — not who ever was, and not the Concierge,
-// which belongs to no workspace and writes to none.
-describe('origin registry: who is live in a workspace', () => {
-	it('lists the sessions registered against that workspace only', () => {
+// asks the registry who is registered there — not the Concierge, which belongs
+// to no workspace and writes to none. Classifying what comes back is the
+// service's job, so this hands over whole origins rather than ids.
+describe('origin registry: who is registered in a workspace', () => {
+	it('lists the origins registered against that workspace only', () => {
 		const registry = createOriginRegistry();
 		registry.register({
 			sessionId: 'a',
@@ -170,11 +171,32 @@ describe('origin registry: who is live in a workspace', () => {
 			workspaceId: 'ws-b',
 		});
 
-		expect([...registry.sessionsInWorkspace('ws-a')].sort()).toEqual([
-			'a',
-			'b',
-		]);
-		expect(registry.sessionsInWorkspace('ws-b')).toEqual(['c']);
+		expect(
+			registry
+				.originsInWorkspace('ws-a')
+				.map((origin) => origin.sessionId)
+				.sort(),
+		).toEqual(['a', 'b']);
+		expect(
+			registry.originsInWorkspace('ws-b').map((origin) => origin.sessionId),
+		).toEqual(['c']);
+	});
+
+	// The workspace-scoped origin a terminal launch mints carries `harness`, and
+	// telling it apart from a conversation is what the species is for — so it has
+	// to survive the trip rather than be flattened to an id here.
+	it('carries the species through, so a caller can tell a terminal apart', () => {
+		const registry = createOriginRegistry();
+		registry.register({
+			sessionId: 'ws:ws-a',
+			species: 'harness',
+			workspaceCwd: '/a',
+			workspaceId: 'ws-a',
+		});
+
+		expect(
+			registry.originsInWorkspace('ws-a').map((origin) => origin.species),
+		).toEqual(['harness']);
 	});
 
 	it('leaves out the Concierge, which belongs to no workspace', () => {
@@ -187,7 +209,7 @@ describe('origin registry: who is live in a workspace', () => {
 			workspaceId: '',
 		});
 
-		expect(registry.sessionsInWorkspace('')).toEqual([]);
+		expect(registry.originsInWorkspace('')).toEqual([]);
 	});
 
 	it('drops a session as soon as it is released', () => {
@@ -200,6 +222,6 @@ describe('origin registry: who is live in a workspace', () => {
 		});
 		registry.release('a');
 
-		expect(registry.sessionsInWorkspace('ws-a')).toEqual([]);
+		expect(registry.originsInWorkspace('ws-a')).toEqual([]);
 	});
 });

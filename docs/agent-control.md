@@ -327,13 +327,25 @@ Four gates, in order:
    a root, so `peer` there is a misunderstanding rather than a request.
 2. **Plan Mode is refused.** A peer is a second writer, and a planning agent has
    nothing yet for two agents to write.
-3. **Two orchestrators per workspace**, the caller included, counted as live
-   control origins in the workspace minus the ones carrying the durable
-   sub-agent marker. A terminal harness counts: its origin is registered against
-   the workspace and carries no chat tab to mark, and it is an unrestricted
-   writer on the same checkout, which is what the cap is about. This is also what bounds the recursion: a peer is a root and
-   looks like one to every gate, so "peers may not open peers" is not a rule the
-   app could check — a second peer is refused because the workspace is full.
+3. **Two agents writing one checkout**, the caller included. Counted from two
+   places, because the two kinds of writer are recorded in different ones:
+   - **Conversations** — control origins in the workspace whose species drives a
+     chat tab, minus the ones carrying the durable sub-agent marker.
+   - **Harness terminals** — sessions of kind `agent` that are still `running`,
+     read from the live terminal list. A harness is an unrestricted writer on the
+     same checkout, so it counts for the reason the cap exists. It is *not*
+     counted from its control origin: a terminal launch of any kind mints one
+     workspace-scoped `harness` origin so a CLI the user starts by hand can reach
+     the control server, and that origin is never released — counting it would
+     spend the whole allowance on a `npm run dev` somebody opened once, and would
+     go on doing so after the terminal exited.
+
+   A spawn that has cleared the cap but has not opened yet holds a reservation,
+   because the count is read before a confirmation prompt that blocks with no
+   time limit and the peer registers nothing until it is running. This is also
+   what bounds the recursion: a peer is a root and looks like one to every gate,
+   so "peers may not open peers" is not a rule the app could check — a second
+   peer is refused because the workspace is full.
 4. **The user confirms it**, through `ConfirmPort`, whatever the permission mode.
    "The user explicitly asked for this" is not something a model can establish
    about its own prompt, so passing `peer` states an intent and the confirmation

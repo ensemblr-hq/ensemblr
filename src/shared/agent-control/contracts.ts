@@ -239,11 +239,15 @@ export interface StartConversationArgs {
 }
 
 /**
- * How many root orchestrators may work one workspace at once, the caller
+ * How many agents may write one workspace's checkout at once, the caller
  * included. Two, because they share one worktree and one git index and nothing
  * arbitrates that: the hazard grows with every additional writer, and the user
  * asked for *a* peer. It is also what bounds the recursion — a peer opening a
  * peer is refused by this cap rather than by a rule about who may open what.
+ *
+ * Root orchestrators are not the only thing counted against it. A harness
+ * terminal that is still running is an unrestricted writer on the same files, so
+ * it takes one of the two.
  */
 export const PEER_ORCHESTRATOR_LIMITS = {
 	maxPerWorkspace: 2,

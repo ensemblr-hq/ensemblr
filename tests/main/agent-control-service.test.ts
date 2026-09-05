@@ -2132,6 +2132,145 @@ describe('agent-control service: peer orchestrators', () => {
 		expect(result.ok).toBe(true);
 	});
 
+	// Every terminal — a dev server included — mints one workspace-scoped
+	// `harness` origin so a CLI the user starts by hand can reach the control
+	// server, and nothing releases it. Counting that as an orchestrator spent the
+	// workspace's whole allowance on a run script somebody opened once.
+	it('does not count the origin a terminal launch registers', async () => {
+		const ports = makePorts();
+		const { registry, service } = setup({ ports });
+		registry.register({
+			sessionId: 'ws:ws',
+			species: 'harness',
+			workspaceCwd: '/ws',
+			workspaceId: 'ws',
+		});
+
+		const result = await service.invoke({
+			op: 'startConversation',
+			token: 'tok-caller',
+			rawArgs: PEER,
+		});
+
+		expect(result.ok).toBe(true);
+	});
+
+	// A harness is an unrestricted writer on the same checkout, so it counts for
+	// the reason the cap exists — but it is counted live, from the terminal list,
+	// rather than from an origin that only says one was opened here once.
+	it('counts a running harness terminal, and says only the user can close it', async () => {
+		const ports = makePorts();
+		vi.mocked(ports.terminals.listTerminals).mockResolvedValue([
+			{
+				kind: 'agent',
+				scriptName: null,
+				status: 'running',
+				terminalId: 'term-claude',
+				workspaceId: 'ws',
+			},
+		]);
+		const { service } = setup({ ports });
+
+		const result = await service.invoke({
+			op: 'startConversation',
+			token: 'tok-caller',
+			rawArgs: PEER,
+		});
+
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.code).toBe('denied-quota');
+			expect(result.error).toContain('term-claude');
+			expect(result.error).toContain('only the user can close');
+		}
+		expect(ports.confirm.confirm).not.toHaveBeenCalled();
+	});
+
+	it('ignores a harness that has exited and a run script that is still going', async () => {
+		const ports = makePorts();
+		vi.mocked(ports.terminals.listTerminals).mockResolvedValue([
+			{
+				kind: 'agent',
+				scriptName: null,
+				status: 'exited',
+				terminalId: 'term-dead',
+				workspaceId: 'ws',
+			},
+			{
+				kind: 'run-script',
+				scriptName: 'dev',
+				status: 'running',
+				terminalId: 'term-dev',
+				workspaceId: 'ws',
+			},
+		]);
+		const { service } = setup({ ports });
+
+		const result = await service.invoke({
+			op: 'startConversation',
+			token: 'tok-caller',
+			rawArgs: PEER,
+		});
+
+		expect(result.ok).toBe(true);
+	});
+
+	// The cap is read before a prompt that blocks with no time limit, and the peer
+	// registers an origin only once it is open, so without a reservation two
+	// spawns issued in one parallel block both read the same count and both pass.
+	it('refuses a second peer issued while the first is still opening', async () => {
+		const ports = makePorts();
+		let releaseFirstSpawn = (): void => {};
+		const firstSpawnOpening = new Promise<void>((resolve) => {
+			releaseFirstSpawn = resolve;
+		});
+		vi.mocked(ports.conversations.startConversation).mockImplementation(
+			async () => {
+				await firstSpawnOpening;
+				return { agentSessionId: 'pi-peer', chatTabId: 't', ok: true };
+			},
+		);
+		const { service } = setup({ ports });
+
+		const first = service.invoke({
+			op: 'startConversation',
+			token: 'tok-caller',
+			rawArgs: PEER,
+		});
+		const second = await service.invoke({
+			op: 'startConversation',
+			token: 'tok-caller',
+			rawArgs: { ...PEER, title: 'Third half' },
+		});
+
+		expect(second.ok).toBe(false);
+		if (!second.ok) {
+			expect(second.code).toBe('denied-quota');
+		}
+		releaseFirstSpawn();
+		expect((await first).ok).toBe(true);
+	});
+
+	it('gives the slot back when the user declines, so the next ask still works', async () => {
+		const ports = makePorts({ confirm: false });
+		const { service } = setup({ ports });
+
+		const declined = await service.invoke({
+			op: 'startConversation',
+			token: 'tok-caller',
+			rawArgs: PEER,
+		});
+		vi.mocked(ports.confirm.confirm).mockResolvedValue(true);
+		const retried = await service.invoke({
+			op: 'startConversation',
+			token: 'tok-caller',
+			rawArgs: PEER,
+		});
+
+		expect(declined.ok).toBe(false);
+		expect(retried.ok).toBe(true);
+	});
+
 	it('refuses a peer while planning', async () => {
 		const ports = makePorts({ planning: true });
 		const { service } = setup({ ports });
@@ -2480,6 +2619,40 @@ describe('agent-control service: linear', () => {
 			title: 'A follow-up',
 			workspaceId: 'ws',
 		});
+	});
+
+	// A search that came back `not-connected` never read the backlog, so it is not
+	// the looking the precondition is about — clearing the gate on the attempt
+	// would let the duplicate guard be satisfied by a call that saw nothing.
+	it('does not let a search that failed clear the first filing', async () => {
+		const ports = makePorts();
+		vi.mocked(ports.linear.listIssues).mockResolvedValue({
+			issues: [],
+			message: 'Linear is not connected.',
+			omittedIssues: 0,
+			source: null,
+			status: 'not-connected',
+			truncated: false,
+		});
+		const { service } = setup({ ports });
+
+		const searched = await service.invoke({
+			op: 'linearListIssues',
+			token: 'tok-caller',
+			rawArgs: { query: 'terminal drops a line' },
+		});
+		const filed = await service.invoke({
+			op: 'linearCreateIssue',
+			token: 'tok-caller',
+			rawArgs: { teamId: 't-1', title: 'A follow-up' },
+		});
+
+		expect(searched.ok).toBe(true);
+		expect(filed.ok).toBe(false);
+		if (!filed.ok) {
+			expect(filed.code).toBe('denied-scope');
+		}
+		expect(ports.linear.createIssue).not.toHaveBeenCalled();
 	});
 
 	// The gate is per session, not per app: one agent searching cannot clear the

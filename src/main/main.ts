@@ -1314,34 +1314,12 @@ const conciergePorts = {
 		/**
 		 * Hands a workspace agent's message to whichever Concierge conversation is
 		 * live, as an ordinary turn so the user reads it in the panel like any
-		 * other. The id is resolved here rather than passed in, and an absent
-		 * conversation is reported rather than opened: a message that booted the
-		 * Concierge would start a turn nobody asked for and nobody is watching.
+		 * other. Passed straight through rather than assembled here: resolving the
+		 * session and refusing to open one are the same decision, and the service
+		 * that owns the attachment is the only place both can be made at once.
 		 */
-		deliverMessage: async ({ prompt }: { prompt: string }) => {
-			const conciergeSessionId = conciergeSessionService.activeSessionId();
-			if (!conciergeSessionId) {
-				return {
-					cause: 'no-session' as const,
-					delivered: false as const,
-					detail: '',
-				};
-			}
-			const result = await conciergeSessionService.submitPrompt({
-				prompt,
-				sessionId: conciergeSessionId,
-			});
-			return result.error
-				? {
-						cause: 'failed' as const,
-						delivered: false as const,
-						detail: result.error,
-					}
-				: {
-						conciergeSessionId: result.session?.id ?? conciergeSessionId,
-						delivered: true as const,
-					};
-		},
+		deliverMessage: (input: { prompt: string }) =>
+			conciergeSessionService.deliverAgentMessage(input),
 		/** What the live Concierge conversation runs on, for a child to inherit. */
 		describeSession: () => conciergeSessionService.describeActiveSession(),
 		/** Where the Concierge may write, which is what its tool policy checks against. */

@@ -312,6 +312,68 @@ describe('a Concierge prompt sent after its runtime child has died', () => {
 	});
 });
 
+// A workspace agent reaching upward takes the opposite branch from a user
+// prompt at exactly one point: it must never bring a Concierge conversation into
+// being. One that booted from here would spend tokens and act on the app with
+// nobody watching, and a message replayed into it hours later would land in a
+// conversation the user has since cleared.
+describe('a workspace agent message to the Concierge', () => {
+	it('delivers into the conversation that is live, and names it', async () => {
+		const { children, service } = setup();
+		const opened = await service.openSession({ fresh: true });
+
+		const result = await service.deliverAgentMessage({
+			prompt: 'MESSAGE FROM AN AGENT — blocked on the schema',
+		});
+
+		expect(result).toEqual({
+			conciergeSessionId: opened.session?.id,
+			delivered: true,
+		});
+		expect(children[0]?.submitted).toEqual([
+			'MESSAGE FROM AN AGENT — blocked on the schema',
+		]);
+	});
+
+	// The window the guard on `activeSessionId` could not see: the child is gone
+	// but the shutdown event has not cleared the attachment yet, so the send gets
+	// as far as the runtime before finding out.
+	it('opens no replacement when the runtime child has died', async () => {
+		const { children, requests, service } = setup();
+		await service.openSession({ fresh: true });
+		children[0]?.kill();
+
+		const result = await service.deliverAgentMessage({ prompt: 'anyone up?' });
+
+		expect(result).toMatchObject({ cause: 'no-session', delivered: false });
+		expect(children).toHaveLength(1);
+		expect(requests).toHaveLength(1);
+	});
+
+	it('reports no session when the Concierge was never opened', async () => {
+		const { children, service } = setup();
+
+		const result = await service.deliverAgentMessage({ prompt: 'anyone up?' });
+
+		expect(result).toMatchObject({ cause: 'no-session', delivered: false });
+		expect(children).toHaveLength(0);
+	});
+
+	it('passes on a refusal from a live child rather than reopening', async () => {
+		const { children, service } = setup();
+		await service.openSession({ fresh: true });
+
+		const result = await service.deliverAgentMessage({ prompt: '   ' });
+
+		expect(result).toEqual({
+			cause: 'failed',
+			delivered: false,
+			detail: 'Prompt must not be empty.',
+		});
+		expect(children).toHaveLength(1);
+	});
+});
+
 /** Lets the fire-and-forget heal run to completion before the test reads state. */
 const settle = async (): Promise<void> => {
 	for (let pass = 0; pass < 6; pass += 1) {

@@ -486,7 +486,10 @@ export interface ConciergePort {
 	 * Never opens a conversation that is not already there. A message that started
 	 * a Concierge turn nobody was watching would spend tokens and act on the app
 	 * with no human in the loop, so an absent conversation is reported rather than
-	 * created.
+	 * created — and that has to hold through a child that has died but whose
+	 * shutdown has not landed yet, which is why the adapter behind this reaches
+	 * for the session service's non-reviving path rather than guarding the
+	 * reviving one.
 	 */
 	deliverMessage: (input: {
 		prompt: string;
