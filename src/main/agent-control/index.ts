@@ -81,5 +81,14 @@ export {
 	type TerminalPort,
 	type WorkspacePort,
 } from './ports.ts';
+export {
+	makeReviewBriefFallback,
+	type ReviewBriefFallbackDeps,
+} from './review-brief-fallback.ts';
+export {
+	createReviewLaunchCoordinator,
+	REVIEW_BRIEF_TIMEOUT_MS,
+	type ReviewLaunchCoordinator,
+} from './review-launch.ts';
 export { isSessionTabMarkedSubAgent } from './sub-agent-marker.ts';
 export { readWorkspaceLinkedIssue } from './workspace-linked-issue.ts';

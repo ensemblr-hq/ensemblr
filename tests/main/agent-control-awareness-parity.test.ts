@@ -727,7 +727,7 @@ describe('agent-control AWARENESS parity', () => {
 	// order pins the two hand-maintained copies of that sequence together.
 	it('appends every rendered brief block, in the order the app joins them', () => {
 		expect(readExtensionSource()).toMatch(
-			/event\.systemPrompt,\s*playbook,\s*nudge,\s*planRefinement,\s*afkDirective,\s*languageDirective,\s*issueDirective,/,
+			/event\.systemPrompt,\s*playbook,\s*nudge,\s*planRefinement,\s*afkDirective,\s*afkWorkflowDirective,\s*languageDirective,\s*issueDirective,/,
 		);
 	});
 

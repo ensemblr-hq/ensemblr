@@ -733,6 +733,20 @@ export const ENSEMBLR_TOOL_LABELS: Record<string, EnsemblrToolLabel> = {
 				),
 		],
 	},
+	ensemblr_start_review: {
+		conciergeDetailKeys: [],
+		detailKeys: ['title'],
+		glyph: 'eye',
+		title: [
+			() =>
+				i18n.t('workbench:control-tool.start-review.done', 'Opened the review'),
+			() =>
+				i18n.t(
+					'workbench:control-tool.start-review.running',
+					'Opening the review',
+				),
+		],
+	},
 	ensemblr_start_conversation: {
 		chatKeys: ['chatTabId'],
 		conciergeDetailKeys: [],

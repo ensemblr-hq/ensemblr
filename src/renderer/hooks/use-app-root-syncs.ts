@@ -11,6 +11,7 @@ import {
 	useLanguageEffect,
 	useThemeEffect,
 } from '@/renderer/state/preferences';
+import { useReviewBriefSync } from '@/renderer/state/review-launch';
 import { useToolApprovalSync } from '@/renderer/state/tool-approval';
 import { useNotificationFocusSync } from '@/renderer/state/unread';
 import { useUpdateSync } from '@/renderer/state/updates';
@@ -36,6 +37,7 @@ export function useAppRootSyncs(): void {
 	useNotificationFocusSync();
 	useConciergeActivityWatch();
 	useAskUserQuestionSync();
+	useReviewBriefSync();
 	useToolApprovalSync();
 	usePlanReviewSync();
 	usePlanModeSync();

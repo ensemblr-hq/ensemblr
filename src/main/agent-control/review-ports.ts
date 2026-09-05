@@ -88,7 +88,7 @@ function resolveBaseRef(
  * @param baseRef - The workspace's base branch, or null when it has none.
  * @returns The branch scope, or the working-tree scope when no base resolves.
  */
-function scopeFor(baseRef: string | null): WorkspaceGitDiffScope {
+export function scopeFor(baseRef: string | null): WorkspaceGitDiffScope {
 	return baseRef ? { baseRef, kind: 'branch' } : { kind: 'working-tree' };
 }
 

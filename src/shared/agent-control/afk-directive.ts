@@ -16,6 +16,13 @@
  * run this mode exists to keep moving. The rest is the counterweight to the
  * auto-approved permission confirmations: nobody is watching, so the agent's own
  * judgement is the only remaining gate on anything hard to reverse.
+ *
+ * What an unattended turn should *do* with those hours is a separate block —
+ * {@link buildAfkWorkflowDirective} — appended after this one. The split is not
+ * cosmetic: this block applies to every AFK turn, a question about the codebase
+ * included, while the loop applies only to a turn that changes code, and folding
+ * the two together would put "open a pull request" in front of an agent that was
+ * asked to explain a function.
  */
 
 /** Opening line of the block, and the marker tests assert on. */

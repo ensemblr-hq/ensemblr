@@ -6,10 +6,17 @@ import type {
 import { bareBranchName } from '@/shared/branch-ref';
 import {
 	formatAttachedFileBlock,
+	interpolatePromptFields,
+	USER_PREF_ADDON,
 	USER_PREFERENCES_TAG,
 } from '@/shared/prompt-scaffolding';
+import {
+	clampReviewContext,
+	formatReviewChangedFiles,
+	formatReviewPullRequest,
+	REVIEW_BASE_PROMPT,
+} from '@/shared/review-brief';
 import { seedPrDetails } from './pr-details-draft';
-import { clampReviewContext } from './review-context';
 
 /**
  * Trailing sections both pull-request prompts carry, holding the title and
@@ -76,48 +83,7 @@ Investigate each failing check, reproduce the failure locally where possible, an
 	'resolve-conflicts': `This branch has merge conflicts with its base branch (\${TARGET_BRANCH}).
 
 Rebase your branch onto the remote base branch, resolve each conflict keeping the intent of both sides, and explain each resolution. Stage the resolved files, run \`git rebase --continue\`, then push with \`--force-with-lease\`.`,
-	review: `# Review guidelines
-
-You are acting as a reviewer for a proposed code change made by another engineer.
-
-## Check for the user's own review skill first
-
-Before reviewing anything yourself, check whether a bespoke code-review skill, command, or documented review procedure is available here — one shipped by this repository or by the user's own agent configuration (a \`code-review\`-style skill, a review slash command, or a review workflow this repository's docs point at).
-
-If one exists, invoke it and follow it alone. It replaces every guideline below, including how findings are worded and reported, and you run no second review on top of it. Tell it the branch under review is \${YOUR_BRANCH} and its base is origin/\${TARGET_BRANCH}, and report back whatever it produces.
-
-Only when there is no such skill, review the change yourself using the default guidelines below.
-
-## Default guidelines
-
-Below are the default guidelines for deciding whether the original author would appreciate an issue being flagged. More specific guidelines you encounter elsewhere (in this repository's docs, a developer message, or a file) override these.
-
-An issue should be flagged when:
-- It meaningfully impacts the accuracy, performance, security, or maintainability of the code.
-- The bug is discrete and actionable (not a general complaint about the codebase).
-- Fixing it does not demand a level of rigor absent from the rest of the codebase.
-- The bug was introduced in this change (pre-existing bugs should not be flagged).
-- The author would likely fix it if they were made aware of it.
-- It does not rely on unstated assumptions about the codebase or the author's intent — identify the parts of the code that are provably affected.
-- It is clearly not an intentional change by the author.
-
-When flagging a bug, provide an accompanying comment:
-- Be clear about why the issue is a bug and communicate its severity accurately, without overstating it.
-- Keep it brief (at most one paragraph) and avoid code chunks longer than three lines; wrap any code in inline code or a code block.
-- State the scenarios, environments, or inputs necessary for the bug to arise.
-- Keep the tone matter-of-fact — a helpful assistant suggestion, not an accusatory or flattering human reviewer. Avoid phrasing like "Great job…" or "Thanks for…".
-
-How many findings to return: output every finding the author would want to fix. If there is no finding a person would clearly want to see and fix, prefer no findings. Do not stop at the first qualifying finding.
-
-Getting the diff:
-\`\`\`
-MERGE_BASE=$(git merge-base origin/\${TARGET_BRANCH} HEAD)
-git diff $MERGE_BASE HEAD   # committed changes on this branch
-git diff HEAD               # uncommitted work in progress
-\`\`\`
-Review the combination of both outputs.
-
-Ignore trivial style unless it obscures meaning or violates a documented standard. Use one finding per distinct issue, and keep each finding's location as short as possible. Write out a numbered list of findings, each with a short title, an explanation, and the file (and line range) it applies to.`,
+	review: REVIEW_BASE_PROMPT,
 	'update-pr': `The user likes the current state of the code and has requested that the pull request already open for this branch be brought up to date.
 
 The current branch is \${YOUR_BRANCH}.
@@ -141,14 +107,6 @@ If any step fails, ask the user for help.
 
 ${PR_DETAIL_SECTIONS}`,
 };
-
-/**
- * Header injected before the user's per-action preferences, telling the agent
- * those preferences win over the built-in base prompt. Mirrors
- * `base-prompt-examples/user-settings-addon.md`.
- */
-const USER_PREF_ADDON =
-	"IMPORTANT: The following are the user's custom preferences. These preferences take precedence over any default guidelines or instructions above. When there is a conflict, always follow the user's preferences.";
 
 /**
  * Short composer message that fronts the attached prompt file for each of the
@@ -282,24 +240,9 @@ function resolvePrDetailFields({
 	};
 }
 
-/** Substitutes the `${…}` template fields the base prompts reference. */
-function interpolate(template: string, fields: Record<string, string>): string {
-	return template.replaceAll(/\$\{(\w+)\}/g, (match, key: string) =>
-		key in fields ? fields[key] : match,
-	);
-}
-
 /** Lists the workspace's changed files for an agent prompt, or a fallback line. */
 function formatChangedFiles(workspace: WorkspaceShellModel): string {
-	const files = workspace.reviewFiles
-		.map(
-			(file) =>
-				`- ${file.path} (${file.status}, +${file.additions}/-${file.deletions})`,
-		)
-		.join('\n');
-	return files
-		? `Changed files:\n${files}`
-		: 'There are currently no uncommitted changes; work against the branch diff.';
+	return formatReviewChangedFiles(workspace.reviewFiles);
 }
 
 /** Lists the failing PR checks for an agent prompt, or a fallback line. */
@@ -317,12 +260,12 @@ function formatFailingChecks(workspace: WorkspaceShellModel): string {
 /** Describes the open pull request for an agent prompt, when one exists. */
 function formatPullRequest(workspace: WorkspaceShellModel): string | null {
 	const { pullRequest } = workspace;
-	if (typeof pullRequest.number !== 'number') {
-		return null;
-	}
-	return `Pull request: #${pullRequest.number}${
-		pullRequest.url ? ` (${pullRequest.url})` : ''
-	}`;
+	return typeof pullRequest.number === 'number'
+		? formatReviewPullRequest({
+				number: pullRequest.number,
+				url: pullRequest.url,
+			})
+		: null;
 }
 
 /** Appends the action-specific workspace/PR/check context after the base prompt. */
@@ -371,7 +314,7 @@ export function composeActionPrompt({
 	prTitle?: string;
 	workspace: WorkspaceShellModel;
 }): string {
-	const base = interpolate(BASE_PROMPTS[action], {
+	const base = interpolatePromptFields(BASE_PROMPTS[action], {
 		...resolvePrDetailFields({ action, prDescription, prTitle, workspace }),
 		// Carries its own trailing space: `gh pr view` and `gh pr edit` act on the
 		// current branch's PR when given no number, so the field has to vanish

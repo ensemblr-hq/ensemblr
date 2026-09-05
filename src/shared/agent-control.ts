@@ -9,6 +9,10 @@ export {
 	buildAfkDirective,
 } from './agent-control/afk-directive.ts';
 export {
+	AFK_WORKFLOW_HEADER,
+	buildAfkWorkflowDirective,
+} from './agent-control/afk-workflow.ts';
+export {
 	AGENT_CONTROL_ARG_ALIASES,
 	CANONICAL_ARG_KEYS,
 	canonicalizeArgs,
@@ -57,6 +61,10 @@ export {
 	PEER_BRIEF_HEADER,
 } from './agent-control/peer-brief.ts';
 export { buildPlanSubmittedResult } from './agent-control/plan-mode.ts';
+export {
+	buildReviewPeerDirective,
+	REVIEW_PEER_BRIEF_HEADER,
+} from './agent-control/review-peer-brief.ts';
 export * from './agent-control/schemas.ts';
 export {
 	buildPlanModeDelegationDirective,

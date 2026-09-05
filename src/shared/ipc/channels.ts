@@ -30,6 +30,9 @@ export const IPC_CHANNELS = {
 	agentControlAskUserQuestionClosed:
 		'ensemblr:agent-control-ask-user-question-closed',
 	agentControlAnswerUserQuestion: 'ensemblr:agent-control-answer-user-question',
+	agentControlReviewBriefRequested:
+		'ensemblr:agent-control-review-brief-requested',
+	agentControlReviewBriefReply: 'ensemblr:agent-control-review-brief-reply',
 	agentControlExitPlanMode: 'ensemblr:agent-control-exit-plan-mode',
 	agentControlPlanModeChanged: 'ensemblr:agent-control-plan-mode-changed',
 	agentControlAfkModeChanged: 'ensemblr:agent-control-afk-mode-changed',

@@ -22,6 +22,7 @@ import { MAX_AGENT_PAYLOAD_CHARS } from './workspace-diff.ts';
 export const AGENT_CONTROL_OPS = [
 	'spawnChatTab',
 	'startConversation',
+	'startReview',
 	'sendFollowUp',
 	'setName',
 	'setBranchName',
@@ -147,6 +148,7 @@ export type AgentControlOp = (typeof AGENT_CONTROL_OPS)[number];
 const WRITE_OPS: ReadonlySet<AgentControlOp> = new Set([
 	'spawnChatTab',
 	'startConversation',
+	'startReview',
 	'sendFollowUp',
 	'setName',
 	'setBranchName',
@@ -179,6 +181,7 @@ const WRITE_OPS: ReadonlySet<AgentControlOp> = new Set([
 const SPAWN_OPS: ReadonlySet<AgentControlOp> = new Set([
 	'spawnChatTab',
 	'startConversation',
+	'startReview',
 	'launchHarness',
 	'startTerminal',
 	'openTab',
@@ -252,6 +255,34 @@ export interface StartConversationArgs {
 export const PEER_ORCHESTRATOR_LIMITS = {
 	maxPerWorkspace: 2,
 } as const;
+
+/**
+ * Args for `startReview`: open the app's own Review chat over the caller's
+ * workspace.
+ *
+ * There is deliberately no way to steer what the review looks for. The value of
+ * this op is that it runs the *same* review the user's Review button runs — the
+ * repository's own review skill when it ships one, the built-in guidelines when
+ * it does not, on the model the user configured for reviews — and a `focus`
+ * argument would let a caller commission a reviewer that agrees with it.
+ * Anything the reviewer needs to know after it has reported goes to it as a
+ * follow-up, in the open, on the record.
+ */
+export interface StartReviewArgs {
+	/** Short, descriptive name for the review conversation's tab. */
+	title?: string;
+}
+
+/**
+ * What `startReview` opened. The session is a root orchestrator rather than the
+ * caller's child, so it is absent from the children `waitForAgents` defaults to
+ * and has to be named in `targets` — which is what `message` says.
+ */
+export interface StartReviewResult {
+	agentSessionId: string;
+	chatTabId: string;
+	message: string;
+}
 
 /** Args for `setName`: set the display title of the caller's own conversation tab. */
 export interface SetNameArgs {
@@ -984,6 +1015,14 @@ export interface GetSessionBriefResult {
 	 * this block; the block is what tells the agent to keep going instead.
 	 */
 	afkDirective: string | null;
+	/**
+	 * Ready-to-append plan → build → review → fix → pull-request loop for an
+	 * unattended session, or null when the user is present. Separate from
+	 * {@link GetSessionBriefResult.afkDirective} because that block applies to
+	 * every AFK turn while this one is gated, in its own prose, on the turn being
+	 * a change to the codebase.
+	 */
+	afkWorkflowDirective: string | null;
 	/**
 	 * Ready-to-append instruction to keep the workspace's linked Linear issue
 	 * current, cut to what this caller's role and mode may actually do to a

@@ -73,6 +73,9 @@ const EXPECTED_DENIALS: Record<
 	setWorkspaceStatus: [],
 	spawnChatTab: [],
 	startConversation: 'conditional',
+	// Denied for both roles: it opens a second root orchestrator on this worktree
+	// to review a change that does not exist while `write` and `edit` are blocked.
+	startReview: ['orchestrator', 'subagent'],
 	startTerminal: ['orchestrator', 'subagent'],
 	stopTerminal: [],
 	// Denied in Plan Mode for both roles: it is the only permitted write that

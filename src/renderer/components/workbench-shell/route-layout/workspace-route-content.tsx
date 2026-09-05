@@ -22,6 +22,7 @@ import { configuredPreviewUrls } from '@/renderer/lib/workbench/preview-urls';
 import { isDockTab } from '@/renderer/lib/workbench/route-search';
 import { useAgentComposerController } from '@/renderer/state/composer';
 import { repoSettingsOverrideAtomFamily } from '@/renderer/state/preferences';
+import { usePublishLiveReviewContext } from '@/renderer/state/review-launch';
 import { usePublishActiveChat } from '@/renderer/state/unread';
 import {
 	useSessionTabState,
@@ -110,6 +111,22 @@ export function WorkspaceRouteContent({
 		activeWorkspace: workspaceWithLiveDockTabs,
 		search,
 	});
+	usePublishLiveReviewContext(
+		useMemo(
+			() => ({
+				repositoryId: activeProject.id,
+				repositoryPath: activeProject.pathLabel,
+				workspace: workspaceWithLiveDockTabs,
+				workspaceId: activeWorkspace.id,
+			}),
+			[
+				activeProject.id,
+				activeProject.pathLabel,
+				activeWorkspace.id,
+				workspaceWithLiveDockTabs,
+			],
+		),
+	);
 	const activeReviewTab = panelTabs.activeReviewTab;
 	const activeDockTab = panelTabs.activeDockTab;
 	const { state: setupDiagnosticsState } = useSetupDiagnostics();

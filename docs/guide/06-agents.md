@@ -425,9 +425,44 @@ AFK and plan mode are mutually exclusive — planning exists to stop and ask —
 so switching one on switches the other off. A conversation an AFK agent spawns
 inherits AFK, the same way a planning agent's investigators inherit plan mode.
 
+### The delivery loop
+
+When the task is a **change to the code**, AFK also hands the agent a workflow to
+run it through, because nobody is there to correct the approach at message three
+or to read the diff before it lands:
+
+1. **Plan first.** It reads the code, weighs at least one alternative, and writes
+   the approach down in the conversation before the first edit — choosing what is
+   best for the architecture rather than what is quickest to type, since an
+   unattended run is the one place where doing it properly costs only time.
+2. **Build the plan**, saying so in the conversation when something it finds
+   makes the plan wrong.
+3. **Open the Review chat.** The same review your Review button runs — your
+   review skill, your review model — over its own change, opened by the agent
+   rather than by you. It is a full chat with its own delegation budget, so it
+   can spread a wide diff over several readers.
+4. **Send the findings back to that same chat** and have it fix them there, then
+   re-review. At most three rounds: a fourth still finding the same class of
+   problem means the approach is wrong rather than the code, and that gets
+   reported instead.
+5. **Open the pull request.** Turning AFK on for a change is the request for one.
+   It never merges, never force-pushes over other work, and updates an existing
+   pull request rather than opening a second.
+
+A **hard block** — a credential it does not have, a service refusing it, a step
+that needs your authority — stops the run there and produces the report rather
+than being worked around. Being unsure is not a hard block: that it decides
+itself and records.
+
+This applies to a change, not to a question. Asking an AFK chat what a module
+does gets an answer, not a pull request.
+
 Read the session summary first when you come back: it is written for exactly this
-case, and it carries what the agent did, what it assumed, and what it left. See
-[ADR 0060](../adr/0060-let-a-chat-run-unattended.md).
+case, and it carries what the agent did, what it assumed, and what it left. The
+report names every decision it took on your behalf, every review finding it
+disagreed with, and anything it could not finish. See
+[ADR 0060](../adr/0060-let-a-chat-run-unattended.md) and
+[ADR 0061](../adr/0061-run-an-unattended-change-through-plan-review-and-a-pull-request.md).
 
 ## Checkpoints and session branching
 

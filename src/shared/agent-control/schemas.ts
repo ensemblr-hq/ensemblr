@@ -4,6 +4,7 @@
  * runs. Each schema is keyed by its {@link AgentControlOp} in {@link AGENT_CONTROL_ARG_SCHEMAS}.
  */
 import { z } from 'zod';
+import type { ReviewBriefReply } from '../ipc/contracts/review-launch.ts';
 import { toSlug } from '../slug.ts';
 import { canonicalizeArgs } from './arg-naming.ts';
 import {
@@ -76,6 +77,10 @@ const startConversationSchema = z
 		message:
 			'A peer is not a child to wait on — it is a root orchestrator with its own turn and its own user. Drop `wait`, and read its tab when it has something to say.',
 	});
+
+const startReviewSchema = z.strictObject({
+	title: nonEmpty.optional(),
+});
 
 const setNameSchema = z.strictObject({
 	title: nonEmpty,
@@ -506,6 +511,7 @@ const emptySchema = z.strictObject({});
 const AGENT_CONTROL_ARG_SCHEMAS = {
 	spawnChatTab: spawnChatTabSchema,
 	startConversation: startConversationSchema,
+	startReview: startReviewSchema,
 	sendFollowUp: sendFollowUpSchema,
 	setName: setNameSchema,
 	setBranchName: setBranchNameSchema,
@@ -592,6 +598,26 @@ export function parseAskUserQuestionReply(
 	raw: unknown,
 ): AskUserQuestionReply | null {
 	const parsed = askUserQuestionReplySchema.safeParse(raw);
+	return parsed.success ? parsed.data : null;
+}
+
+const reviewBriefReplySchema = z.strictObject({
+	requestId: nonEmpty,
+	prompt: z.string(),
+	model: nonEmpty.nullish(),
+	thinkingLevel: nonEmpty.nullish(),
+});
+
+/**
+ * Validates a renderer-supplied review prompt before it settles a pending
+ * `startReview`. An empty `prompt` is valid and means "not mine to answer" — the
+ * window holds no live model for that workspace — so main falls back rather than
+ * opening a review on nothing.
+ * @param raw - Untrusted reply payload from the renderer.
+ * @returns The parsed reply, or null when the payload is malformed.
+ */
+export function parseReviewBriefReply(raw: unknown): ReviewBriefReply | null {
+	const parsed = reviewBriefReplySchema.safeParse(raw);
 	return parsed.success ? parsed.data : null;
 }
 

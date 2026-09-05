@@ -128,6 +128,16 @@ const REVIEW_INVENTORY_READS = `- Review: read this workspace's diff (\`ensemblr
 const REVIEW_INVENTORY = `${REVIEW_INVENTORY_READS} Once you have fixed what a comment asked for, mark it resolved (\`ensemblr_resolve_diff_comments\`).`;
 
 /**
+ * The bullet for the app's own Review conversation, held only by a root that can
+ * open one. Named separately from {@link REVIEW_INVENTORY} — which is about
+ * reading the diff and leaving comments on it — because this opens a second
+ * agent, and the three facts that make it usable are all about that agent: it is
+ * not a child, it shares the checkout, and the fixes go back to it rather than
+ * being taken over by the caller.
+ */
+const ORCHESTRATOR_START_REVIEW = `- Get the change reviewed: \`ensemblr_start_review\` opens this workspace's Review conversation over your change — the same review the user's Review button runs, on the model they configured for it, deferring to whatever review skill the repository ships. Prefer it to reviewing your own work. What it opens is a root orchestrator rather than your child, so it can spawn its own readers over a wide diff, and \`ensemblr_wait_for_agents\` will not find it unless you name its \`agentSessionId\` in \`targets\`. It shares this worktree: leave the files alone while it works. Send its findings back to the SAME conversation with \`ensemblr_send_follow_up\` and have it fix them there rather than fixing them yourself — you stay the committer and you own the pull request. It takes one of the workspace's two co-tenancy slots, so a workspace already holding a peer or a running harness terminal refuses it.`;
+
+/**
  * The architecture diagram bullet, for a role that may both read and redraw.
  *
  * Three things it has to say, because each carries its own failure. Nothing
@@ -244,6 +254,7 @@ const NATIVE_ORCHESTRATOR_CONVERSATIONS = `- Conversations: name your own tab (\
 const orchestratorInventory = (
 	conversations: string,
 	architecture: string,
+	startReview: string,
 ): string =>
 	joinBullets(
 		conversations,
@@ -252,6 +263,7 @@ const orchestratorInventory = (
 		`- Focus & inspect: bring a tab/terminal or the Files/Changes/Checks panel forward (\`ensemblr_focus_tab\`/\`ensemblr_focus_dock_tab\`/\`ensemblr_focus_panel\`); list workspaces/tabs/terminals; read a conversation's status or last message; audit what a conversation actually did, tool calls included (\`ensemblr_read_conversation\`).`,
 		REVIEW_INVENTORY,
 		architecture,
+		startReview,
 		LINEAR_INVENTORY,
 		`- Board: move your workspace across the kanban board and read its status (\`ensemblr_set_workspace_status\`/\`ensemblr_get_workspace_status\`); \`ensemblr_list_workspaces\` shows every workspace's board status.`,
 		`- Reach the Concierge: \`ensemblr_message_concierge\` is your one channel upward — to the app-level agent that briefs workspace agents and supervises every workspace at once. Use it when something you found changes what the Concierge should do and it has no way to see it: you are blocked on a dependency outside this workspace, the brief it gave you was wrong, the work belongs in a different repository, or you have finished what it asked for. It does not read your workspace on its own initiative, so a discovery left only in your own tab reaches nobody. You pass no session id and should hold none — its conversation is cleared and restarted routinely, so the app resolves whichever one is live at the moment you send. The send does not block: carry on, and a reply, if one comes, arrives here as a follow-up. It is refused outright when no Concierge conversation is open, and capped per conversation, so say it once and in full rather than in installments.`,
@@ -396,7 +408,7 @@ const ORCHESTRATOR_ANSWER_LAST = `Your last message is your answer to the user, 
  * @returns The root orchestrator's playbook.
  */
 export const orchestratorAwareness = (architecture: boolean): string =>
-	`${preambleFor(orchestratorInventory(ORCHESTRATOR_CONVERSATIONS, architectureInventory(architecture)), ORCHESTRATOR_LEGIBILITY, LINEAR_FOLLOW_THROUGH)}
+	`${preambleFor(orchestratorInventory(ORCHESTRATOR_CONVERSATIONS, architectureInventory(architecture), ORCHESTRATOR_START_REVIEW), ORCHESTRATOR_LEGIBILITY, LINEAR_FOLLOW_THROUGH)}
 
 ${PEER_ORCHESTRATOR_GUIDANCE}
 
@@ -443,13 +455,13 @@ ${SHARED_ETIQUETTE}`;
  * @returns The natively-delegating root's playbook.
  */
 export const nativeOrchestratorAwareness = (architecture: boolean): string =>
-	`${preambleFor(orchestratorInventory(NATIVE_ORCHESTRATOR_CONVERSATIONS, architectureInventory(architecture)), ORCHESTRATOR_LEGIBILITY, LINEAR_FOLLOW_THROUGH)}
+	`${preambleFor(orchestratorInventory(NATIVE_ORCHESTRATOR_CONVERSATIONS, architectureInventory(architecture), ''), ORCHESTRATOR_LEGIBILITY, LINEAR_FOLLOW_THROUGH)}
 
 Do the work yourself by default — one agent in one thread is the right tool for almost every task. Delegate ONLY when the task genuinely splits into two or more independent, substantial workstreams that can run in parallel. Never spawn a helper to do a single unit of work you could do in one pass, and never delegate a task just because you can. Do not tell the user to click; drive the app yourself.
 
 ${ORCHESTRATOR_ANSWER_LAST}
 
-Delegation runs through YOUR OWN runtime's sub-agent tool in this mode, chosen by the user in Settings → Providers. Ensemblr's chat-tab spawn tools — \`ensemblr_start_conversation\`, \`ensemblr_spawn_chat_tab\`, \`ensemblr_send_follow_up\`, \`ensemblr_wait_for_agents\`, \`ensemblr_list_models\` — are absent from your list rather than merely discouraged, so do not go hunting for them and do not tell the user to spawn a tab by hand. Your children run inside this conversation and report back to you directly; the app never sees them as tabs of their own.
+Delegation runs through YOUR OWN runtime's sub-agent tool in this mode, chosen by the user in Settings → Providers. Ensemblr's chat-tab spawn tools — \`ensemblr_start_conversation\`, \`ensemblr_spawn_chat_tab\`, \`ensemblr_send_follow_up\`, \`ensemblr_wait_for_agents\`, \`ensemblr_list_models\` — are absent from your list rather than merely discouraged, so do not go hunting for them and do not tell the user to spawn a tab by hand. Your children run inside this conversation and report back to you directly; the app never sees them as tabs of their own. \`ensemblr_start_review\` is absent too, for a different reason: the review it opens is a conversation you would have to wait on and steer, and the two tools for that are the ones above — so when a change wants a second reader, spawn one through your own mechanism and brief it to review the branch diff.
 
 Everything else about delegating still holds, because it is a property of the work rather than of the mechanism:
 

@@ -43,6 +43,10 @@ const PLAN_MODE_BLOCKED_OPS: ReadonlyMap<AgentControlOp, string> = new Map([
 		'`ensemblr_write_terminal` runs arbitrary commands in a shell',
 	],
 	[
+		'startReview',
+		'`ensemblr_start_review` opens the app’s own Review chat over this workspace — a second root orchestrator on the same checkout, reviewing a change that does not exist yet while `write` and `edit` are blocked. Put the review in the plan and open it once the plan is approved',
+	],
+	[
 		'resolveDiffComments',
 		'`ensemblr_resolve_diff_comments` marks a review finding as fixed, and nothing has been fixed while `write` and `edit` are blocked — a comment resolved from here tells the user a change landed that does not exist',
 	],

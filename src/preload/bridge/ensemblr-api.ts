@@ -30,6 +30,7 @@ import type {
 	FocusChatBroadcast,
 } from '../../shared/ipc/contracts/notifications';
 import type { WindowMaximizedBroadcast } from '../../shared/ipc/contracts/repository-navigation';
+import type { ReviewBriefRequestedBroadcast } from '../../shared/ipc/contracts/review-launch';
 import type {
 	TerminalLifecycleBroadcast,
 	TerminalOutputBroadcast,
@@ -55,6 +56,7 @@ type InvokeKey = Exclude<
 	| 'onMenuBarChanged'
 	| 'onAskUserQuestion'
 	| 'onAskUserQuestionClosed'
+	| 'onReviewBriefRequested'
 	| 'onAgentToolApprovalRequested'
 	| 'onAgentToolApprovalClosed'
 	| 'onExitPlanMode'
@@ -77,6 +79,7 @@ type InvokeKey = Exclude<
  */
 const CHANNEL_OVERRIDES = {
 	answerUserQuestion: IPC_CHANNELS.agentControlAnswerUserQuestion,
+	replyReviewBrief: IPC_CHANNELS.agentControlReviewBriefReply,
 	prepareCloneGithubRepository: IPC_CHANNELS.cloneGithubRepositoryPrepare,
 	reportActiveChat: IPC_CHANNELS.activeChatContext,
 	reportBoardStatus: IPC_CHANNELS.agentControlReportBoardStatus,
@@ -315,6 +318,12 @@ export function createEnsemblrApi(): EnsemblrApi {
 				listener,
 			),
 		answerUserQuestion: (reply) => invoke('answerUserQuestion', reply),
+		onReviewBriefRequested: (listener) =>
+			subscribe<ReviewBriefRequestedBroadcast>(
+				IPC_CHANNELS.agentControlReviewBriefRequested,
+				listener,
+			),
+		replyReviewBrief: (reply) => invoke('replyReviewBrief', reply),
 		onAgentToolApprovalRequested: (listener) =>
 			subscribe<ToolApprovalRequestedBroadcast>(
 				IPC_CHANNELS.agentToolApprovalRequested,

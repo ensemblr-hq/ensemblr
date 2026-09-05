@@ -91,6 +91,7 @@ import {
 	type MemoryPort,
 	originHasChatTab,
 	type PlanModePort,
+	type ReviewLaunchPort,
 	type SessionNamingPort,
 	type StartTerminalOutcome,
 	type TabPort,
@@ -209,6 +210,7 @@ export interface PortAdapterDeps {
 	ask: AskPort;
 	planMode: PlanModePort;
 	afkMode: AfkModePort;
+	reviewLaunch: ReviewLaunchPort;
 }
 
 const IDLE_STATUSES: ReadonlySet<string> = new Set([
@@ -1371,6 +1373,7 @@ export function createAgentControlPorts(
 		},
 		confirm: deps.confirm,
 		ask: deps.ask,
+		reviewLaunch: deps.reviewLaunch,
 		planMode: deps.planMode,
 		afkMode: deps.afkMode,
 		...(deps.conciergePorts ?? {}),
