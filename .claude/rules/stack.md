@@ -110,9 +110,11 @@ stable.
   `target`/`lib` ES2022, `allowImportingTsExtensions: true`. Path alias `@/*` → `./src/*`.
 - **Vite 8** — four configs: `vite.main.config.mts`, `vite.preload.config.mts`,
   `vite.renderer.config.mts`, `vite.playground.config.mts`.
-- Three tsconfig projects, all checked by `npm run typecheck`: app
+- Four tsconfig projects, all checked by `npm run typecheck`: app
   (`tsconfig.json`), scripts (`tsconfig.scripts.json`), tests
-  (`tsconfig.tests.json`).
+  (`tsconfig.tests.json`), demo (`tsconfig.demo.json`). They each `include`
+  `src`, so `scripts/typecheck.mjs` runs them concurrently rather than chaining
+  four passes over the same program.
 
 **Two packages are deliberately `external` and must not be bundled**
 (`vite.main.config.mts`):

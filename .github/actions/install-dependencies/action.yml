@@ -1,0 +1,21 @@
+name: Install dependencies
+description: >-
+  Select the Node version .nvmrc pins and install the locked dependency tree.
+  Every check job installs identically, so the steps live here rather than being
+  repeated four times — a change to how CI installs is then one edit, not four.
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@v7
+      with:
+        node-version-file: .nvmrc
+        cache: npm
+
+    # `--prefer-offline` reads the tarballs setup-node just restored instead of
+    # revalidating each one against the registry; `--no-audit` and `--no-fund`
+    # drop two network round trips whose output nothing here reads. None of them
+    # changes which versions are installed — `npm ci` still installs exactly the
+    # lockfile.
+    - run: npm ci --prefer-offline --no-audit --no-fund
+      shell: bash

@@ -98,14 +98,9 @@ jobs:
         with:
           ref: ${{ needs.gate.outputs.sha }}
 
-      - uses: actions/setup-node@v7
-        with:
-          node-version-file: .nvmrc
-          cache: npm
-
       # Before the version stamp: `npm ci` requires package.json and the lockfile
       # to agree, and the stamp deliberately breaks that agreement.
-      - run: npm ci
+      - uses: ./.github/actions/install-dependencies
 
       - name: Stamp the nightly version
         run: npm pkg set version="$NIGHTLY_VERSION"
@@ -231,11 +226,6 @@ jobs:
         with:
           ref: ${{ needs.gate.outputs.sha }}
 
-      - uses: actions/setup-node@v7
-        with:
-          node-version-file: .nvmrc
-          cache: npm
-
       # `@reforged/maker-appimage` declares mksquashfs as a required external
       # binary and refuses to run without it; ubuntu-latest does not ship it.
       - name: Install mksquashfs
@@ -246,7 +236,7 @@ jobs:
 
       # Before the version stamp, for the same reason as the macOS job: `npm ci`
       # requires package.json and the lockfile to agree.
-      - run: npm ci
+      - uses: ./.github/actions/install-dependencies
 
       - name: Stamp the nightly version
         run: npm pkg set version="$NIGHTLY_VERSION"

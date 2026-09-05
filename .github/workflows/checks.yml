@@ -17,64 +17,72 @@ on:
 permissions:
   contents: read
 
+# A pull request groups by its number, so pushing a fixup cancels the run it
+# just superseded. Three pushes in a minute used to mean three full runs racing
+# for the same runners, and the third one waiting behind the two nobody would
+# read. Everything else groups by commit — which is unique — so a push to master
+# and a release's `workflow_call` never queue behind an unrelated run.
+concurrency:
+  group: checks-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
+  # Lint, typecheck and test used to be three steps of one job, run twice over a
+  # `[macos, ubuntu]` matrix — so the slowest leg was the sum of all three, and
+  # Biome and tsc ran a second time on a platform that cannot make them disagree.
+  # They are separate jobs now: the wall clock is the slowest single job rather
+  # than the sum, and only the suite that actually reads `process.platform` pays
+  # for a second operating system.
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/install-dependencies
+      - name: Biome, Tailwind scale, i18n lint, hardcoded strings
+        run: npm run check
+
+  # `npm run typecheck` runs the four tsconfig projects concurrently
+  # (scripts/typecheck.mjs). They each `include` `src`, so chaining them with
+  # `&&` type-checked the bulk of the program four times in a row.
+  typecheck:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/install-dependencies
+      - name: Type check
+        run: npm run typecheck
+
   # Both platforms Ensemblr ships for. The keymap suites resolve `mod` to ⌘ on
   # darwin and Ctrl elsewhere and assert whichever the runner is, so the Linux
   # leg is what proves a darwin-only assumption fails here rather than in a
   # user's AppImage.
   #
-  # Named `verify-matrix`, not `verify`: a matrix reports one status check per
-  # leg — `verify (macos-latest)` — so keeping the name here would retire the
-  # `verify` context that branch protection on master requires, and every PR
-  # would block on a check that is never reported again. The aggregate below
-  # keeps reporting it.
-  verify-matrix:
+  # Sharded in two because the suite is ~570 files whose cost is dominated by
+  # per-file module import rather than by the assertions, which halves cleanly
+  # across runners. Raising the shard count further hits diminishing returns:
+  # `npm ci` is a fixed ~25s (~40s on macOS) that every shard pays.
+  test:
     strategy:
       fail-fast: false
       matrix:
         os: [macos-latest, ubuntu-latest]
+        shard: [1, 2]
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
-
-      - uses: actions/setup-node@v7
-        with:
-          node-version-file: .nvmrc
-          cache: npm
-
-      - run: npm ci
-
-      - name: Biome, Tailwind scale, i18n lint, hardcoded strings
-        run: npm run check
-
-      - name: Type check
-        run: npm run typecheck
-
-      - name: Vitest
-        run: npm run test
-
-  # One status check named `verify`, whatever the matrix grows to. The branch
-  # ruleset lives in repository settings rather than in this tree, so a required
-  # context can only be kept by keeping the name.
-  verify:
-    needs: verify-matrix
-    if: always()
-    runs-on: ubuntu-latest
-    steps:
-      # A job whose dependency failed is *skipped*, and a skipped required check
-      # reports neutral rather than failing — which would make this aggregate
-      # green on a red matrix. Read the result explicitly instead.
-      - name: Fail unless every matrix leg passed
-        if: needs.verify-matrix.result != 'success'
-        run: |
-          echo "::error::verify-matrix reported '${{ needs.verify-matrix.result }}'."
-          exit 1
+      - uses: ./.github/actions/install-dependencies
+      - name: Vitest (shard ${{ matrix.shard }} of 2)
+        run: npm run test -- --shard=${{ matrix.shard }}/2
 
   scan:
     # `inputs` is null on push/pull_request, so those keep running the scan; only
     # a workflow_call passing false skips it.
     if: ${{ inputs.run_scan == null || inputs.run_scan }}
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     # Scoped to this job rather than the workflow: a called workflow cannot hold
     # permissions its caller lacks, and release.yml has no use for these. It
     # still has to grant them on the calling job, because a called workflow's
@@ -102,3 +110,24 @@ jobs:
         with:
           scope: changed
           blocking: error
+
+  # One status check named `verify`, whatever the jobs above grow to. The branch
+  # ruleset lives in repository settings rather than in this tree, so a required
+  # context can only be kept by keeping the name — renaming or dropping this job
+  # would leave every PR blocked on a check that is never reported again.
+  verify:
+    needs: [lint, typecheck, test]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      # A job whose dependency failed is *skipped*, and a skipped required check
+      # reports neutral rather than failing — which would make this aggregate
+      # green on a red matrix. Read each result explicitly instead.
+      - name: Fail unless every check passed
+        if: >-
+          needs.lint.result != 'success' || needs.typecheck.result != 'success'
+          || needs.test.result != 'success'
+        run: |
+          echo "::error::lint=${{ needs.lint.result }} typecheck=${{ needs.typecheck.result }} test=${{ needs.test.result }}"
+          exit 1
