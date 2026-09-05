@@ -122,7 +122,7 @@ export function createGithubService({
 	databaseService,
 	localCommandService,
 	now = () => new Date(),
-	readCoAuthorEnabled = () => false,
+	readCoAuthorEnabled = () => true,
 }: {
 	databaseService: EnsemblrDatabaseService;
 	localCommandService: LocalCommandService;
@@ -130,7 +130,8 @@ export function createGithubService({
 	/**
 	 * Whether to credit Ensemblr as a co-author on commits this service makes.
 	 * Read here rather than taken from the request so no caller can forget it,
-	 * and read per commit so a toggle lands on the next one.
+	 * and read per commit so a toggle lands on the next one. Omitted, it reads as
+	 * on, matching the shipped default.
 	 */
 	readCoAuthorEnabled?: () => boolean;
 }): GithubService {

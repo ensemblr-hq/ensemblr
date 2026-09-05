@@ -154,8 +154,9 @@ export const archiveOnMergeAtom = settingAtom('git', 'archiveAfterMerge');
 export const setUpstreamOnPushAtom = settingAtom('git', 'setUpstreamOnPush');
 /**
  * Whether commits made in an Ensemblr workspace credit Ensemblr as a co-author.
- * Off by default: it writes a line into the user's git history, so it is theirs
- * to opt into rather than something to discover after the fact.
+ * On by default and opted out of here: the trailer is a credit line beside the
+ * user's own authorship rather than a claim on it, and one switch removes it
+ * from every commit that follows.
  */
 export const coAuthorEnsemblrAtom = settingAtom('git', 'coAuthorEnsemblr');
 

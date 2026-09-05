@@ -56,9 +56,9 @@ interface AgentControlIntegrationDeps {
 	 */
 	readArchitectureDiagramEnabled?: () => boolean;
 	/**
-	 * Whether the user opted into crediting Ensemblr as a commit co-author. Off,
-	 * the harness playbook never mentions the trailer. Omitted, the credit reads
-	 * as off, which is also its shipped default.
+	 * Whether Ensemblr is credited as a commit co-author, which it is until the
+	 * user turns it off. Off, the harness playbook never mentions the trailer.
+	 * Omitted, the credit reads as on, which is also its shipped default.
 	 */
 	readCoAuthorEnabled?: () => boolean;
 	/**
@@ -242,7 +242,7 @@ export function createAgentControlIntegration({
 	isSpawnedSubAgent = () => false,
 	originRegistry,
 	readArchitectureDiagramEnabled = () => false,
-	readCoAuthorEnabled = () => false,
+	readCoAuthorEnabled = () => true,
 	readLinkedIssue = () => null,
 	readSkillPluginDirectories = () => [],
 	resolveConciergeCwd = () => null,
