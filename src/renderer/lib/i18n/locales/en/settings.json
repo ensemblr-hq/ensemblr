@@ -751,6 +751,7 @@
 			"composer-send-now": "Send now, skipping the follow-up queue",
 			"composer-submit": "Send message",
 			"composer-submit-with-mod": "Send message",
+			"composer-toggle-afk-mode": "Toggle AFK mode",
 			"composer-toggle-dictation": "Start or stop dictation",
 			"composer-toggle-model-picker": "Toggle model picker",
 			"composer-toggle-plan-mode": "Toggle plan mode",

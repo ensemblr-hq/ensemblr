@@ -64,6 +64,22 @@ export const chatPlanModeAtomFamily = atomFamily((chatTabId: string) =>
 );
 
 /**
+ * Whether the user has stepped away from a chat, keyed by chat-tab id. Plan
+ * Mode's opposite number and stored the same way, for the same reasons: it is
+ * the durable record of what the user chose, it rides every
+ * `openAgentSession`/`submitAgentPrompt` call, and `null` means "never decided"
+ * rather than "off" so a conversation that inherited AFK from an unattended
+ * parent is not cleared by the user's first message into it.
+ *
+ * The two are mutually exclusive — planning exists to stop and ask, which is the
+ * one thing AFK rules out — and the composer controller clears one when the
+ * other is switched on.
+ */
+export const chatAfkModeAtomFamily = atomFamily((chatTabId: string) =>
+	atomWithStorage<boolean | null>(KEY(`chat_afk_mode_${chatTabId}`), null),
+);
+
+/**
  * Directories outside the workspace this chat has been given access to, keyed by
  * chat-tab id. Like {@link chatPlanModeAtomFamily} this is the durable record of
  * the user's choice and rides every `openAgentSession` call; the main process
@@ -111,6 +127,7 @@ export function forgetChatOverrides(chatTabId: string): void {
 	chatModelOverrideAtomFamily.remove(chatTabId);
 	chatThinkingOverrideAtomFamily.remove(chatTabId);
 	chatPlanModeAtomFamily.remove(chatTabId);
+	chatAfkModeAtomFamily.remove(chatTabId);
 	chatLinkedDirectoriesAtomFamily.remove(chatTabId);
 	chatAppliedLinkedDirectoriesAtomFamily.remove(chatTabId);
 	const storage =
@@ -123,6 +140,7 @@ export function forgetChatOverrides(chatTabId: string): void {
 	storage.removeItem(KEY(`chat_model_${chatTabId}`));
 	storage.removeItem(KEY(`chat_thinking_${chatTabId}`));
 	storage.removeItem(KEY(`chat_plan_mode_${chatTabId}`));
+	storage.removeItem(KEY(`chat_afk_mode_${chatTabId}`));
 	storage.removeItem(KEY(`chat_linked_dirs_${chatTabId}`));
 	storage.removeItem(KEY(`chat_applied_linked_dirs_${chatTabId}`));
 }

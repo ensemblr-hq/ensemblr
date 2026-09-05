@@ -66,6 +66,11 @@ interface OpenRequest {
 	 */
 	planMode?: boolean;
 	/**
+	 * Whether the chat's AFK toggle is on. Absent means the caller states no
+	 * opinion, and the AFK registry decides for a session it already knows.
+	 */
+	afkMode?: boolean;
+	/**
 	 * Agent runtime the requested model needs. Pins a new session; on a resume
 	 * the row already decided, so this is checked against it and a mismatch is
 	 * rejected rather than coerced. Absent states no opinion.
@@ -87,6 +92,12 @@ interface SessionOpenerOptions {
 	 * ever answers for a session id that already exists.
 	 */
 	isPlanModeActive: (agentSessionId: string) => boolean;
+	/**
+	 * Reads whether the user is away from a session, for a resume whose caller
+	 * states no opinion. Backed by the in-memory AFK registry, so it only ever
+	 * answers for a session id that already exists.
+	 */
+	isAfkModeActive: (agentSessionId: string) => boolean;
 	now: () => Date;
 	agentClient: AgentClient;
 	/** Fires the derived-title attempt for a freshly opened session. */
@@ -155,6 +166,7 @@ export function createSessionOpener({
 	activeSessions,
 	eventSink,
 	isPlanModeActive,
+	isAfkModeActive,
 	now,
 	agentClient,
 	isSpawnedSubAgent,
@@ -271,6 +283,7 @@ export function createSessionOpener({
 			agentClient,
 			permissionMode: resolvePermissionMode(),
 			planMode: request.planMode ?? isPlanModeActive(row.id),
+			afkMode: request.afkMode ?? isAfkModeActive(row.id),
 			// A chat is pinned to the provider its session was opened on; a resume
 			// never re-decides it.
 			provider: row.provider,
@@ -378,6 +391,7 @@ export function createSessionOpener({
 			agentClient,
 			permissionMode: resolvePermissionMode(),
 			planMode: request.planMode ?? isPlanModeActive(session.id),
+			afkMode: request.afkMode ?? isAfkModeActive(session.id),
 			provider,
 			rowForErrorPatch: session,
 			sessionInput: {
@@ -533,6 +547,7 @@ async function createRuntimeSessionOrFail({
 	agentClient,
 	permissionMode,
 	planMode,
+	afkMode,
 	provider,
 	rowForErrorPatch,
 	sessionInput,
@@ -545,6 +560,7 @@ async function createRuntimeSessionOrFail({
 	agentClient: AgentClient;
 	permissionMode: PermissionMode;
 	planMode: boolean;
+	afkMode: boolean;
 	provider: AgentProviderId;
 	rowForErrorPatch: AgentSessionRow;
 	sessionInput: {
@@ -571,6 +587,7 @@ async function createRuntimeSessionOrFail({
 			modelOverride,
 			permissionMode,
 			planMode,
+			afkMode,
 			resolveTurnPreamble: control.resolveTurnPreamble,
 			resumeRuntimeSession: sessionInput.resumeRuntimeSession,
 			runtimeSessionId: sessionInput.runtimeSessionId,

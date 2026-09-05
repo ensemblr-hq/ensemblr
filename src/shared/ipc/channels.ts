@@ -32,6 +32,7 @@ export const IPC_CHANNELS = {
 	agentControlAnswerUserQuestion: 'ensemblr:agent-control-answer-user-question',
 	agentControlExitPlanMode: 'ensemblr:agent-control-exit-plan-mode',
 	agentControlPlanModeChanged: 'ensemblr:agent-control-plan-mode-changed',
+	agentControlAfkModeChanged: 'ensemblr:agent-control-afk-mode-changed',
 	setAgentPlanMode: 'ensemblr:set-agent-plan-mode',
 	agentSessionEvent: 'ensemblr:agent-session-event',
 	agentToolApprovalAnswered: 'ensemblr:agent-tool-approval-answered',

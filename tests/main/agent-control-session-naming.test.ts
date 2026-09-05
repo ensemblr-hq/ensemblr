@@ -95,6 +95,11 @@ function setup(
 			isActive: () => overrides.planMode ?? false,
 			releaseSession: vi.fn(),
 		},
+		afkMode: {
+			activateForSpawn: vi.fn(),
+			isActive: vi.fn(() => false),
+			releaseSession: vi.fn(),
+		},
 		sessionNaming: {
 			readBrief: overrides.readBrief ?? vi.fn().mockResolvedValue(idleBrief),
 			setBranchName: overrides.setBranchName ?? vi.fn(),

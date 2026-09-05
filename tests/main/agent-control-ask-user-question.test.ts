@@ -58,6 +58,11 @@ const makeUnusedPorts = (): Omit<AgentControlPorts, 'ask'> =>
 			isActive: vi.fn().mockReturnValue(false),
 			releaseSession: vi.fn(),
 		},
+		afkMode: {
+			activateForSpawn: vi.fn(),
+			isActive: vi.fn(() => false),
+			releaseSession: vi.fn(),
+		},
 		tabs: {},
 		terminals: {},
 		workspaces: {},

@@ -153,6 +153,14 @@
 		var(--ensemblr-if-dark, oklch(0.76 0.18 151));
 	--ensemblr-status-warning: var(--ensemblr-if-light, oklch(0.64 0.155 73))
 		var(--ensemblr-if-dark, oklch(0.81 0.13 73));
+	/*
+	 * The AFK indigo. Palette-independent for the reason the merged-PR purple is,
+	 * and a hue no other status owns: the composer's two turn-mode chips sit side
+	 * by side and are mutually exclusive, so AFK must not borrow the accent Plan
+	 * Mode tints with, nor the amber the thinking chip already claims.
+	 */
+	--ensemblr-status-away: var(--ensemblr-if-light, oklch(0.52 0.16 277))
+		var(--ensemblr-if-dark, oklch(0.76 0.15 277));
 	--ensemblr-status-danger-on-dark: oklch(0.79 0.15 28);
 	--ensemblr-status-danger: var(--ensemblr-if-light, oklch(0.58 0.19 28))
 		var(--ensemblr-if-dark, var(--ensemblr-status-danger-on-dark));
@@ -514,6 +522,7 @@
 	--color-status-ok: var(--ensemblr-status-ok);
 	--color-status-warning: var(--ensemblr-status-warning);
 	--color-status-danger: var(--ensemblr-status-danger);
+	--color-status-away: var(--ensemblr-status-away);
 	/*
 	 * Borrows the merged-PR purple rather than declaring an
 	 * `--ensemblr-status-merged` beside the three above: the sidebar chip and the

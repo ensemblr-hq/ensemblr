@@ -52,6 +52,8 @@ const composerStateFor = (
 		lockedProvider: null,
 		modelId: 'gpt-5.5',
 		onModelChange: () => undefined,
+		afkMode: false,
+		onAfkModeChange: () => undefined,
 		onPlanModeChange: () => undefined,
 		onStop: () => undefined,
 		onSubmit: () => Promise.resolve({}),

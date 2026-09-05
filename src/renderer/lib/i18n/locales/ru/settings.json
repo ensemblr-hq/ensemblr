@@ -767,6 +767,7 @@
 			"composer-send-now": "Отправить сразу, минуя очередь дополнений",
 			"composer-submit": "Отправить сообщение",
 			"composer-submit-with-mod": "Отправить сообщение",
+			"composer-toggle-afk-mode": "Переключить режим AFK",
 			"composer-toggle-dictation": "Начать или остановить диктовку",
 			"composer-toggle-model-picker": "Переключить выбор модели",
 			"composer-toggle-plan-mode": "Переключить режим плана",

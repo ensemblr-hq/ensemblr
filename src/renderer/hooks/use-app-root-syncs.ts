@@ -2,6 +2,7 @@ import { useConciergeActivityWatch } from '@/renderer/hooks/concierge/use-concie
 import { useConfigReloadSync } from '@/renderer/hooks/use-config-reload-sync';
 import { useModalInertBodyGuard } from '@/renderer/hooks/use-modal-inert-body-guard';
 import { useNotificationSoundSync } from '@/renderer/hooks/use-notification-sound-sync';
+import { useAfkModeSync } from '@/renderer/state/afk-mode';
 import { useAskUserQuestionSync } from '@/renderer/state/ask-user-question';
 import { usePlanModeSync, usePlanReviewSync } from '@/renderer/state/plan-mode';
 import {
@@ -38,6 +39,7 @@ export function useAppRootSyncs(): void {
 	useToolApprovalSync();
 	usePlanReviewSync();
 	usePlanModeSync();
+	useAfkModeSync();
 	useUpdateSync();
 	useModalInertBodyGuard();
 }

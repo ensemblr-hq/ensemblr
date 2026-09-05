@@ -39,6 +39,7 @@ const linkedDirectoriesSchema = z
 
 /** {@link import('../../../shared/ipc').OpenAgentSessionRequest}. */
 export const openAgentSessionRequestSchema = z.object({
+	afkMode: z.boolean().optional(),
 	chatTabId: optionalNullableString,
 	initialPrompt: optionalNullableString,
 	label: z.string().optional(),
@@ -53,6 +54,7 @@ export const openAgentSessionRequestSchema = z.object({
 
 /** {@link import('../../../shared/ipc').SubmitAgentPromptRequest}. */
 export const submitAgentPromptRequestSchema = z.object({
+	afkMode: z.boolean().optional(),
 	model: optionalNullableString,
 	planMode: z.boolean().optional(),
 	prompt: z.string(),

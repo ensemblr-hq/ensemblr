@@ -120,6 +120,7 @@ export const MENU_COMMANDS = {
 	'composer.focus': { shortcutId: 'composer.focus' },
 	'composer.submit': { shortcutId: 'composer.submitWithMod' },
 	'composer.togglePlanMode': { shortcutId: 'composer.togglePlanMode' },
+	'composer.toggleAfkMode': { shortcutId: 'composer.toggleAfkMode' },
 	'composer.cycleThinking': { shortcutId: 'composer.cycleThinking' },
 	'composer.toggleModelPicker': { shortcutId: 'composer.toggleModelPicker' },
 	'tab.next': { ownsAccelerator: true, shortcutId: 'tab.next' },

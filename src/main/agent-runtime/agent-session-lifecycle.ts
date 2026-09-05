@@ -123,6 +123,8 @@ interface AgentSessionLifecycleOptions {
 	eventSink: AgentSessionEventSink | undefined;
 	/** Reads a session's Plan Mode state off the plan-mode registry. */
 	isPlanModeActive: (agentSessionId: string) => boolean;
+	/** Reads a session's AFK state off the AFK registry. */
+	isAfkModeActive: (agentSessionId: string) => boolean;
 	now: () => Date;
 	/**
 	 * Announces a stop the user asked for, before the abort settles the turn to
@@ -213,6 +215,7 @@ export function createAgentSessionLifecycle({
 	captureCheckpoint,
 	eventSink,
 	isPlanModeActive,
+	isAfkModeActive,
 	now,
 	onSessionAborted,
 	onSummaryPersisted,
@@ -252,6 +255,7 @@ export function createAgentSessionLifecycle({
 		activeSessions,
 		eventSink,
 		isPlanModeActive,
+		isAfkModeActive,
 		now,
 		agentClient,
 		isSpawnedSubAgent,
@@ -345,6 +349,7 @@ export function createAgentSessionLifecycle({
 		const acknowledgement = await active.agentRuntimeSession.submit({
 			modelOverride: request.model ?? undefined,
 			planMode: request.planMode ?? isPlanModeActive(request.sessionId),
+			afkMode: request.afkMode ?? isAfkModeActive(request.sessionId),
 			prompt: request.prompt,
 			thinkingLevel: request.thinkingLevel ?? undefined,
 		});

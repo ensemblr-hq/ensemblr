@@ -17,7 +17,8 @@ import type { ComposerSubmitOutcome } from '@/renderer/types/workbench';
 import type { PiStreamingBehavior } from '@/shared/ipc/contracts/agent-session';
 
 /**
- * Model, thinking level, and Plan Mode one turn is sent with, snapshotted when
+ * Model, thinking level, and the two turn modes one turn is sent with,
+ * snapshotted when
  * the user fired it. Both requests of a first turn (open, then submit) carry the
  * same snapshot, so a tab switch while the runtime spawns cannot re-stamp the
  * second request with the newly-active tab's picks.
@@ -25,6 +26,7 @@ import type { PiStreamingBehavior } from '@/shared/ipc/contracts/agent-session';
 interface AgentTurnOptions {
 	model: string | null;
 	planMode?: boolean;
+	afkMode?: boolean;
 	thinkingLevel: string | null;
 }
 
@@ -56,6 +58,7 @@ export function useAgentTurns({
 	modelId,
 	persistedActiveSession,
 	planModeRequest,
+	afkModeRequest,
 	thinkingLevel,
 	workspaceCwd,
 	workspaceId,
@@ -73,6 +76,8 @@ export function useAgentTurns({
 	modelId: string | null;
 	persistedActiveSession: PersistedSession | undefined;
 	planModeRequest: () => { planMode?: boolean };
+	/** Reads the chat's AFK toggle at call time, matching `planModeRequest`. */
+	afkModeRequest: () => { afkMode?: boolean };
 	thinkingLevel: string | null;
 	workspaceCwd: string;
 	workspaceId: string;
@@ -235,6 +240,7 @@ export function useAgentTurns({
 			const turn: AgentTurnOptions = {
 				model: modelId,
 				...planModeRequest(),
+				...afkModeRequest(),
 				thinkingLevel,
 			};
 
@@ -287,6 +293,7 @@ export function useAgentTurns({
 			modelId,
 			optimistic,
 			planModeRequest,
+			afkModeRequest,
 			submitMutation,
 			thinkingLevel,
 		],

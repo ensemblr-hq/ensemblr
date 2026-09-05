@@ -219,6 +219,8 @@ function ChatHarness({
 		lockedProvider: agentComposer.lockedProvider,
 		modelId: agentComposer.modelId,
 		onModelChange: agentComposer.onModelChange,
+		afkMode: false,
+		onAfkModeChange: () => undefined,
 		onPlanModeChange: agentComposer.onPlanModeChange,
 		onStop: agentComposer.onStop,
 		onSubmit: agentComposer.onSubmit,
