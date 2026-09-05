@@ -329,7 +329,9 @@ Four gates, in order:
    nothing yet for two agents to write.
 3. **Two orchestrators per workspace**, the caller included, counted as live
    control origins in the workspace minus the ones carrying the durable
-   sub-agent marker. This is also what bounds the recursion: a peer is a root and
+   sub-agent marker. A terminal harness counts: its origin is registered against
+   the workspace and carries no chat tab to mark, and it is an unrestricted
+   writer on the same checkout, which is what the cap is about. This is also what bounds the recursion: a peer is a root and
    looks like one to every gate, so "peers may not open peers" is not a rule the
    app could check — a second peer is refused because the workspace is full.
 4. **The user confirms it**, through `ConfirmPort`, whatever the permission mode.

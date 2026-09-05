@@ -1010,7 +1010,8 @@ export function createAgentControlService({
 		const approved = await ports.confirm.confirm({
 			origin,
 			signal,
-			summary: `Open a second orchestrator in this workspace? It shares the worktree and git index with this conversation.`,
+			summary:
+				'Open a second orchestrator in this workspace? It shares the worktree and git index with this conversation.',
 		});
 		if (signal?.aborted) {
 			return fail('timeout', ABANDONED_CONFIRMATION);
