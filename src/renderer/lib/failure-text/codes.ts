@@ -741,6 +741,16 @@ export const APP_FAILURE_TEXT: Record<
 			'errors:failure.repository-delete-failed',
 			'The repository could not be deleted.',
 		),
+	'repository-folder-delete-failed': (t) =>
+		t(
+			'errors:failure.repository-folder-delete-failed',
+			'The repository folder could not be removed from disk.',
+		),
+	'repository-folder-external': (t) =>
+		t(
+			'errors:failure.repository-folder-external',
+			'The repository folder was left on disk because it lives outside the folder Ensemblr manages.',
+		),
 	'repository-id-required': (t) =>
 		t('errors:failure.repository-id-required', 'A repository is required.'),
 	'repository-insert-failed': (t) =>

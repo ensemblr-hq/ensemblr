@@ -73,12 +73,16 @@ export interface LocalRepositorySelectionResult {
 
 /**
  * Destructive removal of a repository and all its workspaces. Wipes worktrees,
- * drops branches, deletes rows, and writes the `.ensemblr-archived` sentinel
- * so the shared-root reconciler skips the still-on-disk folder on next launch.
+ * drops branches, deletes rows, and clears the repository's leftover workspace
+ * directory. The repository folder itself is removed only when the request asks
+ * for it; otherwise it stays on disk tagged with the `.ensemblr-archived`
+ * sentinel so the shared-root reconciler skips it on next launch.
  */
 export type DeleteRepositoryDiagnosticCode =
 	| 'database-unavailable'
 	| 'repository-delete-failed'
+	| 'repository-folder-delete-failed'
+	| 'repository-folder-external'
 	| 'repository-id-required'
 	| 'repository-not-found'
 	| 'workspace-cleanup-failed';
@@ -97,6 +101,13 @@ export interface DeleteRepositoryDiagnostic {
 
 /** Request to permanently delete a repository and its workspaces. */
 export interface DeleteRepositoryRequest {
+	/**
+	 * Also remove the repository folder from disk instead of leaving it behind
+	 * tagged with the archived sentinel. Honoured only for a folder inside the
+	 * managed `repos/` root; anything else is refused with a
+	 * `repository-folder-external` diagnostic.
+	 */
+	deleteFolder?: boolean;
 	repositoryId: string;
 }
 
@@ -106,6 +117,8 @@ export type DeleteRepositoryStatus = 'failure' | 'success';
 /** Wire snapshot of a repository after it has been deleted. */
 export interface DeletedRepositorySnapshot {
 	deletedWorkspaceIds: string[];
+	/** True when the repository folder itself was removed from disk. */
+	folderDeleted: boolean;
 	id: string;
 	name: string;
 	path: string;

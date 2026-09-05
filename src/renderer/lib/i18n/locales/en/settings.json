@@ -562,7 +562,7 @@
 			"search-placeholder": "Search or enter a ref…"
 		},
 		"delete": {
-			"row-description": "Drops this repository from Ensemblr and deletes every workspace worktree. The repository folder stays on disk.",
+			"row-description": "Drops this repository from Ensemblr and deletes every workspace worktree. You choose whether the repository folder itself is removed from disk.",
 			"row-label": "Delete repository",
 			"trigger": "Delete repository"
 		},

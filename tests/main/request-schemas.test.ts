@@ -7,6 +7,7 @@ import {
 	launchAgentHarnessRequestSchema,
 	openChatTabRequestSchema,
 	parseCreateWorkspaceRequest,
+	parseDeleteRepositoryRequest,
 	parseGithubRepositoryListRequest,
 	parseUpdateRepositorySettingsRequest,
 	refreshAgentPlanUsageRequestSchema,
@@ -346,4 +347,25 @@ test('refreshAgentPlanUsageRequestSchema requires a non-empty session id', () =>
 		refreshAgentPlanUsageRequestSchema.parse({ sessionId: '' }),
 	).toThrow();
 	expect(() => refreshAgentPlanUsageRequestSchema.parse({})).toThrow();
+});
+
+test('parseDeleteRepositoryRequest carries the folder flag through', () => {
+	expect(
+		parseDeleteRepositoryRequest({
+			deleteFolder: true,
+			repositoryId: 'repo-1',
+		}),
+	).toEqual({ deleteFolder: true, repositoryId: 'repo-1' });
+});
+
+test('parseDeleteRepositoryRequest omits the folder flag when absent', () => {
+	expect(parseDeleteRepositoryRequest({ repositoryId: 'repo-1' })).toEqual({
+		repositoryId: 'repo-1',
+	});
+});
+
+test('parseDeleteRepositoryRequest drops the folder flag on a malformed payload', () => {
+	expect(parseDeleteRepositoryRequest({ deleteFolder: true })).toEqual({
+		repositoryId: '',
+	});
 });

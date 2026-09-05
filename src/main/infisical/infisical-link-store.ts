@@ -230,6 +230,30 @@ function toLinkRow(row: unknown): InfisicalLinkRow | null {
 }
 
 /**
+ * Drops a repository's link and discovery-dismissal rows. Neither table has a
+ * foreign key back to `repositories`, so a deleted repository leaves its
+ * Infisical link behind — and a later repository reusing the id would inherit
+ * it — unless this runs from the delete path.
+ * @param input - The database connection and the repository being removed.
+ */
+export function deleteRepositoryInfisicalLinks({
+	database,
+	repositoryId,
+}: {
+	database: DatabaseSync;
+	repositoryId: string;
+}): void {
+	database
+		.prepare('DELETE FROM infisical_links WHERE scope = ? AND scope_id = ?')
+		.run('repository', repositoryId);
+	database
+		.prepare(
+			'DELETE FROM infisical_discovery_dismissals WHERE scope = ? AND scope_id = ?',
+		)
+		.run('repository', repositoryId);
+}
+
+/**
  * Reads a non-empty string column off a raw SQLite row.
  * @param row - Raw row value.
  * @param column - Column to read.

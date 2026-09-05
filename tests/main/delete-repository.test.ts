@@ -5,6 +5,7 @@ import {
 	mkdirSync,
 	mkdtempSync,
 	rmSync,
+	symlinkSync,
 	writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -295,4 +296,214 @@ test('delete rejects when the repository id is missing or unknown', async (t) =>
 	const notFound = await service.delete({ repositoryId: 'repository-bogus' });
 	assert.equal(notFound.status, 'failure');
 	assert.equal(notFound.diagnostics[0]?.code, 'repository-not-found');
+});
+
+test('delete removes the repository folder and its workspaces directory when asked', async (t) => {
+	const harness = createHarness(t);
+	const ws = await seedWorkspace(harness, 'folder-delete');
+	const slugDirectory = path.join(harness.workspacesPath, 'demo');
+	assert.equal(existsSync(slugDirectory), true);
+
+	const service = createDeleteRepositoryService({
+		databaseService: harness.databaseService,
+		localCommandService: createLocalCommandService(),
+		rootDirectoryService: rootDirectoryStub(harness),
+		workspaceTeardownService: buildWorkspaceTeardownStub(),
+	});
+
+	const result = await service.delete({
+		deleteFolder: true,
+		repositoryId: harness.repositoryId,
+	});
+
+	assert.equal(result.status, 'success');
+	assert.equal(result.repository?.folderDeleted, true);
+	assert.equal(existsSync(harness.repositoryPath), false);
+	assert.equal(existsSync(slugDirectory), false);
+	assert.equal(existsSync(ws.path), false);
+	assert.deepEqual(
+		result.diagnostics.filter(
+			(diagnostic) => diagnostic.severity !== 'warning',
+		),
+		[],
+	);
+});
+
+test('delete clears the workspaces directory even when the folder is kept', async (t) => {
+	const harness = createHarness(t);
+	await seedWorkspace(harness, 'residue');
+	const slugDirectory = path.join(harness.workspacesPath, 'demo');
+	writeFileSync(path.join(slugDirectory, 'stray.txt'), 'left behind\n');
+
+	const service = createDeleteRepositoryService({
+		databaseService: harness.databaseService,
+		localCommandService: createLocalCommandService(),
+		rootDirectoryService: rootDirectoryStub(harness),
+		workspaceTeardownService: buildWorkspaceTeardownStub(),
+	});
+
+	const result = await service.delete({ repositoryId: harness.repositoryId });
+
+	assert.equal(result.status, 'success');
+	assert.equal(result.repository?.folderDeleted, false);
+	assert.equal(existsSync(slugDirectory), false);
+	assert.equal(existsSync(harness.repositoryPath), true);
+	assert.equal(
+		existsSync(path.join(harness.repositoryPath, '.ensemblr-archived')),
+		true,
+	);
+});
+
+test('delete refuses to remove a repository folder outside the managed root', async (t) => {
+	const harness = createHarness(t);
+	const outsidePath = mkdtempSync(path.join(tmpdir(), 'ensemblr-external-'));
+	t.after(() => rmSync(outsidePath, { force: true, recursive: true }));
+
+	runGit(outsidePath, ['init', '-b', 'main']);
+	const timestamp = fixedNow().toISOString();
+	const database = harness.databaseService.getConnection()
+		?.database as DatabaseSync;
+	database
+		.prepare(
+			`INSERT INTO repositories (id, slug, name, path, default_branch, created_at, updated_at, metadata_json)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		)
+		.run(
+			'repository-external',
+			'external',
+			'external',
+			outsidePath,
+			'main',
+			timestamp,
+			timestamp,
+			'{}',
+		);
+
+	const service = createDeleteRepositoryService({
+		databaseService: harness.databaseService,
+		localCommandService: createLocalCommandService(),
+		rootDirectoryService: rootDirectoryStub(harness),
+		workspaceTeardownService: buildWorkspaceTeardownStub(),
+	});
+
+	const result = await service.delete({
+		deleteFolder: true,
+		repositoryId: 'repository-external',
+	});
+
+	assert.equal(result.status, 'success');
+	assert.equal(result.repository?.folderDeleted, false);
+	assert.equal(existsSync(outsidePath), true);
+	assert.equal(
+		result.diagnostics.some(
+			(diagnostic) => diagnostic.code === 'repository-folder-external',
+		),
+		true,
+	);
+	assert.equal(
+		existsSync(path.join(outsidePath, '.ensemblr-archived')),
+		true,
+		'a refused folder still gets the sentinel so it is not re-adopted',
+	);
+});
+
+test('delete refuses a repository path that symlinks out of the managed root', async (t) => {
+	const harness = createHarness(t);
+	const outsidePath = mkdtempSync(path.join(tmpdir(), 'ensemblr-symlinked-'));
+	t.after(() => rmSync(outsidePath, { force: true, recursive: true }));
+	writeFileSync(path.join(outsidePath, 'precious.txt'), 'do not delete\n');
+
+	const linkPath = path.join(harness.rootPath, 'repos', 'evil');
+	symlinkSync(outsidePath, linkPath);
+
+	const timestamp = fixedNow().toISOString();
+	const database = harness.databaseService.getConnection()
+		?.database as DatabaseSync;
+	database
+		.prepare(
+			`INSERT INTO repositories (id, slug, name, path, default_branch, created_at, updated_at, metadata_json)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		)
+		.run(
+			'repository-symlinked',
+			'evil',
+			'evil',
+			linkPath,
+			'main',
+			timestamp,
+			timestamp,
+			'{}',
+		);
+
+	const service = createDeleteRepositoryService({
+		databaseService: harness.databaseService,
+		localCommandService: createLocalCommandService(),
+		rootDirectoryService: rootDirectoryStub(harness),
+		workspaceTeardownService: buildWorkspaceTeardownStub(),
+	});
+
+	const result = await service.delete({
+		deleteFolder: true,
+		repositoryId: 'repository-symlinked',
+	});
+
+	assert.equal(result.repository?.folderDeleted, false);
+	assert.equal(existsSync(path.join(outsidePath, 'precious.txt')), true);
+	assert.equal(
+		result.diagnostics.some(
+			(diagnostic) => diagnostic.code === 'repository-folder-external',
+		),
+		true,
+	);
+});
+
+test('delete purges the private ensemblr refs when the folder is kept', async (t) => {
+	const harness = createHarness(t);
+	runGit(harness.repositoryPath, [
+		'update-ref',
+		'refs/ensemblr/archived/workspace-x',
+		'HEAD',
+	]);
+
+	const service = createDeleteRepositoryService({
+		databaseService: harness.databaseService,
+		localCommandService: createLocalCommandService(),
+		rootDirectoryService: rootDirectoryStub(harness),
+		workspaceTeardownService: buildWorkspaceTeardownStub(),
+	});
+
+	await service.delete({ repositoryId: harness.repositoryId });
+
+	const refs = runGit(harness.repositoryPath, [
+		'for-each-ref',
+		'--format=%(refname)',
+		'refs/ensemblr/',
+	]);
+	assert.equal(refs, '');
+});
+
+test('delete drops the repository-scoped Infisical link row', async (t) => {
+	const harness = createHarness(t);
+	const database = harness.databaseService.getConnection()
+		?.database as DatabaseSync;
+	database
+		.prepare(
+			`INSERT INTO infisical_links (scope, scope_id, project_id, environment_slug, folder_path, recursive, enabled)
+			 VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		)
+		.run('repository', harness.repositoryId, 'proj-1', 'dev', '/', 0, 1);
+
+	const service = createDeleteRepositoryService({
+		databaseService: harness.databaseService,
+		localCommandService: createLocalCommandService(),
+		rootDirectoryService: rootDirectoryStub(harness),
+		workspaceTeardownService: buildWorkspaceTeardownStub(),
+	});
+
+	await service.delete({ repositoryId: harness.repositoryId });
+
+	const remaining = database
+		.prepare('SELECT * FROM infisical_links WHERE scope = ? AND scope_id = ?')
+		.all('repository', harness.repositoryId);
+	assert.equal(remaining.length, 0);
 });

@@ -123,7 +123,7 @@ function RepoMiscSettings() {
 				}
 				description={t(
 					'settings:repo.delete.row-description',
-					'Drops this repository from Ensemblr and deletes every workspace worktree. The repository folder stays on disk.',
+					'Drops this repository from Ensemblr and deletes every workspace worktree. You choose whether the repository folder itself is removed from disk.',
 				)}
 				label={t('settings:repo.delete.row-label', 'Delete repository')}
 			/>

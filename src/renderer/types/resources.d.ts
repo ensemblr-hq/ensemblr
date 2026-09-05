@@ -779,6 +779,8 @@ export default interface Resources {
 			'repository-copy-failed': 'The repository could not be copied.';
 			'repository-copy-target-inside-source': 'Choose a project outside the managed root — the destination would be inside the folder you picked.';
 			'repository-delete-failed': 'The repository could not be deleted.';
+			'repository-folder-delete-failed': 'The repository folder could not be removed from disk.';
+			'repository-folder-external': 'The repository folder was left on disk because it lives outside the folder Ensemblr manages.';
 			'repository-id-required': 'A repository is required.';
 			'repository-insert-failed': 'The repository could not be saved.';
 			'repository-not-found': 'That repository was not found.';
@@ -2181,7 +2183,7 @@ export default interface Resources {
 				'search-placeholder': 'Search or enter a ref…';
 			};
 			delete: {
-				'row-description': 'Drops this repository from Ensemblr and deletes every workspace worktree. The repository folder stays on disk.';
+				'row-description': 'Drops this repository from Ensemblr and deletes every workspace worktree. You choose whether the repository folder itself is removed from disk.';
 				'row-label': 'Delete repository';
 				trigger: 'Delete repository';
 			};
@@ -2842,6 +2844,10 @@ export default interface Resources {
 				done: 'Listed workspaces';
 				running: 'Listing workspaces';
 			};
+			'message-concierge': {
+				done: 'Messaged the Concierge';
+				running: 'Messaging the Concierge';
+			};
 			'notify-orchestrator': {
 				done: 'Notified the orchestrator';
 				running: 'Notifying the orchestrator';
@@ -3018,7 +3024,9 @@ export default interface Resources {
 			};
 		};
 		'delete-repository': {
-			description: "Permanently removes the repository and {{workspaces}} from Ensemblr. Each workspace's worktree folder is deleted and its local branch is dropped. The repository folder stays on disk so you can re-register it later. This cannot be undone.";
+			'delete-folder': 'Also delete the repository folder from disk';
+			'delete-folder-warning': 'The folder and everything in it is removed, including uncommitted work and any branch that was never pushed.';
+			description: "Permanently removes the repository and {{workspaces}} from Ensemblr. Each workspace's worktree folder is deleted and its local branch is dropped. This cannot be undone.";
 			title: 'Delete repository?';
 		};
 		'delete-workspace': {

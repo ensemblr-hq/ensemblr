@@ -43,6 +43,7 @@ export {
 export {
 	type CreateInfisicalLinkStoreOptions,
 	createInfisicalLinkStore,
+	deleteRepositoryInfisicalLinks,
 	type InfisicalLinkRow,
 	type InfisicalLinkStore,
 	type WriteInfisicalLinkInput,
