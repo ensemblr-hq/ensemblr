@@ -18,10 +18,18 @@ binding rules for that boundary. Those files are normative; this one is a map.
 | Preload (context-isolated) | `src/preload/preload.ts` | `vite.preload.config.mts` |
 | Renderer (React) | `src/renderer/main.tsx` → `#root` | `vite.renderer.config.mts` |
 | Dev preview harness | `playground/main.tsx` | `vite.playground.config.mts` |
+| Demo mode (screenshot capture) | `demo/demo-main.ts` + `demo/demo-preload.ts` → `demo/main.tsx` | `vite.demo-main.config.mts`, `vite.demo.config.mts` |
 
 Electron Forge wires the first three in `forge.config.ts` via `VitePlugin`. The
 same list is fallow's `entry` surface in `.fallowrc.jsonc` — add a new entry to
 both or fallow will report the new tree as dead code.
+
+`demo/` is a second Electron entrypoint that renders the real app against
+scripted fixtures for promotional and documentation screenshots (ADR&nbsp;0058).
+Forge is not involved and the packaged build contains none of it; it is reached
+through `npm run dev:demo` and builds to `.demo/`. It imports `src/` read-only
+and is kept apart from `playground/` in both directions by
+`tests/renderer/demo-isolation.test.ts`.
 
 ## `src/main` — Electron main process
 
@@ -41,6 +49,7 @@ each exposing its public surface through `index.ts`.
 | Shipped Agent Skills | `agent-skills/` | Where the bundled skills live on disk, each addressed as a Pi skill directory and as a Claude plugin root. Two roots ship: `resources/agent-skills/` always, and `resources/agent-skills-architecture/` only while the Experimental architecture-diagram switch is on |
 | Plan mode | `plan-mode/` | Per-session plan registry, plan-file writing, plan submission — the enforcement classifiers live in `src/shared/plan-mode/` |
 | App lifecycle | `app/` | `BrowserWindow` creation, window state, and the quit guard + coordinator that confirm a quit while agents are still running |
+| Architecture diagram | `architecture/` | The committed `.ensemblr/architecture.json` document — the file reader/writer, the service the control ops and the diagram pane read through, and the staleness gate that decides whether the per-turn upkeep block asks an agent to redraw. Nothing derives a diagram; an agent authors it through the control op |
 | Chat tabs | `chat-tabs/` | Tab service, preview slot, terminal-session persistence |
 | Checkpoints | `checkpoints/` | Git-backed per-turn checkpoints (ADR&nbsp;0012) |
 | Process execution | `commands/` | Local process and shell execution |
@@ -48,7 +57,7 @@ each exposing its public surface through `index.ts`.
 | Config | `config/` | Declarative config loading, settings resolution, repository config |
 | Dictation | `dictation/` | The transcription service behind the composer's mic control, its endpoint policy, and the Keychain-held key it authenticates with |
 | Environment | `environment/` | Environment-variable catalogue and layered assembly, Infisical joining as its own layer |
-| IPC | `ipc/` | Handler registration (`handlers/`, 36 modules), request validation (`request-schemas/`, 23 modules), permission gate |
+| IPC | `ipc/` | Handler registration (`handlers/`, 37 modules), request validation (`request-schemas/`, 24 modules), permission gate |
 | Integrations | `github/`, `linear/`, `infisical/` | `gh` CLI wrapper, PR snapshots, cached issue backlog; Linear OAuth + client + per-account store; Infisical account store, REST boundary, token-caching client, per-scope cache, link store |
 | Linked directories | `linked-directories/` | Read grants for directories outside a workspace, plus the app-global recents list behind them |
 | Native menus | `menu/` | One builder per menu behind `createMenuItemFactory`, driven by the renderer's command report and the localized `menu-strings.ts` table |
@@ -88,7 +97,7 @@ A new feature is split across these buckets, not given a folder of its own.
 | `components/` | React components and UI composition | `workbench-shell/`, `conversation/`, `diff-viewer/`, `code-surface/`, `settings/`, `setup-diagnostics/`, `onboarding/`, `git/`, `linear/`, `command-palette/`, `ask-user-question/`, `tool-approval/`, `tool-collapsible/`, `pi-replay/`, `text-context-menu/`, `welcome/`, `concierge/`, `markdown/` (the file-link and image renderers streamdown is handed), `ui/` (vendored shadcn) |
 | `config/` | Stable renderer constants (route stale times, knobs) | — |
 | `hooks/` | Renderer hooks that are not durable shared state | `workbench-shell/`, `workspace/`, `conversation/`, `code-surface/`, `setup-diagnostics/`, `preferences/`, `git/`, `linear/`, `ask-user-question/`, `welcome/`, `concierge/`, `markdown/` |
-| `lib/` | Runtime helpers grouped by concern | `workbench/`, `agent-timeline/`, `conversation/`, `diff/`, `code/`, `github/`, `linear/`, `pi/`, `pi-replay/`, `terminal/`, `dictation/`, `i18n/` (i18next instance + bundled `locales/`), `onboarding/`, `instrumentation/`, `ask-user-question/`, `welcome/`, `notification-sound/` (the bundled chime and its player), `concierge/`, plus the code→`t()` mappers `failure-text/`, `agent-failure-text/`, `setup-check-text/`, `provider-check-text/`, `plan-limit-text/`, `github-owner-text/` |
+| `lib/` | Runtime helpers grouped by concern | `workbench/`, `agent-timeline/`, `conversation/`, `diff/`, `code/`, `github/`, `linear/`, `pi/`, `pi-replay/`, `terminal/`, `dictation/`, `i18n/` (i18next instance + bundled `locales/`), `onboarding/`, `instrumentation/`, `ask-user-question/`, `welcome/`, `notification-sound/` (the bundled chime and its player), `concierge/`, `architecture-diagram/` (the layout engine that compiles the stored document into a drawn canvas), plus the code→`t()` mappers `failure-text/`, `agent-failure-text/`, `setup-check-text/`, `provider-check-text/`, `plan-limit-text/`, `github-owner-text/` |
 | `fixtures/` | Fixture/demo data production code may still consume | `workbench/` |
 | `routing/` | TanStack Router file routes + generated tree | `routes/` |
 | `state/` | Durable Jotai state | `workspace/`, `composer/`, `pi/`, `plan-mode/`, `preferences/`, `dialogs/`, `recents/`, `sidebar/`, `settings-ui/`, `slash-commands/`, `tool-approval/`, `ask-user-question/`, `conversation-scroll/`, `menu-commands/`, `linear/`, `unread/`, `updates/`, `concierge/` |
@@ -119,14 +128,15 @@ The only code both processes may import. Two shapes coexist:
 
 - **Single-file concerns** — plain root modules (`config.ts`, `permissions.ts`,
   `github.ts`, `slug.ts`, `menu-commands.ts`, `concierge-references.ts`,
-  `window-chrome.ts`, …); 35 `.ts` files sit at the shared root in total.
+  `window-chrome.ts`, …); 37 `.ts` files sit at the shared root in total.
 - **Multi-file concerns** — an implementation directory behind a stable
   entrypoint, in one of two forms:
-  - `<concern>/index.ts` — `ipc/` (41 contract modules under `ipc/contracts/`,
+  - `<concern>/index.ts` — `ipc/` (42 contract modules under `ipc/contracts/`,
     plus `channels.ts` and `handler-map.ts`), `pi-rpc/`, `keymap/`.
   - `<concern>.ts` + `<concern>/` — `agent-control`, `agent-failure`,
-    `plan-mode`, `scripts`, `terminal`. This is the form `electron --test` can
-    resolve, so prefer it for anything the main-process suites import.
+    `architecture-diagram`, `plan-mode`, `scripts`, `terminal`. This is the form
+    `electron --test` can resolve, so prefer it for anything the main-process
+    suites import.
 
 Never import renderer UI, main-process services, Electron, or `node:fs` from
 here.
@@ -191,9 +201,9 @@ migration ids, so a new migration must be added to both.
 
 | Suite | Runner | Count |
 | --- | --- | --- |
-| `tests/main/**` | `electron --test` (`ELECTRON_RUN_AS_NODE=1`), plus the pure-logic files listed one-by-one in `vitest.config.mts` — an explicit list, not a glob, so it never drags in the Electron-only suites | 233 files |
-| `tests/renderer/**` | Vitest (`node` env; DOM files opt in per file) | 366 files (47 under `dom/`) |
-| `tests/shared/**` | Vitest | 39 files |
+| `tests/main/**` | `electron --test` (`ELECTRON_RUN_AS_NODE=1`), plus the pure-logic files listed one-by-one in `vitest.config.mts` — an explicit list, not a glob, so it never drags in the Electron-only suites | 236 files |
+| `tests/renderer/**` | Vitest (`node` env; DOM files opt in per file) | 381 files (50 under `dom/`) |
+| `tests/shared/**` | Vitest | 42 files |
 
 See [`onboarding.md`](./onboarding.md#6-running-the-tests) for which runner a new
 test should use.
