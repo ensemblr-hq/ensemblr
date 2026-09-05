@@ -256,7 +256,7 @@ a primitive gets reformatted to house style.
 
 ## Tooling
 
-- **Biome 2.5.10** is the only linter and formatter — no ESLint, no Prettier.
+- **Biome 2.5.11** is the only linter and formatter — no ESLint, no Prettier.
   Tabs for indentation; single quotes for JS **and** JSX. `biome.json` pins the
   `$schema` URL to the installed version, so a Biome bump updates that line too
   or `biome check` reports the config as stale.
