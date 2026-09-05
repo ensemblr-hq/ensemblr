@@ -373,6 +373,7 @@ export function registerIpcHandlers({
 	const githubService = createGithubService({
 		databaseService,
 		localCommandService,
+		readCoAuthorEnabled: () => appSettingsService.read().git.coAuthorEnsemblr,
 	});
 	registerGithubHandlers({ githubService, withPermissionGate });
 	const prStatusSweeper = createWorkspacePrStatusSweeper({

@@ -52,6 +52,7 @@ const makeStubService = (
 		return { ok: true, data: { echoed: command.op, args: command.rawArgs } };
 	},
 	readIssueDirective: async () => issueDirective,
+	readCoAuthorDirective: () => null,
 	readLanguageDirective: () => languageDirective,
 	readTurnPreamble: async () => null,
 	releaseSession: () => {},
@@ -532,6 +533,7 @@ const makeBlockingService = (audience: ControlAudience = HARNESS_ROOT) => {
 			return { ok: true, data: { ok: true } };
 		},
 		readIssueDirective: async () => null,
+		readCoAuthorDirective: () => null,
 		readLanguageDirective: () => null,
 		readTurnPreamble: async () => null,
 		releaseSession: () => {},

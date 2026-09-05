@@ -38,6 +38,9 @@ Rules of thumb:
 | Branch | Ветка | Κλάδος | |
 | Commit | Коммит | Commit | |
 | Uncommitted change | Изменение без коммита | Αλλαγή χωρίς commit | The working-tree change set. Russian says *without a commit* rather than a participle; Greek keeps the porcelain `commit`. Already the shape every `git:` catalogue row uses — reuse it rather than coining `незакоммиченный`/`μη υποβεβλημένη`. |
+| Commit co-author | Соавтор коммита | Συν-συντάκτης commit | The credit a `Co-authored-by:` trailer earns on GitHub. Russian `соавтор` is the ordinary word for it; Greek takes `συν-συντάκτης` rather than `συν-συγγραφέας`, which reads as co-authorship of a *book*. |
+| Trailer *(commit)* | trailer | trailer | Untranslated in both, as git porcelain: it is the name of a git mechanism (`git interpret-trailers`, `--trailer`), and the line it produces is English regardless of app language. Russian keeps it in Latin script the way `upstream` and `worktree` already are on the same settings pane. |
+| Contributor *(GitHub)* | Участник | Συνεισφέρων | A GitHub account credited on a repository's contributor list. `Участник` is GitHub's own Russian term; never `вкладчик`, which is a bank depositor. |
 | Pull request | Pull request | Pull request | Untranslated; `PR` stays `PR`. |
 | Diff | Diff | Diff | Untranslated — "различия"/"διαφορές" reads as prose, not the view. |
 | Review comment | Комментарий к ревью | Σχόλιο αξιολόγησης | |

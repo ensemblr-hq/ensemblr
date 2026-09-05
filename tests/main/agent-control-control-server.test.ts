@@ -30,6 +30,7 @@ const stubService: AgentControlService = {
 		return { ok: true, data: { echoed: command.op } };
 	},
 	readIssueDirective: async () => null,
+	readCoAuthorDirective: () => null,
 	readLanguageDirective: () => null,
 	readTurnPreamble: async () => null,
 	releaseSession: () => {},
@@ -188,6 +189,7 @@ describe('control server', () => {
 				role: 'orchestrator',
 			}),
 			readIssueDirective: async () => null,
+			readCoAuthorDirective: () => null,
 			readLanguageDirective: () => null,
 			readTurnPreamble: async () => null,
 			releaseSession: () => {},
@@ -258,6 +260,7 @@ describe('control server', () => {
 				role: 'orchestrator',
 			}),
 			readIssueDirective: async () => null,
+			readCoAuthorDirective: () => null,
 			readLanguageDirective: () => null,
 			readTurnPreamble: async () => null,
 			releaseSession: () => {},

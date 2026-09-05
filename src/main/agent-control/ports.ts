@@ -599,6 +599,17 @@ export interface LanguagePort {
 }
 
 /**
+ * Reports whether the user opted into crediting Ensemblr as a commit co-author,
+ * so the playbooks an agent receives can carry the trailer block. Like the
+ * language and the permission mode this is a global app setting, so it takes no
+ * workspace argument, and it is read per call rather than captured because the
+ * user can toggle it while sessions are live.
+ */
+export interface CommitCreditPort {
+	isCoAuthorEnabled: () => boolean;
+}
+
+/**
  * Surfaces a confirmation to the human when the mode requires approval. Returns
  * true when approved. Harnesses have no native confirm channel, so this drives
  * Ensemblr's own UI regardless of the caller's species.
@@ -742,5 +753,6 @@ export interface AgentControlPorts {
 	linear: LinearPort;
 	permissions: PermissionPort;
 	language: LanguagePort;
+	commitCredit: CommitCreditPort;
 	confirm: ConfirmPort;
 }
