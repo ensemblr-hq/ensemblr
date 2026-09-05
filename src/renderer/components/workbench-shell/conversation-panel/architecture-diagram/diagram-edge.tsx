@@ -1,12 +1,18 @@
-import { useState } from 'react';
+import { memo, useState } from 'react';
 import type { DiagramEdge as RoutedEdge } from '@/renderer/lib/architecture-diagram';
 import { cn } from '@/renderer/lib/utils';
-import type { ArchitectureDeltaStatus } from '@/shared/architecture-diagram';
+import type {
+	ArchitectureConnectionVariant,
+	ArchitectureDeltaStatus,
+} from '@/shared/architecture-diagram';
 
 import { CONNECTION_TONE, DELTA_TONE, EDGE_HIT_WIDTH } from './diagram-tokens';
 
-/** Marker id an edge points at, per variant. */
-const MARKER_ID: Record<string, string> = {
+/**
+ * Marker id an edge points at, per variant. Keyed by the union so a new variant
+ * is a compile error here rather than an arrowhead that silently goes missing.
+ */
+const MARKER_ID: Record<ArchitectureConnectionVariant, string> = {
 	dashed: 'architecture-arrow-dashed',
 	default: 'architecture-arrow-default',
 	emphasis: 'architecture-arrow-emphasis',
@@ -22,7 +28,7 @@ const MARKER_ID: Record<string, string> = {
  * width chosen to be legible next to fifty boxes, the line itself is far too
  * thin to be a pointer target.
  */
-export function DiagramEdge({
+export const DiagramEdge = memo(function DiagramEdge({
 	deltaStatus,
 	edge,
 	isDimmed,
@@ -43,6 +49,9 @@ export function DiagramEdge({
 				'transition-opacity duration-150',
 				isDimmed && !isHovered && 'opacity-15',
 			)}
+			data-delta={deltaStatus ?? undefined}
+			data-dimmed={isDimmed && !isHovered ? 'true' : undefined}
+			data-edge-id={edge.id}
 			onPointerEnter={() => setIsHovered(true)}
 			onPointerLeave={() => setIsHovered(false)}
 		>
@@ -74,7 +83,7 @@ export function DiagramEdge({
 			) : null}
 		</g>
 	);
-}
+});
 
 /**
  * An edge's label, plated so it reads over whatever the edge happens to cross.

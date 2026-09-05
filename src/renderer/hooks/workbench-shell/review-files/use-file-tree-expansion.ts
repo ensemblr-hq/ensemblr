@@ -83,6 +83,12 @@ export function useFileTreeExpansion(
 
 	const revealOnly = useCallback(
 		(paths: readonly string[]) => {
+			// A reveal with nothing to open means the caller resolved no directory,
+			// not "close the tree" — collapsing everything and showing nothing is the
+			// one outcome no caller can have wanted.
+			if (paths.length === 0) {
+				return;
+			}
 			const open = new Set(paths);
 			setToggledPaths(
 				defaultExpanded

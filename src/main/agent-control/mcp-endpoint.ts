@@ -154,6 +154,21 @@ const architectureDiagram = z.looseObject({
 });
 
 /**
+ * What the tool actually accepts: the advertised object, or the JSON string a
+ * client that could not read the advertisement sent instead.
+ *
+ * The string arm is what makes the two bridges answer the same way. The Pi
+ * extension declares this argument `Type.Unknown()`, so a stringified document
+ * reaches `decodeSubmittedDiagram` and is decoded; without the union the SDK
+ * rejects the identical call here with a raw Zod error before the port is ever
+ * entered — and this is the bridge whose clients are likeliest to stringify.
+ * The tolerance is kept rather than dropped because the encoding is the bridge's
+ * mistake and the document is right: refusing it sends a model rewriting content
+ * that was never the problem.
+ */
+const submittedArchitectureDiagram = z.union([architectureDiagram, z.string()]);
+
+/**
  * Every tool this endpoint knows how to serve, in the whole control vocabulary
  * rather than one audience's slice of it — {@link toolDefsFor} cuts it down per
  * caller. Input shapes are advisory for the client; the service re-validates
@@ -231,7 +246,7 @@ export const TOOL_DEFS: readonly McpToolDef[] = [
 		name: 'ensemblr_update_architecture_diagram',
 		op: 'updateArchitectureDiagram',
 		description: `Replace this workspace's architecture diagram with a refined one, passed whole as \`diagram\` — as a JSON object, never as a string containing JSON. Ensemblr already keeps a scanned diagram of every workspace — directories as nodes, cross-module imports as edges — so this op is for *editing* that document, not authoring one from nothing: read the current diagram first, then rename the boundaries to what the concerns are actually called, drop the nodes that are noise, and fix which boundary each node belongs to. Placement follows \`layout.mode\`: under \`organic\` (what the scanner seeds) a component names no position at all and the boundaries *are* the layout — a boundary wrapping a subset of another's members draws nested inside it, and one sharing members with another without nesting draws as an overlapping lens; under \`grid\` a component names \`row\`/\`col\` instead. The shape is archify's architecture IR: \`meta.title\`, \`components\` (each with \`id\`, \`type\` of frontend|backend|database|cloud|security|messagebus|external, \`label\`, optional \`sublabel\`/\`sources\`, plus \`row\`/\`col\` under grid placement only), \`connections\` (each with \`id\`, \`from\`, \`to\`, optional \`label\`/\`variant\`), and \`boundaries\` (each with \`kind\`, \`label\`, \`wraps\`). A component's \`sources\` is a list of \`{ "path": "…" }\` objects, at most ${MAX_COMPONENT_SOURCES} of them — a node needing more is a node that should have been several — and \`layout.cols\` — grid mode only — is at most ${ARCHITECTURE_LAYOUT_MAX_COLS}. At most ${ARCHITECTURE_DIAGRAM_LIMITS.maxComponents} components, ${ARCHITECTURE_DIAGRAM_LIMITS.maxConnections} connections, and ${ARCHITECTURE_DIAGRAM_LIMITS.maxBoundaries} boundaries. A rejection names the fields that failed, so fix those rather than resubmitting a guess. What you store is the diagram from then on: nothing re-scans over it.`,
-		shape: { diagram: architectureDiagram },
+		shape: { diagram: submittedArchitectureDiagram },
 	},
 	{
 		name: 'ensemblr_close_tab',

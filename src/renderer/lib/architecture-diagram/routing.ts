@@ -375,12 +375,17 @@ interface PortCandidate {
 /**
  * True when a connection's anchors are the router's to choose. Authored
  * geometry — an explicit route, `via` points, a placed label — means the author
- * already decided where the edge attaches, and spreading would move it.
+ * already decided where the edge attaches, and spreading would move it. A
+ * self-loop is drawn as a fixed lobe rather than anchored side to side, so it
+ * neither takes a port slot nor gives one up.
  * @param connection - The connection to test
  * @returns True when the router owns both anchors
  */
 function hasAutomaticPorts(connection: ArchitectureConnection): boolean {
 	if (connection.route && connection.route !== 'auto') {
+		return false;
+	}
+	if (connection.from === connection.to) {
 		return false;
 	}
 	return !(connection.via || connection.labelAt);

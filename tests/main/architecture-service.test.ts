@@ -1,5 +1,6 @@
 import { execFile } from 'node:child_process';
 import {
+	existsSync,
 	mkdirSync,
 	mkdtempSync,
 	readFileSync,
@@ -18,6 +19,7 @@ import {
 	architectureFilePath,
 	createArchitectureScanQueue,
 	createArchitectureService,
+	readArchitectureFile,
 } from '../../src/main/architecture/index.ts';
 import { openEnsemblrDatabase } from '../../src/main/storage/database.ts';
 
@@ -38,6 +40,7 @@ afterEach(() => {
 async function createFixture(): Promise<{
 	architectureService: ArchitectureService;
 	cwd: string;
+	database: DatabaseSync;
 	writeFile: (relative: string, contents: string) => void;
 	workspaceId: string;
 }> {
@@ -64,6 +67,7 @@ async function createFixture(): Promise<{
 			requireDatabase: () => connection.database,
 		}),
 		cwd,
+		database: connection.database,
 		workspaceId: 'ws-1',
 		writeFile,
 	};
@@ -323,5 +327,184 @@ describe('architecture scan queue', () => {
 		});
 		expect(() => queue.queueScan({ workspaceId: 'ws-1' })).not.toThrow();
 		await expect(queue.awaitInFlight()).resolves.toBeUndefined();
+	});
+});
+
+describe('architecture service: scanIfMissingAndRead', () => {
+	it('seeds and returns the diagram it wrote, in one call', async () => {
+		const { architectureService, workspaceId } = await createFixture();
+		const result = await architectureService.scanIfMissingAndRead({
+			workspaceId,
+		});
+		expect(result.rebuilt).toBe(true);
+		expect(result.current?.source).toBe('scan');
+		expect(result.error).toBeUndefined();
+		expect(result.previous).toBeNull();
+	});
+
+	it('returns the stored diagram without rebuilding it', async () => {
+		const { architectureService, workspaceId } = await createFixture();
+		await architectureService.scanIfMissing({ workspaceId });
+		const result = await architectureService.scanIfMissingAndRead({
+			workspaceId,
+		});
+		expect(result.rebuilt).toBe(false);
+		expect(result.current?.source).toBe('scan');
+	});
+
+	it('reports an unreadable document rather than scanning over it', async () => {
+		const { architectureService, cwd, workspaceId } = await createFixture();
+		await architectureService.scanIfMissing({ workspaceId });
+		writeFileSync(architectureFilePath(cwd), '{ not json', 'utf8');
+
+		const result = await architectureService.scanIfMissingAndRead({
+			workspaceId,
+		});
+		expect(result).toMatchObject({ current: null, rebuilt: false });
+		expect(result.error?.code).toBe('diagram-unreadable');
+		expect(readFileSync(architectureFilePath(cwd), 'utf8')).toBe('{ not json');
+	});
+
+	// Two panels opening on one fresh workspace used to interleave between the
+	// scan and the read, so the first reported `rebuilt` against a document its
+	// own scan had not written.
+	it('lets only one of two concurrent asks claim the rebuild', async () => {
+		const { architectureService, workspaceId } = await createFixture();
+		const [first, second] = await Promise.all([
+			architectureService.scanIfMissingAndRead({ workspaceId }),
+			architectureService.scanIfMissingAndRead({ workspaceId }),
+		]);
+		expect([first.rebuilt, second.rebuilt].filter(Boolean)).toHaveLength(1);
+		expect(first.current?.generatedAt).toBe(second.current?.generatedAt);
+	});
+});
+
+describe('architecture service: an agent refinement over a document it cannot read', () => {
+	it('refuses rather than overwriting somebody’s hand edit', async () => {
+		const { architectureService, cwd, workspaceId } = await createFixture();
+		await architectureService.scanIfMissing({ workspaceId });
+		const handEdited = '{ "ir": { "components": [] } }';
+		writeFileSync(architectureFilePath(cwd), handEdited, 'utf8');
+
+		await expect(
+			architectureService.storeRefinedIr({
+				ir: {
+					components: [
+						{ id: 'alpha', label: 'Alpha', type: 'backend' as const },
+					],
+					meta: { title: 'refined' },
+					schemaVersion: 1,
+				},
+				workspaceId,
+			}),
+		).rejects.toThrow(/could not be read/);
+		expect(readFileSync(architectureFilePath(cwd), 'utf8')).toBe(handEdited);
+	});
+});
+
+// A scan started at workspace creation outlives a workspace deleted a second
+// later. The writer creates the directories it needs, so without a re-check the
+// finished walk recreates `.ensemblr/` inside a removed worktree and the next
+// `git worktree add` at that path fails.
+describe('architecture service: a workspace that goes away mid-scan', () => {
+	it('drops the write when the directory is gone', async () => {
+		const { architectureService, cwd, workspaceId } = await createFixture();
+		rmSync(cwd, { force: true, recursive: true });
+
+		await expect(
+			architectureService.scanIfMissing({ workspaceId }),
+		).rejects.toThrow(/no longer on disk/);
+		expect(existsSync(cwd)).toBe(false);
+	});
+
+	it('drops the write when the row is gone', async () => {
+		const { architectureService, database, cwd, workspaceId } =
+			await createFixture();
+		const scan = architectureService.scanIfMissing({ workspaceId });
+		database.exec(`DELETE FROM workspaces WHERE id = '${workspaceId}'`);
+
+		await expect(scan).rejects.toThrow(/No workspace with id/);
+		expect(existsSync(architectureFilePath(cwd))).toBe(false);
+	});
+});
+
+describe('readArchitectureFile', () => {
+	/**
+	 * Materializes a workspace directory with a diagram file of given bytes.
+	 * @param raw - What to write at `.ensemblr/architecture.json`
+	 * @returns The absolute workspace root
+	 */
+	function writeDiagram(raw: string): string {
+		const cwd = mkdtempSync(path.join(tmpdir(), 'ensemblr-diagram-'));
+		cleanups.push(() => rmSync(cwd, { force: true, recursive: true }));
+		mkdirSync(path.join(cwd, '.ensemblr'), { recursive: true });
+		writeFileSync(architectureFilePath(cwd), raw, 'utf8');
+		return cwd;
+	}
+
+	it('reports a missing file as absent', async () => {
+		const cwd = mkdtempSync(path.join(tmpdir(), 'ensemblr-diagram-'));
+		cleanups.push(() => rmSync(cwd, { force: true, recursive: true }));
+		expect(await readArchitectureFile(cwd)).toEqual({ status: 'absent' });
+	});
+
+	// Only ENOENT means "there is nothing to lose". Every other rejection is a
+	// document that exists and that the seed scan must not write over.
+	it('reports a directory in the file’s place as unreadable', async () => {
+		const cwd = mkdtempSync(path.join(tmpdir(), 'ensemblr-diagram-'));
+		cleanups.push(() => rmSync(cwd, { force: true, recursive: true }));
+		mkdirSync(architectureFilePath(cwd), { recursive: true });
+
+		const read = await readArchitectureFile(cwd);
+		expect(read.status).toBe('unreadable');
+		expect(read.status === 'unreadable' && read.problem).toContain('EISDIR');
+	});
+
+	it('reports a file holding only `null` as unreadable rather than throwing', async () => {
+		const read = await readArchitectureFile(writeDiagram('null'));
+		expect(read.status).toBe('unreadable');
+		expect(read.status === 'unreadable' && read.problem).toContain(
+			'not a JSON object',
+		);
+	});
+
+	it('reports a top-level array as unreadable', async () => {
+		const read = await readArchitectureFile(writeDiagram('[]'));
+		expect(read.status).toBe('unreadable');
+	});
+
+	it('refuses a document too large to be a diagram', async () => {
+		const read = await readArchitectureFile(
+			writeDiagram(`{"pad":"${'x'.repeat(5 * 1024 * 1024)}"}`),
+		);
+		expect(read.status).toBe('unreadable');
+		expect(read.status === 'unreadable' && read.problem).toContain('ceiling');
+	});
+});
+
+describe('writeArchitectureFile', () => {
+	it('refuses a diagram the reader would reject, and leaves no file behind', async () => {
+		const { architectureService, cwd, workspaceId } = await createFixture();
+		await expect(
+			architectureService.storeRefinedIr({
+				ir: {
+					components: [
+						{ id: 'alpha', label: 'Alpha', type: 'backend' as const },
+						{ id: 'alpha', label: 'Alpha again', type: 'backend' as const },
+					],
+					meta: { title: 'refined' },
+					schemaVersion: 1,
+				},
+				workspaceId,
+			}),
+		).rejects.toThrow(/would not load back/);
+		expect(existsSync(architectureFilePath(cwd))).toBe(false);
+		expect(existsSync(`${architectureFilePath(cwd)}.tmp`)).toBe(false);
+	});
+
+	it('leaves no temporary file beside a diagram it did write', async () => {
+		const { architectureService, cwd, workspaceId } = await createFixture();
+		await architectureService.scanIfMissing({ workspaceId });
+		expect(existsSync(`${architectureFilePath(cwd)}.tmp`)).toBe(false);
 	});
 });

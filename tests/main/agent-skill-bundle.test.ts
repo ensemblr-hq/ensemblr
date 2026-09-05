@@ -25,12 +25,30 @@ const SETTINGS_SCHEMA_PATH = path.join(
 const readBundleFile = (relative: string): string =>
 	readFileSync(path.join(SKILL_ROOT, relative), 'utf8');
 
-const SKILL_MD = readBundleFile('SKILL.md');
-const REFERENCES = readdirSync(path.join(SKILL_ROOT, 'references'));
-const EVERY_DOC = [
-	SKILL_MD,
-	...REFERENCES.map((file) => readBundleFile(path.join('references', file))),
-].join('\n');
+const referenceFiles = (root: string): string[] => {
+	const directory = path.join(root, 'references');
+	return existsSync(directory) ? readdirSync(directory) : [];
+};
+
+const shippedSkill = (root: string) => {
+	const read = (relative: string): string =>
+		readFileSync(path.join(root, relative), 'utf8');
+	const skillMarkdown = read('SKILL.md');
+	return {
+		everyDoc: [
+			skillMarkdown,
+			...referenceFiles(root).map((file) =>
+				read(path.join('references', file)),
+			),
+		].join('\n'),
+		name: path.basename(root),
+		root,
+		skillMarkdown,
+	};
+};
+
+const SHIPPED_SKILLS = [SKILL_ROOT, ARCHITECTURE_SKILL_ROOT].map(shippedSkill);
+const EVERY_DOC = SHIPPED_SKILLS.map((skill) => skill.everyDoc).join('\n');
 
 const manifest = (): { name: string; skills: string[] } =>
 	JSON.parse(
@@ -73,28 +91,50 @@ describe('the shipped Claude plugin manifest', () => {
 	});
 });
 
-describe('the ensemblr SKILL.md', () => {
+describe.each(SHIPPED_SKILLS)('the $name SKILL.md', (skill) => {
 	it('carries a name matching its directory and the Agent Skills charset', () => {
-		const name = frontmatter(SKILL_MD).name;
-		expect(name).toBe(path.basename(SKILL_ROOT));
+		const name = frontmatter(skill.skillMarkdown).name;
+		expect(name).toBe(skill.name);
 		expect(name).toMatch(/^[a-z0-9]+(-[a-z0-9]+)*$/);
 		expect((name ?? '').length).toBeLessThanOrEqual(64);
 	});
 
 	it('carries a description within the 1024-character limit', () => {
-		const description = frontmatter(SKILL_MD).description ?? '';
+		const description = frontmatter(skill.skillMarkdown).description ?? '';
 		expect(description.length).toBeGreaterThan(0);
 		expect(description.length).toBeLessThanOrEqual(1024);
 	});
 
 	it('links only to reference files that exist', () => {
-		const links = [...SKILL_MD.matchAll(/\]\((references\/[^)]+)\)/g)].map(
-			(match) => match[1] as string,
-		);
-		expect(links.length).toBeGreaterThan(0);
+		const links = [
+			...skill.skillMarkdown.matchAll(/\]\((references\/[^)]+)\)/g),
+		].map((match) => match[1] as string);
 		for (const link of links) {
-			expect(existsSync(path.join(SKILL_ROOT, link))).toBe(true);
+			expect(existsSync(path.join(skill.root, link))).toBe(true);
 		}
+	});
+});
+
+describe('the shipped skills as a set', () => {
+	it('ships exactly the skills the manifest names', () => {
+		const listed = manifest()
+			.skills.map((entry) => path.basename(path.resolve(PLUGIN_ROOT, entry)))
+			.sort();
+		expect(readdirSync(path.join(PLUGIN_ROOT, 'skills')).sort()).toEqual(
+			listed,
+		);
+	});
+
+	it('validates every skill the plugin bundles, not just the first', () => {
+		expect(SHIPPED_SKILLS.map((skill) => skill.name).sort()).toEqual(
+			readdirSync(path.join(PLUGIN_ROOT, 'skills')).sort(),
+		);
+	});
+
+	it('keeps at least one reference link across the bundle, so the link check cannot pass vacuously', () => {
+		expect(
+			[...EVERY_DOC.matchAll(/\]\(references\/[^)]+\)/g)].length,
+		).toBeGreaterThan(0);
 	});
 });
 

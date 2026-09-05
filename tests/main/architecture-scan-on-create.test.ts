@@ -70,3 +70,41 @@ describe('architecture scan on workspace create', () => {
 		expect(create).toHaveBeenCalledWith(request);
 	});
 });
+
+// The scan reads the whole source tree, so it has no business on the path the
+// user is waiting on: a create that a tree walk could delay — or fail — is a
+// worse trade than a workspace that arrives without a diagram.
+describe('architecture scan on workspace create: fire and forget', () => {
+	it('resolves the create without waiting for the scan', async () => {
+		let released: (() => void) | undefined;
+		const scanned = new Promise<void>((resolve) => {
+			released = resolve;
+		});
+		const queueScan = vi.fn(() => scanned);
+		const decorated = withArchitectureScanOnCreate({
+			createWorkspaceService: createStub(success).service,
+			queueScan,
+		});
+
+		await expect(
+			decorated.create({ name: 'w', repositoryId: 'repo-1' }),
+		).resolves.toBe(success);
+		expect(queueScan).toHaveBeenCalledOnce();
+		released?.();
+	});
+
+	it('leaves a create alone when the result names no workspace', async () => {
+		const queueScan = vi.fn();
+		const decorated = withArchitectureScanOnCreate({
+			createWorkspaceService: createStub({
+				diagnostics: [],
+				status: 'success',
+			} as unknown as CreateWorkspaceResult).service,
+			queueScan,
+		});
+
+		await decorated.create({ name: 'w', repositoryId: 'repo-1' });
+
+		expect(queueScan).not.toHaveBeenCalled();
+	});
+});

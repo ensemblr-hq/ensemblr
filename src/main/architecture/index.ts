@@ -10,6 +10,7 @@ export {
 export type {
 	ArchitectureFailureCode,
 	ArchitectureReadResult,
+	ArchitectureScanAndReadResult,
 	ArchitectureScanOutcome,
 	ArchitectureScanSkipReason,
 	ArchitectureService,

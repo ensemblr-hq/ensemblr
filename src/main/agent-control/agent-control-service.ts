@@ -11,6 +11,7 @@ import type {
 	AgentControlOp,
 	AgentControlResult,
 	AgentControlRole,
+	ArchitectureFailureReason,
 	AskUserQuestionArgs,
 	CheckPlanModeToolArgs,
 	CloseTabArgs,
@@ -372,6 +373,24 @@ const START_TERMINAL_ERROR_CODES: Readonly<
 function startTerminalErrorCode(code: string): AgentControlErrorCode {
 	return START_TERMINAL_ERROR_CODES[code] ?? 'internal';
 }
+
+/**
+ * Maps an architecture refusal onto the code an agent branches on. Only
+ * `invalid` is the caller's own doing, so only it may report `invalid-args` —
+ * that code precedes an instruction to fix the fields and resubmit, which for a
+ * failed write sends the agent to rewrite a document that was already correct,
+ * forever. `unreadable` is `conflict` rather than `internal` because nothing is
+ * broken in the app: a tracked file is in a state that blocks the read, and only
+ * the user can clear it.
+ */
+const ARCHITECTURE_FAILURE_CODES: Readonly<
+	Record<ArchitectureFailureReason, AgentControlErrorCode>
+> = {
+	invalid: 'invalid-args',
+	'store-failed': 'internal',
+	unavailable: 'internal',
+	unreadable: 'conflict',
+};
 
 /**
  * Closes a refused launch with the id of the terminal it collided with. The
@@ -1073,14 +1092,10 @@ export function createAgentControlService({
 				'This build keeps no architecture diagram, so there is none to read.',
 			);
 		}
-		try {
-			return ok(await ports.architecture.readDiagram({ origin }));
-		} catch (error) {
-			return fail(
-				'internal',
-				error instanceof Error ? error.message : String(error),
-			);
-		}
+		const outcome = await ports.architecture.readDiagram({ origin });
+		return outcome.ok
+			? ok(outcome.result)
+			: fail(ARCHITECTURE_FAILURE_CODES[outcome.reason], outcome.message);
 	};
 
 	/**
@@ -1099,19 +1114,13 @@ export function createAgentControlService({
 				'This build keeps no architecture diagram, so there is nothing to update.',
 			);
 		}
-		try {
-			return ok(
-				await ports.architecture.updateDiagram({
-					diagram: args.diagram,
-					origin,
-				}),
-			);
-		} catch (error) {
-			return fail(
-				'invalid-args',
-				error instanceof Error ? error.message : String(error),
-			);
-		}
+		const outcome = await ports.architecture.updateDiagram({
+			diagram: args.diagram,
+			origin,
+		});
+		return outcome.ok
+			? ok(outcome.result)
+			: fail(ARCHITECTURE_FAILURE_CODES[outcome.reason], outcome.message);
 	};
 
 	/**

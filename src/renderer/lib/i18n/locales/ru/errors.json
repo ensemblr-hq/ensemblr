@@ -75,6 +75,12 @@
 			"title": "Не удалось восстановить агента"
 		}
 	},
+	"architecture-diagram": {
+		"open-failed": {
+			"description": "Вкладку открыть не удалось. Попробуйте ещё раз.",
+			"title": "Не удалось открыть схему архитектуры"
+		}
+	},
 	"attachment": {
 		"file-diff-empty": {
 			"message": "У {{label}} нет diff для прикрепления."

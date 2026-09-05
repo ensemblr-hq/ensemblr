@@ -10,8 +10,8 @@
  * way they conflict on any committed file — resolve it by taking either side
  * and letting the next scan settle it.
  */
-import { mkdirSync, renameSync, writeFileSync } from 'node:fs';
-import { readFile } from 'node:fs/promises';
+import { mkdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
 
 import {
@@ -24,6 +24,14 @@ const ENSEMBLR_DIRECTORY = '.ensemblr';
 
 /** Filename the diagram is stored under, inside {@link ENSEMBLR_DIRECTORY}. */
 const DIAGRAM_FILENAME = 'architecture.json';
+
+/**
+ * Largest stored document read at all. A diagram is bounded — at most a few
+ * dozen components with short labels — so anything past this is a mistake or a
+ * hostile file, and reading it means allocating and `JSON.parse`ing it on the
+ * main thread before anything can decide it is too big.
+ */
+const MAX_DIAGRAM_BYTES = 4 * 1024 * 1024;
 
 /**
  * How the stored document wraps the IR with the provenance a rebuild needs.
@@ -78,6 +86,56 @@ export type ArchitectureFileRead =
 	| { problem: string; status: 'unreadable' };
 
 /**
+ * The `code` a Node filesystem rejection carries, when it carries one.
+ * @param error - Whatever the filesystem call rejected with
+ * @returns The error code, or null for anything that is not a system error
+ */
+function errorCodeOf(error: unknown): string | null {
+	return typeof error === 'object' &&
+		error !== null &&
+		'code' in error &&
+		typeof (error as { code: unknown }).code === 'string'
+		? (error as { code: string }).code
+		: null;
+}
+
+/**
+ * Reads the raw file, keeping "there is none" apart from "there is one and this
+ * build could not get at it".
+ *
+ * Only `ENOENT` means absent. A permission denial, a directory where the file
+ * should be, an exhausted descriptor table — each of those is a document that
+ * exists and that a caller must not scan over, so they answer `unreadable` with
+ * the code that stopped them.
+ * @param filePath - Absolute path of the diagram file
+ * @returns The file's text, or why it could not be had
+ */
+async function readDiagramText(
+	filePath: string,
+): Promise<{ raw: string } | ArchitectureFileRead> {
+	try {
+		const stats = await stat(filePath);
+		if (stats.size > MAX_DIAGRAM_BYTES) {
+			return {
+				problem: `It is ${stats.size} bytes, past the ${MAX_DIAGRAM_BYTES}-byte ceiling for a diagram.`,
+				status: 'unreadable',
+			};
+		}
+		return { raw: await readFile(filePath, 'utf8') };
+	} catch (error) {
+		if (errorCodeOf(error) === 'ENOENT') {
+			return { status: 'absent' };
+		}
+		return {
+			problem:
+				errorCodeOf(error) ??
+				(error instanceof Error ? error.message : 'It could not be read.'),
+			status: 'unreadable',
+		};
+	}
+}
+
+/**
  * Reads a workspace's stored diagram.
  * @param workspaceCwd - Absolute path of the workspace root
  * @returns What the read found: a diagram, nothing, or a file it cannot use
@@ -85,18 +143,22 @@ export type ArchitectureFileRead =
 export async function readArchitectureFile(
 	workspaceCwd: string,
 ): Promise<ArchitectureFileRead> {
-	let raw: string;
-	try {
-		raw = await readFile(architectureFilePath(workspaceCwd), 'utf8');
-	} catch {
-		return { status: 'absent' };
+	const read = await readDiagramText(architectureFilePath(workspaceCwd));
+	if (!('raw' in read)) {
+		return read;
 	}
 	let parsed: unknown;
 	try {
-		parsed = JSON.parse(raw);
+		parsed = JSON.parse(read.raw);
 	} catch (error) {
 		return {
 			problem: error instanceof Error ? error.message : 'It is not valid JSON.',
+			status: 'unreadable',
+		};
+	}
+	if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+		return {
+			problem: 'The document is not a JSON object.',
 			status: 'unreadable',
 		};
 	}
@@ -128,6 +190,12 @@ export async function readArchitectureFile(
  * leave a half-written document in the repository — the same discipline the
  * committed `settings.toml` writer uses. Trailing newline included, because
  * this file is meant to be read in a diff.
+ *
+ * The IR is validated against the schema that reads it back first. A producer
+ * emitting a document this build then refuses leaves the workspace with a
+ * diagram every path reports as unreadable and none will scan over, which the
+ * user can only escape by deleting the file outside the app — so a bad document
+ * fails its own write instead.
  * @param contents - The diagram and its provenance
  * @param workspaceCwd - Absolute path of the workspace root
  */
@@ -138,13 +206,23 @@ export function writeArchitectureFile({
 	contents: StoredDiagram;
 	workspaceCwd: string;
 }): void {
+	const validated = parseArchitectureIrResult(contents.ir);
+	if (!validated.ok) {
+		throw new Error(
+			`Refusing to write ${ARCHITECTURE_FILE_RELATIVE_PATH}: the diagram would not load back. ${validated.problems.join('; ')}`,
+		);
+	}
 	const filePath = architectureFilePath(workspaceCwd);
 	const temporaryPath = `${filePath}.tmp`;
 	mkdirSync(path.dirname(filePath), { recursive: true });
-	writeFileSync(
-		temporaryPath,
-		`${JSON.stringify(contents, null, '\t')}\n`,
-		'utf8',
-	);
-	renameSync(temporaryPath, filePath);
+	try {
+		writeFileSync(
+			temporaryPath,
+			`${JSON.stringify(contents, null, '\t')}\n`,
+			'utf8',
+		);
+		renameSync(temporaryPath, filePath);
+	} finally {
+		rmSync(temporaryPath, { force: true });
+	}
 }

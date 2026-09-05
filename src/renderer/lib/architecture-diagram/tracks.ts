@@ -19,6 +19,8 @@ import type {
 	DiagramPoint,
 } from '@/shared/architecture-diagram';
 
+import { textUnits } from './text-fit';
+
 /**
  * Frame metrics, shared with the boundary measurement in `compile.ts` so the
  * clearance a seam reserves and the frame drawn into it cannot drift apart.
@@ -31,6 +33,32 @@ export const FRAME_METRICS = {
 	labelInset: 4,
 	pad: 30,
 } as const;
+
+/**
+ * Most tracks either axis may be solved for, whatever index a component names.
+ *
+ * A track is an array entry and a pixel offset, so the count is the compiler's
+ * only allocation that scales with a number the document chose rather than with
+ * how much the document contains. Left unbounded, `col: 50000000` froze the
+ * renderer's main thread for seconds and `row: 2147483648` aborted the process
+ * inside V8's allocator, which no error boundary can catch. A document past
+ * this ceiling is drawn as far as the ceiling reaches and the components beyond
+ * it are reported by {@link validateGridPlacement}.
+ */
+export const MAX_GRID_TRACKS = 512;
+
+/**
+ * Width a frame's title band reserves.
+ *
+ * Measured in advance width rather than code units: a CJK label is two columns
+ * per character and an emoji label wider still, so `label.length` sizes the
+ * band at half the drawn width for one and double it for the other.
+ * @param label - The boundary's label
+ * @returns The band's width in pixels
+ */
+export function frameTitleWidth(label: string): number {
+	return textUnits(label) * 5 + 10;
+}
 
 /** Room above a frame's first member row, which has to clear its title band. */
 const FRAME_TOP_PAD = Math.max(
@@ -83,7 +111,7 @@ export interface ResolvedGrid {
 }
 
 /** The uniform cell geometry archify's renderer uses, kept as the pinned mode's defaults. */
-export const DEFAULT_GRID = {
+const DEFAULT_GRID = {
 	cellH: 64,
 	cellW: 130,
 	cols: 4,
@@ -135,7 +163,9 @@ function cellOf(component: ArchitectureComponent): Cell | null {
 
 /**
  * Largest index used along one axis, so a component sitting outside the
- * declared `cols` still lands on a track rather than off the end of the array.
+ * declared `cols` still lands on a track rather than off the end of the array —
+ * bounded by {@link MAX_GRID_TRACKS}, because the index comes from the document
+ * and the allocation must not.
  * @param cells - Every grid-placed cell
  * @param axis - Which index to take
  * @param declared - Lower bound from the document, as a count
@@ -150,11 +180,17 @@ function trackCount(
 		(largest, cell) => Math.max(largest, cell[axis]),
 		-1,
 	);
-	return Math.max(declared, highest + 1);
+	return Math.min(MAX_GRID_TRACKS, Math.max(declared, highest + 1));
 }
 
 /**
  * Solves one axis's track sizes from the components sitting on it.
+ *
+ * A cell outside the solved range is skipped rather than written: the index
+ * comes from the document, and writing past the end grows the array to that
+ * index — which is the same unbounded allocation {@link MAX_GRID_TRACKS} exists
+ * to prevent. Those components are reported by `validateGridPlacement` and land
+ * on no track.
  * @param components - Every component, with the cell each occupies
  * @param count - How many tracks the axis has
  * @param axis - Which index selects the track
@@ -172,6 +208,9 @@ function solveTrackSizes(
 	const sizes = Array.from({ length: count }, () => minimum);
 	for (const { cell, size } of components) {
 		const index = cell[axis];
+		if (index < 0 || index >= count) {
+			continue;
+		}
 		sizes[index] = Math.max(sizes[index] ?? minimum, size[extent]);
 	}
 	return sizes;

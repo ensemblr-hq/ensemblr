@@ -161,8 +161,6 @@ export function useSessionTabOpeners({
 		 */
 		openArchitectureDiagramTab: useCallback(
 			async ({ preview = false }: { preview?: boolean } = {}) => {
-				// A workspace has exactly one architecture, so a second tab for it
-				// would be a duplicate of the first rather than a different subject.
 				// The preview slot only retargets an *ephemeral* tab, so once the user
 				// pins theirs the toggle has to find it rather than open beside it.
 				const openTabId = findOpenDiagramTabId();

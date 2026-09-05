@@ -63,6 +63,76 @@ const ROOT_NODE_LABEL = 'root';
 const MIN_BOUNDARY_MEMBERS = 2;
 
 /**
+ * Marks a role lens's label as a role rather than a directory path.
+ *
+ * Both kinds of boundary are labelled with derived data and the schema requires
+ * a `kind` and `label` pair to be unique, so a repository with a top-level
+ * `frontend/` directory would otherwise emit a region and a lens under one
+ * name and be rejected. A symbol rather than a word, because main cannot reach
+ * the renderer's translations and an English noun here would be English in
+ * every language.
+ */
+const ROLE_LENS_LABEL_PREFIX = '@';
+
+/**
+ * Caps the IR schema applies to the strings this module writes, mirrored from
+ * `src/shared/architecture-diagram/schema.ts`. The seed is validated against
+ * that schema before it is persisted, and a document it rejects leaves the
+ * workspace with a diagram nothing can read — so a pathologically long
+ * directory name is truncated here rather than failing the scan.
+ */
+const LABEL_LIMITS = {
+	/** A component label, a boundary label, or the diagram title. */
+	label: 120,
+	/** A component's sublabel, which carries its parent path. */
+	sublabel: 240,
+	/** A source reference's path. */
+	sourcePath: 240,
+} as const;
+
+/**
+ * Truncates a derived string to what the IR schema accepts.
+ * @param value - The string as derived from the repository
+ * @param limit - Longest form the schema takes
+ * @returns The string, shortened from the end when it is over the limit
+ */
+function clampToLimit(value: string, limit: number): string {
+	return value.length <= limit ? value : value.slice(0, limit);
+}
+
+/**
+ * Assigns every node a component id no other node holds.
+ *
+ * {@link componentIdForModule} is lossy — it folds case and collapses every
+ * non-alphanumeric run — so `src/API` and `src/api`, or `packages/ui/kit` and
+ * `packages/ui-kit`, land on one id. The compiler and the delta comparator both
+ * index components into a `Map` where the last entry wins, so a collision
+ * renders two directories as one box and silently re-aims the loser's edges.
+ * Ids are assigned in sorted order so the same tree always resolves a collision
+ * the same way, which is what keeps the delta comparator matching across scans.
+ * @param nodes - Every node in the graph
+ * @returns Module id → the component id that stands for it
+ */
+function assignComponentIds(
+	nodes: readonly ModuleGraphNode[],
+): ReadonlyMap<string, string> {
+	const assigned = new Map<string, string>();
+	const taken = new Set<string>();
+	for (const moduleId of nodes.map((node) => node.id).sort()) {
+		const base = componentIdForModule(moduleId);
+		let candidate = base;
+		let suffix = 2;
+		while (taken.has(candidate)) {
+			candidate = `${base}-${suffix}`;
+			suffix += 1;
+		}
+		taken.add(candidate);
+		assigned.set(moduleId, candidate);
+	}
+	return assigned;
+}
+
+/**
  * Path fragments that imply a component's role, most specific first. A
  * directory matches the first row whose fragments it contains, so `security`
  * beats the `lib` that would otherwise claim `src/lib/security`.
@@ -195,20 +265,27 @@ function enclosingPaths(moduleId: string): readonly string[] {
  * by the regions that enclose it, so a seeded `row`/`col` would be a coordinate
  * nothing reads.
  * @param node - The scanned directory
+ * @param componentIds - Module id → the component id that stands for it
  * @returns The component to draw
  */
-function toComponent(node: ModuleGraphNode): ArchitectureComponent {
+function toComponent(
+	node: ModuleGraphNode,
+	componentIds: ReadonlyMap<string, string>,
+): ArchitectureComponent {
 	const segments = node.id === '.' ? [] : node.id.split('/');
 	const leaf = segments.at(-1);
 	const parent = segments.slice(0, -1).join('/');
+	const openable = leaf && node.id.length <= LABEL_LIMITS.sourcePath;
 	return {
-		id: componentIdForModule(node.id),
-		label: leaf ?? ROOT_NODE_LABEL,
+		id: componentIds.get(node.id) ?? componentIdForModule(node.id),
+		label: clampToLimit(leaf ?? ROOT_NODE_LABEL, LABEL_LIMITS.label),
 		// The root node stands for whatever files sit loose at the top of the
 		// repository rather than for one directory, so it gets no source: a click
 		// target of `.` resolves to nothing openable and reads as a broken link.
-		...(leaf ? { sources: [{ path: node.id }] } : {}),
-		...(parent ? { sublabel: parent } : {}),
+		...(openable ? { sources: [{ path: node.id }] } : {}),
+		...(parent
+			? { sublabel: clampToLimit(parent, LABEL_LIMITS.sublabel) }
+			: {}),
 		type: componentTypeForModule(node.id),
 	};
 }
@@ -222,18 +299,21 @@ function toComponent(node: ModuleGraphNode): ArchitectureComponent {
  * enclosing the same nodes draw as two curves with nothing between them, and
  * the deeper label is the more specific true statement about that group.
  * @param nodes - Every node in the graph
+ * @param componentIds - Module id → the component id that stands for it
  * @returns The regions, shallowest first
  */
 function toRegions(
 	nodes: readonly ModuleGraphNode[],
+	componentIds: ReadonlyMap<string, string>,
 ): readonly ArchitectureBoundary[] {
 	const byPath = new Map<string, string[]>();
 	for (const node of nodes) {
+		const componentId = componentIds.get(node.id);
+		if (!componentId) {
+			continue;
+		}
 		for (const enclosing of enclosingPaths(node.id)) {
-			byPath.set(enclosing, [
-				...(byPath.get(enclosing) ?? []),
-				componentIdForModule(node.id),
-			]);
+			byPath.set(enclosing, [...(byPath.get(enclosing) ?? []), componentId]);
 		}
 	}
 	const candidates = [...byPath.entries()].filter(
@@ -257,7 +337,11 @@ function toRegions(
 			return bySize !== 0 ? bySize : leftPath.localeCompare(rightPath);
 		})
 		.slice(0, MAX_BOUNDARIES - MAX_ROLE_LENSES)
-		.map(([label, wraps]) => ({ kind: 'region' as const, label, wraps }));
+		.map(([label, wraps]) => ({
+			kind: 'region' as const,
+			label: clampToLimit(label, LABEL_LIMITS.label),
+			wraps,
+		}));
 }
 
 /**
@@ -288,22 +372,27 @@ function deepestRegionOf(
  *
  * The label is the role's own id rather than a sentence, for the same reason
  * every other string here is a path: main cannot reach the renderer's
- * translations, so authored English would be English in every language.
+ * translations, so authored English would be English in every language. It
+ * carries {@link ROLE_LENS_LABEL_PREFIX} so it cannot read as, or collide with,
+ * the directory path a region is labelled with.
  * @param nodes - Every node in the graph
  * @param regions - The regions already emitted, which a lens has to cross
+ * @param componentIds - Module id → the component id that stands for it
  * @returns The lenses, tightest first
  */
 function toRoleLenses(
 	nodes: readonly ModuleGraphNode[],
 	regions: readonly ArchitectureBoundary[],
+	componentIds: ReadonlyMap<string, string>,
 ): readonly ArchitectureBoundary[] {
 	const byRole = new Map<ArchitectureComponentType, string[]>();
 	for (const node of nodes) {
+		const componentId = componentIds.get(node.id);
+		if (!componentId) {
+			continue;
+		}
 		const role = componentTypeForModule(node.id);
-		byRole.set(role, [
-			...(byRole.get(role) ?? []),
-			componentIdForModule(node.id),
-		]);
+		byRole.set(role, [...(byRole.get(role) ?? []), componentId]);
 	}
 	return ARCHITECTURE_COMPONENT_TYPES.flatMap((role) => {
 		const wraps = byRole.get(role) ?? [];
@@ -322,7 +411,7 @@ function toRoleLenses(
 					role === 'security'
 						? ('security-group' as const)
 						: ('region' as const),
-				label: role,
+				label: `${ROLE_LENS_LABEL_PREFIX}${role}`,
 				wraps,
 			},
 		];
@@ -334,10 +423,18 @@ function toRoleLenses(
 /**
  * Builds the connections, keeping the heaviest edges when the graph has more
  * than the diagram can show without becoming a hairball.
+ * Endpoints are read out of the assignment map rather than derived again, so an
+ * edge names the id a collision actually gave its directory; an edge either end
+ * of which the graph did not keep is dropped, because an endpoint resolving to
+ * nothing is an edge the renderer discards without a word.
  * @param graph - The scanned graph
+ * @param componentIds - Module id → the component id that stands for it
  * @returns The connections to draw
  */
-function toConnections(graph: ModuleGraph): readonly ArchitectureConnection[] {
+function toConnections(
+	graph: ModuleGraph,
+	componentIds: ReadonlyMap<string, string>,
+): readonly ArchitectureConnection[] {
 	const heaviestWeight = Math.max(1, ...graph.edges.map((edge) => edge.weight));
 	return [...graph.edges]
 		.sort((left, right) => {
@@ -347,46 +444,115 @@ function toConnections(graph: ModuleGraph): readonly ArchitectureConnection[] {
 				: `${left.from}>${left.to}`.localeCompare(`${right.from}>${right.to}`);
 		})
 		.slice(0, MAX_EDGES)
-		.map((edge) => ({
-			from: componentIdForModule(edge.from),
-			id: `e-${componentIdForModule(edge.from)}-to-${componentIdForModule(edge.to)}`,
-			to: componentIdForModule(edge.to),
-			variant:
-				edge.weight >= heaviestWeight / 2
-					? ('emphasis' as const)
-					: ('default' as const),
-		}));
+		.flatMap((edge) => {
+			const from = componentIds.get(edge.from);
+			const to = componentIds.get(edge.to);
+			if (!from || !to) {
+				return [];
+			}
+			return [
+				{
+					from,
+					id: `e-${from}-to-${to}`,
+					to,
+					variant:
+						edge.weight >= heaviestWeight / 2
+							? ('emphasis' as const)
+							: ('default' as const),
+				},
+			];
+		});
 }
 
 /**
  * The document's boundaries: the nested regions, plus the role lenses that cross
- * them.
+ * them, with no two of one kind sharing a label.
+ *
+ * Both labels are derived — a region's from a directory path, a lens's from a
+ * role — and the schema rejects a repeated `kind` and `label` pair, so the last
+ * pass suffixes rather than letting a truncated path or an exotic directory
+ * name cost the whole document.
  * @param nodes - Every node in the graph
+ * @param componentIds - Module id → the component id that stands for it
  * @returns The boundaries, regions first
  */
-function withRoleLenses(
+function toBoundaries(
 	nodes: readonly ModuleGraphNode[],
+	componentIds: ReadonlyMap<string, string>,
 ): readonly ArchitectureBoundary[] {
-	const regions = toRegions(nodes);
-	return [...regions, ...toRoleLenses(nodes, regions)];
+	const regions = toRegions(nodes, componentIds);
+	return withDistinctLabels([
+		...regions,
+		...toRoleLenses(nodes, regions, componentIds),
+	]);
+}
+
+/**
+ * Renames any boundary repeating a `kind` and `label` its predecessor claimed.
+ * @param boundaries - The boundaries in document order
+ * @returns The same boundaries, each with a label unique within its kind
+ */
+function withDistinctLabels(
+	boundaries: readonly ArchitectureBoundary[],
+): readonly ArchitectureBoundary[] {
+	const taken = new Set<string>();
+	return boundaries.map((boundary) => {
+		let label = boundary.label;
+		let suffix = 2;
+		while (taken.has(`${boundary.kind}:${label}`)) {
+			label = `${clampToLimit(boundary.label, LABEL_LIMITS.label - 4)}-${suffix}`;
+			suffix += 1;
+		}
+		taken.add(`${boundary.kind}:${label}`);
+		return { ...boundary, label };
+	});
+}
+
+/**
+ * Titles the diagram after the repository it describes.
+ *
+ * Not after the workspace directory: every Ensemblr workspace is a git worktree
+ * whose directory is named after its branch, so a basename here would title the
+ * committed document with whatever branch happened to create it — and the seed
+ * is scanned once, so that title would outlive the branch and reach every
+ * future clone. The basename remains as the last resort for a caller with no
+ * repository record, because the schema requires a non-empty title.
+ * @param repositoryName - Name of the repository the workspace was cut from
+ * @param workspaceCwd - Absolute path of the workspace root
+ * @returns The diagram title
+ */
+function diagramTitle({
+	repositoryName,
+	workspaceCwd,
+}: {
+	repositoryName?: string | null;
+	workspaceCwd: string;
+}): string {
+	const candidate =
+		repositoryName?.trim() ||
+		path.basename(workspaceCwd) ||
+		workspaceCwd ||
+		'/';
+	return clampToLimit(candidate, LABEL_LIMITS.label);
 }
 
 /**
  * Seeds a diagram from a scanned graph.
  * @param graph - The scanned module graph
- * @param workspaceCwd - Absolute workspace path, whose basename titles the diagram
+ * @param source - The repository the graph was scanned from, which titles it
  * @returns A complete, drawable IR
  */
 export function irFromModuleGraph(
 	graph: ModuleGraph,
-	workspaceCwd: string,
+	source: { repositoryName?: string | null; workspaceCwd: string },
 ): ArchitectureIR {
+	const componentIds = assignComponentIds(graph.nodes);
 	return {
-		boundaries: withRoleLenses(graph.nodes),
-		components: graph.nodes.map(toComponent),
-		connections: toConnections(graph),
+		boundaries: toBoundaries(graph.nodes, componentIds),
+		components: graph.nodes.map((node) => toComponent(node, componentIds)),
+		connections: toConnections(graph, componentIds),
 		layout: { mode: 'organic' },
-		meta: { title: path.basename(workspaceCwd) || workspaceCwd || '/' },
+		meta: { title: diagramTitle(source) },
 		schemaVersion: ARCHITECTURE_IR_SCHEMA_VERSION,
 	};
 }

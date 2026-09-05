@@ -381,6 +381,42 @@ export interface UpdateArchitectureDiagramResult {
 	message: string;
 }
 
+/**
+ * Why an architecture op could not be served, as one word the dispatcher maps
+ * onto a failure code. Four rather than one because the recoveries have nothing
+ * in common: `invalid` is the caller's own document and is fixed by resubmitting
+ * a corrected one, `unreadable` is a tracked file only the user can repair,
+ * `store-failed` is a write that did not land, and `unavailable` is a diagram
+ * that could not be produced at all. Collapsing them is what sends an agent to
+ * rewrite a document that was already valid.
+ */
+export type ArchitectureFailureReason =
+	| 'invalid'
+	| 'store-failed'
+	| 'unavailable'
+	| 'unreadable';
+
+/** A refused architecture op: the reason word and the message the agent reads. */
+export interface ArchitectureFailure {
+	message: string;
+	ok: false;
+	reason: ArchitectureFailureReason;
+}
+
+/**
+ * What `readDiagram` answers with. The payload is wrapped rather than widened
+ * with an `ok` field of its own, so a success hands the agent exactly
+ * {@link GetArchitectureDiagramResult} and nothing about the port's plumbing.
+ */
+export type ReadArchitectureDiagramOutcome =
+	| ArchitectureFailure
+	| { ok: true; result: GetArchitectureDiagramResult };
+
+/** What `updateDiagram` answers with, shaped like {@link ReadArchitectureDiagramOutcome}. */
+export type UpdateArchitectureDiagramOutcome =
+	| ArchitectureFailure
+	| { ok: true; result: UpdateArchitectureDiagramResult };
+
 /** Args for `sendFollowUp`: submit a follow-up prompt into an existing conversation. */
 export interface SendFollowUpArgs {
 	agentSessionId: string;

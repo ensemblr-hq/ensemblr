@@ -1,12 +1,40 @@
 import { describe, expect, it } from 'vitest';
 
-import { parseArchitectureIr } from '../../src/shared/architecture-diagram';
+import {
+	ARCHITECTURE_LAYOUT_MAX_COLS,
+	parseArchitectureIr,
+	parseArchitectureIrResult,
+} from '../../src/shared/architecture-diagram';
+import { ARCHITECTURE_LAYOUT_MAX_ROWS } from '../../src/shared/architecture-diagram/schema.ts';
 
 const minimal = () => ({
 	components: [{ id: 'alpha', label: 'Alpha', type: 'backend' }],
 	meta: { title: 'fixture' },
 	schemaVersion: 1,
 });
+
+const pair = () => ({
+	...minimal(),
+	components: [
+		{ id: 'alpha', label: 'Alpha', type: 'backend' },
+		{ id: 'beta', label: 'Beta', type: 'backend' },
+	],
+});
+
+const withSourcePath = (path: string) => ({
+	...minimal(),
+	components: [
+		{ id: 'alpha', label: 'Alpha', sources: [{ path }], type: 'backend' },
+	],
+});
+
+const problemsFor = (document: unknown): string[] => {
+	const result = parseArchitectureIrResult(document);
+	if (result.ok) {
+		throw new Error('Expected the document to be rejected.');
+	}
+	return result.problems;
+};
 
 describe('parseArchitectureIr', () => {
 	it('rejects a document with no title', () => {
@@ -98,13 +126,239 @@ describe('parseArchitectureIr', () => {
 	it('keeps an authored connection id rather than deriving over it', () => {
 		expect(
 			parseArchitectureIr({
-				...minimal(),
-				components: [
-					{ id: 'alpha', label: 'Alpha', type: 'backend' },
-					{ id: 'beta', label: 'Beta', type: 'backend' },
-				],
+				...pair(),
 				connections: [{ from: 'alpha', id: 'authored', to: 'beta' }],
 			})?.connections?.[0]?.id,
 		).toBe('authored');
+	});
+});
+
+describe('source paths', () => {
+	it.each([
+		['an absolute POSIX path', '/etc/passwd'],
+		['a UNC path', '\\\\server\\share\\secrets'],
+		['a Windows drive letter', 'C:\\Users\\me\\.gitconfig'],
+		['a home-relative path', '~/.config/gh/hosts.yml'],
+		['a bare parent prefix', '../../etc/passwd'],
+		['a parent segment mid-path', 'a/../../etc/passwd'],
+		['a parent segment behind a backslash', 'a\\..\\..\\etc'],
+		['a home-relative path behind whitespace', '  ~/.config/gh/hosts.yml'],
+	])('rejects %s', (_name, path) => {
+		expect(problemsFor(withSourcePath(path))).toContainEqual(
+			expect.stringContaining('components.0.sources.0.path'),
+		);
+	});
+
+	it('accepts an ordinary workspace-relative path', () => {
+		expect(
+			parseArchitectureIr(withSourcePath('src/main/architecture/index.ts'))
+				?.components[0]?.sources?.[0]?.path,
+		).toBe('src/main/architecture/index.ts');
+	});
+
+	it('accepts a path whose own name merely starts with a dot', () => {
+		expect(
+			parseArchitectureIr(withSourcePath('.ensemblr/settings.toml')),
+		).not.toBeNull();
+	});
+});
+
+describe('grid placement bounds', () => {
+	const placed = (cell: { col?: number; row?: number }) => ({
+		...minimal(),
+		components: [{ id: 'alpha', label: 'Alpha', type: 'backend', ...cell }],
+	});
+
+	it('rejects a col past the widest grid a document may declare', () => {
+		expect(
+			problemsFor(placed({ col: ARCHITECTURE_LAYOUT_MAX_COLS, row: 0 })),
+		).toContainEqual(expect.stringContaining('components.0.col'));
+	});
+
+	it('rejects a row past the tallest grid a document may declare', () => {
+		expect(
+			problemsFor(placed({ col: 0, row: ARCHITECTURE_LAYOUT_MAX_ROWS })),
+		).toContainEqual(expect.stringContaining('components.0.row'));
+	});
+
+	it('rejects the row that aborted the renderer out of memory', () => {
+		expect(problemsFor(placed({ col: 0, row: 2_147_483_648 }))).toContainEqual(
+			expect.stringContaining('components.0.row'),
+		);
+	});
+
+	it('accepts the last cell of the largest grid', () => {
+		const parsed = parseArchitectureIr(
+			placed({
+				col: ARCHITECTURE_LAYOUT_MAX_COLS - 1,
+				row: ARCHITECTURE_LAYOUT_MAX_ROWS - 1,
+			}),
+		);
+		expect(parsed?.components[0]).toMatchObject({
+			col: ARCHITECTURE_LAYOUT_MAX_COLS - 1,
+			row: ARCHITECTURE_LAYOUT_MAX_ROWS - 1,
+		});
+	});
+});
+
+describe('text and list bounds', () => {
+	it('rejects a component label long enough to bloat the tracked file', () => {
+		expect(
+			problemsFor({
+				...minimal(),
+				components: [
+					{ id: 'alpha', label: 'A'.repeat(50_000), type: 'backend' },
+				],
+			}),
+		).toContainEqual(expect.stringContaining('components.0.label'));
+	});
+
+	it('rejects an over-long connection label', () => {
+		expect(
+			problemsFor({
+				...pair(),
+				connections: [{ from: 'alpha', label: 'A'.repeat(50_000), to: 'beta' }],
+			}),
+		).toContainEqual(expect.stringContaining('connections.0.label'));
+	});
+
+	it('rejects an over-long via list', () => {
+		expect(
+			problemsFor({
+				...pair(),
+				connections: [
+					{
+						from: 'alpha',
+						to: 'beta',
+						via: Array.from({ length: 1_000 }, (_, index) => [index, index]),
+					},
+				],
+			}),
+		).toContainEqual(expect.stringContaining('connections.0.via'));
+	});
+
+	it('rejects more cards than a panel can show', () => {
+		expect(
+			problemsFor({
+				...minimal(),
+				cards: Array.from({ length: 500 }, (_, index) => ({
+					dot: 'cyan',
+					items: [],
+					title: `Card ${index}`,
+				})),
+			}),
+		).toContainEqual(expect.stringContaining('cards'));
+	});
+
+	it('rejects an over-long card item list', () => {
+		expect(
+			problemsFor({
+				...minimal(),
+				cards: [
+					{
+						dot: 'cyan',
+						items: Array.from({ length: 500 }, (_, index) => `${index}`),
+						title: 'Notes',
+					},
+				],
+			}),
+		).toContainEqual(expect.stringContaining('cards.0.items'));
+	});
+});
+
+describe('identity and referential integrity', () => {
+	it('rejects two components sharing an id, naming the later one', () => {
+		expect(
+			problemsFor({
+				...minimal(),
+				components: [
+					{ id: 'api', label: 'Api', type: 'backend' },
+					{ id: 'api', label: 'Api again', type: 'frontend' },
+				],
+			}),
+		).toContainEqual(expect.stringContaining('components.1.id'));
+	});
+
+	it('rejects two explicit connection ids that collide', () => {
+		expect(
+			problemsFor({
+				...pair(),
+				connections: [
+					{ from: 'alpha', id: 'edge', to: 'beta' },
+					{ from: 'beta', id: 'edge', to: 'alpha' },
+				],
+			}),
+		).toContainEqual(expect.stringContaining('connections.1.id'));
+	});
+
+	it('rejects two boundaries sharing a kind and label', () => {
+		expect(
+			problemsFor({
+				...pair(),
+				boundaries: [
+					{ kind: 'region', label: 'src', wraps: ['alpha'] },
+					{ kind: 'region', label: 'src', wraps: ['beta'] },
+				],
+			}),
+		).toContainEqual(expect.stringContaining('boundaries.1.label'));
+	});
+
+	it('accepts two boundaries whose labels match under different kinds', () => {
+		expect(
+			parseArchitectureIr({
+				...pair(),
+				boundaries: [
+					{ kind: 'region', label: 'security', wraps: ['alpha'] },
+					{ kind: 'security-group', label: 'security', wraps: ['beta'] },
+				],
+			}),
+		).not.toBeNull();
+	});
+
+	it('rejects a connection endpoint no component declares', () => {
+		expect(
+			problemsFor({
+				...pair(),
+				connections: [{ from: 'alpha', to: 'apiSevrice' }],
+			}),
+		).toContainEqual(expect.stringContaining('connections.0.to'));
+	});
+
+	it('rejects a boundary wrapping a component no one declares', () => {
+		expect(
+			problemsFor({
+				...pair(),
+				boundaries: [
+					{ kind: 'region', label: 'src', wraps: ['alpha', 'ghost'] },
+				],
+			}),
+		).toContainEqual(expect.stringContaining('boundaries.0.wraps.1'));
+	});
+});
+
+describe('parseArchitectureIrResult', () => {
+	it('names the document itself when the failure has no field path', () => {
+		const result = parseArchitectureIrResult(null);
+		expect(result.ok).toBe(false);
+		expect(result.ok ? [] : result.problems).toContainEqual(
+			expect.stringContaining('the document'),
+		);
+	});
+
+	it('says how many further fields it did not name', () => {
+		const result = parseArchitectureIrResult({
+			...minimal(),
+			components: Array.from({ length: 9 }, (_, index) => ({
+				id: `n${index}`,
+				label: 'Node',
+				type: 'quantum',
+			})),
+		});
+		if (result.ok) {
+			throw new Error('Expected the document to be rejected.');
+		}
+		expect(result.problemCount).toBe(9);
+		expect(result.problems).toHaveLength(7);
+		expect(result.problems.at(-1)).toContain('3 further field(s)');
 	});
 });

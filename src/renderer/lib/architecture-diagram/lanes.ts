@@ -25,16 +25,18 @@ export function clearLanes(
 	nodes: readonly MeasuredRect[],
 	axis: 'x' | 'y',
 ): readonly number[] {
-	const bands = nodes
-		.filter((node) => Number.isFinite(node.x))
-		.map(
-			(node) =>
-				[
-					axis === 'x' ? node.x : node.y,
-					axis === 'x' ? node.x + node.width : node.y + node.height,
-				] as const,
-		)
-		.sort((left, right) => left[0] - right[0]);
+	const bands: (readonly [number, number])[] = [];
+	for (const node of nodes) {
+		if (!Number.isFinite(node.x)) {
+			continue;
+		}
+		bands.push(
+			axis === 'x'
+				? [node.x, node.x + node.width]
+				: [node.y, node.y + node.height],
+		);
+	}
+	bands.sort((left, right) => left[0] - right[0]);
 	if (bands.length === 0) {
 		return [];
 	}

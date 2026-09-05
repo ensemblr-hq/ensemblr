@@ -83,13 +83,15 @@ function needsLazyLoad(node: FileTreeNode<WorkspaceFileSummary>): boolean {
 
 /**
  * Folder expansion state, plus the pending "reveal this directory" request that
- * drives it: the target and its ancestors are expanded and *everything else is
- * closed*, an ignored folder's children are lazily loaded when the target has
- * none, and the path is recorded for the scroll pass that follows.
+ * drives it: the target and its ancestors are expanded, an ignored folder's
+ * children are lazily loaded when the target has none, and the path is recorded
+ * for the scroll pass that follows.
  *
- * The reveal is exclusive because a diagram node pointing at one directory in a
- * tree of hundreds is only useful if that directory is the one thing the user
- * can see when they arrive.
+ * A request marked `exclusive` closes everything else — the architecture
+ * diagram asks for that, because a node pointing at one directory in a tree of
+ * hundreds is only useful if that directory is the one thing the user can see
+ * when they arrive. Every other reveal only opens, so clicking a file path in a
+ * tool result does not collapse the folders the user opened themselves.
  *
  * Expansion is owned here rather than passed in so the reveal effect drives its
  * own state instead of calling back out to its caller's.
@@ -113,10 +115,8 @@ function useDirectoryReveal({
 }) {
 	// Folders start collapsed: the full repo tree would be overwhelming if every
 	// directory rendered open.
-	const { isExpanded, revealOnly, toggleDirectory } = useFileTreeExpansion(
-		false,
-		knownDirectoryPaths,
-	);
+	const { expandDirectories, isExpanded, revealOnly, toggleDirectory } =
+		useFileTreeExpansion(false, knownDirectoryPaths);
 	const revealRequest = useAtomValue(workspaceDirectoryRevealRequestAtom);
 	const handledRevealRequestIdRef = useRef<number | null>(null);
 	const pendingRevealPathRef = useRef<string | null>(null);
@@ -137,17 +137,21 @@ function useDirectoryReveal({
 			return;
 		}
 		handledRevealRequestIdRef.current = revealRequest.id;
-		revealOnly(
-			directoryPathAndAncestors(directoryPath).filter((path) =>
-				knownDirectoryPathSet.has(path),
-			),
+		const chain = directoryPathAndAncestors(directoryPath).filter((path) =>
+			knownDirectoryPathSet.has(path),
 		);
+		if (revealRequest.exclusive) {
+			revealOnly(chain);
+		} else {
+			expandDirectories(chain);
+		}
 		pendingRevealPathRef.current = directoryPath;
 		const directoryNode = findDirectoryNode(tree, directoryPath);
 		if (directoryNode && needsLazyLoad(directoryNode)) {
 			loadIgnoredDirectory(directoryPath);
 		}
 	}, [
+		expandDirectories,
 		knownDirectoryPathSet,
 		loadIgnoredDirectory,
 		revealOnly,

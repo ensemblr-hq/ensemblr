@@ -1749,10 +1749,26 @@ const ARCHITECTURE_MIGRATION_ID = '027_architecture_diagram';
 const ARCHITECTURE_MIGRATION_VERSION = 27;
 
 /**
+ * Every chat-tab kind the pre-027 CHECK accepts. Migration 027 rebuilds
+ * `chat_tabs` by copying rows through the widened CHECK, so a kind dropped from
+ * that list on a later edit fails the copy at startup for any user holding one.
+ * Seeding all six is what turns that into a red test rather than a database the
+ * app cannot open.
+ */
+const CHAT_TAB_KINDS_BEFORE_ARCHITECTURE = [
+	'chat',
+	'diff',
+	'document',
+	'file',
+	'preview',
+	'terminal',
+] as const;
+
+/**
  * Builds a database at the pre-027 schema the same way
  * {@link openDatabaseBeforeConcierge} does: `027_architecture_diagram` is
  * pre-recorded as applied so 001-026 run and it does not, leaving `chat_tabs`
- * with the narrower kind CHECK and no `architecture_snapshots` table.
+ * with the narrower kind CHECK that does not yet accept `diagram`.
  */
 function openDatabaseBeforeArchitecture(databasePath: string) {
 	const markerConnection = new DatabaseSync(databasePath);
@@ -1794,6 +1810,13 @@ test('widens the chat-tab kinds to diagram without losing tabs or their runtime 
 		INSERT INTO agent_runtime_state (workspace_id, active_tab_id, last_active_session_id)
 		VALUES ('ws-arch', 'tab-chat', 'sess-arch');
 	`);
+	for (const [index, kind] of CHAT_TAB_KINDS_BEFORE_ARCHITECTURE.entries()) {
+		seeded.database
+			.prepare(
+				'INSERT INTO chat_tabs (id, workspace_id, kind, title, position) VALUES (?, ?, ?, ?, ?)',
+			)
+			.run(`tab-kind-${kind}`, 'ws-arch', kind, kind, 10 + index);
+	}
 	assert.throws(
 		() =>
 			seeded.database.exec(`
@@ -1825,7 +1848,7 @@ test('widens the chat-tab kinds to diagram without losing tabs or their runtime 
 	assert.deepEqual(
 		readRows(
 			connection.database,
-			'SELECT id, kind, agent_session_id, full_title FROM chat_tabs ORDER BY position',
+			"SELECT id, kind, agent_session_id, full_title FROM chat_tabs WHERE id IN ('tab-chat', 'tab-file') ORDER BY position",
 		),
 		[
 			{
@@ -1841,6 +1864,15 @@ test('widens the chat-tab kinds to diagram without losing tabs or their runtime 
 				kind: 'file',
 			},
 		],
+	);
+
+	assert.deepEqual(
+		readRows(
+			connection.database,
+			"SELECT kind FROM chat_tabs WHERE id LIKE 'tab-kind-%' ORDER BY kind",
+		),
+		CHAT_TAB_KINDS_BEFORE_ARCHITECTURE.map((kind) => ({ kind })),
+		'migration 027 must copy every kind the pre-027 CHECK accepted',
 	);
 	assert.deepEqual(
 		readRows(

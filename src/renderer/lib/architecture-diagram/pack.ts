@@ -97,7 +97,10 @@ function wrapWidth(
  * cluster's own top-left corner.
  *
  * Items are ordered by rank, then tallest first, so boxes of a like height share
- * a row and a row of same-size nodes comes out on aligned columns.
+ * a row and a row of same-size nodes comes out on aligned columns. Ties break on
+ * id by code unit rather than by collation: `localeCompare` follows the host's
+ * ICU default, and a locale that orders two ids the other way round would move
+ * every node downstream of them and report the whole diagram as changed.
  * @param items - The boxes to pack
  * @param holdsIslands - True when the items are regions rather than plain nodes,
  * which are spread across a wider row and given more room between them
@@ -122,7 +125,7 @@ export function packCluster(
 			return byHeight;
 		}
 		const byWidth = right.width - left.width;
-		return byWidth !== 0 ? byWidth : left.id.localeCompare(right.id);
+		return byWidth !== 0 ? byWidth : left.id < right.id ? -1 : 1;
 	});
 
 	const limit = wrapWidth(ordered, gap, aspect);

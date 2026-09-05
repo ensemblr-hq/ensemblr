@@ -26,7 +26,7 @@ import {
 	flattenRegions,
 	type RegionNode,
 } from './set-forest';
-import { FRAME_METRICS, SOLVED_NODE_SIZE } from './tracks';
+import { FRAME_METRICS, frameTitleWidth, SOLVED_NODE_SIZE } from './tracks';
 
 /** Spacing the organic solver lays out against. */
 const ORGANIC = {
@@ -192,6 +192,7 @@ function toPackedRegion(
 	children: readonly RegionNode[],
 ): PackedRegion {
 	const nodes = new Map<string, PlacedNode>();
+	const childBySetId = new Map(children.map((child) => [child.set.id, child]));
 	for (const placement of cluster.placements) {
 		if (!placement.id.startsWith(REGION_ITEM_PREFIX)) {
 			nodes.set(placement.id, {
@@ -203,7 +204,7 @@ function toPackedRegion(
 			continue;
 		}
 		const setId = placement.id.slice(REGION_ITEM_PREFIX.length);
-		const child = children.find((entry) => entry.set.id === setId);
+		const child = childBySetId.get(setId);
 		const packed = packedChildren.get(setId);
 		if (!child || !packed) {
 			continue;
@@ -307,6 +308,7 @@ function toFrame(
 	const topmost = outline.polygon.reduce((best, point) =>
 		point[1] < best[1] ? point : best,
 	);
+	const titleWidth = frameTitleWidth(set.boundary.label);
 	return {
 		frame: {
 			boundary: set.boundary,
@@ -317,8 +319,8 @@ function toFrame(
 			outline: outline.d,
 			title: {
 				height: FRAME_METRICS.labelHeight,
-				width: Math.max(0, Math.min(width, set.boundary.label.length * 5 + 10)),
-				x: topmost[0] - (set.boundary.label.length * 5 + 10) / 2,
+				width: Math.max(0, Math.min(width, titleWidth)),
+				x: topmost[0] - titleWidth / 2,
 				y:
 					topmost[1] - FRAME_METRICS.labelClearance - FRAME_METRICS.labelHeight,
 			},
@@ -444,7 +446,7 @@ function refineForLenses(
 				continue;
 			}
 			for (const [candidate, other] of [...current].sort(([left], [right]) =>
-				left.localeCompare(right),
+				left < right ? -1 : 1,
 			)) {
 				if (
 					inALens.has(candidate) ||

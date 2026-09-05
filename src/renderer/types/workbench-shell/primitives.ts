@@ -67,8 +67,9 @@ export interface SessionTabActions {
 		placement?: SessionTabPlacement;
 	}) => Promise<{ chatTabId: string } | null>;
 	/**
-	 * Opens the workspace's architecture diagram tab. Ephemeral by default, so it
-	 * shares the one preview slot with file and diff previews.
+	 * Opens the workspace's architecture diagram tab, or returns the one already
+	 * showing it. Permanent by default, unlike the file and diff previews — pass
+	 * `preview: true` to open it into the shared ephemeral slot instead.
 	 */
 	openArchitectureDiagramTab: (input?: {
 		preview?: boolean;

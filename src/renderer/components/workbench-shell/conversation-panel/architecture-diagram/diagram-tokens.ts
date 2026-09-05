@@ -78,6 +78,54 @@ export const CONNECTION_TONE: Record<
 /** Width of the invisible band that makes a hairline edge hoverable. */
 export const EDGE_HIT_WIDTH = 14;
 
+/** Every class and measurement one boundary frame is drawn from. */
+interface BoundaryTone {
+	dashArray: string;
+	fill: string;
+	rx: number;
+	stroke: string;
+	strokeWidth: number;
+	titleFill: string;
+}
+
+/**
+ * Fill, stroke, dash, and title colour for a boundary frame.
+ *
+ * A lens — a set that crosses the regions rather than nesting inside one — is
+ * drawn unfilled and on a longer dash, because the only thing that makes an
+ * overlap readable is being able to see both curves through it.
+ * @param isLens - True when the boundary overlaps rather than nests
+ * @param isSecurity - True for a security group, which reads in the rose tone
+ * @returns The tone the frame draws itself with
+ */
+export function boundaryTone({
+	isLens,
+	isSecurity,
+}: {
+	isLens: boolean;
+	isSecurity: boolean;
+}): BoundaryTone {
+	const titleFill = isSecurity ? 'fill-rose-500' : 'fill-muted-foreground';
+	if (isLens) {
+		return {
+			dashArray: '7 5',
+			fill: 'fill-none',
+			rx: isSecurity ? 8 : 12,
+			stroke: isSecurity ? 'stroke-rose-500/70' : 'stroke-border',
+			strokeWidth: 1.5,
+			titleFill,
+		};
+	}
+	return {
+		dashArray: '3 3',
+		fill: isSecurity ? 'fill-rose-500/5' : 'fill-muted/25',
+		rx: isSecurity ? 8 : 12,
+		stroke: isSecurity ? 'stroke-rose-500/40' : 'stroke-border/60',
+		strokeWidth: 1,
+		titleFill,
+	};
+}
+
 /**
  * Outline colour for a node or edge the last rebuild changed. `null` means the
  * entity is unchanged and takes no badge at all — the common case, which must

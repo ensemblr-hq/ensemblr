@@ -44,6 +44,7 @@ import type {
 } from '../../shared/ipc/contracts/linear.ts';
 import type { LinearService } from '../linear';
 import type { EnsemblrDatabaseService } from '../storage';
+import { fitRows } from './payload-fit.ts';
 import type { LinearPort } from './ports.ts';
 import { readWorkspaceLinkedIssue } from './workspace-linked-issue.ts';
 
@@ -168,32 +169,6 @@ function clampText(text: string, budget: number): string {
 	return text.length <= budget
 		? text
 		: `${text.slice(0, budget).trimEnd()}\n\n… shortened to ${budget} characters. Open the issue in Linear for the rest.`;
-}
-
-/**
- * Keeps as many rows as the budget affords, measuring each by the JSON an agent
- * actually receives. Greedy from the front rather than proportional: the service
- * hands back its most recently updated issues first, so a contiguous head is the
- * half worth keeping.
- * @param rows - Rows in the order they should survive.
- * @param budget - Characters the kept rows may occupy in total.
- * @returns The rows that fit and how many were dropped.
- */
-function fitRows<T>(
-	rows: readonly T[],
-	budget: number,
-): { kept: readonly T[]; omitted: number; spent: number } {
-	const kept: T[] = [];
-	let spent = 0;
-	for (const row of rows) {
-		const cost = JSON.stringify(row).length + 1;
-		if (spent + cost > budget) {
-			break;
-		}
-		kept.push(row);
-		spent += cost;
-	}
-	return { kept, omitted: rows.length - kept.length, spent };
 }
 
 /**

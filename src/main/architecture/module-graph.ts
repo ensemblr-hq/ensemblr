@@ -14,6 +14,7 @@ import { createHash } from 'node:crypto';
 import type { Dirent } from 'node:fs';
 import { readdir, readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
+import { setImmediate as yieldToEventLoop } from 'node:timers/promises';
 
 /** One directory in the graph, with the traffic through it. */
 export interface ModuleGraphNode {
@@ -97,17 +98,35 @@ export const SCAN_LIMITS = {
 const READ_BATCH_SIZE = 64;
 
 /**
+ * Joins the two endpoints of an edge into one map key. A NUL can appear in
+ * neither half of a path, so the halves are recoverable — and both sides spell
+ * it through this constant, because a literal that drifted apart once already
+ * turned every key into single characters.
+ */
+const EDGE_KEY_SEPARATOR = '\u0000';
+
+/**
  * Every way a module specifier appears in JavaScript or TypeScript source:
  * static `import`/`export … from`, bare side-effect `import`, dynamic
  * `import()`, and CommonJS `require()`. Deliberately a regex rather than a
  * parser — the graph needs specifiers, not an AST, and a parse failure on one
  * exotic file must not cost the whole scan.
+ *
+ * The static clause is matched with a tempered class rather than `[\s\S]*?`,
+ * and that is a hard requirement rather than a tidiness one. An unanchored lazy
+ * wildcard re-scans to end-of-file for every `import`/`export` token that is
+ * *not* followed by `from '…'`, which is quadratic: a 512 KB rolled-up `.d.ts`
+ * of semicolon-free `export { … }` lines measured 991 ms of blocked main event
+ * loop, against 1 ms here. The class holds only what an import clause can hold
+ * (bindings, braces, commas, `*`, whitespace, so a multi-line braced or
+ * type-only import still matches) and the lookahead stops it dead at the next
+ * `import`/`export` keyword, so a match can never span a statement.
  */
 const SPECIFIER_PATTERNS: readonly RegExp[] = [
-	/(?:^|[\s;}])(?:import|export)\s[\s\S]*?\sfrom\s*['"]([^'"]+)['"]/g,
-	/(?:^|[\s;}])import\s*['"]([^'"]+)['"]/g,
-	/\bimport\s*\(\s*['"]([^'"]+)['"]\s*\)/g,
-	/\brequire\s*\(\s*['"]([^'"]+)['"]\s*\)/g,
+	/(?:^|[\s;}])(?:import|export)\b(?:(?!\b(?:import|export)\b)[\w$*,{}\s])*?\bfrom\s*['"]([^'"\n]+)['"]/g,
+	/(?:^|[\s;}])import\s*['"]([^'"\n]+)['"]/g,
+	/\bimport\s*\(\s*['"]([^'"\n]+)['"]\s*\)/g,
+	/\brequire\s*\(\s*['"]([^'"\n]+)['"]\s*\)/g,
 ];
 
 /**
@@ -158,14 +177,20 @@ function resolveRelativeSpecifier(
 	if (!specifier.startsWith('.')) {
 		return null;
 	}
-	const resolved = path.normalize(path.join(path.dirname(fromFile), specifier));
-	return resolved.startsWith('..') ? null : resolved;
+	return insideWorkspace(
+		path.normalize(path.join(path.dirname(fromFile), specifier)),
+	);
 }
 
 /**
  * Resolves an alias specifier — `@/renderer/lib/x` — to a workspace-relative
  * path, so this repository's own `@/*` imports land on the right node instead
  * of being dropped as external.
+ *
+ * A monorepo whose tsconfig maps an alias above the workspace root — `"@/*":
+ * ["../shared/*"]` — is ordinary, and the graph draws only what the workspace
+ * holds, so such a target is dropped the same way a relative one that climbs
+ * out is.
  * @param specifier - The specifier as written
  * @param aliasRoots - Alias prefix → workspace-relative directory
  * @returns The workspace-relative target path, or null when no alias matches
@@ -176,10 +201,24 @@ function resolveAliasSpecifier(
 ): string | null {
 	for (const [prefix, root] of aliasRoots) {
 		if (specifier.startsWith(prefix)) {
-			return path.normalize(path.join(root, specifier.slice(prefix.length)));
+			return insideWorkspace(
+				path.normalize(path.join(root, specifier.slice(prefix.length))),
+			);
 		}
 	}
 	return null;
+}
+
+/**
+ * Keeps a resolved path only while it still names something under the
+ * workspace root, so no node id and no `sources` entry can point outside it.
+ * @param resolvedPath - A normalized workspace-relative path
+ * @returns The path, or null when it climbs above the root
+ */
+function insideWorkspace(resolvedPath: string): string | null {
+	return resolvedPath === '..' || resolvedPath.startsWith(`..${path.sep}`)
+		? null
+		: resolvedPath;
 }
 
 /**
@@ -354,10 +393,11 @@ export async function scanModuleGraph(
 				continue;
 			}
 			for (const target of importedModuleIds(file, source, aliasRoots)) {
-				const key = `${moduleIdForFile(file.relativePath)}\u0000${target}`;
+				const key = `${moduleIdForFile(file.relativePath)}${EDGE_KEY_SEPARATOR}${target}`;
 				edgeWeights.set(key, (edgeWeights.get(key) ?? 0) + 1);
 			}
 		}
+		await yieldToEventLoop();
 	}
 
 	return buildGraph({
@@ -432,7 +472,7 @@ function buildGraph({
 	scannedFileCount: number;
 }): ModuleGraph {
 	const allEdges = [...edgeWeights.entries()].map(([key, weight]) => {
-		const [from = '', to = ''] = key.split(' ');
+		const [from = '', to = ''] = key.split(EDGE_KEY_SEPARATOR);
 		return { from, to, weight };
 	});
 	const degree = new Map<string, number>();

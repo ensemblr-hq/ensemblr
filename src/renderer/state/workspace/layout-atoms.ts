@@ -10,6 +10,13 @@ const workspaceStorageOptions = { getOnInit: true };
 
 /** One-shot request to reveal a directory in the All files tree. */
 interface WorkspaceDirectoryRevealRequest {
+	/**
+	 * True when everything else should close, which only the architecture diagram
+	 * asks for: a node pointing at one directory in a tree of hundreds is useful
+	 * only if that directory is the one thing on screen. Every other preview
+	 * reveals additively and leaves the user's own expansion alone.
+	 */
+	exclusive: boolean;
 	id: number;
 	path: string;
 	workspaceId: string;

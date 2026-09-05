@@ -413,6 +413,18 @@ document this build cannot read is still somebody’s work — a hand edit, a me
 conflict, a refinement with one bad field. Repairing or deleting it is the
 user’s call.
 
+**A read is fitted to the payload budget rather than dumped whole.** The file is
+hand-editable and tracked, so its size has no ceiling the way a submission does,
+and one over `MAX_AGENT_PAYLOAD_CHARS` would spend the agent's context on a
+document it cannot page through. Detail is shed in a fixed order until it fits —
+annotation cards, then every component's `sources` paths, then a tail of
+connections, then of boundary frames, then of components — and the result's
+`message` names each cut. The order keeps the shortened document one the schema
+still accepts: dropping an edge or a frame strands no reference, and by the time
+components go both of those are already fitted around what remains. The message
+also tells the agent not to submit the shortened copy back, because an update
+replaces the whole document and would store the cut as the diagram.
+
 The submitted document is validated against the shared IR schema, which strips
 unknown keys rather than rejecting them, and refused when it exceeds 64
 components, 160 connections, or 24 boundaries. A rejection names the field paths
@@ -420,7 +432,30 @@ that failed rather than saying only that the document is invalid. `diagram` is
 declared as a typed object in both bridges: left untyped it serializes to an
 empty JSON Schema, and a client with nothing to aim at sends the whole document
 as a JSON string — which is decoded rather than blamed on the caller, since the
-encoding is the bridge’s doing.
+encoding is the bridge’s doing. Both bridges also *accept* that string: the MCP
+shape is a union of the object and a string and the Pi extension declares the
+argument unknown, so a stringified document is decoded on either path rather
+than rejected on one and tolerated on the other.
+
+**Both ops answer with a reason word rather than throwing**, and the four map
+onto different failure codes because the recoveries have nothing in common. A
+document that fails validation or a cap is `invalid` → `invalid-args`, which is
+the only one whose message tells the agent to fix fields and resubmit. A stored
+file that cannot be parsed is `unreadable` → `conflict`: nothing is broken in the
+app, a tracked file is in a state that blocks the read, and only the user clears
+it. A write that did not land is `store-failed` and a diagram that could not be
+produced at all is `unavailable`, both → `internal`. A failed write reports the
+errno and nothing else — the `fs` message embeds the absolute path of the user's
+checkout, which is a leak and an invitation to go editing around the app.
+
+`updateArchitectureDiagram` is refused in Plan Mode, for both roles. It is the
+only otherwise-permitted write that touches the git working tree:
+`.ensemblr/architecture.json` is tracked, so a redraw from a planning session
+lands in the user's `git status` and in the Changes panel. Reading stays
+available — describing the architecture is planning output — and the refusal says
+so, alongside the shared escape hatch. The precedent is
+`ensemblr_resolve_diff_comments` rather than `ensemblr_linear_create_comment`;
+that one writes to a remote tracker, not to the repository.
 
 Withheld from the Concierge for the reason `ensemblr_open_tab` is: the diagram
 belongs to a workspace and the Concierge has none of its own.

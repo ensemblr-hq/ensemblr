@@ -1,6 +1,5 @@
 import { FileIcon, FolderOpenIcon } from 'lucide-react';
-import type { ReactNode } from 'react';
-import { useTranslation } from 'react-i18next';
+import { memo, type ReactNode } from 'react';
 import type { DiagramNode as PositionedNode } from '@/renderer/lib/architecture-diagram';
 import { fittedNodeFontSize } from '@/renderer/lib/architecture-diagram';
 import { cn } from '@/renderer/lib/utils';
@@ -12,6 +11,27 @@ import { namesAFile } from './source-path';
 /** Geometry of the corner control that opens a node's source. */
 const OPEN_BUTTON = { icon: 11, inset: 5, size: 18 } as const;
 
+/** Focus ring an SVG group can actually show — `ring` is a box-shadow, which it cannot. */
+const SVG_FOCUS_RING =
+	'outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring focus-visible:-outline-offset-2';
+
+/** Everything one module box is drawn and driven from. */
+interface DiagramNodeProps {
+	deltaStatus: ArchitectureDeltaStatus | null;
+	/** True while this node is the diagram's single node-group tab stop. */
+	isActive: boolean;
+	/** True while another node's selection has pushed this one into the background. */
+	isDimmed: boolean;
+	isSelected: boolean;
+	node: PositionedNode;
+	onOpenSource: ((path: string) => void) | null;
+	onSelect: (nodeId: string | null) => void;
+	/** Pre-translated label for the corner control, null when there is no source. */
+	openSourceLabel: string | null;
+	/** Pre-translated accessible name for the body. */
+	selectLabel: string;
+}
+
 /**
  * One module box.
  *
@@ -19,28 +39,23 @@ const OPEN_BUTTON = { icon: 11, inset: 5, size: 18 } as const;
  * until you can ask one of them what it talks to, and a click that left the
  * diagram made that the one thing it could not do. Going to the files is still
  * one click, but a deliberate one, on the corner control.
+ *
+ * Memoized, and handed labels rather than translating its own: a pan writes new
+ * viewport state on every pointer event, and a two-hundred-node diagram cannot
+ * afford to reconcile — let alone re-interpolate — itself per frame.
  */
-export function DiagramNode({
+export const DiagramNode = memo(function DiagramNode({
 	deltaStatus,
+	isActive,
 	isDimmed,
 	isSelected,
 	node,
 	onOpenSource,
 	onSelect,
-}: {
-	deltaStatus: ArchitectureDeltaStatus | null;
-	/** True while another node's selection has pushed this one into the background. */
-	isDimmed: boolean;
-	isSelected: boolean;
-	node: PositionedNode;
-	onOpenSource: ((path: string) => void) | null;
-	onSelect: (nodeId: string | null) => void;
-}) {
-	const { t } = useTranslation();
+	openSourceLabel,
+	selectLabel,
+}: DiagramNodeProps) {
 	const sourcePath = node.component.sources?.[0]?.path ?? null;
-	const accessibleName = node.component.sublabel
-		? `${node.component.label} — ${node.component.sublabel}`
-		: node.component.label;
 
 	return (
 		<g
@@ -48,16 +63,15 @@ export function DiagramNode({
 				'transition-opacity duration-150',
 				isDimmed && 'opacity-15',
 			)}
+			data-delta={deltaStatus ?? undefined}
+			data-dimmed={isDimmed ? 'true' : undefined}
+			data-node-id={node.id}
 		>
 			{/* biome-ignore lint/a11y/useSemanticElements: SVG has no <button>; role="button" plus tabIndex on a <g> is the accessible pattern for a clickable shape, and a foreignObject wrapper would break the diagram's own coordinate space. */}
 			<g
-				aria-label={t(
-					'workbench:architecture-diagram.node.select-label',
-					'{{name}} — show what it connects to',
-					{ name: accessibleName },
-				)}
+				aria-label={selectLabel}
 				aria-pressed={isSelected}
-				className='cursor-pointer'
+				className={cn('cursor-pointer', SVG_FOCUS_RING)}
 				onClick={() => onSelect(isSelected ? null : node.id)}
 				onKeyDown={(event) => {
 					if (event.key === 'Enter' || event.key === ' ') {
@@ -66,7 +80,7 @@ export function DiagramNode({
 					}
 				}}
 				role='button'
-				tabIndex={0}
+				tabIndex={isActive ? 0 : -1}
 			>
 				<NodeBody
 					deltaStatus={deltaStatus}
@@ -74,8 +88,10 @@ export function DiagramNode({
 					node={node}
 				/>
 			</g>
-			{sourcePath && onOpenSource ? (
+			{sourcePath && openSourceLabel && onOpenSource ? (
 				<OpenSourceButton
+					isActive={isActive}
+					label={openSourceLabel}
 					node={node}
 					onOpen={() => onOpenSource(sourcePath)}
 					sourcePath={sourcePath}
@@ -83,7 +99,7 @@ export function DiagramNode({
 			) : null}
 		</g>
 	);
-}
+});
 
 /**
  * The corner control that opens the node's source — a file in the preview, a
@@ -91,20 +107,18 @@ export function DiagramNode({
  * node and leaving the diagram stay separate intentions.
  */
 function OpenSourceButton({
+	isActive,
+	label,
 	node,
 	onOpen,
 	sourcePath,
 }: {
+	isActive: boolean;
+	label: string;
 	node: PositionedNode;
 	onOpen: () => void;
 	sourcePath: string;
 }) {
-	const { t } = useTranslation();
-	const label = t(
-		'workbench:architecture-diagram.node.open-source',
-		'Open {{path}}',
-		{ path: sourcePath },
-	);
 	const x = node.x + node.width - OPEN_BUTTON.size - OPEN_BUTTON.inset;
 	const y = node.y + OPEN_BUTTON.inset;
 	const Icon = namesAFile(sourcePath) ? FileIcon : FolderOpenIcon;
@@ -123,7 +137,10 @@ function OpenSourceButton({
 		// biome-ignore lint/a11y/useSemanticElements: same SVG constraint as the node body — there is no <button> element inside an <svg> coordinate space.
 		<g
 			aria-label={label}
-			className='cursor-pointer opacity-45 transition-opacity hover:opacity-100 focus-visible:opacity-100'
+			className={cn(
+				'cursor-pointer opacity-45 transition-opacity hover:opacity-100 focus-visible:opacity-100',
+				SVG_FOCUS_RING,
+			)}
 			onClick={open}
 			onKeyDown={(event) => {
 				if (event.key === 'Enter' || event.key === ' ') {
@@ -131,7 +148,7 @@ function OpenSourceButton({
 				}
 			}}
 			role='button'
-			tabIndex={0}
+			tabIndex={isActive ? 0 : -1}
 		>
 			<title>{label}</title>
 			<rect

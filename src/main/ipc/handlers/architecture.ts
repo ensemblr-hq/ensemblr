@@ -71,13 +71,9 @@ export function registerArchitectureHandlers({
 		async (_event, raw: unknown): Promise<ScanArchitectureSnapshotResult> => {
 			try {
 				const request = scanArchitectureSnapshotRequestSchema.parse(raw);
-				const outcome = await architectureService.scanIfMissing({
+				return await architectureService.scanIfMissingAndRead({
 					workspaceId: request.workspaceId,
 				});
-				const stored = await architectureService.readDiagram({
-					workspaceId: request.workspaceId,
-				});
-				return { ...stored, rebuilt: outcome.rebuilt };
 			} catch (error) {
 				return {
 					current: null,

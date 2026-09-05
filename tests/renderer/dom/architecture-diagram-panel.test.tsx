@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 
-import { screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -190,7 +190,16 @@ describe('ArchitectureDiagramPanel', () => {
 		await waitFor(() => {
 			expect(scanArchitectureSnapshot).toHaveBeenCalledTimes(1);
 		});
-		await new Promise((resolve) => setTimeout(resolve, 50));
+		// A slow retry loop is still a retry loop: advance far past anything a
+		// re-render or a refetch interval could schedule.
+		vi.useFakeTimers();
+		try {
+			await act(async () => {
+				await vi.advanceTimersByTimeAsync(5 * 60_000);
+			});
+		} finally {
+			vi.useRealTimers();
+		}
 		expect(scanArchitectureSnapshot).toHaveBeenCalledTimes(1);
 	});
 
@@ -289,14 +298,16 @@ describe('ArchitectureDiagramPanel', () => {
 			/>,
 		);
 
-		expect(container.querySelectorAll('.opacity-15')).toHaveLength(0);
+		expect(container.querySelectorAll('[data-dimmed="true"]')).toHaveLength(0);
 		await userEvent.click(
 			await screen.findByRole('button', {
 				name: /storage — src\/main — show what it connects to/,
 			}),
 		);
 
-		expect(container.querySelectorAll('.opacity-15').length).toBeGreaterThan(0);
+		expect(
+			container.querySelectorAll('[data-dimmed="true"]').length,
+		).toBeGreaterThan(0);
 		expect(revealDirectory).not.toHaveBeenCalled();
 	});
 
@@ -394,6 +405,191 @@ describe('ArchitectureDiagramPanel', () => {
 		);
 
 		await screen.findByRole('application', { name: /Architecture diagram/ });
-		expect(container.querySelector('.stroke-emerald-500')).not.toBeNull();
+		expect(
+			container.querySelector('[data-node-id][data-delta="added"]'),
+		).not.toBeNull();
+	});
+
+	// Every node carrying its own tab stop meant a two-hundred-node diagram took
+	// four hundred Tab presses to cross. One node holds the stop; N and P move it.
+	it('gives the node group a single tab stop', async () => {
+		installBridge({ current: snapshot(), previous: null });
+		renderWithProviders(
+			<ArchitectureDiagramPanel
+				onDirectoryReveal={revealDirectory}
+				workspaceId='ws-1'
+			/>,
+		);
+
+		const storage = await screen.findByRole('button', {
+			name: /storage — src\/main — show what it connects to/,
+		});
+		const ipc = screen.getByRole('button', {
+			name: /^ipc — src\/main — show what it connects to$/,
+		});
+		expect(storage).toHaveAttribute('tabindex', '0');
+		expect(ipc).toHaveAttribute('tabindex', '-1');
+	});
+
+	it('steps the tab stop between nodes on N and P', async () => {
+		installBridge({ current: snapshot(), previous: null });
+		renderWithProviders(
+			<ArchitectureDiagramPanel
+				onDirectoryReveal={revealDirectory}
+				workspaceId='ws-1'
+			/>,
+		);
+
+		const canvas = await screen.findByRole('application', {
+			name: /Architecture diagram of uematsu/,
+		});
+		const ipc = screen.getByRole('button', {
+			name: /^ipc — src\/main — show what it connects to$/,
+		});
+		canvas.focus();
+		await userEvent.keyboard('{n}');
+
+		expect(ipc).toHaveAttribute('tabindex', '0');
+		expect(
+			screen.getByRole('button', {
+				name: /storage — src\/main — show what it connects to/,
+			}),
+		).toHaveAttribute('tabindex', '-1');
+
+		await userEvent.keyboard('{p}');
+		expect(
+			screen.getByRole('button', {
+				name: /storage — src\/main — show what it connects to/,
+			}),
+		).toHaveAttribute('tabindex', '0');
+	});
+
+	// The svg is the pan surface and the first keyboard stop, so it has to say so
+	// when it takes focus rather than starting to pan against a blank screen.
+	it('shows a focus ring on the canvas itself', async () => {
+		installBridge({ current: snapshot(), previous: null });
+		renderWithProviders(
+			<ArchitectureDiagramPanel
+				onDirectoryReveal={revealDirectory}
+				workspaceId='ws-1'
+			/>,
+		);
+
+		const canvas = await screen.findByRole('application', {
+			name: /Architecture diagram of uematsu/,
+		});
+		expect(canvas).toHaveAttribute('tabindex', '0');
+		expect(canvas.getAttribute('class')).toContain(
+			'focus-visible:outline-ring',
+		);
+	});
+
+	// The gestures were the only thing the description named, so arrow-key
+	// panning, fit, zoom, stepping, and Escape were all undiscoverable.
+	it('names every key the canvas answers to', async () => {
+		installBridge({ current: snapshot(), previous: null });
+		const { container } = renderWithProviders(
+			<ArchitectureDiagramPanel
+				onDirectoryReveal={revealDirectory}
+				workspaceId='ws-1'
+			/>,
+		);
+
+		const canvas = await screen.findByRole('application', {
+			name: /Architecture diagram of uematsu/,
+		});
+		const hintId = canvas.getAttribute('aria-describedby');
+		const hint = container.querySelector(`#${hintId}`)?.textContent ?? '';
+		expect(hint).toContain('arrow keys');
+		expect(hint).toContain('0');
+		expect(hint).toContain('N and P');
+		expect(hint).toContain('Escape');
+	});
+
+	// Panning the background ends in a click on it. Clearing the selection there
+	// would undo the very thing the drag was serving.
+	it('keeps the selection when a background click ends a drag', async () => {
+		installBridge({ current: snapshot(), previous: null });
+		renderWithProviders(
+			<ArchitectureDiagramPanel
+				onDirectoryReveal={revealDirectory}
+				workspaceId='ws-1'
+			/>,
+		);
+
+		const storage = await screen.findByRole('button', {
+			name: /storage — src\/main — show what it connects to/,
+		});
+		await userEvent.click(storage);
+		expect(storage).toHaveAttribute('aria-pressed', 'true');
+
+		const canvas = screen.getByRole('application', {
+			name: /Architecture diagram of uematsu/,
+		});
+		fireEvent.pointerDown(canvas, { button: 0, clientX: 10, clientY: 10 });
+		fireEvent.click(canvas, { clientX: 90, clientY: 60 });
+
+		expect(storage).toHaveAttribute('aria-pressed', 'true');
+	});
+
+	it('clears the selection when the background is clicked without a drag', async () => {
+		installBridge({ current: snapshot(), previous: null });
+		renderWithProviders(
+			<ArchitectureDiagramPanel
+				onDirectoryReveal={revealDirectory}
+				workspaceId='ws-1'
+			/>,
+		);
+
+		const storage = await screen.findByRole('button', {
+			name: /storage — src\/main — show what it connects to/,
+		});
+		await userEvent.click(storage);
+		const canvas = screen.getByRole('application', {
+			name: /Architecture diagram of uematsu/,
+		});
+		fireEvent.pointerDown(canvas, { button: 0, clientX: 40, clientY: 40 });
+		fireEvent.click(canvas, { clientX: 41, clientY: 40 });
+
+		expect(storage).toHaveAttribute('aria-pressed', 'false');
+	});
+
+	// `Dockerfile` has no extension, and the old classifier read it as a folder —
+	// which handed it to a directory reveal that could match nothing.
+	it('opens an extensionless file in the preview rather than revealing it', async () => {
+		installBridge({
+			current: snapshot({
+				ir: ir({
+					boundaries: [],
+					components: [
+						{
+							col: 0,
+							id: 'image',
+							label: 'Dockerfile',
+							row: 0,
+							sources: [{ path: 'Dockerfile' }],
+							type: 'cloud',
+						},
+					],
+					connections: [],
+				}),
+			}),
+			previous: null,
+		});
+		const openFilePreview = vi.fn();
+		renderWithProviders(
+			<FilePreviewOpenerProvider value={openFilePreview}>
+				<ArchitectureDiagramPanel
+					onDirectoryReveal={revealDirectory}
+					workspaceId='ws-1'
+				/>
+			</FilePreviewOpenerProvider>,
+		);
+
+		await userEvent.click(
+			await screen.findByRole('button', { name: 'Open Dockerfile' }),
+		);
+		expect(openFilePreview).toHaveBeenCalledWith('Dockerfile');
+		expect(revealDirectory).not.toHaveBeenCalled();
 	});
 });

@@ -75,6 +75,12 @@
 			"title": "Could not restore agent"
 		}
 	},
+	"architecture-diagram": {
+		"open-failed": {
+			"description": "The tab could not be opened. Try again.",
+			"title": "Could not open the architecture diagram"
+		}
+	},
 	"attachment": {
 		"file-diff-empty": {
 			"message": "{{label}} has no diff to attach."

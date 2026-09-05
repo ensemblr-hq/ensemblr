@@ -165,20 +165,22 @@ function parentIndexOf(
 	sets: readonly BoundarySet[],
 ): number | null {
 	const child = sets[index] as BoundarySet;
+	const childSize = child.members.size;
 	let best: number | null = null;
+	let bestSize = Number.POSITIVE_INFINITY;
 	for (const [candidate, set] of sets.entries()) {
 		if (candidate === index || !isSubset(child.members, set.members)) {
 			continue;
 		}
-		const isStrictlyLarger = set.members.size > child.members.size;
-		const isEarlierTwin =
-			set.members.size === child.members.size && candidate < index;
+		const size = set.members.size;
+		const isStrictlyLarger = size > childSize;
+		const isEarlierTwin = size === childSize && candidate < index;
 		if (!isStrictlyLarger && !isEarlierTwin) {
 			continue;
 		}
-		const incumbent = best === null ? null : (sets[best] as BoundarySet);
-		if (!incumbent || set.members.size < incumbent.members.size) {
+		if (best === null || size < bestSize) {
 			best = candidate;
+			bestSize = size;
 		}
 	}
 	return best;

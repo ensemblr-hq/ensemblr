@@ -81,7 +81,9 @@ function useNonPassiveWheel(
 	onWheel: (event: WheelEvent) => void,
 ): void {
 	const handlerRef = useRef(onWheel);
-	handlerRef.current = onWheel;
+	useEffect(() => {
+		handlerRef.current = onWheel;
+	}, [onWheel]);
 	useEffect(() => {
 		const pane = paneRef.current;
 		if (!pane) {
@@ -110,6 +112,7 @@ export function useDiagramViewport(
 	const paneSize = usePaneSize(paneRef);
 	const [view, setView] = useState<DiagramViewport>(IDENTITY_VIEWPORT);
 	const [isPanning, setIsPanning] = useState(false);
+	const isPanningRef = useRef(false);
 	const hasFramedRef = useRef(false);
 
 	const fitToView = useCallback(() => {
@@ -168,28 +171,37 @@ export function useDiagramViewport(
 	const onPointerDown = useCallback((event: PointerEvent<SVGSVGElement>) => {
 		const isBackground = event.currentTarget === event.target;
 		if (
-			event.button !== MIDDLE_BUTTON &&
-			!(event.button === 0 && isBackground)
+			isPanningRef.current ||
+			(event.button !== MIDDLE_BUTTON && !(event.button === 0 && isBackground))
 		) {
 			return;
 		}
 		event.preventDefault();
 		const target = event.currentTarget;
-		target.setPointerCapture(event.pointerId);
+		const pointerId = event.pointerId;
+		target.setPointerCapture(pointerId);
+		isPanningRef.current = true;
 		setIsPanning(true);
 		let last = { x: event.clientX, y: event.clientY };
 
 		const move = (moved: globalThis.PointerEvent) => {
+			if (moved.pointerId !== pointerId) {
+				return;
+			}
 			const dx = moved.clientX - last.x;
 			const dy = moved.clientY - last.y;
 			last = { x: moved.clientX, y: moved.clientY };
 			setView((current) => panViewport(current, dx, dy));
 		};
-		const stop = () => {
-			target.releasePointerCapture?.(event.pointerId);
+		const stop = (ended: globalThis.PointerEvent) => {
+			if (ended.pointerId !== pointerId) {
+				return;
+			}
+			target.releasePointerCapture?.(pointerId);
 			target.removeEventListener('pointermove', move);
 			target.removeEventListener('pointerup', stop);
 			target.removeEventListener('pointercancel', stop);
+			isPanningRef.current = false;
 			setIsPanning(false);
 		};
 		target.addEventListener('pointermove', move);

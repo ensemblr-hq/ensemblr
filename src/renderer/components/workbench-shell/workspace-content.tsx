@@ -112,10 +112,15 @@ export function WorkspaceWorkbenchContent({
 			requestDiffLineReveal,
 		],
 	);
+	/**
+	 * Selects All files and expands a workspace-relative directory. `exclusive`
+	 * closes every other folder, which only the architecture diagram asks for.
+	 */
 	const revealWorkspaceDirectory = useCallback(
-		(directoryPath: string) => {
+		(directoryPath: string, options?: { exclusive?: boolean }) => {
 			directoryRevealRequestIdRef.current += 1;
 			setDirectoryRevealRequest({
+				exclusive: options?.exclusive ?? false,
 				id: directoryRevealRequestIdRef.current,
 				path: directoryPath,
 				workspaceId: activeWorkspace.id,
@@ -130,11 +135,12 @@ export function WorkspaceWorkbenchContent({
 			setDirectoryRevealRequest,
 		],
 	);
-	// Opening a file also says where it lives: the tree jumps to its folder with
-	// the rest of the repository closed, so the preview arrives with its context
-	// beside it rather than as a path in a tab title. Every preview goes through
-	// here — the review panel's opener and the conversation's alike — because two
-	// openers meant the diagram and the timeline silently skipped the reveal.
+	/**
+	 * Opens a file preview and says where it lives, by expanding its folder in the
+	 * tree. Every preview in the app goes through here — the review panel's opener
+	 * and the conversation's alike — because two openers meant the diagram and the
+	 * timeline silently skipped the reveal.
+	 */
 	const openFilePreviewAndReveal = useCallback(
 		(input: { filePath: string; preview?: boolean }) => {
 			const parentDirectory = input.filePath.split('/').slice(0, -1).join('/');
@@ -144,6 +150,13 @@ export function WorkspaceWorkbenchContent({
 			return openFilePreviewTab(input);
 		},
 		[openFilePreviewTab, revealWorkspaceDirectory],
+	);
+	/** Reveals a diagram node's directory, and only it, in the All files tree. */
+	const revealDiagramDirectory = useCallback(
+		(directoryPath: string) => {
+			revealWorkspaceDirectory(directoryPath, { exclusive: true });
+		},
+		[revealWorkspaceDirectory],
 	);
 	const openReviewFilePreview = useCallback(
 		(filePath: string, options?: FileOpenOptions) => {
@@ -191,7 +204,7 @@ export function WorkspaceWorkbenchContent({
 		activeWorkspace,
 		closedSessions: sessionNavigation.closedSessions,
 		composer,
-		onDirectoryReveal: revealWorkspaceDirectory,
+		onDirectoryReveal: revealDiagramDirectory,
 		onFilePreviewOpen: openFilePreviewAndReveal,
 		onLaunchHarness: sessionNavigation.openTerminalTab,
 		onOpenArchitectureDiagram: sessionNavigation.openArchitectureDiagramTab,

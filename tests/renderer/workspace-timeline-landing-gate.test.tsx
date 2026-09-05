@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 
 import type { QueryClient } from '@tanstack/react-query';
+import { waitFor } from '@testing-library/react';
 import { afterEach, expect, test } from 'vitest';
 
 import { ensemblrQueryKeys } from '@/renderer/api/ensemblr/query-keys';
@@ -106,11 +107,26 @@ function seed(
 
 function renderTimeline(input: {
 	changedFiles?: number;
+	changedPaths?: readonly string[];
 	entries?: readonly ChatTabSummaryEntryWire[];
 	sessions?: readonly AgentSessionSnapshotWire[];
 }) {
 	const entries = input.entries ?? [];
+	const changedPaths = input.changedPaths ?? [];
 	installEnsemblrApi({
+		getWorkspaceGitStatus: async () => ({
+			files: changedPaths.map((path) => ({
+				additions: 1,
+				deletions: 0,
+				path,
+				status: 'modified',
+			})),
+			summary: {
+				additions: changedPaths.length,
+				deletions: 0,
+				files: changedPaths.length,
+			},
+		}),
 		listAgentSessions: async () => ({ sessions: input.sessions ?? [] }),
 		listChatTabSummaries: async () => ({ entries }),
 	});
@@ -144,11 +160,36 @@ test('a sibling chat tab that already ran an agent retires the landing card', ()
 	expect(container.querySelector(EMPTY_STATE)).not.toBeNull();
 });
 
-test('a worktree the app dirtied on create keeps the landing card', () => {
-	const container = renderTimeline({ changedFiles: 18 });
+// The app writes into a workspace it has just cut — the seed architecture scan
+// lands in `.ensemblr/` — so those files are not a sign anyone has worked here.
+test('a worktree only the app dirtied keeps the landing card', async () => {
+	const container = renderTimeline({
+		changedFiles: 2,
+		changedPaths: ['.ensemblr/architecture.json', '.context/plans/first.md'],
+	});
 
-	expect(container.querySelector(LANDING_CARD)).not.toBeNull();
+	await waitFor(() => {
+		expect(container.querySelector(LANDING_CARD)).not.toBeNull();
+	});
 	expect(container.textContent).toContain('new copy of');
+});
+
+// What the gate is for: a user who never opened a chat, worked in a terminal,
+// and edited forty files must not be greeted with "New workspace ready".
+test('a worktree the user dirtied retires the landing card', async () => {
+	const container = renderTimeline({
+		changedFiles: 3,
+		changedPaths: [
+			'.ensemblr/architecture.json',
+			'src/main/storage/database.ts',
+			'docs/architecture-map.md',
+		],
+	});
+
+	await waitFor(() => {
+		expect(container.querySelector(LANDING_CARD)).toBeNull();
+	});
+	expect(container.querySelector(EMPTY_STATE)).not.toBeNull();
 });
 
 test('the landing card stays hidden until the session list has loaded', () => {

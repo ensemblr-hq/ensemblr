@@ -1,6 +1,7 @@
 import { NetworkIcon } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { toast } from 'sonner';
 
 import {
 	Tooltip,
@@ -8,14 +9,11 @@ import {
 	TooltipTrigger,
 } from '@/renderer/components/ui/tooltip';
 
-import { GhostIconButton } from './ghost-icon-button';
+import { GhostIconButton } from '../ghost-icon-button';
 
 /**
  * Tab-strip control that opens the workspace's architecture diagram and
  * focuses it.
- *
- * Lives beside `session-tabs.tsx` rather than inside it because that file is
- * already close to the repository's 800-line ceiling.
  */
 export function ArchitectureDiagramButton({
 	onOpenArchitectureDiagram,
@@ -31,7 +29,12 @@ export function ArchitectureDiagramButton({
 		'Workspace architecture',
 	);
 
-	/** Opens the diagram tab and selects it, guarding against a double click. */
+	/**
+	 * Opens the diagram tab and selects it, guarding against a double click.
+	 * The open is a database write behind `mutateAsync`, so a rejection has to be
+	 * caught here — `.finally` re-enables the button and would otherwise leave a
+	 * live-looking control over an unhandled rejection.
+	 */
 	function handleOpen() {
 		if (isOpening) {
 			return;
@@ -42,6 +45,20 @@ export function ArchitectureDiagramButton({
 				if (result) {
 					onSessionTabChange(result.chatTabId);
 				}
+			})
+			.catch(() => {
+				toast.error(
+					t(
+						'errors:architecture-diagram.open-failed.title',
+						'Could not open the architecture diagram',
+					),
+					{
+						description: t(
+							'errors:architecture-diagram.open-failed.description',
+							'The tab could not be opened. Try again.',
+						),
+					},
+				);
 			})
 			.finally(() => setIsOpening(false));
 	}

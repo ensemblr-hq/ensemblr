@@ -544,6 +544,12 @@ export default interface Resources {
 				title: 'Could not restore agent';
 			};
 		};
+		'architecture-diagram': {
+			'open-failed': {
+				description: 'The tab could not be opened. Try again.';
+				title: 'Could not open the architecture diagram';
+			};
+		};
 		attachment: {
 			'file-diff-empty': {
 				message: '{{label}} has no diff to attach.';
@@ -2439,7 +2445,7 @@ export default interface Resources {
 		};
 		'architecture-diagram': {
 			canvas: {
-				hint: 'Drag to pan. Pinch, or hold Command and scroll, to zoom. Select a node to see what it connects to.';
+				hint: 'Drag or press the arrow keys to pan. Pinch, hold Command and scroll, or press plus and minus to zoom. Press 0 to fit the whole diagram. Press N and P to step between modules, Enter to see what one connects to, and Escape to clear that again.';
 				label: 'Architecture diagram of {{title}}';
 			};
 			'captured-at': 'scanned {{when}}';
@@ -2455,6 +2461,7 @@ export default interface Resources {
 			};
 			loading: 'Reading the workspace architecture…';
 			node: {
+				'name-with-sublabel': '{{label}} — {{sublabel}}';
 				'open-source': 'Open {{path}}';
 				'select-label': '{{name}} — show what it connects to';
 			};

@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { Outlet, useNavigate } from '@tanstack/react-router';
 import { useAtomValue } from 'jotai';
-import { useCallback, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { settingsResolutionQuery } from '@/renderer/api/ensemblr';
 import { CloseRunningChatDialog } from '@/renderer/components/workbench-shell/conversation-panel/close-running-chat-dialog';
 import { useSetupDiagnostics } from '@/renderer/components/workbench-shell/shell-contexts';
@@ -178,16 +178,16 @@ export function WorkspaceRouteContent({
 		workspaceId: activeWorkspace.id,
 	});
 
-	// Every navigation rebuilds the whole search object, so the panel tabs it
-	// carries have to be the latest ones rather than the ones this render closed
-	// over. Two updates in one tick are routine — revealing a file's directory
-	// switches to All files and then selects the preview's tab — and reading the
-	// render-time value in the second one silently reverts the first.
+	// Two navigations in one tick are routine — revealing a file's directory
+	// switches to All files and then selects the preview's tab — and the second
+	// one reading this render's value would silently revert the first.
 	const latestPanelTabs = useRef({
 		dock: activeDockTab,
 		review: activeReviewTab,
 	});
-	latestPanelTabs.current = { dock: activeDockTab, review: activeReviewTab };
+	useEffect(() => {
+		latestPanelTabs.current = { dock: activeDockTab, review: activeReviewTab };
+	}, [activeDockTab, activeReviewTab]);
 
 	/** Navigates to the canonical chat route, preserving existing search state. */
 	function navigateToWorkspaceChat({

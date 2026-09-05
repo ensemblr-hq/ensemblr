@@ -51,7 +51,7 @@ import type { SessionTabModel } from '@/renderer/types/workbench';
 import type { SessionTabPlacement } from '@/renderer/types/workbench-shell';
 import { formatShortcut } from '@/shared/keymap';
 
-import { ArchitectureDiagramButton } from './architecture-diagram-button';
+import { ArchitectureDiagramButton } from './architecture-diagram';
 import { GhostIconButton } from './ghost-icon-button';
 import { SessionTab } from './session-tab';
 

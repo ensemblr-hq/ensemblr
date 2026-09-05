@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import {
 	agentSessionsForWorkspaceQuery,
 	listChatTabSummariesQuery,
+	workspaceGitStatusQuery,
 } from '@/renderer/api/ensemblr-queries';
 import { useHasPendingPrompts } from '@/renderer/state/composer';
 import type {
@@ -14,6 +15,32 @@ import type {
 import { NewChatEmptyState } from './new-chat-empty-state';
 import { AgentSessionTimeline } from './timeline/timeline';
 import { WorkspaceLandingCard } from './workspace-landing-card';
+
+/**
+ * Directories Ensemblr writes into a workspace itself: the seed architecture
+ * scan and the committed repository settings under one, the agent's plans,
+ * transcripts, and prompt attachments under the other. A change under either is
+ * the app's own bookkeeping rather than work the user did.
+ */
+const APP_OWNED_PREFIXES = ['.ensemblr/', '.context/'] as const;
+
+/**
+ * How many changed files the *user* is responsible for.
+ * @param paths - Every changed path git reports, or null before the read lands
+ * @param fallbackCount - The workspace model's own count, used until it does
+ * @returns The count the landing-card gate reads
+ */
+function countUserChangedFiles(
+	paths: readonly string[] | null,
+	fallbackCount: number,
+): number {
+	if (!paths) {
+		return fallbackCount;
+	}
+	return paths.filter(
+		(path) => !APP_OWNED_PREFIXES.some((prefix) => path.startsWith(prefix)),
+	).length;
+}
 
 /**
  * Scrollable timeline content shown above the composer.
@@ -55,6 +82,11 @@ export function WorkspaceTimeline({
 	const { data: agentSessionsData } = useQuery(
 		agentSessionsForWorkspaceQuery(workspace.id),
 	);
+	// The same query the workspace model derives `changeSummary` from, so reading
+	// it here costs a cache hit rather than a second poll.
+	const { data: gitStatusData } = useQuery(
+		workspaceGitStatusQuery(composer.workspaceCwd || null),
+	);
 	// The summary query lists every restorable tab, including terminal tabs no
 	// transcript is ever written for. Chats are the ones this surface can speak
 	// to, minus this tab itself — attaching a chat's own transcript to itself says
@@ -81,17 +113,23 @@ export function WorkspaceTimeline({
 		);
 	}
 
-	// Only Ensemblr's own record of work counts — a sibling chat tab's session or
-	// a closed tab's transcript. A dirty worktree does not: the app writes into a
-	// workspace it has just cut (the seed architecture scan, the setup script), so
-	// change counts report the app's own bookkeeping as if it were the user's
-	// work. An unloaded session list counts as history too: guessing "untouched"
-	// before it lands is the one answer that can be wrong, and the neutral empty
-	// state is right either way.
+	// A workspace the app has just cut is already dirty — it writes the seed
+	// architecture scan into it — so the dirty-worktree signal counts only the
+	// files outside the directories the app writes.
+	const userChangedFiles = countUserChangedFiles(
+		gitStatusData && !gitStatusData.error
+			? gitStatusData.files.map((file) => file.path)
+			: null,
+		workspace.changeSummary.files,
+	);
+	// An unloaded session list counts as history: guessing "untouched" before it
+	// lands is the one answer that can be wrong, and the neutral empty state is
+	// right either way.
 	const hasWorkspaceHistory =
 		agentSessionsData === undefined ||
 		agentSessionsData.sessions.length > 0 ||
-		hasAttachableTranscript;
+		hasAttachableTranscript ||
+		userChangedFiles > 0;
 	const showLandingCard =
 		!hasWorkspaceHistory && Boolean(workspace.landingSummary);
 

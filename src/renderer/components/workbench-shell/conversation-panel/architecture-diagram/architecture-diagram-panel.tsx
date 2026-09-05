@@ -23,6 +23,7 @@ import { failureText } from '@/renderer/lib/failure-text';
 import { formatRelativeTimestamp } from '@/renderer/lib/workbench/relative-time';
 import {
 	ARCHITECTURE_COMPONENT_TYPES,
+	type ArchitectureComponentType,
 	type ArchitectureIR,
 	diffArchitectureIr,
 } from '@/shared/architecture-diagram';
@@ -239,6 +240,15 @@ function DiagramSurface({
 	);
 }
 
+/** The toolbar's title strip and the viewport controls it drives. */
+interface DiagramToolbarProps {
+	capturedAt: string | null;
+	onFit: () => void;
+	onReset: () => void;
+	onZoom: (zoom: number) => void;
+	zoom: number;
+}
+
 /** Header strip: title, capture time, and the viewport controls. */
 function DiagramToolbar({
 	capturedAt,
@@ -246,13 +256,7 @@ function DiagramToolbar({
 	onReset,
 	onZoom,
 	zoom,
-}: {
-	capturedAt: string | null;
-	onFit: () => void;
-	onReset: () => void;
-	onZoom: (zoom: number) => void;
-	zoom: number;
-}) {
+}: DiagramToolbarProps) {
 	const { t } = useTranslation();
 	return (
 		<div className='flex h-10 shrink-0 items-center justify-between gap-3 border-border border-b px-3'>
@@ -325,8 +329,11 @@ function DiagramToolbar({
 	);
 }
 
-/** Translated label for each component role, shown in the footer legend. */
-function useComponentTypeLabels(): Record<string, string> {
+/**
+ * Translated label for each component role, shown in the footer legend. Keyed by
+ * the union so a new role is a compile error here rather than a blank row.
+ */
+function useComponentTypeLabels(): Record<ArchitectureComponentType, string> {
 	const { t } = useTranslation();
 	return {
 		backend: t('workbench:architecture-diagram.legend.backend', 'Backend'),

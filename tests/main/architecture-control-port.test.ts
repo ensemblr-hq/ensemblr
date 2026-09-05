@@ -9,7 +9,11 @@ import type {
 	ArchitectureScanOutcome,
 	ArchitectureService,
 } from '../../src/main/architecture/index.ts';
-import type { ArchitectureIR } from '../../src/shared/architecture-diagram.ts';
+import { MAX_AGENT_PAYLOAD_CHARS } from '../../src/shared/agent-control.ts';
+import type {
+	ArchitectureComponent,
+	ArchitectureIR,
+} from '../../src/shared/architecture-diagram.ts';
 
 const origin = { workspaceId: 'ws-1' } as never;
 
@@ -94,16 +98,78 @@ function makePort(service: Partial<ArchitectureService>) {
 }
 
 /** The stored read a workspace with a diagram answers with. */
-const stored = (): ArchitectureReadResult => ({
+const stored = (ir: ArchitectureIR = diagram): ArchitectureReadResult => ({
 	current: {
 		generatedAt: '2026-09-04T00:00:00.000Z',
 		graphFingerprint: 'abc',
-		ir: diagram,
+		ir,
 		relativePath: '.ensemblr/architecture.json',
 		source: 'scan',
 	},
 	previous: null,
 });
+
+/**
+ * Builds a component whose fields are padded to a known width, so a document can
+ * be pushed past the payload budget by count rather than by a magic blob.
+ * @param index - Which component this is
+ * @param padding - Characters of filler on each text field
+ * @returns The component
+ */
+const fatComponent = (
+	index: number,
+	padding: number,
+): ArchitectureComponent => ({
+	id: `c${index}`,
+	label: `l${index}`.padEnd(padding, 'x'),
+	sources: [
+		{ path: `src/a${index}`.padEnd(padding, 'y') },
+		{ path: `src/b${index}`.padEnd(padding, 'z') },
+	],
+	sublabel: `s${index}`.padEnd(padding, 'w'),
+	type: 'backend',
+});
+
+/**
+ * Builds a diagram whose serialized size is far past the payload budget.
+ * @param components - How many components to draw
+ * @param padding - Characters of filler on each text field
+ * @returns The oversized document
+ */
+const oversized = (components: number, padding: number): ArchitectureIR => ({
+	boundaries: [
+		{
+			kind: 'region',
+			label: 'everything',
+			wraps: Array.from({ length: components }, (_, index) => `c${index}`),
+		},
+	],
+	cards: [{ dot: 'cyan', items: ['a'.repeat(200)], title: 'notes' }],
+	components: Array.from({ length: components }, (_, index) =>
+		fatComponent(index, padding),
+	),
+	connections: Array.from({ length: components - 1 }, (_, index) => ({
+		from: `c${index}`,
+		id: `e${index}`,
+		label: `edge${index}`.padEnd(padding, 'e'),
+		to: `c${index + 1}`,
+	})),
+	meta: { title: 'oversized' },
+	schemaVersion: 1,
+});
+
+/**
+ * Reads a diagram and asserts the read succeeded, narrowing the outcome.
+ * @param port - The port under test
+ * @returns The successful result
+ */
+async function readOk(port: ReturnType<typeof makePort>['port']) {
+	const outcome = await port?.readDiagram({ origin });
+	if (!outcome?.ok) {
+		throw new Error(`expected a successful read, got ${outcome?.reason}`);
+	}
+	return outcome.result;
+}
 
 describe('architecture control port: reading', () => {
 	it('seeds a workspace that has none rather than reporting one missing', async () => {
@@ -115,11 +181,11 @@ describe('architecture control port: reading', () => {
 			}),
 		});
 
-		const result = await port?.readDiagram({ origin });
+		const result = await readOk(port);
 
 		expect(scanIfMissing).toHaveBeenCalledWith({ workspaceId: 'ws-1' });
-		expect(result?.source).toBe('scan');
-		expect(result?.componentCount).toBe(2);
+		expect(result.source).toBe('scan');
+		expect(result.componentCount).toBe(2);
 	});
 
 	// The file is tracked, so a document this build cannot parse is somebody's
@@ -137,10 +203,124 @@ describe('architecture control port: reading', () => {
 			}),
 		});
 
-		await expect(port?.readDiagram({ origin })).rejects.toThrow(
+		const outcome = await port?.readDiagram({ origin });
+
+		expect(outcome).toMatchObject({ ok: false, reason: 'unreadable' });
+		expect(outcome?.ok === false && outcome.message).toMatch(
 			/could not be read/,
 		);
 		expect(scanIfMissing).not.toHaveBeenCalled();
+	});
+
+	it('reports a workspace whose diagram could not be scanned as unavailable', async () => {
+		const { port } = makePort({
+			readDiagram: async () => ({ current: null, previous: null }),
+			scanIfMissing: async () => ({ reason: 'already-stored', rebuilt: false }),
+		});
+
+		const outcome = await port?.readDiagram({ origin });
+
+		expect(outcome).toMatchObject({ ok: false, reason: 'unavailable' });
+	});
+
+	it('answers rather than throwing when the service itself throws', async () => {
+		const { port } = makePort({
+			readDiagram: async () => {
+				throw Object.assign(
+					new Error('EACCES: permission denied, open /Users/p/x'),
+					{
+						code: 'EACCES',
+					},
+				);
+			},
+		});
+
+		const outcome = await port?.readDiagram({ origin });
+
+		expect(outcome).toMatchObject({ ok: false, reason: 'unavailable' });
+		expect(outcome?.ok === false && outcome.message).not.toContain('/Users/p');
+	});
+});
+
+describe('architecture control port: payload budget', () => {
+	it('returns an ordinary diagram whole, with nothing said about a cut', async () => {
+		const { port } = makePort({ readDiagram: async () => stored() });
+
+		const result = await readOk(port);
+
+		expect(result.diagram).toEqual(diagram);
+		expect(result.message).not.toMatch(/shortened/);
+	});
+
+	it('fits an oversized document into the agent payload budget', async () => {
+		const { port } = makePort({
+			readDiagram: async () => stored(oversized(60, 900)),
+		});
+
+		const result = await readOk(port);
+
+		expect(JSON.stringify(result.diagram).length).toBeLessThanOrEqual(
+			MAX_AGENT_PAYLOAD_CHARS,
+		);
+	});
+
+	// Annotation and evidence go before topology: the nodes and how they group are
+	// what an agent redraws, and the paths are the fattest optional field on the
+	// longest array.
+	it('sheds the cards and the source paths before it touches the topology', async () => {
+		const { port } = makePort({
+			readDiagram: async () => stored(oversized(12, 800)),
+		});
+
+		const result = await readOk(port);
+		const fitted = result.diagram as ArchitectureIR;
+
+		expect(fitted.cards).toBeUndefined();
+		expect(fitted.components.every((component) => !component.sources)).toBe(
+			true,
+		);
+		expect(fitted.components).toHaveLength(12);
+		expect(fitted.connections).toHaveLength(11);
+		expect(result.message).toContain('annotation cards were dropped');
+		expect(result.message).toContain('`sources` paths were dropped');
+	});
+
+	it('drops a tail of connections once shedding detail is not enough', async () => {
+		const { port } = makePort({
+			readDiagram: async () => stored(oversized(60, 900)),
+		});
+
+		const result = await readOk(port);
+		const fitted = result.diagram as ArchitectureIR;
+
+		expect(fitted.connections?.length ?? 0).toBeLessThan(59);
+		expect(result.message).toMatch(/\d+ connection\(s\) were dropped/);
+	});
+
+	// A shortened copy submitted back would store the cut as the whole document,
+	// deleting what was dropped out of a tracked file.
+	it('warns against submitting a shortened copy back', async () => {
+		const { port } = makePort({
+			readDiagram: async () => stored(oversized(60, 900)),
+		});
+
+		const result = await readOk(port);
+
+		expect(result.message).toContain('Do not submit this copy back');
+	});
+
+	it('counts what it returned rather than what it read', async () => {
+		const { port } = makePort({
+			readDiagram: async () => stored(oversized(400, 400)),
+		});
+
+		const result = await readOk(port);
+		const fitted = result.diagram as ArchitectureIR;
+
+		expect(result.componentCount).toBe(fitted.components.length);
+		expect(result.connectionCount).toBe(fitted.connections?.length ?? 0);
+		expect(result.componentCount).toBeLessThan(400);
+		expect(result.message).toMatch(/\d+ component\(s\) were dropped/);
 	});
 });
 
@@ -150,7 +330,7 @@ describe('architecture control port: writing', () => {
 			readDiagram: async () => stored(),
 		});
 
-		const result = await port?.updateDiagram({ diagram, origin });
+		const outcome = await port?.updateDiagram({ diagram, origin });
 
 		expect(storeRefinedIr).toHaveBeenCalledWith({
 			ir: expect.objectContaining({ meta: { title: 'uematsu' } }),
@@ -159,7 +339,8 @@ describe('architecture control port: writing', () => {
 		expect(broadcastArchitectureChanged).toHaveBeenCalledWith({
 			workspaceId: 'ws-1',
 		});
-		expect(result?.componentCount).toBe(2);
+		expect(outcome).toMatchObject({ ok: true });
+		expect(outcome?.ok === true && outcome.result.componentCount).toBe(2);
 	});
 
 	// A bridge that could not see the argument's shape sends the whole document
@@ -178,69 +359,176 @@ describe('architecture control port: writing', () => {
 		});
 	});
 
+	// Every rule the shared schema grows reaches the agent through this one
+	// message, so the port passes the parser's field paths through rather than
+	// flattening them into "that document is invalid".
+	it('passes a schema rule the port knows nothing about through by field path', async () => {
+		const { port, storeRefinedIr } = makePort({
+			readDiagram: async () => stored(),
+		});
+
+		const outcome = await port?.updateDiagram({
+			diagram: {
+				...diagram,
+				components: [
+					{
+						...diagram.components[0],
+						sources: [{ path: '../../../etc/passwd' }],
+					},
+					diagram.components[1],
+				],
+			},
+			origin,
+		});
+
+		expect(outcome).toMatchObject({ ok: false, reason: 'invalid' });
+		const message = outcome?.ok === false ? outcome.message : '';
+		expect(message).toMatch(/components\.0\.sources\.0\.path/);
+		expect(message).toMatch(/workspace-relative/);
+		expect(storeRefinedIr).not.toHaveBeenCalled();
+	});
+
 	it('names the fields that failed rather than only refusing', async () => {
 		const { port, storeRefinedIr } = makePort({
 			readDiagram: async () => stored(),
 		});
 
-		await expect(
-			port?.updateDiagram({
-				diagram: {
-					...diagram,
-					components: [{ ...diagram.components[0], type: 'not-a-type' }],
-				},
-				origin,
-			}),
-		).rejects.toThrow(/components\.0\.type/);
+		const outcome = await port?.updateDiagram({
+			diagram: {
+				...diagram,
+				components: [{ ...diagram.components[0], type: 'not-a-type' }],
+			},
+			origin,
+		});
+
+		expect(outcome).toMatchObject({ ok: false, reason: 'invalid' });
+		expect(outcome?.ok === false && outcome.message).toMatch(
+			/components\.0\.type/,
+		);
 		expect(storeRefinedIr).not.toHaveBeenCalled();
 	});
 
 	it('reports the undocumented source cap by name when it is exceeded', async () => {
 		const { port } = makePort({ readDiagram: async () => stored() });
 
-		await expect(
-			port?.updateDiagram({
-				diagram: {
-					...diagram,
-					components: [
-						{
-							...diagram.components[0],
-							sources: [
-								{ path: 'a' },
-								{ path: 'b' },
-								{ path: 'c' },
-								{ path: 'd' },
-							],
-						},
-					],
-				},
-				origin,
-			}),
-		).rejects.toThrow(/components\.0\.sources/);
+		const outcome = await port?.updateDiagram({
+			diagram: {
+				...diagram,
+				components: [
+					{
+						...diagram.components[0],
+						sources: [
+							{ path: 'a' },
+							{ path: 'b' },
+							{ path: 'c' },
+							{ path: 'd' },
+						],
+					},
+				],
+			},
+			origin,
+		});
+
+		expect(outcome?.ok === false && outcome.message).toMatch(
+			/components\.0\.sources/,
+		);
 	});
 
-	it('refuses a document too large to read', async () => {
+	it('refuses more components than the documented cap', async () => {
 		const { port, storeRefinedIr } = makePort({
 			readDiagram: async () => stored(),
 		});
 
-		await expect(
-			port?.updateDiagram({
-				diagram: {
-					...diagram,
-					boundaries: [],
-					components: Array.from({ length: 65 }, (_, index) => ({
-						col: index % 4,
-						id: `c${index}`,
-						label: `c${index}`,
-						row: Math.floor(index / 4),
-						type: 'backend' as const,
-					})),
-					connections: [],
-				},
-				origin,
-			}),
-		).rejects.toThrow(/too large to read/);
+		const outcome = await port?.updateDiagram({
+			diagram: {
+				...diagram,
+				boundaries: [],
+				components: Array.from({ length: 65 }, (_, index) => ({
+					col: index % 4,
+					id: `c${index}`,
+					label: `c${index}`,
+					row: Math.floor(index / 4),
+					type: 'backend' as const,
+				})),
+				connections: [],
+			},
+			origin,
+		});
+
+		expect(outcome).toMatchObject({ ok: false, reason: 'invalid' });
+		expect(outcome?.ok === false && outcome.message).toMatch(
+			/too large to read/,
+		);
 		expect(storeRefinedIr).not.toHaveBeenCalled();
+	});
+
+	it('refuses more connections than the documented cap', async () => {
+		const { port, storeRefinedIr } = makePort({
+			readDiagram: async () => stored(),
+		});
+
+		const outcome = await port?.updateDiagram({
+			diagram: {
+				...diagram,
+				boundaries: [],
+				connections: Array.from({ length: 161 }, (_, index) => ({
+					from: 'ipc',
+					id: `e${index}`,
+					to: 'storage',
+				})),
+			},
+			origin,
+		});
+
+		expect(outcome).toMatchObject({ ok: false, reason: 'invalid' });
+		expect(outcome?.ok === false && outcome.message).toMatch(/160 connections/);
+		expect(storeRefinedIr).not.toHaveBeenCalled();
+	});
+
+	it('refuses more boundaries than the documented cap', async () => {
+		const { port, storeRefinedIr } = makePort({
+			readDiagram: async () => stored(),
+		});
+
+		const outcome = await port?.updateDiagram({
+			diagram: {
+				...diagram,
+				boundaries: Array.from({ length: 25 }, (_, index) => ({
+					kind: 'region' as const,
+					label: `b${index}`,
+					wraps: ['storage'],
+				})),
+			},
+			origin,
+		});
+
+		expect(outcome).toMatchObject({ ok: false, reason: 'invalid' });
+		expect(outcome?.ok === false && outcome.message).toMatch(/24 boundaries/);
+		expect(storeRefinedIr).not.toHaveBeenCalled();
+	});
+
+	// A read-only mount is not the caller's mistake, and the error text names the
+	// absolute path of the user's checkout — neither belongs in an agent's context
+	// behind an instruction to fix the fields and resubmit.
+	it('reports a failed write without blaming the document or leaking the path', async () => {
+		const { port } = makePort({
+			readDiagram: async () => stored(),
+			storeRefinedIr: async () => {
+				throw Object.assign(
+					new Error(
+						"EACCES: permission denied, open '/Users/p/ws/.ensemblr/architecture.json'",
+					),
+					{ code: 'EACCES' },
+				);
+			},
+		});
+
+		const outcome = await port?.updateDiagram({ diagram, origin });
+
+		expect(outcome).toMatchObject({ ok: false, reason: 'store-failed' });
+		const message = outcome?.ok === false ? outcome.message : '';
+		expect(message).toContain('EACCES');
+		expect(message).not.toContain('/Users/p');
+		expect(message).toMatch(/valid and nothing is wrong with it/);
 	});
 });

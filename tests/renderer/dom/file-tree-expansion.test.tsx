@@ -47,4 +47,17 @@ describe('useFileTreeExpansion: revealOnly', () => {
 		expect(result.current.isExpanded('docs')).toBe(true);
 		expect(result.current.isExpanded('src')).toBe(true);
 	});
+
+	// A reveal that resolved no directory means the caller had nothing to open,
+	// not "close the tree" — collapsing everything and showing nothing is the one
+	// outcome no caller can have wanted.
+	it('ignores a reveal with no paths instead of collapsing the tree', () => {
+		const { result } = renderHook(() => useFileTreeExpansion(false, PATHS));
+
+		act(() => result.current.expandDirectories(['docs', 'tests']));
+		act(() => result.current.revealOnly([]));
+
+		expect(result.current.isExpanded('docs')).toBe(true);
+		expect(result.current.isExpanded('tests')).toBe(true);
+	});
 });

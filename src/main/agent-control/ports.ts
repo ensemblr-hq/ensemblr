@@ -20,7 +20,6 @@ import type {
 	ExitPlanModeArgs,
 	ExitPlanModeResult,
 	FocusPanelName,
-	GetArchitectureDiagramResult,
 	GetDiffCommentsResult,
 	GetWorkspaceDiffResult,
 	LinearCreateCommentArgs,
@@ -34,6 +33,7 @@ import type {
 	LinearUpdateIssueArgs,
 	LinearUpdateIssueResult,
 	OpenTabVariant,
+	ReadArchitectureDiagramOutcome,
 	ReadConversationArgs,
 	ReadConversationResult,
 	RecallMemoryResult,
@@ -43,7 +43,7 @@ import type {
 	SetSummaryResult,
 	StartTerminalKind,
 	SubagentMechanism,
-	UpdateArchitectureDiagramResult,
+	UpdateArchitectureDiagramOutcome,
 	WorkspaceBoardStatusValue,
 	WorkspaceLinkedIssue,
 } from '../../shared/agent-control.ts';
@@ -696,10 +696,11 @@ export interface SessionNamingPort {
  *
  * The port is where the policy lives, not the handler: it validates the
  * submitted document against the shared IR schema, refuses one that exceeds
- * {@link ARCHITECTURE_DIAGRAM_LIMITS}, and answers with one `status` word rather
- * than throwing across the boundary. Control adds no capability of its own — the
- * scan, the storage, and the gates are the architecture service's, and this only
- * reaches them.
+ * {@link ARCHITECTURE_DIAGRAM_LIMITS}, fits a read to
+ * {@link MAX_AGENT_PAYLOAD_CHARS} and says what it cut, and answers with one
+ * `reason` word rather than throwing across the boundary. Control adds no
+ * capability of its own — the scan, the storage, and the gates are the
+ * architecture service's, and this only reaches them.
  */
 export interface ArchitecturePort {
 	/**
@@ -708,11 +709,11 @@ export interface ArchitecturePort {
 	 */
 	readDiagram: (input: {
 		origin: AgentControlOrigin;
-	}) => Promise<GetArchitectureDiagramResult>;
+	}) => Promise<ReadArchitectureDiagramOutcome>;
 	updateDiagram: (input: {
 		diagram: unknown;
 		origin: AgentControlOrigin;
-	}) => Promise<UpdateArchitectureDiagramResult>;
+	}) => Promise<UpdateArchitectureDiagramOutcome>;
 }
 
 /** All collaborators the agent-control service composes. */
