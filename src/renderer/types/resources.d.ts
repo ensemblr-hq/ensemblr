@@ -2907,6 +2907,10 @@ export default interface Resources {
 				done: 'Started a sub-agent';
 				running: 'Starting a sub-agent';
 			};
+			'start-review': {
+				done: 'Opened the review';
+				running: 'Opening the review';
+			};
 			'start-terminal': {
 				done: 'Started a terminal';
 				running: 'Starting a terminal';

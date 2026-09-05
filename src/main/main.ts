@@ -16,6 +16,7 @@ import {
 	buildCoAuthorDirective,
 	buildLanguageDirective,
 	parseAskUserQuestionReply,
+	parseReviewBriefReply,
 	resolveAgentRole,
 } from '../shared/agent-control.ts';
 import type { AgentProviderId } from '../shared/agent-provider.ts';
@@ -56,7 +57,9 @@ import {
 	createBoardStatusStore,
 	createGuardrails,
 	createOriginRegistry,
+	createReviewLaunchCoordinator,
 	isSessionTabMarkedSubAgent,
+	makeReviewBriefFallback,
 	readWorkspaceLinkedIssue,
 	startControlServer,
 } from './agent-control';
@@ -1260,6 +1263,44 @@ ipcMain.handle(
 		}
 	},
 );
+// Built once here rather than inside the ports factory: the review-brief
+// fallback needs the same git reads the control layer's diff port does, and it
+// is constructed before those ports are.
+const controlWorkspaceGitService = createWorkspaceGitService({
+	localCommandService,
+});
+const reviewLaunchCoordinator = createReviewLaunchCoordinator({
+	/**
+	 * Asks every window to compose the workspace's review prompt; only one that
+	 * holds a live model for it answers, and none answering is the ordinary case
+	 * the fallback covers.
+	 */
+	broadcastRequest: (payload) =>
+		broadcastToAllWindows(
+			IPC_CHANNELS.agentControlReviewBriefRequested,
+			payload,
+		),
+	/** Composes the brief in main when no window answers in time. */
+	composeFallback: makeReviewBriefFallback({
+		databaseService,
+		/** Resolves the repository's settings for its committed review preference. */
+		resolveRepositorySettings: (repository) =>
+			settingsResolutionService.resolve({ repository }),
+		workspaceGitService: controlWorkspaceGitService,
+	}),
+	/** Reports whether any window is alive to compose one. */
+	hasRenderer: () =>
+		BrowserWindow.getAllWindows().some((window) => !window.isDestroyed()),
+});
+ipcMain.handle(
+	IPC_CHANNELS.agentControlReviewBriefReply,
+	(_event, reply: unknown) => {
+		const parsed = parseReviewBriefReply(reply);
+		if (parsed) {
+			reviewLaunchCoordinator.settle(parsed);
+		}
+	},
+);
 const planSubmission = createPlanSubmission({
 	/** Pushes a finished plan to every window; only the owning chat renders it. */
 	broadcastReview: (payload) =>
@@ -1386,6 +1427,7 @@ agentControlService = createAgentControlService({
 		augmentHarnessCommand,
 		conciergePorts,
 		boardStatusStore,
+		reviewLaunch: reviewLaunchCoordinator.port,
 		/** Broadcasts an agent-refined diagram so an open diagram tab refreshes. */
 		broadcastArchitectureChanged: (payload) =>
 			broadcastToAllWindows(
@@ -1439,7 +1481,7 @@ agentControlService = createAgentControlService({
 		// the control layer builds its own rather than reaching into the IPC
 		// handlers that build theirs the same way.
 		reviewService: createReviewService({ databaseService }),
-		workspaceGitService: createWorkspaceGitService({ localCommandService }),
+		workspaceGitService: controlWorkspaceGitService,
 		planMode: {
 			/** Saves the finished plan, surfaces the review, and ends the turn. */
 			exit: planSubmission.submit,

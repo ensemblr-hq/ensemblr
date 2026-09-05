@@ -40,6 +40,10 @@ const SUBAGENT_BLOCKED_OPS: ReadonlyMap<AgentControlOp, string> = new Map([
 		'You were spawned as a sub-agent to carry out one unit of work, and nested delegation is blocked. Do the work yourself and leave your findings as your last message.',
 	],
 	[
+		'startReview',
+		'You were spawned as a sub-agent to carry out one unit of work, and opening the workspace\u2019s Review conversation belongs to the orchestrator that spawned you \u2014 it is a second root agent on a worktree you do not own, and it reviews the whole change rather than your part of it. Report what you did and let the orchestrator have it reviewed.',
+	],
+	[
 		'sendFollowUp',
 		'You were spawned as a sub-agent and have no conversations of your own to steer. Driving another agent from here would put a second writer on a workspace you do not own. Leave your findings as your last message, or call `ensemblr_notify_orchestrator` if you are blocked.',
 	],
@@ -160,6 +164,10 @@ const CONCIERGE_BLOCKED_OPS: ReadonlyMap<AgentControlOp, string> = new Map([
 	[
 		'spawnChatTab',
 		'You have no workspace of your own to open a tab in. Use `ensemblr_start_conversation` with a `workspaceId` to put an orchestrator into a workspace instead.',
+	],
+	[
+		'startReview',
+		'The Review conversation opens over one workspace\u2019s change, and you have none of your own. Brief the orchestrator working there with `ensemblr_start_conversation` and let it open its own review.',
 	],
 	[
 		'launchHarness',
@@ -326,6 +334,13 @@ const NATIVE_DELEGATION_WITHHELD_OPS: ReadonlySet<AgentControlOp> = new Set([
 	'sendFollowUp',
 	'waitForAgents',
 	'listModels',
+	// Not delegation, and withheld for a different reason than the four above:
+	// driving the review it opens needs `sendFollowUp` to send the findings back
+	// and `waitForAgents` to know it has reported, and this caller holds neither.
+	// A review it can open but can neither wait on nor steer is worse than none,
+	// so the unattended loop tells this role to get its second reading through
+	// its own runtime's sub-agent mechanism instead.
+	'startReview',
 ]);
 
 /**

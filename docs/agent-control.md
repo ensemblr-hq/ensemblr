@@ -134,13 +134,13 @@ Delegation is bounded so a runaway agent cannot fork-bomb the app
 
 Guardrails count spawns; they do not decide who may do what. That is the role
 policy in `src/shared/agent-control/subagent-policy.ts`, which refuses a spawned
-sub-agent seventeen ops with `denied-scope` **whatever mode it is in**:
+sub-agent eighteen ops with `denied-scope` **whatever mode it is in**:
 
-`spawnChatTab`, `startConversation`, `sendFollowUp`, `launchHarness`,
-`startTerminal`, `stopTerminal`, `writeTerminal`, `openTab`, `closeTab`,
-`setBranchName`, `setWorkspaceStatus`, `askUserQuestion`, `exitPlanMode`,
-`linearCreateComment`, `linearCreateIssue`, `linearUpdateIssue`,
-`messageConcierge`.
+`spawnChatTab`, `startConversation`, `startReview`, `sendFollowUp`,
+`launchHarness`, `startTerminal`, `stopTerminal`, `writeTerminal`, `openTab`,
+`closeTab`, `setBranchName`, `setWorkspaceStatus`, `askUserQuestion`,
+`exitPlanMode`, `linearCreateComment`, `linearCreateIssue`,
+`linearUpdateIssue`, `messageConcierge`.
 
 Two things run together and are easy to confuse. The spawn guardrail reads
 `origin.depth`, which lives in the in-memory origin registry; the role policy
@@ -164,10 +164,10 @@ the tab carried before rather than assuming which way the write went.
 `waitForAgents`, `listModels`, and `listRunScripts` are not denied — a sub-agent
 simply has no children to wait on, no spawn to pick a model for, and no
 `startTerminal` to pick a run script for. Those three (`SUBAGENT_UNUSABLE_OPS`)
-are withheld from its tool list along with the seventeen above, because listing a
+are withheld from its tool list along with the eighteen above, because listing a
 tool the service would only refuse teaches the model to keep reaching for it. The
-Pi extension registers the complement of `SUBAGENT_WITHHELD_OPS` — twenty ops in
-all — for a child, and a parity test compares its copy of that set against the
+Pi extension registers the complement of `SUBAGENT_WITHHELD_OPS` — twenty-one ops
+in all — for a child, and a parity test compares its copy of that set against the
 shared one.
 
 What a sub-agent keeps: every read, `focusTab`/`focusDockTab`/`focusPanel`,
@@ -266,7 +266,7 @@ harness.
 
 ## Tool reference
 
-Forty-seven tools, enumerated from `TOOL_DEFS` in
+Forty-eight tools, enumerated from `TOOL_DEFS` in
 `src/main/agent-control/mcp-endpoint.ts`. The argument names and types below are
 the authoritative Zod schemas in `src/shared/agent-control/schemas.ts` — every
 schema is a `strictObject`, so an argument not listed here is rejected as
@@ -666,11 +666,42 @@ its tool calls with their arguments and results — rather than trusting the rep
 | `ensemblr_get_diff_comments` | `filePath?: string`, `workspaceId?: string` | read | — |
 | `ensemblr_add_diff_comments` | **`comments: { filePath: string; lineNumber?: number \| null; body: string }[]`** (1–50, body ≤ 4,000), `workspaceId?: string` | write | — |
 | `ensemblr_resolve_diff_comments` | **`commentIds: string[]`** (1–50), `workspaceId?: string` | write | — |
+| `ensemblr_start_review` | `title?: string` | write, spawn | sub-agent, Concierge |
 
-All four act on the caller's own workspace and none takes a workspace argument.
-`resolveDiffComments` is refused in Plan Mode. Any `filePath` must be relative to
-the workspace and must not climb out of it — an absolute path, a drive letter, or
-a `..` segment comes back as `invalid-args` rather than reaching git.
+The first four act on the caller's own workspace and none takes a workspace
+argument. `resolveDiffComments` is refused in Plan Mode. Any `filePath` must be
+relative to the workspace and must not climb out of it — an absolute path, a
+drive letter, or a `..` segment comes back as `invalid-args` rather than reaching
+git.
+
+#### Opening the app's own review
+
+`startReview` opens the workspace's **Review conversation** over the caller's
+change: the same review the user's Review button runs, deferring to whatever
+review skill the repository ships, carrying the user's own review instructions,
+on the model they configured for reviews. The prompt is composed by a renderer
+window through the same path the button uses, so an agent's review and a clicked
+one are the same review; when no window answers within
+`REVIEW_BRIEF_TIMEOUT_MS`, main composes the brief itself from the shared
+template and the repository's committed `[prompts]` preference, and the result
+message says so.
+
+What it opens is a **root orchestrator**, not a sub-agent, so it can delegate its
+own readers over a wide diff. Three consequences the result message spells out
+for the caller: it is absent from the children `waitForAgents` defaults to and
+must be named in `targets`; it shares the worktree, so the caller holds off
+writing while it works; and the caller stays the committer and owns the pull
+request. Findings go back to the *same* conversation with `sendFollowUp` — the
+reviewer fixes what it found, in the context that found it.
+
+It costs one of the workspace's two co-tenancy slots and refuses with the same
+message a peer spawn does when the checkout is full. Unlike a peer it raises no
+confirmation and is not refused while the user is away: a peer is a second writer
+the agent chose, whereas this is the Review action the user already has a button
+for. It is refused in Plan Mode, withheld from a sub-agent and the Concierge
+(neither has a change of its own to have reviewed), and withheld from a root
+delegating through its own runtime, which holds neither `sendFollowUp` nor
+`waitForAgents` and so could not drive the review it opened.
 
 ### Linear
 

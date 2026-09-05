@@ -206,6 +206,13 @@ export const TOOL_DEFS: readonly McpToolDef[] = [
 		},
 	},
 	{
+		name: 'ensemblr_start_review',
+		op: 'startReview',
+		description:
+			"Open this workspace's Review conversation over the change you have made — the same review the user's Review button runs, deferring to whatever review skill this repository ships, carrying the user's own review instructions, on the model they picked for reviews. Use it when a change is ready for a second reader, and prefer it to reviewing your own work: a reviewer that did not write the code is the whole point. What it opens is a root orchestrator with its own delegation budget, not your child, so it can spawn its own readers over a wide diff — which also means ensemblr_wait_for_agents will not pick it up by default and you must name its agentSessionId in `targets`. It shares this worktree with you: leave the files alone while it works. When it reports, send its findings back to the SAME conversation with ensemblr_send_follow_up and have it fix them there; you stay the committer and you own the pull request. Pass a short `title` when this is not the workspace's only review. It costs one of the workspace's two co-tenancy slots, so a workspace already holding a peer orchestrator or a running harness terminal refuses it.",
+		shape: { title: z.string().optional() },
+	},
+	{
 		name: 'ensemblr_send_follow_up',
 		op: 'sendFollowUp',
 		description: 'Send a follow-up prompt into an existing Pi conversation.',

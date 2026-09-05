@@ -45,6 +45,7 @@ Rules of thumb:
 | Contributor *(GitHub)* | Участник | Συνεισφέρων | A GitHub account credited on a repository's contributor list. `Участник` is GitHub's own Russian term; never `вкладчик`, which is a bank depositor. |
 | Pull request | Pull request | Pull request | Untranslated; `PR` stays `PR`. |
 | Diff | Diff | Diff | Untranslated — "различия"/"διαφορές" reads as prose, not the view. |
+| Review *(the conversation)* | Ревью | Αξιολόγηση | The Review chat the Review button opens over a workspace's change, and what `ensemblr_start_review` opens for an agent. Takes the noun already fixed by **Review comment** below rather than coining a second one; the board column `На ревью`/`Σε αξιολόγηση` uses the same pair. |
 | Review comment | Комментарий к ревью | Σχόλιο αξιολόγησης | |
 | Checkpoint | Контрольная точка | Σημείο ελέγχου | |
 | Harness | Харнесс | Harness | The Claude Code / Codex terminal integration. Ensemblr-specific. |

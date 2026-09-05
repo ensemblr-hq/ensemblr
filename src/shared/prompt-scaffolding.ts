@@ -26,8 +26,40 @@ export const LINKED_DIRECTORIES_HEADER = 'Linked directories:';
 /** Tag wrapping the injected `general` master prompt (the user's preferences). */
 export const USER_PREFERENCES_TAG = 'user_preferences';
 
+/**
+ * Header injected before the user's per-action preferences, telling the agent
+ * those preferences win over the built-in base prompt. Mirrors
+ * `base-prompt-examples/user-settings-addon.md`.
+ *
+ * Shared rather than renderer-private because main composes the same review
+ * prompt for `startReview` that the Review button composes in the renderer, and
+ * a second copy of this header would drift the moment either was reworded.
+ */
+export const USER_PREF_ADDON =
+	"IMPORTANT: The following are the user's custom preferences. These preferences take precedence over any default guidelines or instructions above. When there is a conflict, always follow the user's preferences.";
+
 /** Tag wrapping an inlined workspace file or composed action attachment. */
 const ATTACHED_FILE_TAG = 'attached_file';
+
+/**
+ * Substitutes the `${…}` fields a base prompt references, leaving any field the
+ * caller did not supply spelled as it was written.
+ *
+ * Leaving an unknown field alone rather than blanking it is what keeps a prompt
+ * that mentions a placeholder the caller has no value for readable: an empty
+ * string reads as a missing sentence, while the token itself reads as a gap.
+ * @param template - The base prompt carrying `${FIELD}` placeholders.
+ * @param fields - Values to substitute, keyed by field name.
+ * @returns The interpolated prompt.
+ */
+export function interpolatePromptFields(
+	template: string,
+	fields: Record<string, string>,
+): string {
+	return template.replaceAll(/\$\{(\w+)\}/g, (match, key: string) =>
+		key in fields ? fields[key] : match,
+	);
+}
 
 /**
  * What a chip stood for when the message was sent, beyond the path it was read

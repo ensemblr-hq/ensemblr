@@ -54,6 +54,7 @@
 		"src/shared/agent-failure.ts",
 		"src/shared/architecture-diagram.ts",
 		"src/shared/plan-mode.ts",
+		"src/shared/review-brief.ts",
 		"src/shared/scripts.ts",
 		"src/shared/terminal.ts",
 		"src/renderer/state/*/index.ts",

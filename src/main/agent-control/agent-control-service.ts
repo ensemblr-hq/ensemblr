@@ -61,6 +61,8 @@ import type {
 	SetWorkspaceStatusArgs,
 	SpawnChatTabArgs,
 	StartConversationArgs,
+	StartReviewArgs,
+	StartReviewResult,
 	StartTerminalArgs,
 	StopTerminalArgs,
 	UpdateArchitectureDiagramArgs,
@@ -74,12 +76,14 @@ import type {
 import {
 	briefReport,
 	buildAfkDirective,
+	buildAfkWorkflowDirective,
 	buildCoAuthorDirective,
 	buildConciergeMessage,
 	buildLanguageDirective,
 	buildLinkedIssueDirective,
 	buildPeerBriefDirective,
 	buildPlanModeDelegationDirective,
+	buildReviewPeerDirective,
 	buildSessionBriefNudge,
 	CONCIERGE_AWARENESS,
 	conciergeControlOpDenial,
@@ -305,6 +309,42 @@ const HARNESS_TERMINAL_KIND = 'agent';
 
 /** Terminal status of a session whose process is still alive. */
 const RUNNING_TERMINAL_STATUS = 'running';
+
+/** Tab title an agent-opened review takes when the caller names none. */
+const DEFAULT_REVIEW_TAB_TITLE = 'Review';
+
+/**
+ * Renders what an agent reads back after opening a review.
+ *
+ * Three things it cannot work out for itself, and each one costs a wasted turn
+ * if it is missing. The review is a root orchestrator rather than a child, so
+ * `ensemblr_wait_for_agents` will not find it unless it is named in `targets`.
+ * It shares the worktree, so writing while it works is how two agents lose each
+ * other's edits. And a `fallback` brief means the user's own review instructions
+ * and model pin never reached it, which belongs in the agent's report rather
+ * than being silently absorbed.
+ * @param input - The review session, whether its model pin was dropped, and
+ *   whether a window composed the brief or main fell back.
+ * @returns The message returned alongside the session and tab ids.
+ */
+function startedReviewMessage(input: {
+	agentSessionId: string;
+	droppedModel: boolean;
+	source: 'renderer' | 'fallback';
+}): string {
+	const caveats = [
+		input.source === 'fallback'
+			? "No Ensemblr window answered in time, so this review runs on the built-in guidelines and the repository's committed review preferences only — the user's personal review instructions and their configured review model did not reach it."
+			: '',
+		input.droppedModel
+			? "The model the user configured for reviews runs on the other agent runtime, which a spawn cannot cross, so this review runs on yours instead — it is still the user's review prompt, on a model they did not pick."
+			: '',
+	].filter(Boolean);
+	const reported = caveats.length
+		? ` ${caveats.join(' ')} Say so in your report.`
+		: '';
+	return `Opened this workspace's Review conversation, running the same review the user's Review button runs. It is a root orchestrator with its own delegation budget rather than your child, so \`ensemblr_wait_for_agents\` will not pick it up by default — wait on it with \`targets: ["${input.agentSessionId}"]\`, and steer it with \`ensemblr_send_follow_up\` against the same id. It shares this worktree with you: leave the files alone until it reports, and do the committing and the pull request yourself.${reported}`;
+}
 
 /**
  * Builds a failure envelope.
@@ -1081,6 +1121,35 @@ export function createAgentControlService({
 	};
 
 	/**
+	 * Takes a slot in the workspace's co-tenancy allowance, or refuses because the
+	 * checkout is already full.
+	 *
+	 * Shared by every op that opens a second root orchestrator on one worktree —
+	 * {@link gatePeerSpawn} for a peer the user asked for, {@link handleStartReview}
+	 * for the app's own Review conversation — because the cap is about concurrent
+	 * writers rather than about why any one of them was opened. The two differ in
+	 * what they ask *after* the cap, not in the cap itself.
+	 * @param origin - Resolved caller identity, naming the workspace to count in.
+	 * @returns The reservation to release once the conversation is open, or the denial.
+	 */
+	const reserveCoTenantSlot = async (
+		origin: AgentControlOrigin,
+	): Promise<AgentControlResult<never> | (() => void)> => {
+		const [roots, harnesses] = await Promise.all([
+			rootsInWorkspace(origin.workspaceId),
+			liveHarnessTerminals(origin.workspaceId),
+		]);
+		const opening = peerSpawnsOpening.get(origin.workspaceId) ?? 0;
+		if (
+			roots.length + harnesses.length + opening >=
+			PEER_ORCHESTRATOR_LIMITS.maxPerWorkspace
+		) {
+			return fail('denied-quota', workspaceFullRefusal(roots, harnesses));
+		}
+		return reservePeerSlot(origin.workspaceId);
+	};
+
+	/**
 	 * Decides whether a peer orchestrator may be opened, and asks the user.
 	 *
 	 * "The user explicitly asked for this" cannot be a judgement the spawning agent
@@ -1115,18 +1184,11 @@ export function createAgentControlService({
 				'A peer orchestrator is a second writer on this worktree, and you are planning — there is nothing yet for two agents to write. Say in the plan that the work splits in two, and open the peer once the plan is approved.',
 			);
 		}
-		const [roots, harnesses] = await Promise.all([
-			rootsInWorkspace(origin.workspaceId),
-			liveHarnessTerminals(origin.workspaceId),
-		]);
-		const opening = peerSpawnsOpening.get(origin.workspaceId) ?? 0;
-		if (
-			roots.length + harnesses.length + opening >=
-			PEER_ORCHESTRATOR_LIMITS.maxPerWorkspace
-		) {
-			return fail('denied-quota', workspaceFullRefusal(roots, harnesses));
+		const reserved = await reserveCoTenantSlot(origin);
+		if (typeof reserved !== 'function') {
+			return reserved;
 		}
-		const release = reservePeerSlot(origin.workspaceId);
+		const release = reserved;
 		// Not auto-approved the way `gatePermission`'s confirmation is. A peer is
 		// only ever opened because the USER asked for one, and that premise cannot
 		// hold while they are away — so this refuses rather than waiting on a dialog
@@ -1253,6 +1315,126 @@ export function createAgentControlService({
 			chatTabId: started.chatTabId,
 			result,
 		});
+	};
+
+	/**
+	 * The review model to pin the review conversation to, dropped when it belongs
+	 * to a runtime the caller cannot spawn on.
+	 *
+	 * The review model is one app-level preference the user sets once, and nothing
+	 * ties it to whatever runtime a given workspace agent happens to run. A spawn
+	 * refuses a model from the other runtime outright — correctly, since a child
+	 * cannot cross runtimes — and `startReview` takes no model argument, so
+	 * forwarding it unchecked would dead-end the caller on a refusal it has no way
+	 * to answer. Dropping it opens the review on the caller's own runtime instead,
+	 * and {@link startedReviewMessage} says the configured model was not used so
+	 * the substitution reaches the user's report rather than passing silently.
+	 * @param origin - Resolved caller identity, naming the runtime to check against.
+	 * @param requested - The model the brief carried, or null when it carried none.
+	 * @returns The model to pin, or null to let the spawn inherit the caller's.
+	 */
+	const spawnableReviewModel = async (
+		origin: AgentControlOrigin,
+		requested: string | null,
+	): Promise<string | null> => {
+		const runtime = originRuntime(origin);
+		if (!requested || runtime === null) {
+			return requested;
+		}
+		const listing = await ports.conversations
+			.listModels({ runtime })
+			.catch(() => null);
+		return listing?.models.some((model) => model.id === requested)
+			? requested
+			: null;
+	};
+
+	/**
+	 * Opens the app's own Review conversation over the caller's workspace and
+	 * hands back the session to wait on.
+	 *
+	 * What it opens is a **root orchestrator**, not a sub-agent, and that is the
+	 * point rather than an implementation detail: a review of a wide change is
+	 * itself delegable work, and a reviewer that cannot spawn readers of its own
+	 * reads a fifty-file diff in one pass or not at all. It costs a slot in the
+	 * workspace's co-tenancy allowance for exactly the reason a peer does — it is
+	 * a second writer on one checkout — so a workspace already holding its limit
+	 * refuses this the same way and with the same message.
+	 *
+	 * The Concierge and a spawned sub-agent are refused it by
+	 * {@link CONCIERGE_BLOCKED_OPS} and {@link SUBAGENT_BLOCKED_OPS}: neither has
+	 * a workspace whose change is its own to have reviewed.
+	 *
+	 * Unlike {@link gatePeerSpawn} it raises no confirmation and is not refused
+	 * while the user is away. A peer is a second writer the *agent* chose, so
+	 * "the user asked for this" has to be established by a dialog; this is the
+	 * Review action the user already has a button for, composed from their own
+	 * settings and running on the model they picked for reviews. Asking them to
+	 * confirm their own review — and refusing it overnight, when the unattended
+	 * loop is the one that most needs a second reader — would be gating the wrong
+	 * thing.
+	 * @param origin - Resolved caller identity.
+	 * @param args - The optional tab title.
+	 * @returns The review session and tab, or a failure envelope.
+	 */
+	const handleStartReview = async (
+		origin: AgentControlOrigin,
+		args: StartReviewArgs,
+		callerModel: string | undefined,
+	): Promise<AgentControlResult<unknown>> => {
+		const spawnDenied = evaluateSpawnGuard(origin);
+		if (spawnDenied) {
+			return spawnDenied;
+		}
+		const reserved = await reserveCoTenantSlot(origin);
+		if (typeof reserved !== 'function') {
+			return reserved;
+		}
+		// Held until the review is open, because that is when it registers an origin
+		// of its own and starts being counted by the reservation above — and
+		// released on every path out, including a throwing compose, because
+		// `peerSpawnsOpening` has no other decrement and a slot lost here is lost
+		// for the life of the process.
+		try {
+			const brief = await ports.reviewLaunch.composeBrief({
+				workspaceCwd: origin.workspaceCwd,
+				workspaceId: origin.workspaceId,
+			});
+			const pinned = await spawnableReviewModel(origin, brief.model);
+			const started = await ports.conversations.startConversation({
+				afkMode: isUnattended(origin),
+				asPeer: true,
+				callerConcierge: false,
+				callerModel,
+				callerRuntime: originRuntime(origin),
+				model: pinned ?? undefined,
+				parentSessionId: origin.sessionId,
+				planMode: false,
+				prompt: `${buildReviewPeerDirective(origin.sessionId)}\n\n---\n\n${brief.prompt}`,
+				// Forwarded whichever way the model resolved: the level is the user's
+				// own review preference and is set independently of the model pin, and
+				// `resolveForSpawn` already drops one the resolved model cannot take.
+				thinkingLevel: brief.thinkingLevel ?? undefined,
+				title: args.title ?? DEFAULT_REVIEW_TAB_TITLE,
+				workspaceCwd: origin.workspaceCwd,
+				workspaceId: origin.workspaceId,
+			});
+			if (!started.ok) {
+				return fail('invalid-args', started.reason);
+			}
+			guardrails.recordSpawn(origin.sessionId);
+			return ok({
+				agentSessionId: started.agentSessionId,
+				chatTabId: started.chatTabId,
+				message: startedReviewMessage({
+					agentSessionId: started.agentSessionId,
+					droppedModel: brief.model !== null && pinned === null,
+					source: brief.source,
+				}),
+			} satisfies StartReviewResult);
+		} finally {
+			reserved();
+		}
 	};
 
 	/**
@@ -1440,6 +1622,7 @@ export function createAgentControlService({
 		return ok({
 			afkDirective: buildAfkDirective(afkMode),
 			afkMode,
+			afkWorkflowDirective: buildAfkWorkflowDirective(afkMode),
 			issueDirective: await readIssueDirectiveForOrigin(origin),
 			languageDirective: readLanguageDirective(),
 			naming,
@@ -2587,6 +2770,8 @@ export function createAgentControlService({
 				callerModel,
 				signal,
 			),
+		startReview: ({ args, callerModel, origin }) =>
+			handleStartReview(origin, args as StartReviewArgs, callerModel),
 		startTerminal: ({ args, origin }) =>
 			handleStartTerminal(origin, args as StartTerminalArgs),
 		stopTerminal: ({ args, origin }) =>
@@ -2696,6 +2881,7 @@ export function createAgentControlService({
 			planDelegationFor(origin, role),
 			readPlanRefinement(origin),
 			buildAfkDirective(isUnattended(origin)),
+			buildAfkWorkflowDirective(isUnattended(origin)),
 			readLanguageDirective(),
 			issueDirectiveFor(origin, role),
 			readCoAuthorDirective(),

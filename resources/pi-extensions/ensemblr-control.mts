@@ -72,6 +72,7 @@ What you can drive:
 - Terminals: start/stop the setup script, a run script, or a spawn terminal (\`ensemblr_start_terminal\`/\`ensemblr_stop_terminal\`); type into one (\`ensemblr_write_terminal\`); read its output (\`ensemblr_read_terminal_output\`, by \`terminalId\` or by \`kind\`, cleaned of escape codes unless you ask for \`ansi\`). A repository configures its run scripts by name — a dev server, a playground, an unsigned build — so call \`ensemblr_list_run_scripts\` and pass the \`scriptName\` you want; starting a run script without one takes the repository's default, which is rarely the one you meant. Only one script of a kind runs at a time: starting a second is refused with \`conflict\`, and that refusal names the terminal already holding the slot, which \`restart: true\` replaces.
 - Focus & inspect: bring a tab/terminal or the Files/Changes/Checks panel forward (\`ensemblr_focus_tab\`/\`ensemblr_focus_dock_tab\`/\`ensemblr_focus_panel\`); list workspaces/tabs/terminals; read a conversation's status or last message; audit what a conversation actually did, tool calls included (\`ensemblr_read_conversation\`).
 - Review: read this workspace's diff (\`ensemblr_get_workspace_diff\`) — call it with \`stat: true\` FIRST to see which files changed and how large the diff is, then read the whole thing, or one file at a time with \`filePath\`; read the review comments already on it (\`ensemblr_get_diff_comments\`); leave your own against a file and line (\`ensemblr_add_diff_comments\`), which the user reads as a list in the Checks panel. Ensemblr brings Checks forward itself after a comment op — once per batch, not once per call — so never spend an \`ensemblr_focus_panel\` call on it. Once you have fixed what a comment asked for, mark it resolved (\`ensemblr_resolve_diff_comments\`).${architecture ? ARCHITECTURE_INVENTORY : ''}
+- Get the change reviewed: \`ensemblr_start_review\` opens this workspace's Review conversation over your change — the same review the user's Review button runs, on the model they configured for it, deferring to whatever review skill the repository ships. Prefer it to reviewing your own work. What it opens is a root orchestrator rather than your child, so it can spawn its own readers over a wide diff, and \`ensemblr_wait_for_agents\` will not find it unless you name its \`agentSessionId\` in \`targets\`. It shares this worktree: leave the files alone while it works. Send its findings back to the SAME conversation with \`ensemblr_send_follow_up\` and have it fix them there rather than fixing them yourself — you stay the committer and you own the pull request. It takes one of the workspace's two co-tenancy slots, so a workspace already holding a peer or a running harness terminal refuses it.
 - Linear: search the connected account's issues (\`ensemblr_linear_list_issues\`), read one with its comments (\`ensemblr_linear_get_issue\`), and read the team/project/state/label/user tables an update needs ids from (\`ensemblr_linear_get_metadata\`). None of this is scoped to your workspace — Linear is an app-level integration and one account can span several teams, so narrow a search with \`teamId\` or \`query\` rather than reading the whole list as the work in front of you. Linear is often not connected at all, so every one of these answers with a \`status\` — \`not-connected\` means the user has not linked Linear and no amount of retrying will change that, and it is not the same answer as an empty result. Comment on an issue (\`ensemblr_linear_create_comment\`) and move one along (\`ensemblr_linear_update_issue\`: state, assignee, priority, title, description). A state whose type is \`completed\` or \`canceled\` is refused whatever you pass — you take work as far as \`In Review\` and the user decides whether it is done. File a new one (\`ensemblr_linear_create_issue\`, \`teamId\` required) for the follow-up you found and were told not to fix, never for the work you are already doing; \`ensemblr_linear_list_issues\` has to have run at least once in this conversation before the first create, because nothing here can delete the duplicate a search would have caught.
 - Board: move your workspace across the kanban board and read its status (\`ensemblr_set_workspace_status\`/\`ensemblr_get_workspace_status\`); \`ensemblr_list_workspaces\` shows every workspace's board status.
 - Reach the Concierge: \`ensemblr_message_concierge\` is your one channel upward — to the app-level agent that briefs workspace agents and supervises every workspace at once. Use it when something you found changes what the Concierge should do and it has no way to see it: you are blocked on a dependency outside this workspace, the brief it gave you was wrong, the work belongs in a different repository, or you have finished what it asked for. It does not read your workspace on its own initiative, so a discovery left only in your own tab reaches nobody. You pass no session id and should hold none — its conversation is cleared and restarted routinely, so the app resolves whichever one is live at the moment you send. The send does not block: carry on, and a reply, if one comes, arrives here as a follow-up. It is refused outright when no Concierge conversation is open, and capped per conversation, so say it once and in full rather than in installments.
@@ -379,6 +380,7 @@ const SUBAGENT_WITHHELD_OPS = new Set([
 	'setWorkspaceStatus',
 	'spawnChatTab',
 	'startConversation',
+	'startReview',
 	'startTerminal',
 	'stopTerminal',
 	'waitForAgents',
@@ -404,6 +406,7 @@ const CONCIERGE_WITHHELD_OPS = new Set([
 	'setName',
 	'setSummary',
 	'spawnChatTab',
+	'startReview',
 	'startTerminal',
 	'getArchitectureDiagram',
 	'stopTerminal',
@@ -641,12 +644,14 @@ async function fetchSessionBrief(): Promise<{
 	languageDirective: string | null;
 	issueDirective: string | null;
 	afkDirective: string | null;
+	afkWorkflowDirective: string | null;
 	rolePlaybook: string | null;
 }> {
 	const result = await invoke('getSessionBrief', {}, undefined);
 	if (!result.ok) {
 		return {
 			afkDirective: null,
+			afkWorkflowDirective: null,
 			issueDirective: null,
 			languageDirective: null,
 			nudge: null,
@@ -663,6 +668,7 @@ async function fetchSessionBrief(): Promise<{
 				languageDirective?: string | null;
 				issueDirective?: string | null;
 				afkDirective?: string | null;
+				afkWorkflowDirective?: string | null;
 				rolePlaybook?: string | null;
 		  }
 		| undefined;
@@ -673,6 +679,10 @@ async function fetchSessionBrief(): Promise<{
 				: null,
 		afkDirective:
 			typeof brief?.afkDirective === 'string' ? brief.afkDirective : null,
+		afkWorkflowDirective:
+			typeof brief?.afkWorkflowDirective === 'string'
+				? brief.afkWorkflowDirective
+				: null,
 		issueDirective:
 			typeof brief?.issueDirective === 'string' ? brief.issueDirective : null,
 		languageDirective:
@@ -710,6 +720,7 @@ export default function ensemblrControl(pi: ExtensionAPI): void {
 	pi.on('before_agent_start', async (event) => {
 		const {
 			afkDirective,
+			afkWorkflowDirective,
 			issueDirective,
 			languageDirective,
 			nudge,
@@ -726,6 +737,7 @@ export default function ensemblrControl(pi: ExtensionAPI): void {
 			nudge,
 			planRefinement,
 			afkDirective,
+			afkWorkflowDirective,
 			languageDirective,
 			issueDirective,
 		].filter((block) => typeof block === 'string' && block.length > 0);
@@ -819,6 +831,12 @@ export default function ensemblrControl(pi: ExtensionAPI): void {
 			wait: Type.Optional(Type.Boolean()),
 			workspaceId: Type.Optional(Type.String()),
 		}),
+	);
+	tool(
+		'ensemblr_start_review',
+		'startReview',
+		"Open this workspace's Review conversation over the change you have made — the same review the user's Review button runs, deferring to whatever review skill this repository ships, carrying the user's own review instructions, on the model they picked for reviews. Use it when a change is ready for a second reader, and prefer it to reviewing your own work: a reviewer that did not write the code is the whole point. What it opens is a root orchestrator with its own delegation budget, not your child, so it can spawn its own readers over a wide diff — which also means ensemblr_wait_for_agents will not pick it up by default and you must name its agentSessionId in `targets`. It shares this worktree with you: leave the files alone while it works. When it reports, send its findings back to the SAME conversation with ensemblr_send_follow_up and have it fix them there; you stay the committer and you own the pull request. Pass a short `title` when this is not the workspace's only review. It costs one of the workspace's two co-tenancy slots, so a workspace already holding a peer orchestrator or a running harness terminal refuses it.",
+		Type.Object({ title: Type.Optional(Type.String()) }),
 	);
 	tool(
 		'ensemblr_send_follow_up',

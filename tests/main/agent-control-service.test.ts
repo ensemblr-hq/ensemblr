@@ -229,6 +229,14 @@ const makePorts = (
 		isActive: vi.fn(() => false),
 		releaseSession: vi.fn(),
 	},
+	reviewLaunch: {
+		composeBrief: vi.fn().mockResolvedValue({
+			model: null,
+			prompt: 'REVIEW',
+			source: 'fallback',
+			thinkingLevel: null,
+		}),
+	},
 	sessionNaming: {
 		readBrief: vi.fn().mockResolvedValue({
 			branch: { current: null, eligible: false },

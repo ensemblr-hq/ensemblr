@@ -16,6 +16,7 @@ export type ToolGlyph =
 	| 'circle-x'
 	| 'clipboard-list'
 	| 'crosshair'
+	| 'eye'
 	| 'file-diff'
 	| 'file-pen'
 	| 'file-plus'

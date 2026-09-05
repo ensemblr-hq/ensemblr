@@ -571,6 +571,44 @@ export interface ReviewPort {
 }
 
 /**
+ * The review prompt `startReview` opens its conversation with, plus the model
+ * pins that conversation runs on.
+ *
+ * `source` is not decoration. `renderer` means a window composed the prompt the
+ * way the Review button does — the user's personal per-repository review
+ * instructions and their configured review model included — while `fallback`
+ * means main composed it alone and could reach neither. The op tells the calling
+ * agent which it got, because a review run without the user's own instructions
+ * is a weaker review than the one they configured and the agent's report should
+ * be able to say so.
+ */
+export interface ReviewLaunchBrief {
+	prompt: string;
+	model: string | null;
+	thinkingLevel: string | null;
+	source: 'renderer' | 'fallback';
+}
+
+/**
+ * Composes the review prompt for a workspace, asking a renderer first and
+ * composing it in main when none answers.
+ *
+ * The round trip exists because the two inputs that make the review the *user's*
+ * review live in the renderer and nowhere else: the personal per-repository
+ * review instructions are still `localStorage`, and the review model and
+ * thinking level are renderer preference atoms. Main can compose everything else
+ * — the base prompt, the branch and its base, the changed files, the committed
+ * `[prompts]` preference — which is what makes the fallback a trimmed version of
+ * the same prompt rather than a second one.
+ */
+export interface ReviewLaunchPort {
+	composeBrief: (input: {
+		workspaceId: string;
+		workspaceCwd: string;
+	}) => Promise<ReviewLaunchBrief>;
+}
+
+/**
  * Reads and writes Linear issues over the service that already backs the
  * renderer's tracker views.
  *
@@ -820,6 +858,7 @@ export interface AgentControlPorts {
 	architecture?: ArchitecturePort;
 	diff: DiffPort;
 	review: ReviewPort;
+	reviewLaunch: ReviewLaunchPort;
 	linear: LinearPort;
 	permissions: PermissionPort;
 	language: LanguagePort;

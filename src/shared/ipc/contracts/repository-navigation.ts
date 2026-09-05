@@ -21,6 +21,10 @@ import type {
 	ConciergeVisibilityReport,
 	FocusChatBroadcast,
 } from './notifications.ts';
+import type {
+	ReviewBriefReply,
+	ReviewBriefRequestedBroadcast,
+} from './review-launch.ts';
 
 /** Open-ended metadata bag attached to a repository or workspace in the navigation tree. */
 export interface RepositoryWorkspaceNavigationMetadata {
@@ -263,6 +267,17 @@ export interface ShellApi {
 	) => () => void;
 	/** Answers a pending questionnaire, unblocking the agent that asked it. */
 	answerUserQuestion: (reply: AskUserQuestionReply) => Promise<void>;
+	/**
+	 * Subscribes to review-prompt requests (an agent called `startReview` and main
+	 * wants the prompt the Review button would compose). Returns an unsubscribe
+	 * function. A window that holds no live model for the named workspace answers
+	 * with an empty prompt, and main composes its own.
+	 */
+	onReviewBriefRequested: (
+		listener: (payload: ReviewBriefRequestedBroadcast) => void,
+	) => () => void;
+	/** Answers a pending review-prompt request. */
+	replyReviewBrief: (reply: ReviewBriefReply) => Promise<void>;
 	/**
 	 * Subscribes to finished agent plans (an agent called `exitPlanMode` and
 	 * ended its turn). Returns an unsubscribe function. The renderer shows each
