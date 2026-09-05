@@ -9,6 +9,75 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.3] - 2026-09-05
+
+**Every workspace can carry an architecture diagram, and the guide finally shows the app at its own
+resolution.** The diagram is a committed document rather than application state, drawn by an agent
+rather than derived from a scan, and it ships behind an experimental switch that is off by default —
+with it off, the pane, the control ops and the bundled skill are absent rather than disabled. Beside
+it, a second Electron entrypoint renders the shipped renderer against scripted fixtures, which is what
+let the whole guide image set be recaptured at native resolution instead of staged by hand against
+real data and then scrubbed.
+[Release](https://github.com/ensemblr-hq/ensemblr/releases/tag/v0.1.3) ·
+[`.dmg`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.3/Ensemblr-0.1.3-arm64.dmg) ·
+[`.AppImage`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.3/Ensemblr-0.1.3-x64.AppImage)
+
+### Added
+
+- **The workspace architecture diagram, in its own pane.** Directories as nodes, cross-module imports
+  as edges, top-level directories as boundary frames, opened from the conversation tab strip beside
+  the file preview. The document is a committed file at `.ensemblr/architecture.json` rather than a
+  row in SQLite, so it travels with the code it describes: a clone arrives with the architecture
+  already drawn, and a refinement shows up in a pull request instead of hiding in application state.
+  Nothing in the app derives it — the module-graph scanner and the on-create seeding were removed in
+  favour of authoring it entirely through two control ops, `ensemblr_get_architecture_diagram` and
+  `ensemblr_update_architecture_diagram`, because a scan's only output was a diff full of directory
+  names an agent had to rewrite before it was worth reading. The bundled `architecture-diagram` skill
+  teaches what only a model can fix — boundary labels, node types, reading order, which edges carry
+  meaning — and states the rule the diagram lives by: it is a drawing for the user, never a source of
+  truth for an agent, which reads the code instead. A stale diagram asks to be corrected through three
+  gates, cheapest first: a workspace nobody has drawn costs one failed `stat`, only one that has a
+  diagram pays for the change-set read, and only a change set landing inside a component's `sources`
+  pays for the timestamps. The feature is an experimental switch defaulting off, and it is a feature
+  gate rather than a preference — with it off the pane, both control ops, the skill and every mention
+  of the diagram in an agent playbook are absent rather than disabled, so nothing advertises a surface
+  the app will not serve. Migration 027 adds only the `diagram` tab kind. (#437)
+
+- **A separate demo Electron entrypoint, and a guide image set recaptured at native resolution.**
+  Marketing and guide assets needed states that are awkward to stage against real data — an agent
+  frozen mid-turn, a board with cards in every column, a diff with a review thread open — and the old
+  ritual was to shoot the real app on a maintainer's machine, then scrub tracker titles, blur
+  `/Users/…` paths and pixelate the account block. Two shots stayed outstanding for exactly that
+  reason. Demo mode is a second entrypoint (`demo/demo-main.ts`, `demo/demo-preload.ts`, a renderer
+  root at `demo/main.tsx`) launched by `npm run dev:demo`, rendering the shipped renderer against a
+  stubbed bridge whose answers come from a scenario file — so a shot is a file in `demo/scenarios/`
+  rather than a state somebody reproduced by hand. Nothing under `src/` changes, Forge is not
+  involved, and the packaged app carries no demo code because there is none to strip: demo mode has
+  its own `tsconfig.demo.json`, its own `.demo/` build output, and its own Electron product name so
+  its `userData` is neither the installed app's nor the dev build's. The result is 21 shots at
+  2992×1866 with no downscale and no quantization, replacing a 1600px-wide pngquant'd set, plus the
+  seven images that were missing or outstanding and a still for the README hero.
+  See [ADR 0058](./docs/adr/0058-capture-promotional-screenshots-from-a-separate-demo-electron-entrypoint.md). (#435)
+
+### Changed
+
+- **Dev dependencies bumped within their pinned majors.** `@biomejs/biome` 2.5.11,
+  `@vitejs/plugin-react` 6.1.1 and `happy-dom` 20.12.0. The `$schema` URL in `biome.json` moves with
+  Biome, which reports a config pinned to the previous patch as stale. (#436)
+
+- **`docs/` corrected against the code for the stable line.** The drift an audit turned up is fixed
+  rather than tidied around, the published 0.1.2 assets are pinned in the install guide, and
+  `docs/guide/14-troubleshooting.md` stops attributing "`npm run make` exits 0 and `out/` is empty"
+  solely to running under Node 26 — a failed Electron download presents identically and was not
+  mentioned. (#432, #433, #434)
+
+- **Demo mode is excluded from fallow and react-doctor.** A screenshot harness is not product code, so
+  scoring it as first-party is all noise: a scenario is a fixture whose only consumer is the scenario
+  registry, and its shape is dictated by whichever bridge calls a route happens to make. Fallow takes
+  a `demo/**` ignore pattern so the tree drops out at file discovery and every pass skips it;
+  react-doctor ignores `demo/**` and `.demo/`. Verified at 0 demo files discovered against 1,588 under
+  `src/`, and a full react-doctor scan reporting 0 demo findings at score 100. (#435)
+
 ## [0.1.2] - 2026-09-04
 
 **Quick Start can publish into an organization, and a sent prompt keeps the chips the composer
