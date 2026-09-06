@@ -8,6 +8,7 @@ import {
 	BrowserWindow,
 	dialog,
 	ipcMain,
+	nativeTheme,
 	safeStorage,
 	shell,
 } from 'electron';
@@ -100,6 +101,7 @@ import type { QuitExit } from './app/quit-coordinator';
 import { createQuitCoordinator } from './app/quit-coordinator';
 import { createQuitGuard } from './app/quit-guard';
 import { resolveUserDataDirectory } from './app/user-data-location';
+import { resolveWindowBackgroundColor } from './app/window-background';
 import { createMainWindowStateStore } from './app/window-state';
 import { createArchitectureService } from './architecture';
 import { createChatTabService } from './chat-tabs/chat-tab-service.ts';
@@ -1556,6 +1558,32 @@ let activeWindowChrome = resolveWindowChrome(
 );
 
 /**
+ * The colour every open window should show wherever the page has not painted,
+ * for the theme the app is currently in.
+ * @returns The hex colour matching the renderer's canvas.
+ */
+function currentWindowBackgroundColor(): string {
+	return resolveWindowBackgroundColor({
+		prefersDark: nativeTheme.shouldUseDarkColors,
+		theme: appSettingsService.read().appearance.theme,
+	});
+}
+
+/**
+ * Repaints every open window's backing colour after the active theme moves, so
+ * a frame the renderer misses keeps showing the surface the user is looking at
+ * rather than the one they switched away from.
+ */
+function refreshWindowBackgrounds(): void {
+	const color = currentWindowBackgroundColor();
+	for (const window of BrowserWindow.getAllWindows()) {
+		if (!window.isDestroyed()) {
+			window.setBackgroundColor(color);
+		}
+	}
+}
+
+/**
  * Opens the workbench window and re-announces any questionnaire still waiting on
  * the user. A renderer keeps its pending questions in memory only, and an
  * `askUserQuestion` call has no timeout to fall back on, so a window that
@@ -1571,6 +1599,7 @@ function openMainWindow(): void {
 		appSettingsService.read().appearance.titleBar,
 	);
 	const window = createMainWindow({
+		backgroundColor: currentWindowBackgroundColor(),
 		titleBar: activeWindowChrome.titleBar,
 		windowStateStore: mainWindowStateStore,
 	});
@@ -1713,8 +1742,12 @@ app.whenReady().then(() => {
 		} satisfies AppSettingsChangedBroadcast);
 		agentActivityMonitor.refresh();
 		updateService.settingsChanged();
+		refreshWindowBackgrounds();
 		rebuildMenu();
 	});
+	// A `system` theme follows the OS, and the backing colour has to follow it
+	// too — otherwise the window keeps flashing the polarity the user left.
+	nativeTheme.on('updated', refreshWindowBackgrounds);
 	// Live-reload the non-App config sections (linear, security, managed,
 	// environment, repositoryDefaults, repositoryRules) so external config.json
 	// edits take effect without a restart.
@@ -1790,6 +1823,7 @@ app.whenReady().then(() => {
 		onAppSettingsUpdated: () => {
 			agentActivityMonitor.refresh();
 			updateService.settingsChanged();
+			refreshWindowBackgrounds();
 			rebuildMenu();
 		},
 		menuBarStore,

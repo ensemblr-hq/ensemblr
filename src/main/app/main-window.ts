@@ -23,20 +23,22 @@ import {
 /**
  * Creates the Ensemblr main BrowserWindow, restoring persisted bounds and
  * wiring the Vite-served renderer (dev URL or built bundle).
- * @param options - The persisted window-state store and the user's title-bar preference.
+ * @param options - The persisted window-state store, the user's title-bar preference, and the colour to show wherever the page has not painted.
  * @returns The created {@link BrowserWindow}.
  */
 export function createMainWindow({
+	backgroundColor,
 	titleBar = 'custom',
 	windowStateStore,
 }: {
+	backgroundColor: string;
 	titleBar?: TitleBarPreference;
 	windowStateStore?: MainWindowStateStore;
-} = {}): BrowserWindow {
+}): BrowserWindow {
 	const restoredState = windowStateStore?.load(screen.getAllDisplays()) ?? null;
 	const mainWindow = new BrowserWindow({
 		...resolveWindowChromeOptions(process.platform, titleBar),
-		backgroundColor: '#0b0808',
+		backgroundColor,
 		height: restoredState?.bounds.height ?? DEFAULT_MAIN_WINDOW_HEIGHT,
 		// Linux only: macOS reads the icon off the bundle. Undefined everywhere
 		// else, which BrowserWindow treats as "unset".

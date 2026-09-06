@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useState } from 'react';
 
 import { agentSessionEventsQuery } from '@/renderer/api/ensemblr-queries';
 import { resolveContextUsage } from '@/renderer/lib/workbench';
@@ -20,12 +20,46 @@ import type {
 	ComposerModelOption,
 	ComposerPlanUsage,
 } from '@/renderer/types/workbench';
-import type { AgentSessionEventWire } from '@/shared/ipc/contracts/agent-session';
+import type {
+	AgentSessionEventWire,
+	ListAgentSessionEventsResult,
+} from '@/shared/ipc/contracts/agent-session';
 
 /** Both gauges a chat can show, as its session currently reports them. */
 export interface SessionUsage {
 	contextUsage: ComposerContextUsage | null;
 	planUsage: ComposerPlanUsage | null;
+}
+
+/** What a session's stored events say about its two gauges, before the live half is layered on. */
+interface PersistedSessionUsage {
+	contextUsage: ComposerContextUsage | null;
+	planUsage: ComposerPlanUsage | null;
+}
+
+/**
+ * Replays a session's stored events into the two gauge readings and nothing
+ * else.
+ *
+ * This runs as the query's `select` rather than as a `useMemo` over the raw
+ * event list, and that is a rendering constraint rather than a tidiness one. The
+ * timeline merges every streamed token into this same cache, so an observer of
+ * the raw list wakes once per token — and this hook is reached from the workspace
+ * route, so waking it re-rendered the entire screen (tabs, composer, dock, review
+ * panel, every message row and every popover inside them) on every token. Query
+ * structurally shares a `select` result, so a fold that comes back deeply equal
+ * keeps its previous reference and notifies nobody, which is what keeps a
+ * streaming turn off the shell's render path.
+ * @param result - The session's stored events, oldest first.
+ * @returns The gauge readings the events replay to.
+ */
+function selectPersistedUsage(
+	result: ListAgentSessionEventsResult,
+): PersistedSessionUsage {
+	return {
+		contextUsage: latestContextUsageFromEvents(result.events),
+		planUsage: planUsageFromEvents(result.events),
+	};
 }
 
 /**
@@ -67,16 +101,12 @@ export function useLiveSessionUsage({
 		workspaceId,
 	});
 
-	const { data: eventsData } = useQuery(agentSessionEventsQuery(branchId));
-	const events = eventsData?.events;
-	const persistedContextUsage = useMemo(
-		() => latestContextUsageFromEvents(events ?? []),
-		[events],
-	);
-	const persistedPlanUsage = useMemo(
-		() => planUsageFromEvents(events ?? []),
-		[events],
-	);
+	const { data: persistedUsage } = useQuery({
+		...agentSessionEventsQuery(branchId),
+		select: selectPersistedUsage,
+	});
+	const persistedContextUsage = persistedUsage?.contextUsage ?? null;
+	const persistedPlanUsage = persistedUsage?.planUsage ?? null;
 
 	const boundContextUsage =
 		liveContextUsage?.sessionId === activeSessionId

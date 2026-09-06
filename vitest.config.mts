@@ -153,6 +153,7 @@ export default defineConfig({
 						'tests/main/forge-linux-maker.test.ts',
 						'tests/main/linux-desktop-identity.test.ts',
 						'tests/main/user-data-location.test.ts',
+						'tests/main/window-background.test.ts',
 						'tests/main/about-panel.test.ts',
 						'tests/main/menu-bar-descriptor.test.ts',
 						'tests/main/menu-bar-store.test.ts',
