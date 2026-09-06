@@ -112,6 +112,8 @@ interface SessionOpenerOptions {
 	/** Whether the architecture diagram feature is on, for the playbook a session receives. */
 	readArchitectureDiagramEnabled?: () => boolean;
 	readClaudeSubagentMode?: SubagentMechanismReader;
+	/** Whether third-party CLI harnesses are on, for the playbook a session receives. */
+	readTuiHarnessesEnabled?: () => boolean;
 	/**
 	 * Reads the durable sub-agent marker off a session's chat tab, so a child
 	 * resumed after a restart is still pinned to `ensemblr` rather than picking
@@ -173,6 +175,7 @@ export function createSessionOpener({
 	queueNaming,
 	readArchitectureDiagramEnabled,
 	readClaudeSubagentMode,
+	readTuiHarnessesEnabled,
 	resolveAgentControlEnv,
 	resolvePermissionMode,
 	resolveProviderExecutable,
@@ -272,6 +275,7 @@ export function createSessionOpener({
 				provider: row.provider,
 				readArchitectureDiagramEnabled,
 				readClaudeSubagentMode,
+				readTuiHarnessesEnabled,
 				resolveAgentControlEnv,
 				resolveTurnPreamble,
 				sessionId: row.id,
@@ -380,6 +384,7 @@ export function createSessionOpener({
 				provider,
 				readArchitectureDiagramEnabled,
 				readClaudeSubagentMode,
+				readTuiHarnessesEnabled,
 				resolveAgentControlEnv,
 				resolveTurnPreamble,
 				sessionId: session.id,

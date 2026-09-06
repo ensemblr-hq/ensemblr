@@ -363,6 +363,8 @@ export function registerIpcHandlers({
 		augmentHarnessCommand,
 		databaseService,
 		harnessDetectionService,
+		readTuiHarnessesEnabled: () =>
+			appSettingsService.read().experimental.tuiHarnesses,
 		terminalService,
 	});
 	registerWorkspaceScriptHandlers({ databaseService, scriptLifecycleService });

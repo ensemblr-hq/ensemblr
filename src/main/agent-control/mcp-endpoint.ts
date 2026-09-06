@@ -304,7 +304,7 @@ export const TOOL_DEFS: readonly McpToolDef[] = [
 	{
 		name: 'ensemblr_write_terminal',
 		op: 'writeTerminal',
-		description: 'Write input into an existing terminal or harness.',
+		description: 'Write input into an existing terminal.',
 		shape: { terminalId: z.string(), input: z.string() },
 	},
 	{
@@ -323,7 +323,7 @@ export const TOOL_DEFS: readonly McpToolDef[] = [
 		name: 'ensemblr_focus_tab',
 		op: 'focusTab',
 		description:
-			'Bring a session tab (chat/terminal/diff/file) to the foreground by id. Only a closed chat tab is reopened; every other closed kind, a terminal included, stays shut — a terminal carries no live PTY and only the user can respawn its harness. A closed chat whose conversation has since moved to another tab stays shut as well, since reopening it would surface an emptied row rather than the conversation.',
+			'Bring a session tab (chat/terminal/diff/file) to the foreground by id. Only a closed chat tab is reopened; every other closed kind, a terminal included, stays shut — a terminal carries no live PTY and only the user can respawn it. A closed chat whose conversation has since moved to another tab stays shut as well, since reopening it would surface an emptied row rather than the conversation.',
 		shape: { chatTabId: z.string() },
 	},
 	{
@@ -524,7 +524,7 @@ export const TOOL_DEFS: readonly McpToolDef[] = [
 		name: 'ensemblr_list_models',
 		op: 'listModels',
 		description:
-			'List the models you can spawn a child on (id, runtime, vendor, display name, thinking ladder, cost tier) plus the default. `runtime` is the agent runtime that would drive the child and is the axis a spawn may not cross; `vendor` is only who serves the model. Called from a chat tab the list is already cut to your own runtime, because a child you spawn always runs the runtime you do. Called from a terminal harness it carries every runtime, because the app cannot tell which one you are — which is also why `model` is mandatory there. Call this before setting a model on start_conversation and pass an id that appears here; one from another runtime is refused, not substituted. `thinkingLevels` is the ladder that model accepts and `thinkingAxis` names what its runtime calls the dial (`effort` on Claude Code, `thinking` on pi) — pass one of those as `thinkingLevel` rather than a level from the other runtime, which is refused. `tier` is `frontier` for the costliest models: spawning a child on one is put to the user for confirmation, so prefer a `standard` id unless the task genuinely needs more.',
+			'List the models you can spawn a child on (id, runtime, vendor, display name, thinking ladder, cost tier) plus the default. `runtime` is the agent runtime that would drive the child and is the axis a spawn may not cross; `vendor` is only who serves the model. Called from a chat tab the list is already cut to your own runtime, because a child you spawn always runs the runtime you do. Called from a terminal tab it carries every runtime, because the app cannot tell which one you are — which is also why `model` is mandatory there. Call this before setting a model on start_conversation and pass an id that appears here; one from another runtime is refused, not substituted. `thinkingLevels` is the ladder that model accepts and `thinkingAxis` names what its runtime calls the dial (`effort` on Claude Code, `thinking` on pi) — pass one of those as `thinkingLevel` rather than a level from the other runtime, which is refused. `tier` is `frontier` for the costliest models: spawning a child on one is put to the user for confirmation, so prefer a `standard` id unless the task genuinely needs more.',
 		shape: {},
 	},
 	{
@@ -582,7 +582,7 @@ export const TOOL_DEFS: readonly McpToolDef[] = [
 		name: 'ensemblr_read_terminal_output',
 		op: 'readTerminalOutput',
 		description:
-			"Read the current scrollback of a terminal or harness, by id or — like ensemblr_start_terminal and ensemblr_stop_terminal — by kind, which reads this workspace's running setup or run script without your having to list terminals for its id. Pass exactly one of the two; the result echoes the terminalId it read. The text comes back readable: escape sequences dropped, overwritten progress lines resolved, repaint blank-line runs collapsed. Pass ansi: true only when you need the raw bytes, colour codes and cursor moves included.",
+			"Read the current scrollback of a terminal, by id or — like ensemblr_start_terminal and ensemblr_stop_terminal — by kind, which reads this workspace's running setup or run script without your having to list terminals for its id. Pass exactly one of the two; the result echoes the terminalId it read. The text comes back readable: escape sequences dropped, overwritten progress lines resolved, repaint blank-line runs collapsed. Pass ansi: true only when you need the raw bytes, colour codes and cursor moves included.",
 		shape: {
 			terminalId: z.string().optional(),
 			kind: startStop.optional(),

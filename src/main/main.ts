@@ -387,6 +387,16 @@ const databaseService = createEnsemblrDatabaseService(
 const readArchitectureDiagramEnabled = (): boolean =>
 	appSettingsService.read().experimental.architectureDiagram;
 /**
+ * Reads the user's "third-party CLI harnesses" setting. Read per call for the
+ * same reason the diagram flag is: it gates the launcher, its menu item, the
+ * `launchHarness` op, and the playbooks that describe them, and the settings file
+ * is watched, so a session opened after the switch flips gets what the user just
+ * asked for.
+ * @returns True when the user has enabled third-party CLI harnesses.
+ */
+const readTuiHarnessesEnabled = (): boolean =>
+	appSettingsService.read().experimental.tuiHarnesses;
+/**
  * Reads the user's "Credit Ensemblr as a commit co-author" setting, which puts
  * the trailer block into the playbooks an agent receives. Read per call rather
  * than captured, and for the same reason the diagram flag is: the settings file
@@ -633,6 +643,7 @@ const {
 	readArchitectureDiagramEnabled,
 	readCoAuthorEnabled,
 	readSkillPluginDirectories: () => readAgentSkillBundle().pluginDirectories,
+	readTuiHarnessesEnabled,
 	/** Resolves a workspace's checkout path, or null before the database is open. */
 	resolveWorkspaceCwd: (workspaceId) => {
 		const database = databaseService.getConnection()?.database;
@@ -883,6 +894,7 @@ const agentSessionService = createAgentSessionService({
 	/** Reads the delegation mechanism each new Claude Code session opens under. */
 	readClaudeSubagentMode: () =>
 		appSettingsService.read().providers.claudeSubagentMode,
+	readTuiHarnessesEnabled,
 	resolveAgentControlEnv,
 	/** Reads the workspace permission mode each new agent session must honour. */
 	resolvePermissionMode: () =>
@@ -1135,6 +1147,7 @@ const conciergeSessionService = createConciergeSessionService({
 							delegation: 'ensemblr',
 							hasChatTab: true,
 							role: 'concierge',
+							tuiHarnesses: readTuiHarnessesEnabled(),
 						})
 					: null,
 				buildLanguageDirective(resolveAppLanguage()),
@@ -1425,6 +1438,7 @@ agentControlService = createAgentControlService({
 	guardrails: agentControlGuardrails,
 	originRegistry: agentControlOriginRegistry,
 	readArchitectureDiagramEnabled,
+	readTuiHarnessesEnabled,
 	ports: createAgentControlPorts({
 		architectureService,
 		augmentHarnessCommand,

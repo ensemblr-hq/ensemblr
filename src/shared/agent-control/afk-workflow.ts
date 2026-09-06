@@ -127,12 +127,27 @@ const BUILD = `**2. Build the plan.** Follow it. When something you find while b
  * writers answers `denied-quota`. Nothing the agent can do frees one — a running
  * harness is the user's to close — so the step states the fallback rather than
  * leaving a mandatory step with no way past it.
+ *
+ * The harness half of that sentence is cut with the feature, the same way
+ * `PEER_ORCHESTRATOR_HARNESS_CLAUSE` is: off, it names a cause that cannot
+ * occur. The refusal itself still names whatever holds the checkout when it
+ * fires, so what goes is the warning rather than the explanation.
  */
-const REVIEW_ENSEMBLR = `**3. Have it reviewed by an agent that did not write it.** Call \`ensemblr_start_review\`. That opens this workspace's Review conversation over your change: the same review the user's Review button runs, on the model they configured for it, deferring to whatever review skill this repository ships. Do not review your own work instead — a reader who already believes the code is right is the weakest reviewer available, and the whole point of the hours nobody is watching is that a second reading is free. It reads the diff so you do not have to, which is the largest single saving of context in the loop.
+const REVIEW_QUOTA_HARNESS_CLAUSE = ` — a running harness is the user's to close`;
+
+/**
+ * Step three for the Ensemblr mechanism, with the quota sentence closing on the
+ * harness clause only while harnesses exist.
+ * @param harnesses - Whether third-party CLI harnesses are switched on.
+ * @returns The review step for that feature state.
+ */
+const reviewEnsemblr = (
+	harnesses: boolean,
+): string => `**3. Have it reviewed by an agent that did not write it.** Call \`ensemblr_start_review\`. That opens this workspace's Review conversation over your change: the same review the user's Review button runs, on the model they configured for it, deferring to whatever review skill this repository ships. Do not review your own work instead — a reader who already believes the code is right is the weakest reviewer available, and the whole point of the hours nobody is watching is that a second reading is free. It reads the diff so you do not have to, which is the largest single saving of context in the loop.
 
 Two things about what it opens. It is a root orchestrator rather than your child — it has a delegation budget of its own and fans readers out over a wide diff — so \`ensemblr_wait_for_agents\` will not find it unless you name its \`agentSessionId\` in \`targets\`; wait on it that way. And it shares this worktree with you, so leave the files alone while it works.
 
-A \`denied-quota\` here means this workspace already holds as many agents writing the checkout as your allowance covers, and nothing you can do frees a slot — a running harness is the user's to close. Do not retry it in a loop: read your own diff as adversarially as you can manage, carry on to step 5, and say in both your report and the pull request that the second reading was refused and why.`;
+A \`denied-quota\` here means this workspace already holds as many agents writing the checkout as your allowance covers, and nothing you can do frees a slot${harnesses ? REVIEW_QUOTA_HARNESS_CLAUSE : ''}. Do not retry it in a loop: read your own diff as adversarially as you can manage, carry on to step 5, and say in both your report and the pull request that the second reading was refused and why.`;
 
 /**
  * Step three for a root delegating through its own runtime, which does not hold
@@ -290,12 +305,16 @@ function delegateFor(delegation: SubagentMechanism): string {
  * review is the one that drives the fix round, and a caller handed one half of
  * each pair would be told to follow up into something it never opened.
  * @param delegation - The mechanism this session was pinned to at open.
+ * @param harnesses - Whether third-party CLI harnesses are switched on.
  * @returns The review and fix steps, joined.
  */
-function reviewAndFixFor(delegation: SubagentMechanism): string {
+function reviewAndFixFor(
+	delegation: SubagentMechanism,
+	harnesses: boolean,
+): string {
 	return delegation === 'native'
 		? `${REVIEW_NATIVE}\n\n${FIX_NATIVE}`
-		: `${REVIEW_ENSEMBLR}\n\n${FIX_ENSEMBLR}`;
+		: `${reviewEnsemblr(harnesses)}\n\n${FIX_ENSEMBLR}`;
 }
 
 /**
@@ -305,16 +324,18 @@ function reviewAndFixFor(delegation: SubagentMechanism): string {
  * toggle and the Concierge is a panel, so no Concierge session is ever in the
  * registry `isUnattended` reads. A branch for it would be an unreachable answer
  * to a question the caller cannot ask.
- * @param options - Whether the session is unattended, the delegation mechanism it was pinned to at open, and the caller's control-layer role.
+ * @param options - Whether the session is unattended, the delegation mechanism it was pinned to at open, the caller's control-layer role, and whether third-party CLI harnesses are switched on.
  * @returns The block to append to this turn's prompt, or null when AFK is off.
  */
 export function buildAfkWorkflowDirective({
 	delegation,
 	role,
+	tuiHarnesses,
 	unattended,
 }: {
 	delegation: SubagentMechanism;
 	role: AgentControlRole;
+	tuiHarnesses: boolean;
 	unattended: boolean;
 }): string | null {
 	if (!unattended) {
@@ -331,7 +352,7 @@ ${PLAN}
 
 ${BUILD}
 
-${reviewAndFixFor(delegation)}
+${reviewAndFixFor(delegation, tuiHarnesses)}
 
 ${iterateFor(delegation)}
 

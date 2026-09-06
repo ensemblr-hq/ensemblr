@@ -56,6 +56,7 @@ function makeUserExperimental(
 		architectureDiagram: false,
 		autoRunAfterSetup: false,
 		developerMode: false,
+		tuiHarnesses: false,
 		...overrides,
 	};
 }

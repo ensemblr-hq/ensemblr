@@ -37,6 +37,7 @@ const CHAT_TAB_ONLY_OPS = new Set(
 	[
 		...withheldControlOps({
 			architectureDiagram: true,
+			tuiHarnesses: true,
 			delegation: 'ensemblr',
 			hasChatTab: false,
 			role: 'orchestrator',

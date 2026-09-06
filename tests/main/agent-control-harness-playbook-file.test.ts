@@ -26,7 +26,10 @@ import {
 import type { AppLanguage } from '../../src/shared/i18n.ts';
 
 /** The harness playbook with the architecture diagram on, as these tests wire it. */
-const HARNESS_AWARENESS = harnessAwareness(true);
+const HARNESS_AWARENESS = harnessAwareness({
+	architectureDiagram: true,
+	tuiHarnesses: true,
+});
 
 const WORKSPACE = 'ws-1';
 const SERVER_URL = 'http://127.0.0.1:4321';
@@ -66,6 +69,7 @@ const launchWith = (
 		} as never,
 		getLanguage: () => 'en',
 		readArchitectureDiagramEnabled: () => true,
+		readTuiHarnessesEnabled: () => true,
 		getServerUrl: () => SERVER_URL,
 		originRegistry: createOriginRegistry({ generateToken: () => 'tok' }),
 		readLinkedIssue: () => null,

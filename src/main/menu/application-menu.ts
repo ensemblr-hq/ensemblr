@@ -38,8 +38,9 @@ export function installApplicationMenu(
 	readSettings: () => AppSettings,
 	context: MenuContext | null = null,
 ): DescribedMenuItem[] {
+	const settings = readSettings();
 	const language = resolveLanguage(
-		readSettings().general.language,
+		settings.general.language,
 		app.getPreferredSystemLanguages(),
 	);
 
@@ -53,7 +54,12 @@ export function installApplicationMenu(
 		buildFileMenu(labels, items, context),
 		buildEditMenu(labels),
 		buildViewMenu(labels, items),
-		buildWorkspaceMenu(labels, items, context),
+		buildWorkspaceMenu(
+			labels,
+			items,
+			context,
+			settings.experimental.tuiHarnesses,
+		),
 		buildChatMenu(labels, items, context),
 		buildChangesMenu(labels, items),
 		buildWindowMenu(labels, items),

@@ -181,6 +181,13 @@ export const autoRunAfterSetupAtom = settingAtom(
 );
 /** Whether developer-only diagnostics and debug controls are visible. */
 export const developerModeAtom = settingAtom('experimental', 'developerMode');
+/**
+ * Whether the third-party CLI harnesses exist at all: the launcher in the tab
+ * strip, its menu item and shortcut, the `launchHarness` control op, and every
+ * mention of one in an agent playbook. Off, the feature is absent rather than
+ * disabled, and a harness terminal already open stays until the user closes it.
+ */
+export const tuiHarnessesAtom = settingAtom('experimental', 'tuiHarnesses');
 
 // ─── Appearance ─────────────────────────────────────────────────────────────────
 // Backs the Settings → Appearance page. Consumers apply these live via

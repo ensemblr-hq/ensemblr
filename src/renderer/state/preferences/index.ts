@@ -54,6 +54,7 @@ export {
 	themeAtom,
 	titleBarAtom,
 	toolCallCollapseAtom,
+	tuiHarnessesAtom,
 	useAppSettingsSync,
 } from './app-settings';
 export type {

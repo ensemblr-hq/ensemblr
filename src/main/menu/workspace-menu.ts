@@ -5,15 +5,21 @@ import type { MenuLabels } from './menu-strings';
 /**
  * Builds the Workspace menu: everything scoped to the workspace on screen —
  * scripts and terminals, its files, its place on the board, and its lifecycle.
+ * The harness item is omitted rather than disabled when the feature is off. An
+ * item's enablement comes from what the renderer reports it holds, and with the
+ * launcher unmounted it reports nothing — which would leave a permanently greyed
+ * "Agent Harness…" in the bar, exactly the surface the switch exists to remove.
  * @param labels - Native menu labels for the active language
  * @param items - Factory for the command items in this menu
  * @param context - The last context the renderer reported, or null
+ * @param tuiHarnesses - Whether third-party CLI harnesses are switched on
  * @returns The Workspace menu
  */
 export function buildWorkspaceMenu(
 	labels: MenuLabels,
 	items: MenuItemFactory,
 	context: MenuContext | null,
+	tuiHarnesses: boolean,
 ): DescribedMenuItem {
 	return {
 		label: labels.workspace,
@@ -27,7 +33,9 @@ export function buildWorkspaceMenu(
 			),
 			items.command('run.setup', labels.runSetupScript),
 			items.command('terminal.new', labels.newTerminal),
-			items.command('agents.open', labels.agentHarness),
+			...(tuiHarnesses
+				? [items.command('agents.open', labels.agentHarness)]
+				: []),
 			{ type: 'separator' },
 			items.command('files.search', labels.findFile),
 			items.submenu(

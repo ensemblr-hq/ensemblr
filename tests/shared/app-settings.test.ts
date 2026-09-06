@@ -104,6 +104,53 @@ describe('parseAppSettings', () => {
 		).toBe(false);
 	});
 
+	// The harness switch gates a feature that launches an unrestricted writer, so
+	// every way a hand-edited config.json can fail to say "on" has to read as off:
+	// the key absent, the whole section absent, and any non-boolean in its place.
+	test('parses the harness switch, defaulting off on anything but true', () => {
+		expect(DEFAULT_APP_SETTINGS.experimental.tuiHarnesses).toBe(false);
+		expect(
+			parseAppSettings({ experimental: { tuiHarnesses: true } }).experimental
+				.tuiHarnesses,
+		).toBe(true);
+		for (const malformed of [null, undefined, 'yes', 'true', 1, 0, [], {}]) {
+			expect(
+				parseAppSettings({ experimental: { tuiHarnesses: malformed } })
+					.experimental.tuiHarnesses,
+				`tuiHarnesses: ${JSON.stringify(malformed)}`,
+			).toBe(false);
+		}
+	});
+
+	test('defaults the harness switch off when the key or section is absent', () => {
+		expect(
+			parseAppSettings({
+				experimental: { architectureDiagram: true, developerMode: true },
+			}).experimental,
+		).toMatchObject({
+			architectureDiagram: true,
+			developerMode: true,
+			tuiHarnesses: false,
+		});
+		expect(parseAppSettings({}).experimental.tuiHarnesses).toBe(false);
+		for (const section of [null, undefined, 'on', 7, []]) {
+			expect(() => parseAppSettings({ experimental: section })).not.toThrow();
+			expect(
+				parseAppSettings({ experimental: section }).experimental.tuiHarnesses,
+				`experimental: ${JSON.stringify(section)}`,
+			).toBe(false);
+		}
+	});
+
+	test('leaves a stored harness switch alone when a patch omits it', () => {
+		const on = parseAppSettings({ experimental: { tuiHarnesses: true } });
+		const merged = mergeAppSettings(on, {
+			experimental: { developerMode: true },
+		});
+		expect(merged.experimental.tuiHarnesses).toBe(true);
+		expect(merged.experimental.developerMode).toBe(true);
+	});
+
 	test('parses the onboarding completion stamp, defaulting to never shown', () => {
 		expect(DEFAULT_APP_SETTINGS.onboarding.completedAt).toBeNull();
 		expect(

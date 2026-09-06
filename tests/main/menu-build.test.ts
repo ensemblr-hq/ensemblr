@@ -160,6 +160,7 @@ describe('buildWorkspaceMenu', () => {
 			LABELS,
 			createMenuItemFactory(reported),
 			reported,
+			true,
 		);
 
 		expect(submenuOf(itemLabelled(menu, LABELS.runScript))).toHaveLength(1);
@@ -169,7 +170,12 @@ describe('buildWorkspaceMenu', () => {
 	});
 
 	test('falls back to empty submenus when the renderer has not reported', () => {
-		const menu = buildWorkspaceMenu(LABELS, createMenuItemFactory(null), null);
+		const menu = buildWorkspaceMenu(
+			LABELS,
+			createMenuItemFactory(null),
+			null,
+			true,
+		);
 		const runScript = itemLabelled(menu, LABELS.runScript);
 
 		expect(runScript?.enabled).toBe(false);
@@ -179,7 +185,12 @@ describe('buildWorkspaceMenu', () => {
 	});
 
 	test('renders the board statuses as a radio group', () => {
-		const menu = buildWorkspaceMenu(LABELS, createMenuItemFactory(null), null);
+		const menu = buildWorkspaceMenu(
+			LABELS,
+			createMenuItemFactory(null),
+			null,
+			true,
+		);
 
 		expect(
 			submenuOf(itemLabelled(menu, LABELS.status)).map((item) => item.type),

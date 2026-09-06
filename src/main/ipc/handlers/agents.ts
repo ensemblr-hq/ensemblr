@@ -18,6 +18,21 @@ import {
 	resumeAgentHarnessRequestSchema,
 } from '../request-schemas.ts';
 
+/** Feature-off diagnostic result, refused before any PATH lookup happens. */
+function harnessesDisabledResult(): LaunchAgentHarnessResult {
+	return {
+		diagnostics: [
+			{
+				code: 'harness-unavailable',
+				message:
+					'Third-party CLI harnesses are switched off in Settings → Experimental.',
+				severity: 'error',
+			},
+		],
+		session: null,
+	};
+}
+
 /** Harness-unavailable diagnostic result reused by launch and resume. */
 function harnessUnavailableResult(harnessId: string): LaunchAgentHarnessResult {
 	return {
@@ -65,12 +80,18 @@ function repointTerminalTab(
  * into an existing tab after an app restart. Launch and resume commands are
  * rebuilt from the trusted registry via the detection service, so the renderer
  * only ever supplies a harness id — never shell text.
+ *
+ * Launch and resume both refuse while the Experimental switch is off, which is
+ * the backstop under the unmounted launcher: a terminal tab restored from a
+ * previous session would otherwise respawn a harness the user has since turned
+ * off, and the renderer archives that tab instead once this refuses it.
  * @param options - Required services.
  */
 export function registerAgentHandlers({
 	augmentHarnessCommand = (command) => command,
 	databaseService,
 	harnessDetectionService,
+	readTuiHarnessesEnabled = () => false,
 	terminalService,
 }: {
 	/**
@@ -85,17 +106,27 @@ export function registerAgentHandlers({
 	) => string;
 	databaseService: EnsemblrDatabaseService;
 	harnessDetectionService: HarnessDetectionService;
+	/**
+	 * Whether third-party CLI harnesses are on, read live off the watched settings
+	 * file. Defaults to off, so a build that never wires it launches none.
+	 */
+	readTuiHarnessesEnabled?: () => boolean;
 	terminalService: TerminalService;
 }): void {
 	ipcMain.handle(
 		IPC_CHANNELS.listAgentHarnesses,
 		(): Promise<ListAgentHarnessesResult> =>
-			harnessDetectionService.listHarnesses(),
+			readTuiHarnessesEnabled()
+				? harnessDetectionService.listHarnesses()
+				: Promise.resolve({ harnesses: [] }),
 	);
 
 	ipcMain.handle(
 		IPC_CHANNELS.launchAgentHarness,
 		async (_event, raw: unknown): Promise<LaunchAgentHarnessResult> => {
+			if (!readTuiHarnessesEnabled()) {
+				return harnessesDisabledResult();
+			}
 			const { harnessId, workspaceId } =
 				launchAgentHarnessRequestSchema.parse(raw);
 			const command =
@@ -120,6 +151,9 @@ export function registerAgentHandlers({
 	ipcMain.handle(
 		IPC_CHANNELS.resumeAgentHarness,
 		async (_event, raw: unknown): Promise<LaunchAgentHarnessResult> => {
+			if (!readTuiHarnessesEnabled()) {
+				return harnessesDisabledResult();
+			}
 			const { chatTabId, fresh, harnessId, sessionId, workspaceId } =
 				resumeAgentHarnessRequestSchema.parse(raw);
 			const command = fresh

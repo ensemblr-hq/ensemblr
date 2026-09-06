@@ -194,6 +194,7 @@ export function resolveAgentControlWiring({
 	readClaudeSubagentMode,
 	resolveAgentControlEnv,
 	resolveTurnPreamble,
+	readTuiHarnessesEnabled,
 	sessionId,
 	workspaceId,
 }: {
@@ -205,6 +206,8 @@ export function resolveAgentControlWiring({
 	readClaudeSubagentMode: SubagentMechanismReader | undefined;
 	resolveAgentControlEnv: AgentControlEnvResolver | undefined;
 	resolveTurnPreamble: TurnPreambleResolver | undefined;
+	/** Whether third-party CLI harnesses are on, for the playbook this session receives. */
+	readTuiHarnessesEnabled: (() => boolean) | undefined;
 	sessionId: string;
 	workspaceId: string;
 }): AgentControlWiring {
@@ -248,6 +251,7 @@ export function resolveAgentControlWiring({
 			delegation,
 			hasChatTab: true,
 			role: readControlRole(env),
+			tuiHarnesses: readTuiHarnessesEnabled?.() ?? false,
 		}),
 	};
 }

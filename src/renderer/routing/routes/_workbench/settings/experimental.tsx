@@ -9,6 +9,7 @@ import {
 	architectureDiagramAtom,
 	autoRunAfterSetupAtom,
 	developerModeAtom,
+	tuiHarnessesAtom,
 } from '@/renderer/state/preferences';
 import { DEFAULT_APP_SETTINGS } from '@/shared/config';
 
@@ -28,6 +29,7 @@ function ExperimentalSettings() {
 	const [architectureDiagram, setArchitectureDiagram] = useAtom(
 		architectureDiagramAtom,
 	);
+	const [tuiHarnesses, setTuiHarnesses] = useAtom(tuiHarnessesAtom);
 
 	return (
 		<SettingsSection
@@ -70,6 +72,22 @@ function ExperimentalSettings() {
 				)}
 				modified={architectureDiagram !== DEFAULTS.architectureDiagram}
 				onReset={() => setArchitectureDiagram(DEFAULTS.architectureDiagram)}
+			/>
+
+			<SettingRow
+				control={
+					<Switch checked={tuiHarnesses} onCheckedChange={setTuiHarnesses} />
+				}
+				description={t(
+					'settings:experimental.tui-harnesses.description',
+					'Launch Claude Code, OpenAI Codex, or Mistral Vibe in a terminal tab, and let agents launch one too. Off, a harness terminal already open keeps running until you close it.',
+				)}
+				label={t(
+					'settings:experimental.tui-harnesses.label',
+					'Third-party CLI harnesses',
+				)}
+				modified={tuiHarnesses !== DEFAULTS.tuiHarnesses}
+				onReset={() => setTuiHarnesses(DEFAULTS.tuiHarnesses)}
 			/>
 
 			<SettingRow

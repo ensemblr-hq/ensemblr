@@ -29,6 +29,17 @@ export const CONTROL_ARCHITECTURE_ENV_KEY = 'ENSEMBLR_CONTROL_ARCHITECTURE';
 export const CONTROL_ARCHITECTURE_ENABLED = '1';
 
 /**
+ * Env var telling the Pi extension whether third-party CLI harnesses are on, for
+ * the reason {@link CONTROL_ARCHITECTURE_ENV_KEY} exists: the extension registers
+ * its own tools and injects its own playbook, so neither the app's tool list nor
+ * its playbooks reach it. Set to `1` when on, absent otherwise.
+ */
+export const CONTROL_TUI_HARNESSES_ENV_KEY = 'ENSEMBLR_CONTROL_TUI_HARNESSES';
+
+/** The value {@link CONTROL_TUI_HARNESSES_ENV_KEY} carries when the feature is on. */
+export const CONTROL_TUI_HARNESSES_ENABLED = '1';
+
+/**
  * Renders a shell-style reference to an env var, for configs the agent's own
  * CLI expands at launch. Passing the reference instead of the value keeps the
  * secret out of the child's argv, where any process on the machine can read it.

@@ -11,6 +11,7 @@ import path from 'node:path';
 import { type App, BrowserWindow, dialog } from 'electron';
 
 import {
+	type AwarenessFeatures,
 	buildCoAuthorDirective,
 	buildLanguageDirective,
 	buildLinkedIssueDirective,
@@ -24,6 +25,8 @@ import {
 	CONTROL_ARCHITECTURE_ENV_KEY,
 	CONTROL_ROLE_ENV_KEY,
 	CONTROL_TOKEN_ENV_KEY,
+	CONTROL_TUI_HARNESSES_ENABLED,
+	CONTROL_TUI_HARNESSES_ENV_KEY,
 	CONTROL_URL_ENV_KEY,
 } from './control-env-keys.ts';
 import {
@@ -55,6 +58,12 @@ interface AgentControlIntegrationDeps {
 	 * it. Omitted, the feature reads as off.
 	 */
 	readArchitectureDiagramEnabled?: () => boolean;
+	/**
+	 * Whether third-party CLI harnesses are on. Off, the harness playbook never
+	 * mentions launching another one, matching the tool list the MCP endpoint
+	 * serves it. Omitted, the feature reads as off.
+	 */
+	readTuiHarnessesEnabled?: () => boolean;
 	/**
 	 * Whether Ensemblr is credited as a commit co-author, which it is until the
 	 * user turns it off. Off, the harness playbook never mentions the trailer.
@@ -154,8 +163,8 @@ function resolvePiControlExtensionPath(app: App): string | null {
  */
 function writeHarnessInstructions(input: {
 	app: App;
-	architectureDiagram: boolean;
 	directives: readonly (string | null)[];
+	features: AwarenessFeatures;
 	language: AppLanguage;
 	workspaceId: string;
 }): string | null {
@@ -167,7 +176,7 @@ function writeHarnessInstructions(input: {
 	const playbook = path.join(directory, HARNESS_INSTRUCTIONS_FILENAME);
 	const staging = `${playbook}.tmp`;
 	const blocks = [
-		harnessAwareness(input.architectureDiagram),
+		harnessAwareness(input.features),
 		buildLanguageDirective(input.language),
 		...input.directives,
 	].filter((block) => block !== null);
@@ -245,6 +254,7 @@ export function createAgentControlIntegration({
 	readCoAuthorEnabled = () => true,
 	readLinkedIssue = () => null,
 	readSkillPluginDirectories = () => [],
+	readTuiHarnessesEnabled = () => false,
 	resolveConciergeCwd = () => null,
 	resolveWorkspaceCwd,
 }: AgentControlIntegrationDeps): AgentControlIntegration {
@@ -285,6 +295,9 @@ export function createAgentControlIntegration({
 			...(readArchitectureDiagramEnabled()
 				? { [CONTROL_ARCHITECTURE_ENV_KEY]: CONTROL_ARCHITECTURE_ENABLED }
 				: {}),
+			...(readTuiHarnessesEnabled()
+				? { [CONTROL_TUI_HARNESSES_ENV_KEY]: CONTROL_TUI_HARNESSES_ENABLED }
+				: {}),
 		};
 	};
 
@@ -298,7 +311,10 @@ export function createAgentControlIntegration({
 			harnessId,
 			instructionsDirectory: writeHarnessInstructions({
 				app,
-				architectureDiagram: readArchitectureDiagramEnabled(),
+				features: {
+					architectureDiagram: readArchitectureDiagramEnabled(),
+					tuiHarnesses: readTuiHarnessesEnabled(),
+				},
 				directives: [
 					buildLinkedIssueDirective(readLinkedIssue(workspaceId)),
 					buildCoAuthorDirective(readCoAuthorEnabled()),

@@ -86,7 +86,7 @@ import {
 	buildPlanModeDelegationDirective,
 	buildReviewPeerDirective,
 	buildSessionBriefNudge,
-	CONCIERGE_AWARENESS,
+	conciergeAwareness,
 	conciergeControlOpDenial,
 	isWriteOp,
 	PEER_ORCHESTRATOR_LIMITS,
@@ -245,6 +245,12 @@ interface AgentControlServiceOptions {
 	 * so a build that never wires it keeps the feature absent.
 	 */
 	readArchitectureDiagramEnabled?: () => boolean;
+	/**
+	 * Whether third-party CLI harnesses are on, read live for the same reason:
+	 * the answer gates `launchHarness` and every playbook passage that names one.
+	 * Defaults to off, so a build that never wires it keeps the feature absent.
+	 */
+	readTuiHarnessesEnabled?: () => boolean;
 	/**
 	 * Overrides the service clock and sleep; defaults to the real scheduler. Its
 	 * `now` drives both the wait-loop deadline and the review-focus coalescing
@@ -699,6 +705,7 @@ export function createAgentControlService({
 	originRegistry,
 	guardrails,
 	readArchitectureDiagramEnabled = () => false,
+	readTuiHarnessesEnabled = () => false,
 	scheduler = REAL_SCHEDULER,
 	dispatchTimeoutMs = DISPATCH_TIMEOUT_MS,
 }: AgentControlServiceOptions): AgentControlService {
@@ -2086,6 +2093,7 @@ export function createAgentControlService({
 			afkWorkflowDirective: buildAfkWorkflowDirective({
 				delegation: origin.delegation,
 				role,
+				tuiHarnesses: readTuiHarnessesEnabled(),
 				unattended: afkMode,
 			}),
 			issueDirective: issueDirectiveFor(origin, role),
@@ -2094,7 +2102,12 @@ export function createAgentControlService({
 			nudge: buildSessionBriefNudge(naming, planMode),
 			planMode,
 			planRefinement: readPlanRefinement(origin),
-			rolePlaybook: origin.concierge ? CONCIERGE_AWARENESS : null,
+			rolePlaybook: origin.concierge
+				? conciergeAwareness({
+						architectureDiagram: readArchitectureDiagramEnabled(),
+						tuiHarnesses: readTuiHarnessesEnabled(),
+					})
+				: null,
 		} satisfies GetSessionBriefResult);
 	};
 
@@ -2168,6 +2181,12 @@ export function createAgentControlService({
 		origin: AgentControlOrigin,
 		args: LaunchHarnessArgs,
 	): Promise<AgentControlResult<unknown>> => {
+		if (!readTuiHarnessesEnabled()) {
+			return fail(
+				'denied-scope',
+				'This build launches no third-party CLI harnesses, so there is none to launch.',
+			);
+		}
 		const spawnDenied = evaluateSpawnGuard(origin);
 		if (spawnDenied) {
 			return spawnDenied;
@@ -3320,6 +3339,7 @@ export function createAgentControlService({
 
 	const describeAudience = async (token: string): Promise<ControlAudience> => {
 		const architectureDiagram = readArchitectureDiagramEnabled();
+		const tuiHarnesses = readTuiHarnessesEnabled();
 		const origin = originRegistry.resolveByToken(token);
 		if (!origin) {
 			return {
@@ -3327,6 +3347,7 @@ export function createAgentControlService({
 				delegation: 'ensemblr',
 				hasChatTab: false,
 				role: 'orchestrator',
+				tuiHarnesses,
 			};
 		}
 		return {
@@ -3334,6 +3355,7 @@ export function createAgentControlService({
 			delegation: origin.delegation,
 			hasChatTab: originHasChatTab(origin),
 			role: await resolveRole(origin),
+			tuiHarnesses,
 		};
 	};
 
@@ -3356,6 +3378,7 @@ export function createAgentControlService({
 			buildAfkWorkflowDirective({
 				delegation: origin.delegation,
 				role,
+				tuiHarnesses: readTuiHarnessesEnabled(),
 				unattended: isUnattended(origin),
 			}),
 			readLanguageDirective(),

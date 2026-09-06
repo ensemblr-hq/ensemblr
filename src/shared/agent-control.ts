@@ -20,11 +20,12 @@ export {
 export { buildAskUserQuestionResult } from './agent-control/ask-user-question.ts';
 export type {
 	AgentControlRole,
+	AwarenessFeatures,
 	ControlAudience,
 } from './agent-control/awareness.ts';
 export {
 	awarenessForAudience,
-	CONCIERGE_AWARENESS,
+	conciergeAwareness,
 	harnessAwareness,
 	nativeOrchestratorAwareness,
 	orchestratorAwareness,
@@ -88,6 +89,7 @@ export {
 	SUBAGENT_UNUSABLE_OPS,
 	SUBAGENT_WITHHELD_OPS,
 	subAgentControlOpDenial,
+	TUI_HARNESS_OPS,
 	withheldControlOps,
 } from './agent-control/subagent-policy.ts';
 export type { DiffFilePatch } from './agent-control/workspace-diff.ts';

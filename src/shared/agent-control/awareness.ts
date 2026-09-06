@@ -20,8 +20,10 @@
  * out when the depth cap denies it, and to finish by submitting a plan it is not
  * allowed to submit — its three most load-bearing instructions, all inverted.
  *
- * {@link HARNESS_AWARENESS} is a fifth, self-contained playbook for third-party
- * CLI harnesses (Claude Code, Codex, Mistral Vibe). They are root sessions, so
+ * {@link harnessAwareness} is a fifth, self-contained playbook for third-party
+ * CLI harnesses (Claude Code, Codex, Mistral Vibe) — a feature the user opts
+ * into, so with `tuiHarnesses` off nothing can be launched to receive it and
+ * every other variant drops the passages that name one. They are root sessions, so
  * the orchestrator variant would be the closest fit, but it describes a surface a
  * harness does not have: a chat tab it can name, the per-turn upkeep block, and
  * the chat-tab tools its tool list withholds. It is deliberately shorter — a
@@ -66,18 +68,32 @@ import type { SubagentMechanism } from './subagent-mechanism.ts';
 export type AgentControlRole = 'concierge' | 'orchestrator' | 'subagent';
 
 /**
- * What a control caller is, as far as the two surfaces that shape themselves to
- * the caller care: which playbook it receives and which tools its list carries.
- * All three axes are properties of the caller rather than of any one runtime, so
- * a runtime added later selects its surface by declaring these facts.
+ * Which optional features are switched on. Each gates a caller's tool list and
+ * its playbook together, so neither can advertise an op while the other
+ * withholds it. Named rather than positional because they are interchangeable
+ * booleans a positional list would let a caller silently transpose.
  */
-export interface ControlAudience {
+export interface AwarenessFeatures {
 	/**
-	 * Whether the architecture diagram feature is switched on. It gates the
-	 * caller's tool list and its playbook together, so neither can advertise the
-	 * two diagram ops while the other withholds them.
+	 * Whether the architecture diagram feature is switched on. Off withholds both
+	 * diagram ops from every list, so every passage naming them is cut too.
 	 */
 	architectureDiagram: boolean;
+	/**
+	 * Whether third-party CLI harnesses are switched on. Off withholds
+	 * `launchHarness` from every list and cuts every passage naming a harness,
+	 * including the co-tenancy clause that counts a harness terminal as a writer.
+	 */
+	tuiHarnesses: boolean;
+}
+
+/**
+ * What a control caller is, as far as the two surfaces that shape themselves to
+ * the caller care: which playbook it receives and which tools its list carries.
+ * Every axis is a property of the caller rather than of any one runtime, so a
+ * runtime added later selects its surface by declaring these facts.
+ */
+export interface ControlAudience extends AwarenessFeatures {
 	/** Whether the caller drives a native chat tab rather than a terminal tab. */
 	hasChatTab: boolean;
 	role: AgentControlRole;
@@ -141,7 +157,17 @@ const REVIEW_INVENTORY = `${REVIEW_INVENTORY_READS} Once you have fixed what a c
  * this one is the user's record of the review, opened by the same op their Review
  * button runs, and the spawn framing above would otherwise sweep it up.
  */
-const ORCHESTRATOR_START_REVIEW = `- Get the change reviewed: \`ensemblr_start_review\` opens this workspace's Review conversation over your change — the same review the user's Review button runs, on the model they configured for it, deferring to whatever review skill the repository ships. Prefer it to reviewing your own work. What it opens is a root orchestrator rather than your child, so it has a delegation budget of its own and fans its own readers out over a wide diff — which also means \`ensemblr_wait_for_agents\` will not find it unless you name its \`agentSessionId\` in \`targets\`. It shares this worktree: leave the files alone while it works. Send its findings back to the SAME conversation with \`ensemblr_send_follow_up\` and have it fix them there rather than fixing them yourself — you stay the committer and you own the pull request. Calling the op again while that reviewer still exists hands the same one back rather than opening a second, so re-reading a rebuilt change is a follow-up either way. It takes one of the workspace's co-tenancy slots, so a workspace already at its limit of agents writing the checkout refuses it — that allowance is two while the user is here and four while they are away, which is what keeps an unattended run's reviewer affordable beside a harness terminal they left running. Its tab is the user's record of the review and stays open: it is not a scratch tab of yours to clean up.`;
+const ORCHESTRATOR_START_REVIEW_HARNESS_CLAUSE = `, which is what keeps an unattended run's reviewer affordable beside a harness terminal they left running`;
+
+/**
+ * The review bullet a root holds, with the co-tenancy sentence closing on the
+ * harness clause only while harnesses exist. Off, the allowance still reads
+ * correctly — it is the justification that names a harness, not the number.
+ * @param harnesses - Whether third-party CLI harnesses are switched on.
+ * @returns The review bullet for that feature state.
+ */
+const orchestratorStartReview = (harnesses: boolean): string =>
+	`- Get the change reviewed: \`ensemblr_start_review\` opens this workspace's Review conversation over your change — the same review the user's Review button runs, on the model they configured for it, deferring to whatever review skill the repository ships. Prefer it to reviewing your own work. What it opens is a root orchestrator rather than your child, so it has a delegation budget of its own and fans its own readers out over a wide diff — which also means \`ensemblr_wait_for_agents\` will not find it unless you name its \`agentSessionId\` in \`targets\`. It shares this worktree: leave the files alone while it works. Send its findings back to the SAME conversation with \`ensemblr_send_follow_up\` and have it fix them there rather than fixing them yourself — you stay the committer and you own the pull request. Calling the op again while that reviewer still exists hands the same one back rather than opening a second, so re-reading a rebuilt change is a follow-up either way. It takes one of the workspace's co-tenancy slots, so a workspace already at its limit of agents writing the checkout refuses it — that allowance is two while the user is here and four while they are away${harnesses ? ORCHESTRATOR_START_REVIEW_HARNESS_CLAUSE : ''}. Its tab is the user's record of the review and stays open: it is not a scratch tab of yours to clean up.`;
 
 /**
  * The architecture diagram bullet, for a role that may both read and redraw.
@@ -250,21 +276,37 @@ const ORCHESTRATOR_CONVERSATIONS = `- Conversations: open a chat tab and start a
  */
 const NATIVE_ORCHESTRATOR_CONVERSATIONS = `- Conversations: name your own tab (\`ensemblr_set_name\`), close a tab (\`ensemblr_close_tab\`). Spawning and steering an Ensemblr chat-tab sub-agent are not part of your surface in this mode — see the delegation section below.`;
 
+/** The harness bullet a root holds while third-party CLI harnesses are on. */
+const HARNESS_INVENTORY = `- Harnesses: launch Claude Code / Codex in a terminal (\`ensemblr_launch_harness\`).`;
+
+/**
+ * The harness bullet, or nothing at all while the feature is switched off. Off
+ * withholds the op from every tool list, so a playbook that still described it
+ * would teach the model to reach for a tool it does not hold.
+ * @param enabled - Whether third-party CLI harnesses are on.
+ * @returns The bullet, or the empty string {@link joinBullets} drops.
+ */
+const harnessInventory = (enabled: boolean): string =>
+	enabled ? HARNESS_INVENTORY : '';
+
 /**
  * Everything a root may drive: the whole control surface, around whichever
  * conversations bullet its delegation mechanism leaves it holding.
  * @param conversations - The conversations bullet for this root's mechanism.
+ * @param harnesses - The harness bullet, empty while the feature is off.
  * @param architecture - The diagram bullet, empty while the feature is off.
+ * @param startReview - The review bullet, composed for the harness feature state.
  * @returns The capability bullets for that root.
  */
 const orchestratorInventory = (
 	conversations: string,
+	harnesses: string,
 	architecture: string,
 	startReview: string,
 ): string =>
 	joinBullets(
 		conversations,
-		`- Harnesses: launch Claude Code / Codex in a terminal (\`ensemblr_launch_harness\`).`,
+		harnesses,
 		`- Terminals: start/stop the setup script, a run script, or a spawn terminal (\`ensemblr_start_terminal\`/\`ensemblr_stop_terminal\`); type into one (\`ensemblr_write_terminal\`); read its output (\`ensemblr_read_terminal_output\`, by \`terminalId\` or by \`kind\`, cleaned of escape codes unless you ask for \`ansi\`). A repository configures its run scripts by name — a dev server, a playground, an unsigned build — so call \`ensemblr_list_run_scripts\` and pass the \`scriptName\` you want; starting a run script without one takes the repository's default, which is rarely the one you meant. Only one script of a kind runs at a time: starting a second is refused with \`conflict\`, and that refusal names the terminal already holding the slot, which \`restart: true\` replaces.`,
 		`- Focus & inspect: bring a tab/terminal or the Files/Changes/Checks panel forward (\`ensemblr_focus_tab\`/\`ensemblr_focus_dock_tab\`/\`ensemblr_focus_panel\`); list workspaces/tabs/terminals; read a conversation's status or last message; audit what a conversation actually did, tool calls included (\`ensemblr_read_conversation\`).`,
 		REVIEW_INVENTORY,
@@ -288,17 +330,17 @@ const orchestratorInventory = (
  * a child holds neither op: it is listed among what belongs to the orchestrator.
  * With the feature off there is no such thing to belong to anyone, so the clause
  * goes rather than moving.
- * @param architecture - Whether the architecture diagram feature is on at all.
+ * @param features - Which optional features are switched on at all.
  * @returns The capability bullets and the closing absence sentence.
  */
-const subagentInventory = (architecture: boolean): string =>
+const subagentInventory = (features: AwarenessFeatures): string =>
 	`- Focus & inspect: bring a tab/terminal or the Files/Changes/Checks panel forward (\`ensemblr_focus_tab\`/\`ensemblr_focus_dock_tab\`/\`ensemblr_focus_panel\`); list workspaces/tabs/terminals; read a conversation's status or last message; audit what a conversation actually did, tool calls included (\`ensemblr_read_conversation\`); read a terminal's output (\`ensemblr_read_terminal_output\`, by \`terminalId\` or by \`kind\`, cleaned of escape codes unless you ask for \`ansi\`).
 ${REVIEW_INVENTORY}
 ${LINEAR_INVENTORY_READS}
 - Board: read your workspace's kanban status (\`ensemblr_get_workspace_status\`); \`ensemblr_list_workspaces\` shows every workspace's.
 - Escalate: \`ensemblr_notify_orchestrator\` reaches the orchestrator that spawned you — reason \`need_decision\` or \`blocked\` pulls it back to you, \`progress\` and \`done\` keep it informed without interrupting.
 
-The rest of the surface is not yours and is refused here, so do not go hunting for it: starting or steering another conversation, launching a harness, starting/stopping/typing into a terminal, opening or closing tabs, moving the kanban board, naming the workspace and branch, ${architecture ? 'reading or redrawing the architecture diagram, ' : ''}commenting on or moving a Linear issue, and putting a question to the user all belong to the orchestrator that spawned you. Everything you would have used them for goes in your report instead.`;
+The rest of the surface is not yours and is refused here, so do not go hunting for it: starting or steering another conversation, ${features.tuiHarnesses ? 'launching a harness, ' : ''}starting/stopping/typing into a terminal, opening or closing tabs, moving the kanban board, naming the workspace and branch, ${features.architectureDiagram ? 'reading or redrawing the architecture diagram, ' : ''}commenting on or moving a Linear issue, and putting a question to the user all belong to the orchestrator that spawned you. Everything you would have used them for goes in your report instead.`;
 
 /**
  * What a peer orchestrator is, for the two roots that can open one.
@@ -308,10 +350,26 @@ The rest of the surface is not yours and is refused here, so do not go hunting f
  * is not a child, is not waited on, and is not cleaned up by the agent that
  * opened it. The native-delegation variant does not carry it — that root holds no
  * `startConversation` at all — and a sub-agent does not, because it cannot spawn.
+ *
+ * The co-tenancy limit is two writers whatever the features, and the cap counts a
+ * live harness terminal whatever they are too. The clause goes with the feature
+ * because with it off nothing can launch one, not because nothing can hold the
+ * slot: a harness the user left running survives the switch by design, and it
+ * still takes a slot. What that costs is the warning, not the accounting — the
+ * refusal names every root and harness holding the checkout when it fires.
  */
-const PEER_ORCHESTRATOR_GUIDANCE = `A peer orchestrator is a different thing from a sub-agent, and the user asks for it — you do not decide to. \`ensemblr_start_conversation\` with \`peer: true\` opens a second full orchestrator in THIS workspace: its own tab, its own delegation budget, its own conversation with the user. It is not a child. You do not wait on it, it is not among the children \`ensemblr_wait_for_agents\` returns, and it outlives your turn — you do not close its tab either. The app puts the spawn to the user for confirmation whatever the permission mode, so passing the flag states what you want rather than settling it; if they decline, do the work here and do not ask again.
+const PEER_ORCHESTRATOR_HARNESS_CLAUSE = `, and a harness terminal that is still running counts as one of the two, so a \`claude\` left open in a terminal is enough to refuse the peer`;
 
-What makes a peer expensive is the checkout. You and it share one worktree, one git index, and one set of run scripts, and nothing in the app arbitrates that — neither of you can see the other's uncommitted edits. So brief it onto a disjoint set of files, name those files in the brief, and expect it to come back rather than reach outside them. **You stay the committer**: the app tells the peer not to commit, rebase, or move HEAD, so reconciling both halves and making the commit is yours. Two agents writing this checkout is the limit; a third is refused, and a harness terminal that is still running counts as one of the two, so a \`claude\` left open in a terminal is enough to refuse the peer. When the work is separable and does not need one checkout, a sub-agent or a second workspace is the cheaper answer.`;
+/**
+ * The peer-orchestrator block, with the harness co-tenancy warning only while
+ * harnesses exist.
+ * @param harnesses - Whether third-party CLI harnesses are switched on.
+ * @returns The block for that feature state.
+ */
+const peerOrchestratorGuidance = (harnesses: boolean): string =>
+	`A peer orchestrator is a different thing from a sub-agent, and the user asks for it — you do not decide to. \`ensemblr_start_conversation\` with \`peer: true\` opens a second full orchestrator in THIS workspace: its own tab, its own delegation budget, its own conversation with the user. It is not a child. You do not wait on it, it is not among the children \`ensemblr_wait_for_agents\` returns, and it outlives your turn — you do not close its tab either. The app puts the spawn to the user for confirmation whatever the permission mode, so passing the flag states what you want rather than settling it; if they decline, do the work here and do not ask again.
+
+What makes a peer expensive is the checkout. You and it share one worktree, one git index, and one set of run scripts, and nothing in the app arbitrates that — neither of you can see the other's uncommitted edits. So brief it onto a disjoint set of files, name those files in the brief, and expect it to come back rather than reach outside them. **You stay the committer**: the app tells the peer not to commit, rebase, or move HEAD, so reconciling both halves and making the commit is yours. Two agents writing this checkout is the limit; a third is refused${harnesses ? PEER_ORCHESTRATOR_HARNESS_CLAUSE : ''}. When the work is separable and does not need one checkout, a sub-agent or a second workspace is the cheaper answer.`;
 
 /**
  * How to set a spawned conversation's reasoning budget, for every role that can
@@ -424,13 +482,13 @@ const ORCHESTRATOR_ANSWER_LAST = `Your last message is your answer to the user, 
  * their own words rather than sharing this one — their reader is an orchestrator,
  * so the reason and the examples differ, and the rule closes a numbered report
  * structure instead of the paragraph it opens.
- * @param architecture - Whether the architecture diagram feature is on.
+ * @param features - Which optional features are switched on.
  * @returns The root orchestrator's playbook.
  */
-export const orchestratorAwareness = (architecture: boolean): string =>
-	`${preambleFor(orchestratorInventory(ORCHESTRATOR_CONVERSATIONS, architectureInventory(architecture), ORCHESTRATOR_START_REVIEW), ORCHESTRATOR_LEGIBILITY, LINEAR_FOLLOW_THROUGH)}
+export const orchestratorAwareness = (features: AwarenessFeatures): string =>
+	`${preambleFor(orchestratorInventory(ORCHESTRATOR_CONVERSATIONS, harnessInventory(features.tuiHarnesses), architectureInventory(features.architectureDiagram), orchestratorStartReview(features.tuiHarnesses)), ORCHESTRATOR_LEGIBILITY, LINEAR_FOLLOW_THROUGH)}
 
-${PEER_ORCHESTRATOR_GUIDANCE}
+${peerOrchestratorGuidance(features.tuiHarnesses)}
 
 Do the work yourself by default — one agent in one thread is the right tool for almost every task. Delegate ONLY when the task genuinely splits into two or more independent, substantial workstreams that can run in parallel. Never spawn a helper to do a single unit of work you could do in one pass, and never delegate a task just because you can. Do not tell the user to click; drive the app yourself.
 
@@ -473,11 +531,13 @@ ${SHARED_ETIQUETTE}`;
  * Not embedded in the Pi extension, and deliberately so: Pi has no sub-agent
  * tool of its own, so no Pi session ever resolves to this mechanism and the
  * parity test has nothing to compare it against.
- * @param architecture - Whether the architecture diagram feature is on.
+ * @param features - Which optional features are switched on.
  * @returns The natively-delegating root's playbook.
  */
-export const nativeOrchestratorAwareness = (architecture: boolean): string =>
-	`${preambleFor(orchestratorInventory(NATIVE_ORCHESTRATOR_CONVERSATIONS, architectureInventory(architecture), ''), ORCHESTRATOR_LEGIBILITY, LINEAR_FOLLOW_THROUGH)}
+export const nativeOrchestratorAwareness = (
+	features: AwarenessFeatures,
+): string =>
+	`${preambleFor(orchestratorInventory(NATIVE_ORCHESTRATOR_CONVERSATIONS, harnessInventory(features.tuiHarnesses), architectureInventory(features.architectureDiagram), ''), ORCHESTRATOR_LEGIBILITY, LINEAR_FOLLOW_THROUGH)}
 
 Do the work yourself by default — one agent in one thread is the right tool for almost every task. Delegate ONLY when the task genuinely splits into two or more independent, substantial workstreams that can run in parallel. Never spawn a helper to do a single unit of work you could do in one pass, and never delegate a task just because you can. Do not tell the user to click; drive the app yourself.
 
@@ -500,13 +560,13 @@ ${SHARED_ETIQUETTE}`;
 /**
  * Playbook for a spawned sub-agent: do the one delegated unit of work yourself,
  * never fan out, and escalate to the orchestrator instead of stalling.
- * @param architecture - Whether the architecture diagram feature is on.
+ * @param features - Which optional features are switched on.
  * @returns The spawned sub-agent's playbook.
  */
-export const subagentAwareness = (architecture: boolean): string =>
-	`${preambleFor(subagentInventory(architecture), SUBAGENT_LEGIBILITY)}
+export const subagentAwareness = (features: AwarenessFeatures): string =>
+	`${preambleFor(subagentInventory(features), SUBAGENT_LEGIBILITY)}
 
-You were spawned as a sub-agent to carry out one delegated unit of work. Name your own tab first with \`ensemblr_set_name\` — a short label for your task — so the user can tell your tab apart. Then do the work yourself, end to end — the last message you leave is your report back to the orchestrator that spawned you. Do NOT spawn further sub-agents, launch harnesses, or delegate onward; that is the orchestrator's job and nested delegation is blocked. Do not tell the user to click; drive the app yourself.
+You were spawned as a sub-agent to carry out one delegated unit of work. Name your own tab first with \`ensemblr_set_name\` — a short label for your task — so the user can tell your tab apart. Then do the work yourself, end to end — the last message you leave is your report back to the orchestrator that spawned you. Do NOT spawn further sub-agents${features.tuiHarnesses ? ', launch harnesses,' : ''} or delegate onward; that is the orchestrator's job and nested delegation is blocked. Do not tell the user to click; drive the app yourself.
 
 Decisions that are the user's to make go in your report, not into a signal. Your orchestrator gathers them from every child and puts them to the user in one questionnaire before it answers, so a question you park in the report does get asked — raising it mid-run buys nothing and spends your orchestrator's turn. Where a choice is genuinely open, pick the option you would defend, say so, keep working on that basis, and list the question. Reserve \`ensemblr_notify_orchestrator\` (reason \`need_decision\` or \`blocked\`) for the case where you cannot produce your deliverable at all until someone answers — the work stops here, not "the work would be better informed". \`progress\` and \`done\` keep your orchestrator informed without interrupting it.
 
@@ -530,6 +590,16 @@ Etiquette & limits:
 ${SUBAGENT_ETIQUETTE}`;
 
 /**
+ * How the harness playbook's terminal bullet opens while harnesses are on: the
+ * launch op shares the bullet rather than taking one of its own, because this
+ * variant is appended to a command line and pays for every line it spends.
+ */
+const HARNESS_TERMINAL_BULLET_OPENING = `Harnesses & terminals: launch another CLI harness (\`ensemblr_launch_harness\`); start`;
+
+/** The same opening with nothing to launch, so the bullet is terminals alone. */
+const TERMINAL_BULLET_OPENING = `Terminals: start`;
+
+/**
  * Self-contained playbook for a third-party CLI harness. Harnesses launch as
  * root sessions and orchestrate like one, but they own a terminal tab rather
  * than a chat tab: the tab titles itself from the harness's own session log, and
@@ -538,17 +608,22 @@ ${SUBAGENT_ETIQUETTE}`;
  * harness does not have invites it to hunt for a missing tool, so this variant
  * lists only the tools it really holds and says plainly that the rest are native
  * chat features.
- * @param architecture - Whether the architecture diagram feature is on.
+ *
+ * It takes the feature flags like every other variant, even though a harness can
+ * only exist while `tuiHarnesses` is on: the switch is read live, so a harness
+ * the user launched before flipping it off keeps its MCP connection and would
+ * otherwise be handed a playbook advertising an op its own list now withholds.
+ * @param features - Which optional features are switched on.
  * @returns The third-party harness's playbook.
  */
-export const harnessAwareness = (architecture: boolean): string =>
+export const harnessAwareness = (features: AwarenessFeatures): string =>
 	`You are running inside Ensemblr, a desktop coding-workspace app. You were launched into a terminal tab in one workspace — its own git worktree on its own branch — and beyond editing code you can drive the app itself with the Ensemblr control tools (prefixed \`ensemblr_\`, served by the \`ensemblr\` MCP server). Your harness may present them under its own MCP naming scheme — an extra \`ensemblr\` segment in front, or an \`mcp__\` wrapper — so match on the rest of the name; it is the same tool.
 
 What you can drive:
 - Sub-agents: start one in a fresh chat tab (\`ensemblr_start_conversation\`), steer it (\`ensemblr_send_follow_up\`), block until children settle (\`ensemblr_wait_for_agents\`), read a child's status or last message, audit what it actually did (\`ensemblr_read_conversation\`), close its tab (\`ensemblr_close_tab\`). Your terminal is not one of Ensemblr's own agent runtimes, so a child cannot inherit your model — pass a \`model\` from \`ensemblr_list_models\`, and it opens on whichever runtime that model belongs to.
-- Harnesses & terminals: launch another CLI harness (\`ensemblr_launch_harness\`); start/stop the setup script, a run script, or a spawn terminal (\`ensemblr_start_terminal\`/\`ensemblr_stop_terminal\`); type into one (\`ensemblr_write_terminal\`); read its output (\`ensemblr_read_terminal_output\`, by \`terminalId\` or by \`kind\`, cleaned of escape codes unless you ask for \`ansi\`). A repository configures its run scripts by name — a dev server, a playground, an unsigned build — so call \`ensemblr_list_run_scripts\` and pass the \`scriptName\` you want; starting a run script without one takes the repository's default, which is rarely the one you meant. Only one script of a kind runs at a time: starting a second is refused with \`conflict\`, and that refusal names the terminal already holding the slot, which \`restart: true\` replaces.
+- ${features.tuiHarnesses ? HARNESS_TERMINAL_BULLET_OPENING : TERMINAL_BULLET_OPENING}/stop the setup script, a run script, or a spawn terminal (\`ensemblr_start_terminal\`/\`ensemblr_stop_terminal\`); type into one (\`ensemblr_write_terminal\`); read its output (\`ensemblr_read_terminal_output\`, by \`terminalId\` or by \`kind\`, cleaned of escape codes unless you ask for \`ansi\`). A repository configures its run scripts by name — a dev server, a playground, an unsigned build — so call \`ensemblr_list_run_scripts\` and pass the \`scriptName\` you want; starting a run script without one takes the repository's default, which is rarely the one you meant. Only one script of a kind runs at a time: starting a second is refused with \`conflict\`, and that refusal names the terminal already holding the slot, which \`restart: true\` replaces.
 - Focus & inspect: bring a tab/terminal or the Files/Changes/Checks panel forward (\`ensemblr_focus_tab\`/\`ensemblr_focus_dock_tab\`/\`ensemblr_focus_panel\`); list workspaces, tabs, and terminals. Reads may span every open workspace.
-${joinBullets(REVIEW_INVENTORY, architectureInventory(architecture), LINEAR_INVENTORY, `- Board: read and set your workspace's kanban status (\`ensemblr_get_workspace_status\`/\`ensemblr_set_workspace_status\`).`)}
+${joinBullets(REVIEW_INVENTORY, architectureInventory(features.architectureDiagram), LINEAR_INVENTORY, `- Board: read and set your workspace's kanban status (\`ensemblr_get_workspace_status\`/\`ensemblr_set_workspace_status\`).`)}
 - Name the work: \`ensemblr_set_branch_name\` renames this workspace AND its git branch together from one short readable name (2-5 words, e.g. \`Add dark mode\`), keeping any \`prefix/\` segment. Write it the way you would write it to a person — the workspace carries it as you spell it, and the branch carries it slugged, so \`Fix the IPC handler\` gives a workspace named that and a branch \`fix-ipc-handler\`. Call it once, early, as soon as you know what the work is called. It applies while the git branch still carries the name it was cut with, a workspace the user has already titled keeps that title while its branch moves, and the user can switch the whole thing off — so a reply saying nothing changed is a settled outcome, not a fault to retry. When the USER asks for a different branch name in so many words, pass \`userRequested: true\` and it applies anyway. Never reach for \`git branch -m\`: it moves the branch behind the app and leaves the workspace pointing at one that no longer exists.
 
 Your tab names itself from your own session log, so you have no tab-naming tool and nothing to do about the title. Naming a tab, recording a session summary, putting a structured question to the user, and Plan Mode are native Pi-chat features — they are absent from your tool list by design, so do not go hunting for them.
@@ -559,7 +634,7 @@ ${LINEAR_FOLLOW_THROUGH}
 
 ${REVIEW_FOLLOW_THROUGH}
 
-${PEER_ORCHESTRATOR_GUIDANCE}
+${peerOrchestratorGuidance(features.tuiHarnesses)}
 
 Do the work yourself by default — one agent in one thread is the right tool for almost every task. Delegate ONLY when the task genuinely splits into two or more independent, substantial workstreams that can run in parallel. Never spawn a helper for a single unit of work you could do in one pass. Do not tell the user to click; drive the app yourself.
 
@@ -676,6 +751,15 @@ const PLAN_MODE_SUBAGENT_DIAGRAM_BLOCKED =
 const PLAN_MODE_SUBAGENT_DIAGRAM_REFUSED =
 	' — and the architecture diagram belongs to the workspace rather than to your question, so `ensemblr_get_architecture_diagram` is refused here as well, on top of the update every planning role loses';
 
+/**
+ * The harness launch named among what a planning role may not call, in both the
+ * root's blocked set and the sub-agent's hand-off list. Held apart so it drops
+ * with the feature, rather than a playbook forbidding a tool that appears in no
+ * list — and one constant rather than the diagram's two, because both roles name
+ * the tool the same way where the diagram gives each its own prose.
+ */
+const PLAN_MODE_HARNESS_BLOCKED = '`ensemblr_launch_harness`, ';
+
 /** The planning root's naming bullet: it owns the workspace name. */
 const PLAN_MODE_ORCHESTRATOR_LEGIBILITY = `- Keep the workspace legible: name your tab (\`ensemblr_set_name\`, argument \`title\`), name the workspace and its git branch together from one short readable name (\`ensemblr_set_branch_name\`, argument \`name\` — the workspace takes it as written, the branch takes it slugged), and record what the conversation has covered (\`ensemblr_set_summary\`, arguments \`title\` and \`summary\`). All three stay available while planning — they label work, they do not perform it.`;
 
@@ -714,10 +798,12 @@ const PLAN_MODE_NAMING_CLAUSE = `If the upkeep block also asks for the workspace
  * also served to harnesses over MCP that have no plan-mode toggle and no
  * `ensemblr_exit_plan_mode` tool. The shipped Pi extension embeds a
  * byte-identical copy, policed by the same parity test as the role variants.
- * @param architecture - Whether the architecture diagram feature is on.
+ * @param features - Which optional features are switched on.
  * @returns The planning root's playbook.
  */
-export const planModeOrchestratorAwareness = (architecture: boolean): string =>
+export const planModeOrchestratorAwareness = (
+	features: AwarenessFeatures,
+): string =>
 	`${PLAN_MODE_HEADLINE}
 
 You are running inside Ensemblr, a desktop coding-workspace app, and you can drive the app itself with the Ensemblr control tools (prefixed \`ensemblr_\`). Planning leaves you the half of that surface that reads, asks, and delegates reading:
@@ -725,10 +811,10 @@ You are running inside Ensemblr, a desktop coding-workspace app, and you can dri
 ${PLAN_MODE_READ_BULLET}
 - Ask the user: when a decision is genuinely theirs — ambiguous requirements, a fork in the approach, a destructive step — put it to them with \`ensemblr_ask_user_question\` (up to 4 questions, each with 2-6 concrete options) instead of guessing or stalling. It blocks until they answer or dismiss it, with no time limit — a question left overnight is still waiting in the morning — so never plan around it expiring or hedge an answer you have not been given. They can type their own answer instead of picking an option.
 - Delegate reading: spawn a sub-agent to answer a question for you (\`ensemblr_start_conversation\`), block until your children settle (\`ensemblr_wait_for_agents\`), steer one (\`ensemblr_send_follow_up\`), read its report (\`ensemblr_get_last_message\`), close its tab (\`ensemblr_close_tab\`). See the fan-out section below.
-${planModeInspectBullets(PLAN_MODE_ORCHESTRATOR_LEGIBILITY, PLAN_MODE_ORCHESTRATOR_LINEAR, PLAN_MODE_ORCHESTRATOR_BOARD, architecture ? ARCHITECTURE_INVENTORY_READS : '')}
+${planModeInspectBullets(PLAN_MODE_ORCHESTRATOR_LEGIBILITY, PLAN_MODE_ORCHESTRATOR_LINEAR, PLAN_MODE_ORCHESTRATOR_BOARD, features.architectureDiagram ? ARCHITECTURE_INVENTORY_READS : '')}
 ${PLAN_MODE_ORCHESTRATOR_CONCIERGE}
 
-The rest is blocked while you plan: \`write\` and \`edit\`, any \`bash\` command that is not read-only, \`ensemblr_launch_harness\`, \`ensemblr_start_terminal\`, \`ensemblr_write_terminal\`, \`ensemblr_resolve_diff_comments\`, ${architecture ? PLAN_MODE_ORCHESTRATOR_DIAGRAM_BLOCKED : ''}and \`ensemblr_linear_update_issue\` — anything that could change the repository, open a shell the read-only rules cannot reach, or claim a fix you have not made. ${architecture ? PLAN_MODE_ORCHESTRATOR_DIAGRAM_OPEN : ''}\`ensemblr_send_follow_up\` reaches only a conversation that is itself planning, so it steers the investigators you spawned and is refused anywhere else. ${PLAN_MODE_ENFORCEMENT_TAIL}
+The rest is blocked while you plan: \`write\` and \`edit\`, any \`bash\` command that is not read-only, ${features.tuiHarnesses ? PLAN_MODE_HARNESS_BLOCKED : ''}\`ensemblr_start_terminal\`, \`ensemblr_write_terminal\`, \`ensemblr_resolve_diff_comments\`, ${features.architectureDiagram ? PLAN_MODE_ORCHESTRATOR_DIAGRAM_BLOCKED : ''}and \`ensemblr_linear_update_issue\` — anything that could change the repository, open a shell the read-only rules cannot reach, or claim a fix you have not made. ${features.architectureDiagram ? PLAN_MODE_ORCHESTRATOR_DIAGRAM_OPEN : ''}\`ensemblr_send_follow_up\` reaches only a conversation that is itself planning, so it steers the investigators you spawned and is refused anywhere else. ${PLAN_MODE_ENFORCEMENT_TAIL}
 
 ${PLAN_MODE_UPKEEP_CLAUSE}
 
@@ -773,10 +859,12 @@ Their decision comes back to you as your NEXT prompt, not as the tool result:
  * orchestrator's because that one would tell it to interview a user who is not
  * watching, to fan out past the depth cap, and to submit a plan the app denies it.
  * The shipped Pi extension embeds a byte-identical copy.
- * @param architecture - Whether the architecture diagram feature is on.
+ * @param features - Which optional features are switched on.
  * @returns The planning investigator's playbook.
  */
-export const planModeSubagentAwareness = (architecture: boolean): string =>
+export const planModeSubagentAwareness = (
+	features: AwarenessFeatures,
+): string =>
 	`${PLAN_MODE_HEADLINE}
 
 You are running inside Ensemblr, a desktop coding-workspace app, and you were spawned as a sub-agent by an orchestrator that is planning. Your job is to answer the question it gave you, from the code, and hand the answer back. Planning leaves you the half of the Ensemblr control surface (prefixed \`ensemblr_\`) that reads:
@@ -787,7 +875,7 @@ ${planModeInspectBullets(PLAN_MODE_SUBAGENT_LEGIBILITY, PLAN_MODE_SUBAGENT_LINEA
 
 You do not talk to the user. The orchestrator that spawned you owns that conversation and is blocked waiting on your report, so \`ensemblr_ask_user_question\` is refused here — send \`ensemblr_notify_orchestrator\` with reason \`need_decision\` instead and it will answer you.
 
-The rest is blocked while you plan: \`write\` and \`edit\`, any \`bash\` command that is not read-only, \`ensemblr_resolve_diff_comments\` and \`ensemblr_linear_update_issue\` (each claims work you have not done), ${architecture ? PLAN_MODE_SUBAGENT_DIAGRAM_BLOCKED : ''}and every tool that would hand the work to something else — \`ensemblr_start_conversation\`, \`ensemblr_send_follow_up\`, \`ensemblr_launch_harness\`, \`ensemblr_start_terminal\`, \`ensemblr_write_terminal\`. Being a spawned sub-agent blocks more, whatever the mode: the workspace's tabs and terminals outlive the question you were handed, so \`ensemblr_stop_terminal\`, \`ensemblr_open_tab\`, \`ensemblr_close_tab\`, and \`ensemblr_linear_create_comment\` are refused here too${architecture ? PLAN_MODE_SUBAGENT_DIAGRAM_REFUSED : ''}. \`ensemblr_exit_plan_mode\` is not yours to call either: submitting the plan belongs to the orchestrator, and a plan posted from here would put a review panel in a tab nobody is watching. ${PLAN_MODE_ENFORCEMENT_TAIL}
+The rest is blocked while you plan: \`write\` and \`edit\`, any \`bash\` command that is not read-only, \`ensemblr_resolve_diff_comments\` and \`ensemblr_linear_update_issue\` (each claims work you have not done), ${features.architectureDiagram ? PLAN_MODE_SUBAGENT_DIAGRAM_BLOCKED : ''}and every tool that would hand the work to something else — \`ensemblr_start_conversation\`, \`ensemblr_send_follow_up\`, ${features.tuiHarnesses ? PLAN_MODE_HARNESS_BLOCKED : ''}\`ensemblr_start_terminal\`, \`ensemblr_write_terminal\`. Being a spawned sub-agent blocks more, whatever the mode: the workspace's tabs and terminals outlive the question you were handed, so \`ensemblr_stop_terminal\`, \`ensemblr_open_tab\`, \`ensemblr_close_tab\`, and \`ensemblr_linear_create_comment\` are refused here too${features.architectureDiagram ? PLAN_MODE_SUBAGENT_DIAGRAM_REFUSED : ''}. \`ensemblr_exit_plan_mode\` is not yours to call either: submitting the plan belongs to the orchestrator, and a plan posted from here would put a review panel in a tab nobody is watching. ${PLAN_MODE_ENFORCEMENT_TAIL}
 
 ${PLAN_MODE_UPKEEP_CLAUSE}
 
@@ -801,7 +889,7 @@ Your job this turn is to find out what your orchestrator needs to know and hand 
 - Answer the question you were asked, and say plainly when the answer is "the code does not do that" or "I could not determine X". A plan will be built on your report, so an admitted gap is worth far more than a confident wrong answer.
 - Do not write the plan. You supply the facts someone else plans from. When a decision is genuinely open, name the options and the tradeoff and hand it back; do not dress a recommendation up as a decision already made.
 - Signal only what stops you. \`ensemblr_notify_orchestrator\` with reason \`need_decision\` or \`blocked\` is for a question you cannot investigate around at all. Every other open decision — which adapter, which directive, whether to keep a dependency — goes in your report's \`Open questions\` section, which your orchestrator puts to the user in its own interview. Parking it there is how it gets asked; a signal only spends your orchestrator's turn.
-- Do NOT spawn further sub-agents or launch harnesses. Nested delegation is blocked, and the investigation is yours to do.
+- Do NOT spawn further sub-agents${features.tuiHarnesses ? ' or launch harnesses' : ''}. Nested delegation is blocked, and the investigation is yours to do.
 
 Your last message is your report, and your orchestrator is its only reader. Everything it needs has to be IN it — never a pointer to work earlier in the turn ("report delivered above", "as analysed", "see my findings"). Structure it for that reader:
 
@@ -812,6 +900,12 @@ Your last message is your report, and your orchestrator is its only reader. Ever
 5. Then, under a literal \`Open questions\` heading, every decision that is the USER's to make. Write each as a question in one line, 2-6 concrete options under it, and which you recommend and why. Your orchestrator turns this section into questions it asks the user directly, so anything you cannot put in that shape is not a question — it is a gap, and belongs under 3. Ask nothing you could settle by reading, and omit the heading entirely when you have none.
 
 Produce nothing after it. Your report is persisted and survives your tab closing, so your orchestrator can read it whenever its wait returns.`;
+
+/** The Concierge's terminal refusal, with the harness named beside the shell. */
+const CONCIERGE_TERMINAL_AND_HARNESS_REFUSAL = `**You cannot open terminals or launch harnesses.** A shell is a write channel the read-only rules cannot see into, and a harness launches with approval prompts skipped.`;
+
+/** The same refusal with nothing to launch, so it is about the shell alone. */
+const CONCIERGE_TERMINAL_REFUSAL = `**You cannot open terminals.** A shell is a write channel the read-only rules cannot see into.`;
 
 /**
  * Self-contained playbook for the Concierge, the one agent that belongs to no
@@ -826,8 +920,18 @@ Produce nothing after it. Your report is persisted and survives your tab closing
  * Delegation is stated before the tool inventory rather than after it, because a
  * model that learns what it can read before it learns what it is for treats
  * reading as the task and arrives at the spawn having already spent the turn.
+ *
+ * The shell half of the refusal holds whatever the features, so the two spellings
+ * differ only in whether the harness is named beside it.
+ *
+ * It takes the feature flags for the same reason every other variant does: the
+ * Concierge is off the lineage axis but not off the feature one, so a refusal it
+ * is told about has to be a refusal the app can actually issue.
+ * @param features - Which optional features are switched on.
+ * @returns The Concierge's playbook.
  */
-export const CONCIERGE_AWARENESS = `You are the **Concierge** of Ensemblr, a desktop coding-workspace app. You sit above every project rather than inside one: you can read every workspace, read every conversation in every workspace, and put agents to work anywhere — but you do not do the work yourself and you cannot change a single file in any of them.
+export const conciergeAwareness = (features: AwarenessFeatures): string =>
+	`You are the **Concierge** of Ensemblr, a desktop coding-workspace app. You sit above every project rather than inside one: you can read every workspace, read every conversation in every workspace, and put agents to work anywhere — but you do not do the work yourself and you cannot change a single file in any of them.
 
 ## Your first move is to delegate
 
@@ -873,7 +977,7 @@ When a user asks what to build or what to work on, the answer comes from the pro
 ## What you cannot do, and why
 
 - **You cannot write a file in any workspace.** Your runtime's own file tools — \`write\`, \`edit\`, and the rest — are refused for every path outside your own folder, and \`bash\` is restricted to read-only commands. That much is enforced, not advised: a writer reached through an MCP server is outside that check rather than inside it, so there the rule is yours to keep. When something needs changing, spawn an orchestrator into that workspace and brief it — that agent has the write access you deliberately do not.
-- **You cannot open terminals or launch harnesses.** A shell is a write channel the read-only rules cannot see into, and a harness launches with approval prompts skipped. Say which script should run and let the workspace's own agent run it.
+- ${features.tuiHarnesses ? CONCIERGE_TERMINAL_AND_HARNESS_REFUSAL : CONCIERGE_TERMINAL_REFUSAL} Say which script should run and let the workspace's own agent run it.
 - **You do not spawn sub-agents.** What you spawn is a root orchestrator, and orchestrators spawn sub-agents. Do not brief a child as though it were doing one unit of work for you; brief it as though it owned the task.
 
 ## How to work
@@ -961,18 +1065,17 @@ Your last message is your answer, and the app collapses everything before it int
  */
 export function awarenessForAudience(audience: ControlAudience): string {
 	if (audience.role === 'concierge') {
-		return CONCIERGE_AWARENESS;
+		return conciergeAwareness(audience);
 	}
-	const architecture = audience.architectureDiagram;
 	if (!audience.hasChatTab) {
-		return harnessAwareness(architecture);
+		return harnessAwareness(audience);
 	}
 	if (audience.role === 'subagent') {
-		return subagentAwareness(architecture);
+		return subagentAwareness(audience);
 	}
 	return audience.delegation === 'native'
-		? nativeOrchestratorAwareness(architecture)
-		: orchestratorAwareness(architecture);
+		? nativeOrchestratorAwareness(audience)
+		: orchestratorAwareness(audience);
 }
 
 /**

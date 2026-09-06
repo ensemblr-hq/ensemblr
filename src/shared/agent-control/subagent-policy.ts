@@ -289,6 +289,14 @@ export const ARCHITECTURE_DIAGRAM_OPS: readonly AgentControlOp[] = [
 ];
 
 /**
+ * The one op the third-party CLI harnesses own, withheld from every caller while
+ * the feature is off. The same feature axis as {@link ARCHITECTURE_DIAGRAM_OPS}:
+ * off, the op is absent from every list, the playbooks stop describing it, and
+ * the app offers no way to launch one.
+ */
+export const TUI_HARNESS_OPS: readonly AgentControlOp[] = ['launchHarness'];
+
+/**
  * Ops only the Concierge holds, withheld from every workspace agent because
  * each addresses the app above the workspace: navigating to another workspace,
  * cutting a new one, listing the projects any of them could be cut from, and
@@ -344,28 +352,29 @@ const NATIVE_DELEGATION_WITHHELD_OPS: ReadonlySet<AgentControlOp> = new Set([
 ]);
 
 /**
- * Every op a caller's tool list leaves out, folding all three withholding axes
- * into one answer: the chat-tab ops a caller without a tab cannot use, the ops a
- * spawned sub-agent is denied or has no use for, and the spawn ops a root
- * delegating through its own runtime does not hold. Listing a tool the service
- * would only refuse teaches the model to keep reaching for it, which is the same
- * argument on every axis.
+ * Every op a caller's tool list leaves out, folding all four withholding axes
+ * into one answer: the ops an optional feature owns while it is switched off, the
+ * chat-tab ops a caller without a tab cannot use, the ops a spawned sub-agent is
+ * denied or has no use for, and the spawn ops a root delegating through its own
+ * runtime does not hold. Listing a tool the service would only refuse teaches the
+ * model to keep reaching for it, which is the same argument on every axis.
  *
  * The Concierge answers on its own rather than through those axes, because it is
  * not on the lineage one at all: it is neither a root that delegates nor a child
  * that was delegated to, so folding it in would mean answering "is it a
  * sub-agent?" about something that can never be one — but the feature axis still
- * applies to it, because a Concierge with the diagram switched on would otherwise
- * be handed ops the rest of the app does not serve.
+ * applies to it, because a Concierge holding an op of a feature the user has
+ * switched off would be handed something the rest of the app does not serve.
  * @param audience - Whether the caller has a chat tab, its lineage role, its delegation mechanism, and which optional features are on.
  * @returns The ops to withhold from that caller's tool list.
  */
 export function withheldControlOps(
 	audience: ControlAudience,
 ): ReadonlySet<AgentControlOp> {
-	const featureWithheld = audience.architectureDiagram
-		? []
-		: ARCHITECTURE_DIAGRAM_OPS;
+	const featureWithheld = [
+		...(audience.architectureDiagram ? [] : ARCHITECTURE_DIAGRAM_OPS),
+		...(audience.tuiHarnesses ? [] : TUI_HARNESS_OPS),
+	];
 	if (audience.role === 'concierge') {
 		return new Set([...CONCIERGE_WITHHELD_OPS, ...featureWithheld]);
 	}

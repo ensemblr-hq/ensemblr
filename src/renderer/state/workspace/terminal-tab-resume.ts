@@ -1,5 +1,7 @@
+import { useAtomValue } from 'jotai';
 import { useEffect, useRef } from 'react';
 
+import { tuiHarnessesAtom } from '@/renderer/state/preferences';
 import type { SessionTabModel } from '@/renderer/types/workbench';
 
 import {
@@ -21,6 +23,12 @@ import {
  * first dead tab of a harness only; further same-harness tabs launch fresh so
  * they never collide on one shared log. The main handler persists the new
  * terminalId, so invalidating re-derives the tab against the live PTY.
+ *
+ * With the Experimental harness switch off, a dead tab is archived rather than
+ * respawned. The switch can be flipped while tabs from an earlier session are
+ * still on disk, and a restart that quietly relaunched Claude Code would undo
+ * the user's choice; a tab whose PTY is still alive is left alone, because
+ * turning the feature off is not a reason to kill a running conversation.
  * @param closeSessionTabAsync - Archives a tab, awaited so failures self-heal
  * @param invalidateChatTabs - Refetches the tab list once a resume lands
  * @param sessionTabs - The workspace's current tabs
@@ -46,6 +54,7 @@ export function useTerminalTabAutoResume({
 	// the harness's most recent cwd conversation, but at most one tab per harness
 	// may — two concurrent `--continue` would write and corrupt one shared log.
 	const resumedHarnessIdsRef = useRef<Set<string>>(new Set());
+	const harnessesEnabled = useAtomValue(tuiHarnessesAtom);
 
 	useEffect(() => {
 		const api = window.ensemblr;
@@ -90,6 +99,9 @@ export function useTerminalTabAutoResume({
 					if (snapshot.session) {
 						return;
 					}
+					if (!harnessesEnabled) {
+						return closeSessionTabAsync(chatTabId);
+					}
 					// Exact-conversation resume when the native id was captured; it never
 					// collides on a shared log. Without an id, fall back to the cwd
 					// `--continue` — but only the first dead tab of a harness, since two
@@ -124,7 +136,13 @@ export function useTerminalTabAutoResume({
 					resumed.delete(chatTabId);
 				});
 		}
-	}, [closeSessionTabAsync, invalidateChatTabs, sessionTabs, workspaceId]);
+	}, [
+		closeSessionTabAsync,
+		harnessesEnabled,
+		invalidateChatTabs,
+		sessionTabs,
+		workspaceId,
+	]);
 
 	return {
 		claimTab: (tabId: string) => autoResumedTabIdsRef.current.add(tabId),

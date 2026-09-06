@@ -412,6 +412,19 @@ Concierge → orchestrator → Concierge has no natural end.
 | `ensemblr_write_terminal` | **`terminalId: string`**, **`input: string`** | write | sub-agent, Concierge |
 | `ensemblr_read_terminal_output` | `terminalId?: string`, `kind?: 'setup' \| 'run'` — exactly one, `ansi?: boolean` | read | — |
 
+**`ensemblr_launch_harness` is off by default**, behind Settings → Experimental →
+*Third-party CLI harnesses* (`app.experimental.tuiHarnesses`). It is the same
+feature axis the architecture diagram uses, and it works the same way: off, the
+op leaves every tool list, every playbook stops naming a harness — the
+orchestrator's inventory bullet, the sub-agent's absence sentence, both plan-mode
+blocked sets, the Concierge's terminal refusal, and the co-tenancy warning that a
+live harness terminal holds one of the two writer slots — and the service refuses
+the op ahead of the spawn guard. One field carries all of it: `tuiHarnesses` on
+`AwarenessFeatures`, which `withheldControlOps` and `awarenessForAudience` read
+together. The Pi extension is told separately over
+`ENSEMBLR_CONTROL_TUI_HARNESSES`. The user-facing half — launcher, shortcut, menu
+item, launch and resume IPC — is in [`harnesses.md`](./harnesses.md).
+
 `scriptName` is accepted only with `kind: 'run'`; any other pairing is rejected.
 `restart` is accepted only with `kind: 'setup'` or `'run'`, and replaces a script
 of that kind already running — which is otherwise refused with `conflict`. That

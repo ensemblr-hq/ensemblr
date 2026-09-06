@@ -148,6 +148,8 @@ interface AgentSessionServiceOptions {
 	/** Whether the architecture diagram feature is on, for the playbook a session receives. */
 	readArchitectureDiagramEnabled?: () => boolean;
 	readClaudeSubagentMode?: SubagentMechanismReader;
+	/** Whether third-party CLI harnesses are on, for the playbook a session receives. */
+	readTuiHarnessesEnabled?: () => boolean;
 	/** Reads the durable sub-agent marker, so a resumed child stays on `ensemblr`. */
 	isSpawnedSubAgent?: SubAgentMarkerReader;
 	/** Injects the agent-control env (control URL + token) into each agent child. */
@@ -295,6 +297,7 @@ export function createAgentSessionService({
 	queueNaming,
 	readArchitectureDiagramEnabled,
 	readClaudeSubagentMode,
+	readTuiHarnessesEnabled,
 	resolveAgentControlEnv,
 	resolvePermissionMode = () => DEFAULT_PERMISSION_MODE,
 	resolveProviderExecutable,
@@ -327,6 +330,7 @@ export function createAgentSessionService({
 		queueNaming,
 		readArchitectureDiagramEnabled,
 		readClaudeSubagentMode,
+		readTuiHarnessesEnabled,
 		requireDatabase: requireSessionDatabase,
 		resolveAgentControlEnv,
 		resolvePermissionMode,
