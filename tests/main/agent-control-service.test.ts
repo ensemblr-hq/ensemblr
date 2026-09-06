@@ -1369,6 +1369,53 @@ describe('agent-control service: delegation', () => {
 		);
 	});
 
+	// A terminal an agent started behind whatever dock tab was already open is one
+	// the user never sees, so starting one focuses it.
+	it('brings a spawned terminal forward in the dock', async () => {
+		const ports = makePorts();
+		const { service } = setup({ ports });
+		const result = await service.invoke({
+			op: 'startTerminal',
+			token: 'tok-caller',
+			rawArgs: { kind: 'spawn' },
+		});
+		expect(result.ok).toBe(true);
+		expect(ports.focus.focusDockTab).toHaveBeenCalledWith({
+			workspaceId: 'ws',
+			dock: 'terminal:term-1',
+		});
+	});
+
+	it('brings a started script forward by its fixed dock tab', async () => {
+		const ports = makePorts();
+		const { service } = setup({ ports });
+		await service.invoke({
+			op: 'startTerminal',
+			token: 'tok-caller',
+			rawArgs: { kind: 'run', scriptName: 'playground' },
+		});
+		expect(ports.focus.focusDockTab).toHaveBeenCalledWith({
+			workspaceId: 'ws',
+			dock: 'run',
+		});
+	});
+
+	it('focuses nothing when the start was refused', async () => {
+		const ports = makePorts();
+		vi.mocked(ports.terminals.startTerminal).mockResolvedValue({
+			ok: false,
+			code: 'script-already-running',
+			message: 'A run script is already running.',
+		});
+		const { service } = setup({ ports });
+		await service.invoke({
+			op: 'startTerminal',
+			token: 'tok-caller',
+			rawArgs: { kind: 'run' },
+		});
+		expect(ports.focus.focusDockTab).not.toHaveBeenCalled();
+	});
+
 	it('rejects a run script name paired with a non-run terminal kind', async () => {
 		const ports = makePorts();
 		const { service } = setup({ ports });

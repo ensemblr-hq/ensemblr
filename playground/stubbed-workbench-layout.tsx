@@ -34,6 +34,7 @@ export function StubbedWorkbenchLayout({
 		() => ({
 			actions: {
 				collapseRightSidebar: () => undefined,
+				expandDockPanel: () => undefined,
 				expandRightSidebar: () => undefined,
 				handleDockResize: () => undefined,
 				handleRightSidebarResize: () => undefined,

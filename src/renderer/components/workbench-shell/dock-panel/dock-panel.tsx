@@ -27,6 +27,7 @@ import { selectActiveRunScript } from '@/renderer/lib/terminal';
 import { cn } from '@/renderer/lib/utils';
 import { DEFAULT_DOCK_TAB } from '@/renderer/lib/workbench';
 import { lastRunScriptAtomFamily } from '@/renderer/state/preferences';
+import { useProvideDockExpander } from '@/renderer/state/workspace/terminal-requests';
 import type {
 	DockTabId,
 	DockTabModel,
@@ -75,6 +76,10 @@ export function DockPanel({
 		runSummary: workspace.scripts.run,
 	});
 
+	useProvideDockExpander(workspace.id, () => {
+		layoutActions.expandDockPanel();
+		layoutActions.expandRightSidebar();
+	});
 	useRunScriptHotkey(workspace.scripts.run.status, actions, activeRunScript);
 	useDockMenuCommands(
 		workspace.scripts.run.status,
