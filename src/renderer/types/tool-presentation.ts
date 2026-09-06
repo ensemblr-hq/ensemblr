@@ -56,6 +56,33 @@ export type ToolGlyph =
  */
 export type TimelineSurface = 'concierge' | 'workspace';
 
+/**
+ * What a conversation a control call acted on turned out to be. `subagent` is a
+ * child the caller spawned and collects; `orchestrator` is a root the caller does
+ * not own — a peer, or the Review conversation — which the app opens with no
+ * sub-agent marker precisely because it is nobody's child.
+ */
+export type TimelineAgentRole = 'orchestrator' | 'subagent';
+
+/**
+ * Reads back what a targeted conversation is, so a control row names its object
+ * rather than assuming every one of them is a child.
+ *
+ * Answering null is meaningful and distinct from having no resolver at all. Null
+ * means the surface looked and could not place the conversation: the app no
+ * longer holds it, or the listing backing this resolver still predates a tab an
+ * agent has just opened, or it belongs to a workspace other than the one that
+ * listing covers — `ensemblr_read_conversation` and its siblings are not
+ * workspace-scoped, so a row can name a session the caller's own workspace never
+ * held. None of them earns a noun beyond the neutral one, and a conversation in
+ * another workspace is not the caller's child by construction. A surface that
+ * supplies no resolver has not looked at all, and keeps the sub-agent wording
+ * the majority of calls deserve.
+ */
+export type AgentRoleResolver = (
+	agentSessionId: string,
+) => TimelineAgentRole | null;
+
 /** The file a row touched, pinned beside its title. */
 export interface ToolFileBadgeDescriptor {
 	/** Added-line count for an edit; null when the tool reports no diff. */

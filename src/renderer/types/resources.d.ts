@@ -2777,7 +2777,15 @@ export default interface Resources {
 					running: 'Checking a chat';
 				};
 				done: 'Checked a sub-agent';
+				orchestrator: {
+					done: 'Checked an orchestrator';
+					running: 'Checking an orchestrator';
+				};
 				running: 'Checking a sub-agent';
+				unresolved: {
+					done: 'Checked a chat';
+					running: 'Checking a chat';
+				};
 			};
 			'get-diff-comments': {
 				done: 'Read review comments';
@@ -2789,7 +2797,15 @@ export default interface Resources {
 					running: "Reading a chat's report";
 				};
 				done: "Read a sub-agent's report";
+				orchestrator: {
+					done: "Read an orchestrator's report";
+					running: "Reading an orchestrator's report";
+				};
 				running: "Reading a sub-agent's report";
+				unresolved: {
+					done: "Read a chat's report";
+					running: "Reading a chat's report";
+				};
 			};
 			'get-workspace-diff': {
 				done: 'Read the diff';
@@ -2869,7 +2885,15 @@ export default interface Resources {
 					running: "Reading a chat's transcript";
 				};
 				done: "Read a sub-agent's transcript";
+				orchestrator: {
+					done: "Read an orchestrator's transcript";
+					running: "Reading an orchestrator's transcript";
+				};
 				running: "Reading a sub-agent's transcript";
+				unresolved: {
+					done: "Read a chat's transcript";
+					running: "Reading a chat's transcript";
+				};
 			};
 			'read-terminal-output': {
 				done: 'Read terminal output';
@@ -2889,7 +2913,15 @@ export default interface Resources {
 					running: 'Steering a chat';
 				};
 				done: 'Steered a sub-agent';
+				orchestrator: {
+					done: 'Steered an orchestrator';
+					running: 'Steering an orchestrator';
+				};
 				running: 'Steering a sub-agent';
+				unresolved: {
+					done: 'Steered a chat';
+					running: 'Steering a chat';
+				};
 			};
 			'set-workspace-status': {
 				done: 'Moved the workspace';
@@ -2905,6 +2937,10 @@ export default interface Resources {
 					running: 'Starting a chat';
 				};
 				done: 'Started a sub-agent';
+				orchestrator: {
+					done: 'Started an orchestrator';
+					running: 'Starting an orchestrator';
+				};
 				running: 'Starting a sub-agent';
 			};
 			'start-review': {
@@ -2929,7 +2965,15 @@ export default interface Resources {
 					running: 'Waiting for the chats';
 				};
 				done: 'Waited for sub-agents';
+				orchestrator: {
+					done: 'Waited for orchestrators';
+					running: 'Waiting for orchestrators';
+				};
 				running: 'Waiting for sub-agents';
+				unresolved: {
+					done: 'Waited for the chats';
+					running: 'Waiting for the chats';
+				};
 			};
 			'with-detail': '{{action}}: {{detail}}';
 			'write-terminal': {

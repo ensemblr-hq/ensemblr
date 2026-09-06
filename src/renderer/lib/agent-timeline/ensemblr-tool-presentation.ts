@@ -1,6 +1,7 @@
 import type { DynamicToolUIPart } from 'ai';
 import { i18n } from '@/renderer/lib/i18n';
 import type {
+	AgentRoleResolver,
 	TimelineSurface,
 	ToolBadgeDescriptor,
 	ToolGlyph,
@@ -9,6 +10,7 @@ import {
 	BOOKKEEPING_TOOL_NAMES,
 	canonicalEnsemblrToolName,
 	ENSEMBLR_TOOL_LABELS,
+	type TitlePair,
 } from './ensemblr-control-tool-registry';
 import { inputOf, outputOf } from './tool-part-fields';
 
@@ -318,6 +320,57 @@ function referencedIdOf(
 }
 
 /**
+ * Names the conversation a control call acted on, which is the object of the row
+ * rather than its verb.
+ *
+ * The surface picks the speaker's vocabulary; this picks the object's noun,
+ * because one workspace agent steers a child it owns, a peer beside it, and the
+ * Review conversation with the same op. A spawn already carries the answer in its
+ * own arguments; everything else resolves session ids against the app's live
+ * catalogue of chat tabs.
+ *
+ * The mixed case falls to the neutral wording deliberately: a wait naming one
+ * child and one peer has no single noun that is true of the set, and picking
+ * either would be a claim about the other.
+ * @param label - The tool's registry entry
+ * @param input - The tool call's input bag
+ * @param resolveRole - The catalogue lookup, or null on a surface that has none
+ * @returns The titles to use instead of the tool's default pair, or null to keep
+ * that default — which is the sub-agent reading
+ */
+function targetTitles(
+	label: (typeof ENSEMBLR_TOOL_LABELS)[string],
+	input: Record<string, unknown>,
+	resolveRole: AgentRoleResolver | null,
+): TitlePair | null {
+	const target = label.target;
+	if (!target) {
+		return null;
+	}
+	if ('peerFlagKey' in target) {
+		return valuesAtPath(input, target.peerFlagKey)[0] === true
+			? target.orchestrator
+			: null;
+	}
+	if (resolveRole === null) {
+		return null;
+	}
+	const roles = target.sessionKeys
+		.flatMap((key) => valuesAtPath(input, key))
+		.filter((value): value is string => typeof value === 'string')
+		.map(resolveRole);
+	if (roles.length === 0) {
+		return null;
+	}
+	if (roles.every((role) => role === 'subagent')) {
+		return null;
+	}
+	return roles.every((role) => role === 'orchestrator')
+		? target.orchestrator
+		: target.unresolved;
+}
+
+/**
  * Resolves the human-readable title, glyph, and chip for a control tool call,
  * folding in the one argument that says which tab, sub-agent, or status it acted
  * on. A call still in flight reads in the present participle, so a blocking wait
@@ -325,7 +378,9 @@ function referencedIdOf(
  *
  * The surface picks the vocabulary rather than the tool doing so alone: the same
  * `ensemblr_start_conversation` opens a sub-agent for a workspace agent and a
- * chat the user can talk to for the Concierge.
+ * chat the user can talk to for the Concierge. Inside a workspace the target's
+ * own role narrows it further — see {@link targetTitles} — so steering a peer or
+ * the Review conversation stops reading as steering a child.
  *
  * A surface that hands the detail to a chip gets an `unpinnedTitle` back as
  * well, because whether the chip resolves is only known once a component has
@@ -334,6 +389,8 @@ function referencedIdOf(
  * @param part - The tool part to read, arguments and result both
  * @param isRunning - Whether the call has yet to return
  * @param surface - Which transcript the row is being rendered in
+ * @param resolveRole - Reads back what a targeted conversation is; null on a
+ * surface that cannot look one up, which keeps the sub-agent wording
  * @returns The title, glyph, and badge, or null when the name is not a control
  * tool
  */
@@ -341,6 +398,7 @@ export function ensemblrToolLabel(
 	part: DynamicToolUIPart,
 	isRunning: boolean,
 	surface: TimelineSurface = 'workspace',
+	resolveRole: AgentRoleResolver | null = null,
 ): {
 	badge: ToolBadgeDescriptor | null;
 	glyph: ToolGlyph;
@@ -356,7 +414,7 @@ export function ensemblrToolLabel(
 	const titles =
 		surface === 'concierge'
 			? (label.conciergeTitle ?? label.title)
-			: label.title;
+			: (targetTitles(label, input, resolveRole) ?? label.title);
 	const action = titles[isRunning ? 1 : 0]();
 	const detailKeys =
 		surface === 'concierge'

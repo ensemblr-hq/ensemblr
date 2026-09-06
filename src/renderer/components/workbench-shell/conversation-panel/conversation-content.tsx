@@ -8,12 +8,14 @@ import { showsComposer } from '@/renderer/lib/workbench';
 import { usePiRawFrameCapture } from '@/renderer/state/pi';
 import { developerModeAtom } from '@/renderer/state/preferences';
 import { useWorkspaceUnreadKeys } from '@/renderer/state/unread';
+import { useWorkspaceAgentRoleResolver } from '@/renderer/state/workspace';
 import type { WorkspaceMainContentState } from '@/renderer/types/components/workspace-main-content';
 import type {
 	ComposerShellState,
 	SessionTabModel,
 	WorkspaceShellModel,
 } from '@/renderer/types/workbench';
+import { AgentRoleResolverProvider } from './agent-role-context';
 import { ArchitectureDiagramPanel } from './architecture-diagram/architecture-diagram-panel';
 import { CommentPreviewPanel } from './comment-preview-panel';
 import { ComposerSlot } from './composer-slot';
@@ -71,6 +73,7 @@ export function WorkspaceConversationContent({
 			onSessionTabChange,
 			onTurnDiffOpen,
 		});
+	const resolveAgentRole = useWorkspaceAgentRoleResolver(activeWorkspace.id);
 	const workspaceCwd = activeWorkspace.pathLabel ?? null;
 	// Chat sits at the workspace root: an agent writes the paths it reports
 	// relative to the repository, not to any document of its own.
@@ -97,24 +100,26 @@ export function WorkspaceConversationContent({
 			/>
 			<WorkspacePathResolverProvider value={resolveWorkspacePath}>
 				<FilePreviewOpenerProvider value={openFilePreview}>
-					<MarkdownDocumentScopeProvider value={markdownDocumentScope}>
-						{isChatTab ? (
-							<ChatTabBody
-								activeSession={activeSession}
-								activeWorkspace={activeWorkspace}
-								composer={composer}
-								openTurnDiff={openTurnDiff}
-							/>
-						) : (
-							<ActiveAuxiliaryPanel
-								activeSession={activeSession}
-								activeWorkspace={activeWorkspace}
-								onDirectoryReveal={onDirectoryReveal}
-								onDrawArchitectureDiagram={onDrawArchitectureDiagram}
-								onSessionTabChange={onSessionTabChange}
-							/>
-						)}
-					</MarkdownDocumentScopeProvider>
+					<AgentRoleResolverProvider value={resolveAgentRole}>
+						<MarkdownDocumentScopeProvider value={markdownDocumentScope}>
+							{isChatTab ? (
+								<ChatTabBody
+									activeSession={activeSession}
+									activeWorkspace={activeWorkspace}
+									composer={composer}
+									openTurnDiff={openTurnDiff}
+								/>
+							) : (
+								<ActiveAuxiliaryPanel
+									activeSession={activeSession}
+									activeWorkspace={activeWorkspace}
+									onDirectoryReveal={onDirectoryReveal}
+									onDrawArchitectureDiagram={onDrawArchitectureDiagram}
+									onSessionTabChange={onSessionTabChange}
+								/>
+							)}
+						</MarkdownDocumentScopeProvider>
+					</AgentRoleResolverProvider>
 				</FilePreviewOpenerProvider>
 			</WorkspacePathResolverProvider>
 			{developerMode ? <PiRawFramePanel sessionId={debugSessionId} /> : null}
