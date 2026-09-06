@@ -115,6 +115,62 @@ export function buildPullRequestShellModel({
 	};
 }
 
+/**
+ * Re-states a PR model's *verdict* — the fields that say what state GitHub has
+ * the pull request in — from a cached observation that saw GitHub more recently,
+ * keeping the live snapshot's *body*.
+ *
+ * The two sources are not interchangeable: the compact cached presentation knows
+ * the status and nothing else, while the live snapshot carries the title, checks,
+ * comments, and branch sync. Returning the cached one whole would empty the
+ * Checks panel every time the background sweeper overtook the workspace's own
+ * poll — a window that recurs on the open workspace, since the sweeper refreshes
+ * it too and the renderer only re-fetches every ten seconds. So the newer source
+ * answers what the status is and the older one still answers what the pull
+ * request contains; the body catches up on the refetch already in flight.
+ *
+ * Two cases are not a graft at all. When the cached verdict names a *different*
+ * pull request the live body describes another one entirely — reachable when a
+ * workspace continues onto a successor branch and its cached snapshot is
+ * dropped — so the cached model is returned whole rather than lending its number
+ * to somebody else's title and URL. And when the live model has no pull request
+ * to lend a body from — a refresh that failed outright, or one that succeeded and
+ * found none — there is nothing to keep but a failure if there was one, which
+ * travels with the cached verdict so the panel reports the last known status
+ * *and* that it has stopped refreshing.
+ *
+ * `isConflicting` is a probe input rather than a display flag:
+ * `useReprobeOnGithubVerdictChange` reads a flip as "the trial merge on file is
+ * known-wrong" and re-runs a `git fetch`-backed merge. So it is carried
+ * unchanged while the cached verdict still says `blocked` — where the two
+ * sources agree and a re-probe would be noise — and denied only when the cached
+ * verdict has moved off `blocked`, where the flip is the point and a stale
+ * `true` would otherwise let the header override the verdict this restores.
+ *
+ * @param live - The model built from the live snapshot.
+ * @param cached - The model built from the fresher cached presentation.
+ * @returns The live model wearing the cached verdict.
+ */
+export function withCachedPullRequestVerdict(
+	live: WorkspaceShellModel['pullRequest'],
+	cached: WorkspaceShellModel['pullRequest'],
+): WorkspaceShellModel['pullRequest'] {
+	if (live.number === undefined || live.number !== cached.number) {
+		return live.syncError ? { ...cached, syncError: live.syncError } : cached;
+	}
+	const conflicting = cached.status === 'blocked' ? live.isConflicting : false;
+	return {
+		...live,
+		detail: cached.detail,
+		...(conflicting === undefined ? {} : { isConflicting: conflicting }),
+		label: cached.label,
+		number: cached.number,
+		...(cached.state === undefined ? {} : { state: cached.state }),
+		status: cached.status,
+		...(cached.syncedAt === undefined ? {} : { syncedAt: cached.syncedAt }),
+	};
+}
+
 /** Maps wire check buckets onto the panel's blocked/pending/ready statuses. */
 function toCheckSummary(check: GithubCheckWire): PullRequestCheckSummary {
 	const isPreviewProvider = /vercel|netlify/i.test(

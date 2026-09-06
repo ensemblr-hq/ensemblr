@@ -185,6 +185,7 @@ export default defineConfig({
 						'tests/main/linux-app-launch.test.ts',
 						'tests/main/workspace-pr-sweeper.test.ts',
 						'tests/main/sweepable-workspaces.test.ts',
+						'tests/main/pr-cache.test.ts',
 						'tests/main/terminal-scrollback-text.test.ts',
 						'tests/main/terminal-tab-naming.test.ts',
 						'tests/main/agent-control-service.test.ts',

@@ -65,7 +65,18 @@ export function deleteCachedPullRequestSnapshot({
 		.run(PROVIDER, RESOURCE_TYPE, workspaceId);
 }
 
-/** Upserts the PR snapshot cache row for a workspace (idempotent refresh). */
+/**
+ * Upserts the PR snapshot cache row for a workspace (idempotent refresh),
+ * refusing a snapshot older than the one already stored.
+ *
+ * Two writers race for this row: the active workspace's own poll and the
+ * background sweeper, each of which spends a second or more inside `gh` before
+ * it writes. Without the guard a slow earlier fetch lands after a fast later one
+ * and pushes the persisted status backwards — which every sidebar row, the
+ * header pill, and a cold launch then read as the truth. `synced_at` is written
+ * as `toISOString()`, so it sorts chronologically as text; an equal stamp is
+ * allowed through, since a same-instant rewrite carries no older claim.
+ */
 export function writeCachedPullRequestSnapshot({
 	database,
 	snapshot,
@@ -82,7 +93,9 @@ export function writeCachedPullRequestSnapshot({
 			 ON CONFLICT(provider, resource_type, resource_id, external_id)
 			 DO UPDATE SET synced_at = excluded.synced_at,
 				metadata_json = excluded.metadata_json,
-				updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')`,
+				updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+			 WHERE integration_metadata.synced_at IS NULL
+				OR excluded.synced_at >= integration_metadata.synced_at`,
 		)
 		.run(
 			randomUUID(),

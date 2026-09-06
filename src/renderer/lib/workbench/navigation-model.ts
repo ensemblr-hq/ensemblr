@@ -238,8 +238,16 @@ function mapPresentationChecks(
 
 /**
  * Maps a compact PR presentation onto the sidebar row's placeholder PR model.
- * Only the fields the sidebar icon reads (number, status, state) are populated;
- * the heavier panel model is still built from the live snapshot elsewhere.
+ * Only the fields the sidebar icon and the header pill read (number, status,
+ * state, label) are populated; the heavier panel model is still built from the
+ * live snapshot elsewhere.
+ *
+ * The presentation's `syncedAt` is carried through so `useLivePullRequestModel`
+ * can tell this observation apart from the one its own snapshot query holds and
+ * render whichever saw GitHub last. The status label comes from the same
+ * `git:pull-request.label.*` keys the live model uses, so the pill reads its real
+ * status from the first frame instead of a placeholder that changes a second
+ * later.
  */
 function mapPresentationPullRequest(
 	presentation: WorkspacePrPresentation | null,
@@ -277,11 +285,43 @@ function mapPresentationPullRequest(
 			'workbench:workspace-pull-request.present.detail',
 			'Pull request status from the last GitHub sync.',
 		),
-		label: 'PR',
+		label: mapPresentationLabel(presentation.status),
 		number: presentation.number,
 		state,
 		status,
+		syncedAt: presentation.syncedAt,
 	};
+}
+
+/**
+ * Names a compact presentation status in the user's language, reusing the keys
+ * the live PR model labels the same statuses with, so a cold navigation reads as
+ * a status rather than a placeholder that changes a second later.
+ *
+ * Two labels the live model draws finer still differ, because the compact status
+ * cannot carry the distinction: a draft reads blank here where the snapshot says
+ * "Draft", and a conflicting PR reads "Blocked" where the snapshot names the
+ * conflict. Both resolve when the snapshot lands.
+ * @param status - The compact presentation status.
+ * @returns The label for the header pill, blank when there is no status to name.
+ */
+function mapPresentationLabel(
+	status: WorkspacePrPresentation['status'],
+): string {
+	switch (status) {
+		case 'merged':
+			return i18n.t('git:pull-request.label.merged', 'Merged');
+		case 'closed':
+			return i18n.t('git:pull-request.label.closed', 'Closed');
+		case 'blocked':
+			return i18n.t('git:pull-request.label.blocked', 'Blocked');
+		case 'checking':
+			return i18n.t('git:pull-request.label.checking', 'Checks running');
+		case 'ready':
+			return i18n.t('git:pull-request.label.ready-to-merge', 'Ready to merge');
+		default:
+			return '';
+	}
 }
 
 /** Translates a compact presentation status into the shell PR status + state. */
