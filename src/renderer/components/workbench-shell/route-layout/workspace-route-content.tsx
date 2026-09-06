@@ -1,16 +1,16 @@
 import { useQuery } from '@tanstack/react-query';
 import { Outlet, useNavigate } from '@tanstack/react-router';
 import { useAtomValue } from 'jotai';
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useMemo } from 'react';
 import { settingsResolutionQuery } from '@/renderer/api/ensemblr';
 import { CloseRunningChatDialog } from '@/renderer/components/workbench-shell/conversation-panel/close-running-chat-dialog';
 import { useSetupDiagnostics } from '@/renderer/components/workbench-shell/shell-contexts';
 import { WorkspaceWorkbenchContent } from '@/renderer/components/workbench-shell/workspace-content';
 import { useAskAgentSetupScript } from '@/renderer/hooks/workbench-shell/composer/use-ask-agent-setup-script';
-import { useAgentControlFocus } from '@/renderer/hooks/workbench-shell/route-layout/use-agent-control-focus';
 import { useChatRouteRepair } from '@/renderer/hooks/workbench-shell/route-layout/use-chat-route-repair';
 import { useGuardedSessionClose } from '@/renderer/hooks/workbench-shell/route-layout/use-guarded-session-close';
 import { useLiveWorkspaceModel } from '@/renderer/hooks/workbench-shell/route-layout/use-live-workspace-model';
+import { useWorkspaceRouteNavigation } from '@/renderer/hooks/workbench-shell/route-layout/use-workspace-route-navigation';
 import {
 	createPlaceholderSession,
 	getComposerState,
@@ -20,7 +20,6 @@ import {
 	sharedActionPreference,
 } from '@/renderer/lib/workbench/action-preference';
 import { configuredPreviewUrls } from '@/renderer/lib/workbench/preview-urls';
-import { isDockTab } from '@/renderer/lib/workbench/route-search';
 import { useAgentComposerController } from '@/renderer/state/composer';
 import { repoSettingsOverrideAtomFamily } from '@/renderer/state/preferences';
 import { usePublishLiveReviewContext } from '@/renderer/state/review-launch';
@@ -33,11 +32,9 @@ import { useWorkspaceDockActions } from '@/renderer/state/workspace/dock-actions
 import { useWorkspaceTerminalSessions } from '@/renderer/state/workspace/terminal-sessions';
 import type { WorkspaceMainContentState } from '@/renderer/types/components';
 import type {
-	DockTabId,
 	WorkbenchRouteSearch,
 	WorkspaceNavigationSelection,
 } from '@/renderer/types/workbench';
-import type { FocusViewBroadcast } from '@/shared/agent-control';
 import { WorkspaceMainContentProvider } from '../shell-contexts';
 
 /** Workspace shell content — wires panel tabs, composer state, and navigation. */
@@ -121,7 +118,12 @@ export function WorkspaceRouteContent({
 	// Never `activeSession.id`: it substitutes this workspace's first tab when the
 	// routed id is not one of its tabs, and persisting that erases what the
 	// workspace remembered.
-	const panelTabs = useWorkspacePanelTabState({
+	const {
+		activeDockTab,
+		activeReviewTab,
+		setWorkspaceDockTab,
+		setWorkspaceReviewTab,
+	} = useWorkspacePanelTabState({
 		activeChatId: sessionNavigation.resolvedActiveChatId,
 		activeWorkspace: workspaceWithLiveDockTabs,
 		search,
@@ -142,8 +144,6 @@ export function WorkspaceRouteContent({
 			],
 		),
 	);
-	const activeReviewTab = panelTabs.activeReviewTab;
-	const activeDockTab = panelTabs.activeDockTab;
 	const { state: setupDiagnosticsState } = useSetupDiagnostics();
 	const repoOverrides = useAtomValue(
 		repoSettingsOverrideAtomFamily(activeProject.id),
@@ -196,6 +196,16 @@ export function WorkspaceRouteContent({
 		workspaceCwd: activeWorkspace.pathLabel,
 		workspaceFiles: liveWorkspaceFiles,
 	});
+	const { selectChatTab, selectDockTab, selectReviewTab, updateSearch } =
+		useWorkspaceRouteNavigation({
+			activeChatTabId: activeSession.id,
+			activeDockTab,
+			activeReviewTab,
+			projectId: activeProject.id,
+			setWorkspaceDockTab,
+			setWorkspaceReviewTab,
+			workspaceId: activeWorkspace.id,
+		});
 	const askAgentSetupScript = useAskAgentSetupScript({
 		activeChatTabId: activeSession.chatTabId,
 		openSessionTab: sessionNavigation.openSessionTab,
@@ -212,89 +222,6 @@ export function WorkspaceRouteContent({
 		workspaceId: activeWorkspace.id,
 	});
 
-	// Two navigations in one tick are routine — revealing a file's directory
-	// switches to All files and then selects the preview's tab — and the second
-	// one reading this render's value would silently revert the first.
-	const latestPanelTabs = useRef({
-		dock: activeDockTab,
-		review: activeReviewTab,
-	});
-	useEffect(() => {
-		latestPanelTabs.current = { dock: activeDockTab, review: activeReviewTab };
-	}, [activeDockTab, activeReviewTab]);
-
-	/** Navigates to the canonical chat route, preserving existing search state. */
-	function navigateToWorkspaceChat({
-		nextChatId,
-		nextSearch,
-	}: {
-		nextChatId: string;
-		nextSearch?: WorkbenchRouteSearch;
-	}) {
-		navigate({
-			params: {
-				chatId: nextChatId,
-				projectId: activeProject.id,
-				workspaceId: activeWorkspace.id,
-			},
-			search: {
-				dock: latestPanelTabs.current.dock,
-				review: latestPanelTabs.current.review,
-				...nextSearch,
-			},
-			to: '/projects/$projectId/workspaces/$workspaceId/chats/$chatId',
-		});
-	}
-
-	/** Persists tab changes to local prefs and forwards them to the URL. */
-	function updateSearch(nextSearch: WorkbenchRouteSearch) {
-		latestPanelTabs.current = {
-			dock: nextSearch.dock ?? latestPanelTabs.current.dock,
-			review: nextSearch.review ?? latestPanelTabs.current.review,
-		};
-		if (nextSearch.review) {
-			panelTabs.setWorkspaceReviewTab(activeWorkspace.id, nextSearch.review);
-		}
-		if (nextSearch.dock) {
-			panelTabs.setWorkspaceDockTab(activeWorkspace.id, nextSearch.dock);
-		}
-
-		navigateToWorkspaceChat({
-			nextChatId: activeSession.id,
-			nextSearch,
-		});
-	}
-
-	/**
-	 * Applies an agent-control focus request for the window showing this
-	 * workspace, ignoring requests targeting another workspace or carrying a dock
-	 * id that is not a valid {@link DockTabId} (the payload is agent-supplied).
-	 * @param payload - The focus request broadcast from the main process.
-	 */
-	function applyFocus(payload: FocusViewBroadcast) {
-		if (payload.workspaceId !== activeWorkspace.id) {
-			return;
-		}
-		const { target } = payload;
-		if (target.kind === 'tab') {
-			navigateToWorkspaceChat({ nextChatId: target.chatTabId });
-			return;
-		}
-		if (target.kind === 'dock') {
-			if (isDockTab(target.dock)) {
-				updateSearch({ dock: target.dock });
-			}
-			return;
-		}
-		// `workspace` crosses workspaces by definition, so the shell drains it —
-		// see `AgentControlWorkspaceFocusBridge`. Reaching it here would mean the
-		// route is already where it asked to be.
-		if (target.kind === 'panel') {
-			updateSearch({ review: target.panel });
-		}
-	}
-	useAgentControlFocus(applyFocus);
-
 	return (
 		<>
 			<WorkspaceWorkbenchContent
@@ -304,11 +231,9 @@ export function WorkspaceRouteContent({
 				composer={composer}
 				dockActions={dockActions}
 				dockTabId={activeDockTab}
-				onDockTabChange={(dock: DockTabId) => updateSearch({ dock })}
-				onReviewTabChange={(review) => updateSearch({ review })}
-				onSessionTabChange={(nextChatId) =>
-					navigateToWorkspaceChat({ nextChatId })
-				}
+				onDockTabChange={selectDockTab}
+				onReviewTabChange={selectReviewTab}
+				onSessionTabChange={selectChatTab}
 				sessionNavigation={guardedSessionNavigation}
 				MainContent={WorkspaceMainContentOutlet}
 			/>

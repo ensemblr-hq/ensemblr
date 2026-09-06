@@ -51,12 +51,25 @@ export function useConversationScrollRestore({
 		if (scrollKey === undefined) {
 			return;
 		}
-		const handleScroll = () => {
+		// A streaming turn animates this viewport every frame, so the raw event
+		// fires ~60 times a second and each read of `scrollHeight` flushes a layout
+		// the stream has just dirtied. One sample per frame is the finest grain the
+		// remembered position can be used at anyway.
+		let frame: number | null = null;
+		const sampleOffset = () => {
+			frame = null;
 			offsets.remember(scrollKey, readScrollOffset(viewport));
+		};
+		const handleScroll = () => {
+			frame ??= requestAnimationFrame(sampleOffset);
 		};
 		viewport.addEventListener('scroll', handleScroll, { passive: true });
 		return () => {
 			viewport.removeEventListener('scroll', handleScroll);
+			if (frame !== null) {
+				cancelAnimationFrame(frame);
+				sampleOffset();
+			}
 		};
 	}, [offsets, scrollKey, scrollRef, scrollState, stopScroll]);
 
