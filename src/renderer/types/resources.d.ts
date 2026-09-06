@@ -3586,6 +3586,8 @@ export default interface Resources {
 				title: 'Pi raw frames (debug)';
 				toggle: 'Toggle Pi debug panel';
 			};
+			'mode-afk': 'Unattended';
+			'mode-plan': 'Planning';
 			'new-tab': 'New chat tab';
 			unread: 'Unread messages';
 			untitled: 'New chat';
