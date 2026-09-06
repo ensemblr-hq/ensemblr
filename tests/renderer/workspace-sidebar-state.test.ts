@@ -10,8 +10,11 @@ import type {
 } from '../../src/shared/ipc/contracts/repository-navigation';
 
 function workspaceModelWith(
-	pullRequest: WorkspacePrPresentation | null,
+	presentation: Omit<WorkspacePrPresentation, 'syncedAt'> | null,
 ): WorkspaceShellModel {
+	const pullRequest = presentation
+		? { ...presentation, syncedAt: '2026-07-15T00:00:00.000Z' }
+		: null;
 	const snapshot: RepositoryWorkspaceNavigationSnapshot = {
 		generatedAt: '2026-07-15T00:00:00.000Z',
 		repositories: [

@@ -161,6 +161,11 @@ export function getRepositoryWorkspaceNavigationSnapshot({
 /**
  * Parses a joined PR-snapshot JSON column into the compact presentation the
  * sidebar row renders, tolerating a missing join or malformed cache row.
+ *
+ * A row with no readable `syncedAt` yields no presentation rather than an
+ * unstamped one: the renderer orders this observation against the workspace's
+ * own live snapshot by that timestamp, and an absent stamp would silently mean
+ * "always the older of the two".
  * @param snapshotJson - Raw `integration_metadata.metadata_json`, or null.
  * @returns The compact PR presentation, or null when absent/unparseable.
  */
@@ -172,7 +177,9 @@ function parsePullRequestPresentation(
 	}
 	try {
 		const parsed = JSON.parse(snapshotJson) as GithubPullRequestSnapshotWire;
-		return deriveWorkspacePrPresentation(parsed);
+		return typeof parsed?.syncedAt === 'string'
+			? deriveWorkspacePrPresentation(parsed)
+			: null;
 	} catch {
 		return null;
 	}

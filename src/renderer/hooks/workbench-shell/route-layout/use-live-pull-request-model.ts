@@ -7,8 +7,12 @@ import {
 	reviewCommentsQuery,
 	reviewTodosQuery,
 } from '@/renderer/api/ensemblr-queries';
-import { buildPullRequestShellModel } from '@/renderer/lib/workbench/pull-request-model';
+import {
+	buildPullRequestShellModel,
+	withCachedPullRequestVerdict,
+} from '@/renderer/lib/workbench/pull-request-model';
 import type { WorkspaceShellModel } from '@/renderer/types/workbench';
+import { isFresherPrObservation } from '@/shared/github-pr-presentation';
 
 /** Inputs for {@link useLivePullRequestModel}. */
 interface UseLivePullRequestModelInput {
@@ -27,18 +31,32 @@ interface UseLivePullRequestModelInput {
  * icon in lockstep when a PR flips to ready-to-merge, instead of one lagging a
  * slower navigation poll.
  *
- * Returns `fallback` unchanged (same reference) until a snapshot lands, and when
- * `enabled` is false, so inactive rows never subscribe or allocate a new model.
+ * Which source states the *status* is decided by `syncedAt`, never by which is
+ * loaded. The snapshot query only refreshes while a consumer is mounted on the
+ * workspace, so its cache entry freezes the moment the user navigates away while
+ * the background sweeper keeps the `fallback` presentation moving — and React
+ * Query serves that frozen entry synchronously on the next mount. Preferring it
+ * unconditionally is what walked a row back from ready-to-merge to
+ * checks-running for the second a refetch took. So when the fallback observed
+ * GitHub later, its verdict is grafted onto the live model rather than replacing
+ * it: the status is the newer source's and the body — title, checks, comments,
+ * branch sync — stays the live snapshot's, which is the only source that has one.
+ * Before any snapshot lands there is no body to keep and `fallback` is returned
+ * unchanged, by the same reference.
+ *
+ * `enabled` gates the queries, not the choice: an inactive row keeps rendering a
+ * live snapshot it already holds for as long as that snapshot is the fresher of
+ * the two, rather than regressing to the navigation poll's copy on blur.
  *
  * The model it builds carries already-translated labels, so the active language
  * is one of the memo's inputs and a language switch rebuilds it.
  *
  * @param changeSummary - Branch change counts folded into the PR git-status row.
- * @param enabled - Whether to subscribe to the live queries; false yields the fallback.
- * @param fallback - PR model to return before the snapshot is available.
+ * @param enabled - Whether to fetch and poll the live queries; a false value still reads what they have cached.
+ * @param fallback - PR model whose verdict wins while it is the fresher observation.
  * @param workspaceCwd - Worktree path used by the snapshot query function.
  * @param workspaceId - Workspace id the PR queries are keyed by.
- * @returns The live PR model, or the fallback when no snapshot is loaded yet.
+ * @returns The PR model, carrying whichever source saw GitHub last.
  */
 export function useLivePullRequestModel({
 	changeSummary,
@@ -63,19 +81,24 @@ export function useLivePullRequestModel({
 
 	// biome-ignore lint/correctness/useExhaustiveDependencies: the model builder translates through the i18n singleton, so the language is a real input Biome cannot see.
 	return useMemo(() => {
-		if (!enabled || !prSnapshotData) {
+		if (!prSnapshotData) {
 			return fallback;
 		}
-		return buildPullRequestShellModel({
+		const live = buildPullRequestShellModel({
 			changeSummary,
 			localComments: reviewCommentsData?.comments ?? [],
 			snapshot: prSnapshotData.snapshot,
 			...(prSnapshotData.error ? { syncFailure: prSnapshotData.error } : {}),
 			todos: reviewTodosData?.todos ?? [],
 		});
+		return isFresherPrObservation(
+			prSnapshotData.snapshot?.syncedAt,
+			fallback.syncedAt,
+		)
+			? live
+			: withCachedPullRequestVerdict(live, fallback);
 	}, [
 		changeSummary,
-		enabled,
 		fallback,
 		i18n.language,
 		prSnapshotData,

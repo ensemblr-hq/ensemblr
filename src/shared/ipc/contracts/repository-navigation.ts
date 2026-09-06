@@ -48,6 +48,13 @@ export type WorkspacePrPresentationStatus =
 export interface WorkspacePrPresentation {
 	number: number;
 	status: WorkspacePrPresentationStatus;
+	/**
+	 * ISO timestamp of the snapshot this status was derived from. Lets a consumer
+	 * that also holds the workspace's full snapshot tell which of the two observed
+	 * GitHub more recently, so navigating between workspaces cannot show an older
+	 * status than the one already on screen.
+	 */
+	syncedAt: string;
 }
 
 /** A workspace entry in the repository/workspace navigation tree. */

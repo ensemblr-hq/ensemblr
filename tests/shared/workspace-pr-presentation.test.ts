@@ -1,6 +1,9 @@
 import { describe, expect, test } from 'vitest';
 
-import { deriveWorkspacePrPresentation } from '../../src/shared/github-pr-presentation';
+import {
+	deriveWorkspacePrPresentation,
+	isFresherPrObservation,
+} from '../../src/shared/github-pr-presentation';
 import type {
 	GithubCheckBucket,
 	GithubPullRequestSnapshotWire,
@@ -29,13 +32,15 @@ function pr(overrides: Partial<GithubPullRequestWire>): GithubPullRequestWire {
 	};
 }
 
+const SYNCED_AT = '2026-07-15T00:00:00.000Z';
+
 function snapshot(
 	pullRequest: GithubPullRequestWire | null,
 ): GithubPullRequestSnapshotWire {
 	return {
 		branchSync: null,
 		pullRequest,
-		syncedAt: '2026-07-15T00:00:00.000Z',
+		syncedAt: SYNCED_AT,
 	};
 }
 
@@ -54,10 +59,10 @@ describe('deriveWorkspacePrPresentation', () => {
 	test('reports merged and closed straight from PR state', () => {
 		expect(
 			deriveWorkspacePrPresentation(snapshot(pr({ state: 'merged' }))),
-		).toEqual({ number: 7, status: 'merged' });
+		).toEqual({ number: 7, syncedAt: SYNCED_AT, status: 'merged' });
 		expect(
 			deriveWorkspacePrPresentation(snapshot(pr({ state: 'closed' }))),
-		).toEqual({ number: 7, status: 'closed' });
+		).toEqual({ number: 7, syncedAt: SYNCED_AT, status: 'closed' });
 	});
 
 	test('failing checks or policy blocks win over pending', () => {
@@ -65,10 +70,10 @@ describe('deriveWorkspacePrPresentation', () => {
 			deriveWorkspacePrPresentation(
 				snapshot(pr({ checks: [check('failing'), check('pending')] })),
 			),
-		).toEqual({ number: 7, status: 'blocked' });
+		).toEqual({ number: 7, syncedAt: SYNCED_AT, status: 'blocked' });
 		expect(
 			deriveWorkspacePrPresentation(snapshot(pr({ mergeable: 'conflicting' }))),
-		).toEqual({ number: 7, status: 'blocked' });
+		).toEqual({ number: 7, syncedAt: SYNCED_AT, status: 'blocked' });
 	});
 
 	test('pending checks report as checking', () => {
@@ -76,7 +81,7 @@ describe('deriveWorkspacePrPresentation', () => {
 			deriveWorkspacePrPresentation(
 				snapshot(pr({ checks: [check('pending')] })),
 			),
-		).toEqual({ number: 7, status: 'checking' });
+		).toEqual({ number: 7, syncedAt: SYNCED_AT, status: 'checking' });
 	});
 
 	test('clean mergeable PR without required review is ready', () => {
@@ -84,7 +89,7 @@ describe('deriveWorkspacePrPresentation', () => {
 			deriveWorkspacePrPresentation(
 				snapshot(pr({ checks: [check('passing')], mergeable: 'mergeable' })),
 			),
-		).toEqual({ number: 7, status: 'ready' });
+		).toEqual({ number: 7, syncedAt: SYNCED_AT, status: 'ready' });
 	});
 
 	test('draft and review-required PRs stay open', () => {
@@ -92,13 +97,54 @@ describe('deriveWorkspacePrPresentation', () => {
 			deriveWorkspacePrPresentation(
 				snapshot(pr({ isDraft: true, mergeable: 'mergeable' })),
 			),
-		).toEqual({ number: 7, status: 'open' });
+		).toEqual({ number: 7, syncedAt: SYNCED_AT, status: 'open' });
 		expect(
 			deriveWorkspacePrPresentation(
 				snapshot(
 					pr({ mergeable: 'mergeable', reviewDecision: 'REVIEW_REQUIRED' }),
 				),
 			),
-		).toEqual({ number: 7, status: 'open' });
+		).toEqual({ number: 7, syncedAt: SYNCED_AT, status: 'open' });
+	});
+
+	test('stamps the presentation with the snapshot it was derived from', () => {
+		expect(
+			deriveWorkspacePrPresentation({
+				branchSync: null,
+				pullRequest: pr({}),
+				syncedAt: '2026-07-15T09:30:00.000Z',
+			})?.syncedAt,
+		).toBe('2026-07-15T09:30:00.000Z');
+	});
+});
+
+describe('isFresherPrObservation', () => {
+	const EARLIER = '2026-07-15T09:00:00.000Z';
+	const LATER = '2026-07-15T09:30:00.000Z';
+
+	test('a later observation supersedes an earlier one', () => {
+		expect(isFresherPrObservation(LATER, EARLIER)).toBe(true);
+	});
+
+	test('an earlier observation never supersedes a later one', () => {
+		expect(isFresherPrObservation(EARLIER, LATER)).toBe(false);
+	});
+
+	test('an equal stamp supersedes, so a same-instant rewrite still lands', () => {
+		expect(isFresherPrObservation(EARLIER, EARLIER)).toBe(true);
+	});
+
+	test('there is nothing to protect when the incumbent has no stamp', () => {
+		expect(isFresherPrObservation(EARLIER, undefined)).toBe(true);
+	});
+
+	test('an unstamped candidate cannot unseat a stamped incumbent', () => {
+		expect(isFresherPrObservation(undefined, LATER)).toBe(false);
+		expect(isFresherPrObservation('not-a-date', LATER)).toBe(false);
+	});
+
+	test('an unreadable incumbent stamp still yields to the candidate', () => {
+		expect(isFresherPrObservation(EARLIER, 'not-a-date')).toBe(true);
+		expect(isFresherPrObservation(undefined, undefined)).toBe(true);
 	});
 });

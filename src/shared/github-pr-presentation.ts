@@ -15,6 +15,12 @@ import type {
  * ready, but stays dependency-free so the main process can derive and persist
  * it per workspace without importing renderer types.
  *
+ * Carries the snapshot's own `syncedAt` so a consumer holding two observations
+ * of the same workspace — this compact one and a full snapshot of its own — can
+ * tell which describes GitHub more recently. Without it the two are only
+ * orderable by which happens to be loaded, which is what lets a status move
+ * backwards; see {@link isFresherPrObservation}.
+ *
  * @param snapshot - The cached PR snapshot, or null when none is stored.
  * @returns The compact presentation, or null when the workspace has no PR.
  */
@@ -22,19 +28,82 @@ export function deriveWorkspacePrPresentation(
 	snapshot: GithubPullRequestSnapshotWire | null,
 ): WorkspacePrPresentation | null {
 	const pullRequest = snapshot?.pullRequest ?? null;
-	if (!pullRequest) {
+	if (!snapshot || !pullRequest) {
 		return null;
-	}
-	if (pullRequest.state === 'merged') {
-		return { number: pullRequest.number, status: 'merged' };
-	}
-	if (pullRequest.state === 'closed') {
-		return { number: pullRequest.number, status: 'closed' };
 	}
 	return {
 		number: pullRequest.number,
-		status: deriveOpenPullRequestStatus(pullRequest),
+		status: derivePresentationStatus(pullRequest),
+		syncedAt: snapshot.syncedAt,
 	};
+}
+
+/**
+ * The compact status for a pull request in any state: `merged`/`closed` mirror
+ * GitHub's own state, and an open one collapses through the shared open-PR
+ * policy.
+ * @param pullRequest - The pull request wire record.
+ * @returns The compact presentation status.
+ */
+function derivePresentationStatus(
+	pullRequest: GithubPullRequestWire,
+): WorkspacePrPresentationStatus {
+	if (pullRequest.state === 'merged') {
+		return 'merged';
+	}
+	if (pullRequest.state === 'closed') {
+		return 'closed';
+	}
+	return deriveOpenPullRequestStatus(pullRequest);
+}
+
+/**
+ * Whether an observation of a workspace's pull request stamped `candidateSyncedAt`
+ * describes GitHub at least as recently as one stamped `incumbentSyncedAt`, and
+ * may therefore replace it on screen.
+ *
+ * PR status reaches the UI down two independently-timed paths — a workspace's own
+ * `gh`-backed snapshot, which only refreshes while something is mounted on it,
+ * and the compact presentation persisted for every workspace by the background
+ * sweeper. Either can be the older one at any moment, so choosing between them by
+ * which is *loaded* rather than which is *newer* is what makes a row flip from
+ * ready-to-merge back to checks-running on navigation. Every hand-off between the
+ * two goes through this predicate so the reported status only ever moves forward.
+ *
+ * An absent or unreadable incumbent stamp yields true: there is no older claim to
+ * protect. An unstamped *candidate* yields false whenever the incumbent is
+ * stamped, because a candidate that cannot say when it observed GitHub is not
+ * evidence that the incumbent is out of date — a `gh` failure returns no
+ * snapshot at all, and letting that unseat a status the app does know would
+ * replace a real pull request with "No PR".
+ *
+ * @param candidateSyncedAt - ISO timestamp of the observation offered.
+ * @param incumbentSyncedAt - ISO timestamp of the observation on screen.
+ * @returns True when the candidate may replace the incumbent.
+ */
+export function isFresherPrObservation(
+	candidateSyncedAt: string | undefined,
+	incumbentSyncedAt: string | undefined,
+): boolean {
+	const incumbent = parseTimestamp(incumbentSyncedAt);
+	if (incumbent === null) {
+		return true;
+	}
+	const candidate = parseTimestamp(candidateSyncedAt);
+	return candidate !== null && candidate >= incumbent;
+}
+
+/**
+ * Parses an ISO timestamp to epoch milliseconds.
+ * @param value - The timestamp to parse, when there is one.
+ * @returns The epoch milliseconds, or null when absent or unparseable.
+ */
+function parseTimestamp(value: string | undefined): number | null {
+	if (!value) {
+		return null;
+	}
+	const parsed = Date.parse(value);
+	return Number.isFinite(parsed) ? parsed : null;
 }
 
 /** The subset of {@link WorkspacePrPresentationStatus} an OPEN PR can hold. */

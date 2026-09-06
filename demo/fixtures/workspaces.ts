@@ -41,7 +41,7 @@ function workspace(
 		id: string;
 		name: string;
 		path: string;
-		pullRequest?: WorkspacePrPresentation;
+		pullRequest?: Omit<WorkspacePrPresentation, 'syncedAt'>;
 		slug: string;
 	},
 ): RepositoryWorkspaceNavigationWorkspace {
@@ -54,7 +54,9 @@ function workspace(
 		metadata: {},
 		name: options.name,
 		path: options.path,
-		...(options.pullRequest ? { pullRequest: options.pullRequest } : {}),
+		...(options.pullRequest
+			? { pullRequest: { ...options.pullRequest, syncedAt: DEMO_CLOCK } }
+			: {}),
 		repositoryId,
 		slug: options.slug,
 		updatedAt: DEMO_CLOCK,

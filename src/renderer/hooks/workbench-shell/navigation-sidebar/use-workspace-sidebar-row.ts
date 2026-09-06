@@ -21,10 +21,12 @@ import type { WorkspaceShellModel } from '@/renderer/types/workbench';
  *
  * The active row shares the header's live PR snapshot (same query key), so its
  * icon flips to ready-to-merge in the same render as the header rather than one
- * navigation poll later. Inactive rows keep the navigation snapshot's PR state,
- * which adds no subscriptions or re-renders — so the PR icon's freshness is not
- * uniform across rows. Agent runtime activity flows through `agentBusy` so it
- * takes spinner priority without disturbing cached `workspace.status` semantics.
+ * navigation poll later. Only the active row *fetches* that snapshot; an inactive
+ * one still reads the copy it already holds, and the status it renders is
+ * whichever of that copy and the navigation poll's observed GitHub last — so
+ * leaving a workspace cannot walk its icon back to a status the poll has not
+ * caught up to yet. Agent runtime activity flows through `agentBusy` so it takes
+ * spinner priority without disturbing cached `workspace.status` semantics.
  *
  * Dock activity is uniform across rows: it comes from the app-wide terminal
  * activity the workbench frame watches, not from this workspace's dock, which
