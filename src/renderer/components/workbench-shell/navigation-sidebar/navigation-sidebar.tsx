@@ -1,7 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query';
 import type { TFunction } from 'i18next';
-import { useAtomValue } from 'jotai';
-import { useCallback, useState } from 'react';
+import { useAtomValue, useSetAtom } from 'jotai';
+import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { prefetchBoardIssues } from '@/renderer/api/ensemblr';
 import { StatusBadge } from '@/renderer/components/status-badge';
@@ -11,11 +11,13 @@ import {
 	SidebarContent,
 	SidebarFooter,
 	SidebarRail,
+	useSidebar,
 } from '@/renderer/components/ui/sidebar';
 import { useSetupDiagnosticsOptional } from '@/renderer/components/workbench-shell/shell-contexts';
 import { readWindowChrome } from '@/renderer/lib/window-chrome';
 import { healthTone } from '@/renderer/lib/workbench';
 import { developerModeAtom } from '@/renderer/state/preferences';
+import { navigationSidebarVisibleAtom } from '@/renderer/state/sidebar';
 import type {
 	AddProjectActionId,
 	AddProjectMenuModel,
@@ -37,6 +39,7 @@ import { NavigationSidebarHeader } from './navigation-sidebar-header';
 import { PinnedWorkspaceGroup } from './pinned-workspace-group';
 import { ProjectNavigationGroups } from './project-navigation-groups';
 import { SidebarPrimaryNavigation } from './sidebar-primary-navigation';
+import { SidebarUpdatePanel } from './update-panel/sidebar-update-panel';
 
 /** Off-canvas workbench sidebar housing primary nav, pins, projects, and health. */
 export function WorkspaceNavigationSidebar({
@@ -76,6 +79,7 @@ export function WorkspaceNavigationSidebar({
 		useState<WorkspaceShellModel | null>(null);
 	const developerMode = useAtomValue(developerModeAtom);
 	const windowChrome = readWindowChrome();
+	useReportSidebarVisible();
 	const queryClient = useQueryClient();
 	const prefetchIssues = useCallback(
 		() =>
@@ -124,6 +128,7 @@ export function WorkspaceNavigationSidebar({
 				</ScrollArea>
 			</SidebarContent>
 
+			<SidebarUpdatePanel />
 			{developerMode ? (
 				<SidebarHealthFooter health={health} projects={projects} />
 			) : null}
@@ -139,6 +144,26 @@ export function WorkspaceNavigationSidebar({
 			/>
 		</Sidebar>
 	);
+}
+
+/**
+ * Publishes whether the sidebar is actually on screen, so a surface pinned
+ * inside it is not mistaken for one the user can see.
+ *
+ * Collapsing the sidebar leaves its contents mounted and slides the container
+ * off-canvas, and routes outside the workbench shell drop it entirely — neither
+ * is visible from the panel's own render, and both mean a menu command has to
+ * answer for itself rather than defer to the sidebar.
+ */
+function useReportSidebarVisible(): void {
+	const { isMobile, openMobile, state } = useSidebar();
+	const setVisible = useSetAtom(navigationSidebarVisibleAtom);
+	const visible = isMobile ? openMobile : state === 'expanded';
+
+	useEffect(() => {
+		setVisible(visible);
+		return () => setVisible(false);
+	}, [setVisible, visible]);
 }
 
 /**

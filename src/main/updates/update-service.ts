@@ -203,13 +203,20 @@ export function createUpdateService(
 			return snapshot;
 		}
 
+		// A feed that could not be read does not retract an offer already made: the
+		// release page the user was sent to still works, and `error` would report a
+		// download failure that never happened on a build that never downloads.
+		const offerSurvivesFeedError = snapshot.state === 'available';
 		advance({ failure: null, state: 'checking' });
 		const result = await options.releaseFeed.resolve(
 			options.channel,
 			options.getCurrentVersion(),
 		);
 		if (result.status === 'error') {
-			return advance({ failure: result.failure, state: 'error' });
+			return advance({
+				failure: result.failure,
+				state: offerSurvivesFeedError ? 'available' : 'error',
+			});
 		}
 		if (!result.candidate) {
 			return advance({

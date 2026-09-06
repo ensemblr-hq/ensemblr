@@ -1,6 +1,6 @@
 import type { TFunction } from 'i18next';
 import { useAtomValue, useSetAtom } from 'jotai';
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 
@@ -12,11 +12,13 @@ import {
 } from '@/renderer/api/ensemblr';
 import { failureText } from '@/renderer/lib/failure-text';
 import { useMenuCommand } from '@/renderer/state/menu-commands';
+import { navigationSidebarVisibleAtom } from '@/renderer/state/sidebar';
 import type { UpdateStatusSnapshot } from '@/shared/ipc/contracts/update';
 
 import { updateStatusAtom } from './atoms';
+import { resolveUpdatePanelKind } from './update-panel-kind';
 
-/** Toast id for the update-ready prompt, so re-renders replace it rather than stack it. */
+/** Toast id for the update-ready answer, so a second check replaces it rather than stacking it. */
 const READY_TOAST_ID = 'ensemblr-update-ready';
 
 /** What the read hooks hand a surface that lets the user drive the updater. */
@@ -28,18 +30,24 @@ export interface UpdateActions {
 }
 
 /**
- * Keeps the update snapshot in step with main, registers the "Check for
- * Updates…" menu command, and raises the restart prompt once a build is staged.
+ * Keeps the update snapshot in step with main and registers the "Check for
+ * Updates…" menu command.
  *
- * Mount once at the app root. Background failures are recorded on the snapshot
- * for Settings to show but are deliberately not toasted: a check runs every few
- * hours, and an offline laptop would otherwise nag all day. A check the user
- * asked for reports its outcome either way.
+ * Mount once at the app root. A newer build is not announced from here on its
+ * own schedule: the navigation sidebar pins an update panel for as long as one
+ * is outstanding, which a toast could never do — a toast the user has to be
+ * able to dismiss is the wrong shape for an offer that must survive until it is
+ * taken or refused. Background failures are recorded on the snapshot for
+ * Settings to show but are deliberately not toasted either: a check runs every
+ * few hours, and an offline laptop would otherwise nag all day.
+ *
+ * A check the user *asked* for still answers, here, whenever the panel that
+ * would otherwise carry the answer is not on screen.
  */
 export function useUpdateSync(): void {
 	const { t } = useTranslation();
 	const setStatus = useSetAtom(updateStatusAtom);
-	const readyToastShownFor = useRef<string | null>(null);
+	const sidebarVisible = useAtomValue(navigationSidebarVisibleAtom);
 
 	useEffect(() => {
 		const unsubscribe = subscribeUpdateStatusChanged((event) =>
@@ -51,64 +59,44 @@ export function useUpdateSync(): void {
 		return unsubscribe;
 	}, [setStatus]);
 
-	const status = useAtomValue(updateStatusAtom);
 	const restart = useCallback(async () => {
-		const next = await installUpdate();
-		setStatus(next);
+		setStatus(await installUpdate());
 	}, [setStatus]);
-
-	useEffect(() => {
-		if (status?.state !== 'ready' || !status.availableVersion) {
-			// Turning updates off drops the staged build, and `install` refuses once
-			// it has — so a restart prompt left on screen would be a button that
-			// does nothing.
-			if (readyToastShownFor.current) {
-				readyToastShownFor.current = null;
-				toast.dismiss(READY_TOAST_ID);
-			}
-			return;
-		}
-		if (readyToastShownFor.current === status.availableVersion) {
-			return;
-		}
-		readyToastShownFor.current = status.availableVersion;
-		toast.success(
-			t('common:update.ready.title', 'Ensemblr {{version}} is ready', {
-				version: status.availableVersion,
-			}),
-			{
-				action: {
-					label: t('common:update.ready.restart', 'Restart'),
-					onClick: () => void restart(),
-				},
-				description: t(
-					'common:update.ready.description',
-					'Restart to finish installing. Agents still working are asked first.',
-				),
-				duration: Number.POSITIVE_INFINITY,
-				id: READY_TOAST_ID,
-			},
-		);
-	}, [restart, status?.availableVersion, status?.state, t]);
 
 	const runCheck = useCallback(async () => {
 		const next = await checkForUpdates();
 		setStatus(next);
-		reportCheck(next, t);
-	}, [setStatus, t]);
+		reportCheck(next, t, {
+			onRestart: () => void restart(),
+			panelIsVisible: sidebarVisible && resolveUpdatePanelKind(next) !== null,
+		});
+	}, [restart, setStatus, sidebarVisible, t]);
 
 	useMenuCommand('app.checkForUpdates', () => void runCheck());
 }
 
 /**
- * Tells the user how a check they asked for went. Exhaustive over
- * {@link UpdateStatusSnapshot.state} so a state added later is a compile error
- * rather than a menu item that answers nothing; `ready` is the one deliberate
- * silence, because the restart prompt above already says it, with the action.
+ * Tells the user how a check they asked for went.
+ *
+ * Silent only when the sidebar's update panel is genuinely on screen — it names
+ * the same version and carries the same action, so a toast beside it would be
+ * the same news twice. A collapsed sidebar, or a route that renders outside the
+ * workbench shell, leaves nothing else to say it, and a menu item that answers
+ * nothing is worse than one that repeats itself. Otherwise exhaustive over
+ * {@link UpdateStatusSnapshot.state}, so a state added later is a compile error
+ * rather than a menu item that answers nothing.
  * @param snapshot - The state the check left the updater in
  * @param t - Translator bound to the active language
+ * @param surfaces - Whether the panel already speaks for this outcome, and how to restart when it does not
  */
-function reportCheck(snapshot: UpdateStatusSnapshot, t: TFunction): void {
+function reportCheck(
+	snapshot: UpdateStatusSnapshot,
+	t: TFunction,
+	surfaces: { onRestart: () => void; panelIsVisible: boolean },
+): void {
+	if (surfaces.panelIsVisible) {
+		return;
+	}
 	switch (snapshot.state) {
 		case 'error':
 		case 'unsupported':
@@ -135,6 +123,9 @@ function reportCheck(snapshot: UpdateStatusSnapshot, t: TFunction): void {
 				}),
 			);
 			return;
+		case 'ready':
+			reportReady(snapshot, t, surfaces.onRestart);
+			return;
 		case 'checking':
 			toast.info(t('common:update.checking', 'Checking for updates…'));
 			return;
@@ -144,8 +135,6 @@ function reportCheck(snapshot: UpdateStatusSnapshot, t: TFunction): void {
 					version: snapshot.currentVersion,
 				}),
 			);
-			return;
-		case 'ready':
 			return;
 		default:
 			snapshot.state satisfies never;
@@ -181,6 +170,36 @@ function reportAvailable(snapshot: UpdateStatusSnapshot, t: TFunction): void {
 				'common:update.available.description',
 				'Ensemblr does not install this one itself — download it from the release page.',
 			),
+		},
+	);
+}
+
+/**
+ * Reports a staged build and offers the restart that finishes it, for the
+ * checks made where the sidebar panel is not there to carry the button.
+ * @param snapshot - The state the check left the updater in
+ * @param t - Translator bound to the active language
+ * @param onRestart - Restarts into the staged update
+ */
+function reportReady(
+	snapshot: UpdateStatusSnapshot,
+	t: TFunction,
+	onRestart: () => void,
+): void {
+	toast.success(
+		t('common:update.ready.title', 'Ensemblr {{version}} is ready', {
+			version: snapshot.availableVersion ?? '',
+		}),
+		{
+			action: {
+				label: t('common:update.ready.restart', 'Restart'),
+				onClick: onRestart,
+			},
+			description: t(
+				'common:update.ready.description',
+				'Restart to finish installing. Agents still working are asked first.',
+			),
+			id: READY_TOAST_ID,
 		},
 	);
 }

@@ -22,6 +22,7 @@ import { TimelinePreview } from './timeline-preview.tsx';
 import { ToolApprovalScene } from './tool-approval-preview.tsx';
 import { TurnSummaryPreview } from './turn-summary-preview.tsx';
 import { UnreadScene } from './unread-preview.tsx';
+import { UpdatePanelScene } from './update-panel-preview.tsx';
 import { ViewersScene } from './viewers-preview.tsx';
 import { WindowTitleBarScene } from './window-title-bar-preview.tsx';
 
@@ -176,6 +177,12 @@ export const SCENE_GROUPS = [
 				label: 'window title bar',
 				render: () => <WindowTitleBarScene />,
 				source: 'playground/window-title-bar-preview.tsx',
+			},
+			{
+				id: 'update-panel',
+				label: 'update panel',
+				render: () => <UpdatePanelScene />,
+				source: 'playground/update-panel-preview.tsx',
 			},
 		],
 	},
