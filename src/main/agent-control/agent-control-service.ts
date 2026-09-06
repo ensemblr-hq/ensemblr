@@ -84,7 +84,7 @@ import {
 	buildLinkedIssueDirective,
 	buildPeerBriefDirective,
 	buildPlanModeDelegationDirective,
-	buildReviewSubAgentDirective,
+	buildReviewPeerDirective,
 	buildSessionBriefNudge,
 	CONCIERGE_AWARENESS,
 	conciergeControlOpDenial,
@@ -324,13 +324,13 @@ const DEFAULT_REVIEW_TAB_TITLE = 'Review';
  * Renders what an agent reads back after opening a review.
  *
  * Four things it cannot work out for itself, and each one costs a wasted turn if
- * it is missing. The review is one of the caller's own children, so the ops that
- * default to "every child you spawned" already cover it and it needs no `targets`
- * of its own. It reads the diff alone, so a wide change makes it slow rather than
- * stuck. It shares the worktree, so writing while it works is how two agents lose
- * each other's edits. And a `fallback` brief means the user's own review
- * instructions and model pin never reached it, which belongs in the agent's
- * report rather than being silently absorbed.
+ * it is missing. The review is a root rather than a child, so the ops that default
+ * to "every child you spawned" do not cover it and it has to be named in
+ * `targets`. It delegates its own readers, so a wide change does not make it slow.
+ * It shares the worktree, so writing while it works is how two agents lose each
+ * other's edits. And a `fallback` brief means the user's own review instructions
+ * and model pin never reached it, which belongs in the agent's report rather than
+ * being silently absorbed.
  *
  * The last three caveats are about the user's configured review settings, and
  * every way one of them degrades is named rather than absorbed. The model is
@@ -372,7 +372,7 @@ function startedReviewMessage(input: {
 	const reported = caveats.length
 		? ` ${caveats.join(' ')} Say so in your report.`
 		: '';
-	return `Opened this workspace's Review conversation, running the same review the user's Review button runs. It is one of your sub-agents, so \`ensemblr_wait_for_agents\` picks it up like any other child — or name \`targets: ["${input.agentSessionId}"]\` to wait on it alone — and \`ensemblr_send_follow_up\` against the same id steers it. It reads the diff itself and cannot spawn readers of its own, so give it the time a wide change takes. It shares this worktree with you: leave the files alone until it reports, and do the committing and the pull request yourself.${reported}`;
+	return `Opened this workspace's Review conversation, running the same review the user's Review button runs. It is a root orchestrator rather than one of your children, so \`ensemblr_wait_for_agents\` will not find it unless you name \`targets: ["${input.agentSessionId}"]\` — wait on it that way, and \`ensemblr_send_follow_up\` against the same id steers it. It has a delegation budget of its own and fans readers out over a wide diff. It shares this worktree with you: leave the files alone until it reports, and do the committing and the pull request yourself.${reported}`;
 }
 
 /**
@@ -729,12 +729,12 @@ export function createAgentControlService({
 	 * over the *same whole diff*, so its files are guaranteed to overlap the first
 	 * one's, and both write — fixing what they found on a follow-up is the point.
 	 * The rest of the app answers concurrent children with "brief them onto
-	 * disjoint files", which is exactly the answer this op cannot give. While the
-	 * reviewer was a peer the co-tenancy cap made the second call impossible; since
-	 * [ADR 0062](../../../docs/adr/0062-open-an-agent-requested-review-as-a-sub-agent.md)
-	 * dropped that cap this map is what stands in its place — and it has to stand,
-	 * because the unattended loop's own re-entry path walks back through a step
-	 * that says to call this op.
+	 * disjoint files", which is exactly the answer this op cannot give. The
+	 * co-tenancy cap used to make the second call impossible on its own; since
+	 * [ADR 0063](../../../docs/adr/0063-open-an-agent-requested-review-as-a-peer-again.md)
+	 * widened that cap for an unattended caller a second reviewer fits through it,
+	 * so this map is what refuses one — and it has to, because the unattended
+	 * loop's own re-entry path walks back through a step that says to call this op.
 	 *
 	 * Keyed by caller rather than by workspace: a peer running alongside is a
 	 * different orchestrator with its own reading to have done, and handing it the
@@ -744,6 +744,19 @@ export function createAgentControlService({
 		string,
 		{ agentSessionId: string; chatTabId: string }
 	>();
+
+	/**
+	 * Sessions this service opened as a review, which are the ones refused a
+	 * `startReview` of their own.
+	 *
+	 * The reverse index of {@link reviewsByCaller}, held because the forward map
+	 * answers "what did this caller open" and the refusal asks "is this caller
+	 * something somebody opened". A reviewer is a root, so nothing else about it
+	 * says no: {@link SUBAGENT_BLOCKED_OPS} refused the op while it was a child,
+	 * and since it became a peer again the widened unattended allowance leaves
+	 * room for the review-of-a-review chain that refusal used to bound.
+	 */
+	const openedReviewSessions = new Set<string>();
 
 	/**
 	 * Workspace-and-model pairs the user has already approved a frontier-tier
@@ -1182,14 +1195,20 @@ export function createAgentControlService({
 	};
 
 	/**
-	 * Takes a slot in the workspace's peer allowance for a spawn that has cleared
-	 * the cap but not yet opened.
+	 * Takes a slot in the workspace's co-tenancy allowance for a spawn that has
+	 * cleared the cap but not yet opened.
 	 *
-	 * The cap is read before a confirmation prompt that blocks with no time limit,
-	 * and the peer registers an origin of its own only once it is open, so between
-	 * those two moments the workspace looks emptier than it is. Two spawns issued
-	 * in one parallel tool block would both read the same count, both raise a
-	 * prompt, and both pass. The reservation is what they contend on instead.
+	 * What both callers share is the window: the count is read before the spawn,
+	 * and the conversation registers an origin of its own only once it is open, so
+	 * in between the workspace looks emptier than it is. Two spawns issued in one
+	 * parallel tool block would both read the same count and both pass. The
+	 * reservation is what they contend on instead.
+	 *
+	 * The window is a different length for each. {@link gatePeerSpawn} holds it
+	 * across a confirmation prompt that blocks with no time limit, which is what
+	 * this was built for; {@link handleStartReview} raises no prompt and holds it
+	 * across the compose, the model lookup and the spawn. Shorter, but not short
+	 * enough to skip — a review is a writer on the checkout the moment it opens.
 	 * @param workspaceId - Workspace the spawn is opening into.
 	 * @returns The release, which is idempotent so a `finally` may call it freely.
 	 */
@@ -1218,11 +1237,22 @@ export function createAgentControlService({
 	 * The two kinds of occupant take different answers, so listing them together
 	 * would send an agent to steer a terminal id `ensemblr_send_follow_up` cannot
 	 * reach. A conversation is steerable; a harness is the user's to close.
+	 *
+	 * The limit is stated as the caller's own allowance rather than as the
+	 * workspace's occupancy, because {@link coTenantLimit} reads the caller and
+	 * the two can disagree: an unattended run legitimately seats three, the user
+	 * comes back, and the next attended spawn is held to two in a workspace that
+	 * holds more than two. Phrased as arithmetic — "already holds its limit of
+	 * two" over three named occupants — that reads as a bug the agent can falsify
+	 * by counting. The number stays, because an agent that cannot see the
+	 * allowance cannot tell a full workspace from a broken op.
+	 * @param limit - The allowance applied to this caller, which its turn mode widens.
 	 * @param roots - Session ids of the orchestrators already in the workspace.
 	 * @param harnesses - Terminal ids of the harnesses running there.
 	 * @returns The model-facing denial message.
 	 */
 	const workspaceFullRefusal = (
+		limit: number,
 		roots: readonly string[],
 		harnesses: readonly string[],
 	): string => {
@@ -1234,8 +1264,29 @@ export function createAgentControlService({
 				? `${harnesses.length} running harness terminal${harnesses.length > 1 ? 's' : ''} (${harnesses.join(', ')}), which only the user can close`
 				: '',
 		].filter(Boolean);
-		return `This workspace already holds its limit of ${PEER_ORCHESTRATOR_LIMITS.maxPerWorkspace} agents writing to one checkout: ${occupants.join(' and ')}. They share one worktree and one git index, and nothing arbitrates a further writer. Work with what is there, or do the work in this conversation.`;
+		return `This workspace is full for you: your allowance is ${limit} agents writing one checkout, and it already holds ${occupants.join(' and ')}. They share one worktree and one git index, and nothing arbitrates a further writer. Work with what is there, or do the work in this conversation.`;
 	};
+
+	/**
+	 * How many uncoordinated writers this caller's workspace may hold at once.
+	 *
+	 * Read off the caller rather than off the workspace, because the wider
+	 * unattended allowance answers a need the unattended run has and an attended
+	 * orchestrator beside it does not
+	 * ([ADR 0063](../../../docs/adr/0063-open-an-agent-requested-review-as-a-peer-again.md)).
+	 * The delivery loop keeps a review peer open across every round it runs, so
+	 * two slots are spent before it has room for anything the user left behind —
+	 * and the two things they routinely leave, a harness terminal still running
+	 * and a peer opened earlier, are exactly what the extra two absorb. A run
+	 * script is not one of them: {@link liveHarnessTerminals} counts terminals of
+	 * kind `agent`, so a dev server has never taken a slot.
+	 * @param origin - Resolved caller identity, whose turn mode picks the limit.
+	 * @returns The co-tenancy limit to hold this caller to.
+	 */
+	const coTenantLimit = (origin: AgentControlOrigin): number =>
+		isUnattended(origin)
+			? PEER_ORCHESTRATOR_LIMITS.maxPerUnattendedWorkspace
+			: PEER_ORCHESTRATOR_LIMITS.maxPerWorkspace;
 
 	/**
 	 * Takes a slot in the workspace's co-tenancy allowance, or refuses because the
@@ -1245,8 +1296,10 @@ export function createAgentControlService({
 	 * none of which knows what the others are editing. A spawned sub-agent is not
 	 * one — the orchestrator that opened it blocks on it and sequences it against
 	 * its own edits — which is why {@link rootsInWorkspace} excludes the durably
-	 * marked ones, and why {@link handleStartReview} no longer comes through here
-	 * ([ADR 0062](../../../docs/adr/0062-open-an-agent-requested-review-as-a-sub-agent.md)).
+	 * marked ones. {@link handleStartReview} does come through here: the reviewer
+	 * is a root with a delegation budget of its own, so it is a writer nothing
+	 * sequences, and {@link coTenantLimit} is what keeps that affordable for the
+	 * unattended loop rather than an exemption from the count.
 	 * @param origin - Resolved caller identity, naming the workspace to count in.
 	 * @returns The reservation to release once the conversation is open, or the denial.
 	 */
@@ -1258,11 +1311,12 @@ export function createAgentControlService({
 			liveHarnessTerminals(origin.workspaceId),
 		]);
 		const opening = peerSpawnsOpening.get(origin.workspaceId) ?? 0;
-		if (
-			roots.length + harnesses.length + opening >=
-			PEER_ORCHESTRATOR_LIMITS.maxPerWorkspace
-		) {
-			return fail('denied-quota', workspaceFullRefusal(roots, harnesses));
+		const limit = coTenantLimit(origin);
+		if (roots.length + harnesses.length + opening >= limit) {
+			return fail(
+				'denied-quota',
+				workspaceFullRefusal(limit, roots, harnesses),
+			);
 		}
 		return reservePeerSlot(origin.workspaceId);
 	};
@@ -1647,12 +1701,20 @@ export function createAgentControlService({
 	 * act on; opening a duplicate reviewer over the same whole diff is the harm
 	 * this map exists to prevent, and nothing downstream detects it.
 	 *
-	 * Two `startReview` calls issued in one parallel tool block both read an empty
-	 * map and both spawn — deliberately not guarded the way {@link reservePeerSlot}
-	 * guards its op, because that window holds a confirmation dialog that blocks
-	 * with no time limit while this one is two short awaits, and nothing has a
-	 * reason to batch this op with itself. The path the loop actually walks is
-	 * sequential, a turn or more apart, and that one this closes.
+	 * Two `startReview` calls issued in one parallel tool block can both read an
+	 * empty map, and this lookup does nothing to stop them. What partly does is
+	 * {@link reserveCoTenantSlot}, which the op now goes through: the reservation
+	 * is taken in the same synchronous run as the count it clears, so the second
+	 * call to resume always sees the first's slot, and an attended caller one slot
+	 * from full has the duplicate refused as `denied-quota`. Partly, because that
+	 * is arithmetic rather than mutual exclusion — where the allowance has room
+	 * for both, as an unattended caller's four does, both reservations succeed and
+	 * both spawn.
+	 *
+	 * No tighter guard here, because the window is two short awaits rather than
+	 * {@link gatePeerSpawn}'s confirmation dialog, and nothing has a reason to
+	 * batch this op with itself. The path the loop actually walks is sequential, a
+	 * turn or more apart, and that one this closes outright.
 	 * @param origin - Resolved caller identity, naming the caller and its workspace.
 	 * @returns The open review's session and tab, or null when there is none.
 	 */
@@ -1674,28 +1736,105 @@ export function createAgentControlService({
 	};
 
 	/**
+	 * Composes the review brief and opens the conversation, inside the co-tenancy
+	 * reservation {@link handleStartReview} holds around it.
+	 *
+	 * Split out so that reservation is a `try`/`finally` over one call rather than
+	 * over the whole body: the release has no other decrement, and a compose that
+	 * throws would otherwise strand a slot for the life of the process.
+	 * @param origin - Resolved caller identity.
+	 * @param args - The optional tab title.
+	 * @param callerModel - The Pi extension's live-model hint, absent for MCP callers.
+	 * @returns The review session and tab, or a failure envelope.
+	 */
+	const openReview = async (
+		origin: AgentControlOrigin,
+		args: StartReviewArgs,
+		callerModel: string | undefined,
+	): Promise<AgentControlResult<unknown>> => {
+		const brief = await ports.reviewLaunch.composeBrief({
+			workspaceCwd: origin.workspaceCwd,
+			workspaceId: origin.workspaceId,
+		});
+		const pinned = await reviewModelRow(brief.model);
+		const thinkingLevel = reviewThinkingLevel(brief, pinned);
+		const started = await ports.conversations.startConversation({
+			afkMode: isUnattended(origin),
+			asPeer: true,
+			callerConcierge: false,
+			callerModel,
+			// Withheld when the user pinned a review model, which is what lets the
+			// spawn open on that model's own runtime: `resolveRequested` refuses a
+			// cross-runtime model only against a caller runtime it can see, and here
+			// the model is the user's rather than the caller's to have chosen.
+			callerRuntime: pinned ? null : originRuntime(origin),
+			model: pinned?.id,
+			parentSessionId: origin.sessionId,
+			planMode: false,
+			prompt: `${buildReviewPeerDirective(origin.sessionId)}\n\n---\n\n${brief.prompt}`,
+			thinkingLevel: thinkingLevel ?? undefined,
+			title: args.title ?? DEFAULT_REVIEW_TAB_TITLE,
+			workspaceCwd: origin.workspaceCwd,
+			workspaceId: origin.workspaceId,
+		});
+		if (!started.ok) {
+			return fail('invalid-args', started.reason);
+		}
+		guardrails.recordSpawn(origin.sessionId);
+		reviewsByCaller.set(origin.sessionId, {
+			agentSessionId: started.agentSessionId,
+			chatTabId: started.chatTabId,
+		});
+		openedReviewSessions.add(started.agentSessionId);
+		return ok({
+			agentSessionId: started.agentSessionId,
+			chatTabId: started.chatTabId,
+			message: startedReviewMessage({
+				agentSessionId: started.agentSessionId,
+				crossRuntime:
+					pinned && pinned.runtime !== originRuntime(origin)
+						? pinned.runtime
+						: null,
+				droppedModel: brief.model !== null && pinned === null,
+				droppedThinkingLevel:
+					brief.thinkingLevel !== null && thinkingLevel === null
+						? brief.thinkingLevel
+						: null,
+				source: brief.source,
+			}),
+		} satisfies StartReviewResult);
+	};
+
+	/**
 	 * Opens the app's own Review conversation over the caller's workspace and
 	 * hands back the session to wait on.
 	 *
-	 * What it opens is the caller's **sub-agent**, and the bound it is shaped by is
-	 * the workspace's co-tenancy cap rather than the reviewer's own reach
-	 * ([ADR 0062](../../../docs/adr/0062-open-an-agent-requested-review-as-a-sub-agent.md)).
-	 * A review opened as a root costs one of two slots that a running harness or a
-	 * peer may already hold, and it holds that slot for as long as the review is
-	 * open — which the unattended loop, whose whole shape is review-fix-re-review
-	 * against one conversation, runs into first and hardest. As a child it is
-	 * bounded by the per-session spawn guardrails instead, it is among the children
-	 * {@link handleWaitForAgents} defaults to, and it is coordinated by the
-	 * orchestrator that blocks on it rather than by nothing at all. The cost is
-	 * that it reads a wide diff itself; `readWorkspaceDiff` already budgets and
-	 * slices one, and {@link startedReviewMessage} says so.
+	 * What it opens is a **root orchestrator**, not a sub-agent, and that is the
+	 * point rather than an implementation detail
+	 * ([ADR 0063](../../../docs/adr/0063-open-an-agent-requested-review-as-a-peer-again.md)).
+	 * A review of a wide change is itself delegable work, and a reviewer that
+	 * cannot spawn readers of its own reads a fifty-file diff in one window or not
+	 * at all. It costs a slot in the workspace's co-tenancy allowance for exactly
+	 * the reason a peer does — it is a second writer on one checkout — and what
+	 * keeps that affordable for the unattended loop, which holds a reviewer open
+	 * across every round it runs, is {@link coTenantLimit} widening the allowance
+	 * for an unattended caller rather than this op stepping outside the count.
+	 *
+	 * A reviewer may not open a review, and {@link openedReviewSessions} is what
+	 * holds that. While the reviewer was a child {@link SUBAGENT_BLOCKED_OPS}
+	 * refused the op; as a root nothing else does, and the widened unattended
+	 * allowance leaves room for the chain — orchestrator, reviewer, reviewer's
+	 * reviewer — that the attended cap of two closed by arithmetic. Refused ahead
+	 * of everything else, because a caller that is itself a review has no reuse
+	 * entry to be handed and no reason to reach the reservation.
 	 *
 	 * One review per caller, and {@link reusableReview} is what holds that: a
-	 * caller that already has one is handed it back as an `ok`, ahead of both the
-	 * spawn guardrail and the compose, because reusing spends neither. That is the
-	 * one thing the dropped co-tenancy cap was still doing here — two reviewers are
-	 * two writers over the same whole diff, where the app's usual answer to
-	 * concurrent children is to brief them onto disjoint files.
+	 * caller that already has one is handed it back as an `ok`, ahead of the
+	 * co-tenancy reservation, the spawn guardrail and the compose, because reusing
+	 * spends none of them. Two reviewers are two writers over the same whole diff,
+	 * where the app's usual answer to concurrent agents is to brief them onto
+	 * disjoint files — and a wider allowance is what would otherwise let a second
+	 * one through.
 	 *
 	 * The review runs on the model and thinking level the user configured for
 	 * reviews, wherever those live — {@link reviewModelRow} resolves the pin across
@@ -1725,6 +1864,12 @@ export function createAgentControlService({
 		args: StartReviewArgs,
 		callerModel: string | undefined,
 	): Promise<AgentControlResult<unknown>> => {
+		if (openedReviewSessions.has(origin.sessionId)) {
+			return fail(
+				'denied-scope',
+				'You are the review. The change in this workspace is already under review — by you — so opening another one would seat a third writer over the same whole diff to read what you were opened to read. Report what you found, and let the orchestrator that opened you decide what happens to the change.',
+			);
+		}
 		const open = await reusableReview(origin);
 		if (open) {
 			return ok({
@@ -1736,56 +1881,20 @@ export function createAgentControlService({
 		if (spawnDenied) {
 			return spawnDenied;
 		}
-		const brief = await ports.reviewLaunch.composeBrief({
-			workspaceCwd: origin.workspaceCwd,
-			workspaceId: origin.workspaceId,
-		});
-		const pinned = await reviewModelRow(brief.model);
-		const thinkingLevel = reviewThinkingLevel(brief, pinned);
-		const started = await ports.conversations.startConversation({
-			afkMode: isUnattended(origin),
-			asPeer: false,
-			callerConcierge: false,
-			callerModel,
-			// Withheld when the user pinned a review model, which is what lets the
-			// spawn open on that model's own runtime: `resolveRequested` refuses a
-			// cross-runtime model only against a caller runtime it can see, and here
-			// the model is the user's rather than the caller's to have chosen.
-			callerRuntime: pinned ? null : originRuntime(origin),
-			model: pinned?.id,
-			parentSessionId: origin.sessionId,
-			planMode: false,
-			prompt: `${buildReviewSubAgentDirective(origin.sessionId)}\n\n---\n\n${brief.prompt}`,
-			thinkingLevel: thinkingLevel ?? undefined,
-			title: args.title ?? DEFAULT_REVIEW_TAB_TITLE,
-			workspaceCwd: origin.workspaceCwd,
-			workspaceId: origin.workspaceId,
-		});
-		if (!started.ok) {
-			return fail('invalid-args', started.reason);
+		const reserved = await reserveCoTenantSlot(origin);
+		if (typeof reserved !== 'function') {
+			return reserved;
 		}
-		guardrails.recordSpawn(origin.sessionId);
-		reviewsByCaller.set(origin.sessionId, {
-			agentSessionId: started.agentSessionId,
-			chatTabId: started.chatTabId,
-		});
-		return ok({
-			agentSessionId: started.agentSessionId,
-			chatTabId: started.chatTabId,
-			message: startedReviewMessage({
-				agentSessionId: started.agentSessionId,
-				crossRuntime:
-					pinned && pinned.runtime !== originRuntime(origin)
-						? pinned.runtime
-						: null,
-				droppedModel: brief.model !== null && pinned === null,
-				droppedThinkingLevel:
-					brief.thinkingLevel !== null && thinkingLevel === null
-						? brief.thinkingLevel
-						: null,
-				source: brief.source,
-			}),
-		} satisfies StartReviewResult);
+		// Held until the review is open, because that is when it registers an origin
+		// of its own and starts being counted by the reservation above — and
+		// released on every path out, including a throwing compose, because
+		// `peerSpawnsOpening` has no other decrement and a slot lost here is lost
+		// for the life of the process.
+		try {
+			return await openReview(origin, args, callerModel);
+		} finally {
+			reserved();
+		}
 	};
 
 	/**
@@ -3268,6 +3377,7 @@ export function createAgentControlService({
 		signalsByChild.delete(sessionId);
 		linearSearchesBySession.delete(sessionId);
 		reviewsByCaller.delete(sessionId);
+		openedReviewSessions.delete(sessionId);
 		guardrails.release(sessionId);
 		originRegistry.release(sessionId);
 	};

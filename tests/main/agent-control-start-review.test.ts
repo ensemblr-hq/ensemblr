@@ -8,7 +8,7 @@ import {
 	type OriginRegistry,
 } from '../../src/main/agent-control/index.ts';
 import type { AgentControlResult } from '../../src/shared/agent-control.ts';
-import { REVIEW_SUBAGENT_BRIEF_HEADER } from '../../src/shared/agent-control.ts';
+import { REVIEW_PEER_BRIEF_HEADER } from '../../src/shared/agent-control.ts';
 
 const CALLER = 'caller';
 
@@ -77,7 +77,7 @@ interface PortOptions {
  * Ports for the review-launch cases. Only `reviewLaunch`, `conversations`, and
  * `terminals` carry real behavior: the brief the renderer composed, the spawn
  * the op delegates to, and the harness terminals that fill the workspace's
- * co-tenancy allowance without refusing a review.
+ * co-tenancy allowance and refuse a review once it is full.
  */
 const makePorts = (options: PortOptions): AgentControlPorts =>
 	({
@@ -189,8 +189,12 @@ const setup = (
 			chatTabId: 'review-tab',
 			ok: true,
 		});
+	let minted = 0;
 	const registry: OriginRegistry = createOriginRegistry({
-		generateToken: () => 'tok-caller',
+		generateToken: () => {
+			minted += 1;
+			return minted === 1 ? 'tok-caller' : `tok-${minted}`;
+		},
 	});
 	registry.register({
 		concierge: options.concierge === true,
@@ -254,17 +258,22 @@ describe('agent-control startReview', () => {
 		);
 	});
 
-	// A review opened as a root spends one of the workspace's two co-tenancy
-	// slots and holds it for as long as the review is open, which the unattended
-	// loop runs into first and hardest. As the caller's child it is bounded by the
-	// per-session spawn guardrails instead.
-	it('opens a sub-agent of the caller rather than a peer', async () => {
+	// A reviewer that cannot spawn readers of its own reads a wide diff in one
+	// window or not at all, and the review is the one step of the loop whose job
+	// is a wider reading than the author managed.
+	//
+	// `parentSessionId` rides along even though a peer records none, and that is
+	// not a contradiction to be tidied away: `describeCaller` reads it before the
+	// `asPeer` branch drops it from the session, and that lookup is how a review
+	// with no pinned model inherits the caller's. Removing it would leave an
+	// unpinned review resolving from nothing.
+	it('opens a root orchestrator rather than a sub-agent', async () => {
 		const { service, startConversation } = setup();
 
 		await startReview(service);
 
 		expect(startConversation.mock.calls[0][0]).toMatchObject({
-			asPeer: false,
+			asPeer: true,
 			parentSessionId: CALLER,
 			planMode: false,
 		});
@@ -286,9 +295,9 @@ describe('agent-control startReview', () => {
 		await startReview(service);
 		const { prompt } = startConversation.mock.calls[0][0];
 
-		expect(prompt).toContain(REVIEW_SUBAGENT_BRIEF_HEADER);
+		expect(prompt).toContain(REVIEW_PEER_BRIEF_HEADER);
 		expect(prompt).toContain(CALLER);
-		expect(prompt.indexOf(REVIEW_SUBAGENT_BRIEF_HEADER)).toBeLessThan(
+		expect(prompt.indexOf(REVIEW_PEER_BRIEF_HEADER)).toBeLessThan(
 			prompt.indexOf('THE REVIEW PROMPT'),
 		);
 	});
@@ -470,27 +479,29 @@ describe('agent-control startReview', () => {
 
 		const { message } = succeeded(await startReview(service));
 
-		expect(message).toContain('one of your sub-agents');
+		expect(message).toContain(
+			'root orchestrator rather than one of your children',
+		);
 		expect(message).toContain('targets: ["review-1"]');
 		expect(message).toContain('ensemblr_send_follow_up');
 		expect(message).toContain('leave the files alone');
 	});
 
-	// The reviewer trades fanning readers out for costing no co-tenancy slot, and
-	// an orchestrator that does not know it reads alone will cut its wait short on
-	// a wide diff.
-	it('says the reviewer reads the diff alone', async () => {
+	// A caller that waits with no targets never sees the reviewer settle, so the
+	// one mechanic the root shape costs has to be in the message rather than left
+	// to be discovered.
+	it('says the reviewer delegates its own readers', async () => {
 		const { service } = setup();
 
 		expect(succeeded(await startReview(service)).message).toContain(
-			'cannot spawn readers of its own',
+			'delegation budget of its own',
 		);
 	});
 
 	// Two reviewers are two writers over the same whole diff, so their files are
 	// guaranteed to overlap — and the unattended loop's re-entry path walks back
-	// through a step that says to call this op. The co-tenancy cap used to make
-	// the second call impossible; this is what replaced it.
+	// through a step that says to call this op. The widened unattended cap leaves
+	// room for that second reviewer, so this is what refuses it.
 	it('hands back the review the caller already has', async () => {
 		const { service, startConversation } = setup();
 
@@ -502,6 +513,65 @@ describe('agent-control startReview', () => {
 			chatTabId: first.chatTabId,
 		});
 		expect(startConversation).toHaveBeenCalledTimes(1);
+	});
+
+	// The reviewer is a root, so `SUBAGENT_BLOCKED_OPS` no longer refuses it this
+	// op and its playbook is the orchestrator one that recommends it. At two the
+	// arithmetic closed the chain; the widened unattended cap has room for it, so
+	// only this guard does. Both sessions count as roots here and the limit is
+	// four, which is what makes the refusal `denied-scope` rather than a quota one.
+	it('refuses a review that would open a review of its own', async () => {
+		const { registry, service, startConversation } = setup({
+			unattended: true,
+		});
+		succeeded(await startReview(service));
+		const reviewer = registry.register({
+			concierge: false,
+			sessionId: 'review-1',
+			species: 'pi',
+			workspaceCwd: '/ws',
+			workspaceId: 'ws',
+		});
+		startConversation.mockClear();
+
+		const refusal = refused(
+			await service.invoke({
+				op: 'startReview',
+				rawArgs: {},
+				token: reviewer.token,
+			}),
+		);
+
+		expect(refusal.code).toBe('denied-scope');
+		expect(refusal.error).toContain('You are the review');
+		expect(startConversation).not.toHaveBeenCalled();
+	});
+
+	// The set is keyed by session id, so without the teardown beside
+	// `reviewsByCaller` a later conversation issued the same id would be refused a
+	// review it is entitled to.
+	it('stops treating a released session as a review', async () => {
+		const { registry, service } = setup({ unattended: true });
+		succeeded(await startReview(service));
+		service.releaseSession('review-1');
+
+		const reopened = registry.register({
+			concierge: false,
+			sessionId: 'review-1',
+			species: 'pi',
+			workspaceCwd: '/ws',
+			workspaceId: 'ws',
+		});
+
+		expect(
+			(
+				await service.invoke({
+					op: 'startReview',
+					rawArgs: {},
+					token: reopened.token,
+				})
+			).ok,
+		).toBe(true);
 	});
 
 	// It is a settled outcome rather than a refusal, so the message has to say
@@ -605,18 +675,72 @@ describe('agent-control startReview', () => {
 		expect(confirm).not.toHaveBeenCalled();
 	});
 
-	// The cap counts uncoordinated writers, and a child its orchestrator blocks on
-	// is not one. An unattended run whose workspace happens to hold a harness would
-	// otherwise be refused the second reading the whole loop is built around.
-	it('opens even when the workspace already holds its co-tenancy limit', async () => {
-		const { service } = setup({
+	// The reviewer is a root with its own delegation budget, so it is an
+	// uncoordinated writer on the checkout by the cap's own definition and answers
+	// a full workspace the way a peer spawn does.
+	it('refuses when the workspace already holds its co-tenancy limit', async () => {
+		const { service, startConversation } = setup({
 			terminals: [
 				{ kind: 'agent', status: 'running', terminalId: 'term-1' },
 				{ kind: 'agent', status: 'running', terminalId: 'term-2' },
 			],
 		});
 
+		expect(refused(await startReview(service)).code).toBe('denied-quota');
+		expect(startConversation).not.toHaveBeenCalled();
+	});
+
+	// The unattended loop's own floor is two — itself and its review — so an
+	// attended-width workspace has no room for the harness terminal a user
+	// routinely leaves running when they step away.
+	it('opens for an unattended caller past the attended limit', async () => {
+		const { service } = setup({
+			terminals: [
+				{ kind: 'agent', status: 'running', terminalId: 'term-1' },
+				{ kind: 'agent', status: 'running', terminalId: 'term-2' },
+			],
+			unattended: true,
+		});
+
 		expect((await startReview(service)).ok).toBe(true);
+	});
+
+	// Four is where the widened allowance stops, and the refusal names the limit
+	// it applied rather than the attended one.
+	it('refuses an unattended caller at the widened limit', async () => {
+		const { service } = setup({
+			terminals: [
+				{ kind: 'agent', status: 'running', terminalId: 'term-1' },
+				{ kind: 'agent', status: 'running', terminalId: 'term-2' },
+				{ kind: 'agent', status: 'running', terminalId: 'term-3' },
+				{ kind: 'agent', status: 'running', terminalId: 'term-4' },
+			],
+			unattended: true,
+		});
+
+		expect(refused(await startReview(service)).error).toContain(
+			'your allowance is 4',
+		);
+	});
+
+	// The limit is read off the caller, so an attended one can be held to two in a
+	// workspace an unattended run legitimately filled past that. The refusal has
+	// to stay true there: it states the caller's own allowance rather than an
+	// occupancy the agent could falsify by counting the names it lists.
+	it('states the allowance rather than the count when the workspace is over it', async () => {
+		const { service } = setup({
+			terminals: [
+				{ kind: 'agent', status: 'running', terminalId: 'term-1' },
+				{ kind: 'agent', status: 'running', terminalId: 'term-2' },
+				{ kind: 'agent', status: 'running', terminalId: 'term-3' },
+			],
+		});
+
+		const { error } = refused(await startReview(service));
+
+		expect(error).toContain('your allowance is 2');
+		expect(error).toContain('3 running harness terminals');
+		expect(error).not.toContain('holds its limit of');
 	});
 
 	it('refuses while the caller is planning', async () => {
@@ -635,9 +759,10 @@ describe('agent-control startReview', () => {
 		expect(startConversation).not.toHaveBeenCalled();
 	});
 
-	// A refused spawn leaves nothing sticky behind, so the retry that follows it in
-	// an unattended run is answered on its own merits.
-	it('lets a later review open after a refused spawn', async () => {
+	// The reservation has no decrement but this release, so a slot lost on a
+	// refused spawn is lost for the life of the process and the retry an
+	// unattended run makes next would be refused for a reviewer that never opened.
+	it('frees the co-tenancy slot when the spawn is refused', async () => {
 		const startConversation = vi
 			.fn()
 			.mockResolvedValueOnce({ ok: false, reason: 'no model' })
@@ -659,7 +784,7 @@ describe('agent-control startReview', () => {
 	// settings, none of which is enveloped. A throw there is the caller's answer
 	// for that one call and nothing more — the retry an unattended loop makes next
 	// has to be able to succeed.
-	it('recovers when composing the brief throws', async () => {
+	it('frees the co-tenancy slot when composing the brief throws', async () => {
 		const composeBrief = vi
 			.fn()
 			.mockRejectedValueOnce(new Error('git status failed'))

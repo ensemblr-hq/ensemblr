@@ -43,11 +43,11 @@ describe('afk delivery loop', () => {
 		expect(directive).toContain('skip the rest of this block');
 	});
 
-	// A peer inherits the opener's AFK mode, so it reads this block — and the turn
-	// where it is asked to fix what it found is a change to the codebase by the
-	// first gate's own definition. Without this second gate that turn ends in a
-	// commit and a pull request the agent's opening brief forbids, racing the
-	// orchestrator that owns them.
+	// A review and a peer both inherit the opener's AFK mode, so both read this
+	// block — and the turn where one is asked to fix what it found is a change to
+	// the codebase by the first gate's own definition. Without this second gate
+	// that turn ends in a commit and a pull request the agent's opening brief
+	// forbids, racing the orchestrator that owns them.
 	it('excludes an agent whose brief named somebody else as the committer', () => {
 		expect(directive).toContain('as the committer');
 		expect(directive).toContain('leave it in the working tree');
@@ -57,7 +57,8 @@ describe('afk delivery loop', () => {
 	// The gate is self-checking — it asks what this conversation's own brief said —
 	// so an example only works if the reader can match it. A harness brief names no
 	// committer above the harness, so naming one here offers a test it cannot run.
-	it('offers the peer as the only example a reader can check', () => {
+	it('offers the reviewer and the peer as examples a reader can check', () => {
+		expect(directive).toContain('as it does for a reviewer');
 		expect(directive).toContain('a peer opened to take half the work');
 		expect(directive).not.toContain('harness launched into this checkout');
 	});
@@ -104,11 +105,20 @@ describe('afk delivery loop', () => {
 	// The whole point of the review step is that somebody other than the author
 	// reads the change, and the two mechanics below are the ones an agent cannot
 	// work out for itself.
-	it('names the review tool and what it opens', () => {
+	it('names the review tool and how to wait on what it opens', () => {
 		expect(directive).toContain('ensemblr_start_review');
-		expect(directive).toContain('one of your own sub-agents');
-		expect(directive).toContain('reads the whole change itself');
-		expect(directive).not.toContain('root orchestrator');
+		expect(directive).toContain('root orchestrator rather than your child');
+		expect(directive).toContain('targets');
+		expect(directive).not.toContain('one of your own sub-agents');
+	});
+
+	// The review takes a co-tenancy slot again, so a full workspace refuses a step
+	// the loop treats as mandatory — and nothing the agent can do frees one, since
+	// a running harness is the user's to close.
+	it('says what to do when the review is refused for quota', () => {
+		expect(directive).toContain('denied-quota');
+		expect(directive).toContain('Do not retry it in a loop');
+		expect(directive).toContain('the second reading was refused');
 	});
 
 	// Fixes belong in the conversation that found the problem, not back here.
@@ -125,7 +135,6 @@ describe('afk delivery loop', () => {
 		expect(directive).toContain('ask that same conversation to re-review');
 		expect(directive).toContain('hands you back the reviewer you already have');
 		expect(directive).toContain('re-read the whole diff from cold');
-		expect(directive).not.toContain('co-tenancy slot');
 		expect(directive).not.toContain('repeat step 3');
 	});
 

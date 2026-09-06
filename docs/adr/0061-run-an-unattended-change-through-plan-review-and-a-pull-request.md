@@ -45,19 +45,19 @@ Review conversation so the loop has something to call.**
 
 ### `ensemblr_start_review` opens a root orchestrator
 
-> **Superseded in part by
-> [0062](./0062-open-an-agent-requested-review-as-a-sub-agent.md).** The review is
-> now spawned as the caller's sub-agent and costs no co-tenancy slot. This
-> section records the original reasoning; the two paragraphs it changes are
-> marked below.
+> **Reversed by [0062](./0062-open-an-agent-requested-review-as-a-sub-agent.md)
+> and restored by
+> [0063](./0063-open-an-agent-requested-review-as-a-peer-again.md).** The reviewer
+> is a root orchestrator again and takes a co-tenancy slot again, so this section
+> stands as written; 0063 widens the cap for an unattended caller rather than
+> changing what `startReview` opens.
 
 The op composes the review prompt, opens a conversation over the caller's
 workspace, and hands back the session to wait on. Three decisions inside it:
 
-**It is a root orchestrator, not a sub-agent.** *(Reversed by 0062: the cap it
-cost was worth more than the delegation it bought.)* A review of a fifty-file
-change is itself delegable work, and a reviewer that cannot spawn its own readers
-reads that diff in one pass or not at all. It therefore records no
+**It is a root orchestrator, not a sub-agent.** A review of a fifty-file change
+is itself delegable work, and a reviewer that cannot spawn its own readers reads
+that diff in one pass or not at all. It therefore records no
 `parentSessionId`, which has consequences the result message spells out rather
 than leaving to be discovered: it is absent from the children `waitForAgents`
 defaults to and has to be named in `targets`, and it outlives the turn that
@@ -70,12 +70,12 @@ same way it delegated the reading. The caller sends the findings back with
 to commit, rebase, move HEAD, or touch a pull request — so one agent reconciles
 the branch and one agent owns the PR.
 
-**It costs a co-tenancy slot, and raises no confirmation.** *(First half
-reversed by 0062: a child its orchestrator blocks on is coordinated, so it now
-takes no slot. The confirmation carve-out below stands.)* It is a second writer
-on one checkout for exactly the reason a peer orchestrator is, so it takes one of
-the two `PEER_ORCHESTRATOR_LIMITS` slots and answers a full workspace with the
-same refusal. What it does *not* inherit from `gatePeerSpawn` is the dialog, or
+**It costs a co-tenancy slot, and raises no confirmation.** It is a second
+writer on one checkout for exactly the reason a peer orchestrator is, so it takes
+one of the `PEER_ORCHESTRATOR_LIMITS` slots and answers a full workspace with the
+same refusal — two slots while the user is here, and four while they are away,
+which 0063 added so an unattended run's reviewer is not refused by whatever they
+left running. What it does *not* inherit from `gatePeerSpawn` is the dialog, or
 the AFK refusal behind it. That gate exists because "the user asked for a second
 writer" is not something a model can establish about its own prompt — so a dialog
 establishes it. Here there is nothing to establish: this is the Review action the
@@ -118,9 +118,7 @@ is the first thing the block says.
 
 There are two gates, and the second one exists because of this change's own op.
 A review opened by `startReview` inherits the caller's AFK mode, as does a peer
-opened by `startConversation`, so both read the block on every turn *(since 0062
-the review reads the sub-agent variant, which refuses it the commit by role, so
-the gate below names only the peer)* — and the
+opened by `startConversation`, so both read the block on every turn — and the
 turn where one is asked to fix what it found *is* a change to the codebase by the
 first gate's definition. Left there, that turn ends in a commit and a pull
 request from an agent whose opening brief forbids both, racing the orchestrator
@@ -136,11 +134,9 @@ The five steps and why each is there:
 2. **Build it, and revise the plan out loud when it stops being right.**
 3. **Have it reviewed by an agent that did not write it**, via the op above.
 4. **Send the findings back to the reviewer**, judging rather than accepting each
-   one — every round in that same conversation, because the open review holds a
-   co-tenancy slot and a second `startReview` would be refused rather than
-   opening a fresh reader. *(Since 0062 the reviewer is a child holding no slot,
-   and the rule is kept by the op itself: a second call hands back the review the
-   caller already has.)*
+   one — every round in that same conversation, because a second `startReview`
+   hands back the review the caller already has rather than opening a fresh
+   reader.
 5. **Open the pull request, and never merge it.**
 
 ### Steps 1 to 4 are a cycle the agent bounds itself
@@ -167,11 +163,10 @@ what each round moved goes in the conversation and in the final report.
 That re-entry walks back through step 3, which is the one step the two delegation
 mechanisms do not share, so the cycle carries one mechanism-dependent sentence of
 its own. On Ensemblr's mechanism the reviewer opened on the first pass is still
-holding the workspace's second co-tenancy slot, so the rebuilt change goes back
-to it as another follow-up and a second `startReview` on the way past step 3
-would be refused — *until 0062, after which the op answers that call with the
-review already open rather than refusing it* — the same fact step 4 states for an
-ordinary round, repeated because the re-entry bypasses step 4. On the native one there is nothing open to
+open, so the rebuilt change goes back to it as another follow-up and a second
+`startReview` on the way past step 3 answers with that same reviewer rather than
+opening a fresh one — the same fact step 4 states for an ordinary round, repeated
+because the re-entry bypasses step 4. On the native one there is nothing open to
 follow up, so the rebuilt change goes to a fresh reviewer child, read whole
 rather than as a delta against a plan that no longer holds.
 
@@ -252,8 +247,7 @@ review wording has to go through it, and the parity test fails if the renderer's
 generic composition drifts from it.
 
 **Two agents can now write one checkout without the user asking.** Bounded by the
-same cap as a peer *(until 0062, which counts the reviewer as the child it
-behaves like and leaves it outside the cap)*, and serialized by the loop — the caller waits rather than
+same cap as a peer, and serialized by the loop — the caller waits rather than
 working alongside — but the serialization is a contract in the directive rather
 than a lock, exactly as it is for a peer.
 

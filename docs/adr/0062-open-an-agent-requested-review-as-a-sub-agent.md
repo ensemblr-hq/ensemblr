@@ -4,7 +4,13 @@ Date: 2026-09-06
 
 ## Status
 
-Accepted
+Superseded by [0063](./0063-open-an-agent-requested-review-as-a-peer-again.md) (2026-09-06).
+The sub-agent shape below cost the reviewer its delegation budget, which is a
+worse trade than the co-tenancy slot it was made to save; 0063 restores the peer
+and widens the cap for an unattended caller instead. The two decisions this ADR
+made *besides* the shape — resolving the user's review-model pin across both
+runtimes, and handing back the review a caller already has — are carried forward
+by 0063 unchanged.
 
 Amends [0061](./0061-run-an-unattended-change-through-plan-review-and-a-pull-request.md),
 which introduced `startReview` and opened what it opens as a root orchestrator.

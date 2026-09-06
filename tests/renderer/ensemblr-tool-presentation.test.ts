@@ -687,13 +687,13 @@ describe('ensemblrToolLabel', () => {
 // carrying no sub-agent marker. Naming all three a sub-agent is what this
 // resolves — and the majority case, a genuine child, must keep reading exactly as
 // it did, or an orchestrator auditing its own transcript can no longer tell which
-// rows acted on something it has to collect. The Review conversation is on the
-// child side of this since ADR 0062.
+// rows acted on something it has to collect. The Review conversation is one of
+// the roots, since ADR 0063.
 describe('ensemblrToolLabel against the target role', () => {
 	const ROLES: Record<string, TimelineAgentRole> = {
 		'session-child': 'subagent',
 		'session-peer': 'orchestrator',
-		'session-root': 'orchestrator',
+		'session-review': 'orchestrator',
 	};
 	const resolveRole: AgentRoleResolver = (id) => ROLES[id] ?? null;
 
@@ -726,7 +726,7 @@ describe('ensemblrToolLabel against the target role', () => {
 		['ensemblr_read_conversation', "Read an orchestrator's transcript"],
 		['ensemblr_send_follow_up', 'Steered an orchestrator'],
 	])('names a root orchestrator in the %s row', (toolName, expected) => {
-		expect(titleFor(toolName, { agentSessionId: 'session-root' })).toBe(
+		expect(titleFor(toolName, { agentSessionId: 'session-review' })).toBe(
 			expected,
 		);
 	});
@@ -782,9 +782,9 @@ describe('ensemblrToolLabel against the target role', () => {
 	test.each([
 		[['session-child'], 'Waited for sub-agents'],
 		[['session-child', 'session-child'], 'Waited for sub-agents'],
-		[['session-root'], 'Waited for orchestrators'],
-		[['session-peer', 'session-root'], 'Waited for orchestrators'],
-		[['session-child', 'session-root'], 'Waited for the chats'],
+		[['session-review'], 'Waited for orchestrators'],
+		[['session-peer', 'session-review'], 'Waited for orchestrators'],
+		[['session-child', 'session-review'], 'Waited for the chats'],
 		[['session-gone'], 'Waited for the chats'],
 	])('resolves every named target before naming the set', (targets, title) => {
 		expect(titleFor('ensemblr_wait_for_agents', { targets })).toBe(title);
@@ -798,7 +798,7 @@ describe('ensemblrToolLabel against the target role', () => {
 		expect(
 			ensemblrToolLabel(
 				toolCall('ensemblr_send_follow_up', {
-					agentSessionId: 'session-root',
+					agentSessionId: 'session-review',
 				}),
 				false,
 				'workspace',

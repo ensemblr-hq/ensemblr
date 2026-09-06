@@ -131,18 +131,17 @@ const REVIEW_INVENTORY = `${REVIEW_INVENTORY_READS} Once you have fixed what a c
  * The bullet for the app's own Review conversation, held only by a root that can
  * open one. Named separately from {@link REVIEW_INVENTORY} — which is about
  * reading the diff and leaving comments on it — because this opens a second
- * agent, and the facts that make it usable are all about that agent: it is one of
- * the caller's children, it shares the checkout, calling again reaches the one
- * already open, and the fixes go back to it rather than being taken over by the
- * caller.
+ * agent, and the facts that make it usable are all about that agent: it is not a
+ * child, it shares the checkout, calling again reaches the one already open, and
+ * the fixes go back to it rather than being taken over by the caller.
  *
  * The closing sentence is the one exception to {@link CLEANUP_ETIQUETTE}, and it
  * is here rather than there because the exception is about this tab rather than
- * about cleanup. A sub-agent's tab is scratch the orchestrator opened for itself;
+ * about cleanup. A delegated tab is scratch the orchestrator opened for itself;
  * this one is the user's record of the review, opened by the same op their Review
- * button runs, and the sub-agent framing above would otherwise sweep it up.
+ * button runs, and the spawn framing above would otherwise sweep it up.
  */
-const ORCHESTRATOR_START_REVIEW = `- Get the change reviewed: \`ensemblr_start_review\` opens this workspace's Review conversation over your change — the same review the user's Review button runs, on the model they configured for it, deferring to whatever review skill the repository ships. Prefer it to reviewing your own work. What it opens is one of your own sub-agents, so \`ensemblr_wait_for_agents\` picks it up like any other child and it costs none of the workspace's co-tenancy allowance — a running harness or an open peer does not refuse it. It reads the diff itself rather than fanning readers out over it, so give it the time a wide change takes. It shares this worktree: leave the files alone while it works. Send its findings back to the SAME conversation with \`ensemblr_send_follow_up\` and have it fix them there rather than fixing them yourself — you stay the committer and you own the pull request. Calling the op again while that reviewer still exists hands the same one back rather than opening a second, so re-reading a rebuilt change is a follow-up either way. Its tab is the user's record of the review and stays open: it is not a scratch tab of yours to clean up.`;
+const ORCHESTRATOR_START_REVIEW = `- Get the change reviewed: \`ensemblr_start_review\` opens this workspace's Review conversation over your change — the same review the user's Review button runs, on the model they configured for it, deferring to whatever review skill the repository ships. Prefer it to reviewing your own work. What it opens is a root orchestrator rather than your child, so it has a delegation budget of its own and fans its own readers out over a wide diff — which also means \`ensemblr_wait_for_agents\` will not find it unless you name its \`agentSessionId\` in \`targets\`. It shares this worktree: leave the files alone while it works. Send its findings back to the SAME conversation with \`ensemblr_send_follow_up\` and have it fix them there rather than fixing them yourself — you stay the committer and you own the pull request. Calling the op again while that reviewer still exists hands the same one back rather than opening a second, so re-reading a rebuilt change is a follow-up either way. It takes one of the workspace's co-tenancy slots, so a workspace already at its limit of agents writing the checkout refuses it — that allowance is two while the user is here and four while they are away, which is what keeps an unattended run's reviewer affordable beside a harness terminal they left running. Its tab is the user's record of the review and stays open: it is not a scratch tab of yours to clean up.`;
 
 /**
  * The architecture diagram bullet, for a role that may both read and redraw.
