@@ -682,17 +682,18 @@ describe('ensemblrToolLabel', () => {
 	});
 });
 
-// A workspace agent steers a child it owns, a peer beside it, and the Review
-// conversation with one op, and the app opens the last two as roots carrying no
-// sub-agent marker. Naming all three a sub-agent is what this resolves — and the
-// majority case, a genuine child, must keep reading exactly as it did, or an
-// orchestrator auditing its own transcript can no longer tell which rows acted
-// on something it has to collect.
+// A workspace agent steers a child it owns, a peer beside it, and a conversation
+// the Concierge opened with one op, and the app opens the last two as roots
+// carrying no sub-agent marker. Naming all three a sub-agent is what this
+// resolves — and the majority case, a genuine child, must keep reading exactly as
+// it did, or an orchestrator auditing its own transcript can no longer tell which
+// rows acted on something it has to collect. The Review conversation is on the
+// child side of this since ADR 0062.
 describe('ensemblrToolLabel against the target role', () => {
 	const ROLES: Record<string, TimelineAgentRole> = {
 		'session-child': 'subagent',
 		'session-peer': 'orchestrator',
-		'session-review': 'orchestrator',
+		'session-root': 'orchestrator',
 	};
 	const resolveRole: AgentRoleResolver = (id) => ROLES[id] ?? null;
 
@@ -725,7 +726,7 @@ describe('ensemblrToolLabel against the target role', () => {
 		['ensemblr_read_conversation', "Read an orchestrator's transcript"],
 		['ensemblr_send_follow_up', 'Steered an orchestrator'],
 	])('names a root orchestrator in the %s row', (toolName, expected) => {
-		expect(titleFor(toolName, { agentSessionId: 'session-review' })).toBe(
+		expect(titleFor(toolName, { agentSessionId: 'session-root' })).toBe(
 			expected,
 		);
 	});
@@ -781,9 +782,9 @@ describe('ensemblrToolLabel against the target role', () => {
 	test.each([
 		[['session-child'], 'Waited for sub-agents'],
 		[['session-child', 'session-child'], 'Waited for sub-agents'],
-		[['session-review'], 'Waited for orchestrators'],
-		[['session-peer', 'session-review'], 'Waited for orchestrators'],
-		[['session-child', 'session-review'], 'Waited for the chats'],
+		[['session-root'], 'Waited for orchestrators'],
+		[['session-peer', 'session-root'], 'Waited for orchestrators'],
+		[['session-child', 'session-root'], 'Waited for the chats'],
 		[['session-gone'], 'Waited for the chats'],
 	])('resolves every named target before naming the set', (targets, title) => {
 		expect(titleFor('ensemblr_wait_for_agents', { targets })).toBe(title);
@@ -797,7 +798,7 @@ describe('ensemblrToolLabel against the target role', () => {
 		expect(
 			ensemblrToolLabel(
 				toolCall('ensemblr_send_follow_up', {
-					agentSessionId: 'session-review',
+					agentSessionId: 'session-root',
 				}),
 				false,
 				'workspace',

@@ -131,11 +131,18 @@ const REVIEW_INVENTORY = `${REVIEW_INVENTORY_READS} Once you have fixed what a c
  * The bullet for the app's own Review conversation, held only by a root that can
  * open one. Named separately from {@link REVIEW_INVENTORY} — which is about
  * reading the diff and leaving comments on it — because this opens a second
- * agent, and the three facts that make it usable are all about that agent: it is
- * not a child, it shares the checkout, and the fixes go back to it rather than
- * being taken over by the caller.
+ * agent, and the facts that make it usable are all about that agent: it is one of
+ * the caller's children, it shares the checkout, calling again reaches the one
+ * already open, and the fixes go back to it rather than being taken over by the
+ * caller.
+ *
+ * The closing sentence is the one exception to {@link CLEANUP_ETIQUETTE}, and it
+ * is here rather than there because the exception is about this tab rather than
+ * about cleanup. A sub-agent's tab is scratch the orchestrator opened for itself;
+ * this one is the user's record of the review, opened by the same op their Review
+ * button runs, and the sub-agent framing above would otherwise sweep it up.
  */
-const ORCHESTRATOR_START_REVIEW = `- Get the change reviewed: \`ensemblr_start_review\` opens this workspace's Review conversation over your change — the same review the user's Review button runs, on the model they configured for it, deferring to whatever review skill the repository ships. Prefer it to reviewing your own work. What it opens is a root orchestrator rather than your child, so it can spawn its own readers over a wide diff, and \`ensemblr_wait_for_agents\` will not find it unless you name its \`agentSessionId\` in \`targets\`. It shares this worktree: leave the files alone while it works. Send its findings back to the SAME conversation with \`ensemblr_send_follow_up\` and have it fix them there rather than fixing them yourself — you stay the committer and you own the pull request. It takes one of the workspace's two co-tenancy slots, so a workspace already holding a peer or a running harness terminal refuses it.`;
+const ORCHESTRATOR_START_REVIEW = `- Get the change reviewed: \`ensemblr_start_review\` opens this workspace's Review conversation over your change — the same review the user's Review button runs, on the model they configured for it, deferring to whatever review skill the repository ships. Prefer it to reviewing your own work. What it opens is one of your own sub-agents, so \`ensemblr_wait_for_agents\` picks it up like any other child and it costs none of the workspace's co-tenancy allowance — a running harness or an open peer does not refuse it. It reads the diff itself rather than fanning readers out over it, so give it the time a wide change takes. It shares this worktree: leave the files alone while it works. Send its findings back to the SAME conversation with \`ensemblr_send_follow_up\` and have it fix them there rather than fixing them yourself — you stay the committer and you own the pull request. Calling the op again while that reviewer still exists hands the same one back rather than opening a second, so re-reading a rebuilt change is a follow-up either way. Its tab is the user's record of the review and stays open: it is not a scratch tab of yours to clean up.`;
 
 /**
  * The architecture diagram bullet, for a role that may both read and redraw.
@@ -448,7 +455,7 @@ When delegation is warranted — delegate → wait → evaluate → integrate:
 
 A child's last message is its report and is persisted permanently — it survives the child closing and even an app restart. If your wait is ever interrupted (for example the app restarts) and a child then shows a \`closed\` or \`idle\` status, read its result with \`ensemblr_get_last_message\` before reacting — \`closed\` means the child ended, not that its work was lost, and \`ensemblr_get_conversation_status\` reports \`hasFinalMessage: true\` whenever that report is still there. Never re-spawn a child to redo work whose report you can still read.
 
-Model selection: omit \`model\` and the child inherits yours. To run one on a different model, call \`ensemblr_list_models\` first and pass an id from that list — it carries only the models your own agent runtime can drive, and a model belonging to the other runtime is refused rather than substituted, so a child always runs the runtime you do. Never invent or guess a model id. Each row also carries a \`tier\`: naming a \`frontier\` one is put to the user for confirmation whatever the permission mode, because it costs several times what the rest do and inheriting yours does not. Reach for it only when the task genuinely needs it, and expect to be refused while the user is away.
+Model selection: omit \`model\` and the child inherits yours. To run one on a different model, call \`ensemblr_list_models\` first and pass an id from that list — it carries only the models your own agent runtime can drive, and a model belonging to the other runtime is refused rather than substituted, so a child you spawn always runs the runtime you do. The Review conversation is the one exception, and you do not choose it: \`ensemblr_start_review\` opens on the model the user configured for reviews, wherever that lives, so it may run on the other runtime and its result message says when it did. Never invent or guess a model id. Each row also carries a \`tier\`: naming a \`frontier\` one is put to the user for confirmation whatever the permission mode, because it costs several times what the rest do and inheriting yours does not. Reach for it only when the task genuinely needs it, and expect to be refused while the user is away.
 
 ${SPAWN_THINKING_GUIDANCE}
 

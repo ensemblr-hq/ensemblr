@@ -8,9 +8,53 @@ import {
 	type OriginRegistry,
 } from '../../src/main/agent-control/index.ts';
 import type { AgentControlResult } from '../../src/shared/agent-control.ts';
-import { REVIEW_PEER_BRIEF_HEADER } from '../../src/shared/agent-control.ts';
+import { REVIEW_SUBAGENT_BRIEF_HEADER } from '../../src/shared/agent-control.ts';
 
 const CALLER = 'caller';
+
+/** One catalogue row, cut to the fields the review's model resolution reads. */
+interface CatalogRow {
+	id: string;
+	runtime: string;
+	thinkingLevels: readonly string[];
+}
+
+/**
+ * The app's model catalogue, one entry per runtime. The default puts the pinned
+ * review model on the runtime the caller does *not* run on, because honouring a
+ * cross-runtime pin is the behaviour most of these cases are about.
+ */
+const CATALOG: Record<string, CatalogRow[]> = {
+	claude: [
+		{
+			id: 'claude-opus-5',
+			runtime: 'claude',
+			thinkingLevels: ['off', 'low', 'medium', 'high'],
+		},
+	],
+	pi: [
+		{ id: 'pi/sonnet', runtime: 'pi', thinkingLevels: ['off', 'low', 'high'] },
+	],
+};
+
+/**
+ * The models `listModels` answers with for one runtime, or for all of them when
+ * the caller passes none. The null case is the port's own contract rather than a
+ * convenience for these tests — `modelsOn` returns the whole merged snapshot for
+ * a null runtime, and the review's model lookup depends on it, so a stub that
+ * answered an empty list there would pass a lookup that production fails. Pi
+ * first, because that is the order `mergeCatalogs` produces.
+ * @param catalog - The per-runtime catalogue this case is running against.
+ * @param runtime - The runtime to narrow to, or null for every runtime's.
+ * @returns The rows in scope.
+ */
+const modelsFor = (
+	catalog: Record<string, CatalogRow[]>,
+	runtime: string | null,
+): CatalogRow[] =>
+	runtime === null
+		? [...(catalog.pi ?? []), ...(catalog.claude ?? [])]
+		: (catalog[runtime] ?? []);
 
 /** Options every stub in {@link makePorts} varies on. */
 interface PortOptions {
@@ -20,10 +64,10 @@ interface PortOptions {
 		source: 'renderer' | 'fallback';
 		thinkingLevel: string | null;
 	};
+	catalog?: Record<string, CatalogRow[]>;
 	composeBrief?: ReturnType<typeof vi.fn>;
 	confirm: ReturnType<typeof vi.fn>;
 	planning?: boolean;
-	runtimeModels?: { id: string }[];
 	startConversation: ReturnType<typeof vi.fn>;
 	terminals?: { kind: string; status: string; terminalId: string }[];
 	unattended?: boolean;
@@ -32,8 +76,8 @@ interface PortOptions {
 /**
  * Ports for the review-launch cases. Only `reviewLaunch`, `conversations`, and
  * `terminals` carry real behavior: the brief the renderer composed, the spawn
- * the op delegates to, and the harness terminals that count against the
- * workspace's co-tenancy allowance.
+ * the op delegates to, and the harness terminals that fill the workspace's
+ * co-tenancy allowance without refusing a review.
  */
 const makePorts = (options: PortOptions): AgentControlPorts =>
 	({
@@ -54,10 +98,13 @@ const makePorts = (options: PortOptions): AgentControlPorts =>
 			getStatus: vi.fn().mockResolvedValue(null),
 			hasFinalMessage: vi.fn().mockResolvedValue(false),
 			isSpawnedSubAgent: vi.fn().mockResolvedValue(false),
-			listModels: vi.fn().mockResolvedValue({
-				defaultModelId: 'm',
-				models: options.runtimeModels ?? [{ id: 'claude-opus-5' }],
-			}),
+			listModels: vi.fn(({ runtime }: { runtime: string | null }) =>
+				Promise.resolve({
+					defaultModelId: 'm',
+					models: modelsFor(options.catalog ?? CATALOG, runtime),
+					runtime,
+				}),
+			),
 			readTranscript: vi.fn(),
 			resolveConversationWorkspace: vi.fn().mockResolvedValue('ws'),
 			sendFollowUp: vi.fn().mockResolvedValue(undefined),
@@ -207,15 +254,18 @@ describe('agent-control startReview', () => {
 		);
 	});
 
-	// A reviewer that cannot spawn its own readers reads a fifty-file diff in one
-	// pass or not at all, so the root-orchestrator shape is the feature.
-	it('opens a root orchestrator rather than a sub-agent', async () => {
+	// A review opened as a root spends one of the workspace's two co-tenancy
+	// slots and holds it for as long as the review is open, which the unattended
+	// loop runs into first and hardest. As the caller's child it is bounded by the
+	// per-session spawn guardrails instead.
+	it('opens a sub-agent of the caller rather than a peer', async () => {
 		const { service, startConversation } = setup();
 
 		await startReview(service);
 
 		expect(startConversation.mock.calls[0][0]).toMatchObject({
-			asPeer: true,
+			asPeer: false,
+			parentSessionId: CALLER,
 			planMode: false,
 		});
 	});
@@ -229,16 +279,16 @@ describe('agent-control startReview', () => {
 	});
 
 	// The reviewer answers to the orchestrator, not to a user reading its tab, so
-	// the co-tenancy contract has to be in front of the review prompt.
+	// that contract has to be in front of the review prompt.
 	it('fronts the review prompt with the reviewer’s own contract', async () => {
 		const { service, startConversation } = setup();
 
 		await startReview(service);
 		const { prompt } = startConversation.mock.calls[0][0];
 
-		expect(prompt).toContain(REVIEW_PEER_BRIEF_HEADER);
+		expect(prompt).toContain(REVIEW_SUBAGENT_BRIEF_HEADER);
 		expect(prompt).toContain(CALLER);
-		expect(prompt.indexOf(REVIEW_PEER_BRIEF_HEADER)).toBeLessThan(
+		expect(prompt.indexOf(REVIEW_SUBAGENT_BRIEF_HEADER)).toBeLessThan(
 			prompt.indexOf('THE REVIEW PROMPT'),
 		);
 	});
@@ -254,27 +304,62 @@ describe('agent-control startReview', () => {
 		});
 	});
 
-	// The review model is one app-level preference set once, and nothing ties it
-	// to the runtime a given workspace agent runs. A spawn refuses a model from
-	// the other runtime outright, and this op takes no model argument — so
-	// forwarding it unchecked would dead-end the caller on an unanswerable
-	// refusal.
-	it('drops a review model the caller cannot spawn on, and says so', async () => {
+	// The review model and its level are one app-level preference the user sets
+	// once, and nothing ties either to the runtime a given workspace agent happens
+	// to run on. Withholding the caller's runtime is what lets the spawn open on
+	// the model's own: `resolveRequested` refuses a cross-runtime model only
+	// against a caller runtime it can see.
+	it('opens the review on the pinned model’s runtime rather than the caller’s', async () => {
+		const { service, startConversation } = setup();
+
+		const { message } = succeeded(await startReview(service));
+
+		expect(startConversation.mock.calls[0][0]).toMatchObject({
+			callerRuntime: null,
+			model: 'claude-opus-5',
+		});
+		expect(message).toContain('Claude Code');
+		expect(message).toContain('Say so in your report');
+	});
+
+	// The runtime is withheld whenever a pin resolved, because the check it feeds
+	// has nothing to say about a model on the caller's own runtime either. What
+	// changes is the caveat: there is nothing to report when the review runs where
+	// the caller does.
+	it('raises no runtime caveat when the pinned model is already on the caller’s', async () => {
 		const { service, startConversation } = setup({
-			runtimeModels: [{ id: 'anthropic/sonnet' }],
+			brief: {
+				model: 'pi/sonnet',
+				prompt: 'THE REVIEW PROMPT',
+				source: 'renderer',
+				thinkingLevel: 'high',
+			},
 		});
 
 		const { message } = succeeded(await startReview(service));
 
-		expect(startConversation.mock.calls[0][0].model).toBeUndefined();
-		expect(message).toContain('the other agent runtime');
+		expect(startConversation.mock.calls[0][0].model).toBe('pi/sonnet');
+		expect(message).not.toContain('Say so in your report');
+	});
+
+	// A stale preference must not sink the review: the caller's own model is a
+	// weaker review than the one configured, and no review at all is weaker still.
+	it('falls back to the caller’s model when the catalogue has lost the pin, and says so', async () => {
+		const { service, startConversation } = setup({ catalog: { pi: [] } });
+
+		const { message } = succeeded(await startReview(service));
+
+		expect(startConversation.mock.calls[0][0]).toMatchObject({
+			callerRuntime: 'pi',
+			model: undefined,
+		});
+		expect(message).toContain("no longer in this app's catalogue");
 		expect(message).toContain('Say so in your report');
 	});
 
 	// The two are independent settings and the Review button applies each behind
 	// its own check, so coupling the level to the model pin loses it for a user
-	// who set only the level. `resolveForSpawn` drops a level the resolved model
-	// cannot take, so forwarding it whichever way the model resolved is safe.
+	// who set only the level.
 	it('keeps the pinned thinking level when the user pinned no review model', async () => {
 		const { service, startConversation } = setup({
 			brief: {
@@ -291,21 +376,74 @@ describe('agent-control startReview', () => {
 	});
 
 	it('keeps the pinned thinking level when the model pin is dropped', async () => {
-		const { service, startConversation } = setup({
-			runtimeModels: [{ id: 'anthropic/sonnet' }],
-		});
+		const { service, startConversation } = setup({ catalog: { pi: [] } });
 
 		await startReview(service);
 
 		expect(startConversation.mock.calls[0][0].thinkingLevel).toBe('high');
 	});
 
-	it('says nothing about the model when the pin was honoured', async () => {
-		const { service } = setup();
+	// The two runtimes do not share a thinking ladder, so a level set beside one
+	// runtime's model is routinely absent from the other's. `selectionFor` refuses
+	// such a spawn outright rather than coercing it, so forwarding the level would
+	// cost the user the review to save the setting.
+	it('drops a configured level the pinned model’s ladder has no rung for', async () => {
+		const { service, startConversation } = setup({
+			catalog: {
+				claude: [
+					{
+						id: 'claude-opus-5',
+						runtime: 'claude',
+						thinkingLevels: ['off', 'low'],
+					},
+				],
+			},
+		});
 
-		expect(succeeded(await startReview(service)).message).not.toContain(
-			'Say so in your report',
-		);
+		await startReview(service);
+
+		expect(startConversation.mock.calls[0][0].thinkingLevel).toBeUndefined();
+	});
+
+	// Dropping it is a degradation of a setting the user chose, exactly as falling
+	// back off their pinned model is. Reported rather than absorbed, or the caller
+	// reports a review it believes ran at the level they set.
+	it('says so when it drops the configured level', async () => {
+		const { service } = setup({
+			catalog: {
+				claude: [
+					{
+						id: 'claude-opus-5',
+						runtime: 'claude',
+						thinkingLevels: ['off', 'low'],
+					},
+				],
+			},
+		});
+
+		const { message } = succeeded(await startReview(service));
+
+		expect(message).toContain('"high" thinking level');
+		expect(message).toContain('Say so in your report');
+	});
+
+	// The level is only degraded when a model resolved to check it against. A user
+	// who set a level and no model keeps it, and must not read a caveat saying
+	// otherwise.
+	it('raises no level caveat when the brief pinned no model', async () => {
+		const { service, startConversation } = setup({
+			brief: {
+				model: null,
+				prompt: 'THE REVIEW PROMPT',
+				source: 'renderer',
+				thinkingLevel: 'high',
+			},
+		});
+
+		const { message } = succeeded(await startReview(service));
+
+		expect(startConversation.mock.calls[0][0].thinkingLevel).toBe('high');
+		expect(message).not.toContain('thinking level');
 	});
 
 	// A review opened without the user's own instructions is a weaker review than
@@ -332,9 +470,118 @@ describe('agent-control startReview', () => {
 
 		const { message } = succeeded(await startReview(service));
 
+		expect(message).toContain('one of your sub-agents');
 		expect(message).toContain('targets: ["review-1"]');
 		expect(message).toContain('ensemblr_send_follow_up');
 		expect(message).toContain('leave the files alone');
+	});
+
+	// The reviewer trades fanning readers out for costing no co-tenancy slot, and
+	// an orchestrator that does not know it reads alone will cut its wait short on
+	// a wide diff.
+	it('says the reviewer reads the diff alone', async () => {
+		const { service } = setup();
+
+		expect(succeeded(await startReview(service)).message).toContain(
+			'cannot spawn readers of its own',
+		);
+	});
+
+	// Two reviewers are two writers over the same whole diff, so their files are
+	// guaranteed to overlap — and the unattended loop's re-entry path walks back
+	// through a step that says to call this op. The co-tenancy cap used to make
+	// the second call impossible; this is what replaced it.
+	it('hands back the review the caller already has', async () => {
+		const { service, startConversation } = setup();
+
+		const first = succeeded(await startReview(service));
+		const second = succeeded(await startReview(service));
+
+		expect(second).toMatchObject({
+			agentSessionId: first.agentSessionId,
+			chatTabId: first.chatTabId,
+		});
+		expect(startConversation).toHaveBeenCalledTimes(1);
+	});
+
+	// It is a settled outcome rather than a refusal, so the message has to say
+	// which reviewer the caller is holding and how to reach it — otherwise the
+	// caller reads an `ok` naming a session it did not just open as a fresh one.
+	it('names the reused review and how to steer it', async () => {
+		const { service } = setup();
+
+		await startReview(service);
+		const { message } = succeeded(await startReview(service));
+
+		expect(message).toContain('already have a review open');
+		expect(message).toContain('review-1');
+		expect(message).toContain('ensemblr_send_follow_up');
+	});
+
+	// Reuse spends neither, so a caller out of spawn quota still reaches the
+	// reviewer it already has.
+	it('spends no spawn quota and composes no brief when it reuses', async () => {
+		const composeBrief = vi.fn().mockResolvedValue({
+			model: 'claude-opus-5',
+			prompt: 'THE REVIEW PROMPT',
+			source: 'renderer',
+			thinkingLevel: 'high',
+		});
+		const { service } = setup({ composeBrief });
+
+		await startReview(service);
+		await startReview(service);
+
+		expect(composeBrief).toHaveBeenCalledTimes(1);
+	});
+
+	// The session row outlives the reviewer going idle and outlives its tab being
+	// closed, and `sendFollowUp` reaches it in both. Only a session that no longer
+	// exists at all is not a reviewer the caller still has.
+	it('opens a fresh review once the first no longer resolves', async () => {
+		const startConversation = vi
+			.fn()
+			.mockResolvedValueOnce({
+				agentSessionId: 'review-1',
+				chatTabId: 'review-tab',
+				ok: true,
+			})
+			.mockResolvedValueOnce({
+				agentSessionId: 'review-2',
+				chatTabId: 'review-tab-2',
+				ok: true,
+			});
+		const { ports, service } = setup({ startConversation });
+
+		expect(succeeded(await startReview(service)).agentSessionId).toBe(
+			'review-1',
+		);
+		vi.mocked(
+			ports.conversations.resolveConversationWorkspace,
+		).mockResolvedValue(null);
+
+		expect(succeeded(await startReview(service)).agentSessionId).toBe(
+			'review-2',
+		);
+		expect(startConversation).toHaveBeenCalledTimes(2);
+	});
+
+	// A probe that throws says nothing about the reviewer. Handing back an id whose
+	// follow-up then fails costs a turn and a `not-found` the caller can act on;
+	// a duplicate reviewer over the same whole diff is what this guard exists to
+	// stop, and nothing downstream notices one.
+	it('keeps the review when the probe itself fails', async () => {
+		const { ports, service, startConversation } = setup();
+
+		await startReview(service);
+		vi.mocked(
+			ports.conversations.resolveConversationWorkspace,
+		).mockRejectedValue(new Error('database is locked'));
+
+		expect(succeeded(await startReview(service)).agentSessionId).toBe(
+			'review-1',
+		);
+		expect(startConversation).toHaveBeenCalledTimes(1);
 	});
 
 	// A reviewer spawned by an unattended agent must not raise a questionnaire in
@@ -358,9 +605,10 @@ describe('agent-control startReview', () => {
 		expect(confirm).not.toHaveBeenCalled();
 	});
 
-	// It is a second writer on one checkout for exactly the reason a peer is, so
-	// it answers a full workspace the same way.
-	it('refuses when the workspace already holds its co-tenancy limit', async () => {
+	// The cap counts uncoordinated writers, and a child its orchestrator blocks on
+	// is not one. An unattended run whose workspace happens to hold a harness would
+	// otherwise be refused the second reading the whole loop is built around.
+	it('opens even when the workspace already holds its co-tenancy limit', async () => {
 		const { service } = setup({
 			terminals: [
 				{ kind: 'agent', status: 'running', terminalId: 'term-1' },
@@ -368,7 +616,7 @@ describe('agent-control startReview', () => {
 			],
 		});
 
-		expect(refused(await startReview(service)).code).toBe('denied-quota');
+		expect((await startReview(service)).ok).toBe(true);
 	});
 
 	it('refuses while the caller is planning', async () => {
@@ -387,9 +635,9 @@ describe('agent-control startReview', () => {
 		expect(startConversation).not.toHaveBeenCalled();
 	});
 
-	// The reservation is released whatever the spawn did, or one failed launch
-	// would spend a co-tenancy slot the workspace never gets back.
-	it('frees the co-tenancy slot when the spawn is refused', async () => {
+	// A refused spawn leaves nothing sticky behind, so the retry that follows it in
+	// an unattended run is answered on its own merits.
+	it('lets a later review open after a refused spawn', async () => {
 		const startConversation = vi
 			.fn()
 			.mockResolvedValueOnce({ ok: false, reason: 'no model' })
@@ -408,10 +656,10 @@ describe('agent-control startReview', () => {
 	});
 
 	// The compose reads the workspace row, the git status, and the repository's
-	// settings, none of which is enveloped. A slot lost to one of them throwing is
-	// lost for the life of the process, and one leak is enough to refuse every
-	// later review and peer spawn in a workspace whose only occupant is the caller.
-	it('frees the co-tenancy slot when composing the brief throws', async () => {
+	// settings, none of which is enveloped. A throw there is the caller's answer
+	// for that one call and nothing more — the retry an unattended loop makes next
+	// has to be able to succeed.
+	it('recovers when composing the brief throws', async () => {
 		const composeBrief = vi
 			.fn()
 			.mockRejectedValueOnce(new Error('git status failed'))

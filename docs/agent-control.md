@@ -713,22 +713,56 @@ one are the same review; when no window answers within
 template and the repository's committed `[prompts]` preference, and the result
 message says so.
 
-What it opens is a **root orchestrator**, not a sub-agent, so it can delegate its
-own readers over a wide diff. Three consequences the result message spells out
-for the caller: it is absent from the children `waitForAgents` defaults to and
-must be named in `targets`; it shares the worktree, so the caller holds off
-writing while it works; and the caller stays the committer and owns the pull
-request. Findings go back to the *same* conversation with `sendFollowUp` — the
-reviewer fixes what it found, in the context that found it.
+What it opens is the caller's **sub-agent**
+([ADR 0062](./adr/0062-open-an-agent-requested-review-as-a-sub-agent.md)), so it
+is among the children `waitForAgents` defaults to and costs none of the
+workspace's co-tenancy allowance — a running harness or an open peer does not
+refuse it, and it does not refuse a later peer. Three consequences the result
+message spells out for the caller: it reads the diff itself and cannot spawn
+readers of its own, so a wide change takes it longer; it shares the worktree, so
+the caller holds off writing while it works; and the caller stays the committer
+and owns the pull request. Findings go back to the *same* conversation with
+`sendFollowUp` — the reviewer fixes what it found, in the context that found it.
 
-It costs one of the workspace's two co-tenancy slots and refuses with the same
-message a peer spawn does when the checkout is full. Unlike a peer it raises no
-confirmation and is not refused while the user is away: a peer is a second writer
-the agent chose, whereas this is the Review action the user already has a button
-for. It is refused in Plan Mode, withheld from a sub-agent and the Concierge
-(neither has a change of its own to have reviewed), and withheld from a root
-delegating through its own runtime, which holds neither `sendFollowUp` nor
-`waitForAgents` and so could not drive the review it opened.
+**The user's review model is honoured across runtimes.** The pin is looked up in
+every runtime's catalogue rather than only the caller's, and the spawn withholds
+the caller's runtime so the review opens on the model's own — `resolveRequested`
+refuses a cross-runtime model only against a caller runtime it can see, and here
+nobody asked for the model: it came from settings, and honouring it is the value
+of the op. So a Pi orchestrator whose user reviews on Claude Code gets that. The
+configured thinking level rides along, except where the resolved model's ladder
+has no such rung — the two runtimes do not share one, and `selectionFor` refuses
+a spawn rather than coercing the level, so forwarding it would cost the review to
+save the setting. A pin the catalogue has lost falls back to the caller's own
+model.
+
+Every one of those degradations is named in the result message rather than
+absorbed: the runtime it opened on, a pin the catalogue has lost, a configured
+level the model's ladder has no rung for, or none of them. The cross-runtime and
+dropped-level caveats are the one pair that can appear together, and they are the
+common pair — a level configured beside one runtime's model is routinely absent
+from the other's ladder. A lost pin excludes both, because there is no resolved
+model to compare against; a `fallback` brief excludes all three, because it
+carries neither a model nor a level to begin with.
+
+**One review per caller.** The op remembers the review each caller opened, and a
+second call hands that one back as an `ok` rather than seating a second reader
+beside it — ahead of the spawn guardrail and the compose, so reuse spends
+neither. The probe is `resolveConversationWorkspace`: the session row outlives
+the reviewer going idle and outlives its tab being closed, and `sendFollowUp`
+reaches it in both, so both still count as a reviewer the caller has. Only a
+session that no longer exists opens a fresh one. This is the one thing the
+dropped co-tenancy cap was still doing here — two reviewers are two writers over
+the same whole diff, where the app's usual answer to concurrent children is to
+brief them onto disjoint files.
+
+Unlike a peer it raises no confirmation and is not refused while the user is
+away: a peer is a second writer the agent chose, whereas this is the Review
+action the user already has a button for. It is refused in Plan Mode, withheld
+from a sub-agent and the Concierge (neither has a change of its own to have
+reviewed), and withheld from a root delegating through its own runtime, which
+holds neither `sendFollowUp` nor `waitForAgents` and so could not drive the
+review it opened.
 
 ### Linear
 

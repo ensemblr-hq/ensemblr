@@ -43,15 +43,23 @@ describe('afk delivery loop', () => {
 		expect(directive).toContain('skip the rest of this block');
 	});
 
-	// A review and a peer both inherit the opener's AFK mode, so both read this
-	// block — and the turn where one is asked to fix what it found is a change to
-	// the codebase by the first gate's own definition. Without this second gate
-	// that turn ends in a commit and a pull request the agent's opening brief
-	// forbids, racing the orchestrator that owns them.
+	// A peer inherits the opener's AFK mode, so it reads this block — and the turn
+	// where it is asked to fix what it found is a change to the codebase by the
+	// first gate's own definition. Without this second gate that turn ends in a
+	// commit and a pull request the agent's opening brief forbids, racing the
+	// orchestrator that owns them.
 	it('excludes an agent whose brief named somebody else as the committer', () => {
 		expect(directive).toContain('as the committer');
 		expect(directive).toContain('leave it in the working tree');
 		expect(directive).toContain('follow-up asking you to fix what you found');
+	});
+
+	// The gate is self-checking — it asks what this conversation's own brief said —
+	// so an example only works if the reader can match it. A harness brief names no
+	// committer above the harness, so naming one here offers a test it cannot run.
+	it('offers the peer as the only example a reader can check', () => {
+		expect(directive).toContain('a peer opened to take half the work');
+		expect(directive).not.toContain('harness launched into this checkout');
 	});
 
 	// The five steps in order. Asserted by their leading numbers rather than by
@@ -96,10 +104,11 @@ describe('afk delivery loop', () => {
 	// The whole point of the review step is that somebody other than the author
 	// reads the change, and the two mechanics below are the ones an agent cannot
 	// work out for itself.
-	it('names the review tool and how to wait on what it opens', () => {
+	it('names the review tool and what it opens', () => {
 		expect(directive).toContain('ensemblr_start_review');
-		expect(directive).toContain('targets');
-		expect(directive).toContain('root orchestrator');
+		expect(directive).toContain('one of your own sub-agents');
+		expect(directive).toContain('reads the whole change itself');
+		expect(directive).not.toContain('root orchestrator');
 	});
 
 	// Fixes belong in the conversation that found the problem, not back here.
@@ -108,12 +117,15 @@ describe('afk delivery loop', () => {
 		expect(directive).toContain('same');
 	});
 
-	// The open review holds a co-tenancy slot, so re-reviewing by calling
-	// `ensemblr_start_review` again is a guaranteed `denied-quota` — a turn of an
-	// unattended run spent on a refusal the block itself walked the agent into.
+	// The op hands the open reviewer back rather than seating a second one, so the
+	// block states that outcome instead of arguing against a call the app allows.
+	// The reason is still carried, because it is what makes the outcome the right
+	// one rather than a limitation to work around.
 	it('re-reviews in the same conversation rather than opening a second', () => {
 		expect(directive).toContain('ask that same conversation to re-review');
-		expect(directive).toContain('co-tenancy slot');
+		expect(directive).toContain('hands you back the reviewer you already have');
+		expect(directive).toContain('re-read the whole diff from cold');
+		expect(directive).not.toContain('co-tenancy slot');
 		expect(directive).not.toContain('repeat step 3');
 	});
 
@@ -139,18 +151,18 @@ describe('afk delivery loop', () => {
 	});
 
 	// Re-entering at step 1 walks back through step 3, and step 3 says to call
-	// `ensemblr_start_review` — which the reviewer still open from the first pass
-	// refuses, because it is holding the workspace's second co-tenancy slot. The
-	// warning in step 4 does not cover this path: the re-entry bypasses step 4.
+	// `ensemblr_start_review` — which answers with the reviewer already open. Step
+	// 4 says the same for an ordinary round, but the re-entry bypasses step 4, so
+	// the fact has to be here too.
 	it('re-reads a rebuilt change without opening a second review', () => {
 		const reEntry = directive.indexOf('rebuild from there');
 		expect(reEntry).toBeGreaterThan(-1);
 		expect(directive).toContain(
 			'Send the rebuilt change back to the reviewer you already have',
 		);
-		expect(
-			directive.indexOf('on the way past step 3 is refused'),
-		).toBeGreaterThan(reEntry);
+		expect(directive.indexOf('hands that same reviewer back')).toBeGreaterThan(
+			reEntry,
+		);
 	});
 
 	it('opens a pull request and forbids merging it', () => {

@@ -10,6 +10,7 @@ import type {
 	AddDiffCommentsArgs,
 	AgentControlConversationStatus,
 	AgentControlErrorCode,
+	AgentControlModelInfo,
 	AgentControlOp,
 	AgentControlResult,
 	AgentControlRole,
@@ -83,7 +84,7 @@ import {
 	buildLinkedIssueDirective,
 	buildPeerBriefDirective,
 	buildPlanModeDelegationDirective,
-	buildReviewPeerDirective,
+	buildReviewSubAgentDirective,
 	buildSessionBriefNudge,
 	CONCIERGE_AWARENESS,
 	conciergeControlOpDenial,
@@ -97,6 +98,10 @@ import {
 	validateArgs,
 } from '../../shared/agent-control.ts';
 import { isFrontierAgentModel } from '../../shared/agent-model-tier.ts';
+import {
+	type AgentProviderId,
+	getAgentProviderLabel,
+} from '../../shared/agent-provider.ts';
 import { classifyPermissionAction } from '../../shared/permissions.ts';
 import {
 	evaluateConciergeTool,
@@ -116,6 +121,7 @@ import {
 	type AgentControlPorts,
 	originHasChatTab,
 	originRuntime,
+	type ReviewLaunchBrief,
 } from './ports.ts';
 import { createReviewFocus } from './review-focus.ts';
 
@@ -317,20 +323,36 @@ const DEFAULT_REVIEW_TAB_TITLE = 'Review';
 /**
  * Renders what an agent reads back after opening a review.
  *
- * Three things it cannot work out for itself, and each one costs a wasted turn
- * if it is missing. The review is a root orchestrator rather than a child, so
- * `ensemblr_wait_for_agents` will not find it unless it is named in `targets`.
- * It shares the worktree, so writing while it works is how two agents lose each
- * other's edits. And a `fallback` brief means the user's own review instructions
- * and model pin never reached it, which belongs in the agent's report rather
- * than being silently absorbed.
- * @param input - The review session, whether its model pin was dropped, and
- *   whether a window composed the brief or main fell back.
+ * Four things it cannot work out for itself, and each one costs a wasted turn if
+ * it is missing. The review is one of the caller's own children, so the ops that
+ * default to "every child you spawned" already cover it and it needs no `targets`
+ * of its own. It reads the diff alone, so a wide change makes it slow rather than
+ * stuck. It shares the worktree, so writing while it works is how two agents lose
+ * each other's edits. And a `fallback` brief means the user's own review
+ * instructions and model pin never reached it, which belongs in the agent's
+ * report rather than being silently absorbed.
+ *
+ * The last three caveats are about the user's configured review settings, and
+ * every way one of them degrades is named rather than absorbed. The model is
+ * honoured across runtimes, so a caller on one runtime routinely opens a review
+ * on the other and should say so rather than reporting a review it believes ran
+ * beside it. A pin the catalogue no longer carries falls back to the caller's own
+ * model, which is a weaker review than the one the user configured. And a
+ * configured thinking level the resolved model has no rung for is dropped for the
+ * spawn's own model, which is the same class of silent downgrade as the model
+ * one — the reason the level had to be dropped is that `selectionFor` refuses the
+ * spawn outright otherwise, not that the level did not matter.
+ * @param input - The review session, the runtime it opened on when that is not the
+ *   caller's, whether a stale model pin was dropped, the configured thinking level
+ *   the resolved model would not take, and whether a window composed the brief or
+ *   main fell back.
  * @returns The message returned alongside the session and tab ids.
  */
 function startedReviewMessage(input: {
 	agentSessionId: string;
+	crossRuntime: AgentProviderId | null;
 	droppedModel: boolean;
+	droppedThinkingLevel: string | null;
 	source: 'renderer' | 'fallback';
 }): string {
 	const caveats = [
@@ -338,13 +360,69 @@ function startedReviewMessage(input: {
 			? "No Ensemblr window answered in time, so this review runs on the built-in guidelines and the repository's committed review preferences only — the user's personal review instructions and their configured review model did not reach it."
 			: '',
 		input.droppedModel
-			? "The model the user configured for reviews runs on the other agent runtime, which a spawn cannot cross, so this review runs on yours instead — it is still the user's review prompt, on a model they did not pick."
+			? "The model the user configured for reviews is no longer in this app's catalogue, so this review runs on yours instead — it is still the user's review prompt, on a model they did not pick."
+			: '',
+		input.crossRuntime
+			? `This review runs on the ${getAgentProviderLabel(input.crossRuntime)} runtime rather than yours, because that is where the model the user configured for reviews lives. Nothing about steering it changes.`
+			: '',
+		input.droppedThinkingLevel
+			? `The "${input.droppedThinkingLevel}" thinking level the user configured for reviews is not a rung on that model's ladder — the two runtimes do not share one — so this review opens at the level the spawn fell back to rather than the one they set.`
 			: '',
 	].filter(Boolean);
 	const reported = caveats.length
 		? ` ${caveats.join(' ')} Say so in your report.`
 		: '';
-	return `Opened this workspace's Review conversation, running the same review the user's Review button runs. It is a root orchestrator with its own delegation budget rather than your child, so \`ensemblr_wait_for_agents\` will not pick it up by default — wait on it with \`targets: ["${input.agentSessionId}"]\`, and steer it with \`ensemblr_send_follow_up\` against the same id. It shares this worktree with you: leave the files alone until it reports, and do the committing and the pull request yourself.${reported}`;
+	return `Opened this workspace's Review conversation, running the same review the user's Review button runs. It is one of your sub-agents, so \`ensemblr_wait_for_agents\` picks it up like any other child — or name \`targets: ["${input.agentSessionId}"]\` to wait on it alone — and \`ensemblr_send_follow_up\` against the same id steers it. It reads the diff itself and cannot spawn readers of its own, so give it the time a wide change takes. It shares this worktree with you: leave the files alone until it reports, and do the committing and the pull request yourself.${reported}`;
+}
+
+/**
+ * The thinking level to open the review on: the user's configured one, unless
+ * the model it will actually run on has no such rung.
+ *
+ * Two settings that are set independently and can therefore disagree. When the
+ * pinned model resolved, the level is checked against *that* model's ladder —
+ * the two runtimes do not share one, so a level configured beside a Pi model is
+ * routinely absent from a Claude Code model's, and `selectionFor` refuses a spawn
+ * outright rather than coercing it. Dropping the level costs the review one
+ * setting; forwarding it would cost the user the review. A `null` here is a
+ * degradation rather than an absence, so {@link handleStartReview} tells the two
+ * apart by the brief and {@link startedReviewMessage} reports it — the level is
+ * the user's setting exactly as the model is, and swapping it for the caller's
+ * silently is the same defect one layer down.
+ *
+ * When no model resolved the level is forwarded as it always was. The pair are
+ * independent preferences, and a user who set only a level would otherwise lose
+ * it — the level is then the caller's own inherited model's problem, which is
+ * where it has always been.
+ * @param brief - The composed brief, carrying the user's configured pair.
+ * @param pinned - The catalogue row the pinned model resolved to, or null.
+ * @returns The level to open on, or null to let the spawn inherit the caller's.
+ */
+function reviewThinkingLevel(
+	brief: ReviewLaunchBrief,
+	pinned: AgentControlModelInfo | null,
+): string | null {
+	if (!brief.thinkingLevel || !pinned) {
+		return brief.thinkingLevel;
+	}
+	return pinned.thinkingLevels.includes(brief.thinkingLevel)
+		? brief.thinkingLevel
+		: null;
+}
+
+/**
+ * Renders what an agent reads back when it already had a review open.
+ *
+ * A settled outcome rather than a refusal, and the wording carries that: the
+ * caller asked for a reviewer and is handed one, so nothing about the call
+ * failed. It reads as an `ok` for the same reason `setName` does when the user
+ * has titled the tab themselves — the app answered the intent, not the literal
+ * request.
+ * @param agentSessionId - The review this caller already has open.
+ * @returns The message returned alongside that session and its tab.
+ */
+function reusedReviewMessage(agentSessionId: string): string {
+	return `You already have a review open on this workspace, and this is it: session \`${agentSessionId}\`, handed back rather than replaced by a second reader. Steer it with \`ensemblr_send_follow_up\` against that id — send it the findings to fix, or the rebuilt change to read again. It holds every round that led here, where a reviewer opened now would re-read the whole diff from cold to arrive where this one is already standing. Nothing was spawned, so this cost you no spawn quota.`;
 }
 
 /**
@@ -642,6 +720,30 @@ export function createAgentControlService({
 	 * flight and nothing else in the app records one.
 	 */
 	const peerSpawnsOpening = new Map<string, number>();
+
+	/**
+	 * The review each caller has already opened, so a second `startReview` reaches
+	 * that reviewer instead of seating a fresh one beside it.
+	 *
+	 * A second review is not a second child like any other: it is another agent
+	 * over the *same whole diff*, so its files are guaranteed to overlap the first
+	 * one's, and both write — fixing what they found on a follow-up is the point.
+	 * The rest of the app answers concurrent children with "brief them onto
+	 * disjoint files", which is exactly the answer this op cannot give. While the
+	 * reviewer was a peer the co-tenancy cap made the second call impossible; since
+	 * [ADR 0062](../../../docs/adr/0062-open-an-agent-requested-review-as-a-sub-agent.md)
+	 * dropped that cap this map is what stands in its place — and it has to stand,
+	 * because the unattended loop's own re-entry path walks back through a step
+	 * that says to call this op.
+	 *
+	 * Keyed by caller rather than by workspace: a peer running alongside is a
+	 * different orchestrator with its own reading to have done, and handing it the
+	 * reviewer briefed for somebody else's half would be the wrong answer.
+	 */
+	const reviewsByCaller = new Map<
+		string,
+		{ agentSessionId: string; chatTabId: string }
+	>();
 
 	/**
 	 * Workspace-and-model pairs the user has already approved a frontier-tier
@@ -1139,11 +1241,12 @@ export function createAgentControlService({
 	 * Takes a slot in the workspace's co-tenancy allowance, or refuses because the
 	 * checkout is already full.
 	 *
-	 * Shared by every op that opens a second root orchestrator on one worktree —
-	 * {@link gatePeerSpawn} for a peer the user asked for, {@link handleStartReview}
-	 * for the app's own Review conversation — because the cap is about concurrent
-	 * writers rather than about why any one of them was opened. The two differ in
-	 * what they ask *after* the cap, not in the cap itself.
+	 * What the cap counts is *uncoordinated* writers: roots and running harnesses,
+	 * none of which knows what the others are editing. A spawned sub-agent is not
+	 * one — the orchestrator that opened it blocks on it and sequences it against
+	 * its own edits — which is why {@link rootsInWorkspace} excludes the durably
+	 * marked ones, and why {@link handleStartReview} no longer comes through here
+	 * ([ADR 0062](../../../docs/adr/0062-open-an-agent-requested-review-as-a-sub-agent.md)).
 	 * @param origin - Resolved caller identity, naming the workspace to count in.
 	 * @returns The reservation to release once the conversation is open, or the denial.
 	 */
@@ -1479,48 +1582,126 @@ export function createAgentControlService({
 	};
 
 	/**
-	 * The review model to pin the review conversation to, dropped when it belongs
-	 * to a runtime the caller cannot spawn on.
+	 * The catalogue row for the model the user configured for reviews, looked up
+	 * across every runtime rather than only the caller's.
 	 *
-	 * The review model is one app-level preference the user sets once, and nothing
-	 * ties it to whatever runtime a given workspace agent happens to run. A spawn
-	 * refuses a model from the other runtime outright — correctly, since a child
-	 * cannot cross runtimes — and `startReview` takes no model argument, so
-	 * forwarding it unchecked would dead-end the caller on a refusal it has no way
-	 * to answer. Dropping it opens the review on the caller's own runtime instead,
-	 * and {@link startedReviewMessage} says the configured model was not used so
-	 * the substitution reaches the user's report rather than passing silently.
-	 * @param origin - Resolved caller identity, naming the runtime to check against.
+	 * The review model and its thinking level are one app-level preference the
+	 * user sets once, and nothing ties either to whatever runtime a given
+	 * workspace agent happens to run on. So the review is opened on the runtime
+	 * the *model* belongs to, and the search covers both: a Pi orchestrator whose
+	 * user reviews on Claude Code gets the review they configured, not the nearest
+	 * thing its own runtime could offer.
+	 *
+	 * That is a deliberate exception to the rule {@link resolveRequested} enforces
+	 * for `startConversation`, where a cross-runtime model is refused because an
+	 * orchestrator asking for one has misunderstood its own children. Here nobody
+	 * asked: the model came from the user's settings, and honouring it is the
+	 * whole value of the op. {@link handleStartReview} withholds the caller's
+	 * runtime from the spawn to say so, which is the same shape the Concierge
+	 * spawns in.
+	 *
+	 * The row rather than the id, because the caller needs two more facts off it:
+	 * which runtime the review will open on, and whether the configured thinking
+	 * level is one this model's ladder accepts — the two runtimes do not share a
+	 * ladder, and a level the model refuses sinks the whole spawn.
+	 *
+	 * `runtime: null` is the argument that makes the search cover every runtime,
+	 * and it is the right one rather than the loose one: the listing is narrowed to
+	 * a runtime so that a caller only sees models it may spawn a child on, and this
+	 * pin is the user's rather than the caller's. Narrowing it to the caller's
+	 * runtime would reinstate exactly the bug this resolves. One call also means
+	 * one catalogue build — `list()` is rebuilt per call rather than cached, and it
+	 * shells out to `pi --list-models` to do it, so a search that asked per runtime
+	 * paid for the same merged catalogue twice.
 	 * @param requested - The model the brief carried, or null when it carried none.
-	 * @returns The model to pin, or null to let the spawn inherit the caller's.
+	 * @returns The catalogue row, or null when no model is pinned or the
+	 *   catalogue no longer carries the pinned one.
 	 */
-	const spawnableReviewModel = async (
-		origin: AgentControlOrigin,
+	const reviewModelRow = async (
 		requested: string | null,
-	): Promise<string | null> => {
-		const runtime = originRuntime(origin);
-		if (!requested || runtime === null) {
-			return requested;
+	): Promise<AgentControlModelInfo | null> => {
+		if (!requested) {
+			return null;
 		}
 		const listing = await ports.conversations
-			.listModels({ runtime })
+			.listModels({ runtime: null })
 			.catch(() => null);
-		return listing?.models.some((model) => model.id === requested)
-			? requested
-			: null;
+		return listing?.models.find((model) => model.id === requested) ?? null;
+	};
+
+	/**
+	 * Reports the review this caller already opened, when there is still a
+	 * conversation behind it in this workspace.
+	 *
+	 * `resolveConversationWorkspace` is the whole probe, and it answers the right
+	 * question rather than a stricter one: the session row
+	 * outlives the reviewer going idle and outlives its tab being closed, and
+	 * `sendFollowUp` reaches it in both of those states, so both are a reviewer the
+	 * caller still has. Only a session that no longer exists at all — a deleted
+	 * workspace, a cleared database — falls through to a fresh spawn, and the stale
+	 * entry is dropped on the way past so the next call does not probe it again.
+	 *
+	 * A probe that *throws* is read as still-there rather than gone, which is the
+	 * one place here the safe answer is not the strict one. Handing back an id
+	 * whose follow-up then fails costs the caller a turn and a `not-found` it can
+	 * act on; opening a duplicate reviewer over the same whole diff is the harm
+	 * this map exists to prevent, and nothing downstream detects it.
+	 *
+	 * Two `startReview` calls issued in one parallel tool block both read an empty
+	 * map and both spawn — deliberately not guarded the way {@link reservePeerSlot}
+	 * guards its op, because that window holds a confirmation dialog that blocks
+	 * with no time limit while this one is two short awaits, and nothing has a
+	 * reason to batch this op with itself. The path the loop actually walks is
+	 * sequential, a turn or more apart, and that one this closes.
+	 * @param origin - Resolved caller identity, naming the caller and its workspace.
+	 * @returns The open review's session and tab, or null when there is none.
+	 */
+	const reusableReview = async (
+		origin: AgentControlOrigin,
+	): Promise<{ agentSessionId: string; chatTabId: string } | null> => {
+		const open = reviewsByCaller.get(origin.sessionId);
+		if (!open) {
+			return null;
+		}
+		const owner = await ports.conversations
+			.resolveConversationWorkspace(open.agentSessionId)
+			.catch(() => origin.workspaceId);
+		if (owner === origin.workspaceId) {
+			return open;
+		}
+		reviewsByCaller.delete(origin.sessionId);
+		return null;
 	};
 
 	/**
 	 * Opens the app's own Review conversation over the caller's workspace and
 	 * hands back the session to wait on.
 	 *
-	 * What it opens is a **root orchestrator**, not a sub-agent, and that is the
-	 * point rather than an implementation detail: a review of a wide change is
-	 * itself delegable work, and a reviewer that cannot spawn readers of its own
-	 * reads a fifty-file diff in one pass or not at all. It costs a slot in the
-	 * workspace's co-tenancy allowance for exactly the reason a peer does — it is
-	 * a second writer on one checkout — so a workspace already holding its limit
-	 * refuses this the same way and with the same message.
+	 * What it opens is the caller's **sub-agent**, and the bound it is shaped by is
+	 * the workspace's co-tenancy cap rather than the reviewer's own reach
+	 * ([ADR 0062](../../../docs/adr/0062-open-an-agent-requested-review-as-a-sub-agent.md)).
+	 * A review opened as a root costs one of two slots that a running harness or a
+	 * peer may already hold, and it holds that slot for as long as the review is
+	 * open — which the unattended loop, whose whole shape is review-fix-re-review
+	 * against one conversation, runs into first and hardest. As a child it is
+	 * bounded by the per-session spawn guardrails instead, it is among the children
+	 * {@link handleWaitForAgents} defaults to, and it is coordinated by the
+	 * orchestrator that blocks on it rather than by nothing at all. The cost is
+	 * that it reads a wide diff itself; `readWorkspaceDiff` already budgets and
+	 * slices one, and {@link startedReviewMessage} says so.
+	 *
+	 * One review per caller, and {@link reusableReview} is what holds that: a
+	 * caller that already has one is handed it back as an `ok`, ahead of both the
+	 * spawn guardrail and the compose, because reusing spends neither. That is the
+	 * one thing the dropped co-tenancy cap was still doing here — two reviewers are
+	 * two writers over the same whole diff, where the app's usual answer to
+	 * concurrent children is to brief them onto disjoint files.
+	 *
+	 * The review runs on the model and thinking level the user configured for
+	 * reviews, wherever those live — {@link reviewModelRow} resolves the pin across
+	 * both runtimes and the spawn withholds the caller's own runtime so it can open
+	 * there. A caller on one runtime routinely opens a review on the other, and
+	 * only a pin the catalogue has lost falls back to the caller's own model.
 	 *
 	 * The Concierge and a spawned sub-agent are refused it by
 	 * {@link CONCIERGE_BLOCKED_OPS} and {@link SUBAGENT_BLOCKED_OPS}: neither has
@@ -1536,6 +1717,7 @@ export function createAgentControlService({
 	 * thing.
 	 * @param origin - Resolved caller identity.
 	 * @param args - The optional tab title.
+	 * @param callerModel - The Pi extension's live-model hint, absent for MCP callers.
 	 * @returns The review session and tab, or a failure envelope.
 	 */
 	const handleStartReview = async (
@@ -1543,59 +1725,67 @@ export function createAgentControlService({
 		args: StartReviewArgs,
 		callerModel: string | undefined,
 	): Promise<AgentControlResult<unknown>> => {
+		const open = await reusableReview(origin);
+		if (open) {
+			return ok({
+				...open,
+				message: reusedReviewMessage(open.agentSessionId),
+			} satisfies StartReviewResult);
+		}
 		const spawnDenied = evaluateSpawnGuard(origin);
 		if (spawnDenied) {
 			return spawnDenied;
 		}
-		const reserved = await reserveCoTenantSlot(origin);
-		if (typeof reserved !== 'function') {
-			return reserved;
+		const brief = await ports.reviewLaunch.composeBrief({
+			workspaceCwd: origin.workspaceCwd,
+			workspaceId: origin.workspaceId,
+		});
+		const pinned = await reviewModelRow(brief.model);
+		const thinkingLevel = reviewThinkingLevel(brief, pinned);
+		const started = await ports.conversations.startConversation({
+			afkMode: isUnattended(origin),
+			asPeer: false,
+			callerConcierge: false,
+			callerModel,
+			// Withheld when the user pinned a review model, which is what lets the
+			// spawn open on that model's own runtime: `resolveRequested` refuses a
+			// cross-runtime model only against a caller runtime it can see, and here
+			// the model is the user's rather than the caller's to have chosen.
+			callerRuntime: pinned ? null : originRuntime(origin),
+			model: pinned?.id,
+			parentSessionId: origin.sessionId,
+			planMode: false,
+			prompt: `${buildReviewSubAgentDirective(origin.sessionId)}\n\n---\n\n${brief.prompt}`,
+			thinkingLevel: thinkingLevel ?? undefined,
+			title: args.title ?? DEFAULT_REVIEW_TAB_TITLE,
+			workspaceCwd: origin.workspaceCwd,
+			workspaceId: origin.workspaceId,
+		});
+		if (!started.ok) {
+			return fail('invalid-args', started.reason);
 		}
-		// Held until the review is open, because that is when it registers an origin
-		// of its own and starts being counted by the reservation above — and
-		// released on every path out, including a throwing compose, because
-		// `peerSpawnsOpening` has no other decrement and a slot lost here is lost
-		// for the life of the process.
-		try {
-			const brief = await ports.reviewLaunch.composeBrief({
-				workspaceCwd: origin.workspaceCwd,
-				workspaceId: origin.workspaceId,
-			});
-			const pinned = await spawnableReviewModel(origin, brief.model);
-			const started = await ports.conversations.startConversation({
-				afkMode: isUnattended(origin),
-				asPeer: true,
-				callerConcierge: false,
-				callerModel,
-				callerRuntime: originRuntime(origin),
-				model: pinned ?? undefined,
-				parentSessionId: origin.sessionId,
-				planMode: false,
-				prompt: `${buildReviewPeerDirective(origin.sessionId)}\n\n---\n\n${brief.prompt}`,
-				// Forwarded whichever way the model resolved: the level is the user's
-				// own review preference and is set independently of the model pin, and
-				// `resolveForSpawn` already drops one the resolved model cannot take.
-				thinkingLevel: brief.thinkingLevel ?? undefined,
-				title: args.title ?? DEFAULT_REVIEW_TAB_TITLE,
-				workspaceCwd: origin.workspaceCwd,
-				workspaceId: origin.workspaceId,
-			});
-			if (!started.ok) {
-				return fail('invalid-args', started.reason);
-			}
-			guardrails.recordSpawn(origin.sessionId);
-			return ok({
+		guardrails.recordSpawn(origin.sessionId);
+		reviewsByCaller.set(origin.sessionId, {
+			agentSessionId: started.agentSessionId,
+			chatTabId: started.chatTabId,
+		});
+		return ok({
+			agentSessionId: started.agentSessionId,
+			chatTabId: started.chatTabId,
+			message: startedReviewMessage({
 				agentSessionId: started.agentSessionId,
-				chatTabId: started.chatTabId,
-				message: startedReviewMessage({
-					agentSessionId: started.agentSessionId,
-					droppedModel: brief.model !== null && pinned === null,
-					source: brief.source,
-				}),
-			} satisfies StartReviewResult);
-		} finally {
-			reserved();
-		}
+				crossRuntime:
+					pinned && pinned.runtime !== originRuntime(origin)
+						? pinned.runtime
+						: null,
+				droppedModel: brief.model !== null && pinned === null,
+				droppedThinkingLevel:
+					brief.thinkingLevel !== null && thinkingLevel === null
+						? brief.thinkingLevel
+						: null,
+				source: brief.source,
+			}),
+		} satisfies StartReviewResult);
 	};
 
 	/**
@@ -3077,6 +3267,7 @@ export function createAgentControlService({
 		ports.afkMode.releaseSession(sessionId);
 		signalsByChild.delete(sessionId);
 		linearSearchesBySession.delete(sessionId);
+		reviewsByCaller.delete(sessionId);
 		guardrails.release(sessionId);
 		originRegistry.release(sessionId);
 	};
