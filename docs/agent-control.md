@@ -449,6 +449,20 @@ main process does not freeze the row into one language. A `comment` tab has no p
 opens untitled, where the strip supplies a localized *Untitled* — the chat placeholder is reserved
 for chat rows, so a file tab never reads as a conversation nobody named.
 
+**Steering or focusing a closed chat reopens it.** Closing a tab archives it; it does not stop the
+conversation inside, so an orchestrator or the Concierge can steer a session whose tab the user shut.
+`ensemblr_send_follow_up` and `ensemblr_focus_tab` therefore restore a closed *chat* tab before they
+act — the follow-up ahead of the submit, so the turn it steers streams into a tab that is on screen
+rather than into the closed-tabs menu the user would otherwise have to go hunting through. Only ops
+that mean "somebody should look at this now" reopen anything: a read like `ensemblr_get_conversation_status`
+or a poll like `ensemblr_wait_for_agents` leaves a tab the user deliberately closed shut. A closed
+*terminal* tab is left shut too — it carries no live PTY, and respawning its harness is the
+renderer's job. So is a chat whose conversation has since moved on: the archived row goes on naming
+the session, but `restoreChatTab` strips that pointer whenever an open tab already holds it, so
+reopening would surface an emptied row rather than the chat somebody asked to see. Only a row that
+would come back whole is reopened, and that is asked of every target rather than inferred from how
+it was found. Reopening is best-effort: it never costs the op it accompanies.
+
 ### Naming and session record
 
 | Tool | Arguments | Gate | Withheld from |

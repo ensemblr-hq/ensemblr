@@ -67,15 +67,21 @@ const makeDeps = (): {
 	boardStatusStore: ReturnType<typeof createBoardStatusStore>;
 	openTab: ReturnType<typeof vi.fn>;
 	claimIdleChatTab: ReturnType<typeof vi.fn>;
+	restoreTab: ReturnType<typeof vi.fn>;
+	broadcastFocus: ReturnType<typeof vi.fn>;
 } => {
 	const broadcastTabsChanged = vi.fn();
 	const broadcastBoardStatus = vi.fn();
+	const broadcastFocus = vi.fn();
 	const boardStatusStore = createBoardStatusStore();
 	const openTab = vi.fn((input: { metadata?: unknown }) => ({
 		id: 'tab-1',
 		metadata: input.metadata ?? {},
 	}));
 	const claimIdleChatTab = vi.fn(() => null);
+	const restoreTab = vi.fn(({ chatTabId }: { chatTabId: string }) => ({
+		id: chatTabId,
+	}));
 	const deps = {
 		databaseService: { getConnection: () => ({ database: {} }) },
 		chatTabService: {
@@ -83,6 +89,7 @@ const makeDeps = (): {
 			openTab,
 			closeTab: vi.fn(),
 			listTabs: vi.fn(),
+			restoreTab,
 		},
 		agentSessionService: {},
 		terminalService: {},
@@ -93,7 +100,7 @@ const makeDeps = (): {
 			modelOption({ id: 'anthropic/sonnet', runtime: 'pi' }),
 		]),
 		getPermissionMode: () => 'workspace-trusted',
-		broadcastFocus: vi.fn(),
+		broadcastFocus,
 		broadcastTabsChanged,
 		broadcastBoardStatus,
 		broadcastAfkMode: vi.fn(),
@@ -116,11 +123,13 @@ const makeDeps = (): {
 	} as unknown as PortAdapterDeps;
 	return {
 		deps,
+		broadcastFocus,
 		broadcastTabsChanged,
 		broadcastBoardStatus,
 		boardStatusStore,
 		claimIdleChatTab,
 		openTab,
+		restoreTab,
 	};
 };
 
@@ -710,6 +719,214 @@ describe('agent-control port adapters: conversation naming', () => {
 		).rejects.toThrow('pi is not ready');
 
 		expect(setChatTabMetadata).not.toHaveBeenCalled();
+	});
+});
+
+describe('agent-control port adapters: reopening a closed chat tab', () => {
+	const asRow = (
+		value: Record<string, unknown> | null,
+	): ReturnType<typeof getChatTabById> =>
+		value as unknown as ReturnType<typeof getChatTabById>;
+
+	const closedChatRow = (overrides: Record<string, unknown> = {}) =>
+		openChatRow({ closedAt: '2026-09-01T00:00:00.000Z', ...overrides });
+
+	const withSession = (deps: PortAdapterDeps, submitPrompt = vi.fn()) => {
+		(deps as { agentSessionService: unknown }).agentSessionService = {
+			getSession: vi.fn(() => ({ status: 'idle', workspaceId: 'ws' })),
+			submitPrompt,
+		};
+		return submitPrompt;
+	};
+
+	beforeEach(() => {
+		vi.mocked(getChatTabByAgentSessionId).mockReset();
+		vi.mocked(getChatTabByAgentSessionId).mockReturnValue(asRow(null));
+	});
+
+	it('reopens the closed chat a follow-up steers, before submitting the prompt', async () => {
+		vi.mocked(getChatTabByAgentSessionId).mockReturnValue(
+			asRow(closedChatRow({ agentSessionId: 'sess-1' })),
+		);
+		const { deps, broadcastTabsChanged, restoreTab } = makeDeps();
+		const submitPrompt = withSession(deps);
+		const ports = createAgentControlPorts(deps);
+
+		await ports.conversations.sendFollowUp({
+			agentSessionId: 'sess-1',
+			prompt: 'keep going',
+		});
+
+		expect(restoreTab).toHaveBeenCalledWith({ chatTabId: 'tab-1' });
+		expect(broadcastTabsChanged).toHaveBeenCalledWith({ workspaceId: 'ws' });
+		expect(restoreTab.mock.invocationCallOrder[0]).toBeLessThan(
+			submitPrompt.mock.invocationCallOrder[0],
+		);
+	});
+
+	it('leaves a chat that is already open alone', async () => {
+		vi.mocked(getChatTabByAgentSessionId).mockReturnValue(
+			asRow(openChatRow({ agentSessionId: 'sess-1' })),
+		);
+		const { deps, broadcastTabsChanged, restoreTab } = makeDeps();
+		const submitPrompt = withSession(deps);
+		const ports = createAgentControlPorts(deps);
+
+		await ports.conversations.sendFollowUp({
+			agentSessionId: 'sess-1',
+			prompt: 'keep going',
+		});
+
+		expect(restoreTab).not.toHaveBeenCalled();
+		expect(broadcastTabsChanged).not.toHaveBeenCalled();
+		expect(submitPrompt).toHaveBeenCalled();
+	});
+
+	it('leaves a closed terminal tab shut, since only the renderer can respawn its harness', async () => {
+		vi.mocked(getChatTabByAgentSessionId).mockReturnValue(
+			asRow(closedChatRow({ agentSessionId: 'sess-1', kind: 'terminal' })),
+		);
+		const { deps, broadcastTabsChanged, restoreTab } = makeDeps();
+		const submitPrompt = withSession(deps);
+		const ports = createAgentControlPorts(deps);
+
+		await ports.conversations.sendFollowUp({
+			agentSessionId: 'sess-1',
+			prompt: 'keep going',
+		});
+
+		expect(restoreTab).not.toHaveBeenCalled();
+		expect(broadcastTabsChanged).not.toHaveBeenCalled();
+		expect(submitPrompt).toHaveBeenCalled();
+	});
+
+	it('still steers the conversation when the tab cannot be reopened', async () => {
+		const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+		vi.mocked(getChatTabByAgentSessionId).mockReturnValue(
+			asRow(closedChatRow({ agentSessionId: 'sess-1' })),
+		);
+		const { deps, broadcastTabsChanged, restoreTab } = makeDeps();
+		restoreTab.mockImplementation(() => {
+			throw new Error('database is closed');
+		});
+		const submitPrompt = withSession(deps);
+		const ports = createAgentControlPorts(deps);
+
+		await ports.conversations.sendFollowUp({
+			agentSessionId: 'sess-1',
+			prompt: 'keep going',
+		});
+
+		expect(submitPrompt).toHaveBeenCalledWith({
+			prompt: 'keep going',
+			sessionId: 'sess-1',
+			streamingBehavior: undefined,
+		});
+		expect(broadcastTabsChanged).not.toHaveBeenCalled();
+		expect(warn).toHaveBeenCalled();
+		warn.mockRestore();
+	});
+
+	it('steers a conversation whose tab has gone', async () => {
+		const { deps, broadcastTabsChanged, restoreTab } = makeDeps();
+		const submitPrompt = withSession(deps);
+		const ports = createAgentControlPorts(deps);
+
+		await ports.conversations.sendFollowUp({
+			agentSessionId: 'sess-1',
+			prompt: 'keep going',
+		});
+
+		expect(restoreTab).not.toHaveBeenCalled();
+		expect(broadcastTabsChanged).not.toHaveBeenCalled();
+		expect(submitPrompt).toHaveBeenCalled();
+	});
+
+	it('reopens a closed chat before focusing it', () => {
+		vi.mocked(getChatTabById).mockReturnValue(asRow(closedChatRow()));
+		const { deps, broadcastFocus, broadcastTabsChanged, restoreTab } =
+			makeDeps();
+		const ports = createAgentControlPorts(deps);
+
+		ports.focus.focusTab({ workspaceId: 'ws', chatTabId: 'tab-1' });
+
+		expect(restoreTab).toHaveBeenCalledWith({ chatTabId: 'tab-1' });
+		expect(broadcastTabsChanged.mock.invocationCallOrder[0]).toBeLessThan(
+			broadcastFocus.mock.invocationCallOrder[0],
+		);
+		expect(broadcastFocus).toHaveBeenCalledWith({
+			target: { chatTabId: 'tab-1', kind: 'tab' },
+			workspaceId: 'ws',
+		});
+	});
+
+	it('focuses an open tab without reopening anything', () => {
+		vi.mocked(getChatTabById).mockReturnValue(asRow(openChatRow()));
+		const { deps, broadcastFocus, restoreTab } = makeDeps();
+		const ports = createAgentControlPorts(deps);
+
+		ports.focus.focusTab({ workspaceId: 'ws', chatTabId: 'tab-1' });
+
+		expect(restoreTab).not.toHaveBeenCalled();
+		expect(broadcastFocus).toHaveBeenCalledWith({
+			target: { chatTabId: 'tab-1', kind: 'tab' },
+			workspaceId: 'ws',
+		});
+	});
+
+	it('still focuses, without reopening, an archived chat whose session an open tab now holds', () => {
+		vi.mocked(getChatTabById).mockReturnValue(
+			asRow(closedChatRow({ agentSessionId: 'sess-1' })),
+		);
+		vi.mocked(getChatTabByAgentSessionId).mockReturnValue(
+			asRow(openChatRow({ agentSessionId: 'sess-1', id: 'tab-2' })),
+		);
+		const { deps, broadcastFocus, broadcastTabsChanged, restoreTab } =
+			makeDeps();
+		const ports = createAgentControlPorts(deps);
+
+		ports.focus.focusTab({ workspaceId: 'ws', chatTabId: 'tab-1' });
+
+		expect(restoreTab).not.toHaveBeenCalled();
+		expect(broadcastTabsChanged).not.toHaveBeenCalled();
+		expect(broadcastFocus).toHaveBeenCalledWith({
+			target: { chatTabId: 'tab-1', kind: 'tab' },
+			workspaceId: 'ws',
+		});
+	});
+
+	it('leaves a closed diff tab shut, since only a chat is reopened', () => {
+		vi.mocked(getChatTabById).mockReturnValue(
+			asRow(closedChatRow({ kind: 'diff' })),
+		);
+		const { deps, broadcastFocus, broadcastTabsChanged, restoreTab } =
+			makeDeps();
+		const ports = createAgentControlPorts(deps);
+
+		ports.focus.focusTab({ workspaceId: 'ws', chatTabId: 'tab-1' });
+
+		expect(restoreTab).not.toHaveBeenCalled();
+		expect(broadcastTabsChanged).not.toHaveBeenCalled();
+		expect(broadcastFocus).toHaveBeenCalledWith({
+			target: { chatTabId: 'tab-1', kind: 'tab' },
+			workspaceId: 'ws',
+		});
+	});
+
+	it('reopens an archived chat when the only other tab naming its session is closed too', () => {
+		vi.mocked(getChatTabById).mockReturnValue(
+			asRow(closedChatRow({ agentSessionId: 'sess-1' })),
+		);
+		vi.mocked(getChatTabByAgentSessionId).mockReturnValue(
+			asRow(closedChatRow({ agentSessionId: 'sess-1', id: 'tab-2' })),
+		);
+		const { deps, broadcastTabsChanged, restoreTab } = makeDeps();
+		const ports = createAgentControlPorts(deps);
+
+		ports.focus.focusTab({ workspaceId: 'ws', chatTabId: 'tab-1' });
+
+		expect(restoreTab).toHaveBeenCalledWith({ chatTabId: 'tab-1' });
+		expect(broadcastTabsChanged).toHaveBeenCalledWith({ workspaceId: 'ws' });
 	});
 });
 

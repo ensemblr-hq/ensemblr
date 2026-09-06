@@ -64,6 +64,7 @@ import type { ScriptLifecycleService } from '../scripts/script-lifecycle-service
 import type { EnsemblrDatabaseService } from '../storage';
 import type { ChatTabRow } from '../storage/repositories/chat-tab-repository.ts';
 import {
+	getChatTabByAgentSessionId,
 	getChatTabById,
 	setChatTabMetadata,
 } from '../storage/repositories/chat-tab-repository.ts';
@@ -288,6 +289,113 @@ function readTabRow(
 		return null;
 	}
 	return getChatTabById({ database, id: chatTabId }) ?? null;
+}
+
+/**
+ * Reads the tab an op names, by whichever id it holds.
+ * @param deps - Adapter collaborators.
+ * @param target - The tab itself, or the conversation living in it.
+ * @returns The row, or null when it is gone or the database is not connected.
+ */
+function readTargetTabRow(
+	deps: PortAdapterDeps,
+	target: { agentSessionId: string } | { chatTabId: string },
+): ChatTabRow | null {
+	if ('chatTabId' in target) {
+		return readTabRow(deps, target.chatTabId);
+	}
+	const database = deps.databaseService.getConnection()?.database;
+	if (!database) {
+		return null;
+	}
+	return (
+		getChatTabByAgentSessionId({
+			agentSessionId: target.agentSessionId,
+			database,
+		}) ?? null
+	);
+}
+
+/**
+ * Whether reopening this archived row would cost it the conversation it points
+ * at, because an open tab already holds that session.
+ *
+ * `restoreChatTab` nulls the restored row's `agent_session_id` in exactly that
+ * case, so reopening blind surfaces a blank chat while the conversation stays in
+ * the tab that took it. The state is ordinary rather than exotic: `bindAgentSession`
+ * clears the pointer off open rows only, so resuming a persisted session into a
+ * fresh tab leaves the archived one still naming it.
+ *
+ * Only an *open* holder detaches, mirroring the repository's own condition — two
+ * archived rows may name one session, and restoring either of those keeps it.
+ *
+ * Answers yes when the database cannot be read, since leaving a tab shut costs
+ * less than surfacing an emptied one.
+ * @param deps - Adapter collaborators.
+ * @param tab - The closed row a reopen is considering.
+ * @returns Whether the restore would leave the row detached.
+ */
+function wouldRestoreDetachSession(
+	deps: PortAdapterDeps,
+	tab: ChatTabRow,
+): boolean {
+	if (tab.agentSessionId === null) {
+		return false;
+	}
+	const database = deps.databaseService.getConnection()?.database;
+	if (!database) {
+		return true;
+	}
+	const holder = getChatTabByAgentSessionId({
+		agentSessionId: tab.agentSessionId,
+		database,
+	});
+	return holder !== null && holder.closedAt === null && holder.id !== tab.id;
+}
+
+/**
+ * Puts a closed chat tab back in the strip, so a conversation an agent steers or
+ * focuses is where the user is looking rather than buried in closed history.
+ * Called by the ops whose whole point is that somebody should now see the chat;
+ * a read or a poll must not reopen a tab the user deliberately shut.
+ *
+ * Chat tabs only. A restored harness terminal carries no live PTY, and respawning
+ * one is the renderer's job (`resumeRestoredTerminalTab`), so reopening it from
+ * here would leave a dead tab on screen.
+ *
+ * Reopens only what would come back whole: a row whose session an open tab has
+ * since taken is left shut by {@link wouldRestoreDetachSession}, because
+ * `restoreChatTab` would strip its pointer and surface an empty chat. That check
+ * is asked of every target rather than inferred from how the row was found — the
+ * session lookup happens to prove it on its own, a lookup by tab id proves
+ * nothing, and one enforced invariant beats two that differ per branch.
+ *
+ * Best-effort: the op the caller actually asked for must land whether or not the
+ * tab could be reopened, so a failed read or restore is logged and swallowed.
+ * @param deps - Adapter collaborators.
+ * @param target - The tab itself, or the conversation living in it.
+ */
+function reopenClosedChatTab(
+	deps: PortAdapterDeps,
+	target: { agentSessionId: string } | { chatTabId: string },
+): void {
+	try {
+		const tab = readTargetTabRow(deps, target);
+		if (!tab || tab.closedAt === null || tab.kind !== 'chat') {
+			return;
+		}
+		if (wouldRestoreDetachSession(deps, tab)) {
+			return;
+		}
+		if (deps.chatTabService.restoreTab({ chatTabId: tab.id })) {
+			deps.broadcastTabsChanged({ workspaceId: tab.workspaceId });
+		}
+	} catch (cause) {
+		console.warn('[agent-control] could not reopen a closed chat tab.', {
+			cause: cause instanceof Error ? cause.message : String(cause),
+			target,
+		});
+	}
 }
 
 /**
@@ -649,6 +757,9 @@ function makeConversationPort(deps: PortAdapterDeps): ConversationPort {
 			return { ok: true, chatTabId: targetTabId, agentSessionId: snapshot.id };
 		},
 		sendFollowUp: async ({ agentSessionId, prompt }) => {
+			// Ahead of the submit, so the tab is back on screen before the turn it
+			// steers starts streaming into it.
+			reopenClosedChatTab(deps, { agentSessionId });
 			const streaming =
 				deps.agentSessionService.getSession(agentSessionId)?.status ===
 				'streaming';
@@ -1171,11 +1282,15 @@ function makeHarnessPort(deps: PortAdapterDeps): HarnessPort {
  */
 function makeFocusPort(deps: PortAdapterDeps): FocusPort {
 	return {
-		focusTab: ({ workspaceId, chatTabId }) =>
+		focusTab: ({ workspaceId, chatTabId }) => {
+			// Ahead of the focus, so the tab-list invalidation reaches the renderer
+			// before the navigation that has to land on the restored row.
+			reopenClosedChatTab(deps, { chatTabId });
 			deps.broadcastFocus({
 				workspaceId,
 				target: { kind: 'tab', chatTabId },
-			}),
+			});
+		},
 		focusDockTab: ({ workspaceId, dock }) =>
 			deps.broadcastFocus({ workspaceId, target: { kind: 'dock', dock } }),
 		focusPanel: ({ workspaceId, panel }) =>
