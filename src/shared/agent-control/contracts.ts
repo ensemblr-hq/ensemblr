@@ -290,9 +290,12 @@ export interface StartReviewArgs {
 }
 
 /**
- * What `startReview` opened. The session is a root orchestrator rather than the
- * caller's child, so it is absent from the children `waitForAgents` defaults to
- * and has to be named in `targets` — which is what `message` says.
+ * What `startReview` opened, or the review the caller already had. The session is
+ * one of the caller's own sub-agents, so it is among the children `waitForAgents`
+ * defaults to and costs none of the workspace's co-tenancy allowance. A second
+ * call answers with the first review rather than a new one, and the two cases are
+ * told apart by `message` rather than by shape — either way the caller holds a
+ * reviewer to follow up, which is what it asked for.
  */
 export interface StartReviewResult {
 	agentSessionId: string;

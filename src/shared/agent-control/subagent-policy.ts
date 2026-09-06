@@ -41,7 +41,7 @@ const SUBAGENT_BLOCKED_OPS: ReadonlyMap<AgentControlOp, string> = new Map([
 	],
 	[
 		'startReview',
-		'You were spawned as a sub-agent to carry out one unit of work, and opening the workspace\u2019s Review conversation belongs to the orchestrator that spawned you \u2014 it is a second root agent on a worktree you do not own, and it reviews the whole change rather than your part of it. Report what you did and let the orchestrator have it reviewed.',
+		'You were spawned as a sub-agent to carry out one unit of work, and opening the workspace\u2019s Review conversation belongs to the orchestrator that spawned you \u2014 it opens a sibling sub-agent of that orchestrator, over the whole change rather than your part of it, and nested delegation is blocked here. Report what you did and let the orchestrator have it reviewed.',
 	],
 	[
 		'sendFollowUp',
