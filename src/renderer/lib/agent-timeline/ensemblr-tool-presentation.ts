@@ -2,6 +2,7 @@ import type { DynamicToolUIPart } from 'ai';
 import { i18n } from '@/renderer/lib/i18n';
 import type {
 	AgentRoleResolver,
+	TimelineAgentRole,
 	TimelineSurface,
 	ToolBadgeDescriptor,
 	ToolGlyph,
@@ -320,6 +321,33 @@ function referencedIdOf(
 }
 
 /**
+ * Reads back what each conversation a call named turned out to be.
+ *
+ * A path may reach a batch rather than one id — `ensemblr_wait_for_agents` names
+ * its whole `targets` array — and a value that is not a string is not a session
+ * id, so both are folded into the one walk.
+ * @param input - The tool call's input bag
+ * @param keys - Input paths carrying the agent session ids the call acted on
+ * @param resolveRole - The catalogue lookup
+ * @returns One role per id the call named, in the order the paths reach them
+ */
+function targetRoles(
+	input: Record<string, unknown>,
+	keys: readonly string[],
+	resolveRole: AgentRoleResolver,
+): readonly (TimelineAgentRole | null)[] {
+	const roles: (TimelineAgentRole | null)[] = [];
+	for (const key of keys) {
+		for (const named of valuesAtPath(input, key)) {
+			if (typeof named === 'string') {
+				roles.push(resolveRole(named));
+			}
+		}
+	}
+	return roles;
+}
+
+/**
  * Names the conversation a control call acted on, which is the object of the row
  * rather than its verb.
  *
@@ -355,10 +383,7 @@ function targetTitles(
 	if (resolveRole === null) {
 		return null;
 	}
-	const roles = target.sessionKeys
-		.flatMap((key) => valuesAtPath(input, key))
-		.filter((value): value is string => typeof value === 'string')
-		.map(resolveRole);
+	const roles = targetRoles(input, target.sessionKeys, resolveRole);
 	if (roles.length === 0) {
 		return null;
 	}
