@@ -1,12 +1,10 @@
-## Ensemblr v0.1.3
+## Ensemblr v0.1.4
 
-**Every workspace can carry an architecture diagram.** Directories as nodes, cross-module imports as edges, top-level directories as boundary frames, opened from the conversation tab strip beside the file preview. It is a committed file at `.ensemblr/architecture.json` rather than a row in the database, so it travels with the code it describes — a clone arrives with the architecture already drawn, and a refinement shows up in a pull request instead of hiding in application state.
+**The unattended (AFK) delivery loop is now complete, end to end.** A chat can be told the user is away and it keeps moving without them — its own composer chip, Plan Mode's opposite number — and the Concierge can now open a workspace agent directly into that mode rather than only inheriting it. The loop itself pushes an unattended change through plan, review, and a pull request on its own: it delegates the wide reading a plan needs out to a sub-agent so the orchestrator's own context lasts the whole run, and it stops itself on convergence — nothing left to fix, or the same class of problem circling — rather than on a fixed round count. The review shape moved from a sub-agent back to a peer orchestrator after the review-fix-review cycle showed what a single context window costs a fifty-file diff, alongside a co-tenancy quota that gives an unattended run room for both occupants at once.
 
-Nothing in the app derives it. The module-graph scanner is gone, because its only output was a diff full of directory names an agent had to rewrite before it was worth reading; the document is authored entirely through two control ops, and the bundled `architecture-diagram` skill teaches what only a model can fix — boundary labels, node types, reading order, which edges carry meaning. The rule it lives by is stated in the skill: **it is a drawing for you, never a source of truth for an agent**, which reads the code instead.
+**Agents can also reach sideways and upwards.** `ensemblr_start_conversation` with `peer: true` opens a second root orchestrator in the caller's own workspace; `ensemblr_message_concierge` gives a workspace agent a channel back to the Concierge for what it cannot see from where it sits; `ensemblr_linear_create_issue` files a ticket for the follow-up work a session finds but should not do itself.
 
-The feature ships behind an **experimental switch, defaulting off** — and it is a feature gate rather than a preference. With it off, the pane, both control ops, the skill, and every mention of the diagram in an agent playbook are *absent* rather than disabled, so nothing advertises a surface the app will not serve.
-
-**The guide finally shows the app at its own resolution.** Screenshots now come from a separate demo Electron entrypoint that renders the shipped renderer against scripted fixtures, so a shot is a file in `demo/scenarios/` rather than a state someone reproduced by hand and then scrubbed. The guide image set is recaptured at full native resolution: 21 shots at 2992×1866, no downscale and no quantization, including the seven that were missing or outstanding.
+**Elsewhere:** workspaces get a readable display name distinct from their slugged branch, the review rail is reachable at any window width through a sheet below 1024px, full screen fills its own corner with the wordmark instead of an empty gutter, dock terminals number themselves and show what they're running, and third-party CLI harnesses (Claude Code, OpenAI Codex, Mistral Vibe) now sit behind an Experimental switch, off by default.
 
 ### Install
 
@@ -24,22 +22,45 @@ curl -fsSL https://www.ensemblr.dev/install.sh | sh
 
 The `.dmg` is signed with a Developer ID certificate, hardened-runtime, notarized by Apple and stapled, so it opens without a Gatekeeper prompt and validates offline. The Linux installer needs no root, writes nothing outside `$HOME`, verifies the download against the digest GitHub publishes, and keeps a manifest so `--uninstall` removes exactly what it added. Re-running it is an update.
 
-### What's Changed since v0.1.2
+### What's Changed since v0.1.3
 
 #### Added
 
-* **The workspace architecture diagram, in its own pane**: a committed document at `.ensemblr/architecture.json`, opened from the conversation tab strip. Authored through `ensemblr_get_architecture_diagram` and `ensemblr_update_architecture_diagram` rather than derived from a scan — the scanner, the IR translator, the scan queue and the on-create seeding all go, about 1,200 lines whose output was never worth reading unrevised. A stale diagram asks to be corrected through three gates, cheapest first: a workspace nobody has drawn costs one failed `stat`, only one that has a diagram pays for the change-set read, and only a change set landing inside a component's `sources` pays for the timestamps. Ships behind an experimental switch defaulting off; with it off the pane, the ops, the skill and every playbook mention are absent rather than disabled. Migration 027 adds only the `diagram` tab kind. (#437)
+* **Agents can reach sideways and upwards, not only down**: `ensemblr_start_conversation` with `peer: true` opens a second root orchestrator in the caller's own workspace, capped at two agents writing one checkout and confirmed with the user whatever the permission mode; `ensemblr_message_concierge` gives a workspace agent a channel back to the Concierge; `ensemblr_linear_create_issue` files a ticket, with a search enforced as a precondition on the first create in a conversation. Decided in ADR 0059. (#442)
+* **A chat can be told the user is away, and it keeps moving without them**: a per-chat AFK composer chip, Plan Mode's opposite number. `ensemblr_ask_user_question` is refused, permission confirmations auto-approve at the boundary that means "confirmation required" only, and the toggle is inherited by every conversation it spawns. (#444)
+* **Deleting a repository can now take its folder with it**, for one Ensemblr cloned into the managed `repos/` root, cleaning up the leftover `workspaces/<slug>` directory, every private archive-pinning ref, and Infisical link rows along with it. (#445)
+* **The Review action now defers to a repository's own review skill instead of overriding it**, running it alone rather than layering a second review guideline set on top. (#446)
+* **An unattended change now runs itself through plan, review, and a pull request** instead of stopping at an uncommitted tree: `ensemblr_start_review` opens the workspace's own Review conversation as a second root orchestrator, fixes route back into that same conversation, and a new `buildAfkWorkflowDirective` block states the loop end to end. (#447)
+* **The Concierge can now open a workspace agent that runs unattended**, rather than only being able to inherit AFK mode from a caller that already carries it. (#453)
+* **Delegating a child now picks its reasoning budget, and the costliest tier of model needs a nod first**: `ensemblr_list_models` publishes each model's thinking-level ladder, and spawning a child onto an explicitly-named frontier model needs the user's confirmation, remembered per workspace and model for the process lifetime. (#454)
+* **Dock terminals number themselves and show what they're running**, switching a tab's title to the command its foreground process reports and reverting once it exits. (#456)
+* **The navigation sidebar carries a panel for as long as an app update is outstanding**, replacing a dismissible toast that could be waved away and never seen again. (#460)
+* **A chat tab now shows the mode its next turn will run under** — the AFK glyph in away indigo, the Plan Mode glyph in accent — while a working chat keeps its spinner tinted to the mode instead of losing it to a static glyph. (#464)
+* **Workspaces now get a readable name, and only the branch gets slugged**, so the board no longer shows a kebab slug over its own branch name with the prefix stripped. (#465)
+* **The review rail is reachable on any window width**, through a resizable panel at ≥1024px or a sliding Sheet below it, closing a 720–1023px band that had no reachable rail at all. (#468)
+* **Full screen fills its own corner with the wordmark** instead of leaving the traffic-lights inset as an empty gutter once macOS slides them off the window. (#469)
+* **Third-party CLI agent harnesses are now gated behind an Experimental switch, off by default**, covering Claude Code, OpenAI Codex, and Mistral Vibe; with it off, the launcher, its binding, the menu item, and every playbook mention are absent rather than disabled. (#470)
 
-* **A separate demo Electron entrypoint for screenshots**: `demo/demo-main.ts`, `demo/demo-preload.ts` and a renderer root at `demo/main.tsx`, launched by `npm run dev:demo`. It renders the shipped renderer against a stubbed bridge whose answers come from a scenario file, so states that are awkward to stage against real data — an agent frozen mid-turn, a board with cards in every column, a diff with a review thread open — are a file rather than a manual setup followed by scrubbing tracker titles and blurring `/Users/…` paths. Nothing under `src/` changes and the packaged app carries no demo code, because there is none to strip: demo mode has its own `tsconfig.demo.json`, its own `.demo/` output, and its own Electron product name so its `userData` is neither the installed app's nor the dev build's. The guide image set is recaptured at 2992×1866 with no downscale or quantization, replacing a 1600px-wide pngquant'd set. (#435)
+#### Fixed
+
+* **A spawned conversation no longer lands in the tab you just opened.** Claimability is now declared rather than inferred from an idle-looking row. (#451)
+* **Steering a conversation whose tab was closed brings that tab back**, so a follow-up an orchestrator or the Concierge sends streams where the user is looking. (#452)
+* **A workspace re-opens on the tab it was on, and closing one walks back the way you came**, fixing three compounding faults in the route loaders and the in-memory visit chain. (#448)
+* **Steering a peer orchestrator or the Review conversation no longer mislabels it as a sub-agent in the timeline.** (THE-209) (#449)
+* **New workspaces now actually fork from the branch configured in Git settings**, fetching the configured ref before probing it rather than silently falling back to the repository's root branch. (#459)
+* **A workspace's PR status no longer flickers backwards when navigating between tabs**, making every hand-off between the live and cached status sources monotonic on a `syncedAt` stamp. (#457)
+* **Closing a dock terminal tab now keeps it closed, and tab numbers follow the strip's order**, instead of the dead tab reappearing on the next workspace visit. (#462)
+* **A message typed right after stopping a turn no longer gets stranded behind that stop**, since the pause is now scoped to only the messages it's actually about. (#463)
+* **The chat timeline holds still while the user has scrolled up during a stream.** (THE-211) (#466)
+* **A workspace being archived or deleted no longer shows stale diff counts** beside its "Archiving…" status. (#467)
 
 #### Changed
 
-* **Dev dependencies bumped within their pinned majors**: `@biomejs/biome` 2.5.11, `@vitejs/plugin-react` 6.1.1, `happy-dom` 20.12.0. The `$schema` URL in `biome.json` moves with Biome, which reports a config pinned to the previous patch as stale. (#436)
-
-* **`docs/` corrected against the code**: the drift an audit turned up is fixed rather than tidied around, the published 0.1.2 assets are pinned in the install guide, and the troubleshooting page stops attributing "`npm run make` exits 0 and `out/` is empty" solely to running under Node 26 — a failed Electron download presents identically and was not mentioned. (#432, #433, #434)
-
-* **Demo mode is excluded from fallow and react-doctor**: a screenshot harness is not product code, and scoring it as first-party is all noise. Fallow takes a `demo/**` ignore pattern so the tree drops out at file discovery and every pass skips it; react-doctor ignores `demo/**` and `.demo/`. Verified at 0 demo files discovered against 1,588 under `src/`, and a full react-doctor scan reporting 0 demo findings at score 100. (#435)
+* **CI checks run in roughly half the time**: splitting Vitest into `node` and `renderer` projects and running `lint`/`typecheck`/`test` as parallel jobs took a CI-shaped run from 96.3s to 72.8s. (#443)
+* **A streaming agent turn no longer pins the whole workspace screen's render path**, cutting `Tooltip` renders from 14,911 to 380 and main-thread task time from 13.9s to 8.4s over one measured turn. (#450)
+* **The AFK delivery loop now delegates its wide reading and stops itself on convergence, not on a round count**, ending on a clean round, a repeated finding, or a re-plan when one class of problem keeps circling. (#455)
+* **Reviews opened by an agent moved to run as a sub-agent, then moved back to running as a peer**, after the sub-agent shape capped the very wide-reading the review exists to buy; a new co-tenancy quota (`maxPerUnattendedWorkspace: 4`) pays the underlying cost instead. (#458, #461)
 
 ---
 
-*Full changelog*: https://github.com/ensemblr-hq/ensemblr/compare/v0.1.2...v0.1.3
+*Full changelog*: https://github.com/ensemblr-hq/ensemblr/compare/v0.1.3...v0.1.4
