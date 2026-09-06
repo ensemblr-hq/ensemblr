@@ -10,9 +10,22 @@ import { useEffect } from 'react';
 const bootstrappedWorkspacesGlobal = new Set<string>();
 
 /**
+ * The open request this bootstrap sends. `placeholder` is what tells the main
+ * process a spawned conversation may take this tab over; it belongs to this open
+ * alone.
+ */
+const BOOTSTRAP_OPEN_REQUEST = { placeholder: true } as const;
+
+/**
  * Opens a real chat-tab row for a workspace that has none. Placeholder session
  * ids like `<workspaceId>:overview` are not persisted, so the first prompt would
  * fail to bind without a real row.
+ *
+ * This is the one open nobody asked for, so it is the one open marked
+ * `placeholder`: a conversation an agent spawns into this workspace takes this
+ * tab rather than stacking a second beside it and leaving one permanently blank.
+ * No other open may set the flag — a tab the user opened is theirs from the
+ * moment it appears, draft or no draft.
  *
  * Only a settled query is acted on: a mid-refetch snapshot can momentarily read
  * as empty even when tabs exist, and opening on that would spawn a spurious
@@ -58,7 +71,7 @@ export function useWorkspaceChatBootstrap({
 			return;
 		}
 		bootstrappedWorkspacesGlobal.add(workspaceId);
-		openChatTab(undefined, {
+		openChatTab(BOOTSTRAP_OPEN_REQUEST, {
 			onError: () => {
 				bootstrappedWorkspacesGlobal.delete(workspaceId);
 			},

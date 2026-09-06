@@ -396,7 +396,7 @@ describe('a spawned sub-agent starts in Plan Mode rather than joining it late', 
 			broadcastPlanMode: vi.fn(),
 			broadcastTabsChanged: vi.fn(),
 			chatTabService: {
-				claimIdleChatTab: vi.fn(() => null),
+				claimPlaceholderChatTab: vi.fn(() => null),
 				openTab: vi.fn(() => ({ id: 'tab-1', metadata: {} })),
 			},
 			confirm: { confirm: vi.fn() },

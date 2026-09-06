@@ -14,6 +14,7 @@ import type {
 	ComposerDraftChange,
 	ComposerEditorHandle,
 } from '@/renderer/components/workbench-shell/conversation-panel/composer/editor';
+import { useClaimPlaceholderTab } from '@/renderer/hooks/workbench-shell/composer/use-claim-placeholder-tab';
 import { useComposerAttachments } from '@/renderer/hooks/workbench-shell/composer/use-composer-attachments';
 import { useComposerAutocomplete } from '@/renderer/hooks/workbench-shell/composer/use-composer-autocomplete';
 import { useComposerKeymap } from '@/renderer/hooks/workbench-shell/composer/use-composer-keymap';
@@ -259,6 +260,8 @@ export function useComposerState({
 	const [value, setValue] = useAtom(composerValueAtomFamily(chatTabId));
 	const setAttachments = useSetAtom(composerAttachmentsAtomFamily(chatTabId));
 	const setEditorState = useSetAtom(composerEditorStateAtomFamily(chatTabId));
+
+	useClaimPlaceholderTab(chatTabId);
 
 	// Read once per mount, which is once per chat because `ComposerPanel` keys its
 	// body by chat tab: the editor takes ownership of the draft from here on,

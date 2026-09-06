@@ -756,35 +756,92 @@ test('service surfaces a clear error when the database is closed', (t) => {
 	);
 });
 
-test('claimIdleChatTab offers a chat nobody has spent yet', (t) => {
+test('claimPlaceholderChatTab offers the placeholder the app opened', (t) => {
 	const fixture = openFixture(t);
 
-	const idle = fixture.service.openTab({ workspaceId: fixture.workspaceId });
+	const placeholder = fixture.service.openTab({
+		placeholder: true,
+		workspaceId: fixture.workspaceId,
+	});
 
 	assert.equal(
-		fixture.service.claimIdleChatTab({ workspaceId: fixture.workspaceId })?.id,
-		idle.id,
+		fixture.service.claimPlaceholderChatTab({
+			workspaceId: fixture.workspaceId,
+		})?.id,
+		placeholder.id,
 	);
 });
 
-test('claimIdleChatTab refuses a tab the user named or already used', (t) => {
+test('claimPlaceholderChatTab refuses a blank tab the user opened', (t) => {
+	const fixture = openFixture(t);
+
+	fixture.service.openTab({ workspaceId: fixture.workspaceId });
+
+	assert.equal(
+		fixture.service.claimPlaceholderChatTab({
+			workspaceId: fixture.workspaceId,
+		}),
+		null,
+	);
+});
+
+test('claimPlaceholderChatTab releases the marker so a second spawn opens its own', (t) => {
 	const fixture = openFixture(t);
 
 	fixture.service.openTab({
+		placeholder: true,
+		workspaceId: fixture.workspaceId,
+	});
+	fixture.service.claimPlaceholderChatTab({ workspaceId: fixture.workspaceId });
+
+	assert.equal(
+		fixture.service.claimPlaceholderChatTab({
+			workspaceId: fixture.workspaceId,
+		}),
+		null,
+	);
+});
+
+test('claimPlaceholderChatTab refuses a placeholder the user has claimed', (t) => {
+	const fixture = openFixture(t);
+
+	const placeholder = fixture.service.openTab({
+		placeholder: true,
+		workspaceId: fixture.workspaceId,
+	});
+	fixture.service.pinTab({ chatTabId: placeholder.id });
+
+	assert.equal(
+		fixture.service.claimPlaceholderChatTab({
+			workspaceId: fixture.workspaceId,
+		}),
+		null,
+	);
+});
+
+test('claimPlaceholderChatTab refuses a tab the user named or already used', (t) => {
+	const fixture = openFixture(t);
+
+	fixture.service.openTab({
+		placeholder: true,
 		title: 'Release notes',
 		workspaceId: fixture.workspaceId,
 	});
 	fixture.service.openTab({
 		agentSessionId: fixture.agentSessionId,
+		placeholder: true,
 		workspaceId: fixture.workspaceId,
 	});
 	fixture.service.openTab({
 		kind: 'terminal',
+		placeholder: true,
 		workspaceId: fixture.workspaceId,
 	});
 
 	assert.equal(
-		fixture.service.claimIdleChatTab({ workspaceId: fixture.workspaceId }),
+		fixture.service.claimPlaceholderChatTab({
+			workspaceId: fixture.workspaceId,
+		}),
 		null,
 	);
 });

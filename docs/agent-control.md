@@ -449,6 +449,19 @@ main process does not freeze the row into one language. A `comment` tab has no p
 opens untitled, where the strip supplies a localized *Untitled* — the chat placeholder is reserved
 for chat rows, so a file tab never reads as a conversation nobody named.
 
+**A spawn takes the workspace's placeholder chat, never a tab the user opened.** The renderer opens
+one blank chat for a workspace that has none, so a first prompt has a row to bind to, and
+`ensemblr_start_conversation` called without `chatTabId` takes *that* tab rather than stacking a
+second beside it and leaving one permanently blank. Which tab that is cannot be inferred from the
+row: a composer draft is in-memory by design and never reaches the main process, so a tab opened a
+second ago from the strip's new-tab button is indistinguishable from a blank one nobody wants. The
+bootstrap therefore *declares* its tab claimable — a `placeholder` marker on the row's metadata,
+alongside the preview-slot and sub-agent markers — and no other open sets it. The marker is retired
+the moment anybody spends the tab: by the claim itself, so a second spawn arriving behind the first
+opens its own, and by the composer as soon as a draft or an attachment appears, which is what keeps a
+spawn off a prompt the user is halfway through writing. A workspace whose placeholder is already
+taken gets a fresh tab.
+
 **Steering or focusing a closed chat reopens it.** Closing a tab archives it; it does not stop the
 conversation inside, so an orchestrator or the Concierge can steer a session whose tab the user shut.
 `ensemblr_send_follow_up` and `ensemblr_focus_tab` therefore restore a closed *chat* tab before they

@@ -32,7 +32,7 @@ const makeDeps = () => {
 	const deps = {
 		databaseService: { getConnection: () => ({ database: {} }) },
 		chatTabService: {
-			claimIdleChatTab: vi.fn(() => null),
+			claimPlaceholderChatTab: vi.fn(() => null),
 			openTab: vi.fn(() => ({ id: 'tab-1', metadata: {} })),
 			closeTab: vi.fn(),
 		},

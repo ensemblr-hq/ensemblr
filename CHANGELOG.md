@@ -34,6 +34,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A spawned conversation no longer lands in the tab you just opened.** Open a
+  new chat while an orchestrator is running, start typing a prompt, and its next
+  sub-agent could take that tab out from under you — the draft went with it and
+  the prompt was never sent. `ensemblr_start_conversation` claimed the
+  workspace's first *idle* chat tab, and idle was inferred from the row: a chat,
+  unnamed, with no conversation bound. A tab you opened a second ago looks
+  exactly like that, and has to — a composer draft is in-memory by design, so
+  that the app never puts text back in front of you that you do not remember
+  leaving, which means the main process has nothing else to read. Claimability is
+  now declared rather than inferred. The one open nobody asked for — the blank
+  chat the app opens to fill a workspace that has no tabs, so a first prompt has
+  a row to bind to — marks itself as the tab a spawn may take, and it is the only
+  one offered. Every other tab is yours from the moment it appears. The mark is
+  retired as soon as anybody spends the tab: by the claim, so a second spawn
+  arriving behind the first opens its own, and by the composer the moment a draft
+  or an attachment appears, which covers a workspace you opened, started typing
+  in, and the Concierge then delegated into.
+
 - **Steering a conversation whose tab was closed brings that tab back.** Closing
   a chat tab archives it without stopping the conversation inside, so an
   orchestrator or the Concierge could send a follow-up into a session whose tab
