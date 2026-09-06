@@ -34,6 +34,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Steering a conversation whose tab was closed brings that tab back.** Closing
+  a chat tab archives it without stopping the conversation inside, so an
+  orchestrator or the Concierge could send a follow-up into a session whose tab
+  sat in the closed-tabs menu — the agent ran, its turn streamed, and the only
+  way to watch it was to go hunting through closed history for a tab you did not
+  know had been steered. `ensemblr_send_follow_up` now reopens a closed chat tab
+  before it submits the prompt, so the turn arrives on screen, and
+  `ensemblr_focus_tab` reopens one before it navigates rather than aiming the
+  route at a tab the strip does not hold. Only ops that mean *somebody should
+  look at this now* reopen anything: a status read or a wait leaves a tab the
+  user deliberately closed shut, and so does a closed terminal tab, which carries
+  no live PTY and whose harness only the renderer can respawn. Only a tab that
+  would come back whole is reopened at all — a chat whose conversation has since
+  moved to another tab stays shut, because reopening it would surface an emptied
+  row rather than the conversation somebody asked to see.
+
 - **A workspace re-opens on the tab it was on, and closing one walks back the way
   you came.** Three faults compounded into the same symptom. The route loaders
   redirected to a synthetic placeholder chat id rather than the remembered tab,

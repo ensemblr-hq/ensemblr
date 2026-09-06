@@ -841,7 +841,7 @@ export default function ensemblrControl(pi: ExtensionAPI): void {
 	tool(
 		'ensemblr_send_follow_up',
 		'sendFollowUp',
-		'Send a follow-up prompt into a conversation that is already running, whichever runtime it is on — not necessarily a child you spawned. Pass the `agentSessionId` that opening the conversation returned, not your own.',
+		'Send a follow-up prompt into a conversation that is already running, whichever runtime it is on — not necessarily a child you spawned. Pass the `agentSessionId` that opening the conversation returned, not your own. Steering a conversation whose chat tab was closed puts that tab back in the tab strip, so the turn you asked for streams where the user is looking instead of into closed history.',
 		Type.Object({
 			agentSessionId: Type.String(),
 			prompt: Type.String(),
@@ -959,7 +959,7 @@ export default function ensemblrControl(pi: ExtensionAPI): void {
 	tool(
 		'ensemblr_focus_tab',
 		'focusTab',
-		'Bring a session tab (chat/terminal/diff/file) to the foreground by id.',
+		'Bring a session tab (chat/terminal/diff/file) to the foreground by id. Only a closed chat tab is reopened; every other closed kind, a terminal included, stays shut — a terminal carries no live PTY and only the user can respawn its harness. A closed chat whose conversation has since moved to another tab stays shut as well, since reopening it would surface an emptied row rather than the conversation.',
 		Type.Object({ chatTabId: Type.String() }),
 	);
 	tool(

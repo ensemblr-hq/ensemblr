@@ -216,7 +216,7 @@ export const TOOL_DEFS: readonly McpToolDef[] = [
 		name: 'ensemblr_send_follow_up',
 		op: 'sendFollowUp',
 		description:
-			'Send a follow-up prompt into a conversation that is already running, whichever runtime it is on — not necessarily a child you spawned. Pass the `agentSessionId` that opening the conversation returned, not your own.',
+			'Send a follow-up prompt into a conversation that is already running, whichever runtime it is on — not necessarily a child you spawned. Pass the `agentSessionId` that opening the conversation returned, not your own. Steering a conversation whose chat tab was closed puts that tab back in the tab strip, so the turn you asked for streams where the user is looking instead of into closed history.',
 		shape: {
 			agentSessionId: z.string(),
 			prompt: z.string(),
@@ -321,7 +321,7 @@ export const TOOL_DEFS: readonly McpToolDef[] = [
 		name: 'ensemblr_focus_tab',
 		op: 'focusTab',
 		description:
-			'Bring a session tab (chat/terminal/diff/file) to the foreground by id.',
+			'Bring a session tab (chat/terminal/diff/file) to the foreground by id. Only a closed chat tab is reopened; every other closed kind, a terminal included, stays shut — a terminal carries no live PTY and only the user can respawn its harness. A closed chat whose conversation has since moved to another tab stays shut as well, since reopening it would surface an emptied row rather than the conversation.',
 		shape: { chatTabId: z.string() },
 	},
 	{
