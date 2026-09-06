@@ -20,11 +20,11 @@ import type { RenameWorkspaceService } from '../../repository';
 import type { EnsemblrDatabaseService } from '../../storage';
 import { getChatTabByAgentSessionId } from '../../storage/repositories/chat-tab-repository.ts';
 import { applyBranchSlug } from './apply-branch-slug.ts';
-import { deriveProvisionalBranchSlug } from './provisional-branch-slug.ts';
+import { deriveProvisionalWorkspaceName } from './provisional-workspace-name.ts';
 
 /** One provisional-naming attempt, built from a session open or a prompt submit. */
 export interface ProvisionalNamingInput {
-	/** The user's prompt, which the slug describes. */
+	/** The user's prompt, which the name describes. */
 	prompt: string;
 	sessionId: string;
 	/** The session's workspace when the caller knows it; resolved from the tab otherwise. */
@@ -86,7 +86,7 @@ export function createProvisionalWorkspaceNaming({
 	};
 }
 
-/** Runs one gated attempt: derive the slug, then apply it as a provisional name. */
+/** Runs one gated attempt: derive the name, then apply it provisionally. */
 async function runProvisionalNaming({
 	databaseService,
 	input,
@@ -117,13 +117,13 @@ async function runProvisionalNaming({
 	if (!workspaceId) {
 		return;
 	}
-	const slug = deriveProvisionalBranchSlug(input.prompt);
-	if (!slug) {
+	const provisionalName = deriveProvisionalWorkspaceName(input.prompt);
+	if (!provisionalName) {
 		return;
 	}
 	const result = await applyBranchSlug({
 		database,
-		name: slug,
+		name: provisionalName,
 		namingEnabled: true,
 		provisional: true,
 		renameWorkspace,

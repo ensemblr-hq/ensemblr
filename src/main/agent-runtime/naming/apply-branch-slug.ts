@@ -1,5 +1,12 @@
 /**
- * Workspace + git-branch naming from a slug.
+ * Workspace + git-branch naming from one naming input.
+ *
+ * The input is rendered twice, for the two surfaces that carry it: the git
+ * branch takes the kebab slug, and the workspace takes a human-readable name
+ * with words and spaces. Workspace *creation* has always split it that way —
+ * `prepareWorkspace` keeps the typed name and slugs it separately for the
+ * folder and the branch — and rename does the same here, so a workspace is
+ * never titled with its own branch name minus the `prefix/`.
  *
  * Two callers reach it: the agent, through `ensemblr_set_branch_name`, and the
  * deterministic namer that runs when a session opens. Both go through the same
@@ -37,6 +44,7 @@ import {
 	isWorkspaceNameable,
 	sanitizeBranchSlug,
 } from '../branch-name-slug.ts';
+import { deriveWorkspaceDisplayName } from './workspace-display-name.ts';
 
 /** The workspace branch + metadata consulted by the rename gate. */
 interface WorkspaceRenameTarget {
@@ -61,8 +69,9 @@ export class BranchSlugRejected extends Error {
 }
 
 /**
- * Names a workspace and its git branch from one slug, keeping any `prefix/`
- * segment of the current branch. `namingEnabled` carries the user's resolved
+ * Names a workspace and its git branch from one naming input — the branch as a
+ * kebab slug, the workspace as a readable name — keeping any `prefix/` segment
+ * of the current branch. `namingEnabled` carries the user's resolved
  * `git.renameWorkspaceOnBranch` setting and is a hard gate that `userRequested`
  * does not lift: when it is off nothing is renamed and the caller is told to
  * stop, whatever the workspace's placeholder state.
@@ -72,9 +81,9 @@ export class BranchSlugRejected extends Error {
  * passes the narrower {@link isProvisionallyNameable} instead: a guess only ever
  * improves on a generated placeholder, so it never runs over a workspace
  * somebody has titled, nor a second time over a name it already guessed.
- * @param input - The workspace to name, the raw slug, whether the user asked for this rename by name, whether this is the app's own provisional guess, the user's naming setting, and the rename service.
+ * @param input - The workspace to name, the raw naming input, whether the user asked for this rename by name, whether this is the app's own provisional guess, the user's naming setting, and the rename service.
  * @returns Whether the name was applied, plus the resulting name and branch.
- * @throws {BranchSlugRejected} When the workspace is unknown, the slug is unusable, or the branch collides with an existing one.
+ * @throws {BranchSlugRejected} When the workspace is unknown, the input yields no usable slug, or the branch collides with an existing one.
  */
 export async function applyBranchSlug({
 	database,
@@ -107,7 +116,7 @@ export async function applyBranchSlug({
 	if (!slug) {
 		throw new BranchSlugRejected(
 			'invalid-slug',
-			`"${name}" has no usable branch-name characters. Use a kebab-case slug such as "add-dark-mode".`,
+			`"${name}" has no usable branch-name characters. Use a short name for the work, such as "Add dark mode".`,
 		);
 	}
 	const metadata = parseMetadata(target.metadataJson);
@@ -122,9 +131,10 @@ export async function applyBranchSlug({
 	}
 
 	const nextBranch = composeRenamedBranch(target.branchName ?? '', slug);
+	const displayName = deriveWorkspaceDisplayName(name) ?? slug;
 	const result = await renameWorkspace({
 		branchName: nextBranch,
-		name: isWorkspaceNameable(metadata) ? slug : target.name,
+		name: isWorkspaceNameable(metadata) ? displayName : target.name,
 		provisional,
 		requirePlaceholderName: !userRequested,
 		workspaceId,

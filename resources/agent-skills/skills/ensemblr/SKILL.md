@@ -65,9 +65,10 @@ workspace. Treat that shape as managed — never rearrange it by hand.
 ## Working the loops
 
 - **Name the work first.** Your tab (`ensemblr_set_name`), the workspace and its
-  branch together (`ensemblr_set_branch_name`, one kebab-case slug, one-shot).
-  Do it before the work, not after — until you do, the board shows a card whose
-  name says nothing.
+  branch together (`ensemblr_set_branch_name`, one short readable name of 2-5
+  words, e.g. `Add dark mode`, one-shot — the workspace takes it as written, the
+  branch takes it slugged). Do it before the work, not after — until you do, the
+  board shows a card whose name says nothing.
 - **Keep the tracked issue current.** Move it to a started state and claim it
   when you begin; move it to In Review the same turn the work becomes reviewable.
 - **Close the loop on review.** Resolve a diff comment only in the turn you

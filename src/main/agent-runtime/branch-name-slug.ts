@@ -3,16 +3,15 @@
  * a pure sibling helper is imported) so they unit-test under Vitest.
  */
 
-import { firstContentLine } from './naming/first-content-line.ts';
+import { readNamingInput } from './naming/naming-input.ts';
 
 const BRANCH_NAME_MAX_LENGTH = 40;
 
 /**
- * Normalizes raw LLM output into a git-safe kebab-case slug. Takes the first
- * non-empty line, strips code fences / quotes / `branch:`-style prefixes,
- * lower-cases, collapses every non-alphanumeric run to a single dash, trims
- * dashes, and caps the length at a word boundary. Returns null when nothing
- * usable remains.
+ * Normalizes raw LLM output into a git-safe kebab-case slug. Reads the bare
+ * name through {@link readNamingInput}, lower-cases it, collapses every
+ * non-alphanumeric run to a single dash, trims dashes, and caps the length at a
+ * word boundary. Returns null when nothing usable remains.
  * @param text - The collected agent response.
  * @returns A branch slug, or null.
  */
@@ -20,13 +19,10 @@ export function sanitizeBranchSlug(text: string): string | null {
 	if (!text) {
 		return null;
 	}
-	const firstLine = firstContentLine(text);
-	if (!firstLine) {
+	const cleaned = readNamingInput(text);
+	if (!cleaned) {
 		return null;
 	}
-	const cleaned = firstLine
-		.replace(/^(?:branch(?:\s*name)?|name)\s*[:\-—]\s*/i, '')
-		.replace(/^["'“”‘’`]+|["'“”‘’`]+$/g, '');
 	const slug = cleaned
 		.toLowerCase()
 		.replace(/[^a-z0-9]+/g, '-')

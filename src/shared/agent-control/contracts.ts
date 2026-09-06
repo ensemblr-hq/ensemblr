@@ -330,7 +330,10 @@ export const SET_BRANCH_NAME_LIMITS = {
 
 /** Args for `setBranchName`: name the caller's workspace and its git branch. */
 export interface SetBranchNameArgs {
-	/** Kebab-case slug describing the work, e.g. `add-dark-mode`. */
+	/**
+	 * Short readable name for the work, e.g. `Add dark mode`. The workspace
+	 * carries it as written; the branch carries it slugged.
+	 */
 	name: string;
 	/**
 	 * Set only when the user asked for a different branch name in so many words.

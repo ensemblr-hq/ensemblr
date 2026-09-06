@@ -1025,7 +1025,7 @@ describe('agent-control port adapters: branch naming', () => {
 		});
 
 		expect(renameWorkspace).toHaveBeenCalledWith(
-			expect.objectContaining({ name: 'add-dark-mode', workspaceId: 'ws' }),
+			expect.objectContaining({ name: 'Add dark mode', workspaceId: 'ws' }),
 		);
 		expect(result).toMatchObject({ applied: true, name: 'add-dark-mode' });
 		expect(broadcastTabsChanged).toHaveBeenCalledWith({ workspaceId: 'ws' });

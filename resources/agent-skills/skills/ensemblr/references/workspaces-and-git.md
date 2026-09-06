@@ -29,8 +29,14 @@ app.
 
 `git branch -m` desyncs the workspace from git and leaves the app pointing at a
 branch that no longer exists. Use **`ensemblr_set_branch_name`**, which renames
-the workspace and the branch together from one kebab-case slug and keeps any
-`prefix/` segment.
+the workspace and the branch together from one short readable name (2-5 words,
+e.g. `Add dark mode`) and keeps any `prefix/` segment.
+
+Write that name the way you would write it to a person: the workspace carries it
+as you spell it, and the branch carries it slugged, so `Fix the IPC handler`
+gives a workspace named that and a branch `fix-ipc-handler`. Spelling terms the
+way their owners spell them is the whole point — `GitHub` and `macOS` cannot be
+recovered from a lowercased slug.
 
 It is one-shot per workspace: a reply saying nothing changed is a settled
 outcome, not a fault to retry. When the *user* asks for a different name in so
