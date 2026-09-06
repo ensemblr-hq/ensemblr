@@ -239,6 +239,19 @@ export interface StartConversationArgs {
 	 * its own prompt.
 	 */
 	peer?: boolean;
+	/**
+	 * Open the conversation planning. Concierge-only, and the two turn-mode flags
+	 * below are the only way a mode reaches a spawn that does not inherit one:
+	 * every workspace agent passes its own mode down, while the Concierge holds no
+	 * composer chip of its own for a child to inherit from.
+	 */
+	planMode?: boolean;
+	/**
+	 * Open the conversation unattended, because the user has said they are away.
+	 * Concierge-only, on the same terms as {@link StartConversationArgs.planMode},
+	 * and mutually exclusive with it.
+	 */
+	afkMode?: boolean;
 }
 
 /**
