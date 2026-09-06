@@ -3,6 +3,8 @@ import { flushesAutomatically } from '../../src/renderer/hooks/workbench-shell/c
 import { resolveSendIntent } from '../../src/renderer/lib/workbench';
 import {
 	appendFollowUp,
+	createFollowUpQueueHold,
+	holdCoversEntry,
 	moveFollowUp,
 	removeFollowUp,
 	reorderFollowUps,
@@ -87,6 +89,55 @@ describe('follow-up queue ordering', () => {
 			'b',
 			'a',
 		]);
+	});
+});
+
+describe('queue pauses', () => {
+	test('a stop names the entries it parked and covers those alone', () => {
+		const hold = createFollowUpQueueHold('turn-stopped', [
+			entry('a'),
+			entry('b'),
+		]);
+
+		expect(hold).toEqual({ entryIds: ['a', 'b'], reason: 'turn-stopped' });
+		expect(holdCoversEntry(hold, 'a')).toBe(true);
+		expect(holdCoversEntry(hold, 'b')).toBe(true);
+	});
+
+	test('a message queued after a stop is not one of the messages it parked', () => {
+		// The whole of resuming without pressing Resume: the stop was about the
+		// messages on screen when it happened, not about the queue as a container.
+		const hold = createFollowUpQueueHold('turn-stopped', [entry('a')]);
+
+		expect(holdCoversEntry(hold, 'later')).toBe(false);
+	});
+
+	test('a stop over an empty queue parks nothing, so it stores no pause', () => {
+		// A hold naming no entries could never cover one, and a non-null pause that
+		// pauses nothing makes every reader check the list before trusting the flag.
+		expect(createFollowUpQueueHold('turn-stopped', [])).toBeNull();
+	});
+
+	test('a failed send pauses the queue whatever it holds, empty included', () => {
+		const hold = createFollowUpQueueHold('send-failed', []);
+
+		expect(hold).toEqual({ reason: 'send-failed' });
+		expect(holdCoversEntry(hold, 'a')).toBe(true);
+	});
+
+	test('an emptied queue is still paused by a failed send but not by a stop', () => {
+		// What lets a stop stop mattering once its messages are gone, while a
+		// session that would not take the last message keeps the queue shut.
+		const stopped = createFollowUpQueueHold('turn-stopped', [entry('a')]);
+		const failed = createFollowUpQueueHold('send-failed', [entry('a')]);
+
+		expect(holdCoversEntry(stopped, undefined)).toBe(false);
+		expect(holdCoversEntry(failed, undefined)).toBe(true);
+	});
+
+	test('no pause covers nothing', () => {
+		expect(holdCoversEntry(null, 'a')).toBe(false);
+		expect(holdCoversEntry(null, undefined)).toBe(false);
 	});
 });
 

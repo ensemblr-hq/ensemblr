@@ -3,6 +3,7 @@ import { atomFamily } from 'jotai-family';
 import { useCallback, useMemo } from 'react';
 
 import type {
+	FollowUpQueueHold,
 	FollowUpQueueHoldReason,
 	QueuedFollowUp,
 } from '@/renderer/types/workbench';
@@ -23,17 +24,73 @@ const followUpQueueAtomFamily = atomFamily((_chatTabId: string) =>
 );
 
 /**
- * Why a chat's queue is paused, keyed by chat-tab id, and null while it drains
- * normally. Set when the user stops a turn — a stop lowers the streaming flag
- * exactly like a natural finish, and draining into the silence the user just
- * asked for would send the very messages they were interrupting — and when a
- * send genuinely fails, so a broken session cannot empty the queue into the
- * void. The reason travels with the flag because a pause the user cannot explain
- * reads as the queue breaking rather than obeying them.
+ * Which of a chat's queued messages are paused, keyed by chat-tab id, and null
+ * while the queue drains normally — a stop that found nothing to park included.
+ * Set when the user stops a turn — a stop lowers the streaming flag exactly like
+ * a natural finish, and draining into the silence the user just asked for would
+ * send the very messages they were interrupting — and when a send genuinely
+ * fails, so a broken session cannot empty the queue into the void. The reason
+ * travels with the pause because one the user cannot explain reads as the queue
+ * breaking rather than obeying them.
  */
-const followUpQueueHoldReasonAtomFamily = atomFamily((_chatTabId: string) =>
-	atom<FollowUpQueueHoldReason | null>(null),
+const followUpQueueHoldAtomFamily = atomFamily((_chatTabId: string) =>
+	atom<FollowUpQueueHold | null>(null),
 );
+
+/**
+ * Builds the pause a reason means over the queue as it stands, or null when it
+ * would mean nothing.
+ *
+ * A stop is recorded against the entries it parked, so it dies with them rather
+ * than outliving the interruption and stranding every message queued afterwards.
+ * A stop over an empty queue therefore parks nothing and stores null rather than
+ * an empty list, which is what keeps "the pause atom is non-null" and "the queue
+ * is paused" the same statement — stopping with nothing queued is the ordinary
+ * case, and a hold that can never cover an entry would make every later reader
+ * check the list before believing the flag.
+ *
+ * Null there also clears a `send-failed` pause standing over an empty queue.
+ * That takes a failed send, the user deleting the entry it put back, and then a
+ * stop; what it leaves is an unpaused empty queue under an error strip that
+ * still names the failure, so it is accepted rather than branched around.
+ *
+ * Every reason other than a stop is about the session rather than the messages,
+ * so it covers the queue whatever ends up in it, empty included.
+ * @param reason - Why the queue is pausing
+ * @param queue - The queue at the moment it paused
+ * @returns The pause to store, or null when a stop found nothing to park
+ */
+export function createFollowUpQueueHold(
+	reason: FollowUpQueueHoldReason,
+	queue: readonly QueuedFollowUp[],
+): FollowUpQueueHold | null {
+	if (reason !== 'turn-stopped') {
+		return { reason };
+	}
+	const entryIds = queue.map((entry) => entry.id);
+	return entryIds.length === 0 ? null : { entryIds, reason };
+}
+
+/**
+ * Whether a pause covers a given entry. An absent entry — an empty queue — is
+ * covered by a session-wide pause and by nothing else, which is what lets a stop
+ * whose messages have all been sent, edited, or cleared away stop mattering.
+ * @param hold - The pause in force, or null while the queue drains
+ * @param entryId - Id of the entry being considered, or undefined for an empty queue
+ * @returns True when that entry may not be sent without the user's say-so
+ */
+export function holdCoversEntry(
+	hold: FollowUpQueueHold | null,
+	entryId: string | undefined,
+): boolean {
+	if (hold === null) {
+		return false;
+	}
+	if (hold.reason !== 'turn-stopped') {
+		return true;
+	}
+	return entryId !== undefined && hold.entryIds.includes(entryId);
+}
 
 /**
  * Appends an entry at the tail. Order is arrival order; the flush takes from the
@@ -142,7 +199,14 @@ export interface FollowUpQueueApi {
 	entries: readonly QueuedFollowUp[];
 	/** Queues a draft and returns the entry it created. */
 	enqueue: (input: Omit<QueuedFollowUp, 'id' | 'queuedAt'>) => QueuedFollowUp;
-	/** Why the queue is paused and will not drain on its own, or null while it does. */
+	/**
+	 * Why the head of the queue will not go on its own, or null while it will.
+	 *
+	 * Head-scoped rather than queue-scoped because a stop pauses the messages it
+	 * interrupted and not the ones queued after it: with the parked messages gone
+	 * the queue moves again, and the strip stops claiming a pause the user would
+	 * have to press Resume to clear.
+	 */
 	holdReason: FollowUpQueueHoldReason | null;
 	hold: (reason: FollowUpQueueHoldReason) => void;
 	move: (id: string, direction: 'down' | 'up') => void;
@@ -173,7 +237,10 @@ export interface FollowUpQueueApi {
 export function useFollowUpQueue(chatTabId: string): FollowUpQueueApi {
 	const store = useStore();
 	const entries = useAtomValue(followUpQueueAtomFamily(chatTabId));
-	const holdReason = useAtomValue(followUpQueueHoldReasonAtomFamily(chatTabId));
+	const hold = useAtomValue(followUpQueueHoldAtomFamily(chatTabId));
+	const [head] = entries;
+	const holdReason =
+		hold !== null && holdCoversEntry(hold, head?.id) ? hold.reason : null;
 
 	const update = useCallback(
 		(next: (queue: readonly QueuedFollowUp[]) => readonly QueuedFollowUp[]) => {
@@ -193,12 +260,17 @@ export function useFollowUpQueue(chatTabId: string): FollowUpQueueApi {
 			},
 			entries,
 			hold: (reason) =>
-				store.set(followUpQueueHoldReasonAtomFamily(chatTabId), reason),
+				store.set(
+					followUpQueueHoldAtomFamily(chatTabId),
+					createFollowUpQueueHold(
+						reason,
+						store.get(followUpQueueAtomFamily(chatTabId)),
+					),
+				),
 			holdReason,
 			move: (id, direction) =>
 				update((queue) => moveFollowUp(queue, id, direction)),
-			release: () =>
-				store.set(followUpQueueHoldReasonAtomFamily(chatTabId), null),
+			release: () => store.set(followUpQueueHoldAtomFamily(chatTabId), null),
 			remove: (id) => update((queue) => removeFollowUp(queue, id)),
 			reorder: (orderedIds) =>
 				update((queue) => reorderFollowUps(queue, orderedIds)),
@@ -241,7 +313,7 @@ export function useFollowUpQueue(chatTabId: string): FollowUpQueueApi {
  */
 export function forgetFollowUpQueue(chatTabId: string): void {
 	followUpQueueAtomFamily.remove(chatTabId);
-	followUpQueueHoldReasonAtomFamily.remove(chatTabId);
+	followUpQueueHoldAtomFamily.remove(chatTabId);
 }
 
 /**
@@ -264,4 +336,4 @@ export function useDropFollowUpQueue(): (chatTabId: string) => number {
 	);
 }
 
-export { followUpQueueAtomFamily, followUpQueueHoldReasonAtomFamily };
+export { followUpQueueAtomFamily, followUpQueueHoldAtomFamily };

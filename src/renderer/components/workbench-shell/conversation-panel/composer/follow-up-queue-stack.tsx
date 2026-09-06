@@ -28,7 +28,7 @@ interface FollowUpQueueStackProps {
 	onSendNow: (() => void) | null;
 	/** Sends one entry out of turn; null while the composer cannot send at all. */
 	onSteer: ((id: string) => void) | null;
-	/** Why a stop or a failed send paused the queue outright, or null while it is not paused. */
+	/** Why the head will not go on its own — a stop, or a failed send — or null while it will. */
 	pauseReason: FollowUpQueueHoldReason | null;
 	/** True while the queue waits on the user rather than on the agent. */
 	stalled: boolean;
@@ -50,6 +50,12 @@ type QueueStatus = 'draining' | 'paused' | 'waiting';
  * the user stopped from one whose session would not take the message, and a
  * pause a user cannot account for is what made this read as arbitrary.
  *
+ * The stop line names the stop and nothing further. A pause is scoped to the
+ * messages it parked rather than to the queue, so the rows on screen can be a
+ * stopped message with newer ones queued behind it; a line saying what the pause
+ * is *about* would be false of half that list, and the strip has no room to name
+ * which rows it means.
+ *
  * Switched rather than chained so a reason added to
  * {@link FollowUpQueueHoldReason} is a compile error here rather than a paused
  * queue quietly rendering the draining line.
@@ -67,7 +73,7 @@ function queueStatusLine(
 		case 'turn-stopped':
 			return t(
 				'workbench:follow-up-queue.status-paused-stopped',
-				'Paused — you stopped the turn these were waiting for',
+				'Paused — you stopped the turn',
 			);
 		case 'send-failed':
 			return t(

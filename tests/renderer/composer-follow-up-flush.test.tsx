@@ -21,7 +21,7 @@ import {
 } from '../../src/renderer/hooks/workbench-shell/composer/use-composer-submit';
 import {
 	followUpQueueAtomFamily,
-	followUpQueueHoldReasonAtomFamily,
+	followUpQueueHoldAtomFamily,
 } from '../../src/renderer/state/composer';
 import {
 	appSettingsAtom,
@@ -123,7 +123,7 @@ function mount({
 
 	const queued = () => store.get(followUpQueueAtomFamily(chatTabId));
 	const pauseReason = () =>
-		store.get(followUpQueueHoldReasonAtomFamily(chatTabId));
+		store.get(followUpQueueHoldAtomFamily(chatTabId))?.reason ?? null;
 	const send = (text: string) =>
 		act(() => {
 			view.result.current.dispatchSubmit({
@@ -307,7 +307,10 @@ describe('flushing when the turn ends', () => {
 				text: 'parked',
 			},
 		]);
-		store.set(followUpQueueHoldReasonAtomFamily(CHAT_TAB_ID), 'turn-stopped');
+		store.set(followUpQueueHoldAtomFamily(CHAT_TAB_ID), {
+			entryIds: ['parked'],
+			reason: 'turn-stopped',
+		});
 		const { onSubmit, queued } = mount({
 			behavior: 'queue',
 			isStreaming: false,
@@ -374,6 +377,100 @@ describe('flushing when the turn ends', () => {
 		expect(onSubmit).not.toHaveBeenCalled();
 		expect(queued()).toHaveLength(1);
 		expect(pauseReason()).toBe('turn-stopped');
+	});
+
+	test('a message queued after a stop goes without the queue being resumed', async () => {
+		// The streaming flag reads a session status that settles a round-trip after
+		// the stop, so a message typed straight afterwards is queued rather than
+		// sent. Pausing the whole queue stranded it behind an interruption it was
+		// written in answer to, and every later queue needed Resume pressed by hand.
+		const { onSubmit, queued, send, view } = mount({
+			behavior: 'queue',
+			isStreaming: true,
+		});
+
+		await act(async () => {
+			await view.result.current.handleStop();
+		});
+		send('and now do this instead');
+		act(() => view.rerender({ streaming: false }));
+
+		await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+		expect(prompts(onSubmit)).toEqual(['and now do this instead']);
+		expect(queued()).toHaveLength(0);
+		expect(view.result.current.queueStalled).toBe(false);
+	});
+
+	test('the messages a stop parked stay parked while a newer one waits behind them', async () => {
+		const { onSubmit, queued, send, view } = mount({
+			behavior: 'queue',
+			isStreaming: true,
+		});
+
+		send('parked');
+		await act(async () => {
+			await view.result.current.handleStop();
+		});
+		send('newer');
+		act(() => view.rerender({ streaming: false }));
+
+		await new Promise((resolve) => setTimeout(resolve, 0));
+
+		expect(onSubmit).not.toHaveBeenCalled();
+		expect(queued().map((entry) => entry.text)).toEqual(['parked', 'newer']);
+		expect(view.result.current.queueStalled).toBe(true);
+	});
+
+	test('clearing the messages a stop parked lets the queue move again', async () => {
+		// Stop, discard the stale messages, type a fresh one: the pause has nothing
+		// left to protect, so nothing should be asking the user to resume it.
+		const { onSubmit, queued, send, view } = mount({
+			behavior: 'queue',
+			isStreaming: true,
+		});
+
+		send('parked');
+		await act(async () => {
+			await view.result.current.handleStop();
+		});
+		act(() => view.result.current.queue.clear());
+		send('fresh');
+		act(() => view.rerender({ streaming: false }));
+
+		await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+		expect(prompts(onSubmit)).toEqual(['fresh']);
+		expect(queued()).toHaveLength(0);
+	});
+
+	test('sending the message ahead of a parked one leaves the stop in force', async () => {
+		// The strip has one button and it says two things: Resume when the head is
+		// paused, Send next when the behavior is merely holding it back. With a
+		// newer message dragged above a parked one it reads Send next, so releasing
+		// the whole pause on that press would throw away the stop the user cannot
+		// see from there — and the parked message would come back as an ordinary
+		// held-back one, sent by the next routine press.
+		const { onSubmit, pauseReason, queued, send, view } = mount({
+			behavior: 'block',
+			isStreaming: true,
+		});
+
+		send('parked');
+		await act(async () => {
+			await view.result.current.handleStop();
+		});
+		send('newer');
+		const [parked, newer] = queued();
+		act(() => view.result.current.queue.reorder([newer.id, parked.id]));
+		act(() => view.rerender({ streaming: false }));
+
+		expect(view.result.current.queue.holdReason).toBeNull();
+
+		act(() => view.result.current.flushQueueNow());
+
+		await waitFor(() => expect(prompts(onSubmit)).toEqual(['newer']));
+		expect(queued().map((entry) => entry.text)).toEqual(['parked']);
+		expect(pauseReason()).toBe('turn-stopped');
+		expect(view.result.current.queue.holdReason).toBe('turn-stopped');
 	});
 
 	test('a failed send puts the entry back at the head and pauses', async () => {

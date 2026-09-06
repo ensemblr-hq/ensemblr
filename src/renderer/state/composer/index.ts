@@ -42,9 +42,11 @@ export type { FollowUpQueueApi } from './follow-up-queue';
 export {
 	appendFollowUp,
 	createFollowUp,
+	createFollowUpQueueHold,
 	followUpQueueAtomFamily,
-	followUpQueueHoldReasonAtomFamily,
+	followUpQueueHoldAtomFamily,
 	forgetFollowUpQueue,
+	holdCoversEntry,
 	moveFollowUp,
 	removeFollowUp,
 	reorderFollowUps,

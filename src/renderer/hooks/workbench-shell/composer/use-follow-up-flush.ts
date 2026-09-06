@@ -23,9 +23,9 @@ export function flushesAutomatically(
 }
 
 /**
- * Whether a turn end has an entry to answer it. False for a paused queue, an
- * empty one, and one whose head is a message the behavior holds back — the three
- * ways a turn end is settled rather than merely postponed.
+ * Whether a turn end has an entry to answer it. False for a paused head, an
+ * empty queue, and a head the behavior holds back — the three ways a turn end is
+ * settled rather than merely postponed.
  * @param queue - The chat's follow-up queue
  * @param behavior - The Follow-up behavior setting
  * @returns True when the head may be sent now
@@ -51,12 +51,15 @@ function hasSendableHead(
  * witness on the way back. Waiting for the next one strands the queue for good,
  * because the turn it is waiting on is the one it was supposed to start.
  *
- * `holdReason` is what says a queue must not drain on its own, and both paths
- * that mean it set it: a stop, and a send that genuinely failed. Together with
- * the `block` behavior that is the whole of "leave this alone", so an idle agent
- * and a sendable head need no further permission. A send the composer merely
- * turned away sets nothing — the entry goes back on the queue, which is a change
- * this effect re-reads, so it is re-attempted as soon as `canSend` allows.
+ * `holdReason` is what says the head must not go on its own, and both paths that
+ * mean it set it: a stop, and a send that genuinely failed. It is head-scoped,
+ * so a stop stops mattering once the messages it interrupted are gone and a
+ * message queued after one drains without the user resuming anything. Together
+ * with the `block` behavior that is the whole of "leave this alone", so an idle
+ * agent and a sendable head need no further permission. A send the composer
+ * merely turned away sets nothing — the entry goes back on the queue, which is a
+ * change this effect re-reads, so it is re-attempted as soon as `canSend`
+ * allows.
  *
  * Sending the head raises `isStreaming` again, so the next entry waits for that
  * turn in its own right. Ordering stays FIFO, each queued message gets its own

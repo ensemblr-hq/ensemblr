@@ -149,7 +149,7 @@ describe('the queue stack', () => {
 		});
 
 		expect(
-			screen.getByText('Paused — you stopped the turn these were waiting for'),
+			screen.getByText('Paused — you stopped the turn'),
 		).toBeInTheDocument();
 		await userEvent.click(screen.getByRole('button', { name: 'Resume' }));
 

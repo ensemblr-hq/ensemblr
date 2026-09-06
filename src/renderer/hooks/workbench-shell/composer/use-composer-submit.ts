@@ -451,12 +451,12 @@ export function useComposerSubmit({
 	});
 
 	const [queueHead] = queue.entries;
-	// Whether the queue is waiting on the user rather than on the agent: paused
-	// after a stop or a failed flush, or holding a `block`-mode message once the
-	// agent has freed up. The second case never drains on its own, so without it
-	// the panel would show a queue with no way to send it. Mid-turn under `block`
-	// there is still nothing the user can do, so it stays false until the turn
-	// ends rather than offering a control that would no-op.
+	// Whether the queue is waiting on the user rather than on the agent: its head
+	// paused after a stop or a failed flush, or a `block`-mode message held once
+	// the agent has freed up. The second case never drains on its own, so without
+	// it the panel would show a queue with no way to send it. Mid-turn under
+	// `block` there is still nothing the user can do, so it stays false until the
+	// turn ends rather than offering a control that would no-op.
 	const queueStalled =
 		queue.holdReason !== null ||
 		(!composer.isStreaming &&
@@ -466,10 +466,15 @@ export function useComposerSubmit({
 	return {
 		dispatchSubmit,
 		/**
-		 * Stops the turn and pauses the queue with it. A stop lowers the streaming
-		 * flag exactly like a natural finish, so without the pause the flush would
-		 * read the interruption as the agent finishing and send the very messages
-		 * the user was cutting short.
+		 * Stops the turn and parks the messages that were waiting for it. A stop
+		 * lowers the streaming flag exactly like a natural finish, so without the
+		 * pause the flush would read the interruption as the agent finishing and
+		 * send the very messages the user was cutting short.
+		 *
+		 * It parks those messages and no others. The streaming flag reads a session
+		 * status that only settles a round-trip after the stop, so a message typed
+		 * straight afterwards is queued rather than sent — and holding the whole
+		 * queue would strand it behind an interruption it was written in answer to.
 		 */
 		handleStop: useCallback(async () => {
 			queue.hold('turn-stopped');
@@ -480,9 +485,19 @@ export function useComposerSubmit({
 		 * "stop holding" — the head still waits for the turn to end, because that is
 		 * the whole point of not steering. Idle, the head goes straight out and the
 		 * flush takes the rest as each turn finishes.
+		 *
+		 * Releases only a pause the user can see. This control is the strip's one
+		 * button and it says two different things: `Resume` when the head is paused,
+		 * `Send next` when the behavior is merely holding it back. Since a pause is
+		 * scoped to the messages a stop parked, a queue can be unpaused at the head
+		 * and still be guarding a stopped message further down — releasing there
+		 * would discard that guard on a press the user read as "send this one", and
+		 * the parked message would then drain on its own turn.
 		 */
 		flushQueueNow: useCallback(() => {
-			queue.release();
+			if (queue.holdReason !== null) {
+				queue.release();
+			}
 			if (composer.isStreaming) {
 				return;
 			}

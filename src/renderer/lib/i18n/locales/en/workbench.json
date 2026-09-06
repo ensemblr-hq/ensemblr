@@ -740,7 +740,7 @@
 		"send-next": "Send next",
 		"status-draining": "Sending one at a time as the agent finishes",
 		"status-paused-failed": "Paused — the last message could not be sent",
-		"status-paused-stopped": "Paused — you stopped the turn these were waiting for",
+		"status-paused-stopped": "Paused — you stopped the turn",
 		"status-waiting": "Held back — send them yourself when you are ready",
 		"steer": "Steer the agent with this now",
 		"steer-blocked": "The agent cannot take a message right now"
