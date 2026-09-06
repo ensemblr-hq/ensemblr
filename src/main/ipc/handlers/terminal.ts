@@ -1,6 +1,8 @@
 import { ipcMain } from 'electron';
 import { IPC_CHANNELS } from '../../../shared/ipc/channels';
 import type {
+	CloseTerminalRequest,
+	CloseTerminalResult,
 	CreateTerminalSessionRequest,
 	CreateTerminalSessionResult,
 	KillTerminalRequest,
@@ -19,7 +21,7 @@ import { TerminalServiceError } from '../../terminal/terminal-service';
 
 /**
  * Registers the IPC handlers for PTY-backed terminal sessions: create, input,
- * resize, kill, list, list-restorable, and re-attach snapshot.
+ * resize, kill, close, list, list-restorable, and re-attach snapshot.
  * @param options - Required services.
  */
 export function registerTerminalHandlers({
@@ -74,6 +76,31 @@ export function registerTerminalHandlers({
 							},
 						],
 						session: null,
+					};
+				}
+
+				throw error;
+			}
+		},
+	);
+
+	ipcMain.handle(
+		IPC_CHANNELS.closeTerminalSession,
+		(_event, request: CloseTerminalRequest): CloseTerminalResult => {
+			try {
+				terminalService.close(request.terminalId);
+
+				return { diagnostics: [] };
+			} catch (error) {
+				if (error instanceof TerminalServiceError) {
+					return {
+						diagnostics: [
+							{
+								code: error.code,
+								message: error.message,
+								severity: 'error',
+							},
+						],
 					};
 				}
 

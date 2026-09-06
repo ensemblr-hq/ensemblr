@@ -217,6 +217,7 @@ export function createEnsemblrApi(): EnsemblrApi {
 		infisicalSetLink: (request) => invoke('infisicalSetLink', request),
 		infisicalSync: (request) => invoke('infisicalSync', request),
 		infisicalTestAccount: (request) => invoke('infisicalTestAccount', request),
+		closeTerminalSession: (request) => invoke('closeTerminalSession', request),
 		killTerminalSession: (request) => invoke('killTerminalSession', request),
 		clearDictationApiKey: () => invoke('clearDictationApiKey'),
 		dictationKeyStatus: () => invoke('dictationKeyStatus'),

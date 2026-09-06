@@ -97,15 +97,6 @@ export interface TerminalSessionSnapshot {
 	 */
 	scriptName: string | null;
 	status: TerminalSessionStatus;
-	/**
-	 * Position of this interactive terminal among the workspace's dock terminals,
-	 * counting from 1, so unnamed tabs read `Terminal 1`, `Terminal 2`, and so on.
-	 * `null` for every other kind — setup, run, archive, and agent sessions are not
-	 * numbered. Assigned once at creation as the lowest number no live dock
-	 * terminal holds and never reassigned, so closing one tab does not renumber the
-	 * rest; the number is released when its own tab closes.
-	 */
-	terminalNumber: number | null;
 	title: string;
 	/**
 	 * True while {@link title} is the English stand-in main assigns a session that
@@ -170,6 +161,20 @@ export interface KillTerminalRequest {
 export interface KillTerminalResult {
 	diagnostics: TerminalDiagnostic[];
 	session: TerminalSessionSnapshot | null;
+}
+
+/**
+ * Request to close a dock terminal: stop it and drop it from the workspace for
+ * good. Distinct from killing one, which stops the process but leaves the
+ * session listed so its tab can still show the outcome.
+ */
+export interface CloseTerminalRequest {
+	terminalId: string;
+}
+
+/** Result of closing a dock terminal, carrying any failure to reach the session. */
+export interface CloseTerminalResult {
+	diagnostics: TerminalDiagnostic[];
 }
 
 /** Request to list terminal sessions. */
@@ -250,6 +255,9 @@ export interface TerminalLifecycleBroadcast {
 
 /** Terminal slice of the `window.ensemblr` API. */
 export interface TerminalApi {
+	closeTerminalSession: (
+		request: CloseTerminalRequest,
+	) => Promise<CloseTerminalResult>;
 	createTerminalSession: (
 		request: CreateTerminalSessionRequest,
 	) => Promise<CreateTerminalSessionResult>;

@@ -40,7 +40,6 @@ function createSession(
 		rows: 24,
 		scriptName: null,
 		status: 'running',
-		terminalNumber: 1,
 		title: 'Terminal',
 		titleIsDefault: false,
 		workspaceId: 'workspace-1',

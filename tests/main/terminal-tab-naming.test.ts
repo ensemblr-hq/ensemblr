@@ -1,26 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
 import { resolveForegroundCommand } from '../../src/main/terminal/foreground-command.ts';
-import { allocateTerminalNumber } from '../../src/main/terminal/terminal-numbering.ts';
-
-describe('allocateTerminalNumber', () => {
-	it('starts at one and counts up while every number is held', () => {
-		expect(allocateTerminalNumber([])).toBe(1);
-		expect(allocateTerminalNumber([1])).toBe(2);
-		expect(allocateTerminalNumber([1, 2, 3])).toBe(4);
-	});
-
-	// The alternative — always taking one past the highest — reaches Terminal 47
-	// on a dock that has been open all day.
-	it('fills the gap a closed terminal left rather than counting past it', () => {
-		expect(allocateTerminalNumber([1, 3])).toBe(2);
-		expect(allocateTerminalNumber([2, 3])).toBe(1);
-	});
-
-	it('ignores duplicates and unordered input', () => {
-		expect(allocateTerminalNumber([3, 1, 1, 3])).toBe(2);
-	});
-});
 
 describe('resolveForegroundCommand', () => {
 	it('reports nothing while the session shell itself holds the foreground', () => {

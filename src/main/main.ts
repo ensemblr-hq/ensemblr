@@ -957,7 +957,7 @@ const workspaceTeardownService = createWorkspaceTeardownService({
 			.listSessionsForWorkspace(workspaceId)
 			.map((session) => session.id),
 	listTerminalIds: (workspaceId) =>
-		terminalService.list(workspaceId).map((session) => session.id),
+		terminalService.readWorkspaceSessionIds(workspaceId),
 	readTerminalScrollbacks: (workspaceId) =>
 		terminalService.readWorkspaceScrollbacks(workspaceId),
 	releaseAgentControl: (sessionId) => {

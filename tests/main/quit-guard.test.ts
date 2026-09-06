@@ -30,7 +30,6 @@ function terminal(
 		rows: 24,
 		scriptName: null,
 		status: 'running',
-		terminalNumber: null,
 		title: `${SPINNER} Fix login bug`,
 		titleIsDefault: false,
 		workspaceId: 'w1',

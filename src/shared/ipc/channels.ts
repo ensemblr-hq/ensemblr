@@ -64,6 +64,7 @@ export const IPC_CHANNELS = {
 	cloneGithubRepositoryPrepare: 'ensemblr:clone-github-repository:prepare',
 	cloneGithubRepositoryProgress: 'ensemblr:clone-github-repository:progress',
 	cloneGithubRepositoryStart: 'ensemblr:clone-github-repository:start',
+	closeTerminalSession: 'ensemblr:close-terminal-session',
 	commitWorkspaceChanges: 'ensemblr:commit-workspace-changes',
 	computeTurnDiff: 'ensemblr:compute-turn-diff',
 	confirmRootDirectoryChange: 'ensemblr:confirm-root-directory-change',

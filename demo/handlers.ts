@@ -230,7 +230,6 @@ function terminalSession(
 		rows: 30,
 		scriptName: terminal.scriptName ?? null,
 		status: terminal.status ?? 'running',
-		terminalNumber: null,
 		title: terminal.title,
 		titleIsDefault: false,
 		workspaceId: scenario.workspaceId,

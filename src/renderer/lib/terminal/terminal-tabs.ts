@@ -126,15 +126,17 @@ export function terminalSessionToDockStatus(
  * Names one terminal dock tab. A command running in the terminal wins over
  * everything: the foreground process is what the tab is doing right now, and it
  * clears the moment the command finishes, so the tab falls back to its own name.
- * That name is whatever the terminal was titled, or its number when nobody
- * titled it — main leaves an unnamed session's `title` as an English stand-in,
- * so the number is rendered here rather than travelling as text.
+ * That name is whatever the terminal was titled, or its position in the strip
+ * when nobody titled it — main leaves an unnamed session's `title` as an English
+ * stand-in, so the number is rendered here rather than travelling as text.
  * @param session - The interactive session backing the tab.
+ * @param position - Where the tab sits in the terminal strip, counting from 1.
  * @param t - Translator bound to the active language.
  * @returns The label to show on the tab.
  */
 function terminalDockTabLabel(
 	session: TerminalSessionSnapshot,
+	position: number,
 	t: TFunction,
 ): string {
 	if (session.foregroundCommand) {
@@ -143,11 +145,11 @@ function terminalDockTabLabel(
 	if (!session.titleIsDefault) {
 		return session.title;
 	}
-	return session.terminalNumber === null
-		? t('workbench:dock-tab.terminal.label', 'Terminal')
-		: t('workbench:dock-tab.terminal.numbered-label', 'Terminal {{number}}', {
-				number: session.terminalNumber,
-			});
+	return t(
+		'workbench:dock-tab.terminal.numbered-label',
+		'Terminal {{number}}',
+		{ number: position },
+	);
 }
 
 /**
@@ -155,6 +157,12 @@ function terminalDockTabLabel(
  * workspace. Script-kind sessions render in the fixed Setup/Run tabs and are
  * excluded here. With no interactive session the dock shows only Setup/Run and
  * the `+` button — an empty list is returned.
+ *
+ * An unnamed tab is numbered by where it sits in the strip this builds rather
+ * than by a number fixed at creation, so the numbers follow the strip's own
+ * order: closing one renumbers those after it, and reordering the strip reorders
+ * the numbers with it. A named tab occupies a position without consuming a
+ * number, so the numbered tabs are ordered but need not form an unbroken 1..n.
  * @param options - Live sessions plus the interactive terminal ids with recent output activity.
  * @returns The terminal dock tabs (empty when no interactive session exists).
  */
@@ -175,7 +183,7 @@ export function mapTerminalSessionsToDockTabs({
 		tabs.push({
 			id: `terminal:${session.id}` as const,
 			kind: 'terminal',
-			label: terminalDockTabLabel(session, t),
+			label: terminalDockTabLabel(session, tabs.length + 1, t),
 			sessionStatus: session.status,
 			status:
 				session.status === 'running' && activeTerminalIds.has(session.id)
