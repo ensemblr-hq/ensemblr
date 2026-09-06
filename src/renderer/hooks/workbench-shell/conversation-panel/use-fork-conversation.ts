@@ -9,6 +9,7 @@ import {
 	openChatTab,
 	writeForkSummary,
 } from '@/renderer/api/ensemblr-queries';
+import { reportCreateWorkspaceWarnings } from '@/renderer/lib/workbench/create-workspace-warnings';
 import { useComposerAttachmentDispatcher } from '@/renderer/state/composer';
 import type { WorkspaceShellModel } from '@/renderer/types/workbench';
 import { pickComposerSurname } from '@/shared/workspace-name-pool';
@@ -153,6 +154,7 @@ export function useForkConversation({
 							);
 						throw new Error(reason);
 					}
+					reportCreateWorkspaceWarnings(created);
 					const target = created.workspace;
 					const opened = await openChatTab({
 						title: t('workbench:fork.new-tab-title', 'Forked chat'),

@@ -202,6 +202,8 @@
 		"callback-failed": "Ensemblr could not open the local port Linear sends you back to. Close other Ensemblr windows, then retry.",
 		"callback-timeout": "Linear did not answer in time. Try signing in again.",
 		"command-failed": "The command failed.",
+		"configured-base-invalid": "The branch new workspaces fork from is not a usable branch name, so this workspace took the repository default as its base instead.",
+		"configured-base-unresolvable": "The branch new workspaces fork from could not be resolved, so this workspace took the repository default as its base instead.",
 		"copy-failed": "The files could not be copied.",
 		"database-error": "The local database is unavailable, so the Linear account was not saved.",
 		"database-unavailable": "The local database is unavailable, so nothing was changed.",

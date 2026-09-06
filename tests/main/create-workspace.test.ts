@@ -25,6 +25,10 @@ import {
 	openEnsemblrDatabase,
 } from '../../src/main/storage/database.ts';
 import type { GitSettings } from '../../src/shared/config.ts';
+import type {
+	SettingsResolutionSnapshot,
+	SettingsResolutionSource,
+} from '../../src/shared/ipc/contracts/settings-resolution.ts';
 import { toWorkspaceDisplayName } from '../../src/shared/workspace-name.ts';
 import { buildRootDirectoryStub } from './helpers/root-directory-stub.ts';
 
@@ -138,6 +142,77 @@ const rootDirectoryStub = (
 
 function runGit(cwd: string, args: string[]): string {
 	return execFileSync('git', args, { cwd, encoding: 'utf8' }).trim();
+}
+
+/**
+ * A settings snapshot carrying nothing but a resolved `branchFrom`. The source
+ * is named per test rather than fixed: creation reads the resolved value and
+ * cannot tell the two apart, but `ensemblr-config` is the repository's own
+ * committed settings file — which outranks `sqlite` — so a test about a hostile
+ * value should say that is where it came from.
+ * @param value - The resolved `branchFrom`.
+ * @param source - Which layer won the resolution.
+ * @returns A snapshot the service can read that one setting out of.
+ */
+function branchFromSettings(
+	value: string,
+	source: SettingsResolutionSource = 'sqlite',
+): SettingsResolutionSnapshot {
+	return {
+		app: { diagnostics: [], settings: [] },
+		repository: {
+			diagnostics: [],
+			settings: [
+				{
+					candidates: [],
+					key: 'branchFrom',
+					locked: false,
+					source,
+					value,
+				},
+			],
+		},
+	};
+}
+
+/**
+ * Gives the harness repository a real bare `origin` with `main` pushed to it,
+ * so a base the service decides to fetch has somewhere to fetch from.
+ * @param harness - The sandbox whose repository gains the remote.
+ */
+function attachOrigin(harness: Harness): void {
+	const remotePath = path.join(harness.rootPath, 'origin.git');
+	runGit(harness.rootPath, ['init', '--bare', remotePath]);
+	runGit(harness.repositoryPath, ['remote', 'add', 'origin', remotePath]);
+	runGit(harness.repositoryPath, ['push', 'origin', 'main']);
+}
+
+/**
+ * Gives the harness repository an `origin` holding a branch the clone itself
+ * has no ref for — the state a GitHub-listed branch is in before anything
+ * fetches it.
+ * @param harness - The sandbox whose repository gains the remote.
+ * @param branch - Branch to publish and then forget locally.
+ * @returns The commit sha the published branch points at.
+ */
+function publishUnfetchedBranch(harness: Harness, branch: string): string {
+	attachOrigin(harness);
+
+	runGit(harness.repositoryPath, ['checkout', '-b', branch]);
+	writeFileSync(path.join(harness.repositoryPath, `${branch}.md`), '# ahead\n');
+	runGit(harness.repositoryPath, ['add', '.']);
+	runGit(harness.repositoryPath, ['commit', '-m', branch]);
+	const tip = runGit(harness.repositoryPath, ['rev-parse', 'HEAD']);
+	runGit(harness.repositoryPath, ['push', 'origin', branch]);
+
+	runGit(harness.repositoryPath, ['checkout', 'main']);
+	runGit(harness.repositoryPath, ['branch', '-D', branch]);
+	runGit(harness.repositoryPath, [
+		'update-ref',
+		'-d',
+		`refs/remotes/origin/${branch}`,
+	]);
+	return tip;
 }
 
 function listWorktrees(repositoryPath: string): string[] {
@@ -304,10 +379,136 @@ test('falls back to the root branch when the configured branchFrom is missing', 
 	});
 
 	// A configured base that no longer resolves must not blow up creation with
-	// `git-worktree-failed`; it degrades to the live root branch instead.
+	// `git-worktree-failed`; it degrades to the live root branch instead, and
+	// says so rather than looking like the setting was ignored.
 	assert.equal(result.status, 'success');
-	assert.notEqual(result.diagnostics[0]?.code, 'git-worktree-failed');
+	assert.equal(result.diagnostics[0]?.code, 'configured-base-unresolvable');
+	assert.equal(result.diagnostics[0]?.severity, 'warning');
 	assert.equal(result.workspace?.baseBranch, 'main');
+});
+
+test('fetches a configured branchFrom this clone has never seen', async (t) => {
+	const harness = createHarness(t);
+	const remoteTip = publishUnfetchedBranch(harness, 'staging');
+	const service = createWorkspaceService({
+		databaseService: harness.databaseService,
+		localCommandService: createLocalCommandService(),
+		now: fixedNow,
+		readRepositorySettings: () => branchFromSettings('origin/staging'),
+		rootDirectoryService: rootDirectoryStub(harness),
+	});
+
+	const result = await service.create({
+		name: 'from-staging',
+		repositoryId: harness.repositoryId,
+	});
+
+	// The Git settings picker lists branches from GitHub, not from local refs,
+	// so a perfectly valid selection can name a ref this clone has never
+	// fetched. Probing it without fetching first silently drops the setting and
+	// cuts every workspace off the root branch.
+	assert.equal(result.status, 'success');
+	assert.deepEqual(result.diagnostics, []);
+	assert.equal(result.workspace?.baseBranch, 'origin/staging');
+	assert.equal(
+		runGit(result.workspace?.path ?? '', ['rev-parse', 'HEAD']),
+		remoteTip,
+	);
+});
+
+test('refuses a configured branchFrom that would smuggle a git option', async (t) => {
+	const harness = createHarness(t);
+	const service = createWorkspaceService({
+		databaseService: harness.databaseService,
+		localCommandService: createLocalCommandService(),
+		now: fixedNow,
+		readRepositorySettings: () =>
+			branchFromSettings(
+				'origin/--upload-pack=/tmp/pwned.sh',
+				'ensemblr-config',
+			),
+		rootDirectoryService: rootDirectoryStub(harness),
+	});
+
+	const result = await service.create({
+		name: 'hostile-base',
+		repositoryId: harness.repositoryId,
+	});
+
+	// The setting stores a ref verbatim, and the base is now fetched before it
+	// is probed, so a dash-led segment must never reach `git fetch`. It is
+	// reported apart from a base that was fetched and still did not resolve:
+	// this one names a setting to correct, not a branch that is gone.
+	assert.equal(result.status, 'success');
+	assert.equal(result.diagnostics[0]?.code, 'configured-base-invalid');
+	assert.equal(result.diagnostics[0]?.severity, 'warning');
+	assert.equal(result.workspace?.baseBranch, 'main');
+});
+
+test('refuses a configured branchFrom carrying a writing refspec', async (t) => {
+	const harness = createHarness(t);
+	attachOrigin(harness);
+	const service = createWorkspaceService({
+		databaseService: harness.databaseService,
+		localCommandService: createLocalCommandService(),
+		now: fixedNow,
+		readRepositorySettings: () =>
+			branchFromSettings('origin/+main:refs/heads/pwned', 'ensemblr-config'),
+		rootDirectoryService: rootDirectoryStub(harness),
+	});
+
+	const result = await service.create({
+		name: 'refspec-base',
+		repositoryId: harness.repositoryId,
+	});
+
+	// `branchFrom` is read from the repository's committed settings, which
+	// outrank the user's own, so its value can belong to whoever wrote the
+	// repository. `ensureBaseRefAvailable` hands the tail to `git fetch origin
+	// <tail>`, where a colon makes it a refspec that writes a local ref — and a
+	// leading `+` makes that write a forced one.
+	assert.equal(result.status, 'success');
+	assert.equal(result.diagnostics[0]?.code, 'configured-base-invalid');
+	assert.equal(result.workspace?.baseBranch, 'main');
+	assert.equal(
+		runGit(harness.repositoryPath, ['branch', '--list', 'pwned']),
+		'',
+	);
+});
+
+test('warns about an unresolvable base without disturbing an adopted branch', async (t) => {
+	const harness = createHarness(t);
+	runGit(harness.repositoryPath, ['checkout', '-b', 'feature-x']);
+	writeFileSync(path.join(harness.repositoryPath, 'feature.md'), '# ahead\n');
+	runGit(harness.repositoryPath, ['add', '.']);
+	runGit(harness.repositoryPath, ['commit', '-m', 'feature work']);
+	const adoptedTip = runGit(harness.repositoryPath, ['rev-parse', 'HEAD']);
+	runGit(harness.repositoryPath, ['checkout', 'main']);
+
+	const service = createWorkspaceService({
+		databaseService: harness.databaseService,
+		localCommandService: createLocalCommandService(),
+		now: fixedNow,
+		readRepositorySettings: () => branchFromSettings('origin/gone'),
+		rootDirectoryService: rootDirectoryStub(harness),
+	});
+
+	const result = await service.create({
+		branchPlan: { branch: 'feature-x', kind: 'adopt' },
+		name: 'adopts-with-stale-base',
+		repositoryId: harness.repositoryId,
+	});
+
+	// An adopted branch keeps the history it already had, so the fallback is
+	// only its merge target — the workspace did not come off it. The warning
+	// says the base was taken rather than branched from for exactly this case.
+	assert.equal(result.status, 'success');
+	assert.equal(result.diagnostics[0]?.code, 'configured-base-unresolvable');
+	assert.equal(result.workspace?.baseBranch, 'main');
+	assert.equal(
+		runGit(result.workspace?.path ?? '', ['rev-parse', 'HEAD']),
+		adoptedTip,
+	);
 });
 
 test('an explicit request base overrides the configured branchFrom', async (t) => {

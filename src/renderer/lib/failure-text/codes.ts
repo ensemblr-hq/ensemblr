@@ -325,6 +325,16 @@ export const APP_FAILURE_TEXT: Record<
 		),
 	'command-failed': (t) =>
 		t('errors:failure.command-failed', 'The command failed.'),
+	'configured-base-invalid': (t) =>
+		t(
+			'errors:failure.configured-base-invalid',
+			'The branch new workspaces fork from is not a usable branch name, so this workspace took the repository default as its base instead.',
+		),
+	'configured-base-unresolvable': (t) =>
+		t(
+			'errors:failure.configured-base-unresolvable',
+			'The branch new workspaces fork from could not be resolved, so this workspace took the repository default as its base instead.',
+		),
 	'copy-failed': (t) =>
 		t('errors:failure.copy-failed', 'The files could not be copied.'),
 	'database-unavailable': (t) =>

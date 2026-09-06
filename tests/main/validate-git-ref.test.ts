@@ -30,6 +30,34 @@ describe('validateGitRef', () => {
 		expect(validateGitRef('master..feature')?.reason).toBe('invalid-chars');
 	});
 
+	it('rejects a colon, which git reads as a writing refspec', () => {
+		// `ensureBaseRefAvailable` passes the tail to `git fetch origin <tail>`,
+		// where `+main:refs/heads/master` force-updates a local branch, and the
+		// leading segment of `git@host:a/b` is read as an scp-style URL.
+		expect(validateGitRef('origin/main:refs/heads/pwned')?.reason).toBe(
+			'invalid-chars',
+		);
+		expect(validateGitRef('origin/+main:refs/heads/master')?.reason).toBe(
+			'invalid-chars',
+		);
+		expect(validateGitRef('git@evil.example:a/b.git/main')?.reason).toBe(
+			'invalid-chars',
+		);
+	});
+
+	it('rejects revision and glob syntax git-check-ref-format forbids', () => {
+		for (const ref of [
+			'origin/main~1',
+			'origin/main^2',
+			'origin/rele?se',
+			'origin/*',
+			'origin/[abc]',
+			'origin/back\\slash',
+		]) {
+			expect(validateGitRef(ref)?.reason).toBe('invalid-chars');
+		}
+	});
+
 	it('rejects a leading dash on the whole ref', () => {
 		expect(validateGitRef('--upload-pack=/tmp/x')?.reason).toBe(
 			'invalid-chars',
