@@ -8,6 +8,7 @@ import { useSetupDiagnostics } from '@/renderer/components/workbench-shell/shell
 import { WorkspaceWorkbenchContent } from '@/renderer/components/workbench-shell/workspace-content';
 import { useAskAgentSetupScript } from '@/renderer/hooks/workbench-shell/composer/use-ask-agent-setup-script';
 import { useAgentControlFocus } from '@/renderer/hooks/workbench-shell/route-layout/use-agent-control-focus';
+import { useChatRouteRepair } from '@/renderer/hooks/workbench-shell/route-layout/use-chat-route-repair';
 import { useGuardedSessionClose } from '@/renderer/hooks/workbench-shell/route-layout/use-guarded-session-close';
 import { useLiveWorkspaceModel } from '@/renderer/hooks/workbench-shell/route-layout/use-live-workspace-model';
 import {
@@ -25,7 +26,6 @@ import { repoSettingsOverrideAtomFamily } from '@/renderer/state/preferences';
 import { usePublishLiveReviewContext } from '@/renderer/state/review-launch';
 import { usePublishActiveChat } from '@/renderer/state/unread';
 import {
-	useChatRouteRepair,
 	useSessionTabState,
 	useWorkspacePanelTabState,
 } from '@/renderer/state/workspace';
@@ -88,26 +88,12 @@ export function WorkspaceRouteContent({
 	// close the tab out from under the URL. Repairing it is what keeps the memory
 	// and the visit chain being written at all — both are sourced from
 	// `resolvedActiveChatId`, which stays null for as long as the URL is wrong.
-	const replaceChatRoute = useCallback(
-		(nextChatId: string) => {
-			navigate({
-				params: {
-					chatId: nextChatId,
-					projectId: activeProject.id,
-					workspaceId: activeWorkspace.id,
-				},
-				replace: true,
-				search,
-				to: '/projects/$projectId/workspaces/$workspaceId/chats/$chatId',
-			});
-		},
-		[activeProject.id, activeWorkspace.id, navigate, search],
-	);
 	useChatRouteRepair({
 		hasSettledTabList: sessionNavigation.hasSettledTabList,
-		navigateToChat: replaceChatRoute,
+		projectId: activeProject.id,
 		resolvedChatId: sessionNavigation.resolvedActiveChatId,
 		routedChatId: chatId,
+		search,
 		sessionTabs: sessionNavigation.sessionTabs,
 		workspaceId: activeWorkspace.id,
 	});

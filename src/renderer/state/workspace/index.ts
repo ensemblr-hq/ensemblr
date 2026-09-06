@@ -1,7 +1,4 @@
-export {
-	resolveChatRouteRepair,
-	useChatRouteRepair,
-} from './active-chat-route-repair';
+export { resolveChatRouteRepair } from './active-chat-route-repair';
 export type {
 	BoardCardSource,
 	BoardFilters,
