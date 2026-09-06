@@ -949,6 +949,27 @@
 			"blocked_other": "{{count}} setup checks blocked — open diagnostics",
 			"checking": "Setup checks running…",
 			"not-ready": "Setup not ready — open diagnostics"
+		},
+		"update": {
+			"available": {
+				"description": "Ensemblr does not install this one itself — download it from the release page.",
+				"title": "Ensemblr {{version}} is available"
+			},
+			"downloading": {
+				"description": "A restart is offered here as soon as it finishes.",
+				"title": "Downloading Ensemblr {{version}}"
+			},
+			"failed": {
+				"description": "The download did not finish. Try again, or take the release page instead.",
+				"title": "Ensemblr {{version}} did not download"
+			},
+			"open-release": "Open the release page",
+			"ready": {
+				"description": "Restart to finish installing. Agents still working are asked first.",
+				"title": "Ensemblr {{version}} is ready"
+			},
+			"restart": "Restart to update",
+			"retry": "Try again"
 		}
 	},
 	"new-chat": {

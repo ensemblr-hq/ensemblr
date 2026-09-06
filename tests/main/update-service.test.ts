@@ -274,4 +274,64 @@ describe('createUpdateService — a build that may check but not install', () =>
 
 		expect(second.state).toBe('available');
 	});
+
+	test('a feed error does not retract the offer, or claim a download failed', async () => {
+		let unreachable = false;
+		const h = harness({
+			preconditions: { capability: 'check-only', failure: null },
+			releaseFeed: {
+				resolve: async () =>
+					unreachable
+						? {
+								failure: {
+									code: 'update-feed-unreachable' as const,
+									message: 'The release feed could not be reached.',
+								},
+								status: 'error' as const,
+							}
+						: {
+								candidate: {
+									feedUrl: 'https://example.invalid/update.json',
+									notes: null,
+									releaseUrl: 'https://example.invalid/releases/tag/v0.2.0',
+									version: '0.2.0',
+								},
+								status: 'ok' as const,
+							},
+			},
+		});
+		await h.service.checkNow();
+		unreachable = true;
+
+		const second = await h.service.checkNow();
+
+		expect(second).toMatchObject({
+			availableVersion: '0.2.0',
+			failure: { code: 'update-feed-unreachable' },
+			releaseUrl: 'https://example.invalid/releases/tag/v0.2.0',
+			state: 'available',
+		});
+	});
+
+	test('a feed error with no offer behind it still errors', async () => {
+		const h = harness({
+			preconditions: { capability: 'check-only', failure: null },
+			releaseFeed: {
+				resolve: async () => ({
+					failure: {
+						code: 'update-feed-unreachable' as const,
+						message: 'The release feed could not be reached.',
+					},
+					status: 'error' as const,
+				}),
+			},
+		});
+
+		const snapshot = await h.service.checkNow();
+
+		expect(snapshot).toMatchObject({
+			availableVersion: null,
+			state: 'error',
+		});
+	});
 });
