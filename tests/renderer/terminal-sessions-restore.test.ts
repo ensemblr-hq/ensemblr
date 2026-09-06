@@ -31,7 +31,6 @@ function relaunchedSnapshot(
 		rows: 24,
 		scriptName: null,
 		status: 'running',
-		terminalNumber: 1,
 		titleIsDefault: false,
 		title: request.title ?? 'Terminal',
 		workspaceId: request.workspaceId,

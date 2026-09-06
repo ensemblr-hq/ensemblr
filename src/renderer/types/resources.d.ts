@@ -3109,7 +3109,6 @@ export default interface Resources {
 				label: 'Setup';
 			};
 			terminal: {
-				label: 'Terminal';
 				'numbered-label': 'Terminal {{number}}';
 			};
 		};

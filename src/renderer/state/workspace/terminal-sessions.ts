@@ -16,7 +16,7 @@ interface WorkspaceTerminalSessionsState {
 	 * workspaces. Ids are unique, so the caller's own tabs read it directly.
 	 */
 	activeTerminalIds: ReadonlySet<string>;
-	/** Kills the session and removes its tab from the dock. */
+	/** Stops the session and removes its tab from the dock for good. */
 	closeTerminal: (terminalId: string) => Promise<void>;
 	/** Opens a dock terminal; without a command it spawns an interactive login shell. */
 	createTerminal: (options?: {
@@ -87,8 +87,9 @@ export function useWorkspaceTerminalSessions(
 ): WorkspaceTerminalSessionsState {
 	const [sessions, setSessions] = useState<TerminalSessionSnapshot[]>([]);
 	const activeTerminalIds = useAtomValue(activeTerminalIdsAtom);
-	// Tabs the user explicitly closed: their later lifecycle broadcasts (exit
-	// after kill) must not resurrect the tab.
+	// Tabs the user explicitly closed, covering the window before main has marked
+	// the session closed and stopped broadcasting for it — and the case where
+	// that call never lands. Main is what keeps them gone across a remount.
 	const closedTerminalIdsRef = useRef<Set<string>>(
 		null as unknown as Set<string>,
 	);
@@ -188,7 +189,7 @@ export function useWorkspaceTerminalSessions(
 		);
 
 		try {
-			await window.ensemblr?.killTerminalSession({ terminalId });
+			await window.ensemblr?.closeTerminalSession({ terminalId });
 		} catch {
 			// The tab is gone either way; main-process cleanup is best-effort.
 		}

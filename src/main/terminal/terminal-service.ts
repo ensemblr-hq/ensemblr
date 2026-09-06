@@ -44,7 +44,6 @@ import {
 	type PtyProcess,
 	type PtySpawnOptions,
 } from './pty-backend.ts';
-import { allocateTerminalNumber } from './terminal-numbering.ts';
 import type { TerminalScrollbackCapture } from './terminal-output-file.ts';
 import {
 	deleteTerminalOutput,
@@ -102,7 +101,9 @@ function isRestorableTerminalKind(kind: TerminalSessionKind): boolean {
 }
 
 /** Machine-readable failure categories raised by the terminal service. */
-export type TerminalServiceErrorCode = 'session-not-found';
+export type TerminalServiceErrorCode =
+	| 'not-a-dock-terminal'
+	| 'session-not-found';
 
 /** Domain-specific error thrown by the terminal service. */
 export class TerminalServiceError extends Error {
@@ -159,6 +160,18 @@ export interface CreateTerminalSessionOptions {
 
 /** Public surface of the main-process terminal service. */
 export interface TerminalService {
+	/**
+	 * Closes a dock terminal's tab: stops it exactly as {@link kill} does, then
+	 * drops it from every live listing and every by-id lookup and silences its
+	 * lifecycle broadcasts, so the tab stays gone once the renderer reseeds from
+	 * {@link list} on a later visit. Killing alone is not enough — a stopped
+	 * script keeps its tab to show how it ended, and an agent stopping a spawn
+	 * terminal must leave its output readable.
+	 *
+	 * Refuses any other kind with a `not-a-dock-terminal`
+	 * {@link TerminalServiceError}, leaving that session untouched.
+	 */
+	close: (terminalId: string) => void;
 	create: (
 		options: CreateTerminalSessionOptions,
 	) => Promise<CreateTerminalSessionResult>;
@@ -170,17 +183,25 @@ export interface TerminalService {
 	 * wait for them.
 	 */
 	forgetWorkspaceSessions: (workspaceId: string) => number;
+	/**
+	 * One session's snapshot and re-attach scrollback, by id. A session whose tab
+	 * was closed reads as absent, exactly as an unknown id does, so an agent
+	 * holding an id it captured before the close cannot reach the bytes
+	 * {@link close} deleted from disk.
+	 */
 	getSnapshot: (terminalId: string) => TerminalSnapshotResult;
 	kill: (terminalId: string) => TerminalSessionSnapshot | null;
 	/**
 	 * Live sessions of one workspace, or of every workspace when `workspaceId` is
 	 * omitted — the renderer seeds its cross-workspace activity badges that way.
+	 * Sessions whose tab was closed are excluded.
 	 */
 	list: (workspaceId?: string) => TerminalSessionSnapshot[];
 	/**
 	 * Every live session of one kind, across all workspaces. Backs the
 	 * `nonconcurrent` run mode, which has to reach outside the launching
-	 * workspace to stop a sibling's run script.
+	 * workspace to stop a sibling's run script. Sessions whose tab was closed are
+	 * excluded.
 	 */
 	listByKind: (kind: TerminalSessionKind) => TerminalSessionSnapshot[];
 	/**
@@ -198,6 +219,17 @@ export interface TerminalService {
 	readWorkspaceScrollbacks: (
 		workspaceId: string,
 	) => TerminalScrollbackCapture[];
+	/**
+	 * Every session id this workspace still has tracked, closed tabs included.
+	 *
+	 * Deliberately not {@link list}, which answers what the workspace still
+	 * *shows*. Teardown needs what is still *running*: a tab the user closed
+	 * seconds ago has a child inside its kill grace, and archive has to wait for
+	 * that child before the worktree it is sitting in can be pruned. Reading the
+	 * tracking map is what {@link forgetWorkspaceSessions} and
+	 * {@link readWorkspaceScrollbacks} do for the same reason.
+	 */
+	readWorkspaceSessionIds: (workspaceId: string) => string[];
 	recoverStaleSessions: () => void;
 	resize: (terminalId: string, cols: number, rows: number) => void;
 	/**
@@ -299,6 +331,14 @@ interface TrackedSession {
 	 * PTY output (Vibe) rather than from a spinner in its OSC title.
 	 */
 	busyFromPtySpinner: boolean;
+	/**
+	 * True once the user closed this session's tab, which removes it from the
+	 * workspace for good — it is excluded from every live listing and stops
+	 * broadcasting, so navigating away and back cannot bring the tab back. Set
+	 * only by {@link TerminalService.close}; stopping a session leaves it false,
+	 * because a stopped script's tab still has to render its outcome.
+	 */
+	closed: boolean;
 	/**
 	 * Harness session-log source read for the conversation title (Codex, Vibe) and
 	 * native session id (all harnesses), or null for non-agent sessions.
@@ -588,10 +628,16 @@ export function createTerminalService({
 	}
 
 	/**
-	 * Emits a lifecycle event carrying the session's current snapshot.
+	 * Emits a lifecycle event carrying the session's current snapshot. A closed
+	 * session emits nothing: its own kill lands an exit event afterwards, and a
+	 * renderer folding that into dock state would put the tab back.
 	 * @param session - Tracked session whose state to broadcast
 	 */
 	function broadcastLifecycle(session: TrackedSession): void {
+		if (session.closed) {
+			return;
+		}
+
 		onLifecycle({
 			session: { ...session.snapshot },
 			terminalId: session.snapshot.id,
@@ -648,10 +694,16 @@ export function createTerminalService({
 	 * Writes a restorable session's current scrollback to its `.context` output
 	 * log so a later app run can replay it. No-op for non-restorable kinds.
 	 * Best-effort — the writer swallows errors.
+	 *
+	 * A closed session never writes: {@link close} deletes the log while the PTY
+	 * is still dying, so anything the child prints inside the kill grace would
+	 * otherwise re-arm the debounced flush and put the log back — and a quit
+	 * landing in that window keeps the row `running`, which is what offers the
+	 * closed tab for restore on the next launch.
 	 * @param session - Tracked session whose scrollback to persist.
 	 */
 	function persistSessionOutput(session: TrackedSession): void {
-		if (!isRestorableTerminalKind(session.snapshot.kind)) {
+		if (session.closed || !isRestorableTerminalKind(session.snapshot.kind)) {
 			return;
 		}
 
@@ -862,37 +914,6 @@ export function createTerminalService({
 	}
 
 	/**
-	 * Picks the tab number a new interactive terminal takes in its workspace, or
-	 * null for the kinds that are not numbered. A session the user closed has
-	 * released its number — `kill` is what a closed dock tab reaches the service
-	 * through — while one whose shell exited on its own keeps the tab, and the
-	 * number with it, until the user closes it.
-	 * @param kind - Kind of the session being created.
-	 * @param workspaceId - Workspace the new session belongs to.
-	 * @returns The number to assign, or null when the kind is not numbered.
-	 */
-	function nextTerminalNumber(
-		kind: TerminalSessionKind,
-		workspaceId: string,
-	): number | null {
-		if (kind !== 'terminal') {
-			return null;
-		}
-		const taken: number[] = [];
-		for (const session of sessions.values()) {
-			const { terminalNumber } = session.snapshot;
-			if (
-				session.snapshot.workspaceId === workspaceId &&
-				!session.stopRequested &&
-				terminalNumber !== null
-			) {
-				taken.push(terminalNumber);
-			}
-		}
-		return allocateTerminalNumber(taken);
-	}
-
-	/**
 	 * Reads the PTY's foreground process once and, when the command it names has
 	 * changed, stamps it on the snapshot and broadcasts so the dock tab renames
 	 * itself. Stops once the session is no longer running, which is what reverts a
@@ -1019,6 +1040,24 @@ export function createTerminalService({
 						},
 					]
 				: [],
+		);
+	}
+
+	/**
+	 * Reads the ids of every session the tracking map still holds for one
+	 * workspace, closed tabs included.
+	 *
+	 * Teardown kills and then waits on each of these, so the set has to mean
+	 * "still tracked" rather than the "still shown" that `list` answers: a tab
+	 * closed moments before the workspace is archived has a child inside its kill
+	 * grace, and dropping it here would prune the worktree out from under that
+	 * child and lose the diagnostic saying it never exited.
+	 * @param workspaceId - Workspace whose tracked session ids to read
+	 * @returns Every tracked session id of the workspace, oldest first
+	 */
+	function readWorkspaceSessionIds(workspaceId: string): string[] {
+		return Array.from(sessions.values()).flatMap((session) =>
+			session.snapshot.workspaceId === workspaceId ? [session.snapshot.id] : [],
 		);
 	}
 
@@ -1213,7 +1252,6 @@ export function createTerminalService({
 		scriptName,
 		seedOutput,
 		shell,
-		terminalNumber,
 		title,
 		workspaceId,
 	}: {
@@ -1230,7 +1268,6 @@ export function createTerminalService({
 		scriptName: string | undefined;
 		seedOutput: string | undefined;
 		shell: string;
-		terminalNumber: number | null;
 		title: string | undefined;
 		workspaceId: string;
 	}): TrackedSession {
@@ -1238,6 +1275,7 @@ export function createTerminalService({
 			agentBusyIdleTimer: null,
 			busyFromPtySpinner:
 				kind === 'agent' && harnessBusySource(harnessId) === 'pty-spinner',
+			closed: false,
 			sessionLogSince: resumed ? null : createdAt,
 			sessionLogSource:
 				kind === 'agent' ? harnessSessionLogSource(harnessId) : null,
@@ -1275,7 +1313,6 @@ export function createTerminalService({
 				rows,
 				scriptName: scriptName ?? null,
 				status: 'running',
-				terminalNumber,
 				title: title?.trim() || defaultTitle(kind),
 				titleIsDefault: !title?.trim(),
 				workspaceId,
@@ -1440,7 +1477,6 @@ export function createTerminalService({
 			scriptName,
 			seedOutput,
 			shell,
-			terminalNumber: nextTerminalNumber(kind, workspaceId),
 			title,
 			workspaceId,
 		});
@@ -1478,8 +1514,8 @@ export function createTerminalService({
 	 * Requests graceful termination of a running session via SIGHUP, escalating
 	 * to SIGKILL after a grace window when the process ignores the signal. A
 	 * session whose shell already exited has nothing left to signal but is still
-	 * recorded as stopped: this is the only call a closed dock tab makes, so it is
-	 * what releases the tab's terminal number.
+	 * recorded as stopped, so its tab can report how it ended. Stopping is not
+	 * closing: {@link close} is what removes the tab.
 	 * @param terminalId - Id of the terminal session to stop
 	 * @returns The session's current snapshot
 	 */
@@ -1510,6 +1546,49 @@ export function createTerminalService({
 		}
 
 		return { ...session.snapshot };
+	}
+
+	/**
+	 * Closes a session's tab for good: marks it closed so no live listing or
+	 * lifecycle broadcast can surface it again, then stops it. The mark is set
+	 * before the kill so the exit event the kill provokes is already silenced.
+	 *
+	 * The persisted output log goes at once rather than at finalization, so a quit
+	 * landing inside the kill grace cannot leave the tab restorable: a session
+	 * still running at quit keeps its row marked `running` on purpose, and restore
+	 * offers such a row only while its log is on disk. Deleting it is half the
+	 * job — {@link persistSessionOutput} refuses a closed session, or output the
+	 * dying child prints inside the grace would write the log straight back.
+	 *
+	 * The session stays in the tracking map rather than being deleted: quit still
+	 * has to wait on a child that has not exited, and a workspace archive reads
+	 * closed terminals' scrollback from memory. That archive read is the one
+	 * deliberate exception — {@link readWorkspaceScrollbacks} keeps a closed
+	 * session on purpose, because the archive is the last copy of what the user
+	 * ran, while every by-id lookup ({@link getSnapshot}) reports it as absent so
+	 * nothing that lost the tab can reach its bytes through a captured id.
+	 *
+	 * Refuses any kind but `terminal`, and refuses it without touching the
+	 * session. Only a dock terminal has a tab to close, and the flag this sets is
+	 * read by paths that must not lose a session: {@link listByKind} backs the
+	 * `nonconcurrent` run-script stop and the quit guard's warning that agents are
+	 * still running.
+	 * @param terminalId - Id of the terminal session whose tab is closing
+	 * @throws TerminalServiceError `not-a-dock-terminal` when the session is any other kind
+	 */
+	function close(terminalId: string): void {
+		const session = requireSession(terminalId);
+
+		if (session.snapshot.kind !== 'terminal') {
+			throw new TerminalServiceError(
+				'not-a-dock-terminal',
+				`Only a dock terminal can be closed; ${terminalId} is a ${session.snapshot.kind} session.`,
+			);
+		}
+
+		session.closed = true;
+		discardSessionOutput(session);
+		kill(terminalId);
 	}
 
 	/**
@@ -1550,8 +1629,10 @@ export function createTerminalService({
 	 * Only a live session is flushed, and that ordering is load-bearing: a
 	 * session that already exited had its log deleted by `finalizeSession` on
 	 * purpose, so writing it back here would restore a secret-bearing orphan —
-	 * and for a workspace archived earlier in the run, restore it inside a
-	 * worktree the prune removed.
+	 * and, for a workspace archived earlier in the run, restore it inside a
+	 * worktree the prune removed. A closed tab is turned away by
+	 * {@link persistSessionOutput} itself rather than here, since the debounced
+	 * flush has to be refused on the same grounds.
 	 * @param session - Session to wind down
 	 * @returns Resolves once the child exits, immediately when it is already gone
 	 */
@@ -1648,11 +1729,12 @@ export function createTerminalService({
 	}
 
 	return {
+		close,
 		create,
 		getSnapshot: (terminalId) => {
 			const session = sessions.get(terminalId);
 
-			if (!session) {
+			if (!session || session.closed) {
 				return { lastSeq: 0, scrollback: '', session: null };
 			}
 
@@ -1669,14 +1751,17 @@ export function createTerminalService({
 		kill,
 		list: (workspaceId) =>
 			Array.from(sessions.values()).flatMap((session) =>
-				workspaceId === undefined ||
-				session.snapshot.workspaceId === workspaceId
+				!session.closed &&
+				(workspaceId === undefined ||
+					session.snapshot.workspaceId === workspaceId)
 					? [{ ...session.snapshot }]
 					: [],
 			),
 		listByKind: (kind) =>
 			Array.from(sessions.values()).flatMap((session) =>
-				session.snapshot.kind === kind ? [{ ...session.snapshot }] : [],
+				!session.closed && session.snapshot.kind === kind
+					? [{ ...session.snapshot }]
+					: [],
 			),
 		listRestorable: (workspaceId) => {
 			const rows = restorableByWorkspace.get(workspaceId);
@@ -1708,6 +1793,7 @@ export function createTerminalService({
 			});
 		},
 		readWorkspaceScrollbacks,
+		readWorkspaceSessionIds,
 		recoverStaleSessions: () => {
 			const database = getDatabase();
 

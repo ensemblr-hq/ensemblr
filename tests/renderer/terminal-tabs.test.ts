@@ -31,7 +31,6 @@ function createSession(
 		rows: 24,
 		scriptName: null,
 		status: 'running',
-		terminalNumber: 1,
 		titleIsDefault: false,
 		title: 'Terminal',
 		workspaceId: 'workspace-1',
@@ -114,18 +113,69 @@ describe('mapTerminalSessionsToDockTabs', () => {
 	test('numbers unnamed terminals and leaves named ones alone', () => {
 		const tabs = mapTerminalSessionsToDockTabs({
 			sessions: [
-				createSession({ id: 'a', terminalNumber: 1, titleIsDefault: true }),
-				createSession({ id: 'b', terminalNumber: 3, titleIsDefault: true }),
-				createSession({ id: 'c', terminalNumber: 4, title: 'Deploy' }),
+				createSession({ id: 'a', titleIsDefault: true }),
+				createSession({ id: 'b', titleIsDefault: true }),
+				createSession({ id: 'c', title: 'Deploy' }),
 			],
 			t: i18n.t,
 		});
 
 		expect(tabs.map((tab) => tab.label)).toEqual([
 			'Terminal 1',
-			'Terminal 3',
+			'Terminal 2',
 			'Deploy',
 		]);
+	});
+
+	// A number fixed at creation left the strip reading `Terminal 2, Terminal 4`
+	// after two closes, and handed the freed 1 to the next terminal opened — so
+	// two tabs could read `Terminal 1` at once.
+	test('numbers by position in the strip, not by when the terminal opened', () => {
+		const closedTheFirst = mapTerminalSessionsToDockTabs({
+			sessions: [
+				createSession({ id: 'b', titleIsDefault: true }),
+				createSession({ id: 'c', titleIsDefault: true }),
+			],
+			t: i18n.t,
+		});
+
+		expect(closedTheFirst.map((tab) => tab.label)).toEqual([
+			'Terminal 1',
+			'Terminal 2',
+		]);
+	});
+
+	// Numbering counts the strip it is building, so a named terminal takes a slot
+	// rather than a number, and the tabs after it stay contiguous.
+	test('counts a named terminal in the run without numbering it', () => {
+		const tabs = mapTerminalSessionsToDockTabs({
+			sessions: [
+				createSession({ id: 'a', titleIsDefault: true }),
+				createSession({ id: 'b', title: 'Deploy' }),
+				createSession({ id: 'c', titleIsDefault: true }),
+			],
+			t: i18n.t,
+		});
+
+		expect(tabs.map((tab) => tab.label)).toEqual([
+			'Terminal 1',
+			'Deploy',
+			'Terminal 3',
+		]);
+	});
+
+	// Script sessions render in the fixed Setup/Run tabs, so they take no slot in
+	// the terminal strip and must not push its numbering along.
+	test('skips script sessions when numbering the strip', () => {
+		const tabs = mapTerminalSessionsToDockTabs({
+			sessions: [
+				createSession({ id: 'a', kind: 'run-script', title: 'Run' }),
+				createSession({ id: 'b', titleIsDefault: true }),
+			],
+			t: i18n.t,
+		});
+
+		expect(tabs.map((tab) => tab.label)).toEqual(['Terminal 1']);
 	});
 
 	test('names the running command and reverts once it finishes', () => {
@@ -133,13 +183,11 @@ describe('mapTerminalSessionsToDockTabs', () => {
 			sessions: [
 				createSession({
 					foregroundCommand: 'npm',
-					terminalNumber: 2,
 					titleIsDefault: true,
 				}),
 				createSession({
 					foregroundCommand: 'vim',
 					id: 'b',
-					terminalNumber: 3,
 					title: 'Deploy',
 				}),
 			],
@@ -151,13 +199,12 @@ describe('mapTerminalSessionsToDockTabs', () => {
 			sessions: [
 				createSession({
 					foregroundCommand: null,
-					terminalNumber: 2,
 					titleIsDefault: true,
 				}),
 			],
 			t: i18n.t,
 		});
-		expect(finished[0]?.label).toBe('Terminal 2');
+		expect(finished[0]?.label).toBe('Terminal 1');
 	});
 
 	test('shows recent interactive terminal output as activity', () => {

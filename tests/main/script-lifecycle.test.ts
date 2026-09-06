@@ -166,6 +166,10 @@ function createTerminalServiceFake({
 	let counter = 0;
 
 	const terminalService: TerminalService = {
+		close: (terminalId) => {
+			killedIds.push(terminalId);
+			sessions.delete(terminalId);
+		},
 		create: async (options) => {
 			createCalls.push(options);
 			await beforeCreate?.();
@@ -188,7 +192,6 @@ function createTerminalServiceFake({
 				rows: 24,
 				scriptName: options.scriptName ?? null,
 				status: 'running',
-				terminalNumber: null,
 				titleIsDefault: false,
 				title: options.title ?? 'Terminal',
 				workspaceId: options.workspaceId,
@@ -224,6 +227,7 @@ function createTerminalServiceFake({
 			Array.from(sessions.values()).filter((session) => session.kind === kind),
 		listRestorable: () => [],
 		readWorkspaceScrollbacks: () => [],
+		readWorkspaceSessionIds: () => Array.from(sessions.keys()),
 		recoverStaleSessions: () => undefined,
 		resize: () => undefined,
 		shutdown: () => Promise.resolve(),

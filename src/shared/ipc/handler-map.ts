@@ -185,6 +185,8 @@ import type { SetupDiagnosticsSnapshot } from './contracts/setup';
 import type { SharedRootAdoptionSnapshot } from './contracts/shared-root-adoption';
 import type { InitialShellSnapshot } from './contracts/shell-snapshot';
 import type {
+	CloseTerminalRequest,
+	CloseTerminalResult,
 	CreateTerminalSessionRequest,
 	CreateTerminalSessionResult,
 	KillTerminalRequest,
@@ -304,6 +306,10 @@ export interface IpcHandlerMap {
 	[IPC_CHANNELS.cloneGithubRepositoryStart]: IpcHandlerEntry<
 		CloneGithubRepositoryStartRequest,
 		CloneGithubRepositoryStartResult
+	>;
+	[IPC_CHANNELS.closeTerminalSession]: IpcHandlerEntry<
+		CloseTerminalRequest,
+		CloseTerminalResult
 	>;
 	[IPC_CHANNELS.confirmRootDirectoryChange]: IpcHandlerEntry<
 		RootDirectoryChangeRequest,

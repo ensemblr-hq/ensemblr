@@ -25,7 +25,10 @@ import {
 	writeTerminalOutput,
 } from '../../src/main/terminal/terminal-output-file.ts';
 import { createScrollbackBuffer } from '../../src/main/terminal/terminal-scrollback.ts';
-import { createTerminalService } from '../../src/main/terminal/terminal-service.ts';
+import {
+	createTerminalService,
+	TerminalServiceError,
+} from '../../src/main/terminal/terminal-service.ts';
 import { resolveUserShell } from '../../src/main/terminal/user-shell.ts';
 import type { SessionLogSource } from '../../src/shared/agents.ts';
 import type {
@@ -288,72 +291,175 @@ test('create spawns a PTY in the workspace cwd with the assembled env', async (t
 	assert.equal(spawnOptions.env.ENSEMBLR_PORT, '41000');
 });
 
-test('numbers interactive terminals and leaves script sessions unnumbered', async (t) => {
+// Closing a tab used to only signal the PTY, leaving the session listed as
+// stopped — so navigating away and back reseeded the dock from `list` and the
+// tab came back, dead, for the rest of the run.
+test('drops a closed terminal from the listing for good', async (t) => {
 	const fake = createFakePty();
 	const backend: PtyBackend = { spawn: () => fake.pty };
 	const { service } = createServiceFixture(t, { backend });
 
 	const first = await service.create({ workspaceId: WORKSPACE_ID });
 	const second = await service.create({ workspaceId: WORKSPACE_ID });
+	service.close(first.session?.id ?? '');
+
+	assert.deepEqual(
+		service.list(WORKSPACE_ID).map((session) => session.id),
+		[second.session?.id],
+	);
+
+	fake.emitExit(0);
+
+	assert.deepEqual(
+		service.list(WORKSPACE_ID).map((session) => session.id),
+		[second.session?.id],
+	);
+});
+
+// A stopped script keeps its tab so it can report how it ended, and an agent
+// stopping a spawn terminal must leave its output readable — so stopping one
+// must not do what closing does.
+test('keeps a killed terminal listed, since stopping is not closing', async (t) => {
+	const fake = createFakePty();
+	const backend: PtyBackend = { spawn: () => fake.pty };
+	const { service } = createServiceFixture(t, { backend });
+
+	const session = await service.create({ workspaceId: WORKSPACE_ID });
+	service.kill(session.session?.id ?? '');
+
+	assert.deepEqual(
+		service.list(WORKSPACE_ID).map((entry) => entry.id),
+		[session.session?.id],
+	);
+});
+
+// The kill a close performs lands an exit event afterwards; broadcasting it
+// would put the tab straight back into a dock that had just removed it.
+test('stops broadcasting for a terminal once its tab is closed', async (t) => {
+	const fake = createFakePty();
+	const backend: PtyBackend = { spawn: () => fake.pty };
+	const { lifecycleEvents, service } = createServiceFixture(t, { backend });
+
+	const created = await service.create({ workspaceId: WORKSPACE_ID });
+	const terminalId = created.session?.id ?? '';
+	const eventsForTab = () =>
+		lifecycleEvents.filter((event) => event.terminalId === terminalId).length;
+
+	service.close(terminalId);
+	const beforeExit = eventsForTab();
+	fake.emitExit(0);
+
+	assert.equal(eventsForTab(), beforeExit);
+});
+
+// `nonconcurrent` run mode reaches across workspaces through this listing to
+// stop a sibling's run script; a closed tab is not a session it may find.
+test('hides a closed terminal from the by-kind listing too', async (t) => {
+	const fake = createFakePty();
+	const backend: PtyBackend = { spawn: () => fake.pty };
+	const { service } = createServiceFixture(t, { backend });
+
+	const created = await service.create({ workspaceId: WORKSPACE_ID });
+	assert.equal(service.listByKind('terminal').length, 1);
+
+	service.close(created.session?.id ?? '');
+
+	assert.deepEqual(service.listByKind('terminal'), []);
+});
+
+// Closing deletes the log while the child is still dying, so anything it prints
+// inside the kill grace used to re-arm the debounced flush and write the log
+// straight back — and a quit landing there offered the closed tab again.
+test('does not write the log back when a closed terminal keeps printing', async (t) => {
+	const cwd = createWorktreeCwd(t);
+	const fake = createFakePty();
+	const backend: PtyBackend = { spawn: () => fake.pty };
+	const { service } = createServiceFixture(t, { backend, cwd });
+
+	const opened = await service.create({ workspaceId: WORKSPACE_ID });
+	const terminalId = opened.session?.id ?? '';
+
+	fake.emitData('output the user closed away');
+	service.close(terminalId);
+	assert.equal(readTerminalOutput(cwd, terminalId), null);
+
+	// The child ignored SIGHUP and printed again before the grace ran out.
+	fake.emitData('a dying gasp');
+	await new Promise((resolve) => setTimeout(resolve, 1_200));
+
+	assert.equal(readTerminalOutput(cwd, terminalId), null);
+});
+
+// Teardown kills and waits on these ids, so a tab closed moments before the
+// workspace is archived has to stay in the set: its child is still inside the
+// kill grace, holding the worktree the prune is about to remove.
+test('keeps a closed terminal in the workspace session ids until its child exits', async (t) => {
+	const fake = createFakePty();
+	const backend: PtyBackend = { spawn: () => fake.pty };
+	const { service } = createServiceFixture(t, { backend });
+
+	const opened = await service.create({ workspaceId: WORKSPACE_ID });
+	const terminalId = opened.session?.id ?? '';
+
+	service.close(terminalId);
+
+	assert.deepEqual(service.list(WORKSPACE_ID), []);
+	assert.deepEqual(service.readWorkspaceSessionIds(WORKSPACE_ID), [terminalId]);
+});
+
+// Closing deletes the on-disk log because it is a secret-bearing orphan, so the
+// same bytes must not stay reachable in memory through an id an agent captured
+// before the close — agent control reads output and resolves a terminal's
+// workspace through this one lookup.
+test('reports a closed terminal as absent when looked up by id', async (t) => {
+	const fake = createFakePty();
+	const backend: PtyBackend = { spawn: () => fake.pty };
+	const { service } = createServiceFixture(t, { backend });
+
+	const opened = await service.create({ workspaceId: WORKSPACE_ID });
+	const terminalId = opened.session?.id ?? '';
+	fake.emitData('secrets the user closed away');
+
+	service.close(terminalId);
+
+	assert.deepEqual(service.getSnapshot(terminalId), {
+		lastSeq: 0,
+		scrollback: '',
+		session: null,
+	});
+	assert.deepEqual(
+		service.getSnapshot(terminalId),
+		service.getSnapshot('never-existed'),
+	);
+});
+
+// The closed flag hides a session from `listByKind`, which is what the quit
+// guard reads to warn that agents are still running and what the `nonconcurrent`
+// run mode reads to stop a sibling's script. Only a dock terminal has a tab.
+test('refuses to close a session that is not a dock terminal', async (t) => {
+	const fake = createFakePty();
+	const backend: PtyBackend = { spawn: () => fake.pty };
+	const { service } = createServiceFixture(t, { backend });
+
 	const script = await service.create({
 		command: 'npm run dev',
 		kind: 'run-script',
 		workspaceId: WORKSPACE_ID,
 	});
+	const terminalId = script.session?.id ?? '';
 
-	assert.equal(first.session?.terminalNumber, 1);
-	assert.equal(second.session?.terminalNumber, 2);
-	assert.equal(script.session?.terminalNumber, null);
-});
-
-// Closing a tab has to free its number, or a dock that has been open all day
-// reaches Terminal 47 — but a number must never move under a tab still on screen.
-test('reuses a closed terminal number without renumbering the live ones', async (t) => {
-	const fake = createFakePty();
-	const backend: PtyBackend = { spawn: () => fake.pty };
-	const { service } = createServiceFixture(t, { backend });
-
-	const first = await service.create({ workspaceId: WORKSPACE_ID });
-	const second = await service.create({ workspaceId: WORKSPACE_ID });
-	service.kill(first.session?.id ?? '');
-
-	const third = await service.create({ workspaceId: WORKSPACE_ID });
-
-	assert.equal(third.session?.terminalNumber, 1);
-	assert.equal(
-		service
-			.list(WORKSPACE_ID)
-			.find((session) => session.id === second.session?.id)?.terminalNumber,
-		2,
+	assert.throws(
+		() => service.close(terminalId),
+		(error: unknown) =>
+			error instanceof TerminalServiceError &&
+			error.code === 'not-a-dock-terminal',
 	);
-});
 
-// A terminal whose shell exited on its own keeps its tab, and its number with
-// it — but closing that tab still has to free the number, or every `exit` the
-// user types costs one and the dock climbs away from Terminal 1 for good.
-test('frees the number of a terminal closed after its shell exited', async (t) => {
-	const fake = createFakePty();
-	const backend: PtyBackend = { spawn: () => fake.pty };
-	const { service } = createServiceFixture(t, { backend });
-
-	const first = await service.create({ workspaceId: WORKSPACE_ID });
-	fake.emitExit(0);
-	service.kill(first.session?.id ?? '');
-
-	const second = await service.create({ workspaceId: WORKSPACE_ID });
-
-	assert.equal(second.session?.terminalNumber, 1);
-});
-
-test('numbers each workspace independently', async (t) => {
-	const fake = createFakePty();
-	const backend: PtyBackend = { spawn: () => fake.pty };
-	const { service } = createServiceFixture(t, { backend });
-
-	await service.create({ workspaceId: WORKSPACE_ID });
-	const other = await service.create({ workspaceId: 'workspace-2' });
-
-	assert.equal(other.session?.terminalNumber, 1);
+	assert.deepEqual(
+		service.listByKind('run-script').map((entry) => entry.id),
+		[terminalId],
+	);
+	assert.equal(service.getSnapshot(terminalId).session?.status, 'running');
 });
 
 test('names the command a terminal is running and clears it when it finishes', async (t) => {
@@ -1303,6 +1409,44 @@ test('integration: a real PTY dock tab survives quit and restores after restart'
 	assert.match(restorable[0]?.output ?? '', /restore-me/);
 
 	await after.shutdown();
+});
+
+// Closing a tab and quitting inside the kill grace used to leave the session
+// still 'running' at shutdown, so quit flushed its scrollback and the next
+// launch offered the tab straight back.
+test('does not offer a closed terminal for restore after a quit mid-close', async (t) => {
+	const cwd = createWorktreeCwd(t);
+	const database = createDatabaseFixture(t);
+	const fake = createFakePty();
+
+	const before = createTerminalService({
+		backend: { spawn: () => fake.pty },
+		databaseService: createDatabaseServiceStub(database),
+		now: () => NOW,
+		onLifecycle: () => undefined,
+		onOutput: () => undefined,
+		workspaceEnvironmentService: createWorkspaceEnvironmentStub(cwd),
+	});
+	const opened = await before.create({ workspaceId: WORKSPACE_ID });
+	fake.emitData('output the user closed away');
+	before.close(opened.session?.id ?? '');
+
+	// Quit before the child has reported the exit the close asked for.
+	const quitting = before.shutdown();
+	fake.emitExit(0);
+	await quitting;
+
+	const after = createTerminalService({
+		backend: { spawn: () => createFakePty().pty },
+		databaseService: createDatabaseServiceStub(database),
+		now: () => NOW,
+		onLifecycle: () => undefined,
+		onOutput: () => undefined,
+		workspaceEnvironmentService: createWorkspaceEnvironmentStub(cwd),
+	});
+	after.recoverStaleSessions();
+
+	assert.deepEqual(after.listRestorable(WORKSPACE_ID), []);
 });
 
 test('agent sessions are never offered as restorable dock terminals', async (t) => {
