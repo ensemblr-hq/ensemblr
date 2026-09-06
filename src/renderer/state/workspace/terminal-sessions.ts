@@ -60,7 +60,7 @@ async function restoreDockTerminals(
 			?.createTerminalSession({
 				restoredFromId: terminal.id,
 				seedOutput: terminal.output,
-				title: terminal.title,
+				...(terminal.titleIsDefault ? {} : { title: terminal.title }),
 				workspaceId,
 			})
 			.catch(() => null);

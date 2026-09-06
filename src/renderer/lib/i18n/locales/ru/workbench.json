@@ -704,7 +704,8 @@
 			"label": "Настройка"
 		},
 		"terminal": {
-			"label": "Терминал"
+			"label": "Терминал",
+			"numbered-label": "Терминал {{number}}"
 		}
 	},
 	"file-diff": {

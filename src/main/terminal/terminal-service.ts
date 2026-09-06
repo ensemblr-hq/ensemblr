@@ -37,12 +37,14 @@ import {
 	type ReadAgentConversationTitleOptions,
 	readAgentConversationInfo,
 } from './agent-conversation-title.ts';
+import { resolveForegroundCommand } from './foreground-command.ts';
 import {
 	createNodePtyBackend,
 	type PtyBackend,
 	type PtyProcess,
 	type PtySpawnOptions,
 } from './pty-backend.ts';
+import { allocateTerminalNumber } from './terminal-numbering.ts';
 import type { TerminalScrollbackCapture } from './terminal-output-file.ts';
 import {
 	deleteTerminalOutput,
@@ -228,6 +230,8 @@ export interface CreateTerminalServiceOptions {
 	databaseService: EnsemblrDatabaseService;
 	/** Shell for interactive terminals; defaults to the user's login shell. */
 	defaultShell?: string;
+	/** How often an interactive terminal's foreground process is re-read. */
+	foregroundPollMs?: number;
 	killGraceMs?: number;
 	now?: () => Date;
 	onLifecycle: (event: TerminalLifecycleBroadcast) => void;
@@ -312,6 +316,11 @@ interface TrackedSession {
 	dataSubscription: { dispose: () => void } | null;
 	exitSubscription: { dispose: () => void } | null;
 	exitWaiters: Array<() => void>;
+	/**
+	 * Poll timer reading the PTY's foreground process, or null when the session is
+	 * not an interactive terminal or has stopped.
+	 */
+	foregroundPollTimer: NodeJS.Timeout | null;
 	killTimer: NodeJS.Timeout | null;
 	/**
 	 * Debounce timer coalescing scrollback writes to disk for persisted dock
@@ -341,6 +350,8 @@ interface TrackedSession {
 	 */
 	ptyExited: boolean;
 	scrollback: ScrollbackBuffer;
+	/** Shell the PTY spawned, compared against the foreground process to tell idle from busy. */
+	shell: string;
 	/** Whether quit has already wound this session down, so it is not signalled twice. */
 	shutdownStarted: boolean;
 	snapshot: TerminalSessionSnapshot;
@@ -376,6 +387,14 @@ const TITLE_SCAN_WINDOW = 512;
  * current (e.g. a Vibe title that only lands once a turn completes).
  */
 const CONVERSATION_TITLE_POLL_MS = 1_500;
+
+/**
+ * How often to re-read an interactive terminal's foreground process. Short
+ * enough that a tab names a command while it is still worth naming, and each
+ * read is one `tcgetpgrp` plus a process lookup, so a dock full of terminals
+ * still costs nothing measurable.
+ */
+const FOREGROUND_COMMAND_POLL_MS = 500;
 
 /**
  * How long a `pty-spinner` harness (Vibe) stays flagged busy after its last braille
@@ -513,6 +532,7 @@ export function createTerminalService({
 	backend = createNodePtyBackend(),
 	databaseService,
 	defaultShell = resolveUserShell(),
+	foregroundPollMs = FOREGROUND_COMMAND_POLL_MS,
 	killGraceMs = DEFAULT_KILL_GRACE_MS,
 	now = () => new Date(),
 	onAgentSessionCaptured,
@@ -842,6 +862,80 @@ export function createTerminalService({
 	}
 
 	/**
+	 * Picks the tab number a new interactive terminal takes in its workspace, or
+	 * null for the kinds that are not numbered. A session the user closed has
+	 * released its number — `kill` is what a closed dock tab reaches the service
+	 * through — while one whose shell exited on its own keeps the tab, and the
+	 * number with it, until the user closes it.
+	 * @param kind - Kind of the session being created.
+	 * @param workspaceId - Workspace the new session belongs to.
+	 * @returns The number to assign, or null when the kind is not numbered.
+	 */
+	function nextTerminalNumber(
+		kind: TerminalSessionKind,
+		workspaceId: string,
+	): number | null {
+		if (kind !== 'terminal') {
+			return null;
+		}
+		const taken: number[] = [];
+		for (const session of sessions.values()) {
+			const { terminalNumber } = session.snapshot;
+			if (
+				session.snapshot.workspaceId === workspaceId &&
+				!session.stopRequested &&
+				terminalNumber !== null
+			) {
+				taken.push(terminalNumber);
+			}
+		}
+		return allocateTerminalNumber(taken);
+	}
+
+	/**
+	 * Reads the PTY's foreground process once and, when the command it names has
+	 * changed, stamps it on the snapshot and broadcasts so the dock tab renames
+	 * itself. Stops once the session is no longer running, which is what reverts a
+	 * tab whose command finished with the shell.
+	 * @param session - Tracked interactive terminal to refresh.
+	 */
+	function refreshForegroundCommand(session: TrackedSession): void {
+		const foregroundCommand =
+			session.snapshot.status === 'running'
+				? resolveForegroundCommand(
+						session.pty?.foregroundProcess?.(),
+						session.shell,
+					)
+				: null;
+
+		if (foregroundCommand === session.snapshot.foregroundCommand) {
+			return;
+		}
+		session.snapshot = { ...session.snapshot, foregroundCommand };
+		broadcastLifecycle(session);
+	}
+
+	/**
+	 * Starts polling an interactive terminal's foreground process so its dock tab
+	 * can name whatever it is running. No-op for other kinds and for a backend that
+	 * cannot report one. The timer is unref'd so it never keeps the app alive and
+	 * is cleared when the session finalizes.
+	 * @param session - Tracked session to begin polling.
+	 */
+	function startForegroundCommandPolling(session: TrackedSession): void {
+		if (
+			session.snapshot.kind !== 'terminal' ||
+			!session.pty?.foregroundProcess
+		) {
+			return;
+		}
+		session.foregroundPollTimer = setInterval(() => {
+			refreshForegroundCommand(session);
+		}, foregroundPollMs);
+		session.foregroundPollTimer.unref?.();
+	}
+
+	/**
 	 * Marks a `pty-spinner` agent tab (Vibe) busy on seeing a braille spinner glyph
 	 * in its PTY output and arms an idle timer to clear it once the glyphs stop. The
 	 * rising edge and the later idle clear each broadcast once; the renderer holds
@@ -884,6 +978,10 @@ export function createTerminalService({
 		if (session.titlePollTimer) {
 			clearInterval(session.titlePollTimer);
 			session.titlePollTimer = null;
+		}
+		if (session.foregroundPollTimer) {
+			clearInterval(session.foregroundPollTimer);
+			session.foregroundPollTimer = null;
 		}
 		if (session.agentBusyIdleTimer) {
 			clearTimeout(session.agentBusyIdleTimer);
@@ -1001,6 +1099,7 @@ export function createTerminalService({
 			...session.snapshot,
 			endedAt,
 			exitCode,
+			foregroundCommand: null,
 			status,
 		};
 
@@ -1113,6 +1212,8 @@ export function createTerminalService({
 		rows,
 		scriptName,
 		seedOutput,
+		shell,
+		terminalNumber,
 		title,
 		workspaceId,
 	}: {
@@ -1128,6 +1229,8 @@ export function createTerminalService({
 		rows: number;
 		scriptName: string | undefined;
 		seedOutput: string | undefined;
+		shell: string;
+		terminalNumber: number | null;
 		title: string | undefined;
 		workspaceId: string;
 	}): TrackedSession {
@@ -1142,6 +1245,7 @@ export function createTerminalService({
 			dataSubscription: null,
 			exitSubscription: null,
 			exitWaiters: [],
+			foregroundPollTimer: null,
 			killTimer: null,
 			outputFlushTimer: null,
 			outputSeq: 0,
@@ -1151,6 +1255,7 @@ export function createTerminalService({
 			pty,
 			ptyExited: false,
 			scrollback: buildSessionScrollback(seedOutput),
+			shell,
 			shutdownStarted: false,
 			snapshot: {
 				agentBusy: false,
@@ -1162,6 +1267,7 @@ export function createTerminalService({
 				createdAt,
 				endedAt: null,
 				exitCode: null,
+				foregroundCommand: null,
 				id,
 				kind,
 				previewUrl: null,
@@ -1169,6 +1275,7 @@ export function createTerminalService({
 				rows,
 				scriptName: scriptName ?? null,
 				status: 'running',
+				terminalNumber,
 				title: title?.trim() || defaultTitle(kind),
 				titleIsDefault: !title?.trim(),
 				workspaceId,
@@ -1332,6 +1439,8 @@ export function createTerminalService({
 			rows: normalizedRows,
 			scriptName,
 			seedOutput,
+			shell,
+			terminalNumber: nextTerminalNumber(kind, workspaceId),
 			title,
 			workspaceId,
 		});
@@ -1351,6 +1460,7 @@ export function createTerminalService({
 		}
 
 		startConversationInfoPolling(session);
+		startForegroundCommandPolling(session);
 
 		const persistenceWarning = persistNewSession(session, harnessId, shell);
 
@@ -1366,18 +1476,22 @@ export function createTerminalService({
 
 	/**
 	 * Requests graceful termination of a running session via SIGHUP, escalating
-	 * to SIGKILL after a grace window when the process ignores the signal.
+	 * to SIGKILL after a grace window when the process ignores the signal. A
+	 * session whose shell already exited has nothing left to signal but is still
+	 * recorded as stopped: this is the only call a closed dock tab makes, so it is
+	 * what releases the tab's terminal number.
 	 * @param terminalId - Id of the terminal session to stop
 	 * @returns The session's current snapshot
 	 */
 	function kill(terminalId: string): TerminalSessionSnapshot | null {
 		const session = requireSession(terminalId);
 
+		session.stopRequested = true;
+
 		if (!session.pty || session.snapshot.status !== 'running') {
 			return { ...session.snapshot };
 		}
 
-		session.stopRequested = true;
 		session.pty.kill('SIGHUP');
 
 		if (!session.killTimer) {
@@ -1581,7 +1695,16 @@ export function createTerminalService({
 
 				const output = row.cwd ? readTerminalOutput(row.cwd, row.id) : null;
 
-				return output ? [{ id: row.id, output, title: row.title }] : [];
+				return output
+					? [
+							{
+								id: row.id,
+								output,
+								title: row.title,
+								titleIsDefault: row.title === defaultTitle(kind),
+							},
+						]
+					: [];
 			});
 		},
 		readWorkspaceScrollbacks,

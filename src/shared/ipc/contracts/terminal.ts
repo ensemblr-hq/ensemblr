@@ -67,6 +67,14 @@ export interface TerminalSessionSnapshot {
 	createdAt: string;
 	endedAt: string | null;
 	exitCode: number | null;
+	/**
+	 * Name of the command currently running in the foreground of an interactive
+	 * terminal, read from the PTY's foreground process group — `null` whenever the
+	 * shell itself is in the foreground (nothing is running) and for every session
+	 * kind but `terminal`. The dock shows it in place of the tab's own label while
+	 * it is set, so a tab reads `npm` while a build runs and reverts afterwards.
+	 */
+	foregroundCommand: string | null;
 	id: string;
 	kind: TerminalSessionKind;
 	/**
@@ -89,6 +97,15 @@ export interface TerminalSessionSnapshot {
 	 */
 	scriptName: string | null;
 	status: TerminalSessionStatus;
+	/**
+	 * Position of this interactive terminal among the workspace's dock terminals,
+	 * counting from 1, so unnamed tabs read `Terminal 1`, `Terminal 2`, and so on.
+	 * `null` for every other kind — setup, run, archive, and agent sessions are not
+	 * numbered. Assigned once at creation as the lowest number no live dock
+	 * terminal holds and never reassigned, so closing one tab does not renumber the
+	 * rest; the number is released when its own tab closes.
+	 */
+	terminalNumber: number | null;
 	title: string;
 	/**
 	 * True while {@link title} is the English stand-in main assigns a session that
@@ -185,6 +202,13 @@ export interface RestorableTerminal {
 	/** Persisted scrollback to seed into the relaunched session. */
 	output: string;
 	title: string;
+	/**
+	 * True when {@link title} is the English stand-in rather than a name anyone
+	 * chose. The relaunch drops it instead of adopting it, so a terminal nobody
+	 * named comes back as an unnamed, numbered tab in the app's language rather
+	 * than the literal word "Terminal".
+	 */
+	titleIsDefault: boolean;
 }
 
 /** The dock terminals a workspace can relaunch after restart. */

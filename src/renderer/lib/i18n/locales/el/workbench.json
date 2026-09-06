@@ -680,7 +680,8 @@
 			"label": "Εγκατάσταση"
 		},
 		"terminal": {
-			"label": "Τερματικό"
+			"label": "Τερματικό",
+			"numbered-label": "Τερματικό {{number}}"
 		}
 	},
 	"file-diff": {

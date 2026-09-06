@@ -680,7 +680,8 @@
 			"label": "Setup"
 		},
 		"terminal": {
-			"label": "Terminal"
+			"label": "Terminal",
+			"numbered-label": "Terminal {{number}}"
 		}
 	},
 	"file-diff": {

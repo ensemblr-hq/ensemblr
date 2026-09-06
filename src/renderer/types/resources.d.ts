@@ -3108,6 +3108,7 @@ export default interface Resources {
 			};
 			terminal: {
 				label: 'Terminal';
+				'numbered-label': 'Terminal {{number}}';
 			};
 		};
 		'file-diff': {

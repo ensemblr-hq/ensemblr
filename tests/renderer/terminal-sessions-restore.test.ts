@@ -22,6 +22,7 @@ function relaunchedSnapshot(
 		createdAt: '2026-07-21T00:00:00.000Z',
 		endedAt: null,
 		exitCode: null,
+		foregroundCommand: null,
 		harnessSessionId: null,
 		id: 'new-1',
 		kind: 'terminal',
@@ -30,6 +31,7 @@ function relaunchedSnapshot(
 		rows: 24,
 		scriptName: null,
 		status: 'running',
+		terminalNumber: 1,
 		titleIsDefault: false,
 		title: request.title ?? 'Terminal',
 		workspaceId: request.workspaceId,
@@ -43,7 +45,12 @@ function relaunchedSnapshot(
  * @returns The `createTerminalSession` spy.
  */
 function installRestorableBridge(
-	terminals: { id: string; output: string; title: string }[],
+	terminals: {
+		id: string;
+		output: string;
+		title: string;
+		titleIsDefault: boolean;
+	}[],
 ) {
 	const createTerminalSession = vi.fn(
 		async (request: CreateTerminalSessionRequest) => ({
@@ -72,7 +79,12 @@ afterEach(() => {
 describe('useWorkspaceTerminalSessions restore', () => {
 	test('relaunches an open dock terminal with its persisted output seeded', async () => {
 		const { createTerminalSession } = installRestorableBridge([
-			{ id: 'old-1', output: 'prior output', title: 'Terminal' },
+			{
+				id: 'old-1',
+				output: 'prior output',
+				title: 'Deploy',
+				titleIsDefault: false,
+			},
 		]);
 
 		const { result } = renderHook(() => useWorkspaceTerminalSessions('ws-1'));
@@ -81,13 +93,37 @@ describe('useWorkspaceTerminalSessions restore', () => {
 			expect(createTerminalSession).toHaveBeenCalledWith({
 				restoredFromId: 'old-1',
 				seedOutput: 'prior output',
-				title: 'Terminal',
+				title: 'Deploy',
 				workspaceId: 'ws-1',
 			}),
 		);
 
 		await waitFor(() =>
 			expect(result.current.sessions.map((s) => s.id)).toContain('new-1'),
+		);
+	});
+
+	// The persisted title of a terminal nobody named is main's English stand-in.
+	// Adopting it would relaunch the tab as a *named* terminal called "Terminal",
+	// which neither translates nor takes a number.
+	test('relaunches a terminal nobody named without a title', async () => {
+		const { createTerminalSession } = installRestorableBridge([
+			{
+				id: 'old-1',
+				output: 'prior output',
+				title: 'Terminal',
+				titleIsDefault: true,
+			},
+		]);
+
+		renderHook(() => useWorkspaceTerminalSessions('ws-1'));
+
+		await waitFor(() =>
+			expect(createTerminalSession).toHaveBeenCalledWith({
+				restoredFromId: 'old-1',
+				seedOutput: 'prior output',
+				workspaceId: 'ws-1',
+			}),
 		);
 	});
 
