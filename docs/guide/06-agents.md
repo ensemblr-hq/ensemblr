@@ -442,12 +442,35 @@ or to read the diff before it lands:
    rather than by you. It is a full chat with its own delegation budget, so it
    can spread a wide diff over several readers.
 4. **Send the findings back to that same chat** and have it fix them there, then
-   re-review. At most three rounds: a fourth still finding the same class of
-   problem means the approach is wrong rather than the code, and that gets
-   reported instead.
+   re-review — judging each finding rather than accepting the list.
 5. **Open the pull request.** Turning AFK on for a change is the request for one.
    It never merges, never force-pushes over other work, and updates an existing
    pull request rather than opening a second.
+
+A Claude chat set to **Claude Code built-in** sub-agents
+([11. App settings](./11-app-settings.md#providers)) reads a step 3 and 4 of its
+own. It cannot open the Review chat — driving one needs the spawn tools that
+setting withholds — so it briefs one of its own sub-agents over the branch diff
+instead, and fixes what comes back itself. The rest of the loop is the same.
+
+**Steps 1 to 4 are a loop, and the agent decides how many times it runs.** There
+is no round cap: it keeps reviewing, judging, repairing, and re-reading for as
+long as each pass changes something. Three things end it — a round that finds
+nothing it agrees needs fixing, a round that repeats findings it has already
+answered, and rounds circling the same class of problem, which says the approach
+is wrong rather than the code and sends it back to step 1 to re-plan. When
+re-planning does not break the circle either, it stops and reports rather than
+spending the night on one finding, and the pull request is not opened while real
+problems stand.
+
+**It works through sub-agents where that keeps the run alive.** An unattended run
+ends when the agent's context window fills, not when the work does, and nobody is
+there to restart it — so it is told to spend a child's context rather than its
+own on wide reading: surveying a subsystem before it plans, triaging a failing
+suite, sweeping files a review round touched. The plan, the design calls, and the
+load-bearing edits stay with the one agent, so the change keeps a single author.
+This matters most on a model with a smaller context window, which is exactly
+where an overnight run would otherwise run out part-way.
 
 A **hard block** — a credential it does not have, a service refusing it, a step
 that needs your authority — stops the run there and produces the report rather

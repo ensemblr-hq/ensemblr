@@ -124,13 +124,93 @@ The five steps and why each is there:
 2. **Build it, and revise the plan out loud when it stops being right.**
 3. **Have it reviewed by an agent that did not write it**, via the op above.
 4. **Send the findings back to the reviewer**, judging rather than accepting each
-   one, for at most **three** rounds — every round in that same conversation,
-   because the open review holds a co-tenancy slot and a second `startReview`
-   would be refused rather than opening a fresh reader. A loop with no exit is
-   how an unattended run spends a night on the same three findings; a fourth
-   round still finding the same class of problem means the approach is wrong
-   rather than the code, which is a thing to report.
+   one — every round in that same conversation, because the open review holds a
+   co-tenancy slot and a second `startReview` would be refused rather than
+   opening a fresh reader.
 5. **Open the pull request, and never merge it.**
+
+### Steps 1 to 4 are a cycle the agent bounds itself
+
+The loop shipped with a cap of **three** review rounds. A count is the wrong
+instrument in both directions: it cuts off a run that was still converging on
+round four, and it licenses rounds two and three when round one already settled
+the change. The agent inside the loop is the only party that can tell a round
+that moved something from a round that did not — nobody else is awake — so the
+bound is progress rather than arithmetic, and the block says plainly that
+nothing caps the rounds.
+
+Three conditions end it, and they are stated as conditions rather than as a
+number: a round that finds nothing the agent agrees needs fixing; a round that
+repeats findings already judged and answered, which is not new information; and
+a run of rounds circling the same class of problem. The third is the one the old
+cap was really aiming at, and it now has a better answer than stopping — it is
+evidence about the *approach*, so the loop re-enters at step 1, re-plans with
+what the reviews taught it, and rebuilds. Only when re-planning fails to break
+the circle does it stop and report, and the pull request is still withheld while
+real problems stand. Each pass has to be paid for by something changing, and
+what each round moved goes in the conversation and in the final report.
+
+That re-entry walks back through step 3, which is the one step the two delegation
+mechanisms do not share, so the cycle carries one mechanism-dependent sentence of
+its own. On Ensemblr's mechanism the reviewer opened on the first pass is still
+holding the workspace's second co-tenancy slot, so the rebuilt change goes back
+to it as another follow-up and a second `startReview` on the way past step 3
+would be refused — the same fact step 4 states for an ordinary round, repeated
+because the re-entry bypasses step 4. On the native one there is nothing open to
+follow up, so the rebuilt change goes to a fresh reviewer child, read whole
+rather than as a delta against a plan that no longer holds.
+
+### The loop delegates its reading, and names the mechanism the caller holds
+
+An unattended run ends when the orchestrator's context window fills, not when the
+work does, and nobody is there to start it again. That makes context the run's
+real budget, and the loop is where it gets spent: the survey a plan needs, the
+triage of a failing suite, the sweep confirming a fix landed. A sub-agent's
+window is a separate one and costs the orchestrator only what it reports back, so
+the block asks for that reading to be spent out of a child — stated *before* step
+1, because the widest read of a run happens while planning and cannot be
+un-spent afterwards.
+
+It has to override the role playbook in as many words. That playbook says to
+delegate only when the task splits into two or more substantial parallel
+workstreams, which is right for a chat somebody is watching; an agent holding
+both instructions with nothing saying which governs picks one by guess, the same
+failure [0057](./0057-answer-the-harness-plan-workflow-in-the-per-turn-preamble.md)
+resolved for the harness plan workflow. The counterweight is the half that does
+not move: the plan, the design calls, the load-bearing edits and the
+reconciliation stay with the one agent, because a diff written by four agents at
+once has no author who can hold it.
+
+Which makes the block mechanism-dependent, so it is now rendered from the same
+two facts `buildPlanModeDelegationDirective` takes — the session's
+`SubagentMechanism` and the caller's `AgentControlRole`:
+
+- **A root on Ensemblr's mechanism** reads what it read before, plus
+  `startConversation` / `waitForAgents` and the `reports: "brief"` habit that
+  keeps a wide fan-out from costing more context than it saved.
+- **A root delegating natively** is told `startReview` is absent from its list
+  and to spawn its own reviewer over the branch diff, with the brief a reviewer
+  needs to be actionable. This closes a contradiction the original shipped with:
+  the block ordered two ops — `startReview` and `sendFollowUp` — that
+  `NATIVE_DELEGATION_WITHHELD_OPS` withholds from that role, answered only by a
+  playbook read once at session open.
+- **A spawned sub-agent** gets a short body instead of the steps. Nested
+  delegation is blocked on every axis, so the delegation block would be an
+  instruction it cannot follow, and the steps name ops it does not hold. What
+  it keeps is the discipline: decide the approach before the first edit, run
+  the repository's checks *where its unit of work changed files*, name the
+  assumptions, and leave the change in the working tree for whichever agent
+  above it owns the commit — stated as what the child does not do, because a
+  reviewer and a peer read this file as roots too, and a child of one has its
+  commit two levels up rather than at its own parent. That gate matters more
+  here than the one on the orchestrator body, because the delegation block
+  above recruits read-only children by name — the survey before a plan, the
+  triage of a failing suite — and an ungated instruction to run the checks
+  spends a minute of an unattended run per scout on a tree the child never
+  wrote to.
+
+There is no Concierge branch. AFK is a per-chat-tab toggle and the Concierge is a
+panel, so no Concierge session is ever in the registry `isUnattended` reads.
 
 Step 5 resolves a standing conflict rather than ignoring one. This repository's
 own `AGENTS.md` says never to open a pull request unless the user asked in the
@@ -165,7 +245,15 @@ than a lock, exactly as it is for a peer.
 review needs `sendFollowUp` and `waitForAgents`, and that role holds neither, so
 `startReview` joins them in `NATIVE_DELEGATION_WITHHELD_OPS` and its playbook
 says so. A review it could open but neither wait on nor steer would be worse than
-none.
+none. The loop now says so on every turn as well, rather than leaving the
+correction to a playbook read once at session open.
+
+**The block is no longer one string.** It renders from the session's delegation
+mechanism and the caller's role, which puts two more consumers on facts the
+control service already resolves — `handleGetSessionBrief` now resolves the role
+once and hands it to both the workflow block and the linked-issue directive
+instead of resolving it twice. A third variant added later is a third branch in
+`buildAfkWorkflowDirective`, not a second block on the preamble.
 
 **The personal review preference being `localStorage` is now load-bearing.** It
 is the reason main has to ask a window at all. Moving the per-action preferences

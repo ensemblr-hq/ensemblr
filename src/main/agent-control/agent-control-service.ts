@@ -1654,11 +1654,16 @@ export function createAgentControlService({
 		const naming = await ports.sessionNaming.readBrief(origin);
 		const planMode = isPlanning(origin);
 		const afkMode = isUnattended(origin);
+		const role = await resolveRole(origin);
 		return ok({
 			afkDirective: buildAfkDirective(afkMode),
 			afkMode,
-			afkWorkflowDirective: buildAfkWorkflowDirective(afkMode),
-			issueDirective: await readIssueDirectiveForOrigin(origin),
+			afkWorkflowDirective: buildAfkWorkflowDirective({
+				delegation: origin.delegation,
+				role,
+				unattended: afkMode,
+			}),
+			issueDirective: issueDirectiveFor(origin, role),
 			languageDirective: readLanguageDirective(),
 			naming,
 			nudge: buildSessionBriefNudge(naming, planMode),
@@ -2916,7 +2921,11 @@ export function createAgentControlService({
 			planDelegationFor(origin, role),
 			readPlanRefinement(origin),
 			buildAfkDirective(isUnattended(origin)),
-			buildAfkWorkflowDirective(isUnattended(origin)),
+			buildAfkWorkflowDirective({
+				delegation: origin.delegation,
+				role,
+				unattended: isUnattended(origin),
+			}),
 			readLanguageDirective(),
 			issueDirectiveFor(origin, role),
 			readCoAuthorDirective(),

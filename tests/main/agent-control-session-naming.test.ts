@@ -10,6 +10,8 @@ import type { AgentSpecies } from '../../src/main/agent-control/ports.ts';
 import { BranchSlugRejected } from '../../src/main/agent-runtime/naming/apply-branch-slug.ts';
 import type { SubagentMechanism } from '../../src/shared/agent-control.ts';
 import {
+	AFK_WORKFLOW_HEADER,
+	buildAfkWorkflowDirective,
 	buildLanguageDirective,
 	buildLinkedIssueDirective,
 	buildPlanModeDelegationDirective,
@@ -54,6 +56,7 @@ function setup(
 		coAuthor?: boolean;
 		subAgent?: boolean;
 		delegation?: SubagentMechanism;
+		afk?: boolean;
 	} = {},
 ) {
 	const registry = createOriginRegistry({ generateToken: () => 'tok' });
@@ -97,7 +100,7 @@ function setup(
 		},
 		afkMode: {
 			activateForSpawn: vi.fn(),
-			isActive: vi.fn(() => false),
+			isActive: vi.fn(() => overrides.afk ?? false),
 			releaseSession: vi.fn(),
 		},
 		sessionNaming: {
@@ -372,6 +375,74 @@ describe('getSessionBrief', () => {
 			expect(result.data).toMatchObject({ languageDirective: null });
 		}
 	});
+
+	it('renders the delivery loop for an unattended root', async () => {
+		const { invoke } = setup({ afk: true });
+
+		const result = await invoke('getSessionBrief');
+
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			expect(result.data).toMatchObject({
+				afkMode: true,
+				afkWorkflowDirective: buildAfkWorkflowDirective({
+					delegation: 'ensemblr',
+					role: 'orchestrator',
+					unattended: true,
+				}),
+			});
+		}
+	});
+
+	// Both facts are resolved here rather than inside the renderer, so hardcoding
+	// either one would leave every other case green while handing a spawned child
+	// the five steps and their pull request.
+	it('cuts the delivery loop to a sub-agent role', async () => {
+		const { invoke } = setup({ afk: true, subAgent: true });
+
+		const result = await invoke('getSessionBrief');
+
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			expect(result.data).toMatchObject({
+				afkWorkflowDirective: expect.stringContaining(
+					'The delivery loop Ensemblr runs an unattended change through is not yours',
+				),
+			});
+			expect(result.data).not.toMatchObject({
+				afkWorkflowDirective: expect.stringContaining('**5.'),
+			});
+		}
+	});
+
+	it('gives a natively delegating root the review step it can act on', async () => {
+		const { invoke } = setup({ afk: true, delegation: 'native' });
+
+		const result = await invoke('getSessionBrief');
+
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			expect(result.data).toMatchObject({
+				afkWorkflowDirective: expect.stringContaining(
+					'`ensemblr_start_review` is absent from your tool list',
+				),
+			});
+		}
+	});
+
+	it('renders no delivery loop while the user is present', async () => {
+		const { invoke } = setup();
+
+		const result = await invoke('getSessionBrief');
+
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			expect(result.data).toMatchObject({
+				afkMode: false,
+				afkWorkflowDirective: null,
+			});
+		}
+	});
 });
 
 describe('readTurnPreamble', () => {
@@ -410,6 +481,32 @@ describe('readTurnPreamble', () => {
 		const { service } = setup({ language: 'ru' });
 
 		expect(await service.readTurnPreamble('unknown')).toBeNull();
+	});
+
+	// The second of the two call sites, and the one Pi actually reads. It resolves
+	// the role for the plan-delegation and linked-issue blocks anyway, so the
+	// failure to guard against is that block being handed a literal instead.
+	it('cuts the delivery loop to a sub-agent role', async () => {
+		const { service } = setup({ afk: true, subAgent: true });
+
+		const preamble = await service.readTurnPreamble(CALLER);
+
+		expect(preamble).toContain(AFK_WORKFLOW_HEADER);
+		expect(preamble).toContain(
+			'The delivery loop Ensemblr runs an unattended change through is not yours',
+		);
+		expect(preamble).not.toContain('**5.');
+	});
+
+	it('gives a natively delegating root the loop its mechanism can run', async () => {
+		const { service } = setup({ afk: true, delegation: 'native' });
+
+		const preamble = await service.readTurnPreamble(CALLER);
+
+		expect(preamble).toContain(
+			'`ensemblr_start_review` is absent from your tool list',
+		);
+		expect(preamble).toContain('Brief a fresh reviewer child');
 	});
 
 	it('tells a refinement turn to close on another plan submission', async () => {
