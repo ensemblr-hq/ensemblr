@@ -17,6 +17,7 @@ import {
 import { Button } from '@/renderer/components/ui/button';
 import { ScrollBar } from '@/renderer/components/ui/scroll-area';
 import { useConversationFollowKey } from '@/renderer/hooks/conversation/use-conversation-follow-key';
+import { useConversationScrollHold } from '@/renderer/hooks/conversation/use-conversation-scroll-hold';
 import { useConversationScrollRestore } from '@/renderer/hooks/conversation/use-conversation-scroll-restore';
 import { cn } from '@/renderer/lib/utils';
 
@@ -60,6 +61,12 @@ export const ConversationContent = ({
 	const context = useStickToBottomContext();
 	const ready = useConversationScrollRestore({
 		scrollKey,
+		scrollRef: context.scrollRef,
+		scrollState: context.state,
+		stopScroll: context.stopScroll,
+	});
+	useConversationScrollHold({
+		contentRef: context.contentRef,
 		scrollRef: context.scrollRef,
 		scrollState: context.state,
 		stopScroll: context.stopScroll,

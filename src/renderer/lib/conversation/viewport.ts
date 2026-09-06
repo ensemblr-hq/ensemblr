@@ -16,6 +16,15 @@ const AT_END_TOLERANCE_PX = 1;
 /** Sub-pixel drift is measurement noise, not a row that moved. */
 const ANCHOR_DRIFT_TOLERANCE_PX = 1;
 
+/** The computed `overflow-y` values that make an element a scroll container. */
+const SCROLLING_OVERFLOW_Y = ['auto', 'scroll'];
+
+/**
+ * The computed `overscroll-behavior-y` values that stop a gesture chaining out
+ * of an element once it has nothing left to scroll.
+ */
+const CONTAINING_OVERSCROLL_Y = ['contain', 'none'];
+
 /**
  * How far a viewport sits above the end of its own content.
  * @param viewport - The scrolling element
@@ -26,13 +35,106 @@ function distanceFromBottom(viewport: HTMLElement): number {
 }
 
 /**
+ * The furthest a scrolling element can currently be scrolled. Content that
+ * shrinks mid-stream lowers this, which is what puts a position the user chose
+ * temporarily out of reach rather than making it wrong.
+ * @param element - The scrolling element
+ * @returns The largest offset the browser will accept.
+ */
+export function maxScrollTop(element: Element): number {
+	return Math.max(0, element.scrollHeight - element.clientHeight);
+}
+
+/**
+ * Whether a viewport parked at some offset would count as following the newest
+ * message. The offset need not be the current one, so an offset the content has
+ * already shrunk past — which the library reads as being at the end, and re-arms
+ * its lock for — is recognised as one of these too.
+ * @param viewport - The scrolling element
+ * @param scrollTop - The offset to judge
+ * @returns True when that offset sits within the near-bottom threshold of the end.
+ */
+export function wouldFollowNewest(
+	viewport: HTMLElement,
+	scrollTop: number,
+): boolean {
+	return maxScrollTop(viewport) - scrollTop <= NEAR_BOTTOM_THRESHOLD_PX;
+}
+
+/**
  * Whether a viewport sits close enough to its end to count as following the
  * newest message.
  * @param viewport - The scrolling element
  * @returns True while the stream is effectively in view.
  */
 function isFollowingNewest(viewport: HTMLElement): boolean {
-	return distanceFromBottom(viewport) <= NEAR_BOTTOM_THRESHOLD_PX;
+	return wouldFollowNewest(viewport, viewport.scrollTop);
+}
+
+/**
+ * Whether an element can still scroll the way a gesture is pushing it.
+ * @param element - The scrolling element
+ * @param deltaY - How far the gesture scrolls, negative being upwards
+ * @returns True when it has content left to reach in that direction.
+ */
+function hasRoomToScroll(element: Element, deltaY: number): boolean {
+	return deltaY < 0
+		? element.scrollTop > 0
+		: element.scrollTop < maxScrollTop(element);
+}
+
+/**
+ * Whether a wheel gesture stops at an element rather than chaining out of it. A
+ * pane that can still move the way the gesture is pushing takes it; one already
+ * at that limit takes it only when its `overscroll-behavior` blocks the chain,
+ * and otherwise the gesture passes through to whatever encloses it.
+ * @param element - The element to judge
+ * @param deltaY - How far the gesture scrolls, negative being upwards
+ * @returns True when the gesture goes no further out than here.
+ */
+function consumesWheel(element: Element, deltaY: number): boolean {
+	const style = getComputedStyle(element);
+	if (
+		!SCROLLING_OVERFLOW_Y.includes(style.overflowY) ||
+		element.scrollHeight <= element.clientHeight
+	) {
+		return false;
+	}
+	return (
+		hasRoomToScroll(element, deltaY) ||
+		CONTAINING_OVERSCROLL_Y.includes(style.overscrollBehaviorY)
+	);
+}
+
+/**
+ * Whether a wheel gesture belongs to the conversation viewport itself rather
+ * than to a pane scrolling inside it — a tool panel, a code surface, a table.
+ * A pane that consumes the gesture leaves the transcript still, so treating one
+ * as a transcript scroll would drop the stick-to-bottom lock while nothing
+ * moved; a pane the gesture chains out of does move the transcript, and the
+ * lock has to go with it.
+ *
+ * The library's own version of this test reads the `overflow` shorthand, which
+ * Radix's viewport computes as `hidden scroll`; matching on `overflow-y` is what
+ * makes it recognise this viewport at all.
+ * @param viewport - The scrolling element the conversation owns
+ * @param target - What the wheel event was dispatched on
+ * @param deltaY - How far the gesture scrolls, negative being upwards
+ * @returns True when the gesture reaches the viewport rather than stopping inside it.
+ */
+export function ownsWheelGesture(
+	viewport: HTMLElement,
+	target: EventTarget | null,
+	deltaY: number,
+): boolean {
+	let element = target instanceof Element ? target : null;
+	while (element !== null && element !== viewport) {
+		if (consumesWheel(element, deltaY)) {
+			return false;
+		}
+		element = element.parentElement;
+	}
+	return element === viewport;
 }
 
 /**
