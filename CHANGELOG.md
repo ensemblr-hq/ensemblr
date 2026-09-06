@@ -9,6 +9,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.4] - 2026-09-06
+
+**The unattended (AFK) delivery loop is now complete, end to end.** A chat can be told the user is
+away and keeps moving without them; the Concierge can open an unattended workspace agent directly;
+the loop pushes an unattended change through plan, review, and a pull request on its own, delegates
+the wide reading a plan needs to a sub-agent so the orchestrator's own context lasts the whole run,
+and stops itself on convergence rather than a fixed round count. The review shape moved from a
+sub-agent back to a peer orchestrator after the review-fix-review cycle exposed what a single context
+window costs a fifty-file diff, alongside a co-tenancy quota that gives an unattended run room for
+both occupants. Agents can also now reach sideways to a peer orchestrator, upward to the Concierge,
+and file a Linear issue directly. Elsewhere: workspaces get a readable display name distinct from
+their slugged branch, the review rail is reachable at any window width through a sheet below 1024px,
+and third-party CLI harnesses (Claude Code, Codex, Vibe) sit behind an Experimental switch, off by
+default.
+[Release](https://github.com/ensemblr-hq/ensemblr/releases/tag/v0.1.4) ·
+[`.dmg`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.4/Ensemblr-0.1.4-arm64.dmg) ·
+[`.AppImage`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.4/Ensemblr-0.1.4-x64.AppImage)
+
 ### Added
 
 - **Agents can reach sideways and upwards, not only down.** Three new control ops
@@ -30,7 +48,163 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   from an agent. `ensemblr_linear_create_issue` files a ticket, with `teamId`
   required, a started or terminal opening state refused, and a
   `ensemblr_linear_list_issues` search enforced as a precondition on the first
-  create in a conversation, because nothing here can delete a duplicate.
+  create in a conversation, because nothing here can delete a duplicate. (#442)
+
+- **A chat can be told the user is away, and it keeps moving without them.** A per-chat AFK chip in
+  the composer, Plan Mode's opposite number: `ensemblr_ask_user_question` is refused by
+  `afkModeControlOpDenial`, with the reason carrying the escape hatch rather than only the cause —
+  take the most defensible reading, act on it, record the assumption under its own heading in the
+  final message. Claude Code's native `AskUserQuestion` is withheld by a `PreToolUse` hook rather than
+  a `disallowedTools` entry, since the SDK fixes that list when `query()` opens while the chip can
+  flip mid-session. Permission confirmations auto-approve at both `gatePermission`'s dialog and
+  Claude's own per-tool card, scoped to the `confirmation-required` boundary only — a `blocked` gate
+  stays blocked, and the peer-orchestrator confirmation is refused rather than approved, because two
+  unsupervised writers must never land on one worktree. The toggle is a per-chat `atomWithStorage`
+  mirrored into an in-memory `AfkModeRegistry`, mutually exclusive with Plan Mode, and inherited by
+  every conversation it spawns. (#444)
+
+- **Deleting a repository can now take its folder with it.** Previously the folder was always left
+  behind, tagged `.ensemblr-archived` — correct for a checkout registered in place, wrong for one
+  Ensemblr cloned into the managed `repos/` root, where the folder is Ensemblr's to clean up. The
+  delete dialog offers a checkbox for a repository whose folder sits directly inside that root; main
+  honors it only after canonicalizing both the repository path and the managed root, so neither a
+  symlinked row nor a symlink planted in `repos/` can walk the removal outside the managed tree. A
+  refusal falls back to the sentinel path and reports a warning toast on success, since the dialog's
+  diagnostics list otherwise renders only failures. Three things that used to survive a deleted
+  repository are now cleaned up alongside it: the leftover `workspaces/<slug>` directory, every
+  private `refs/ensemblr/**` archive-pinning ref, and the repository-scoped Infisical link rows, which
+  carry no foreign key back to `repositories`. The containment rule lives in
+  `src/shared/managed-path.ts`, hand-rolled since shared code may not import `node:path`, so main and
+  renderer decide "is this ours to remove" from one implementation. (#445)
+
+- **The Review action now defers to a repository's own review skill instead of overriding it.** The
+  `review` base prompt opens by checking for a bespoke review skill, slash command, or documented
+  review procedure supplied by the repository or the user's agent configuration; when one exists, the
+  agent runs it alone — it replaces every guideline below it, including how findings are worded and
+  reported, and no second review layers on top. The existing guidelines move under a
+  `## Default guidelines` heading and apply only when no such skill exists. Mirrors the shape
+  `create-pr` and `update-pr` already use, but stronger: the skill wins outright rather than merely
+  taking precedence. (#446)
+
+- **An unattended change now runs itself through plan, review, and a pull request instead of stopping
+  at an uncommitted tree.** `ensemblr_start_review` opens the workspace's own Review conversation —
+  the repository's review skill when it has one, on the model configured for reviews — as a second
+  root orchestrator rather than a sub-agent, so a wide diff can spawn its own readers; fixes route
+  back into that same conversation via `ensemblr_send_follow_up` rather than scattering across tabs.
+  It costs one of the workspace's two co-tenancy slots but raises no confirmation, since this is the
+  action the Review button already offers with the user's consent implied. A new
+  `buildAfkWorkflowDirective` block states the loop for any AFK turn that changes code: plan in
+  writing, build, get reviewed by an agent that didn't write it, judge each finding rather than accept
+  it wholesale for up to three rounds, then open a pull request and stop — never merge, never
+  force-push. (#447)
+
+- **The Concierge can now open a workspace agent that runs unattended.** AFK previously reached a
+  workspace only by inheritance — a spawn carried `afkMode: isUnattended(origin)` — and the Concierge
+  has no composer chip of its own to inherit from, so telling it you were stepping away still produced
+  an attended orchestrator that parks on `ensemblr_ask_user_question`. `ensemblr_start_conversation`
+  now takes `afkMode` and `planMode`, refused from every other caller since a caller that already
+  inherits a mode has no reason to override it. Both flags OR with whatever the caller already carries
+  rather than coalescing, so no argument can turn an inherited mode off, and stating both at once is
+  refused. `afkMode` also refuses `wait`, as `peer` does, since the unattended delivery loop runs for
+  hours and no wait window covers it. (#453)
+
+- **Delegating a child now picks its reasoning budget, and the costliest tier of model needs a nod
+  first.** `thinkingLevel` had been an argument on `startConversation` from the start and was almost
+  never passed, so every child ran at whatever its parent happened to be set to — a mechanical rename
+  thinking as hard as the design question beside it. `ensemblr_list_models` now publishes each model's
+  `thinkingLevels` ladder and the `thinkingAxis` its runtime calls that dial (`effort` on Claude Code,
+  `thinking` on pi, since the two runtimes don't share rungs), and a level the child's model does not
+  accept is refused by name rather than silently dropped back to the caller's. Separately,
+  `classifyAgentModelTier` sorts every model into `standard` or `frontier` off its own name, and
+  spawning a child onto a model the caller explicitly *names* at that tier now needs the user's
+  confirmation — inheriting the caller's own model is never gated, since that was already the user's
+  choice. The approval is remembered per workspace and model for the process lifetime, an AFK spawn is
+  refused rather than parked on an unanswerable dialog, and `defaultModelFor` now steps over the
+  frontier tier so a spawn naming nothing can no longer fall through to Claude's costliest catalog
+  default. (#454)
+
+- **Dock terminals number themselves and show what they're running.** Every unnamed terminal used to
+  read "Terminal", so a dock with three offered no way to tell which was which, and an inactive tab
+  running a build looked identical to an idle shell. Terminals now number from 1, assigned in main as
+  the lowest number no live terminal holds and never reassigned — gap-filling rather than counting
+  past the highest keeps a dock open all day off "Terminal 47", and the number releases when its tab
+  closes. A tab's title also switches to the command its PTY's foreground process group reports (read
+  via `tcgetpgrp`, verified under bash and fish) and reverts once that process exits. Setup, run,
+  archive, and agent tabs stay unnumbered since they render in fixed tabs of their own. Finally,
+  `ensemblr_start_terminal` now focuses and reveals the terminal it opened, including un-collapsing
+  the dock and its parent sidebar, so an agent-started terminal no longer opens invisibly behind a
+  collapsed dock. (#456)
+
+- **The navigation sidebar carries a panel for as long as an app update is outstanding.** A toast was
+  the wrong shape for an update offer — dismissible, so it could be waved away and never seen again,
+  and raised from a background effect nagging on every re-render. The sidebar now shows `UpdatePanel`
+  for the `available`, `downloading`, `ready`, and `failed` states, and it leaves only when the update
+  does: the user restarts into it and main reports `idle`, or they disable automatic updates and main
+  reports `disabled`. A feed error checking for updates no longer retracts an offer already made:
+  `checkNow` keeps a standing `available` state and records the failure alongside it instead of
+  turning it into "did not download." (#460)
+
+- **A chat tab now shows the mode its next turn will run under.** A chat left unattended shows the
+  composer's keyboard-off glyph in the away indigo; one in Plan Mode shows a map glyph in the accent,
+  replacing the resting message-square or bot mark. A working chat keeps its spinner and takes the
+  mode's tint instead of losing it to a static glyph, since an unattended run spends most of its life
+  working and an untinted spinner would hide the mode; a sub-agent keeps its bot mark for the same
+  reason, since sub-agents inherit their parent's mode and every spawned tab under an unattended or
+  planning orchestrator would otherwise lose its identity. Status still outranks identity, so a
+  working sub-agent gets the tinted spinner, not a static tinted bot. Each mode icon carries
+  `role='img'` and a translated `aria-label`, since glyph and hue alone are unreadable to a screen
+  reader and the tinted spinner alone is unreadable without colour vision. (#464)
+
+- **Workspaces now get a readable name, and only the branch gets slugged.** Renaming a workspace used
+  to write one kebab slug into both the git branch and the display name, so the board showed
+  `fix-terminal-resurrection` over its own branch name with the prefix stripped — a title carrying
+  nothing the subtitle didn't already say. Rename now reads one naming input through a shared
+  `readNamingInput` and renders it twice — `sanitizeBranchSlug` for the branch, a new
+  `deriveWorkspaceDisplayName` for the workspace — so the two surfaces can never diverge from two
+  different readings of one answer. Case is preserved rather than imposed, and the provisional namer
+  now yields the phrase from a user's first prompt instead of a slug, carrying their own
+  capitalization through to the sidebar; a small table fixes the spelling of terms whose rendering is
+  determinate, such as initialisms, so `npm install caching` isn't rewritten into
+  `Npm install caching`. `ensemblr_set_branch_name` now asks agents for a short readable name rather
+  than a kebab slug across every playbook, tool description and skill bundle that names it. (#465)
+
+- **The review rail is reachable on any window width.** Below 1024px the rail — the pull-request
+  header, All files / Changes / Checks, and the terminal dock — was `display:none` with no way back
+  except growing the user's window, which bailed outright in fullscreen; since the window minimum is
+  720px, the entire 720–1023px band had no reachable rail at all. The rail now has two hosts and is
+  mounted in exactly one: the resizable panel beside the content at ≥1024px, unchanged, or a shadcn
+  Sheet sliding over the content below it. The panel stays registered with the group at every width so
+  the frozen `defaultSize` the persisted width restores from survives, and opening or closing the
+  sheet never writes the collapse preference or width, so a window narrowed for an afternoon comes
+  back to the layout it left. Commands the rail's own views used to register — ⌘R and the Run menu,
+  ⌘P's file palette, ⌥⌘U, the View menu's tab picks, and the dock reveal an agent uses to focus a
+  terminal — move up to the workspace shell, which stays mounted, since each owns its accelerator on
+  macOS and a registration dying with the sheet would leave the OS swallowing the chord against
+  nothing. `ensureWindowWidth` is removed outright, since growing the user's window is exactly what
+  the sheet replaces. (#468)
+
+- **Full screen fills its own corner with the wordmark instead of an empty gutter.** macOS slides the
+  traffic lights off the window in full screen, but the leading inset reserved for them stayed,
+  leaving the sidebar's title-bar strip holding a gutter around nothing. Full screen now takes the
+  path Linux with a native title bar already used: `resolveWindowChrome` takes a `fullScreen` flag and
+  zeroes the leading inset for `system-inset` only, since the title bar Ensemblr draws itself keeps
+  its strip where that inset is the window's only chrome. Main re-resolves and pushes a fresh snapshot
+  on each fullscreen transition over a new `ensemblr:window-chrome-changed` channel, and the renderer
+  applies it both to the CSS custom properties every inset-aware surface reads and to a new
+  `windowChromeAtom` the two render-path readers — the nav sidebar and the Concierge panel header —
+  subscribe to instead of reading a frozen bootstrap snapshot. (#469)
+
+- **Third-party CLI agent harnesses are now gated behind an Experimental switch, off by default.**
+  `experimental.tuiHarnesses` covers the third-party coding-agent CLIs (Claude Code, OpenAI Codex,
+  Mistral Vibe) Ensemblr launches into a terminal tab, mirroring the existing
+  `experimental.architectureDiagram` precedent for a whole-feature switch. With it off, the feature is
+  absent rather than disabled: the tab-strip launcher, its `⌘⇧A` binding, the Workspace → Agent
+  Harness… menu item, its row in Settings → Shortcuts, and the launch/resume IPC all disappear, and
+  `ensemblr_launch_harness` leaves every tool list along with every playbook passage naming a harness.
+  A harness already running is deliberately left alone, since it's a live process with an unsaved
+  conversation and hiding its tab would orphan a PTY the user can't reach; a tab whose PTY died is
+  archived on the next launch instead of respawned, so nothing comes back from the dead once the
+  switch flips back on. (#470)
 
 ### Fixed
 
@@ -50,7 +224,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   retired as soon as anybody spends the tab: by the claim, so a second spawn
   arriving behind the first opens its own, and by the composer the moment a draft
   or an attachment appears, which covers a workspace you opened, started typing
-  in, and the Concierge then delegated into.
+  in, and the Concierge then delegated into. (#451)
 
 - **Steering a conversation whose tab was closed brings that tab back.** Closing
   a chat tab archives it without stopping the conversation inside, so an
@@ -66,7 +240,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   no live PTY and whose harness only the renderer can respawn. Only a tab that
   would come back whole is reopened at all — a chat whose conversation has since
   moved to another tab stays shut, because reopening it would surface an emptied
-  row rather than the conversation somebody asked to see.
+  row rather than the conversation somebody asked to see. (#452)
 
 - **A workspace re-opens on the tab it was on, and closing one walks back the way
   you came.** Three faults compounded into the same symptom. The route loaders
@@ -81,7 +255,137 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   honour and the first close of the run slid sideways along the strip instead.
   The loaders now redirect to the remembered tab, a stale routed id is replaced
   with the most recent still-open tab once the rows land — which also covers a
-  tab closed by an agent or by a second window — and the chain is persisted.
+  tab closed by an agent or by a second window — and the chain is persisted. (#448)
+
+- **Steering a peer orchestrator or the Review conversation no longer mislabels it as a sub-agent in
+  the timeline.** Six control-tool rows hardcoded "sub-agent" in their workspace-surface titles, so a
+  root the app opens with no sub-agent marker — a peer, or the Review conversation — read as if it had
+  been spawned as a child. The surface now picks the speaker's vocabulary while the target's resolved
+  role picks the object's noun, with three outcomes: a genuine sub-agent keeps its existing wording, a
+  root orchestrator gets "orchestrator", and an unresolvable target falls to the neutral "chat" — a
+  fallback for ignorance, never a blanket replacement. Nothing new crosses the process boundary: a
+  spawn already carries `peer: true` in its own arguments, and every other tool resolves against the
+  workspace's chat tabs, where `spawnedChildRole` already recorded the marker. (THE-209) (#449)
+
+- **New workspaces now actually fork from the branch configured in Git settings.** `resolveBaseBranch`
+  probed the configured `branchFrom` with `rev-parse` and silently fell back to the repository's root
+  branch when that failed — and nothing fetched the ref first, unlike the equivalent path for
+  retargeting an existing workspace's base branch. Since the Git settings branch picker lists branches
+  from the GitHub API rather than local refs, a perfectly valid selection could name an `origin/<name>`
+  the clone had never fetched, and every new workspace quietly came off the default branch while the
+  settings screen kept showing the branch actually picked. The base is now fetched via
+  `ensureBaseRefAvailable` before being probed, and when it still can't be resolved, workspace creation
+  succeeds but attaches a `warning` diagnostic surfaced from every create path. `validateGitRef` also
+  now rejects `:`, `?`, `*`, `[`, `\`, `^`, and `~` in a configured base, closing off a value stored
+  verbatim (and settable via a repository's committed `.ensemblr/settings.toml`) from being turned
+  into a writing refspec, an scp-style URL, a revision expression, or a glob. (#459)
+
+- **A workspace's PR status no longer flickers backwards when navigating between tabs.** Status
+  reaches the UI down two independently-timed paths — a live `gh`-backed snapshot and a cached compact
+  presentation kept warm by a background sweeper — and the renderer picked between them by whichever
+  happened to be loaded rather than whichever was newer, so a row could read "Ready to merge" and flip
+  back to "Checks running" for a second before settling. Every hand-off is now made monotonic on a
+  `syncedAt` stamp: `WorkspacePrPresentation` carries the timestamp of the snapshot it derives from,
+  `isFresherPrObservation` is the one predicate that orders the two sources (an unstamped candidate
+  can never unseat a stamped one, so a failed `gh` refresh can no longer replace a known PR with
+  "No PR"), and `useLivePullRequestModel` grafts the fresher source's verdict onto the live model
+  rather than swapping it whole. The SQLite cache write itself now refuses to overwrite a newer stored
+  snapshot with an older one arriving late from a slow `gh` call. (#457)
+
+- **Closing a dock terminal tab now keeps it closed, and tab numbers follow the strip's order.**
+  Closing a terminal only killed its PTY; the session stayed tracked as `stopped` and still came back
+  from `list`, so returning to the workspace reseeded the dock and the dead tab reappeared for the
+  rest of the run. Closing is now a distinct act from stopping: `close` marks the session, drops it
+  from `list`, `listByKind` and `getSnapshot`, silences its lifecycle broadcasts, and deletes its
+  persisted output log at once, so a quit landing inside the kill grace can't re-offer the tab on the
+  next launch. `kill` is unchanged, since a stopped script still needs to report how it ended and an
+  agent-stopped spawn terminal still needs readable output. Tab numbers now derive from position in
+  the terminal strip rather than a number fixed at creation, so the run renumbers when a tab closes
+  and follows any future reorder. (#462)
+
+- **A message typed right after stopping a turn no longer gets stranded behind that stop.** Stopping
+  paused the whole follow-up queue, and nothing but the Resume button ever lifted that pause — since
+  the streaming flag reads a session status that only settles a round-trip after the stop, a message
+  typed straight afterward queued rather than sent, landing behind a pause it was written in answer
+  to. The pause is now scoped to the messages it's actually about: a stop records the ids of the
+  entries it parked, and only those stay covered, so a message queued afterward drains on its own and
+  clearing the parked ones lets the queue move again. `send-failed` stays queue-wide, since it
+  describes a session that wouldn't take the last message, which the next one has no more reason to
+  fare well with. `holdReason` becomes head-scoped, so the strip's one button now means two things —
+  Resume when the head is paused, Send next when the behavior alone holds it back. (#463)
+
+- **The chat timeline holds still while the user has scrolled up during a stream.** Scrolling up while
+  a turn streamed didn't hold: the viewport jumped and snapped back on every chunk. The conversation
+  puts `use-stick-to-bottom`'s refs on Radix's ScrollArea rather than using `StickToBottom.Content`,
+  and three of the library's paths miss that composition — its resize handler clamps `scrollTop` to
+  the end of content without checking whether the user has escaped the lock, its 70px near-bottom
+  threshold can re-arm the lock on a momentary content shrink, and its wheel escape hatch only matches
+  a scroller whose computed `overflow` is exactly `scroll` or `auto`, while Radix's viewport computes
+  `hidden scroll`, so the hatch never fires here at all. `useConversationScrollHold` now owns the
+  position while the lock is released — it remembers where the user put the viewport, declines to
+  adopt an offset that is only content shrinking underneath it, restores that offset once content can
+  reach it again, and re-asserts the escape when a shrink revokes it. (THE-211) (#466)
+
+- **A workspace being archived or deleted no longer shows stale diff counts beside its
+  "Archiving…" status.** The +/− stats kept rendering next to the lifecycle status line, describing a
+  worktree the run is actively removing. The stats are now gated on the run in both places a workspace
+  appears — the navigation sidebar row and the dashboard board card — so the two can no longer
+  disagree with each other inside one window. (#467)
+
+### Changed
+
+- **CI checks run in roughly half the time.** Every check previously ran serially inside one job,
+  twice over a `[macOS, Linux]` matrix, putting the critical path at the sum of all of them on the
+  slower platform — 297 to 424 seconds, of which Vitest alone was 203 to 266s. Profiling found the
+  cost wasn't assertion time: actual test execution was ~55s of a 96s run, with the rest going to
+  per-file `setupFiles` overhead — the i18next singleton (24 catalogues, three languages, ~650 KB of
+  JSON) plus jest-dom matchers loading once per test file, even for suites under `tests/main` and
+  `tests/shared` that reference neither. Splitting `vitest.config.mts` into a `node` project (150
+  main-process and shared suites, no setup file, no react plugin) and a `renderer` project takes a
+  CI-shaped three-worker run from 96.3s to 72.8s. `scripts/typecheck.mjs` now runs the four tsconfig
+  projects concurrently instead of chaining them with `&&`, which had been type-checking most of the
+  program four times over. `checks.yml` splits the matrix into parallel `lint`, `typecheck`, and
+  `test` jobs, so wall clock is the slowest job rather than their sum. (#443)
+
+- **A streaming agent turn no longer pins the whole workspace screen's render path.** A working agent
+  tab re-rendered the entire workspace route on every streamed token, since `useLiveSessionUsage`
+  observed the raw agent-event list via the same query the timeline folds every token into, and that
+  hook is reached from `WorkspaceRouteContent` — so each token woke session tabs, composer, dock,
+  review panel, every resizable panel, every message row, and every Radix popover inside them.
+  Measured over 18s of one turn on a ~1,200-node transcript: `Tooltip` renders dropped from 14,911 to
+  380, `Popper` from 16,796 to 825, `TimelineMessage` from 5,820 to 481, `ResizablePanel` from 2,352 to
+  32, and main-thread task time from 13.9s to 8.4s. The usage hook now reads its two gauge values
+  through a `select`, which Query structurally shares so a deeply-equal fold notifies nobody;
+  `useTimelineEvents` folds a frame's worth of broadcasts at a time instead of committing once per
+  token. The conversation viewport's scroll listener was also sampled down to once per frame. (#450)
+
+- **The AFK delivery loop now delegates its wide reading and stops itself on convergence, not on a
+  round count.** A sub-agent's context window is separate from its orchestrator's, and an unattended
+  run previously ended when the *orchestrator's* window filled rather than when the work did — so the
+  loop's playbook now asks for the initial survey to be spent out of a child, stated ahead of step 1
+  since that reading is the largest of the run and can't be un-spent afterwards. It explicitly
+  overrides the general "delegate only for two or more parallel workstreams" default, while keeping
+  the plan, design calls, load-bearing edits, and reconciliation with one agent. Separately, the fixed
+  cap of three review rounds is gone: a count cut off runs still converging and licensed rounds that
+  had already settled nothing. The loop now ends itself on one of three conditions — a round with
+  nothing left to fix, a round repeating already-answered findings, or rounds circling one class of
+  problem, which now re-enters at step 1 to re-plan rather than grinding through step 4 again. (#455)
+
+- **Reviews opened by an agent moved to run as a sub-agent, then moved back to running as a peer, with
+  the underlying fixes kept both times.** #458 first made `ensemblr_start_review` open the Review
+  conversation as the caller's sub-agent rather than a root orchestrator, because the root shape held
+  one of the workspace's two co-tenancy slots for as long as the review stayed open — the unattended
+  loop's review-fix-re-review shape against one conversation hit that hardest, sometimes getting
+  refused its second reading with `denied-quota` when nothing was awake to free a slot. #461 reverts
+  the shape: a sub-agent can't delegate on any axis, so a reviewer shaped as one gets a single context
+  window for a change that may span fifty files, for both the review and every fix round after it. The
+  cost is now paid arithmetically instead: `PEER_ORCHESTRATOR_LIMITS` gains
+  `maxPerUnattendedWorkspace: 4` alongside `maxPerWorkspace: 2`, and `reserveCoTenantSlot` picks
+  between them off the caller's own AFK state, so an unattended run's two mandatory occupants (itself
+  and its review) leave room for a running harness terminal and an earlier peer. Kept from #458 across
+  the reversion: the review now honors the user's configured review model and thinking level across
+  whichever runtime it actually lives on, and `ensemblr_start_review` is idempotent per caller so a
+  second call hands back the same session instead of opening a duplicate. (#458, #461)
 
 ## [0.1.3] - 2026-09-05
 

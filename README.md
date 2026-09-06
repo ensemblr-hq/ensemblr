@@ -25,7 +25,7 @@ installed.
 
 *Ensemblr Control driving the app from inside a workspace: the agent moved the workspace to In progress, started a run script, delegated to two sub-agents in their own chat tabs, and launched a Claude Code harness in a terminal — all of it visible on one screen.*
 
-- **Version:** [`0.1.3`](https://github.com/ensemblr-hq/ensemblr/releases/tag/v0.1.3) (stable)
+- **Version:** [`0.1.4`](https://github.com/ensemblr-hq/ensemblr/releases/tag/v0.1.4) (stable)
 - **License:** Apache-2.0
 
 | Platform | Artifact | Install |
@@ -39,7 +39,7 @@ Intel Macs and arm64 Linux are not built. Windows is not supported.
 
 ## Status
 
-Ensemblr is **stable at 0.1.3**, released 2026-09-05. The core workflows —
+Ensemblr is **stable at 0.1.4**, released 2026-09-06. The core workflows —
 isolated workspaces, Pi and Claude Code agent sessions, the review and PR flow, and the GitHub / Linear /
 git integrations — are implemented and wired to real services, on both macOS and Linux. Stable means
 ordinary semver rather than a frozen surface: breaking changes remain possible before 1.0 and are recorded
@@ -51,7 +51,7 @@ in [`CHANGELOG.md`](./CHANGELOG.md) when they land.
 brew install --cask ensemblr-hq/tap/ensemblr
 ```
 
-Or **[Download Ensemblr 0.1.3 (.dmg, Apple silicon)](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.3/Ensemblr-0.1.3-arm64.dmg)** — open it and drag Ensemblr to Applications.
+Or **[Download Ensemblr 0.1.4 (.dmg, Apple silicon)](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.4/Ensemblr-0.1.4-arm64.dmg)** — open it and drag Ensemblr to Applications.
 
 The macOS build is code-signed with a Developer ID certificate, hardened-runtime, notarized by Apple, and
 stapled, so it opens without a Gatekeeper prompt and validates offline. Every build is on the
