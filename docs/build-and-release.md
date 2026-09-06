@@ -533,7 +533,7 @@ you need to bisect a packaging break.
 **Write the notes and create the release. That is the whole ritual.**
 
 ```bash
-gh release create v0.1.3 --notes-file NOTES.md
+gh release create v0.1.4 --notes-file NOTES.md
 ```
 
 Add `--prerelease` for an `-alpha` / `-beta` / `-rc` tag; the workflow corrects
@@ -578,7 +578,7 @@ returns `output.summary: null`, and the raw logs show only the unexpanded
 script. Every pinned line above derives from one fact, each asset's `name`:
 
 ```bash
-gh release view v0.1.3 --json assets -q '.assets[].name'
+gh release view v0.1.4 --json assets -q '.assets[].name'
 ```
 
 The version string is the tag with `v` stripped; each URL is
@@ -589,7 +589,7 @@ empty or partial asset list is not the signal to start editing — poll until al
 four are there. Then check the URLs actually resolve before opening the PR:
 
 ```bash
-gh api repos/ensemblr-hq/ensemblr/releases/tags/v0.1.3 \
+gh api repos/ensemblr-hq/ensemblr/releases/tags/v0.1.4 \
   --jq '.assets[] | "\(.name)\t\(.digest)"'
 ```
 
@@ -656,10 +656,10 @@ Squirrel.Mac feed the in-app updater reads:
 
 ```json
 {
-  "url": "https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.3/Ensemblr-darwin-arm64-0.1.3.zip",
-  "name": "0.1.3",
+  "url": "https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.4/Ensemblr-darwin-arm64-0.1.4.zip",
+  "name": "0.1.4",
   "notes": "…the release body…",
-  "pub_date": "2026-09-05T11:50:34Z"
+  "pub_date": "2026-09-06T20:50:21Z"
 }
 ```
 
