@@ -8,6 +8,7 @@ import { NavigationProvider } from '../../src/renderer/components/workbench-shel
 import { WorkspaceSidebarItem } from '../../src/renderer/components/workbench-shell/workspace-sidebar-item/workspace-sidebar-item';
 import { shellFixtureProjects } from '../../src/renderer/fixtures/workbench';
 import { workspaceLifecycleRunsAtom } from '../../src/renderer/state/workspace/workspace-lifecycle-runs';
+import type { WorkspaceLifecycleRun } from '../../src/renderer/types/components';
 import type { WorkbenchRouteSearch } from '../../src/renderer/types/workbench';
 import { renderWithProviders } from './support/dom';
 
@@ -15,6 +16,8 @@ const workspace = {
 	...shellFixtureProjects[0].workspaces[0],
 	name: 'Doomed',
 };
+
+const { additions, deletions } = workspace.changeSummary;
 
 const store = getDefaultStore();
 
@@ -41,19 +44,16 @@ function renderRow() {
 	);
 }
 
-/** Marks the fixture workspace as having an archive in flight. */
-function markArchiving(): void {
-	store.set(
-		workspaceLifecycleRunsAtom,
-		new Map([[workspace.id, 'archiving' as const]]),
-	);
+/** Marks the fixture workspace as having a teardown of the given kind in flight. */
+function markLifecycleRun(run: WorkspaceLifecycleRun): void {
+	store.set(workspaceLifecycleRunsAtom, new Map([[workspace.id, run]]));
 }
 
 afterEach(() => {
 	store.set(workspaceLifecycleRunsAtom, new Map());
 });
 
-describe('workspace sidebar row while archiving', () => {
+describe('workspace sidebar row while archiving or deleting', () => {
 	test('an idle row offers the archive button and shows its branch', () => {
 		renderRow();
 
@@ -65,7 +65,7 @@ describe('workspace sidebar row while archiving', () => {
 	});
 
 	test('an archiving row says so instead of naming its branch', () => {
-		markArchiving();
+		markLifecycleRun('archiving');
 		renderRow();
 
 		expect(screen.getByText('Archiving…')).toBeInTheDocument();
@@ -75,7 +75,7 @@ describe('workspace sidebar row while archiving', () => {
 	// The row going non-interactive is the whole fix: the quick button was the
 	// only way to fire a second archive at a workspace already being torn down.
 	test('an archiving row is disabled and offers no archive button', () => {
-		markArchiving();
+		markLifecycleRun('archiving');
 		renderRow();
 
 		const row = screen.getByRole('button', {
@@ -86,4 +86,24 @@ describe('workspace sidebar row while archiving', () => {
 			screen.queryByRole('button', { name: /Archive workspace Doomed/ }),
 		).toBeNull();
 	});
+
+	test('an idle row shows the diff stats it has', () => {
+		renderRow();
+
+		expect(screen.getByText(`+${additions}`)).toBeInTheDocument();
+		expect(screen.getByText(`-${deletions}`)).toBeInTheDocument();
+	});
+
+	// The counts describe a worktree the run is removing, so they are noise on a
+	// row that already says what is happening to it.
+	test.each(['archiving', 'deleting'] as const)(
+		'a row hides its diff stats while %s',
+		(run) => {
+			markLifecycleRun(run);
+			renderRow();
+
+			expect(screen.queryByText(`+${additions}`)).toBeNull();
+			expect(screen.queryByText(`-${deletions}`)).toBeNull();
+		},
+	);
 });

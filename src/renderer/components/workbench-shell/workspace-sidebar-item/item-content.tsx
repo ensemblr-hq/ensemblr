@@ -62,6 +62,9 @@ function workspaceSubtitle(
  * carrying its unread weight, diff stats and the dock-activity dot, and the
  * branch line underneath. Shared by the lifecycle-held and interactive rows so
  * the two differ only in the button that wraps them.
+ *
+ * A row any lifecycle run holds shows no diff stats: the subtitle underneath
+ * already says what is happening to the workspace.
  */
 export function WorkspaceSidebarItemContent({
 	dockActivityState,
@@ -74,6 +77,7 @@ export function WorkspaceSidebarItemContent({
 }: WorkspaceSidebarItemContentProps) {
 	const { t } = useTranslation();
 	const WorkspaceIcon = sidebarState.icon;
+	const showsDiffStats = hasDiffStats && pendingLifecycle === null;
 
 	return (
 		<>
@@ -101,7 +105,9 @@ export function WorkspaceSidebarItemContent({
 						{unreadCount > 0 ? (
 							<WorkspaceUnreadDot count={unreadCount} />
 						) : null}
-						{hasDiffStats ? <WorkspaceDiffStats workspace={workspace} /> : null}
+						{showsDiffStats ? (
+							<WorkspaceDiffStats workspace={workspace} />
+						) : null}
 						{dockActivityState ? (
 							<DockActivityDot state={dockActivityState} />
 						) : null}

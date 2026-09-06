@@ -76,7 +76,8 @@ function teardownCardLabel(
  * — not openable, not draggable, not a drop target, and outside the context
  * menu, the same way the sidebar row is. The workspace is leaving the board, so
  * a status it is dragged into lands on nothing and every lifecycle action in the
- * menu would fire a second run against it.
+ * menu would fire a second run against it. It shows no diff stats either: the
+ * counts describe a worktree the run is removing.
  */
 export function WorkspaceCard({
 	allowReorder,
@@ -94,9 +95,10 @@ export function WorkspaceCard({
 	const isUnread = useWorkspaceIsUnread(workspace.id);
 	const lifecycleRun = useWorkspaceLifecycleRun(workspace.id);
 	const isTearingDown = lifecycleRun !== null;
-	const hasDiffStats =
-		workspace.changeSummary.additions > 0 ||
-		workspace.changeSummary.deletions > 0;
+	const showsDiffStats =
+		!isTearingDown &&
+		(workspace.changeSummary.additions > 0 ||
+			workspace.changeSummary.deletions > 0);
 	const { closestEdge, isDragging, ref } = useCardDnd({
 		allowReorder,
 		cardId: workspace.id,
@@ -134,7 +136,9 @@ export function WorkspaceCard({
 						>
 							{workspace.name}
 						</span>
-						{hasDiffStats ? <WorkspaceDiffStats workspace={workspace} /> : null}
+						{showsDiffStats ? (
+							<WorkspaceDiffStats workspace={workspace} />
+						) : null}
 					</div>
 					<span className='truncate text-muted-foreground text-xxs'>
 						{projectName}

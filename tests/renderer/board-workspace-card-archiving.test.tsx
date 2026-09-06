@@ -9,10 +9,12 @@ import { BoardWorkspaceMenuProvider } from '@/renderer/components/workbench-shel
 import { WorkspaceCard } from '@/renderer/components/workbench-shell/dashboard/workspace-card';
 import { shellFixtureProjects } from '@/renderer/fixtures/workbench';
 import { workspaceLifecycleRunsAtom } from '@/renderer/state/workspace/workspace-lifecycle-runs';
+import type { WorkspaceLifecycleRun } from '@/renderer/types/components';
 
 import { renderWithProviders } from './support/dom';
 
 const workspace = { ...shellFixtureProjects[0].workspaces[0], name: 'Doomed' };
+const { additions, deletions } = workspace.changeSummary;
 const store = getDefaultStore();
 
 const menuController = {
@@ -35,12 +37,9 @@ function renderCard(onOpen = vi.fn()) {
 	);
 }
 
-/** Marks the fixture workspace as having an archive in flight. */
-function markArchiving(): void {
-	store.set(
-		workspaceLifecycleRunsAtom,
-		new Map([[workspace.id, 'archiving' as const]]),
-	);
+/** Marks the fixture workspace as having a teardown of the given kind in flight. */
+function markLifecycleRun(run: WorkspaceLifecycleRun): void {
+	store.set(workspaceLifecycleRunsAtom, new Map([[workspace.id, run]]));
 }
 
 afterEach(() => {
@@ -48,7 +47,7 @@ afterEach(() => {
 	vi.clearAllMocks();
 });
 
-describe('board workspace card while archiving', () => {
+describe('board workspace card while archiving or deleting', () => {
 	test('an idle card opens on click and carries its grab cursor', async () => {
 		const onOpen = vi.fn();
 		renderCard(onOpen);
@@ -65,7 +64,7 @@ describe('board workspace card while archiving', () => {
 	// The workspace is leaving the board, so a status it is dragged into lands on
 	// nothing and the menu's lifecycle actions would fire a second run at it.
 	test('an archiving card is disabled, undraggable and outside the menu', async () => {
-		markArchiving();
+		markLifecycleRun('archiving');
 		const onOpen = vi.fn();
 		const { container } = renderCard(onOpen);
 
@@ -80,4 +79,26 @@ describe('board workspace card while archiving', () => {
 		expect(screen.queryByRole('menu')).toBeNull();
 		expect(menuController.archive).not.toHaveBeenCalled();
 	});
+
+	// Guards the hiding cases below from going vacuous: they only mean anything
+	// while the fixture still carries counts an idle card renders.
+	test('an idle card shows the diff stats it has', () => {
+		renderCard();
+
+		expect(screen.getByText(`+${additions}`)).toBeInTheDocument();
+		expect(screen.getByText(`-${deletions}`)).toBeInTheDocument();
+	});
+
+	// The counts describe a worktree the run is removing, and the sidebar row for
+	// the same workspace drops them too.
+	test.each(['archiving', 'deleting'] as const)(
+		'a card hides its diff stats while %s',
+		(run) => {
+			markLifecycleRun(run);
+			renderCard();
+
+			expect(screen.queryByText(`+${additions}`)).toBeNull();
+			expect(screen.queryByText(`-${deletions}`)).toBeNull();
+		},
+	);
 });
