@@ -1,6 +1,6 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import type { TFunction } from 'i18next';
-import { useAtom } from 'jotai';
+import { useAtomValue, useSetAtom } from 'jotai';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -80,6 +80,29 @@ function emptyStateForSource(
 }
 
 /**
+ * Writes the Changes-tab source for one workspace.
+ *
+ * Exported on its own so the workspace shell can drive ⌥⌘U without mounting the
+ * review panel the rest of {@link useChangesSource} serves: the selection lives
+ * in a persisted atom keyed by workspace, so there is nothing to hand between
+ * the two callers.
+ * @param workspaceId - Workspace whose Changes source is being written
+ * @returns A setter storing the source for that workspace
+ */
+export function useSetChangesSource(
+	workspaceId: string,
+): (next: ChangesSource) => void {
+	const setSourceMap = useSetAtom(changesSourceByWorkspaceAtom);
+
+	return useCallback(
+		(next: ChangesSource) => {
+			setSourceMap((current) => ({ ...current, [workspaceId]: next }));
+		},
+		[setSourceMap, workspaceId],
+	);
+}
+
+/**
  * The Changes tab's source selection and the file set it resolves to. The tab
  * can show every branch change, only uncommitted edits, or a single commit —
  * picked per workspace and persisted.
@@ -94,18 +117,13 @@ function emptyStateForSource(
  */
 export function useChangesSource(workspace: WorkspaceShellModel) {
 	const { t } = useTranslation();
-	const [sourceMap, setSourceMap] = useAtom(changesSourceByWorkspaceAtom);
+	const sourceMap = useAtomValue(changesSourceByWorkspaceAtom);
 	const storedSource = sourceMap[workspace.id];
 	const source = useMemo<ChangesSource>(
 		() => storedSource ?? { kind: 'all' },
 		[storedSource],
 	);
-	const setSource = useCallback(
-		(next: ChangesSource) => {
-			setSourceMap((current) => ({ ...current, [workspace.id]: next }));
-		},
-		[setSourceMap, workspace.id],
-	);
+	const setSource = useSetChangesSource(workspace.id);
 
 	const baseRef = workspace.landingSummary?.branchSource.baseBranch ?? null;
 	const scope = useMemo(

@@ -1,4 +1,3 @@
-import { useAtomValue } from 'jotai';
 import {
 	ChevronDownIcon,
 	ChevronUpIcon,
@@ -21,13 +20,9 @@ import {
 	TabsTrigger,
 } from '@/renderer/components/ui/tabs';
 import { useWorkbenchLayout } from '@/renderer/components/workbench-shell/shell-contexts';
-import { useRunScriptHotkey } from '@/renderer/hooks/workbench-shell/dock-panel/use-run-script-hotkey';
-import { useDockMenuCommands } from '@/renderer/hooks/workbench-shell/use-dock-menu-commands';
-import { selectActiveRunScript } from '@/renderer/lib/terminal';
+import { useActiveRunScript } from '@/renderer/hooks/workbench-shell/dock-panel/use-active-run-script';
 import { cn } from '@/renderer/lib/utils';
 import { DEFAULT_DOCK_TAB } from '@/renderer/lib/workbench';
-import { lastRunScriptAtomFamily } from '@/renderer/state/preferences';
-import { useProvideDockExpander } from '@/renderer/state/workspace/terminal-requests';
 import type {
 	DockTabId,
 	DockTabModel,
@@ -67,26 +62,7 @@ export function DockPanel({
 	const terminalTabs = workspace.dockTabs.filter(isTerminalDockTab);
 	const setupTabLabel = fixedDockTabLabel(workspace.dockTabs, 'setup');
 	const runTabLabel = fixedDockTabLabel(workspace.dockTabs, 'run');
-	const rememberedRunScript = useAtomValue(
-		lastRunScriptAtomFamily(workspace.id),
-	);
-	const activeRunScript = selectActiveRunScript({
-		rememberedName: rememberedRunScript,
-		runScripts: workspace.runScripts,
-		runSummary: workspace.scripts.run,
-	});
-
-	useProvideDockExpander(workspace.id, () => {
-		layoutActions.expandDockPanel();
-		layoutActions.expandRightSidebar();
-	});
-	useRunScriptHotkey(workspace.scripts.run.status, actions, activeRunScript);
-	useDockMenuCommands(
-		workspace.scripts.run.status,
-		actions,
-		activeRunScript,
-		workspace.runScripts,
-	);
+	const activeRunScript = useActiveRunScript(workspace);
 
 	return (
 		<Tabs

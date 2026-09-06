@@ -1,17 +1,19 @@
 import { useSetAtom } from 'jotai';
-import { type ComponentType, useCallback, useRef } from 'react';
+import { type ComponentType, useCallback, useRef, useState } from 'react';
 import { useWorkspaceMenuCommands } from '@/renderer/components/workbench-shell/workspace-menu-commands';
 import { useDrawArchitectureDiagram } from '@/renderer/hooks/workbench-shell/architecture-diagram/use-draw-architecture-diagram';
-import { useAgentActionRunner } from '@/renderer/hooks/workbench-shell/review-actions/use-agent-action-runner';
-import { useChatPromptHandoff } from '@/renderer/hooks/workbench-shell/review-actions/use-chat-prompt-handoff';
+import { useReviewAgentActions } from '@/renderer/hooks/workbench-shell/review-actions/use-review-agent-actions';
 import { useDockController } from '@/renderer/hooks/workbench-shell/use-dock-controller';
 import { useLayoutMenuCommands } from '@/renderer/hooks/workbench-shell/use-layout-menu-commands';
+import { useReviewPanelCommands } from '@/renderer/hooks/workbench-shell/use-review-panel-commands';
 import { useRightSidebarController } from '@/renderer/hooks/workbench-shell/use-right-sidebar-controller';
+import { useRunScriptCommands } from '@/renderer/hooks/workbench-shell/use-run-script-commands';
 import { useRouteProfilerMount } from '@/renderer/lib/instrumentation';
 import {
 	useRequestDiffLineReveal,
 	workspaceDirectoryRevealRequestAtom,
 } from '@/renderer/state/workspace';
+import { useProvideDockExpander } from '@/renderer/state/workspace/terminal-requests';
 import type { WorkspaceMainContentState } from '@/renderer/types/components';
 import type {
 	FileOpenOptions,
@@ -31,6 +33,7 @@ import {
 } from './conversation-panel/file-preview-context';
 import { WorkbenchPanelLayout } from './panel-layout';
 import { ReviewActionsProvider } from './review-actions/review-actions-provider';
+import { AllFilesSearchDialog } from './review-files/all-files-search-dialog';
 import { WorkbenchLayoutProvider } from './shell-contexts';
 
 /**
@@ -69,8 +72,41 @@ export function WorkspaceWorkbenchContent({
 
 	const rightSidebar = useRightSidebarController();
 	const dock = useDockController();
+	const { expandDockPanel } = dock;
+	const { expandRightSidebar, setRightSidebarSheetOpen } = rightSidebar;
+	const [isFileSearchOpen, setIsFileSearchOpen] = useState(false);
 	useLayoutMenuCommands(dock, rightSidebar);
 	useWorkspaceMenuCommands(activeWorkspace);
+	// Registered here rather than inside the dock and review panels: a narrow
+	// window hosts those in a sheet that unmounts when dismissed, and a script
+	// hotkey or menu item that dies with the view showing its output is a command
+	// the user cannot reach at all.
+	const revealReviewRail = useCallback(() => {
+		expandRightSidebar();
+	}, [expandRightSidebar]);
+	const openFileSearch = useCallback(() => {
+		setIsFileSearchOpen(true);
+	}, []);
+	useRunScriptCommands(activeWorkspace, dockActions);
+	useReviewPanelCommands({
+		activeTab: activeReviewTab,
+		onTabChange: onReviewTabChange,
+		openFileSearch,
+		revealRail: revealReviewRail,
+		workspaceId: activeWorkspace.id,
+	});
+	const revealDockPanel = useCallback(() => {
+		expandDockPanel();
+		expandRightSidebar();
+	}, [expandDockPanel, expandRightSidebar]);
+	useProvideDockExpander(activeWorkspace.id, revealDockPanel);
+	/**
+	 * Closes the narrow-window rail sheet, which covers the content it just opened
+	 * something in. A no-op on a wide window, where the rail sits beside it.
+	 */
+	const dismissReviewRailSheet = useCallback(() => {
+		setRightSidebarSheetOpen(false);
+	}, [setRightSidebarSheetOpen]);
 	const setDirectoryRevealRequest = useSetAtom(
 		workspaceDirectoryRevealRequestAtom,
 	);
@@ -96,6 +132,7 @@ export function WorkspaceWorkbenchContent({
 					workspaceId: activeWorkspace.id,
 				});
 			}
+			dismissReviewRailSheet();
 			void openWorkspaceFileDiffTab({
 				filePath,
 				preview: options?.preview,
@@ -108,6 +145,7 @@ export function WorkspaceWorkbenchContent({
 		},
 		[
 			activeWorkspace.id,
+			dismissReviewRailSheet,
 			onSessionTabChange,
 			openWorkspaceFileDiffTab,
 			requestDiffLineReveal,
@@ -127,7 +165,7 @@ export function WorkspaceWorkbenchContent({
 				workspaceId: activeWorkspace.id,
 			});
 			onReviewTabChange('files');
-			void rightSidebar.expandRightSidebar();
+			rightSidebar.expandRightSidebar();
 		},
 		[
 			activeWorkspace.id,
@@ -148,9 +186,12 @@ export function WorkspaceWorkbenchContent({
 			if (parentDirectory) {
 				revealWorkspaceDirectory(parentDirectory);
 			}
+			// After the reveal, whose rail expansion is a sheet over this very
+			// preview on a narrow window.
+			dismissReviewRailSheet();
 			return openFilePreviewTab(input);
 		},
-		[openFilePreviewTab, revealWorkspaceDirectory],
+		[dismissReviewRailSheet, openFilePreviewTab, revealWorkspaceDirectory],
 	);
 	/** Reveals a diagram node's directory, and only it, in the All files tree. */
 	const revealDiagramDirectory = useCallback(
@@ -178,31 +219,27 @@ export function WorkspaceWorkbenchContent({
 			preview?: boolean;
 			prNumber?: number;
 		}) => {
+			dismissReviewRailSheet();
 			void openCommentPreviewTab(input).then((result) => {
 				if (result) {
 					onSessionTabChange(result.chatTabId);
 				}
 			});
 		},
-		[onSessionTabChange, openCommentPreviewTab],
+		[dismissReviewRailSheet, onSessionTabChange, openCommentPreviewTab],
 	);
-	const runAgentAction = useAgentActionRunner({
-		activeProject,
-		activeSession: sessionNavigation.effectiveActiveSession,
-		activeWorkspace,
-		openSessionTab: sessionNavigation.openSessionTab,
-		selectChat: onSessionTabChange,
-		sessionTabs: sessionNavigation.sessionTabs,
-	});
 	const drawArchitectureDiagram = useDrawArchitectureDiagram({
 		openSessionTab: sessionNavigation.openSessionTab,
 		selectChat: onSessionTabChange,
 	});
-	const handOffToChat = useChatPromptHandoff({
+	const { handOffToChat, runAgentAction } = useReviewAgentActions({
+		activeProject,
 		activeSession: sessionNavigation.effectiveActiveSession,
+		activeWorkspace,
+		dismissRail: dismissReviewRailSheet,
+		openSessionTab: sessionNavigation.openSessionTab,
 		selectChat: onSessionTabChange,
 		sessionTabs: sessionNavigation.sessionTabs,
-		workspaceId: activeWorkspace.id,
 	});
 	const mainContentState = {
 		activeSession: sessionNavigation.effectiveActiveSession,
@@ -230,7 +267,9 @@ export function WorkspaceWorkbenchContent({
 				state: {
 					initialRightSidebarSize: rightSidebar.initialRightSidebarSize,
 					isDockCollapsed: dock.isDockCollapsed,
+					isNarrowViewport: rightSidebar.isNarrowViewport,
 					isRightSidebarCollapsed: rightSidebar.isRightSidebarCollapsed,
+					isRightSidebarSheetOpen: rightSidebar.isRightSidebarSheetOpen,
 				},
 				actions: {
 					collapseRightSidebar: rightSidebar.collapseRightSidebar,
@@ -239,6 +278,7 @@ export function WorkspaceWorkbenchContent({
 					toggleDockPanel: dock.toggleDockPanel,
 					handleDockResize: dock.handleDockResize,
 					handleRightSidebarResize: rightSidebar.handleRightSidebarResize,
+					setRightSidebarSheetOpen: rightSidebar.setRightSidebarSheetOpen,
 				},
 				meta: {
 					dockPanelRef: dock.dockPanelRef,
@@ -263,7 +303,19 @@ export function WorkspaceWorkbenchContent({
 								dockTabId={dockTabId}
 								mainContent={<MainContent {...mainContentState} />}
 								onDockTabChange={onDockTabChange}
+								onFileSearchOpen={openFileSearch}
 								onReviewTabChange={onReviewTabChange}
+							/>
+							{/*
+							  Hosted by the shell rather than by the review panel it searches:
+							  the panel unmounts with the narrow-window rail sheet, and ⌘P has
+							  to keep working there. Inside the preview-opener provider it
+							  reads to open what it finds.
+							*/}
+							<AllFilesSearchDialog
+								files={activeWorkspace.workspaceFiles}
+								onOpenChange={setIsFileSearchOpen}
+								open={isFileSearchOpen}
 							/>
 						</CommentPreviewOpenerProvider>
 					</ReviewFilePreviewOpenerProvider>

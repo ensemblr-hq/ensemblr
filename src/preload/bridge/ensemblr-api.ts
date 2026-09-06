@@ -182,8 +182,6 @@ export function createEnsemblrApi(): EnsemblrApi {
 		deleteWorkspace: (request) => invoke('deleteWorkspace', request),
 		discardWorkspaceChanges: (request) =>
 			invoke('discardWorkspaceChanges', request),
-		ensureWindowWidth: (minimumWidth) =>
-			invoke('ensureWindowWidth', minimumWidth),
 		ensureWorkspaceSetup: (request) => invoke('ensureWorkspaceSetup', request),
 		environmentVariables: () => invoke('environmentVariables'),
 		getAppSettings: () => invoke('getAppSettings'),

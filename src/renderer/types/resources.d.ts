@@ -3555,6 +3555,10 @@ export default interface Resources {
 			title: 'Restore workspace to before this turn?';
 			untracked: 'Files created after the snapshot that were never tracked stay in place.';
 		};
+		'review-rail-sheet': {
+			description: 'Pull request status, files, changes, checks and the terminal area for this workspace.';
+			title: 'Review sidebar';
+		};
 		'run-script': {
 			choose: 'Choose run script';
 			'configure-action': 'Setup Scripts';

@@ -6,21 +6,16 @@ import {
 	RefreshCwIcon,
 	SearchIcon,
 } from 'lucide-react';
-import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/renderer/components/ui/button';
 import { Tabs, TabsContent } from '@/renderer/components/ui/tabs';
-import { useHotkey } from '@/renderer/hooks/use-hotkey';
 import { useChangesSource } from '@/renderer/hooks/workbench-shell/review-files/use-changes-source';
 import { useDiscardChanges } from '@/renderer/hooks/workbench-shell/review-files/use-discard-changes';
 import { useReviewableChanges } from '@/renderer/hooks/workbench-shell/review-files/use-reviewable-changes';
 import { useWorkspaceConflicts } from '@/renderer/hooks/workbench-shell/review-files/use-workspace-conflicts';
 import { cn } from '@/renderer/lib/utils';
-import {
-	useMenuCommand,
-	useMenuCommandChecked,
-} from '@/renderer/state/menu-commands';
+import { useMenuCommand } from '@/renderer/state/menu-commands';
 import { changesViewModeAtom } from '@/renderer/state/workspace';
 import type {
 	ReviewPanelTab,
@@ -33,7 +28,6 @@ import type {
 import { ChecksPanel } from './checks-panel/checks-panel';
 import { useReviewActions } from './review-actions/review-actions-context';
 import { AllFilesList } from './review-files/all-files-list';
-import { AllFilesSearchDialog } from './review-files/all-files-search-dialog';
 import {
 	ChangesOverflowMenu,
 	ChangesSourceBadge,
@@ -41,19 +35,26 @@ import {
 import { DiscardChangesDialog } from './review-files/discard-changes-dialog';
 import { ReviewFileList } from './review-files/review-file-list';
 
-/** Tabbed review surface for files, changes, and checks. */
+/**
+ * Tabbed review surface for files, changes, and checks.
+ *
+ * `onFileSearchOpen` reaches the ⌘P palette, which the workspace shell hosts:
+ * the panel unmounts with the narrow-window rail sheet and the palette has to
+ * outlive it.
+ */
 export function ReviewPanel({
 	activeTab,
+	onFileSearchOpen,
 	onTabChange,
 	workspace,
 }: {
 	activeTab: ReviewPanelTab;
+	onFileSearchOpen: () => void;
 	onTabChange: (tab: ReviewPanelTab) => void;
 	workspace: WorkspaceShellModel;
 }) {
 	const { t } = useTranslation();
 	const [changesViewMode, setChangesViewMode] = useAtom(changesViewModeAtom);
-	const [isFileSearchOpen, setIsFileSearchOpen] = useState(false);
 
 	// The Review action only makes sense when there's something to review, so gate
 	// it on the *whole* branch diff vs base — committed-on-branch and uncommitted
@@ -89,33 +90,6 @@ export function ReviewPanel({
 		},
 		{ id: 'checks', label: t('review:review-panel.tabs.checks', 'Checks') },
 	];
-
-	const openFileSearch = useCallback(() => {
-		setIsFileSearchOpen(true);
-	}, []);
-	useHotkey('files.search', openFileSearch);
-	useMenuCommand('files.search', openFileSearch);
-
-	// ⌥⌘U jumps straight to the uncommitted change set, switching tabs if needed.
-	const showUncommitted = useCallback(() => {
-		onTabChange('changes');
-		setSource({ kind: 'uncommitted' });
-	}, [onTabChange, setSource]);
-	useHotkey('changes.uncommitted', showUncommitted);
-	useMenuCommand('changes.uncommitted', showUncommitted);
-
-	const showFilesTab = useCallback(() => onTabChange('files'), [onTabChange]);
-	const showChangesTab = useCallback(
-		() => onTabChange('changes'),
-		[onTabChange],
-	);
-	const showChecksTab = useCallback(() => onTabChange('checks'), [onTabChange]);
-	useMenuCommand('panel.files', showFilesTab);
-	useMenuCommand('panel.changes', showChangesTab);
-	useMenuCommand('panel.checks', showChecksTab);
-	useMenuCommandChecked('panel.files', activeTab === 'files');
-	useMenuCommandChecked('panel.changes', activeTab === 'changes');
-	useMenuCommandChecked('panel.checks', activeTab === 'checks');
 
 	const {
 		discardErrorMessage,
@@ -163,7 +137,7 @@ export function ReviewPanel({
 						)
 					}
 					onDiscardAll={handleDiscardAll}
-					onFileSearchOpen={() => setIsFileSearchOpen(true)}
+					onFileSearchOpen={onFileSearchOpen}
 					onSelectSource={setSource}
 					source={source}
 					workspace={workspace}
@@ -195,11 +169,6 @@ export function ReviewPanel({
 			<TabsContent className='min-h-0 overflow-hidden' value='checks'>
 				<ChecksPanel workspace={workspace} />
 			</TabsContent>
-			<AllFilesSearchDialog
-				files={workspace.workspaceFiles}
-				onOpenChange={setIsFileSearchOpen}
-				open={isFileSearchOpen}
-			/>
 			<DiscardChangesDialog
 				errorMessage={discardErrorMessage}
 				isPending={isDiscarding}

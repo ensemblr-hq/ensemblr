@@ -47,6 +47,7 @@ Rules of thumb:
 | Diff | Diff | Diff | Untranslated — "различия"/"διαφορές" reads as prose, not the view. |
 | Review *(the conversation)* | Ревью | Αξιολόγηση | The Review chat the Review button opens over a workspace's change, and what `ensemblr_start_review` opens for an agent. Takes the noun already fixed by **Review comment** below rather than coining a second one; the board column `На ревью`/`Σε αξιολόγηση` uses the same pair. |
 | Review comment | Комментарий к ревью | Σχόλιο αξιολόγησης | |
+| Review sidebar | Панель ревью | Πλαϊνή στήλη αξιολόγησης | The rail down the right of a workspace: pull-request header over All files / Changes / Checks and the terminal area. Both terms were already fixed by the toolbar toggle (`header.review-sidebar.*`); this row records them now that the surface names itself, in the accessible title of the sheet it becomes below 1024px. Russian says `панель` rather than a literal `боковая панель` — the toggle's own label established it and the extra adjective buys nothing where there is one rail. Greek keeps the full `πλαϊνή στήλη`, which is what the toggle says. Never `панель обзора`/`πλευρικό πάνελ` — the noun is the **Review** above, not a generic overview. |
 | Checkpoint | Контрольная точка | Σημείο ελέγχου | |
 | Harness | Харнесс | Harness | The Claude Code / Codex terminal integration. Ensemblr-specific. |
 | Agent | Агент | Πράκτορας | |

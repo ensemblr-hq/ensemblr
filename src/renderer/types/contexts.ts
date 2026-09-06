@@ -11,7 +11,11 @@ export interface WorkbenchLayoutContextValue {
 	state: {
 		initialRightSidebarSize: string;
 		isDockCollapsed: boolean;
+		/** True below the breakpoint the resizable rail needs, where it is a sheet. */
+		isNarrowViewport: boolean;
+		/** Whether the rail is hidden — the sheet while narrow, the panel while wide. */
 		isRightSidebarCollapsed: boolean;
+		isRightSidebarSheetOpen: boolean;
 	};
 	actions: {
 		collapseRightSidebar: () => void;
@@ -21,6 +25,7 @@ export interface WorkbenchLayoutContextValue {
 		toggleDockPanel: () => void;
 		handleDockResize: (isCollapsed: boolean) => void;
 		handleRightSidebarResize: (size: PanelSize) => void;
+		setRightSidebarSheetOpen: (open: boolean) => void;
 	};
 	meta: {
 		dockPanelRef: RefObject<PanelImperativeHandle | null>;

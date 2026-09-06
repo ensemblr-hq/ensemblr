@@ -730,6 +730,23 @@
 		inset-block-start: var(--ensemblr-window-chrome-inset-top);
 	}
 
+	/* A left- or right-side sheet pins itself to the viewport's own top edge, so
+	   where Ensemblr draws the title bar it would slide out over that strip and
+	   its window controls. Same fix and same reason as the sidebar container
+	   above: the primitive is vendored. */
+	html.app-window-controls [data-slot="sheet-content"][data-side="left"],
+	html.app-window-controls [data-slot="sheet-content"][data-side="right"] {
+		block-size: var(--ensemblr-shell-height);
+		inset-block-start: var(--ensemblr-window-chrome-inset-top);
+	}
+
+	/* A toolbar inside a sheet is overlay chrome rather than the window's title
+	   bar, so dragging its empty space must not drag the window out from under
+	   the sheet. */
+	[data-slot="sheet-content"] .native-toolbar {
+		-webkit-app-region: no-drag;
+	}
+
 	.native-toolbar {
 		background: var(--ensemblr-toolbar);
 		backdrop-filter: blur(18px) saturate(1.3);

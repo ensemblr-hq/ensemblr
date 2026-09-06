@@ -18,7 +18,7 @@ export function useLayoutMenuCommands(
 	dock: { isDockCollapsed: boolean; toggleDockPanel: () => void },
 	rightSidebar: {
 		collapseRightSidebar: () => void;
-		expandRightSidebar: () => Promise<void>;
+		expandRightSidebar: () => void;
 		isRightSidebarCollapsed: boolean;
 	},
 ): void {
@@ -32,7 +32,7 @@ export function useLayoutMenuCommands(
 
 	const toggleRightSidebar = useCallback(() => {
 		if (isRightSidebarCollapsed) {
-			void expandRightSidebar();
+			expandRightSidebar();
 			return;
 		}
 		collapseRightSidebar();

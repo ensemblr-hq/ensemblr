@@ -82,7 +82,6 @@ export const IPC_CHANNELS = {
 	setDictationApiKey: 'ensemblr:set-dictation-api-key',
 	transcribeAudio: 'ensemblr:transcribe-audio',
 	addEnvFile: 'ensemblr:add-env-file',
-	ensureWindowWidth: 'ensemblr:ensure-window-width',
 	environmentVariables: 'ensemblr:environment-variables',
 	listEnvFiles: 'ensemblr:list-env-files',
 	readEnvironmentVariableValue: 'ensemblr:read-environment-variable-value',
