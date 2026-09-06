@@ -101,9 +101,13 @@ export function useExpandDockPanel(): (workspaceId: string) => void {
 
 /**
  * Registers this workspace's dock as the target for expand requests aimed at it,
- * for as long as the dock is mounted. The registration is held through a ref, so
- * a caller composing layout actions that are rebuilt each render still registers
- * once per workspace rather than rewriting the atom on every dock re-render.
+ * for as long as the workspace shell is mounted. The registration is held through
+ * a ref, so a caller composing layout actions that are rebuilt each render still
+ * registers once per workspace rather than rewriting the atom on every re-render.
+ *
+ * Registered by the shell rather than by the dock view: below the review rail's
+ * breakpoint the dock is hosted by a sheet that unmounts when dismissed, and an
+ * expander that died with it would leave a focused terminal unreachable.
  * @param workspaceId - Workspace whose dock is being offered.
  * @param expand - Reveals the terminal area, opening every panel enclosing it that the user has collapsed.
  */

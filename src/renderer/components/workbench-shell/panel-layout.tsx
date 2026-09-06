@@ -15,9 +15,11 @@ import type {
 	WorkspaceShellModel,
 } from '@/renderer/types/workbench';
 import type { WorkbenchDockActions } from '@/renderer/types/workbench-shell';
-import { DockPanel } from './dock-panel/dock-panel';
-import { ReviewPanel } from './review-panel';
-import { RightSidebarHeader } from './right-sidebar-header/right-sidebar-header';
+import {
+	ReviewRail,
+	type ReviewRailProps,
+	ReviewRailSheet,
+} from './review-rail';
 import { useWorkbenchLayout } from './shell-contexts';
 import { WorkbenchHeader } from './workbench-header';
 
@@ -30,6 +32,7 @@ export function WorkbenchPanelLayout({
 	dockTabId,
 	mainContent,
 	onDockTabChange,
+	onFileSearchOpen,
 	onReviewTabChange,
 }: {
 	activeProject: ProjectShellModel;
@@ -39,8 +42,19 @@ export function WorkbenchPanelLayout({
 	dockTabId: DockTabId;
 	mainContent: ReactNode;
 	onDockTabChange: (tab: DockTabId) => void;
+	onFileSearchOpen: () => void;
 	onReviewTabChange: (tab: ReviewPanelTab) => void;
 }) {
+	const railProps = {
+		activeReviewTab,
+		activeWorkspace,
+		dockActions,
+		dockTabId,
+		onDockTabChange,
+		onFileSearchOpen,
+		onReviewTabChange,
+	};
+
 	return (
 		<SidebarInset className={SHELL_INSET_CLASS}>
 			<ResizablePanelGroup className='min-h-0 flex-1' orientation='horizontal'>
@@ -51,17 +65,23 @@ export function WorkbenchPanelLayout({
 					{mainContent}
 				</MainWorkspacePanel>
 				<ResizableHandle className='hidden lg:flex' />
-				<ReviewDockPanel
-					activeReviewTab={activeReviewTab}
-					activeWorkspace={activeWorkspace}
-					dockActions={dockActions}
-					dockTabId={dockTabId}
-					onDockTabChange={onDockTabChange}
-					onReviewTabChange={onReviewTabChange}
-				/>
+				<ReviewDockPanel {...railProps} />
 			</ResizablePanelGroup>
+			{/*
+			  Outside the panel group on purpose: the sheet's own DOM is portalled to
+			  the body, and a closed one renders nothing, so hosting it here keeps the
+			  group's children to the panels and handles it lays out.
+			*/}
+			<NarrowReviewRailHost {...railProps} />
 		</SidebarInset>
 	);
+}
+
+/** Mounts the sheet host only below the width the resizable rail needs. */
+function NarrowReviewRailHost(props: ReviewRailProps) {
+	const { state } = useWorkbenchLayout();
+
+	return state.isNarrowViewport ? <ReviewRailSheet {...props} /> : null;
 }
 
 /** Left resizable panel containing the workbench header and main content. */
@@ -87,22 +107,17 @@ function MainWorkspacePanel({
 	);
 }
 
-/** Right-hand collapsible review panel plus the bottom dock panel group. */
-function ReviewDockPanel({
-	activeReviewTab,
-	activeWorkspace,
-	dockActions,
-	dockTabId,
-	onDockTabChange,
-	onReviewTabChange,
-}: {
-	activeReviewTab: ReviewPanelTab;
-	activeWorkspace: WorkspaceShellModel;
-	dockActions: WorkbenchDockActions;
-	dockTabId: DockTabId;
-	onDockTabChange: (tab: DockTabId) => void;
-	onReviewTabChange: (tab: ReviewPanelTab) => void;
-}) {
+/**
+ * Right-hand collapsible review panel plus the bottom dock panel group.
+ *
+ * The panel stays registered with the group at every width — dropping it below
+ * `lg` would re-lay the group out and lose the frozen `defaultSize` the
+ * persisted width is restored from, and would leave the handle beside it with no
+ * neighbour. Only its contents move: below `lg` the panel is `hidden` and the
+ * rail is hosted by {@link ReviewRailSheet} instead, so the rail — and the
+ * terminals inside it — is mounted in exactly one place.
+ */
+function ReviewDockPanel(props: ReviewRailProps) {
 	const { state, actions, meta } = useWorkbenchLayout();
 
 	return (
@@ -116,39 +131,7 @@ function ReviewDockPanel({
 			onResize={actions.handleRightSidebarResize}
 			panelRef={meta.rightSidebarPanelRef}
 		>
-			<aside className='flex h-full w-full min-w-0 flex-col bg-card'>
-				<RightSidebarHeader activeWorkspace={activeWorkspace} />
-				<ResizablePanelGroup className='min-h-0 flex-1' orientation='vertical'>
-					<ResizablePanel className='min-h-0' defaultSize='62%' minSize='8rem'>
-						<ReviewPanel
-							activeTab={activeReviewTab}
-							onTabChange={onReviewTabChange}
-							workspace={activeWorkspace}
-						/>
-					</ResizablePanel>
-					<ResizableHandle withHandle />
-					<ResizablePanel
-						className='min-h-0'
-						collapsedSize='2.25rem'
-						collapsible
-						defaultSize='18rem'
-						groupResizeBehavior='preserve-pixel-size'
-						maxSize='70%'
-						minSize='9rem'
-						onResize={(size) => {
-							actions.handleDockResize(size.inPixels <= 40);
-						}}
-						panelRef={meta.dockPanelRef}
-					>
-						<DockPanel
-							actions={dockActions}
-							activeTab={dockTabId}
-							onTabChange={onDockTabChange}
-							workspace={activeWorkspace}
-						/>
-					</ResizablePanel>
-				</ResizablePanelGroup>
-			</aside>
+			{state.isNarrowViewport ? null : <ReviewRail {...props} />}
 		</ResizablePanel>
 	);
 }

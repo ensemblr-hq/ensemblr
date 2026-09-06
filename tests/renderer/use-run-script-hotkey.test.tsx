@@ -3,7 +3,7 @@
 import { renderHook } from '@testing-library/react';
 import { expect, test, vi } from 'vitest';
 
-import { useRunScriptHotkey } from '@/renderer/hooks/workbench-shell/dock-panel/use-run-script-hotkey';
+import { useRunScriptHotkey } from '@/renderer/hooks/workbench-shell/use-run-script-hotkey';
 import type { WorkspaceScriptSummary } from '@/renderer/types/workbench';
 import { matchesShortcut } from '@/shared/keymap';
 import type { RunScriptDefinition } from '@/shared/scripts';

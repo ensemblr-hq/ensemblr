@@ -4,13 +4,11 @@ import { IPC_CHANNELS } from '../../../shared/ipc/channels';
 import type { WindowMaximizedBroadcast } from '../../../shared/ipc/contracts/repository-navigation';
 import { openExternalUrl } from '../../app/external-links';
 
-const MAX_ENSURED_WINDOW_WIDTH = 2400;
-
 /**
  * Registers IPC handlers that mutate the BrowserWindow on behalf of the
- * renderer — the app-drawn window controls, the "ensure-minimum-width" request,
- * the relaunch that applies a construct-time setting, and opening vetted
- * external URLs (remediation docs links) in the default browser.
+ * renderer — the app-drawn window controls, the relaunch that applies a
+ * construct-time setting, and opening vetted external URLs (remediation docs
+ * links) in the default browser.
  * @param options - The quit-guarded relaunch the settings surface asks for.
  */
 export function registerWindowHandlers({
@@ -20,33 +18,6 @@ export function registerWindowHandlers({
 }): void {
 	ipcMain.handle(IPC_CHANNELS.openExternal, (_event, url: unknown) =>
 		openExternalUrl(url),
-	);
-
-	ipcMain.handle(
-		IPC_CHANNELS.ensureWindowWidth,
-		(event, minimumWidth: unknown) => {
-			const requestedWidth =
-				typeof minimumWidth === 'number' && Number.isFinite(minimumWidth)
-					? Math.ceil(minimumWidth)
-					: 0;
-
-			if (requestedWidth <= 0) {
-				return;
-			}
-
-			const window = liveWindow(event.sender);
-
-			if (!window || window.isFullScreen()) {
-				return;
-			}
-
-			const targetWidth = Math.min(requestedWidth, MAX_ENSURED_WINDOW_WIDTH);
-			const [width, height] = window.getSize();
-
-			if (width < targetWidth) {
-				window.setSize(targetWidth, height);
-			}
-		},
 	);
 
 	// `close()` rather than `app.quit()`: the window's own `close` handler is

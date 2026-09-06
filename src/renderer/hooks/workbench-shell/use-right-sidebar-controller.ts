@@ -1,5 +1,11 @@
 import { useAtom, useSetAtom, useStore } from 'jotai';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+	useCallback,
+	useEffect,
+	useRef,
+	useState,
+	useSyncExternalStore,
+} from 'react';
 import type { PanelImperativeHandle, PanelSize } from 'react-resizable-panels';
 
 import {
@@ -13,19 +19,40 @@ const RIGHT_SIDEBAR_MAX_SIZE_PERCENT = 68;
 const RIGHT_SIDEBAR_COLLAPSED_THRESHOLD_PERCENT = 1;
 const RIGHT_SIDEBAR_SIZE_COMMIT_DELAY_MS = 250;
 
+/**
+ * The one query every viewport test here goes through, read positively for wide
+ * and negated for narrow. It mirrors Tailwind's `lg` (64rem), which
+ * `panel-layout.tsx` gates the resizable rail on — a separate `max-width:
+ * 1023px` query would leave a fractional-width band where both read false and
+ * the rail was neither panel nor sheet.
+ */
+const RIGHT_SIDEBAR_WIDE_VIEWPORT_QUERY = `(min-width: ${RIGHT_SIDEBAR_MIN_VIEWPORT_WIDTH}px)`;
+
 /** The width the right sidebar collapses to, shared with the panel that renders it. */
 export const RIGHT_SIDEBAR_COLLAPSED_SIZE = '0rem';
 
-/** Asks the main process to grow the window to fit the right sidebar minimum. */
-async function ensureWindowCanShowRightSidebar() {
-	if (
-		window.matchMedia(`(min-width: ${RIGHT_SIDEBAR_MIN_VIEWPORT_WIDTH}px)`)
-			.matches
-	) {
-		return;
-	}
+/** True when the viewport is wide enough to seat the rail beside the content. */
+function isWideViewport() {
+	return window.matchMedia(RIGHT_SIDEBAR_WIDE_VIEWPORT_QUERY).matches;
+}
 
-	await window.ensemblr?.ensureWindowWidth(RIGHT_SIDEBAR_MIN_VIEWPORT_WIDTH);
+/**
+ * Subscribes to changes in the wide-viewport query.
+ * @param onStoreChange - Callback invoked when the match state flips.
+ * @returns A teardown function that removes the listener.
+ */
+function subscribeToViewportWidthChanges(onStoreChange: () => void) {
+	const wideViewportQuery = window.matchMedia(
+		RIGHT_SIDEBAR_WIDE_VIEWPORT_QUERY,
+	);
+
+	wideViewportQuery.addEventListener('change', onStoreChange);
+	return () => wideViewportQuery.removeEventListener('change', onStoreChange);
+}
+
+/** Snapshot for {@link useSyncExternalStore}: the negation of the wide query. */
+function getNarrowViewportSnapshot() {
+	return !isWideViewport();
 }
 
 /** Clamps a sidebar size percentage to the supported range, defaulting on NaN. */
@@ -45,23 +72,33 @@ function getClampedRightSidebarSizePercent(sizePercent: number) {
 
 /** True when the viewport is wide enough to persist user-driven sidebar sizes. */
 function canPersistRightSidebarResize() {
-	return window.matchMedia(`(min-width: ${RIGHT_SIDEBAR_MIN_VIEWPORT_WIDTH}px)`)
-		.matches;
+	return isWideViewport();
 }
 
 /** Right-sidebar collapse/expand state and handlers returned by {@link useRightSidebarController}. */
 interface RightSidebarController {
 	collapseRightSidebar: () => void;
-	expandRightSidebar: () => Promise<void>;
+	expandRightSidebar: () => void;
 	handleRightSidebarResize: (size: PanelSize) => void;
 	initialRightSidebarSize: string;
+	/** True below the breakpoint the resizable rail needs, where it is a sheet. */
+	isNarrowViewport: boolean;
+	/** Whether the rail is hidden — the sheet while narrow, the panel while wide. */
 	isRightSidebarCollapsed: boolean;
+	isRightSidebarSheetOpen: boolean;
 	rightSidebarPanelRef: React.RefObject<PanelImperativeHandle | null>;
+	setRightSidebarSheetOpen: (open: boolean) => void;
 }
 
 /**
  * Owns the right-sidebar collapse/expand state, viewport-driven auto-collapse,
  * and the imperative panel ref.
+ *
+ * Below {@link RIGHT_SIDEBAR_MIN_VIEWPORT_WIDTH} the rail has no room beside the
+ * content, so expanding opens it as a sheet over the content instead of widening
+ * the user's window. The persisted collapse preference and width describe the
+ * wide layout only: opening and closing the sheet never writes either, so a
+ * window narrowed for an afternoon comes back to the layout it left.
  */
 export function useRightSidebarController(): RightSidebarController {
 	const store = useStore();
@@ -94,26 +131,44 @@ export function useRightSidebarController(): RightSidebarController {
 	);
 	const pendingRightSidebarSizePercentRef = useRef<number | null>(null);
 	const rightSidebarSizeCommitTimerRef = useRef<number | null>(null);
-	const [isRightSidebarCollapsed, setIsRightSidebarCollapsed] = useState(
-		storedRightSidebarCollapsed,
+	const [isRightSidebarPanelCollapsed, setIsRightSidebarPanelCollapsed] =
+		useState(storedRightSidebarCollapsed);
+	const [isRightSidebarSheetOpen, setRightSidebarSheetOpen] = useState(false);
+	const isNarrowViewport = useSyncExternalStore(
+		subscribeToViewportWidthChanges,
+		getNarrowViewportSnapshot,
+		() => false,
 	);
 
 	useEffect(() => {
 		rightSidebarCollapsedPreferenceRef.current = storedRightSidebarCollapsed;
 	}, [storedRightSidebarCollapsed]);
 
-	/** Collapses the right sidebar and persists the preference. */
+	// Both toggles read the live query rather than the rendered snapshot: a click
+	// can land in the frame between a viewport change and the re-render it
+	// schedules, and hiding the panel when the sheet is the visible host — or the
+	// reverse — leaves the user's click doing nothing at all.
+	/** Hides the rail: the sheet while narrow, the panel and its preference while wide. */
 	const collapseRightSidebar = () => {
+		if (!isWideViewport()) {
+			setRightSidebarSheetOpen(false);
+			return;
+		}
+
 		rightSidebarCollapsedByViewportRef.current = false;
 		rightSidebarPanelRef.current?.collapse();
 		rightSidebarCollapsedPreferenceRef.current = true;
-		setIsRightSidebarCollapsed(true);
+		setIsRightSidebarPanelCollapsed(true);
 		setStoredRightSidebarCollapsed(true);
 	};
-	/** Asks the window to widen if needed, then expands the right sidebar. */
-	const expandRightSidebar = async () => {
+	/** Shows the rail: the sheet over the content while narrow, the panel while wide. */
+	const expandRightSidebar = () => {
+		if (!isWideViewport()) {
+			setRightSidebarSheetOpen(true);
+			return;
+		}
+
 		rightSidebarCollapsedByViewportRef.current = false;
-		await ensureWindowCanShowRightSidebar();
 
 		window.requestAnimationFrame(() => {
 			rightSidebarPanelRef.current?.expand();
@@ -121,7 +176,7 @@ export function useRightSidebarController(): RightSidebarController {
 				`${rightSidebarSizePercentRef.current}%`,
 			);
 			rightSidebarCollapsedPreferenceRef.current = false;
-			setIsRightSidebarCollapsed(false);
+			setIsRightSidebarPanelCollapsed(false);
 			setStoredRightSidebarCollapsed(false);
 		});
 	};
@@ -159,7 +214,7 @@ export function useRightSidebarController(): RightSidebarController {
 		const isCollapsed =
 			size.asPercentage <= RIGHT_SIDEBAR_COLLAPSED_THRESHOLD_PERCENT;
 
-		setIsRightSidebarCollapsed(isCollapsed);
+		setIsRightSidebarPanelCollapsed(isCollapsed);
 
 		if (!canPersistRightSidebarResize()) {
 			return;
@@ -198,12 +253,12 @@ export function useRightSidebarController(): RightSidebarController {
 	}, [flushRightSidebarSizePercent]);
 
 	useEffect(() => {
-		const narrowViewportQuery = window.matchMedia(
-			`(max-width: ${RIGHT_SIDEBAR_MIN_VIEWPORT_WIDTH - 1}px)`,
+		const wideViewportQuery = window.matchMedia(
+			RIGHT_SIDEBAR_WIDE_VIEWPORT_QUERY,
 		);
 		let restoreFrame: number | null = null;
 		const syncRightSidebarWithViewport = () => {
-			if (narrowViewportQuery.matches) {
+			if (!wideViewportQuery.matches) {
 				if (restoreFrame !== null) {
 					window.cancelAnimationFrame(restoreFrame);
 					restoreFrame = null;
@@ -211,16 +266,20 @@ export function useRightSidebarController(): RightSidebarController {
 
 				const wasAlreadyCollapsed =
 					rightSidebarPanelRef.current?.isCollapsed() ||
-					isRightSidebarCollapsed;
+					isRightSidebarPanelCollapsed;
 
 				rightSidebarPanelRef.current?.collapse();
-				setIsRightSidebarCollapsed(true);
+				setIsRightSidebarPanelCollapsed(true);
 
 				if (!wasAlreadyCollapsed) {
 					rightSidebarCollapsedByViewportRef.current = true;
 				}
 				return;
 			}
+
+			// The panel is about to seat the rail beside the content, so the sheet
+			// holding it must let go first or both would show it at once.
+			setRightSidebarSheetOpen(false);
 
 			if (
 				rightSidebarCollapsedByViewportRef.current &&
@@ -231,7 +290,7 @@ export function useRightSidebarController(): RightSidebarController {
 					rightSidebarPanelRef.current?.resize(
 						`${rightSidebarSizePercentRef.current}%`,
 					);
-					setIsRightSidebarCollapsed(false);
+					setIsRightSidebarPanelCollapsed(false);
 					rightSidebarCollapsedByViewportRef.current = false;
 					restoreFrame = null;
 				});
@@ -242,28 +301,30 @@ export function useRightSidebarController(): RightSidebarController {
 		};
 
 		syncRightSidebarWithViewport();
-		narrowViewportQuery.addEventListener(
-			'change',
-			syncRightSidebarWithViewport,
-		);
+		wideViewportQuery.addEventListener('change', syncRightSidebarWithViewport);
 
 		return () => {
 			if (restoreFrame !== null) {
 				window.cancelAnimationFrame(restoreFrame);
 			}
-			narrowViewportQuery.removeEventListener(
+			wideViewportQuery.removeEventListener(
 				'change',
 				syncRightSidebarWithViewport,
 			);
 		};
-	}, [isRightSidebarCollapsed]);
+	}, [isRightSidebarPanelCollapsed]);
 
 	return {
 		collapseRightSidebar,
 		expandRightSidebar,
 		handleRightSidebarResize,
 		initialRightSidebarSize: initialRightSidebarLayout.size,
-		isRightSidebarCollapsed,
+		isNarrowViewport,
+		isRightSidebarCollapsed: isNarrowViewport
+			? !isRightSidebarSheetOpen
+			: isRightSidebarPanelCollapsed,
+		isRightSidebarSheetOpen,
 		rightSidebarPanelRef,
+		setRightSidebarSheetOpen,
 	};
 }

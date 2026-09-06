@@ -1,6 +1,8 @@
 import { useAtomValue } from 'jotai';
+import { PanelRightCloseIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
+import { Button } from '@/renderer/components/ui/button';
 import { useReviewableChanges } from '@/renderer/hooks/workbench-shell/review-files/use-reviewable-changes';
 import { useWorkspaceConflicts } from '@/renderer/hooks/workbench-shell/review-files/use-workspace-conflicts';
 import { cn } from '@/renderer/lib/utils';
@@ -48,12 +50,18 @@ const HEADER_LABEL_TONE_CLASSES: Record<HeaderTone, string> = {
  * belongs on that row because `flex-1` sizes it from the outside; an
  * `inline-size` container that took its width from its own contents would
  * measure itself as empty and collapse to zero.
+ *
+ * `onDismiss` appends a close button, for the narrow-window sheet where the
+ * toolbar toggle that would otherwise close the rail sits behind the overlay.
  */
 export function RightSidebarHeader({
 	activeWorkspace,
+	onDismiss,
 }: {
 	activeWorkspace: WorkspaceShellModel;
+	onDismiss?: () => void;
 }) {
+	const { t } = useTranslation();
 	const headerState = useRightSidebarHeaderState(activeWorkspace);
 	const hasPullRequestNumber = 'number' in headerState;
 	const headerLabel = 'label' in headerState ? headerState.label : '';
@@ -78,11 +86,22 @@ export function RightSidebarHeader({
 					</p>
 				) : null}
 			</div>
-			<div className='ml-auto flex shrink-0 items-center justify-end'>
+			<div className='ml-auto flex shrink-0 items-center justify-end gap-1'>
 				<RightSidebarHeaderAction
 					activeWorkspace={activeWorkspace}
 					headerState={headerState}
 				/>
+				{onDismiss ? (
+					<Button onClick={onDismiss} size='icon-sm' variant='ghost'>
+						<PanelRightCloseIcon />
+						<span className='sr-only'>
+							{t(
+								'workbench:header.review-sidebar.collapse',
+								'Collapse review sidebar',
+							)}
+						</span>
+					</Button>
+				) : null}
 			</div>
 		</header>
 	);

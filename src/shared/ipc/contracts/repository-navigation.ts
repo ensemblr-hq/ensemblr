@@ -115,7 +115,6 @@ export interface ShellApi {
 	 * own `close` event, so the quit guard still asks about running agents.
 	 */
 	closeWindow: () => Promise<void>;
-	ensureWindowWidth: (minimumWidth: number) => Promise<void>;
 	/** Minimizes the BrowserWindow that issued the request. */
 	minimizeWindow: () => Promise<void>;
 	/**
