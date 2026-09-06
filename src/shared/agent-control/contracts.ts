@@ -8,7 +8,10 @@
  * delegates. The op names are namespaced `ensemblr.<op>` on the wire; this module
  * defines the bare op identifiers and their argument/result shapes.
  */
+
+import type { AgentModelTier } from '../agent-model-tier.ts';
 import type { AgentProviderId } from '../agent-provider.ts';
+import type { ThinkingAxis } from '../agent-thinking.ts';
 import { ARCHITECTURE_DIAGRAM_LIMITS } from '../architecture-diagram/schema.ts';
 import type { ReviewCommentWire } from '../ipc/contracts/review-comments.ts';
 import type {
@@ -1746,11 +1749,24 @@ export interface GetLastMessageResult {
  * `vendor` is the inference vendor (`anthropic`, `openai`, `claude-code`) and is
  * descriptive only. They were both called "provider" once, which is how a spawn
  * check meant to keep a child inside its runtime ended up comparing vendors.
+ *
+ * `thinkingLevels` and `thinkingAxis` are here so a caller can *choose* a level
+ * rather than inherit its own: the two runtimes publish different ladders (pi
+ * has `minimal` and no `max`, Claude the reverse) and a level from the wrong one
+ * is refused, so the ladder has to travel with the model it belongs to. `tier`
+ * is here for the same reason — a caller that can see which ids are `frontier`
+ * can avoid a spawn the app would stop to ask the user about.
  */
 export interface AgentControlModelInfo {
 	displayName: string;
 	id: string;
 	runtime: AgentProviderId;
+	/** The dial this model's runtime steers: `effort` on Claude, `thinking` on pi. */
+	thinkingAxis: ThinkingAxis;
+	/** Levels this model accepts, ascending, starting at `off`. */
+	thinkingLevels: readonly string[];
+	/** Cost tier; a `frontier` model the caller does not already run on is confirmed with the user. */
+	tier: AgentModelTier;
 	vendor: string;
 }
 

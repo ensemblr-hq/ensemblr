@@ -409,6 +409,132 @@ describe('the child’s thinking level', () => {
 
 		expect(request.thinkingLevel).toBe('low');
 	});
+
+	// A level the orchestrator *asked* for is a decision, so a rung the child's
+	// runtime does not have is refused by name rather than dropped back to the
+	// caller's own — which is what let a deliberate choice run as its opposite
+	// with nothing said.
+	it('refuses a requested level the child’s runtime does not have', async () => {
+		const message = await refusal({
+			caller: { model: PI_MODEL, thinkingLevel: 'high' },
+			callerRuntime: 'pi',
+			thinkingLevel: 'max',
+		});
+
+		expect(message).toContain('"max"');
+		expect(message).toContain('minimal');
+		expect(message).toContain('xhigh');
+	});
+
+	it('refuses a level the child’s model does not publish', async () => {
+		const message = await refusal({
+			caller: { model: CLAUDE_MODEL, thinkingLevel: 'high' },
+			callerRuntime: 'claude',
+			thinkingLevel: 'minimal',
+		});
+
+		expect(message).toContain('"minimal"');
+		expect(message).toContain(CLAUDE_LADDER.join(', '));
+	});
+});
+
+// A caller with nothing to inherit is the one path onto a model that nobody
+// chose, and Claude's catalog orders the costliest family first — so the
+// fallback steps over the frontier tier rather than landing a child on it.
+describe('the catalog default a spawn falls through to', () => {
+	const FRONTIER_MODEL = 'claude-fable-5-1';
+	const FRONTIER_CATALOG = [
+		modelOption({
+			id: FRONTIER_MODEL,
+			runtime: 'claude',
+			thinkingLevels: CLAUDE_LADDER,
+			vendor: 'claude-code',
+		}),
+		modelOption({
+			id: CLAUDE_MODEL,
+			runtime: 'claude',
+			thinkingLevels: CLAUDE_LADDER,
+			vendor: 'claude-code',
+		}),
+	];
+
+	it('steps over a frontier model the catalog calls default', async () => {
+		const request = await spawn({
+			callerRuntime: 'claude',
+			catalogDefaultModelId: FRONTIER_MODEL,
+			models: FRONTIER_CATALOG,
+		});
+
+		expect(request.model).toBe(CLAUDE_MODEL);
+	});
+
+	it('still opens on a frontier model when the runtime publishes nothing else', async () => {
+		const request = await spawn({
+			callerRuntime: 'claude',
+			catalogDefaultModelId: FRONTIER_MODEL,
+			models: [FRONTIER_CATALOG[0] as (typeof CATALOG)[number]],
+		});
+
+		expect(request.model).toBe(FRONTIER_MODEL);
+	});
+
+	it('reports the model it would fall through to as the listed default', async () => {
+		const ports = createAgentControlPorts(
+			makeDeps({
+				catalogDefaultModelId: FRONTIER_MODEL,
+				models: FRONTIER_CATALOG,
+			}),
+		);
+		const listing = await ports.conversations.listModels({
+			runtime: 'claude',
+		});
+
+		expect(listing.defaultModelId).toBe(CLAUDE_MODEL);
+		expect(listing.models.map((model) => model.tier)).toEqual([
+			'frontier',
+			'standard',
+		]);
+	});
+
+	// A terminal harness cannot be narrowed to a runtime and is the one caller
+	// required to name a model, so an unnarrowed listing advertising the frontier
+	// row as its default would send it straight into the gate. Both branches read
+	// the same helper rather than only the narrowed one stepping over the tier.
+	it('steps over it for a caller whose runtime cannot be narrowed', async () => {
+		const ports = createAgentControlPorts(
+			makeDeps({
+				catalogDefaultModelId: FRONTIER_MODEL,
+				models: FRONTIER_CATALOG,
+			}),
+		);
+		const listing = await ports.conversations.listModels({ runtime: null });
+
+		expect(listing.defaultModelId).toBe(CLAUDE_MODEL);
+		expect(listing.models.map((model) => model.id)).toEqual([
+			FRONTIER_MODEL,
+			CLAUDE_MODEL,
+		]);
+	});
+
+	it('publishes each model’s thinking ladder and axis', async () => {
+		const ports = createAgentControlPorts(makeDeps({}));
+		const listing = await ports.conversations.listModels({ runtime: 'claude' });
+
+		expect(listing.models[0]?.thinkingLevels).toEqual(CLAUDE_LADDER);
+		expect(listing.models[0]?.thinkingAxis).toBe('effort');
+	});
+
+	// Pi's rows publish no ladder of their own, so the runtime's canonical one
+	// stands in — an empty list would leave the caller with nothing to choose from
+	// and a guess is what the refusal above exists to stop.
+	it('falls back to the runtime ladder for a model that publishes none', async () => {
+		const ports = createAgentControlPorts(makeDeps({}));
+		const listing = await ports.conversations.listModels({ runtime: 'pi' });
+
+		expect(listing.models[0]?.thinkingLevels).toContain('minimal');
+		expect(listing.models[0]?.thinkingLevels).not.toContain('max');
+		expect(listing.models[0]?.thinkingAxis).toBe('thinking');
+	});
 });
 
 describe('an unreadable model catalog', () => {

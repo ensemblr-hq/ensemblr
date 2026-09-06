@@ -308,6 +308,20 @@ const PEER_ORCHESTRATOR_GUIDANCE = `A peer orchestrator is a different thing fro
 What makes a peer expensive is the checkout. You and it share one worktree, one git index, and one set of run scripts, and nothing in the app arbitrates that — neither of you can see the other's uncommitted edits. So brief it onto a disjoint set of files, name those files in the brief, and expect it to come back rather than reach outside them. **You stay the committer**: the app tells the peer not to commit, rebase, or move HEAD, so reconciling both halves and making the commit is yours. Two agents writing this checkout is the limit; a third is refused, and a harness terminal that is still running counts as one of the two, so a \`claude\` left open in a terminal is enough to refuse the peer. When the work is separable and does not need one checkout, a sub-agent or a second workspace is the cheaper answer.`;
 
 /**
+ * How to set a spawned conversation's reasoning budget, for every role that can
+ * open one.
+ *
+ * It exists because the argument alone was not enough. `thinkingLevel` has been
+ * on `startConversation` from the start and was almost never passed: a level the
+ * caller does not name is inherited, so every child in a fan-out ran at whatever
+ * the parent happened to be set to — a mechanical rename thinking as hard as the
+ * design question beside it, and a hard question thinking as little as the
+ * rename. Naming the rungs and what each is for is what turns an argument
+ * nobody used into a decision.
+ */
+const SPAWN_THINKING_GUIDANCE = `Thinking level: pick one per child rather than letting it inherit yours. \`thinkingLevel\` is a real decision and an omitted one is not a default — it is your own level, which was chosen for your work rather than for theirs. Match it to the child's task: the lowest rungs for mechanical work with one obvious shape (a rename, a mapping, applying a decision already made), the middle for ordinary implementation and for reading code to answer a question, the high rungs for design, for diagnosing something that does not reproduce, and for reviewing work you will rely on. Spend the top rung on genuine difficulty only — it is slower and costs more, and a child that thinks hard about a trivial task is a child that finishes late. \`ensemblr_list_models\` publishes each model's ladder in \`thinkingLevels\` and what its runtime calls the dial in \`thinkingAxis\`; the two runtimes do not share a ladder, and a level from the wrong one is refused by name rather than quietly dropped.`;
+
+/**
  * Points at the Agent Skill the app ships, which every runtime loads per launch.
  * The playbook stays the guaranteed channel and carries what a turn cannot go
  * without; the skill carries what would be waste to repeat every turn — the
@@ -434,7 +448,9 @@ When delegation is warranted — delegate → wait → evaluate → integrate:
 
 A child's last message is its report and is persisted permanently — it survives the child closing and even an app restart. If your wait is ever interrupted (for example the app restarts) and a child then shows a \`closed\` or \`idle\` status, read its result with \`ensemblr_get_last_message\` before reacting — \`closed\` means the child ended, not that its work was lost, and \`ensemblr_get_conversation_status\` reports \`hasFinalMessage: true\` whenever that report is still there. Never re-spawn a child to redo work whose report you can still read.
 
-Model selection: omit \`model\` and the child inherits yours. To run one on a different model, call \`ensemblr_list_models\` first and pass an id from that list — it carries only the models your own agent runtime can drive, and a model belonging to the other runtime is refused rather than substituted, so a child always runs the runtime you do. Never invent or guess a model id.
+Model selection: omit \`model\` and the child inherits yours. To run one on a different model, call \`ensemblr_list_models\` first and pass an id from that list — it carries only the models your own agent runtime can drive, and a model belonging to the other runtime is refused rather than substituted, so a child always runs the runtime you do. Never invent or guess a model id. Each row also carries a \`tier\`: naming a \`frontier\` one is put to the user for confirmation whatever the permission mode, because it costs several times what the rest do and inheriting yours does not. Reach for it only when the task genuinely needs it, and expect to be refused while the user is away.
+
+${SPAWN_THINKING_GUIDANCE}
 
 Etiquette & limits:
 - Delegation is shallow by design — only you, the root, may spawn; children do their own work and cannot delegate onward. Depth, per-session spawn count, and spawn rate are capped; never fork-bomb.
@@ -552,7 +568,9 @@ When delegation is warranted — delegate → wait → evaluate → integrate:
 
 A child's last message is its report and is persisted permanently — it survives the child closing and even an app restart, so read it with \`ensemblr_get_last_message\` rather than re-spawning a child to redo work you can still read.
 
-Model selection: \`model\` is REQUIRED of you. A chat tab spawns children on its own agent runtime, but you are a terminal harness — your control token is minted per workspace and shared by every terminal in it, so the app cannot tell which runtime you are and will not guess one for you. Call \`ensemblr_list_models\` first: it returns every runtime's models (each with its \`runtime\` and its inference \`vendor\`) precisely because yours cannot be narrowed, and pass one of those ids on \`ensemblr_start_conversation\`. Omitting \`model\` is refused, not defaulted. Never invent or guess a model id.
+Model selection: \`model\` is REQUIRED of you. A chat tab spawns children on its own agent runtime, but you are a terminal harness — your control token is minted per workspace and shared by every terminal in it, so the app cannot tell which runtime you are and will not guess one for you. Call \`ensemblr_list_models\` first: it returns every runtime's models (each with its \`runtime\` and its inference \`vendor\`) precisely because yours cannot be narrowed, and pass one of those ids on \`ensemblr_start_conversation\`. Omitting \`model\` is refused, not defaulted. Never invent or guess a model id. Each row also carries a \`tier\`: naming a \`frontier\` one is put to the user for confirmation whatever the permission mode, because it costs several times what the rest do. Reach for it only when the task genuinely needs it, and expect to be refused while the user is away.
+
+${SPAWN_THINKING_GUIDANCE}
 
 Etiquette & limits:
 - Delegation is shallow by design — children do their own work and cannot delegate onward. Depth, per-session spawn count, and spawn rate are capped; never fork-bomb.
@@ -720,13 +738,15 @@ Your job this turn is to reach a shared understanding with the user before any c
 
 Finding those facts does not have to be serial. When the plan hinges on facts spread across two or more independent areas of the codebase — areas you would otherwise read one after another — fan out read-only investigators and read them at once. Never fan out for one file, one question, or anything you could answer in a single pass; a fan-out you did not need costs the user a tab and costs you a wait. Split the work before you split the investigators: a child cold-starts with nothing but its brief, so a fact two of them both need is a repository read paid for twice. When the areas share a foundation — the same files, the same inventory, the same shape of the code — establish it once yourself, or with one scout child, and hand the findings with full paths to each investigator; fan out cold only where the questions are genuinely disjoint. When it is warranted, the loop is delegate → wait → evaluate → integrate:
 
-1. Spawn each investigator with \`ensemblr_start_conversation\` in its own fresh tab — pass a short \`title\` naming the QUESTION it is answering and do NOT pass \`chatTabId\`; omit \`wait\` and keep the \`agentSessionId\` it returns. To run one on a specific model, call \`ensemblr_list_models\` first and pass an id from that list; never invent one. Depth, per-session spawn count, and spawn rate are capped, and a child cannot spawn further — never fork-bomb.
+1. Spawn each investigator with \`ensemblr_start_conversation\` in its own fresh tab — pass a short \`title\` naming the QUESTION it is answering and do NOT pass \`chatTabId\`; omit \`wait\` and keep the \`agentSessionId\` it returns. To run one on a specific model, call \`ensemblr_list_models\` first and pass an id from that list; never invent one. Each row also carries a \`tier\`: naming a \`frontier\` one is put to the user for confirmation whatever the permission mode, because it costs several times what the rest do and inheriting yours does not. Reach for it only when the question genuinely needs it, and expect to be refused while the user is away. Depth, per-session spawn count, and spawn rate are capped, and a child cannot spawn further — never fork-bomb.
 2. A child you spawn inherits Plan Mode: it reads the repository and runs read-only commands, and it cannot write, edit, spawn anything of its own, or talk to the user. So brief it as a question to answer — "find and report how X works, with full paths" — never as work to do. A child briefed to implement will come back saying it could not. Name the defaults it should assume rather than come back and ask you about, so it spends its turn reading instead of waiting on you.
 3. Once everything that can run in parallel is delegated, call \`ensemblr_wait_for_agents\` and let it block. Do NOT hand-roll a polling loop with \`ensemblr_get_conversation_status\`. \`mode: "all"\` (default target: every child you spawned) waits for all of them — pass it explicitly, because the mode itself defaults to \`first\`, which returns on the first to settle. Either way the result names the investigators still running in \`pending\`, so wait again on those ids rather than polling them — including when it comes back \`timedOut: true\`, which is a capped wait window expiring while a child still works, not a fault to report or a reason to re-spawn. A child that is stuck calls \`ensemblr_notify_orchestrator\`, which wakes your wait immediately so you can answer it.
 4. Evaluate each report. A child's last message IS its report — a planning child never calls \`ensemblr_exit_plan_mode\`, so do not wait for a plan from one. If a report is thin or off-target, reply with \`ensemblr_send_follow_up\` and wait again. \`ensemblr_get_last_message\` recovers a report if your wait was interrupted. A child cannot ask the user anything, so its \`Open questions\` section is interview material for you: drop what you can settle by reading, merge what several children raised, and fold the rest into your next \`ensemblr_ask_user_question\` round. A decision a child left open is not one you may quietly close.
 5. Verify before you rely. A report is a claim, not a fact you checked. Before a load-bearing one — a version floor, a package or config wiring, a constraint that picks the approach — goes into your plan, open the path the child cited and read it yourself; that is what the full paths are for. Delegation makes a citation feel checked when nobody checked it. A child that read documentation rather than this repository leaves you nothing to re-read, so attribute that claim to its report in the plan instead of asserting it. A claim about what the child did rather than what a file says is settled by \`ensemblr_read_conversation\`, which replays its actual tool calls.
 6. Integrate the findings as EVIDENCE for the plan you will submit, not as the plan. You still own the interview, the decisions, and the exit call. Never forward a child's report to the user as your plan.
 7. Close the investigation tabs you opened (\`ensemblr_close_tab\`) once you have their reports.
+
+${SPAWN_THINKING_GUIDANCE}
 
 When you and the user share an understanding, hand the plan over and stop:
 
@@ -863,6 +883,10 @@ One orchestrator per workspace is what YOU open — never two, because two orche
 You are the only one who can see both sides, so the coordination is yours: name in each brief what the other workspace is doing and what it will produce, because neither agent can read the other's tab or its repository. Where one genuinely depends on the other — a version the other side has to publish, a schema it has to land first — brief the dependent one to that fact, or hold it back and spawn it once the first reports. Parallel or sequential is your call, and it follows from the dependency rather than from the task being one task. Then supervise both, and say in your answer which workspace holds which half.
 
 **Several orchestrators may work the same task, so long as each has a workspace of its own.** Cut two or three workspaces off one project and brief each differently — a different model, passed as \`model\` from an id \`ensemblr_list_models\` returned, or the same model pointed at a different approach — and you get implementations to choose between instead of the first one that compiles. Name each workspace for the variant it carries, tell no contender about the others, then read the diffs when they report and put the choice to the user with your own recommendation and what each one cost. It spends a workspace and a whole agent run per contender, so spend it where the approach is genuinely open or the user asked to see options, not on work with one obvious shape.
+
+**What an orchestrator runs on is your decision, and both halves of it are.** \`model\` is one half: omit it and the orchestrator inherits yours, which is right for most work. \`ensemblr_list_models\` is where a different id comes from, and each row carries a \`tier\` — naming a \`frontier\` one is put to the user for confirmation whatever the permission mode, because it costs several times what the rest do, so reach for it only when the task genuinely needs it.
+
+${SPAWN_THINKING_GUIDANCE}
 
 ## When the user has stepped away
 

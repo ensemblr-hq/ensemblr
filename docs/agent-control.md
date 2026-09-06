@@ -944,6 +944,72 @@ one request and is gone, so a row left at the value the session opened with woul
 hand a child the model its parent left several turns ago — the user's own pick in
 the Concierge composer being invisible to the very spawn that inherits from it.
 
+### Choosing a thinking level for a child
+
+`thinkingLevel` resolves the same way a model does — what the caller asked for,
+then what the caller itself runs at, then `medium` — but only the first of those
+is a *decision*, and it was almost never passed. An omitted level is the
+parent's, chosen for the parent's work: a fan-out then runs a rename at the same
+budget as the design question beside it. So the playbooks now name the rungs and
+what each is for, and `listModels` publishes the ladder that makes a choice
+possible: `thinkingLevels` per model, and `thinkingAxis` naming what its runtime
+calls the dial (`effort` on Claude Code, `thinking` on pi).
+
+The two runtimes do not share a ladder — pi has `minimal` and no `max`, Claude
+the reverse — so a level is only meaningful next to the model it is for. A level
+the child's model does not publish is refused by name, listing what it does
+accept, rather than dropped back to the caller's: silently running a child at a
+level nobody asked for is the same failure as silently substituting a model, and
+the resolver already refuses that.
+
+### The frontier tier is confirmed with the user
+
+`classifyAgentModelTier` in `src/shared/agent-model-tier.ts` sorts every model
+into `standard` or `frontier`. Neither runtime publishes a price — `pi
+--list-models` reports a provider, a name, and a context window; Claude Code's
+`supportedModels()` reports a display name and an effort ladder — so the tier is
+read off the model's own name segments, and an id the table does not recognise is
+`standard`. `frontier` names the flagship tier a user would not expect an agent to
+reach for unprompted, not "the capable models": Opus, Sonnet, and the GPT line
+are ordinary delegation.
+
+A `model` the caller **names** that classifies as `frontier` is put to the user
+for confirmation whatever the permission mode, on the same grounds as a peer
+orchestrator: `workspace-trusted` is the user trusting an agent with their files,
+not with their bill. Inheritance is never gated — the model a conversation
+already runs on is one the user picked, and confirming every delegation out of a
+frontier chat would make the tier unusable rather than deliberate. An approval is
+remembered per workspace and model for the life of the process, so a fan-out onto
+the model the user just approved raises one dialog rather than five; a decline is
+not remembered, and the refusal tells the agent not to ask again.
+
+The gate classifies the **catalog row**, not the id the caller passed, because a
+runtime may advertise a moving alias whose id names no family — Claude Code
+publishes exactly those, and the picker names such a row after the release its
+`resolvedModel` points at, so the display name is the only place the family
+appears. `listModels` classifies the same row, which is what stops the listing
+and the gate disagreeing about which ids are `frontier`. A row the catalog cannot
+supply falls back to classifying the bare id rather than to `standard`: an
+unreadable catalog must never be the thing that turns the gate off. The
+remembered approval is checked ahead of the tier, so a fan-out pays one catalog
+read rather than one per child, and a spawn that named no model reads none at
+all.
+
+While the user is AFK the spawn is refused rather than parked on a dialog nobody
+will answer, and the refusal names the two ways forward: omit `model` to inherit,
+or pass a `standard` id.
+
+The other route onto that tier is a spawn that named nothing at all falling
+through to the catalog default, and there is nobody to ask on that path either —
+Claude's catalog orders the most capable family first, so its declared default
+*is* the costliest model. `defaultModelFor` therefore steps over the frontier
+tier when picking a default, and only when picking one: a caller that wants that
+model still gets it by naming it, which is the path that asks. That one helper
+answers for both the spawn fallback and the default `listModels` publishes,
+including for the null runtime a terminal harness has — advertising the frontier
+row as the default to the one caller that is *required* to name a model would
+walk it straight into the dialog.
+
 ## How the questionnaire behaves
 
 The questionnaire renders in the chat tab that asked, in place of the composer,

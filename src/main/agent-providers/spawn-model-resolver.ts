@@ -15,11 +15,15 @@
  * orchestrator's on Pi, and a caller whose runtime cannot be determined is told
  * to name a model rather than quietly handed Pi's default.
  */
+import { classifyAgentModelTier } from '../../shared/agent-model-tier.ts';
 import {
 	type AgentProviderId,
 	getAgentProviderLabel,
 } from '../../shared/agent-provider.ts';
-import { listThinkingLevels } from '../../shared/agent-thinking.ts';
+import {
+	getThinkingAxisLabel,
+	listThinkingLevels,
+} from '../../shared/agent-thinking.ts';
 import type { AgentModelOption } from '../../shared/ipc/contracts/agent-models.ts';
 import type { AgentModelCatalogService } from './agent-model-catalog.ts';
 
@@ -123,41 +127,77 @@ async function readCatalog(
 }
 
 /**
+ * The models in scope for one caller: its own runtime's, or every runtime's when
+ * the caller has none the app can name and therefore has to pick explicitly.
+ * @param snapshot - The catalog's models.
+ * @param runtime - The runtime to narrow to, or null to leave every runtime's in.
+ * @returns The models that caller may spawn a child on.
+ */
+function modelsOn(
+	snapshot: CatalogSnapshot,
+	runtime: AgentProviderId | null,
+): readonly AgentModelOption[] {
+	return runtime === null
+		? snapshot.models
+		: snapshot.models.filter((option) => option.agentProvider === runtime);
+}
+
+/**
  * The model a caller on `runtime` lands on when it names none and has none to
  * inherit: the catalog's own default when that runtime publishes it, else that
  * runtime's first entry. Preferring the catalog's default is what keeps a spawn
  * on the model the app itself would open, rather than on whatever `pi
  * --list-models` happened to print first.
+ *
+ * The frontier tier is stepped over here, and only here. Claude's catalog orders
+ * the most capable family first, so its declared default *is* the costliest
+ * model — and a spawn reaching this branch is one where neither the caller nor
+ * the orchestrator named anything, which is the one case where landing on that
+ * tier is nobody's decision. A caller that wants it still gets it by naming it,
+ * which is the path the user is asked to confirm.
+ *
+ * Both the spawn fallback and the default `listModels` publishes read this one
+ * function, including for the null runtime a terminal harness has: an
+ * unnarrowed listing that advertised the frontier row as its default would send
+ * the one caller that must name a model straight into the gate.
  * @param snapshot - The catalog's models and its declared default.
- * @param runtime - The runtime the child is pinned to.
- * @returns The default model for that runtime, or undefined when it has none.
+ * @param runtime - The runtime the child is pinned to, or null when it has none.
+ * @returns The default model in that scope, or undefined when it has none.
  */
 function defaultModelFor(
 	snapshot: CatalogSnapshot,
-	runtime: AgentProviderId,
+	runtime: AgentProviderId | null,
 ): AgentModelOption | undefined {
-	const onRuntime = snapshot.models.filter(
-		(option) => option.agentProvider === runtime,
+	const inScope = modelsOn(snapshot, runtime);
+	const affordable = inScope.filter(
+		(option) => classifyAgentModelTier(option) !== 'frontier',
 	);
+	const candidates = affordable.length > 0 ? affordable : inScope;
 	return (
-		onRuntime.find((option) => option.id === snapshot.defaultModelId) ??
-		onRuntime[0]
+		candidates.find((option) => option.id === snapshot.defaultModelId) ??
+		candidates[0]
 	);
 }
 
 /**
  * The levels a child may be opened at: the model's own list when it publishes
- * one, else its runtime's canonical ladder.
+ * one, else its runtime's canonical ladder. Exported because `listModels`
+ * publishes the same ladder to the agent choosing a level, and two answers to
+ * "which levels does this model take" is how a documented level gets refused.
  * @param model - The child's model, when the catalog knows it.
- * @param runtime - The runtime the child is pinned to.
+ * @param runtime - The runtime the child is pinned to. Defaults to the model's own.
  * @returns The acceptable thinking levels.
  */
-function acceptableLevels(
+export function acceptableThinkingLevels(
 	model: AgentModelOption | undefined,
-	runtime: AgentProviderId,
+	runtime?: AgentProviderId,
 ): readonly string[] {
 	const published = model?.thinkingLevels ?? [];
-	return published.length > 0 ? published : listThinkingLevels(runtime);
+	if (published.length > 0) {
+		return published;
+	}
+	const owner = runtime ?? model?.agentProvider;
+	return owner ? listThinkingLevels(owner) : [];
 }
 
 /**
@@ -196,21 +236,31 @@ export function createSpawnModelResolver({
 		runtime: AgentProviderId;
 		caller: SpawnCallerIdentity;
 		requestedThinkingLevel: string | null;
-	}): SpawnModelResolution => ({
-		ok: true,
-		selection: {
-			modelId: input.modelId,
-			runtime: input.runtime,
-			thinkingLevel: pickThinkingLevel({
-				candidates: [
-					input.requestedThinkingLevel,
-					input.caller.thinkingLevel,
-					FALLBACK_THINKING_LEVEL,
-				],
-				levels: acceptableLevels(input.model, input.runtime),
-			}),
-		},
-	});
+	}): SpawnModelResolution => {
+		const levels = acceptableThinkingLevels(input.model, input.runtime);
+		const requested = input.requestedThinkingLevel;
+		if (requested !== null && !levels.includes(requested)) {
+			return {
+				ok: false,
+				reason: `Model "${input.modelId}" does not accept the ${getThinkingAxisLabel(input.runtime).toLowerCase()} level "${requested}". It accepts: ${levels.join(', ')}. The ${getAgentProviderLabel(input.runtime)} runtime's ladder is not the other one's — pass a level from this list, or omit "thinkingLevel" to inherit yours.`,
+			};
+		}
+		return {
+			ok: true,
+			selection: {
+				modelId: input.modelId,
+				runtime: input.runtime,
+				thinkingLevel: pickThinkingLevel({
+					candidates: [
+						requested,
+						input.caller.thinkingLevel,
+						FALLBACK_THINKING_LEVEL,
+					],
+					levels,
+				}),
+			},
+		};
+	};
 
 	/**
 	 * Honours an explicitly requested model, but only when it belongs to the
@@ -317,18 +367,9 @@ export function createSpawnModelResolver({
 	return {
 		listModelsFor: async (runtime) => {
 			const snapshot = await readCatalog(catalog);
-			if (runtime === null) {
-				return {
-					defaultModelId: snapshot.defaultModelId ?? null,
-					models: snapshot.models,
-					runtime,
-				};
-			}
 			return {
 				defaultModelId: defaultModelFor(snapshot, runtime)?.id ?? null,
-				models: snapshot.models.filter(
-					(option) => option.agentProvider === runtime,
-				),
+				models: modelsOn(snapshot, runtime),
 				runtime,
 			};
 		},

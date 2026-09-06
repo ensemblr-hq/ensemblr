@@ -96,6 +96,7 @@ import {
 	subAgentControlOpDenial,
 	validateArgs,
 } from '../../shared/agent-control.ts';
+import { isFrontierAgentModel } from '../../shared/agent-model-tier.ts';
 import { classifyPermissionAction } from '../../shared/permissions.ts';
 import {
 	evaluateConciergeTool,
@@ -642,6 +643,20 @@ export function createAgentControlService({
 	 */
 	const peerSpawnsOpening = new Map<string, number>();
 
+	/**
+	 * Workspace-and-model pairs the user has already approved a frontier-tier
+	 * spawn for, so a fan-out of five children onto the model they just said yes
+	 * to raises one dialog rather than five. Held for the life of the process and
+	 * keyed by workspace, because "yes, run this here" is not a licence for the
+	 * workspace next door.
+	 *
+	 * Declines are deliberately not remembered. Nothing here can be un-remembered
+	 * without restarting the app, so a remembered "no" would outlive the user
+	 * changing their mind; the refusal tells the agent not to ask again instead,
+	 * which is the same lever {@link gatePeerSpawn} pulls.
+	 */
+	const approvedFrontierSpawns = new Set<string>();
+
 	/** Pulls the review panel to Checks after a comment op, once per burst. */
 	const reviewFocus = createReviewFocus(ports.focus, scheduler.now);
 
@@ -1150,6 +1165,105 @@ export function createAgentControlService({
 	};
 
 	/**
+	 * Whether a named model is the costliest tier, read off the catalog row
+	 * rather than off the id.
+	 *
+	 * The row is what `ensemblr_list_models` classifies, so reading it here is
+	 * what stops the listing and the gate disagreeing about which ids are
+	 * `frontier`. It matters because a runtime may advertise a moving alias whose
+	 * id says nothing about the family it currently resolves to — Claude Code
+	 * publishes exactly those, and the picker names such a row after its
+	 * `resolvedModel`, so the display name is the only place the family appears.
+	 *
+	 * A row the catalog cannot supply falls back to the bare id rather than to
+	 * `standard`: an unreadable catalog, or an id from a runtime the spawn
+	 * resolver is about to refuse anyway, must never be the thing that turns the
+	 * gate off. The catalog read is memoized behind its own TTL, and only a spawn
+	 * that named a model reaches it.
+	 * @param origin - Resolved caller identity, naming the runtime to list.
+	 * @param modelId - The model the caller named.
+	 * @returns True when opening a child on it would escalate onto the frontier tier.
+	 */
+	const namesFrontierModel = async (
+		origin: AgentControlOrigin,
+		modelId: string,
+	): Promise<boolean> => {
+		const listing = await ports.conversations
+			.listModels({ runtime: originRuntime(origin) })
+			.catch(() => null);
+		const row = listing?.models.find((model) => model.id === modelId);
+		return isFrontierAgentModel(row ?? { id: modelId });
+	};
+
+	/**
+	 * Decides whether a child may be opened on the costliest tier of model, and
+	 * asks the user when it would be.
+	 *
+	 * Only a model the caller *named* reaches this gate. Inheriting is never
+	 * gated: the model a conversation already runs on is one the user chose, and
+	 * confirming every delegation out of a Fable chat would make the tier
+	 * unusable rather than deliberate. What is gated is the escalation — an agent
+	 * reaching past what it was given onto the tier that costs several times
+	 * more. The other way onto that tier without anyone choosing it, a spawn that
+	 * named nothing falling through to a catalog default, is closed in
+	 * `defaultModelFor` instead, because there is no one to ask there either.
+	 *
+	 * Raised whatever the permission mode, for the reason {@link gatePeerSpawn}'s
+	 * is: `workspace-trusted` is the user trusting an agent with their files, not
+	 * with their bill.
+	 *
+	 * A remembered approval is checked before the tier is, so the fan-out it was
+	 * given for costs one catalog read rather than one per child. The set only
+	 * ever holds keys a frontier classification put there, so answering from it
+	 * cannot wave through a model that was never gated.
+	 * @param origin - Resolved caller identity.
+	 * @param input - The workspace the child opens in and the model it named.
+	 * @param signal - Aborts when the spawning turn ends, withdrawing the prompt.
+	 * @returns A denial envelope, or null when the spawn may proceed.
+	 */
+	const gateFrontierModelSpawn = async (
+		origin: AgentControlOrigin,
+		input: { modelId: string | undefined; workspaceId: string },
+		signal: AbortSignal | undefined,
+	): Promise<AgentControlResult<never> | null> => {
+		const modelId = input.modelId;
+		if (!modelId) {
+			return null;
+		}
+		const approvalKey = `${input.workspaceId}:${modelId}`;
+		if (approvedFrontierSpawns.has(approvalKey)) {
+			return null;
+		}
+		if (!(await namesFrontierModel(origin, modelId))) {
+			return null;
+		}
+		if (isUnattended(origin)) {
+			return fail(
+				'denied-permission',
+				`"${modelId}" is the costliest tier of model and a child is not opened on it without the user's say-so — and they are away, so nobody can be asked. Omit "model" to inherit the one this conversation already runs on, or pass an id ensemblr_list_models reports as tier "standard". Say in your final message that you wanted this model and why.`,
+			);
+		}
+		const approved = await ports.confirm
+			.confirm({
+				origin,
+				signal,
+				summary: `Open a conversation on "${modelId}"? It is the costliest tier of model, and this agent chose it rather than inheriting the one it runs on.`,
+			})
+			.catch(() => false);
+		if (signal?.aborted) {
+			return fail('timeout', ABANDONED_CONFIRMATION);
+		}
+		if (!approved) {
+			return fail(
+				'denied-permission',
+				`The user declined to open a conversation on "${modelId}". Spawn without "model" to inherit the one you run on, or pass an id ensemblr_list_models reports as tier "standard" — and do not ask for this model again unless they raise it.`,
+			);
+		}
+		approvedFrontierSpawns.add(approvalKey);
+		return null;
+	};
+
+	/**
 	 * Decides whether a peer orchestrator may be opened, and asks the user.
 	 *
 	 * "The user explicitly asked for this" cannot be a judgement the spawning agent
@@ -1297,6 +1411,18 @@ export function createAgentControlService({
 		const modeDenied = spawnModeDenial(origin, args);
 		if (modeDenied) {
 			return fail('invalid-args', modeDenied);
+		}
+		// After the argument checks, so a call that was never valid does not raise a
+		// dialog first; ahead of the peer gate so a refusal here never strands a
+		// reserved co-tenancy slot, and so the user is not asked to seat a second
+		// orchestrator before being asked what it would cost to run.
+		const frontierDenied = await gateFrontierModelSpawn(
+			origin,
+			{ modelId: args.model, workspaceId: target.workspaceId },
+			signal,
+		);
+		if (frontierDenied) {
+			return frontierDenied;
 		}
 		const asPeer = args.peer === true;
 		let releasePeerSlot: (() => void) | null = null;
