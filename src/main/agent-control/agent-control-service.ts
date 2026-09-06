@@ -1224,6 +1224,30 @@ export function createAgentControlService({
 	};
 
 	/**
+	 * Why a caller may not state the turn mode its spawn opens in.
+	 *
+	 * Concierge-only, because every other caller already passes its own mode down
+	 * and has no reason to override it. An attended orchestrator opting a child
+	 * into AFK would be opting it into auto-approved permission confirmations with
+	 * no user behind the decision, and the Concierge is the only caller that
+	 * cannot inherit — it holds no composer chip of its own.
+	 * @param origin - Resolved caller identity.
+	 * @param args - The spawn's arguments.
+	 * @returns The refusal reason, or null when the caller may state a mode.
+	 */
+	const spawnModeDenial = (
+		origin: AgentControlOrigin,
+		args: StartConversationArgs,
+	): string | null => {
+		const statesMode =
+			args.planMode !== undefined || args.afkMode !== undefined;
+		if (!statesMode || origin.concierge) {
+			return null;
+		}
+		return 'Only the Concierge states the mode a conversation opens in. What you spawn inherits your own: it plans when you are planning, and it runs unattended when the user has stepped away from this chat. Drop `planMode` and `afkMode`.';
+	};
+
+	/**
 	 * Opens a delegated conversation. A model the spawn cannot honour — one from
 	 * another agent runtime, or none inferable at all — comes back as an argument
 	 * failure naming the runtime, because the calling agent can fix that on its
@@ -1238,7 +1262,7 @@ export function createAgentControlService({
 	 * the Concierge session service rather than from a session row it has none of.
 	 * @param origin - Resolved caller identity.
 	 * @param args - Prompt, optional tab, model, thinking level, title, wait flag,
-	 *   and the workspace for a Concierge.
+	 *   and — for a Concierge — the workspace and the turn mode it opens in.
 	 * @param callerModel - The Pi extension's live-model hint, absent for MCP callers.
 	 * @param signal - Aborts when the spawning turn ends, so a `wait: true` poll
 	 *   stops instead of watching a child for a caller that has gone.
@@ -1270,6 +1294,10 @@ export function createAgentControlService({
 		if (spawnDenied) {
 			return spawnDenied;
 		}
+		const modeDenied = spawnModeDenial(origin, args);
+		if (modeDenied) {
+			return fail('invalid-args', modeDenied);
+		}
 		const asPeer = args.peer === true;
 		let releasePeerSlot: (() => void) | null = null;
 		if (asPeer) {
@@ -1297,8 +1325,15 @@ export function createAgentControlService({
 				callerModel,
 				callerRuntime: originRuntime(origin),
 				parentSessionId: origin.sessionId,
-				planMode: isPlanning(origin),
-				afkMode: isUnattended(origin),
+				// Unreachable defence today, and deliberately so: `spawnModeDenial`
+				// refuses both flags from every caller that inherits a mode, and the
+				// Concierge, which is the only one that may pass them, has no composer
+				// chip to inherit from — so the two operands are never both live. It is
+				// an OR rather than a coalesce so that a Concierge which later gains a
+				// mode of its own cannot open a child *less* restricted than itself; a
+				// coalesce would invert that the day such a chip lands.
+				planMode: isPlanning(origin) || args.planMode === true,
+				afkMode: isUnattended(origin) || args.afkMode === true,
 			})
 			.finally(() => releasePeerSlot?.());
 		if (!started.ok) {

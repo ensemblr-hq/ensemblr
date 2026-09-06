@@ -60,8 +60,10 @@ const spawnChatTabSchema = z.strictObject({
 // work that is deliberately not its own.
 const startConversationSchema = z
 	.strictObject({
+		afkMode: z.boolean().optional(),
 		chatTabId: nonEmpty.optional(),
 		peer: z.boolean().optional(),
+		planMode: z.boolean().optional(),
 		prompt: nonEmpty,
 		model: nonEmpty.optional(),
 		thinkingLevel: nonEmpty.optional(),
@@ -76,6 +78,24 @@ const startConversationSchema = z
 	.refine((args) => !args.peer || !args.wait, {
 		message:
 			'A peer is not a child to wait on — it is a root orchestrator with its own turn and its own user. Drop `wait`, and read its tab when it has something to say.',
+	})
+	// Refused rather than resolved in Plan Mode's favour, which is how the IPC
+	// path settles the same collision. There the sender is a stale window with no
+	// turn to be corrected in, so the safer flag has to win silently; here the
+	// sender is a model that can fix the call on its next turn, and a silent
+	// resolution would hand it a planning orchestrator when it asked for an
+	// unattended one.
+	.refine((args) => !(args.planMode && args.afkMode), {
+		message:
+			'`planMode` and `afkMode` are opposites: planning exists to stop and put a plan to the user, and AFK exists because nobody is there to read one. Pass whichever the user actually asked for — and only if you are the Concierge, since every other caller is refused both flags and its spawn inherits the mode it is running in.',
+	})
+	// The wait window cannot cover an unattended spawn, so this refuses rather
+	// than letting the caller discover it as a `timeout`. Same shape as the peer
+	// refinement above and the same reason: the spawn is deliberately not the
+	// caller's turn to hold open.
+	.refine((args) => !args.afkMode || !args.wait, {
+		message:
+			'An unattended conversation runs for hours — it plans the work, builds it, has it reviewed, fixes what came back, and opens a pull request — so no wait window covers it and `wait` would only time out. Brief it fully, drop `wait`, and read its tab or its last message when it has something to say.',
 	});
 
 const startReviewSchema = z.strictObject({

@@ -22,6 +22,8 @@ import type { AgentControlOp } from './contracts.ts';
 export const CANONICAL_ARG_KEYS = {
 	accountId:
 		'Identifier of one connected tracker account. Several can be connected at once, and an id from one is never valid in another.',
+	afkMode:
+		'Open a conversation unattended, because the user has said they are away.',
 	agentSessionId: 'Identifier of an agent conversation.',
 	ansi: 'Return raw terminal bytes with their escape sequences, not readable text.',
 	assigneeId: 'Identifier of the person an issue is assigned to.',
@@ -52,6 +54,8 @@ export const CANONICAL_ARG_KEYS = {
 	peer: 'Open a second root orchestrator in this workspace rather than a sub-agent.',
 	path: 'Filesystem path a guarded tool call is about to write.',
 	plan: 'Markdown plan handed to the user.',
+	planMode:
+		'Open a conversation planning, so it comes back with a plan for the user to approve.',
 	prNumber: 'Number of the pull request a tab is opened on.',
 	priority: "Urgency rank of a tracker issue, on the tracker's own scale.",
 	projectId: 'Identifier of a tracked git repository.',

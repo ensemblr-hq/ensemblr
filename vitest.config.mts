@@ -105,6 +105,7 @@ export default defineConfig({
 						'tests/main/concierge-runtime-choice.test.ts',
 						'tests/main/concierge-runtime-continuity.test.ts',
 						'tests/main/concierge-session-recovery.test.ts',
+						'tests/main/concierge-spawn-mode.test.ts',
 						'tests/main/concierge-spawn-role.test.ts',
 						'tests/main/concierge-tool-policy.test.ts',
 						'tests/main/dictation-service.test.ts',

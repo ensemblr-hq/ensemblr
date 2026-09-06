@@ -295,7 +295,7 @@ nor a chat tab of its own).
 | Tool | Arguments | Gate | Withheld from |
 | --- | --- | --- | --- |
 | `ensemblr_spawn_chat_tab` | `title?: string` | write, spawn | sub-agent, Concierge |
-| `ensemblr_start_conversation` | **`prompt: string`**, `chatTabId?: string`, `model?: string`, `peer?: boolean`, `thinkingLevel?: string`, `title?: string`, `wait?: boolean`, `workspaceId?: string` | write, spawn | sub-agent |
+| `ensemblr_start_conversation` | **`prompt: string`**, `afkMode?: boolean`, `chatTabId?: string`, `model?: string`, `peer?: boolean`, `planMode?: boolean`, `thinkingLevel?: string`, `title?: string`, `wait?: boolean`, `workspaceId?: string` | write, spawn | sub-agent |
 | `ensemblr_send_follow_up` | **`agentSessionId: string`**, **`prompt: string`**, `wait?: boolean` | write | sub-agent |
 | `ensemblr_wait_for_agents` | `targets?: string[]`, `mode?: 'first' \| 'all'`, `reports?: 'full' \| 'brief'`, `timeoutMs?: number` | read | sub-agent\* |
 | `ensemblr_notify_orchestrator` | **`reason: 'need_decision' \| 'blocked' \| 'progress' \| 'done'`**, **`message: string`** | read | Concierge |
@@ -855,6 +855,24 @@ is only ever opened because the user asked for one, a premise that cannot hold
 while they are away, so it fails fast rather than putting two unsupervised
 writers on one worktree. See
 [ADR 0060](./adr/0060-let-a-chat-run-unattended.md).
+
+**AFK reaches a workspace two ways.** Every workspace agent passes its own mode
+down: a conversation an unattended agent opens is registered unattended before
+its first prompt is submitted, and so is the Review conversation `startReview`
+opens for it. The Concierge inherits nothing — it has no composer chip of its
+own — so it states the mode instead. `startConversation` takes `planMode` and
+`afkMode`, both refused from every other caller, and both OR-ed with whatever the
+caller already carries rather than coalesced. That OR is unreachable defence as
+the code stands — the gate refuses either flag from every caller that inherits,
+and the one caller allowed to pass them inherits nothing — and it is written that
+way so a Concierge which later grows a mode chip of its own cannot open a child
+*less* restricted than itself. A spawn stating both is refused,
+where the IPC path resolves the same collision in Plan Mode's favour — a stale
+window has no turn in which to be corrected and a model does, and a silent
+resolution would hand the Concierge a planning orchestrator when it asked for an
+unattended one. `afkMode` also refuses `wait`, for the reason `peer` does: the
+unattended loop runs for hours and `waitTimeoutMs` is five minutes, so every such
+wait would return `timeout` having said nothing.
 
 ### Not served over MCP
 

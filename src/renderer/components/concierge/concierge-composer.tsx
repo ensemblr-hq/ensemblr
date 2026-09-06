@@ -68,7 +68,10 @@ interface ConciergeComposerProps {
  *
  * Plan Mode is deliberately absent: the Concierge does not plan on anyone's
  * behalf; an orchestrator it spawns with `planMode: true` submits its own plan,
- * in the workspace the plan is about.
+ * in the workspace the plan is about. AFK is absent for the mirror reason —
+ * being away is a fact about the user rather than about this panel, and the
+ * Concierge carries it into the workspaces it delegates to by spawning with
+ * `afkMode: true` rather than by wearing a chip of its own.
  */
 export function ConciergeComposer({
 	centered,
