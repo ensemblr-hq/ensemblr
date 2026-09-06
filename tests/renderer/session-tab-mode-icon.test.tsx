@@ -29,6 +29,14 @@ function chatTab(
 	};
 }
 
+/** Builds a spawned sub-agent's chat tab, which keeps its bot glyph under a mode. */
+function subAgentTab(
+	id: string,
+	status: SessionTabModel['status'] = 'idle',
+): SessionTabModel {
+	return { ...chatTab(id, status), isSubAgent: true };
+}
+
 /** Builds a harness terminal tab, the modeless kind the icon must skip. */
 function terminalTab(
 	id: string,
@@ -194,6 +202,74 @@ describe('session tab turn-mode icon', () => {
 
 		expect(modeIconIn(container, 'tab-terminal')).toBeNull();
 	});
+
+	test('a sub-agent keeps its bot glyph and takes the AFK tint', () => {
+		const store = createStore();
+		store.set(chatAfkModeAtomFamily('tab-sub-afk'), true);
+		const { container } = renderWithProviders(
+			stripFor(store, subAgentTab('tab-sub-afk')),
+		);
+
+		const icon = modeIconIn(container, 'tab-sub-afk');
+		expect(icon?.classList.contains('lucide-bot')).toBe(true);
+		expect(icon?.classList.contains('lucide-keyboard-off')).toBe(false);
+		expect(icon?.classList.contains('text-status-away')).toBe(true);
+		expect(icon?.getAttribute('data-session-tab-mode')).toBe('afk');
+	});
+
+	test('a sub-agent keeps its bot glyph and takes the planning tint', () => {
+		const store = createStore();
+		store.set(chatPlanModeAtomFamily('tab-sub-plan'), true);
+		const { container } = renderWithProviders(
+			stripFor(store, subAgentTab('tab-sub-plan')),
+		);
+
+		const icon = modeIconIn(container, 'tab-sub-plan');
+		expect(icon?.classList.contains('lucide-bot')).toBe(true);
+		expect(icon?.classList.contains('lucide-map')).toBe(false);
+		expect(icon?.classList.contains('text-accent-strong')).toBe(true);
+	});
+
+	test('a working sub-agent gets the tinted spinner, not a tinted bot', () => {
+		const store = createStore();
+		store.set(chatAfkModeAtomFamily('tab-sub-working'), true);
+		const { container } = renderWithProviders(
+			stripFor(store, subAgentTab('tab-sub-working', 'working')),
+		);
+
+		const icon = modeIconIn(container, 'tab-sub-working');
+		expect(icon?.classList.contains('animate-spin')).toBe(true);
+		expect(icon?.classList.contains('lucide-bot')).toBe(false);
+		expect(icon?.classList.contains('text-status-away')).toBe(true);
+	});
+
+	test('a modeless sub-agent keeps the plain untinted bot', () => {
+		const store = createStore();
+		const { container } = renderWithProviders(
+			stripFor(store, subAgentTab('tab-sub-plain')),
+		);
+
+		expect(modeIconIn(container, 'tab-sub-plain')).toBeNull();
+		const icon = container.querySelector(
+			'[data-tab-key="tab-sub-plain"] .lucide-bot',
+		);
+		expect(icon).not.toBeNull();
+		expect(icon?.classList.contains('text-status-away')).toBe(false);
+		expect(icon?.getAttribute('aria-hidden')).toBe('true');
+		expect(icon?.getAttribute('role')).toBeNull();
+	});
+
+	test('a top-level chat under the same mode still swaps its glyph', () => {
+		const store = createStore();
+		store.set(chatAfkModeAtomFamily('tab-root-afk'), true);
+		const { container } = renderWithProviders(
+			stripFor(store, chatTab('tab-root-afk')),
+		);
+
+		const icon = modeIconIn(container, 'tab-root-afk');
+		expect(icon?.classList.contains('lucide-keyboard-off')).toBe(true);
+		expect(icon?.classList.contains('lucide-bot')).toBe(false);
+	});
 });
 
 describe('session tab turn-mode icon accessible name', () => {
@@ -264,5 +340,17 @@ describe('session tab turn-mode icon accessible name', () => {
 			'[data-tab-key="tab-named-button"] button',
 		);
 		expect(button).toHaveAccessibleName('Planning tab-named-button');
+	});
+
+	test('a sub-agent announces its mode but not that it is a sub-agent', () => {
+		const store = createStore();
+		store.set(chatAfkModeAtomFamily('tab-sub-named'), true);
+		const { container } = renderWithProviders(
+			stripFor(store, subAgentTab('tab-sub-named')),
+		);
+
+		expect(
+			container.querySelector('[data-tab-key="tab-sub-named"] button'),
+		).toHaveAccessibleName('Unattended tab-sub-named');
 	});
 });

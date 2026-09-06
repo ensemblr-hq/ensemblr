@@ -44,7 +44,7 @@ const SESSION_TAB_MODE_ICONS = {
 	plan: { className: 'text-accent-strong', glyph: MapIcon },
 } as const;
 
-/** The turn modes a chat tab can advertise in place of its resting glyph. */
+/** The turn modes a chat tab can advertise. */
 type SessionTabMode = keyof typeof SESSION_TAB_MODE_ICONS;
 
 /** Props for a single reorderable session tab. */
@@ -345,13 +345,22 @@ function useSessionTabModeLabel(
 }
 
 /**
- * A chat tab's icon, which its turn mode replaces while one is on. A working
- * chat keeps its spinner and takes the mode's tint instead: an unattended run
- * spends most of its life working, so a glyph that won there would hide the run
- * and an untinted spinner would hide the mode. The spinner is rendered here for
- * both cases rather than delegated to {@link KindSessionTabIcon} for the
- * modeless one, so toggling a mode mid-run retints the same element instead of
- * swapping component types and restarting the spin.
+ * A chat tab's icon while a turn mode is on. The mode is always carried by the
+ * tint; it takes the glyph too only when the glyph has nothing better to say.
+ *
+ * A working chat keeps its spinner: an unattended run spends most of its life
+ * working, so a glyph that won there would hide the run and an untinted spinner
+ * would hide the mode. The spinner is rendered here for the modeless case as
+ * well, rather than delegated to {@link KindSessionTabIcon}, so toggling a mode
+ * mid-run retints the same element instead of swapping component types and
+ * restarting the spin.
+ *
+ * A sub-agent keeps its bot glyph for the same reason. Sub-agents inherit their
+ * parent's mode, so under an unattended or planning orchestrator every spawned
+ * tab carries one — and a strip whose every glyph had been replaced would no
+ * longer say which chat is the orchestrator and which are its children. Status
+ * still outranks identity, as it does in {@link KindSessionTabIcon}: a working
+ * sub-agent gets the tinted spinner rather than a tinted bot.
  *
  * A mode icon is deliberately **not** hidden from assistive tech, against the
  * usual rule for an icon inside a labelled control: it is the only carrier of
@@ -382,7 +391,8 @@ function ChatSessionTabIcon({ session }: { session: SessionTabModel }) {
 		return <KindSessionTabIcon session={session} />;
 	}
 
-	const { className, glyph: ModeIcon } = SESSION_TAB_MODE_ICONS[mode];
+	const { className, glyph } = SESSION_TAB_MODE_ICONS[mode];
+	const ModeIcon = session.isSubAgent ? BotIcon : glyph;
 	return (
 		<ModeIcon
 			aria-label={modeLabel}
