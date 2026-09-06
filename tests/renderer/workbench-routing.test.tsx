@@ -14,6 +14,10 @@ import {
 	loadWorkspaceIndexRoute,
 	loadWorkspaceWorkbenchRoute,
 } from '../../src/renderer/routing/workbench-route-loaders';
+import {
+	ACTIVE_CHAT_TAB_STORAGE_KEY,
+	SESSION_VISIT_ORDER_STORAGE_KEY,
+} from '../../src/renderer/state/workspace/selection-atoms';
 import type { WorkspaceRouteLoaderData } from '../../src/renderer/types/routing';
 import type { RepositoryWorkspaceNavigationSnapshot } from '../../src/shared/ipc';
 
@@ -164,14 +168,37 @@ async function loadDefaultWorkspaceRouteData(): Promise<WorkspaceRouteLoaderData
 	return workspaceData;
 }
 
+/**
+ * Installs a key-aware `localStorage` holding the persisted workspace state the
+ * loaders read, so a test can say what the app remembered without stubbing a
+ * getter that answers every key with the same value.
+ */
+function stubStoredWorkspaceState(entries: Record<string, unknown>): void {
+	Object.defineProperty(globalThis, 'window', {
+		configurable: true,
+		value: {
+			localStorage: {
+				getItem: (key: string) =>
+					key in entries ? JSON.stringify(entries[key]) : null,
+			},
+		},
+	});
+}
+
 async function catchWorkspaceIndexRouteRedirect({
 	rawSearch = {},
 	search = normalizeWorkbenchSearch(rawSearch),
+	storedState,
 }: {
 	rawSearch?: Record<string, unknown>;
 	search?: ReturnType<typeof normalizeWorkbenchSearch>;
+	storedState?: Record<string, unknown>;
 }) {
 	const workspaceData = await loadDefaultWorkspaceRouteData();
+
+	if (storedState) {
+		stubStoredWorkspaceState(storedState);
+	}
 
 	try {
 		await loadWorkspaceIndexRoute({
@@ -489,6 +516,76 @@ test('redirects workspace index routes to the default chat route', async () => {
 			review: 'checks',
 		},
 		to: '/projects/$projectId/workspaces/$workspaceId/chats/$chatId',
+	});
+});
+
+test('re-enters a workspace on the chat tab it was last on', async () => {
+	const redirectOptions = await catchWorkspaceIndexRouteRedirect({
+		storedState: {
+			[ACTIVE_CHAT_TAB_STORAGE_KEY]: {
+				'san-antonio': 'chat-tab-from-database',
+			},
+		},
+	});
+
+	expect(redirectOptions).toMatchObject({
+		params: {
+			chatId: 'chat-tab-from-database',
+			projectId: 'ensemblr',
+			workspaceId: 'san-antonio',
+		},
+	});
+});
+
+test('re-enters on the most recent visit when no tab is remembered', async () => {
+	const redirectOptions = await catchWorkspaceIndexRouteRedirect({
+		storedState: {
+			[SESSION_VISIT_ORDER_STORAGE_KEY]: {
+				'san-antonio': ['visited-recently', 'visited-before'],
+			},
+		},
+	});
+
+	expect(redirectOptions).toMatchObject({
+		params: {
+			chatId: 'visited-recently',
+			projectId: 'ensemblr',
+			workspaceId: 'san-antonio',
+		},
+	});
+});
+
+// An empty id is not nullish, so keeping one would redirect to a chat route
+// with no chat id rather than falling through to the next candidate.
+test('skips empty ids in a corrupt visit order', async () => {
+	const redirectOptions = await catchWorkspaceIndexRouteRedirect({
+		storedState: {
+			[SESSION_VISIT_ORDER_STORAGE_KEY]: {
+				'san-antonio': ['', 'visited-recently'],
+			},
+		},
+	});
+
+	expect(redirectOptions).toMatchObject({
+		params: {
+			chatId: 'visited-recently',
+			projectId: 'ensemblr',
+			workspaceId: 'san-antonio',
+		},
+	});
+});
+
+test('re-enters on the placeholder session when nothing is remembered', async () => {
+	const redirectOptions = await catchWorkspaceIndexRouteRedirect({
+		storedState: { [ACTIVE_CHAT_TAB_STORAGE_KEY]: { elsewhere: 'other-tab' } },
+	});
+
+	expect(redirectOptions).toMatchObject({
+		params: {
+			chatId: 'review-shell',
+			projectId: 'ensemblr',
+			workspaceId: 'san-antonio',
+		},
 	});
 });
 

@@ -23,14 +23,27 @@ export const lastWorkspaceSelectionAtom = atomWithStorage<{
 	workspaceStorageOptions,
 );
 
+/** localStorage key for the per-workspace chat-tab visit order. */
+export const SESSION_VISIT_ORDER_STORAGE_KEY =
+	'ensemblr_workspace_session_visit_order_by_workspace';
+
 /**
- * Chat tabs visited this run, most recent first, keyed by workspace id. Drives
- * where the strip lands when the active tab closes. In-memory on purpose: a
- * fresh app run has no back-track to honour and falls back to the neighbor rule.
+ * Chat tabs visited, most recent first, keyed by workspace id. Drives where the
+ * strip lands when the active tab closes, and which tab a workspace re-opens on
+ * when the one it remembers is gone.
+ *
+ * Persisted, and capped per workspace by `recordTabVisit`. An in-memory chain
+ * meant every restart re-entered a workspace with no back-track to honour, so
+ * the first close of the run fell through to the neighbour rule — the strip
+ * sliding sideways rather than walking back the way the user came.
  */
-export const sessionVisitOrderByWorkspaceAtom = atom<Record<string, string[]>>(
-	{},
-);
+export const sessionVisitOrderByWorkspaceAtom = atomWithStorage<
+	Record<string, string[]>
+>(SESSION_VISIT_ORDER_STORAGE_KEY, {}, undefined, workspaceStorageOptions);
+
+/** localStorage key for the per-workspace last-active chat tab. */
+export const ACTIVE_CHAT_TAB_STORAGE_KEY =
+	'ensemblr_workspace_active_chat_tab_by_workspace';
 
 /**
  * Persisted id of the tab each workspace was last on, so re-entering it lands
@@ -41,9 +54,4 @@ export const sessionVisitOrderByWorkspaceAtom = atom<Record<string, string[]>>(
  */
 export const activeChatTabByWorkspaceAtom = atomWithStorage<
 	Record<string, string>
->(
-	'ensemblr_workspace_active_chat_tab_by_workspace',
-	{},
-	undefined,
-	workspaceStorageOptions,
-);
+>(ACTIVE_CHAT_TAB_STORAGE_KEY, {}, undefined, workspaceStorageOptions);

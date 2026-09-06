@@ -15,6 +15,7 @@ import {
 	pinnedWorkspaceIdsAtom,
 	rightSidebarCollapsedAtom,
 	rightSidebarSizePercentAtom,
+	sessionVisitOrderByWorkspaceAtom,
 } from '../../src/renderer/state/workspace';
 
 const STORAGE_KEYS = {
@@ -29,6 +30,8 @@ const STORAGE_KEYS = {
 	pinnedWorkspaceIds: 'ensemblr_workspace_pinned_workspace_ids',
 	rightSidebarCollapsed: 'ensemblr_workspace_right_sidebar_collapsed',
 	rightSidebarSizePercent: 'ensemblr_workspace_right_sidebar_size_percent',
+	sessionVisitOrderByWorkspace:
+		'ensemblr_workspace_session_visit_order_by_workspace',
 };
 
 class MemoryStorage implements Storage {
@@ -109,6 +112,9 @@ test('hydrates workspace navigation atoms from localStorage when mounted', () =>
 		[STORAGE_KEYS.pinnedWorkspaceIds]: JSON.stringify(['workspace-a']),
 		[STORAGE_KEYS.rightSidebarCollapsed]: JSON.stringify(true),
 		[STORAGE_KEYS.rightSidebarSizePercent]: JSON.stringify(48),
+		[STORAGE_KEYS.sessionVisitOrderByWorkspace]: JSON.stringify({
+			'workspace-a': ['session-a', 'session-b'],
+		}),
 	});
 
 	const store = createStore();
@@ -123,6 +129,7 @@ test('hydrates workspace navigation atoms from localStorage when mounted', () =>
 		store.sub(pinnedWorkspaceIdsAtom, () => undefined),
 		store.sub(rightSidebarCollapsedAtom, () => undefined),
 		store.sub(rightSidebarSizePercentAtom, () => undefined),
+		store.sub(sessionVisitOrderByWorkspaceAtom, () => undefined),
 	];
 
 	try {
@@ -148,6 +155,9 @@ test('hydrates workspace navigation atoms from localStorage when mounted', () =>
 		expect(store.get(pinnedWorkspaceIdsAtom)).toEqual(['workspace-a']);
 		expect(store.get(rightSidebarCollapsedAtom)).toBe(true);
 		expect(store.get(rightSidebarSizePercentAtom)).toBe(48);
+		expect(store.get(sessionVisitOrderByWorkspaceAtom)).toEqual({
+			'workspace-a': ['session-a', 'session-b'],
+		});
 	} finally {
 		for (const unsubscribe of unsubscribes) {
 			unsubscribe();
@@ -172,6 +182,9 @@ test('writes workspace navigation atom changes to localStorage', () => {
 	store.set(pinnedWorkspaceIdsAtom, ['workspace-b']);
 	store.set(rightSidebarCollapsedAtom, true);
 	store.set(rightSidebarSizePercentAtom, 52);
+	store.set(sessionVisitOrderByWorkspaceAtom, {
+		'workspace-b': ['session-b', 'session-a'],
+	});
 
 	expect(storage.getItem(STORAGE_KEYS.activeChatTabByWorkspace)).toBe(
 		JSON.stringify({ 'workspace-b': 'session-b' }),
@@ -205,6 +218,9 @@ test('writes workspace navigation atom changes to localStorage', () => {
 	);
 	expect(storage.getItem(STORAGE_KEYS.rightSidebarSizePercent)).toBe(
 		JSON.stringify(52),
+	);
+	expect(storage.getItem(STORAGE_KEYS.sessionVisitOrderByWorkspace)).toBe(
+		JSON.stringify({ 'workspace-b': ['session-b', 'session-a'] }),
 	);
 });
 
@@ -289,4 +305,18 @@ test('resolves the remembered chat tab per workspace', () => {
 			workspace,
 		}),
 	).toBe(firstSession.id);
+	expect(
+		getPreferredChatId({
+			chatTabsByWorkspace: {},
+			visitOrder: ['visited-recently', 'visited-before'],
+			workspace,
+		}),
+	).toBe('visited-recently');
+	expect(
+		getPreferredChatId({
+			chatTabsByWorkspace: { [workspace.id]: secondSession.id },
+			visitOrder: ['visited-recently'],
+			workspace,
+		}),
+	).toBe(secondSession.id);
 });

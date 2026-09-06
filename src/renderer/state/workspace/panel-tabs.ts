@@ -232,24 +232,35 @@ export function getPreferredDockTab({
 }
 
 /**
- * Picks the chat tab id to route to, preferring URL, then persisted tab id,
- * then the workspace's preferred fixture session.
- * @param input - Persisted prefs, URL override and workspace.
+ * Picks the chat tab id to route to, preferring the URL, then the persisted tab
+ * id, then the most recently visited tab, then the workspace's placeholder
+ * session.
+ *
+ * The visit fallback covers a workspace that has been visited but whose
+ * remembered tab was dropped — an eviction pass, a hand-edited store — where
+ * falling straight through to the placeholder would open it on its first tab.
+ * Nothing here can check the ids against live tab rows: the caller is a sidebar
+ * link or a cross-workspace jump, and the destination's rows are not loaded.
+ * `useChatRouteRepair` settles a stale id once they are.
+ * @param input - Persisted prefs, URL override, visit history and workspace.
  * @returns The chosen chat tab id.
  */
 export function getPreferredChatId({
 	chatTabsByWorkspace,
 	routeChatId,
+	visitOrder,
 	workspace,
 }: {
 	chatTabsByWorkspace: ChatTabPreferences;
 	routeChatId?: string;
+	visitOrder?: readonly string[];
 	workspace: WorkspaceShellModel;
 }) {
 	const storedChatId = chatTabsByWorkspace[workspace.id];
 	const preferredChatId =
 		routeChatId ??
-		(typeof storedChatId === 'string' ? storedChatId : undefined);
+		(typeof storedChatId === 'string' ? storedChatId : undefined) ??
+		visitOrder?.[0];
 
 	return preferredChatId ?? getPreferredSession(workspace).id;
 }

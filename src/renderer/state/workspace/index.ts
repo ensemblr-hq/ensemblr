@@ -1,3 +1,4 @@
+export { resolveChatRouteRepair } from './active-chat-route-repair';
 export type {
 	BoardCardSource,
 	BoardFilters,
@@ -62,7 +63,11 @@ export {
 	lastWorkspaceSelectionAtom,
 	sessionVisitOrderByWorkspaceAtom,
 } from './selection-atoms';
-export { readStoredWorkspaceSelection } from './selection-storage';
+export {
+	readStoredActiveChatTabId,
+	readStoredSessionVisitOrder,
+	readStoredWorkspaceSelection,
+} from './selection-storage';
 export { resolveRunningCloseTarget } from './session-tab-close';
 export { shouldSelectOnTabClick } from './session-tab-select';
 export { basenameOf } from './session-tab-titles';

@@ -32,6 +32,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `ensemblr_linear_list_issues` search enforced as a precondition on the first
   create in a conversation, because nothing here can delete a duplicate.
 
+### Fixed
+
+- **A workspace re-opens on the tab it was on, and closing one walks back the way
+  you came.** Three faults compounded into the same symptom. The route loaders
+  redirected to a synthetic placeholder chat id rather than the remembered tab,
+  so launching — or hopping back through Welcome after another workspace was
+  archived or deleted — always re-entered a workspace on its first tab. A routed
+  chat id that named no open tab was then never repaired: the shell rendered the
+  first tab while the URL kept the dead id, and because both the per-workspace
+  tab memory and the visit chain are written from the *resolved* id, neither was
+  written at all for as long as the URL was wrong. And the visit chain was
+  in-memory, so every restart re-entered a workspace with no back-track to
+  honour and the first close of the run slid sideways along the strip instead.
+  The loaders now redirect to the remembered tab, a stale routed id is replaced
+  with the most recent still-open tab once the rows land — which also covers a
+  tab closed by an agent or by a second window — and the chain is persisted.
+
 ## [0.1.3] - 2026-09-05
 
 **Every workspace can carry an architecture diagram, and the guide finally shows the app at its own

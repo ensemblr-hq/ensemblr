@@ -9,6 +9,8 @@ import {
 } from '@/renderer/lib/workbench';
 import {
 	getUnavailableWorkspaceIds,
+	readStoredActiveChatTabId,
+	readStoredSessionVisitOrder,
 	readStoredWorkspaceSelection,
 } from '@/renderer/state/workspace';
 import type {
@@ -21,6 +23,7 @@ import type {
 import type {
 	ProjectShellModel,
 	WorkbenchRouteSearch,
+	WorkspaceShellModel,
 } from '@/renderer/types/workbench';
 import type { RepositoryWorkspaceNavigationSnapshot } from '@/shared/ipc/contracts/repository-navigation';
 
@@ -344,7 +347,7 @@ async function resolveLaunchProjects({
 }
 
 /**
- * Loader for the workspace index route — redirects to the preferred chat.
+ * Loader for the workspace index route — redirects to the remembered chat.
  * @param input - Parent match, URL params, canonical search.
  */
 export async function loadWorkspaceIndexRoute({
@@ -364,11 +367,41 @@ export async function loadWorkspaceIndexRoute({
 	}
 
 	throw redirectToWorkspaceChat({
-		chatId: getPreferredSession(workspaceData.workspace).id,
+		chatId: resolveRememberedChatId(workspaceData.workspace),
 		projectId: params.projectId,
 		search,
 		workspaceId: params.workspaceId,
 	});
+}
+
+/**
+ * Picks the chat tab a workspace should re-open on, from the memories persisted
+ * for it: the tab it was last on, else the most recent one in its visit chain.
+ *
+ * Falls back to the synthetic `<workspaceId>:overview` placeholder only for a
+ * workspace nothing is remembered about. Redirecting to that placeholder
+ * unconditionally — which is what these loaders used to do — is why launching,
+ * or hopping back through Welcome after another workspace was archived or
+ * deleted, re-entered a workspace on its first tab whatever it had been showing.
+ *
+ * Neither memory is verified against the workspace's live tab rows: those are
+ * database-backed and this runs before the shell has queried them. A stale id is
+ * repaired by `useChatRouteRepair` once the rows land, which the shell needs
+ * regardless for tabs closed by an agent or by a second window.
+ * @param workspace - The workspace being entered
+ * @returns The chat tab id to route to
+ */
+function resolveRememberedChatId(workspace: WorkspaceShellModel): string {
+	const rememberedChatId = readStoredActiveChatTabId(workspace.id);
+
+	if (rememberedChatId) {
+		return rememberedChatId;
+	}
+
+	return (
+		readStoredSessionVisitOrder(workspace.id)[0] ??
+		getPreferredSession(workspace).id
+	);
 }
 
 /**
@@ -430,7 +463,7 @@ function redirectToWorkspaceSelection(
 ) {
 	return redirect({
 		params: {
-			chatId: getPreferredSession(selection.workspace).id,
+			chatId: resolveRememberedChatId(selection.workspace),
 			projectId: selection.project.id,
 			workspaceId: selection.workspace.id,
 		},

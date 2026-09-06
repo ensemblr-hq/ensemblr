@@ -8,6 +8,7 @@ import { useSetupDiagnostics } from '@/renderer/components/workbench-shell/shell
 import { WorkspaceWorkbenchContent } from '@/renderer/components/workbench-shell/workspace-content';
 import { useAskAgentSetupScript } from '@/renderer/hooks/workbench-shell/composer/use-ask-agent-setup-script';
 import { useAgentControlFocus } from '@/renderer/hooks/workbench-shell/route-layout/use-agent-control-focus';
+import { useChatRouteRepair } from '@/renderer/hooks/workbench-shell/route-layout/use-chat-route-repair';
 import { useGuardedSessionClose } from '@/renderer/hooks/workbench-shell/route-layout/use-guarded-session-close';
 import { useLiveWorkspaceModel } from '@/renderer/hooks/workbench-shell/route-layout/use-live-workspace-model';
 import {
@@ -82,6 +83,20 @@ export function WorkspaceRouteContent({
 		onSessionTabChange: handleSessionTabChange,
 	});
 	const activeSession = sessionNavigation.effectiveActiveSession;
+	// A routed chat id naming no open tab of this workspace is routine: the
+	// loaders redirect to the placeholder id, and an agent or a second window can
+	// close the tab out from under the URL. Repairing it is what keeps the memory
+	// and the visit chain being written at all — both are sourced from
+	// `resolvedActiveChatId`, which stays null for as long as the URL is wrong.
+	useChatRouteRepair({
+		hasSettledTabList: sessionNavigation.hasSettledTabList,
+		projectId: activeProject.id,
+		resolvedChatId: sessionNavigation.resolvedActiveChatId,
+		routedChatId: chatId,
+		search,
+		sessionTabs: sessionNavigation.sessionTabs,
+		workspaceId: activeWorkspace.id,
+	});
 	const terminalSessions = useWorkspaceTerminalSessions(activeWorkspace.id);
 	const { data: settingsResolution } = useQuery(
 		settingsResolutionQuery({
