@@ -1,4 +1,5 @@
 import type { WindowMaximizedBroadcast } from '@/shared/ipc/contracts/repository-navigation';
+import type { WindowChromeSnapshot } from '@/shared/window-chrome';
 
 import { getEnsemblrApiOrNull } from './query-keys';
 
@@ -30,6 +31,18 @@ export async function toggleMaximizeWindow(): Promise<boolean> {
  */
 export async function relaunchApp(): Promise<void> {
 	await getEnsemblrApiOrNull()?.relaunchApp();
+}
+
+/**
+ * Subscribes to the chrome the live window wears, which full screen changes
+ * under the shell.
+ * @param listener - Called with each new snapshot.
+ * @returns An unsubscribe function; a no-op without the preload bridge.
+ */
+export function onWindowChromeChanged(
+	listener: (snapshot: WindowChromeSnapshot) => void,
+): () => void {
+	return getEnsemblrApiOrNull()?.onWindowChromeChanged(listener) ?? (() => {});
 }
 
 /**

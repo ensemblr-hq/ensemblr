@@ -102,6 +102,7 @@ import { createQuitCoordinator } from './app/quit-coordinator';
 import { createQuitGuard } from './app/quit-guard';
 import { resolveUserDataDirectory } from './app/user-data-location';
 import { resolveWindowBackgroundColor } from './app/window-background';
+import { trackWindowChrome } from './app/window-chrome';
 import { createMainWindowStateStore } from './app/window-state';
 import { createArchitectureService } from './architecture';
 import { createChatTabService } from './chat-tabs/chat-tab-service.ts';
@@ -1547,10 +1548,16 @@ const mainWindowStateStore = createMainWindowStateStore({
 });
 
 /**
- * The chrome the live window was constructed with. `titleBarStyle` is
- * construct-time, so this is the only honest answer for the renderer: reading
- * the setting again would report a preference the window predates, and the
- * shell would inset for a title bar that is not there.
+ * The chrome the live window currently wears. `titleBarStyle` is construct-time,
+ * so re-reading the setting would report a preference the window predates and
+ * the shell would inset for a title bar that is not there; full screen is the
+ * one part that does move while the window lives, and `trackWindowChrome`
+ * writes it back here as it pushes each new snapshot.
+ *
+ * One value for one window: every `openMainWindow` call site is guarded so at
+ * most one exists. A second would have to key this per window the way the
+ * bootstrap handler already resolves `maximized` from the sender, or a reload
+ * would be served the other window's full-screen state.
  */
 let activeWindowChrome = resolveWindowChrome(
 	process.platform,
@@ -1604,6 +1611,13 @@ function openMainWindow(): void {
 		windowStateStore: mainWindowStateStore,
 	});
 	trackWindowMaximizedState(window);
+	trackWindowChrome({
+		onResolved: (chrome) => {
+			activeWindowChrome = chrome;
+		},
+		titleBar: activeWindowChrome.titleBar,
+		window,
+	});
 	window.webContents.on('did-finish-load', () => {
 		for (const payload of askUserQuestionCoordinator.openAsks()) {
 			window.webContents.send(

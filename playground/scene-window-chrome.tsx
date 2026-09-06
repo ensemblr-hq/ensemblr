@@ -1,3 +1,4 @@
+import { useSetAtom } from 'jotai';
 import { useEffect } from 'react';
 
 import {
@@ -5,6 +6,8 @@ import {
 	WindowTitleBarSurface,
 } from '@/renderer/components/workbench-shell/window-controls';
 import { applyWindowChrome } from '@/renderer/lib/window-chrome';
+import { windowChromeAtom } from '@/renderer/state/window-chrome';
+import type { WindowChromeSnapshot } from '@/shared/window-chrome';
 import { resolveWindowChrome } from '@/shared/window-chrome';
 
 import { MENU_BAR_FIXTURE } from './menu-bar-fixtures.ts';
@@ -24,13 +27,25 @@ const BROWSER_CHROME = resolveWindowChrome('linux', 'system');
  * room a surface leaves for the control cluster is decided by CSS keyed on
  * `html.app-window-controls`, so a scene that only rendered the buttons would
  * show none of the reservations that actually matter.
+ *
+ * Writes the document and the atom together, as `WindowChromeSync` does in the
+ * app: the surfaces that branch on the chrome read the atom, so a scene that
+ * moved only the custom properties would leave them describing a different
+ * window from the one it is drawing.
  * @param isEnabled - Whether the scene wants the Linux chrome applied.
  */
 export function useSceneWindowChrome(isEnabled: boolean): void {
+	const setWindowChrome = useSetAtom(windowChromeAtom);
+
 	useEffect(() => {
-		applyWindowChrome(isEnabled ? LINUX_CUSTOM_CHROME : BROWSER_CHROME);
-		return () => applyWindowChrome(BROWSER_CHROME);
-	}, [isEnabled]);
+		const wear = (chrome: WindowChromeSnapshot): void => {
+			applyWindowChrome(chrome);
+			setWindowChrome(chrome);
+		};
+
+		wear(isEnabled ? LINUX_CUSTOM_CHROME : BROWSER_CHROME);
+		return () => wear(BROWSER_CHROME);
+	}, [isEnabled, setWindowChrome]);
 }
 
 /**

@@ -29,13 +29,36 @@ const INSET_CONTROLS_CLASS = 'inset-window-controls';
 const REM_IN_PX = 16;
 
 /**
- * Reads the chrome the main process actually constructed the window with. Falls
- * back to resolving it from the platform when the preload snapshot is missing —
- * a dev reload before the bridge is up, or a test harness — which errs toward
- * the macOS answer on macOS and no insets anywhere else.
- * @returns The window chrome for this session.
+ * The chrome `applyWindowChrome` last wrote to the document, replaced whole on
+ * each write rather than edited.
+ *
+ * Most of the chrome is fixed when the window is constructed, but full screen
+ * is not: macOS slides its traffic lights off the window there and main pushes
+ * a fresh snapshot. The preload bootstrap value is frozen for the page's
+ * lifetime, so a reader that trusted it would keep reporting a gutter for
+ * traffic lights that are no longer on the window.
+ *
+ * Lives as long as the module instance, which under Vitest means one test file:
+ * a file that applies chrome and then expects the bootstrap value back has to
+ * apply the one it expects rather than assume a clean slate.
+ */
+let appliedChrome: WindowChromeSnapshot | null = null;
+
+/**
+ * Reads the chrome the window currently wears — whatever `applyWindowChrome`
+ * last wrote, which main keeps current across full-screen transitions.
+ *
+ * Falls back to the preload bootstrap snapshot until the first write, and to
+ * resolving from the platform when that snapshot is missing too — a dev reload
+ * before the bridge is up, or a test harness — which errs toward the macOS
+ * answer on macOS and no insets anywhere else.
+ * @returns The window chrome as it stands.
  */
 export function readWindowChrome(): WindowChromeSnapshot {
+	if (appliedChrome) {
+		return appliedChrome;
+	}
+
 	const snapshot =
 		typeof window === 'undefined'
 			? undefined
@@ -45,28 +68,56 @@ export function readWindowChrome(): WindowChromeSnapshot {
 }
 
 /**
- * The same insets in pixels, for the floating surfaces that place themselves
- * against the viewport rather than inside the flow: a panel clamping its own
- * drag has a measured rectangle to compare against, not a CSS length.
+ * A snapshot's insets in pixels, for the surfaces that weigh them against a
+ * measured rectangle rather than against a CSS length: a maximized panel
+ * deciding whether it covers the corner the traffic lights sit in has a
+ * `DOMRect`, not a `rem`.
+ *
+ * Takes the snapshot rather than reading one, so a component that subscribes to
+ * `windowChromeAtom` converts the value it re-rendered on instead of reaching
+ * for a second source that may have moved since.
+ * @param chrome - The chrome to measure.
+ * @returns The leading and top insets, in pixels.
+ */
+export function windowChromeInsetsPx(chrome: WindowChromeSnapshot): {
+	start: number;
+	top: number;
+} {
+	return {
+		start: chrome.insets.start * REM_IN_PX,
+		top: chrome.insets.top * REM_IN_PX,
+	};
+}
+
+/**
+ * The same insets for the chrome the window currently wears, for callers
+ * outside React that have nothing to subscribe with. Tracks full screen along
+ * with {@link readWindowChrome}, so the leading inset falls to zero at the same
+ * moment the custom property does.
+ *
+ * `start` is the one that moves, and this is a plain read that never tells React
+ * so. A component branching on it needs {@link windowChromeInsetsPx} over
+ * `windowChromeAtom`; `top` is construct-time, so a drag clamp may read it here.
  * @returns The leading and top insets, in pixels.
  */
 export function readWindowChromeInsetsPx(): { start: number; top: number } {
-	const { insets } = readWindowChrome();
-
-	return { start: insets.start * REM_IN_PX, top: insets.top * REM_IN_PX };
+	return windowChromeInsetsPx(readWindowChrome());
 }
 
 /**
  * Writes the resolved insets onto the document element as CSS custom
  * properties, before React's first paint, so no toolbar renders at the wrong
- * offset and then jumps.
- * @param chrome - The chrome the window was constructed with.
+ * offset and then jumps. The snapshot it writes becomes the one
+ * {@link readWindowChrome} reports, so the properties and the readers cannot
+ * describe different windows.
+ * @param chrome - The chrome the window wears from now on.
  */
 export function applyWindowChrome(chrome: WindowChromeSnapshot): void {
 	if (typeof document === 'undefined') {
 		return;
 	}
 
+	appliedChrome = chrome;
 	const root = document.documentElement;
 	root.style.setProperty(INSET_START_PROPERTY, `${chrome.insets.start}rem`);
 	root.style.setProperty(INSET_TOP_PROPERTY, `${chrome.insets.top}rem`);

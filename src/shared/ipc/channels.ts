@@ -59,6 +59,7 @@ export const IPC_CHANNELS = {
 	closeWindow: 'ensemblr:close-window',
 	minimizeWindow: 'ensemblr:minimize-window',
 	toggleMaximizeWindow: 'ensemblr:toggle-maximize-window',
+	windowChromeChanged: 'ensemblr:window-chrome-changed',
 	windowMaximizedChanged: 'ensemblr:window-maximized-changed',
 	relaunchApp: 'ensemblr:relaunch-app',
 	cloneGithubRepositoryPrepare: 'ensemblr:clone-github-repository:prepare',

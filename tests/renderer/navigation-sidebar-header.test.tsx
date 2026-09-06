@@ -54,3 +54,16 @@ test('only macOS reserves the corner the wordmark would take', () => {
 	expect(resolveWindowChrome('linux', 'system').insets.start).toBe(0);
 	expect(resolveWindowChrome('linux', 'custom').insets.start).toBe(0);
 });
+
+test('macOS full screen frees the corner, so the wordmark takes it', () => {
+	expect(resolveWindowChrome('darwin', 'system', true).insets.start).toBe(0);
+});
+
+test('full screen leaves the title bar Ensemblr draws itself alone', () => {
+	const fullScreen = resolveWindowChrome('linux', 'custom', true);
+
+	expect(fullScreen.insets.top).toBe(
+		resolveWindowChrome('linux', 'custom').insets.top,
+	);
+	expect(fullScreen.drawsOwnControls).toBe(true);
+});

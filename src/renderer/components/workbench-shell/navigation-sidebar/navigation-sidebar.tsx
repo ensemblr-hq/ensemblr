@@ -14,10 +14,10 @@ import {
 	useSidebar,
 } from '@/renderer/components/ui/sidebar';
 import { useSetupDiagnosticsOptional } from '@/renderer/components/workbench-shell/shell-contexts';
-import { readWindowChrome } from '@/renderer/lib/window-chrome';
 import { healthTone } from '@/renderer/lib/workbench';
 import { developerModeAtom } from '@/renderer/state/preferences';
 import { navigationSidebarVisibleAtom } from '@/renderer/state/sidebar';
+import { windowChromeAtom } from '@/renderer/state/window-chrome';
 import type {
 	AddProjectActionId,
 	AddProjectMenuModel,
@@ -78,7 +78,7 @@ export function WorkspaceNavigationSidebar({
 	const [renameWorkspaceTarget, setRenameWorkspaceTarget] =
 		useState<WorkspaceShellModel | null>(null);
 	const developerMode = useAtomValue(developerModeAtom);
-	const windowChrome = readWindowChrome();
+	const windowChrome = useAtomValue(windowChromeAtom);
 	useReportSidebarVisible();
 	const queryClient = useQueryClient();
 	const prefetchIssues = useCallback(
