@@ -1904,6 +1904,13 @@ export function createAgentControlService({
 			);
 		}
 		guardrails.recordSpawn(origin.sessionId);
+		// A terminal an agent started is one the user is meant to watch, so bring it
+		// forward rather than leaving it behind whichever dock tab was already open.
+		ports.focus.focusDockTab({
+			workspaceId: origin.workspaceId,
+			dock:
+				args.kind === 'spawn' ? `terminal:${started.terminalId}` : args.kind,
+		});
 		return ok({ terminalId: started.terminalId });
 	};
 

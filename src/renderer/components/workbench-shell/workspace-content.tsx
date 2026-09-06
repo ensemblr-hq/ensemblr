@@ -234,6 +234,7 @@ export function WorkspaceWorkbenchContent({
 				},
 				actions: {
 					collapseRightSidebar: rightSidebar.collapseRightSidebar,
+					expandDockPanel: dock.expandDockPanel,
 					expandRightSidebar: rightSidebar.expandRightSidebar,
 					toggleDockPanel: dock.toggleDockPanel,
 					handleDockResize: dock.handleDockResize,

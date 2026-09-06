@@ -123,6 +123,34 @@ export function terminalSessionToDockStatus(
 }
 
 /**
+ * Names one terminal dock tab. A command running in the terminal wins over
+ * everything: the foreground process is what the tab is doing right now, and it
+ * clears the moment the command finishes, so the tab falls back to its own name.
+ * That name is whatever the terminal was titled, or its number when nobody
+ * titled it — main leaves an unnamed session's `title` as an English stand-in,
+ * so the number is rendered here rather than travelling as text.
+ * @param session - The interactive session backing the tab.
+ * @param t - Translator bound to the active language.
+ * @returns The label to show on the tab.
+ */
+function terminalDockTabLabel(
+	session: TerminalSessionSnapshot,
+	t: TFunction,
+): string {
+	if (session.foregroundCommand) {
+		return session.foregroundCommand;
+	}
+	if (!session.titleIsDefault) {
+		return session.title;
+	}
+	return session.terminalNumber === null
+		? t('workbench:dock-tab.terminal.label', 'Terminal')
+		: t('workbench:dock-tab.terminal.numbered-label', 'Terminal {{number}}', {
+				number: session.terminalNumber,
+			});
+}
+
+/**
  * Builds the terminal dock tabs for the live interactive sessions of one
  * workspace. Script-kind sessions render in the fixed Setup/Run tabs and are
  * excluded here. With no interactive session the dock shows only Setup/Run and
@@ -147,9 +175,7 @@ export function mapTerminalSessionsToDockTabs({
 		tabs.push({
 			id: `terminal:${session.id}` as const,
 			kind: 'terminal',
-			label: session.titleIsDefault
-				? t('workbench:dock-tab.terminal.label', 'Terminal')
-				: session.title,
+			label: terminalDockTabLabel(session, t),
 			sessionStatus: session.status,
 			status:
 				session.status === 'running' && activeTerminalIds.has(session.id)

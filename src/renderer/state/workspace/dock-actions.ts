@@ -11,7 +11,10 @@ import {
 } from '@/renderer/api/ensemblr/workspace-scripts';
 import { failureDetail, failureText } from '@/renderer/lib/failure-text';
 import { lastRunScriptAtomFamily } from '@/renderer/state/preferences';
-import { useProvideDockTerminal } from '@/renderer/state/workspace/terminal-requests';
+import {
+	useExpandDockPanel,
+	useProvideDockTerminal,
+} from '@/renderer/state/workspace/terminal-requests';
 import type { WorkbenchRouteSearch } from '@/renderer/types/workbench';
 import type { WorkbenchDockActions } from '@/renderer/types/workbench-shell';
 import type {
@@ -65,6 +68,7 @@ export function useWorkspaceDockActions({
 }: UseWorkspaceDockActionsOptions): WorkbenchDockActions {
 	const navigate = useNavigate();
 	const { t } = useTranslation();
+	const expandDockPanel = useExpandDockPanel();
 	const setLastRunScript = useSetAtom(lastRunScriptAtomFamily(workspaceId));
 	const askAgentSetupScriptRef = useRef(askAgentSetupScript);
 	const updateSearchRef = useRef(updateSearch);
@@ -78,9 +82,10 @@ export function useWorkspaceDockActions({
 	});
 
 	/**
-	 * Spawns a dock terminal and focuses its tab, reporting a failed spawn as a
-	 * toast. Backs both the dock's own "New terminal" action and the requests
-	 * other surfaces queue when they need a real TTY.
+	 * Spawns a dock terminal, focuses its tab, and opens the terminal area if the
+	 * user has it collapsed — selecting a tab nobody can see is not opening one.
+	 * Reports a failed spawn as a toast. Backs both the dock's own "New terminal"
+	 * action and the requests other surfaces queue when they need a real TTY.
 	 * @param options - Command to run and tab title; omitted for a login shell.
 	 */
 	const openTerminal = useCallback(
@@ -89,6 +94,7 @@ export function useWorkspaceDockActions({
 				.then((result) => {
 					if (result.session) {
 						updateSearchRef.current({ dock: `terminal:${result.session.id}` });
+						expandDockPanel(workspaceId);
 						return;
 					}
 
@@ -112,7 +118,7 @@ export function useWorkspaceDockActions({
 					);
 				});
 		},
-		[createTerminal, t],
+		[createTerminal, expandDockPanel, t, workspaceId],
 	);
 	useProvideDockTerminal(workspaceId, openTerminal);
 

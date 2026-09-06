@@ -15,6 +15,8 @@ export interface WorkbenchLayoutContextValue {
 	};
 	actions: {
 		collapseRightSidebar: () => void;
+		/** Opens the dock without collapsing it again when it is already open. */
+		expandDockPanel: () => void;
 		expandRightSidebar: () => void;
 		toggleDockPanel: () => void;
 		handleDockResize: (isCollapsed: boolean) => void;

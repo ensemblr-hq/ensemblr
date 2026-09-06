@@ -11,6 +11,13 @@ import * as nodePty from 'node-pty';
 
 /** One live pseudo-terminal process. */
 export interface PtyProcess {
+	/**
+	 * Name of the process currently holding the PTY's foreground process group —
+	 * the shell's own name while nothing is running, the command's while one is.
+	 * Optional: reporting it is a backend capability rather than part of running a
+	 * terminal, and a backend that cannot simply leaves the dock tab unlabelled.
+	 */
+	foregroundProcess?: () => string | null;
 	kill: (signal?: string) => void;
 	onData: (listener: (data: string) => void) => { dispose: () => void };
 	onExit: (
@@ -59,6 +66,22 @@ function isolateListener<TEvent>(
 }
 
 /**
+ * Reads node-pty's foreground process name without letting a torn-down PTY
+ * throw at the caller. The getter reaches into the file descriptor, which a
+ * child that has just exited may already have closed, and a poll must not be
+ * able to take the terminal service down with it.
+ * @param pty - The live node-pty terminal.
+ * @returns The foreground process name, or null when it cannot be read.
+ */
+function readForegroundProcess(pty: nodePty.IPty): string | null {
+	try {
+		return pty.process || null;
+	} catch {
+		return null;
+	}
+}
+
+/**
  * Builds the production backend backed by node-pty.
  * @returns A node-pty backed {@link PtyBackend}.
  */
@@ -75,6 +98,7 @@ export function createNodePtyBackend(): PtyBackend {
 			});
 
 			return {
+				foregroundProcess: () => readForegroundProcess(pty),
 				kill: (signal) => pty.kill(signal),
 				onData: (listener) => pty.onData(isolateListener(listener)),
 				onExit: (listener) => pty.onExit(isolateListener(listener)),

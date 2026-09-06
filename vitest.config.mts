@@ -186,6 +186,7 @@ export default defineConfig({
 						'tests/main/workspace-pr-sweeper.test.ts',
 						'tests/main/sweepable-workspaces.test.ts',
 						'tests/main/terminal-scrollback-text.test.ts',
+						'tests/main/terminal-tab-naming.test.ts',
 						'tests/main/agent-control-service.test.ts',
 						'tests/main/agent-control-guardrails.test.ts',
 						'tests/main/agent-control-origin-registry.test.ts',

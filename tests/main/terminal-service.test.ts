@@ -104,11 +104,12 @@ function createWorkspaceEnvironmentStub(
 }
 
 /** Controllable fake PTY for unit-style service tests. */
-function createFakePty(): {
+function createFakePty(foregroundProcessName = 'zsh'): {
 	pty: PtyProcess;
 	emitData: (data: string) => void;
 	emitExit: (exitCode: number) => void;
 	killSignals: string[];
+	setForegroundProcess: (name: string) => void;
 	writes: string[];
 	resizes: Array<{ cols: number; rows: number }>;
 } {
@@ -117,6 +118,7 @@ function createFakePty(): {
 	const killSignals: string[] = [];
 	const writes: string[] = [];
 	const resizes: Array<{ cols: number; rows: number }> = [];
+	let foreground = foregroundProcessName;
 
 	return {
 		emitData: (data) => {
@@ -130,7 +132,11 @@ function createFakePty(): {
 			}
 		},
 		killSignals,
+		setForegroundProcess: (name) => {
+			foreground = name;
+		},
 		pty: {
+			foregroundProcess: () => foreground,
 			kill: (signal) => {
 				killSignals.push(signal ?? 'SIGTERM');
 			},
@@ -174,6 +180,7 @@ function createServiceFixture(
 	{
 		backend,
 		cwd,
+		foregroundPollMs = 5,
 		killGraceMs = 50,
 		readConversationInfo = async () => ({
 			fullTitle: null,
@@ -184,6 +191,7 @@ function createServiceFixture(
 	}: {
 		backend: PtyBackend;
 		cwd?: string;
+		foregroundPollMs?: number;
 		killGraceMs?: number;
 		readConversationInfo?: (
 			source: SessionLogSource,
@@ -204,6 +212,7 @@ function createServiceFixture(
 	const service = createTerminalService({
 		backend,
 		databaseService: createDatabaseServiceStub(database),
+		foregroundPollMs,
 		killGraceMs,
 		now: () => NOW,
 		onAgentSessionCaptured: (input) => capturedAgentSessions.push(input),
@@ -221,6 +230,26 @@ function createServiceFixture(
 		outputEvents,
 		service,
 	};
+}
+
+/**
+ * Waits for a session's reported foreground command to settle on `expected`,
+ * so a test does not have to guess how many poll intervals that takes.
+ */
+async function waitForForegroundCommand(
+	service: ReturnType<typeof createTerminalService>,
+	terminalId: string,
+	expected: string | null,
+): Promise<void> {
+	for (let attempt = 0; attempt < 200; attempt += 1) {
+		if (
+			service.getSnapshot(terminalId).session?.foregroundCommand === expected
+		) {
+			return;
+		}
+		await new Promise((resolve) => setTimeout(resolve, 5));
+	}
+	assert.fail(`foreground command never became ${String(expected)}`);
 }
 
 /** A throwaway worktree root whose `.context` receives persisted output. */
@@ -257,6 +286,122 @@ test('create spawns a PTY in the workspace cwd with the assembled env', async (t
 	assert.deepEqual(spawnOptions.args, ['-l']);
 	assert.equal(spawnOptions.env.ENSEMBLR_WORKSPACE_NAME, 'monterrey');
 	assert.equal(spawnOptions.env.ENSEMBLR_PORT, '41000');
+});
+
+test('numbers interactive terminals and leaves script sessions unnumbered', async (t) => {
+	const fake = createFakePty();
+	const backend: PtyBackend = { spawn: () => fake.pty };
+	const { service } = createServiceFixture(t, { backend });
+
+	const first = await service.create({ workspaceId: WORKSPACE_ID });
+	const second = await service.create({ workspaceId: WORKSPACE_ID });
+	const script = await service.create({
+		command: 'npm run dev',
+		kind: 'run-script',
+		workspaceId: WORKSPACE_ID,
+	});
+
+	assert.equal(first.session?.terminalNumber, 1);
+	assert.equal(second.session?.terminalNumber, 2);
+	assert.equal(script.session?.terminalNumber, null);
+});
+
+// Closing a tab has to free its number, or a dock that has been open all day
+// reaches Terminal 47 — but a number must never move under a tab still on screen.
+test('reuses a closed terminal number without renumbering the live ones', async (t) => {
+	const fake = createFakePty();
+	const backend: PtyBackend = { spawn: () => fake.pty };
+	const { service } = createServiceFixture(t, { backend });
+
+	const first = await service.create({ workspaceId: WORKSPACE_ID });
+	const second = await service.create({ workspaceId: WORKSPACE_ID });
+	service.kill(first.session?.id ?? '');
+
+	const third = await service.create({ workspaceId: WORKSPACE_ID });
+
+	assert.equal(third.session?.terminalNumber, 1);
+	assert.equal(
+		service
+			.list(WORKSPACE_ID)
+			.find((session) => session.id === second.session?.id)?.terminalNumber,
+		2,
+	);
+});
+
+// A terminal whose shell exited on its own keeps its tab, and its number with
+// it — but closing that tab still has to free the number, or every `exit` the
+// user types costs one and the dock climbs away from Terminal 1 for good.
+test('frees the number of a terminal closed after its shell exited', async (t) => {
+	const fake = createFakePty();
+	const backend: PtyBackend = { spawn: () => fake.pty };
+	const { service } = createServiceFixture(t, { backend });
+
+	const first = await service.create({ workspaceId: WORKSPACE_ID });
+	fake.emitExit(0);
+	service.kill(first.session?.id ?? '');
+
+	const second = await service.create({ workspaceId: WORKSPACE_ID });
+
+	assert.equal(second.session?.terminalNumber, 1);
+});
+
+test('numbers each workspace independently', async (t) => {
+	const fake = createFakePty();
+	const backend: PtyBackend = { spawn: () => fake.pty };
+	const { service } = createServiceFixture(t, { backend });
+
+	await service.create({ workspaceId: WORKSPACE_ID });
+	const other = await service.create({ workspaceId: 'workspace-2' });
+
+	assert.equal(other.session?.terminalNumber, 1);
+});
+
+test('names the command a terminal is running and clears it when it finishes', async (t) => {
+	const fake = createFakePty(resolveUserShell());
+	const backend: PtyBackend = { spawn: () => fake.pty };
+	const { lifecycleEvents, service } = createServiceFixture(t, {
+		backend,
+		foregroundPollMs: 1,
+	});
+
+	const created = await service.create({ workspaceId: WORKSPACE_ID });
+	const terminalId = created.session?.id ?? '';
+	assert.equal(created.session?.foregroundCommand, null);
+
+	fake.setForegroundProcess('npm');
+	await waitForForegroundCommand(service, terminalId, 'npm');
+
+	fake.setForegroundProcess(resolveUserShell());
+	await waitForForegroundCommand(service, terminalId, null);
+
+	// Only the transitions broadcast; an unchanged poll must not re-render the
+	// whole tab strip every interval.
+	assert.equal(
+		lifecycleEvents.filter((event) => event.session.foregroundCommand === 'npm')
+			.length,
+		1,
+	);
+});
+
+test('clears the running command once the terminal exits', async (t) => {
+	const fake = createFakePty(resolveUserShell());
+	const backend: PtyBackend = { spawn: () => fake.pty };
+	const { service } = createServiceFixture(t, {
+		backend,
+		foregroundPollMs: 1,
+	});
+
+	const created = await service.create({ workspaceId: WORKSPACE_ID });
+	const terminalId = created.session?.id ?? '';
+	fake.setForegroundProcess('npm');
+	await waitForForegroundCommand(service, terminalId, 'npm');
+
+	fake.emitExit(0);
+
+	assert.equal(
+		service.getSnapshot(terminalId).session?.foregroundCommand,
+		null,
+	);
 });
 
 test('output streams broadcast and accumulate as scrollback', async (t) => {
@@ -775,6 +920,42 @@ test('scrollback buffer trims from the front past its limit', () => {
 	buffer.append('6789');
 
 	assert.equal(buffer.read(), '23456789');
+});
+
+// The fake backend cannot prove node-pty actually reports a foreground process,
+// which is the whole mechanism behind naming a tab after what it is running.
+test('integration: a real PTY reports the command it is running', async () => {
+	const integrationService = createTerminalService({
+		backend: createNodePtyBackend(),
+		databaseService: createDatabaseServiceStub(null),
+		foregroundPollMs: 25,
+		killGraceMs: 200,
+		onLifecycle: () => undefined,
+		onOutput: () => undefined,
+		workspaceEnvironmentService: createWorkspaceEnvironmentStub(),
+	});
+
+	const created = await integrationService.create({
+		command: 'sleep 5',
+		workspaceId: WORKSPACE_ID,
+	});
+	const terminalId = created.session?.id ?? '';
+
+	await waitFor(
+		() =>
+			integrationService.getSnapshot(terminalId).session?.foregroundCommand !==
+			null,
+	);
+
+	integrationService.kill(terminalId);
+	await waitFor(
+		() =>
+			integrationService.getSnapshot(terminalId).session?.status !== 'running',
+	);
+	assert.equal(
+		integrationService.getSnapshot(terminalId).session?.foregroundCommand,
+		null,
+	);
 });
 
 test('integration: real PTY runs a shell command, accepts input, and terminates', async () => {

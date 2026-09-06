@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef } from 'react';
 
 import { useAgentControlFocus } from '@/renderer/hooks/workbench-shell/route-layout/use-agent-control-focus';
 import { isDockTab } from '@/renderer/lib/workbench/route-search';
+import { useExpandDockPanel } from '@/renderer/state/workspace/terminal-requests';
 import type {
 	DockTabId,
 	ReviewPanelTab,
@@ -53,6 +54,7 @@ export function useWorkspaceRouteNavigation({
 	workspaceId: string;
 }): WorkspaceRouteNavigation {
 	const navigate = useNavigate();
+	const expandDockPanel = useExpandDockPanel();
 	// Two navigations in one tick are routine — revealing a file's directory
 	// switches to All files and then selects the preview's tab — and the second
 	// one reading this render's value would silently revert the first.
@@ -124,7 +126,9 @@ export function useWorkspaceRouteNavigation({
 	/**
 	 * Applies an agent-control focus request for the window showing this
 	 * workspace, ignoring requests targeting another workspace or carrying a dock
-	 * id that is not a valid {@link DockTabId} (the payload is agent-supplied).
+	 * id that is not a valid {@link DockTabId} (the payload is agent-supplied). A
+	 * dock request also reveals the terminal area, since selecting a tab behind a
+	 * collapsed dock or sidebar shows the user nothing.
 	 * @param payload - The focus request broadcast from the main process.
 	 */
 	const applyFocus = useCallback(
@@ -140,6 +144,7 @@ export function useWorkspaceRouteNavigation({
 			if (target.kind === 'dock') {
 				if (isDockTab(target.dock)) {
 					updateSearch({ dock: target.dock });
+					expandDockPanel(workspaceId);
 				}
 				return;
 			}
@@ -150,7 +155,7 @@ export function useWorkspaceRouteNavigation({
 				updateSearch({ review: target.panel });
 			}
 		},
-		[selectChatTab, updateSearch, workspaceId],
+		[expandDockPanel, selectChatTab, updateSearch, workspaceId],
 	);
 	useAgentControlFocus(applyFocus);
 

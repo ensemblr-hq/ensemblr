@@ -22,6 +22,7 @@ function createSession(
 		createdAt: '2026-06-11T00:00:00.000Z',
 		endedAt: null,
 		exitCode: null,
+		foregroundCommand: null,
 		harnessSessionId: null,
 		id: 'terminal-1',
 		kind: 'terminal',
@@ -30,6 +31,7 @@ function createSession(
 		rows: 24,
 		scriptName: null,
 		status: 'running',
+		terminalNumber: 1,
 		titleIsDefault: false,
 		title: 'Terminal',
 		workspaceId: 'workspace-1',
@@ -107,6 +109,55 @@ describe('mapTerminalSessionsToDockTabs', () => {
 		expect(tabs[0]?.status).toBe('idle');
 		expect(tabs[1]?.status).toBe('warning');
 		expect(tabs[1]?.sessionStatus).toBe('failed');
+	});
+
+	test('numbers unnamed terminals and leaves named ones alone', () => {
+		const tabs = mapTerminalSessionsToDockTabs({
+			sessions: [
+				createSession({ id: 'a', terminalNumber: 1, titleIsDefault: true }),
+				createSession({ id: 'b', terminalNumber: 3, titleIsDefault: true }),
+				createSession({ id: 'c', terminalNumber: 4, title: 'Deploy' }),
+			],
+			t: i18n.t,
+		});
+
+		expect(tabs.map((tab) => tab.label)).toEqual([
+			'Terminal 1',
+			'Terminal 3',
+			'Deploy',
+		]);
+	});
+
+	test('names the running command and reverts once it finishes', () => {
+		const running = mapTerminalSessionsToDockTabs({
+			sessions: [
+				createSession({
+					foregroundCommand: 'npm',
+					terminalNumber: 2,
+					titleIsDefault: true,
+				}),
+				createSession({
+					foregroundCommand: 'vim',
+					id: 'b',
+					terminalNumber: 3,
+					title: 'Deploy',
+				}),
+			],
+			t: i18n.t,
+		});
+		expect(running.map((tab) => tab.label)).toEqual(['npm', 'vim']);
+
+		const finished = mapTerminalSessionsToDockTabs({
+			sessions: [
+				createSession({
+					foregroundCommand: null,
+					terminalNumber: 2,
+					titleIsDefault: true,
+				}),
+			],
+			t: i18n.t,
+		});
+		expect(finished[0]?.label).toBe('Terminal 2');
 	});
 
 	test('shows recent interactive terminal output as activity', () => {
