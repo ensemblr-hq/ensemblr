@@ -25,6 +25,7 @@ import { repoSettingsOverrideAtomFamily } from '@/renderer/state/preferences';
 import { usePublishLiveReviewContext } from '@/renderer/state/review-launch';
 import { usePublishActiveChat } from '@/renderer/state/unread';
 import {
+	useChatRouteRepair,
 	useSessionTabState,
 	useWorkspacePanelTabState,
 } from '@/renderer/state/workspace';
@@ -82,6 +83,34 @@ export function WorkspaceRouteContent({
 		onSessionTabChange: handleSessionTabChange,
 	});
 	const activeSession = sessionNavigation.effectiveActiveSession;
+	// A routed chat id naming no open tab of this workspace is routine: the
+	// loaders redirect to the placeholder id, and an agent or a second window can
+	// close the tab out from under the URL. Repairing it is what keeps the memory
+	// and the visit chain being written at all — both are sourced from
+	// `resolvedActiveChatId`, which stays null for as long as the URL is wrong.
+	const replaceChatRoute = useCallback(
+		(nextChatId: string) => {
+			navigate({
+				params: {
+					chatId: nextChatId,
+					projectId: activeProject.id,
+					workspaceId: activeWorkspace.id,
+				},
+				replace: true,
+				search,
+				to: '/projects/$projectId/workspaces/$workspaceId/chats/$chatId',
+			});
+		},
+		[activeProject.id, activeWorkspace.id, navigate, search],
+	);
+	useChatRouteRepair({
+		hasSettledTabList: sessionNavigation.hasSettledTabList,
+		navigateToChat: replaceChatRoute,
+		resolvedChatId: sessionNavigation.resolvedActiveChatId,
+		routedChatId: chatId,
+		sessionTabs: sessionNavigation.sessionTabs,
+		workspaceId: activeWorkspace.id,
+	});
 	const terminalSessions = useWorkspaceTerminalSessions(activeWorkspace.id);
 	const { data: settingsResolution } = useQuery(
 		settingsResolutionQuery({

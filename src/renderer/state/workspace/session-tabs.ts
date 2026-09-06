@@ -70,6 +70,8 @@ export function useSessionTabState({
 	bootstrap?: boolean;
 	onSessionTabChange: (sessionId: string) => void;
 }): SessionTabState & {
+	/** True once the tab query has settled, so an unresolved routed id is really gone. */
+	hasSettledTabList: boolean;
 	/** True while the routed tab has no row in the list yet, so its session is unknown. */
 	isResolvingActiveSession: boolean;
 	/** The routed tab id once confirmed to be an open tab of this workspace, else null. */
@@ -365,6 +367,7 @@ export function useSessionTabState({
 		closeSessionTab,
 		closeSessionTabAsync,
 		effectiveActiveSession,
+		hasSettledTabList,
 		isResolvingActiveSession,
 		openArchitectureDiagramTab,
 		openCommentPreviewTab,

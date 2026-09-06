@@ -23,6 +23,7 @@ import {
 	getPreferredDockTab,
 	getPreferredReviewTab,
 	lastWorkspaceSelectionAtom,
+	sessionVisitOrderByWorkspaceAtom,
 } from '@/renderer/state/workspace';
 import type { NavigationContextValue } from '@/renderer/types/contexts';
 import type {
@@ -77,6 +78,9 @@ export function useWorkbenchNavigation({
 	const reviewTabsByWorkspace = useAtomValue(activeReviewTabByWorkspaceAtom);
 	const dockTabsByWorkspace = useAtomValue(activeDockTabByWorkspaceAtom);
 	const chatTabsByWorkspace = useAtomValue(activeChatTabByWorkspaceAtom);
+	const sessionVisitsByWorkspace = useAtomValue(
+		sessionVisitOrderByWorkspaceAtom,
+	);
 	const setCloneDialogOpen = useSetAtom(cloneDialogOpenAtom);
 	const setQuickStartDialogOpen = useSetAtom(quickStartDialogOpenAtom);
 
@@ -95,8 +99,12 @@ export function useWorkbenchNavigation({
 	);
 	const resolveWorkspaceChatId = useCallback(
 		(workspace: WorkspaceShellModel) =>
-			getPreferredChatId({ chatTabsByWorkspace, workspace }),
-		[chatTabsByWorkspace],
+			getPreferredChatId({
+				chatTabsByWorkspace,
+				visitOrder: sessionVisitsByWorkspace[workspace.id],
+				workspace,
+			}),
+		[chatTabsByWorkspace, sessionVisitsByWorkspace],
 	);
 	const { renderStaticLink, renderWorkspaceLink } =
 		useWorkbenchNavigationLinkRenderers({ resolveWorkspaceChatId });
