@@ -87,7 +87,7 @@ const makeDeps = (
 		broadcastPlanMode: vi.fn(),
 		broadcastTabsChanged: vi.fn(),
 		chatTabService: {
-			claimIdleChatTab: vi.fn(() => null),
+			claimPlaceholderChatTab: vi.fn(() => null),
 			closeTab: vi.fn(),
 			listTabs: vi.fn(),
 			openTab: vi.fn(() => tabs.open('tab-opened')),

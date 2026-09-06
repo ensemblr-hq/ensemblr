@@ -25,6 +25,11 @@ import {
 	setChatTabMetadata,
 } from '../storage/repositories/chat-tab-repository.ts';
 import {
+	isPlaceholderChatTab,
+	withoutPlaceholderFlag,
+	withPlaceholderFlag,
+} from './placeholder-chat-tab.ts';
+import {
 	canPreviewKind,
 	findPreviewSlot,
 	isPreviewTab,
@@ -71,11 +76,14 @@ export interface ChatTabService {
 		title?: string;
 	}) => { deleted: boolean };
 	/**
-	 * The workspace's first chat tab nobody has used yet, for a caller that would
-	 * otherwise open one beside it. Null when every open tab is named, carries a
-	 * conversation, or is not a chat.
+	 * Takes the workspace's placeholder chat tab, for a spawn that would otherwise
+	 * open one beside it, and releases the marker so nothing takes it twice. Null
+	 * when the workspace has no placeholder — including when the only blank chat
+	 * in the strip is one the user opened, which a spawn must never take.
 	 */
-	claimIdleChatTab: (input: { workspaceId: string }) => ChatTabRow | null;
+	claimPlaceholderChatTab: (input: {
+		workspaceId: string;
+	}) => ChatTabRow | null;
 	/**
 	 * Every tab of a workspace that has something to offer, newest summary first.
 	 * Open tabs are included, since a live chat's summary is rewritten at each turn
@@ -108,12 +116,23 @@ export interface ChatTabService {
 		kind?: ChatTabKind;
 		metadata?: Record<string, unknown>;
 		agentSessionId?: string | null;
+		/**
+		 * Opens the tab as the workspace's placeholder chat, which a spawned
+		 * conversation may take over. Ignored for every kind but `chat`.
+		 */
+		placeholder?: boolean;
 		/** Opens into the workspace's single ephemeral preview slot. */
 		preview?: boolean;
 		/** Blank opens the tab untitled; the renderer supplies the localized placeholder. */
 		title?: string;
 		workspaceId: string;
 	}) => ChatTabRow;
+	/**
+	 * Makes a tab permanent: it stops holding the ephemeral preview slot and stops
+	 * being a placeholder a spawned conversation may take over. Both markers say
+	 * "another open may have this tab", and any gesture that puts the user's own
+	 * work in it — pinning a preview, typing a draft — retires them.
+	 */
 	pinTab: (input: { chatTabId: string }) => ChatTabRow | null;
 	reorderTabs: (input: {
 		orderedIds: readonly string[];
@@ -222,12 +241,15 @@ export function createChatTabService({
 			}
 			return { deleted: false };
 		},
-		claimIdleChatTab: ({ workspaceId }) => {
+		claimPlaceholderChatTab: ({ workspaceId }) => {
 			const database = requireChatTabDatabase();
-			return (
-				listOpenForWorkspace({ database, workspaceId }).find(isIdleChatTab) ??
-				null
-			);
+			const placeholder = listOpenForWorkspace({
+				database,
+				workspaceId,
+			}).find(isClaimableChatTab);
+			return placeholder
+				? releasePlaceholder({ database, tab: placeholder })
+				: null;
 		},
 		listChatTabSummaries: ({ workspaceId }) => {
 			const database = requireChatTabDatabase();
@@ -257,6 +279,7 @@ export function createChatTabService({
 			kind = 'chat',
 			metadata,
 			agentSessionId,
+			placeholder = false,
 			preview = false,
 			title,
 			workspaceId,
@@ -265,6 +288,7 @@ export function createChatTabService({
 			const openTabs = listOpenForWorkspace({ database, workspaceId });
 			const resolvedTitle = title?.trim() || UNTITLED_TAB_TITLE;
 			const asPreview = preview && canPreviewKind(kind);
+			const asPlaceholder = placeholder && kind === 'chat';
 
 			if (kind !== 'chat') {
 				const reused = reuseOpenTab({
@@ -285,7 +309,11 @@ export function createChatTabService({
 				input: {
 					insertAfterChatTabId: insertAfterChatTabId ?? null,
 					kind,
-					metadata: asPreview ? withPreviewFlag(metadata) : metadata,
+					metadata: withEphemeralMarkers({
+						asPlaceholder,
+						asPreview,
+						metadata,
+					}),
 					agentSessionId: agentSessionId ?? null,
 					title: resolvedTitle,
 					workspaceId,
@@ -295,7 +323,7 @@ export function createChatTabService({
 		pinTab: ({ chatTabId }) => {
 			const database = requireChatTabDatabase();
 			const existing = getChatTabById({ database, id: chatTabId });
-			if (!existing || !isPreviewTab(existing)) {
+			if (!existing || !isEphemeralTab(existing)) {
 				return existing;
 			}
 			return pinOpenTab({ database, tab: existing });
@@ -317,23 +345,76 @@ export function createChatTabService({
 }
 
 /**
- * Whether a tab is a chat nobody has spent yet: still the kind a conversation
- * goes in, still unnamed, and with no session bound to it.
+ * Whether a spawned conversation may take this tab over: the placeholder the app
+ * opened to fill an empty workspace, still the kind a conversation goes in,
+ * still unnamed, and with no session bound to it.
  *
- * All three conditions are load-bearing. The renderer opens one of these for
- * every workspace that has none, so an orchestrator arriving afterwards should
- * take it rather than stack a second beside it — but a tab the user titled is
- * one they meant to keep, and a tab carrying a session already has a
- * conversation in it.
+ * All four conditions are load-bearing, and the placeholder marker is the one
+ * that keeps a spawn off the user's own tab. The other three describe a blank
+ * chat, which is equally what a tab opened a second ago from the strip's new-tab
+ * button looks like — an unsent draft never reaches this row.
  * @param tab - An open tab in the workspace.
  * @returns Whether a spawn may claim it.
  */
-function isIdleChatTab(tab: ChatTabRow): boolean {
+function isClaimableChatTab(tab: ChatTabRow): boolean {
 	return (
+		isPlaceholderChatTab(tab) &&
 		tab.kind === 'chat' &&
 		tab.agentSessionId === null &&
 		tab.title === UNTITLED_TAB_TITLE
 	);
+}
+
+/**
+ * Whether a tab still carries a marker saying another open may have it — the
+ * ephemeral preview slot, or a placeholder chat awaiting a spawn.
+ * @param tab - The tab row to test
+ * @returns True while some other open could still take the tab
+ */
+function isEphemeralTab(tab: ChatTabRow): boolean {
+	return isPreviewTab(tab) || isPlaceholderChatTab(tab);
+}
+
+/**
+ * Applies the ephemeral marker an open declares. The two never coexist: the
+ * preview slot excludes chat tabs, and only a chat is ever a placeholder.
+ * @param options - Whether the open is a placeholder or a preview, and the metadata the caller supplied
+ * @returns The metadata to persist on the new row
+ */
+function withEphemeralMarkers({
+	asPlaceholder,
+	asPreview,
+	metadata,
+}: {
+	asPlaceholder: boolean;
+	asPreview: boolean;
+	metadata: Record<string, unknown> | undefined;
+}): Record<string, unknown> | undefined {
+	if (asPreview) {
+		return withPreviewFlag(metadata);
+	}
+	return asPlaceholder ? withPlaceholderFlag(metadata) : metadata;
+}
+
+/**
+ * Drops the placeholder marker as a claim takes the tab, so a second spawn
+ * arriving behind the first opens its own rather than landing on the same row.
+ * @param options - The open database and the tab being claimed
+ * @returns The claimed tab, re-read so the caller sees the released marker
+ */
+function releasePlaceholder({
+	database,
+	tab,
+}: {
+	database: DatabaseSync;
+	tab: ChatTabRow;
+}): ChatTabRow | null {
+	setChatTabMetadata({
+		database,
+		id: tab.id,
+		metadata: withoutPlaceholderFlag(tab.metadata),
+	});
+	return getChatTabById({ database, id: tab.id });
 }
 
 /**
@@ -405,8 +486,9 @@ function findOpenTabForSubject({
 }
 
 /**
- * Promotes a preview tab to a permanent one by dropping its marker, freeing the
- * slot so the next preview open takes a fresh tab.
+ * Promotes an ephemeral tab to a permanent one by dropping both markers: the
+ * preview slot is freed so the next preview open takes a fresh tab, and a
+ * placeholder chat stops being one a spawn may take over.
  * @param options - The open database and the tab to pin
  * @returns The pinned tab row
  */
@@ -420,7 +502,7 @@ function pinOpenTab({
 	setChatTabMetadata({
 		database,
 		id: tab.id,
-		metadata: withoutPreviewFlag(tab.metadata),
+		metadata: withoutPlaceholderFlag(withoutPreviewFlag(tab.metadata)),
 	});
 	return getChatTabById({ database, id: tab.id });
 }

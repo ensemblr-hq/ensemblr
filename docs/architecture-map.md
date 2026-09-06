@@ -50,7 +50,7 @@ each exposing its public surface through `index.ts`.
 | Plan mode | `plan-mode/` | Per-session plan registry, plan-file writing, plan submission — the enforcement classifiers live in `src/shared/plan-mode/` |
 | App lifecycle | `app/` | `BrowserWindow` creation, window state, and the quit guard + coordinator that confirm a quit while agents are still running |
 | Architecture diagram | `architecture/` | The committed `.ensemblr/architecture.json` document — the file reader/writer, the service the control ops and the diagram pane read through, and the staleness gate that decides whether the per-turn upkeep block asks an agent to redraw. Nothing derives a diagram; an agent authors it through the control op |
-| Chat tabs | `chat-tabs/` | Tab service, preview slot, terminal-session persistence |
+| Chat tabs | `chat-tabs/` | Tab service, preview slot, placeholder-chat policy, terminal-session persistence |
 | Checkpoints | `checkpoints/` | Git-backed per-turn checkpoints (ADR&nbsp;0012) |
 | Process execution | `commands/` | Local process and shell execution |
 | Concierge | `concierge/` | App-level agent session service, its home-folder layout under the Ensemblr root, the memory index and background memory pass, the artifact lister the panel's reader reads through, and the wire that retires a session while it finishes writing memories |

@@ -90,7 +90,11 @@ export function openChatTab(
 	);
 }
 
-/** Promotes an ephemeral preview tab to a permanent one. */
+/**
+ * Promotes an ephemeral tab to a permanent one: a preview tab releases the
+ * workspace's preview slot, and a placeholder chat stops being a tab a spawned
+ * conversation may take over.
+ */
 export function pinChatTab(
 	request: PinChatTabRequest,
 ): Promise<PinChatTabResult> {

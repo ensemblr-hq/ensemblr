@@ -89,6 +89,15 @@ export interface OpenChatTabRequest {
 	kind?: ChatTabKindWire;
 	metadata?: Record<string, unknown>;
 	/**
+	 * Opens the tab as the workspace's placeholder chat: the one the app opens on
+	 * the user's behalf so a workspace with no tabs still has a row a first prompt
+	 * can bind to, and the only tab a spawned conversation may take over instead
+	 * of opening its own. Set it from that bootstrap alone — a tab the user asked
+	 * for is theirs, and {@link PinChatTabRequest} retires the marker as soon as
+	 * they start writing in a placeholder. Ignored for every kind but `chat`.
+	 */
+	placeholder?: boolean;
+	/**
 	 * Opens the tab as the workspace's single ephemeral preview slot: the next
 	 * preview open retargets this same tab instead of adding another one, until
 	 * {@link PinChatTabRequest} makes it permanent. Ignored for chat and terminal
@@ -166,8 +175,11 @@ export interface ReorderChatTabsResult {
 }
 
 /**
- * Promote an ephemeral preview tab to a permanent one, so later preview opens
- * take a fresh slot rather than retargeting it.
+ * Promote an ephemeral tab to a permanent one. A preview tab stops holding the
+ * slot, so later preview opens take a fresh one; a placeholder chat stops being
+ * a tab a spawned conversation may take over, which is how the composer marks a
+ * blank chat as the user's the moment they start writing in it. A no-op on a tab
+ * that is already permanent.
  */
 export interface PinChatTabRequest {
 	chatTabId: string;

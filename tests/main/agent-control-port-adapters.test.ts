@@ -66,7 +66,7 @@ const makeDeps = (): {
 	broadcastBoardStatus: ReturnType<typeof vi.fn>;
 	boardStatusStore: ReturnType<typeof createBoardStatusStore>;
 	openTab: ReturnType<typeof vi.fn>;
-	claimIdleChatTab: ReturnType<typeof vi.fn>;
+	claimPlaceholderChatTab: ReturnType<typeof vi.fn>;
 	restoreTab: ReturnType<typeof vi.fn>;
 	broadcastFocus: ReturnType<typeof vi.fn>;
 } => {
@@ -78,14 +78,14 @@ const makeDeps = (): {
 		id: 'tab-1',
 		metadata: input.metadata ?? {},
 	}));
-	const claimIdleChatTab = vi.fn(() => null);
+	const claimPlaceholderChatTab = vi.fn(() => null);
 	const restoreTab = vi.fn(({ chatTabId }: { chatTabId: string }) => ({
 		id: chatTabId,
 	}));
 	const deps = {
 		databaseService: { getConnection: () => ({ database: {} }) },
 		chatTabService: {
-			claimIdleChatTab,
+			claimPlaceholderChatTab,
 			openTab,
 			closeTab: vi.fn(),
 			listTabs: vi.fn(),
@@ -127,7 +127,7 @@ const makeDeps = (): {
 		broadcastTabsChanged,
 		broadcastBoardStatus,
 		boardStatusStore,
-		claimIdleChatTab,
+		claimPlaceholderChatTab,
 		openTab,
 		restoreTab,
 	};
@@ -511,10 +511,11 @@ describe('agent-control port adapters: conversation naming', () => {
 
 	// The renderer opens an empty chat tab for every workspace that has none, so a
 	// spawn that always opened its own left a freshly created workspace showing
-	// two tabs, one of them permanently blank.
-	it('startConversation claims the workspace’s idle chat tab', async () => {
-		const { claimIdleChatTab, deps, openTab } = makeDeps();
-		claimIdleChatTab.mockReturnValue({ id: 'tab-idle', kind: 'chat' });
+	// two tabs, one of them permanently blank. Only that placeholder is offered —
+	// a blank tab the user opened is never returned here.
+	it('startConversation claims the workspace’s placeholder chat tab', async () => {
+		const { claimPlaceholderChatTab, deps, openTab } = makeDeps();
+		claimPlaceholderChatTab.mockReturnValue({ id: 'tab-idle', kind: 'chat' });
 		(deps as { agentSessionService: unknown }).agentSessionService = {
 			openSession: vi.fn().mockResolvedValue({ id: 'sess-1' }),
 			submitPrompt: vi.fn().mockResolvedValue({}),
@@ -545,11 +546,47 @@ describe('agent-control port adapters: conversation naming', () => {
 		expect(openTab).not.toHaveBeenCalled();
 	});
 
+	// A blank tab the user opened is indistinguishable from a placeholder on the
+	// row — an unsent draft never leaves the renderer — so the service refuses to
+	// offer one and the spawn opens its own rather than typing over the user.
+	it('startConversation opens its own tab when nothing is claimable', async () => {
+		const { claimPlaceholderChatTab, deps, openTab } = makeDeps();
+		claimPlaceholderChatTab.mockReturnValue(null);
+		(deps as { agentSessionService: unknown }).agentSessionService = {
+			openSession: vi.fn().mockResolvedValue({ id: 'sess-1' }),
+			submitPrompt: vi.fn().mockResolvedValue({}),
+			setSessionName: vi.fn().mockResolvedValue({ applied: true }),
+			getSession: vi.fn(),
+			listSessionsForWorkspace: () => [],
+		};
+		(deps as { piExecutableService: unknown }).piExecutableService = {
+			getSnapshot: vi
+				.fn()
+				.mockResolvedValue({ status: 'ready', command: 'pi' }),
+		};
+		const ports = createAgentControlPorts(deps);
+
+		const result = await ports.conversations.startConversation({
+			workspaceId: 'ws',
+			workspaceCwd: '/ws',
+			prompt: 'do it',
+			asPeer: false,
+			callerConcierge: false,
+			callerRuntime: 'pi',
+			parentSessionId: 'parent-1',
+			planMode: false,
+			afkMode: false,
+		});
+
+		expect(openTab).toHaveBeenCalledWith({ kind: 'chat', workspaceId: 'ws' });
+		expect(result).toMatchObject({ chatTabId: 'tab-1', ok: true });
+	});
+
 	// Rollback closes what the spawn created, and a tab that was already there is
 	// not that — closing it would take the user's own empty tab away with it.
 	it('startConversation leaves a claimed tab open when the submit fails', async () => {
-		const { claimIdleChatTab, deps } = makeDeps();
-		claimIdleChatTab.mockReturnValue({ id: 'tab-idle', kind: 'chat' });
+		const { claimPlaceholderChatTab, deps } = makeDeps();
+		claimPlaceholderChatTab.mockReturnValue({ id: 'tab-idle', kind: 'chat' });
 		const closeTab = vi.fn();
 		(deps.chatTabService as { closeTab: unknown }).closeTab = closeTab;
 		(deps as { agentSessionService: unknown }).agentSessionService = {

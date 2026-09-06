@@ -92,7 +92,7 @@ const makeDeps = (input: {
 		broadcastPlanMode: vi.fn(),
 		broadcastTabsChanged: vi.fn(),
 		chatTabService: {
-			claimIdleChatTab: vi.fn(() => null),
+			claimPlaceholderChatTab: vi.fn(() => null),
 			openTab: vi.fn(() => ({ id: 'tab-1', metadata: {} })),
 		},
 		confirm: { confirm: vi.fn() },
@@ -507,7 +507,7 @@ describe('startConversation rollback on submit failure', () => {
 				}),
 			},
 			chatTabService: {
-				claimIdleChatTab: vi.fn(() => null),
+				claimPlaceholderChatTab: vi.fn(() => null),
 				closeTab,
 				openTab,
 			},

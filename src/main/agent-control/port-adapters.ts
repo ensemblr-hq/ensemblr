@@ -656,12 +656,14 @@ function makeConversationPort(deps: PortAdapterDeps): ConversationPort {
 			// A workspace the user has looked at already has an empty chat tab: the
 			// renderer opens one for every workspace with none, so a spawn that
 			// always opened its own left the freshly created workspace showing two,
-			// one of them permanently blank. Claimed rather than opened, the tab
+			// one of them permanently blank. Only that placeholder is claimable — a
+			// blank tab the user opened looks identical on the row, because an unsent
+			// draft never leaves the renderer. Claimed rather than opened, the tab
 			// stays out of `openedTabId` — rollback closes what this spawn created,
 			// and a tab that was already there is not that.
 			const claimedTab = chatTabId
 				? null
-				: deps.chatTabService.claimIdleChatTab({ workspaceId });
+				: deps.chatTabService.claimPlaceholderChatTab({ workspaceId });
 			const openedTabId =
 				chatTabId || claimedTab
 					? null

@@ -36,6 +36,7 @@ export const openChatTabRequestSchema = z.object({
 		.optional(),
 	metadata: z.record(z.string(), z.unknown()).optional(),
 	agentSessionId: optionalNullableString,
+	placeholder: z.boolean().optional(),
 	preview: z.boolean().optional(),
 	title: optionalStringCoerceNullToUndefined,
 	workspaceId: z.string().min(1),
