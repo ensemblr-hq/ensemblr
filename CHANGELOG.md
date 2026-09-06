@@ -48,7 +48,7 @@ default.
   from an agent. `ensemblr_linear_create_issue` files a ticket, with `teamId`
   required, a started or terminal opening state refused, and a
   `ensemblr_linear_list_issues` search enforced as a precondition on the first
-  create in a conversation, because nothing here can delete a duplicate.
+  create in a conversation, because nothing here can delete a duplicate. (#442)
 
 - **A chat can be told the user is away, and it keeps moving without them.** A per-chat AFK chip in
   the composer, Plan Mode's opposite number: `ensemblr_ask_user_question` is refused by
@@ -224,7 +224,7 @@ default.
   retired as soon as anybody spends the tab: by the claim, so a second spawn
   arriving behind the first opens its own, and by the composer the moment a draft
   or an attachment appears, which covers a workspace you opened, started typing
-  in, and the Concierge then delegated into.
+  in, and the Concierge then delegated into. (#451)
 
 - **Steering a conversation whose tab was closed brings that tab back.** Closing
   a chat tab archives it without stopping the conversation inside, so an
@@ -240,7 +240,7 @@ default.
   no live PTY and whose harness only the renderer can respawn. Only a tab that
   would come back whole is reopened at all — a chat whose conversation has since
   moved to another tab stays shut, because reopening it would surface an emptied
-  row rather than the conversation somebody asked to see.
+  row rather than the conversation somebody asked to see. (#452)
 
 - **A workspace re-opens on the tab it was on, and closing one walks back the way
   you came.** Three faults compounded into the same symptom. The route loaders
@@ -255,7 +255,7 @@ default.
   honour and the first close of the run slid sideways along the strip instead.
   The loaders now redirect to the remembered tab, a stale routed id is replaced
   with the most recent still-open tab once the rows land — which also covers a
-  tab closed by an agent or by a second window — and the chain is persisted.
+  tab closed by an agent or by a second window — and the chain is persisted. (#448)
 
 - **Steering a peer orchestrator or the Review conversation no longer mislabels it as a sub-agent in
   the timeline.** Six control-tool rows hardcoded "sub-agent" in their workspace-surface titles, so a
