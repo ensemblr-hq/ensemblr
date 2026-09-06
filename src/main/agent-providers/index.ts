@@ -38,4 +38,7 @@ export type {
 	SpawnModelResolver,
 	SpawnModelSelection,
 } from './spawn-model-resolver';
-export { createSpawnModelResolver } from './spawn-model-resolver';
+export {
+	acceptableThinkingLevels,
+	createSpawnModelResolver,
+} from './spawn-model-resolver';

@@ -29,7 +29,9 @@ import {
 	resolveAgentRole,
 	spawnedChildRole,
 } from '../../shared/agent-control.ts';
+import { classifyAgentModelTier } from '../../shared/agent-model-tier.ts';
 import type { AgentProviderId } from '../../shared/agent-provider.ts';
+import { getThinkingAxis } from '../../shared/agent-thinking.ts';
 import { findHarnessDefinition } from '../../shared/agents.ts';
 import type { AppLanguage } from '../../shared/i18n.ts';
 import type {
@@ -43,6 +45,7 @@ import type {
 	SpawnCallerIdentity,
 	SpawnModelResolver,
 } from '../agent-providers';
+import { acceptableThinkingLevels } from '../agent-providers';
 import type { AgentSessionService } from '../agent-runtime/agent-session-service.ts';
 import {
 	applyBranchSlug,
@@ -608,6 +611,9 @@ function makeConversationPort(deps: PortAdapterDeps): ConversationPort {
 					displayName: model.displayName,
 					id: model.id,
 					runtime: model.agentProvider,
+					thinkingAxis: getThinkingAxis(model.agentProvider),
+					thinkingLevels: acceptableThinkingLevels(model),
+					tier: classifyAgentModelTier(model),
 					vendor: model.vendor,
 				})),
 				runtime: listing.runtime,

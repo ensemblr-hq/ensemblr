@@ -148,6 +148,23 @@ A child's last message is its report, and it is persisted permanently — it
 survives the child closing and an app restart. A `closed` or `idle` child is not
 lost work: read it with `ensemblr_get_last_message`.
 
+**What a child runs on is two decisions, and `ensemblr_list_models` answers
+both.** Omit `model` and the child inherits yours; pass an id from that list to
+run it on another, never one you invented. Each row also carries the model's
+`thinkingLevels` ladder, the `thinkingAxis` its runtime calls that dial
+(`effort` on Claude Code, `thinking` on pi), and a `tier`.
+
+- **`thinkingLevel` is chosen per child, not inherited.** An omitted level is
+  your own, picked for your work rather than theirs. Lowest rungs for mechanical
+  work, the middle for ordinary implementation and for reading code to answer a
+  question, the high rungs for design, for diagnosing what does not reproduce,
+  and for reviewing work you will rely on. The runtimes do not share a ladder, so
+  a level from the wrong one is refused by name rather than quietly dropped.
+- **A `tier: "frontier"` model is confirmed with the user**, whatever the
+  permission mode, because it costs several times what the rest do. Inheriting is
+  never confirmed. While the user is away, naming one is refused — omit `model`
+  or pass a `standard` id.
+
 A child that cannot produce its deliverable until someone answers calls
 `ensemblr_notify_orchestrator` with `need_decision` or `blocked`, which wakes a
 pending wait whatever its mode. Ordinary open decisions do not arrive that way —

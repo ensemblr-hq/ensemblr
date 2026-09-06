@@ -74,7 +74,8 @@ export const CANONICAL_ARG_KEYS = {
 	targets: 'Conversations an op acts on.',
 	teamId: 'Identifier of a tracker team.',
 	terminalId: 'Identifier of a dock terminal or harness.',
-	thinkingLevel: 'Reasoning budget a conversation runs at.',
+	thinkingLevel:
+		'Reasoning budget a conversation runs at, from the ladder its own model publishes. Chosen per child rather than inherited.',
 	timeoutMs: 'Upper bound on a blocking call, in milliseconds.',
 	title:
 		'Human-readable label of a UI surface or an artifact — a chat tab, a plan, a summary, a tracker issue. Never `name`.',
