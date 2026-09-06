@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useAtomValue } from 'jotai';
 import { useAtomCallback } from 'jotai/utils';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import {
@@ -16,7 +17,10 @@ import {
 	useDropFollowUpQueue,
 } from '@/renderer/state/composer';
 import { useConversationScrollOffsets } from '@/renderer/state/conversation-scroll';
-import { forgetChatOverrides } from '@/renderer/state/preferences';
+import {
+	forgetChatOverrides,
+	tuiHarnessesAtom,
+} from '@/renderer/state/preferences';
 import { useUnreadChatActions } from '@/renderer/state/unread';
 import type { LiveTerminalTitle } from '@/renderer/state/workspace/terminal-tab-title';
 import type {
@@ -139,7 +143,7 @@ export function useSessionTabState({
 	const { busyTerminalIds } = useWorkspaceAgentBusy(workspaceId);
 
 	const {
-		closedSessions,
+		closedSessions: allClosedSessions,
 		effectiveActiveSession,
 		isResolvingActiveSession,
 		resolvedActiveChatId,
@@ -152,6 +156,17 @@ export function useSessionTabState({
 		busyTerminalIds,
 		terminalTitles,
 	});
+
+	// Restoring a closed harness tab respawns the harness, so with the feature off
+	// the history omits them rather than offering a row the app would refuse.
+	const harnessesEnabled = useAtomValue(tuiHarnessesAtom);
+	const closedSessions = useMemo(
+		() =>
+			harnessesEnabled
+				? allClosedSessions
+				: allClosedSessions.filter((session) => session.kind !== 'terminal'),
+		[allClosedSessions, harnessesEnabled],
+	);
 
 	const insertAnchorTabId = resolveInsertAnchorId(
 		sessionTabs,

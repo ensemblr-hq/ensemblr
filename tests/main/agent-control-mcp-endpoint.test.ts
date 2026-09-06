@@ -22,16 +22,29 @@ import {
 } from '../../src/shared/agent-control.ts';
 
 /** Each playbook with the architecture diagram on, the variant these tests use. */
-const HARNESS_AWARENESS = harnessAwareness(true);
-const NATIVE_ORCHESTRATOR_AWARENESS = nativeOrchestratorAwareness(true);
-const ORCHESTRATOR_AWARENESS = orchestratorAwareness(true);
-const SUBAGENT_AWARENESS = subagentAwareness(true);
+const HARNESS_AWARENESS = harnessAwareness({
+	architectureDiagram: true,
+	tuiHarnesses: true,
+});
+const NATIVE_ORCHESTRATOR_AWARENESS = nativeOrchestratorAwareness({
+	architectureDiagram: true,
+	tuiHarnesses: true,
+});
+const ORCHESTRATOR_AWARENESS = orchestratorAwareness({
+	architectureDiagram: true,
+	tuiHarnesses: true,
+});
+const SUBAGENT_AWARENESS = subagentAwareness({
+	architectureDiagram: true,
+	tuiHarnesses: true,
+});
 
 const calls: AgentControlCommand[] = [];
 let server: ControlServer | null = null;
 
 const HARNESS_ROOT: ControlAudience = {
 	architectureDiagram: true,
+	tuiHarnesses: true,
 	delegation: 'ensemblr',
 	hasChatTab: false,
 	role: 'orchestrator',
@@ -278,6 +291,7 @@ describe('agent-control MCP endpoint, per-origin surface', () => {
 	it('serves the chat-tab tools to a first-class root', async () => {
 		const names = await toolNamesFor({
 			architectureDiagram: true,
+			tuiHarnesses: true,
 			delegation: 'ensemblr',
 			hasChatTab: true,
 			role: 'orchestrator',
@@ -295,6 +309,7 @@ describe('agent-control MCP endpoint, per-origin surface', () => {
 	it('withholds the spawn tools from a root delegating through its own runtime', async () => {
 		const names = await toolNamesFor({
 			architectureDiagram: true,
+			tuiHarnesses: true,
 			delegation: 'native',
 			hasChatTab: true,
 			role: 'orchestrator',
@@ -333,6 +348,7 @@ describe('agent-control MCP endpoint, per-origin surface', () => {
 	it('withholds the delegation surface from a first-class sub-agent', async () => {
 		const names = await toolNamesFor({
 			architectureDiagram: true,
+			tuiHarnesses: true,
 			delegation: 'ensemblr',
 			hasChatTab: true,
 			role: 'subagent',
@@ -365,6 +381,7 @@ describe('agent-control MCP endpoint, per-origin surface', () => {
 	it('serves the orchestrator playbook to a first-class root', async () => {
 		const client = await connectAs({
 			architectureDiagram: true,
+			tuiHarnesses: true,
 			delegation: 'ensemblr',
 			hasChatTab: true,
 			role: 'orchestrator',
@@ -378,6 +395,7 @@ describe('agent-control MCP endpoint, per-origin surface', () => {
 	it('serves the sub-agent playbook to a first-class sub-agent', async () => {
 		const client = await connectAs({
 			architectureDiagram: true,
+			tuiHarnesses: true,
 			delegation: 'ensemblr',
 			hasChatTab: true,
 			role: 'subagent',
@@ -418,6 +436,7 @@ describe('agent-control MCP endpoint, per-origin surface', () => {
 		const client = await connectAs(
 			{
 				architectureDiagram: true,
+				tuiHarnesses: true,
 				delegation: 'ensemblr',
 				hasChatTab: true,
 				role: 'orchestrator',
@@ -457,6 +476,7 @@ describe('agent-control MCP endpoint, per-origin surface', () => {
 		const client = await connectAs(
 			{
 				architectureDiagram: true,
+				tuiHarnesses: true,
 				delegation: 'ensemblr',
 				hasChatTab: true,
 				role: 'orchestrator',
@@ -474,6 +494,7 @@ describe('agent-control MCP endpoint, per-origin surface', () => {
 		const served = new Set(
 			await toolNamesFor({
 				architectureDiagram: true,
+				tuiHarnesses: true,
 				delegation: 'ensemblr',
 				hasChatTab: true,
 				role: 'orchestrator',
@@ -494,6 +515,7 @@ describe('agent-control MCP endpoint, per-origin surface', () => {
 	it('names only served tools in the native playbook, bar the absent ones', async () => {
 		const audience: ControlAudience = {
 			architectureDiagram: true,
+			tuiHarnesses: true,
 			delegation: 'native',
 			hasChatTab: true,
 			role: 'orchestrator',
@@ -544,6 +566,7 @@ const makeBlockingService = (audience: ControlAudience = HARNESS_ROOT) => {
 
 const CHAT_TAB_ROOT: ControlAudience = {
 	architectureDiagram: true,
+	tuiHarnesses: true,
 	delegation: 'ensemblr',
 	hasChatTab: true,
 	role: 'orchestrator',

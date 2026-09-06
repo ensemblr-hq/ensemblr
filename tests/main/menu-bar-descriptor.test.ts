@@ -329,7 +329,7 @@ function drawnBarTemplate(context: MenuContext): DescribedMenuItem[] {
 			buildFileMenu(labels, items, context),
 			buildEditMenu(labels),
 			buildViewMenu(labels, items),
-			buildWorkspaceMenu(labels, items, context),
+			buildWorkspaceMenu(labels, items, context, true),
 			buildChatMenu(labels, items, context),
 			buildChangesMenu(labels, items),
 			buildWindowMenu(labels, items),

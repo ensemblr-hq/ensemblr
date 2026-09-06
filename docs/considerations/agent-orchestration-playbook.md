@@ -19,10 +19,13 @@
 >   `resources/pi-extensions/ensemblr-control.mts` embeds byte-identical copies of all four; a parity
 >   test (`tests/main/agent-control-awareness-parity.test.ts`) fails if any drifts.
 > - **Harnesses** (Claude Code, Codex, Mistral Vibe) — a harness launches as a root session but
->   owns a *terminal* tab, so it gets its own shorter variant, `HARNESS_AWARENESS`. The MCP server's
+>   owns a *terminal* tab, so it gets its own shorter variant, `harnessAwareness`. The MCP server's
 >   `instructions` field (`src/main/agent-control/mcp-endpoint.ts`) carries it, and
 >   `src/main/agent-control/harness-launch-config.ts` also appends it to the launch command as a
 >   system prompt, because no harness reliably surfaces an MCP server's `instructions` to its model.
+>   Harnesses are opt-in (Settings → Experimental → *Third-party CLI harnesses*), so with the switch
+>   off nothing can be launched to receive that variant and every other one drops the passages that
+>   name a harness — see the feature-switch paragraph in [`agent-control.md`](../agent-control.md).
 >
 > This file is the human-facing reference for that guidance; keep it in step with the constants by
 > hand.

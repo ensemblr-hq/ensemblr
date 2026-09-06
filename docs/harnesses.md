@@ -13,6 +13,17 @@ source of every launch command. The renderer only ever sends a harness **id**;
 the main process assembles the command from the registry, so a renderer value is
 never turned into free-text shell.
 
+**The whole feature is off by default**, behind Settings → Experimental →
+*Third-party CLI harnesses* (`app.experimental.tuiHarnesses`). Off, it is absent
+rather than refused: the tab strip grows no launcher, `⌘⇧A` and the Workspace →
+*Agent Harness…* item are gone, `ensemblr_launch_harness` leaves every tool list,
+every playbook stops naming a harness, and the launch and resume IPC refuse. A
+harness terminal already running is left alone — it is a live process with an
+unsaved conversation, and hiding its tab would orphan a PTY the user cannot
+reach — but a tab whose PTY died is archived on the next launch instead of
+respawned, and a closed one drops out of the restore history. See the feature-
+switch paragraph in [`agent-control.md`](./agent-control.md) for the agent half.
+
 ## Harness Claude Code is not native Claude Code
 
 The two Claude paths are deliberately separate, and the difference is

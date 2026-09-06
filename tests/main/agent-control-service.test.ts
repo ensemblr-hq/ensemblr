@@ -10,7 +10,7 @@ import {
 	type GuardrailConfig,
 } from '../../src/main/agent-control/index.ts';
 import {
-	CONCIERGE_AWARENESS,
+	conciergeAwareness,
 	PLAN_REFINEMENT_DIRECTIVE,
 } from '../../src/shared/agent-control.ts';
 import type { AppLanguage } from '../../src/shared/i18n.ts';
@@ -257,6 +257,7 @@ const setup = (
 		species?: AgentSpecies;
 		dispatchTimeoutMs?: number;
 		architectureDiagram?: boolean;
+		tuiHarnesses?: boolean;
 	} = {},
 ) => {
 	// The caller keeps `tok-caller`; anything a test registers afterwards gets its
@@ -281,6 +282,7 @@ const setup = (
 		originRegistry: registry,
 		guardrails: createGuardrails(options.guardrails),
 		readArchitectureDiagramEnabled: () => options.architectureDiagram ?? true,
+		readTuiHarnessesEnabled: () => options.tuiHarnesses ?? true,
 	});
 	return { service, ports, registry };
 };
@@ -3027,7 +3029,12 @@ describe('agent-control service: chat-tab ops by species', () => {
 		});
 
 		expect(result).toMatchObject({
-			data: { rolePlaybook: CONCIERGE_AWARENESS },
+			data: {
+				rolePlaybook: conciergeAwareness({
+					architectureDiagram: true,
+					tuiHarnesses: true,
+				}),
+			},
 			ok: true,
 		});
 	});
@@ -3067,6 +3074,7 @@ describe('agent-control service: audience resolution', () => {
 
 		expect(await service.describeAudience('tok-caller')).toEqual({
 			architectureDiagram: true,
+			tuiHarnesses: true,
 			delegation: 'ensemblr',
 			hasChatTab: true,
 			role: 'orchestrator',
@@ -3078,6 +3086,7 @@ describe('agent-control service: audience resolution', () => {
 
 		expect(await service.describeAudience('tok-caller')).toEqual({
 			architectureDiagram: true,
+			tuiHarnesses: true,
 			delegation: 'ensemblr',
 			hasChatTab: true,
 			role: 'orchestrator',
@@ -3089,6 +3098,7 @@ describe('agent-control service: audience resolution', () => {
 
 		expect(await service.describeAudience('tok-caller')).toEqual({
 			architectureDiagram: true,
+			tuiHarnesses: true,
 			delegation: 'ensemblr',
 			hasChatTab: false,
 			role: 'orchestrator',
@@ -3103,6 +3113,7 @@ describe('agent-control service: audience resolution', () => {
 
 		expect(await service.describeAudience('tok-caller')).toEqual({
 			architectureDiagram: true,
+			tuiHarnesses: true,
 			delegation: 'ensemblr',
 			hasChatTab: true,
 			role: 'subagent',
@@ -3116,6 +3127,7 @@ describe('agent-control service: audience resolution', () => {
 
 		expect(await service.describeAudience('bogus')).toEqual({
 			architectureDiagram: true,
+			tuiHarnesses: true,
 			delegation: 'ensemblr',
 			hasChatTab: false,
 			role: 'orchestrator',

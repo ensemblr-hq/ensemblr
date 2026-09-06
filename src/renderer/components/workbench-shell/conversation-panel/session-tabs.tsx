@@ -1,23 +1,15 @@
 import { Icon } from '@iconify/react';
-import { useQuery } from '@tanstack/react-query';
 import { useAtomValue } from 'jotai';
 import {
 	BotIcon,
 	BugIcon,
 	HistoryIcon,
-	LoaderCircleIcon,
 	MessageSquareIcon,
 	PlusIcon,
 	RotateCcwIcon,
 } from 'lucide-react';
 import { Reorder } from 'motion/react';
-import {
-	type KeyboardEvent,
-	useEffect,
-	useMemo,
-	useRef,
-	useState,
-} from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/renderer/components/ui/button';
 import {
@@ -27,12 +19,7 @@ import {
 	DropdownMenuTrigger,
 } from '@/renderer/components/ui/dropdown-menu';
 import { TabScroller } from '@/renderer/components/ui/tab-scroller';
-import {
-	Tooltip,
-	TooltipContent,
-	TooltipTrigger,
-} from '@/renderer/components/ui/tooltip';
-import { useHotkey } from '@/renderer/hooks/use-hotkey';
+import { Tooltip, TooltipTrigger } from '@/renderer/components/ui/tooltip';
 import { useSessionTabOrder } from '@/renderer/hooks/workbench-shell/conversation-panel/use-session-tab-order';
 import { useSessionTabShortcuts } from '@/renderer/hooks/workbench-shell/conversation-panel/use-session-tab-shortcuts';
 import { cn } from '@/renderer/lib/utils';
@@ -41,10 +28,7 @@ import {
 	harnessIconName,
 } from '@/renderer/lib/workbench';
 import { useRequestComposerFocus } from '@/renderer/state/composer';
-import {
-	useMenuCommand,
-	useMenuDynamicEntries,
-} from '@/renderer/state/menu-commands';
+import { useMenuDynamicEntries } from '@/renderer/state/menu-commands';
 import { useDebugPanelToggle } from '@/renderer/state/pi';
 import { developerModeAtom } from '@/renderer/state/preferences';
 import type { SessionTabModel } from '@/renderer/types/workbench';
@@ -53,29 +37,12 @@ import { formatShortcut } from '@/shared/keymap';
 
 import { ArchitectureDiagramButton } from './architecture-diagram/architecture-diagram-button';
 import { GhostIconButton } from './ghost-icon-button';
+import { HarnessLauncherMenu } from './harness-launcher/harness-launcher-menu';
 import { SessionTab } from './session-tab';
-
-/** Display label for the coding-agent launcher shortcut, e.g. `⌘⇧A`. */
-const AGENTS_SHORTCUT_HINT = formatShortcut('agents.open');
+import { ShortcutTooltipContent } from './shortcut-tooltip-content';
 
 /** Display label for the new-chat-tab shortcut, e.g. `⌘T`. */
 const NEW_TAB_SHORTCUT_HINT = formatShortcut('tab.new');
-
-/** Tooltip body pairing a label with an optional keyboard-shortcut chip. */
-function ShortcutTooltipContent({
-	label,
-	shortcut,
-}: {
-	label: string;
-	shortcut?: string;
-}) {
-	return (
-		<TooltipContent>
-			{label}
-			{shortcut ? <kbd className='font-sans'>{shortcut}</kbd> : null}
-		</TooltipContent>
-	);
-}
 
 /** Horizontal session-tab bar with close, restore, new-tab, and drag-order controls. */
 export function SessionTabs({
@@ -290,209 +257,6 @@ export function SessionTabs({
 				/>
 			</div>
 		</div>
-	);
-}
-
-/**
- * Robot-icon dropdown listing the installed AI coding-agent harnesses. Selecting
- * one (by click or its number key) launches it in a new embedded-terminal tab
- * and focuses that tab. Availability is detected in the main process; only
- * installed harnesses are shown. The list is fetched lazily on first open.
- */
-function HarnessLauncherMenu({
-	onLaunchHarness,
-	onSessionTabChange,
-}: {
-	onLaunchHarness: (input: {
-		harnessId: string;
-		harnessLabel: string;
-	}) => Promise<{ chatTabId: string } | null>;
-	onSessionTabChange: (sessionId: string) => void;
-}) {
-	const { t } = useTranslation();
-	const [open, setOpen] = useState(false);
-	const [launchingId, setLaunchingId] = useState<string | null>(null);
-	const launchedRef = useRef(false);
-	const { data, isPending } = useQuery({
-		queryFn: async () =>
-			(await window.ensemblr?.listAgentHarnesses()) ?? { harnesses: [] },
-		queryKey: ['agent-harnesses'],
-		staleTime: 30_000,
-	});
-	const installedHarnesses = (data?.harnesses ?? []).filter(
-		(harness) => harness.available,
-	);
-	const noHarnessesDetected = !isPending && installedHarnesses.length === 0;
-
-	useHotkey('agents.open', () => setOpen(true), {
-		enabled: !noHarnessesDetected,
-	});
-	useMenuCommand('agents.open', () => setOpen(true), !noHarnessesDetected);
-
-	/** Launches the chosen harness, focuses the new tab, then closes the menu. */
-	function handleLaunch(harnessId: string, harnessLabel: string) {
-		if (launchingId) {
-			return;
-		}
-		setLaunchingId(harnessId);
-		void onLaunchHarness({ harnessId, harnessLabel })
-			.then((result) => {
-				if (result) {
-					launchedRef.current = true;
-					onSessionTabChange(result.chatTabId);
-				}
-			})
-			.finally(() => {
-				setLaunchingId(null);
-				setOpen(false);
-			});
-	}
-
-	/** Launches the harness whose 1-based position matches the pressed number. */
-	function handleNumberShortcut(event: KeyboardEvent) {
-		if (launchingId) {
-			return;
-		}
-		const position = Number.parseInt(event.key, 10);
-		if (
-			Number.isNaN(position) ||
-			position < 1 ||
-			position > installedHarnesses.length
-		) {
-			return;
-		}
-		event.preventDefault();
-		const harness = installedHarnesses[position - 1];
-		handleLaunch(harness.id, harness.label);
-	}
-
-	if (noHarnessesDetected) {
-		return (
-			<Tooltip>
-				<TooltipTrigger asChild>
-					<span className='inline-flex'>
-						<GhostIconButton
-							disabled
-							icon={<BotIcon />}
-							label={t(
-								'workbench:harness-launcher.trigger',
-								'Launch coding agent',
-							)}
-						/>
-					</span>
-				</TooltipTrigger>
-				<ShortcutTooltipContent
-					label={t(
-						'workbench:harness-launcher.none-detected',
-						'No harnesses detected',
-					)}
-				/>
-			</Tooltip>
-		);
-	}
-
-	return (
-		<DropdownMenu
-			onOpenChange={(next) => {
-				// Reset the launch marker on every open so a launch that resolves
-				// after an early close (Escape while pending) can't leave a stale
-				// true that suppresses focus restore on the next plain close.
-				if (next) {
-					launchedRef.current = false;
-				}
-				setOpen(next);
-			}}
-			open={open}
-		>
-			<Tooltip>
-				<TooltipTrigger asChild>
-					<DropdownMenuTrigger asChild>
-						<GhostIconButton
-							icon={<BotIcon />}
-							label={t(
-								'workbench:harness-launcher.trigger',
-								'Launch coding agent',
-							)}
-						/>
-					</DropdownMenuTrigger>
-				</TooltipTrigger>
-				<ShortcutTooltipContent
-					label={t('workbench:harness-launcher.trigger', 'Launch coding agent')}
-					shortcut={AGENTS_SHORTCUT_HINT}
-				/>
-			</Tooltip>
-			<DropdownMenuContent
-				align='end'
-				className='w-56 p-1'
-				onCloseAutoFocus={(event) => {
-					// A launch activates the new terminal tab, which mounts XtermTerminal
-					// and grabs keyboard focus. Radix otherwise restores focus to the
-					// trigger on close, stealing it back; skip the restore only for a
-					// launch so plain closes (Escape, click-outside) keep normal a11y.
-					if (launchedRef.current) {
-						launchedRef.current = false;
-						event.preventDefault();
-					}
-				}}
-				onKeyDown={handleNumberShortcut}
-			>
-				{installedHarnesses.length ? (
-					installedHarnesses.map((harness, index) => {
-						const iconName = harnessIconName(harness.id);
-						return (
-							<DropdownMenuItem
-								className='h-9 gap-2 px-2 text-[0.8125rem]'
-								disabled={launchingId !== null}
-								key={harness.id}
-								onSelect={(event) => {
-									event.preventDefault();
-									handleLaunch(harness.id, harness.label);
-								}}
-							>
-								{iconName ? (
-									<Icon
-										aria-hidden='true'
-										className={cn(
-											'size-4 shrink-0',
-											harnessIconClassName(harness.id),
-										)}
-										icon={iconName}
-									/>
-								) : (
-									<BotIcon
-										aria-hidden='true'
-										className='size-4 shrink-0 text-muted-foreground'
-									/>
-								)}
-								<span className='min-w-0 flex-1 truncate font-medium'>
-									{harness.label}
-								</span>
-								{launchingId === harness.id ? (
-									<LoaderCircleIcon
-										aria-hidden='true'
-										className='size-3.5 shrink-0 animate-spin'
-									/>
-								) : index < 9 ? (
-									<kbd className='grid size-4 shrink-0 place-items-center rounded-sm border border-border font-medium text-[0.625rem] text-muted-foreground'>
-										{index + 1}
-									</kbd>
-								) : null}
-							</DropdownMenuItem>
-						);
-					})
-				) : (
-					<DropdownMenuItem
-						className='h-9 px-2 text-muted-foreground text-xs'
-						disabled
-					>
-						{t(
-							'workbench:harness-launcher.none-installed',
-							'No coding agents detected',
-						)}
-					</DropdownMenuItem>
-				)}
-			</DropdownMenuContent>
-		</DropdownMenu>
 	);
 }
 

@@ -1774,6 +1774,10 @@ export default interface Resources {
 				label: 'Developer Mode';
 			};
 			title: 'Experimental';
+			'tui-harnesses': {
+				description: 'Launch Claude Code, OpenAI Codex, or Mistral Vibe in a terminal tab, and let agents launch one too. Off, a harness terminal already open keeps running until you close it.';
+				label: 'Third-party CLI harnesses';
+			};
 		};
 		general: {
 			'auto-convert': {

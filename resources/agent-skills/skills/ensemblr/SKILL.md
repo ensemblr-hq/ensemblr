@@ -24,6 +24,9 @@ timeline: **Pi** and **Claude Code**. It also launches third-party **harnesses**
 terminal tab. Claude Code is both, and the two paths are deliberately different:
 a harness tab always runs skip-permissions and holds no chat-tab tools, while a
 native chat tab honours the workspace permission mode and holds the full set.
+Harnesses are an **opt-in Experimental feature**, absent unless the user has
+switched them on — so if nothing in your tool list launches one, that is the
+switch being off rather than a tool to hunt for.
 
 Either way you reach the app through tools named `ensemblr_*`, served over an
 MCP endpoint. **A harness may re-expose them under its own naming scheme** — an

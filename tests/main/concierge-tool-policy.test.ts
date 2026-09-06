@@ -209,6 +209,7 @@ describe('the Concierge withholding axis', () => {
 		expect(
 			withheldControlOps({
 				architectureDiagram: true,
+				tuiHarnesses: true,
 				delegation: 'native',
 				hasChatTab: false,
 				role: 'concierge',
@@ -220,6 +221,7 @@ describe('the Concierge withholding axis', () => {
 		for (const role of ['orchestrator', 'subagent'] as const) {
 			const withheld = withheldControlOps({
 				architectureDiagram: true,
+				tuiHarnesses: true,
 				delegation: 'ensemblr',
 				hasChatTab: true,
 				role,

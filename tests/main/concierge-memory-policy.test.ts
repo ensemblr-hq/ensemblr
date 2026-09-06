@@ -6,7 +6,13 @@ import {
 	CONCIERGE_MEMORY_KINDS,
 	coerceConciergeMemoryKind,
 } from '../../src/main/storage/repositories/concierge-memory-repository.ts';
-import { CONCIERGE_AWARENESS } from '../../src/shared/agent-control.ts';
+import { conciergeAwareness } from '../../src/shared/agent-control.ts';
+
+/** The Concierge playbook with every optional feature on, which these assertions describe. */
+const CONCIERGE_AWARENESS = conciergeAwareness({
+	architectureDiagram: true,
+	tuiHarnesses: true,
+});
 
 /** The four frontmatter fields the reader recognises, as the playbook names them. */
 const DOCUMENTED_FIELDS = ['description', 'kind', 'name', 'projects'] as const;

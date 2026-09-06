@@ -87,6 +87,7 @@ describe('withheldControlOps: the other half of the same choice', () => {
 	it('withholds the chat-tab spawn ops from a root delegating natively', () => {
 		const withheld = withheldControlOps({
 			architectureDiagram: true,
+			tuiHarnesses: true,
 			delegation: 'native',
 			hasChatTab: true,
 			role: 'orchestrator',
@@ -100,6 +101,7 @@ describe('withheldControlOps: the other half of the same choice', () => {
 	it('leaves the reads and the tab ops alone, which act on the user’s own tabs', () => {
 		const withheld = withheldControlOps({
 			architectureDiagram: true,
+			tuiHarnesses: true,
 			delegation: 'native',
 			hasChatTab: true,
 			role: 'orchestrator',
@@ -118,6 +120,7 @@ describe('withheldControlOps: the other half of the same choice', () => {
 	it('withholds none of them from a root delegating through chat tabs', () => {
 		const withheld = withheldControlOps({
 			architectureDiagram: true,
+			tuiHarnesses: true,
 			delegation: 'ensemblr',
 			hasChatTab: true,
 			role: 'orchestrator',
@@ -131,6 +134,7 @@ describe('withheldControlOps: the other half of the same choice', () => {
 	it('withholds the Concierge-only ops from a workspace agent', () => {
 		const withheld = withheldControlOps({
 			architectureDiagram: true,
+			tuiHarnesses: true,
 			delegation: 'ensemblr',
 			hasChatTab: true,
 			role: 'orchestrator',
@@ -271,6 +275,7 @@ async function openClaudeSessions({
 		now: () => new Date('2026-08-07T00:00:00.000Z'),
 		queueNaming: () => undefined,
 		readArchitectureDiagramEnabled: () => true,
+		readTuiHarnessesEnabled: () => true,
 		readClaudeSubagentMode: mode,
 		resolvePermissionMode: () => 'workspace-trusted',
 		subscribeToRuntime: () => noSubscription,
@@ -343,6 +348,7 @@ describe('a spawned child never opens under the native mechanism', () => {
 			parentSessionId: 'sess-root',
 			provider: 'claude',
 			readArchitectureDiagramEnabled: () => true,
+			readTuiHarnessesEnabled: () => true,
 			readClaudeSubagentMode: () => 'native',
 			resolveAgentControlEnv: undefined,
 			resolveTurnPreamble: undefined,
@@ -373,6 +379,7 @@ describe('a spawned child never opens under the native mechanism', () => {
 			parentSessionId: null,
 			provider: 'claude',
 			readArchitectureDiagramEnabled: () => true,
+			readTuiHarnessesEnabled: () => true,
 			readClaudeSubagentMode: () => 'native',
 			resolveAgentControlEnv: undefined,
 			resolveTurnPreamble: undefined,
@@ -389,6 +396,7 @@ describe('a spawned child never opens under the native mechanism', () => {
 			parentSessionId: null,
 			provider: 'claude',
 			readArchitectureDiagramEnabled: () => true,
+			readTuiHarnessesEnabled: () => true,
 			readClaudeSubagentMode: () => 'native',
 			resolveAgentControlEnv: undefined,
 			resolveTurnPreamble: undefined,
@@ -407,6 +415,7 @@ describe('the setting never reaches a runtime with no sub-agent tool of its own'
 			parentSessionId: null,
 			provider: 'pi',
 			readArchitectureDiagramEnabled: () => true,
+			readTuiHarnessesEnabled: () => true,
 			readClaudeSubagentMode: () => 'native',
 			resolveAgentControlEnv: undefined,
 			resolveTurnPreamble: undefined,
@@ -423,6 +432,7 @@ describe('the setting never reaches a runtime with no sub-agent tool of its own'
 			parentSessionId: null,
 			provider: 'claude',
 			readArchitectureDiagramEnabled: () => true,
+			readTuiHarnessesEnabled: () => true,
 			readClaudeSubagentMode: () => 'native',
 			resolveAgentControlEnv: undefined,
 			resolveTurnPreamble: undefined,

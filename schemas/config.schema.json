@@ -370,6 +370,11 @@
 							"type": "boolean",
 							"default": false,
 							"description": "Expose developer-facing panels and diagnostics."
+						},
+						"tuiHarnesses": {
+							"type": "boolean",
+							"default": false,
+							"description": "Enable the third-party CLI agent harnesses Ensemblr launches into a terminal tab: the launcher, its menu item and shortcut, and the `launchHarness` agent-control op."
 						}
 					}
 				},

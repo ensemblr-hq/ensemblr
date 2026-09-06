@@ -11,6 +11,7 @@ describe('afk delivery loop', () => {
 		buildAfkWorkflowDirective({
 			delegation: 'ensemblr',
 			role: 'orchestrator',
+			tuiHarnesses: true,
 			unattended: true,
 			...overrides,
 		}) ?? '';
@@ -24,6 +25,7 @@ describe('afk delivery loop', () => {
 			buildAfkWorkflowDirective({
 				delegation: 'ensemblr',
 				role: 'orchestrator',
+				tuiHarnesses: true,
 				unattended: false,
 			}),
 		).toBeNull();
@@ -280,6 +282,36 @@ describe('afk delivery loop', () => {
 				'Where your unit of work changed files',
 			);
 			expect(subagentDirective).toContain('has nothing to check');
+		});
+	});
+
+	// Same axis as the peer block's harness clause: off, nothing can launch one,
+	// so naming a running harness as what holds the slot describes a cause that
+	// cannot occur. The quota sentence itself has to survive either way — it is
+	// the only thing standing between a refused mandatory step and a retry loop.
+	describe('with third-party CLI harnesses switched off', () => {
+		const off = render({ tuiHarnesses: false });
+
+		it('drops the harness from the quota refusal', () => {
+			expect(directive).toContain("a running harness is the user's to close");
+			expect(off).not.toContain('harness');
+		});
+
+		it('still tells the agent what denied-quota means and not to retry', () => {
+			expect(off).toContain('A `denied-quota` here means');
+			expect(off).toContain('nothing you can do frees a slot.');
+			expect(off).toContain('Do not retry it in a loop');
+		});
+
+		it('leaves the rest of the loop intact', () => {
+			expect(off.length).toBeGreaterThan(directive.length * 0.95);
+			expect(off).not.toBe(directive);
+		});
+
+		it('changes nothing for a root that delegates natively', () => {
+			expect(render({ delegation: 'native', tuiHarnesses: false })).toBe(
+				nativeDirective,
+			);
 		});
 	});
 });

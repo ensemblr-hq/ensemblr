@@ -20,9 +20,18 @@ import {
 } from '../../src/shared/agent-control.ts';
 
 /** Each playbook with the architecture diagram on, as these tests wire it. */
-const HARNESS_AWARENESS = harnessAwareness(true);
-const ORCHESTRATOR_AWARENESS = orchestratorAwareness(true);
-const SUBAGENT_AWARENESS = subagentAwareness(true);
+const HARNESS_AWARENESS = harnessAwareness({
+	architectureDiagram: true,
+	tuiHarnesses: true,
+});
+const ORCHESTRATOR_AWARENESS = orchestratorAwareness({
+	architectureDiagram: true,
+	tuiHarnesses: true,
+});
+const SUBAGENT_AWARENESS = subagentAwareness({
+	architectureDiagram: true,
+	tuiHarnesses: true,
+});
 
 const WORKSPACE = 'ws-1';
 const CWD = '/tmp/ws-1';
@@ -68,6 +77,7 @@ const setup = (
 			parentSessionId: input.parentSessionId ?? null,
 			provider: input.provider,
 			readArchitectureDiagramEnabled: () => true,
+			readTuiHarnessesEnabled: () => true,
 			readClaudeSubagentMode: undefined,
 			resolveAgentControlEnv,
 			resolveTurnPreamble: undefined,
@@ -168,6 +178,7 @@ describe('agent-control wiring: the control MCP endpoint', () => {
 			parentSessionId: null,
 			provider: 'claude',
 			readArchitectureDiagramEnabled: () => true,
+			readTuiHarnessesEnabled: () => true,
 			readClaudeSubagentMode: undefined,
 			resolveAgentControlEnv: undefined,
 			resolveTurnPreamble: undefined,
@@ -212,6 +223,7 @@ describe('agent-control wiring: the per-turn upkeep block', () => {
 					parentSessionId: null,
 					provider,
 					readArchitectureDiagramEnabled: () => true,
+					readTuiHarnessesEnabled: () => true,
 					readClaudeSubagentMode: undefined,
 					resolveAgentControlEnv,
 					resolveTurnPreamble: async (id) => {

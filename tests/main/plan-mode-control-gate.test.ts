@@ -141,6 +141,9 @@ const setup = (options: {
 		guardrails: createGuardrails(),
 		originRegistry: registry,
 		ports,
+		// This suite is about the plan-mode gate, so the feature axis is held open:
+		// `launchHarness` must reach the gate rather than be refused ahead of it.
+		readTuiHarnessesEnabled: () => true,
 	});
 	return { ports, service };
 };

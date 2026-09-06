@@ -388,6 +388,9 @@ describe('getSessionBrief', () => {
 				afkWorkflowDirective: buildAfkWorkflowDirective({
 					delegation: 'ensemblr',
 					role: 'orchestrator',
+					// This service is built without `readTuiHarnessesEnabled`, so it
+					// takes the off default and the quota step drops its harness clause.
+					tuiHarnesses: false,
 					unattended: true,
 				}),
 			});

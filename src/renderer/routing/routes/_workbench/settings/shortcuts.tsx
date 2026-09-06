@@ -1,9 +1,11 @@
 import { createFileRoute } from '@tanstack/react-router';
 import type { TFunction } from 'i18next';
+import { useAtomValue } from 'jotai';
 import { useTranslation } from 'react-i18next';
 
 import { SettingRow } from '@/renderer/components/settings/setting-row';
 import { SettingsSection } from '@/renderer/components/settings/settings-section';
+import { tuiHarnessesAtom } from '@/renderer/state/preferences';
 import {
 	formatChord,
 	formatShortcut,
@@ -234,7 +236,7 @@ function shortcutName(t: TFunction): Record<ShortcutId, string> {
  * a scope so related bindings stay adjacent.
  * @returns Shortcut ids keyed by the scope they are active in
  */
-function shortcutsByScope(): Record<Scope, ShortcutId[]> {
+function shortcutsByScope(tuiHarnesses: boolean): Record<Scope, ShortcutId[]> {
 	const grouped: Record<Scope, ShortcutId[]> = {
 		autocomplete: [],
 		composer: [],
@@ -246,6 +248,9 @@ function shortcutsByScope(): Record<Scope, ShortcutId[]> {
 	};
 
 	for (const id of Object.keys(SHORTCUTS) as ShortcutId[]) {
+		if (id === 'agents.open' && !tuiHarnesses) {
+			continue;
+		}
 		grouped[SHORTCUTS[id].scope].push(id);
 	}
 
@@ -255,13 +260,15 @@ function shortcutsByScope(): Record<Scope, ShortcutId[]> {
 /**
  * Read-only keyboard reference for every shortcut the app binds. Rebinding is
  * not offered: `SHORTCUTS` is a compile-time table shared with the main process
- * menu accelerators, so a custom binding needs a persisted keymap first.
+ * menu accelerators, so a custom binding needs a persisted keymap first. The
+ * harness chord is dropped while its Experimental switch is off — a reference
+ * listing a chord that opens nothing is worse than a shorter reference.
  */
 function ShortcutsSettings() {
 	const { t } = useTranslation();
 	const headings = scopeHeading(t);
 	const names = shortcutName(t);
-	const grouped = shortcutsByScope();
+	const grouped = shortcutsByScope(useAtomValue(tuiHarnessesAtom));
 
 	return (
 		<SettingsSection

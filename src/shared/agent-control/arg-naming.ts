@@ -73,7 +73,7 @@ export const CANONICAL_ARG_KEYS = {
 	summary: 'Markdown record of what a session covered.',
 	targets: 'Conversations an op acts on.',
 	teamId: 'Identifier of a tracker team.',
-	terminalId: 'Identifier of a dock terminal or harness.',
+	terminalId: 'Identifier of a terminal.',
 	thinkingLevel:
 		'Reasoning budget a conversation runs at, from the ladder its own model publishes. Chosen per child rather than inherited.',
 	timeoutMs: 'Upper bound on a blocking call, in milliseconds.',
