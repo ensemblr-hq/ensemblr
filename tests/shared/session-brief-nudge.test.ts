@@ -62,6 +62,9 @@ describe('buildSessionBriefNudge', () => {
 		expect(nudge).toContain('ensemblr_set_branch_name');
 		expect(nudge).toContain('octocat/bach');
 		expect(nudge).not.toContain('ensemblr_set_name`');
+		expect(nudge).toMatch(
+			/name for the work \(2-5 words, e\.g\. `Add dark mode`\) — it titles the workspace/,
+		);
 	});
 
 	test('never raises the branch tool when the user turned naming off', () => {
@@ -104,7 +107,9 @@ describe('buildSessionBriefNudge', () => {
 
 		expect(nudge).toContain('ensemblr_set_branch_name');
 		expect(nudge).toContain('leaves the title the user chose alone');
-		expect(nudge).not.toContain('renames the workspace and the git branch');
+		expect(nudge).not.toContain(
+			'titles the workspace with the name as you wrote it',
+		);
 	});
 
 	test('warns the branch bullet off renaming the branch with git', () => {
@@ -290,8 +295,14 @@ describe('buildSessionBriefNudge in Plan Mode', () => {
 
 		expect(nudge).toContain('ensemblr_set_branch_name');
 		expect(nudge).toContain('that was a guess');
-		expect(nudge).toContain('describes the work better');
 		expect(nudge).not.toContain('still has its generated placeholder name');
+		// `branchBullet` grafts this clause straight onto the end of the shared
+		// call sentence, so that sentence has to end on the noun naming the
+		// argument. Asserting the junction rather than the clause alone is what
+		// catches a reworded `BRANCH_CALL` ending on a subordinate clause.
+		expect(nudge).toMatch(
+			/name for the work \(2-5 words, e\.g\. `Add dark mode`\) that describes the work better — it titles the workspace/,
+		);
 	});
 
 	// `provisional` and `namesWorkspace` move independently: a workspace the user
@@ -313,7 +324,9 @@ describe('buildSessionBriefNudge in Plan Mode', () => {
 
 		expect(nudge).toContain('that was a guess');
 		expect(nudge).toContain('leaves the title the user chose alone');
-		expect(nudge).not.toContain('renames the workspace and the git branch');
+		expect(nudge).not.toContain(
+			'titles the workspace with the name as you wrote it',
+		);
 	});
 
 	test('keeps the git warning on the provisional branch bullet', () => {

@@ -117,20 +117,27 @@ const PLAN_MODE_BRANCH_TIMING =
 const BRANCH_TAIL =
 	'never reach for `git branch -m` instead, which renames the branch behind the app.';
 
-/** How to name a branch, shared by all four wordings. */
+/**
+ * How to name a branch, shared by all four wordings. It has to end on the noun
+ * phrase naming the argument, because {@link branchBullet} grafts a relative
+ * clause straight onto it — a trailing subordinate clause here reads as
+ * "…the way they are spelled that describes the work better".
+ */
 const BRANCH_CALL =
-	'Call `ensemblr_set_branch_name` once with a kebab-case slug naming the work (2-5 words, e.g. `add-dark-mode`)';
+	'Write the name the way you would write it to a person, capitalizing terms the way they are actually spelled, and call `ensemblr_set_branch_name` once with a short readable name for the work (2-5 words, e.g. `Add dark mode`)';
 
 /**
  * Describes what the naming call will actually move, which turns on whether the
- * workspace still answers to a name the app may replace.
+ * workspace still answers to a name the app may replace. It also owns how each
+ * surface renders the one argument, because a workspace the user has titled
+ * takes nothing from it at all.
  * @param namesWorkspace - Whether naming the branch also retitles the workspace.
  * @returns The clause completing the branch bullet.
  */
 function branchCallEffect(namesWorkspace: boolean): string {
 	return namesWorkspace
-		? 'it renames the workspace and the git branch together and keeps any `prefix/` segment.'
-		: 'it moves the branch, keeps any `prefix/` segment, and leaves the title the user chose alone.';
+		? 'it titles the workspace with the name as you wrote it, moves the git branch onto the slugged form, and keeps any `prefix/` segment.'
+		: 'it moves the git branch onto the slugged form, keeps any `prefix/` segment, and leaves the title the user chose alone.';
 }
 
 /**

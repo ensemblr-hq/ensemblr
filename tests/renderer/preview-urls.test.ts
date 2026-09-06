@@ -52,6 +52,37 @@ test('resolvePreviewUrlOptions interpolates port and workspace name', () => {
 	).toEqual([{ name: 'Web', url: 'https://alpha.test:5173' }]);
 });
 
+// Agent naming writes a readable workspace name rather than the branch slug it
+// used to, so a spaced name is now the common case and a raw substitution would
+// emit an invalid URL.
+test('resolvePreviewUrlOptions percent-encodes a spaced workspace name', () => {
+	expect(
+		resolvePreviewUrlOptions({
+			configured: [
+				{ name: 'Web', url: 'https://preview.test/$ENSEMBLR_WORKSPACE_NAME' },
+			],
+			detectedUrl: null,
+			port: null,
+			workspaceName: 'Add dark mode',
+		}),
+	).toEqual([{ name: 'Web', url: 'https://preview.test/Add%20dark%20mode' }]);
+});
+
+// Everything else a workspace name may carry is already URL-safe, so encoding
+// must leave a name that worked before byte-identical.
+test('resolvePreviewUrlOptions leaves a slug-shaped workspace name untouched', () => {
+	expect(
+		resolvePreviewUrlOptions({
+			configured: [
+				{ name: 'Web', url: 'https://$ENSEMBLR_WORKSPACE_NAME.test' },
+			],
+			detectedUrl: null,
+			port: null,
+			workspaceName: 'add-dark_mode.2',
+		}),
+	).toEqual([{ name: 'Web', url: 'https://add-dark_mode.2.test' }]);
+});
+
 test('resolvePreviewUrlOptions leaves the port token when the port is unknown', () => {
 	expect(
 		resolvePreviewUrlOptions({

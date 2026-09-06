@@ -82,7 +82,7 @@ describe('createProvisionalWorkspaceNaming', () => {
 
 		expect(renameWorkspace).toHaveBeenCalledWith({
 			branchName: 'octocat/add-dark-mode',
-			name: 'add-dark-mode',
+			name: 'Add dark mode',
 			provisional: true,
 			requirePlaceholderName: true,
 			workspaceId: 'ws-1',

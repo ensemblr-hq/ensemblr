@@ -54,7 +54,7 @@ describe('applyBranchSlug', () => {
 
 		expect(renameWorkspace).toHaveBeenCalledWith({
 			branchName: 'octocat/add-dark-mode',
-			name: 'add-dark-mode',
+			name: 'Add Dark Mode',
 			provisional: false,
 			requirePlaceholderName: true,
 			workspaceId: 'ws-1',
@@ -64,6 +64,32 @@ describe('applyBranchSlug', () => {
 			branchName: 'octocat/add-dark-mode',
 			name: 'add-dark-mode',
 		});
+	});
+
+	// The workspace used to be titled with its own branch name minus the
+	// `prefix/`, so the board read `add-dark-mode` over `octocat/add-dark-mode`.
+	test('titles the workspace readably while the branch takes the slug', async () => {
+		selectWorkspace.mockReturnValue(workspaceRow());
+		const renameWorkspace = vi
+			.fn()
+			.mockResolvedValue(
+				renameResult('Fix IPC handler', 'octocat/fix-ipc-handler'),
+			);
+
+		await applyBranchSlug({
+			database,
+			name: 'fix-ipc-handler',
+			namingEnabled: true,
+			renameWorkspace,
+			workspaceId: 'ws-1',
+		});
+
+		expect(renameWorkspace).toHaveBeenCalledWith(
+			expect.objectContaining({
+				branchName: 'octocat/fix-ipc-handler',
+				name: 'Fix IPC handler',
+			}),
+		);
 	});
 
 	test('reports an already-named workspace as settled without renaming it', async () => {
@@ -384,7 +410,7 @@ describe('applyBranchSlug: a workspace the user has already titled', () => {
 
 		expect(renameWorkspace).toHaveBeenCalledWith({
 			branchName: 'octocat/add-dark-mode',
-			name: 'add-dark-mode',
+			name: 'Add dark mode',
 			provisional: false,
 			requirePlaceholderName: true,
 			workspaceId: 'ws-1',
@@ -412,7 +438,7 @@ describe('applyBranchSlug: a workspace the user has already titled', () => {
 
 		expect(renameWorkspace).toHaveBeenCalledWith({
 			branchName: 'octocat/add-dark-mode',
-			name: 'add-dark-mode',
+			name: 'Add dark mode',
 			provisional: true,
 			requirePlaceholderName: true,
 			workspaceId: 'ws-1',
@@ -505,7 +531,7 @@ describe('applyBranchSlug: a workspace the user has already titled', () => {
 
 		expect(renameWorkspace).toHaveBeenCalledWith({
 			branchName: 'octocat/theme-switcher',
-			name: 'theme-switcher',
+			name: 'Theme switcher',
 			provisional: false,
 			requirePlaceholderName: true,
 			workspaceId: 'ws-1',

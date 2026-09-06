@@ -39,6 +39,21 @@ export function configuredPreviewUrls(
  * Substitutes the `$ENSEMBLR_PORT` and `$ENSEMBLR_WORKSPACE_NAME` template
  * fields a configured preview URL may reference. An unknown port leaves the
  * `$ENSEMBLR_PORT` token intact so the user can see it was not resolved.
+ *
+ * The workspace name is percent-encoded because this builds a URL and a
+ * workspace name may carry spaces — agent naming now writes readable names
+ * rather than the branch slug it used to, so a spaced name is the common case
+ * rather than the odd one. `encodeURIComponent` is deliberately not a slug:
+ * every other character a workspace name may hold (`A-Za-z0-9._-`) passes
+ * through untouched, so a template that produced a valid URL before produces a
+ * byte-identical one now, where slugging would lowercase a token sitting in a
+ * path.
+ *
+ * It does not rescue a token in the *host*: `https://a name.test` and
+ * `https://a%20name.test` are both rejected by the URL parser in
+ * `openExternalUrl`, so that template opens nothing either way. Repairing it
+ * needs a slug, which would regress the case-sensitive path templates that work
+ * today, so it is left as it was.
  * @param template - Configured preview URL template.
  * @param fields - The detected run port and the workspace name.
  * @returns The interpolated URL.
@@ -48,7 +63,10 @@ function interpolatePreviewUrl(
 	fields: { port: number | null; workspaceName: string },
 ): string {
 	return template
-		.replaceAll('$ENSEMBLR_WORKSPACE_NAME', fields.workspaceName)
+		.replaceAll(
+			'$ENSEMBLR_WORKSPACE_NAME',
+			encodeURIComponent(fields.workspaceName),
+		)
 		.replaceAll(
 			'$ENSEMBLR_PORT',
 			fields.port === null ? '$ENSEMBLR_PORT' : String(fields.port),

@@ -648,11 +648,23 @@ a multi-kilobyte re-emit and risk losing the record.
 Planning delays `ensemblr_set_branch_name` the longest — the agent reads,
 interviews, and writes a plan before it names anything — so the app names the
 workspace itself when a Plan Mode session opens or submits, from the user's
-prompt alone. `deriveProvisionalBranchSlug`
-(`src/main/agent-runtime/naming/provisional-branch-slug.ts`) trims the opening
+prompt alone. `deriveProvisionalWorkspaceName`
+(`src/main/agent-runtime/naming/provisional-workspace-name.ts`) trims the opening
 pleasantry and caps at five meaningful words; the queue in
 `provisional-workspace-naming.ts` applies it through the same
 `applyBranchSlug` gate the agent's own call passes through.
+
+What it yields is a naming *phrase* rather than a slug, because both callers of
+that gate hand it one input rendered twice: `sanitizeBranchSlug` gives the git
+branch its kebab slug, and `deriveWorkspaceDisplayName`
+(`src/main/agent-runtime/naming/workspace-display-name.ts`) gives the workspace
+the readable name with its words and spaces — the same split workspace
+*creation* has always made, so a workspace is never titled with its own branch
+name minus the `prefix/`. Both derivations start from `readNamingInput`, which
+is what keeps them reading the same text. Carrying the phrase rather than the
+slug is also what preserves the user's own capitalization: the `IPC` they typed
+reaches the sidebar as `IPC` rather than as `ipc` recovered from a lowercased
+slug.
 
 The rename is marked `provisional`, which writes `branchProvisional: true` and
 deliberately leaves `renamedAt` and `branchNamed` unwritten. Both
@@ -678,7 +690,7 @@ nothing in the transcript, so the guess stays silent.
 The queue is fire-and-forget and never fails a turn. It declines when the user
 has turned `git.renameWorkspaceOnBranch` off, when the branch was adopted rather
 than cut, when somebody has already named the workspace, and when the prompt
-yields no usable slug.
+yields no usable words.
 
 ### Reading a conversation
 
