@@ -219,6 +219,24 @@ export type QueuedFollowUpSource = 'chore' | 'user';
 export type FollowUpQueueHoldReason = 'send-failed' | 'turn-stopped';
 
 /**
+ * A paused follow-up queue: why it stopped, and which messages the pause is
+ * actually about.
+ *
+ * A stop names the entries it parked in `entryIds` and covers nothing else. A
+ * message queued afterwards was typed with the interruption already on screen,
+ * so it is fresh intent rather than something to protect the user from, and a
+ * pause that outlived the messages it was guarding is what made every later
+ * queue need the resume button pressed by hand.
+ *
+ * `send-failed` names no entries because it is not about any: a session that
+ * would not take the last message has no more reason to take the next one, so
+ * the pause covers whatever the queue holds until the user says otherwise.
+ */
+export type FollowUpQueueHold =
+	| { entryIds: readonly string[]; reason: 'turn-stopped' }
+	| { reason: 'send-failed' };
+
+/**
  * One message waiting to go to the agent once the current turn ends.
  *
  * Carries the whole draft rather than a serialized prompt: attachment content is

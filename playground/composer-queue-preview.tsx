@@ -5,8 +5,9 @@ import { useCallback, useState } from 'react';
 import { ComposerPanel } from '@/renderer/components/workbench-shell/conversation-panel';
 import { FollowUpQueueList } from '@/renderer/components/workbench-shell/conversation-panel/composer/follow-up-queue-list';
 import {
+	createFollowUpQueueHold,
 	followUpQueueAtomFamily,
-	followUpQueueHoldReasonAtomFamily,
+	followUpQueueHoldAtomFamily,
 	moveFollowUp,
 	removeFollowUp,
 	reorderFollowUps,
@@ -157,18 +158,44 @@ export function ComposerQueueScene() {
 
 	const chatTabId = 'playground-composer-queue-live';
 
-	const seed = useCallback(
-		(count: number, entryShape: 'long' | 'short') => {
+	/**
+	 * Pauses the live queue over whatever it currently holds. A stop is recorded
+	 * against the entries it parks, so the pause has to be rebuilt whenever the
+	 * scene reseeds — otherwise it names entries that no longer exist and the
+	 * preview quietly renders a draining queue under a paused control.
+	 */
+	const applyPause = useCallback(
+		(reason: FollowUpQueueHoldReason | null) => {
 			store.set(
-				followUpQueueAtomFamily(chatTabId),
-				buildQueueEntries(count, entryShape),
+				followUpQueueHoldAtomFamily(chatTabId),
+				reason === null
+					? null
+					: createFollowUpQueueHold(
+							reason,
+							store.get(followUpQueueAtomFamily(chatTabId)),
+						),
 			);
 		},
 		[store],
 	);
 
+	const seed = useCallback(
+		(
+			count: number,
+			entryShape: 'long' | 'short',
+			reason: FollowUpQueueHoldReason | null,
+		) => {
+			store.set(
+				followUpQueueAtomFamily(chatTabId),
+				buildQueueEntries(count, entryShape),
+			);
+			applyPause(reason);
+		},
+		[applyPause, store],
+	);
+
 	useState(() => {
-		seed(depth, shape);
+		seed(depth, shape, pauseReason);
 		store.set(followUpBehaviorAtom, behavior);
 	});
 
@@ -184,28 +211,28 @@ export function ComposerQueueScene() {
 	const setDepth = useCallback(
 		(next: number) => {
 			setDepthState(next);
-			seed(next, shape);
+			seed(next, shape, pauseReason);
 			setLastAction(`queue depth → ${next}`);
 		},
-		[seed, shape],
+		[pauseReason, seed, shape],
 	);
 
 	const setShape = useCallback(
 		(next: 'long' | 'short') => {
 			setShapeState(next);
-			seed(depth, next);
+			seed(depth, next, pauseReason);
 			setLastAction(`entry shape → ${next}`);
 		},
-		[depth, seed],
+		[depth, pauseReason, seed],
 	);
 
 	const setPauseReason = useCallback(
 		(next: FollowUpQueueHoldReason | null) => {
 			setPauseReasonState(next);
-			store.set(followUpQueueHoldReasonAtomFamily(chatTabId), next);
+			applyPause(next);
 			setLastAction(next ? `queue paused — ${next}` : 'queue resumed');
 		},
-		[store],
+		[applyPause],
 	);
 
 	const composer = useComposerStub({
