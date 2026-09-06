@@ -1,4 +1,5 @@
 export { resolveChatRouteRepair } from './active-chat-route-repair';
+export { useWorkspaceAgentRoleResolver } from './agent-role-resolver';
 export type {
 	BoardCardSource,
 	BoardFilters,

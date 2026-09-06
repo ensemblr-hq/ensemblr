@@ -30,6 +30,7 @@ import {
 import { ToolCollapsible } from './tool-collapsible';
 import { ToolBody } from './tool-collapsible/tool-body';
 import { ToolCommandChip, ToolFileBadge } from './tool-collapsible/tool-chips';
+import { useAgentRoleResolver } from './workbench-shell/conversation-panel/agent-role-context';
 import {
 	useFilePreviewOpener,
 	useWorkspacePathResolver,
@@ -42,10 +43,11 @@ import {
 export function ChatToolCall({ part }: { part: DynamicToolUIPart }) {
 	const { i18n } = useTranslation();
 	const surface = useTimelineSurface();
+	const resolveAgentRole = useAgentRoleResolver();
 	// biome-ignore lint/correctness/useExhaustiveDependencies: the presenter translates through the i18n singleton, so the language is a real input Biome cannot see.
 	const presentation = useMemo(
-		() => presentToolCall(part, surface),
-		[part, surface, i18n.language],
+		() => presentToolCall(part, surface, resolveAgentRole),
+		[part, resolveAgentRole, surface, i18n.language],
 	);
 	return <ToolRow presentation={presentation} />;
 }

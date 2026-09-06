@@ -215,7 +215,8 @@ export const TOOL_DEFS: readonly McpToolDef[] = [
 	{
 		name: 'ensemblr_send_follow_up',
 		op: 'sendFollowUp',
-		description: 'Send a follow-up prompt into an existing Pi conversation.',
+		description:
+			'Send a follow-up prompt into a conversation that is already running, whichever runtime it is on — not necessarily a child you spawned. Pass the `agentSessionId` that opening the conversation returned, not your own.',
 		shape: {
 			agentSessionId: z.string(),
 			prompt: z.string(),
@@ -552,21 +553,22 @@ export const TOOL_DEFS: readonly McpToolDef[] = [
 	{
 		name: 'ensemblr_get_conversation_status',
 		op: 'getConversationStatus',
-		description: 'Get the status of a Pi conversation by session id.',
+		description:
+			'Get the status of a conversation by session id, whichever runtime it is on.',
 		shape: { agentSessionId: z.string() },
 	},
 	{
 		name: 'ensemblr_get_last_message',
 		op: 'getLastMessage',
 		description:
-			"Get a Pi conversation's report: every assistant message of its newest answered turn, joined in the order it was written. Persisted, so it survives the conversation closing and an app restart.",
+			"Get a conversation's report, whichever runtime it is on: every assistant message of its newest answered turn, joined in the order it was written. Persisted, so it survives the conversation closing and an app restart.",
 		shape: { agentSessionId: z.string() },
 	},
 	{
 		name: 'ensemblr_read_conversation',
 		op: 'readConversation',
 		description:
-			'Read what a Pi conversation actually did — its prompts, its answers, and every tool call with its arguments and result — rather than only the report ensemblr_get_last_message hands back. This is how you audit a sub-agent: confirm it ran what it claims to have run before you act on its findings. Call it with stat=true FIRST: that returns the entry count, the turn count, and the ordinal range with no content, so you know how much there is before you read it. Then page forward with fromOrdinal, resuming from the nextOrdinal each page returns, or pass ordinal to read a single entry whole — stat, ordinal, and fromOrdinal are alternatives, not a combination. Long fields are cut and marked with the ordinal that reads them in full.',
+			'Read what a conversation actually did, whichever runtime it is on — its prompts, its answers, and every tool call with its arguments and result — rather than only the report ensemblr_get_last_message hands back. This is how you audit an agent whose report you are about to act on, child or not: confirm it ran what it claims to have run. Call it with stat=true FIRST: that returns the entry count, the turn count, and the ordinal range with no content, so you know how much there is before you read it. Then page forward with fromOrdinal, resuming from the nextOrdinal each page returns, or pass ordinal to read a single entry whole — stat, ordinal, and fromOrdinal are alternatives, not a combination. Long fields are cut and marked with the ordinal that reads them in full.',
 		shape: {
 			agentSessionId: z.string(),
 			stat: z.boolean().optional(),
@@ -589,7 +591,7 @@ export const TOOL_DEFS: readonly McpToolDef[] = [
 		name: 'ensemblr_wait_for_agents',
 		op: 'waitForAgents',
 		description:
-			'Block until delegated Pi sub-agents finish or need a decision, then return each settled one\'s status and report (its whole final turn), plus `pending` naming the children still running so you can wait on exactly those next. Prefer this over polling get_conversation_status. targets defaults to every child you spawned; mode defaults to "first", which returns on the first to settle — pass "all" to wait for every target. A need_decision/blocked signal wakes the wait whatever the mode. reports: "brief" returns each report\'s opening plus a pointer to ensemblr_get_last_message for the rest, instead of every child\'s whole turn at once — worth it on a wide fan-out, where reading four full reports to use one line of each is what makes delegation cost you more context than doing the work inline.',
+			'Block until the agents you are waiting on finish or need a decision, then return each settled one\'s status and report (its whole final turn), plus `pending` naming the ones still running so you can wait on exactly those next. Prefer this over polling get_conversation_status. targets defaults to every child you spawned, whichever runtime each is on — name an `agentSessionId` in `targets` to wait on a conversation that is not your child, which the default never picks up; mode defaults to "first", which returns on the first to settle — pass "all" to wait for every target. A need_decision/blocked signal wakes the wait whatever the mode. reports: "brief" returns each report\'s opening plus a pointer to ensemblr_get_last_message for the rest, instead of every child\'s whole turn at once — worth it on a wide fan-out, where reading four full reports to use one line of each is what makes delegation cost you more context than doing the work inline.',
 		shape: {
 			targets: z.array(z.string()).optional(),
 			mode: z.enum(['first', 'all']).optional(),

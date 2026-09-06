@@ -67,7 +67,7 @@ const ORCHESTRATOR_AWARENESS = (architecture: boolean): string =>
 	`You are running inside Ensemblr, a desktop coding-workspace app, and you can drive the app itself with the Ensemblr control tools (prefixed \`ensemblr_\`).
 
 What you can drive:
-- Conversations: open a chat tab and start a Pi sub-agent (\`ensemblr_start_conversation\`), steer one (\`ensemblr_send_follow_up\`), name your own tab (\`ensemblr_set_name\`), close a tab (\`ensemblr_close_tab\`).
+- Conversations: open a chat tab and start a sub-agent on your own runtime (\`ensemblr_start_conversation\`), steer one (\`ensemblr_send_follow_up\`, which also reaches a peer and the Review conversation), name your own tab (\`ensemblr_set_name\`), close a tab (\`ensemblr_close_tab\`).
 - Harnesses: launch Claude Code / Codex in a terminal (\`ensemblr_launch_harness\`).
 - Terminals: start/stop the setup script, a run script, or a spawn terminal (\`ensemblr_start_terminal\`/\`ensemblr_stop_terminal\`); type into one (\`ensemblr_write_terminal\`); read its output (\`ensemblr_read_terminal_output\`, by \`terminalId\` or by \`kind\`, cleaned of escape codes unless you ask for \`ansi\`). A repository configures its run scripts by name — a dev server, a playground, an unsigned build — so call \`ensemblr_list_run_scripts\` and pass the \`scriptName\` you want; starting a run script without one takes the repository's default, which is rarely the one you meant. Only one script of a kind runs at a time: starting a second is refused with \`conflict\`, and that refusal names the terminal already holding the slot, which \`restart: true\` replaces.
 - Focus & inspect: bring a tab/terminal or the Files/Changes/Checks panel forward (\`ensemblr_focus_tab\`/\`ensemblr_focus_dock_tab\`/\`ensemblr_focus_panel\`); list workspaces/tabs/terminals; read a conversation's status or last message; audit what a conversation actually did, tool calls included (\`ensemblr_read_conversation\`).
@@ -841,7 +841,7 @@ export default function ensemblrControl(pi: ExtensionAPI): void {
 	tool(
 		'ensemblr_send_follow_up',
 		'sendFollowUp',
-		'Send a follow-up prompt into an existing Pi conversation.',
+		'Send a follow-up prompt into a conversation that is already running, whichever runtime it is on — not necessarily a child you spawned. Pass the `agentSessionId` that opening the conversation returned, not your own.',
 		Type.Object({
 			agentSessionId: Type.String(),
 			prompt: Type.String(),
@@ -1066,19 +1066,19 @@ export default function ensemblrControl(pi: ExtensionAPI): void {
 	tool(
 		'ensemblr_get_conversation_status',
 		'getConversationStatus',
-		'Get the status of a Pi conversation by session id.',
+		'Get the status of a conversation by session id, whichever runtime it is on.',
 		Type.Object({ agentSessionId: Type.String() }),
 	);
 	tool(
 		'ensemblr_get_last_message',
 		'getLastMessage',
-		"Get a Pi conversation's report: every assistant message of its newest answered turn, joined in the order it was written. Persisted, so it survives the conversation closing and an app restart.",
+		"Get a conversation's report, whichever runtime it is on: every assistant message of its newest answered turn, joined in the order it was written. Persisted, so it survives the conversation closing and an app restart.",
 		Type.Object({ agentSessionId: Type.String() }),
 	);
 	tool(
 		'ensemblr_read_conversation',
 		'readConversation',
-		'Read what a Pi conversation actually did — its prompts, its answers, and every tool call with its arguments and result — rather than only the report ensemblr_get_last_message hands back. This is how you audit a sub-agent: confirm it ran what it claims to have run before you act on its findings. Call it with stat=true FIRST: that returns the entry count, the turn count, and the ordinal range with no content, so you know how much there is before you read it. Then page forward with fromOrdinal, resuming from the nextOrdinal each page returns, or pass ordinal to read a single entry whole — stat, ordinal, and fromOrdinal are alternatives, not a combination. Long fields are cut and marked with the ordinal that reads them in full.',
+		'Read what a conversation actually did, whichever runtime it is on — its prompts, its answers, and every tool call with its arguments and result — rather than only the report ensemblr_get_last_message hands back. This is how you audit an agent whose report you are about to act on, child or not: confirm it ran what it claims to have run. Call it with stat=true FIRST: that returns the entry count, the turn count, and the ordinal range with no content, so you know how much there is before you read it. Then page forward with fromOrdinal, resuming from the nextOrdinal each page returns, or pass ordinal to read a single entry whole — stat, ordinal, and fromOrdinal are alternatives, not a combination. Long fields are cut and marked with the ordinal that reads them in full.',
 		Type.Object({
 			agentSessionId: Type.String(),
 			stat: Type.Optional(
@@ -1340,7 +1340,7 @@ export default function ensemblrControl(pi: ExtensionAPI): void {
 	tool(
 		'ensemblr_wait_for_agents',
 		'waitForAgents',
-		'Block until delegated Pi sub-agents finish or need a decision, then return each settled one\'s status and report (its whole final turn), plus `pending` naming the children still running so you can wait on exactly those next. Prefer this over polling get_conversation_status. targets defaults to every child you spawned; mode defaults to "first", which returns on the first to settle — pass "all" to wait for every target. A need_decision/blocked signal wakes the wait whatever the mode. reports: "brief" returns each report\'s opening plus a pointer to ensemblr_get_last_message for the rest, instead of every child\'s whole turn at once — worth it on a wide fan-out, where reading four full reports to use one line of each is what makes delegation cost you more context than doing the work inline.',
+		'Block until the agents you are waiting on finish or need a decision, then return each settled one\'s status and report (its whole final turn), plus `pending` naming the ones still running so you can wait on exactly those next. Prefer this over polling get_conversation_status. targets defaults to every child you spawned, whichever runtime each is on — name an `agentSessionId` in `targets` to wait on a conversation that is not your child, which the default never picks up; mode defaults to "first", which returns on the first to settle — pass "all" to wait for every target. A need_decision/blocked signal wakes the wait whatever the mode. reports: "brief" returns each report\'s opening plus a pointer to ensemblr_get_last_message for the rest, instead of every child\'s whole turn at once — worth it on a wide fan-out, where reading four full reports to use one line of each is what makes delegation cost you more context than doing the work inline.',
 		Type.Object({
 			targets: Type.Optional(Type.Array(Type.String())),
 			mode: Type.Optional(

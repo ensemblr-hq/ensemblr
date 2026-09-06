@@ -2,6 +2,7 @@ import type { DynamicToolUIPart } from 'ai';
 import { i18n } from '@/renderer/lib/i18n';
 import type { PiCustomMessageData } from '@/renderer/types/agent-timeline';
 import type {
+	AgentRoleResolver,
 	TimelineSurface,
 	ToolGlyph,
 	ToolPresentation,
@@ -89,11 +90,15 @@ function failureTextOf(part: DynamicToolUIPart): string | null {
  * @param part - The tool part to project
  * @param surface - Which transcript the row is rendered in, which decides what
  * the app's own control tools are called there
+ * @param resolveRole - Reads back what a conversation a control call targeted
+ * is, so a row acting on a peer or the Review conversation does not name it a
+ * child; null on a surface that cannot look one up
  * @returns The row's icon, title, badge, preview, and body
  */
 export function presentToolCall(
 	part: DynamicToolUIPart,
 	surface: TimelineSurface = 'workspace',
+	resolveRole: AgentRoleResolver | null = null,
 ): ToolPresentation {
 	const failureText = failureTextOf(part);
 	if (failureText !== null) {
@@ -115,7 +120,7 @@ export function presentToolCall(
 	const glyph = restingGlyph(part);
 	const isRunning = RUNNING_STATES.has(part.state);
 	const projected = presenterFor(part.toolName)(part);
-	const controlLabel = ensemblrToolLabel(part, isRunning, surface);
+	const controlLabel = ensemblrToolLabel(part, isRunning, surface, resolveRole);
 	const presentation = {
 		...projected,
 		badge: controlLabel?.badge ?? projected.badge,

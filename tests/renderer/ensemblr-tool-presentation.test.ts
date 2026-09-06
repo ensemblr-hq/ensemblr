@@ -12,7 +12,11 @@ import {
 	glyphForToolCall,
 	presentToolCall,
 } from '../../src/renderer/lib/agent-timeline/tool-presentation';
-import type { TimelineSurface } from '../../src/renderer/types/tool-presentation';
+import type {
+	AgentRoleResolver,
+	TimelineAgentRole,
+	TimelineSurface,
+} from '../../src/renderer/types/tool-presentation';
 
 const toolCall = (
 	toolName: string,
@@ -675,6 +679,145 @@ describe('ensemblrToolLabel', () => {
 	test('returns null for a tool that is not a control tool', () => {
 		expect(labelFor('bash', { command: 'ls' }, false)).toBeNull();
 		expect(ensemblrToolGlyph('bash')).toBeNull();
+	});
+});
+
+// A workspace agent steers a child it owns, a peer beside it, and the Review
+// conversation with one op, and the app opens the last two as roots carrying no
+// sub-agent marker. Naming all three a sub-agent is what this resolves — and the
+// majority case, a genuine child, must keep reading exactly as it did, or an
+// orchestrator auditing its own transcript can no longer tell which rows acted
+// on something it has to collect.
+describe('ensemblrToolLabel against the target role', () => {
+	const ROLES: Record<string, TimelineAgentRole> = {
+		'session-child': 'subagent',
+		'session-peer': 'orchestrator',
+		'session-review': 'orchestrator',
+	};
+	const resolveRole: AgentRoleResolver = (id) => ROLES[id] ?? null;
+
+	const titleFor = (
+		toolName: string,
+		input: Record<string, unknown>,
+		isRunning = false,
+	) =>
+		ensemblrToolLabel(
+			toolCall(toolName, input),
+			isRunning,
+			'workspace',
+			resolveRole,
+		)?.title;
+
+	test.each([
+		['ensemblr_get_conversation_status', 'Checked a sub-agent'],
+		['ensemblr_get_last_message', "Read a sub-agent's report"],
+		['ensemblr_read_conversation', "Read a sub-agent's transcript"],
+		['ensemblr_send_follow_up', 'Steered a sub-agent'],
+	])('keeps the sub-agent wording for %s on a child', (toolName, expected) => {
+		expect(titleFor(toolName, { agentSessionId: 'session-child' })).toBe(
+			expected,
+		);
+	});
+
+	test.each([
+		['ensemblr_get_conversation_status', 'Checked an orchestrator'],
+		['ensemblr_get_last_message', "Read an orchestrator's report"],
+		['ensemblr_read_conversation', "Read an orchestrator's transcript"],
+		['ensemblr_send_follow_up', 'Steered an orchestrator'],
+	])('names a root orchestrator in the %s row', (toolName, expected) => {
+		expect(titleFor(toolName, { agentSessionId: 'session-review' })).toBe(
+			expected,
+		);
+	});
+
+	// Neutral is the fallback for ignorance, not a blanket replacement: the app no
+	// longer holds this conversation, so neither noun can be claimed.
+	test.each([
+		['ensemblr_get_conversation_status', 'Checked a chat'],
+		['ensemblr_get_last_message', "Read a chat's report"],
+		['ensemblr_read_conversation', "Read a chat's transcript"],
+		['ensemblr_send_follow_up', 'Steered a chat'],
+	])(
+		'falls to the neutral noun when %s resolves nothing',
+		(toolName, title) => {
+			expect(titleFor(toolName, { agentSessionId: 'session-gone' })).toBe(
+				title,
+			);
+		},
+	);
+
+	test('reads a steered orchestrator in the present participle', () => {
+		expect(
+			titleFor(
+				'ensemblr_send_follow_up',
+				{ agentSessionId: 'session-peer' },
+				true,
+			),
+		).toBe('Steering an orchestrator');
+	});
+
+	// A spawn carries the answer in its own arguments — `peer: true` is what made
+	// the thing a root — so its row needs no lookup and resolves for certain.
+	test.each([
+		[{ prompt: 'go' }, 'Started a sub-agent'],
+		[{ peer: false, prompt: 'go' }, 'Started a sub-agent'],
+		[{ peer: true, prompt: 'go' }, 'Started an orchestrator'],
+	])('names what a spawn opened from its own arguments', (input, title) => {
+		expect(titleFor('ensemblr_start_conversation', input)).toBe(title);
+	});
+
+	// Omitting `targets` means every child the caller spawned, and those are
+	// children by construction — so the plural the row has always carried is
+	// right, and no lookup runs.
+	test('waits on sub-agents when the call names no targets', () => {
+		expect(titleFor('ensemblr_wait_for_agents', {})).toBe(
+			'Waited for sub-agents',
+		);
+		expect(titleFor('ensemblr_wait_for_agents', { mode: 'all' }, true)).toBe(
+			'Waiting for sub-agents',
+		);
+	});
+
+	test.each([
+		[['session-child'], 'Waited for sub-agents'],
+		[['session-child', 'session-child'], 'Waited for sub-agents'],
+		[['session-review'], 'Waited for orchestrators'],
+		[['session-peer', 'session-review'], 'Waited for orchestrators'],
+		[['session-child', 'session-review'], 'Waited for the chats'],
+		[['session-gone'], 'Waited for the chats'],
+	])('resolves every named target before naming the set', (targets, title) => {
+		expect(titleFor('ensemblr_wait_for_agents', { targets })).toBe(title);
+	});
+
+	// Without a resolver the surface has not looked, which is a different answer
+	// from having looked and found nothing: the sub-agent wording is right for the
+	// overwhelming majority of these calls, so it is what an unequipped surface
+	// keeps rather than neutralizing every row.
+	test('keeps the sub-agent wording when no resolver is supplied', () => {
+		expect(
+			ensemblrToolLabel(
+				toolCall('ensemblr_send_follow_up', {
+					agentSessionId: 'session-review',
+				}),
+				false,
+				'workspace',
+			)?.title,
+		).toBe('Steered a sub-agent');
+	});
+
+	// The Concierge spawns nothing but roots, so its own vocabulary already names
+	// every target a chat and a lookup could only disagree with it.
+	test('leaves the Concierge vocabulary untouched', () => {
+		expect(
+			ensemblrToolLabel(
+				toolCall('ensemblr_send_follow_up', {
+					agentSessionId: 'session-child',
+				}),
+				false,
+				'concierge',
+				resolveRole,
+			)?.title,
+		).toBe('Steered a chat');
 	});
 });
 
