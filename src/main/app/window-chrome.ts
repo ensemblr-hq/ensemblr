@@ -1,8 +1,10 @@
-import type { BrowserWindowConstructorOptions } from 'electron';
+import type { BrowserWindow, BrowserWindowConstructorOptions } from 'electron';
 
+import { IPC_CHANNELS } from '../../shared/ipc/channels.ts';
 import {
 	resolveWindowChrome,
 	type TitleBarPreference,
+	type WindowChromeSnapshot,
 	type WindowControlsOwner,
 } from '../../shared/window-chrome.ts';
 
@@ -49,4 +51,46 @@ export function resolveWindowChromeOptions(
 	return {
 		...OPTIONS_BY_CONTROLS[resolveWindowChrome(platform, titleBar).controls],
 	};
+}
+
+/**
+ * Keeps the live window's chrome current across full-screen transitions and
+ * pushes each new snapshot to the renderer.
+ *
+ * Everything else about the chrome is fixed when the window is constructed, but
+ * full screen is not: macOS slides its traffic lights off the window there, so
+ * the leading inset reserved for them has to go with them and come back on the
+ * way out. `onResolved` hands the caller the same snapshot, so the value the
+ * bootstrap channel serves a reload cannot fall behind the one already pushed.
+ * @param options - The window to follow, the user's title-bar preference, and where to record each resolved snapshot.
+ */
+export function trackWindowChrome({
+	onResolved,
+	titleBar,
+	window,
+}: {
+	onResolved: (chrome: WindowChromeSnapshot) => void;
+	titleBar: TitleBarPreference;
+	window: BrowserWindow;
+}): void {
+	const publish = (): void => {
+		if (window.isDestroyed() || window.webContents.isDestroyed()) {
+			return;
+		}
+
+		const chrome = resolveWindowChrome(
+			process.platform,
+			titleBar,
+			window.isFullScreen(),
+		);
+		onResolved(chrome);
+		window.webContents.send(IPC_CHANNELS.windowChromeChanged, chrome);
+	};
+
+	window.on('enter-full-screen', publish);
+	window.on('leave-full-screen', publish);
+	// Preload seeds the bootstrap snapshot best-effort and exposes nothing if the
+	// sync call throws, which would leave that renderer on its platform guess for
+	// the page's lifetime. Republishing on load is what it recovers from.
+	window.webContents.on('did-finish-load', publish);
 }

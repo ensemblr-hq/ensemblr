@@ -15,6 +15,7 @@ import type {
 	MenuBarInvokeRequest,
 } from '../../menu-bar.ts';
 import type { MenuCommandBroadcast, MenuContext } from '../../menu-commands.ts';
+import type { WindowChromeSnapshot } from '../../window-chrome.ts';
 import type {
 	ActiveChatContext,
 	ChatTurnFinishedBroadcast,
@@ -118,6 +119,14 @@ export interface ShellApi {
 	ensureWindowWidth: (minimumWidth: number) => Promise<void>;
 	/** Minimizes the BrowserWindow that issued the request. */
 	minimizeWindow: () => Promise<void>;
+	/**
+	 * Subscribes to the chrome the live window wears, which full screen changes
+	 * under the shell: macOS takes its traffic lights away there, so the leading
+	 * inset reserved for them has to go with them. Returns an unsubscribe function.
+	 */
+	onWindowChromeChanged: (
+		listener: (snapshot: WindowChromeSnapshot) => void,
+	) => () => void;
 	/**
 	 * Subscribes to the window's maximized state, so an app-drawn control shows
 	 * what the window actually is rather than what it was last clicked to be —

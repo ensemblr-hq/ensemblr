@@ -12,7 +12,9 @@ import { TOOLBAR_HEIGHT_CLASS } from '@/renderer/lib/workbench/shell-inset';
  *
  * macOS parks the traffic lights in that corner, so there the strip stays bare
  * rather than crowding them; everywhere else the corner is empty and the bar
- * reads as an unexplained gap above the navigation.
+ * reads as an unexplained gap above the navigation. Full screen takes the
+ * traffic lights away, which hands macOS the same empty corner and the same
+ * wordmark to fill it with.
  *
  * Not mounted at all where Ensemblr draws its own title bar: the wordmark is
  * already up there, which leaves a strip carrying nothing but the collapse

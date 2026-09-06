@@ -1,3 +1,4 @@
+import { useAtomValue } from 'jotai';
 import { GripVertical, Maximize2, Minimize2, RotateCcw, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
@@ -5,11 +6,9 @@ import { Button } from '@/renderer/components/ui/button';
 import { SidebarTrigger, useSidebar } from '@/renderer/components/ui/sidebar';
 import { conciergeSidebarEdgeLabel } from '@/renderer/lib/concierge';
 import { cn } from '@/renderer/lib/utils';
-import {
-	readWindowChrome,
-	readWindowChromeInsetsPx,
-} from '@/renderer/lib/window-chrome';
+import { windowChromeInsetsPx } from '@/renderer/lib/window-chrome';
 import { TOOLBAR_HEIGHT_CLASS } from '@/renderer/lib/workbench/shell-inset';
+import { windowChromeAtom } from '@/renderer/state/window-chrome';
 
 import { ConciergeMark } from './concierge-mark';
 
@@ -46,9 +45,9 @@ export function ConciergePanelHeader({
 	const { t } = useTranslation();
 	const { state: sidebarState } = useSidebar();
 	const sidebarIsCollapsed = sidebarState === 'collapsed';
-	const windowChrome = readWindowChrome();
+	const windowChrome = useAtomValue(windowChromeAtom);
 	const clearsLeadingChrome =
-		(insetLeft ?? 0) >= readWindowChromeInsetsPx().start;
+		(insetLeft ?? 0) >= windowChromeInsetsPx(windowChrome).start;
 	// Where Ensemblr draws the title bar the nav sidebar has no header strip, so
 	// a maximized panel covers the only trigger there is — open or collapsed.
 	const showsSidebarTrigger =

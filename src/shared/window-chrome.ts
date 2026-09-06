@@ -43,6 +43,12 @@ export interface WindowChromeSnapshot {
 	controls: WindowControlsOwner;
 	/** Whether Ensemblr draws minimize / maximize / close itself. */
 	drawsOwnControls: boolean;
+	/**
+	 * Whether the window is in the desktop's own full-screen mode. Unlike the
+	 * rest of this snapshot it changes while the window lives, which is why main
+	 * pushes a fresh snapshot on every transition rather than only at boot.
+	 */
+	fullScreen: boolean;
 	insets: WindowChromeInsets;
 	titleBar: TitleBarPreference;
 }
@@ -69,8 +75,8 @@ const INSETS_BY_CONTROLS: Record<WindowControlsOwner, WindowChromeInsets> = {
 };
 
 /**
- * Resolves the window chrome for a platform and the user's title-bar
- * preference.
+ * Resolves the window chrome for a platform, the user's title-bar preference,
+ * and whether the window is currently full-screen.
  *
  * macOS ignores the preference: the traffic lights are the system's to draw, and
  * a frameless macOS window would lose them along with full-screen and the window
@@ -78,21 +84,23 @@ const INSETS_BY_CONTROLS: Record<WindowControlsOwner, WindowChromeInsets> = {
  * a user whose compositor mishandles a frameless window needs a way back.
  * @param platform - The running platform.
  * @param titleBar - The user's title-bar preference.
+ * @param fullScreen - Whether the window is in the desktop's full-screen mode.
  * @returns Who draws the controls, and the insets the shell must leave.
  */
 export function resolveWindowChrome(
 	platform: NodeJS.Platform | string,
 	titleBar: TitleBarPreference,
+	fullScreen = false,
 ): WindowChromeSnapshot {
 	if (platform === 'darwin') {
-		return describeWindowChrome('system-inset', titleBar);
+		return describeWindowChrome('system-inset', titleBar, fullScreen);
 	}
 
 	if (platform === 'linux' && titleBar === 'custom') {
-		return describeWindowChrome('app', titleBar);
+		return describeWindowChrome('app', titleBar, fullScreen);
 	}
 
-	return describeWindowChrome('system-frame', titleBar);
+	return describeWindowChrome('system-frame', titleBar, fullScreen);
 }
 
 /**
@@ -100,18 +108,46 @@ export function resolveWindowChrome(
  * insets are computed in one place and cannot drift apart.
  * @param controls - Who draws the window controls.
  * @param titleBar - The user's title-bar preference.
+ * @param fullScreen - Whether the window is in the desktop's full-screen mode.
  * @returns The snapshot both processes read.
  */
 function describeWindowChrome(
 	controls: WindowControlsOwner,
 	titleBar: TitleBarPreference,
+	fullScreen: boolean,
 ): WindowChromeSnapshot {
 	return {
 		controls,
 		drawsOwnControls: controls === 'app',
-		insets: { ...INSETS_BY_CONTROLS[controls] },
+		fullScreen,
+		insets: resolveInsets(controls, fullScreen),
 		titleBar,
 	};
+}
+
+/**
+ * The room the controls claim, less whatever full screen takes back.
+ *
+ * macOS slides the traffic lights off the window in full screen and reveals
+ * them on an overlay that covers content rather than displacing it, so the
+ * leading inset they earn would otherwise hold a gutter open around nothing.
+ * The title bar Ensemblr draws itself keeps its strip: there it is the window's
+ * only chrome, and full screen does not take it away.
+ * @param controls - Who draws the window controls.
+ * @param fullScreen - Whether the window is in the desktop's full-screen mode.
+ * @returns The insets the shell must leave, as a fresh object.
+ */
+function resolveInsets(
+	controls: WindowControlsOwner,
+	fullScreen: boolean,
+): WindowChromeInsets {
+	const claimed = INSETS_BY_CONTROLS[controls];
+
+	if (fullScreen && controls === 'system-inset') {
+		return { ...claimed, start: 0 };
+	}
+
+	return { ...claimed };
 }
 
 /**

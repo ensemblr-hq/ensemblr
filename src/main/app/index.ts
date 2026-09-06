@@ -10,7 +10,7 @@ export { createQuitGuard } from './quit-guard';
 export { resolveUserDataDirectory } from './user-data-location';
 export { resolveWindowBackgroundColor } from './window-background';
 export type { WindowChromeOptions } from './window-chrome';
-export { resolveWindowChromeOptions } from './window-chrome';
+export { resolveWindowChromeOptions, trackWindowChrome } from './window-chrome';
 export type { MainWindowStateStore } from './window-state';
 export {
 	createMainWindowStateStore,

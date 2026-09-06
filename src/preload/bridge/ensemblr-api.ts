@@ -40,6 +40,7 @@ import type { UpdateStatusChangedBroadcast } from '../../shared/ipc/contracts/up
 import type { WorkspaceFilesChangedBroadcast } from '../../shared/ipc/contracts/workspace-files';
 import type { MenuBarDescriptor } from '../../shared/menu-bar';
 import type { MenuCommandBroadcast } from '../../shared/menu-commands';
+import type { WindowChromeSnapshot } from '../../shared/window-chrome';
 
 /**
  * Keys of {@link EnsemblrApi} that represent typed `ipcRenderer.invoke`
@@ -69,6 +70,7 @@ type InvokeKey = Exclude<
 	| 'onTerminalOutput'
 	| 'onTextContextMenu'
 	| 'onUpdateStatusChanged'
+	| 'onWindowChromeChanged'
 	| 'onWindowMaximizedChanged'
 	| 'onWorkspaceFilesChanged'
 >;
@@ -158,6 +160,11 @@ export function createEnsemblrApi(): EnsemblrApi {
 		minimizeWindow: () => invoke('minimizeWindow'),
 		toggleMaximizeWindow: () => invoke('toggleMaximizeWindow'),
 		relaunchApp: () => invoke('relaunchApp'),
+		onWindowChromeChanged: (listener) =>
+			subscribe<WindowChromeSnapshot>(
+				IPC_CHANNELS.windowChromeChanged,
+				listener,
+			),
 		onWindowMaximizedChanged: (listener) =>
 			subscribe<WindowMaximizedBroadcast>(
 				IPC_CHANNELS.windowMaximizedChanged,
